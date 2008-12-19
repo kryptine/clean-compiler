@@ -1298,7 +1298,20 @@ void GenerateCodeForConstructorsAndRecords (Symbol symbols)
 					ConstructorList alt;
 
 					for_l (alt,def->sdef_type->type_constructors,cl_next)
-						GenerateConstructorDescriptorAndFunction (alt);
+						if (alt->cl_constructor->type_node_symbol->symb_def->sdef_arity!=0)
+							break;
+					
+					if (alt==NULL){
+						int constructor_n;
+						
+						constructor_n=0;
+						for_l (alt,def->sdef_type->type_constructors,cl_next){
+							GenConstructor0DescriptorAndExport (alt->cl_constructor->type_node_symbol->symb_def,constructor_n);
+							++constructor_n;
+						}
+					} else
+						for_l (alt,def->sdef_type->type_constructors,cl_next)
+							GenerateConstructorDescriptorAndFunction (alt);
 				} else if (def->sdef_kind==RECORDTYPE){
 					FieldList fields;
 					int asize, bsize;
@@ -3231,6 +3244,21 @@ void set_local_reference_counts_and_add_free_node_ids (NodeP case_node,NodeIdLis
 }
 #endif
 
+static SymbDef sdef_of_function (NodeP node_p,int arity)
+{
+	if (node_p->node_kind==NormalNode && node_p->node_symbol->symb_kind==definition){
+		SymbDef sdef;
+
+		sdef=node_p->node_symbol->symb_def;
+		if ((sdef->sdef_kind==IMPRULE || sdef->sdef_kind==DEFRULE || sdef->sdef_kind==SYSRULE) &&
+			sdef->sdef_arity==arity && sdef->sdef_arfun==NoArrayFun)
+
+			return sdef;
+	}
+	
+	return NULL;
+}
+
 static int generate_code_for_switch_node (NodeP node,int asp,int bsp,struct esc *esc_p,StateP result_state_p,
 										  SavedNidStateS **save_states_p,AbNodeIdsP ab_node_ids_p)
 {
@@ -3312,6 +3340,9 @@ static int generate_code_for_switch_node (NodeP node,int asp,int bsp,struct esc 
 		struct node *case_node;
 
 		case_node=arg->arg_node;
+		
+		if (case_node->node_kind==OverloadedCaseNode)
+			case_node=case_node->node_node;
 		
 		node_id_ref_count_elem_h=&case_node->node_node_id_ref_counts;
 
@@ -3480,6 +3511,49 @@ static int generate_code_for_switch_node (NodeP node,int asp,int bsp,struct esc 
 							}
 							GenJmpTrue (&case_label);
 							break;
+						case integer_denot:
+						{
+							LabDef not_eq_z_label;
+
+							MakeLabel (&not_eq_z_label,"not_eq_z",new_not_eq_z_label_n,no_pref);
+							++new_not_eq_z_label_n;
+
+							if (IsSimpleState (node->node_state)){
+								GenPushRArgs (asp-a_index,1,1);
+
+								GenJmpNotEqZ (symbol->symb_val,&not_eq_z_label);
+
+								GenPopA (1);
+								GenPopB (1);				
+								GenJmp (&case_label);
+		
+								GenLabelDefinition (&not_eq_z_label);
+
+								GenPopA (1);
+								GenPopB (1);				
+							} else {
+								if (asp!=a_index)
+									GenPushA (asp-a_index);
+								if (bsp!=b_index)
+									GenPushB (bsp-b_index);
+								
+								GenJmpNotEqZ (symbol->symb_val,&not_eq_z_label);
+
+								if (asp!=a_index)
+									GenPopA (1);
+								if (bsp!=b_index)
+									GenPopB (1);				
+								GenJmp (&case_label);
+		
+								GenLabelDefinition (&not_eq_z_label);
+
+								if (asp!=a_index)
+									GenPopA (1);
+								if (bsp!=b_index)
+									GenPopB (1);				
+							}
+							break;
+						}
 						default:
 							if (symbol->symb_kind < Nr_Of_Predef_Types){
 								ObjectKind denot_type;
@@ -3512,6 +3586,179 @@ static int generate_code_for_switch_node (NodeP node,int asp,int bsp,struct esc 
 								error_in_function ("generate_code_for_switch_node");
 					}
 					
+					++NewLabelNr;
+					break;
+				}
+				
+				case OverloadedCaseNode:
+				{
+					CodeGenNodeIdsS code_gen_node_ids;
+					LabDef case_label;
+					NodeP from_node_p,equal_node_p;
+					SymbDef from_sdef,equal_sdef;
+					StateS demanded_from_result_state;
+
+					symbol=case_node->node_node->node_symbol;
+					MakeLabel (&case_label,case_symb,NewLabelNr,no_pref);
+	
+					code_gen_node_ids.saved_nid_state_l=save_states_p;
+					code_gen_node_ids.free_node_ids=ab_node_ids_p->free_node_ids;
+					code_gen_node_ids.moved_node_ids_l=NULL;
+					code_gen_node_ids.a_node_ids=ab_node_ids_p->a_node_ids;
+					code_gen_node_ids.b_node_ids=ab_node_ids_p->b_node_ids;
+					code_gen_node_ids.doesnt_fail=0;					
+
+					equal_node_p=case_node->node_arguments->arg_node;
+					from_node_p=case_node->node_arguments->arg_next->arg_node;
+
+					equal_sdef = sdef_of_function (equal_node_p,2);
+					from_sdef = sdef_of_function (from_node_p,1);
+
+					if (equal_sdef==NULL)
+						demanded_from_result_state=LazyState;
+					else {
+						if (equal_sdef->sdef_kind==IMPRULE)
+							demanded_from_result_state=equal_sdef->sdef_rule->rule_state_p[1];
+						else
+							demanded_from_result_state=equal_sdef->sdef_rule_type->rule_type_state_p[1];
+					}
+
+					if (from_sdef!=NULL){
+						StateP state_p;
+						LabDef name;
+						StateS result_state;
+						int a_size,b_size;
+						ArgS arg;
+						
+						if (from_sdef->sdef_kind==IMPRULE)
+							state_p=from_sdef->sdef_rule->rule_state_p;
+						else
+							state_p=from_sdef->sdef_rule_type->rule_type_state_p;
+
+						result_state=state_p[-1];
+						
+						if (ExpectsResultNode (result_state))
+							GenCreate (-1);
+
+						if (state_p[0].state_type==SimpleState && state_p[0].state_kind==OnB)
+							PushBasic (state_p[0].state_object,symbol->symb_val);
+						else {
+							if (symbol->symb_kind==integer_denot){
+								GenPushZ (symbol->symb_val);
+								if (state_p[0].state_type!=RecordState){
+									LabDef record_lab;
+
+									ConvertSymbolToRLabel (&record_lab,BasicSymbolStates [integer_denot].state_record_symbol);
+									GenBuildR (&record_lab,1,1,0,0,True);
+								}
+							} else if (symbol->symb_kind==rational_denot){
+								push_rational (symbol);
+								if (state_p[0].state_type!=RecordState){
+									LabDef ratio_record_lab;
+
+									ConvertSymbolToKLabel (&ratio_record_lab,special_types[1]->sdef_type->type_constructors->cl_constructor->type_node_symbol->symb_def);
+									GenBuildR (&ratio_record_lab,2,0,0,0,True);
+								}
+							} else
+								BuildBasic (BasicSymbolStates [symbol->symb_kind].state_object,symbol->symb_val);
+						}
+						
+						arg.arg_state=state_p[0];
+						arg.arg_next=NULL;
+						
+						ConvertSymbolToLabel (&name,from_sdef);
+						CallFunction1 (&name,from_sdef,result_state,&arg,1);
+
+						DetermineSizeOfState (result_state,&a_size,&b_size);
+						asp+=a_size;
+						bsp+=b_size;
+						CoerceArgumentOnTopOfStack (&asp,&bsp,demanded_from_result_state,result_state,a_size,b_size);
+					} else {
+						asp += 1;
+						
+						if (symbol->symb_kind==integer_denot){
+							LabDef record_lab;
+
+							GenPushZ (symbol->symb_val);
+							ConvertSymbolToRLabel (&record_lab,BasicSymbolStates [integer_denot].state_record_symbol);
+							GenBuildR (&record_lab,1,1,0,0,True);
+						} else if (symbol->symb_kind==rational_denot){
+							LabDef ratio_record_lab;
+
+							push_rational (symbol);
+
+							ConvertSymbolToKLabel (&ratio_record_lab,special_types[1]->sdef_type->type_constructors->cl_constructor->type_node_symbol->symb_def);
+
+							GenBuildR (&ratio_record_lab,2,0,0,0,True);
+						} else
+							BuildBasic (BasicSymbolStates [symbol->symb_kind].state_object,symbol->symb_val);
+
+						Build (from_node_p,&asp,&bsp,&code_gen_node_ids);
+
+						asp -= 1;
+						GenJsrAp (1);
+
+						if (equal_sdef!=NULL)
+							CoerceArgumentOnTopOfStack (&asp,&bsp,demanded_from_result_state,StrictState,1,0);
+					}
+
+					if (equal_sdef!=NULL){
+						StateP state_p;
+						LabDef name;
+						StateS result_state;
+						int a_size,b_size;
+						ArgS arg1,arg2;
+						
+						if (equal_sdef->sdef_kind==IMPRULE)
+							state_p=equal_sdef->sdef_rule->rule_state_p;
+						else
+							state_p=equal_sdef->sdef_rule_type->rule_type_state_p;
+				
+						arg2.arg_state=state_p[1];
+						arg2.arg_next=NULL;
+						arg1.arg_state=state_p[0];
+						arg1.arg_next=&arg2;
+
+						result_state=state_p[-1];
+
+						{
+							int arg_asp,arg_bsp;
+
+							arg_asp=asp;
+							arg_bsp=bsp;
+							CopyNodeIdArgument (arg1.arg_state,node_id,&arg_asp,&arg_bsp);
+						}
+
+						SubSizeOfState (arg2.arg_state,&asp,&bsp);
+						
+						ConvertSymbolToLabel (&name,equal_sdef);
+						CallFunction1 (&name,equal_sdef,result_state,&arg1,2);
+
+						DetermineSizeOfState (result_state,&a_size,&b_size);
+						asp+=a_size;
+						bsp+=b_size;
+						CoerceArgumentOnTopOfStack (&asp,&bsp,BasicSymbolStates [bool_type],result_state,a_size,b_size);
+
+						bsp -= 1;
+					} else {
+						CopyNodeIdArgument (LazyState,node_id,&asp,&bsp);
+
+						Build (equal_node_p,&asp,&bsp,&code_gen_node_ids);
+
+						asp -= 2;
+						GenJsrAp (2);
+
+						PushBasicFromAOnB (BoolObj,0);
+						asp -= 1;
+						GenPopA (1);
+					}
+
+					ab_node_ids_p->free_node_ids=code_gen_node_ids.free_node_ids;
+					ab_node_ids_p->a_node_ids=code_gen_node_ids.a_node_ids;
+					ab_node_ids_p->b_node_ids=code_gen_node_ids.b_node_ids;
+
+					GenJmpTrue (&case_label);
+
 					++NewLabelNr;
 					break;
 				}
@@ -3572,6 +3819,9 @@ static int generate_code_for_switch_node (NodeP node,int asp,int bsp,struct esc 
 		SavedNidStateP saved_node_id_states;
 
 		case_node=arg->arg_node;
+		
+		if (case_node->node_kind==OverloadedCaseNode)
+			case_node=case_node->node_node;
 
 		MakeLabel (&case_label,case_symb,first_case_label_number,no_pref);
 		++first_case_label_number;
@@ -3684,7 +3934,7 @@ static void repl_overloaded_cons_arguments (NodeP node_p,int *asp_p,int *bsp_p,S
 	GenJsr (&apply_label);
 	GenOAStackLayout (1);
 
-	GenReplArgs (2,2);	
+	GenReplArgs (2,2);
 }
 #endif
 

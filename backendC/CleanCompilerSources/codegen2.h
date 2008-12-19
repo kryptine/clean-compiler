@@ -27,7 +27,7 @@ STRUCT (code_gen_node_ids,CodeGenNodeIds){
 
 extern StateS OnAState;
 extern LabDef BasicDescriptors [];
-extern unsigned NewLabelNr;
+extern unsigned NewLabelNr,new_not_eq_z_label_n;
 extern Bool LazyTupleSelectors [];
 extern int ObjectSizes [];
  
@@ -40,6 +40,7 @@ extern void ScanInlineFile (char *fname);
 
 extern Bool EqualState (StateS st1, StateS st2);
 extern void DetermineSizeOfArguments (ArgS *args,int *a_offset_p,int *b_offset_p);
+extern void SubSizeOfState (StateS state,int *a_offset_p,int *b_offset_p);
 extern void BuildTuple (int aindex, int bindex, int asp, int bsp, int arity,
 						States argstates,int asize,int bsize,int rootindex,FillKind fkind,Bool newnode);
 
@@ -145,3 +146,5 @@ void FillNodeOnACycle (Node node,int *asp_p,int *bsp_p,NodeId update_node_id,Cod
 #endif
 void PushField (StateS recstate,int fieldnr,int offset,int *asp_p,int *bsp_p,int *a_size_p,int *b_size_p);
 void ReplaceRecordByField (StateS recstate,int fieldnr,int *asp_p,int *bsp_p,int *a_size_p,int *b_size_p);
+
+void push_rational (SymbolP symb);

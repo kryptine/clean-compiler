@@ -958,6 +958,20 @@ static void CodeNormalRootNode (Node root,NodeId rootid,int asp,int bsp,CodeGenN
 			GenBuildString (rootsymb->symb_val);
 			GenRtn (1, 0, OnAState);
 			return;
+		case integer_denot:
+			GenPopA (asp);
+			GenPopB (bsp);
+
+			GenPushZ (rootsymb->symb_val);
+			if (IsSimpleState (resultstate)){
+				LabDef record_lab;
+				
+				ConvertSymbolToRLabel (&record_lab,BasicSymbolStates [integer_denot].state_record_symbol);
+				GenBuildR (&record_lab,1,1,0,0,True);
+				GenRtn (1,0,OnAState);
+			} else
+				GenRtn (1,1,resultstate);
+			return;
 		default:
 			if (rootsymb->symb_kind < Nr_Of_Basic_Types)
 				FillRhsRoot (&BasicDescriptors[rootsymb->symb_kind], root, asp, bsp,code_gen_node_ids_p);

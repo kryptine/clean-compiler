@@ -53,7 +53,7 @@ char notused_string[] = "notused";
 
 SymbDef ApplyDef,IfDef;
 
-unsigned NewLabelNr;
+unsigned NewLabelNr,new_not_eq_z_label_n;
 		
 StateS StrictOnAState;
 static StateS UnderEvalState,ProcIdState;
@@ -231,7 +231,7 @@ Coercions CoerceStateKind (StateKind dem_state_kind, StateKind off_state_kind)
 {
 	if (dem_state_kind==Undefined)
 		error_in_function ("CoerceStateKind");
-	
+
 	switch (off_state_kind){
 		case OnB:
 			if (dem_state_kind == OnB)
@@ -2128,15 +2128,13 @@ void cleanup_stack
 	}
 }
 
-static void SubSizeOfState (StateS state,int *a_offset_p,int *b_offset_p);
-
 static void SubSizeOfStates (int arity,States states,int *a_offset_p,int *b_offset_p)
 {
 	for (; arity; arity--)
 		SubSizeOfState (states [arity-1],a_offset_p,b_offset_p);
 }
 
-static void SubSizeOfState (StateS state,int *a_offset_p,int *b_offset_p)
+void SubSizeOfState (StateS state,int *a_offset_p,int *b_offset_p)
 {
 	if (IsSimpleState (state)){
 		if (state.state_kind==OnB)
@@ -2348,7 +2346,7 @@ static void FillSymbol (Node node,SymbDef sdef,int *asp_p,int *bsp_p,NodeId upda
 					
 					if (update_node_id==NULL && ExpectsResultNode (node->node_state)){
 						BuildArgsWithNewResultNode (node->node_arguments,asp_p,bsp_p,code_gen_node_ids_p,&a_size,&b_size);
-												
+
 						*asp_p-=a_size;
 						*bsp_p-=b_size;
 
@@ -3008,12 +3006,27 @@ int simple_expression_without_node_ids (NodeP node_p)
 }
 #endif
 
+void push_rational (SymbolP symb)
+{
+	LabDef integer_record_lab;
+
+	ConvertSymbolToRLabel (&integer_record_lab,BasicSymbolStates [integer_denot].state_record_symbol);
+
+	GenPushZR (symb->symb_val);
+	GenBuildR (&integer_record_lab,1,1,1,1,False);
+	GenBuildR (&integer_record_lab,1,1,0+1,0,False);
+	GenPopB (2);
+	GenUpdateA (1,3);
+	GenUpdateA (0,2);
+	GenPopA (2);
+}
+
 static void FillNormalNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_id,CodeGenNodeIdsP code_gen_node_ids_p)
 {
 	Symbol symb;
 	
 	symb = node->node_symbol;
-		
+
 	switch (symb->symb_kind){
 		case definition:
 			FillSymbol (node,symb->symb_def,asp_p,bsp_p,update_node_id,code_gen_node_ids_p);
@@ -3210,7 +3223,7 @@ static void FillNormalNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 			return;
 		case string_denot:
 			GenBuildString (symb->symb_val);
-			*asp_p+=1;				
+			*asp_p+=1;
 			if (IsSimpleState (node->node_state)){
 				if (update_node_id==NULL){
 					GenBuildh (&BasicDescriptors[ArrayObj],1);
@@ -3220,6 +3233,39 @@ static void FillNormalNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 				}
 			}
 			return;
+		case integer_denot:
+			GenPushZ (symb->symb_val);
+			*asp_p+=1;
+			if (IsSimpleState (node->node_state)){			
+				LabDef record_lab;
+
+				ConvertSymbolToRLabel (&record_lab,BasicSymbolStates [integer_denot].state_record_symbol);
+
+				if (update_node_id==NULL)
+					GenBuildR (&record_lab,1,1,0,0,True);
+				else {
+					GenFillR (&record_lab,1,1,*asp_p-update_node_id->nid_a_index,0,0,node->node_state.state_kind==SemiStrict ? ReleaseAndFill : NormalFill,True);
+					*asp_p-=1;
+				}
+			} else
+				*bsp_p+=1;
+			return;
+		case rational_denot:
+		{
+			LabDef ratio_record_lab;
+
+			push_rational (symb);
+
+			ConvertSymbolToKLabel (&ratio_record_lab,special_types[1]->sdef_type->type_constructors->cl_constructor->type_node_symbol->symb_def);
+
+			if (update_node_id==NULL){
+				GenBuildR (&ratio_record_lab,2,0,0,0,True);
+				*asp_p+=1;
+			} else {
+				GenFillR (&ratio_record_lab,2,0,*asp_p+2-update_node_id->nid_a_index,0,0,node->node_state.state_kind==SemiStrict ? ReleaseAndFill : NormalFill,True);
+			}
+			return;
+		}
 		default:
 			if (symb->symb_kind<Nr_Of_Basic_Types){
 				if (update_node_id==NULL){
@@ -6422,6 +6468,7 @@ void InitCoding (void)
 	int i;
 
 	NewLabelNr	  = 1;
+	new_not_eq_z_label_n=1;
 	SetUnaryState (& StrictOnAState, StrictOnA, UnknownObj);
 	SetUnaryState (& OnAState, OnA, UnknownObj);
 	SetUnaryState (& UnderEvalState, UnderEval, UnknownObj);
