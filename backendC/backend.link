@@ -6,6 +6,7 @@
 /EXPORT: BEDeclareModules
 /EXPORT: BEBindSpecialModule
 /EXPORT: BEBindSpecialFunction
+/EXPORT: BEBindSpecialType
 /EXPORT: BESpecialArrayFunctionSymbol
 /EXPORT: BEDictionarySelectFunSymbol
 /EXPORT: BEDictionaryUpdateFunSymbol
@@ -52,6 +53,7 @@
 /EXPORT: BEAddNodeIdsRefCounts
 /EXPORT: BESwitchNode
 /EXPORT: BECaseNode
+/EXPORT: BEOverloadedCaseNode
 /EXPORT: BEEnterLocalScope
 /EXPORT: BELeaveLocalScope
 /EXPORT: BEPushNode
@@ -114,6 +116,7 @@
 /EXPORT: BEDeclarePredefinedModule
 /EXPORT: BEDefineRules
 /EXPORT: BEGenerateCode
+/EXPORT: BEGetError
 /EXPORT: BEExportType
 /EXPORT: BEExportConstructor
 /EXPORT: BEExportField
