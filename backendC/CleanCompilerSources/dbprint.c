@@ -351,32 +351,6 @@ void PrintRuleNode (Node node,Bool brackets,int n_leading_spaces,File file)
 			FPrintF (file, " i_%lx<%d>",(long) node_id,node_id->nid_refcount);
 		break;
 	}
-	case RecordNode:
-		if (brackets && node -> node_arguments)
-			FPutC ('(', file);
-		PrintSymbol (node->node_symbol, file);
-		if (node -> node_arguments){
-			FPutC (' ', file);
-			PrintArguments (node -> node_arguments,' ', True,n_leading_spaces,file);
-			if (brackets)
-				FPutC (')', file);
-		}
-		break;
-	case IdentNode:
-		if (brackets && node -> node_arguments)
-			FPutC ('(', file);
-
-		FPutC ('\"',file);
-		FPutS (node->node_ident->ident_name, file);
-		FPutC ('\"',file);
-
-		if (node -> node_arguments){
-			FPutC (' ', file);
-			PrintArguments (node -> node_arguments,' ', True,n_leading_spaces,file);
-			if (brackets)
-				FPutC (')', file);
-		}
-		break;
 	case UpdateNode:
 	{	Args field = node -> node_arguments;
 
@@ -398,14 +372,6 @@ void PrintRuleNode (Node node,Bool brackets,int n_leading_spaces,File file)
 	{
 		FPutS ("Match ",file);
 		PrintSymbol (node->node_symbol,file);
-		FPutC (' ',file);
-		PrintArgument (node->node_arguments,False,n_leading_spaces,file);
-		break;
-	}
-	case ApplyNode:
-	{
-		FPutS ("Apply ",file);
-		PrintRuleNode (node->node_node, False,n_leading_spaces,file);
 		FPutC (' ',file);
 		PrintArgument (node->node_arguments,False,n_leading_spaces,file);
 		break;
@@ -553,14 +519,6 @@ void PrintRuleNode (Node node,Bool brackets,int n_leading_spaces,File file)
 		PrintArguments (node->node_arguments,',',True,n_leading_spaces,file);
 		FPutS (") = ",file);
 		PrintRuleNode (node->node_node,True,n_leading_spaces,file);
-		break;
-	case ScopeNode:
-		FPutS ("ScopeNode ",file);
-		PrintRuleNode (node->node_node,True,n_leading_spaces,file);
-		if (node->node_arguments!=NULL){
-			FPutS (" ScopeNodeArguments ",file);
-			PrintArguments (node->node_arguments,' ',True,n_leading_spaces,file);
-		}
 		break;
 	case FillUniqueNode:
 		FPutS ("FillUniqueNode ",file);
