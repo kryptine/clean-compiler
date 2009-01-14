@@ -193,8 +193,6 @@ InitParser (void)
 
 	ApplySymbol		= NewSymbol (apply_symb);
 	FailSymbol		= NewSymbol (fail_symb);
-	AllSymbol		= NewSymbol (all_symb);
-	EmptyTypeSymbol	= NewSymbol (empty_type);
 
 	clear_p_at_node_tree();
 } /* InitParser */

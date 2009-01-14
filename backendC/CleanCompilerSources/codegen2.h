@@ -102,7 +102,7 @@ void build_and_cleanup (Node node,int *asp_p,int *bsp_p,CodeGenNodeIdsP code_gen
 #define CONSTRUCTOR_R_PREF k_pref
 
 extern char *Co_Wtype,*Co_Wspine,else_symb[],then_symb[],notused_string[];
-extern SymbDef ApplyDef,IfDef;
+extern SymbDef ApplyDef,IfDef,SeqDef;
 extern StateS StrictOnAState;
 
 void FillSelectSymbol (StateKind result_state_kind,int arity,int argnr,Args arg,int *asp_p,int *bsp_p,

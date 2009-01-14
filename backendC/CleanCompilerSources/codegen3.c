@@ -724,6 +724,8 @@ static void CodeRootSelection (Node root, NodeId rootid,int asp,int bsp,CodeGenN
 	}
 }
 
+static int CodeRootNode (Node root,NodeId rootid,int asp,int bsp,CodeGenNodeIdsP code_gen_node_ids_p,StateS resultstate,struct esc *esc_p);
+
 static int CodeRhsNodeDefsAndRestoreNodeIdStates (Node root_node,NodeDefs defs,int asp,int bsp,StateS resultstate,struct esc *esc_p,
 												NodeIdListElementP a_node_ids,NodeIdListElementP b_node_ids,
 												NodeIdListElementP free_node_ids,int doesnt_fail)
@@ -971,6 +973,25 @@ static void CodeNormalRootNode (Node root,NodeId rootid,int asp,int bsp,CodeGenN
 				GenRtn (1,0,OnAState);
 			} else
 				GenRtn (1,1,resultstate);
+			return;
+		case seq_symb:
+			if (root->node_arity==2){
+				int old_asp,old_bsp;
+				
+				old_asp=asp;
+				old_bsp=bsp;
+				BuildArg (root->node_arguments,&asp,&bsp,code_gen_node_ids_p);
+				GenPopA (asp-old_asp);
+				GenPopB (bsp-old_bsp);
+				/* asp=old_asp; bsp=old_bsp; */
+
+				CodeRootNode (root->node_arguments->arg_next->arg_node,rootid,old_asp,old_bsp,code_gen_node_ids_p,resultstate,NULL);
+			} else {
+				LabDef name;
+
+				ConvertSymbolToDLabel (&name,SeqDef);
+				FillRhsRoot (&name, root, asp, bsp,code_gen_node_ids_p);
+			}
 			return;
 		default:
 			if (rootsymb->symb_kind < Nr_Of_Basic_Types)

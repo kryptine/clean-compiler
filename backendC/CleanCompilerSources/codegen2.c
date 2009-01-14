@@ -51,7 +51,7 @@ char else_symb[] = "else";
 char then_symb[] = "then";
 char notused_string[] = "notused";
 
-SymbDef ApplyDef,IfDef;
+SymbDef ApplyDef,IfDef,SeqDef;
 
 unsigned NewLabelNr,new_not_eq_z_label_n;
 		
@@ -3266,6 +3266,58 @@ static void FillNormalNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 			}
 			return;
 		}
+		case seq_symb:
+			if (node->node_arity==2){
+				if (IsLazyState (node->node_state)){
+					FillSymbol (node,SeqDef,asp_p,bsp_p,update_node_id,code_gen_node_ids_p);
+				} else {
+					int old_asp,old_bsp;
+
+					old_asp=*asp_p;
+					old_bsp=*bsp_p;
+					BuildArg (node->node_arguments,asp_p,bsp_p,code_gen_node_ids_p);
+					GenPopA (*asp_p-old_asp);
+					GenPopA (*bsp_p-old_bsp);
+					*asp_p=old_asp;
+					*bsp_p=old_bsp;
+
+					if (update_node_id==NULL){
+						ArgP arg2_arg;
+					
+						arg2_arg=node->node_arguments->arg_next;
+						if (arg2_arg->arg_node->node_kind!=NodeIdNode){
+							Build (arg2_arg->arg_node,asp_p,bsp_p,code_gen_node_ids_p);
+						} else {
+							NodeId arg_node_id;
+							
+							arg_node_id=arg2_arg->arg_node->node_node_id;
+#if BOXED_RECORDS
+							arg_node_id->nid_mark2 |= NID_RECORD_USED_BY_NON_SELECTOR_OR_UPDATES;		
+#endif
+							if (CopyNodeIdArgument (arg2_arg->arg_state,arg_node_id,asp_p,bsp_p))
+								ChangeEvalStatusKindToStrictOnA (arg_node_id,code_gen_node_ids_p->saved_nid_state_l);
+							
+							decrement_reference_count_of_node_id (arg_node_id,&code_gen_node_ids_p->free_node_ids);
+						}
+					} else
+						FillNodeOnACycle (node->node_arguments->arg_next->arg_node,asp_p,bsp_p,update_node_id,code_gen_node_ids_p);
+				}
+			} else {
+				LabDef name;
+				
+				ConvertSymbolToConstructorDLabel (&name,SeqDef);
+
+				BuildArgs (node->node_arguments,asp_p,bsp_p,code_gen_node_ids_p);
+						
+				if (update_node_id==NULL){
+					*asp_p+=1-node->node_arity;
+					GenBuildPartialFunctionh (&name,node->node_arity);
+				} else {
+					GenFillh (&name,node->node_arity,*asp_p-update_node_id->nid_a_index,NormalFill);
+					*asp_p-=node->node_arity;
+				}
+			}
+			return;
 		default:
 			if (symb->symb_kind<Nr_Of_Basic_Types){
 				if (update_node_id==NULL){
@@ -6479,6 +6531,9 @@ void InitCoding (void)
 
 	IfDef=MakeNewSymbolDefinition ("system", IfId, 3, DEFRULE);
 	IfDef->sdef_number=0;
+
+	SeqDef=MakeNewSymbolDefinition ("system", system_seq_id, 2, DEFRULE);
+	SeqDef->sdef_number=0;
 
 	InitBasicDescriptor (UnknownObj, "_", SizeOfAStackElem);
 #if ABSTRACT_OBJECT

@@ -16,6 +16,7 @@ extern Ident DynamicId;
 #if SA_RECOGNIZES_ABORT_AND_UNDEF
 extern Ident StdMiscId,abort_id,undef_id;
 #endif
+extern Ident PreludeId,seq_id,system_seq_id;
 
 extern Symbol StartSymbol, UnboxedArrayClassSymbols [], UnboxedArrayFunctionSymbols [];
 extern SymbDef scc_dependency_list,ArrayFunctionDefs[], StdArrayAbortDef;

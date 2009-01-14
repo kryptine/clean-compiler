@@ -2124,6 +2124,17 @@ static Bool NodeInAStrictContext (Node node,StateS demanded_state,int local_scop
 				}
 				break;
 			}
+			case seq_symb:
+				node->node_state=demanded_state;
+				if (node->node_arity==2){
+					parallel = DetermineStrictArgContext (node->node_arguments,StrictState,local_scope);
+					parallel = DetermineStrictArgContext (node->node_arguments->arg_next,demanded_state,local_scope);
+				} else {
+					if (ShouldDecrRefCount)
+						DecrRefCountCopiesOfArgs (node->node_arguments IF_OPTIMIZE_LAZY_TUPLE_RECURSION(local_scope));
+					node->node_state = StrictState;
+				}
+				break;
 			default:
 				if (rootsymb->symb_kind < Nr_Of_Predef_Types){
 					node->node_state = BasicSymbolStates [rootsymb->symb_kind];

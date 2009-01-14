@@ -3347,6 +3347,15 @@ static void ExamineSymbolApplication (struct node *node)
 				symbol->symb_unboxed_cons_sdef_p->sdef_mark |= SDEF_USED_CURRIED_MASK;
 			else if (IsLazyState (node->node_state))
 				symbol->symb_unboxed_cons_sdef_p->sdef_mark |= SDEF_USED_LAZILY_MASK;
+		} else if (symbol->symb_kind==seq_symb){
+			if (node->node_arity!=2)
+				SeqDef->sdef_mark |= SDEF_USED_CURRIED_MASK;
+			else {
+				if (IsLazyState (node->node_state))
+					SeqDef->sdef_mark |= SDEF_USED_LAZILY_MASK;
+				else
+					SeqDef->sdef_mark |= SDEF_USED_STRICTLY_MASK;
+			}
 		}
 		return;
 	}

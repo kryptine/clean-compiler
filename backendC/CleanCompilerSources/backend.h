@@ -166,6 +166,7 @@ Clean (::BESpecialIdentIndex :== Int)
 enum {
 	BESpecialIdentStdMisc, BESpecialIdentAbort, BESpecialIdentUndef,
 	BESpecialIdentStdBool, BESpecialIdentAnd, BESpecialIdentOr,
+	BESpecialIdentPrelude, BESpecialIdentSeq,
 
 	BESpecialIdentCount
 };

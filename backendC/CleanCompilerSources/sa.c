@@ -2164,7 +2164,9 @@ static void InitNode (Node node)
 
 static void InitAlternative (RuleAltS *alt)
 {
+#ifndef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
 	NodeDefs nds;
+#endif
 
 	InitNode (alt->alt_lhs_root);
 
@@ -2337,6 +2339,20 @@ static Exp ConvertNode (Node node, NodeId nid)
 					}
 					break;
 				}
+				case seq_symb:
+					if (node->node_arity==2){
+						e->e_kind = Dep;
+						e->e_args = NewExpArgs (2);
+						e->e_sym = 2;
+
+						e->e_args[0] = ConvertNode (node->node_arguments->arg_node,NULL);
+						e->e_args[1] = ConvertNode (node->node_arguments->arg_next->arg_node,NULL);
+
+						if (nid)
+							nid->nid_exp_ = e;
+
+						return e;
+					}
 				default:
 					e = & top;
 					if (nid)

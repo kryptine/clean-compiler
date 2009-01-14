@@ -583,8 +583,13 @@ BEBindSpecialFunction (BESpecialIdentIndex index, int functionIndex, int moduleI
 	Assert ((unsigned int) functionIndex < module->bem_nFunctions);
 	functionSymbol	= &module->bem_functions [functionIndex];
 
-	if (functionSymbol->symb_kind == definition)
+	if (functionSymbol->symb_kind == definition){
 		*gSpecialIdents [index]	= functionSymbol->symb_def->sdef_ident;
+		
+		if (index==BESpecialIdentSeq && moduleIndex!=main_dcl_module_n){
+			functionSymbol->symb_kind=seq_symb;
+		}
+	}
 } /* BEBindSpecialFunction */
 
 extern SymbDefP special_types[]; /* defined in statesgen */
@@ -3630,7 +3635,6 @@ CheckBEEnumTypes (void)
 	Assert (apply_symb					== BEApplySymb);
 	Assert (if_symb						== BEIfSymb);
 	Assert (fail_symb					== BEFailSymb);
-	Assert (all_symb					== BEAllSymb);
 	Assert (select_symb					== BESelectSymb);
 	Assert (Nr_Of_Predef_FunsOrConses	== BENrOfPredefFunsOrConses);
 	Assert (definition					== BEDefinition);
@@ -3786,6 +3790,11 @@ BEInit (int argc)
 	gSpecialIdents [BESpecialIdentStdBool]	= &StdBoolId;
 	gSpecialIdents [BESpecialIdentAnd]		= &AndId;
 	gSpecialIdents [BESpecialIdentOr]		= &OrId;
+
+	PreludeId = Identifier ("Prelude");
+	seq_id = NULL;
+	gSpecialIdents[BESpecialIdentPrelude] = &PreludeId;
+	gSpecialIdents[BESpecialIdentSeq] = &seq_id;
 
 	UserDefinedArrayFunctions	= NULL;
 #if STRICT_LISTS

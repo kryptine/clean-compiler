@@ -13,7 +13,7 @@ SymbolP	BasicTypeSymbols [Nr_Of_Basic_Types],
 
 		ApplyTypeSymbol, TrueSymbol, FalseSymbol,
 		TupleSymbol, ListSymbol, ConsSymbol, NilSymbol,
-		SelectSymbols [MaxNodeArity], ApplySymbol, IfSymbol, FailSymbol, AllSymbol,
+		SelectSymbols [MaxNodeArity], ApplySymbol, IfSymbol, FailSymbol,
 		EmptyTypeSymbol,
 		TupleTypeSymbols [MaxNodeArity];
 
@@ -451,11 +451,6 @@ NewRuleAlt (void)
 
 	return (alt);
 } /* NewRuleAlt */
-
-TypeNode NewEmptyTypeNode (void)
-{
-	return NewTypeNode (NoAnnot, NoAttr, EmptyTypeSymbol, NIL, 0);
-} /* NewEmptyTypeNode */
 
 struct p_at_node_tree {
 	NodeP					annoted_node;

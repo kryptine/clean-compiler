@@ -72,7 +72,7 @@ typedef enum {
 #endif
 	Nr_Of_Predef_Types,
 	tuple_symb, cons_symb, nil_symb,
-	apply_symb, if_symb, fail_symb, all_symb,
+	apply_symb, if_symb, fail_symb, seq_symb,
 	select_symb,
 	Nr_Of_Predef_FunsOrConses,
 	definition, newsymbol, instance_symb, empty_symbol, field_symbol_list,

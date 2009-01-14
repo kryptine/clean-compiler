@@ -3717,7 +3717,7 @@ void GenSystemImports (void)
 		GenImpDesc ("e_system_dAP");
 		GenImpLab_node_entry ("e_system_nAP","e_system_eaAP");
 		GenImpLab ("e_system_sAP");
-		
+
 		GenImpDesc (nil_lab.lab_name);
 		GenImpDesc (cons_lab.lab_name);
 #if STRICT_LISTS
@@ -3743,6 +3743,12 @@ void GenSystemImports (void)
 			FPrintF (OutFile,N_PREFIX "%s.%d " EA_PREFIX "%s.%d",glob_selr,selnum,glob_selr,selnum);
 		}
 #endif
+
+		if (SeqDef!=NULL && (SeqDef->sdef_mark & (SDEF_USED_LAZILY_MASK | SDEF_USED_CURRIED_MASK))){
+			GenImpDesc ("e_system_dseq");
+			GenImpLab_node_entry ("e_system_nseq","e_system_easeq");	
+		}
+
 		GenImpLab ("_driver");
 	}
 }

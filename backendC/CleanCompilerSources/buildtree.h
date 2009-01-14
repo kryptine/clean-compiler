@@ -78,8 +78,6 @@ extern char *CopyString (char *to, char *from, int *rest_size);
 extern	char BasicTypeIds  [];
 #define ConvertBasicTypeToChar(type_symb) BasicTypeIds [(type_symb) -> symb_kind]
 
-extern TypeNode NewEmptyTypeNode (void);
-
 extern IdentP DetermineNewSymbolId (char *prefix, TypeNode inst_type, TableKind table);
 
 extern	IdentP	gArrayIdents [];
@@ -88,7 +86,7 @@ extern SymbolP	BasicTypeSymbols [],
 				ArraySymbols [],
 				TrueSymbol, FalseSymbol, TupleSymbol, ListSymbol, ConsSymbol, NilSymbol,
 				ApplySymbol, ApplyTypeSymbol, SelectSymbols[],
-				FailSymbol, IfSymbol, AllSymbol, EmptyTypeSymbol;
+				FailSymbol, IfSymbol;
 #if STRICT_LISTS
 extern SymbolP
 	StrictListSymbol, StrictConsSymbol, StrictNilSymbol,

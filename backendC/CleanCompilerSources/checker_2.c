@@ -110,6 +110,8 @@ Ident AnnotatedId, ListId, TupleId, ConsId, NilId, ApplyId, SelectId,
 Ident StdMiscId,abort_id,undef_id;	
 #endif
 
+Ident PreludeId,seq_id,system_seq_id;
+
 Symbol StartSymbol;
 
 SymbDef ArrayFunctionDefs [NoArrayFun],StdArrayAbortDef;
@@ -202,6 +204,8 @@ void InitChecker (void)
 #if SA_RECOGNIZES_ABORT_AND_UNDEF
 	StdMiscId = PutStringInHashTable ("StdMisc",ModuleIdTable);
 #endif
+
+	system_seq_id = PutStringInHashTable ("seq", SymbolIdTable);
 
  	/* Predefined Array functions */
 
