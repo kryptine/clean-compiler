@@ -500,6 +500,8 @@ checkExplicitImportCompleteness dcls_explicit explicit_qualified_imports dcl_mod
 		continuation (STE_DclMacroOrLocalMacroFunction _) dcl_common dcl_functions cci ccs
 			# (macro,ccs) = ccs!box_ccs.ccs_macro_defs.[mod_index,decl_index]
 			= check_completeness macro cci ccs
+		continuation STE_Generic dcl_common dcl_functions cci ccs
+			= ccs // check_completeness not yet implemented
 	
 	checkCompletenessOfMacro :: !Ident !Index !Int !Position !*CheckCompletenessStateBox -> *CheckCompletenessStateBox
 	checkCompletenessOfMacro decl_ident decl_index main_dcl_module_n import_position ccs
