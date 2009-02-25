@@ -455,16 +455,11 @@ instance toString (Import from_symbol), AttributeVar, TypeAttribute, Annotation
 
 ::	ParsedImport		:== Import ImportDeclaration
 
-::	ImportedIdent =
-	{	ii_ident	:: !Ident
-	,	ii_extended	:: !Bool
-	}
-
-::	ImportDeclaration	= ID_Function !ImportedIdent
-						| ID_Class !ImportedIdent !(Optional [ImportedIdent])
-						| ID_Type !ImportedIdent !(Optional [ImportedIdent])
-						| ID_Record !ImportedIdent !(Optional [ImportedIdent])
-						| ID_Instance !ImportedIdent !Ident !(![Type],![TypeContext])
+::	ImportDeclaration	= ID_Function !Ident
+						| ID_Class !Ident !(Optional [Ident])
+						| ID_Type !Ident !(Optional [Ident])
+						| ID_Record !Ident !(Optional [Ident])
+						| ID_Instance !Ident !Ident !(![Type],![TypeContext])
 
 cIsImportedLibrary :== True
 cIsImportedObject :== False
@@ -1423,7 +1418,7 @@ instance == ModuleKind, Ident
 instance <<< (Module a) | <<< a, ParsedDefinition, InstanceType, AttributeVar, TypeVar, SymbolType, Expression, Type, Ident, (Global object) | <<< object,
 			 Position, CaseAlt, AType, FunDef, ParsedExpr, TypeAttribute, (Bind a b) | <<< a & <<< b,
 			 FieldNameOrQualifiedFieldName, ParsedConstructor, (TypeDef a) | <<< a, TypeVarInfo, AttrVarInfo,
-			 BasicValue, ATypeVar, TypeRhs, (Import from_symbol) | <<< from_symbol, ImportDeclaration, ImportedIdent, CasePatterns,
+			 BasicValue, ATypeVar, TypeRhs, (Import from_symbol) | <<< from_symbol, ImportDeclaration, CasePatterns,
 			 (Optional a) | <<< a, ConsVariable, BasicType, Annotation, SelectorKind, Selection, SelectorDef, ConsDef, LocalDefs, FreeVar, ClassInstance, SignClassification,
 			 TypeCodeExpression, CoercionPosition, AttrInequality, LetBind, Declaration, STE_Kind, BoundVar,
 			 TypeSymbIdent,

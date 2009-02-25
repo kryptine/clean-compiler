@@ -103,7 +103,7 @@ imp_decl_to_string (ID_OldSyntax idents) = "ID_OldSyntax "+++idents_to_string id
 		idents_to_string [{id_name}:l] = toString id_name+++","+++idents_to_string l
 */
 
-getBelongingSymbolsFromID :: !ImportDeclaration -> Optional [ImportedIdent]
+getBelongingSymbolsFromID :: !ImportDeclaration -> Optional [Ident]
 getBelongingSymbolsFromID (ID_Class _ x)					= x
 getBelongingSymbolsFromID (ID_Type _ x)						= x
 getBelongingSymbolsFromID (ID_Record _ x)					= x
@@ -265,7 +265,7 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 		  new_ste = { ste & ste_kind = STE_BelongingSymbol i, ste_previous = ste }
 		= (i+1, writePtr id_info new_ste cs_symbol_table)
 	
-	get_opt_nr_and_ident position eii_ident {ii_ident=ii_ident=:{id_info}} (cs_error, cs_symbol_table)
+	get_opt_nr_and_ident position eii_ident ii_ident=:{id_info} (cs_error, cs_symbol_table)
 		# ({ste_kind}, cs_symbol_table) = readPtr id_info cs_symbol_table
 		= case ste_kind of
 			STE_BelongingSymbol i
@@ -374,7 +374,7 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 			eii_declaring_modules visited_modules
 		= (No, [], eii_declaring_modules, visited_modules)
 
-	search_imported_symbol :: !Int ![ImportNrAndIdents] -> (!Bool, !Optional [ImportedIdent])
+	search_imported_symbol :: !Int ![ImportNrAndIdents] -> (!Bool, !Optional [Ident])
 	search_imported_symbol imported_symbol []
 		= (False, No)
 	search_imported_symbol imported_symbol [{ini_symbol_nr, ini_imp_decl}:t]
@@ -382,7 +382,7 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 			= (True, getBelongingSymbolsFromID ini_imp_decl)
 		= search_imported_symbol imported_symbol t
 
-	belong_ident_found :: !Ident !(Optional [ImportedIdent]) -> Bool
+	belong_ident_found :: !Ident !(Optional [Ident]) -> Bool
 	belong_ident_found belong_ident No
 		// like from m import ::T
 		= False
@@ -393,10 +393,10 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 		// like from m import ::T(C1,C2)
 		= is_member belong_ident import_list
 
-	is_member :: !Ident ![ImportedIdent] -> Bool
+	is_member :: !Ident ![Ident] -> Bool
 	is_member belong_ident []
 		= False
-	is_member belong_ident [{ii_ident}:t]
+	is_member belong_ident [ii_ident:t]
 		| belong_ident==ii_ident
 			= True
 		= is_member belong_ident t

@@ -1145,22 +1145,22 @@ wantImportDeclarationT token pState
 		DoubleColonToken
 			# (name, pState)				= wantConstructorName "import type" pState
 			  (type_id, pState)				= stringToIdent name IC_Type pState
-			  (ii_extended, token, pState)	= optional_extension_with_next_token pState
+			  (token, pState) = nextToken FunctionContext pState
 			| token == OpenToken
 			  	#	(conses, pState)			= want_names (wantConstructorName "import type (..)") IC_Expression CloseToken pState
-			  	->	(ID_Type { ii_ident = type_id, ii_extended = ii_extended } (Yes conses), pState)
+			  	->	(ID_Type type_id (Yes conses), pState)
 			| token == CurlyOpenToken
 			  	#	(fields, pState) = want_names (wantLowerCaseName "import record fields") (IC_Field type_id) CurlyCloseToken pState
-			  	->	(ID_Record { ii_ident = type_id, ii_extended = ii_extended } (Yes fields), pState)
-			  	->	(ID_Type { ii_ident = type_id, ii_extended = ii_extended } No, tokenBack pState)
+			  	->	(ID_Record type_id (Yes fields), pState)
+			  	->	(ID_Type type_id No, tokenBack pState)
 		ClassToken
 			# (name, pState)				= want pState
 			  (class_id, pState)			= stringToIdent name IC_Class pState
-			  (ii_extended, token, pState)	= optional_extension_with_next_token pState
+			  (token, pState) = nextToken FunctionContext pState
 			| token == OpenToken
 			  	#	(members, pState)			= want_names want IC_Expression CloseToken pState
-			  	->	(ID_Class { ii_ident = class_id, ii_extended = ii_extended } (Yes members), pState)
-			  	->	(ID_Class { ii_ident = class_id, ii_extended = ii_extended } No, tokenBack pState)
+			  	->	(ID_Class class_id (Yes members), pState)
+			  	->	(ID_Class class_id No, tokenBack pState)
 		InstanceToken
 			#	(class_name, pState)	= want pState
 //				(ii_extended, pState)	= optional_extension pState // MW: removed but still not ok
@@ -1169,14 +1169,14 @@ wantImportDeclarationT token pState
 				(class_id, pState)		= stringToIdent class_name IC_Class pState
 				(inst_id, pState)		= stringToIdent class_name (IC_Instance types) pState
 				(context, pState)		= optionalContext pState
-			->	(ID_Instance { ii_ident = class_id, ii_extended = ii_extended } inst_id (types,context), pState)
+			->	(ID_Instance class_id inst_id (types,context), pState)
 		IdentToken fun_name
 			#	(fun_id, pState)		= stringToIdent fun_name IC_Expression pState
 				(ii_extended, pState)	= optional_extension pState
-			->	(ID_Function { ii_ident = fun_id, ii_extended = ii_extended }, pState)
+			->	(ID_Function fun_id, pState)
 		token
 			#	(fun_id, pState)		= stringToIdent "dummy" IC_Expression pState
-			->	( ID_Function { ii_ident = fun_id, ii_extended = False }
+			->	( ID_Function fun_id
 				, parseError "from import" (Yes token) "imported item" pState
 				)
 where				
@@ -1189,26 +1189,19 @@ where
 	want_list_of_names want_fun ident_kind close_token pState
 		# (name, pState) = want_fun pState
 		  (name_id, pState)	= stringToIdent name ident_kind pState
-		  (ii_extended, token, pState) = optional_extension_with_next_token pState
+		  (token, pState) = nextToken FunctionContext pState
 		| token == CommaToken
 			# (names, pState) = want_list_of_names want_fun ident_kind close_token pState
-			= ([{ ii_ident = name_id, ii_extended = ii_extended } : names], pState)
+			= ([name_id : names], pState)
 		| token == close_token
-			= ([{ ii_ident = name_id, ii_extended = ii_extended }], pState)
-			= ([{ ii_ident = name_id, ii_extended = ii_extended }], parseError "ImportDeclaration" (Yes token) ")" pState)
+			= ([name_id], pState)
+			= ([name_id], parseError "ImportDeclaration" (Yes token) ")" pState)
 		
 	optional_extension pState
 		# (token, pState) = nextToken FunctionContext pState
 		| token == DotDotToken
 			= (True, pState)
 			= (False, tokenBack pState)			
-		
-	optional_extension_with_next_token pState
-		# (token, pState) = nextToken FunctionContext pState
-		| token == DotDotToken
-			# (token, pState) = nextToken FunctionContext pState
-			= (True, token, pState)
-			= (False, token, pState)
 
 /*
 	Classes and instances

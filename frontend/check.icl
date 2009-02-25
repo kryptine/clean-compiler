@@ -1863,10 +1863,10 @@ checkDclModules imports_of_icl_mod dcl_modules icl_functions macro_defs heaps cs
 		= get_symbol imp_decl (get_ident imp_decl) state
 	where
 		get_ident :: !ImportDeclaration -> Ident
-		get_ident (ID_Function {ii_ident})						= ii_ident
-		get_ident (ID_Class {ii_ident} _)						= ii_ident
-		get_ident (ID_Type {ii_ident} _)						= ii_ident
-		get_ident (ID_Record {ii_ident} _)						= ii_ident
+		get_ident (ID_Function ii_ident)						= ii_ident
+		get_ident (ID_Class ii_ident _)							= ii_ident
+		get_ident (ID_Type ii_ident _)							= ii_ident
+		get_ident (ID_Record ii_ident _)						= ii_ident
 		get_ident (ID_Instance class_ident instance_ident _)	= instance_ident
 
 	get_symbol :: ImportDeclaration !Ident !*([Ident],Int,[ImportNrAndIdents],*(Heap SymbolTableEntry)) -> ([Ident],Int,[ImportNrAndIdents],.(Heap SymbolTableEntry))

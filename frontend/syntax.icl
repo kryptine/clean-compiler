@@ -962,10 +962,6 @@ readable {id_name}
 			= id_name%(1, size id_name-1)
 	= id_name
 
-instance <<< ImportedIdent
-where
-	(<<<) file {ii_ident, ii_extended}	= file <<< ii_ident <<< ' ' <<< ii_extended
-
 instance == ModuleKind
 where
 	(==) mk1 mk2 = equal_constructor mk1 mk2
