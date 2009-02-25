@@ -373,8 +373,8 @@ cNameLocationDependent :== True
 	}
 
 :: GenericDef = 
-	{	gen_ident		:: !Ident		// the generics name in IC_Class 
-	,	gen_member_ident	:: !Ident		// the generics name in IC_Member
+	{	gen_ident		:: !Ident		// the generics name in IC_Generic 
+	,	gen_member_ident	:: !Ident	// the generics name in IC_Expression
 	, 	gen_pos			:: !Position
 	,	gen_type		:: !SymbolType	// Generic type (st_vars include generic type vars)
 	,	gen_vars		:: ![TypeVar]	// Generic type variables
@@ -460,6 +460,7 @@ instance toString (Import from_symbol), AttributeVar, TypeAttribute, Annotation
 						| ID_Type !Ident !(Optional [Ident])
 						| ID_Record !Ident !(Optional [Ident])
 						| ID_Instance !Ident !Ident !(![Type],![TypeContext])
+						| ID_Generic !Ident !Ident
 
 cIsImportedLibrary :== True
 cIsImportedObject :== False

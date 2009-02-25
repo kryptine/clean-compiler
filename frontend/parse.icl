@@ -1174,6 +1174,11 @@ wantImportDeclarationT token pState
 			#	(fun_id, pState)		= stringToIdent fun_name IC_Expression pState
 				(ii_extended, pState)	= optional_extension pState
 			->	(ID_Function fun_id, pState)
+		GenericToken
+			#	(name, pState)			= want pState
+				(generic_id, pState)	= stringToIdent name IC_Generic pState
+				(expr_id, pState)		= stringToIdent name IC_Expression pState
+		  	->	(ID_Generic generic_id expr_id, pState)
 		token
 			#	(fun_id, pState)		= stringToIdent "dummy" IC_Expression pState
 			->	( ID_Function fun_id

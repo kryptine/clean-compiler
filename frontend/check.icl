@@ -1859,15 +1859,19 @@ checkDclModules imports_of_icl_mod dcl_modules icl_functions macro_defs heaps cs
 		  					 ei_symbols=expl_imp_indices, ei_qualified=import_qualified}
 		= (expl_imp_symbols_accu, nr_of_expl_imp_symbols, [explicit_import:expl_imp_indices_accu], cs_symbol_table)
 
-	get_expl_imp_symbol imp_decl state
-		= get_symbol imp_decl (get_ident imp_decl) state
-	where
-		get_ident :: !ImportDeclaration -> Ident
-		get_ident (ID_Function ii_ident)						= ii_ident
-		get_ident (ID_Class ii_ident _)							= ii_ident
-		get_ident (ID_Type ii_ident _)							= ii_ident
-		get_ident (ID_Record ii_ident _)						= ii_ident
-		get_ident (ID_Instance class_ident instance_ident _)	= instance_ident
+	get_expl_imp_symbol imp_decl=:(ID_Function ident) state
+		= get_symbol imp_decl ident state
+	get_expl_imp_symbol imp_decl=:(ID_Class ident _) state
+		= get_symbol imp_decl ident state
+	get_expl_imp_symbol imp_decl=:(ID_Type ident _) state
+		= get_symbol imp_decl ident state
+	get_expl_imp_symbol imp_decl=:(ID_Record ident _) state
+		= get_symbol imp_decl ident state
+	get_expl_imp_symbol imp_decl=:(ID_Instance class_ident instance_ident _) state
+		= get_symbol imp_decl instance_ident state
+	get_expl_imp_symbol (ID_Generic generic_ident ident) state
+		= get_symbol (ID_Function ident) ident
+		 (get_symbol (ID_Function generic_ident) generic_ident state)
 
 	get_symbol :: ImportDeclaration !Ident !*([Ident],Int,[ImportNrAndIdents],*(Heap SymbolTableEntry)) -> ([Ident],Int,[ImportNrAndIdents],.(Heap SymbolTableEntry))
 	get_symbol imp_decl ident=:{id_info} (expl_imp_symbols_accu, nr_of_expl_imp_symbols, expl_imp_indices_accu, cs_symbol_table)
