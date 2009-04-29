@@ -912,9 +912,9 @@ instance t_corresponds SelectorDef where
 		&&& equal dclDef.sd_field_nr iclDef.sd_field_nr
 
 init_atype_vars atype_vars1 atype_vars2 tc_state=:{tc_type_vars=tc_type_vars=:{hwn_heap}}
-	# type_heap = foldSt init_type_var atype_vars1 hwn_heap
-	# type_heap = foldSt init_type_var atype_vars2 hwn_heap
-	= {tc_state & tc_type_vars = {tc_type_vars & hwn_heap = type_heap}}
+	# hwn_heap = foldSt init_type_var atype_vars1 hwn_heap
+	# hwn_heap = foldSt init_type_var atype_vars2 hwn_heap
+	= {tc_state & tc_type_vars = {tc_type_vars & hwn_heap = hwn_heap}}
   where
 	init_type_var {atv_variable} type_heap = writePtr atv_variable.tv_info_ptr TVI_Empty type_heap
 
