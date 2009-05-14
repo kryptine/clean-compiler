@@ -8,17 +8,6 @@ ParseOnly :== False
 toLineAndColumn {fp_line, fp_col}
 	=	{lc_line = fp_line, lc_column = fp_col}
 
-// +++ move to utilities?
-
-groupBy :: (a a -> Bool) [a] -> [[a]]
-groupBy eq []
-    =   []
-groupBy eq [h : t]
-    =   [[h : this] : groupBy eq other]
-    where
-        (this, other)
-            =   span (eq h) t
-
 /*
 
 Parser for Clean 2.0
@@ -42,10 +31,13 @@ Conventions:
 :: *ParseState =
 	{	ps_scanState		:: !ScanState
 	,	ps_error			:: !*ParseErrorAdmin
-	,	ps_skipping			:: !Bool
+	,	ps_flags			:: !Int
 	,	ps_hash_table		:: !*HashTable
-	,	ps_support_generics :: !Bool // AA: compiler option "-generics"
 	}
+
+PS_SkippingMask :== 1
+PS_SupportGenericsMask :==2
+PS_DynamicTypeUsedMask :== 4
 
 /*
 appScanState :: (ScanState -> ScanState) !ParseState -> ParseState
@@ -283,50 +275,46 @@ cWantIclFile :== True
 cWantDclFile :== False
 
 wantModule :: !Bool !Ident !Position !Bool !*HashTable !*File !SearchPaths (ModTimeFunction *Files) !*Files
-	-> (!Bool, !ParsedModule, !*HashTable, !*File, !*Files)
+	-> (!Bool,!Bool,!ParsedModule, !*HashTable, !*File, !*Files)
 wantModule iclmodule file_id=:{id_name} import_file_position support_generics hash_table error searchPaths modtimefunction files
 	= case openScanner file_name searchPaths modtimefunction files of
 		(Yes (scanState, modification_time), files)
 			# hash_table=set_hte_mark (if iclmodule 1 0) hash_table
-			# (ok,mod,hash_table,file,files) = initModule file_name modification_time scanState hash_table error files
+			# (ok,dynamic_type_used,mod,hash_table,file,files) = initModule file_name modification_time scanState hash_table error files
 			# hash_table=set_hte_mark 0 hash_table
-			->(ok,mod,hash_table,file,files)
+			-> (ok,dynamic_type_used,mod,hash_table,file,files)
 		(No, files)
 			-> let mod = { mod_ident = file_id,  mod_modification_time = "", mod_type = MK_None, mod_imports = [], mod_imported_objects = [],mod_foreign_exports=[],mod_defs = [] } in
-			  (False, mod, hash_table, error <<< "Error " <<< import_file_position <<< ": "  <<< file_name <<< " could not be imported\n", files)
+			   (False, False, mod, hash_table, error <<< "Error " <<< import_file_position <<< ": "  <<< file_name <<< " could not be imported\n", files)
 where
 	file_name = if iclmodule (id_name +++ ".icl") (id_name +++ ".dcl")
 
-	initModule :: String String ScanState !*HashTable !*File *Files
-				-> (!Bool, !ParsedModule, !*HashTable, !*File, !*Files)
+	initModule :: String String ScanState     !*HashTable !*File  *Files
+				-> (!Bool,!Bool,!ParsedModule,!*HashTable,!*File,!*Files)
 	initModule file_name modification_time scanState hash_table error files
 		# (succ, mod_type, mod_name, scanState) = try_module_header iclmodule scanState
 		| succ
 			# pState				=	{ ps_scanState = scanState
 										, ps_error = { pea_file = error, pea_ok = True }
-										, ps_skipping = False
+										, ps_flags = if support_generics PS_SupportGenericsMask 0
 										, ps_hash_table = hash_table
-										, ps_support_generics = support_generics
 										}
 			  pState				= verify_name mod_name id_name file_name pState
 		  	  (mod_ident, pState)	= stringToIdent mod_name IC_Module pState
 		  	  pState				= check_layout_rule pState
 		  	  (defs, pState)		= want_definitions (SetGlobalContext iclmodule) pState
-			  {ps_scanState,ps_hash_table,ps_error}
+			  {ps_scanState,ps_hash_table,ps_error,ps_flags}
 			  						= pState
 			  defs = if (ParseOnly && id_name <> "StdOverloaded" && id_name <> "StdArray" && id_name <> "StdEnum" && id_name <> "StdBool" && id_name <> "StdDynamics" && id_name <> "StdGeneric")
 						[PD_Import imports \\ PD_Import imports <- defs]
 						defs
 			  mod	= { mod_ident = mod_ident, mod_modification_time = modification_time, mod_type = mod_type, mod_imports = [], mod_imported_objects = [], mod_foreign_exports=[],mod_defs = defs }
-			= ( ps_error.pea_ok
-			  , mod, ps_hash_table
-			  , ps_error.pea_file
-			  , closeScanner ps_scanState files
-			  )
+			  files = closeScanner ps_scanState files
+			= ( ps_error.pea_ok, ps_flags bitand PS_DynamicTypeUsedMask<>0, mod, ps_hash_table, ps_error.pea_file, files)
 		// otherwise // ~ succ
 		# ({fp_line}, scanState) = getPosition scanState
 		  mod = { mod_ident = file_id,  mod_modification_time = modification_time, mod_type = mod_type, mod_imports = [], mod_imported_objects = [],mod_foreign_exports=[],mod_defs = [] }
-		= (False, mod, hash_table, error <<< "Error [" <<< file_name <<< ',' <<< fp_line <<< "]: incorrect module header",
+		= (False, False, mod, hash_table, error <<< "Error [" <<< file_name <<< ',' <<< fp_line <<< "]: incorrect module header",
 			closeScanner scanState files)
 
 	try_module_header :: !Bool !ScanState -> (!Bool,!ModuleKind,!String,!ScanState)
@@ -1517,7 +1505,7 @@ optionalCoercions pState
 
 wantGenericDefinition :: !ParseContext !Position !ParseState -> (!ParsedDefinition, !ParseState)
 wantGenericDefinition parseContext pos pState
-	| not pState.ps_support_generics
+	| pState.ps_flags bitand PS_SupportGenericsMask==0
 		= (PD_Erroneous, parseErrorSimple "generic definition" "to enable generics use the command line flag -generics" pState)
 	# (name, pState) = want_name pState
 	| name == "" 
@@ -1553,7 +1541,7 @@ wantGenericDefinition parseContext pos pState
 			
 wantDeriveDefinition :: !ParseContext !Position !*ParseState -> (!ParsedDefinition, !*ParseState)
 wantDeriveDefinition parseContext pos pState
-	| not pState.ps_support_generics
+	| pState.ps_flags bitand PS_SupportGenericsMask==0
 		= (PD_Erroneous, parseErrorSimple "generic definition" "to enable generics use the command line flag -generics" pState)
 	# (name, pState) = want_name pState
 	| name == "" 
@@ -2470,7 +2458,7 @@ where
 	try CharTypeToken	 pState	= (Yes BT_Char			, pState)
 	try BoolTypeToken	 pState	= (Yes BT_Bool			, pState)
 	try RealTypeToken	 pState	= (Yes BT_Real			, pState)
-	try DynamicTypeToken pState	= (Yes BT_Dynamic		, pState)
+	try DynamicTypeToken pState	= (Yes BT_Dynamic		, {pState & ps_flags=pState.ps_flags bitor PS_DynamicTypeUsedMask})
 	try FileTypeToken	 pState = (Yes BT_File			, pState)
 	try WorldTypeToken	 pState = (Yes BT_World			, pState)
 	try _				 pState = (No					, tokenBack pState)
@@ -3524,7 +3512,15 @@ where
 								=	field_name1 == field_name2
 							equal_selectors _ _
 								=	False
-		
+
+			groupBy :: (a a -> Bool) [a] -> [[a]]
+			groupBy eq []
+			    =   []
+			groupBy eq [h : t]
+			    =   [[h : this] : groupBy eq other]
+			    where
+			        (this, other) = span (eq h) t
+
 			is_record_update [{nu_selectors=[select : _]} : _]
 				=	is_record_select select
 			is_record_update updates
@@ -3793,9 +3789,9 @@ wantEndCodeRhs pState
 		= tokenBack pState
 
 wantEndOfDefinition :: String !ParseState -> ParseState
-wantEndOfDefinition msg pState=:{ps_skipping}
-	| ps_skipping
-		#	(token, pState) = skipToEndOfDefinition {pState & ps_skipping = False}
+wantEndOfDefinition msg pState
+	| pState.ps_flags bitand PS_SkippingMask<>0
+		#	(token, pState) = skipToEndOfDefinition {pState & ps_flags = pState.ps_flags bitand (bitnot PS_SkippingMask)}
 		= want_end_of_definition token msg pState
 	# (token, pState) = nextToken FunctionContext pState
 	= want_end_of_definition token msg pState
@@ -3827,8 +3823,8 @@ where
 				token				->	wantEndOfDefinition "" (parseError msg (Yes token) "end of definition" pState)
 
 wantEndRootExpression :: !ParseState -> ParseState
-wantEndRootExpression pState=:{ps_skipping}
-	| ps_skipping
+wantEndRootExpression pState
+	| pState.ps_flags bitand PS_SkippingMask<>0
 		=	wantEndOfDefinition "root expression" pState
 		#	(token, pState)			= nextToken FunctionContext pState
 			(ss_useLayout, pState)	= accScanState UseLayout pState
@@ -3983,7 +3979,7 @@ wantBeginGroup msg pState
 // AA..
 wantKind :: !ParseState -> (!TypeKind, !ParseState)
 wantKind pState
-	| not pState.ps_support_generics
+	| pState.ps_flags bitand PS_SupportGenericsMask==0
 		= (KindConst, parseErrorSimple "kind" "to enable generics use -generics command line flag" pState)
 	# (token, pState) = nextToken TypeContext pState
 	# (kind, pState) = want_simple_kind token pState
@@ -4031,8 +4027,8 @@ where
 */
 instance tokenBack ParseState
 where
-	tokenBack pState=:{ps_skipping}
-		| ps_skipping
+	tokenBack pState
+		| pState.ps_flags bitand PS_SkippingMask<>0
 			= pState
 			= appScanState tokenBack pState
 
@@ -4040,7 +4036,7 @@ instance nextToken ParseState
 where
 	nextToken :: !ScanContext !ParseState -> (!Token, !ParseState)
 	nextToken scanContext pState
-		| pState.ps_skipping // in error recovery from parse error
+		| pState.ps_flags bitand PS_SkippingMask<>0 // in error recovery from parse error
 			= (ErrorToken "Skipping", pState)
 			= accScanState (nextToken scanContext) pState
 
@@ -4053,7 +4049,7 @@ warnIfStrictAnnot (StrictAnnotWithPosition position) pState = parseWarningWithPo
 
 parseWarningWithPosition :: !{# Char} !{# Char} !FilePosition !ParseState -> ParseState
 parseWarningWithPosition act msg position pState
-	| pState.ps_skipping
+	| pState.ps_flags bitand PS_SkippingMask<>0
 		= pState
 	| otherwise // not pState.ps_skipping
 		# (filename,pState=:{ps_error={pea_file,pea_ok}})	= getFilename pState
@@ -4070,7 +4066,7 @@ parseWarningWithPosition act msg position pState
 
 parseWarning :: !{# Char} !{# Char} !ParseState -> ParseState
 parseWarning act msg pState
-	| pState.ps_skipping
+	| pState.ps_flags bitand PS_SkippingMask<>0
 		= pState
 	| otherwise // not pState.ps_skipping
 		# (pos,pState) 	= getPosition pState
@@ -4088,7 +4084,7 @@ parseWarning act msg pState
 
 parseError :: !{# Char} !(Optional Token) !{# Char} !ParseState -> ParseState
 parseError act opt_token msg pState
-	| pState.ps_skipping
+	| pState.ps_flags bitand PS_SkippingMask<>0
 		= pState
 	| otherwise // not pState.ps_skipping
 		# (pos,pState) 	= getPosition pState
@@ -4103,8 +4099,8 @@ parseError act opt_token msg pState
 		  				Yes token	-> pea_file <<< " expected instead of " <<< token <<< "\n"
 		  				No			-> pea_file <<< " expected\n"
 		  pState 	=	{ pState
-						& ps_skipping	= True
-						, ps_error		= { pea_file = pea_file, pea_ok = False }
+						& ps_flags = pState.ps_flags bitor PS_SkippingMask
+						, ps_error = { pea_file = pea_file, pea_ok = False }
 						}
 		= case opt_token of
 			Yes _	-> tokenBack pState
@@ -4112,7 +4108,7 @@ parseError act opt_token msg pState
 
 parseErrorSimple :: !{# Char} !{# Char} !ParseState -> ParseState
 parseErrorSimple act msg pState
-	| pState.ps_skipping
+	| pState.ps_flags bitand PS_SkippingMask<>0
 		= pState
 	| otherwise // not pState.ps_skipping
 		# (pos,pState) 	= getPosition pState
@@ -4124,11 +4120,9 @@ parseErrorSimple act msg pState
 		  				<<< (if (size act > 0) ("," + act) "") <<< "]: "
 		  				<<< msg
 		  				<<< '\n'
-		  pState 	=	{ pState
-						& ps_skipping	= True
-						, ps_error		= { pea_file = pea_file, pea_ok = False }
-						}
-		= pState
+		= { pState	& ps_flags = pState.ps_flags bitor PS_SkippingMask
+					, ps_error = { pea_file = pea_file, pea_ok = False }
+		  }
 
 getFileAndLineNr :: !ParseState -> (!String, !Int, !ParseState)
 getFileAndLineNr pState =: {ps_scanState}

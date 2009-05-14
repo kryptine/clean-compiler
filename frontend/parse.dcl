@@ -11,4 +11,4 @@ cWantIclFile :== True
 cWantDclFile :== False	
 
 wantModule :: !Bool !Ident !Position !Bool !*HashTable !*File !SearchPaths (ModTimeFunction *Files) !*Files
-	-> (!Bool, !ParsedModule, !*HashTable, !*File, !*Files)
+	-> (!Bool,!Bool,!ParsedModule, !*HashTable, !*File, !*Files)
