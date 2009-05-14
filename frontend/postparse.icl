@@ -1056,7 +1056,7 @@ parseAndScanDclModule :: !Ident !Position ![ScannedModule] ![Ident] !SearchPaths
 	-> *(!Bool, ![ScannedModule],!*Files, !*CollectAdmin)
 parseAndScanDclModule dcl_module import_file_position parsed_modules cached_modules searchPaths support_generics support_dynamics modtimefunction files ca
 	# {ca_error, ca_hash_table} = ca
-	# (parse_ok, mod, ca_hash_table, err_file, files) = wantModule cWantDclFile dcl_module import_file_position support_generics ca_hash_table ca_error.pea_file searchPaths modtimefunction files
+	# (parse_ok,dynamic_type_used,mod, ca_hash_table, err_file, files) = wantModule cWantDclFile dcl_module import_file_position support_generics ca_hash_table ca_error.pea_file searchPaths modtimefunction files
 	# ca = {ca & ca_hash_table=ca_hash_table, ca_error={pea_file=err_file,pea_ok=True} }
 	| parse_ok
 		= scan_dcl_module dcl_module mod parsed_modules searchPaths modtimefunction files ca
@@ -1146,7 +1146,7 @@ where
 		| module_n_in_cache<>NoIndex
 			= (True,No,module_n_in_cache,[],cached_modules,files,ca)
 		# {ca_error, ca_hash_table} = ca
-		# (parse_ok, mod, hash_table, err_file, /*predefs,*/ files) = wantModule cWantDclFile mod_ident NoPos support_generics ca_hash_table ca_error.pea_file searchPaths modtimefunction files
+		# (parse_ok,dynamic_type_used,mod, hash_table, err_file, /*predefs,*/ files) = wantModule cWantDclFile mod_ident NoPos support_generics ca_hash_table ca_error.pea_file searchPaths modtimefunction files
 		# ca = {ca & ca_hash_table=hash_table, ca_error={pea_file=err_file,pea_ok=True}}
 		| not parse_ok
 			= (False, No,NoIndex, [],cached_modules, files, ca)
