@@ -34,14 +34,14 @@ frontEndInterface :: !FrontEndOptions !Ident !SearchPaths !{#DclModule} !*{#*{#F
   	-> ( !Optional *FrontEndSyntaxTree,!*{#*{#FunDef}},!{#DclModule},!Int,!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional *File, !*Heaps) 
 frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_macros list_inferred_types predef_symbols hash_table modtimefunction files error io out tcl_file heaps 
 // 	# files = trace_n ("Compiling "+++mod_ident.id_name) files
-	# (ok, mod, hash_table, error, files)
+	# (ok,dynamic_type_used,mod,hash_table,error,files)
 		= wantModule cWantIclFile mod_ident NoPos options.feo_generics(hash_table /* ---> ("Parsing:", mod_ident)*/) error search_paths modtimefunction files
 	| not ok
 		= (No,{},{},0,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
 	# cached_module_idents = [dcl_mod.dcl_name \\ dcl_mod<-:cached_dcl_modules]
 	#! support_dynamics = case tcl_file of Yes _ -> True ; No -> False
 	# (ok, mod, global_fun_range, mod_functions, optional_dcl_mod, modules, dcl_module_n_in_cache,hash_table, error, files)
-		= scanModule (mod -*-> "Scanning") cached_module_idents options.feo_generics support_dynamics hash_table error search_paths modtimefunction files
+		= scanModule mod cached_module_idents options.feo_generics support_dynamics hash_table error search_paths modtimefunction files
 
 //	# hash_table = {hash_table & hte_entries={}}
 	# hash_table = remove_icl_symbols_from_hash_table hash_table
@@ -53,7 +53,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_m
 
 
   	# (ok, icl_mod, dcl_mods, components, cached_dcl_macros,main_dcl_module_n,heaps, predef_symbols, symbol_table, error, directly_imported_dcl_modules)
-  	  	= checkModule support_dynamics mod global_fun_range mod_functions dcl_module_n_in_cache optional_dcl_mod modules cached_dcl_modules cached_dcl_macros predef_symbols (symbol_table -*-> "Checking") error heaps
+  	  	= checkModule mod global_fun_range mod_functions support_dynamics dynamic_type_used dcl_module_n_in_cache optional_dcl_mod modules cached_dcl_modules cached_dcl_macros predef_symbols symbol_table error heaps
 
 	  hash_table = { hash_table & hte_symbol_heap = symbol_table}
 
