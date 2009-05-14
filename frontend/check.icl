@@ -2280,10 +2280,10 @@ renumber_icl_module mod_type icl_global_function_range icl_instance_range icl_ge
 					# new_table = {new_table & [dcl_type_fun_index] = icl_type_fun_index}
 					= fill_conversion_table_for_type_funs (inc dcl_type_index) dcl_types icl_type_defs type_conversions new_table
 
-checkModule :: !Bool !ScannedModule !IndexRange ![FunDef] !Int !(Optional ScannedModule) ![ScannedModule] !{#DclModule} !*{#*{#FunDef}} !*PredefinedSymbols !*SymbolTable !*File !*Heaps
+checkModule :: !ScannedModule !IndexRange ![FunDef] !Bool !Bool !Int !(Optional ScannedModule) ![ScannedModule] !{#DclModule} !*{#*{#FunDef}} !*PredefinedSymbols !*SymbolTable !*File !*Heaps
 	-> (!Bool, *IclModule, *{#DclModule}, *{!Group}, !*{#*{#FunDef}},!Int, !*Heaps, !*PredefinedSymbols, !*SymbolTable, *File, [String])
 
-checkModule support_dynamics {mod_defs,mod_ident,mod_type,mod_imports,mod_imported_objects,mod_foreign_exports,mod_modification_time} icl_global_function_range fun_defs dcl_module_n_in_cache 
+checkModule {mod_defs,mod_ident,mod_type,mod_imports,mod_imported_objects,mod_foreign_exports,mod_modification_time} icl_global_function_range fun_defs support_dynamics dynamic_type_used dcl_module_n_in_cache
 	optional_dcl_mod scanned_modules dcl_modules cached_dcl_macros predef_symbols symbol_table err_file heaps
 	# nr_of_cached_modules = size dcl_modules
 	# (optional_pre_def_mod,predef_symbols)
@@ -2295,7 +2295,7 @@ checkModule support_dynamics {mod_defs,mod_ident,mod_type,mod_imports,mod_import
 		= check_module1 mod_defs icl_global_function_range fun_defs optional_dcl_mod optional_pre_def_mod scanned_modules dcl_modules cached_dcl_macros dcl_module_n_in_cache predef_symbols symbol_table err_file
 	# icl_instance_range = {ir_from = first_inst_index, ir_to = first_gen_inst_index}
 	# icl_generic_range = {ir_from = first_gen_inst_index, ir_to = nr_of_functions}
-	= check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports mod_foreign_exports mod_type icl_global_function_range icl_instance_range icl_generic_range nr_of_cached_modules optional_pre_def_mod local_defs support_dynamics icl_functions macro_defs init_dcl_modules cdefs sizes heaps cs
+	= check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports mod_foreign_exports mod_type icl_global_function_range icl_instance_range icl_generic_range nr_of_cached_modules optional_pre_def_mod local_defs support_dynamics dynamic_type_used icl_functions macro_defs init_dcl_modules cdefs sizes heaps cs
 
 check_module1 cdefs icl_global_function_range fun_defs optional_dcl_mod optional_pre_def_mod scanned_modules dcl_modules cached_dcl_macros dcl_module_n_in_cache predef_symbols symbol_table err_file
 	# error = {ea_file = err_file, ea_loc = [], ea_ok = True }
@@ -2320,7 +2320,8 @@ check_module1 cdefs icl_global_function_range fun_defs optional_dcl_mod optional
 
 	  main_dcl_module_n = if (dcl_module_n_in_cache<>NoIndex) dcl_module_n_in_cache nr_of_cached_modules
 
-	  cs = { cs_symbol_table = symbol_table, cs_predef_symbols = predef_symbols, cs_error = error, cs_x= {x_needed_modules=0,x_main_dcl_module_n=main_dcl_module_n, x_check_dynamic_types = False}}
+	  cs_x = {x_needed_modules = 0,x_main_dcl_module_n=main_dcl_module_n, x_check_dynamic_types = False}
+	  cs = { cs_symbol_table = symbol_table, cs_predef_symbols = predef_symbols, cs_error = error, cs_x = cs_x}
 	  
 	  (scanned_modules,macro_defs,cs) = add_dcl_module_predef_module_and_modules_to_symbol_table optional_dcl_mod optional_pre_def_mod scanned_modules nr_of_cached_modules cs
 	  macro_defs = make_macro_def_array cached_dcl_macros macro_defs
@@ -2461,11 +2462,12 @@ check_module1 cdefs icl_global_function_range fun_defs optional_dcl_mod optional
 	  		fill_macro_def_array i [dcl_macro_defs:macro_defs] a
 	  			= fill_macro_def_array (i+1) macro_defs {a & [i]=dcl_macro_defs}
 
-check_module2 :: Ident {#Char} [.ImportedObject] .[Import ImportDeclaration] [ParsedForeignExport] .ModuleKind !.IndexRange !.IndexRange !.IndexRange !Int 
-				(Optional (Module a)) [Declaration] Bool *{#FunDef} *{#*{#FunDef}} *{#DclModule} (CollectedDefinitions ClassInstance)
+check_module2 :: Ident {#Char} [.ImportedObject] .[Import ImportDeclaration] [ParsedForeignExport] .ModuleKind !.IndexRange !.IndexRange !.IndexRange !Int
+				(Optional (Module a)) [Declaration] Bool Bool *{#FunDef} *{#*{#FunDef}} *{#DclModule} (CollectedDefinitions ClassInstance)
 				*{#.Int} *Heaps *CheckState
 			-> (!Bool,.IclModule,!.{#DclModule},.{!Group},!*{#*{#FunDef}},!Int,!.Heaps,!.{#PredefinedSymbol},!.Heap SymbolTableEntry,!.File,[String]);
-check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports mod_foreign_exports mod_type icl_global_function_range icl_instance_range icl_generic_range nr_of_cached_modules optional_pre_def_mod local_defs support_dynamics icl_functions macro_defs init_dcl_modules cdefs sizes heaps cs
+check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports mod_foreign_exports mod_type icl_global_function_range icl_instance_range icl_generic_range nr_of_cached_modules
+	optional_pre_def_mod local_defs support_dynamics dynamic_type_used icl_functions macro_defs init_dcl_modules cdefs sizes heaps cs
 	# (main_dcl_module_n,cs)=cs!cs_x.x_main_dcl_module_n
 		
 	  (copied_dcl_defs, dcl_conversions, dcl_modules, local_defs, cdefs, icl_sizes, cs)
@@ -2512,7 +2514,7 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 	  (imported_module_numbers, dcl_modules)
 	  		= foldSt compute_used_module_nrs expl_imp_indices (addNr cPredefinedModuleIndex imported_module_numbers_of_main_dcl_mod, dcl_modules)
 	 
-	  cs = { cs & cs_error=error,cs_x.x_needed_modules = 0 }
+	  cs = { cs & cs_error=error,cs_x.x_needed_modules = if dynamic_type_used cNeedStdDynamic 0 }
 	
 	  (nr_of_modules, dcl_modules)	= usize dcl_modules
 
@@ -2878,7 +2880,7 @@ checkForeignExportedFunctionTypes [] error_admin predefined_symbols fun_defs
 check_dynamics_used_without_support_dynamics support_dynamics mod_ident cs
 	| not support_dynamics && (cs.cs_x.x_needed_modules bitand cNeedStdDynamic)<>0
 		# error_location = { ip_ident = {id_name="",id_info=nilPtr}/*mod_ident*/, ip_line = 1, ip_file = mod_ident.id_name+++".icl"}
-	= {cs & cs_error = popErrorAdmin (checkError "" ("dynamic used but support for dynamics not enabled") (pushErrorAdmin error_location cs.cs_error))}
+		= {cs & cs_error = popErrorAdmin (checkError "" ("dynamic used but support for dynamics not enabled") (pushErrorAdmin error_location cs.cs_error))}
 		= cs
 
 check_needed_modules_are_imported mod_ident extension cs=:{cs_x={x_needed_modules}}
