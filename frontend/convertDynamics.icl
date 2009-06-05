@@ -143,8 +143,8 @@ where
 			# (fun_body, ci) = convertDynamics {cinp_st_args = [], cinp_dynamic_representation = dynamic_representation,
 					cinp_subst_var = unify_subst_var} fun_body ci
 
-			= ({fun_defs & [fun] = { fun_def & fun_body = fun_body, fun_info = { fun_info & fi_local_vars = ci.ci_new_variables ++ fun_info.fi_local_vars }}},
-				{ ci & ci_new_variables = [] })
+			= ({fun_defs & [fun] = {fun_def & fun_body = fun_body, fun_info = {fun_info & fi_local_vars = ci.ci_new_variables ++ fun_info.fi_local_vars }}},
+				{ci & ci_new_variables = []})
 
 class convertDynamics a :: !ConversionInput !a !*ConversionState -> (!a, !*ConversionState)
 
@@ -154,17 +154,15 @@ instance convertDynamics [a] | convertDynamics a where
 
 instance convertDynamics (Optional a) | convertDynamics a where
 	convertDynamics cinp (Yes x) ci
-		# (x, ci)
-			=	convertDynamics cinp x ci
-		=	(Yes x, ci)
+		# (x, ci) = convertDynamics cinp x ci
+		= (Yes x, ci)
 	convertDynamics _ No ci
-		=	(No, ci)
+		= (No, ci)
 
 instance convertDynamics FunctionBody where
 	convertDynamics cinp (TransformedBody body) ci
-		# (body, ci)
-			=	convertDynamics cinp body ci
-		=	(TransformedBody body, ci)
+		# (body, ci) = convertDynamics cinp body ci
+		= (TransformedBody body, ci)
 
 instance convertDynamics TransformedBody where
 	convertDynamics cinp body=:{tb_args,tb_rhs} ci=:{ci_var_heap}
@@ -233,14 +231,9 @@ instance convertDynamics TransformedBody where
 					,	lb_dst =  varToFreeVar subst 1
 					,	lb_position = NoPos
 					}
-
-				# let_binds
-					=	[let_bind_initial_subst : global_tpv_binds]
-				# (let_info_ptr,  ci)	= let_ptr (length let_binds) ci
-				# ci
-					= { ci & 
-						ci_new_variables	= [lb_dst  \\ {lb_dst} <- let_binds] ++ ci.ci_new_variables
-					}
+				# let_binds = [let_bind_initial_subst : global_tpv_binds]
+				# (let_info_ptr, ci) = let_ptr (length let_binds) ci
+				# ci = { ci & ci_new_variables	= [lb_dst  \\ {lb_dst} <- let_binds] ++ ci.ci_new_variables}
 				# rhs
 					= Let {	let_strict_binds	= [],
 							let_lazy_binds		= let_binds,
@@ -252,162 +245,125 @@ instance convertDynamics TransformedBody where
 
 instance convertDynamics LetBind where
 	convertDynamics cinp binding=:{lb_src} ci
-		# (lb_src, ci)
-			=	convertDynamics cinp lb_src ci
-		=	({binding &  lb_src = lb_src}, ci)
+		# (lb_src, ci) = convertDynamics cinp lb_src ci
+		= ({binding &  lb_src = lb_src}, ci)
 
 instance convertDynamics (Bind a b) | convertDynamics a where
 	convertDynamics cinp binding=:{bind_src} ci
-		# (bind_src, ci)
-			=	convertDynamics cinp bind_src ci
-		=	({binding &  bind_src = bind_src}, ci)
+		# (bind_src, ci) = convertDynamics cinp bind_src ci
+		= ({binding &  bind_src = bind_src}, ci)
 
 instance convertDynamics Expression where
 	convertDynamics cinp (TypeCodeExpression tce) ci
-		# (dyn_type_code, ci)
-			=	convertExprTypeCode cinp tce ci
-		=	(dyn_type_code, ci)
+		# (dyn_type_code, ci) = convertExprTypeCode cinp tce ci
+		= (dyn_type_code, ci)
 	convertDynamics cinp (Var var) ci
 		# (info, ci_var_heap)
 			=	readPtr var.var_info_ptr ci.ci_var_heap
-		# ci
-			=	{ci & ci_var_heap = ci_var_heap}
+		# ci = {ci & ci_var_heap = ci_var_heap}
 		=	case (info, ci) of
 				(VI_DynamicValueAlias value_var, ci)
 					->	(Var value_var, ci)
 				(_, ci)
 					->	(Var var, ci)
 	convertDynamics cinp (App app) ci
-		# (app, ci)
-			= convertDynamics cinp app ci
-		=	(App app, ci)
+		# (app, ci) = convertDynamics cinp app ci
+		= (App app, ci)
 	convertDynamics cinp (expr @ exprs) ci
-		# (expr, ci)
-			=	convertDynamics cinp expr  ci
-		  (exprs, ci)
-		  	=	convertDynamics cinp exprs ci
-		=	(expr @ exprs, ci)
+		# (expr, ci) = convertDynamics cinp expr  ci
+		  (exprs, ci) = convertDynamics cinp exprs ci
+		= (expr @ exprs, ci)
 	convertDynamics cinp (Let letje) ci
-		# (letje, ci)
-			=	convertDynamics cinp letje  ci
-		=	(Let letje, ci)
+		# (letje, ci) = convertDynamics cinp letje  ci
+		= (Let letje, ci)
 	convertDynamics cinp (Case kees) ci
-		# (kees,  ci)
-			=	convertDynamics cinp kees  ci
-		=	(Case kees, ci)
+		# (kees,  ci) = convertDynamics cinp kees  ci
+		= (Case kees, ci)
 	convertDynamics cinp (Selection opt_symb expression selections) ci
-		# (expression,ci)
-			=	convertDynamics cinp expression ci
-		# (selections,ci)
-			=	convertDynamics cinp selections ci
+		# (expression,ci) = convertDynamics cinp expression ci
+		# (selections,ci) = convertDynamics cinp selections ci
 		=	(Selection opt_symb expression selections, ci)
 	convertDynamics cinp (Update expression1 selections expression2) ci
-		# (expression1, ci)
-			=	convertDynamics cinp expression1 ci
-		# (selections, ci)
-			=	convertDynamics cinp selections ci
-		# (expression2, ci)
-			=	convertDynamics cinp expression2 ci
+		# (expression1, ci) = convertDynamics cinp expression1 ci
+		# (selections, ci) = convertDynamics cinp selections ci
+		# (expression2, ci) = convertDynamics cinp expression2 ci
 		=	(Update expression1 selections expression2, ci)
 	convertDynamics cinp (RecordUpdate cons_symbol expression expressions) ci
-		# (expression, ci)
-			=	convertDynamics cinp expression ci
-		# (expressions, ci)
-			=	convertDynamics cinp expressions ci
-		=	(RecordUpdate cons_symbol expression expressions, ci)
+		# (expression, ci) = convertDynamics cinp expression ci
+		# (expressions, ci) = convertDynamics cinp expressions ci
+		= (RecordUpdate cons_symbol expression expressions, ci)
 	convertDynamics cinp (TupleSelect definedSymbol int expression) ci
-		# (expression, ci)
-			=	convertDynamics cinp expression ci
-		=	(TupleSelect definedSymbol int expression, ci)
+		# (expression, ci) = convertDynamics cinp expression ci
+		= (TupleSelect definedSymbol int expression, ci)
 	convertDynamics _ be=:(BasicExpr _) ci
-		=	(be, ci)
+		= (be, ci)
 	convertDynamics _ code_expr=:(AnyCodeExpr _ _ _) ci
-		=	(code_expr, ci)
+		= (code_expr, ci)
 	convertDynamics _ code_expr=:(ABCCodeExpr _ _) ci
-		=	(code_expr, ci)
+		= (code_expr, ci)
 	convertDynamics cinp (MatchExpr symb expression) ci
-		# (expression, ci)
-			=	convertDynamics cinp expression ci
-		=	(MatchExpr symb expression, ci)
+		# (expression, ci) = convertDynamics cinp expression ci
+		= (MatchExpr symb expression, ci)
 	convertDynamics cinp (DynamicExpr dyno) ci
-		=	convertDynamic cinp dyno ci
+		= convertDynamic cinp dyno ci
 	convertDynamics cinp EE ci
-		=	(EE, ci)
+		= (EE, ci)
 	convertDynamics cinp expr=:(NoBind _) ci
-		=	(expr,ci)
+		= (expr,ci)
 
 instance convertDynamics App where
 	convertDynamics cinp app=:{app_args} ci
-		# (app_args,ci)
-			=	convertDynamics cinp app_args ci
+		# (app_args,ci) = convertDynamics cinp app_args ci
 		=	({app & app_args = app_args}, ci)
 
 instance convertDynamics Let where
-	convertDynamics cinp letje=:{let_strict_binds, let_lazy_binds,
-											let_expr, let_info_ptr} ci
-		# (let_strict_binds, ci)
-		  	=	convertDynamics cinp let_strict_binds ci
-		  (let_lazy_binds, ci)
-		  	=	convertDynamics cinp let_lazy_binds ci
-		  (let_expr,  ci)
-		   	=	convertDynamics cinp let_expr  ci
-		  letje
-		  	=	{ letje &  let_strict_binds = let_strict_binds,
-		  			let_lazy_binds = let_lazy_binds, let_expr = let_expr}
+	convertDynamics cinp letje=:{let_strict_binds, let_lazy_binds, let_expr, let_info_ptr} ci
+		# (let_strict_binds, ci) = convertDynamics cinp let_strict_binds ci
+		  (let_lazy_binds, ci) = convertDynamics cinp let_lazy_binds ci
+		  (let_expr,  ci) = convertDynamics cinp let_expr  ci
+		  letje = {letje &  let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds, let_expr = let_expr}
 		= (letje, ci)
 
 instance convertDynamics Case where
 	convertDynamics cinp kees=:{case_expr, case_guards, case_default} ci
-		# (case_expr, ci)
-			=	convertDynamics cinp case_expr ci
-		# (case_default, ci)
-			=	convertDynamics cinp case_default ci
-		# kees
-			=	{kees & case_expr=case_expr, case_default=case_default}
+		# (case_expr, ci) = convertDynamics cinp case_expr ci
+		# (case_default, ci) = convertDynamics cinp case_default ci
+		# kees = {kees & case_expr=case_expr, case_default=case_default}
 		= case case_guards of
 			DynamicPatterns alts
 				->	convertDynamicCase cinp kees ci
 			_
-				# (case_guards, ci)
-					=	convertDynamics cinp case_guards ci
-				# kees
-					=	{kees & case_explicit=False, case_guards=case_guards}
+				# (case_guards, ci) = convertDynamics cinp case_guards ci
+				# kees = {kees & case_guards=case_guards}
 				->	(kees, ci)
 
 instance convertDynamics CasePatterns where
 	convertDynamics cinp (BasicPatterns type alts) ci
-		# (alts, ci)
-			=	convertDynamics cinp alts ci
-		=	(BasicPatterns type alts, ci)
+		# (alts, ci) = convertDynamics cinp alts ci
+		= (BasicPatterns type alts, ci)
 	convertDynamics cinp (AlgebraicPatterns type alts) ci
-		# (alts, ci)
-			=	convertDynamics cinp alts ci
-		=	(AlgebraicPatterns type alts, ci)
+		# (alts, ci) = convertDynamics cinp alts ci
+		= (AlgebraicPatterns type alts, ci)
 	convertDynamics cinp (OverloadedListPatterns type decons alts) ci
-		# (alts, ci)
-			=	convertDynamics cinp alts ci
-		=	(OverloadedListPatterns type decons alts, ci)
+		# (alts, ci) = convertDynamics cinp alts ci
+		= (OverloadedListPatterns type decons alts, ci)
 
 convertDynamic cinp=:{cinp_dynamic_representation={dr_type_ident}}
 					{dyn_expr, dyn_type_code} ci
-	# (dyn_expr, ci)
-		=	convertDynamics cinp dyn_expr ci
+	# (dyn_expr, ci) = convertDynamics cinp dyn_expr ci
 	# (dyn_type_code, ci)
 		=	convertExprTypeCode cinp dyn_type_code ci
 	=	(App {	app_symb		= dr_type_ident,
 				app_args 		= [dyn_expr, dyn_type_code],
 				app_info_ptr	= nilPtr }, ci)
+
 convertDynamicCase cinp=:{cinp_dynamic_representation={dr_dynamic_symbol, dr_dynamic_type}}
 			kees=:{case_guards=DynamicPatterns alts, case_info_ptr, case_default} ci
-	# (value_var, ci)
-		=	newVariable "value" VI_Empty ci
-	# (type_var, ci)
-		=	newVariable "type" VI_Empty ci
-	# ci
-		=	{ci & ci_new_variables	= [varToFreeVar value_var 1, varToFreeVar type_var 1 : ci.ci_new_variables ]}
+	# (value_var, ci) = newVariable "value" VI_Empty ci
+	# (type_var, ci) = newVariable "type" VI_Empty ci
+	# ci = {ci & ci_new_variables = [varToFreeVar value_var 1, varToFreeVar type_var 1 : ci.ci_new_variables ]}
 
-	# (result_type, ci)
-		=	getResultType case_info_ptr ci
+	# (result_type, ci) = getResultType case_info_ptr ci
 	# (matches, ci)
 		=	case convertDynamicAlts cinp kees type_var value_var result_type case_default alts ci of
 				(Yes matches, ci) -> (matches, ci)
@@ -418,12 +374,9 @@ convertDynamicCase cinp=:{cinp_dynamic_representation={dr_dynamic_symbol, dr_dyn
 		,	ap_expr		= matches
 		,	ap_position	= position alts
 		}
-	# (case_info_ptr, ci)
-		=	dummy_case_ptr result_type ci
-	# kees
-		=	{kees & case_explicit=False, case_guards=AlgebraicPatterns dr_dynamic_type [match],
-								case_default=No, case_info_ptr = case_info_ptr}
-	=	(kees, ci)
+	# (case_info_ptr, ci) = dummy_case_ptr result_type ci
+	# kees = {kees & case_guards=AlgebraicPatterns dr_dynamic_type [match], case_default=No, case_info_ptr = case_info_ptr}
+	= (kees, ci)
 
 convertDynamicAlts _ _ _ _ _ defoult [] ci
 	=	(defoult, ci)
@@ -434,51 +387,34 @@ convertDynamicAlts cinp kees type_var value_var result_type defoult [{dp_rhs, dp
 	#  (unify_symb, ci) 
 		=	getSymbol PD_Dyn_unify SK_Function (extended_unify_and_coerce 3 4) /*3 was 2 */ ci
 
-	# unify_call
-		=	App { app_symb = unify_symb,  app_args = [ Var cinp.cinp_subst_var, Var type_var, type_code],  app_info_ptr = nilPtr }
+	# unify_call = App {app_symb = unify_symb, app_args = [Var cinp.cinp_subst_var,Var type_var,type_code], app_info_ptr = nilPtr}
 
 	// FIXME, more precise types (not all TEs)
-	# (let_info_ptr, ci)
-		=	let_ptr (/* 4 */ 3+length binds) ci
+	# (let_info_ptr, ci) = let_ptr (/* 4 */ 3+length binds) ci
 
-	  (unify_result_var, ci)
-	  	=	newVariable "result" VI_Empty ci
-	  unify_result_fv
-	  	=	varToFreeVar unify_result_var 1
-	  (unify_bool_var, ci)
-	  	=	newVariable "unify_bool" VI_Empty ci
-	  unify_bool_fv
-	  	=	varToFreeVar unify_bool_var 1
-
-	  (unify_subst_var, ci)
-	  	=	newVariable "unify_subst" VI_Empty ci
-	  unify_subst_fv
-	  	=	varToFreeVar unify_subst_var 1
+	  (unify_result_var, ci) = newVariable "result" VI_Empty ci
+	  unify_result_fv = varToFreeVar unify_result_var 1
+	  (unify_bool_var, ci) = newVariable "unify_bool" VI_Empty ci
+	  unify_bool_fv = varToFreeVar unify_bool_var 1
+	  (unify_subst_var, ci) = newVariable "unify_subst" VI_Empty ci
+	  unify_subst_fv = varToFreeVar unify_subst_var 1
 
 	# ci_var_heap = writePtr dp_var.fv_info_ptr (VI_DynamicValueAlias value_var) ci.ci_var_heap
 	# ci = {ci & ci_var_heap = ci_var_heap}
 
-	# (dp_rhs, ci)
-		=	convertDynamics {cinp & cinp_subst_var=unify_subst_var} dp_rhs ci
+	# (dp_rhs, ci) = convertDynamics {cinp & cinp_subst_var=unify_subst_var} dp_rhs ci
 
-	# (case_info_ptr, ci)
-		=	bool_case_ptr result_type ci
-	# case_guards
-		=	BasicPatterns BT_Bool
-				[{bp_value = BVB True, bp_expr = dp_rhs, bp_position = dp_position}]
+	# (case_info_ptr, ci) = bool_case_ptr result_type ci
+	# case_guards =	BasicPatterns BT_Bool [{bp_value = BVB True, bp_expr = dp_rhs, bp_position = dp_position}]
 	# (case_default, ci)
-		=	convertDynamicAlts cinp
-				kees type_var value_var result_type defoult alts ci
+		=	convertDynamicAlts cinp kees type_var value_var result_type defoult alts ci
 
-	# kees
-		=	{kees & case_info_ptr=case_info_ptr, case_guards=case_guards,
-						case_default=case_default, case_explicit=False, case_expr=Var unify_bool_var}
+	# kees = {kees & case_info_ptr=case_info_ptr, case_guards=case_guards,
+					 case_default=case_default, case_explicit=False, case_expr=Var unify_bool_var}
 
-	# ci
-		=	{ci & ci_new_variables	= [unify_result_fv, unify_bool_fv, unify_subst_fv : ci.ci_new_variables ]}
+	# ci = {ci & ci_new_variables = [unify_result_fv, unify_bool_fv, unify_subst_fv : ci.ci_new_variables ]}
 
-	  (twotuple, ci)
-	  	=	getTupleSymbol 2 ci
+	  (twotuple, ci) = getTupleSymbol 2 ci
 
 	  letje
 		=	{	let_strict_binds = [{ lb_src =  unify_call,
@@ -486,15 +422,14 @@ convertDynamicAlts cinp kees type_var value_var result_type defoult [{dp_rhs, dp
 		  							{ lb_src =  TupleSelect twotuple 0 (Var unify_result_var),
 		  							   lb_dst = unify_bool_fv, lb_position = NoPos }]
 		  	,	let_lazy_binds = [ // { lb_src = Var value_var, lb_dst = dp_var, lb_position = NoPos },
-		  	{ lb_src = TupleSelect twotuple 1 (Var unify_result_var),
+								  	{ lb_src = TupleSelect twotuple 1 (Var unify_result_var),
 		  							   lb_dst = unify_subst_fv, lb_position = NoPos }] ++ binds
 			,	let_info_ptr = let_info_ptr
 			,	let_expr = Case kees
 			,	let_expr_position = NoPos // FIXME, add correct position
 			} 
 
-	=	(Yes (Let letje), ci)
-
+	= (Yes (Let letje), ci)
 
 class position a :: a -> Position
 
@@ -510,27 +445,23 @@ instance position DynamicPattern where
 
 instance convertDynamics BasicPattern where
 	convertDynamics cinp alt=:{bp_expr} ci
-		# (bp_expr, ci)
-			=	convertDynamics cinp bp_expr ci
+		# (bp_expr, ci) = convertDynamics cinp bp_expr ci
 		= ({alt & bp_expr=bp_expr}, ci)
 
 instance convertDynamics AlgebraicPattern where
 	convertDynamics cinp alt=:{ap_expr} ci
-		# (ap_expr, ci)
-			=	convertDynamics cinp ap_expr ci
+		# (ap_expr, ci) = convertDynamics cinp ap_expr ci
 		=	({alt & ap_expr=ap_expr}, ci)
 
 instance convertDynamics Selection where
 	convertDynamics cinp selection=:(RecordSelection _ _) ci
-		=	(selection, ci)
+		= (selection, ci)
 	convertDynamics cinp (ArraySelection selector expr_ptr expr) ci
-		# (expr, ci)
-			=	convertDynamics cinp expr ci
-		=	(ArraySelection selector expr_ptr expr, ci)
+		# (expr, ci) = convertDynamics cinp expr ci
+		= (ArraySelection selector expr_ptr expr, ci)
 	convertDynamics cinp (DictionarySelection var selectors expr_ptr expr) ci
-		# (expr, ci)
-			=	convertDynamics cinp expr ci
-		=	(DictionarySelection var selectors expr_ptr expr, ci)
+		# (expr, ci) = convertDynamics cinp expr ci
+		= (DictionarySelection var selectors expr_ptr expr, ci)
 
 convertExprTypeCode
 	::	!ConversionInput !TypeCodeExpression !*ConversionState
@@ -555,8 +486,7 @@ convertExprTypeCode cinp tce ci
 convertPatternTypeCode :: !ConversionInput !TypeCodeExpression !*ConversionState
 										-> (!Expression, ![LetBind], !*ConversionState)
 convertPatternTypeCode cinp tce ci
-	# (type_code, (_, binds, ci))
-		=	convertTypeCode True cinp tce (False, [], ci)
+	# (type_code, (_, binds, ci)) = convertTypeCode True cinp tce (False, [], ci)
 	=	(type_code, binds, ci)
 
 convertTypeCode :: !Bool !ConversionInput !TypeCodeExpression (!Bool, ![LetBind], !*ConversionState)
