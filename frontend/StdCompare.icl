@@ -7,7 +7,6 @@ instance == TypeVar
 where
 	(==) varid1 varid2 = varid1.tv_info_ptr == varid2.tv_info_ptr
 
-//AA..
 instance == AttributeVar 
 where
 	(==) varid1 varid2 = varid1.av_info_ptr == varid2.av_info_ptr
@@ -15,7 +14,6 @@ where
 instance == AttrInequality
 where
 	(==) ai1 ai2 = ai1.ai_demanded == ai2.ai_demanded && ai1.ai_offered == ai2.ai_offered
-//..AA
 
 instance == FunKind
 where
@@ -41,8 +39,7 @@ instance == ConsVariable
 where
 	(==) (CV tv1) (CV tv2)			= tv1 == tv2
 	(==) (TempCV tv1) (TempCV tv2)	= tv1 == tv2
-	(==) (TempQCV tv1) (TempQCV tv2)	= tv1 == tv2 // MW4++
-// MW4 removed:	(==) cv1 cv2					= False
+	(==) (TempQCV tv1) (TempQCV tv2)= tv1 == tv2
 
 instance == TypeContext
 where
@@ -101,14 +98,12 @@ where
 			= type1 == type2 && types1 == types2
 		equal_constructor_args (TQV varid1) (TQV varid2)
 			= varid1 == varid2
-// MW4..
 		equal_constructor_args (GTV varid1) (GTV varid2)
 			= varid1 == varid2
 		equal_constructor_args (TempQV varid1) (TempQV varid2)
 			= varid1 == varid2
 		equal_constructor_args (TLifted varid1) (TLifted varid2)
 			= varid1 == varid2
-// ..MW4
 		equal_constructor_args type1 type2
 			= True
 
