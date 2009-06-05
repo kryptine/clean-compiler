@@ -450,7 +450,7 @@ where
 		= expandTempTypeVariable tv_number est
 	expandType modules cons_vars (TV {tv_info_ptr}) (subst, es=:{es_type_heaps})
 		# (TVI_Type type, th_vars) = readPtr tv_info_ptr es_type_heaps.th_vars
-		= (True,type, (subst, {es & es_type_heaps = { es_type_heaps & th_vars = th_vars }}))
+		= (True,type, (subst, {es & es_type_heaps = {es_type_heaps & th_vars = th_vars}}))
 	expandType modules cons_vars t0=:(arg_type0 --> res_type0) es
 		# (changed,arg_type, es) = expandType modules cons_vars arg_type0 es
 		| changed
@@ -462,13 +462,6 @@ where
 			| changed
 				= (True,arg_type0 --> res_type, es)
 				= (False,t0, es)
-//AA..
-	expandType modules cons_vars type=:(TArrow1 arg_type) es
-		# (changed,arg_type, es) = expandType modules cons_vars arg_type es
-		| changed
-			= (True, TArrow1 arg_type, es)
-			= (False, type, es)	
-//..AA					
 	expandType modules cons_vars t0=:(TA cons_id=:{type_ident, type_index={glob_object,glob_module},type_prop=type_prop0} cons_args) (subst, es)
 		# ({tdi_kinds}, es) = es!es_td_infos.[glob_module].[glob_object]
 		  (changed,cons_args, hio_signs, hio_props, (subst,es=:{es_td_infos,es_type_heaps})) = expand_type_list modules cons_vars cons_args tdi_kinds (subst, es)
@@ -501,6 +494,11 @@ where
 				= (False,t0, (subst, es))
 				# es = { es & es_td_infos = es_td_infos, es_type_heaps = { es_type_heaps & th_vars = th_vars }}
 				= (True,TAS { cons_id & type_prop = type_prop } cons_args strictness, (subst, es))
+	expandType modules cons_vars type=:(TArrow1 arg_type) es
+		# (changed,arg_type, es) = expandType modules cons_vars arg_type es
+		| changed
+			= (True, TArrow1 arg_type, es)
+			= (False, type, es)	
 	expandType modules cons_vars type=:(TempCV temp_var :@: types) es
 		# (changed_type, var_type, es) = expandTempTypeVariable temp_var es
 		  (changed_types, types, es) = expandType modules cons_vars types es
@@ -518,7 +516,6 @@ where
 					-> (True, TempQCV tv_number :@: types, es)
 				cons_var :@: cv_types
 					-> (True, cons_var :@: (cv_types ++ types), es)
-// AA..
 				TArrow -> case types of
 					[t1, t2] 	-> (True, t1 --> t2, es)
 					[t1]		-> (True, TArrow1 t1, es)
@@ -526,7 +523,6 @@ where
 				(TArrow1 t1) -> case types of
 					[t2]		-> (True, t1 --> t2, es)
 					_			-> (False, type, es)				
-//..AA
 			= (False, type, es)
 	expandType modules cons_vars type es
 		= (False, type, es)
