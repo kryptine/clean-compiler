@@ -186,12 +186,6 @@ where
 		| cui.cui_top_level
 			= cleanUpVariable True type qv_number {cus & cus_exis_vars = add_new_variable type qv_number cus_exis_vars}
 			= cleanUpVariable False type qv_number cus
-	where			
-		add_new_variable TE qv_number cus_exis_vars
-			= [(qv_number, TA_None) : cus_exis_vars]
-		add_new_variable type qv_number cus_exis_vars
-			= cus_exis_vars
-			
 	clean_up cui tv=:(TV _) cus
 		= (tv, cus)
 	clean_up cui (TFA vars type) cus=:{cus_heaps}
@@ -199,6 +193,11 @@ where
 		= (TFA vars type, cus)
 	clean_up cui type cus
 		= abort ("clean_up Type (typesupport.icl): unknown type " ---> ("clean_up Type", type))
+
+add_new_variable TE qv_number cus_exis_vars
+	= [(qv_number, TA_None) : cus_exis_vars]
+add_new_variable type qv_number cus_exis_vars
+	= cus_exis_vars
 				
 instance clean_up [a] | clean_up a
 where
