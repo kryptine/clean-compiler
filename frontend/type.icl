@@ -104,6 +104,12 @@ where
 				| ok
 					-> (True, simplified_type, subst)
 					-> (False, tcv, subst)
+	arraySubst tcv=:((cv=:CV _) :@: types) subst
+		// should occur only for A. type variables
+		# (changed,types, subst) = arraySubst types subst
+		| changed
+			= (True, cv :@: types, subst)
+			= (False, tcv, subst)
 	arraySubst type=:(TArrow1 arg_type) subst
 		# (changed, arg_type, subst) = arraySubst arg_type subst
 		| changed
@@ -134,7 +140,7 @@ where
 		| changed
 			= (True, [type : types ], subst)
 			= (False, t, subst)
-	
+
 instance arraySubst TempSymbolType
 where
 	arraySubst tst=:{tst_args,tst_result,tst_context} subst
@@ -610,7 +616,7 @@ freshConsVariable {tv_info_ptr} type_var_heap
 			= abort "type.icl: to_constructor_variable, tvi\n" ---> tvi
 
 instance freshCopy AType
-where 	
+where
 	freshCopy type=:{at_type = cv :@: types, at_attribute} type_heaps=:{th_attrs}
 		# (fresh_attribute, th_attrs)	= freshCopyOfTypeAttribute at_attribute th_attrs
 		# (fresh_types, type_heaps)		= freshCopy types { type_heaps & th_attrs = th_attrs }
@@ -675,7 +681,6 @@ freshCopyOfTFAType vars type type_heaps
 			= attr_heap <:= (av_info_ptr, AVI_Empty)
 		clear_attr attr attr_heap
 			= attr_heap
-
 
 freshExistentialVariables type_variables var_store attr_store type_heaps
 	= foldSt fresh_existential_variable type_variables ([], var_store, attr_store, type_heaps) 
@@ -847,14 +852,12 @@ freshSymbolType is_appl fresh_context_vars st=:{st_vars,st_args,st_result,st_con
 			fresh_attribute {av_info_ptr} (attr_heap, attr_store)
 				= (attr_heap <:= (av_info_ptr, AVI_Attr (TA_TempVar attr_store)), inc attr_store)
 
-
 		clear_attributes :: [AttributeVar] !*AttrVarHeap -> *AttrVarHeap
 		clear_attributes attributes attr_heap
 			= foldSt clear_attribute attributes attr_heap
 		where
 			clear_attribute {av_info_ptr} attr_heap
 				= attr_heap <:= (av_info_ptr, AVI_Empty)
-
 
 		collect_cons_variables_in_tc common_defs tc=:{tc_class=TCClass {glob_module,glob_object={ds_index}}, tc_types} collected_cons_vars
 			# {class_cons_vars} = common_defs.[glob_module].com_class_defs.[ds_index]
@@ -870,10 +873,9 @@ freshSymbolType is_appl fresh_context_vars st=:{st_vars,st_args,st_result,st_con
 				= case type of
 					TempV temp_var_id 
 						-> collect_cons_variables tc_types (class_cons_vars >> 1) (add_variable temp_var_id collected_cons_vars)
-//							---> ("collect_cons_variables", temp_var_id)
 					_
 						-> collect_cons_variables tc_types (class_cons_vars >> 1) collected_cons_vars
-						
+
 		add_variable new_var_id []
 			= [new_var_id]
 		add_variable new_var_id vars=:[var_id : var_ids]
@@ -930,13 +932,11 @@ freshSymbolType is_appl fresh_context_vars st=:{st_vars,st_args,st_result,st_con
 					
 			clear_binding_of_attr_var av_info_ptr attr_var_heap
 				= attr_var_heap <:= (av_info_ptr, AVI_Empty)
-
 			
 addToExistentialVariables pos [] exis_variables
 	= exis_variables
 addToExistentialVariables pos new_exis_variables exis_variables
 	= [(pos, new_exis_variables) : exis_variables]
-
 	
 freshInequality :: AttrInequality *(Heap AttrVarInfo) -> (!AttrCoercion,!.Heap AttrVarInfo);
 freshInequality {ai_demanded,ai_offered} attr_heap
@@ -1091,11 +1091,9 @@ addPropagationAttributesToType modules (arg_type --> res_type) ps
 addPropagationAttributesToType modules (type_var :@: types) ps
 	# (types, ps) = addPropagationAttributesToATypes modules types ps
 	= (type_var :@: types, ps)
-//AA..
 addPropagationAttributesToType modules (TArrow1 arg_type) ps
 	# (arg_type, prop_class, ps) = addPropagationAttributesToAType modules arg_type ps
 	= (TArrow1 arg_type, ps)
-//..AA
 addPropagationAttributesToType modules type ps
 	= (type, ps)
 
@@ -1159,7 +1157,7 @@ where
 determineSymbolTypeOfFunction :: CoercionPosition Ident Int SymbolType (Ptr VarInfo) {#CommonDefs} *TypeState -> *(!TempSymbolType,!*TypeState);
 determineSymbolTypeOfFunction pos ident act_arity st=:{st_args,st_result,st_attr_vars,st_attr_env} type_ptr common_defs ts=:{ts_var_heap}
 	# (type_info, ts_var_heap) = readPtr type_ptr ts_var_heap
-	  ts = { ts & ts_var_heap = ts_var_heap }
+	  ts = {ts & ts_var_heap = ts_var_heap}
 	= case type_info of
 		VI_PropagationType symb_type
 	   		# (copy_symb_type, ts) = freshSymbolType (Yes pos) cWithFreshContextVars symb_type common_defs ts 
@@ -1179,11 +1177,9 @@ determineSymbolTypeOfFunction pos ident act_arity st=:{st_args,st_result,st_attr
 standardFieldSelectorType pos {glob_object={ds_ident,ds_index},glob_module} {ti_common_defs} ts=:{ts_var_store,ts_attr_store,ts_type_heaps,ts_exis_variables}
 	# (st=:{sd_type,sd_exi_vars}) = ti_common_defs.[glob_module].com_selector_defs.[ds_index]
 	  (new_exis_variables, ts_var_store, ts_attr_store, ts_type_heaps) = freshExistentialVariables sd_exi_vars ts_var_store ts_attr_store ts_type_heaps
-//		  	-?-> (not (isEmpty sd_exi_vars), ("standardFieldSelectorType", sd_exi_vars, st))
 	  ts_exis_variables = addToExistentialVariables pos new_exis_variables ts_exis_variables
 	  ts = { ts & ts_type_heaps = ts_type_heaps, ts_var_store = ts_var_store, ts_attr_store = ts_attr_store, ts_exis_variables = ts_exis_variables }
 	= freshSymbolType (Yes pos) cWithFreshContextVars sd_type ti_common_defs ts
-//		 ---> ("standardFieldSelectorType", ds_ident, inst)
 
 standardTupleSelectorType pos {ds_index} arg_nr {ti_common_defs} ts
 	#! {cons_type} = ti_common_defs.[cPredefinedModuleIndex].com_cons_defs.[ds_index]
@@ -1195,7 +1191,6 @@ standardRhsConstructorType pos index mod arity {ti_common_defs} ts
 	  cons_type = { ct & st_vars = st_vars, st_attr_vars = st_attr_vars }
 	  (fresh_type, ts) = freshSymbolType (Yes pos) cWithFreshContextVars cons_type ti_common_defs ts
 	= currySymbolType fresh_type arity ts
-//		---> ("standardRhsConstructorType", fresh_type)
 where
 	add_vars_and_attr {atv_variable, atv_attribute} (type_variables, attr_variables)
 		= ([ atv_variable : type_variables ], add_attr_var atv_attribute attr_variables)
@@ -1208,11 +1203,9 @@ where
 standardLhsConstructorType pos index mod {ti_common_defs} ts=:{ts_var_store,ts_attr_store,ts_type_heaps,ts_exis_variables}
 	# {cons_ident, cons_type, cons_exi_vars } = ti_common_defs.[mod].com_cons_defs.[index]
 	  (new_exis_variables, ts_var_store, ts_attr_store, ts_type_heaps) = freshExistentialVariables cons_exi_vars ts_var_store ts_attr_store ts_type_heaps
-//	  	-?-> (not (isEmpty cons_exi_vars), ("standardLhsConstructorType", cons_exi_vars, cons_type))
 	  ts_exis_variables = addToExistentialVariables pos new_exis_variables ts_exis_variables
 	  ts = { ts & ts_type_heaps = ts_type_heaps, ts_var_store = ts_var_store, ts_attr_store = ts_attr_store, ts_exis_variables = ts_exis_variables }
 	= freshSymbolType No cWithFreshContextVars cons_type ti_common_defs ts
-//		 ---> ("standardLhsConstructorType", cons_ident, fresh_type)
 
 :: ReferenceMarking :== Bool
 
@@ -1234,7 +1227,7 @@ getSymbolType pos ti=:{ti_functions,ti_common_defs,ti_main_dcl_module_n} {symb_k
 			UncheckedType fun_type
 				# (fun_type_copy, ts) = currySymbolType fun_type n_app_args ts
 				-> (fun_type_copy, [], ts)
-			SpecifiedType fun_type lifted_arg_types _ 
+			SpecifiedType fun_type lifted_arg_types _
 				# (fun_type_copy=:{tst_args,tst_arity}, ts) = freshSymbolType (Yes pos) cWithoutFreshContextVars fun_type ti_common_defs ts
 				  (fun_type_copy, ts) = currySymbolType { fun_type_copy & tst_args = lifted_arg_types ++ fun_type_copy.tst_args,
 				  										  tst_arity = tst_arity + length lifted_arg_types } n_app_args ts
@@ -1280,7 +1273,7 @@ getSymbolType pos ti=:{ti_functions,ti_common_defs,ti_main_dcl_module_n} {symb_k
 		_
 			-> abort ("getSymbolType SK_LocalMacroFunction: "+++toString symb_ident+++" " +++toString glob_object)
 //			-> abort "getSymbolType (type.icl)" ---> (symb_ident, glob_object, fun_type)
-getSymbolType pos ti=:{ti_common_defs} { symb_kind = SK_OverloadedFunction {glob_module,glob_object}} n_app_args ts
+getSymbolType pos ti=:{ti_common_defs} {symb_kind = SK_OverloadedFunction {glob_module,glob_object}} n_app_args ts
 	# {me_ident, me_type,me_type_ptr} = ti_common_defs.[glob_module].com_member_defs.[glob_object]
 	  (fun_type_copy, ts) = determineSymbolTypeOfFunction pos me_ident n_app_args me_type me_type_ptr ti_common_defs ts
 	= (fun_type_copy, [], ts)
@@ -1303,7 +1296,7 @@ instance requirements BoundVar
 where
 	requirements ti {var_ident,var_info_ptr,var_expr_ptr} (reqs, ts)
 		# (var_info, ts_var_heap) = readPtr var_info_ptr ts.ts_var_heap
-		  ts = { ts & ts_var_heap = ts_var_heap }
+		  ts = {ts & ts_var_heap = ts_var_heap}
 		= case var_info of
 			VI_Type type _
 				-> (type, Yes var_expr_ptr, (reqs, ts))
@@ -1389,8 +1382,8 @@ where
 		  (cons_types, reqs_ts) = requirements_of_guarded_expressions case_guards ti case_expr expr_type opt_expr_ptr fresh_v (reqs, ts)
 		  (reqs, ts) = requirements_of_default ti case_default case_default_pos fresh_v reqs_ts
 		  ts_expr_heap =  ts.ts_expr_heap <:= (case_info_ptr, EI_CaseType { ct_pattern_type = expr_type, ct_result_type = fresh_v, ct_cons_types = cons_types })
-		= (fresh_v, No, ({ reqs & req_case_and_let_exprs = [case_info_ptr : reqs.req_case_and_let_exprs]},
-				{ ts & ts_expr_heap = ts_expr_heap }))
+		= (fresh_v, No, ({reqs & req_case_and_let_exprs = [case_info_ptr : reqs.req_case_and_let_exprs]},
+				{ts & ts_expr_heap = ts_expr_heap}))
 	where
 		requirements_of_guarded_expressions (AlgebraicPatterns alg_type patterns) ti=:{ti_common_defs} match_expr pattern_type opt_pattern_ptr
 						goal_type (reqs, ts)
@@ -1497,7 +1490,7 @@ where
 				= (reqs, { ts &  ts_expr_heap = ts_expr_heap })
 				# reqs = { reqs & req_type_coercions = [ type_coercion : reqs.req_type_coercions], req_overloaded_calls = [dyn_expr_ptr : reqs.req_overloaded_calls ]}
 				= (reqs, { ts & ts_expr_heap = ts_expr_heap <:=
-						(dyn_expr_ptr,  EI_Overloaded {  oc_symbol = type_code_symbol, oc_context = dyn_context, oc_specials = [] }) })	
+						(dyn_expr_ptr,  EI_Overloaded {oc_symbol = type_code_symbol, oc_context = dyn_context, oc_specials = []}) })
 	
 		requirements_of_default ti (Yes expr) case_default_pos goal_type reqs_ts
 	  		= possibly_accumulate_reqs_in_new_group
@@ -1534,7 +1527,7 @@ where
 		  (reqs, ts) = requirements_of_binds let_binds var_types NoPos [] reqs ts
 		  (res_type, opt_expr_ptr, (reqs, ts)) = requirements_of_let_expr let_expr_position ti let_expr (reqs, ts)
 		  ts_expr_heap = writePtr let_info_ptr (EI_LetType var_types) ts.ts_expr_heap
-		= ( res_type, opt_expr_ptr, ({ reqs & req_case_and_let_exprs = [let_info_ptr : reqs.req_case_and_let_exprs]},{ ts & ts_expr_heap = ts_expr_heap }))
+		= (res_type, opt_expr_ptr, ({ reqs & req_case_and_let_exprs = [let_info_ptr : reqs.req_case_and_let_exprs]},{ts & ts_expr_heap = ts_expr_heap}))
 	where
 	
 		make_base [{lb_src, lb_dst={fv_ident, fv_info_ptr}}:bs] var_types ts=:{ts_var_heap}
@@ -2021,14 +2014,14 @@ where
 			= (vars, ts)
 			# (var, ts) = freshAttributedVariable ts
 			= fresh_attributed_type_variables (dec n) [var : vars] ts
-
+	/*
 	fresh_non_unique_type_variables :: !Int ![AType] !*TypeState -> (![AType], !*TypeState)
 	fresh_non_unique_type_variables n vars ts
 		| n == 0
 			= (vars, ts)
 			# (var, ts) = freshNonUniqueVariable ts
 			= fresh_non_unique_type_variables (dec n) [var : vars] ts
-
+	*/
 	fresh_dynamics dyn_ptrs state
 		= foldSt fresh_dynamic dyn_ptrs state
 
@@ -2170,8 +2163,7 @@ where
 				# (clean_fun_type, type_var_env, attr_var_env, ts_type_heaps, ts_var_heap, ts_expr_heap, ts_error)
 					= cleanUpSymbolType is_start_rule cSpecifiedType exp_fun_type type_contexts type_ptrs coercion_env 
 										attr_partition type_var_env attr_var_env ts.ts_type_heaps ts.ts_var_heap ts.ts_expr_heap ts.ts_error
-				  ts_error
-					= check_caf_context (newPosition fun_ident fun_pos) fun_kind clean_fun_type ts_error
+				  ts_error = check_caf_context (newPosition fun_ident fun_pos) fun_kind clean_fun_type ts_error
 				| ts_error.ea_ok
 					# (ts_fun_env, attr_var_env, ts_type_heaps, ts_expr_heap, ts_error)
 			  			= check_function_type fun_type tmp_fun_type clean_fun_type type_ptrs defs ts.ts_fun_env attr_var_env ts_type_heaps ts_expr_heap ts_error
@@ -2181,8 +2173,7 @@ where
 				# (clean_fun_type, type_var_env, attr_var_env, ts_type_heaps, ts_var_heap, ts_expr_heap, ts_error)
 					= cleanUpSymbolType is_start_rule cDerivedType exp_fun_type type_contexts type_ptrs coercion_env
 										attr_partition type_var_env attr_var_env ts.ts_type_heaps ts.ts_var_heap ts.ts_expr_heap ts.ts_error
-				  ts_error
-					= check_caf_context (newPosition fun_ident fun_pos) fun_kind clean_fun_type ts_error
+				  ts_error = check_caf_context (newPosition fun_ident fun_pos) fun_kind clean_fun_type ts_error
 				  th_attrs = ts_type_heaps.th_attrs
 				  (out, th_attrs)
 				  		= case list_inferred_types of
@@ -2208,11 +2199,9 @@ where
 		| equi
 			# type_with_lifted_arg_types = addLiftedArgumentsToSymbolType fun_type tst_lifted st_args st_vars st_attr_vars st_context
 			  (type_heaps, expr_heap) = updateExpressionTypes clean_fun_type type_with_lifted_arg_types type_ptrs type_heaps expr_heap
-			= ({ fun_env & [fun] = CheckedType type_with_lifted_arg_types}, attr_var_env, type_heaps, expr_heap, error)
-					// ---> ("check_function_type", clean_fun_type, fun_type, type_with_lifted_arg_types)
+			= ({fun_env & [fun] = CheckedType type_with_lifted_arg_types}, attr_var_env, type_heaps, expr_heap, error)
 			# (printable_type, th_attrs) = beautifulizeAttributes clean_fun_type type_heaps.th_attrs
 			# (printable_type1, th_attrs) = beautifulizeAttributes fun_type th_attrs
-			
 			= (fun_env, attr_var_env, { type_heaps & th_attrs = th_attrs }, expr_heap, specification_error printable_type printable_type1 error)
 	where
 		add_lifted_arg_types arity_diff args1 args2
@@ -2443,7 +2432,7 @@ where
 		# (start_index, predef_symbols) = get_index_of_start_rule predef_symbols
 //		# (functions, fun_defs) = show_component comp fun_defs
 		# (predef_symbols, ts) = CreateInitialSymbolTypes start_index ti_common_defs comp (predef_symbols, ts)
-		| not ts.ts_error.ea_ok  // ---> ("typing", functions)
+		| not ts.ts_error.ea_ok
 			= (True, predef_symbols, special_instances, out, create_erroneous_function_types comp
 					{ ts & ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [],
 								ts_error = { ts.ts_error & ea_ok = True } })
@@ -2631,7 +2620,7 @@ where
 
 	collect_and_expand_overloaded_calls [] calls subst_and_heap
 		= (calls, subst_and_heap)
-	collect_and_expand_overloaded_calls [{ fe_context=Yes context, fe_requirements={req_overloaded_calls,req_case_and_let_exprs}, fe_location, fe_index}:reqs] calls (subst, expr_heap)
+	collect_and_expand_overloaded_calls [{fe_context=Yes context, fe_requirements={req_overloaded_calls,req_case_and_let_exprs}, fe_location, fe_index}:reqs] calls (subst, expr_heap)
 		# (_, context, subst) = arraySubst context subst
 		  subst_expr_heap = expand_case_or_let_types req_case_and_let_exprs (subst, expr_heap)
 		= collect_and_expand_overloaded_calls reqs [(Yes context, req_overloaded_calls, fe_location, fe_index) : calls]
@@ -2729,8 +2718,7 @@ where
 		= ( { fe_location = fe_location, fe_context = if (has_option fun_type) (Yes temp_fun_type.tst_context) No, fe_index = fun_index,
 			  fe_requirements = { rhs_reqs & req_type_coercions = [], req_type_coercion_groups = req_type_coercion_groups }
 		    },
-		    ({ ts & ts_expr_heap = ts_expr_heap }))
-//					 ---> ("type_function", fun_ident, tb_args, tb_rhs, fun_info.fi_local_vars)
+		    {ts & ts_expr_heap = ts_expr_heap})
 	where
 		has_option (Yes _)	= True
 		has_option No 		= False
