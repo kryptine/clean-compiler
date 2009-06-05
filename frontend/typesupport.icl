@@ -84,7 +84,7 @@ where
 			  (var, cus)			= cleanUpVariable True type qv_number cus
 			= ({atype & at_attribute = at_attribute, at_type = var},
 					{cus & cus_exis_vars = add_new_variable type qv_number at_attribute cus.cus_exis_vars})
-	where			
+	where	
 		add_new_variable TE ev_number ev_attr cus_exis_vars
 			= [(ev_number, ev_attr) : cus_exis_vars]
 		add_new_variable type ev_number ev_attr cus_exis_vars
@@ -159,23 +159,25 @@ where
 		=  (argtype --> restype, cus)
 	clean_up cui t=:(TB _) cus
 		=  (t, cus)
-//AA..
 	clean_up cui (TArrow1 argtype) cus
 		# (argtype, cus) = clean_up cui argtype cus
 		=  (TArrow1 argtype, cus)
 	clean_up cui t=:TArrow cus
 		=  (t, cus)
-//..AA
 	clean_up cui (TempCV tempvar :@: types) cus
 		# (type, cus) = cus!cus_var_env.[tempvar]
 		# (type, cus) = cleanUpVariable cui.cui_top_level type tempvar cus
 		  (types, cus) = clean_up cui types cus
 		= (simplifyTypeApplication type types, cus)
-	clean_up cui (TempQCV tempvar :@: types) cus
-		# (type, cus) = cus!cus_var_env.[tempvar]
-		# (TV tv, cus) = cleanUpVariable cui.cui_top_level type tempvar cus
-		  (types, cus) = clean_up cui types cus
-		= (CV tv :@: types, cus)
+	clean_up cui (TempQCV qv_number :@: types) cus=:{cus_exis_vars}
+		# (type, cus) = cus!cus_var_env.[qv_number]
+		| cui.cui_top_level
+			# (TV tv, cus) = cleanUpVariable True type qv_number {cus & cus_exis_vars = add_new_variable type qv_number cus_exis_vars}
+			  (types, cus) = clean_up cui types cus
+			= (CV tv :@: types, cus)
+			# (TV tv, cus) = cleanUpVariable False type qv_number cus
+			  (types, cus) = clean_up cui types cus
+			= (CV tv :@: types, cus)
 	clean_up cui (cv :@: types) cus
 		# (types, cus) = clean_up cui types cus
 		= (cv :@: types, cus)
@@ -204,9 +206,9 @@ where
 
 cleanUpVariable _ TE tv_number cus=:{cus_heaps,cus_var_store,cus_var_env}
 	# (tv_info_ptr, th_vars) = newPtr TVI_Empty cus_heaps.th_vars
-	  new_var = TV { tv_ident = NewVarId cus_var_store, tv_info_ptr = tv_info_ptr }
-	= (new_var, { cus & cus_var_env = { cus_var_env & [tv_number] = new_var},
-				cus_heaps = { cus_heaps & th_vars = th_vars }, cus_var_store = inc cus_var_store})
+	  new_var = TV {tv_ident = NewVarId cus_var_store, tv_info_ptr = tv_info_ptr}
+	= (new_var, {cus & cus_var_env = { cus_var_env & [tv_number] = new_var},
+					   cus_heaps = { cus_heaps & th_vars = th_vars }, cus_var_store = inc cus_var_store})
 cleanUpVariable top_level (TLifted var) tv_number cus=:{cus_error}
 	| top_level
 		= (TV var, { cus & cus_error = liftedError var cus_error})
@@ -293,11 +295,11 @@ errorHeading  error_kind err=:{ea_file,ea_loc = [ loc : _ ]}
 
 contextError class_symb err
 	# err = errorHeading "Overloading error" err
-	= { err & ea_file = err.ea_file <<< " unresolved class \"" <<< class_symb <<< "\" not occurring in specified type\n"}
+	= {err & ea_file = err.ea_file <<< " unresolved class \"" <<< class_symb <<< "\" not occurring in specified type\n"}
 
 liftedContextError class_symb err
 	# err = errorHeading "Overloading error" err
-	= { err & ea_file = err.ea_file <<< " type variable of type of lifted argument appears in class \"" <<< class_symb <<< "\"\n"}
+	= {err & ea_file = err.ea_file <<< " type variable of type of lifted argument appears in class \"" <<< class_symb <<< "\"\n"}
 
 existentialError err
 	# err = errorHeading "Type error" err
@@ -346,7 +348,7 @@ cDerivedType	:== False
 cleanUpSymbolType :: !Bool !Bool !TempSymbolType ![TypeContext] ![ExprInfoPtr] !{! CoercionTree} !AttributePartition
 						!*VarEnv !*AttributeEnv !*TypeHeaps !*VarHeap !*ExpressionHeap !*ErrorAdmin
 							-> (!SymbolType, !*VarEnv, !*AttributeEnv, !*TypeHeaps, !*VarHeap, !*ExpressionHeap, !*ErrorAdmin)
-cleanUpSymbolType is_start_rule spec_type tst=:{tst_arity,tst_args,tst_result,tst_context,tst_lifted} derived_context case_and_let_exprs
+cleanUpSymbolType is_start_rule spec_type {tst_arity,tst_args,tst_result,tst_context,tst_lifted} derived_context case_and_let_exprs
 		coercions attr_part var_env attr_var_env heaps var_heap expr_heap error
 	#! nr_of_temp_vars = size var_env
 	#! max_attr_nr = size attr_var_env
@@ -366,12 +368,11 @@ cleanUpSymbolType is_start_rule spec_type tst=:{tst_arity,tst_args,tst_result,ts
 				expr_heap { cus & cus_var_env = cus_var_env, cus_attr_env = cus_attr_env,
 							 cus_appears_in_lifted_part = {el\\el<-:cus.cus_appears_in_lifted_part},
 							 cus_error = cus_error }
-	  st = {  st_arity = tst_arity, st_vars = st_vars , st_args = lifted_args ++ st_args, st_args_strictness=NotStrict, st_result = st_result, st_context = st_context,
+	  st = {st_arity = tst_arity, st_vars = st_vars , st_args = lifted_args ++ st_args, st_args_strictness=NotStrict, st_result = st_result, st_context = st_context,
 			st_attr_env = st_attr_env, st_attr_vars = st_attr_vars }
 	  cus_error = check_type_of_start_rule is_start_rule st cus_error
 	= (st,			{ cus_var_env & [i] = TE \\ i <- [0..nr_of_temp_vars - 1]},
 					{ cus_attr_env & [i] = TA_None \\ i <- [0..max_attr_nr - 1]}, cus_heaps, var_heap, expr_heap, cus_error)
-//					---> ("cleanUpSymbolType", st)
 where
 	determine_type_vars to_index all_vars var_env
 		= iFoldSt determine_type_var 0 to_index (all_vars, var_env)
@@ -397,7 +398,7 @@ where
 		| isEmpty cus_exis_vars
 			= (at, (all_exi_vars, cus))
 			# (new_exi_vars, all_exi_vars, cus) = foldSt check_existential_var cus_exis_vars ([], all_exi_vars, cus)
-			= ({ at & at_type = TFA new_exi_vars at.at_type }, (all_exi_vars, { cus & cus_exis_vars = [] }))
+			= ({ at & at_type = TFA new_exi_vars at.at_type }, (all_exi_vars, {cus & cus_exis_vars = []}))
 	where
 		check_existential_var (var_number,var_attr) (exi_vars, all_vars, cus)
 			| isMember var_number all_vars
@@ -408,10 +409,10 @@ where
 					_
 						# (TV var, cus) = cus!cus_var_env.[var_number]
 						-> ([{atv_attribute = var_attr, atv_variable = var } : exi_vars ], all_vars,
-							{ cus & cus_var_env = { cus.cus_var_env & [var_number] = TE }, cus_error = existentialError cus.cus_error })
+							{cus & cus_var_env = {cus.cus_var_env & [var_number] = TE }, cus_error = existentialError cus.cus_error })
 				# (TV var, cus) = cus!cus_var_env.[var_number]
 				= ([{atv_attribute = var_attr, atv_variable = var } : exi_vars ],
-						[var_number : all_vars], { cus & cus_var_env = { cus.cus_var_env & [var_number] = TE }})
+						[var_number : all_vars], {cus & cus_var_env = {cus.cus_var_env & [var_number] = TE}})
 
 	clean_up_result_type cui at cus
 		# (at, cus=:{cus_exis_vars}) = clean_up cui at cus
@@ -436,7 +437,7 @@ where
 				= var_heap
 				= var_heap <:= (spec_tc.tc_var, VI_ForwardClassVar tc_var)
 			= mark_specified_context tcs spec_tc var_heap
-				
+
 	clean_up_type_context tc=:{tc_types, tc_class} (collected_contexts, env, error)
 		# (cur, tc_types, env) = cleanUpClosed tc_types env
 		| checkCleanUpResult cur cUndefinedVar
@@ -564,7 +565,6 @@ where
 	to 'TVI_Type t' were t is the subtype to which the type variable is matched.
 	Be careful with calling 'bindInstances': all the 'tv_info_ptr'-info's should be cleaned first, unless one 
 	is sure that t1 does not contain any 'tv_info_ptr' with value  'TVI_Type ...'.
-	
 
 	instance bindInstances AType, Type, [a] | bindInstances a
 */ 
@@ -738,7 +738,7 @@ instance substitute Type
 where
 	substitute tv=:(TV {tv_info_ptr}) heaps=:{th_vars}
 		# (tv_info, th_vars) = readPtr tv_info_ptr th_vars
-		  heaps = { heaps & th_vars = th_vars }
+		  heaps = {heaps & th_vars = th_vars}
 		= case tv_info of
 			TVI_Type type
 				-> (type, heaps)
@@ -758,7 +758,7 @@ where
 		= (TAS cons_id cons_args strictness,  heaps)
 	substitute (CV type_var :@: types) heaps=:{th_vars}
 		# (tv_info, th_vars) = readPtr type_var.tv_info_ptr th_vars
-		  heaps = { heaps & th_vars = th_vars }
+		  heaps = {heaps & th_vars = th_vars}
 		  (types, heaps) = substitute types heaps
 		= case tv_info of
 			TVI_Type type
@@ -966,6 +966,9 @@ where
 		| equi_vars
 			= equiv types1 types2 { heaps & th_vars = th_vars }
 			= (False, { heaps & th_vars = th_vars })
+	equiv (CV tv1 :@: types1) (CV tv2 :@: types2) heaps
+		// should occur only for A. type variables
+		= equiv types1 types2 heaps
 	equiv (TFA vars1 type1) (TFA vars2 type2) heaps
 		= equiv type1 type2 heaps
 	equiv type1 type2 heaps
@@ -1336,7 +1339,6 @@ where
 			= (file, opt_beautifulizer)
 	writeType file opt_beautifulizer (form, TB tb)
 		= (file <<< tb, opt_beautifulizer)
-//AA..
 	writeType file opt_beautifulizer (form, TArrow)
 		= (file <<< "(->)", opt_beautifulizer)	
 	writeType file opt_beautifulizer (form, TArrow1 t)
@@ -1344,7 +1346,6 @@ where
 		# (file, opt_opt_beautifulizer) = writeType file opt_beautifulizer (form, t)
 		# file = file <<< ")" 
 		= (file, opt_beautifulizer)	
-//..AA		
 	writeType file opt_beautifulizer (form, TFA vars type)
 		 # (file, opt_beautifulizer) = writeType (file <<< "(A.") opt_beautifulizer (form, vars)
 		 # (file, opt_beautifulizer) = writeType (file <<< ":") opt_beautifulizer (clearProperty form cBrackets, type)
@@ -1598,12 +1599,10 @@ getImplicitAttrInequalities st=:{st_args, st_result}
 		= get_ineqs_of_atype_list args
 	get_ineqs_of_type (l --> r)
 		= Pair (get_ineqs_of_atype l) (get_ineqs_of_atype r)
-//AA..
-	get_ineqs_of_type (TArrow1 type)
-		= get_ineqs_of_atype type
-//..AA
 	get_ineqs_of_type (cv :@: args)
 		= get_ineqs_of_atype_list args
+	get_ineqs_of_type (TArrow1 type)
+		= get_ineqs_of_atype type
 	get_ineqs_of_type (TFA vars type)
 		= get_ineqs_of_type type
 	get_ineqs_of_type _
@@ -1968,8 +1967,7 @@ removeUnusedAttrVars demanded unused_attr_vars
 	
 getTypeVars :: !a !*TypeVarHeap -> (!.[TypeVar],!.TypeVarHeap) | performOnTypeVars a
 getTypeVars type th_vars
-	# th_vars
-			= performOnTypeVars initializeToTVI_Empty type th_vars
+	# th_vars = performOnTypeVars initializeToTVI_Empty type th_vars
 	= performOnTypeVars accum_unencountered_type_var type ([], th_vars)
   where
 	accum_unencountered_type_var _ tv=:{tv_info_ptr} (type_var_accu, th_vars)
@@ -1982,8 +1980,7 @@ getTypeVars type th_vars
 
 getAttrVars :: !a !*AttrVarHeap -> (!.[AttributeVar],!.AttrVarHeap) | performOnAttrVars a
 getAttrVars type th_attrs
-	# th_attrs
-			= performOnAttrVars initializeToAVI_Empty type th_attrs
+	# th_attrs = performOnAttrVars initializeToAVI_Empty type th_attrs
 	= performOnAttrVars accum_unencountered_attr_var type ([], th_attrs)
   where
 	accum_unencountered_attr_var av=:{av_info_ptr} (attr_var_accu, th_attrs)
@@ -2005,12 +2002,10 @@ instance performOnTypeVars Type
 		= performOnTypeVars f args st
 	performOnTypeVars f (at1 --> at2) st
 		= performOnTypeVars f at2 (performOnTypeVars f at1 st)
-//AA..
-	performOnTypeVars f (TArrow1 at) st
-		= performOnTypeVars f at st
-//..AA
 	performOnTypeVars f (cv :@: at) st
 		= performOnTypeVars f cv (performOnTypeVars f at st)
+	performOnTypeVars f (TArrow1 at) st
+		= performOnTypeVars f at st
 	performOnTypeVars f (TFA vars type) st
 		= performOnTypeVars f type st
 	performOnTypeVars f _ st
@@ -2055,11 +2050,9 @@ instance performOnAttrVars Type
 		= performOnAttrVars f args st
 	performOnAttrVars f (at1 --> at2) st
 		= performOnAttrVars f at2 (performOnAttrVars f at1 st)
-//AA..
-	performOnAttrVars f (TArrow1 at) st
-		= performOnAttrVars f at st
-//..AA
 	performOnAttrVars f (_ :@: at) st
+		= performOnAttrVars f at st
+	performOnAttrVars f (TArrow1 at) st
 		= performOnAttrVars f at st
 	performOnAttrVars f (TFA vars type) st
 		= performOnAttrVars f type st
