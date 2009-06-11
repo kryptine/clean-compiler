@@ -466,7 +466,7 @@ checkExplicitImportCompleteness dcls_explicit explicit_qualified_imports dcl_mod
 	   				{ box_ccs = box_ccs }
 	  { ccs_dcl_modules, ccs_icl_functions,ccs_macro_defs,ccs_expr_heap, ccs_symbol_table, ccs_error, ccs_heap_changes_accu } = ccs.box_ccs
 	// repair heap contents
-	  ccs_symbol_table = restore_symbol_table_after_checking_completeness modified_symbol_ptrs ccs_symbol_table
+	  ccs_symbol_table = restore_symbol_table_after_checking_completeness ccs_heap_changes_accu ccs_symbol_table
 
 	  cs = { cs & cs_symbol_table = ccs_symbol_table, cs_error = ccs_error }
 	= (ccs_dcl_modules, ccs_icl_functions,ccs_macro_defs, ccs_expr_heap, cs)
