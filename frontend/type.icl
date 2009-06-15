@@ -2466,9 +2466,9 @@ where
 		# (subst, coercions, ts_td_infos, ts_type_heaps, ts_error)
 		  		= build_coercion_env fun_reqs subst coercion_env ti_common_defs cons_var_vects ts_td_infos os_type_heaps os_error
 		  (subst, ts_fun_env) = expand_function_types comp subst ts.ts_fun_env
-		  (ts_fun_env, {coer_offered,coer_demanded})
+		  ({coer_offered,coer_demanded},ts_error,ts_fun_env)
 		  		= foldSt (add_unicity_of_essentially_unique_types_for_function ti_common_defs)
-		  				comp (ts_fun_env, coercions)
+		  				comp (coercions,ts_error,ts_fun_env)
 		  (attr_partition, coer_demanded) = partitionateAttributes coer_offered coer_demanded
 		  (coer_demanded, ts_error) = check_existential_attributes ts_exis_variables attr_partition coer_demanded ts_error
 		  attr_var_env = createArray nr_of_attr_vars TA_None
@@ -2492,37 +2492,45 @@ where
 				  	ts_var_heap = ts_var_heap, ts_type_heaps = { ts_type_heaps & th_vars =  tci_type_var_heap, th_attrs =  tci_attr_var_heap },
 				  	ts_fun_env = ts_fun_env, ts_fun_defs=fun_defs})
 
-	add_unicity_of_essentially_unique_types_for_function ti_common_defs fun (ts_fun_env, coercions)
+	add_unicity_of_essentially_unique_types_for_function ti_common_defs fun (coercions,ts_error,ts_fun_env)
 		# (env_type, ts_fun_env) = ts_fun_env![fun]
 		= case env_type of
 			ExpandedType _ _ _
-				-> (ts_fun_env, coercions)
+				-> (coercions,ts_error,ts_fun_env)
 		  	UncheckedType {tst_args, tst_result}
-				-> ( ts_fun_env
-				   , foldSt (foldATypeSt (add_unicity_of_essentially_unique_type ti_common_defs) (\x st -> st)) 
-							[tst_result:tst_args] coercions
-				   )
+		  		# (coercions,ts_error)
+		  			= foldSt (foldATypeSt (add_unicity_of_essentially_unique_type ti_common_defs) (\x st -> st)) [tst_result:tst_args]
+						(coercions,ts_error)
+				-> (coercions,ts_error,ts_fun_env)
 	  where
-		add_unicity_of_essentially_unique_type common_defs 
-								{at_attribute=TA_TempVar av_number, at_type=TA {type_index} _} coercions
-			# {td_attribute} = common_defs.[type_index.glob_module].com_type_defs.[type_index.glob_object]
+		add_unicity_of_essentially_unique_type common_defs {at_attribute=TA_TempVar av_number, at_type=TA {type_index} _} (coercions,ts_error)
+			# {td_attribute,td_ident} = common_defs.[type_index.glob_module].com_type_defs.[type_index.glob_object]
 			= case td_attribute of
 				TA_Unique
 					// the type is essentially unique
-					-> snd (tryToMakeUnique av_number coercions)
+					# (ok,coercions) = tryToMakeUnique av_number coercions
+					| ok
+						-> (coercions,ts_error)
+						-> (coercions,type_not_unique_error td_ident ts_error)
 				_
-					-> coercions
-		add_unicity_of_essentially_unique_type common_defs 
-								{at_attribute=TA_TempVar av_number, at_type=TAS {type_index} _ _} coercions
-			# {td_attribute} = common_defs.[type_index.glob_module].com_type_defs.[type_index.glob_object]
+					-> (coercions,ts_error)
+		add_unicity_of_essentially_unique_type common_defs {at_attribute=TA_TempVar av_number, at_type=TAS {type_index} _ _} (coercions,ts_error)
+			# {td_attribute,td_ident} = common_defs.[type_index.glob_module].com_type_defs.[type_index.glob_object]
 			= case td_attribute of
 				TA_Unique
 					// the type is essentially unique
-					-> snd (tryToMakeUnique av_number coercions)
+					# (ok,coercions) = tryToMakeUnique av_number coercions
+					| ok
+						-> (coercions,ts_error)
+						-> (coercions,type_not_unique_error td_ident ts_error)
 				_
-					-> coercions
-		add_unicity_of_essentially_unique_type _ _ coercions
-			= coercions
+					-> (coercions,ts_error)
+		add_unicity_of_essentially_unique_type _ _ coercions_and_ts_error
+			= coercions_and_ts_error
+
+		type_not_unique_error type_name err
+			# err = errorHeading "Uniqueness error " err
+			= {err & ea_file = err.ea_file <<< "* annotated type " <<< type_name <<< " occurs non unique in inferred function type"<<< '\n'}
 
 	unify_requirements_of_functions :: ![FunctionRequirements] !TypeInput !*{!Type} !*TypeHeaps !*ErrorAdmin -> (!*{!Type},!*TypeHeaps,!*ErrorAdmin)
 	unify_requirements_of_functions [{fe_requirements={req_type_coercion_groups},fe_location={ip_ident}} : reqs_list] ti subst heaps ts_error
