@@ -32,9 +32,6 @@ import genericsupport, compilerSwitches, type_io_common
 						| CA_Context !TypeContext
 						| CA_LocalTypeCode !VarInfoPtr			/* for (local) type pattern variables */
 						| CA_GlobalTypeCode !TypeCodeInstance	/* for (global) type constructors */
-
-
-
 		
 instanceError symbol types err
 	# err = errorHeading "Overloading error" err
@@ -253,6 +250,11 @@ where
 		| type_cons1 == type_cons2
 			= adjust_attributes_and_subtypes defs cons_args1 cons_args2 (ok, coercion_env, type_heaps)
 			= expand_types_and_adjust_type_attribute type_cons1 cons_args1 type_cons2 cons_args2 defs type1 type2 ok coercion_env type_heaps
+	adjust_type_attribute defs type1=:(TA type_cons1 cons_args1) type2 (ok, coercion_env, type_heaps)
+		# (expanded, type1, type_heaps) = tryToExpandTypeSyn defs type1 type_cons1 cons_args1 type_heaps
+		| expanded
+			= adjust_type_attribute defs type1 type2 (ok, coercion_env, type_heaps)
+			= (ok, coercion_env, type_heaps)
 	adjust_type_attribute defs type1=:(TAS type_cons1 cons_args1 _) type2=:(TA type_cons2 cons_args2) (ok, coercion_env, type_heaps)
 		| type_cons1 == type_cons2
 			= adjust_attributes_and_subtypes defs cons_args1 cons_args2 (ok, coercion_env, type_heaps)
@@ -261,24 +263,17 @@ where
 		| type_cons1 == type_cons2
 			= adjust_attributes_and_subtypes defs cons_args1 cons_args2 (ok, coercion_env, type_heaps)
 			= expand_types_and_adjust_type_attribute type_cons1 cons_args1 type_cons2 cons_args2 defs type1 type2 ok coercion_env type_heaps
-	adjust_type_attribute defs (arg_type1 --> res_type1) (arg_type2 --> res_type2) state
-		= adjust_attributes_and_subtypes defs [arg_type1, res_type1] [arg_type2, res_type2] state
-// AA..
-	adjust_type_attribute defs (TArrow1 x) (TArrow1 y) state
-		= adjust_attributes_and_subtypes defs [x] [y] state
-// ..AA
-	adjust_type_attribute defs (_ :@: types1) (_ :@: types2) state
-		= adjust_attributes_and_subtypes defs types1 types2 state
-	adjust_type_attribute defs type1=:(TA type_cons1 cons_args1) type2 (ok, coercion_env, type_heaps)
-		# (expanded, type1, type_heaps) = tryToExpandTypeSyn defs type1 type_cons1 cons_args1 type_heaps
-		| expanded
-			= adjust_type_attribute defs type1 type2 (ok, coercion_env, type_heaps)
-			= (ok, coercion_env, type_heaps)
 	adjust_type_attribute defs type1=:(TAS type_cons1 cons_args1 _) type2 (ok, coercion_env, type_heaps)
 		# (expanded, type1, type_heaps) = tryToExpandTypeSyn defs type1 type_cons1 cons_args1 type_heaps
 		| expanded
 			= adjust_type_attribute defs type1 type2 (ok, coercion_env, type_heaps)
 			= (ok, coercion_env, type_heaps)
+	adjust_type_attribute defs (arg_type1 --> res_type1) (arg_type2 --> res_type2) state
+		= adjust_attributes_and_subtypes defs [arg_type1, res_type1] [arg_type2, res_type2] state
+	adjust_type_attribute defs (TArrow1 x) (TArrow1 y) state
+		= adjust_attributes_and_subtypes defs [x] [y] state
+	adjust_type_attribute defs (_ :@: types1) (_ :@: types2) state
+		= adjust_attributes_and_subtypes defs types1 types2 state
 	adjust_type_attribute defs type1 type2=:(TA type_cons2 cons_args2) (ok, coercion_env, type_heaps)
 		# (expanded, type2, type_heaps) = tryToExpandTypeSyn defs type2 type_cons2 cons_args2 type_heaps
 		| expanded
@@ -556,7 +551,7 @@ where
 			  (rc_red_contexts, rtcs_state) = reduce_TC_contexts defs type_code_class cons_args rtcs_state
 			= (CA_GlobalTypeCode { tci_constructor = type_constructor, tci_contexts = rc_red_contexts }, rtcs_state)
 		reduce_tc_context defs type_code_class (TAS cons_id cons_args _) rtcs_state
-			=	reduce_tc_context defs type_code_class (TA cons_id cons_args) rtcs_state
+			= reduce_tc_context defs type_code_class (TA cons_id cons_args) rtcs_state
 		reduce_tc_context defs type_code_class (TB basic_type) rtcs_state
 			= (CA_GlobalTypeCode { tci_constructor = GTT_Basic basic_type, tci_contexts = [] }, rtcs_state)
 		reduce_tc_context defs type_code_class (arg_type --> result_type) rtcs_state
@@ -570,6 +565,13 @@ where
 			# (tc_var, rtcs_var_heap) = newPtr VI_Empty rtcs_var_heap
 			# rtcs_state={rtcs_state & rtcs_var_heap=rtcs_var_heap}
 			  tc = { tc_class = type_code_class, tc_types = [TempV var_number], tc_var = tc_var }
+			| containsContext tc rtcs_new_contexts
+				= (CA_Context tc, rtcs_state)
+				= (CA_Context tc, {rtcs_state & rtcs_new_contexts = [tc : rtcs_new_contexts]})
+		reduce_tc_context defs type_code_class type=:(TempCV _ :@: _) rtcs_state=:{rtcs_var_heap, rtcs_new_contexts}
+			# (tc_var, rtcs_var_heap) = newPtr VI_Empty rtcs_var_heap
+			# rtcs_state={rtcs_state & rtcs_var_heap=rtcs_var_heap}
+			  tc = { tc_class=type_code_class, tc_types=[type], tc_var=tc_var }
 			| containsContext tc rtcs_new_contexts
 				= (CA_Context tc, rtcs_state)
 				= (CA_Context tc, {rtcs_state & rtcs_new_contexts = [tc : rtcs_new_contexts]})
