@@ -17,12 +17,9 @@ SwitchCurriedFusion			fuse xtra dont_fuse :== fuse
 SwitchExtraCurriedFusion	fuse macro	   :== fuse//(fuse && macro)//fuse
 SwitchTrivialFusion			fuse dont_fuse :== fuse
 SwitchUnusedFusion			fuse dont_fuse :== fuse
-SwitchReanalyseFunction		rean dont_rean :== dont_rean
 SwitchTransformConstants	tran dont_tran :== tran
 SwitchSpecialFusion			fuse dont_fuse :== fuse
 SwitchArityChecks			check dont_check :== check
-SwitchNWayFusion			fuse dont_fuse :== dont_fuse
-SwitchDirectConsumerUnfold	unfold dont    :== dont
 SwitchAutoFoldCaseInCase	fold dont	   :== fold
 SwitchAutoFoldAppInCase		fold dont	   :== fold
 SwitchAlwaysIntroduceCaseFunction yes no   :== no//yes
@@ -2428,12 +2425,12 @@ transformFunctionApplication fun_def instances cc=:{cc_size, cc_args, cc_linear_
 	  			# (expr,ti) = transformApplication { app & app_symb = app_symb, app_args = app_args } extra_args ro ti
 	  			= possiblyAddStrictLetBinds expr strict_let_binds ti
   			# (FI_Function {gf_fun_index, gf_fun_def}, ti_fun_heap) = readPtr fun_def_ptr ti_fun_heap
+  			# ti = {ti & ti_fun_heap = ti_fun_heap}
 			| gf_fun_index == (-1)
 				= (build_application { app & app_args = app_args } extra_args, ti) // ---> ("known failed instance")
 			# app_symb` = { app_symb & symb_kind = SK_GeneratedFunction fun_def_ptr gf_fun_index }
 			  (app_args, extra_args) = complete_application gf_fun_def.fun_arity new_args extra_args
-  			# ti = {ti & ti_fun_heap = ti_fun_heap } // ---> ("known instance",gf_fun_index)
-  			# (expr,ti) = transformApplication { app & app_symb = app_symb`, app_args = app_args } extra_args ro ti
+  			# (expr,ti) = transformApplication { app & app_symb = app_symb`, app_args = app_args } extra_args ro ti // ---> ("known instance",gf_fun_index)
   			= possiblyAddStrictLetBinds expr strict_let_binds ti
 		| SwitchTrivialFusion ro.ro_transform_fusion False
 			= transform_trivial_function app app_args extra_args ro ti

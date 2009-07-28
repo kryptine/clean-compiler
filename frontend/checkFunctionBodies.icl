@@ -1472,7 +1472,7 @@ checkQualifiedIdentExpression free_vars module_id ident_name is_expr_list e_inpu
 										| is_called_before ei_fun_index calls
 											-> (e_state,cs)
 											# entry = {entry & ste_kind = STE_DclMacroOrLocalMacroFunction [ ei_fun_index : calls ]}
-											# cs = {cs & cs_symbol_table = writePtr symbol_table_ptr entry cs_symbol_table}
+											# cs = {cs & cs_symbol_table = writePtr symbol_table_ptr entry cs.cs_symbol_table}
 											-> ({e_state & es_calls = [MacroCall ste_mod_index ste_index ste_def_level : es_calls ]},cs)
 								/* also imported unqualified */
 								STE_DclMacroOrLocalMacroFunction calls
@@ -1480,7 +1480,7 @@ checkQualifiedIdentExpression free_vars module_id ident_name is_expr_list e_inpu
 										| is_called_before ei_fun_index calls
 											-> (e_state,cs)
 											# entry = {entry & ste_kind = STE_DclMacroOrLocalMacroFunction [ ei_fun_index : calls ]}
-											# cs = {cs & cs_symbol_table = writePtr symbol_table_ptr entry cs_symbol_table}
+											# cs = {cs & cs_symbol_table = writePtr symbol_table_ptr entry cs.cs_symbol_table}
 											-> ({e_state & es_calls = [MacroCall ei_mod_index ste_index ste_def_level : es_calls ]},cs)
 								_
 									| macro_is_called_before decl_index mod_index es_calls

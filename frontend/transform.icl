@@ -2281,7 +2281,7 @@ collectUpdateVar var=:{var_ident,var_info_ptr,var_expr_ptr} update_selectors fre
 			# (original, free_vars, dynamics, cos) = collectUpdateVar alias update_selectors free_vars dynamics { cos & cos_var_heap = cos_var_heap }
 			-> ({ original & var_expr_ptr = var_expr_ptr }, free_vars, dynamics, cos)
 		VI_RefFromTupleSel0 count
-			-> (var, free_vars, dynamics, { cos & cos_var_heap = writePtr var_info_ptr (VI_Count (inc count) False) cos.cos_var_heap })
+			-> (var, free_vars, dynamics, { cos & cos_var_heap = writePtr var_info_ptr (VI_Count (inc count) False) cos_var_heap })
 		VI_RefFromArrayUpdate count selectors
 			| same_selections selectors update_selectors
 				-> (var, free_vars, dynamics, { cos & cos_var_heap = writePtr var_info_ptr (VI_RefFromArrayUpdate (inc count) update_selectors) cos_var_heap })
@@ -2291,7 +2291,7 @@ collectUpdateVar var=:{var_ident,var_info_ptr,var_expr_ptr} update_selectors fre
 			# cos_var_heap = writePtr var_info_ptr (VI_Count (inc count) False) cos_var_heap
 			-> (var, free_vars, dynamics, { cos & cos_var_heap = cos_var_heap })			
 		VI_RefFromArrayUpdateOfTupleElem2 count _
-			-> (var, free_vars, dynamics, { cos & cos_var_heap = writePtr var_info_ptr (VI_Count (inc count) False) cos.cos_var_heap })
+			-> (var, free_vars, dynamics, { cos & cos_var_heap = writePtr var_info_ptr (VI_Count (inc count) False) cos_var_heap })
 
 collectUpdateTupleSelect2Var :: !BoundVar ![Selection] ![FreeVar] ![DynamicPtr] !*CollectState -> (!BoundVar, ![FreeVar],![DynamicPtr],!*CollectState)
 collectUpdateTupleSelect2Var var=:{var_ident,var_info_ptr,var_expr_ptr} update_selectors free_vars dynamics cos=:{cos_var_heap}
