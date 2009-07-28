@@ -630,7 +630,7 @@ where
 			= var_heap
 
 		set_strict_let_expr_info lb=:{lb_dst={fv_info_ptr}} var_heap
-			# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
+			# (new_info_ptr, var_heap) = newPtr VI_StrictLetVar var_heap
 			= ({lb & lb_dst.fv_info_ptr = new_info_ptr}, var_heap <:= (fv_info_ptr, VI_CaseOrStrictLetVar new_info_ptr))
 	
 		distribute_lets_in_non_distributed_let di {lb_dst={fv_ident,fv_info_ptr}} ds=:{ds_var_heap}
@@ -717,11 +717,13 @@ where
 				is_lhs_var (Var {var_info_ptr, var_ident}) var_heap
 					= 	case sreadPtr var_info_ptr var_heap of
 							VI_LocalLetVar
-								->	False ->> (var_ident.id_name, "rhs1")
+								->	False
 							VI_LetExpression _
-								->	False ->> (var_ident.id_name, "rhs2")
+								->	False
+							VI_StrictLetVar
+								->	False
 							info
-								->	True ->> (var_ident.id_name, "lhs", info)
+								->	True
 				is_lhs_var _ _
 					=	False
 		

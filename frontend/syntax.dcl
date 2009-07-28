@@ -691,7 +691,7 @@ from convertDynamics import :: TypeCodeVariableInfo, :: DynamicValueAliasInfo
 				VI_ClassVar !Ident !VarInfoPtr !Int | /* to hold dictionary variables during overloading */
 				VI_ForwardClassVar !VarInfoPtr | /* to hold the dictionary variable generated during overloading */
 				VI_Forward !BoundVar | VI_LetVar !LetVarInfo | VI_LetExpression !LetExpressionInfo |
-				VI_CaseOrStrictLetVar !VarInfoPtr |
+				VI_CaseOrStrictLetVar !VarInfoPtr | VI_StrictLetVar |
 				VI_CorrespondenceNumber !Int | /* it is assumed that this alternative is _only_ used in module comparedefimp */
 				VI_SequenceNumber !Int | VI_AliasSequenceNumber !BoundVar |
 				VI_Used | /* for indicating that an imported function has been used */
