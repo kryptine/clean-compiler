@@ -690,7 +690,8 @@ from convertDynamics import :: TypeCodeVariableInfo, :: DynamicValueAliasInfo
 				VI_FreeVar !Ident !VarInfoPtr !Int !AType | VI_BoundVar !AType | VI_LocalVar |
 				VI_ClassVar !Ident !VarInfoPtr !Int | /* to hold dictionary variables during overloading */
 				VI_ForwardClassVar !VarInfoPtr | /* to hold the dictionary variable generated during overloading */
-				VI_Forward !BoundVar | VI_LetVar !LetVarInfo | VI_LetExpression !LetExpressionInfo | VI_CaseVar !VarInfoPtr |
+				VI_Forward !BoundVar | VI_LetVar !LetVarInfo | VI_LetExpression !LetExpressionInfo |
+				VI_CaseOrStrictLetVar !VarInfoPtr |
 				VI_CorrespondenceNumber !Int | /* it is assumed that this alternative is _only_ used in module comparedefimp */
 				VI_SequenceNumber !Int | VI_AliasSequenceNumber !BoundVar |
 				VI_Used | /* for indicating that an imported function has been used */
@@ -706,7 +707,7 @@ from convertDynamics import :: TypeCodeVariableInfo, :: DynamicValueAliasInfo
 // MdM
 				VI_CPSExprVar !CheatCompiler /* a pointer to a variable in CleanProverSystem is stored here, using a cast */
 // ... MdM
-				| VI_Labelled_Empty {#Char} // RWS debugging
+				| VI_Labelled_Empty !{#Char} // RWS debugging
 				| VI_LocalLetVar // RWS, mark Let vars during case transformation
 
 ::	ExtendedVarInfo = EVI_VarType !AType
@@ -851,7 +852,6 @@ cNonRecursiveAppl	:== False
 ::	ExtendedExprInfo
 					= EEI_ActiveCase !ActiveCaseInfo
 
-
 ::	ActiveCaseInfo =
 	{	aci_params					:: ![FreeVar]
 	,	aci_opt_unfolder			:: !(Optional SymbIdent)
@@ -859,15 +859,6 @@ cNonRecursiveAppl	:== False
 	,	aci_linearity_of_patterns	:: ![[Bool]]
 	,	aci_safe					:: !Bool
 	}
-
-
-/*
-::	UnboundVariable =
-	{	free_name		:: !Ident
-	,	free_info_ptr	:: !VarInfoPtr
-	,	free_selections	:: ![Int]
-	}
-*/
 
 /*
 	OverloadedCall contains (type) information about functions that are overloaded. This structure is built during type checking
