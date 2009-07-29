@@ -1113,8 +1113,9 @@ instance toString 	KindInfo
 	}
 
 ::	OccurrenceBinding	= OB_Empty 
-						| OB_OpenLet	FreeVar (Optional RefMarkResult)
-						| OB_LockedLet	OccurrenceBinding
+						| OB_OpenLet	!FreeVar !(Optional RefMarkResult)
+						| OB_LockedLet	!OccurrenceBinding
+						| OB_MarkedLet	!OccurrenceBinding
 
 ::	RefMarkResult :== ([CountedFreeVar], [FreeVar])
 

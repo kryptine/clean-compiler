@@ -22,7 +22,7 @@ fullRefMarkOfRootOrLetExpr free_vars sel def expr rms_counted_let_vars var_heap
 		= refMark free_vars sel def expr {rms_var_heap=var_heap, rms_let_vars=[], rms_counted_let_vars=rms_counted_let_vars}
 	  rms_var_heap = openLetVars rms_let_vars rms_var_heap
 	  (closed_let_vars,rms) = addParRefMarksOfLets rms_let_vars ([],{rms_let_vars=[],rms_counted_let_vars=rms_counted_let_vars,rms_var_heap=rms_var_heap})
-	= rms
+	= {rms & rms_counted_let_vars=closed_let_vars++rms.rms_counted_let_vars}
 
 fullRefMarkOfAlternative :: ![[FreeVar]] !Int !(Optional [CountedFreeVar]) !expr !*VarHeap -> (!*[FreeVar],!*RMState) | refMark expr
 fullRefMarkOfAlternative free_vars sel def expr var_heap
@@ -56,6 +56,32 @@ where
 		  rms_var_heap = openLetVars rms_let_vars rms_var_heap
 		  (occurrences, rms_var_heap) = restoreOccurrences free_vars rms_var_heap
 		= ((occurrences, rms_let_vars),rms_counted_let_vars,rms_var_heap)
+
+remove_local_let_vars_from_counted_let_vars :: ![FreeVar] ![FreeVar] !*VarHeap -> (![FreeVar],!*VarHeap)
+remove_local_let_vars_from_counted_let_vars local_let_vars counted_let_vars var_heap
+	# var_heap = foldSt (\ {fv_info_ptr} -> mark_bind fv_info_ptr) local_let_vars var_heap
+	  (counted_let_vars,var_heap) = remove_marked_local_let_vars counted_let_vars var_heap
+	  var_heap = foldSt (\ {fv_info_ptr} -> unmark_bind fv_info_ptr) local_let_vars var_heap
+	= (counted_let_vars,var_heap)
+where
+	mark_bind fv_info_ptr var_heap
+		# (VI_Occurrence occ,var_heap) = readPtr fv_info_ptr var_heap
+		= writePtr fv_info_ptr (VI_Occurrence {occ & occ_bind=OB_MarkedLet occ.occ_bind}) var_heap
+
+	remove_marked_local_let_vars [closed_let_var:closed_let_vars] var_heap
+		# (VI_Occurrence occ) = sreadPtr closed_let_var.fv_info_ptr var_heap
+		= case occ.occ_bind of
+			OB_MarkedLet _
+				-> remove_marked_local_let_vars closed_let_vars var_heap
+			_
+				# (closed_let_vars,var_heap) = remove_marked_local_let_vars closed_let_vars var_heap
+				-> ([closed_let_var:closed_let_vars],var_heap)
+	remove_marked_local_let_vars [] var_heap
+		= ([],var_heap)
+
+	unmark_bind fv_info_ptr var_heap
+		# (VI_Occurrence occ=:{occ_bind=OB_MarkedLet occ_bind},var_heap) = readPtr fv_info_ptr var_heap
+		= writePtr fv_info_ptr (VI_Occurrence {occ & occ_bind=occ_bind}) var_heap
 
 instance refMark [a] | refMark a
 where
@@ -221,18 +247,18 @@ where
 	refMark free_vars sel _ (fun @ args) rms 
 		= refMark free_vars NotASelector No args (refMark free_vars NotASelector No fun rms)
 
-	refMark free_vars sel def (Let {let_strict_binds,let_lazy_binds,let_expr}) rms=:{rms_counted_let_vars,rms_var_heap} 
+	refMark free_vars sel def (Let {let_strict_binds,let_lazy_binds,let_expr}) rms=:{rms_counted_let_vars,rms_var_heap}
 		| isEmpty let_lazy_binds
 			# local_let_vars = [lb_dst \\ {lb_dst} <- let_strict_binds]
 			# new_free_vars = [local_let_vars : free_vars]
-			# (observing, rms_var_heap) = binds_are_observing let_strict_binds rms_var_heap
-			| observing
+			| binds_are_observing let_strict_binds rms_var_heap
 				# rms_var_heap = saveOccurrences free_vars rms_var_heap
 				  rms = refMark new_free_vars NotASelector No let_strict_binds {rms & rms_var_heap = rms_var_heap}
 				  rms_var_heap = saveOccurrences new_free_vars rms.rms_var_heap
 				  {rms_var_heap,rms_let_vars,rms_counted_let_vars}
 					= fullRefMarkOfRootOrLetExpr new_free_vars sel def let_expr rms_counted_let_vars rms_var_heap
 				  rms_var_heap = let_combine free_vars rms_var_heap
+				  (rms_counted_let_vars,rms_var_heap) = remove_local_let_vars_from_counted_let_vars local_let_vars rms_counted_let_vars rms_var_heap
 				= {rms_var_heap=rms_var_heap, rms_let_vars=rms_let_vars ++ rms.rms_let_vars, rms_counted_let_vars=rms_counted_let_vars}
 					===> ("refMark (Let (observing))", hd new_free_vars)
 				= refMark new_free_vars sel def let_expr (refMark new_free_vars NotASelector No let_strict_binds {rms & rms_var_heap = rms_var_heap})
@@ -243,14 +269,14 @@ where
 			  (rms_counted_let_vars,rms_var_heap)	= ref_mark_of_lets new_free_vars all_binds rms_counted_let_vars rms_var_heap
 			  {rms_var_heap,rms_let_vars,rms_counted_let_vars}
 				= fullRefMarkOfRootOrLetExpr new_free_vars sel def let_expr rms_counted_let_vars rms_var_heap
+			  (rms_counted_let_vars,rms_var_heap) = remove_local_let_vars_from_counted_let_vars local_let_vars rms_counted_let_vars rms_var_heap
 			= {rms_var_heap=rms_var_heap, rms_let_vars=rms_let_vars ++ rms.rms_let_vars, rms_counted_let_vars=rms_counted_let_vars}
 		where
-		    binds_are_observing binds var_heap
-		    	= foldSt bind_is_observing binds (True, var_heap)
-			where
-				bind_is_observing {lb_dst={fv_info_ptr}} (observing, var_heap) 
-					# (VI_Occurrence {occ_observing=(observe,attr)}, var_heap) = readPtr fv_info_ptr var_heap
-					= (observing && observe, var_heap)
+			binds_are_observing [{lb_dst={fv_info_ptr}}:binds] var_heap
+				# (VI_Occurrence {occ_observing=(is_observing,_)}) = sreadPtr fv_info_ptr var_heap
+				= is_observing && binds_are_observing binds var_heap
+		    binds_are_observing [] var_heap
+		    	= True
 			
 			let_combine free_vars var_heap
 				= foldSt (foldSt let_combine_ref_count) free_vars var_heap
