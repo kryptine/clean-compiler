@@ -441,7 +441,7 @@ where
 			# rms_var_heap = rms_var_heap <:= (var_info_ptr, VI_Occurrence {var_occ & occ_bind = OB_LockedLet ob}) 
 			| do_seq_combine
 				# rms_var_heap = addSeqRefCounts ref_counts rms_var_heap
-				= addSeqRefMarksOfLets  let_vars ([fv : closed_lets], { rms & rms_var_heap = rms_var_heap })
+				= addSeqRefMarksOfLets let_vars ([fv : closed_lets], { rms & rms_var_heap = rms_var_heap })
 				# rms_var_heap = addParRefCounts ref_counts rms_var_heap
 				= addParRefMarksOfLets let_vars ([fv : closed_lets], { rms & rms_var_heap = rms_var_heap })
 		add_let_variable do_seq_combine var_info_ptr var_occ=:{occ_bind = ob =: OB_OpenLet fv No} (closed_lets, rms=:{rms_var_heap,rms_let_vars})
@@ -451,7 +451,6 @@ where
 			= closed_lets_and_rms
 
 refMarkOfAlgebraicOrOverloadedListCase free_vars sel def case_expr alternatives case_explicit case_default rms=:{rms_var_heap}
-//	# (case_expr_res, rms_var_heap) = partialRefMark free_vars case_expr rms_var_heap
 	# (def, all_closed_let_vars, rms) = refMarkOfDefault case_explicit free_vars sel def case_expr case_default [] { rms & rms_var_heap = rms_var_heap }
 	  (pattern_depth, all_closed_let_vars, rms) = foldSt (ref_mark_of_algebraic_pattern free_vars sel def case_expr) alternatives (0, all_closed_let_vars, rms)
 	  (let_vars_in_default, rms_var_heap) = addRefMarkOfDefault pattern_depth free_vars def rms.rms_var_heap
@@ -488,14 +487,11 @@ refMarkOfAlternative free_vars [] sel def case_expr alt_expr all_closed_let_vars
 
 refMarkOfAlternative free_vars pattern_vars sel def case_expr alt_expr all_closed_let_vars rms=:{rms_var_heap,rms_let_vars}
 	# rms_var_heap = saveOccurrences [pattern_vars : free_vars] rms_var_heap
-	  (closed_let_vars_in_alt, alt_rms)		= fullRefMark [pattern_vars : free_vars] sel def alt_expr rms_var_heap
-	  rms_var_heap = saveOccurrences free_vars alt_rms.rms_var_heap
-	  (closed_let_vars_in_expr, case_rms)	= fullRefMark free_vars sel def case_expr rms_var_heap
-	  rms_var_heap = parCombine free_vars case_rms.rms_var_heap
-	  rms_var_heap = openLetVars closed_let_vars_in_alt rms_var_heap
-	  rms_var_heap = openLetVars closed_let_vars_in_expr rms_var_heap
-	= ([ closed_let_vars_in_alt , closed_let_vars_in_expr : all_closed_let_vars ],
-			{ case_rms & rms_var_heap = rms_var_heap, rms_let_vars = case_rms.rms_let_vars ++ alt_rms.rms_let_vars ++ rms_let_vars })
+	  (closed_let_vars_in_alt_and_expr, alt_and_case_rms)
+		= fullRefMark [pattern_vars : free_vars] sel def [alt_expr,case_expr] rms_var_heap
+	  rms_var_heap = openLetVars closed_let_vars_in_alt_and_expr alt_and_case_rms.rms_var_heap
+	= ([ closed_let_vars_in_alt_and_expr : all_closed_let_vars ],
+			{ alt_and_case_rms & rms_var_heap = rms_var_heap, rms_let_vars = alt_and_case_rms.rms_let_vars ++ rms_let_vars })
 
 addSeqRefMarksOfLets let_vars closed_vars_and_rms
 	= foldSt ref_mark_of_let let_vars closed_vars_and_rms
@@ -516,7 +512,6 @@ where
 			OB_LockedLet _
 				-> (closed_let_vars, rms)
 //					  ===> ("addSeqRefMarksOfLets (OB_LockedLet)", fv_ident) 
-
 
 addRefMarkOfDefault :: !Int ![[FreeVar]] !(Optional [CountedFreeVar]) !*VarHeap -> *(![FreeVar], !*VarHeap)
 addRefMarkOfDefault pattern_depth free_vars (Yes occurrences) var_heap
