@@ -19,7 +19,7 @@ fullRefMark :: ![[FreeVar]] !Int !(Optional [CountedFreeVar]) !expr !*VarHeap ->
 fullRefMark free_vars sel def expr var_heap
 	# {rms_let_vars,rms_var_heap} = refMark free_vars sel def expr { rms_var_heap = var_heap, rms_let_vars = [] }
 	  rms_var_heap = openLetVars rms_let_vars rms_var_heap
-	= addParRefMarksOfLets "fullRefMark" rms_let_vars ([], { rms_var_heap = rms_var_heap, rms_let_vars = [] })
+	= addParRefMarksOfLets rms_let_vars ([], { rms_var_heap = rms_var_heap, rms_let_vars = [] })
 
 
 partialRefMark :: ![[FreeVar]] !expr !*VarHeap -> (!RefMarkResult, *VarHeap) | refMark expr
@@ -27,7 +27,7 @@ partialRefMark free_vars  expr var_heap
 	# var_heap = saveOccurrences free_vars var_heap
 	  {rms_var_heap,rms_let_vars}  = refMark free_vars NotASelector No expr { rms_var_heap = var_heap, rms_let_vars = [] }
 	  rms_var_heap = openLetVars rms_let_vars rms_var_heap
-	  (occurrences, rms_var_heap) = restoreOccurrences "partialRefMark" free_vars rms_var_heap
+	  (occurrences, rms_var_heap) = restoreOccurrences free_vars rms_var_heap
 	= ((occurrences, rms_let_vars), rms_var_heap)
 
 instance refMark [a] | refMark a
@@ -40,28 +40,24 @@ collectAllSelections [] cum_sels
 collectAllSelections [{su_multiply,su_uniquely} : sels ] cum_sels
 	= collectAllSelections sels (su_uniquely ++ su_multiply ++ cum_sels)
 
-contains x []		= False
-contains x [y:ys]	= x == y || contains x ys
-
-		
 saveOccurrences free_vars var_heap
-	= foldSt (foldSt save_occurrence)  free_vars var_heap // (free_vars ===> ("saveOccurrences", free_vars)) var_heap
+	= foldSt (foldSt save_occurrence) free_vars var_heap // (free_vars ===> ("saveOccurrences", free_vars)) var_heap
 where
 	save_occurrence {fv_ident,fv_info_ptr} var_heap
 		# (VI_Occurrence old_occ=:{occ_ref_count,occ_previous}, var_heap) = readPtr fv_info_ptr var_heap
 		= var_heap <:= (fv_info_ptr, VI_Occurrence {old_occ & occ_ref_count = RC_Unused, occ_previous = [occ_ref_count : occ_previous] } )
  			===> ("save_occurrence", fv_ident, fv_info_ptr, occ_ref_count, length occ_previous)
 
-restoreOccurrences wher free_vars var_heap
-	= foldSt (foldSt (restore_occurrence wher)) (free_vars ===> ("restoreOccurrences", wher, free_vars)) ([], var_heap)
+restoreOccurrences free_vars var_heap
+	= foldSt (foldSt restore_occurrence) (free_vars ===> ("restoreOccurrences", free_vars)) ([], var_heap)
 where
-	restore_occurrence wher fv=:{fv_ident,fv_info_ptr} (occurrences, var_heap)
+	restore_occurrence fv=:{fv_ident,fv_info_ptr} (occurrences, var_heap)
 		# (VI_Occurrence old_occ=:{occ_ref_count,occ_previous,occ_bind}, var_heap) = readPtr fv_info_ptr var_heap
 		  (prev_ref_count, occ_previous) = case occ_previous of
 		  										[x : xs]
 		  											-> (x, xs)
 		  										_
-		  											-> abort ("restoreOccurrences" /* ---> (fv_ident, fv_info_ptr, wher) */)
+		  											-> abort ("restoreOccurrences" /* ---> (fv_ident, fv_info_ptr) */)
 		  var_heap = var_heap <:= (fv_info_ptr, VI_Occurrence {old_occ & occ_ref_count = prev_ref_count, occ_previous = occ_previous })
 		= case occ_ref_count ===> ("restore_occurrence", fv_ident, fv_info_ptr, (occ_ref_count, prev_ref_count, occ_previous)) of
 			RC_Unused
@@ -132,7 +128,6 @@ where
 			= [ { su_field = sel, su_multiply = [], su_uniquely = [var_expr_ptr]  } : sels ]
 			= [ selection : add_selection var_expr_ptr sel selections ]
 
-
 	ref_count_of_bindings free_vars var_ident var_info_ptr occ_ref_count var_occ=:{occ_bind = OB_OpenLet fv let_info} rms=:{rms_var_heap,rms_let_vars}
 		# rms_var_heap = rms_var_heap <:= (var_info_ptr, VI_Occurrence { var_occ & occ_ref_count = occ_ref_count, occ_bind = OB_LockedLet var_occ.occ_bind })
 		= { rms & rms_var_heap = rms_var_heap, rms_let_vars = [ fv : rms_let_vars ]}
@@ -143,8 +138,8 @@ where
 	ref_count_of_bindings free_vars var_ident var_info_ptr occ_ref_count var_occ rms=:{rms_var_heap}
 		= { rms & rms_var_heap = rms_var_heap <:= (var_info_ptr, VI_Occurrence { var_occ & occ_ref_count = occ_ref_count })}
 
-addParRefMarksOfLets call let_vars closed_vars_end_rms
-	= foldSt ref_mark_of_let let_vars closed_vars_end_rms
+addParRefMarksOfLets let_vars closed_vars_and_rms
+	= foldSt ref_mark_of_let let_vars closed_vars_and_rms
 where
 	ref_mark_of_let fv=:{fv_ident,fv_info_ptr} (closed_let_vars, rms=:{rms_var_heap})
 		# (VI_Occurrence var_occ, rms_var_heap) = readPtr fv_info_ptr rms_var_heap
@@ -152,8 +147,8 @@ where
 		= case var_occ.occ_bind of
 			OB_OpenLet _ (Yes (ref_counts, let_vars))
 				# rms_var_heap = rms.rms_var_heap <:= (fv_info_ptr, VI_Occurrence {var_occ & occ_bind = OB_LockedLet var_occ.occ_bind})
-				  rms_var_heap = addParRefCounts call ref_counts rms_var_heap
-				-> addParRefMarksOfLets call let_vars ([fv : closed_let_vars], {rms & rms_var_heap = rms_var_heap})
+				  rms_var_heap = addParRefCounts ref_counts rms_var_heap
+				-> addParRefMarksOfLets let_vars ([fv : closed_let_vars], {rms & rms_var_heap = rms_var_heap})
 						 ===> ("addParRefMarksOfLets (OB_OpenLet Yes)", fv_ident) 
 			OB_OpenLet _ No
 				# rms_var_heap = rms.rms_var_heap <:= (fv_info_ptr, VI_Occurrence {var_occ & occ_bind = OB_LockedLet var_occ.occ_bind})
@@ -162,15 +157,15 @@ where
 			OB_LockedLet _
 				-> (closed_let_vars, rms)
 						 ===> ("addParRefMarksOfLets (OB_LockedLet)", fv_ident) 
-		
-addParRefCounts call ref_counts var_heap
-	= foldSt (set_occurrence call) ref_counts var_heap
+
+addParRefCounts ref_counts var_heap
+	= foldSt set_occurrence ref_counts var_heap
 where
-	set_occurrence call {cfv_var = {fv_ident,fv_info_ptr}, cfv_count} var_heap
+	set_occurrence {cfv_var = {fv_ident,fv_info_ptr}, cfv_count} var_heap
 		# (VI_Occurrence occ=:{occ_ref_count}, var_heap) = readPtr fv_info_ptr var_heap
 		  comb_ref_count = parCombineRefCount occ_ref_count cfv_count
 		= var_heap <:= (fv_info_ptr, VI_Occurrence { occ & occ_ref_count = comb_ref_count})
-			===>  ("addParRefCounts", call, fv_ident, fv_info_ptr, (cfv_count, occ_ref_count, comb_ref_count))
+			===>  ("addParRefCounts", fv_ident, fv_info_ptr, (cfv_count, occ_ref_count, comb_ref_count))
 
 addSeqRefCounts ref_counts var_heap
 	= foldSt set_occurrence ref_counts var_heap
@@ -262,7 +257,6 @@ where
 				-> refMark free_vars NotASelector No expr rms
 			_ 
 				-> refMark free_vars (field_number selectors) No expr rms 
-//		= refMark free_vars (field_number selectors) No expr rms 
 	where
 		field_number [ RecordSelection _ field_nr : _ ]
 			= field_nr	
@@ -303,15 +297,10 @@ where
 	refMark _ _ _ _ rms 
 		= rms 
 
-
-isUsed RC_Unused	= False				
-isUsed _			= True				
-
 instance refMark LetBind
 where
 	refMark free_vars sel _ {lb_src} rms 
 		= refMark free_vars NotASelector No lb_src rms 
-
 
 instance refMark Selection
 where
@@ -319,7 +308,6 @@ where
 		= refMark free_vars NotASelector No index_expr rms 
 	refMark free_vars _ _ _ rms 
 		= rms 
-
 
 collectPatternsVariables pattern_vars
 	= collect_used_vars pattern_vars 0 []
@@ -342,7 +330,7 @@ where
 //					 ===> ("openLetVars (OB_LockedLet)", fv_ident)
 			_
 				-> abort "open_let_vars (refmark.icl))"
-	
+
 setUsedLetVars used_vars var_heap
 	= foldSt (foldSt set_used_let_var) used_vars var_heap
 where
@@ -402,7 +390,7 @@ where
 		  (closed_lets, rms) = fullRefMark free_vars sel No expr rms_var_heap 
 		  (closed_lets, rms) = ref_mark_of_variable_pattern True var (closed_lets, rms)
 		  rms_var_heap = openLetVars closed_lets rms.rms_var_heap
-		  (occurrences, rms_var_heap) = restoreOccurrences "ref_mark_of_default" free_vars rms_var_heap
+		  (occurrences, rms_var_heap) = restoreOccurrences free_vars rms_var_heap
 		= (Yes occurrences, [closed_lets:all_closed_let_vars], { rms & rms_var_heap = rms_var_heap, rms_let_vars = rms.rms_let_vars ++ rms_let_vars })
 			===>  ("ref_mark_of_default", occurrences, closed_lets)
 	ref_mark_of_default case_explicit free_vars sel def var No all_closed_let_vars rms
@@ -450,14 +438,13 @@ where
 			| do_seq_combine
 				# rms_var_heap = addSeqRefCounts ref_counts rms_var_heap
 				= addSeqRefMarksOfLets  let_vars ([fv : closed_lets], { rms & rms_var_heap = rms_var_heap })
-				# rms_var_heap = addParRefCounts "add_let_variable 1" ref_counts rms_var_heap
-				= addParRefMarksOfLets "add_let_variable 2" let_vars ([fv : closed_lets], { rms & rms_var_heap = rms_var_heap })
+				# rms_var_heap = addParRefCounts ref_counts rms_var_heap
+				= addParRefMarksOfLets let_vars ([fv : closed_lets], { rms & rms_var_heap = rms_var_heap })
 		add_let_variable do_seq_combine var_info_ptr var_occ=:{occ_bind = ob =: OB_OpenLet fv No} (closed_lets, rms=:{rms_var_heap,rms_let_vars})
 			# rms_var_heap = rms_var_heap <:= (var_info_ptr, VI_Occurrence {var_occ & occ_bind = OB_LockedLet ob}) 
 			= (closed_lets, {rms_var_heap = rms_var_heap, rms_let_vars = [fv : rms_let_vars]})
 		add_let_variable do_seq_combine var_info_ptr v_ closed_lets_and_rms
 			= closed_lets_and_rms
-		
 
 refMarkOfAlgebraicOrOverloadedListCase free_vars sel def case_expr alternatives case_explicit case_default rms=:{rms_var_heap}
 //	# (case_expr_res, rms_var_heap) = partialRefMark free_vars case_expr rms_var_heap
@@ -476,10 +463,9 @@ where
 
 refMarkOfDefault case_explicit free_vars sel def case_expr (Yes expr) all_closed_let_vars rms
 	# (all_closed_let_vars, rms) = refMarkOfAlternative free_vars [] sel def case_expr expr all_closed_let_vars rms
-	  (occurrences, rms_var_heap) = restoreOccurrences "refMarkOfDefault" free_vars rms.rms_var_heap
+	  (occurrences, rms_var_heap) = restoreOccurrences free_vars rms.rms_var_heap
 	= (Yes occurrences, all_closed_let_vars, { rms & rms_var_heap = rms_var_heap })
 		===>  ("refMarkOfDefault", occurrences)
-
 refMarkOfDefault case_explicit free_vars sel def case_expr No all_closed_let_vars rms 
 	| case_explicit
 		= (No,	all_closed_let_vars, rms)
@@ -502,9 +488,9 @@ where
 	combine_pattern_and_alternative free_vars _ var_heap
 		= parCombine free_vars var_heap
 
-addSeqRefMarksOfLets let_vars closed_vars_end_rms
-	= foldSt ref_mark_of_let let_vars closed_vars_end_rms
-where		
+addSeqRefMarksOfLets let_vars closed_vars_and_rms
+	= foldSt ref_mark_of_let let_vars closed_vars_and_rms
+where
 	ref_mark_of_let fv=:{fv_ident,fv_info_ptr} (closed_let_vars, rms=:{rms_var_heap})
 		# (VI_Occurrence var_occ, rms_var_heap) = readPtr fv_info_ptr rms_var_heap
 		  rms = { rms & rms_var_heap = rms_var_heap }
@@ -536,9 +522,8 @@ where
 	where
 		cond_add cond var vars
 			| cond
-				= [ var : vars]
-				= vars 
-	
+				= [var : vars]
+				= vars
 addRefMarkOfDefault pattern_depth free_vars No var_heap
 	= ([], altCombine pattern_depth free_vars var_heap)
 
@@ -602,8 +587,6 @@ where
 			| su_field < sel2.su_field
 				= [sel1 : alt_combine_of_selections sels1 sl2 ]
 				= [sel2 : alt_combine_of_selections sl1 sels2 ]
-	
-		
 
 parCombineRefCount RC_Unused ref_count
 	= ref_count
@@ -612,10 +595,10 @@ parCombineRefCount ref_count RC_Unused
 parCombineRefCount (RC_Used {rcu_multiply,rcu_selectively,rcu_uniquely}) (RC_Used ref_count2)
 	# rcu_multiply = ref_count2.rcu_uniquely ++ ref_count2.rcu_multiply ++ rcu_uniquely ++ rcu_multiply
 	| isEmpty rcu_multiply
-		=  RC_Used { rcu_multiply = [], rcu_uniquely = [], rcu_selectively = par_combine_selections rcu_selectively ref_count2.rcu_selectively }
+		= RC_Used { rcu_multiply = [], rcu_uniquely = [], rcu_selectively = par_combine_selections rcu_selectively ref_count2.rcu_selectively }
 		# rcu_multiply = collectAllSelections ref_count2.rcu_selectively (collectAllSelections rcu_selectively rcu_multiply)
 		= RC_Used { rcu_multiply = rcu_multiply, rcu_uniquely = [], rcu_selectively = [] }
-where	
+where
 	par_combine_selections [] sels
 		= sels
 	par_combine_selections sels []
@@ -623,10 +606,10 @@ where
 	par_combine_selections sl1=:[sel1=:{ su_field, su_multiply, su_uniquely } : sels1] sl2=:[sel2 : sels2]
 		| su_field == sel2.su_field
 			# sel1 = { sel1 & su_multiply = sel2.su_multiply ++ su_multiply ++ sel2.su_uniquely ++ su_uniquely, su_uniquely = [] }
-			= [ sel1 : par_combine_selections sels1 sels2 ]
+			= [sel1 : par_combine_selections sels1 sels2]
 		| su_field < sel2.su_field
-			= [sel1 : par_combine_selections sels1 sl2 ]
-			= [sel2 : par_combine_selections sl1 sels2 ]
+			= [sel1 : par_combine_selections sels1 sl2]
+			= [sel2 : par_combine_selections sl1 sels2]
 
 seqCombineRefCount RC_Unused ref_count
 	= ref_count
@@ -638,11 +621,11 @@ seqCombineRefCount (RC_Used sec_ref) (RC_Used prim_ref)
 		| isEmpty sec_ref.rcu_uniquely /* so sec_ref contains selections only */
 			# rcu_selectively = seq_combine_selections sec_ref.rcu_selectively prim_ref.rcu_selectively /* rcu_selectively can't be empty */
 			= RC_Used { rcu_uniquely = [], rcu_multiply = [], rcu_selectively = rcu_selectively }
-			# prim_selections = make_primary_selections_on_unique prim_ref.rcu_selectively
+			# prim_selections = make_primary_selections_non_unique prim_ref.rcu_selectively
 			  rcu_selectively = seq_combine_selections sec_ref.rcu_selectively prim_selections
 			= RC_Used { sec_ref & rcu_selectively = rcu_selectively }
 		= RC_Used { sec_ref & rcu_multiply = collectAllSelections prim_ref.rcu_selectively rcu_multiply }
-	where	
+	where
 		seq_combine_selections [] sels
 			= sels
 		seq_combine_selections sels []
@@ -655,9 +638,9 @@ seqCombineRefCount (RC_Used sec_ref) (RC_Used prim_ref)
 				= [sel1 : seq_combine_selections sels1 sl2 ]
 				= [sel2 : seq_combine_selections sl1 sels2 ]
 
-		make_primary_selections_on_unique [sel=:{su_multiply, su_uniquely } : sels]
-			= [ { sel & su_multiply = su_uniquely ++ su_multiply, su_uniquely = [] } : make_primary_selections_on_unique sels ]
-		make_primary_selections_on_unique []
+		make_primary_selections_non_unique [sel=:{su_multiply, su_uniquely } : sels]
+			= [ { sel & su_multiply = su_uniquely ++ su_multiply, su_uniquely = [] } : make_primary_selections_non_unique sels ]
+		make_primary_selections_non_unique []
 			= []
 
 
@@ -669,10 +652,6 @@ emptyOccurrence type_info =
 		, 	occ_pattern_vars	= []
 		}
 
-/*
-emptyObservingOccurrence	=: VI_Occurrence (emptyOccurrence True)
-emptyNonObservingOccurrence =: VI_Occurrence (emptyOccurrence False)
-*/
 makeSharedReferencesNonUnique :: ![Int] !u:{# FunDef} !*Coercions !w:{! Type} !v:TypeDefInfos !*VarHeap !*ExpressionHeap !*ErrorAdmin
 	-> (!u:{# FunDef}, !*Coercions, !w:{! Type},  !v:TypeDefInfos, !*VarHeap, !*ExpressionHeap, !*ErrorAdmin)
 makeSharedReferencesNonUnique [] fun_defs coercion_env subst type_def_infos var_heap expr_heap  error
@@ -702,9 +681,6 @@ where
 				# (var_info, var_heap) = readPtr fv_info_ptr var_heap
 				  {at_type, at_attribute} 	= get_type var_info
 				  (expr_ptr, expr_heap)		= newPtr (EI_Attribute (toInt at_attribute)) expr_heap
-//				| has_observing_base_type var_info type_def_infos subst
-//					= (subst, type_def_infos, var_heap <:= (fv_info_ptr, emptyObservingOccurrence), expr_heap)
-//					= (subst, type_def_infos, var_heap <:= (fv_info_ptr, emptyNonObservingOccurrence), expr_heap)
 				| has_observing_type at_type type_def_infos subst
 					= (subst, type_def_infos, var_heap <:= (fv_info_ptr, VI_Occurrence (emptyOccurrence (True, expr_ptr))), expr_heap)
 					= (subst, type_def_infos, var_heap <:= (fv_info_ptr, VI_Occurrence (emptyOccurrence (False, expr_ptr))), expr_heap)
@@ -714,13 +690,6 @@ where
 		where
 			empty_occurrence {fv_info_ptr} var_heap 
 				= var_heap <:= (fv_info_ptr, VI_Empty)
-
-		has_observing_base_type (VI_Type {at_type} _) type_def_infos subst
-			= has_observing_type at_type type_def_infos subst
-		has_observing_base_type (VI_FAType _ {at_type} _) type_def_infos subst
-			= has_observing_type at_type type_def_infos subst
-		has_observing_base_type _ type_def_infos subst
-			= abort "has_observing_base_type (refmark.icl)"
 
 		get_type (VI_Type atype _)		= atype
 		get_type (VI_FAType _ atype _)	= atype
