@@ -135,11 +135,13 @@ cleanup_attributes expr_info_ptr symbol_heap
 	,	ti_type_def_infos		:: !*TypeDefInfos
 	,	ti_next_fun_nr			:: !Index
 	,	ti_cleanup_info			:: !CleanupInfo
-	,	ti_recursion_introduced	:: !Optional Index
+	,	ti_recursion_introduced	:: !Optional RI
 //	,	ti_trace				:: !Bool // XXX just for tracing
 	,	ti_error_file			:: !*File
 	,	ti_predef_symbols		:: !*PredefinedSymbols
 	}
+
+:: RI = { ri_fun_index :: !Int, ri_fun_ptr :: !FunctionInfoPtr}
 
 ::	ReadOnlyTI = 
 	{	ro_imported_funs	:: !{# {# FunType} }
@@ -203,17 +205,17 @@ where
 		store_type_info_of_bindings_in_heap {let_strict_binds, let_lazy_binds,let_info_ptr} ti
 			# let_binds = let_strict_binds ++ let_lazy_binds
 			# (EI_LetType var_types, ti_symbol_heap) = readExprInfo let_info_ptr ti.ti_symbol_heap
-			  ti_var_heap								= foldSt store_type_info_let_bind
-								   (zip2 var_types let_binds) ti.ti_var_heap
+			  ti_var_heap = foldSt store_type_info_let_bind (zip2 var_types let_binds) ti.ti_var_heap
 								   //  ---> ("store_type_info_of_bindings_in_heap",let_strict_binds,let_lazy_binds,var_types)
 			= { ti & ti_symbol_heap = ti_symbol_heap, ti_var_heap = ti_var_heap }
 		store_type_info_let_bind (var_type, {lb_dst={fv_info_ptr}}) var_heap
 			= setExtendedVarInfo fv_info_ptr (EVI_VarType var_type) var_heap
+/*
 		check_type_info {let_strict_binds,let_lazy_binds,let_info_ptr} ti
 			# (EI_LetType var_types, ti_symbol_heap) = readExprInfo let_info_ptr ti.ti_symbol_heap
 			= { ti & ti_symbol_heap = ti_symbol_heap }
 				//  ---> ("check_type_info_of_bindings_in_heap",let_strict_binds,let_lazy_binds,var_types)
-
+*/
 	transform (Case kees) ro ti
 		# ti = store_type_info_of_patterns_in_heap kees ti
 		# (res,ti) = transformCase kees ro ti
@@ -478,22 +480,24 @@ transCase is_active opt_aci this_case=:{case_expr = case_expr=:(App app=:{app_sy
 								-> possiblyFoldOuterCase this_case ro ti					-!-> ("transCase","Diff opt unfolder",unfolder,app_symb)
 							# variables = [ Var {var_ident=fv_ident, var_info_ptr=fv_info_ptr, var_expr_ptr=nilPtr}
 											\\ {fv_ident, fv_info_ptr} <- ro.ro_fun_args ]
-							  (ti_next_fun_nr, ti) = ti!ti_next_fun_nr						-!-> ("transCase","Yes opt unfolder",unfolder)
-							  (new_next_fun_nr, app_symb)
-								= case ro.ro_root_case_mode of
-										RootCaseOfZombie
-											# (ro_fun=:{symb_kind=SK_GeneratedFunction fun_info_ptr _}) = ro.ro_fun_case
-											-> (inc ti_next_fun_nr,
-											    { ro_fun & symb_kind=SK_GeneratedFunction fun_info_ptr ti_next_fun_nr })
-												-!-> ("Recursion","RootCaseOfZombie",ti_next_fun_nr,ti.ti_recursion_introduced)
-										RootCase
-											-> (ti_next_fun_nr, ro.ro_fun_root)
-												-!-> ("Recursion","RootCase",ti_next_fun_nr,ro.ro_fun_root,ti.ti_recursion_introduced)
-							  ti = case ro.ro_root_case_mode of
-										RootCaseOfZombie
-											-> { ti & ti_next_fun_nr = new_next_fun_nr, ti_recursion_introduced = Yes ti_next_fun_nr }
-										RootCase
-											-> { ti & ti_next_fun_nr = new_next_fun_nr, ti_recursion_introduced = No }
+							  (app_symb, ti)
+								= case ro.ro_root_case_mode -!-> ("transCase","Yes opt unfolder",unfolder) of
+									RootCaseOfZombie
+										# (recursion_introduced,ti) = ti!ti_recursion_introduced
+										  (ro_fun=:{symb_kind=SK_GeneratedFunction fun_info_ptr _}) = ro.ro_fun_case
+										-> case recursion_introduced of
+											No
+												# (ti_next_fun_nr, ti) = ti!ti_next_fun_nr
+												  ri = {ri_fun_index=ti_next_fun_nr, ri_fun_ptr=fun_info_ptr}
+												-> ({ro_fun & symb_kind=SK_GeneratedFunction fun_info_ptr ti_next_fun_nr},
+												    {ti & ti_next_fun_nr = inc ti_next_fun_nr, ti_recursion_introduced = Yes ri})
+													-!-> ("Recursion","RootCaseOfZombie",ti_next_fun_nr,recursion_introduced)
+											Yes {ri_fun_index,ri_fun_ptr}
+												| ri_fun_ptr==fun_info_ptr
+													-> ({ro_fun & symb_kind=SK_GeneratedFunction fun_info_ptr ri_fun_index},ti)
+									RootCase
+										-> (ro.ro_fun_root,{ti & ti_recursion_introduced = No})
+											-!-> ("Recursion","RootCase",ro.ro_fun_root)
 							  app_args1 = replace_arg [ fv_info_ptr \\ {fv_info_ptr}<-aci_params ] app_args variables
 							  (app_args2, ti) = transform app_args1 { ro & ro_root_case_mode = NotRootCase } ti
 							-> (App {app_symb=app_symb, app_args=app_args2, app_info_ptr=nilPtr}, ti)
@@ -881,8 +885,8 @@ possibly_generate_case_function kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti
 	  			<-!- ("transformCaseFunction>>>",fun_ident)
 	  ti	= { ti & ti_recursion_introduced = old_ti_recursion_introduced }
 	= case ti_recursion_introduced of
-		Yes fun_index
-			-> generate_case_function fun_index case_info_ptr new_expr outer_fun_def outer_cons_args used_mask new_ro ti
+		Yes {ri_fun_index}
+			-> generate_case_function ri_fun_index case_info_ptr new_expr outer_fun_def outer_cons_args used_mask new_ro ti
 		No	-> (new_expr, ti)
 
 generate_case_function :: !Int !ExprInfoPtr !Expression FunDef .ConsClasses [.Bool] !.ReadOnlyTI !*TransformInfo -> (!Expression,!*TransformInfo)
@@ -932,7 +936,6 @@ generate_case_function fun_index case_info_ptr new_expr outer_fun_def outer_cons
 								,	fi_free_vars	= []
 								,	fi_local_vars	= []
 								,	fi_dynamics		= []
-// Sjaak: 							,	fi_is_macro_fun = outer_fun_def.fun_info.fi_is_macro_fun
 								,	fi_properties	= outer_fun_def.fun_info.fi_properties
 								}	
 				}
@@ -967,8 +970,10 @@ where
 	get_type_of_local_var {fv_info_ptr} var_heap
 		# (EVI_VarType a_type, var_heap)	= readExtendedVarInfo fv_info_ptr var_heap
 		= (a_type, var_heap)
+
 	free_var_to_bound_var {fv_ident, fv_info_ptr}
 		= Var { var_ident = fv_ident, var_info_ptr = fv_info_ptr, var_expr_ptr = nilPtr}
+
 	determine_case_function_type fun_arity ct_result_type arg_types st_attr_env ti
 		# {ti_type_heaps}						= ti
 		  {th_vars}								= ti_type_heaps
@@ -1300,8 +1305,7 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 	#!(fi_group_index, ti_cons_args, ti_fun_defs, ti_fun_heap)
 			= max_group_index 0 prods ro.ro_main_dcl_module_n fi_group_index ti_fun_defs ti_fun_heap ti_cons_args
 
-	# (Yes consumer_symbol_type)
-			= fd.fun_type
+	# (Yes consumer_symbol_type) = fd.fun_type
 	  (function_producer_types, ti_fun_defs, ti_fun_heap)
 	  		= iFoldSt (accum_function_producer_type prods ro) 0 (size prods) 
 	  				([], ti_fun_defs, ti_fun_heap)
