@@ -981,8 +981,14 @@ static void CodeNormalRootNode (Node root,NodeId rootid,int asp,int bsp,CodeGenN
 				old_asp=asp;
 				old_bsp=bsp;
 				BuildArg (root->node_arguments,&asp,&bsp,code_gen_node_ids_p);
-				GenPopA (asp-old_asp);
-				GenPopB (bsp-old_bsp);
+				if (asp>=old_asp)
+					GenPopA (asp-old_asp);
+				else
+					old_asp=asp;
+				if (bsp>=old_bsp)
+					GenPopB (bsp-old_bsp);
+				else
+					old_bsp=bsp;
 				/* asp=old_asp; bsp=old_bsp; */
 
 				CodeRootNode (root->node_arguments->arg_next->arg_node,rootid,old_asp,old_bsp,code_gen_node_ids_p,resultstate,NULL);

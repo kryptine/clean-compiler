@@ -227,6 +227,27 @@ void UnpackArray (int aindex, int *asp_p, Bool removeroot)
 	*asp_p += SizeOfAStackElem;	
 }
 
+#if 0 /* defined (_WINDOWS_) */
+void trace (char *s)
+{
+	DWORD n_chars;
+
+	n_chars = strlen (s);
+	WriteFile (GetStdHandle (STD_OUTPUT_HANDLE),s,n_chars,&n_chars,NULL);
+}
+
+void trace_si (char *e,int i)
+{
+	DWORD n_chars;
+	char s[128];
+	
+	sprintf (s,"%s %d\n",e,i);
+
+	n_chars = strlen (s);
+	WriteFile (GetStdHandle (STD_OUTPUT_HANDLE),s,n_chars,&n_chars,NULL);
+}
+#endif
+
 Coercions CoerceStateKind (StateKind dem_state_kind, StateKind off_state_kind)
 {
 	if (dem_state_kind==Undefined)
@@ -3276,10 +3297,14 @@ static void FillNormalNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 					old_asp=*asp_p;
 					old_bsp=*bsp_p;
 					BuildArg (node->node_arguments,asp_p,bsp_p,code_gen_node_ids_p);
-					GenPopA (*asp_p-old_asp);
-					GenPopA (*bsp_p-old_bsp);
-					*asp_p=old_asp;
-					*bsp_p=old_bsp;
+					if (*asp_p>=old_asp){
+						GenPopA (*asp_p-old_asp);
+						*asp_p=old_asp;
+					}
+					if (*bsp_p>=old_bsp){
+						GenPopB (*bsp_p-old_bsp);
+						*bsp_p=old_bsp;
+					}
 
 					if (update_node_id==NULL){
 						ArgP arg2_arg;
