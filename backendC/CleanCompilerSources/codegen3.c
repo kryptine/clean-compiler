@@ -2765,8 +2765,8 @@ struct saved_node_id_ref_counts* save_rhs_node_id_ref_counts
 			
 			new_snir_p->snir_next=snir_p;
 			snir_p=new_snir_p;
-			
-			if (node_def_p->def_node->node_kind==TupleSelectorsNode){
+
+			if (node_def_p->def_node!=NULL && node_def_p->def_node->node_kind==TupleSelectorsNode){
 				ArgP arg_p;
 				
 				for_l (arg_p,node_def_p->def_node->node_arguments,arg_next)
