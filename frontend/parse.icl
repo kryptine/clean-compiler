@@ -499,8 +499,8 @@ where
 		  (tspec, pState) = want pState		//	SymbolType
 		| isDclContext parseContext
 			# (specials, pState) = optionalSpecials pState
-			= (PD_TypeSpec pos name (if is_infix DefaultPriority NoPrio) (Yes tspec) specials, wantEndOfDefinition "type definition (1)" pState)
-			= (PD_TypeSpec pos name (if is_infix DefaultPriority NoPrio) (Yes tspec) SP_None, wantEndOfDefinition "type definition (2)" pState)
+			= (PD_TypeSpec pos name (if is_infix DefaultPriority NoPrio) (Yes tspec) specials, wantEndOfDefinition "type definition" pState)
+			= (PD_TypeSpec pos name (if is_infix DefaultPriority NoPrio) (Yes tspec) SP_None, wantEndOfDefinition "type definition" pState)
 	want_rhs_of_def parseContext (opt_name, args) (PriorityToken prio) pos pState
 		# (name, _, pState) = check_name_and_fixity opt_name cHasPriority pState
 		  (token, pState) = nextToken TypeContext pState
@@ -508,9 +508,9 @@ where
 		  	# (tspec, pState) = want pState
 			| isDclContext parseContext
 				# (specials, pState) = optionalSpecials pState
-				= (PD_TypeSpec pos name prio (Yes tspec) specials, wantEndOfDefinition "type definition (3)" pState)
-				= (PD_TypeSpec pos name prio (Yes tspec) SP_None, wantEndOfDefinition "type definition (4)" pState)
-			= (PD_TypeSpec pos name prio No SP_None, wantEndOfDefinition "type defenition (5)" (tokenBack pState))
+				= (PD_TypeSpec pos name prio (Yes tspec) specials, wantEndOfDefinition "type definition" pState)
+				= (PD_TypeSpec pos name prio (Yes tspec) SP_None, wantEndOfDefinition "type definition" pState)
+			= (PD_TypeSpec pos name prio No SP_None, wantEndOfDefinition "type definition" (tokenBack pState))
 	want_rhs_of_def parseContext (No, args) token pos pState
 		# pState			= want_node_def_token pState token
 		# (ss_useLayout, pState) = accScanState UseLayout pState
