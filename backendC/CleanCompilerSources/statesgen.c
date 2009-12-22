@@ -3734,12 +3734,16 @@ static NodeDefs *CollectSharedNodeIdsInRootNode (Node* node_p,NodeId parent_node
 					else
 						case_last=CollectSharedNodeIdsInRootNode (&node->node_arguments->arg_node, parent_node_id, case_last);
 					*case_last=NULL;
+
+					AddStrictLhsNodeIdsToNodeDefs (node->node_strict_node_ids,&node->node_node_defs);
 				} else if (node->node_kind==DefaultNode){
 					NodeDefs *default_last;
 
 					default_last=&node->node_node_defs;
 					default_last=CollectSharedNodeIdsInRootNode (&node->node_arguments->arg_node, parent_node_id, default_last);
 					*default_last=NULL;
+
+					AddStrictLhsNodeIdsToNodeDefs (node->node_strict_node_ids,&node->node_node_defs);
 				} else if (node->node_kind==OverloadedCaseNode){
 					NodeP case_node_p;
 					NodeDefs *case_last;
@@ -3756,6 +3760,8 @@ static NodeDefs *CollectSharedNodeIdsInRootNode (Node* node_p,NodeId parent_node
 					case_last=&case_node_p->node_node_defs;
 					case_last=CollectSharedNodeIdsInRootNode (&case_node_p->node_arguments->arg_node, parent_node_id, case_last);
 					*case_last=NULL;
+
+					AddStrictLhsNodeIdsToNodeDefs (node->node_strict_node_ids,&node->node_node_defs);
 				} else
 					error_in_function ("CollectSharedNodeIdsInRootNode");
 			}
