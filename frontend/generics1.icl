@@ -68,23 +68,7 @@ convertGenerics ::
 		, !u:{# DclModule}		// dcl modules
 		, !*ErrorAdmin			// to report errors
 		)
-convertGenerics
-		main_dcl_module_n 
-		used_module_numbers
-		modules 
-		groups 
-		funs 
-		td_infos 
-		heaps
-		hash_table 
-		u_predefs 
-		dcl_modules 
-		error
-
-	//#! td_infos = td_infos ---> "************************* generic phase started ******************** "
-	//#! funs = dump_funs 0 funs
-	//#! dcl_modules = dump_dcl_modules 0 dcl_modules
-		
+convertGenerics main_dcl_module_n used_module_numbers modules groups funs td_infos heaps hash_table u_predefs dcl_modules error
 	#! modules = {x \\ x <-: modules} 			// unique copy
 	#! dcl_modules = { x \\ x <-: dcl_modules } 	// unique copy
 	#! size_predefs = size u_predefs
@@ -132,25 +116,20 @@ where
 	convert_generics :: !*GenericState -> (![IndexRange], !*GenericState)
 	convert_generics gs		
 		#! (iso_range, gs) = buildGenericRepresentations gs
-		#! (ok, gs) = gs_ok gs
+		#! (ok, gs) = gs!gs_error.ea_ok
 		| not ok = ([], gs)	
 		
 		#! gs = buildClasses gs			
-		#! (ok, gs) = gs_ok gs
+		#! (ok, gs) = gs!gs_error.ea_ok
 		| not ok = ([], gs)	
 
 		#! (instance_range, gs) = convertGenericCases gs
-		#! (ok, gs) = gs_ok gs
+		#! (ok, gs) = gs!gs_error.ea_ok
 		| not ok = ([], gs)	
 
 		#! gs = convertGenericTypeContexts gs
 
 		= ([iso_range,instance_range], gs)
-
-	gs_ok :: !*GenericState -> (!Bool, !*GenericState)
-	gs_ok gs=:{gs_error} 
-		#! ok = gs_error.ea_ok
-		= (ok, {gs & gs_error = gs_error})
 
 //****************************************************************************************
 // clear stuff that might have been left over
@@ -269,9 +248,7 @@ buildGenericTypeRep ::
 		, !*GenericState
 		)
 buildGenericTypeRep type_index funs_and_groups
-		gs=:{gs_modules, gs_predefs, gs_main_module, gs_error, gs_td_infos,
-			gs_exprh, gs_varh, gs_genh, gs_avarh, gs_tvarh}
-		
+		gs=:{gs_modules, gs_predefs, gs_main_module, gs_error, gs_td_infos, gs_exprh, gs_varh, gs_genh, gs_avarh, gs_tvarh}
 	# heaps = 
 		{ hp_expression_heap = gs_exprh
 		, hp_var_heap = gs_varh
@@ -854,15 +831,11 @@ buildConversionTo ::
 buildConversionTo		
 		type_def_mod 
 		type_def=:{td_rhs, td_ident, td_index, td_pos} 
-		main_module_index
-		predefs
-		funs_and_groups
-		heaps
-		error
+		main_module_index predefs funs_and_groups heaps error
 	# (arg_expr, arg_var, heaps) = buildVarExpr "x" heaps 
 	# (body_expr, heaps, error) = 
 		build_expr_for_type_rhs type_def_mod td_index td_rhs arg_expr heaps error
-	# fun_name = makeIdent ("fromGenericTo" +++ td_ident.id_name)
+	# fun_name = makeIdent ("toGeneric" +++ td_ident.id_name)
 	| not error.ea_ok
 		# (def_sym, funs_and_groups) 
 			= (buildFunAndGroup fun_name [] EE No main_module_index td_pos funs_and_groups)
@@ -989,14 +962,10 @@ buildConversionFrom	::
 buildConversionFrom		
 		type_def_mod 
 		type_def=:{td_rhs, td_ident, td_index, td_pos} 
-		main_module_index
-		predefs
-		funs_and_groups
-		heaps
-		error
+		main_module_index predefs funs_and_groups heaps error
 	# (body_expr, arg_var, heaps, error) = 
 		build_expr_for_type_rhs type_def_mod td_rhs heaps error
-	# fun_name = makeIdent ("toGenericFrom" +++ td_ident.id_name)
+	# fun_name = makeIdent ("fromGeneric" +++ td_ident.id_name)
 	| not error.ea_ok
 		# (def_sym, funs_and_groups) 
 			= (buildFunAndGroup fun_name [] EE No main_module_index td_pos funs_and_groups)
@@ -1206,21 +1175,11 @@ where
 			#! com_gencase_defs = {com_gencase_defs & [index] = gencase} 	
 			= build_module1 module_index (inc index) com_gencase_defs st gs
 
-	on_gencase :: 
-			!Index 
-			!Index 
-			!GenericCaseDef 
-			(![ClassDef], ![MemberDef], !Index, Index)
-			!*GenericState
-		->  ( !GenericCaseDef
-			, (![ClassDef], ![MemberDef], !Index, Index)
-			, !*GenericState
-			)
-	on_gencase 
-			module_index index 
-			gencase=:{gc_ident,gc_generic, gc_type_cons} 
-			st 
-			gs=:{gs_modules, gs_td_infos}
+	on_gencase :: !Index !Index 
+			!GenericCaseDef (![ClassDef], ![MemberDef], !Index, Index) !*GenericState
+		-> (!GenericCaseDef,(![ClassDef], ![MemberDef], !Index, Index), !*GenericState)
+	on_gencase module_index index 
+				gencase=:{gc_ident,gc_generic, gc_type_cons} st gs=:{gs_modules, gs_td_infos}
 
 		#! (gen_def, gs_modules) = gs_modules ! [gc_generic.gi_module].com_generic_defs.[gc_generic.gi_index] 
 		#! (kind, gs_td_infos) = get_kind_of_type_cons gc_type_cons gs_td_infos
@@ -1442,12 +1401,10 @@ where
 		#! {pds_module, pds_def} = gs_predefs . [PD_GenericInfo]
 		#! pds_ident = predefined_idents . [PD_GenericInfo]
 		#! type_symb = MakeTypeSymbIdent { glob_module = pds_module, glob_object = pds_def } pds_ident 0
-		#! st = 
-			{ st
-			& st_args = [ makeAType (TA type_symb []) TA_Multi : st_args]
-			, st_arity = st_arity + 1
-			, st_args_strictness = insert_n_strictness_values_at_beginning 1 st_args_strictness	 
-			}
+		#! st = { st & st_args = [ makeAType (TA type_symb []) TA_Multi : st_args]
+				, st_arity = st_arity + 1
+				, st_args_strictness = insert_n_lazy_values_at_beginning 1 st_args_strictness	 
+				}
 		= (st, {th & th_vars = th_vars })	
 
 
@@ -1958,7 +1915,6 @@ where
 	fresh_symbol_type st heaps=:{hp_type_heaps}
 		# (fresh_st, hp_type_heaps) = freshSymbolType st hp_type_heaps
 		= (fresh_st, {heaps & hp_type_heaps = hp_type_heaps})	
-			//---> ("fresh_symbol_type")
 		
 buildGenericCaseBody :: 
 		!Index					// current icl module
@@ -2056,8 +2012,7 @@ where
 			= buildRecordSelectionExpr bimap_expr PD_map_from 1 predefs
 		= (adaptor_expr, (modules, td_infos, heaps, error))		
 	where
-		{pds_module = bimap_module, pds_def=bimap_index} 
-			= predefs.[PD_GenericBimap]
+		{pds_module = bimap_module, pds_def=bimap_index} = predefs.[PD_GenericBimap]
 		bimap_ident = predefined_idents.[PD_GenericBimap]	
 		
 		get_var_kinds gen_info_ptr heaps=:{hp_generic_heap}
@@ -2108,7 +2063,6 @@ where
 		= adaptor_expr @ [specialized_expr]
 	build_body_expr adaptor_expr specialized_expr original_arg_exprs
 		= (adaptor_expr @ [specialized_expr]) @ original_arg_exprs
-		
 
 //buildGenericCaseBody main_module_index {gc_ident,gc_pos, gc_generic, gc_type_cons=TypeConsSymb {type_index}} st predefs td_infos modules heaps error
 buildGenericCaseBody main_module_index {gc_ident,gc_pos} st predefs td_infos modules heaps error
