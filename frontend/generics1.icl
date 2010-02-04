@@ -391,7 +391,6 @@ where
 		= (t, st)
 	simplify t st 
 		= abort "invalid generic type structure\n"
-			//---> ("invalid generic type structure", t)
 		
 	occurs (GTSAppCons _ args) st 	= occurs_list args st
 	occurs (GTSAppVar tv args) st 	= occurs_list [GTSVar tv: args] st		
@@ -539,17 +538,10 @@ buildTypeDefInfo ::
 		!CheckedTypeDef		// the type definition
 		!Index				// icl module
 		!PredefinedSymbols		
-		!FunsAndGroups
-		!*Modules
-		!*Heaps
-		!*ErrorAdmin
+		!FunsAndGroups !*Modules !*Heaps !*ErrorAdmin
 	-> 	( DefinedSymbol	// type info
 		, ![ConsInfo]
-		, !FunsAndGroups
-		, !*Modules
-		, !*Heaps
-		, !*ErrorAdmin
-		)
+		, !FunsAndGroups, !*Modules, !*Heaps, !*ErrorAdmin)
 buildTypeDefInfo td_module td=:{td_rhs = AlgType alts} main_module_index predefs funs_and_groups modules heaps error
 	= buildTypeDefInfo2 td_module td alts [] main_module_index predefs funs_and_groups modules heaps error
 
@@ -1053,13 +1045,10 @@ where
 			!Bool				// is record 
 			!Index 
 			![DefinedSymbol] 
-			!*Heaps 
-			!*ErrorAdmin
+			!*Heaps !*ErrorAdmin
 		-> 	( !Expression
 			, !FreeVar			// top variable
-			, !*Heaps
-			, !*ErrorAdmin
-			)
+			, !*Heaps, !*ErrorAdmin)
 	build_sum is_record type_def_mod [] heaps error
 		= abort "algebraic type with no constructors!\n"
 	build_sum is_record type_def_mod [def_symbol] heaps error
@@ -1071,13 +1060,10 @@ where
 		= (alt_expr, var, heaps, error)
 	build_sum is_record type_def_mod def_symbols heaps error
 		#! (left_def_syms, right_def_syms) = splitAt ((length def_symbols) /2) def_symbols
-	
 		#! (left_expr, left_var, heaps, error) 
 			= build_sum is_record type_def_mod left_def_syms heaps error
-
 		#! (right_expr, right_var, heaps, error) 
-			= build_sum is_record type_def_mod right_def_syms heaps error
-	
+			= build_sum is_record type_def_mod right_def_syms heaps error	
 		#! (case_expr, var, heaps) = 
 			build_case_either left_var left_expr right_var right_expr heaps
 		= (case_expr, var, heaps, error)
@@ -1355,7 +1341,6 @@ where
 			, gs_symtab = gs_symtab 
 			}
 		= (common_defs, gs)		
-
 
 // limitations:
 // - context restrictions on generic variables are not allowed
@@ -2068,7 +2053,7 @@ where
 			= specializeGeneric {gi_module=bimap_module,gi_index=bimap_index} struct_gen_type spec_env bimap_ident gc_pos main_module_index predefs (td_infos, heaps, error)
 
 		#! adaptor_expr 
-			= buildRecordSelectionExpr bimap_expr PD_map_from predefs
+			= buildRecordSelectionExpr bimap_expr PD_map_from 1 predefs
 		= (adaptor_expr, (modules, td_infos, heaps, error))		
 	where
 		{pds_module = bimap_module, pds_def=bimap_index} 
@@ -2332,10 +2317,8 @@ specializeGeneric gen_index type spec_env gen_ident gen_pos main_module_index pr
 	#! heaps = set_tvs spec_env heaps
 	#! (expr, (td_infos, heaps, error)) 
 		= specialize type (td_infos, heaps, error)
-
 	#! heaps = clear_tvs spec_env heaps
 	= (expr, (td_infos, heaps, error))
-		//---> ("specializeGeneric", expr)
 where
 	set_tvs spec_env heaps=:{hp_type_heaps=hp_type_heaps=:{th_vars}}
 		#! th_vars = foldSt write_tv spec_env th_vars
@@ -2365,35 +2348,24 @@ where
 
 	specialize (GTSCons cons_info_ds arg_type) st
 		# (arg_expr, (td_infos, heaps, error)) = specialize arg_type st
-
-		#! (generic_info_expr, heaps) = buildFunApp main_module_index cons_info_ds [] heaps 
-		
+		#! (generic_info_expr, heaps) = buildFunApp main_module_index cons_info_ds [] heaps 		
 		#! (expr, heaps) = buildGenericApp 
 				gen_index.gi_module gen_index.gi_index gen_ident 
 				(KindArrow [KindConst]) [generic_info_expr, arg_expr] heaps
-
 		= (expr, (td_infos, heaps, error))
-
 	specialize (GTSField field_info_ds arg_type) st
 		# (arg_expr, (td_infos, heaps, error)) = specialize arg_type st
-
-		#! (generic_info_expr, heaps) = buildFunApp main_module_index field_info_ds [] heaps 
-		
+		#! (generic_info_expr, heaps) = buildFunApp main_module_index field_info_ds [] heaps 		
 		#! (expr, heaps) = buildGenericApp 
 				gen_index.gi_module gen_index.gi_index gen_ident 
 				(KindArrow [KindConst]) [generic_info_expr, arg_expr] heaps
-
 		= (expr, (td_infos, heaps, error))
-	
 	specialize (GTSObject type_info_ds arg_type) st
 		# (arg_expr, (td_infos, heaps, error)) = specialize arg_type st
-
 		#! (generic_info_expr, heaps) = buildFunApp main_module_index type_info_ds [] heaps 
-		
 		#! (expr, heaps) = buildGenericApp 
 				gen_index.gi_module gen_index.gi_index gen_ident 
 				(KindArrow [KindConst]) [generic_info_expr, arg_expr] heaps
-
 		= (expr, (td_infos, heaps, error))
 
 	specialize GTSAppConsBimapKindConst (td_infos, heaps, error)
@@ -2404,7 +2376,6 @@ where
 		#! error = reportError gen_ident gen_pos "cannot specialize " error 
 		= (EE, (td_infos, heaps, error))
 
-
 	specialize_type_var tv=:{tv_info_ptr} (td_infos, heaps=:{hp_type_heaps=th=:{th_vars}}, error)		
 		#! (TVI_Expr expr, th_vars) = readPtr tv_info_ptr th_vars
 		= (expr, (td_infos, {heaps & hp_type_heaps = {th & th_vars = th_vars}}, error))
@@ -2412,9 +2383,7 @@ where
 
 	build_generic_app kind arg_exprs (td_infos, heaps, error)
 		# (generic_info_expr, heaps) = buildPredefConsApp PD_NoGenericInfo [] predefs heaps
-		
-		# arg_exprs = SwitchGenericInfo [generic_info_expr:arg_exprs] arg_exprs
-		
+		# arg_exprs = SwitchGenericInfo [generic_info_expr:arg_exprs] arg_exprs		
 		#! (expr, heaps) 
 			= buildGenericApp gen_index.gi_module gen_index.gi_index gen_ident kind arg_exprs heaps 
 		= (expr, (td_infos, heaps, error))
@@ -2455,7 +2424,6 @@ buildKindIndexedType st gtvs kind ident pos th error
 	= (kind_indexed_st, gatvs, th, error)
 		//---> ("buildKindIndexedType returns", kind_indexed_st)			 
 where
-
 	fresh_generic_type st gtvs th
 		# (fresh_st, th) = freshSymbolType st th
 		# fresh_gtvs = take (length gtvs) fresh_st.st_vars		
@@ -2583,9 +2551,7 @@ where
 			![ATypeVar]
 			![[ATypeVar]]
 			!*TypeHeaps
-		->	(!SymbolType
-			, !*TypeHeaps
-			)
+		->	(!SymbolType, !*TypeHeaps)
 	build_body st gatvs arg_gatvss  th
 		# th = clearSymbolType st th
 		# th = fold2St subst_gatv gatvs arg_gatvss th
@@ -3530,14 +3496,14 @@ buildCaseExpr case_arg case_alts heaps=:{hp_expression_heap}
 	# heaps = { heaps & hp_expression_heap = hp_expression_heap}	
 	= (expr, heaps)
 
-buildRecordSelectionExpr :: !Expression !Index !PredefinedSymbols -> Expression
-buildRecordSelectionExpr record_expr predef_field predefs 
+buildRecordSelectionExpr :: !Expression !Index !Int !PredefinedSymbols -> Expression
+buildRecordSelectionExpr record_expr predef_field field_n predefs 
 	# {pds_module, pds_def} = predefs . [predef_field]
 	# pds_ident = predefined_idents . [predef_field]
 	# selector = { 
 		glob_module = pds_module, 
 		glob_object = {ds_ident = pds_ident, ds_index = pds_def, ds_arity = 1}}
-	= Selection NormalSelector record_expr [RecordSelection selector 1]
+	= Selection NormalSelector record_expr [RecordSelection selector field_n]
 
 //=============================================================================
 // variables
@@ -3587,9 +3553,9 @@ foldExpr f expr=:(Var _) st
 foldExpr f expr=:(App {app_args}) st 
 	# st = f expr st
 	= foldSt (foldExpr f) app_args st
-foldExpr f expr1=:(expr @ exprs) st
-	# st = f expr st	
-	= foldSt (foldExpr f) [expr:exprs] st	
+foldExpr f expr=:(expr1 @ exprs) st
+	# st = f expr st
+	= foldSt (foldExpr f) [expr1:exprs] st	
 foldExpr f expr=:(Let {let_lazy_binds, let_strict_binds, let_expr}) st
 	# st = f expr st
 	# st = foldSt (fold_let_binds f) let_strict_binds st 
