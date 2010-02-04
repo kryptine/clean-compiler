@@ -11,15 +11,6 @@ from transform import ::Group
 import genericsupport
 import compilerSwitches
 
-//****************************************************************************************
-//	tracing
-//****************************************************************************************
-traceGenerics context message x
-	//:== traceValue context message x
-	:== x
-
-
-
 //**************************************************************************************
 // Data types
 //**************************************************************************************
@@ -136,14 +127,8 @@ convertGenerics
 		, hp_generic_heap = hp_generic_heap
 		, hp_type_heaps = { th_vars = th_vars, th_attrs = th_attrs }
 		}	
-		
-	//#! funs = dump_funs 0 funs
-	//#! dcl_modules = dump_dcl_modules 0 dcl_modules
-	//#! error = error ---> "************************* generic phase completed ******************** "
-	//| True = abort "generic phase aborted for testing\n"		
 	= (modules, groups, funs, generic_ranges, td_infos, heaps, hash_table, u_predefs, dcl_modules, error)
 where
-
 	convert_generics :: !*GenericState -> (![IndexRange], !*GenericState)
 	convert_generics gs		
 		#! (iso_range, gs) = buildGenericRepresentations gs
@@ -166,27 +151,6 @@ where
 	gs_ok gs=:{gs_error} 
 		#! ok = gs_error.ea_ok
 		= (ok, {gs & gs_error = gs_error})
-
-	dump_funs n funs 
-		| n == size funs
-			= funs
-			#! ({fun_ident, fun_type, fun_body}, funs) = funs ! [n]
-			#! funs = funs
-				//---> ("icl function ", fun_ident, n, fun_type, fun_body) 
-			=  dump_funs (inc n) funs
-	dump_dcl_modules n dcl_modules
-		| n == size dcl_modules
-			= dcl_modules			
-			# ({dcl_functions}, dcl_modules) = dcl_modules ! [n]				
-			= dump_dcl_modules (inc n) (dump_dcl_funs 0 dcl_functions dcl_modules)
-				//---> ("dcl module", n)		
-	dump_dcl_funs n dcl_funs dcl_modules
-		| n == size dcl_funs
-			= dcl_modules
-			# {ft_ident, ft_type} = dcl_funs.[n]
-			= dump_dcl_funs (inc n) dcl_funs dcl_modules
-				//---> ("dcl function", ft_ident, n, ft_type)
-
 
 //****************************************************************************************
 // clear stuff that might have been left over
@@ -270,7 +234,6 @@ where
 				
 			GeneratedBody	
 				// needs a generic representation
-				
 				-> case type_def.td_rhs of
 					SynType _
 						#  gs_error = reportError gc_ident gc_pos ("cannot derive a generic instance for a synonym type " +++ type_def.td_ident.id_name) gs.gs_error
@@ -346,7 +309,6 @@ buildGenericTypeRep type_index funs_and_groups
 		, gs_exprh = hp_expression_heap
 		}
 	= ({gtr_type=atype,gtr_iso=iso_fun_ds}, funs_and_groups, gs)
-		//---> ("buildGenericTypeRep", type_def.td_ident, atype)
 	
 //========================================================================================
 //	the structure type
@@ -464,7 +426,6 @@ where
 	clear_type_var {tv_info_ptr} th_vars
 		= writePtr tv_info_ptr TVI_Empty th_vars 
 
-	
 buildStructType ::
 		!GlobalIndex				// type def global index
 		!DefinedSymbol 				// type_info
@@ -476,7 +437,6 @@ buildStructType ::
 		)
 buildStructType {gi_module,gi_index} type_info cons_infos predefs (modules, td_infos, heaps, error)
 	# (type_def=:{td_ident}, modules) = modules![gi_module].com_type_defs.[gi_index]	
-	//# (common_defs, modules) = modules ! [gi_module]	
 	= build_type type_def type_info cons_infos (modules, td_infos, heaps, error)	
 		//---> ("buildStructureType", td_ident, atype)	
 where
@@ -534,7 +494,8 @@ where
 	where
 		build_either x y = GTSAppCons (KindArrow [KindConst, KindConst]) [x, y]	
 		build_void = abort "sanity check: no alternatives in a type\n"		
-		
+
+/*		
 // build a product of types
 buildProductType :: ![AType] !PredefinedSymbols -> AType
 buildProductType types predefs 
@@ -550,6 +511,7 @@ buildSumType types predefs
 where
 	build_either x y = buildPredefTypeApp PD_TypeEITHER [x, y] predefs	
 	build_void  = abort "sum of zero types\n"
+*/
 
 // build a binary representation of a list
 listToBin :: (a a -> a) a [a] -> a 
@@ -990,7 +952,6 @@ where
 			ap_position = NoPos
 			}
 		= (alg_pattern, heaps, error)	
-	
 	
 	build_sum :: !Int !Int !Expression !PredefinedSymbols !*Heaps -> (!Expression, !*Heaps)
 	build_sum i n expr predefs heaps
@@ -1696,7 +1657,6 @@ where
 		#! st = build_main_instance module_index gc_index gencase st	
 		#! st = build_shorthand_instances module_index gc_index gencase st
 		= st
-			//---> ("convert gencase", gc_ident, gc_type)
 
 	build_main_instance module_index gc_index 
 			gencase=:{gc_ident, gc_kind, gc_generic, gc_pos, gc_type, gc_type_cons, gc_body = GCB_FunIndex fun_index} 
@@ -3019,13 +2979,10 @@ curryGenericArgType  st=:{st_args, st_result, st_attr_env, st_attr_vars} attr_va
 	= (curried_st, {th & th_attrs = th_attrs})	
 		//---> ("curryGenericArgType", st, curried_st)
 
-
 curryGenericArgType1 :: !SymbolType !String !*TypeHeaps 
 	-> (!SymbolType, !*TypeHeaps)
 curryGenericArgType1  st=:{st_args, st_result, st_attr_env, st_attr_vars} attr_var_name th=:{th_attrs}
-		
 	# (atype, attr_vars, av_num, th_attrs) = curry st_args st_result 1 th_attrs
-
 	# curried_st = 
 		{ st 
 		& st_args = []
@@ -3691,117 +3648,6 @@ foldExpr f EE st
 foldExpr f expr st 
 	= abort "generic.icl: foldExpr does not match\n"//f expr st
 		---> ("foldExpr does not match", expr)
-/*
-//-----------------------------------------------------------------------------
-// map expression applies a function to each node of an expression
-// recursively:
-// first recurse, then apply the function
-//-----------------------------------------------------------------------------
-mapExprSt :: 
-		!(Expression -> w:st -> u:(Expression, w:st)) 
-		!Expression 
-		w:st
-	->  
-	v:	( Expression
-		, w:st
-		)
-	, [v<=w,u<=v]	
-mapExprSt f (App app=:{app_args}) st
-		# (app_args, st) = mapSt (mapExprSt f) app_args st
-		= f (App { app & app_args = app_args }) st
-				
-mapExprSt f (Let lad=:{let_lazy_binds, let_strict_binds, let_expr}) st
-	# (let_lazy_binds, st) = mapSt map_bind let_lazy_binds st
-	# (let_strict_binds, st) = mapSt map_bind let_strict_binds st
-	# (let_expr, st) = mapExprSt f let_expr st
-	# lad =
-		{ 	lad 
-		& 	let_expr = let_expr
-		, 	let_lazy_binds = let_lazy_binds
-		, 	let_strict_binds = let_strict_binds
-		}
-	= f (Let lad) st
-where
-	map_bind b=:{lb_src} st
-		# (lb_src, st) = mapExprSt f lb_src st
-		= ({b & lb_src = lb_src}, st)
-
-mapExprSt f (Selection a expr b) st
-	# (expr, st) = mapExprSt f expr st
-	= f (Selection a expr b) st
-	
-mapExprSt f (Update e1 x e2) st
-	# (e1, st) = mapExprSt f e1 st
-	# (e2, st) = mapExprSt f e2 st
-	= f (Update e1 x e2) st
-
-mapExprSt f (RecordUpdate x expr binds) st
-	# (expr, st) = mapExprSt f expr st
-	# (binds, st) = mapSt map_bind binds st
-	= f (RecordUpdate x expr binds) st
-where
-	map_bind b=:{bind_src} st
-		# (bind_dst, st) = mapExprSt f bind_src st
-		= ({b & bind_src = bind_src}, st)	
-
-mapExprSt f (TupleSelect x y expr) st
-	# (expr, st) = mapExprSt f expr st
-	= f (TupleSelect x y expr) st
-	
-mapExprSt f (Conditional cond=:{if_cond, if_then, if_else}) st
-	# (if_cond, st) = mapExprSt f if_cond st
-	# (if_then, st) = mapExprSt f if_then st
-	# (if_else, st) = mapOptionalSt (mapExprSt f) if_else st 
-/*
-	# (if_else, st) = case if_else of
-		(Yes x) 
-			# (x, st) = mapExprSt f x st
-			-> (Yes x, st)
-		No  -> (No, st)	
-*/
-	= f (Conditional {cond & if_cond = if_cond, if_then = if_then, if_else = if_else}) st
-		
-mapExprSt f (MatchExpr y expr) st
-	# (expr, st) = mapExprSt f expr st
-	= f (MatchExpr y expr) st
-
-mapExprSt f (DynamicExpr dyn=:{dyn_expr}) st
-	# (dyn_expr, st) = mapExprSt f dyn_expr st
-	= f (DynamicExpr {dyn& dyn_expr = dyn_expr}) st 
-
-mapExprSt f (Case c=:{case_expr, case_guards, case_default=case_default}) st
-	# (case_expr, st) = mapExprSt f case_expr st
-	# (case_guards, st) = map_patterns case_guards st
-	# (case_default, st) = case case_default of 
-		(Yes x) 
-			# (x, st) = mapExprSt f x st
-			-> (Yes x, st)
-		No  -> (No, st)	
-	# new_case = {c & case_expr=case_expr, case_guards=case_guards, case_default=case_default} 
-	=  f (Case new_case) st 
-where
-	map_patterns (AlgebraicPatterns index pats) st
-		# (pats, st) = mapSt map_alg_pattern pats st
-		= (AlgebraicPatterns index pats, st) 
-	map_patterns (BasicPatterns bt pats) st 
-		# (pats, st) = mapSt map_basic_pattern pats st
-		= (BasicPatterns bt pats, st)
-	map_patterns (DynamicPatterns pats) st
-		# (pats, st) = mapSt map_dyn_pattern pats st	
-		= (DynamicPatterns pats, st) 
-		
-	map_alg_pattern pat=:{ap_expr} st 
-		# (ap_expr, st) = mapExprSt f ap_expr st
-		= ({pat & ap_expr = ap_expr}, st) 
-	map_basic_pattern pat=:{bp_expr} st 
-		# (bp_expr, st) = mapExprSt f bp_expr st
-		= ({pat & bp_expr = bp_expr}, st) 
-	map_dyn_pattern pat=:{dp_rhs} st 
-		# (dp_rhs, st) = mapExprSt f dp_rhs	st
-		= ({pat & dp_rhs = dp_rhs}, st) 
-
-mapExprSt f expr st = f expr st		
-*/
 
 // needed for collectCalls
 instance == FunCall where (==) (FunCall x _) (FunCall y _) = x == y
@@ -3875,35 +3721,6 @@ where
 // Array helpers
 //****************************************************************************************
 
-//updateArray :: (Int a  -> a) *{a} -> *{a}
-updateArray f xs 
-	= map_array 0 xs
-where
-	map_array n xs
-		#! (s, xs) = usize xs
-		| n == s
-			= xs
-			# (x, xs) = xs ! [n]
-			= map_array (inc n) {xs & [n] = f n x} 
-
-//updateArray1 :: (Int .a  -> .a) *{.a} .a -> *{.a}
-updateArray1 f xs dummy
-	# (xs, _) = map_array 0 xs dummy
-	= xs
-where
-	map_array n xs d
-		#! (s, xs) = usize xs
-		| n == s
-			= (xs, d)
-			# (x, xs) = replace xs n d	
-			# x = f n x
-			# (d, xs) = replace xs n x			
-			= map_array (inc n) xs d
-
-update2dArray f xss 
-	= updateArray1 (\n xs -> updateArray (f n) xs) xss {}
-
-
 //updateArraySt :: (Int a .st -> (a, .st)) *{a} .st -> (*{a}, .st) 
 updateArraySt f xs st
 	= map_array 0 xs st
@@ -3916,24 +3733,6 @@ where
 			# (x, st) = f n x st			
 			= map_array (inc n) {xs&[n]=x} st
 
-
-//updateArraySt :: (Int .a .st -> (.a, .st)) *{a} .a .st -> (*{a}, .st) 
-updateArray1St f xs dummy st
-	# (xs, _, st) = map_array 0 xs dummy st
-	= (xs, st)
-where
-	map_array n xs d st
-		#! (s, xs) = usize xs
-		| n == s
-			= (xs, d, st)
-			# (x, xs) = replace xs n d	
-			# (x, st) = f n x st
-			# (d, xs) = replace xs n x			
-			= map_array (inc n) xs d st
- 
-update2dArraySt f xss st
-	= updateArray1St (\n xs st -> updateArraySt (f n) xs st) xss {} st
-
 //foldArraySt :: (Int a .st -> .st) {a} .st -> .st 
 foldArraySt f xs st
 	= fold_array 0 xs st
@@ -3944,18 +3743,6 @@ where
 			= st	
 			# st = f n xs.[n] st
 			= fold_array (inc n) xs st
-
-//foldUArraySt :: (Int a .st -> .st) u:{a} .st -> (u:{a}, .st) 
-foldUArraySt f array st
-	= map_array 0 array st
-where
-	map_array n array st
-		# (s, array) = usize array
-		| n == s
-			= (array, st)	
-			# (x, array) = array ! [n]
-			# st = f x st
-			= map_array (inc n) array st
 
 //****************************************************************************************
 //	General Helpers
@@ -3972,31 +3759,12 @@ transpose [[] : xss]     = transpose xss
 transpose [[x:xs] : xss] = 
 	[[x : [hd l \\ l <- xss]] : transpose [xs : [ tl l \\  l <- xss]]]
 
-unzip3 [] = ([], [], [])
-unzip3 [(x1,x2,x3):xs]
-	# (x1s, x2s, x3s) = unzip3 xs
-	= ([x1:x1s], [x2:x2s], [x3:x3s]) 	
-	
 foldOptional f No st = st
 foldOptional f (Yes x) st = f x st
-
-mapOptional f No = No
-mapOptional f (Yes x) = Yes (f x)
-
-mapOptionalSt f No st = (No, st)
-mapOptionalSt f (Yes x) st 
-	# (y, st) = f x st
-	= (Yes y, st)
 
 filterOptionals [] = []
 filterOptionals [No : xs] 	= filterOptionals xs
 filterOptionals [Yes x : xs] = [x : filterOptionals xs]
-	
-mapSt2 f [] st1 st2 		= ([], st1, st2) 
-mapSt2 f [x:xs] st1 st2
-	# (y, st1, st2) = f x st1 st2
-	# (ys, st1, st2) = mapSt2 f xs st1 st2 	
-	= ([y:ys], st1, st2)
 
 zipWith f [] [] = []
 zipWith f [x:xs] [y:ys] = [f x y : zipWith f xs ys]
