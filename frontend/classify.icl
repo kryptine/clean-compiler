@@ -57,7 +57,7 @@ where
 			| IsAVariable redir
 				= skip_indirections redir subst
 				= cons_var
-			
+
 	combine_cons_classes :: !ConsClass !ConsClass !*ConsClassSubst -> *ConsClassSubst
 	combine_cons_classes cc1 cc2 subst
 		| cc1 == cc2
@@ -73,7 +73,7 @@ where
 			#! cc_val2 = subst.[cc2]
 			= { subst & [cc2] = combine_cons_constants cc1 cc_val2 }
 			= subst
-				   
+
 	combine_cons_constants :: !ConsClass !ConsClass -> ConsClass
 	combine_cons_constants cc1 cc2
 		= min cc1 cc2
@@ -316,11 +316,11 @@ instance consumerRequirements BoundVar
 where
 	consumerRequirements {var_ident,var_info_ptr} _ ai=:{ai_var_heap}
 		# (var_info, ai_var_heap)	= readPtr var_info_ptr ai_var_heap
-		  ai						= { ai & ai_var_heap=ai_var_heap }
+		  ai						= {ai & ai_var_heap=ai_var_heap}
 		= case var_info of
 			VI_AccVar temp_var arg_position
 				#! (ref_count,ai)	= ai!ai_cur_ref_counts.[arg_position] 
-				   ai				= { ai & ai_cur_ref_counts.[arg_position] = inc_ref_count ref_count }
+				   ai				= {ai & ai_cur_ref_counts.[arg_position] = inc_ref_count ref_count}
 				-> (temp_var, False, ai)
 			_
 				-> abort ("consumerRequirements [BoundVar] " ---> (var_ident,var_info_ptr))
@@ -338,19 +338,18 @@ instance consumerRequirements Expression where
 		# let_binds					= let_strict_binds ++ let_lazy_binds
 		# (new_next_var, new_ai_next_var_of_fun, ai_var_heap)
 									= init_variables let_binds ai_next_var ai_next_var_of_fun ai_var_heap
-		# ai						= { ai & ai_next_var = new_next_var, ai_next_var_of_fun = new_ai_next_var_of_fun, ai_var_heap = ai_var_heap }
+		# ai						= {ai & ai_next_var = new_next_var, ai_next_var_of_fun = new_ai_next_var_of_fun, ai_var_heap = ai_var_heap}
 		# ai						= acc_requirements_of_let_binds let_binds ai_next_var common_defs ai
-		= consumerRequirements let_expr common_defs ai // XXX why not not_an_unsafe_pattern
+		= consumerRequirements let_expr common_defs ai
 		where
 			init_variables [{lb_dst={fv_count, fv_info_ptr}} : binds] ai_next_var ai_next_var_of_fun ai_var_heap
 				| fv_count > 0
 					# ai_var_heap = writePtr fv_info_ptr (VI_AccVar ai_next_var ai_next_var_of_fun) ai_var_heap
 					= init_variables binds (inc ai_next_var) (inc ai_next_var_of_fun) ai_var_heap
-						
 					= init_variables binds ai_next_var ai_next_var_of_fun ai_var_heap
 			init_variables [] ai_next_var ai_next_var_of_fun ai_var_heap
 				= (ai_next_var, ai_next_var_of_fun, ai_var_heap)
-				
+
 			acc_requirements_of_let_binds [ {lb_src, lb_dst} : binds ] ai_next_var common_defs ai
 				| lb_dst.fv_count > 0
 					# (bind_var, _, ai) = consumerRequirements lb_src common_defs ai
@@ -359,7 +358,6 @@ instance consumerRequirements Expression where
 					= acc_requirements_of_let_binds binds ai_next_var common_defs ai
 			acc_requirements_of_let_binds [] ai_next_var _ ai
 				= ai
-				
 	consumerRequirements (Case case_expr) common_defs ai
 		= consumerRequirements case_expr common_defs ai
 	consumerRequirements (BasicExpr _) _ ai
@@ -415,10 +413,9 @@ where
 		# (_, _, ai) = consumerRequirements index_expr common_defs ai
 		  (cc_var, _, ai) = consumerRequirements dict_var common_defs ai
 		= aiUnifyClassifications CActive cc_var ai
-	// record selection missing?!
-	reqs_of_selector _ _ ai
+	reqs_of_selector common_defs (RecordSelection _ _) ai
 		= ai
-			
+
 instance consumerRequirements App where
 	consumerRequirements {app_symb={symb_kind = SK_Function {glob_module,glob_object},symb_ident}, app_args}
 			common_defs=:(ConsumerAnalysisRO {main_dcl_module_n,stdStrictLists_module_n,imported_funs})
@@ -434,7 +431,7 @@ instance consumerRequirements App where
 
 		| glob_module == stdStrictLists_module_n && (not (isEmpty app_args))
 				&& is_nil_cons_or_decons_of_UList_or_UTSList glob_object glob_module imported_funs
-			# [app_arg:app_args]=app_args;
+			# [app_arg:app_args]=app_args
 			# (cc, _, ai) = consumerRequirements app_arg common_defs ai
 			# ai = aiUnifyClassifications CActive cc ai
 			= consumerRequirements app_args common_defs ai
@@ -496,13 +493,14 @@ instance consumerRequirements App where
 		| isMember index ai_group_members
 			= reqs_of_args index 0 cc_args app_args CPassive common_defs ai
 		= reqs_of_args (-1) 0 cc_args app_args CPassive common_defs ai
-	
+
 	consumerRequirements {app_args} common_defs ai
 		=  not_an_unsafe_pattern (consumerRequirements app_args common_defs ai)
 
 instance <<< TypeContext
 where
 	(<<<) file co = file <<< co.tc_class <<< " " <<< co.tc_types <<< " <" <<< co.tc_var <<< '>'
+
 instance <<< (Ptr a)
 where
 	(<<<) file p = file <<< ptrToInt p
@@ -512,8 +510,7 @@ reqs_of_args _ _ _ [] cumm_arg_class _ ai
 	= (cumm_arg_class, False, ai)
 reqs_of_args _ _ [] _ cumm_arg_class _ ai
 	= (cumm_arg_class, False, ai)
-
-reqs_of_args fun_idx arg_idx [form_cc : ccs] [(Var arg): args] cumm_arg_class common_defs ai
+reqs_of_args fun_idx arg_idx [form_cc : ccs] [Var arg : args] cumm_arg_class common_defs ai
 	| fun_idx >= 0
 		# (act_cc, _, ai) = consumerRequirements` arg common_defs ai
 		  ai = aiUnifyClassifications form_cc act_cc ai
@@ -524,7 +521,7 @@ where
 		  ai						= { ai & ai_var_heap=ai_var_heap }
 		= case var_info of
 			VI_AccVar temp_var arg_position
-				#! (ref_count,ai)	= ai!ai_cur_ref_counts.[arg_position] 
+				#! (ref_count,ai)	= ai!ai_cur_ref_counts.[arg_position]
 				   ai				= { ai & ai_cur_ref_counts.[arg_position] = add_dep_count (fun_idx,arg_idx) ref_count }
 				-> (temp_var, False, ai)
 			_
@@ -845,7 +842,7 @@ instance consumerRequirements (!a,!b) | consumerRequirements a & consumerRequire
 		# (ccx, _, ai) = consumerRequirements x common_defs ai
 		  (ccy, _, ai) = consumerRequirements y common_defs ai
 		= (combineClasses ccx ccy, False, ai)
-		
+
 instance consumerRequirements [a] | consumerRequirements a where
 	consumerRequirements [x : xs] common_defs ai
 		# (ccx,  _, ai) = consumerRequirements x  common_defs ai
@@ -900,19 +897,15 @@ where
 
 		# (_,ai_cases_of_vars_for_group, rev_strictness_for_group, ai)
 				= foldSt (analyse_functions common_defs) group_members (0, [], [], ai)
-		  ai_group_counts
-		  		= ai.ai_group_counts
-		  ai_group_counts
-		  		= replace_global_idx_by_group_idx group_members ai_group_counts
+		  ai_group_counts = ai.ai_group_counts
+		  ai_group_counts = replace_global_idx_by_group_idx group_members ai_group_counts
 		#!
-		  ai_group_counts
-		  		= substitute_dep_counts group_members ai_group_counts
+		  ai_group_counts = substitute_dep_counts group_members ai_group_counts
 		  ai	= { ai & ai_group_counts =  ai_group_counts}
-		  
+
 		# (_,_,ai)
 		  		= foldSt set_linearity_info_for_group group_members (0,reverse rev_strictness_for_group,ai)
-		  class_env
-		  		= ai.ai_cons_class
+		  class_env = ai.ai_cons_class
 		  class_env
 		  		= foldSt (collect_classifications ai.ai_class_subst) group_members class_env
 		  (cleanup_info, class_env, fun_defs, var_heap, expr_heap)
@@ -1403,14 +1396,13 @@ where
 		= count_locals index_expr n
 	count_selector_locals (DictionarySelection _ _ _ index_expr) n
 		= count_locals index_expr n
-	// record selection missing?!
-	count_selector_locals _ n
+	count_selector_locals (RecordSelection _ _) n
 		= n
 
 add_unused_args fun fun_index args ref_counts group_strictness
 	= SwitchNewOld
 		[if (is_non_zero  rc)
-			arg 
+			arg
 			(unused2class (collect_deps (if (arg_strictness fun_index idx group_strictness) UStrict ULazy) [!rc!]) )
 		\\ arg <- args & rc <-: ref_counts & idx <- [0..]]	// new
 		[if (is_non_zero` rc) arg CUnusedStrict \\ arg <- args & rc <-: ref_counts]	// old
@@ -1674,17 +1666,11 @@ instance producerRequirements (Optional a) | producerRequirements a where
 
 instance producerRequirements CasePatterns where
 	producerRequirements (AlgebraicPatterns index patterns) prs
-		// name shadowing...
-		# (safe,prs)	= producerRequirements patterns prs
-		= (safe,prs)
+		= producerRequirements patterns prs
 	producerRequirements (BasicPatterns type patterns) prs
-		// name shadowing...
-		# (safe,prs)	= producerRequirements patterns prs
-		= (safe,prs)
+		= producerRequirements patterns prs
 	producerRequirements (OverloadedListPatterns _ _ patterns) prs
-		// name shadowing...
-		# (safe,prs)	= producerRequirements patterns prs
-		= (safe,prs)
+		= producerRequirements patterns prs
 	producerRequirements (DynamicPatterns patterns) prs
 		//...disallow for now...
 		= (False,prs)
@@ -1693,12 +1679,10 @@ instance producerRequirements CasePatterns where
 
 instance producerRequirements AlgebraicPattern where
 	producerRequirements {ap_expr} prs
-		// name shadowing...
 		= producerRequirements ap_expr prs
 
 instance producerRequirements BasicPattern where
 	producerRequirements {bp_expr} prs
-		// name shadowing...
 		= producerRequirements bp_expr prs
 
 instance producerRequirements LetBind where
