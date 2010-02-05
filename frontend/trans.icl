@@ -164,6 +164,19 @@ cleanup_attributes expr_info_ptr symbol_heap
 
 ::	RootCaseMode = NotRootCase | RootCase | RootCaseOfZombie
 
+::	CopyState =
+	{	cs_var_heap				:: !.VarHeap
+	,	cs_symbol_heap			:: !.ExpressionHeap
+	,	cs_opt_type_heaps		:: !.Optional .TypeHeaps,
+		cs_cleanup_info			:: ![ExprInfoPtr]
+	}
+
+::	CopyInfo =
+	{	ci_handle_aci_free_vars	:: !AciFreeVarsHandleMode
+	}
+
+:: AciFreeVarsHandleMode = LeaveAciFreeVars | RemoveAciFreeVars | SubstituteAciFreeVars
+
 neverMatchingCase (Yes ident)
 	# ident = ident -!-> ("neverMatchingCase",ident)
 	= FailExpr ident
@@ -178,6 +191,7 @@ neverMatchingCase _
 // ... RWS
 						case_default_pos = NoPos }
 */
+
 class transform a :: !a !ReadOnlyTI !*TransformInfo -> (!a, !*TransformInfo)
 
 instance transform Expression
@@ -433,17 +447,17 @@ where
 		| final
 			# new_case = {outer_case & case_expr = guard_expr}
 			= transformCase new_case ro ti // ---> ("possiblyFoldOuterCase`",Case new_case)
-		# us = { us_var_heap = ti.ti_var_heap, us_symbol_heap = ti.ti_symbol_heap, us_opt_type_heaps = No
-				,us_cleanup_info=ti.ti_cleanup_info, us_local_macro_functions = No }
-		  ui									= {ui_handle_aci_free_vars = LeaveThem }
-		  (outer_guards, us=:{us_cleanup_info})	= unfold outer_case.case_guards ui us
-		  (expr_info, ti_symbol_heap)			= readPtr outer_case.case_info_ptr us.us_symbol_heap
+		# cs = { cs_var_heap = ti.ti_var_heap, cs_symbol_heap = ti.ti_symbol_heap, cs_opt_type_heaps = No
+				,cs_cleanup_info=ti.ti_cleanup_info }
+		  ci									= {ci_handle_aci_free_vars = LeaveAciFreeVars }
+		  (outer_guards, cs=:{cs_cleanup_info})	= copy outer_case.case_guards ci cs
+		  (expr_info, ti_symbol_heap)			= readPtr outer_case.case_info_ptr cs.cs_symbol_heap
 		  (new_info_ptr, ti_symbol_heap)		= newPtr expr_info ti_symbol_heap
 		  new_cleanup_info 						= case expr_info of 
 		  		EI_Extended _ _
-		  			-> [new_info_ptr:us_cleanup_info]
-		  		_ 	-> us_cleanup_info
-		  ti = { ti & ti_var_heap = us.us_var_heap, ti_symbol_heap = ti_symbol_heap, ti_cleanup_info=new_cleanup_info }
+		  			-> [new_info_ptr:cs_cleanup_info]
+		  		_ 	-> cs_cleanup_info
+		  ti = { ti & ti_var_heap = cs.cs_var_heap, ti_symbol_heap = ti_symbol_heap, ti_cleanup_info=new_cleanup_info }
 		  new_case								= { outer_case & case_expr = guard_expr, case_guards=outer_guards, case_info_ptr=new_info_ptr }
 		= transformCase new_case ro ti // ---> ("possiblyFoldOuterCase`",Case new_case)
 	
@@ -683,13 +697,12 @@ where
 		  ti_var_heap = foldSt (\({fv_info_ptr}, arg) -> writeVarInfo fv_info_ptr (VI_Expression arg)) unfoldable_args ti.ti_var_heap
 //		  (new_expr, ti_symbol_heap) = possibly_add_let non_unfoldable_args ap_expr not_unfoldable cons_type_args ro ti.ti_symbol_heap
 		  (new_expr, ti_symbol_heap) = possibly_add_let zipped ap_expr not_unfoldable cons_type_args ro ti.ti_symbol_heap cons_type_args_strictness
-		  unfold_state = { us_var_heap = ti_var_heap, us_symbol_heap = ti_symbol_heap, us_opt_type_heaps = No,us_cleanup_info=ti.ti_cleanup_info,
-		  				   us_local_macro_functions = No }
-		  ui= {ui_handle_aci_free_vars = LeaveThem }
-		  (unfolded_expr, unfold_state) = unfold new_expr ui unfold_state
+		  copy_state = { cs_var_heap = ti_var_heap, cs_symbol_heap = ti_symbol_heap, cs_opt_type_heaps = No,cs_cleanup_info=ti.ti_cleanup_info }
+		  ci = {ci_handle_aci_free_vars = LeaveAciFreeVars }
+		  (unfolded_expr, copy_state) = copy new_expr ci copy_state
 		  (final_expr, ti) = transform unfolded_expr
 		  						{ ro & ro_root_case_mode = NotRootCase }
-		  						{ ti & ti_var_heap = unfold_state.us_var_heap, ti_symbol_heap = unfold_state.us_symbol_heap,ti_cleanup_info=unfold_state.us_cleanup_info }
+		  						{ ti & ti_var_heap = copy_state.cs_var_heap, ti_symbol_heap = copy_state.cs_symbol_heap,ti_cleanup_info=copy_state.cs_cleanup_info }
 //		| False ---> ("instantiate",app_args,ap_vars,ap_expr,final_expr,unfoldables) = undef
 		= (Yes final_expr, ti)
 	where
@@ -908,19 +921,18 @@ generate_case_function fun_index case_info_ptr new_expr outer_fun_def outer_cons
 	# (fun_type,ti)							= determine_case_function_type fun_arity ct_result_type arg_types st_attr_env ti
 
 	  // unfold...
-	  us =		{ us_var_heap				= ti.ti_var_heap
-	  			, us_symbol_heap			= ti.ti_symbol_heap
-	  			, us_opt_type_heaps			= Yes ti.ti_type_heaps
-	  			, us_cleanup_info			= ti.ti_cleanup_info
-	  			, us_local_macro_functions	= No 
+	  cs =		{ cs_var_heap				= ti.ti_var_heap
+	  			, cs_symbol_heap			= ti.ti_symbol_heap
+	  			, cs_opt_type_heaps			= Yes ti.ti_type_heaps
+	  			, cs_cleanup_info			= ti.ti_cleanup_info
 	  			}
-	  ui =
-	  			{ ui_handle_aci_free_vars	= SubstituteThem
+	  ci =
+	  			{ ci_handle_aci_free_vars	= SubstituteAciFreeVars
 	  			}
-	  (copied_expr, us)
-			= unfold new_expr ui us
-	  {us_var_heap=ti_var_heap, us_symbol_heap=ti_symbol_heap, us_cleanup_info=ti_cleanup_info, us_opt_type_heaps = Yes ti_type_heaps}
-	  		= us
+	  (copied_expr, cs)
+			= copy new_expr ci cs
+	  {cs_var_heap=ti_var_heap, cs_symbol_heap=ti_symbol_heap, cs_cleanup_info=ti_cleanup_info, cs_opt_type_heaps = Yes ti_type_heaps}
+	  		= cs
 	  // generated function...
 	  fun_def =	{ fun_ident					= ro_fun.symb_ident
 				, fun_arity					= fun_arity
@@ -1530,20 +1542,19 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 	  						_
 	  							-> (i+1, writePtr tv_info_ptr (TVI_Type subst.[i]) th_vars))
 	  				all_type_vars (0, ti_type_heaps.th_vars)
-	  us 	=	{ us_var_heap				= ti_var_heap
-	  			, us_symbol_heap			= ti_symbol_heap
-	  			, us_opt_type_heaps			= Yes { ti_type_heaps & th_vars = th_vars }
-	  			, us_cleanup_info			= ti_cleanup_info
-	  			, us_local_macro_functions	= No 
+	  cs 	=	{ cs_var_heap				= ti_var_heap
+	  			, cs_symbol_heap			= ti_symbol_heap
+	  			, cs_opt_type_heaps			= Yes { ti_type_heaps & th_vars = th_vars }
+	  			, cs_cleanup_info			= ti_cleanup_info
 	  			}
- 	  ui	=	{ ui_handle_aci_free_vars	= RemoveThem
+ 	  ci	=	{ ci_handle_aci_free_vars	= RemoveAciFreeVars
  	  			}
 //	| False ---> ("before unfold:", tb_rhs) = undef
-	# (tb_rhs, {us_var_heap,us_symbol_heap,us_opt_type_heaps=Yes ti_type_heaps, us_cleanup_info})
-	  		= unfold tb_rhs ui us
+	# (tb_rhs, {cs_var_heap,cs_symbol_heap,cs_opt_type_heaps=Yes ti_type_heaps, cs_cleanup_info})
+	  		= copy tb_rhs ci cs
 //	| False ---> ("unfolded:", tb_rhs) = undef
 //*999
-	# us_var_heap						= fold2St store_arg_type_info new_fun_args fresh_arg_types us_var_heap
+	# cs_var_heap						= fold2St store_arg_type_info new_fun_args fresh_arg_types cs_var_heap
 		with
 			store_arg_type_info {fv_info_ptr} a_type ti_var_heap
 				= setExtendedVarInfo fv_info_ptr (EVI_VarType a_type) ti_var_heap
@@ -1554,23 +1565,23 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 	  							-> RootCase
 	  						_	-> NotRootCase
 	
-	# (args1,resto,restn,us_var_heap) = take1 tb_args new_fun_args us_var_heap
+	# (args1,resto,restn,cs_var_heap) = take1 tb_args new_fun_args cs_var_heap
 		with
-			take1 [o:os] [n:ns] us_var_heap
-				# (vi,us_var_heap) = readVarInfo o.fv_info_ptr us_var_heap
+			take1 [o:os] [n:ns] cs_var_heap
+				# (vi,cs_var_heap) = readVarInfo o.fv_info_ptr cs_var_heap
 				# eq = case vi of
 					VI_Variable _ fip	-> fip == n.fv_info_ptr
 					_					-> False
 				| eq
-					# (ts,os,ns,us_var_heap)	= take1 os ns us_var_heap
-					= ([o:ts],os,ns,us_var_heap)
-					= ([],[o:os],[n:ns],us_var_heap)
-			take1 os ns us_var_heap = ([],os,ns,us_var_heap)
-	# (args2o,args2n,resto,restn,us_var_heap) = take2 resto restn us_var_heap
+					# (ts,os,ns,cs_var_heap)	= take1 os ns cs_var_heap
+					= ([o:ts],os,ns,cs_var_heap)
+					= ([],[o:os],[n:ns],cs_var_heap)
+			take1 os ns cs_var_heap = ([],os,ns,cs_var_heap)
+	# (args2o,args2n,resto,restn,cs_var_heap) = take2 resto restn cs_var_heap
 		with
-			take2 [] [] us_var_heap = ([],[],[],[],us_var_heap)
-			take2 os ns us_var_heap
-				# (os`,us_var_heap) = extend os us_var_heap 
+			take2 [] [] cs_var_heap = ([],[],[],[],cs_var_heap)
+			take2 os ns cs_var_heap
+				# (os`,cs_var_heap) = extend os cs_var_heap 
 				# os`` = map fst os`
 				# ns`` = map (\{fv_info_ptr}->fv_info_ptr) ns
 				# condO = \(o,_) -> not (isMember o ns``)
@@ -1579,7 +1590,7 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 				# (an,rn) = (takeWhile condN ns, dropWhile condN ns)
 				# ao = shrink ao`
 				# ro = shrink ro`
-				= (ao,an,ro,rn,us_var_heap)
+				= (ao,an,ro,rn,cs_var_heap)
 			where
 				extend os uvh	= seqList (map ext os) uvh
 				ext o uvh
@@ -1595,18 +1606,18 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 					= hd==x || isMember x tl
 				isMember x []	= False
 
-	# (args3,resto,restn,us_var_heap) = take1 resto restn us_var_heap
+	# (args3,resto,restn,cs_var_heap) = take1 resto restn cs_var_heap
 		with
-			take1 [o:os] [n:ns] us_var_heap
-				# (vi,us_var_heap) = readVarInfo o.fv_info_ptr us_var_heap
+			take1 [o:os] [n:ns] cs_var_heap
+				# (vi,cs_var_heap) = readVarInfo o.fv_info_ptr cs_var_heap
 				# eq = case vi of
 					VI_Variable _ fip	-> fip == n.fv_info_ptr
 					_					-> False
 				| eq
-					# (ts,os,ns,us_var_heap)	= take1 os ns us_var_heap
-					= ([o:ts],os,ns,us_var_heap)
-					= ([],[o:os],[n:ns],us_var_heap)
-			take1 os ns us_var_heap = ([],os,ns,us_var_heap)
+					# (ts,os,ns,cs_var_heap)	= take1 os ns cs_var_heap
+					= ([o:ts],os,ns,cs_var_heap)
+					= ([],[o:os],[n:ns],cs_var_heap)
+			take1 os ns cs_var_heap = ([],os,ns,cs_var_heap)
 /*			take1 [] [] = ([],[],[])
 			take1 [o:os] [n:ns]
 				| o.fv_info_ptr == n.fv_info_ptr
@@ -1631,10 +1642,10 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 //	| False ---> ("transforming new function:",ti_next_fun_nr,tb_rhs)		= undef
 //	| False -!-> ("transforming new function:",tb_rhs)		= undef
 	# ti
-			= { ti & ti_var_heap = us_var_heap, ti_fun_heap = ti_fun_heap, ti_symbol_heap = us_symbol_heap,
+			= { ti & ti_var_heap = cs_var_heap, ti_fun_heap = ti_fun_heap, ti_symbol_heap = cs_symbol_heap,
 	  			ti_next_fun_nr = inc ti_next_fun_nr, ti_type_def_infos = ti_type_def_infos,
 	  			ti_new_functions = [fun_def_ptr : ti_new_functions], ti_fun_defs = ti_fun_defs,
-	  			ti_type_heaps = ti_type_heaps, ti_cleanup_info = us_cleanup_info, 
+	  			ti_type_heaps = ti_type_heaps, ti_cleanup_info = cs_cleanup_info, 
 	  			ti_cons_args = ti_cons_args,
 	  			ti_predef_symbols = ti_predef_symbols }
 	# ti = arity_warning "generateFunction" fd.fun_ident.id_name ti_next_fun_nr new_fun_arity ti
@@ -4469,3 +4480,322 @@ where
 mapOpt f [Yes a:x]	= [Yes (f a):mapOpt f x]
 mapOpt f [No:x]		= [No:mapOpt f x]
 mapOpt f [] 		= []
+
+class copy a :: !a !CopyInfo !*CopyState -> (!a, !*CopyState)
+
+instance copy Expression
+where
+	copy (Var var) ci cs
+		= copyVariable var ci cs
+	copy (App app) ci cs
+		# (app, cs) = copy app ci cs
+		= (App app, cs)
+	copy (expr @ exprs) ci cs
+		# ((expr,exprs), cs) = copy (expr,exprs) ci cs
+		= (expr @ exprs, cs)
+	copy (Let lad) ci cs
+		# (lad, cs) = copy lad ci cs
+		= (Let lad, cs)
+	copy (Case case_expr) ci cs
+		# (case_expr, cs) = copy case_expr ci cs
+		= (Case case_expr, cs)
+	copy (Selection is_unique expr selectors) ci cs
+		# ((expr, selectors), cs) = copy (expr, selectors) ci cs
+		= (Selection is_unique expr selectors, cs)
+	copy (Update expr1 selectors expr2) ci cs
+		# (((expr1, expr2), selectors), cs) = copy ((expr1, expr2), selectors) ci cs
+		= (Update expr1 selectors expr2, cs)
+	copy (RecordUpdate cons_symbol expression expressions) ci cs
+		# ((expression, expressions), cs) = copy (expression, expressions) ci cs
+		= (RecordUpdate cons_symbol expression expressions, cs)
+	copy (TupleSelect symbol argn_nr expr) ci cs
+		# (expr, cs) = copy expr ci cs
+		= (TupleSelect symbol argn_nr expr, cs)
+	copy (MatchExpr cons_ident expr) ci cs
+		# (expr, cs) = copy expr ci cs
+		= (MatchExpr cons_ident expr, cs)
+	copy (DynamicExpr expr) ci cs
+		# (expr, cs) = copy expr ci cs
+		= (DynamicExpr expr, cs)
+	copy (TypeSignature type_function expr) ci cs
+		# (expr, cs) = copy expr ci cs
+		= (TypeSignature type_function expr, cs)
+	copy expr ci cs
+		= (expr, cs)
+
+instance copy DynamicExpr
+where
+	copy expr=:{dyn_expr, dyn_info_ptr} ci cs=:{cs_symbol_heap}
+		# (dyn_info, cs_symbol_heap) = readPtr dyn_info_ptr cs_symbol_heap
+		# (new_dyn_info_ptr, cs_symbol_heap) = newPtr dyn_info cs_symbol_heap
+		# (dyn_expr, cs) = copy dyn_expr ci {cs & cs_symbol_heap=cs_symbol_heap}
+		= ({ expr & dyn_expr = dyn_expr, dyn_info_ptr = new_dyn_info_ptr }, cs)
+
+instance copy Selection
+where
+	copy (ArraySelection array_select expr_ptr index_expr) ci cs=:{cs_symbol_heap}
+		# (new_ptr, cs_symbol_heap) = newPtr EI_Empty cs_symbol_heap
+		  (index_expr, cs) = copy index_expr ci { cs & cs_symbol_heap = cs_symbol_heap}
+		= (ArraySelection array_select new_ptr index_expr, cs)
+	copy (DictionarySelection var selectors expr_ptr index_expr) ci cs=:{cs_symbol_heap}
+		# (new_ptr, cs_symbol_heap) = newPtr EI_Empty cs_symbol_heap
+		  (index_expr, cs) = copy index_expr ci { cs & cs_symbol_heap = cs_symbol_heap}
+		  (var_expr, cs) = copyVariable var ci cs
+		= case var_expr of 
+			App {app_symb={symb_kind= SK_Constructor _ }, app_args}
+				# [RecordSelection _ field_index:_] = selectors
+				  (App { app_symb = {symb_ident, symb_kind = SK_Function array_select}}) =  app_args !! field_index
+				-> (ArraySelection { array_select & glob_object = { ds_ident = symb_ident, ds_arity = 2, ds_index = array_select.glob_object}}
+							new_ptr index_expr, cs)
+			Var var
+				-> (DictionarySelection var selectors new_ptr index_expr, cs)
+	copy record_selection ci cs
+		= (record_selection, cs)
+
+instance copy FreeVar
+where
+	copy fv=:{fv_info_ptr,fv_ident} ci cs=:{cs_var_heap}
+		# (new_info_ptr, cs_var_heap) = newPtr VI_Empty cs_var_heap
+		= ({ fv & fv_info_ptr = new_info_ptr }, { cs & cs_var_heap = writePtr fv_info_ptr (VI_Variable fv_ident new_info_ptr) cs_var_heap })
+
+instance copy App
+where
+	copy app=:{app_symb={symb_kind}, app_args, app_info_ptr} ci cs
+		= case symb_kind of
+			SK_Function {glob_module,glob_object}
+				-> copy_function_app app ci cs
+			SK_IclMacro macro_index
+				-> copy_function_app app ci cs
+			SK_DclMacro {glob_module,glob_object}
+				-> copy_function_app app ci cs
+			SK_OverloadedFunction {glob_module,glob_object}
+				-> copy_function_app app ci cs
+			SK_Generic {glob_module,glob_object} kind
+				-> copy_function_app app ci cs
+			SK_LocalMacroFunction local_macro_function_n
+				-> copy_function_app app ci cs
+			SK_LocalDclMacroFunction {glob_module,glob_object}
+				-> copy_function_app app ci cs
+			SK_Constructor _
+				| not (isNilPtr app_info_ptr)
+					# (app_info, cs_symbol_heap) = readPtr app_info_ptr cs.cs_symbol_heap
+					  (new_app_info, cs_opt_type_heaps) = substitute_EI_DictionaryType app_info cs.cs_opt_type_heaps
+					  (new_info_ptr, cs_symbol_heap) = newPtr new_app_info cs_symbol_heap
+					  cs={ cs & cs_symbol_heap = cs_symbol_heap, cs_opt_type_heaps = cs_opt_type_heaps }
+					  (app_args, cs) = copy app_args ci cs
+					-> ({ app & app_args = app_args, app_info_ptr = new_info_ptr}, cs) 
+					# (app_args, cs) = copy app_args ci cs
+					-> ({ app & app_args = app_args}, cs)
+			_
+				# (app_args, cs) = copy app_args ci cs
+				-> ({ app & app_args = app_args, app_info_ptr = nilPtr}, cs) 
+	where
+		copy_function_app app=:{app_args, app_info_ptr} ci cs
+			# (new_info_ptr, cs_symbol_heap) = newPtr EI_Empty cs.cs_symbol_heap
+			# cs={ cs & cs_symbol_heap = cs_symbol_heap }
+			# (app_args, cs) = copy app_args ci cs
+			= ({ app & app_args = app_args, app_info_ptr = new_info_ptr}, cs) 
+
+		substitute_EI_DictionaryType (EI_DictionaryType class_type) (Yes type_heaps)
+			# (new_class_type, type_heaps) = substitute class_type type_heaps
+			= (EI_DictionaryType new_class_type, Yes type_heaps)
+		substitute_EI_DictionaryType x opt_type_heaps
+			= (x, opt_type_heaps)
+
+instance copy LetBind
+where
+	copy bind=:{lb_src} ci cs
+		# (lb_src, cs) = copy lb_src ci cs
+		= ({ bind & lb_src = lb_src }, cs)
+
+instance copy (Bind a b) | copy a
+where
+	copy bind=:{bind_src} ci cs
+		# (bind_src, cs) = copy bind_src ci cs
+		= ({ bind & bind_src = bind_src }, cs)
+
+instance copy Case
+where
+	copy kees=:{ case_expr,case_guards,case_default,case_info_ptr} ci cs=:{cs_cleanup_info}
+		# (old_case_info, cs_symbol_heap) = readPtr case_info_ptr cs.cs_symbol_heap
+		  (new_case_info, cs_opt_type_heaps) = substitute_let_or_case_type old_case_info cs.cs_opt_type_heaps
+		  (new_info_ptr, cs_symbol_heap) = newPtr new_case_info cs_symbol_heap
+		  cs_cleanup_info = case old_case_info of
+								EI_Extended _ _	-> [new_info_ptr:cs_cleanup_info]
+								_				-> cs_cleanup_info
+		  cs = { cs & cs_symbol_heap = cs_symbol_heap, cs_opt_type_heaps = cs_opt_type_heaps, cs_cleanup_info=cs_cleanup_info }
+		  ((case_guards,case_default), cs) = copy (case_guards,case_default) ci cs
+		  (case_expr, cs) = update_active_case_info_and_copy case_expr new_info_ptr cs
+		= ({ kees & case_expr = case_expr,case_guards = case_guards, case_default = case_default, case_info_ptr =  new_info_ptr}, cs)
+	where
+		update_active_case_info_and_copy case_expr=:(Var {var_info_ptr}) case_info_ptr cs
+			# (case_info, cs_symbol_heap) = readPtr case_info_ptr cs.cs_symbol_heap
+			  cs = { cs & cs_symbol_heap = cs_symbol_heap }
+			= case case_info of
+				EI_Extended (EEI_ActiveCase aci=:{aci_free_vars}) ei
+					# (new_aci_free_vars, cs) = case ci.ci_handle_aci_free_vars of
+													LeaveAciFreeVars
+														-> (aci_free_vars, cs)
+													RemoveAciFreeVars
+														-> (No, cs)
+													SubstituteAciFreeVars
+														-> case aci_free_vars of
+																No		-> (No, cs)
+																Yes fvs	# (fvs_subst, cs) = mapSt copyBoundVar fvs cs
+																		-> (Yes fvs_subst, cs)
+					  (var_info,var_heap) = readVarInfo var_info_ptr cs.cs_var_heap
+					  cs = {cs & cs_var_heap=var_heap}
+					-> case var_info of
+						VI_Body fun_ident {tb_args, tb_rhs} new_aci_params
+							# tb_args_ptrs = [ fv_info_ptr \\ {fv_info_ptr}<-tb_args ] 
+							  (original_bindings, cs_var_heap) = mapSt readPtr tb_args_ptrs cs.cs_var_heap
+							  cs_var_heap = fold2St bind tb_args_ptrs new_aci_params cs_var_heap
+							  (tb_rhs, cs) = copy tb_rhs ci { cs & cs_var_heap = cs_var_heap }
+							  cs_var_heap = fold2St writePtr tb_args_ptrs original_bindings cs.cs_var_heap
+							  new_aci = { aci & aci_params = new_aci_params, aci_opt_unfolder = Yes fun_ident, aci_free_vars = new_aci_free_vars }
+							  new_eei = (EI_Extended (EEI_ActiveCase new_aci) ei)
+							  cs_symbol_heap = writePtr case_info_ptr new_eei cs.cs_symbol_heap
+							-> (tb_rhs, { cs & cs_var_heap = cs_var_heap, cs_symbol_heap = cs_symbol_heap })
+						_	# new_eei = EI_Extended (EEI_ActiveCase { aci & aci_free_vars = new_aci_free_vars }) ei
+							  cs_symbol_heap = writePtr case_info_ptr new_eei cs.cs_symbol_heap
+							-> copy case_expr ci { cs & cs_symbol_heap = cs_symbol_heap }
+				_	-> copy case_expr ci cs	
+		  where 
+			bind fv_info_ptr {fv_ident=name, fv_info_ptr=info_ptr} var_heap
+				= writeVarInfo fv_info_ptr (VI_Expression (Var {var_ident=name, var_info_ptr=info_ptr, var_expr_ptr = nilPtr})) var_heap
+		update_active_case_info_and_copy case_expr _ cs
+			= copy case_expr ci cs
+
+		copyBoundVar {var_info_ptr} cs
+			# (VI_Expression (Var act_var), cs_var_heap) = readPtr var_info_ptr cs.cs_var_heap
+			= (act_var, { cs & cs_var_heap = cs_var_heap })
+
+instance copy Let
+where
+	copy lad=:{let_strict_binds, let_lazy_binds, let_expr, let_info_ptr} ci cs
+		# (let_strict_binds, cs) = copy_bound_vars let_strict_binds cs
+		# (let_lazy_binds, cs) = copy_bound_vars let_lazy_binds cs
+		# (let_strict_binds, cs) = copy let_strict_binds ci cs
+		# (let_lazy_binds, cs) = copy let_lazy_binds ci cs
+		# (let_expr, cs) = copy let_expr ci cs
+		  (old_let_info, cs_symbol_heap) = readPtr let_info_ptr cs.cs_symbol_heap
+		  (new_let_info, cs_opt_type_heaps) = substitute_let_or_case_type old_let_info cs.cs_opt_type_heaps
+		  (new_info_ptr, cs_symbol_heap) = newPtr new_let_info cs_symbol_heap
+		= ({lad & let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds, let_expr = let_expr, let_info_ptr = new_info_ptr},
+			{ cs & cs_symbol_heap = cs_symbol_heap, cs_opt_type_heaps = cs_opt_type_heaps })
+		where
+			copy_bound_vars [bind=:{lb_dst} : binds] cs
+				# (lb_dst, cs) = copy lb_dst ci cs
+				  (binds, cs) = copy_bound_vars binds cs
+				= ([ {bind & lb_dst = lb_dst} : binds ], cs)
+			copy_bound_vars [] cs
+				= ([], cs)
+
+substitute_let_or_case_type	expr_info No
+	= (expr_info, No)
+substitute_let_or_case_type	(EI_Extended extensions expr_info) yes_type_heaps
+	# (new_expr_info, yes_type_heaps) = substitute_let_or_case_type expr_info yes_type_heaps
+	= (EI_Extended extensions new_expr_info, yes_type_heaps)
+substitute_let_or_case_type	(EI_CaseType case_type) (Yes type_heaps)
+	# (new_case_type, type_heaps) = substitute case_type type_heaps
+	= (EI_CaseType new_case_type, Yes type_heaps)
+substitute_let_or_case_type	(EI_LetType let_type) (Yes type_heaps)
+	# (new_let_type, type_heaps) = substitute let_type type_heaps
+	= (EI_LetType new_let_type, Yes type_heaps)
+
+instance copy CasePatterns
+where
+	copy (AlgebraicPatterns type patterns) ci cs
+		# (patterns, cs) = copy patterns ci cs
+		= (AlgebraicPatterns type patterns, cs)
+	copy (BasicPatterns type patterns) ci cs
+		# (patterns, cs) = copy patterns ci cs
+		= (BasicPatterns type patterns, cs)
+	copy (OverloadedListPatterns type decons_expr patterns) ci cs
+		# (patterns, cs) = copy patterns ci cs
+		# (decons_expr, cs) = copy decons_expr ci cs
+		= (OverloadedListPatterns type decons_expr patterns, cs)
+	copy (NewTypePatterns type patterns) ci cs
+		# (patterns, cs) = copy patterns ci cs
+		= (NewTypePatterns type patterns, cs)
+	copy (DynamicPatterns patterns) ci cs
+		# (patterns, cs) = copy patterns ci cs
+		= (DynamicPatterns patterns, cs)
+
+instance copy AlgebraicPattern
+where
+	copy guard=:{ap_vars,ap_expr} ci cs
+		# (ap_vars, cs) = copy ap_vars ci cs
+		  (ap_expr, cs) = copy ap_expr ci cs
+		= ({ guard & ap_vars = ap_vars, ap_expr = ap_expr }, cs)
+
+instance copy BasicPattern
+where
+	copy guard=:{bp_expr} ci cs
+		# (bp_expr, cs) = copy bp_expr ci cs
+		= ({ guard & bp_expr = bp_expr }, cs)
+
+instance copy DynamicPattern
+where
+	copy guard=:{dp_var,dp_rhs} ci cs
+		# (dp_var, cs) = copy dp_var ci cs
+		  (dp_rhs, cs) = copy dp_rhs ci cs
+		= ({ guard & dp_var = dp_var, dp_rhs = dp_rhs }, cs)
+
+instance copy [a] | copy a
+where
+	copy l ci cs
+		= map_st l cs
+		where
+			map_st [x : xs] s
+			 	# (x, s) = copy x ci s
+				  (xs, s) = map_st xs s
+				#! s = s
+				= ([x : xs], s)
+			map_st [] s
+			 	= ([], s)
+
+instance copy (a,b) | copy a & copy b
+where
+	copy (a,b) ci cs
+		# (a,cs) = copy a ci cs
+		# (b,cs) = copy b ci cs
+		= ((a,b),cs)
+
+instance copy (Optional a) | copy a
+where
+	copy (Yes x) ci cs
+		# (x, cs) = copy x ci cs
+		= (Yes x, cs)
+	copy no ci cs
+		= (no, cs)
+
+copyVariable :: !BoundVar CopyInfo !*CopyState -> (!Expression, !*CopyState)
+copyVariable var=:{var_ident,var_info_ptr} ci cs
+	# (var_info,var_heap) = readVarInfo var_info_ptr cs.cs_var_heap
+	  cs = {cs & cs_var_heap=var_heap}
+	= case var_info of
+		VI_Expression expr
+			-> (expr, cs)
+		VI_Variable var_ident var_info_ptr
+		 	# (var_expr_ptr, cs_symbol_heap) = newPtr EI_Empty cs.cs_symbol_heap
+			-> (Var {var_ident = var_ident, var_info_ptr = var_info_ptr, var_expr_ptr = var_expr_ptr}, { cs & cs_symbol_heap = cs_symbol_heap})
+		VI_Body fun_ident _ vars
+			-> (App {	app_symb = fun_ident,
+						app_args = [ Var { var_ident=fv_ident, var_info_ptr=fv_info_ptr, var_expr_ptr=nilPtr }
+									\\ {fv_ident,fv_info_ptr}<-vars],
+						app_info_ptr = nilPtr }, cs)
+		VI_Dictionary app_symb app_args class_type
+			# (new_class_type, cs_opt_type_heaps) = substitute_class_types class_type cs.cs_opt_type_heaps
+			  (new_info_ptr, cs_symbol_heap) = newPtr (EI_DictionaryType new_class_type) cs.cs_symbol_heap
+			  app = App { app_symb = app_symb, app_args = app_args, app_info_ptr = new_info_ptr }
+			  cs = { cs & cs_opt_type_heaps = cs_opt_type_heaps, cs_symbol_heap = cs_symbol_heap }
+			-> copy app ci cs
+		_
+			-> (Var var, cs)
+  where
+	substitute_class_types class_types No
+		= (class_types, No)
+	substitute_class_types class_types (Yes type_heaps)
+		# (new_class_types, type_heaps) = substitute class_types type_heaps
+		= (new_class_types, Yes type_heaps)
