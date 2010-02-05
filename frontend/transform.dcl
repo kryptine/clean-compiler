@@ -31,16 +31,8 @@ determineVariablesAndRefCounts :: ![FreeVar] !Expression !*CollectState -> (!Exp
 ::	UnfoldState =
 	{	us_var_heap				:: !.VarHeap
 	,	us_symbol_heap			:: !.ExpressionHeap
-	,	us_opt_type_heaps		:: !.Optional .TypeHeaps,
-		us_cleanup_info			:: ![ExprInfoPtr],
-		us_local_macro_functions :: !Optional CopiedLocalFunctions
+	,	us_local_macro_functions :: !Optional CopiedLocalFunctions
 	}
 
-::	UnfoldInfo =
-	{	ui_handle_aci_free_vars	:: !AciFreeVarHandleMode
-	}
-
-:: AciFreeVarHandleMode = LeaveThem | RemoveThem | SubstituteThem
-
-class unfold a :: !a !UnfoldInfo !*UnfoldState -> (!a, !*UnfoldState)
+class unfold a :: !a !*UnfoldState -> (!a, !*UnfoldState)
 instance unfold Expression, CasePatterns
