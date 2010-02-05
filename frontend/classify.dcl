@@ -16,3 +16,16 @@ analyseGroups	:: !{# CommonDefs} !{#{#FunType}} !IndexRange !Int !Int !*{! Group
 
 reanalyseGroups	:: !{# CommonDefs} !{#{#FunType}} !Int !Int ![FunctionInfoPtr]  ![Group] !*{#FunDef} !*VarHeap !*ExpressionHeap !*FunctionHeap !*{!ConsClasses}
 				-> (!CleanupInfo, !*{#FunDef}, !*VarHeap, !*ExpressionHeap, !*FunctionHeap, !*{!ConsClasses}, !Bool)
+
+:: *PRState =
+	{ prs_group				:: ![Int]
+	, prs_cons_args 		:: !*{!ConsClasses}
+	, prs_main_dcl_module_n	:: !Int
+	, prs_fun_heap			:: !*FunctionHeap
+	, prs_fun_defs			:: !*{#FunDef}
+	, prs_group_index		:: !Int
+	}
+
+class producerRequirements a :: !a !*PRState -> *(!Bool,!*PRState)
+
+instance producerRequirements Expression
