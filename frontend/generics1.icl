@@ -874,18 +874,13 @@ where
 		#! (arg_exprs, heaps) = build_fields (SwitchGenericInfo True False && is_record) var_exprs heaps
 			with
 				build_fields False var_exprs heaps = (var_exprs, heaps)
-				build_fields True var_exprs heaps = mapSt build_field var_exprs heaps
-				build_field var_expr heaps = buildPredefConsApp PD_ConsFIELD [var_expr] predefs heaps 
+				build_fields True var_exprs heaps = mapSdSt build_field var_exprs predefs heaps
 
 		#! (expr, heaps) = build_prod arg_exprs predefs heaps
-		#! (expr, heaps) = SwitchGenericInfo (build_cons expr heaps) (expr, heaps)
-			with 
-				build_cons expr heaps = buildPredefConsApp PD_ConsCONS [expr] predefs heaps						
+		#! (expr, heaps) = SwitchGenericInfo (build_cons expr predefs heaps) (expr, heaps)
 		#! (expr, heaps) = build_sum i n expr predefs heaps
 				
-		#! (expr, heaps) = SwitchGenericInfo (build_object expr heaps) (expr, heaps)
-			with 
-				build_object expr heaps = buildPredefConsApp PD_ConsOBJECT [expr] predefs heaps						
+		#! (expr, heaps) = SwitchGenericInfo (build_object expr predefs heaps) (expr, heaps)
 						
 		#! alg_pattern = {
 			ap_symbol = {glob_module = type_def_mod, glob_object = cons_def_sym},
@@ -902,13 +897,10 @@ where
 		| n == 1 	= (expr, heaps)
 		| i < (n/2) 
 			# (expr, heaps) = build_sum i (n/2) expr predefs heaps
-			= build_left expr heaps
+			= build_left expr predefs heaps
 		| otherwise
 			# (expr, heaps) = build_sum (i - (n/2)) (n - (n/2)) expr predefs heaps
-			= build_right expr heaps
-	where
-		build_left x heaps = buildPredefConsApp PD_ConsLEFT [x] predefs heaps
-		build_right x heaps = buildPredefConsApp PD_ConsRIGHT [x] predefs heaps
+			= build_right expr predefs heaps
 				
 	build_prod :: ![Expression] !PredefinedSymbols !*Heaps -> (!Expression, !*Heaps)
 	build_prod [] predefs heaps = build_unit heaps
@@ -919,9 +911,7 @@ where
 		# (lexprs, rexprs) = splitAt ((length exprs)/2) exprs  
 		# (lexpr, heaps) = build_prod lexprs predefs heaps
 		# (rexpr, heaps) = build_prod rexprs predefs heaps
-		= build_pair lexpr rexpr heaps
-	where
-		build_pair x y heaps = buildPredefConsApp PD_ConsPAIR [x, y] predefs heaps
+		= build_pair lexpr rexpr predefs heaps
 			
 buildConversionFrom	::	
 		!Index				// type def module
@@ -962,13 +952,13 @@ where
 	build_expr_for_type_rhs type_def_mod (AlgType def_symbols) heaps error
 		#! (expr, var, heaps, error) = build_sum False type_def_mod def_symbols heaps error
 		#! (expr, var, heaps) = SwitchGenericInfo 
-			(build_case_object var expr heaps)
+			(build_case_object var expr predefs heaps)
 			(expr, var, heaps)
 		= (expr, var, heaps, error)
 	build_expr_for_type_rhs type_def_mod (RecordType {rt_constructor}) heaps error				
 		# (expr, var, heaps, error) = build_sum True type_def_mod [rt_constructor] heaps	error
 		#! (expr, var, heaps) = SwitchGenericInfo 
-			(build_case_object var expr heaps)
+			(build_case_object var expr predefs heaps)
 			(expr, var, heaps)
 		= (expr, var, heaps, error)
 		
@@ -996,7 +986,7 @@ where
 		#! (cons_app_expr, cons_arg_vars, heaps) = build_cons_app type_def_mod def_symbol heaps
 		#! (prod_expr, var, heaps) = build_prod is_record cons_app_expr cons_arg_vars heaps 
 		#! (alt_expr, var, heaps) = SwitchGenericInfo 
-			(build_case_cons var prod_expr heaps)
+			(build_case_cons var prod_expr predefs heaps)
 			(prod_expr, var, heaps)
 		= (alt_expr, var, heaps, error)
 	build_sum is_record type_def_mod def_symbols heaps error
@@ -1006,7 +996,7 @@ where
 		#! (right_expr, right_var, heaps, error) 
 			= build_sum is_record type_def_mod right_def_syms heaps error	
 		#! (case_expr, var, heaps) = 
-			build_case_either left_var left_expr right_var right_expr heaps
+			build_case_either left_var left_expr right_var right_expr predefs heaps
 		= (case_expr, var, heaps, error)
 	
 	// build expression for products
@@ -1024,15 +1014,15 @@ where
 	build_prod is_record expr [cons_arg_var] heaps
 	
 		#! (arg_expr, var, heaps) = SwitchGenericInfo 
-			(case is_record of True -> build_case_field cons_arg_var expr heaps; False -> (expr, cons_arg_var, heaps))
+			(case is_record of True -> build_case_field cons_arg_var expr predefs heaps; False -> (expr, cons_arg_var, heaps))
 			(expr, cons_arg_var, heaps)
 		
 		= (arg_expr, var, heaps)	
 	build_prod is_record expr cons_arg_vars heaps
 		#! (left_vars, right_vars) = splitAt ((length cons_arg_vars) /2) cons_arg_vars		 
 		#! (expr, left_var, heaps) = build_prod is_record expr left_vars heaps
-		#! (expr, right_var, heaps) = build_prod is_record expr right_vars heaps		
-		#! (case_expr, var, heaps) = build_case_pair left_var right_var expr heaps		
+		#! (expr, right_var, heaps) = build_prod is_record expr right_vars heaps
+		#! (case_expr, var, heaps) = build_case_pair left_var right_var expr predefs heaps
 		= (case_expr, var, heaps) 
 	
 	// build constructor application expression
@@ -1044,53 +1034,66 @@ where
 		#! (expr, heaps) = buildConsApp cons_mod def_symbol var_exprs heaps
 	 	= (expr, vars, heaps)
 
-	// build case expressions for PAIR, EITHER and UNIT
 	build_case_unit body_expr heaps
 		# unit_pat = buildPredefConsPattern PD_ConsUNIT [] body_expr predefs
 		# {pds_module, pds_def} = predefs.[PD_TypeUNIT]
 		# case_patterns = AlgebraicPatterns {glob_module = pds_module, glob_object = pds_def} [unit_pat]
 		= build_case_expr case_patterns heaps
-		
-	build_case_pair var1 var2 body_expr heaps
-		# pair_pat = buildPredefConsPattern PD_ConsPAIR [var1, var2] body_expr predefs	
-		# {pds_module, pds_def} = predefs.[PD_TypePAIR]
-		# case_patterns = AlgebraicPatterns {glob_module = pds_module, glob_object = pds_def} [pair_pat]	
-		= build_case_expr case_patterns heaps
-	
-	build_case_either left_var left_expr right_var right_expr heaps
-		# left_pat = buildPredefConsPattern PD_ConsLEFT [left_var] left_expr predefs
-		# right_pat = buildPredefConsPattern PD_ConsRIGHT [right_var] right_expr predefs
-		# {pds_module, pds_def} = predefs.[PD_TypeEITHER]
-		# case_patterns = AlgebraicPatterns {glob_module = pds_module, glob_object = pds_def} [left_pat, right_pat]
-		= build_case_expr case_patterns heaps
 
-	// CONS case
-	build_case_cons var body_expr heaps
-		# pat = buildPredefConsPattern PD_ConsCONS [var] body_expr predefs	
-		# {pds_module, pds_def} = predefs.[PD_TypeCONS]
-		# case_patterns = AlgebraicPatterns {glob_module = pds_module, glob_object = pds_def} [pat]
-		= build_case_expr case_patterns heaps 
-	
-	// FIELD case
-	build_case_field var body_expr heaps
-		# pat = buildPredefConsPattern PD_ConsFIELD [var] body_expr predefs	
-		# {pds_module, pds_def} = predefs.[PD_TypeFIELD]
-		# case_patterns = AlgebraicPatterns {glob_module = pds_module, glob_object = pds_def} [pat]
-		= build_case_expr case_patterns heaps 
-	
-	// OBJECT case
-	build_case_object var body_expr heaps
-		# pat = buildPredefConsPattern PD_ConsOBJECT [var] body_expr predefs	
-		# {pds_module, pds_def} = predefs.[PD_TypeOBJECT]
-		# case_patterns = AlgebraicPatterns {glob_module = pds_module, glob_object = pds_def} [pat]
-		= build_case_expr case_patterns heaps 
-		
-	// case with a variable as the selector expression
-	build_case_expr case_patterns heaps
-		# (var_expr, var, heaps) = buildVarExpr "c" heaps
-		# (case_expr, heaps) = buildCaseExpr var_expr case_patterns heaps
-		= (case_expr, var, heaps)
-		
+build_pair x y predefs heaps
+	= buildPredefConsApp PD_ConsPAIR [x, y] predefs heaps
+
+build_left x predefs heaps
+	= buildPredefConsApp PD_ConsLEFT [x] predefs heaps
+
+build_right x predefs heaps
+	= buildPredefConsApp PD_ConsRIGHT [x] predefs heaps
+
+build_object expr predefs heaps
+	= buildPredefConsApp PD_ConsOBJECT [expr] predefs heaps						
+
+build_cons expr predefs heaps
+	= buildPredefConsApp PD_ConsCONS [expr] predefs heaps
+
+build_field var_expr predefs heaps
+	= buildPredefConsApp PD_ConsFIELD [var_expr] predefs heaps 
+
+build_case_pair var1 var2 body_expr predefs heaps
+	# pair_pat = buildPredefConsPattern PD_ConsPAIR [var1, var2] body_expr predefs	
+	# {pds_module, pds_def} = predefs.[PD_TypePAIR]
+	# case_patterns = AlgebraicPatterns {glob_module = pds_module, glob_object = pds_def} [pair_pat]	
+	= build_case_expr case_patterns heaps
+
+build_case_either left_var left_expr right_var right_expr predefs heaps
+	# left_pat = buildPredefConsPattern PD_ConsLEFT [left_var] left_expr predefs
+	# right_pat = buildPredefConsPattern PD_ConsRIGHT [right_var] right_expr predefs
+	# {pds_module, pds_def} = predefs.[PD_TypeEITHER]
+	# case_patterns = AlgebraicPatterns {glob_module = pds_module, glob_object = pds_def} [left_pat, right_pat]
+	= build_case_expr case_patterns heaps
+
+build_case_object var body_expr predefs heaps
+	# pat = buildPredefConsPattern PD_ConsOBJECT [var] body_expr predefs	
+	# {pds_module, pds_def} = predefs.[PD_TypeOBJECT]
+	# case_patterns = AlgebraicPatterns {glob_module = pds_module, glob_object = pds_def} [pat]
+	= build_case_expr case_patterns heaps
+
+build_case_cons var body_expr predefs heaps
+	# pat = buildPredefConsPattern PD_ConsCONS [var] body_expr predefs	
+	# {pds_module, pds_def} = predefs.[PD_TypeCONS]
+	# case_patterns = AlgebraicPatterns {glob_module = pds_module, glob_object = pds_def} [pat]
+	= build_case_expr case_patterns heaps 
+
+build_case_field var body_expr predefs heaps
+	# pat = buildPredefConsPattern PD_ConsFIELD [var] body_expr predefs	
+	# {pds_module, pds_def} = predefs.[PD_TypeFIELD]
+	# case_patterns = AlgebraicPatterns {glob_module = pds_module, glob_object = pds_def} [pat]
+	= build_case_expr case_patterns heaps 
+
+// case with a variable as the selector expression
+build_case_expr case_patterns heaps
+	# (var_expr, var, heaps) = buildVarExpr "c" heaps
+	# (case_expr, heaps) = buildCaseExpr var_expr case_patterns heaps
+	= (case_expr, var, heaps)
 
 //****************************************************************************************
 // build kind indexed classes 
@@ -1558,7 +1561,7 @@ where
 			= update_dcl_function fun_index gencase fun_type dcl_functions heaps
 
 		#! (fun_info, fun_defs, td_infos, modules, heaps, error) 
-				= update_icl_function_if_needed 
+				= update_icl_function_if_needed
 						module_index 
 						fun_index gencase fun_type 
 						fun_info fun_defs td_infos modules heaps error
@@ -3546,11 +3549,23 @@ zipWith f [] [] = []
 zipWith f [x:xs] [y:ys] = [f x y : zipWith f xs ys]
 zipWith f _ _ = abort "zipWith: lists of different length\n"
 
-zipWithSt f [] [] st 
-	= ([], st)
-zipWithSt f [x:xs] [y:ys] st
-	# (z, st) = f x y st
-	# (zs, st) = zipWithSt f xs ys st
-	= ([z:zs], st) 
-zipWithSt f _ _ st = abort "zipWithSt: lists of different length\n"
-	
+zipWithSt f l1 l2 st
+	:== zipWithSt l1 l2 st
+where
+	zipWithSt [] [] st 
+		= ([], st)
+	zipWithSt [x:xs] [y:ys] st
+		# (z, st) = f x y st
+		# (zs, st) = zipWithSt xs ys st
+		= ([z:zs], st) 
+
+mapSdSt f l sd s :== map_sd_st l s
+where
+	map_sd_st [x : xs] s
+	 	# (x, s) = f x sd s
+		  (xs, s) = map_sd_st xs s
+		#! s = s
+		= ([x : xs], s)
+	map_sd_st [] s
+		#! s = s
+	 	= ([], s)
