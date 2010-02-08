@@ -1,6 +1,3 @@
-/*
-	module owner: Diederik van Arkel
-*/
 implementation module trans
 
 import StdEnv
@@ -147,16 +144,19 @@ cleanup_attributes expr_info_ptr symbol_heap
 	,	ro_common_defs		:: !{# CommonDefs }
 // the following four are used when possibly generating functions for cases...
 	,	ro_root_case_mode		:: !RootCaseMode
-	,	ro_fun_root				:: !SymbIdent		// original function
-	,	ro_fun_case				:: !SymbIdent		// original function or possibly generated case
-	,	ro_fun_args				:: ![FreeVar]		// args of above
-	,	ro_fun_vars				:: ![FreeVar]		// strict variables
-	,	ro_fun_geni				:: !(!Int,!Int)
-	,	ro_fun_orig				:: !SymbIdent		// original consumer
-
+	,	ro_tfi					:: !TransformFunctionInfo
 	,	ro_main_dcl_module_n 	:: !Int
 	,	ro_transform_fusion		:: !Bool			// fusion switch
 	,	ro_stdStrictLists_module_n :: !Int
+	}
+
+::	TransformFunctionInfo =
+	{	tfi_root				:: !SymbIdent		// original function
+	,	tfi_case				:: !SymbIdent		// original function or possibly generated case
+	,	tfi_args				:: ![FreeVar]		// args of above
+	,	tfi_vars				:: ![FreeVar]		// strict variables
+	,	tfi_geni				:: !(!Int,!Int)
+	,	tfi_orig				:: !SymbIdent		// original consumer
 	}
 
 ::	RootCaseMode = NotRootCase | RootCase | RootCaseOfZombie
@@ -399,7 +399,7 @@ where
 
 	possiblyFoldOuterCase final guard_expr outer_case ro ti
 		| SwitchAutoFoldCaseInCase (isFoldExpression guard_expr ti.ti_fun_defs ti.ti_cons_args) False // otherwise GOTO next alternative
-			| False -!-> ("possiblyFoldOuterCase","Case",bef < 0 || act < 0,ro.ro_fun_args,aci.aci_params) = undef
+			| False -!-> ("possiblyFoldOuterCase","Case",bef < 0 || act < 0,ro.ro_tfi.tfi_args,aci.aci_params) = undef
 			| bef < 0 || act < 0
 				= possiblyFoldOuterCase` final guard_expr outer_case ro ti	//abort "possiblyFoldOuterCase: unexpected!\n"
 			= transformApplication { app_symb = folder, app_args = folder_args, app_info_ptr = nilPtr } [] ro ti
@@ -425,18 +425,20 @@ where
 		isFoldExpression (Var _)	ti_fun_defs ti_cons_args = True
 //		isFoldExpression (Case _)	ti_fun_defs ti_cons_args = True
 		isFoldExpression _			ti_fun_defs ti_cons_args = False
-		
-		(bef,act)	= ro.ro_fun_geni
-		new_f_a_before	= take bef ro.ro_fun_args
-		new_f_a_after	= drop (bef+act) ro.ro_fun_args
+
+		ro_tfi = ro.ro_tfi
+
+		(bef,act) = ro_tfi.tfi_geni
+		new_f_a_before	= take bef ro_tfi.tfi_args
+		new_f_a_after	= drop (bef+act) ro_tfi.tfi_args
 		
 		f_a_before	= new_f_a_before	//| new_f_a_before <> old_f_a_before	= abort "!!!"
 		f_a_after	= new_f_a_after
 
-		folder		= ro.ro_fun_orig
+		folder		= ro_tfi.tfi_orig
 		folder_args = f_a_before` ++ [guard_expr:f_a_after`]
-		old_f_a_before	= takeWhile (\e -> not (isMember e aci.aci_params)) ro.ro_fun_args
-		old_f_a_help	= dropWhile (\e -> not (isMember e aci.aci_params)) ro.ro_fun_args
+		old_f_a_before	= takeWhile (\e -> not (isMember e aci.aci_params)) ro_tfi.tfi_args
+		old_f_a_help	= dropWhile (\e -> not (isMember e aci.aci_params)) ro_tfi.tfi_args
 		old_f_a_after	= dropWhile (\e -> isMember e aci.aci_params) old_f_a_help
 		f_a_before`	= free_vars_to_bound_vars f_a_before
 		f_a_after`	= free_vars_to_bound_vars f_a_after
@@ -448,7 +450,7 @@ where
 		| final
 			# new_case = {outer_case & case_expr = guard_expr}
 			= transformCase new_case ro ti // ---> ("possiblyFoldOuterCase`",Case new_case)
-		# cs = {cs_var_heap = ti.ti_var_heap, cs_symbol_heap = ti.ti_symbol_heap, cs_opt_type_heaps = No, cs_cleanup_info=ti.ti_cleanup_info }
+		# cs = {cs_var_heap = ti.ti_var_heap, cs_symbol_heap = ti.ti_symbol_heap, cs_opt_type_heaps = No, cs_cleanup_info=ti.ti_cleanup_info}
 		  (outer_guards, cs=:{cs_cleanup_info})	= copy outer_case.case_guards {ci_handle_aci_free_vars = LeaveAciFreeVars} cs
 		  (expr_info, ti_symbol_heap)			= readPtr outer_case.case_info_ptr cs.cs_symbol_heap
 		  (new_info_ptr, ti_symbol_heap)		= newPtr expr_info ti_symbol_heap
@@ -459,7 +461,7 @@ where
 		  ti = { ti & ti_var_heap = cs.cs_var_heap, ti_symbol_heap = ti_symbol_heap, ti_cleanup_info=new_cleanup_info }
 		  new_case								= { outer_case & case_expr = guard_expr, case_guards=outer_guards, case_info_ptr=new_info_ptr }
 		= transformCase new_case ro ti // ---> ("possiblyFoldOuterCase`",Case new_case)
-	
+
 transform_active_root_case aci this_case=:{case_expr = case_expr=:(App app=:{app_symb,app_args}),case_guards,case_default,case_explicit,case_ident} ro ti
 	= case app_symb.symb_kind of
 		SK_Constructor cons_index
@@ -490,12 +492,12 @@ transform_active_root_case aci this_case=:{case_expr = case_expr=:(App app=:{app
 						// in this case a third function could be fused in
 						-> possiblyFoldOuterCase this_case ro ti					-!-> ("transform_active_root_case","Diff opt unfolder",unfolder,app_symb)
 					# variables = [ Var {var_ident=fv_ident, var_info_ptr=fv_info_ptr, var_expr_ptr=nilPtr}
-									\\ {fv_ident, fv_info_ptr} <- ro.ro_fun_args ]
+									\\ {fv_ident, fv_info_ptr} <- ro.ro_tfi.tfi_args ]
 					  (app_symb, ti)
 						= case ro.ro_root_case_mode -!-> ("transform_active_root_case","Yes opt unfolder",unfolder) of
 							RootCaseOfZombie
 								# (recursion_introduced,ti) = ti!ti_recursion_introduced
-								  (ro_fun=:{symb_kind=SK_GeneratedFunction fun_info_ptr _}) = ro.ro_fun_case
+								  (ro_fun=:{symb_kind=SK_GeneratedFunction fun_info_ptr _}) = ro.ro_tfi.tfi_case
 								-> case recursion_introduced of
 									No
 										# (ti_next_fun_nr, ti) = ti!ti_next_fun_nr
@@ -507,30 +509,33 @@ transform_active_root_case aci this_case=:{case_expr = case_expr=:(App app=:{app
 										| ri_fun_ptr==fun_info_ptr
 											-> ({ro_fun & symb_kind=SK_GeneratedFunction fun_info_ptr ri_fun_index},ti)
 							RootCase
-								-> (ro.ro_fun_root,{ti & ti_recursion_introduced = No})
-									-!-> ("Recursion","RootCase",ro.ro_fun_root)
+								-> (ro.ro_tfi.tfi_root,{ti & ti_recursion_introduced = No})
+									-!-> ("Recursion","RootCase",ro.ro_tfi.tfi_root)
 					  app_args1 = replace_arg [ fv_info_ptr \\ {fv_info_ptr}<-aci_params ] app_args variables
 					  (app_args2, ti) = transform app_args1 { ro & ro_root_case_mode = NotRootCase } ti
 					-> (App {app_symb=app_symb, app_args=app_args2, app_info_ptr=nilPtr}, ti)
 where
-	possiblyFoldOuterCase outer_case ro ti
+	possiblyFoldOuterCase this_case ro ti
 		| SwitchAutoFoldAppInCase True False
-			| False -!-> ("possiblyFoldOuterCase","App",bef < 0 || act < 0,ro.ro_fun_args,aci.aci_params) = undef
-			| bef < 0 || act < 0	= skip_over this_case ro ti	//abort "possiblyFoldOuterCase: unexpected!\n"
+			| False -!-> ("possiblyFoldOuterCase","App",bef < 0 || act < 0,ro.ro_tfi.tfi_args,aci.aci_params) = undef
+			| bef < 0 || act < 0
+				= skip_over this_case ro ti	//abort "possiblyFoldOuterCase: unexpected!\n"
 			= transformApplication { app_symb = folder, app_args = folder_args, app_info_ptr = nilPtr } [] ro ti
 		= skip_over this_case ro ti
 	where
-		(bef,act)	= ro.ro_fun_geni
-		new_f_a_before	= take bef ro.ro_fun_args
-		new_f_a_after	= drop (bef+act) ro.ro_fun_args
+		ro_tfi = ro.ro_tfi
+		
+		(bef,act)	= ro_tfi.tfi_geni
+		new_f_a_before	= take bef ro_tfi.tfi_args
+		new_f_a_after	= drop (bef+act) ro_tfi.tfi_args
 		
 		f_a_before	= new_f_a_before
 		f_a_after	= new_f_a_after
 
-		folder		= ro.ro_fun_orig
+		folder		= ro_tfi.tfi_orig
 		folder_args = f_a_before` ++ [case_expr:f_a_after`]
-		old_f_a_before	= takeWhile (\e -> not (isMember e aci.aci_params)) ro.ro_fun_args
-		old_f_a_help	= dropWhile (\e -> not (isMember e aci.aci_params)) ro.ro_fun_args
+		old_f_a_before	= takeWhile (\e -> not (isMember e aci.aci_params)) ro_tfi.tfi_args
+		old_f_a_help	= dropWhile (\e -> not (isMember e aci.aci_params)) ro_tfi.tfi_args
 		old_f_a_after	= dropWhile (\e -> isMember e aci.aci_params) old_f_a_help
 		f_a_before`	= free_vars_to_bound_vars f_a_before
 		f_a_after`	= free_vars_to_bound_vars f_a_after
@@ -736,7 +741,7 @@ where
 		where
 			never_ident = case ro.ro_root_case_mode of
 							NotRootCase -> case_ident
-							_ -> Yes ro.ro_fun_case.symb_ident
+							_ -> Yes ro.ro_tfi.tfi_case.symb_ident
 
 transform_active_root_case aci this_case=:{case_expr = (BasicExpr basic_value),case_guards,case_default} ro ti
 	// currently only active cases are matched at runtime (multimatch problem)
@@ -749,7 +754,7 @@ transform_active_root_case aci this_case=:{case_expr = (BasicExpr basic_value),c
 					with
 						never_ident = case ro.ro_root_case_mode of
 							NotRootCase -> this_case.case_ident
-							_ -> Yes ro.ro_fun_case.symb_ident
+							_ -> Yes ro.ro_tfi.tfi_case.symb_ident
 	= transform (hd may_be_match_pattern).bp_expr { ro & ro_root_case_mode = NotRootCase } ti
 where
 	getBasicPatterns (BasicPatterns _ basicPatterns)
@@ -827,7 +832,7 @@ transform_active_non_root_case kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti=
 	  free_vars	= fvi_variables
 	// search function definition and consumer arguments
 	  (outer_fun_def, outer_cons_args, ti_cons_args, ti_fun_defs, ti_fun_heap)
-			= get_fun_def_and_cons_args ro.ro_fun_root.symb_kind ti.ti_cons_args ti.ti_fun_defs ti.ti_fun_heap
+			= get_fun_def_and_cons_args ro.ro_tfi.tfi_root.symb_kind ti.ti_cons_args ti.ti_fun_defs ti.ti_fun_heap
 	  outer_arguments
 	  		= case outer_fun_def.fun_body of
 							TransformedBody {tb_args} 	-> tb_args
@@ -843,20 +848,20 @@ transform_active_non_root_case kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti=
 	| SwitchArityChecks (length all_args > 32) False
 		# ti = { ti & ti_cons_args = ti_cons_args, ti_fun_defs = ti_fun_defs, ti_fun_heap = ti_fun_heap, ti_recursion_introduced = No }
 		| ro.ro_transform_fusion
-			#  ti	= { ti & ti_error_file = ti.ti_error_file <<< "Possibly missed fusion oppurtunity: Case Arity > 32 " <<< ro.ro_fun_root.symb_ident.id_name <<< "\n"}
+			#  ti	= { ti & ti_error_file = ti.ti_error_file <<< "Possibly missed fusion oppurtunity: Case Arity > 32 " <<< ro.ro_tfi.tfi_root.symb_ident.id_name <<< "\n"}
 			= skip_over kees ro ti
 		= skip_over kees ro ti
 	# (fun_info_ptr, ti_fun_heap) = newPtr FI_Empty ti_fun_heap
-	  fun_ident = { id_name = ro.ro_fun_root.symb_ident.id_name+++"_case", id_info = nilPtr }
+	  fun_ident = { id_name = ro.ro_tfi.tfi_root.symb_ident.id_name+++"_case", id_info = nilPtr }
 	  fun_ident = { symb_ident = fun_ident, symb_kind=SK_GeneratedFunction fun_info_ptr undeff }
-	  			<-!- ("<<<transformCaseFunction",fun_ident)
+			 		<-!- ("<<<transformCaseFunction",fun_ident)
 	| SwitchAlwaysIntroduceCaseFunction True False
 		# ti = { ti & ti_cons_args = ti_cons_args, ti_fun_defs = ti_fun_defs, ti_fun_heap = ti_fun_heap }
 	  	# fun_index = ti.ti_next_fun_nr
 	  	# ti = { ti & ti_next_fun_nr = fun_index + 1 }
-		# new_ro = { ro & ro_root_case_mode = RootCaseOfZombie , ro_fun_case = fun_ident, ro_fun_args = all_args }
+		# new_ro = { ro & ro_root_case_mode = RootCaseOfZombie , ro_tfi.tfi_case = fun_ident, ro_tfi.tfi_args = all_args }
 	  	= generate_case_function fun_index case_info_ptr (Case kees) outer_fun_def outer_cons_args used_mask new_ro ti
-	# new_ro = { ro & ro_root_case_mode = RootCaseOfZombie , ro_fun_case = fun_ident, ro_fun_args = all_args, ro_fun_geni = (-1,-1) }
+	# new_ro = { ro & ro_root_case_mode = RootCaseOfZombie , ro_tfi.tfi_case = fun_ident, ro_tfi.tfi_args = all_args, ro_tfi.tfi_geni = (-1,-1) }
 	  ti = { ti & ti_cons_args = ti_cons_args, ti_fun_defs = ti_fun_defs, ti_fun_heap = ti_fun_heap, ti_recursion_introduced = No }
 	  (new_expr, ti)
 	  		= transformCase kees new_ro ti
@@ -870,15 +875,15 @@ transform_active_non_root_case kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti=
 
 generate_case_function :: !Int !ExprInfoPtr !Expression FunDef .ConsClasses [.Bool] !.ReadOnlyTI !*TransformInfo -> (!Expression,!*TransformInfo)
 generate_case_function fun_index case_info_ptr new_expr outer_fun_def outer_cons_args used_mask
-					{ro_fun_case=ro_fun=:{symb_kind=SK_GeneratedFunction fun_info_ptr _}, ro_fun_args} ti
-	# fun_arity								= length ro_fun_args
-	# ti = arity_warning "generate_case_function" ro_fun.symb_ident fun_index fun_arity ti
-	  (Yes {st_vars,st_args,st_attr_env})	= outer_fun_def.fun_type
+					{ro_tfi={tfi_case=tfi_fun=:{symb_kind=SK_GeneratedFunction fun_info_ptr _},tfi_args}} ti
+	# fun_arity								= length tfi_args
+	# ti = arity_warning "generate_case_function" tfi_fun.symb_ident fun_index fun_arity ti
+	  (Yes {st_args,st_attr_env})			= outer_fun_def.fun_type
 	  types_from_outer_fun					= [ st_arg \\ st_arg <- st_args & used <- used_mask | used ]
 	  nr_of_lifted_vars						= fun_arity-(length types_from_outer_fun)
-	  (lifted_types, ti_var_heap)			= get_types_of_local_vars (take nr_of_lifted_vars ro_fun_args) ti.ti_var_heap
+	  (lifted_types, ti_var_heap)			= get_types_of_local_vars (take nr_of_lifted_vars tfi_args) ti.ti_var_heap
 	  (EI_CaseType {ct_result_type}, ti_symbol_heap) = readExprInfo case_info_ptr ti.ti_symbol_heap
-	  (form_vars, ti_var_heap)				= mapSt bind_to_fresh_expr_var ro_fun_args ti_var_heap
+	  (form_vars, ti_var_heap)				= mapSt bind_to_fresh_expr_var tfi_args ti_var_heap
 
 	  arg_types								= lifted_types++types_from_outer_fun
 
@@ -896,7 +901,7 @@ generate_case_function fun_index case_info_ptr new_expr outer_fun_def outer_cons
 	  {cs_var_heap=ti_var_heap, cs_symbol_heap=ti_symbol_heap, cs_cleanup_info=ti_cleanup_info, cs_opt_type_heaps = Yes ti_type_heaps}
 	  		= cs
 	  // generated function...
-	  fun_def =	{ fun_ident					= ro_fun.symb_ident
+	  fun_def =	{ fun_ident					= tfi_fun.symb_ident
 				, fun_arity					= fun_arity
 				, fun_priority				= NoPrio
 				, fun_body					= TransformedBody { tb_args = form_vars, tb_rhs = copied_expr}
@@ -934,8 +939,8 @@ generate_case_function fun_index case_info_ptr new_expr outer_fun_def outer_cons
 	  			, ti_type_heaps		= ti_type_heaps
 	  			, ti_cleanup_info	= ti_cleanup_info 
 	  			}
-	  app_symb = { ro_fun & symb_kind = SK_GeneratedFunction fun_info_ptr fun_index}
-	  app_args = free_vars_to_bound_vars ro_fun_args
+	  app_symb = { tfi_fun & symb_kind = SK_GeneratedFunction fun_info_ptr fun_index}
+	  app_args = free_vars_to_bound_vars tfi_args
 	= ( App {app_symb = app_symb, app_args = app_args, app_info_ptr = nilPtr}, ti)
 
 get_types_of_local_vars n_vars var_heap
@@ -1023,7 +1028,7 @@ where
 		= is_never_matching_case expr
 	never_ident = case ro.ro_root_case_mode of
 		NotRootCase -> kees.case_ident
-		_ -> Yes ro.ro_fun_case.symb_ident
+		_ -> Yes ro.ro_tfi.tfi_case.symb_ident
 removeNeverMatchingSubcases expr ro
 	= expr
 
@@ -1379,7 +1384,7 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 				, ti_fun_heap = ti_fun_heap, ti_var_heap = ti_var_heap, ti_cons_args = ti_cons_args, ti_type_def_infos = ti_type_def_infos
 				, ti_predef_symbols = ti_predef_symbols }
 		| ro.ro_transform_fusion
-			#  ti = { ti & ti_error_file = ti.ti_error_file <<< "Possibly missed fusion oppurtunity: Function Arity > 32 " <<< ro.ro_fun_root.symb_ident.id_name <<< "\n"}
+			#  ti = { ti & ti_error_file = ti.ti_error_file <<< "Possibly missed fusion oppurtunity: Function Arity > 32 " <<< ro.ro_tfi.tfi_root.symb_ident.id_name <<< "\n"}
 			= (-1,new_fun_arity,ti)
 		= (-1,new_fun_arity,ti)
 	# new_arg_types = flatten [ ats_types \\ {ats_types}<-:new_arg_types_array ]
@@ -1583,15 +1588,16 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 	| not (isEmpty resto)	= abort "genFun:resto"
 	| not (isEmpty restn)	= abort "genFun:restn"
 
-	# ro 	=	{ ro &	ro_root_case_mode = ro_root_case_mode,
-						ro_fun_root = ro_fun,
-						ro_fun_case = ro_fun,
-						ro_fun_orig = app_symb,
-						ro_fun_args = new_fun_args,
-						ro_fun_vars = uvar ++ [arg \\ arg <- new_fun_args & i <- [0..] | arg_is_strict i new_args_strictness],
+	# tfi = {	tfi_root = ro_fun,
+				tfi_case = ro_fun,
+				tfi_orig = app_symb,
+				tfi_args = new_fun_args,
+				tfi_vars = uvar ++ [arg \\ arg <- new_fun_args & i <- [0..] | arg_is_strict i new_args_strictness],
 										// evt ++ verwijderde stricte arg...
-						ro_fun_geni = (length args1,length args2n)
-				} // ---> ("genfun uvars",uvar,[arg \\ arg <- new_fun_args & i <- [0..] | arg_is_strict i new_args_strictness])
+				tfi_geni = (length args1,length args2n)
+			 }
+	# ro = { ro & ro_root_case_mode = ro_root_case_mode, ro_tfi=tfi}
+				// ---> ("genfun uvars",uvar,[arg \\ arg <- new_fun_args & i <- [0..] | arg_is_strict i new_args_strictness])
 //	| False ---> ("transform generated function:",ti_next_fun_nr,ro_root_case_mode)		= undef
 //	| False ---> ("transforming new function:",ti_next_fun_nr,tb_rhs)		= undef
 //	| False -!-> ("transforming new function:",tb_rhs)		= undef
@@ -1961,7 +1967,7 @@ determine_arg producer (Yes {st_args, st_args_strictness, st_result, st_attr_var
 							-> (fun_body, take nr_of_applied_args [ fv_ident \\ {fv_ident}<-tb.tb_args ], das_fun_defs, das_fun_heap)
 						_
 							-> abort ("determine_args:not a Transformed Body:"--->("producer",producer))
-	  (form_vars, act_vars, das_var_heap) 
+	  (form_vars, act_vars, das_var_heap)
 	  		= build_var_args (reverse var_names) das.das_vars [] das_var_heap
 	  (expr_to_unfold, das_var_heap)
 			= case producer of
@@ -2196,8 +2202,6 @@ where
 		= (current_max, cons_args, fun_defs, fun_heap)
 	max_group_index_of_producer (PR_Constructor symb _ args) current_max fun_defs fun_heap cons_args
 		= (current_max, cons_args, fun_defs, fun_heap)	// DvA: not a clue what we're trying here...
-	max_group_index_of_producer prod current_max fun_defs fun_heap cons_args
-		= abort ("trans.icl: max_group_index_of_producer" ---> prod)
 
 	max_group_index_of_member
 				(App {app_symb = {symb_ident, symb_kind = SK_Function { glob_object = fun_index, glob_module = mod_index}}}) 
@@ -3009,7 +3013,7 @@ where
 	
 	getArgType (Yes {st_args}) index = st_args!!index
 	
-	isStrictVar (Var bv) = not (isEmpty [fv \\ fv <- ro.ro_fun_vars | fv.fv_info_ptr == bv.var_info_ptr])
+	isStrictVar (Var bv) = not (isEmpty [fv \\ fv <- ro.ro_tfi.tfi_vars | fv.fv_info_ptr == bv.var_info_ptr])
 	isStrictVar _ = False
 	
 	determine_producer is_applied_to_macro_fun consumer_is_curried ok_non_rec_consumer linear_bit arg=:(App app=:{app_info_ptr}) new_args prod_index producers ro ti
@@ -3491,15 +3495,17 @@ where
 		# (Yes {st_args,st_args_strictness})= fun_def.fun_type
 		  {fun_body = TransformedBody tb} 	= fun_def
 		  ti_var_heap						= fold2St store_arg_type_info tb.tb_args st_args ti.ti_var_heap
+		  tfi =	{ tfi_root				= ro_fun
+				, tfi_case				= ro_fun
+				, tfi_orig				= ro_fun
+				, tfi_args				= tb.tb_args
+				, tfi_vars				= [arg \\ arg <- tb.tb_args & i <- [0..] | arg_is_strict i st_args_strictness]
+				, tfi_geni				= (-1,-1)
+				}
 		  ro =	{ ro_imported_funs				= imported_funs
 				, ro_common_defs 				= common_defs
 				, ro_root_case_mode				= get_root_case_mode tb
-				, ro_fun_root					= ro_fun
-				, ro_fun_case					= ro_fun
-				, ro_fun_orig					= ro_fun
-				, ro_fun_args					= tb.tb_args
-				, ro_fun_vars					= [arg \\ arg <- tb.tb_args & i <- [0..] | arg_is_strict i st_args_strictness]
-				, ro_fun_geni					= (-1,-1)
+				, ro_tfi						= tfi
 				, ro_main_dcl_module_n			= main_dcl_module_n
 				, ro_transform_fusion			= compile_with_fusion
 				, ro_stdStrictLists_module_n	= stdStrictLists_module_n
