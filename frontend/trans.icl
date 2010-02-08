@@ -1851,11 +1851,11 @@ determine_arg PR_Empty _ form=:{fv_ident,fv_info_ptr} _ ((linear_bit,cons_arg), 
 		, das_var_heap			= das_var_heap
 		}
 
-determine_arg PR_Unused _ form=:{fv_ident,fv_info_ptr} prod_index (_,ro) das=:{das_var_heap}
+determine_arg PR_Unused _ form prod_index (_,ro) das=:{das_var_heap}
 	# no_arg_type				= { ats_types= [], ats_strictness = NotStrict }
 	= {das & das_arg_types.[prod_index] = no_arg_type}
 
-determine_arg (PR_Class class_app free_vars_and_types class_type) _ {fv_info_ptr,fv_ident} prod_index (_,ro)
+determine_arg (PR_Class class_app free_vars_and_types class_type) _ {fv_info_ptr} prod_index (_,ro)
 			  das=:{das_arg_types, das_subst, das_type_heaps, das_predef}
 	# (ws_arg_type, das_arg_types)
 			= das_arg_types![prod_index]
@@ -2753,7 +2753,7 @@ is_safe_producer (SK_GeneratedFunction fun_ptr _) ro fun_heap cons_args
 	= cc_producer
 is_safe_producer (SK_LocalMacroFunction glob_object) ro fun_heap cons_args
 	= cons_args.[glob_object].cc_producer
-is_safe_producer (SK_Function { glob_module, glob_object }) ro fun_heap cons_args
+is_safe_producer (SK_Function {glob_module, glob_object}) ro fun_heap cons_args
 	# max_index = size cons_args
 	| glob_module <> ro.ro_main_dcl_module_n || glob_object >= max_index
 		= False
@@ -3038,15 +3038,15 @@ where
 
 	determine_producer is_applied_to_macro_fun consumer_is_curried ok_non_rec_consumer linear_bit arg=:(App app=:{app_info_ptr}) new_args prod_index producers ro ti
 		| isNilPtr app_info_ptr
-			= determineProducer is_applied_to_macro_fun consumer_is_curried ok_non_rec_consumer linear_bit app EI_Empty new_args prod_index producers ro ti
+			= determineProducer app EI_Empty is_applied_to_macro_fun consumer_is_curried ok_non_rec_consumer linear_bit new_args prod_index producers ro ti
 		# (app_info, ti_symbol_heap) = readPtr app_info_ptr ti.ti_symbol_heap
 		# ti = { ti & ti_symbol_heap = ti_symbol_heap }
-		= determineProducer is_applied_to_macro_fun consumer_is_curried ok_non_rec_consumer linear_bit app app_info new_args prod_index producers ro ti
+		= determineProducer app app_info is_applied_to_macro_fun consumer_is_curried ok_non_rec_consumer linear_bit new_args prod_index producers ro ti
 	determine_producer _ _ _ _ arg new_args _ producers _ ti
 		= (producers, [arg : new_args], ti)
 
-determineProducer :: Bool Bool Bool Bool App ExprInfo [Expression] Int *{!Producer} ReadOnlyTI *TransformInfo -> *(!*{!Producer},![Expression],!*TransformInfo)
-determineProducer _ _ _ _ app=:{app_symb = symb=:{symb_kind = SK_Constructor _}, app_args} (EI_DictionaryType type)
+determineProducer :: App ExprInfo Bool Bool Bool Bool [Expression] Int *{!Producer} ReadOnlyTI *TransformInfo -> *(!*{!Producer},![Expression],!*TransformInfo)
+determineProducer app=:{app_symb = symb=:{symb_kind = SK_Constructor _}, app_args} (EI_DictionaryType type) _ _ _ _
 				  new_args prod_index producers _ ti
 	# (app_args, (new_vars_and_types, free_vars, ti_var_heap)) 
 			= renewVariables app_args ti.ti_var_heap
@@ -3055,7 +3055,7 @@ determineProducer _ _ _ _ app=:{app_symb = symb=:{symb_kind = SK_Constructor _},
 	  , mapAppend Var free_vars new_args
 	  , { ti & ti_var_heap = ti_var_heap }
 	  )
-determineProducer _ _ _ linear_bit app=:{app_symb = symb=:{symb_kind = SK_Constructor cons_index, symb_ident}, app_args} _
+determineProducer app=:{app_symb = symb=:{symb_kind = SK_Constructor cons_index, symb_ident}, app_args} _ _ _ _ linear_bit
 				  new_args prod_index producers ro ti
 	# {cons_type}								= ro.ro_common_defs.[cons_index.glob_module].com_cons_defs.[cons_index.glob_object]
 	  rnf										= rnf_args app_args 0 cons_type.st_args_strictness ro
@@ -3075,7 +3075,7 @@ where
 				BasicExpr _	-> rnf_args args (inc index) strictness ro
 				App app		-> rnf_app_args app args index strictness ro
 				_			-> False
-		= rnf_args args (inc index) strictness ro
+			= rnf_args args (inc index) strictness ro
 
 	rnf_app_args {app_symb=symb=:{symb_kind = SK_Constructor cons_index, symb_ident}, app_args} args index strictness ro
 		# {cons_type}		= ro.ro_common_defs.[cons_index.glob_module].com_cons_defs.[cons_index.glob_object]
@@ -3085,8 +3085,7 @@ where
 	// what else is rnf => curried apps
 	rnf_app_args {app_symb=symb=:{symb_kind}, app_args} args index strictness ro
 		= False
-determineProducer is_applied_to_macro_fun consumer_is_curried ok_non_rec_consumer linear_bit
-				  app=:{app_symb = symb=:{ symb_kind = SK_GeneratedFunction fun_ptr fun_index}, app_args} _
+determineProducer app=:{app_symb = symb=:{ symb_kind = SK_GeneratedFunction fun_ptr fun_index}, app_args} _ is_applied_to_macro_fun consumer_is_curried ok_non_rec_consumer linear_bit
 				  new_args prod_index producers ro ti
 	# (FI_Function {gf_cons_args={cc_producer},gf_fun_def={fun_body, fun_arity, fun_type, fun_info}}, ti_fun_heap)
 					= readPtr fun_ptr ti.ti_fun_heap
@@ -3098,15 +3097,13 @@ determineProducer is_applied_to_macro_fun consumer_is_curried ok_non_rec_consume
 		| SwitchCurriedFusion ro.ro_transform_fusion cc_producer False
 			= ({producers & [prod_index] = PR_Curried symb n_app_args}, app_args ++ new_args, ti)
 		= (producers, [App app : new_args], ti)
-	# is_good_producer
-		= case fun_body of
-			Expanding _
-				-> False
-			(TransformedBody {tb_rhs})
-				-> SwitchGeneratedFusion (ro.ro_transform_fusion && linear_bit && is_sexy_body tb_rhs) False
+	# (is_good_producer,ti)
+		= SwitchGeneratedFusion
+			(function_is_good_producer fun_body fun_type linear_bit ro ti)
+			(False,ti)
 	| cc_producer && is_good_producer
-		= ({ producers & [prod_index] = PR_GeneratedFunction symb n_app_args fun_index}, app_args ++ new_args, ti)
-    # not_expanding_producer
+		= ({producers & [prod_index] = PR_GeneratedFunction symb n_app_args fun_index}, app_args ++ new_args, ti)
+	# not_expanding_producer
 		= case fun_body of
 			Expanding _
 				-> False
@@ -3130,7 +3127,7 @@ determineProducer is_applied_to_macro_fun consumer_is_curried ok_non_rec_consume
 	| SwitchNonRecFusion ok_non_rec False
 		= ({producers & [prod_index] = PR_GeneratedFunction symb n_app_args fun_index}, app_args ++ new_args, ti)
 	= (producers, [App app : new_args ], ti)
-determineProducer is_applied_to_macro_fun consumer_is_curried ok_non_rec_consumer linear_bit app=:{app_symb = symb=:{symb_kind}, app_args} _
+determineProducer app=:{app_symb = symb=:{symb_kind}, app_args} _ is_applied_to_macro_fun consumer_is_curried ok_non_rec_consumer linear_bit
 				  new_args prod_index producers ro ti
 	| is_SK_Function_or_SK_LocalMacroFunction symb_kind
 		# { glob_module, glob_object }
@@ -3151,8 +3148,10 @@ determineProducer is_applied_to_macro_fun consumer_is_curried ok_non_rec_consume
 			= (producers, [App app : new_args ], ti)
 					-!-> ("Produce2cc_array",symb.symb_ident,if (glob_module <> ro.ro_main_dcl_module_n) "foreign" "array")
 		# ({fun_body,fun_type,fun_info}, ti) = ti!ti_fun_defs.[glob_object]
-		  (TransformedBody {tb_rhs}) = fun_body
-		  is_good_producer = SwitchFunctionFusion (ro.ro_transform_fusion && linear_bit && is_sexy_body tb_rhs) False
+		# (is_good_producer,ti)
+			= SwitchFunctionFusion
+				(function_is_good_producer fun_body fun_type linear_bit ro ti)
+				(False,ti)
 		  {cc_producer} = ti.ti_cons_args.[glob_object]
 		| is_good_producer && cc_producer && not consumer_is_curried
 			= ({ producers & [prod_index] = PR_Function symb n_app_args glob_object}, app_args ++ new_args, ti)
@@ -3187,7 +3186,67 @@ where
 		// for imported functions you have to add ft_arity and length st_context, but for unimported
 		// functions fun_arity alone is sufficient
 		= ti!ti_fun_defs.[glob_object].fun_arity
+
+function_is_good_producer (Expanding _) fun_type linear_bit ro ti
+	= (False,ti)
+function_is_good_producer (TransformedBody {tb_rhs}) fun_type linear_bit ro ti
+	| ro.ro_transform_fusion
+		| linear_bit && is_sexy_body tb_rhs
+			= (True,ti)
+			= function_may_be_copied fun_type tb_rhs ro ti
+		= (False,ti)
+where
+	function_may_be_copied (Yes {st_args_strictness}) rhs ro ti
+		| is_not_strict st_args_strictness
+			= expression_may_be_copied rhs ro ti
+			= (False,ti)
+	function_may_be_copied No rhs ro ti
+		= expression_may_be_copied rhs ro ti
+
+	// to optimize bimap
+	expression_may_be_copied (Var _) ro ti
+		= (True,ti)
+	expression_may_be_copied (App {app_symb={symb_kind = SK_Constructor cons_index}, app_args}) ro ti
+		# cons_type = ro.ro_common_defs.[cons_index.glob_module].com_cons_defs.[cons_index.glob_object].cons_type
+		| cons_index.glob_module==ro.ro_StdGeneric_module_n && is_not_strict cons_type.st_args_strictness
+			= expressions_may_be_copied app_args ro ti
+			= (False,ti)
+	expression_may_be_copied (App {app_symb={symb_kind = SK_Function {glob_object,glob_module}}, app_args}) ro ti
+		| glob_module <> ro.ro_main_dcl_module_n
+			# fun_type = ro.ro_imported_funs.[glob_module].[glob_object].ft_type
+			| length app_args < fun_type.st_arity+length fun_type.st_context
+				= expressions_may_be_copied app_args ro ti
+				= (False,ti)
+			# (fun_arity,ti) = ti!ti_fun_defs.[glob_object].fun_arity
+			| length app_args < fun_arity
+				= expressions_may_be_copied app_args ro ti
+				= (False,ti)
+	expression_may_be_copied (App {app_symb={symb_kind = SK_LocalMacroFunction glob_object}, app_args}) ro ti
+		# (fun_arity,ti) = ti!ti_fun_defs.[glob_object].fun_arity
+		| length app_args < fun_arity
+			= expressions_may_be_copied app_args ro ti
+			= (False,ti)
+	expression_may_be_copied (App {app_symb={symb_kind = SK_GeneratedFunction fun_ptr _}, app_args}) ro ti
+		# (FI_Function {gf_fun_def={fun_arity}}) = sreadPtr fun_ptr ti.ti_fun_heap
+		| length app_args < fun_arity
+			= expressions_may_be_copied app_args ro ti
+			= (False,ti)
+	expression_may_be_copied (Selection NormalSelector (Var _) [RecordSelection {glob_module,glob_object={ds_index}} _]) ro ti
+		# selector_type = ro.ro_common_defs.[glob_module].com_selector_defs.[ds_index].sd_type
+		| glob_module==ro.ro_StdGeneric_module_n && is_not_strict selector_type.st_args_strictness
+			= (True,ti)
+			= (False,ti)
+	expression_may_be_copied _ ro ti
+		= (False,ti)
 	
+	expressions_may_be_copied [expr:exprs] ro ti
+		# (ok,ti) = expression_may_be_copied expr ro ti
+		| ok
+			= expressions_may_be_copied exprs ro ti
+			= (False,ti)
+	expressions_may_be_copied [] ro ti
+		= (True,ti)
+
 // when two function bodies have fusion with each other this only leads into satisfaction if one body
 // fulfills the following sexyness property
 // DvA: now that we have producer requirements we can integrate this condition there...
