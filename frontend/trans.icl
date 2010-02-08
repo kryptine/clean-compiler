@@ -855,7 +855,7 @@ transform_active_non_root_case kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti=
 	# (fun_info_ptr, ti_fun_heap) = newPtr FI_Empty ti_fun_heap
 	  fun_ident = { id_name = ro.ro_tfi.tfi_root.symb_ident.id_name+++"_case", id_info = nilPtr }
 	  fun_ident = { symb_ident = fun_ident, symb_kind=SK_GeneratedFunction fun_info_ptr undeff }
-			 		<-!- ("<<<transformCaseFunction",fun_ident)
+					<-!- ("<<<transformCaseFunction",fun_ident)
 	| SwitchAlwaysIntroduceCaseFunction True False
 		# ti = { ti & ti_cons_args = ti_cons_args, ti_fun_defs = ti_fun_defs, ti_fun_heap = ti_fun_heap }
 	  	# fun_index = ti.ti_next_fun_nr
@@ -894,7 +894,7 @@ generate_case_function fun_index case_info_ptr new_expr outer_fun_def outer_cons
 	  // unfold...
 	  cs =		{ cs_var_heap				= ti.ti_var_heap
 	  			, cs_symbol_heap			= ti.ti_symbol_heap
-	  			, cs_opt_type_heaps			= Yes ti.ti_type_heaps
+				, cs_opt_type_heaps			= Yes ti.ti_type_heaps
 	  			, cs_cleanup_info			= ti.ti_cleanup_info
 	  			}
 	  (copied_expr, cs)
@@ -940,7 +940,7 @@ generate_case_function fun_index case_info_ptr new_expr outer_fun_def outer_cons
 	  			, ti_type_heaps		= ti_type_heaps
 	  			, ti_cleanup_info	= ti_cleanup_info 
 	  			}
-	  app_symb = { tfi_fun & symb_kind = SK_GeneratedFunction fun_info_ptr fun_index}
+	  app_symb = {tfi_fun & symb_kind = SK_GeneratedFunction fun_info_ptr fun_index}
 	  app_args = free_vars_to_bound_vars tfi_args
 	= ( App {app_symb = app_symb, app_args = app_args, app_info_ptr = nilPtr}, ti)
 
@@ -1507,7 +1507,7 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 	  th_attrs = remove_TA_TempVars_in_info_ptrs das_AVI_Attr_TA_TempVar_info_ptrs ti_type_heaps.th_attrs
 	  cs 	=	{ cs_var_heap				= ti_var_heap
 	  			, cs_symbol_heap			= ti_symbol_heap
-				, cs_opt_type_heaps			= Yes { ti_type_heaps & th_vars = th_vars }
+				, cs_opt_type_heaps			= Yes { ti_type_heaps & th_vars=th_vars, th_attrs=th_attrs }
 	  			, cs_cleanup_info			= ti_cleanup_info
 	  			}
 //	| False ---> ("before unfold:", tb_rhs) = undef
@@ -3070,11 +3070,12 @@ determineProducer is_applied_to_macro_fun consumer_is_curried ok_non_rec_consume
 	# (FI_Function {gf_cons_args={cc_producer},gf_fun_def={fun_body, fun_arity, fun_type, fun_info}}, ti_fun_heap)
 					= readPtr fun_ptr ti.ti_fun_heap
 	  ti = { ti & ti_fun_heap=ti_fun_heap }
-	| length app_args<>fun_arity
+	# n_app_args = length app_args
+	| n_app_args<>fun_arity
 		| is_applied_to_macro_fun
-			= ({ producers & [prod_index] = PR_Curried symb (length app_args)}, app_args ++ new_args, ti)
+			= ({producers & [prod_index] = PR_Curried symb n_app_args}, app_args ++ new_args, ti)
 		| SwitchCurriedFusion ro.ro_transform_fusion cc_producer False
-			= ({ producers & [prod_index] = PR_Curried symb (length app_args)}, app_args ++ new_args, ti)
+			= ({producers & [prod_index] = PR_Curried symb n_app_args}, app_args ++ new_args, ti)
 		= (producers, [App app : new_args ], ti)
 	# is_good_producer
 		= case fun_body of
@@ -3093,11 +3094,11 @@ determineProducer is_applied_to_macro_fun consumer_is_curried ok_non_rec_consume
     | SwitchHOFusion
     	((not consumer_is_curried && not_expanding_producer) && is_applied_to_macro_fun && linear_bit && is_higher_order_function fun_type)
     	False
-		= ({ producers & [prod_index] = PR_Curried symb (length app_args)}, app_args ++ new_args, ti)
+		= ({ producers & [prod_index] = PR_Curried symb n_app_args}, app_args ++ new_args, ti)
     | SwitchHOFusion`
     	((not consumer_is_curried && not_expanding_producer) && ok_non_rec_consumer && linear_bit && is_higher_order_function fun_type)
     	False
-		= ({ producers & [prod_index] = PR_Curried symb (length app_args)}, app_args ++ new_args, ti)
+		= ({ producers & [prod_index] = PR_Curried symb n_app_args}, app_args ++ new_args, ti)
 	# non_rec_producer = (fun_info.fi_properties bitand FI_IsNonRecursive) <> 0
 	# ok_non_rec
 		= case fun_body of
@@ -3106,7 +3107,7 @@ determineProducer is_applied_to_macro_fun consumer_is_curried ok_non_rec_consume
 			(TransformedBody {tb_rhs})
 				-> ro.ro_transform_fusion && not_expanding_producer && is_sexy_body tb_rhs && ok_non_rec_consumer && non_rec_producer//is_good_producer
 	| SwitchNonRecFusion ok_non_rec False
-		= ({ producers & [prod_index] = (PR_GeneratedFunction symb (length app_args) fun_index)}, app_args ++ new_args, ti)
+		= ({producers & [prod_index] = PR_GeneratedFunction symb n_app_args fun_index}, app_args ++ new_args, ti)
 	= (producers, [App app : new_args ], ti)
 determineProducer is_applied_to_macro_fun consumer_is_curried ok_non_rec_consumer linear_bit app=:{app_symb = symb=:{symb_kind}, app_args} _
 				  new_args prod_index producers ro ti
@@ -3116,13 +3117,14 @@ determineProducer is_applied_to_macro_fun consumer_is_curried ok_non_rec_consume
 				SK_Function global_index -> global_index
 				SK_LocalMacroFunction index -> { glob_module = ro.ro_main_dcl_module_n, glob_object = index }
 		# (fun_arity, ti) = get_fun_arity glob_module glob_object ro ti
-		| length app_args<>fun_arity
+		  n_app_args = length app_args
+		| n_app_args<>fun_arity
 			| is_applied_to_macro_fun
-				= ({ producers & [prod_index] = PR_Curried symb (length app_args)}, app_args ++ new_args, ti)
+				= ({ producers & [prod_index] = PR_Curried symb n_app_args}, app_args ++ new_args, ti)
 			# ({cc_producer},ti) = ti!ti_cons_args.[glob_object]
 			| SwitchCurriedFusion ro.ro_transform_fusion cc_producer False
-				= ({ producers & [prod_index] = PR_Curried symb (length app_args)}, app_args ++ new_args, ti)
-			= (producers, [App app : new_args ], ti)
+				= ({ producers & [prod_index] = PR_Curried symb n_app_args}, app_args ++ new_args, ti)
+			= (producers, [App app : new_args], ti)
 		#! max_index = size ti.ti_cons_args
 		| glob_module <> ro.ro_main_dcl_module_n || glob_object >= max_index /* Sjaak, to skip array functions */
 			= (producers, [App app : new_args ], ti)
@@ -3132,7 +3134,7 @@ determineProducer is_applied_to_macro_fun consumer_is_curried ok_non_rec_consume
 		  is_good_producer = SwitchFunctionFusion (ro.ro_transform_fusion && linear_bit && is_sexy_body tb_rhs) False
 		  {cc_producer} = ti.ti_cons_args.[glob_object]
 		| is_good_producer && cc_producer && not consumer_is_curried
-			= ({ producers & [prod_index] = (PR_Function symb (length app_args) glob_object)}, app_args ++ new_args, ti)
+			= ({ producers & [prod_index] = PR_Function symb n_app_args glob_object}, app_args ++ new_args, ti)
 	    # not_expanding_producer
 			= case fun_body of
 				Expanding _
@@ -3140,7 +3142,7 @@ determineProducer is_applied_to_macro_fun consumer_is_curried ok_non_rec_consume
 				_
 					-> True // cc_producer
 		| (not consumer_is_curried && not_expanding_producer) && is_applied_to_macro_fun && linear_bit && is_higher_order_function fun_type
-			= ({ producers & [prod_index] = PR_Curried symb (length app_args)}, app_args ++ new_args, ti)
+			= ({ producers & [prod_index] = PR_Curried symb n_app_args}, app_args ++ new_args, ti)
 		# non_rec_producer = (fun_info.fi_properties bitand FI_IsNonRecursive) <> 0
 		# ok_non_rec
 			= case fun_body of
@@ -3149,9 +3151,9 @@ determineProducer is_applied_to_macro_fun consumer_is_curried ok_non_rec_consume
 				(TransformedBody {tb_rhs})
 					-> ro.ro_transform_fusion && not_expanding_producer && is_sexy_body tb_rhs && ok_non_rec_consumer && non_rec_producer//&& is_good_producer
 		| SwitchNonRecFusion ok_non_rec False
-			= ({ producers & [prod_index] = (PR_Function symb (length app_args) glob_object)}, app_args ++ new_args, ti)
-		= (producers, [App app : new_args ], ti)
-	= (producers, [App app : new_args ], ti)
+			= ({producers & [prod_index] = PR_Function symb n_app_args glob_object}, app_args ++ new_args, ti)
+		= (producers, [App app : new_args], ti)
+	= (producers, [App app : new_args], ti)
 where
 	get_max_index ti=:{ti_cons_args}
 		#! (max_index, ti_cons_args)	= usize ti_cons_args
@@ -3461,8 +3463,7 @@ where
 		# (FI_Function gf, ti_fun_heap)
 											= readPtr fun_def_ptr ti_fun_heap
 		# ti_fun_heap						= writePtr fun_def_ptr (FI_Function {gf & gf_fun_def = fun_def}) ti_fun_heap
-		  ti								= { ti & ti_fun_heap = ti_fun_heap }
-		= ti
+		= { ti & ti_fun_heap = ti_fun_heap }
 	
 	partition_group :: !.Int ![.Int] !*TransformInfo -> *(![Group],!*TransformInfo)
 	partition_group group_nr group_members ti
