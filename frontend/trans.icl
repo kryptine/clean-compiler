@@ -370,7 +370,7 @@ where
 		= (AlgebraicPatterns type [ { case_guard & ap_expr=guard_expr } \\ case_guard<-case_guards & guard_expr<-guard_exprs_with_case], ti)
 	lift_patterns default_exists (BasicPatterns basic_type case_guards) case_info_ptr outer_case ro ti
 		# guard_exprs	= [ bp_expr \\ {bp_expr} <- case_guards ]
-		# (guard_exprs_with_case, ti) = lift_patterns_2 default_exists guard_exprs outer_case ro ti
+		  (guard_exprs_with_case, ti) = lift_patterns_2 default_exists guard_exprs outer_case ro ti
 		= (BasicPatterns basic_type [ { case_guard & bp_expr=guard_expr } \\ case_guard<-case_guards & guard_expr<-guard_exprs_with_case], ti)
 	lift_patterns default_exists (OverloadedListPatterns type decons_expr case_guards) case_info_ptr outer_case ro ti
 		# guard_exprs	= [ ap_expr \\ {ap_expr} <- case_guards ]
@@ -679,7 +679,8 @@ where
 		# zipped = zip2 ap_vars app_args
 		  (body_strictness,ti_fun_defs,ti_fun_heap) = body_strict ap_expr ap_vars ro ti.ti_fun_defs ti.ti_fun_heap
 		  ti = {ti & ti_fun_defs = ti_fun_defs, ti_fun_heap = ti_fun_heap}
-		  unfoldables = [ (arg_is_strict i body_strictness || ((not (arg_is_strict i cons_type_args_strictness))) && linear) || in_normal_form app_arg \\ linear <- linearity & app_arg <- app_args & i <- [0..]]
+		  unfoldables = [ (arg_is_strict i body_strictness || ((not (arg_is_strict i cons_type_args_strictness))) && linear) || in_normal_form app_arg
+		  				 \\ linear <- linearity & app_arg <- app_args & i <- [0..]]
 		  unfoldable_args = filterWith unfoldables zipped
 		  not_unfoldable = map not unfoldables
 		  non_unfoldable_args = filterWith not_unfoldable zipped
@@ -687,11 +688,9 @@ where
 //		  (new_expr, ti_symbol_heap) = possibly_add_let non_unfoldable_args ap_expr not_unfoldable cons_type_args ro ti.ti_symbol_heap
 		  (new_expr, ti_symbol_heap) = possibly_add_let zipped ap_expr not_unfoldable cons_type_args ro ti.ti_symbol_heap cons_type_args_strictness
 		  copy_state = { cs_var_heap = ti_var_heap, cs_symbol_heap = ti_symbol_heap, cs_opt_type_heaps = No,cs_cleanup_info=ti.ti_cleanup_info }
-		  ci = {ci_handle_aci_free_vars = LeaveAciFreeVars }
-		  (unfolded_expr, copy_state) = copy new_expr ci copy_state
-		  (final_expr, ti) = transform unfolded_expr
-		  						{ ro & ro_root_case_mode = NotRootCase }
-		  						{ ti & ti_var_heap = copy_state.cs_var_heap, ti_symbol_heap = copy_state.cs_symbol_heap,ti_cleanup_info=copy_state.cs_cleanup_info }
+		  (unfolded_expr, copy_state) = copy new_expr {ci_handle_aci_free_vars = LeaveAciFreeVars} copy_state
+		  ti = { ti & ti_var_heap = copy_state.cs_var_heap, ti_symbol_heap = copy_state.cs_symbol_heap,ti_cleanup_info=copy_state.cs_cleanup_info }
+		  (final_expr, ti) = transform unfolded_expr { ro & ro_root_case_mode = NotRootCase } ti
 //		| False ---> ("instantiate",app_args,ap_vars,ap_expr,final_expr,unfoldables) = undef
 		= (Yes final_expr, ti)
 	where
@@ -921,12 +920,12 @@ generate_case_function fun_index case_info_ptr new_expr outer_fun_def outer_cons
 	  			, cc_args			= repeatn nr_of_lifted_vars CPassive ++ cc_args_from_outer_fun
 	  			, cc_linear_bits	= repeatn nr_of_lifted_vars    False ++ cc_linear_bits_from_outer_fun
 	  			, cc_producer		= False
-	  			}
+				}
 	  gf =		{ gf_fun_def		= fun_def
-	  			, gf_instance_info	= II_Empty
-	  			, gf_cons_args		= new_cons_args
-	  			, gf_fun_index		= fun_index
-	  			}
+				, gf_instance_info	= II_Empty
+				, gf_cons_args		= new_cons_args
+				, gf_fun_index		= fun_index
+				}
 	  ti_fun_heap = writePtr fun_info_ptr (FI_Function gf) ti.ti_fun_heap
 	  ti = { ti & ti_new_functions	= [fun_info_ptr:ti.ti_new_functions]
 	  			, ti_var_heap		= ti_var_heap
@@ -1249,6 +1248,23 @@ compute_args_strictness new_arg_types_array = compute_args_strictness 0 0 NotStr
  * GENERATE FUSED FUNCTION
  */
 
+:: *DetermineArgsState =
+	{ das_vars						:: ![FreeVar]
+	, das_arg_types					:: !*{#ATypesWithStrictness}
+	, das_next_attr_nr				:: !Int
+	, das_new_linear_bits			:: ![Bool]
+	, das_new_cons_args				:: ![ConsClass]
+	, das_uniqueness_requirements	:: ![UniquenessRequirement]
+	, das_AVI_Attr_TA_TempVar_info_ptrs	:: ![[AttributeVar]]
+	, das_subst						:: !*{!Type}
+	, das_type_heaps				:: !*TypeHeaps
+	, das_fun_defs					:: !*{#FunDef}
+	, das_fun_heap					:: !*FunctionHeap
+	, das_var_heap					:: !*VarHeap
+	, das_cons_args					:: !*{!ConsClasses}
+	, das_predef					:: !*PredefinedSymbols
+	}
+
 generateFunction :: !SymbIdent !FunDef ![ConsClass] ![Bool] !{! Producer} !FunctionInfoPtr !ReadOnlyTI !Int !*TransformInfo -> (!Index, !Int, !*TransformInfo)
 generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi_group_index}} 
 				 cc_args cc_linear_bits prods fun_def_ptr ro n_extra
@@ -1280,7 +1296,7 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 	  sound_function_producer_types		// nog even voor determine args....
 	  		= [x \\ Yes x <- opt_sound_function_producer_types]
 
-	# ({st_attr_vars,st_args,st_args_strictness,st_result,st_attr_env})
+	# {st_attr_vars,st_args,st_args_strictness,st_result,st_attr_env}
 	  		= sound_consumer_symbol_type
 
 	  (class_types, ti_fun_defs, ti_fun_heap)
@@ -1303,8 +1319,11 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 	  		=  foldSt bind_to_temp_type_var all_type_vars (0, th_vars)
 	  subst = createArray nr_of_all_type_vars TE
 	  (next_attr_nr, th_attrs)
-	  		= foldSt bind_to_temp_attr_var st_attr_vars (FirstAttrVar, ti_type_heaps.th_attrs)
-	  ti_type_heaps = { ti_type_heaps & th_attrs = th_attrs, th_vars = th_vars }
+	  		= bind_to_temp_attr_vars st_attr_vars (FirstAttrVar, ti_type_heaps.th_attrs)
+	  // remember the st_attr_vars, because the AVI_Attr (TA_TempVar _)'s must be removed before unfold,
+	  // because types in Cases and Lets should not use TA_TempVar's
+	  das_AVI_Attr_TA_TempVar_info_ptrs = [st_attr_vars]
+	  ti_type_heaps = {ti_type_heaps & th_attrs = th_attrs, th_vars = th_vars}
 //	| False-!->("before substitute", st_args, "->", st_result)		= undef
 	# ((st_args,st_result), ti_type_heaps)
 	  		= substitute (st_args,st_result) ti_type_heaps
@@ -1316,10 +1335,9 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 			, das_new_linear_bits			= []
 			, das_new_cons_args				= []
 			, das_uniqueness_requirements	= []
+			, das_AVI_Attr_TA_TempVar_info_ptrs = das_AVI_Attr_TA_TempVar_info_ptrs
 			, das_subst						= subst
-			, das_let_bindings				= ([],[],[],[])
 			, das_type_heaps				= ti_type_heaps
-			, das_symbol_heap				= ti_symbol_heap
 			, das_fun_defs					= ti_fun_defs
 			, das_fun_heap					= ti_fun_heap
 			, das_var_heap					= ti_var_heap
@@ -1338,10 +1356,9 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 	  new_linear_bits			= das.das_new_linear_bits
 	  new_cons_args				= das.das_new_cons_args
 	  uniqueness_requirements	= das.das_uniqueness_requirements
+	  das_AVI_Attr_TA_TempVar_info_ptrs = das.das_AVI_Attr_TA_TempVar_info_ptrs
 	  subst						= das.das_subst
-	  let_bindings				= das.das_let_bindings
 	  ti_type_heaps				= das.das_type_heaps
-	  ti_symbol_heap			= das.das_symbol_heap
 	  ti_fun_defs				= das.das_fun_defs
 	  ti_fun_heap				= das.das_fun_heap
 	  ti_var_heap				= das.das_var_heap
@@ -1407,7 +1424,7 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 	  		= accTypeVarHeap (create_fresh_type_vars nr_of_all_type_vars) ti_type_heaps
 	  (attr_partition, demanded) 
 	  		= partitionateAttributes coercions.coer_offered coercions.coer_demanded
-	  		// to eliminate circles in the attribute inequalities graph that was built during "determine_arg s"
+	  		// to eliminate circles in the attribute inequalities graph that was built during "determine_args"
 	  (fresh_attr_vars, ti_type_heaps)
 	  		= accAttrVarHeap (create_fresh_attr_vars demanded (size demanded)) ti_type_heaps
 	  		// the attribute variables stored in the "demanded" graph are represented as integers: 
@@ -1417,13 +1434,13 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 	  				 (createArray (size demanded) False)
 			// replace the integer-attribute-variables with pointer-attribute-variables or TA_Unique or TA_Multi
 	  final_coercions
-	  		= removeUnusedAttrVars demanded [i \\ i<-[0..(size used_attr_vars)-1] | not used_attr_vars.[i]]
+	  		= removeUnusedAttrVars demanded [i \\ i<-[0..size used_attr_vars-1] | not used_attr_vars.[i]]
 			// the attribute inequalities graph may have contained unused attribute variables.
 
  	  (all_attr_vars2, ti_type_heaps)
  	  		= accAttrVarHeap (getAttrVars (fresh_arg_types, fresh_result_type)) ti_type_heaps
 	  all_attr_vars
-	  		= [ attr_var \\ TA_Var attr_var <- [fresh_attr_vars.[i] \\ i<-[0..(size used_attr_vars)-1] | used_attr_vars.[i]]]
+	  		= [ attr_var \\ TA_Var attr_var <- [fresh_attr_vars.[i] \\ i<-[0..size used_attr_vars-1] | used_attr_vars.[i]]]
  	# (all_fresh_type_vars, ti_type_heaps)
  	  		= accTypeVarHeap (getTypeVars (fresh_arg_types, fresh_result_type)) ti_type_heaps
 	  new_fun_type
@@ -1436,7 +1453,7 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 	  			, st_context	= []
 	  			, st_attr_vars	= all_attr_vars
 	  			, st_attr_env	= coercionsToAttrEnv fresh_attr_vars final_coercions 
-	  			}
+				}
 /* DvA... STRICT_LET
 	  // DvA: moet hier rekening houden met strictness dwz alleen safe args expanderen en rest in stricte let genereren...
 	  (tb_rhs,ti_symbol_heap,strict_free_vars) = case let_bindings of
@@ -1481,16 +1498,16 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 	  						_
 	  							-> (i+1, writePtr tv_info_ptr (TVI_Type subst.[i]) th_vars))
 	  				all_type_vars (0, ti_type_heaps.th_vars)
+	  // remove the AVI_Attr (TA_TempVar _)'s before unfold, because types in Cases and Lets should not use TA_TempVar's
+	  th_attrs = remove_TA_TempVars_in_info_ptrs das_AVI_Attr_TA_TempVar_info_ptrs ti_type_heaps.th_attrs
 	  cs 	=	{ cs_var_heap				= ti_var_heap
 	  			, cs_symbol_heap			= ti_symbol_heap
 	  			, cs_opt_type_heaps			= Yes { ti_type_heaps & th_vars = th_vars }
 	  			, cs_cleanup_info			= ti_cleanup_info
 	  			}
- 	  ci	=	{ ci_handle_aci_free_vars	= RemoveAciFreeVars
- 	  			}
 //	| False ---> ("before unfold:", tb_rhs) = undef
 	# (tb_rhs, {cs_var_heap,cs_symbol_heap,cs_opt_type_heaps=Yes ti_type_heaps, cs_cleanup_info})
-	  		= copy tb_rhs ci cs
+	  		= copy tb_rhs {ci_handle_aci_free_vars	= RemoveAciFreeVars} cs
 //	| False ---> ("unfolded:", tb_rhs) = undef
 	# var_heap						= fold2St store_arg_type_info new_fun_args fresh_arg_types cs_var_heap
 		with
@@ -1775,24 +1792,6 @@ get_producer_type {symb_kind=SK_Constructor {glob_module, glob_object}} ro fun_d
 	= (cons_type, fun_defs, fun_heap)
 
 //@ determine_args
-:: *DetermineArgsState =
-	{ das_vars						:: ![FreeVar]
-	, das_arg_types					:: !*{#ATypesWithStrictness}
-	, das_next_attr_nr				:: !Int
-	, das_new_linear_bits			:: ![Bool]
-	, das_new_cons_args				:: ![ConsClass]
-	, das_uniqueness_requirements	:: ![UniquenessRequirement]
-	, das_subst						:: !*{!Type}
-	, das_let_bindings				:: !(![LetBind],![LetBind],![AType],![AType])	// DvA: only used in strict_let variant
-	, das_type_heaps				:: !*TypeHeaps
-	, das_symbol_heap				:: !*ExpressionHeap					// unused...
-	, das_fun_defs					:: !*{#FunDef}
-	, das_fun_heap					:: !*FunctionHeap
-	, das_var_heap					:: !*VarHeap
-	, das_cons_args					:: !*{!ConsClasses}
-	, das_predef					:: !*PredefinedSymbols
-	}
-
 determine_args
 	:: ![Bool] ![ConsClass] !Index !{!Producer} ![Optional SymbolType] ![FreeVar] !ReadOnlyTI !*DetermineArgsState
 	-> *DetermineArgsState
@@ -1897,7 +1896,7 @@ determine_arg (PR_Class class_app free_vars_and_types class_type) _ {fv_info_ptr
 
 determine_arg producer (Yes {st_args, st_args_strictness, st_result, st_attr_vars, st_context, st_attr_env, st_arity})
 				{fv_info_ptr,fv_ident} prod_index ((linear_bit, _),ro)
-				das=:{das_subst,das_type_heaps,das_fun_defs,das_fun_heap,das_var_heap,das_cons_args,das_arg_types,das_next_attr_nr}
+				das=:{das_subst,das_type_heaps,das_fun_defs,das_fun_heap,das_var_heap,das_cons_args,das_arg_types,das_next_attr_nr,das_AVI_Attr_TA_TempVar_info_ptrs}
 
 	# {th_vars, th_attrs}		= das_type_heaps
 	# (symbol,symbol_arity)		= get_producer_symbol producer
@@ -1910,7 +1909,10 @@ determine_arg producer (Yes {st_args, st_args_strictness, st_result, st_attr_var
 	  		= das_arg_types![prod_index]
 
 	  (das_next_attr_nr, th_attrs)
-	  		= foldSt bind_to_temp_attr_var st_attr_vars (das_next_attr_nr, th_attrs)
+	  		= bind_to_temp_attr_vars st_attr_vars (das_next_attr_nr, th_attrs)
+	  // remember the st_attr_vars, because the AVI_Attr (TA_TempVar _)'s must be removed before unfold,
+	  // because types in Cases and Lets should not use TA_TempVar's
+	  das_AVI_Attr_TA_TempVar_info_ptrs = [st_attr_vars:das_AVI_Attr_TA_TempVar_info_ptrs]
 	  		// prepare for substitute calls
 	  ((st_args, st_result), das_type_heaps)
 	  		= substitute (st_args, st_result) { das_type_heaps & th_vars = th_vars, th_attrs = th_attrs }
@@ -1995,6 +1997,7 @@ determine_arg producer (Yes {st_args, st_args_strictness, st_result, st_attr_var
 		, das_new_linear_bits			= cc_linear_bits ++ das.das_new_linear_bits
 		, das_new_cons_args				= cc_args ++ das.das_new_cons_args
 		, das_uniqueness_requirements	= [new_uniqueness_requirement:das.das_uniqueness_requirements]
+		, das_AVI_Attr_TA_TempVar_info_ptrs = das_AVI_Attr_TA_TempVar_info_ptrs
 		, das_subst						= das_subst
 		, das_type_heaps				= das_type_heaps
 		, das_fun_defs					= das_fun_defs
@@ -2257,10 +2260,11 @@ instance replaceIntegers TypeAttribute where
 	replaceIntegers (TA_TempVar i) (_, attributes, attr_partition) used
 		# index = attr_partition.[i]
 		  attribute = attributes.[index]
-		= (attribute, { used & [index] = isAttrVar attribute })
-	  where
-		isAttrVar (TA_Var _) = True
-		isAttrVar _ = False
+		= case attribute of
+			TA_Var _
+				-> (attribute, {used & [index] = True})
+			_
+				-> (attribute, used)
 	replaceIntegers ta _ used
 		= (ta, used)
 
@@ -2311,8 +2315,29 @@ bind_to_fresh_attr_variable {av_ident, av_info_ptr} th_attrs
 bind_to_temp_type_var {tv_info_ptr} (next_type_var_nr, th_vars)
 	= (next_type_var_nr+1, writePtr tv_info_ptr (TVI_Type (TempV next_type_var_nr)) th_vars)
 
-bind_to_temp_attr_var {av_info_ptr} (next_attr_var_nr, th_attrs)
-	= (next_attr_var_nr+1, writePtr av_info_ptr (AVI_Attr (TA_TempVar next_attr_var_nr)) th_attrs)
+bind_to_temp_attr_vars :: [AttributeVar] *(Int,*AttrVarHeap) -> (!Int,!*AttrVarHeap)
+bind_to_temp_attr_vars attr_vars next_attr_var_n_and_attrs
+	= foldSt bind_to_temp_attr_var attr_vars next_attr_var_n_and_attrs
+where
+	bind_to_temp_attr_var {av_info_ptr} (next_attr_var_nr, th_attrs)
+		= (next_attr_var_nr+1, writePtr av_info_ptr (AVI_Attr (TA_TempVar next_attr_var_nr)) th_attrs)
+
+remove_TA_TempVars_in_info_ptrs [hAVI_Attr_TA_TempVar_info_ptrs:tAVI_Attr_TA_TempVar_info_ptrs] attrs
+	# attrs = remove_TA_TempVars_in_info_ptr_list hAVI_Attr_TA_TempVar_info_ptrs attrs
+	= remove_TA_TempVars_in_info_ptrs tAVI_Attr_TA_TempVar_info_ptrs attrs
+where
+	remove_TA_TempVars_in_info_ptr_list [{av_info_ptr}:tAVI_Attr_TA_TempVar_info_ptrs] attrs
+		= case readPtr av_info_ptr attrs of
+			(AVI_Attr (TA_TempVar _),attrs)
+				// use TA_Multi as in cleanUpTypeAttribute
+				# attrs = writePtr av_info_ptr (AVI_Attr TA_Multi) attrs
+				-> remove_TA_TempVars_in_info_ptr_list tAVI_Attr_TA_TempVar_info_ptrs attrs
+			(_,attrs)
+				-> remove_TA_TempVars_in_info_ptr_list tAVI_Attr_TA_TempVar_info_ptrs attrs
+	remove_TA_TempVars_in_info_ptr_list [] attrs
+		= attrs
+remove_TA_TempVars_in_info_ptrs [] attrs
+	= attrs
 
 transformFunctionApplication :: !FunDef !InstanceInfo !ConsClasses !App ![Expression] !ReadOnlyTI !*TransformInfo -> *(!Expression,!*TransformInfo)
 transformFunctionApplication fun_def instances cc=:{cc_size, cc_args, cc_linear_bits} app=:{app_symb,app_args} extra_args ro ti
@@ -3009,7 +3034,7 @@ determineProducer _ _ _ _ app=:{app_symb = symb=:{symb_kind = SK_Constructor _},
 determineProducer _ _ _ linear_bit app=:{app_symb = symb=:{symb_kind = SK_Constructor cons_index, symb_ident}, app_args} _
 				  new_args prod_index producers ro ti
 	# {cons_type}								= ro.ro_common_defs.[cons_index.glob_module].com_cons_defs.[cons_index.glob_object]
-	  rnf										= rnf_args app_args 0 cons_type.st_args_strictness ro	//---> ("rnf_args",symb_ident)
+	  rnf										= rnf_args app_args 0 cons_type.st_args_strictness ro
 	| SwitchConstructorFusion
 		(ro.ro_transform_fusion && SwitchRnfConstructorFusion (linear_bit || rnf) linear_bit)
 		False
