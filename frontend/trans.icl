@@ -347,7 +347,7 @@ where
 		# default_exists = case case_default of
 							Yes _	-> True
 							No		-> False
-		  (case_guards, ti) = lift_patterns default_exists case_guards outer_case ro ti
+		  (case_guards, ti) = lift_patterns default_exists case_guards nested_case.case_info_ptr outer_case ro ti
 		  (case_default, ti) = lift_default case_default outer_case ro ti
 		  (EI_CaseType outer_case_type, ti_symbol_heap) = readExprInfo outer_case.case_info_ptr ti.ti_symbol_heap
 		// the result type of the nested case becomes the result type of the outer case
@@ -361,17 +361,23 @@ where
 			#! (EI_CaseType case_type, ti_symbol_heap)	= readExprInfo case_info_ptr ti_symbol_heap
 			= writeExprInfo case_info_ptr (EI_CaseType { case_type & ct_result_type = new_result_type}) ti_symbol_heap
 
-	lift_patterns default_exists (AlgebraicPatterns type case_guards) outer_case ro ti
+	lift_patterns default_exists (AlgebraicPatterns type case_guards) case_info_ptr outer_case ro ti
 		# guard_exprs	= [ ap_expr \\ {ap_expr} <- case_guards ]
-		# (guard_exprs_with_case, ti) = lift_patterns_2 default_exists guard_exprs outer_case ro ti
+		  (EI_CaseType {ct_cons_types,ct_result_type},symbol_heap) = readExprInfo case_info_ptr ti.ti_symbol_heap
+		  var_heap = store_type_info_of_alg_pattern_in_pattern_variables ct_cons_types case_guards ti.ti_var_heap
+		  ti = {ti & ti_symbol_heap=symbol_heap,ti_var_heap=var_heap}
+		  (guard_exprs_with_case, ti) = lift_patterns_2 default_exists guard_exprs outer_case ro ti
 		= (AlgebraicPatterns type [ { case_guard & ap_expr=guard_expr } \\ case_guard<-case_guards & guard_expr<-guard_exprs_with_case], ti)
-	lift_patterns default_exists (BasicPatterns basic_type case_guards) outer_case ro ti
+	lift_patterns default_exists (BasicPatterns basic_type case_guards) case_info_ptr outer_case ro ti
 		# guard_exprs	= [ bp_expr \\ {bp_expr} <- case_guards ]
 		# (guard_exprs_with_case, ti) = lift_patterns_2 default_exists guard_exprs outer_case ro ti
 		= (BasicPatterns basic_type [ { case_guard & bp_expr=guard_expr } \\ case_guard<-case_guards & guard_expr<-guard_exprs_with_case], ti)
-	lift_patterns default_exists (OverloadedListPatterns type decons_expr case_guards) outer_case ro ti
+	lift_patterns default_exists (OverloadedListPatterns type decons_expr case_guards) case_info_ptr outer_case ro ti
 		# guard_exprs	= [ ap_expr \\ {ap_expr} <- case_guards ]
-		# (guard_exprs_with_case, ti) = lift_patterns_2 default_exists guard_exprs outer_case ro ti
+		  (EI_CaseType {ct_cons_types},symbol_heap) = readExprInfo case_info_ptr ti.ti_symbol_heap
+		  var_heap = store_type_info_of_alg_pattern_in_pattern_variables ct_cons_types case_guards ti.ti_var_heap
+		  ti = {ti & ti_symbol_heap=symbol_heap,ti_var_heap=var_heap}
+		  (guard_exprs_with_case, ti) = lift_patterns_2 default_exists guard_exprs outer_case ro ti
 		= (OverloadedListPatterns type decons_expr [ { case_guard & ap_expr=guard_expr } \\ case_guard<-case_guards & guard_expr<-guard_exprs_with_case], ti)
 
 	lift_patterns_2 False [guard_expr] outer_case ro ti
