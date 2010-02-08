@@ -834,17 +834,58 @@ possibly_add_let zipped_ap_vars_and_args ap_expr not_unfoldable cons_type_args r
 	  , ti_symbol_heap
 	  )
 
+free_variables_of_expression expr ti
+	# ti_var_heap = clearVariables expr ti.ti_var_heap
+	  fvi = {fvi_var_heap = ti_var_heap, fvi_expr_heap = ti.ti_symbol_heap, fvi_variables = [], fvi_expr_ptrs = ti.ti_cleanup_info}
+	  {fvi_var_heap, fvi_expr_heap, fvi_variables, fvi_expr_ptrs} = freeVariables expr fvi
+	  ti = {ti & ti_var_heap = fvi_var_heap, ti_symbol_heap = fvi_expr_heap, ti_cleanup_info = fvi_expr_ptrs}
+	 = (fvi_variables,ti)
+
 transform_active_non_root_case :: !Case !ActiveCaseInfo !ReadOnlyTI !*TransformInfo -> *(!Expression, !*TransformInfo)
+transform_active_non_root_case kees=:{case_info_ptr,case_expr = App {app_symb}} aci=:{aci_free_vars} ro ti=:{ti_recursion_introduced=old_ti_recursion_introduced}
+	| not aci.aci_safe
+		= skip_over kees ro ti
+	| is_safe_producer app_symb.symb_kind ro ti.ti_fun_heap ti.ti_cons_args
+		// determine free variables	
+		# (free_vars,ti) = free_variables_of_expression (Case {kees & case_expr=EE}) ti	
+		// search function definition and consumer arguments
+		  (outer_fun_def, outer_cons_args, ti_cons_args, ti_fun_defs, ti_fun_heap)
+				= get_fun_def_and_cons_args ro.ro_tfi.tfi_root.symb_kind ti.ti_cons_args ti.ti_fun_defs ti.ti_fun_heap
+		  outer_arguments
+		  		= case outer_fun_def.fun_body of
+								TransformedBody {tb_args} 	-> tb_args
+								Expanding args				-> args
+		  outer_info_ptrs = [ fv_info_ptr \\ {fv_info_ptr}<-outer_arguments]
+		  free_var_info_ptrs = [ var_info_ptr \\ {var_info_ptr}<-free_vars ]
+		  used_mask = [isMember fv_info_ptr free_var_info_ptrs \\ {fv_info_ptr}<-outer_arguments]
+		  arguments_from_outer_fun = [ outer_argument \\ outer_argument<-outer_arguments & used<-used_mask | used ]
+		  lifted_arguments
+		  		= [ { fv_def_level = undeff, fv_ident = var_ident, fv_info_ptr = var_info_ptr, fv_count = undeff}
+								\\ {var_ident, var_info_ptr} <- free_vars | not (isMember var_info_ptr outer_info_ptrs)]
+		  all_args = lifted_arguments++arguments_from_outer_fun
+		| SwitchArityChecks (1+length all_args > 32) False
+			# ti = { ti & ti_cons_args = ti_cons_args, ti_fun_defs = ti_fun_defs, ti_fun_heap = ti_fun_heap, ti_recursion_introduced = No }
+			| ro.ro_transform_fusion
+				# ti = { ti & ti_error_file = ti.ti_error_file <<< "Possibly missed fusion oppurtunity: Case Arity > 32 " <<< ro.ro_tfi.tfi_root.symb_ident.id_name <<< "\n"}
+				= skip_over kees ro ti
+			= skip_over kees ro ti
+		# (fun_info_ptr, ti_fun_heap) = newPtr FI_Empty ti_fun_heap
+		  fun_ident = { id_name = ro.ro_tfi.tfi_root.symb_ident.id_name+++"_case", id_info = nilPtr }
+		  fun_ident = { symb_ident = fun_ident, symb_kind=SK_GeneratedFunction fun_info_ptr undeff }
+		# ti = { ti & ti_cons_args = ti_cons_args, ti_fun_defs = ti_fun_defs, ti_fun_heap = ti_fun_heap }
+//				---> ("lifted arguments",[fv_ident\\{fv_ident}<-lifted_arguments],outer_arguments,
+//					'\n',kees.case_expr,kees.case_guards,kees.case_default)
+	  	# fun_index = ti.ti_next_fun_nr
+	  	# ti = { ti & ti_next_fun_nr = fun_index + 1 }
+		// JvG: why are dictionaries not the first arguments ?
+		# new_ro = { ro & ro_root_case_mode = RootCaseOfZombie, ro_tfi.tfi_case = fun_ident, ro_tfi.tfi_args = all_args }
+	  	= generate_case_function_with_pattern_argument fun_index case_info_ptr (Case kees) outer_fun_def outer_cons_args used_mask fun_ident all_args ti
+
 transform_active_non_root_case kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti=:{ti_recursion_introduced=old_ti_recursion_introduced}
 	| not aci.aci_safe
 		= skip_over kees ro ti
 	// determine free variables
-	# ti_var_heap = clearVariables (Case kees) ti.ti_var_heap
-	  fvi	= { fvi_var_heap = ti_var_heap, fvi_expr_heap = ti.ti_symbol_heap, fvi_variables = [], fvi_expr_ptrs = ti.ti_cleanup_info }
-	  {fvi_var_heap, fvi_expr_heap, fvi_variables, fvi_expr_ptrs}
-	  		= freeVariables (Case kees) fvi
-	  ti	= { ti & ti_var_heap = fvi_var_heap, ti_symbol_heap = fvi_expr_heap, ti_cleanup_info = fvi_expr_ptrs }
-	  free_vars	= fvi_variables
+	# (free_vars,ti) = free_variables_of_expression (Case kees) ti	
 	// search function definition and consumer arguments
 	  (outer_fun_def, outer_cons_args, ti_cons_args, ti_fun_defs, ti_fun_heap)
 			= get_fun_def_and_cons_args ro.ro_tfi.tfi_root.symb_kind ti.ti_cons_args ti.ti_fun_defs ti.ti_fun_heap
@@ -957,6 +998,87 @@ generate_case_function fun_index case_info_ptr new_expr outer_fun_def outer_cons
 	  app_symb = {tfi_fun & symb_kind = SK_GeneratedFunction fun_info_ptr fun_index}
 	  app_args = free_vars_to_bound_vars tfi_args
 	= ( App {app_symb = app_symb, app_args = app_args, app_info_ptr = nilPtr}, ti)
+
+
+generate_case_function_with_pattern_argument :: !Int !ExprInfoPtr !Expression FunDef .ConsClasses [.Bool] !SymbIdent ![FreeVar] !*TransformInfo
+	-> (!Expression,!*TransformInfo)
+generate_case_function_with_pattern_argument fun_index case_info_ptr 
+					case_expr=:(Case kees=:{case_expr=old_case_expr}) outer_fun_def outer_cons_args used_mask
+					ro_fun=:{symb_kind=SK_GeneratedFunction fun_info_ptr _} ro_fun_args ti
+	# fun_arity								= length ro_fun_args
+	# ti = arity_warning "generate_case_function" ro_fun.symb_ident fun_index fun_arity ti
+	  (Yes {st_args,st_attr_env})			= outer_fun_def.fun_type
+	  types_from_outer_fun					= [ st_arg \\ st_arg <- st_args & used <- used_mask | used ]
+	  nr_of_lifted_vars						= fun_arity-(length types_from_outer_fun)
+	  (lifted_types, ti_var_heap)			= get_types_of_local_vars (take nr_of_lifted_vars ro_fun_args) ti.ti_var_heap
+	  (EI_CaseType {ct_result_type,ct_pattern_type}, ti_symbol_heap) = readExprInfo case_info_ptr ti.ti_symbol_heap
+	  (form_vars, ti_var_heap)				= mapSt bind_to_fresh_expr_var ro_fun_args ti_var_heap
+
+	  arg_types								= lifted_types++types_from_outer_fun
+
+	  ti = {ti & ti_var_heap = ti_var_heap, ti_symbol_heap = ti_symbol_heap}
+	  (fun_type,ti)							= determine_case_function_type fun_arity ct_result_type [ct_pattern_type:arg_types] st_attr_env ti
+
+	  // unfold...
+	  cs =		{ cs_var_heap				= ti.ti_var_heap
+	  			, cs_symbol_heap			= ti.ti_symbol_heap
+				, cs_opt_type_heaps			= Yes ti.ti_type_heaps
+	  			, cs_cleanup_info			= ti.ti_cleanup_info
+	  			}
+	  (Case copied_kees, cs)
+			= copy (Case {kees & case_expr=EE}) {ci_handle_aci_free_vars = SubstituteAciFreeVars} cs
+	  {cs_var_heap=ti_var_heap, cs_symbol_heap=ti_symbol_heap, cs_cleanup_info=ti_cleanup_info, cs_opt_type_heaps = Yes ti_type_heaps}
+	  		= cs
+
+	  (new_info_ptr, ti_var_heap) = newPtr VI_Empty ti_var_heap
+	  var_id = {id_name = "_x", id_info = nilPtr}
+	  case_free_var = {fv_def_level = NotALevel, fv_ident = var_id, fv_info_ptr = new_info_ptr, fv_count = 0}
+	  case_var = Var {var_ident = var_id, var_info_ptr = new_info_ptr, var_expr_ptr = nilPtr}
+	  copied_expr = Case {copied_kees & case_expr=case_var}
+	  form_vars = [case_free_var:form_vars]
+	  fun_arity = fun_arity+1
+	  // generated function...
+	  fun_def =	{ fun_ident					= ro_fun.symb_ident
+				, fun_arity					= fun_arity
+				, fun_priority				= NoPrio
+				, fun_body					= TransformedBody { tb_args = form_vars, tb_rhs = copied_expr}
+				, fun_type					= Yes fun_type
+				, fun_pos					= NoPos
+				, fun_kind					= FK_Function cNameNotLocationDependent
+				, fun_lifted				= undeff
+				, fun_info = 	{	fi_calls		= []
+								,	fi_group_index	= outer_fun_def.fun_info.fi_group_index
+								,	fi_def_level	= NotALevel
+								,	fi_free_vars	= []
+								,	fi_local_vars	= []
+								,	fi_dynamics		= []
+								,	fi_properties	= outer_fun_def.fun_info.fi_properties
+								}	
+				}
+	# cc_args_from_outer_fun		= [ cons_arg \\ cons_arg <- outer_cons_args.cc_args & used <- used_mask | used ]
+	  cc_linear_bits_from_outer_fun	= [ cons_arg \\ cons_arg <- outer_cons_args.cc_linear_bits & used <- used_mask | used ]
+	  new_cons_args =
+	  			{ cc_size			= fun_arity
+	  			, cc_args			= [CActive : repeatn nr_of_lifted_vars CPassive ++ cc_args_from_outer_fun]
+	  			, cc_linear_bits	= [True    : repeatn nr_of_lifted_vars    False ++ cc_linear_bits_from_outer_fun]
+	  			, cc_producer		= False
+	  			}
+	  gf =		{ gf_fun_def		= fun_def
+	  			, gf_instance_info	= II_Empty
+	  			, gf_cons_args		= new_cons_args
+	  			, gf_fun_index		= fun_index
+	  			}
+	  ti_fun_heap = writePtr fun_info_ptr (FI_Function gf) ti.ti_fun_heap
+	  ti = { ti & ti_new_functions	= [fun_info_ptr:ti.ti_new_functions]
+	  			, ti_var_heap		= ti_var_heap
+	  			, ti_fun_heap		= ti_fun_heap
+	  			, ti_symbol_heap	= ti_symbol_heap
+	  			, ti_type_heaps		= ti_type_heaps
+	  			, ti_cleanup_info	= ti_cleanup_info 
+	  			}
+	  app_symb = { ro_fun & symb_kind = SK_GeneratedFunction fun_info_ptr fun_index}
+	  app_args = [old_case_expr : free_vars_to_bound_vars ro_fun_args]
+	= (App {app_symb = app_symb, app_args = app_args, app_info_ptr = nilPtr}, ti)
 
 get_types_of_local_vars n_vars var_heap
 	= mapSt get_type_of_local_var n_vars var_heap
@@ -4522,13 +4644,16 @@ copyVariable var=:{var_info_ptr} ci cs
 									\\ {fv_ident,fv_info_ptr}<-vars],
 						app_info_ptr = nilPtr }, cs)
 		VI_Dictionary app_symb app_args class_type
-			# (new_class_type, cs_opt_type_heaps) = substitute_class_types class_type cs.cs_opt_type_heaps
-			  (new_info_ptr, cs_symbol_heap) = newPtr (EI_DictionaryType new_class_type) cs.cs_symbol_heap
-			  app = App { app_symb = app_symb, app_args = app_args, app_info_ptr = new_info_ptr }
-			  cs = { cs & cs_opt_type_heaps = cs_opt_type_heaps, cs_symbol_heap = cs_symbol_heap }
-			-> copy app ci cs
+			-> copy_dictionary_variable app_symb app_args class_type ci cs
 		_
 			-> (Var var, cs)
+
+copy_dictionary_variable app_symb app_args class_type ci cs
+	# (new_class_type, cs_opt_type_heaps) = substitute_class_types class_type cs.cs_opt_type_heaps
+	  (new_info_ptr, cs_symbol_heap) = newPtr (EI_DictionaryType new_class_type) cs.cs_symbol_heap
+	  app = App { app_symb = app_symb, app_args = app_args, app_info_ptr = new_info_ptr }
+	  cs = { cs & cs_opt_type_heaps = cs_opt_type_heaps, cs_symbol_heap = cs_symbol_heap }
+	= copy app ci cs
   where
 	substitute_class_types class_types No
 		= (class_types, No)
