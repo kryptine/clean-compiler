@@ -682,17 +682,15 @@ where
 		*/
 
 	instantiate linearity app_args ap_vars ap_expr cons_type_args_strictness cons_type_args ti
-		# zipped = zip2 ap_vars app_args
+		# zipped_ap_vars_and_args = zip2 ap_vars app_args
 		  (body_strictness,ti_fun_defs,ti_fun_heap) = body_strict ap_expr ap_vars ro ti.ti_fun_defs ti.ti_fun_heap
 		  ti = {ti & ti_fun_defs = ti_fun_defs, ti_fun_heap = ti_fun_heap}
 		  unfoldables = [ (arg_is_strict i body_strictness || ((not (arg_is_strict i cons_type_args_strictness))) && linear) || in_normal_form app_arg
 		  				 \\ linear <- linearity & app_arg <- app_args & i <- [0..]]
-		  unfoldable_args = filterWith unfoldables zipped
+		  unfoldable_args = filterWith unfoldables zipped_ap_vars_and_args
 		  not_unfoldable = map not unfoldables
-		  non_unfoldable_args = filterWith not_unfoldable zipped
 		  ti_var_heap = foldSt (\({fv_info_ptr}, arg) -> writeVarInfo fv_info_ptr (VI_Expression arg)) unfoldable_args ti.ti_var_heap
-//		  (new_expr, ti_symbol_heap) = possibly_add_let non_unfoldable_args ap_expr not_unfoldable cons_type_args ro ti.ti_symbol_heap
-		  (new_expr, ti_symbol_heap) = possibly_add_let zipped ap_expr not_unfoldable cons_type_args ro ti.ti_symbol_heap cons_type_args_strictness
+		  (new_expr, ti_symbol_heap) = possibly_add_let zipped_ap_vars_and_args ap_expr not_unfoldable cons_type_args ro ti.ti_symbol_heap cons_type_args_strictness
 		  copy_state = { cs_var_heap = ti_var_heap, cs_symbol_heap = ti_symbol_heap, cs_opt_type_heaps = No,cs_cleanup_info=ti.ti_cleanup_info }
 		  (unfolded_expr, copy_state) = copy new_expr {ci_handle_aci_free_vars = LeaveAciFreeVars} copy_state
 		  ti = { ti & ti_var_heap = copy_state.cs_var_heap, ti_symbol_heap = copy_state.cs_symbol_heap,ti_cleanup_info=copy_state.cs_cleanup_info }
@@ -784,39 +782,55 @@ filterWith _ _
 
 possibly_add_let [] ap_expr _ _ _ ti_symbol_heap cons_type_args_strictness
 	= (ap_expr, ti_symbol_heap)
-possibly_add_let non_unfoldable_args ap_expr not_unfoldable cons_type_args ro ti_symbol_heap cons_type_args_strictness
+possibly_add_let zipped_ap_vars_and_args ap_expr not_unfoldable cons_type_args ro ti_symbol_heap cons_type_args_strictness
 	# let_type = filterWith not_unfoldable cons_type_args
 	  (new_info_ptr, ti_symbol_heap) = newPtr (EI_LetType let_type) ti_symbol_heap
 	= SwitchStrictPossiblyAddLet
-		( Let
-			{	let_strict_binds	= [ {lb_src=lb_src, lb_dst=lb_dst, lb_position = NoPos}
-										\\ (lb_dst,lb_src)<-non_unfoldable_args
-										& n <- not_unfoldable
-										& i <- [0..]
-										| n && arg_is_strict i cons_type_args_strictness
-										]
-			,	let_lazy_binds		= [ {lb_src=lb_src, lb_dst=lb_dst, lb_position = NoPos}
-										\\ (lb_dst,lb_src)<-non_unfoldable_args
-										& n <- not_unfoldable
-										& i <- [0..]
-										| n && not (arg_is_strict i cons_type_args_strictness)
-										]
-			,	let_expr			= ap_expr
-			,	let_info_ptr		= new_info_ptr
-			,	let_expr_position	= NoPos
-			}
+		(let
+			strict_binds	= [ {lb_src=lb_src, lb_dst=lb_dst, lb_position = NoPos}
+									\\ (lb_dst,lb_src)<-zipped_ap_vars_and_args
+									& n <- not_unfoldable
+									& i <- [0..]
+									| n && arg_is_strict i cons_type_args_strictness
+									]
+			lazy_binds		= [ {lb_src=lb_src, lb_dst=lb_dst, lb_position = NoPos}
+									\\ (lb_dst,lb_src)<-zipped_ap_vars_and_args
+									& n <- not_unfoldable
+									& i <- [0..]
+									| n && not (arg_is_strict i cons_type_args_strictness)
+									]
+		 in
+		 	case (strict_binds,lazy_binds) of
+		 		([],[])
+		 			->	ap_expr
+		 		_
+		 			->	Let
+						{	let_strict_binds	= strict_binds
+						,	let_lazy_binds		= lazy_binds
+						,	let_expr			= ap_expr
+						,	let_info_ptr		= new_info_ptr
+						,	let_expr_position	= NoPos
+						}
 	  , ti_symbol_heap
 	  ) 
-	  ( Let	{	let_strict_binds	= []
-			,	let_lazy_binds		= [ {lb_src=lb_src, lb_dst=lb_dst, lb_position = NoPos}
-										\\ (lb_dst,lb_src)<-non_unfoldable_args
-										& n <- not_unfoldable
-										| n
-										]
-			,	let_expr			= ap_expr
-			,	let_info_ptr		= new_info_ptr
-			,	let_expr_position	= NoPos
-			}
+	  (let
+			lazy_binds		= [ {lb_src=lb_src, lb_dst=lb_dst, lb_position = NoPos}
+									\\ (lb_dst,lb_src)<-zipped_ap_vars_and_args
+									& n <- not_unfoldable
+									| n
+									]
+	   in
+			case lazy_binds of
+				[]
+					-> ap_expr
+				_
+					-> Let
+		  			 	{	let_strict_binds	= []
+						,	let_lazy_binds		= lazy_binds
+						,	let_expr			= ap_expr
+						,	let_info_ptr		= new_info_ptr
+						,	let_expr_position	= NoPos
+						}
 	  , ti_symbol_heap
 	  )
 
@@ -2607,8 +2621,7 @@ is_trivial_body [fv] (Var bv) [arg] type ro fun_defs fun_heap type_heaps cons_ar
 			(Yes arg, fun_defs, fun_heap, type_heaps, cons_args)
 			(No, fun_defs, fun_heap, type_heaps , cons_args)
 is_trivial_body args (App app) f_args type ro fun_defs fun_heap type_heaps cons_args
-	# (safe_producer, fun_heap, cons_args) = get_producer_class app.app_symb.symb_kind ro fun_heap cons_args
-	| not safe_producer
+	| not (is_safe_producer app.app_symb.symb_kind ro fun_heap cons_args)
 		= (No,fun_defs,fun_heap,type_heaps,cons_args)
 	# (type`,fun_defs,fun_heap)	= get_producer_type app.app_symb ro fun_defs fun_heap
 	# match = match_args (length f_args) info args app.app_args []
@@ -2735,20 +2748,18 @@ where
 is_trivial_body args rhs f_args type ro fun_defs fun_heap type_heaps cons_args
 	= (No,fun_defs,fun_heap,type_heaps,cons_args)
 
-get_producer_class (SK_GeneratedFunction fun_ptr _) ro fun_heap cons_args
-	# (FI_Function {gf_cons_args={cc_producer}}, fun_heap) = readPtr fun_ptr fun_heap
-	= (cc_producer, fun_heap, cons_args)
-get_producer_class (SK_LocalMacroFunction glob_object) ro fun_heap cons_args
-	# ({cc_producer},cons_args) = cons_args![glob_object]
-	= (cc_producer, fun_heap, cons_args)
-get_producer_class (SK_Function { glob_module, glob_object }) ro fun_heap cons_args
-	# (max_index,cons_args)			= usize cons_args
+is_safe_producer (SK_GeneratedFunction fun_ptr _) ro fun_heap cons_args
+	# (FI_Function {gf_cons_args={cc_producer}}) = sreadPtr fun_ptr fun_heap
+	= cc_producer
+is_safe_producer (SK_LocalMacroFunction glob_object) ro fun_heap cons_args
+	= cons_args.[glob_object].cc_producer
+is_safe_producer (SK_Function { glob_module, glob_object }) ro fun_heap cons_args
+	# max_index = size cons_args
 	| glob_module <> ro.ro_main_dcl_module_n || glob_object >= max_index
-		= (False, fun_heap, cons_args)
-	# ({cc_producer},cons_args) = cons_args![glob_object]
-	= (cc_producer, fun_heap, cons_args)
-get_producer_class (SK_Constructor {glob_module, glob_object}) ro fun_heap cons_args
-	= (SwitchConstructorFusion True (glob_module==ro.ro_StdGeneric_module_n) False, fun_heap, cons_args)
+		= False
+		= cons_args.[glob_object].cc_producer
+is_safe_producer (SK_Constructor {glob_module}) ro fun_heap cons_args
+	= SwitchConstructorFusion True (glob_module==ro.ro_StdGeneric_module_n) False
 
 //@ transformApplication
 transformApplication :: !App ![Expression] !ReadOnlyTI !*TransformInfo -> *(!Expression,!*TransformInfo)
@@ -3065,7 +3076,7 @@ where
 				App app		-> rnf_app_args app args index strictness ro
 				_			-> False
 		= rnf_args args (inc index) strictness ro
-	
+
 	rnf_app_args {app_symb=symb=:{symb_kind = SK_Constructor cons_index, symb_ident}, app_args} args index strictness ro
 		# {cons_type}		= ro.ro_common_defs.[cons_index.glob_module].com_cons_defs.[cons_index.glob_object]
 		| rnf_args app_args 0 cons_type.st_args_strictness ro
@@ -3086,7 +3097,7 @@ determineProducer is_applied_to_macro_fun consumer_is_curried ok_non_rec_consume
 			= ({producers & [prod_index] = PR_Curried symb n_app_args}, app_args ++ new_args, ti)
 		| SwitchCurriedFusion ro.ro_transform_fusion cc_producer False
 			= ({producers & [prod_index] = PR_Curried symb n_app_args}, app_args ++ new_args, ti)
-		= (producers, [App app : new_args ], ti)
+		= (producers, [App app : new_args], ti)
 	# is_good_producer
 		= case fun_body of
 			Expanding _
@@ -3094,7 +3105,7 @@ determineProducer is_applied_to_macro_fun consumer_is_curried ok_non_rec_consume
 			(TransformedBody {tb_rhs})
 				-> SwitchGeneratedFusion (ro.ro_transform_fusion && linear_bit && is_sexy_body tb_rhs) False
 	| cc_producer && is_good_producer
-		= ({ producers & [prod_index] = (PR_GeneratedFunction symb (length app_args) fun_index)}, app_args ++ new_args, ti)
+		= ({ producers & [prod_index] = PR_GeneratedFunction symb n_app_args fun_index}, app_args ++ new_args, ti)
     # not_expanding_producer
 		= case fun_body of
 			Expanding _
