@@ -1511,7 +1511,7 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 	  			, cs_cleanup_info			= ti_cleanup_info
 	  			}
 //	| False ---> ("before unfold:", tb_rhs) = undef
-	# (tb_rhs, {cs_var_heap,cs_symbol_heap,cs_opt_type_heaps=Yes ti_type_heaps, cs_cleanup_info})
+	# (tb_rhs, {cs_var_heap=var_heap,cs_symbol_heap,cs_opt_type_heaps=Yes ti_type_heaps, cs_cleanup_info})
 	  		= copy tb_rhs {ci_handle_aci_free_vars	= RemoveAciFreeVars} cs
 //	| False ---> ("unfolded:", tb_rhs) = undef
 	# var_heap						= fold2St store_arg_type_info new_fun_args fresh_arg_types var_heap
