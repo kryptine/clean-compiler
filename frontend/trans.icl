@@ -1512,7 +1512,7 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 	  			}
 //	| False ---> ("before unfold:", tb_rhs) = undef
 	# (tb_rhs, {cs_var_heap=var_heap,cs_symbol_heap,cs_opt_type_heaps=Yes ti_type_heaps, cs_cleanup_info})
-	  		= copy tb_rhs {ci_handle_aci_free_vars	= RemoveAciFreeVars} cs
+			= copy tb_rhs {ci_handle_aci_free_vars = RemoveAciFreeVars} cs
 //	| False ---> ("unfolded:", tb_rhs) = undef
 	# var_heap						= fold2St store_arg_type_info new_fun_args fresh_arg_types var_heap
 		with
@@ -1683,7 +1683,7 @@ where
 		# ([sound_st_result:sound_st_args], ps)
 			  	= mapSt (add_propagation_attributes_to_atype common_defs) [st_result:st_args] ps
 		  sound_symbol_type = {st & st_args	= sound_st_args
-								  , st_result	= sound_st_result
+								  , st_result = sound_st_result
 								  , st_attr_env = ps.prop_attr_env
 								  , st_attr_vars = ps.prop_attr_vars
 						  		}
@@ -1910,7 +1910,7 @@ determine_arg producer (Yes {st_args, st_args_strictness, st_result, st_attr_var
 	#! size_fun_defs			= size das_fun_defs
 
 	# ({cc_args, cc_linear_bits}, das_fun_heap, das_cons_args)
-			= calc_cons_args curried symbol symbol_arity das_cons_args linear_bit size_fun_defs das_fun_heap
+			= calc_cons_args curried symbol.symb_kind symbol_arity das_cons_args linear_bit size_fun_defs das_fun_heap
 	  ({ats_types=[arg_type:_],ats_strictness}, das_arg_types)
 	  		= das_arg_types![prod_index]
 
@@ -2020,7 +2020,7 @@ where
 		  act_var = { var_ident = new_name, var_info_ptr = info_ptr, var_expr_ptr = nilPtr }
 		= build_var_args new_names [form_var : form_vars] [Var act_var : act_vars] var_heap
 
-	calc_cons_args curried {symb_kind} symbol_arity ti_cons_args linear_bit size_fun_defs fun_heap
+	calc_cons_args curried symb_kind symbol_arity ti_cons_args linear_bit size_fun_defs fun_heap
 		# (cons_size, ti_cons_args) = usize ti_cons_args
 		# (opt_cons_classes, fun_heap, ti_cons_args)
 				= case symb_kind of
@@ -2389,12 +2389,12 @@ transformFunctionApplication fun_def instances cc=:{cc_size, cc_args, cc_linear_
 	  			# (expr,ti) = transformApplication { app & app_symb = app_symb, app_args = app_args } extra_args ro ti
 	  			= possiblyAddStrictLetBinds expr strict_let_binds ti
   			# (FI_Function {gf_fun_index, gf_fun_def}, ti_fun_heap) = readPtr fun_def_ptr ti_fun_heap
-  			# ti = {ti & ti_fun_heap = ti_fun_heap}
+			# ti = {ti & ti_fun_heap = ti_fun_heap}
 			| gf_fun_index == (-1)
 				= (build_application { app & app_args = app_args } extra_args, ti) // ---> ("known failed instance")
 			# app_symb` = { app_symb & symb_kind = SK_GeneratedFunction fun_def_ptr gf_fun_index }
 			  (app_args, extra_args) = complete_application gf_fun_def.fun_arity new_args extra_args
-  			# (expr,ti) = transformApplication { app & app_symb = app_symb`, app_args = app_args } extra_args ro ti // ---> ("known instance",gf_fun_index)
+			# (expr,ti) = transformApplication { app & app_symb = app_symb`, app_args = app_args } extra_args ro ti // ---> ("known instance",gf_fun_index)
   			= possiblyAddStrictLetBinds expr strict_let_binds ti
 		| SwitchTrivialFusion ro.ro_transform_fusion False
 			= transform_trivial_function app app_args extra_args ro ti
@@ -2975,7 +2975,7 @@ determineProducers is_applied_to_macro_fun consumer_is_curried ok_non_rec_consum
 		&&	isStrictArg fun_type prod_index
 		) False
 		# producers = { producers & [prod_index] = PR_Unused }
-		# (lb,ti) = case isStrictVar arg of
+		# (lb,ti) = case isStrictVarOrSimpleExpression arg of
 						True	-> ([],ti)
 						_		# (info_ptr, ti_var_heap)	= newPtr VI_Empty ti.ti_var_heap
 								  ti						= {ti & ti_var_heap = ti_var_heap}
@@ -3010,12 +3010,21 @@ where
 	
 	isStrictArg No _ = False
 	isStrictArg (Yes {st_args_strictness}) index = arg_is_strict index st_args_strictness
-	
+
 	getArgType (Yes {st_args}) index = st_args!!index
-	
+
 	isStrictVar (Var bv) = not (isEmpty [fv \\ fv <- ro.ro_tfi.tfi_vars | fv.fv_info_ptr == bv.var_info_ptr])
 	isStrictVar _ = False
-	
+
+	isStrictVarOrSimpleExpression (Var bv)
+		= not (isEmpty [fv \\ fv <- ro.ro_tfi.tfi_vars | fv.fv_info_ptr == bv.var_info_ptr])
+	isStrictVarOrSimpleExpression (App {app_symb={symb_kind=SK_Constructor _},app_args=[]})
+		= True
+	isStrictVarOrSimpleExpression (BasicExpr _)
+		= True
+	isStrictVarOrSimpleExpression _
+		= False
+
 	determine_producer is_applied_to_macro_fun consumer_is_curried ok_non_rec_consumer linear_bit arg=:(App app=:{app_info_ptr}) new_args prod_index producers ro ti
 		| isNilPtr app_info_ptr
 			= determineProducer is_applied_to_macro_fun consumer_is_curried ok_non_rec_consumer linear_bit app EI_Empty new_args prod_index producers ro ti
@@ -3047,18 +3056,19 @@ determineProducer _ _ _ linear_bit app=:{app_symb = symb=:{symb_kind = SK_Constr
 		= (producers, app_args ++ new_args, ti)
 	= ( producers, [App app : new_args ], ti)
 where
-	rnf_args [] index strictness ro = True
+	rnf_args [] index strictness ro
+		= True
 	rnf_args [arg:args] index strictness ro
 		| arg_is_strict index strictness
 			= case arg of
-				BasicExpr _	-> rnf_args args (inc index) strictness ro			//---> ("rnf_arg","Basic")
-				App app		-> rnf_app_args app args index strictness ro		//---> ("rnf_arg","App")
-				_			-> False											//---> ("rnf_arg","Other")
-		= rnf_args args (inc index) strictness ro								//---> ("rnf_arg","Lazy")
+				BasicExpr _	-> rnf_args args (inc index) strictness ro
+				App app		-> rnf_app_args app args index strictness ro
+				_			-> False
+		= rnf_args args (inc index) strictness ro
 	
 	rnf_app_args {app_symb=symb=:{symb_kind = SK_Constructor cons_index, symb_ident}, app_args} args index strictness ro
 		# {cons_type}		= ro.ro_common_defs.[cons_index.glob_module].com_cons_defs.[cons_index.glob_object]
-		| rnf_args app_args 0 cons_type.st_args_strictness ro					//---> ("rnf_args",symb_ident)
+		| rnf_args app_args 0 cons_type.st_args_strictness ro
 			= rnf_args args (inc index) strictness ro
 			= False
 	// what else is rnf => curried apps
@@ -3091,7 +3101,7 @@ determineProducer is_applied_to_macro_fun consumer_is_curried ok_non_rec_consume
 				-> False
 			_
 				-> True //cc_producer
-    | SwitchHOFusion
+	| SwitchHOFusion
     	((not consumer_is_curried && not_expanding_producer) && is_applied_to_macro_fun && linear_bit && is_higher_order_function fun_type)
     	False
 		= ({ producers & [prod_index] = PR_Curried symb n_app_args}, app_args ++ new_args, ti)
