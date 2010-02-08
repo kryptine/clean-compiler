@@ -8,7 +8,7 @@ import classify, partition
 SwitchCaseFusion			fuse dont_fuse :== fuse
 SwitchGeneratedFusion		fuse dont_fuse :== fuse
 SwitchFunctionFusion		fuse dont_fuse :== fuse
-SwitchConstructorFusion		fuse dont_fuse :== dont_fuse
+SwitchConstructorFusion		fuse fuse_generic_constructors dont_fuse :== fuse_generic_constructors
 SwitchRnfConstructorFusion  rnf  linear	   :== rnf
 SwitchCurriedFusion			fuse xtra dont_fuse :== fuse 
 SwitchExtraCurriedFusion	fuse macro	   :== fuse//(fuse && macro)//fuse
@@ -147,7 +147,8 @@ cleanup_attributes expr_info_ptr symbol_heap
 	,	ro_tfi					:: !TransformFunctionInfo
 	,	ro_main_dcl_module_n 	:: !Int
 	,	ro_transform_fusion		:: !Bool			// fusion switch
-	,	ro_stdStrictLists_module_n :: !Int
+	,	ro_StdStrictLists_module_n :: !Int
+	,	ro_StdGeneric_module_n	:: !Int
 	}
 
 ::	TransformFunctionInfo =
@@ -408,7 +409,7 @@ where
 		isFoldExpression (App app)	ti_fun_defs ti_cons_args = isFoldSymbol app.app_symb.symb_kind
 			where
 				isFoldSymbol (SK_Function {glob_module,glob_object})
-					| glob_module==ro.ro_stdStrictLists_module_n
+					| glob_module==ro.ro_StdStrictLists_module_n
 						# type_arity = ro.ro_imported_funs.[glob_module].[glob_object].ft_type.st_arity
 						| type_arity==0 || (type_arity==2 && case app.app_args of [_:_] -> True; _ -> False)
 							= False
@@ -470,7 +471,7 @@ transform_active_root_case aci this_case=:{case_expr = case_expr=:(App app=:{app
 			  (may_be_match_expr, ti) = match_and_instantiate aci_linearity_of_patterns cons_index app_args case_guards case_default ro ti
 			-> expr_or_never_matching_case may_be_match_expr case_ident ti
 		SK_Function {glob_module,glob_object}
-			| glob_module==ro.ro_stdStrictLists_module_n &&
+			| glob_module==ro.ro_StdStrictLists_module_n &&
 				(let type = ro.ro_imported_funs.[glob_module].[glob_object].ft_type
 				 in (type.st_arity==0 || (type.st_arity==2 && case app_args of [_:_] -> True; _ -> False)))
 				# type = ro.ro_imported_funs.[glob_module].[glob_object].ft_type
@@ -861,7 +862,7 @@ transform_active_non_root_case kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti=
 	  	# ti = { ti & ti_next_fun_nr = fun_index + 1 }
 		# new_ro = { ro & ro_root_case_mode = RootCaseOfZombie , ro_tfi.tfi_case = fun_ident, ro_tfi.tfi_args = all_args }
 	  	= generate_case_function fun_index case_info_ptr (Case kees) outer_fun_def outer_cons_args used_mask new_ro ti
-	# new_ro = { ro & ro_root_case_mode = RootCaseOfZombie , ro_tfi.tfi_case = fun_ident, ro_tfi.tfi_args = all_args, ro_tfi.tfi_geni = (-1,-1) }
+	# new_ro = { ro & ro_root_case_mode = RootCaseOfZombie, ro_tfi.tfi_case = fun_ident, ro_tfi.tfi_args = all_args, ro_tfi.tfi_geni = (-1,-1) }
 	  ti = { ti & ti_cons_args = ti_cons_args, ti_fun_defs = ti_fun_defs, ti_fun_heap = ti_fun_heap, ti_recursion_introduced = No }
 	  (new_expr, ti)
 	  		= transformCase kees new_ro ti
@@ -921,10 +922,10 @@ generate_case_function fun_index case_info_ptr new_expr outer_fun_def outer_cons
 	# cc_args_from_outer_fun		= [ cons_arg \\ cons_arg <- outer_cons_args.cc_args & used <- used_mask | used ]
 	  cc_linear_bits_from_outer_fun	= [ cons_arg \\ cons_arg <- outer_cons_args.cc_linear_bits & used <- used_mask | used ]
 	  new_cons_args =
-	  			{ cc_size			= fun_arity
-	  			, cc_args			= repeatn nr_of_lifted_vars CPassive ++ cc_args_from_outer_fun
-	  			, cc_linear_bits	= repeatn nr_of_lifted_vars    False ++ cc_linear_bits_from_outer_fun
-	  			, cc_producer		= False
+				{ cc_size			= fun_arity
+				, cc_args			= repeatn nr_of_lifted_vars CPassive ++ cc_args_from_outer_fun
+				, cc_linear_bits	= repeatn nr_of_lifted_vars    False ++ cc_linear_bits_from_outer_fun
+				, cc_producer		= False
 				}
 	  gf =		{ gf_fun_def		= fun_def
 				, gf_instance_info	= II_Empty
@@ -1423,7 +1424,6 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 	  		= mapSt (expand_type ro.ro_common_defs cons_vars) [st_result:new_arg_types]
 	  				(coercions, subst, ti_type_heaps, ti_type_def_infos)
 //	| False-!->("unified type", new_arg_types, "->", st_result)		= undef
-//	| False-!->("coercions", readableCoercions coercions)			= undef
 
 	# (fresh_type_vars_array,ti_type_heaps)
 	  		= accTypeVarHeap (create_fresh_type_vars nr_of_all_type_vars) ti_type_heaps
@@ -1507,7 +1507,7 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 	  th_attrs = remove_TA_TempVars_in_info_ptrs das_AVI_Attr_TA_TempVar_info_ptrs ti_type_heaps.th_attrs
 	  cs 	=	{ cs_var_heap				= ti_var_heap
 	  			, cs_symbol_heap			= ti_symbol_heap
-	  			, cs_opt_type_heaps			= Yes { ti_type_heaps & th_vars = th_vars }
+				, cs_opt_type_heaps			= Yes { ti_type_heaps & th_vars = th_vars }
 	  			, cs_cleanup_info			= ti_cleanup_info
 	  			}
 //	| False ---> ("before unfold:", tb_rhs) = undef
@@ -1948,7 +1948,7 @@ determine_arg producer (Yes {st_args, st_args_strictness, st_result, st_attr_var
 	  			PR_Constructor {symb_kind=SK_Constructor {glob_module}} arity _
   					-> (NoBody, repeatn arity { id_name = "_x", id_info = nilPtr }, das_fun_defs, das_fun_heap)
 	  			PR_Curried {symb_kind=SK_Function {glob_module}} arity
-	  				| glob_module <> ro.ro_main_dcl_module_n
+					| glob_module <> ro.ro_main_dcl_module_n
 	  					// we do not have good names for the formal variables of that function: invent some
 	  					-> (NoBody, repeatn arity { id_name = "_x", id_info = nilPtr }, das_fun_defs, das_fun_heap)
 	  			PR_Curried _ arity
@@ -2748,7 +2748,7 @@ get_producer_class (SK_Function { glob_module, glob_object }) ro fun_heap cons_a
 	# ({cc_producer},cons_args) = cons_args![glob_object]
 	= (cc_producer, fun_heap, cons_args)
 get_producer_class (SK_Constructor {glob_module, glob_object}) ro fun_heap cons_args
-	= (SwitchConstructorFusion True False, fun_heap, cons_args)
+	= (SwitchConstructorFusion True (glob_module==ro.ro_StdGeneric_module_n) False, fun_heap, cons_args)
 
 //@ transformApplication
 transformApplication :: !App ![Expression] !ReadOnlyTI !*TransformInfo -> *(!Expression,!*TransformInfo)
@@ -2772,7 +2772,7 @@ transformApplication app=:{app_symb=symb=:{symb_kind}, app_args} extra_args
 					= (App app, ti)
 					= (App { app & app_args = app_args ++ extra_args}, ti)
 
-		| glob_module==ro.ro_stdStrictLists_module_n && is_cons_or_decons_of_UList_or_UTSList glob_object glob_module ro.ro_imported_funs && (not (isEmpty app_args))
+		| glob_module==ro.ro_StdStrictLists_module_n && is_cons_or_decons_of_UList_or_UTSList glob_object glob_module ro.ro_imported_funs && (not (isEmpty app_args))
 //			&& True ---> ("transformApplication "+++toString symb.symb_ident)
 			# {ft_type} = ro.ro_imported_funs.[glob_module].[glob_object] // type of cons instance of instance List [#] a | U(TS)List a
 			# [{tc_class=TCClass {glob_module,glob_object={ds_index}}}:_] = ft_type.st_context			
@@ -3041,6 +3041,7 @@ determineProducer _ _ _ linear_bit app=:{app_symb = symb=:{symb_kind = SK_Constr
 	  rnf										= rnf_args app_args 0 cons_type.st_args_strictness ro
 	| SwitchConstructorFusion
 		(ro.ro_transform_fusion && SwitchRnfConstructorFusion (linear_bit || rnf) linear_bit)
+		(ro.ro_transform_fusion && cons_index.glob_module==ro.ro_StdGeneric_module_n && (linear_bit || rnf))
 		False
 		# producers = {producers & [prod_index] = PR_Constructor symb (length app_args) app_args }
 		= (producers, app_args ++ new_args, ti)
@@ -3321,7 +3322,7 @@ add_let_binds free_vars rhss original_binds
 transformGroups :: !CleanupInfo !Int !Int !Int !Int !*{!Group} !*{#FunDef} !*{!.ConsClasses} !{# CommonDefs}  !{# {# FunType} }
 		!*ImportedTypes !ImportedConstructors !*TypeDefInfos !*VarHeap !*TypeHeaps !*ExpressionHeap !Bool !*File !*PredefinedSymbols
 			-> (!*{!Group}, !*{#FunDef}, !*ImportedTypes, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap, !*{!ConsClasses}, !*File, !*PredefinedSymbols)
-transformGroups cleanup_info main_dcl_module_n stdStrictLists_module_n def_min def_max groups fun_defs cons_args common_defs imported_funs
+transformGroups cleanup_info main_dcl_module_n ro_StdStrictLists_module_n def_min def_max groups fun_defs cons_args common_defs imported_funs
 		imported_types collected_imports type_def_infos var_heap type_heaps symbol_heap compile_with_fusion error predef_symbols
 	#! nr_of_funs = size fun_defs
 	# initial_ti =
@@ -3395,7 +3396,7 @@ where
 			# (new_groups,ti) = partition_group group_nr (group_members++[before..after-1]) ti
 			// reanalyse consumers
 			# (cleanup,ti_fun_defs,ti_var_heap,ti_symbol_heap,ti_fun_heap,ti_cons_args,same)
-					= reanalyseGroups common_defs imported_funs main_dcl_module_n stdStrictLists_module_n ti.ti_new_functions
+					= reanalyseGroups common_defs imported_funs main_dcl_module_n ro_StdStrictLists_module_n ti.ti_new_functions
 						new_groups
 						ti.ti_fun_defs ti.ti_var_heap ti.ti_symbol_heap ti.ti_fun_heap ti.ti_cons_args
 			# ti = {ti 
@@ -3492,6 +3493,7 @@ where
 	transform_function common_defs imported_funs fun ti
 		# (fun_def, ro_fun, ti)	= get_fun_def_and_symb_ident fun ti
 		# ti = ti <-!- ("transform_function",fun,ro_fun,fun_def)
+		  (ro_StdGeneric_module_n,ti) = ti!ti_predef_symbols.[PD_StdGeneric].pds_def
 		# (Yes {st_args,st_args_strictness})= fun_def.fun_type
 		  {fun_body = TransformedBody tb} 	= fun_def
 		  ti_var_heap						= fold2St store_arg_type_info tb.tb_args st_args ti.ti_var_heap
@@ -3508,9 +3510,10 @@ where
 				, ro_tfi						= tfi
 				, ro_main_dcl_module_n			= main_dcl_module_n
 				, ro_transform_fusion			= compile_with_fusion
-				, ro_stdStrictLists_module_n	= stdStrictLists_module_n
+				, ro_StdStrictLists_module_n	= ro_StdStrictLists_module_n
+				, ro_StdGeneric_module_n		= ro_StdGeneric_module_n
 				}
-		  ti								= { ti & ti_var_heap = ti_var_heap } <-!- ("transform_function",fun,ro.ro_root_case_mode)
+		  ti = { ti & ti_var_heap = ti_var_heap } // <--- ("transform_function",fun,ro.ro_root_case_mode)
 		  (fun_rhs, ti)						= transform tb.tb_rhs ro ti
 		  fun_def							= { fun_def & fun_body = TransformedBody { tb & tb_rhs = fun_rhs }}
 		# ti			= set_fun_def fun fun_def ti
@@ -3548,15 +3551,16 @@ where
 
 	reannotate_producers group_nr group_members ti
 		// determine if safe group
-		# (safe,ti) = safe_producers group_nr group_members group_members ti
+		# (safe,ti) = safe_producers group_nr group_members group_members main_dcl_module_n ti
 		| safe
 			// if safe mark all members as safe
 			= foldSt mark_producer_safe group_members ti
 		= ti
 
-	safe_producers group_nr group_members [] ti
+	safe_producers :: Int [Int] [Int] Int *TransformInfo -> *(!Bool,!*TransformInfo)
+	safe_producers group_nr group_members [] main_dcl_module_n ti
 		= (True,ti)
-	safe_producers group_nr group_members [fun:funs] ti
+	safe_producers group_nr group_members [fun:funs] main_dcl_module_n ti
 		// look for occurrence of group_members in safe argument position of fun RHS
 		// i.e. linearity ok && ...
 		#! (fun_def, ti)	= get_fun_def fun ti
@@ -3577,7 +3581,7 @@ where
 		#! ti = {ti & ti_fun_defs = prs.prs_fun_defs, ti_fun_heap = prs.prs_fun_heap, ti_cons_args = prs.prs_cons_args}
 		// put back prs info into ti?
 		| safe
-			= safe_producers group_nr group_members funs ti
+			= safe_producers group_nr group_members funs main_dcl_module_n ti
 			= (False,ti)
 	
 	mark_producer_safe fun ti=:{ti_fun_defs}
@@ -3652,8 +3656,6 @@ where
 	  	  fun_defs = { fun_defs & [fun_index] = fun_def }
 		= (fun_defs, imported_types, collected_imports, type_heaps, var_heap)
 
-//@ convertSymbolType
-
 RemoveAnnotationsMask:==1
 ExpandAbstractSynTypesMask:==2
 DontCollectImportedConstructors:==4
@@ -3700,8 +3702,6 @@ convertSymbolType_  rem_annots common_defs st main_dcl_module_n imported_types c
 										= ets
 	= (st, ets_contains_unexpanded_abs_syn_type, ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap)
 
-//@	addTypesOfDictionaries
-
 addTypesOfDictionaries :: !{#CommonDefs} ![TypeContext] ![AType] -> [AType]
 addTypesOfDictionaries common_defs type_contexts type_args
 	= mapAppend (add_types_of_dictionary common_defs) type_contexts type_args
@@ -3733,8 +3733,6 @@ where
 						  	tc_types
 						  	class_cons_vars
 		= {at_attribute = TA_Multi, /* at_annotation = AN_Strict, */ at_type = TA dict_type_symb dict_args}
-
-//@ expandSynTypes
 
 ::	ExpandTypeState =
 	{	ets_type_defs			:: !.{#{#CheckedTypeDef}}
