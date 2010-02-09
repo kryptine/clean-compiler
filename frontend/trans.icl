@@ -4183,13 +4183,15 @@ where
 	clearVariables bound_var=:{var_info_ptr} var_heap
 		# (var_info, var_heap) = readVarInfo var_info_ptr var_heap
 		= case var_info of
-			(VI_UsedVar _)			-> writeVarInfo var_info_ptr VI_Empty var_heap
+			VI_UsedVar _			-> writeVarInfo var_info_ptr VI_Empty var_heap
 			VI_LocalVar				-> writeVarInfo var_info_ptr VI_Empty var_heap
 			VI_Empty				-> var_heap
 			VI_Expression _			-> writeVarInfo var_info_ptr VI_Empty var_heap
 			VI_Dictionary _ _ _		-> writeVarInfo var_info_ptr VI_Empty var_heap
 			VI_Variable _ _			-> writeVarInfo var_info_ptr VI_Empty var_heap
 			VI_AccVar _ _			-> writeVarInfo var_info_ptr VI_Empty var_heap
+			VI_ExpressionOrBody _ _	_ _
+				-> writeVarInfo var_info_ptr VI_Empty var_heap
 
 instance clearVariables Expression
 where
