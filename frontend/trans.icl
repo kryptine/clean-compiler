@@ -50,6 +50,8 @@ get_producer_symbol (PR_GeneratedFunction symbol arity _)
 	= (symbol,arity)
 get_producer_symbol (PR_Constructor symbol arity _)
 	= (symbol,arity)
+get_producer_symbol (PR_CurriedFunction symbol arity _)
+	= (symbol,arity)
 
 // Extended variable info accessors...
 
@@ -1298,6 +1300,8 @@ where
 			= Equal
 		compare_constructor_arguments (PR_Constructor symb_ident1 _ _) (PR_Constructor symb_ident2 _ _)
 			= symb_ident1 =< symb_ident2
+		compare_constructor_arguments (PR_CurriedFunction symb_ident1 _ _) (PR_CurriedFunction symb_ident2 _ _)
+			= symb_ident1 =< symb_ident2
 			
 		compare_types [(_, type1):types1] [(_, type2):types2]
 			# cmp = smallerOrEqual type1 type2
@@ -1822,7 +1826,7 @@ where
 								  , st_result = sound_st_result
 								  , st_attr_env = ps.prop_attr_env
 								  , st_attr_vars = ps.prop_attr_vars
-						  		}
+								}
 		  state = (ps.prop_type_heaps, ps.prop_td_infos)
 		= (sound_symbol_type, state)
 
@@ -2042,7 +2046,10 @@ determine_arg producer (Yes {st_args, st_args_strictness, st_result, st_attr_var
 
 	# {th_vars, th_attrs}		= das_type_heaps
 	# (symbol,symbol_arity)		= get_producer_symbol producer
-	  curried					= case producer of (PR_Curried _ _) -> True; _ -> False;
+	  curried					= case producer of
+	  									PR_Curried _ _ -> True
+	  									PR_CurriedFunction _ _ _  -> True
+	  									_ -> False;
 	#! size_fun_defs			= size das_fun_defs
 
 	# ({cc_args, cc_linear_bits}, das_fun_heap, das_cons_args)
@@ -2079,41 +2086,8 @@ determine_arg producer (Yes {st_args, st_args_strictness, st_result, st_attr_var
 //	  		  , ur_attr_ineqs	= attr_inequalities 
 	  		  , ur_attr_ineqs	= attr_inequalities ++ attr_env
 	  		  }
-	  (opt_body, var_names, das_fun_defs, das_fun_heap)
-	  		= case producer of
-	  			PR_Constructor {symb_kind=SK_Constructor {glob_module}} arity _
-  					-> (NoBody, repeatn arity { id_name = "_x", id_info = nilPtr }, das_fun_defs, das_fun_heap)
-	  			PR_Curried {symb_kind=SK_Function {glob_module}} arity
-					| glob_module <> ro.ro_main_dcl_module_n
-	  					// we do not have good names for the formal variables of that function: invent some
-	  					-> (NoBody, repeatn arity { id_name = "_x", id_info = nilPtr }, das_fun_defs, das_fun_heap)
-	  			PR_Curried _ arity
-					# ({fun_body}, das_fun_defs, das_fun_heap)
-							= get_fun_def symbol.symb_kind ro.ro_main_dcl_module_n das_fun_defs das_fun_heap
-					-> case fun_body of
-						TransformedBody tb
-							-> (NoBody, take nr_of_applied_args [ fv_ident \\ {fv_ident}<-tb.tb_args ], das_fun_defs, das_fun_heap)
-						_
-							-> (NoBody, repeatn arity { id_name = "_x", id_info = nilPtr }, das_fun_defs, das_fun_heap)
-	  			_
-					# ({fun_body}, das_fun_defs, das_fun_heap)
-							= get_fun_def symbol.symb_kind ro.ro_main_dcl_module_n das_fun_defs das_fun_heap
-					-> case fun_body of
-						TransformedBody tb
-							-> (fun_body, take nr_of_applied_args [ fv_ident \\ {fv_ident}<-tb.tb_args ], das_fun_defs, das_fun_heap)
-						_
-							-> abort ("determine_args:not a Transformed Body:"--->("producer",producer))
-	  (form_vars, act_vars, das_var_heap)
-	  		= build_var_args (reverse var_names) das.das_vars [] das_var_heap
-	  (expr_to_unfold, das_var_heap)
-			= case producer of
-				(PR_Constructor symb _ expr)
-					-> (VI_Expression (App { app_symb = symbol, app_args = act_vars, app_info_ptr = nilPtr }), das_var_heap)
-				(PR_Curried _ _)
-					-> (VI_Expression (App { app_symb = symbol, app_args = act_vars, app_info_ptr = nilPtr }), das_var_heap)
-				_ // function or generated function
-					# (TransformedBody tb) = opt_body
-					-> (VI_Body symbol tb (take nr_of_applied_args form_vars), das_var_heap)
+	  (expr_to_unfold,form_vars,das_fun_defs,das_fun_heap,das_var_heap)
+		= make_producer_expression_and_args producer das.das_vars das_fun_defs das_fun_heap das_var_heap
 /* DvA... STRICT_LET
 	  (expr_to_unfold, das_var_heap, let_bindings)
 			= case arg_type.at_annotation of
@@ -2148,6 +2122,58 @@ determine_arg producer (Yes {st_args, st_args_strictness, st_result, st_attr_var
 		, das_cons_args					= das_cons_args
 		}
 where
+	make_producer_expression_and_args (PR_Constructor symbol=:{symb_kind=SK_Constructor {glob_module}} arity _) das_vars das_fun_defs das_fun_heap das_var_heap
+		# (form_vars, act_vars, das_var_heap) = build_n_anonymous_var_args arity das_vars das_var_heap
+		= (VI_Expression (App {app_symb = symbol, app_args = act_vars, app_info_ptr = nilPtr}),form_vars,das_fun_defs,das_fun_heap,das_var_heap)
+	make_producer_expression_and_args (PR_Curried symbol=:{symb_kind=SK_Function {glob_module}} arity) das_vars das_fun_defs das_fun_heap das_var_heap
+		| glob_module <> ro.ro_main_dcl_module_n
+			# (form_vars, act_vars, das_var_heap) = build_n_anonymous_var_args arity das_vars das_var_heap
+			= (VI_Expression (App {app_symb = symbol, app_args = act_vars, app_info_ptr = nilPtr}),form_vars,das_fun_defs,das_fun_heap,das_var_heap)
+	make_producer_expression_and_args (PR_Curried symbol=:{symb_kind} arity) das_vars das_fun_defs das_fun_heap das_var_heap
+		# ({fun_body}, das_fun_defs, das_fun_heap)
+			= get_fun_def symb_kind ro.ro_main_dcl_module_n das_fun_defs das_fun_heap
+		= case fun_body of
+			TransformedBody tb=:{tb_args}
+				# (form_vars, act_vars, das_var_heap)
+					= build_n_named_var_args arity tb_args das_vars das_var_heap
+				-> (VI_Expression (App {app_symb = symbol, app_args = act_vars, app_info_ptr = nilPtr}),form_vars,das_fun_defs,das_fun_heap,das_var_heap)
+			_
+				# (form_vars, act_vars, das_var_heap) = build_n_anonymous_var_args arity das_vars das_var_heap
+				-> (VI_Expression (App {app_symb = symbol, app_args = act_vars, app_info_ptr = nilPtr}),form_vars,das_fun_defs,das_fun_heap,das_var_heap)
+	make_producer_expression_and_args (PR_Function symbol=:{symb_kind} arity _) das_vars das_fun_defs das_fun_heap das_var_heap
+		# ({fun_body}, das_fun_defs, das_fun_heap)
+			= get_fun_def symb_kind ro.ro_main_dcl_module_n das_fun_defs das_fun_heap
+		= case fun_body of
+			TransformedBody tb=:{tb_args}
+				# (form_vars, act_vars, das_var_heap)
+					= build_n_named_var_args arity tb_args das_vars das_var_heap
+				-> (VI_Body symbol tb (take arity form_vars), form_vars, das_fun_defs,das_fun_heap,das_var_heap)
+	make_producer_expression_and_args (PR_GeneratedFunction symbol=:{symb_kind} arity _) das_vars das_fun_defs das_fun_heap das_var_heap
+		# ({fun_body}, das_fun_defs, das_fun_heap)
+			= get_fun_def symb_kind ro.ro_main_dcl_module_n das_fun_defs das_fun_heap
+		= case fun_body of
+			TransformedBody tb=:{tb_args}
+				# (form_vars, act_vars, das_var_heap)
+					= build_n_named_var_args arity tb_args das_vars das_var_heap
+				-> (VI_Body symbol tb (take arity form_vars), form_vars, das_fun_defs,das_fun_heap,das_var_heap)
+	make_producer_expression_and_args (PR_CurriedFunction symbol=:{symb_kind} arity _) das_vars das_fun_defs das_fun_heap das_var_heap
+		# ({fun_body}, das_fun_defs, das_fun_heap)
+			= get_fun_def symb_kind ro.ro_main_dcl_module_n das_fun_defs das_fun_heap
+		= case fun_body of
+			TransformedBody tb=:{tb_args}
+				# (form_vars, act_vars, das_var_heap)
+					= build_n_named_var_args arity tb_args das_vars das_var_heap
+				  expr = App {app_symb = symbol, app_args = act_vars, app_info_ptr = nilPtr}
+				-> (VI_ExpressionOrBody expr symbol tb (take arity form_vars), form_vars, das_fun_defs,das_fun_heap,das_var_heap)
+
+	build_n_anonymous_var_args arity das_vars das_var_heap
+ 		# var_names = repeatn arity {id_name = "_x", id_info = nilPtr}
+		= build_var_args (/*reverse*/ var_names) das_vars [] das_var_heap
+
+	build_n_named_var_args arity tb_args das_vars das_var_heap
+		# var_names = take arity [fv_ident \\ {fv_ident}<-tb_args]
+		= build_var_args (reverse var_names) das_vars [] das_var_heap
+		
 	build_var_args [] form_vars act_vars var_heap
 		= (form_vars, act_vars, var_heap)
 	build_var_args [new_name:new_names] form_vars act_vars var_heap
@@ -2337,7 +2363,15 @@ where
 		# (current_max, fun_defs, fun_heap) = max_group_index_of_fun_with_fun_index_and_ptr fun_ptr fun_index current_max fun_defs fun_heap
 		= (current_max, cons_args, fun_defs, fun_heap)
 	max_group_index_of_producer (PR_Constructor symb _ args) current_max fun_defs fun_heap cons_args
-		= (current_max, cons_args, fun_defs, fun_heap)	// DvA: not a clue what we're trying here...
+		= (current_max, cons_args, fun_defs, fun_heap)
+	max_group_index_of_producer (PR_CurriedFunction {symb_kind = SK_GeneratedFunction fun_ptr fun_index} _ _)
+								current_max fun_defs fun_heap cons_args
+		# (current_max, fun_defs, fun_heap) = max_group_index_of_fun_with_fun_index_and_ptr fun_ptr fun_index current_max fun_defs fun_heap
+		= (current_max, cons_args, fun_defs, fun_heap)
+	max_group_index_of_producer (PR_CurriedFunction _ _ fun_index)
+								current_max fun_defs fun_heap cons_args
+		# (current_max, fun_defs) = max_group_index_of_fun_with_fun_index fun_index current_max fun_defs
+		= (current_max, cons_args, fun_defs, fun_heap)
 
 	max_group_index_of_member
 				(App {app_symb = {symb_ident, symb_kind = SK_Function { glob_object = fun_index, glob_module = mod_index}}}) 
@@ -2530,7 +2564,7 @@ transformFunctionApplication fun_def instances cc=:{cc_size, cc_args, cc_linear_
 				= (build_application { app & app_args = app_args } extra_args, ti) // ---> ("known failed instance")
 			# app_symb` = { app_symb & symb_kind = SK_GeneratedFunction fun_def_ptr gf_fun_index }
 			  (app_args, extra_args) = complete_application gf_fun_def.fun_arity new_args extra_args
-			# (expr,ti) = transformApplication { app & app_symb = app_symb`, app_args = app_args } extra_args ro ti // ---> ("known instance",gf_fun_index)
+			  (expr,ti) = transformApplication {app & app_symb = app_symb`, app_args = app_args} extra_args ro ti
   			= possiblyAddStrictLetBinds expr strict_let_binds ti
 		| SwitchTrivialFusion ro.ro_transform_fusion False
 			= transform_trivial_function app app_args extra_args ro ti
@@ -3217,6 +3251,12 @@ determineProducer app=:{app_symb = symb=:{ symb_kind = SK_GeneratedFunction fun_
 		| is_applied_to_macro_fun
 			= ({producers & [prod_index] = PR_Curried symb n_app_args}, app_args ++ new_args, ti)
 		| SwitchCurriedFusion ro.ro_transform_fusion cc_producer False
+			# (is_good_producer,ti)
+				= SwitchGeneratedFusion
+					(function_is_good_producer fun_body fun_type linear_bit ro ti)
+					(False,ti)
+			| cc_producer && is_good_producer
+				= ({producers & [prod_index] = PR_CurriedFunction symb n_app_args fun_index}, app_args ++ new_args, ti)
 			= ({producers & [prod_index] = PR_Curried symb n_app_args}, app_args ++ new_args, ti)
 		= (producers, [App app : new_args], ti)
 	# (is_good_producer,ti)
@@ -3263,6 +3303,15 @@ determineProducer app=:{app_symb = symb=:{symb_kind}, app_args} _ is_applied_to_
 				= ({ producers & [prod_index] = PR_Curried symb n_app_args}, app_args ++ new_args, ti)
 			# ({cc_producer},ti) = ti!ti_cons_args.[glob_object]
 			| SwitchCurriedFusion ro.ro_transform_fusion cc_producer False
+				# ({fun_body,fun_type,fun_info}, ti) = ti!ti_fun_defs.[glob_object]
+				# (is_good_producer,ti)
+					= SwitchFunctionFusion
+						(function_is_good_producer fun_body fun_type linear_bit ro ti)
+						(False,ti)
+				#! max_index = size ti.ti_cons_args
+				| glob_module==ro.ro_main_dcl_module_n && glob_object < max_index &&
+				  is_good_producer && cc_producer && not consumer_is_curried
+					= ({producers & [prod_index] = PR_CurriedFunction symb n_app_args glob_object}, app_args ++ new_args, ti)
 				= ({ producers & [prod_index] = PR_Curried symb n_app_args}, app_args ++ new_args, ti)
 			= (producers, [App app : new_args], ti)
 		#! max_index = size ti.ti_cons_args
@@ -4443,6 +4492,8 @@ instance <<< Producer where
 		= file <<< "(G:" <<< ident <<< ")"
 	(<<<) file (PR_Curried ident int)
 		= file <<< "(P:" <<< ident <<< ")"
+	(<<<) file (PR_CurriedFunction ident int index)
+		= file <<< "(CF:" <<< ident <<< ")"
 
 instance <<< {!a} | <<< a
 where
@@ -4604,6 +4655,37 @@ where
 	copy (Case case_expr) ci cs
 		# (case_expr, cs) = copy case_expr ci cs
 		= (Case case_expr, cs)
+	copy (Selection selector_kind=:NormalSelector (Var var) selectors=:[RecordSelection _ field_n]) ci cs	
+		# (var_info,var_heap) = readVarInfo var.var_info_ptr cs.cs_var_heap
+		  cs = {cs & cs_var_heap=var_heap}
+		= case var_info of
+			VI_Expression expr
+				-> (Selection selector_kind expr selectors, cs)
+			VI_Variable var_ident var_info_ptr
+			 	# (var_expr_ptr, cs_symbol_heap) = newPtr EI_Empty cs.cs_symbol_heap
+				  expr = Var {var_ident = var_ident, var_info_ptr = var_info_ptr, var_expr_ptr = var_expr_ptr}
+				-> (Selection selector_kind expr selectors, {cs & cs_symbol_heap = cs_symbol_heap})
+			VI_Dictionary app_symb app_args class_type
+				# (expr,cs) = copy_dictionary_variable app_symb app_args class_type ci cs
+				-> (Selection selector_kind expr selectors, cs)
+			VI_Body fun_ident {tb_args, tb_rhs} new_aci_params
+				# tb_args_ptrs = [ fv_info_ptr \\ {fv_info_ptr}<-tb_args ] 
+				  (original_bindings, cs_var_heap) = mapSt readPtr tb_args_ptrs cs.cs_var_heap
+				  cs_var_heap = bind_vars tb_args_ptrs new_aci_params cs_var_heap
+				  cs = { cs & cs_var_heap = cs_var_heap }
+				-> case tb_rhs of
+					App {app_symb={symb_kind=SK_Constructor _},app_args}
+						# (expr,cs) = copy (app_args!!field_n) ci cs
+						  cs_var_heap = fold2St writePtr tb_args_ptrs original_bindings cs.cs_var_heap
+						-> (expr, {cs & cs_var_heap = cs_var_heap})
+					_
+						# (expr,cs) = copy tb_rhs ci cs
+						  cs_var_heap = fold2St writePtr tb_args_ptrs original_bindings cs.cs_var_heap
+						-> (Selection selector_kind expr selectors, {cs & cs_var_heap = cs_var_heap})
+			VI_ExpressionOrBody expr _ _ _
+				-> (Selection selector_kind expr selectors, cs)
+			_
+				-> (Selection selector_kind (Var var) selectors, cs)
 	copy (Selection selector_kind expr selectors) ci cs
 		# ((expr, selectors), cs) = copy (expr, selectors) ci cs
 		= (Selection selector_kind expr selectors, cs)
@@ -4645,6 +4727,8 @@ copyVariable var=:{var_info_ptr} ci cs
 						app_info_ptr = nilPtr }, cs)
 		VI_Dictionary app_symb app_args class_type
 			-> copy_dictionary_variable app_symb app_args class_type ci cs
+		VI_ExpressionOrBody expr _ _ _
+			-> (expr, cs)
 		_
 			-> (Var var, cs)
 
@@ -4797,7 +4881,37 @@ where
 						_	# new_eei = EI_Extended (EEI_ActiveCase { aci & aci_free_vars = new_aci_free_vars }) ei
 							  cs_symbol_heap = writePtr case_info_ptr new_eei cs.cs_symbol_heap
 							-> copy case_expr ci { cs & cs_symbol_heap = cs_symbol_heap }
-				_	-> copy case_expr ci cs	
+				_	-> copy case_expr ci cs
+		update_active_case_info_and_copy (Var var=:{var_info_ptr} @ exprs) case_info_ptr cs
+			# (exprs,cs) = copy exprs ci cs
+			| is_var_list exprs
+				# (var_info,var_heap) = readVarInfo var_info_ptr cs.cs_var_heap
+				  cs = {cs & cs_var_heap=var_heap}
+				= case var_info of
+					VI_ExpressionOrBody _ fun_ident {tb_args, tb_rhs} new_aci_params
+						# free_vars = var_list_to_free_var_list exprs
+						  tb_args_ptrs = [fv_info_ptr \\ {fv_info_ptr}<-tb_args] 
+						  (original_bindings, cs_var_heap) = mapSt readPtr tb_args_ptrs cs.cs_var_heap
+						  cs_var_heap = bind_vars tb_args_ptrs (new_aci_params++free_vars) cs_var_heap
+						  cs = { cs & cs_var_heap = cs_var_heap }
+						  (expr,cs) = copy tb_rhs ci cs
+						  cs_var_heap = fold2St writePtr tb_args_ptrs original_bindings cs.cs_var_heap
+						  cs = {cs & cs_var_heap = cs_var_heap}
+						-> (expr,cs)
+					_
+						# (expr,cs) = copyVariable var ci cs
+						-> (expr @ exprs, cs)
+				# (expr,cs) = copyVariable var ci cs
+				= (expr @ exprs, cs)
+			where
+				is_var_list [Var _:exprs] = is_var_list exprs
+				is_var_list [_ : _] = False
+				is_var_list [] = True
+
+				var_list_to_free_var_list [Var {var_ident,var_info_ptr}:exprs]
+					= [{fv_ident=var_ident, fv_def_level=NotALevel, fv_info_ptr=var_info_ptr, fv_count = 0}:var_list_to_free_var_list exprs]
+				var_list_to_free_var_list []
+					= []
 		update_active_case_info_and_copy case_expr _ cs
 			= copy case_expr ci cs
 

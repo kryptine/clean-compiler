@@ -703,6 +703,7 @@ from convertDynamics import :: TypeCodeVariableInfo, :: DynamicValueAliasInfo
 				VI_TypeCodeVariable !TypeCodeVariableInfo |
 				VI_DynamicValueAlias !DynamicValueAliasInfo |
 				VI_Body !SymbIdent !TransformedBody ![FreeVar] | /* used during fusion */
+				VI_ExpressionOrBody !Expression !SymbIdent !TransformedBody ![FreeVar] | /* used during fusion */
 				VI_Dictionary !SymbIdent ![Expression] !Type | /* used during fusion */
 				VI_Extended !ExtendedVarInfo !VarInfo |
 // MdM
@@ -781,6 +782,7 @@ cNonRecursiveAppl	:== False
 				| PR_GeneratedFunction !SymbIdent !Int !Index
 				| PR_Curried !SymbIdent !Int
 				| PR_Unused
+				| PR_CurriedFunction !SymbIdent !Int !Index
 
 ::	InstanceInfo = II_Empty | II_Node !{! Producer} !FunctionInfoPtr !InstanceInfo !InstanceInfo
 
