@@ -76,7 +76,20 @@ where
 
 instance == Type
 where
-	(==) t1 t2 = equal_constructor t1 t2 && equal_constructor_args t1 t2
+	(==) (TA tc1 types1) (TA tc2 types2)
+		= tc1 == tc2 && types1 == types2
+	(==) (TA tc1 types1) (TAS tc2 types2 _)
+		= tc1 == tc2 && types1 == types2
+	(==) (TA tc1 types1) _
+		= False
+	(==) (TAS tc1 types1 _) (TA tc2 types2)
+		= tc1 == tc2 && types1 == types2
+	(==) (TAS tc1 types1 _) (TAS tc2 types2 _)
+		= tc1 == tc2 && types1 == types2
+	(==) (TAS tc1 types1 _) _
+		= False
+	(==) t1 t2
+		= equal_constructor t1 t2 && equal_constructor_args t1 t2
 	where
 		equal_constructor_args (TV varid1) (TV varid2)
 			= varid1 == varid2
@@ -84,14 +97,6 @@ where
 			= varid1 == varid2
 		equal_constructor_args (arg_type1 --> restype1) (arg_type2 --> restype2)
 			= arg_type1 == arg_type2 && restype1 == restype2
-		equal_constructor_args (TA tc1 types1) (TA tc2 types2)
-			= tc1 == tc2 && types1 == types2
-		equal_constructor_args (TA tc1 types1) (TAS tc2 types2 _)
-			= tc1 == tc2 && types1 == types2
-		equal_constructor_args (TAS tc1 types1 _) (TA tc2 types2)
-			= tc1 == tc2 && types1 == types2
-		equal_constructor_args (TAS tc1 types1 _) (TAS tc2 types2 _)
-			= tc1 == tc2 && types1 == types2
 		equal_constructor_args (TB tb1) (TB tb2)
 			= tb1 == tb2
 		equal_constructor_args (type1 :@: types1) (type2 :@: types2)
@@ -243,6 +248,10 @@ where
 
 instance =< Type
 where
+	(=<) (TA tc1 _) (TA tc2 _)	= tc1 =< tc2
+	(=<) (TA tc1 _) (TAS tc2 _ _)	= tc1 =< tc2
+	(=<) (TAS tc1 _ _) (TA tc2 _)	= tc1 =< tc2
+	(=<) (TAS tc1 _ _) (TAS tc2 _ _)	= tc1 =< tc2
 	(=<) t1 t2
 		| equal_constructor t1 t2
 			= compare_arguments t1 t2
@@ -251,40 +260,36 @@ where
 			= Greater
 	where
 		compare_arguments (TB tb1) (TB tb2)		= tb1 =< tb2 
-		compare_arguments (TA tc1 _) (TA tc2 _)	= tc1 =< tc2
-		compare_arguments (TA tc1 _) (TAS tc2 _ _)	= tc1 =< tc2
-		compare_arguments (TAS tc1 _ _) (TA tc2 _)	= tc1 =< tc2
-		compare_arguments (TAS tc1 _ _) (TAS tc2 _ _)	= tc1 =< tc2
 		compare_arguments _ _					= Equal
 
 smallerOrEqual :: !Type !Type -> CompareValue
+smallerOrEqual (TA tc1 args1) (TA tc2 args2)
+	# cmp_app_symb = tc1 =< tc2
+	| cmp_app_symb==Equal
+		= args1 =< args2
+	= cmp_app_symb
+smallerOrEqual (TA tc1 args1) (TAS tc2 args2 _)
+	# cmp_app_symb = tc1 =< tc2
+	| cmp_app_symb==Equal
+		= args1 =< args2
+	= cmp_app_symb
+smallerOrEqual (TAS tc1 args1 _) (TA tc2 args2)
+	# cmp_app_symb = tc1 =< tc2
+	| cmp_app_symb==Equal
+		= args1 =< args2
+	= cmp_app_symb
+smallerOrEqual (TAS tc1 args1 _) (TAS tc2 args2 _)
+	# cmp_app_symb = tc1 =< tc2
+	| cmp_app_symb==Equal
+		= args1 =< args2
+	= cmp_app_symb
 smallerOrEqual t1 t2
-		| equal_constructor t1 t2
-			= compare_arguments t1 t2
-		| less_constructor t1 t2
-			= Smaller
-			= Greater
+	| equal_constructor t1 t2
+		= compare_arguments t1 t2
+	| less_constructor t1 t2
+		= Smaller
+		= Greater
 	where
-		compare_arguments (TA tc1 args1) (TA tc2 args2)
-			# cmp_app_symb = tc1 =< tc2
-			| cmp_app_symb==Equal
-				= args1 =< args2
-			= cmp_app_symb
-		compare_arguments (TA tc1 args1) (TAS tc2 args2 _)
-			# cmp_app_symb = tc1 =< tc2
-			| cmp_app_symb==Equal
-				= args1 =< args2
-			= cmp_app_symb
-		compare_arguments (TAS tc1 args1 _) (TA tc2 args2)
-			# cmp_app_symb = tc1 =< tc2
-			| cmp_app_symb==Equal
-				= args1 =< args2
-			= cmp_app_symb
-		compare_arguments (TAS tc1 args1 _) (TAS tc2 args2 _)
-			# cmp_app_symb = tc1 =< tc2
-			| cmp_app_symb==Equal
-				= args1 =< args2
-			= cmp_app_symb
 		compare_arguments (l1 --> r1) (l2 --> r2)
 			# cmp_app_symb = l1 =< l2
 			| cmp_app_symb==Equal
