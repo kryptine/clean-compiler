@@ -194,7 +194,7 @@ where
 			#! modules = {modules & [n].com_generic_defs = com_generic_defs}
 			= clear_module (inc n) modules heaps
 			
-	clear_generic_def _ generic_def=:{gen_ident,gen_info_ptr} heaps=:{hp_generic_heap}
+	clear_generic_def generic_def=:{gen_ident,gen_info_ptr} heaps=:{hp_generic_heap}
 		#! (gen_info, hp_generic_heap) = readPtr gen_info_ptr hp_generic_heap
 		#! gen_info = { gen_info & gen_classes = createArray 32 [] }
 		#! hp_generic_heap = writePtr gen_info_ptr gen_info hp_generic_heap
@@ -813,9 +813,6 @@ where
 			make_expr TE heaps
 				= make_error_type_cons heaps
 			make_expr (TFA _ _) heaps
-				// error is reported in convertATypeToGenTypeStruct
-				= make_error_type_cons heaps
-			make_expr (TFAC _ _ _) heaps
 				// error is reported in convertATypeToGenTypeStruct
 				= make_error_type_cons heaps
 			make_expr _ heaps
