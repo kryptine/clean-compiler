@@ -540,21 +540,24 @@ where
 	build_type
 			{td_rhs=RecordType {rt_constructor}, td_ident, td_pos} 
 			type_info  [{ci_cons_info, ci_field_infos}] 
-			(modules, td_infos, heaps, error)		
-		# ({cons_type={st_args}}, modules) = modules![gi_module].com_cons_defs.[rt_constructor.ds_index]	
-		# (args, st) = mapSt (convertATypeToGenTypeStruct td_ident td_pos predefs) st_args (modules, td_infos, heaps, error)
-		# args = SwitchGenericInfo [GTSField fi arg \\ arg <- args & fi <- ci_field_infos] args
-		# prod_type = build_prod_type args		
-		# type = SwitchGenericInfo (GTSCons ci_cons_info prod_type) prod_type
-		# type = SwitchGenericInfo (GTSObject type_info type) type
-		= (type, st)
+			(modules, td_infos, heaps, error)
+		# ({cons_type={st_args},cons_exi_vars}, modules) = modules![gi_module].com_cons_defs.[rt_constructor.ds_index]
+		| isEmpty cons_exi_vars
+			# (args, st) = mapSt (convertATypeToGenTypeStruct td_ident td_pos predefs) st_args (modules, td_infos, heaps, error)		
+			# args = SwitchGenericInfo [GTSField fi arg \\ arg <- args & fi <- ci_field_infos] args
+			# prod_type = build_prod_type args		
+			# type = SwitchGenericInfo (GTSCons ci_cons_info prod_type) prod_type
+			# type = SwitchGenericInfo (GTSObject type_info type) type
+			= (type, st)
+			# error = reportError td_ident td_pos "cannot build a generic representation of an existential type" error
+			= (GTSE, (modules, td_infos, heaps, error))
 	build_type {td_rhs=SynType type,td_ident, td_pos} type_info cons_infos (modules, td_infos, heaps, error)
 		# error = reportError td_ident td_pos "cannot build a generic representation of a synonym type" error
 		= (GTSE, (modules, td_infos, heaps, error))
 	build_type td=:{td_rhs=(AbstractType _),td_ident, td_arity, td_args, td_pos} type_info cdis (modules, td_infos, heaps, error)
 		# error = reportError td_ident td_pos "cannot build a generic representation of an abstract type" error
 		= (GTSE, (modules, td_infos, heaps, error))
-		
+
 	build_alt td_ident td_pos cons_def_sym=:{ds_index} {ci_cons_info} (modules, td_infos, heaps, error)
 		# ({cons_type={st_args},cons_exi_vars}, modules) = modules![gi_module].com_cons_defs.[ds_index]
 		| isEmpty cons_exi_vars
@@ -721,13 +724,13 @@ where
 		= (fun, heaps)
 
 	build_cons_dsc group_index type_def_info_ds field_dsc_dss cons_info_ds cons_ds (modules, heaps)
-		# ({cons_ident, cons_type, cons_priority,cons_number}, modules)	
+		# ({cons_ident,cons_type,cons_priority,cons_number,cons_exi_vars}, modules)
 			= modules! [td_module].com_cons_defs.[cons_ds.ds_index]  		
 		# name_expr 			 = makeStringExpr cons_ident.id_name
 		# arity_expr 			 = makeIntExpr cons_type.st_arity
 		# (prio_expr, heaps)	 = make_prio_expr cons_priority heaps
 		# (type_def_expr, heaps) = buildFunApp main_module_index type_def_info_ds [] heaps
-		# (type_expr, heaps) 	 = make_type_expr cons_type heaps 			
+		# (type_expr, heaps) 	 = make_type_expr cons_exi_vars cons_type heaps 			
 		# (field_exprs, heaps)   = mapSt (\x st->buildFunApp main_module_index x [] st) field_dsc_dss heaps
 		# (fields_expr, heaps)   =  makeListExpr field_exprs predefs heaps 
 		# cons_index_expr		 = makeIntExpr cons_number
@@ -757,7 +760,7 @@ where
 			# prio_expr = makeIntExpr prio		
 			= buildPredefConsApp PD_CGenConsPrio [assoc_expr, prio_expr] predefs heaps 
 
-		make_type_expr {st_vars, st_args, st_result} heaps=:{hp_type_heaps=type_heaps=:{th_vars}}
+		make_type_expr [] {st_vars, st_args, st_result} heaps=:{hp_type_heaps=type_heaps=:{th_vars}}
 			# (_,th_vars) = foldSt (\ {tv_info_ptr} (n, th_vars) -> (n+1, writePtr tv_info_ptr (TVI_GenTypeVarNumber n) th_vars)) st_vars (0,th_vars)
 			# heaps = {heaps & hp_type_heaps={type_heaps & th_vars=th_vars}}
 			# (arg_exprs, heaps) = mapSt make_expr1 st_args heaps
@@ -767,7 +770,6 @@ where
 			# heaps = {heaps & hp_type_heaps={type_heaps & th_vars=th_vars}}
 			= curry arg_exprs result_expr heaps
 		where
-		
 			curry [] result_expr heaps 
 				= (result_expr, heaps)
 			curry [x:xs] result_expr heaps
@@ -809,19 +811,21 @@ where
 			make_expr (TQV {tv_info_ptr}) heaps 
 				= make_type_var tv_info_ptr heaps
 			make_expr TE heaps
-				= make_type_cons "<error>" heaps	 
-			make_expr _ heaps 
+				= make_error_type_cons heaps
+			make_expr (TFA _ _) heaps
+				// error is reported in convertATypeToGenTypeStruct
+				= make_error_type_cons heaps
+			make_expr (TFAC _ _ _) heaps
+				// error is reported in convertATypeToGenTypeStruct
+				= make_error_type_cons heaps
+			make_expr _ heaps
 				= abort "type does not match\n"
-		
+
 			make_apps x [] heaps 
 				= (x, heaps)
 			make_apps x [y:ys] heaps
 				# (z, heaps) = make_app x y heaps	
-				= make_apps z ys heaps 
-		
-			make_type_cons name heaps
-				# name_expr = makeStringExpr name
-				= buildPredefConsApp PD_CGenTypeCons [name_expr] predefs heaps
+				= make_apps z ys heaps
 
 			make_type_var tv_info_ptr heaps
 				#! type_var_n = case sreadPtr tv_info_ptr heaps.hp_type_heaps.th_vars of
@@ -831,6 +835,15 @@ where
 			make_arrow x y heaps = buildPredefConsApp PD_CGenTypeArrow [x, y] predefs heaps
 
 			make_app x y heaps = buildPredefConsApp PD_CGenTypeApp [x, y] predefs heaps 	 
+
+			make_error_type_cons heaps = make_type_cons "<error>" heaps
+		make_type_expr [_:_] {st_vars, st_args, st_result} heaps
+			// Error "cannot build a generic representation of an existential type" is reported in buildStructType
+			= make_type_cons "<error>" heaps
+
+	make_type_cons name heaps
+		# name_expr = makeStringExpr name
+		= buildPredefConsApp PD_CGenTypeCons [name_expr] predefs heaps
 
 	build_field_dsc group_index cons_dsc_ds field_dsc_ds {fs_ident, fs_index} (modules, heaps)
 		# name_expr = makeStringExpr fs_ident.id_name
@@ -2125,8 +2138,7 @@ convertGenericTypeContexts
 
 	# {hp_expression_heap, hp_var_heap, hp_generic_heap, hp_type_heaps={th_vars, th_attrs}} = heaps
 
-	# gs = 
-		{ gs
+	 = { gs
 		& gs_funs = gs_funs
 		, gs_modules = gs_modules
 		, gs_dcl_modules = gs_dcl_modules
@@ -2137,8 +2149,6 @@ convertGenericTypeContexts
 		, gs_genh = hp_generic_heap
 		, gs_exprh = hp_expression_heap
 		}
-
-	= gs
 where
 	convert_functions fun_index funs st
 		| fun_index == size funs 
@@ -2206,20 +2216,20 @@ where
 		
 		= (common_defs, modules, (heaps, error))
 	where
-		convert_class _ class_def=:{class_ident, class_pos, class_context} st
+		convert_class class_def=:{class_ident, class_pos, class_context} st
 			# (ok, class_context, st) = convert_contexts class_ident class_pos class_context st
 			| ok 
 				# class_def={class_def & class_context = class_context}
 				= (class_def, st) 	
 				= (class_def, st) 	
-		convert_member _ member_def=:{me_ident, me_pos, me_type=me_type=:{st_context}} st
+		convert_member member_def=:{me_ident, me_pos, me_type=me_type=:{st_context}} st
 			# (ok, st_context, st) = convert_contexts me_ident me_pos st_context st
 			| ok 
 				# member_def={member_def & me_type = {me_type & st_context = st_context}}
 				= (member_def, st) 	
 				= (member_def, st) 	
 									
-		convert_instance _ ins=:{ins_type=ins_type=:{it_context}, ins_ident, ins_pos} st
+		convert_instance ins=:{ins_type=ins_type=:{it_context}, ins_ident, ins_pos} st
 			# (ok, it_context, st) = convert_contexts ins_ident ins_pos it_context st
 			| ok 
 				# ins={ins & ins_type = {ins_type & it_context = it_context}}
@@ -2231,7 +2241,7 @@ where
 			= updateArraySt convert_dcl_function dcl_functions (modules, heaps, error)	
 		= (dcl_functions, modules, (heaps, error))
 	where
-		convert_dcl_function _ fun=:{ft_type=ft_type=:{st_context}, ft_ident, ft_pos} st	
+		convert_dcl_function fun=:{ft_type=ft_type=:{st_context}, ft_ident, ft_pos} st	
 			# (ok, st_context, st) = convert_contexts ft_ident ft_pos st_context st
 			| ok 
 				# fun={fun & ft_type = {ft_type & st_context = st_context}}
@@ -2267,8 +2277,6 @@ where
 						, ds_index = class_info.gci_class
 						}
 					}
-				//-> (TCClass clazz, error)
-				
 				/* 
 					AA HACK: dummy dictionary
 				*/
@@ -4262,7 +4270,7 @@ where
 // Array helpers
 //****************************************************************************************
 
-//updateArraySt :: (Int a .st -> (a, .st)) *{a} .st -> (*{a}, .st) 
+//updateArraySt :: (a .st -> (a, .st)) *{a} .st -> (*{a}, .st) 
 updateArraySt f xs st
 	= map_array 0 xs st
 where
@@ -4271,7 +4279,7 @@ where
 		| n == s
 			= (xs, st)
 			# (x, xs) = xs![n]	
-			# (x, st) = f n x st			
+			# (x, st) = f x st			
 			= map_array (inc n) {xs&[n]=x} st
 
 //foldArraySt :: (Int a .st -> .st) {a} .st -> .st 
