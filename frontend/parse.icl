@@ -1010,11 +1010,49 @@ where
 			 =	(token, pState)
 	want_LetBefores token pState
 		= ([], token, pState)
-	
+
 	try_LetDef :: !Bool !ParseState -> (!Bool, NodeDefWithLocals, !ParseState)
 	try_LetDef strict pState
-		# (succ, lhs_exp, pState)	= trySimpleLhsExpression pState
-		| succ
+		# (token, pState) = nextToken FunctionContext pState
+		= case token of
+			IdentToken name
+				| isLowerCaseName name
+					# (id, pState) = stringToIdent name IC_Expression pState
+					# (token, pState) = nextToken FunctionContext pState
+					| token == DefinesColonToken
+						# (succ, expr, pState) = trySimpleExpression cIsAPattern pState
+						| succ
+							# lhs_exp = PE_Bound { bind_dst = id, bind_src = expr }
+							-> parse_let_rhs lhs_exp pState
+							# pState = parseError "simple expression" No "expression" pState
+							  lhs_exp = PE_Empty
+							-> parse_let_rhs lhs_exp pState
+
+					| token == AndToken
+						# lhs_exp = PE_Ident id
+						  (file_name, line_nr, pState) = getFileAndLineNr pState
+						  (token, pState) = nextToken FunctionContext pState
+						  (update_exp, pState) = want_update_without_curly_close NoRecordName lhs_exp token pState
+						  pState = wantEndRootExpression pState
+				  	  	  (locals , pState) = optionalLocals WithToken localsExpected pState
+						  ndwl = {	ndwl_strict	= strict
+								  ,	ndwl_def	= { bind_dst = lhs_exp, bind_src = update_exp }
+								  , ndwl_locals	= locals
+								  , ndwl_position
+								  				= LinePos file_name line_nr
+							  }
+						->	(True, ndwl, pState)
+					
+						# lhs_exp = PE_Ident id
+						  pState = tokenBack pState
+						-> parse_let_rhs lhs_exp pState					
+			_
+				# (succ, lhs_exp, pState) = trySimpleExpressionT token cIsAPattern pState
+				| succ
+					-> parse_let_rhs lhs_exp pState
+					-> (False, abort "no definition", pState)
+	where
+		parse_let_rhs lhs_exp pState
 			# pState			= wantToken FunctionContext "let definition" EqualToken pState
 			  (file_name, line_nr, pState)
 			  					= getFileAndLineNr pState
@@ -1032,16 +1070,6 @@ where
 				  }
 				, pState
 				)
-		// otherwise // ~ succ
-			= (False, abort "no definition", pState)
-	
-	try_let_lhs pState
-		# (succ, lhs_exp, pState) = trySimpleLhsExpression pState
-		| succ
-			= (True, lhs_exp, pState)
-			# (token,pState) = nextToken FunctionContext pState
-			= case token of
-				_ -> (False, lhs_exp, tokenBack pState)
 
 optionalLocals :: !Token !Bool !ParseState -> (!LocalDefs, !ParseState)
 optionalLocals dem_token localsExpected pState
@@ -3439,331 +3467,337 @@ where
 	try_type_specification _ pState
 		= (NoRecordName, pState)
 
-	want_updates :: !OptionalRecordName Token ParseState -> ([NestedUpdate], ParseState)
-	want_updates type token pState
-		# (updates, pState)
-			= parse_updates token pState
+want_updates :: !OptionalRecordName Token ParseState -> ([NestedUpdate], ParseState)
+want_updates type token pState
+	# (updates, pState)
+		= parse_updates token pState
 // RWS FIXME error message if updates == []
-		= (updates, pState)
-	where
-		parse_updates :: Token ParseState -> ([NestedUpdate], ParseState)
-		parse_updates token pState
-				# (update, pState) = want_update token pState
-				  (token, pState) = nextToken FunctionContext pState
-				| token == CommaToken
-					# (token, pState) = nextToken FunctionContext pState
-					  (updates, pState) = parse_updates token pState 
-					= ([update : updates], pState)
-				// otherwise
-					= ([update], tokenBack pState)
-
-		want_update :: Token ParseState -> (NestedUpdate, ParseState)
-		want_update token pState
-			# (selectors, pState) = wantSelectors token pState
-			  (token, pState) = nextToken FunctionContext pState
-			| token == EqualToken
-				# (expr, pState) = wantExpression cIsNotAPattern pState
-				= ({nu_selectors = selectors, nu_update_expr = expr}, pState)
-				= ({nu_selectors = selectors, nu_update_expr = PE_Empty}, parseError "field assignment" (Yes token) "=" pState)
-
-	transform_record_or_array_update :: !OptionalRecordName ParsedExpr [NestedUpdate] !Int ParseState -> (ParsedExpr, ParseState)
-	transform_record_or_array_update type expr updates level pState
-		| is_record_update sortedUpdates
-			=	transform_record_update type expr groupedUpdates level pState
-		// otherwise
-			=	transform_array_update expr updates level pState
-		where
-			sortedUpdates
-				// sort updates by first field name, array updates last
-				=	sortBy smaller_update updates
-				where
-					smaller_update :: NestedUpdate NestedUpdate -> Bool
-					smaller_update a b
-				 		=	smaller_selector (hd a.nu_selectors) (hd b.nu_selectors)
-			 			where
-							smaller_selector :: ParsedSelection ParsedSelection -> Bool
-							smaller_selector (PS_Record ident1 _) (PS_Record ident2 _)
-								=	ident1.id_name < ident2.id_name
-							smaller_selector (PS_Record ident1 _) (PS_QualifiedRecord _ field_name2 _)
-								=	ident1.id_name < field_name2
-							smaller_selector (PS_Record _ _) _
-								=	True
-							smaller_selector (PS_QualifiedRecord _ field_name1 _) (PS_QualifiedRecord _ field_name2 _)
-								=	field_name1 < field_name2
-							smaller_selector (PS_QualifiedRecord _ field_name1 _) (PS_Record ident2 _)
-								=	field_name1 < ident2.id_name
-							smaller_selector (PS_QualifiedRecord _ _ _) _
-								=	True
-							smaller_selector _ _
-								=	False
-
-			groupedUpdates
-				// group nested updates by first field name
-				=	groupBy equal_update sortedUpdates
-				where
-					equal_update :: NestedUpdate NestedUpdate -> Bool
-					equal_update a b
-						=	equal_selectors a.nu_selectors b.nu_selectors
-			 			where
-							equal_selectors :: [ParsedSelection] [ParsedSelection] -> Bool
-							equal_selectors [PS_Record ident1 _ ,_ : _] [PS_Record ident2 _ ,_: _]
-								=	ident1.id_name == ident2.id_name
-							equal_selectors [PS_QualifiedRecord _ field_name1 _ ,_ : _] [PS_QualifiedRecord _ field_name2 _ ,_: _]
-								=	field_name1 == field_name2
-							equal_selectors _ _
-								=	False
-
-			groupBy :: (a a -> Bool) [a] -> [[a]]
-			groupBy eq []
-			    =   []
-			groupBy eq [h : t]
-			    =   [[h : this] : groupBy eq other]
-			    where
-			        (this, other) = span (eq h) t
-
-			is_record_update [{nu_selectors=[select : _]} : _]
-				=	is_record_select select
-			is_record_update updates
-				=	False
-
-			is_record_select (PS_Record _ _)
-				=	True
-			is_record_select (PS_QualifiedRecord _ _ _)
-				=	True
-			is_record_select _
-				=	False
-
-			transform_record_update :: OptionalRecordName ParsedExpr ![[NestedUpdate]] !Int ParseState -> (ParsedExpr, ParseState)
-			transform_record_update record_type expr groupedUpdates level pState
-				=	(updateExpr, pState2)
-				where
-					/* final_record_type on a cycle */
-					(assignments, (optionalIdent, final_record_type,pState2))
-						= mapSt (transform_update level) groupedUpdates (No, record_type,pState)
-					updateExpr
-						= build_update final_record_type optionalIdent expr assignments
-					// transform one group of nested updates with the same first field
-					//  for example: f.g1 = e1, f.g2 = e2 -> f = {id.f & g1 = e1, g2 = e2},
-					//  (id is ident to shared expression that's being updated)
-
-					transform_update :: !Int [NestedUpdate] (Optional Ident,OptionalRecordName,ParseState) -> (FieldAssignment, !(!Optional Ident,OptionalRecordName,ParseState))
-					transform_update _ [{nu_selectors=[PS_Record fieldIdent field_record_type], nu_update_expr}] (shareIdent,record_type,pState)
-						# (record_type,pState) = check_field_and_record_types field_record_type record_type pState;
-						= ({bind_dst = FieldName fieldIdent, bind_src = nu_update_expr},(shareIdent,record_type,pState))
-					transform_update _ [{nu_selectors=[PS_QualifiedRecord module_id field_name field_record_type], nu_update_expr}] (shareIdent,record_type,pState)
-						# (record_type,pState) = check_field_and_record_types field_record_type record_type pState;
-						= ({bind_dst = QualifiedFieldName module_id field_name, bind_src = nu_update_expr},(shareIdent,record_type,pState))
-					transform_update level updates=:[{nu_selectors=[PS_Record fieldIdent field_record_type : _]} : _] (optionalIdent,record_type,pState)
-						# (record_type,pState) = check_field_and_record_types field_record_type record_type pState;
-						  (shareIdent, pState) = make_ident optionalIdent level pState
-						  select = PE_Selection ParsedNormalSelector (PE_Ident shareIdent) [PS_Record fieldIdent final_record_type]
-						  (update_expr, pState)
-						  	=	transform_record_or_array_update NoRecordName select (map sub_update updates) (level+1) pState
-						= ({bind_dst = FieldName fieldIdent, bind_src = update_expr}, (Yes shareIdent,record_type,pState))
-					transform_update level updates=:[{nu_selectors=[PS_QualifiedRecord module_id field_name field_record_type : _]} : _] (optionalIdent,record_type,pState)
-						# (record_type,pState) = check_field_and_record_types field_record_type record_type pState;
-						  (shareIdent, pState) = make_ident optionalIdent level pState
-						  select = PE_Selection ParsedNormalSelector (PE_Ident shareIdent) [PS_QualifiedRecord module_id field_name final_record_type]
-						  (update_expr, pState)
-						  	=	transform_record_or_array_update NoRecordName select (map sub_update updates) (level+1) pState
-						= ({bind_dst = QualifiedFieldName module_id field_name, bind_src = update_expr}, (Yes shareIdent,record_type,pState))
-					transform_update _ _ (_, record_type,pState)
-						# pState = parseError "record or array" No "field assignments mixed with array assignments not" pState
-						=	({bind_dst = FieldName errorIdent, bind_src = PE_Empty}, (No,record_type,pState))
-
-					make_ident :: (Optional Ident) !Int ParseState -> (Ident, ParseState)
-					make_ident (Yes ident) _ pState
-						=	(ident, pState)
-					make_ident No level pState
-						=	internalIdent ("s" +++ toString level +++ ";") pState
-
-					sub_update :: NestedUpdate -> NestedUpdate
-					sub_update update=:{nu_selectors}
-						=	{update & nu_selectors = tl nu_selectors}
-
-					build_update :: !OptionalRecordName !(Optional Ident) !ParsedExpr ![FieldAssignment] -> ParsedExpr
-					build_update record_type No expr assignments
-						=	PE_Record expr record_type assignments
-					build_update record_type (Yes ident) expr assignments
-						=	PE_Let False (LocalParsedDefs [buildNodeDef (PE_Ident ident) expr])
-									(PE_Record (PE_Ident ident) record_type assignments)
-					
-					check_field_and_record_types :: OptionalRecordName OptionalRecordName ParseState -> (!OptionalRecordName,!ParseState);
-					check_field_and_record_types NoRecordName record_type pState
-						= (record_type,pState);
-					check_field_and_record_types field_record_type=:(RecordNameIdent _) NoRecordName pState
-						= (field_record_type,pState);
-					check_field_and_record_types (RecordNameIdent field_record_type_name) record_type=:(RecordNameIdent record_type_name) pState
-						| field_record_type_name==record_type_name
-							= (record_type,pState);
-							# error_message = "record type in update: "+++field_record_type_name.id_name+++" where "+++record_type_name.id_name+++" was"
-							= (record_type,parseError "record or array" No error_message pState);
-
-			transform_array_update :: ParsedExpr [NestedUpdate] !Int ParseState -> (ParsedExpr, ParseState)
-			transform_array_update expr updates level pState
-				// transform {<e> & [i].<...> = e1, ... } to  {{<e> & [i1].<...> = e1} & ...}
-				=	foldSt (transform_update level) updates (expr, pState)
-				where
-					transform_update :: !Int NestedUpdate (ParsedExpr, ParseState) -> (ParsedExpr, ParseState)
-					transform_update level {nu_selectors, nu_update_expr} (expr1, pState)
-						=	build_update expr1 (split_selectors nu_selectors) nu_update_expr level pState
-						where
-							// split selectors into final record selectors and initial selectors
-							//  (resulting selectors are reversed)
-							//		for example: [i1].[i2].f.[i3].g.h -> (h.g, [i3].f.[i2].[i1])
-							split_selectors selectors
-								=	span is_record_select (reverse selectors)
-
-							build_update :: ParsedExpr ([ParsedSelection], [ParsedSelection]) ParsedExpr !Int ParseState -> (ParsedExpr, ParseState)
-							build_update expr ([], initial_selectors) update_expr _ pState
-								=	(PE_Update expr (reverse initial_selectors) update_expr, pState)
-							// transform {<e> & <...>.[i].f.g. = e1} to
-							//     let
-							//		index_id = i
-							//		(element_id, array_id) = <e>!<...>.[index_id]
-							//	   in {array_id & [index_id] = {element_id & f.g = e1}}
-							build_update expr (record_selectors, [PS_Array index : initial_selectors]) update_expr level pState
-								# (index_id, pState)
-									=	internalIdent ("i" +++ toString level +++ ";") pState
-								# (element_id, pState)
-									=	internalIdent ("e" +++ toString level +++ ";") pState
-								# (array_id, pState)
-									=	internalIdent ("a" +++ toString level +++ ";") pState
-								  index_def
-								  	=	buildNodeDef (PE_Ident index_id) index
-								  select_def
-								  	=	buildNodeDef
-								  			(PE_Tuple [PE_Ident element_id, PE_Ident array_id])
-								  			(PE_Selection (ParsedUniqueSelector True) expr (reverse [PS_Array (PE_Ident index_id) : initial_selectors]))
-								  (updated_element, pState)
-									= transform_record_update NoRecordName
-										(PE_Ident element_id)
-										[[{nu_selectors=(reverse record_selectors), nu_update_expr=update_expr}]] (level+1) pState
-								=	(PE_Let False
-										(LocalParsedDefs [index_def, select_def])
-										(PE_Update (PE_Ident array_id) (reverse [PS_Array (PE_Ident index_id) : initial_selectors]) updated_element), pState)
-
-	want_field_assignments is_pattern token=:(IdentToken field_name) pState
-		| isLowerCaseName field_name
-			# (field_id, pState) = stringToIdent field_name IC_Selector pState
-			= want_more_field_assignments (FieldName field_id) is_pattern pState
-	want_field_assignments is_pattern token=:(QualifiedIdentToken module_name field_name) pState
-		| isLowerCaseName field_name
-			# (module_id, pState) = stringToIdent module_name IC_Module pState
-			= want_more_field_assignments (QualifiedFieldName module_id field_name) is_pattern pState
-	want_field_assignments is_pattern token pState
-		= ([], parseError "record or array field assignments" (Yes token) "field name" pState)
-
-	want_more_field_assignments field_name_or_qualified_field_name is_pattern pState
-		# (field_expr, pState) = want_field_expression is_pattern pState
-		  field = { bind_src = field_expr, bind_dst = field_name_or_qualified_field_name}
-		#  (token, pState) = nextToken FunctionContext pState
-		| token == CommaToken
-			# (token, pState) = nextToken FunctionContext pState
-			  (fields, pState) = want_field_assignments is_pattern token pState 
-			= ([ field : fields ], pState)
-			= ([ field ], tokenBack pState)
-
-	try_field_assignment (IdentToken field_name) pState
-		| isLowerCaseName field_name
-			# (token, pState) = nextToken FunctionContext pState
-			| token == EqualToken
-				# (field_expr, pState) = wantExpression cIsNotAPattern pState
-				  (field_id, pState) = stringToIdent field_name IC_Selector pState
-				= (True, { bind_src = field_expr, bind_dst = FieldName field_id}, pState) 
-				= (False, abort "no field", tokenBack pState)
-			= (False, abort "no field", pState)
-	try_field_assignment (QualifiedIdentToken module_name field_name) pState
-		| isLowerCaseName field_name
-			# (token, pState) = nextToken FunctionContext pState
-			| token == EqualToken
-				# (field_expr, pState) = wantExpression cIsNotAPattern pState
-				  (module_id, pState) = stringToIdent module_name IC_Module pState
-				= (True, { bind_src = field_expr, bind_dst = QualifiedFieldName module_id field_name}, pState) 
-				= (False, abort "no field", tokenBack pState)
-			= (False, abort "no field", pState)
-	try_field_assignment _ pState
-		= (False, abort "no field", pState)
-
-	want_field_expression is_pattern pState
-		# (token, pState) = nextToken FunctionContext pState
-		| token == EqualToken
-			= wantExpression is_pattern pState
-			= (PE_Empty, tokenBack pState)
-
-	want_record :: !OptionalRecordName !ParseState -> (!ParsedExpr,!ParseState)		
-	want_record type pState
-		# (token1, pState) = nextToken FunctionContext pState
-  		  (token2, pState) = nextToken FunctionContext pState
-		| isDefinesFieldToken token2
-			# (fields, pState) = want_field_assignments cIsNotAPattern token1 (tokenBack pState)
-			= (PE_Record PE_Empty type fields, wantToken FunctionContext "record" CurlyCloseToken pState)
-			= want_record_update type token1 (tokenBack pState)
-	where
-		want_record_update :: !OptionalRecordName !Token !ParseState -> (!ParsedExpr, !ParseState)
-		want_record_update type token pState
-			# (expr,  pState)	= wantRhsExpressionT token pState
-			  pState			= wantToken FunctionContext "record update" AndToken pState
-			  (token, pState)	= nextToken FunctionContext pState
-			= want_update type expr token pState
-
-	want_update :: !OptionalRecordName !ParsedExpr !Token !ParseState -> (!ParsedExpr, !ParseState)
-	want_update type expr token pState
-		# (position, pState) = getPosition pState
-		  (updates, pState)	= want_updates type token pState
-		  (qualifiers, pState) = try_qualifiers pState
-		  (updatable_expr, pState) = test_qualifiers expr (toLineAndColumn position) qualifiers pState
-		  (updated_expr, pState) = transform_record_or_array_update type updatable_expr updates 0 pState
-		= (add_qualifiers qualifiers expr updated_expr updatable_expr, wantToken FunctionContext "update" CurlyCloseToken pState)
-		where
-			try_qualifiers :: !ParseState -> (![Qualifier], !ParseState)
-			try_qualifiers pState
-				# (token, pState) = nextToken FunctionContext pState
-				| token == DoubleBackSlashToken
-					= wantQualifiers pState
-					= ([], tokenBack pState)
-
-			test_qualifiers :: !ParsedExpr !LineAndColumn [Qualifier] !ParseState -> (!ParsedExpr, !ParseState)
-			test_qualifiers updateExpr _ [] pState
-				=	(updateExpr, pState)
-			test_qualifiers updateExpr {lc_line, lc_column} qualifiers pState
-				# (ident, pState)
-					=	stringToIdent ("a;" +++ toString lc_line +++ ";" +++ toString lc_column) IC_Expression pState
-				=	(PE_Ident ident, pState)
-
-			add_qualifiers :: ![Qualifier] !ParsedExpr !ParsedExpr !ParsedExpr -> ParsedExpr
-			add_qualifiers [] _ update_expr _
-				=	update_expr
-			add_qualifiers qualifiers expr update_expr ident_expr
-				=	PE_UpdateComprehension expr update_expr ident_expr qualifiers
-
-	want_record_or_array_update token expr pState
-		= want_update NoRecordName expr token pState
-
-	want_array_assignments pState
-		# (assign, pState) = want_array_assignment pState
+	= (updates, pState)
+where
+	parse_updates :: Token ParseState -> ([NestedUpdate], ParseState)
+	parse_updates token pState
+		# (update, pState) = want_update token pState
 		  (token, pState) = nextToken FunctionContext pState
 		| token == CommaToken
-			# pState = wantToken FunctionContext "array assignments" SquareOpenToken pState
-			  (assigns, pState) = want_array_assignments pState 
-			= ([ assign : assigns ], pState)
-			= ([ assign ], tokenBack pState)
-	where
-		want_array_assignment pState
-			# (index_exprs, pState) = want_index_exprs pState
-			  pState = wantToken FunctionContext "array assignment" EqualToken pState
-			  (pattern_exp, pState) = wantExpression cIsAPattern pState
-			= ({bind_dst = index_exprs, bind_src = pattern_exp}, pState)
+			# (token, pState) = nextToken FunctionContext pState
+			  (updates, pState) = parse_updates token pState 
+			= ([update : updates], pState)
+		// otherwise
+			= ([update], tokenBack pState)
 
-		want_index_exprs pState
-			# (index_expr,  pState) = wantExpression cIsNotAPattern pState
-			  (token, pState) = nextToken GeneralContext pState
-			| token==CommaToken
-				# (index_exprs, pState) = want_index_exprs pState
-				= ([index_expr:index_exprs], pState)
-			| token==SquareCloseToken
-				= ([index_expr], pState)
-			= ([], parseError "" (Yes token) "] or ," pState)
+	want_update :: Token ParseState -> (NestedUpdate, ParseState)
+	want_update token pState
+		# (selectors, pState) = wantSelectors token pState
+		  (token, pState) = nextToken FunctionContext pState
+		| token == EqualToken
+			# (expr, pState) = wantExpression cIsNotAPattern pState
+			= ({nu_selectors = selectors, nu_update_expr = expr}, pState)
+			= ({nu_selectors = selectors, nu_update_expr = PE_Empty}, parseError "field assignment" (Yes token) "=" pState)
+
+transform_record_or_array_update :: !OptionalRecordName ParsedExpr [NestedUpdate] !Int ParseState -> (ParsedExpr, ParseState)
+transform_record_or_array_update type expr updates level pState
+	| is_record_update sortedUpdates
+		=	transform_record_update type expr groupedUpdates level pState
+	// otherwise
+		=	transform_array_update expr updates level pState
+	where
+		sortedUpdates
+			// sort updates by first field name, array updates last
+			=	sortBy smaller_update updates
+			where
+				smaller_update :: NestedUpdate NestedUpdate -> Bool
+				smaller_update a b
+			 		=	smaller_selector (hd a.nu_selectors) (hd b.nu_selectors)
+		 			where
+						smaller_selector :: ParsedSelection ParsedSelection -> Bool
+						smaller_selector (PS_Record ident1 _) (PS_Record ident2 _)
+							=	ident1.id_name < ident2.id_name
+						smaller_selector (PS_Record ident1 _) (PS_QualifiedRecord _ field_name2 _)
+							=	ident1.id_name < field_name2
+						smaller_selector (PS_Record _ _) _
+							=	True
+						smaller_selector (PS_QualifiedRecord _ field_name1 _) (PS_QualifiedRecord _ field_name2 _)
+							=	field_name1 < field_name2
+						smaller_selector (PS_QualifiedRecord _ field_name1 _) (PS_Record ident2 _)
+							=	field_name1 < ident2.id_name
+						smaller_selector (PS_QualifiedRecord _ _ _) _
+							=	True
+						smaller_selector _ _
+							=	False
+
+		groupedUpdates
+			// group nested updates by first field name
+			=	groupBy equal_update sortedUpdates
+			where
+				equal_update :: NestedUpdate NestedUpdate -> Bool
+				equal_update a b
+					=	equal_selectors a.nu_selectors b.nu_selectors
+		 			where
+						equal_selectors :: [ParsedSelection] [ParsedSelection] -> Bool
+						equal_selectors [PS_Record ident1 _ ,_ : _] [PS_Record ident2 _ ,_: _]
+							=	ident1.id_name == ident2.id_name
+						equal_selectors [PS_QualifiedRecord _ field_name1 _ ,_ : _] [PS_QualifiedRecord _ field_name2 _ ,_: _]
+							=	field_name1 == field_name2
+						equal_selectors _ _
+							=	False
+
+		groupBy :: (a a -> Bool) [a] -> [[a]]
+		groupBy eq []
+		    =   []
+		groupBy eq [h : t]
+		    =   [[h : this] : groupBy eq other]
+		    where
+		        (this, other) = span (eq h) t
+
+		is_record_update [{nu_selectors=[select : _]} : _]
+			=	is_record_select select
+		is_record_update updates
+			=	False
+
+		is_record_select (PS_Record _ _)
+			=	True
+		is_record_select (PS_QualifiedRecord _ _ _)
+			=	True
+		is_record_select _
+			=	False
+
+		transform_record_update :: OptionalRecordName ParsedExpr ![[NestedUpdate]] !Int ParseState -> (ParsedExpr, ParseState)
+		transform_record_update record_type expr groupedUpdates level pState
+			=	(updateExpr, pState2)
+			where
+				/* final_record_type on a cycle */
+				(assignments, (optionalIdent, final_record_type,pState2))
+					= mapSt (transform_update level) groupedUpdates (No, record_type,pState)
+				updateExpr
+					= build_update final_record_type optionalIdent expr assignments
+				// transform one group of nested updates with the same first field
+				//  for example: f.g1 = e1, f.g2 = e2 -> f = {id.f & g1 = e1, g2 = e2},
+				//  (id is ident to shared expression that's being updated)
+
+				transform_update :: !Int [NestedUpdate] (Optional Ident,OptionalRecordName,ParseState) -> (FieldAssignment, !(!Optional Ident,OptionalRecordName,ParseState))
+				transform_update _ [{nu_selectors=[PS_Record fieldIdent field_record_type], nu_update_expr}] (shareIdent,record_type,pState)
+					# (record_type,pState) = check_field_and_record_types field_record_type record_type pState;
+					= ({bind_dst = FieldName fieldIdent, bind_src = nu_update_expr},(shareIdent,record_type,pState))
+				transform_update _ [{nu_selectors=[PS_QualifiedRecord module_id field_name field_record_type], nu_update_expr}] (shareIdent,record_type,pState)
+					# (record_type,pState) = check_field_and_record_types field_record_type record_type pState;
+					= ({bind_dst = QualifiedFieldName module_id field_name, bind_src = nu_update_expr},(shareIdent,record_type,pState))
+				transform_update level updates=:[{nu_selectors=[PS_Record fieldIdent field_record_type : _]} : _] (optionalIdent,record_type,pState)
+					# (record_type,pState) = check_field_and_record_types field_record_type record_type pState;
+					  (shareIdent, pState) = make_ident optionalIdent level pState
+					  select = PE_Selection ParsedNormalSelector (PE_Ident shareIdent) [PS_Record fieldIdent final_record_type]
+					  (update_expr, pState)
+					  	=	transform_record_or_array_update NoRecordName select (map sub_update updates) (level+1) pState
+					= ({bind_dst = FieldName fieldIdent, bind_src = update_expr}, (Yes shareIdent,record_type,pState))
+				transform_update level updates=:[{nu_selectors=[PS_QualifiedRecord module_id field_name field_record_type : _]} : _] (optionalIdent,record_type,pState)
+					# (record_type,pState) = check_field_and_record_types field_record_type record_type pState;
+					  (shareIdent, pState) = make_ident optionalIdent level pState
+					  select = PE_Selection ParsedNormalSelector (PE_Ident shareIdent) [PS_QualifiedRecord module_id field_name final_record_type]
+					  (update_expr, pState)
+					  	=	transform_record_or_array_update NoRecordName select (map sub_update updates) (level+1) pState
+					= ({bind_dst = QualifiedFieldName module_id field_name, bind_src = update_expr}, (Yes shareIdent,record_type,pState))
+				transform_update _ _ (_, record_type,pState)
+					# pState = parseError "record or array" No "field assignments mixed with array assignments not" pState
+					=	({bind_dst = FieldName errorIdent, bind_src = PE_Empty}, (No,record_type,pState))
+
+				make_ident :: (Optional Ident) !Int ParseState -> (Ident, ParseState)
+				make_ident (Yes ident) _ pState
+					=	(ident, pState)
+				make_ident No level pState
+					=	internalIdent ("s" +++ toString level +++ ";") pState
+
+				sub_update :: NestedUpdate -> NestedUpdate
+				sub_update update=:{nu_selectors}
+					=	{update & nu_selectors = tl nu_selectors}
+
+				build_update :: !OptionalRecordName !(Optional Ident) !ParsedExpr ![FieldAssignment] -> ParsedExpr
+				build_update record_type No expr assignments
+					=	PE_Record expr record_type assignments
+				build_update record_type (Yes ident) expr assignments
+					=	PE_Let False (LocalParsedDefs [buildNodeDef (PE_Ident ident) expr])
+								(PE_Record (PE_Ident ident) record_type assignments)
+				
+				check_field_and_record_types :: OptionalRecordName OptionalRecordName ParseState -> (!OptionalRecordName,!ParseState);
+				check_field_and_record_types NoRecordName record_type pState
+					= (record_type,pState);
+				check_field_and_record_types field_record_type=:(RecordNameIdent _) NoRecordName pState
+					= (field_record_type,pState);
+				check_field_and_record_types (RecordNameIdent field_record_type_name) record_type=:(RecordNameIdent record_type_name) pState
+					| field_record_type_name==record_type_name
+						= (record_type,pState);
+						# error_message = "record type in update: "+++field_record_type_name.id_name+++" where "+++record_type_name.id_name+++" was"
+						= (record_type,parseError "record or array" No error_message pState);
+
+		transform_array_update :: ParsedExpr [NestedUpdate] !Int ParseState -> (ParsedExpr, ParseState)
+		transform_array_update expr updates level pState
+			// transform {<e> & [i].<...> = e1, ... } to  {{<e> & [i1].<...> = e1} & ...}
+			=	foldSt (transform_update level) updates (expr, pState)
+			where
+				transform_update :: !Int NestedUpdate (ParsedExpr, ParseState) -> (ParsedExpr, ParseState)
+				transform_update level {nu_selectors, nu_update_expr} (expr1, pState)
+					=	build_update expr1 (split_selectors nu_selectors) nu_update_expr level pState
+					where
+						// split selectors into final record selectors and initial selectors
+						//  (resulting selectors are reversed)
+						//		for example: [i1].[i2].f.[i3].g.h -> (h.g, [i3].f.[i2].[i1])
+						split_selectors selectors
+							=	span is_record_select (reverse selectors)
+
+						build_update :: ParsedExpr ([ParsedSelection], [ParsedSelection]) ParsedExpr !Int ParseState -> (ParsedExpr, ParseState)
+						build_update expr ([], initial_selectors) update_expr _ pState
+							=	(PE_Update expr (reverse initial_selectors) update_expr, pState)
+						// transform {<e> & <...>.[i].f.g. = e1} to
+						//     let
+						//		index_id = i
+						//		(element_id, array_id) = <e>!<...>.[index_id]
+						//	   in {array_id & [index_id] = {element_id & f.g = e1}}
+						build_update expr (record_selectors, [PS_Array index : initial_selectors]) update_expr level pState
+							# (index_id, pState)
+								=	internalIdent ("i" +++ toString level +++ ";") pState
+							# (element_id, pState)
+								=	internalIdent ("e" +++ toString level +++ ";") pState
+							# (array_id, pState)
+								=	internalIdent ("a" +++ toString level +++ ";") pState
+							  index_def
+							  	=	buildNodeDef (PE_Ident index_id) index
+							  select_def
+							  	=	buildNodeDef
+							  			(PE_Tuple [PE_Ident element_id, PE_Ident array_id])
+							  			(PE_Selection (ParsedUniqueSelector True) expr (reverse [PS_Array (PE_Ident index_id) : initial_selectors]))
+							  (updated_element, pState)
+								= transform_record_update NoRecordName
+									(PE_Ident element_id)
+									[[{nu_selectors=(reverse record_selectors), nu_update_expr=update_expr}]] (level+1) pState
+							=	(PE_Let False
+									(LocalParsedDefs [index_def, select_def])
+									(PE_Update (PE_Ident array_id) (reverse [PS_Array (PE_Ident index_id) : initial_selectors]) updated_element), pState)
+
+want_field_assignments is_pattern token=:(IdentToken field_name) pState
+	| isLowerCaseName field_name
+		# (field_id, pState) = stringToIdent field_name IC_Selector pState
+		= want_more_field_assignments (FieldName field_id) is_pattern pState
+want_field_assignments is_pattern token=:(QualifiedIdentToken module_name field_name) pState
+	| isLowerCaseName field_name
+		# (module_id, pState) = stringToIdent module_name IC_Module pState
+		= want_more_field_assignments (QualifiedFieldName module_id field_name) is_pattern pState
+want_field_assignments is_pattern token pState
+	= ([], parseError "record or array field assignments" (Yes token) "field name" pState)
+
+want_more_field_assignments field_name_or_qualified_field_name is_pattern pState
+	# (field_expr, pState) = want_field_expression is_pattern pState
+	  field = { bind_src = field_expr, bind_dst = field_name_or_qualified_field_name}
+	#  (token, pState) = nextToken FunctionContext pState
+	| token == CommaToken
+		# (token, pState) = nextToken FunctionContext pState
+		  (fields, pState) = want_field_assignments is_pattern token pState 
+		= ([ field : fields ], pState)
+		= ([ field ], tokenBack pState)
+
+try_field_assignment (IdentToken field_name) pState
+	| isLowerCaseName field_name
+		# (token, pState) = nextToken FunctionContext pState
+		| token == EqualToken
+			# (field_expr, pState) = wantExpression cIsNotAPattern pState
+			  (field_id, pState) = stringToIdent field_name IC_Selector pState
+			= (True, { bind_src = field_expr, bind_dst = FieldName field_id}, pState) 
+			= (False, abort "no field", tokenBack pState)
+		= (False, abort "no field", pState)
+try_field_assignment (QualifiedIdentToken module_name field_name) pState
+	| isLowerCaseName field_name
+		# (token, pState) = nextToken FunctionContext pState
+		| token == EqualToken
+			# (field_expr, pState) = wantExpression cIsNotAPattern pState
+			  (module_id, pState) = stringToIdent module_name IC_Module pState
+			= (True, { bind_src = field_expr, bind_dst = QualifiedFieldName module_id field_name}, pState) 
+			= (False, abort "no field", tokenBack pState)
+		= (False, abort "no field", pState)
+try_field_assignment _ pState
+	= (False, abort "no field", pState)
+
+want_field_expression is_pattern pState
+	# (token, pState) = nextToken FunctionContext pState
+	| token == EqualToken
+		= wantExpression is_pattern pState
+		= (PE_Empty, tokenBack pState)
+
+want_record :: !OptionalRecordName !ParseState -> (!ParsedExpr,!ParseState)		
+want_record type pState
+	# (token1, pState) = nextToken FunctionContext pState
+	  (token2, pState) = nextToken FunctionContext pState
+	| isDefinesFieldToken token2
+		# (fields, pState) = want_field_assignments cIsNotAPattern token1 (tokenBack pState)
+		= (PE_Record PE_Empty type fields, wantToken FunctionContext "record" CurlyCloseToken pState)
+		= want_record_update type token1 (tokenBack pState)
+where
+	want_record_update :: !OptionalRecordName !Token !ParseState -> (!ParsedExpr, !ParseState)
+	want_record_update type token pState
+		# (expr,  pState)	= wantRhsExpressionT token pState
+		  pState			= wantToken FunctionContext "record update" AndToken pState
+		  (token, pState)	= nextToken FunctionContext pState
+		= want_update type expr token pState
+
+want_update :: !OptionalRecordName !ParsedExpr !Token !ParseState -> (!ParsedExpr, !ParseState)
+want_update type expr token pState
+	# (expr, pState) = want_update_without_curly_close type expr token pState
+	  pState = wantToken FunctionContext "update" CurlyCloseToken pState
+	= (expr, pState)
+
+want_update_without_curly_close :: !OptionalRecordName !ParsedExpr !Token !ParseState -> (!ParsedExpr, !ParseState)
+want_update_without_curly_close type expr token pState
+	# (position, pState) = getPosition pState
+	  (updates, pState)	= want_updates type token pState
+	  (qualifiers, pState) = try_qualifiers pState
+	  (updatable_expr, pState) = test_qualifiers expr (toLineAndColumn position) qualifiers pState
+	  (updated_expr, pState) = transform_record_or_array_update type updatable_expr updates 0 pState
+	= (add_qualifiers qualifiers expr updated_expr updatable_expr, pState)
+	where
+		try_qualifiers :: !ParseState -> (![Qualifier], !ParseState)
+		try_qualifiers pState
+			# (token, pState) = nextToken FunctionContext pState
+			| token == DoubleBackSlashToken
+				= wantQualifiers pState
+				= ([], tokenBack pState)
+
+		test_qualifiers :: !ParsedExpr !LineAndColumn [Qualifier] !ParseState -> (!ParsedExpr, !ParseState)
+		test_qualifiers updateExpr _ [] pState
+			=	(updateExpr, pState)
+		test_qualifiers updateExpr {lc_line, lc_column} qualifiers pState
+			# (ident, pState)
+				=	stringToIdent ("a;" +++ toString lc_line +++ ";" +++ toString lc_column) IC_Expression pState
+			=	(PE_Ident ident, pState)
+
+		add_qualifiers :: ![Qualifier] !ParsedExpr !ParsedExpr !ParsedExpr -> ParsedExpr
+		add_qualifiers [] _ update_expr _
+			=	update_expr
+		add_qualifiers qualifiers expr update_expr ident_expr
+			=	PE_UpdateComprehension expr update_expr ident_expr qualifiers
+
+want_record_or_array_update token expr pState
+	= want_update NoRecordName expr token pState
+
+want_array_assignments pState
+	# (assign, pState) = want_array_assignment pState
+	  (token, pState) = nextToken FunctionContext pState
+	| token == CommaToken
+		# pState = wantToken FunctionContext "array assignments" SquareOpenToken pState
+		  (assigns, pState) = want_array_assignments pState 
+		= ([ assign : assigns ], pState)
+		= ([ assign ], tokenBack pState)
+where
+	want_array_assignment pState
+		# (index_exprs, pState) = want_index_exprs pState
+		  pState = wantToken FunctionContext "array assignment" EqualToken pState
+		  (pattern_exp, pState) = wantExpression cIsAPattern pState
+		= ({bind_dst = index_exprs, bind_src = pattern_exp}, pState)
+
+	want_index_exprs pState
+		# (index_expr,  pState) = wantExpression cIsNotAPattern pState
+		  (token, pState) = nextToken GeneralContext pState
+		| token==CommaToken
+			# (index_exprs, pState) = want_index_exprs pState
+			= ([index_expr:index_exprs], pState)
+		| token==SquareCloseToken
+			= ([index_expr], pState)
+		= ([], parseError "" (Yes token) "] or ," pState)
 /**
 	End of definitions
 **/
