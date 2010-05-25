@@ -374,10 +374,6 @@ where
 												ss_tokenBuffer,
 							ss_offsides=ss_offsides,	ss_scanOptions=ss_scanOptions
 						}	 -->> (token,pos)
-	where
-		mark_position {inp_stream=input=:(OldLine i _ _),inp_filename,inp_pos,inp_tabsize}
-			= {inp_stream=input, inp_filename=inp_filename, inp_pos={inp_pos &fp_col=1}, inp_tabsize=inp_tabsize}
-		mark_poistion input = input
 	nextToken _ _ = abort "Scanner: Error in nextToken"
 
 class tokenBack state :: !*state -> *state
@@ -580,13 +576,11 @@ Scan '(' input co			= (OpenToken, input)
 Scan ')' input co			= (CloseToken, input)
 Scan '{' input CodeContext	= ScanCodeBlock input
 //Scan '{' input co			= (CurlyOpenToken, input)
-// AA ...
 Scan c0=:'{' input co
 	# (eof, c1, input)		= ReadNormalChar input
 	| eof					= (CurlyOpenToken, input)
 	| c1 == '|'				= (GenericOpenToken, input)
 							= (CurlyOpenToken, charBack input)
-// ... AA
 Scan '}' input co			= (CurlyCloseToken, input)
 Scan '[' input co			= (SquareOpenToken, input)
 Scan ']' input co			= (SquareCloseToken, input)
@@ -737,7 +731,7 @@ Scan c0=:':' input co
 	// c1 <> '='
 	| isSpecialChar c1		= ScanOperator 1 input [c1, c0] co
 							= (ColonToken, charBack input)
-Scan c0=:'\'' input co		= ScanChar input [c0]
+Scan '\'' input co			= ScanChar input
 Scan c0=:'\"' input co		= ScanString 0 [c0] input
 
 Scan 'E' input TypeContext
@@ -1055,13 +1049,13 @@ ScanOctNumeral n input
 	| isOctDigit c			= ScanOctNumeral (n*8+digitToInt c) input
 							= (IntToken (toString n), charBack input)
 
-ScanChar :: !Input ![Char] -> (!Token, !Input)
-ScanChar input chars
+ScanChar :: !Input -> (!Token, !Input)
+ScanChar input
 	# (eof, c, input)		= ReadChar input // PK: was ReadNormalChar input
 	| eof					= (ErrorToken "End of file inside Char denotation", input)
-	| '\'' == c				= (CharListToken "", input)
-	| '\\' == c				= ScanBSChar 0 chars input ScanEndOfChar
-							= ScanEndOfChar 1 [c: chars] input
+	| c=='\''				= (CharListToken "", input)
+	| c=='\\'				= ScanBSChar 0 ['\''] input ScanEndOfChar
+							= ScanEndOfNoBSChar c input
 
 ScanBSChar :: !Int ![Char] !Input (Int [Char] Input -> (!Token, !Input)) -> (!Token, !Input)
 ScanBSChar n chars input cont
@@ -1129,7 +1123,118 @@ ScanEndOfChar n chars input
 	| '\'' == c				= (CharToken (revCharListToString (n + 1) [c:chars]), input)
 	| '\\' == c				= ScanBSChar n chars input ScanCharList
 							= ScanCharList (n+1) [c:chars] input
-//							= (ErrorToken ScanErrCharErr, input)
+
+ScanEndOfNoBSChar :: !Char !Input -> (!Token, !Input)
+ScanEndOfNoBSChar c1 input
+	# (eof, c, input)		= ReadChar input
+	| eof					= (ErrorToken "End of file inside char denotation", input)
+	| c=='\''
+							| is_ident_char c1
+								= qualified_ident_or_CharToken c1 input							
+								= (CharToken {'\'',c1,'\''}, input)
+	| c=='\\'				= ScanBSChar 1 [c1,'\''] input ScanCharList
+							= scan_CharList_or_qualified_ident c1 c input
+where
+	qualified_ident_or_CharToken :: !Char !Input -> (!Token,!Input)
+	qualified_ident_or_CharToken c input=:{inp_stream=OldLine i line stream,inp_pos}
+		| i+1<size line && line.[i]=='.'
+			# c=line.[i+1]
+			| is_ident_char c
+				# end_i = scan_ident_chars_in_string (i+2) line
+				  ident_name = line % (i+1,end_i-1)
+				  pos = {inp_pos & fp_col = inp_pos.fp_col + (end_i-i)}
+				  input =  {input & inp_stream=OldLine end_i line stream,inp_pos=pos}
+				= (QualifiedIdentToken {c} ident_name,input)
+			| c==' ' && i+2<size line && isSpecialChar line.[i+2]
+				# end_i = scan_special_chars_in_string (i+3) line
+				  ident_name = line % (i+1,end_i-1)
+				  pos = {inp_pos & fp_col = inp_pos.fp_col + (end_i-i)}
+				  input =  {input & inp_stream=OldLine end_i line stream,inp_pos=pos}
+				= (QualifiedIdentToken {c} ident_name,input)
+				= scan_char c input
+			= scan_char c input
+	qualified_ident_or_CharToken c input
+		= scan_char c input
+
+	scan_CharList_or_qualified_ident :: !Char !Char !Input -> (!Token, !Input)
+	scan_CharList_or_qualified_ident c1 c2 input=:{inp_stream=OldLine i line _}
+		| i>=3 && is_ident_char c1
+			| is_ident_char c2
+				# after_module_name_i = scan_rest_of_module_name_in_string i line
+				| after_module_name_i+2<size line && line.[after_module_name_i]=='\'' && line.[after_module_name_i+1]=='.'
+					# c=line.[after_module_name_i+2]
+					| is_ident_char c
+						= qualified_ident after_module_name_i input
+					| c==' ' && after_module_name_i+3<size line && isSpecialChar line.[after_module_name_i+3]
+						= qualified_special_ident after_module_name_i input
+						= scan_char_list c2 c1 input
+					= scan_char_list c2 c1 input
+			| c2=='.' && i<size line && is_ident_char line.[i]
+				# after_module_name_i = scan_rest_of_module_name_in_string (i+1) line
+				| after_module_name_i+2<size line && line.[after_module_name_i]=='\'' && line.[after_module_name_i+1]=='.'
+					# c=line.[after_module_name_i+2]
+					| is_ident_char c
+						= qualified_ident after_module_name_i input
+					| c==' ' && after_module_name_i+3<size line && isSpecialChar line.[after_module_name_i+3]
+						= qualified_special_ident after_module_name_i input
+						= scan_char_list c2 c1 input
+					= scan_char_list c2 c1 input
+				= scan_char_list c2 c1 input
+			= scan_char_list c2 c1 input
+	where
+		scan_rest_of_module_name_in_string :: !Int !{#Char} -> Int
+		scan_rest_of_module_name_in_string i s
+			| i<size s
+				# c=s.[i]
+				| is_ident_char c
+					= scan_rest_of_module_name_in_string (i+1) s
+				| c=='.' && i+1<size s && is_ident_char s.[i+1]
+					= scan_rest_of_module_name_in_string (i+2) s
+					= i
+				= i
+
+		qualified_ident :: !Int !Input -> (!Token,!Input)
+		qualified_ident after_module_name_i input=:{inp_stream=OldLine i line stream,inp_pos}
+			# module_name = line % (i-2,after_module_name_i-1)
+			  after_ident_i = scan_ident_chars_in_string (after_module_name_i+3) line
+			  ident_name = line % (after_module_name_i+2,after_ident_i-1)
+			  pos = {inp_pos & fp_col = inp_pos.fp_col + (after_ident_i-i)}
+			  input =  {input & inp_stream=OldLine after_ident_i line stream,inp_pos=pos}
+			= (QualifiedIdentToken module_name ident_name,input)
+
+		qualified_special_ident :: !Int !Input -> (!Token,!Input)
+		qualified_special_ident after_module_name_i input=:{inp_stream=OldLine i line stream,inp_pos}
+			# module_name = line % (i-2,after_module_name_i-1)
+			  after_ident_i = scan_special_chars_in_string (after_module_name_i+4) line
+			  ident_name = line % (after_module_name_i+3,after_ident_i-1)
+			  pos = {inp_pos & fp_col = inp_pos.fp_col + (after_ident_i-i)}
+			  input =  {input & inp_stream=OldLine after_ident_i line stream,inp_pos=pos}
+			= (QualifiedIdentToken module_name ident_name,input)
+
+		scan_char_list :: !Char !Char !Input -> (!Token, !Input)
+		scan_char_list c2 c1 input
+			= ScanCharList 2 [c2,c1,'\''] input
+	scan_CharList_or_qualified_ident c1 c2 input
+		= ScanCharList 2 [c2,c1,'\''] input
+
+	scan_ident_chars_in_string :: !Int !{#Char} -> Int
+	scan_ident_chars_in_string i line
+		| i<size line && is_ident_char line.[i]
+			= scan_ident_chars_in_string (i+1) line
+			= i
+
+	scan_special_chars_in_string :: !Int !{#Char} -> Int
+	scan_special_chars_in_string i line
+		| i<size line && isSpecialChar line.[i]
+			= scan_special_chars_in_string (i+1) line
+			= i
+
+	scan_char :: !Char !Input -> (!Token, !Input)
+	scan_char c input
+		= (CharToken {'\'',c,'\''}, input)
+
+	is_ident_char c
+		= isAlphanum c || c=='_' || c=='`'
 
 ScanCharList :: !Int ![Char] !Input -> (!Token, !Input)
 ScanCharList n chars input
