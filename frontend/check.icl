@@ -2540,8 +2540,8 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 	  		= addImportedSymbolsToSymbolTable nr_of_modules (Yes dcl_macros) modules_in_component_set imports_ikh dcl_modules cs
 
 	  qualified_explicit_imports = (ikhSearch` nr_of_modules imports_ikh).si_qualified_explicit
-	  (dcl_modules, icl_functions,macro_defs,hp_expression_heap, cs)
-			= checkExplicitImportCompleteness imports.si_explicit qualified_explicit_imports dcl_modules icl_functions macro_defs heaps.hp_expression_heap cs
+	  (dcl_modules, macro_defs,hp_expression_heap, cs)
+			= checkExplicitImportCompleteness imports.si_explicit qualified_explicit_imports dcl_modules macro_defs heaps.hp_expression_heap cs
 	  (modified_ste_kinds,symbol_table,dcl_modules)
 		= store_qualified_explicit_imports_in_symbol_table qualified_explicit_imports [] cs.cs_symbol_table dcl_modules
 	  cs = {cs & cs_symbol_table=symbol_table}
