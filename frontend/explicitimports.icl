@@ -425,9 +425,7 @@ get_eei_ident (eii=:ExplImpInfo eii_ident _) = (eii_ident, eii)
 	
 :: CheckCompletenessState =
 	{	ccs_dcl_modules				:: !.{#DclModule}
-	,	ccs_icl_functions			:: !.{#FunDef}
 	,	ccs_macro_defs :: !.{#.{#FunDef}}
-	,	ccs_set_of_visited_icl_funs	:: !.{#Bool}		// ccs_set_of_visited_icl_funs.[i] <=> function nr i has been considered
 	,	ccs_set_of_visited_macros	:: !.{#.{#Bool}}
 	,	ccs_expr_heap				:: !.ExpressionHeap
 	,	ccs_symbol_table			:: !.SymbolTable
@@ -445,16 +443,14 @@ get_eei_ident (eii=:ExplImpInfo eii_ident _) = (eii_ident, eii)
 :: CheckCompletenessInputBox = { box_cci :: !CheckCompletenessInput }
 
 checkExplicitImportCompleteness :: ![([Declaration], Position)] ![([Declaration], Int, Position)]
-										!*{#DclModule} !*{#FunDef} !*{#*{#FunDef}} !*ExpressionHeap !*CheckState
-									-> (!.{#DclModule},!.{#FunDef},!*{#*{#FunDef}},!.ExpressionHeap,!.CheckState)
-checkExplicitImportCompleteness dcls_explicit explicit_qualified_imports dcl_modules icl_functions macro_defs expr_heap cs=:{cs_symbol_table, cs_error}
-	#! nr_icl_functions = size icl_functions
+										!*{#DclModule} !*{#*{#FunDef}} !*ExpressionHeap !*CheckState
+									-> (!.{#DclModule},!*{#*{#FunDef}},!.ExpressionHeap,!.CheckState)
+checkExplicitImportCompleteness dcls_explicit explicit_qualified_imports dcl_modules macro_defs expr_heap cs=:{cs_symbol_table, cs_error}
 	#! n_dcl_modules = size dcl_modules
 
 	# (modified_symbol_ptrs,cs_symbol_table) = store_qualified_explicitly_imported_symbols_in_symbol_table explicit_qualified_imports [] cs_symbol_table
 
-	  box_ccs = { ccs_dcl_modules = dcl_modules, ccs_icl_functions = icl_functions, ccs_macro_defs=macro_defs,
-	   			ccs_set_of_visited_icl_funs = createArray nr_icl_functions False,
+	  box_ccs = { ccs_dcl_modules = dcl_modules, ccs_macro_defs=macro_defs,
 	   			ccs_set_of_visited_macros = { {} \\ module_n<-[0..n_dcl_modules-1]},
 				ccs_expr_heap = expr_heap, ccs_symbol_table = cs_symbol_table,
 				ccs_error = cs_error, ccs_heap_changes_accu = modified_symbol_ptrs }
@@ -464,18 +460,14 @@ checkExplicitImportCompleteness dcls_explicit explicit_qualified_imports dcl_mod
 	   					-> foldSt (checkCompleteness main_dcl_module_n position) dcls ccs)
 	   				dcls_explicit
 	   				{ box_ccs = box_ccs }
-	  { ccs_dcl_modules, ccs_icl_functions,ccs_macro_defs,ccs_expr_heap, ccs_symbol_table, ccs_error, ccs_heap_changes_accu } = ccs.box_ccs
+	  { ccs_dcl_modules, ccs_macro_defs,ccs_expr_heap, ccs_symbol_table, ccs_error, ccs_heap_changes_accu } = ccs.box_ccs
 	// repair heap contents
 	  ccs_symbol_table = restore_symbol_table_after_checking_completeness ccs_heap_changes_accu ccs_symbol_table
 
 	  cs = { cs & cs_symbol_table = ccs_symbol_table, cs_error = ccs_error }
-	= (ccs_dcl_modules, ccs_icl_functions,ccs_macro_defs, ccs_expr_heap, cs)
+	= (ccs_dcl_modules, ccs_macro_defs, ccs_expr_heap, cs)
   where
 	checkCompleteness :: !Int !Position !Declaration !*CheckCompletenessStateBox -> *CheckCompletenessStateBox
-	checkCompleteness main_dcl_module_n import_position (Declaration {decl_ident, decl_index, decl_kind=STE_FunctionOrMacro _}) ccs 
-		= checkCompletenessOfMacro decl_ident decl_index main_dcl_module_n import_position ccs
-	checkCompleteness main_dcl_module_n import_position (Declaration {decl_ident, decl_index, decl_kind=STE_Imported (STE_FunctionOrMacro _) mod_index}) ccs 
-		= checkCompletenessOfMacro decl_ident decl_index main_dcl_module_n import_position ccs
 	checkCompleteness main_dcl_module_n import_position (Declaration {decl_ident, decl_index, decl_kind=STE_Imported expl_imp_kind mod_index}) ccs
 		#! ({dcl_common,dcl_functions}, ccs) = ccs!box_ccs.ccs_dcl_modules.[mod_index]
 		   cci = { box_cci = { cci_import_position = import_position, cci_main_dcl_module_n=main_dcl_module_n }}
@@ -502,13 +494,6 @@ checkExplicitImportCompleteness dcls_explicit explicit_qualified_imports dcl_mod
 			= check_completeness macro cci ccs
 		continuation STE_Generic dcl_common dcl_functions cci ccs
 			= ccs // check_completeness not yet implemented
-	
-	checkCompletenessOfMacro :: !Ident !Index !Int !Position !*CheckCompletenessStateBox -> *CheckCompletenessStateBox
-	checkCompletenessOfMacro decl_ident decl_index main_dcl_module_n import_position ccs
-		#! ({fun_body}, ccs) = ccs!box_ccs.ccs_icl_functions.[decl_index]
-		   ccs = { ccs & box_ccs.ccs_set_of_visited_icl_funs.[decl_index] = True }
-		   cci = { box_cci = { cci_import_position = import_position, cci_main_dcl_module_n=main_dcl_module_n }}
-		= check_completeness fun_body cci ccs
 
 instance toString STE_Kind where
 	toString (STE_FunctionOrMacro _)	= "function/macro"
@@ -748,24 +733,11 @@ instance check_completeness SymbIdent where
 				-> check_completeness_for_macro symb_ident global_index cci ccs
 			SK_LocalDclMacroFunction global_index
 				-> check_completeness_for_local_dcl_macro symb_ident global_index cci ccs
-			SK_LocalMacroFunction function_index
-				-> check_completeness_for_local_macro_function symb_ident function_index cci ccs
 			SK_OverloadedFunction {glob_module,glob_object}
 				-> check_whether_ident_is_imported symb_ident glob_module glob_object STE_Member cci ccs
   	  where
 		check_completeness_for_function symb_ident {glob_object,glob_module} cci ccs
-			| glob_module<>cci.box_cci.cci_main_dcl_module_n
-				// the function that is referred from within a macro is a DclFunction
-				// -> must be global -> has to be imported
-				= check_whether_ident_is_imported symb_ident glob_module glob_object (STE_FunctionOrMacro []) cci ccs
-			// otherwise the function was defined locally in a macro
-			// it is not a consequence, but it's type and body are consequences !
-			#! (already_visited, ccs) = ccs!box_ccs.ccs_set_of_visited_icl_funs.[glob_object]
-			| /* ccs.box_ccs.ccs_set_of_visited_icl_funs.[glob_object] */ already_visited
-				= ccs
-				# ccs = { ccs & box_ccs.ccs_set_of_visited_icl_funs.[glob_object] = True }
-				# (fun_def, ccs)	= ccs!box_ccs.ccs_icl_functions.[glob_object]
-				= check_completeness fun_def cci ccs
+			= check_whether_ident_is_imported symb_ident glob_module glob_object (STE_FunctionOrMacro []) cci ccs
 
 		check_completeness_for_macro symb_ident global_index cci ccs
 			| global_index.glob_module<>cci.box_cci.cci_main_dcl_module_n
@@ -790,15 +762,6 @@ instance check_completeness SymbIdent where
 				# ccs = {ccs & box_ccs.ccs_set_of_visited_macros.[glob_module].[glob_object]=True}
 				# (macro_def, ccs) = ccs!box_ccs.ccs_macro_defs.[glob_module,glob_object]
 				= check_completeness macro_def cci ccs
-
-		check_completeness_for_local_macro_function symb_ident glob_object cci ccs
-			// otherwise the function was defined locally in a macro
-			// it is not a consequence, but it's type and body are consequences !
-			| ccs.box_ccs.ccs_set_of_visited_icl_funs.[glob_object]
-				= ccs
-				# ccs = { ccs & box_ccs.ccs_set_of_visited_icl_funs.[glob_object] = True }
-				# (fun_def, ccs)	= ccs!box_ccs.ccs_icl_functions.[glob_object]
-				= check_completeness fun_def cci ccs
 
 instance check_completeness SymbolType where
 	check_completeness {st_args, st_result, st_context} cci ccs

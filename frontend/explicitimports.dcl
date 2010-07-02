@@ -31,8 +31,8 @@ solveExplicitImports :: !(IntKeyHashtable [ExplicitImport]) !{#Int} !Index
 			-> (!.SolvedImports,! (!v:{#DclModule},!.{#Int},!{!.ExplImpInfo},!.CheckState))
 
 checkExplicitImportCompleteness :: ![([Declaration], Position)] ![([Declaration], Int, Position)]
-										!*{#DclModule} !*{#FunDef} !*{#*{#FunDef}} !*ExpressionHeap !*CheckState
-									-> (!.{#DclModule},!.{#FunDef},!*{#*{#FunDef}},!.ExpressionHeap,!.CheckState)
+										!*{#DclModule} !*{#*{#FunDef}} !*ExpressionHeap !*CheckState
+									-> (!.{#DclModule},!*{#*{#FunDef}},!.ExpressionHeap,!.CheckState)
 
 store_qualified_explicit_imports_in_symbol_table :: ![([Declaration],Int,Position)] ![(SymbolPtr,STE_Kind)] !*SymbolTable *{#DclModule} -> (![(SymbolPtr,STE_Kind)],!*SymbolTable,!*{#DclModule})
 

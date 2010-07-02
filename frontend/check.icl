@@ -1171,6 +1171,48 @@ instance < FunDef
 where
 	(<) fd1 fd2 = fd1.fun_ident.id_name < fd2.fun_ident.id_name
 
+		
+collectCommonfinitions :: !(CollectedDefinitions ClassInstance) -> (!*{# Int}, ![Declaration])
+collectCommonfinitions {def_types,def_constructors,def_selectors,def_classes,def_members,def_instances, def_generic_cases, def_generics} 
+	// MW: the order in which the declarations appear in the returned list is essential (explicit imports)
+	# sizes = createArray cConversionTableSize 0
+	  (size, defs) = foldSt cons_def_to_dcl def_constructors (0, [])
+	  sizes = { sizes & [cConstructorDefs] = size }
+	  (size, defs) = foldSt selector_def_to_dcl def_selectors (0, defs)
+	  sizes = { sizes & [cSelectorDefs] = size }
+	  (size, defs) = foldSt type_def_to_dcl def_types (0, defs)
+	  sizes = { sizes & [cTypeDefs] = size }
+	  (size, defs) = foldSt member_def_to_dcl def_members (0, defs)
+	  sizes = { sizes & [cMemberDefs] = size }
+	  (size, defs) = foldSt class_def_to_dcl def_classes (0, defs)
+	  sizes = { sizes & [cClassDefs] = size }
+	  (size, defs) = foldSt instance_def_to_dcl def_instances (0, defs)
+	  sizes = { sizes & [cInstanceDefs] = size }
+	  (size, defs) = foldSt generic_def_to_dcl def_generics (0, defs)
+	  sizes = { sizes & [cGenericDefs] = size }
+	  (size, defs) = foldSt gen_case_def_to_dcl def_generic_cases (0, defs)
+	  sizes = { sizes & [cGenericCaseDefs] = size }
+	= (sizes, defs)
+where
+	type_def_to_dcl {td_ident, td_pos} (decl_index, decls)
+		= (inc decl_index, [Declaration { decl_ident = td_ident, decl_pos = td_pos, decl_kind = STE_Type, decl_index = decl_index } : decls]) 
+	cons_def_to_dcl {cons_ident, cons_pos} (decl_index, decls)
+		= (inc decl_index, [Declaration { decl_ident = cons_ident, decl_pos = cons_pos, decl_kind = STE_Constructor, decl_index = decl_index } : decls]) 
+	selector_def_to_dcl {sd_ident, sd_field, sd_pos} (decl_index, decls)
+		= (inc decl_index, [Declaration { decl_ident = sd_field, decl_pos = sd_pos, decl_kind = STE_Field sd_ident, decl_index = decl_index } : decls]) 
+	class_def_to_dcl {class_ident, class_pos} (decl_index, decls)
+		= (inc decl_index, [Declaration { decl_ident = class_ident, decl_pos = class_pos, decl_kind = STE_Class, decl_index = decl_index } : decls]) 
+	member_def_to_dcl {me_ident, me_pos} (decl_index, decls)
+		= (inc decl_index, [Declaration { decl_ident = me_ident, decl_pos = me_pos, decl_kind = STE_Member, decl_index = decl_index } : decls]) 
+	instance_def_to_dcl {ins_ident, ins_pos} (decl_index, decls)
+		= (inc decl_index, [Declaration { decl_ident = ins_ident, decl_pos = ins_pos, decl_kind = STE_Instance, decl_index = decl_index } : decls])
+	generic_def_to_dcl {gen_ident, gen_member_ident, gen_type, gen_pos} (decl_index, decls)
+		# generic_decl = Declaration { decl_ident = gen_ident, decl_pos = gen_pos, decl_kind = STE_Generic, decl_index = decl_index }
+		# member_decl = Declaration { decl_ident = gen_member_ident, decl_pos = gen_pos, decl_kind = STE_Generic, decl_index = decl_index }
+		= (inc decl_index, [generic_decl, member_decl : decls]) 
+	gen_case_def_to_dcl {gc_ident, gc_pos} (decl_index, decls)
+		= (inc decl_index, [Declaration { decl_ident = gc_ident, decl_pos = gc_pos, decl_kind = STE_GenericCase, decl_index = decl_index } : decls]) 
+
 createCommonDefinitions :: (CollectedDefinitions ClassInstance) -> .CommonDefs;
 createCommonDefinitions {def_types,def_constructors,def_selectors,def_classes,def_members,def_instances, def_generics,def_generic_cases}
 	=	{	com_type_defs		= { type \\ type <- def_types }
@@ -1227,47 +1269,6 @@ checkCommonDefinitions opt_icl_info module_index common modules heaps cs
 							 com_member_defs = com_member_defs,  com_instance_defs = com_instance_defs, 
 							 com_generic_defs = com_generic_defs, com_gencase_defs = com_gencase_defs}	
 		= (dictionary_info,common, modules,	heaps, cs)
-		
-collectCommonfinitions :: !(CollectedDefinitions ClassInstance) -> (!*{# Int}, ![Declaration])
-collectCommonfinitions {def_types,def_constructors,def_selectors,def_classes,def_members,def_instances, def_generic_cases, def_generics} 
-	// MW: the order in which the declarations appear in the returned list is essential (explicit imports)
-	# sizes = createArray cConversionTableSize 0
-	  (size, defs) = foldSt cons_def_to_dcl def_constructors (0, [])
-	  sizes = { sizes & [cConstructorDefs] = size }
-	  (size, defs) = foldSt selector_def_to_dcl def_selectors (0, defs)
-	  sizes = { sizes & [cSelectorDefs] = size }
-	  (size, defs) = foldSt type_def_to_dcl def_types (0, defs)
-	  sizes = { sizes & [cTypeDefs] = size }
-	  (size, defs) = foldSt member_def_to_dcl def_members (0, defs)
-	  sizes = { sizes & [cMemberDefs] = size }
-	  (size, defs) = foldSt class_def_to_dcl def_classes (0, defs)
-	  sizes = { sizes & [cClassDefs] = size }
-	  (size, defs) = foldSt instance_def_to_dcl def_instances (0, defs)
-	  sizes = { sizes & [cInstanceDefs] = size }
-	  (size, defs) = foldSt generic_def_to_dcl def_generics (0, defs)
-	  sizes = { sizes & [cGenericDefs] = size }
-	  (size, defs) = foldSt gen_case_def_to_dcl def_generic_cases (0, defs)
-	  sizes = { sizes & [cGenericCaseDefs] = size }
-	= (sizes, defs)
-where
-	type_def_to_dcl {td_ident, td_pos} (decl_index, decls)
-		= (inc decl_index, [Declaration { decl_ident = td_ident, decl_pos = td_pos, decl_kind = STE_Type, decl_index = decl_index } : decls]) 
-	cons_def_to_dcl {cons_ident, cons_pos} (decl_index, decls)
-		= (inc decl_index, [Declaration { decl_ident = cons_ident, decl_pos = cons_pos, decl_kind = STE_Constructor, decl_index = decl_index } : decls]) 
-	selector_def_to_dcl {sd_ident, sd_field, sd_pos} (decl_index, decls)
-		= (inc decl_index, [Declaration { decl_ident = sd_field, decl_pos = sd_pos, decl_kind = STE_Field sd_ident, decl_index = decl_index } : decls]) 
-	class_def_to_dcl {class_ident, class_pos} (decl_index, decls)
-		= (inc decl_index, [Declaration { decl_ident = class_ident, decl_pos = class_pos, decl_kind = STE_Class, decl_index = decl_index } : decls]) 
-	member_def_to_dcl {me_ident, me_pos} (decl_index, decls)
-		= (inc decl_index, [Declaration { decl_ident = me_ident, decl_pos = me_pos, decl_kind = STE_Member, decl_index = decl_index } : decls]) 
-	instance_def_to_dcl {ins_ident, ins_pos} (decl_index, decls)
-		= (inc decl_index, [Declaration { decl_ident = ins_ident, decl_pos = ins_pos, decl_kind = STE_Instance, decl_index = decl_index } : decls])
-	generic_def_to_dcl {gen_ident, gen_member_ident, gen_type, gen_pos} (decl_index, decls)
-		# generic_decl = Declaration { decl_ident = gen_ident, decl_pos = gen_pos, decl_kind = STE_Generic, decl_index = decl_index }
-		# member_decl = Declaration { decl_ident = gen_member_ident, decl_pos = gen_pos, decl_kind = STE_Generic, decl_index = decl_index }
-		= (inc decl_index, [generic_decl, member_decl : decls]) 
-	gen_case_def_to_dcl {gc_ident, gc_pos} (decl_index, decls)
-		= (inc decl_index, [Declaration { decl_ident = gc_ident, decl_pos = gc_pos, decl_kind = STE_GenericCase, decl_index = decl_index } : decls]) 
 
 collectMacros {ir_from,ir_to} macro_defs sizes_defs
 	= collectGlobalFunctions cMacroDefs ir_from ir_to macro_defs sizes_defs
@@ -1535,7 +1536,6 @@ combineDclAndIclModule _ modules icl_decl_symbols icl_definitions icl_sizes cs
 		, { cs & cs_symbol_table = symbol_table, cs_error=errors }
 		)
 where
-
 	mark_copied_definitions :: !Int ![Index] -> *{# Bool}
 	mark_copied_definitions nr_of_defs not_to_be_checked
 		# marks = createArray nr_of_defs False
@@ -1950,16 +1950,16 @@ checkDclComponent components_array components_importing_module_a expl_imp_indice
 			| not cs.cs_error.ea_ok
 				-> (component_nr-1, expl_imp_infos, dcl_modules, icl_functions, macro_defs, heaps, cs)
 
-			# (dcl_modules, icl_functions,macro_defs,heaps, cs)
+			# (dcl_modules, macro_defs,heaps, cs)
 					= case is_on_cycle of
 						False
-							-> (dcl_modules, icl_functions, macro_defs,heaps, cs)
+							-> (dcl_modules, macro_defs,heaps, cs)
 						True
-							# (dcl_modules, icl_functions, macro_defs,hp_expression_heap, cs)
+							# (dcl_modules, macro_defs,hp_expression_heap, cs)
 									= fold2St check_expl_imp_completeness_of_dcl_mod_within_non_trivial_component
 											mod_indices imports
-											(dcl_modules, icl_functions,macro_defs,heaps.hp_expression_heap, cs)
-							-> (dcl_modules, icl_functions, macro_defs,{ heaps & hp_expression_heap = hp_expression_heap }, cs)	
+											(dcl_modules, macro_defs,heaps.hp_expression_heap, cs)
+							-> (dcl_modules, macro_defs,{ heaps & hp_expression_heap = hp_expression_heap }, cs)	
 			  (dcl_modules, heaps, cs)
 			   		= fold2St checkInstancesOfDclModule mod_indices afterwards_info (dcl_modules, heaps, cs)
 			-> (component_nr-1, expl_imp_infos, dcl_modules, icl_functions, macro_defs, heaps, cs)
@@ -1994,14 +1994,14 @@ checkDclComponent components_array components_importing_module_a expl_imp_indice
 		# ({dcls_local_for_import, dcls_import}, dcl_modules) = dcl_modules![mod_index].dcl_declared
 		= updateExplImpInfoForCachedModule components_importing_module_a.[mod_index] mod_index dcls_import dcls_local_for_import expl_imp_infos dcl_modules cs_symbol_table
 
-	check_expl_imp_completeness_of_dcl_mod_within_non_trivial_component mod_index {si_explicit,si_qualified_explicit} (dcl_modules, icl_functions,macro_defs,hp_expression_heap, cs)
+	check_expl_imp_completeness_of_dcl_mod_within_non_trivial_component mod_index {si_explicit,si_qualified_explicit} (dcl_modules, macro_defs,hp_expression_heap, cs)
 		# ({dcl_declared}, dcl_modules) = dcl_modules![mod_index]
 		  ({dcls_local_for_import, dcls_import}) = dcl_declared
 		  cs = addDeclarationsOfDclModToSymbolTable mod_index dcls_local_for_import dcls_import cs
-		  (dcl_modules, icl_functions,macro_defs,hp_expression_heap, cs=:{cs_symbol_table})
-		  		= checkExplicitImportCompleteness si_explicit si_qualified_explicit dcl_modules icl_functions macro_defs hp_expression_heap cs
+		  (dcl_modules, macro_defs,hp_expression_heap, cs=:{cs_symbol_table})
+		  		= checkExplicitImportCompleteness si_explicit si_qualified_explicit dcl_modules macro_defs hp_expression_heap cs
 		  cs_symbol_table = removeImportsAndLocalsOfModuleFromSymbolTable dcl_declared cs.cs_symbol_table
-		= (dcl_modules, icl_functions,macro_defs,hp_expression_heap, { cs & cs_symbol_table = cs_symbol_table })
+		= (dcl_modules, macro_defs,hp_expression_heap, { cs & cs_symbol_table = cs_symbol_table })
 
 compute_used_module_nrs {ei_module_n=mod_index} (mod_nr_accu, dcl_modules)
 	| inNumberSet mod_index mod_nr_accu
@@ -3442,13 +3442,13 @@ checkDclModule2 dcl_imported_module_numbers components_importing_module imports_
 	  (ef_member_defs, com_instance_defs, dcl_functions, cs)
 	  		= adjust_predefined_symbols mod_index e_info.ef_member_defs com_instance_defs dcl_functions cs
 
-	  (modules, icl_functions, macro_defs, hp_expression_heap, cs)
+	  (modules, macro_defs, hp_expression_heap, cs)
 			= case is_on_cycle of
 				False
 					# {si_explicit,si_qualified_explicit} = ikhSearch` mod_index imports_ikh
-					-> checkExplicitImportCompleteness si_explicit si_qualified_explicit  modules icl_functions macro_defs hp_expression_heap cs
+					-> checkExplicitImportCompleteness si_explicit si_qualified_explicit  modules macro_defs hp_expression_heap cs
 				True
-					-> (modules, icl_functions, macro_defs, hp_expression_heap, cs)
+					-> (modules, macro_defs, hp_expression_heap, cs)
 
 	  heaps = { heaps & hp_expression_heap = hp_expression_heap }
 
