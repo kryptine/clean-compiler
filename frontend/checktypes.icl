@@ -1003,7 +1003,7 @@ where
 	  	# clazz = 
 	  		{ glob_module = -1
 	  		, glob_object = 
-	  			{ ds_ident = genericIdentToClassIdent gen_ident gtc_kind
+	  			{ ds_ident = genericIdentToClassIdent gen_ident.id_name gtc_kind
 	  			, ds_arity = 1
 	  			, ds_index = -1
 	  			}
@@ -1605,7 +1605,7 @@ where
 		// FIXME: We do not know the type before the generic phase.
 		// The generic phase currently does not update the type.
 		# field_type = makeAttributedType TA_Multi TE 
-		# class_ident = genericIdentToClassIdent gtc_generic.glob_object.ds_ident gtc_kind
+		# class_ident = genericIdentToClassIdent gtc_generic.glob_object.ds_ident.id_name gtc_kind
 		# (field, var_heap, symbol_table) = build_field field_nr class_ident.id_name rec_type_index rec_type field_type next_selector_index var_heap symbol_table
 		= build_context_fields mod_index (inc field_nr) tcs rec_type rec_type_index (inc next_selector_index) [ field : rev_fields ]
 				 [field_type : rev_field_types] class_defs modules var_heap symbol_table

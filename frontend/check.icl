@@ -2419,7 +2419,7 @@ check_module1 cdefs icl_global_function_range fun_defs optional_dcl_mod optional
 		convert_generic_instances [gc=:{gc_ident,gc_pos, gc_type_cons, gc_body=GCB_None} : gcs] next_fun_index
 			# (fun_defs, gcs) =  convert_generic_instances gcs (inc next_fun_index)
 			# fun_def = 
- 				{ fun_ident = genericIdentToFunIdent gc_ident gc_type_cons
+ 				{ fun_ident = genericIdentToFunIdent gc_ident.id_name gc_type_cons
  				, fun_arity = 0
  				, fun_priority = NoPrio
  				, fun_body = GeneratedBody
@@ -3333,7 +3333,7 @@ checkInstancesOfDclModule mod_index	(nr_of_dcl_functions_and_instances, nr_of_dc
   			# gencase_def = { gencase_def & gc_body = GCB_FunIndex fun_index }
   			# gencase_defs = {gencase_defs & [gc_index] = gencase_def} 
   			
-			#! fun_ident = genericIdentToFunIdent gc_ident gc_type_cons
+			#! fun_ident = genericIdentToFunIdent gc_ident.id_name gc_type_cons
 		 	#! (var_info_ptr, hp_var_heap) = newPtr VI_Empty hp_var_heap
 	 		#! fun = 
 	  			{ ft_ident = fun_ident

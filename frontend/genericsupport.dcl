@@ -46,7 +46,7 @@ getGenericClass ::
 //	Ident Helpers
 //****************************************************************************************
 makeIdent 					:: !String -> Ident
-postfixIdent 				:: !Ident !String -> Ident
-genericIdentToClassIdent 	:: !Ident !TypeKind -> Ident
-genericIdentToMemberIdent 	:: !Ident !TypeKind -> Ident
-genericIdentToFunIdent 		:: !Ident !TypeCons -> Ident
+postfixIdent 				:: !String !String -> Ident
+genericIdentToClassIdent 	:: !String !TypeKind -> Ident
+genericIdentToMemberIdent 	:: !String !TypeKind -> Ident
+genericIdentToFunIdent 		:: !String !TypeCons -> Ident

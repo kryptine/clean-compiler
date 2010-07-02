@@ -1440,7 +1440,7 @@ reorganiseDefinitions icl_module [PD_GenericCase gc : defs] cons_count sel_count
 		, pb_position = gc.gc_pos 
 		}
 	#! bodies = [body : bodies ]
-	#! fun_name = genericIdentToFunIdent gc.gc_ident gc.gc_type_cons 
+	#! fun_name = genericIdentToFunIdent gc.gc_ident.id_name gc.gc_type_cons 
 	#! fun = MakeNewImpOrDefFunction fun_name gc.gc_arity bodies (FK_Function cNameNotLocationDependent) NoPrio No gc.gc_pos
 	#! inst = { gc & gc_body = GCB_FunDef fun } 
 	#! c_defs = {c_defs & def_generic_cases = [inst : c_defs.def_generic_cases]}

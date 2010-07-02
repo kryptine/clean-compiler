@@ -1517,8 +1517,8 @@ buildClassAndMember
 		//---> ("buildClassAndMember", gen_def.gen_ident, kind)
 where
 
-	class_ident = genericIdentToClassIdent gen_def.gen_ident kind 
-	member_ident = genericIdentToMemberIdent gen_def.gen_ident kind 
+	class_ident = genericIdentToClassIdent gen_def.gen_ident.id_name kind 
+	member_ident = genericIdentToMemberIdent gen_def.gen_ident.id_name kind 
 	class_ds = {ds_index = class_index, ds_ident = class_ident, ds_arity = 1}
 
 	build_class_member class_var gs=:{gs_varh}
@@ -1773,7 +1773,7 @@ where
 					{	tc_class = TCClass
 							{ glob_module=gci_module // the same as icl module
 							, glob_object =
-								{ ds_ident = genericIdentToClassIdent gc_ident gci_kind
+								{ ds_ident = genericIdentToClassIdent gc_ident.id_name gci_kind
 								, ds_index = gci_class
 								, ds_arity = 1
 								}
@@ -1789,7 +1789,7 @@ where
 					
 			#! (expr_info_ptr, hp_expression_heap) = newPtr EI_Empty heaps.hp_expression_heap
 			#! heaps = {heaps & hp_expression_heap = hp_expression_heap}
-			#! fun_name = genericIdentToMemberIdent gc_ident this_kind
+			#! fun_name = genericIdentToMemberIdent gc_ident.id_name this_kind
 	
 			# (gen_exprs, heaps) = mapSt (build_generic_app gc_generic gc_ident) class_infos heaps
 	
@@ -1821,7 +1821,7 @@ where
 			
 			# {gc_pos, gc_ident, gc_kind} = gencase
 			
-			#! class_ident = genericIdentToClassIdent gc_ident this_kind		
+			#! class_ident = genericIdentToClassIdent gc_ident.id_name this_kind		
 			#! class_ds = {ds_index = class_index, ds_arity=1, ds_ident=class_ident}
 			#! ins = 
 			 	{	ins_class 	= {glob_module=gs_main_module, glob_object=class_ds}
@@ -1864,7 +1864,7 @@ where
 		| fun_index < size dcl_functions
 			#! (symbol_type, heaps) = fresh_symbol_type symbol_type heaps			
 			#! (fun, dcl_functions) = dcl_functions ! [fun_index]
-			#! fun = { fun	& ft_ident = genericIdentToFunIdent gc_ident gc_type_cons
+			#! fun = { fun	& ft_ident = genericIdentToFunIdent gc_ident.id_name gc_type_cons
 							, ft_type = symbol_type
 							, ft_arity = symbol_type.st_arity }
 			#! dcl_functions = { dcl_functions & [fun_index] = fun}
@@ -1887,7 +1887,7 @@ where
 	update_icl_function fun_index gencase=:{gc_ident, gc_type_cons, gc_pos} st funs_and_groups fun_defs td_infos modules heaps error
 		#! (st, heaps) = fresh_symbol_type st heaps
 		#! (fun=:{fun_body, fun_arity}, fun_defs) = fun_defs ! [fun_index] 		
-		#! fun_ident = genericIdentToFunIdent gc_ident gc_type_cons
+		#! fun_ident = genericIdentToFunIdent gc_ident.id_name gc_type_cons
 		= case fun_body of 
 			TransformedBody tb	// user defined case
 				| fun_arity <> st.st_arity
@@ -1928,7 +1928,7 @@ where
 		
 			#! (expr_info_ptr, hp_expression_heap) = newPtr EI_Empty heaps.hp_expression_heap
 			#! heaps = {heaps & hp_expression_heap = hp_expression_heap}
-			#! fun_name = genericIdentToFunIdent gc_ident gc_type_cons
+			#! fun_name = genericIdentToFunIdent gc_ident.id_name gc_type_cons
 			#! expr = App 
 				{ app_symb = 
 					{ symb_ident=fun_name
@@ -1940,7 +1940,7 @@ where
 		
 			#! (st, heaps) = fresh_symbol_type st heaps
 		
-			#! memfun_name = genericIdentToMemberIdent gc_ident gc_kind
+			#! memfun_name = genericIdentToMemberIdent gc_ident.id_name gc_kind
 			#! (fun_ds, fun_info) 
 				= buildFunAndGroup memfun_name arg_vars expr (Yes st) gs_main_module gc_pos fun_info
 			= (fun_ds, fun_info, heaps)
@@ -1949,7 +1949,7 @@ where
 		
 		# {gc_pos, gc_ident, gc_kind} = gencase
 		
-		#! class_ident = genericIdentToClassIdent gc_ident gc_kind		
+		#! class_ident = genericIdentToClassIdent gc_ident.id_name gc_kind
 		#! class_ds = {ds_index = class_index, ds_arity=1, ds_ident=class_ident}
 		#! ins = 
 		 	{	ins_class 	= {glob_module=gs_main_module, glob_object=class_ds}
@@ -2269,7 +2269,7 @@ where
 				# clazz = 
 					{ glob_module = class_info.gci_module
 					, glob_object = 
-						{ ds_ident = genericIdentToClassIdent gtc_generic.glob_object.ds_ident gtc_kind 
+						{ ds_ident = genericIdentToClassIdent gtc_generic.glob_object.ds_ident.id_name gtc_kind 
 						, ds_arity = 1
 						, ds_index = class_info.gci_class
 						}
@@ -3151,11 +3151,11 @@ where
 			
 		// generic type var is replaced with a fresh one
 		subst_gtv {tv_info_ptr, tv_ident} th_vars 
-			# (tv, th_vars) = freshTypeVar (postfixIdent tv_ident postfix) th_vars	
+			# (tv, th_vars) = freshTypeVar (postfixIdent tv_ident.id_name postfix) th_vars	
 			= (tv, writePtr tv_info_ptr (TVI_Type (TV tv)) th_vars)
 		
 		subst_attr (TA_Var {av_ident, av_info_ptr}) th_attrs 
-			# (av, th_attrs) = freshAttrVar (postfixIdent av_ident postfix) th_attrs
+			# (av, th_attrs) = freshAttrVar (postfixIdent av_ident.id_name postfix) th_attrs
 			= (TA_Var av, writePtr av_info_ptr (AVI_Attr (TA_Var av)) th_attrs)
 				//---> ("(2) writePtr av_info_ptr", ptrToInt av_info_ptr, av)
 		subst_attr TA_Multi th = (TA_Multi, th)

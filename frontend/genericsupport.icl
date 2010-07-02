@@ -79,12 +79,12 @@ addGenericClassInfo class_info=:{gci_kind} class_infos
 makeIdent :: !String -> Ident
 makeIdent str = {id_name = str, id_info = nilPtr} 
 
-postfixIdent :: !Ident !String -> Ident
-postfixIdent {id_name} postfix = makeIdent (id_name +++ postfix)
+postfixIdent :: !String !String -> Ident
+postfixIdent id_name postfix = makeIdent (id_name +++ postfix)
 
-genericIdentToClassIdent :: !Ident !TypeKind -> Ident
-genericIdentToClassIdent gen_ident kind
-	= postfixIdent gen_ident ("_" +++ kind_to_str kind) 
+genericIdentToClassIdent :: !String !TypeKind -> Ident
+genericIdentToClassIdent id_name kind
+	= postfixIdent id_name ("_" +++ kind_to_str kind) 
 where
 	kind_to_str KindConst = "s"
 	kind_to_str (KindArrow kinds) 
@@ -93,13 +93,13 @@ where
 	kinds_to_str [KindConst:ks] = "s" +++ kinds_to_str ks
 	kinds_to_str [k:ks] = "o" +++ (kind_to_str k) +++ "c" +++ kinds_to_str ks	
 
-genericIdentToMemberIdent :: !Ident !TypeKind -> Ident
-genericIdentToMemberIdent gen_ident kind
-	= genericIdentToClassIdent gen_ident kind
+genericIdentToMemberIdent :: !String !TypeKind -> Ident
+genericIdentToMemberIdent id_name kind
+	= genericIdentToClassIdent id_name kind
 
-genericIdentToFunIdent :: !Ident !TypeCons -> Ident
-genericIdentToFunIdent gen_ident type_cons
-	= postfixIdent gen_ident ("_" +++ type_cons_to_str type_cons)
+genericIdentToFunIdent :: !String !TypeCons -> Ident
+genericIdentToFunIdent id_name type_cons
+	= postfixIdent id_name ("_" +++ type_cons_to_str type_cons)
 where
 	type_cons_to_str (TypeConsSymb {type_ident}) = toString type_ident
 	type_cons_to_str (TypeConsBasic bt) = toString bt
