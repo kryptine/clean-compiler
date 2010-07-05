@@ -1145,8 +1145,8 @@ checkAndPartitionateDclMacros mod_index range fun_defs e_info=:{ef_is_macro_fun=
 			= checkDclMacros mod_index cGlobalScope range.ir_from range.ir_to fun_defs { e_info & ef_is_macro_fun=True } heaps cs
 	  (e_info=:{ef_macro_defs}) = { e_info & ef_is_macro_fun=ef_is_macro_fun_old }
 	# (predef_symbols_for_transform, cs_predef_symbols) = get_predef_symbols_for_transform cs_predef_symbols
-	  (fun_defs, macro_defs, hp_var_heap, hp_expression_heap, cs_symbol_table, cs_error)
-	  		= partitionateDclMacros range mod_index predef_symbols_for_transform fun_defs ef_macro_defs hp_var_heap hp_expression_heap cs_symbol_table cs_error
+	  (macro_defs, hp_var_heap, hp_expression_heap, cs_symbol_table, cs_error)
+	  		= partitionateDclMacros range mod_index predef_symbols_for_transform ef_macro_defs hp_var_heap hp_expression_heap cs_symbol_table cs_error
 	= (fun_defs, { e_info & ef_macro_defs=macro_defs }, {heaps &  hp_var_heap = hp_var_heap, hp_expression_heap = hp_expression_heap},
 			{ cs & cs_symbol_table = cs_symbol_table, cs_predef_symbols = cs_predef_symbols, cs_error = cs_error })
 

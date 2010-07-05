@@ -388,9 +388,9 @@ where
 	unfold (Case case_expr) us
 		# (case_expr, us) = unfold case_expr us
 		= (Case case_expr, us)
-	unfold (Selection is_unique expr selectors) us
+	unfold (Selection selector_kind expr selectors) us
 		# ((expr, selectors), us) = unfold (expr, selectors) us
-		= (Selection is_unique expr selectors, us)
+		= (Selection selector_kind expr selectors, us)
 	unfold (Update expr1 selectors expr2) us
 		# (((expr1, expr2), selectors), us) = unfold ((expr1, expr2), selectors) us
 		= (Update expr1 selectors expr2, us)
@@ -981,18 +981,18 @@ partitionate_icl_macro mod_index max_fun_nr predef_symbols_for_transform macro_i
 	 			-> pi
 		= pi
 
-partitionateDclMacros :: !IndexRange !Index !PredefSymbolsForTransform !*{#FunDef} !*{#*{#FunDef}} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
-																   -> (!*{#FunDef},!*{#*{#FunDef}},!*VarHeap,!*ExpressionHeap,!*SymbolTable,!*ErrorAdmin )
-partitionateDclMacros {ir_from,ir_to} mod_index predef_symbols_for_transform fun_defs macro_defs var_heap symbol_heap symbol_table error
+partitionateDclMacros :: !IndexRange !Index !PredefSymbolsForTransform !*{#*{#FunDef}} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
+																   -> (!*{#*{#FunDef}},!*VarHeap,!*ExpressionHeap,!*SymbolTable,!*ErrorAdmin )
+partitionateDclMacros {ir_from,ir_to} mod_index predef_symbols_for_transform macro_defs var_heap symbol_heap symbol_table error
 	#! max_fun_nr = cMAXINT
 	# partitioning_info = { pi_var_heap = var_heap, pi_symbol_heap = symbol_heap,
-							pi_symbol_table = symbol_table, pi_fun_defs=fun_defs, pi_macro_defs=macro_defs,
+							pi_symbol_table = symbol_table, pi_fun_defs={}, pi_macro_defs=macro_defs,
 							pi_error = error, pi_deps = [], pi_next_num = 0, pi_next_group = 0, pi_groups = [],
 							pi_unexpanded_dcl_macros=[] }
 	  {pi_symbol_table, pi_var_heap, pi_symbol_heap, pi_fun_defs, pi_macro_defs, pi_error, pi_next_group, pi_groups, pi_deps}
 	  		= iFoldSt (partitionate_dcl_macro mod_index max_fun_nr predef_symbols_for_transform) ir_from ir_to partitioning_info
-	  (fun_defs,macro_defs) = reset_body_of_rhs_macros pi_deps pi_fun_defs pi_macro_defs
-	= (fun_defs,macro_defs, pi_var_heap, pi_symbol_heap, pi_symbol_table, pi_error)
+	  (_,macro_defs) = reset_body_of_rhs_macros pi_deps pi_fun_defs pi_macro_defs
+	= (macro_defs, pi_var_heap, pi_symbol_heap, pi_symbol_table, pi_error)
 
 partitionateIclMacros :: !IndexRange !Index !PredefSymbolsForTransform !*{#FunDef} !*{#*{#FunDef}} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
 																   -> (!*{#FunDef},!*{#*{#FunDef}},!*VarHeap,!*ExpressionHeap,!*SymbolTable,!*ErrorAdmin )
