@@ -8,8 +8,8 @@ checkModule :: !ScannedModule !IndexRange ![FunDef] !Bool !Bool !Int !(Optional 
 checkFunctions :: !Index !Level !Index !Index !Int !*{#FunDef} !*ExpressionInfo !*Heaps !*CheckState
 											   -> (!*{#FunDef},!*ExpressionInfo,!*Heaps,!*CheckState)
 
-checkDclMacros :: !Index !Level !Index !Index !*{#FunDef} !*ExpressionInfo !*Heaps !*CheckState
-										  -> (!*{#FunDef},!*ExpressionInfo,!*Heaps,!*CheckState)
+checkDclMacros :: !Index !Level !Index !Index !*ExpressionInfo !*Heaps !*CheckState
+										  -> (!*ExpressionInfo,!*Heaps,!*CheckState)
 
 checkForeignExportedFunctionTypes :: ![ForeignExport] !*ErrorAdmin !p:PredefinedSymbols !*{#FunDef}
 												  -> (!*ErrorAdmin,!p:PredefinedSymbols,!*{#FunDef})

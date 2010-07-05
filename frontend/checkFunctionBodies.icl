@@ -502,7 +502,8 @@ checkLocalFunctions mod_index level (CollectedLocalDefs {loc_functions={ir_from,
 	# ir_to=ir_to+local_functions_index_offset
 	| loc_in_icl_module
 		= checkFunctions mod_index level ir_from ir_to local_functions_index_offset fun_defs e_info heaps cs
-		= checkDclMacros mod_index level ir_from ir_to fun_defs e_info heaps cs
+		# (e_info,heaps,cs) = checkDclMacros mod_index level ir_from ir_to e_info heaps cs
+		= (fun_defs,e_info,heaps,cs)
 
 checkExpression :: ![FreeVar] !ParsedExpr !ExpressionInput !*ExpressionState !*ExpressionInfo !*CheckState
 	-> *(!Expression, ![FreeVar], !*ExpressionState, !*ExpressionInfo, !*CheckState);
