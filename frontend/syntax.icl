@@ -517,7 +517,7 @@ where
 instance <<< FieldNameOrQualifiedFieldName
 where
 	(<<<) file (FieldName ident) = file <<< ident
-	(<<<) file (QualifiedFieldName module_ident field_name) = file <<< module_ident <<< '@' <<< field_name
+	(<<<) file (QualifiedFieldName module_ident field_name) = file <<< '.' <<< module_ident <<< "'." <<< field_name
 
 instance <<< CaseAlt
 where

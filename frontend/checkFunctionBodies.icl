@@ -1797,9 +1797,9 @@ checkQualifiedMacroPatternConstructor macro=:{fun_ident,fun_arity,fun_kind,fun_p
 			# (pattern, ps, ef_modules, ef_cons_defs, cs_error)
 					= unfoldPatternMacro macro mod_index [] opt_var ps e_info.ef_modules e_info.ef_cons_defs cs_error
 			= (pattern, ps, { e_info & ef_modules = ef_modules, ef_cons_defs = ef_cons_defs }, { cs & cs_error = cs_error })
-			# name=module_name+++"@"+++ident_name
+			# name="'"+++module_name+++"'."+++ident_name
 			= (AP_Empty, ps, e_info, { cs & cs_error = checkError name "not defined" cs_error })
-		# name=module_name+++"@"+++ident_name
+		# name="'"+++module_name+++"'."+++ident_name
 		= (AP_Empty, ps, e_info, { cs & cs_error = checkError name "not allowed in a pattern" cs_error })
 
 checkPatternConstructor :: !Index !Bool !SymbolTableEntry !Ident !(Optional (Bind Ident VarInfoPtr)) !*PatternState !*ExpressionInfo !*CheckState
@@ -1844,7 +1844,7 @@ where
 checkQualifiedPatternConstructor :: !STE_Kind !Index !Ident !{#Char} !{#Char} !Index !Bool !(Optional (Bind Ident VarInfoPtr)) !*PatternState !*ExpressionInfo !*CheckState
 	-> (!AuxiliaryPattern, !*PatternState, !*ExpressionInfo, !*CheckState);
 checkQualifiedPatternConstructor STE_Empty _ decl_ident module_name ident_name _ _ _  ps e_info cs=:{cs_error}
-	# name=module_name+++"@"+++ident_name
+	# name="'"+++module_name+++"'."+++ident_name
 	= (AP_Empty, ps, e_info, { cs & cs_error = checkError name "not defined" cs_error })
 checkQualifiedPatternConstructor (STE_FunctionOrMacro _) ste_index decl_ident module_name ident_name mod_index is_expr_list opt_var ps e_info cs=:{cs_x}
 	# (macro,ps) = ps!ps_fun_defs.[ste_index]
@@ -1879,7 +1879,7 @@ where
 		  {cons_type={st_arity},cons_priority,cons_type_index,cons_number} = dcl_common.com_cons_defs.[id_index]
 		= (id_index, import_mod_index, st_arity, cons_priority, cons_type_index, cons_number, cons_defs, modules, error)
 	determine_pattern_symbol mod_index id_index id_kind module_name ident_name cons_defs modules error
-		= (id_index, NoIndex, 0, NoPrio, NoIndex, NoIndex, cons_defs, modules, checkError (module_name+++"@"+++ident_name) "constructor expected" error)
+		= (id_index, NoIndex, 0, NoPrio, NoIndex, NoIndex, cons_defs, modules, checkError ("'"+++module_name+++"'."+++ident_name) "constructor expected" error)
 
 checkBoundPattern {bind_src,bind_dst} opt_var p_input (var_env, array_patterns) ps e_info cs=:{cs_symbol_table}
 	| isLowerCaseName bind_dst.id_name
@@ -1924,7 +1924,7 @@ checkQualifiedIdentPattern is_expr_list module_id ident_name opt_var {pi_mod_ind
 				# (pattern, ps, e_info, cs) = checkQualifiedPatternConstructor decl_kind decl_index decl_ident module_id.id_name ident_name pi_mod_index is_expr_list opt_var ps e_info cs
 				-> (pattern, accus, ps, e_info, cs)
 			_
-				-> (AP_Empty, accus, ps, e_info, { cs & cs_error = checkError (module_id.id_name+++"@"+++ident_name) "not imported" cs.cs_error })
+				-> (AP_Empty, accus, ps, e_info, { cs & cs_error = checkError ("'"+++module_id.id_name+++"'."+++ident_name) "not imported" cs.cs_error })
 
 convertSubPatterns :: [AuxiliaryPattern] Expression Position *(Heap VarInfo) *(Heap ExprInfo) u:[Ptr ExprInfo] *CheckState -> *(!.[FreeVar],!Expression,!Position,!*Heap VarInfo,!*Heap ExprInfo,!u:[Ptr ExprInfo],!*CheckState);
 convertSubPatterns [] result_expr pattern_position var_store expr_heap opt_dynamics cs
@@ -2305,7 +2305,7 @@ where
 		not_imported_error cs
 			# selector = {id_name=field_name,id_info=nilPtr}
 			= (RecordSelection {glob_object = MakeDefinedSymbol selector NoIndex 1,glob_module = NoIndex} NoIndex,
-				free_vars, e_state, e_info, {cs & cs_error = checkError (module_id.id_name+++"@"+++field_name) "not imported" cs.cs_error })
+				free_vars, e_state, e_info, {cs & cs_error = checkError ("'"+++module_id.id_name+++"'."+++field_name) "not imported" cs.cs_error })
 
 	check_selector end_with_update free_vars (PS_Array index_expr) e_input e_state e_info cs
 		| end_with_update
@@ -2344,7 +2344,7 @@ get_field_nr mod_index (RecordNameQualifiedIdent module_id record_name) selector
 						{cs & cs_error = checkError id_name "selector not defined" cs.cs_error })
 			_
 				-> (NoIndex, NoIndex, NoIndex, selector_defs, modules,
-					{cs & cs_error = checkError (module_id.id_name+++"@"+++record_name) "type not defined" cs.cs_error} )
+					{cs & cs_error = checkError ("'"+++module_id.id_name+++"'."+++record_name) "type not defined" cs.cs_error} )
 get_field_nr mod_index NoRecordName [{glob_object,glob_module}] id_name selector_defs modules cs
 	| mod_index == glob_module
 		# (selector_offset,selector_defs) = selector_defs![glob_object].sd_field_nr
@@ -2419,7 +2419,7 @@ where
 				-> (False, [], { cs & cs_error = checkError module_id "not defined" cs.cs_error })
 		where
 			not_imported_error cs
-				= (False, [], { cs & cs_error = checkError (module_id.id_name+++"@"+++field_name) "not defined as a record field" cs.cs_error })
+				= (False, [], { cs & cs_error = checkError ("'"+++module_id.id_name+++"'."+++field_name) "not defined as a record field" cs.cs_error })
 	check_fields [] cs
 		= (True, [], cs)
 
@@ -2453,7 +2453,7 @@ where
 						# (type_def, modules) = modules![type_mod_index].dcl_common.com_type_defs.[decl_index]
 						-> (Yes (type_def, type_mod_index), selector_defs, type_defs, modules, cs)
 				_
-					-> (No, selector_defs, type_defs, modules, { cs & cs_error = checkError (module_id.id_name+++"@"+++record_name) "not imported" cs.cs_error })
+					-> (No, selector_defs, type_defs, modules, { cs & cs_error = checkError ("'"+++module_id.id_name+++"'."+++record_name) "not imported" cs.cs_error })
 
 	determine_record_type mod_index NoRecordName fields selector_defs type_defs modules cs=:{cs_error}
 		# succ = try_to_get_unique_field fields
