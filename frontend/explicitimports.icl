@@ -133,7 +133,8 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 		# (not_exported_symbols,decl_accu, unsolved_belonging, visited_modules, expl_imp_info)
 				= search_expl_imp_symbols imported_symbols expl_imp_indices_ikh modules_in_component_set path imported_mod
 						([],[], [], visited_modules, expl_imp_info)
-		  (expl_imp_info,cs_error) = report_not_exported_symbol_errors not_exported_symbols position expl_imp_info cs.cs_error
+		  (expl_imp_info,dcl_modules,cs_error)
+		  		= report_not_exported_symbol_errors not_exported_symbols position expl_imp_info imported_mod dcl_modules cs.cs_error
 		  (decl_accu, dcl_modules, visited_modules, expl_imp_info, cs)
 		  		= solve_belongings unsolved_belonging position expl_imp_indices_ikh modules_in_component_set path
 		  				(decl_accu, dcl_modules, visited_modules, expl_imp_info, { cs & cs_error = cs_error }) 
@@ -144,7 +145,8 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 		# (not_exported_symbols,decl_accu, unsolved_belonging, visited_modules, expl_imp_info)
 				= search_expl_imp_symbols imported_symbols expl_imp_indices_ikh modules_in_component_set path imported_mod
 						([],[], [], visited_modules, expl_imp_info)
-		  (expl_imp_info,cs_error) = report_not_exported_symbol_errors not_exported_symbols position expl_imp_info cs.cs_error
+		  (expl_imp_info,dcl_modules,cs_error)
+		  		= report_not_exported_symbol_errors not_exported_symbols position expl_imp_info imported_mod dcl_modules cs.cs_error
 		  (decl_accu, dcl_modules, visited_modules, expl_imp_info, cs)
 		  		= solve_belongings unsolved_belonging position expl_imp_indices_ikh modules_in_component_set path
 		  				(decl_accu, dcl_modules, visited_modules, expl_imp_info, { cs & cs_error = cs_error }) 
@@ -202,15 +204,13 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 				  (belong_decl, dcl_modules) = get_nth_belonging_decl position belong_nr decl dcl_modules
 				-> ([belong_decl:decls_accu], dcl_modules, eii_declaring_modules, visited_modules, cs_error)
 			_
-				# cs_error
-					= case need_all of
-						True
-							# cs_error = pushErrorAdmin (newPosition import_ident position) cs_error
-							  cs_error = checkError belong_ident ("of "+++eii_ident.id_name+++" not exported by the specified module") cs_error
-							-> popErrorAdmin cs_error
-						_
-							-> cs_error
-				-> (decls_accu, dcl_modules, eii_declaring_modules, visited_modules, cs_error)
+				| need_all
+					# (module_name,dcl_modules)=dcl_modules![imported_mod].dcl_name.id_name
+					  cs_error = pushErrorAdmin (newPosition import_ident position) cs_error
+					  cs_error = checkError belong_ident ("of "+++eii_ident.id_name+++" not exported by module "+++module_name) cs_error
+					  cs_error = popErrorAdmin cs_error
+					-> (decls_accu, dcl_modules, eii_declaring_modules, visited_modules, cs_error)
+					-> (decls_accu, dcl_modules, eii_declaring_modules, visited_modules, cs_error)
 
 	store_belonging belong_nr ini_symbol_nr mod_index eii_declaring_modules
 		# (Yes di=:{di_belonging}, eii_declaring_modules)
@@ -401,14 +401,15 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 			= True
 		= is_member belong_ident t
 
-	report_not_exported_symbol_errors [{ini_symbol_nr,ini_imp_decl}:not_exported_symbols] position expl_imp_info cs_error
+	report_not_exported_symbol_errors [{ini_symbol_nr,ini_imp_decl}:not_exported_symbols] position expl_imp_info imported_mod dcl_modules cs_error
 		# (eii_ident, expl_imp_info) = do_a_lot_just_to_read_an_array_2 ini_symbol_nr expl_imp_info
-		  cs_error = popErrorAdmin (checkError eii_ident 
-									("not exported as a "+++impDeclToNameSpaceString ini_imp_decl +++" by the specified module")
+		  (module_name,dcl_modules)=dcl_modules![imported_mod].dcl_name.id_name
+		  cs_error = popErrorAdmin (checkError eii_ident
+									("not exported as a "+++impDeclToNameSpaceString ini_imp_decl +++" by module "+++module_name)
 									(pushErrorAdmin (newPosition import_ident position) cs_error))
-		= report_not_exported_symbol_errors not_exported_symbols position expl_imp_info cs_error
-	report_not_exported_symbol_errors [] position expl_imp_info cs_error
-		= (expl_imp_info,cs_error)
+		= report_not_exported_symbol_errors not_exported_symbols position expl_imp_info imported_mod dcl_modules cs_error
+	report_not_exported_symbol_errors [] position expl_imp_info imported_mod dcl_modules cs_error
+		= (expl_imp_info,dcl_modules,cs_error)
 
 	do_a_lot_just_to_read_an_array_2 i expl_imp_info
 		# (eii, expl_imp_info) = replace expl_imp_info i TemporarilyFetchedAway
@@ -884,7 +885,7 @@ restore_symbol_table_after_checking_completeness modified_symbol_ptrs symbol_tab
 						= ste_kind
 			= writePtr symbol_ptr {symbol_ste & ste_kind=ste_kind} symbol_table
 
-store_qualified_explicit_imports_in_symbol_table :: ![([Declaration],Int,Position)] ![(SymbolPtr,STE_Kind)] !*SymbolTable *{#DclModule} -> (![(SymbolPtr,STE_Kind)],!*SymbolTable,!*{#DclModule})
+store_qualified_explicit_imports_in_symbol_table :: ![([Declaration],Int,Position)] ![(SymbolPtr,STE_Kind)] !*SymbolTable !*{#DclModule} -> (![(SymbolPtr,STE_Kind)],!*SymbolTable,!*{#DclModule})
 store_qualified_explicit_imports_in_symbol_table [(declarations,module_n,position):qualified_explicit_imports] modified_ste_kinds symbol_table modules
 	# (module_symbol_ptr,modules) = modules![module_n].dcl_name.id_info
 	  (module_ste=:{ste_kind},symbol_table) = readPtr module_symbol_ptr symbol_table

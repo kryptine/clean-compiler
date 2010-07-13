@@ -34,7 +34,7 @@ checkExplicitImportCompleteness :: ![([Declaration], Position)] ![([Declaration]
 										!*{#DclModule} !*{#*{#FunDef}} !*ExpressionHeap !*CheckState
 									-> (!.{#DclModule},!*{#*{#FunDef}},!.ExpressionHeap,!.CheckState)
 
-store_qualified_explicit_imports_in_symbol_table :: ![([Declaration],Int,Position)] ![(SymbolPtr,STE_Kind)] !*SymbolTable *{#DclModule} -> (![(SymbolPtr,STE_Kind)],!*SymbolTable,!*{#DclModule})
+store_qualified_explicit_imports_in_symbol_table :: ![([Declaration],Int,Position)] ![(SymbolPtr,STE_Kind)] !*SymbolTable !*{#DclModule} -> (![(SymbolPtr,STE_Kind)],!*SymbolTable,!*{#DclModule})
 
 :: NameSpaceN:==Int
 
