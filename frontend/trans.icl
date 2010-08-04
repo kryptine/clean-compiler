@@ -1983,10 +1983,8 @@ determine_arg PR_Unused _ form prod_index (_,ro) das=:{das_var_heap}
 
 determine_arg (PR_Class class_app free_vars_and_types class_type) _ {fv_info_ptr} prod_index (_,ro)
 			  das=:{das_arg_types, das_subst, das_type_heaps, das_predef}
-	# (ws_arg_type, das_arg_types)
-			= das_arg_types![prod_index]
-	# {ats_types=[arg_type:_]}
-	  		= ws_arg_type
+	# (ws_arg_type, das_arg_types) = das_arg_types![prod_index]
+	# {ats_types=[arg_type:_]} = ws_arg_type
 	  (int_class_type, das_type_heaps)
 	  		= substitute class_type das_type_heaps
 	  class_atype = { empty_atype & at_type = int_class_type }
@@ -4850,7 +4848,7 @@ where
 		  cs = { cs & cs_symbol_heap = cs_symbol_heap, cs_opt_type_heaps = cs_opt_type_heaps, cs_cleanup_info=cs_cleanup_info }
 		  ((case_guards,case_default), cs) = copy (case_guards,case_default) ci cs
 		  (case_expr, cs) = update_active_case_info_and_copy case_expr new_info_ptr cs
-		= ({ kees & case_expr = case_expr,case_guards = case_guards, case_default = case_default, case_info_ptr =  new_info_ptr}, cs)
+		= ({ kees & case_expr = case_expr,case_guards = case_guards, case_default = case_default, case_info_ptr = new_info_ptr}, cs)
 	where
 		update_active_case_info_and_copy case_expr=:(Var {var_info_ptr}) case_info_ptr cs
 			# (case_info, cs_symbol_heap) = readPtr case_info_ptr cs.cs_symbol_heap
@@ -4891,15 +4889,36 @@ where
 				  cs = {cs & cs_var_heap=var_heap}
 				= case var_info of
 					VI_ExpressionOrBody _ fun_ident {tb_args, tb_rhs} new_aci_params
-						# free_vars = var_list_to_free_var_list exprs
-						  tb_args_ptrs = [fv_info_ptr \\ {fv_info_ptr}<-tb_args] 
+						# tb_args_ptrs = [fv_info_ptr \\ {fv_info_ptr}<-tb_args] 
 						  (original_bindings, cs_var_heap) = mapSt readPtr tb_args_ptrs cs.cs_var_heap
-						  cs_var_heap = bind_vars tb_args_ptrs (new_aci_params++free_vars) cs_var_heap
-						  cs = { cs & cs_var_heap = cs_var_heap }
+						  (extra_exprs,cs_var_heap) = bind_variables tb_args_ptrs new_aci_params exprs cs_var_heap
+						  cs = {cs & cs_var_heap = cs_var_heap}
 						  (expr,cs) = copy tb_rhs ci cs
 						  cs_var_heap = fold2St writePtr tb_args_ptrs original_bindings cs.cs_var_heap
 						  cs = {cs & cs_var_heap = cs_var_heap}
-						-> (expr,cs)
+						-> case extra_exprs of
+							[]
+								-> (expr,cs)
+							extra_exprs
+								-> (expr @ extra_exprs, cs)
+						where
+							bind_variables :: [VarInfoPtr] [FreeVar] [Expression] *VarHeap -> (![Expression],!*VarHeap)
+							bind_variables [fv_info_ptr:arg_ptrs] [{fv_ident=name, fv_info_ptr=info_ptr}:new_aci_params] exprs var_heap
+								# (exprs,var_heap) = bind_variables arg_ptrs new_aci_params exprs var_heap
+								# var_heap = writeVarInfo fv_info_ptr (VI_Expression (Var {var_ident=name, var_info_ptr=info_ptr, var_expr_ptr = nilPtr})) var_heap
+								= (exprs,var_heap)
+							bind_variables arg_ptrs=:[_:_] [] exprs var_heap
+								= bind_variables_for_exprs arg_ptrs exprs var_heap
+							bind_variables [] [] exprs var_heap
+								= (exprs,var_heap)
+
+							bind_variables_for_exprs :: [VarInfoPtr] [Expression] *VarHeap -> (![Expression],!*VarHeap)
+							bind_variables_for_exprs [fv_info_ptr:arg_ptrs] [Var {var_ident=name, var_info_ptr=info_ptr}:exprs] var_heap
+								# (exprs,var_heap) = bind_variables_for_exprs arg_ptrs exprs var_heap
+								# var_heap = writeVarInfo fv_info_ptr (VI_Expression (Var {var_ident=name, var_info_ptr=info_ptr, var_expr_ptr = nilPtr})) var_heap
+								= (exprs,var_heap)
+							bind_variables_for_exprs [] exprs var_heap
+								= (exprs,var_heap)
 					_
 						# (expr,cs) = copyVariable var ci cs
 						-> (expr @ exprs, cs)
@@ -4909,11 +4928,6 @@ where
 				is_var_list [Var _:exprs] = is_var_list exprs
 				is_var_list [_ : _] = False
 				is_var_list [] = True
-
-				var_list_to_free_var_list [Var {var_ident,var_info_ptr}:exprs]
-					= [{fv_ident=var_ident, fv_def_level=NotALevel, fv_info_ptr=var_info_ptr, fv_count = 0}:var_list_to_free_var_list exprs]
-				var_list_to_free_var_list []
-					= []
 		update_active_case_info_and_copy case_expr _ cs
 			= copy case_expr ci cs
 
