@@ -3492,7 +3492,7 @@ static int generate_code_for_switch_node (NodeP node,int asp,int bsp,struct esc 
 								return need_next_alternative;
 							}
 #if defined (TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS)
-							if (!(arg->arg_next->arg_node->node_kind==DefaultNode))
+							if (!(arg->arg_next!=NULL && arg->arg_next->arg_node->node_kind==DefaultNode))
 #endif
 							GenJmp (&case_label);
 							matches_always=1;
