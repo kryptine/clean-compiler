@@ -42,8 +42,7 @@ Global
 		Path:	{Project}\main
 		Path:	{Project}\main\Windows
 		Path:	{Project}\backend\Windows
-		Path:	{Application}\Libraries\ArgEnvWindows 1.0.3
-		Path:	{Application}\Libraries\ArgEnvWindows
+		Path:	{Application}\Libraries\ArgEnv
 	Precompile:	
 	Postlink:	
 MainModule
