@@ -38,11 +38,10 @@ Global
 	Paths
 		Path:	{Project}\frontend
 		Path:	{Project}\backend
-		Path:	{Project}\backendCModules
 		Path:	{Project}\main
 		Path:	{Project}\main\Windows
 		Path:	{Project}\backend\Windows
-		Path:	{Application}\Libraries\ArgEnvWindows
+		Path:	{Application}\Libraries\ArgEnv
 	Precompile:	
 	Postlink:	
 MainModule
