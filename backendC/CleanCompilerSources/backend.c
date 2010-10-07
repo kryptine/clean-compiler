@@ -2403,7 +2403,7 @@ BERuleAlt (int line, BENodeDefP lhsDefs, BENodeP lhs, BENodeDefP rhsDefs, BEStri
 	alt->alt_lhs_defs 			= CollectNodeDefs (lhs, lhsDefs);
 	alt->alt_rhs_root			= rhs;
 	alt->alt_rhs_defs 			= rhsDefs;
-	alt->alt_line				= line;
+	alt->alt_line				= line<0 ? 0 : line;
 	alt->alt_kind				= Contractum;
 	alt->alt_strict_node_ids	= rhsStrictNodeIds;
 
@@ -2428,7 +2428,7 @@ BECodeAlt (int line, BENodeDefP lhsDefs, BENodeP lhs, BECodeBlockP codeBlock)
 	alt->alt_lhs_defs 			= CollectNodeDefs (lhs, lhsDefs);
 	alt->alt_rhs_code			= codeBlock;
 	alt->alt_rhs_defs 			= NULL;
-	alt->alt_line				= line;
+	alt->alt_line				= line<0 ? 0 : line;
 	alt->alt_kind				= ExternalCall;
 	alt->alt_strict_node_ids	= NULL;
 
