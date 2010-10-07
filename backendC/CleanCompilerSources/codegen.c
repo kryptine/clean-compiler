@@ -953,10 +953,13 @@ static void CodeRule (ImpRuleP rule)
 	
 	if (rule_may_fail){
 		++CurrentAltLabel.lab_post;
-		
+
 		CurrentLine=rule->rule_alts->alt_line;
-		StaticMessage (FunctionMayFailIsError, "%S", "function may fail", CurrentSymbol);
-	
+#if CLEAN2
+		if (FunctionMayFailIsError)
+#endif
+			StaticMessage (FunctionMayFailIsError, "%S", "function may fail", CurrentSymbol);
+
 		MatchError (asize,bsize,rule_sdef,root_node_needed,0);
 	}
 
@@ -1195,7 +1198,7 @@ void CodeGeneration (ImpMod imod, char *fname)
 			Verbose ("Code generation");
 
 			if (!OpenABCFile (fname)){
-				StaticMessage (True, "<open file>","Can't create abc file (disk full?)");
+				StaticMessage (True, "<open file>","Can't create abc file '%s'",fname);
 				return;
 			}
 			
