@@ -1,3 +1,6 @@
+
+#include <stdlib.h>
+#include <string.h>
 #include <stdio.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -5,7 +8,6 @@
 #include <time.h>
 #include <dirent.h>
 #include <unistd.h>
-#include <stdio.h>
 #include "Clean.h"
 
 #ifndef NAME_MAX
