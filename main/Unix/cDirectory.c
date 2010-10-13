@@ -17,7 +17,7 @@
 #define FALSE 0
 #define TRUE (!FALSE)
 
-// error codes:
+/* error codes: */
 #define NoDirError           0
 #define OtherDirError       -1
 #define DoesntExist         -2
@@ -74,12 +74,14 @@ static int openSearch(const char *path, int length)
         gpDir   = (struct DIR*) opendir(gPath);
         if (!gpDir)
             return unix_error_to_clean_error(errno);
-        gPath[gPathLength]  = '/'; // filename will be added later
+        gPath[gPathLength]  = '/'; /* filename will be added later */
         gUserId = getuid();
         gGroupId    = getgid();
         return NoDirError;
         };
 }
+
+int findNextFileC (int);
 
 int findFirstFileC(CleanString cs_path)
 {
@@ -97,7 +99,7 @@ void getCommonFileInfoC(int also_get_file_name,
                         int *pYear, int *pMonth, int *pDay, int *pDayNr,
                         int *pHours, int *pMinutes, int *pSeconds,
                         int *pIsDirectory, int *pIsReadOnly)
-// requires gFileName and gFileStat to be initialized
+/* requires gFileName and gFileStat to be initialized */
 {
     struct tm   *pModificationTime;
     int         mask;
@@ -122,7 +124,7 @@ void getCommonFileInfoC(int also_get_file_name,
 }
 
 int findNextFileC(int dummy)
-// return values: 0=ok, 1=no further files in directory
+/* return values: 0=ok, 1=no further files in directory */
 {
     int i;
 
@@ -156,8 +158,8 @@ void getMacFileInfoC()
 {}
 
 void getUnixFileInfoC(int *pModeBits, int *pOwnerUserId, int *pOwnerGroupId,
-                        int *pLAYear, int *pLAMonth, int *pLADay, int *pLADayNr,    // last access time
-                        int *pLAHours, int *pLAMinutes, int *pLASeconds)            // dito 
+                        int *pLAYear, int *pLAMonth, int *pLADay, int *pLADayNr,    /* last access time */
+                        int *pLAHours, int *pLAMinutes, int *pLASeconds)            /* dito */
 {
     struct tm   *pModificationTime;
 
@@ -197,7 +199,7 @@ int findSingleFileC(CleanString cs_path)
     i = CleanStringLength(cs_path)-2;
     while (i>=0 && path_chars[i]!='/')
         i--;
-    // the last path element ranges from path_chars[i+1] to path_chars[CleanStringLength(cs_path)-2]
+    /* the last path element ranges from path_chars[i+1] to path_chars[CleanStringLength(cs_path)-2] */
 
     length = CleanStringLength(cs_path)-2-i;
     CleanStringLength(gFileName) = length;
@@ -215,7 +217,7 @@ int createDirectoryC(CleanString cs_path)
     
     err = mkdir(CleanStringCharacters(cs_path),
                  S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
-    // access rights for newly created directory: rwx--x--x
+    /* access rights for newly created directory: rwx--x--x */
     if (err)
         return unix_error_to_clean_error(errno);
     else
@@ -237,7 +239,7 @@ int fremoveC(CleanString cs_path)
         return NoDirError;
 }
 
-// Try this code with slackware linux, if the testLinux program doesn't work
+/* Try this code with slackware linux, if the testLinux program doesn't work
 //int fremoveC(CleanString cs_path)
 //{
 //  int err;
@@ -257,6 +259,7 @@ int fremoveC(CleanString cs_path)
 //  else
 //      return NoDirError;
 //}
+*/
 
 #define OK 0
 #define STRING_TOO_SMALL 1
@@ -264,7 +267,7 @@ int fremoveC(CleanString cs_path)
 int getCurrentDirectory_SE(CleanString cs)
 {
     if (getcwd(CleanStringCharacters(cs), CleanStringLength(cs))) {
-        // success. convert C String to Clean string
+        /* success. convert C String to Clean string */
         int i;
         i = 0;
         while(CleanStringCharacters(cs)[i]!='\0')
@@ -273,10 +276,10 @@ int getCurrentDirectory_SE(CleanString cs)
         return OK;
         }
     else {
-        // failure
+        /* failure */
         if (errno==EACCES) {
-            // the permission to read the current directory was denied (how ever)
-            // return root directory
+            /* the permission to read the current directory was denied (how ever)
+               return root directory */
             CleanStringLength(cs) = 1;
             CleanStringCharacters(cs)[0] = '/';
             return OK;
@@ -320,8 +323,8 @@ int fmoveC(int overwrite, CleanString from, CleanString to)
     if (overwrite) {
         err = rename(CleanStringCharacters(from), CleanStringCharacters(to));
         if (err && errno==ENOTDIR) {
-            // from is a directory and to a file
-            // try again after removing to
+            /* from is a directory and to a file
+               try again after removing to */
             err = remove(CleanStringCharacters(to));
             if (!err)
                 err = rename(CleanStringCharacters(from), CleanStringCharacters(to));
