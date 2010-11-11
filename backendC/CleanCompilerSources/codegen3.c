@@ -2720,6 +2720,8 @@ struct saved_node_id_ref_counts* save_rhs_node_id_ref_counts
 				NodeIdRefCountListP node_id_ref_count_elem_p;
 
 				case_node_p=arg_p->arg_node;
+				if (case_node_p->node_kind==OverloadedCaseNode)
+					case_node_p=case_node_p->node_node;
 				
 				for_l (node_id_ref_count_elem_p,case_node_p->node_node_id_ref_counts,nrcl_next){
 					struct saved_case_node_id_ref_counts *new_scnirc_p;
