@@ -49,28 +49,23 @@ where
 				(foldSt (convert_function group_nr dcl_functions common_defs main_dcl_module_n) group.group_members fun_defs_and_ci)
 
 	convert_function group_index dcl_functions common_defs main_dcl_module_n fun (fun_defs, collected_imports, cs)
-		# (fun_def, fun_defs) = fun_defs![fun]
-		# {fun_body,fun_type} = fun_def -*-> ("*** converting ****", fun_def.fun_ident.id_name)
-		  (fun_body, (collected_imports, cs)) = eliminate_code_sharing_in_function dcl_functions main_dcl_module_n common_defs fun_body /* (fun_body 
-		   ("convert_function", fun_def.fun_ident, fun_body)) */ (collected_imports, cs)		  		
+		# ({fun_body,fun_type}, fun_defs) = fun_defs![fun]
+		  (fun_body, (collected_imports, cs))
+				= eliminate_code_sharing_in_function dcl_functions main_dcl_module_n common_defs fun_body (collected_imports, cs)
 		  (fun_body, cs) = convertCasesInBody fun_body fun_type group_index common_defs cs
-		= ({fun_defs & [fun].fun_body = fun_body }, collected_imports, cs)
+		= ({fun_defs & [fun].fun_body = fun_body}, collected_imports, cs)
 
 	eliminate_code_sharing_in_function dcl_functions main_dcl_module_n common_defs (TransformedBody body=:{tb_rhs}) (collected_imports, cs=:{cs_expr_heap,cs_var_heap})
 		# {rcs_var_heap, rcs_expr_heap, rcs_imports} = weightedRefCount {rci_imported = {cii_dcl_functions=dcl_functions, cii_common_defs=common_defs, cii_main_dcl_module_n = main_dcl_module_n}, rci_depth=1} tb_rhs
 				{ rcs_var_heap = cs_var_heap, rcs_expr_heap = cs_expr_heap, rcs_free_vars = [],
 				  rcs_imports = collected_imports} 
-		  	-*-> ("eliminate_code_sharing_in_function (weightedRefCount)", tb_rhs)
 		  ds = { ds_lets = [], ds_var_heap = rcs_var_heap, ds_expr_heap = rcs_expr_heap}
-		  (tb_rhs, ds) = distributeLets {di_depth=1,di_explicit_case_depth=0} tb_rhs ds -*-> "dis"
-		  (tb_rhs, {ds_var_heap, ds_expr_heap}) = buildLetExpr tb_rhs ds -*-> "build"
-
+		  (tb_rhs, ds) = distributeLets {di_depth=1,di_explicit_case_depth=0} tb_rhs ds
+		  (tb_rhs, {ds_var_heap, ds_expr_heap}) = buildLetExpr tb_rhs ds
 		  {ss_expr_heap, ss_var_heap}
 		  	= findSplitCases {si_next_alt=No, si_force_next_alt=False} tb_rhs
 		  						{ss_var_heap=ds_var_heap, ss_expr_heap = ds_expr_heap}
-
 		= (TransformedBody {body & tb_rhs = tb_rhs }, (rcs_imports, { cs & cs_var_heap = ss_var_heap, cs_expr_heap = ss_expr_heap}))
-		  	-*-> ("eliminate_code_sharing_in_function (distributeLets)", 2, tb_rhs)
 
 	split :: SymbKind (ImportedFunctions, ImportedConstructors) -> (ImportedFunctions, ImportedConstructors) 
 	split (SK_Function fun_ident) (collected_functions, collected_conses)
@@ -227,10 +222,9 @@ checkImportedSymbol symb_kind symb_type_ptr (collected_imports, var_heap)
 			-> ([symb_kind : collected_imports ], var_heap <:= (symb_type_ptr, VI_Used))
 
 weightedRefCountOfVariable depth var_info_ptr lvi=:{lvi_count,lvi_var,lvi_depth,lvi_previous,lvi_new} ref_count new_vars
-	| lvi_depth < depth 
+	| lvi_depth < depth
 		= (True, {lvi & lvi_count = ref_count, lvi_depth = depth, lvi_new = True, lvi_previous =
 				[{plvi_count = lvi_count, plvi_depth = lvi_depth, plvi_new = lvi_new } : lvi_previous]}, [var_info_ptr : new_vars])
-//					-*-> (lvi_var, " PUSHED ",lvi_depth)
 	| lvi_count == 0
 		= (True, { lvi & lvi_count = ref_count }, [var_info_ptr : new_vars])
 	// otherwise
@@ -242,7 +236,7 @@ instance weightedRefCount BoundVar
 where
 	weightedRefCount rci=:{rci_depth} {var_ident,var_info_ptr} rs=:{rcs_var_heap}
 		# (var_info, rcs_var_heap) = readPtr var_info_ptr rcs_var_heap
-		  rs = { rs & rcs_var_heap = rcs_var_heap }
+		  rs = {rs & rcs_var_heap = rcs_var_heap}
 		= case var_info of
 			VI_LetVar lvi
 				# (is_new, lvi=:{lvi_expression}, rcs_free_vars) = weightedRefCountOfVariable rci_depth var_info_ptr lvi 1 rs.rcs_free_vars
@@ -252,7 +246,6 @@ where
 							  rcs_var_heap = rs.rcs_var_heap  <:= (var_info_ptr, VI_LetVar {lvi & lvi_expression = EE, lvi_new = False})}
 					  (VI_LetVar lvi, rcs_var_heap) = readPtr var_info_ptr rs.rcs_var_heap
 					-> { rs & rcs_var_heap = rcs_var_heap <:= (var_info_ptr, VI_LetVar { lvi & lvi_expression = lvi_expression }) }
-//							 -*-> (var_ident, var_info_ptr, depth, lvi.lvi_count)
 				// otherwise
 					-> { rs & rcs_var_heap = rs.rcs_var_heap <:= (var_info_ptr, VI_LetVar lvi) }
 			_
@@ -277,11 +270,9 @@ where
 				  (rcs_free_vars, rcs_var_heap) = foldl remove_variable (rs.rcs_free_vars, rcs_var_heap) let_lazy_binds
 				-> { rs & rcs_free_vars = rcs_free_vars, rcs_var_heap = rcs_var_heap,
 						rcs_expr_heap = rs.rcs_expr_heap <:= (let_info_ptr, EI_LetTypeAndRefCounts let_type ref_counts)}
-//							-*-> ("weightedRefCount (EI_LetType)", ptrToInt let_info_ptr, [ x.bind_dst \\ x <- let_lazy_binds])
 			_
 				# (rcs_free_vars, rcs_var_heap) = foldl remove_variable (rs.rcs_free_vars, rs.rcs_var_heap) let_lazy_binds
 				-> { rs & rcs_free_vars = rcs_free_vars, rcs_var_heap = rcs_var_heap }
-//							-*-> ("weightedRefCount (_)", ptrToInt let_info_ptr, [ x.bind_dst \\ x <- let_lazy_binds])
 	where
 		remove_variable ([], var_heap) let_bind
 			= ([], var_heap)
@@ -289,7 +280,6 @@ where
 			| fv_info_ptr == var_ptr
 				# (VI_LetVar {lvi_count,lvi_depth}, var_heap) = readPtr fv_info_ptr var_heap
 				= (var_ptrs, var_heap) 
-//						-*-> ("remove_variable (lvi_count,lvi_dpeth) ", fv_ident, lvi_count, lvi_depth)
 			// otherwise
 				# (var_ptrs, var_heap) = remove_variable (var_ptrs, var_heap) bind
 				= ([var_ptr : var_ptrs], var_heap)
@@ -301,7 +291,7 @@ where
 		get_ref_count {lb_dst={fv_ident,fv_info_ptr}} var_heap 
 			# (VI_LetVar {lvi_count}, var_heap) = readPtr fv_info_ptr var_heap
 		  	= (lvi_count, var_heap)
-//				-*-> (fv_ident,fv_info_ptr,lvi_count)
+
 	weightedRefCount rci (Case case_expr) rs=:{rcs_expr_heap}
 /*
 // sanity check ...
@@ -311,7 +301,7 @@ where
 // ... sanity check
 */
 		# (case_info, rcs_expr_heap) = readPtr case_expr.case_info_ptr rcs_expr_heap
-		= weightedRefCountOfCase rci case_expr case_info { rs & rcs_expr_heap = rcs_expr_heap }
+		= weightedRefCountOfCase rci case_expr case_info {rs & rcs_expr_heap = rcs_expr_heap}
 	weightedRefCount rci expr=:(BasicExpr _) rs
 		= rs
 	weightedRefCount rci (MatchExpr constructor expr) rs
@@ -358,8 +348,7 @@ weightedRefCountOfCase rci=:{rci_depth} this_case=:{case_expr, case_guards, case
 	  (rcs_free_vars, rcs_var_heap) = foldSt (addPatternVariable rci_depth) all_vars (rs.rcs_free_vars, rs.rcs_var_heap)
 	  rcs_expr_heap = rs.rcs_expr_heap <:= (case_info_ptr, EI_CaseTypeAndRefCounts case_type 
 	  		{ rcc_all_variables = all_vars, rcc_default_variables = default_vars, rcc_pattern_variables = local_vars })
-	= { rs & rcs_var_heap = rcs_var_heap, rcs_expr_heap = rcs_expr_heap, rcs_free_vars = rcs_free_vars   }
-//			-*-> ("weightedRefCountOfCase", ptrToInt case_info_ptr, case_expr)
+	= {rs & rcs_var_heap = rcs_var_heap, rcs_expr_heap = rcs_expr_heap, rcs_free_vars = rcs_free_vars}
 	where
 		weighted_ref_count_in_default rci (Yes expr) info
 			= weightedRefCountInPatternExpr rci expr info
@@ -400,8 +389,7 @@ weightedRefCountOfCase rci=:{rci_depth} this_case=:{case_expr, case_guards, case
 			rs=:{ rcs_var_heap, rcs_expr_heap, rcs_imports }
 	# rs = weightedRefCount rci case_expr rs
 	  (rcs_free_vars, rcs_var_heap) = foldSt (addPatternVariable rci_depth) rcc_all_variables (rs.rcs_free_vars, rs.rcs_var_heap)
-	= { rs & rcs_var_heap = rcs_var_heap, rcs_free_vars = rcs_free_vars }	
-//			-*-> ("weightedRefCountOfCase 2", ptrToInt case_info_ptr, case_expr)
+	= {rs & rcs_var_heap = rcs_var_heap, rcs_free_vars = rcs_free_vars}
 
 instance weightedRefCount Selection
 where
@@ -420,7 +408,6 @@ weightedRefCountInPatternExpr rci=:{rci_depth} pattern_expr (previous_free_vars,
 	  (free_vars_with_rc, rcs_var_heap) = mapSt get_ref_count rcs_free_vars rcs_var_heap
 	  (previous_free_vars, rcs_var_heap) = foldSt (select_unused_free_variable rci_depth) previous_free_vars ([], rcs_var_heap)
 	  (all_free_vars, rcs_var_heap) = foldSt (collect_free_variable rci_depth) rcs_free_vars (previous_free_vars, rcs_var_heap)
-//			-*-> ("remove_vars ", depth, free_vars_with_rc)
 	= (free_vars_with_rc, (all_free_vars, rcs_imports, rcs_var_heap, rcs_expr_heap))
 where
 	select_unused_free_variable depth var=:{cv_variable = var_ptr, cv_count = var_count} (collected_vars, var_heap)
@@ -623,8 +610,6 @@ where
 			# (new_info_ptr, var_heap) = newPtr VI_LocalLetVar var_heap
 			  lei = { lei_count = ref_count, lei_depth = depth, lei_var = { lb_dst & fv_info_ptr = new_info_ptr },
 			  			lei_expression = lb_src, lei_type = type, lei_status =  LES_Untouched }
-//			  				-*-> ("set_let_expr_info", lb_dst.fv_info_ptr, new_info_ptr)
-			  				->> ("set_let_expr_info", lb_dst.fv_ident.id_name, depth)
 			= set_let_expr_info depth binds ref_counts types (var_heap <:= (lb_dst.fv_info_ptr, VI_LetExpression lei))
 		set_let_expr_info _ [] _ _ var_heap
 			= var_heap
@@ -638,9 +623,7 @@ where
 			| lei_count > 0
 //			| not lei_moved && lei_count > 0
 				= distributeLetsInLetExpression di fv_info_ptr lei { ds & ds_var_heap = ds_var_heap }
-			// otherwise
 				= { ds & ds_var_heap = ds_var_heap }
-					-*-> ("distribute_lets_in_non_distributed_let (moved or not used)", lei_count, fv_ident)
 
 	distributeLets _ expr=:(TypeCodeExpression _) ds
 		= (expr, ds)
@@ -665,7 +648,7 @@ where
 		= (FailExpr id, ds)
 
 instance distributeLets Case
-where 
+where
 	distributeLets di=:{di_depth,di_explicit_case_depth} kees=:{case_info_ptr,case_guards,case_default,case_expr,case_explicit} ds=:{ds_var_heap, ds_expr_heap}
 		# (case_old_info, ds_expr_heap) = readPtr case_info_ptr ds_expr_heap
 		  (EI_CaseTypeAndRefCounts type
@@ -764,10 +747,8 @@ where
 
 		mark_local_let_var depth {cv_variable, cv_count} (local_vars, var_heap)
 			# (VI_LetExpression lei=:{lei_count,lei_depth,lei_var}, var_heap) = readPtr cv_variable var_heap
-			| lei_count == cv_count && lei_depth==depth-1	// -*-> ("mark_test", lei_count, cv_count)
+			| lei_count == cv_count && lei_depth==depth-1
 				= ([(cv_variable, lei_count, lei_depth) : local_vars ], var_heap <:= (cv_variable, VI_LetExpression { lei & lei_depth = depth}))
-						->> ("mark_local_let_var ", lei_var.fv_ident.id_name, lei_depth, " ->> ", depth)
-			// otherwise
 				= (local_vars, var_heap)
 
 		mark_local_let_var_of_explicit_case depth {cv_variable, cv_count} (local_vars,local_select_vars,var_heap)
@@ -816,8 +797,6 @@ where
 		reset_local_let_var (var_info_ptr, lei_count, lei_depth)  var_heap
 			# (VI_LetExpression lei, var_heap) = readPtr var_info_ptr var_heap
 			= var_heap <:= (var_info_ptr, VI_LetExpression { lei & lei_depth = lei_depth, lei_count = lei_count, lei_status = LES_Moved })
-//					-*-> ("reset_local_let_var", var_info_ptr)
-					->> ("reset_local_let_var", lei.lei_var.fv_ident.id_name, lei.lei_depth, lei.lei_count, " ->> ", lei_depth, lei_count)
    
 		is_outer_var {di_depth, di_explicit_case_depth} {cv_variable}  (outer, var_heap)
 			| outer
@@ -844,8 +823,6 @@ where
 			# (VI_LetExpression lei, var_heap) = readPtr cv_variable var_heap
 			| depth == lei.lei_depth
 				= (var_heap <:= (cv_variable, VI_LetExpression { lei & lei_count = cv_count, lei_status = LES_Untouched }))
-						-*-> ("mark_local_let_var_of_pattern_expr ", lei.lei_var.fv_ident, cv_variable, (lei.lei_var.fv_info_ptr, cv_count, depth))
-			// otherwise
 				= var_heap
 
 		reexamine_local_let_expr di=:{di_depth} {cv_variable, cv_count} ds=:{ds_var_heap}
@@ -858,9 +835,9 @@ where
 
 distributeLetsInLetExpression :: DistributeInfo VarInfoPtr LetExpressionInfo *DistributeState -> *DistributeState
 distributeLetsInLetExpression _ let_var_info_ptr {lei_status = LES_Moved, lei_var} ds
-	= ds -*-> ("distributeLetsInLetExpression, LES_Moved", lei_var.fv_ident.id_name, let_var_info_ptr)
+	= ds
 distributeLetsInLetExpression _ let_var_info_ptr {lei_status = LES_Updated _, lei_var} ds
-	= ds -*-> ("distributeLetsInLetExpression, LES_Updated", lei_var.fv_ident.id_name, let_var_info_ptr)
+	= ds
 distributeLetsInLetExpression di let_var_info_ptr lei=:{lei_expression, lei_status = LES_Untouched, lei_var} ds=:{ds_var_heap}
 	# ds_var_heap = ds_var_heap <:= (let_var_info_ptr, VI_LetExpression { lei & lei_status = LES_Updated EE}) /* to prevent doing this expr twice */ -*-> ("distributeLetsInLetExpression, LES_Untouched", lei_var.fv_ident.id_name, let_var_info_ptr)
       (lei_expression, ds) = distributeLets di lei_expression { ds & ds_var_heap = ds_var_heap }
@@ -869,10 +846,10 @@ distributeLetsInLetExpression di let_var_info_ptr lei=:{lei_expression, lei_stat
 
 buildLetExpr :: !Expression !*DistributeState -> (!Expression, !*DistributeState)
 buildLetExpr let_expr ds=:{ds_lets=[]}
-	=	(let_expr, ds) -*-> ("buildLetExpr", 0)
+	=	(let_expr, ds)
 buildLetExpr let_expr ds=:{ds_lets, ds_var_heap, ds_expr_heap}
 	# (lazy_binds, lazy_binds_types, ds_var_heap) = foldr build_bind ([], [], ds_var_heap) ds_lets
-	  ds = {ds & ds_var_heap = ds_var_heap} -*-> ("buildLetExpr", ds_lets)
+	  ds = {ds & ds_var_heap = ds_var_heap}
 	// otherwise
 	= case let_expr of
 		Let inner_let=:{let_info_ptr }
@@ -894,7 +871,6 @@ where
 		  (LES_Updated updated_expr) = lei_status
 		  (new_info_ptr, var_heap) = newPtr (VI_Labelled_Empty "build_bind") var_heap 
 		  var_heap = var_heap <:= (info_ptr, VI_LetExpression { lei & lei_status = LES_Untouched, lei_var = { lei_var & fv_info_ptr = new_info_ptr }})
-			-*-> ("build_bind", lei_var.fv_ident, info_ptr, new_info_ptr)
 		= ([{ lb_src = updated_expr, lb_dst = lei_var, lb_position = NoPos } : lazy_binds], [lei_type : lazy_binds_types ], var_heap)
 
 instance distributeLets Selection
@@ -1373,7 +1349,7 @@ convert_case_to_if case_expr then_expr else_expr ci cs
 	# (else_expr,cs)=convert_then_or_else else_expr ci cs
 	= (Conditional { if_cond = case_expr, if_then = then_expr, if_else = Yes else_expr },cs)
 where
-	convert_then_or_else (Let lad=:{let_strict_binds,let_lazy_binds,let_expr,let_info_ptr}) ci=:{ci_bound_vars} cs=:{cs_expr_heap}
+	convert_then_or_else (Let lad=:{let_strict_binds,let_lazy_binds,let_expr,let_info_ptr}) ci cs=:{cs_expr_heap}
 		# (let_strict_binds,let_lazy_binds,ci,cs) = convert_let_binds let_strict_binds let_lazy_binds let_info_ptr ci cs
 		  (let_expr,cs) = convert_condition let_expr ci cs
 		= (Let { lad & let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds, let_expr = let_expr }, cs)
@@ -1424,7 +1400,6 @@ instance convertRootCases Expression where
 						case_guards=case_guards, case_default=case_default}, cs)
 		| sic_case_kind == CaseKindTransform
 			=	convertNonRootCase ci kees cs
-		// otherwise
 			= case sic_case_kind of
 				CaseKindUnknown label
 					->	abort ("convertRootCases, unknown casekind " +++ label)
@@ -1475,9 +1450,7 @@ splitCase ci kees=:{case_info_ptr} cs=:{cs_expr_heap}
 	# sic_splits
 		=	uniq (sortBy (>) sic_splits)
 
-	# cs_expr_heap
-  	  	=	cs_expr_heap <:= (case_info_ptr,
-  	  			EI_CaseTypeAndSplits case_type {splits & sic_splits = []})
+	# cs_expr_heap = cs_expr_heap <:= (case_info_ptr, EI_CaseTypeAndSplits case_type {splits & sic_splits = []})
 
 	# (kees, case_type, cs=:{cs_expr_heap})
 		=	split ci sic_splits (kees, case_type, {cs & cs_expr_heap = cs_expr_heap})->> ("split: yes", toString kees.case_ident, ptrToInt kees.case_info_ptr) //, sic_splits)
@@ -1677,7 +1650,7 @@ where
 
 instance convertCases Let
 where
-	convertCases ci=:{ci_bound_vars} lad=:{let_strict_binds,let_lazy_binds,let_expr,let_info_ptr} cs
+	convertCases ci lad=:{let_strict_binds,let_lazy_binds,let_expr,let_info_ptr} cs
 		# (let_strict_binds,let_lazy_binds,ci,cs) = convert_let_binds let_strict_binds let_lazy_binds let_info_ptr ci cs
 		# (let_expr, cs) = convertCases ci let_expr cs
 		= ({ lad & let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds, let_expr = let_expr }, cs)
@@ -1717,8 +1690,7 @@ where
 		# {ss_expr_heap, ss_var_heap}
 		  	= findSplitCases {si_next_alt=No, si_force_next_alt=False} case_expr
 		  				{ss_var_heap=cs.cs_var_heap,ss_expr_heap = cs.cs_expr_heap}
-		  cs
-		  	=	{cs & cs_var_heap=ss_var_heap, cs_expr_heap = ss_expr_heap}
+		  cs = {cs & cs_var_heap=ss_var_heap, cs_expr_heap = ss_expr_heap}
 		= convertNonRootCase ci case_expr cs
 	convertCases ci (FailExpr ident) cs
 		# (failExpr, cs)
@@ -1746,7 +1718,7 @@ convertNonRootFail ci=:{ci_bound_vars, ci_group_index, ci_common_defs} ident cs
 			}
 	# (fun_ident, cs)
 	  	=	new_case_function (Yes ident) result_type (FailExpr ident) [] []
-	  						ci_bound_vars ci_group_index ci_common_defs cs
+	  							ci_bound_vars ci_group_index ci_common_defs cs
 	= (App { app_symb = fun_ident, app_args = [], app_info_ptr = nilPtr }, cs)
 
 convertNonRootCase ci=:{ci_bound_vars, ci_group_index, ci_common_defs} kees=:{ case_expr, case_ident, case_info_ptr} cs
@@ -1763,7 +1735,7 @@ convertNonRootCase ci=:{ci_bound_vars, ci_group_index, ci_common_defs} kees=:{ c
 		  (fun_ident, cs) = new_case_function_and_restore_old_fv_info_ptr_values case_ident case_type.ct_result_type caseExpr
 		  							form_vars local_vars
 		  							ci_bound_vars old_fv_info_ptr_values ci_group_index ci_common_defs cs
-		= (App { app_symb = fun_ident, app_args = act_vars, app_info_ptr = nilPtr }, cs)
+		= (App {app_symb = fun_ident, app_args = act_vars, app_info_ptr = nilPtr}, cs)
 
 	// otherwise
 
@@ -1826,7 +1798,6 @@ where
 		  (expr, {cp_free_vars, cp_var_heap, cp_local_vars}) = copy guards_and_default { cp_free_vars = [], cp_var_heap = var_heap, cp_local_vars = [] }
 		  (bound_vars, free_typed_vars, var_heap) = retrieve_variables cp_free_vars cp_var_heap
 		= (bound_vars, free_typed_vars, cp_local_vars, expr, old_fv_info_ptr_values,var_heap)
-	//				-*-> ("copy_case_expr", length bound_vars, length free_typed_vars)
 	
 	copy_case_expr_and_use_new_var bound_vars {var_ident,var_info_ptr} new_info_ptr guards_and_default var_heap
 	    # (old_fv_info_ptr_values,var_heap) = store_VI_BoundVar_in_bound_vars_and_save_old_values bound_vars [] var_heap
@@ -1834,11 +1805,11 @@ where
 		= case var_info of
 			VI_BoundVar type
 				# var_heap = var_heap <:= (var_info_ptr, VI_FreeVar var_ident new_info_ptr 0 type)
-				  (expr, {cp_free_vars, cp_var_heap, cp_local_vars}) = copy guards_and_default { cp_free_vars = [(var_info_ptr, type)], cp_var_heap = var_heap, cp_local_vars = [] }
+				  (expr, {cp_free_vars, cp_var_heap, cp_local_vars}) = copy guards_and_default { cp_free_vars = [(var_info_ptr, type)], cp_var_heap = var_heap, cp_local_vars = []}
 				  (bound_vars, free_typed_vars, var_heap) = retrieve_variables cp_free_vars cp_var_heap
 				-> (True,bound_vars, free_typed_vars, cp_local_vars, expr, old_fv_info_ptr_values,var_heap)
 			VI_LocalVar
-				# (expr, {cp_free_vars, cp_var_heap, cp_local_vars}) = copy guards_and_default { cp_free_vars = [], cp_var_heap = var_heap, cp_local_vars = [] }
+				# (expr, {cp_free_vars, cp_var_heap, cp_local_vars}) = copy guards_and_default { cp_free_vars = [], cp_var_heap = var_heap, cp_local_vars = []}
 				  (bound_vars, free_typed_vars, var_heap) = retrieve_variables cp_free_vars cp_var_heap
 				-> (False,bound_vars, free_typed_vars, cp_local_vars, expr, old_fv_info_ptr_values,var_heap)
 	
@@ -1873,8 +1844,7 @@ where
 
 new_case_function opt_id result_type rhs free_vars local_vars
 	bound_vars group_index common_defs cs=:{cs_expr_heap}
-	# body
-		=	TransformedBody {tb_args=[var \\ (var, _) <- free_vars], tb_rhs=rhs}
+	# body = TransformedBody {tb_args=[var \\ (var, _) <- free_vars], tb_rhs=rhs}
 	  (_,type)
 		=	removeAnnotations
 			{	st_vars			= []
@@ -1918,16 +1888,13 @@ where
 			VI_FreeVar name new_info_ptr count type
 				-> ({ var & var_info_ptr = new_info_ptr },
 					{ cp_info & cp_var_heap = cp_info.cp_var_heap <:= (var_info_ptr, VI_FreeVar name new_info_ptr (inc count) type)})
-						-*-> ("copy: VI_FreeVar", var_ident.id_name, ptrToInt var_info_ptr)
 			VI_LocalVar
 				-> (var, cp_info)
-						-*-> ("copy: VI_LocalVar", var_ident.id_name)
 			VI_BoundVar type
-				# (new_info_ptr, cp_var_heap) = newPtr (VI_Labelled_Empty "copy [BoundVar]") cp_info.cp_var_heap // RWS ??? 
+				# (new_info_ptr, cp_var_heap) = newPtr (VI_Labelled_Empty "copy [BoundVar]") cp_info.cp_var_heap
 				-> ({ var & var_info_ptr = new_info_ptr },
-					{ cp_info & cp_free_vars = [ (var_info_ptr, type) : cp_info.cp_free_vars ],
-							cp_var_heap = cp_var_heap <:= (var_info_ptr, VI_FreeVar var_ident new_info_ptr 1 type) })
-						-*-> ("copy: VI_BoundVar", var_ident.id_name, ptrToInt new_info_ptr)
+					{ cp_info & cp_free_vars = [(var_info_ptr, type) : cp_info.cp_free_vars],
+								cp_var_heap = cp_var_heap <:= (var_info_ptr, VI_FreeVar var_ident new_info_ptr 1 type) })
 			_
 				-> abort "copy [BoundVar] (convertcases)"
 
