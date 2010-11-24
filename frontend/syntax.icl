@@ -98,8 +98,8 @@ where
 
 instance toString AttributeVar
 where
-	toString {av_ident,av_info_ptr} = toString av_ident + "[" + toString (ptrToInt av_info_ptr) + "]"
-//	toString {av_ident,av_info_ptr} = toString av_ident
+//	toString {av_ident,av_info_ptr} = toString av_ident + "[" + toString (ptrToInt av_info_ptr) + "]"
+	toString {av_ident,av_info_ptr} = toString av_ident
 
 instance <<< AType
 where
@@ -183,16 +183,14 @@ where
 		= file  <<< consid <<< ' ' <<< strictness <<< ' ' <<< types
 	(<<<) file (arg_type --> res_type)
 		= file <<< arg_type <<< " -> " <<< res_type
-//AA..		
-	(<<<) file TArrow
-		= file <<< "(->)"	
-	(<<<) file (TArrow1 t)
-		= file <<< "(->) " <<< t	
-//..AA		
 	(<<<) file (type :@: types)
 		= file <<< type <<< " @" <<< types
 	(<<<) file (TB tb)
 		= file <<< tb
+	(<<<) file TArrow
+		= file <<< "(->)"	
+	(<<<) file (TArrow1 t)
+		= file <<< "(->) " <<< t	
 	(<<<) file (TFA vars types)
 		= file <<< "A." <<< vars <<< ':' <<< types
 	(<<<) file (TQV varid)
@@ -399,7 +397,7 @@ where
 
 	(<<<) file (FailExpr _) = file <<< "** FAIL **"
 	(<<<) file (TypeSignature array_kind expr) = file <<< "TypeSignature " <<< '(' <<< expr <<< ')'
-	(<<<) file expr         				= abort ("<<< (Expression) [line 1290]" )//<<- expr)
+	(<<<) file expr         				= abort ("<<< (Expression)" )
 	
 instance <<< LetBind
 where
@@ -623,11 +621,10 @@ where
 	(==) KindConst KindConst = True
 	(==) (KindArrow xs) (KindArrow ys) = xs == ys
 	(==) _ _ = False
-				
 
 instance toString KindInfo
 where
-	toString (KI_Var ptr) 				= "*" +++ toString (ptrToInt ptr)
+	toString (KI_Var ptr) 				= "*" // +++ toString (ptrToInt ptr)
 	toString (KI_Const) 				= "*"
 	toString (KI_Arrow kind1 kind2)		= withBrackets kind1 (toString kind1) +++ " -> " +++ toString kind2
 	where
@@ -896,14 +893,6 @@ where
 	(<<<) file
 		STE_Class
 			= file <<< "STE_Class"
-// AA..			
-	(<<<) file
-		STE_Generic
-			= file <<< "STE_Generic"
-	(<<<) file
-		STE_GenericCase
-			= file <<< "STE_GenericCase"
-// ..AA
 	(<<<) file
 		(STE_Field _)
 			= file <<< "STE_Field"
@@ -931,6 +920,12 @@ where
 	(<<<) file
 		STE_DclFunction
 			= file <<< "STE_DclFunction"
+	(<<<) file
+		STE_Generic
+			= file <<< "STE_Generic"
+	(<<<) file
+		STE_GenericCase
+			= file <<< "STE_GenericCase"
 	(<<<) file
 		(STE_Module _)
 			= file <<< "STE_Module"
