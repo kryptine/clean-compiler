@@ -57,6 +57,7 @@ beautifulizeAttributes :: !SymbolType !*AttrVarHeap -> (!SymbolType, !.AttrVarHe
 	,	tst_lifted		:: !Int
 	,	tst_result		:: !AType
 	,	tst_context		:: ![TypeContext]
+	,	tst_var_contexts :: !(VarContexts TypeContext)
 	,	tst_attr_env	:: ![AttrCoercion]
 	}
 

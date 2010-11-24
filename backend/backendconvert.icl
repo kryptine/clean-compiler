@@ -1407,6 +1407,8 @@ convertTypeNode TE
 	=	beNormalTypeNode beDontCareDefinitionSymbol beNoTypeArgs
 convertTypeNode (TFA vars type)
 	=	beAddForAllTypeVariables (convertTypeVars vars) (convertTypeNode type)
+convertTypeNode (TFAC vars type contexts)
+	=	beAddForAllTypeVariables (convertTypeVars vars) (convertTypeNode type)
 convertTypeNode typeNode
 	=	abort "convertTypeNode"  // <<- ("backendconvert, convertTypeNode: unknown type node", typeNode)
 

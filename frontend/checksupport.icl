@@ -21,6 +21,7 @@ where
 	toInt STE_DclFunction			= cFunctionDefs
 	toInt (STE_FunctionOrMacro _)	= cMacroDefs
 	toInt (STE_DclMacroOrLocalMacroFunction _)= cMacroDefs
+	toInt STE_GenericDeriveClass	= cGenericCaseDefs
 	toInt _							= NoIndex
 
 instance Erroradmin ErrorAdmin
@@ -54,6 +55,16 @@ newPosition id (PreDefPos file_name)
 	= { ip_ident = id, ip_line = cNotALineNumber, ip_file = file_name.id_name }
 newPosition id NoPos
 	= { ip_ident = id, ip_line = cNotALineNumber, ip_file = "???" }
+
+stringPosition :: !String !Position -> StringPos
+stringPosition id (FunPos file_name line_nr _)
+	= { sp_name = id, sp_line = line_nr, sp_file = file_name }
+stringPosition id (LinePos file_name line_nr)
+	= { sp_name = id, sp_line = line_nr, sp_file = file_name }
+stringPosition id (PreDefPos file_name)
+	= { sp_name = id, sp_line = cNotALineNumber, sp_file = file_name.id_name }
+stringPosition id NoPos
+	= { sp_name = id, sp_line = cNotALineNumber, sp_file = "???" }
 
 checkError :: !a !b !*ErrorAdmin -> *ErrorAdmin | <<< a & <<< b // PK
 checkError id mess error=:{ea_file,ea_loc=[]}
@@ -509,6 +520,12 @@ where
 	| ip_line == cNotALineNumber
 		= file <<< '[' <<< ip_file <<< ',' <<< ip_ident <<< ']'
 		= file <<< '[' <<< ip_file <<< ',' <<< ip_line <<< ',' <<< ip_ident <<< ']'
+
+instance <<< StringPos where
+	(<<<) file {sp_file,sp_line,sp_name}
+	| sp_line == cNotALineNumber
+		= file <<< '[' <<< sp_file <<< ',' <<< sp_name <<< ']'
+		= file <<< '[' <<< sp_file <<< ',' <<< sp_line <<< ',' <<< sp_name <<< ']'
 
 instance <<< ExplImpInfo
   where

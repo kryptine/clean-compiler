@@ -51,22 +51,6 @@ where
 		= (	{gen_def & gen_info_ptr = gen_info_ptr}, 
 			{heaps & hp_generic_heap = hp_generic_heap})
 
-	check_generic_vars {gen_vars,gen_type} heaps=:{hp_type_heaps=hp_type_heaps=:{th_vars}} cs	
-		#! types = [gen_type.st_result:gen_type.st_args]
-		#! th_vars = performOnTypeVars mark_var types th_vars
-		#! (th_vars,cs) = foldSt check_var_marked gen_vars (th_vars,cs)
-		#! th_vars = performOnTypeVars initializeToTVI_Empty types th_vars
-		= ({heaps & hp_type_heaps={hp_type_heaps&th_vars=th_vars}}, cs)
-	where
-		mark_var _ {tv_ident,tv_info_ptr} th_vars
-			= writePtr tv_info_ptr TVI_Used th_vars
-		check_var_marked {tv_ident,tv_info_ptr} (th_vars,cs=:{cs_error})
-			#! (tv_info, th_vars) = readPtr tv_info_ptr th_vars
-			#! cs_error = case tv_info of  
-				TVI_Empty -> checkError tv_ident "generic variable not used" cs_error
-				TVI_Used -> cs_error
-			= (th_vars, {cs & cs_error = cs_error})	
-
 	check_generic_type gen_def=:{gen_type, gen_vars, gen_ident, gen_pos} module_index type_defs class_defs modules heaps=:{hp_type_heaps} cs
 		#! (checked_gen_type, _, type_defs, class_defs, modules, hp_type_heaps, cs) =
 			checkFunctionType module_index gen_type SP_None type_defs class_defs modules hp_type_heaps cs
@@ -155,46 +139,109 @@ where
 				TVI_Used
 					#! cs_error = checkError tv_ident "context restrictions on generic variables are not allowed" cs_error 
 					-> (th_vars, cs_error)
-				_	-> abort ("check_no_generic_vars_in_contexts: wrong TVI" ---> (tv, tv_info))	
-						
-checkGenericCaseDefs :: !Index !*{#GenericCaseDef} !*{#GenericDef} !u:{#CheckedTypeDef} !*{#DclModule} !*Heaps !*CheckState
-						   -> (!*{#GenericCaseDef},!*{#GenericDef},!u:{#CheckedTypeDef},!*{#DclModule},!.Heaps,!.CheckState)
-checkGenericCaseDefs mod_index gen_case_defs generic_defs type_defs modules heaps cs
-	= check_instances 0 mod_index gen_case_defs generic_defs type_defs modules heaps cs
+				_	-> abort ("check_no_generic_vars_in_contexts: wrong TVI" ---> (tv, tv_info))
+
+checkGenericCaseDefs :: !Index !*{#GenericCaseDef} !*{#GenericDef} !u:{#CheckedTypeDef} !*{#ClassDef} !*{#DclModule} !*Heaps !*CheckState
+						   -> (!*{#GenericCaseDef},!*{#GenericDef},!u:{#CheckedTypeDef},!*{#ClassDef},!*{#DclModule},!.Heaps,!.CheckState)
+checkGenericCaseDefs mod_index gen_case_defs generic_defs type_defs class_defs modules heaps cs
+	| size gen_case_defs==0
+		= (gen_case_defs, generic_defs, type_defs, class_defs, modules, heaps, cs)	
+		# {cs_x} = cs
+		# cs = {cs & cs_x = {cs_x & x_needed_modules = cs_x.x_needed_modules bitor cNeedStdGeneric}}
+		= check_generic_case_defs 0 mod_index gen_case_defs generic_defs type_defs class_defs modules heaps cs
 where
-	check_instances index mod_index gen_case_defs generic_defs type_defs modules heaps cs
-		# (n_gc, gen_inst_defs) = usize gen_case_defs
-		| index == n_gc  
-			= (gen_case_defs, generic_defs, type_defs, modules, heaps, cs)	
-			# (gen_case_defs, generic_defs, type_defs, modules, heaps, cs) 
-				= check_instance index mod_index gen_case_defs generic_defs type_defs modules heaps cs
-			= check_instances (inc index)  mod_index gen_case_defs generic_defs type_defs modules heaps cs			
+	check_generic_case_defs index mod_index gen_case_defs generic_defs type_defs class_defs modules heaps cs
+		| index == size gen_case_defs
+			= (gen_case_defs, generic_defs, type_defs, class_defs, modules, heaps, cs)	
+			# (gen_case_defs, generic_defs, type_defs, class_defs, modules, heaps, cs) 
+				= check_generic_case_def index mod_index gen_case_defs generic_defs type_defs class_defs modules heaps cs
+			= check_generic_case_defs (inc index)  mod_index gen_case_defs generic_defs type_defs class_defs modules heaps cs			
 
-	check_instance index mod_index gen_case_defs generic_defs type_defs modules heaps cs
+	check_generic_case_def index mod_index gen_case_defs generic_defs type_defs class_defs modules heaps cs
+		# (case_def=:{gc_pos,gc_type,gc_gcf}, gen_case_defs) = gen_case_defs![index]
+		= case gc_gcf of
+			GCF gc_ident gcf=:{gcf_gident}
+				# cs = pushErrorAdmin (newPosition gc_ident gc_pos) cs
+				# (gc_type, gc_type_cons, type_defs, modules, heaps, cs)
+					= check_instance_type mod_index gc_type type_defs modules heaps cs 
+				# (generic_gi, cs) = get_generic_index gcf_gident mod_index cs
+				| not cs.cs_error.ea_ok
+					# cs = popErrorAdmin cs
+					-> (gen_case_defs, generic_defs, type_defs, class_defs, modules, heaps, cs)
+				# case_def = {case_def & gc_gcf=GCF gc_ident {gcf & gcf_generic = generic_gi}, gc_type=gc_type, gc_type_cons=gc_type_cons}
+				# gen_case_defs = {gen_case_defs & [index] = case_def}
+				# cs = popErrorAdmin cs	
+				-> (gen_case_defs, generic_defs, type_defs, class_defs, modules, heaps, cs)
+			GCFS gcfs
+				# cs = pushErrorAdmin (newPosition {id_name="derive generic superclass",id_info=nilPtr} gc_pos) cs
+				# (gc_type, gc_type_cons, type_defs, modules, heaps, cs)
+				 	= check_instance_type mod_index gc_type type_defs modules heaps cs 
+				| not cs.cs_error.ea_ok
+					# cs = popErrorAdmin cs
+					-> (gen_case_defs, generic_defs, type_defs, class_defs, modules, heaps, cs)
+				# (gcfs,cs) = check_generic_superclasses gcfs mod_index cs
+				# cs = popErrorAdmin cs
+				# case_def = {case_def & gc_gcf=GCFS gcfs, gc_type=gc_type, gc_type_cons=gc_type_cons}
+				# gen_case_defs = {gen_case_defs & [index] = case_def}
+				-> (gen_case_defs, generic_defs, type_defs, class_defs, modules, heaps, cs)
+//			GCFC {gcfc_class_ident=gcfc_class_ident=:{id_info}}
+			GCFC _ gcfc_class_ident=:{id_info}
+				# cs = pushErrorAdmin (newPosition {id_name="derive generic superclass",id_info=nilPtr} gc_pos) cs
+				# (gc_type, gc_type_cons, type_defs, modules, heaps, cs)
+				 	= check_instance_type mod_index gc_type type_defs modules heaps cs 
+				| not cs.cs_error.ea_ok
+					# cs = popErrorAdmin cs
+					-> (gen_case_defs, generic_defs, type_defs, class_defs, modules, heaps, cs)
+				# (entry,symbol_table) = readPtr id_info cs.cs_symbol_table
+				# cs = {cs & cs_symbol_table=symbol_table}
+				-> case entry.ste_kind of
+					STE_Class
+						# (class_context,class_defs) = class_defs![entry.ste_index].class_context
+						# (gen_case_defs,cs) = check_generic_superclasses_of_case_def class_context index mod_index gc_type gc_type_cons gen_case_defs cs
+						# cs = popErrorAdmin cs
+						-> (gen_case_defs,generic_defs,type_defs,class_defs, modules,heaps,cs)
+					STE_Imported STE_Class decl_index
+	 					# (class_context,modules) = modules![decl_index].dcl_common.com_class_defs.[entry.ste_index].class_context
+						# (gen_case_defs,cs) = check_generic_superclasses_of_case_def class_context index mod_index gc_type gc_type_cons gen_case_defs cs
+						# cs = popErrorAdmin cs
+						-> (gen_case_defs,generic_defs,type_defs,class_defs, modules,heaps,cs)
+					_
+						# cs = popErrorAdmin cs
+						# cs = {cs & cs_error = checkErrorWithPosition gcfc_class_ident gc_pos "class undefined" cs.cs_error}
+						-> (gen_case_defs,generic_defs,type_defs,class_defs, modules,heaps,cs)
+				where
+					check_generic_superclasses_of_case_def class_context index mod_index gc_type gc_type_cons gen_case_defs cs
+						# gcfs = convert_generic_contexts class_context
+						  (gcfs,cs) = check_generic_superclasses gcfs mod_index cs
+						  case_def = {case_def & gc_gcf=GCFS gcfs, gc_type=gc_type, gc_type_cons=gc_type_cons}
+						  gen_case_defs = {gen_case_defs & [index]=case_def}
+						= (gen_case_defs,cs)
 
-		#! (case_def=:{gc_ident,gc_gident,gc_pos,gc_type}, gen_case_defs) = gen_case_defs ! [index]
-
-		#! cs = pushErrorAdmin (newPosition gc_ident gc_pos) cs
-
-		#! (gc_type, gc_type_cons, type_defs, modules, heaps, cs)
-		 	= check_instance_type mod_index gc_type type_defs modules heaps cs 
-
-		#! (generic_gi, cs) = get_generic_index gc_gident mod_index cs 
-		| not cs.cs_error.ea_ok
-			# cs = popErrorAdmin cs
-			= (gen_case_defs, generic_defs, type_defs, modules, heaps, cs)
-				 
-		#! case_def = 
-			{ case_def 
-			& gc_generic = generic_gi
-			, gc_type = gc_type
-			, gc_type_cons = gc_type_cons
+	convert_generic_contexts [{tc_class=TCGeneric {gtc_generic={glob_object={ds_ident}}}}:type_contexts]
+		# gcf = {
+			gcf_gident = ds_ident,
+		 	gcf_generic = {gi_module=NoIndex,gi_index=NoIndex},
+			gcf_arity = 0,
+			gcf_body = GCB_None,
+			gcf_kind = KindError
 			}
-		#! gen_case_defs = { gen_case_defs & [index] = case_def }
-			
-		#! (cs=:{cs_x}) = popErrorAdmin cs	
-		#! cs = { cs & cs_x = {cs_x & x_needed_modules = cs_x.x_needed_modules bitor cNeedStdGeneric}}			
-		= (gen_case_defs, generic_defs, type_defs, modules, heaps, cs)
+		# gcfs = convert_generic_contexts type_contexts
+		= [!gcf:gcfs!]
+	convert_generic_contexts [_:type_contexts]
+		= convert_generic_contexts type_contexts
+	convert_generic_contexts []
+		= [!!]
+
+	check_generic_superclasses [!gcf=:{gcf_gident}:gcfs!] mod_index cs
+		# (generic_gi,cs) = get_generic_index gcf_gident mod_index cs
+		| not cs.cs_error.ea_ok
+			# (gcfs,cs) = check_generic_superclasses gcfs mod_index cs
+			= ([!gcf:gcfs!],cs)
+			# gcf = {gcf & gcf_generic = generic_gi}
+			# (gcfs,cs) = check_generic_superclasses gcfs mod_index cs
+			= ([!gcf:gcfs!],cs)
+	check_generic_superclasses [!!] mod_index cs
+		= ([!!],cs)
 
 	check_instance_type module_index (TA type_cons []) type_defs modules heaps=:{hp_type_heaps} cs
 		# (entry, cs_symbol_table) = readPtr type_cons.type_ident.id_info cs.cs_symbol_table
@@ -242,30 +289,75 @@ where
 			_	->	( {gi_module=NoIndex,gi_index = NoIndex}
 					, {cs & cs_error = checkError id_name "generic undefined" cs.cs_error})
 
-convert_generic_instances :: !.[GenericCaseDef] !Int -> (!.[FunDef], !.[GenericCaseDef])
-convert_generic_instances [gc=:{gc_ident, gc_body=GCB_FunDef fun_def} : gcs] next_fun_index
-	# (fun_defs, gcs) =  convert_generic_instances gcs (inc next_fun_index)
-	# gc = { gc & gc_body = GCB_FunIndex next_fun_index } 
-	= ([fun_def : fun_defs], [gc:gcs])
-		//---> ("convert generic case: user defined function", gc.gc_ident, gc.gc_type_cons, next_fun_index)
-convert_generic_instances [gc=:{gc_ident,gc_pos, gc_type_cons, gc_body=GCB_None} : gcs] next_fun_index
-	# (fun_defs, gcs) =  convert_generic_instances gcs (inc next_fun_index)
-	# fun_def = 
-			{ fun_ident = genericIdentToFunIdent gc_ident.id_name gc_type_cons
-			, fun_arity = 0
-			, fun_priority = NoPrio
-			, fun_body = GeneratedBody
-			, fun_type = No
-			, fun_pos = gc_pos
-			, fun_kind = FK_Unknown
-			, fun_lifted = 0
-			, fun_info = EmptyFunInfo
-			}
-	# gc = { gc & gc_body = GCB_FunIndex next_fun_index } 
-	= ([fun_def:fun_defs], [gc:gcs])
-		//---> ("convert generic case: function to derive ", gc.gc_ident, gc.gc_type_cons, next_fun_index)
-convert_generic_instances [] next_fun_index 
-	= ([], [])
+convert_generic_instances :: !Int !Int !*{#GenericCaseDef} !*{#ClassDef} !*SymbolTable !*ErrorAdmin !*{#DclModule}
+						-> (!.[FunDef],!*{#GenericCaseDef},!*{#ClassDef},!*SymbolTable,!*ErrorAdmin,!*{#DclModule})
+convert_generic_instances gci next_fun_index gencase_defs class_defs symbol_table error dcl_modules
+	| gci<size gencase_defs
+		# (gencase_def,gencase_defs)=gencase_defs![gci]
+		= case gencase_def of
+			gc=:{gc_gcf=GCF gc_ident gcf=:{gcf_body=GCB_FunDef fun_def}}
+				# gc = {gc & gc_gcf=GCF gc_ident {gcf & gcf_body = GCB_FunIndex next_fun_index}}
+				  gencase_defs = {gencase_defs & [gci]=gc}
+				  (fun_defs,gencase_defs,class_defs,symbol_table,error,dcl_modules)
+					= convert_generic_instances (gci+1) (next_fun_index+1) gencase_defs class_defs symbol_table error dcl_modules
+				-> ([fun_def : fun_defs],gencase_defs,class_defs,symbol_table,error,dcl_modules)
+			gc=:{gc_pos, gc_type_cons, gc_gcf=GCF gc_ident gcf=:{gcf_body=GCB_None}}
+				# fun_def =
+					{ fun_ident = genericIdentToFunIdent gc_ident.id_name gc_type_cons
+					, fun_arity = 0, fun_priority = NoPrio
+					, fun_body = GeneratedBody, fun_type = No
+					, fun_pos = gc_pos, fun_kind = FK_Unknown
+					, fun_lifted = 0, fun_info = EmptyFunInfo
+					}
+				  gc = {gc & gc_gcf=GCF gc_ident {gcf & gcf_body = GCB_FunIndex next_fun_index}} 
+				  gencase_defs = {gencase_defs & [gci]=gc}
+				  (fun_defs,gencase_defs,class_defs,symbol_table,error,dcl_modules)
+					= convert_generic_instances (gci+1) (next_fun_index+1) gencase_defs class_defs symbol_table error dcl_modules
+				-> ([fun_def : fun_defs],gencase_defs,class_defs,symbol_table,error,dcl_modules)
+//			gc=:{gc_gcf=GCFC {gcfc_class_ident=gcfc_class_ident=:{id_info}},gc_type_cons,gc_pos}
+			gc=:{gc_gcf=GCFC _ gcfc_class_ident=:{id_info},gc_type_cons,gc_pos}
+				# (entry,symbol_table) = readPtr id_info symbol_table
+				-> case entry.ste_kind of
+					STE_Class
+						# (class_context,class_defs) = class_defs![entry.ste_index].class_context
+						-> convert_generic_instances_and_superclasses class_context gci next_fun_index gencase_defs class_defs symbol_table error dcl_modules
+					STE_Imported STE_Class decl_index
+	 					# (class_context,dcl_modules) = dcl_modules![decl_index].dcl_common.com_class_defs.[entry.ste_index].class_context
+						-> convert_generic_instances_and_superclasses class_context gci next_fun_index gencase_defs class_defs symbol_table error dcl_modules
+					_
+						# error = checkErrorWithPosition gcfc_class_ident gc_pos "class undefined" error
+						-> convert_generic_instances (gci+1) next_fun_index gencase_defs class_defs symbol_table error dcl_modules
+			where
+				convert_generic_instances_and_superclasses class_context gci next_fun_index gencase_defs class_defs symbol_table error dcl_modules
+					# (gcfs,next_fun_index,new_fun_defs) = convert_generic_contexts class_context gc_type_cons gc_pos next_fun_index []
+					  gc = {gc & gc_gcf=GCFS gcfs}
+					  gencase_defs = {gencase_defs & [gci]=gc}
+					  (fun_defs,gencase_defs,class_defs,symbol_table,error,dcl_modules)
+						= convert_generic_instances (gci+1) next_fun_index gencase_defs class_defs symbol_table error dcl_modules
+					= (new_fun_defs++fun_defs,gencase_defs,class_defs,symbol_table,error,dcl_modules)
+		= ([],gencase_defs,class_defs,symbol_table,error,dcl_modules)
+	where
+		convert_generic_contexts [{tc_class=TCGeneric {gtc_generic={glob_object={ds_ident}}}}:type_contexts] type_cons pos next_fun_index new_fun_defs
+			# fun_def = {
+				fun_ident = genericIdentToFunIdent ds_ident.id_name type_cons,
+				fun_arity = 0, fun_priority = NoPrio,
+				fun_body = GeneratedBody, fun_type = No,
+				fun_pos = pos, fun_kind = FK_Unknown,
+				fun_lifted = 0, fun_info = EmptyFunInfo
+				}
+			# gcf = {
+				gcf_gident = ds_ident,
+			 	gcf_generic = {gi_module=NoIndex,gi_index=NoIndex},
+				gcf_arity = 0,
+				gcf_body = GCB_FunIndex next_fun_index,
+				gcf_kind = KindError
+				}
+			# (gcfs,next_fun_index,new_fun_defs) = convert_generic_contexts type_contexts type_cons pos (next_fun_index+1) new_fun_defs
+			= ([!gcf:gcfs!],next_fun_index,[fun_def:new_fun_defs])
+		convert_generic_contexts [_:type_contexts] type_cons pos next_fun_index new_fun_defs
+			= convert_generic_contexts type_contexts type_cons pos next_fun_index new_fun_defs
+		convert_generic_contexts [] type_cons pos next_fun_index new_fun_defs
+			= ([!!],next_fun_index,new_fun_defs)
 
 create_gencase_funtypes :: !Index !*{#GenericCaseDef} !*Heaps
 			-> (!Index,![FunType],!*{#GenericCaseDef},!*Heaps)
@@ -277,28 +369,46 @@ where
 	create_funs gc_index fun_index gencase_defs hp_var_heap
 		| gc_index == size gencase_defs
 			= (fun_index, [], gencase_defs, hp_var_heap)
-			#! (fun, gencase_defs,hp_var_heap) 
-				= create_fun gc_index fun_index gencase_defs hp_var_heap
-			#! (fun_index, funs, gencase_defs,hp_var_heap) 
-				= create_funs (inc gc_index) (inc fun_index) gencase_defs hp_var_heap
-			= (fun_index, [fun:funs], gencase_defs, hp_var_heap)
+		# (gencase_def,gencase_defs) = gencase_defs![gc_index]
+		= case gencase_def of
+			{gc_gcf=GCF gc_ident gcf,gc_pos,gc_type_cons}
+	  			# gencase_def = {gencase_def & gc_gcf=GCF gc_ident {gcf & gcf_body = GCB_FunIndex fun_index}}
+	  			# gencase_defs = {gencase_defs & [gc_index] = gencase_def} 
+				# (fun,hp_var_heap) = create_gencase_function_type gc_ident gc_type_cons gc_pos hp_var_heap
+				# (fun_index,funs,gencase_defs,hp_var_heap)
+					= create_funs (gc_index+1) (fun_index+1) gencase_defs hp_var_heap
+				-> (fun_index, [fun:funs], gencase_defs, hp_var_heap)
+	   		{gc_gcf=GCFS gcfs,gc_pos,gc_type_cons}
+				# (gcfs,superclass_funs,fun_index,hp_var_heap)
+					= create_functions_for_generic_superclasses gcfs gc_type_cons gc_pos fun_index hp_var_heap
+	  			# gencase_def = {gencase_def & gc_gcf=GCFS gcfs}
+	  			# gencase_defs = {gencase_defs & [gc_index] = gencase_def} 
+				# (fun_index,funs,gencase_defs,hp_var_heap) 
+					= create_funs (gc_index+1) fun_index gencase_defs hp_var_heap
+				-> (fun_index,superclass_funs++funs,gencase_defs,hp_var_heap)
+		where
+			create_functions_for_generic_superclasses [!gcf=:{gcf_gident}:gcfs!] gc_type_cons gc_pos fun_index hp_var_heap
+				# (fun,hp_var_heap) = create_gencase_function_type gcf_gident gc_type_cons gc_pos hp_var_heap
+	  			# gcf={gcf & gcf_body = GCB_FunIndex fun_index}
+				# (gcfs,superclass_funs,fun_index,hp_var_heap)
+					= create_functions_for_generic_superclasses gcfs gc_type_cons gc_pos (fun_index+1) hp_var_heap
+				= ([!gcf:gcfs!],[fun:superclass_funs],fun_index,hp_var_heap)
+			create_functions_for_generic_superclasses [!!] gc_type_cons gc_pos fun_index hp_var_heap
+				= ([!!],[],fun_index,hp_var_heap)
 
-	create_fun gc_index fun_index gencase_defs hp_var_heap
-		# (gencase_def=:{gc_ident, gc_pos, gc_type_cons}, gencase_defs) = gencase_defs ! [gc_index]
-		# gencase_def = { gencase_def & gc_body = GCB_FunIndex fun_index }
-		# gencase_defs = {gencase_defs & [gc_index] = gencase_def}
-		#! fun_ident = genericIdentToFunIdent gc_ident.id_name gc_type_cons
-	 	#! (var_info_ptr, hp_var_heap) = newPtr VI_Empty hp_var_heap
-		#! fun = 
-				{ ft_ident = fun_ident
-				, ft_arity = 0
-				, ft_priority = NoPrio
-				, ft_type = {st_vars=[],st_attr_vars=[],st_arity=0,st_args=[],st_result={at_type=TE,at_attribute=TA_Multi},st_attr_env=[],st_context=[],st_args_strictness=NotStrict} 
-				, ft_pos = gc_pos
-				, ft_specials = SP_None
-				, ft_type_ptr = var_info_ptr
-				}
-		= (fun, gencase_defs, hp_var_heap)
+	create_gencase_function_type {id_name} gc_type_cons gc_pos var_heap
+		#! fun_ident = genericIdentToFunIdent id_name gc_type_cons
+	 	#! (var_info_ptr, var_heap) = newPtr VI_Empty var_heap
+ 		#! fun = 
+  			{ ft_ident = fun_ident
+  			, ft_arity = 0
+  			, ft_priority = NoPrio
+  			, ft_type = {st_vars=[],st_attr_vars=[],st_arity=0,st_args=[],st_result={at_type=TE,at_attribute=TA_Multi},st_attr_env=[],st_context=[],st_args_strictness=NotStrict}
+  			, ft_pos = gc_pos
+  			, ft_specials = SP_None
+  			, ft_type_ptr = var_info_ptr
+  			}
+		= (fun,var_heap)
 
 NewEntry symbol_table symb_ptr def_kind def_index level previous :==
 	 symbol_table <:= (symb_ptr,{  ste_kind = def_kind, ste_index = def_index, ste_def_level = level, ste_previous = previous })

@@ -400,6 +400,16 @@ instance consumerRequirements Expression where
 		= (CPassive, False, ai)
 	consumerRequirements (FailExpr _) _ ai
 		= (CPassive, False, ai)
+	consumerRequirements (DictionariesFunction dictionaries expr expr_type) common_defs ai
+		# (new_next_var,new_next_var_of_fun,ai_var_heap) = init_variables dictionaries ai.ai_next_var ai.ai_next_var_of_fun ai.ai_var_heap
+		# ai = {ai & ai_next_var=new_next_var,ai_next_var_of_fun=new_next_var_of_fun,ai_var_heap=ai_var_heap}
+		= consumerRequirements expr common_defs ai
+		where
+			init_variables [({fv_info_ptr},_):dictionaries] ai_next_var ai_next_var_of_fun ai_var_heap
+				# ai_var_heap = writePtr fv_info_ptr (VI_AccVar ai_next_var ai_next_var_of_fun) ai_var_heap
+				= init_variables dictionaries (inc ai_next_var) (inc ai_next_var_of_fun) ai_var_heap
+			init_variables [] ai_next_var ai_next_var_of_fun ai_var_heap
+				= (ai_next_var,ai_next_var_of_fun,ai_var_heap)
 	consumerRequirements expr _ ai
 		= abort ("consumerRequirements [Expression]" ---> expr)
 
@@ -1353,6 +1363,13 @@ count_locals EE n
 count_locals (FailExpr _) n = n
 count_locals (NoBind _) n
 	= n
+count_locals (DictionariesFunction dictionaries expr expr_type) n
+	= count_locals expr (foldSt count_local_dictionary dictionaries n)
+	where
+		count_local_dictionary ({fv_count},_) n
+			| fv_count > 0
+				= n+1
+				= n
 
 count_optional_locals (Yes e) n
 	= count_locals e n

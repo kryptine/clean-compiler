@@ -45,6 +45,7 @@ instance == FunctionOrMacroIndex
 				| STE_Member
 				| STE_Generic
 				| STE_GenericCase
+				| STE_GenericDeriveClass
 				| STE_Instance
 				| STE_Variable !VarInfoPtr
 				| STE_TypeVariable !TypeVarInfoPtr
@@ -291,6 +292,7 @@ cNameLocationDependent :== True
 	,	pc_exi_vars		:: ![ATypeVar]
 	,	pc_arg_types	:: ![AType]
 	,	pc_args_strictness	:: !StrictnessList
+	,	pc_context		:: ![TypeContext]
 	,	pc_cons_prio	:: !Priority
 	,	pc_cons_pos		:: !Position
 	}
@@ -402,17 +404,26 @@ cNameLocationDependent :== True
 	| TypeConsArrow
 	| TypeConsVar TypeVar 
 
-:: GenericCaseDef = 
-	{	gc_ident			:: !Ident				// name in IC_GenricCase namespace
-	,	gc_gident		:: !Ident  				// name in IC_Generic namespace
-	,	gc_generic		:: !GlobalIndex  		// index of the generic
-	,	gc_arity		:: !Int					// arity of the function
-	,	gc_pos			:: !Position			// position in the source file
+:: GenericCaseDef =
+	{	gc_pos			:: !Position			// position in the source file
 	,	gc_type			:: !Type				// the instance type
 	,   gc_type_cons	:: !TypeCons			// type constructor of the type argument
-	,	gc_body			:: !GenericCaseBody		// the body function or NoIndex
-	,	gc_kind			:: !TypeKind			// kind of the instance type
+	,	gc_gcf			:: !GenericCaseFunctions
 	}
+
+::	GenericCaseFunctions
+	= GCF !Ident !GCF
+	| GCFS ![!GCF!]
+	| GCFC !Ident !Ident	// IC_GenericDeriveClass IC_Class
+
+::	GCF = {
+		gcf_gident	:: !Ident,	  			// name in IC_Generic namespace
+		gcf_generic	:: !GlobalIndex,		// index of the generic
+		gcf_arity	:: !Int,				// arity of the function
+		gcf_body	:: !GenericCaseBody,	// the body function or NoIndex
+		gcf_kind	:: !TypeKind			// kind of the instance type
+	}
+
 :: GenericCaseBody 
 	= GCB_None 									// to be generated
 	| GCB_FunIndex !Index 
@@ -676,7 +687,9 @@ from convertDynamics import :: TypeCodeVariableInfo, :: DynamicValueAliasInfo
 				| VITI_PatternType	[AType] /*module*/!Index /*constructor*/!Index VI_TypeInfo
 
 //::	VarInfo  =	VI_Empty | VI_Type !AType !(Optional CoercionPosition) | VI_FAType ![ATypeVar] !AType !(Optional CoercionPosition) |
-::	VarInfo  =	VI_Empty | VI_Type !AType !VI_TypeInfo | VI_FAType ![ATypeVar] !AType !VI_TypeInfo |
+::	VarInfo  =	VI_Empty | VI_Type !AType !VI_TypeInfo |
+				VI_FAType ![ATypeVar] !AType !VI_TypeInfo |
+				VI_FATypeC ![ATypeVar] !AType ![TypeContext] !VI_TypeInfo | VI_FPC |
 				VI_Occurrence !Occurrence | VI_UsedVar !Ident |
 				VI_Expression !Expression | VI_Variable !Ident !VarInfoPtr | VI_LiftedVariable !VarInfoPtr |
 				VI_Count !Int /* the reference count of a variable */ !Bool /* true if the variable is global, false otherwise */ |
@@ -690,6 +703,7 @@ from convertDynamics import :: TypeCodeVariableInfo, :: DynamicValueAliasInfo
 				VI_RefFromArrayUpdateOfTupleElem2 !Int ![Selection] |
 				VI_FreeVar !Ident !VarInfoPtr !Int !AType | VI_BoundVar !AType | VI_LocalVar |
 				VI_ClassVar !Ident !VarInfoPtr !Int | /* to hold dictionary variables during overloading */
+				VI_EmptyConstructorClassVar |
 				VI_ForwardClassVar !VarInfoPtr | /* to hold the dictionary variable generated during overloading */
 				VI_Forward !BoundVar | VI_LetVar !LetVarInfo | VI_LetExpression !LetExpressionInfo |
 				VI_CaseOrStrictLetVar !VarInfoPtr | VI_StrictLetVar |
@@ -762,6 +776,10 @@ cNonRecursiveAppl	:== False
 				| SK_NewTypeConstructor !GlobalIndex
 				| SK_Generic !(Global Index) !TypeKind
 				| SK_TypeCode
+				| SK_OverloadedConstructor !(Global Index)
+				| SK_TFACVar !ExprInfoPtr
+				| SK_VarContexts !(VarContexts TypeContext)
+				| SK_TypeCodeAndContexts !(VarContexts TypeContext)
 
 /*	Some auxiliary type definitions used during fusion. Actually, these definitions
 	should have been given in seperate module. Unfortunately, Clean's module system
@@ -808,15 +826,18 @@ cNonRecursiveAppl	:== False
 		/* For handling overloading */
 
 					| EI_Overloaded !OverloadedCall 						/* initial, set by the type checker */
+					| EI_OverloadedWithVarContexts !OverloadedCallWithVarContexts /* initial, set by the type checker */
 					| EI_Instance 	!(Global DefinedSymbol) ![Expression]	/* intermedediate, used during resolving of overloading */ 
 					| EI_Selection 	![Selection] !VarInfoPtr ![Expression]	/* intermedediate, used during resolving of overloading */
 					| EI_Context 	![Expression]							/* intermedediate, used during resolving of overloading */
+					| EI_ContextWithVarContexts ![Expression] !(VarContexts DictionaryAndClassType) /* intermedediate, used during resolving of overloading */
+					| EI_FPContext	![Expression] !ExprInfoPtr				/* intermedediate, used during resolving of overloading */
 
 		/* For handling dynamics */
 
-					| EI_UnmarkedDynamic 		!(Optional DynamicType) ![DynamicPtr]
-					| EI_Dynamic 				!(Optional DynamicType) ![DynamicPtr]
-					| EI_DynamicType			!DynamicType ![DynamicPtr]
+					| EI_UnmarkedDynamic 		!(Optional DynamicType) ![DynamicPtr]	// in expression
+					| EI_Dynamic 				!(Optional DynamicType) ![DynamicPtr]	// in expression
+					| EI_DynamicType			!DynamicType ![DynamicPtr]				// in pattern
 
 		/* Auxiliary, was EI_DynamicType before checking */
 
@@ -824,14 +845,16 @@ cNonRecursiveAppl	:== False
 
 		/* Auxiliary, used during type checking */
 
-					| EI_TempDynamicType 		!(Optional DynamicType) ![DynamicPtr] !AType ![TypeContext] !ExprInfoPtr !SymbIdent
+					| EI_TempDynamicType 		!(Optional DynamicType) ![DynamicPtr] !AType ![TypeContext] ![TypeContext] !ExprInfoPtr !SymbIdent
 					| EI_TempDynamicPattern 	![TypeVar] !DynamicType ![DynamicPtr] ![TempLocalVar] !AType ![TypeContext] !ExprInfoPtr !SymbIdent
-					
-					| EI_TypeOfDynamic 			!TypeCodeExpression				/* Final */
-					| EI_TypeOfDynamicPattern 	![VarInfoPtr] !TypeCodeExpression				/* Final */
+
+					| EI_TypeOfDynamic 			!TypeCodeExpression						/* Final */
+					| EI_TypeOfDynamicPattern 	![VarInfoPtr] !TypeCodeExpression !Bool	/* Final */
+					| EI_TypeOfDynamicWithContexts !TypeCodeExpression !(VarContexts DictionaryAndClassType)
 
 					| EI_TypeCode 		!TypeCodeExpression
 					| EI_TypeCodes 		![TypeCodeExpression]
+					| EI_TypeCodesWithContexts ![TypeCodeExpression] !(VarContexts DictionaryAndClassType)
 
 					| EI_Attribute !Int
 
@@ -841,6 +864,7 @@ cNonRecursiveAppl	:== False
 					| EI_DictionaryType !Type
 					| EI_CaseType !CaseType
 					| EI_LetType ![AType]
+					| EI_CaseTypeWithContexts !CaseType ![(DefinedSymbol,[TypeContext])]
 					| EI_CaseTypeAndRefCounts !CaseType !RefCountsInCase
 					| EI_CaseTypeAndSplits !CaseType !SplitsInCase
 					| EI_LetTypeAndRefCounts ![AType] ![Int]
@@ -866,7 +890,6 @@ cNonRecursiveAppl	:== False
 /*
 	OverloadedCall contains (type) information about functions that are overloaded. This structure is built during type checking
 	and used after (standard) unification to insert the proper instances of the corresponding functions.
-
 */
 
 ::	OverloadedCall = 
@@ -874,6 +897,21 @@ cNonRecursiveAppl	:== False
 	,	oc_context	:: ![TypeContext]
 	,	oc_specials	:: ![Special]
 	}
+
+::	OverloadedCallWithVarContexts = 
+	{	ocvc_symbol       :: !SymbIdent
+	,	ocvc_context      :: ![TypeContext]
+	,	ocvc_var_contexts :: !VarContexts TypeContext
+	}
+
+::	DictionaryAndClassType =
+	{	dc_var			:: !VarInfoPtr
+	,	dc_class_type	:: !AType
+	}
+
+::	VarContexts type_contexts
+	= VarContext !Int /*arg_n*/ ![type_contexts] !AType !(VarContexts type_contexts)
+	| NoVarContexts
 
 /*
 	CaseType contains the type information needed to type the corresponding case construct:
@@ -962,10 +1000,13 @@ cNonRecursiveAppl	:== False
 			|	(:@:) infixl 9 !ConsVariable ![AType]
 			|	TB !BasicType
 
-			|	TFA [ATypeVar] Type				/* Universally quantified types */
+			|	TFA ![ATypeVar] !Type			/* Universally quantified types */
 
 			| 	GTV !TypeVar
 			| 	TV !TypeVar
+
+			|	TFAC ![ATypeVar] !Type ![TypeContext]	// Universally quantified function argument type with contexts
+
 			|	TempV !TempVarId				/* Auxiliary, used during type checking */
 
 			
@@ -985,6 +1026,7 @@ cNonRecursiveAppl	:== False
 	{	dt_uni_vars 	:: ![ATypeVar]
 	,	dt_global_vars	:: ![TypeVar]
 	,	dt_type			:: !AType
+	,	dt_contexts		:: ![TypeContext]
 	}
 
 ::	KindHeap	:== Heap KindInfo
@@ -1269,6 +1311,8 @@ cIsNotStrict	:== False
 
 				| MatchExpr !(Global DefinedSymbol) !Expression
 				| FreeVar FreeVar 
+				| DictionariesFunction ![(FreeVar,AType)] !Expression !AType
+
 				| Constant !SymbIdent !Int !Priority		/* auxiliary clause used during checking */
 				| ClassVariable !VarInfoPtr					/* auxiliary clause used during overloading */
 
@@ -1400,6 +1444,12 @@ instance == OverloadedListType
 	,	ip_file		:: !FileName
 	}
 
+::	StringPos =
+	{	sp_name		:: !String
+	,	sp_line		:: !Int
+	,	sp_file		:: !FileName
+	}
+
 :: FileName			:== String
 
 :: FunctName		:== String
@@ -1479,7 +1529,7 @@ ParsedSelectorToSelectorDef sd_type_index ps :==
 ParsedConstructorToConsDef pc :==
 	{	cons_ident = pc.pc_cons_ident, cons_pos = pc.pc_cons_pos, cons_priority = pc.pc_cons_prio, cons_number = NoIndex, cons_type_index = NoIndex,
 		cons_type = { st_vars = [], st_args = pc.pc_arg_types, st_args_strictness=pc.pc_args_strictness, st_result = MakeAttributedType TE, 
-				  st_arity = pc.pc_cons_arity, st_context = [], st_attr_env = [], st_attr_vars = []},
+				  st_arity = pc.pc_cons_arity, st_context = pc.pc_context, st_attr_env = [], st_attr_vars = []},
 		cons_exi_vars = pc.pc_exi_vars, cons_type_ptr = nilPtr }
 
 ParsedInstanceToClassInstance pi members :==

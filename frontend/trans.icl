@@ -298,6 +298,9 @@ where
 	transform (DynamicExpr dynamic_expr) ro ti
 		# (dynamic_expr, ti) = transform dynamic_expr ro ti
 		= (DynamicExpr dynamic_expr, ti)
+	transform (DictionariesFunction dictionaries expr expr_type) ro ti
+		# (expr,ti) = transform expr ro ti
+		= (DictionariesFunction dictionaries expr expr_type,ti)
 	transform expr ro ti
 		= (expr, ti)
 
@@ -3201,13 +3204,14 @@ where
 
 determineProducer :: App ExprInfo Bool Bool Bool Bool [Expression] Int *{!Producer} ReadOnlyTI *TransformInfo -> *(!*{!Producer},![Expression],!*TransformInfo)
 determineProducer app=:{app_symb = symb=:{symb_kind = SK_Constructor _}, app_args} (EI_DictionaryType type) _ _ _ _
-				  new_args prod_index producers _ ti
-	# (app_args, (new_vars_and_types, free_vars, ti_var_heap)) 
-			= renewVariables app_args ti.ti_var_heap
+				  new_args prod_index producers _ ti=:{ti_var_heap,ti_predef_symbols}
+	# (normalise_symbol,ti_predef_symbols) = ti_predef_symbols![PD_Dyn_normalise]
+	# (app_args, (new_vars_and_types, free_vars, ti_var_heap))
+			= renewVariables app_args normalise_symbol ti_var_heap
 	# prod	= PR_Class { app & app_args = app_args } new_vars_and_types type
-	= ( { producers & [prod_index] = prod }
-	  , mapAppend Var free_vars new_args
-	  , { ti & ti_var_heap = ti_var_heap }
+	= ( {producers & [prod_index] = prod}
+	  , free_vars++new_args
+	  , {ti & ti_var_heap=ti_var_heap, ti_predef_symbols=ti_predef_symbols}
 	  )
 determineProducer app=:{app_symb = symb=:{symb_kind = SK_Constructor cons_index, symb_ident}, app_args} _ _ _ _ linear_bit
 				  new_args prod_index producers ro ti
@@ -3443,38 +3447,60 @@ where
 	is_a_producer PR_Empty	= False
 	is_a_producer _ 		= True
 
-:: *RenewState :== (![(BoundVar, Type)], ![BoundVar], !*VarHeap)
-// DvA: should be in typesupport?
-renewVariables :: ![Expression] !*VarHeap
-				-> (![Expression], !RenewState)
-renewVariables exprs var_heap
+:: *RenewState :== (![(BoundVar, Type)], ![Expression], !*VarHeap)
+
+renewVariables :: ![Expression] !PredefinedSymbol !*VarHeap -> (![Expression], !RenewState)
+renewVariables exprs normalise_symbol var_heap
 	# (exprs, (new_vars, free_vars, var_heap))
-			= mapSt (mapExprSt map_expr preprocess_local_var postprocess_local_var)
-					exprs ([], [], var_heap)
-	  var_heap
-	  		= foldSt (\{var_info_ptr} var_heap -> writeVarInfo var_info_ptr VI_Empty var_heap)
-	  				free_vars var_heap
+			= mapSt map_expr_st exprs ([], [], var_heap)
+	  var_heap = foldSt (\ expr var_heap
+	  						-> case expr of
+	  							Var {var_info_ptr}	-> writeVarInfo var_info_ptr VI_Empty var_heap
+	  							_					-> var_heap
+	  					) free_vars var_heap
 	= (exprs, (new_vars, free_vars, var_heap))
   where
-	map_expr :: !Expression !RenewState -> (!Expression, !RenewState)
-	map_expr (Var var=:{var_info_ptr, var_ident}) (new_vars_accu, free_vars_accu, var_heap)
-		# (var_info, var_heap)
-				= readPtr var_info_ptr var_heap
+	map_expr_st (Var var=:{var_info_ptr, var_ident}) (new_vars_accu, free_vars_accu, var_heap)
+		# (var_info, var_heap) = readPtr var_info_ptr var_heap
 		= case var_info of
 			VI_Extended _ (VI_Forward new_var)
-				-> ( Var new_var
-				   , (new_vars_accu, free_vars_accu, var_heap))
+				-> (Var new_var, (new_vars_accu, free_vars_accu, var_heap))
 			VI_Extended evi=:(EVI_VarType var_type) _
 				# (new_var, var_heap)
-						= allocate_and_bind_new_var var_ident var_info_ptr evi var_heap
-				-> ( Var new_var
-				   , ( [(new_var, var_type.at_type) : new_vars_accu]
-				     , [var:free_vars_accu]
-				     , var_heap
-				     )
-				   )
-			_	-> abort "map_expr in module trans does not match\n"// <<- ("map_expr",var,var_info)
-	map_expr x st = (x, st)
+					= allocate_and_bind_new_var var_ident var_info_ptr evi var_heap
+				-> (Var new_var, ([(new_var, var_type.at_type) : new_vars_accu], [Var var:free_vars_accu], var_heap))
+	map_expr_st expr=:(App app=:{app_symb={symb_kind=SK_Function {glob_object,glob_module},symb_ident},app_args}) (new_vars_accu, free_vars_accu, var_heap)
+		| glob_module==normalise_symbol.pds_module && glob_object==normalise_symbol.pds_def
+			# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
+			  new_var = { var_ident = symb_ident, var_info_ptr = new_info_ptr, var_expr_ptr = nilPtr }
+			= (Var new_var, ([(new_var, TE) : new_vars_accu], [expr:free_vars_accu], var_heap))
+	map_expr_st expr=:(App app=:{app_args}) st
+		# (app_args, st) = mapSt map_expr_st app_args st
+		= (App { app & app_args = app_args }, st)
+	map_expr_st (Let lad=:{let_lazy_binds, let_strict_binds, let_expr}) st
+		# (lazy_free_vars, st)
+				= mapSt (\{lb_dst} st -> preprocess_local_var lb_dst st) let_lazy_binds st
+		  (strict_free_vars, st)
+				= mapSt (\{lb_dst} st -> preprocess_local_var lb_dst st) let_strict_binds st
+		  (lazy_rhss, st)
+		  		= mapSt (\{lb_src} st -> map_expr_st lb_src st) let_lazy_binds st
+		  (strict_rhss, st)
+		  		= mapSt (\{lb_src} st -> map_expr_st lb_src st) let_strict_binds st
+		  (let_expr, st)
+		  		= map_expr_st let_expr st
+		  st	= foldSt (\{lb_dst} st -> postprocess_local_var lb_dst st) let_lazy_binds st
+		  st	= foldSt (\{lb_dst} st -> postprocess_local_var lb_dst st) let_strict_binds st
+		  expr	= Let { lad
+		  			& let_lazy_binds	= add_let_binds lazy_free_vars lazy_rhss let_lazy_binds
+		  			, let_strict_binds	= add_let_binds strict_free_vars strict_rhss let_strict_binds
+		  			, let_expr			= let_expr
+					}
+		= (expr, st)
+	map_expr_st (Selection a expr b) st
+		# (expr, st) = map_expr_st expr st
+		= (Selection a expr b, st)
+	map_expr_st expr=:(BasicExpr _) st 
+		= (expr, st)
 
 	preprocess_local_var :: !FreeVar !RenewState -> (!FreeVar, !RenewState)
 	preprocess_local_var fv=:{fv_ident, fv_info_ptr} (new_vars_accu, free_vars_accu, var_heap)
@@ -3496,51 +3522,6 @@ renewVariables exprs var_heap
 	postprocess_local_var :: !FreeVar !RenewState -> RenewState
 	postprocess_local_var {fv_info_ptr} (a, b, var_heap)
 		= (a, b, writeVarInfo fv_info_ptr VI_Empty var_heap)
-	
-//@ ExprSt ops
-
-mapExprSt f map_free_var postprocess_free_var expr st
-	:== map_expr_st expr st
-where
-	map_expr_st expr=:(Var bound_var) st
-		= f expr st
-	map_expr_st (App app=:{app_args}) st
-		# (app_args, st) = mapSt map_expr_st app_args st
-		= f (App { app & app_args = app_args }) st
-	map_expr_st (Let lad=:{let_lazy_binds, let_strict_binds, let_expr}) st
-		# (lazy_free_vars, st)
-				= mapSt (\{lb_dst} st -> map_free_var lb_dst st) let_lazy_binds st
-		  (strict_free_vars, st)
-				= mapSt (\{lb_dst} st -> map_free_var lb_dst st) let_strict_binds st
-		  (lazy_rhss, st)
-		  		= mapSt (\{lb_src} st -> map_expr_st lb_src st) let_lazy_binds st
-		  (strict_rhss, st)
-		  		= mapSt (\{lb_src} st -> map_expr_st lb_src st) let_strict_binds st
-		  (let_expr, st)
-		  		= map_expr_st let_expr st
-		  st	= foldSt (\{lb_dst} st -> postprocess_free_var lb_dst st) let_lazy_binds st
-		  st	= foldSt (\{lb_dst} st -> postprocess_free_var lb_dst st) let_strict_binds st
-		  expr	= Let { lad
-		  			& let_lazy_binds	= add_let_binds lazy_free_vars lazy_rhss let_lazy_binds
-		  			, let_strict_binds	= add_let_binds strict_free_vars strict_rhss let_strict_binds
-		  			, let_expr			= let_expr
-					}
-		= f expr st
-	map_expr_st (Selection a expr b) st
-		# (expr, st) = map_expr_st expr st
-		= f (Selection a expr b) st
-
-	// AA:
-	map_expr_st expr=:(BasicExpr _) st 
-		= f expr st
-	map_expr_st (expr @ exprs) st 
-		= abort "trans.icl: map_expr_st (expr @ exprs) not implemented\n"
-	map_expr_st (TupleSelect ds n expr) st 
-		= abort "trans.icl: map_expr_st (TupleSelect ds n expr) not implemented\n"
-	map_expr_st (DynamicExpr dyn_expr) st 
-		= abort "trans.icl: map_expr_st (DynamicExpr dyn_expr) not implemented\n"
-	map_expr_st _ st = abort "trans.icl: map_expr_st does not match !!!!!!!!!!!!\n"
-
 
 foldrExprSt f expr st :== foldr_expr_st expr st
   where
@@ -4629,6 +4610,8 @@ strip_universal_quantor st=:{st_vars,st_args,st_result}
 where
 	strip :: AType [TypeVar] -> (AType,[TypeVar])
 	strip atype=:{at_type = TFA vars type} tvs
+		= ({atype & at_type = type}, map (\{atv_variable}->atv_variable) vars ++ tvs)
+	strip atype=:{at_type = TFAC vars type contexts} tvs
 		= ({atype & at_type = type}, map (\{atv_variable}->atv_variable) vars ++ tvs)
 	strip atype tvs
 		= (atype,tvs)

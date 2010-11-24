@@ -547,17 +547,9 @@ where
 			  (tks, is_non_coercible, conds_as) = check_type_list kind_var modules form_tvs types conds_as
 			= (KI_Arrow tk tks, is_non_coercible || (type_props bitand cIsNonCoercible <> 0), conds_as)
 	analTypes has_root_attr modules form_tvs (TFA vars type) (conds, as=:{as_type_var_heap,as_kind_heap})
-		# (as_type_var_heap, as_kind_heap) = new_local_kind_variables vars as_type_var_heap as_kind_heap
-		= analTypes has_root_attr modules form_tvs type (conds, { as & as_type_var_heap = as_type_var_heap, as_kind_heap = as_kind_heap})
-	where
-		new_local_kind_variables :: [ATypeVar] !*TypeVarHeap !*KindHeap -> (!*TypeVarHeap,!*KindHeap)
-		new_local_kind_variables type_vars type_var_heap as_kind_heap
-			= foldSt new_kind type_vars (type_var_heap, as_kind_heap)
-		where
-			new_kind :: !ATypeVar !(!*TypeVarHeap,!*KindHeap) -> (!*TypeVarHeap,!*KindHeap)
-			new_kind {atv_variable={tv_info_ptr}} (type_var_heap, kind_heap)
-				# (kind_info_ptr, kind_heap) = newPtr KI_Const kind_heap
-				= (	type_var_heap <:= (tv_info_ptr, TVI_TypeKind kind_info_ptr), kind_heap <:= (kind_info_ptr, KI_Var kind_info_ptr))
+		# (as_type_var_heap, as_kind_heap) = new_local_kind_variables_for_universal_vars vars as_type_var_heap as_kind_heap
+		  as = {as & as_type_var_heap = as_type_var_heap, as_kind_heap = as_kind_heap}
+		= analTypes has_root_attr modules form_tvs type (conds,as)
 	analTypes has_root_attr modules form_tvs type conds_as
 		= (KI_Const, cIsHyperStrict, conds_as)
 
@@ -615,7 +607,7 @@ emptyIdent name :== { id_name = name, id_info = nilPtr }
 newKindVariables td_args (type_var_heap, as_kind_heap)
 	= mapSt new_kind td_args (type_var_heap, as_kind_heap)
 where
-	new_kind :: ATypeVar *(*Heap TypeVarInfo,*Heap KindInfo) -> (!.TypeKind,!(!.Heap TypeVarInfo,!.Heap KindInfo));
+	new_kind :: ATypeVar *(*TypeVarHeap,*KindHeap) -> (!.TypeKind,!(!*TypeVarHeap,!*KindHeap));
 	new_kind {atv_variable={tv_info_ptr}} (type_var_heap, kind_heap)
 		# (kind_info_ptr, kind_heap) = newPtr KI_Const kind_heap
 		= (KindVar kind_info_ptr, (type_var_heap <:= (tv_info_ptr, TVI_TypeKind kind_info_ptr), kind_heap <:= (kind_info_ptr, KI_Var kind_info_ptr)))
@@ -839,11 +831,11 @@ where
 determine_kinds_type_list :: !{#CommonDefs} [AType] !*AnalyseState -> *AnalyseState
 determine_kinds_type_list modules types as
 	= foldSt (force_star_kind modules) types as
-where
-	force_star_kind modules type as
-		# (off_kind, as=:{as_kind_heap,as_error}) = determineKind modules type as
-		  {uki_kind_heap, uki_error} = unifyKinds off_kind KI_Const {uki_kind_heap = as_kind_heap, uki_error = as_error}
-		= { as & as_kind_heap = uki_kind_heap, as_error = uki_error }
+
+force_star_kind modules type as
+	# (off_kind, as=:{as_kind_heap,as_error}) = determineKind modules type as
+	  {uki_kind_heap, uki_error} = unifyKinds off_kind KI_Const {uki_kind_heap = as_kind_heap, uki_error = as_error}
+	= { as & as_kind_heap = uki_kind_heap, as_error = uki_error }
 
 class_def_error = "cyclic dependencies between type classes"
 type_appl_error = "type constructor has too many arguments"
@@ -965,6 +957,15 @@ where
 			# (kind_info, kind_heap) = readPtr kind_info_ptr kind_heap
 			= kindInfoToKind kind_info kind_heap
 
+new_local_kind_variables_for_universal_vars :: [ATypeVar] !*TypeVarHeap !*KindHeap -> (!*TypeVarHeap,!*KindHeap)
+new_local_kind_variables_for_universal_vars type_vars type_var_heap as_kind_heap
+	= foldSt new_kind type_vars (type_var_heap, as_kind_heap)
+  where
+	new_kind :: !ATypeVar !(!*TypeVarHeap,!*KindHeap) -> (!*TypeVarHeap,!*KindHeap)
+	new_kind {atv_variable={tv_info_ptr}} (type_var_heap, kind_heap)
+		# (kind_info_ptr, kind_heap) = newPtr KI_Const kind_heap
+		= (type_var_heap <:= (tv_info_ptr, TVI_TypeKind kind_info_ptr), kind_heap <:= (kind_info_ptr, KI_Var kind_info_ptr))
+
 bindFreshKindVariablesToTypeVars :: [TypeVar] !*TypeVarHeap !*KindHeap -> (!*TypeVarHeap,!*KindHeap)
 bindFreshKindVariablesToTypeVars type_vars type_var_heap as_kind_heap
 	= foldSt new_kind type_vars (type_var_heap, as_kind_heap)
@@ -1085,7 +1086,7 @@ where
 
 	check_kinds_of_icl_fuction common_defs fun_index (icl_fun_defs, class_infos, expression_heap, as)
 		# ({fun_type,fun_ident,fun_info,fun_pos}, icl_fun_defs) = icl_fun_defs![fun_index]
-		  (expression_heap, as) = check_kinds_of_dynamics common_defs fun_info.fi_dynamics expression_heap as
+		  (expression_heap,class_infos,as) = check_kinds_of_dynamics common_defs fun_info.fi_dynamics expression_heap class_infos as
 		= case fun_type of
 			Yes symbol_type
 				# as_error = pushErrorAdmin (newPosition fun_ident fun_pos) as.as_error
@@ -1103,50 +1104,63 @@ where
 		check_kinds_of_dcl_fuction common_defs dcl_functions fun_index (class_infos, as)
 			# {ft_type,ft_ident,ft_pos} = dcl_functions.[fun_index]
 			  as_error = pushErrorAdmin (newPosition ft_ident ft_pos) as.as_error
-			  (class_infos, as) = check_kinds_of_symbol_type common_defs ft_type class_infos
-			  							{ as & as_error = as_error }			  								
+			  (class_infos, as) = check_kinds_of_symbol_type common_defs ft_type class_infos {as & as_error = as_error}			  								
 			= (class_infos, { as & as_error = popErrorAdmin as.as_error})
-			
+
 	check_kinds_of_symbol_type :: !{#CommonDefs} !SymbolType !*ClassDefInfos !*AnalyseState -> (!*ClassDefInfos, !*AnalyseState)
 	check_kinds_of_symbol_type common_defs {st_vars,st_result,st_args,st_context} class_infos as=:{as_type_var_heap,as_kind_heap}
 		# (as_type_var_heap, as_kind_heap) = bindFreshKindVariablesToTypeVars st_vars as_type_var_heap as_kind_heap
-		  as = determine_kinds_type_list common_defs [st_result:st_args] { as & as_type_var_heap = as_type_var_heap, as_kind_heap = as_kind_heap}
+		  as = {as & as_type_var_heap = as_type_var_heap, as_kind_heap = as_kind_heap}
+		  as = force_star_kind common_defs st_result as
+		  (class_infos,as) = check_kinds_of_function_arguments st_args common_defs class_infos as
 		= determine_kinds_of_type_contexts common_defs st_context class_infos as
-
-	check_kinds_of_dynamics :: {#CommonDefs} [DynamicPtr] *ExpressionHeap *AnalyseState -> (*ExpressionHeap, *AnalyseState)
-	check_kinds_of_dynamics common_defs dynamic_ptrs expr_heap as
-		= foldSt (check_kinds_of_dynamic common_defs) dynamic_ptrs (expr_heap, as)
 	where
-		check_kinds_of_dynamic :: {#CommonDefs} DynamicPtr (*ExpressionHeap, *AnalyseState) -> (*ExpressionHeap, *AnalyseState)
-		check_kinds_of_dynamic common_defs dynamic_ptr (expr_heap, as)
+		check_kinds_of_function_arguments :: [AType] {#CommonDefs} !*ClassDefInfos !*AnalyseState -> (!*ClassDefInfos, !*AnalyseState)
+		check_kinds_of_function_arguments [{at_type=TFAC vars type contexts}:types] common_defs class_infos as
+			# (as_type_var_heap, as_kind_heap) = new_local_kind_variables_for_universal_vars vars as.as_type_var_heap as.as_kind_heap
+			  as = {as & as_type_var_heap = as_type_var_heap, as_kind_heap = as_kind_heap}
+			  as = force_star_kind common_defs type as
+			  (class_infos,as) = determine_kinds_of_type_contexts common_defs contexts class_infos as
+			= check_kinds_of_function_arguments types common_defs class_infos as
+		check_kinds_of_function_arguments [type:types] common_defs class_infos as
+			= check_kinds_of_function_arguments types common_defs class_infos (force_star_kind common_defs type as)
+		check_kinds_of_function_arguments [] common_defs class_infos as
+			= (class_infos,as)
+
+	check_kinds_of_dynamics :: {#CommonDefs} [DynamicPtr] *ExpressionHeap *ClassDefInfos *AnalyseState -> (!*ExpressionHeap,!*ClassDefInfos,!*AnalyseState)
+	check_kinds_of_dynamics common_defs dynamic_ptrs expr_heap class_infos as
+		= foldSt (check_kinds_of_dynamic common_defs) dynamic_ptrs (expr_heap,class_infos,as)
+	where
+		check_kinds_of_dynamic :: {#CommonDefs} DynamicPtr (*ExpressionHeap,*ClassDefInfos,*AnalyseState) -> (!*ExpressionHeap,!*ClassDefInfos,!*AnalyseState)
+		check_kinds_of_dynamic common_defs dynamic_ptr (expr_heap,class_infos,as)
 			# (dynamic_info, expr_heap) = readPtr dynamic_ptr expr_heap
-			  (expr_heap, as) = check_kinds_of_dynamic_info common_defs dynamic_info (expr_heap, as)
-			= (expr_heap, as)
+			= check_kinds_of_dynamic_info dynamic_info common_defs (expr_heap,class_infos,as)
 
-		check_kinds_of_dynamic_info :: {#CommonDefs} ExprInfo (*ExpressionHeap, *AnalyseState) -> (*ExpressionHeap, *AnalyseState)
-		check_kinds_of_dynamic_info	common_defs (EI_Dynamic opt_type locals) (expr_heap, as)
-			# as = check_kinds_of_opt_dynamic_type common_defs opt_type as
-			  (expr_heap, as) = check_kinds_of_dynamics common_defs locals expr_heap as
-			= (expr_heap, as)
-		check_kinds_of_dynamic_info	common_defs (EI_DynamicTypeWithVars	vars type locals) (expr_heap, as=:{as_type_var_heap,as_kind_heap})
+		check_kinds_of_dynamic_info :: ExprInfo {#CommonDefs} (*ExpressionHeap,*ClassDefInfos,*AnalyseState) -> (!*ExpressionHeap,!*ClassDefInfos,!*AnalyseState)
+		check_kinds_of_dynamic_info	(EI_Dynamic opt_type locals) common_defs (expr_heap,class_infos,as)
+			# (class_infos,as) = check_kinds_of_opt_dynamic_type common_defs opt_type class_infos as
+			= check_kinds_of_dynamics common_defs locals expr_heap class_infos as
+		check_kinds_of_dynamic_info	(EI_DynamicTypeWithVars	vars type locals) common_defs (expr_heap,class_infos,as=:{as_type_var_heap,as_kind_heap})
 			# (as_type_var_heap, as_kind_heap) = bindFreshKindVariablesToTypeVars vars as_type_var_heap as_kind_heap
-			  as = check_kinds_of_dynamic_type common_defs type { as & as_type_var_heap = as_type_var_heap, as_kind_heap = as_kind_heap}
-			  (expr_heap, as) = check_kinds_of_dynamics common_defs locals expr_heap as
-			= (expr_heap, as)
+			  (class_infos,as) = check_kinds_of_dynamic_type common_defs type class_infos {as & as_type_var_heap = as_type_var_heap, as_kind_heap = as_kind_heap}
+			= check_kinds_of_dynamics common_defs locals expr_heap class_infos as
+		check_kinds_of_dynamic_info	(EI_UnmarkedDynamic _ _) common_defs (expr_heap,class_infos,as)
+			// EI_UnmarkedDynamic can only occur here (instead of EI_Dynamic) in an unused local function,
+			// because collectVariables is not called for unused local functions, therefore we ignore it
+			= (expr_heap,class_infos,as)
 
-		check_kinds_of_opt_dynamic_type :: {#CommonDefs} (Optional DynamicType) *AnalyseState -> *AnalyseState
-		check_kinds_of_opt_dynamic_type	common_defs (Yes type) as
-			= check_kinds_of_dynamic_type common_defs type as
-		check_kinds_of_opt_dynamic_type	common_defs No as
-			= as
+		check_kinds_of_opt_dynamic_type :: {#CommonDefs} (Optional DynamicType) *ClassDefInfos *AnalyseState -> (!*ClassDefInfos,!*AnalyseState)
+		check_kinds_of_opt_dynamic_type	common_defs (Yes type) class_infos as
+			= check_kinds_of_dynamic_type common_defs type class_infos as
+		check_kinds_of_opt_dynamic_type	common_defs No class_infos as
+			= (class_infos,as)
 
-		check_kinds_of_dynamic_type :: {#CommonDefs} DynamicType *AnalyseState -> *AnalyseState
-		check_kinds_of_dynamic_type	common_defs {dt_type, dt_uni_vars, dt_global_vars} as=:{as_type_var_heap,as_kind_heap}
-			# (as_type_var_heap, as_kind_heap)
-				= bindFreshKindVariablesToTypeVars [atv_variable \\ {atv_variable} <- dt_uni_vars]
-						as_type_var_heap as_kind_heap
+		check_kinds_of_dynamic_type :: {#CommonDefs} DynamicType *ClassDefInfos *AnalyseState -> (!*ClassDefInfos,!*AnalyseState)
+		check_kinds_of_dynamic_type	common_defs {dt_type,dt_uni_vars,dt_global_vars,dt_contexts} class_infos as=:{as_type_var_heap,as_kind_heap}
+			# (as_type_var_heap, as_kind_heap) = new_local_kind_variables_for_universal_vars dt_uni_vars as_type_var_heap as_kind_heap
 			  (as_type_var_heap, as_kind_heap) = bindFreshKindVariablesToTypeVars dt_global_vars as_type_var_heap as_kind_heap
-			= determine_kinds_type_list common_defs [dt_type] { as & as_type_var_heap = as_type_var_heap, as_kind_heap = as_kind_heap}
+			  as = force_star_kind common_defs dt_type { as & as_type_var_heap = as_type_var_heap, as_kind_heap = as_kind_heap}
+			= determine_kinds_of_type_contexts common_defs dt_contexts class_infos as
 
 instance <<< DynamicType
 where

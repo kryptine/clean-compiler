@@ -70,6 +70,7 @@ where
 instance Erroradmin ErrorAdmin, CheckState
 
 newPosition :: !Ident !Position -> IdentPos 
+stringPosition :: !String !Position -> StringPos
 
 checkError :: !a !b !*ErrorAdmin -> *ErrorAdmin | <<< a & <<< b
 checkWarning :: !a !b !*ErrorAdmin -> *ErrorAdmin | <<< a & <<< b
@@ -87,7 +88,7 @@ instance toIdent ConsDef, (TypeDef a), ClassDef, MemberDef, FunDef, SelectorDef 
 instance toIdent SymbIdent, TypeSymbIdent, BoundVar, TypeVar, ATypeVar, Ident
 
 instance toInt STE_Kind
-instance <<< IdentPos, ExplImpInfo, DeclarationInfo
+instance <<< IdentPos, StringPos, ExplImpInfo, DeclarationInfo
 
 ::	ExpressionInfo =
 	{	ef_type_defs		:: !.{# CheckedTypeDef}

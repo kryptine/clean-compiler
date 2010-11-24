@@ -402,9 +402,9 @@ make_list_definition list_type_pre_def_symbol_index cons_pre_def_symbol_index ni
 	  nil_symb = { ds_ident = nil_ident, ds_arity=0 ,ds_index = nil_pre_def_symbol_index-FirstConstructorPredefinedSymbolIndex }
 	  (list_def, pre_def_symbols) = make_type_def list_type_pre_def_symbol_index [type_var] (AlgType [cons_ds,nil_symb]) pre_def_symbols	
 	  list_type = MakeAttributedType (TA (MakeNewTypeSymbIdent list_ident 1) [type_var_with_attr])
-	  cons_def = {	pc_cons_ident = cons_ident, pc_cons_arity = 2, pc_arg_types = [type_var_with_attr, list_type],
+	  cons_def = {	pc_cons_ident = cons_ident, pc_cons_arity = 2, pc_arg_types = [type_var_with_attr, list_type], pc_context = [],
 				 	pc_args_strictness=cons_strictness,	pc_cons_prio =  NoPrio, pc_exi_vars = [], pc_cons_pos = PreDefPos pre_mod_id}
-	  nil_def = {	pc_cons_ident = nil_ident, pc_cons_arity = 0, pc_arg_types = [], pc_args_strictness=NotStrict,
+	  nil_def = {	pc_cons_ident = nil_ident, pc_cons_arity = 0, pc_arg_types = [], pc_args_strictness=NotStrict, pc_context = [],
 	  				pc_cons_prio =  NoPrio, pc_exi_vars = [], pc_cons_pos = PreDefPos pre_mod_id}
 	= (list_def,ParsedConstructorToConsDef cons_def,ParsedConstructorToConsDef nil_def,pre_def_symbols);
 
@@ -463,7 +463,7 @@ where
 			  (tuple_type_def, pre_def_symbols)	= make_type_def (GetTupleTypeIndex tup_arity) type_vars (AlgType [tuple_cons_symb]) pre_def_symbols
 			  tuple_cons_def	= { pc_cons_ident = tuple_ident, pc_cons_arity = tup_arity, pc_cons_pos = PreDefPos pre_mod_id,
 			  						pc_arg_types = [ MakeAttributedType (TV tv) \\ tv <- type_vars],
-			  						pc_args_strictness = NotStrict,
+			  						pc_args_strictness = NotStrict, pc_context = [],
 			  						pc_cons_prio =  NoPrio, pc_exi_vars = []}
 			= add_tuple_defs pre_mod_id (dec tup_arity) [tuple_type_def : type_defs] [ParsedConstructorToConsDef tuple_cons_def : cons_defs] pre_def_symbols
 			= (type_defs, cons_defs, pre_def_symbols)

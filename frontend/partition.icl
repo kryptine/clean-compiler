@@ -472,13 +472,16 @@ where
 		= abort "DynamicExpr"
 	find_calls fc_info (TypeCodeExpression _) fc_state
 		= abort "TypeCodeExpression"
-	find_calls fc_info (EE) fc_state
+	find_calls fc_info EE fc_state
 		= fc_state	//abort "EE"
 	find_calls fc_info (NoBind _) fc_state
 		= fc_state
 	find_calls fc_info (FailExpr _) fc_state
 		= fc_state
-	find_calls _ u _ = abort ("Undefined pattern in Expression\n")
+	find_calls fc_info (DictionariesFunction dictionaries expr expr_type) fc_state
+		= find_calls fc_info expr fc_state
+	find_calls _ u _
+		= abort ("find_calls : Undefined pattern in Expression\n")
 
 instance find_calls App
 where

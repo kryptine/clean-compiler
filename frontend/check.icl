@@ -381,6 +381,10 @@ where
 		# (fresh_type_vars, type_heaps) = foldSt build_avar_subst type_vars ([], type_heaps)
 		  (new_at, type_heaps) = substitute {at & at_type = type} type_heaps
 		= ({ new_at & at_type = TFA fresh_type_vars new_at.at_type}, (was_ok, type_heaps))
+	substitue_arg_type at=:{at_type = TFAC type_vars type type_contexts} (was_ok, type_heaps)
+		# (fresh_type_vars, type_heaps) = foldSt build_avar_subst type_vars ([], type_heaps)
+		  (new_at, type_heaps) = substitute {at & at_type = type} type_heaps
+		= ({ new_at & at_type = TFAC fresh_type_vars new_at.at_type type_contexts}, (was_ok, type_heaps))
 	substitue_arg_type type (was_ok, type_heaps)
 		# (type, type_heaps) = substitute type type_heaps
 		= (type, (was_ok, type_heaps))
@@ -788,8 +792,8 @@ checkFunction fun_def=:{fun_ident,fun_pos,fun_body,fun_type,fun_kind} mod_index 
 	  (fun_body, free_vars, e_state, e_info, cs) = checkFunctionBodies fun_body function_ident_for_errors e_input e_state e_info cs
 
 	# {es_fun_defs,es_calls,es_var_heap,es_expr_heap,es_type_heaps,es_generic_heap,es_dynamics} = e_state
-	  (ef_type_defs, ef_modules, es_type_heaps, es_expr_heap, cs) = 
-	  	checkDynamicTypes mod_index es_dynamics fun_type e_info.ef_type_defs e_info.ef_modules es_type_heaps es_expr_heap cs
+	  (ef_type_defs, ef_class_defs, ef_modules, es_type_heaps, es_expr_heap, cs) = 
+	  	checkDynamicTypes mod_index es_dynamics fun_type e_info.ef_type_defs e_info.ef_class_defs e_info.ef_modules es_type_heaps es_expr_heap cs
 	  (fun_body, cs_error) = checkFunctionBodyIfMacro fun_kind fun_body cs.cs_error
 	  cs = { cs & cs_error = popErrorAdmin cs_error }
 	  fi_properties = (if ef_is_macro_fun FI_IsMacroFun 0) bitor (has_type fun_type)
@@ -799,10 +803,9 @@ checkFunction fun_def=:{fun_ident,fun_pos,fun_body,fun_type,fun_kind} mod_index 
 	  fun_def = { fun_def & fun_body = fun_body, fun_info = fun_info, fun_type = fun_type}
 	  (fun_defs,macro_defs,cs_symbol_table) = remove_calls_from_symbol_table fun_index def_level es_calls e_state.es_fun_defs e_info.ef_macro_defs cs.cs_symbol_table
 	= (fun_def,fun_defs,
-			{ e_info & ef_type_defs = ef_type_defs, ef_modules = ef_modules,ef_macro_defs=macro_defs },
-			{ heaps & hp_var_heap = es_var_heap, hp_expression_heap = es_expr_heap, hp_type_heaps = es_type_heaps,hp_generic_heap=es_generic_heap }, 
-			{ cs & cs_symbol_table = cs_symbol_table })
-
+			{e_info & ef_type_defs=ef_type_defs, ef_class_defs=ef_class_defs, ef_modules=ef_modules,ef_macro_defs=macro_defs},
+			{heaps & hp_var_heap = es_var_heap, hp_expression_heap = es_expr_heap, hp_type_heaps = es_type_heaps,hp_generic_heap=es_generic_heap},
+			{cs & cs_symbol_table = cs_symbol_table})
 where
 	has_type (Yes _) 	= FI_HasTypeSpec
 	has_type no 		= 0
@@ -925,9 +928,8 @@ instance < FunDef
 where
 	(<) fd1 fd2 = fd1.fun_ident.id_name < fd2.fun_ident.id_name
 
-		
-collectCommonfinitions :: !(CollectedDefinitions ClassInstance) -> (!*{# Int}, ![Declaration])
-collectCommonfinitions {def_types,def_constructors,def_selectors,def_classes,def_members,def_instances, def_generic_cases, def_generics} 
+collectCommonDefinitions :: !(CollectedDefinitions ClassInstance) -> (!*{# Int}, ![Declaration])
+collectCommonDefinitions {def_types,def_constructors,def_selectors,def_classes,def_members,def_instances, def_generic_cases, def_generics} 
 	// MW: the order in which the declarations appear in the returned list is essential (explicit imports)
 	# sizes = createArray cConversionTableSize 0
 	  (size, defs) = foldSt cons_def_to_dcl def_constructors (0, [])
@@ -964,8 +966,11 @@ where
 		# generic_decl = Declaration { decl_ident = gen_ident, decl_pos = gen_pos, decl_kind = STE_Generic, decl_index = decl_index }
 		# member_decl = Declaration { decl_ident = gen_member_ident, decl_pos = gen_pos, decl_kind = STE_Generic, decl_index = decl_index }
 		= (inc decl_index, [generic_decl, member_decl : decls]) 
-	gen_case_def_to_dcl {gc_ident, gc_pos} (decl_index, decls)
-		= (inc decl_index, [Declaration { decl_ident = gc_ident, decl_pos = gc_pos, decl_kind = STE_GenericCase, decl_index = decl_index } : decls]) 
+
+	gen_case_def_to_dcl {gc_gcf=GCF gc_ident _, gc_pos} (decl_index, decls)
+		= (inc decl_index, [Declaration {decl_ident = gc_ident, decl_pos = gc_pos, decl_kind = STE_GenericCase, decl_index = decl_index} : decls]) 
+	gen_case_def_to_dcl {gc_gcf=GCFC gcfc_ident _, gc_pos} (decl_index, decls)
+		= (inc decl_index, [Declaration {decl_ident = gcfc_ident, decl_pos = gc_pos, decl_kind = STE_GenericDeriveClass, decl_index = decl_index} : decls]) 
 
 createCommonDefinitions :: (CollectedDefinitions ClassInstance) -> .CommonDefs;
 createCommonDefinitions {def_types,def_constructors,def_selectors,def_classes,def_members,def_instances, def_generics,def_generic_cases}
@@ -985,19 +990,19 @@ array_plus_list a l = arrayPlusList a l
 checkCommonDefinitions :: !(Optional (CopiedDefinitions, Int)) !Index !*CommonDefs !*{# DclModule} !*Heaps !*CheckState
 												  -> (!DictionaryInfo,!*CommonDefs,!*{# DclModule},!*Heaps, !*CheckState)
 checkCommonDefinitions opt_icl_info module_index common modules heaps cs
-	# (com_type_defs, com_cons_defs, com_selector_defs, modules, heaps, cs)
+	# (com_type_defs, com_cons_defs, com_selector_defs, com_class_defs, modules, heaps, cs)
 			= checkTypeDefs module_index opt_icl_info
-					common.com_type_defs common.com_cons_defs common.com_selector_defs modules heaps cs
+					common.com_type_defs common.com_cons_defs common.com_selector_defs common.com_class_defs modules heaps cs
 	  (com_class_defs, com_member_defs, com_type_defs, modules, heaps, cs)
-	  		= checkTypeClasses module_index opt_icl_info common.com_class_defs common.com_member_defs com_type_defs modules heaps cs
+	  		= checkTypeClasses module_index opt_icl_info com_class_defs common.com_member_defs com_type_defs modules heaps cs
 	  (com_member_defs, com_type_defs, com_class_defs, modules, heaps, cs)
 	  		= checkMemberTypes module_index opt_icl_info com_member_defs com_type_defs com_class_defs modules heaps cs
 	  (com_instance_defs, com_type_defs, com_class_defs, com_member_defs, modules, heaps, cs)
 	  		= checkInstanceDefs module_index common.com_instance_defs com_type_defs com_class_defs com_member_defs modules heaps cs
 	  (com_generic_defs, com_type_defs, com_class_defs, modules, heaps, cs)
 			= checkGenericDefs module_index opt_icl_info common.com_generic_defs com_type_defs com_class_defs modules heaps cs
-	  (com_gencase_defs, com_generic_defs, com_type_defs, modules, heaps, cs)
-			= checkGenericCaseDefs module_index common.com_gencase_defs com_generic_defs com_type_defs modules heaps cs	  
+	  (com_gencase_defs, com_generic_defs, com_type_defs, com_class_defs, modules, heaps, cs)
+			= checkGenericCaseDefs module_index common.com_gencase_defs com_generic_defs com_type_defs com_class_defs modules heaps cs	  
  	| cs.cs_error.ea_ok
 		# (size_com_type_defs,com_type_defs) = usize com_type_defs
 	 	  (size_com_selector_defs,com_selector_defs) = usize com_selector_defs
@@ -1053,29 +1058,22 @@ where
 gimme_a_strict_array_type :: !u:{!.a} -> v:{!.a}, [u<=v]
 gimme_a_strict_array_type a = a
 
-create_icl_to_dcl_index_table :: !ModuleKind !{#Int} !Int !(Optional {#{#Int}}) !*{#DclModule} !*{#FunDef}
-																  -> (!Optional {#{#Int}},!Optional {#{#Int}},  !.{#DclModule},!*{#FunDef})
-create_icl_to_dcl_index_table MK_Main icl_sizes main_dcl_module_n dcl_conversions modules fun_defs
-	= (No,No,modules,fun_defs)
-create_icl_to_dcl_index_table _ icl_sizes main_dcl_module_n old_conversions modules fun_defs
-	#! (size_icl_functions,fun_defs) = usize fun_defs
-	#! icl_sizes = make_icl_sizes
-		with
-			make_icl_sizes :: *{#Int}
-			make_icl_sizes => {{icl_sizes.[i] \\ i<-[0..cMacroDefs-1]} & [cFunctionDefs]=size_icl_functions}
+create_icl_to_dcl_index_table_except_functions :: !ModuleKind !{#Int} !Int !(Optional {#{#Int}}) !*{#DclModule} -> (!Optional {#{#Int}}, !*{#DclModule})
+create_icl_to_dcl_index_table_except_functions MK_Main icl_sizes main_dcl_module_n dcl_conversions modules
+	= (No,modules)
+create_icl_to_dcl_index_table_except_functions _ icl_sizes main_dcl_module_n (Yes conversion_table) modules
 	#! (dcl_mod,modules) = modules![main_dcl_module_n]
-	#! dictionary_info=dcl_mod.dcl_dictionary_info	
-	# (Yes conversion_table) = old_conversions
-	#! icl_to_dcl_index_table = {create_icl_to_dcl_index_table_for_kind table_size dcl_to_icl_table table_kind dictionary_info \\ table_kind<-[0..] & table_size <-: icl_sizes & dcl_to_icl_table <-: conversion_table }
-	#! modules = {modules & [main_dcl_module_n].dcl_macro_conversions=Yes conversion_table.[cMacroDefs]}
-	= (Yes icl_to_dcl_index_table,old_conversions,modules,fun_defs)
+	#! dictionary_info=dcl_mod.dcl_dictionary_info
+	#! icl_to_dcl_index_table = {create_icl_to_dcl_index_table_for_kind table_size dcl_to_icl_table table_kind dictionary_info
+								 \\ table_kind<-[0..cFunctionDefs-1] & table_size <-: icl_sizes & dcl_to_icl_table <-: conversion_table }
+//	#! modules = {modules & [main_dcl_module_n].dcl_macro_conversions=Yes conversion_table.[cMacroDefs]}
+	= (Yes icl_to_dcl_index_table,modules)
 
-recompute_icl_to_dcl_index_table_for_functions No dcl_icl_conversions n_functions
+compute_icl_to_dcl_index_table_for_functions No n_functions
 	= No
-recompute_icl_to_dcl_index_table_for_functions (Yes icl_to_dcl_index_table) (Yes dcl_icl_conversions) n_functions
+compute_icl_to_dcl_index_table_for_functions (Yes dcl_icl_conversions) n_functions
 	# icl_to_dcl_index_table_for_functions = create_icl_to_dcl_index_table_for_kind n_functions dcl_icl_conversions cFunctionDefs {n_dictionary_types=0, n_dictionary_constructors=0, n_dictionary_selectors=0}
-	# icl_to_dcl_index_table = {{t\\t<-:icl_to_dcl_index_table} & [cFunctionDefs] = icl_to_dcl_index_table_for_functions}
-	= Yes icl_to_dcl_index_table
+	= Yes icl_to_dcl_index_table_for_functions
 
 create_icl_to_dcl_index_table_for_kind :: !Int !{#Int} Int DictionaryInfo -> {#Int}
 create_icl_to_dcl_index_table_for_kind table_size dcl_to_icl_table table_kind dcl_dictionary_info
@@ -1096,67 +1094,22 @@ create_icl_to_dcl_index_table_for_kind table_size dcl_to_icl_table table_kind dc
 					= icl_to_dcl_index_table_for_kind
 	= icl_to_dcl_index_table_for_kind
 
-renumber_member_indexes_of_class_instances No class_instances
-	= class_instances
-renumber_member_indexes_of_class_instances (Yes icl_to_dcl_index_table) class_instances
-	= renumber_member_indexes_of_class_instances 0 class_instances
-	where
-		function_conversion_table = icl_to_dcl_index_table.[cFunctionDefs]
-
-		renumber_member_indexes_of_class_instances class_inst_index class_instances
-			| class_inst_index < size class_instances
-				# (class_instance,class_instances) = class_instances![class_inst_index]
-				# new_members = {{icl_member & ds_index=function_conversion_table.[icl_member.ds_index]} \\ icl_member<-:class_instance.ins_members}
-				# class_instances = {class_instances & [class_inst_index]={class_instance & ins_members=new_members}}
-				= renumber_member_indexes_of_class_instances (class_inst_index+1) class_instances
-				= class_instances
-
-renumber_members_of_gencases No gencases
-	= gencases
-renumber_members_of_gencases (Yes icl_to_dcl_index_table) gencases
-	= renumber 0 gencases
+set_td_fun_index_for_icl_types [dcl_type_funs,not_exported_type_fun_range] icl_common=:{com_type_defs}
+	# (type_index,com_type_defs) = set_td_fun_index_for_type_defs 0 dcl_type_funs.ir_from dcl_type_funs.ir_to com_type_defs
+	# (_,com_type_defs) = set_td_fun_index_for_type_defs type_index not_exported_type_fun_range.ir_from not_exported_type_fun_range.ir_to com_type_defs
+	= {icl_common & com_type_defs=com_type_defs}
 where
-	function_conversion_table = icl_to_dcl_index_table.[cFunctionDefs]
-	
-	renumber gencase_index gencases
-		| gencase_index < size gencases
-			# (gencase=:{gc_body = GCB_FunIndex icl_index}, gencases) = gencases ! [gencase_index]
-			# dcl_index = function_conversion_table.[icl_index] 
-			# gencase = { gencase & gc_body = GCB_FunIndex dcl_index }
-			# gencases = { gencases & [gencase_index] = gencase } 
-			= renumber (inc gencase_index) gencases
-			= gencases	
+	set_td_fun_index_for_type_defs type_index type_fun_index end_type_fun_index type_defs
+		| type_fun_index<end_type_fun_index
+			# type_defs = {type_defs & [type_index].td_fun_index=type_fun_index}
+			= set_td_fun_index_for_type_defs (type_index+1) (type_fun_index+1) end_type_fun_index type_defs
+			= (type_index,type_defs)
 
-
-renumber_type_fun_indices :: (Optional {{#Int}}) *{#CheckedTypeDef} -> *{#CheckedTypeDef}
-renumber_type_fun_indices No type_defs
-	=	type_defs
-renumber_type_fun_indices (Yes conversion_table) type_defs
-	# (n, type_defs) = usize type_defs
-	= renumber 0 n conversion_table.[cFunctionDefs] type_defs
-where
-	renumber :: Int Int {# Int} *{#CheckedTypeDef} -> *{#CheckedTypeDef}
-	renumber i n conversion type_defs
-		| i < n
-			# (type_def, type_defs) = type_defs![i]
-			# icl_index = type_def.td_fun_index
-			| icl_index <> NoIndex && icl_index < size conversion
-				# dcl_index = conversion.[icl_index] 
-				# type_def = { type_def & td_fun_index = dcl_index }
-				# type_defs = { type_defs & [i] = type_def } 
-				= renumber (inc i) n conversion type_defs
-			// otherwise
-				= renumber (inc i) n conversion type_defs
-		// otherwise
-			= type_defs	 
-
-renumber_icl_definitions_as_dcl_definitions :: !(Optional {{#Int}}) !{#Int} IndexRange !Int ![Declaration] !*{#DclModule} !*CommonDefs !*{#FunDef}
-																					 	-> (![Declaration],!.{#DclModule},!.CommonDefs,!*{#FunDef})
-renumber_icl_definitions_as_dcl_definitions No icl_sizes icl_global_function_range main_dcl_module_n icl_decl_symbols modules cdefs fun_defs
-	= (icl_decl_symbols,modules,cdefs,fun_defs)
-renumber_icl_definitions_as_dcl_definitions (Yes icl_to_dcl_index_table) icl_sizes icl_global_function_range main_dcl_module_n icl_decl_symbols modules cdefs fun_defs
-	# (size_icl_functions,fun_defs) = usize fun_defs
-	# icl_sizes = {{icl_sizes.[i] \\ i<-[0..cMacroDefs-1]} & [cFunctionDefs]=size_icl_functions}
+renumber_icl_definitions_without_functions_as_dcl_definitions :: !(Optional {#{#Int}}) !DictionaryInfo ![Declaration] !*CommonDefs
+																								 -> (![Declaration],!*CommonDefs)
+renumber_icl_definitions_without_functions_as_dcl_definitions No dcl_dictionary_info icl_decl_symbols cdefs
+	= (icl_decl_symbols,cdefs)
+renumber_icl_definitions_without_functions_as_dcl_definitions (Yes icl_to_dcl_index_table) dcl_dictionary_info icl_decl_symbols cdefs
 	# (icl_decl_symbols,cdefs) = renumber_icl_decl_symbols icl_decl_symbols cdefs
 		with
 			renumber_icl_decl_symbols [] cdefs
@@ -1202,14 +1155,9 @@ renumber_icl_definitions_as_dcl_definitions (Yes icl_to_dcl_index_table) icl_siz
 					renumber_icl_decl_symbol (Declaration icl_decl_symbol=:{decl_kind = STE_GenericCase, decl_index}) cdefs
 						= (Declaration {icl_decl_symbol & decl_index=icl_to_dcl_index_table.[cGenericCaseDefs,decl_index]},cdefs)
 							//---> ("renumber generic case", icl_decl_symbol.decl_ident, decl_index, icl_to_dcl_index_table.[cGenericCaseDefs,decl_index])		
-					renumber_icl_decl_symbol icl_decl=:(Declaration icl_decl_symbol=:{decl_kind=STE_FunctionOrMacro _, decl_index}) cdefs
-//						| decl_index>=icl_global_function_range.ir_from && decl_index<icl_global_function_range.ir_to
-							= (Declaration {icl_decl_symbol & decl_index=icl_to_dcl_index_table.[cFunctionDefs,decl_index]},cdefs)	
-//							= (icl_decl,cdefs)
 					renumber_icl_decl_symbol icl_decl_symbol cdefs
 						= (icl_decl_symbol,cdefs)
-	# (dcl_mod,modules) = modules![main_dcl_module_n]
-	# {n_dictionary_types,n_dictionary_selectors,n_dictionary_constructors}=dcl_mod.dcl_dictionary_info
+	# {n_dictionary_types,n_dictionary_selectors,n_dictionary_constructors}=dcl_dictionary_info
 	# cdefs=reorder_common_definitions cdefs
 		with
 			reorder_common_definitions {com_type_defs,com_cons_defs,com_selector_defs,com_class_defs,com_member_defs,com_instance_defs,com_generic_defs,com_gencase_defs}
@@ -1232,29 +1180,49 @@ renumber_icl_definitions_as_dcl_definitions (Yes icl_to_dcl_index_table) icl_siz
 					com_class_defs=com_class_defs,com_member_defs=com_member_defs,com_instance_defs=com_instance_defs,
 					com_generic_defs=com_generic_defs,com_gencase_defs=com_gencase_defs
 				  }
-	# fun_defs = reorder_array fun_defs icl_to_dcl_index_table.[cFunctionDefs]
-	= (icl_decl_symbols,modules,cdefs,fun_defs)
+	= (icl_decl_symbols,cdefs)
 	where
-		reorder_array array index_array
-			# new_array={e\\e<-:array}
-			= {new_array & [index_array.[i]]=e \\ e<-:array & i<-[0..]}
-
 		reorder_and_enlarge_array array n_extra_elements index_array dummy_element
 			# new_array=createArray (size array+n_extra_elements) dummy_element
 			= {new_array & [index_array.[i]] = e \\ e<-:array & i<-[0..]}
 
-combineDclAndIclModule ::			 ModuleKind *{#DclModule}  [Declaration] (CollectedDefinitions a)  *{#Int}   *CheckState
-	-> (!CopiedDefinitions,!Optional {#{#Int}},!*{#DclModule},![Declaration],!CollectedDefinitions a, !*{#Int}, !*CheckState);
+renumber_icl_function_definitions_as_dcl_definitions :: !(Optional {#Int}) ![Declaration] !*{#FunDef} -> (![Declaration],!*{#FunDef})
+renumber_icl_function_definitions_as_dcl_definitions No icl_decl_symbols fun_defs
+	= (icl_decl_symbols,fun_defs)
+renumber_icl_function_definitions_as_dcl_definitions (Yes icl_to_dcl_index_table_for_functions) icl_decl_symbols fun_defs
+	# icl_decl_symbols = renumber_icl_decl_symbols icl_decl_symbols
+		with
+			renumber_icl_decl_symbols []
+				= []
+			renumber_icl_decl_symbols [icl_decl_symbol : icl_decl_symbols]
+				# icl_decl_symbol = renumber_icl_decl_symbol icl_decl_symbol
+				# icl_decl_symbols = renumber_icl_decl_symbols icl_decl_symbols
+				= [icl_decl_symbol : icl_decl_symbols]
+				where
+					renumber_icl_decl_symbol icl_decl=:(Declaration icl_decl_symbol=:{decl_kind=STE_FunctionOrMacro _, decl_index})
+						= Declaration {icl_decl_symbol & decl_index=icl_to_dcl_index_table_for_functions.[decl_index]}	
+					renumber_icl_decl_symbol icl_decl_symbol
+						= icl_decl_symbol
+	# fun_defs = reorder_array fun_defs icl_to_dcl_index_table_for_functions
+	= (icl_decl_symbols,fun_defs)
+
+reorder_array array index_array
+	# new_array={e\\e<-:array}
+	= {new_array & [index_array.[i]]=e \\ e<-:array & i<-[0..]}
+
+combineDclAndIclModule ::			    ModuleKind *{#DclModule}  [Declaration] (CollectedDefinitions a)  *{#Int}   *CheckState
+	-> (!CopiedDefinitions,!*Optional *{#*{#Int}},!*{#DclModule},![Declaration],!CollectedDefinitions a, !*{#Int}, !*CheckState);
 combineDclAndIclModule MK_Main modules icl_decl_symbols icl_definitions icl_sizes cs
 	= ({ copied_type_defs = {}, copied_class_defs = {}, copied_generic_defs = {}}, No, modules, icl_decl_symbols, icl_definitions, icl_sizes, cs)
 combineDclAndIclModule _ modules icl_decl_symbols icl_definitions icl_sizes cs
 	#! main_dcl_module_n=cs.cs_x.x_main_dcl_module_n
-	# (dcl_mod=:{dcl_declared={dcls_local},dcl_macros, dcl_sizes, dcl_common}, modules) =  modules![main_dcl_module_n]
+	# (dcl_mod=:{dcl_declared={dcls_local}, dcl_sizes, dcl_common}, modules) =  modules![main_dcl_module_n]
 
 	  cs = addGlobalDefinitionsToSymbolTable icl_decl_symbols cs
 
+	  conversion_table = { createArray size NoIndex \\ size <-: dcl_sizes }
 	  (moved_dcl_defs,dcl_cons_and_member_defs,conversion_table, icl_sizes, icl_decl_symbols, cs)
-			= foldSt (add_to_conversion_table dcl_macros.ir_from dcl_common) dcls_local ([],[],{ createArray size NoIndex \\ size <-: dcl_sizes }, icl_sizes, icl_decl_symbols, cs)
+			= foldSt (add_to_conversion_table dcl_common) dcls_local ([],[], conversion_table, icl_sizes, icl_decl_symbols, cs)
 	  (new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, new_generic_defs, (cop_td_indexes, cop_cd_indexes, cop_gd_indexes), conversion_table, icl_sizes, icl_decl_symbols, cs)
 			= foldSt (add_dcl_definition dcl_common) moved_dcl_defs ([], [], [], [], [], [], ([], [],[]), conversion_table, icl_sizes, icl_decl_symbols, cs)
 	  (new_cons_defs,new_member_defs,conversion_table,icl_sizes,icl_decl_symbols,symbol_table,errors)
@@ -1276,7 +1244,7 @@ combineDclAndIclModule _ modules icl_decl_symbols icl_definitions icl_sizes cs
 			, copied_generic_defs = copied_generic_defs 
 			}
 		, Yes conversion_table
-		, { modules & [main_dcl_module_n] = { dcl_mod & dcl_macro_conversions = Yes conversion_table.[cMacroDefs] }}
+		, modules
 		, icl_decl_symbols
 		, { icl_definitions
 				& def_types			= my_append icl_definitions.def_types new_type_defs
@@ -1297,7 +1265,13 @@ where
 	where
 		mark_def index marks = { marks & [index] = True }
 
-	add_to_conversion_table first_macro_index dcl_common decl=:(Declaration {decl_ident=decl_ident=:{id_info},decl_kind,decl_index,decl_pos})
+	add_to_conversion_table dcl_common (Declaration {decl_kind=STE_DclFunction})
+			(moved_dcl_defs, dcl_cons_and_member_defs, conversion_table, icl_sizes, icl_defs, cs)
+		= (moved_dcl_defs, dcl_cons_and_member_defs, conversion_table, icl_sizes, icl_defs, cs)
+	add_to_conversion_table dcl_common (Declaration {decl_kind=STE_DclMacroOrLocalMacroFunction _})
+			(moved_dcl_defs, dcl_cons_and_member_defs, conversion_table, icl_sizes, icl_defs, cs)
+		= (moved_dcl_defs, dcl_cons_and_member_defs, conversion_table, icl_sizes, icl_defs, cs)
+	add_to_conversion_table dcl_common decl=:(Declaration {decl_ident=decl_ident=:{id_info},decl_kind,decl_index,decl_pos})
 			(moved_dcl_defs,dcl_cons_and_member_defs, conversion_table, icl_sizes, icl_defs, cs)
 		# (entry=:{ste_kind,ste_index,ste_def_level}, cs_symbol_table) = readPtr id_info cs.cs_symbol_table
 		| ste_kind == STE_Empty
@@ -1308,16 +1282,12 @@ where
 				# (conversion_table, icl_sizes, icl_defs, cs_symbol_table)
 					= add_dcl_declaration id_info entry decl def_index decl_index (conversion_table, icl_sizes, icl_defs, cs_symbol_table)
 				= ([ decl : moved_dcl_defs ],dcl_cons_and_member_defs,conversion_table, icl_sizes, icl_defs, { cs & cs_symbol_table = cs_symbol_table })
-			| def_index == cMacroDefs
-				# (conversion_table, icl_defs, cs_symbol_table)
-					= add_macro_declaration id_info entry decl (decl_index - first_macro_index) /*decl_index*/ (conversion_table, icl_defs, cs_symbol_table)
-				= (moved_dcl_defs /* [ decl : moved_dcl_defs ] */,dcl_cons_and_member_defs,conversion_table, icl_sizes, icl_defs, { cs & cs_symbol_table = cs_symbol_table })
 				# cs_error = checkError "undefined in implementation module" "" (setErrorAdmin (newPosition decl_ident decl_pos) cs.cs_error)
 				= (moved_dcl_defs,dcl_cons_and_member_defs,conversion_table, icl_sizes, icl_defs, { cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table })
 		| ste_def_level == cGlobalScope && ste_kind == decl_kind
 			# def_index = toInt decl_kind
-			# decl_index = if (def_index == cMacroDefs) (decl_index - first_macro_index) decl_index
-			= (moved_dcl_defs,dcl_cons_and_member_defs,{ conversion_table & [def_index].[decl_index] = ste_index },  icl_sizes, icl_defs, { cs & cs_symbol_table = cs_symbol_table })
+			  conversion_table = {conversion_table & [def_index].[decl_index] = ste_index}
+			= (moved_dcl_defs,dcl_cons_and_member_defs, conversion_table, icl_sizes, icl_defs, { cs & cs_symbol_table = cs_symbol_table })
 			# cs_error = checkError "conflicting definition in implementation module" "" (setErrorAdmin (newPosition decl_ident decl_pos) cs.cs_error)
 			= (moved_dcl_defs,dcl_cons_and_member_defs,conversion_table, icl_sizes, icl_defs, { cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table })
 
@@ -1333,12 +1303,6 @@ where
 			,	{ icl_sizes & [def_index] = inc icl_index }
 			,	[ Declaration { dcl & decl_index = icl_index } : icl_defs ]
 			,	NewEntry symbol_table info_ptr dcl.decl_kind icl_index cGlobalScope entry
-			)
-
-	add_macro_declaration info_ptr entry decl=:(Declaration dcl) decl_index /*icl_index*/ (conversion_table, icl_defs, symbol_table)
-		=	(	{ conversion_table & [cMacroDefs].[decl_index] = -1 /*icl_index*/ }
-			,	[ decl /* Declaration { dcl & decl_index = icl_index } */ : icl_defs ]
-			,	NewEntry symbol_table info_ptr dcl.decl_kind dcl.decl_index /*icl_index*/ cGlobalScope entry
 			)
 
 	add_dcl_definition {com_type_defs,com_cons_defs} dcl=:(Declaration {decl_kind = STE_Type, decl_index})
@@ -1461,6 +1425,69 @@ where
 		= front
 	my_append front back
 		= front ++ back
+
+make_dcl_macro_and_function_conversions :: ModuleKind /*!Int !Int*/ *{#DclModule}  [Declaration]  *CheckState
+												  -> (!{#Int}, !*{#DclModule},![Declaration],!*CheckState);
+make_dcl_macro_and_function_conversions MK_Main /*n_dcl_functions n_dcl_macros*/ modules macro_and_function_local_defs cs
+	= ({}, modules, macro_and_function_local_defs, cs)
+make_dcl_macro_and_function_conversions _ /*n_dcl_functions n_dcl_macros*/ modules macro_and_function_local_defs cs
+	#! main_dcl_module_n=cs.cs_x.x_main_dcl_module_n
+	# (dcl_mod=:{dcl_declared={dcls_local},dcl_macros,dcl_sizes}, modules) = modules![main_dcl_module_n]
+
+	#! n_dcl_functions = dcl_sizes.[cFunctionDefs]
+	#! n_dcl_macros = dcl_sizes.[cMacroDefs]
+
+	# cs = addGlobalDefinitionsToSymbolTable macro_and_function_local_defs cs
+
+	  function_conversion_table = createArray n_dcl_functions NoIndex
+	  macro_conversion_table = createArray n_dcl_macros NoIndex
+
+	  (function_conversion_table,macro_conversion_table,macro_and_function_local_defs,cs)
+			= foldSt (add_to_conversion_table dcl_macros.ir_from) dcls_local (function_conversion_table,macro_conversion_table,macro_and_function_local_defs,cs)
+
+	  symbol_table = removeDeclarationsFromSymbolTable macro_and_function_local_defs cGlobalScope cs.cs_symbol_table
+
+	  modules = {modules & [main_dcl_module_n] = {dcl_mod & dcl_macro_conversions = Yes macro_conversion_table}}
+	= (function_conversion_table, modules, macro_and_function_local_defs, {cs & cs_symbol_table = symbol_table})
+where
+	add_to_conversion_table first_macro_index decl=:(Declaration {decl_kind=STE_DclFunction,decl_ident=decl_ident=:{id_info},decl_index,decl_pos})
+			(function_conversion_table,macro_conversion_table,icl_defs,cs)
+		# (entry=:{ste_kind,ste_index,ste_def_level}, cs_symbol_table) = readPtr id_info cs.cs_symbol_table
+		| ste_kind == STE_Empty
+			# cs_error = checkError "undefined in implementation module" "" (setErrorAdmin (newPosition decl_ident decl_pos) cs.cs_error)
+			= (function_conversion_table,macro_conversion_table,icl_defs,{cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table})
+		| ste_def_level == cGlobalScope && ste_kind == STE_DclFunction
+			# function_conversion_table = {function_conversion_table & [decl_index] = ste_index}
+			= (function_conversion_table,macro_conversion_table,icl_defs,{cs & cs_symbol_table = cs_symbol_table})
+			# cs_error = checkError "conflicting definition in implementation module" "" (setErrorAdmin (newPosition decl_ident decl_pos) cs.cs_error)
+			= (function_conversion_table,macro_conversion_table,icl_defs,{cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table})
+	add_to_conversion_table first_macro_index decl=:(Declaration {decl_kind=decl_kind=:STE_DclMacroOrLocalMacroFunction _,decl_ident=decl_ident=:{id_info},decl_index,decl_pos})
+			(function_conversion_table,macro_conversion_table,icl_defs,cs)
+		# (entry=:{ste_kind,ste_index,ste_def_level}, cs_symbol_table) = readPtr id_info cs.cs_symbol_table
+		| ste_kind == STE_Empty
+		  ||
+		  ste_def_level == cModuleScope && case ste_kind of
+												STE_Imported (STE_DclMacroOrLocalMacroFunction _) module_n
+													-> module_n==cs.cs_x.x_main_dcl_module_n // possible if dcl module on a cycle
+												_ ->
+													False
+
+			# (macro_conversion_table,icl_defs,cs_symbol_table)
+				= add_macro_declaration id_info entry decl (decl_index - first_macro_index) (macro_conversion_table,icl_defs,cs_symbol_table)
+			= (function_conversion_table,macro_conversion_table,icl_defs,{cs & cs_symbol_table = cs_symbol_table})
+		| ste_def_level == cGlobalScope && ste_kind == decl_kind
+			# macro_conversion_table = {macro_conversion_table & [decl_index - first_macro_index] = ste_index}
+			= (function_conversion_table,macro_conversion_table,icl_defs,{cs & cs_symbol_table = cs_symbol_table})
+			# cs_error = checkError "conflicting definition in implementation module" "" (setErrorAdmin (newPosition decl_ident decl_pos) cs.cs_error)
+			= (function_conversion_table,macro_conversion_table,icl_defs,{cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table})
+	add_to_conversion_table first_macro_index decl (function_conversion_table,macro_conversion_table,icl_defs,cs)
+		= (function_conversion_table,macro_conversion_table,icl_defs,cs)
+
+	add_macro_declaration info_ptr entry decl=:(Declaration dcl) decl_index (macro_conversion_table, icl_defs, symbol_table)
+		=	(	{ macro_conversion_table & [decl_index] = -1 }
+			,	[ decl : icl_defs ]
+			,	NewEntry symbol_table info_ptr dcl.decl_kind dcl.decl_index cGlobalScope entry
+			)
 
 replace_icl_macros_by_dcl_macros :: ModuleKind IndexRange [Declaration] *{#DclModule} *CheckState -> (![Declaration],!*{#DclModule},!*CheckState);
 replace_icl_macros_by_dcl_macros MK_Main icl_macro_index_range decls dcl_modules cs 
@@ -1765,6 +1792,13 @@ compute_used_module_nrs {ei_module_n=mod_index} (mod_nr_accu, dcl_modules)
 	= (addNr mod_index (numberSetUnion dcl_imported_module_numbers mod_nr_accu),
 		 dcl_modules)
 
+number_class_dictionaries :: !Int !Int !*{#ClassDef} -> *{#ClassDef}
+number_class_dictionaries class_index type_index class_defs
+	| class_index < size class_defs
+		# class_defs = { class_defs & [class_index].class_dictionary.ds_index = type_index }
+		= number_class_dictionaries (inc class_index) (inc type_index) class_defs
+		= class_defs
+
 createCommonDefinitionsWithinComponent :: Bool Int *(!*{#.DclModule},*CheckState) -> (*CommonDefs,(*{#DclModule},*CheckState))
 createCommonDefinitionsWithinComponent is_on_cycle mod_index (dcl_modules, cs=:{cs_symbol_table})
 	# (dcl_mod=:{dcl_name}, dcl_modules) = dcl_modules![mod_index]
@@ -1773,13 +1807,7 @@ createCommonDefinitionsWithinComponent is_on_cycle mod_index (dcl_modules, cs=:{
 	  cs = { cs & cs_symbol_table = cs_symbol_table}
 	# dcl_common = createCommonDefinitions mod.mod_defs
 	#! first_type_index = size dcl_common.com_type_defs		
-	# dcl_common = {dcl_common & com_class_defs = number_class_dictionaries 0 dcl_common.com_class_defs first_type_index}
-		with
-			number_class_dictionaries class_index class_defs index_type
-				| class_index < size class_defs
-					# class_defs = { class_defs & [class_index].class_dictionary.ds_index = index_type }
-					= number_class_dictionaries (inc class_index) class_defs (inc index_type)
-					= class_defs
+	# dcl_common = {dcl_common & com_class_defs = number_class_dictionaries 0 first_type_index dcl_common.com_class_defs}
 	| not is_on_cycle
 		= (dcl_common, (dcl_modules, cs))
 		# (dcl_common,dcl_common2) = copy_common_defs dcl_common
@@ -1796,8 +1824,10 @@ createCommonDefinitionsWithinComponent is_on_cycle mod_index (dcl_modules, cs=:{
 				# (instance_defs1,instance_defs2) = arrayCopy com_instance_defs
 				# (generic_defs1,generic_defs2) = arrayCopy com_generic_defs
 				# (gencase_defs1,gencase_defs2) = arrayCopy com_gencase_defs
-				= ({com_type_defs=type_defs1,com_cons_defs=cons_defs1,com_selector_defs=selector_defs1,com_class_defs=class_defs1,com_member_defs=member_defs1,com_instance_defs=instance_defs1,com_generic_defs=generic_defs1,com_gencase_defs=gencase_defs1},
-				   {com_type_defs=type_defs2,com_cons_defs=cons_defs2,com_selector_defs=selector_defs2,com_class_defs=class_defs2,com_member_defs=member_defs2,com_instance_defs=instance_defs2,com_generic_defs=generic_defs2,com_gencase_defs=gencase_defs2})
+				= ({com_type_defs=type_defs1,com_cons_defs=cons_defs1,com_selector_defs=selector_defs1,com_class_defs=class_defs1,
+					com_member_defs=member_defs1,com_instance_defs=instance_defs1,com_generic_defs=generic_defs1,com_gencase_defs=gencase_defs1},
+				   {com_type_defs=type_defs2,com_cons_defs=cons_defs2,com_selector_defs=selector_defs2,com_class_defs=class_defs2,
+					com_member_defs=member_defs2,com_instance_defs=instance_defs2,com_generic_defs=generic_defs2,com_gencase_defs=gencase_defs2})
 
 checkDclModuleWithinComponent :: .NumberSet Int Bool {#.Int} {![.Int]} (IntKeyHashtable SolvedImports) Int *CommonDefs
 						 *(*{!*{!*ExplImpInfo}},*{#.DclModule},*{#*{#.FunDef}},*Heaps,*CheckState)
@@ -1813,54 +1843,63 @@ checkDclModuleWithinComponent dcl_imported_module_numbers component_nr is_on_cyc
 	= checkDclModule2 dcl_imported_module_numbers components_importing_module_a.[mod_index] imports_ikh component_nr is_on_cycle modules_in_component_set False
 		 mod_ident dcl_common def_macro_indices def_funtypes ste_index expl_imp_infos dcl_modules macro_defs heaps cs
 
-renumber_icl_module :: ModuleKind IndexRange IndexRange IndexRange IndexRange Index Int {#Int} (Optional {#{#Int}}) IndexRange  *{#FunDef}  *CommonDefs  [Declaration]  *{#DclModule} *ErrorAdmin
-												 -> (![IndexRange],![IndexRange],![IndexRange], ![IndexRange], !Int,!Index,!IndexRange,!*{#FunDef},!*CommonDefs,![Declaration],!*{#DclModule}, *ErrorAdmin);
-renumber_icl_module mod_type icl_global_function_range icl_instance_range icl_generic_range icl_type_fun_range nr_of_functions main_dcl_module_n icl_sizes dcl_conversions def_macro_indices icl_functions icl_common local_defs dcl_modules error
-	# (optional_icl_to_dcl_index_table,optional_old_conversion_table,dcl_modules,icl_functions)
-		= create_icl_to_dcl_index_table mod_type icl_sizes main_dcl_module_n dcl_conversions dcl_modules icl_functions
+renumber_icl_common_defs :: ModuleKind Index {#Int} (Optional {#{#Int}}) *CommonDefs  [Declaration]  *{#DclModule}
+																	-> (!*CommonDefs,![Declaration],!*{#DclModule})
+renumber_icl_common_defs mod_type main_dcl_module_n icl_sizes dcl_conversions icl_common local_defs dcl_modules
+	# (optional_icl_to_dcl_index_table,dcl_modules)
+		= create_icl_to_dcl_index_table_except_functions mod_type icl_sizes main_dcl_module_n dcl_conversions dcl_modules
+	# (dcl_mod, dcl_modules) = dcl_modules![main_dcl_module_n]
+	# (local_defs,icl_common)
+		= renumber_icl_definitions_without_functions_as_dcl_definitions optional_icl_to_dcl_index_table dcl_mod.dcl_dictionary_info local_defs icl_common
+	= (icl_common,local_defs,dcl_modules)
+
+renumber_icl_module_functions :: ModuleKind IndexRange IndexRange IndexRange IndexRange Index Int !{#Int} !Int !Int IndexRange
+																			 			 *{#FunDef}  *CommonDefs  [Declaration]  *{#DclModule}  *ErrorAdmin
+	-> (![IndexRange],![IndexRange],![IndexRange],![IndexRange],!Int,!Index,!IndexRange,!*{#FunDef},!*CommonDefs,![Declaration],!*{#DclModule}, *ErrorAdmin)
+renumber_icl_module_functions mod_type icl_global_function_range icl_instance_range icl_generic_range icl_type_fun_range nr_of_functions main_dcl_module_n
+								dcl_function_table instances_conversion_table_size gencase_conversion_table_size def_macro_indices
+								icl_functions icl_common macro_and_function_local_defs dcl_modules error
 	# (dcl_mod, dcl_modules) = dcl_modules![main_dcl_module_n]
 	# icl_functions = add_dummy_specialized_functions mod_type dcl_mod icl_functions
 	# class_instances = icl_common.com_instance_defs
 	# gencase_defs = icl_common.com_gencase_defs
 	# type_defs = icl_common.com_type_defs
+
+	#! dcl_specials = dcl_mod.dcl_specials
+	# n_dcl_specials = dcl_specials.ir_to-dcl_specials.ir_from
+	  dcl_type_funs = dcl_mod.dcl_type_funs
+	  n_dcl_type_funs = dcl_type_funs.ir_to-dcl_type_funs.ir_from
+	  not_exported_generic_range_to = icl_generic_range.ir_to + n_dcl_specials + n_dcl_type_funs
+	  n_not_exported_type_funs = (icl_type_fun_range.ir_to - icl_type_fun_range.ir_from) - n_dcl_type_funs
+	  not_exported_type_fun_range = { ir_from = not_exported_generic_range_to
+									, ir_to = not_exported_generic_range_to + n_not_exported_type_funs
+									}
+
 	# (dcl_icl_conversions, class_instances, gencase_defs, type_defs, error)
-		= add_dcl_instances_to_conversion_table 
-			optional_old_conversion_table nr_of_functions dcl_mod class_instances gencase_defs type_defs error
+		= add_dcl_instances_generic_cases_and_type_funs_to_conversion_table dcl_function_table instances_conversion_table_size gencase_conversion_table_size
+			nr_of_functions icl_type_fun_range /*not_exported_type_fun_range*/ dcl_mod class_instances gencase_defs type_defs error
 	| not error.ea_ok
 		= ([],[],[],[], 0,0,def_macro_indices,icl_functions,
-			{icl_common & com_instance_defs=class_instances, com_gencase_defs=gencase_defs,
-			 com_type_defs=type_defs},
-			local_defs,dcl_modules,error)
+			{icl_common & com_instance_defs=class_instances, com_gencase_defs=gencase_defs, com_type_defs=type_defs},
+			macro_and_function_local_defs,dcl_modules,error)
 	# (n_functions,icl_functions) = usize icl_functions
-	# optional_icl_to_dcl_index_table = recompute_icl_to_dcl_index_table_for_functions optional_icl_to_dcl_index_table dcl_icl_conversions n_functions
-	# class_instances = renumber_member_indexes_of_class_instances optional_icl_to_dcl_index_table class_instances
-	# gencase_defs = renumber_members_of_gencases optional_icl_to_dcl_index_table gencase_defs
-	# type_defs = renumber_type_fun_indices optional_icl_to_dcl_index_table type_defs
+	# optional_icl_to_dcl_index_table_for_functions = compute_icl_to_dcl_index_table_for_functions dcl_icl_conversions n_functions
+	# class_instances = renumber_member_indexes_of_class_instances optional_icl_to_dcl_index_table_for_functions class_instances
+	# gencase_defs = renumber_members_of_gencases optional_icl_to_dcl_index_table_for_functions gencase_defs
+//	# type_defs = renumber_type_fun_indices optional_icl_to_dcl_index_table type_defs
 
-	# icl_common = 
-		{ icl_common 
-		& com_instance_defs = class_instances
-		, com_gencase_defs = gencase_defs
-		, com_type_defs = type_defs
-		}
-
-	# (local_defs,dcl_modules,icl_common,icl_functions)
-		= renumber_icl_definitions_as_dcl_definitions optional_icl_to_dcl_index_table icl_sizes icl_global_function_range main_dcl_module_n local_defs dcl_modules icl_common icl_functions
-	# (dcl_mod, dcl_modules) = dcl_modules![main_dcl_module_n]
+	# icl_common = {icl_common & com_instance_defs = class_instances, com_gencase_defs = gencase_defs, com_type_defs = type_defs}
+	# (macro_and_function_local_defs,icl_functions)
+		= renumber_icl_function_definitions_as_dcl_definitions optional_icl_to_dcl_index_table_for_functions macro_and_function_local_defs icl_functions
 
 	#! dcl_instances = dcl_mod.dcl_instances
 	#! n_exported_global_functions=dcl_mod.dcl_sizes.[cFunctionDefs]
 	#! first_not_exported_global_function_index = size dcl_mod.dcl_functions
 
 	# n_dcl_instances = dcl_instances.ir_to-dcl_instances.ir_from
-	#! dcl_specials = dcl_mod.dcl_specials
-	# n_dcl_specials = dcl_specials.ir_to-dcl_specials.ir_from
 
 	# dcl_gencases = dcl_mod.dcl_gencases
 	# n_dcl_gencases = dcl_gencases.ir_to-dcl_gencases.ir_from
-
-	# dcl_type_funs = dcl_mod.dcl_type_funs
-	# n_dcl_type_funs = dcl_type_funs.ir_to-dcl_type_funs.ir_from
 
 	# local_functions_index_offset = n_dcl_instances + n_dcl_gencases + n_dcl_specials + n_dcl_type_funs
 
@@ -1890,17 +1929,10 @@ renumber_icl_module mod_type icl_global_function_range icl_instance_range icl_ge
 	# icl_instances_ranges = [dcl_instances, not_exported_instance_range]	
 
 	# not_exported_generic_range = 
-		{ ir_from =icl_generic_range.ir_from + n_dcl_specials_and_gencases + n_dcl_type_funs
-		, ir_to = icl_generic_range.ir_to + n_dcl_specials + n_dcl_type_funs
+		{ ir_from = icl_generic_range.ir_from + n_dcl_specials_and_gencases + n_dcl_type_funs
+		, ir_to = not_exported_generic_range_to
 		}
 	# icl_generic_ranges = [dcl_gencases, not_exported_generic_range]
-
-	# n_not_exported_type_funs
-		=	(icl_type_fun_range.ir_to - icl_type_fun_range.ir_from) - n_dcl_type_funs
-	# not_exported_type_fun_range = 
-		{ ir_from = not_exported_generic_range.ir_to
-		, ir_to = not_exported_generic_range.ir_to + n_not_exported_type_funs
-		}
 
 	# icl_type_fun_ranges = [dcl_type_funs, not_exported_type_fun_range]
 
@@ -1911,7 +1943,7 @@ renumber_icl_module mod_type icl_global_function_range icl_instance_range icl_ge
 	# icl_ranges = 
 		[icl_global, not_exported_instance_range, not_exported_generic_range]
 
-	= (icl_global_functions_ranges, icl_instances_ranges, icl_generic_ranges, icl_type_fun_ranges, n_exported_global_functions,local_functions_index_offset,def_macro_indices,icl_functions,icl_common,local_defs,dcl_modules, error)
+	= (icl_global_functions_ranges, icl_instances_ranges, icl_generic_ranges, icl_type_fun_ranges, n_exported_global_functions,local_functions_index_offset,def_macro_indices,icl_functions,icl_common,macro_and_function_local_defs,dcl_modules, error)
 	where
 		add_dummy_specialized_functions MK_Main dcl_mod icl_functions
 			= icl_functions
@@ -1922,66 +1954,79 @@ renumber_icl_module mod_type icl_global_function_range icl_instance_range icl_ge
 				# dummy_function = {fun_ident={id_name="",id_info=nilPtr},fun_arity= -1,fun_priority=NoPrio,fun_body=NoBody,fun_type=No,fun_pos=NoPos,fun_kind=FK_Unknown,fun_lifted=0,fun_info=EmptyFunInfo}
 				= arrayPlusList icl_functions [dummy_function \\ i<-[0..n_specials-1]]
 
-		add_dcl_instances_to_conversion_table :: (Optional {#{#Int}}) !Index !DclModule !*{# ClassInstance} !*{# GenericCaseDef} !*{# CheckedTypeDef} *ErrorAdmin
-			-> (!*Optional *{#Index},!*{# ClassInstance}, !*{# GenericCaseDef}, !*{# CheckedTypeDef},*ErrorAdmin)
- 		add_dcl_instances_to_conversion_table optional_old_conversion_table first_free_index
+		add_dcl_instances_generic_cases_and_type_funs_to_conversion_table :: !{#Int} !Int !Int !Index IndexRange /*IndexRange*/ !DclModule
+									 !*{# ClassInstance} !*{# GenericCaseDef} !*{# CheckedTypeDef} *ErrorAdmin
+			-> (!*Optional *{#Index},!*{# ClassInstance},!*{# GenericCaseDef},!*{# CheckedTypeDef},*ErrorAdmin)
+ 		add_dcl_instances_generic_cases_and_type_funs_to_conversion_table
+ 				dcl_function_table instances_conversion_table_size gencase_conversion_table_size first_free_index icl_type_fun_range /*not_exported_type_fun_range*/
  				dcl_mod=:{dcl_specials,dcl_functions,dcl_common,dcl_macro_conversions,dcl_type_funs}
  												icl_instances icl_gencases icl_type_defs error
 			= case dcl_macro_conversions of
 				Yes _
 					# (new_conversion_table, icl_instances, icl_gencases, icl_type_defs, error)
-					  		= build_conversion_table_for_instances_of_dcl_mod dcl_specials first_free_index optional_old_conversion_table
+					  		= build_conversion_table_for_instances_generic_cases_and_type_funs_of_dcl_mod dcl_specials first_free_index
+					  				dcl_function_table instances_conversion_table_size gencase_conversion_table_size
 					  				dcl_functions dcl_common.com_instance_defs icl_instances dcl_common.com_gencase_defs icl_gencases
 					  				dcl_common.com_type_defs icl_type_defs error
 					-> (Yes new_conversion_table,icl_instances, icl_gencases, icl_type_defs, error)
 				No
 					-> (No, icl_instances, icl_gencases, icl_type_defs, error)
 		where
-			build_conversion_table_for_instances_of_dcl_mod dcl_specials=:{ir_from,ir_to} first_free_index optional_old_conversion_table dcl_functions
-					dcl_instances icl_instances dcl_gencases icl_gencases dcl_types icl_type_defs error
+			build_conversion_table_for_instances_generic_cases_and_type_funs_of_dcl_mod dcl_specials=:{ir_from,ir_to} first_free_index
+	  				dcl_function_table instances_conversion_table_size gencase_conversion_table_size
+					dcl_functions dcl_instances icl_instances dcl_gencases icl_gencases dcl_types icl_type_defs error
 				#! nr_of_dcl_functions = size dcl_functions
-				# (Yes old_conversion_table) = optional_old_conversion_table
-				#! dcl_instances_table = old_conversion_table.[cInstanceDefs]
-				#! dcl_gencase_table = old_conversion_table.[cGenericCaseDefs]
-				#! dcl_function_table = old_conversion_table.[cFunctionDefs]
-				#! dcl_type_table =  old_conversion_table.[cTypeDefs]
+//				#! dcl_type_table =  old_conversion_table.[cTypeDefs]
 				#! new_table = { createArray nr_of_dcl_functions NoIndex & [i] = icl_index \\ icl_index <-: dcl_function_table & i <- [0..] }
 				#! index_diff = first_free_index - ir_from
 				#! new_table = { new_table & [i] = i + index_diff \\ i <- [ir_from .. ir_to - 1] }
 				#! (new_table, icl_instances, error) 
-					= build_conversion_table_for_instances 0 dcl_instances dcl_instances_table icl_instances new_table error
+					= build_conversion_table_for_instances 0 dcl_instances instances_conversion_table_size icl_instances new_table error
 				#! (new_table, icl_gencases, error) 
-					= build_conversion_table_for_generic_cases 0 dcl_gencases dcl_gencase_table icl_gencases new_table error
-				#! (new_table, icl_type_defs)
-					= fill_conversion_table_for_type_funs 0 dcl_types icl_type_defs dcl_type_table new_table
+					= build_conversion_table_for_generic_cases 0 dcl_gencases gencase_conversion_table_size icl_gencases new_table error
+//				#! (new_table, icl_type_defs)
+//					= fill_conversion_table_for_type_funs 0 dcl_types icl_type_defs dcl_type_table new_table
+
+				#! new_table = fill_conversion_table_for_type_funs icl_type_fun_range dcl_type_funs /*not_exported_type_fun_range*/ new_table
+
 				= (new_table, icl_instances, icl_gencases, icl_type_defs, error)
 
-			build_conversion_table_for_generic_cases dcl_index dcl_gencases gencase_table icl_gencases new_table error
-				| dcl_index < size gencase_table
+			build_conversion_table_for_generic_cases dcl_index gencase_table gencase_conversion_table_size icl_gencases new_table error
+				| dcl_index < gencase_conversion_table_size
 					#! (new_table, icl_gencases, error)
-						= build_conversion_table_for_generic_case dcl_index dcl_gencases gencase_table icl_gencases new_table error
-					= build_conversion_table_for_generic_cases (inc dcl_index) dcl_gencases gencase_table icl_gencases new_table error
-					= (new_table, icl_gencases, error)					
-			build_conversion_table_for_generic_case dcl_index dcl_gencases gencase_table icl_gencases new_table error
-				#! icl_index = gencase_table.[dcl_index]	
-				#! (icl_gencase, icl_gencases) = icl_gencases ! [icl_index]
-				#! dcl_gencase = dcl_gencases.[dcl_index]
-				# (GCB_FunIndex icl_fun) = icl_gencase.gc_body 				
-				# (GCB_FunIndex dcl_fun) = dcl_gencase.gc_body
-				#! new_table = { new_table & [dcl_fun] = icl_fun } 								
-				= (new_table, icl_gencases, error)	
+						= build_conversion_table_for_generic_case dcl_index gencase_table icl_gencases new_table error
+					= build_conversion_table_for_generic_cases (inc dcl_index) gencase_table gencase_conversion_table_size icl_gencases new_table error
+					= (new_table, icl_gencases, error)
 
-			build_conversion_table_for_instances dcl_class_inst_index dcl_instances class_instances_table icl_instances new_table error
-				| dcl_class_inst_index < size class_instances_table
-					# icl_index = class_instances_table.[dcl_class_inst_index]				
+			build_conversion_table_for_generic_case dcl_index dcl_gencases icl_gencases new_table error
+				# icl_index = dcl_index
+				  (icl_gencase, icl_gencases) = icl_gencases![icl_index]
+				  dcl_gencase = dcl_gencases.[dcl_index]
+				= case (dcl_gencase,icl_gencase) of
+					({gc_gcf=GCF _ {gcf_body = GCB_FunIndex dcl_fun}},{gc_gcf=GCF _ {gcf_body = GCB_FunIndex icl_fun}})
+						#! new_table = {new_table & [dcl_fun] = icl_fun} 								
+						-> (new_table, icl_gencases, error)
+					({gc_gcf=GCFS dcl_gcfs},{gc_gcf=GCFS icl_gcfs})
+						#! new_table = build_conversion_table_for_generic_superclasses dcl_gcfs icl_gcfs new_table
+						-> (new_table, icl_gencases, error)
+				where
+					build_conversion_table_for_generic_superclasses [!{gcf_body=GCB_FunIndex dcl_fun}:dcl_gcfs!] [!{gcf_body=GCB_FunIndex icl_fun}:icl_gcfs!] new_table
+						# new_table = {new_table & [dcl_fun] = icl_fun}												
+						= build_conversion_table_for_generic_superclasses dcl_gcfs icl_gcfs new_table
+					build_conversion_table_for_generic_superclasses [!!] [!!] new_table
+						= new_table
+
+			build_conversion_table_for_instances dcl_class_inst_index dcl_instances instances_conversion_table_size icl_instances new_table error
+				| dcl_class_inst_index < instances_conversion_table_size
+					# icl_index = dcl_class_inst_index				
 					# (icl_instance, icl_instances) = icl_instances![icl_index]
 					  dcl_members = dcl_instances.[dcl_class_inst_index].ins_members
 					  icl_members = icl_instance.ins_members
 					| size dcl_members == size icl_members
 						# new_table = build_conversion_table_for_instances_of_members 0 dcl_members icl_members new_table
-						= build_conversion_table_for_instances (inc dcl_class_inst_index) dcl_instances class_instances_table icl_instances new_table error
+						= build_conversion_table_for_instances (inc dcl_class_inst_index) dcl_instances instances_conversion_table_size icl_instances new_table error
 						# error = checkErrorWithIdentPos (newPosition icl_instance.ins_ident icl_instance.ins_pos) "incorrect number of members specified" error
-						= build_conversion_table_for_instances (inc dcl_class_inst_index) dcl_instances class_instances_table icl_instances new_table error
+						= build_conversion_table_for_instances (inc dcl_class_inst_index) dcl_instances instances_conversion_table_size icl_instances new_table error
 					= (new_table, icl_instances,error)
 			
 			build_conversion_table_for_instances_of_members mem_index dcl_members icl_members new_table
@@ -1992,90 +2037,95 @@ renumber_icl_module mod_type icl_global_function_range icl_instance_range icl_ge
 					= build_conversion_table_for_instances_of_members (inc mem_index) dcl_members icl_members new_table
 					= new_table
 
-			fill_conversion_table_for_type_funs dcl_type_index dcl_types icl_type_defs type_conversions new_table
-				| dcl_type_index >= size dcl_types
-					= (new_table, icl_type_defs)
-				# dcl_type_fun_index = dcl_types.[dcl_type_index].td_fun_index
-				| dcl_type_fun_index == NoIndex || dcl_types.[dcl_type_index].td_fun_index == NoIndex
-					= fill_conversion_table_for_type_funs (inc dcl_type_index) dcl_types icl_type_defs type_conversions new_table
-				// sanity check ...
-				| dcl_type_index < 0 // == NoIndex
-					=	abort ("check, fill_conversion_table_for_type_funs: too small dcl conversion "
-									+++ dcl_types.[dcl_type_index].td_ident.id_name)
-				| dcl_type_index >= size type_conversions
-					=	abort ("check, fill_conversion_table_for_type_funs: too large dcl conversion "
-									+++ dcl_types.[dcl_type_index].td_ident.id_name)
-				# icl_type_index = type_conversions.[dcl_type_index]
-				// sanity check ...
-				| icl_type_index < 0 // == NoIndex
-					=	abort ("check, fill_conversion_table_for_type_funs: no icl type index "
-									+++ dcl_types.[dcl_type_index].td_ident.id_name)
-				| icl_type_index >= size icl_type_defs
-					=	abort ("check, fill_conversion_table_for_type_funs: too large icl type index "
-									+++ dcl_types.[dcl_type_index].td_ident.id_name)
-				// ... sanity check
-				# (icl_type_fun_index,icl_type_defs) = icl_type_defs![icl_type_index].td_fun_index
-				| dcl_type_fun_index == NoIndex
-					// sanity check ...
-					| icl_type_fun_index <> NoIndex
-						=	abort ("check, fill_conversion_table_for_type_funs: indices mismatch icl ")
-									//	+++ icl_types.[icl_type_index].td_ident.id_name)
-					// ... sanity check
-					= fill_conversion_table_for_type_funs (inc dcl_type_index) dcl_types icl_type_defs type_conversions new_table
-				// otherwise
-					// sanity check ...
-					| icl_type_fun_index == NoIndex
-						=	abort ("check, fill_conversion_table_for_type_funs: indices mismatch dcl ")
-									//	+++ dcl_types.[dcl_type_index].td_ident.id_name)
-					| new_table.[dcl_type_fun_index] <> NoIndex
-						=	abort ("check, fill_conversion_table_for_type_funs: entry already occupied ")
-									//	+++ dcl_types.[dcl_type_index].td_ident.id_name)
-					/// ... sanity check
-					# new_table = {new_table & [dcl_type_fun_index] = icl_type_fun_index}
-					= fill_conversion_table_for_type_funs (inc dcl_type_index) dcl_types icl_type_defs type_conversions new_table
+			fill_conversion_table_for_type_funs icl_type_fun_range dcl_type_funs /*not_exported_type_fun_range*/ new_table
+				#! first_dcl_index = dcl_type_funs.ir_from
+				#! end_dcl_index = dcl_type_funs.ir_to
+				#! dcl_to_icl_index_diff = icl_type_fun_range.ir_from-first_dcl_index
+				= {new_table & [dcl_index] = dcl_index + dcl_to_icl_index_diff \\ dcl_index <- [first_dcl_index..end_dcl_index-1]}
 
-checkModule :: !ScannedModule !IndexRange ![FunDef] !Bool !Bool !Int !(Optional ScannedModule) ![ScannedModule] !{#DclModule} !*{#*{#FunDef}} !*PredefinedSymbols !*SymbolTable !*File !*Heaps
+		renumber_member_indexes_of_class_instances No class_instances
+			= class_instances
+		//renumber_member_indexes_of_class_instances (Yes icl_to_dcl_index_table) class_instances
+		renumber_member_indexes_of_class_instances (Yes function_conversion_table) class_instances
+			= renumber_member_indexes_of_class_instances 0 class_instances
+			where
+		//		function_conversion_table = icl_to_dcl_index_table.[cFunctionDefs]
+		
+				renumber_member_indexes_of_class_instances class_inst_index class_instances
+					| class_inst_index < size class_instances
+						# (class_instance,class_instances) = class_instances![class_inst_index]
+						# new_members = {{icl_member & ds_index=function_conversion_table.[icl_member.ds_index]} \\ icl_member<-:class_instance.ins_members}
+						# class_instances = {class_instances & [class_inst_index]={class_instance & ins_members=new_members}}
+						= renumber_member_indexes_of_class_instances (class_inst_index+1) class_instances
+						= class_instances
+		
+		renumber_members_of_gencases No gencases
+			= gencases
+		renumber_members_of_gencases (Yes function_conversion_table) gencases
+			= renumber_gencase_members 0 gencases
+		where
+			renumber_gencase_members gencase_index gencases
+				| gencase_index < size gencases
+					# (gencase,gencases) = gencases![gencase_index]
+					= case gencase of
+						{gc_gcf=GCF gc_ident gcf=:{gcf_body=GCB_FunIndex icl_index}}
+							# dcl_index = function_conversion_table.[icl_index] 
+							# gencase = {gencase & gc_gcf=GCF gc_ident {gcf & gcf_body = GCB_FunIndex dcl_index}}
+							# gencases = {gencases & [gencase_index] = gencase} 
+							= renumber_gencase_members (gencase_index+1) gencases
+						{gc_gcf=GCFS gcfs}
+							# gcfs = renumber_gcfs gcfs function_conversion_table
+							# gencase = {gencase & gc_gcf=GCFS gcfs}
+							# gencases = {gencases & [gencase_index] = gencase} 
+							= renumber_gencase_members (gencase_index+1) gencases
+					= gencases
+
+			renumber_gcfs [!gcf=:{gcf_body=GCB_FunIndex icl_index}:gcfs!] function_conversion_table
+				# dcl_index = function_conversion_table.[icl_index] 
+				# gcf = {gcf & gcf_body=GCB_FunIndex dcl_index}
+				# gcfs = renumber_gcfs gcfs function_conversion_table
+				= [!gcf:gcfs!]
+			renumber_gcfs [!!] function_conversion_table
+				= [!!]
+
+checkModule :: !ScannedModule !IndexRange ![FunDef] !Bool !Bool !Int !(Optional ScannedModule) ![ScannedModule]
+				!{#DclModule} !*{#*{#FunDef}} !*PredefinedSymbols !*SymbolTable !*File !*Heaps
 	-> (!Bool, *IclModule, *{#DclModule}, *{!Group}, !*{#*{#FunDef}},!Int, !*Heaps, !*PredefinedSymbols, !*SymbolTable, *File, [String])
 
-checkModule {mod_defs,mod_ident,mod_type,mod_imports,mod_imported_objects,mod_foreign_exports,mod_modification_time} icl_global_function_range fun_defs support_dynamics dynamic_type_used dcl_module_n_in_cache
-	optional_dcl_mod scanned_modules dcl_modules cached_dcl_macros predef_symbols symbol_table err_file heaps
+checkModule {mod_defs,mod_ident,mod_type,mod_imports,mod_imported_objects,mod_foreign_exports,mod_modification_time}
+			icl_global_function_range fun_defs support_dynamics dynamic_type_used dcl_module_n_in_cache optional_dcl_mod scanned_modules 
+			dcl_modules cached_dcl_macros predef_symbols symbol_table err_file heaps
 	# nr_of_cached_modules = size dcl_modules
 	# (optional_pre_def_mod,predef_symbols)
 		= case nr_of_cached_modules of
 			0	# (predef_mod,predef_symbols) = buildPredefinedModule support_dynamics predef_symbols
 				-> (Yes predef_mod,predef_symbols)
 			_	-> (No,predef_symbols)
-	# (nr_of_functions,first_inst_index,first_gen_inst_index, local_defs,icl_functions,macro_defs,init_dcl_modules,main_dcl_module_n,cdefs,sizes,cs)
+	# (local_defs,macro_and_function_local_defs,icl_functions,inst_fun_defs,macro_defs,init_dcl_modules,main_dcl_module_n,cdefs,sizes,cs)
 		= check_module1 mod_defs icl_global_function_range fun_defs optional_dcl_mod optional_pre_def_mod scanned_modules dcl_modules cached_dcl_macros dcl_module_n_in_cache predef_symbols symbol_table err_file
-	# icl_instance_range = {ir_from = first_inst_index, ir_to = first_gen_inst_index}
-	# icl_generic_range = {ir_from = first_gen_inst_index, ir_to = nr_of_functions}
-	= check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports mod_foreign_exports mod_type icl_global_function_range icl_instance_range icl_generic_range nr_of_cached_modules optional_pre_def_mod local_defs support_dynamics dynamic_type_used icl_functions macro_defs init_dcl_modules cdefs sizes heaps cs
+
+	= check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports mod_foreign_exports mod_type icl_global_function_range nr_of_cached_modules
+		optional_pre_def_mod local_defs macro_and_function_local_defs support_dynamics dynamic_type_used icl_functions inst_fun_defs macro_defs init_dcl_modules cdefs sizes heaps cs
 
 check_module1 cdefs icl_global_function_range fun_defs optional_dcl_mod optional_pre_def_mod scanned_modules dcl_modules cached_dcl_macros dcl_module_n_in_cache predef_symbols symbol_table err_file
 	# error = {ea_file = err_file, ea_loc = [], ea_ok = True }
 
-	  first_inst_index = length fun_defs
-	  (inst_fun_defs, def_instances) = convert_class_instances cdefs.def_instances first_inst_index	  
-
+	# icl_functions = { next_fun \\ next_fun <- fun_defs}
+	#! first_inst_index = size icl_functions
+	# (inst_fun_defs, def_instances) = convert_class_instances cdefs.def_instances first_inst_index
 	  first_gen_inst_index = first_inst_index + length inst_fun_defs
-	  (gen_inst_fun_defs, def_generic_cases) = convert_generic_instances cdefs.def_generic_cases first_gen_inst_index
+	  cdefs = { cdefs & def_instances = def_instances }
 
-	  icl_functions = { next_fun \\ next_fun <- fun_defs ++ inst_fun_defs ++ gen_inst_fun_defs}
-
-	  cdefs = { cdefs & def_instances = def_instances, def_generic_cases = def_generic_cases }
-	#! nr_of_functions = size icl_functions
-
-	# sizes_and_local_defs = collectCommonfinitions cdefs
-	  (icl_functions, sizes_and_local_defs) = collectGlobalFunctions cFunctionDefs icl_global_function_range.ir_from icl_global_function_range.ir_to icl_functions sizes_and_local_defs
-
-	  (icl_functions, (sizes, local_defs)) = collectMacros cdefs.def_macro_indices icl_functions sizes_and_local_defs
+	# (sizes,local_defs) = collectCommonDefinitions cdefs
+	  (icl_functions, sizes_and_macro_and_function_local_defs) = collectGlobalFunctions cFunctionDefs icl_global_function_range.ir_from icl_global_function_range.ir_to icl_functions (sizes,[])
+	  (icl_functions, (sizes, macro_and_function_local_defs)) = collectMacros cdefs.def_macro_indices icl_functions sizes_and_macro_and_function_local_defs
 
 	# nr_of_cached_modules = size dcl_modules
 
 	  main_dcl_module_n = if (dcl_module_n_in_cache<>NoIndex) dcl_module_n_in_cache nr_of_cached_modules
 
 	  cs_x = {x_needed_modules = 0,x_main_dcl_module_n=main_dcl_module_n, x_check_dynamic_types = False}
-	  cs = { cs_symbol_table = symbol_table, cs_predef_symbols = predef_symbols, cs_error = error, cs_x = cs_x}
+	  cs = {cs_symbol_table = symbol_table, cs_predef_symbols = predef_symbols, cs_error = error, cs_x = cs_x}
 	  
 	  (scanned_modules,macro_defs,cs) = add_dcl_module_predef_module_and_modules_to_symbol_table optional_dcl_mod optional_pre_def_mod scanned_modules nr_of_cached_modules cs
 	  macro_defs = make_macro_def_array cached_dcl_macros macro_defs
@@ -2086,7 +2136,7 @@ check_module1 cdefs icl_global_function_range fun_defs optional_dcl_mod optional
 	  							dcl_modules.[i]
 		  						init_new_dcl_modules.[i-size dcl_modules] 
 	  						\\ i<-[0..size dcl_modules+size init_new_dcl_modules-1]}
-	= (nr_of_functions,first_inst_index,first_gen_inst_index,local_defs,icl_functions,macro_defs,init_dcl_modules,main_dcl_module_n,cdefs,sizes,cs)
+	= (local_defs,macro_and_function_local_defs,icl_functions,inst_fun_defs,macro_defs,init_dcl_modules,main_dcl_module_n,cdefs,sizes,cs)
 
 	where
 		add_dcl_module_predef_module_and_modules_to_symbol_table (Yes dcl_mod) optional_predef_mod modules mod_index cs
@@ -2133,10 +2183,11 @@ check_module1 cdefs icl_global_function_range fun_defs optional_dcl_mod optional
 
 		add_module_to_symbol_table mod=:{mod_defs} mod_index cs=:{cs_symbol_table, cs_error}
 			# def_instances	= convert_class_instances mod_defs.def_instances
-			# def_generic_cases = convert_generic_instances mod_defs.def_generic_cases
-			  mod_defs = { mod_defs & def_instances = def_instances, def_generic_cases = def_generic_cases }
-			  sizes_and_defs = collectFunctionTypes mod_defs.def_funtypes (collectCommonfinitions mod_defs)
-			  
+			# mod_defs = { mod_defs & def_instances = def_instances}
+
+			  (sizes,defs) = collectCommonDefinitions mod_defs
+			  sizes_and_defs = collectFunctionTypes mod_defs.def_funtypes (sizes,defs)
+
 			  dcl_macro_defs={macro_def \\ macro_def<-mod_defs.def_macros}
 			  (dcl_macro_defs, (sizes, defs)) = collectDclMacros mod_defs.def_macro_indices dcl_macro_defs sizes_and_defs
 			  
@@ -2149,11 +2200,6 @@ check_module1 cdefs icl_global_function_range fun_defs optional_dcl_mod optional
 				= [ParsedInstanceToClassInstance pi {} : convert_class_instances pins]
 			convert_class_instances []
 				= []
-				
-			convert_generic_instances :: ![GenericCaseDef] -> [GenericCaseDef]	
-			convert_generic_instances gcs 
-				// TODO: check what to do here
-				= gcs //[{ gc & gc_body = gc.gc_body } \\ gc <- gcs]
 
 		convert_class_instances :: .[ParsedInstance FunDef] Int -> (!.[FunDef],!.[ClassInstance]);
 		convert_class_instances [pi=:{pi_members} : pins] next_fun_index
@@ -2163,7 +2209,7 @@ check_module1 cdefs icl_global_function_range fun_defs optional_dcl_mod optional
 			= (ins_members ++ next_fun_defs, [ParsedInstanceToClassInstance pi { member \\ member <- member_symbols} : cins])
 		convert_class_instances [] next_fun_index
 			= ([], [])
-			
+
 		determine_indexes_of_members [{fun_ident,fun_arity}:members] next_fun_index
 			#! (member_symbols, last_fun_index) = determine_indexes_of_members members (inc next_fun_index)
 			= ([{ds_ident = fun_ident, ds_index = next_fun_index, ds_arity = fun_arity} : member_symbols], last_fun_index)
@@ -2191,19 +2237,30 @@ check_module1 cdefs icl_global_function_range fun_defs optional_dcl_mod optional
 	  		fill_macro_def_array i [dcl_macro_defs:macro_defs] a
 	  			= fill_macro_def_array (i+1) macro_defs {a & [i]=dcl_macro_defs}
 
-check_module2 :: Ident {#Char} [.ImportedObject] .[Import ImportDeclaration] [ParsedForeignExport] .ModuleKind !.IndexRange !.IndexRange !.IndexRange !Int
-				(Optional (Module a)) [Declaration] Bool Bool *{#FunDef} *{#*{#FunDef}} *{#DclModule} (CollectedDefinitions ClassInstance)
+check_module2 :: Ident {#Char} [.ImportedObject] .[Import ImportDeclaration] [ParsedForeignExport] .ModuleKind !.IndexRange !Int
+				(Optional (Module a)) [Declaration] [Declaration] Bool Bool *{#FunDef} [FunDef] *{#*{#FunDef}} *{#DclModule} (CollectedDefinitions ClassInstance)
 				*{#.Int} *Heaps *CheckState
 			-> (!Bool,.IclModule,!.{#DclModule},.{!Group},!*{#*{#FunDef}},!Int,!.Heaps,!.{#PredefinedSymbol},!.Heap SymbolTableEntry,!.File,[String]);
-check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports mod_foreign_exports mod_type icl_global_function_range icl_instance_range icl_generic_range nr_of_cached_modules
-	optional_pre_def_mod local_defs support_dynamics dynamic_type_used icl_functions macro_defs init_dcl_modules cdefs sizes heaps cs
+check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports mod_foreign_exports mod_type icl_global_function_range nr_of_cached_modules
+			optional_pre_def_mod local_defs macro_and_function_local_defs support_dynamics dynamic_type_used icl_functions inst_fun_defs macro_defs init_dcl_modules cdefs sizes heaps cs
 	# (main_dcl_module_n,cs)=cs!cs_x.x_main_dcl_module_n
-		
+
 	  (copied_dcl_defs, dcl_conversions, dcl_modules, local_defs, cdefs, icl_sizes, cs)
 	  		= combineDclAndIclModule mod_type init_dcl_modules local_defs cdefs sizes cs
+
+	# (instances_conversion_table_size,gencase_conversion_table_size,dcl_conversions)
+		= case dcl_conversions of
+			Yes conversion_table
+				#! instances_conversion_table_size = size conversion_table.[cInstanceDefs]
+				#! gencase_conversion_table_size = size conversion_table.[cGenericCaseDefs]
+				-> (instances_conversion_table_size,gencase_conversion_table_size,Yes conversion_table)
+			No
+				-> (0,0,No)
+
 	| not cs.cs_error.ea_ok
 		= (False, abort "evaluated error 1 (check.icl)", {}, {}, {}, cs.cs_x.x_main_dcl_module_n,heaps, cs.cs_predef_symbols, cs.cs_symbol_table, cs.cs_error.ea_file, [])
 
+	#! def_macro_indices=cdefs.def_macro_indices
 	# icl_common = createCommonDefinitions cdefs
 	
 	  (dcl_modules, macro_defs, heaps, cs)
@@ -2215,53 +2272,33 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 	| not cs.cs_error.ea_ok
 		= (False, abort "evaluated error 2 (check.icl)", {}, {}, {}, cs.cs_x.x_main_dcl_module_n,heaps, cs.cs_predef_symbols, cs.cs_symbol_table, cs.cs_error.ea_file, [])
 
-
 	# cs_symbol_table = cs.cs_symbol_table
-	# cs_predef_symbols = cs.cs_predef_symbols
-	# hp_var_heap = heaps.hp_var_heap
-	# (icl_type_fun_range, dcl_modules, icl_functions, icl_common,
-						cs_predef_symbols, hp_var_heap, cs_symbol_table)
-		=	if support_dynamics
-				(addTypeFunctions mod_ident nr_of_cached_modules dcl_modules
-					icl_functions icl_common
-					cs_predef_symbols hp_var_heap cs_symbol_table)
-				({ir_from=0,ir_to=0}, dcl_modules, icl_functions, icl_common,
-						cs_predef_symbols, hp_var_heap, cs_symbol_table)
-	# cs = {cs & cs_symbol_table=cs_symbol_table, cs_predef_symbols=cs_predef_symbols}
-	# heaps = {heaps & hp_var_heap=hp_var_heap}
+	  cs_predef_symbols = cs.cs_predef_symbols
+	  hp_var_heap = heaps.hp_var_heap
+	# (dcl_modules,cs_predef_symbols,hp_var_heap,cs_symbol_table)
+		= if support_dynamics
+			(addDclTypeFunctions nr_of_cached_modules dcl_modules cs_predef_symbols hp_var_heap cs_symbol_table)
+			(dcl_modules,cs_predef_symbols,hp_var_heap,cs_symbol_table)
 
+	# cs = {cs & cs_symbol_table = cs_symbol_table, cs_predef_symbols = cs_predef_symbols}
+	  heaps = {heaps & hp_var_heap=hp_var_heap}
 
-	# (nr_of_functions, icl_functions) = usize icl_functions
+	# (icl_common,local_defs,dcl_modules)
+		= renumber_icl_common_defs mod_type main_dcl_module_n icl_sizes dcl_conversions icl_common local_defs dcl_modules
 
-	# def_macro_indices=cdefs.def_macro_indices
-	# (icl_global_functions_ranges,icl_instances_ranges, icl_generic_ranges,icl_type_fun_ranges, n_exported_global_functions,local_functions_index_offset,def_macro_indices,icl_functions,icl_common,local_defs,dcl_modules, error)
-		= renumber_icl_module mod_type icl_global_function_range icl_instance_range icl_generic_range icl_type_fun_range nr_of_functions main_dcl_module_n icl_sizes dcl_conversions def_macro_indices icl_functions icl_common local_defs dcl_modules cs.cs_error
-	| not error.ea_ok
-		= (False, abort "evaluated error 3 (check.icl)", {}, {}, {}, cs.cs_x.x_main_dcl_module_n,heaps, cs.cs_predef_symbols, cs.cs_symbol_table, error.ea_file, [])
-
-	# (imported_module_numbers_of_main_dcl_mod, dcl_modules) = dcl_modules![main_dcl_module_n].dcl_imported_module_numbers
-	  (imported_module_numbers, dcl_modules)
-	  		= foldSt compute_used_module_nrs expl_imp_indices (addNr cPredefinedModuleIndex imported_module_numbers_of_main_dcl_mod, dcl_modules)
-	 
-	  cs = { cs & cs_error=error,cs_x.x_needed_modules = if dynamic_type_used cNeedStdDynamic 0 }
+	# (imported_module_numbers, dcl_modules) = determine_imported_module_numbers expl_imp_indices main_dcl_module_n dcl_modules
 	
 	  (nr_of_modules, dcl_modules)	= usize dcl_modules
 
 	  (dcl_macros, dcl_modules) = dcl_modules![main_dcl_module_n].dcl_macros
 
-	  expl_imp_indices_ikh = ikhInsert` False nr_of_modules expl_imp_indices ikhEmpty
-
 	  modules_in_component_set = bitvectCreate nr_of_modules
-	  
-	  (imports, (dcl_modules, _, _, cs))
-			= solveExplicitImports expl_imp_indices_ikh modules_in_component_set nr_of_modules
-									(dcl_modules, bitvectCreate nr_of_modules, expl_imp_info.[nr_of_icl_component], cs)
+
+	  (imports, dcl_modules, cs)
+			= determine_explicit_imports expl_imp_info.[nr_of_icl_component] expl_imp_indices nr_of_modules modules_in_component_set dcl_modules cs
 
 	  imports_ikh = ikhInsert` False nr_of_modules imports ikhEmpty
-	  		// maps the module indices of all modules in the actual component to all explicit
-	  		// imports of that module
-
-	  (local_defs,dcl_modules,cs) = replace_icl_macros_by_dcl_macros mod_type def_macro_indices local_defs dcl_modules cs 
+	  		// maps the module indices of all modules in the actual component to all explicit imports of that module
 
 	  cs = addGlobalDefinitionsToSymbolTable local_defs cs
 
@@ -2271,17 +2308,76 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 	  qualified_explicit_imports = (ikhSearch` nr_of_modules imports_ikh).si_qualified_explicit
 	  (dcl_modules, macro_defs,hp_expression_heap, cs)
 			= checkExplicitImportCompleteness imports.si_explicit qualified_explicit_imports dcl_modules macro_defs heaps.hp_expression_heap cs
+	  heaps	= { heaps & hp_expression_heap=hp_expression_heap }
+
 	  (modified_ste_kinds,symbol_table,dcl_modules)
 		= store_qualified_explicit_imports_in_symbol_table qualified_explicit_imports [] cs.cs_symbol_table dcl_modules
-	  cs = {cs & cs_symbol_table=symbol_table}
 
-	  heaps	= { heaps & hp_expression_heap=hp_expression_heap }
+	#! first_inst_index = size icl_functions
+	   first_gen_inst_index = first_inst_index + length inst_fun_defs
+
+	# (gen_inst_fun_defs,gencase_defs,class_defs,symbol_table,error,dcl_modules)
+		= convert_generic_instances 0 first_gen_inst_index icl_common.com_gencase_defs icl_common.com_class_defs symbol_table cs.cs_error dcl_modules
+	  icl_common = {icl_common & com_gencase_defs = gencase_defs, com_class_defs = class_defs}
+	  cs = {cs & cs_symbol_table=symbol_table,cs_error=error}
+
+	# icl_functions = array_plus_list icl_functions (inst_fun_defs ++ gen_inst_fun_defs)
+	#! nr_of_functions = size icl_functions
+	# icl_instance_range = {ir_from = first_inst_index, ir_to = first_gen_inst_index}
+	# icl_generic_range = {ir_from = first_gen_inst_index, ir_to = nr_of_functions}
+
+	# (dcl_function_table, dcl_modules, macro_and_function_local_defs, cs)
+		= make_dcl_macro_and_function_conversions mod_type /*n_dcl_functions n_dcl_macros*/ dcl_modules macro_and_function_local_defs cs
+
+	# (n_dcl_type_defs,n_dcl_class_defs,dcl_modules)
+		= case mod_type of
+			MK_Main
+				-> (0,0,dcl_modules)
+			_
+				# (dcl_sizes,dcl_modules) = dcl_modules![main_dcl_module_n].dcl_sizes
+				#! n_dcl_type_defs = dcl_sizes.[cTypeDefs]
+				#! n_class_defs = dcl_sizes.[cClassDefs]
+				-> (n_dcl_type_defs,n_class_defs,dcl_modules)
+
+	# {cs_symbol_table,cs_predef_symbols} = cs
+	  {com_type_defs,com_class_defs} = icl_common
+	  hp_var_heap = heaps.hp_var_heap
+	  (icl_type_fun_range,icl_functions,com_type_defs,com_class_defs,cs_predef_symbols,hp_var_heap,cs_symbol_table)
+	  	= if support_dynamics
+			(addIclTypeFunctions n_dcl_type_defs n_dcl_class_defs icl_functions com_type_defs com_class_defs cs_predef_symbols hp_var_heap cs_symbol_table)
+	  		({ir_from=0,ir_to=0},icl_functions,com_type_defs,com_class_defs,cs_predef_symbols,hp_var_heap,cs_symbol_table)
+	  icl_common = {icl_common & com_type_defs=com_type_defs,com_class_defs=com_class_defs}
+	  cs = {cs & cs_symbol_table=cs_symbol_table, cs_predef_symbols=cs_predef_symbols}
+	  heaps = {heaps & hp_var_heap=hp_var_heap}
+
+	# (nr_of_functions, icl_functions) = usize icl_functions
+
+	# (icl_global_functions_ranges,icl_instances_ranges,icl_generic_ranges,icl_type_fun_ranges,n_exported_global_functions,local_functions_index_offset,
+										def_macro_indices,icl_functions,icl_common,macro_and_function_local_defs,dcl_modules,error)
+		= renumber_icl_module_functions mod_type icl_global_function_range icl_instance_range icl_generic_range icl_type_fun_range nr_of_functions main_dcl_module_n
+										dcl_function_table instances_conversion_table_size gencase_conversion_table_size
+										def_macro_indices icl_functions icl_common macro_and_function_local_defs dcl_modules cs.cs_error
+
+	| not error.ea_ok
+		= (False, abort "evaluated error 3 (check.icl)", {}, {}, {}, cs.cs_x.x_main_dcl_module_n,heaps, cs.cs_predef_symbols, cs.cs_symbol_table, error.ea_file, [])
+
+	# cs = { cs & cs_error=error,cs_x.x_needed_modules = if dynamic_type_used cNeedStdDynamic 0 }
+
+	# (macro_and_function_local_defs,dcl_modules,cs) = replace_icl_macros_by_dcl_macros mod_type def_macro_indices macro_and_function_local_defs dcl_modules cs
+
+	  cs = addGlobalDefinitionsToSymbolTable macro_and_function_local_defs cs
 
 	  icl_imported = { el \\ el<-dcls_import_list }
 	  
 	  (_,icl_common, dcl_modules, heaps=:{hp_var_heap, hp_type_heaps}, cs)
 	  		= checkCommonDefinitions (Yes (copied_dcl_defs, nr_of_cached_modules)) main_dcl_module_n icl_common dcl_modules heaps cs
-				
+
+	  (no_errors,cs) = cs!cs_error.ea_ok
+	  icl_common
+			= if (no_errors && support_dynamics)
+				(set_td_fun_index_for_icl_types icl_type_fun_ranges icl_common)
+				icl_common
+
 	  (instance_types, icl_common, dcl_modules, hp_var_heap, hp_type_heaps, cs)
 	  		= checkIclInstances main_dcl_module_n icl_common dcl_modules hp_var_heap hp_type_heaps cs
 	  		  	
@@ -2318,6 +2414,7 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 
   	  cs_symbol_table = restore_module_ste_kinds_in_symbol_table modified_ste_kinds cs_symbol_table
 	  cs_symbol_table = removeDeclarationsFromSymbolTable local_defs cGlobalScope cs_symbol_table
+	  cs_symbol_table = removeDeclarationsFromSymbolTable macro_and_function_local_defs cGlobalScope cs_symbol_table
 	  cs_symbol_table = foldlArraySt removeImportedSymbolsFromSymbolTable icl_imported cs_symbol_table
 
 	  dcl_modules = e_info.ef_modules
@@ -2533,6 +2630,17 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 						  cs_error = checkError "the specified member type is incorrect (" (luxurious_explanation+++" not ok)") cs_error
 						-> ( popErrorAdmin cs_error, type_heaps)
 			= (icl_functions, type_heaps, cs_error)
+
+		determine_imported_module_numbers expl_imp_indices main_dcl_module_n dcl_modules
+			# (imported_module_numbers_of_main_dcl_mod, dcl_modules) = dcl_modules![main_dcl_module_n].dcl_imported_module_numbers
+	  		= foldSt compute_used_module_nrs expl_imp_indices (addNr cPredefinedModuleIndex imported_module_numbers_of_main_dcl_mod, dcl_modules)
+
+		determine_explicit_imports component_expl_imp_info expl_imp_indices nr_of_modules modules_in_component_set dcl_modules cs
+	 		# expl_imp_indices_ikh = ikhInsert` False nr_of_modules expl_imp_indices ikhEmpty
+	 		# (imports, (dcl_modules, _, _, cs))
+				= solveExplicitImports expl_imp_indices_ikh modules_in_component_set nr_of_modules
+										(dcl_modules, bitvectCreate nr_of_modules, component_expl_imp_info, cs)
+			= (imports, dcl_modules, cs)
 
 checkForeignExports :: [ParsedForeignExport] [IndexRange] *{#FunDef} *CheckState -> (![ForeignExport],!*{#FunDef},!*CheckState)
 checkForeignExports [{pfe_ident=pfe_ident=:{id_name,id_info},pfe_line,pfe_file,pfe_stdcall}:foreign_exports] icl_global_functions_ranges fun_defs cs
@@ -3040,7 +3148,7 @@ checkInstancesOfDclModule mod_index	(nr_of_dcl_functions_and_instances, nr_of_dc
 		
 	   dcl_modules = { dcl_modules & [mod_index] = dcl_mod }
 	= (dcl_modules, heaps, cs)
-  where   
+  where
 	adjust_instance_types_of_array_functions_in_std_array_dcl array_mod_index class_members class_instances fun_types cs=:{cs_predef_symbols}
 		#! nr_of_instances = size class_instances
 		# ({pds_def}, cs_predef_symbols) = cs_predef_symbols![PD_ArrayClass]
@@ -3073,13 +3181,7 @@ checkPredefinedDclModule dcl_imported_module_numbers components_importing_module
 		 mod=:{mod_ident,mod_defs=mod_defs=:{def_macro_indices,def_funtypes}} mod_index expl_imp_info modules macro_defs heaps cs
 	# dcl_common = createCommonDefinitions mod_defs
 	#! first_type_index = size dcl_common.com_type_defs		
-	# dcl_common = {dcl_common & com_class_defs = number_class_dictionaries 0 dcl_common.com_class_defs first_type_index}
-		with
-			number_class_dictionaries class_index class_defs index_type
-				| class_index < size class_defs
-					# class_defs = { class_defs & [class_index].class_dictionary.ds_index = index_type }
-					= number_class_dictionaries (inc class_index) class_defs (inc index_type)
-					= class_defs
+	# dcl_common = {dcl_common & com_class_defs = number_class_dictionaries 0 first_type_index dcl_common.com_class_defs}
 	= checkDclModule2 dcl_imported_module_numbers components_importing_module imports_ikh component_nr is_on_cycle modules_in_component_set support_dynamics
 		 mod_ident dcl_common def_macro_indices def_funtypes mod_index expl_imp_info modules macro_defs heaps cs
 

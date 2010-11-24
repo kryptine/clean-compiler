@@ -24,6 +24,7 @@ set_hte_mark :: !Int !*HashTable -> *HashTable
 				| IC_Instance ![Type]
 				| IC_Generic
 				| IC_GenericCase !Type
+				| IC_GenericDeriveClass !Type
 				| IC_Unknown
 
 :: BoxedIdent = {boxed_ident::!Ident}

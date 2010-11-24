@@ -99,7 +99,7 @@ where
 instance toString AttributeVar
 where
 //	toString {av_ident,av_info_ptr} = toString av_ident + "[" + toString (ptrToInt av_info_ptr) + "]"
-	toString {av_ident,av_info_ptr} = toString av_ident
+	toString {av_ident} = toString av_ident
 
 instance <<< AType
 where
@@ -193,6 +193,8 @@ where
 		= file <<< "(->) " <<< t	
 	(<<<) file (TFA vars types)
 		= file <<< "A." <<< vars <<< ':' <<< types
+	(<<<) file (TFAC vars types contexts)
+		= file <<< "A." <<< vars <<< ':' <<< types <<< " | " <<< contexts
 	(<<<) file (TQV varid)
 		= file <<< "E." <<< varid
 	(<<<) file (TempQV tv_number)
@@ -397,6 +399,8 @@ where
 
 	(<<<) file (FailExpr _) = file <<< "** FAIL **"
 	(<<<) file (TypeSignature array_kind expr) = file <<< "TypeSignature " <<< '(' <<< expr <<< ')'
+	(<<<) file (DictionariesFunction dictionaries expr expr_type)
+		= file <<< "DictionariesFunction " <<< dictionaries <<< expr <<< expr_type
 	(<<<) file expr         				= abort ("<<< (Expression)" )
 	
 instance <<< LetBind
@@ -741,8 +745,7 @@ where
 	(<<<) file (PD_TypeSpec _ name prio st sp) = file <<< name <<< st
 	(<<<) file (PD_Type td) = file <<< td
 	(<<<) file (PD_Generic {gen_ident}) = file <<< "generic " <<< gen_ident
-	(<<<) file (PD_GenericCase {gc_ident,gc_type_cons}) = file <<< gc_ident <<< "{|" <<< gc_type_cons <<< "|}"
-	 
+	(<<<) file (PD_GenericCase {gc_gcf=GCF gc_ident _,gc_type_cons}) = file <<< gc_ident <<< "{|" <<< gc_type_cons <<< "|}"
 	(<<<) file _ = file
 
 instance <<< Rhs
@@ -920,12 +923,9 @@ where
 	(<<<) file
 		STE_DclFunction
 			= file <<< "STE_DclFunction"
-	(<<<) file
-		STE_Generic
-			= file <<< "STE_Generic"
-	(<<<) file
-		STE_GenericCase
-			= file <<< "STE_GenericCase"
+	(<<<) file STE_Generic = file <<< "STE_Generic"
+	(<<<) file STE_GenericCase = file <<< "STE_GenericCase"
+	(<<<) file STE_GenericDeriveClass = file <<< "STE_GenericDeriveClass"
 	(<<<) file
 		(STE_Module _)
 			= file <<< "STE_Module"
