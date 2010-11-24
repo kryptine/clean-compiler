@@ -28,8 +28,7 @@ where
 	has_to_be_checked module_index generic_index (Yes ({copied_generic_defs}, n_cached_dcl_mods))
 		= not (module_index < n_cached_dcl_mods && generic_index < size copied_generic_defs && copied_generic_defs.[generic_index])
 			
-	check_generic index mod_index gen_defs type_defs class_defs modules heaps cs		
-
+	check_generic index mod_index gen_defs type_defs class_defs modules heaps cs
 		#(gen_def=:{gen_ident, gen_pos}, gen_defs) = gen_defs ! [index]
 		# cs = pushErrorAdmin (newPosition gen_ident gen_pos) cs
 
@@ -38,13 +37,10 @@ where
 		# (gen_def, type_defs, class_defs, modules, heaps, cs)
 			= check_generic_type gen_def mod_index type_defs class_defs modules heaps cs
 
-		//# (heaps, cs) = check_generic_vars gen_def heaps cs
-
 		# gen_defs = {gen_defs & [index] = gen_def} 
 		# (cs=:{cs_x}) = popErrorAdmin cs
 		#! cs = { cs & cs_x = {cs_x & x_needed_modules = cs_x.x_needed_modules bitor cNeedStdGeneric}}			
 		= (gen_defs, type_defs, class_defs, modules, heaps, cs)
-				//---> ("check_generic", gen_ident, gen_def.gen_vars, gen_def.gen_type)
 
 	alloc_gen_info gen_def heaps=:{hp_generic_heap}
 		# initial_info = 
@@ -72,7 +68,6 @@ where
 			= (th_vars, {cs & cs_error = cs_error})	
 
 	check_generic_type gen_def=:{gen_type, gen_vars, gen_ident, gen_pos} module_index type_defs class_defs modules heaps=:{hp_type_heaps} cs
-
 		#! (checked_gen_type, _, type_defs, class_defs, modules, hp_type_heaps, cs) =
 			checkFunctionType module_index gen_type SP_None type_defs class_defs modules hp_type_heaps cs
 		
@@ -87,7 +82,6 @@ where
 			, {heaps & hp_type_heaps = hp_type_heaps}
 			, cs
 			)
-			//---> ("check_genric_type", gen_vars, checked_gen_vars, checked_gen_type)
 	where
 		check_generic_vars gen_vars st_vars cs=:{cs_error}
 			# (gen_vars, _, cs_error) = foldSt check_generic_var gen_vars ([], st_vars, cs_error)
@@ -201,7 +195,6 @@ where
 		#! (cs=:{cs_x}) = popErrorAdmin cs	
 		#! cs = { cs & cs_x = {cs_x & x_needed_modules = cs_x.x_needed_modules bitor cNeedStdGeneric}}			
 		= (gen_case_defs, generic_defs, type_defs, modules, heaps, cs)
-			//---> ("check_generic_case", gc_ident, gc_type_cons)
 
 	check_instance_type module_index (TA type_cons []) type_defs modules heaps=:{hp_type_heaps} cs
 		# (entry, cs_symbol_table) = readPtr type_cons.type_ident.id_info cs.cs_symbol_table
@@ -246,8 +239,7 @@ where
 				-> ({gi_module=mod_index,gi_index = ste.ste_index}, cs) 
 			STE_Imported STE_Generic imported_generic_module
 				-> ({gi_module=imported_generic_module,gi_index = ste.ste_index}, cs)
-			_	->	//abort "--------------" ---> ("STE_Kind", ste.ste_kind)			
-					( {gi_module=NoIndex,gi_index = NoIndex}
+			_	->	( {gi_module=NoIndex,gi_index = NoIndex}
 					, {cs & cs_error = checkError id_name "generic undefined" cs.cs_error})
 
 convert_generic_instances :: !.[GenericCaseDef] !Int -> (!.[FunDef], !.[GenericCaseDef])
@@ -276,7 +268,7 @@ convert_generic_instances [] next_fun_index
 	= ([], [])
 
 create_gencase_funtypes :: !Index !*{#GenericCaseDef} !*Heaps
-		  -> (!Index, ![FunType], !*{#GenericCaseDef},!*Heaps)
+			-> (!Index,![FunType],!*{#GenericCaseDef},!*Heaps)
 create_gencase_funtypes fun_index gencase_defs heaps
 	#! (fun_index, new_funs, gencase_defs, hp_var_heap) 
 		= create_funs 0 fun_index gencase_defs heaps.hp_var_heap
