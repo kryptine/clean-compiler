@@ -26,9 +26,10 @@ addLetVars [{lb_dst} : binds] [bind_type : bind_types] bound_vars
 addLetVars [] [] bound_vars
 	= bound_vars
 
-convertCasesOfFunctions :: !*{! Group} !Int !{# {# FunType} } !{# CommonDefs} !*{#FunDef} !*{#{# CheckedTypeDef}}
-		!ImportedConstructors !*VarHeap !*TypeHeaps !*ExpressionHeap
-			-> (!ImportedFunctions, !*{! Group}, !*{#FunDef}, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap)
+convertCasesOfFunctions :: !*{!Group} !Int !{#{#FunType}} !{#CommonDefs}
+				!*{#FunDef} !*{#{#CheckedTypeDef}} !ImportedConstructors !*VarHeap !*TypeHeaps !*ExpressionHeap
+			-> (!ImportedFunctions, !*{!Group},
+				!*{#FunDef},!*{#{#CheckedTypeDef}},!ImportedConstructors,!*VarHeap,!*TypeHeaps,!*ExpressionHeap)
 convertCasesOfFunctions groups main_dcl_module_n dcl_functions common_defs fun_defs imported_types imported_conses var_heap type_heaps expr_heap
 	#! nr_of_funs = size fun_defs
 	# (groups, (fun_defs, collected_imports, {cs_new_functions, cs_var_heap, cs_expr_heap, cs_fun_heap}))
@@ -63,9 +64,8 @@ where
 		  (tb_rhs, ds) = distributeLets {di_depth=1,di_explicit_case_depth=0} tb_rhs ds
 		  (tb_rhs, {ds_var_heap, ds_expr_heap}) = buildLetExpr tb_rhs ds
 		  {ss_expr_heap, ss_var_heap}
-		  	= findSplitCases {si_next_alt=No, si_force_next_alt=False} tb_rhs
-		  						{ss_var_heap=ds_var_heap, ss_expr_heap = ds_expr_heap}
-		= (TransformedBody {body & tb_rhs = tb_rhs }, (rcs_imports, { cs & cs_var_heap = ss_var_heap, cs_expr_heap = ss_expr_heap}))
+		  	= findSplitCases {si_next_alt=No, si_force_next_alt=False} tb_rhs {ss_var_heap=ds_var_heap, ss_expr_heap = ds_expr_heap}
+		= (TransformedBody {body & tb_rhs = tb_rhs }, (rcs_imports, {cs & cs_var_heap = ss_var_heap, cs_expr_heap = ss_expr_heap}))
 
 	split :: SymbKind (ImportedFunctions, ImportedConstructors) -> (ImportedFunctions, ImportedConstructors) 
 	split (SK_Function fun_ident) (collected_functions, collected_conses)
@@ -136,8 +136,8 @@ instance checkCaseTypes [a] | checkCaseTypes a where
 instance checkCaseTypes BasicPattern where
 	checkCaseTypes pattern=:{bp_expr} cs
 		=	checkCaseTypes bp_expr cs
-
 // ... sanity check
+
 :: CaseLevel = CaseLevelRoot | CaseLevelAfterGuardRoot
 
 :: ConvertInfo =
@@ -1717,8 +1717,7 @@ convertNonRootFail ci=:{ci_bound_vars, ci_group_index, ci_common_defs} ident cs
 			,	at_type = TV {tv_ident = { id_name = "a", id_info = nilPtr }, tv_info_ptr = nilPtr}
 			}
 	# (fun_ident, cs)
-	  	=	new_case_function (Yes ident) result_type (FailExpr ident) [] []
-	  							ci_bound_vars ci_group_index ci_common_defs cs
+	  	=	new_case_function (Yes ident) result_type (FailExpr ident) [] [] ci_group_index ci_common_defs cs
 	= (App { app_symb = fun_ident, app_args = [], app_info_ptr = nilPtr }, cs)
 
 convertNonRootCase ci=:{ci_bound_vars, ci_group_index, ci_common_defs} kees=:{ case_expr, case_ident, case_info_ptr} cs
@@ -1805,11 +1804,11 @@ where
 		= case var_info of
 			VI_BoundVar type
 				# var_heap = var_heap <:= (var_info_ptr, VI_FreeVar var_ident new_info_ptr 0 type)
-				  (expr, {cp_free_vars, cp_var_heap, cp_local_vars}) = copy guards_and_default { cp_free_vars = [(var_info_ptr, type)], cp_var_heap = var_heap, cp_local_vars = []}
+				  (expr, {cp_free_vars, cp_var_heap, cp_local_vars}) = copy guards_and_default {cp_free_vars = [(var_info_ptr, type)], cp_var_heap = var_heap, cp_local_vars = []}
 				  (bound_vars, free_typed_vars, var_heap) = retrieve_variables cp_free_vars cp_var_heap
 				-> (True,bound_vars, free_typed_vars, cp_local_vars, expr, old_fv_info_ptr_values,var_heap)
 			VI_LocalVar
-				# (expr, {cp_free_vars, cp_var_heap, cp_local_vars}) = copy guards_and_default { cp_free_vars = [], cp_var_heap = var_heap, cp_local_vars = []}
+				# (expr, {cp_free_vars, cp_var_heap, cp_local_vars}) = copy guards_and_default {cp_free_vars = [], cp_var_heap = var_heap, cp_local_vars = []}
 				  (bound_vars, free_typed_vars, var_heap) = retrieve_variables cp_free_vars cp_var_heap
 				-> (False,bound_vars, free_typed_vars, cp_local_vars, expr, old_fv_info_ptr_values,var_heap)
 	
@@ -1831,8 +1830,7 @@ where
 
 new_case_function_and_restore_old_fv_info_ptr_values opt_id result_type rhs free_vars local_vars
 	bound_vars old_fv_info_ptr_values group_index common_defs cs
-	# (fun_ident,cs) = new_case_function opt_id result_type rhs free_vars local_vars
-										bound_vars group_index common_defs cs
+	# (fun_ident,cs) = new_case_function opt_id result_type rhs free_vars local_vars group_index common_defs cs
 	# cs_var_heap=restore_old_fv_info_ptr_values old_fv_info_ptr_values bound_vars cs.cs_var_heap
 	= (fun_ident,{ cs & cs_var_heap = cs_var_heap});
 where
@@ -1842,8 +1840,7 @@ where
 	restore_old_fv_info_ptr_values [] bound_vars var_heap
 		= var_heap
 
-new_case_function opt_id result_type rhs free_vars local_vars
-	bound_vars group_index common_defs cs=:{cs_expr_heap}
+new_case_function opt_id result_type rhs free_vars local_vars group_index common_defs cs=:{cs_expr_heap}
 	# body = TransformedBody {tb_args=[var \\ (var, _) <- free_vars], tb_rhs=rhs}
 	  (_,type)
 		=	removeAnnotations
