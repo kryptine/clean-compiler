@@ -208,14 +208,7 @@ wantList msg try_fun pState :== want_list msg pState // try_fun +
 				= ([tree : trees], pState)
 				# (token, pState) = nextToken GeneralContext pState
 				= ([tree], parseError ("wantList of "+msg) (Yes token) msg pState)
-/*
-instance want (a,b) | want a & want b
-where
-	want pState
-		# (x, pState) = want pState
-		  (y, pState) = want pState
-		= ((x,y), pState)
-*/
+
 wantModuleIdents :: !ScanContext !IdentClass !ParseState -> (![Ident], !ParseState)
 wantModuleIdents scanContext ident_class pState
 	# (first_name, pState) = wantModuleName pState
@@ -902,13 +895,7 @@ where
 			#	(token, pState)				= nextToken FunctionContext pState
 				(nodeDefs2, token, pState)	= want_LetBefores token pState
 			= want_FunctionBody token (nodeDefs ++ nodeDefs2) alts definingSymbol pState // to allow | otherwise | c1 = .. | c2 = ..
-/* PK ??? 
-			=	case token of
-				BarToken
-					#	pState = parseError "RHS: default alternative" No "root expression instead of guarded expression" pState
-					->	root_expression True token (nodeDefs ++ nodeDefs2) (reverse alts) sep pState
-				_	->	root_expression True token (nodeDefs ++ nodeDefs2) (reverse alts) sep pState
-*/		|	token == LetToken True
+		|	token == LetToken True
 			#	pState	= parseError "RHS" No "No 'let!' in this version of Clean" pState
 			=	root_expression True token nodeDefs (reverse alts) definingSymbol pState
 		#	(guard, pState)				= wantRhsExpressionT token pState
