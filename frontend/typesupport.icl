@@ -560,7 +560,22 @@ where
 						= (NoVarContexts,cus)
 				EI_CaseTypeWithContexts case_type constructor_contexts
 					# (case_type, cus) = clean_up cui case_type cus
+					  (constructor_contexts, cus) = clean_up_constructor_contexts cui constructor_contexts cus
 					-> (expr_heap <:= (expr_ptr, EI_CaseTypeWithContexts case_type constructor_contexts), cus)
+				where
+					clean_up_constructor_contexts cui [(ds,type_contexts):constructor_contexts] cus
+						# (type_contexts,cus) = clean_up_type_contexts cui type_contexts cus
+						  (constructor_contexts,cus) = clean_up_constructor_contexts cui constructor_contexts cus
+						= ([(ds,type_contexts):constructor_contexts],cus)
+					clean_up_constructor_contexts cui [] cus
+						= ([],cus)
+
+					clean_up_type_contexts cui [type_contexts=:{tc_types}:constructor_contexts] cus
+						# (tc_types,cus) = clean_up cui tc_types cus
+						  (constructor_contexts,cus) = clean_up_type_contexts cui constructor_contexts cus
+						= ([{type_contexts & tc_types=tc_types}:constructor_contexts],cus)
+					clean_up_type_contexts cui [] cus
+						= ([],cus)
 
  	check_type_of_start_rule is_start_rule {st_context,st_arity,st_args} cus_error
  		| is_start_rule
