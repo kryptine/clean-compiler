@@ -5,7 +5,7 @@ implementation module frontend
 
 import scanner, parse, postparse, check, type, trans, convertcases, overloading, utilities, convertDynamics,
 		convertimportedtypes, compilerSwitches, analtypes, generics1,
-		typereify
+		typereify, saplinterface
 //import coredump
 
 //import print
@@ -30,9 +30,9 @@ frontSyntaxTree cached_dcl_macros cached_dcl_mods main_dcl_module_n predef_symbo
 
 // import StdDebug
 
-frontEndInterface :: !FrontEndOptions !Ident !SearchPaths !{#DclModule} !*{#*{#FunDef}} !(Optional Bool) !*PredefinedSymbols !*HashTable (ModTimeFunction *Files) !*Files !*File !*File !*File !(Optional *File) !*Heaps
+frontEndInterface :: !FrontEndOptions !Ident !SearchPaths !{#DclModule} !*{#*{#FunDef}} !(Optional Bool) !*PredefinedSymbols !*HashTable (ModTimeFunction *Files) !*Files !*File !*File !*File !(Optional *File) !*Heaps !String
   	-> ( !Optional *FrontEndSyntaxTree,!*{#*{#FunDef}},!{#DclModule},!Int,!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional *File, !*Heaps) 
-frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_macros list_inferred_types predef_symbols hash_table modtimefunction files error io out tcl_file heaps 
+frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_macros list_inferred_types predef_symbols hash_table modtimefunction files error io out tcl_file heaps csf_path
 // 	# files = trace_n ("Compiling "+++mod_ident.id_name) files
 	# (ok,dynamic_type_used,mod,hash_table,error,files)
 		= wantModule cWantIclFile mod_ident NoPos options.feo_generics(hash_table /* ---> ("Parsing:", mod_ident)*/) error search_paths modtimefunction files
@@ -270,6 +270,12 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_m
 		= abort "";
 */
 
+//	# (files,components,fun_defs) = gensaplfiles files dcl_mods dcl_types components fun_defs icl_common common_defs icl_name icl_global_functions
+	# (files,components,fun_defs) = 
+		case options.feo_generate_sapl of
+    		True = gensaplfiles files dcl_mods dcl_types components fun_defs icl_common common_defs icl_name icl_global_functions csf_path
+    		_	 = (files,components,fun_defs)
+    	
 //	# (fun_defs,out,var_heap,predef_symbols) = sa components main_dcl_module_n dcl_mods fun_defs out var_heap predef_symbols;
 
 	# heaps = {hp_var_heap = var_heap, hp_expression_heap=expression_heap, hp_type_heaps=type_heaps,hp_generic_heap=heaps.hp_generic_heap}

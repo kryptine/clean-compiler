@@ -13,6 +13,7 @@ import checksupport, transform, overloading
 		,	feo_fusion	 			:: !Bool
 		,	feo_dump_core			:: !Bool
 		,	feo_strip_unused		:: !Bool
+		,	feo_generate_sapl		:: !Bool
 		}
 
 :: FrontEndSyntaxTree
@@ -37,5 +38,5 @@ import checksupport, transform, overloading
 	}
 instance == ListTypesKind
 
-frontEndInterface :: !FrontEndOptions !Ident !SearchPaths !{#DclModule} !*{#*{#FunDef}} !(Optional Bool) !*PredefinedSymbols !*HashTable (ModTimeFunction *Files) !*Files !*File !*File !*File !(Optional *File) !*Heaps
+frontEndInterface :: !FrontEndOptions !Ident !SearchPaths !{#DclModule} !*{#*{#FunDef}} !(Optional Bool) !*PredefinedSymbols !*HashTable (ModTimeFunction *Files) !*Files !*File !*File !*File !(Optional *File) !*Heaps !String
 	-> ( !Optional *FrontEndSyntaxTree,!*{#*{#FunDef}},!{#DclModule},!Int,!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional *File, !*Heaps) 

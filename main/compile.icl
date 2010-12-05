@@ -34,12 +34,16 @@ splitBy char string
 		stringSize
 			=	size string
 
+getCsfPath :: !String -> !String
+getCsfPath icl_mod_pathname
+	= directoryName icl_mod_pathname +++ "Clean System Files"
+	
 openTclFile :: !Bool !String !*File !*Files -> (!Bool, !Optional .File, !*File, !*Files)
 openTclFile False icl_mod_pathname error files
 	= (True,No,error,files)
 openTclFile compile_for_dynamics icl_mod_pathname error files
 	# csf_path
-		= directoryName icl_mod_pathname +++ "Clean System Files"
+		= getCsfPath icl_mod_pathname
 	# tcl_path
 		= csf_path +++ {DirectorySeparator} +++ baseName icl_mod_pathname +++ ".tcl"
 	# (opened, tcl_file, files)
@@ -80,6 +84,7 @@ closeTclFile _ files
 	,	dump_core				:: !Bool
 	,	strip_unused			:: !Bool
 	,	compile_with_generics   :: !Bool
+	,	generate_sapl           :: !Bool
 	}
 
 StdErrPathName :== "_stderr_"
@@ -100,6 +105,7 @@ InitialCoclOptions =
 	,	dump_core				= False
 	,	strip_unused			= False
 	,	compile_with_generics 	= True 
+	,	generate_sapl       	= False
 	}
 
 :: DclCache = {
@@ -174,6 +180,9 @@ parseCommandLine ["-lset":args] options
 	= parseCommandLine args {options & listTypes.lto_listTypesKind = ListTypesStrictExports}
 parseCommandLine ["-lat":args] options
 	= parseCommandLine args {options & listTypes.lto_listTypesKind = ListTypesAll}
+	// enable sapl	
+parseCommandLine ["-sapl":args] options
+	= parseCommandLine args {options & generate_sapl = True}
 parseCommandLine [arg : args] options
 	| arg.[0] == '-'
 		# (args,modules,options)=	parseCommandLine args options
@@ -274,7 +283,8 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 			,feo_fusion=options.compile_with_fusion
 			,feo_dump_core=options.dump_core
 			,feo_strip_unused=options.strip_unused
-			} moduleIdent options.searchPaths dcl_modules functions_and_macros list_inferred_types predef_symbols hash_table fmodificationtime files error io out tcl_file heaps 
+			,feo_generate_sapl=options.generate_sapl
+			} moduleIdent options.searchPaths dcl_modules functions_and_macros list_inferred_types predef_symbols hash_table fmodificationtime files error io out tcl_file heaps (getCsfPath options.pathName)
 
 	# unique_copy_of_predef_symbols={predef_symbol\\predef_symbol<-:predef_symbols}
 	# (closed, files)
