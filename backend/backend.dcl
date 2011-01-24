@@ -365,7 +365,7 @@ BESpecialIdentUndef:==2;
 BESpecialIdentStdBool:==3;
 BESpecialIdentAnd:==4;
 BESpecialIdentOr:==5;
-BESpecialIdentCount:==6;
+BESpecialIdentCount:==8;
 BELhsNodeId:==0;
 BERhsNodeId:==1;
 BEIsNotACaf:==0;
