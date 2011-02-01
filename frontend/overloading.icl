@@ -1063,7 +1063,7 @@ where
 
 	convert_TypeContext_to_DictionaryAndClassType {tc_var,tc_class=TCClass {glob_module,glob_object={ds_ident,ds_index}},tc_types} defs
 		# {class_dictionary} = defs.[glob_module].com_class_defs.[ds_index]
-		  dict_type_symbol = MakeTypeSymbIdent {glob_module=glob_module,glob_object=ds_index} class_dictionary.ds_ident class_dictionary.ds_arity
+		  dict_type_symbol = MakeTypeSymbIdent {glob_module=glob_module,glob_object=class_dictionary.ds_index} class_dictionary.ds_ident class_dictionary.ds_arity
 		  class_type = TA dict_type_symbol [AttributedType type \\ type <- tc_types]
 		= {dc_var=tc_var,dc_class_type=AttributedType class_type}
 get_var_contexts NoVarContexts defs contexts error
