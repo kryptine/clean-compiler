@@ -217,6 +217,10 @@ static Bool findfilepath (char *fname, FileKind kind, char *mode, char *path)
 }
 #endif
 
+#include <sys/time.h>
+#include <sys/resource.h>
+#include <sys/stat.h>
+
 File FOpen (char *wname, FileKind kind, char *mode)
 {
 	char path[MAXPATHLEN];
@@ -373,9 +377,6 @@ void FGetXY (int *x, int *y, File f)
  ******************************************************************************/
 
 
-#include <sys/time.h>
-#include <sys/resource.h>
-#include <sys/stat.h>
 
 #ifdef HP
 #	include <unistd.h>
