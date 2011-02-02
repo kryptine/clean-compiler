@@ -22,12 +22,9 @@ import type_io_common
 // unsupported:
 // - 	ADTs
 
-F a b :== b;
-
 :: WriteTypeInfoState
 	= { 
 		wtis_n_type_vars						:: !Int
-	,	wtis_predefined_module_def				:: !Index
 	,	wtis_common_defs						:: !{#CommonDefs}	
 	,	wtis_type_defs							:: !.{#{#CheckedTypeDef}}
 	,	wtis_collected_conses					:: !ImportedConstructors
@@ -87,7 +84,7 @@ where
 			
 instance WriteTypeInfo (TypeDef TypeRhs)
 where 
-	write_type_info {td_ident,td_arity,td_args,td_rhs} tcl_file wtis
+	write_type_info {td_ident,td_arity,td_args,td_rhs,td_fun_index} tcl_file wtis
 		// normalize ...
  		# (th_vars,wtis)
  			= sel_type_var_heap wtis
@@ -99,18 +96,19 @@ where
  			,	wtis_n_type_vars		= n_type_vars
  			}
  		// ... normalize
- 		
  		# (tcl_file,wtis)
  			= write_type_info td_ident tcl_file wtis
 		# (tcl_file,wtis)
- 			= write_type_info td_arity tcl_file wtis 				
+ 			= write_type_info td_arity tcl_file wtis				
  		# (tcl_file,wtis)
- 			= write_type_info td_args tcl_file wtis	
-		# (tcl_file,wtis)
+ 			= write_type_info td_args tcl_file wtis
+		| td_fun_index<>NoIndex
  			= write_type_info td_rhs tcl_file wtis
- 			
- 		= (tcl_file,wtis)
- 	
+			# (RecordType {rt_constructor,rt_fields}) = td_rhs
+			  tcl_file = fwritec GenericDictionaryTypeCode tcl_file;
+			  (tcl_file,wtis) = write_type_info rt_constructor tcl_file wtis
+			= write_type_info rt_fields tcl_file wtis
+ 
 normalize_type_var :: !ATypeVar (!Int,!*TypeVarHeap) -> (!Int,(!Int,!*TypeVarHeap))
 normalize_type_var td_arg=:{atv_variable={tv_info_ptr}} (id,th_vars)
 	# th_vars
@@ -163,12 +161,12 @@ where
 			= write_type_info defined_symbols tcl_file wtis
 
 		= (tcl_file,wtis)
-		
+
 	write_type_info (SynType _) tcl_file wtis
 		# tcl_file
  			= fwritec SynTypeCode tcl_file;
   		= (tcl_file,wtis) 
-		
+
 	write_type_info (RecordType {rt_constructor,rt_fields}) tcl_file wtis
  		#! tcl_file
  			= fwritec RecordTypeCode tcl_file;
@@ -345,7 +343,7 @@ where
 		# (tcl_file,wtis)
 			= write_type_info type_var tcl_file wtis
 		= (tcl_file,wtis)
-		
+
 	write_type_info (TQV type_var) tcl_file wtis
 		# tcl_file
 			= fwritec TypeTQVCode tcl_file
@@ -397,9 +395,8 @@ where
 
 instance WriteTypeInfo TypeSymbIdent
 where
-	write_type_info tsi=:{type_ident,type_arity,type_index={glob_module,glob_object}} tcl_file wtis=:{wtis_predefined_module_def}
-		# is_type_without_definition
-			= glob_module == wtis_predefined_module_def
+	write_type_info tsi=:{type_ident,type_arity,type_index={glob_module,glob_object}} tcl_file wtis
+		# is_type_without_definition = glob_module==cPredefinedModuleIndex
 		# tcl_file
 			= fwritec (if is_type_without_definition TypeSymbIdentWithoutDefinition TypeSymbIdentWithDefinition) tcl_file
 

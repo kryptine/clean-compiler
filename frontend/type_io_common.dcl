@@ -26,6 +26,7 @@ AlgTypeCode						:== (toChar 5)
 SynTypeCode 					:== (toChar 6)
 RecordTypeCode					:== (toChar 7)
 AbstractTypeCode				:== (toChar 8)
+GenericDictionaryTypeCode		:== '\x22'
 
 // Type
 //TypeTACode						:== (toChar 9)		// TA

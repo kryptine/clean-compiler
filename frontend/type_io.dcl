@@ -14,7 +14,6 @@ import trans
 :: WriteTypeInfoState
 	= { 
 		wtis_n_type_vars						:: !Int
-	,	wtis_predefined_module_def				:: !Index
 	,	wtis_common_defs						:: !{#CommonDefs}	
 	,	wtis_type_defs							:: !.{#{#CheckedTypeDef}}
 	,	wtis_collected_conses					:: !ImportedConstructors

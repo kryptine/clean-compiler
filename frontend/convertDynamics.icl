@@ -45,11 +45,9 @@ fatal function_name message
 
 write_tcl_file main_dcl_module_n dcl_mods=:{[main_dcl_module_n] = main_dcl_module} icl_common_defs tcl_file directly_imported_dcl_modules type_heaps 
 			   predefined_symbols imported_types var_heap common_defs icl_mod
-	# (pre_mod, predefined_symbols) = predefined_symbols![PD_PredefinedModule]
 	# write_type_info_state2
 		= { WriteTypeInfoState |
 			wtis_n_type_vars				= 0
-		,	wtis_predefined_module_def		= pre_mod.pds_module
 		,	wtis_common_defs				= common_defs
 		,	wtis_type_defs					= imported_types
 	  	, 	wtis_collected_conses			= []
