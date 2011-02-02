@@ -205,18 +205,14 @@ where
 		# tcl_file
 			= fwritei (size id_name) tcl_file
 		= (fwrites id_name tcl_file,wtis)
-		
+
 instance WriteTypeInfo FieldSymbol
 where
-	write_type_info {fs_ident,fs_var,fs_index} tcl_file wtis
+	write_type_info {fs_ident,fs_index} tcl_file wtis
 		# (tcl_file,wtis)
 			= write_type_info fs_ident tcl_file wtis
-		# (tcl_file,wtis)
-			= write_type_info fs_var tcl_file wtis
-		# (tcl_file,wtis)
-			= write_type_info fs_index tcl_file wtis
-		= (tcl_file,wtis)
-		
+		= write_type_info fs_index tcl_file wtis
+
 instance WriteTypeInfo SymbolType
 where
 	write_type_info symbol_type tcl_file wtis
