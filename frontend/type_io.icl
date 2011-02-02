@@ -27,7 +27,6 @@ F a b :== b;
 :: WriteTypeInfoState
 	= { 
 		wtis_n_type_vars						:: !Int
-	,	wtis_predefined_module_def				:: !Index
 	,	wtis_common_defs						:: !{#CommonDefs}	
 	,	wtis_type_defs							:: !.{#{#CheckedTypeDef}}
 	,	wtis_collected_conses					:: !ImportedConstructors
@@ -397,9 +396,8 @@ where
 
 instance WriteTypeInfo TypeSymbIdent
 where
-	write_type_info tsi=:{type_ident,type_arity,type_index={glob_module,glob_object}} tcl_file wtis=:{wtis_predefined_module_def}
-		# is_type_without_definition
-			= glob_module == wtis_predefined_module_def
+	write_type_info tsi=:{type_ident,type_arity,type_index={glob_module,glob_object}} tcl_file wtis
+		# is_type_without_definition = glob_module == cPredefinedModuleIndex
 		# tcl_file
 			= fwritec (if is_type_without_definition TypeSymbIdentWithoutDefinition TypeSymbIdentWithDefinition) tcl_file
 
