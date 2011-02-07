@@ -65,14 +65,6 @@ write_tcl_file main_dcl_module_n dcl_mods=:{[main_dcl_module_n] = main_dcl_modul
 	#! (tcl_file,write_type_info_state)
 		= write_type_info directly_imported_dcl_modules tcl_file write_type_info_state
 
-	// dynamic pattern matches
-	#! (tcl_file,write_type_info_state)
-		= write_type_info no_type_symb_ident tcl_file write_type_info_state
-		with
-			no_type_symb_ident :: [TypeSymbIdent]
-			no_type_symb_ident
-				=	[]
-
 	#! (tcl_file,write_type_info_state)
 		= write_type_info (help_20_compiler { dcl_name.id_name\\ {dcl_name} <-: dcl_mods }) tcl_file write_type_info_state
 			with 
