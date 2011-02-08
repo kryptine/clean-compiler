@@ -3,10 +3,6 @@
 */
 implementation module type_io
 
-// WARNING: It is essential to report changes in this module to martijnv@cs.kun.nl
-//			because the binary format for type-files is used by the dynamic run-time
-//			system.
-
 import StdEnv, compare_constructor
 import scanner, general, Heap, typeproperties, utilities, checksupport
 import trans
@@ -21,8 +17,6 @@ import type_io_common
 //
 // unsupported:
 // - 	ADTs
-
-F a b :== b;
 
 :: WriteTypeInfoState
 	= { 
@@ -41,22 +35,11 @@ where
 	
 instance WriteTypeInfo CommonDefs
 where 
-	write_type_info {com_type_defs,com_cons_defs,com_selector_defs} tcl_file wtis
+	write_type_info {com_type_defs,com_cons_defs} tcl_file wtis
 		# (tcl_file,wtis)
 			= write_type_info com_type_defs tcl_file wtis
-		# (tcl_file,wtis)
- 			= write_type_info com_cons_defs tcl_file wtis
- 		# (tcl_file,wtis)
- 			= write_type_info com_selector_defs tcl_file wtis
-		= (tcl_file,wtis)
-		
-instance WriteTypeInfo SelectorDef
-where
-	write_type_info {sd_type} tcl_file wtis
-		# (tcl_file,wtis)
-			= write_type_info sd_type tcl_file wtis
-		= (tcl_file,wtis)
-	
+ 		= write_type_info com_cons_defs tcl_file wtis
+
 instance WriteTypeInfo ConsDef
 where 
 	write_type_info {cons_ident,cons_type,cons_type_index,cons_exi_vars} tcl_file wtis=:{wtis_n_type_vars}
@@ -85,22 +68,16 @@ where
  			= sel_type_var_heap wtis
  		# (_,(n_type_vars,th_vars))
  			= mapSt normalize_type_var td_args (0,th_vars)
-  		# wtis
- 			= { wtis &
- 				wtis_type_heaps.th_vars = th_vars
- 			,	wtis_n_type_vars		= n_type_vars
- 			}
+  		# wtis = { wtis & wtis_type_heaps.th_vars = th_vars, wtis_n_type_vars = n_type_vars }
  		// ... normalize
- 		
  		# (tcl_file,wtis)
  			= write_type_info td_ident tcl_file wtis
 		# (tcl_file,wtis)
- 			= write_type_info td_arity tcl_file wtis 				
+ 			= write_type_info td_arity tcl_file wtis
  		# (tcl_file,wtis)
- 			= write_type_info td_args tcl_file wtis	
+ 			= write_type_info td_args tcl_file wtis
 		# (tcl_file,wtis)
  			= write_type_info td_rhs tcl_file wtis
- 			
  		= (tcl_file,wtis)
  	
 normalize_type_var :: !ATypeVar (!Int,!*TypeVarHeap) -> (!Int,(!Int,!*TypeVarHeap))
@@ -135,10 +112,7 @@ where
 		# tcl_file
 			= fwritei (get_type_var_nf_number v) tcl_file
 
-  		# wtis 
- 			= { wtis &
- 				wtis_type_heaps.th_vars = th_vars
- 			}
+  		# wtis = { wtis & wtis_type_heaps.th_vars = th_vars }
  		= (tcl_file,wtis)	
  	where 
  		get_type_var_nf_number (TVI_Normalized i)	= i
@@ -148,12 +122,10 @@ where
 	write_type_info (AlgType defined_symbols) tcl_file wtis
  		# tcl_file
  			= fwritec AlgTypeCode tcl_file
-		
 		# defined_symbols
 			= (sortBy (\{ds_ident={id_name=id_name1}} {ds_ident={id_name=id_name2}} -> id_name1 < id_name2) defined_symbols)
 		# (tcl_file,wtis)
 			= write_type_info defined_symbols tcl_file wtis
-
 		= (tcl_file,wtis)
 		
 	write_type_info (SynType _) tcl_file wtis
@@ -201,10 +173,8 @@ where
 
 instance WriteTypeInfo FieldSymbol
 where
-	write_type_info {fs_ident,fs_index} tcl_file wtis
-		# (tcl_file,wtis)
-			= write_type_info fs_ident tcl_file wtis
-		= write_type_info fs_index tcl_file wtis
+	write_type_info {fs_ident} tcl_file wtis
+		= write_type_info fs_ident tcl_file wtis
 
 instance WriteTypeInfo SymbolType
 where
@@ -389,14 +359,12 @@ where
 		# is_type_without_definition = glob_module == cPredefinedModuleIndex
 		# tcl_file
 			= fwritec (if is_type_without_definition TypeSymbIdentWithoutDefinition TypeSymbIdentWithDefinition) tcl_file
-
 		# (tcl_file,wtis)
 			= write_type_info type_ident tcl_file wtis
 		# (tcl_file,wtis)		 
 			= write_type_info type_arity tcl_file wtis
 		# (tcl_file,wtis)
 			= write_type_info tsi.type_index tcl_file wtis
-
 		= (tcl_file,wtis)
 
 instance WriteTypeInfo (Global object) | WriteTypeInfo object
@@ -420,8 +388,7 @@ where
 		# s_unboxed_array
 			= size unboxed_array
 		# tcl_file
-			= fwritei s_unboxed_array tcl_file
-			
+			= fwritei s_unboxed_array tcl_file			
 		= write_type_info_loop 0 s_unboxed_array tcl_file wtis
 	where 
 
@@ -461,4 +428,3 @@ where
 		# (tcl_file,wtis)
 			= write_type_info c2 tcl_file wtis
 		= (tcl_file,wtis)
-
