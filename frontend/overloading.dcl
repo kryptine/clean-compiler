@@ -9,7 +9,7 @@ import syntax, check, typesupport
 
 ::	ArrayInstance =
 	{	ai_record		:: !TypeSymbIdent
-	,	ai_members		:: !{# DefinedSymbol}
+	,	ai_members		:: !{#ClassInstanceMember}
 	}
 
 ::	GlobalTCInstance =

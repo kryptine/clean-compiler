@@ -1052,12 +1052,12 @@ where
 		adjust_strict_list_members i members backEnd
 			| i<size members
 				# member=members.[i]
-				# member_name=member.ds_ident.id_name
+				# member_name=member.cim_ident.id_name
 				| size member_name>1 && member_name.[1]=='c' // && trace_tn ("member: "+++member_name)
-					# (ft_type,backEnd) = read_from_var_heap std_strict_lists.dcl_functions.[member.ds_index].ft_type_ptr backEnd
+					# (ft_type,backEnd) = read_from_var_heap std_strict_lists.dcl_functions.[member.cim_index].ft_type_ptr backEnd
 					= case ft_type of
 						VI_ExpandedType _
-							# backEnd=appBackEnd (BEAdjustStrictListConsInstance member.ds_index std_strict_list_module_index) backEnd
+							# backEnd=appBackEnd (BEAdjustStrictListConsInstance member.cim_index std_strict_list_module_index) backEnd
 							-> adjust_strict_list_members (i+1) members backEnd
 						_
 							-> adjust_strict_list_members (i+1) members backEnd					
@@ -1166,15 +1166,15 @@ adjustArrayFunctions array_first_instance_indices predefs main_dcl_module_n func
 						adjustArrayClassInstance arrayInfo {ins_members, ins_ident}
 							=	foldStateWithIndexA (adjustMember arrayInfo) ins_members
 						where
-							adjustMember :: AdjustStdArrayInfo Int DefinedSymbol -> BackEnder
-							adjustMember {asai_moduleIndex, asai_mapping, asai_funs} offset {ds_index}
+							adjustMember :: AdjustStdArrayInfo Int ClassInstanceMember -> BackEnder
+							adjustMember {asai_moduleIndex, asai_mapping, asai_funs} offset {cim_index}
 								| asai_moduleIndex == main_dcl_module_n
-									=	beAdjustArrayFunction asai_mapping.[offset] ds_index asai_moduleIndex
+									=	beAdjustArrayFunction asai_mapping.[offset] cim_index asai_moduleIndex
 								// otherwise
-									= \be0 ->	let (ft_type,be) = read_from_var_heap asai_funs.[ds_index].ft_type_ptr be0 in
+									= \be0 ->	let (ft_type,be) = read_from_var_heap asai_funs.[cim_index].ft_type_ptr be0 in
 										(case ft_type of
 											VI_ExpandedType _
-												->	beAdjustArrayFunction asai_mapping.[offset] ds_index asai_moduleIndex
+												->	beAdjustArrayFunction asai_mapping.[offset] cim_index asai_moduleIndex
 											_
 												->	identity) be
 

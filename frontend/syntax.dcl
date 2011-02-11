@@ -450,9 +450,15 @@ cNameLocationDependent :== True
  	{	ins_class		:: !Global DefinedSymbol
 	,	ins_ident		:: !Ident
 	,	ins_type		:: !InstanceType
-	,	ins_members		:: !{# DefinedSymbol}
+	,	ins_members		:: !{#ClassInstanceMember}
 	,	ins_specials	:: !Specials
 	,	ins_pos			:: !Position
+	}
+
+::	ClassInstanceMember = 
+	{	cim_ident		:: !Ident
+	,	cim_arity		:: !Int		// module number if cim_index<0
+	,	cim_index		:: !Index	// or -1-index
 	}
 
 ::	Import from_symbol =

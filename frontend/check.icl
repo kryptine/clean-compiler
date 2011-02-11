@@ -111,19 +111,21 @@ checkSpecialsOfInstances mod_index first_mem_index [class_inst=:{ins_members,ins
 			-> checkSpecialsOfInstances mod_index first_mem_index class_insts next_inst_index [class_inst : all_class_instances]
 					all_specials new_inst_defs all_spec_types heaps predef_symbols error
 where
-	check_and_build_members :: !Index !Index !Int {# DefinedSymbol} !Int !Index ![DefinedSymbol] ![FunType] !{#FunType} !*{! [Special]} !*Heaps !*PredefinedSymbols !*ErrorAdmin
-		-> (!Index, ![DefinedSymbol], ![FunType], !*{! [Special]}, !*Heaps, !*PredefinedSymbols,!*ErrorAdmin)
+	check_and_build_members :: !Index !Index !Int {#ClassInstanceMember} !Int !Index ![ClassInstanceMember] ![FunType] !{#FunType}
+					!*{![Special]} !*Heaps !*PredefinedSymbols !*ErrorAdmin
+		-> (!Index,![ClassInstanceMember],![FunType],
+					!*{![Special]},!*Heaps,!*PredefinedSymbols,!*ErrorAdmin)
 	check_and_build_members mod_index first_mem_index member_offset ins_members type_offset next_inst_index rev_mem_specials all_specials inst_spec_defs
 			all_spec_types heaps predef_symbols error
 		| member_offset < size ins_members
 			# member = ins_members.[member_offset]
-			  member_index = member.ds_index
+			  member_index = member.cim_index
 			  spec_member_index = member_index - first_mem_index
 		 	# (spec_types, all_spec_types) = all_spec_types![spec_member_index]
 		 	# mem_inst = inst_spec_defs.[spec_member_index]
 		 	  (SP_Substitutions specials) = mem_inst.ft_specials
 		 	  env = specials !! type_offset
-			  member = { member & ds_index = next_inst_index }
+			  member = {member & cim_index = next_inst_index}
 			  (spec_type, (next_inst_index, all_specials, heaps, predef_symbols,error))
 			  		= checkSpecial mod_index mem_inst member_index env (next_inst_index, all_specials, heaps, predef_symbols,error)
 			  all_spec_types = { all_spec_types & [spec_member_index] = [ spec_type : spec_types] }
@@ -273,7 +275,7 @@ where
 			// otherwise
 				= (instance_types, class_defs, member_defs, generic_defs, type_defs, modules, var_heap, type_heaps, cs)
 */
-	check_icl_instance_members :: !Index !Index !Int !Int !{#DefinedSymbol} !{#DefinedSymbol} Ident !Position !InstanceType ![(Index,SymbolType)]
+	check_icl_instance_members :: !Index !Index !Int !Int !{#ClassInstanceMember} !{#DefinedSymbol} Ident !Position !InstanceType ![(Index,SymbolType)]
 		!v:{# MemberDef} !blah:{# CheckedTypeDef} !u:{# DclModule} !*VarHeap !*TypeHeaps !*CheckState
 			-> (![(Index,SymbolType)], !v:{# MemberDef}, !blah:{# CheckedTypeDef}, !u:{# DclModule},!*VarHeap, !*TypeHeaps, !*CheckState)
 
@@ -284,11 +286,11 @@ where
 			# ins_member = ins_members.[mem_offset]
 			  class_member = class_members.[mem_offset]
 			  cs = setErrorAdmin (newPosition class_ident ins_pos) cs
-			| ins_member.ds_ident <> class_member.ds_ident
+			| ins_member.cim_ident <> class_member.ds_ident
 				= check_icl_instance_members module_index member_mod_index (inc mem_offset) class_size ins_members class_members class_ident ins_pos ins_type 
 						instance_types member_defs type_defs modules var_heap type_heaps
 							{ cs & cs_error = checkError class_member.ds_ident "instance of class member expected" cs.cs_error}
-			| ins_member.ds_arity <> class_member.ds_arity
+			| ins_member.cim_arity <> class_member.ds_arity
 				= check_icl_instance_members module_index member_mod_index (inc mem_offset) class_size ins_members class_members class_ident ins_pos ins_type
 						instance_types member_defs type_defs modules var_heap type_heaps
 							{ cs & cs_error = checkError class_member.ds_ident "used with wrong arity" cs.cs_error}
@@ -297,7 +299,7 @@ where
 				  		= determineTypeOfMemberInstance me_type me_class_vars ins_type SP_None type_heaps (Yes (modules, type_defs, x_main_dcl_module_n)) cs.cs_error
 				  (st_context, var_heap) = initializeContextVariables instance_type.st_context var_heap
 				= check_icl_instance_members module_index member_mod_index (inc mem_offset) class_size ins_members class_members class_ident ins_pos ins_type
-						[ (ins_member.ds_index, { instance_type & st_context = st_context }) : instance_types ] member_defs type_defs modules var_heap type_heaps { cs & cs_error = cs_error }
+						[ (ins_member.cim_index, { instance_type & st_context = st_context }) : instance_types ] member_defs type_defs modules var_heap type_heaps { cs & cs_error = cs_error }
 
 
 getClassDef :: !(Global DefinedSymbol) !Int !u:{#ClassDef} !v:{#DclModule} -> (!ClassDef,!u:{#ClassDef},!v:{#DclModule})
@@ -540,12 +542,13 @@ where
 
 	determine_dcl_instance_symbols_and_types :: !Index !Index !Index !Index !Index !Int !{#DefinedSymbol} !InstanceType !Specials Ident !Position
 			!w:{#MemberDef} !u:{#DclModule} !*TypeHeaps !*VarHeap !*ErrorAdmin
-					-> (![DefinedSymbol], ![FunType], !w:{#MemberDef}, !u:{#DclModule}, !*TypeHeaps, !*VarHeap, !.ErrorAdmin)
+					-> (![ClassInstanceMember], ![FunType], !w:{#MemberDef}, !u:{#DclModule}, !*TypeHeaps, !*VarHeap, !.ErrorAdmin)
 	determine_dcl_instance_symbols_and_types x_main_dcl_module_n first_inst_index mem_offset module_index member_mod_index class_size class_members
 			ins_type ins_specials class_ident ins_pos member_defs modules type_heaps var_heap cs_error
 		| mem_offset == class_size
 			=  ([], [], member_defs, modules, type_heaps, var_heap, cs_error)
 			# class_member = class_members.[mem_offset]
+			  class_instance_member = {cim_ident=class_member.ds_ident, cim_arity=class_member.ds_arity, cim_index = first_inst_index +  mem_offset}
 			  ({me_ident,me_type,me_priority,me_class_vars}, member_defs, modules) = getMemberDef member_mod_index class_member.ds_index module_index member_defs modules
 			  cs_error = pushErrorAdmin (newPosition class_ident ins_pos) cs_error
 			  (instance_type, new_ins_specials, type_heaps, Yes (modules, _), cs_error)
@@ -556,7 +559,7 @@ where
 			  (inst_symbols, memb_inst_defs, member_defs, modules, type_heaps, var_heap, cs_error)
 			  		= determine_dcl_instance_symbols_and_types x_main_dcl_module_n first_inst_index (inc mem_offset) module_index member_mod_index
 			  				class_size class_members ins_type ins_specials class_ident ins_pos member_defs modules type_heaps var_heap cs_error
-			= ([{ class_member & ds_index = first_inst_index +  mem_offset } : inst_symbols], [inst_def : memb_inst_defs], member_defs, modules, type_heaps, var_heap, cs_error)
+			= ([class_instance_member : inst_symbols], [inst_def : memb_inst_defs], member_defs, modules, type_heaps, var_heap, cs_error)
 
 	check_instance_specials :: !Index !ClassInstance !Index !Specials !Index ![ClassInstance] !*TypeHeaps !*PredefinedSymbols !*ErrorAdmin
 		-> (!Specials, !Index, ![ClassInstance], !*TypeHeaps, !*PredefinedSymbols,!*ErrorAdmin)
@@ -2033,7 +2036,7 @@ renumber_icl_module_functions mod_type icl_global_function_range icl_instance_ra
 				| mem_index < size dcl_members
 					# dcl_member = dcl_members.[mem_index]
 					# icl_member = icl_members.[mem_index]
-					# new_table = {new_table & [dcl_member.ds_index] = icl_member.ds_index}
+					# new_table = {new_table & [dcl_member.cim_index] = icl_member.cim_index}
 					= build_conversion_table_for_instances_of_members (inc mem_index) dcl_members icl_members new_table
 					= new_table
 
@@ -2054,7 +2057,7 @@ renumber_icl_module_functions mod_type icl_global_function_range icl_instance_ra
 				renumber_member_indexes_of_class_instances class_inst_index class_instances
 					| class_inst_index < size class_instances
 						# (class_instance,class_instances) = class_instances![class_inst_index]
-						# new_members = {{icl_member & ds_index=function_conversion_table.[icl_member.ds_index]} \\ icl_member<-:class_instance.ins_members}
+						# new_members = {{icl_member & cim_index=function_conversion_table.[icl_member.cim_index]} \\ icl_member<-:class_instance.ins_members}
 						# class_instances = {class_instances & [class_inst_index]={class_instance & ins_members=new_members}}
 						= renumber_member_indexes_of_class_instances (class_inst_index+1) class_instances
 						= class_instances
@@ -2212,7 +2215,7 @@ check_module1 cdefs icl_global_function_range fun_defs optional_dcl_mod optional
 
 		determine_indexes_of_members [{fun_ident,fun_arity}:members] next_fun_index
 			#! (member_symbols, last_fun_index) = determine_indexes_of_members members (inc next_fun_index)
-			= ([{ds_ident = fun_ident, ds_index = next_fun_index, ds_arity = fun_arity} : member_symbols], last_fun_index)
+			= ([{cim_ident = fun_ident, cim_index = next_fun_index, cim_arity = fun_arity} : member_symbols], last_fun_index)
 		determine_indexes_of_members [] next_fun_index
 			= ([], next_fun_index)
 
@@ -2595,13 +2598,13 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 					# fun_defs = iFoldSt (make_instance_strict ins_members offset_table) 0 (size ins_members) fun_defs
 					= (class_instances, fun_defs, predef_symbols)
 					= (class_instances, fun_defs, predef_symbols)
-			
-			make_instance_strict :: !{#DefinedSymbol} !{#Index} !Int !*{# FunDef} -> *{# FunDef}
+
+			make_instance_strict :: !{#ClassInstanceMember} !{#Index} !Int !*{# FunDef} -> *{# FunDef}
 			make_instance_strict instances offset_table ins_offset instance_defs
-				# {ds_index} = instances.[ins_offset]
-				  (inst_def, instance_defs) = instance_defs![ds_index]
+				# {cim_index} = instances.[ins_offset]
+				  (inst_def, instance_defs) = instance_defs![cim_index]
 				  (Yes symbol_type) = inst_def.fun_type
-				= { instance_defs & [ds_index] = { inst_def & fun_type = Yes (makeElemTypeOfArrayFunctionStrict symbol_type ins_offset offset_table) } }
+				= {instance_defs & [cim_index] = {inst_def & fun_type = Yes (makeElemTypeOfArrayFunctionStrict symbol_type ins_offset offset_table)}}
 
 		checkSpecifiedInstanceType (index_of_member_fun, derived_symbol_type) (icl_functions, type_heaps, cs_error)
 			# ({fun_type, fun_pos, fun_ident}, icl_functions) = icl_functions![index_of_member_fun]
@@ -3166,13 +3169,13 @@ checkInstancesOfDclModule mod_index	(nr_of_dcl_functions_and_instances, nr_of_dc
 				# fun_types = iFoldSt (make_instance_strict ins_members offset_table) 0 (size ins_members) fun_types
 				= (class_instances, fun_types, predef_symbols)
 				= (class_instances, fun_types, predef_symbols)
-		
-		make_instance_strict :: !{#DefinedSymbol} !{#Index} !Int !*{# FunType} -> *{# FunType}
+
+		make_instance_strict :: !{#ClassInstanceMember} !{#Index} !Int !*{# FunType} -> *{# FunType}
 		make_instance_strict instances offset_table ins_offset instance_defs
-			# {ds_index} = instances.[ins_offset]
-			  (inst_def, instance_defs) = instance_defs![ds_index]
+			# {cim_index} = instances.[ins_offset]
+			  (inst_def, instance_defs) = instance_defs![cim_index]
 			  (Yes symbol_type) = inst_def.ft_type
-			= { instance_defs & [ds_index] = { inst_def & ft_type =  makeElemTypeOfArrayFunctionStrict inst_def.ft_type ins_offset offset_table } }
+			= {instance_defs & [cim_index] = {inst_def & ft_type = makeElemTypeOfArrayFunctionStrict inst_def.ft_type ins_offset offset_table}}
 
 checkPredefinedDclModule :: !NumberSet ![Int] !(IntKeyHashtable SolvedImports) !Int !Bool !LargeBitvect !Bool
 							!(Module (CollectedDefinitions ClassInstance)) !Index !*ExplImpInfos !*{#DclModule} !*{#*{#FunDef}} !*Heaps !*CheckState
