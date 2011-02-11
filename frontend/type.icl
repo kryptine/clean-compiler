@@ -1,7 +1,7 @@
 implementation module type
 
 import StdEnv
-import syntax, typesupport, check, analtypes, overloading, unitype, refmark, predef, utilities, compare_constructor // , RWSDebug
+import syntax, typesupport, check, analtypes, overloading, unitype, refmark, predef, utilities, compare_constructor
 import compilerSwitches
 import genericsupport
 
@@ -187,16 +187,14 @@ where
 			= tv_number == var_id
 	containsTypeVariable var_id (arg_type --> res_type) subst
 		= containsTypeVariable var_id arg_type subst || containsTypeVariable var_id res_type subst
-//AA..
-	containsTypeVariable var_id (TArrow1 arg_type) subst
-		= containsTypeVariable var_id arg_type subst
-//..AA
 	containsTypeVariable var_id (TA cons_id cons_args) subst
 		= containsTypeVariable var_id cons_args subst
 	containsTypeVariable var_id (TAS cons_id cons_args _) subst
 		= containsTypeVariable var_id cons_args subst
 	containsTypeVariable var_id (type :@: types) subst
 		= containsTypeVariable var_id type subst || containsTypeVariable var_id types subst
+	containsTypeVariable var_id (TArrow1 arg_type) subst
+		= containsTypeVariable var_id arg_type subst
 	containsTypeVariable _ _ _
 		= False
 
@@ -442,14 +440,12 @@ simplifyTypeApplication (TempV tv_number) type_args
 	= (True, TempCV tv_number :@: type_args)
 simplifyTypeApplication (TempQV tv_number) type_args
 	= (True, TempQCV tv_number :@: type_args)
-//AA..
 simplifyTypeApplication TArrow [type1, type2] 
 	= (True, type1 --> type2)
 simplifyTypeApplication TArrow [type] 
 	= (True, TArrow1 type)
 simplifyTypeApplication (TArrow1 type1) [type2] 
 	= (True, type1 --> type2)
-//..AA
 simplifyTypeApplication type type_args
 	= (False, type)
 
@@ -495,7 +491,6 @@ unifyCVwithType is_exist tv_number type_args type=:(TAS type_cons cons_args stri
 		    = (False, subst, heaps)
 		= (False, subst, heaps)
 
-// AA..
 unifyCVwithType is_exist tv_number [type_arg1, type_arg2] type=:(atype1 --> atype2) modules subst heaps
 	# (succ, subst, heaps) = unify (type_arg1, type_arg2) (atype1, atype2) modules subst heaps
 	| succ
@@ -519,7 +514,6 @@ unifyCVwithType is_exist tv_number [] type=:(TArrow1 atype) modules subst heaps
 
 unifyCVwithType is_exist tv_number [] TArrow modules subst heaps
 	= unifyTypes (toTV is_exist tv_number) TA_Multi TArrow TA_Multi modules subst heaps
-// ..AA 		
 
 unifyCVwithType is_exist tv_number type_args type modules subst heaps
 	= (False, subst, heaps)
@@ -944,7 +938,7 @@ freshInequality {ai_demanded,ai_offered} attr_heap
 	  (av_off_info, attr_heap) = readPtr ai_offered.av_info_ptr attr_heap
 	  (AVI_Attr (TA_TempVar dem_attr_var)) = av_dem_info
 	  (AVI_Attr (TA_TempVar off_attr_var)) = av_off_info
-	= ({ac_demanded = dem_attr_var, ac_offered = off_attr_var}, attr_heap) // <<- (av_dem_info,av_off_info)
+	= ({ac_demanded = dem_attr_var, ac_offered = off_attr_var}, attr_heap)
 	
 freshEnvironment [ineq : ineqs] attr_heap
 	# (fresh_ineq, attr_heap) = freshInequality ineq attr_heap
@@ -2769,7 +2763,7 @@ where
 			convert_array_instance class_members array_members unboxed_array_type offset_table {ai_record,ai_members} funs_heaps_and_error
 				= create_instance_types class_members array_members unboxed_array_type offset_table (TA ai_record []) (size class_members) funs_heaps_and_error
 			where
-				first_instance_index=ai_members.[0].ds_index
+				first_instance_index=ai_members.[0].cim_index
 				
 				create_instance_types :: {#DefinedSymbol} {#MemberDef} Type {#Int} Type !Int !(!*{#FunDef}, !*TypeHeaps, !*ErrorAdmin)
 					-> (!*{#FunDef}, !*TypeHeaps, !*ErrorAdmin);
@@ -2812,7 +2806,7 @@ where
 			convert_list_instance class_members list_members {ai_record,ai_members} funs_heaps_and_error
 				= create_instance_types class_members list_members (TA ai_record []) (size class_members) funs_heaps_and_error
 			where
-				first_instance_index=ai_members.[0].ds_index
+				first_instance_index=ai_members.[0].cim_index
 				
 				create_instance_types :: {#DefinedSymbol} {#MemberDef} Type !Int !(!*{#FunDef}, !*TypeHeaps, !*ErrorAdmin)
 					-> (!*{#FunDef}, !*TypeHeaps, !*ErrorAdmin)
@@ -2842,7 +2836,7 @@ where
 					= ({fun_defs & [fun_index]=fun}, type_heaps, error)
 	
 		first_instance_indices instances
-			= [ai_members.[0].ds_index \\ {ai_members}<-instances]
+			= [ai_members.[0].cim_index \\ {ai_members}<-instances]
 	
 	create_erroneous_function_types group ts
 		= foldSt create_erroneous_function_type group ts

@@ -14,7 +14,7 @@ import genericsupport, compilerSwitches, type_io_common
 	{	rc_class			:: !Global DefinedSymbol
 	,	rc_types			:: ![Type]
 	,	rc_inst_module		:: !Index
-	,	rc_inst_members		:: !{# DefinedSymbol}
+	,	rc_inst_members		:: !{#ClassInstanceMember}
 	,	rc_red_contexts		:: ![ClassApplication]
 	}
 
@@ -398,7 +398,7 @@ where
 	is_unboxed_array _ predef_symbols
 		= False
 
-	check_unboxed_array_type :: Int Int (Global DefinedSymbol) {#DefinedSymbol} ![Type] {#DefinedSymbol} {#CommonDefs} *SpecialInstances *(*PredefinedSymbols,*TypeHeaps) *ErrorAdmin
+	check_unboxed_array_type :: Int Int (Global DefinedSymbol) {#ClassInstanceMember} ![Type] {#DefinedSymbol} {#CommonDefs} *SpecialInstances *(*PredefinedSymbols,*TypeHeaps) *ErrorAdmin
 		-> (ReducedContext,*SpecialInstances,(*PredefinedSymbols,*TypeHeaps), *ErrorAdmin)
 	check_unboxed_array_type main_dcl_module_n ins_module ins_class ins_members types=:[ _, elem_type :_] class_members defs special_instances predef_symbols_type_heaps error
 		# (unboxable, opt_record, predef_symbols_type_heaps) = try_to_unbox elem_type defs predef_symbols_type_heaps
@@ -414,7 +414,7 @@ where
 			= ({ rc_class = ins_class, rc_inst_module = ins_module, rc_inst_members = ins_members, rc_red_contexts = [], rc_types = types },
 					special_instances, predef_symbols_type_heaps, unboxError "Array" elem_type error)
 	where
-		add_record_to_array_instances :: !TypeSymbIdent !{# DefinedSymbol} !*SpecialInstances -> (!{#DefinedSymbol},!*SpecialInstances)
+		add_record_to_array_instances :: !TypeSymbIdent !{#DefinedSymbol} !*SpecialInstances -> (!{#ClassInstanceMember},!*SpecialInstances)
 		add_record_to_array_instances record members special_instances=:{si_next_array_member_index,si_array_instances}
 			# may_be_there = look_up_array_or_list_instance record si_array_instances
 			= case may_be_there of
@@ -425,7 +425,7 @@ where
 					-> (inst.ai_members, { special_instances &  si_next_array_member_index = si_next_array_member_index + size members,
 																si_array_instances = [ inst : si_array_instances ] })
 
-	check_unboxed_list_type :: Int Int (Global DefinedSymbol) {#DefinedSymbol} ![Type] {#DefinedSymbol} {#CommonDefs} *SpecialInstances *(*PredefinedSymbols,*TypeHeaps) *ErrorAdmin
+	check_unboxed_list_type :: Int Int (Global DefinedSymbol) {#ClassInstanceMember} ![Type] {#DefinedSymbol} {#CommonDefs} *SpecialInstances *(*PredefinedSymbols,*TypeHeaps) *ErrorAdmin
 		-> (ReducedContext,*SpecialInstances,(*PredefinedSymbols,*TypeHeaps), *ErrorAdmin)
 	check_unboxed_list_type main_dcl_module_n ins_module ins_class ins_members types=:[elem_type:_] class_members defs special_instances predef_symbols_type_heaps error
 		# (unboxable, opt_record, predef_symbols_type_heaps) = try_to_unbox elem_type defs predef_symbols_type_heaps
@@ -441,7 +441,7 @@ where
 			= ({ rc_class = ins_class, rc_inst_module = ins_module, rc_inst_members = ins_members, rc_red_contexts = [], rc_types = types },
 					special_instances, predef_symbols_type_heaps, unboxError "UList" elem_type error)
 	where
-		add_record_to_list_instances :: !TypeSymbIdent !{# DefinedSymbol} !*SpecialInstances -> (!{#DefinedSymbol},!*SpecialInstances)
+		add_record_to_list_instances :: !TypeSymbIdent !{#DefinedSymbol} !*SpecialInstances -> (!{#ClassInstanceMember},!*SpecialInstances)
 		add_record_to_list_instances record members special_instances=:{si_next_array_member_index,si_list_instances}
 			# may_be_there = look_up_array_or_list_instance record si_list_instances
 			= case may_be_there of
@@ -452,7 +452,7 @@ where
 					-> (inst.ai_members, { special_instances &  si_next_array_member_index = si_next_array_member_index + size members,
 																si_list_instances = [ inst : si_list_instances ] })
 
-	check_unboxed_tail_strict_list_type :: Int Int (Global DefinedSymbol) {#DefinedSymbol} ![Type] {#DefinedSymbol} {#CommonDefs} *SpecialInstances *(*PredefinedSymbols,*TypeHeaps) *ErrorAdmin
+	check_unboxed_tail_strict_list_type :: Int Int (Global DefinedSymbol) {#ClassInstanceMember} ![Type] {#DefinedSymbol} {#CommonDefs} *SpecialInstances *(*PredefinedSymbols,*TypeHeaps) *ErrorAdmin
 		-> (ReducedContext,*SpecialInstances,(*PredefinedSymbols,*TypeHeaps), *ErrorAdmin)
 	check_unboxed_tail_strict_list_type main_dcl_module_n ins_module ins_class ins_members types=:[elem_type:_] class_members defs special_instances predef_symbols_type_heaps error
 		# (unboxable, opt_record, predef_symbols_type_heaps) = try_to_unbox elem_type defs predef_symbols_type_heaps
@@ -468,7 +468,7 @@ where
 			= ({ rc_class = ins_class, rc_inst_module = ins_module, rc_inst_members = ins_members, rc_red_contexts = [], rc_types = types },
 					special_instances, predef_symbols_type_heaps, unboxError "UTSList" elem_type error)
 	where
-		add_record_to_tail_strict_list_instances :: !TypeSymbIdent !{# DefinedSymbol} !*SpecialInstances -> (!{#DefinedSymbol},!*SpecialInstances)
+		add_record_to_tail_strict_list_instances :: !TypeSymbIdent !{#DefinedSymbol} !*SpecialInstances -> (!{#ClassInstanceMember},!*SpecialInstances)
 		add_record_to_tail_strict_list_instances record members special_instances=:{si_next_array_member_index,si_tail_strict_list_instances}
 			# may_be_there = look_up_array_or_list_instance record si_tail_strict_list_instances
 			= case may_be_there of
@@ -478,7 +478,6 @@ where
 					# inst = new_array_instance record members si_next_array_member_index
 					-> (inst.ai_members, { special_instances &  si_next_array_member_index = si_next_array_member_index + size members,
 																si_tail_strict_list_instances = [ inst : si_tail_strict_list_instances ] })
-
 
 	try_to_unbox ::  Type !{#CommonDefs} (!*PredefinedSymbols, !*TypeHeaps) -> (!Bool, !Optional TypeSymbIdent, !(!*PredefinedSymbols, !*TypeHeaps))
 	try_to_unbox (TB _) _ predef_symbols_type_heaps
@@ -517,9 +516,9 @@ where
 	
 	new_array_instance :: !TypeSymbIdent !{# DefinedSymbol} !Index -> ArrayInstance
 	new_array_instance record members next_member_index
-		= {	ai_members = { { class_member & ds_index = next_inst_index } \\ class_member <-: members & next_inst_index <- [next_member_index .. ]},
+		= {	ai_members = { {cim_ident=ds_ident,cim_arity=ds_arity,cim_index=next_inst_index} \\ {ds_ident,ds_arity} <-: members & next_inst_index <- [next_member_index .. ]},
 			ai_record = record }
-				
+
 	disallow_abstract_types_in_dynamics :: {#CommonDefs} (Global Index) *ErrorAdmin ->  *ErrorAdmin
 	disallow_abstract_types_in_dynamics defs type_index=:{glob_module,glob_object} error
 		| cPredefinedModuleIndex == glob_module
@@ -904,7 +903,10 @@ where
 	find_instance_of_member :: (Global Int) Int ReducedContexts -> ((Global Int),[ClassApplication])
 	find_instance_of_member me_class me_offset { rcs_class_context = {rc_class, rc_inst_module, rc_inst_members, rc_red_contexts}, rcs_constraints_contexts}
 		| rc_class.glob_module == me_class.glob_module && rc_class.glob_object.ds_index == me_class.glob_object
-			= ({ glob_module = rc_inst_module, glob_object = rc_inst_members.[me_offset].ds_index }, rc_red_contexts)
+			# {cim_index,cim_arity} = rc_inst_members.[me_offset]
+			| cim_index<0
+				= ({ glob_module = cim_arity, glob_object = -1 - cim_index }, rc_red_contexts)
+				= ({ glob_module = rc_inst_module, glob_object = cim_index }, rc_red_contexts)
 			= find_instance_of_member_in_constraints me_class me_offset rcs_constraints_contexts
 	where
 		find_instance_of_member_in_constraints me_class me_offset [ CA_Instance rcs=:{rcs_constraints_contexts} : rcss ]
@@ -1003,14 +1005,18 @@ where
 			| mem_offset == 0
 				= dictionary_args
 				# mem_offset = dec mem_offset
-				  {ds_ident,ds_index} = ins_members.[mem_offset]
-				  mem_expr =  App { app_symb = {
-				  							symb_ident = ds_ident,
-				  							symb_kind = SK_Function { glob_object = ds_index, glob_module = mod_index }
-											},
-									app_args = class_arguments,
-									app_info_ptr = nilPtr }
-				= build_class_members mem_offset ins_members mod_index class_arguments arity [ mem_expr : dictionary_args ]
+				  {cim_ident,cim_index,cim_arity} = ins_members.[mem_offset]
+				| cim_index<0
+					# mem_expr =  App { app_symb = { symb_ident = cim_ident,
+						  							 symb_kind = SK_Function {glob_object = -1 - cim_index, glob_module = cim_arity} },
+										app_args = class_arguments,
+										app_info_ptr = nilPtr }
+					= build_class_members mem_offset ins_members mod_index class_arguments arity [mem_expr : dictionary_args]
+					# mem_expr =  App { app_symb = { symb_ident = cim_ident,
+						  							 symb_kind = SK_Function {glob_object = cim_index, glob_module = mod_index} },
+										app_args = class_arguments,
+										app_info_ptr = nilPtr }
+					= build_class_members mem_offset ins_members mod_index class_arguments arity [mem_expr : dictionary_args]
 		
 		build_dictionary class_symbol instance_types dictionary_args defs expr_heap ptrs
 			# (dict_type, dict_cons) = getDictionaryTypeAndConstructor class_symbol defs

@@ -1280,7 +1280,6 @@ where
 		-> (!GenericCaseDef,(![ClassDef], ![MemberDef], !Index, Index), !*GenericState)
 	on_gencase module_index index 
 				gencase=:{gc_ident,gc_generic, gc_type_cons} st gs=:{gs_modules, gs_td_infos}
-
 		#! (gen_def, gs_modules) = gs_modules ! [gc_generic.gi_module].com_generic_defs.[gc_generic.gi_index] 
 		#! (kind, gs_td_infos) = get_kind_of_type_cons gc_type_cons gs_td_infos
 
@@ -1665,10 +1664,8 @@ where
 		#  (Yes class_info) 
 			= lookupGenericClassInfo gc_kind gen_classes
 		
-		#! ({class_members}, modules) 
-			= modules ! [class_info.gci_module].com_class_defs.[class_info.gci_class]	
-		#! (member_def, modules) 
-			= modules ! [class_info.gci_module].com_member_defs.[class_members.[0].ds_index]
+		#! ({class_members}, modules) = modules![class_info.gci_module].com_class_defs.[class_info.gci_class]	
+		#! (member_def, modules) = modules![class_info.gci_module].com_member_defs.[class_members.[0].ds_index]
 
 		#! ins_type = 
 			{	it_vars	= case gc_type_cons of 
@@ -1691,9 +1688,8 @@ where
 						fun_index gencase fun_type 
 						fun_info fun_defs td_infos modules heaps error
 
-		#! (fun_info, ins_info, heaps)
-			= build_instance_and_member module_index class_info.gci_class gencase fun_type ins_type fun_info ins_info heaps  
-		
+		#! ins_info = build_exported_class_instance class_info.gci_class gencase module_index ins_type ins_info
+
 		= (dcl_functions, modules, (fun_info, ins_info, fun_defs, td_infos, heaps, error))
 
 	build_shorthand_instances module_index gc_index gencase=:{gc_kind=KindConst} st	
@@ -1817,26 +1813,22 @@ where
 			build_generic_info_expr heaps				
 				= buildPredefConsApp PD_NoGenericInfo [] gs_predefs heaps
 
-		build_class_instance this_kind class_index gencase member_fun_ds ins_type (ins_index, instances) 
-			
-			# {gc_pos, gc_ident, gc_kind} = gencase
-			
+		build_class_instance this_kind class_index gencase {ds_ident,ds_arity,ds_index} ins_type (ins_index, instances) 
+			# {gc_pos, gc_ident, gc_kind} = gencase			
 			#! class_ident = genericIdentToClassIdent gc_ident.id_name this_kind		
 			#! class_ds = {ds_index = class_index, ds_arity=1, ds_ident=class_ident}
 			#! ins = 
 			 	{	ins_class 	= {glob_module=gs_main_module, glob_object=class_ds}
 				,	ins_ident 	= class_ident
 				,	ins_type 	= ins_type
-				,	ins_members	= {member_fun_ds}
+				,	ins_members	= {{cim_ident=ds_ident,cim_arity=ds_arity,cim_index=ds_index}}
 				,	ins_specials = SP_None
 				,	ins_pos		= gc_pos
 				}
-			
 			= (inc ins_index, [ins:instances])
 
 	get_generic_info {gi_module, gi_index} modules heaps=:{hp_generic_heap}
-		#! ({gen_info_ptr}, modules) 
-			= modules ! [gi_module] . com_generic_defs . [gi_index]
+		#! ({gen_info_ptr}, modules) = modules![gi_module].com_generic_defs.[gi_index]
 		#! (gen_info, hp_generic_heap) = readPtr gen_info_ptr hp_generic_heap	
 		= (gen_info, modules, {heaps & hp_generic_heap = hp_generic_heap})
 
@@ -1906,62 +1898,21 @@ where
 				# group = {group_members=[fun_index]}
 				  funs_and_groups = {funs_and_groups & fg_group_index=fg_group_index+1,fg_groups=[group:fg_groups]}
 				-> (funs_and_groups, fun_defs, td_infos, modules, heaps, error)
-	
-	// build wrapping instance for the generic case function
-	build_instance_and_member :: !Index !Index !GenericCaseDef !SymbolType !InstanceType !FunsAndGroups (!Index, ![ClassInstance]) !*Heaps
-		-> (!FunsAndGroups, (!Index, ![ClassInstance]), !*Heaps)
-	build_instance_and_member module_index class_index gencase symbol_type ins_type fun_info ins_info heaps
-		#! (memfun_ds, fun_info, heaps) 
-			= build_instance_member module_index gencase symbol_type fun_info heaps
-		#! ins_info = build_class_instance class_index gencase memfun_ds ins_type ins_info
-		= (fun_info, ins_info, heaps)
-	where
-		
-		// Creates a function that just calls the generic case function
-		// It is needed because the instance member must be in the same
-		// module as the instance itself
-		build_instance_member module_index gencase st fun_info heaps
-		
-			# {gc_ident, gc_pos, gc_type_cons, gc_kind, gc_body=GCB_FunIndex fun_index} = gencase
-			#! arg_var_names = ["x" +++ toString i \\ i <- [1..st.st_arity]]
-			#! (arg_var_exprs, arg_vars, heaps) = buildVarExprs arg_var_names heaps
-		
-			#! (expr_info_ptr, hp_expression_heap) = newPtr EI_Empty heaps.hp_expression_heap
-			#! heaps = {heaps & hp_expression_heap = hp_expression_heap}
-			#! fun_name = genericIdentToFunIdent gc_ident.id_name gc_type_cons
-			#! expr = App 
-				{ app_symb = 
-					{ symb_ident=fun_name
-					, symb_kind=SK_Function {glob_module=module_index, glob_object=fun_index}
-					}
-				, app_args = arg_var_exprs
-				, app_info_ptr = expr_info_ptr
-				}
-		
-			#! (st, heaps) = fresh_symbol_type st heaps
-		
-			#! memfun_name = genericIdentToMemberIdent gc_ident.id_name gc_kind
-			#! (fun_ds, fun_info) 
-				= buildFunAndGroup memfun_name arg_vars expr (Yes st) gs_main_module gc_pos fun_info
-			= (fun_ds, fun_info, heaps)
-		
-	build_class_instance class_index gencase member_fun_ds ins_type (ins_index, instances) 
-		
-		# {gc_pos, gc_ident, gc_kind} = gencase
-		
-		#! class_ident = genericIdentToClassIdent gc_ident.id_name gc_kind
-		#! class_ds = {ds_index = class_index, ds_arity=1, ds_ident=class_ident}
+
+	build_exported_class_instance class_index {gc_ident,gc_pos,gc_type_cons,gc_kind,gc_body=GCB_FunIndex fun_index} fun_module_index ins_type (ins_index, instances)
+		# fun_ident = genericIdentToFunIdent gc_ident.id_name gc_type_cons
+		# class_ident = genericIdentToClassIdent gc_ident.id_name gc_kind
+		# class_ds = {ds_index = class_index, ds_arity=1, ds_ident=class_ident}
 		#! ins = 
 		 	{	ins_class 	= {glob_module=gs_main_module, glob_object=class_ds}
 			,	ins_ident 	= class_ident
 			,	ins_type 	= ins_type
-			,	ins_members	= {member_fun_ds}
+			,	ins_members	= {{cim_ident=fun_ident,cim_arity=fun_module_index,cim_index= -1-fun_index}}
 			,	ins_specials = SP_None
 			,	ins_pos		= gc_pos
 			}
-		
 		= (inc ins_index, [ins:instances])
-	
+
 	fresh_symbol_type :: !SymbolType !*Heaps -> (!SymbolType, !*Heaps)	
 	fresh_symbol_type st heaps=:{hp_type_heaps}
 		# (fresh_st, hp_type_heaps) = freshSymbolType st hp_type_heaps
@@ -1977,10 +1928,8 @@ buildGenericCaseBody ::
 		!FunsAndGroups, !*TypeDefInfos,!*{#CommonDefs},!*Heaps,!*ErrorAdmin)
 buildGenericCaseBody main_module_index gc=:{gc_ident, gc_pos, gc_generic, gc_type_cons=TypeConsSymb {type_ident,type_index}} st predefs
 					funs_and_groups td_infos modules heaps error
-	#! (gen_def, modules) 	
-		= modules ! [gc_generic.gi_module].com_generic_defs.[gc_generic.gi_index] 		
-	#! (td_info=:{tdi_gen_rep}, td_infos)
-		= td_infos ! [type_index.glob_module, type_index.glob_object]
+	#! (gen_def, modules) = modules![gc_generic.gi_module].com_generic_defs.[gc_generic.gi_index] 		
+	#! (td_info=:{tdi_gen_rep}, td_infos) = td_infos![type_index.glob_module,type_index.glob_object]
 	# (gen_type_rep=:{gtr_iso, gtr_type}) = case tdi_gen_rep of
 		Yes x -> x
 		No -> abort "sanity check: no generic representation\n"
@@ -2256,9 +2205,8 @@ where
 		
 	convert_context :: !Ident !Position !TypeContext (!*Modules, !*Heaps, !*ErrorAdmin)
 		-> (!Bool, !TypeContext, (!*Modules, !*Heaps, !*ErrorAdmin))	
-	convert_context fun_name fun_pos tc=:{tc_class=TCGeneric gtc=:{gtc_generic, gtc_kind, gtc_class}} (modules, heaps=:{hp_generic_heap}, error)		
-	
-		# ({gen_info_ptr}, modules) = modules ! [gtc_generic.glob_module] . com_generic_defs . [gtc_generic.glob_object.ds_index]
+	convert_context fun_name fun_pos tc=:{tc_class=TCGeneric gtc=:{gtc_generic, gtc_kind, gtc_class}} (modules, heaps=:{hp_generic_heap}, error)	
+		# ({gen_info_ptr}, modules) = modules![gtc_generic.glob_module].com_generic_defs.[gtc_generic.glob_object.ds_index]
 		# ({gen_classes}, hp_generic_heap) = readPtr gen_info_ptr hp_generic_heap		
 		# opt_class_info = lookupGenericClassInfo gtc_kind gen_classes
 		# (tc_class, error) = case opt_class_info of 
