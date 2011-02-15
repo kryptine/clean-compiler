@@ -996,7 +996,8 @@ ScanNumeral n input chars
 	| IsDigit c				= ScanNumeral (n + 1) input [c:chars]
 	| c == 'E'				= ScanExponentSign (n + 1) input [c:chars]
 	| c == '.'				= TestFraction n input chars
-							= (IntToken (revCharListToString n chars), charBack input)
+							#! s = revCharListToString n chars
+							= (IntToken s, charBack input)
 
 TestFraction :: !Int !Input ![Char] -> (!Token, !Input)
 TestFraction n input chars
@@ -1004,7 +1005,6 @@ TestFraction n input chars
 	| eof					= (ErrorToken ("Incorrect Real at end of file: "+(revCharListToString (n+1) ['.':chars])), input)
 	| IsDigit c				= ScanFraction (n + 2) input [c,'.':chars]
 			 				= (IntToken (revCharListToString n chars), charBack (charBack input))
-
 
 ScanFraction :: !Int !Input ![Char] -> (!Token, !Input)
 ScanFraction n input chars
@@ -1136,7 +1136,7 @@ ScanEndOfNoBSChar c1 input
 							= scan_CharList_or_qualified_ident c1 c input
 where
 	qualified_ident_or_CharToken :: !Char !Input -> (!Token,!Input)
-	qualified_ident_or_CharToken c input=:{inp_stream=OldLine i line stream,inp_pos}
+	qualified_ident_or_CharToken c1 input=:{inp_stream=OldLine i line stream,inp_pos}
 		| i+1<size line && line.[i]=='.'
 			# c=line.[i+1]
 			| is_ident_char c
@@ -1144,17 +1144,17 @@ where
 				  ident_name = line % (i+1,end_i-1)
 				  pos = {inp_pos & fp_col = inp_pos.fp_col + (end_i-i)}
 				  input =  {input & inp_stream=OldLine end_i line stream,inp_pos=pos}
-				= (QualifiedIdentToken {c} ident_name,input)
+				= (QualifiedIdentToken {c1} ident_name,input)
 			| c==' ' && i+2<size line && isSpecialChar line.[i+2]
 				# end_i = scan_special_chars_in_string (i+3) line
 				  ident_name = line % (i+1,end_i-1)
 				  pos = {inp_pos & fp_col = inp_pos.fp_col + (end_i-i)}
 				  input =  {input & inp_stream=OldLine end_i line stream,inp_pos=pos}
-				= (QualifiedIdentToken {c} ident_name,input)
-				= scan_char c input
-			= scan_char c input
-	qualified_ident_or_CharToken c input
-		= scan_char c input
+				= (QualifiedIdentToken {c1} ident_name,input)
+				= scan_char c1 input
+			= scan_char c1 input
+	qualified_ident_or_CharToken c1 input
+		= scan_char c1 input
 
 	scan_CharList_or_qualified_ident :: !Char !Char !Input -> (!Token, !Input)
 	scan_CharList_or_qualified_ident c1 c2 input=:{inp_stream=OldLine i line _}
@@ -1937,4 +1937,3 @@ where
 
 (-->>) val _ :== val
 //(-->>) val message :== val ---> ("Scanner",message)
-
