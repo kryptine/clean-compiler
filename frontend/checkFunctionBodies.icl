@@ -74,7 +74,8 @@ make_unboxed_list type_symbol expr_heap cs
 	# (stdStrictLists_index,cons_u_index,decons_u_index,nil_u_index,decons_u_ident,cs) = get_unboxed_list_indices_and_decons_u_ident cs
 	# unboxed_list=UnboxedList type_symbol stdStrictLists_index decons_u_index nil_u_index
 	# (new_info_ptr,expr_heap) = newPtr EI_Empty expr_heap
-	# decons_expr = App {app_symb={symb_ident=decons_u_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_u_index,glob_module=stdStrictLists_index}},app_args=[],app_info_ptr=new_info_ptr}
+	  app_symb = {symb_ident=decons_u_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_u_index,glob_module=stdStrictLists_index}}
+	# decons_expr = App {app_symb=app_symb,app_args=[],app_info_ptr=new_info_ptr}
 	= (unboxed_list,decons_expr,expr_heap,cs)
 
 get_unboxed_tail_strict_list_indices_and_decons_uts_ident :: *CheckState -> (!Index,!Index,!Index,!Index,!Ident,!*CheckState);
@@ -91,7 +92,8 @@ make_unboxed_tail_strict_list type_symbol expr_heap cs
 	# (stdStrictLists_index,cons_uts_index,decons_uts_index,nil_uts_index,decons_uts_ident,cs) = get_unboxed_tail_strict_list_indices_and_decons_uts_ident cs
 	# unboxed_list=UnboxedTailStrictList type_symbol stdStrictLists_index decons_uts_index nil_uts_index
 	# (new_info_ptr,expr_heap) = newPtr EI_Empty expr_heap
-	# decons_expr = App {app_symb={symb_ident=decons_uts_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_uts_index,glob_module=stdStrictLists_index}},app_args=[],app_info_ptr=new_info_ptr}
+	  app_symb = {symb_ident=decons_uts_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_uts_index,glob_module=stdStrictLists_index}}
+	# decons_expr = App {app_symb=app_symb,app_args=[],app_info_ptr=new_info_ptr}
 	= (unboxed_list,decons_expr,expr_heap,cs)
 
 get_overloaded_list_indices_and_decons_ident :: *CheckState -> (!Index,!Index,!Index,!Index,!Ident,!*CheckState);
@@ -108,7 +110,8 @@ make_overloaded_list type_symbol expr_heap cs
 	# (stdStrictLists_index,cons_index,decons_index,nil_index,decons_ident,cs) = get_overloaded_list_indices_and_decons_ident cs
 	# overloaded_list=OverloadedList type_symbol stdStrictLists_index decons_index nil_index
 	# (new_info_ptr,expr_heap) = newPtr EI_Empty expr_heap
-	# decons_expr = App {app_symb={symb_ident=decons_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_index,glob_module=stdStrictLists_index}},app_args=[],app_info_ptr=new_info_ptr}
+	  app_symb = {symb_ident=decons_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_index,glob_module=stdStrictLists_index}}
+	# decons_expr = App {app_symb=app_symb,app_args=[],app_info_ptr=new_info_ptr}
 	= (overloaded_list,decons_expr,expr_heap,cs)
 
 make_case_guards cons_symbol type_symbol alg_patterns expr_heap cs
@@ -195,7 +198,7 @@ where
 		  										 es_var_heap es_expr_heap dynamics_in_rhs cs
 		= ([{ ca_rhs = rhs_expr, ca_position = position } : rhs_exprs], free_vars,
 			{ e_state & es_var_heap = es_var_heap, es_expr_heap = es_expr_heap,
-			es_dynamics = dynamics_in_patterns ++ es_dynamics }, e_info, cs)
+						es_dynamics = dynamics_in_patterns ++ es_dynamics }, e_info, cs)
 	check_function_bodies free_vars fun_args [] e_input e_state e_info cs
 		= ([], free_vars, e_state, e_info, cs) 
 		
@@ -624,7 +627,7 @@ checkExpression free_vars (PE_Let strict let_locals expr) e_input=:{ei_expr_leve
 	  		= checkLhssOfLocalDefs ei_expr_level ei_mod_index let_locals ei_local_functions_index_offset e_state e_info cs
 	  e_input = { e_input & ei_expr_level = ei_expr_level }
 	  (let_expr, free_vars, e_state, e_info, cs) = checkExpression free_vars expr e_input e_state e_info cs
-	  (expr, free_vars, e_state=:{es_dynamics,es_expr_heap,es_var_heap}, e_info, cs)
+	  (expr, free_vars, e_state, e_info, cs)
 			= addArraySelections array_patterns let_expr free_vars e_input e_state e_info cs
 	  (expr, free_vars, e_state, e_info, cs) = checkRhssAndTransformLocalDefs free_vars loc_defs expr e_input e_state e_info cs
 	  (es_fun_defs, e_info, heaps, cs)
@@ -1149,42 +1152,19 @@ checkExpression free_vars (PE_QualifiedIdent module_id ident_name) e_input e_sta
 checkExpression free_vars (PE_Generic id=:{id_name,id_info} kind) e_input e_state e_info cs=:{cs_symbol_table}
 	# (entry, cs_symbol_table) = readPtr id_info cs_symbol_table
 	= check_generic_expr free_vars entry id kind e_input e_state e_info {cs & cs_symbol_table = cs_symbol_table}
-	where 
+	where
 		check_generic_expr :: ![FreeVar] !SymbolTableEntry !Ident !TypeKind !ExpressionInput !*ExpressionState !*ExpressionInfo !*CheckState
 			-> (!Expression, ![FreeVar], !*ExpressionState, !*ExpressionInfo, !*CheckState)
-		check_generic_expr 
-				free_vars entry=:{ste_kind=STE_Generic,ste_index} id  kind  
-				e_input=:{ei_mod_index} e_state 
-				e_info=:{ef_generic_defs} cs
-
-			#! (ef_generic_defs, e_state) = add_kind ste_index kind ef_generic_defs e_state
-			#! e_info = { e_info & ef_generic_defs = ef_generic_defs }  
-			= check_it free_vars ei_mod_index ste_index id kind e_input e_state e_info cs	
-		check_generic_expr 
-				free_vars entry=:{ste_kind=STE_Imported STE_Generic mod_index, ste_index} id kind  
-				e_input e_state 
-				e_info=:{ef_modules} cs
-			
-			#! (dcl_module, ef_modules) = ef_modules ! [mod_index]
-			#! (dcl_common, dcl_module) = dcl_module ! dcl_common 
-			#! (com_generic_defs, dcl_common) = dcl_common ! com_generic_defs
-			
-			#! (com_generic_defs, e_state) = add_kind ste_index kind com_generic_defs e_state
-						
-			#! dcl_common = {dcl_common & com_generic_defs = com_generic_defs}
-			#! dcl_module = {dcl_module & dcl_common = dcl_common}
-			#! ef_modules = {ef_modules & [mod_index] = dcl_module} 
-			
-			#! e_info = { e_info & ef_modules = ef_modules }
-
-			= check_it free_vars mod_index ste_index id kind e_input e_state e_info cs	
-		check_generic_expr free_vars  entry=:{ste_kind=STE_Empty} id kind  e_input e_state e_info cs=:{cs_error}
+		check_generic_expr free_vars entry=:{ste_kind=STE_Generic,ste_index} id kind e_input=:{ei_mod_index} e_state e_info cs
+			= check_it free_vars ei_mod_index ste_index id kind e_input e_state e_info cs
+		check_generic_expr free_vars entry=:{ste_kind=STE_Imported STE_Generic mod_index, ste_index} id kind e_input e_state e_info cs
+			= check_it free_vars mod_index ste_index id kind e_input e_state e_info cs
+		check_generic_expr free_vars entry=:{ste_kind=STE_Empty} id kind e_input e_state e_info cs=:{cs_error}
 			= (EE, free_vars, e_state, e_info, { cs & cs_error = checkError id "undefined generic" cs_error })
-		check_generic_expr free_vars entry id kind  e_input e_state e_info cs=:{cs_error}
+		check_generic_expr free_vars entry id kind e_input e_state e_info cs=:{cs_error}
 			= (EE, free_vars, e_state, e_info, { cs & cs_error = checkError id "not a generic" cs_error })						
 
-		check_it free_vars mod_index gen_index id kind e_input e_state=:{es_expr_heap} e_info cs		
-
+		check_it free_vars mod_index gen_index id kind e_input e_state=:{es_expr_heap} e_info cs
 			# (generic_info_expr, es_expr_heap, cs) = build_generic_info es_expr_heap cs 
 			#! (app_args, es_expr_heap, cs) = SwitchGenericInfo 
 				([generic_info_expr], es_expr_heap, cs) 
@@ -1202,7 +1182,7 @@ checkExpression free_vars (PE_Generic id=:{id_name,id_info} kind) e_input e_stat
 				#! pds_ident = predefined_idents.[PD_NoGenericInfo]
 				#! ({pds_module, pds_def}, cs_predef_symbols) = cs_predef_symbols ! [PD_NoGenericInfo]
 				#! (new_info_ptr, es_expr_heap) = newPtr EI_Empty es_expr_heap
-				#! app = 
+				#! app =
 					{ app_symb = 
 						{ symb_ident = pds_ident
 						, symb_kind = SK_Constructor {glob_module=pds_module, glob_object=pds_def} 
@@ -1215,12 +1195,6 @@ checkExpression free_vars (PE_Generic id=:{id_name,id_info} kind) e_input e_stat
 		add_kind :: !Index !TypeKind !u:{#GenericDef} !*ExpressionState 
 			-> (!u:{#GenericDef}, !*ExpressionState)			
 		add_kind generic_index kind generic_defs e_state=:{es_generic_heap}
-/*
-			#! ({gen_info_ptr}, generic_defs) = generic_defs ! [generic_index]
-			#! (gen_info, es_generic_heap) = readPtr gen_info_ptr es_generic_heap						
-			#! gen_kinds = eqMerge [(kind,NoIndex)] gen_info.gen_kinds   
-			#! es_generic_heap = writePtr gen_info_ptr {gen_info&gen_kinds=gen_kinds} es_generic_heap
-*/
 			= (generic_defs, {e_state & es_generic_heap = es_generic_heap}) 									 
 
 checkExpression free_vars (PE_TypeSignature array_kind expr) e_input e_state e_info cs
@@ -1330,7 +1304,7 @@ where
 			= (Constant symbol arity priority, free_vars, e_state, e_info, cs)
 			= case symb_kind of
 				SK_Constructor _
-					# app_expr = App { app_symb = symbol , app_args = [], app_info_ptr = nilPtr }
+					# app_expr = App {app_symb = symbol, app_args = [], app_info_ptr = nilPtr}
 					-> (app_expr, free_vars, e_state, e_info, cs)
 				SK_NewTypeConstructor _
 					# cs = { cs & cs_error = checkError id "argument missing (for newtype constructor)" cs.cs_error}
@@ -1498,7 +1472,7 @@ checkQualifiedIdentExpression free_vars module_id ident_name is_expr_list e_inpu
 				# (app_expr, e_state) = build_application_or_constant_for_function symbol fun_arity fun_priority e_state
 				-> (app_expr, free_vars, e_state, e_info, cs)
 			_
-				-> (EE, free_vars, e_state, e_info, { cs & cs_error = checkError (module_id.id_name+++"@"+++ident_name) "not imported" cs.cs_error })
+				-> (EE, free_vars, e_state, e_info, { cs & cs_error = checkError ("'"+++module_id.id_name+++"'."+++ident_name) "not imported" cs.cs_error })
 	where
 		build_application_or_constant_for_function symbol arity priority e_state
 	  		| is_expr_list
@@ -2196,17 +2170,20 @@ add_decons_call_for_overloaded_lists glob_module ds_index src_expr expr_heap cs
 		| pd_cons_index==PD_UnboxedConsSymbol			
 			# (stdStrictLists_index,_,decons_u_index,_,decons_u_ident,cs) = get_unboxed_list_indices_and_decons_u_ident cs
 			# (new_info_ptr,expr_heap) = newPtr EI_Empty expr_heap
-			# decons_u_expr = App {app_symb={symb_ident=decons_u_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_u_index,glob_module=stdStrictLists_index}},app_args=[src_expr],app_info_ptr=new_info_ptr}			
+			  app_symb = {symb_ident=decons_u_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_u_index,glob_module=stdStrictLists_index}}
+			# decons_u_expr = App {app_symb=app_symb,app_args=[src_expr],app_info_ptr=new_info_ptr}			
 			= (decons_u_expr,expr_heap,cs)
 		| pd_cons_index==PD_UnboxedTailStrictConsSymbol
 			# (stdStrictLists_index,_,decons_uts_index,_,decons_uts_ident,cs) = get_unboxed_tail_strict_list_indices_and_decons_uts_ident cs
 			# (new_info_ptr,expr_heap) = newPtr EI_Empty expr_heap
-			# decons_uts_expr = App {app_symb={symb_ident=decons_uts_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_uts_index,glob_module=stdStrictLists_index}},app_args=[src_expr],app_info_ptr=new_info_ptr}
+			  app_symb = {symb_ident=decons_uts_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_uts_index,glob_module=stdStrictLists_index}}
+			# decons_uts_expr = App {app_symb=app_symb,app_args=[src_expr],app_info_ptr=new_info_ptr}
 			= (decons_uts_expr,expr_heap,cs)
 		| pd_cons_index==PD_OverloadedConsSymbol
 			# (stdStrictLists_index,_,decons_index,_,decons_ident,cs) = get_overloaded_list_indices_and_decons_ident cs
 			# (new_info_ptr,expr_heap) = newPtr EI_Empty expr_heap
-			# decons_expr = App {app_symb={symb_ident=decons_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_index,glob_module=stdStrictLists_index}},app_args=[src_expr],app_info_ptr=new_info_ptr}
+			  app_symb = {symb_ident=decons_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_index,glob_module=stdStrictLists_index}}
+			# decons_expr = App {app_symb=app_symb,app_args=[src_expr],app_info_ptr=new_info_ptr}
 			= (decons_expr,expr_heap,cs)
 			= (src_expr,expr_heap,cs)
 		= (src_expr,expr_heap,cs)
