@@ -627,9 +627,7 @@ where
 																				
 		//# pState = wantToken FunctionContext "type argument" GenericCloseToken pState
 		# (args, pState) = parseList trySimpleLhsExpression pState
-	
-		//# (geninfo_ident, pState) = stringToIdent "geninfo" IC_Expression pState
-		# args = SwitchGenericInfo [geninfo_arg :  args] args
+		# args = [geninfo_arg : args]
 	
 		// must be EqualToken or HashToken or ???
 		//# pState = wantToken FunctionContext "generic definition" EqualToken pState
