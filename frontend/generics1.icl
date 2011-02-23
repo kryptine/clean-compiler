@@ -69,7 +69,6 @@ import compilerSwitches
 	, gs_used_modules :: !NumberSet
 	}
 
-
 //**************************************************************************************
 // Exported functions
 //**************************************************************************************
@@ -1889,7 +1888,6 @@ where
 		# (Yes class_info) = lookupGenericClassInfo kind gen_classes
 		= (class_info, (modules, heaps))	
 
-
 	determine_type_of_member_instance :: !MemberDef !InstanceType !*Heaps !*ErrorAdmin
 		-> (!SymbolType, !*Heaps, !*ErrorAdmin)
 	determine_type_of_member_instance {me_type, me_class_vars} ins_type heaps=:{hp_type_heaps, hp_var_heap} error
@@ -1900,7 +1898,6 @@ where
 		#! symbol_type = {symbol_type & st_context = st_context}
 		#! heaps = {heaps & hp_type_heaps = hp_type_heaps, hp_var_heap = hp_var_heap}
 		= (symbol_type, heaps, error)
-			//---> ("determine_type_of_member_instance", ins_type, symbol_type) 
 
 	update_dcl_function :: !Index !Ident !TypeCons !SymbolType !*{#FunType} !*Heaps -> (!*{#FunType}, !*Heaps)
 	update_dcl_function fun_index gc_ident gc_type_cons symbol_type dcl_functions heaps 
@@ -1912,9 +1909,7 @@ where
 							, ft_arity = symbol_type.st_arity }
 			#! dcl_functions = { dcl_functions & [fun_index] = fun}
 			= (dcl_functions, heaps)
-				//---> ("update dcl function", fun.ft_ident, fun_index, symbol_type)  
 			= (dcl_functions, heaps)
-				//---> ("update dcl function: not in the dcl module", fun_index)  
 
 	update_icl_function_if_needed module_index fun_index gc_pos gc_type_cons gc_ident gcf_generic fun_type funs_and_groups fun_defs td_infos modules heaps error
 		| module_index == gs_main_module  // current module
