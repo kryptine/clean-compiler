@@ -50,14 +50,10 @@ write_tcl_file main_dcl_module_n dcl_mods=:{[main_dcl_module_n] = main_dcl_modul
 			wtis_n_type_vars				= 0
 		,	wtis_common_defs				= common_defs
 		,	wtis_type_defs					= imported_types
-	  	, 	wtis_collected_conses			= []
 	  	, 	wtis_type_heaps					= type_heaps
 	  	, 	wtis_var_heap					= var_heap
 	  	, 	wtis_main_dcl_module_n			= main_dcl_module_n
 		};
-
-	# (j,tcl_file)
-		= fposition tcl_file
 
 	#! (tcl_file,write_type_info_state)
 		= write_type_info icl_common_defs tcl_file write_type_info_state2
@@ -70,7 +66,6 @@ write_tcl_file main_dcl_module_n dcl_mods=:{[main_dcl_module_n] = main_dcl_modul
 			with 
 				help_20_compiler :: {#{#Char}} -> {#{#Char}}
 				help_20_compiler l = l
-		
 		 
 	#! tcl_file
 		= fwritei (size main_dcl_module.dcl_common.com_type_defs) tcl_file
@@ -208,7 +203,7 @@ instance convertDynamics TransformedBody where
 			share_init_subst :: BoundVar [LetBind] Expression *ConversionState
 					-> (Expression, *ConversionState)
 			share_init_subst subst global_tpv_binds rhs ci=:{ci_type_pattern_var_count, ci_type_var_count}
-				#  (initial_unifier_symb, ci) 
+				#  (initial_unifier_symb, ci)
 					=	getSymbol PD_Dyn_initial_unification_environment SK_Function 2 ci
 
 				# let_bind_initial_subst
