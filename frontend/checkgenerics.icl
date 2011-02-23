@@ -19,17 +19,15 @@ where
 	check_generic_def index mod_index opt_icl_info gen_defs type_defs class_defs modules heaps cs
 		| has_to_be_checked mod_index index opt_icl_info 	
 			= check_generic index mod_index gen_defs type_defs class_defs modules heaps cs		
-				//---> ("check_generic", mod_index, index)
 			= (gen_defs, type_defs, class_defs, modules, heaps, cs)
-				//---> ("skipped check_generic", mod_index, index)
 
 	has_to_be_checked module_index generic_index No 
 		= True
 	has_to_be_checked module_index generic_index (Yes ({copied_generic_defs}, n_cached_dcl_mods))
 		= not (module_index < n_cached_dcl_mods && generic_index < size copied_generic_defs && copied_generic_defs.[generic_index])
-			
+		
 	check_generic index mod_index gen_defs type_defs class_defs modules heaps cs
-		#(gen_def=:{gen_ident, gen_pos}, gen_defs) = gen_defs ! [index]
+		# (gen_def=:{gen_ident, gen_pos}, gen_defs) = gen_defs![index]
 		# cs = pushErrorAdmin (newPosition gen_ident gen_pos) cs
 
 		# (gen_def, heaps) = alloc_gen_info gen_def heaps
@@ -50,22 +48,6 @@ where
 		# (gen_info_ptr, hp_generic_heap) = newPtr initial_info hp_generic_heap 
 		= (	{gen_def & gen_info_ptr = gen_info_ptr}, 
 			{heaps & hp_generic_heap = hp_generic_heap})
-
-	check_generic_vars {gen_vars,gen_type} heaps=:{hp_type_heaps=hp_type_heaps=:{th_vars}} cs	
-		#! types = [gen_type.st_result:gen_type.st_args]
-		#! th_vars = performOnTypeVars mark_var types th_vars
-		#! (th_vars,cs) = foldSt check_var_marked gen_vars (th_vars,cs)
-		#! th_vars = performOnTypeVars initializeToTVI_Empty types th_vars
-		= ({heaps & hp_type_heaps={hp_type_heaps&th_vars=th_vars}}, cs)
-	where
-		mark_var _ {tv_ident,tv_info_ptr} th_vars
-			= writePtr tv_info_ptr TVI_Used th_vars
-		check_var_marked {tv_ident,tv_info_ptr} (th_vars,cs=:{cs_error})
-			#! (tv_info, th_vars) = readPtr tv_info_ptr th_vars
-			#! cs_error = case tv_info of  
-				TVI_Empty -> checkError tv_ident "generic variable not used" cs_error
-				TVI_Used -> cs_error
-			= (th_vars, {cs & cs_error = cs_error})	
 
 	check_generic_type gen_def=:{gen_type, gen_vars, gen_ident, gen_pos} module_index type_defs class_defs modules heaps=:{hp_type_heaps} cs
 		#! (checked_gen_type, _, type_defs, class_defs, modules, hp_type_heaps, cs) =
@@ -155,8 +137,8 @@ where
 				TVI_Used
 					#! cs_error = checkError tv_ident "context restrictions on generic variables are not allowed" cs_error 
 					-> (th_vars, cs_error)
-				_	-> abort ("check_no_generic_vars_in_contexts: wrong TVI" ---> (tv, tv_info))	
-						
+				_	-> abort ("check_no_generic_vars_in_contexts: wrong TVI" ---> (tv, tv_info))
+
 checkGenericCaseDefs :: !Index !*{#GenericCaseDef} !*{#GenericDef} !u:{#CheckedTypeDef} !*{#DclModule} !*Heaps !*CheckState
 						   -> (!*{#GenericCaseDef},!*{#GenericDef},!u:{#CheckedTypeDef},!*{#DclModule},!.Heaps,!.CheckState)
 checkGenericCaseDefs mod_index gen_case_defs generic_defs type_defs modules heaps cs
