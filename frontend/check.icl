@@ -888,8 +888,8 @@ instance < FunDef
 where
 	(<) fd1 fd2 = fd1.fun_ident.id_name < fd2.fun_ident.id_name
 
-collectCommonfinitions :: !(CollectedDefinitions ClassInstance) -> (!*{# Int}, ![Declaration])
-collectCommonfinitions {def_types,def_constructors,def_selectors,def_classes,def_members,def_instances, def_generic_cases, def_generics}
+collectCommonDefinitions :: !(CollectedDefinitions ClassInstance) -> (!*{# Int}, ![Declaration])
+collectCommonDefinitions {def_types,def_constructors,def_selectors,def_classes,def_members,def_instances, def_generic_cases, def_generics}
 	// MW: the order in which the declarations appear in the returned list is essential (explicit imports)
 	# sizes = createArray cConversionTableSize 0
 	  (size, defs) = foldSt cons_def_to_dcl def_constructors (0, [])
@@ -2027,7 +2027,7 @@ check_module1 cdefs icl_global_function_range fun_defs optional_dcl_mod optional
 	  cdefs = { cdefs & def_instances = def_instances, def_generic_cases = def_generic_cases }
 	#! nr_of_functions = size icl_functions
 
-	# sizes_and_local_defs = collectCommonfinitions cdefs
+	# sizes_and_local_defs = collectCommonDefinitions cdefs
 	  (icl_functions, sizes_and_local_defs) = collectGlobalFunctions cFunctionDefs icl_global_function_range.ir_from icl_global_function_range.ir_to icl_functions sizes_and_local_defs
 
 	  (icl_functions, (sizes, local_defs)) = collectMacros cdefs.def_macro_indices icl_functions sizes_and_local_defs
@@ -2097,7 +2097,7 @@ check_module1 cdefs icl_global_function_range fun_defs optional_dcl_mod optional
 			# def_instances	= convert_class_instances mod_defs.def_instances
 			# def_generic_cases = convert_generic_instances mod_defs.def_generic_cases
 			  mod_defs = { mod_defs & def_instances = def_instances, def_generic_cases = def_generic_cases }
-			  sizes_and_defs = collectFunctionTypes mod_defs.def_funtypes (collectCommonfinitions mod_defs)
+			  sizes_and_defs = collectFunctionTypes mod_defs.def_funtypes (collectCommonDefinitions mod_defs)
 			  
 			  dcl_macro_defs={macro_def \\ macro_def<-mod_defs.def_macros}
 			  (dcl_macro_defs, (sizes, defs)) = collectDclMacros mod_defs.def_macro_indices dcl_macro_defs sizes_and_defs
