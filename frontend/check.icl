@@ -7,14 +7,9 @@ import explicitimports, comparedefimp, checkFunctionBodies, containers, compiler
 import genericsupport
 import typereify
 from checkgenerics import checkGenericDefs,checkGenericCaseDefs,convert_generic_instances,create_gencase_funtypes
-// import RWSDebug
 
 cUndef :== (-1)
 cDummyArray :== {}
-
-isMainModule :: ModuleKind -> Bool
-isMainModule MK_Main	= True
-isMainModule _ 			= False
 				
 checkTypeClasses :: !Index !(Optional (CopiedDefinitions, Int)) !*{#ClassDef} !*{#MemberDef} !*{#CheckedTypeDef} !*{#DclModule} !*Heaps !*CheckState
 	-> (!*{#ClassDef}, !*{#MemberDef}, !*{#CheckedTypeDef}, !*{#DclModule}, !*Heaps, !*CheckState)
@@ -169,7 +164,7 @@ where
 	}
 
 checkInstanceDefs :: !Index !*{#ClassInstance} !u:{#CheckedTypeDef} !u:{#ClassDef} !u:{#MemberDef} !u:{#DclModule} !*Heaps !*CheckState
-	-> (!.{#ClassInstance},!u:{#CheckedTypeDef},!u:{#ClassDef},!u:{#MemberDef}, !u:{#DclModule},!.Heaps,!.CheckState)
+						-> (!.{#ClassInstance},!u:{#CheckedTypeDef},!u:{#ClassDef},!u:{#MemberDef},!u:{#DclModule},!.Heaps,!.CheckState)
 checkInstanceDefs mod_index instance_defs type_defs class_defs member_defs modules heaps=:{hp_type_heaps} cs
 	# is = { is_type_defs = type_defs, is_class_defs = class_defs, is_member_defs = member_defs, is_modules = modules }
 	  (instance_defs, is, hp_type_heaps, cs) = check_instance_defs 0 mod_index instance_defs is hp_type_heaps cs
@@ -191,23 +186,14 @@ where
 		#  	(entry, cs_symbol_table) = readPtr id_info cs_symbol_table
 		# 	cs = pushErrorAdmin (newPosition ins_ident ins_pos) { cs & cs_symbol_table = cs_symbol_table }
 		#   (ins, is, type_heaps, cs) = case entry.ste_kind of
-				STE_Class				
-					# (class_def, is) = class_by_index entry.ste_index is
+				STE_Class
+					# (class_def, is) = is!is_class_defs.[entry.ste_index]
 					-> check_class_instance	class_def module_index entry.ste_index module_index ins is type_heaps cs 
 				STE_Imported STE_Class decl_index	
-					# (class_def, is) = class_by_module_index decl_index entry.ste_index is
+ 					# (class_def, is) = is!is_modules.[decl_index].dcl_common.com_class_defs.[entry.ste_index]
 					-> check_class_instance class_def module_index entry.ste_index decl_index ins is type_heaps cs
 				ste -> (ins, is, type_heaps, { cs & cs_error = checkError id_name "class undefined" cs.cs_error })
 		= (ins, is, type_heaps, popErrorAdmin cs)
-
-	where
-			class_by_index class_index is=:{is_class_defs}
-				#	(class_def, is_class_defs) = is_class_defs![class_index]
- 				= (class_def, {is & is_class_defs = is_class_defs})
-			class_by_module_index decl_index class_index is=:{is_modules}
- 				# 	(dcl_mod, is_modules) = is_modules![decl_index]
-					class_def = dcl_mod.dcl_common.com_class_defs.[class_index]
-				= (class_def, {is & is_modules = is_modules })
 
 	check_class_instance :: ClassDef !Index !Index !Index !ClassInstance !u:InstanceSymbols !*TypeHeaps !*CheckState 
 		-> (!ClassInstance, !u:InstanceSymbols, !*TypeHeaps, !*CheckState)
@@ -232,7 +218,7 @@ checkIclInstances mod_index icl_common=:{com_instance_defs,com_class_defs,com_me
 	| cs_error.ea_ok
 		# (instance_types, com_instance_defs, com_class_defs, com_member_defs, com_generic_defs, com_type_defs, modules, var_heap, type_heaps, cs)
 				= check_icl_instances 0 mod_index [] com_instance_defs com_class_defs com_member_defs /*AA*/com_generic_defs com_type_defs modules var_heap type_heaps cs
-		= (instance_types, { icl_common & com_instance_defs = com_instance_defs,com_class_defs = com_class_defs,com_member_defs = com_member_defs, /*AA*/com_generic_defs = com_generic_defs, com_type_defs = com_type_defs },
+		= (instance_types, { icl_common & com_instance_defs = com_instance_defs,com_class_defs = com_class_defs,com_member_defs = com_member_defs, com_generic_defs = com_generic_defs, com_type_defs = com_type_defs },
 			 	modules, var_heap, type_heaps, cs)
 		= ([], icl_common, modules, var_heap, type_heaps, cs)
 where
@@ -260,21 +246,6 @@ where
 				# cs = { cs & cs_error = checkErrorWithIdentPos (newPosition class_ident ins_pos) "different number of members specified" cs.cs_error }
 				= (instance_types, class_defs, member_defs, generic_defs, type_defs, modules, var_heap, type_heaps, cs)
 
-/*
-	check_generic_instance {ins_class, ins_members, ins_generate} mod_index instance_types class_defs member_defs generic_defs type_defs modules var_heap type_heaps cs
-			# ({gen_ident, gen_member_ident}, generic_defs, modules) = getGenericDef ins_class mod_index generic_defs modules		
-			//| ins_generate 
-			//	= (instance_types, class_defs, member_defs, generic_defs, type_defs, modules, var_heap, type_heaps, cs)
-			| size ins_members <> 1 				
-				# cs = { cs & cs_error = checkError gen_ident "generic instance must have one member" cs.cs_error }
-				= (instance_types, class_defs, member_defs, generic_defs, type_defs, modules, var_heap, type_heaps, cs)
-			# member_name = ins_members.[0].ds_ident
-			| member_name <> gen_member_ident
-				# cs = { cs & cs_error = checkError member_name "wrong member name" cs.cs_error }
-				= (instance_types, class_defs, member_defs, generic_defs, type_defs, modules, var_heap, type_heaps, cs)				
-			// otherwise
-				= (instance_types, class_defs, member_defs, generic_defs, type_defs, modules, var_heap, type_heaps, cs)
-*/
 	check_icl_instance_members :: !Index !Index !Int !Int !{#ClassInstanceMember} !{#DefinedSymbol} Ident !Position !InstanceType ![(Index,SymbolType)]
 		!v:{# MemberDef} !blah:{# CheckedTypeDef} !u:{# DclModule} !*VarHeap !*TypeHeaps !*CheckState
 			-> (![(Index,SymbolType)], !v:{# MemberDef}, !blah:{# CheckedTypeDef}, !u:{# DclModule},!*VarHeap, !*TypeHeaps, !*CheckState)
@@ -317,16 +288,6 @@ getMemberDef mem_mod mem_index mod_index member_defs modules
 		= (member_def, member_defs, modules)
 		# (dcl_mod,modules) = modules![mem_mod]
 		= (dcl_mod.dcl_common.com_member_defs.[mem_index], member_defs, modules)
-
-/*
-getGenericDef :: !(Global DefinedSymbol) !Int !u:{#GenericDef} !v:{#DclModule} -> (!GenericDef,!u:{#GenericDef},!v:{#DclModule})
-getGenericDef {glob_module, glob_object={ds_ident, ds_index}} mod_index generic_defs modules
-	| glob_module == mod_index
-		# (generic_def, generic_defs) = generic_defs![ds_index]
-		= (generic_def, generic_defs, modules)
-		# (dcl_mod, modules) = modules![glob_module]
-		= (dcl_mod.dcl_common.com_generic_defs.[ds_index], generic_defs, modules)
-*/
 
 instantiateTypes :: ![TypeVar] ![AttributeVar] ![AType] ![TypeContext] ![AttrInequality] !SpecialSubstitution ![SpecialSubstitution] !*TypeHeaps !*ErrorAdmin
 	-> (![TypeVar], ![AttributeVar], ![AType], ![TypeContext], ![AttrInequality], ![SpecialSubstitution], !*TypeHeaps, !*ErrorAdmin)
@@ -619,7 +580,7 @@ where
 			= (tc_types, predef_symbols,error)
 			= (tc_types, predef_symbols,checkError ds_ident.id_name "illegal specialization" error)
 	check_and_collect_context_types_of_special {tc_class=TCGeneric {gtc_generic},tc_types} predef_symbols error
-		= (tc_types, predef_symbols,checkError gtc_generic.glob_object.ds_ident.id_name "genenric specials are illegal" error) 
+		= (tc_types, predef_symbols,checkError gtc_generic.glob_object.ds_ident.id_name "generic specials are illegal" error)
 
 	hasNoTypeVariables []
 		= True
@@ -802,10 +763,9 @@ checkFunction fun_def=:{fun_ident,fun_pos,fun_body,fun_type,fun_kind} mod_index 
 	  fun_def = { fun_def & fun_body = fun_body, fun_info = fun_info, fun_type = fun_type}
 	  (fun_defs,macro_defs,cs_symbol_table) = remove_calls_from_symbol_table fun_index def_level es_calls e_state.es_fun_defs e_info.ef_macro_defs cs.cs_symbol_table
 	= (fun_def,fun_defs,
-			{ e_info & ef_type_defs = ef_type_defs, ef_modules = ef_modules,ef_macro_defs=macro_defs },
-			{ heaps & hp_var_heap = es_var_heap, hp_expression_heap = es_expr_heap, hp_type_heaps = es_type_heaps,hp_generic_heap=es_generic_heap }, 
-			{ cs & cs_symbol_table = cs_symbol_table })
-
+			{e_info & ef_type_defs = ef_type_defs, ef_modules = ef_modules,ef_macro_defs=macro_defs},
+			{heaps & hp_var_heap = es_var_heap, hp_expression_heap = es_expr_heap, hp_type_heaps = es_type_heaps,hp_generic_heap=es_generic_heap},
+			{cs & cs_symbol_table = cs_symbol_table})
 where
 	has_type (Yes _) 	= FI_HasTypeSpec
 	has_type no 		= 0
@@ -928,9 +888,8 @@ instance < FunDef
 where
 	(<) fd1 fd2 = fd1.fun_ident.id_name < fd2.fun_ident.id_name
 
-		
 collectCommonfinitions :: !(CollectedDefinitions ClassInstance) -> (!*{# Int}, ![Declaration])
-collectCommonfinitions {def_types,def_constructors,def_selectors,def_classes,def_members,def_instances, def_generic_cases, def_generics} 
+collectCommonfinitions {def_types,def_constructors,def_selectors,def_classes,def_members,def_instances, def_generic_cases, def_generics}
 	// MW: the order in which the declarations appear in the returned list is essential (explicit imports)
 	# sizes = createArray cConversionTableSize 0
 	  (size, defs) = foldSt cons_def_to_dcl def_constructors (0, [])
@@ -963,7 +922,7 @@ where
 		= (inc decl_index, [Declaration { decl_ident = me_ident, decl_pos = me_pos, decl_kind = STE_Member, decl_index = decl_index } : decls]) 
 	instance_def_to_dcl {ins_ident, ins_pos} (decl_index, decls)
 		= (inc decl_index, [Declaration { decl_ident = ins_ident, decl_pos = ins_pos, decl_kind = STE_Instance, decl_index = decl_index } : decls])
-	generic_def_to_dcl {gen_ident, gen_member_ident, gen_type, gen_pos} (decl_index, decls)
+	generic_def_to_dcl {gen_ident, gen_member_ident, gen_pos} (decl_index, decls)
 		# generic_decl = Declaration { decl_ident = gen_ident, decl_pos = gen_pos, decl_kind = STE_Generic, decl_index = decl_index }
 		# member_decl = Declaration { decl_ident = gen_member_ident, decl_pos = gen_pos, decl_kind = STE_Generic, decl_index = decl_index }
 		= (inc decl_index, [generic_decl, member_decl : decls]) 
@@ -979,7 +938,7 @@ createCommonDefinitions {def_types,def_constructors,def_selectors,def_classes,de
 		,	com_member_defs		= { member \\ member <- def_members }
 		,	com_instance_defs	= { next_instance \\ next_instance <- def_instances }
 		,	com_generic_defs	= { gen \\ gen <- def_generics }
-		, 	com_gencase_defs    = { gi \\ gi <- def_generic_cases}		
+		, 	com_gencase_defs    = { gi \\ gi <- def_generic_cases}	
 		}
 
 array_plus_list a [] = a
@@ -1772,8 +1731,8 @@ createCommonDefinitionsWithinComponent :: Bool Int *(!*{#.DclModule},*CheckState
 createCommonDefinitionsWithinComponent is_on_cycle mod_index (dcl_modules, cs=:{cs_symbol_table})
 	# (dcl_mod=:{dcl_name}, dcl_modules) = dcl_modules![mod_index]
 	  (mod_entry, cs_symbol_table) = readPtr dcl_name.id_info cs_symbol_table
-	  ({ ste_kind = STE_Module mod, ste_index }) = mod_entry
-	  cs = { cs & cs_symbol_table = cs_symbol_table}
+	  ({ste_kind = STE_Module mod, ste_index}) = mod_entry
+	  cs = {cs & cs_symbol_table = cs_symbol_table}
 	# dcl_common = createCommonDefinitions mod.mod_defs
 	#! first_type_index = size dcl_common.com_type_defs		
 	# dcl_common = {dcl_common & com_class_defs = number_class_dictionaries 0 dcl_common.com_class_defs first_type_index}
@@ -2078,7 +2037,7 @@ check_module1 cdefs icl_global_function_range fun_defs optional_dcl_mod optional
 	  main_dcl_module_n = if (dcl_module_n_in_cache<>NoIndex) dcl_module_n_in_cache nr_of_cached_modules
 
 	  cs_x = {x_needed_modules = 0,x_main_dcl_module_n=main_dcl_module_n, x_check_dynamic_types = False}
-	  cs = { cs_symbol_table = symbol_table, cs_predef_symbols = predef_symbols, cs_error = error, cs_x = cs_x}
+	  cs = {cs_symbol_table = symbol_table, cs_predef_symbols = predef_symbols, cs_error = error, cs_x = cs_x}
 	  
 	  (scanned_modules,macro_defs,cs) = add_dcl_module_predef_module_and_modules_to_symbol_table optional_dcl_mod optional_pre_def_mod scanned_modules nr_of_cached_modules cs
 	  macro_defs = make_macro_def_array cached_dcl_macros macro_defs
