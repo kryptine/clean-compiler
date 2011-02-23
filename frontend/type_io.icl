@@ -6,8 +6,8 @@ implementation module type_io
 import StdEnv, compare_constructor
 import scanner, general, Heap, typeproperties, utilities, checksupport
 import trans
-
 import type_io_common
+
 // normal form:
 // -	type variables in type definitions are normalized by checkTypeDef in the
 //		module checktypes.icl. The position of a type variable in the left-hand
@@ -19,14 +19,12 @@ import type_io_common
 // - 	ADTs
 
 :: WriteTypeInfoState
-	= { 
-		wtis_n_type_vars						:: !Int
-	,	wtis_common_defs						:: !{#CommonDefs}	
-	,	wtis_type_defs							:: !.{#{#CheckedTypeDef}}
-	,	wtis_collected_conses					:: !ImportedConstructors
-	,	wtis_type_heaps							:: !.TypeHeaps
-	,	wtis_var_heap							:: !.VarHeap
-	,	wtis_main_dcl_module_n 					:: !Int
+	= {	wtis_n_type_vars		:: !Int
+	,	wtis_common_defs		:: !{#CommonDefs}	
+	,	wtis_type_defs			:: !.{#{#CheckedTypeDef}}
+	,	wtis_type_heaps			:: !.TypeHeaps
+	,	wtis_var_heap			:: !.VarHeap
+	,	wtis_main_dcl_module_n	:: !Int
 	};
 	
 class WriteTypeInfo a 
@@ -41,13 +39,13 @@ where
  		= write_type_info com_cons_defs tcl_file wtis
 
 instance WriteTypeInfo ConsDef
-where 
+where
 	write_type_info {cons_ident,cons_type,cons_type_index,cons_exi_vars} tcl_file wtis=:{wtis_n_type_vars}
  		// normalize ...
  		# (th_vars,wtis)
  			= sel_type_var_heap wtis
  		# (_,(_,th_vars))
- 			= mapSt normalize_type_var cons_exi_vars (wtis_n_type_vars,th_vars)
+			= mapSt normalize_type_var cons_exi_vars (wtis_n_type_vars,th_vars)
   		# wtis = { wtis & wtis_type_heaps.th_vars = th_vars }
  		// ... normalize
 		# (tcl_file,wtis)
@@ -193,17 +191,12 @@ where
 			= write_type_info st_result tcl_file wtis
 		= (tcl_file,wtis)
 	where
-		expand_symbol_type symbol_type wtis=:{wtis_common_defs,wtis_type_defs,wtis_main_dcl_module_n,wtis_collected_conses,wtis_type_heaps,wtis_var_heap}
+		expand_symbol_type symbol_type wtis=:{wtis_common_defs,wtis_type_defs,wtis_main_dcl_module_n,wtis_type_heaps,wtis_var_heap}
 			# (expanded_symbol_type,wtis_type_defs,wtis_type_heaps,wtis_var_heap)
 				= convertSymbolTypeWithoutCollectingImportedConstructors False wtis_common_defs symbol_type wtis_main_dcl_module_n wtis_type_defs wtis_type_heaps wtis_var_heap;
-			# wtis
-				= { wtis &
-					wtis_type_defs							= wtis_type_defs
-				,	wtis_type_heaps							= wtis_type_heaps
-				,	wtis_var_heap							= wtis_var_heap
-				};
+			# wtis = {wtis & wtis_type_defs = wtis_type_defs, wtis_type_heaps = wtis_type_heaps, wtis_var_heap = wtis_var_heap};
 			= (expanded_symbol_type,wtis)
-				
+
 instance WriteTypeInfo StrictnessList
 where
 	write_type_info NotStrict tcl_file wtis
@@ -385,20 +378,17 @@ where
 instance WriteTypeInfo {#b} | Array {#} b & WriteTypeInfo b
 where
 	write_type_info unboxed_array tcl_file wtis
-		# s_unboxed_array
-			= size unboxed_array
-		# tcl_file
-			= fwritei s_unboxed_array tcl_file			
+		# s_unboxed_array = size unboxed_array
+		# tcl_file = fwritei s_unboxed_array tcl_file			
 		= write_type_info_loop 0 s_unboxed_array tcl_file wtis
 	where 
-
 		write_type_info_loop i limit tcl_file wtis
 			| i == limit
 				= (tcl_file,wtis)
 			# (tcl_file,wtis)
 				= write_type_info unboxed_array.[i] tcl_file wtis
 			= write_type_info_loop (inc i) limit tcl_file wtis
-			
+
 instance WriteTypeInfo [a] | WriteTypeInfo a
 where
 	write_type_info l tcl_file wtis
