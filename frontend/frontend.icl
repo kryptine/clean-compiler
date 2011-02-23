@@ -28,8 +28,6 @@ frontSyntaxTree cached_dcl_macros cached_dcl_mods main_dcl_module_n predef_symbo
 			},cached_dcl_macros,cached_dcl_mods,main_dcl_module_n,predef_symbols,hash_table,files,error,io,out,tcl_file,heaps
 		)
 
-// import StdDebug
-
 frontEndInterface :: !FrontEndOptions !Ident !SearchPaths !{#DclModule} !*{#*{#FunDef}} !(Optional Bool) !*PredefinedSymbols !*HashTable (ModTimeFunction *Files) !*Files !*File !*File !*File !(Optional *File) !*Heaps !String
   	-> ( !Optional *FrontEndSyntaxTree,!*{#*{#FunDef}},!{#DclModule},!Int,!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional *File, !*Heaps) 
 frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_macros list_inferred_types predef_symbols hash_table modtimefunction files error io out tcl_file heaps csf_path
@@ -167,7 +165,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_m
 
 	| not ok
 		= (No,{},{},main_dcl_module_n,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
-			
+
 	# icl_gencase_indices = icl_function_indices.ifi_gencase_indices++generic_ranges
 	# icl_function_indices = {icl_function_indices & ifi_gencase_indices = icl_gencase_indices }
 
