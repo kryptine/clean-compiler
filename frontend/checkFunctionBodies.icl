@@ -1192,11 +1192,6 @@ checkExpression free_vars (PE_Generic id=:{id_name,id_info} kind) e_input e_stat
  					}
 			 	= (App app, es_expr_heap, {cs & cs_predef_symbols = cs_predef_symbols})	
 
-		add_kind :: !Index !TypeKind !u:{#GenericDef} !*ExpressionState 
-			-> (!u:{#GenericDef}, !*ExpressionState)			
-		add_kind generic_index kind generic_defs e_state=:{es_generic_heap}
-			= (generic_defs, {e_state & es_generic_heap = es_generic_heap}) 									 
-
 checkExpression free_vars (PE_TypeSignature array_kind expr) e_input e_state e_info cs
 	# (expr,free_vars,e_state,e_info,cs) = checkExpression free_vars expr e_input e_state e_info cs
 	  predef_array_index = case array_kind of
