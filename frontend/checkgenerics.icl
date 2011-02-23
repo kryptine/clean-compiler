@@ -19,17 +19,15 @@ where
 	check_generic_def index mod_index opt_icl_info gen_defs type_defs class_defs modules heaps cs
 		| has_to_be_checked mod_index index opt_icl_info 	
 			= check_generic index mod_index gen_defs type_defs class_defs modules heaps cs		
-				//---> ("check_generic", mod_index, index)
 			= (gen_defs, type_defs, class_defs, modules, heaps, cs)
-				//---> ("skipped check_generic", mod_index, index)
 
 	has_to_be_checked module_index generic_index No 
 		= True
 	has_to_be_checked module_index generic_index (Yes ({copied_generic_defs}, n_cached_dcl_mods))
 		= not (module_index < n_cached_dcl_mods && generic_index < size copied_generic_defs && copied_generic_defs.[generic_index])
-			
+		
 	check_generic index mod_index gen_defs type_defs class_defs modules heaps cs
-		#(gen_def=:{gen_ident, gen_pos}, gen_defs) = gen_defs ! [index]
+		# (gen_def=:{gen_ident, gen_pos}, gen_defs) = gen_defs![index]
 		# cs = pushErrorAdmin (newPosition gen_ident gen_pos) cs
 
 		# (gen_def, heaps) = alloc_gen_info gen_def heaps
