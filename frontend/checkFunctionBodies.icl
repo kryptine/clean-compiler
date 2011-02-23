@@ -1165,10 +1165,13 @@ checkExpression free_vars (PE_Generic id=:{id_name,id_info} kind) e_input e_stat
 			= (EE, free_vars, e_state, e_info, { cs & cs_error = checkError id "not a generic" cs_error })						
 
 		check_it free_vars mod_index gen_index id kind e_input e_state=:{es_expr_heap} e_info cs
-			# (generic_info_expr, es_expr_heap, cs) = build_generic_info es_expr_heap cs 
-			#! (app_args, es_expr_heap, cs) = SwitchGenericInfo 
-				([generic_info_expr], es_expr_heap, cs) 
-				([], es_expr_heap, cs) 		
+			#! (app_args, es_expr_heap, cs)
+				= case kind of
+					KindArrow [KindConst]
+						# (generic_info_expr, es_expr_heap, cs) = build_generic_info es_expr_heap cs 
+						-> ([generic_info_expr], es_expr_heap, cs) 
+					_
+						-> ([], es_expr_heap, cs)
 			#! symb_kind = SK_Generic { glob_object = gen_index, glob_module = mod_index} kind
 		  	#! symbol = { symb_ident = id, symb_kind = symb_kind }			
 			#! (new_info_ptr, es_expr_heap) = newPtr EI_Empty es_expr_heap
