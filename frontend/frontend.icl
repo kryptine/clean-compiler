@@ -152,10 +152,11 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_m
 	# error = error_admin.ea_file
 
 /*
-	# (_,genout,files) = fopen "c:\\Clean\\Generics\\genout.icl" FWriteText files
-	# (fun_defs, genout) = printFunDefs fun_defs genout
+	# (_,genout,files) = fopen "genout" FWriteText files
+	# (n_fun_defs,fun_defs) = usize fun_defs
+	# (fun_defs, genout) = show_component [0..n_fun_defs-1] True fun_defs genout
 	# (ok,files) = fclose genout files
-	| not ok = abort "could not write genout.icl" 
+	| not ok = abort "could not write genout" 
 */
 
 	#! ok = error_admin.ea_ok
@@ -163,7 +164,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_m
 		= (No,{},{},main_dcl_module_n,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
 
 	# (ok, fun_defs, array_instances, common_defs, imported_funs, type_def_infos, heaps, predef_symbols, error,out)
-		= typeProgram (components -*-> "Typing") main_dcl_module_n fun_defs icl_function_indices.ifi_specials_indices list_inferred_types icl_common icl_import icl_qualified_imports dcl_mods icl_used_module_numbers td_infos heaps predef_symbols error out
+		= typeProgram components main_dcl_module_n fun_defs icl_function_indices.ifi_specials_indices list_inferred_types icl_common icl_import icl_qualified_imports dcl_mods icl_used_module_numbers td_infos heaps predef_symbols error out
 
 	| not ok
 		= (No,{},{},main_dcl_module_n,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
@@ -181,7 +182,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_m
 		=	frontSyntaxTree cached_dcl_macros cached_dcl_mods main_dcl_module_n
 							predef_symbols hash_table files error io out tcl_file icl_mod dcl_mods fun_defs components array_instances heaps
 
-	# (components, fun_defs, predef_symbols, dcl_types, used_conses_in_dynamics, var_heap, type_heaps, expression_heap, tcl_file)
+	# (components, fun_defs, predef_symbols, dcl_types, var_heap, type_heaps, expression_heap, tcl_file)
 	  		= convertDynamicPatternsIntoUnifyAppls common_defs main_dcl_module_n (components -*-> "convertDynamics") fun_defs predef_symbols
 					heaps.hp_var_heap heaps.hp_type_heaps heaps.hp_expression_heap tcl_file dcl_mods icl_mod directly_imported_dcl_modules
 
@@ -199,7 +200,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_m
 	# (def_min, fun_defs)		= usize fun_defs
 
 	  (components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap, acc_args, error, predef_symbols)
-	  	= transformGroups cleanup_info main_dcl_module_n stdStrictLists_module_n def_min def_max (components -*-> "Transform") fun_defs acc_args common_defs imported_funs dcl_types used_conses_in_dynamics type_def_infos var_heap type_heaps expression_heap options.feo_fusion error predef_symbols
+	  	= transformGroups cleanup_info main_dcl_module_n stdStrictLists_module_n def_min def_max components fun_defs acc_args common_defs imported_funs dcl_types type_def_infos var_heap type_heaps expression_heap options.feo_fusion error predef_symbols
 
 	# error_admin = {ea_file = error, ea_loc = [], ea_ok = True }
 	# {dcl_instances,dcl_specials,dcl_gencases,dcl_type_funs} = dcl_mods.[main_dcl_module_n]
@@ -355,21 +356,16 @@ showComponents comps comp_index show_types fun_defs file
 		# (comp, comps) = comps![comp_index]
 		# (fun_defs, file) = show_component comp.group_members show_types fun_defs (file <<< "component " <<< comp_index <<< '\n')
 		= showComponents comps (inc comp_index) show_types fun_defs file
-where
-	show_component [] show_types fun_defs file
-		= (fun_defs, file <<< '\n')
-	show_component [fun:funs] show_types fun_defs file
-		# (fun_def, fun_defs) = fun_defs![fun]
-		# file=file<<<fun<<<'\n'
-		| show_types
-			= show_component funs show_types fun_defs (file <<< fun_def.fun_type <<< '\n' <<< fun_def)
-			= show_component funs show_types fun_defs (file <<< fun_def)
+
+show_component [] show_types fun_defs file
+	= (fun_defs, file <<< '\n')
+show_component [fun:funs] show_types fun_defs file
+	# (fun_def, fun_defs) = fun_defs![fun]
+	# file=file<<<fun<<<'\n'
+	| show_types
+		= show_component funs show_types fun_defs (file <<< fun_def.fun_type <<< '\n' <<< fun_def)
+		= show_component funs show_types fun_defs (file <<< fun_def)
 //		= show_component funs show_types fun_defs (file <<< fun_def.fun_ident)
-
-//show_components comps fun_defs = map (show_component fun_defs) comps
-
-show_component fun_defs [] = []
-show_component fun_defs [fun:funs] = [fun_defs.[fun ---> fun] : show_component fun_defs funs]
 
 showTypes :: !*{! Group} !Int !*{# FunDef} !*File  -> (!*{! Group}, !*{# FunDef},!*File)
 showTypes comps comp_index fun_defs file

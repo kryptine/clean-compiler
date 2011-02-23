@@ -3571,10 +3571,10 @@ add_let_binds free_vars rhss original_binds
 //@	transformGroups
 
 transformGroups :: !CleanupInfo !Int !Int !Int !Int !*{!Group} !*{#FunDef} !*{!.ConsClasses} !{# CommonDefs}  !{# {# FunType} }
-		!*ImportedTypes !ImportedConstructors !*TypeDefInfos !*VarHeap !*TypeHeaps !*ExpressionHeap !Bool !*File !*PredefinedSymbols
+		!*ImportedTypes !*TypeDefInfos !*VarHeap !*TypeHeaps !*ExpressionHeap !Bool !*File !*PredefinedSymbols
 			-> (!*{!Group}, !*{#FunDef}, !*ImportedTypes, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap, !*{!ConsClasses}, !*File, !*PredefinedSymbols)
 transformGroups cleanup_info main_dcl_module_n ro_StdStrictLists_module_n def_min def_max groups fun_defs cons_args common_defs imported_funs
-		imported_types collected_imports type_def_infos var_heap type_heaps symbol_heap compile_with_fusion error predef_symbols
+		imported_types type_def_infos var_heap type_heaps symbol_heap compile_with_fusion error predef_symbols
 	#! nr_of_funs = size fun_defs
 	# initial_ti =
 				{ ti_fun_defs		= fun_defs
@@ -3594,7 +3594,7 @@ transformGroups cleanup_info main_dcl_module_n ro_StdStrictLists_module_n def_mi
 				}
 	# groups = [group \\ group <-: groups]
 	# (groups, imported_types, collected_imports, fun_indices_with_abs_syn_types, ti)
-		= transform_groups 0 groups [] common_defs imported_funs imported_types collected_imports [] initial_ti
+		= transform_groups 0 groups [] common_defs imported_funs imported_types [] [] initial_ti
 	# groups = {group \\ group <- reverse groups}
 
 	  {ti_fun_defs,ti_new_functions,ti_var_heap,ti_symbol_heap,ti_fun_heap,ti_next_fun_nr,ti_type_heaps,ti_cleanup_info} = ti
