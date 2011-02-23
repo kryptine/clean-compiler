@@ -81,7 +81,7 @@ where
 		= (wtis_type_heaps,wtis_type_defs,wtis_var_heap)
 
 convertDynamicPatternsIntoUnifyAppls :: !{# CommonDefs} !Int !*{! Group} !*{#FunDef} !*PredefinedSymbols !*VarHeap !*TypeHeaps !*ExpressionHeap (Optional *File) {# DclModule} !IclModule [String]
-			-> (!*{! Group}, !*{#FunDef}, !*PredefinedSymbols, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap, (Optional *File))
+			-> (!*{!Group}, !*{#FunDef}, !*PredefinedSymbols, !*{#{#CheckedTypeDef}}, !*VarHeap, !*TypeHeaps, !*ExpressionHeap, !Optional *File)
 convertDynamicPatternsIntoUnifyAppls common_defs main_dcl_module_n groups fun_defs predefined_symbols var_heap type_heaps expr_heap tcl_file dcl_mods icl_mod directly_imported_dcl_modules
 	#! (dynamic_representation,predefined_symbols)
 		=	create_dynamic_and_selector_idents common_defs predefined_symbols
@@ -108,7 +108,7 @@ convertDynamicPatternsIntoUnifyAppls common_defs main_dcl_module_n groups fun_de
 					-> abort "convertDynamicPatternsIntoUnifyAppls: error writing tcl file"
 					-> (Yes tcl_file,type_heaps,ci_predef_symb,imported_types,ci_var_heap)
 
-	= (groups, fun_defs, ci_predef_symb, imported_types, [], ci_var_heap, type_heaps, ci_expr_heap, tcl_file)
+	= (groups, fun_defs, ci_predef_symb, imported_types, ci_var_heap, type_heaps, ci_expr_heap, tcl_file)
 where
 	convert_groups group_nr groups dynamic_representation fun_defs_and_ci
 		| group_nr == size groups
