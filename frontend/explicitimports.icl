@@ -961,7 +961,7 @@ search_qualified_ident module_id=:{id_info} ident_name name_space_n cs
 	where
 		not_imported_error cs
 			= (False,{decl_ident={id_name="",id_info=nilPtr},decl_pos=NoPos,decl_kind=STE_Empty,decl_index=NoIndex},
-					{cs & cs_error=checkError (module_id.id_name+++"@"+++ident_name) "not imported" cs.cs_error})
+					{cs & cs_error=checkError ("'"+++module_id.id_name+++"'."+++ident_name) "not imported" cs.cs_error})
 
 search_qualified_import :: !String !SortedQualifiedImports !NameSpaceN -> (!Bool,!DeclarationRecord)
 search_qualified_import name EmptySortedQualifiedImports name_space_n
