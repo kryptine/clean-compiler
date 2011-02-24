@@ -299,8 +299,10 @@ check_context_class (TCGeneric gtc=:{gtc_generic, gtc_kind}) tc_types mod_index 
 			# checked_gen = 
 				{ glob_module = generic_module
 				, glob_object = {gtc_generic.glob_object & ds_index = generic_index}					
-				}			
-			= (TCGeneric {gtc & gtc_generic = checked_gen, gtc_class=clazz}, class_defs, modules, cs)
+				}
+			  ({pds_module,pds_def},cs) = cs!cs_predef_symbols.[PD_TypeGenericDict]
+			  generic_dict = {gi_module=pds_module, gi_index=pds_def}
+			= (TCGeneric {gtc & gtc_generic = checked_gen, gtc_class=clazz, gtc_generic_dict=generic_dict}, class_defs, modules, cs)
 			# cs_error = checkError gen_ident "generic used with wrong arity: generic has always has one class argument" cs.cs_error  
 			= (TCGeneric {gtc & gtc_class=clazz}, class_defs, modules, {cs & cs_error = cs_error})
 		# cs_error = checkError gen_ident "generic undefined" cs.cs_error
@@ -939,18 +941,16 @@ checkInstanceType mod_index ins_class it=:{it_types,it_context} specials type_de
 			= ti1==ti2 && are_equal_accu
 		compare_context_and_instance_type (_ --> _) (_ --> _) are_equal_accu
 			= are_equal_accu
-//AA..
-		compare_context_and_instance_type TArrow TArrow are_equal_accu
-			= are_equal_accu	
-		compare_context_and_instance_type (TArrow1 _) (TArrow1 _) are_equal_accu
-			= are_equal_accu	
-//..AA			
 		compare_context_and_instance_type (CV tv1 :@: _) (CV tv2 :@: _) are_equal_accu
 			= tv1==tv2 && are_equal_accu
 		compare_context_and_instance_type (TB bt1) (TB bt2) are_equal_accu
 			= bt1==bt2 && are_equal_accu
 		compare_context_and_instance_type (TV tv1) (TV tv2) are_equal_accu
 			= tv1==tv2 && are_equal_accu
+		compare_context_and_instance_type TArrow TArrow are_equal_accu
+			= are_equal_accu	
+		compare_context_and_instance_type (TArrow1 _) (TArrow1 _) are_equal_accu
+			= are_equal_accu	
 		compare_context_and_instance_type _ _ are_equal_accu
 			= False
 
