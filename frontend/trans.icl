@@ -3927,36 +3927,33 @@ convertSymbolTypeWithoutCollectingImportedConstructors rem_annots common_defs st
 convertSymbolType_ :: !Int !{# CommonDefs} !SymbolType !Int !*ImportedTypes !ImportedConstructors !*TypeHeaps !*VarHeap 
 	-> (!SymbolType, !Bool,!*ImportedTypes, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
 convertSymbolType_  rem_annots common_defs st main_dcl_module_n imported_types collected_imports type_heaps var_heap
-	# ets	=
-				{ ets_type_defs			= imported_types
+	# ets	=	{ ets_type_defs			= imported_types
 				, ets_collected_conses	= collected_imports
 				, ets_type_heaps		= type_heaps
 				, ets_var_heap			= var_heap
 				, ets_main_dcl_module_n	= main_dcl_module_n 
 				, ets_contains_unexpanded_abs_syn_type = False
-				}	
-	# {st_args,st_result,st_context,st_args_strictness}
-										= st
+				}
+	# {st_args,st_result,st_context,st_args_strictness} = st
 	#! (_,(st_args,st_result), ets)		= expandSynTypes rem_annots common_defs (st_args,st_result) ets
 	# new_st_args						= addTypesOfDictionaries common_defs st_context st_args
 	  new_st_arity						= length new_st_args
-	  st	=
-	  			{ st
+	  st	=	{ st
 	  			& st_args				= new_st_args
 	  			, st_result				= st_result
 	  			, st_arity				= new_st_arity
 	  			, st_args_strictness	= insert_n_strictness_values_at_beginning (new_st_arity-length st_args) st_args_strictness
 	  			, st_context			= []
 	  			}
-	# {ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap,ets_contains_unexpanded_abs_syn_type}
-										= ets
+	# {ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap,ets_contains_unexpanded_abs_syn_type} = ets
 	= (st, ets_contains_unexpanded_abs_syn_type, ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap)
 
 addTypesOfDictionaries :: !{#CommonDefs} ![TypeContext] ![AType] -> [AType]
 addTypesOfDictionaries common_defs type_contexts type_args
 	= mapAppend (add_types_of_dictionary common_defs) type_contexts type_args
 where
-	add_types_of_dictionary common_defs {tc_class = TCGeneric {gtc_dictionary={glob_module,glob_object={ds_ident,ds_index}}}, tc_types}
+	add_types_of_dictionary common_defs {tc_class = TCGeneric {gtc_generic_dict={gi_module,gi_index}}, tc_types}
+		#! generict_dict_ident = predefined_idents.[PD_TypeGenericDict]
 		/*
 			AA HACK:
 			Generic classes are always generated locally, 
@@ -3967,7 +3964,7 @@ where
 			Solution: plug a dummy dictinary type, defined in StdGeneric.
 			It is possible because all generic class have one class argument and one member.
 		*/
-		# dict_type_symb = MakeTypeSymbIdent {glob_object = ds_index, glob_module = glob_module} ds_ident 1
+		# dict_type_symb = MakeTypeSymbIdent {glob_object = gi_index, glob_module = gi_module} generict_dict_ident 1
 		# type_arg = {at_attribute = TA_Multi, at_type=hd tc_types}
 		= {at_attribute = TA_Multi, at_type = TA dict_type_symb [type_arg]}
 
@@ -3979,9 +3976,7 @@ where
 		  (dict_args,_) = mapSt (\type class_cons_vars
 								-> let at_attribute = if (class_cons_vars bitand 1<>0) TA_MultiOfPropagatingConsVar TA_Multi
 							   		in ({at_attribute = at_attribute, at_type = type}, class_cons_vars>>1)
-						   	)
-						  	tc_types
-						  	class_cons_vars
+						   	) tc_types class_cons_vars
 		= {at_attribute = TA_Multi, /* at_annotation = AN_Strict, */ at_type = TA dict_type_symb dict_args}
 
 ::	ExpandTypeState =

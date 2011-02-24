@@ -51,7 +51,6 @@ getGenericClass gen kind modules generic_heap
 			#! class_glob = {glob_module = gci_module, glob_object = gci_class}
 			-> (Yes class_glob, generic_heap)
 
-				 
 lookupGenericClassInfo :: !TypeKind !GenericClassInfos	-> (Optional GenericClassInfo)
 lookupGenericClassInfo kind class_infos
 	#! hash_index = case kind of
@@ -84,14 +83,15 @@ postfixIdent id_name postfix = makeIdent (id_name +++ postfix)
 
 genericIdentToClassIdent :: !String !TypeKind -> Ident
 genericIdentToClassIdent id_name kind
-	= postfixIdent id_name ("_" +++ kind_to_str kind) 
+	= postfixIdent id_name ("_" +++ kind_to_short_string kind) 
+
+kind_to_short_string :: !TypeKind -> {#Char}
+kind_to_short_string KindConst = "s"
+kind_to_short_string (KindArrow kinds) = kinds_to_str  kinds +++ "s"
 where
-	kind_to_str KindConst = "s"
-	kind_to_str (KindArrow kinds) 
-		= kinds_to_str  kinds +++ "s"
 	kinds_to_str [] = ""
 	kinds_to_str [KindConst:ks] = "s" +++ kinds_to_str ks
-	kinds_to_str [k:ks] = "o" +++ (kind_to_str k) +++ "c" +++ kinds_to_str ks	
+	kinds_to_str [k:ks] = "o" +++ (kind_to_short_string k) +++ "c" +++ kinds_to_str ks	
 
 genericIdentToMemberIdent :: !String !TypeKind -> Ident
 genericIdentToMemberIdent id_name kind

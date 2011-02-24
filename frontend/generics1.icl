@@ -650,7 +650,7 @@ buildTypeDefInfo1 td_module {td_ident, td_pos, td_arity} alts fields main_module
 	
 	# (type_def_dsc_fun, heaps) = build_type_def_dsc group_index cons_dsc_dss type_def_dsc_ds heaps	
 	
-	# (cons_dsc_funs, (modules, heaps)) = zipWithSt (build_cons_dsc group_index type_def_dsc_ds field_dsc_dss) cons_dsc_dss alts (modules, heaps) 
+	# (cons_dsc_funs, (modules, heaps)) = zipWithSt (build_cons_dsc group_index type_def_dsc_ds field_dsc_dss) cons_dsc_dss alts (modules, heaps)
 	
 	# (field_dsc_funs, (modules, heaps)) = zipWithSt (build_field_dsc group_index (hd cons_dsc_dss)) field_dsc_dss fields (modules, heaps)
 	 
@@ -1413,7 +1413,7 @@ where
 				{ gtc_generic=glob_def_sym
 				, gtc_kind = kind
 				, gtc_class = {glob_module=NoIndex,glob_object={ds_ident=makeIdent "<no generic class>", ds_index=NoIndex, ds_arity=1}}
-				, gtc_dictionary = {glob_module=NoIndex,glob_object={ds_ident=makeIdent "<no generic dictionary>", ds_index=NoIndex, ds_arity=1}}
+				, gtc_generic_dict = {gi_module=NoIndex, gi_index=NoIndex}
 				}
 			=({tc_class = tc_class, tc_types = [TV tv], tc_var = var_info_ptr}, gs_varh)	
 
@@ -2190,25 +2190,15 @@ where
 						, ds_index = class_info.gci_class
 						}
 					}
-				/* 
-					AA HACK: dummy dictionary
-				*/
-				#! {pds_module, pds_def} = gs_predefs.[PD_TypeGenericDict]
-				#! pds_ident = predefined_idents.[PD_TypeGenericDict]
-				# dictionary = 
-					{ glob_module = pds_module
-					, glob_object={ds_ident=pds_ident, ds_arity=1, ds_index=pds_def}
-					}				
-				-> (TCGeneric {gtc & gtc_class=clazz, gtc_dictionary=dictionary}, error)
-	
+				// AA HACK: dummy dictionary
+				#! {pds_module,pds_def} = gs_predefs.[PD_TypeGenericDict]
+				# generic_dict = {gi_module=pds_module, gi_index=pds_def}
+				-> (TCGeneric {gtc & gtc_class=clazz, gtc_generic_dict=generic_dict}, error)
 		= (True, {tc & tc_class=tc_class}, (modules, {heaps & hp_generic_heap=hp_generic_heap}, error))
 	convert_context fun_name fun_pos tc st 
 		= (False, tc, st)
-	
-			 							 
-//****************************************************************************************
+		 							 
 //  specialization
-//****************************************************************************************
 
 specializeGeneric ::
 		!GlobalIndex			// generic index

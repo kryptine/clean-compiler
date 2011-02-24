@@ -4,7 +4,6 @@
 implementation module backendconvert
 
 import code from library "backend_library"
-import compilerSwitches
 
 import StdEnv
 // import StdDebug
@@ -476,8 +475,7 @@ backEndConvertModulesH predefs {fe_icl =
 					=	currentDcl.dcl_common
 	# backEnd
 		=	foldSt beExportFunction exported_local_type_funs backEnd
-
-		with	
+		with
 			exported_local_type_funs
 				| False && currentDcl.dcl_module_kind == MK_None
 					=	[]
@@ -1078,19 +1076,6 @@ where
 		# backend = appBackEnd (BEAdjustUnboxedListDeconsInstance (index+1) main_dcl_module_n) backend
 		= adjustRecordListInstances indices backend
 
-
-types_to_string []
-	= ""
-types_to_string [e:l]
-	= type_to_string e+++" "+++types_to_string l
-	
-type_to_string (TB BT_Int) = "Int"
-type_to_string (TB BT_Char) = "Char"
-type_to_string (TB BT_Real) = "Real"
-type_to_string (TB BT_Bool) = "Bool"
-type_to_string (TB BT_File) = "File"
-type_to_string _ = "?"
-
 :: AdjustStdArrayInfo =
 	{	asai_moduleIndex	:: !Int
 	,	asai_mapping 		:: !{#BEArrayFunKind}
@@ -1407,6 +1392,8 @@ convertTypeNode TE
 	=	beNormalTypeNode beDontCareDefinitionSymbol beNoTypeArgs
 convertTypeNode (TFA vars type)
 	=	beAddForAllTypeVariables (convertTypeVars vars) (convertTypeNode type)
+convertTypeNode (TGenericFunctionInDictionary gds type_kind generic_dict=:{gi_module,gi_index})
+	= beNormalTypeNode (beTypeSymbol gi_index gi_module) beNoTypeArgs
 convertTypeNode typeNode
 	=	abort "convertTypeNode"  // <<- ("backendconvert, convertTypeNode: unknown type node", typeNode)
 
@@ -1809,9 +1796,6 @@ where
 			=	beMatchNode ds_arity (beConstructorSymbol glob_module ds_index) (convertExpr expr)
 	convertExpr (Conditional {if_cond=cond, if_then, if_else=Yes else})
 		=	beIfNode (convertExpr cond) (convertExpr if_then) (convertExpr else)
-
-	convertExpr  expr
-		=	undef // <<- ("backendconvert, convertExpr: unknown expression" , expr)
 
 	convertArgs :: [Expression] -> BEMonad BEArgP
 	convertArgs exprs
