@@ -494,7 +494,7 @@ checkExplicitImportCompleteness dcls_explicit explicit_qualified_imports dcl_mod
 			# (macro,ccs) = ccs!box_ccs.ccs_macro_defs.[mod_index,decl_index]
 			= check_completeness macro cci ccs
 		continuation STE_Generic dcl_common dcl_functions cci ccs
-			= ccs // check_completeness not yet implemented
+			= check_completeness dcl_common.com_generic_defs.[decl_index] cci ccs
 
 instance toString STE_Kind where
 	toString (STE_FunctionOrMacro _)	= "function/macro"
@@ -681,6 +681,10 @@ instance check_completeness FunDef where
 instance check_completeness FunType where
 	check_completeness {ft_type} cci ccs
 		= check_completeness ft_type cci ccs
+
+instance check_completeness GenericDef where
+	check_completeness {gen_type} cci ccs
+		= check_completeness gen_type cci ccs
 
 instance check_completeness (Global x) | check_completeness x where
 	check_completeness { glob_object } cci ccs
