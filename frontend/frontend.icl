@@ -6,9 +6,6 @@ implementation module frontend
 import scanner, parse, postparse, check, type, trans, convertcases, overloading, utilities, convertDynamics,
 		convertimportedtypes, compilerSwitches, analtypes, generics1,
 		typereify, saplinterface
-//import coredump
-
-//import print
 
 // trace macro
 (-*->) infixl
@@ -106,19 +103,21 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_m
 		=	abort "frontend: sanityCheckTypeFunctions failed"
 
 	# hp_var_heap = heaps.hp_var_heap
+	#! n_types_with_type_functions = size ti_common_defs.[main_dcl_module_n].com_type_defs
+	#! n_constructors_with_type_functions = size ti_common_defs.[main_dcl_module_n].com_cons_defs
 	# (fun_defs, predef_symbols, hp_var_heap, type_heaps)
-		=	if support_dynamics
-				(buildTypeFunctions main_dcl_module_n fun_defs ti_common_defs 
-						predef_symbols hp_var_heap type_heaps)
-				(fun_defs, predef_symbols, hp_var_heap, type_heaps)
-	# (td_infos, th_vars, error_admin) = analyseTypeDefs ti_common_defs type_groups com_type_defs main_dcl_module_n td_infos type_heaps.th_vars error_admin
+		= if support_dynamics
+			(buildTypeFunctions main_dcl_module_n fun_defs ti_common_defs predef_symbols hp_var_heap type_heaps)
+			(fun_defs, predef_symbols, hp_var_heap, type_heaps)
+	# (td_infos, th_vars, error_admin)
+		= analyseTypeDefs ti_common_defs type_groups com_type_defs main_dcl_module_n td_infos type_heaps.th_vars error_admin
 	# (class_infos, td_infos, th_vars, error_admin)
-			= determineKindsOfClasses icl_used_module_numbers ti_common_defs td_infos th_vars error_admin
+		= determineKindsOfClasses icl_used_module_numbers ti_common_defs td_infos th_vars error_admin
 
 	# icl_global_functions=icl_function_indices.ifi_global_function_indices
 
 	# (fun_defs, dcl_mods, td_infos, th_vars, hp_expression_heap, gen_heap, error_admin)
-			= checkKindsOfCommonDefsAndFunctions n_cached_dcl_modules main_dcl_module_n icl_used_module_numbers
+		= checkKindsOfCommonDefsAndFunctions n_cached_dcl_modules main_dcl_module_n icl_used_module_numbers
 				(icl_global_functions++[icl_function_indices.ifi_local_function_indices])
 				ti_common_defs fun_defs dcl_mods td_infos class_infos th_vars heaps.hp_expression_heap heaps.hp_generic_heap error_admin
 
@@ -171,8 +170,8 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_m
 	# icl_function_indices = {icl_function_indices & ifi_gencase_indices = icl_gencase_indices }
 
 	# (fun_def_size, fun_defs) = usize fun_defs
-	# (components, fun_defs) = partitionateFunctions (fun_defs -*-> "partitionateFunctions") 
-											(icl_global_functions++icl_function_indices.ifi_instance_indices
+	# (components, fun_defs)
+		= partitionateFunctions fun_defs (icl_global_functions++icl_function_indices.ifi_instance_indices
 											++[icl_function_indices.ifi_specials_indices
 											  : icl_gencase_indices++icl_function_indices.ifi_type_function_indices])
 		
@@ -180,9 +179,10 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_m
 		=	frontSyntaxTree cached_dcl_macros cached_dcl_mods main_dcl_module_n
 							predef_symbols hash_table files error io out tcl_file icl_mod dcl_mods fun_defs components array_instances heaps
 
-	# (components, fun_defs, predef_symbols, dcl_types, var_heap, type_heaps, expression_heap, tcl_file)
-	  		= convertDynamicPatternsIntoUnifyAppls common_defs main_dcl_module_n (components -*-> "convertDynamics") fun_defs predef_symbols
-					heaps.hp_var_heap heaps.hp_type_heaps heaps.hp_expression_heap tcl_file dcl_mods icl_mod directly_imported_dcl_modules
+	# (dcl_types, components, fun_defs, predef_symbols, var_heap, type_heaps, expression_heap, tcl_file)
+  		= convertDynamicPatternsIntoUnifyAppls common_defs main_dcl_module_n dcl_mods icl_mod directly_imported_dcl_modules
+			n_types_with_type_functions n_constructors_with_type_functions
+				  components fun_defs predef_symbols heaps.hp_var_heap heaps.hp_type_heaps heaps.hp_expression_heap tcl_file
 
 	| options.feo_up_to_phase == FrontEndPhaseConvertDynamics
 		# heaps = {hp_var_heap=var_heap, hp_type_heaps=type_heaps, hp_expression_heap=expression_heap, hp_generic_heap=newHeap}
@@ -241,8 +241,8 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_m
 		=	frontSyntaxTree cached_dcl_macros cached_dcl_mods main_dcl_module_n
 							predef_symbols hash_table files error io out tcl_file icl_mod dcl_mods fun_defs components array_instances heaps
 
-	# (dcl_types, used_conses, var_heap, type_heaps) = convertIclModule main_dcl_module_n common_defs (dcl_types -*-> "Convert icl") used_conses var_heap type_heaps
-	# (dcl_types, used_conses, var_heap, type_heaps) = convertDclModule main_dcl_module_n dcl_mods common_defs (dcl_types -*-> "Convert dcl") used_conses var_heap type_heaps
+	# (dcl_types, used_conses, var_heap, type_heaps) = convertIclModule main_dcl_module_n common_defs dcl_types used_conses var_heap type_heaps
+	# (dcl_types, used_conses, var_heap, type_heaps) = convertDclModule main_dcl_module_n dcl_mods common_defs dcl_types used_conses var_heap type_heaps
 
 //	  (components, fun_defs, out) = showComponents components 0 False fun_defs out
 

@@ -364,7 +364,7 @@ cNameLocationDependent :== True
 ::	ClassDefInfos :== {# .{! [TypeKind]}}
 
 ::	MemberDef =
-	{	me_ident			:: !Ident
+	{	me_ident		:: !Ident
 	,	me_class		:: !Global Index
 	,	me_offset		:: !Index
 	,	me_type			:: !SymbolType
@@ -375,7 +375,7 @@ cNameLocationDependent :== True
 	}
 
 :: GenericDef = 
-	{	gen_ident		:: !Ident		// the generics name in IC_Generic 
+	{	gen_ident		:: !Ident		// the generics name in IC_Generic
 	,	gen_member_ident	:: !Ident	// the generics name in IC_Expression
 	, 	gen_pos			:: !Position
 	,	gen_type		:: !SymbolType	// Generic type (st_vars include generic type vars)
@@ -925,7 +925,7 @@ cNonRecursiveAppl	:== False
 		ct_result_type  : the type of the result (of each pattern)
 		ct_cons_types   : the types of the arguments of each pattern constructor
 */
-		
+
 ::	CaseType =
 	{	ct_pattern_type	:: !AType
 	,	ct_result_type	:: !AType
@@ -976,18 +976,16 @@ cNonRecursiveAppl	:== False
 	,	tc_var		:: !VarInfoPtr
 	}
 
-//AA: class in a type context is either normal class or a generic class
 :: TCClass 	= TCClass 		!(Global DefinedSymbol) // Normal class
 			| TCGeneric 	!GenericTypeContext		// Generic class
 			| TCQualifiedIdent !Ident !String
 
-:: GenericTypeContext = 
-	{ gtc_generic 	:: !(Global DefinedSymbol)
+:: GenericTypeContext =
+	{ gtc_generic 	:: !Global DefinedSymbol
 	, gtc_kind		:: !TypeKind 
-	, gtc_class		:: !(Global DefinedSymbol) // generated class
-	, gtc_dictionary:: !(Global DefinedSymbol) // HACK: dictionary different from the one contained in the class
+	, gtc_class		:: !Global DefinedSymbol	// generated class
+	, gtc_generic_dict :: !GlobalIndex			// HACK: dictionary different from the one contained in the class
 	}
-//..AA
 
 ::	AType =
 	{	at_attribute	:: !TypeAttribute
@@ -1014,13 +1012,14 @@ cNonRecursiveAppl	:== False
 			|	TFAC ![ATypeVar] !Type ![TypeContext]	// Universally quantified function argument type with contexts
 
 			|	TempV !TempVarId				/* Auxiliary, used during type checking */
-
 			
 			|	TQV	TypeVar
 			|	TempQV !TempVarId				/* Auxiliary, used during type checking */
 
 			|	TLifted !TypeVar				/* Auxiliary, used during type checking of lifted arguments */
 			|	TQualifiedIdent !Ident !String ![AType]
+
+			|	TGenericFunctionInDictionary !(Global DefinedSymbol) !TypeKind !GlobalIndex /*GenericDict*/
 
 			|	TE
 

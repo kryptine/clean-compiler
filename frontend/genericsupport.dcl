@@ -50,3 +50,4 @@ postfixIdent 				:: !String !String -> Ident
 genericIdentToClassIdent 	:: !String !TypeKind -> Ident
 genericIdentToMemberIdent 	:: !String !TypeKind -> Ident
 genericIdentToFunIdent 		:: !String !TypeCons -> Ident
+kind_to_short_string :: !TypeKind -> {#Char}

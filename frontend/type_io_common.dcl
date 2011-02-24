@@ -26,7 +26,7 @@ AlgTypeCode						:== (toChar 5)
 SynTypeCode 					:== (toChar 6)
 RecordTypeCode					:== (toChar 7)
 AbstractTypeCode				:== (toChar 8)
-GenericDictionaryTypeCode		:== '\x22'
+GenericDictionaryTypeCode		:== '\x25'
 
 // Type
 //TypeTACode						:== (toChar 9)		// TA
@@ -38,6 +38,7 @@ TypeGTVCode						:== (toChar 14)		// GTV
 TypeTVCode						:== (toChar 15)		// TV
 TypeTQVCode						:== (toChar 16)		// TempTQV
 TypeTECode						:== (toChar 17)		// TE
+GenericFunctionTypeCode			:== '\x24'			// TGenericFunction
 
 // Type; TB
 BT_IntCode						:== (toChar 18)	

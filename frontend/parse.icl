@@ -1452,10 +1452,10 @@ where
 						# class_global_ds = { glob_object = MakeDefinedSymbol {id_name="<no class>",id_info=nilPtr} NoIndex 1, glob_module = NoIndex}
 						
 						# gen_type_context = 
-							{ gtc_generic = { glob_object = MakeDefinedSymbol ident NoIndex 1, glob_module = NoIndex }
+							{ gtc_generic = {glob_object = MakeDefinedSymbol ident NoIndex 1, glob_module = NoIndex}
 							, gtc_kind = kind
-							, gtc_class = { glob_object = MakeDefinedSymbol {id_name="<no class>",id_info=nilPtr} NoIndex 1, glob_module = NoIndex}
-							, gtc_dictionary = { glob_object = MakeDefinedSymbol {id_name="<no generic dictionary>",id_info=nilPtr} NoIndex 1, glob_module = NoIndex} 							
+							, gtc_class = {glob_object = MakeDefinedSymbol {id_name="<no class>",id_info=nilPtr} NoIndex 1, glob_module = NoIndex}
+							, gtc_generic_dict = {gi_module = NoIndex, gi_index = NoIndex}
 							}
 						
 						-> (True, TCGeneric gen_type_context, pState)
@@ -1519,10 +1519,7 @@ optionalCoercions pState
 			  , parseError "Function type: optional coercions" (Yes token) "<attribute variable>" pState
 			  )
 
-// AA..
-/*
-	Generic definitions
-*/
+/* Generic definitions */
 
 wantGenericDefinition :: !ParseContext !Position !ParseState -> (!ParsedDefinition, !ParseState)
 wantGenericDefinition parseContext pos pState
@@ -1642,8 +1639,6 @@ where
 	get_type_cons type pState 
 		# pState = parseError "generic type" No " type constructor" pState
 		= (abort "no TypeCons", pState)
-		
-// ..AA
 
 /*
 	Type definitions

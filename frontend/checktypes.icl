@@ -1,8 +1,7 @@
 implementation module checktypes
 
 import StdEnv
-import syntax, checksupport, check, typesupport, utilities,
-		compilerSwitches // , RWSDebug
+import syntax, checksupport, check, typesupport, utilities
 import genericsupport
 from explicitimports import search_qualified_ident,::NameSpaceN,TypeNameSpaceN,ClassNameSpaceN
 
@@ -88,7 +87,7 @@ where
 			STE_BoundTypeVariable bv=:{stv_attribute, stv_info_ptr}
 				-> ({ tv & tv_info_ptr = stv_info_ptr}, stv_attribute, (ts, ti, cs))
 			_
-				-> (tv, TA_Multi, (ts, ti, { cs & cs_error = checkError var_id "type variable undefined" cs.cs_error }))
+				-> (tv, TA_Multi, (ts, ti, {cs & cs_error = checkError var_id "type variable undefined" cs.cs_error}))
 
 instance bindTypes [a] | bindTypes a
 where
@@ -1684,16 +1683,17 @@ where
 		  field_type = makeAttributedType TA_Multi (TA type_symb [makeAttributedType TA_Multi TE \\ i <- [1..class_arity]])
 		  (field, var_heap, symbol_table)
 		  	= build_field field_nr class_ident.id_name rec_type_index rec_type field_type next_selector_index var_heap symbol_table
-		= build_context_fields mod_index (inc field_nr) tcs rec_type rec_type_index (inc next_selector_index) [ field : rev_fields ]
+		= build_context_fields mod_index (inc field_nr) tcs rec_type rec_type_index (inc next_selector_index) [field : rev_fields]
 				 [field_type : rev_field_types] class_defs modules var_heap symbol_table
-	build_context_fields mod_index field_nr [{tc_class = TCGeneric {gtc_generic, gtc_kind}} :tcs] rec_type rec_type_index
+	build_context_fields mod_index field_nr [{tc_class = TCGeneric {gtc_generic,gtc_kind,gtc_generic_dict}} :tcs] rec_type rec_type_index
 			next_selector_index rev_fields rev_field_types class_defs modules var_heap symbol_table
 		// FIXME: We do not know the type before the generic phase.
 		// The generic phase currently does not update the type.
-		# field_type = makeAttributedType TA_Multi TE 
+		# field_type = {at_attribute = TA_Multi, at_type = TGenericFunctionInDictionary gtc_generic gtc_kind gtc_generic_dict}
 		# class_ident = genericIdentToClassIdent gtc_generic.glob_object.ds_ident.id_name gtc_kind
-		# (field, var_heap, symbol_table) = build_field field_nr class_ident.id_name rec_type_index rec_type field_type next_selector_index var_heap symbol_table
-		= build_context_fields mod_index (inc field_nr) tcs rec_type rec_type_index (inc next_selector_index) [ field : rev_fields ]
+		# (field, var_heap, symbol_table)
+			= build_field field_nr class_ident.id_name rec_type_index rec_type field_type next_selector_index var_heap symbol_table
+		= build_context_fields mod_index (inc field_nr) tcs rec_type rec_type_index (inc next_selector_index) [field : rev_fields]
 				 [field_type : rev_field_types] class_defs modules var_heap symbol_table
 	build_context_fields mod_index field_nr [] rec_type rec_type_index next_selector_index rev_fields rev_field_types class_defs modules var_heap symbol_table
 		= (next_selector_index, rev_fields, rev_field_types , class_defs, modules, var_heap, symbol_table)			
@@ -1703,7 +1703,7 @@ where
 		  (sd_type_ptr, var_heap) = newPtr VI_Empty var_heap
   		  field_id = { id_name = field_name, id_info = id_info }
   		  sel_def =
-  		  	{	sd_ident			= field_id
+  		  	{	sd_ident		= field_id
   		  	,	sd_field		= field_id
   		  	,	sd_type			= { st_vars	= [], st_args = [ rec_type ], st_args_strictness=Strict 1, st_result = field_type, st_arity = 1,
   		  	                        st_context = [], st_attr_vars = [], st_attr_env = [] }
