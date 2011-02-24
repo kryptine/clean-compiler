@@ -774,8 +774,7 @@ checkOpenATypes mod_index scope types cot_state
 checkInstanceType :: !Index !(Global DefinedSymbol) !InstanceType !Specials !u:{# CheckedTypeDef} !v:{# ClassDef} !u:{# DclModule} !*TypeHeaps !*CheckState
 	-> (!InstanceType, !Specials, !u:{# CheckedTypeDef}, !v:{# ClassDef}, !u:{# DclModule}, !*TypeHeaps, !*CheckState)
 checkInstanceType mod_index ins_class it=:{it_types,it_context} specials type_defs class_defs modules heaps cs
-	# cs_error
-			= check_fully_polymorphity it_types it_context cs.cs_error
+	# cs_error = check_fully_polymorphity it_types it_context cs.cs_error
 	  ots = { ots_type_defs = type_defs, ots_modules = modules }
 	  oti = { oti_heaps = heaps, oti_all_vars = [], oti_all_attrs = [], oti_global_vars= [] }
 	  (it_types, (ots, oti=:{oti_all_vars = it_vars, oti_all_attrs = it_attr_vars}, cs))
@@ -808,9 +807,7 @@ checkInstanceType mod_index ins_class it=:{it_types,it_context} specials type_de
 			| ref_count > 1
 				= (th_vars, checkError tv_ident ": this type variable occurs more than once in an instance type" error)
 				= (th_vars, error)
-			
-		
-	
+
 	compare_context_and_instance_types ins_class it_types {tc_class=TCGeneric _, tc_types} cs_error
 		= cs_error
 	compare_context_and_instance_types ins_class it_types {tc_class=TCClass clazz, tc_types} cs_error
@@ -993,23 +990,20 @@ where
 	  	# gen_ident = gtc_generic.glob_object.ds_ident	
 		# (entry, cs_symbol_table) = readPtr gen_ident.id_info cs.cs_symbol_table
 	  	# cs = { cs & cs_symbol_table = cs_symbol_table }
-	  	# clazz = 
+	  	# clazz =
 	  		{ glob_module = -1
-	  		, glob_object = 
-	  			{ ds_ident = genericIdentToClassIdent gen_ident.id_name gtc_kind
-	  			, ds_arity = 1
-	  			, ds_index = -1
-	  			}
+	  		, glob_object = {ds_ident = genericIdentToClassIdent gen_ident.id_name gtc_kind, ds_arity = 1, ds_index = -1}
 	  		}
-	  		
 		# (generic_index, generic_module) = retrieveGlobalDefinition entry STE_Generic mod_index
 		| generic_index <> NotFound
 			| gtc_generic.glob_object.ds_arity == 1
 				# checked_gen = 
 					{ glob_module = generic_module
 					, glob_object = {gtc_generic.glob_object & ds_index = generic_index}					
-					}			
-				= (TCGeneric {gtc & gtc_generic = checked_gen, gtc_class=clazz}, (class_defs, ots, cs))
+					}
+				  ({pds_module,pds_def},cs) = cs!cs_predef_symbols.[PD_TypeGenericDict]
+				  generic_dict = {gi_module=pds_module, gi_index=pds_def}
+				= (TCGeneric {gtc & gtc_generic = checked_gen, gtc_class=clazz, gtc_generic_dict=generic_dict}, (class_defs, ots, cs))
 				# cs_error = checkError gen_ident "generic used with wrong arity: generic has always has one class argument" cs.cs_error  
 				= (TCGeneric {gtc & gtc_class=clazz}, (class_defs, ots, {cs & cs_error = cs_error}))
 			# cs_error = checkError gen_ident "generic undefined" cs.cs_error
@@ -1074,7 +1068,6 @@ where
 					-> remove_global_type_variables_in_dynamics local_dynamics (expr_heap, symbol_table)
 				EI_DynamicTypeWithVars loc_type_vars {dt_global_vars} local_dynamics
 					-> remove_global_type_variables_in_dynamics local_dynamics (expr_heap, remove_global_type_variables dt_global_vars symbol_table)
-						
 	
 		remove_global_type_variables global_vars symbol_table
 			= foldSt remove_global_type_variable global_vars symbol_table
@@ -1579,10 +1572,11 @@ where
 		
 	build_fields field_nr nr_of_fields class_members rec_type field_type rec_type_index next_selector_index rev_fields var_heap symbol_table
 		| field_nr < nr_of_fields
-			# (field, var_heap, symbol_table) = build_field field_nr class_members.[field_nr].ds_ident.id_name rec_type_index
-											rec_type field_type next_selector_index var_heap symbol_table
+			# field_name = class_members.[field_nr].ds_ident.id_name
+			# (field, var_heap, symbol_table)
+				= build_field field_nr field_name rec_type_index rec_type field_type next_selector_index var_heap symbol_table
 			= build_fields (inc field_nr) nr_of_fields class_members rec_type field_type rec_type_index (inc next_selector_index)
-				 [ field : rev_fields ] var_heap symbol_table
+				 [field : rev_fields] var_heap symbol_table
 			= (rev_fields, var_heap, symbol_table)			
 
 	build_context_fields mod_index field_nr [{tc_class = TCClass {glob_module, glob_object={ds_index}}}:tcs] rec_type rec_type_index
