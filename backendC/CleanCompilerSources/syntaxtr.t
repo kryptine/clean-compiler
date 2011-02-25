@@ -707,7 +707,6 @@ STRUCT (symbol_def,SymbDef){
 	unsigned		sdef_ancestor;
 	short			sdef_arity;
 	short			sdef_cons_arity;
-	short			sdef_over_arity;
 	unsigned short	sdef_nr_of_lifted_nodeids;
 
 	union {
@@ -734,29 +733,15 @@ STRUCT (symbol_def,SymbDef){
 	int				sdef_mark;
 
 	Bool			sdef_isused:1;
-	Bool			sdef_no_sa:1;
 	Bool			sdef_returnsnode:1;
 	Bool			sdef_calledwithrootnode:1;
-	Bool			sdef_unq_attributed:1;
 	Bool			sdef_strict_constructor:1;		/* for CONSTRUCTOR and RECORDTYPE */
 	Bool			sdef_boxed_record:1;			/* for RECORDTYPE */
 	Bool			sdef_exported:1;
 	Bool			sdef_main_dcl:1;				/* if in .dcl of main .icl */
-	Bool			sdef_infix:1;
-#ifdef OS2
-	int				sdef_stupid_gcc;
-	SDefKind		sdef_kind:SDefKindSize;
-	unsigned		sdef_infix_priority:4;
-	unsigned		sdef_checkstatus:4;		/* CheckStatus */
-	unsigned		sdef_arfun:ArrayFunKindBitSize;			/* ArrayFunKind */
-	unsigned		sdef_infix_assoc:2;		/* Assoc */
-#else
 	unsigned		sdef_kind:SDefKindSize;
-	unsigned		sdef_infix_priority:4;
-	unsigned		sdef_infix_assoc:2;		/* Assoc */
 	unsigned		sdef_checkstatus:3;		/* CheckStatus */
 	unsigned		sdef_arfun:ArrayFunKindBitSize;			/* ArrayFunKind */
-#endif
 };
 
 #define sdef_type			sdef_u.u_type

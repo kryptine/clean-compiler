@@ -1,7 +1,6 @@
 
 /*
 	Compiler setttings
-	Note that changes are of influence for project.c !!
 */
 
 extern Bool DoCode;					/* not generated in abc file */
@@ -46,6 +45,4 @@ extern Bool StrictDoVerbose;
 extern Bool StrictDoAnnots;
 extern unsigned long StrictMemUse;
 
-extern Bool VERBOSE;
-
-extern Bool FunctionMayFailIsError,NotUsedIsError,FunctionNotUsedIsError;
+extern Bool FunctionMayFailIsError;

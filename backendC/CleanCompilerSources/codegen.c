@@ -1267,26 +1267,25 @@ void CodeGeneration (ImpMod imod, char *fname)
 #endif
 
 			update_function_p=&first_update_function;
-			for_l (rule,imod->im_rules,rule_next)
-				if (rule->rule_root->node_symbol->symb_def->sdef_over_arity==0){
-					CodeRule (rule);
-					
-					*update_function_p=NULL;
-					if (first_update_function){
-						while (first_update_function){
-							transform_patterns_to_case_and_guard_nodes (first_update_function->rule_alts);
+			for_l (rule,imod->im_rules,rule_next){
+				CodeRule (rule);
+
+				*update_function_p=NULL;
+				if (first_update_function){
+					while (first_update_function){
+						transform_patterns_to_case_and_guard_nodes (first_update_function->rule_alts);
 #ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
-							determine_failing_cases_and_adjust_ref_counts_of_rule (first_update_function->rule_alts);
+						determine_failing_cases_and_adjust_ref_counts_of_rule (first_update_function->rule_alts);
 #endif
-							CodeRule (first_update_function);
-							
-							first_update_function=first_update_function->rule_next;
-						}
-						update_function_p=&first_update_function;						
+						CodeRule (first_update_function);
+						
+						first_update_function=first_update_function->rule_next;
 					}
-	
-					ExitOnInterrupt ();
+					update_function_p=&first_update_function;						
 				}
+
+				ExitOnInterrupt ();
+			}
 
 			GenerateCodeForLazyTupleSelectorEntries (LazyTupleSelectors);
 			GenerateCodeForLazyArrayFunctionEntries();

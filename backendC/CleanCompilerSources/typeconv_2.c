@@ -219,26 +219,6 @@ static Bool DetermineRefCountOfAttributeVarsInNode (TypeNode type_node)
 
 } /* DetermineRefCountOfAttributeVarsInNode */
 
-static void DetermineRefCountOfAttributeVars (TypeAlts type)
-{
-	TypeArgs type_args;
-	UniVarEquations attr_equas;
-	
-	ClearARC_Info ();
-
-	for (type_args = type -> type_alt_lhs -> type_node_arguments; type_args; type_args = type_args -> type_arg_next)
-		DetermineRefCountOfAttributeVarsInNode (type_args -> type_arg_node);
-	DetermineRefCountOfAttributeVarsInNode (type -> type_alt_rhs);
-
-	for (attr_equas = type -> type_alt_attr_equations; attr_equas; attr_equas = attr_equas -> uve_next)
-	{	AttributeKindList next;
-		UpdateRefCountInfo (attr_equas -> uve_demanded - FirstUniVarNumber, False);
-		for (next = attr_equas -> uve_offered; next; next = next -> akl_next)
-			UpdateRefCountInfo (next -> akl_elem - FirstUniVarNumber, False);
-	}
-
-} /* DetermineRefCountOfAttributeVars */
-
 static char *TypeConv = "typeconv";
 
 static unsigned RetrieveRefCountInfo (int attr_var, Bool *used_implicitly)
@@ -663,9 +643,6 @@ void PrintType (SymbDef tdef, TypeAlts type)
 	TypeNode lhs_root = type -> type_alt_lhs;
 	TypeArgs lhsargs = lhs_root -> type_node_arguments;
 	int i;
-	
-	if (tdef -> sdef_unq_attributed && DoShowAttributes)
-		DetermineRefCountOfAttributeVars (type);
 	
 	for (i=0; i<tdef -> sdef_nr_of_lifted_nodeids; i++)
 		lhsargs = lhsargs -> type_arg_next; 

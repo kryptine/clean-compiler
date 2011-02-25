@@ -3602,12 +3602,12 @@ static void ConvertSyntaxTree (Symbol symbols)
 	
 	/* initialise the function table with symbols with a definition */
 	for_l (sdef,scc_dependency_list,sdef_next_scc)
-		if (sdef->sdef_kind==IMPRULE && sdef->sdef_over_arity==0)
+		if (sdef->sdef_kind==IMPRULE)
 			convert_imp_rule_type (sdef);
 
 	/* convert the rules */
 	for_l (sdef,scc_dependency_list,sdef_next_scc)
-		if (sdef->sdef_kind==IMPRULE && sdef->sdef_over_arity==0)
+		if (sdef->sdef_kind==IMPRULE)
 			convert_imp_rule_alts (sdef);
 
 	/* give a warning for annotated functions */
@@ -3663,7 +3663,7 @@ static void UpdateSyntaxTree (void)
 	SymbDef sdef;
 	
 	for_l (sdef,scc_dependency_list,sdef_next_scc)
-		if (sdef->sdef_kind==IMPRULE && sdef->sdef_over_arity==0)			
+		if (sdef->sdef_kind==IMPRULE)			
 			update_function_strictness (sdef);
 }
 
@@ -5502,9 +5502,7 @@ static void DeriveStrictness (Fun *f, unsigned arg, StrictKind arg_kind, StrictK
 	FindStrictPropsOfStrictInfo (&f->fun_strictargs[arg], arg_kind, context);
 }
 
-#define IsAnalysableFun(A)		(! (A)->fun_symbol->sdef_no_sa &&\
-								   (A)->fun_arity != 0 &&\
-								   (A)->fun_kind == Function)
+#define IsAnalysableFun(A) ((A)->fun_arity != 0 && (A)->fun_kind == Function)
 
 static void FindStrictPropertiesOfFunction (Fun *f)
 {
@@ -5687,7 +5685,7 @@ void do_strictness_analysis (void)
 		SymbDef sdef;
 
 		for_l (sdef,scc_dependency_list,sdef_next_scc)
-			if (sdef->sdef_kind==IMPRULE && sdef->sdef_over_arity==0)
+			if (sdef->sdef_kind==IMPRULE)
 				FindStrictPropertiesOfFunction (sdef->sdef_sa_fun);
 	}
 	

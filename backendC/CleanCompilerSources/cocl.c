@@ -160,8 +160,6 @@ Bool CallCompiler (int argc, char **argv)
 	StrictDepth				= 10;/* 8; */
 
 	FunctionMayFailIsError	= False;
-	NotUsedIsError			= False;
-	FunctionNotUsedIsError	= False;
 
 #ifdef CLEAN2
 	StdErrorReopened	= False;
@@ -214,11 +212,7 @@ Bool CallCompiler (int argc, char **argv)
 			else if (strcmp (argv_i,"-wmt") == 0)
 				WriteModificationTimes=True;
 			else if (strcmp (argv_i,"-emf") == 0)
-				FunctionMayFailIsError=True;			
-			else if (strcmp (argv_i,"-enu") ==0)
-				NotUsedIsError=True;
-			else if (strcmp (argv_i,"-efnu") ==0)
-				FunctionNotUsedIsError=True;
+				FunctionMayFailIsError=True;
 			else if (strcmp (argv_i,"-desc") ==0)
 				DoDescriptors=True;
 			else if (strcmp (argv_i,"-exl") ==0)

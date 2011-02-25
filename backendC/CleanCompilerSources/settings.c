@@ -47,7 +47,3 @@ Bool StrictDoVerbose		= False;
 Bool StrictDoAnnots			= True;
 
 Bool FunctionMayFailIsError	= False;
-Bool NotUsedIsError			= False;
-Bool FunctionNotUsedIsError	= False;
-
-Bool VERBOSE      = True;

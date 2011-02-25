@@ -779,7 +779,6 @@ BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, in
 
 			newsdef->sdef_ident			= newIdent;
 			newsdef->sdef_module		= gBEState.be_icl.beicl_module->im_name->symb_def->sdef_module; /* phew! */
-			newsdef->sdef_over_arity	= 0;
 			newsdef->sdef_mark		= 0;
 			newsdef->sdef_isused		= True;
 			newsdef->sdef_exported		= False;
@@ -2510,7 +2509,6 @@ DeclareFunctionC (char *name, int arity, int functionIndex, unsigned int ancesto
 
 	newSymbDef->sdef_kind		= IMPRULE;
 	newSymbDef->sdef_mark		= 0;
-	newSymbDef->sdef_over_arity	= 0;
 	newSymbDef->sdef_arity		= arity;
 	newSymbDef->sdef_module		= module->bem_name;
 	newSymbDef->sdef_ancestor	= ancestor;
@@ -2519,7 +2517,6 @@ DeclareFunctionC (char *name, int arity, int functionIndex, unsigned int ancesto
 	newSymbDef->sdef_exported	= False;
 	newSymbDef->sdef_dcl_icl	= NULL;
 	newSymbDef->sdef_isused		= 0;
-	newSymbDef->sdef_no_sa		= False;
 
 	newSymbDef->sdef_nr_of_lifted_nodeids	= 0;	/* used in PrintType */
 	newSymbDef->sdef_line					= 0;	/* used in PrintType */
@@ -2666,7 +2663,6 @@ BEDefineRuleType (int functionIndex, int moduleIndex, BETypeAltP typeAlt)
 
 	sdef	= functionSymbol->symb_def;
 	Assert (sdef->sdef_kind == NEWDEFINITION);
-	sdef->sdef_over_arity	= 0;
 	sdef->sdef_arity		= typeAlt->type_alt_lhs->type_node_arity;
 	sdef->sdef_arfun		= NoArrayFun;
 	sdef->sdef_kind 		= module->bem_isSystemModule ? SYSRULE : DEFRULE;
@@ -2856,7 +2852,6 @@ BEAlgebraicType (BEFlatTypeP lhs, BEConstructorListP constructors)
 	Assert (type->type_lhs->ft_symbol->symb_kind == definition);
 	sdef	= type->type_lhs->ft_symbol->symb_def;
 	Assert (sdef->sdef_kind == NEWDEFINITION);
-	sdef->sdef_over_arity	= 0;
 	sdef->sdef_kind 		= TYPE;
 	sdef->sdef_type			= type;
 } /* BEAlgebraicType */
@@ -2902,7 +2897,6 @@ BERecordType (int moduleIndex, BEFlatTypeP lhs, BETypeNodeP constructorType, int
 	Assert (type->type_lhs->ft_symbol->symb_kind == definition);
 	sdef	= type->type_lhs->ft_symbol->symb_def;
 	Assert (sdef->sdef_kind == NEWDEFINITION);
-	sdef->sdef_over_arity	= 0;
 	sdef->sdef_cons_arity	= constructorType->type_node_arity;
 	sdef->sdef_checkstatus	= TypeChecked;
 	sdef->sdef_kind 		= RECORDTYPE;
@@ -2944,7 +2938,6 @@ BEAbsType (BEFlatTypeP lhs)
 	Assert (lhs->ft_symbol->symb_kind == definition);
 	sdef	= lhs->ft_symbol->symb_def;
 	Assert (sdef->sdef_kind == NEWDEFINITION);
-	sdef->sdef_over_arity	= 0;
 	sdef->sdef_checkstatus	= TypeChecked;
 	sdef->sdef_kind 		= ABSTYPE;
 	sdef->sdef_abs_type		= absType;
@@ -2988,7 +2981,6 @@ BEConstructor (BETypeNodeP type)
 	sdef->sdef_kind = CONSTRUCTOR;
 	sdef->sdef_constructor	= constructor;
 	sdef->sdef_arity		= type->type_node_arity;
-	sdef->sdef_over_arity	= 0;
 	/* ifdef DEBUG */
 	sdef->sdef_type			= NULL;
 	/* endif */
@@ -3055,7 +3047,6 @@ BEField (int fieldIndex, int moduleIndex, BETypeNodeP type)
 	sdef->sdef_kind = FIELDSELECTOR;
 	sdef->sdef_sel_field	= field;
 	sdef->sdef_arity		= 1;
-	sdef->sdef_over_arity	= 0;
 	sdef->sdef_mark			= 0;
 	/* ifdef DEBUG */
 	sdef->sdef_type			= NULL;
@@ -3106,7 +3097,6 @@ BEDeclareConstructor (int constructorIndex, int moduleIndex, CleanString name)
 	newSymbDef->sdef_ident		= newIdent;
 	newSymbDef->sdef_mark		= 0;
 	newSymbDef->sdef_isused		= 0;
-	newSymbDef->sdef_no_sa		= False;
 
 	constructors [constructorIndex]->symb_kind	= definition;
 	constructors [constructorIndex]->symb_def	= newSymbDef;
