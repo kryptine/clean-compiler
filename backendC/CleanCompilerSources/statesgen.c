@@ -1099,7 +1099,7 @@ void ExamineTypesAndLhsOfImpRuleSymbolDefinitionAgain (SymbDef def)
 	DetermineLhsStatesOfRule (def->sdef_rule);
 #endif
 
-	if (def->sdef_exported && def->sdef_dcl_icl!=NULL && def->sdef_dcl_icl->sdef_kind!=INSTANCE)
+	if (def->sdef_exported && def->sdef_dcl_icl!=NULL)
 		rootstate=def->sdef_dcl_icl->sdef_rule_type->rule_type_state_p[-1];
 
 	if (IsSimpleState (rootstate)){
@@ -1148,7 +1148,7 @@ void ExamineTypesAndLhsOfSymbolDefinition (SymbDef def)
 			def->sdef_rule->rule_state_p = allocate_function_state (def->sdef_arity);
 			rootstate = DetermineStatesOfRuleType (def->sdef_rule->rule_type,def->sdef_rule->rule_state_p);
 			
-			if (def->sdef_exported && def->sdef_dcl_icl!=NULL && def->sdef_dcl_icl->sdef_kind!=INSTANCE){
+			if (def->sdef_exported && def->sdef_dcl_icl!=NULL){
 				def->sdef_dcl_icl->sdef_rule_type->rule_type_state_p = allocate_function_state (def->sdef_arity);
 				rootstate = DetermineStatesOfRuleType (def->sdef_dcl_icl->sdef_rule_type->rule_type_rule,def->sdef_dcl_icl->sdef_rule_type->rule_type_state_p);
 			}

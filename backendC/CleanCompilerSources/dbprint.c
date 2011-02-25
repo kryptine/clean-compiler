@@ -77,18 +77,6 @@ void PrintState (StateS state, File file)
 	}
 }
 
-void DPrintOccurrenceKind (OccurrenceKind kind, File file)
-{
-	switch (kind)
-	{	case NotUsed:			/* FPutS ("NotUsed", file); */ return;
-		case UniquelyUsed:		FPutS ("<U> ", file); return;
-		case SelectivelyUsed:	FPutS ("<S> ", file); return;
-		case MultiplyUsed:		FPutS ("<M> ", file); return;
-		default:				FPutS ("<?> ", file); return;
-	}
-
-}
-
 void DPrintNodeId (NodeId nid, File file)
 {
 	if (nid){
@@ -138,10 +126,8 @@ static void PrintArgument (Args arg,Bool brackets,int n_leading_spaces,File file
 	
 	if (arg->arg_node->node_kind==NodeIdNode)
 		DPrintNodeId (arg->arg_node->node_node_id,file);
-	else {
-		/*	DPrintOccurrenceKind (arg -> arg_occurrence); */
+	else
 		PrintRuleNode (arg->arg_node,brackets,n_leading_spaces,file);
-	}
 }
 
 static void print_spaces (int n_leading_spaces,File file)
@@ -541,11 +527,7 @@ void PrintNodeDef (NodeDefP def_p,int n_leading_spaces,File file)
 	for (n=n_leading_spaces; n>0; --n)
 		FPutC (' ',file);
 	
-/*		if (def_p->def_has_lhs_pattern)
-		PrintRuleNode (def_p->def_pattern,False,n_leading_spaces,file);
-	else
-*/
-		DPrintNodeId (def_p -> def_id, file);
+	DPrintNodeId (def_p -> def_id, file);
 	
 	if (def_p -> def_node){
 		FPutS (" = ", file);
@@ -797,42 +779,3 @@ void PrintRules (ImpRules rules,File file)
 			FPutC ('\n',file);
 	}
 }
-
-#ifdef _COMPSTATS_
-
-unsigned long 
-	NrNodeCells, 
-	NrArgCells, 
-	NrTypeNodeCells,
-	NrTypeArgCells,
-	NrExpandedTypeNodeCells,
-	NrExpandedTypeArgCells,
-	NrNodeIdCells, 
-	NrSymbolCells,
-	NrBasicNodes;
-
-void InitDB (void)
-{
-	NrArgCells = NrNodeCells = NrNodeIdCells =0;
-	NrTypeArgCells = NrTypeNodeCells =0;
-	NrExpandedTypeNodeCells = NrExpandedTypeArgCells = 0;
-	NrBasicNodes = NrSymbolCells = 0;
-}
-
-extern unsigned long NrOfBytes;
-void PrintCompStats (void, File file)
-{
-	FPutC('\n', file);
-	FPrintF (file, "Number of nodes: %lu\n", NrNodeCells);
-	FPrintF (file, "Number of arguments: %lu\n", NrArgCells);
-	FPrintF (file, "Number of type nodes: %lu\n", NrTypeNodeCells);
-	FPrintF (file, "Number of type arguments: %lu\n", NrTypeArgCells);
-	FPrintF (file, "Number of expanded type nodes: %lu\n", NrExpandedTypeNodeCells);
-	FPrintF (file, "Number of expanded type arguments: %lu\n", NrExpandedTypeArgCells);
-	FPrintF (file, "Number of nodeids: %lu\n", NrNodeIdCells);
-	FPrintF (file, "Number of symbols: %lu\n", NrSymbolCells);
-	FPrintF (file, "Number of basic nodes: %lu\n", NrBasicNodes);
-	FPrintF (file, "Total number of bytes: %lu\n", NrOfBytes);
-}
-
-#endif

@@ -758,9 +758,6 @@ static void CodeRule (ImpRuleP rule)
 								rule_sdef->sdef_dcl_icl->sdef_rule_type->rule_type_state_p,rule->rule_state_p,
 								jmp_to_eval_args_entry,init_a_stack_top, init_b_stack_top, &ea_lab, &extlab, root_node_needed);
 					break;
-				case INSTANCE:
-					ext_label_needed=True;
-					break;
 				default:
 					ErrorInCompiler ("codegen.c","CodeRule","unknown kind of rewrite rule");
 					break;
@@ -1295,9 +1292,6 @@ void CodeGeneration (ImpMod imod, char *fname)
 			WriteLastNewlineToABCFile();
 
 			CloseABCFile (fname);
-#ifdef _COMPSTATS_
-			PrintCompStats();
-#endif
 		}
 	}
 }

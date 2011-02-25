@@ -64,7 +64,7 @@ NewArgument (NodeP node)
 	newarg	= CompAllocType (ArgS);
 
 	newarg->arg_node		= node;
-	newarg->arg_occurrence	= NotUsed;
+	newarg->arg_occurrence	= 0;
 	newarg->arg_next		= NIL;
 
 	return (newarg);

@@ -49,7 +49,6 @@ NewIdent (TableKind tableKind, char *name)
 	ident->ident_next		= NULL;
 	ident->ident_environ	= NULL;
 	ident->ident_symbol		= NULL;
-	ident->ident_local_defs = NULL;
 	ident->ident_mark 		= 0;
 
 	return (ident);

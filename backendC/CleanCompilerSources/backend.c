@@ -2518,7 +2518,6 @@ DeclareFunctionC (char *name, int arity, int functionIndex, unsigned int ancesto
 	newSymbDef->sdef_dcl_icl	= NULL;
 	newSymbDef->sdef_isused		= 0;
 
-	newSymbDef->sdef_nr_of_lifted_nodeids	= 0;	/* used in PrintType */
 	newSymbDef->sdef_line					= 0;	/* used in PrintType */
 
 	*icl->beicl_depsP	= newSymbDef;

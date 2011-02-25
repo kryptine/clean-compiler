@@ -4,7 +4,6 @@
 
 #include "compiledefines.h"
 
-#define	class	class_is_keyword
 #define	new		new_is_keyword
 
 #define STRUCT(struct_name,type_name) \
@@ -18,10 +17,6 @@ typedef unsigned long BITVECT;
 typedef	enum
 {	NoAttr, DeferAttr, CopyAttr
 } GraphAttributeKind;
-
-typedef enum
-{	NotUsed, UniquelyUsed, SelectivelyUsed, MultiplyUsed, ObservinglyUsed
-} OccurrenceKind;
 
 typedef enum {
 	TupleState,  ArrayState, RecordState, SimpleState
@@ -193,15 +188,6 @@ STRUCT(ident,Ident){
 		char *				ident_u1_instructions;
 	} ident_union1;
 
-#ifdef SHORT_CLASS_NAMES
-	union{
-		struct local_def *		ident_u2_local_defs;
-		struct module_info *	ident_u2_mod_info;
-	} ident_union2;
-#else
-	struct local_def *		ident_local_defs;
-#endif
-
 	struct ident *		ident_next;
 	unsigned char		ident_table; /* TableKind */
 	unsigned char		ident_mark;
@@ -212,11 +198,6 @@ STRUCT(ident,Ident){
 #define ident_tv			ident_union1.ident_u1_tv
 #define ident_uni_var		ident_union1.ident_u1_uni_var
 #define ident_instructions	ident_union1.ident_u1_instructions
-
-#ifdef SHORT_CLASS_NAMES
-#define ident_local_defs	ident_union2.ident_u2_local_defs
-#define ident_mod_info		ident_union2.ident_u2_mod_info
-#endif
  
 #define IMPORT_MASK					1
 #define IMPORTED_MASK				2
@@ -426,7 +407,6 @@ STRUCT (node,Node){
 		struct if_node_contents *	contents_if;
 		Symbol						contents_symbol;
 		NodeId						contents_node_id;
-		Ident						contents_ident;
 		struct node *				contents_node;
 		struct node_id_list_element *contents_node_ids;
 #ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
@@ -480,7 +460,6 @@ STRUCT (node,Node){
 #define node_node_defs				node_su.su_u.u_node_defs
 #define node_symbol					node_contents.contents_symbol
 #define node_node_id				node_contents.contents_node_id
-#define node_ident					node_contents.contents_ident
 #define node_node					node_contents.contents_node
 #define node_node_ids				node_contents.contents_node_ids
 
@@ -507,7 +486,7 @@ STRUCT (arg,Arg){
 	struct arg *		arg_next;
 	union {
 		StateS			u_state;
-		unsigned long	u_occurrence; /* OccurrenceKind */
+		unsigned long	u_occurrence;
 	} arg_u;
 };
 typedef struct arg *Args;
@@ -516,38 +495,15 @@ typedef struct arg *Args;
 #define arg_occurrence arg_u.u_occurrence
 
 STRUCT (node_def,NodeDef){
-	union {
-		NodeId	u1_id;
-		Node	u1_pattern;
-	} def_u1;
+	NodeId		def_id;
 	Node 		def_node;
 	NodeDefs	def_next;
 	int			def_mark;
 };
 
-#define def_id def_u1.u1_id
-#define def_pattern def_u1.u1_pattern
-
-#define NODE_DEF_HAS_LHS_PATTERN_MASK 1
-#define NODE_DEF_NEW_SCOPE_MASK 2
-#define NODE_DEF_NORMAL_SCOPE_MASK 4
 #define NODE_DEF_MARKED 8
 #define NODE_DEF_OBSERVE_MASK 16
 #define NODE_DEF_SELECT_AND_REMOVE_MASK 32
-
-typedef struct local_def {
-	union {
-		NodeId	contents_node_id;	/*	ldef_node_id, if ldef_kind==0 */
-		Symbol	contents_symbol;	/*	ldef_symbol,  if ldef_kind==1 */
-	} ldef_contents;
-	struct local_def *				ldef_next;
-	int								ldef_scope;
-	char							ldef_kind;
-	char							ldef_lifted;
-} LocalDef,*LocalDefP;
-
-#define ldef_node_id ldef_contents.contents_node_id
-#define ldef_symbol ldef_contents.contents_symbol
 
 /*	for implementing calls to C or the OS */
 
@@ -600,11 +556,7 @@ STRUCT (rule_alt,RuleAlt){
 	StrictNodeIdP			alt_strict_node_ids;
 	RuleAlts				alt_next;
 	unsigned				alt_line;
-#ifdef OS2
-	unsigned				alt_kind:4;	/* RhsKind */
-#else
 	unsigned				alt_kind:3;	/* RhsKind */
-#endif
 	Bool					alt_may_fail:1;
 };
 
@@ -614,16 +566,13 @@ STRUCT (rule_alt,RuleAlt){
 typedef enum {
 	NEWDEFINITION, ABSTYPE, TYPE, TYPESYN, DEFRULE, IMPRULE,
 	CONSTRUCTOR, SYSRULE, 
-	RECORDTYPE, FIELDSELECTOR,
-	INSTANCE
+	RECORDTYPE, FIELDSELECTOR
 } SDefKind;
 
 #define SDefKindSize 5
 
 typedef enum {
-	Indefinite, CurrentlyChecked, TypeChecked,
-	Predefined, Expanded, TotallyExpanded,
-	ConvertingToState, ConvertedToState
+	TypeChecked, ConvertingToState, ConvertedToState
 } CheckStatus;
 
 typedef enum {
@@ -659,7 +608,6 @@ STRUCT (imp_rule,ImpRule){
 	unsigned					rule_ref_count;
 };
 
-#define RULE_CHECKED_MASK				1
 #define RULE_CAF_MASK					2
 #define RULE_LAZY_CALL_NODE_MASK		4
 #if STORE_STRICT_CALL_NODES
@@ -670,7 +618,6 @@ STRUCT (imp_rule,ImpRule){
 #define RULE_UNBOXED_LAZY_CALL			64
 #define RULE_INTERNAL_FUNCTION_MASK		128
 #define RULE_LAMBDA_FUNCTION_MASK		256
-#define RULE_HAS_REF_COUNT_MASK			512
 
 #define RULE_CALL_VIA_LAZY_SELECTIONS_ONLY	1024
 #define RULE_TAIL_MODULO_CONS_ENTRY_MASK	2048
@@ -690,14 +637,9 @@ STRUCT (symbol_def,SymbDef){
 		ImpRules		u_rule;
 	} sdef_u;
 	union
-	{	struct symbol_type_info *	sti_rule_type_info;
-		struct symbol_type *		sti_type_cons_info;
-		StateS					typeinfo_record_state;
+	{	StateS			typeinfo_record_state;
 		struct
 		{	FieldList	fieldinfo_sel_field;
-#ifndef CLEAN2
-			Node		fieldinfo_sel_node;
-#endif
 			int			fieldinfo_sel_field_number;
 		} sdef_fieldinfo;
 		struct constructor_list * typeinfo_constructor;	/* for CONSTRUCTOR */
@@ -707,7 +649,6 @@ STRUCT (symbol_def,SymbDef){
 	unsigned		sdef_ancestor;
 	short			sdef_arity;
 	short			sdef_cons_arity;
-	unsigned short	sdef_nr_of_lifted_nodeids;
 
 	union {
 		struct _fun *	u3_sa_fun;					/* sa.c */
@@ -717,31 +658,25 @@ STRUCT (symbol_def,SymbDef){
 	} sdef_u3;
 
 	struct symbol_def *	sdef_dcl_icl;					/* to dcl if sdef_exported, to icl if sdef_main_dcl */
-
-	union {
-		struct symbol_def *	u1_next_scc;
-		Symbol				u1_subst_symbol;
-	} sdef_u1;
+	struct symbol_def *	sdef_next_scc;
 
 	union {
 		struct symbol_def *		sdef_u2_parent;
-		struct type_cons_repr *	sdef_u2_type_cons_repr;
 		struct symbol_def *		sdef_u2_next_version;	/* for IMPRULES */
 	} sdef_u2;
 	
 	unsigned	 	sdef_line;
 	int				sdef_mark;
 
+	unsigned		sdef_kind:SDefKindSize;
+	unsigned		sdef_checkstatus:3;		/* CheckStatus */
+	unsigned		sdef_arfun:ArrayFunKindBitSize;			/* ArrayFunKind */
 	Bool			sdef_isused:1;
 	Bool			sdef_returnsnode:1;
 	Bool			sdef_calledwithrootnode:1;
 	Bool			sdef_strict_constructor:1;		/* for CONSTRUCTOR and RECORDTYPE */
 	Bool			sdef_boxed_record:1;			/* for RECORDTYPE */
 	Bool			sdef_exported:1;
-	Bool			sdef_main_dcl:1;				/* if in .dcl of main .icl */
-	unsigned		sdef_kind:SDefKindSize;
-	unsigned		sdef_checkstatus:3;		/* CheckStatus */
-	unsigned		sdef_arfun:ArrayFunKindBitSize;			/* ArrayFunKind */
 };
 
 #define sdef_type			sdef_u.u_type
@@ -755,13 +690,9 @@ STRUCT (symbol_def,SymbDef){
  #define sdef_unboxed_cons_symbol sdef_u3.u3_unboxed_cons_symbol
 #endif
 
-#define sdef_next_scc			sdef_u1.u1_next_scc
-#define sdef_subst_symbol		sdef_u1.u1_subst_symbol	/* macros */
-
 #define	SDEF_USED_LAZILY_MASK 1
 #define SDEF_USED_STRICTLY_MASK 2
 #define SDEF_USED_CURRIED_MASK 4
-#define SDEF_LOCAL_MACRO_FUNCTION_MASK 8
 #define SDEF_NEXT_IMP_RULE_VERSION_MASK 32
 #define	SDEF_HAS_IMP_RULE_VERSIONS_MASK 64
 #define	SDEF_OPTIMISED_FUNCTION_MASK 128
@@ -772,24 +703,13 @@ STRUCT (symbol_def,SymbDef){
 #define sdef_has_instance_info	sdef_used_as_instance
 
 #define sdef_parent			sdef_u2.sdef_u2_parent
-#define sdef_type_cons_repr	sdef_u2.sdef_u2_type_cons_repr
 
 #define sdef_next_version	sdef_u2.sdef_u2_next_version
 
 #define sdef_constructor sdef_typeinfo.typeinfo_constructor
 
-#define sdef_rule_type_info			sdef_typeinfo.sti_rule_type_info
-#define sdef_type_cons_info			sdef_typeinfo.sti_type_cons_info
-
-#define sdef_rule_cons_type_info  sdef_rc->rc_type_info
-
-#define sdef_rule_cons_imprule    sdef_rc->rc_imprule
-#define sdef_rule_cons_defrule    sdef_rc->rc_defrule
-
 #define sdef_record_state	sdef_typeinfo.typeinfo_record_state
-#define sdef_ar_fun_aps	sdef_typeinfo.typeinfo_ar_fun_aps
 #define sdef_sel_field	sdef_typeinfo.sdef_fieldinfo.fieldinfo_sel_field
-#define sdef_sel_node	sdef_typeinfo.sdef_fieldinfo.fieldinfo_sel_node
 
 #define sdef_sel_field_number	sdef_typeinfo.sdef_fieldinfo.fieldinfo_sel_field_number
 

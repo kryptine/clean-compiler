@@ -642,10 +642,6 @@ void PrintType (SymbDef tdef, TypeAlts type)
 {
 	TypeNode lhs_root = type -> type_alt_lhs;
 	TypeArgs lhsargs = lhs_root -> type_node_arguments;
-	int i;
-	
-	for (i=0; i<tdef -> sdef_nr_of_lifted_nodeids; i++)
-		lhsargs = lhsargs -> type_arg_next; 
 	
 	PrintSymbolOfIdent (tdef -> sdef_ident, tdef -> sdef_line, StdListTypes);
 	FPutS (" :: ", StdListTypes);
@@ -677,18 +673,6 @@ void PrintType (SymbDef tdef, TypeAlts type)
 		PrintAttributeEquations (type -> type_alt_attr_equations);
 
 	FPutS (";\n", StdListTypes);
-	
-	if (tdef -> sdef_nr_of_lifted_nodeids > 0)
-	{	FPutS ("// internal argument types:", StdListTypes);
-		for (i=0, lhsargs = lhs_root -> type_node_arguments;
-			i<tdef -> sdef_nr_of_lifted_nodeids; i++, lhsargs = lhsargs -> type_arg_next)
-		{	FPutC (' ', StdListTypes);
-			PrintArgument (lhsargs, cPrintBrackets, cInAStrictContext, cDoPrintAttribute);
-		}
-		FPutC ('\n', StdListTypes);
-	}
-	
-
 } /* PrintType */
 
 void ListTypes (ImpMod imod)
@@ -706,17 +690,9 @@ void ListTypes (ImpMod imod)
 	}
 } /* ListTypes */
 
-/******
-
-	Routines for printing types
-	
-******/
-
-
 void InitARC_Info (void)
 {
 	CurrentARC_Info = CompAllocType (struct attr_ref_count_info);
 	CurrentARC_Info -> arci_next = NULL;
 
 } /* InitARC_Info */
-

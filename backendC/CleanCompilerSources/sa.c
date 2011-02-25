@@ -2277,9 +2277,6 @@ static Exp ConvertNode (Node node, NodeId nid)
 					
 					sdef = node->node_symbol->symb_def;
 
-					if (sdef->sdef_kind == INSTANCE)
-						DoFatalError ("Strictness analysis (ConvertNode): instance encounterred");
-
 					if (sdef->sdef_kind==DEFRULE || sdef->sdef_kind==SYSRULE){
 						TypeAlts rule;
 						TypeArgs typeargs;
@@ -2603,9 +2600,6 @@ static Exp convert_pattern (SymbolP symbol_p,int arity,NodeIdListElementP node_i
 			SymbDef sdef;
 			
 			sdef = symbol_p->symb_def;
-
-			if (sdef->sdef_kind == INSTANCE)
-				DoFatalError ("Strictness analysis (convert_pattern): instance encounterred");
 
 			if (sdef->sdef_kind==DEFRULE || sdef->sdef_kind==SYSRULE){
 				TypeAlts rule;

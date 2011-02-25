@@ -132,7 +132,6 @@ SymbDef MakeNewSymbolDefinition (char * module, Ident name, int arity, SDefKind 
 	def->sdef_mark=0;
 
 	def->sdef_exported=False;
-	def->sdef_main_dcl=False;
 
 	def->sdef_arfun				= NoArrayFun;
 	

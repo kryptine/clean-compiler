@@ -425,36 +425,6 @@ void CheckError (char *msg1,char *msg2)
 	StaticMessage (True,"%S","%s %s",CurrentSymbol,msg1,msg2);
 }
 
-void CheckNodeError (char *msg1,char *msg2,NodeP node_p)
-{
-	if (node_p->node_line>=0){
-		unsigned old_CurrentLine;
-		
-		old_CurrentLine=CurrentLine;
-		
-		CurrentLine=node_p->node_line;
-		StaticMessage (True,"%S","%s %s",CurrentSymbol,msg1,msg2);
-		
-		CurrentLine=old_CurrentLine;
-	} else
-		StaticMessage (True,"%S","%s %s",CurrentSymbol,msg1,msg2);
-}
-
-void CheckNodeSymbolError (struct symbol *symbol,char *msg,NodeP node_p)
-{
-	if (node_p->node_line>=0){
-		unsigned old_CurrentLine;
-		
-		old_CurrentLine=CurrentLine;
-		
-		CurrentLine=node_p->node_line;
-		StaticMessage (True,"%S","%S %s",CurrentSymbol,symbol,msg);
-		
-		CurrentLine=old_CurrentLine;
-	} else
-		StaticMessage (True,"%S","%S %s",CurrentSymbol,symbol,msg);
-}
-
 void CheckSymbolError (struct symbol *symbol,char *msg)
 {
 	StaticMessage (True,"%S","%S %s",CurrentSymbol,symbol,msg);

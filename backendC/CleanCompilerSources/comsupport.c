@@ -640,9 +640,6 @@ void InitCompiler (void)
 	InitStatesGen		();
 	InitCoding		();
 	InitInstructions	();
-#ifdef _COMPSTATS_
-	InitDB			();
-#endif
 	oldhandler = SetSignal (SetInterruptFlag);
 
 } /* InitCompiler */
