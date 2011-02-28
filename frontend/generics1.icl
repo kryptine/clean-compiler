@@ -1971,15 +1971,13 @@ buildGenericCaseBody main_module_index gc_pos gc_type_cons=:(TypeConsSymb {type_
 			_
 				-> (arg_vars,heaps)
 
-	#! (adaptor_expr, funs_and_groups, modules, td_infos, heaps, error)
-		= build_adaptor_expr gc_pos gen_def gen_type_rep funs_and_groups modules td_infos heaps error
+	#! (optional_adaptor_expr, adapted_arg_exprs, original_arg_exprs, funs_and_groups, modules, td_infos, heaps, error)
+		= build_adaptor_expr gc_pos gen_def gen_type_rep original_arg_exprs funs_and_groups modules td_infos heaps error
 
 	#! (specialized_expr, funs_and_groups, td_infos, heaps, error)
 		= build_specialized_expr gc_pos gc_ident gcf_generic gtr_type td_args generated_arg_exprs funs_and_groups td_infos heaps error
 
-	#! body_expr 
-		= build_body_expr adaptor_expr specialized_expr original_arg_exprs
-
+	# body_expr = build_body_expr optional_adaptor_expr specialized_expr adapted_arg_exprs original_arg_exprs
 	= (TransformedBody {tb_args=arg_vars, tb_rhs=body_expr}, funs_and_groups, td_infos, modules, heaps, error)	
 where
 	build_generic_info_arg heaps=:{hp_var_heap}
@@ -2001,7 +1999,7 @@ where
 
 	// adaptor that converts a function for the generic representation into a 
 	// function for the type itself
-	build_adaptor_expr gc_pos {gen_type, gen_vars, gen_info_ptr} {gtr_iso} funs_and_groups modules td_infos heaps error
+	build_adaptor_expr gc_pos {gen_type, gen_vars, gen_info_ptr} {gtr_iso} original_arg_exprs funs_and_groups modules td_infos heaps error
 		#! (var_kinds, heaps) = get_var_kinds gen_info_ptr heaps		
 		#! non_gen_var_kinds = drop (length gen_vars) var_kinds  
 		
@@ -2018,11 +2016,12 @@ where
 
 		#! (struct_gen_type, heaps) = simplify_bimap_GenTypeStruct gen_vars struct_gen_type heaps
 
-		#! (adaptor_expr, funs_and_groups, heaps, error)
-			= specialize_generic_from_bimap {gi_module=bimap_module,gi_index=bimap_index} struct_gen_type spec_env bimap_ident gc_pos main_module_index predefs
+		# bimap_gi = {gi_module=bimap_module,gi_index=bimap_index}
+		#! (adaptor_expr, adapted_arg_exprs, original_arg_exprs, funs_and_groups, heaps, error)
+			= specialize_generic_from_bimap bimap_gi struct_gen_type spec_env bimap_ident gc_pos original_arg_exprs main_module_index predefs
 														funs_and_groups heaps error
 
-		= (adaptor_expr, funs_and_groups, modules, td_infos, heaps, error)
+		= (adaptor_expr, adapted_arg_exprs, original_arg_exprs, funs_and_groups, modules, td_infos, heaps, error)
 	where
 		{pds_module = bimap_module, pds_def=bimap_index} = predefs.[PD_GenericBimap]
 		bimap_ident = predefined_idents.[PD_GenericBimap]
@@ -2080,10 +2079,22 @@ where
 			= (expr,funs_and_groups,td_infos,heaps,error)
 
 	// the body expression
-	build_body_expr adaptor_expr specialized_expr []
+	build_body_expr No specialized_expr [] []
+		= specialized_expr
+	build_body_expr No specialized_expr [] original_arg_exprs
+		= specialized_expr @ original_arg_exprs
+	build_body_expr No specialized_expr adapted_arg_exprs []
+		= specialized_expr @ adapted_arg_exprs
+	build_body_expr No specialized_expr adapted_arg_exprs original_arg_exprs
+		= specialized_expr @ (adapted_arg_exprs++original_arg_exprs)
+	build_body_expr (Yes adaptor_expr) specialized_expr [] []
 		= adaptor_expr @ [specialized_expr]
-	build_body_expr adaptor_expr specialized_expr original_arg_exprs
+	build_body_expr (Yes adaptor_expr) specialized_expr [] original_arg_exprs
 		= (adaptor_expr @ [specialized_expr]) @ original_arg_exprs
+	build_body_expr (Yes adaptor_expr) specialized_expr adapted_arg_exprs []
+		= adaptor_expr @ [specialized_expr @ adapted_arg_exprs]
+	build_body_expr (Yes adaptor_expr) specialized_expr adapted_arg_exprs original_arg_exprs
+		= (adaptor_expr @ [specialized_expr @ adapted_arg_exprs]) @ original_arg_exprs
 
 buildGenericCaseBody main_module_index gc_pos gc_type_cons gc_ident gcf_kind gcf_generic st predefs funs_and_groups td_infos modules heaps error
 	# error = reportError gc_ident.id_name gc_pos "cannot specialize to this type" error
@@ -2483,18 +2494,39 @@ specialize_generic_from_bimap ::
 		![(TypeVar, Expression)] // specialization environment
 		!Ident					// generic/generic case
 		!Position				// of generic case
+		![Expression]
 		!Index 					// main_module index
 		!PredefinedSymbols
 		!FunsAndGroups !*Heaps !*ErrorAdmin
-	-> (!Expression,
+	-> (!Optional Expression, ![Expression], ![Expression],
 		!FunsAndGroups,!*Heaps,!*ErrorAdmin)
-specialize_generic_from_bimap gen_index type spec_env gen_ident gen_pos main_module_index predefs funs_and_groups heaps error
+specialize_generic_from_bimap gen_index type spec_env gen_ident gen_pos arg_exprs main_module_index predefs funs_and_groups heaps error
 	#! heaps = set_tvs spec_env heaps
-	#! (adaptor_expr, (funs_and_groups, heaps, error)) 
-		= specialize_from type (funs_and_groups, heaps, error)
+	#! (optional_adaptor_expr, adapted_arg_exprs, arg_exprs, (funs_and_groups, heaps, error))
+		= specialize_args_and_result arg_exprs type (funs_and_groups, heaps, error)
 	# heaps = clear_tvs spec_env heaps
-	= (adaptor_expr, funs_and_groups, heaps, error)
+	= (optional_adaptor_expr, adapted_arg_exprs, arg_exprs, funs_and_groups, heaps, error)
 where
+	specialize_args_and_result [arg_expr:arg_exprs] (GTSArrow arg_type args_type) st
+		# (adapted_arg_expr,st)
+		  	= adapt_arg arg_type arg_expr st
+		  (adaptor_expr,adapted_arg_exprs,arg_exprs,st)
+			= specialize_args_and_result arg_exprs args_type st
+		= (adaptor_expr,[adapted_arg_expr:adapted_arg_exprs],arg_exprs,st)
+	specialize_args_and_result arg_exprs type st
+		| is_bimap_id type
+			= (No, [], arg_exprs, st)
+			# (adaptor_expr,st)
+				= specialize_from type st
+			= (Yes adaptor_expr,[],arg_exprs,st)
+
+	adapt_arg arg_type arg_expr st
+		| is_bimap_id arg_type
+			= (arg_expr,st)
+			# (arg_adaptor_expr,st)
+				= specialize_to arg_type st
+			= (arg_adaptor_expr @ [arg_expr],st)
+
 	specialize_from (GTSArrow (GTSAppCons KindConst []) y) st
 		= specialize_from_arrow_arg_id y st
 	specialize_from (GTSArrow GTSAppConsBimapKindConst y) st
