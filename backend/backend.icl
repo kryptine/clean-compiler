@@ -124,6 +124,12 @@ BETypeSymbol a0 a1 a2 = code {
 }
 // BESymbolP BETypeSymbol (int typeIndex,int moduleIndex);
 
+BETypeSymbolNoMark :: !Int !Int !BackEnd -> (!BESymbolP,!BackEnd);
+BETypeSymbolNoMark a0 a1 a2 = code {
+	ccall BETypeSymbolNoMark "II:p:p"
+}
+// BESymbolP BETypeSymbolNoMark (int typeIndex,int moduleIndex);
+
 BEDontCareDefinitionSymbol :: !BackEnd -> (!BESymbolP,!BackEnd);
 BEDontCareDefinitionSymbol a0 = code {
 	ccall BEDontCareDefinitionSymbol ":p:p"

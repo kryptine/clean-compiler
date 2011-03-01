@@ -217,6 +217,9 @@ Clean (BEConstructorSymbol :: Int Int BackEnd -> (BESymbolP, BackEnd))
 BESymbolP BEFieldSymbol (int fieldIndex, int moduleIndex);
 Clean (BEFieldSymbol :: Int Int BackEnd -> (BESymbolP, BackEnd))
 
+BESymbolP BETypeSymbolNoMark (int typeIndex, int moduleIndex);
+Clean (BETypeSymbolNoMark :: Int Int BackEnd -> (BESymbolP, BackEnd))
+
 BESymbolP BETypeSymbol (int typeIndex, int moduleIndex);
 Clean (BETypeSymbol :: Int Int BackEnd -> (BESymbolP, BackEnd))
 

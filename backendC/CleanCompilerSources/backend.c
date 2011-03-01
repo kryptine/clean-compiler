@@ -1017,6 +1017,11 @@ BETypeSymbol (int typeIndex, int moduleIndex)
 	return (typeSymbol);
 } /* BETypeSymbol */
 
+BESymbolP BETypeSymbolNoMark (int typeIndex, int moduleIndex)
+{
+	return gBEState.be_modules [moduleIndex].bem_types [typeIndex];
+}
+
 BESymbolP
 BEDontCareDefinitionSymbol (void)
 {

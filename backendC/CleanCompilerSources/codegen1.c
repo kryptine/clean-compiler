@@ -1318,6 +1318,19 @@ void GenerateCodeForConstructorsAndRecords (Symbol symbols)
 					ConstructorList constructor;
 
 					constructor = def->sdef_type->type_constructors;
+					if (!(def->sdef_isused || def->sdef_exported || (def->sdef_mark & (SDEF_USED_LAZILY_MASK | SDEF_USED_STRICTLY_MASK | SDEF_USED_CURRIED_MASK)))){
+						for_l (fields,constructor->cl_fields,fl_next){
+							SymbDef field_def;
+							
+							field_def=fields->fl_symbol->symb_def;
+							if (field_def->sdef_isused || field_def->sdef_mark & (SDEF_USED_LAZILY_MASK | SDEF_USED_STRICTLY_MASK | SDEF_USED_CURRIED_MASK))
+								break;
+						}
+
+						if (fields==NULL)
+							continue;
+					}
+
 					DetermineSizeOfState (def->sdef_record_state, &asize, &bsize);
 
 					GenRecordDescriptor (def);
@@ -1327,7 +1340,7 @@ void GenerateCodeForConstructorsAndRecords (Symbol symbols)
 
 					for_l (fields,constructor->cl_fields,fl_next)
 						GenLazyFieldSelectorEntry (fields->fl_symbol->symb_def,def->sdef_record_state, asize, bsize);
-				}					
+				}	
 			}
 		}
 	}

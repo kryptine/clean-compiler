@@ -63,6 +63,8 @@ BEFieldSymbol :: !Int !Int !BackEnd -> (!BESymbolP,!BackEnd);
 // BESymbolP BEFieldSymbol (int fieldIndex,int moduleIndex);
 BETypeSymbol :: !Int !Int !BackEnd -> (!BESymbolP,!BackEnd);
 // BESymbolP BETypeSymbol (int typeIndex,int moduleIndex);
+BETypeSymbolNoMark :: !Int !Int !BackEnd -> (!BESymbolP,!BackEnd);
+// BESymbolP BETypeSymbolNoMark (int typeIndex,int moduleIndex);
 BEDontCareDefinitionSymbol :: !BackEnd -> (!BESymbolP,!BackEnd);
 // BESymbolP BEDontCareDefinitionSymbol ();
 BEBoolSymbol :: !Bool !BackEnd -> (!BESymbolP,!BackEnd);

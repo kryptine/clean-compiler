@@ -204,6 +204,8 @@ beFieldSymbol fieldIndex moduleIndex
 	:==	beFunction0 (BEFieldSymbol fieldIndex moduleIndex)
 beTypeSymbol typeIndex moduleIndex
 	:==	beFunction0 (BETypeSymbol typeIndex moduleIndex)
+beTypeSymbolNoMark typeIndex moduleIndex
+	:==	beFunction0 (BETypeSymbolNoMark typeIndex moduleIndex)
 beBasicSymbol symbolIndex
 	:==	beFunction0 (BEBasicSymbol symbolIndex)
 beDontCareDefinitionSymbol
@@ -792,7 +794,11 @@ defineTypes moduleIndex constructors selectors types
 
 convertTypeLhs :: ModuleIndex Index TypeAttribute [ATypeVar] -> BEMonad BEFlatTypeP
 convertTypeLhs moduleIndex typeIndex attribute args
-	=	beFlatType (beTypeSymbol typeIndex moduleIndex) (convertAttribution attribute) (convertTypeVars args)
+	= be_flat_type (beTypeSymbol typeIndex moduleIndex) attribute args
+
+be_flat_type :: (BEMonad BESymbolP) TypeAttribute [ATypeVar] -> BEMonad BEFlatTypeP
+be_flat_type type_symbol attribute args
+	= beFlatType type_symbol (convertAttribution attribute) (convertTypeVars args)
 
 convertTypeVars :: [ATypeVar] -> BEMonad BETypeVarListP
 convertTypeVars typeVars
@@ -809,25 +815,26 @@ defineType moduleIndex constructors _ typeIndex {td_ident, td_attribute, td_args
 	# (constructors, be)
 		=	convertConstructors typeIndex td_ident.id_name moduleIndex constructors constructorSymbols be
 	=	appBackEnd (BEAlgebraicType flatType constructors) be
-defineType moduleIndex constructors selectors typeIndex {td_attribute, td_args, td_rhs=RecordType {rt_constructor, rt_fields, rt_is_boxed_record}} be
-//	| trace_tn constructorDef.cons_ident
+defineType moduleIndex constructors selectors typeIndex {td_attribute, td_args, td_rhs=RecordType {rt_constructor, rt_fields, rt_is_boxed_record}, td_fun_index} be
+	# constructorIndex = rt_constructor.ds_index
+	  constructorDef = constructors.[constructorIndex]
 	# (flatType, be)
-		=	convertTypeLhs moduleIndex typeIndex td_attribute td_args be
-	# (fields, be)
-		=	convertSelectors moduleIndex selectors rt_fields constructorDef.cons_type.st_args_strictness be
-	# (constructorType,be) = constructorTypeFunction be
-	# (constructorTypeNode, be)
-		=	beNormalTypeNode
+		= if (td_fun_index<>NoIndex)
+			(convertTypeLhs moduleIndex typeIndex td_attribute td_args be)
+			// define the record without marking, to prevent code generation for many unused generic dictionaries
+			(be_flat_type (beTypeSymbolNoMark typeIndex moduleIndex) td_attribute td_args be)
+	  (fields, be)
+		= convertSelectors moduleIndex selectors rt_fields constructorDef.cons_type.st_args_strictness be
+	  (constructorType,be)
+		= constructorTypeFunction constructorDef be
+	  (constructorTypeNode, be)
+		= beNormalTypeNode
 				(beConstructorSymbol moduleIndex constructorIndex)
 				(convertSymbolTypeArgs constructorType)
 				be
-	=	appBackEnd (BERecordType moduleIndex flatType constructorTypeNode (if rt_is_boxed_record 1 0) fields) be
+	= appBackEnd (BERecordType moduleIndex flatType constructorTypeNode (if rt_is_boxed_record 1 0) fields) be
 	where
-		constructorIndex
-			=	rt_constructor.ds_index
-		constructorDef
-			=	constructors.[constructorIndex]
-		constructorTypeFunction be0
+		constructorTypeFunction constructorDef be0
 			= let (cons_type,be) = read_from_var_heap constructorDef.cons_type_ptr be0 in
 					(case cons_type of
 						VI_ExpandedType expandedType
@@ -860,42 +867,36 @@ convertConstructor typeIndex typeName moduleIndex constructorDefs {ds_index}
 			= let (cons_type,be) = read_from_var_heap constructorDef.cons_type_ptr be0 in
 					(case cons_type of
 						VI_ExpandedType expandedType
-							->	(expandedType,be) // ->> (typeName, typeIndex, constructorDef.cons_ident.id_name, ds_index, expandedType)
+							->	(expandedType,be)
 						_
-							->	(constructorDef.cons_type,be)) // ->> (typeName, typeIndex, constructorDef.cons_ident.id_name, ds_index, constructorDef.cons_type)
+							->	(constructorDef.cons_type,be))
 
-
-foldrAi function result array
-	:== foldrA 0
+foldrAi function result array :== foldrA 0
 	where
-		arraySize
-			=	size array
 		foldrA index
-			| index == arraySize
-				=	result
-			// otherwise
-				=	function index array.[index] (foldrA (index+1))
+			| index == size array
+				= result
+				= function index array.[index] (foldrA (index+1))
 
-//convertSelectors :: ModuleIndex {#SelectorDef} {#FieldSymbol} -> BEMonad BEFieldListP
 convertSelectors :: ModuleIndex {#SelectorDef} {#FieldSymbol} StrictnessList -> BEMonad BEFieldListP
 convertSelectors moduleIndex selectors symbols strictness
-	=	foldrAi (\i -> (beFields o convertSelector moduleIndex selectors (arg_is_strict i strictness))) beNoFields symbols
-
-convertSelector :: ModuleIndex {#SelectorDef} Bool FieldSymbol -> BEMonad BEFieldListP
-convertSelector moduleIndex selectorDefs is_strict {fs_index}
-	= \be0 -> let (selectorType,be) = selectorTypeFunction be0 in
-		(	appBackEnd (BEDeclareField fs_index moduleIndex selectorDef.sd_ident.id_name)
-		o`	beField fs_index moduleIndex (convertAnnotAndTypeNode (if is_strict AN_Strict AN_None) (selectorType.st_result))) be
-	where
-		selectorDef
-			=	selectorDefs.[fs_index]
-		selectorTypeFunction be0
-			= let (sd_type,be) = read_from_var_heap selectorDef.sd_type_ptr be0 in
-				(case sd_type of
-					VI_ExpandedType expandedType
-						->	(expandedType,be)
+	= foldrAi (\i -> beFields o convertSelector moduleIndex selectors (arg_is_strict i strictness)) beNoFields symbols
+where
+	convertSelector :: ModuleIndex {#SelectorDef} Bool FieldSymbol -> BEMonad BEFieldListP
+	convertSelector moduleIndex selectorDefs is_strict {fs_index}
+		= \be0 -> let	selectorDef = selectorDefs.[fs_index]
+						(field_type,be) = selectorTypeFunction selectorDef be0 in
+				(	appBackEnd (BEDeclareField fs_index moduleIndex selectorDef.sd_ident.id_name)
+				o`	beField fs_index moduleIndex (convertAnnotAndTypeNode (if is_strict AN_Strict AN_None) field_type)) be
+		where
+			selectorTypeFunction :: !SelectorDef !*BackEndState -> *(!AType,!*BackEndState)
+			selectorTypeFunction {sd_type_ptr,sd_type} be
+				# (sd_type_in_ptr,be) = read_from_var_heap sd_type_ptr be
+				= case sd_type_in_ptr of
+					VI_ExpandedType {st_result}
+						->	(st_result,be)
 					_
-						->	(selectorDef.sd_type,be))
+						->	(sd_type.st_result,be)
 
 declareDynamicTemp :: PredefinedSymbols -> BackEnder
 declareDynamicTemp predefs
