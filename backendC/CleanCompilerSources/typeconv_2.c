@@ -360,38 +360,22 @@ static void PrintArgument (TypeArgs arg, Bool brackets, Bool strict_context, Boo
 static void PrintArguments (TypeArgs args, char separator, Bool brackets, Bool strict_context, FlatType form_type)
 {
 	if (args)
-	{	int arg_nr, nr_of_exi_vars;
+	{	int arg_nr;
 		TypeVarList form_type_vars;
 		
 		if (form_type != NULL)
-		{	nr_of_exi_vars = form_type -> ft_exist_arity;
-			form_type_vars = form_type -> ft_arguments;
+		{	form_type_vars = form_type -> ft_arguments;
 
-			if (nr_of_exi_vars > 0)
-			{	FPutC (':', StdListTypes);
-				PrintArgument (args, cPrintBrackets, strict_context, cDoPrintAttribute);
-			}
-			else
-			{	PrintArgument (args, brackets, strict_context, ! TestMark (form_type_vars -> tvl_elem, tv_mark, TV_EXISTENTIAL_ATTRIBUTE_MASK));
-				form_type_vars = form_type_vars -> tvl_next;
-			}
+			PrintArgument (args, brackets, strict_context, ! TestMark (form_type_vars -> tvl_elem, tv_mark, TV_EXISTENTIAL_ATTRIBUTE_MASK));
+			form_type_vars = form_type_vars -> tvl_next;
 		}
 		else
-		{	nr_of_exi_vars = 0;
-			form_type_vars = NULL;
+		{	form_type_vars = NULL;
 			PrintArgument (args, brackets, strict_context, cDoPrintAttribute);
 		}
 
 		for (arg_nr = 1, args = args -> type_arg_next; args; args = args -> type_arg_next, arg_nr++)
-		{	if (arg_nr == nr_of_exi_vars)
-				FPutS (": ", StdListTypes);
-			else if (arg_nr < nr_of_exi_vars)
-			{	FPutC (',', StdListTypes);
-				PrintArgument (args, brackets, strict_context, cDoPrintAttribute);
-				continue;
-			}
-			else
-				FPutC (separator, StdListTypes);
+		{	FPutC (separator, StdListTypes);
 				
 			if (form_type_vars != NULL)
 			{	PrintArgument (args, brackets, strict_context, ! TestMark (form_type_vars -> tvl_elem, tv_mark, TV_EXISTENTIAL_ATTRIBUTE_MASK));
@@ -400,8 +384,6 @@ static void PrintArguments (TypeArgs args, char separator, Bool brackets, Bool s
 			else
 				PrintArgument (args, brackets, strict_context, cDoPrintAttribute);
 		}
-		if (arg_nr == nr_of_exi_vars)
-			FPutC (':', StdListTypes);
 	}
 	
 } /* PrintArguments */

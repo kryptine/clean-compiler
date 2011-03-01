@@ -35,7 +35,7 @@ BITVECT DetermineConsVarsOfTypeCons (SymbDef typecons, ConsVarList * cons_vars)
 {
 	if (typecons -> sdef_kind == TYPE || typecons -> sdef_kind == RECORDTYPE)
 	{	if (typecons -> sdef_type)
-		{	* cons_vars = typecons -> sdef_type -> type_lhs -> ft_cons_vars;
+		{	* cons_vars = NULL;
 			return typecons -> sdef_type -> type_consvars;
 		}
 		else
@@ -44,7 +44,7 @@ BITVECT DetermineConsVarsOfTypeCons (SymbDef typecons, ConsVarList * cons_vars)
 		}
 	}
 	else if (typecons -> sdef_kind == TYPESYN)
-	{	 * cons_vars =  typecons -> sdef_syn_type -> syn_lhs -> ft_cons_vars ;
+	{	 * cons_vars =  NULL;
 		return typecons -> sdef_syn_type -> syn_consvars;
 	}
 	else

@@ -358,7 +358,6 @@ NewSymbol (SymbKind symbolKind)
 	symbol	= CompAllocType (SymbolS);
 
 	symbol->symb_kind	= symbolKind;
-	symbol->symb_infix	= False;
 
 	return (symbol);
 } /* NewSymbol */	

@@ -2755,7 +2755,6 @@ BETypeVar (CleanString name)
 	typeVar	= ConvertAllocType (struct type_var);
 
 	ident->ident_name	= ConvertCleanString (name);
-	ident->ident_tv	= typeVar;
 
 	typeVar->tv_ident		= ident;
 	typeVar->tv_mark		= 0;
@@ -2797,19 +2796,11 @@ BEFlatTypeP
 BEFlatType (BESymbolP symbol, BEAttribution attribution, BETypeVarListP arguments)
 {
 	FlatType	flatType;
-	int			i;
 
 	flatType	= ConvertAllocType (struct flat_type);
 
 	flatType->ft_symbol		= symbol;
 	flatType->ft_arguments	= arguments;
-	i	= 0;
-	for (; arguments != NULL; arguments=arguments->tvl_next)
-		i++;
-	flatType->ft_arity	= i;
-
-	flatType->ft_cons_vars	= NULL;	/* used in PrintType */
-
 	flatType->ft_attribute = (AttributeKind) attribution;;
 
 	return (flatType);
@@ -2864,9 +2855,7 @@ BERecordType (int moduleIndex, BEFlatTypeP lhs, BETypeNodeP constructorType, int
 	BEConstructorListP	constructor;
 
 	type	= ConvertAllocType (struct type);
-	/* ifdef DEBUG */
 	type->type_next	= NULL;
-	/* endif */
 
 	constructor	= ConvertAllocType (struct constructor_list);
 

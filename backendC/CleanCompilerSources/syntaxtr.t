@@ -125,10 +125,7 @@ typedef union symb_value {
 	char *							val_char;
 	char *							val_string;
 	char *							val_real;
-	char *							val_error_mess;
 	int								val_arity;
-	struct symbol_type *			val_type;		/* for cons_symb, nil_symb apply_symbol ? */
-	struct symbol *					val_symb;		/* for field_symbol_list */
 #if STRICT_LISTS
 	struct state *					val_state_p;		/* element state for unboxed list cons in lhs */
 	struct unboxed_cons *			val_unboxed_cons_p;	/* state and symbol definition for unboxed list cons in rhs */
@@ -145,16 +142,12 @@ struct unboxed_cons {
 STRUCT (symbol,Symbol) {
 	SymbValue			symb_val;
 	Symbol				symb_next;
-	unsigned			symb_kind:8;		/* SymbKind */
-	Bool				symb_infix:1;
-	unsigned			symb_infix_priority:4;
-	unsigned			symb_infix_assoc:2;	/* Assoc */
+	unsigned			symb_kind:8;			/* SymbKind */
+	unsigned			symb_head_strictness:4; /* 0=lazy,1=overloaded,2=strict,3=unboxed overloaded,4=unboxed*/
+	unsigned			symb_tail_strictness:2;	/* 0=lazy,1=strict */
 };
 
 #if STRICT_LISTS
-# define symb_head_strictness symb_infix_priority /* 0=lazy,1=overloaded,2=strict,3=unboxed overloaded,4=unboxed*/
-# define symb_tail_strictness symb_infix_assoc /* 0=lazy,1=strict */
-
 # define symb_state_p symb_val.val_state_p
 # define symb_unboxed_cons_p symb_val.val_unboxed_cons_p
 # define symb_unboxed_cons_state_p symb_val.val_unboxed_cons_p->unboxed_cons_state_p
@@ -169,22 +162,12 @@ STRUCT (symbol,Symbol) {
 #define symb_string symb_val.val_string
 #define symb_real symb_val.val_real
 #define symb_arity symb_val.val_arity
-#define symb_type symb_val.val_type
-#define symb_arrfun symb_val.val_arrfun
-#define symb_symb symb_val.val_symb
-#define symb_instance symb_val.val_instance
-
-#define symb_member symb_val.val_member
-#define symb_error_mess symb_val.val_error_mess
 
 STRUCT(ident,Ident){
 	char *				ident_name;
 	char *				ident_environ;
 	union{
 		Symbol 				ident_u1_symbol;
-		struct node_id *	ident_u1_nodeid;
-		struct type_var *	ident_u1_tv;
-		struct uni_var *	ident_u1_uni_var;
 		char *				ident_u1_instructions;
 	} ident_union1;
 
@@ -194,19 +177,9 @@ STRUCT(ident,Ident){
 };
 
 #define ident_symbol		ident_union1.ident_u1_symbol
-#define ident_nodeid		ident_union1.ident_u1_nodeid
-#define ident_tv			ident_union1.ident_u1_tv
-#define ident_uni_var		ident_union1.ident_u1_uni_var
 #define ident_instructions	ident_union1.ident_u1_instructions
  
-#define IMPORT_MASK					1
-#define IMPORTED_MASK				2
-#define	BOUND_MASK					4
 #define INLINE_MASK					8
-#define IMPLICITLY_IMPORTED_MASK	16
-#define ID_UNIVAR_MASK				(1 << 5)
-#define ID_TYPEVAR_MASK				(1 << 6)
-#define ID_CLASSVAR_MASK			(1 << 7)
 
 /*
 	The order in which the annotationkinds appear in the enum type
@@ -222,8 +195,6 @@ typedef enum {
 	ParallelNFAnnot, InterleavedNFAnnot
 } Annotation;
 
-typedef enum { AssocNone=0, AssocLeft=1, AssocRight=2 } Assoc;
-
 typedef struct ident_string *IdentStringP;
 
 struct ident_string {
@@ -231,14 +202,6 @@ struct ident_string {
 	IdentStringP	right;
 	Ident			ident;
 	char			*string;
-};
-
-typedef struct symb_list SymbElem,*SymbList;
-
-struct symb_list {
-	IdentStringP	slist_ident_string;
-	SymbList		slist_next;
-	unsigned		slist_line;
 };
 
 typedef struct def_repr DefRepr,*DefMod;
