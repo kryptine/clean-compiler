@@ -1055,8 +1055,11 @@ BEConstructorSymbol (int constructorIndex, int moduleIndex)
 	constructorSymbol	= module->bem_constructors [constructorIndex];
 
 	/* RWS +++ hack for record constructors, remove this */
-	if (constructorSymbol->symb_kind == erroneous_symb)
-		return (constructorSymbol);
+	if (constructorSymbol->symb_kind == erroneous_symb){
+		/* store index in symb_arity until BERecordType is called, should be passed directly to BERecordType */
+		constructorSymbol->symb_arity = constructorIndex;
+		return constructorSymbol;
+	}
 
 	Assert (constructorSymbol->symb_kind == definition || constructorSymbol->symb_kind == cons_symb
 				|| (moduleIndex == kPredefinedModuleIndex && constructorSymbol->symb_kind != erroneous_symb));
@@ -2892,20 +2895,21 @@ BERecordType (int moduleIndex, BEFlatTypeP lhs, BETypeNodeP constructorType, int
 	sdef->sdef_arity		= constructorType->type_node_arity;
 
 	sdef->sdef_boxed_record	= is_boxed_record;
-	
-	// +++ change this
+
 	{
-		int	i;
-		BEModuleP	module;
+		int constructor_index;
+		struct symbol *constructor_symbol_p;
+		BEModuleP module;
+		
+		constructor_symbol_p = constructorType->type_node_symbol;
+		/* BEConstructorSymbol has stored the index in symb_arity, should be passed directly to BERecordType */
+		constructor_index = constructor_symbol_p->symb_arity;
+		constructor_symbol_p->symb_arity = 0;
 
-		module	= &gBEState.be_modules [moduleIndex];
-
-		for (i = 0; i < module->bem_nConstructors; i++)
-			if (module->bem_constructors [i] == constructorType->type_node_symbol)
-				break;
-
-		Assert (i < module->bem_nConstructors);
-		module->bem_constructors [i]	= type->type_lhs->ft_symbol;
+		module = &gBEState.be_modules [moduleIndex];
+		
+		Assert (module->bem_constructors[constructor_index]==constructor_symbol_p);
+		module->bem_constructors[constructor_index] = type->type_lhs->ft_symbol;
 	}
 } /* BERecordType */
 
