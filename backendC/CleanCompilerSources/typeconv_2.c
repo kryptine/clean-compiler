@@ -219,26 +219,6 @@ static Bool DetermineRefCountOfAttributeVarsInNode (TypeNode type_node)
 
 } /* DetermineRefCountOfAttributeVarsInNode */
 
-static void DetermineRefCountOfAttributeVars (TypeAlts type)
-{
-	TypeArgs type_args;
-	UniVarEquations attr_equas;
-	
-	ClearARC_Info ();
-
-	for (type_args = type -> type_alt_lhs -> type_node_arguments; type_args; type_args = type_args -> type_arg_next)
-		DetermineRefCountOfAttributeVarsInNode (type_args -> type_arg_node);
-	DetermineRefCountOfAttributeVarsInNode (type -> type_alt_rhs);
-
-	for (attr_equas = type -> type_alt_attr_equations; attr_equas; attr_equas = attr_equas -> uve_next)
-	{	AttributeKindList next;
-		UpdateRefCountInfo (attr_equas -> uve_demanded - FirstUniVarNumber, False);
-		for (next = attr_equas -> uve_offered; next; next = next -> akl_next)
-			UpdateRefCountInfo (next -> akl_elem - FirstUniVarNumber, False);
-	}
-
-} /* DetermineRefCountOfAttributeVars */
-
 static char *TypeConv = "typeconv";
 
 static unsigned RetrieveRefCountInfo (int attr_var, Bool *used_implicitly)
@@ -380,38 +360,22 @@ static void PrintArgument (TypeArgs arg, Bool brackets, Bool strict_context, Boo
 static void PrintArguments (TypeArgs args, char separator, Bool brackets, Bool strict_context, FlatType form_type)
 {
 	if (args)
-	{	int arg_nr, nr_of_exi_vars;
+	{	int arg_nr;
 		TypeVarList form_type_vars;
 		
 		if (form_type != NULL)
-		{	nr_of_exi_vars = form_type -> ft_exist_arity;
-			form_type_vars = form_type -> ft_arguments;
+		{	form_type_vars = form_type -> ft_arguments;
 
-			if (nr_of_exi_vars > 0)
-			{	FPutC (':', StdListTypes);
-				PrintArgument (args, cPrintBrackets, strict_context, cDoPrintAttribute);
-			}
-			else
-			{	PrintArgument (args, brackets, strict_context, ! TestMark (form_type_vars -> tvl_elem, tv_mark, TV_EXISTENTIAL_ATTRIBUTE_MASK));
-				form_type_vars = form_type_vars -> tvl_next;
-			}
+			PrintArgument (args, brackets, strict_context, ! TestMark (form_type_vars -> tvl_elem, tv_mark, TV_EXISTENTIAL_ATTRIBUTE_MASK));
+			form_type_vars = form_type_vars -> tvl_next;
 		}
 		else
-		{	nr_of_exi_vars = 0;
-			form_type_vars = NULL;
+		{	form_type_vars = NULL;
 			PrintArgument (args, brackets, strict_context, cDoPrintAttribute);
 		}
 
 		for (arg_nr = 1, args = args -> type_arg_next; args; args = args -> type_arg_next, arg_nr++)
-		{	if (arg_nr == nr_of_exi_vars)
-				FPutS (": ", StdListTypes);
-			else if (arg_nr < nr_of_exi_vars)
-			{	FPutC (',', StdListTypes);
-				PrintArgument (args, brackets, strict_context, cDoPrintAttribute);
-				continue;
-			}
-			else
-				FPutC (separator, StdListTypes);
+		{	FPutC (separator, StdListTypes);
 				
 			if (form_type_vars != NULL)
 			{	PrintArgument (args, brackets, strict_context, ! TestMark (form_type_vars -> tvl_elem, tv_mark, TV_EXISTENTIAL_ATTRIBUTE_MASK));
@@ -420,8 +384,6 @@ static void PrintArguments (TypeArgs args, char separator, Bool brackets, Bool s
 			else
 				PrintArgument (args, brackets, strict_context, cDoPrintAttribute);
 		}
-		if (arg_nr == nr_of_exi_vars)
-			FPutC (':', StdListTypes);
 	}
 	
 } /* PrintArguments */
@@ -662,13 +624,6 @@ void PrintType (SymbDef tdef, TypeAlts type)
 {
 	TypeNode lhs_root = type -> type_alt_lhs;
 	TypeArgs lhsargs = lhs_root -> type_node_arguments;
-	int i;
-	
-	if (tdef -> sdef_unq_attributed && DoShowAttributes)
-		DetermineRefCountOfAttributeVars (type);
-	
-	for (i=0; i<tdef -> sdef_nr_of_lifted_nodeids; i++)
-		lhsargs = lhsargs -> type_arg_next; 
 	
 	PrintSymbolOfIdent (tdef -> sdef_ident, tdef -> sdef_line, StdListTypes);
 	FPutS (" :: ", StdListTypes);
@@ -700,18 +655,6 @@ void PrintType (SymbDef tdef, TypeAlts type)
 		PrintAttributeEquations (type -> type_alt_attr_equations);
 
 	FPutS (";\n", StdListTypes);
-	
-	if (tdef -> sdef_nr_of_lifted_nodeids > 0)
-	{	FPutS ("// internal argument types:", StdListTypes);
-		for (i=0, lhsargs = lhs_root -> type_node_arguments;
-			i<tdef -> sdef_nr_of_lifted_nodeids; i++, lhsargs = lhsargs -> type_arg_next)
-		{	FPutC (' ', StdListTypes);
-			PrintArgument (lhsargs, cPrintBrackets, cInAStrictContext, cDoPrintAttribute);
-		}
-		FPutC ('\n', StdListTypes);
-	}
-	
-
 } /* PrintType */
 
 void ListTypes (ImpMod imod)
@@ -729,17 +672,9 @@ void ListTypes (ImpMod imod)
 	}
 } /* ListTypes */
 
-/******
-
-	Routines for printing types
-	
-******/
-
-
 void InitARC_Info (void)
 {
 	CurrentARC_Info = CompAllocType (struct attr_ref_count_info);
 	CurrentARC_Info -> arci_next = NULL;
 
 } /* InitARC_Info */
-

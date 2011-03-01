@@ -30,15 +30,13 @@
 #endif
 
 typedef enum
-		{abcFile = 1, iclFile, dclFile, dumpFile, statFile,
-		 stasFile, helpFile, applFile, assFile, sunAssFile,
+		{abcFile = 1, iclFile, dclFile, applFile, assFile, sunAssFile,
 		 obj00File, obj20File, obj81File,
 		 otherFile, hsFile
 		} FileKind;
 
 #define EndOfFile		((int) -1)
 #define FileNameMax		256
-#define FOpenMax		10
 #define SeekSet
 #define SeekCur
 #define SeekEnd

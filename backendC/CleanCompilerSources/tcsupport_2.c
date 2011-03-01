@@ -35,7 +35,7 @@ BITVECT DetermineConsVarsOfTypeCons (SymbDef typecons, ConsVarList * cons_vars)
 {
 	if (typecons -> sdef_kind == TYPE || typecons -> sdef_kind == RECORDTYPE)
 	{	if (typecons -> sdef_type)
-		{	* cons_vars = typecons -> sdef_type -> type_lhs -> ft_cons_vars;
+		{	* cons_vars = NULL;
 			return typecons -> sdef_type -> type_consvars;
 		}
 		else
@@ -44,7 +44,7 @@ BITVECT DetermineConsVarsOfTypeCons (SymbDef typecons, ConsVarList * cons_vars)
 		}
 	}
 	else if (typecons -> sdef_kind == TYPESYN)
-	{	 * cons_vars =  typecons -> sdef_syn_type -> syn_lhs -> ft_cons_vars ;
+	{	 * cons_vars =  NULL;
 		return typecons -> sdef_syn_type -> syn_consvars;
 	}
 	else
@@ -142,24 +142,7 @@ void PrintNodeSymbol (Node node, int arg_nr, File file)
 	}
 	else
 	{	if (arg_nr > 0)
-		{	if (rootsymb -> symb_kind == definition && rootsymb -> symb_def -> sdef_kind == IMPRULE)
-			{	if (arg_nr <= rootsymb -> symb_def -> sdef_nr_of_lifted_nodeids)
-				{	Args lifted_arg;
-					int i;
-					
-					for (i = 1, lifted_arg = node -> node_arguments; i < arg_nr; i ++, lifted_arg = lifted_arg -> arg_next)
-						;
-					if (lifted_arg -> arg_node -> node_kind == NodeIdNode)
-						FPrintF (StdError, "internal argument %s of ", lifted_arg -> arg_node -> node_node_id -> nid_ident -> ident_name);
-					else
-						FPrintF (StdError, "internal argument %d of ", arg_nr);
-				}
-				else
-					FPrintF (StdError, "argument %d of ", arg_nr - rootsymb -> symb_def -> sdef_nr_of_lifted_nodeids);
-			}
-			else
-				FPrintF (StdError, "argument %d of ", arg_nr);
-		}
+			FPrintF (StdError, "argument %d of ", arg_nr);
 		PrintSymbol (rootsymb, file);
 	}
 

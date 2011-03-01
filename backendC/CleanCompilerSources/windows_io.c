@@ -35,17 +35,10 @@ char *GetFileExtension (FileKind kind)
 			return ".dcl";
 		case hsFile:
 			return ".hs";
-		case dumpFile:
-			return ".dmp";
-		case statFile:
-			return ".stt";
-		case stasFile:
-			return ".str";
 		case assFile:
 			return ".a";
 		case sunAssFile:
 			return ".s";
-		case helpFile:
 		case applFile:
 		case otherFile:
 		default:

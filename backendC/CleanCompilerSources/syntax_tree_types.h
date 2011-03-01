@@ -47,15 +47,7 @@ typedef struct flat_type
 {
 	Symbol					ft_symbol;
 	TypeVarList				ft_arguments;
-	TypeVarList				ft_exist_quant_arguments;
-
-	struct cons_var_list *	ft_cons_vars;
-	struct uni_var_admin *	ft_attr_vars;
-	
 	AttributeKind			ft_attribute;
-	int						ft_arity;
-	int						ft_exist_arity;
-
 } * FlatType;
 
 typedef enum {	SLK_Symbol, SLK_TreeOfLists, SLK_ListNumber } SymbolListKind;

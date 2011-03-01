@@ -3,8 +3,6 @@
 	Version:	1.2
 */
 
-#pragma segment checker
-
 #define COMPLEX_ABSTYPES
 #define MOVE_LIFTED_CONSTANTS
 #define OPTIMIZE_APPLIES
@@ -132,11 +130,8 @@ SymbDef MakeNewSymbolDefinition (char * module, Ident name, int arity, SDefKind 
 	def->sdef_line = 0;
 
 	def->sdef_mark=0;
-	def->sdef_over_arity=0;
 
 	def->sdef_exported=False;
-	def->sdef_main_dcl=False;
-	def->sdef_infix=False;
 
 	def->sdef_arfun				= NoArrayFun;
 	

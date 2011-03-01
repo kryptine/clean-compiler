@@ -6,8 +6,6 @@
 extern char *ConvertSymbolKindToString (SymbKind skind);
 
 extern void CheckError (char *msg1,char *msg2);
-extern void CheckNodeError (char *msg1,char *msg2,NodeP node_p);
-extern void CheckNodeSymbolError (struct symbol *symbol,char *msg,NodeP node_p);
 extern void CheckSymbolError (struct symbol *symbol,char *msg);
 extern void CheckWarning (char *msg1,char *msg2);
 extern void CheckSymbolWarning (struct symbol *symbol,char *msg);

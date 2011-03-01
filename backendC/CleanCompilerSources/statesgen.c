@@ -1099,7 +1099,7 @@ void ExamineTypesAndLhsOfImpRuleSymbolDefinitionAgain (SymbDef def)
 	DetermineLhsStatesOfRule (def->sdef_rule);
 #endif
 
-	if (def->sdef_exported && def->sdef_dcl_icl!=NULL && def->sdef_dcl_icl->sdef_kind!=INSTANCE)
+	if (def->sdef_exported && def->sdef_dcl_icl!=NULL)
 		rootstate=def->sdef_dcl_icl->sdef_rule_type->rule_type_state_p[-1];
 
 	if (IsSimpleState (rootstate)){
@@ -1125,9 +1125,6 @@ void ExamineTypesAndLhsOfSymbolDefinition (SymbDef def)
 {
 	StateS rootstate;
 
-	if (def->sdef_over_arity!=0)
-		return;
-
 	def->sdef_number = 0;
 
 	if (def->sdef_exported && def->sdef_dcl_icl!=def)
@@ -1151,7 +1148,7 @@ void ExamineTypesAndLhsOfSymbolDefinition (SymbDef def)
 			def->sdef_rule->rule_state_p = allocate_function_state (def->sdef_arity);
 			rootstate = DetermineStatesOfRuleType (def->sdef_rule->rule_type,def->sdef_rule->rule_state_p);
 			
-			if (def->sdef_exported && def->sdef_dcl_icl!=NULL && def->sdef_dcl_icl->sdef_kind!=INSTANCE){
+			if (def->sdef_exported && def->sdef_dcl_icl!=NULL){
 				def->sdef_dcl_icl->sdef_rule_type->rule_type_state_p = allocate_function_state (def->sdef_arity);
 				rootstate = DetermineStatesOfRuleType (def->sdef_dcl_icl->sdef_rule_type->rule_type_rule,def->sdef_dcl_icl->sdef_rule_type->rule_type_state_p);
 			}
@@ -1268,7 +1265,7 @@ void ImportSymbols (Symbol symbols)
 			continue;
 
 		if (sdef->sdef_module!=CurrentModule){
-			if (sdef->sdef_isused && sdef->sdef_over_arity==0)
+			if (sdef->sdef_isused)
 				GenImport (sdef);
 
 			if (sdef->sdef_kind==RECORDTYPE){
@@ -1279,7 +1276,7 @@ void ImportSymbols (Symbol symbols)
 
 					field_sdef=fields->fl_symbol->symb_def;
 
-					if (field_sdef->sdef_isused && field_sdef->sdef_over_arity==0)
+					if (field_sdef->sdef_isused)
 						GenImport (field_sdef);
 				}
 			}
@@ -2951,37 +2948,36 @@ static void set_states_in_lhs (ArgP arguments,StateP states)
 void GenerateStatesForRule (ImpRuleS *rule)
 {
 	SymbDef rule_sdef;
+	RuleAlts alt;
+#ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
+	StateP function_state_p;
+#endif
 
 	CurrentSymbol=rule->rule_root->node_symbol;
 	rule_sdef=CurrentSymbol->symb_def;
 
-	if (rule_sdef->sdef_over_arity==0){
-		RuleAlts alt;
 #ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
-		StateP function_state_p;
-
-		function_state_p=rule->rule_state_p;
+	function_state_p=rule->rule_state_p;
 #endif
 
-		for_l (alt,rule->rule_alts,alt_next){
-			CurrentLine = alt->alt_line;
-		
+	for_l (alt,rule->rule_alts,alt_next){
+		CurrentLine = alt->alt_line;
+	
 #ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
-			set_states_in_lhs (alt->alt_lhs_root->node_arguments,function_state_p);
-			alt->alt_lhs_root->node_state = function_state_p[-1]; /* i.e. the result state */
+		set_states_in_lhs (alt->alt_lhs_root->node_arguments,function_state_p);
+		alt->alt_lhs_root->node_state = function_state_p[-1]; /* i.e. the result state */
 #endif
 
-			scope=1;
+		scope=1;
 
-			if (alt->alt_kind==Contractum){
-				DetermineStatesOfRootNodeAndDefs (alt->alt_rhs_root,&alt->alt_rhs_defs,alt->alt_lhs_root->node_state,0);
+		if (alt->alt_kind==Contractum){
+			DetermineStatesOfRootNodeAndDefs (alt->alt_rhs_root,&alt->alt_rhs_defs,alt->alt_lhs_root->node_state,0);
 
 #ifdef OBSERVE_ARRAY_SELECTS_IN_PATTERN
-				set_states_of_array_selects_in_pattern (alt);
+			set_states_of_array_selects_in_pattern (alt);
 #endif				
-			} else if (rule->rule_type==NULL)
-				StaticMessage (True, "%S", ECodeBlock, CurrentSymbol);
-		}
+		} else if (rule->rule_type==NULL)
+			StaticMessage (True, "%S", ECodeBlock, CurrentSymbol);
 	}
 }
 
@@ -4013,23 +4009,20 @@ static void AnnotateStrictNodeIds (Node node,StrictNodeIdP strict_node_ids,NodeD
 static void DetermineSharedAndAnnotatedNodesOfRule (ImpRuleP rule)
 {
 	SymbDef rule_sdef;
+	RuleAlts alt;
 
 	CurrentSymbol=rule->rule_root->node_symbol;
 	
 	rule_sdef=CurrentSymbol->symb_def;
 	
-	if (rule_sdef->sdef_over_arity==0){
-		RuleAlts alt;
+	for_l (alt,rule->rule_alts,alt_next)
+		if (alt->alt_kind==Contractum){
+			CurrentLine = alt->alt_line;
 
-		for_l (alt,rule->rule_alts,alt_next)
-			if (alt->alt_kind==Contractum){
-				CurrentLine = alt->alt_line;
+			AnnotateStrictNodeIds (alt->alt_rhs_root,alt->alt_strict_node_ids,&alt->alt_rhs_defs);
 
-				AnnotateStrictNodeIds (alt->alt_rhs_root,alt->alt_strict_node_ids,&alt->alt_rhs_defs);
-
-				CollectSharedAndAnnotatedNodesInRhs (&alt->alt_rhs_root,&alt->alt_rhs_defs,alt->alt_strict_node_ids);
-			}
-	}
+			CollectSharedAndAnnotatedNodesInRhs (&alt->alt_rhs_root,&alt->alt_rhs_defs,alt->alt_strict_node_ids);
+		}
 }
 
 static void reset_states_and_ref_count_copies_of_node_defs (NodeDefS *node_def);
@@ -4171,26 +4164,23 @@ static void reset_states_and_ref_count_copies_of_root_node (NodeP node_p)
 void reset_states_and_ref_count_copies (ImpRuleS *rule)
 {
 	SymbDef rule_sdef;
+	RuleAlts alt;
 
 	CurrentSymbol=rule->rule_root->node_symbol;
 	
 	rule_sdef=CurrentSymbol->symb_def;
-	
-	if (rule_sdef->sdef_over_arity==0){
-		RuleAlts alt;
 
-		for_l (alt,rule->rule_alts,alt_next)
-			if (alt->alt_kind==Contractum){
-				CurrentLine = alt->alt_line;
+	for_l (alt,rule->rule_alts,alt_next)
+		if (alt->alt_kind==Contractum){
+			CurrentLine = alt->alt_line;
 
 #ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
-				reset_states_and_ref_count_copies_of_root_node (alt->alt_rhs_root);
+			reset_states_and_ref_count_copies_of_root_node (alt->alt_rhs_root);
 #else
-				reset_states_and_ref_count_copies_of_node (alt->alt_rhs_root);
+			reset_states_and_ref_count_copies_of_node (alt->alt_rhs_root);
 #endif
-				reset_states_and_ref_count_copies_of_node_defs (alt->alt_rhs_defs);
-			}
-	}
+			reset_states_and_ref_count_copies_of_node_defs (alt->alt_rhs_defs);
+		}
 }
 
 void DetermineSharedAndAnnotatedNodes (ImpRules rules,SymbolP *im_symbols_h)

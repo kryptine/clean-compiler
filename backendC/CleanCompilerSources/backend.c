@@ -779,7 +779,6 @@ BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, in
 
 			newsdef->sdef_ident			= newIdent;
 			newsdef->sdef_module		= gBEState.be_icl.beicl_module->im_name->symb_def->sdef_module; /* phew! */
-			newsdef->sdef_over_arity	= 0;
 			newsdef->sdef_mark		= 0;
 			newsdef->sdef_isused		= True;
 			newsdef->sdef_exported		= False;
@@ -1018,6 +1017,11 @@ BETypeSymbol (int typeIndex, int moduleIndex)
 	return (typeSymbol);
 } /* BETypeSymbol */
 
+BESymbolP BETypeSymbolNoMark (int typeIndex, int moduleIndex)
+{
+	return gBEState.be_modules [moduleIndex].bem_types [typeIndex];
+}
+
 BESymbolP
 BEDontCareDefinitionSymbol (void)
 {
@@ -1056,8 +1060,11 @@ BEConstructorSymbol (int constructorIndex, int moduleIndex)
 	constructorSymbol	= module->bem_constructors [constructorIndex];
 
 	/* RWS +++ hack for record constructors, remove this */
-	if (constructorSymbol->symb_kind == erroneous_symb)
-		return (constructorSymbol);
+	if (constructorSymbol->symb_kind == erroneous_symb){
+		/* store index in symb_arity until BERecordType is called, should be passed directly to BERecordType */
+		constructorSymbol->symb_arity = constructorIndex;
+		return constructorSymbol;
+	}
 
 	Assert (constructorSymbol->symb_kind == definition || constructorSymbol->symb_kind == cons_symb
 				|| (moduleIndex == kPredefinedModuleIndex && constructorSymbol->symb_kind != erroneous_symb));
@@ -2510,7 +2517,6 @@ DeclareFunctionC (char *name, int arity, int functionIndex, unsigned int ancesto
 
 	newSymbDef->sdef_kind		= IMPRULE;
 	newSymbDef->sdef_mark		= 0;
-	newSymbDef->sdef_over_arity	= 0;
 	newSymbDef->sdef_arity		= arity;
 	newSymbDef->sdef_module		= module->bem_name;
 	newSymbDef->sdef_ancestor	= ancestor;
@@ -2519,9 +2525,7 @@ DeclareFunctionC (char *name, int arity, int functionIndex, unsigned int ancesto
 	newSymbDef->sdef_exported	= False;
 	newSymbDef->sdef_dcl_icl	= NULL;
 	newSymbDef->sdef_isused		= 0;
-	newSymbDef->sdef_no_sa		= False;
 
-	newSymbDef->sdef_nr_of_lifted_nodeids	= 0;	/* used in PrintType */
 	newSymbDef->sdef_line					= 0;	/* used in PrintType */
 
 	*icl->beicl_depsP	= newSymbDef;
@@ -2666,7 +2670,6 @@ BEDefineRuleType (int functionIndex, int moduleIndex, BETypeAltP typeAlt)
 
 	sdef	= functionSymbol->symb_def;
 	Assert (sdef->sdef_kind == NEWDEFINITION);
-	sdef->sdef_over_arity	= 0;
 	sdef->sdef_arity		= typeAlt->type_alt_lhs->type_node_arity;
 	sdef->sdef_arfun		= NoArrayFun;
 	sdef->sdef_kind 		= module->bem_isSystemModule ? SYSRULE : DEFRULE;
@@ -2760,7 +2763,6 @@ BETypeVar (CleanString name)
 	typeVar	= ConvertAllocType (struct type_var);
 
 	ident->ident_name	= ConvertCleanString (name);
-	ident->ident_tv	= typeVar;
 
 	typeVar->tv_ident		= ident;
 	typeVar->tv_mark		= 0;
@@ -2802,19 +2804,11 @@ BEFlatTypeP
 BEFlatType (BESymbolP symbol, BEAttribution attribution, BETypeVarListP arguments)
 {
 	FlatType	flatType;
-	int			i;
 
 	flatType	= ConvertAllocType (struct flat_type);
 
 	flatType->ft_symbol		= symbol;
 	flatType->ft_arguments	= arguments;
-	i	= 0;
-	for (; arguments != NULL; arguments=arguments->tvl_next)
-		i++;
-	flatType->ft_arity	= i;
-
-	flatType->ft_cons_vars	= NULL;	/* used in PrintType */
-
 	flatType->ft_attribute = (AttributeKind) attribution;;
 
 	return (flatType);
@@ -2856,7 +2850,6 @@ BEAlgebraicType (BEFlatTypeP lhs, BEConstructorListP constructors)
 	Assert (type->type_lhs->ft_symbol->symb_kind == definition);
 	sdef	= type->type_lhs->ft_symbol->symb_def;
 	Assert (sdef->sdef_kind == NEWDEFINITION);
-	sdef->sdef_over_arity	= 0;
 	sdef->sdef_kind 		= TYPE;
 	sdef->sdef_type			= type;
 } /* BEAlgebraicType */
@@ -2870,9 +2863,7 @@ BERecordType (int moduleIndex, BEFlatTypeP lhs, BETypeNodeP constructorType, int
 	BEConstructorListP	constructor;
 
 	type	= ConvertAllocType (struct type);
-	/* ifdef DEBUG */
 	type->type_next	= NULL;
-	/* endif */
 
 	constructor	= ConvertAllocType (struct constructor_list);
 
@@ -2902,7 +2893,6 @@ BERecordType (int moduleIndex, BEFlatTypeP lhs, BETypeNodeP constructorType, int
 	Assert (type->type_lhs->ft_symbol->symb_kind == definition);
 	sdef	= type->type_lhs->ft_symbol->symb_def;
 	Assert (sdef->sdef_kind == NEWDEFINITION);
-	sdef->sdef_over_arity	= 0;
 	sdef->sdef_cons_arity	= constructorType->type_node_arity;
 	sdef->sdef_checkstatus	= TypeChecked;
 	sdef->sdef_kind 		= RECORDTYPE;
@@ -2910,20 +2900,21 @@ BERecordType (int moduleIndex, BEFlatTypeP lhs, BETypeNodeP constructorType, int
 	sdef->sdef_arity		= constructorType->type_node_arity;
 
 	sdef->sdef_boxed_record	= is_boxed_record;
-	
-	// +++ change this
+
 	{
-		int	i;
-		BEModuleP	module;
+		int constructor_index;
+		struct symbol *constructor_symbol_p;
+		BEModuleP module;
+		
+		constructor_symbol_p = constructorType->type_node_symbol;
+		/* BEConstructorSymbol has stored the index in symb_arity, should be passed directly to BERecordType */
+		constructor_index = constructor_symbol_p->symb_arity;
+		constructor_symbol_p->symb_arity = 0;
 
-		module	= &gBEState.be_modules [moduleIndex];
-
-		for (i = 0; i < module->bem_nConstructors; i++)
-			if (module->bem_constructors [i] == constructorType->type_node_symbol)
-				break;
-
-		Assert (i < module->bem_nConstructors);
-		module->bem_constructors [i]	= type->type_lhs->ft_symbol;
+		module = &gBEState.be_modules [moduleIndex];
+		
+		Assert (module->bem_constructors[constructor_index]==constructor_symbol_p);
+		module->bem_constructors[constructor_index] = type->type_lhs->ft_symbol;
 	}
 } /* BERecordType */
 
@@ -2944,7 +2935,6 @@ BEAbsType (BEFlatTypeP lhs)
 	Assert (lhs->ft_symbol->symb_kind == definition);
 	sdef	= lhs->ft_symbol->symb_def;
 	Assert (sdef->sdef_kind == NEWDEFINITION);
-	sdef->sdef_over_arity	= 0;
 	sdef->sdef_checkstatus	= TypeChecked;
 	sdef->sdef_kind 		= ABSTYPE;
 	sdef->sdef_abs_type		= absType;
@@ -2988,7 +2978,6 @@ BEConstructor (BETypeNodeP type)
 	sdef->sdef_kind = CONSTRUCTOR;
 	sdef->sdef_constructor	= constructor;
 	sdef->sdef_arity		= type->type_node_arity;
-	sdef->sdef_over_arity	= 0;
 	/* ifdef DEBUG */
 	sdef->sdef_type			= NULL;
 	/* endif */
@@ -3055,7 +3044,6 @@ BEField (int fieldIndex, int moduleIndex, BETypeNodeP type)
 	sdef->sdef_kind = FIELDSELECTOR;
 	sdef->sdef_sel_field	= field;
 	sdef->sdef_arity		= 1;
-	sdef->sdef_over_arity	= 0;
 	sdef->sdef_mark			= 0;
 	/* ifdef DEBUG */
 	sdef->sdef_type			= NULL;
@@ -3106,7 +3094,6 @@ BEDeclareConstructor (int constructorIndex, int moduleIndex, CleanString name)
 	newSymbDef->sdef_ident		= newIdent;
 	newSymbDef->sdef_mark		= 0;
 	newSymbDef->sdef_isused		= 0;
-	newSymbDef->sdef_no_sa		= False;
 
 	constructors [constructorIndex]->symb_kind	= definition;
 	constructors [constructorIndex]->symb_def	= newSymbDef;

@@ -872,7 +872,7 @@ int optimise_tuple_result_function (Node node,StateS demanded_state)
 	symbol=node->node_symbol;
 	sdef=symbol->symb_def;
 
-	if (sdef->sdef_kind!=IMPRULE || sdef->sdef_over_arity!=0 || node->node_arity!=sdef->sdef_arity)
+	if (sdef->sdef_kind!=IMPRULE || node->node_arity!=sdef->sdef_arity)
 		return 0;
 	
 	result_type=sdef->sdef_rule->rule_type->type_alt_rhs;
@@ -4023,51 +4023,48 @@ static void mark_shared_strict_tuple_and_record_elements (Args args,int ref_coun
 static ImpRuleS **OptimiseRule (ImpRuleS *rule)
 {
 	SymbDef rule_sdef;
+	RuleAlts alt;
 
 	CurrentSymbol = rule->rule_root->node_symbol;
 	
 	rule_sdef= CurrentSymbol->symb_def;
-	
-	if (rule_sdef->sdef_over_arity==0){
-		RuleAlts alt;
 
 #ifndef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
-		transform_patterns_to_case_and_guard_nodes (rule->rule_alts);
+	transform_patterns_to_case_and_guard_nodes (rule->rule_alts);
 #endif
 
-		alt=rule->rule_alts;
-		CurrentLine = alt->alt_line;
+	alt=rule->rule_alts;
+	CurrentLine = alt->alt_line;
 
-		if (alt->alt_kind==Contractum){				
+	if (alt->alt_kind==Contractum){				
 #ifdef REUSE_UNIQUE_NODES
-			if (DoReuseUniqueNodes)
-				mark_shared_strict_tuple_and_record_elements (alt->alt_lhs_root->node_arguments,1);
+		if (DoReuseUniqueNodes)
+			mark_shared_strict_tuple_and_record_elements (alt->alt_lhs_root->node_arguments,1);
 #endif
 #if OPTIMIZE_LAZY_TUPLE_RECURSION
-			current_rule_mark=rule->rule_mark;
+		current_rule_mark=rule->rule_mark;
 #endif
-			optimise_root_node (alt->alt_rhs_root,alt->alt_rhs_defs,NULL);
+		optimise_root_node (alt->alt_rhs_root,alt->alt_rhs_defs,NULL);
 
-			ReorderNodeDefinitionsAndDetermineUsedEntries (&alt->alt_rhs_defs,alt->alt_rhs_root);
+		ReorderNodeDefinitionsAndDetermineUsedEntries (&alt->alt_rhs_defs,alt->alt_rhs_root);
 
-			determine_then_else_ref_counts (alt->alt_rhs_root);
-		}
+		determine_then_else_ref_counts (alt->alt_rhs_root);
+	}
+	
+	while (new_rules){
+		ImpRuleP new_rule;
+		RuleAltP alt;
 		
-		while (new_rules){
-			ImpRuleP new_rule;
-			RuleAltP alt;
-			
-			new_rule=new_rules;
-			new_rules=new_rule->rule_next;
-			
-			alt=new_rule->rule_alts;
-			DetermineStatesOfRootNodeAndDefs (alt->alt_rhs_root,&alt->alt_rhs_defs,alt->alt_lhs_root->node_state,0);
-			ReorderNodeDefinitionsAndDetermineUsedEntries (&alt->alt_rhs_defs,alt->alt_rhs_root);
-			
-			new_rule->rule_next=rule->rule_next;
-			rule->rule_next=new_rule;
-			rule=new_rule;
-		}
+		new_rule=new_rules;
+		new_rules=new_rule->rule_next;
+		
+		alt=new_rule->rule_alts;
+		DetermineStatesOfRootNodeAndDefs (alt->alt_rhs_root,&alt->alt_rhs_defs,alt->alt_lhs_root->node_state,0);
+		ReorderNodeDefinitionsAndDetermineUsedEntries (&alt->alt_rhs_defs,alt->alt_rhs_root);
+		
+		new_rule->rule_next=rule->rule_next;
+		rule->rule_next=new_rule;
+		rule=new_rule;
 	}
 	
 	return &rule->rule_next;
