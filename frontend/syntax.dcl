@@ -553,7 +553,9 @@ NoGlobalIndex :== {gi_module=NoIndex,gi_index=NoIndex}
  
 :: GenericTypeRep = 
 	{ gtr_type :: GenTypeStruct		// generic structure type
-	, gtr_iso  :: DefinedSymbol		// the conversion isomorphism
+	, gtr_iso  :: !DefinedSymbol	// the conversion isomorphism
+	, gtr_to   :: !DefinedSymbol
+	, gtr_from :: !DefinedSymbol
 	}
 
 ::	TypeDefInfos :== {# .{# TypeDefInfo}}
@@ -772,7 +774,6 @@ cNonRecursiveAppl	:== False
 /*	Some auxiliary type definitions used during fusion. Actually, these definitions
 	should have been given in seperate module. Unfortunately, Clean's module system
 	forbids cyclic dependencies between def modules.
-	
 */
 
 ::	FunctionHeap 	:== Heap FunctionInfo
@@ -1020,6 +1021,7 @@ cNonRecursiveAppl	:== False
 					| TVI_ConsInstance !DefinedSymbol //AA: generic cons instance function 
 					| TVI_Normalized !Int /* MV - position of type variable in its definition */
 					| TVI_Expr !Expression	/* AA: Expression corresponding to the type var during generic specialization */
+					| TVI_Iso !DefinedSymbol !DefinedSymbol !DefinedSymbol
 					| TVI_GenTypeVarNumber !Int
 					| TVI_CPSTypeVar !CheatCompiler /* MdM: a pointer to a variable in CleanProverSystem is stored here, using a cast */
 
