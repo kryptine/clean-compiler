@@ -1973,6 +1973,9 @@ renumber_icl_module_functions mod_type icl_global_function_range icl_instance_ra
 					({gc_gcf=GCFS dcl_gcfs},{gc_gcf=GCFS icl_gcfs})
 						#! new_table = build_conversion_table_for_generic_superclasses dcl_gcfs icl_gcfs new_table
 						-> (new_table, icl_gencases, error)
+					({gc_gcf=GCFS dcl_gcfs},{gc_gcf=GCFC _ _})
+						// error already reported in checkGenericCaseDefs
+						-> (new_table, icl_gencases, error)
 				where
 					build_conversion_table_for_generic_superclasses [!{gcf_body=GCB_FunIndex dcl_fun}:dcl_gcfs!] [!{gcf_body=GCB_FunIndex icl_fun}:icl_gcfs!] new_table
 						# new_table = {new_table & [dcl_fun] = icl_fun}												
