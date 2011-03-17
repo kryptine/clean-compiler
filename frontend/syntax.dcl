@@ -392,7 +392,15 @@ cNameLocationDependent :== True
 :: GenericInfo = 
 	{	gen_classes		:: !GenericClassInfos
 	,	gen_var_kinds	:: ![TypeKind]  	// kinds of all st_vars of the gen_type
+	,	gen_OBJECT_CONS_FIELD_indices	:: !{#OBJECT_CONS_FIELD_index}
 	}
+
+::	OBJECT_CONS_FIELD_index =
+	{	ocf_module	:: !Int
+	,	ocf_index	:: !Int
+	,	ocf_ident	:: !Ident
+	}
+
 :: GenericInfoPtr :== Ptr GenericInfo	
 :: GenericHeap :== Heap GenericInfo
 
@@ -550,7 +558,7 @@ NoGlobalIndex :== {gi_module=NoIndex,gi_index=NoIndex}
 	| GTSAppBimap TypeKind [GenTypeStruct]		// for optimizing bimaps
 	| GTSPair !GenTypeStruct !GenTypeStruct		// for optimizing bimaps
 	| GTSEither !GenTypeStruct !GenTypeStruct	// for optimizing bimaps
- 
+
 :: GenericTypeRep = 
 	{ gtr_type :: GenTypeStruct		// generic structure type
 	, gtr_iso  :: !DefinedSymbol	// the conversion isomorphism

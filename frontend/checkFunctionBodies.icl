@@ -1162,38 +1162,16 @@ checkExpression free_vars (PE_Generic id=:{id_name,id_info} kind) e_input e_stat
 		check_generic_expr free_vars entry=:{ste_kind=STE_Empty} id kind e_input e_state e_info cs=:{cs_error}
 			= (EE, free_vars, e_state, e_info, { cs & cs_error = checkError id "undefined generic" cs_error })
 		check_generic_expr free_vars entry id kind e_input e_state e_info cs=:{cs_error}
-			= (EE, free_vars, e_state, e_info, { cs & cs_error = checkError id "not a generic" cs_error })						
+			= (EE, free_vars, e_state, e_info, { cs & cs_error = checkError id "not a generic" cs_error })
 
 		check_it free_vars mod_index gen_index id kind e_input e_state=:{es_expr_heap} e_info cs
-			#! (app_args, es_expr_heap, cs)
-				= case kind of
-					KindArrow [KindConst]
-						# (generic_info_expr, es_expr_heap, cs) = build_generic_info es_expr_heap cs 
-						-> ([generic_info_expr], es_expr_heap, cs) 
-					_
-						-> ([], es_expr_heap, cs)
-			#! symb_kind = SK_Generic { glob_object = gen_index, glob_module = mod_index} kind
+			#! symb_kind = SK_Generic {glob_object = gen_index, glob_module = mod_index} kind
 		  	#! symbol = { symb_ident = id, symb_kind = symb_kind }			
 			#! (new_info_ptr, es_expr_heap) = newPtr EI_Empty es_expr_heap
-			#! app = { app_symb = symbol, app_args = app_args, app_info_ptr = new_info_ptr }
+			#! app = { app_symb = symbol, app_args = [], app_info_ptr = new_info_ptr }
 			#! e_state = { e_state & es_expr_heap = es_expr_heap }
 			#! cs = { cs & cs_x.x_needed_modules = cs.cs_x.x_needed_modules bitor cNeedStdGeneric }
 			= (App app, free_vars, e_state, e_info, cs)
-		where
-			// adds NoGenericInfo argument to each generic call
-			build_generic_info es_expr_heap cs=:{cs_predef_symbols}
-				#! pds_ident = predefined_idents.[PD_NoGenericInfo]
-				#! ({pds_module, pds_def}, cs_predef_symbols) = cs_predef_symbols ! [PD_NoGenericInfo]
-				#! (new_info_ptr, es_expr_heap) = newPtr EI_Empty es_expr_heap
-				#! app =
-					{ app_symb = 
-						{ symb_ident = pds_ident
-						, symb_kind = SK_Constructor {glob_module=pds_module, glob_object=pds_def} 
-						}
-					, app_args = []
-					, app_info_ptr = new_info_ptr
- 					}
-			 	= (App app, es_expr_heap, {cs & cs_predef_symbols = cs_predef_symbols})	
 
 checkExpression free_vars (PE_TypeSignature array_kind expr) e_input e_state e_info cs
 	# (expr,free_vars,e_state,e_info,cs) = checkExpression free_vars expr e_input e_state e_info cs
