@@ -27,12 +27,8 @@ char *GetFileExtension (FileKind kind)
 		case obj81File:		return ".obj2";
 		case iclFile:		return ".icl";
 		case dclFile:		return ".dcl";
-		case dumpFile:		return ".dmp";
-		case statFile:		return ".stt";
-		case stasFile:		return ".str";
 		case assFile:		return ".a";
 		case sunAssFile:	return ".s";
-		case helpFile:
 		case applFile:
 		case otherFile:
 		default:			return "";
