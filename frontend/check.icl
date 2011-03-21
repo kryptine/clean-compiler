@@ -1127,7 +1127,7 @@ renumber_icl_definitions_without_functions_as_dcl_definitions (Yes icl_to_dcl_in
 			reorder_common_definitions {com_type_defs,com_cons_defs,com_selector_defs,com_class_defs,com_member_defs,com_instance_defs,com_generic_defs,com_gencase_defs}
 				# dummy_ident = {id_name="",id_info=nilPtr}
 				# com_type_defs=reorder_and_enlarge_array com_type_defs n_dictionary_types icl_to_dcl_index_table.[cTypeDefs]
-									{td_ident=dummy_ident,td_index= -1,td_arity=0,td_args=[],td_attrs=[],td_context=[],td_rhs=UnknownType,td_attribute=TA_None,td_pos=NoPos,td_used_types=[],
+									{td_ident=dummy_ident,td_index= -1,td_arity=0,td_args=[],td_attrs=[],td_rhs=UnknownType,td_attribute=TA_None,td_pos=NoPos,td_used_types=[],
 									 td_fun_index = NoIndex}
 				# dummy_symbol_type={st_vars=[],st_args=[],st_args_strictness=NotStrict,st_arity=0,st_result={at_attribute=TA_None,at_type=TE},st_context=[],st_attr_vars=[],st_attr_env=[]}
 				# com_selector_defs=reorder_and_enlarge_array com_selector_defs n_dictionary_selectors icl_to_dcl_index_table.[cSelectorDefs]

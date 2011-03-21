@@ -1646,7 +1646,6 @@ create_class_dictionary mod_index class_index class_defs =:{[class_index] = clas
 		,	td_arity		= 0
 		,	td_args			= td_args
 		,	td_attrs		= []
-		,	td_context		= []
 		,	td_rhs			= RecordType {rt_constructor = cons_symbol, rt_fields = { field \\ field <- reverse rev_fields }, rt_is_boxed_record=False}
 		,	td_attribute	= TA_None
 		,	td_pos			= NoPos

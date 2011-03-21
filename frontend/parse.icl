@@ -1689,8 +1689,7 @@ where
 		  (name,    pState)			= wantConstructorName "Type name" pState
 		  (ident,   pState)			= stringToIdent name IC_Type pState // -->> ("Type name",name)
 		  (args,    pState)			= parseList tryAttributedTypeVar pState
-		  (contexts, pState)		= optionalContext pState
-		= (MakeTypeDef ident args (ConsList []) attr contexts pos, annot, pState)
+		= (MakeTypeDef ident args (ConsList []) attr pos, annot, pState)
 
 	want_type_rhs :: !Token !ParseContext !ParsedTypeDef !Annotation !ParseState -> (ParsedDefinition, !ParseState)
 	want_type_rhs EqualToken parseContext td=:{td_ident,td_attribute} annot pState

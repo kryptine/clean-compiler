@@ -745,12 +745,11 @@ instance t_corresponds (TypeDef TypeRhs) where
 		= t_corresponds_TypeDef dclDef iclDef
 	  where
 		t_corresponds_TypeDef dclDef iclDef tc_state
-//			| False--->("comparing:", dclDef, iclDef)
-//				= undef
 			# tc_state = init_attr_vars dclDef.td_attrs iclDef.td_attrs tc_state 
 			  tc_state = init_atype_vars dclDef.td_args iclDef.td_args tc_state
-			= t_corresponds (dclDef.td_args, (dclDef.td_rhs, (dclDef.td_context, dclDef.td_attribute)))
-			 				(iclDef.td_args, (iclDef.td_rhs, (iclDef.td_context, iclDef.td_attribute))) tc_state
+			= t_corresponds (dclDef.td_args, (dclDef.td_rhs, dclDef.td_attribute))
+			 				(iclDef.td_args, (iclDef.td_rhs, iclDef.td_attribute)) tc_state
+
 
 instance t_corresponds TypeContext where
 	t_corresponds dclDef iclDef

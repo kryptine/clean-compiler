@@ -535,7 +535,6 @@ NoGlobalIndex :== {gi_module=NoIndex,gi_index=NoIndex}
 	,	td_arity		:: !Int
 	,	td_args			:: ![ATypeVar]
 	,	td_attrs		:: ![AttributeVar]
-	,	td_context		:: ![TypeContext]
 	,	td_rhs			:: !type_rhs
 	,	td_attribute	:: !TypeAttribute
 	,	td_pos			:: !Position
@@ -1553,8 +1552,8 @@ ParsedInstanceToClassInstance pi members :==
  					 it_context = pi.pi_context }, 
  		ins_members = members, ins_specials = pi.pi_specials, ins_pos = pi.pi_pos}
 
-MakeTypeDef name lhs rhs attr contexts pos  :== 
-	{	td_ident = name, td_index = -1, td_arity = length lhs, td_args = lhs, td_attrs = [], td_attribute = attr, td_context = contexts,
+MakeTypeDef name lhs rhs attr pos  :== 
+	{	td_ident = name, td_index = -1, td_arity = length lhs, td_args = lhs, td_attrs = [], td_attribute = attr,
 		td_pos = pos, td_rhs = rhs, td_used_types = [], td_fun_index = NoIndex
 	}
 
