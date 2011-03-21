@@ -801,12 +801,10 @@ instance check_completeness TypeContext where
 	check_completeness {tc_class=TCGeneric {gtc_generic={glob_module,glob_object={ds_ident,ds_index}}}, tc_types} cci ccs
 		= check_completeness tc_types cci
 		  (check_whether_ident_is_imported ds_ident glob_module ds_index STE_Generic cci ccs)
-	
 
 instance check_completeness (TypeDef TypeRhs) where
-	check_completeness td=:{td_rhs, td_context}	cci ccs
-		= check_completeness td_rhs cci 
-		  (check_completeness td_context cci ccs)
+	check_completeness td=:{td_rhs}	cci ccs
+		= check_completeness td_rhs cci ccs
 
 instance check_completeness TypeRhs where
 	check_completeness (SynType aType) cci ccs
