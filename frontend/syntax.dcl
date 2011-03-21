@@ -551,12 +551,13 @@ NoGlobalIndex :== {gi_module=NoIndex,gi_index=NoIndex}
  	| GTSCons DefinedSymbol GenTypeStruct
  	| GTSField DefinedSymbol GenTypeStruct
  	| GTSObject DefinedSymbol GenTypeStruct
- 	| GTSE
-	| GTSArrow GenTypeStruct GenTypeStruct		// for optimizing bimaps
-	| GTSAppConsBimapKindConst					// for optimizing bimaps
-	| GTSAppBimap TypeKind [GenTypeStruct]		// for optimizing bimaps
 	| GTSPair !GenTypeStruct !GenTypeStruct		// for optimizing bimaps
 	| GTSEither !GenTypeStruct !GenTypeStruct	// for optimizing bimaps
+	| GTSArrow GenTypeStruct GenTypeStruct		// for optimizing bimaps
+ 	| GTSE
+	| GTSAppConsBimapKindConst					// for optimizing bimaps
+	| GTSAppBimap TypeKind [GenTypeStruct]		// for optimizing bimaps
+	| GTSAppConsSimpleType !(Global Index) !TypeKind ![GenTypeStruct]	// for optimizing bimaps
 
 :: GenericTypeRep = 
 	{ gtr_type :: GenTypeStruct		// generic structure type
