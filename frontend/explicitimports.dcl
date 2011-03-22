@@ -42,7 +42,8 @@ ExpressionNameSpaceN:==0
 TypeNameSpaceN:==1
 ClassNameSpaceN:==2
 FieldNameSpaceN:==3
-OtherNameSpaceN:==4
+GenericNameSpaceN:==4
+OtherNameSpaceN:==5
 
 search_qualified_ident :: !Ident {#Char} !NameSpaceN !*CheckState -> (!Bool,!DeclarationRecord,!*CheckState)
 search_qualified_import :: !String !SortedQualifiedImports !NameSpaceN -> (!Bool,!DeclarationRecord)

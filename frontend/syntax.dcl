@@ -378,8 +378,22 @@ cNameLocationDependent :== True
 	, 	gen_pos			:: !Position
 	,	gen_type		:: !SymbolType	// Generic type (st_vars include generic type vars)
 	,	gen_vars		:: ![TypeVar]	// Generic type variables
+	,	gen_deps		:: ![GenericDependency]	   // Generic function dependencies
 	,	gen_info_ptr	:: !GenericInfoPtr
 	}
+
+:: IdentOrQualifiedIdent
+	= Ident !Ident
+	| QualifiedIdent /*module*/ !Ident !String
+
+instance <<< IdentOrQualifiedIdent
+
+:: GenericDependency =
+	{	gd_ident		:: !IdentOrQualifiedIdent
+	, 	gd_index		:: !GlobalIndex
+	}
+
+instance == GenericDependency
 
 :: GenericClassInfo = 
 	{	gci_kind	:: !TypeKind	// the kind

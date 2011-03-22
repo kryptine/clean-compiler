@@ -1,6 +1,6 @@
 implementation module checkgenerics
 
-import syntax,checksupport,checktypes,genericsupport
+import syntax,checksupport,checktypes,genericsupport,explicitimports
 
 checkGenericDefs :: !Index !(Optional (CopiedDefinitions, Int))
 		!*{#GenericDef} !*{#CheckedTypeDef} !*{#ClassDef} !*{#DclModule} !*Heaps !*CheckState
@@ -32,6 +32,8 @@ where
 
 		# (gen_def, heaps) = alloc_gen_info gen_def heaps
 
+		# (gen_def, cs) = check_generic_dependencies index mod_index gen_ident gen_def cs
+
 		# (gen_def, type_defs, class_defs, modules, heaps, cs)
 			= check_generic_type gen_def mod_index type_defs class_defs modules heaps cs
 
@@ -49,6 +51,35 @@ where
 		# (gen_info_ptr, hp_generic_heap) = newPtr initial_info hp_generic_heap 
 		= (	{gen_def & gen_info_ptr = gen_info_ptr}, 
 			{heaps & hp_generic_heap = hp_generic_heap})
+
+	check_generic_dependencies index mod_index gen_ident gen_def=:{gen_deps} cs
+		# (gen_deps, cs) = foldSt check_dependency gen_deps ([], cs)
+		= ({gen_def & gen_deps = gen_deps}, cs)
+	where
+		check_dependency gen_dep=:{gd_ident, gd_index=gd_index=:{gi_index, gi_module}} (acc, cs) 
+			# (gen_dep, cs) = resolve_dependency_index gen_dep cs
+			| gi_index == index && gi_module == mod_index
+				= (acc, check_generic_error gd_ident "already implicitly depends on itself" cs)
+			| isMember gen_dep acc && gd_index <> NoGlobalIndex
+				= (acc, check_generic_error gd_ident "duplicate generic dependency" cs)
+				= ([gen_dep:acc], cs)
+
+		resolve_dependency_index gen_dep=:{gd_ident} cs
+			= case gd_ident of
+				Ident ident 
+					# (index, cs) = get_generic_index ident mod_index cs
+					= ({gen_dep & gd_index = index}, cs)
+				QualifiedIdent mod_ident name 
+					# (found, {decl_kind, decl_ident, decl_index}, cs) = search_qualified_ident mod_ident name GenericNameSpaceN cs
+					| not found 
+						= (gen_dep, check_generic_error gd_ident "generic dependency not defined" cs)	
+						= case decl_kind of
+							STE_Imported STE_Generic generic_module
+								= ({gen_dep & gd_ident = Ident decl_ident, gd_index = {gi_module = generic_module, gi_index = decl_index}}, cs)
+							_ 
+								= (gen_dep, check_generic_error gd_ident "not a generic function" cs)
+
+		check_generic_error ident msg cs = {cs & cs_error = checkError ident msg cs.cs_error}				
 
 	check_generic_type gen_def=:{gen_type, gen_vars, gen_ident, gen_pos} module_index type_defs class_defs modules heaps=:{hp_type_heaps} cs
 		#! (checked_gen_type, _, type_defs, class_defs, modules, hp_type_heaps, cs) =
@@ -190,7 +221,7 @@ where
 			= getTypeDef module_index {glob_module=type_module, glob_object=type_index} type_defs modules
 		# type_cons = { type_cons & type_index = { glob_object = type_index, glob_module = type_module }}
 		| type_synonym_with_arguments type_def.td_rhs type_def.td_arity
-			# cs = {cs & cs_error = checkError type_def.td_ident "synonym type not allowed" cs.cs_error}
+			# cs = {cs & cs_error = checkError type_def.td_ident "type synonym not allowed" cs.cs_error}
 			= (TA type_cons [], TypeConsSymb type_cons, type_defs, modules,{heaps&hp_type_heaps = hp_type_heaps}, cs)
 			= (TA type_cons [], TypeConsSymb type_cons, type_defs, modules,{heaps&hp_type_heaps = hp_type_heaps}, cs)
 		where
@@ -213,17 +244,17 @@ where
 		# cs_error = checkError {id_name="<>",id_info=nilPtr} "invalid generic type argument" cs_error
 		= (ins_type, TypeConsArrow, type_defs, modules, heaps, {cs & cs_error=cs_error})
 
-	get_generic_index :: !Ident !Index !*CheckState -> (!GlobalIndex, !*CheckState)
-	get_generic_index {id_name,id_info} mod_index cs=:{cs_symbol_table}
- 		# (ste, cs_symbol_table) = readPtr id_info cs_symbol_table
- 		# cs = {cs & cs_symbol_table = cs_symbol_table}
- 		= case ste.ste_kind of
-			STE_Generic
-				-> ({gi_module=mod_index,gi_index = ste.ste_index}, cs) 
-			STE_Imported STE_Generic imported_generic_module
-				-> ({gi_module=imported_generic_module,gi_index = ste.ste_index}, cs)
-			_	->	( {gi_module=NoIndex,gi_index = NoIndex}
-					, {cs & cs_error = checkError id_name "generic undefined" cs.cs_error})
+get_generic_index :: !Ident !Index !*CheckState -> (!GlobalIndex, !*CheckState)
+get_generic_index {id_name,id_info} mod_index cs=:{cs_symbol_table}
+	# (ste, cs_symbol_table) = readPtr id_info cs_symbol_table
+	# cs = {cs & cs_symbol_table = cs_symbol_table}
+	= case ste.ste_kind of
+		STE_Generic
+			-> ({gi_module=mod_index,gi_index = ste.ste_index}, cs) 
+		STE_Imported STE_Generic imported_generic_module
+			-> ({gi_module=imported_generic_module,gi_index = ste.ste_index}, cs)
+		_	->	( {gi_module=NoIndex,gi_index = NoIndex}
+				, {cs & cs_error = checkError id_name "undefined generic function" cs.cs_error})
 
 convert_generic_instances :: !.[GenericCaseDef] !Int -> (!.[FunDef], !.[GenericCaseDef])
 convert_generic_instances [gc=:{gc_ident, gc_body=GCB_FunDef fun_def} : gcs] next_fun_index

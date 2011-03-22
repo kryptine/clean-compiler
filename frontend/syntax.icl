@@ -8,6 +8,18 @@ import syntax
 instance toString Ident
 where toString {id_name} = id_name
 
+instance <<< IdentOrQualifiedIdent
+	where 
+		(<<<) file (Ident ident) 
+			= file <<< ident
+		(<<<) file (QualifiedIdent mod_ident name) 
+			= file <<< "'" <<< mod_ident <<< "'." <<< name
+
+instance == GenericDependency
+	where
+		(==) gen_dep1 gen_dep2
+			= gen_dep1.gd_index == gen_dep2.gd_index
+
 instance toString (Import from_symbol)
 where toString {import_module} = toString import_module
 

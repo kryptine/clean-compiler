@@ -1523,7 +1523,7 @@ wantGenericDefinition parseContext pos pState
 	# (ident, pState) = stringToIdent name IC_Generic/*IC_Class*/ pState
 	# (member_ident, pState) = stringToIdent name IC_Expression pState
 	# (arg_vars, pState) = wantList "generic variable(s)" try_variable pState
-		
+	# (gen_deps, pState) = optionalDependencies pState
 	# pState = wantToken TypeContext "generic definition" DoubleColonToken pState
 	# (type, pState) = want_type pState		//	SymbolType
 	# pState = wantEndOfDefinition "generic definition" pState
@@ -1532,6 +1532,7 @@ wantGenericDefinition parseContext pos pState
 		,	gen_member_ident = member_ident 
 		,	gen_type = type
 		,	gen_vars = arg_vars
+		,	gen_deps = gen_deps                 
 		,	gen_pos = pos
 		,	gen_info_ptr = nilPtr
 		}
@@ -1541,13 +1542,39 @@ wantGenericDefinition parseContext pos pState
 			# (token, pState) = nextToken TypeContext pState
 			= 	case token of
 				IdentToken name -> (name, pState)
-				_ -> ("", parseError "Generic Definition" (Yes token) "<identifier>" pState)
+				_ -> ("", parseError "generic definition" (Yes token) "<identifier>" pState)
+		
 		want_type :: !ParseState -> (!SymbolType, !ParseState)
 		want_type pState = want pState // SymbolType 		
 
 		try_variable pState
 			# (token, pState) = nextToken TypeContext pState
 			= tryTypeVarT token pState
+
+		optionalDependencies :: !ParseState -> (![GenericDependency], !ParseState)
+		optionalDependencies pState
+			# (token, pState) = nextToken TypeContext pState
+			= case token of 
+				BarToken -> wantSepList "generic dependencies" CommaToken TypeContext wantDependency pState
+				_ -> ([], tokenBack pState)
+
+		wantDependency :: !ParseState -> (Bool, GenericDependency, ParseState)
+		wantDependency pState 
+			# (ident, pState) = wantIdentOrQualifiedIdent pState
+			= (True, {gd_ident = ident, gd_index = NoGlobalIndex}, pState)
+		
+		wantIdentOrQualifiedIdent pState
+			# (token, pState) = nextToken TypeContext pState
+			=	case token of
+					IdentToken name 
+						# (ident, pState) = stringToIdent name IC_Generic pState
+						= (Ident ident, pState)
+					QualifiedIdentToken mod_name name 
+						# (mod_ident, pState) = stringToIdent mod_name IC_Module pState
+						= (QualifiedIdent mod_ident name, pState)
+					_ 
+						# (ident, pState) = stringToIdent "" IC_Generic pState
+						= (Ident ident, parseError "generic dependency" (Yes token) "<identifier>" pState)
 			
 wantDeriveDefinition :: !ParseContext !Position !*ParseState -> (!ParsedDefinition, !*ParseState)
 wantDeriveDefinition parseContext pos pState

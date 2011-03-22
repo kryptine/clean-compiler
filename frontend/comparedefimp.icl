@@ -183,8 +183,9 @@ where
 			  (icl_generic_def, icl_generic_defs) = icl_generic_defs![generic_index]
 			  
 			# (ok1, comp_st) = compare dcl_generic_def.gen_type icl_generic_def.gen_type comp_st
-			# (ok2, comp_st) = compare dcl_generic_def.gen_vars icl_generic_def.gen_vars comp_st			
-			| ok1 && ok2 
+			# (ok2, comp_st) = compare dcl_generic_def.gen_vars icl_generic_def.gen_vars comp_st
+			# (ok3, comp_st) = compare dcl_generic_def.gen_deps icl_generic_def.gen_deps comp_st			
+			| ok1 && ok2 && ok3
 				= (icl_generic_defs, comp_st)
 				# comp_error = compareError generic_def_error (newPosition icl_generic_def.gen_ident icl_generic_def.gen_pos) comp_st.comp_error
 				= (icl_generic_defs, { comp_st & comp_error = comp_error })
@@ -350,6 +351,11 @@ where
 		| dcl_tc.tc_class == icl_tc.tc_class
 			= compare dcl_tc.tc_types icl_tc.tc_types comp_st
 			= (False, comp_st)
+
+instance compare GenericDependency
+where
+	compare dcl_gd icl_gd comp_st
+		= (dcl_gd == icl_gd, comp_st)
 
 initialyseTypeVars [{tv_info_ptr=dcl_tv_info_ptr}:dcl_type_vars] [{tv_info_ptr=icl_tv_info_ptr}:icl_type_vars] type_var_heap
 	# type_var_heap = type_var_heap <:= (icl_tv_info_ptr, TVI_TypeVar dcl_tv_info_ptr) <:= (dcl_tv_info_ptr, TVI_TypeVar icl_tv_info_ptr)
