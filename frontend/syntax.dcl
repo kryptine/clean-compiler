@@ -562,12 +562,13 @@ NoGlobalIndex :== {gi_module=NoIndex,gi_index=NoIndex}
  	| GTSCons DefinedSymbol GenTypeStruct
  	| GTSField DefinedSymbol GenTypeStruct
  	| GTSObject DefinedSymbol GenTypeStruct
- 	| GTSE
-	| GTSArrow GenTypeStruct GenTypeStruct		// for optimizing bimaps
-	| GTSAppConsBimapKindConst					// for optimizing bimaps
-	| GTSAppBimap TypeKind [GenTypeStruct]		// for optimizing bimaps
 	| GTSPair !GenTypeStruct !GenTypeStruct		// for optimizing bimaps
 	| GTSEither !GenTypeStruct !GenTypeStruct	// for optimizing bimaps
+	| GTSArrow GenTypeStruct GenTypeStruct		// for optimizing bimaps
+ 	| GTSE
+	| GTSAppConsBimapKindConst					// for optimizing bimaps
+	| GTSAppBimap TypeKind [GenTypeStruct]		// for optimizing bimaps
+	| GTSAppConsSimpleType !(Global Index) !TypeKind ![GenTypeStruct]	// for optimizing bimaps
 
 :: GenericTypeRep = 
 	{ gtr_type :: GenTypeStruct		// generic structure type
@@ -1070,7 +1071,7 @@ cNonRecursiveAppl	:== False
 					| TVI_Kind !TypeKind
 					| TVI_ConsInstance !DefinedSymbol //AA: generic cons instance function 
 					| TVI_Normalized !Int /* MV - position of type variable in its definition */
-					| TVI_Expr !Expression	/* AA: Expression corresponding to the type var during generic specialization */
+					| TVI_Expr !Bool !Expression	/* AA: Expression corresponding to the type var during generic specialization */
 					| TVI_Iso !DefinedSymbol !DefinedSymbol !DefinedSymbol
 					| TVI_GenTypeVarNumber !Int
 					| TVI_CPSTypeVar !CheatCompiler /* MdM: a pointer to a variable in CleanProverSystem is stored here, using a cast */

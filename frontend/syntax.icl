@@ -806,7 +806,7 @@ where
 	(<<<) file (TVI_PropClass _ _ _) 	= file <<< "TVI_PropClass"
 	(<<<) file (TVI_TypeKind kind_info_ptr) = file <<< "TVI_TypeKind " <<< (ptrToInt kind_info_ptr)
 	(<<<) file (TVI_Kind kind) 			= file <<< "TVI_Kind" <<< kind
-	(<<<) file (TVI_Expr expr) 			= file <<< "TVI_Expr " <<< expr
+	(<<<) file (TVI_Expr is_bimap_id expr) = file <<< "TVI_Expr " <<< is_bimap_id <<< ' ' <<< expr
 
 instance <<< AttrVarInfo
 where
