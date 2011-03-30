@@ -257,17 +257,6 @@ where
 	,	ai_group_counts					:: !*{!RefCounts}
 	}
 
-/*	defined in syntax.dcl:
-
-::	ConsClasses =
-	{	cc_size			::!Int
-	,	cc_args			::![ConsClass]
-	,	cc_linear_bits	::![Bool]
-	,	cc_producer		::!ProdClass
-	}
-::	ConsClass		:== Int
-*/
-
 CUnusedLazy				:== -1
 CUnusedStrict			:== -2
 CPassive   				:== -3
@@ -880,8 +869,7 @@ where
 		# (next_var, nr_of_local_vars, var_heap, class_env, fun_defs)
 				= foldSt initial_cons_class group_members (0, 0, var_heap, class_env, fun_defs)
 
-		# ai =
-						{	ai_var_heap						= var_heap
+		# ai =			{	ai_var_heap						= var_heap
 						, 	ai_cons_class					= class_env
 						,	ai_cur_ref_counts				= {}
 						,	ai_class_subst					= createArray (next_var + nr_of_local_vars) CPassive
@@ -892,7 +880,6 @@ where
 						,	ai_fun_defs						= fun_defs
 						,	ai_group_members				= group_members
 						,	ai_group_counts					= createArray (length group_members) {}
-//						,	ai_def_ref_counts				= {}
 						}
 
 		# (_,ai_cases_of_vars_for_group, rev_strictness_for_group, ai)
@@ -913,7 +900,7 @@ where
 					(cleanup_info, class_env, ai.ai_fun_defs, ai.ai_var_heap, expr_heap)
 		= (cleanup_info, class_env, groups, fun_defs, var_heap, expr_heap)
 	  where
-//initial classification...
+		//initial classification...
 		initial_cons_class fun (next_var, nr_of_local_vars, var_heap, class_env, fun_defs)
 			# (fun_def, fun_defs)					= fun_defs![fun]
 			  (TransformedBody {tb_args})			= fun_def.fun_body
@@ -926,7 +913,8 @@ where
 			# fun_class								= { cc_size = 0, cc_args = fresh_vars, cc_linear_bits=[], cc_producer=False}
 			  class_env								= { class_env & [fun] = fun_class}
 			= (next_var, nr_of_local_vars, var_heap, class_env, fun_defs)
-//determine classification...
+
+		//determine classification...
 		analyse_functions common_defs fun (fun_index, cfvog_accu, strictness_accu, ai)
 			#  (fun_def, ai)						= ai!ai_fun_defs.[fun]
 	 		   (TransformedBody {tb_args, tb_rhs})	= fun_def.fun_body
@@ -955,6 +943,7 @@ where
 			   		, ai_group_counts				= {ai.ai_group_counts & [fun_index] = ai_cur_ref_counts}
 			   		}
 			= (fun_index + 1, cfvog_accu, strictness_accu, ai)
+
 		set_linearity_info_for_group fun (fun_index,group_strictness,ai=:{ai_cons_class,ai_group_counts})
 			#  (fun_cons_class,ai_cons_class)		= ai_cons_class![fun]
 			   (fun_ref_counts,ai_group_counts)		= ai_group_counts![fun_index]
@@ -962,13 +951,8 @@ where
 			   ai_cons_class						= {ai_cons_class & [fun] = fun_cons_class}
 			   ai									= {ai & ai_cons_class = ai_cons_class, ai_group_counts = ai_group_counts}
 			= (fun_index+1,group_strictness,ai)
-		set_linearity_info fun fun_index fun_cons_class fun_ref_counts group_strictness
-			#  linear_bits							= determine_linear_bits fun_ref_counts
-			   fun_cons_class						= { fun_cons_class & cc_linear_bits=linear_bits }
-			   cc_args								= add_unused_args fun fun_index fun_cons_class.cc_args fun_ref_counts group_strictness
-			   fun_cons_class						= { fun_cons_class & cc_args = cc_args }
-			= fun_cons_class
-//final classification...
+
+		//final classification...
 		collect_classifications class_subst fun class_env
 			# (fun_class, class_env)	= class_env![fun]
 			  fun_class					= determine_classification fun_class class_subst
@@ -995,8 +979,7 @@ where
 						| IsAVariable cc
 							= skip_indirections subst subst.[cc]
 							= cc
-
-// N-WAY...
+		// N-WAY...
 		set_case_expr_info class_subst ((safe,{case_expr=(App _), case_guards, case_info_ptr}),fun_index)
 				(cleanup_acc, class_env, fun_defs, var_heap, expr_heap)
 			# ({cc_size, cc_args, cc_linear_bits},class_env)	= class_env![fun_index]
@@ -1024,24 +1007,7 @@ where
 			= ([case_info_ptr:cleanup_acc], class_env, fun_defs, var_heap, 
 				setExtendedExprInfo case_info_ptr (EEI_ActiveCase aci) expr_heap)
 		set_case_expr_info _ _ s = s
-// ...N-WAY
-		get_linearity_info cc_linear_bits (AlgebraicPatterns _ algebraic_patterns) var_heap
-			= mapSt (get_linearity_info_of_pattern cc_linear_bits) algebraic_patterns var_heap
-		get_linearity_info cc_linear_bits (OverloadedListPatterns _ _ algebraic_patterns) var_heap
-			= mapSt (get_linearity_info_of_pattern cc_linear_bits) algebraic_patterns var_heap
-		get_linearity_info cc_linear_bits _ var_heap
-			= ([], var_heap)
-
-		get_linearity_info_of_pattern cc_linear_bits {ap_vars} var_heap
-			# (var_indices, var_heap) = mapSt get_var_index ap_vars var_heap
-			= ([if (index==cNope) True (cc_linear_bits!!index) \\ index<-var_indices], var_heap)
-
-		get_var_index {fv_info_ptr} var_heap
-			# (vi, var_heap) = readPtr fv_info_ptr var_heap
-			  index = case vi of
-						VI_AccVar _ index	-> index
-						VI_Count 0 False	-> cNope
-			= (index, var_heap) 
+		// ...N-WAY
 
 reanalyseGroups	:: !{# CommonDefs} !{#{#FunType}} !Int !Int ![FunctionInfoPtr]  ![Group] !*{#FunDef} !*VarHeap !*ExpressionHeap !*FunctionHeap !*{!ConsClasses}
 				-> (!CleanupInfo, !*{#FunDef}, !*VarHeap, !*ExpressionHeap, !*FunctionHeap, !*{!ConsClasses}, !Bool)
@@ -1062,8 +1028,7 @@ where
 		# (next_var, nr_of_local_vars, var_heap, class_env, fun_defs, fun_heap, old_cons_class)
 				= foldSt initial_cons_class group_members (0, 0, var_heap, class_env, fun_defs, fun_heap, [])
 
-		# ai =
-						{	ai_var_heap						= var_heap
+		# ai =			{	ai_var_heap						= var_heap
 						, 	ai_cons_class					= class_env
 						,	ai_cur_ref_counts				= {}
 						,	ai_class_subst					= createArray (next_var + nr_of_local_vars) CPassive
@@ -1090,10 +1055,8 @@ where
 		# (_,_,ai)
 		  		= foldSt set_linearity_info_for_group group_members (0,reverse rev_strictness_for_group,ai)
 
-		  class_env
-		  		= ai.ai_cons_class
-		  fun_heap
-		  		= ai.ai_fun_heap
+		  class_env = ai.ai_cons_class
+		  fun_heap = ai.ai_fun_heap
 		  (class_env,fun_heap,same,_)
 		  		= foldSt (collect_classifications ai.ai_class_subst) group_members (class_env,fun_heap,same,reverse old_cons_class)
 		  (cleanup_info, class_env, fun_defs, var_heap, expr_heap, fun_heap)
@@ -1101,7 +1064,7 @@ where
 					(cleanup_info, class_env, ai.ai_fun_defs, ai.ai_var_heap, expr_heap, fun_heap)
 		= (cleanup_info, fun_defs, var_heap, expr_heap, fun_heap, class_env, same)
 	  where
-//initial classification...
+		//initial classification...
 		initial_cons_class fun (next_var, nr_of_local_vars, var_heap, class_env, fun_defs, fun_heap, old_acc)
 			# (fun_def, fun_defs, fun_heap)			= get_fun_def fun fun_defs fun_heap
 			# (TransformedBody {tb_args,tb_rhs})	= fun_def.fun_body
@@ -1114,7 +1077,6 @@ where
 			# fun_class								= { cc_size = 0, cc_args = fresh_vars, cc_linear_bits=[], cc_producer=False}
 			# (fun_heap,class_env,old_class)		= set_fun_class` fun fun_class fun_heap class_env
 			= (next_var, nr_of_local_vars, var_heap, class_env, fun_defs, fun_heap, [old_class:old_acc])
-
 
 		set_fun_class fun fun_class fun_heap class_env
 			| fun < size class_env
@@ -1154,7 +1116,7 @@ where
 			# fun_heap								= writePtr fun_def_ptr (FI_Function gf) fun_heap
 			= (fun_heap,class_env,old)
 
-//determine classification...
+		//determine classification...
 		analyse_functions common_defs fun (fun_index, cfvog_accu, strictness_accu, ai)
 			#  (fun_def, fun_defs, fun_heap)		= get_fun_def fun ai.ai_fun_defs ai.ai_fun_heap
 	 		   ai									= {ai
@@ -1187,6 +1149,7 @@ where
 			   		, ai_group_counts				= {ai.ai_group_counts & [fun_index] = ai_cur_ref_counts}
 			   		}
 			= (fun_index + 1, cfvog_accu, strictness_accu, ai)
+
 		set_linearity_info_for_group fun (fun_index,group_strictness,ai=:{ai_cons_class,ai_group_counts,ai_fun_heap})
 			#  (fun_cons_class,ai_fun_heap,ai_cons_class)
 													= get_fun_class fun ai_fun_heap ai_cons_class
@@ -1195,13 +1158,8 @@ where
 			   (ai_fun_heap,ai_cons_class)			= set_fun_class fun fun_cons_class ai_fun_heap ai_cons_class
 			   ai									= {ai & ai_cons_class = ai_cons_class, ai_group_counts = ai_group_counts, ai_fun_heap = ai_fun_heap}
 			= (fun_index+1,group_strictness,ai)
-		set_linearity_info fun fun_index fun_cons_class fun_ref_counts group_strictness
-			#  linear_bits							= determine_linear_bits fun_ref_counts
-			   fun_cons_class						= { fun_cons_class & cc_linear_bits=linear_bits }
-			   cc_args								= add_unused_args fun fun_index fun_cons_class.cc_args fun_ref_counts group_strictness
-			   fun_cons_class						= { fun_cons_class & cc_args = cc_args }
-			= fun_cons_class
-//final classification...
+
+		//final classification...
 		collect_classifications :: !.{#Int} !Int !*(!*{!ConsClasses},!*FunctionHeap,!Bool,!u:[w:ConsClasses]) -> *(!*{!ConsClasses},!*FunctionHeap,!Bool,!v:[x:ConsClasses]), [w <= x, u <= v];
 		collect_classifications class_subst fun (class_env,fun_heap,same,[old_class:old_acc])
 			# (fun_class,fun_heap,class_env)	= get_fun_class fun fun_heap class_env
@@ -1211,11 +1169,14 @@ where
 
 		equalCCs l r
 			= equalCCArgs l.cc_args r.cc_args && equalCCBits l.cc_size l.cc_linear_bits r.cc_linear_bits
-		equalCCArgs [] [] = True
-		equalCCArgs [l:ls] [r:rs] = equalCC l r && equalCCArgs ls rs
-		equalCC l r = l == r
-		equalCCBits 0 _ _ = True
-		equalCCBits n [l:ls] [r:rs] = l == r && equalCCBits (dec n) ls rs
+		where
+			equalCCArgs [] [] = True
+			equalCCArgs [l:ls] [r:rs] = equalCC l r && equalCCArgs ls rs
+
+			equalCC l r = l == r
+
+			equalCCBits 0 _ _ = True
+			equalCCBits n [l:ls] [r:rs] = l == r && equalCCBits (dec n) ls rs
 		
 		set_case_expr_info ((safe,{case_expr=case_expr=:(Var {var_info_ptr}), case_guards, case_info_ptr}),fun_index)
 				(cleanup_acc, class_env, fun_defs, var_heap, expr_heap, fun_heap)
@@ -1233,7 +1194,7 @@ where
 				= ([case_info_ptr:cleanup_acc], class_env, fun_defs, var_heap, 
 					setExtendedExprInfo case_info_ptr (EEI_ActiveCase aci) expr_heap, fun_heap)
 			= (cleanup_acc, class_env, fun_defs, var_heap, expr_heap, fun_heap)
-// N-WAY...
+		// N-WAY...
 		set_case_expr_info ((safe,{case_expr=(App _), case_guards, case_info_ptr}),fun_index)
 				(cleanup_acc, class_env, fun_defs, var_heap, expr_heap, fun_heap)
 			# ({cc_size, cc_args, cc_linear_bits},fun_heap,class_env)	= get_fun_class fun_index fun_heap class_env
@@ -1248,7 +1209,7 @@ where
 			= ([case_info_ptr:cleanup_acc], class_env, fun_defs, var_heap, 
 				setExtendedExprInfo case_info_ptr (EEI_ActiveCase aci) expr_heap, fun_heap)
 		set_case_expr_info _ s = s
-// ...N-WAY
+		// ...N-WAY
 
 		get_fun_class fun fun_heap class_env
 			| fun < size class_env
@@ -1266,24 +1227,6 @@ where
 			# (FI_Function {gf_cons_args}, fun_heap)		= readPtr fun_def_ptr fun_heap
 			= (gf_cons_args, fun_heap, class_env)
 
-		get_linearity_info cc_linear_bits (AlgebraicPatterns _ algebraic_patterns) var_heap
-			= mapSt (get_linearity_info_of_pattern cc_linear_bits) algebraic_patterns var_heap
-		get_linearity_info cc_linear_bits (OverloadedListPatterns _ _ algebraic_patterns) var_heap
-			= mapSt (get_linearity_info_of_pattern cc_linear_bits) algebraic_patterns var_heap
-		get_linearity_info cc_linear_bits _ var_heap
-			= ([], var_heap)
-
-		get_linearity_info_of_pattern cc_linear_bits {ap_vars} var_heap
-			# (var_indices, var_heap) = mapSt get_var_index ap_vars var_heap
-			= ([if (index==cNope) True (cc_linear_bits!!index) \\ index<-var_indices], var_heap)
-
-		get_var_index {fv_info_ptr} var_heap
-			# (vi, var_heap) = readPtr fv_info_ptr var_heap
-			  index = case vi of
-						VI_AccVar _ index	-> index
-						VI_Count 0 False	-> cNope
-			= (index, var_heap) 
-
 		get_fun_def fun fun_defs fun_heap
 			| fun < size fun_defs
 				# (fun_def, fun_defs)						= fun_defs![fun]
@@ -1299,8 +1242,34 @@ where
 							= lookup_ptr fun new_functions ti_fun_heap
 			# (FI_Function {gf_fun_def}, fun_heap)
 												= readPtr fun_def_ptr fun_heap
-			= (gf_fun_def, fun_defs, fun_heap) // ---> ("read",fun_def_ptr,gf_fun_def)
-			
+			= (gf_fun_def, fun_defs, fun_heap)
+
+get_linearity_info cc_linear_bits (AlgebraicPatterns _ algebraic_patterns) var_heap
+	= get_linearity_info_of_patterns cc_linear_bits algebraic_patterns var_heap
+get_linearity_info cc_linear_bits (OverloadedListPatterns _ _ algebraic_patterns) var_heap
+	= get_linearity_info_of_patterns cc_linear_bits algebraic_patterns var_heap
+get_linearity_info cc_linear_bits _ var_heap
+	= ([], var_heap)
+
+get_linearity_info_of_patterns cc_linear_bits algebraic_patterns var_heap
+	= mapSt (get_linearity_info_of_pattern cc_linear_bits) algebraic_patterns var_heap
+where
+	get_linearity_info_of_pattern cc_linear_bits {ap_vars} var_heap
+		# (var_indices, var_heap) = mapSt get_var_index ap_vars var_heap
+		= ([if (index==cNope) True (cc_linear_bits!!index) \\ index<-var_indices], var_heap)
+
+	get_var_index {fv_info_ptr} var_heap
+		# (vi, var_heap) = readPtr fv_info_ptr var_heap
+		= case vi of
+			VI_AccVar _ index	-> (index, var_heap)
+			VI_Count 0 False	-> (cNope, var_heap)
+
+set_linearity_info fun fun_index fun_cons_class fun_ref_counts group_strictness
+	#  linear_bits							= determine_linear_bits fun_ref_counts
+	   fun_cons_class						= { fun_cons_class & cc_linear_bits=linear_bits }
+	   cc_args								= add_unused_args fun fun_index fun_cons_class.cc_args fun_ref_counts group_strictness
+	= { fun_cons_class & cc_args = cc_args }
+
 fresh_variables :: ![.FreeVar] !Int !Int !*(Heap VarInfo) -> *(!.[Int],!Int,!*(Heap VarInfo))
 fresh_variables [{fv_info_ptr} : vars] arg_position next_var_number var_heap
 	# var_heap
