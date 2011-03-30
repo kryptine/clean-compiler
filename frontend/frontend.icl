@@ -197,7 +197,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_m
 	# (def_max, acc_args)		= usize acc_args
 	# (def_min, fun_defs)		= usize fun_defs
 
-	  (components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap, acc_args, error, predef_symbols)
+	  (components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap, error, predef_symbols)
 	  	= transformGroups cleanup_info main_dcl_module_n stdStrictLists_module_n def_min def_max components fun_defs acc_args common_defs imported_funs dcl_types type_def_infos var_heap type_heaps expression_heap options.feo_fusion error predef_symbols
 
 	# error_admin = {ea_file = error, ea_loc = [], ea_ok = True }
@@ -229,12 +229,6 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_m
 	| not error_admin.ea_ok
 		# heaps = {hp_var_heap=var_heap, hp_type_heaps=type_heaps, hp_expression_heap=expression_heap,hp_generic_heap=heaps.hp_generic_heap}
 		= (No,{},{},main_dcl_module_n,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
-
-	# (components,fun_defs,files) = case options.feo_dump_core of
-//		True
-//			-> dumpCore components start_function_index exported_global_functions icl_mod dcl_mods.[main_dcl_module_n] fun_defs acc_args def_min def_max files
-		_
-			-> (components,fun_defs,files)
 
 	| options.feo_up_to_phase == FrontEndPhaseTransformGroups
 		# heaps = {hp_var_heap=var_heap, hp_type_heaps=type_heaps, hp_expression_heap=expression_heap,hp_generic_heap=heaps.hp_generic_heap}

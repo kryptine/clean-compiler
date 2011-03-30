@@ -25,8 +25,6 @@ SwitchHOFusion				fuse dont_fuse :== fuse
 SwitchHOFusion`				fuse dont_fuse :== fuse
 SwitchStrictPossiblyAddLet  strict lazy    :== lazy//strict
 
-//import RWSDebug
-
 (-!->) infix
 (-!->) a b :== a  // ---> b
 (<-!-) infix
@@ -118,9 +116,7 @@ cleanup_attributes expr_info_ptr symbol_heap
 		EI_Extended _ expr_info -> writePtr expr_info_ptr expr_info symbol_heap
 		_ -> symbol_heap
 
-/*
- *	TRANSFORM
- */
+//	TRANSFORM
 
 ::	*TransformInfo =
 	{	ti_fun_defs				:: !*{# FunDef}
@@ -3553,7 +3549,7 @@ add_let_binds free_vars rhss original_binds
 
 transformGroups :: !CleanupInfo !Int !Int !Int !Int !*{!Group} !*{#FunDef} !*{!.ConsClasses} !{# CommonDefs}  !{# {# FunType} }
 		!*ImportedTypes !*TypeDefInfos !*VarHeap !*TypeHeaps !*ExpressionHeap !Bool !*File !*PredefinedSymbols
-			-> (!*{!Group}, !*{#FunDef}, !*ImportedTypes, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap, !*{!ConsClasses}, !*File, !*PredefinedSymbols)
+			-> (!*{!Group}, !*{#FunDef}, !*ImportedTypes, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap, !*File, !*PredefinedSymbols)
 transformGroups cleanup_info main_dcl_module_n ro_StdStrictLists_module_n def_min def_max groups fun_defs cons_args common_defs imported_funs
 		imported_types type_def_infos var_heap type_heaps symbol_heap compile_with_fusion error predef_symbols
 	#! nr_of_funs = size fun_defs
@@ -3583,13 +3579,12 @@ transformGroups cleanup_info main_dcl_module_n ro_StdStrictLists_module_n def_mi
 			= foldSt (expand_abstract_syn_types_in_function_type common_defs) (reverse fun_indices_with_abs_syn_types)
 					(ti_fun_defs, imported_types, collected_imports, ti_type_heaps, ti_var_heap)
 
-	  (groups, new_fun_defs, new_cons_classes, imported_types, collected_imports, type_heaps, var_heap) 
+	  (groups, new_fun_defs, imported_types, collected_imports, type_heaps, var_heap) 
 	  		= foldSt (add_new_function_to_group common_defs ti_fun_heap) ti_new_functions
-	  				(groups, [], [], imported_types, collected_imports, type_heaps, var_heap)
+	  				(groups, [], imported_types, collected_imports, type_heaps, var_heap)
 	  symbol_heap = foldSt cleanup_attributes ti.ti_cleanup_info ti.ti_symbol_heap
 	  fun_defs = { fundef \\ fundef <- [ fundef \\ fundef <-: fun_defs ] ++ new_fun_defs }
-	  cons_args	= { consarg \\ consarg <- [ consarg \\ consarg <-: ti.ti_cons_args ] ++ new_cons_classes }
-	= (groups, fun_defs, imported_types, collected_imports,	var_heap, type_heaps, symbol_heap, cons_args, ti.ti_error_file, ti.ti_predef_symbols)
+	= (groups, fun_defs, imported_types, collected_imports,	var_heap, type_heaps, symbol_heap, ti.ti_error_file, ti.ti_predef_symbols)
 where
 	transform_groups :: !Int ![.Group] !u:[Group] !{#CommonDefs} !{#{#FunType}} !*{#{#(TypeDef .TypeRhs)}} ![(Global Int)] !v:[Int] !*TransformInfo -> *(!w:[Group],!.{#{#(TypeDef .TypeRhs)}},![(Global Int)],!x:[Int],!*TransformInfo), [u <= w,v <= x]
 	transform_groups group_nr [] acc_groups common_defs imported_funs imported_types collected_imports fun_indices_with_abs_syn_types ti
@@ -3835,11 +3830,11 @@ where
 		= ti
 // ... DvA		
 
-	add_new_function_to_group ::  !{# CommonDefs} !FunctionHeap  !FunctionInfoPtr
-				!(!*{!Group}, ![FunDef], ![ConsClasses], !*ImportedTypes, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
-					-> (!*{!Group}, ![FunDef], ![ConsClasses], !*ImportedTypes, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
-	add_new_function_to_group common_defs fun_heap fun_ptr (groups, fun_defs, cons_classes, imported_types, collected_imports, type_heaps, var_heap)
-		# (FI_Function {gf_fun_def,gf_fun_index,gf_cons_args}) = sreadPtr fun_ptr fun_heap
+	add_new_function_to_group ::  !{# CommonDefs} !FunctionHeap !FunctionInfoPtr
+				!(!*{!Group}, ![FunDef], !*ImportedTypes, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
+					-> (!*{!Group}, ![FunDef], !*ImportedTypes, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
+	add_new_function_to_group common_defs fun_heap fun_ptr (groups, fun_defs, imported_types, collected_imports, type_heaps, var_heap)
+		# (FI_Function {gf_fun_def,gf_fun_index}) = sreadPtr fun_ptr fun_heap
 		  {fun_type = Yes ft=:{st_args,st_result}, fun_info = {fi_group_index,fi_properties}} = gf_fun_def
 		  ets =
 		  	{ ets_type_defs							= imported_types
@@ -3859,11 +3854,9 @@ where
 		| not (isMember gf_fun_index group.group_members)
 			= abort ("add_new_function_to_group INSANE!\n" +++ toString gf_fun_index +++ "," +++ toString fi_group_index)
 		# groups = {groups & [fi_group_index] = group}
+		# gf_fun_def = { gf_fun_def & fun_type = Yes ft}
+		= (groups, [gf_fun_def : fun_defs], ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap)
 
-		= (groups,
-				[ { gf_fun_def & fun_type = Yes ft} : fun_defs], [gf_cons_args:cons_classes],
-					ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap)
-	
 	convert_function_type common_defs fun_index (fun_defs, imported_types, collected_imports, fun_indices_with_abs_syn_types, type_heaps, var_heap)
 		# (fun_def=:{fun_type = Yes fun_type, fun_info = {fi_properties}}, fun_defs)
 					= fun_defs![fun_index]
