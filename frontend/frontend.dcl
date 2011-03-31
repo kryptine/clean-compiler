@@ -5,7 +5,8 @@ definition module frontend
 
 from scanner import ::SearchPaths
 from general import ::Optional (Yes, No)
-import checksupport, transform, overloading
+import checksupport, overloading
+from partition import ::Component(..),::ComponentMembers
 
 :: FrontEndOptions 
 	=	{	feo_up_to_phase			:: !FrontEndPhase
@@ -18,7 +19,7 @@ import checksupport, transform, overloading
 :: FrontEndSyntaxTree
 	=	{	fe_icl					:: !IclModule
 		,	fe_dcls					:: !{#DclModule}
-		,	fe_components			:: !{!Group}
+		,	fe_components			:: !{!Component}
 		,	fe_arrayInstances		:: !ArrayAndListInstances
 		}
 

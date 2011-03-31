@@ -3,13 +3,14 @@
 */
 definition module convertcases
 
-import syntax, transform
+import syntax
+from trans import ::Component
 
 :: LetVarInfo
 :: LetExpressionInfo
 :: RefCountsInCase
 :: SplitsInCase
 
-convertCasesOfFunctions :: !*{! Group} !Int !{# {# FunType} } !{# CommonDefs} !*{#FunDef} !*{#{# CheckedTypeDef}}
+convertCasesOfFunctions :: !*{!Component} !Int !{# {# FunType} } !{# CommonDefs} !*{#FunDef} !*{#{# CheckedTypeDef}}
 		!ImportedConstructors !*VarHeap !*TypeHeaps !*ExpressionHeap
-			-> (!ImportedFunctions, !*{! Group}, !*{#FunDef}, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap)
+			-> (!ImportedFunctions, !*{!Component}, !*{#FunDef}, !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap)

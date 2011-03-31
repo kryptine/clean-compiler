@@ -26,9 +26,9 @@ addLetVars [{lb_dst} : binds] [bind_type : bind_types] bound_vars
 addLetVars [] [] bound_vars
 	= bound_vars
 
-convertCasesOfFunctions :: !*{!Group} !Int !{#{#FunType}} !{#CommonDefs}
+convertCasesOfFunctions :: !*{!Component} !Int !{#{#FunType}} !{#CommonDefs}
 				!*{#FunDef} !*{#{#CheckedTypeDef}} !ImportedConstructors !*VarHeap !*TypeHeaps !*ExpressionHeap
-			-> (!ImportedFunctions, !*{!Group},
+			-> (!ImportedFunctions, !*{!Component},
 				!*{#FunDef},!*{#{#CheckedTypeDef}},!ImportedConstructors,!*VarHeap,!*TypeHeaps,!*ExpressionHeap)
 convertCasesOfFunctions groups main_dcl_module_n dcl_functions common_defs fun_defs imported_types imported_conses var_heap type_heaps expr_heap
 	#! nr_of_funs = size fun_defs
@@ -47,7 +47,16 @@ where
 		// otherwise
 			# (group, groups) = groups![group_nr]
 			= convert_groups (inc group_nr) groups dcl_functions common_defs main_dcl_module_n
-				(foldSt (convert_function group_nr dcl_functions common_defs main_dcl_module_n) group.group_members fun_defs_and_ci)
+				(convert_functions group.component_members group_nr dcl_functions common_defs main_dcl_module_n fun_defs_and_ci)
+
+	convert_functions (ComponentMember member members) group_nr dcl_functions common_defs main_dcl_module_n fun_defs_and_ci
+		# fun_defs_and_ci = convert_function group_nr dcl_functions common_defs main_dcl_module_n member fun_defs_and_ci
+		= convert_functions members group_nr dcl_functions common_defs main_dcl_module_n fun_defs_and_ci
+	convert_functions (GeneratedComponentMember member _ members) group_nr dcl_functions common_defs main_dcl_module_n fun_defs_and_ci
+		# fun_defs_and_ci = convert_function group_nr dcl_functions common_defs main_dcl_module_n member fun_defs_and_ci
+		= convert_functions members group_nr dcl_functions common_defs main_dcl_module_n fun_defs_and_ci
+	convert_functions NoComponentMembers group_nr dcl_functions common_defs main_dcl_module_n fun_defs_and_ci
+		= fun_defs_and_ci
 
 	convert_function group_index dcl_functions common_defs main_dcl_module_n fun (fun_defs, collected_imports, cs)
 		# ({fun_body,fun_type}, fun_defs) = fun_defs![fun]
@@ -1231,14 +1240,14 @@ newFunctionWithType opt_id fun_bodies local_vars fun_type group_index (cs_next_f
 				cs_fun_heap <:= (fun_def_ptr,  FI_Function { gf_fun_def = fun_def, gf_instance_info = II_Empty,
 	  				  gf_fun_index = cs_next_fun_nr, gf_cons_args = {cc_size=0, cc_args = [], cc_linear_bits = [], cc_producer = False} })))
 
-addNewFunctionsToGroups :: !{#.CommonDefs} FunctionHeap ![FunctionInfoPtr] !Int !*{! Group} !*{#{# CheckedTypeDef}} !ImportedFunctions !*TypeHeaps !*VarHeap
-	-> (!*{! Group}, ![FunDef],  !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
+addNewFunctionsToGroups :: !{#.CommonDefs} FunctionHeap ![FunctionInfoPtr] !Int !*{!Component} !*{#{# CheckedTypeDef}} !ImportedFunctions !*TypeHeaps !*VarHeap
+	-> (!*{!Component}, ![FunDef], !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
 addNewFunctionsToGroups common_defs fun_heap new_functions main_dcl_module_n groups imported_types imported_conses type_heaps var_heap
 	= foldSt (add_new_function_to_group fun_heap common_defs) new_functions (groups, [], imported_types, imported_conses, type_heaps, var_heap)
 where
 	add_new_function_to_group :: !FunctionHeap  !{# CommonDefs} !FunctionInfoPtr
-				!(!*{! Group}, ![FunDef], !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
-					-> (!*{! Group}, ![FunDef],  !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
+				!(!*{!Component}, ![FunDef], !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
+					-> (!*{!Component}, ![FunDef],  !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
 	add_new_function_to_group fun_heap common_defs fun_ptr (groups, fun_defs, imported_types, imported_conses, type_heaps, var_heap)
 		# (FI_Function {gf_fun_def,gf_fun_index}) = sreadPtr fun_ptr fun_heap
 		  {fun_type = Yes ft, fun_info = {fi_group_index, fi_properties}} = gf_fun_def
@@ -1246,7 +1255,7 @@ where
 		  		= convertSymbolType (fi_properties bitand FI_HasTypeSpec == 0) common_defs ft main_dcl_module_n
 		  		 			imported_types imported_conses type_heaps var_heap
 		# (group, groups) = groups![fi_group_index]
-		= ({ groups & [fi_group_index] = { group & group_members = [gf_fun_index : group.group_members]} },
+		= ({ groups & [fi_group_index] = { group & component_members = ComponentMember gf_fun_index group.component_members} },
 				[ { gf_fun_def & fun_type = Yes ft }: fun_defs], imported_types, imported_conses, type_heaps, var_heap)
 
 ::	ConvertState =

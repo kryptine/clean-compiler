@@ -9,6 +9,7 @@ import frontend
 import backend
 import backendpreprocess, backendsupport, backendconvert
 import Version
+import partition
 
 checkVersion :: VersionsCompatability *File -> (!Bool, !*File)
 checkVersion VersionsAreCompatible errorFile
@@ -49,7 +50,19 @@ backEndInterface outputFileName commandLineArgs listTypes typesPath predef_symbo
 	# varHeap
 		=	backEndPreprocess predefined_idents.[PD_DummyForStrictAliasFun] functionIndices fe_icl var_heap
 		with
-			functionIndices = flatten [group.group_members \\ group <-: fe_components]
+			functionIndices = function_indices 0 fe_components
+
+			function_indices i components
+				| i<size components
+					= function_indices2 components.[i].component_members i components
+					= []
+
+			function_indices2 (ComponentMember member members) i components
+				= [member : function_indices2 members i components]
+			function_indices2 (GeneratedComponentMember member _ members) i components
+				= [member : function_indices2 members i components]
+			function_indices2 NoComponentMembers i components
+				= function_indices (i+1) components
 	# backEndFiles
 		=	0
 	# (backEnd, backEndFiles)
@@ -80,18 +93,30 @@ DictionaryToClassInfo iclModuleIndex iclModule dclModules :==
 	,	dtci_dclModules = dclModules
 	}
 
-optionallyPrintFunctionTypes :: ListTypesOption {#Char} DictionaryToClassInfo {!Group} {#FunDef} *AttrVarHeap *File !*BackEnd -> (*AttrVarHeap, *File, *BackEnd)
+optionallyPrintFunctionTypes :: ListTypesOption {#Char} DictionaryToClassInfo {!Component} {#FunDef} *AttrVarHeap *File !*BackEnd -> (*AttrVarHeap, *File, *BackEnd)
 optionallyPrintFunctionTypes {lto_listTypesKind, lto_showAttributes} typesPath info components functions attrHeap outFile backEnd
 	| lto_listTypesKind == ListTypesStrictExports || lto_listTypesKind == ListTypesAll
 		=	printFunctionTypes (lto_listTypesKind == ListTypesAll) lto_showAttributes info components functions attrHeap outFile backEnd
 		=	(attrHeap, outFile, backEnd)
 
-printFunctionTypes :: Bool Bool DictionaryToClassInfo {!Group} {#FunDef} *AttrVarHeap *File *BackEnd -> (*AttrVarHeap, *File, *BackEnd)
+printFunctionTypes :: Bool Bool DictionaryToClassInfo {!Component} {#FunDef} *AttrVarHeap *File *BackEnd -> (*AttrVarHeap, *File, *BackEnd)
 printFunctionTypes all attr info components functions attrHeap file backEnd
 	=	foldSt (printFunctionType all attr info) functionIndicesAndFunctions (attrHeap, file, backEnd)
 	where
 		functionIndicesAndFunctions
-			=	[(member,functions.[member]) \\ group <-: components, member <- group.group_members]
+			= function_indices_and_functions 0 components
+
+		function_indices_and_functions i components
+			| i<size components
+				= function_indices_and_functions2 components.[i].component_members i components
+				= []
+
+		function_indices_and_functions2 (ComponentMember member members) i components
+			= [(member,functions.[member]) : function_indices_and_functions2 members i components]
+		function_indices_and_functions2 (GeneratedComponentMember member _ members) i components
+			= [(member,functions.[member]) : function_indices_and_functions2 members i components]
+		function_indices_and_functions2 NoComponentMembers i components
+			= function_indices_and_functions (i+1) components
 
 printFunctionType :: Bool Bool DictionaryToClassInfo (Int, FunDef) (*AttrVarHeap, *File, *BackEnd) -> (*AttrVarHeap, *File, *BackEnd)
 printFunctionType all attr info (functionIndex, {fun_ident,fun_type=Yes type}) (attrHeap, file, backEnd)

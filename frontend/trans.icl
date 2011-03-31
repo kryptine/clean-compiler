@@ -3566,28 +3566,27 @@ add_let_binds free_vars rhss original_binds
 
 //@	transformGroups
 
-transformGroups :: !CleanupInfo !Int !Int !Int !Int !*{!Group} !*{#FunDef} !*{!.ConsClasses} !{# CommonDefs}  !{# {# FunType} }
+transformGroups :: !CleanupInfo !Int !Int !Int !Int !*{!Component} !*{#FunDef} !*{!.ConsClasses} !{# CommonDefs}  !{# {# FunType} }
 		!*ImportedTypes !*TypeDefInfos !*VarHeap !*TypeHeaps !*ExpressionHeap !Bool !*File !*PredefinedSymbols
-			-> (!*{!Group}, !*{#FunDef}, !*ImportedTypes, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap, !*File, !*PredefinedSymbols)
+			-> (!*{!Component}, !*{#FunDef}, !*ImportedTypes, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap, !*File, !*PredefinedSymbols)
 transformGroups cleanup_info main_dcl_module_n ro_StdStrictLists_module_n def_min def_max groups fun_defs cons_args common_defs imported_funs
 		imported_types type_def_infos var_heap type_heaps symbol_heap compile_with_fusion error predef_symbols
 	#! nr_of_funs = size fun_defs
-	# initial_ti =
-				{ ti_fun_defs		= fun_defs
-				, ti_instances		= createArray nr_of_funs II_Empty
-				, ti_cons_args		= cons_args
-				, ti_new_functions	= []
-				, ti_fun_heap		= newHeap
-				, ti_var_heap		= var_heap
-				, ti_symbol_heap	= symbol_heap
-				, ti_type_heaps		= type_heaps
-				, ti_type_def_infos	= type_def_infos
-				, ti_next_fun_nr	= nr_of_funs
-				, ti_cleanup_info	= cleanup_info
-				, ti_recursion_introduced	= No
-				, ti_error_file		= error
-				, ti_predef_symbols	= predef_symbols
-				}
+	# initial_ti =	{ ti_fun_defs		= fun_defs
+					, ti_instances		= createArray nr_of_funs II_Empty
+					, ti_cons_args		= cons_args
+					, ti_new_functions	= []
+					, ti_fun_heap		= newHeap
+					, ti_var_heap		= var_heap
+					, ti_symbol_heap	= symbol_heap
+					, ti_type_heaps		= type_heaps
+					, ti_type_def_infos	= type_def_infos
+					, ti_next_fun_nr	= nr_of_funs
+					, ti_cleanup_info	= cleanup_info
+					, ti_recursion_introduced	= No
+					, ti_error_file		= error
+					, ti_predef_symbols	= predef_symbols }
+
 	# groups = [group \\ group <-: groups]
 	# (groups, imported_types, collected_imports, fun_indices_with_abs_syn_types, ti)
 		= transform_groups 0 groups [] common_defs imported_funs imported_types [] [] initial_ti
@@ -3605,253 +3604,228 @@ transformGroups cleanup_info main_dcl_module_n ro_StdStrictLists_module_n def_mi
 	  fun_defs = { fundef \\ fundef <- [ fundef \\ fundef <-: fun_defs ] ++ new_fun_defs }
 	= (groups, fun_defs, imported_types, collected_imports,	var_heap, type_heaps, symbol_heap, ti.ti_error_file, ti.ti_predef_symbols)
 where
-	transform_groups :: !Int ![.Group] !u:[Group] !{#CommonDefs} !{#{#FunType}} !*{#{#(TypeDef .TypeRhs)}} ![(Global Int)] !v:[Int] !*TransformInfo -> *(!w:[Group],!.{#{#(TypeDef .TypeRhs)}},![(Global Int)],!x:[Int],!*TransformInfo), [u <= w,v <= x]
+	transform_groups :: !Int ![Component] !u:[Component] !{#CommonDefs} !{#{#FunType}} !*{#{#CheckedTypeDef}} ![(Global Int)] !v:[Int] !*TransformInfo -> *(!w:[Component],!.{#{#CheckedTypeDef}},![(Global Int)],!x:[Int],!*TransformInfo), [u <= w,v <= x]
+	transform_groups group_nr [group:groups] acc_groups common_defs imported_funs imported_types collected_imports fun_indices_with_abs_syn_types ti
+		# {component_members} = group
+		# (ti_fun_defs, imported_types, collected_imports, fun_indices_with_abs_syn_types, ti_type_heaps, ti_var_heap) 
+				= convert_function_types component_members common_defs
+						(ti.ti_fun_defs, imported_types, collected_imports, fun_indices_with_abs_syn_types, ti.ti_type_heaps, ti.ti_var_heap)
+		# ti = { ti & ti_fun_defs = ti_fun_defs, ti_type_heaps = ti_type_heaps, ti_var_heap = ti_var_heap }
+		# (group_nr,acc_groups,ti) = transform_group common_defs imported_funs group_nr component_members acc_groups ti
+		= transform_groups group_nr groups acc_groups common_defs imported_funs imported_types collected_imports fun_indices_with_abs_syn_types ti
 	transform_groups group_nr [] acc_groups common_defs imported_funs imported_types collected_imports fun_indices_with_abs_syn_types ti
 		= (acc_groups, imported_types, collected_imports, fun_indices_with_abs_syn_types, ti)
-	transform_groups group_nr [group:groups] acc_groups common_defs imported_funs imported_types collected_imports fun_indices_with_abs_syn_types ti
-			# {group_members} = group
-			# (ti_fun_defs, imported_types, collected_imports, fun_indices_with_abs_syn_types, ti_type_heaps, ti_var_heap) 
-					= foldSt (convert_function_type common_defs) group_members
-							(ti.ti_fun_defs, imported_types, collected_imports, fun_indices_with_abs_syn_types, ti.ti_type_heaps, ti.ti_var_heap)
-			# ti = { ti & ti_fun_defs = ti_fun_defs, ti_type_heaps = ti_type_heaps, ti_var_heap = ti_var_heap }
-			# (group_nr,acc_groups,ti) = transform_group common_defs imported_funs group_nr group_members acc_groups ti
-			= transform_groups group_nr groups acc_groups common_defs imported_funs imported_types collected_imports fun_indices_with_abs_syn_types ti
 
-	transform_groups` :: !{#CommonDefs} !{#{#FunType}} !Int ![Group] !u:[Group] !*TransformInfo -> *(!Int,!u:[Group],!*TransformInfo)
-	transform_groups` common_defs imported_funs group_nr [] acc_groups ti
+	convert_function_types (ComponentMember member members) common_defs s
+		# s = convert_function_type common_defs member s
+		= convert_function_types members common_defs s
+	convert_function_types NoComponentMembers common_defs s
+		= s
+
+	transform_groups_again :: !Int ![Component] ![Component] !{#CommonDefs} !{#{#FunType}} !*TransformInfo -> *(![Component],!*TransformInfo)
+	transform_groups_again group_nr [group:groups] acc_groups common_defs imported_funs ti
+		# {component_members} = group
+		# (group_nr,acc_groups,ti) = transform_group common_defs imported_funs group_nr component_members acc_groups ti
+		= transform_groups_again group_nr groups acc_groups common_defs imported_funs ti
+	transform_groups_again group_nr [] acc_groups common_defs imported_funs ti
+		= (acc_groups, ti)
+
+	transform_group :: !{#CommonDefs} !{#{#FunType}} !Int !ComponentMembers !u:[Component] !*TransformInfo -> *(!Int,!u:[Component],!*TransformInfo)
+	transform_group common_defs imported_funs group_nr component_members acc_groups ti
+		// assign group_nr to component_members
+		# ti = assign_groups component_members group_nr ti
+
+		# (before,ti) = ti!ti_next_fun_nr
+		// transform component_members
+		# ti = transform_functions component_members common_defs imported_funs ti
+		// partitionate group: need to know added functions for this...
+		# (after,ti) = ti!ti_next_fun_nr
+
+		| not (compile_with_fusion || after > before)
+			= (inc group_nr,[{component_members=component_members}:acc_groups],ti)
+
+		# (ti_new_functions,ti) = ti!ti_new_functions
+
+		# (new_functions_in_component,ti_fun_heap)
+			= determine_new_functions_in_component (after-before) ti_new_functions before after ti.ti_fun_heap
+		# ti = {ti & ti_fun_heap=ti_fun_heap}
+		# (new_groups,ti) = partition_group group_nr (append_ComponentMembers component_members new_functions_in_component) ti
+		// reanalyse consumers
+		# (cleanup,ti_fun_defs,ti_var_heap,ti_symbol_heap,ti_fun_heap,ti_cons_args,same)
+				= reanalyseGroups common_defs imported_funs main_dcl_module_n ro_StdStrictLists_module_n
+					new_groups
+					ti.ti_fun_defs ti.ti_var_heap ti.ti_symbol_heap ti.ti_fun_heap ti.ti_cons_args
+		# ti = {ti 
+				& ti_cleanup_info = cleanup ++ ti.ti_cleanup_info
+				, ti_fun_defs = ti_fun_defs
+				, ti_var_heap = ti_var_heap
+				, ti_symbol_heap = ti_symbol_heap
+				, ti_fun_heap = ti_fun_heap
+				, ti_cons_args = ti_cons_args
+				}
+		// if wanted reapply transform_group to all found groups
+		| after>before || length new_groups > 1 || not same
+			= transform_groups` common_defs imported_funs group_nr new_groups acc_groups ti
+		// producer annotation for finished components!
+		# ti = reannotate_producers group_nr component_members ti
+		= (inc group_nr,(reverse new_groups)++acc_groups,ti)
+	where
+		transform_groups` :: !{#CommonDefs} !{#{#FunType}} !Int ![Component] !u:[Component] !*TransformInfo -> *(!Int,!u:[Component],!*TransformInfo)
+		transform_groups` common_defs imported_funs group_nr [] acc_groups ti
 			= (group_nr, acc_groups, ti)
-	transform_groups` common_defs imported_funs group_nr [{group_members}:groups] acc_groups ti
-			# (group_nr,acc_groups,ti) = transform_group common_defs imported_funs group_nr group_members acc_groups ti
+		transform_groups` common_defs imported_funs group_nr [{component_members}:groups] acc_groups ti
+			# (group_nr,acc_groups,ti) = transform_group common_defs imported_funs group_nr component_members acc_groups ti
 			= transform_groups` common_defs imported_funs group_nr groups acc_groups ti
 	
-	transform_group :: !{#CommonDefs} !{#{#FunType}} !Int ![Int] !u:[Group] !*TransformInfo -> *(!Int,!u:[Group],!*TransformInfo)
-	transform_group common_defs imported_funs group_nr group_members acc_groups ti
-			// assign group_nr to group_members
-			# ti = ti <-!- ("transform_group",group_nr)
-			# ti = foldSt (assign_group group_nr) group_members ti
+		changed_group_classification [] ti
+			= (False,ti)
+		changed_group_classification [fun:funs] ti
+			= (False,ti)
 
-			# (before,ti) = ti!ti_next_fun_nr
-			// transform group_members
-			# ti = foldSt (transform_function common_defs imported_funs) group_members ti
-			// partitionate group: need to know added functions for this...
-			# (after,ti) = ti!ti_next_fun_nr
+		assign_groups :: !ComponentMembers !Int !*TransformInfo -> *TransformInfo
+		assign_groups (ComponentMember member members) group_nr ti
+			# ti = {ti & ti_fun_defs.[member].fun_info.fi_group_index = group_nr}
+			= assign_groups members group_nr ti
+		assign_groups (GeneratedComponentMember member fun_ptr members) group_nr ti=:{ti_fun_heap}
+			# (FI_Function gf=:{gf_fun_def=fd}, ti_fun_heap) = readPtr fun_ptr ti_fun_heap
+			# fd = {fd & fun_info.fi_group_index = group_nr}
+			# ti_fun_heap = writePtr fun_ptr (FI_Function {gf & gf_fun_def=fd}) ti_fun_heap
+			# ti = {ti & ti_fun_heap=ti_fun_heap}
+			= assign_groups members group_nr ti
+		assign_groups NoComponentMembers group_nr ti
+			= ti
+		
+		partition_group :: !.Int !ComponentMembers !*TransformInfo -> *(![Component],!*TransformInfo)
+		partition_group group_nr component_members ti
+			# {ti_fun_defs=fun_defs, ti_fun_heap=fun_heap, ti_next_fun_nr=max_fun_nr,
+			   ti_predef_symbols=predef_symbols, ti_var_heap=var_heap, ti_symbol_heap=expression_heap, ti_error_file} = ti
+			# next_group = group_nr
+			# error_admin = {ea_file = ti_error_file, ea_loc = [], ea_ok = True }
+			# (_,groups,fun_defs,fun_heap,predef_symbols,var_heap,expression_heap,error_admin)
+				= partitionateFunctions`` max_fun_nr next_group fun_defs component_members main_dcl_module_n def_min def_max fun_heap predef_symbols var_heap expression_heap error_admin
+			# ti = { ti	& ti_fun_defs		= fun_defs
+						, ti_fun_heap		= fun_heap
+						, ti_predef_symbols	= predef_symbols
+						, ti_var_heap		= var_heap
+						, ti_symbol_heap	= expression_heap
+						, ti_error_file		= error_admin.ea_file }
+			= (groups,ti)
 
-			| not (compile_with_fusion || after > before)
-				= (inc group_nr,[{group_members=group_members}:acc_groups],ti)
+		transform_functions :: !ComponentMembers !{#CommonDefs} !{#{#FunType}} !*TransformInfo -> *TransformInfo
+		transform_functions (ComponentMember member members) common_defs imported_funs ti
+			# (fun_def, ti) = ti!ti_fun_defs.[member]
+			  fun_symb = {symb_ident=fun_def.fun_ident, symb_kind=SK_Function {glob_object=member, glob_module=main_dcl_module_n}}
+			  (fun_body,ti)
+				= transform_function fun_def.fun_type fun_def.fun_body fun_symb common_defs imported_funs ti
+			  fun_def = {fun_def & fun_body=fun_body}
+			  ti = {ti & ti_fun_defs.[member] = fun_def}
+			= transform_functions members common_defs imported_funs ti
+		transform_functions (GeneratedComponentMember member fun_ptr members) common_defs imported_funs ti
+			# (FI_Function gf=:{gf_fun_def},ti_fun_heap) = readPtr fun_ptr ti.ti_fun_heap
+			  fun_symb = {symb_ident=gf_fun_def.fun_ident, symb_kind=SK_GeneratedFunction fun_ptr member }
+			  ti = {ti & ti_fun_heap = ti_fun_heap}
+			  (fun_body,ti)
+				= transform_function gf_fun_def.fun_type gf_fun_def.fun_body fun_symb common_defs imported_funs ti
+			  gf_fun_def = {gf_fun_def & fun_body=fun_body}
+			  ti_fun_heap = writePtr fun_ptr (FI_Function {gf & gf_fun_def=gf_fun_def}) ti.ti_fun_heap
+			  ti = {ti & ti_fun_heap = ti_fun_heap}
+			= transform_functions members common_defs imported_funs ti
+		transform_functions NoComponentMembers common_defs imported_funs ti
+			= ti
 
-			# (new_groups,ti) = partition_group group_nr (group_members++[before..after-1]) ti
-			// reanalyse consumers
-			# (cleanup,ti_fun_defs,ti_var_heap,ti_symbol_heap,ti_fun_heap,ti_cons_args,same)
-					= reanalyseGroups common_defs imported_funs main_dcl_module_n ro_StdStrictLists_module_n ti.ti_new_functions
-						new_groups
-						ti.ti_fun_defs ti.ti_var_heap ti.ti_symbol_heap ti.ti_fun_heap ti.ti_cons_args
-			# ti = {ti 
-					& ti_cleanup_info = cleanup ++ ti.ti_cleanup_info
-					, ti_fun_defs = ti_fun_defs
-					, ti_var_heap = ti_var_heap
-					, ti_symbol_heap = ti_symbol_heap
-					, ti_fun_heap = ti_fun_heap
-					, ti_cons_args = ti_cons_args
+		transform_function :: !(Optional SymbolType) !FunctionBody !SymbIdent !{#CommonDefs} !{#{#FunType}} !*TransformInfo -> (!FunctionBody,!*TransformInfo)
+		transform_function (Yes {st_args,st_args_strictness}) (TransformedBody tb) fun_symb common_defs imported_funs ti
+			# (ro_StdGeneric_module_n,ti) = ti!ti_predef_symbols.[PD_StdGeneric].pds_def
+			  ti_var_heap					= fold2St store_arg_type_info tb.tb_args st_args ti.ti_var_heap
+			  tfi =	{ tfi_root				= fun_symb
+					, tfi_case				= fun_symb
+					, tfi_orig				= fun_symb
+					, tfi_args				= tb.tb_args
+					, tfi_vars				= [arg \\ arg <- tb.tb_args & i <- [0..] | arg_is_strict i st_args_strictness]
+					, tfi_geni				= (-1,-1)
 					}
-			// if wanted reapply transform_group to all found groups
-			| (after>before) || (length new_groups > 1) || not same
-				= transform_groups` common_defs imported_funs group_nr new_groups acc_groups ti
-			// producer annotation for finished components!
-			# ti = reannotate_producers group_nr group_members ti
-			= (inc group_nr,(reverse new_groups)++acc_groups,ti)
+			  ro =	{ ro_imported_funs				= imported_funs
+					, ro_common_defs 				= common_defs
+					, ro_root_case_mode				= get_root_case_mode tb
+					, ro_tfi						= tfi
+					, ro_main_dcl_module_n			= main_dcl_module_n
+					, ro_transform_fusion			= compile_with_fusion
+					, ro_StdStrictLists_module_n	= ro_StdStrictLists_module_n
+					, ro_StdGeneric_module_n		= ro_StdGeneric_module_n
+					}
+			  ti = {ti & ti_var_heap = ti_var_heap}
+		  
+			  (fun_rhs, ti)						= transform tb.tb_rhs ro ti
+			= (TransformedBody {tb & tb_rhs = fun_rhs},ti)
+		  where
+			store_arg_type_info {fv_info_ptr} a_type ti_var_heap
+				= setExtendedVarInfo fv_info_ptr (EVI_VarType a_type) ti_var_heap
+			
+			fun_def_to_symb_ident fun_index fsize {fun_ident}
+				| fun_index < fsize
+				= { symb_ident=fun_ident, symb_kind=SK_Function {glob_object=fun_index, glob_module=main_dcl_module_n } }
 
-	changed_group_classification [] ti
-		= (False,ti)
-	changed_group_classification [fun:funs] ti
-		= (False,ti)
-	
-	assign_group :: !.Int !.Int !*TransformInfo -> *TransformInfo
-	assign_group group_number fun ti
-		# (fd,ti)		= get_fun_def fun ti
-		# fd			= { fd & fun_info.fi_group_index = group_number }
-		# ti			= set_fun_def fun fd ti
-		= ti
-	
-	get_fun_def :: !.Int !*TransformInfo -> *(!FunDef,!*TransformInfo)
-	get_fun_def fun ti=:{ti_fun_defs}
-		| fun < size ti_fun_defs
-			# (fun_def, ti)						= ti!ti_fun_defs.[fun]
-			= (fun_def,ti)
-		# (fun_def_ptr,ti_fun_heap)			= lookup_ptr fun ti.ti_new_functions ti.ti_fun_heap
-			with
-				lookup_ptr fun [] ti_fun_heap = abort "drat"
-				lookup_ptr fun [fun_def_ptr:new_functions] ti_fun_heap
-					# (FI_Function {gf_fun_index}, ti_fun_heap)
-							= readPtr fun_def_ptr ti_fun_heap
-					| gf_fun_index == fun
-						= (fun_def_ptr, ti_fun_heap)
-						= lookup_ptr fun new_functions ti_fun_heap
-		# (FI_Function {gf_fun_def}, ti_fun_heap)
-											= readPtr fun_def_ptr ti_fun_heap
-		  ti								= { ti & ti_fun_heap = ti_fun_heap }
-		= (gf_fun_def,ti)
+			get_root_case_mode {tb_rhs=Case _}	= RootCase
+			get_root_case_mode _ 				= NotRootCase
 
-	set_fun_def :: !.Int !.FunDef !*TransformInfo -> *TransformInfo
-	set_fun_def fun fun_def ti=:{ti_fun_defs}
-		| fun < size ti_fun_defs
-			= {ti & ti_fun_defs.[fun] = fun_def}
-		# (fun_def_ptr,ti_fun_heap)			= lookup_ptr fun ti.ti_new_functions ti.ti_fun_heap
-			with
-				lookup_ptr fun [] ti_fun_heap = abort "drat"
-				lookup_ptr fun [fun_def_ptr:new_functions] ti_fun_heap
-					# (FI_Function {gf_fun_index}, ti_fun_heap)
-							= readPtr fun_def_ptr ti_fun_heap
-					| gf_fun_index == fun
-						= (fun_def_ptr, ti_fun_heap)
-						= lookup_ptr fun new_functions ti_fun_heap
-		# (FI_Function gf, ti_fun_heap)
-											= readPtr fun_def_ptr ti_fun_heap
-		# ti_fun_heap						= writePtr fun_def_ptr (FI_Function {gf & gf_fun_def = fun_def}) ti_fun_heap
-		= { ti & ti_fun_heap = ti_fun_heap }
-	
-	partition_group :: !.Int ![.Int] !*TransformInfo -> *(![Group],!*TransformInfo)
-	partition_group group_nr group_members ti
-		# fun_defs = ti.ti_fun_defs
-		# fun_heap = ti.ti_fun_heap
-		# max_fun_nr = ti.ti_next_fun_nr
-		# new_functions = ti.ti_new_functions
-		# main_dcl_module_n = main_dcl_module_n
-		# next_group = group_nr
-		# predef_symbols = ti.ti_predef_symbols
-		# var_heap = ti.ti_var_heap
-		# expression_heap = ti.ti_symbol_heap
-		# error_admin = {ea_file = ti.ti_error_file, ea_loc = [], ea_ok = True }
-		# (_,groups,fun_defs,fun_heap,predef_symbols,var_heap,expression_heap,error_admin)
-			= partitionateFunctions`` max_fun_nr next_group new_functions fun_defs group_members main_dcl_module_n def_min def_max fun_heap predef_symbols var_heap expression_heap error_admin
-		# ti = 
-			{ ti
-			& ti_fun_defs		= fun_defs
-			, ti_fun_heap		= fun_heap
-			, ti_predef_symbols	= predef_symbols
-			, ti_var_heap		= var_heap
-			, ti_symbol_heap	= expression_heap
-			, ti_error_file		= error_admin.ea_file
-			}
-		= (groups,ti)
-		
-	transform_function :: !{#.CommonDefs} !{#{#.FunType}} !.Int !*TransformInfo -> *TransformInfo
-	transform_function common_defs imported_funs fun ti
-		# (fun_def, ro_fun, ti)	= get_fun_def_and_symb_ident fun ti
-		# ti = ti <-!- ("transform_function",fun,ro_fun,fun_def)
-		  (ro_StdGeneric_module_n,ti) = ti!ti_predef_symbols.[PD_StdGeneric].pds_def
-		# (Yes {st_args,st_args_strictness})= fun_def.fun_type
-		  {fun_body = TransformedBody tb} 	= fun_def
-		  ti_var_heap						= fold2St store_arg_type_info tb.tb_args st_args ti.ti_var_heap
-		  tfi =	{ tfi_root				= ro_fun
-				, tfi_case				= ro_fun
-				, tfi_orig				= ro_fun
-				, tfi_args				= tb.tb_args
-				, tfi_vars				= [arg \\ arg <- tb.tb_args & i <- [0..] | arg_is_strict i st_args_strictness]
-				, tfi_geni				= (-1,-1)
-				}
-		  ro =	{ ro_imported_funs				= imported_funs
-				, ro_common_defs 				= common_defs
-				, ro_root_case_mode				= get_root_case_mode tb
-				, ro_tfi						= tfi
-				, ro_main_dcl_module_n			= main_dcl_module_n
-				, ro_transform_fusion			= compile_with_fusion
-				, ro_StdStrictLists_module_n	= ro_StdStrictLists_module_n
-				, ro_StdGeneric_module_n		= ro_StdGeneric_module_n
-				}
-		  ti = { ti & ti_var_heap = ti_var_heap } // <--- ("transform_function",fun,ro.ro_root_case_mode)
-		  (fun_rhs, ti)						= transform tb.tb_rhs ro ti
-		  fun_def							= { fun_def & fun_body = TransformedBody { tb & tb_rhs = fun_rhs }}
-		# ti			= set_fun_def fun fun_def ti
-		= ti
-	  where
-		store_arg_type_info {fv_info_ptr} a_type ti_var_heap
-			= setExtendedVarInfo fv_info_ptr (EVI_VarType a_type) ti_var_heap
-		
-		fun_def_to_symb_ident fun_index fsize {fun_ident}
-			| fun_index < fsize
-			= { symb_ident=fun_ident, symb_kind=SK_Function {glob_object=fun_index, glob_module=main_dcl_module_n } }
-
-		get_root_case_mode {tb_rhs=Case _}	= RootCase
-		get_root_case_mode _ 				= NotRootCase
-
-		get_fun_def_and_symb_ident fun ti=:{ti_fun_defs}
-			| fun < size ti_fun_defs
-				# (fun_def, ti)						= ti!ti_fun_defs.[fun]
-				# si = { symb_ident=fun_def.fun_ident, symb_kind=SK_Function {glob_object=fun, glob_module=main_dcl_module_n } }
-				= (fun_def,si,ti)
-			# (fun_def_ptr,ti_fun_heap)			= lookup_ptr fun ti.ti_new_functions ti.ti_fun_heap
-				with
-					lookup_ptr fun [] ti_fun_heap = abort "drat"
-					lookup_ptr fun [fun_def_ptr:new_functions] ti_fun_heap
-						# (FI_Function {gf_fun_index}, ti_fun_heap)
-								= readPtr fun_def_ptr ti_fun_heap
-						| gf_fun_index == fun
-							= (fun_def_ptr, ti_fun_heap)
-							= lookup_ptr fun new_functions ti_fun_heap
-			# (FI_Function {gf_fun_def}, ti_fun_heap)
-											= readPtr fun_def_ptr ti_fun_heap
-			# si = { symb_ident=gf_fun_def.fun_ident, symb_kind=SK_GeneratedFunction fun_def_ptr fun }
-			  ti								= { ti & ti_fun_heap = ti_fun_heap }
-			= (gf_fun_def,si,ti)
-
-	reannotate_producers group_nr group_members ti
+	reannotate_producers group_nr component_members ti
 		// determine if safe group
-		# (safe,ti) = safe_producers group_nr group_members group_members main_dcl_module_n ti
+		# (safe,ti) = safe_producers group_nr component_members component_members main_dcl_module_n ti
 		| safe
 			// if safe mark all members as safe
-			= foldSt mark_producer_safe group_members ti
+			= mark_producers_safe component_members ti
 		= ti
 
-	safe_producers :: Int [Int] [Int] Int *TransformInfo -> *(!Bool,!*TransformInfo)
-	safe_producers group_nr group_members [] main_dcl_module_n ti
-		= (True,ti)
-	safe_producers group_nr group_members [fun:funs] main_dcl_module_n ti
-		// look for occurrence of group_members in safe argument position of fun RHS
+	safe_producers :: Int ComponentMembers ComponentMembers Int *TransformInfo -> *(!Bool,!*TransformInfo)
+	safe_producers group_nr component_members (ComponentMember fun funs) main_dcl_module_n ti
+		// look for occurrence of component_members in safe argument position of fun RHS
 		// i.e. linearity ok && ...
-		#! (fun_def, ti)	= get_fun_def fun ti
-		   {fun_body = TransformedBody tb}
-		   					= fun_def
-		   fun_body			= tb.tb_rhs
-
-		#! prs	=
-			{ prs_group				= group_members
-			, prs_cons_args 		= ti.ti_cons_args
-			, prs_main_dcl_module_n	= main_dcl_module_n
-			, prs_fun_heap			= ti.ti_fun_heap
-			, prs_fun_defs			= ti.ti_fun_defs
-			, prs_group_index		= group_nr
-			}
-		# (safe,prs)	= producerRequirements fun_body prs
-//		# prs = prs ---> ("producerRequirements",fun_def.fun_ident,fun,group_nr,safe,fun_body)
+		# (fun_def,fun_defs) = (ti.ti_fun_defs)![fun]
+		  {fun_body = TransformedBody {tb_rhs}} = fun_def
+		  prs =	{ prs_group				= component_members
+				, prs_cons_args 		= ti.ti_cons_args
+				, prs_main_dcl_module_n	= main_dcl_module_n
+				, prs_fun_heap			= ti.ti_fun_heap
+				, prs_fun_defs			= fun_defs
+				, prs_group_index		= group_nr }
+		# (safe,prs) = producerRequirements tb_rhs prs
 		#! ti = {ti & ti_fun_defs = prs.prs_fun_defs, ti_fun_heap = prs.prs_fun_heap, ti_cons_args = prs.prs_cons_args}
 		// put back prs info into ti?
 		| safe
-			= safe_producers group_nr group_members funs main_dcl_module_n ti
+			= safe_producers group_nr component_members funs main_dcl_module_n ti
 			= (False,ti)
-	
-	mark_producer_safe fun ti=:{ti_fun_defs}
-		// update cc_prod for fun
-		| fun < size ti_fun_defs
-			= {ti & ti_cons_args.[fun].cc_producer = pIsSafe}
-		# (fun_def_ptr,ti_fun_heap)			= lookup_ptr fun ti.ti_new_functions ti.ti_fun_heap
-			with
-				lookup_ptr fun [] ti_fun_heap = abort "drat"
-				lookup_ptr fun [fun_def_ptr:new_functions] ti_fun_heap
-					# (FI_Function {gf_fun_index}, ti_fun_heap)
-							= readPtr fun_def_ptr ti_fun_heap
-					| gf_fun_index == fun
-						= (fun_def_ptr, ti_fun_heap)
-						= lookup_ptr fun new_functions ti_fun_heap
-		# (FI_Function gf, ti_fun_heap)
-											= readPtr fun_def_ptr ti_fun_heap
-		# ti_fun_heap						= writePtr fun_def_ptr (FI_Function {gf & gf_cons_args.cc_producer = pIsSafe}) ti_fun_heap
-		  ti								= { ti & ti_fun_heap = ti_fun_heap }
-		= ti
-// ... DvA		
+	safe_producers group_nr component_members (GeneratedComponentMember fun fun_ptr funs) main_dcl_module_n ti
+		# (FI_Function {gf_fun_def}, ti_fun_heap) = readPtr fun_ptr ti.ti_fun_heap
+		  ti = {ti & ti_fun_heap=ti_fun_heap}
+		  {fun_body = TransformedBody {tb_rhs}} = gf_fun_def
+		  prs =	{ prs_group				= component_members
+				, prs_cons_args 		= ti.ti_cons_args
+				, prs_main_dcl_module_n	= main_dcl_module_n
+				, prs_fun_heap			= ti.ti_fun_heap
+				, prs_fun_defs			= ti.ti_fun_defs
+				, prs_group_index		= group_nr }
+		  (safe,prs) = producerRequirements tb_rhs prs
+		#! ti = {ti & ti_fun_defs = prs.prs_fun_defs, ti_fun_heap = prs.prs_fun_heap, ti_cons_args = prs.prs_cons_args}
+		| safe
+			= safe_producers group_nr component_members funs main_dcl_module_n ti
+			= (False,ti)
+	safe_producers group_nr component_members NoComponentMembers main_dcl_module_n ti
+		= (True,ti)
 
-	add_new_function_to_group ::  !{# CommonDefs} !FunctionHeap !FunctionInfoPtr
-				!(!*{!Group}, ![FunDef], !*ImportedTypes, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
-					-> (!*{!Group}, ![FunDef], !*ImportedTypes, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
+	mark_producers_safe (ComponentMember member members) ti
+		# ti = {ti & ti_cons_args.[member].cc_producer = pIsSafe}
+		= mark_producers_safe members ti
+	mark_producers_safe (GeneratedComponentMember member fun_ptr members) ti
+		# (FI_Function gf,ti_fun_heap) = readPtr fun_ptr ti.ti_fun_heap
+		  ti_fun_heap = writePtr fun_ptr (FI_Function {gf & gf_cons_args.cc_producer = pIsSafe}) ti_fun_heap
+		  ti = {ti & ti_fun_heap = ti_fun_heap}
+		= mark_producers_safe members ti
+	mark_producers_safe NoComponentMembers ti
+		= ti
+
+	add_new_function_to_group ::  !{# CommonDefs} !FunctionHeap  !FunctionInfoPtr
+				  !(!*{!Component}, ![FunDef], !*ImportedTypes, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
+				-> (!*{!Component}, ![FunDef], !*ImportedTypes, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
 	add_new_function_to_group common_defs fun_heap fun_ptr (groups, fun_defs, imported_types, collected_imports, type_heaps, var_heap)
 		# (FI_Function {gf_fun_def,gf_fun_index}) = sreadPtr fun_ptr fun_heap
 		  {fun_type = Yes ft=:{st_args,st_result}, fun_info = {fi_group_index,fi_properties}} = gf_fun_def
@@ -3868,13 +3842,20 @@ where
 		# ft = { ft &  st_result = st_result, st_args = st_args }
 		| fi_group_index >= size groups
 			= abort ("add_new_function_to_group "+++ toString fi_group_index+++ "," +++ toString (size groups) +++ "," +++ toString gf_fun_index)
-				  		
+
 		# (group, groups) = groups![fi_group_index]
-		| not (isMember gf_fun_index group.group_members)
+		| not (isComponentMember gf_fun_index group.component_members)
 			= abort ("add_new_function_to_group INSANE!\n" +++ toString gf_fun_index +++ "," +++ toString fi_group_index)
 		# groups = {groups & [fi_group_index] = group}
-		# gf_fun_def = { gf_fun_def & fun_type = Yes ft}
+		# gf_fun_def = {gf_fun_def & fun_type = Yes ft}
 		= (groups, [gf_fun_def : fun_defs], ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap)
+	where
+		isComponentMember index (ComponentMember member members)
+			= index==member || isComponentMember index members
+		isComponentMember index (GeneratedComponentMember member _ members)
+			= index==member || isComponentMember index members
+		isComponentMember index NoComponentMembers
+			= False
 
 	convert_function_type common_defs fun_index (fun_defs, imported_types, collected_imports, fun_indices_with_abs_syn_types, type_heaps, var_heap)
 		# (fun_def=:{fun_type = Yes fun_type, fun_info = {fi_properties}}, fun_defs)
@@ -3888,7 +3869,7 @@ where
 			= (fun_defs, imported_types, collected_imports, [fun_index : fun_indices_with_abs_syn_types], type_heaps, var_heap)
 			= (fun_defs, imported_types, collected_imports, fun_indices_with_abs_syn_types, type_heaps, var_heap)
 
-	expand_abstract_syn_types_in_function_type :: !{#.CommonDefs} !.Int !*(!*{#FunDef},!*{#{#.(TypeDef .TypeRhs)}},![(Global .Int)],!*TypeHeaps,!*(Heap VarInfo)) -> (!*{#FunDef},!.{#{#(TypeDef .TypeRhs)}},![(Global Int)],!.TypeHeaps,!.(Heap VarInfo))
+	expand_abstract_syn_types_in_function_type :: !{#.CommonDefs} !.Int !*(!*{#FunDef},!*{#{#CheckedTypeDef}},![(Global .Int)],!*TypeHeaps,!*(Heap VarInfo)) -> (!*{#FunDef},!.{#{#CheckedTypeDef}},![(Global Int)],!.TypeHeaps,!.(Heap VarInfo))
 	expand_abstract_syn_types_in_function_type common_defs fun_index (fun_defs, imported_types, collected_imports, type_heaps, var_heap)
 		# (fun_def=:{fun_type = Yes fun_type, fun_info = {fi_properties}}, fun_defs)
 					= fun_defs![fun_index]
@@ -3898,6 +3879,23 @@ where
 	  	  fun_def = { fun_def & fun_type = Yes fun_type}
 	  	  fun_defs = { fun_defs & [fun_index] = fun_def }
 		= (fun_defs, imported_types, collected_imports, type_heaps, var_heap)
+
+	append_ComponentMembers :: !ComponentMembers !ComponentMembers -> ComponentMembers
+	append_ComponentMembers (ComponentMember member members) component_members_to_append
+		= ComponentMember member (append_ComponentMembers members component_members_to_append)
+	append_ComponentMembers (GeneratedComponentMember member fun_ptr members) component_members_to_append
+		= GeneratedComponentMember member fun_ptr (append_ComponentMembers members component_members_to_append)
+	append_ComponentMembers NoComponentMembers component_members_to_append
+		= component_members_to_append
+	
+	determine_new_functions_in_component :: !Int ![FunctionInfoPtr] !Int !Int !*FunctionHeap -> (ComponentMembers,!*FunctionHeap)
+	determine_new_functions_in_component 0 new_functions before after fun_heap
+			= (NoComponentMembers,fun_heap)
+	determine_new_functions_in_component n_functions [fun_ptr:new_functions] before after fun_heap
+		# (FI_Function {gf_fun_index},fun_heap) = readPtr fun_ptr fun_heap
+		| gf_fun_index>=before && gf_fun_index<after
+			# (members,fun_heap) = determine_new_functions_in_component (n_functions-1) new_functions before after fun_heap
+			= (GeneratedComponentMember gf_fun_index fun_ptr members,fun_heap)	
 
 RemoveAnnotationsMask:==1
 ExpandAbstractSynTypesMask:==2
@@ -4440,11 +4438,12 @@ get_fun_def_and_cons_args (SK_GeneratedFunction fun_info_ptr fun_index) cons_arg
 	= (gf_fun_def, gf_cons_args, cons_args, fun_defs, fun_heap)
 
 //@ <<<
-
+/*
 instance <<< Group where
 	(<<<) file {group_members}
 	 = file <<< "Group: " <<< group_members
-	
+*/
+
 instance <<< RootCaseMode where
 	(<<<) file mode = case mode of NotRootCase -> file <<< "NotRootCase"; RootCase -> file <<< "RootCase"; RootCaseOfZombie -> file <<< "RootCaseOfZombie";
 

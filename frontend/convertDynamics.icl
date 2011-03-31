@@ -83,9 +83,9 @@ where
 		= (wtis_type_heaps,wtis_type_defs,wtis_var_heap)
 
 convertDynamicPatternsIntoUnifyAppls :: !{# CommonDefs} !Int  {#DclModule} !IclModule [String] !Int !Int
-		!*{!Group} !*{#FunDef} !*PredefinedSymbols !*VarHeap !*TypeHeaps !*ExpressionHeap !(Optional *File)
+		!*{!Component} !*{#FunDef} !*PredefinedSymbols !*VarHeap !*TypeHeaps !*ExpressionHeap !(Optional *File)
 	-> (!*{#{#CheckedTypeDef}},
-		!*{!Group},!*{#FunDef},!*PredefinedSymbols,!*VarHeap,!*TypeHeaps,!*ExpressionHeap,!(Optional *File))
+		!*{!Component},!*{#FunDef},!*PredefinedSymbols,!*VarHeap,!*TypeHeaps,!*ExpressionHeap,!(Optional *File))
 convertDynamicPatternsIntoUnifyAppls common_defs main_dcl_module_n dcl_mods icl_mod directly_imported_dcl_modules
 		n_types_with_type_functions n_constructors_with_type_functions
 		groups fun_defs predefined_symbols var_heap type_heaps expr_heap tcl_file
@@ -121,7 +121,14 @@ where
 		| group_nr == size groups
 			= (groups, fun_defs_and_ci)
 			# (group, groups) = groups![group_nr]
-			= convert_groups (inc group_nr) groups dynamic_representation (foldSt (convert_function group_nr dynamic_representation) group.group_members fun_defs_and_ci)
+			= convert_groups (inc group_nr) groups dynamic_representation
+				(convert_functions group.component_members group_nr dynamic_representation fun_defs_and_ci)
+
+	convert_functions (ComponentMember member members) group_nr dynamic_representation fun_defs_and_ci
+		# fun_defs_and_ci = convert_function group_nr dynamic_representation member fun_defs_and_ci
+		= convert_functions members group_nr dynamic_representation fun_defs_and_ci
+	convert_functions NoComponentMembers group_nr dynamic_representation fun_defs_and_ci
+		= fun_defs_and_ci
 
 	convert_function group_nr dynamic_representation fun (fun_defs, ci)
 		# (fun_def, fun_defs) = fun_defs![fun]

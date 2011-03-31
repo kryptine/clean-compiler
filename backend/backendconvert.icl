@@ -6,11 +6,10 @@ implementation module backendconvert
 import code from library "backend_library"
 
 import StdEnv
-// import StdDebug
-
 import frontend
 import backend
 import backendsupport, backendpreprocess
+import partition
 
 // trace macro
 (-*->) infixl
@@ -489,7 +488,21 @@ backEndConvertModulesH predefs {fe_icl =
 	=	(backEnd -*-> "backend done")
 	where
 		functionIndices
-			=	flatten [[(componentIndex, member) \\ member <- group.group_members] \\ group <-: fe_components & componentIndex <- [1..]]
+			= function_indices 0 fe_components
+		
+		function_indices i components
+			| i<size components
+				= function_indices2 components.[i].component_members i components
+				= []
+
+		function_indices2 (ComponentMember member members) i components
+			#! inc_i = i+1
+			= [(inc_i,member) : function_indices2 members i components]
+		function_indices2 (GeneratedComponentMember member _ members) i components
+			#! inc_i = i+1
+			= [(inc_i,member) : function_indices2 members i components]
+		function_indices2 NoComponentMembers i components
+			= function_indices (i+1) components
 
 declareOtherDclModules :: {#DclModule} Int NumberSet -> BackEnder
 declareOtherDclModules dcls main_dcl_module_n used_module_numbers

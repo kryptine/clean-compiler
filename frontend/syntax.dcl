@@ -588,7 +588,10 @@ NoGlobalIndex :== {gi_module=NoIndex,gi_index=NoIndex}
 ::	ModuleIndex:==Index;
 ::	DclFunctionIndex:==Index;
 
-::	FunCall = FunCall !Index !Level | MacroCall !ModuleIndex !Index Level | DclFunCall !ModuleIndex !DclFunctionIndex;
+::	FunCall	= FunCall !Index !Level
+			| MacroCall !ModuleIndex !Index Level
+			| DclFunCall !ModuleIndex !DclFunctionIndex
+			| GeneratedFunCall !Index !FunctionInfoPtr;
 
 FI_IsMacroFun	:== 1			// whether the function is a local function of a macro
 FI_HasTypeSpec	:== 2			// whether the function has u user defined type
