@@ -47,7 +47,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_m
   	#! n_cached_dcl_modules=size cached_dcl_modules
 
 
-  	# (ok, icl_mod, dcl_mods, components, cached_dcl_macros,main_dcl_module_n,heaps, predef_symbols, symbol_table, error, directly_imported_dcl_modules)
+  	# (ok, icl_mod, dcl_mods, groups, cached_dcl_macros,main_dcl_module_n,heaps, predef_symbols, symbol_table, error, directly_imported_dcl_modules)
   	  	= checkModule mod global_fun_range mod_functions support_dynamics dynamic_type_used dcl_module_n_in_cache optional_dcl_mod modules cached_dcl_modules cached_dcl_macros predef_symbols symbol_table error heaps
 
 	  hash_table = { hash_table & hte_symbol_heap = symbol_table}
@@ -83,7 +83,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_m
 	| options.feo_up_to_phase == FrontEndPhaseCheck
 		# array_instances = {ali_array_first_instance_indices=[],ali_list_first_instance_indices=[],ali_tail_strict_list_first_instance_indices=[],ali_instances_range={ir_from=0,ir_to=0}}
 		=	frontSyntaxTree cached_dcl_macros dcl_mods main_dcl_module_n
-							predef_symbols hash_table files error io out tcl_file icl_mod dcl_mods fun_defs components array_instances heaps
+							predef_symbols hash_table files error io out tcl_file icl_mod dcl_mods fun_defs (groups_to_components groups) array_instances heaps
 
 	# error_admin = {ea_file = error, ea_loc = [], ea_ok = True }
 /*
@@ -130,13 +130,14 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_m
 			dcl_common_defs dcl_mods
 				=	{dcl_common \\ {dcl_common} <-: dcl_mods }
 
-	#! (ti_common_defs, components, fun_defs, generic_ranges, td_infos, heaps, hash_table, predef_symbols, dcl_mods, error_admin)
+	#! (ti_common_defs, groups, fun_defs, generic_ranges, td_infos, heaps, hash_table, predef_symbols, dcl_mods, error_admin)
 		= case options.feo_generics of
 			True
-				-> convertGenerics main_dcl_module_n icl_used_module_numbers ti_common_defs components fun_defs
+				-> convertGenerics main_dcl_module_n icl_used_module_numbers ti_common_defs groups fun_defs
 									td_infos heaps hash_table predef_symbols dcl_mods error_admin
 			False
-				-> (ti_common_defs, components, fun_defs, [], td_infos, heaps, hash_table, predef_symbols, dcl_mods, error_admin)
+				-> (ti_common_defs, groups, fun_defs, [], td_infos, heaps, hash_table, predef_symbols, dcl_mods, error_admin)
+
 	# (icl_common, ti_common_defs) = replace copied_ti_common_defs main_dcl_module_n saved_main_dcl_common		
 		with 
 			copied_ti_common_defs :: .{#CommonDefs} // needed for Clean 2.0 to disambiguate overloading of replace
@@ -161,7 +162,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_m
 		= (No,{},{},main_dcl_module_n,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
 
 	# (ok, fun_defs, array_instances, common_defs, imported_funs, type_def_infos, heaps, predef_symbols, error,out)
-		= typeProgram components main_dcl_module_n fun_defs icl_function_indices.ifi_specials_indices list_inferred_types icl_common icl_import icl_qualified_imports dcl_mods icl_used_module_numbers td_infos heaps predef_symbols error out
+		= typeProgram groups main_dcl_module_n fun_defs icl_function_indices.ifi_specials_indices list_inferred_types icl_common icl_import icl_qualified_imports dcl_mods icl_used_module_numbers td_infos heaps predef_symbols error out
 
 	| not ok
 		= (No,{},{},main_dcl_module_n,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
@@ -214,8 +215,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_m
 	# exported_functions = exported_global_functions ++  [dcl_instances,dcl_specials,dcl_gencases,dcl_type_funs]
 	# (components, fun_defs, predef_symbols, var_heap, expression_heap, error_admin) 
 		= case options.feo_strip_unused of
-			True -> partitionateFunctions` (fun_defs -*-> "partitionateFunctions`")
-						exported_functions
+			True -> partitionateFunctions` fun_defs exported_functions
 						main_dcl_module_n def_min def_max predef_symbols var_heap expression_heap error_admin
 			_ 
 				-> case options.feo_fusion of
@@ -263,13 +263,10 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_m
 		= abort "";
 */
 
-//	# (files,components,fun_defs) = gensaplfiles files dcl_mods dcl_types components fun_defs icl_common common_defs icl_name icl_global_functions
 	# (files,components,fun_defs) = 
 		case options.feo_generate_sapl of
     		True = gensaplfiles files dcl_mods dcl_types components fun_defs icl_common common_defs icl_name icl_global_functions csf_path
     		_	 = (files,components,fun_defs)
-    	
-//	# (fun_defs,out,var_heap,predef_symbols) = sa components main_dcl_module_n dcl_mods fun_defs out var_heap predef_symbols;
 
 	# heaps = {hp_var_heap = var_heap, hp_expression_heap=expression_heap, hp_type_heaps=type_heaps,hp_generic_heap=heaps.hp_generic_heap}
 	# 	fe ={	fe_icl = {icl_functions=fun_defs, icl_function_indices=icl_function_indices, icl_common=icl_common,
@@ -320,6 +317,12 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_m
 				= (pds_def, predef_symbols)
 				= (NoIndex, predef_symbols)
 
+	groups_to_components groups
+		= {{component_members=group_members_to_component_members group_members} \\ {group_members}<-:groups}
+	where
+		group_members_to_component_members [e:l] = ComponentMember e (group_members_to_component_members l)
+		group_members_to_component_members [] = NoComponentMembers
+		
 newSymbolTable :: !Int -> *{# SymbolTableEntry}
 newSymbolTable size
 	= createArray size {  ste_index = NoIndex, ste_def_level = -1, ste_kind = STE_Empty, ste_previous = abort "PreviousPlaceholder"}

@@ -1,13 +1,12 @@
 	implementation module saplinterface
 
-import StdEnv, CoclSystemDependent, syntax, transform, gensapl
+import StdEnv, CoclSystemDependent, syntax, partition, gensapl
 
 // Generation of Sapl definition from Clean definitions
 // JMJ: May 2007 
 
-//gensaplfiles :: !Files {#DclModule} !*{! Group} !*{# FunDef} CommonDefs {#CommonDefs} Ident -> (!Files,!*{! Group}, !*{# FunDef})
-gensaplfiles :: !Files {#DclModule} {#{#CheckedTypeDef}} !*{! Group} !*{# FunDef} CommonDefs {#CommonDefs} Ident  [IndexRange] !String
-                -> (!Files,!*{! Group}, !*{# FunDef})
+gensaplfiles :: !Files {#DclModule} {#{#CheckedTypeDef}} !*{!Component} !*{# FunDef} CommonDefs {#CommonDefs} Ident  [IndexRange] !String
+                -> (!Files,!*{!Component}, !*{# FunDef})
 gensaplfiles files dcl_mods types components fun_defs icl_common common_defs icl_name icl_function_indices csf_path
 	# (ok, files)
 		= ensureCleanSystemFilesExists csf_path files
@@ -32,7 +31,7 @@ gensaplfiles files dcl_mods types components fun_defs icl_common common_defs icl
 	| ok<>ok 		= abort "";
 	= (files,components,fun_defs) 
 
-convert2sapl :: !*{! Group} !*{# FunDef} CommonDefs {#CommonDefs} Ident !*File !*File [String] String {#DclModule} [IndexRange] -> (!*{! Group}, !*{# FunDef},!*File,!*File)
+convert2sapl :: !*{!Component} !*{# FunDef} CommonDefs {#CommonDefs} Ident !*File !*File [String] String {#DclModule} [IndexRange] -> (!*{!Component}, !*{# FunDef},!*File,!*File)
 convert2sapl comps fun_defs icl_common comdefs icl_name file fdeps modnames mymod dcl_mods icl_function_indices 
   # saplcons  = getSaplConstructors mymod icl_common        // only this module
   # extcons  = getExternalConstructors modnames comdefs     // all including this module!
@@ -73,18 +72,22 @@ makeConsGroup [     ]    = ""
 makeConsGroup [arg]      = toString arg
 makeConsGroup [arg:args] = toString arg +++ " | " +++ makeConsGroup args   
 
-getSaplFunDefs :: !*{! Group} !Int  !*{# FunDef} [String] String {#DclModule} [IndexRange] -> (!*{! Group}, !*{# FunDef},[SaplFuncDef])
+getSaplFunDefs :: !*{!Component} !Int  !*{# FunDef} [String] String {#DclModule} [IndexRange] -> (!*{!Component}, !*{# FunDef},[SaplFuncDef])
 getSaplFunDefs comps comp_index fun_defs  mod_names mymod dcl_mods icl_function_indices
 	| comp_index >= size comps
 		= (comps,fun_defs,[])
 		# (comp, comps) = comps![comp_index]
-		# (fun_defs,saplfuncs) = show_component comp.group_members fun_defs []
+		# (fun_defs,saplfuncs) = show_component comp.component_members fun_defs []
 		# (comps,fun_defs,sfuncs) = getSaplFunDefs comps (inc comp_index) fun_defs mod_names mymod dcl_mods icl_function_indices
 		= (comps,fun_defs,saplfuncs ++ sfuncs)
 where
-	show_component []  fun_defs sapdefs
+	show_component NoComponentMembers fun_defs sapdefs
 		= (fun_defs, sapdefs)
-	show_component [fun:funs]  fun_defs sapdefs 
+	show_component (ComponentMember fun funs) fun_defs sapdefs 
+		# (fun_def, fun_defs) = fun_defs![fun]
+		# saplfunc = CleanFunctoSaplFunc comp_index fun fun_def mod_names mymod dcl_mods icl_function_indices
+		= show_component funs fun_defs [saplfunc:sapdefs]
+	show_component (GeneratedComponentMember fun _ funs) fun_defs sapdefs 
 		# (fun_def, fun_defs) = fun_defs![fun]
 		# saplfunc = CleanFunctoSaplFunc comp_index fun fun_def mod_names mymod dcl_mods icl_function_indices
 		= show_component funs fun_defs [saplfunc:sapdefs]

@@ -5,27 +5,25 @@ implementation module partition
 
 import syntax, transform
 
-/*
- *	PARTITIONING
- */
+//	PARTITIONING
 
-::	PartitioningInfo = 
+::	PartitioningInfo =
 	{	pi_marks :: 		!.{# Int}
 	,	pi_next_num ::		!Int
 	,	pi_next_group ::	!Int
-	,	pi_groups ::		![[Int]]
+	,	pi_groups ::		![ComponentMembers]
 	,	pi_deps ::			![Int]
 	}
 
 NotChecked :== -1	
 
-partitionateFunctions :: !*{# FunDef} ![IndexRange] -> (!*{! Group}, !*{# FunDef})
+partitionateFunctions :: !*{# FunDef} ![IndexRange] -> (!*{!Component}, !*{# FunDef})
 partitionateFunctions fun_defs ranges
 	#! max_fun_nr = size fun_defs
 	# partitioning_info = { pi_marks = createArray max_fun_nr NotChecked, pi_deps = [], pi_next_num = 0, pi_next_group = 0, pi_groups = [] }
 	  (fun_defs, {pi_groups,pi_next_group}) = 
 	  		foldSt (partitionate_functions max_fun_nr) ranges (fun_defs, partitioning_info)
-	  groups = { {group_members = group} \\ group <- reverse pi_groups }
+	  groups = { {component_members = group} \\ group <- reverse pi_groups }
 	= (groups, fun_defs)
 where
 	partitionate_functions :: !Index !IndexRange !(!*{# FunDef}, !*PartitioningInfo) -> (!*{# FunDef}, !*PartitioningInfo)
@@ -49,43 +47,27 @@ where
 					| mark == NotChecked
 						# (mark, fun_defs, pi) = partitionate_function fc_index max_fun_nr fun_defs  pi
 						= visit_functions funs (min min_dep mark) max_fun_nr fun_defs pi
-						= visit_functions funs (min min_dep mark) max_fun_nr fun_defs pi
-				
-				visit_functions [MacroCall module_index fc_index _:funs] min_dep max_fun_nr fun_defs pi
-					= abort ("visit_functions "+++toString fd.fun_ident+++" "+++toString module_index+++" "+++toString fc_index)
-				
+						= visit_functions funs (min min_dep mark) max_fun_nr fun_defs pi				
 				visit_functions [DclFunCall module_index fc_index:funs] min_dep max_fun_nr fun_defs pi
 					= visit_functions funs min_dep max_fun_nr fun_defs pi
-
 				visit_functions [] min_dep max_fun_nr fun_defs pi
 					= (min_dep, fun_defs, pi)
 		= try_to_close_group fun_index pi_next_num min_dep max_fun_nr fun_defs pi
 
-/*				  
-	partitionate_function :: !Int !Int !*{# FunDef} !*PartitioningInfo -> *(!Int, !*{# FunDef}, !*PartitioningInfo)
-	partitionate_function fun_index max_fun_nr fun_defs pi=:{pi_next_num}
-		#! fd = fun_defs.[fun_index]
-		| fd.fun_kind
-			# {fi_calls} = fd.fun_info
-			  (min_dep, fun_defs, pi) = visit_functions fi_calls max_fun_nr max_fun_nr fun_defs (push_on_dep_stack fun_index pi)
-			= try_to_close_group fun_index pi_next_num min_dep max_fun_nr fun_defs pi
-			= (max_fun_nr, fun_defs, pi)
-*/
 	push_on_dep_stack :: !Int !*PartitioningInfo -> *PartitioningInfo;
 	push_on_dep_stack fun_index pi=:{pi_deps,pi_marks,pi_next_num}
 		= { pi & pi_deps = [fun_index : pi_deps], pi_marks = { pi_marks & [fun_index] = pi_next_num}, pi_next_num = inc pi_next_num}
-
 
 	try_to_close_group :: !Int !Int !Int !Int !*{# FunDef} !*PartitioningInfo -> *(!Int, !*{# FunDef}, !*PartitioningInfo)
 	try_to_close_group fun_index fun_nr min_dep max_fun_nr fun_defs pi=:{pi_marks, pi_deps, pi_groups, pi_next_group}
 		| fun_nr <= min_dep
 			# (pi_deps, pi_marks, group, fun_defs)
-				= close_group False False fun_index pi_deps pi_marks [] max_fun_nr pi_next_group fun_defs
+				= close_group False False fun_index pi_deps pi_marks NoComponentMembers max_fun_nr pi_next_group fun_defs
 			  pi = { pi & pi_deps = pi_deps, pi_marks = pi_marks, pi_next_group = inc pi_next_group,  pi_groups = [group : pi_groups] }
 			= (max_fun_nr, fun_defs, pi)
 			= (min_dep, fun_defs, pi)
 	where
-		close_group :: !Bool !Bool !Int ![Int] !*{# Int} ![Int] !Int !Int !*{# FunDef} -> (![Int], !*{# Int}, ![Int], !*{# FunDef})
+		close_group :: !Bool !Bool !Int ![Int] !*{# Int} !ComponentMembers !Int !Int !*{# FunDef} -> (![Int], !*{# Int}, !ComponentMembers, !*{# FunDef})
 		close_group n_r_known non_recursive fun_index [d:ds] marks group max_fun_nr group_number fun_defs
 			# marks = { marks & [d] = max_fun_nr }
 			# (fd,fun_defs) = fun_defs![d]
@@ -97,18 +79,15 @@ where
 			# fd = { fd & fun_info.fi_group_index = group_number, fun_info.fi_properties = set_rec_prop non_recursive fd.fun_info.fi_properties}
 			# fun_defs = { fun_defs & [d] = fd}
 			| d == fun_index
-				= (ds, marks, [d : group], fun_defs)
-				= close_group True non_recursive fun_index ds marks [d : group] max_fun_nr group_number fun_defs
-
+				= (ds, marks, ComponentMember d group, fun_defs)
+				= close_group True non_recursive fun_index ds marks (ComponentMember d group) max_fun_nr group_number fun_defs
 
 ::	PartitioningInfo` = 
 	{	pi_marks` :: 		!.{# Int}
 	,	pi_next_num` ::		!Int
 	,	pi_next_group` ::	!Int
-	,	pi_groups` ::		![[Int]]
+	,	pi_groups` ::		![ComponentMembers]
 	,	pi_deps` ::			![Int]
-	
-//	,	pi_predef` ::		!PredefSymbolsForTransform
 	,	pi_collect` ::		!.CollectState
 	}
 
@@ -121,14 +100,14 @@ stripStrictLets fun_defs predef_symbols var_heap sym_heap error_admin
 		, cos_symbol_heap					= sym_heap
 		, cos_error							= error_admin
 		}
-	# (fun_defs,collect_state) = aMapSt ref_null fun_defs collect_state
+	# (fun_defs,collect_state) = aMapSt determine_ref_counts fun_defs collect_state
 	= (fun_defs,predef_symbols,collect_state.cos_var_heap, collect_state.cos_symbol_heap, collect_state.cos_error)
 where
 	aMapSt f a s
 		# (l,s)	= mapSt f [e \\ e <-: a] s
 		= ({e \\ e <- l},s)
 
-partitionateFunctions` :: !*{# FunDef} ![IndexRange] !Index !Int !Int !*PredefinedSymbols !*VarHeap !*ExpressionHeap !*ErrorAdmin -> (!*{! Group}, !*{# FunDef}, !*PredefinedSymbols, !*VarHeap, !*ExpressionHeap, !*ErrorAdmin)
+partitionateFunctions` :: !*{# FunDef} ![IndexRange] !Index !Int !Int !*PredefinedSymbols !*VarHeap !*ExpressionHeap !*ErrorAdmin -> (!*{!Component}, !*{# FunDef}, !*PredefinedSymbols, !*VarHeap, !*ExpressionHeap, !*ErrorAdmin)
 partitionateFunctions` fun_defs ranges main_dcl_module_n def_min def_max predef_symbols var_heap sym_heap error_admin
 	#! max_fun_nr = size fun_defs
 	# (cs_predef,predef_symbols) = get_predef_symbols_for_transform predef_symbols
@@ -148,7 +127,7 @@ partitionateFunctions` fun_defs ranges main_dcl_module_n def_min def_max predef_
 		}
 	  (fun_defs, {pi_groups`,pi_next_group`,pi_collect`}) = 
 	  		foldSt (partitionate_functions max_fun_nr) ranges (fun_defs, partitioning_info)
-	  groups = { {group_members = group} \\ group <- reverse pi_groups` }
+	  groups = { {component_members = group} \\ group <- reverse pi_groups` }
 	= (groups, fun_defs, predef_symbols, pi_collect`.cos_var_heap, pi_collect`.cos_symbol_heap, pi_collect`.cos_error)
 where
 	partitionate_functions :: !Index !IndexRange !(!*{# FunDef}, !*PartitioningInfo`) -> (!*{# FunDef}, !*PartitioningInfo`)
@@ -163,8 +142,7 @@ where
 	partitionate_function :: !Int !Int !*{# FunDef} !*PartitioningInfo` -> *(!Int, !*{# FunDef}, !*PartitioningInfo`)
 	partitionate_function fun_index max_fun_nr fun_defs pi=:{pi_next_num`,pi_collect`}
 		# (fd, fun_defs) = fun_defs![fun_index]
-//		# {fi_calls} = fd.fun_info
-		# (fd,pi_collect`) = ref_null fd pi_collect`
+		# (fd,pi_collect`) = determine_ref_counts fd pi_collect`
 		# pi = {pi & pi_collect` = pi_collect`}
 		# fc_state = find_calls
 						{ main_dcl_module_n=main_dcl_module_n
@@ -183,45 +161,29 @@ where
 				visit_functions [FunCall fc_index _:funs] min_dep max_fun_nr fun_defs pi=:{pi_marks`} 
 					#! mark = pi_marks`.[fc_index]
 					| mark == NotChecked
-						# (mark, fun_defs, pi) = partitionate_function fc_index max_fun_nr fun_defs  pi
+						# (mark, fun_defs, pi) = partitionate_function fc_index max_fun_nr fun_defs pi
 						= visit_functions funs (min min_dep mark) max_fun_nr fun_defs pi
 						= visit_functions funs (min min_dep mark) max_fun_nr fun_defs pi
-				
-				visit_functions [MacroCall module_index fc_index _:funs] min_dep max_fun_nr fun_defs pi
-					= abort ("visit_functions "+++toString fd.fun_ident+++" "+++toString module_index+++" "+++toString fc_index)
-				
 				visit_functions [DclFunCall module_index fc_index:funs] min_dep max_fun_nr fun_defs pi
 					= visit_functions funs min_dep max_fun_nr fun_defs pi
-
 				visit_functions [] min_dep max_fun_nr fun_defs pi
 					= (min_dep, fun_defs, pi)
 		= try_to_close_group fun_index pi_next_num` min_dep max_fun_nr fun_defs pi
 
-/*				  
-	partitionate_function :: !Int !Int !*{# FunDef} !*PartitioningInfo -> *(!Int, !*{# FunDef}, !*PartitioningInfo)
-	partitionate_function fun_index max_fun_nr fun_defs pi=:{pi_next_num}
-		#! fd = fun_defs.[fun_index]
-		| fd.fun_kind
-			# {fi_calls} = fd.fun_info
-			  (min_dep, fun_defs, pi) = visit_functions fi_calls max_fun_nr max_fun_nr fun_defs (push_on_dep_stack fun_index pi)
-			= try_to_close_group fun_index pi_next_num min_dep max_fun_nr fun_defs pi
-			= (max_fun_nr, fun_defs, pi)
-*/
 	push_on_dep_stack :: !Int !*PartitioningInfo` -> *PartitioningInfo`;
 	push_on_dep_stack fun_index pi=:{pi_deps`,pi_marks`,pi_next_num`}
 		= { pi & pi_deps` = [fun_index : pi_deps`], pi_marks` = { pi_marks` & [fun_index] = pi_next_num`}, pi_next_num` = inc pi_next_num`}
-
 
 	try_to_close_group :: !Int !Int !Int !Int !*{# FunDef} !*PartitioningInfo` -> *(!Int, !*{# FunDef}, !*PartitioningInfo`)
 	try_to_close_group fun_index fun_nr min_dep max_fun_nr fun_defs pi=:{pi_marks`, pi_deps`, pi_groups`, pi_next_group`}
 		| fun_nr <= min_dep
 			# (pi_deps`, pi_marks`, group, fun_defs)
-				= close_group False False fun_index pi_deps` pi_marks` [] max_fun_nr pi_next_group` fun_defs
+				= close_group False False fun_index pi_deps` pi_marks` NoComponentMembers max_fun_nr pi_next_group` fun_defs
 			  pi = { pi & pi_deps` = pi_deps`, pi_marks` = pi_marks`, pi_next_group` = inc pi_next_group`,  pi_groups` = [group : pi_groups`] }
 			= (max_fun_nr, fun_defs, pi)
 			= (min_dep, fun_defs, pi)
 	where
-		close_group :: !Bool !Bool !Int ![Int] !*{# Int} ![Int] !Int !Int !*{# FunDef} -> (![Int], !*{# Int}, ![Int], !*{# FunDef})
+		close_group :: !Bool !Bool !Int ![Int] !*{# Int} !ComponentMembers !Int !Int !*{# FunDef} -> (![Int], !*{# Int}, !ComponentMembers, !*{# FunDef})
 		close_group n_r_known non_recursive fun_index [d:ds] marks group max_fun_nr group_number fun_defs
 			# marks = { marks & [d] = max_fun_nr }
 			# (fd,fun_defs) = fun_defs![d]
@@ -233,15 +195,15 @@ where
 			# fd = { fd & fun_info.fi_group_index = group_number, fun_info.fi_properties = set_rec_prop non_recursive fd.fun_info.fi_properties}
 			# fun_defs = { fun_defs & [d] = fd}
 			| d == fun_index
-				= (ds, marks, [d : group], fun_defs)
-				= close_group True non_recursive fun_index ds marks [d : group] max_fun_nr group_number fun_defs
+				= (ds, marks, ComponentMember d group, fun_defs)
+				= close_group True non_recursive fun_index ds marks (ComponentMember d group) max_fun_nr group_number fun_defs
 
 ::	PartitioningInfo`` = 
 	{ pi_marks``			:: !.Marks
 	, pi_next_num``			:: !Int
 	, pi_next_group``		:: !Int
-	, pi_groups``			:: ![[Int]]
-	, pi_deps``				:: ![Int]
+	, pi_groups``			:: ![ComponentMembers]
+	, pi_deps``				:: !ComponentMembers
 	, pi_collect``			:: !.CollectState
 	}
 
@@ -251,9 +213,16 @@ where
 
 create_marks max_fun_nr functions
 //	# marks				= createArray max_fun_nr max_fun_nr
-//	# marks				= {marks & [i] = NotChecked \\ i <- functions}
-//	= marks
-	= {{m_fun = fun, m_mark = NotChecked} \\ fun <- functions}
+//	= {marks & [i] = NotChecked \\ i <- functions}
+	= {{m_fun = fun, m_mark = NotChecked} \\ fun <- component_members_to_list functions}
+
+component_members_to_list (ComponentMember member members)
+	= [member : component_members_to_list members]
+component_members_to_list (GeneratedComponentMember member _ members)
+	= [member : component_members_to_list members]
+component_members_to_list NoComponentMembers
+	= []
+
 get_mark max_fun_nr marks fun
 //	:== marks.[fun]
 	:== case [m_mark \\ {m_fun,m_mark} <-: marks | m_fun == fun] of
@@ -263,10 +232,10 @@ set_mark marks fun val
 //	:== { marks & [fun] = val}
 //	:== { if (m_fun==fun) {m & m_mark = val} m \\ m=:{m_fun=m_fun} <-: marks}
 	:== { if (m.m_fun==fun) {m & m_mark = val} m \\ m <-: marks}
-	
-partitionateFunctions`` :: !Int !Int ![FunctionInfoPtr] !*{# FunDef} ![Int] !Index !Int !Int !*FunctionHeap !*PredefinedSymbols !*VarHeap !*ExpressionHeap !*ErrorAdmin
-	-> (!Int, ![Group], !*{# FunDef}, !*FunctionHeap, !*PredefinedSymbols, !*VarHeap, !*ExpressionHeap, !*ErrorAdmin)
-partitionateFunctions`` max_fun_nr next_group new_functions fun_defs functions main_dcl_module_n def_min def_max fun_heap predef_symbols var_heap sym_heap error_admin
+
+partitionateFunctions`` :: !Int !Int !*{#FunDef} !ComponentMembers !Index !Int !Int !*FunctionHeap !*PredefinedSymbols !*VarHeap !*ExpressionHeap !*ErrorAdmin
+	-> (!Int, ![Component], !*{#FunDef}, !*FunctionHeap, !*PredefinedSymbols, !*VarHeap, !*ExpressionHeap, !*ErrorAdmin)
+partitionateFunctions`` max_fun_nr next_group fun_defs functions main_dcl_module_n def_min def_max fun_heap predef_symbols var_heap sym_heap error_admin
 	# marks					= create_marks max_fun_nr functions
 	# (cs_predef,predef_symbols) = get_predef_symbols_for_transform predef_symbols
 	# collect_state =
@@ -277,128 +246,127 @@ partitionateFunctions`` max_fun_nr next_group new_functions fun_defs functions m
 		}
 	# partitioning_info =
 		{ pi_marks``		= marks
-		, pi_deps``			= []
+		, pi_deps``			= NoComponentMembers
 		, pi_next_num``		= 0
 		, pi_next_group``	= next_group
 		, pi_groups``		= [] 
 		, pi_collect``		= collect_state
 		}
-	  (fun_defs, fun_heap, {pi_groups``,pi_next_group``,pi_collect``}) = 
-	  		foldSt (partitionate_functions max_fun_nr) functions (fun_defs, fun_heap, partitioning_info)
-	  groups = [ {group_members = group} \\ group <- reverse pi_groups`` ]
+	  (fun_defs, fun_heap, {pi_groups``,pi_next_group``,pi_collect``})
+	  	= partitionate_component functions max_fun_nr (fun_defs, fun_heap, partitioning_info)
+	  groups = [ {component_members = group} \\ group <- reverse pi_groups`` ]
 	= (pi_next_group``,groups, fun_defs, fun_heap, predef_symbols, pi_collect``.cos_var_heap, pi_collect``.cos_symbol_heap, pi_collect``.cos_error)
 where
-	partitionate_functions :: !Index !Int !(!*{# FunDef}, !*FunctionHeap, !*PartitioningInfo``) -> (!*{# FunDef}, !*FunctionHeap, !*PartitioningInfo``)
-	partitionate_functions max_fun_nr fun (fun_defs, fun_heap, pi=:{pi_marks``})
-		| get_mark max_fun_nr pi_marks`` fun == NotChecked
-			# (_, fun_defs, fun_heap, pi) = partitionate_function fun max_fun_nr fun_defs fun_heap pi
-			= (fun_defs, fun_heap, pi)
-			= (fun_defs, fun_heap, pi)
+	partitionate_component :: !ComponentMembers !Index !(!*{# FunDef}, !*FunctionHeap, !*PartitioningInfo``) -> (!*{# FunDef}, !*FunctionHeap, !*PartitioningInfo``)
+	partitionate_component (ComponentMember member members) max_fun_nr (fun_defs, fun_heap, pi=:{pi_marks``})
+		| get_mark max_fun_nr pi_marks`` member == NotChecked
+			# (_, fun_defs, fun_heap, pi) = partitionate_function member max_fun_nr fun_defs fun_heap pi
+		 	= partitionate_component members max_fun_nr (fun_defs, fun_heap, pi)
+		 	= partitionate_component members max_fun_nr (fun_defs, fun_heap, pi)
+	partitionate_component (GeneratedComponentMember member fun_ptr members) max_fun_nr (fun_defs, fun_heap, pi=:{pi_marks``})
+		| get_mark max_fun_nr pi_marks`` member == NotChecked
+			# (_, fun_defs, fun_heap, pi) = partitionate_generated_function member fun_ptr max_fun_nr fun_defs fun_heap pi
+			= partitionate_component members max_fun_nr (fun_defs, fun_heap, pi)
+			= partitionate_component members max_fun_nr (fun_defs, fun_heap, pi)
+	partitionate_component NoComponentMembers max_fun_nr (fun_defs, fun_heap, pi)
+		= (fun_defs, fun_heap, pi)
 
 	partitionate_function :: !Int !Int !*{# FunDef} !*FunctionHeap !*PartitioningInfo`` -> *(!Int, !*{# FunDef}, !*FunctionHeap, !*PartitioningInfo``)
 	partitionate_function fun_index max_fun_nr fun_defs fun_heap pi=:{pi_next_num``,pi_collect``}
-//		# (fd, fun_defs) = fun_defs![fun_index]
-		# (fd, fun_defs, fun_heap)	= get_fun_def fun_index new_functions fun_defs fun_heap
-		# (fd,pi_collect``) = ref_null fd pi_collect``
-		# pi = {pi & pi_collect`` = pi_collect``}
-		# fc_state = find_calls
-						{ main_dcl_module_n=main_dcl_module_n
-						, def_min=def_min
-						, def_max=def_max
-						, fun_index=fun_index
-						} fd.fun_body {fun_calls = []}
+		# (fd,fun_defs) = fun_defs![fun_index]
+		  (fd,pi_collect``) = determine_ref_counts fd pi_collect``
+		  pi = {pi & pi_collect`` = pi_collect``}
+		  fc_state = find_calls {main_dcl_module_n=main_dcl_module_n, def_min=def_min, def_max=def_max, fun_index=fun_index} fd.fun_body {fun_calls = []}
+		  fi_calls = fc_state.fun_calls
+		  fd = {fd & fun_info.fi_calls = fi_calls}	
+		  fun_defs = {fun_defs & [fun_index] = fd}
+		  pi = push_on_dep_stack fun_index pi
+		= visit_functions_and_try_to_close_group fi_calls fun_index pi_next_num`` max_fun_nr fun_defs fun_heap pi
+
+	partitionate_generated_function :: !Int !FunctionInfoPtr !Int !*{# FunDef} !*FunctionHeap !*PartitioningInfo`` -> *(!Int, !*{# FunDef}, !*FunctionHeap, !*PartitioningInfo``)
+	partitionate_generated_function fun_index fun_ptr max_fun_nr fun_defs fun_heap pi=:{pi_next_num``,pi_collect``}
+		# (FI_Function gf=:{gf_fun_def=fd}, fun_heap) = readPtr fun_ptr fun_heap
+		  (fd,pi_collect``) = determine_ref_counts fd pi_collect``
+		  pi = {pi & pi_collect`` = pi_collect``}
+		  fc_state = find_calls {main_dcl_module_n=main_dcl_module_n, def_min=def_min, def_max=def_max, fun_index=fun_index} fd.fun_body {fun_calls = []}
 		  fi_calls = fc_state.fun_calls
 		  fd = {fd & fun_info.fi_calls = fi_calls}
-		# (fun_defs, fun_heap) = set_fun_def fun_index fd new_functions fun_defs fun_heap
-		  pi = push_on_dep_stack fun_index pi
-		  (min_dep, fun_defs, fun_heap, pi) = visit_functions fi_calls max_fun_nr max_fun_nr fun_defs fun_heap pi
-			with
-				visit_functions :: ![FunCall] !Int !Int !*{# FunDef} !*FunctionHeap !*PartitioningInfo`` -> *(!Int, !*{# FunDef}, !*FunctionHeap, !*PartitioningInfo``)
-				visit_functions [FunCall fc_index _:funs] min_dep max_fun_nr fun_defs fun_heap pi=:{pi_marks``} 
-					#! mark = get_mark max_fun_nr pi_marks`` fc_index
-					| mark == NotChecked
-						# (mark, fun_defs, fun_heap, pi) = partitionate_function fc_index max_fun_nr fun_defs fun_heap pi
-						= visit_functions funs (min min_dep mark) max_fun_nr fun_defs fun_heap pi
-						= visit_functions funs (min min_dep mark) max_fun_nr fun_defs fun_heap pi
-				
-				visit_functions [MacroCall module_index fc_index _:funs] min_dep max_fun_nr fun_defs fun_heap pi
-					= abort ("visit_functions "+++toString fd.fun_ident+++" "+++toString module_index+++" "+++toString fc_index)
-				
-				visit_functions [DclFunCall module_index fc_index:funs] min_dep max_fun_nr fun_defs fun_heap pi
-					= visit_functions funs min_dep max_fun_nr fun_defs fun_heap pi
+		  fun_heap = writePtr fun_ptr (FI_Function {gf & gf_fun_def = fd}) fun_heap
+		  pi = push_generated_function_on_dep_stack fun_index fun_ptr pi
+		= visit_functions_and_try_to_close_group fi_calls fun_index pi_next_num`` max_fun_nr fun_defs fun_heap pi
 
-				visit_functions [] min_dep max_fun_nr fun_defs fun_heap pi
-					= (min_dep, fun_defs, fun_heap, pi)
+	visit_functions_and_try_to_close_group :: ![FunCall] !Int !Int !Int !*{#FunDef} !*FunctionHeap !*PartitioningInfo`` -> *(!Int,!*{#FunDef},!*FunctionHeap,!*PartitioningInfo``)
+	visit_functions_and_try_to_close_group fi_calls fun_index pi_next_num`` max_fun_nr fun_defs fun_heap pi
+		# (min_dep, fun_defs, fun_heap, pi) = visit_functions fi_calls max_fun_nr max_fun_nr fun_defs fun_heap pi
 		= try_to_close_group fun_index pi_next_num`` min_dep max_fun_nr fun_defs fun_heap pi
 
-	push_on_dep_stack :: !Int !*PartitioningInfo`` -> *PartitioningInfo``;
-	push_on_dep_stack fun_index pi=:{pi_deps``,pi_marks``,pi_next_num``} =
-		{ pi 
-		& pi_deps`` = [fun_index : pi_deps``]
-		, pi_marks`` = set_mark pi_marks`` fun_index pi_next_num``
-		, pi_next_num`` = inc pi_next_num``
-		}
+	visit_functions :: ![FunCall] !Int !Int !*{# FunDef} !*FunctionHeap !*PartitioningInfo`` -> *(!Int, !*{# FunDef}, !*FunctionHeap, !*PartitioningInfo``)
+	visit_functions [FunCall fc_index _:funs] min_dep max_fun_nr fun_defs fun_heap pi=:{pi_marks``} 
+		#! mark = get_mark max_fun_nr pi_marks`` fc_index
+		| mark == NotChecked
+			# (mark, fun_defs, fun_heap, pi) = partitionate_function fc_index max_fun_nr fun_defs fun_heap pi
+			= visit_functions funs (min min_dep mark) max_fun_nr fun_defs fun_heap pi
+			= visit_functions funs (min min_dep mark) max_fun_nr fun_defs fun_heap pi
+	visit_functions [GeneratedFunCall fc_index fun_ptr:funs] min_dep max_fun_nr fun_defs fun_heap pi=:{pi_marks``} 
+		#! mark = get_mark max_fun_nr pi_marks`` fc_index
+		| mark == NotChecked
+			# (mark, fun_defs, fun_heap, pi) = partitionate_generated_function fc_index fun_ptr max_fun_nr fun_defs fun_heap pi
+			= visit_functions funs (min min_dep mark) max_fun_nr fun_defs fun_heap pi
+			= visit_functions funs (min min_dep mark) max_fun_nr fun_defs fun_heap pi
+	visit_functions [DclFunCall module_index fc_index:funs] min_dep max_fun_nr fun_defs fun_heap pi
+		= visit_functions funs min_dep max_fun_nr fun_defs fun_heap pi
+	visit_functions [] min_dep max_fun_nr fun_defs fun_heap pi
+		= (min_dep, fun_defs, fun_heap, pi)
 
+	push_on_dep_stack :: !Int !*PartitioningInfo`` -> *PartitioningInfo``;
+	push_on_dep_stack fun_index pi=:{pi_deps``,pi_marks``,pi_next_num``}
+		= {pi & pi_deps`` = ComponentMember fun_index pi_deps``
+			  , pi_marks`` = set_mark pi_marks`` fun_index pi_next_num``
+			  , pi_next_num`` = inc pi_next_num`` }
+
+	push_generated_function_on_dep_stack :: !Int !FunctionInfoPtr !*PartitioningInfo`` -> *PartitioningInfo``;
+	push_generated_function_on_dep_stack fun_index fun_ptr pi=:{pi_deps``,pi_marks``,pi_next_num``}
+		= {pi & pi_deps`` = GeneratedComponentMember fun_index fun_ptr pi_deps``
+			  , pi_marks`` = set_mark pi_marks`` fun_index pi_next_num``
+			  , pi_next_num`` = inc pi_next_num`` }
 
 	try_to_close_group :: !Int !Int !Int !Int !*{# FunDef} !*FunctionHeap !*PartitioningInfo`` -> *(!Int, !*{# FunDef}, !*FunctionHeap, !*PartitioningInfo``)
 	try_to_close_group fun_index fun_nr min_dep max_fun_nr fun_defs fun_heap pi=:{pi_marks``, pi_deps``, pi_groups``, pi_next_group``}
 		| fun_nr <= min_dep
 			# (pi_deps``, pi_marks``, group, fun_defs, fun_heap)
-				= close_group False False fun_index pi_deps`` pi_marks`` [] max_fun_nr pi_next_group`` fun_defs fun_heap
+				= close_group False False fun_index pi_deps`` pi_marks`` NoComponentMembers max_fun_nr pi_next_group`` fun_defs fun_heap
 			  pi = { pi & pi_deps`` = pi_deps``, pi_marks`` = pi_marks``, pi_next_group`` = inc pi_next_group``,  pi_groups`` = [group : pi_groups``] }
 			= (max_fun_nr, fun_defs, fun_heap, pi)
 			= (min_dep, fun_defs, fun_heap, pi)
 	where
-		close_group :: !Bool !Bool !Int ![Int] !*Marks ![Int] !Int !Int !*{# FunDef} !*FunctionHeap -> (![Int], !*Marks, ![Int], !*{# FunDef}, !*FunctionHeap)
-		close_group n_r_known non_recursive fun_index [d:ds] marks group max_fun_nr group_number fun_defs fun_heap
+		close_group :: !Bool !Bool !Int !ComponentMembers !*Marks !ComponentMembers !Int !Int !*{# FunDef} !*FunctionHeap -> (!ComponentMembers, !*Marks, !ComponentMembers, !*{# FunDef}, !*FunctionHeap)
+		close_group n_r_known non_recursive fun_index (ComponentMember d ds) marks group max_fun_nr group_number fun_defs fun_heap
 			# marks = set_mark marks d max_fun_nr
-			# (fd, fun_defs, fun_heap) = get_fun_def d new_functions fun_defs fun_heap
-			# non_recursive = case n_r_known of
-								True	-> non_recursive
-								_		-> case fun_index == d of
-									True	-> isEmpty [fc \\ fc <- fd.fun_info.fi_calls | case fc of FunCall idx _ -> idx == d; _ -> False]
-									_		-> False
-			# fd = { fd & fun_info.fi_group_index = group_number, fun_info.fi_properties = set_rec_prop non_recursive fd.fun_info.fi_properties}
-			# (fun_defs, fun_heap) = set_fun_def d fd new_functions fun_defs fun_heap
+			  (fun_info,fun_defs) = fun_defs![d].fun_info
+			  non_recursive = determine_if_function_non_recursive n_r_known fun_index d fun_info.fi_calls non_recursive
+			  fun_info = {fun_info & fi_group_index = group_number, fi_properties = set_rec_prop non_recursive fun_info.fi_properties}
+			  fun_defs = {fun_defs & [d].fun_info = fun_info}
 			| d == fun_index
-				= (ds, marks, [d : group], fun_defs, fun_heap)
-				= close_group True non_recursive fun_index ds marks [d : group] max_fun_nr group_number fun_defs fun_heap
+				= (ds, marks, ComponentMember d group, fun_defs, fun_heap)
+				= close_group True non_recursive fun_index ds marks (ComponentMember d group) max_fun_nr group_number fun_defs fun_heap
+		close_group n_r_known non_recursive fun_index (GeneratedComponentMember d fun_ptr ds) marks group max_fun_nr group_number fun_defs fun_heap
+			# marks = set_mark marks d max_fun_nr
+			  (FI_Function gf=:{gf_fun_def={fun_info}}, fun_heap) = readPtr fun_ptr fun_heap
+			  non_recursive = determine_if_function_non_recursive n_r_known fun_index d fun_info.fi_calls non_recursive
+			  fun_info = {fun_info & fi_group_index = group_number, fi_properties = set_rec_prop non_recursive fun_info.fi_properties}
+			  fun_heap = writePtr fun_ptr (FI_Function {gf & gf_fun_def.fun_info=fun_info}) fun_heap
+			| d == fun_index
+				= (ds, marks, GeneratedComponentMember d fun_ptr group, fun_defs, fun_heap)
+				= close_group True non_recursive fun_index ds marks (GeneratedComponentMember d fun_ptr group) max_fun_nr group_number fun_defs fun_heap
 
-	get_fun_def fun new_functions fun_defs fun_heap
-		| fun < size fun_defs
-			# (fun_def, fun_defs)			= fun_defs![fun]
-			= (fun_def, fun_defs, fun_heap)
-		# (fun_def_ptr, fun_heap)			= lookup_ptr fun new_functions fun_heap
-			with
-				lookup_ptr fun [] ti_fun_heap = abort "drat"
-				lookup_ptr fun [fun_def_ptr:new_functions] ti_fun_heap
-					# (FI_Function {gf_fun_index}, ti_fun_heap)
-							= readPtr fun_def_ptr ti_fun_heap
-					| gf_fun_index == fun
-						= (fun_def_ptr, ti_fun_heap)
-						= lookup_ptr fun new_functions ti_fun_heap
-		# (FI_Function {gf_fun_def}, fun_heap)
-											= readPtr fun_def_ptr fun_heap
-		= (gf_fun_def, fun_defs, fun_heap)
-	
-	set_fun_def fun fun_def new_functions fun_defs fun_heap
-		| fun < size fun_defs
-			= ({fun_defs & [fun] = fun_def}, fun_heap)
-		# (fun_def_ptr, fun_heap)			= lookup_ptr fun new_functions fun_heap
-			with
-				lookup_ptr fun [] ti_fun_heap = abort "drat"
-				lookup_ptr fun [fun_def_ptr:new_functions] ti_fun_heap
-					# (FI_Function {gf_fun_index}, ti_fun_heap)
-							= readPtr fun_def_ptr ti_fun_heap
-					| gf_fun_index == fun
-						= (fun_def_ptr, ti_fun_heap)
-						= lookup_ptr fun new_functions ti_fun_heap
-		# (FI_Function gf, fun_heap)
-											= readPtr fun_def_ptr fun_heap
-		# fun_heap							= writePtr fun_def_ptr (FI_Function {gf & gf_fun_def = fun_def}) fun_heap
-		= (fun_defs, fun_heap)
-
-//~~~~~~~~~~~~~~
+		determine_if_function_non_recursive :: !Bool !Index !Index ![FunCall] !Bool -> Bool
+		determine_if_function_non_recursive n_r_known fun_index d fi_calls non_recursive
+			| n_r_known
+				= non_recursive
+				| fun_index == d
+					= isEmpty [fc \\ fc <- fi_calls
+									| case fc of FunCall idx _ -> idx == d; GeneratedFunCall idx _ -> idx == d; _ -> False]
+					= False
 
 :: FindCallsInfo =
 	{ main_dcl_module_n	:: !Index
@@ -409,8 +377,6 @@ where
 
 :: FindCallsState =
 	{ fun_calls			:: ![FunCall]
-//	, ref_added			:: !Bool
-//	, ref_used_vars		:: !
 	}
 
 class find_calls a :: !FindCallsInfo !a !FindCallsState -> FindCallsState
@@ -454,34 +420,20 @@ where
 		= find_calls fc_info expr fc_state
 	find_calls fc_info (BasicExpr _) fc_state
 		= fc_state
-	find_calls fc_info (Conditional _) fc_state
-		= abort "Conditional"
 	find_calls fc_info (AnyCodeExpr _ _ _) fc_state
 		= fc_state
 	find_calls fc_info (ABCCodeExpr _ _) fc_state
 		= fc_state
 	find_calls fc_info (MatchExpr _ expr) fc_state
 		= find_calls fc_info expr fc_state
-	find_calls fc_info (FreeVar _) fc_state
-		= abort "FreeVar"
-	find_calls fc_info (Constant _ _ _) fc_state
-		= abort "Constant"
-	find_calls fc_info (ClassVariable _) fc_state
-		= abort "ClassVariable"
-	find_calls fc_info (DynamicExpr _) fc_state
-		= abort "DynamicExpr"
-	find_calls fc_info (TypeCodeExpression _) fc_state
-		= abort "TypeCodeExpression"
 	find_calls fc_info EE fc_state
-		= fc_state	//abort "EE"
+		= fc_state
 	find_calls fc_info (NoBind _) fc_state
 		= fc_state
 	find_calls fc_info (FailExpr _) fc_state
 		= fc_state
 	find_calls fc_info (DictionariesFunction dictionaries expr expr_type) fc_state
 		= find_calls fc_info expr fc_state
-	find_calls _ u _
-		= abort ("find_calls : Undefined pattern in Expression\n")
 
 instance find_calls App
 where
@@ -494,30 +446,11 @@ where
 				= {fc_state & fun_calls = [FunCall glob_object 0: fc_state.fun_calls]}
 				= {fc_state & fun_calls = [DclFunCall glob_module glob_object: fc_state.fun_calls]}
 		get_index (SK_Constructor idx) fc_state
-				= fc_state
-		get_index (SK_Unknown) fc_state
-				= abort "SK_Unknown"
-		get_index (SK_IclMacro _) fc_state
-				= abort "SK_IclMacro"
+			= fc_state
 		get_index (SK_LocalMacroFunction idx) fc_state
-				= {fc_state & fun_calls = [FunCall idx 0: fc_state.fun_calls]}
-//				= fc_state
-		get_index (SK_DclMacro _) fc_state
-				= abort "SK_DclMacro"
-		get_index (SK_LocalDclMacroFunction _) fc_state
-				= abort "SK_LocalDclMacroFunction"
-		get_index (SK_OverloadedFunction _) fc_state
-				= abort "SK_OverloadedFunction"
-		get_index (SK_GeneratedFunction _ idx) fc_state
-				= {fc_state & fun_calls = [FunCall idx 0: fc_state.fun_calls]}
-//				= fc_state
-//		get_index (SK_GeneratedCaseFunction _ idx) fc_state
-//				= {fc_state & fun_calls = [FunCall idx 0: fc_state.fun_calls]}
-		get_index (SK_Generic _ _) fc_state
-				= abort "SK_Generic"
-		get_index (SK_TypeCode) fc_state
-				= abort "SK_TypeCode"
-		get_index u _ = abort "Undefined pattern in get_index\n"
+			= {fc_state & fun_calls = [FunCall idx 0: fc_state.fun_calls]}
+		get_index (SK_GeneratedFunction fun_ptr idx) fc_state
+			= {fc_state & fun_calls = [GeneratedFunCall idx fun_ptr : fc_state.fun_calls]}
 
 instance find_calls Let
 where
@@ -575,20 +508,14 @@ where
 	find_calls fc_info {dp_rhs} fc_state
 		= find_calls fc_info dp_rhs fc_state
 
-////////////////////////
-import StdDebug
-
-ref_null fd=:{fun_body=TransformedBody {tb_args,tb_rhs}} pi_collect
-//	| not (fst (ferror (stderr <<< fd)))
-	
-//	# tb_args = tb_args ---> ("ref_null",fd.fun_ident,tb_args,tb_rhs)
+determine_ref_counts fd=:{fun_body=TransformedBody {tb_args,tb_rhs}} pi_collect
 	# (new_rhs, new_args, _, _, pi_collect) = determineVariablesAndRefCounts tb_args tb_rhs pi_collect
 	# fd = {fd & fun_body=TransformedBody {tb_args=new_args,tb_rhs=new_rhs}}
 	= (fd,pi_collect)
-ref_null fd pi_collect
+determine_ref_counts fd pi_collect
 	= (fd, pi_collect)
 
-/////////////// from check.icl ////////////////////
+// from check.icl
 
 get_predef_symbols_for_transform :: *PredefinedSymbols -> (!PredefSymbolsForTransform,!.PredefinedSymbols)
 // clean 2.0 does not allow this, clean 1.3 does:
@@ -611,6 +538,6 @@ dummy_predef_symbols =
 	}
 
 set_rec_prop non_recursive fi_properties
-	= case non_recursive of
-		True	-> fi_properties bitor FI_IsNonRecursive
-		_		-> fi_properties bitand (bitnot FI_IsNonRecursive)
+	| non_recursive
+		= fi_properties bitor FI_IsNonRecursive
+		= fi_properties bitand (bitnot FI_IsNonRecursive)

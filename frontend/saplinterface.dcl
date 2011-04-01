@@ -1,6 +1,7 @@
 definition module saplinterface
 
-import StdEnv, syntax,transform 
+import StdEnv, syntax
+from partition import ::Component
 
-gensaplfiles :: !Files {#DclModule} {#{#CheckedTypeDef}} !*{! Group} !*{# FunDef} CommonDefs {#CommonDefs} Ident  [IndexRange] !String
-                -> (!Files,!*{! Group}, !*{# FunDef})
+gensaplfiles :: !Files {#DclModule} {#{#CheckedTypeDef}} !*{!Component} !*{# FunDef} CommonDefs {#CommonDefs} Ident  [IndexRange] !String
+                -> (!Files,!*{!Component}, !*{# FunDef})
