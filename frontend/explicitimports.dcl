@@ -11,7 +11,7 @@ import syntax, checksupport
 		ei_module_n :: !Int,
 		ei_position :: !Position,
 		ei_symbols  :: ![ImportNrAndIdents],
-		ei_qualified:: !Bool
+		ei_qualified:: !ImportQualified
 	}
 
 :: SolvedImports =

@@ -1084,7 +1084,7 @@ wantImports pState
 	  (file_name, line_nr, pState)	= getFileAndLineNr pState
 	  pState = wantEndOfDefinition "imports" pState
 	  position = LinePos file_name line_nr
-	= ([ { import_module = name, import_symbols = [], import_file_position = position, import_qualified = False }
+	= ([ { import_module = name, import_symbols = [], import_file_position = position, import_qualified = NotQualified }
 			\\ name<-names], pState)
 
 wantFromImports :: !ParseState -> (!ParsedImport, !ParseState)
@@ -1098,11 +1098,11 @@ wantFromImports pState
 		# (import_symbols, pState) = wantImportDeclarations pState
 		  pState = wantEndOfDefinition "from imports" pState
 		= ( { import_module = mod_ident, import_symbols = import_symbols,
-			  import_file_position = LinePos file_name line_nr, import_qualified = True }, pState)
+			  import_file_position = LinePos file_name line_nr, import_qualified = Qualified }, pState)
 	# (import_symbols, pState) = wantImportDeclarationsT token pState
 	  pState = wantEndOfDefinition "from imports" pState
 	= ( { import_module = mod_ident, import_symbols = import_symbols,
-		  import_file_position = LinePos file_name line_nr, import_qualified = False }, pState)
+		  import_file_position = LinePos file_name line_nr, import_qualified = NotQualified }, pState)
 where
 	wantImportDeclarations pState
 		# (token, pState) = nextToken GeneralContext pState

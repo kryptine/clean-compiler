@@ -114,8 +114,8 @@ solveExplicitImports :: !(IntKeyHashtable [ExplicitImport]) !{#Int} !Index
 			-> (!.SolvedImports,! (!v:{#DclModule},!.{#Int},!{!.ExplImpInfo},!.CheckState))
 solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod (dcl_modules, visited_modules, expl_imp_info, cs)
 	# import_indices = ikhSearch` importing_mod expl_imp_indices_ikh
-	  expl_imp_indices = [ imports \\ imports=:{ei_symbols=[_:_],ei_qualified=False} <- import_indices ]
-	  qualified_expl_imp_indices = [ imports \\ imports=:{ei_symbols=[_:_],ei_qualified=True} <- import_indices ]
+	  expl_imp_indices = [ imports \\ imports=:{ei_symbols=[_:_],ei_qualified=NotQualified} <- import_indices ]
+	  qualified_expl_imp_indices = [ imports \\ imports=:{ei_symbols=[_:_],ei_qualified=Qualified} <- import_indices ]
 	  impl_imports = [ (ei_module_n,ei_position) \\ imports=:{ei_module_n,ei_position,ei_symbols=[]} <- import_indices ]
 	  state = (dcl_modules, visited_modules, expl_imp_info, cs)
 	  path = [importing_mod]
