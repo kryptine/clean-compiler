@@ -1468,8 +1468,8 @@ replace_icl_macros_by_dcl_macros _ {ir_from=first_icl_macro_index,ir_to=end_icl_
 (<=<) infixl 
 (<=<) state fun :== fun state 
 
-checkDclModules :: [.(Import .ImportDeclaration)]			*{#.DclModule} *{#*{#.FunDef}} *Heaps *CheckState
-	-> (Int,[ExplicitImport],.[{#Char}],{!{!.ExplImpInfo}},	.{# DclModule},.{#.{# FunDef}},.Heaps,.CheckState)
+checkDclModules :: [Import]									*{#DclModule} *{#*{#FunDef}} *Heaps *CheckState
+	-> (Int,[ExplicitImport],.[{#Char}],{!{!.ExplImpInfo}},	*{#DclModule},*{#*{#FunDef}},*Heaps,*CheckState)
 checkDclModules imports_of_icl_mod dcl_modules macro_defs heaps cs=:{cs_symbol_table}
 	#! nr_of_dcl_modules = size dcl_modules
 	# (bitvect, dependencies, dcl_modules, cs_symbol_table)
@@ -1537,7 +1537,7 @@ checkDclModules imports_of_icl_mod dcl_modules macro_defs heaps cs=:{cs_symbol_t
 			= (No, (already_visited, cs_symbol_table))
 		= (Yes ste_index, (bitvectSet ste_index already_visited, cs_symbol_table))
 
-	set_to_false :: (Import x) !(!*LargeBitvect, !u:SymbolTable) -> (!.LargeBitvect, !u:SymbolTable)
+	set_to_false :: Import !(!*LargeBitvect, !u:SymbolTable) -> (!.LargeBitvect, !u:SymbolTable)
 	set_to_false {import_module} (bitvect, cs_symbol_table)
 		#! ste_index = (sreadPtr import_module.id_info cs_symbol_table).ste_index
 		= (bitvectReset ste_index bitvect, cs_symbol_table)
@@ -2153,7 +2153,7 @@ check_module1 cdefs icl_global_function_range fun_defs optional_dcl_mod optional
 	  		fill_macro_def_array i [dcl_macro_defs:macro_defs] a
 	  			= fill_macro_def_array (i+1) macro_defs {a & [i]=dcl_macro_defs}
 
-check_module2 :: Ident {#Char} [.ImportedObject] .[Import ImportDeclaration] [ParsedForeignExport] .ModuleKind !.IndexRange !.IndexRange !.IndexRange !Int
+check_module2 :: Ident {#Char} [.ImportedObject] [Import] [ParsedForeignExport] .ModuleKind !.IndexRange !.IndexRange !.IndexRange !Int
 				(Optional (Module a)) [Declaration] Bool Bool *{#FunDef} *{#*{#FunDef}} *{#DclModule} (CollectedDefinitions ClassInstance)
 				*{#.Int} *Heaps *CheckState
 			-> (!Bool,.IclModule,!.{#DclModule},.{!Group},!*{#*{#FunDef}},!Int,!.Heaps,!.{#PredefinedSymbol},!.Heap SymbolTableEntry,!.File,[String]);
