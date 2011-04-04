@@ -8,7 +8,7 @@ import syntax
 instance toString Ident
 where toString {id_name} = id_name
 
-instance toString (Import from_symbol)
+instance toString Import
 where toString {import_module} = toString import_module
 
 instance == FunctionOrMacroIndex
@@ -822,9 +822,8 @@ where
 	(<<<) file (AVI_CountVar _) 		= file <<< "AVI_CountVar"
 	(<<<) file (AVI_SequenceNumber n) 	= file <<< "AVI_SequenceNumber " <<< n
 	(<<<) file AVI_Collected 			= file <<< "AVI_Collected"
-
 	
-instance <<< (Import from_symbol) | <<< from_symbol
+instance <<< Import
 where
 	(<<<) file {import_module, import_symbols}
 		= file <<< "import " <<< import_module <<< import_symbols

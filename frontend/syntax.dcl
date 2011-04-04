@@ -469,16 +469,16 @@ cNameLocationDependent :== True
 	,	cim_index		:: !Index	// or -1-index
 	}
 
-::	Import from_symbol =
+::	Import =
 	{	import_module		:: !Ident
-	,	import_symbols		:: ![from_symbol]
+	,	import_symbols		:: ![ImportDeclaration]
 	,	import_file_position:: !Position	// for error messages
 	,	import_qualified	:: !Bool
 	}
 
-instance toString (Import from_symbol), AttributeVar, TypeAttribute, Annotation
+instance toString Import, AttributeVar, TypeAttribute, Annotation
 
-::	ParsedImport		:== Import ImportDeclaration
+::	ParsedImport		:== Import
 
 ::	ImportDeclaration	= ID_Function !Ident
 						| ID_Class !Ident !(Optional [Ident])
@@ -1482,7 +1482,7 @@ instance == ModuleKind, Ident
 instance <<< (Module a) | <<< a, ParsedDefinition, InstanceType, AttributeVar, TypeVar, SymbolType, Expression, Type, Ident, (Global object) | <<< object,
 			 Position, CaseAlt, AType, FunDef, ParsedExpr, TypeAttribute, (Bind a b) | <<< a & <<< b,
 			 FieldNameOrQualifiedFieldName, ParsedConstructor, (TypeDef a) | <<< a, TypeVarInfo, AttrVarInfo,
-			 BasicValue, ATypeVar, TypeRhs, (Import from_symbol) | <<< from_symbol, ImportDeclaration, CasePatterns,
+			 BasicValue, ATypeVar, TypeRhs, Import, ImportDeclaration, CasePatterns,
 			 (Optional a) | <<< a, ConsVariable, BasicType, Annotation, SelectorKind, Selection, SelectorDef, ConsDef, LocalDefs, FreeVar, ClassInstance, SignClassification,
 			 TypeCodeExpression, CoercionPosition, AttrInequality, LetBind, Declaration, STE_Kind, BoundVar,
 			 TypeSymbIdent,
