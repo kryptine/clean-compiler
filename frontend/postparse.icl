@@ -1473,7 +1473,7 @@ reorganiseDefinitionsAndAddTypes mod_ident support_dynamics icl_module defs ca
 			{	import_module = clean_types_module_ident
 			,	import_symbols = []
 			,	import_file_position = NoPos
-			,	import_qualified = False
+			,	import_qualified = NotQualified
 			}
 		# imports = if (mod_ident == clean_types_module_ident) [] [clean_types_module]
 		= reorganiseDefinitions icl_module [PD_Import imports : defs] 0 0 0 0 ca

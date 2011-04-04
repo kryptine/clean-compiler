@@ -462,8 +462,10 @@ cNameLocationDependent :== True
 	{	import_module		:: !Ident
 	,	import_symbols		:: ![ImportDeclaration]
 	,	import_file_position:: !Position	// for error messages
-	,	import_qualified	:: !Bool
+	,	import_qualified	:: !ImportQualified
 	}
+
+::	ImportQualified = NotQualified | Qualified
 
 instance toString Import, AttributeVar, TypeAttribute, Annotation
 
