@@ -262,7 +262,7 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 		=	(False, cache, files)
 	# (io, files)
 		=	stdio files
-	# ({boxed_ident=moduleIdent}, hash_table) = putIdentInHashTable options.moduleName IC_Module hash_table
+	# ({boxed_ident=moduleIdent}, hash_table) = putIdentInHashTable options.moduleName (IC_Module NoQualifiedIdents) hash_table
 	# list_inferred_types
 		=	if (options.listTypes.lto_listTypesKind == ListTypesInferred)
 				(Yes options.listTypes.lto_showAttributes)

@@ -18,7 +18,7 @@ set_hte_mark :: !Int !*HashTable -> *HashTable
 				| IC_Type
 				| IC_TypeAttr
 				| IC_Class
-				| IC_Module
+				| IC_Module !QualifiedIdents
 				| IC_Field !Ident
 				| IC_Selector
 				| IC_Instance ![Type]
@@ -26,9 +26,15 @@ set_hte_mark :: !Int !*HashTable -> *HashTable
 				| IC_GenericCase !Type
 				| IC_Unknown
 
+::	QualifiedIdents	= QualifiedIdents !Ident !IdentClass !QualifiedIdents
+					| NoQualifiedIdents;
+
 :: BoxedIdent = {boxed_ident::!Ident}
 
 putIdentInHashTable :: !String !IdentClass !*HashTable -> (!BoxedIdent, !*HashTable)
+putQualifiedIdentInHashTable :: !String !BoxedIdent !IdentClass !*HashTable -> (!BoxedIdent, !*HashTable)
 putPredefinedIdentInHashTable :: !Ident !IdentClass !*HashTable -> *HashTable
+
+get_qualified_idents_from_hash_table :: !Ident !*HashTable -> (!QualifiedIdents,!*HashTable)
 
 remove_icl_symbols_from_hash_table :: !*HashTable -> *HashTable
