@@ -94,13 +94,10 @@ where
 
 addFunctionsRange :: [FunDef] *CollectAdmin -> (IndexRange, *CollectAdmin)
 addFunctionsRange fun_defs ca
-	# (frm, ca)
-	  	=	ca!ca_fun_count
-	  ca
-		=	foldSt add_function fun_defs ca
-	  (to, ca)
-	  	=	ca!ca_fun_count
-	=	({ir_from = frm, ir_to = to}, ca)
+	# (frm, ca) = ca!ca_fun_count
+	  ca = foldSt add_function fun_defs ca
+	  (to, ca) = ca!ca_fun_count
+	= ({ir_from = frm, ir_to = to}, ca)
 	where
 		add_function :: FunDef !*CollectAdmin -> *CollectAdmin
 		add_function fun_def ca=:{ca_fun_count, ca_rev_fun_defs}
@@ -966,24 +963,6 @@ makeComprehensions [{tq_generators,tq_let_defs,tq_filter, tq_end, tq_call, tq_lh
 					,	{calt_pattern = PE_WildCard, calt_rhs = exprToRhs default_rhs, calt_position=NoPos}
 					])
 
-	/* +++ remove code duplication (bug in 2.0 with nested cases)
-		case_end :: TransformedGenerator Rhs -> Rhs
-		case_end {tg_case1, tg_case_end_expr, tg_case_end_pattern} rhs
-			=	single_case tg_case1 tg_case_end_expr tg_case_end_pattern rhs
-	
-		case_pattern :: TransformedGenerator Rhs -> Rhs
-		case_pattern {tg_case2, tg_element, tg_pattern} rhs
-			=	single_case tg_case2 tg_element tg_pattern rhs
-
-	*/
-		/*
-		single_case :: Ident ParsedExpr ParsedExpr Rhs -> Rhs
-		single_case case_ident expr pattern rhs
-			=	exprToRhs (PE_Case case_ident expr
-					[	{calt_pattern = pattern, calt_rhs = rhs}
-					])
-		*/
-
 transformSequence :: Sequence -> ParsedExpr
 transformSequence (SQ_FromThen pd_from_then frm then)
 	=	predef_ident_expr pd_from_then ` frm ` then
@@ -1452,6 +1431,8 @@ reorganiseDefinitions icl_module [PD_Derive derive_defs : defs] cons_count sel_c
 	#! c_defs = { c_defs & def_generic_cases = derive_defs ++ c_defs.def_generic_cases}
 	= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)  
 reorganiseDefinitions icl_module [PD_Import new_imports : defs] cons_count sel_count mem_count type_count ca
+	# (new_imports,hash_table) = make_implicit_qualified_imports_explicit new_imports ca.ca_hash_table
+	# ca = {ca & ca_hash_table=hash_table}
 	# (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count type_count ca
 	= (fun_defs, c_defs, new_imports ++ imports, imported_objects,foreign_exports, ca)
 reorganiseDefinitions icl_module [PD_ImportedObjects new_imported_objects : defs] cons_count sel_count mem_count type_count ca
@@ -1466,6 +1447,31 @@ reorganiseDefinitions icl_module [] _ _ _ _ ca
 	= ([], { def_types = [], def_constructors = [], def_selectors = [], def_macros = [],def_macro_indices={ir_from=0,ir_to=0},def_classes = [], def_members = [],
 			def_instances = [], def_funtypes = [], 
 			def_generics = [], def_generic_cases = []}, [], [], [], ca)
+
+make_implicit_qualified_imports_explicit [import_=:{import_qualified=Qualified,import_symbols=[],import_module,import_file_position}:imports] hash_table
+	# (qualified_idents,hash_table) = get_qualified_idents_from_hash_table import_module hash_table
+	# import_declarations = qualified_idents_to_import_declarations qualified_idents
+	# (imports,hash_table) = make_implicit_qualified_imports_explicit imports hash_table
+	= ([{import_ & import_symbols=import_declarations}:imports],hash_table)
+make_implicit_qualified_imports_explicit [import_:imports] hash_table
+	# (imports,hash_table) = make_implicit_qualified_imports_explicit imports hash_table
+	= ([import_:imports],hash_table)
+make_implicit_qualified_imports_explicit [] hash_table
+	= ([],hash_table)
+
+qualified_idents_to_import_declarations (QualifiedIdents ident ident_class qualified_idents)
+	= [qualified_ident_to_import_declaration ident_class ident : qualified_idents_to_import_declarations qualified_idents]
+qualified_idents_to_import_declarations NoQualifiedIdents
+	= []
+
+qualified_ident_to_import_declaration IC_Expression ident
+	= ID_Function ident
+qualified_ident_to_import_declaration IC_Type ident
+	= ID_Type ident No
+qualified_ident_to_import_declaration IC_Class ident
+	= ID_Class ident No
+qualified_ident_to_import_declaration IC_Selector ident
+	= abort "qualified_ident_to_import_declaration IC_Selector not yet implemented"
 
 reorganiseDefinitionsAndAddTypes mod_ident support_dynamics icl_module defs ca
 	| support_dynamics

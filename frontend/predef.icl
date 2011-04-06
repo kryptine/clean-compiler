@@ -188,7 +188,6 @@ predefined_idents
 					
 					[PD_Start] = i "Start",
 
-
 					[PD_FromS]= i "_from_s",
 					[PD_FromTS]= i "_from_ts",
 					[PD_FromSTS]= i "_from_sts",
@@ -305,9 +304,9 @@ where
 
 	fill_table_with_hashing hash_table
 		# hash_table = hash_table
-					<<- (local_predefined_idents, IC_Module, PD_StdArray)
-					<<- (local_predefined_idents, IC_Module, PD_StdEnum)
-					<<- (local_predefined_idents, IC_Module, PD_StdBool)
+					<<- (local_predefined_idents, IC_Module NoQualifiedIdents, PD_StdArray)
+					<<- (local_predefined_idents, IC_Module NoQualifiedIdents, PD_StdEnum)
+					<<- (local_predefined_idents, IC_Module NoQualifiedIdents, PD_StdBool)
 					<<- (local_predefined_idents, IC_Expression, PD_AndOp)
 					<<- (local_predefined_idents, IC_Expression, PD_OrOp)
 					<<- (local_predefined_idents, IC_Class, PD_ArrayClass)
@@ -320,7 +319,7 @@ where
 					<<- (local_predefined_idents, IC_Expression, PD_ArraySizeFun)
 					<<- (local_predefined_idents, IC_Expression, PD_UnqArraySizeFun)
 
-					<<- (local_predefined_idents, IC_Module, PD_StdStrictLists)
+					<<- (local_predefined_idents, IC_Module NoQualifiedIdents, PD_StdStrictLists)
 		# hash_table = put_predefined_idents_in_hash_table PD_cons PD_nil_uts IC_Expression local_predefined_idents hash_table
 					<<- (local_predefined_idents, IC_Class, PD_ListClass)
 					<<- (local_predefined_idents, IC_Class, PD_UListClass)
@@ -338,7 +337,7 @@ where
 					
 					<<- (local_predefined_idents,	IC_Class, PD_TypeCodeClass)
 
-					<<- (local_predefined_idents,	IC_Module, PD_StdDynamic)
+					<<- (local_predefined_idents,	IC_Module NoQualifiedIdents, PD_StdDynamic)
 
 					<<- (local_predefined_idents,	IC_Type, PD_Dyn_DynamicTemp)
 					<<- (local_predefined_idents,	IC_Type, PD_Dyn_TypeCode)
@@ -346,7 +345,7 @@ where
 		# hash_table = put_predefined_idents_in_hash_table PD_Dyn_TypeScheme PD_Dyn_TypeCodeConstructor_UnboxedArray IC_Expression local_predefined_idents hash_table
 					<<- (local_predefined_idents,	IC_Expression, PD_Dyn__to_TypeCodeConstructor)
 
-					<<- (local_predefined_idents,	IC_Module, 		PD_StdGeneric)
+					<<- (local_predefined_idents,	IC_Module NoQualifiedIdents, PD_StdGeneric)
 		# hash_table = put_predefined_idents_in_hash_table PD_TypeBimap PD_TypeGenericDict IC_Type local_predefined_idents hash_table
 		# hash_table = put_predefined_idents_in_hash_table PD_ConsBimap PD_bimapId IC_Expression local_predefined_idents hash_table
 					<<- (local_predefined_idents,	IC_Generic,		PD_GenericBimap)	
@@ -355,12 +354,12 @@ where
 					<<- (local_predefined_idents, IC_Field bimap_type, PD_map_to)
 					<<- (local_predefined_idents, IC_Field bimap_type, PD_map_from)
 									
-					<<- (local_predefined_idents,	IC_Module, 		PD_StdMisc)
+					<<- (local_predefined_idents,	IC_Module NoQualifiedIdents, PD_StdMisc)
 
 					<<- (local_predefined_idents,	IC_Expression, 	PD_abort)
 					<<- (local_predefined_idents,	IC_Expression, 	PD_undef)					
 					
-					<<- (local_predefined_idents,	IC_Module, PD_CleanTypes)
+					<<- (local_predefined_idents,	IC_Module NoQualifiedIdents, PD_CleanTypes)
 
 					<<- (local_predefined_idents,	IC_Type, PD_CTTypeDef)
 					<<- (local_predefined_idents,	IC_Expression, PD_CTAlgType)
@@ -483,13 +482,13 @@ where
 			  tc_member_name = predefined_idents.[PD_TypeCodeMember]
 			
 			  class_var = MakeTypeVar type_var_ident
-	
+
 			  me_type = { st_vars = [], st_args = [], st_args_strictness=NotStrict, st_arity = 0,
 						  st_result = { at_attribute = TA_None, at_type = TV class_var },
 						  st_context = [ {tc_class = TCClass {glob_module = NoIndex, glob_object = {ds_ident = tc_class_name, ds_arity = 1, ds_index = NoIndex }},
 						   				tc_types = [ TV class_var ], tc_var = nilPtr}],
 						  st_attr_vars = [], st_attr_env = [] }
-	
+
 			  tc_member_def = { me_ident = tc_member_name, me_type = me_type, me_pos = NoPos, me_priority = NoPrio,
 								me_offset = NoIndex, me_class_vars = [], me_class = { glob_module = NoIndex, glob_object = NoIndex}, me_type_ptr = nilPtr }
 			
