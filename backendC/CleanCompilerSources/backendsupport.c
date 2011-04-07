@@ -142,18 +142,14 @@ AllocConvertBuffer (int min_size)
 {
 	ConvertBufferP	newBuffer;
 	int new_convert_buffer_size;
-	
-	new_convert_buffer_size=sizeof (ConvertBufferS);
 
-	while (min_size>new_convert_buffer_size)
+	new_convert_buffer_size=kDefaultConvertBufferSize;
+	while (new_convert_buffer_size<min_size)
 		new_convert_buffer_size+=kDefaultConvertBufferSize;
 
-	newBuffer	= (ConvertBufferP) malloc (new_convert_buffer_size);
-
+	newBuffer	= (ConvertBufferP) malloc (sizeof (ConvertBufferS)+(new_convert_buffer_size-kDefaultConvertBufferSize));
 	if (newBuffer == NULL)
 		FatalCompError ("backendsupport.c", "AllocConvertBuffer", "out of memory");
-
-	new_convert_buffer_size -= sizeof (ConvertBufferS)-kDefaultConvertBufferSize;
 
 	newBuffer->cb_size=new_convert_buffer_size;
 	
