@@ -357,16 +357,20 @@ where
 			= fwritec ConsVariableCVCode tcl_file
 		# (tcl_file,wtis)
 			= write_type_info type_var tcl_file wtis
-		= (tcl_file,wtis)	
-
+		= (tcl_file,wtis)
 	write_type_info (TempCV temp_var_id) tcl_file wtis
 		# tcl_file
 			= fwritec ConsVariableTempCVCode tcl_file
 		# (tcl_file,wtis)
 			= write_type_info temp_var_id tcl_file wtis
-		= (tcl_file,wtis)	
-		
+		= (tcl_file,wtis)		
 	write_type_info (TempQCV temp_var_id) tcl_file wtis
+		# tcl_file
+			= fwritec ConsVariableTempQCVCode tcl_file
+		# (tcl_file,wtis)
+			= write_type_info temp_var_id tcl_file wtis
+		= (tcl_file,wtis)	
+	write_type_info (TempQCDV temp_var_id) tcl_file wtis
 		# tcl_file
 			= fwritec ConsVariableTempQCVCode tcl_file
 		# (tcl_file,wtis)

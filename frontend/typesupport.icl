@@ -80,21 +80,26 @@ instance clean_up AType
 where
 	clean_up cui atype=:{at_attribute, at_type = TempQV qv_number} cus
 		| cui.cui_top_level
-			# (at_attribute, cus)	= cleanUpTypeAttribute True cui at_attribute cus
-			# (type, cus)			= cus!cus_var_env.[qv_number]
-			  (var, cus)			= cleanUpVariable True type qv_number cus
-			= ({atype & at_attribute = at_attribute, at_type = var},
-					{cus & cus_exis_vars = add_new_variable type qv_number at_attribute cus.cus_exis_vars})
-	where	
-		add_new_variable TE ev_number ev_attr cus_exis_vars
-			= [(ev_number, ev_attr) : cus_exis_vars]
-		add_new_variable type ev_number ev_attr cus_exis_vars
-			= cus_exis_vars
+			= clean_up_top_level_q_variable cui at_attribute qv_number cus
+	clean_up cui atype=:{at_attribute, at_type = TempQDV qv_number} cus
+		| cui.cui_top_level
+			= clean_up_top_level_q_variable cui at_attribute qv_number cus
 	clean_up cui atype=:{at_attribute,at_type} cus
 		# (at_attribute, cus) = cleanUpTypeAttribute False cui at_attribute cus 
 		  (at_type, cus) = clean_up cui at_type cus
 		= ({atype & at_attribute = at_attribute, at_type = at_type}, cus)
 
+clean_up_top_level_q_variable cui at_attribute qv_number cus
+	# (at_attribute, cus)	= cleanUpTypeAttribute True cui at_attribute cus
+	# (type, cus)			= cus!cus_var_env.[qv_number]
+	  (var, cus)			= cleanUpVariable True type qv_number cus
+	  cus = {cus & cus_exis_vars = add_new_exis_attr_var type qv_number at_attribute cus.cus_exis_vars}
+	= ({at_attribute = at_attribute, at_type = var}, cus)
+where
+	add_new_exis_attr_var TE ev_number ev_attr cus_exis_vars
+		= [(ev_number, ev_attr) : cus_exis_vars]
+	add_new_exis_attr_varadd_new_exis_attr_var type ev_number ev_attr cus_exis_vars
+		= cus_exis_vars
 
 attrIsUndefined TA_None = True
 attrIsUndefined _ 		= False
@@ -179,10 +184,24 @@ where
 			# (TV tv, cus) = cleanUpVariable False type qv_number cus
 			  (types, cus) = clean_up cui types cus
 			= (CV tv :@: types, cus)
+	clean_up cui (TempQCDV qv_number :@: types) cus=:{cus_exis_vars}
+		# (type, cus) = cus!cus_var_env.[qv_number]
+		| cui.cui_top_level
+			# (TV tv, cus) = cleanUpVariable True type qv_number {cus & cus_exis_vars = add_new_variable type qv_number cus_exis_vars}
+			  (types, cus) = clean_up cui types cus
+			= (CV tv :@: types, cus)
+			# (TV tv, cus) = cleanUpVariable False type qv_number cus
+			  (types, cus) = clean_up cui types cus
+			= (CV tv :@: types, cus)
 	clean_up cui (cv :@: types) cus
 		# (types, cus) = clean_up cui types cus
 		= (cv :@: types, cus)
 	clean_up cui (TempQV qv_number) cus=:{cus_error,cus_exis_vars}
+		# (type, cus) = cus!cus_var_env.[qv_number]
+		| cui.cui_top_level
+			= cleanUpVariable True type qv_number {cus & cus_exis_vars = add_new_variable type qv_number cus_exis_vars}
+			= cleanUpVariable False type qv_number cus
+	clean_up cui (TempQDV qv_number) cus=:{cus_error,cus_exis_vars}
 		# (type, cus) = cus!cus_var_env.[qv_number]
 		| cui.cui_top_level
 			= cleanUpVariable True type qv_number {cus & cus_exis_vars = add_new_variable type qv_number cus_exis_vars}
@@ -276,6 +295,8 @@ where
 			# (cur2, types, env) = cleanUpClosed types env
             = (combineCleanUpResults cur1 cur2, simplifyTypeApplication type types, env)
 	cleanUpClosed t=:(TempQV _) env
+		= (cQVar, t, env)
+	cleanUpClosed t=:(TempQDV _) env
 		= (cQVar, t, env)
 	cleanUpClosed t env
 		= (cClosed, t, env)
@@ -1451,6 +1472,8 @@ where
 		= (file <<< "E." <<< varid, opt_beautifulizer)
 	writeType file opt_beautifulizer (form, TempQV tv_number)
 		= (file  <<< "E." <<< tv_number <<< ' ', opt_beautifulizer)
+	writeType file opt_beautifulizer (form, TempQDV tv_number)
+		= (file  <<< "E." <<< tv_number <<< ' ', opt_beautifulizer)
 	writeType file opt_beautifulizer (form, TE)
 		= (file <<< "__", opt_beautifulizer)
 	writeType file _ (form, type)
@@ -1557,6 +1580,8 @@ instance writeType ConsVariable where
 	writeType file No (_, cons_variable)
 		= (file <<< cons_variable, No)
 	writeType file yes_beautifulizer (_, cv=:(TempQCV _))
+		= (file <<< cv, yes_beautifulizer)
+	writeType file yes_beautifulizer (_, cv=:(TempQCDV _))
 		= (file <<< cv, yes_beautifulizer)
 	writeType file (Yes beautifulizer) (_, CV tv)
 		= writeBeautifulTypeVar file beautifulizer (TV tv)

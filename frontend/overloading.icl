@@ -3,7 +3,7 @@ implementation module overloading
 import StdEnv
 
 import syntax, check, type, typesupport, utilities, unitype, predef, checktypes, convertDynamics 
-import genericsupport, compilerSwitches, type_io_common
+import genericsupport, type_io_common
 from trans import addTypesOfDictionaries
 
 ::	LocalTypePatternVariable =
@@ -73,7 +73,7 @@ sub_class_error op_symb err
 abstractTypeInDynamicError td_ident err=:{ea_ok}
 	# err = errorHeading "Implementation restriction" err
 	= { err & ea_file = err.ea_file <<< (" derived abstract type '" +++ toString td_ident +++ "' not permitted in a dynamic") <<< '\n' }
-	
+
 typeCodeInDynamicError err=:{ea_ok}
 	# err = errorHeading "Warning" err
 	  err = {err & ea_ok=ea_ok}
@@ -483,27 +483,32 @@ where
 	where
 		reduce_tc_context :: {#CommonDefs} TCClass Type *ReduceTCState -> (ClassApplication, !*ReduceTCState)
 		reduce_tc_context defs type_code_class type=:(TA cons_id=:{type_index} cons_args) rtcs_state=:{rtcs_error,rtcs_type_heaps}
-			# rtcs_error
-				= disallow_abstract_types_in_dynamics defs type_index rtcs_error
-				
+			# rtcs_error = disallow_abstract_types_in_dynamics defs type_index rtcs_error
 			# (expanded, type, rtcs_type_heaps)
 				=	tryToExpandTypeSyn defs type cons_id cons_args rtcs_type_heaps
 			# rtcs_state = {rtcs_state & rtcs_error=rtcs_error, rtcs_type_heaps=rtcs_type_heaps}
 			| expanded
 				=	reduce_tc_context defs type_code_class type rtcs_state
-				
 			# type_constructor = toTypeCodeConstructor type_index defs
 			  (rc_red_contexts, rtcs_state) = reduce_TC_contexts defs type_code_class cons_args rtcs_state
 			= (CA_GlobalTypeCode { tci_constructor = type_constructor, tci_contexts = rc_red_contexts }, rtcs_state)
 		reduce_tc_context defs type_code_class (TAS cons_id cons_args _) rtcs_state
-			=	reduce_tc_context defs type_code_class (TA cons_id cons_args) rtcs_state
+			= reduce_tc_context defs type_code_class (TA cons_id cons_args) rtcs_state
 		reduce_tc_context defs type_code_class (TB basic_type) rtcs_state
 			= (CA_GlobalTypeCode { tci_constructor = GTT_Basic basic_type, tci_contexts = [] }, rtcs_state)
 		reduce_tc_context defs type_code_class (arg_type --> result_type) rtcs_state
 			#  (rc_red_contexts, rtcs_state) = reduce_TC_contexts defs type_code_class [arg_type, result_type] rtcs_state
 			= (CA_GlobalTypeCode { tci_constructor = GTT_Function, tci_contexts = rc_red_contexts }, rtcs_state)
-		reduce_tc_context defs type_code_class (TempQV var_number) rtcs_state=:{rtcs_type_pattern_vars, rtcs_var_heap}
-			# (inst_var, (rtcs_type_pattern_vars, rtcs_var_heap)) = addLocalTCInstance var_number (rtcs_type_pattern_vars, rtcs_var_heap)
+		reduce_tc_context defs type_code_class (TempQV var_number) rtcs_state=:{rtcs_var_heap,rtcs_new_contexts}
+			# (tc_var, rtcs_var_heap) = newPtr VI_Empty rtcs_var_heap
+			# rtcs_state={rtcs_state & rtcs_var_heap=rtcs_var_heap}
+			# tc = { tc_class = type_code_class, tc_types = [TempQV var_number], tc_var = tc_var }
+			| containsContext tc rtcs_new_contexts
+				= (CA_Context tc, rtcs_state)
+				= (CA_Context tc, {rtcs_state & rtcs_new_contexts = [tc : rtcs_new_contexts]})
+		reduce_tc_context defs type_code_class (TempQDV var_number) rtcs_state=:{rtcs_type_pattern_vars,rtcs_var_heap,rtcs_new_contexts}
+			# (inst_var, (rtcs_type_pattern_vars, rtcs_var_heap))
+				= addLocalTCInstance var_number (rtcs_type_pattern_vars, rtcs_var_heap)
 			# rtcs_state = {rtcs_state & rtcs_type_pattern_vars=rtcs_type_pattern_vars, rtcs_var_heap=rtcs_var_heap}
 			= (CA_LocalTypeCode inst_var, rtcs_state)
 		reduce_tc_context defs type_code_class (TempV var_number) rtcs_state=:{rtcs_var_heap, rtcs_new_contexts}
@@ -541,6 +546,8 @@ types_are_reducible [type : types] first_type tc_class predef_symbols
 		_ :@: _
 			->	is_lazy_or_strict_array_or_list_context
 		TempQV _
+			->	is_lazy_or_strict_array_or_list_context
+		TempQDV _
 			->	is_lazy_or_strict_array_or_list_context
 		_
 			-> is_reducible types tc_class predef_symbols
@@ -581,10 +588,10 @@ type_is_reducible (TempV _) tc_class predef_symbols
 	= False // is_predefined_symbol tc_class.glob_module tc_class.glob_object.ds_index PD_TypeCodeClass predef_symbols
 type_is_reducible (_ :@: _) tc_class predef_symbols
 	= False
-type_is_reducible (TempQV _) {glob_object={ds_index},glob_module} predef_symbols
+type_is_reducible (TempQV _) tc_class predef_symbols
+	= False
+type_is_reducible (TempQDV _) {glob_object={ds_index},glob_module} predef_symbols
 	= is_predefined_symbol glob_module ds_index PD_TypeCodeClass predef_symbols
-//	= True
-//	= False
 type_is_reducible _ tc_class predef_symbols
 	= True
 
@@ -644,7 +651,7 @@ expand_and_match cons_id1 cons_args1 cons_id2 cons_args2 defs type1 type2 type_h
 		= (False, type_heaps)
 
 instance match Type
-where 
+where
 	match defs (TV {tv_info_ptr}) type type_heaps=:{th_vars}
 		= (True, { type_heaps & th_vars = th_vars <:= (tv_info_ptr,TVI_Type type)})
 	match defs type1=:(TA cons_id1 cons_args1) type2=:(TA cons_id2 cons_args2) type_heaps
@@ -679,9 +686,6 @@ where
 			= (False, type_heaps)
 	match defs (TB tb1) (TB tb2) type_heaps
 		= (tb1 == tb2, type_heaps)
-/*	match defs type (TB (BT_String array_type)) type_heaps
-		= match defs type array_type type_heaps
-*/
 	match defs TArrow TArrow type_heaps
 		= (True, type_heaps)
 	match defs (TArrow1 t1) (TArrow1 t2) type_heaps
@@ -733,6 +737,8 @@ consVariableToType (TempCV temp_var_id)
 	= TempV temp_var_id
 consVariableToType (TempQCV temp_var_id)
 	= TempQV temp_var_id
+consVariableToType (TempQCDV temp_var_id)
+	= TempQDV temp_var_id
 
 trySpecializedInstances :: [TypeContext] [Special] *TypeHeaps -> (!Global Index,!*TypeHeaps)
 trySpecializedInstances type_contexts [] type_heaps
@@ -935,7 +941,7 @@ where
 			| containsContext super_class super_classes
 				= (super_classes, type_heaps)
 				= generate_super_classes super_class ([super_class : super_classes], type_heaps) 
-		 
+
 	remove_doubles sub_classes tc context
 		| containsContext tc sub_classes
 			= context
@@ -981,7 +987,7 @@ where
 		  class_exprs = exprs ++ class_exprs
 		= (EI_Instance { glob_module = glob_module, glob_object = { ds_ident = me_ident, ds_arity = length class_exprs, ds_index = glob_object }} class_exprs,
 			 heaps_and_ptrs)
-	adjust_member_application  defs contexts  {me_ident,me_offset,me_class={glob_module,glob_object}} (CA_Context tc) class_exprs (heaps=:{hp_type_heaps}, ptrs)
+	adjust_member_application defs contexts  {me_ident,me_offset,me_class={glob_module,glob_object}} (CA_Context tc) class_exprs (heaps=:{hp_type_heaps}, ptrs)
 		# (class_context, address, hp_type_heaps) = determineContextAddress contexts defs tc hp_type_heaps
 		# {class_dictionary={ds_index,ds_ident}} = defs.[glob_module].com_class_defs.[glob_object]
 		  selector = selectFromDictionary glob_module ds_index me_offset defs
@@ -1012,13 +1018,13 @@ convertOverloadedCall defs contexts symbol=:{symb_ident, symb_kind = SK_Generic 
 	#! (opt_member_glob, hp_generic_heap) = getGenericMember gen_glob kind defs heaps.hp_generic_heap
 	#! heaps = { heaps & hp_generic_heap = hp_generic_heap }
 	= case opt_member_glob of		
-		No 
+		No
 			# error = checkError ("no generic instances of " +++ toString symb_ident +++ " for kind") kind error
-			-> (heaps, expr_info_ptrs, error)	
- 		Yes member_glob -> convertOverloadedCall defs contexts {symbol & symb_kind = SK_OverloadedFunction member_glob} expr_ptr class_appls (heaps, expr_info_ptrs, error)  				
+			-> (heaps, expr_info_ptrs, error)
+		Yes member_glob -> convertOverloadedCall defs contexts {symbol & symb_kind = SK_OverloadedFunction member_glob} expr_ptr class_appls (heaps, expr_info_ptrs, error)
 convertOverloadedCall defs contexts {symb_ident,symb_kind = SK_TypeCode} expr_info_ptr class_appls (heaps, ptrs, error)
 	# (class_expressions, (heaps, ptrs)) = convertClassApplsToExpressions defs contexts class_appls (heaps, ptrs)
-	= ({ heaps & hp_expression_heap = heaps.hp_expression_heap <:= (expr_info_ptr, EI_TypeCodes (map expressionToTypeCodeExpression class_expressions))}, ptrs, error)
+	= ({heaps & hp_expression_heap = heaps.hp_expression_heap <:= (expr_info_ptr, EI_TypeCodes (map expressionToTypeCodeExpression class_expressions))}, ptrs, error)
 
 convertOverloadedCall defs contexts {symb_kind=SK_TFACVar var_expr_ptr,symb_ident} expr_info_ptr appls (heaps,ptrs, error)
 	# (class_expressions, (heaps, ptrs)) = convertClassApplsToExpressions defs contexts appls (heaps,ptrs)
@@ -1430,7 +1436,7 @@ where
 		bind_type_vars_to_type_var_codes type_vars var_ptrs type_var_heap
 			= fold2St bind_type_var_to_type_var_code type_vars var_ptrs type_var_heap
 		where
-			bind_type_var_to_type_var_code {tv_ident,tv_info_ptr} var_ptr type_var_heap
+			bind_type_var_to_type_var_code {tv_info_ptr} var_ptr type_var_heap
 				= type_var_heap <:= (tv_info_ptr, TVI_TypeCode (TCE_Var var_ptr))
 
 		add_universal_vars_to_type [] at
@@ -1438,7 +1444,6 @@ where
 		add_universal_vars_to_type uni_vars at=:{at_type}
 			= { at & at_type = TFA uni_vars at_type }
 
-		
 		convert_local_dynamics loc_dynamics state
 			= foldSt update_dynamic loc_dynamics state
 
@@ -1479,10 +1484,8 @@ toTypeCodeConstructor type=:{glob_object=type_index, glob_module=module_index} c
 	| module_index == cPredefinedModuleIndex
 		= GTT_PredefTypeConstructor type
 	// otherwise
-		# type
-			=	common_defs.[module_index].com_type_defs.[type_index]
-		# td_fun_index
-			=	type.td_fun_index
+		# type = common_defs.[module_index].com_type_defs.[type_index]
+		# td_fun_index = type.td_fun_index
 		// sanity check ...
 		| td_fun_index == NoIndex
 			=	fatal "toTypeCodeConstructor" ("no function (" +++ type.td_ident.id_name +++ ")")
@@ -1501,16 +1504,13 @@ class toTypeCodeExpression type :: type !(!*TypeCodeInfo,!*VarHeap,!*ErrorAdmin)
 
 instance toTypeCodeExpression Type where
 	toTypeCodeExpression type=:(TA cons_id=:{type_index} type_args) (tci=:{tci_dcl_modules,tci_common_defs},var_heap,error)
-		# type_heaps
-			=	{th_vars = tci.tci_type_var_heap, th_attrs = tci.tci_attr_var_heap}
+		# type_heaps = {th_vars = tci.tci_type_var_heap, th_attrs = tci.tci_attr_var_heap}
 		# (expanded, type, type_heaps)
 			=	tryToExpandTypeSyn tci_common_defs type cons_id type_args type_heaps
-		# tci
-			=	{tci & tci_type_var_heap = type_heaps.th_vars, tci_attr_var_heap = type_heaps.th_attrs}
+		# tci = {tci & tci_type_var_heap = type_heaps.th_vars, tci_attr_var_heap = type_heaps.th_attrs}
 		| expanded
 			=	toTypeCodeExpression type (tci,var_heap,error)
-		# type_constructor
-			=	toTypeCodeConstructor type_index tci_common_defs
+		# type_constructor = toTypeCodeConstructor type_index tci_common_defs
 		  (type_code_args, tci)
 		  	=	mapSt (toTypeCodeExpression) type_args (tci,var_heap,error)
 		= (TCE_Constructor type_constructor type_code_args, tci)
@@ -1533,7 +1533,6 @@ instance toTypeCodeExpression Type where
 		  (type_code_args, st)
 		  	=	mapSt (toTypeCodeExpression) args st
 		= (foldl TCE_App type_code_var type_code_args, st)
-
 
 instance toTypeCodeExpression TypeVar where
 	toTypeCodeExpression {tv_ident,tv_info_ptr} (tci=:{tci_type_var_heap}, var_heap, error)
@@ -1804,7 +1803,7 @@ update_constructors_with_contexts_patterns [constructor_context:constructor_cont
 	= update_constructor_with_contexts_patterns constructor_context constructor_contexts patterns cons_types group_index ui
 where
 	update_constructor_with_contexts_patterns constructor_context=:(constructor_symbol,context) constructor_contexts [pattern:patterns] [cons_type:cons_types] group_index ui
-		| constructor_symbol==pattern.ap_symbol.glob_object			
+		| constructor_symbol==pattern.ap_symbol.glob_object
 			# (old_var_infos,var_heap) = make_class_vars context ui.ui_var_heap
 			  ui = {ui & ui_var_heap=var_heap}					  
 

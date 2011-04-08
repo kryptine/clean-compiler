@@ -40,6 +40,8 @@ where
 	(==) (CV tv1) (CV tv2)			= tv1 == tv2
 	(==) (TempCV tv1) (TempCV tv2)	= tv1 == tv2
 	(==) (TempQCV tv1) (TempQCV tv2)= tv1 == tv2
+	(==) (TempQCDV tv1) (TempQCDV tv2)= tv1 == tv2
+	(==) _ _ = False
 
 instance == TypeContext
 where
@@ -106,6 +108,8 @@ where
 		equal_constructor_args (GTV varid1) (GTV varid2)
 			= varid1 == varid2
 		equal_constructor_args (TempQV varid1) (TempQV varid2)
+			= varid1 == varid2
+		equal_constructor_args (TempQDV varid1) (TempQDV varid2)
 			= varid1 == varid2
 		equal_constructor_args (TLifted varid1) (TLifted varid2)
 			= varid1 == varid2
