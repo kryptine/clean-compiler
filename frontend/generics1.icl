@@ -3394,7 +3394,7 @@ where
 	build_arg st gatvs deps ident pos order kind (arg_num, th, modules, error)		
 		#! th = clearSymbolType st th
 		#! (fresh_gatvs, th) = mapSt create_fresh_gatv gatvs th 
-		#! (th, error) = foldSt (uncurry make_subst_gatv) (zip2 gatvs fresh_gatvs) (th, error)
+		#! (th, error) = fold2St make_subst_gatv gatvs fresh_gatvs (th, error)
 		#! (new_st, th) = applySubstInSymbolType st th
 		#! (new_st, forall_atvs, (th, modules, error)) 
 			= build_symbol_type new_st fresh_gatvs deps kind ident pos (inc order) (th, modules, error)	
@@ -3461,7 +3461,7 @@ where
 				= modules![gd_index.gi_module].com_generic_defs.[gd_index.gi_index]
 			# (fresh_dep_st, fresh_dep_gatvs, th) = fresh_generic_type gen_type gen_vars th
 			# to_gatvs = map (\num -> fresh_gatvs !! num) gd_nums
-			# (th, error) = foldSt (uncurry make_subst_gatv) (zip2 fresh_dep_gatvs to_gatvs) (th, error)
+			# (th, error) = fold2St make_subst_gatv fresh_dep_gatvs to_gatvs (th, error)
 			# (new_dep_st, th) = applySubstInSymbolType fresh_dep_st th
 			# (new_dep_st, forall_dep_atvs, (th, modules, error)) 
 				= build_symbol_type new_dep_st to_gatvs gen_deps kind gen_ident gen_pos (inc order) (th, modules, error)
