@@ -151,7 +151,8 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_m
 /*
 	# (_,genout,files) = fopen "genout" FWriteText files
 	# (n_fun_defs,fun_defs) = usize fun_defs
-	# (fun_defs, genout) = show_component [0..n_fun_defs-1] True fun_defs genout
+	# genout = show_class_members icl_mod.icl_common genout 
+	# (components, fun_defs, genout) = showComponents components 0 True fun_defs genout
 	# (ok,files) = fclose genout files
 	| not ok = abort "could not write genout" 
 */
@@ -364,6 +365,18 @@ show_component [fun:funs] show_types fun_defs file
 		= show_component funs show_types fun_defs (file <<< fun_def.fun_type <<< '\n' <<< fun_def)
 		= show_component funs show_types fun_defs (file <<< fun_def)
 //		= show_component funs show_types fun_defs (file <<< fun_def.fun_ident)
+
+show_class_members :: !CommonDefs !*File -> *File
+show_class_members {com_member_defs} file
+	= show_class_members 0 com_member_defs file
+	where
+	show_class_members i member_a file
+		| i<size member_a
+		# ({me_ident,me_type},member_a) = member_a![i]
+		# properties = { form_properties = cAttributed bitor cAnnotated, form_attr_position = No }
+		# file = file <<< me_ident <<< " :: " <:: (properties, me_type, No) <<< '\n'
+		= show_class_members (i+1) member_a file
+		= file 
 
 showTypes :: !*{! Group} !Int !*{# FunDef} !*File  -> (!*{! Group}, !*{# FunDef},!*File)
 showTypes comps comp_index fun_defs file
