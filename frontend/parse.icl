@@ -1561,7 +1561,8 @@ wantGenericDefinition parseContext pos pState
 		wantDependency :: !ParseState -> (Bool, GenericDependency, ParseState)
 		wantDependency pState 
 			# (ident, pState) = wantIdentOrQualifiedIdent pState
-			= (True, {gd_ident = ident, gd_index = NoGlobalIndex}, pState)
+			# (vars, pState) = wantList "generic dependency variable(s)" try_variable pState
+			= (True, {gd_ident = ident, gd_index = NoGlobalIndex, gd_vars = vars, gd_nums = repeatn (length vars) (-1)}, pState)
 		
 		wantIdentOrQualifiedIdent pState
 			# (token, pState) = nextToken TypeContext pState

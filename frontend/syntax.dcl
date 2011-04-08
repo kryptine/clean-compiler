@@ -391,6 +391,8 @@ instance <<< IdentOrQualifiedIdent
 :: GenericDependency =
 	{	gd_ident		:: !IdentOrQualifiedIdent
 	, 	gd_index		:: !GlobalIndex
+	, 	gd_vars			:: ![TypeVar]
+	,	gd_nums			:: ![Int] // Mapping from dependency variable to generic type variable
 	}
 
 instance == GenericDependency
@@ -1046,6 +1048,7 @@ cNonRecursiveAppl	:== False
 					| TVI_Iso !DefinedSymbol !DefinedSymbol !DefinedSymbol
 					| TVI_GenTypeVarNumber !Int
 					| TVI_CPSTypeVar !CheatCompiler /* MdM: a pointer to a variable in CleanProverSystem is stored here, using a cast */
+					| TVI_Attr !TypeAttribute
 
 ::	TypeVarInfoPtr	:== Ptr TypeVarInfo
 ::	TypeVarHeap 	:== Heap TypeVarInfo

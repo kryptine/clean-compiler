@@ -32,10 +32,10 @@ where
 
 		# (gen_def, heaps) = alloc_gen_info gen_def heaps
 
-		# (gen_def, cs) = check_generic_dependencies index mod_index gen_ident gen_def cs
-
 		# (gen_def, type_defs, class_defs, modules, heaps, cs)
 			= check_generic_type gen_def mod_index type_defs class_defs modules heaps cs
+
+		# (gen_def, gen_defs, modules, cs) = check_generic_dependencies index mod_index gen_ident gen_def gen_defs modules cs
 
 		# gen_defs = {gen_defs & [index] = gen_def} 
 		# (cs=:{cs_x}) = popErrorAdmin cs
@@ -51,35 +51,6 @@ where
 		# (gen_info_ptr, hp_generic_heap) = newPtr initial_info hp_generic_heap 
 		= (	{gen_def & gen_info_ptr = gen_info_ptr}, 
 			{heaps & hp_generic_heap = hp_generic_heap})
-
-	check_generic_dependencies index mod_index gen_ident gen_def=:{gen_deps} cs
-		# (gen_deps, cs) = foldSt check_dependency gen_deps ([], cs)
-		= ({gen_def & gen_deps = gen_deps}, cs)
-	where
-		check_dependency gen_dep=:{gd_ident, gd_index=gd_index=:{gi_index, gi_module}} (acc, cs) 
-			# (gen_dep, cs) = resolve_dependency_index gen_dep cs
-			| gi_index == index && gi_module == mod_index
-				= (acc, check_generic_error gd_ident "already implicitly depends on itself" cs)
-			| isMember gen_dep acc && gd_index <> NoGlobalIndex
-				= (acc, check_generic_error gd_ident "duplicate generic dependency" cs)
-				= ([gen_dep:acc], cs)
-
-		resolve_dependency_index gen_dep=:{gd_ident} cs
-			= case gd_ident of
-				Ident ident 
-					# (index, cs) = get_generic_index ident mod_index cs
-					= ({gen_dep & gd_index = index}, cs)
-				QualifiedIdent mod_ident name 
-					# (found, {decl_kind, decl_ident, decl_index}, cs) = search_qualified_ident mod_ident name GenericNameSpaceN cs
-					| not found 
-						= (gen_dep, check_generic_error gd_ident "generic dependency not defined" cs)	
-						= case decl_kind of
-							STE_Imported STE_Generic generic_module
-								= ({gen_dep & gd_ident = Ident decl_ident, gd_index = {gi_module = generic_module, gi_index = decl_index}}, cs)
-							_ 
-								= (gen_dep, check_generic_error gd_ident "not a generic function" cs)
-
-		check_generic_error ident msg cs = {cs & cs_error = checkError ident msg cs.cs_error}				
 
 	check_generic_type gen_def=:{gen_type, gen_vars, gen_ident, gen_pos} module_index type_defs class_defs modules heaps=:{hp_type_heaps} cs
 		#! (checked_gen_type, _, type_defs, class_defs, modules, hp_type_heaps, cs) =
@@ -170,6 +141,61 @@ where
 					#! cs_error = checkError tv_ident "context restrictions on generic variables are not allowed" cs_error 
 					-> (th_vars, cs_error)
 				_	-> abort ("check_no_generic_vars_in_contexts: wrong TVI" ---> (tv, tv_info))
+
+	check_generic_dependencies index mod_index gen_ident gen_def=:{gen_vars, gen_deps} gen_defs modules cs
+		# (gen_deps, (gen_defs, modules, cs)) = foldSt check_dependency gen_deps ([], (gen_defs, modules, cs))
+		= ({gen_def & gen_deps = reverse gen_deps}, gen_defs, modules, cs)
+	where
+		check_dependency gen_dep=:{gd_ident, gd_vars} (acc, (gen_defs, modules, cs))
+			# (gen_dep, cs) = resolve_dependency_index gen_dep cs
+			# (gen_dep=:{gd_index, gd_vars}, gen_defs, modules, cs) = check_dependency_vars gen_dep gen_defs modules cs
+			| gd_index.gi_index == index && gd_index.gi_module == mod_index && gd_vars == gen_vars
+				= (acc, (gen_defs, modules, check_generic_dep_error gd_ident "already implicitly depends on itself" cs))
+			| isMember gen_dep acc
+				= (acc, (gen_defs, modules, check_generic_dep_error gd_ident "duplicate generic dependency" cs))
+			= ([gen_dep:acc], (gen_defs, modules, cs))
+
+		resolve_dependency_index gen_dep=:{gd_ident} cs 
+			= case gd_ident of
+				Ident ident 
+					# (index, cs) = get_generic_index ident mod_index cs
+					= ({gen_dep & gd_index = index}, cs)
+				QualifiedIdent mod_ident name 
+					# (found, {decl_kind, decl_ident, decl_index}, cs) = search_qualified_ident mod_ident name GenericNameSpaceN cs
+					| not found 
+						= (gen_dep, check_generic_dep_error gd_ident "generic dependency not defined" cs)	
+					= case decl_kind of
+						STE_Imported STE_Generic generic_module
+							-> ({gen_dep & gd_ident = Ident decl_ident, gd_index = {gi_module = generic_module, gi_index = decl_index}}, cs)
+						_ 
+							-> (gen_dep, check_generic_dep_error gd_ident "not a generic function" cs)
+
+		check_dependency_vars gen_dep=:{gd_ident, gd_vars} gen_defs modules cs 
+			# (gen_defs, modules, cs) = check_dependency_arity gen_dep gen_defs modules cs
+			# (gd_vars, gd_nums, cs) = mapY2St (resolve_dependency_var 0 gen_vars) gd_vars cs
+			= ({gen_dep & gd_vars = gd_vars, gd_nums = gd_nums}, gen_defs, modules, cs)
+		where
+			check_dependency_arity {gd_ident, gd_index, gd_vars} gen_defs modules cs
+				# (gen_def, gen_defs, modules) = lookup_dependency_def gd_index gen_defs modules
+				| not (length gd_vars == length gen_def.gen_vars)
+					= (gen_defs, modules, check_generic_dep_error gd_ident "incorrect dependency variable arity" cs)
+				= (gen_defs, modules, cs)
+			where
+				lookup_dependency_def {gi_module, gi_index} gen_defs modules
+					| gi_module == mod_index
+						# (gen_def, gen_defs) = gen_defs![gi_index]
+						= (gen_def, gen_defs, modules)
+					# (gen_def, modules) = modules![gi_module].dcl_common.com_generic_defs.[gi_index]
+					= (gen_def, gen_defs, modules)
+				
+			resolve_dependency_var num [] var cs
+				= (var, -1, check_generic_dep_error gd_ident "generic dependency is indexed by an unbound generic variable" cs)
+			resolve_dependency_var num [gen_var:gen_vars] var cs
+				| var.tv_ident.id_name == gen_var.tv_ident.id_name
+					= (gen_var, num, cs)
+				= resolve_dependency_var (inc num) gen_vars var cs
+
+		check_generic_dep_error ident msg cs = {cs & cs_error = checkError ident msg cs.cs_error}	
 
 checkGenericCaseDefs :: !Index !*{#GenericCaseDef} !*{#GenericDef} !u:{#CheckedTypeDef} !*{#DclModule} !*Heaps !*CheckState
 						   -> (!*{#GenericCaseDef},!*{#GenericDef},!u:{#CheckedTypeDef},!*{#DclModule},!.Heaps,!.CheckState)

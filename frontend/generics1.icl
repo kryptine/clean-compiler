@@ -1375,21 +1375,20 @@ where
 // limitations:
 // - context restrictions on generic variables are not allowed
 buildMemberType :: !GenericDef !TypeKind !TypeVar !*GenericState -> ( !SymbolType, !*GenericState)
-buildMemberType gen_def=:{gen_ident,gen_pos,gen_type,gen_vars} kind class_var gs=:{gs_predefs}
+buildMemberType gen_def=:{gen_ident,gen_pos,gen_type,gen_vars,gen_deps} kind class_var gs=:{gs_predefs}
 	#! (gen_type, gs) = add_bimap_contexts gen_def gs 
 
 	#! th = {th_vars = gs.gs_tvarh, th_attrs = gs.gs_avarh}
-	#! (kind_indexed_st, gatvs, th, gs_error) 
-		= buildKindIndexedType gen_type gen_vars kind gen_ident gen_pos th gs.gs_error
+	#! (kind_indexed_st, gatvs, th, modules, error) 
+		= buildKindIndexedType gen_type gen_vars gen_deps kind gen_ident gen_pos th gs.gs_modules gs.gs_error
 		
-	#! (member_st, th, gs_error) 
-		= replace_generic_vars_with_class_var kind_indexed_st gatvs th gs_error
+	#! (member_st, th, error) 
+		= replace_generic_vars_with_class_var kind_indexed_st gatvs th error
 
 	#! th = assertSymbolType member_st th // just paranoied about cleared variables
 	#! th = assertSymbolType gen_type th
 	
-	# {th_vars, th_attrs} = th
-	#! gs = {gs & gs_avarh = th_attrs, gs_tvarh = th_vars, gs_error = gs_error }
+	#! gs = {gs & gs_avarh = th.th_attrs, gs_tvarh = th.th_vars, gs_modules = modules, gs_error = error }
 	= (member_st, gs)
 where
 	add_bimap_contexts 
@@ -3298,57 +3297,63 @@ bimap_from_arrow_arg_id_expression arg_exprs main_module_index predefs funs_and_
 buildKindIndexedType :: 
 		!SymbolType			// symbol type to kind-index
 		![TypeVar]			// generic type variables
+		![GenericDependency]		// generic dependencies
 		!TypeKind			// kind index
 		!Ident				// name for debugging
 		!Position 			// position for debugging
 		!*TypeHeaps			// type heaps
+		!*Modules
 		!*ErrorAdmin		
 	-> 	( !SymbolType		// instantiated type
 		, ![ATypeVar]		// fresh generic type variables
 		, !*TypeHeaps		// type heaps
+		, !*Modules
 		, !*ErrorAdmin	
 		)
-buildKindIndexedType st gtvs kind ident pos th error
-	#! th = clearSymbolType st th
-	#! (fresh_st, fresh_gtvs, th) = fresh_generic_type st gtvs th	
+buildKindIndexedType st gtvs deps kind ident pos th modules error
+	#! (fresh_st, gatvs, th) = fresh_generic_type st gtvs th	
 
-	#! (gatvs, th) = collectAttrsOfTypeVarsInSymbolType fresh_gtvs fresh_st th
-
-	#! (kind_indexed_st, _, th, error) = build_symbol_type fresh_st gatvs kind 1 th error	
+	#! (kind_indexed_st, _, (th, modules, error)) = build_symbol_type fresh_st gatvs deps kind ident pos 1 (th, modules, error)
 	 	 
 	#! th = clearSymbolType kind_indexed_st th
 	#! th = clearSymbolType st th				// paranoja
-	= (kind_indexed_st, gatvs, th, error)
+	= (kind_indexed_st, gatvs, th, modules, error)
 where
 	fresh_generic_type st gtvs th
+		# th = clearSymbolType st th
 		# (fresh_st, th) = freshSymbolType st th
-		# fresh_gtvs = take (length gtvs) fresh_st.st_vars		
-		= (fresh_st, fresh_gtvs, th)
+		# fresh_gtvs = take (length gtvs) fresh_st.st_vars
+		# (gatvs, th) = collectAttrsOfTypeVarsInSymbolType fresh_gtvs fresh_st th		
+		= (fresh_st, gatvs, th)
 
 	build_symbol_type ::
 			 !SymbolType 	// generic type, 
 			 ![ATypeVar]	// attributed generic variables
+			 ![GenericDependency]	// generic dependencies
 			 !TypeKind 		// kind to specialize to 
+			 !Ident		
+	 	  	 !Position 	
 			 !Int 			// current order (in the sense of the order of the kind)
-			 !*TypeHeaps !*ErrorAdmin
+			 (!*TypeHeaps, !*Modules, !*ErrorAdmin)
 		-> ( !SymbolType	// new generic type
 			, ![ATypeVar]	// fresh copies of generic variables created for the 
 							// generic arguments
-			, !*TypeHeaps, !*ErrorAdmin)
-	build_symbol_type st gatvs KindConst order th error	
-		= (st, [], th, error)
-	build_symbol_type st gatvs (KindArrow kinds) order th error
+			, (!*TypeHeaps, !*Modules, !*ErrorAdmin))
+	build_symbol_type st _ _ KindConst _ _ _ (th, modules, error)	
+		= (st, [], (th, modules, error))
+	build_symbol_type st gatvs deps (KindArrow kinds) ident pos order (th, modules, error)
 		| order > 2
-			# error = reportError ident pos "kinds of order higher then 2 are not supported" error
-			= (st, [], th, error)
+			# error = reportError ident pos "kinds of order higher than 2 are not supported" error
+			= (st, [], (th, modules, error))
 		
-		# (arg_sts, arg_gatvss, th, error) 
-			= build_args st gatvs order kinds th error 
+		# (arg_stss, arg_gatvss, (_, th, modules, error))
+			= mapY2St (build_arg st gatvs deps ident pos order) kinds (0, th, modules, error)
+		# arg_sts = flatten arg_stss
 
 		# (body_st, th) 
 			= build_body st gatvs (transpose arg_gatvss) th 
 
-		# num_added_args = length kinds
+		# num_added_args = length kinds * (length deps + 1)
 		# new_st = 
 			{ st_vars = removeDup (
 					foldr (++) body_st.st_vars [st_vars \\ {st_vars}<-arg_sts])
@@ -3364,64 +3369,81 @@ where
 			, st_args_strictness = insert_n_lazy_values_at_beginning num_added_args body_st.st_args_strictness	 
 			}
 	
-		= (new_st, flatten arg_gatvss, th, error)
-			//---> ("build_symbol_type returns", arg_gatvss, st)
-
-	build_args st gatvs order kinds th error
-		# (arg_sts_and_gatvss, (_,th,error)) 
-			= mapSt (build_arg st gatvs order) kinds (1,th,error)
-		# (arg_sts, arg_gatvss) = unzip arg_sts_and_gatvss
-		= (arg_sts, arg_gatvss, th, error)
+		= (new_st, flatten arg_gatvss, (th, modules, error))
 
 	build_arg :: 
 			!SymbolType 		// current part of the generic type
 			![ATypeVar]			// generic type variables with their attrs
+			![GenericDependency]		// generic dependencies
+	 	 	!Ident
+	 	 	!Position
 			!Int 				// order
 			!TypeKind			// kind corrseponding to the arg
 			( !Int				// the argument number
 			, !*TypeHeaps
+			, !*Modules
 			, !*ErrorAdmin
 			)				
-		->  ( (!SymbolType, [ATypeVar]) // fresh symbol type and generic variables 
+		->  ( ![SymbolType], [ATypeVar] // fresh symbol type and generic variables 
 			, 	( !Int			// incremented argument number
 				, !*TypeHeaps
+				, !*Modules
 				, !*ErrorAdmin
 				)
 			)
-	build_arg st gatvs order kind (arg_num, th, error)		
+	build_arg st gatvs deps ident pos order kind (arg_num, th, modules, error)		
 		#! th = clearSymbolType st th
-		#! (fresh_gatvs, th) = mapSt subst_gatv gatvs th 
+		#! (fresh_gatvs, th) = mapSt create_fresh_gatv gatvs th 
+		#! (th, error) = foldSt (uncurry make_subst_gatv) (zip2 gatvs fresh_gatvs) (th, error)
 		#! (new_st, th) = applySubstInSymbolType st th
-		
-		#! (new_st, forall_atvs, th, error) 
-			= build_symbol_type new_st fresh_gatvs kind (inc order) th error	
+		#! (new_st, forall_atvs, (th, modules, error)) 
+			= build_symbol_type new_st fresh_gatvs deps kind ident pos (inc order) (th, modules, error)	
 		#! (curry_st, th)	
-			= curryGenericArgType1 new_st ("cur" +++ toString order +++ postfix) th 	
-		
+			= curryGenericArgType1 new_st ("cur" +++ toString order +++ postfix) th
 		#! curry_st = adjust_forall curry_st forall_atvs
-				
-		= ((curry_st, fresh_gatvs), (inc arg_num, th, error))
+
+		# (curry_dep_sts, (th, modules, error)) = mapSt (build_dependency_arg fresh_gatvs order kind) deps (th, modules, error)	
+
+		= ([curry_st:curry_dep_sts], fresh_gatvs, (inc arg_num, th, modules, error))
 	where
 		postfix = toString arg_num
 
-		subst_gatv atv=:{atv_attribute, atv_variable} th=:{th_attrs, th_vars}			
-			# (tv, th_vars) = subst_gtv atv_variable th_vars 
-			# (attr, th_attrs) = subst_attr atv_attribute th_attrs 			
-			=	( {atv & atv_variable = tv, atv_attribute = attr}
-			 	, {th & th_vars = th_vars, th_attrs = th_attrs}
-			 	)	
-			
-		// generic type var is replaced with a fresh one
-		subst_gtv {tv_info_ptr, tv_ident} th_vars 
-			# (tv, th_vars) = freshTypeVar (postfixIdent tv_ident.id_name postfix) th_vars	
-			= (tv, writePtr tv_info_ptr (TVI_Type (TV tv)) th_vars)
-		
-		subst_attr (TA_Var {av_ident, av_info_ptr}) th_attrs 
-			# (av, th_attrs) = freshAttrVar (postfixIdent av_ident.id_name postfix) th_attrs
-			= (TA_Var av, writePtr av_info_ptr (AVI_Attr (TA_Var av)) th_attrs)
+		create_fresh_gatv :: ATypeVar *TypeHeaps -> (!ATypeVar, !*TypeHeaps)
+		create_fresh_gatv atv=:{atv_attribute, atv_variable} th=:{th_attrs, th_vars}
+		    # (fresh_atv_variable, th_vars) = freshTypeVar (postfixIdent atv_variable.tv_ident.id_name postfix) th_vars   
+		    # (fresh_atv_attribute, th_attrs)
+		        = case atv_attribute of
+				TA_Var {av_ident}
+					# (av, th_attrs) = freshAttrVar (postfixIdent av_ident.id_name postfix) th_attrs
+					-> (TA_Var av, th_attrs)
+				TA_Multi
+					-> (TA_Multi, th_attrs)
+				TA_Unique
+					-> (TA_Unique, th_attrs)
+		    # new_atv = {atv_variable = fresh_atv_variable, atv_attribute = fresh_atv_attribute}
+		    # th = {th & th_vars = th_vars, th_attrs = th_attrs}		    
+		    = (new_atv, th)
 
-		subst_attr TA_Multi th = (TA_Multi, th)
-		subst_attr TA_Unique th = (TA_Unique, th)
+		make_subst_gatv :: ATypeVar ATypeVar (*TypeHeaps, *ErrorAdmin) -> (!*TypeHeaps, !*ErrorAdmin)
+		make_subst_gatv atv=:{atv_attribute, atv_variable} gatv=:{atv_attribute=new_atv_attribute, atv_variable=new_atv_variable} (th=:{th_attrs, th_vars}, error)
+			# th_vars = make_subst_gtv atv_variable new_atv_variable th_vars
+			# (th_attrs, error) = make_subst_attr atv_attribute new_atv_attribute th_attrs error
+ 			# th & th_vars = th_vars, th_attrs = th_attrs
+			= (th, error)
+		where
+			make_subst_gtv :: TypeVar TypeVar *TypeVarHeap -> *TypeVarHeap
+			make_subst_gtv {tv_info_ptr} new_atv_variable th_vars
+		        	= writePtr tv_info_ptr (TVI_Type (TV new_atv_variable)) th_vars
+    
+			make_subst_attr :: TypeAttribute TypeAttribute *AttrVarHeap *ErrorAdmin -> (!*AttrVarHeap,!*ErrorAdmin)
+			make_subst_attr (TA_Var {av_ident, av_info_ptr}) new_atv_attribute=:(TA_Var _) th_attrs error
+				= (writePtr av_info_ptr (AVI_Attr new_atv_attribute) th_attrs, error)
+			make_subst_attr TA_Multi TA_Multi th_attrs error
+				= (th_attrs, error)
+			make_subst_attr TA_Unique TA_Unique th_attrs error
+				= (th_attrs, error)
+			make_subst_attr _ _ th_attrs error
+				= (th_attrs, reportError ident pos ("inconsistency with attributes of a generic dependency") error) 
 
 		adjust_forall curry_st [] = curry_st
 		adjust_forall curry_st=:{st_result} forall_atvs 
@@ -3434,6 +3456,19 @@ where
 					= curry_st.st_vars -- [atv_variable \\ {atv_variable} <- forall_atvs]
 				}
 
+		build_dependency_arg fresh_gatvs order kind {gd_index, gd_nums} (th, modules, error)
+			# ({gen_type, gen_vars, gen_deps, gen_ident, gen_pos}, modules) 
+				= modules![gd_index.gi_module].com_generic_defs.[gd_index.gi_index]
+			# (fresh_dep_st, fresh_dep_gatvs, th) = fresh_generic_type gen_type gen_vars th
+			# to_gatvs = map (\num -> fresh_gatvs !! num) gd_nums
+			# (th, error) = foldSt (uncurry make_subst_gatv) (zip2 fresh_dep_gatvs to_gatvs) (th, error)
+			# (new_dep_st, th) = applySubstInSymbolType fresh_dep_st th
+			# (new_dep_st, forall_dep_atvs, (th, modules, error)) 
+				= build_symbol_type new_dep_st to_gatvs gen_deps kind gen_ident gen_pos (inc order) (th, modules, error)
+			# (curry_dep_st, th) = curryGenericArgType1 new_dep_st ("cur" +++ toString order +++ postfix) th
+			# curry_dep_st = adjust_forall curry_dep_st forall_dep_atvs
+			= (curry_dep_st, (th, modules, error))
+		
 	build_body :: 
 			!SymbolType 
 			![ATypeVar]
@@ -3945,9 +3980,12 @@ collectAttrsOfTypeVars tvs type th
 	#! (th=:{th_vars}) = clearType type th
 		//---> ("collectAttrsOfTypeVars called for", tvs)
 	
-	# th_vars = foldSt (\{tv_info_ptr} h->writePtr tv_info_ptr TVI_Used h) tvs th_vars 
+	# th_vars = foldSt (\{tv_info_ptr} h->writePtr tv_info_ptr TVI_Empty h) tvs th_vars 
 	
-	#! (atvs, th_vars) = foldType on_type on_atype type ([], th_vars)
+	# th_vars = foldType on_type on_atype type th_vars
+
+	# (attrs, th_vars) = mapSt read_attr tvs th_vars
+	# atvs = [makeATypeVar tv attr \\ tv <- tvs & attr <- attrs]
 
 	# th_vars = foldSt (\{tv_info_ptr} h->writePtr tv_info_ptr TVI_Empty h) tvs th_vars 
 
@@ -3963,14 +4001,17 @@ where
 	//??? TFA -- seems that it is not needed
  	on_atype _ st = st 	
 
-	on_type_var tv=:{tv_info_ptr} attr (atvs, th_vars)	
+	on_type_var tv=:{tv_info_ptr} attr th_vars
 	 	#! (tvi, th_vars) = readPtr tv_info_ptr th_vars
 	 	= case tvi of
-	 		TVI_Used
-	 			# th_vars = writePtr tv_info_ptr TVI_Empty th_vars
-	 			-> ([makeATypeVar tv attr : atvs], th_vars)
-	 		TVI_Empty 
-	 			-> (atvs, th_vars) 
+	 		TVI_Empty
+	 			-> writePtr tv_info_ptr (TVI_Attr attr) th_vars
+	 		TVI_Attr _ 
+	 			-> th_vars
+
+	read_attr {tv_info_ptr} th_vars
+		# (TVI_Attr attr, th_vars) = readPtr tv_info_ptr th_vars
+		= (attr, th_vars)
 
 collectAttrsOfTypeVarsInSymbolType tvs {st_args, st_result} th
  	= collectAttrsOfTypeVars tvs [st_result:st_args] th  

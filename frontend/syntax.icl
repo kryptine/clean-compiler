@@ -2,7 +2,7 @@ implementation module syntax
 
 import StdEnv, compare_constructor // ,RWSDebug
 
-import scanner, general, Heap, typeproperties, utilities, compilerSwitches
+import scanner, general, Heap, typeproperties, utilities, compilerSwitches, StdCompare
 import syntax
 
 instance toString Ident
@@ -18,7 +18,7 @@ instance <<< IdentOrQualifiedIdent
 instance == GenericDependency
 	where
 		(==) gen_dep1 gen_dep2
-			= gen_dep1.gd_index == gen_dep2.gd_index
+			= gen_dep1.gd_index == gen_dep2.gd_index && gen_dep1.gd_vars == gen_dep2.gd_vars
 
 instance toString (Import from_symbol)
 where toString {import_module} = toString import_module
