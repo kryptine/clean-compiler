@@ -1614,7 +1614,7 @@ where
 			#! (fun_type, heaps, error)
 				= determine_type_of_member_instance member_def ins_type heaps error
 
-			#! fun_ident = genericIdentToFunIdent gc_ident.id_name gc_type_cons
+			#! fun_ident = genericIdentToFunIdent gc_ident.id_name gc_type_cons ---> (gc_ident, ins_type)
 
 			| not has_generic_info
 				#! (dcl_functions, heaps)
