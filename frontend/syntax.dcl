@@ -314,7 +314,6 @@ cNameLocationDependent :== True
 	to store the index of the function that has been specialized.
 */
 
-
 ::	Specials
 	= SP_ParsedSubstitutions 	![Env Type TypeVar]
 	| SP_Substitutions 		 	![SpecialSubstitution]
@@ -432,9 +431,6 @@ cNameLocationDependent :== True
 	,	gt_vars			:: ![TypeVar]			// generic arguments
 	,	gt_arity		:: !Int					// number of generic arguments	
 	}
-
-//getGenericClassForKind 	:: !GenericDef !TypeKind -> (!Bool, DefinedSymbol)
-//addGenericKind			:: !GenericDef !TypeKind -> !GenericDef
 
 ::	InstanceType =
 	{	it_vars			:: [TypeVar]
@@ -987,6 +983,7 @@ cNonRecursiveAppl	:== False
 			
 			|	TQV	TypeVar
 			|	TempQV !TempVarId				/* Auxiliary, used during type checking */
+			|	TempQDV !TempVarId				// Auxiliary, used during type checking, existential type variable in dynamic pattern
 
 			|	TLifted !TypeVar				/* Auxiliary, used during type checking of lifted arguments */
 			|	TQualifiedIdent !Ident !String ![AType]
@@ -998,6 +995,7 @@ cNonRecursiveAppl	:== False
 ::	ConsVariable = CV 		!TypeVar
 				 | TempCV 	!TempVarId
 				 | TempQCV 	!TempVarId
+				 | TempQCDV !TempVarId	// existential type variable in dynamic pattern
 
 ::	DynamicType =
 	{	dt_uni_vars 	:: ![ATypeVar]

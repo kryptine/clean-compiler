@@ -1390,10 +1390,12 @@ convertTypeNode (TAS typeSymbolIdent typeArgs strictness)
 	=	beNormalTypeNode (convertTypeSymbolIdent typeSymbolIdent) (convertAnnotatedTypeArgs typeArgs strictness)
 convertTypeNode (TV {tv_ident})
 	=	beVarTypeNode tv_ident.id_name
-convertTypeNode (TempQV n)
-	=	beVarTypeNode ("_tqv" +++ toString n)
 convertTypeNode (TempV n)
 	=	beVarTypeNode ("_tv" +++ toString n)
+convertTypeNode (TempQV n)
+	=	beVarTypeNode ("_tqv" +++ toString n)
+convertTypeNode (TempQDV n)
+	=	beVarTypeNode ("_tqv" +++ toString n)
 convertTypeNode (a --> b) 
 	=	beNormalTypeNode (beBasicSymbol BEFunType) (convertTypeArgs [a, b])
 convertTypeNode (TArrow1 a) 
@@ -1418,6 +1420,8 @@ consVariableToType (TempCV varId)
 	=	TempV varId
 consVariableToType (TempQCV varId)
 	=	TempQV varId
+consVariableToType (TempQCDV varId)
+	=	TempQDV varId
 
 convertTypeArgs :: [AType] -> BEMonad BETypeArgP
 convertTypeArgs args

@@ -161,6 +161,8 @@ where
 		= file <<<  "v" <<< tv <<< ' ' 
 	(<<<) file (TempQCV tv)
 		= file <<<  "E." <<< tv <<< ' ' 
+	(<<<) file (TempQCDV tv)
+		= file <<<  "E." <<< tv <<< ' ' 
 
 instance <<< StrictnessList
 where
@@ -196,7 +198,9 @@ where
 	(<<<) file (TQV varid)
 		= file <<< "E." <<< varid
 	(<<<) file (TempQV tv_number)
-		= file  <<< "E." <<< tv_number <<< ' ' 
+		= file  <<< "E.#" <<< tv_number <<< ' ' 
+	(<<<) file (TempQDV tv_number)
+		= file  <<< "E.#" <<< tv_number <<< ' ' 
 	(<<<) file TE
 		= file <<< "### EMPTY ###"
 /*

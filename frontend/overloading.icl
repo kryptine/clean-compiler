@@ -3,7 +3,7 @@ implementation module overloading
 import StdEnv
 
 import syntax, check, type, typesupport, utilities, unitype, predef, checktypes, convertDynamics 
-import genericsupport, compilerSwitches, type_io_common
+import genericsupport, type_io_common
 
 ::	LocalTypePatternVariable =
 	{	ltpv_var			:: !Int
@@ -84,7 +84,7 @@ containsContext new_tc []
 	= False
 containsContext new_tc [tc : tcs]
 	= new_tc == tc || containsContext new_tc tcs
-	
+
 FoundObject object :== object.glob_module <> NotFound
 ObjectNotFound 	:== { glob_module = NotFound, glob_object = NotFound }
 
@@ -115,15 +115,13 @@ ObjectNotFound 	:== { glob_module = NotFound, glob_object = NotFound }
 
 reduceContexts :: !ReduceInfo ![TypeContext] !*ReduceState -> (![ClassApplication], !*ReduceState)
 reduceContexts info tcs rs_state
-	=	mapSt (try_to_reduce_context info) tcs rs_state
+	= mapSt (try_to_reduce_context info) tcs rs_state
 where
 	try_to_reduce_context :: !ReduceInfo !TypeContext !*ReduceState -> *(!ClassApplication, !*ReduceState)
 	try_to_reduce_context info tc rs_state=:{rs_predef_symbols, rs_new_contexts}
 		| context_is_reducible tc rs_predef_symbols
 			= reduce_any_context info tc rs_state
-//				---> ("try_to_reduce_context (Yes)", tc)
 		| containsContext tc rs_new_contexts
-//				---> ("try_to_reduce_context (No)", tc)
 			= (CA_Context tc, rs_state)
 			# {rs_var_heap, rs_new_contexts} = rs_state
 			# (tc_var, rs_var_heap) = newPtr VI_Empty rs_var_heap
@@ -330,11 +328,15 @@ where
 	context_is_reducible tc=:{tc_class=TCGeneric {gtc_class}, tc_types = [type : types]} predef_symbols
 		= type_is_reducible type gtc_class predef_symbols && types_are_reducible types type gtc_class predef_symbols
 
-	type_is_reducible :: Type a PredefinedSymbols -> Bool
+	type_is_reducible :: Type (Global DefinedSymbol) PredefinedSymbols -> Bool
 	type_is_reducible (TempV _) tc_class predef_symbols
 		= False // is_predefined_symbol tc_class.glob_module tc_class.glob_object.ds_index PD_TypeCodeClass predef_symbols
 	type_is_reducible (_ :@: _) tc_class predef_symbols
 		= False
+	type_is_reducible (TempQV _) tc_class predef_symbols
+		= False
+	type_is_reducible (TempQDV _) {glob_object={ds_index},glob_module} predef_symbols
+		= is_predefined_symbol glob_module ds_index PD_TypeCodeClass predef_symbols
 	type_is_reducible _ tc_class predef_symbols
 		= True
 
@@ -539,13 +541,13 @@ where
 		reduce_tc_context defs type_code_class type=:(TA cons_id=:{type_index} cons_args) rtcs_state=:{rtcs_error,rtcs_type_heaps}
 			# rtcs_error
 				= disallow_abstract_types_in_dynamics defs type_index rtcs_error
-				
+
 			# (expanded, type, rtcs_type_heaps)
 				=	tryToExpandTypeSyn defs type cons_id cons_args rtcs_type_heaps
 			# rtcs_state = {rtcs_state & rtcs_error=rtcs_error, rtcs_type_heaps=rtcs_type_heaps}
 			| expanded
 				=	reduce_tc_context defs type_code_class type rtcs_state
-				
+
 			# type_constructor = toTypeCodeConstructor type_index defs
 			  (rc_red_contexts, rtcs_state) = reduce_TC_contexts defs type_code_class cons_args rtcs_state
 			= (CA_GlobalTypeCode { tci_constructor = type_constructor, tci_contexts = rc_red_contexts }, rtcs_state)
@@ -556,7 +558,14 @@ where
 		reduce_tc_context defs type_code_class (arg_type --> result_type) rtcs_state
 			#  (rc_red_contexts, rtcs_state) = reduce_TC_contexts defs type_code_class [arg_type, result_type] rtcs_state
 			= (CA_GlobalTypeCode { tci_constructor = GTT_Function, tci_contexts = rc_red_contexts }, rtcs_state)
-		reduce_tc_context defs type_code_class (TempQV var_number) rtcs_state=:{rtcs_type_pattern_vars, rtcs_var_heap}
+		reduce_tc_context defs type_code_class (TempQV var_number) rtcs_state=:{rtcs_var_heap,rtcs_new_contexts}
+			# (tc_var, rtcs_var_heap) = newPtr VI_Empty rtcs_var_heap
+			# rtcs_state={rtcs_state & rtcs_var_heap=rtcs_var_heap}
+			# tc = { tc_class = type_code_class, tc_types = [TempQV var_number], tc_var = tc_var }
+			| containsContext tc rtcs_new_contexts
+				= (CA_Context tc, rtcs_state)
+				= (CA_Context tc, {rtcs_state & rtcs_new_contexts = [tc : rtcs_new_contexts]})
+		reduce_tc_context defs type_code_class (TempQDV var_number) rtcs_state=:{rtcs_type_pattern_vars, rtcs_var_heap}
 			# (inst_var, (rtcs_type_pattern_vars, rtcs_var_heap)) = addLocalTCInstance var_number (rtcs_type_pattern_vars, rtcs_var_heap)
 			# rtcs_state = {rtcs_state & rtcs_type_pattern_vars=rtcs_type_pattern_vars, rtcs_var_heap=rtcs_var_heap}
 			= (CA_LocalTypeCode inst_var, rtcs_state)
@@ -630,7 +639,7 @@ expand_and_match cons_id1 cons_args1 cons_id2 cons_args2 defs type1 type2 type_h
 		= (False, type_heaps)
 
 instance match Type
-where 
+where
 	match defs (TV {tv_info_ptr}) type type_heaps=:{th_vars}
 		= (True, { type_heaps & th_vars = th_vars <:= (tv_info_ptr,TVI_Type type)})
 	match defs type1=:(TA cons_id1 cons_args1) type2=:(TA cons_id2 cons_args2) type_heaps
@@ -663,17 +672,12 @@ where
 		| diff >= 0
 			= match defs (TV tv, types) (TA { type_cons & type_arity = diff } (take diff cons_args), drop diff cons_args) type_heaps
 			= (False, type_heaps)
-//AA..
+	match defs (TB tb1) (TB tb2) type_heaps
+		= (tb1 == tb2, type_heaps)
 	match defs TArrow TArrow type_heaps
 		= (True, type_heaps)
 	match defs (TArrow1 t1) (TArrow1 t2) type_heaps
 		= match defs t1 t2 type_heaps
-//..AA		
-	match defs (TB tb1) (TB tb2) type_heaps
-		= (tb1 == tb2, type_heaps)
-/*	match defs type (TB (BT_String array_type)) type_heaps
-		= match defs type array_type type_heaps
-*/
 	match defs type1=:(TA cons_id cons_args) type2 type_heaps
 		# (succ, type1, type_heaps) = tryToExpandTypeSyn defs type1 cons_id cons_args type_heaps
 		| succ
@@ -721,6 +725,8 @@ consVariableToType (TempCV temp_var_id)
 	= TempV temp_var_id
 consVariableToType (TempQCV temp_var_id)
 	= TempQV temp_var_id
+consVariableToType (TempQCDV temp_var_id)
+	= TempQDV temp_var_id
 
 trySpecializedInstances :: [TypeContext] [Special] *TypeHeaps -> (!Global Index,!*TypeHeaps)
 trySpecializedInstances type_contexts [] type_heaps
@@ -828,8 +834,7 @@ where
 		# (super_classes, type_heaps) = foldSt generate_super_classes contexts ([], type_heaps)
 		  sub_classes = foldSt (remove_doubles super_classes) contexts []
 		= (sub_classes, type_heaps)
-	
-	
+
 	generate_super_classes tc=:{tc_class=TCGeneric {gtc_class}} st
 		= generate_super_classes {tc & tc_class=TCClass gtc_class} st
 	generate_super_classes {tc_class=TCClass {glob_object={ds_index},glob_module},tc_types} (super_classes, type_heaps)
@@ -870,6 +875,7 @@ selectFromDictionary  dict_mod dict_index member_index defs
 	  { fs_ident, fs_index } = rt_fields.[member_index]
 	= { glob_module = dict_mod, glob_object = { ds_ident = fs_ident, ds_index = fs_index, ds_arity = 1 }}
 
+getDictionaryTypeAndConstructor :: !(Global DefinedSymbol) !{#CommonDefs} -> (!DefinedSymbol,!DefinedSymbol)
 getDictionaryTypeAndConstructor {glob_module, glob_object = {ds_ident,ds_index}} defs	  
 	# {class_dictionary} = defs.[glob_module].com_class_defs.[ds_index]
 	  (RecordType {rt_constructor}) = defs.[glob_module].com_type_defs.[class_dictionary.ds_index].td_rhs
@@ -921,7 +927,7 @@ convertOverloadedCall defs contexts symbol=:{symb_ident, symb_kind = SK_Generic 
 	= case opt_member_glob of		
 		No 
 			# error = checkError ("no generic instances of " +++ toString symb_ident +++ " for kind") kind error
-			-> (heaps, expr_info_ptrs, error)	
+			-> (heaps, expr_info_ptrs, error)
  		Yes member_glob -> convertOverloadedCall defs contexts {symbol & symb_kind = SK_OverloadedFunction member_glob} expr_ptr class_appls (heaps, expr_info_ptrs, error)  				
 convertOverloadedCall defs contexts {symb_ident,symb_kind = SK_TypeCode} expr_info_ptr class_appls (heaps, ptrs, error)
 	# (class_expressions, (heaps, ptrs)) = convertClassApplsToExpressions defs contexts class_appls (heaps, ptrs)
@@ -929,7 +935,6 @@ convertOverloadedCall defs contexts {symb_ident,symb_kind = SK_TypeCode} expr_in
 convertOverloadedCall defs contexts {symb_ident} expr_info_ptr appls (heaps,ptrs, error)
 	# (class_expressions, (heaps, ptrs)) = convertClassApplsToExpressions defs contexts appls (heaps,ptrs)
 	= ({ heaps & hp_expression_heap = heaps.hp_expression_heap <:= (expr_info_ptr, EI_Context class_expressions)}, ptrs, error)
-
 
 expressionToTypeCodeExpression (TypeCodeExpression texpr)
 	= texpr
@@ -952,6 +957,8 @@ where
 	toString (CA_LocalTypeCode _)	= abort "CA_LocalTypeCode"
 	toString (CA_GlobalTypeCode _) 	= abort "CA_GlobalTypeCode"
 
+convertClassApplsToExpressions :: {#CommonDefs} [TypeContext] [ClassApplication] *( *Heaps, [ExprInfoPtr])
+															-> *(![Expression], !*(!*Heaps,![ExprInfoPtr]))
 convertClassApplsToExpressions defs contexts cl_appls heaps_and_ptrs
 	= mapSt (convert_class_appl_to_expression defs contexts) cl_appls heaps_and_ptrs
 where
@@ -1051,7 +1058,7 @@ determineContextAddress contexts defs this_context type_heaps
 	= look_up_context_and_address this_context contexts defs type_heaps
 where
 	look_up_context_and_address :: !TypeContext ![TypeContext] !{#CommonDefs} !*TypeHeaps -> (TypeContext, [(Int, Global DefinedSymbol)], !*TypeHeaps)
-	look_up_context_and_address this_context []  defs type_heaps
+	look_up_context_and_address this_context [] defs type_heaps
 		= abort "look_up_context_and_address (overloading.icl)"
 	look_up_context_and_address this_context [tc : tcs] defs type_heaps
 		#! (may_be_addres, type_heaps) = determine_address this_context tc [] defs type_heaps
@@ -1239,7 +1246,6 @@ where
 		add_universal_vars_to_type uni_vars at=:{at_type}
 			= { at & at_type = TFA uni_vars at_type }
 
-		
 		convert_local_dynamics loc_dynamics state
 			= foldSt update_dynamic loc_dynamics state
 
@@ -1280,10 +1286,8 @@ toTypeCodeConstructor type=:{glob_object=type_index, glob_module=module_index} c
 	| module_index == cPredefinedModuleIndex
 		= GTT_PredefTypeConstructor type
 	// otherwise
-		# type
-			=	common_defs.[module_index].com_type_defs.[type_index]
-		# td_fun_index
-			=	type.td_fun_index
+		# type = common_defs.[module_index].com_type_defs.[type_index]
+		# td_fun_index = type.td_fun_index
 		// sanity check ...
 		| td_fun_index == NoIndex
 			=	fatal "toTypeCodeConstructor" ("no function (" +++ type.td_ident.id_name +++ ")")
@@ -1302,16 +1306,13 @@ class toTypeCodeExpression type :: type !(!*TypeCodeInfo,!*VarHeap,!*ErrorAdmin)
 
 instance toTypeCodeExpression Type where
 	toTypeCodeExpression type=:(TA cons_id=:{type_index} type_args) (tci=:{tci_dcl_modules,tci_common_defs},var_heap,error)
-		# type_heaps
-			=	{th_vars = tci.tci_type_var_heap, th_attrs = tci.tci_attr_var_heap}
+		# type_heaps = {th_vars = tci.tci_type_var_heap, th_attrs = tci.tci_attr_var_heap}
 		# (expanded, type, type_heaps)
 			=	tryToExpandTypeSyn tci_common_defs type cons_id type_args type_heaps
-		# tci
-			=	{tci & tci_type_var_heap = type_heaps.th_vars, tci_attr_var_heap = type_heaps.th_attrs}
+		# tci = {tci & tci_type_var_heap = type_heaps.th_vars, tci_attr_var_heap = type_heaps.th_attrs}
 		| expanded
 			=	toTypeCodeExpression type (tci,var_heap,error)
-		# type_constructor
-			=	toTypeCodeConstructor type_index tci_common_defs
+		# type_constructor = toTypeCodeConstructor type_index tci_common_defs
 		  (type_code_args, tci)
 		  	=	mapSt (toTypeCodeExpression) type_args (tci,var_heap,error)
 		= (TCE_Constructor type_constructor type_code_args, tci)
@@ -1334,7 +1335,6 @@ instance toTypeCodeExpression Type where
 		  (type_code_args, st)
 		  	=	mapSt (toTypeCodeExpression) args st
 		= (foldl TCE_App type_code_var type_code_args, st)
-
 
 instance toTypeCodeExpression TypeVar where
 	toTypeCodeExpression {tv_ident,tv_info_ptr} (tci=:{tci_type_var_heap}, var_heap, error)
@@ -1822,12 +1822,6 @@ where
 		= equalTypeVars tv var_number type_var_heap
 	equalTypes (arg_type1 --> restype1) (arg_type2 --> restype2) type_var_heap
 		= equalTypes (arg_type1,restype1) (arg_type2,restype2) type_var_heap
-// AA ..
-	equalTypes TArrow TArrow type_var_heap
-		= (True, type_var_heap)
-	equalTypes (TArrow1 x) (TArrow1 y) type_var_heap
-		= equalTypes x y type_var_heap		
-// .. AA
 	equalTypes (TA tc1 types1) (TA tc2 types2) type_var_heap
 		| tc1 == tc2
 			= equalTypes types1 types2 type_var_heap
@@ -1846,6 +1840,10 @@ where
 			= (False, type_var_heap)
 	equalTypes (TB basic1) (TB basic2) type_var_heap
 		= (basic1 == basic2, type_var_heap)
+	equalTypes TArrow TArrow type_var_heap
+		= (True, type_var_heap)
+	equalTypes (TArrow1 x) (TArrow1 y) type_var_heap
+		= equalTypes x y type_var_heap		
 	equalTypes (CV tv :@: types1) (TempCV var_number :@: types2) type_var_heap
 		# (eq, type_var_heap) = equalTypeVars tv var_number type_var_heap
 		| eq
