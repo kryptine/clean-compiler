@@ -3,7 +3,7 @@ implementation module check
 import StdEnv
 
 import syntax, typesupport, parse, checksupport, utilities, checktypes, transform, predef
-import explicitimports, comparedefimp, checkFunctionBodies, containers, compilerSwitches
+import explicitimports, comparedefimp, checkFunctionBodies, containers
 import genericsupport
 import typereify
 from checkgenerics import checkGenericDefs,checkGenericCaseDefs,convert_generic_instances,create_gencase_funtypes
@@ -938,7 +938,7 @@ createCommonDefinitions {def_types,def_constructors,def_selectors,def_classes,de
 		,	com_member_defs		= { member \\ member <- def_members }
 		,	com_instance_defs	= { next_instance \\ next_instance <- def_instances }
 		,	com_generic_defs	= { gen \\ gen <- def_generics }
-		, 	com_gencase_defs    = { gi \\ gi <- def_generic_cases}	
+		, 	com_gencase_defs    = { gi \\ gi <- def_generic_cases}
 		}
 
 array_plus_list a [] = a
@@ -1468,8 +1468,8 @@ replace_icl_macros_by_dcl_macros _ {ir_from=first_icl_macro_index,ir_to=end_icl_
 (<=<) infixl 
 (<=<) state fun :== fun state 
 
-checkDclModules :: [Import]									*{#DclModule} *{#*{#FunDef}} *Heaps *CheckState
-	-> (Int,[ExplicitImport],.[{#Char}],{!{!.ExplImpInfo}},	*{#DclModule},*{#*{#FunDef}},*Heaps,*CheckState)
+checkDclModules :: [Import]								*{#DclModule} *{#*{#FunDef}} *Heaps *CheckState
+	-> (Int,[ExplicitImport],.[{#Char}],ExplImpInfos,	*{#DclModule},*{#*{#FunDef}},*Heaps,*CheckState)
 checkDclModules imports_of_icl_mod dcl_modules macro_defs heaps cs=:{cs_symbol_table}
 	#! nr_of_dcl_modules = size dcl_modules
 	# (bitvect, dependencies, dcl_modules, cs_symbol_table)
@@ -1762,8 +1762,8 @@ createCommonDefinitionsWithinComponent is_on_cycle mod_index (dcl_modules, cs=:{
 				   {com_type_defs=type_defs2,com_cons_defs=cons_defs2,com_selector_defs=selector_defs2,com_class_defs=class_defs2,com_member_defs=member_defs2,com_instance_defs=instance_defs2,com_generic_defs=generic_defs2,com_gencase_defs=gencase_defs2})
 
 checkDclModuleWithinComponent :: .NumberSet Int Bool {#.Int} {![.Int]} (IntKeyHashtable SolvedImports) Int *CommonDefs
-						 *(*{!*{!*ExplImpInfo}},*{#.DclModule},*{#*{#.FunDef}},*Heaps,*CheckState)
-	-> ((Int,Int,[FunType]),({!{!.ExplImpInfo}},.{# DclModule},.{#.{# FunDef}},.Heaps,.CheckState))
+						   *(*ExplImpInfos,*{#.DclModule},*{#*{#.FunDef}},*Heaps,*CheckState)
+	-> ((Int,Int,[FunType]),(*ExplImpInfos,.{# DclModule},.{#.{# FunDef}},.Heaps,.CheckState))
 checkDclModuleWithinComponent dcl_imported_module_numbers component_nr is_on_cycle modules_in_component_set components_importing_module_a imports_ikh
 		mod_index dcl_common
 		(expl_imp_infos, dcl_modules, macro_defs, heaps, cs=:{cs_symbol_table})
@@ -2761,8 +2761,8 @@ add_declaration_to_symbol_table opt_dcl_macro_range (Declaration {decl_kind=STE_
 add_declaration_to_symbol_table yes_for_icl_module (Declaration {decl_kind=decl_kind=:STE_Imported def_kind def_mod, decl_ident, decl_index, decl_pos}) importing_mod cs
 	= addSymbol yes_for_icl_module decl_ident decl_pos decl_kind def_kind decl_index def_mod importing_mod cs
 
-updateExplImpInfo :: [Int] Index {!Declaration} {!Declaration} u:{#DclModule} {!{!*ExplImpInfo}} *SymbolTable 
-		-> (u:{#DclModule},!{!{!.ExplImpInfo}},.SymbolTable)
+updateExplImpInfo :: [Int] Index {!Declaration} {!Declaration} u:{#DclModule} ExplImpInfos *SymbolTable 
+		-> (u:{#DclModule},!ExplImpInfos,.SymbolTable)
 updateExplImpInfo components_importing_module mod_index dcls_import dcls_local_for_import dcl_modules expl_imp_infos cs_symbol_table
 	# (changed_symbols, (expl_imp_infos, cs_symbol_table))
 	  		= mapSt markExplImpSymbols components_importing_module (expl_imp_infos, cs_symbol_table)
@@ -2774,8 +2774,8 @@ updateExplImpInfo components_importing_module mod_index dcls_import dcls_local_f
 	  		= foldSt (\l cs_symbol_table->foldSt restoreHeap l cs_symbol_table) changed_symbols cs_symbol_table
 	= (dcl_modules, expl_imp_infos, cs_symbol_table)
 
-updateExplImpInfoForCachedModule :: [Int] Index {!Declaration} {!Declaration} {!{!*ExplImpInfo}} u:{#DclModule} *SymbolTable 
-																		 -> (!{!{!.ExplImpInfo}},u:{#DclModule},.SymbolTable)
+updateExplImpInfoForCachedModule :: [Int] Index {!Declaration} {!Declaration} ExplImpInfos u:{#DclModule} *SymbolTable 
+																		 -> (!ExplImpInfos,u:{#DclModule},.SymbolTable)
 updateExplImpInfoForCachedModule components_importing_module mod_index dcls_import dcls_local_for_import expl_imp_infos dcl_modules cs_symbol_table
 	# (changed_symbols, (expl_imp_infos, cs_symbol_table))
 	  		= mapSt markExplImpSymbols components_importing_module (expl_imp_infos, cs_symbol_table)
@@ -2927,17 +2927,16 @@ update_expl_imp_for_marked_local_symbol mod_index decl=:(Declaration {decl_ident
 	# (ste, cs_symbol_table) = readPtr decl_ident.id_info cs_symbol_table
 	= updateExplImpForMarkedLocalSymbol mod_index decl ste dcl_modules expl_imp_infos cs_symbol_table
 where
-	updateExplImpForMarkedLocalSymbol :: !Index Declaration !SymbolTableEntry !u:{#DclModule} !{!{!*ExplImpInfo}} !*SymbolTable
-			-> (!u:{#DclModule}, !{!{!.ExplImpInfo}}, !.SymbolTable)
+	updateExplImpForMarkedLocalSymbol :: !Index Declaration !SymbolTableEntry !u:{#DclModule} !ExplImpInfos !*SymbolTable
+			-> (!u:{#DclModule}, !ExplImpInfos, !.SymbolTable)
 	updateExplImpForMarkedLocalSymbol mod_index decl {ste_kind=STE_ExplImpComponentNrs component_numbers}
 				dcl_modules expl_imp_infos cs_symbol_table
 		= foldSt (addExplImpInfo mod_index decl) component_numbers (dcl_modules, expl_imp_infos, cs_symbol_table)
 	  where
-		addExplImpInfo :: !Index Declaration !ComponentNrAndIndex !(!u:{#DclModule}, !{!{!*ExplImpInfo}}, !v:SymbolTable)
-					-> (!u:{#DclModule}, !{!{!.ExplImpInfo}}, !v:SymbolTable)
+		addExplImpInfo :: !Index Declaration !ComponentNrAndIndex !(!u:{#DclModule}, !ExplImpInfos, !v:SymbolTable)
+					-> (!u:{#DclModule}, !ExplImpInfos, !v:SymbolTable)
 		addExplImpInfo mod_index decl { cai_component_nr, cai_index } (dcl_modules, expl_imp_infos, cs_symbol_table)
-			# (ExplImpInfo eii_ident eii_declaring_modules, expl_imp_infos)
-					= replaceTwoDimArrElt cai_component_nr cai_index TemporarilyFetchedAway expl_imp_infos
+			# (ExplImpInfo eii_ident eii_declaring_modules, expl_imp_infos) = expl_imp_infos![cai_component_nr,cai_index]
 			  (all_belongs, dcl_modules) = getBelongingSymbols decl dcl_modules
 			  di_belonging = nsFromTo (nrOfBelongingSymbols all_belongs)
 			  di = { di_decl = decl, di_belonging = di_belonging }
@@ -2958,8 +2957,7 @@ checkInstancesOfDclModule mod_index	(nr_of_dcl_functions_and_instances, nr_of_dc
 	  				{d \\ d<-:dcl_common.com_class_defs}
 	  				{d \\ d<-:dcl_common.com_member_defs}
 	  				dcl_modules hp_type_heaps hp_var_heap { cs & cs_error = cs_error }
-	  heaps
-	  		= { heaps & hp_type_heaps = hp_type_heaps, hp_var_heap = hp_var_heap }
+	  heaps = { heaps & hp_type_heaps = hp_type_heaps, hp_var_heap = hp_var_heap }
 	  (nr_of_dcl_funs_insts_and_specs, new_class_instances, rev_special_defs, all_spec_types, heaps, cs_predef_symbols,cs_error)
 			= checkSpecialsOfInstances mod_index nr_of_dcl_functions rev_spec_class_inst nr_of_dcl_funs_insts_and_specs []
 					rev_special_defs { mem \\ mem <- memb_inst_defs } { [] \\ mem <- memb_inst_defs } heaps cs.cs_predef_symbols cs.cs_error			

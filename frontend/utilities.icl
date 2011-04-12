@@ -419,11 +419,3 @@ where
 		| d == node_index
 			= (ds, marks, [d : group])
 			= close_group node_index ds marks [d : group] pi
-
-replaceTwoDimArrElt :: !Int !Int !.e !{!*{!.e}} -> (!.e, !{!.{!.e}})
-replaceTwoDimArrElt ix1 ix2 el arr
-	# (inner_array, arr)
-			= replace arr ix1 {}
-	  (el2, inner_array)
-	  		= replace inner_array ix2 el
-	= (el2, { arr & [ix1] = inner_array })
