@@ -48,11 +48,10 @@ cMacroDefs				:== 9
 
 cConversionTableSize	:== 10
 
-::	*ExplImpInfos :== *{!*{!*ExplImpInfo}}
+::	*ExplImpInfos :== *{#*{!*ExplImpInfo}}
 
 ::	ExplImpInfo
 		= ExplImpInfo Ident !.DeclaringModulesSet
-		| TemporarilyFetchedAway
 
 ::	DeclaringModulesSet :== IntKeyHashtable DeclarationInfo
 
