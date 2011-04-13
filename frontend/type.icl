@@ -2099,7 +2099,7 @@ where
 									type_variables state
 
 			fresh_existential_dynamic_pattern_variables type_variables state
-				= mapSt (\{tv_info_ptr} (var_heap, var_store) -> (var_store, (var_heap <:= (tv_info_ptr, TVI_Type (TempQV var_store)), inc var_store)))
+				= mapSt (\{tv_info_ptr} (var_heap, var_store) -> (var_store, (var_heap <:= (tv_info_ptr, TVI_Type (TempQDV var_store)), inc var_store)))
 									type_variables state 
 			fresh_type_variables type_variables state
 				= foldSt fresh_type_variable type_variables state 
