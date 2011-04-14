@@ -160,7 +160,7 @@ instance == FunctionOrMacroIndex
 	,	dcl_sizes			:: !{# Int}
 	,	dcl_dictionary_info	:: !DictionaryInfo
 	,	dcl_declared		:: !Declarations
-	,	dcl_macro_conversions :: !Optional {#Index}
+	,	dcl_has_macro_conversions :: !Bool
 	,	dcl_module_kind		:: !ModuleKind
 	,	dcl_modification_time:: !{#Char}
 	,	dcl_imported_module_numbers :: !NumberSet

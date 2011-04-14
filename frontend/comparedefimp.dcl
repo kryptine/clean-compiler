@@ -4,8 +4,8 @@ import syntax, checksupport
 
 // compare definition and implementation module
 
-compareDefImp :: /*!{#Int}*/ !Int !DclModule !Int !*IclModule !*{#*{#FunDef}} !*Heaps !*ErrorAdmin 
-											  -> (!.IclModule,!.{#.{#FunDef}},!.Heaps,!.ErrorAdmin)
+compareDefImp :: !Int !DclModule !(Optional {#Index}) !Int !*IclModule !*{#*{#FunDef}} !*Heaps !*ErrorAdmin 
+													   -> (!.IclModule,!.{#.{#FunDef}},!.Heaps,!.ErrorAdmin)
 
 symbolTypesCorrespond :: !SymbolType !SymbolType !*TypeHeaps -> (!ComparisionErrorCode, !.TypeHeaps)
 

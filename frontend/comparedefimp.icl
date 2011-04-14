@@ -1,6 +1,6 @@
 implementation module comparedefimp
 
-import syntax, checksupport, compare_constructor, utilities, StdCompare, compilerSwitches
+import syntax, checksupport, compare_constructor, utilities, StdCompare
 
 ::	CompareState =
 	{	comp_type_var_heap	:: !.TypeVarHeap
@@ -173,8 +173,6 @@ where
 			= (icl_instance_defs, comp_st)
 			# comp_error = compareError instance_def_error (newPosition icl_instance_def.ins_ident icl_instance_def.ins_pos) comp_st.comp_error
 			= (icl_instance_defs, { comp_st & comp_error = comp_error })
-//				---> ("compare_instance_defs", dcl_instance_def.ins_ident, dcl_instance_def.ins_type, icl_instance_def.ins_ident, icl_instance_def.ins_type)
-		  
 
 compareGenericDefs :: !{# Int} !{#Bool} !{# GenericDef} !u:{# GenericDef} !*CompareState -> (!u:{# GenericDef}, !*CompareState)
 compareGenericDefs dcl_sizes copied_from_dcl dcl_generic_defs icl_generic_defs comp_st
@@ -344,7 +342,6 @@ where
 		  comp_st = { comp_st & comp_type_var_heap = comp_type_var_heap, comp_attr_var_heap = comp_attr_var_heap }
 		= compare	(dcl_st.st_args, (dcl_st.st_args_strictness, (dcl_st.st_result, (dcl_st.st_context, dcl_st.st_attr_env))))
 					(icl_st.st_args, (icl_st.st_args_strictness, (icl_st.st_result, (icl_st.st_context, icl_st.st_attr_env)))) comp_st
-//						---> ("compare SymbolType", dcl_st, icl_st)
 
 instance compare InstanceType
 where
@@ -353,7 +350,6 @@ where
 		  comp_attr_var_heap = initialyseAttributeVars dcl_it.it_attr_vars icl_it.it_attr_vars comp_attr_var_heap
 		  comp_st = { comp_st & comp_type_var_heap = comp_type_var_heap, comp_attr_var_heap = comp_attr_var_heap }
 		= compare (dcl_it.it_types, dcl_it.it_context) (icl_it.it_types, icl_it.it_context) comp_st
-//						---> ("compare InstanceType", dcl_it, icl_it)
 
 instance compare TypeContext
 where
@@ -446,11 +442,11 @@ class CorrespondenceNumber a where
 
 initial_hwn hwn_heap = { hwn_heap = hwn_heap, hwn_number = 0 }
 
-compareDefImp :: !Int !DclModule !Int !*IclModule !*{#*{#FunDef}} !*Heaps !*ErrorAdmin 
-								  -> (!.IclModule,!.{#.{#FunDef}},!.Heaps,!.ErrorAdmin)
-compareDefImp main_dcl_module_n main_dcl_module=:{dcl_macro_conversions=No} n_exported_global_functions icl_module macro_defs heaps error_admin
+compareDefImp :: !Int !DclModule !(Optional {#Index}) !Int !*IclModule !*{#*{#FunDef}} !*Heaps !*ErrorAdmin 
+													   -> (!.IclModule,!.{#.{#FunDef}},!.Heaps,!.ErrorAdmin)
+compareDefImp main_dcl_module_n main_dcl_module No n_exported_global_functions icl_module macro_defs heaps error_admin
 	= (icl_module, macro_defs,heaps, error_admin)
-compareDefImp main_dcl_module_n main_dcl_module=:{dcl_macro_conversions=Yes macro_conversion_table} n_exported_global_functions icl_module macro_defs heaps error_admin
+compareDefImp main_dcl_module_n main_dcl_module (Yes macro_conversion_table) n_exported_global_functions icl_module macro_defs heaps error_admin
 //	| Trace_array icl_module.icl_functions
 //		&& Trace_array macro_defs.[main_dcl_module_n]
 
@@ -749,7 +745,6 @@ instance t_corresponds (TypeDef TypeRhs) where
 			  tc_state = init_atype_vars dclDef.td_args iclDef.td_args tc_state
 			= t_corresponds (dclDef.td_args, (dclDef.td_rhs, dclDef.td_attribute))
 			 				(iclDef.td_args, (iclDef.td_rhs, iclDef.td_attribute)) tc_state
-
 
 instance t_corresponds TypeContext where
 	t_corresponds dclDef iclDef
