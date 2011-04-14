@@ -50,7 +50,7 @@ checkSpecial mod_index fun_type=:{ft_type} fun_index subst (next_inst_index, spe
 	  ft_type = { special_type & st_context = [] }
 	  (new_info_ptr, hp_var_heap) = newPtr VI_Empty heaps.hp_var_heap
 	= ( { spec_index = { glob_module = mod_index, glob_object = next_inst_index }, spec_types = spec_types, spec_vars = subst.ss_vars, spec_attrs = subst.ss_attrs },
-			((inc next_inst_index), [{ fun_type & ft_type = ft_type, ft_specials = SP_FunIndex fun_index, ft_type_ptr = new_info_ptr} : special_types ],
+			((inc next_inst_index), [{ fun_type & ft_type = ft_type, ft_specials = FSP_FunIndex fun_index, ft_type_ptr = new_info_ptr} : special_types ],
 					{ heaps & hp_type_heaps = hp_type_heaps, hp_var_heap = hp_var_heap }, predef_symbols, error))
 where	
 	substitute_type st=:{st_vars,st_attr_vars,st_args,st_result,st_context,st_attr_env} environment type_heaps error
@@ -82,14 +82,14 @@ where
 				{ fun_type & ft_type = ft_type, ft_specials = spec_types, ft_type_ptr = new_info_ptr } : collected_funtypes]
 					collected_instances type_defs class_defs modules { heaps & hp_var_heap = hp_var_heap } { cs & cs_predef_symbols=cs_predef_symbols,cs_error = cs_error }
 
-	check_specials :: !Index !FunType !Index !Specials !Index ![FunType] !*Heaps !*PredefinedSymbols !*ErrorAdmin
-		-> (!Specials, !Index, ![FunType], !*Heaps, !*PredefinedSymbols, !*ErrorAdmin)
-	check_specials mod_index fun_type fun_index (SP_Substitutions substs) next_inst_index all_instances heaps predef_symbols error
+	check_specials :: !Index !FunType !Index !FunSpecials !Index ![FunType] !*Heaps !*PredefinedSymbols !*ErrorAdmin
+										-> (!FunSpecials, !Index,![FunType],!*Heaps,!*PredefinedSymbols,!*ErrorAdmin)
+	check_specials mod_index fun_type fun_index (FSP_Substitutions substs) next_inst_index all_instances heaps predef_symbols error
 		# (list_of_specials, (next_inst_index, all_instances, heaps, cs_predef_symbols,cs_error))
 				= mapSt (checkSpecial mod_index fun_type fun_index) substs (next_inst_index, all_instances, heaps, predef_symbols,error)
-		= (SP_ContextTypes list_of_specials, next_inst_index, all_instances, heaps, cs_predef_symbols,cs_error)
-	check_specials mod_index fun_type fun_index SP_None next_inst_index all_instances heaps predef_symbols error
-		= (SP_None, next_inst_index, all_instances, heaps, predef_symbols,error)
+		= (FSP_ContextTypes list_of_specials, next_inst_index, all_instances, heaps, cs_predef_symbols,cs_error)
+	check_specials mod_index fun_type fun_index FSP_None next_inst_index all_instances heaps predef_symbols error
+		= (FSP_None, next_inst_index, all_instances, heaps, predef_symbols,error)
 
 checkSpecialsOfInstances :: !Index !Index ![ClassInstance] !Index ![ClassInstance] ![FunType] {# FunType} *{! [Special] } !*Heaps !*PredefinedSymbols !*ErrorAdmin
 		-> (!Index, ![ClassInstance], ![FunType], !*{! [Special]}, !*Heaps, !*PredefinedSymbols,!*ErrorAdmin)
@@ -118,7 +118,7 @@ where
 			  spec_member_index = member_index - first_mem_index
 		 	# (spec_types, all_spec_types) = all_spec_types![spec_member_index]
 		 	# mem_inst = inst_spec_defs.[spec_member_index]
-		 	  (SP_Substitutions specials) = mem_inst.ft_specials
+		 	  (FSP_Substitutions specials) = mem_inst.ft_specials
 		 	  env = specials !! type_offset
 			  member = {member & cim_index = next_inst_index}
 			  (spec_type, (next_inst_index, all_specials, heaps, predef_symbols,error))
@@ -272,7 +272,6 @@ where
 				= check_icl_instance_members module_index member_mod_index (inc mem_offset) class_size ins_members class_members class_ident ins_pos ins_type
 						[ (ins_member.cim_index, { instance_type & st_context = st_context }) : instance_types ] member_defs type_defs modules var_heap type_heaps { cs & cs_error = cs_error }
 
-
 getClassDef :: !(Global DefinedSymbol) !Int !u:{#ClassDef} !v:{#DclModule} -> (!ClassDef,!u:{#ClassDef},!v:{#DclModule})
 getClassDef {glob_module, glob_object={ds_ident, ds_index}} mod_index class_defs modules
 	| glob_module == mod_index
@@ -385,7 +384,7 @@ where
 		= ({ bind & bind_dst = new_tv }, type_var_heap)
 
 determineTypeOfMemberInstance :: !SymbolType ![TypeVar] !InstanceType !Specials !*TypeHeaps !u:(Optional (v:{#DclModule}, w:{#CheckedTypeDef}, Index)) !*ErrorAdmin
-		-> (!SymbolType, !Specials, !*TypeHeaps, !u:Optional (v:{#DclModule}, w:{#CheckedTypeDef}), !*ErrorAdmin)
+												 -> (!SymbolType, !FunSpecials, !*TypeHeaps,!u: Optional (v:{#DclModule}, w:{#CheckedTypeDef}), !*ErrorAdmin)
 determineTypeOfMemberInstance mem_st class_vars {it_types,it_vars,it_attr_vars,it_context} specials type_heaps opt_modules error
 	# env = { ss_environ = foldl2 (\binds var type -> [ {bind_src = type, bind_dst = var} : binds]) [] class_vars it_types,
 			  ss_context = it_context, ss_vars = it_vars, ss_attrs = it_attr_vars} 
@@ -398,11 +397,11 @@ where
 	determine_type_of_member_instance mem_st=:{st_context} env (SP_Substitutions substs) type_heaps error
 		# (mem_st, substs, type_heaps, error) 
 				= substitute_symbol_type { mem_st &  st_context = tl st_context } env substs type_heaps error
-		= (mem_st, SP_Substitutions substs, type_heaps, error) 
+		= (mem_st, FSP_Substitutions substs, type_heaps, error) 
 	determine_type_of_member_instance mem_st=:{st_context} env SP_None type_heaps error
 		# (mem_st, _, type_heaps, error)
 				= substitute_symbol_type { mem_st &  st_context = tl st_context } env [] type_heaps error
-		= (mem_st, SP_None, type_heaps, error)
+		= (mem_st, FSP_None, type_heaps, error)
 
 	substitute_symbol_type st=:{st_vars,st_attr_vars,st_args,st_result,st_context,st_attr_env} environment specials type_heaps error
 		# (st_vars, st_attr_vars, [st_result : st_args], st_context, st_attr_env, specials, type_heaps, error)
@@ -775,7 +774,7 @@ where
 	has_type no 		= 0
 	
 	check_function_type (Yes ft) module_index is_caf type_defs class_defs modules var_heap type_heaps cs
-		# (ft, _, type_defs, class_defs, modules, type_heaps, cs) = checkFunctionType module_index ft SP_None type_defs class_defs modules type_heaps cs
+		# (ft, _, type_defs, class_defs, modules, type_heaps, cs) = checkFunctionType module_index ft FSP_None type_defs class_defs modules type_heaps cs
 		  cs = (if is_caf (check_caf_uniqueness ft.st_result.at_attribute) id) cs
 		  (st_context, var_heap) = initializeContextVariables ft.st_context var_heap
 		= (Yes { ft & st_context = st_context } , type_defs,  class_defs, modules, var_heap, type_heaps, cs)
@@ -2486,11 +2485,10 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 			# (icl_functions, (var_heap, type_var_heap, expr_heap))
 					= collect_specialized_functions ir_from ir_to dcl_functions (icl_functions, (var_heap, type_var_heap, expr_heap))
 			= (dcl_specials,modules, icl_functions, var_heap, type_var_heap, expr_heap)
-
 		where
 			collect_specialized_functions spec_index last_index dcl_fun_types (icl_functions, heaps)
 				| spec_index < last_index
-					# {ft_type,ft_specials = SP_FunIndex decl_index} = dcl_fun_types.[spec_index]
+					# {ft_type,ft_specials = FSP_FunIndex decl_index} = dcl_fun_types.[spec_index]
 					//  icl_index = conversion_table.[decl_index]
 					  icl_index = decl_index
 					  (icl_fun, icl_functions) = icl_functions![icl_index]
@@ -3017,8 +3015,8 @@ checkInstancesOfDclModule mod_index	(nr_of_dcl_functions_and_instances, nr_of_dc
 	  
 	#  dcl_functions
 	  		= arrayPlusList dcl_functions
-	  			(   [ { mem_inst & ft_specials = if (isEmpty spec_types) SP_None (SP_ContextTypes spec_types) } 
-				  	  \\ mem_inst <- memb_inst_defs & spec_types <-: all_spec_types 
+	  			(   [ { mem_inst & ft_specials = if (isEmpty spec_types) FSP_None (FSP_ContextTypes spec_types) } 
+				  	  \\ mem_inst <- memb_inst_defs & spec_types <-: all_spec_types
 				  	]
 	  			 ++ reverse rev_special_defs
 	  			 ++ gen_funs
@@ -3329,7 +3327,6 @@ where
 	(<<<) file (SP_ParsedSubstitutions _)	= file <<< "SP_ParsedSubstitutions"
 	(<<<) file (SP_Substitutions substs)	= file <<< "SP_Substitutions " <<< substs
 	(<<<) file (SP_ContextTypes specials)	= file <<< "SP_ContextTypes " <<< specials
-	(<<<) file (SP_FunIndex _)				= file <<< "SP_ParsedSubstitutions"
 	(<<<) file SP_None						= file <<< "SP_None"
 
 instance <<< Special

@@ -51,8 +51,8 @@ where
 			{heaps & hp_generic_heap = hp_generic_heap})
 
 	check_generic_type gen_def=:{gen_type, gen_vars, gen_ident, gen_pos} module_index type_defs class_defs modules heaps=:{hp_type_heaps} cs
-		#! (checked_gen_type, _, type_defs, class_defs, modules, hp_type_heaps, cs) =
-			checkFunctionType module_index gen_type SP_None type_defs class_defs modules hp_type_heaps cs
+		#! (checked_gen_type, _, type_defs, class_defs, modules, hp_type_heaps, cs)
+			= checkFunctionType module_index gen_type FSP_None type_defs class_defs modules hp_type_heaps cs
 		
 		#! (checked_gen_vars, cs) = check_generic_vars gen_vars checked_gen_type.st_vars cs		
 		#! checked_gen_type = { checked_gen_type & st_vars = move_gen_vars checked_gen_vars checked_gen_type.st_vars}
@@ -404,7 +404,7 @@ where
   			, ft_priority = NoPrio
   			, ft_type = {st_vars=[],st_attr_vars=[],st_arity=0,st_args=[],st_result={at_type=TE,at_attribute=TA_Multi},st_attr_env=[],st_context=[],st_args_strictness=NotStrict}
   			, ft_pos = gc_pos
-  			, ft_specials = SP_None
+  			, ft_specials = FSP_None
   			, ft_type_ptr = var_info_ptr
   			}
 		= (fun,var_heap)
