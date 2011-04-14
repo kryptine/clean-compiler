@@ -7,25 +7,16 @@ cDontRemoveAnnotations :== False
 convertDclModule :: !Int !{# DclModule} !{# CommonDefs} !*{#{# CheckedTypeDef}} !ImportedConstructors !*VarHeap !*TypeHeaps
 	-> (!*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps)
 convertDclModule main_dcl_module_n dcl_mods common_defs imported_types imported_conses var_heap type_heaps
-	# {dcl_functions,dcl_common=dcl_common=:{com_type_defs,com_cons_defs,com_selector_defs},dcl_macro_conversions} = dcl_mods.[main_dcl_module_n]
-	= case dcl_macro_conversions of
-		Yes _
-			#!(icl_type_defs, imported_types) = imported_types![main_dcl_module_n]
-
-			  common_defs = { common \\ common <-: common_defs }
-			  common_defs = { common_defs & [main_dcl_module_n] = dcl_common }
-/*
-			  // AA: HACK: extend dcl modules with the icl module
-			  icl_common = common_defs.[main_dcl_module_n]
-			  common_defs = arrayPlusList common_defs [icl_common]
-			  common_defs = { common_defs & [main_dcl_module_n] = dcl_common }
-*/		   
-			  types_and_heaps = convert_dcl_functions dcl_functions common_defs ( { imported_types & [main_dcl_module_n] = com_type_defs }, imported_conses, var_heap, type_heaps)
-			  types_and_heaps = convertConstructorTypes com_cons_defs main_dcl_module_n common_defs types_and_heaps
-			  (imported_types, imported_conses, var_heap, type_heaps) = convertSelectorTypes com_selector_defs main_dcl_module_n common_defs types_and_heaps
-			-> ({ imported_types & [main_dcl_module_n] = icl_type_defs}, imported_conses, var_heap, type_heaps)
-		No
-			-> (imported_types, imported_conses, var_heap, type_heaps)
+	# {dcl_functions,dcl_common=dcl_common=:{com_type_defs,com_cons_defs,com_selector_defs},dcl_has_macro_conversions} = dcl_mods.[main_dcl_module_n]
+	| dcl_has_macro_conversions
+		#!(icl_type_defs, imported_types) = imported_types![main_dcl_module_n]
+		  common_defs = { common \\ common <-: common_defs }
+		  common_defs = { common_defs & [main_dcl_module_n] = dcl_common }
+		  types_and_heaps = convert_dcl_functions dcl_functions common_defs ( { imported_types & [main_dcl_module_n] = com_type_defs }, imported_conses, var_heap, type_heaps)
+		  types_and_heaps = convertConstructorTypes com_cons_defs main_dcl_module_n common_defs types_and_heaps
+		  (imported_types, imported_conses, var_heap, type_heaps) = convertSelectorTypes com_selector_defs main_dcl_module_n common_defs types_and_heaps
+		= ({ imported_types & [main_dcl_module_n] = icl_type_defs}, imported_conses, var_heap, type_heaps)
+		= (imported_types, imported_conses, var_heap, type_heaps)
 where
 	convert_dcl_functions dcl_functions common_defs types_and_heaps
 		= iFoldSt (convert_dcl_function dcl_functions common_defs) 0 (size dcl_functions) types_and_heaps
@@ -63,21 +54,18 @@ convertIclModule main_dcl_module_n common_defs imported_types imported_conses va
 convertImportedTypeSpecifications :: !Int !{# DclModule}  !{# {# FunType} } !{# CommonDefs} !ImportedConstructors !ImportedFunctions
 	!*{# {#CheckedTypeDef}} !*TypeHeaps !*VarHeap -> (!*{#{#CheckedTypeDef}}, !*TypeHeaps, !*VarHeap)
 convertImportedTypeSpecifications main_dcl_module_n dcl_mods dcl_functions common_defs imported_conses imported_functions imported_types type_heaps var_heap
-	# {dcl_common={com_type_defs},dcl_macro_conversions} = dcl_mods.[main_dcl_module_n]
-	= case dcl_macro_conversions of
-		Yes _
-			# abstract_type_indexes = iFoldSt (determine_abstract_type com_type_defs) 0 (size com_type_defs) []
-			| isEmpty abstract_type_indexes
-				-> convert_imported_type_specs dcl_functions common_defs imported_conses imported_functions imported_types type_heaps var_heap
-				#!(icl_type_defs, imported_types) = imported_types![main_dcl_module_n]
-				  type_defs = foldSt insert_abstract_type abstract_type_indexes { icl_type_def \\ icl_type_def <-: icl_type_defs }
-				  (imported_types, type_heaps, var_heap)
-				  		= convert_imported_type_specs dcl_functions common_defs imported_conses imported_functions
-							{ imported_types & [main_dcl_module_n] = type_defs } type_heaps var_heap
-				-> ({ imported_types & [main_dcl_module_n] = icl_type_defs }, type_heaps, var_heap)
-		No
-			-> convert_imported_type_specs dcl_functions common_defs imported_conses imported_functions imported_types type_heaps var_heap
-
+	# {dcl_common={com_type_defs},dcl_has_macro_conversions} = dcl_mods.[main_dcl_module_n]
+	| dcl_has_macro_conversions
+		# abstract_type_indexes = iFoldSt (determine_abstract_type com_type_defs) 0 (size com_type_defs) []
+		| isEmpty abstract_type_indexes
+			= convert_imported_type_specs dcl_functions common_defs imported_conses imported_functions imported_types type_heaps var_heap
+			#!(icl_type_defs, imported_types) = imported_types![main_dcl_module_n]
+			  type_defs = foldSt insert_abstract_type abstract_type_indexes { icl_type_def \\ icl_type_def <-: icl_type_defs }
+			  (imported_types, type_heaps, var_heap)
+			  		= convert_imported_type_specs dcl_functions common_defs imported_conses imported_functions
+						{ imported_types & [main_dcl_module_n] = type_defs } type_heaps var_heap
+			= ({ imported_types & [main_dcl_module_n] = icl_type_defs }, type_heaps, var_heap)
+		= convert_imported_type_specs dcl_functions common_defs imported_conses imported_functions imported_types type_heaps var_heap
 where
 	determine_abstract_type dcl_type_defs type_index abstract_type_indexes
 		# {td_rhs} = dcl_type_defs.[type_index]
