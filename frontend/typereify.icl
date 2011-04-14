@@ -44,7 +44,7 @@ instance makeTypeFun FunType where
 			,	ft_priority = NoPrio
 			,	ft_type = symbol_type
 			,	ft_pos = position
-			,	ft_specials = SP_None
+			,	ft_specials = FSP_None
 			,	ft_type_ptr	= ft_type_ptr
 			}, var_heap, symbol_table)
 			

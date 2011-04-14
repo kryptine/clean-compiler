@@ -51,8 +51,8 @@ where
 			{heaps & hp_generic_heap = hp_generic_heap})
 
 	check_generic_type gen_def=:{gen_type, gen_vars, gen_ident, gen_pos} module_index type_defs class_defs modules heaps=:{hp_type_heaps} cs
-		#! (checked_gen_type, _, type_defs, class_defs, modules, hp_type_heaps, cs) =
-			checkFunctionType module_index gen_type SP_None type_defs class_defs modules hp_type_heaps cs
+		#! (checked_gen_type, _, type_defs, class_defs, modules, hp_type_heaps, cs)
+			= checkFunctionType module_index gen_type FSP_None type_defs class_defs modules hp_type_heaps cs
 		
 		#! (checked_gen_vars, cs) = check_generic_vars gen_vars checked_gen_type.st_vars cs		
 		#! checked_gen_type = { checked_gen_type & st_vars = move_gen_vars checked_gen_vars checked_gen_type.st_vars}
@@ -272,15 +272,13 @@ where
 		# gencase_defs = {gencase_defs & [gc_index] = gencase_def}
 		#! fun_ident = genericIdentToFunIdent gc_ident.id_name gc_type_cons
 	 	#! (var_info_ptr, hp_var_heap) = newPtr VI_Empty hp_var_heap
-		#! fun = 
-				{ ft_ident = fun_ident
-				, ft_arity = 0
-				, ft_priority = NoPrio
-				, ft_type = {st_vars=[],st_attr_vars=[],st_arity=0,st_args=[],st_result={at_type=TE,at_attribute=TA_Multi},st_attr_env=[],st_context=[],st_args_strictness=NotStrict} 
-				, ft_pos = gc_pos
-				, ft_specials = SP_None
-				, ft_type_ptr = var_info_ptr
-				}
+		#! fun = { ft_ident = fun_ident
+				 , ft_arity = 0
+				 , ft_priority = NoPrio
+				 , ft_type = {st_vars=[],st_attr_vars=[],st_arity=0,st_args=[],st_result={at_type=TE,at_attribute=TA_Multi},st_attr_env=[],st_context=[],st_args_strictness=NotStrict} 
+				 , ft_pos = gc_pos
+				 , ft_specials = FSP_None
+				 , ft_type_ptr = var_info_ptr }
 		= (fun, gencase_defs, hp_var_heap)
 
 NewEntry symbol_table symb_ptr def_kind def_index level previous :==

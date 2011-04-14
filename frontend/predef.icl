@@ -499,13 +499,12 @@ where
 	
 			= ([tc_class_def], [tc_member_def])
 
-// MW..
 	make_identity_fun_type alias_dummy_id type_var
 		# a = { at_attribute = TA_Anonymous, at_type = TV type_var }
 		  id_symbol_type = { st_vars = [], st_args = [a], st_args_strictness = Strict 1, st_arity = 1, st_result = a, st_context = [], 
 							st_attr_vars = [], st_attr_env = [] } // !.a -> .a
 		= { ft_ident = alias_dummy_id, ft_arity = 1, ft_priority = NoPrio, ft_type = id_symbol_type, ft_pos = NoPos,
-			ft_specials = SP_None, ft_type_ptr = nilPtr }
+			ft_specials = FSP_None, ft_type_ptr = nilPtr }
 
 DynamicRepresentation_String			:== "DynamicTemp" // "_DynamicTemp"		
 

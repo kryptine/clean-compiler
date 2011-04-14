@@ -491,19 +491,19 @@ where
 		# (name, is_infix, pState) = check_name_and_fixity opt_name cHasNoPriority pState
 		  (tspec, pState) = want pState		//	SymbolType
 		| isDclContext parseContext
-			# (specials, pState) = optionalSpecials pState
+			# (specials, pState) = optionalFunSpecials pState
 			= (PD_TypeSpec pos name (if is_infix DefaultPriority NoPrio) (Yes tspec) specials, wantEndOfDefinition "type definition" pState)
-			= (PD_TypeSpec pos name (if is_infix DefaultPriority NoPrio) (Yes tspec) SP_None, wantEndOfDefinition "type definition" pState)
+			= (PD_TypeSpec pos name (if is_infix DefaultPriority NoPrio) (Yes tspec) FSP_None, wantEndOfDefinition "type definition" pState)
 	want_rhs_of_def parseContext (opt_name, args) (PriorityToken prio) pos pState
 		# (name, _, pState) = check_name_and_fixity opt_name cHasPriority pState
 		  (token, pState) = nextToken TypeContext pState
 		| token == DoubleColonToken
 		  	# (tspec, pState) = want pState
 			| isDclContext parseContext
-				# (specials, pState) = optionalSpecials pState
+				# (specials, pState) = optionalFunSpecials pState
 				= (PD_TypeSpec pos name prio (Yes tspec) specials, wantEndOfDefinition "type definition" pState)
-				= (PD_TypeSpec pos name prio (Yes tspec) SP_None, wantEndOfDefinition "type definition" pState)
-			= (PD_TypeSpec pos name prio No SP_None, wantEndOfDefinition "type definition" (tokenBack pState))
+				= (PD_TypeSpec pos name prio (Yes tspec) FSP_None, wantEndOfDefinition "type definition" pState)
+			= (PD_TypeSpec pos name prio No FSP_None, wantEndOfDefinition "type definition" (tokenBack pState))
 	want_rhs_of_def parseContext (No, args) token pos pState
 		# pState			= want_node_def_token pState token
 		# (ss_useLayout, pState) = accScanState UseLayout pState
@@ -690,12 +690,24 @@ optionalSpecials :: !ParseState -> (!Specials, !ParseState)
 optionalSpecials pState
 	# (token, pState) = nextToken TypeContext pState
 	| token == SpecialToken
-		# (token, pState) = nextToken GeneralContext pState
-		  pState = begin_special_group token pState
-		# (specials, pState) = wantList "<special statement>" try_substitutions pState
-		= (SP_ParsedSubstitutions specials, end_special_group pState)
-	// otherwise // token <> SpecialToken
+		# (specials, pState) = wantSpecials pState
+		= (SP_ParsedSubstitutions specials, pState)
 		= (SP_None, tokenBack pState)
+
+optionalFunSpecials :: !ParseState -> (!FunSpecials, !ParseState)
+optionalFunSpecials pState
+	# (token, pState) = nextToken TypeContext pState
+	| token == SpecialToken
+		# (specials, pState) = wantSpecials pState
+		= (FSP_ParsedSubstitutions specials, pState)
+		= (FSP_None, tokenBack pState)
+
+wantSpecials :: !ParseState -> (![Env Type TypeVar], !ParseState)
+wantSpecials pState
+	# (token, pState) = nextToken GeneralContext pState
+	  pState = begin_special_group token pState
+	  (specials, pState) = wantList "<special statement>" try_substitutions pState
+	= (specials, end_special_group pState)
 where
 	try_substitutions pState
 		# (succ, type_var, pState) = tryTypeVar pState
@@ -1303,7 +1315,7 @@ wantClassDefinition parseContext pos pState
 			# (tspec, pState) = want pState
 			  (member_id, pState) = stringToIdent member_name IC_Expression pState
 			  (class_id, pState) = stringToIdent member_name IC_Class pState
-			  member = PD_TypeSpec pos member_id prio (Yes tspec) SP_None
+			  member = PD_TypeSpec pos member_id prio (Yes tspec) FSP_None
 			  class_def = {	class_ident = class_id, class_arity = class_arity, class_args = class_args,
 		    				class_context = contexts, class_pos = pos, class_members = {}, class_cons_vars = class_cons_vars,
    							class_dictionary = { ds_ident = { class_id & id_info = nilPtr }, ds_arity = 0, ds_index = NoIndex }

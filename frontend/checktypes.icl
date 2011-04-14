@@ -612,6 +612,7 @@ where
 			= (TA_Multi, error)
 		determine_attribute var_ident dem_attr new_attr error
 			= (new_attr, error)
+
 	check_attribute var_ident dem_attr _ this_attr oti cs
 		= (TA_Multi, oti, cs)
 
@@ -829,23 +830,21 @@ checkInstanceType mod_index ins_class it=:{it_types,it_context} specials type_de
 			= ti1==ti2 && are_equal_accu
 		compare_context_and_instance_type (_ --> _) (_ --> _) are_equal_accu
 			= are_equal_accu
-//AA..
-		compare_context_and_instance_type TArrow TArrow are_equal_accu
-			= are_equal_accu	
-		compare_context_and_instance_type (TArrow1 _) (TArrow1 _) are_equal_accu
-			= are_equal_accu	
-//..AA			
-		compare_context_and_instance_type (CV tv1 :@: _) (CV tv2 :@: _) are_equal_accu
-			= tv1==tv2 && are_equal_accu
 		compare_context_and_instance_type (TB bt1) (TB bt2) are_equal_accu
 			= bt1==bt2 && are_equal_accu
 		compare_context_and_instance_type (TV tv1) (TV tv2) are_equal_accu
 			= tv1==tv2 && are_equal_accu
+		compare_context_and_instance_type (CV tv1 :@: _) (CV tv2 :@: _) are_equal_accu
+			= tv1==tv2 && are_equal_accu
+		compare_context_and_instance_type TArrow TArrow are_equal_accu
+			= are_equal_accu	
+		compare_context_and_instance_type (TArrow1 _) (TArrow1 _) are_equal_accu
+			= are_equal_accu	
 		compare_context_and_instance_type _ _ are_equal_accu
 			= False
 
-checkFunctionType :: !Index !SymbolType !Specials !u:{# CheckedTypeDef} !v:{# ClassDef} !u:{# DclModule} !*TypeHeaps !*CheckState
-	-> (!SymbolType, !Specials, !u:{# CheckedTypeDef}, !v:{# ClassDef}, !u:{# DclModule}, !*TypeHeaps, !*CheckState)
+checkFunctionType :: !Index !SymbolType !FunSpecials !u:{#CheckedTypeDef} !v:{#ClassDef} !u:{#DclModule} !*TypeHeaps !*CheckState
+					   -> (!SymbolType, !FunSpecials,!u:{#CheckedTypeDef},!v:{#ClassDef},!u:{#DclModule},!*TypeHeaps,!*CheckState)
 checkFunctionType mod_index st specials type_defs class_defs modules heaps cs
 	= checkSymbolType True mod_index st specials type_defs class_defs modules heaps cs
 
@@ -853,29 +852,27 @@ checkMemberType :: !Index !SymbolType !u:{# CheckedTypeDef} !v:{# ClassDef} !u:{
 	-> (!SymbolType, !u:{# CheckedTypeDef}, !v:{# ClassDef}, !u:{# DclModule}, !*TypeHeaps, !*CheckState)
 checkMemberType mod_index st type_defs class_defs modules heaps cs
 	# (checked_st, specials, type_defs, class_defs, modules, heaps, cs) 
-			= checkSymbolType False mod_index st SP_None type_defs class_defs modules heaps cs
+			= checkSymbolType False mod_index st FSP_None type_defs class_defs modules heaps cs
 	= (checked_st, type_defs, class_defs, modules, heaps, cs) 
 
-checkSymbolType :: !Bool !Index !SymbolType !Specials !u:{# CheckedTypeDef} !v:{# ClassDef} !u:{# DclModule} !*TypeHeaps !*CheckState
-							-> (!SymbolType,!Specials,!u:{# CheckedTypeDef},!v:{# ClassDef},!u:{# DclModule},!*TypeHeaps,!*CheckState)
+checkSymbolType :: !Bool !Index !SymbolType !FunSpecials !u:{#CheckedTypeDef} !v:{#ClassDef} !u:{#DclModule} !*TypeHeaps !*CheckState
+							-> (!SymbolType,!FunSpecials,!u:{#CheckedTypeDef},!v:{#ClassDef},!u:{#DclModule},!*TypeHeaps,!*CheckState)
 checkSymbolType is_function mod_index st=:{st_args,st_result,st_context,st_attr_env} specials type_defs class_defs modules heaps cs
 	# ots = { ots_type_defs = type_defs, ots_modules = modules }
 	  oti = { oti_heaps = heaps, oti_all_vars = [], oti_all_attrs = [], oti_global_vars= [] }
 	  (st_args, cot_state) = checkOpenATypes mod_index cGlobalScope st_args (ots, oti, cs)
-//	   ---> ("checkSymbolType", st_args))
 	  (st_result, (ots, oti=:{oti_all_vars = st_vars,oti_all_attrs = st_attr_vars,oti_global_vars}, cs))
 	  	= checkOpenAType mod_index cGlobalScope DAK_None st_result cot_state	  
 	  oti = { oti &  oti_all_vars = [], oti_all_attrs = [] }
 	  (st_context, type_defs, class_defs, modules, heaps, cs) = check_type_contexts is_function st_context mod_index class_defs ots oti cs
 	  (st_attr_env, cs) = mapSt check_attr_inequality st_attr_env cs
-	  (specials, cs) = checkSpecialTypeVars specials cs 
+	  (specials, cs) = checkFunSpecialTypeVars specials cs 
 	  cs_symbol_table = removeVariablesFromSymbolTable cGlobalScope st_vars cs.cs_symbol_table
 	  cs_symbol_table = removeAttributesFromSymbolTable st_attr_vars cs_symbol_table
-	  (specials, type_defs, modules, heaps, cs) = checkSpecialTypes mod_index specials type_defs modules heaps { cs & cs_symbol_table = cs_symbol_table }
+	  (specials, type_defs, modules, heaps, cs) = checkFunSpecialTypes mod_index specials type_defs modules heaps { cs & cs_symbol_table = cs_symbol_table }
 	  checked_st = {st & st_vars = st_vars, st_args = st_args, st_result = st_result, st_context = st_context,
 	    					st_attr_vars = st_attr_vars, st_attr_env = st_attr_env }
 	= (checked_st, specials, type_defs, class_defs, modules, heaps, cs)
-//			---> ("checkSymbolType", checked_st)
 where
 	check_attr_inequality ineq=:{ai_demanded=ai_demanded=:{av_ident=dem_name},ai_offered=ai_offered=:{av_ident=off_name}} cs=:{cs_symbol_table,cs_error}
 		# (dem_entry, cs_symbol_table) = readPtr dem_name.id_info cs_symbol_table
@@ -1077,9 +1074,7 @@ where
 				| entry.ste_kind == STE_Empty
 					= symbol_table
 					= symbol_table <:= (id_info, entry.ste_previous)
-
-
-							 
+				 
 checkDynamicTypes mod_index dyn_type_ptrs (Yes {st_vars}) type_defs modules type_heaps expr_heap cs=:{cs_symbol_table}
 	# (th_vars, cs_symbol_table) = foldSt add_type_variable_to_symbol_table st_vars (type_heaps.th_vars, cs_symbol_table)
 	  (type_defs, modules, heaps, expr_heap, cs) = checkDynamics mod_index (inc cModuleScope) dyn_type_ptrs type_defs modules
@@ -1201,14 +1196,23 @@ checkSpecialTypeVars :: !Specials !*CheckState -> (!Specials, !*CheckState)
 checkSpecialTypeVars (SP_ParsedSubstitutions env) cs
 	# (env, cs) = mapSt check_type_vars env cs
 	= (SP_ParsedSubstitutions env, cs)
+checkSpecialTypeVars SP_None cs
+	= (SP_None, cs)
+
+checkFunSpecialTypeVars :: !FunSpecials !*CheckState -> (!FunSpecials, !*CheckState)
+checkFunSpecialTypeVars (FSP_ParsedSubstitutions env) cs
+	# (env, cs) = mapSt check_type_vars env cs
+	= (FSP_ParsedSubstitutions env, cs)
+checkFunSpecialTypeVars FSP_None cs
+	= (FSP_None, cs)
+
+check_type_vars [] cs
+	= ([],cs)
+check_type_vars [bind:binds] cs
+	# (bind,cs) = check_type_var bind binds cs
+	# (binds,cs) = check_type_vars binds cs
+	= ([bind:binds],cs)
 where
-	check_type_vars [] cs
-		= ([],cs)
-	check_type_vars [bind:binds] cs
-		# (bind,cs) = check_type_var bind binds cs
-		# (binds,cs) = check_type_vars binds cs
-		= ([bind:binds],cs)
-	
 	check_type_var bind=:{bind_dst=type_var=:{tv_ident={id_name,id_info}}} binds cs=:{cs_symbol_table,cs_error}
 		# ({ste_kind,ste_def_level}, cs_symbol_table) = readPtr id_info cs_symbol_table
 		| ste_kind <> STE_Empty && ste_def_level == cGlobalScope
@@ -1222,29 +1226,37 @@ where
 		= id_info==bind_dst.tv_ident.id_info || id_info_occurs_in_list id_info l
 	id_info_occurs_in_list id_info []
 		= False
-checkSpecialTypeVars SP_None cs
-	= (SP_None, cs)
 
-checkSpecialTypes :: !Index !Specials !v:{#CheckedTypeDef} !u:{#.DclModule} !*TypeHeaps !*CheckState
-	-> (!Specials,!x:{#CheckedTypeDef},!w:{#DclModule},!.TypeHeaps,!.CheckState), [u v <= w, v u <= x];
+checkSpecialTypes :: !Index !Specials !v:{#CheckedTypeDef} !u:{#DclModule} !*TypeHeaps !*CheckState
+						-> (!Specials,!x:{#CheckedTypeDef},!w:{#DclModule},!.TypeHeaps,!.CheckState), [u v <= w, v u <= x];
 checkSpecialTypes mod_index (SP_ParsedSubstitutions envs) type_defs modules heaps cs
 	# ots = { ots_type_defs = type_defs, ots_modules = modules }
 	  (specials, (heaps, ots, cs)) = mapSt (check_environment mod_index) envs (heaps, ots, cs)
 	= (SP_Substitutions specials, ots.ots_type_defs, ots.ots_modules, heaps, cs)
-where
-	check_environment mod_index env (heaps, ots, cs)
-	 	# oti = { oti_heaps = heaps, oti_all_vars = [], oti_all_attrs = [], oti_global_vars = [] }
-	 	  (env, (ots, {oti_heaps,oti_all_vars,oti_all_attrs,oti_global_vars}, cs)) = mapSt (check_substituted_type mod_index) env (ots, oti, cs)
-	  	  cs_symbol_table = removeVariablesFromSymbolTable cGlobalScope oti_all_vars cs.cs_symbol_table
-		  cs_symbol_table = removeAttributesFromSymbolTable oti_all_attrs cs_symbol_table
-	  	  cs = check_no_global_type_vars oti_global_vars {cs & cs_symbol_table = cs_symbol_table}
-		= ({ ss_environ = env, ss_context = [], ss_vars = oti_all_vars, ss_attrs = oti_all_attrs}, (oti_heaps, ots, cs))
+checkSpecialTypes mod_index SP_None type_defs modules heaps cs
+	= (SP_None, type_defs, modules, heaps, cs)
 
+checkFunSpecialTypes :: !Index !FunSpecials !v:{#CheckedTypeDef} !u:{#DclModule} !*TypeHeaps !*CheckState
+						   -> (!FunSpecials,!x:{#CheckedTypeDef},!w:{#DclModule},!.TypeHeaps,!.CheckState), [u v <= w, v u <= x];
+checkFunSpecialTypes mod_index (FSP_ParsedSubstitutions envs) type_defs modules heaps cs
+	# ots = { ots_type_defs = type_defs, ots_modules = modules }
+	  (specials, (heaps, ots, cs)) = mapSt (check_environment mod_index) envs (heaps, ots, cs)
+	= (FSP_Substitutions specials, ots.ots_type_defs, ots.ots_modules, heaps, cs)
+checkFunSpecialTypes mod_index FSP_None type_defs modules heaps cs
+	= (FSP_None, type_defs, modules, heaps, cs)
+
+check_environment :: Int (Env Type TypeVar) *(*TypeHeaps,u:OpenTypeSymbols,*CheckState) -> *(SpecialSubstitution,(*TypeHeaps,u:OpenTypeSymbols,*CheckState))
+check_environment mod_index env (heaps, ots, cs)
+ 	# oti = { oti_heaps = heaps, oti_all_vars = [], oti_all_attrs = [], oti_global_vars = [] }
+ 	  (env, (ots, {oti_heaps,oti_all_vars,oti_all_attrs,oti_global_vars}, cs)) = mapSt (check_substituted_type mod_index) env (ots, oti, cs)
+  	  cs_symbol_table = removeVariablesFromSymbolTable cGlobalScope oti_all_vars cs.cs_symbol_table
+	  cs_symbol_table = removeAttributesFromSymbolTable oti_all_attrs cs_symbol_table
+  	  cs = check_no_global_type_vars oti_global_vars {cs & cs_symbol_table = cs_symbol_table}
+	= ({ ss_environ = env, ss_context = [], ss_vars = oti_all_vars, ss_attrs = oti_all_attrs}, (oti_heaps, ots, cs))
+where
 	check_substituted_type mod_index bind=:{bind_src} cot_state
 		 # (bind_src, cot_state) = checkOpenType mod_index cGlobalScope DAK_Ignore bind_src cot_state
 		 = ({ bind & bind_src = bind_src }, cot_state)
-checkSpecialTypes mod_index SP_None type_defs modules heaps cs
-	= (SP_None, type_defs, modules, heaps, cs)
 
 /* cOuterMostLevel :== 0 */
 

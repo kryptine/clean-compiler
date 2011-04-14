@@ -2958,8 +2958,8 @@ transformApplication app=:{app_symb=symb=:{symb_kind}, app_args} extra_args
 			// Check imported overloaded function application for specials...
 			# {ft_specials}						= ro.ro_imported_funs.[glob_module].[glob_object]
 			# specials							= case ft_specials of
-													(SP_ContextTypes s)	-> s
-													_	-> []
+													FSP_ContextTypes s	-> s
+													_ -> []
 			| not (isEmpty specials)
 				# (ei,ti_symbol_heap)			= mapSt readAppInfo app_args ti.ti_symbol_heap
 					with
@@ -4551,7 +4551,6 @@ where
 		(SP_ParsedSubstitutions 	_)	-> file <<< "SP_ParsedSubstitutions"
 		(SP_Substitutions 		 	_)	-> file <<< "SP_Substitutions"
 		(SP_ContextTypes			l)	-> file <<< "(SP_ContextTypes: " <<< l <<< ")"
-		(SP_FunIndex				i)	-> file <<< "(SP_FunIndex: " <<< i <<< ")"
 		(SP_TypeOffset				_)	-> file <<< "SP_TypeOffset"
 		SP_None							-> file <<< "SP_None"
 

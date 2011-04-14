@@ -257,7 +257,7 @@ cIsNotAFunction :== False
 	=	PD_Function  Position Ident Bool [ParsedExpr] Rhs FunKind
 	|	PD_NodeDef  Position ParsedExpr Rhs
 	|	PD_Type ParsedTypeDef
-	|	PD_TypeSpec Position Ident Priority (Optional SymbolType) Specials
+	|	PD_TypeSpec Position Ident Priority (Optional SymbolType) FunSpecials
 	|	PD_Class ClassDef [ParsedDefinition]
 	|	PD_Instance (ParsedInstance ParsedDefinition)
 	|	PD_Instances [ParsedInstance ParsedDefinition]
@@ -310,7 +310,7 @@ cNameLocationDependent :== True
 	These can only occur in definition modules. After parsing the SP_ParsedSubstitutions alternative
 	is used to indicate the specific instantiation. The SP_Substitutions alternative is used to deduce
 	the type of the specialized version. Finally the SP_ContextTypes alternative is set and used during 
-	the typing to check whether this instance has been used. The auxiliary SP_FunIndex alternative is used
+	the typing to check whether this instance has been used. The auxiliary FSP_FunIndex alternative is used
 	to store the index of the function that has been specialized.
 */
 
@@ -318,9 +318,15 @@ cNameLocationDependent :== True
 	= SP_ParsedSubstitutions 	![Env Type TypeVar]
 	| SP_Substitutions 		 	![SpecialSubstitution]
 	| SP_ContextTypes			![Special]
-	| SP_FunIndex				!Index
-	| SP_TypeOffset				!Int
+	| SP_TypeOffset				!Int					// index in SP_Substitutions for specialized instance
 	| SP_None
+
+::	FunSpecials
+	= FSP_ParsedSubstitutions 	![Env Type TypeVar]
+	| FSP_Substitutions 		![SpecialSubstitution]
+	| FSP_ContextTypes			![Special]
+	| FSP_FunIndex				!Index
+	| FSP_None
 
 ::	SpecialSubstitution =
 	{	ss_environ	:: !Env Type TypeVar
@@ -572,7 +578,7 @@ NoGlobalIndex :== {gi_module=NoIndex,gi_index=NoIndex}
 	,	ft_priority		:: !Priority
 	,	ft_type			:: !SymbolType
 	,	ft_pos			:: !Position
-	,	ft_specials		:: !Specials
+	,	ft_specials		:: !FunSpecials
 	,	ft_type_ptr		:: !VarInfoPtr
 	}
 
