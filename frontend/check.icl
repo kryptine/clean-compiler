@@ -2402,14 +2402,13 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 		  icl_mod	= { icl_name = mod_ident, icl_functions = icl_functions, icl_function_indices = icl_function_indices,
 		  				icl_common = icl_common, icl_import = icl_imported, icl_qualified_imports = qualified_explicit_imports,
 		  				icl_imported_objects = mod_imported_objects, icl_foreign_exports = foreign_exports,
-		  				icl_used_module_numbers = imported_module_numbers, icl_copied_from_dcl = copied_dcl_defs,
-		  				icl_modification_time = mod_modification_time }
+		  				icl_used_module_numbers = imported_module_numbers, icl_modification_time = mod_modification_time }
 
 		  heaps = { heaps & hp_var_heap = var_heap, hp_expression_heap = expr_heap, hp_type_heaps = {hp_type_heaps & th_vars = th_vars}}
 		  (main_dcl_module, dcl_modules) = dcl_modules![main_dcl_module_n]
 
 		  (icl_mod, macro_defs, heaps, cs_error)
-		  		= compareDefImp main_dcl_module_n main_dcl_module optional_macro_conversions n_exported_global_functions icl_mod e_info.ef_macro_defs heaps cs_error
+		  		= compareDefImp main_dcl_module_n main_dcl_module optional_macro_conversions copied_dcl_defs n_exported_global_functions icl_mod e_info.ef_macro_defs heaps cs_error
 
 		# (predef_symbols_for_transform, cs_predef_symbols) = get_predef_symbols_for_transform cs_predef_symbols
 		  (groups, icl_functions, macro_defs, var_heap, expr_heap, cs_symbol_table, cs_error)
@@ -2433,8 +2432,7 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 		  icl_mod		= { icl_name = mod_ident, icl_functions = icl_functions, icl_function_indices = icl_function_indices,
 		  					icl_common = icl_common, icl_import = icl_imported, icl_qualified_imports = qualified_explicit_imports,
 		  					icl_imported_objects = mod_imported_objects, icl_foreign_exports = foreign_exports,
-		  					icl_used_module_numbers = imported_module_numbers, icl_copied_from_dcl = copied_dcl_defs,
-		  					icl_modification_time = mod_modification_time }
+		  					icl_used_module_numbers = imported_module_numbers, icl_modification_time = mod_modification_time }
 		= (False, icl_mod, dcl_modules, {}, {}, cs_x.x_main_dcl_module_n,heaps, cs_predef_symbols, cs_symbol_table, cs_error.ea_file, directly_imported_dcl_modules)
 	where
 		check_start_rule mod_kind mod_ident icl_global_functions_ranges cs=:{cs_symbol_table,cs_x}

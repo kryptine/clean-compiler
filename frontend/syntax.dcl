@@ -100,7 +100,7 @@ instance == FunctionOrMacroIndex
 	{	glob_object	:: !object
 	,	glob_module	:: !Index
 	}
-	
+
 ::	Module defs = 
 	{	mod_ident		:: !Ident
 	,	mod_modification_time		:: {#Char}
@@ -144,7 +144,6 @@ instance == FunctionOrMacroIndex
 	,	icl_imported_objects	:: ![ImportedObject]
 	,	icl_foreign_exports		:: ![ForeignExport]
 	,	icl_used_module_numbers :: !NumberSet
-	,	icl_copied_from_dcl 	:: !CopiedDefinitions
 	,	icl_modification_time	:: !{#Char}
 	}
 
@@ -443,12 +442,6 @@ cNameLocationDependent :== True
 	| GCB_FunDef !FunDef 
 	| GCB_ParsedBody ![ParsedExpr] !Rhs 
 
-:: GenericType = 
-	{	gt_type 		:: !SymbolType
-	,	gt_vars			:: ![TypeVar]			// generic arguments
-	,	gt_arity		:: !Int					// number of generic arguments	
-	}
-
 ::	InstanceType =
 	{	it_vars			:: [TypeVar]
 	,	it_types		:: ![Type]
@@ -678,7 +671,7 @@ cIsALocalVar	:== False
 	,	cc_linear_bits	::![Bool]
 	,	cc_producer		::!ProdClass
 	}
-					
+		
 ::	ConsClass	:== Int
 
 ::	ProdClass	:== Bool
@@ -767,13 +760,6 @@ cNotVarNumber :== -1
 	,	var_expr_ptr	:: !ExprInfoPtr
 	}
 
-/*
-cRecursiveAppl		:== True
-cNonRecursiveAppl	:== False	
-
-::	ApplicationKind	:== Bool
-*/
- 
 ::	TypeSymbIdent =
 	{	type_ident		:: !Ident
 	,	type_arity		:: !Int
@@ -1348,7 +1334,6 @@ cIsNotStrict	:== False
 				| EE 
 				| NoBind ExprInfoPtr /* auxiliary, to store fields that are not specified in a record expression */ 
 				| FailExpr !Ident // only allowed on (case) root positions
-
 
 ::	CodeBinding	variable :== Env String variable
 

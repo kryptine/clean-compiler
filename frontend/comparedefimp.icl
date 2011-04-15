@@ -7,11 +7,11 @@ import syntax, checksupport, compare_constructor, utilities, StdCompare
 	,	comp_attr_var_heap	:: !.AttrVarHeap
 	,	comp_error			:: !.ErrorAdmin
 	}
-	
+
 type_def_error		= "type definition in the impl module conflicts with the def module"
 class_def_error		= "class definition in the impl module conflicts with the def module"
 instance_def_error	= "instance definition in the impl module conflicts with the def module"
-generic_def_error		= "generic definition in the impl module conflicts with the def module"
+generic_def_error	= "generic definition in the impl module conflicts with the def module"
 
 compareError message pos error_admin
 	= popErrorAdmin (checkError "" message (pushErrorAdmin pos error_admin))
@@ -442,19 +442,17 @@ class CorrespondenceNumber a where
 
 initial_hwn hwn_heap = { hwn_heap = hwn_heap, hwn_number = 0 }
 
-compareDefImp :: !Int !DclModule !(Optional {#Index}) !Int !*IclModule !*{#*{#FunDef}} !*Heaps !*ErrorAdmin 
-													   -> (!.IclModule,!.{#.{#FunDef}},!.Heaps,!.ErrorAdmin)
-compareDefImp main_dcl_module_n main_dcl_module No n_exported_global_functions icl_module macro_defs heaps error_admin
+compareDefImp :: !Int !DclModule !(Optional {#Index}) !CopiedDefinitions !Int !*IclModule !*{#*{#FunDef}} !*Heaps !*ErrorAdmin 
+																		  -> (!.IclModule,!.{#.{#FunDef}},!.Heaps,!.ErrorAdmin)
+compareDefImp main_dcl_module_n main_dcl_module No _ n_exported_global_functions icl_module macro_defs heaps error_admin
 	= (icl_module, macro_defs,heaps, error_admin)
-compareDefImp main_dcl_module_n main_dcl_module (Yes macro_conversion_table) n_exported_global_functions icl_module macro_defs heaps error_admin
+compareDefImp main_dcl_module_n main_dcl_module (Yes macro_conversion_table) {copied_type_defs,copied_class_defs,copied_generic_defs} n_exported_global_functions icl_module macro_defs heaps error_admin
 //	| Trace_array icl_module.icl_functions
 //		&& Trace_array macro_defs.[main_dcl_module_n]
 
 	# {dcl_functions,dcl_macros,dcl_common} = main_dcl_module
-	  {icl_common, icl_functions, icl_copied_from_dcl = {copied_type_defs,copied_class_defs,copied_generic_defs}}
-			= icl_module
-	  {hp_var_heap, hp_expression_heap, hp_type_heaps={th_vars, th_attrs}}
-	  		= heaps
+	  {icl_common, icl_functions} = icl_module
+	  {hp_var_heap, hp_expression_heap, hp_type_heaps={th_vars, th_attrs}} = heaps
 	  { com_cons_defs=icl_com_cons_defs, com_type_defs = icl_com_type_defs,
 		com_selector_defs=icl_com_selector_defs, com_class_defs = icl_com_class_defs,
 		com_member_defs=icl_com_member_defs, com_instance_defs = icl_com_instance_defs,
