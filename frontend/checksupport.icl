@@ -46,7 +46,7 @@ where
 	popErrorAdmin cs=:{cs_error}
 		= {cs & cs_error = popErrorAdmin cs_error } //...PK
 
-newPosition :: !Ident !Position -> IdentPos 
+newPosition :: !Ident !Position -> IdentPos
 newPosition id (FunPos file_name line_nr _)
 	= { ip_ident = id, ip_line = line_nr, ip_file = file_name }
 newPosition id (LinePos file_name line_nr)
@@ -539,60 +539,6 @@ instance <<< DeclarationInfo
 
 import_ident :: Ident
 import_ident =: { id_name = "import", id_info = nilPtr }
-
-/*
-ste_kind_to_string :: STE_Kind -> String
-ste_kind_to_string ste_kind
- = case ste_kind of
-	STE_FunctionOrMacro _
-		-> "STE_FunctionOrMacro"
-	STE_Type
-		-> "STE_Type"
-	STE_Constructor
-		-> "STE_Constructor"
-	STE_Selector _
-		-> "STE_Selector"
-	STE_Field _
-		-> "STE_Field"
-	STE_Class
-		-> "STE_Class"
-	STE_Member
-		-> "STE_Member"
-	STE_Instance _
-		-> "STE_Instance"
-	STE_Variable _
-		-> "STE_Variable"
-	STE_TypeVariable _
-		-> "STE_TypeVariable"
-	STE_TypeAttribute _
-		-> "STE_TypeAttribute"
-	STE_BoundTypeVariable _
-		-> "STE_BoundTypeVariable"
-	STE_Imported ste_kind2 _
-		-> "STE_Imported "+++ste_kind_to_string ste_kind2
-	STE_DclFunction
-		-> "STE_DclFunction"
-	STE_Module _
-		-> "STE_Module"
-	STE_ClosedModule
-		-> "STE_ClosedModule"
-	STE_Empty
-		-> "STE_Empty"
-	STE_DictType _
-		-> "STE_DictType"
-	STE_DictCons _
-		-> "STE_DictCons"
-	STE_DictField _
-		-> "STE_DictField"
-	STE_Called _
-		-> "STE_Called"
-	STE_ExplImpSymbol _
-		-> "STE_ExplImpSymbol"
-	STE_ExplImpComponentNrs _ _
-		-> "STE_ExplImpComponentNrs"
-	STE_BelongingSymbol _
-		-> "STE_BelongingSymbol"
-*/
 
 restoreHeap :: !Ident !*SymbolTable -> .SymbolTable
 restoreHeap {id_info} cs_symbol_table

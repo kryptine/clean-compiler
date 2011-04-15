@@ -450,12 +450,18 @@ cNameLocationDependent :== True
 	}
 
 ::	ClassInstance =
- 	{	ins_class		:: !Global DefinedSymbol
+ 	{	ins_class_index	:: !GlobalIndex
+	,	ins_class_ident	:: !ClassIdent
 	,	ins_ident		:: !Ident
 	,	ins_type		:: !InstanceType
 	,	ins_members		:: !{#ClassInstanceMember}
 	,	ins_specials	:: !Specials
 	,	ins_pos			:: !Position
+	}
+
+::	ClassIdent =
+	{	ci_ident		:: !Ident
+	,	ci_arity		:: !Int
 	}
 
 ::	ClassInstanceMember = 
@@ -671,7 +677,7 @@ cIsALocalVar	:== False
 	,	cc_linear_bits	::![Bool]
 	,	cc_producer		::!ProdClass
 	}
-		
+
 ::	ConsClass	:== Int
 
 ::	ProdClass	:== Bool
@@ -1542,10 +1548,11 @@ ParsedConstructorToConsDef pc :==
 		cons_exi_vars = pc.pc_exi_vars, cons_type_ptr = nilPtr }
 
 ParsedInstanceToClassInstance pi members :==
- 	{	ins_class = {glob_object = MakeDefinedSymbol pi.pi_class NoIndex (length pi.pi_types), glob_module = NoIndex}, ins_ident = pi.pi_ident, 
- 		ins_type = { it_vars = [], it_types = pi.pi_types, it_attr_vars = [],
- 					 it_context = pi.pi_context }, 
- 		ins_members = members, ins_specials = pi.pi_specials, ins_pos = pi.pi_pos}
+	{	ins_class_index = {gi_module=NoIndex, gi_index=NoIndex},
+		ins_class_ident = {ci_ident=pi.pi_class, ci_arity=length pi.pi_types}, ins_ident = pi.pi_ident,
+		ins_type = { it_vars = [], it_types = pi.pi_types, it_attr_vars = [],
+					 it_context = pi.pi_context }, 
+		ins_members = members, ins_specials = pi.pi_specials, ins_pos = pi.pi_pos}
 
 MakeTypeDef name lhs rhs attr pos  :== 
 	{	td_ident = name, td_index = -1, td_arity = length lhs, td_args = lhs, td_attrs = [], td_attribute = attr,

@@ -693,7 +693,6 @@ where
 			= (TA_Multi, error)
 		determine_attribute var_ident dem_attr new_attr error
 			= (new_attr, error)
-
 	check_attribute var_ident dem_attr _ this_attr oti cs
 		= (TA_Multi, oti, cs)
 
@@ -884,9 +883,9 @@ remove_universal_vars vars symbol_table
 	remove_universal_var {atv_variable = {tv_ident}} cs_symbol_table
 		= removeDefinitionFromSymbolTable cRankTwoScope tv_ident cs_symbol_table
 
-checkInstanceType :: !Index !(Global DefinedSymbol) !InstanceType !Specials !u:{# CheckedTypeDef} !v:{# ClassDef} !u:{# DclModule} !*TypeHeaps !*CheckState
-	-> (!InstanceType, !Specials, !u:{# CheckedTypeDef}, !v:{# ClassDef}, !u:{# DclModule}, !*TypeHeaps, !*CheckState)
-checkInstanceType mod_index ins_class it=:{it_types,it_context} specials type_defs class_defs modules heaps cs
+checkInstanceType :: !Index !GlobalIndex !ClassIdent !InstanceType !Specials !u:{# CheckedTypeDef} !v:{# ClassDef} !u:{# DclModule} !*TypeHeaps !*CheckState
+												 -> (!InstanceType,!Specials,!u:{# CheckedTypeDef},!v:{# ClassDef},!u:{# DclModule},!*TypeHeaps,!*CheckState)
+checkInstanceType mod_index ins_class_index ins_class_ident it=:{it_types,it_context} specials type_defs class_defs modules heaps cs
 	# cs_error = check_fully_polymorphity it_types it_context cs.cs_error
 	  ots = { ots_type_defs = type_defs, ots_modules = modules }
 	  oti = { oti_heaps = heaps, oti_all_vars = [], oti_all_attrs = [], oti_global_vars= [] }
@@ -895,7 +894,7 @@ checkInstanceType mod_index ins_class it=:{it_types,it_context} specials type_de
 	  (heaps, cs) = check_linearity_of_type_vars it_vars oti.oti_heaps cs
 	  oti = { oti &  oti_all_vars = [], oti_all_attrs = [], oti_heaps = heaps }
 	  (it_context, type_defs, class_defs, modules, heaps, cs) = checkTypeContexts it_context mod_index class_defs ots oti cs
-	  cs_error = foldSt (compare_context_and_instance_types ins_class it_types) it_context cs.cs_error
+	  cs_error = foldSt (compare_context_and_instance_types ins_class_index ins_class_ident it_types) it_context cs.cs_error
 	  (specials, cs) = checkSpecialTypeVars specials { cs & cs_error = cs_error }
 	  cs_symbol_table = removeVariablesFromSymbolTable cGlobalScope it_vars cs.cs_symbol_table
 	  cs_symbol_table = removeAttributesFromSymbolTable it_attr_vars cs_symbol_table
@@ -921,15 +920,15 @@ checkInstanceType mod_index ins_class it=:{it_types,it_context} specials type_de
 				= (th_vars, checkError tv_ident ": this type variable occurs more than once in an instance type" error)
 				= (th_vars, error)
 
-	compare_context_and_instance_types ins_class it_types {tc_class=TCGeneric _, tc_types} cs_error
+	compare_context_and_instance_types ins_class_index ins_class_ident it_types {tc_class=TCGeneric _, tc_types} cs_error
 		= cs_error
-	compare_context_and_instance_types ins_class it_types {tc_class=TCClass clazz, tc_types} cs_error
-		| ins_class<>clazz
+	compare_context_and_instance_types ins_class_index ins_class_ident it_types {tc_class=TCClass clazz, tc_types} cs_error
+		| ins_class_index.gi_module<>clazz.glob_module || ins_class_index.gi_index<>clazz.glob_object.ds_index
 			= cs_error
 		# are_equal
 				= fold2St compare_context_and_instance_type it_types tc_types True
 		| are_equal
-			= checkError ins_class.glob_object.ds_ident "context restriction equals instance type" cs_error
+			= checkError ins_class_ident.ci_ident "context restriction equals instance type" cs_error
 		= cs_error
 	  where
 		compare_context_and_instance_type (TA {type_index=ti1} _) (TA {type_index=ti2} _) are_equal_accu
@@ -956,7 +955,7 @@ checkInstanceType mod_index ins_class it=:{it_types,it_context} specials type_de
 			= False
 
 checkFunctionType :: !Index !SymbolType !FunSpecials !u:{#CheckedTypeDef} !v:{#ClassDef} !u:{#DclModule} !*TypeHeaps !*CheckState
-					   -> (!SymbolType, !FunSpecials,!u:{#CheckedTypeDef},!v:{#ClassDef},!u:{#DclModule},!*TypeHeaps,!*CheckState)
+						-> (!SymbolType,!FunSpecials,!u:{#CheckedTypeDef},!v:{#ClassDef},!u:{#DclModule},!*TypeHeaps,!*CheckState)
 checkFunctionType mod_index st specials type_defs class_defs modules heaps cs
 	= checkSymbolType True mod_index st specials type_defs class_defs modules heaps cs
 

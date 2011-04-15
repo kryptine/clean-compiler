@@ -1019,11 +1019,12 @@ where
 			= check_kinds_of_class_instances common_defs (inc instance_index) instance_defs class_infos as
 	where	
 		check_kinds_of_class_instance :: !{#CommonDefs} !ClassInstance  !*ClassDefInfos !*AnalyseState -> (!*ClassDefInfos, !*AnalyseState)
-		check_kinds_of_class_instance common_defs {ins_class,ins_ident,ins_pos,ins_type={it_vars,it_types,it_context}} class_infos
+		check_kinds_of_class_instance common_defs {ins_class_index,ins_class_ident={ci_ident,ci_arity},ins_ident,ins_pos,ins_type={it_vars,it_types,it_context}} class_infos
 					as=:{as_type_var_heap,as_kind_heap,as_error}
 			# as_error = pushErrorAdmin (newPosition ins_ident ins_pos) as_error
 			  (as_type_var_heap, as_kind_heap) = bindFreshKindVariablesToTypeVars it_vars as_type_var_heap as_kind_heap
 			  as = { as & as_type_var_heap = as_type_var_heap, as_kind_heap = as_kind_heap, as_error = as_error }
+			  ins_class = {glob_module=ins_class_index.gi_module,glob_object={ds_index=ins_class_index.gi_index,ds_ident=ci_ident,ds_arity=ci_arity}}
 			  context = {tc_class = TCClass ins_class, tc_types = it_types, tc_var = nilPtr}
 			  (class_infos, as) = determine_kinds_of_type_contexts common_defs [context : it_context] class_infos as
 			= (class_infos, { as & as_error = popErrorAdmin as.as_error})

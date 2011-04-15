@@ -1,8 +1,7 @@
 implementation module syntax
 
-import StdEnv, compare_constructor // ,RWSDebug
-
-import scanner, general, Heap, typeproperties, utilities, compilerSwitches
+import StdEnv, compare_constructor
+import scanner, general, Heap, typeproperties, utilities
 import syntax
 
 instance toString Ident
@@ -726,7 +725,7 @@ where
 
 instance <<< ClassInstance
 where
-	(<<<) file {ins_class,ins_type} = file <<< ins_class <<< " :: " <<< ins_type
+	(<<<) file {ins_class_ident,ins_type} = file <<< ins_class_ident.ci_ident <<< " :: " <<< ins_type
 
 instance <<< (Optional a) | <<< a
 where

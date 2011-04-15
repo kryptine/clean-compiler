@@ -281,8 +281,8 @@ buildGenericTypeRep type_index funs_and_groups
 		, hp_var_heap = gs_varh
 		, hp_generic_heap = gs_genh
 		, hp_type_heaps = { th_vars = gs_tvarh, th_attrs = gs_avarh }
-		}	
-		
+		}
+
 	# (type_def, gs_modules) = gs_modules![type_index.gi_module].com_type_defs.[type_index.gi_index]
 
 	# (type_info, cons_infos, funs_and_groups, gs_modules, heaps, gs_error)
@@ -1419,7 +1419,7 @@ buildMemberType gen_def=:{gen_ident,gen_pos,gen_type,gen_vars} kind class_var gs
 	#! th = {th_vars = gs.gs_tvarh, th_attrs = gs.gs_avarh}
 	#! (kind_indexed_st, gatvs, th, gs_error) 
 		= buildKindIndexedType gen_type gen_vars kind gen_ident gen_pos th gs.gs_error
-		
+
 	#! (member_st, th, gs_error) 
 		= replace_generic_vars_with_class_var kind_indexed_st gatvs th gs_error
 
@@ -1937,9 +1937,9 @@ where
 
 		build_shorthand_class_instance this_kind class_index gc_ident gc_pos {ds_ident,ds_arity,ds_index} ins_type (ins_index, instances)
 			#! class_ident = genericIdentToClassIdent gc_ident.id_name this_kind
-			#! class_ds = {ds_index = class_index, ds_arity=1, ds_ident=class_ident}
 			#! ins = 
-			 	{	ins_class 	= {glob_module=gs_main_module, glob_object=class_ds}
+			 	{	ins_class_index = {gi_module=gs_main_module, gi_index=class_index}
+			 	,	ins_class_ident = {ci_ident=class_ident, ci_arity=1}
 				,	ins_ident 	= class_ident
 				,	ins_type 	= ins_type
 				,	ins_members	= {{cim_ident=ds_ident,cim_arity=ds_arity,cim_index=ds_index}}
@@ -2017,7 +2017,8 @@ where
 		# class_ident = genericIdentToClassIdent gc_ident.id_name gc_kind
 		# class_ds = {ds_index = class_index, ds_arity=1, ds_ident=class_ident}
 		#! ins =
-		 	{	ins_class 	= {glob_module=gs_main_module, glob_object=class_ds}
+		 	{	ins_class_index = {gi_module=gs_main_module, gi_index=class_index}
+		 	,	ins_class_ident = {ci_ident=class_ident, ci_arity=1}
 			,	ins_ident 	= class_ident
 			,	ins_type 	= ins_type
 			,	ins_members	= {class_instance_member}
@@ -3969,15 +3970,8 @@ curryGenericArgType1 :: !SymbolType !String !*TypeHeaps
 	-> (!SymbolType, !*TypeHeaps)
 curryGenericArgType1  st=:{st_args, st_result, st_attr_env, st_attr_vars} attr_var_name th=:{th_attrs}
 	# (atype, attr_vars, av_num, th_attrs) = curry st_args st_result 1 th_attrs
-	# curried_st = 
-		{ st 
-		& st_args = []
-		, st_arity = 0
-		, st_result = atype
-		, st_attr_vars = attr_vars
-		}
+	# curried_st = {st & st_args = [], st_arity = 0, st_result = atype, st_attr_vars = attr_vars}
 	= (curried_st, {th & th_attrs = th_attrs})	
-		//---> ("curryGenericArgType", st, curried_st)
 where
 	// outermost closure gets TA_Multi attribute
 	curry [] res av_num th_attrs
@@ -4001,7 +3995,6 @@ where
 clearType t th 
 	= foldType clear_type clear_atype t th
 where
-
 	clear_type (TV tv) th = clear_type_var tv th	
 	clear_type (GTV tv) th = clear_type_var tv th
 	clear_type (CV tv :@: _) th = clear_type_var tv th
@@ -4009,7 +4002,6 @@ where
 		#! th = foldSt clear_attr [atv_attribute \\ {atv_attribute} <- atvs] th
 		#! th = foldSt clear_type_var [atv_variable \\ {atv_variable} <- atvs] th
 		= th
-		 	
 	clear_type _ th = th
 
 	clear_atype {at_attribute} th 
@@ -4021,6 +4013,7 @@ where
 		
 	clear_type_var {tv_info_ptr} th=:{th_vars} 
 		= {th & th_vars = writePtr tv_info_ptr TVI_Empty th_vars} 
+
 	clear_attr_var {av_info_ptr} th=:{th_attrs} 
 		= {th & th_attrs = writePtr av_info_ptr AVI_Empty th_attrs} 
 
@@ -4086,7 +4079,6 @@ collectAttrVars type th
 collectAttrsOfTypeVars :: ![TypeVar] type !*TypeHeaps -> (![ATypeVar], !*TypeHeaps) | foldType type
 collectAttrsOfTypeVars tvs type th
 	#! (th=:{th_vars}) = clearType type th
-		//---> ("collectAttrsOfTypeVars called for", tvs)
 	
 	# th_vars = foldSt (\{tv_info_ptr} h->writePtr tv_info_ptr TVI_Used h) tvs th_vars 
 	
@@ -4096,7 +4088,6 @@ collectAttrsOfTypeVars tvs type th
 
  	#! th = clearType type {th & th_vars= th_vars}
 	= (atvs, th)
-		//---> ("collectAttrsOfTypeVars returns", atvs)
 where
 	on_type type st = st
 
