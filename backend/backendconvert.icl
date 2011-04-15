@@ -1155,8 +1155,8 @@ adjustArrayFunctions array_first_instance_indices predefs main_dcl_module_n func
 				=	foldStateA (adjustStdArrayInstance arrayClassIndex arrayInfo) instances
 			where
 				adjustStdArrayInstance :: Index AdjustStdArrayInfo ClassInstance -> BackEnder
-				adjustStdArrayInstance arrayClassIndex arrayInfo=:{asai_moduleIndex} instance`=:{ins_class}
-					| ins_class.glob_object.ds_index == arrayClassIndex && ins_class.glob_module == asai_moduleIndex
+				adjustStdArrayInstance arrayClassIndex arrayInfo=:{asai_moduleIndex} instance`=:{ins_class_index}
+					| ins_class_index.gi_index == arrayClassIndex && ins_class_index.gi_module == asai_moduleIndex
 						=	adjustArrayClassInstance arrayInfo instance`
 					// otherwise
 						=	identity

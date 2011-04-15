@@ -2250,10 +2250,10 @@ typeProgram comps main_dcl_module_n fun_defs specials list_inferred_types icl_de
 	  ti_functions	 = {dcl_functions \\ {dcl_functions} <-: dcl_modules }	  
 
 	  class_instances = { {  IT_Empty \\ i <- [0 .. dec (size com_class_defs)] } \\ {com_class_defs} <-: ti_common_defs }
-	  state = collect_imported_instances imports ti_common_defs {} ts_error class_instances hp_type_heaps.th_vars td_infos
+	  state = collect_imported_instances imports ti_common_defs ts_error class_instances hp_type_heaps.th_vars td_infos
 	  state = collect_qualified_imported_instances icl_qualified_imports ti_common_defs state
 
-	  (_, ts_error, class_instances, th_vars, td_infos) = collect_and_check_instances (size icl_defs.com_instance_defs) ti_common_defs state
+	  (ts_error, class_instances, th_vars, td_infos) = collect_and_check_instances (size icl_defs.com_instance_defs) ti_common_defs state
 	  
 	  ts = { ts_fun_env = InitFunEnv fun_env_size, ts_var_heap = hp_var_heap, ts_expr_heap = hp_expression_heap, ts_generic_heap = hp_generic_heap, ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [],
 	  		 ts_type_heaps = { hp_type_heaps & th_vars = th_vars }, ts_td_infos = td_infos, ts_error = ts_error, ts_fun_defs=fun_defs }
@@ -2276,10 +2276,9 @@ typeProgram comps main_dcl_module_n fun_defs specials list_inferred_types icl_de
 	= (not type_error, fun_defs, array_and_list_instances, ti_common_defs, ti_functions,
 			ts_td_infos, {hp_var_heap = ts_var_heap, hp_expression_heap = ts_expr_heap, hp_type_heaps = ts_type_heaps, hp_generic_heap=ts_generic_heap },
 			predef_symbols, ts_error.ea_file, out)
-//				---> ("typeProgram", array_inst_types)
 where
-	collect_imported_instances imports common_defs dummy error class_instances type_var_heap td_infos
-		= foldlArraySt (collect_imported_instance common_defs) imports (dummy, error, class_instances, type_var_heap, td_infos)
+	collect_imported_instances imports common_defs error class_instances type_var_heap td_infos
+		= foldlArraySt (collect_imported_instance common_defs) imports (error, class_instances, type_var_heap, td_infos)
 
 	collect_qualified_imported_instances icl_qualified_imports common_defs state
 		= foldSt (\ (declarations,_,_) state -> foldSt (collect_imported_instance common_defs) declarations state)
@@ -2293,16 +2292,14 @@ where
 	collect_and_check_instances nr_of_instances common_defs state
 		= iFoldSt (update_instances_of_class common_defs main_dcl_module_n) 0 nr_of_instances state
 
-	update_instances_of_class common_defs mod_index ins_index (dummy, error, class_instances, type_var_heap, td_infos)
-		#!{ins_class={glob_object={ds_ident={id_name}, ds_index},glob_module},ins_type={it_types},ins_pos} = common_defs.[mod_index].com_instance_defs.[ins_index]
-		  (mod_instances, class_instances) = replace class_instances glob_module dummy 
-		  (instances, mod_instances) = replace mod_instances ds_index IT_Empty
+	update_instances_of_class common_defs mod_index ins_index (error, class_instances, type_var_heap, td_infos)
+		#!{ins_class_index={gi_module,gi_index},ins_type={it_types},ins_pos} = common_defs.[mod_index].com_instance_defs.[ins_index]
+		  (instances, class_instances) = class_instances![gi_module,gi_index]
 		  (error, instances) = insert it_types ins_index mod_index common_defs error instances
-		  (_, mod_instances) = replace mod_instances ds_index instances
-		  (dummy, class_instances) = replace class_instances glob_module mod_instances
+		  class_instances = {class_instances & [gi_module,gi_index]=instances}
 		  (error, type_var_heap, td_infos)
-					= check_types_of_instances ins_pos common_defs glob_module ds_index it_types (error, type_var_heap, td_infos)
-		= (dummy, error, class_instances, type_var_heap, td_infos)
+					= check_types_of_instances ins_pos common_defs gi_module gi_index it_types (error, type_var_heap, td_infos)
+		= (error, class_instances, type_var_heap, td_infos)
 	where
 		insert ::  ![Type] !Index !Index !{# CommonDefs } !*ErrorAdmin !*InstanceTree -> (!*ErrorAdmin, !*InstanceTree)
 		insert ins_types new_ins_index new_ins_module modules error IT_Empty
