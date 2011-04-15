@@ -60,8 +60,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_m
 			select_and_remove_icl_functions_from_record :: !*IclModule -> (!.{#FunDef},!.IclModule)
 			select_and_remove_icl_functions_from_record icl_mod=:{icl_functions} = (icl_functions,{icl_mod & icl_functions={}})
 
-	# { icl_common,icl_function_indices,icl_name,icl_import,icl_qualified_imports,icl_imported_objects,
-		icl_foreign_exports,icl_used_module_numbers,icl_copied_from_dcl			} = icl_mod
+	# {icl_common,icl_function_indices,icl_name,icl_import,icl_qualified_imports,icl_imported_objects,icl_foreign_exports,icl_used_module_numbers} = icl_mod
 /*
 	  (_,f,files) = fopen "components" FWriteText files
 	  (components, icl_functions, f) = showComponents components 0 True icl_functions f
@@ -269,7 +268,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_m
 	# 	fe ={	fe_icl = {icl_functions=fun_defs, icl_function_indices=icl_function_indices, icl_common=icl_common,
 						 icl_import=icl_import, icl_qualified_imports=icl_qualified_imports, icl_imported_objects=icl_imported_objects,
 						 icl_foreign_exports=icl_foreign_exports,icl_name=icl_name,icl_used_module_numbers=icl_used_module_numbers,
-						 icl_copied_from_dcl=icl_copied_from_dcl,icl_modification_time=icl_mod.icl_modification_time }
+						 icl_modification_time=icl_mod.icl_modification_time }
 			,	fe_dcls = dcl_mods
 			,	fe_components = components
 			,	fe_arrayInstances = array_instances
