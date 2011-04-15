@@ -1268,7 +1268,8 @@ where
 			, KindArrow [KindConst]
 			, KindArrow [KindConst, KindConst] 
 			: subkinds]
-		#! (st, gs) = foldSt (build_class_if_needed gen_def) kinds (st, gs)
+		# (dep_defs, gs) = mapSt lookup_dependency_def gen_def.gen_deps gs
+		#! (st, gs) = foldSt (\def -> foldSt (build_class_if_needed def) kinds) [gen_def:dep_defs] (st, gs)
 		#! gencase = {gencase & gc_kind = kind}
 
 		#! type_index = index_OBJECT_CONS_FIELD_type gencase.gc_type gs.gs_predefs
@@ -1288,6 +1289,10 @@ where
 			= (gencase, st, gs)
 
 			= (gencase, st, gs)
+	where
+		lookup_dependency_def {gd_index} gs=:{gs_modules}
+			# (gen_dep, gs_modules) = gs_modules![gd_index.gi_module].com_generic_defs.[gd_index.gi_index]
+			= (gen_dep, {gs & gs_modules = gs_modules})
 
 	build_class_if_needed :: !GenericDef !TypeKind ((![ClassDef], ![MemberDef], !Index, Index), *GenericState)
 		-> ((![ClassDef], ![MemberDef], !Index, Index), *GenericState)		
@@ -1736,14 +1741,20 @@ where
 			#! this_kind = case rest_kinds of
 				[] -> KindConst
 				_  -> KindArrow rest_kinds 
-	
+
 			#! (class_info, (modules, heaps)) = get_class_for_kind gc_generic this_kind (modules, heaps)
 			#! (arg_class_infos, (modules, heaps)) 
 				= mapSt (get_class_for_kind gc_generic) consumed_kinds (modules, heaps)
-			#! ({class_members}, modules) = modules![class_info.gci_module].com_class_defs.[class_info.gci_class]	
+			# (deps, modules) = modules![gc_generic.gi_module].com_generic_defs.[gc_generic.gi_index].gen_deps
+			# (dep_class_infoss, (modules, heaps))
+				= mapSt (\{gd_index} -> mapSt (get_class_for_kind gd_index) consumed_kinds) deps (modules, heaps)
+			# class_idents = [(gc_generic, gc_ident):[(gd_index, ident) \\ {gd_index, gd_ident=Ident ident} <- deps]]
+			# arg_and_dep_class_infos = flatten (map (zip2 class_idents) (transpose [arg_class_infos:dep_class_infoss]))
+
+			#! ({class_members}, modules) = modules![class_info.gci_module].com_class_defs.[class_info.gci_class]
 			#! (member_def, modules) = modules![class_info.gci_module].com_member_defs.[class_members.[0].ds_index]
 			#! (ins_type, heaps)
-				= build_instance_type gc_type arg_class_infos heaps
+				= build_instance_type gc_type num_args (length deps) arg_and_dep_class_infos heaps
 			#! (fun_type, heaps, error)
 				= determine_type_of_member_instance member_def ins_type heaps error
 
@@ -1752,13 +1763,12 @@ where
 			#! has_generic_info = is_OBJECT_CONS_FIELD_type gc_type gs_predefs
 
 			#! (memfun_ds, fun_info, heaps)
-				= build_shorthand_instance_member module_index this_kind gc_generic has_generic_info fun_index fun_ident gc_pos fun_type arg_class_infos fun_info heaps
+				= build_shorthand_instance_member module_index this_kind has_generic_info fun_index fun_ident gc_pos fun_type arg_and_dep_class_infos fun_info heaps
 
 			#! ins_info = build_shorthand_class_instance this_kind class_info.gci_class gc_ident gc_pos memfun_ds ins_type ins_info
 			= (modules, (fun_info, ins_info, heaps, error))
 			
-		build_instance_type type class_infos heaps=:{hp_type_heaps=th=:{th_vars},hp_var_heap}
-			#! arity = length class_infos
+		build_instance_type type arity num_deps arg_and_dep_class_infos heaps=:{hp_type_heaps=th=:{th_vars},hp_var_heap}
 			#! type_var_names = [makeIdent ("a" +++ toString i) \\ i <- [1 .. arity]]
 			#! (type_vars, th_vars) = mapSt freshTypeVar type_var_names th_vars 
 			#! type_var_types = [TV tv \\ tv <- type_vars] 	
@@ -1766,8 +1776,9 @@ where
 			
 			#! type = fill_type_args type new_type_args	
 			
+			# context_type_vars = flatten (map (repeatn (num_deps + 1)) type_vars)
 			#! (contexts, hp_var_heap) 
-				= zipWithSt build_context class_infos type_vars hp_var_heap
+				= zipWithSt build_context arg_and_dep_class_infos context_type_vars hp_var_heap
 			
 			#! ins_type = 
 				{	it_vars	= type_vars
@@ -1790,13 +1801,13 @@ where
 			fill_type_args type args
 				= abort ("fill_type_args\n"---> ("fill_type_args", type, args)) 
 
-			build_context {gci_class, gci_module, gci_kind} tv hp_var_heap
+			build_context ((_, ident), {gci_class, gci_module, gci_kind}) tv hp_var_heap
 				# (var_info_ptr, hp_var_heap) = newPtr VI_Empty hp_var_heap			
 				# type_context =		
 					{	tc_class = TCClass
 							{ glob_module=gci_module // the same as icl module
 							, glob_object =
-								{ ds_ident = genericIdentToClassIdent gc_ident.id_name gci_kind
+								{ ds_ident = genericIdentToClassIdent ident.id_name gci_kind
 								, ds_index = gci_class
 								, ds_arity = 1
 								}
@@ -1804,11 +1815,11 @@ where
 					,	tc_types = [TV tv]
 					,	tc_var	 = var_info_ptr
 					}
-				= (type_context, hp_var_heap)	
+				= (type_context, hp_var_heap)
 
-		build_shorthand_instance_member :: Int TypeKind GlobalIndex Bool Int Ident Position SymbolType [GenericClassInfo] !FunsAndGroups !*Heaps
+		build_shorthand_instance_member :: Int TypeKind Bool Int Ident Position SymbolType [((GlobalIndex, Ident), GenericClassInfo)] !FunsAndGroups !*Heaps
 										-> (!DefinedSymbol,!FunsAndGroups,!*Heaps)
-		build_shorthand_instance_member module_index this_kind gc_generic has_generic_info fun_index fun_ident gc_pos st class_infos fun_info heaps
+		build_shorthand_instance_member module_index this_kind has_generic_info fun_index fun_ident gc_pos st arg_and_dep_class_infos fun_info heaps
 			#! arg_var_names = ["x" +++ toString i \\ i <- [1..st.st_arity]]
 			#! (arg_var_exprs, arg_vars, heaps) = buildVarExprs arg_var_names heaps
 					
@@ -1816,7 +1827,7 @@ where
 			#! heaps = {heaps & hp_expression_heap = hp_expression_heap}
 			#! fun_name = genericIdentToMemberIdent gc_ident.id_name this_kind
 	
-			# (gen_exprs, heaps) = mapSt (build_generic_app gc_generic gc_ident) class_infos heaps
+			# (gen_exprs, heaps) = mapSt build_generic_app arg_and_dep_class_infos heaps
 	
 			#! arg_exprs = gen_exprs ++ arg_var_exprs
 			# (body_expr, heaps)
@@ -1832,8 +1843,8 @@ where
 
 			= (fun_ds, fun_info, heaps)
 		where
-			build_generic_app {gi_module, gi_index} gc_ident {gci_kind} heaps
-				= buildGenericApp gi_module gi_index gc_ident gci_kind [] heaps
+			build_generic_app (({gi_module, gi_index}, ident), {gci_kind}) heaps
+				= buildGenericApp gi_module gi_index ident gci_kind [] heaps
 
 		build_shorthand_class_instance :: TypeKind Int Ident Position DefinedSymbol InstanceType !(!Int,![ClassInstance]) -> (!Int,![ClassInstance])
 		build_shorthand_class_instance this_kind class_index gc_ident gc_pos {ds_ident,ds_arity,ds_index} ins_type (ins_index, instances)
