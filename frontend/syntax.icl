@@ -941,6 +941,13 @@ where
 		_ 
 			= file <<< "STE_???"
 
+instance <<< IdentOrQualifiedIdent
+where
+	(<<<) file (Ident ident)
+		= file <<< ident
+	(<<<) file (QualifiedIdent module_ident name)
+		= file<<<'\''<<<module_ident<<<"'."<<<name
+
 readable :: !Ident -> String // somewhat hacky
 readable {id_name}
 	| size id_name>0 && id_name.[0]=='_'

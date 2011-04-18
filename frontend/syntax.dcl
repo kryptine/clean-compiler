@@ -297,7 +297,7 @@ cNameLocationDependent :== True
 	}
 	
 ::	ParsedInstance member =
-	{	pi_class 	:: !Ident
+	{	pi_class 	:: !IdentOrQualifiedIdent
 	,	pi_ident	:: !Ident
 	,	pi_types	:: ![Type]
 	,	pi_context	:: ![TypeContext]
@@ -305,6 +305,10 @@ cNameLocationDependent :== True
 	,	pi_members	:: ![member]
 	,	pi_specials	:: !Specials
 	}
+
+::	IdentOrQualifiedIdent
+	= Ident !Ident
+	| QualifiedIdent /*module*/!Ident !String
 
 /*
 	Objects of type Specials are used to specify specialized instances of overloaded functions.
@@ -460,7 +464,7 @@ cNameLocationDependent :== True
 	}
 
 ::	ClassIdent =
-	{	ci_ident		:: !Ident
+	{	ci_ident		:: !IdentOrQualifiedIdent
 	,	ci_arity		:: !Int
 	}
 
@@ -1487,7 +1491,7 @@ instance <<< (Module a) | <<< a, ParsedDefinition, InstanceType, AttributeVar, T
 			 IndexRange,
 			 FunType,
 			 GenericClassInfo,
-			 TCClass
+			 TCClass, IdentOrQualifiedIdent
 
 instance <<< FunctionBody
 

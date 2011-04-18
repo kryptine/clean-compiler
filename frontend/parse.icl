@@ -1,7 +1,7 @@
 implementation module parse
 
 import StdEnv
-import scanner, syntax, hashtable, utilities, predef, containers, compilerSwitches
+import scanner, syntax, hashtable, utilities, predef, containers
 
 ParseOnly :== False
 
@@ -716,7 +716,7 @@ where
 			# (subst, pState) = want_rest_substitutions type_var pState
 			= (True, subst, wantEndOfDefinition "substitution" pState)
 			= (False, [], pState)
-	
+
 	want_rest_substitutions type_var pState
 		# pState = wantToken GeneralContext "specials" EqualToken pState
 		  (type, pState) = want pState
@@ -1342,37 +1342,47 @@ wantClassDefinition parseContext pos pState
 
 wantInstanceDeclaration :: !ParseContext !Position !ParseState -> (!ParsedDefinition, !ParseState)
 wantInstanceDeclaration parseContext pi_pos pState
-	# (class_name, pState) = want pState
-	  (pi_class, pState) = stringToIdent class_name IC_Class pState
-	  ((pi_types, pi_context), pState) = want_instance_type pState
-	  (pi_ident, pState) = stringToIdent class_name (IC_Instance pi_types) pState
-	# (token, pState) = nextToken TypeContext pState
-	| isIclContext parseContext
-		# pState = want_begin_group token pState
-		  (pi_members, pState) = wantDefinitions (SetClassOrInstanceDefsContext parseContext) pState
-		  pState = wantEndGroup "instance" pState
-
-		= (PD_Instance {pi_class = pi_class, pi_ident = pi_ident, pi_types = pi_types, pi_context = pi_context,
-						pi_members = pi_members, pi_specials = SP_None, pi_pos = pi_pos}, pState)
-	// otherwise // ~ (isIclContext parseContext)
-		| token == CommaToken
-			# (pi_types_and_contexts, pState)	= want_instance_types pState
-			  (idents, pState)		= seqList [stringToIdent class_name (IC_Instance type) \\ (type,context) <- pi_types_and_contexts] pState
-			= (PD_Instances
-				[	{ pi_class = pi_class, pi_ident = ident, pi_types = type, pi_context = context
-					, pi_members = [], pi_specials = SP_None, pi_pos = pi_pos}
-				\\	(type,context)	<- [ (pi_types, pi_context) : pi_types_and_contexts ]
-				&	ident			<- [ pi_ident : idents ]
-				]
-			  , pState
-			  )
-		// otherwise // token <> CommaToken
-			# (specials, pState) = optionalSpecials (tokenBack pState)
-			  pState = wantEndOfDefinition "instance declaration" pState
+	# (token, pState) = nextToken GeneralContext pState
+	= case token of
+		IdentToken class_name
+			# (pi_class, pState) = stringToIdent class_name IC_Class pState
+			-> want_instance_declaration class_name (Ident pi_class) parseContext pi_pos pState
+		QualifiedIdentToken module_name class_name
+			# (module_ident, pState) = stringToQualifiedModuleIdent module_name class_name IC_Class pState
+			-> want_instance_declaration class_name (QualifiedIdent module_ident class_name) parseContext pi_pos pState
+		_
+			# pState = parseError "String" (Yes token) "identifier" pState
+			# (pi_class, pState) = stringToIdent "" IC_Class pState
+			-> want_instance_declaration "" (Ident pi_class) parseContext pi_pos pState
+	where
+	want_instance_declaration class_name pi_class parseContext pi_pos pState
+		# ((pi_types, pi_context), pState) = want_instance_type pState
+		  (pi_ident, pState) = stringToIdent class_name (IC_Instance pi_types) pState
+		# (token, pState) = nextToken TypeContext pState
+		| isIclContext parseContext
+			# pState = want_begin_group token pState
+			  (pi_members, pState) = wantDefinitions (SetClassOrInstanceDefsContext parseContext) pState
+			  pState = wantEndGroup "instance" pState
 			= (PD_Instance {pi_class = pi_class, pi_ident = pi_ident, pi_types = pi_types, pi_context = pi_context,
-							pi_members = [], pi_specials = specials, pi_pos = pi_pos}, pState)
-		
-where
+							pi_members = pi_members, pi_specials = SP_None, pi_pos = pi_pos}, pState)
+		// otherwise // ~ (isIclContext parseContext)
+			| token == CommaToken
+				# (pi_types_and_contexts, pState)	= want_instance_types pState
+				  (idents, pState)		= seqList [stringToIdent class_name (IC_Instance type) \\ (type,context) <- pi_types_and_contexts] pState
+				= (PD_Instances
+					[	{ pi_class = pi_class, pi_ident = ident, pi_types = type, pi_context = context
+						, pi_members = [], pi_specials = SP_None, pi_pos = pi_pos}
+					\\	(type,context)	<- [ (pi_types, pi_context) : pi_types_and_contexts ]
+					&	ident			<- [ pi_ident : idents ]
+					]
+				  , pState
+				  )
+			// otherwise // token <> CommaToken
+				# (specials, pState) = optionalSpecials (tokenBack pState)
+				  pState = wantEndOfDefinition "instance declaration" pState
+				= (PD_Instance {pi_class = pi_class, pi_ident = pi_ident, pi_types = pi_types, pi_context = pi_context,
+								pi_members = [], pi_specials = specials, pi_pos = pi_pos}, pState)
+
 	want_begin_group token pState  // For JvG layout
 		# // (token, pState) = nextToken TypeContext pState PK
 		  (token, pState)

@@ -600,9 +600,9 @@ instance check_completeness ClassDef where
 		= check_completeness class_context cci ccs
 		
 instance check_completeness ClassInstance where
-	check_completeness {ins_class_index={gi_module,gi_index},ins_class_ident={ci_ident},ins_type} cci ccs
+	check_completeness {ins_class_index={gi_module,gi_index},ins_class_ident={ci_ident=Ident class_ident},ins_type} cci ccs
 		= check_completeness ins_type cci
-		  (check_whether_ident_is_imported ci_ident gi_module gi_index STE_Class cci ccs)
+		  (check_whether_ident_is_imported class_ident gi_module gi_index STE_Class cci ccs)
 
 instance check_completeness ConsDef
   where

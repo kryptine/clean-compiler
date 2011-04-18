@@ -1939,7 +1939,7 @@ where
 			#! class_ident = genericIdentToClassIdent gc_ident.id_name this_kind
 			#! ins = 
 			 	{	ins_class_index = {gi_module=gs_main_module, gi_index=class_index}
-			 	,	ins_class_ident = {ci_ident=class_ident, ci_arity=1}
+			 	,	ins_class_ident = {ci_ident=Ident class_ident, ci_arity=1}
 				,	ins_ident 	= class_ident
 				,	ins_type 	= ins_type
 				,	ins_members	= {{cim_ident=ds_ident,cim_arity=ds_arity,cim_index=ds_index}}
@@ -2018,7 +2018,7 @@ where
 		# class_ds = {ds_index = class_index, ds_arity=1, ds_ident=class_ident}
 		#! ins =
 		 	{	ins_class_index = {gi_module=gs_main_module, gi_index=class_index}
-		 	,	ins_class_ident = {ci_ident=class_ident, ci_arity=1}
+		 	,	ins_class_ident = {ci_ident=Ident class_ident, ci_arity=1}
 			,	ins_ident 	= class_ident
 			,	ins_type 	= ins_type
 			,	ins_members	= {class_instance_member}
