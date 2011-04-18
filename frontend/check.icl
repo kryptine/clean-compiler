@@ -180,23 +180,38 @@ where
 			= (instance_defs, is, type_heaps, cs)
 
 	check_instance :: !ClassInstance !Index !u:InstanceSymbols !*TypeHeaps !*CheckState -> (!ClassInstance, !u:InstanceSymbols, !*TypeHeaps, !*CheckState)
-	check_instance ins=:{ins_class_ident={ci_ident={id_name,id_info}},ins_pos,ins_ident} module_index is type_heaps cs=:{cs_symbol_table}
-		#  	(entry, cs_symbol_table) = readPtr id_info cs_symbol_table
+	check_instance ins=:{ins_class_ident={ci_ident=Ident {id_name,id_info}},ins_pos,ins_ident} module_index is type_heaps cs=:{cs_symbol_table}
+		#  	({ste_index,ste_kind}, cs_symbol_table) = readPtr id_info cs_symbol_table
 		# 	cs = pushErrorAdmin (newPosition ins_ident ins_pos) { cs & cs_symbol_table = cs_symbol_table }
-		#   (ins, is, type_heaps, cs) = case entry.ste_kind of
+		#   (ins, is, type_heaps, cs) = case ste_kind of
 				STE_Class
-					# (class_def, is) = is!is_class_defs.[entry.ste_index]
-					-> check_class_instance	class_def module_index entry.ste_index module_index ins is type_heaps cs 
-				STE_Imported STE_Class decl_index	
- 					# (class_def, is) = is!is_modules.[decl_index].dcl_common.com_class_defs.[entry.ste_index]
-					-> check_class_instance class_def module_index entry.ste_index decl_index ins is type_heaps cs
+					# (class_def, is) = is!is_class_defs.[ste_index]
+					-> check_class_instance	class_def module_index ste_index module_index ins is type_heaps cs 
+				STE_Imported STE_Class decl_index
+ 					# (class_def, is) = is!is_modules.[decl_index].dcl_common.com_class_defs.[ste_index]
+					-> check_class_instance class_def module_index ste_index decl_index ins is type_heaps cs
 				ste -> (ins, is, type_heaps, { cs & cs_error = checkError id_name "class undefined" cs.cs_error })
 		= (ins, is, type_heaps, popErrorAdmin cs)
+	check_instance ins=:{ins_class_ident={ci_ident=QualifiedIdent module_ident class_name},ins_pos,ins_ident}
+			module_index is type_heaps cs
+		# cs = pushErrorAdmin (newPosition ins_ident ins_pos) cs
+		# (found,{decl_kind,decl_ident=type_ident,decl_index=class_index},cs) = search_qualified_ident module_ident class_name ClassNameSpaceN cs
+		| not found
+			# cs = {cs & cs_error = checkError ("'"+++module_ident.id_name+++"'."+++class_name) "class undefined" cs.cs_error}
+			= (ins, is, type_heaps, popErrorAdmin cs)
+			= case decl_kind of
+				STE_Imported STE_Class class_module
+					# (class_def, is) = is!is_modules.[class_module].dcl_common.com_class_defs.[class_index]
+					# ins = {ins & ins_class_ident.ci_ident=Ident class_def.class_ident}
+					-> check_class_instance class_def module_index class_index class_module ins is type_heaps cs
+				_
+					# cs = {cs & cs_error = checkError ("'"+++module_ident.id_name+++"'."+++class_name) "class undefined" cs.cs_error}
+					-> (ins, is, type_heaps, popErrorAdmin cs)
 
 	check_class_instance :: ClassDef !Index !Index !Index !ClassInstance !u:InstanceSymbols !*TypeHeaps !*CheckState 
 		-> (!ClassInstance, !u:InstanceSymbols, !*TypeHeaps, !*CheckState)
 	check_class_instance class_def module_index class_index class_mod_index
-			ins=:{ins_class_ident=ins_class_ident=:{ci_ident={id_name,id_info},ci_arity},ins_type,ins_specials,ins_pos,ins_ident}
+			ins=:{ins_class_ident=ins_class_ident=:{ci_ident,ci_arity},ins_type,ins_specials,ins_pos,ins_ident}
 			is=:{is_class_defs,is_modules} type_heaps cs=:{cs_symbol_table}	
 		| class_def.class_arity == ci_arity
 			# ins_class_index = {gi_index = class_index, gi_module = class_mod_index}
@@ -205,6 +220,7 @@ where
 							is.is_type_defs is.is_class_defs is.is_modules type_heaps cs
 			  is = { is & is_type_defs = is_type_defs, is_class_defs = is_class_defs, is_modules = is_modules }
 			= ({ins & ins_class_index = ins_class_index, ins_type = ins_type, ins_specials = ins_specials}, is, type_heaps, cs)
+			# (Ident {id_name}) = ci_ident
 			# cs = {cs & cs_error = checkError id_name ("wrong arity: expected "+++toString class_def.class_arity+++" found "+++toString ci_arity) cs.cs_error}
 			= (ins, is, type_heaps, cs)
 
