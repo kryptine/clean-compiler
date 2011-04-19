@@ -21,7 +21,7 @@ implies a b :== not a || b
 
 markExplImpSymbols :: !Int !*(!*ExplImpInfos,!*SymbolTable) -> (!.[Ident],!(!*ExplImpInfos,!*SymbolTable))
 markExplImpSymbols component_nr (expl_imp_info, cs_symbol_table)
-	#  (expl_imp_info_from_component,expl_imp_info) = replace expl_imp_info component_nr {}
+	#  (expl_imp_info_from_component,expl_imp_info) = expl_imp_info![component_nr]
 	#! nr_of_expl_imp_symbols = size expl_imp_info_from_component
 	#  (new_symbols, expl_imp_info_from_component, cs_symbol_table) = iFoldSt (mark_symbol component_nr) 0 nr_of_expl_imp_symbols ([], expl_imp_info_from_component, cs_symbol_table)
 	   expl_imp_info = {expl_imp_info & [component_nr] = expl_imp_info_from_component}

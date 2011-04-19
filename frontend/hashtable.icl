@@ -93,7 +93,7 @@ where
 putIdentInHashTable :: !String !IdentClass !*HashTable -> (!BoxedIdent, !*HashTable)
 putIdentInHashTable name ident_class {hte_symbol_heap,hte_entries,hte_mark}
 	# hash_val = hashValue name
-	  (entries,hte_entries) = replace hte_entries hash_val HTE_Empty
+	  (entries,hte_entries) = hte_entries![hash_val]
 	  (ident, hte_symbol_heap, entries) = insert name ident_class hte_mark hte_symbol_heap entries
 	  hte_entries = {hte_entries & [hash_val]=entries}
 	= (ident, { hte_symbol_heap = hte_symbol_heap, hte_entries = hte_entries,hte_mark=hte_mark })
@@ -117,9 +117,9 @@ where
 putQualifiedIdentInHashTable :: !String !BoxedIdent !IdentClass !*HashTable -> (!BoxedIdent, !*HashTable)
 putQualifiedIdentInHashTable module_name ident ident_class {hte_symbol_heap,hte_entries,hte_mark}
 	# hash_val = hashValue module_name
-	  (entries,hte_entries) = replace hte_entries hash_val HTE_Empty
+	  (entries,hte_entries) = hte_entries![hash_val]
 	  (ident, hte_symbol_heap, entries) = insert module_name ident ident_class (IC_Module NoQualifiedIdents) hte_mark hte_symbol_heap entries
-	  hte_entries = update hte_entries hash_val entries
+	  hte_entries = {hte_entries & [hash_val]=entries}
 	= (ident, { hte_symbol_heap = hte_symbol_heap, hte_entries = hte_entries,hte_mark=hte_mark })
 where
 	insert :: !String !BoxedIdent !IdentClass !IdentClass !Int !*SymbolTable *HashTableEntry -> (!BoxedIdent, !*SymbolTable, !*HashTableEntry)
@@ -144,9 +144,9 @@ where
 putPredefinedIdentInHashTable :: !Ident !IdentClass !*HashTable -> *HashTable
 putPredefinedIdentInHashTable predefined_ident=:{id_name} ident_class {hte_symbol_heap,hte_entries,hte_mark}
 	# hash_val = hashValue id_name
-	  (entries,hte_entries) = replace hte_entries hash_val HTE_Empty
+	  (entries,hte_entries) = hte_entries![hash_val]
 	  (hte_symbol_heap, entries) = insert id_name ident_class hte_mark hte_symbol_heap entries
-	  hte_entries = update hte_entries hash_val entries
+	  hte_entries = {hte_entries & [hash_val]=entries}
 	= { hte_symbol_heap = hte_symbol_heap, hte_entries = hte_entries,hte_mark=hte_mark }
 where
 	insert ::  !String !IdentClass !Int !*SymbolTable *HashTableEntry -> (!*SymbolTable, !*HashTableEntry)
@@ -167,9 +167,9 @@ where
 get_qualified_idents_from_hash_table :: !Ident !*HashTable -> (!QualifiedIdents,!*HashTable)
 get_qualified_idents_from_hash_table module_ident=:{id_name} hash_table=:{hte_entries}
 	# hash_val = hashValue id_name
-	  (entries,hte_entries) = replace hte_entries hash_val HTE_Empty
+	  (entries,hte_entries) = hte_entries![hash_val]
 	  (qualified_idents, entries) = find_qualified_idents id_name (IC_Module NoQualifiedIdents) entries
-	  hte_entries = update hte_entries hash_val entries
+	  hte_entries = {hte_entries & [hash_val] = entries}
 	= (qualified_idents, {hash_table & hte_entries = hte_entries})
 where
 	find_qualified_idents :: !String !IdentClass *HashTableEntry -> (!QualifiedIdents, !*HashTableEntry)
@@ -191,9 +191,9 @@ remove_icl_symbols_from_hash_table hash_table=:{hte_entries}
 	where
 		remove_icl_symbols_from_array i hte_entries
 			 | i<size hte_entries
-			 	# (entries,hte_entries) = replace hte_entries i HTE_Empty
+			 	# (entries,hte_entries) = hte_entries![i]
 				# (_,entries) = remove_icl_entries_from_tree entries
-				# hte_entries = update hte_entries i entries
+				# hte_entries = {hte_entries & [i] = entries}
 				= remove_icl_symbols_from_array (i+1) hte_entries
 				= hte_entries
 

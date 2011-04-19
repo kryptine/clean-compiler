@@ -160,7 +160,7 @@ where
 	clear_modules n td_infos
 		| n == size td_infos
 			= td_infos
-			#! (td_infos1, td_infos) = replace td_infos n {}
+			#! (td_infos1, td_infos) = td_infos![n]
 			#! td_infos1 = clear_td_infos 0 td_infos1
 			#! td_infos = {td_infos & [n]=td_infos1}
 			= clear_modules (inc n) td_infos 

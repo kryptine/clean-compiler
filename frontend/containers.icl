@@ -387,14 +387,11 @@ ikhInsert :: !Bool !IntKey a !*(IntKeyHashtable a) -> (!Bool, !.IntKeyHashtable 
 ikhInsert overide int_key value (IntKeyHashtable ikh_rehash_threshold ikh_nr_of_entries ikh_bitmask ikh_entries)
 	| ikh_rehash_threshold<=ikh_nr_of_entries
 		= ikhInsert overide int_key value (grow ikh_entries)
-	#! hash_value
-			= int_key bitand ikh_bitmask
-	   (tree, ikh_entries)
-			= replace ikh_entries hash_value IKT_Leaf
+	#! hash_value = int_key bitand ikh_bitmask
+	   (tree, ikh_entries) = ikh_entries![hash_value]
 	   (is_new, tree)
 	   		= iktUInsert overide int_key value tree 
-	   ikh_entries
-	   		= { ikh_entries & [hash_value] = tree }
+	   ikh_entries = { ikh_entries & [hash_value] = tree }
 	| is_new
 		= (is_new, (IntKeyHashtable ikh_rehash_threshold (ikh_nr_of_entries+1) ikh_bitmask ikh_entries))
 	= (is_new, (IntKeyHashtable ikh_rehash_threshold ikh_nr_of_entries ikh_bitmask ikh_entries))
@@ -444,14 +441,11 @@ ikhUSearch :: !IntKey !*(IntKeyHashtable a) -> (!.Optional a, !*IntKeyHashtable 
 ikhUSearch int_key (IntKeyHashtable ikh_rehash_threshold ikh_nr_of_entries ikh_bitmask ikh_entries)
 	| size ikh_entries==0
 		= (No, IntKeyHashtable ikh_rehash_threshold ikh_nr_of_entries ikh_bitmask ikh_entries)
-	# hash_value
-			= int_key bitand ikh_bitmask
-	  (ikt, ikh_entries)
-			= replace ikh_entries hash_value IKT_Leaf
+	# hash_value = int_key bitand ikh_bitmask
+	  (ikt, ikh_entries) = ikh_entries![hash_value]
 	  (opt_result, ikt)
 			= iktUSearch int_key ikt
-	  ikh_entries
-	  		= { ikh_entries & [hash_value] = ikt }
+	  ikh_entries = { ikh_entries & [hash_value] = ikt }
 	= (opt_result, (IntKeyHashtable ikh_rehash_threshold ikh_nr_of_entries ikh_bitmask ikh_entries))
 
 iktUInsert :: !Bool !IntKey a !*(IntKeyTree a) -> (!Bool, !.IntKeyTree a)

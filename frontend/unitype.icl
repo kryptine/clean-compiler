@@ -163,7 +163,6 @@ where
 			= combine_coercion_trees group_index attrs partition merged_tree coer_offered coer_demanded
 	combine_coercion_trees group_index [ ] partition merged_tree coer_offered coer_demanded
 		= (merged_tree, coer_demanded)
-		
 
 	rebuild_tree :: !Index !AttributePartition !*CoercionTree !*CoercionTree -> *CoercionTree
 	rebuild_tree group_index partition (CT_Node attr left right) tree
@@ -668,13 +667,13 @@ coerceAttributes off_attr dem_attr _ coercions
 
 newInequality :: !Int !Int !*Coercions -> *Coercions 
 newInequality off_attr dem_attr coercions=:{coer_demanded, coer_offered}
-	# (dem_coercions, coer_demanded) = replace coer_demanded off_attr CT_Empty
+	# (dem_coercions, coer_demanded) = coer_demanded![off_attr]
 	  (succ, dem_coercions) = insert dem_attr dem_coercions
-	  coer_demanded = { coer_demanded & [off_attr] = dem_coercions }
+	  coer_demanded = {coer_demanded & [off_attr] = dem_coercions}
 	| succ
-		# (off_coercions, coer_offered) = replace coer_offered dem_attr CT_Empty
+		# (off_coercions, coer_offered) = coer_offered![dem_attr]
 	  	  (succ, off_coercions) = insert off_attr off_coercions
-	 	  coer_offered = { coer_offered & [dem_attr] = off_coercions }
+	 	  coer_offered = {coer_offered & [dem_attr] = off_coercions}
 		= {coer_demanded = coer_demanded, coer_offered = coer_offered}
 		= {coer_demanded = coer_demanded, coer_offered = coer_offered}
 where
@@ -715,9 +714,8 @@ makeUnique :: !Int !*Coercions -> *Coercions
 makeUnique attr {coer_demanded, coer_offered}
 	# (off_coercions, coer_offered) = replace coer_offered attr CT_Empty
 	  coer_demanded = { coer_demanded & [attr] = CT_Unique }
-	= make_unique off_coercions {coer_offered = coer_offered, coer_demanded = coer_demanded}// ---> ("makeUnique :", attr)
+	= make_unique off_coercions {coer_offered = coer_offered, coer_demanded = coer_demanded}
 where
-	// JVG added type:
 	make_unique :: !CoercionTree !*Coercions -> *Coercions;
 	make_unique (CT_Node this_attr ct_less ct_greater) coercions
 		# coercions = makeUnique this_attr coercions
@@ -988,7 +986,7 @@ copyCoercions coercions=:{coer_demanded, coer_offered}
 	= ({coercions & coer_demanded = coer_demanded, coer_offered = coer_offered}, {coercions & coer_demanded = coer_demanded_copy, coer_offered = coer_offered_copy})
 where
 	copy_coercion_trees trees
-		= arrayAndElementsCopy CT_Empty copy_coercion_tree trees
+		= arrayAndElementsCopy copy_coercion_tree trees
 
 	copy_coercion_tree (CT_Node attr left right)
 		# (copy_left, left) = copy_coercion_tree left

@@ -1426,7 +1426,7 @@ substitute_dep_counts component_members ai_group_counts
 where
 	build_known :: !*{!RefCounts} -> (!*{*{#Bool}},!*{!RefCounts})
 	build_known t
-		= arrayAndElementsCopy {} (\e->(createArray (size e) False,e)) t
+		= arrayAndElementsCopy (\e->(createArray (size e) False,e)) t
 
 	subst_non_zero :: ![(!FunIndex,!ArgIndex)] !FunIndex !ArgIndex !FunIndex !ArgIndex !*{*{#Bool}} !*{!RefCounts}-> *{!RefCounts}
 	subst_non_zero iter fi ai fm am known rcs

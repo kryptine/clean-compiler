@@ -44,22 +44,18 @@ where
 arrayCopy a
 	:== arrayCopyBegin a1 s
 	where
-		(s, a1)
-			=	usize a
+		(s, a1) = usize a
 
-arrayAndElementsCopy place_holder copy_element_function array
-	:== copy place_holder array1 (_createArray n) 0 n
+arrayAndElementsCopy copy_element_function array
+	:== copy array1 (_createArray n) 0 n
 	where
-		(n, array1)
-			=	usize array
-		copy place_holder array array_copy i n
+		(n, array1) = usize array
+
+		copy array array_copy i n
 			| i == n
-				=	(array_copy, array)
-			// otherwise
-				# (element, array)
-					=	replace array i place_holder
+				= (array_copy, array)
+				# (element, array) = array![i]
 				# (copy_element, element)
 					=	copy_element_function element
-				# (place_holder, array)
-					=	replace array i element
-				=	copy place_holder array {array_copy & [i] = copy_element} (i+1) n
+				# array = {array & [i] = element}
+				= copy array {array_copy & [i] = copy_element} (i+1) n
