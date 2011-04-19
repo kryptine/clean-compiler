@@ -1739,7 +1739,7 @@ accCoercionTree f i coercion_trees
 	:== acc_coercion_tree i coercion_trees
   where
 	acc_coercion_tree i coercion_trees
-		# (coercion_tree, coercion_trees) = replace coercion_trees i CT_Empty
+		# (coercion_tree, coercion_trees) = coercion_trees![i]
 		  (x, coercion_tree) = f coercion_tree
 		= (x, {coercion_trees & [i]=coercion_tree})
 	
@@ -1747,7 +1747,7 @@ appCoercionTree f i coercion_trees
 	:== acc_coercion_tree i coercion_trees
   where
 	acc_coercion_tree i coercion_trees
-		# (coercion_tree, coercion_trees) = replace coercion_trees i CT_Empty
+		# (coercion_tree, coercion_trees) = coercion_trees![i]
 		= {coercion_trees & [i] = f coercion_tree}
 	
 flattenCoercionTree :: !u:CoercionTree -> (![Int], !u:CoercionTree)

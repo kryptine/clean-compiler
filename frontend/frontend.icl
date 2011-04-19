@@ -284,16 +284,16 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_m
 
 		clear_group_indices_of_macros :: !*{#*{#FunDef}} -> *{#*{#FunDef}}
 		clear_group_indices_of_macros cached_dcl_macros
-			= clear_group_indices1 0 {} cached_dcl_macros
+			= clear_group_indices1 0 cached_dcl_macros
 		where
-			clear_group_indices1 :: !Int !*{#FunDef} !*{#*{#u:FunDef}} -> *{#*{#FunDef}}
-			clear_group_indices1 i dummy cached_dcl_macros
+			clear_group_indices1 :: !Int !*{#*{#u:FunDef}} -> *{#*{#FunDef}}
+			clear_group_indices1 i cached_dcl_macros
 				| i==size cached_dcl_macros
 					= cached_dcl_macros
-					# (cached_dcl_macros_i,cached_dcl_macros) = replace cached_dcl_macros i dummy
+					# (cached_dcl_macros_i,cached_dcl_macros) = cached_dcl_macros![i]
 					# cached_dcl_macros_i = clear_group_indices2 0 cached_dcl_macros_i
-					# (dummy,cached_dcl_macros) = replace cached_dcl_macros i cached_dcl_macros_i
-					= clear_group_indices1 (i+1) dummy cached_dcl_macros
+					# cached_dcl_macros = {cached_dcl_macros & [i]=cached_dcl_macros_i}
+					= clear_group_indices1 (i+1) cached_dcl_macros
 
 			clear_group_indices2 j cached_dcl_macros_i
 				| j==size cached_dcl_macros_i
