@@ -475,7 +475,7 @@ where
 		try_function_symbol OpenToken pState
 			# (token, pState) = nextToken FunctionContext pState
 			= case token of
-				(IdentToken name)
+				IdentToken name
 					# (token, pState) = nextToken FunctionContext pState
 					| CloseToken == token
 						# (id, pState) = stringToIdent name IC_Expression pState
@@ -685,6 +685,81 @@ where
 		where
 			foreign_export_error s pState
 				= (True,PD_Erroneous,tokenBack (parseError "foreign export" No s pState))
+
+want_instance_type_definitions :: ![Type] !ParseState -> (![ParsedDefinition], !ParseState)
+want_instance_type_definitions instance_type pState
+	= parseList want_instance_type_definition pState
+where
+	want_instance_type_definition :: !ParseState -> (!Bool, ParsedDefinition, !ParseState)
+	want_instance_type_definition pState
+		# (token, pState)			= nextToken GeneralContext pState
+		  (fname, linenr, pState)	= getFileAndLineNr pState
+		  pos = LinePos fname linenr
+		| isLhsStartToken token
+			# (lhs, pState) = want_lhs_of_def token pState
+			  (token, pState) = nextToken FunctionContext pState
+			  (def, pState) = want_rhs_of_instance_member_def lhs token (determine_position lhs pos) pState
+			= (True, def, pState)
+		= (False, abort "no def(1)", tokenBack pState)
+	where
+		determine_position (Yes (name, _))	(LinePos f l) = FunPos f l name.id_name
+		determine_position lhs          	pos           = pos
+
+	want_lhs_of_def :: !Token !ParseState -> (!Optional (Ident, Bool), !ParseState)
+	want_lhs_of_def token pState
+		# (succ, fname, is_infix, pState) = try_function_symbol token pState
+		| succ
+			# (function_ident, pState) = stringToIdent fname (IC_InstanceMember instance_type) pState
+			= (Yes (function_ident, is_infix), pState)
+			= (No, pState)
+	where
+		try_function_symbol :: !Token !ParseState -> (!Bool, {#Char}, !Bool, !ParseState)
+		try_function_symbol (IdentToken name) pState
+			= (True, name, False, pState)
+		try_function_symbol OpenToken pState
+			# (token, pState) = nextToken FunctionContext pState
+			= case token of
+				IdentToken name
+					# (token, pState) = nextToken FunctionContext pState
+					| CloseToken == token
+						-> (True, name, True, pState)
+						-> (False, abort "no name", False, tokenBack (tokenBack (tokenBack pState)))
+				_
+					-> (False,  abort "no name", False, tokenBack (tokenBack pState))
+		try_function_symbol token pState
+			= (False, abort "name", False, tokenBack pState)
+
+	check_name No pState
+		= (erroneousIdent, NoPrio, parseError "Definition" No "identifier" pState)
+	check_name (Yes (name,False)) pState
+		= (name, NoPrio, pState)
+	check_name (Yes (name,is_infix)) pState
+//		= (name, DefaultPriority, pState)
+		= (name, Prio NoAssoc 9, pState)
+
+	want_rhs_of_instance_member_def :: !(Optional (Ident, Bool)) !Token !Position !ParseState -> (ParsedDefinition, !ParseState)
+	want_rhs_of_instance_member_def opt_name DoubleColonToken pos pState
+		# (name, priority, pState) = check_name opt_name pState
+		  (tspec, pState) = want pState // SymbolType
+		= (PD_TypeSpec pos name priority (Yes tspec) FSP_None, wantEndOfDefinition "type definition" pState)
+	want_rhs_of_instance_member_def opt_name (PriorityToken prio) pos pState
+		# (name,_,pState) = check_name_and_fixity opt_name cHasPriority pState
+		  (token, pState) = nextToken TypeContext pState
+		| token == DoubleColonToken
+		  	# (tspec, pState) = want pState // SymbolType
+			= (PD_TypeSpec pos name prio (Yes tspec) FSP_None, wantEndOfDefinition "type definition" pState)
+			# pState = parseError "type definition" (Yes token) "::" pState
+			= (PD_TypeSpec pos name prio No FSP_None, wantEndOfDefinition "type defenition" pState)
+	want_rhs_of_instance_member_def opt_name token pos pState
+		# pState = parseError "type definition" (Yes token) "::" pState
+		= (PD_Erroneous, wantEndOfDefinition "type defenition" pState)
+
+check_name_and_fixity No hasprio pState
+	= (erroneousIdent, False, parseError "Definition" No "identifier" pState)
+check_name_and_fixity (Yes (name,is_infix)) hasprio pState
+	| not is_infix	&& hasprio
+		= (name, False, parseError "Definition" No "Infix operator should be inside parentheses; no infix" pState)
+		= (name, is_infix, pState)
 
 optionalSpecials :: !ParseState -> (!Specials, !ParseState)
 optionalSpecials pState
@@ -1186,8 +1261,6 @@ wantImportDeclarationT token pState
 			  	->	(ID_Class class_id No, tokenBack pState)
 		InstanceToken
 			#	(class_name, pState)	= want pState
-//				(ii_extended, pState)	= optional_extension pState // MW: removed but still not ok
-				ii_extended				= False
 				(types, pState)			= wantList "instance types" tryBrackType pState
 				(class_id, pState)		= stringToIdent class_name IC_Class pState
 				(inst_id, pState)		= stringToIdent class_name (IC_Instance types) pState
@@ -1362,15 +1435,17 @@ wantInstanceDeclaration parseContext pi_pos pState
 			# pState = want_begin_group token pState
 			  (pi_members, pState) = wantDefinitions (SetClassOrInstanceDefsContext parseContext) pState
 			  pState = wantEndGroup "instance" pState
-			= (PD_Instance {pi_class = pi_class, pi_ident = pi_ident, pi_types = pi_types, pi_context = pi_context,
-							pi_members = pi_members, pi_specials = SP_None, pi_pos = pi_pos}, pState)
+			= (PD_Instance {pim_pi = {pi_class = pi_class, pi_ident = pi_ident, pi_types = pi_types, pi_context = pi_context,
+									  pi_specials = SP_None, pi_pos = pi_pos},
+							pim_members = pi_members}, pState)
 		// otherwise // ~ (isIclContext parseContext)
 			| token == CommaToken
 				# (pi_types_and_contexts, pState)	= want_instance_types pState
 				  (idents, pState)		= seqList [stringToIdent class_name (IC_Instance type) \\ (type,context) <- pi_types_and_contexts] pState
 				= (PD_Instances
-					[	{ pi_class = pi_class, pi_ident = ident, pi_types = type, pi_context = context
-						, pi_members = [], pi_specials = SP_None, pi_pos = pi_pos}
+					[ {	pim_pi = { pi_class = pi_class, pi_ident = ident, pi_types = type, pi_context = context
+								 , pi_specials = SP_None, pi_pos = pi_pos},
+						pim_members = [] } 
 					\\	(type,context)	<- [ (pi_types, pi_context) : pi_types_and_contexts ]
 					&	ident			<- [ pi_ident : idents ]
 					]
@@ -1378,9 +1453,9 @@ wantInstanceDeclaration parseContext pi_pos pState
 				  )
 			// otherwise // token <> CommaToken
 				# (specials, pState) = optionalSpecials (tokenBack pState)
-				  pState = wantEndOfDefinition "instance declaration" pState
-				= (PD_Instance {pi_class = pi_class, pi_ident = pi_ident, pi_types = pi_types, pi_context = pi_context,
-								pi_members = [], pi_specials = specials, pi_pos = pi_pos}, pState)
+				# pim_pi = {pi_class = pi_class, pi_ident = pi_ident, pi_types = pi_types,
+							pi_context = pi_context, pi_specials = specials, pi_pos = pi_pos}
+				= want_optional_member_types pim_pi pState
 
 	want_begin_group token pState  // For JvG layout
 		# // (token, pState) = nextToken TypeContext pState PK
@@ -1400,6 +1475,16 @@ wantInstanceDeclaration parseContext pi_pos pState
 					-> parseError "instance declaration" (Yes token) "where" pState
 					-> parseError "instance declaration" (Yes token) "where or {" pState
 
+	want_optional_member_types pim_pi pState
+		# (token, pState) = nextToken TypeContext pState
+		# (begin_members, pState) = begin_member_group token pState
+		| begin_members
+			# (instance_member_types, pState) = want_instance_type_definitions pim_pi.pi_types pState
+    	  	  pState = wantEndGroup "instance" pState
+			= (PD_Instance {pim_pi = pim_pi, pim_members = instance_member_types}, pState)
+			# pState = wantEndOfDefinition "instance declaration" (tokenBack pState)
+			= (PD_Instance {pim_pi = pim_pi, pim_members = []}, pState)
+
 	want_instance_type pState
 		# (pi_types, pState)	= wantList "instance types" tryBrackType pState
 		  (pi_context, pState)	= optionalContext pState
@@ -1412,6 +1497,35 @@ wantInstanceDeclaration parseContext pi_pos pState
 			= ([type_and_context:types], pState)
 		// otherwise // token <> CommaToken
 			= ([type_and_context], pState)
+
+	begin_member_group SemicolonToken pState
+		# (token, pState) = nextToken TypeContext pState
+		| token == WhereToken
+			= begin_member_group_where pState
+		| token == CurlyOpenToken
+			= begin_member_group_curly_open pState
+			= (False, tokenBack pState)
+	begin_member_group token pState
+		| token == WhereToken
+			= begin_member_group_where pState
+		| token == CurlyOpenToken
+			= begin_member_group_curly_open pState
+			= (False, pState)
+
+	begin_member_group_where pState
+		# (ss_useLayout, pState) = accScanState UseLayout pState
+		# (token, pState) = nextToken TypeContext pState
+		| token == CurlyOpenToken
+			| ss_useLayout
+				= (True, parseError "instance definition" No "No { in layout mode" pState) 
+				= (True, pState)
+			= (True, tokenBack pState)
+
+	begin_member_group_curly_open pState
+		# (ss_useLayout, pState) = accScanState UseLayout pState
+		| ss_useLayout
+			= (True, parseError "instance definition" (Yes CurlyOpenToken) "in layout mode the keyword where is" pState) 
+			= (True, pState)
 
 optionalContext :: !ParseState -> ([TypeContext],ParseState)
 optionalContext pState

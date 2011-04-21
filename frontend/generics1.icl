@@ -945,7 +945,7 @@ buildConversionTo
 	| not error.ea_ok
 		# (def_sym, funs_and_groups) 
 			= (buildFunAndGroup fun_name [] EE No main_module_index td_pos funs_and_groups)
-		= (def_sym, funs_and_groups, heaps, error)	
+		= (def_sym, funs_and_groups, heaps, error)
 		# (def_sym, funs_and_groups) 
 			= (buildFunAndGroup fun_name [arg_var] body_expr No main_module_index td_pos funs_and_groups)
 		= (def_sym, funs_and_groups, heaps, error)
@@ -1370,7 +1370,7 @@ where
 					, gs_varh = gs_varh
 					, gs_dcl_modules = gs_dcl_modules
 					, gs_symtab = gs_symtab }
-		= (common_defs, gs)		
+		= (common_defs, gs)
 
 // limitations:
 // - context restrictions on generic variables are not allowed
@@ -1420,7 +1420,7 @@ where
 			# glob_def_sym = 
 				{ glob_module = pds_module
 				, glob_object = {ds_ident=pds_ident, ds_index=pds_def, ds_arity = 1}
-				}	
+				}
 			# tc_class = TCGeneric 
 				{ gtc_generic=glob_def_sym
 				, gtc_kind = kind
@@ -1844,6 +1844,7 @@ where
 			 	,	ins_class_ident = {ci_ident=Ident class_ident, ci_arity=1}
 				,	ins_ident 	= class_ident
 				,	ins_type 	= ins_type
+				,	ins_member_types = []
 				,	ins_members	= {{cim_ident=ds_ident,cim_arity=ds_arity,cim_index=ds_index}}
 				,	ins_specials = SP_None
 				,	ins_pos		= gc_pos
@@ -1923,6 +1924,7 @@ where
 		 	,	ins_class_ident = {ci_ident=Ident class_ident, ci_arity=1}
 			,	ins_ident 	= class_ident
 			,	ins_type 	= ins_type
+			,	ins_member_types = []
 			,	ins_members	= {class_instance_member}
 			,	ins_specials = SP_None
 			,	ins_pos		= gc_pos

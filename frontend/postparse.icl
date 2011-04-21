@@ -3,8 +3,6 @@ implementation module postparse
 import StdEnv
 import syntax, parse, utilities, containers, StdCompare
 import genericsupport
-//import RWSDebug
-
 
 :: *CollectAdmin =
 	{	ca_error		:: !*ParseErrorAdmin
@@ -354,10 +352,10 @@ where
 	collectFunctions e icl_module ca
 		= (e, ca)
 
-instance collectFunctions (ParsedInstance a) | collectFunctions a where
-	collectFunctions inst=:{pi_members} icl_module ca
-		# (pi_members, ca) = collectFunctions pi_members icl_module ca
-		= ({inst & pi_members = pi_members }, ca)
+instance collectFunctions (ScannedInstanceAndMembersR FunDef) where
+	collectFunctions inst=:{sim_members} icl_module ca
+		# (sim_members, ca) = collectFunctions sim_members icl_module ca
+		= ({inst & sim_members = sim_members }, ca)
 
 instance collectFunctions GenericCaseDef where
 	collectFunctions gc=:{gc_body=GCB_FunDef fun_def} icl_module ca
@@ -1108,7 +1106,7 @@ scanModule mod=:{mod_ident,mod_type,mod_defs = pdefs} cached_modules support_gen
 
 	= (reorganise_icl_ok && pea_ok && import_dcl_ok && import_dcls_ok, mod, fun_range, fun_defs, optional_dcl_mod, modules, dcl_module_n,hash_table, err_file, files)
 where
-	scan_main_dcl_module :: Ident ModuleKind (ModTimeFunction *Files) *Files *CollectAdmin -> (!Bool,!Optional (Module (CollectedDefinitions (ParsedInstance FunDef))),!Int,![ScannedModule],![Ident],!*Files,!*CollectAdmin)
+	scan_main_dcl_module :: Ident ModuleKind (ModTimeFunction *Files) *Files *CollectAdmin -> (!Bool,!Optional (Module (CollectedDefinitions (ScannedInstanceAndMembersR FunDef))),!Int,![ScannedModule],![Ident],!*Files,!*CollectAdmin)
 	scan_main_dcl_module mod_ident MK_Main _ files ca
 		= (True, No,NoIndex,[MakeEmptyModule mod_ident MK_NoMainDcl], cached_modules,files, ca)
 	scan_main_dcl_module mod_ident MK_None _ files ca
@@ -1179,7 +1177,7 @@ collectFunctionBodies fun_name fun_arity fun_prio fun_kind defs ca
 	= ([], fun_kind, defs, ca)
 
 collectGenericBodies :: !GenericCaseDef ![ParsedDefinition] !*CollectAdmin
-	-> (![ParsedBody], ![ParsedDefinition], !*CollectAdmin)
+					 -> (![ParsedBody], ![ParsedDefinition],!*CollectAdmin)
 collectGenericBodies first_case all_defs=:[PD_GenericCase gc : defs] ca
 	| first_case.gc_ident == gc.gc_ident && first_case.gc_type_cons == gc.gc_type_cons		
 		#! (bodies, rest_defs, ca) = collectGenericBodies first_case defs ca
@@ -1215,7 +1213,7 @@ where
 		# (strictness_index,strictness,strictness_list) = add_next_not_strict strictness_index strictness strictness_list
 		= add_strictness_for_arguments fields strictness_index strictness strictness_list
 
-reorganiseDefinitions :: Bool [ParsedDefinition] Index Index Index Index *CollectAdmin -> (![FunDef],!CollectedDefinitions (ParsedInstance FunDef), ![ParsedImport], ![ImportedObject],![ParsedForeignExport],!*CollectAdmin)
+reorganiseDefinitions :: Bool [ParsedDefinition] Index Index Index Index *CollectAdmin -> (![FunDef],!CollectedDefinitions (ScannedInstanceAndMembersR FunDef), ![ParsedImport], ![ImportedObject],![ParsedForeignExport],!*CollectAdmin)
 reorganiseDefinitions icl_module [PD_Function pos name is_infix args rhs fun_kind : defs] cons_count sel_count mem_count type_count ca
 	# prio = if is_infix (Prio NoAssoc 9) NoPrio
 	  fun_arity = length args
@@ -1373,13 +1371,13 @@ where
 	determine_indexes_of_class_members [] first_mem_index last_mem_offset
 		= ([], [], last_mem_offset)
 
-reorganiseDefinitions icl_module [PD_Instance class_instance=:{pi_members,pi_pos} : defs] cons_count sel_count mem_count type_count ca
+reorganiseDefinitions icl_module [PD_Instance class_instance=:{pim_members,pim_pi} : defs] cons_count sel_count mem_count type_count ca
 	# (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count type_count ca
-	  (mem_defs, ca) = collect_member_instances pi_members ca
-	| icl_module || isEmpty mem_defs
-		= (fun_defs, { c_defs & def_instances = [{class_instance & pi_members = mem_defs} : c_defs.def_instances] }, imports, imported_objects,foreign_exports, ca)
-		= (fun_defs, { c_defs & def_instances = [{class_instance & pi_members = []} : c_defs.def_instances] }, imports, imported_objects,foreign_exports,
-			postParseError pi_pos "instance specifications of members not allowed" ca)
+	| icl_module || isEmpty pim_members
+		# (mem_defs, ca) = collect_member_instances pim_members ca
+		= (fun_defs, { c_defs & def_instances = [{sim_pi=class_instance.pim_pi, sim_members = mem_defs, sim_member_types=[]} : c_defs.def_instances] }, imports, imported_objects,foreign_exports, ca)
+		# (mem_types, ca) = collect_member_instance_types pim_members ca
+		= (fun_defs, { c_defs & def_instances = [{sim_pi=class_instance.pim_pi, sim_members = [], sim_member_types=mem_types} : c_defs.def_instances] }, imports, imported_objects,foreign_exports, ca)
 where	  
 	collect_member_instances :: [ParsedDefinition] *CollectAdmin -> ([FunDef], *CollectAdmin)
 	collect_member_instances [PD_Function pos name is_infix args rhs fun_kind : defs] ca
@@ -1402,6 +1400,18 @@ where
 				-> collect_member_instances defs (postParseError fun_pos "function body expected" ca)
 	collect_member_instances [] ca
 	    = ([], ca)	
+
+	collect_member_instance_types :: [ParsedDefinition] *CollectAdmin -> (![FunType], !*CollectAdmin)
+	collect_member_instance_types [PD_TypeSpec fun_pos fun_name prio type specials : defs] ca
+		= case type of
+			Yes fun_type=:{st_arity}
+				# fun_type = MakeNewFunctionType fun_name st_arity prio fun_type fun_pos specials nilPtr
+  				  (fun_types, ca) = collect_member_instance_types defs ca
+				-> ([fun_type : fun_types], ca)
+			No
+				-> collect_member_instance_types defs (postParseError fun_pos "function body expected" ca)
+	collect_member_instance_types [] ca
+	    = ([], ca)
 reorganiseDefinitions icl_module [PD_Instances class_instances : defs] cons_count sel_count mem_count type_count ca
 	= reorganiseDefinitions icl_module ([PD_Instance class_instance \\ class_instance <- class_instances] ++ defs) cons_count sel_count mem_count type_count ca
 reorganiseDefinitions icl_module [PD_Generic gen : defs] cons_count sel_count mem_count type_count ca
@@ -1440,7 +1450,7 @@ reorganiseDefinitions icl_module [PD_ForeignExport new_foreign_export file_name 
 	# (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count type_count ca
 	= (fun_defs, c_defs, imports, imported_objects,[{pfe_ident=new_foreign_export,pfe_file=file_name,pfe_line=line_n,pfe_stdcall=stdcall}:foreign_exports], ca)
 reorganiseDefinitions icl_module [def:defs] _ _ _ _ ca
-	= abort ("reorganiseDefinitions does not match" ---> def)
+	= abort "reorganiseDefinitions does not match"
 reorganiseDefinitions icl_module [] _ _ _ _ ca
 	= ([], { def_types = [], def_constructors = [], def_selectors = [], def_macros = [],def_macro_indices={ir_from=0,ir_to=0},def_classes = [], def_members = [],
 			def_instances = [], def_funtypes = [], 
