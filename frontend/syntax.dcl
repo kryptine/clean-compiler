@@ -14,7 +14,6 @@ from containers import ::NumberSet
 
 instance toString Ident
 
-
 /*	Each Identifier is equipped with a pointer to a SymbolTableEntry that is
 	used for binding the identifier with its definition.
 */
@@ -119,7 +118,7 @@ instance == FunctionOrMacroIndex
 	}
 
 ::	ParsedModule	:== Module  [ParsedDefinition]
-::	ScannedModule 	:== Module  (CollectedDefinitions (ParsedInstance FunDef))
+::	ScannedModule 	:== Module  (CollectedDefinitions (ScannedInstanceAndMembersR FunDef))
 	
 ::	ModuleKind		= MK_Main | MK_Module | MK_System | MK_None | MK_NoMainDcl
 
@@ -259,8 +258,8 @@ cIsNotAFunction :== False
 	|	PD_Type ParsedTypeDef
 	|	PD_TypeSpec Position Ident Priority (Optional SymbolType) FunSpecials
 	|	PD_Class ClassDef [ParsedDefinition]
-	|	PD_Instance (ParsedInstance ParsedDefinition)
-	|	PD_Instances [ParsedInstance ParsedDefinition]
+	|	PD_Instance ParsedInstanceAndMembers
+	|	PD_Instances [ParsedInstanceAndMembers]
 	|	PD_Import [ParsedImport]
 	|	PD_ImportedObjects [ImportedObject]
 	|	PD_ForeignExport !Ident !{#Char} !Int !Bool /* if stdcall */
@@ -295,15 +294,25 @@ cNameLocationDependent :== True
 	,	pc_cons_prio	:: !Priority
 	,	pc_cons_pos		:: !Position
 	}
-	
-::	ParsedInstance member =
+
+::	ParsedInstance =
 	{	pi_class 	:: !IdentOrQualifiedIdent
 	,	pi_ident	:: !Ident
 	,	pi_types	:: ![Type]
 	,	pi_context	:: ![TypeContext]
 	,	pi_pos		:: !Position
-	,	pi_members	:: ![member]
 	,	pi_specials	:: !Specials
+	}
+
+::	ParsedInstanceAndMembers =
+	{	pim_pi 		:: !ParsedInstance
+	,	pim_members	:: ![ParsedDefinition]
+	}
+
+::	ScannedInstanceAndMembersR icl_member =
+	{	sim_pi 				:: !ParsedInstance
+	,	sim_members			:: ![icl_member]	// for .icl
+	,	sim_member_types	:: ![FunType]	// for .dcl
 	}
 
 ::	IdentOrQualifiedIdent
@@ -458,6 +467,7 @@ cNameLocationDependent :== True
 	,	ins_class_ident	:: !ClassIdent
 	,	ins_ident		:: !Ident
 	,	ins_type		:: !InstanceType
+	,	ins_member_types :: ![FunType]	// for .dcl
 	,	ins_members		:: !{#ClassInstanceMember}
 	,	ins_specials	:: !Specials
 	,	ins_pos			:: !Position
@@ -615,6 +625,7 @@ FI_IsMacroFun	:== 1			// whether the function is a local function of a macro
 FI_HasTypeSpec	:== 2			// whether the function has u user defined type
 FI_IsNonRecursive :== 4			// used in trans.icl and partition.icl
 FI_IsUnboxedListOfRecordsConsOrNil :== 8
+FI_MemberInstanceRequiresTypeInDefMod :== 16
 
 ::	FunInfo =
 	{	fi_calls			:: ![FunCall]
@@ -1551,12 +1562,12 @@ ParsedConstructorToConsDef pc :==
 				  st_arity = pc.pc_cons_arity, st_context = pc.pc_context, st_attr_env = [], st_attr_vars = []},
 		cons_exi_vars = pc.pc_exi_vars, cons_type_ptr = nilPtr }
 
-ParsedInstanceToClassInstance pi members :==
+ParsedInstanceToClassInstance pi members member_types :==
 	{	ins_class_index = {gi_module=NoIndex, gi_index=NoIndex},
 		ins_class_ident = {ci_ident=pi.pi_class, ci_arity=length pi.pi_types}, ins_ident = pi.pi_ident,
 		ins_type = { it_vars = [], it_types = pi.pi_types, it_attr_vars = [],
 					 it_context = pi.pi_context }, 
-		ins_members = members, ins_specials = pi.pi_specials, ins_pos = pi.pi_pos}
+		ins_members = members, ins_member_types = member_types, ins_specials = pi.pi_specials, ins_pos = pi.pi_pos}
 
 MakeTypeDef name lhs rhs attr pos  :== 
 	{	td_ident = name, td_index = -1, td_arity = length lhs, td_args = lhs, td_attrs = [], td_attribute = attr,

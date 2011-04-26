@@ -20,6 +20,7 @@ import predef, syntax, StdCompare, compare_constructor
 				| IC_Field !Ident
 				| IC_Selector
 				| IC_Instance ![Type]
+				| IC_InstanceMember ![Type]
 				| IC_Generic
 				| IC_GenericCase !Type
 				| IC_GenericDeriveClass !Type
@@ -40,18 +41,8 @@ instance =< IdentClass
 where
 	(=<) (IC_Instance types1) (IC_Instance types2)
 		= compare_types types1 types2
-	where
-		compare_types [t1 : t1s] [t2 : t2s]
-			# cmp = t1 =< t2
-			| cmp == Equal
-				= t1s =< t2s
-				= cmp
-		compare_types [] []
-			= Equal
-		compare_types [] _
-			= Smaller
-		compare_types _ []
-			= Greater
+	(=<) (IC_InstanceMember types1) (IC_InstanceMember types2)
+		= compare_types types1 types2
 	(=<) (IC_GenericCase type1) (IC_GenericCase type2)
 		= type1 =< type2
 	(=<) (IC_GenericDeriveClass type1) (IC_GenericDeriveClass type2)
@@ -64,6 +55,18 @@ where
 		| less_constructor ic1 ic2
 			= Smaller
 			= Greater
+
+compare_types [t1 : t1s] [t2 : t2s]
+	# cmp = t1 =< t2
+	| cmp == Equal
+		= t1s =< t2s
+		= cmp
+compare_types [] []
+	= Equal
+compare_types [] _
+	= Smaller
+compare_types _ []
+	= Greater
 
 instance =< (!a,!b) |  =< a &  =< b
 where

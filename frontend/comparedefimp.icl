@@ -36,7 +36,6 @@ where
 				= (icl_type_defs, icl_cons_defs, comp_st)
 				# comp_error = compareError type_def_error (newPosition icl_type_def.td_ident icl_type_def.td_pos) comp_st.comp_error
 				= (icl_type_defs, icl_cons_defs, { comp_st & comp_error = comp_error })
-//						 ---> ("compare_type_defs", dcl_type_def.td_ident, dcl_type_def.td_rhs, icl_type_def.td_ident, icl_type_def.td_rhs)
 			= (icl_type_defs, icl_cons_defs, comp_st)
 
 	compare_rhs_of_types (AlgType dclConstructors) (AlgType iclConstructors) dcl_cons_defs icl_cons_defs comp_st
@@ -159,20 +158,69 @@ where
 				= (False, icl_member_defs, comp_st)
 			= (False, icl_member_defs, comp_st)
 
-compareInstanceDefs :: !{# Int} !{# ClassInstance} !u:{# ClassInstance} !*CompareState -> (!u:{# ClassInstance}, !*CompareState)
-compareInstanceDefs dcl_sizes dcl_instance_defs icl_instance_defs comp_st
+compareInstanceDefs :: !{# Int} !{# ClassInstance} !u:{# ClassInstance} !*{#FunDef} !*CompareState
+											   -> (!u:{# ClassInstance},!*{#FunDef},!*CompareState)
+compareInstanceDefs dcl_sizes dcl_instance_defs icl_instance_defs icl_functions comp_st
 	# nr_of_dcl_instances = dcl_sizes.[cInstanceDefs]
-	= iFoldSt (compare_instance_defs dcl_instance_defs) 0 nr_of_dcl_instances (icl_instance_defs, comp_st)
+	= iFoldSt (compare_instance_defs dcl_instance_defs) 0 nr_of_dcl_instances (icl_instance_defs,icl_functions,comp_st)
 where
-	compare_instance_defs ::  !{# ClassInstance} !Index (!u:{# ClassInstance}, !*CompareState) -> (!u:{# ClassInstance}, !*CompareState)
-	compare_instance_defs dcl_instance_defs instance_index (icl_instance_defs, comp_st)
+	compare_instance_defs ::  !{# ClassInstance} !Index !(!u:{# ClassInstance},!*{#FunDef},!*CompareState)
+													  -> (!u:{# ClassInstance},!*{#FunDef},!*CompareState)
+	compare_instance_defs dcl_instance_defs instance_index (icl_instance_defs,icl_functions,comp_st)
 		# dcl_instance_def = dcl_instance_defs.[instance_index]
 		  (icl_instance_def, icl_instance_defs) = icl_instance_defs![instance_index]
 		  (ok, comp_st) = compare dcl_instance_def.ins_type icl_instance_def.ins_type comp_st
-		| ok
-			= (icl_instance_defs, comp_st)
-			# comp_error = compareError instance_def_error (newPosition icl_instance_def.ins_ident icl_instance_def.ins_pos) comp_st.comp_error
-			= (icl_instance_defs, { comp_st & comp_error = comp_error })
+		| not ok
+			# comp_st = instance_def_conflicts_error icl_instance_def.ins_ident icl_instance_def.ins_pos comp_st
+			= (icl_instance_defs,icl_functions, comp_st)
+		# (icl_functions,comp_st)
+			= member_types_equal dcl_instance_def.ins_member_types icl_instance_def.ins_members 0 icl_functions comp_st
+		= (icl_instance_defs,icl_functions,comp_st)
+
+	member_types_equal :: [FunType] {#ClassInstanceMember} Int *{#FunDef} *CompareState -> (!*{#FunDef},!*CompareState)
+	member_types_equal [] icl_instance_members icl_member_n icl_functions comp_st
+		| icl_member_n<size icl_instance_members
+			# function_index = icl_instance_members.[icl_member_n].cim_index
+			| icl_functions.[function_index].fun_info.fi_properties bitand FI_MemberInstanceRequiresTypeInDefMod<>0
+			  	# ({fun_ident,fun_pos},icl_functions) = icl_functions![function_index]
+				# comp_st = instance_def_conflicts_error fun_ident fun_pos comp_st
+				= member_types_equal [] icl_instance_members (icl_member_n+1) icl_functions comp_st
+				= member_types_equal [] icl_instance_members (icl_member_n+1) icl_functions comp_st
+			= (icl_functions,comp_st)
+	member_types_equal [instance_member_type:instance_member_types] icl_instance_members icl_member_n icl_functions comp_st
+		= member_type_and_types_equal instance_member_type instance_member_types icl_instance_members icl_member_n icl_functions comp_st
+	where
+		member_type_and_types_equal instance_member_type=:{ft_ident,ft_type,ft_pos} instance_member_types icl_instance_members icl_member_n icl_functions comp_st
+			| icl_member_n<size icl_instance_members
+				# {cim_ident,cim_index} = icl_instance_members.[icl_member_n]
+				| ft_ident.id_name<>cim_ident.id_name
+					| icl_functions.[cim_index].fun_info.fi_properties bitand FI_MemberInstanceRequiresTypeInDefMod<>0
+					  	# ({fun_ident,fun_pos},icl_functions) = icl_functions![cim_index]
+						# comp_st = instance_def_conflicts_error fun_ident fun_pos comp_st
+						= member_type_and_types_equal instance_member_type instance_member_types icl_instance_members (icl_member_n+1) icl_functions comp_st
+						= member_type_and_types_equal instance_member_type instance_member_types icl_instance_members (icl_member_n+1) icl_functions comp_st
+
+				  	# ({fun_type},icl_functions) = icl_functions![cim_index]
+				  	# (Yes icl_instance_member_type) = fun_type
+
+					# tc_state = { tc_type_vars = initial_hwn comp_st.comp_type_var_heap
+								 , tc_attr_vars = initial_hwn comp_st.comp_attr_var_heap
+								 , tc_strictness_flags = 0
+				  				 }
+		 			# tc_state = init_symbol_type_vars ft_type icl_instance_member_type tc_state
+
+					# (corresponds, tc_state) = t_corresponds ft_type icl_instance_member_type tc_state
+				  	# comp_st = {comp_st &	comp_type_var_heap=tc_state.tc_type_vars.hwn_heap,
+				  							comp_attr_var_heap=tc_state.tc_attr_vars.hwn_heap }
+					# comp_st = if (not corresponds)
+									(instance_def_conflicts_error ft_ident ft_pos comp_st)
+									comp_st
+					= member_types_equal instance_member_types icl_instance_members (icl_member_n+1) icl_functions comp_st
+			# comp_st = instance_def_conflicts_error ft_ident ft_pos comp_st
+			= member_types_equal instance_member_types icl_instance_members icl_member_n icl_functions comp_st
+
+	instance_def_conflicts_error ident pos comp_st
+		= {comp_st & comp_error = compareError instance_def_error (newPosition ident pos) comp_st.comp_error }
 
 compareGenericDefs :: !{# Int} !{#Bool} !{# GenericDef} !u:{# GenericDef} !*CompareState -> (!u:{# GenericDef}, !*CompareState)
 compareGenericDefs dcl_sizes copied_from_dcl dcl_generic_defs icl_generic_defs comp_st
@@ -193,10 +241,8 @@ where
 				= (icl_generic_defs, { comp_st & comp_error = comp_error })
 		| otherwise
 			= (icl_generic_defs, comp_st)
-		
 
 class compare a :: !a !a !*CompareState -> (!Bool, !*CompareState)
-
 
 instance compare (a,b) | compare a & compare b
 where
@@ -387,12 +433,15 @@ initialyseAttributeVars [] [{av_info_ptr}:icl_type_vars] type_var_heap
 	= initialyseAttributeVars [] icl_type_vars (type_var_heap <:= (av_info_ptr, AVI_Empty));
 initialyseAttributeVars [] [] type_var_heap
 	= type_var_heap
-	
+
 :: TypesCorrespondState =
 		{	tc_type_vars :: !.HeapWithNumber TypeVarInfo
 		,	tc_attr_vars :: !.HeapWithNumber AttrVarInfo
-		,	tc_ignore_strictness :: !Bool
+		,	tc_strictness_flags :: !Int
 		}
+
+AllowFirstMoreStrictness:==1;
+FirstHasMoreStrictness:==2;
 
 :: TypesCorrespondMonad
 		:==	*TypesCorrespondState -> *(!Bool, !*TypesCorrespondState)
@@ -425,9 +474,10 @@ initialyseAttributeVars [] [] type_var_heap
 // arg n not ok: n
 CEC_ResultNotOK :== 0
 CEC_Ok :== -1
-CEC_ArgNrNotOk :== -2
-CEC_ContextNotOK :== -3
-CEC_AttrEnvNotOK :== -4
+CEC_NrArgsNotOk :== -2
+CEC_StrictnessOfArgsNotOk :== -3
+CEC_ContextNotOK :== -4
+CEC_AttrEnvNotOK :== -5
 
 class t_corresponds a :: !a !a -> *TypesCorrespondMonad
 	// whether two types correspond
@@ -471,8 +521,8 @@ compareDefImp main_dcl_module_n main_dcl_module (Yes macro_conversion_table) {co
 	  		= compareClassDefs main_dcl_module.dcl_sizes copied_class_defs 	dcl_common.com_class_defs dcl_common.com_member_defs
 	  																		icl_com_class_defs icl_com_member_defs comp_st
 
-	  (icl_com_instance_defs, comp_st)
-	  		= compareInstanceDefs main_dcl_module.dcl_sizes dcl_common.com_instance_defs icl_com_instance_defs comp_st
+	  (icl_com_instance_defs, icl_functions, comp_st)
+	  		= compareInstanceDefs main_dcl_module.dcl_sizes dcl_common.com_instance_defs icl_com_instance_defs icl_functions comp_st
 
 	  (icl_com_generic_defs, comp_st)
 	  		= compareGenericDefs 
@@ -484,7 +534,7 @@ compareDefImp main_dcl_module_n main_dcl_module (Yes macro_conversion_table) {co
 	  tc_state
 	  		=	{ tc_type_vars = initial_hwn th_vars
 				, tc_attr_vars = initial_hwn th_attrs
-				, tc_ignore_strictness = False
+				, tc_strictness_flags = 0
 				}
 	  (icl_functions, macro_defs, hp_var_heap, hp_expression_heap, tc_state, error_admin)
 			= compareMacrosWithConversion main_dcl_module_n macro_conversion_table dcl_macros icl_functions macro_defs hp_var_heap hp_expression_heap tc_state error_admin
@@ -505,9 +555,9 @@ compareDefImp main_dcl_module_n main_dcl_module (Yes macro_conversion_table) {co
 compareFunctionTypes n_exported_global_functions dcl_fun_types icl_functions tc_state error_admin
 	= iFoldSt (compareTwoFunctionTypes dcl_fun_types) 0 n_exported_global_functions (icl_functions, tc_state, error_admin)
 
-compareTwoFunctionTypes :: /*!{#Int}*/ !{#FunType} !Int !*(!u:{#FunDef},!*TypesCorrespondState,!*ErrorAdmin) 
-						-> (!v:{#FunDef},!.TypesCorrespondState,!.ErrorAdmin) , [u <= v]
-compareTwoFunctionTypes /*conversions*/	dcl_fun_types dclIndex (icl_functions, tc_state, error_admin)
+compareTwoFunctionTypes :: !{#FunType} !Int !*(!u:{#FunDef},!*TypesCorrespondState,!*ErrorAdmin)
+										   -> (!v:{#FunDef},!.TypesCorrespondState,!.ErrorAdmin) , [u <= v]
+compareTwoFunctionTypes dcl_fun_types dclIndex (icl_functions, tc_state, error_admin)
 	# (fun_def=:{fun_type, fun_priority}, icl_functions) = icl_functions![dclIndex]
 	= case fun_type of
 		No	-> generate_error "type of exported function is missing" fun_def icl_functions tc_state error_admin
@@ -515,40 +565,43 @@ compareTwoFunctionTypes /*conversions*/	dcl_fun_types dclIndex (icl_functions, t
 			# {ft_type=dcl_symbol_type, ft_priority,ft_ident} = dcl_fun_types.[dclIndex]			
 			# tc_state = init_symbol_type_vars dcl_symbol_type icl_symbol_type tc_state
 			  (corresponds, tc_state)
-					= t_corresponds dcl_symbol_type icl_symbol_type tc_state // --->("comparing:", dcl_symbol_type ,icl_symbol_type)
+					= t_corresponds dcl_symbol_type icl_symbol_type tc_state
 			| corresponds && fun_priority==ft_priority
 				-> (icl_functions, tc_state, error_admin)
 			-> generate_error ErrorMessage fun_def icl_functions tc_state error_admin
 
-symbolTypesCorrespond :: !SymbolType !SymbolType !*TypeHeaps -> (!ComparisionErrorCode, !.TypeHeaps)
-symbolTypesCorrespond symbol_type_1 symbol_type_2 type_heaps=:{th_vars, th_attrs}
-	| length symbol_type_1.st_args<>length symbol_type_2.st_args
-		= (CEC_ArgNrNotOk, type_heaps)
-	# tc_state
-			= { tc_type_vars = initial_hwn th_vars
-			  , tc_attr_vars = initial_hwn th_attrs
-			  , tc_ignore_strictness = True
-			  }
-	  tc_state
-	  		= init_symbol_type_vars symbol_type_1 symbol_type_2 tc_state
+compare_specified_and_derived_instance_types :: !SymbolType !SymbolType !*TypeHeaps -> (!ComparisionErrorCode, !*TypeHeaps)
+compare_specified_and_derived_instance_types specified_instance_type derived_symbol_type type_heaps=:{th_vars, th_attrs}
+	| length specified_instance_type.st_args<>length derived_symbol_type.st_args
+		= (CEC_NrArgsNotOk, type_heaps)
+	# tc_state = { tc_type_vars = initial_hwn th_vars
+				 , tc_attr_vars = initial_hwn th_attrs
+				 , tc_strictness_flags = AllowFirstMoreStrictness
+				 }
+	  tc_state = init_symbol_type_vars specified_instance_type derived_symbol_type tc_state
 	  (correspond_list, tc_state)
 	  		= map2St t_corresponds
-	  				[symbol_type_1.st_result:symbol_type_1.st_args]
-	  				[symbol_type_2.st_result:symbol_type_2.st_args]
+	  				[specified_instance_type.st_result:specified_instance_type.st_args]
+	  				[derived_symbol_type.st_result:derived_symbol_type.st_args]
 	  		        tc_state
-	  err_code
-	  		= firstIndex not correspond_list
+	  err_code = firstIndex not correspond_list
 	| err_code<>CEC_Ok
 		= (err_code, tc_state_to_type_heaps tc_state)
+	# (arg_strictness_corresponds, tc_state)
+			=  t_corresponds specified_instance_type.st_args_strictness derived_symbol_type.st_args_strictness tc_state
+	| not arg_strictness_corresponds
+		= (CEC_StrictnessOfArgsNotOk, tc_state_to_type_heaps tc_state)
 	# (context_corresponds, tc_state)
-			= t_corresponds symbol_type_1.st_context symbol_type_2.st_context tc_state
+			= t_corresponds specified_instance_type.st_context derived_symbol_type.st_context tc_state
 	| not context_corresponds
 		= (CEC_ContextNotOK, tc_state_to_type_heaps tc_state)
 	# (attr_env_corresponds, tc_state)
-			= t_corresponds symbol_type_1.st_attr_env symbol_type_2.st_attr_env tc_state
+			= t_corresponds specified_instance_type.st_attr_env derived_symbol_type.st_attr_env tc_state
 	| not attr_env_corresponds
 		= (CEC_AttrEnvNotOK, tc_state_to_type_heaps tc_state)
-	= (CEC_Ok, tc_state_to_type_heaps tc_state)
+	| tc_state.tc_strictness_flags bitand FirstHasMoreStrictness<>0
+		= (CEC_OkWithFirstMoreStrictness, tc_state_to_type_heaps tc_state)
+		= (CEC_Ok, tc_state_to_type_heaps tc_state)
   where
 	tc_state_to_type_heaps {tc_type_vars, tc_attr_vars}
 		= { th_vars = tc_type_vars.hwn_heap, th_attrs = tc_attr_vars.hwn_heap}
@@ -771,16 +824,36 @@ instance t_corresponds Annotation where
 	t_corresponds dcl_annotation icl_annotation 
 		= t_corresponds` dcl_annotation icl_annotation
 	  where
-		t_corresponds` dcl_annotation icl_annotation tc_state=:{tc_ignore_strictness}
-			= (tc_ignore_strictness || dcl_annotation==icl_annotation, tc_state)
+		t_corresponds` AN_Strict AN_Strict tc_state
+			= (True, tc_state)
+		t_corresponds` AN_Strict AN_None tc_state=:{tc_strictness_flags}
+			| tc_strictness_flags bitand AllowFirstMoreStrictness==0
+				= (False,tc_state)
+			| tc_strictness_flags bitand FirstHasMoreStrictness<>0
+				= (True,tc_state)
+				# tc_state = {tc_state & tc_strictness_flags = tc_strictness_flags bitor FirstHasMoreStrictness}
+				= (True,tc_state)
+		t_corresponds` AN_None AN_None tc_state
+			= (True, tc_state)
+		t_corresponds` AN_None AN_Strict tc_state
+			= (False, tc_state)
 
 instance t_corresponds StrictnessList where
 	t_corresponds dcl_strictness icl_strictness 
 		= t_corresponds` dcl_strictness icl_strictness
 	  where
-		t_corresponds` dcl_strictness icl_strictness tc_state=:{tc_ignore_strictness}
-			= (tc_ignore_strictness || equal_strictness_lists dcl_strictness icl_strictness, tc_state)
-			
+		t_corresponds` dcl_strictness icl_strictness tc_state=:{tc_strictness_flags}
+			| tc_strictness_flags bitand AllowFirstMoreStrictness==0
+				= (equal_strictness_lists dcl_strictness icl_strictness, tc_state)
+			| tc_strictness_flags bitand FirstHasMoreStrictness<>0
+				= (more_or_equal_strictness_lists dcl_strictness icl_strictness, tc_state)
+			 | equal_strictness_lists dcl_strictness icl_strictness
+				= (True,tc_state)
+			| more_or_equal_strictness_lists dcl_strictness icl_strictness
+				# tc_state = {tc_state & tc_strictness_flags = tc_strictness_flags bitor FirstHasMoreStrictness}
+				= (True,tc_state)
+				= (False,tc_state)				
+
 instance t_corresponds AType where
 	t_corresponds dclDef iclDef
 		=	t_corresponds dclDef.at_attribute iclDef.at_attribute
@@ -815,25 +888,45 @@ instance t_corresponds AttributeVar where
 			= (unifiable, { tc_state & tc_attr_vars = tc_attr_vars })
 
 instance t_corresponds Type where
-	t_corresponds (TA dclIdent dclArgs) icl_type=:(TA iclIdent iclArgs)
+	t_corresponds (TA dclIdent dclArgs) (TA iclIdent iclArgs)
 		=	equal dclIdent.type_ident iclIdent.type_ident
 		&&& equal dclIdent.type_index.glob_module iclIdent.type_index.glob_module
 		&&& t_corresponds dclArgs iclArgs
-	t_corresponds (TA dclIdent dclArgs) icl_type=:(TAS iclIdent iclArgs iclStrictness)
+	t_corresponds (TA dclIdent dclArgs) (TAS iclIdent iclArgs iclStrictness)
 		=	equal dclIdent.type_ident iclIdent.type_ident
 		&&& equal dclIdent.type_index.glob_module iclIdent.type_index.glob_module
-		&&& return (equal_strictness_lists NotStrict iclStrictness)
+		&&& return (is_not_strict iclStrictness)
 		&&& t_corresponds dclArgs iclArgs
-	t_corresponds (TAS dclIdent dclArgs dclStrictness) icl_type=:(TA iclIdent iclArgs)
+	t_corresponds (TAS dclIdent dclArgs dclStrictness) (TA iclIdent iclArgs)
 		=	equal dclIdent.type_ident iclIdent.type_ident
 		&&& equal dclIdent.type_index.glob_module iclIdent.type_index.glob_module
-		&&& return (equal_strictness_lists dclStrictness NotStrict)
+		&&& compare_strictness dclStrictness
 		&&& t_corresponds dclArgs iclArgs
-	t_corresponds (TAS dclIdent dclArgs dclStrictness) icl_type=:(TAS iclIdent iclArgs iclStrictness)
+		where
+			compare_strictness dclStrictness tc_state=:{tc_strictness_flags}
+				| tc_strictness_flags bitand AllowFirstMoreStrictness==0
+					= (equal_strictness_lists dclStrictness NotStrict, tc_state)
+				| tc_strictness_flags bitand FirstHasMoreStrictness<>0 || equal_strictness_lists dclStrictness NotStrict
+					= (True, tc_state)
+					# tc_state = {tc_state & tc_strictness_flags = tc_strictness_flags bitor FirstHasMoreStrictness}
+					= (True, tc_state)
+	t_corresponds (TAS dclIdent dclArgs dclStrictness) (TAS iclIdent iclArgs iclStrictness)
 		=	equal dclIdent.type_ident iclIdent.type_ident
 		&&& equal dclIdent.type_index.glob_module iclIdent.type_index.glob_module
-		&&& return (equal_strictness_lists dclStrictness iclStrictness)
+		&&& compare_strictness dclStrictness iclStrictness
 		&&& t_corresponds dclArgs iclArgs
+		where
+			compare_strictness dclStrictness iclStrictness tc_state=:{tc_strictness_flags}
+				| tc_strictness_flags bitand AllowFirstMoreStrictness==0
+					= (equal_strictness_lists dclStrictness iclStrictness, tc_state)
+				| tc_strictness_flags bitand FirstHasMoreStrictness<>0
+					= (more_or_equal_strictness_lists dclStrictness iclStrictness, tc_state)
+				| equal_strictness_lists dclStrictness iclStrictness
+					= (True, tc_state)
+				| more_or_equal_strictness_lists dclStrictness iclStrictness
+					# tc_state = {tc_state & tc_strictness_flags = tc_strictness_flags bitor FirstHasMoreStrictness}
+					= (True, tc_state)
+					= (False, tc_state)
 	t_corresponds (dclFun --> dclArg) (iclFun --> iclArg)
 		=	t_corresponds dclFun iclFun
 		&&&	t_corresponds dclArg iclArg
@@ -955,19 +1048,6 @@ instance t_corresponds MemberDef where
 		&&&	equal dclDef.me_offset iclDef.me_offset
 		&&&	equal dclDef.me_priority iclDef.me_priority
 		&&&	t_corresponds dclDef.me_type iclDef.me_type
-
-instance t_corresponds ClassInstance where
-	t_corresponds dclDef iclDef
-		= t_corresponds` dclDef.ins_type iclDef.ins_type
-	  where
-		t_corresponds` dclDef iclDef tc_state
-			# tc_state = init_attr_vars dclDef.it_attr_vars iclDef.it_attr_vars tc_state
-			  tc_state = init_type_vars dclDef.it_vars iclDef.it_vars tc_state
-			  (corresponds, tc_state)
-			  		=  t_corresponds dclDef.it_types iclDef.it_types tc_state
-			| not corresponds
-				= (corresponds, tc_state)
-			=  t_corresponds dclDef.it_context iclDef.it_context tc_state
 
 instance t_corresponds DynamicType where
 	t_corresponds dclDef iclDef

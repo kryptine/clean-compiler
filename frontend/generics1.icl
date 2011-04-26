@@ -1408,7 +1408,7 @@ where
 					, gs_varh = gs_varh
 					, gs_dcl_modules = gs_dcl_modules
 					, gs_symtab = gs_symtab }
-		= (common_defs, gs)		
+		= (common_defs, gs)
 
 // limitations:
 // - context restrictions on generic variables are not allowed
@@ -1458,7 +1458,7 @@ where
 			# glob_def_sym = 
 				{ glob_module = pds_module
 				, glob_object = {ds_ident=pds_ident, ds_index=pds_def, ds_arity = 1}
-				}	
+				}
 			# tc_class = TCGeneric 
 				{ gtc_generic=glob_def_sym
 				, gtc_kind = kind
@@ -1942,6 +1942,7 @@ where
 			 	,	ins_class_ident = {ci_ident=Ident class_ident, ci_arity=1}
 				,	ins_ident 	= class_ident
 				,	ins_type 	= ins_type
+				,	ins_member_types = []
 				,	ins_members	= {{cim_ident=ds_ident,cim_arity=ds_arity,cim_index=ds_index}}
 				,	ins_specials = SP_None
 				,	ins_pos		= gc_pos
@@ -2015,12 +2016,12 @@ where
 	build_class_instance :: Int Ident Position TypeKind ClassInstanceMember InstanceType !(!Int,![ClassInstance]) -> (!Int,![ClassInstance])
 	build_class_instance class_index gc_ident gc_pos gc_kind class_instance_member ins_type (ins_index, instances)
 		# class_ident = genericIdentToClassIdent gc_ident.id_name gc_kind
-		# class_ds = {ds_index = class_index, ds_arity=1, ds_ident=class_ident}
 		#! ins =
 		 	{	ins_class_index = {gi_module=gs_main_module, gi_index=class_index}
 		 	,	ins_class_ident = {ci_ident=Ident class_ident, ci_arity=1}
 			,	ins_ident 	= class_ident
 			,	ins_type 	= ins_type
+			,	ins_member_types = []
 			,	ins_members	= {class_instance_member}
 			,	ins_specials = SP_None
 			,	ins_pos		= gc_pos
@@ -3507,9 +3508,7 @@ where
 				foldr (++) body_st.st_attr_env [st_attr_env \\ {st_attr_env} <- arg_sts])
 			, st_args_strictness = insert_n_lazy_values_at_beginning num_added_args body_st.st_args_strictness	 
 			}
-	
 		= (new_st, flatten arg_gatvss, th, error)
-			//---> ("build_symbol_type returns", arg_gatvss, st)
 
 	build_args st gatvs order kinds th error
 		# (arg_sts_and_gatvss, (_,th,error)) 
@@ -3523,27 +3522,22 @@ where
 			!Int 				// order
 			!TypeKind			// kind corrseponding to the arg
 			( !Int				// the argument number
-			, !*TypeHeaps
-			, !*ErrorAdmin
-			)				
+			, !*TypeHeaps, !*ErrorAdmin)				
 		->  ( (!SymbolType, [ATypeVar]) // fresh symbol type and generic variables 
 			, 	( !Int			// incremented argument number
-				, !*TypeHeaps
-				, !*ErrorAdmin
-				)
-			)
-	build_arg st gatvs order kind (arg_num, th, error)		
+				, !*TypeHeaps, !*ErrorAdmin))
+	build_arg st gatvs order kind (arg_num, th, error)
 		#! th = clearSymbolType st th
-		#! (fresh_gatvs, th) = mapSt subst_gatv gatvs th 
+		#! (fresh_gatvs, th) = mapSt subst_gatv gatvs th
 		#! (new_st, th) = applySubstInSymbolType st th
 		
 		#! (new_st, forall_atvs, th, error) 
 			= build_symbol_type new_st fresh_gatvs kind (inc order) th error	
 		#! (curry_st, th)	
 			= curryGenericArgType1 new_st ("cur" +++ toString order +++ postfix) th 	
-		
+
 		#! curry_st = adjust_forall curry_st forall_atvs
-				
+
 		= ((curry_st, fresh_gatvs), (inc arg_num, th, error))
 	where
 		postfix = toString arg_num
@@ -3554,12 +3548,12 @@ where
 			=	( {atv & atv_variable = tv, atv_attribute = attr}
 			 	, {th & th_vars = th_vars, th_attrs = th_attrs}
 			 	)	
-			
+
 		// generic type var is replaced with a fresh one
 		subst_gtv {tv_info_ptr, tv_ident} th_vars 
 			# (tv, th_vars) = freshTypeVar (postfixIdent tv_ident.id_name postfix) th_vars	
 			= (tv, writePtr tv_info_ptr (TVI_Type (TV tv)) th_vars)
-		
+
 		subst_attr (TA_Var {av_ident, av_info_ptr}) th_attrs 
 			# (av, th_attrs) = freshAttrVar (postfixIdent av_ident.id_name postfix) th_attrs
 			= (TA_Var av, writePtr av_info_ptr (AVI_Attr (TA_Var av)) th_attrs)
