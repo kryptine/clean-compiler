@@ -24,60 +24,76 @@ from explicitimports import search_qualified_ident,::NameSpaceN,TypeNameSpaceN,C
 	,	cti_lhs_attribute	:: !TypeAttribute
 	}
 
+bindArgAType :: !CurrentTypeInfo !AType !(!*TypeSymbols, !*TypeInfo, !*CheckState)
+			-> (!AType, !TypeAttribute, !(!*TypeSymbols, !*TypeInfo, !*CheckState))
+bindArgAType cti {at_attribute,at_type=TFA vars type} (ts, ti=:{ti_type_heaps}, cs)
+	# (type_vars, (_, ti_type_heaps, cs)) = addTypeVariablesToSymbolTable cRankTwoScope vars [] ti_type_heaps cs
+	  (type, _, (ts, ti, cs)) = bindTypes cti type (ts, {ti & ti_type_heaps = ti_type_heaps}, cs)
+	  cs & cs_symbol_table = removeAttributedTypeVarsFromSymbolTable cRankTwoScope type_vars cs.cs_symbol_table
+	  at_type = TFA type_vars type
+	= bindAttributes TA_Multi cti at_attribute at_type (ts, ti, cs)
+bindArgAType cti {at_attribute,at_type} ts_ti_cs
+	# (at_type, type_attr, ts_ti_cs) = bindTypes cti at_type ts_ti_cs
+	= bindAttributes type_attr cti at_attribute at_type ts_ti_cs
+
 class bindTypes type :: !CurrentTypeInfo !type !(!*TypeSymbols, !*TypeInfo, !*CheckState)
-	-> (!type, !TypeAttribute, !(!*TypeSymbols, !*TypeInfo, !*CheckState))
+					-> (!type, !TypeAttribute, !(!*TypeSymbols, !*TypeInfo, !*CheckState))
 
 instance bindTypes AType
 where
-	bindTypes cti atype=:{at_attribute,at_type} ts_ti_cs
-		# (at_type, type_attr, (ts, ti, cs)) = bindTypes cti at_type ts_ti_cs
-		  cs_error = check_attr_of_type_var at_attribute at_type cs.cs_error
-		  (combined_attribute, cs_error) = check_type_attribute at_attribute type_attr cti.cti_lhs_attribute cs_error
-		= ({ atype & at_attribute = combined_attribute, at_type = at_type }, combined_attribute, (ts, ti, { cs & cs_error = cs_error }))
+	bindTypes cti {at_attribute,at_type} ts_ti_cs
+		# (at_type, type_attr, ts_ti_cs) = bindTypes cti at_type ts_ti_cs
+		= bindAttributes type_attr cti at_attribute at_type ts_ti_cs
+
+bindAttributes :: !TypeAttribute !CurrentTypeInfo !TypeAttribute !Type !(!*TypeSymbols, !*TypeInfo, !*CheckState)
+										   -> (!AType, !TypeAttribute, !(!*TypeSymbols, !*TypeInfo, !*CheckState))
+bindAttributes type_attr cti at_attribute at_type (ts, ti, cs)
+	# cs_error = check_attr_of_type_var at_attribute at_type cs.cs_error
+	  (combined_attribute, cs_error) = check_type_attribute at_attribute type_attr cti.cti_lhs_attribute cs_error
+	= ({ at_attribute = combined_attribute, at_type = at_type }, combined_attribute, (ts, ti, { cs & cs_error = cs_error }))
+where
+	check_type_attribute :: !TypeAttribute !TypeAttribute !TypeAttribute !*ErrorAdmin -> (!TypeAttribute,!*ErrorAdmin)
+	check_type_attribute TA_Anonymous type_attr root_attr error
+		| try_to_combine_attributes type_attr root_attr
+			= (to_root_attr root_attr, error)
+			= (TA_Multi, checkError "conflicting attribution of type definition" "" error)
 	where
-		check_type_attribute :: !TypeAttribute !TypeAttribute !TypeAttribute !*ErrorAdmin -> (!TypeAttribute,!*ErrorAdmin)
-		check_type_attribute TA_Anonymous type_attr root_attr error
-			| try_to_combine_attributes type_attr root_attr
-				= (to_root_attr root_attr, error)
-//				= (root_attr, error)
-				= (TA_Multi, checkError "conflicting attribution of type definition" "" error)
-		check_type_attribute TA_Unique type_attr root_attr error
-			| try_to_combine_attributes TA_Unique type_attr || try_to_combine_attributes TA_Unique root_attr
-				= (TA_Unique, error)
-				= (TA_Multi, checkError "conflicting attribution of type definition" "" error)
-		check_type_attribute (TA_Var var) _ _ error
-			= (TA_Multi, checkError var "attribute variable not allowed" error)
-		check_type_attribute (TA_RootVar var) _ _ error
-			= (TA_Multi, checkError var "attribute variable not allowed" error)
-		check_type_attribute _ type_attr root_attr error
-			= (type_attr, error)
-
-		try_to_combine_attributes :: !TypeAttribute !TypeAttribute -> Bool
-		try_to_combine_attributes TA_Multi _
-			= True
-		try_to_combine_attributes (TA_Var attr_var1) (TA_Var attr_var2)
-			= attr_var1.av_ident == attr_var2.av_ident
-		try_to_combine_attributes TA_Unique TA_Unique
-			= True
-		try_to_combine_attributes TA_Unique TA_Multi
-			= True
-		try_to_combine_attributes _ _
-			= False
-
-		check_attr_of_type_var :: !TypeAttribute !Type !*ErrorAdmin -> .ErrorAdmin 
-		check_attr_of_type_var TA_Unique (TV var) error
-			// the case "TA_Var" is catched by check_type_attribute
-			= checkError var "uniqueness attribute not allowed" error
-		check_attr_of_type_var TA_Anonymous (CV tv :@: types) error
-			= checkError tv "attribute variable not allowed" error
-		check_attr_of_type_var attr _ error
-			= error
-
 		to_root_attr (TA_Var var)
 			= TA_RootVar var
 		to_root_attr attr
 			= attr
-					
+	check_type_attribute TA_Unique type_attr root_attr error
+		| try_to_combine_attributes TA_Unique type_attr || try_to_combine_attributes TA_Unique root_attr
+			= (TA_Unique, error)
+			= (TA_Multi, checkError "conflicting attribution of type definition" "" error)
+	check_type_attribute (TA_Var var) _ _ error
+		= (TA_Multi, checkError var "attribute variable not allowed" error)
+	check_type_attribute (TA_RootVar var) _ _ error
+		= (TA_Multi, checkError var "attribute variable not allowed" error)
+	check_type_attribute _ type_attr root_attr error
+		= (type_attr, error)
+
+	try_to_combine_attributes :: !TypeAttribute !TypeAttribute -> Bool
+	try_to_combine_attributes TA_Multi _
+		= True
+	try_to_combine_attributes (TA_Var attr_var1) (TA_Var attr_var2)
+		= attr_var1.av_ident == attr_var2.av_ident
+	try_to_combine_attributes TA_Unique TA_Unique
+		= True
+	try_to_combine_attributes TA_Unique TA_Multi
+		= True
+	try_to_combine_attributes _ _
+		= False
+
+	check_attr_of_type_var :: !TypeAttribute !Type !*ErrorAdmin -> .ErrorAdmin 
+	check_attr_of_type_var TA_Unique (TV var) error
+		// the case "TA_Var" is catched by check_type_attribute
+		= checkError var "uniqueness attribute not allowed" error
+	check_attr_of_type_var TA_Anonymous (CV tv :@: types) error
+		= checkError tv "attribute variable not allowed" error
+	check_attr_of_type_var attr _ error
+		= error
+				
 instance bindTypes TypeVar
 where
 	bindTypes cti tv=:{tv_ident=var_id=:{id_info}} (ts, ti, cs=:{cs_symbol_table})
@@ -184,11 +200,6 @@ where
 		# (tv, type_attr, ts_ti_cs) = bindTypes cti tv ts_ti_cs
 		  (types, _, ts_ti_cs) = bindTypes cti types ts_ti_cs
 		= (CV tv :@: types, type_attr, ts_ti_cs)
-	bindTypes cti (TFA vars type) (ts, ti=:{ti_type_heaps}, cs)
-		# (type_vars, (_, ti_type_heaps, cs)) = addTypeVariablesToSymbolTable cRankTwoScope vars [] ti_type_heaps cs
-		  (type, _, (ts, ti, cs)) = bindTypes cti type (ts, {ti & ti_type_heaps = ti_type_heaps}, cs)
-		  cs_symbol_table = removeAttributedTypeVarsFromSymbolTable cRankTwoScope type_vars cs.cs_symbol_table
-		= (TFA type_vars type, TA_Multi, (ts, ti, {cs & cs_symbol_table = cs_symbol_table}))
 	bindTypes cti=:{cti_module_index,cti_type_index,cti_lhs_attribute} type=:(TQualifiedIdent module_id type_name types)
 					(ts=:{ts_type_defs,ts_modules}, ti, cs)
 		# (found,{decl_kind,decl_ident=type_ident,decl_index=type_index},cs) = search_qualified_ident module_id type_name TypeNameSpaceN cs
@@ -239,8 +250,16 @@ where
 					= qualified_type_occurs next_kind ste_index type_module type_index
 			qualified_type_occurs _ _ _ _
 				= False
+	bindTypes cti type=:(TFA vars _) (ts, ti, cs)
+		# cs = universal_quantifier_error vars cs
+		= (type, TA_Multi, (ts, ti, cs))
 	bindTypes cti type ts_ti_cs
 		= (type, TA_Multi, ts_ti_cs)
+
+universal_quantifier_error [{atv_variable={tv_ident}}:_] cs
+	= {cs & cs_error = checkError tv_ident "universally quantified type variable not allowed here" cs.cs_error}
+universal_quantifier_error _ cs
+	= {cs & cs_error = checkError "" "universal quantifier not allowed here" cs.cs_error}
 
 addToAttributeEnviron :: !TypeAttribute !TypeAttribute ![AttrInequality] !*ErrorAdmin -> (![AttrInequality],!*ErrorAdmin)
 addToAttributeEnviron TA_Multi _ attr_env error
@@ -454,7 +473,7 @@ where
 		bind_types_of_cons [type : types] cti free_vars attr_env ts_ti_cs
 			# (types, attr_env, ts_ti_cs)
 					= bind_types_of_cons types cti free_vars attr_env ts_ti_cs
-			  (type, type_attr, (ts, ti, cs)) = bindTypes cti type ts_ti_cs
+			  (type, type_attr, (ts, ti, cs)) = bindArgAType cti type ts_ti_cs
 			  (attr_env, cs_error) = addToAttributeEnviron type_attr cti.cti_lhs_attribute attr_env cs.cs_error
 			= ([type : types], attr_env, (ts, ti , { cs & cs_error = cs_error }))
 
@@ -712,8 +731,23 @@ new_demanded_attribute _ TA_Unique
 new_demanded_attribute dem_attr_kind _
 	= DAK_None /* dem_attr_kind */
 
+checkOpenArgAType :: !Index !Int !DemandedAttributeKind !AType !(!u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState)
+												   -> (!AType, !(!u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState))
+checkOpenArgAType mod_index scope dem_attr atype=:{at_type = TFA vars type, at_attribute} (ots, oti, cs)
+	# (vars, (oti, cs)) = add_universal_vars vars oti cs
+	  (checked_type, (ots, oti, cs)) = checkOpenAType mod_index cRankTwoScope dem_attr { atype & at_type = type } (ots, oti, cs)
+	  cs = {cs & cs_symbol_table = remove_universal_vars vars cs.cs_symbol_table}
+	= ({checked_type & at_type = TFA vars checked_type.at_type }, (ots, oti, cs))
+checkOpenArgAType mod_index scope dem_attr atype=:{at_type = TFAC vars type contexts, at_attribute} (ots, oti, cs)
+	# cs = add_universal_vars_again vars cs
+	  (checked_type, (ots, oti, cs)) = checkOpenAType mod_index cRankTwoScope dem_attr {atype & at_type = type} (ots, oti, cs)
+	  cs = {cs & cs_symbol_table = remove_universal_vars vars cs.cs_symbol_table}
+	= ({checked_type & at_type = TFAC vars checked_type.at_type contexts}, (ots, oti, cs))
+checkOpenArgAType mod_index scope dem_attr type ots_oti_cs
+	= checkOpenAType mod_index scope dem_attr type ots_oti_cs
+
 checkOpenAType :: !Index !Int !DemandedAttributeKind !AType !(!u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState)
-	-> (!AType, !(!u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState))
+												-> (!AType, !(!u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState))
 checkOpenAType mod_index scope dem_attr type=:{at_type = TV tv, at_attribute} (ots, oti, cs)
 	# (tv, at_attribute, (oti, cs)) = checkTypeVar scope dem_attr tv at_attribute (oti, cs) 
 	= ({ type & at_type = TV tv, at_attribute = at_attribute }, (ots, oti, cs))
@@ -742,7 +776,6 @@ where
 							-> (var, global_vars, var_heap, entry)
 			# (var, global_vars, var_heap, ste_previous) = retrieve_global_variable var ste_previous global_vars var_heap
 			= (var, global_vars, var_heap, { entry & ste_previous = ste_previous })
-//
 checkOpenAType mod_index scope dem_attr_kind type=:{ at_type=TA type_cons=:{type_ident=type_ident=:{id_name,id_info}} types, at_attribute}
 		(ots=:{ots_type_defs,ots_modules}, oti, cs=:{cs_symbol_table,cs_x={x_check_dynamic_types}})
 	# (entry, cs_symbol_table) = readPtr id_info cs_symbol_table
@@ -816,16 +849,12 @@ checkOpenAType mod_index scope dem_attr_kind type=:{ at_type=TQualifiedIdent mod
 					-> (type, (ots, oti, {cs & cs_error = checkError type_ident "used with wrong arity" cs.cs_error}))
 			_
 				-> (type, (ots, oti, {cs & cs_error = checkError (module_id.id_name+++"@"+++type_name) "not imported" cs.cs_error}))
-checkOpenAType mod_index scope dem_attr atype=:{at_type = TFA vars type, at_attribute} (ots, oti, cs)
-	# (vars, (oti, cs)) = add_universal_vars vars oti cs
-	  (checked_type, (ots, oti, cs)) = checkOpenAType mod_index cRankTwoScope dem_attr { atype & at_type = type } (ots, oti, cs)
-	  cs = {cs & cs_symbol_table = remove_universal_vars vars cs.cs_symbol_table}
-	= ({checked_type & at_type = TFA vars checked_type.at_type }, (ots, oti, cs))
-checkOpenAType mod_index scope dem_attr atype=:{at_type = TFAC vars type contexts, at_attribute} (ots, oti, cs)
-	# cs = add_universal_vars_again vars cs
-	  (checked_type, (ots, oti, cs)) = checkOpenAType mod_index cRankTwoScope dem_attr {atype & at_type = type} (ots, oti, cs)
-	  cs = {cs & cs_symbol_table = remove_universal_vars vars cs.cs_symbol_table}
-	= ({checked_type & at_type = TFAC vars checked_type.at_type contexts}, (ots, oti, cs))
+checkOpenAType mod_index scope dem_attr atype=:{at_type = TFA vars type} (ots, oti, cs)
+	# cs = universal_quantifier_error vars cs
+	= (atype, (ots, oti, cs))
+checkOpenAType mod_index scope dem_attr atype=:{at_type = TFAC vars type contexts} (ots, oti, cs)
+	# cs = universal_quantifier_error vars cs
+	= (atype, (ots, oti, cs))
 checkOpenAType mod_index scope dem_attr type=:{at_attribute} (ots, oti, cs)
 	# (new_attr, oti, cs) = newAttribute dem_attr "." at_attribute oti cs
 	= ({ type & at_attribute = new_attr}, (ots, oti, cs))
@@ -836,9 +865,9 @@ checkOpenTypes mod_index scope dem_attr types cot_state
 checkOpenType mod_index scope dem_attr type cot_state
 	# ({at_type}, cot_state) = checkOpenAType mod_index scope dem_attr { at_type = type, at_attribute = TA_Multi } cot_state
 	= (at_type, cot_state)
-	
-checkOpenATypes mod_index scope types cot_state
-	= mapSt (checkOpenAType mod_index scope DAK_None) types cot_state
+
+checkOpenArgATypes mod_index scope types cot_state
+	= mapSt (checkOpenArgAType mod_index scope DAK_None) types cot_state
 
 add_universal_vars vars oti cs
 	= mapSt add_universal_var vars  (oti, cs) 
@@ -972,7 +1001,7 @@ checkSymbolType is_function mod_index st=:{st_args,st_result,st_context,st_attr_
 	# ots = {ots_type_defs = type_defs, ots_modules = modules}
 	  oti = {oti_heaps = heaps, oti_all_vars = [], oti_all_attrs = [], oti_global_vars= []}
 	  (st_args,class_defs,ots,oti,cs) = check_argument_type_contexts st_args mod_index class_defs ots oti cs
-	  (st_args, cot_state) = checkOpenATypes mod_index cGlobalScope st_args (ots, oti, cs)
+	  (st_args, cot_state) = checkOpenArgATypes mod_index cGlobalScope st_args (ots, oti, cs)
 	  (st_result, (ots, oti=:{oti_all_vars = st_vars,oti_all_attrs = st_attr_vars,oti_global_vars}, cs))
 	  	= checkOpenAType mod_index cGlobalScope DAK_None st_result cot_state	  
 	  oti = {oti & oti_all_vars = [], oti_all_attrs = []}
