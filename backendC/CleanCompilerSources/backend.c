@@ -3828,12 +3828,24 @@ BEInit (int argc)
 void
 BECloseFiles (void)
 {
-	if (StdErrorReopened)
+	if (StdErrorReopened){
+#ifdef _SUN_
+		fclose (std_error_file_p);
+		std_error_file_p = stderr;
+#else
 		fclose (StdError);
-	StdErrorReopened = False;
-	if (StdOutReopened)
+#endif
+		StdErrorReopened = False;
+	}
+	if (StdOutReopened){
+#ifdef _SUN_
+		fclose (std_out_file_p);
+		std_out_file_p = stdout;
+#else
 		fclose (StdOut);
-	StdOutReopened = False;
+#endif
+		StdOutReopened = False;
+	}
 } /* BECloseFiles */
 
 void
