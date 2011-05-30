@@ -221,7 +221,7 @@ where
 										determine_type_attribute td_attribute, ts_ti_cs)
 						-> (TE, TA_Multi, (ts, ti, { cs & cs_error = checkError type_cons.type_ident "used with wrong arity" cs.cs_error }))
 				_
-					-> (TE, TA_Multi, (ts, ti, { cs & cs_error = checkError (module_id.id_name+++"@"+++type_name) "not imported" cs.cs_error}))
+					-> (TE, TA_Multi, (ts, ti, { cs & cs_error = checkError ("'"+++module_id.id_name+++"'."+++type_name) "not imported" cs.cs_error}))
 		where
 			add_qualified_type_to_used_types symbol_table_ptr type_module type_index symbol_table used_types
 				# (entry=:{ste_kind,ste_index}, symbol_table) = readPtr symbol_table_ptr symbol_table
@@ -300,10 +300,10 @@ check_context_class tc_class=:(TCQualifiedIdent module_id class_name) tc_types m
 				| class_arity == length tc_types
 					# checked_class = { glob_object = MakeDefinedSymbol class_ident class_index class_arity, glob_module = class_module }
 					-> (TCClass checked_class, class_defs, modules, cs) 
-					# cs_error = checkError (module_id.id_name+++"@"+++class_name) "class used with wrong arity" cs.cs_error
+					# cs_error = checkError ("'"+++module_id.id_name+++"'."+++class_name) "class used with wrong arity" cs.cs_error
 					-> (tc_class, class_defs, modules, {cs & cs_error = cs_error})
 			_
-				-> (tc_class, class_defs, modules, {cs & cs_error = checkError (module_id.id_name+++"@"+++class_name) "class undefined" cs.cs_error})
+				-> (tc_class, class_defs, modules, {cs & cs_error = checkError ("'"+++module_id.id_name+++"'."+++class_name) "class undefined" cs.cs_error})
 check_context_class (TCGeneric gtc=:{gtc_generic, gtc_kind}) tc_types mod_index class_defs modules cs 			
   	# gen_ident = gtc_generic.glob_object.ds_ident
 	# (entry, cs_symbol_table) = readPtr gen_ident.id_info cs.cs_symbol_table
@@ -321,7 +321,11 @@ check_context_class (TCGeneric gtc=:{gtc_generic, gtc_kind}) tc_types mod_index 
 				}
 			  ({pds_module,pds_def},cs) = cs!cs_predef_symbols.[PD_TypeGenericDict]
 			  generic_dict = {gi_module=pds_module, gi_index=pds_def}
-			= (TCGeneric {gtc & gtc_generic = checked_gen, gtc_class=clazz, gtc_generic_dict=generic_dict}, class_defs, modules, cs)
+			#! tc_class = TCGeneric {gtc & gtc_generic = checked_gen, gtc_class=clazz, gtc_generic_dict=generic_dict}
+			| not cs.cs_x.x_check_dynamic_types
+				= (tc_class, class_defs, modules, cs)
+				# cs = {cs & cs_error = checkError gen_ident "a generic context is not allowed in a dynamic type" cs.cs_error}
+				= (tc_class, class_defs, modules, cs)
 			# cs_error = checkError gen_ident "generic used with wrong arity: generic has always has one class argument" cs.cs_error  
 			= (TCGeneric {gtc & gtc_class=clazz}, class_defs, modules, {cs & cs_error = cs_error})
 		# cs_error = checkError gen_ident "generic undefined" cs.cs_error
