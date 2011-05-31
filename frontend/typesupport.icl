@@ -98,7 +98,7 @@ clean_up_top_level_q_variable cui at_attribute qv_number cus
 where
 	add_new_exis_attr_var TE ev_number ev_attr cus_exis_vars
 		= [(ev_number, ev_attr) : cus_exis_vars]
-	add_new_exis_attr_varadd_new_exis_attr_var type ev_number ev_attr cus_exis_vars
+	add_new_exis_attr_var type ev_number ev_attr cus_exis_vars
 		= cus_exis_vars
 
 attrIsUndefined TA_None = True
