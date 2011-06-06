@@ -1,6 +1,6 @@
 implementation module type
 
-import StdEnv
+import StdEnv,StdOverloadedList
 import syntax, typesupport, check, analtypes, overloading, unitype, refmark, predef, utilities, compare_constructor
 import genericsupport
 
@@ -706,6 +706,8 @@ where
 		= (TArrow1 arg_type, type_heaps)
 	freshCopy (TFA vars type) type_heaps
 		= freshCopyOfTFAType vars type type_heaps
+	freshCopy (TFAC vars type context) type_heaps
+		= freshCopyOfTFACType vars type context type_heaps
 	freshCopy type type_heaps
 		= (type, type_heaps)
 
@@ -1949,7 +1951,7 @@ where
 		attributedBasicType {box=type} ts=:{ts_attr_store}
 			= ({ at_attribute = TA_TempVar ts_attr_store, at_type = type}, {ts & ts_attr_store = inc ts_attr_store})
 
-	requirements ti (MatchExpr {glob_object={ds_arity, ds_index},glob_module} expr) reqs_ts=:(reqs, ts)
+	requirements ti (MatchExpr {glob_object={ds_arity,ds_index,ds_ident},glob_module} expr) reqs_ts=:(reqs, ts)
 		| glob_module==cPredefinedModuleIndex
 			&& (let
 					pd_cons_index=ds_index+FirstConstructorPredefinedSymbolIndex
@@ -1958,6 +1960,9 @@ where
 			= requirements ti expr reqs_ts
 			# cp = CP_Expression expr
 			  ({tst_result,tst_args,tst_attr_env}, ts) = standardLhsConstructorType cp ds_index glob_module ti ts	
+			  ts = if (Any is_TFAC tst_args)
+					{ts & ts_error = checkError ds_ident "selection not allowed for constructor with universally quantified context" ts.ts_error}
+					ts
 			  (e_type, opt_expr_ptr, (reqs, ts)) = requirements ti expr (reqs, ts)
 			  reqs = { reqs & req_attr_coercions =  tst_attr_env ++ reqs.req_attr_coercions,
 			  				  req_type_coercions = [{ tc_demanded = tst_result, tc_offered = e_type, tc_position = cp, tc_coercible = True } : reqs.req_type_coercions ] }
@@ -1966,6 +1971,9 @@ where
 				# tuple_type = MakeTypeSymbIdent { glob_object = PD_Arity2TupleTypeIndex+(ds_arity-2), glob_module = cPredefinedModuleIndex } predefined_idents.[PD_Arity2TupleType+(ds_arity-2)] ds_arity
 				= ({ at_type = TA tuple_type tst_args, at_attribute = TA_Unique }, No, (reqs, ts))
 				= ( hd tst_args, No, (reqs, ts))
+		where
+			is_TFAC {at_type=TFAC _ _ _} = True
+			is_TFAC _ = False
 
 	requirements _ (AnyCodeExpr _ _ _) (reqs, ts)
 		# (fresh_v, ts) = freshAttributedVariable ts

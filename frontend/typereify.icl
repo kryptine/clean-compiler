@@ -210,12 +210,10 @@ buildTypeFunctions main icl_functions common_defs predefs var_heap type_heaps
 		,	bs_var_heap = var_heap
 		,	bs_type_heaps = type_heaps
 		}
-	# type_defs
-		=	common_defs.[main].com_type_defs
+	# type_defs = common_defs.[main].com_type_defs
 	# (type_funs, bs_state)
 		=	build 0 (size type_defs) type_defs icl_functions bs_state 
-	=	(type_funs, bs_state.bs_predefs, bs_state.bs_var_heap, 
-			bs_state.bs_type_heaps)
+	= (type_funs, bs_state.bs_predefs, bs_state.bs_var_heap, bs_state.bs_type_heaps)
 	where
 		build i n type_defs functions bs_state
 			| i < n
@@ -227,7 +225,6 @@ buildTypeFunctions main icl_functions common_defs predefs var_heap type_heaps
 				# (functions, bs_state)
 					=	buildTypeFunction type_defs.[i] functions info bs_state
 				=	build (i+1) n type_defs functions bs_state
-			// otherwise
 				=	(functions, bs_state)
 
 buildTypeFunction :: CheckedTypeDef *{#FunDef} Info *BuildTypeFunState
@@ -239,18 +236,12 @@ buildTypeFunction type_def=:{td_fun_index, td_args} functions info bs_state
 		# (rhs, bs_state)
 			=	numberTypeVarsBeforeRiefy td_args (reify type_def) info bs_state
 		# (new_info_ptr, bs_var_heap) = newPtr VI_Empty bs_state.bs_var_heap
-		# bs_state
-			=	{bs_state & bs_var_heap=bs_var_heap}
-	  	# var_id
-	  		=	{id_name = "_x", id_info = nilPtr}
-	  	  lhs_free_var
-	  	  	=	{fv_def_level = NotALevel, fv_ident = var_id,
-	  	  			fv_info_ptr = new_info_ptr, fv_count = 0}
-		# body
-			=	{tb_args = [lhs_free_var], tb_rhs = rhs}
-		# functions
-			=	{functions & [td_fun_index].fun_body=TransformedBody body}
-		=	(functions, bs_state)
+		# bs_state = {bs_state & bs_var_heap=bs_var_heap}
+	  	# var_id = {id_name = "_x", id_info = nilPtr}
+	  	  lhs_free_var = {fv_def_level = NotALevel, fv_ident = var_id, fv_info_ptr = new_info_ptr, fv_count = 0}
+		# body = {tb_args = [lhs_free_var], tb_rhs = rhs}
+		# functions = {functions & [td_fun_index].fun_body=TransformedBody body}
+		= (functions, bs_state)
 
 numberTypeVarsBeforeRiefy :: a Riefier Info *BuildTypeFunState
 	-> (Expression, *BuildTypeFunState) | numberTypeVars a
@@ -459,8 +450,7 @@ instance reify FieldSymbol where
 					info st
 			where
 				def
-					=	ri_common_defs.[ri_main]
-									.com_selector_defs.[fs_index]
+					=	ri_common_defs.[ri_main].com_selector_defs.[fs_index]
 				vars
 					=	[atv_variable \\ {atv_variable} <- def.sd_exi_vars]
 					++	def.sd_type.st_vars
@@ -496,8 +486,8 @@ instance reify Type where
 		=	reify basic_type
 	reify (TFA vars type)
 		=	numberTypeVarsBeforeRiefy vars (reify type)
-	reify t
-		=	undef //  <<- ("reify", t)
+	reify (TFAC vars type _)
+		=	numberTypeVarsBeforeRiefy vars (reify type)
 
 reifyApp :: TypeSymbIdent [AType] Info *BuildTypeFunState
 	-> (Expression, *BuildTypeFunState)
@@ -624,10 +614,8 @@ toTypeCodeConstructor type=:{glob_object=type_index, glob_module=module_index} c
 	| module_index == cPredefinedModuleIndex
 		= GTT_PredefTypeConstructor type
 	// otherwise
-		# type
-			=	common_defs.[module_index].com_type_defs.[type_index]
-		# td_fun_index
-			=	type.td_fun_index
+		# type = common_defs.[module_index].com_type_defs.[type_index]
+		# td_fun_index = type.td_fun_index
 		// sanity check ...
 		| td_fun_index == NoIndex
 			=	fatal "toTypeCodeConstructor" ("no function (" +++ type.td_ident.id_name +++ ")")

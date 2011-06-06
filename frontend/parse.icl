@@ -2337,18 +2337,10 @@ where
 		= {at_attribute = attr, at_type = t1 --> make_curry_type TA_None tr res_type}
 	make_curry_type _ _ _ = abort "make_curry_type: wrong assumption"
 
-tryBrackSAType :: !ParseState -> (!Bool, SAType, !ParseState)
-tryBrackSAType pState
-	# (_, annot, attr, pState)	= optionalAnnotAndAttr pState
-	# (succ, atype, pState) = trySimpleType attr pState
-	= (succ, {s_annotation=annot,s_type=atype}, pState)
-
-tryBrackSATypeWithPosition :: !ParseState -> (!Bool, SATypeWithPosition, !ParseState)
-tryBrackSATypeWithPosition pState
-	// type of function argument
-	# (_, annot, attr, pState)	= optionalAnnotAndAttrWithPosition pState
-//	# (succ, atype, pState) = trySimpleType attr pState
-	  (token, pState) = nextToken TypeContext pState
+tryBrackAType_allow_universal_quantifier :: !TypeAttribute !ParseState -> (!Bool, AType, !ParseState)
+tryBrackAType_allow_universal_quantifier attr pState
+	// type of function or constructor argument
+	# (token, pState) = nextToken TypeContext pState
 	= case token of
 		OpenToken
 			# (token, pState) = nextToken TypeContext pState
@@ -2371,17 +2363,28 @@ tryBrackSATypeWithPosition pState
 									_
 										-> (False, atype, parseError "Simple type" (Yes token) "')' or ','" pState)
 							  atype = {atype & at_type = TFAC vars atype.at_type contexts}
-							-> (succ, {sp_annotation=annot,sp_type=atype}, pState)
+							-> (succ, atype, pState)
 						_
 							# atype = {atype & at_type = TFA vars atype.at_type}
-							  (succ, atype, pState) = trySimpleTypeT_after_OpenToken_and_type token annot_with_pos atype attr pState
-							-> (succ, {sp_annotation=annot,sp_type=atype}, pState)
+							-> trySimpleTypeT_after_OpenToken_and_type token annot_with_pos atype attr pState
 				_
-					# (succ, atype, pState) = trySimpleTypeT_after_OpenToken token attr pState
-					-> (succ, {sp_annotation=annot,sp_type=atype}, pState)
+					-> trySimpleTypeT_after_OpenToken token attr pState
 		_
-			# (succ, atype, pState) = trySimpleTypeT token attr pState
-			-> (succ, {sp_annotation=annot,sp_type=atype}, pState)
+			-> trySimpleTypeT token attr pState
+
+tryBrackSATypeWithPosition :: !ParseState -> (!Bool, SATypeWithPosition, !ParseState)
+tryBrackSATypeWithPosition pState
+	// type of function argument
+	# (_, annot, attr, pState) = optionalAnnotAndAttrWithPosition pState
+	# (succ, atype, pState) = tryBrackAType_allow_universal_quantifier attr pState
+	= (succ, {sp_annotation=annot,sp_type=atype}, pState)
+
+tryBrackSAType :: !ParseState -> (!Bool, SAType, !ParseState)
+tryBrackSAType pState
+	// type of constructor argument
+	# (_, annot, attr, pState)	= optionalAnnotAndAttr pState
+	# (succ, atype, pState) = tryBrackAType_allow_universal_quantifier attr pState
+	= (succ, {s_annotation=annot,s_type=atype}, pState)
 
 instance want AType
 where

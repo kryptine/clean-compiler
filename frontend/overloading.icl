@@ -1,6 +1,6 @@
 implementation module overloading
 
-import StdEnv
+import StdEnv,StdOverloadedList
 
 import syntax, check, type, typesupport, utilities, unitype, predef, checktypes, convertDynamics 
 import genericsupport, type_io_common
@@ -1267,7 +1267,7 @@ where
 			  (CheckedType st=:{st_context,st_args}, fun_env) = fun_env![fun_index]
 			  {fun_body = TransformedBody {tb_args,tb_rhs},fun_info,fun_arity,fun_ident,fun_pos} = fun_def
 			  
-			  var_heap = mark_FPC_vars st_args tb_args var_heap
+			  var_heap = mark_FPC_arguments st_args tb_args var_heap
 			  
 			  error = setErrorAdmin (newPosition fun_ident fun_pos) error
 			  (rev_variables,var_heap,error) = foldSt determine_class_argument st_context ([],var_heap,error)
@@ -1297,22 +1297,11 @@ where
 				mark_type_codes _ info
 					=	info
 
-	mark_FPC_vars st_args tb_args var_heap
+	mark_FPC_arguments :: ![AType] ![FreeVar] !*VarHeap -> *VarHeap
+	mark_FPC_arguments st_args tb_args var_heap
 		| has_TFAC st_args
 			= mark_FPC_vars st_args tb_args var_heap
-			= var_heap 
-		where
-			has_TFAC [{at_type=TFAC _ _ _}:_] = True
-			has_TFAC [_:atypes] = has_TFAC atypes
-			has_TFAC [] = False
-
-			mark_FPC_vars [{at_type=TFAC _ _ _}:atypes] [{fv_info_ptr}:args] var_heap
-				# var_heap = writePtr fv_info_ptr VI_FPC var_heap
-				= mark_FPC_vars atypes args var_heap
-			mark_FPC_vars [_:atypes] [_:args] var_heap
-				= mark_FPC_vars atypes args var_heap
-			mark_FPC_vars [] [] var_heap
-				= var_heap
+			= var_heap
 
 	determine_class_argument {tc_class, tc_var} (variables,var_heap,error)
 		# (var_info, var_heap) = readPtr tc_var var_heap
@@ -1344,6 +1333,18 @@ where
 	retrieve_class_argument var_info_ptr (args, var_heap)
 		# (VI_ClassVar var_ident new_info_ptr count, var_heap) = readPtr var_info_ptr var_heap
 		= ([{fv_ident = var_ident, fv_info_ptr = new_info_ptr, fv_def_level = NotALevel, fv_count = count } : args], var_heap <:= (var_info_ptr, VI_Empty))
+
+has_TFAC [{at_type=TFAC _ _ _}:_] = True
+has_TFAC [_:atypes] = has_TFAC atypes
+has_TFAC [] = False
+
+mark_FPC_vars [{at_type=TFAC _ _ _}:atypes] [{fv_info_ptr}:args] var_heap
+	# var_heap = writePtr fv_info_ptr VI_FPC var_heap
+	= mark_FPC_vars atypes args var_heap
+mark_FPC_vars [_:atypes] [_:args] var_heap
+	= mark_FPC_vars atypes args var_heap
+mark_FPC_vars [] [] var_heap
+	= var_heap
 
 convertDynamicTypes :: [ExprInfoPtr]
 	   *(*TypeCodeInfo,*ExpressionHeap,[LocalTypePatternVariable],*VarHeap,*ErrorAdmin)
@@ -1702,7 +1703,6 @@ where
 		# (let_expr, ui)			= updateExpression group_index let_expr ui
 		= (Let {lad & let_lazy_binds = let_lazy_binds, let_strict_binds = let_strict_binds, let_expr = let_expr}, ui)
 
-
 	updateExpression group_index (Case kees=:{case_guards=case_guards=:AlgebraicPatterns type patterns,case_expr,case_default,case_info_ptr}) ui
 		# (case_info, ui_symbol_heap) = readPtr case_info_ptr ui.ui_symbol_heap
 		  ui = {ui & ui_symbol_heap = ui_symbol_heap}
@@ -1715,6 +1715,13 @@ where
 				  ui_symbol_heap = writePtr case_info_ptr (EI_CaseType {case_type & ct_cons_types=ct_cons_types}) ui.ui_symbol_heap
 				  ui = {ui & ui_symbol_heap = ui_symbol_heap}
 				-> (Case {kees & case_expr = case_expr, case_guards = case_guards, case_default = case_default}, ui)
+			EI_CaseType {ct_cons_types}
+				| Any has_TFAC ct_cons_types
+					# (case_expr,ui) = updateExpression group_index case_expr ui
+					  (patterns, ui) = update_algebraic_patterns patterns ct_cons_types group_index ui
+					  case_guards = AlgebraicPatterns type patterns
+					  (case_default, ui) = updateExpression group_index case_default ui
+					-> (Case {kees & case_expr = case_expr, case_guards = case_guards, case_default = case_default}, ui)
 			_
 				# ((case_expr,(case_guards,case_default)), ui) = updateExpression group_index (case_expr,(case_guards,case_default)) ui
 				-> (Case {kees & case_expr = case_expr, case_guards = case_guards, case_default = case_default}, ui)
@@ -1853,6 +1860,13 @@ update_constructors_with_contexts_patterns [] patterns cons_types group_index ui
 	# (patters,ui) = updateExpression group_index patterns ui
 	= (patters,cons_types,ui)
 
+update_algebraic_patterns [pattern=:{ap_expr,ap_vars}:patterns] [cons_arg_types:conses_args_types] group_index ui
+	# ui & ui_var_heap = mark_FPC_vars cons_arg_types ap_vars ui.ui_var_heap
+	# (ap_expr,ui) = updateExpression group_index ap_expr ui
+	# (patterns,ui) = update_algebraic_patterns patterns conses_args_types group_index ui
+	= ([{pattern & ap_expr=ap_expr}:patterns],ui)
+update_algebraic_patterns [] [] group_index ui
+	= ([],ui)
 
 add_class_vars_for_var_context [{dc_var}:contexts] var_heap
 	# (var_info,var_heap) = readPtr dc_var var_heap

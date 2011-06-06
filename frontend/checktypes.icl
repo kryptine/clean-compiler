@@ -24,17 +24,69 @@ from explicitimports import search_qualified_ident,::NameSpaceN,TypeNameSpaceN,C
 	,	cti_lhs_attribute	:: !TypeAttribute
 	}
 
-bindArgAType :: !CurrentTypeInfo !AType !(!*TypeSymbols, !*TypeInfo, !*CheckState)
-			-> (!AType, !TypeAttribute, !(!*TypeSymbols, !*TypeInfo, !*CheckState))
-bindArgAType cti {at_attribute,at_type=TFA vars type} (ts, ti=:{ti_type_heaps}, cs)
+bindArgAType :: !CurrentTypeInfo !AType !v:{#ClassDef}  !(!*TypeSymbols, !*TypeInfo, !*CheckState)
+			-> (!AType, !TypeAttribute, !v:{#ClassDef}, !(!*TypeSymbols, !*TypeInfo, !*CheckState))
+bindArgAType cti {at_attribute,at_type=TFA vars type} class_defs (ts, ti=:{ti_type_heaps}, cs)
 	# (type_vars, (_, ti_type_heaps, cs)) = addTypeVariablesToSymbolTable cRankTwoScope vars [] ti_type_heaps cs
 	  (type, _, (ts, ti, cs)) = bindTypes cti type (ts, {ti & ti_type_heaps = ti_type_heaps}, cs)
 	  cs & cs_symbol_table = removeAttributedTypeVarsFromSymbolTable cRankTwoScope type_vars cs.cs_symbol_table
 	  at_type = TFA type_vars type
-	= bindAttributes TA_Multi cti at_attribute at_type (ts, ti, cs)
-bindArgAType cti {at_attribute,at_type} ts_ti_cs
+	  (attype,combined_attribute,ts_ti_cs) = bindAttributes TA_Multi cti at_attribute at_type (ts, ti, cs)
+	= (attype,combined_attribute,class_defs,ts_ti_cs)
+bindArgAType cti {at_attribute,at_type=TFAC vars type contexts} class_defs (ts, ti=:{ti_type_heaps}, cs)
+	# (type_vars, (_, ti_type_heaps, cs)) = addTypeVariablesToSymbolTable cRankTwoScope vars [] ti_type_heaps cs
+	  (type, _, (ts, ti, cs)) = bindTypes cti type (ts, {ti & ti_type_heaps = ti_type_heaps}, cs)
+	  (contexts,class_defs,ts,ti,cs) = bind_rank2_context_of_cons contexts cti class_defs ts ti cs
+	  cs & cs_symbol_table = removeAttributedTypeVarsFromSymbolTable cRankTwoScope type_vars cs.cs_symbol_table
+	  at_type = TFAC type_vars type contexts
+	  (attype,combined_attribute,ts_ti_cs) = bindAttributes TA_Multi cti at_attribute at_type (ts, ti, cs)
+	= (attype,combined_attribute,class_defs,ts_ti_cs)
+bindArgAType cti {at_attribute,at_type} class_defs ts_ti_cs
 	# (at_type, type_attr, ts_ti_cs) = bindTypes cti at_type ts_ti_cs
-	= bindAttributes type_attr cti at_attribute at_type ts_ti_cs
+	  (attype,combined_attribute,ts_ti_cs) = bindAttributes type_attr cti at_attribute at_type ts_ti_cs
+	= (attype,combined_attribute,class_defs,ts_ti_cs)
+
+bind_rank2_context_of_cons [context=:{tc_class,tc_types}:contexts] cti class_defs ts ti cs
+	# (tc_class, class_defs, modules, cs=:{cs_error}) = check_context_class tc_class tc_types cti.cti_module_index class_defs ts.ts_modules cs
+	  ts = {ts & ts_modules=modules}
+	| cs_error.ea_ok
+	 	# (tc_types, _, (ts,ti,cs)) = bindTypes cti tc_types (ts,ti,cs)
+		  cs = check_context_types tc_class tc_types cs
+		  (contexts,class_defs,ts,ti,cs) = bind_rank2_context_of_cons contexts cti class_defs ts ti cs
+		#! contexts = [{context & tc_class=tc_class, tc_types=tc_types}:contexts]
+		| cs_error.ea_ok
+			# cs = foldSt check_rank2_vars_in_type tc_types cs
+			= (contexts,class_defs,ts,ti,cs)
+			= (contexts,class_defs,ts,ti,cs)
+		# (contexts,class_defs,ts,ti,cs) = bind_rank2_context_of_cons contexts cti class_defs ts ti cs
+		= ([{context & tc_types = []}:contexts],class_defs,ts,ti,cs)
+where
+	check_rank2_vars_in_atypes [{at_type}:tc_types] cs
+		= check_rank2_vars_in_atypes tc_types (check_rank2_vars_in_type at_type cs)
+	check_rank2_vars_in_atypes [] cs
+		= cs
+	
+	check_rank2_vars_in_type (TV {tv_ident}) cs=:{cs_symbol_table}
+		| (sreadPtr tv_ident.id_info cs_symbol_table).ste_def_level==cRankTwoScope
+			= cs
+			= {cs & cs_error = checkError tv_ident "universally quantified type variable expected" cs.cs_error}
+	check_rank2_vars_in_type (TA _ atypes) cs
+		= check_rank2_vars_in_atypes atypes cs
+	check_rank2_vars_in_type (TAS _ atypes _) cs
+		= check_rank2_vars_in_atypes atypes cs
+	check_rank2_vars_in_type (arg_type --> res_type) cs
+		= check_rank2_vars_in_type res_type.at_type (check_rank2_vars_in_type arg_type.at_type cs)
+	check_rank2_vars_in_type (TArrow1 {at_type}) cs
+		= check_rank2_vars_in_type at_type cs
+	check_rank2_vars_in_type (CV {tv_ident} :@: types) cs=:{cs_symbol_table}
+		| (sreadPtr tv_ident.id_info cs_symbol_table).ste_def_level==cRankTwoScope
+			= check_rank2_vars_in_atypes types cs
+			# cs & cs_error = checkError tv_ident "universally quantified type variable expected" cs.cs_error
+			= check_rank2_vars_in_atypes types cs
+	check_rank2_vars_in_type _ cs
+		= cs
+bind_rank2_context_of_cons [] cti class_defs ts ti cs
+	= ([],class_defs,ts,ti,cs)
 
 class bindTypes type :: !CurrentTypeInfo !type !(!*TypeSymbols, !*TypeInfo, !*CheckState)
 					-> (!type, !TypeAttribute, !(!*TypeSymbols, !*TypeInfo, !*CheckState))
@@ -100,7 +152,7 @@ where
 		# (var_def, cs_symbol_table) = readPtr id_info cs_symbol_table
 		  cs = { cs & cs_symbol_table = cs_symbol_table }
 		= case var_def.ste_kind of
-			STE_BoundTypeVariable bv=:{stv_attribute, stv_info_ptr}
+			STE_BoundTypeVariable {stv_attribute,stv_info_ptr}
 				-> ({ tv & tv_info_ptr = stv_info_ptr}, stv_attribute, (ts, ti, cs))
 			_
 				-> (tv, TA_Multi, (ts, ti, {cs & cs_error = checkError var_id "type variable undefined" cs.cs_error}))
@@ -113,7 +165,6 @@ where
 		# (x, _, ts_ti_cs) = bindTypes cti x ts_ti_cs
 		  (xs, attr, ts_ti_cs) = bindTypes cti xs ts_ti_cs
 		= ([x : xs], attr, ts_ti_cs)
-	
 
 retrieveTypeDefinition :: SymbolPtr !Index !*SymbolTable ![SymbolPtr] -> ((!Index, !Index), !*SymbolTable, ![SymbolPtr])
 retrieveTypeDefinition type_ptr mod_index symbol_table used_types
@@ -458,8 +509,8 @@ where
 		# (cons_def, ts) = ts!ts_cons_defs.[ds_index]
 		# (exi_vars, (ti_type_heaps, cs))
 		  		= addExistentionalTypeVariablesToSymbolTable cti_lhs_attribute cons_def.cons_exi_vars ti_type_heaps cs
-		  (st_args, st_attr_env, (ts, ti, cs))
-		  		= bind_types_of_cons cons_def.cons_type.st_args cti free_vars [] (ts, { ti & ti_type_heaps = ti_type_heaps }, cs)
+		  (st_args, st_attr_env,class_defs,(ts, ti, cs))
+		  		= bind_types_of_cons cons_def.cons_type.st_args cti free_vars [] class_defs (ts, {ti & ti_type_heaps = ti_type_heaps}, cs)
 		  (st_context,class_defs,ts,ti,cs)
 		  		= bind_context_of_cons cons_def.cons_type.st_context cti class_defs ts ti cs
 		  symbol_table = removeAttributedTypeVarsFromSymbolTable cGlobalScope /* cOuterMostLevel */ exi_vars cs.cs_symbol_table
@@ -470,16 +521,16 @@ where
 		  						  cons_type_ptr = new_type_ptr }
 		= (class_defs, {ts & ts_cons_defs.[ds_index] = cons_def}, {ti & ti_var_heap = ti_var_heap}, {cs & cs_symbol_table=symbol_table})
 	where
-		bind_types_of_cons :: ![AType] !CurrentTypeInfo ![TypeVar] ![AttrInequality] !(!*TypeSymbols, !*TypeInfo, !*CheckState)
-									  -> (![AType], ![AttrInequality],!(!*TypeSymbols, !*TypeInfo, !*CheckState))
-		bind_types_of_cons [] cti free_vars attr_env ts_ti_cs
-			= ([], attr_env, ts_ti_cs)
-		bind_types_of_cons [type : types] cti free_vars attr_env ts_ti_cs
-			# (types, attr_env, ts_ti_cs)
-					= bind_types_of_cons types cti free_vars attr_env ts_ti_cs
-			  (type, type_attr, (ts, ti, cs)) = bindArgAType cti type ts_ti_cs
+		bind_types_of_cons :: ![AType] !CurrentTypeInfo ![TypeVar] ![AttrInequality] !v:{#ClassDef} !(!*TypeSymbols, !*TypeInfo, !*CheckState)
+													 -> (![AType], ![AttrInequality],!v:{#ClassDef},!(!*TypeSymbols, !*TypeInfo, !*CheckState))
+		bind_types_of_cons [] cti free_vars attr_env class_defs ts_ti_cs
+			= ([], attr_env, class_defs, ts_ti_cs)
+		bind_types_of_cons [type : types] cti free_vars attr_env class_defs ts_ti_cs
+			# (types, attr_env, class_defs, ts_ti_cs)
+					= bind_types_of_cons types cti free_vars attr_env class_defs ts_ti_cs
+			  (type, type_attr, class_defs, (ts, ti, cs)) = bindArgAType cti type class_defs ts_ti_cs
 			  (attr_env, cs_error) = addToAttributeEnviron type_attr cti.cti_lhs_attribute attr_env cs.cs_error
-			= ([type : types], attr_env, (ts, ti , { cs & cs_error = cs_error }))
+			= ([type : types], attr_env, class_defs, (ts, ti, {cs & cs_error = cs_error}))
 
 		bind_context_of_cons [context=:{tc_class,tc_types,tc_var}:contexts] cti class_defs ts ti cs
 			# (tc_class, class_defs, modules, cs=:{cs_error}) = check_context_class tc_class tc_types cti.cti_module_index class_defs ts.ts_modules cs
@@ -497,15 +548,19 @@ where
 		add_universal_attr_vars [] attr_vars
 			= attr_vars
 		add_universal_attr_vars [{at_type=TFA vars type}:types] attr_vars
-			# attr_vars = foldSt add_attr_var vars attr_vars
+			= add_universal_attr_vars types (add_attr_vars vars attr_vars)
+		add_universal_attr_vars [{at_type=TFAC vars type contexts}:types] attr_vars
+			= add_universal_attr_vars types (add_attr_vars vars attr_vars)
+		add_universal_attr_vars [type:types] attr_vars
 			= add_universal_attr_vars types attr_vars
+			
+		add_attr_vars vars attr_vars
+			= foldSt add_attr_var vars attr_vars
 		where
 			add_attr_var {atv_attribute=TA_Var av=:{av_info_ptr}} attr_vars
 				= [av : attr_vars]
 			add_attr_var _ attr_vars
 				= attr_vars
-		add_universal_attr_vars [type:types] attr_vars
-			= add_universal_attr_vars types attr_vars
 
 	retrieve_used_types symb_ptrs symbol_table
 		= foldSt retrieve_used_type symb_ptrs ([], symbol_table)
@@ -1196,8 +1251,7 @@ where
 					-> check_global_type_variables_in_dynamics loc_dynamics (expr_heap, cs)
 				EI_DynamicTypeWithVars loc_type_vars {dt_global_vars} loc_dynamics
 					-> check_global_type_variables_in_dynamics loc_dynamics (expr_heap, check_global_type_variables dt_global_vars cs)
-						
-	
+
 		check_global_type_variables global_vars cs
 			= foldSt check_global_type_variable global_vars cs
 		where		

@@ -1172,7 +1172,6 @@ checkExpression free_vars (PE_Generic id=:{id_name,id_info} kind) e_input e_stat
 			#! e_state = { e_state & es_expr_heap = es_expr_heap }
 			#! cs = { cs & cs_x.x_needed_modules = cs.cs_x.x_needed_modules bitor cNeedStdGeneric }
 			= (App app, free_vars, e_state, e_info, cs)
-
 checkExpression free_vars (PE_TypeSignature array_kind expr) e_input e_state e_info cs
 	# (expr,free_vars,e_state,e_info,cs) = checkExpression free_vars expr e_input e_state e_info cs
 	  predef_array_index = case array_kind of
@@ -1349,9 +1348,9 @@ where
 			# {me_type={st_arity},me_priority} = com_member_defs.[def_index]
 			= (SK_OverloadedFunction { glob_object = def_index, glob_module = mod_index }, st_arity, me_priority)
 		ste_kind_to_symbol_kind STE_Constructor def_index mod_index {dcl_common={com_cons_defs}}
-			# {cons_type={st_arity,st_context},cons_priority,cons_number} = com_cons_defs.[def_index]
+			# {cons_type={st_arity,st_args,st_context},cons_priority,cons_number} = com_cons_defs.[def_index]
 			| cons_number <> -2
-				| isEmpty st_context
+				| isEmpty st_context && no_TFAC_argument st_args
 					= (SK_Constructor {glob_object = def_index, glob_module = mod_index}, st_arity, cons_priority)
 					= (SK_OverloadedConstructor {glob_object = def_index, glob_module = mod_index}, st_arity, cons_priority)
 				= (SK_NewTypeConstructor {gi_index = def_index, gi_module = mod_index}, st_arity, cons_priority)
@@ -1360,9 +1359,9 @@ where
 		= (SK_OverloadedFunction { glob_object = ste_index, glob_module = ei_mod_index}, st_arity, me_priority,
 				e_state, { e_info & ef_member_defs = ef_member_defs }, cs)
 	determine_info_of_symbol {ste_kind=STE_Constructor, ste_index} _ e_input=:{ei_mod_index} e_state e_info cs
-		# ({cons_type={st_arity,st_context},cons_priority,cons_number}, e_info) = e_info!ef_cons_defs.[ste_index]
+		# ({cons_type={st_arity,st_args,st_context},cons_priority,cons_number}, e_info) = e_info!ef_cons_defs.[ste_index]
 		| cons_number <> -2
-			| isEmpty st_context
+			| isEmpty st_context && no_TFAC_argument st_args
 				= (SK_Constructor {glob_object = ste_index, glob_module = ei_mod_index}, st_arity, cons_priority, e_state, e_info, cs)
 				= (SK_OverloadedConstructor {glob_object = ste_index, glob_module = ei_mod_index}, st_arity, cons_priority, e_state, e_info, cs)
 			= (SK_NewTypeConstructor {gi_index = ste_index, gi_module = ei_mod_index}, st_arity, cons_priority, e_state, e_info, cs)
@@ -1382,6 +1381,10 @@ where
 		| fi_properties bitand FI_IsMacroFun <> 0
 			= SK_LocalMacroFunction index.glob_object
 			= SK_Function index
+
+	no_TFAC_argument [{at_type=TFAC _ _ _}:_] = False
+	no_TFAC_argument [_:args] = no_TFAC_argument args
+	no_TFAC_argument [] = True
 
 checkQualifiedIdentExpression free_vars module_id ident_name is_expr_list e_input=:{ei_fun_index,ei_mod_index} e_state e_info cs
 	# (found,{decl_kind,decl_ident,decl_index},cs) = search_qualified_ident module_id ident_name ExpressionNameSpaceN cs

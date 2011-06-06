@@ -1384,7 +1384,7 @@ where
 		UStrict	-> CUnusedStrict
 		ULazy	-> CUnusedLazy
 		UMixed	-> CUnusedStrict
-	
+
 	collect_deps :: !UnusedStatus ![!RefCount!] -> UnusedStatus
 	collect_deps s [|]
 		= s
@@ -1633,6 +1633,8 @@ instance producerRequirements Expression where
 		= (True,prs)
 	producerRequirements (FailExpr _) prs
 		= (True,prs)
+	producerRequirements (DictionariesFunction dictionaries expr expr_type) prs
+		= producerRequirements expr prs
 	producerRequirements expr prs
 		= abort ("producerRequirements " ---> expr)
 
