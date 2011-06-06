@@ -1666,12 +1666,26 @@ where
 				  (free_vars_and_types,local_vars,var_heap)
 					= restore_old_var_infos_and_retrieve_class_vars context old_var_infos ui.ui_local_vars ui.ui_var_heap
 				  ui = {ui & ui_local_vars=local_vars,ui_var_heap=var_heap}
-				  app_arg = DictionariesFunction free_vars_and_types app_arg arg_atype
-				  (app_args,ui) = add_class_vars_for_var_contexts_and_update_expressions var_contexts_t app_args (app_arg_n+1) group_index ui
-				= ([app_arg:app_args],ui)
+				= case app_arg of
+					expr @ args
+						| same_args args free_vars_and_types
+							# app_arg = expr
+							  (app_args,ui) = add_class_vars_for_var_contexts_and_update_expressions var_contexts_t app_args (app_arg_n+1) group_index ui
+							-> ([app_arg:app_args],ui)
+					_
+						# app_arg = DictionariesFunction free_vars_and_types app_arg arg_atype
+						  (app_args,ui) = add_class_vars_for_var_contexts_and_update_expressions var_contexts_t app_args (app_arg_n+1) group_index ui
+						-> ([app_arg:app_args],ui)
 		add_class_vars_for_var_contexts_and_update_expressions NoVarContexts app_args app_arg_n group_index ui
 			= updateExpression group_index app_args ui
-				
+
+		same_args [] []
+			= True
+		same_args [Var {var_info_ptr}:args] [({fv_info_ptr},_):free_vars_and_types]
+			= var_info_ptr==fv_info_ptr && same_args args free_vars_and_types
+		same_args _ _
+			= False
+
 		get_recursive_fun_index :: !Index !SymbKind Int !{# FunDef} -> Index
 		get_recursive_fun_index group_index (SK_Function {glob_module,glob_object}) main_dcl_module_n fun_defs
 			| glob_module == main_dcl_module_n
