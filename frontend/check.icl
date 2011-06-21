@@ -1269,11 +1269,11 @@ renumber_icl_definitions_as_dcl_definitions (Yes icl_to_dcl_index_table) icl_siz
 			# new_array=createArray (size array+n_extra_elements) dummy_element
 			= {new_array & [index_array.[i]] = e \\ e<-:array & i<-[0..]}
 
-combineDclAndIclModule ::			 ModuleKind *{#DclModule}  [Declaration]  [Declaration] (CollectedDefinitions a)  *{#Int}   *CheckState
+combineDclAndIclModule :: ModuleKind IndexRange *{#DclModule}  [Declaration]  [Declaration] (CollectedDefinitions a)  *{#Int}   *CheckState
 	-> (!CopiedDefinitions,!Optional {#{#Int}},!*{#DclModule},![Declaration],![Declaration],!CollectedDefinitions a, !*{#Int}, !*CheckState);
-combineDclAndIclModule MK_Main modules icl_decl_symbols macro_and_function_local_defs icl_definitions icl_sizes cs
+combineDclAndIclModule MK_Main icl_macro_indices modules icl_decl_symbols macro_and_function_local_defs icl_definitions icl_sizes cs
 	= ({ copied_type_defs = {}, copied_class_defs = {}, copied_generic_defs = {}}, No, modules, icl_decl_symbols, macro_and_function_local_defs, icl_definitions, icl_sizes, cs)
-combineDclAndIclModule _ modules icl_decl_symbols macro_and_function_local_defs icl_definitions icl_sizes cs
+combineDclAndIclModule _ icl_macro_indices modules icl_decl_symbols macro_and_function_local_defs icl_definitions icl_sizes cs
 	#! main_dcl_module_n=cs.cs_x.x_main_dcl_module_n
 	# ({dcl_declared={dcls_local},dcl_macros, dcl_sizes, dcl_common}, modules) =  modules![main_dcl_module_n]
 
@@ -1281,7 +1281,7 @@ combineDclAndIclModule _ modules icl_decl_symbols macro_and_function_local_defs 
 	  cs = addGlobalDefinitionsToSymbolTable macro_and_function_local_defs cs
 
 	  (moved_dcl_defs,dcl_cons_and_member_defs,conversion_table,icl_sizes,icl_decl_symbols,macro_and_function_local_defs,cs)
-			= foldSt (add_to_conversion_table dcl_macros.ir_from dcl_common) dcls_local
+			= foldSt (add_to_conversion_table icl_macro_indices dcl_macros.ir_from dcl_common) dcls_local
 				([],[],{createArray size NoIndex \\ size <-: dcl_sizes}, icl_sizes, icl_decl_symbols, macro_and_function_local_defs, cs)
 	  (new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, new_generic_defs, (cop_td_indexes, cop_cd_indexes, cop_gd_indexes), conversion_table, icl_sizes, icl_decl_symbols, cs)
 			= foldSt (add_dcl_definition dcl_common) moved_dcl_defs ([], [], [], [], [], [], ([], [],[]), conversion_table, icl_sizes, icl_decl_symbols, cs)
@@ -1326,7 +1326,8 @@ where
 	where
 		mark_def index marks = { marks & [index] = True }
 
-	add_to_conversion_table first_macro_index dcl_common decl=:(Declaration {decl_ident=decl_ident=:{id_info},decl_kind,decl_index,decl_pos})
+	add_to_conversion_table icl_macro_indices first_macro_index dcl_common
+			decl=:(Declaration {decl_ident=decl_ident=:{id_info},decl_kind,decl_index,decl_pos})
 			(moved_dcl_defs,dcl_cons_and_member_defs,conversion_table,icl_sizes,icl_defs,macro_and_function_local_defs,cs)
 		# (entry=:{ste_kind,ste_index,ste_def_level}, cs_symbol_table) = readPtr id_info cs.cs_symbol_table
 		| ste_kind == STE_Empty
@@ -1343,12 +1344,25 @@ where
 				= (moved_dcl_defs,dcl_cons_and_member_defs,conversion_table,icl_sizes,icl_defs,macro_and_function_local_defs,{cs & cs_symbol_table = cs_symbol_table})
 				# cs_error = checkError "undefined in implementation module" "" (setErrorAdmin (newPosition decl_ident decl_pos) cs.cs_error)
 				= (moved_dcl_defs,dcl_cons_and_member_defs,conversion_table,icl_sizes,icl_defs,macro_and_function_local_defs,{cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table})
-		| ste_def_level == cGlobalScope && ste_kind == decl_kind
-			# def_index = toInt decl_kind
-			# decl_index = if (def_index == cMacroDefs) (decl_index - first_macro_index) decl_index
-			= (moved_dcl_defs,dcl_cons_and_member_defs,{conversion_table & [def_index].[decl_index] = ste_index},icl_sizes,icl_defs,macro_and_function_local_defs,{cs & cs_symbol_table = cs_symbol_table})
-			# cs_error = checkError "conflicting definition in implementation module" "" (setErrorAdmin (newPosition decl_ident decl_pos) cs.cs_error)
-			= (moved_dcl_defs,dcl_cons_and_member_defs,conversion_table,icl_sizes,icl_defs,macro_and_function_local_defs,{cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table})
+		| ste_def_level == cGlobalScope
+			= case (ste_kind,decl_kind) of
+				(STE_FunctionOrMacro _,STE_DclFunction)
+					| ste_index>=icl_macro_indices.ir_from && ste_index<icl_macro_indices.ir_to
+						# cs = {cs & cs_symbol_table = cs_symbol_table}
+						-> conflictingind_definition decl_ident decl_pos moved_dcl_defs dcl_cons_and_member_defs conversion_table icl_sizes icl_defs macro_and_function_local_defs cs
+				_
+					| ste_kind == decl_kind
+						# def_index = toInt decl_kind
+						# decl_index = if (def_index == cMacroDefs) (decl_index - first_macro_index) decl_index
+						-> (moved_dcl_defs,dcl_cons_and_member_defs,{conversion_table & [def_index].[decl_index] = ste_index},icl_sizes,icl_defs,macro_and_function_local_defs,{cs & cs_symbol_table = cs_symbol_table})
+						# cs = {cs & cs_symbol_table = cs_symbol_table}
+						-> conflictingind_definition decl_ident decl_pos moved_dcl_defs dcl_cons_and_member_defs conversion_table icl_sizes icl_defs macro_and_function_local_defs cs
+			# cs = {cs & cs_symbol_table = cs_symbol_table}
+			= conflictingind_definition decl_ident decl_pos moved_dcl_defs dcl_cons_and_member_defs conversion_table icl_sizes icl_defs macro_and_function_local_defs cs
+
+	conflictingind_definition decl_ident decl_pos moved_dcl_defs dcl_cons_and_member_defs conversion_table icl_sizes icl_defs macro_and_function_local_defs cs
+		# cs_error = checkError "conflicting definition in implementation module" "" (setErrorAdmin (newPosition decl_ident decl_pos) cs.cs_error)
+		= (moved_dcl_defs,dcl_cons_and_member_defs,conversion_table,icl_sizes,icl_defs,macro_and_function_local_defs,{cs & cs_error = cs_error})
 
 	can_be_only_in_dcl def_kind
 		= def_kind == cTypeDefs || def_kind == cSelectorDefs || def_kind == cClassDefs || def_kind == cGenericDefs 
@@ -2218,8 +2232,9 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 	optional_pre_def_mod local_defs macro_and_function_local_defs support_dynamics dynamic_type_used icl_functions macro_defs init_dcl_modules cdefs sizes heaps cs
 	# (main_dcl_module_n,cs)=cs!cs_x.x_main_dcl_module_n
 
+	  def_macro_indices=cdefs.def_macro_indices
 	  (copied_dcl_defs, dcl_conversions, dcl_modules, local_defs, macro_and_function_local_defs, cdefs, icl_sizes, cs)
-	  		= combineDclAndIclModule mod_type init_dcl_modules local_defs macro_and_function_local_defs cdefs sizes cs
+	  		= combineDclAndIclModule mod_type def_macro_indices init_dcl_modules local_defs macro_and_function_local_defs cdefs sizes cs
 	| not cs.cs_error.ea_ok
 		= (False, abort "evaluated error 1 (check.icl)", {}, {}, {}, cs.cs_x.x_main_dcl_module_n,heaps, cs.cs_predef_symbols, cs.cs_symbol_table, cs.cs_error.ea_file, [])
 
@@ -2246,7 +2261,6 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 
 	# (nr_of_functions, icl_functions) = usize icl_functions
 
-	# def_macro_indices=cdefs.def_macro_indices
 	# (icl_global_functions_ranges,icl_instances_ranges,icl_generic_ranges,icl_type_fun_ranges,n_exported_global_functions,local_functions_index_offset,def_macro_indices,optional_macro_conversions,
 			icl_functions,icl_common,local_defs,macro_and_function_local_defs,dcl_modules, error)
 		= renumber_icl_module mod_type icl_global_function_range icl_instance_range icl_generic_range icl_type_fun_range nr_of_functions main_dcl_module_n icl_sizes dcl_conversions def_macro_indices
