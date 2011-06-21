@@ -1454,11 +1454,11 @@ where
 	my_append front back
 		= front ++ back
 
-make_dcl_macro_and_function_conversions :: !ModuleKind ![Declaration] !Int !Int !Int [Declaration]  *CheckState
-													   -> (!Optional {#Int},!{#Int},![Declaration],!*CheckState);
-make_dcl_macro_and_function_conversions MK_Main main_dcls_local n_dcl_functions n_dcl_macros first_dcl_macro_index macro_and_function_local_defs cs
+make_dcl_macro_and_function_conversions :: !ModuleKind ![Declaration] !Int !Int !Int !IndexRange [Declaration]  *CheckState
+																   -> (!Optional {#Int},!{#Int},![Declaration],!*CheckState);
+make_dcl_macro_and_function_conversions MK_Main main_dcls_local n_dcl_functions n_dcl_macros first_dcl_macro_index icl_macro_indices macro_and_function_local_defs cs
 	= (No, {}, macro_and_function_local_defs, cs)
-make_dcl_macro_and_function_conversions _ main_dcls_local n_dcl_functions n_dcl_macros first_dcl_macro_index macro_and_function_local_defs cs
+make_dcl_macro_and_function_conversions _ main_dcls_local n_dcl_functions n_dcl_macros first_dcl_macro_index icl_macro_indices macro_and_function_local_defs cs
 	# cs = addGlobalDefinitionsToSymbolTable macro_and_function_local_defs cs
 
 	  function_conversion_table = createArray n_dcl_functions NoIndex
@@ -1477,7 +1477,12 @@ where
 		| ste_kind == STE_Empty
 			# cs_error = checkError "undefined in implementation module" "" (setErrorAdmin (newPosition decl_ident decl_pos) cs.cs_error)
 			= (function_conversion_table,macro_conversion_table,icl_defs,{cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table})
-		| ste_def_level == cGlobalScope && ste_kind == STE_DclFunction
+		| ste_def_level == cGlobalScope && case ste_kind of
+											STE_FunctionOrMacro _
+												| ste_index>=icl_macro_indices.ir_from && ste_index<icl_macro_indices.ir_to
+													-> False
+													-> True
+											_ -> False
 			# function_conversion_table = {function_conversion_table & [decl_index] = ste_index}
 			= (function_conversion_table,macro_conversion_table,icl_defs,{cs & cs_symbol_table = cs_symbol_table})
 			# cs_error = checkError "conflicting definition in implementation module" "" (setErrorAdmin (newPosition decl_ident decl_pos) cs.cs_error)
@@ -2348,7 +2353,7 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 	#! n_dcl_functions = dcl_sizes.[cFunctionDefs]
 	#! n_dcl_macros = dcl_sizes.[cMacroDefs]
 	# (optional_macro_conversions, dcl_function_table, macro_and_function_local_defs, cs)
-		= make_dcl_macro_and_function_conversions mod_type dcls_local n_dcl_functions n_dcl_macros dcl_macros.ir_from macro_and_function_local_defs cs
+		= make_dcl_macro_and_function_conversions mod_type dcls_local n_dcl_functions n_dcl_macros dcl_macros.ir_from def_macro_indices macro_and_function_local_defs cs
 
 	# (n_dcl_type_defs,n_dcl_class_defs)
 		= case mod_type of
