@@ -291,30 +291,33 @@ where
 	compare (TV dclVar) (TV iclVar) comp_st
 		= compare dclVar iclVar comp_st
 	compare (TFA dclvars dcltype) (TFA iclvars icltype) comp_st=:{comp_type_var_heap}
-		# comp_type_var_heap = initialyseATypeVars dclvars iclvars comp_type_var_heap 
+		# comp_type_var_heap = initialyseATypeVars dclvars iclvars comp_type_var_heap
 		  (ok, comp_st) = compare dcltype icltype {comp_st & comp_type_var_heap = comp_type_var_heap}
 		  type_heaps = clear_type_vars dclvars (comp_st.comp_type_var_heap, comp_st.comp_attr_var_heap)
 		  (comp_type_var_heap, comp_attr_var_heap) = clear_type_vars iclvars type_heaps
 		= (ok, {comp_st & comp_type_var_heap = comp_type_var_heap, comp_attr_var_heap = comp_attr_var_heap})
-	where
-		clear_type_vars vars type_and_attr_var_heaps
-			= foldSt clear_type_var vars type_and_attr_var_heaps
-		where
-			clear_type_var {atv_variable={tv_info_ptr}, atv_attribute} (type_var_heap,attr_var_heap) 
-				= (type_var_heap <:= (tv_info_ptr, TVI_Empty), clear_attr_var atv_attribute attr_var_heap)
-			
-			clear_attr_var (TA_Var {av_info_ptr}) attr_var_heap
-				= attr_var_heap <:= (av_info_ptr, AVI_Empty)
-			clear_attr_var (TA_RootVar {av_info_ptr}) attr_var_heap
-				= attr_var_heap <:= (av_info_ptr, AVI_Empty)
-			clear_attr_var attr attr_var_heap
-				= attr_var_heap
-
-	compare (TFAC dclvars dcltype dcl_contexts) (TFAC iclvars icltype icl_contexts) comp_st
-		= (False, comp_st)
-
+	compare (TFAC dclvars dcltype dcl_contexts) (TFAC iclvars icltype icl_contexts) comp_st=:{comp_type_var_heap}
+		# comp_type_var_heap = initialyseATypeVars dclvars iclvars comp_type_var_heap
+		  (ok, comp_st) = compare (dcltype,dcl_contexts) (icltype,icl_contexts) {comp_st & comp_type_var_heap = comp_type_var_heap}
+		  type_heaps = clear_type_vars dclvars (comp_st.comp_type_var_heap, comp_st.comp_attr_var_heap)
+		  (comp_type_var_heap, comp_attr_var_heap) = clear_type_vars iclvars type_heaps
+		= (ok, {comp_st & comp_type_var_heap = comp_type_var_heap, comp_attr_var_heap = comp_attr_var_heap})
 	compare _ _ comp_st
 		= (False, comp_st)
+
+clear_type_vars vars type_and_attr_var_heaps
+	= foldSt clear_type_var vars type_and_attr_var_heaps
+where
+	clear_type_var {atv_variable={tv_info_ptr}, atv_attribute} (type_var_heap,attr_var_heap) 
+		= (type_var_heap <:= (tv_info_ptr, TVI_Empty), clear_attr_var atv_attribute attr_var_heap)
+	
+	clear_attr_var (TA_Var {av_info_ptr}) attr_var_heap
+		= attr_var_heap <:= (av_info_ptr, AVI_Empty)
+	clear_attr_var (TA_RootVar {av_info_ptr}) attr_var_heap
+		= attr_var_heap <:= (av_info_ptr, AVI_Empty)
+	clear_attr_var attr attr_var_heap
+		= attr_var_heap
+
 
 instance compare AType
 where
