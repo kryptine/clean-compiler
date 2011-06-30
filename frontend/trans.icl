@@ -3819,7 +3819,7 @@ where
 		  	, ets_contains_unexpanded_abs_syn_type	= False
 		  	}
 		#! (_,(st_result,st_args), {ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap})
-		  		= expandSynTypes (if (fi_properties bitand FI_HasTypeSpec == 0) (RemoveAnnotationsMask bitor ExpandAbstractSynTypesMask) ExpandAbstractSynTypesMask) common_defs (st_result,st_args) ets
+				= expandSynTypes (if (fi_properties bitand FI_HasTypeSpec == 0) (RemoveAnnotationsMask bitor ExpandAbstractSynTypesMask) ExpandAbstractSynTypesMask) common_defs (st_result,st_args) ets
 		# ft = { ft &  st_result = st_result, st_args = st_args }
 		| fi_group_index >= size groups
 			= abort ("add_new_function_to_group "+++ toString fi_group_index+++ "," +++ toString (size groups) +++ "," +++ toString gf_fun_index)
@@ -3985,6 +3985,11 @@ where
 		| changed
 			= (True,TFA vars type, ets)
 			= (False,tfa_type, ets)
+	expandSynTypes rem_annots common_defs tfac_type=:(TFAC vars type type_context) ets
+		# (changed,type, ets) = expandSynTypes rem_annots common_defs type ets
+		| changed
+			= (True,TFAC vars type type_context, ets)
+			= (False,tfac_type, ets)
 	expandSynTypes rem_annots common_defs type ets
 		= (False,type, ets)
 
