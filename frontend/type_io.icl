@@ -42,13 +42,11 @@ where
 
 instance WriteTypeInfo ConsDef
 where
-	write_type_info {cons_ident,cons_type,cons_type_index,cons_exi_vars} tcl_file wtis=:{wtis_n_type_vars}
+	write_type_info {cons_ident,cons_type,cons_type_index,cons_exi_vars} tcl_file wtis=:{wtis_n_type_vars,wtis_type_heaps}
  		// normalize ...
- 		# (th_vars,wtis)
- 			= sel_type_var_heap wtis
- 		# (_,(_,th_vars))
-			= mapSt normalize_atype_var cons_exi_vars (wtis_n_type_vars,th_vars)
-  		# wtis = { wtis & wtis_type_heaps.th_vars = th_vars }
+ 		# (_,th_vars)
+ 			= foldSt normalize_atype_var cons_exi_vars (wtis_n_type_vars,wtis_type_heaps.th_vars)
+  		# wtis & wtis_type_heaps = {wtis_type_heaps & th_vars = th_vars}
  		// ... normalize
 		# (tcl_file,wtis)
 			= write_type_info cons_ident tcl_file wtis
@@ -62,13 +60,11 @@ where
 
 instance WriteTypeInfo (TypeDef TypeRhs)
 where
-	write_type_info {td_ident,td_arity,td_args,td_rhs,td_fun_index} tcl_file wtis
+	write_type_info {td_ident,td_arity,td_args,td_rhs,td_fun_index} tcl_file wtis=:{wtis_type_heaps}
 		// normalize ...
- 		# (th_vars,wtis)
- 			= sel_type_var_heap wtis
- 		# (_,(n_type_vars,th_vars))
-			= mapSt normalize_atype_var td_args (0,th_vars)
-  		# wtis = { wtis & wtis_type_heaps.th_vars = th_vars, wtis_n_type_vars = n_type_vars }
+ 		# (n_type_vars,th_vars)
+ 			= foldSt normalize_atype_var td_args (0,wtis_type_heaps.th_vars)
+  		# wtis & wtis_n_type_vars = n_type_vars, wtis_type_heaps = {wtis_type_heaps & th_vars = th_vars}
  		// ... normalize
  		# (tcl_file,wtis)
  			= write_type_info td_ident tcl_file wtis
@@ -84,24 +80,15 @@ where
 			  (tcl_file,wtis) = write_type_info rt_constructor tcl_file wtis
 			= write_type_info rt_fields tcl_file wtis
 
-normalize_atype_var :: !ATypeVar (!Int,!*TypeVarHeap) -> (!Int,(!Int,!*TypeVarHeap))
+normalize_atype_var :: !ATypeVar (!Int,!*TypeVarHeap) -> (!Int,!*TypeVarHeap)
 normalize_atype_var td_arg=:{atv_variable={tv_info_ptr}} (id,th_vars)
 	# th_vars = writePtr tv_info_ptr (TVI_Normalized id) th_vars
-	= (id,(inc id,th_vars));
+	= (inc id,th_vars)
 
-normalize_type_var :: !TypeVar (!Int,!*TypeVarHeap) -> (!Int,(!Int,!*TypeVarHeap))
+normalize_type_var :: !TypeVar (!Int,!*TypeVarHeap) -> (!Int,!*TypeVarHeap)
 normalize_type_var {tv_info_ptr} (id,th_vars)
 	# th_vars = writePtr tv_info_ptr (TVI_Normalized id) th_vars
-	= (id,(inc id,th_vars));
-
-sel_type_var_heap :: !*WriteTypeInfoState -> (!*TypeVarHeap,!*WriteTypeInfoState)
-sel_type_var_heap wtis=:{wtis_type_heaps}
-	# (th_vars,wtis_type_heaps)
-		= sel wtis_type_heaps
-	= (th_vars,{ wtis & wtis_type_heaps = wtis_type_heaps} )
-where
-	sel wtis_type_heaps=:{th_vars}
-		= (th_vars,{ wtis_type_heaps & th_vars = newHeap } )
+	= (inc id,th_vars)
  
 instance WriteTypeInfo ATypeVar
 where 
@@ -112,15 +99,13 @@ where
 
 instance WriteTypeInfo TypeVar
 where
-	write_type_info {tv_info_ptr} tcl_file wtis
-		# (th_vars,wtis)
-			= sel_type_var_heap wtis
-		# ( v,th_vars)
-			= readPtr tv_info_ptr th_vars
+	write_type_info {tv_info_ptr} tcl_file wtis=:{wtis_type_heaps}
+		# (v,th_vars)
+			= readPtr tv_info_ptr wtis_type_heaps.th_vars
 		# tcl_file
 			= fwritei (get_type_var_nf_number v) tcl_file
 
-  		# wtis = { wtis & wtis_type_heaps.th_vars = th_vars }
+  		# wtis & wtis_type_heaps = {wtis_type_heaps & th_vars = th_vars}
  		= (tcl_file,wtis)	
  	where 
  		get_type_var_nf_number (TVI_Normalized i)	= i
@@ -317,19 +302,13 @@ where
 	// FIXME: the universally quantifier and type vars are ignored here
 	// this is really just a hack to prevent the compiler from crashing
 	// on rank>1 types
-	write_type_info (TFA uni_vars type) tcl_file wtis
- 		# (th_vars,wtis)
- 			= sel_type_var_heap wtis
- 		# (_,(_,th_vars))
- 			= mapSt normalize_atype_var uni_vars (0,th_vars)
-  		# wtis
- 			= { wtis & wtis_type_heaps.th_vars = th_vars }
-		# (tcl_file,wtis)
-			= write_type_info type tcl_file wtis
-		= (tcl_file,wtis)	
+	write_type_info (TFA uni_vars type) tcl_file wtis=:{wtis_type_heaps}
+ 		# (_,th_vars) = foldSt normalize_atype_var uni_vars (0,wtis_type_heaps.th_vars)
+  		# wtis & wtis_type_heaps = {wtis_type_heaps & th_vars = th_vars}
+		= write_type_info type tcl_file wtis
 
 	write_type_info (TFAC uni_vars type _) tcl_file wtis=:{wtis_type_heaps}
- 		# (_,(_,th_vars)) = mapSt normalize_atype_var uni_vars (0,wtis_type_heaps.th_vars)
+ 		# (_,th_vars) = foldSt normalize_atype_var uni_vars (0,wtis_type_heaps.th_vars)
   		# wtis & wtis_type_heaps = {wtis_type_heaps & th_vars = th_vars}
 		= write_type_info type tcl_file wtis
 
@@ -344,8 +323,8 @@ where
 				wtis!wtis_icl_generic_defs.[ds_index]
 				wtis!wtis_common_defs.[glob_module].com_generic_defs.[ds_index]
 		  {wtis_type_heaps,wtis_n_type_vars} = wtis
- 		  (_,(n_type_vars,th_vars))
- 			= mapSt normalize_type_var gen_type.st_vars (0,wtis_type_heaps.th_vars)
+ 		  (n_type_vars,th_vars)
+ 			= foldSt normalize_type_var gen_type.st_vars (0,wtis_type_heaps.th_vars)
   		  wtis = {wtis & wtis_type_heaps={wtis_type_heaps & th_vars = th_vars}, wtis_n_type_vars = n_type_vars}
 		  tcl_file = fwritec GenericFunctionTypeCode tcl_file
 		  kind_string = kind_to_short_string type_kind;
@@ -368,7 +347,7 @@ where
 			= fwritec ConsVariableTempCVCode tcl_file
 		# (tcl_file,wtis)
 			= write_type_info temp_var_id tcl_file wtis
-		= (tcl_file,wtis)		
+		= (tcl_file,wtis)
 	write_type_info (TempQCV temp_var_id) tcl_file wtis
 		# tcl_file
 			= fwritec ConsVariableTempQCVCode tcl_file
