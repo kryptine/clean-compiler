@@ -1537,7 +1537,7 @@ static Bool IsInArgs (Exp *args, unsigned n, Exp e)
 }
 
 static void RemoveExpOfKind (Exp e, ExpKind kind)
-{	unsigned	i, j, k, n, new_n, new_done;
+{	unsigned	i, j, k, n, new_n;
 	Exp			*new_args;
 	
 	/* count the new number of 'kind' args (the current args + the new ones) */
@@ -1552,27 +1552,25 @@ static void RemoveExpOfKind (Exp e, ExpKind kind)
 	
 	new_args = NewExpArgs (new_n);
 	
-	for (i = 0, j = 0; i < n; i++)
-	{	if (e->e_args[i]->e_kind == kind)
-		{	int kind_n = e->e_args[i]->e_sym;
-			for (k = 0; k < kind_n; k++)
-			{	if (! IsInArgs (e->e_args, j, e->e_args[i]->e_args[k]))
-				{	new_args[j] = e->e_args[i]->e_args[k];
+	for (i = 0, j = 0; i < n; i++){
+		if (e->e_args[i]->e_kind == kind){
+			int kind_n = e->e_args[i]->e_sym;
+			for (k = 0; k < kind_n; k++){
+				if (! IsInArgs (new_args, j, e->e_args[i]->e_args[k])){
+					new_args[j] = e->e_args[i]->e_args[k];
 					j++;
 				}
 			}
-		}
-		else
-		if (! IsInArgs (e->e_args, j, e->e_args[i]))
-		{	new_args[j] = e->e_args[i];
-			j++;
-		}
+		} else
+			if (! IsInArgs (new_args, j, e->e_args[i])){
+				new_args[j] = e->e_args[i];
+				j++;
+			}
 	}
 	
 	/* put new arguments in original expression */
 	e->e_args = new_args;
 	e->e_sym  = j;
-	new_done  = n;
 
 	/* remove remaining subkind expressions */
 	if (ContainsExpOfKind (e, kind))
@@ -3636,7 +3634,7 @@ static void update_function_strictness (SymbDef sdef)
 			if (strict_added){
 				if (DoListStrictTypes && ! DoListAllTypes)
 					PrintType (sdef, rule);
-				else
+				else if (!AddStrictnessToExportedFunctionTypes)
 					export_warning = True;
 			}
 			
