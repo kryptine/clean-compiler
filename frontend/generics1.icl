@@ -1268,7 +1268,8 @@ where
 			, KindArrow [KindConst]
 			, KindArrow [KindConst, KindConst] 
 			: subkinds]
-		# (dep_defs, gs) = mapSt lookup_dependency_def gen_def.gen_deps gs
+		# (dep_defs, gs_modules) = mapSt lookupDependencyDef gen_def.gen_deps gs.gs_modules
+		# gs = {gs & gs_modules = gs_modules}
 		#! (st, gs) = foldSt (\def -> foldSt (build_class_if_needed def) kinds) [gen_def:dep_defs] (st, gs)
 		#! gencase = {gencase & gc_kind = kind}
 
@@ -1289,10 +1290,6 @@ where
 			= (gencase, st, gs)
 
 			= (gencase, st, gs)
-	where
-		lookup_dependency_def {gd_index} gs=:{gs_modules}
-			# (gen_dep, gs_modules) = gs_modules![gd_index.gi_module].com_generic_defs.[gd_index.gi_index]
-			= (gen_dep, {gs & gs_modules = gs_modules})
 
 	build_class_if_needed :: !GenericDef !TypeKind ((![ClassDef], ![MemberDef], !Index, Index), *GenericState)
 		-> ((![ClassDef], ![MemberDef], !Index, Index), *GenericState)		
@@ -1375,7 +1372,11 @@ where
 					, gs_varh = gs_varh
 					, gs_dcl_modules = gs_dcl_modules
 					, gs_symtab = gs_symtab }
-		= (common_defs, gs)		
+		= (common_defs, gs)	
+
+
+lookupDependencyDef :: GenericDependency !*Modules -> (GenericDef, *Modules)
+lookupDependencyDef {gd_index} modules = modules![gd_index.gi_module].com_generic_defs.[gd_index.gi_index]	
 
 // limitations:
 // - context restrictions on generic variables are not allowed
@@ -2026,8 +2027,8 @@ buildGenericCaseBody main_module_index gc=:{gc_type_cons=TypeConsSymb {type_iden
 		No -> abort "sanity check: no generic representation\n"
 
 	#! (type_def=:{td_args, td_arity}, modules) = modules![type_index.glob_module].com_type_defs.[type_index.glob_object]
-	#! (generated_arg_exprs, original_arg_exprs, arg_vars, heaps)
-		= build_arg_vars gen_def td_args heaps
+	#! (generated_arg_exprss, original_arg_exprs, arg_vars, heaps)
+		= build_arg_vars gen_def gc_generic td_args heaps
 
 	# (arg_vars,heaps)
 		= case has_generic_info of
@@ -2038,8 +2039,8 @@ buildGenericCaseBody main_module_index gc=:{gc_type_cons=TypeConsSymb {type_iden
 			False
 				-> (arg_vars,heaps)
 
-	#! (specialized_expr, funs_and_groups, td_infos, heaps, error)
-		= build_specialized_expr gc_pos gc_ident gc_generic gtr_type td_args generated_arg_exprs gen_def.gen_info_ptr funs_and_groups td_infos heaps error
+	#! (specialized_expr, funs_and_groups, modules, td_infos, heaps, error)
+		= build_specialized_expr gc_pos gc_ident gc_generic gen_def.gen_deps gtr_type td_args generated_arg_exprss gen_def.gen_info_ptr funs_and_groups modules td_infos heaps error
 
 	#! (body_expr, funs_and_groups, modules, td_infos, heaps, error)
 		= adapt_specialized_expr gc_pos gen_def gen_type_rep original_arg_exprs specialized_expr funs_and_groups modules td_infos heaps error
@@ -2052,20 +2053,29 @@ where
 		#! fv = {fv_count = 0, fv_ident = makeIdent "geninfo", fv_info_ptr = fv_info_ptr, fv_def_level = NotALevel}	
 		= (fv, {heaps & hp_var_heap = hp_var_heap})
 
-	build_arg_vars {gen_ident, gen_vars, gen_type} td_args heaps 
-		#! (generated_arg_exprs, generated_arg_vars, heaps) 
-			= buildVarExprs 
-				[ gen_ident.id_name +++ atv_variable.tv_ident.id_name \\ {atv_variable} <- td_args] 
+	build_arg_vars {gen_ident, gen_vars, gen_type, gen_deps} gc_generic td_args heaps 
+		# dep_names = [(gen_ident, gen_vars, gc_generic) : [(ident, gd_vars, gd_index) \\ {gd_ident=Ident ident, gd_vars, gd_index} <- gen_deps]]
+		#! (generated_arg_exprss, generated_arg_vars, heaps) 
+			= mapY2St buildVarExprs
+				[[mkDepName dep_name atv_variable \\ dep_name <- dep_names] \\ {atv_variable} <- td_args]
 				heaps	
 		#! (original_arg_exprs, original_arg_vars, heaps) 
 			= buildVarExprs 
 				[ "x" +++ toString n \\ n <- [1 .. gen_type.st_arity]] 
 				heaps	
-		= (generated_arg_exprs, original_arg_exprs, generated_arg_vars ++ original_arg_vars, heaps)
+		= (generated_arg_exprss, original_arg_exprs, flatten generated_arg_vars ++ original_arg_vars, heaps)
+		where 
+			mkDepName (ident, gvars, index) atv 
+				# gvarsName = foldl (\vs v -> vs +++ "_" +++ v.tv_ident.id_name) "" gvars
+				# indexName = "_" +++ toString index.gi_module +++ "-" +++ toString index.gi_index
+				= ident.id_name +++ gvarsName +++ indexName +++ "_" +++ atv.tv_ident.id_name
 
 	// generic function specialized to the generic representation of the type
-	build_specialized_expr gc_pos gc_ident gcf_generic gtr_type td_args generated_arg_exprs gen_info_ptr funs_and_groups td_infos heaps error
-		#! spec_env = [(atv_variable, TVI_Expr expr) \\ {atv_variable} <- td_args & expr <- generated_arg_exprs]
+	build_specialized_expr gc_pos gc_ident gcf_generic gen_deps gtr_type td_args generated_arg_exprss gen_info_ptr funs_and_groups modules td_infos heaps error
+                // TODO!!! TvN: bimap_spec_env is hacked to fit the original description of a spec_env, change it to the new form mapping var to list of expr args
+		#! bimap_spec_env = [(atv_variable, TVI_Expr (hd expr)) \\ {atv_variable} <- td_args & expr <- generated_arg_exprss]
+                // TODO!!! TvN: very quick and dirty implementation
+		#! spec_env = [(atv_variable, TVI_Exprs (zip2 [gcf_generic:[gd_index \\ {gd_index} <- gen_deps]] exprs)) \\ {atv_variable} <- td_args & exprs <- generated_arg_exprss]
 		# generic_bimap = predefs.[PD_GenericBimap]
 		| gcf_generic.gi_module==generic_bimap.pds_module && gcf_generic.gi_index==generic_bimap.pds_def
 
@@ -2073,15 +2083,15 @@ where
 			# (gtr_type, heaps) = simplify_bimap_GenTypeStruct [atv_variable \\ {atv_variable} <- td_args] gtr_type heaps
 
 			# (expr,funs_and_groups,heaps,error)
-				= specialize_generic_bimap gcf_generic gtr_type spec_env gc_ident gc_pos main_module_index predefs funs_and_groups heaps error
-			= (expr,funs_and_groups,td_infos,heaps,error)
+				= specialize_generic_bimap gcf_generic gtr_type bimap_spec_env gc_ident gc_pos main_module_index predefs funs_and_groups heaps error
+			= (expr,funs_and_groups,modules,td_infos,heaps,error)
 
 			# ({gen_OBJECT_CONS_FIELD_indices},generic_heap) = readPtr gen_info_ptr heaps.hp_generic_heap
 			  heaps = {heaps & hp_generic_heap=generic_heap}
 
-			# (expr,td_infos,heaps,error)
-				= specializeGeneric gcf_generic gtr_type spec_env gc_ident gc_pos gen_OBJECT_CONS_FIELD_indices main_module_index td_infos heaps error
-			= (expr,funs_and_groups,td_infos,heaps,error)
+			# (expr,modules,td_infos,heaps,error)
+				= specializeGeneric gcf_generic gtr_type spec_env gc_ident gc_pos gen_deps gen_OBJECT_CONS_FIELD_indices main_module_index modules td_infos heaps error
+			= (expr,funs_and_groups,modules,td_infos,heaps,error)
 
 	// adaptor that converts a function for the generic representation into a 
 	// function for the type itself
@@ -2143,7 +2153,6 @@ where
 				#! (expr, heaps)
 					= buildGenericApp bimap_module bimap_index bimap_ident kind [] heaps		
 				= ((non_gen_var, TVI_Expr expr), funs_and_groups, heaps)
-
 buildGenericCaseBody main_module_index {gc_ident,gc_pos} has_generic_info st predefs funs_and_groups td_infos modules heaps error
 	# error = reportError gc_ident gc_pos "cannot specialize to this type" error
 	= (TransformedBody {tb_args=[], tb_rhs=EE}, funs_and_groups, td_infos, modules, heaps, error)
@@ -2311,93 +2320,109 @@ specializeGeneric ::
 		![(TypeVar, TypeVarInfo)] // specialization environment
 		!Ident					// generic/generic case
 		!Position				// of generic case
+		![GenericDependency]
 		!{#OBJECT_CONS_FIELD_index}
 		!Index 					// main_module index
-		!*TypeDefInfos !*Heaps !*ErrorAdmin
+		!*Modules !*TypeDefInfos !*Heaps !*ErrorAdmin
 	-> (!Expression,
-		!*TypeDefInfos,!*Heaps,!*ErrorAdmin)
-specializeGeneric gen_index type spec_env gen_ident gen_pos gen_OBJECT_CONS_FIELD_indices main_module_index td_infos heaps error
+		!*Modules,!*TypeDefInfos,!*Heaps,!*ErrorAdmin)
+specializeGeneric gen_index type spec_env gen_ident gen_pos gen_deps gen_OBJECT_CONS_FIELD_indices main_module_index modules td_infos heaps error
 	#! heaps = set_tvs spec_env heaps
-	#! (expr, (td_infos, heaps, error)) 
-		= specialize type (td_infos, heaps, error)
+	#! (expr, (modules, td_infos, heaps, error)) 
+		= specialize gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices type (modules, td_infos, heaps, error)
 	#! heaps = clear_tvs spec_env heaps
-	= (expr, td_infos, heaps, error)
+	= (expr, modules, td_infos, heaps, error)
 where
-	specialize (GTSAppCons kind arg_types) st
-		#! (arg_exprs, st) = mapSt specialize arg_types st
+	specialize gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices (GTSAppCons kind arg_types) st
+		#! (arg_exprs, st) = specialize_with_deps gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices arg_types st
 		= build_generic_app kind arg_exprs gen_index gen_ident st
-	specialize (GTSAppVar tv arg_types) st
-		#! (arg_exprs, st) = mapSt specialize arg_types st
-		#! (expr, st) = specialize_type_var tv st 
+	specialize gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices (GTSAppVar tv arg_types) st
+		#! (arg_exprs, st) = specialize_with_deps gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices arg_types st
+		#! (expr, st) = specialize_type_var tv gen_index st 
 		= (expr @ arg_exprs, st)
-	specialize (GTSVar tv) st
-		= specialize_type_var tv st
-	specialize (GTSArrow x y) st
-		#! (x, st) = specialize x st
-		#! (y, st) = specialize y st
-		= build_generic_app (KindArrow [KindConst, KindConst]) [x,y] gen_index gen_ident st
-	specialize (GTSPair x y) st
-		#! (x, st) = specialize x st
-		#! (y, st) = specialize y st
-		= build_generic_app (KindArrow [KindConst, KindConst]) [x,y] gen_index gen_ident st
-	specialize (GTSEither x y) st
-		#! (x, st) = specialize x st
-		#! (y, st) = specialize y st
-		= build_generic_app (KindArrow [KindConst, KindConst]) [x,y] gen_index gen_ident st
-	specialize (GTSCons cons_info_ds arg_type) st
-		# (arg_expr, (td_infos, heaps, error)) = specialize arg_type st
+	specialize gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices (GTSVar tv) st
+		= specialize_type_var tv gen_index st
+	specialize gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices (GTSArrow x y) st
+		# (arg_exprs, st) = specialize_with_deps gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices [x, y] st
+		= build_generic_app (KindArrow [KindConst, KindConst]) arg_exprs gen_index gen_ident st
+	specialize gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices (GTSPair x y) st
+		# (arg_exprs, st) = specialize_with_deps gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices [x, y] st
+		= build_generic_app (KindArrow [KindConst, KindConst]) arg_exprs gen_index gen_ident st
+	specialize gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices (GTSEither x y) st
+		# (arg_exprs, st) = specialize_with_deps gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices [x, y] st
+		= build_generic_app (KindArrow [KindConst, KindConst]) arg_exprs gen_index gen_ident st
+	specialize gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices (GTSCons cons_info_ds arg_type) st
+		# (arg_exprs, (modules, td_infos, heaps, error)) = specialize_with_deps gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices [arg_type] st
+                // TODO!!! Must main_module_index be changed or is this the module where all the generated stuff is put?
 		#! (generic_info_expr, heaps) = buildFunApp main_module_index cons_info_ds [] heaps		
 		# gen_CONS_index = gen_OBJECT_CONS_FIELD_indices.[1]
 		| gen_CONS_index.ocf_module>=0
 			#! (expr, heaps)
-				= buildFunApp2 gen_CONS_index.ocf_module gen_CONS_index.ocf_index gen_CONS_index.ocf_ident [generic_info_expr, arg_expr] heaps
-			= (expr, (td_infos, heaps, error))
+				= buildFunApp2 gen_CONS_index.ocf_module gen_CONS_index.ocf_index gen_CONS_index.ocf_ident [generic_info_expr:arg_exprs] heaps
+			= (expr, (modules, td_infos, heaps, error))
 			// no instance for CONS, report error here ?
-			#! (expr, heaps)
-				= buildGenericApp gen_index.gi_module gen_index.gi_index gen_ident (KindArrow [KindConst]) [arg_expr] heaps
-			= (expr, (td_infos, heaps, error))
-	specialize (GTSField field_info_ds arg_type) st
-		# (arg_expr, (td_infos, heaps, error)) = specialize arg_type st
+			= build_generic_app (KindArrow [KindConst]) arg_exprs gen_index gen_ident (modules, td_infos, heaps, error)
+	specialize gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices (GTSField field_info_ds arg_type) st
+		# (arg_exprs, (modules, td_infos, heaps, error)) = specialize_with_deps gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices [arg_type] st
 		#! (generic_info_expr, heaps) = buildFunApp main_module_index field_info_ds [] heaps
 		# gen_FIELD_index = gen_OBJECT_CONS_FIELD_indices.[2]
 		| gen_FIELD_index.ocf_module>=0
 			#! (expr, heaps)
-				= buildFunApp2 gen_FIELD_index.ocf_module gen_FIELD_index.ocf_index gen_FIELD_index.ocf_ident [generic_info_expr, arg_expr] heaps
-			= (expr, (td_infos, heaps, error))
+				= buildFunApp2 gen_FIELD_index.ocf_module gen_FIELD_index.ocf_index gen_FIELD_index.ocf_ident [generic_info_expr:arg_exprs] heaps
+			= (expr, (modules, td_infos, heaps, error))
 			// no instance for FIELD, report error here ?
- 			#! (expr, heaps)
-				= buildGenericApp gen_index.gi_module gen_index.gi_index gen_ident (KindArrow [KindConst]) [arg_expr] heaps
-			= (expr, (td_infos, heaps, error))
-	specialize (GTSObject type_info_ds arg_type) st
-		# (arg_expr, (td_infos, heaps, error)) = specialize arg_type st
+ 			= build_generic_app (KindArrow [KindConst]) arg_exprs gen_index gen_ident (modules, td_infos, heaps, error)
+	specialize gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices (GTSObject type_info_ds arg_type) st
+		# (arg_exprs, (modules, td_infos, heaps, error)) = specialize_with_deps gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices [arg_type] st
 		#! (generic_info_expr, heaps) = buildFunApp main_module_index type_info_ds [] heaps
 		# gen_OBJECT_index = gen_OBJECT_CONS_FIELD_indices.[0]
 		| gen_OBJECT_index.ocf_module>=0
 			#! (expr, heaps)
-				= buildFunApp2 gen_OBJECT_index.ocf_module gen_OBJECT_index.ocf_index gen_OBJECT_index.ocf_ident [generic_info_expr, arg_expr] heaps
-			= (expr, (td_infos, heaps, error))
+				= buildFunApp2 gen_OBJECT_index.ocf_module gen_OBJECT_index.ocf_index gen_OBJECT_index.ocf_ident [generic_info_expr:arg_exprs] heaps
+			= (expr, (modules, td_infos, heaps, error))
 		// no instance for OBJECT, report error here ?
-	 		#! (expr, heaps)
-				= buildGenericApp gen_index.gi_module gen_index.gi_index gen_ident (KindArrow [KindConst]) [arg_expr] heaps
-			= (expr, (td_infos, heaps, error))
-	specialize type (td_infos, heaps, error)
+	 		= build_generic_app (KindArrow [KindConst]) arg_exprs gen_index gen_ident (modules, td_infos, heaps, error)
+	specialize gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices type (modules, td_infos, heaps, error)
 		#! error = reportError gen_ident gen_pos "cannot specialize " error 
-		= (EE, (td_infos, heaps, error))
+		= (EE, (modules, td_infos, heaps, error))
 
-	specialize_type_var tv=:{tv_info_ptr} (td_infos, heaps=:{hp_type_heaps=th=:{th_vars}}, error)		
+	specialize_type_var tv=:{tv_info_ptr} gen_index (modules, td_infos, heaps=:{hp_type_heaps=th=:{th_vars}}, error)		
 		# (expr, th_vars) = readPtr tv_info_ptr th_vars
 		# heaps = {heaps & hp_type_heaps = {th & th_vars = th_vars}}
 		= case expr of
-			TVI_Expr expr
-				-> (expr, (td_infos, heaps, error))
+                        // TODO!!! TvN: Now we use the gen_index to look up the right argument expression, but this fails when you have a dependency on a multivar
+                        // generic function where both occurrences have different instantiations
+			TVI_Exprs exprs
+				-> (lookup gen_index exprs, (modules, td_infos, heaps, error))
 			TVI_Iso iso_ds to_ds from_ds
 				# (expr,heaps) = buildFunApp main_module_index iso_ds [] heaps
-				-> (expr, (td_infos, heaps, error))
+				-> (expr, (modules, td_infos, heaps, error))
+	where
+		lookup _ [] = abort "value not found"
+		lookup x [(k, v):kvs] | k == x = v
+			          	= lookup x kvs	
+		
+	specialize_with_deps gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices xs st
+		# (info_deps, st) = mapSt collect_dependency_info gen_deps st
+		# info_self_deps = [(gen_index, gen_ident, gen_deps, gen_OBJECT_CONS_FIELD_indices) : info_deps]
+		= accumSt [specialize index ident deps indices arg \\ arg <- xs, (index, ident, deps, indices) <- info_self_deps] st
+	where
+		collect_dependency_info gen_dep (modules, td_infos, heap, error)
+			# ({gen_ident, gen_deps, gen_info_ptr}, modules) = lookupDependencyDef gen_dep modules
+			# ({gen_OBJECT_CONS_FIELD_indices}, generic_heap) = readPtr gen_info_ptr heap.hp_generic_heap
+			# heap = {heap & hp_generic_heap = generic_heap}
+			= ((gen_dep.gd_index, gen_ident, gen_deps, gen_OBJECT_CONS_FIELD_indices), (modules, td_infos, heap, error))
 
-	build_generic_app kind arg_exprs gen_index gen_ident (td_infos, heaps, error)
+		accumSt [] st = ([], st)
+		accumSt [f:fs] st 
+			# (x, st) = f st
+			# (xs, st) = accumSt fs st
+			= ([x:xs], st)
+
+	build_generic_app kind arg_exprs gen_index gen_ident (modules, td_infos, heaps, error)
 		#! (expr, heaps)
 			= buildGenericApp gen_index.gi_module gen_index.gi_index gen_ident kind arg_exprs heaps 
-		= (expr, (td_infos, heaps, error))
+		= (expr, (modules, td_infos, heaps, error))
 
 specialize_generic_bimap ::
 		!GlobalIndex			// generic index

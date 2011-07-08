@@ -1045,6 +1045,7 @@ cNonRecursiveAppl	:== False
 					| TVI_ConsInstance !DefinedSymbol //AA: generic cons instance function 
 					| TVI_Normalized !Int /* MV - position of type variable in its definition */
 					| TVI_Expr !Expression	/* AA: Expression corresponding to the type var during generic specialization */
+					| TVI_Exprs ![(GlobalIndex, Expression)] /* List of expressions corresponding to the type var during generic specialization */
 					| TVI_Iso !DefinedSymbol !DefinedSymbol !DefinedSymbol
 					| TVI_GenTypeVarNumber !Int
 					| TVI_CPSTypeVar !CheatCompiler /* MdM: a pointer to a variable in CleanProverSystem is stored here, using a cast */
