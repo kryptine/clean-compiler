@@ -13,6 +13,7 @@
 /EXPORT:BEConstructorSymbol
 /EXPORT:BEFieldSymbol
 /EXPORT:BETypeSymbol
+/EXPORT:BETypeSymbolNoMark
 /EXPORT:BEDontCareDefinitionSymbol
 /EXPORT:BEBoolSymbol
 /EXPORT:BELiteralSymbol

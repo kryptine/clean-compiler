@@ -33,6 +33,7 @@ arg_strictness_annotation :: !Int !StrictnessList -> Annotation;
 arg_is_strict :: !Int !StrictnessList -> Bool;
 is_not_strict :: !StrictnessList -> Bool
 equal_strictness_lists :: !StrictnessList !StrictnessList -> Bool
+more_or_equal_strictness_lists :: !StrictnessList !StrictnessList -> Bool
 add_next_strict :: !Int !Int !StrictnessList -> (!Int,!Int,!StrictnessList)
 add_next_not_strict :: !Int !Int !StrictnessList -> (!Int,!Int,!StrictnessList)
 append_strictness :: !Int !StrictnessList -> StrictnessList
@@ -46,15 +47,15 @@ remove_first_n :: !Int !StrictnessList -> StrictnessList
 :: IntKeyTree a = IKT_Leaf | IKT_Node !IntKey a !.(IntKeyTree a) !.(IntKeyTree a)
 
 ikhEmpty :: .(IntKeyHashtable a)
-ikhInsert :: !Bool !IntKey a !*(IntKeyHashtable a) -> (!Bool, !.IntKeyHashtable a)
+ikhInsert :: !Bool !IntKey !a !*(IntKeyHashtable a) -> (!Bool, !.IntKeyHashtable a)
 	// input bool: overide old value, output bool: a new element was inserted
-ikhInsert` :: !Bool !IntKey a !*(IntKeyHashtable a) -> .IntKeyHashtable a
+ikhInsert` :: !Bool !IntKey !a !*(IntKeyHashtable a) -> .IntKeyHashtable a
 	// bool: overide old value
 ikhSearch :: !IntKey !(IntKeyHashtable a) -> .Optional a
 ikhSearch` :: !IntKey !(IntKeyHashtable a) -> a
 ikhUSearch :: !IntKey !*(IntKeyHashtable a) -> (!.Optional a, !*IntKeyHashtable a)
 
-iktUInsert :: !Bool !IntKey a !*(IntKeyTree a) -> (!Bool, !.IntKeyTree a)
+iktUInsert :: !Bool !IntKey !a !*(IntKeyTree a) -> (!Bool, !.IntKeyTree a)
 	// input bool: overide old value, output bool: a new element was inserted
 iktFlatten :: !(IntKeyTree a) -> [(IntKey, a)]
 iktSearch :: !IntKey !(IntKeyTree a) -> .Optional a

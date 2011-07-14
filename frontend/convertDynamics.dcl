@@ -4,12 +4,12 @@
 definition module convertDynamics
 
 import syntax , checksupport
-from transform import ::Group
+from trans import ::Component
 
 :: TypeCodeVariableInfo
 :: DynamicValueAliasInfo
 
 convertDynamicPatternsIntoUnifyAppls :: !{# CommonDefs} !Int  {#DclModule} !IclModule [String] !Int !Int
-		!*{!Group} !*{#FunDef} !*PredefinedSymbols !*VarHeap !*TypeHeaps !*ExpressionHeap !(Optional *File)
+		!*{!Component} !*{#FunDef} !*PredefinedSymbols !*VarHeap !*TypeHeaps !*ExpressionHeap !(Optional *File)
 	-> (!*{#{#CheckedTypeDef}},
-		!*{!Group},!*{#FunDef},!*PredefinedSymbols,!*VarHeap,!*TypeHeaps,!*ExpressionHeap,!(Optional *File))
+		!*{!Component},!*{#FunDef},!*PredefinedSymbols,!*VarHeap,!*TypeHeaps,!*ExpressionHeap,!(Optional *File))

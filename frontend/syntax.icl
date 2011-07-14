@@ -1,26 +1,18 @@
 implementation module syntax
 
-import StdEnv, compare_constructor // ,RWSDebug
-
-import scanner, general, Heap, typeproperties, utilities, compilerSwitches, StdCompare
+import StdEnv, compare_constructor
+import scanner, general, Heap, typeproperties, utilities, StdCompare
 import syntax
 
 instance toString Ident
 where toString {id_name} = id_name
-
-instance <<< IdentOrQualifiedIdent
-	where 
-		(<<<) file (Ident ident) 
-			= file <<< ident
-		(<<<) file (QualifiedIdent mod_ident name) 
-			= file <<< "'" <<< mod_ident <<< "'." <<< name
 
 instance == GenericDependency
 	where
 		(==) gen_dep1 gen_dep2
 			= gen_dep1.gd_index == gen_dep2.gd_index && gen_dep1.gd_vars == gen_dep2.gd_vars
 
-instance toString (Import from_symbol)
+instance toString Import
 where toString {import_module} = toString import_module
 
 instance == FunctionOrMacroIndex
@@ -173,6 +165,8 @@ where
 		= file <<<  "v" <<< tv <<< ' ' 
 	(<<<) file (TempQCV tv)
 		= file <<<  "E." <<< tv <<< ' ' 
+	(<<<) file (TempQCDV tv)
+		= file <<<  "E." <<< tv <<< ' ' 
 
 instance <<< StrictnessList
 where
@@ -208,7 +202,9 @@ where
 	(<<<) file (TQV varid)
 		= file <<< "E." <<< varid
 	(<<<) file (TempQV tv_number)
-		= file  <<< "E." <<< tv_number <<< ' ' 
+		= file  <<< "E.#" <<< tv_number <<< ' ' 
+	(<<<) file (TempQDV tv_number)
+		= file  <<< "E.#" <<< tv_number <<< ' ' 
 	(<<<) file TE
 		= file <<< "### EMPTY ###"
 /*
@@ -730,7 +726,7 @@ where
 
 instance <<< ClassInstance
 where
-	(<<<) file {ins_class,ins_type} = file <<< ins_class <<< " :: " <<< ins_type
+	(<<<) file {ins_class_ident,ins_type} = file <<< ins_class_ident.ci_ident <<< " :: " <<< ins_type
 
 instance <<< (Optional a) | <<< a
 where
@@ -815,7 +811,7 @@ where
 	(<<<) file (TVI_PropClass _ _ _) 	= file <<< "TVI_PropClass"
 	(<<<) file (TVI_TypeKind kind_info_ptr) = file <<< "TVI_TypeKind " <<< (ptrToInt kind_info_ptr)
 	(<<<) file (TVI_Kind kind) 			= file <<< "TVI_Kind" <<< kind
-	(<<<) file (TVI_Expr expr) 			= file <<< "TVI_Expr " <<< expr
+	(<<<) file (TVI_Expr is_bimap_id expr) = file <<< "TVI_Expr " <<< is_bimap_id <<< ' ' <<< expr
 
 instance <<< AttrVarInfo
 where
@@ -831,9 +827,8 @@ where
 	(<<<) file (AVI_CountVar _) 		= file <<< "AVI_CountVar"
 	(<<<) file (AVI_SequenceNumber n) 	= file <<< "AVI_SequenceNumber " <<< n
 	(<<<) file AVI_Collected 			= file <<< "AVI_Collected"
-
 	
-instance <<< (Import from_symbol) | <<< from_symbol
+instance <<< Import
 where
 	(<<<) file {import_module, import_symbols}
 		= file <<< "import " <<< import_module <<< import_symbols
@@ -950,6 +945,13 @@ where
 	(<<<) file
 		_ 
 			= file <<< "STE_???"
+
+instance <<< IdentOrQualifiedIdent
+where
+	(<<<) file (Ident ident)
+		= file <<< ident
+	(<<<) file (QualifiedIdent module_ident name)
+		= file<<<'\''<<<module_ident<<<"'."<<<name
 
 readable :: !Ident -> String // somewhat hacky
 readable {id_name}

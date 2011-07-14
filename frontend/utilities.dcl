@@ -233,6 +233,3 @@ isEmptyBag :: !(Bag x) -> Bool
 	}
 
 partitionateDAG :: !DAG ![Int] -> [[Int]]
-
-replaceTwoDimArrElt :: !Int !Int !.e !{!*{!.e}} -> (!.e, !{!.{!.e}})
-	// like "replace" for one dimensional arrays

@@ -313,6 +313,22 @@ equal_strictness_lists (StrictList s1 l) (Strict s2)
 equal_strictness_lists (StrictList s1 l1) (StrictList s2 l2)
 	= s1==s2 && equal_strictness_lists l1 l2
 
+more_or_equal_strictness_lists :: !StrictnessList !StrictnessList -> Bool
+more_or_equal_strictness_lists NotStrict s2
+	= is_not_strict s2
+more_or_equal_strictness_lists (Strict s) NotStrict
+	= True
+more_or_equal_strictness_lists (Strict s1) (Strict s2)
+	= (bitnot s1) bitand s2==0
+more_or_equal_strictness_lists (Strict s1) (StrictList s2 l)
+	= (bitnot s1) bitand s2==0 && is_not_strict l
+more_or_equal_strictness_lists (StrictList s l) NotStrict
+	= True
+more_or_equal_strictness_lists (StrictList s1 l) (Strict s2)
+	= (bitnot s1) bitand s2==0
+more_or_equal_strictness_lists (StrictList s1 l1) (StrictList s2 l2)
+	= (bitnot s1) bitand s2==0 && more_or_equal_strictness_lists l1 l2
+
 add_next_strict :: !Int !Int !StrictnessList -> (!Int,!Int,!StrictnessList)
 add_next_strict strictness_index strictness strictness_list
 	| strictness_index<32
@@ -383,18 +399,15 @@ screw :== 80
 ikhEmpty :: .(IntKeyHashtable a)
 ikhEmpty = IntKeyHashtable 0 0 0 {}
 
-ikhInsert :: !Bool !IntKey a !*(IntKeyHashtable a) -> (!Bool, !.IntKeyHashtable a)
+ikhInsert :: !Bool !IntKey !a !*(IntKeyHashtable a) -> (!Bool, !.IntKeyHashtable a)
 ikhInsert overide int_key value (IntKeyHashtable ikh_rehash_threshold ikh_nr_of_entries ikh_bitmask ikh_entries)
 	| ikh_rehash_threshold<=ikh_nr_of_entries
 		= ikhInsert overide int_key value (grow ikh_entries)
-	#! hash_value
-			= int_key bitand ikh_bitmask
-	   (tree, ikh_entries)
-			= replace ikh_entries hash_value IKT_Leaf
+	#! hash_value = int_key bitand ikh_bitmask
+	   (tree, ikh_entries) = ikh_entries![hash_value]
 	   (is_new, tree)
 	   		= iktUInsert overide int_key value tree 
-	   ikh_entries
-	   		= { ikh_entries & [hash_value] = tree }
+	   ikh_entries = {ikh_entries & [hash_value] = tree}
 	| is_new
 		= (is_new, (IntKeyHashtable ikh_rehash_threshold (ikh_nr_of_entries+1) ikh_bitmask ikh_entries))
 	= (is_new, (IntKeyHashtable ikh_rehash_threshold ikh_nr_of_entries ikh_bitmask ikh_entries))
@@ -424,7 +437,7 @@ grow old_entries
 		   		= foldSt (\(key, value) ikh -> snd (ikhInsert False key value ikh)) list ikh
 		= (old_entries, ikh)
 
-ikhInsert` :: !Bool !IntKey a !*(IntKeyHashtable a) -> .IntKeyHashtable a
+ikhInsert` :: !Bool !IntKey !a !*(IntKeyHashtable a) -> .IntKeyHashtable a
 ikhInsert` overide int_key value ikh
 	= snd (ikhInsert overide int_key value ikh)
 
@@ -444,17 +457,14 @@ ikhUSearch :: !IntKey !*(IntKeyHashtable a) -> (!.Optional a, !*IntKeyHashtable 
 ikhUSearch int_key (IntKeyHashtable ikh_rehash_threshold ikh_nr_of_entries ikh_bitmask ikh_entries)
 	| size ikh_entries==0
 		= (No, IntKeyHashtable ikh_rehash_threshold ikh_nr_of_entries ikh_bitmask ikh_entries)
-	# hash_value
-			= int_key bitand ikh_bitmask
-	  (ikt, ikh_entries)
-			= replace ikh_entries hash_value IKT_Leaf
+	# hash_value = int_key bitand ikh_bitmask
+	  (ikt, ikh_entries) = ikh_entries![hash_value]
 	  (opt_result, ikt)
 			= iktUSearch int_key ikt
-	  ikh_entries
-	  		= { ikh_entries & [hash_value] = ikt }
+	  ikh_entries = {ikh_entries & [hash_value] = ikt}
 	= (opt_result, (IntKeyHashtable ikh_rehash_threshold ikh_nr_of_entries ikh_bitmask ikh_entries))
 
-iktUInsert :: !Bool !IntKey a !*(IntKeyTree a) -> (!Bool, !.IntKeyTree a)
+iktUInsert :: !Bool !IntKey !a !*(IntKeyTree a) -> (!Bool, !.IntKeyTree a)
 iktUInsert overide int_key value IKT_Leaf
 	= (True, IKT_Node int_key value IKT_Leaf IKT_Leaf)
 iktUInsert overide int_key value (IKT_Node key2 value2 left right)

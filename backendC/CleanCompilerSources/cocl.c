@@ -8,6 +8,10 @@
 
 #include "MAIN_CLM.d"
 
+#ifdef _SUN_
+FILE *std_out_file_p,*std_error_file_p;
+#endif
+
 static char usage[]=
 	"Usage: \'cocl [options] [-o file] file\'\n"
 	"Options: [-v] [-w] [-tc] [-d] [-sl] [-p] [-sa] [-lt] [-lset] [-lat] [-lattr]";
@@ -62,35 +66,7 @@ int use_clean_system_files;
 #endif
 
 #ifdef CLEAN2
-	int StdOutReopened,StdErrorReopened;
-	
-	/* Windows:
-	static int myfreopen (char *fileName, char *mode, FILE *oldFile)
-	{
-		FILE    *newFile;
-	
-		newFile=freopen (fileName,mode,oldFile);
-		if (newFile == NULL)
-			return False;
-	
-		return True;
-	}
-	
-	static int myfreopen (char *fileName, char *mode, FILE *oldFile)
-	{
-		FILE    *newFile;
-		FILE    tmpFile;
-	
-		newFile=fopen (fileName,mode);
-		if (newFile == NULL)
-			return False;
-	
-		tmpFile     = *oldFile;
-		*oldFile    = *newFile;
-		*newFile    = tmpFile;
-	}
-	# define freopen myfreopen
-	*/
+int StdOutReopened,StdErrorReopened;
 #endif
 
 #if defined (_MAC_) && defined (GNU_C)
@@ -118,11 +94,11 @@ Bool CallCompiler (int argc, char **argv)
 {
 	char *fname,*output_file_name;
 	int i;
-#ifdef OS2
-	extern int window_application;
 
-	window_application=0;
-#endif
+# ifdef _SUN_
+	std_out_file_p = stdout;
+	std_error_file_p = stderr;
+# endif
 
 	fname = NULL;
 	output_file_name=NULL;
@@ -182,11 +158,7 @@ Bool CallCompiler (int argc, char **argv)
 			else if (strcmp (argv_i, "-c") == 0)
 				DoCode = False;
 			else if (strcmp (argv_i, "-p") == 0)
-#ifdef OS2
-				window_application=1;
-#else
 				DoParallel = True;
-#endif
 #ifdef _SUN_
 			else if (strcmp (argv_i, "-csf")==0)
 				use_clean_system_files=1;
@@ -243,9 +215,17 @@ Bool CallCompiler (int argc, char **argv)
 				}
 			} else if (strcmp (argv_i, "-RE") == 0){
 				if (++i < argc){
+#ifdef _SUN_
+					std_error_file_p = fopen (argv[i],"w");
+					if (std_error_file_p!=NULL)
+						StdErrorReopened = True;
+					else
+						std_error_file_p = stderr;
+#else
 					freopen (argv[i],"w",StdError);
-#ifdef CLEAN2
+# ifdef CLEAN2
 					StdErrorReopened	= True;
+# endif
 #endif
 				} else {
 					CmdError ("file name expected after -RE");
@@ -253,9 +233,17 @@ Bool CallCompiler (int argc, char **argv)
 				}
 			} else if (strcmp (argv_i, "-RAE") == 0){
 				if (++i < argc){
+#ifdef _SUN_
+					std_error_file_p = fopen (argv[i],"aw");
+					if (std_error_file_p!=NULL)
+						StdErrorReopened = True;
+					else
+						std_error_file_p = stderr;
+#else
 					freopen (argv[i],"aw",StdError);
-#ifdef CLEAN2
+# ifdef CLEAN2
 					StdErrorReopened	= True;
+# endif
 #endif
 				} else {
 					CmdError ("file name expected after -RAE");
@@ -263,9 +251,17 @@ Bool CallCompiler (int argc, char **argv)
 				}
 			} else if (strcmp (argv_i, "-RO") == 0){
 				if (++i < argc){
+#ifdef _SUN_
+					std_out_file_p = fopen (argv[i],"w");
+					if (std_out_file_p!=NULL)
+						StdOutReopened = True;
+					else
+						std_out_file_p = stdout;
+#else
 					freopen (argv[i],"w",StdOut);
-#ifdef CLEAN2
+# ifdef CLEAN2
 					StdOutReopened	= True;
+# endif
 #endif
 				} else {
 					CmdError ("file name expected after -RO");
@@ -273,9 +269,17 @@ Bool CallCompiler (int argc, char **argv)
 				}
 			} else if (strcmp (argv_i, "-RAO") == 0){
 				if (++i < argc){
+#ifdef _SUN_
+					std_out_file_p = fopen (argv[i],"aw");
+					if (std_out_file_p!=NULL)
+						StdOutReopened = True;
+					else
+						std_out_file_p = stdout;
+#else
 					freopen (argv[i],"aw",StdOut);
-#ifdef CLEAN2
+# ifdef CLEAN2
 					StdOutReopened	= True;
+# endif
 #endif
 				} else {
 					CmdError ("file name expected after -RAO");
@@ -333,27 +337,11 @@ Bool CallCompiler (int argc, char **argv)
 #if ! defined (MAIN_CLM)
 int main (int argc, char *argv[])
 {
-#ifdef OS2
-	{
-		int length;
-		extern char clean_lib_directory[];
+# ifdef _SUN_
+	std_out_file_p = stdout;
+	std_error_file_p = stderr;
+# endif
 
-		length=strlen (argv[0]);
-		
-		if (length<=128){
-			strcpy (clean_lib_directory,argv[0]);
-	
-			while (length>0){
-				--length;
-				if (clean_lib_directory[length]=='\\'){
-					 clean_lib_directory[length]=0;
-					break;
-				}
-			}
-		} else
-			clean_lib_directory[0]='\0';
-	}
-#endif
 	if (CallCompiler (argc-1, & argv[1]))
 		return 0;
 	else

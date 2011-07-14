@@ -14,7 +14,6 @@ from containers import ::NumberSet
 
 instance toString Ident
 
-
 /*	Each Identifier is equipped with a pointer to a SymbolTableEntry that is
 	used for binding the identifier with its definition.
 */
@@ -99,7 +98,7 @@ instance == FunctionOrMacroIndex
 	{	glob_object	:: !object
 	,	glob_module	:: !Index
 	}
-	
+
 ::	Module defs = 
 	{	mod_ident		:: !Ident
 	,	mod_modification_time		:: {#Char}
@@ -118,7 +117,7 @@ instance == FunctionOrMacroIndex
 	}
 
 ::	ParsedModule	:== Module  [ParsedDefinition]
-::	ScannedModule 	:== Module  (CollectedDefinitions (ParsedInstance FunDef))
+::	ScannedModule 	:== Module  (CollectedDefinitions (ScannedInstanceAndMembersR FunDef))
 	
 ::	ModuleKind		= MK_Main | MK_Module | MK_System | MK_None | MK_NoMainDcl
 
@@ -143,7 +142,6 @@ instance == FunctionOrMacroIndex
 	,	icl_imported_objects	:: ![ImportedObject]
 	,	icl_foreign_exports		:: ![ForeignExport]
 	,	icl_used_module_numbers :: !NumberSet
-	,	icl_copied_from_dcl 	:: !CopiedDefinitions
 	,	icl_modification_time	:: !{#Char}
 	}
 
@@ -159,7 +157,7 @@ instance == FunctionOrMacroIndex
 	,	dcl_sizes			:: !{# Int}
 	,	dcl_dictionary_info	:: !DictionaryInfo
 	,	dcl_declared		:: !Declarations
-	,	dcl_macro_conversions :: !Optional {#Index}
+	,	dcl_has_macro_conversions :: !Bool
 	,	dcl_module_kind		:: !ModuleKind
 	,	dcl_modification_time:: !{#Char}
 	,	dcl_imported_module_numbers :: !NumberSet
@@ -257,10 +255,10 @@ cIsNotAFunction :== False
 	=	PD_Function  Position Ident Bool [ParsedExpr] Rhs FunKind
 	|	PD_NodeDef  Position ParsedExpr Rhs
 	|	PD_Type ParsedTypeDef
-	|	PD_TypeSpec Position Ident Priority (Optional SymbolType) Specials
+	|	PD_TypeSpec Position Ident Priority (Optional SymbolType) FunSpecials
 	|	PD_Class ClassDef [ParsedDefinition]
-	|	PD_Instance (ParsedInstance ParsedDefinition)
-	|	PD_Instances [ParsedInstance ParsedDefinition]
+	|	PD_Instance ParsedInstanceAndMembers
+	|	PD_Instances [ParsedInstanceAndMembers]
 	|	PD_Import [ParsedImport]
 	|	PD_ImportedObjects [ImportedObject]
 	|	PD_ForeignExport !Ident !{#Char} !Int !Bool /* if stdcall */
@@ -294,34 +292,53 @@ cNameLocationDependent :== True
 	,	pc_cons_prio	:: !Priority
 	,	pc_cons_pos		:: !Position
 	}
-	
-::	ParsedInstance member =
-	{	pi_class 	:: !Ident
+
+::	ParsedInstance =
+	{	pi_class 	:: !IdentOrQualifiedIdent
 	,	pi_ident	:: !Ident
 	,	pi_types	:: ![Type]
 	,	pi_context	:: ![TypeContext]
 	,	pi_pos		:: !Position
-	,	pi_members	:: ![member]
 	,	pi_specials	:: !Specials
 	}
+
+::	ParsedInstanceAndMembers =
+	{	pim_pi 		:: !ParsedInstance
+	,	pim_members	:: ![ParsedDefinition]
+	}
+
+::	ScannedInstanceAndMembersR icl_member =
+	{	sim_pi 				:: !ParsedInstance
+	,	sim_members			:: ![icl_member]	// for .icl
+	,	sim_member_types	:: ![FunType]	// for .dcl
+	}
+
+::	IdentOrQualifiedIdent
+	= Ident !Ident
+	| QualifiedIdent /*module*/!Ident !String
 
 /*
 	Objects of type Specials are used to specify specialized instances of overloaded functions.
 	These can only occur in definition modules. After parsing the SP_ParsedSubstitutions alternative
 	is used to indicate the specific instantiation. The SP_Substitutions alternative is used to deduce
 	the type of the specialized version. Finally the SP_ContextTypes alternative is set and used during 
-	the typing to check whether this instance has been used. The auxiliary SP_FunIndex alternative is used
+	the typing to check whether this instance has been used. The auxiliary FSP_FunIndex alternative is used
 	to store the index of the function that has been specialized.
 */
-
 
 ::	Specials
 	= SP_ParsedSubstitutions 	![Env Type TypeVar]
 	| SP_Substitutions 		 	![SpecialSubstitution]
 	| SP_ContextTypes			![Special]
-	| SP_FunIndex				!Index
-	| SP_TypeOffset				!Int
+	| SP_TypeOffset				!Int					// index in SP_Substitutions for specialized instance
 	| SP_None
+
+::	FunSpecials
+	= FSP_ParsedSubstitutions 	![Env Type TypeVar]
+	| FSP_Substitutions 		![SpecialSubstitution]
+	| FSP_ContextTypes			![Special]
+	| FSP_FunIndex				!Index
+	| FSP_None
 
 ::	SpecialSubstitution =
 	{	ss_environ	:: !Env Type TypeVar
@@ -382,12 +399,6 @@ cNameLocationDependent :== True
 	,	gen_info_ptr	:: !GenericInfoPtr
 	}
 
-:: IdentOrQualifiedIdent
-	= Ident !Ident
-	| QualifiedIdent /*module*/ !Ident !String
-
-instance <<< IdentOrQualifiedIdent
-
 :: GenericDependency =
 	{	gd_ident		:: !IdentOrQualifiedIdent
 	, 	gd_index		:: !GlobalIndex
@@ -443,15 +454,6 @@ instance == GenericDependency
 	| GCB_FunDef !FunDef 
 	| GCB_ParsedBody ![ParsedExpr] !Rhs 
 
-:: GenericType = 
-	{	gt_type 		:: !SymbolType
-	,	gt_vars			:: ![TypeVar]			// generic arguments
-	,	gt_arity		:: !Int					// number of generic arguments	
-	}
-
-//getGenericClassForKind 	:: !GenericDef !TypeKind -> (!Bool, DefinedSymbol)
-//addGenericKind			:: !GenericDef !TypeKind -> !GenericDef
-
 ::	InstanceType =
 	{	it_vars			:: [TypeVar]
 	,	it_types		:: ![Type]
@@ -460,12 +462,19 @@ instance == GenericDependency
 	}
 
 ::	ClassInstance =
- 	{	ins_class		:: !Global DefinedSymbol
+ 	{	ins_class_index	:: !GlobalIndex
+	,	ins_class_ident	:: !ClassIdent
 	,	ins_ident		:: !Ident
 	,	ins_type		:: !InstanceType
+	,	ins_member_types :: ![FunType]	// for .dcl
 	,	ins_members		:: !{#ClassInstanceMember}
 	,	ins_specials	:: !Specials
 	,	ins_pos			:: !Position
+	}
+
+::	ClassIdent =
+	{	ci_ident		:: !IdentOrQualifiedIdent
+	,	ci_arity		:: !Int
 	}
 
 ::	ClassInstanceMember = 
@@ -474,16 +483,18 @@ instance == GenericDependency
 	,	cim_index		:: !Index	// or -1-index
 	}
 
-::	Import from_symbol =
+::	Import =
 	{	import_module		:: !Ident
-	,	import_symbols		:: ![from_symbol]
+	,	import_symbols		:: ![ImportDeclaration]
 	,	import_file_position:: !Position	// for error messages
-	,	import_qualified	:: !Bool
+	,	import_qualified	:: !ImportQualified
 	}
 
-instance toString (Import from_symbol), AttributeVar, TypeAttribute, Annotation
+::	ImportQualified = NotQualified | Qualified
 
-::	ParsedImport		:== Import ImportDeclaration
+instance toString Import, AttributeVar, TypeAttribute, Annotation
+
+::	ParsedImport		:== Import
 
 ::	ImportDeclaration	= ID_Function !Ident
 						| ID_Class !Ident !(Optional [Ident])
@@ -590,7 +601,7 @@ NoGlobalIndex :== {gi_module=NoIndex,gi_index=NoIndex}
 	,	ft_priority		:: !Priority
 	,	ft_type			:: !SymbolType
 	,	ft_pos			:: !Position
-	,	ft_specials		:: !Specials
+	,	ft_specials		:: !FunSpecials
 	,	ft_type_ptr		:: !VarInfoPtr
 	}
 
@@ -604,12 +615,16 @@ NoGlobalIndex :== {gi_module=NoIndex,gi_index=NoIndex}
 ::	ModuleIndex:==Index;
 ::	DclFunctionIndex:==Index;
 
-::	FunCall = FunCall !Index !Level | MacroCall !ModuleIndex !Index Level | DclFunCall !ModuleIndex !DclFunctionIndex;
+::	FunCall	= FunCall !Index !Level
+			| MacroCall !ModuleIndex !Index Level
+			| DclFunCall !ModuleIndex !DclFunctionIndex
+			| GeneratedFunCall !Index !FunctionInfoPtr;
 
 FI_IsMacroFun	:== 1			// whether the function is a local function of a macro
 FI_HasTypeSpec	:== 2			// whether the function has u user defined type
 FI_IsNonRecursive :== 4			// used in trans.icl and partition.icl
 FI_IsUnboxedListOfRecordsConsOrNil :== 8
+FI_MemberInstanceRequiresTypeInDefMod :== 16
 
 ::	FunInfo =
 	{	fi_calls			:: ![FunCall]
@@ -676,7 +691,7 @@ cIsALocalVar	:== False
 	,	cc_linear_bits	::![Bool]
 	,	cc_producer		::!ProdClass
 	}
-					
+
 ::	ConsClass	:== Int
 
 ::	ProdClass	:== Bool
@@ -762,13 +777,6 @@ cNotVarNumber :== -1
 	,	var_expr_ptr	:: !ExprInfoPtr
 	}
 
-/*
-cRecursiveAppl		:== True
-cNonRecursiveAppl	:== False	
-
-::	ApplicationKind	:== Bool
-*/
- 
 ::	TypeSymbIdent =
 	{	type_ident		:: !Ident
 	,	type_arity		:: !Int
@@ -998,6 +1006,7 @@ cNonRecursiveAppl	:== False
 			
 			|	TQV	TypeVar
 			|	TempQV !TempVarId				/* Auxiliary, used during type checking */
+			|	TempQDV !TempVarId				// Auxiliary, used during type checking, existential type variable in dynamic pattern
 
 			|	TLifted !TypeVar				/* Auxiliary, used during type checking of lifted arguments */
 			|	TQualifiedIdent !Ident !String ![AType]
@@ -1009,6 +1018,7 @@ cNonRecursiveAppl	:== False
 ::	ConsVariable = CV 		!TypeVar
 				 | TempCV 	!TempVarId
 				 | TempQCV 	!TempVarId
+				 | TempQCDV !TempVarId	// existential type variable in dynamic pattern
 
 ::	DynamicType =
 	{	dt_uni_vars 	:: ![ATypeVar]
@@ -1044,7 +1054,7 @@ cNonRecursiveAppl	:== False
 					| TVI_Kind !TypeKind
 					| TVI_ConsInstance !DefinedSymbol //AA: generic cons instance function 
 					| TVI_Normalized !Int /* MV - position of type variable in its definition */
-					| TVI_Expr !Expression	/* AA: Expression corresponding to the type var during generic specialization */
+					| TVI_Expr !Bool !Expression	/* AA: Expression corresponding to the type var during generic specialization */
 					| TVI_Exprs ![(GlobalIndex, Expression)] /* List of expressions corresponding to the type var during generic specialization */
 					| TVI_Iso !DefinedSymbol !DefinedSymbol !DefinedSymbol
 					| TVI_GenTypeVarNumber !Int
@@ -1313,7 +1323,6 @@ cIsNotStrict	:== False
 				| NoBind ExprInfoPtr /* auxiliary, to store fields that are not specified in a record expression */ 
 				| FailExpr !Ident // only allowed on (case) root positions
 
-
 ::	CodeBinding	variable :== Env String variable
 
 ::	App =
@@ -1446,7 +1455,7 @@ instance == ModuleKind, Ident
 instance <<< (Module a) | <<< a, ParsedDefinition, InstanceType, AttributeVar, TypeVar, SymbolType, Expression, Type, Ident, (Global object) | <<< object,
 			 Position, CaseAlt, AType, FunDef, ParsedExpr, TypeAttribute, (Bind a b) | <<< a & <<< b,
 			 FieldNameOrQualifiedFieldName, ParsedConstructor, (TypeDef a) | <<< a, TypeVarInfo, AttrVarInfo,
-			 BasicValue, ATypeVar, TypeRhs, (Import from_symbol) | <<< from_symbol, ImportDeclaration, CasePatterns,
+			 BasicValue, ATypeVar, TypeRhs, Import, ImportDeclaration, CasePatterns,
 			 (Optional a) | <<< a, ConsVariable, BasicType, Annotation, SelectorKind, Selection, SelectorDef, ConsDef, LocalDefs, FreeVar, ClassInstance, SignClassification,
 			 TypeCodeExpression, CoercionPosition, AttrInequality, LetBind, Declaration, STE_Kind, BoundVar,
 			 TypeSymbIdent,
@@ -1454,7 +1463,7 @@ instance <<< (Module a) | <<< a, ParsedDefinition, InstanceType, AttributeVar, T
 			 IndexRange,
 			 FunType,
 			 GenericClassInfo,
-			 TCClass
+			 TCClass, IdentOrQualifiedIdent
 
 instance <<< FunctionBody
 
@@ -1514,11 +1523,12 @@ ParsedConstructorToConsDef pc :==
 				  st_arity = pc.pc_cons_arity, st_context = [], st_attr_env = [], st_attr_vars = []},
 		cons_exi_vars = pc.pc_exi_vars, cons_type_ptr = nilPtr }
 
-ParsedInstanceToClassInstance pi members :==
- 	{	ins_class = {glob_object = MakeDefinedSymbol pi.pi_class NoIndex (length pi.pi_types), glob_module = NoIndex}, ins_ident = pi.pi_ident, 
- 		ins_type = { it_vars = [], it_types = pi.pi_types, it_attr_vars = [],
- 					 it_context = pi.pi_context }, 
- 		ins_members = members, ins_specials = pi.pi_specials, ins_pos = pi.pi_pos}
+ParsedInstanceToClassInstance pi members member_types :==
+	{	ins_class_index = {gi_module=NoIndex, gi_index=NoIndex},
+		ins_class_ident = {ci_ident=pi.pi_class, ci_arity=length pi.pi_types}, ins_ident = pi.pi_ident,
+		ins_type = { it_vars = [], it_types = pi.pi_types, it_attr_vars = [],
+					 it_context = pi.pi_context }, 
+		ins_members = members, ins_member_types = member_types, ins_specials = pi.pi_specials, ins_pos = pi.pi_pos}
 
 MakeTypeDef name lhs rhs attr pos  :== 
 	{	td_ident = name, td_index = -1, td_arity = length lhs, td_args = lhs, td_attrs = [], td_attribute = attr,

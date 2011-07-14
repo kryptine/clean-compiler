@@ -79,21 +79,26 @@ instance clean_up AType
 where
 	clean_up cui atype=:{at_attribute, at_type = TempQV qv_number} cus
 		| cui.cui_top_level
-			# (at_attribute, cus)	= cleanUpTypeAttribute True cui at_attribute cus
-			# (type, cus)			= cus!cus_var_env.[qv_number]
-			  (var, cus)			= cleanUpVariable True type qv_number cus
-			= ({atype & at_attribute = at_attribute, at_type = var},
-					{cus & cus_exis_vars = add_new_variable type qv_number at_attribute cus.cus_exis_vars})
-	where	
-		add_new_variable TE ev_number ev_attr cus_exis_vars
-			= [(ev_number, ev_attr) : cus_exis_vars]
-		add_new_variable type ev_number ev_attr cus_exis_vars
-			= cus_exis_vars
+			= clean_up_top_level_q_variable cui at_attribute qv_number cus
+	clean_up cui atype=:{at_attribute, at_type = TempQDV qv_number} cus
+		| cui.cui_top_level
+			= clean_up_top_level_q_variable cui at_attribute qv_number cus
 	clean_up cui atype=:{at_attribute,at_type} cus
 		# (at_attribute, cus) = cleanUpTypeAttribute False cui at_attribute cus 
 		  (at_type, cus) = clean_up cui at_type cus
 		= ({atype & at_attribute = at_attribute, at_type = at_type}, cus)
 
+clean_up_top_level_q_variable cui at_attribute qv_number cus
+	# (at_attribute, cus)	= cleanUpTypeAttribute True cui at_attribute cus
+	# (type, cus)			= cus!cus_var_env.[qv_number]
+	  (var, cus)			= cleanUpVariable True type qv_number cus
+	  cus = {cus & cus_exis_vars = add_new_exis_attr_var type qv_number at_attribute cus.cus_exis_vars}
+	= ({at_attribute = at_attribute, at_type = var}, cus)
+where
+	add_new_exis_attr_var TE ev_number ev_attr cus_exis_vars
+		= [(ev_number, ev_attr) : cus_exis_vars]
+	add_new_exis_attr_var type ev_number ev_attr cus_exis_vars
+		= cus_exis_vars
 
 attrIsUndefined TA_None = True
 attrIsUndefined _ 		= False
@@ -178,10 +183,24 @@ where
 			# (TV tv, cus) = cleanUpVariable False type qv_number cus
 			  (types, cus) = clean_up cui types cus
 			= (CV tv :@: types, cus)
+	clean_up cui (TempQCDV qv_number :@: types) cus=:{cus_exis_vars}
+		# (type, cus) = cus!cus_var_env.[qv_number]
+		| cui.cui_top_level
+			# (TV tv, cus) = cleanUpVariable True type qv_number {cus & cus_exis_vars = add_new_variable type qv_number cus_exis_vars}
+			  (types, cus) = clean_up cui types cus
+			= (CV tv :@: types, cus)
+			# (TV tv, cus) = cleanUpVariable False type qv_number cus
+			  (types, cus) = clean_up cui types cus
+			= (CV tv :@: types, cus)
 	clean_up cui (cv :@: types) cus
 		# (types, cus) = clean_up cui types cus
 		= (cv :@: types, cus)
 	clean_up cui (TempQV qv_number) cus=:{cus_error,cus_exis_vars}
+		# (type, cus) = cus!cus_var_env.[qv_number]
+		| cui.cui_top_level
+			= cleanUpVariable True type qv_number {cus & cus_exis_vars = add_new_variable type qv_number cus_exis_vars}
+			= cleanUpVariable False type qv_number cus
+	clean_up cui (TempQDV qv_number) cus=:{cus_error,cus_exis_vars}
 		# (type, cus) = cus!cus_var_env.[qv_number]
 		| cui.cui_top_level
 			= cleanUpVariable True type qv_number {cus & cus_exis_vars = add_new_variable type qv_number cus_exis_vars}
@@ -451,7 +470,6 @@ where
 			| checkCleanUpResult cur cDefinedVar
 				= (collected_contexts, env, liftedContextError (toString tc.tc_class) error)
 				= ([{ tc & tc_types = tc_types } : collected_contexts], env, error)
-		| otherwise
 			= (collected_contexts, env, error)
 
 	build_attribute_environment :: !LargeBitvect !Index !Index !{! CoercionTree} !*LargeBitvect !*AttributeEnv ![AttributeVar] ![AttrInequality] !*ErrorAdmin
@@ -557,7 +575,6 @@ where
 		clean_up_arg_type cui at cus
 			= clean_up cui at cus
 
-
 /*
 	In 'bindInstances t1 t2' type variables of t1 are bound to the corresponding subtypes of t2, provided that
 	t2 is a substitution instance of t1. Binding is done by setting the 'tv_info_ptr' of the variables of t1
@@ -603,7 +620,6 @@ where
 			EI_DictionaryType dict_type
 				# (dict_type, type_heaps) = substitute dict_type type_heaps
 				-> (type_heaps, expr_heap <:= (expr_ptr, EI_DictionaryType dict_type))
-
 
 class bindInstances a :: !a !a !*TypeVarHeap -> *TypeVarHeap
 
@@ -1338,6 +1354,12 @@ where
 			= (file, opt_beautifulizer)
 	writeType file opt_beautifulizer (form, TB tb)
 		= (file <<< tb, opt_beautifulizer)
+	writeType file (Yes beautifulizer) (_, type_var=:TV _)
+		= writeBeautifulTypeVar file beautifulizer type_var
+	writeType file (Yes beautifulizer) (_, GTV tv)
+		= writeBeautifulTypeVar file beautifulizer (TV tv)
+	writeType file (Yes beautifulizer) (_, type_var=:TempV _)
+		= writeBeautifulTypeVar file beautifulizer type_var
 	writeType file opt_beautifulizer (form, TArrow)
 		= (file <<< "(->)", opt_beautifulizer)	
 	writeType file opt_beautifulizer (form, TArrow1 t)
@@ -1353,14 +1375,10 @@ where
 		= (file <<< "E." <<< varid, opt_beautifulizer)
 	writeType file opt_beautifulizer (form, TempQV tv_number)
 		= (file  <<< "E." <<< tv_number <<< ' ', opt_beautifulizer)
+	writeType file opt_beautifulizer (form, TempQDV tv_number)
+		= (file  <<< "E." <<< tv_number <<< ' ', opt_beautifulizer)
 	writeType file opt_beautifulizer (form, TE)
 		= (file <<< "__", opt_beautifulizer)
-	writeType file (Yes beautifulizer) (_, type_var=:TV _)
-		= writeBeautifulTypeVar file beautifulizer type_var
-	writeType file (Yes beautifulizer) (_, GTV tv)
-		= writeBeautifulTypeVar file beautifulizer (TV tv)
-	writeType file (Yes beautifulizer) (_, type_var=:TempV _)
-		= writeBeautifulTypeVar file beautifulizer type_var
 	writeType file _ (form, type)
 		= abort ("<:: (Type) (typesupport.icl)" ---> type)
 
@@ -1465,6 +1483,8 @@ instance writeType ConsVariable where
 	writeType file No (_, cons_variable)
 		= (file <<< cons_variable, No)
 	writeType file yes_beautifulizer (_, cv=:(TempQCV _))
+		= (file <<< cv, yes_beautifulizer)
+	writeType file yes_beautifulizer (_, cv=:(TempQCDV _))
 		= (file <<< cv, yes_beautifulizer)
 	writeType file (Yes beautifulizer) (_, CV tv)
 		= writeBeautifulTypeVar file beautifulizer (TV tv)
@@ -1719,7 +1739,7 @@ accCoercionTree f i coercion_trees
 	:== acc_coercion_tree i coercion_trees
   where
 	acc_coercion_tree i coercion_trees
-		# (coercion_tree, coercion_trees) = replace coercion_trees i CT_Empty
+		# (coercion_tree, coercion_trees) = coercion_trees![i]
 		  (x, coercion_tree) = f coercion_tree
 		= (x, {coercion_trees & [i]=coercion_tree})
 	
@@ -1727,7 +1747,7 @@ appCoercionTree f i coercion_trees
 	:== acc_coercion_tree i coercion_trees
   where
 	acc_coercion_tree i coercion_trees
-		# (coercion_tree, coercion_trees) = replace coercion_trees i CT_Empty
+		# (coercion_tree, coercion_trees) = coercion_trees![i]
 		= {coercion_trees & [i] = f coercion_tree}
 	
 flattenCoercionTree :: !u:CoercionTree -> (![Int], !u:CoercionTree)
@@ -2122,4 +2142,3 @@ foldATypeSt on_atype on_type type st :== fold_atype_st type st
 		#! st
 				= fold_type_st at_type st
 		= on_atype atype st
-

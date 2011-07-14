@@ -262,7 +262,7 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 		=	(False, cache, files)
 	# (io, files)
 		=	stdio files
-	# ({boxed_ident=moduleIdent}, hash_table) = putIdentInHashTable options.moduleName IC_Module hash_table
+	# ({boxed_ident=moduleIdent}, hash_table) = putIdentInHashTable options.moduleName (IC_Module NoQualifiedIdents) hash_table
 	# list_inferred_types
 		=	if (options.listTypes.lto_listTypesKind == ListTypesInferred)
 				(Yes options.listTypes.lto_showAttributes)
@@ -325,7 +325,7 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 	| not closed
 		=	abort ("couldn't close error file \"" +++ options.errorPath +++ "\"\n")
 	| success
-		# dcl_modules={{dcl_module \\ dcl_module<-:cached_dcl_mods} & [main_dcl_module_n].dcl_macro_conversions=No}
+		# dcl_modules={{dcl_module \\ dcl_module<-:cached_dcl_mods} & [main_dcl_module_n].dcl_has_macro_conversions=False}
 		# cache={dcl_modules=dcl_modules,functions_and_macros=cached_functions_and_macros,predef_symbols=unique_copy_of_predef_symbols,hash_table=hash_table,heaps=heaps}
 		= (success,cache,files)
 		# cache={dcl_modules=cached_dcl_mods,functions_and_macros=cached_functions_and_macros,predef_symbols=unique_copy_of_predef_symbols,hash_table=hash_table,heaps=heaps}

@@ -6,11 +6,10 @@ implementation module backendconvert
 import code from library "backend_library"
 
 import StdEnv
-// import StdDebug
-
 import frontend
 import backend
 import backendsupport, backendpreprocess
+import partition
 
 // trace macro
 (-*->) infixl
@@ -489,7 +488,21 @@ backEndConvertModulesH predefs {fe_icl =
 	=	(backEnd -*-> "backend done")
 	where
 		functionIndices
-			=	flatten [[(componentIndex, member) \\ member <- group.group_members] \\ group <-: fe_components & componentIndex <- [1..]]
+			= function_indices 0 fe_components
+		
+		function_indices i components
+			| i<size components
+				= function_indices2 components.[i].component_members i components
+				= []
+
+		function_indices2 (ComponentMember member members) i components
+			#! inc_i = i+1
+			= [(inc_i,member) : function_indices2 members i components]
+		function_indices2 (GeneratedComponentMember member _ members) i components
+			#! inc_i = i+1
+			= [(inc_i,member) : function_indices2 members i components]
+		function_indices2 NoComponentMembers i components
+			= function_indices (i+1) components
 
 declareOtherDclModules :: {#DclModule} Int NumberSet -> BackEnder
 declareOtherDclModules dcls main_dcl_module_n used_module_numbers
@@ -1142,8 +1155,8 @@ adjustArrayFunctions array_first_instance_indices predefs main_dcl_module_n func
 				=	foldStateA (adjustStdArrayInstance arrayClassIndex arrayInfo) instances
 			where
 				adjustStdArrayInstance :: Index AdjustStdArrayInfo ClassInstance -> BackEnder
-				adjustStdArrayInstance arrayClassIndex arrayInfo=:{asai_moduleIndex} instance`=:{ins_class}
-					| ins_class.glob_object.ds_index == arrayClassIndex && ins_class.glob_module == asai_moduleIndex
+				adjustStdArrayInstance arrayClassIndex arrayInfo=:{asai_moduleIndex} instance`=:{ins_class_index}
+					| ins_class_index.gi_index == arrayClassIndex && ins_class_index.gi_module == asai_moduleIndex
 						=	adjustArrayClassInstance arrayInfo instance`
 					// otherwise
 						=	identity
@@ -1377,10 +1390,12 @@ convertTypeNode (TAS typeSymbolIdent typeArgs strictness)
 	=	beNormalTypeNode (convertTypeSymbolIdent typeSymbolIdent) (convertAnnotatedTypeArgs typeArgs strictness)
 convertTypeNode (TV {tv_ident})
 	=	beVarTypeNode tv_ident.id_name
-convertTypeNode (TempQV n)
-	=	beVarTypeNode ("_tqv" +++ toString n)
 convertTypeNode (TempV n)
 	=	beVarTypeNode ("_tv" +++ toString n)
+convertTypeNode (TempQV n)
+	=	beVarTypeNode ("_tqv" +++ toString n)
+convertTypeNode (TempQDV n)
+	=	beVarTypeNode ("_tqv" +++ toString n)
 convertTypeNode (a --> b) 
 	=	beNormalTypeNode (beBasicSymbol BEFunType) (convertTypeArgs [a, b])
 convertTypeNode (TArrow1 a) 
@@ -1405,6 +1420,8 @@ consVariableToType (TempCV varId)
 	=	TempV varId
 consVariableToType (TempQCV varId)
 	=	TempQV varId
+consVariableToType (TempQCDV varId)
+	=	TempQDV varId
 
 convertTypeArgs :: [AType] -> BEMonad BETypeArgP
 convertTypeArgs args

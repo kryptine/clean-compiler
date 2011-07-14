@@ -11,7 +11,7 @@ import syntax, checksupport
 		ei_module_n :: !Int,
 		ei_position :: !Position,
 		ei_symbols  :: ![ImportNrAndIdents],
-		ei_qualified:: !Bool
+		ei_qualified:: !ImportQualified
 	}
 
 :: SolvedImports =
@@ -20,11 +20,10 @@ import syntax, checksupport
 	,	si_implicit				:: ![(ModuleN, Position)]
 	}
 
-markExplImpSymbols :: !Int !*(!*{!*{!u:ExplImpInfo}}, !*SymbolTable)
-			-> (!.[Ident],!(!{!{!u:ExplImpInfo}},!.SymbolTable))
+markExplImpSymbols :: !Int !*(!*ExplImpInfos,!*SymbolTable) -> (!.[Ident],!(!*ExplImpInfos,!*SymbolTable))
 
-updateExplImpForMarkedSymbol :: !Index !Declaration !SymbolTableEntry !u:{#DclModule} !{!{!*ExplImpInfo}} !*SymbolTable
-			-> (!u:{#DclModule}, !{!{!.ExplImpInfo}}, !.SymbolTable)
+updateExplImpForMarkedSymbol :: !Index !Declaration !SymbolTableEntry !u:{#DclModule} !*ExplImpInfos !*SymbolTable
+																  -> (!u:{#DclModule},!*ExplImpInfos,!*SymbolTable)
 
 solveExplicitImports :: !(IntKeyHashtable [ExplicitImport]) !{#Int} !Index 
 								!*(!v:{#DclModule},!*{#Int},!{!*ExplImpInfo},!*CheckState)
