@@ -397,7 +397,8 @@ where
 instance compare GenericDependency
 where
 	compare dcl_gd icl_gd comp_st
-		= (dcl_gd == icl_gd, comp_st)
+		| dcl_gd.gd_index == icl_gd.gd_index = compare dcl_gd.gd_vars icl_gd.gd_vars comp_st
+		= (False, comp_st)
 
 initialyseTypeVars [{tv_info_ptr=dcl_tv_info_ptr}:dcl_type_vars] [{tv_info_ptr=icl_tv_info_ptr}:icl_type_vars] type_var_heap
 	# type_var_heap = type_var_heap <:= (icl_tv_info_ptr, TVI_TypeVar dcl_tv_info_ptr) <:= (dcl_tv_info_ptr, TVI_TypeVar icl_tv_info_ptr)
