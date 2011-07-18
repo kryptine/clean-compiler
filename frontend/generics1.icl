@@ -1749,12 +1749,12 @@ where
 			# (dep_class_infoss, (modules, heaps))
 				= mapSt (\{gd_index} -> mapSt (get_class_for_kind gd_index) consumed_kinds) deps (modules, heaps)
 			# class_idents = [(gc_generic, gc_ident):[(gd_index, ident) \\ {gd_index, gd_ident=Ident ident} <- deps]]
-			# arg_and_dep_class_infos = flatten (map (zip2 class_idents) (transpose [arg_class_infos:dep_class_infoss]))
+			# arg_and_dep_class_infoss = map (zip2 class_idents) (transpose [arg_class_infos:dep_class_infoss])
 
 			#! ({class_members}, modules) = modules![class_info.gci_module].com_class_defs.[class_info.gci_class]
 			#! (member_def, modules) = modules![class_info.gci_module].com_member_defs.[class_members.[0].ds_index]
 			#! (ins_type, heaps)
-				= build_instance_type gc_type num_args (length deps) arg_and_dep_class_infos heaps
+				= build_instance_type gc_type num_args (map removeDupByIndex arg_and_dep_class_infoss) heaps
 			#! (fun_type, heaps, error)
 				= determine_type_of_member_instance member_def ins_type heaps error
 
@@ -1763,12 +1763,15 @@ where
 			#! has_generic_info = is_OBJECT_CONS_FIELD_type gc_type gs_predefs
 
 			#! (memfun_ds, fun_info, heaps)
-				= build_shorthand_instance_member module_index this_kind has_generic_info fun_index fun_ident gc_pos fun_type arg_and_dep_class_infos fun_info heaps
+				= build_shorthand_instance_member module_index this_kind has_generic_info fun_index fun_ident gc_pos fun_type (flatten arg_and_dep_class_infoss) fun_info heaps
 
 			#! ins_info = build_shorthand_class_instance this_kind class_info.gci_class gc_ident gc_pos memfun_ds ins_type ins_info
 			= (modules, (fun_info, ins_info, heaps, error))
-			
-		build_instance_type type arity num_deps arg_and_dep_class_infos heaps=:{hp_type_heaps=th=:{th_vars},hp_var_heap}
+			where
+				removeDupByIndex [] = []
+				removeDupByIndex [x=:((indexx, _), _):xs] = [x:removeDupByIndex (filter (\((indexy, _), _) -> indexx <> indexy) xs)]
+
+		build_instance_type type arity arg_and_dep_class_infoss heaps=:{hp_type_heaps=th=:{th_vars},hp_var_heap}
 			#! type_var_names = [makeIdent ("a" +++ toString i) \\ i <- [1 .. arity]]
 			#! (type_vars, th_vars) = mapSt freshTypeVar type_var_names th_vars 
 			#! type_var_types = [TV tv \\ tv <- type_vars] 	
@@ -1776,9 +1779,10 @@ where
 			
 			#! type = fill_type_args type new_type_args	
 			
-			# context_type_vars = flatten (map (repeatn (num_deps + 1)) type_vars)
+			# num_contexts = length (hd arg_and_dep_class_infoss)
+			# context_type_vars = flatten (map (repeatn num_contexts) type_vars)
 			#! (contexts, hp_var_heap) 
-				= zipWithSt build_context arg_and_dep_class_infos context_type_vars hp_var_heap
+				= zipWithSt build_context (flatten arg_and_dep_class_infoss) context_type_vars hp_var_heap
 			
 			#! ins_type = 
 				{	it_vars	= type_vars
@@ -2355,7 +2359,6 @@ where
 		= build_generic_app (KindArrow [KindConst, KindConst]) arg_exprs gen_index gen_ident st
 	specialize gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices (GTSCons cons_info_ds arg_type) st
 		# (arg_exprs, (modules, td_infos, heaps, error)) = specialize_with_deps gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices [arg_type] st
-                // TODO!!! Must main_module_index be changed or is this the module where all the generated stuff is put?
 		#! (generic_info_expr, heaps) = buildFunApp main_module_index cons_info_ds [] heaps		
 		# gen_CONS_index = gen_OBJECT_CONS_FIELD_indices.[1]
 		| gen_CONS_index.ocf_module>=0
