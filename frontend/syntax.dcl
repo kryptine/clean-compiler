@@ -1252,7 +1252,6 @@ instance toString 	KindInfo
 				| PE_ArrayCompr !ArrayKind !ParsedExpr ![Qualifier]
 				| PE_Sequ Sequence
 				| PE_WildCard
-				| PE_Field !ParsedExpr !(Global FieldSymbol) /* Auxiliary, used during checking */
 
 				| PE_QualifiedIdent !Ident !String
 
