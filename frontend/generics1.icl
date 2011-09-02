@@ -2408,14 +2408,15 @@ where
                         // 
                         // f_Object (f_Cons f_a_b_x g_?_x g_?_x) () ()
 			TVI_Exprs exprs
-				-> (lookup gen_index exprs, (modules, td_infos, heaps, error))
+				# (argExpr, error) = lookupArgExpr gen_index exprs error
+				-> (argExpr, (modules, td_infos, heaps, error))
 			TVI_Iso iso_ds to_ds from_ds
 				# (expr,heaps) = buildFunApp main_module_index iso_ds [] heaps
 				-> (expr, (modules, td_infos, heaps, error))
 	where
-		lookup _ [] = abort "value not found"
-		lookup x [(k, v):kvs] | k == x = v
-			          	= lookup x kvs	
+		lookupArgExpr _ [] error = (undef, reportError gen_ident gen_pos "missing dependencies of its dependencies in the type signature" error)
+		lookupArgExpr x [(k, v):kvs] error | k == x = (v, error)
+						   = lookupArgExpr x kvs error
 		
 	specialize_with_deps gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices xs st
 		# (info_deps, st) = mapSt collect_dependency_info gen_deps st

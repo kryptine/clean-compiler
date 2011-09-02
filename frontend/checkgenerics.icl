@@ -142,6 +142,8 @@ where
 					-> (th_vars, cs_error)
 				_	-> abort ("check_no_generic_vars_in_contexts: wrong TVI" ---> (tv, tv_info))
 
+        // TODO!!! TvN: check that a generic function also includes all the dependencies of its dependencies, and so on. This is required when
+        // deriving generic functions since then the generated function needs to have all the arguments to all the generic functions called.
 	check_generic_dependencies index mod_index gen_ident gen_def=:{gen_vars, gen_deps} gen_defs modules cs
 		# (gen_deps, (gen_defs, modules, cs)) = foldSt check_dependency gen_deps ([], (gen_defs, modules, cs))
 		= ({gen_def & gen_deps = reverse gen_deps}, gen_defs, modules, cs)
