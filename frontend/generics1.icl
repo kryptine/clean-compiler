@@ -2078,10 +2078,11 @@ where
 
 	// generic function specialized to the generic representation of the type
 	build_specialized_expr gc_pos gc_ident gcf_generic gen_deps gtr_type td_args generated_arg_exprss gen_info_ptr funs_and_groups modules td_infos heaps error
-                // TODO!!! TvN: bimap_spec_env is hacked to fit the original description of a spec_env, taking the hd of the generated_arg_exprss, change it?
+                // TODO: TvN: bimap_spec_env is hacked to fit the original description of a spec_env, taking the hd of the generated_arg_exprss, change it?
 		#! bimap_spec_env = [(atv_variable, TVI_Expr False (hd exprs)) \\ {atv_variable} <- td_args & exprs <- generated_arg_exprss]
-                // TODO!!! TvN: very quick and dirty implementation, must include generic dependency variables as well to look up right argument with 
-                // multiple dependies on the same generic function but with different generic dependency variables
+                // TODO: TvN: very quick and dirty implementation, must include generic dependency variables as well to look up right argument with 
+                // multiple dependencies on the same generic function but with different generic dependency variables
+                // See functions: specialize_type_var and checkgenerics.check_dependency
 		#! spec_env = [(atv_variable, TVI_Exprs (zip2 [gcf_generic:[gd_index \\ {gd_index} <- gen_deps]] exprs)) \\ {atv_variable} <- td_args & exprs <- generated_arg_exprss]
 		# generic_bimap = predefs.[PD_GenericBimap]
 		| gcf_generic.gi_module==generic_bimap.pds_module && gcf_generic.gi_index==generic_bimap.pds_def
@@ -2396,17 +2397,13 @@ where
 		# (expr, th_vars) = readPtr tv_info_ptr th_vars
 		# heaps = {heaps & hp_type_heaps = {th & th_vars = th_vars}}
 		= case expr of
-                        // TODO!!! TvN: Now we use the gen_index to look up the right argument expression, but this fails when you have a duplicate dependency on
+                        // TODO: TvN: Now we use the gen_index to look up the right argument expression, but this fails when you have a duplicate dependency on
                         // the same generic function with different generic variables. The generic variables must be included in the spec_env as well, but this
-                        // requires including forwarding pointers to obtain substitutions. For example:
+                        // requires including forwarding pointers to obtain substitutions of dependency variables. For example:
                         // 
                         // generic f a b | g a, g b :: a -> b
-                        // generic g c | h c :: c -> c
-                        // generic h d :: d -> Int
-                        //
-                        // :: Test x = Test x
-                        // 
-                        // f_Object (f_Cons f_a_b_x g_?_x g_?_x) () ()
+                        // generic g c :: c -> c
+                        // See functions: build_specialized_expr and checkgenerics.check_dependency
 			TVI_Exprs exprs
 				# (argExpr, error) = lookupArgExpr gen_index exprs error
 				-> (argExpr, (modules, td_infos, heaps, error))
