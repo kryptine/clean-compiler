@@ -2923,33 +2923,28 @@ trySimpleExpression is_pattern pState
 
 trySimpleExpressionT :: !Token !Bool !ParseState -> (!Bool, !ParsedExpr, !ParseState)
 trySimpleExpressionT (IdentToken name) is_pattern pState
+	# (id, pState) = stringToIdent name IC_Expression pState
 	| isLowerCaseName name
-	# (id, pState) = stringToIdent name IC_Expression pState
-	| is_pattern
-		# (token, pState) = nextToken FunctionContext pState
-		| token == DefinesColonToken
-			# (succ, expr, pState) = trySimpleExpression is_pattern pState
-			| succ
-				= (True, PE_Bound { bind_dst = id, bind_src = expr }, pState)
-				= (True, PE_Empty, parseError "simple expression" No "expression" pState)
-			// token <> DefinesColonToken
-			= (True, PE_Ident id, tokenBack pState)
-		// not is_pattern
-		# (token, pState) = nextToken FunctionContext pState
-		| token == GenericOpenToken
-			# (kind, pState) = wantKind pState	
-			= (True, PE_Generic id kind, pState)
-			= (True, PE_Ident id, tokenBack pState)			
-			
-trySimpleExpressionT (IdentToken name) is_pattern pState
-//	| isUpperCaseName name || ~ is_pattern
-	# (id, pState) = stringToIdent name IC_Expression pState
-	# (token, pState) = nextToken FunctionContext pState
-	| token == GenericOpenToken
-		# (kind, pState) = wantKind pState	
-		= (True, PE_Generic id kind, pState)
-		= (True, PE_Ident id, tokenBack pState)
-
+		| is_pattern
+			# (token, pState) = nextToken FunctionContext pState
+			| token == DefinesColonToken
+				# (succ, expr, pState) = trySimpleExpression is_pattern pState
+				| succ
+					= (True, PE_Bound { bind_dst = id, bind_src = expr }, pState)
+					= (True, PE_Empty, parseError "simple expression" No "expression" pState)
+				= (True, PE_Ident id, tokenBack pState)
+			# (token, pState) = nextToken FunctionContext pState
+			| token == GenericOpenToken
+				# (kind, pState) = wantKind pState	
+				= (True, PE_Generic id kind, pState)
+				= (True, PE_Ident id, tokenBack pState)
+		| is_pattern
+			= (True, PE_Ident id, pState)
+			# (token, pState) = nextToken FunctionContext pState
+			| token == GenericOpenToken
+				# (kind, pState) = wantKind pState	
+				= (True, PE_Generic id kind, pState)
+				= (True, PE_Ident id, tokenBack pState)
 trySimpleExpressionT SquareOpenToken is_pattern pState
 	# (list_expr, pState) = wantListExp is_pattern pState
 	= (True, list_expr, pState)
