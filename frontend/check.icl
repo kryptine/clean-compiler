@@ -607,28 +607,6 @@ where
 			= (list_of_specials,  next_inst_index, all_instances, type_heaps, predef_symbols, error)
 	check_instance_specials mod_index fun_type fun_index SP_None next_inst_index all_instances type_heaps predef_symbols error
 		= (SP_None, next_inst_index, all_instances, type_heaps, predef_symbols,error)
-
-mapSt2 f l s1 s2 :== map_st2 l s1 s2
-where
-	map_st2 [x : xs] s1 s2
-	 	# (x, s1,s2) = f x s1 s2
-		  (xs, s1,s2) = map_st2 xs s1 s2
-		#! s1 = s1
-		#! s2 = s2
-		= ([x : xs], s1,s2)
-	map_st2 [] s1 s2
-	 	= ([], s1,s2)
-
-mapY2St f l s :== map_y2_st l s
-where
-	map_y2_st [x : xs] s
-	 	# (x, y, s) = f x s
-		  (xs, ys, s) = map_y2_st xs s
-		#! s = s
-		= ([x : xs], [y : ys], s)
-	map_y2_st [] s
-		#! s = s
-	 	= ([], [], s)
 	
 checkAndCollectTypesOfContextsOfSpecials :: [TypeContext] *PredefinedSymbols *ErrorAdmin -> (![[Type]],!*PredefinedSymbols,!*ErrorAdmin);
 checkAndCollectTypesOfContextsOfSpecials type_contexts predef_symbols error

@@ -1281,7 +1281,9 @@ where
 			, KindArrow [KindConst]
 			, KindArrow [KindConst, KindConst] 
 			: subkinds]
-		#! (st, gs) = build_classes_if_needed gen_def kinds st gs
+		# (dep_defs, gs_modules) = mapSt lookupDependencyDef gen_def.gen_deps gs.gs_modules
+		# gs = {gs & gs_modules = gs_modules}
+		#! (st, gs) = foldSt (\def -> foldSt (build_class_if_needed def) kinds) [gen_def:dep_defs] (st, gs)
 		#! gencase = { gencase & gc_gcf = GCF gc_ident {gcf & gcf_kind = kind}}
 
 		#! type_index = index_OBJECT_CONS_FIELD_type gencase.gc_type gs.gs_predefs
@@ -1408,26 +1410,28 @@ where
 					, gs_varh = gs_varh
 					, gs_dcl_modules = gs_dcl_modules
 					, gs_symtab = gs_symtab }
-		= (common_defs, gs)
+		= (common_defs, gs)	
+
+lookupDependencyDef :: GenericDependency !*Modules -> (GenericDef, *Modules)
+lookupDependencyDef {gd_index} modules = modules![gd_index.gi_module].com_generic_defs.[gd_index.gi_index]	
 
 // limitations:
 // - context restrictions on generic variables are not allowed
 buildMemberType :: !GenericDef !TypeKind !TypeVar !*GenericState -> ( !SymbolType, !*GenericState)
-buildMemberType gen_def=:{gen_ident,gen_pos,gen_type,gen_vars} kind class_var gs=:{gs_predefs}
+buildMemberType gen_def=:{gen_ident,gen_pos,gen_type,gen_vars,gen_deps} kind class_var gs=:{gs_predefs}
 	#! (gen_type, gs) = add_bimap_contexts gen_def gs 
 
 	#! th = {th_vars = gs.gs_tvarh, th_attrs = gs.gs_avarh}
-	#! (kind_indexed_st, gatvs, th, gs_error) 
-		= buildKindIndexedType gen_type gen_vars kind gen_ident gen_pos th gs.gs_error
+	#! (kind_indexed_st, gatvs, th, modules, error) 
+		= buildKindIndexedType gen_type gen_vars gen_deps kind gen_ident gen_pos th gs.gs_modules gs.gs_error
 
-	#! (member_st, th, gs_error) 
-		= replace_generic_vars_with_class_var kind_indexed_st gatvs th gs_error
+	#! (member_st, th, error) 
+		= replace_generic_vars_with_class_var kind_indexed_st gatvs th error
 
 	#! th = assertSymbolType member_st th // just paranoied about cleared variables
 	#! th = assertSymbolType gen_type th
 	
-	# {th_vars, th_attrs} = th
-	#! gs = {gs & gs_avarh = th_attrs, gs_tvarh = th_vars, gs_error = gs_error }
+	#! gs = {gs & gs_avarh = th.th_attrs, gs_tvarh = th.th_vars, gs_modules = modules, gs_error = error }
 	= (member_st, gs)
 where
 	add_bimap_contexts 
@@ -1827,40 +1831,45 @@ where
 
 	build_shorthand_instance_for_kinds gc_ident kinds gcf_generic (GCB_FunIndex fun_index) gc_type gc_type_cons gc_pos module_index st
 		= foldSt (build_shorthand_instance gc_ident kinds gcf_generic fun_index gc_type gc_type_cons gc_pos module_index) [1 .. length kinds] st
-
-	build_shorthand_instance gc_ident kinds gcf_generic fun_index gc_type gc_type_cons gc_pos module_index num_args
-			(modules, (fun_info, ins_info, heaps, error))
-
-		#! (consumed_kinds, rest_kinds) = splitAt num_args kinds 		
-		#! this_kind = case rest_kinds of
-			[] -> KindConst
-			_  -> KindArrow rest_kinds 
-
-		#! (class_info, (modules, heaps)) = get_class_for_kind gcf_generic this_kind (modules, heaps)
-		#! (arg_class_infos, (modules, heaps)) 
-			= mapSt (get_class_for_kind gcf_generic) consumed_kinds (modules, heaps)
-		#! ({class_members}, modules) = modules![class_info.gci_module].com_class_defs.[class_info.gci_class]	
-		#! (member_def, modules) = modules![class_info.gci_module].com_member_defs.[class_members.[0].ds_index]
-
-		#! (ins_type, heaps)
-			= build_instance_type gc_type arg_class_infos heaps
-		#! (fun_type, heaps, error)
-			= determine_type_of_member_instance member_def ins_type heaps error
-
-		# fun_ident = genericIdentToFunIdent gc_ident.id_name gc_type_cons
-
-		#! has_generic_info = is_OBJECT_CONS_FIELD_type gc_type gs_predefs
-
-		#! (memfun_ds, fun_info, heaps) 
-			= build_shorthand_instance_member module_index this_kind gcf_generic has_generic_info fun_index fun_ident gc_pos fun_type arg_class_infos fun_info heaps
-		
-		#! ins_info 
-			= build_shorthand_class_instance this_kind class_info.gci_class gc_ident gc_pos memfun_ds ins_type ins_info
-
-		= (modules, (fun_info, ins_info, heaps, error))
 	where
-		build_instance_type type class_infos heaps=:{hp_type_heaps=th=:{th_vars},hp_var_heap}
-			#! arity = length class_infos
+		build_shorthand_instance gc_ident kinds gcf_generic fun_index gc_type gc_type_cons gc_pos module_index num_args
+				(modules, (fun_info, ins_info, heaps, error))
+
+			#! (consumed_kinds, rest_kinds) = splitAt num_args kinds 		
+			#! this_kind = case rest_kinds of
+				[] -> KindConst
+				_  -> KindArrow rest_kinds 
+
+			#! (class_info, (modules, heaps)) = get_class_for_kind gcf_generic this_kind (modules, heaps)
+			#! (arg_class_infos, (modules, heaps)) 
+				= mapSt (get_class_for_kind gcf_generic) consumed_kinds (modules, heaps)
+			# (deps, modules) = modules![gcf_generic.gi_module].com_generic_defs.[gcf_generic.gi_index].gen_deps
+			# (dep_class_infoss, (modules, heaps))
+				= mapSt (\{gd_index} -> mapSt (get_class_for_kind gd_index) consumed_kinds) deps (modules, heaps)
+			# class_idents = [(gcf_generic, gc_ident):[(gd_index, ident) \\ {gd_index, gd_ident=Ident ident} <- deps]]
+			# arg_and_dep_class_infoss = map (zip2 class_idents) (transpose [arg_class_infos:dep_class_infoss])
+
+			#! ({class_members}, modules) = modules![class_info.gci_module].com_class_defs.[class_info.gci_class]
+			#! (member_def, modules) = modules![class_info.gci_module].com_member_defs.[class_members.[0].ds_index]
+			#! (ins_type, heaps)
+				= build_instance_type gc_type num_args (map removeDupByIndex arg_and_dep_class_infoss) heaps
+
+			#! (fun_type, heaps, error)
+				= determine_type_of_member_instance member_def ins_type heaps error
+			# fun_ident = genericIdentToFunIdent gc_ident.id_name gc_type_cons
+			#! has_generic_info = is_OBJECT_CONS_FIELD_type gc_type gs_predefs
+
+			#! (memfun_ds, fun_info, heaps) 
+				= build_shorthand_instance_member module_index this_kind has_generic_info fun_index fun_ident gc_pos fun_type (flatten arg_and_dep_class_infoss) fun_info heaps
+			#! ins_info 
+				= build_shorthand_class_instance this_kind class_info.gci_class gc_ident gc_pos memfun_ds ins_type ins_info
+
+			= (modules, (fun_info, ins_info, heaps, error))
+		where
+			removeDupByIndex [] = []
+			removeDupByIndex [x=:((indexx, _), _):xs] = [x:removeDupByIndex (filter (\((indexy, _), _) -> indexx <> indexy) xs)]
+
+		build_instance_type type arity arg_and_dep_class_infoss heaps=:{hp_type_heaps=th=:{th_vars},hp_var_heap}
 			#! type_var_names = [makeIdent ("a" +++ toString i) \\ i <- [1 .. arity]]
 			#! (type_vars, th_vars) = mapSt freshTypeVar type_var_names th_vars 
 			#! type_var_types = [TV tv \\ tv <- type_vars] 	
@@ -1868,8 +1877,10 @@ where
 			
 			#! type = fill_type_args type new_type_args	
 			
+			# num_contexts = length (hd arg_and_dep_class_infoss)
+			# context_type_vars = flatten (map (repeatn num_contexts) type_vars)
 			#! (contexts, hp_var_heap) 
-				= zipWithSt build_context class_infos type_vars hp_var_heap
+				= zipWithSt build_context (flatten arg_and_dep_class_infoss) context_type_vars hp_var_heap
 			
 			#! ins_type = 
 				{	it_vars	= type_vars
@@ -1892,13 +1903,13 @@ where
 			fill_type_args type args
 				= abort ("fill_type_args\n"---> ("fill_type_args", type, args)) 
 
-			build_context {gci_class, gci_module, gci_kind} tv hp_var_heap
+			build_context ((_, ident), {gci_class, gci_module, gci_kind}) tv hp_var_heap
 				# (var_info_ptr, hp_var_heap) = newPtr VI_Empty hp_var_heap			
 				# type_context =		
 					{	tc_class = TCClass
 							{ glob_module=gci_module // the same as icl module
 							, glob_object =
-								{ ds_ident = genericIdentToClassIdent gc_ident.id_name gci_kind
+								{ ds_ident = genericIdentToClassIdent ident.id_name gci_kind
 								, ds_index = gci_class
 								, ds_arity = 1
 								}
@@ -1906,9 +1917,11 @@ where
 					,	tc_types = [TV tv]
 					,	tc_var	 = var_info_ptr
 					}
-				= (type_context, hp_var_heap)	
+				= (type_context, hp_var_heap)
 
-		build_shorthand_instance_member module_index this_kind gcf_generic has_generic_info fun_index fun_ident gc_pos st class_infos fun_info heaps
+		build_shorthand_instance_member :: Int TypeKind Bool Int Ident Position SymbolType [((GlobalIndex, Ident), GenericClassInfo)] !FunsAndGroups !*Heaps
+										-> (!DefinedSymbol,!FunsAndGroups,!*Heaps)
+		build_shorthand_instance_member module_index this_kind has_generic_info fun_index fun_ident gc_pos st arg_and_dep_class_infos fun_info heaps
 			#! arg_var_names = ["x" +++ toString i \\ i <- [1..st.st_arity]]
 			#! (arg_var_exprs, arg_vars, heaps) = buildVarExprs arg_var_names heaps
 					
@@ -1916,7 +1929,7 @@ where
 			#! heaps = {heaps & hp_expression_heap = hp_expression_heap}
 			#! fun_name = genericIdentToMemberIdent gc_ident.id_name this_kind
 	
-			# (gen_exprs, heaps) = mapSt (build_generic_app gcf_generic gc_ident) class_infos heaps
+			# (gen_exprs, heaps) = mapSt build_generic_app arg_and_dep_class_infos heaps
 	
 			#! arg_exprs = gen_exprs ++ arg_var_exprs
 			# (body_expr, heaps)
@@ -1932,8 +1945,8 @@ where
 
 			= (fun_ds, fun_info, heaps)
 		where
-			build_generic_app {gi_module, gi_index} gc_ident {gci_kind} heaps
-				= buildGenericApp gi_module gi_index gc_ident gci_kind [] heaps
+			build_generic_app (({gi_module, gi_index}, ident), {gci_kind}) heaps
+				= buildGenericApp gi_module gi_index ident gci_kind [] heaps
 
 		build_shorthand_class_instance this_kind class_index gc_ident gc_pos {ds_ident,ds_arity,ds_index} ins_type (ins_index, instances)
 			#! class_ident = genericIdentToClassIdent gc_ident.id_name this_kind
@@ -2116,8 +2129,8 @@ buildGenericCaseBody main_module_index gc_pos (TypeConsSymb {type_ident,type_ind
 		No -> abort "sanity check: no generic representation\n"
 
 	#! (type_def=:{td_args, td_arity}, modules) = modules![type_index.glob_module].com_type_defs.[type_index.glob_object]
-	#! (generated_arg_exprs, original_arg_exprs, arg_vars, heaps)
-		= build_arg_vars gen_def td_args heaps
+	#! (generated_arg_exprss, original_arg_exprs, arg_vars, heaps)
+		= build_arg_vars gen_def gcf_generic td_args heaps
 
 	# (arg_vars,heaps)
 		= case has_generic_info of
@@ -2128,8 +2141,8 @@ buildGenericCaseBody main_module_index gc_pos (TypeConsSymb {type_ident,type_ind
 			False
 				-> (arg_vars,heaps)
 
-	#! (specialized_expr, funs_and_groups, td_infos, heaps, error)
-		= build_specialized_expr gc_pos gc_ident gcf_generic gtr_type td_args generated_arg_exprs gen_def.gen_info_ptr funs_and_groups td_infos heaps error
+	#! (specialized_expr, funs_and_groups, modules, td_infos, heaps, error)
+		= build_specialized_expr gc_pos gc_ident gcf_generic gen_def.gen_deps gtr_type td_args generated_arg_exprss gen_def.gen_info_ptr funs_and_groups modules td_infos heaps error
 
 	#! (body_expr, funs_and_groups, modules, td_infos, heaps, error)
 		= adapt_specialized_expr gc_pos gen_def gen_type_rep original_arg_exprs specialized_expr funs_and_groups modules td_infos heaps error
@@ -2142,20 +2155,31 @@ where
 		#! fv = {fv_count = 0, fv_ident = makeIdent "geninfo", fv_info_ptr = fv_info_ptr, fv_def_level = NotALevel}	
 		= (fv, {heaps & hp_var_heap = hp_var_heap})
 
-	build_arg_vars {gen_ident, gen_vars, gen_type} td_args heaps 
-		#! (generated_arg_exprs, generated_arg_vars, heaps) 
-			= buildVarExprs 
-				[ gen_ident.id_name +++ atv_variable.tv_ident.id_name \\ {atv_variable} <- td_args] 
+	build_arg_vars {gen_ident, gen_vars, gen_type, gen_deps} gcf_generic td_args heaps 
+		# dep_names = [(gen_ident, gen_vars, gcf_generic) : [(ident, gd_vars, gd_index) \\ {gd_ident=Ident ident, gd_vars, gd_index} <- gen_deps]]
+		#! (generated_arg_exprss, generated_arg_vars, heaps) 
+			= mapY2St buildVarExprs
+				[[mkDepName dep_name atv_variable \\ dep_name <- dep_names] \\ {atv_variable} <- td_args]
 				heaps	
 		#! (original_arg_exprs, original_arg_vars, heaps) 
 			= buildVarExprs 
 				[ "x" +++ toString n \\ n <- [1 .. gen_type.st_arity]] 
 				heaps	
-		= (generated_arg_exprs, original_arg_exprs, generated_arg_vars ++ original_arg_vars, heaps)
+		= (generated_arg_exprss, original_arg_exprs, flatten generated_arg_vars ++ original_arg_vars, heaps)
+		where 
+			mkDepName (ident, gvars, index) atv 
+				# gvarsName = foldl (\vs v -> vs +++ "_" +++ v.tv_ident.id_name) "" gvars
+				# indexName = "_" +++ toString index.gi_module +++ "-" +++ toString index.gi_index
+				= ident.id_name +++ gvarsName +++ indexName +++ "_" +++ atv.tv_ident.id_name
 
 	// generic function specialized to the generic representation of the type
-	build_specialized_expr gc_pos gc_ident gcf_generic gtr_type td_args generated_arg_exprs gen_info_ptr funs_and_groups td_infos heaps error
-		#! spec_env = [(atv_variable, TVI_Expr False expr) \\ {atv_variable} <- td_args & expr <- generated_arg_exprs]
+	build_specialized_expr gc_pos gc_ident gcf_generic gen_deps gtr_type td_args generated_arg_exprss gen_info_ptr funs_and_groups modules td_infos heaps error
+                // TODO: TvN: bimap_spec_env is hacked to fit the original description of a spec_env, taking the hd of the generated_arg_exprss, change it?
+		#! bimap_spec_env = [(atv_variable, TVI_Expr False (hd exprs)) \\ {atv_variable} <- td_args & exprs <- generated_arg_exprss]
+                // TODO: TvN: very quick and dirty implementation, must include generic dependency variables as well to look up right argument with 
+                // multiple dependencies on the same generic function but with different generic dependency variables
+                // See functions: specialize_type_var and checkgenerics.check_dependency
+		#! spec_env = [(atv_variable, TVI_Exprs (zip2 [gcf_generic:[gd_index \\ {gd_index} <- gen_deps]] exprs)) \\ {atv_variable} <- td_args & exprs <- generated_arg_exprss]
 		# generic_bimap = predefs.[PD_GenericBimap]
 		| gcf_generic.gi_module==generic_bimap.pds_module && gcf_generic.gi_index==generic_bimap.pds_def
 
@@ -2163,15 +2187,15 @@ where
 			# (gtr_type, heaps) = simplify_bimap_GenTypeStruct [atv_variable \\ {atv_variable} <- td_args] gtr_type heaps
 
 			# (expr,funs_and_groups,heaps,error)
-				= specialize_generic_bimap gcf_generic gtr_type spec_env gc_ident gc_pos main_module_index predefs funs_and_groups heaps error
-			= (expr,funs_and_groups,td_infos,heaps,error)
+				= specialize_generic_bimap gcf_generic gtr_type bimap_spec_env gc_ident gc_pos main_module_index predefs funs_and_groups heaps error
+			= (expr,funs_and_groups,modules,td_infos,heaps,error)
 
 			# ({gen_OBJECT_CONS_FIELD_indices},generic_heap) = readPtr gen_info_ptr heaps.hp_generic_heap
 			  heaps = {heaps & hp_generic_heap=generic_heap}
 
-			# (expr,td_infos,heaps,error)
-				= specializeGeneric gcf_generic gtr_type spec_env gc_ident gc_pos gen_OBJECT_CONS_FIELD_indices main_module_index td_infos heaps error
-			= (expr,funs_and_groups,td_infos,heaps,error)
+			# (expr,modules,td_infos,heaps,error)
+				= specializeGeneric gcf_generic gtr_type spec_env gc_ident gc_pos gen_deps gen_OBJECT_CONS_FIELD_indices main_module_index modules td_infos heaps error
+			= (expr,funs_and_groups,modules,td_infos,heaps,error)
 
 	// adaptor that converts a function for the generic representation into a 
 	// function for the type itself
@@ -2233,7 +2257,6 @@ where
 				#! (expr, heaps)
 					= buildGenericApp bimap_module bimap_index bimap_ident kind [] heaps		
 				= ((non_gen_var, TVI_Expr False expr), funs_and_groups, heaps)
-
 buildGenericCaseBody main_module_index gc_pos gc_type_cons gc_ident has_generic_info gcf_generic st predefs funs_and_groups td_infos modules heaps error
 	# error = reportError gc_ident.id_name gc_pos "cannot specialize to this type" error
 	= (TransformedBody {tb_args=[], tb_rhs=EE}, funs_and_groups, td_infos, modules, heaps, error)
@@ -2436,93 +2459,114 @@ specializeGeneric ::
 		![(TypeVar, TypeVarInfo)] // specialization environment
 		!Ident					// generic/generic case
 		!Position				// of generic case
+		![GenericDependency]
 		!{#OBJECT_CONS_FIELD_index}
 		!Index 					// main_module index
-		!*TypeDefInfos !*Heaps !*ErrorAdmin
+		!*Modules !*TypeDefInfos !*Heaps !*ErrorAdmin
 	-> (!Expression,
-		!*TypeDefInfos,!*Heaps,!*ErrorAdmin)
-specializeGeneric gen_index type spec_env gen_ident gen_pos gen_OBJECT_CONS_FIELD_indices main_module_index td_infos heaps error
+		!*Modules,!*TypeDefInfos,!*Heaps,!*ErrorAdmin)
+specializeGeneric gen_index type spec_env gen_ident gen_pos gen_deps gen_OBJECT_CONS_FIELD_indices main_module_index modules td_infos heaps error
 	#! heaps = set_tvs spec_env heaps
-	#! (expr, (td_infos, heaps, error)) 
-		= specialize type (td_infos, heaps, error)
+	#! (expr, (modules, td_infos, heaps, error)) 
+		= specialize gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices type (modules, td_infos, heaps, error)
 	#! heaps = clear_tvs spec_env heaps
-	= (expr, td_infos, heaps, error)
+	= (expr, modules, td_infos, heaps, error)
 where
-	specialize (GTSAppCons kind arg_types) st
-		#! (arg_exprs, st) = mapSt specialize arg_types st
+	specialize gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices (GTSAppCons kind arg_types) st
+		#! (arg_exprs, st) = specialize_with_deps gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices arg_types st
 		= build_generic_app kind arg_exprs gen_index gen_ident st
-	specialize (GTSAppVar tv arg_types) st
-		#! (arg_exprs, st) = mapSt specialize arg_types st
-		#! (expr, st) = specialize_type_var tv st 
+	specialize gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices (GTSAppVar tv arg_types) st
+		#! (arg_exprs, st) = specialize_with_deps gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices arg_types st
+		#! (expr, st) = specialize_type_var tv gen_index st 
 		= (expr @ arg_exprs, st)
-	specialize (GTSVar tv) st
-		= specialize_type_var tv st
-	specialize (GTSArrow x y) st
-		#! (x, st) = specialize x st
-		#! (y, st) = specialize y st
-		= build_generic_app (KindArrow [KindConst, KindConst]) [x,y] gen_index gen_ident st
-	specialize (GTSPair x y) st
-		#! (x, st) = specialize x st
-		#! (y, st) = specialize y st
-		= build_generic_app (KindArrow [KindConst, KindConst]) [x,y] gen_index gen_ident st
-	specialize (GTSEither x y) st
-		#! (x, st) = specialize x st
-		#! (y, st) = specialize y st
-		= build_generic_app (KindArrow [KindConst, KindConst]) [x,y] gen_index gen_ident st
-	specialize (GTSCons cons_info_ds arg_type) st
-		# (arg_expr, (td_infos, heaps, error)) = specialize arg_type st
+	specialize gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices (GTSVar tv) st
+		= specialize_type_var tv gen_index st
+	specialize gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices (GTSArrow x y) st
+		# (arg_exprs, st) = specialize_with_deps gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices [x, y] st
+		= build_generic_app (KindArrow [KindConst, KindConst]) arg_exprs gen_index gen_ident st
+	specialize gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices (GTSPair x y) st
+		# (arg_exprs, st) = specialize_with_deps gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices [x, y] st
+		= build_generic_app (KindArrow [KindConst, KindConst]) arg_exprs gen_index gen_ident st
+	specialize gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices (GTSEither x y) st
+		# (arg_exprs, st) = specialize_with_deps gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices [x, y] st
+		= build_generic_app (KindArrow [KindConst, KindConst]) arg_exprs gen_index gen_ident st
+	specialize gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices (GTSCons cons_info_ds arg_type) st
+		# (arg_exprs, (modules, td_infos, heaps, error)) = specialize_with_deps gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices [arg_type] st
 		#! (generic_info_expr, heaps) = buildFunApp main_module_index cons_info_ds [] heaps		
 		# gen_CONS_index = gen_OBJECT_CONS_FIELD_indices.[1]
 		| gen_CONS_index.ocf_module>=0
 			#! (expr, heaps)
-				= buildFunApp2 gen_CONS_index.ocf_module gen_CONS_index.ocf_index gen_CONS_index.ocf_ident [generic_info_expr, arg_expr] heaps
-			= (expr, (td_infos, heaps, error))
+				= buildFunApp2 gen_CONS_index.ocf_module gen_CONS_index.ocf_index gen_CONS_index.ocf_ident [generic_info_expr:arg_exprs] heaps
+			= (expr, (modules, td_infos, heaps, error))
 			// no instance for CONS, report error here ?
-			#! (expr, heaps)
-				= buildGenericApp gen_index.gi_module gen_index.gi_index gen_ident (KindArrow [KindConst]) [arg_expr] heaps
-			= (expr, (td_infos, heaps, error))
-	specialize (GTSField field_info_ds arg_type) st
-		# (arg_expr, (td_infos, heaps, error)) = specialize arg_type st
+			= build_generic_app (KindArrow [KindConst]) arg_exprs gen_index gen_ident (modules, td_infos, heaps, error)
+	specialize gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices (GTSField field_info_ds arg_type) st
+		# (arg_exprs, (modules, td_infos, heaps, error)) = specialize_with_deps gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices [arg_type] st
 		#! (generic_info_expr, heaps) = buildFunApp main_module_index field_info_ds [] heaps
 		# gen_FIELD_index = gen_OBJECT_CONS_FIELD_indices.[2]
 		| gen_FIELD_index.ocf_module>=0
 			#! (expr, heaps)
-				= buildFunApp2 gen_FIELD_index.ocf_module gen_FIELD_index.ocf_index gen_FIELD_index.ocf_ident [generic_info_expr, arg_expr] heaps
-			= (expr, (td_infos, heaps, error))
+				= buildFunApp2 gen_FIELD_index.ocf_module gen_FIELD_index.ocf_index gen_FIELD_index.ocf_ident [generic_info_expr:arg_exprs] heaps
+			= (expr, (modules, td_infos, heaps, error))
 			// no instance for FIELD, report error here ?
-			#! (expr, heaps)
-				= buildGenericApp gen_index.gi_module gen_index.gi_index gen_ident (KindArrow [KindConst]) [arg_expr] heaps
-			= (expr, (td_infos, heaps, error))
-	specialize (GTSObject type_info_ds arg_type) st
-		# (arg_expr, (td_infos, heaps, error)) = specialize arg_type st
+ 			= build_generic_app (KindArrow [KindConst]) arg_exprs gen_index gen_ident (modules, td_infos, heaps, error)
+	specialize gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices (GTSObject type_info_ds arg_type) st
+		# (arg_exprs, (modules, td_infos, heaps, error)) = specialize_with_deps gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices [arg_type] st
 		#! (generic_info_expr, heaps) = buildFunApp main_module_index type_info_ds [] heaps
 		# gen_OBJECT_index = gen_OBJECT_CONS_FIELD_indices.[0]
 		| gen_OBJECT_index.ocf_module>=0
 			#! (expr, heaps)
-				= buildFunApp2 gen_OBJECT_index.ocf_module gen_OBJECT_index.ocf_index gen_OBJECT_index.ocf_ident [generic_info_expr, arg_expr] heaps
-			= (expr, (td_infos, heaps, error))
-			// no instance for OBJECT, report error here ?
-			#! (expr, heaps)
-				= buildGenericApp gen_index.gi_module gen_index.gi_index gen_ident (KindArrow [KindConst]) [arg_expr] heaps
-			= (expr, (td_infos, heaps, error))
-	specialize type (td_infos, heaps, error)
+				= buildFunApp2 gen_OBJECT_index.ocf_module gen_OBJECT_index.ocf_index gen_OBJECT_index.ocf_ident [generic_info_expr:arg_exprs] heaps
+			= (expr, (modules, td_infos, heaps, error))
+		// no instance for OBJECT, report error here ?
+	 		= build_generic_app (KindArrow [KindConst]) arg_exprs gen_index gen_ident (modules, td_infos, heaps, error)
+	specialize gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices type (modules, td_infos, heaps, error)
 		#! error = reportError gen_ident.id_name gen_pos "cannot specialize " error 
-		= (EE, (td_infos, heaps, error))
+		= (EE, (modules, td_infos, heaps, error))
 
-	specialize_type_var tv=:{tv_info_ptr} (td_infos, heaps=:{hp_type_heaps=th=:{th_vars}}, error)		
+	specialize_type_var tv=:{tv_info_ptr} gen_index (modules, td_infos, heaps=:{hp_type_heaps=th=:{th_vars}}, error)		
 		# (expr, th_vars) = readPtr tv_info_ptr th_vars
 		# heaps = {heaps & hp_type_heaps = {th & th_vars = th_vars}}
 		= case expr of
-			TVI_Expr is_bimap_id expr
-				-> (expr, (td_infos, heaps, error))
+                        // TODO: TvN: Now we use the gen_index to look up the right argument expression, but this fails when you have a duplicate dependency on
+                        // the same generic function with different generic variables. The generic variables must be included in the spec_env as well, but this
+                        // requires including forwarding pointers to obtain substitutions of dependency variables. For example:
+                        // 
+                        // generic f a b | g a, g b :: a -> b
+                        // generic g c :: c -> c
+                        // See functions: build_specialized_expr and checkgenerics.check_dependency
+			TVI_Exprs exprs
+				# (argExpr, error) = lookupArgExpr gen_index exprs error
+				-> (argExpr, (modules, td_infos, heaps, error))
 			TVI_Iso iso_ds to_ds from_ds
 				# (expr,heaps) = buildFunApp main_module_index iso_ds [] heaps
-				-> (expr, (td_infos, heaps, error))
+				-> (expr, (modules, td_infos, heaps, error))
+	where
+		lookupArgExpr _ [] error = (undef, reportError gen_ident.id_name gen_pos "missing dependencies of its dependencies in the type signature" error)
+		lookupArgExpr x [(k, v):kvs] error | k == x = (v, error)
+						   = lookupArgExpr x kvs error
+		
+	specialize_with_deps gen_index gen_ident gen_deps gen_OBJECT_CONS_FIELD_indices xs st
+		# (info_deps, st) = mapSt collect_dependency_info gen_deps st
+		# info_self_deps = [(gen_index, gen_ident, gen_deps, gen_OBJECT_CONS_FIELD_indices) : info_deps]
+		= accumSt [specialize index ident deps indices arg \\ arg <- xs, (index, ident, deps, indices) <- info_self_deps] st
+	where
+		collect_dependency_info gen_dep (modules, td_infos, heap, error)
+			# ({gen_ident, gen_deps, gen_info_ptr}, modules) = lookupDependencyDef gen_dep modules
+			# ({gen_OBJECT_CONS_FIELD_indices}, generic_heap) = readPtr gen_info_ptr heap.hp_generic_heap
+			# heap = {heap & hp_generic_heap = generic_heap}
+			= ((gen_dep.gd_index, gen_ident, gen_deps, gen_OBJECT_CONS_FIELD_indices), (modules, td_infos, heap, error))
 
-	build_generic_app kind arg_exprs gen_index gen_ident (td_infos, heaps, error)
+		accumSt [] st = ([], st)
+		accumSt [f:fs] st 
+			# (x, st) = f st
+			# (xs, st) = accumSt fs st
+			= ([x:xs], st)
+
+	build_generic_app kind arg_exprs gen_index gen_ident (modules, td_infos, heaps, error)
 		#! (expr, heaps)
 			= buildGenericApp gen_index.gi_module gen_index.gi_index gen_ident kind arg_exprs heaps 
-		= (expr, (td_infos, heaps, error))
+		= (expr, (modules, td_infos, heaps, error))
 
 specialize_generic_bimap ::
 		!GlobalIndex			// generic index
@@ -3443,57 +3487,63 @@ bimap_from_arrow_arg_id_expression arg_exprs main_module_index predefs funs_and_
 buildKindIndexedType :: 
 		!SymbolType			// symbol type to kind-index
 		![TypeVar]			// generic type variables
+		![GenericDependency]		// generic dependencies
 		!TypeKind			// kind index
 		!Ident				// name for debugging
 		!Position 			// position for debugging
 		!*TypeHeaps			// type heaps
+		!*Modules
 		!*ErrorAdmin		
 	-> 	( !SymbolType		// instantiated type
 		, ![ATypeVar]		// fresh generic type variables
 		, !*TypeHeaps		// type heaps
+		, !*Modules
 		, !*ErrorAdmin	
 		)
-buildKindIndexedType st gtvs kind ident pos th error
-	#! th = clearSymbolType st th
-	#! (fresh_st, fresh_gtvs, th) = fresh_generic_type st gtvs th	
+buildKindIndexedType st gtvs deps kind ident pos th modules error
+	#! (fresh_st, gatvs, th) = fresh_generic_type st gtvs th	
 
-	#! (gatvs, th) = collectAttrsOfTypeVarsInSymbolType fresh_gtvs fresh_st th
-
-	#! (kind_indexed_st, _, th, error) = build_symbol_type fresh_st gatvs kind 1 th error	
+	#! (kind_indexed_st, _, (th, modules, error)) = build_symbol_type fresh_st gatvs deps kind ident pos 1 (th, modules, error)
 	 	 
 	#! th = clearSymbolType kind_indexed_st th
 	#! th = clearSymbolType st th				// paranoja
-	= (kind_indexed_st, gatvs, th, error)
+	= (kind_indexed_st, gatvs, th, modules, error)
 where
 	fresh_generic_type st gtvs th
+		# th = clearSymbolType st th
 		# (fresh_st, th) = freshSymbolType st th
-		# fresh_gtvs = take (length gtvs) fresh_st.st_vars		
-		= (fresh_st, fresh_gtvs, th)
+		# fresh_gtvs = take (length gtvs) fresh_st.st_vars
+		# (gatvs, th) = collectAttrsOfTypeVarsInSymbolType fresh_gtvs fresh_st th		
+		= (fresh_st, gatvs, th)
 
 	build_symbol_type ::
 			 !SymbolType 	// generic type, 
 			 ![ATypeVar]	// attributed generic variables
+			 ![GenericDependency]	// generic dependencies
 			 !TypeKind 		// kind to specialize to 
+			 !Ident		
+	 	  	 !Position 	
 			 !Int 			// current order (in the sense of the order of the kind)
-			 !*TypeHeaps !*ErrorAdmin
+			 (!*TypeHeaps, !*Modules, !*ErrorAdmin)
 		-> ( !SymbolType	// new generic type
 			, ![ATypeVar]	// fresh copies of generic variables created for the 
 							// generic arguments
-			, !*TypeHeaps, !*ErrorAdmin)
-	build_symbol_type st gatvs KindConst order th error	
-		= (st, [], th, error)
-	build_symbol_type st gatvs (KindArrow kinds) order th error
+			, (!*TypeHeaps, !*Modules, !*ErrorAdmin))
+	build_symbol_type st _ _ KindConst _ _ _ (th, modules, error)	
+		= (st, [], (th, modules, error))
+	build_symbol_type st gatvs deps (KindArrow kinds) ident pos order (th, modules, error)
 		| order > 2
-			# error = reportError ident.id_name pos "kinds of order higher then 2 are not supported" error
-			= (st, [], th, error)
+			# error = reportError ident.id_name pos "kinds of order higher than 2 are not supported" error
+			= (st, [], (th, modules, error))
 		
-		# (arg_sts, arg_gatvss, th, error) 
-			= build_args st gatvs order kinds th error 
+		# (arg_stss, arg_gatvss, (_, th, modules, error))
+			= mapY2St (build_arg st gatvs deps ident pos order) kinds (0, th, modules, error)
+		# arg_sts = flatten arg_stss
 
 		# (body_st, th) 
 			= build_body st gatvs (transpose arg_gatvss) th 
 
-		# num_added_args = length kinds
+		# num_added_args = length kinds * (length deps + 1)
 		# new_st = 
 			{ st_vars = removeDup (
 					foldr (++) body_st.st_vars [st_vars \\ {st_vars}<-arg_sts])
@@ -3508,58 +3558,81 @@ where
 				foldr (++) body_st.st_attr_env [st_attr_env \\ {st_attr_env} <- arg_sts])
 			, st_args_strictness = insert_n_lazy_values_at_beginning num_added_args body_st.st_args_strictness	 
 			}
-		= (new_st, flatten arg_gatvss, th, error)
-
-	build_args st gatvs order kinds th error
-		# (arg_sts_and_gatvss, (_,th,error)) 
-			= mapSt (build_arg st gatvs order) kinds (1,th,error)
-		# (arg_sts, arg_gatvss) = unzip arg_sts_and_gatvss
-		= (arg_sts, arg_gatvss, th, error)
+		= (new_st, flatten arg_gatvss, (th, modules, error))
 
 	build_arg :: 
 			!SymbolType 		// current part of the generic type
 			![ATypeVar]			// generic type variables with their attrs
+			![GenericDependency]		// generic dependencies
+	 	 	!Ident
+	 	 	!Position
 			!Int 				// order
 			!TypeKind			// kind corrseponding to the arg
 			( !Int				// the argument number
-			, !*TypeHeaps, !*ErrorAdmin)				
-		->  ( (!SymbolType, [ATypeVar]) // fresh symbol type and generic variables 
+			, !*TypeHeaps
+			, !*Modules
+			, !*ErrorAdmin
+			)				
+		->  ( ![SymbolType], [ATypeVar] // fresh symbol type and generic variables 
 			, 	( !Int			// incremented argument number
-				, !*TypeHeaps, !*ErrorAdmin))
-	build_arg st gatvs order kind (arg_num, th, error)
+				, !*TypeHeaps
+				, !*Modules
+				, !*ErrorAdmin
+				)
+			)
+	build_arg st gatvs deps ident pos order kind (arg_num, th, modules, error)		
 		#! th = clearSymbolType st th
-		#! (fresh_gatvs, th) = mapSt subst_gatv gatvs th
+		#! (fresh_gatvs, th) = mapSt create_fresh_gatv gatvs th 
+		#! (th, error) = fold2St make_subst_gatv gatvs fresh_gatvs (th, error)
 		#! (new_st, th) = applySubstInSymbolType st th
-		
-		#! (new_st, forall_atvs, th, error) 
-			= build_symbol_type new_st fresh_gatvs kind (inc order) th error	
+		#! (new_st, forall_atvs, (th, modules, error)) 
+			= build_symbol_type new_st fresh_gatvs deps kind ident pos (inc order) (th, modules, error)	
 		#! (curry_st, th)	
-			= curryGenericArgType1 new_st ("cur" +++ toString order +++ postfix) th 	
-
+			= curryGenericArgType1 new_st ("cur" +++ toString order +++ postfix) th
 		#! curry_st = adjust_forall curry_st forall_atvs
 
-		= ((curry_st, fresh_gatvs), (inc arg_num, th, error))
+		# (curry_dep_sts, (th, modules, error)) = mapSt (build_dependency_arg fresh_gatvs order kind) deps (th, modules, error)	
+
+		= ([curry_st:curry_dep_sts], fresh_gatvs, (inc arg_num, th, modules, error))
 	where
 		postfix = toString arg_num
 
-		subst_gatv atv=:{atv_attribute, atv_variable} th=:{th_attrs, th_vars}			
-			# (tv, th_vars) = subst_gtv atv_variable th_vars 
-			# (attr, th_attrs) = subst_attr atv_attribute th_attrs 			
-			=	( {atv & atv_variable = tv, atv_attribute = attr}
-			 	, {th & th_vars = th_vars, th_attrs = th_attrs}
-			 	)	
+		create_fresh_gatv :: ATypeVar *TypeHeaps -> (!ATypeVar, !*TypeHeaps)
+		create_fresh_gatv atv=:{atv_attribute, atv_variable} th=:{th_attrs, th_vars}
+		    # (fresh_atv_variable, th_vars) = freshTypeVar (postfixIdent atv_variable.tv_ident.id_name postfix) th_vars   
+		    # (fresh_atv_attribute, th_attrs)
+		        = case atv_attribute of
+				TA_Var {av_ident}
+					# (av, th_attrs) = freshAttrVar (postfixIdent av_ident.id_name postfix) th_attrs
+					-> (TA_Var av, th_attrs)
+				TA_Multi
+					-> (TA_Multi, th_attrs)
+				TA_Unique
+					-> (TA_Unique, th_attrs)
+		    # new_atv = {atv_variable = fresh_atv_variable, atv_attribute = fresh_atv_attribute}
+		    # th = {th & th_vars = th_vars, th_attrs = th_attrs}		    
+		    = (new_atv, th)
 
-		// generic type var is replaced with a fresh one
-		subst_gtv {tv_info_ptr, tv_ident} th_vars 
-			# (tv, th_vars) = freshTypeVar (postfixIdent tv_ident.id_name postfix) th_vars	
-			= (tv, writePtr tv_info_ptr (TVI_Type (TV tv)) th_vars)
-
-		subst_attr (TA_Var {av_ident, av_info_ptr}) th_attrs 
-			# (av, th_attrs) = freshAttrVar (postfixIdent av_ident.id_name postfix) th_attrs
-			= (TA_Var av, writePtr av_info_ptr (AVI_Attr (TA_Var av)) th_attrs)
-
-		subst_attr TA_Multi th = (TA_Multi, th)
-		subst_attr TA_Unique th = (TA_Unique, th)
+		make_subst_gatv :: ATypeVar ATypeVar (*TypeHeaps, *ErrorAdmin) -> (!*TypeHeaps, !*ErrorAdmin)
+		make_subst_gatv atv=:{atv_attribute, atv_variable} gatv=:{atv_attribute=new_atv_attribute, atv_variable=new_atv_variable} (th=:{th_attrs, th_vars}, error)
+			# th_vars = make_subst_gtv atv_variable new_atv_variable th_vars
+			# (th_attrs, error) = make_subst_attr atv_attribute new_atv_attribute th_attrs error
+ 			# th & th_vars = th_vars, th_attrs = th_attrs
+			= (th, error)
+		where
+			make_subst_gtv :: TypeVar TypeVar *TypeVarHeap -> *TypeVarHeap
+			make_subst_gtv {tv_info_ptr} new_atv_variable th_vars
+		        	= writePtr tv_info_ptr (TVI_Type (TV new_atv_variable)) th_vars
+    
+			make_subst_attr :: TypeAttribute TypeAttribute *AttrVarHeap *ErrorAdmin -> (!*AttrVarHeap,!*ErrorAdmin)
+			make_subst_attr (TA_Var {av_ident, av_info_ptr}) new_atv_attribute=:(TA_Var _) th_attrs error
+				= (writePtr av_info_ptr (AVI_Attr new_atv_attribute) th_attrs, error)
+			make_subst_attr TA_Multi TA_Multi th_attrs error
+				= (th_attrs, error)
+			make_subst_attr TA_Unique TA_Unique th_attrs error
+				= (th_attrs, error)
+			make_subst_attr _ _ th_attrs error
+				= (th_attrs, reportError ident.id_name pos ("inconsistency with attributes of a generic dependency") error) 
 
 		adjust_forall curry_st [] = curry_st
 		adjust_forall curry_st=:{st_result} forall_atvs 
@@ -3572,6 +3645,19 @@ where
 					= curry_st.st_vars -- [atv_variable \\ {atv_variable} <- forall_atvs]
 				}
 
+		build_dependency_arg fresh_gatvs order kind {gd_index, gd_nums} (th, modules, error)
+			# ({gen_type, gen_vars, gen_deps, gen_ident, gen_pos}, modules) 
+				= modules![gd_index.gi_module].com_generic_defs.[gd_index.gi_index]
+			# (fresh_dep_st, fresh_dep_gatvs, th) = fresh_generic_type gen_type gen_vars th
+			# to_gatvs = map (\num -> fresh_gatvs !! num) gd_nums
+			# (th, error) = fold2St make_subst_gatv fresh_dep_gatvs to_gatvs (th, error)
+			# (new_dep_st, th) = applySubstInSymbolType fresh_dep_st th
+			# (new_dep_st, forall_dep_atvs, (th, modules, error)) 
+				= build_symbol_type new_dep_st to_gatvs gen_deps kind gen_ident gen_pos (inc order) (th, modules, error)
+			# (curry_dep_st, th) = curryGenericArgType1 new_dep_st ("cur" +++ toString order +++ postfix) th
+			# curry_dep_st = adjust_forall curry_dep_st forall_dep_atvs
+			= (curry_dep_st, (th, modules, error))
+		
 	build_body :: 
 			!SymbolType 
 			![ATypeVar]
@@ -4074,9 +4160,12 @@ collectAttrsOfTypeVars :: ![TypeVar] type !*TypeHeaps -> (![ATypeVar], !*TypeHea
 collectAttrsOfTypeVars tvs type th
 	#! (th=:{th_vars}) = clearType type th
 	
-	# th_vars = foldSt (\{tv_info_ptr} h->writePtr tv_info_ptr TVI_Used h) tvs th_vars 
+	# th_vars = foldSt (\{tv_info_ptr} h->writePtr tv_info_ptr TVI_Empty h) tvs th_vars 
 	
-	#! (atvs, th_vars) = foldType on_type on_atype type ([], th_vars)
+	# th_vars = foldType on_type on_atype type th_vars
+
+	# (attrs, th_vars) = mapSt read_attr tvs th_vars
+	# atvs = [makeATypeVar tv attr \\ tv <- tvs & attr <- attrs]
 
 	# th_vars = foldSt (\{tv_info_ptr} h->writePtr tv_info_ptr TVI_Empty h) tvs th_vars 
 
@@ -4091,14 +4180,17 @@ where
 	//??? TFA -- seems that it is not needed
  	on_atype _ st = st 	
 
-	on_type_var tv=:{tv_info_ptr} attr (atvs, th_vars)	
+	on_type_var tv=:{tv_info_ptr} attr th_vars
 	 	#! (tvi, th_vars) = readPtr tv_info_ptr th_vars
 	 	= case tvi of
-	 		TVI_Used
-	 			# th_vars = writePtr tv_info_ptr TVI_Empty th_vars
-	 			-> ([makeATypeVar tv attr : atvs], th_vars)
-	 		TVI_Empty 
-	 			-> (atvs, th_vars) 
+	 		TVI_Empty
+	 			-> writePtr tv_info_ptr (TVI_Attr attr) th_vars
+	 		TVI_Attr _ 
+	 			-> th_vars
+
+	read_attr {tv_info_ptr} th_vars
+		# (TVI_Attr attr, th_vars) = readPtr tv_info_ptr th_vars
+		= (attr, th_vars)
 
 collectAttrsOfTypeVarsInSymbolType tvs {st_args, st_result} th
  	= collectAttrsOfTypeVars tvs [st_result:st_args] th  

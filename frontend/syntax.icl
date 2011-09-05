@@ -1,11 +1,16 @@
 implementation module syntax
 
 import StdEnv, compare_constructor
-import scanner, general, Heap, typeproperties, utilities
+import scanner, general, Heap, typeproperties, utilities, StdCompare
 import syntax
 
 instance toString Ident
 where toString {id_name} = id_name
+
+instance == GenericDependency
+	where
+		(==) gen_dep1 gen_dep2
+			= gen_dep1.gd_index == gen_dep2.gd_index && gen_dep1.gd_vars == gen_dep2.gd_vars
 
 instance toString Import
 where toString {import_module} = toString import_module
