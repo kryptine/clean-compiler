@@ -207,7 +207,11 @@ where
 checkGenericCaseDefs :: !Index !*{#GenericCaseDef} !*{#GenericDef} !u:{#CheckedTypeDef} !*{#ClassDef} !*{#DclModule} !*Heaps !*CheckState
 						   -> (!*{#GenericCaseDef},!*{#GenericDef},!u:{#CheckedTypeDef},!*{#ClassDef},!*{#DclModule},!.Heaps,!.CheckState)
 checkGenericCaseDefs mod_index gen_case_defs generic_defs type_defs class_defs modules heaps cs
-	= check_generic_case_defs 0 mod_index gen_case_defs generic_defs type_defs class_defs modules heaps cs
+	| size gen_case_defs==0
+		= (gen_case_defs, generic_defs, type_defs, class_defs, modules, heaps, cs)	
+		# {cs_x} = cs
+		# cs = {cs & cs_x = {cs_x & x_needed_modules = cs_x.x_needed_modules bitor cNeedStdGeneric}}
+		= check_generic_case_defs 0 mod_index gen_case_defs generic_defs type_defs class_defs modules heaps cs
 where
 	check_generic_case_defs index mod_index gen_case_defs generic_defs type_defs class_defs modules heaps cs
 		| index == size gen_case_defs
