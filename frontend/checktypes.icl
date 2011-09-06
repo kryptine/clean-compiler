@@ -558,15 +558,6 @@ getClassDef class_index type_module module_index class_defs modules
 		  class_def = com_class_defs.[class_index]
 		= (class_def, class_index, class_defs, modules)
 
-getGenericDef :: !Index !Index !Index !u:{# GenericDef} !v:{# DclModule} -> (!GenericDef, !Index , !u:{# GenericDef}, !v:{# DclModule})
-getGenericDef generic_index type_module module_index generic_defs modules
-	| type_module == module_index
-		# (generic_def, generic_defs) = generic_defs![generic_index]
-		= (generic_def, generic_index, generic_defs, modules)
-		# ({dcl_common={com_generic_defs}}, modules) = modules![type_module]
-		  generic_def = com_generic_defs.[generic_index]
-		= (generic_def, generic_index, generic_defs, modules)
-
 checkTypeVar :: !Level !DemandedAttributeKind !TypeVar !TypeAttribute !(!*OpenTypeInfo, !*CheckState)
 					-> (! TypeVar, !TypeAttribute, !(!*OpenTypeInfo, !*CheckState))
 checkTypeVar scope dem_attr tv=:{tv_ident=var_ident=:{id_name,id_info}} tv_attr (oti, cs=:{cs_symbol_table})
