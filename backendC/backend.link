@@ -86,6 +86,7 @@
 /EXPORT: BENoTypes
 /EXPORT: BEFlatType
 /EXPORT: BEAlgebraicType
+/EXPORT: BEExtendableAlgebraicType
 /EXPORT: BERecordType
 /EXPORT: BEAbsType
 /EXPORT: BEConstructors
