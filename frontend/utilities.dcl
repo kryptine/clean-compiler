@@ -37,6 +37,28 @@ where
 		#! s = s
 	 	= ([], s)
 
+mapSt2 f l s1 s2 :== map_st2 l s1 s2
+where
+	map_st2 [x : xs] s1 s2
+	 	# (x, s1,s2) = f x s1 s2
+		  (xs, s1,s2) = map_st2 xs s1 s2
+		#! s1 = s1
+		#! s2 = s2
+		= ([x : xs], s1,s2)
+	map_st2 [] s1 s2
+	 	= ([], s1,s2)
+
+mapY2St f l s :== map_y2_st l s
+where
+	map_y2_st [x : xs] s
+	 	# (x, y, s) = f x s
+		  (xs, ys, s) = map_y2_st xs s
+		#! s = s
+		= ([x : xs], [y : ys], s)
+	map_y2_st [] s
+		#! s = s
+	 	= ([], [], s)
+
 map2St f l1 l2 st :== map2_st l1 l2 st
   where
 	map2_st [h1:t1] [h2:t2] st
