@@ -27,12 +27,8 @@ char *GetFileExtension (FileKind kind)
 		case obj81File:		return ".obj2";
 		case iclFile:		return ".icl";
 		case dclFile:		return ".dcl";
-		case dumpFile:		return ".dmp";
-		case statFile:		return ".stt";
-		case stasFile:		return ".str";
 		case assFile:		return ".a";
 		case sunAssFile:	return ".s";
-		case helpFile:
 		case applFile:
 		case otherFile:
 		default:			return "";
@@ -444,38 +440,29 @@ FileTime FGetFileTime (char *fname, FileKind kind)
 	return (FileTime) buf.st_mtime;
 } /* FGetFileTime */
 
-
-
-
-/*******************************************************************************
- *                                                                             *
- *     Error Handling                                                          *
- *                                                                             *
- ******************************************************************************/
+/* Error Handling */
 	
 void DoError (char *fmt, ...)
 {	va_list args;
 	
 	va_start (args, fmt);
 
-	(void) vfprintf (stderr, fmt, args);
+	(void) vfprintf (StdError, fmt, args);
 	
 	va_end (args);
-} /* DoError */
-
+}
 
 void DoFatalError (char *fmt, ...)
 {	va_list args;
 	
 	va_start (args, fmt);
 
-	(void) vfprintf (stderr, fmt, args);
+	(void) vfprintf (StdError, fmt, args);
 	
 	va_end (args);
 
 	exit (0);
-} /* DoFatalError */
-
+}
 
 void CmdError (char *errormsg,...)
 {	va_list args;
@@ -487,8 +474,7 @@ void CmdError (char *errormsg,...)
 	fputc ('\n', stdout); 
 		
 	va_end (args);
-} /* CmdError */
-
+}
 
 /*******************************************************************************
  *     Interrupt Handling                                                      *

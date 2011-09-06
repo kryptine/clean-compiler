@@ -137,9 +137,6 @@ void create_result_state_database (struct imp_rule *imp_rules)
 		TypeAlts type_alt;
 		struct state *state_p;
 		
-		if (rule->rule_root->node_symbol->symb_def->sdef_over_arity!=0)
-			continue;
-
 		type_alt=rule->rule_type;
 		if (type_alt==NULL)
 			continue;

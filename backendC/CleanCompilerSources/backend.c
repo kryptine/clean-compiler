@@ -2854,6 +2854,26 @@ BEAlgebraicType (BEFlatTypeP lhs, BEConstructorListP constructors)
 	sdef->sdef_type			= type;
 } /* BEAlgebraicType */
 
+void BEExtendableAlgebraicType (BEFlatTypeP lhs, BEConstructorListP constructors)
+{
+	Types type;
+	SymbDefP sdef;
+
+	type = ConvertAllocType (struct type);
+	type->type_next = NULL;
+	type->type_lhs = lhs;
+	type->type_line = 0;
+	type->type_constructors	= constructors;
+	type->type_nr_of_constructors = 0;
+
+	for (; constructors!=NULL; constructors=constructors->cl_next)
+		constructors->cl_constructor->type_node_symbol->symb_def->sdef_type = type;
+
+	sdef = type->type_lhs->ft_symbol->symb_def;
+	sdef->sdef_kind = TYPE;
+	sdef->sdef_type = type;
+}
+
 void
 BERecordType (int moduleIndex, BEFlatTypeP lhs, BETypeNodeP constructorType, int is_boxed_record, BEFieldListP fields)
 {
@@ -3828,12 +3848,24 @@ BEInit (int argc)
 void
 BECloseFiles (void)
 {
-	if (StdErrorReopened)
+	if (StdErrorReopened){
+#ifdef _SUN_
+		fclose (std_error_file_p);
+		std_error_file_p = stderr;
+#else
 		fclose (StdError);
-	StdErrorReopened = False;
-	if (StdOutReopened)
+#endif
+		StdErrorReopened = False;
+	}
+	if (StdOutReopened){
+#ifdef _SUN_
+		fclose (std_out_file_p);
+		std_out_file_p = stdout;
+#else
 		fclose (StdOut);
-	StdOutReopened = False;
+#endif
+		StdOutReopened = False;
+	}
 } /* BECloseFiles */
 
 void

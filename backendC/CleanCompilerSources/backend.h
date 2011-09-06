@@ -442,6 +442,9 @@ Clean (BEFlatType :: BESymbolP BEAttribution BETypeVarListP BackEnd -> (BEFlatTy
 void BEAlgebraicType (BEFlatTypeP lhs, BEConstructorListP constructors);
 Clean (BEAlgebraicType:: BEFlatTypeP BEConstructorListP BackEnd -> BackEnd)
 
+void BEExtendableAlgebraicType (BEFlatTypeP lhs, BEConstructorListP constructors);
+Clean (BEExtendableAlgebraicType:: BEFlatTypeP BEConstructorListP BackEnd -> BackEnd)
+
 void BERecordType (int moduleIndex, BEFlatTypeP lhs, BETypeNodeP constructorType, int is_boxed_record, BEFieldListP fields);
 Clean (BERecordType :: Int BEFlatTypeP BETypeNodeP Int BEFieldListP BackEnd -> BackEnd)
 

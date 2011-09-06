@@ -23,24 +23,19 @@ typedef float			FourBytesReal;
 
 typedef FILE *File;
 
-#define StdOut stdout
-#define StdError stderr
-#define StdVerboseH stdout
-#define StdVerboseL stdout
-#define StdTrace stdout
-#define StdDebug stdout;
-#define StdListTypes stdout
+extern FILE *std_out_file_p,*std_error_file_p;
+#define StdOut std_out_file_p 
+#define StdError std_error_file_p
+#define StdVerboseH std_out_file_p
+#define StdVerboseL std_out_file_p
+#define StdTrace std_out_file_p
+#define StdDebug std_out_file_p
+#define StdListTypes std_out_file_p
 
 #define FGetC(f) fgetc(f)
 #define FGetS(s,n,f) fgets(s,n,f)
 #define FPutC(c,f) fputc(c,f)
 
-/* #define System system */
-
 int System (char *s);
 int abs (int n);
-
-/* int rand (void); */
-/* int vsprintf (char *s, char *format, va_list arg); */
-
 
