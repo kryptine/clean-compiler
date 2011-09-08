@@ -766,7 +766,7 @@ where
 	fresh_existential_attribute attr state
 		= state
 	
-fresh_type_variables :: [ATypeVar] *(*Heap TypeVarInfo,Int) -> *(!*Heap TypeVarInfo,!Int);
+fresh_type_variables :: [ATypeVar] *(*TypeVarHeap,Int) -> *(!*TypeVarHeap,!Int);
 fresh_type_variables type_variables state
 	= foldSt (\{atv_variable={tv_info_ptr}} (var_heap, var_store) -> (var_heap <:= (tv_info_ptr, TVI_Type (TempV var_store)), inc var_store))
 				type_variables state
@@ -800,46 +800,87 @@ fresh_environment inequalities attr_env attr_heap
 		is_new_ineqality dem_attr_var off_attr_var []
 			= True
 
-freshAlgebraicType :: !(Global Int) ![AlgebraicPattern] !{#CommonDefs} !*TypeState
+freshAlgebraicType :: !GlobalIndex ![AlgebraicPattern] !{#CommonDefs} !*TypeState
 					-> (![[AType]],!AType,![AttrCoercion],[(DefinedSymbol,[TypeContext])],!TypeRhs,!*TypeState)
-freshAlgebraicType {glob_module, glob_object} patterns common_defs ts=:{ts_var_store,ts_attr_store,ts_type_heaps,ts_exis_variables}
-	# {td_rhs,td_args,td_attrs,td_ident,td_attribute} = common_defs.[glob_module].com_type_defs.[glob_object]
+freshAlgebraicType {gi_module,gi_index} patterns common_defs ts=:{ts_var_store,ts_attr_store,ts_type_heaps,ts_exis_variables}
+	# {td_rhs,td_args,td_attrs}		= common_defs.[gi_module].com_type_defs.[gi_index]
 	# (th_vars, ts_var_store)		= fresh_type_variables td_args (ts_type_heaps.th_vars, ts_var_store)
 	  (th_attrs, ts_attr_store)		= fresh_attributes td_attrs (ts_type_heaps.th_attrs, ts_attr_store)
 	  ts_type_heaps					= { ts_type_heaps & th_vars = th_vars, th_attrs = th_attrs }
 	  (cons_types, alg_type, attr_env, constructor_contexts, ts_var_store, ts_attr_store, ts_type_heaps, ts_exis_variables)
-	  		= fresh_symbol_types patterns common_defs.[glob_module].com_cons_defs ts_var_store ts_attr_store ts_type_heaps ts_exis_variables
+	  		= fresh_symbol_types patterns common_defs td_attrs td_args ts_var_store ts_attr_store ts_type_heaps ts_exis_variables
 	= (cons_types, alg_type, attr_env, constructor_contexts, td_rhs,
 			{ ts & ts_var_store = ts_var_store, ts_attr_store = ts_attr_store, ts_type_heaps = ts_type_heaps, ts_exis_variables = ts_exis_variables })
 where
-	fresh_symbol_types [{ap_symbol={glob_object},ap_expr}] cons_defs var_store attr_store type_heaps all_exis_variables
-		# {cons_type = ct=:{st_args,st_attr_env,st_result,st_context}, cons_exi_vars} = cons_defs.[glob_object.ds_index]
-		  (exis_variables, var_store, attr_store, type_heaps) = freshExistentialVariables cons_exi_vars var_store attr_store type_heaps
-	  	  (attr_env, th_attrs) 		= fresh_environment st_attr_env [] type_heaps.th_attrs
-	  	  (result_type, type_heaps)	= freshCopy st_result { type_heaps & th_attrs = th_attrs }
-	  	  (fresh_args, type_heaps)	= freshCopy st_args type_heaps
-	  	  all_exis_variables		= add_exis_variables ap_expr exis_variables all_exis_variables
-		| isEmpty st_context
-			= ([fresh_args], result_type, attr_env, [], var_store, attr_store, type_heaps, all_exis_variables)
-			# (context, type_heaps) = freshTypeContexts_no_fresh_context_vars st_context type_heaps // fresh_context_vars are created later
-			= ([fresh_args], result_type, attr_env, [(glob_object,context)], var_store, attr_store, type_heaps, all_exis_variables)
-	fresh_symbol_types [{ap_symbol={glob_object},ap_expr} : patterns] cons_defs var_store attr_store type_heaps all_exis_variables
+	fresh_symbol_types [{ap_symbol={glob_object,glob_module},ap_expr}] common_defs td_attrs td_args var_store attr_store type_heaps all_exis_variables
+		# {cons_type = {st_args,st_attr_env,st_result,st_context}, cons_exi_vars, cons_number, cons_type_index} = common_defs.[glob_module].com_cons_defs.[glob_object.ds_index]
+		| cons_number <> -3
+			# (exis_variables, var_store, attr_store, type_heaps) = freshExistentialVariables cons_exi_vars var_store attr_store type_heaps
+		  	  (attr_env, th_attrs) 		= fresh_environment st_attr_env [] type_heaps.th_attrs
+		  	  (result_type, type_heaps)	= freshCopy st_result { type_heaps & th_attrs = th_attrs }
+		  	  (fresh_args, type_heaps)	= freshCopy st_args type_heaps
+		  	  all_exis_variables		= add_exis_variables ap_expr exis_variables all_exis_variables
+			| isEmpty st_context
+				= ([fresh_args], result_type, attr_env, [], var_store, attr_store, type_heaps, all_exis_variables)
+				# (context, type_heaps) = freshTypeContexts_no_fresh_context_vars st_context type_heaps // fresh_context_vars are created later
+				= ([fresh_args], result_type, attr_env, [(glob_object,context)], var_store, attr_store, type_heaps, all_exis_variables)
+			# extension_type = common_defs.[glob_module].com_type_defs.[cons_type_index]
+			  th_vars = copy_type_variables extension_type.td_args td_args type_heaps.th_vars
+			  th_attrs = copy_attributes extension_type.td_attrs td_attrs type_heaps.th_attrs
+			  type_heaps & th_vars = th_vars, th_attrs = th_attrs
+			# (exis_variables, var_store, attr_store, type_heaps) = freshExistentialVariables cons_exi_vars var_store attr_store type_heaps
+		  	  (attr_env, th_attrs) 		= fresh_environment st_attr_env [] type_heaps.th_attrs
+		  	  (result_type, type_heaps)	= freshCopy st_result { type_heaps & th_attrs = th_attrs }
+		  	  (fresh_args, type_heaps)	= freshCopy st_args type_heaps
+		  	  all_exis_variables		= add_exis_variables ap_expr exis_variables all_exis_variables
+			| isEmpty st_context
+				= ([fresh_args], result_type, attr_env, [], var_store, attr_store, type_heaps, all_exis_variables)
+				# (context, type_heaps) = freshTypeContexts_no_fresh_context_vars st_context type_heaps // fresh_context_vars are created later
+				= ([fresh_args], result_type, attr_env, [(glob_object,context)], var_store, attr_store, type_heaps, all_exis_variables)
+	fresh_symbol_types [{ap_symbol={glob_object,glob_module},ap_expr} : patterns] common_defs td_attrs td_args var_store attr_store type_heaps all_exis_variables
 		# (cons_types, result_type, attr_env, constructor_contexts, var_store, attr_store, type_heaps, all_exis_variables)
-				= fresh_symbol_types patterns cons_defs var_store attr_store type_heaps all_exis_variables
-		  {cons_type = ct=:{st_args,st_attr_env,st_context}, cons_exi_vars} = cons_defs.[glob_object.ds_index]
-		  (exis_variables, var_store, attr_store, type_heaps) = freshExistentialVariables cons_exi_vars var_store attr_store type_heaps
-		  (attr_env, th_attrs) 		= fresh_environment st_attr_env attr_env type_heaps.th_attrs
-	  	  (fresh_args, type_heaps) 	= freshCopy st_args { type_heaps & th_attrs = th_attrs }
-	  	  all_exis_variables		= add_exis_variables ap_expr exis_variables all_exis_variables
-		| isEmpty st_context
-			= ([fresh_args : cons_types], result_type, attr_env, constructor_contexts, var_store, attr_store, type_heaps, all_exis_variables)
-		  	# (context, type_heaps) = freshTypeContexts_no_fresh_context_vars st_context type_heaps // fresh_context_vars are created later
-			= ([fresh_args : cons_types], result_type, attr_env, [(glob_object,context):constructor_contexts], var_store, attr_store, type_heaps, all_exis_variables)
+				= fresh_symbol_types patterns common_defs td_attrs td_args var_store attr_store type_heaps all_exis_variables
+		# {cons_type = {st_args,st_attr_env,st_context}, cons_exi_vars,cons_number, cons_type_index} = common_defs.[glob_module].com_cons_defs.[glob_object.ds_index]
+		| cons_number <> -3
+			# (exis_variables, var_store, attr_store, type_heaps) = freshExistentialVariables cons_exi_vars var_store attr_store type_heaps
+			  (attr_env, th_attrs) 		= fresh_environment st_attr_env attr_env type_heaps.th_attrs
+		  	  (fresh_args, type_heaps) 	= freshCopy st_args { type_heaps & th_attrs = th_attrs }
+		  	  all_exis_variables		= add_exis_variables ap_expr exis_variables all_exis_variables
+			| isEmpty st_context
+				= ([fresh_args : cons_types], result_type, attr_env, constructor_contexts, var_store, attr_store, type_heaps, all_exis_variables)
+			  	# (context, type_heaps) = freshTypeContexts_no_fresh_context_vars st_context type_heaps // fresh_context_vars are created later
+				= ([fresh_args : cons_types], result_type, attr_env, [(glob_object,context):constructor_contexts], var_store, attr_store, type_heaps, all_exis_variables)
+			# extension_type = common_defs.[glob_module].com_type_defs.[cons_type_index]
+			  th_vars = copy_type_variables extension_type.td_args td_args type_heaps.th_vars
+			  th_attrs = copy_attributes extension_type.td_attrs td_attrs type_heaps.th_attrs
+			  type_heaps & th_vars = th_vars, th_attrs = th_attrs
+			# (exis_variables, var_store, attr_store, type_heaps) = freshExistentialVariables cons_exi_vars var_store attr_store type_heaps
+			  (attr_env, th_attrs) 		= fresh_environment st_attr_env attr_env type_heaps.th_attrs
+		  	  (fresh_args, type_heaps) 	= freshCopy st_args { type_heaps & th_attrs = th_attrs }
+		  	  all_exis_variables		= add_exis_variables ap_expr exis_variables all_exis_variables
+			| isEmpty st_context
+				= ([fresh_args : cons_types], result_type, attr_env, constructor_contexts, var_store, attr_store, type_heaps, all_exis_variables)
+			  	# (context, type_heaps) = freshTypeContexts_no_fresh_context_vars st_context type_heaps // fresh_context_vars are created later
+				= ([fresh_args : cons_types], result_type, attr_env, [(glob_object,context):constructor_contexts], var_store, attr_store, type_heaps, all_exis_variables)
 
 	add_exis_variables expr [] exis_variables
 		= exis_variables
 	add_exis_variables expr new_exis_variables exis_variables
 		= [(CP_Expression expr, new_exis_variables) : exis_variables]
+
+	copy_type_variables [dest_type_var:dest_type_vars] [source_type_var:source_type_vars] th_vars
+		# (tv_info/*TVI_Type (TempV type_var_number)*/,th_vars) = readPtr source_type_var.atv_variable.tv_info_ptr th_vars
+		# th_vars = writePtr dest_type_var.atv_variable.tv_info_ptr tv_info th_vars
+		= copy_type_variables dest_type_vars source_type_vars th_vars
+	copy_type_variables [] [] th_vars
+		= th_vars
+
+	copy_attributes [dest_attr:dest_attrs] [source_attr:source_attrs] th_attrs
+		# (av_info/*AVI_Attr (TA_TempVar attr_number)*/,th_attrs) = readPtr source_attr.av_info_ptr th_attrs
+		# th_attrs = writePtr dest_attr.av_info_ptr av_info th_attrs
+		= copy_attributes dest_attrs source_attrs th_attrs
+	copy_attributes [] [] th_attrs
+		= th_attrs
 
 create_fresh_context_vars [(cons_symbol,contexts):constructor_contexts] var_heap
 	# (constructor_contexts,var_heap) = create_fresh_context_vars constructor_contexts var_heap
@@ -1597,9 +1638,8 @@ where
 
 		requirements_of_algebraic_patterns ti [] cons_types goal_type used_cons_types reqs_ts
 			= (used_cons_types, reqs_ts)
-		requirements_of_algebraic_patterns ti [alg_pattern=:{ap_position}:alg_patterns] [ cons_arg_types : cons_types] 
-											goal_type used_cons_types reqs_ts
-			= requirements_of_algebraic_patterns ti alg_patterns cons_types goal_type [ cons_arg_types : used_cons_types ]
+		requirements_of_algebraic_patterns ti [alg_pattern=:{ap_position}:alg_patterns] [cons_arg_types : cons_types] goal_type used_cons_types reqs_ts
+			= requirements_of_algebraic_patterns ti alg_patterns cons_types goal_type [cons_arg_types : used_cons_types]
 					(possibly_accumulate_reqs_in_new_group 
 						ap_position
 						(requirements_of_algebraic_pattern ti alg_pattern cons_arg_types goal_type) 
@@ -1668,13 +1708,13 @@ where
 			= ({ reqs & req_type_coercions = [ { tc_demanded = goal_type, tc_offered = res_type, tc_position = CP_Expression expr, tc_coercible = True } : reqs.req_type_coercions] },
 					{ ts & ts_expr_heap = ts_expr_heap })
 		
-		update_case_variable (Var {var_ident,var_info_ptr}) (RecordType {rt_constructor={ds_index}}) [cons_type] {glob_module} var_heap
+		update_case_variable (Var {var_ident,var_info_ptr}) (RecordType {rt_constructor={ds_index}}) [cons_type] {gi_module} var_heap
 			# (var_info, var_heap) = readPtr var_info_ptr var_heap
 			= case var_info of
 				VI_Type type type_info
-					-> var_heap <:= (var_info_ptr, VI_Type type (VITI_PatternType cons_type glob_module ds_index type_info))
+					-> var_heap <:= (var_info_ptr, VI_Type type (VITI_PatternType cons_type gi_module ds_index type_info))
 				VI_FAType vars type type_info
-					-> var_heap <:= (var_info_ptr, VI_FAType vars type (VITI_PatternType cons_type glob_module ds_index type_info))
+					-> var_heap <:= (var_info_ptr, VI_FAType vars type (VITI_PatternType cons_type gi_module ds_index type_info))
 			  	_
 					-> abort "update_case_variable" // ---> (var_ident <<- var_info))
 		update_case_variable expr td_rhs cons_types alg_type var_heap
@@ -2093,19 +2133,20 @@ possibly_accumulate_reqs_in_new_group position state_transition reqs_ts
 		= (reqs_with_new_group, ts)
 
 makeBase id=:{id_name} l1 l2 vh
-	| length l1 <> length l2
-		=	abort ("makeBase!!! " +++ id_name +++ toString (length l1) +++ toString (length l2))
-	// otherwise
+//	| length l1 <> length l2
+//		=	abort ("makeBase!!! " +++ id_name +++ toString (length l1) +++ toString (length l2))
 		=	makeBase2 id 1 l1 l2 vh
 where
-	makeBase2 _ _ [] [] ts_var_heap
-		= ts_var_heap
 	makeBase2 fun_or_cons_ident arg_nr [{fv_ident, fv_info_ptr} : vars] [type : types] ts_var_heap
 		| is_rare_name fv_ident
 			# ts_var_heap = addToBase fv_info_ptr type (VITI_Coercion (CP_FunArg fun_or_cons_ident arg_nr)) ts_var_heap
 			= makeBase2 fun_or_cons_ident (arg_nr+1) vars types ts_var_heap
 			# ts_var_heap = addToBase fv_info_ptr type VITI_Empty ts_var_heap
 			= makeBase2 fun_or_cons_ident (arg_nr+1) vars types ts_var_heap
+	makeBase2 _ _ [] [] ts_var_heap
+		= ts_var_heap
+	makeBase2 {id_name} _ _ _ ts_var_heap
+		= abort ("makeBase!!! "+++id_name)
 
 addToBase info_ptr atype=:{at_type = TFA atvs type} optional_position ts_var_heap 
 	= ts_var_heap  <:= (info_ptr, VI_FAType atvs {atype & at_type = type} optional_position)
@@ -2283,7 +2324,7 @@ where
 									type_variables state
 			fresh_existential_dynamic_pattern_variables type_variables state
 				= mapSt (\{tv_info_ptr} (var_heap, var_store) -> (var_store, (var_heap <:= (tv_info_ptr, TVI_Type (TempQV var_store)), inc var_store)))
-									type_variables state 
+									type_variables state
 
 			fresh_type_variables type_variables state
 				= foldSt fresh_type_variable type_variables state 
@@ -2316,7 +2357,7 @@ where
 			
 		clear_type_vars type_vars var_heap
 			= foldSt (\{tv_info_ptr} -> writePtr tv_info_ptr TVI_Empty) type_vars var_heap 
-	
+
 specification_error type type1 err
 	# err = errorHeading "Type error" err
 	  format = { form_properties = cAttributed, form_attr_position = No}
@@ -2960,7 +3001,7 @@ where
 				= create_instance_types class_members array_members unboxed_array_type offset_table (TA ai_record []) (size class_members) funs_heaps_and_error
 			where
 				first_instance_index=ai_members.[0].cim_index
-				
+
 				create_instance_types :: {#DefinedSymbol} {#MemberDef} Type {#Int} Type !Int !(!*{#FunDef}, !*TypeHeaps, !*ErrorAdmin)
 					-> (!*{#FunDef}, !*TypeHeaps, !*ErrorAdmin);
 				create_instance_types members array_members unboxed_array_type offset_table record_type member_index funs_heaps_and_error
@@ -3071,8 +3112,7 @@ where
 		= map_a_st (i+1) a (f ai st)
 
 is_rare_name {id_name}
-	= id_name.[0]=='_'
-
+	:== id_name.[0]=='_'
 
 getPositionOfExpr expr=:(Var var) var_heap
 	# (type_info, var_heap) = getTypeInfoOfVariable var var_heap

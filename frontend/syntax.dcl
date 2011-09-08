@@ -75,6 +75,7 @@ instance == FunctionOrMacroIndex
 				| STE_UsedQualifiedType !ModuleN !Index !STE_Kind
 				| STE_BelongingSymbolExported
 				| STE_BelongingSymbolForExportedSymbol
+				| STE_TypeExtension
 
 ::	ModuleN:==Int;
 
@@ -186,6 +187,8 @@ instance == FunctionOrMacroIndex
 					| NewTypeCons !ParsedConstructor
 					| EmptyRhs !BITVECT
 					| AbstractTypeSpec !BITVECT !AType
+					| ExtendableConses ![ParsedConstructor]
+					| MoreConses !Ident ![ParsedConstructor]
 
 ::	CollectedDefinitions instance_kind =
 	{	def_types 			:: ![TypeDef TypeRhs]
@@ -337,7 +340,7 @@ cNameLocationDependent :== True
 
 ::	FunSpecials
 	= FSP_ParsedSubstitutions 	![Env Type TypeVar]
-	| FSP_Substitutions 		![SpecialSubstitution]
+	| FSP_Substitutions			![SpecialSubstitution]
 	| FSP_ContextTypes			![Special]
 	| FSP_FunIndex				!Index
 	| FSP_None
@@ -540,6 +543,9 @@ cIsImportedObject :== False
 			| NewType !DefinedSymbol
 			| AbstractType !BITVECT
 			| AbstractSynType !BITVECT !AType
+			| ExtendableAlgType ![DefinedSymbol]
+			| AlgConses ![DefinedSymbol] !GlobalIndex
+			| UncheckedAlgConses !Ident ![DefinedSymbol]
 			| UnknownType
 
 ::	ParsedTypeDef	:== TypeDef RhsDefsOfType
@@ -595,7 +601,7 @@ NoGlobalIndex :== {gi_module=NoIndex,gi_index=NoIndex}
  	| GTSE
 	| GTSAppConsBimapKindConst					// for optimizing bimaps
 	| GTSAppBimap TypeKind [GenTypeStruct]		// for optimizing bimaps
-	| GTSAppConsSimpleType !(Global Index) !TypeKind ![GenTypeStruct]	// for optimizing bimaps
+	| GTSAppConsSimpleType !GlobalIndex !TypeKind ![GenTypeStruct]	// for optimizing bimaps
 
 :: GenericTypeRep = 
 	{ gtr_type :: GenTypeStruct		// generic structure type
@@ -716,7 +722,7 @@ pIsSafe			:== True
 ::	OptionalVariable :== Optional (Bind Ident VarInfoPtr)
 
 :: 	AuxiliaryPattern
-		= AP_Algebraic !(Global DefinedSymbol) !Index [AuxiliaryPattern] OptionalVariable
+		= AP_Algebraic !(Global DefinedSymbol) !GlobalIndex ![AuxiliaryPattern] !OptionalVariable
 		| AP_Variable !Ident !VarInfoPtr OptionalVariable
 		| AP_Basic !BasicValue OptionalVariable
 		| AP_NewType !(Global DefinedSymbol) !Index AuxiliaryPattern OptionalVariable
@@ -725,7 +731,7 @@ pIsSafe			:== True
 		| AP_WildCard !OptionalVariable
 		| AP_Empty
 
-:: AP_Kind = APK_Constructor !Index | APK_NewTypeConstructor !Index | APK_Macro !Bool // is_dcl_macro
+:: AP_Kind = APK_Constructor !GlobalIndex | APK_NewTypeConstructor !Index | APK_Macro !Bool // is_dcl_macro
 
 from convertDynamics import :: TypeCodeVariableInfo, :: DynamicValueAliasInfo
 
@@ -974,7 +980,7 @@ cNotVarNumber :== -1
 	{	cons_ident			:: !Ident
 	,	cons_type			:: !SymbolType
 	,	cons_priority		:: !Priority
-	,	cons_number			:: !Index // -2 for newtype constructor
+	,	cons_number			:: !Index // -2 for newtype constructor, -3 for added constructor
 	,	cons_type_index		:: !Index
 	,	cons_exi_vars		:: ![ATypeVar]
 	,	cons_type_ptr		:: !VarInfoPtr
@@ -1363,7 +1369,7 @@ cIsNotStrict	:== False
 
 				| TypeSignature !(Int Int -> (AType,Int,Int)) !Expression
 
-				| EE 
+				| EE
 				| NoBind ExprInfoPtr /* auxiliary, to store fields that are not specified in a record expression */ 
 				| FailExpr !Ident // only allowed on (case) root positions
 
@@ -1412,16 +1418,16 @@ cIsNotStrict	:== False
 	,	dyn_type_code	:: !TypeCodeExpression		/* filled after type checking */
 	}	
 
-::	CasePatterns= AlgebraicPatterns !(Global Index) ![AlgebraicPattern]
+::	CasePatterns= AlgebraicPatterns !GlobalIndex ![AlgebraicPattern]
 				| BasicPatterns !BasicType [BasicPattern]
-				| NewTypePatterns !(Global Index) ![AlgebraicPattern]
+				| NewTypePatterns !GlobalIndex ![AlgebraicPattern]
 				| DynamicPatterns [DynamicPattern]						/* auxiliary */
 				| OverloadedListPatterns !OverloadedListType !Expression ![AlgebraicPattern]
 				| NoPattern											/* auxiliary */
 
-::	OverloadedListType	= UnboxedList !(Global Index) !Index !Index !Index // list_type_symbol StdStrictLists module index, decons_u index, nil_u index
-						| UnboxedTailStrictList !(Global Index) !Index !Index !Index // list_type_symbol StdStrictLists module index, decons_uts index, nil_uts index
-						| OverloadedList !(Global Index) !Index !Index !Index // list_type_symbol StdStrictLists module index, decons index, nil index
+::	OverloadedListType	= UnboxedList !GlobalIndex !Index !Index !Index // list_type_symbol StdStrictLists module index, decons_u index, nil_u index
+						| UnboxedTailStrictList !GlobalIndex !Index !Index !Index // list_type_symbol StdStrictLists module index, decons_uts index, nil_uts index
+						| OverloadedList !GlobalIndex !Index !Index !Index // list_type_symbol StdStrictLists module index, decons index, nil index
 
 instance == OverloadedListType
 

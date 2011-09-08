@@ -152,7 +152,7 @@ where
 		# (var_def, cs_symbol_table) = readPtr id_info cs_symbol_table
 		  cs = { cs & cs_symbol_table = cs_symbol_table }
 		= case var_def.ste_kind of
-			STE_BoundTypeVariable {stv_attribute,stv_info_ptr}
+			STE_BoundTypeVariable {stv_info_ptr,stv_attribute}
 				-> ({ tv & tv_info_ptr = stv_info_ptr}, stv_attribute, (ts, ti, cs))
 			_
 				-> (tv, TA_Multi, (ts, ti, {cs & cs_error = checkError var_id "type variable undefined" cs.cs_error}))
@@ -166,39 +166,39 @@ where
 		  (xs, attr, ts_ti_cs) = bindTypes cti xs ts_ti_cs
 		= ([x : xs], attr, ts_ti_cs)
 
-retrieveTypeDefinition :: SymbolPtr !Index !*SymbolTable ![SymbolPtr] -> ((!Index, !Index), !*SymbolTable, ![SymbolPtr])
+retrieveTypeDefinition :: SymbolPtr !Index !*SymbolTable ![SymbolPtr] -> (!Index, !Index, !*SymbolTable, ![SymbolPtr])
 retrieveTypeDefinition type_ptr mod_index symbol_table used_types
 	# (entry=:{ste_kind,ste_def_level,ste_index}, symbol_table)	= readPtr type_ptr symbol_table
 	= case ste_kind of
 		this_kind=:(STE_Imported STE_Type ste_mod_index)
-			-> ((ste_index, ste_mod_index), symbol_table <:= (type_ptr, { entry & ste_kind = STE_UsedType ste_mod_index this_kind }), [type_ptr : used_types])
+			-> (ste_index, ste_mod_index, symbol_table <:= (type_ptr, { entry & ste_kind = STE_UsedType ste_mod_index this_kind }), [type_ptr : used_types])
 		this_kind=:STE_Type
 			| ste_def_level == cGlobalScope
-				-> ((ste_index, mod_index), symbol_table <:= (type_ptr, { entry & ste_kind = STE_UsedType mod_index this_kind }), [type_ptr : used_types])
-				-> ((NotFound, mod_index), symbol_table, used_types)
+				-> (ste_index, mod_index, symbol_table <:= (type_ptr, { entry & ste_kind = STE_UsedType mod_index this_kind }), [type_ptr : used_types])
+				-> (NotFound, mod_index, symbol_table, used_types)
 		STE_UsedType mod_index _
-			-> ((ste_index, mod_index), symbol_table, used_types)
+			-> (ste_index, mod_index, symbol_table, used_types)
 		this_kind=:(STE_UsedQualifiedType uqt_mod_index uqt_index orig_kind)
 			| uqt_mod_index==mod_index && uqt_index==ste_index
-				-> ((ste_index, mod_index),symbol_table, used_types) 
+				-> (ste_index, mod_index, symbol_table, used_types) 
 				-> retrieve_type_definition orig_kind
 		with
 			retrieve_type_definition (STE_UsedQualifiedType uqt_mod_index uqt_index orig_kind)
 				| uqt_mod_index==mod_index && uqt_index==ste_index
-					= ((ste_index, mod_index),symbol_table, used_types) 
+					= (ste_index, mod_index, symbol_table, used_types) 
 					= retrieve_type_definition orig_kind
 			retrieve_type_definition (STE_Imported STE_Type ste_mod_index)
-				= ((ste_index, ste_mod_index), symbol_table <:= (type_ptr, { entry & ste_kind = STE_UsedType ste_mod_index this_kind }), used_types)
+				= (ste_index, ste_mod_index, symbol_table <:= (type_ptr, { entry & ste_kind = STE_UsedType ste_mod_index this_kind }), used_types)
 			retrieve_type_definition STE_Type
 				| ste_def_level == cGlobalScope
-					= ((ste_index, mod_index), symbol_table <:= (type_ptr, { entry & ste_kind = STE_UsedType mod_index this_kind }), used_types)
-					= ((NotFound, mod_index), symbol_table, used_types)
+					= (ste_index, mod_index, symbol_table <:= (type_ptr, { entry & ste_kind = STE_UsedType mod_index this_kind }), used_types)
+					= (NotFound, mod_index, symbol_table, used_types)
 			retrieve_type_definition (STE_UsedType mod_index _)
-				= ((ste_index, mod_index), symbol_table, used_types)
+				= (ste_index, mod_index, symbol_table, used_types)
 			retrieve_type_definition _
-				= ((NotFound, mod_index), symbol_table, used_types)
+				= (NotFound, mod_index, symbol_table, used_types)
 		_
-			-> ((NotFound, mod_index), symbol_table, used_types)
+			-> (NotFound, mod_index, symbol_table, used_types)
 
 determine_type_attribute TA_Unique		= TA_Unique
 determine_type_attribute _				= TA_Multi
@@ -210,7 +210,7 @@ where
 		= (TV tv, attr, ts_ti_cs)
 	bindTypes cti=:{cti_module_index,cti_type_index,cti_lhs_attribute} type=:(TA type_cons=:{type_ident=type_ident=:{id_info}} types)
 					(ts=:{ts_type_defs,ts_modules}, ti, cs=:{cs_symbol_table})
-		# ((type_index, type_module), cs_symbol_table, ti_used_types) = retrieveTypeDefinition id_info cti_module_index cs_symbol_table ti.ti_used_types
+		# (type_index, type_module, cs_symbol_table, ti_used_types) = retrieveTypeDefinition id_info cti_module_index cs_symbol_table ti.ti_used_types
 		  ti = { ti & ti_used_types = ti_used_types }
 		# cs = { cs & cs_symbol_table = cs_symbol_table }
 		| type_index <> NotFound
@@ -226,7 +226,7 @@ where
 			= (TE, TA_Multi, (ts, ti, { cs & cs_error = checkError type_cons.type_ident "undefined" cs.cs_error}))
 	bindTypes cti=:{cti_module_index,cti_type_index,cti_lhs_attribute} type=:(TAS type_cons=:{type_ident=type_ident=:{id_info}} types strictness)
 					(ts=:{ts_type_defs,ts_modules}, ti, cs=:{cs_symbol_table})
-		# ((type_index, type_module), cs_symbol_table, ti_used_types) = retrieveTypeDefinition id_info cti_module_index cs_symbol_table ti.ti_used_types
+		# (type_index, type_module, cs_symbol_table, ti_used_types) = retrieveTypeDefinition id_info cti_module_index cs_symbol_table ti.ti_used_types
 		  ti = { ti & ti_used_types = ti_used_types }
 		# cs = { cs & cs_symbol_table = cs_symbol_table }
 		| type_index <> NotFound
@@ -404,7 +404,7 @@ checkTypeDef type_index module_index class_defs ts=:{ts_type_defs} ti=:{ti_type_
 		  (td_attribute, attr_vars, th_attrs) = determine_root_attribute td_attribute td_ident.id_name ti_type_heaps.th_attrs
 		  (type_vars, (attr_vars, ti_type_heaps, cs))
 		  		= addTypeVariablesToSymbolTable cGlobalScope td_args attr_vars { ti_type_heaps & th_attrs = th_attrs } { cs & cs_error = cs_error }
-		  type_def = {	type_def & td_args = type_vars, td_index = type_index, td_attrs = attr_vars, td_attribute = td_attribute }
+		  type_def = { type_def & td_args = type_vars, td_index = type_index, td_attrs = attr_vars, td_attribute = td_attribute }
 		  (td_rhs, (class_defs,ts,ti,cs)) = check_rhs_of_TypeDef type_def attr_vars
 				{ cti_module_index = module_index, cti_type_index = type_index, cti_lhs_attribute = td_attribute }
 					(class_defs, {ts & ts_type_defs = ts_type_defs}, {ti & ti_type_heaps = ti_type_heaps}, cs)
@@ -428,17 +428,17 @@ where
 		# type_lhs = { at_attribute = cti_lhs_attribute,
 				  	   at_type = TA (MakeTypeSymbIdent { glob_object = cti_type_index, glob_module = cti_module_index } td_ident td_arity)
 									[{at_attribute = atv_attribute,at_type = TV atv_variable} \\ {atv_variable, atv_attribute} <- td_args]}
-		  class_defs_ts_ti_cs = bind_types_of_constructors cti 0 [ atv_variable \\ {atv_variable} <- td_args] attr_vars type_lhs conses class_defs_ts_ti_cs
+		  class_defs_ts_ti_cs = bind_types_of_constructors cti 0 (atype_vars_to_type_vars td_args) attr_vars type_lhs conses class_defs_ts_ti_cs
 		= (td_rhs, class_defs_ts_ti_cs)
-	check_rhs_of_TypeDef {td_ident,td_arity,td_args,td_rhs = td_rhs=:RecordType {rt_constructor=rec_cons=:{ds_index,ds_arity}, rt_fields}}
+	check_rhs_of_TypeDef {td_ident,td_arity,td_args,td_rhs = td_rhs=:RecordType {rt_constructor={ds_index,ds_arity}, rt_fields}}
 			attr_vars cti=:{cti_module_index,cti_type_index,cti_lhs_attribute} (class_defs,ts,ti,cs)
 		# type_lhs = {	at_attribute = cti_lhs_attribute,
 						at_type = TA (MakeTypeSymbIdent { glob_object = cti_type_index, glob_module = cti_module_index } td_ident td_arity)
-				[{ at_attribute = atv_attribute,at_type = TV atv_variable} \\ {atv_variable, atv_attribute} <- td_args]}
+									[{ at_attribute = atv_attribute,at_type = TV atv_variable} \\ {atv_variable, atv_attribute} <- td_args]}
 		  cs = if (ds_arity>32)
 				{ cs & cs_error = checkError ("Record has too many fields ("+++toString ds_arity+++",") "32 are allowed)" cs.cs_error }
 				cs;
-		  (class_defs,ts,ti,cs) = bind_types_of_constructor cti 0 [ atv_variable \\ {atv_variable} <- td_args] attr_vars type_lhs rec_cons (class_defs,ts,ti,cs)
+		  (class_defs,ts,ti,cs) = bind_types_of_constructor cti 0 (atype_vars_to_type_vars td_args) attr_vars type_lhs ds_index (class_defs,ts,ti,cs)
 		# (rec_cons_def, ts) = ts!ts_cons_defs.[ds_index]
 		# {cons_type = { st_vars,st_args,st_result,st_attr_vars }, cons_exi_vars} = rec_cons_def
 		# (ts_selector_defs, ti_var_heap, cs_error) = check_selectors 0 rt_fields cti_type_index st_args st_result st_vars st_attr_vars cons_exi_vars
@@ -477,36 +477,75 @@ where
 	check_rhs_of_TypeDef {td_rhs = SynType type} _ cti (class_defs,ts,ti,cs)
 		# (type, type_attr, (ts,ti,cs)) = bindTypes cti type (ts,ti,cs)
 		= (SynType type, (class_defs,ts,ti,cs))
-	check_rhs_of_TypeDef {td_ident,td_arity,td_args,td_rhs = td_rhs=:NewType cons} attr_vars cti=:{cti_module_index,cti_type_index,cti_lhs_attribute} class_defs_ts_ti_cs
+	check_rhs_of_TypeDef {td_ident,td_arity,td_args,td_rhs = td_rhs=:NewType {ds_index}} attr_vars cti=:{cti_module_index,cti_type_index,cti_lhs_attribute} class_defs_ts_ti_cs
 		# type_lhs = { at_attribute = cti_lhs_attribute,
 				  	   at_type = TA (MakeTypeSymbIdent { glob_object = cti_type_index, glob_module = cti_module_index } td_ident td_arity)
 									[{at_attribute = atv_attribute,at_type = TV atv_variable} \\ {atv_variable, atv_attribute} <- td_args]}
-		  class_defs_ts_ti_cs = bind_types_of_constructor cti -2 [ atv_variable \\ {atv_variable} <- td_args] attr_vars type_lhs cons class_defs_ts_ti_cs
+		  class_defs_ts_ti_cs = bind_types_of_constructor cti -2 (atype_vars_to_type_vars td_args) attr_vars type_lhs ds_index class_defs_ts_ti_cs
 		= (td_rhs, class_defs_ts_ti_cs)
 	check_rhs_of_TypeDef {td_rhs = AbstractSynType properties type} _ cti (class_defs,ts,ti,cs)
 		# (type, type_attr, (ts,ti,cs)) = bindTypes cti type (ts,ti,cs)
 		= (AbstractSynType properties type, (class_defs,ts,ti,cs))
+	check_rhs_of_TypeDef {td_ident,td_arity,td_args,td_rhs = td_rhs=:ExtendableAlgType conses} attr_vars cti=:{cti_module_index,cti_type_index,cti_lhs_attribute} class_defs_ts_ti_cs
+		# type_lhs = { at_attribute = cti_lhs_attribute,
+				  	   at_type = TA (MakeTypeSymbIdent {glob_object = cti_type_index, glob_module = cti_module_index} td_ident td_arity)
+									[{at_attribute = atv_attribute,at_type = TV atv_variable} \\ {atv_variable, atv_attribute} <- td_args]}
+		  class_defs_ts_ti_cs = bind_types_of_constructors cti 0 (atype_vars_to_type_vars td_args) attr_vars type_lhs conses class_defs_ts_ti_cs
+		= (td_rhs, class_defs_ts_ti_cs)
+	check_rhs_of_TypeDef {td_ident,td_arity,td_args,td_rhs = td_rhs=:UncheckedAlgConses type_ext_ident conses} attr_vars cti=:{cti_module_index,cti_type_index,cti_lhs_attribute} class_defs_ts_ti_cs
+		# (class_defs,ts,ti,cs) = class_defs_ts_ti_cs
+		  (type_index, type_module, cs_symbol_table, ti_used_types) = retrieveTypeDefinition td_ident.id_info cti_module_index cs.cs_symbol_table ti.ti_used_types
+		  ti & ti_used_types = ti_used_types
+		  cs & cs_symbol_table = cs_symbol_table
+		| type_index <> NotFound
+		 	# class_defs_ts_ti_cs = (class_defs,ts,ti,cs)
+			// to do check if ExtendableAlgType
+			# type_lhs = { at_attribute = cti_lhs_attribute,
+					  	   at_type = TA (MakeTypeSymbIdent { glob_object = type_index, glob_module = type_module } td_ident td_arity)
+										[{at_attribute = atv_attribute,at_type = TV atv_variable} \\ {atv_variable, atv_attribute} <- td_args]}
+			  class_defs_ts_ti_cs = bind_types_of_added_constructors cti (atype_vars_to_type_vars td_args) attr_vars type_lhs conses class_defs_ts_ti_cs
+			= (AlgConses conses {gi_module=type_module,gi_index=type_index}, class_defs_ts_ti_cs)
+			# cs & cs_error = checkError td_ident "undefined" cs.cs_error
+			= (td_rhs, (class_defs,ts,ti,cs))
 	check_rhs_of_TypeDef {td_rhs} _ _ class_defs_ts_ti_cs
 		= (td_rhs, class_defs_ts_ti_cs)
+
+	atype_vars_to_type_vars atype_vars
+		= [atv_variable \\ {atv_variable} <- atype_vars]
 
 	bind_types_of_constructors :: !CurrentTypeInfo !Index ![TypeVar] ![AttributeVar] !AType ![DefinedSymbol]
 								!(!v:{#ClassDef},!*TypeSymbols,!*TypeInfo,!*CheckState)
 							->   (!v:{#ClassDef},!*TypeSymbols,!*TypeInfo,!*CheckState)
-	bind_types_of_constructors cti cons_index free_vars free_attrs type_lhs [cons=:{ds_arity,ds_ident,ds_index}:conses] (class_defs,ts,ti,cs)
+	bind_types_of_constructors cti cons_number free_vars free_attrs type_lhs [{ds_arity,ds_ident,ds_index}:conses] (class_defs,ts,ti,cs)
 		# (ts,cs) = if (ds_arity>32)
-						(let (cons_pos,ts2) = ts!ts_cons_defs.[ds_index].cons_pos
-						 in  (ts2,{ cs & cs_error = checkErrorWithPosition ds_ident cons_pos ("Constructor has too many arguments ("+++toString ds_arity+++", 32 are allowed)") cs.cs_error }))
+						(constructor_has_too_many_arguments ds_index ds_ident ds_arity ts cs)
 						(ts,cs);
-		# class_defs_ts_ti_cs = bind_types_of_constructor cti cons_index free_vars free_attrs type_lhs cons (class_defs,ts,ti,cs)
-		= bind_types_of_constructors cti (inc cons_index) free_vars free_attrs type_lhs conses class_defs_ts_ti_cs
+		# class_defs_ts_ti_cs = bind_types_of_constructor cti cons_number free_vars free_attrs type_lhs ds_index (class_defs,ts,ti,cs)
+		= bind_types_of_constructors cti (inc cons_number) free_vars free_attrs type_lhs conses class_defs_ts_ti_cs
 	bind_types_of_constructors _ _ _ _ _ [] class_defs_ts_ti_cs
 		= class_defs_ts_ti_cs
 
-	bind_types_of_constructor :: !CurrentTypeInfo !Index ![TypeVar] ![AttributeVar] !AType !DefinedSymbol
+	bind_types_of_added_constructors :: !CurrentTypeInfo ![TypeVar] ![AttributeVar] !AType ![DefinedSymbol]
+								!(!v:{#ClassDef},!*TypeSymbols,!*TypeInfo,!*CheckState)
+							->   (!v:{#ClassDef},!*TypeSymbols,!*TypeInfo,!*CheckState)
+	bind_types_of_added_constructors cti free_vars free_attrs type_lhs [{ds_arity,ds_ident,ds_index}:conses] (class_defs,ts,ti,cs)
+		# (ts,cs) = if (ds_arity>32)
+						(constructor_has_too_many_arguments ds_index ds_ident ds_arity ts cs)
+						(ts,cs);
+		# class_defs_ts_ti_cs = bind_types_of_constructor cti -3 free_vars free_attrs type_lhs ds_index (class_defs,ts,ti,cs)
+		= bind_types_of_added_constructors cti free_vars free_attrs type_lhs conses class_defs_ts_ti_cs
+	bind_types_of_added_constructors _ _ _ _ [] class_defs_ts_ti_cs
+		= class_defs_ts_ti_cs
+
+	constructor_has_too_many_arguments ds_index ds_ident ds_arity ts cs
+		# (cons_pos,ts2) = ts!ts_cons_defs.[ds_index].cons_pos
+		= (ts2, {cs & cs_error = checkErrorWithPosition ds_ident cons_pos ("Constructor has too many arguments ("+++toString ds_arity+++", 32 are allowed)") cs.cs_error})
+
+	bind_types_of_constructor :: !CurrentTypeInfo !Index ![TypeVar] ![AttributeVar] !AType !Index
 					!(!v:{#ClassDef},!*TypeSymbols,!*TypeInfo,!*CheckState)
 				->	 (!v:{#ClassDef},!*TypeSymbols,!*TypeInfo,!*CheckState)
-	bind_types_of_constructor cti=:{cti_lhs_attribute} cons_index free_vars free_attrs type_lhs {ds_index} (class_defs, ts, ti=:{ti_type_heaps}, cs)
-		# (cons_def, ts) = ts!ts_cons_defs.[ds_index]
+	bind_types_of_constructor cti=:{cti_lhs_attribute} cons_number free_vars free_attrs type_lhs cons_index (class_defs, ts, ti=:{ti_type_heaps}, cs)
+		# (cons_def, ts) = ts!ts_cons_defs.[cons_index]
 		# (exi_vars, (ti_type_heaps, cs))
 		  		= addExistentionalTypeVariablesToSymbolTable cti_lhs_attribute cons_def.cons_exi_vars ti_type_heaps cs
 		  (st_args, st_attr_env,class_defs,(ts, ti, cs))
@@ -517,9 +556,9 @@ where
 		  attr_vars = add_universal_attr_vars st_args free_attrs
 		  cons_type = {cons_def.cons_type & st_vars = free_vars, st_args = st_args, st_result = type_lhs, st_context = st_context, st_attr_vars = attr_vars, st_attr_env = st_attr_env}
 		  (new_type_ptr, ti_var_heap) = newPtr VI_Empty ti.ti_var_heap
-		  cons_def = { cons_def & cons_type = cons_type, cons_number = cons_index, cons_type_index = cti.cti_type_index, cons_exi_vars = exi_vars,
+		  cons_def = { cons_def & cons_type = cons_type, cons_number = cons_number, cons_type_index = cti.cti_type_index, cons_exi_vars = exi_vars,
 		  						  cons_type_ptr = new_type_ptr }
-		= (class_defs, {ts & ts_cons_defs.[ds_index] = cons_def}, {ti & ti_var_heap = ti_var_heap}, {cs & cs_symbol_table=symbol_table})
+		= (class_defs, {ts & ts_cons_defs.[cons_index] = cons_def}, {ti & ti_var_heap = ti_var_heap}, {cs & cs_symbol_table=symbol_table})
 	where
 		bind_types_of_cons :: ![AType] !CurrentTypeInfo ![TypeVar] ![AttrInequality] !v:{#ClassDef} !(!*TypeSymbols, !*TypeInfo, !*CheckState)
 													 -> (![AType], ![AttrInequality],!v:{#ClassDef},!(!*TypeSymbols, !*TypeInfo, !*CheckState))
@@ -898,7 +937,7 @@ checkOpenAType mod_index scope dem_attr_kind type=:{ at_type=TQualifiedIdent mod
 					-> ({ type & at_type = TA type_cons types, at_attribute = new_attr } , (ots, oti, cs))
 					-> (type, (ots, oti, {cs & cs_error = checkError type_ident "used with wrong arity" cs.cs_error}))
 			_
-				-> (type, (ots, oti, {cs & cs_error = checkError (module_id.id_name+++"@"+++type_name) "not imported" cs.cs_error}))
+				-> (type, (ots, oti, {cs & cs_error = checkError ("'"+++module_id.id_name+++"'."+++type_name) "not imported" cs.cs_error}))
 checkOpenAType mod_index scope dem_attr atype=:{at_type = TFA vars type} (ots, oti, cs)
 	# cs = universal_quantifier_error vars cs
 	= (atype, (ots, oti, cs))
@@ -1178,7 +1217,7 @@ where
 		check_class_variable {tv_ident} cs=:{cs_symbol_table,cs_error}
 			= { cs & cs_symbol_table	= removeDefinitionFromSymbolTable cGlobalScope tv_ident cs_symbol_table,
 					 cs_error			= checkError tv_ident "wrongly used or not used at all" cs_error}
-	
+
 	check_class_attributes class_attributes cs
 		= foldSt check_class_attribute class_attributes cs
 	where
@@ -1518,14 +1557,6 @@ where
 				-> (TA_Var { var & av_info_ptr = attr_info_ptr}, attr_var_heap, error)
 	check_attribute attr root_attr name attr_var_heap error
 		= (TA_Multi, attr_var_heap, checkError name "specified attribute not allowed" error)
-
-	
-retrieveKinds :: ![ATypeVar] *TypeVarHeap -> (![TypeKind], !*TypeVarHeap)
-retrieveKinds type_vars var_heap = mapSt retrieve_kind type_vars var_heap
-where
-	retrieve_kind {atv_variable = {tv_info_ptr}} var_heap
-		# (TVI_TypeKind kind_info_ptr, var_heap) = readPtr tv_info_ptr var_heap
-		= (KindVar kind_info_ptr, var_heap)
 
 removeAttributedTypeVarsFromSymbolTable :: !Level ![ATypeVar] !*SymbolTable -> *SymbolTable
 removeAttributedTypeVarsFromSymbolTable level vars symbol_table

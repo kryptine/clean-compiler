@@ -25,9 +25,8 @@ instance GetSetPatternRhs DynamicPattern
 		get_pattern_rhs p = p.dp_rhs
 		set_pattern_rhs p expr = {p & dp_rhs=expr}
 
-
 mergeCases :: !(!Expression, !Position) ![(!Expression, !Position)] !*VarHeap !*ExpressionHeap !*ErrorAdmin
-									-> *(!(!Expression, !Position), !*VarHeap, !*ExpressionHeap, !*ErrorAdmin)
+									-> *(!(!Expression, !Position), !*VarHeap,!*ExpressionHeap,!*ErrorAdmin)
 mergeCases expr_and_pos [] var_heap symbol_heap error
 	= (expr_and_pos, var_heap, symbol_heap, error)
 mergeCases (Let lad=:{let_expr}, pos) exprs var_heap symbol_heap error
@@ -299,8 +298,8 @@ where
 		# (merged_patterns, var_heap, symbol_heap, error) = merge_dynamic_patterns patterns1 patterns2 var_heap symbol_heap error
 		= (DynamicPatterns merged_patterns, var_heap, symbol_heap, error) 
 	merge_guards guards=:(AlgebraicPatterns type1 patterns1) (OverloadedListPatterns type2 decons_expr2 patterns2) var_heap symbol_heap error
-		| type1.glob_module==cPredefinedModuleIndex && isOverloaded type2
-			# index=type1.glob_object+FirstTypePredefinedSymbolIndex
+		| type1.gi_module==cPredefinedModuleIndex && isOverloaded type2
+			# index=type1.gi_index+FirstTypePredefinedSymbolIndex
 			| index==PD_ListType
 				# patterns2=replace_overloaded_symbols_in_patterns patterns2 PD_ConsSymbol PD_NilSymbol
 				= merge_algebraic_patterns type1 patterns1 patterns2 var_heap symbol_heap error
@@ -315,8 +314,8 @@ where
 				= merge_algebraic_patterns type1 patterns1 patterns2 var_heap symbol_heap error
 				= (guards, var_heap, symbol_heap, incompatible_patterns_in_case_error error)
 	merge_guards guards=:(OverloadedListPatterns type1 decons_expr1 patterns1) (AlgebraicPatterns type2 patterns2) var_heap symbol_heap error
-		| type2.glob_module==cPredefinedModuleIndex && isOverloaded type1
-			# index=type2.glob_object+FirstTypePredefinedSymbolIndex
+		| type2.gi_module==cPredefinedModuleIndex && isOverloaded type1
+			# index=type2.gi_index+FirstTypePredefinedSymbolIndex
 			| index==PD_ListType
 				# patterns1=replace_overloaded_symbols_in_patterns patterns1 PD_ConsSymbol PD_NilSymbol
 				= merge_algebraic_patterns type2 patterns1 patterns2 var_heap symbol_heap error

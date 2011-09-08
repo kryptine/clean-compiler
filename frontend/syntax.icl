@@ -390,7 +390,6 @@ where
 	(<<<) file (Update expr1 selections expr2) =  file <<< '{' <<< expr1  <<< " & " <<<  selections <<< " = " <<< expr2 <<< '}'
 	(<<<) file (RecordUpdate cons_symbol expression expressions) = file <<< '{' <<< cons_symbol <<< ' ' <<< expression <<< " & " <<< expressions <<< '}'
 	(<<<) file (TupleSelect field field_nr expr) = file <<< expr <<<'.' <<< field_nr
-//	(<<<) file (Lambda vars expr) = file <<< '\\' <<< vars <<< " -> " <<< expr
 	(<<<) file (MatchExpr cons expr) = file <<< cons <<< " =: " <<< expr
 	(<<<) file EE = file <<< "** E **"
 	(<<<) file (NoBind _) = file <<< "** NB **"

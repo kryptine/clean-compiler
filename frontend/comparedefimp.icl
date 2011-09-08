@@ -40,20 +40,6 @@ where
 
 	compare_rhs_of_types (AlgType dclConstructors) (AlgType iclConstructors) dcl_cons_defs icl_cons_defs comp_st
 		= compare_constructor_lists dclConstructors iclConstructors dcl_cons_defs icl_cons_defs comp_st
-	where
-		compare_constructor_lists [ dcl_cons : dcl_conses ][icl_cons : icl_conses] dcl_cons_defs icl_cons_defs comp_st
-			| dcl_cons.ds_index == icl_cons.ds_index
-				# last_cons = isEmpty dcl_conses
-				# (ok, icl_cons_defs, comp_st) = compare_constructors last_cons dcl_cons.ds_index dcl_cons_defs icl_cons_defs comp_st
-				| ok
-					| last_cons
-						= (isEmpty icl_conses, icl_cons_defs, comp_st) 
-						= compare_constructor_lists dcl_conses icl_conses dcl_cons_defs icl_cons_defs comp_st
-					= (False, icl_cons_defs, comp_st)	
-				= (False, icl_cons_defs, comp_st)	
-		compare_constructor_lists [ dcl_cons : dcl_conses ] [] dcl_cons_defs icl_cons_defs comp_st
-			= (False, icl_cons_defs, comp_st)	
-
 	compare_rhs_of_types (SynType dclType) (SynType iclType) dcl_cons_defs icl_cons_defs comp_st
 		# (ok, comp_st) = compare dclType iclType comp_st
 		= (ok, icl_cons_defs, comp_st)
@@ -86,8 +72,29 @@ where
 	compare_rhs_of_types (AbstractSynType _ dclType) (SynType iclType) dcl_cons_defs icl_cons_defs comp_st
 		# (ok, comp_st) = compare dclType iclType comp_st
 		= (ok, icl_cons_defs, comp_st)
+	compare_rhs_of_types (ExtendableAlgType []) (ExtendableAlgType []) dcl_cons_defs icl_cons_defs comp_st
+		= (True, icl_cons_defs, comp_st)
+	compare_rhs_of_types (ExtendableAlgType dclConstructors) (ExtendableAlgType iclConstructors) dcl_cons_defs icl_cons_defs comp_st
+		= compare_constructor_lists dclConstructors iclConstructors dcl_cons_defs icl_cons_defs comp_st
+	compare_rhs_of_types (AlgConses dclConstructors dcl_type_index) (AlgConses iclConstructors icl_type_index) dcl_cons_defs icl_cons_defs comp_st
+		| dcl_type_index==icl_type_index
+			= compare_constructor_lists dclConstructors iclConstructors dcl_cons_defs icl_cons_defs comp_st
+			= (False, icl_cons_defs, comp_st)
 	compare_rhs_of_types dcl_type icl_type dcl_cons_defs icl_cons_defs comp_st
 		= (False, icl_cons_defs, comp_st)
+
+	compare_constructor_lists [dcl_cons : dcl_conses] [icl_cons : icl_conses] dcl_cons_defs icl_cons_defs comp_st
+		| dcl_cons.ds_index == icl_cons.ds_index
+			# last_cons = isEmpty dcl_conses
+			# (ok, icl_cons_defs, comp_st) = compare_constructors last_cons dcl_cons.ds_index dcl_cons_defs icl_cons_defs comp_st
+			| ok
+				| last_cons
+					= (isEmpty icl_conses, icl_cons_defs, comp_st) 
+					= compare_constructor_lists dcl_conses icl_conses dcl_cons_defs icl_cons_defs comp_st
+				= (False, icl_cons_defs, comp_st)	
+			= (False, icl_cons_defs, comp_st)
+	compare_constructor_lists _ _ dcl_cons_defs icl_cons_defs comp_st
+		= (False, icl_cons_defs, comp_st)	
 
 	compare_constructors do_compare_result_types cons_index dcl_cons_defs icl_cons_defs comp_st
 		# dcl_cons_def = dcl_cons_defs.[cons_index]
@@ -986,6 +993,8 @@ instance t_corresponds TypeRhs where
 		=	t_corresponds dclType iclType
 	t_corresponds (NewType dclConstructor) (NewType iclConstructor)
 		=	t_corresponds dclConstructor iclConstructor
+	t_corresponds (ExtendableAlgType dclConstructors) (ExtendableAlgType iclConstructors)
+		=	t_corresponds dclConstructors iclConstructors
 
 // sanity check ...
 	t_corresponds UnknownType _

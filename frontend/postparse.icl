@@ -138,12 +138,11 @@ where
 		# ((pattern_expr,case_alts), ca) = collectFunctions (pattern_expr,case_alts) icl_module ca
 		= (PE_Case case_ident pattern_expr case_alts, ca)
 	collectFunctions (PE_If if_ident c t e) icl_module ca
-		# true_pattern		= PE_Basic (BVB True)
-		  false_pattern		= PE_WildCard // PE_Basic (BVB False)
-		= collectFunctions (PE_Case if_ident c
-							[ {calt_pattern = true_pattern , calt_rhs = exprToRhs t, calt_position=NoPos}
-							, {calt_pattern = false_pattern, calt_rhs = exprToRhs e, calt_position=NoPos}
-							]) icl_module ca
+		# case_alts			= [ {calt_pattern = PE_Basic (BVB True), calt_rhs = exprToRhs t, calt_position=NoPos}
+							  , {calt_pattern = PE_WildCard        , calt_rhs = exprToRhs e, calt_position=NoPos}]
+		  (c, ca) = collectFunctions c icl_module ca
+		  (case_alts, ca) = collectFunctions case_alts icl_module ca
+		= (PE_Case if_ident c case_alts, ca)
 	collectFunctions (PE_Let strict locals in_expr) icl_module ca
 		# ((node_defs,in_expr), ca) = collectFunctions (locals,in_expr) icl_module ca
 		= (PE_Let strict node_defs in_expr, ca)
@@ -1130,7 +1129,7 @@ where
 		| not parse_ok
 			= (False, No,NoIndex, [],cached_modules, files, ca)
 			# pdefs = mod.mod_defs
-			# (_, defs, imports, imported_objects,foreign_exports,ca) =   reorganiseDefinitionsAndAddTypes mod_ident support_dynamics False pdefs ca
+			# (_, defs, imports, imported_objects,foreign_exports,ca) = reorganiseDefinitionsAndAddTypes mod_ident support_dynamics False pdefs ca
 			# mod  = { mod & mod_imports = imports, mod_imported_objects = imported_objects, mod_defs = defs}
 			# cached_modules = [mod.mod_ident:cached_modules]
 			# (import_ok, parsed_modules,files, ca) = scanModules imports [] cached_modules searchPaths support_generics support_dynamics modtimefunction files ca
@@ -1261,17 +1260,9 @@ reorganiseDefinitions icl_module [PD_TypeSpec pos name prio (Yes fun_type=:{st_a
 reorganiseDefinitions icl_module [PD_Type type_def=:{td_rhs = ConsList cons_defs} : defs] cons_count sel_count mem_count type_count ca
 	# (cons_symbs, cons_count) = determine_symbols_of_conses cons_defs cons_count
 	  (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count (type_count+1) ca
-	  type_def = { type_def & td_rhs = AlgType 	cons_symbs }
+	  type_def = { type_def & td_rhs = AlgType cons_symbs }
 	  c_defs = { c_defs & def_types = [type_def : c_defs.def_types], def_constructors = mapAppend ParsedConstructorToConsDef cons_defs c_defs.def_constructors }
 	= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)  
-where
-	determine_symbols_of_conses :: [ParsedConstructor] Index -> ([DefinedSymbol], Index)
-	determine_symbols_of_conses [{pc_cons_ident,pc_cons_arity} : conses] next_cons_index
-		# cons = { ds_ident = pc_cons_ident, ds_arity = pc_cons_arity, ds_index = next_cons_index }
-		  (conses, next_cons_index) = determine_symbols_of_conses conses (inc next_cons_index)
-		= ([cons : conses], next_cons_index)
-	determine_symbols_of_conses [] next_cons_index
-		= ([], next_cons_index)
 reorganiseDefinitions icl_module [PD_Type type_def=:{td_rhs = NewTypeCons cons_def=:{pc_cons_ident,pc_cons_arity}} : defs] cons_count sel_count mem_count type_count ca
 	# cons_symb = { ds_ident = pc_cons_ident, ds_arity = pc_cons_arity, ds_index = cons_count }
 	  cons_count = inc cons_count
@@ -1313,6 +1304,18 @@ reorganiseDefinitions icl_module [PD_Type type_def=:{td_rhs = AbstractTypeSpec p
 	# (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count (type_count+1) ca
 	  type_def = { type_def & td_rhs = AbstractSynType properties type }
 	  c_defs = { c_defs & def_types = [type_def : c_defs.def_types] }
+	= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)
+reorganiseDefinitions icl_module [PD_Type type_def=:{td_rhs = ExtendableConses cons_defs} : defs] cons_count sel_count mem_count type_count ca
+	# (cons_symbs, cons_count) = determine_symbols_of_conses cons_defs cons_count
+	  (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count (type_count+1) ca
+	  type_def & td_rhs = ExtendableAlgType cons_symbs
+	  c_defs & def_types = [type_def : c_defs.def_types], def_constructors = mapAppend ParsedConstructorToConsDef cons_defs c_defs.def_constructors
+	= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)  
+reorganiseDefinitions icl_module [PD_Type type_def=:{td_rhs = MoreConses type_ext_ident cons_defs} : defs] cons_count sel_count mem_count type_count ca
+	# (cons_symbs, cons_count) = determine_symbols_of_conses cons_defs cons_count
+	  (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count (type_count+1) ca
+	  type_def & td_rhs = UncheckedAlgConses type_ext_ident cons_symbs
+	  c_defs & def_types = [type_def : c_defs.def_types], def_constructors = mapAppend ParsedConstructorToConsDef cons_defs c_defs.def_constructors
 	= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)  
 reorganiseDefinitions icl_module [PD_Class class_def=:{class_ident,class_arity,class_args} members : defs] cons_count sel_count mem_count type_count ca
 	# type_context = { tc_class = TCClass {glob_module = NoIndex, glob_object = {ds_ident = class_ident, ds_arity = class_arity, ds_index = NoIndex }},
@@ -1457,6 +1460,14 @@ reorganiseDefinitions icl_module [] _ _ _ _ ca
 	= ([], { def_types = [], def_constructors = [], def_selectors = [], def_macros = [],def_macro_indices={ir_from=0,ir_to=0},def_classes = [], def_members = [],
 			def_instances = [], def_funtypes = [], 
 			def_generics = [], def_generic_cases = []}, [], [], [], ca)
+
+determine_symbols_of_conses :: [ParsedConstructor] Index -> ([DefinedSymbol], Index)
+determine_symbols_of_conses [{pc_cons_ident,pc_cons_arity} : conses] next_cons_index
+	# cons = { ds_ident = pc_cons_ident, ds_arity = pc_cons_arity, ds_index = next_cons_index }
+	  (conses, next_cons_index) = determine_symbols_of_conses conses (inc next_cons_index)
+	= ([cons : conses], next_cons_index)
+determine_symbols_of_conses [] next_cons_index
+	= ([], next_cons_index)
 
 make_implicit_qualified_imports_explicit [import_=:{import_qualified=Qualified,import_symbols=[],import_module,import_file_position}:imports] hash_table
 	# (qualified_idents,hash_table) = get_qualified_idents_from_hash_table import_module hash_table

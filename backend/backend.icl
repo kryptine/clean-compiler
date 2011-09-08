@@ -550,6 +550,12 @@ BEAlgebraicType a0 a1 a2 = code {
 }
 // void BEAlgebraicType (BEFlatTypeP lhs,BEConstructorListP constructors);
 
+BEExtendableAlgebraicType :: !BEFlatTypeP !BEConstructorListP !BackEnd -> BackEnd;
+BEExtendableAlgebraicType a0 a1 a2 = code {
+	ccall BEExtendableAlgebraicType "pp:V:p"
+}
+// void BEExtendableAlgebraicType (BEFlatTypeP lhs,BEConstructorListP constructors);
+
 BERecordType :: !Int !BEFlatTypeP !BETypeNodeP !Int !BEFieldListP !BackEnd -> BackEnd;
 BERecordType a0 a1 a2 a3 a4 a5 = code {
 	ccall BERecordType "IppIp:V:p"

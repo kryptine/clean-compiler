@@ -615,11 +615,13 @@ instance consumerRequirements Case where
 										  		_ -> False
 
 		inspect_patterns :: !{#.CommonDefs} !.Bool !.CasePatterns ![.Bool] -> (!.Bool,!Bool)
-		inspect_patterns common_defs has_default (AlgebraicPatterns {glob_object, glob_module} algebraic_patterns) unsafe_bits
-			# type_def						= common_defs.[glob_module].com_type_defs.[glob_object]
+		inspect_patterns common_defs has_default (AlgebraicPatterns {gi_index,gi_module} algebraic_patterns) unsafe_bits
+			# type_def						= common_defs.[gi_module].com_type_defs.[gi_index]
 			  defined_symbols				= case type_def.td_rhs of
 													AlgType defined_symbols		-> defined_symbols
 													RecordType {rt_constructor}	-> [rt_constructor]
+													ExtendableAlgType defined_symbols -> defined_symbols
+													AlgConses defined_symbols _	-> defined_symbols
 			  all_constructors				= [ ds_index \\ {ds_index}<-defined_symbols ]
 			  pattern_constructors			= [ glob_object.ds_index \\ {ap_symbol={glob_object}}<-algebraic_patterns]	
 			  sorted_pattern_constructors	= sort pattern_constructors unsafe_bits
@@ -636,15 +638,17 @@ instance consumerRequirements Case where
 				not (multimatch_loop has_default sorted_pattern_constructors))
 		inspect_patterns common_defs has_default (OverloadedListPatterns overloaded_list _ algebraic_patterns) unsafe_bits
 			# type_def = case overloaded_list of
-							UnboxedList {glob_object, glob_module} _ _ _
-								-> common_defs.[glob_module].com_type_defs.[glob_object]
-							UnboxedTailStrictList {glob_object, glob_module} _ _ _
-								-> common_defs.[glob_module].com_type_defs.[glob_object]
-							OverloadedList {glob_object, glob_module} _ _ _
-								-> common_defs.[glob_module].com_type_defs.[glob_object]
+							UnboxedList {gi_index,gi_module} _ _ _
+								-> common_defs.[gi_module].com_type_defs.[gi_index]
+							UnboxedTailStrictList {gi_index,gi_module} _ _ _
+								-> common_defs.[gi_module].com_type_defs.[gi_index]
+							OverloadedList {gi_index,gi_module} _ _ _
+								-> common_defs.[gi_module].com_type_defs.[gi_index]
 			  defined_symbols = case type_def.td_rhs of
 									AlgType defined_symbols		-> defined_symbols
 									RecordType {rt_constructor}	-> [rt_constructor]
+									ExtendableAlgType defined_symbols -> defined_symbols
+									AlgConses defined_symbols _	-> defined_symbols
 			  all_constructors = [ ds_index \\ {ds_index}<-defined_symbols ]
 			  pattern_constructors = [ glob_object.ds_index \\ {ap_symbol={glob_object}}<-algebraic_patterns]	
 			  sorted_pattern_constructors = sort pattern_constructors unsafe_bits
@@ -657,6 +661,8 @@ instance consumerRequirements Case where
 			= True
 		is_sorted [h1:t=:[h2:_]]
 			= h1 < h2 && is_sorted t
+		is_sorted []
+			= True
 
 		sort constr_indices unsafe_bits
 			= sortBy smaller (zip3 constr_indices [0..] unsafe_bits)
@@ -724,7 +730,7 @@ where
 			-> True
 		_ -> False //---> ("not ok_pattern_type",patterns)
 	pattern_constructors = case patterns of
-		(AlgebraicPatterns {glob_object, glob_module} algebraic_patterns)
+		(AlgebraicPatterns _ algebraic_patterns)
 			-> [ glob_object.ds_index \\ {ap_symbol={glob_object}}<-algebraic_patterns] //---> ("AlgebraicPatterns")
 		(BasicPatterns BT_Bool basic_patterns)
 			-> [ if bool 1 0 \\ {bp_value=BVB bool}<-basic_patterns ] //---> ("BasicPatterns Bool")

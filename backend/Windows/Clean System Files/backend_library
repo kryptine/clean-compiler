@@ -85,6 +85,7 @@ BETypes
 BENoTypes
 BEFlatType
 BEAlgebraicType
+BEExtendableAlgebraicType
 BERecordType
 BEAbsType
 BEConstructors

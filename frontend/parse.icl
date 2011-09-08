@@ -1688,7 +1688,6 @@ wantGenericDefinition parseContext pos pState
 			= 	case token of
 				IdentToken name -> (name, pState)
 				_ -> ("", parseError "generic definition" (Yes token) "<identifier>" pState)
-		
 
 		try_variable pState
 			# (token, pState) = nextToken TypeContext pState
@@ -1709,17 +1708,17 @@ wantGenericDefinition parseContext pos pState
 		
 		wantIdentOrQualifiedIdent pState
 			# (token, pState) = nextToken TypeContext pState
-			=	case token of
-					IdentToken name 
-						# (ident, pState) = stringToIdent name IC_Generic pState
-						= (Ident ident, pState)
-					QualifiedIdentToken mod_name name 
-						# (mod_ident, pState) = stringToQualifiedModuleIdent mod_name name IC_Generic pState
-						= (QualifiedIdent mod_ident name, pState)
-					_ 
-						# (ident, pState) = stringToIdent "" IC_Generic pState
-						= (Ident ident, parseError "generic dependency" (Yes token) "<identifier>" pState)
-			
+			= case token of
+				IdentToken name 
+					# (ident, pState) = stringToIdent name IC_Generic pState
+					= (Ident ident, pState)
+				QualifiedIdentToken mod_name name 
+					# (mod_ident, pState) = stringToQualifiedModuleIdent mod_name name IC_Generic pState
+					= (QualifiedIdent mod_ident name, pState)
+				_ 
+					# (ident, pState) = stringToIdent "" IC_Generic pState
+					= (Ident ident, parseError "generic dependency" (Yes token) "<identifier>" pState)
+
 wantDeriveDefinition :: !ParseContext !Position !*ParseState -> (!ParsedDefinition, !*ParseState)
 wantDeriveDefinition parseContext pos pState
 	| pState.ps_flags bitand PS_SupportGenericsMask==0
@@ -1863,36 +1862,32 @@ where
 		  (exi_vars, pState)	= optionalExistentialQuantifiedVariables pState
 		  (token, pState)		= nextToken GeneralContext pState // should be TypeContext
 		= case token of
-  			CurlyOpenToken
+			CurlyOpenToken
   				-> want_record_type_rhs name False exi_vars pState
   			ExclamationToken
 			  	# (token, pState) = nextToken TypeContext pState
   				| token==CurlyOpenToken
   					-> want_record_type_rhs name True exi_vars pState
 	 		  		->	(PD_Type td, parseError "Record type" No ("after ! in definition of record type "+name+" { ") pState)
-/*			ColonToken
-				| isEmpty exi_vars
-				->	(PD_Erroneous, parseError "Algebraic type" No "no colon, :," pState)
-				->	(PD_Erroneous, parseError "Algebraic type" No "in this version of Clean no colon, :, after quantified variables" pState)
-*/
-			_	#	(condefs, pState)	= want_constructor_list exi_vars token pState
-					td					= { td & td_rhs = ConsList condefs }
-				|	annot == AN_None
+			_
+				# (condefs, extendable_algebraic_type, pState) = want_constructor_list exi_vars token pState
+				# td & td_rhs = if extendable_algebraic_type (ExtendableConses condefs) (ConsList condefs)
+				| annot == AN_None
 	 		  		->	(PD_Type td, pState)
-	 		  		->	(PD_Type td, parseError "Algebraic type" No ("No lhs strictness annotation for the algebraic type "+name) pState)
-		where
-			want_record_type_rhs name is_boxed_record exi_vars pState
-				#	(fields, pState)			= wantFields td_ident pState
-					pState						= wantToken TypeContext "record type def" CurlyCloseToken pState
-				  	(rec_cons_ident, pState)	= stringToIdent ("_" + name) IC_Expression pState
-				=	(PD_Type { td & td_rhs = SelectorList rec_cons_ident exi_vars is_boxed_record fields }, pState)
+					->	(PD_Type td, parseError "Algebraic type" No ("No lhs strictness annotation for the algebraic type "+name) pState)
+	where
+		want_record_type_rhs name is_boxed_record exi_vars pState
+			#	(fields, pState)			= wantFields td_ident pState
+				pState						= wantToken TypeContext "record type def" CurlyCloseToken pState
+			  	(rec_cons_ident, pState)	= stringToIdent ("_" + name) IC_Expression pState
+			=	(PD_Type { td & td_rhs = SelectorList rec_cons_ident exi_vars is_boxed_record fields }, pState)
 
 	want_type_rhs ColonDefinesToken parseContext td=:{td_attribute} annot pState // type synonym
 		# name				= td.td_ident.id_name
 		  pState			= verify_annot_attr annot td_attribute name pState
 		  (atype, pState)	= want pState // Atype
 		  td				= {td & td_rhs = TypeSpec atype}
-		|	annot == AN_None
+		| annot == AN_None
 			= (PD_Type td, pState)
 			= (PD_Type td, parseError "Type synonym" No ("No lhs strictness annotation for the type synonym "+name) pState)
 
@@ -1919,6 +1914,20 @@ where
 		| td_attribute == TA_Anonymous || td_attribute == TA_Unique || td_attribute == TA_None
 			= (PD_Type td, pState)
 			= (PD_Type td, parseError "abstract type" No ("type attribute "+toString td_attribute+" for abstract type "+name+" is not") (tokenBack pState))
+
+	want_type_rhs BarToken parseContext td=:{td_ident,td_attribute} annot pState
+		# name					= td_ident.id_name
+		  pState				= verify_annot_attr annot td_attribute name pState
+		  (exi_vars, pState)	= optionalExistentialQuantifiedVariables pState
+		  (token, pState)		= nextToken GeneralContext pState // should be TypeContext
+		  (condefs, pState)		= want_more_constructors exi_vars token pState
+		  (file_name, pState) = getFilename pState
+		  module_name = file_name % (0,size file_name-4)
+		  (type_ext_ident, pState) = stringToIdent name (IC_TypeExtension module_name) pState
+		  td & td_rhs			= MoreConses type_ext_ident condefs
+		| annot == AN_None
+	 		= (PD_Type td, pState)
+	 		= (PD_Type td, parseError "Algebraic type" No ("No lhs strictness annotation for the algebraic type "+name) pState)
 
 	want_type_rhs token parseContext td=:{td_attribute} annot pState
 		| isIclContext parseContext
@@ -1948,16 +1957,28 @@ where
 			= (TA_None, cAllBitsClear)
 			= (attr, cIsNonCoercible)
 
-	want_constructor_list :: ![ATypeVar] !Token !ParseState -> (.[ParsedConstructor],ParseState)
+	want_constructor_list :: ![ATypeVar] !Token !ParseState -> (![ParsedConstructor],!Bool,!ParseState)
+	want_constructor_list exi_vars DotDotToken pState
+		= ([], True, pState)
 	want_constructor_list exi_vars token pState
 		# (cons,pState) = want_constructor exi_vars token pState
 		  (token, pState) = nextToken TypeContext pState
 		| token == BarToken
 			# (exi_vars, pState) = optionalExistentialQuantifiedVariables pState
 			  (token, pState) = nextToken GeneralContext pState
-			  (cons_list, pState) = want_constructor_list exi_vars token pState
+			  (cons_list, extendable_algebraic_type, pState) = want_constructor_list exi_vars token pState
+			= ([cons : cons_list], extendable_algebraic_type, pState)
+			= ([cons], False, tokenBack pState)
+
+	want_more_constructors :: ![ATypeVar] !Token !ParseState -> (![ParsedConstructor],!ParseState)
+	want_more_constructors exi_vars token pState
+		# (cons,pState) = want_constructor exi_vars token pState
+		  (token, pState) = nextToken TypeContext pState
+		| token == BarToken
+			# (exi_vars, pState) = optionalExistentialQuantifiedVariables pState
+			  (token, pState) = nextToken GeneralContext pState
+			  (cons_list, pState) = want_more_constructors exi_vars token pState
 			= ([cons : cons_list], pState)
-		// otherwise
 			= ([cons], tokenBack pState)
 
 	want_constructor :: ![ATypeVar] !Token !ParseState -> (.ParsedConstructor,!ParseState)

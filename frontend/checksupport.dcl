@@ -29,11 +29,7 @@ cNeedStdStrictLists		:== 16
 
 ::	CheckStateX = {x_needed_modules :: !BITVECT,x_main_dcl_module_n :: !Int, x_check_dynamic_types :: !Bool }
 
-//	SymbolTable			:== {# SymbolTableEntry}
-
 instance == STE_Kind
-
-::	ConversionTable		:== {# .{# Int }}
 
 cTypeDefs				:== 0
 cConstructorDefs		:== 1
@@ -100,8 +96,6 @@ instance <<< IdentPos, StringPos, ExplImpInfo, DeclarationInfo
 	,	ef_macro_defs		:: !.{#.{#FunDef}}
 	,	ef_is_macro_fun		:: !Bool
 	}
-
-//convertIndex :: !Index !Index !(Optional ConversionTable) -> !Index
 
 retrieveGlobalDefinition :: !SymbolTableEntry !STE_Kind !Index -> (!Index, !Index)
 

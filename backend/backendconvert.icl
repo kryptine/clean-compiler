@@ -824,11 +824,9 @@ convertTypeVar typeVar
 
 defineType :: ModuleIndex {#ConsDef} {#SelectorDef} Index CheckedTypeDef *BackEndState -> *BackEndState
 defineType moduleIndex constructors _ typeIndex {td_ident, td_attribute, td_args, td_rhs=AlgType constructorSymbols} be
-	# (flatType, be)
-		=	convertTypeLhs moduleIndex typeIndex td_attribute td_args be
-	# (constructors, be)
-		=	convertConstructors typeIndex td_ident.id_name moduleIndex constructors constructorSymbols be
-	=	appBackEnd (BEAlgebraicType flatType constructors) be
+	# (flatType, be) = convertTypeLhs moduleIndex typeIndex td_attribute td_args be
+	# (constructors, be) = convertConstructors typeIndex td_ident.id_name moduleIndex constructors constructorSymbols be
+	= appBackEnd (BEAlgebraicType flatType constructors) be
 defineType moduleIndex constructors selectors typeIndex {td_attribute, td_args, td_rhs=RecordType {rt_constructor, rt_fields, rt_is_boxed_record}, td_fun_index} be
 	# constructorIndex = rt_constructor.ds_index
 	  constructorDef = constructors.[constructorIndex]
@@ -859,6 +857,14 @@ defineType moduleIndex _ _ typeIndex {td_attribute, td_args, td_rhs=AbstractType
  	=	beAbsType (convertTypeLhs moduleIndex typeIndex td_attribute td_args) be
 defineType moduleIndex _ _ typeIndex {td_attribute, td_args, td_rhs=AbstractSynType _ _} be
  	=	beAbsType (convertTypeLhs moduleIndex typeIndex td_attribute td_args) be
+defineType moduleIndex constructors _ typeIndex {td_ident, td_attribute, td_args, td_rhs=ExtendableAlgType constructorSymbols} be
+	# (flatType, be) = convertTypeLhs moduleIndex typeIndex td_attribute td_args be
+	# (constructors, be) = convertConstructors typeIndex td_ident.id_name moduleIndex constructors constructorSymbols be
+	= appBackEnd (BEExtendableAlgebraicType flatType constructors) be
+defineType moduleIndex constructors _ typeIndex {td_ident, td_attribute, td_args, td_rhs=AlgConses constructorSymbols _} be
+	# (flatType, be) = convertTypeLhs moduleIndex typeIndex td_attribute td_args be
+	# (constructors, be) = convertConstructors typeIndex td_ident.id_name moduleIndex constructors constructorSymbols be
+	= appBackEnd (BEExtendableAlgebraicType flatType constructors) be
 defineType _ _ _ _ _ be
 	=	be
 

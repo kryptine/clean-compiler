@@ -29,7 +29,7 @@ import type_io;
 
 :: DynamicRepresentation =
 	{	dr_type_ident		:: SymbIdent
-	,	dr_dynamic_type		:: Global Index
+	,	dr_dynamic_type		:: GlobalIndex
 	,	dr_dynamic_symbol	:: Global DefinedSymbol
 	}
 
@@ -769,7 +769,7 @@ create_dynamic_and_selector_idents common_defs predefined_symbols
 	
 		# dynamic_defined_symbol
 			= {glob_module = pds_module1, glob_object = rt_constructor}
-		# dynamic_type = {glob_module = pds_module1, glob_object = pds_def1}
+		# dynamic_type = {gi_module = pds_module1, gi_index = pds_def1}
 
 		# dynamic_temp_symb_ident
 			= { SymbIdent |
