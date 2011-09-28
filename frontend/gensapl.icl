@@ -6,7 +6,7 @@ implementation module gensapl
 import StdEnv, syntax, transform, StdDebug
 
 instance toString SaplConsDef  
-where toString (SaplConsDef mod t name alt nrargs nralt) = makePrintableName (mod +++ "_" +++ name) +++  makeString [" a"+++toString n\\ n <- [1..nrargs]]
+where toString (SaplConsDef mod t name alt nrargs nralt) = makePrintableName (mod +++ "." +++ name) +++  makeString [" a"+++toString n\\ n <- [1..nrargs]]
 
 instance toString SaplFuncDef  
 where toString (SaplFuncDef name nrargs args body kind) = makePrintableName name +++ makeArgs args +++ toString kind +++ toString body
@@ -63,7 +63,6 @@ makeArgs [SaplVar arg _ a:args] = " " +++ makePrintableAnnotatedName (toString a
 
 makeCodeString :: [String] -> String
 makeCodeString []     = ""
-//makeCodeString [c]    = c
 makeCodeString [c:cs] = c +++ ";" +++ makeCodeString cs 
 
 // Converting Clean like selects (pre-transformed) to Sapl selects
@@ -102,11 +101,11 @@ makeConstantPats args case_exp [] consdefs def                   = select2func a
 makeConstantPats args case_exp [(pat,_,res):conses] consdefs def = multiApp [(makeSingleConstMatch case_exp pat),(select2func args res consdefs def),
                                                                                makeConstantPats args case_exp conses consdefs def]
 
-makeSingleConstMatch case_exp (MatchInt val)    = SaplApp (SaplFun "if") (multiApp [SaplFun /*"eq"*/"StdInt_==_16",case_exp,SaplInt val])
-makeSingleConstMatch case_exp (MatchString val) = SaplApp (SaplFun "if") (multiApp [SaplFun "StdString_==_2",case_exp,SaplString val])
-makeSingleConstMatch case_exp (MatchChar val)   = SaplApp (SaplFun "if") (multiApp [SaplFun /*"eq"*/"StdChar_==_18",case_exp,SaplChar val])
-makeSingleConstMatch case_exp (MatchReal val)   = SaplApp (SaplFun "if") (multiApp [SaplFun "StdReal_==_11",case_exp,SaplReal val])
-makeSingleConstMatch case_exp (MatchBool val)   = SaplApp (SaplFun "if") (multiApp [SaplFun "StdBool_==_3",case_exp,SaplBool val])
+makeSingleConstMatch case_exp (MatchInt val)    = SaplApp (SaplFun "if") (multiApp [SaplFun /*"eq"*/"StdInt.==_16",case_exp,SaplInt val])
+makeSingleConstMatch case_exp (MatchString val) = SaplApp (SaplFun "if") (multiApp [SaplFun "StdString.==_2",case_exp,SaplString val])
+makeSingleConstMatch case_exp (MatchChar val)   = SaplApp (SaplFun "if") (multiApp [SaplFun /*"eq"*/"StdChar.==_18",case_exp,SaplChar val])
+makeSingleConstMatch case_exp (MatchReal val)   = SaplApp (SaplFun "if") (multiApp [SaplFun "StdReal.==_11",case_exp,SaplReal val])
+makeSingleConstMatch case_exp (MatchBool val)   = SaplApp (SaplFun "if") (multiApp [SaplFun "StdBool.==_3",case_exp,SaplBool val])
 makeSingleConstMatch case_exp MatchSingleIf     = SaplApp (SaplFun "if") case_exp
 makeSingleConstMatch case_exp val  = SaplError "not implemented const match"
 
@@ -158,7 +157,7 @@ CleanFunctoSaplFunc  :: Int Int FunDef  [String] String {#DclModule} [IndexRange
 CleanFunctoSaplFunc modindex funindex 
                     {fun_ident,fun_body=TransformedBody {tb_args,tb_rhs},fun_info={fi_free_vars,fi_local_vars,fi_def_level,fi_calls},fun_type,fun_kind} 
                     mns mymod dcl_mods icl_function_indices
-        = SaplFuncDef (mymod +++ "_" +++ makeFuncName -1 (getName fun_ident) 0 funindex dcl_mods icl_function_indices mymod mns) //(getName fun_ident) +++ toString funindex)   
+        = SaplFuncDef (mymod +++ "." +++ makeFuncName -1 (getName fun_ident) 0 funindex dcl_mods icl_function_indices mymod mns) //(getName fun_ident) +++ toString funindex)   
                        (length tb_args) (counterMap (getFreeFuncArgName (getStrictnessList fun_type)) tb_args 0)  
                        (cleanExpToSaplExp tb_rhs) fun_kind
 
@@ -180,14 +179,14 @@ where
 	cleanExpToSaplExp (Selection _ expr selectors)                              = makeSelector  selectors (cleanExpToSaplExp expr)  
 	cleanExpToSaplExp (Update expr1 selections expr2)                           = makeArrayUpdate (cleanExpToSaplExp expr1) selections (cleanExpToSaplExp expr2)  
 	cleanExpToSaplExp (RecordUpdate cons_symbol expression expressions)         = makeRecordUpdate (cleanExpToSaplExp expression) expressions 
-	cleanExpToSaplExp (TupleSelect cons field_nr expr)                          = SaplApp (SaplFun ("_predefined_tupsels" +++ toString cons.ds_arity +++ "v" +++ toString field_nr)) (cleanExpToSaplExp expr)
-	cleanExpToSaplExp (MatchExpr cons expr)  |cons.glob_object.ds_arity == 1    = SaplApp (SaplFun ("_predefined_tupsels1v0"))(cleanExpToSaplExp expr) 
+	cleanExpToSaplExp (TupleSelect cons field_nr expr)                          = SaplApp (SaplFun ("_predefined.tupsels" +++ toString cons.ds_arity +++ "v" +++ toString field_nr)) (cleanExpToSaplExp expr)
+	cleanExpToSaplExp (MatchExpr cons expr)  |cons.glob_object.ds_arity == 1    = SaplApp (SaplFun ("_predefined.tupsels1v0"))(cleanExpToSaplExp expr) 
 	                                                                            = cleanExpToSaplExp expr
 	cleanExpToSaplExp EE                                                        = SaplError "no EE"  
 	cleanExpToSaplExp (DynamicExpr {dyn_expr,dyn_type_code})                    = SaplError "no DynamicExpr"   
 	cleanExpToSaplExp (TypeCodeExpression type_code)                            = SaplError "no TypeCodeExpression" 
 	
-	cleanExpToSaplExp (ABCCodeExpr code_sequence do_inline)                     = SaplABCCode code_sequence //"no ABCCodeExpr" 
+	cleanExpToSaplExp (ABCCodeExpr code_sequence do_inline)                     = SaplError "no AnyCodeExpr" //SaplABCCode code_sequence
 	cleanExpToSaplExp (AnyCodeExpr input output code_sequence)                  = SaplError "no AnyCodeExpr" 
 	
 	cleanExpToSaplExp (FailExpr _)                                              = SaplError "no FailExpr" 
@@ -210,12 +209,12 @@ where
 	
 	makeSelector  [] e = e
 	makeSelector  [selector:sels] e  = makeSelector  sels (mksel selector e)
-	where mksel (RecordSelection globsel ind)     exp = SaplApp (SaplFun (mns !! globsel.glob_module  +++ "_get_" +++ toString globsel.glob_object.ds_ident)) e 
-	      mksel (ArraySelection globsel _ e)      exp = multiApp [SaplFun (mns !! globsel.glob_module +++ "_" +++ toString globsel.glob_object.ds_ident +++ "_" +++ toString globsel.glob_object.ds_index),exp, cleanExpToSaplExp e]                             
+	where mksel (RecordSelection globsel ind)     exp = SaplApp (SaplFun (mns !! globsel.glob_module  +++ ".get_" +++ toString globsel.glob_object.ds_ident)) e 
+	      mksel (ArraySelection globsel _ e)      exp = multiApp [SaplFun (mns !! globsel.glob_module +++ "." +++ toString globsel.glob_object.ds_ident +++ "_" +++ toString globsel.glob_object.ds_index),exp, cleanExpToSaplExp e]                             
 	      mksel (DictionarySelection var sels _ e)exp = multiApp [makeSelector sels (getBoundVarName var),exp,cleanExpToSaplExp e]
 	
 	makeRecordUpdate expression [         ]                      = expression
-	makeRecordUpdate expression [upbind:us] | not(isNoBind value)= makeRecordUpdate (multiApp [SaplFun (field_mod +++ "_set_" +++ field),expression,cleanExpToSaplExp value]) us
+	makeRecordUpdate expression [upbind:us] | not(isNoBind value)= makeRecordUpdate (multiApp [SaplFun (field_mod +++ ".set_" +++ field),expression,cleanExpToSaplExp value]) us
 	                                                             = makeRecordUpdate expression us
 	where field               = toString upbind.bind_dst.glob_object.fs_ident
 	      index               = toString upbind.bind_dst.glob_object.fs_index
@@ -258,18 +257,18 @@ where
 	getSymbName symb             = getName symb.symb_ident 
 	
 	printGeneratedFunction symbol symb_index  = decsymbol (toString symbol)
-	where decsymbol s                         = mymod +++ "_"  +++ makeFuncName 0 s 0 symb_index dcl_mods icl_function_indices mymod mns 
-//	where decsymbol s                         = mymod +++ "_"  +++ makeName s   +++ symb_index 
+	where decsymbol s                         = mymod +++ "."  +++ makeFuncName 0 s 0 symb_index dcl_mods icl_function_indices mymod mns 
+//	where decsymbol s                         = mymod +++ "."  +++ makeName s   +++ symb_index 
 	
 	printOverloaded symbol symb_index modnr   = decsymbol (toString symbol)
-	where decsymbol s | startsWith "c;" s     = mymod +++ "__lc_"  +++ toString symb_index 
-	                  | startsWith "g_c;" s   = mymod +++ "__lc_"  +++ toString symb_index 
+	where decsymbol s | startsWith "c;" s     = mymod +++ "._lc_"  +++ toString symb_index 
+	                  | startsWith "g_c;" s   = mymod +++ "._lc_"  +++ toString symb_index 
 	                                          = makemod modnr +++ makeFuncName 0 s modnr symb_index dcl_mods icl_function_indices  mymod mns
 //	                                          = makemod modnr +++ makeName s   +++ toString symb_index 
 	printConsName symbol symb_index modnr     = makemod modnr +++  toString symbol
 	
 	getmodnr sym = sym.glob_module
-	makemod n =  mns!! n +++ "_"
+	makemod n =  mns!! n +++ "."
 	
 	// Converting Case definitions
 	genSaplCase case_exp (AlgebraicPatterns gindex pats) def = SaplSelect (cleanExpToSaplExp case_exp) (map getCasePat pats) (map cleanExpToSaplExp def) 
@@ -372,14 +371,14 @@ startsWith :: String String -> Bool
 startsWith s1 s2 = s1 == s2%(0,size s1-1)
                                  
 // Record access defintions
-makeGetSets mod recname fields = ":: " +++ makePrintableName (mod +++ "_" +++ recname) +++ " = {" +++ makeconsargs (map ((+++) (mod +++ "_")) fields) +++ "}\n" +++
+makeGetSets mod recname fields = ":: " +++ makePrintableName (mod +++ "." +++ recname) +++ " = {" +++ makeconsargs (map ((+++) (mod +++ ".")) fields) +++ "}\n" +++
                                  mGets 1 (length fields) fields +++ mSets 1  (length fields) fields
 where
  mGets _ _ [] = ""
- mGets k nf [field:fields] = makePrintableName (mod +++ "_get_" +++ field) +++ " rec = select rec (\\" +++ makeargs nf +++ " = a" +++ toString k +++ ")\n" +++ mGets (k+1) nf fields
+ mGets k nf [field:fields] = makePrintableName (mod +++ ".get_" +++ field) +++ " rec = select rec (\\" +++ makeargs nf +++ " = a" +++ toString k +++ ")\n" +++ mGets (k+1) nf fields
  mSets _ _ [] = ""
- mSets k nf [field:fields] = makePrintableName (mod +++ "_set_" +++ field) +++ " rec val = select rec (\\" +++ makeargs nf +++ " = " +++ 
-                             makePrintableName (mod +++ "_" +++ recname) +++ " " +++ makerepargs k nf +++ ")\n"  +++ mSets (k+1) nf fields
+ mSets k nf [field:fields] = makePrintableName (mod +++ ".set_" +++ field) +++ " rec val = select rec (\\" +++ makeargs nf +++ " = " +++ 
+                             makePrintableName (mod +++ "." +++ recname) +++ " " +++ makerepargs k nf +++ ")\n"  +++ mSets (k+1) nf fields
  makeconsargs [     ]  = ""
  makeconsargs [a]      = makePrintableName a
  makeconsargs [a:args] = makePrintableName a +++ ", " +++ makeconsargs args 
@@ -396,18 +395,19 @@ makePrintableAnnotatedName f SA_None = makePrintableName f
 makePrintableAnnotatedName f SA_Strict = "!" +++ makePrintableName f
 
 makePrintableName f | ss f                                   = "<{" +++ f +++ "}>"
-                         | startsWith "_predefined__Cons" f  = "cons"
-                         | startsWith "_predefined__Nil"   f = "nil" 
+// DL 2011.09.26
+//                         | startsWith "_predefined__Cons" f  = "cons"
+//                         | startsWith "_predefined__Nil"   f = "nil" 
                                                              = f
 where ss f = or [is_ss c\\ c <-: f]
-      is_ss c = not (isAlphanum c || c == '_')          
+      is_ss c = not (isAlphanum c || c == '_' || c == '.')          
       
 
 genFunDepends :: [SaplFuncDef] [SaplConsDef]  [SaplRecordDef] -> [(String,[String])]   
 genFunDepends fundefs consdefs recdefs = map (\(n,ns) -> (makePrintableName n, map makePrintableName ns))(  initdeps) ++ 
-                                         [(makePrintableName (mod +++ "_" +++ consname),[])\\ SaplConsDef mod _ consname _ _ _ <- consdefs]++
-                                         [(makePrintableName (mod +++ "_" +++ consname),[])\\ SaplRecordDef mod consname _ <- recdefs]++
-                                         [(makePrintableName (mod +++ "_" +++ getset),[makePrintableName (mod +++ "_" +++ recname)])\\ SaplRecordDef mod recname fields <- recdefs,
+                                         [(makePrintableName (mod +++ "." +++ consname),[])\\ SaplConsDef mod _ consname _ _ _ <- consdefs]++
+                                         [(makePrintableName (mod +++ "." +++ consname),[])\\ SaplRecordDef mod consname _ <- recdefs]++
+                                         [(makePrintableName (mod +++ "." +++ getset),[makePrintableName (mod +++ "." +++ recname)])\\ SaplRecordDef mod recname fields <- recdefs,
                                                                                                    field <- fields, 
                                                                                                    getset <- ["get_"+++ field, "set_"+++ field]]
 where
