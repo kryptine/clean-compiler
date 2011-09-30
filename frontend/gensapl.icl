@@ -394,32 +394,11 @@ makePrintableAnnotatedName :: String SaplAnnotation -> String
 makePrintableAnnotatedName f SA_None = makePrintableName f
 makePrintableAnnotatedName f SA_Strict = "!" +++ makePrintableName f
 
-makePrintableName f | ss f                                   = "<{" +++ f +++ "}>"
-// DL 2011.09.26
-//                         | startsWith "_predefined__Cons" f  = "cons"
-//                         | startsWith "_predefined__Nil"   f = "nil" 
-                                                             = f
+makePrintableName f | ss f = "<{" +++ f +++ "}>"
+                           = f
+                           
 where ss f = or [is_ss c\\ c <-: f]
       is_ss c = not (isAlphanum c || c == '_' || c == '.')          
-      
-
-genFunDepends :: [SaplFuncDef] [SaplConsDef]  [SaplRecordDef] -> [(String,[String])]   
-genFunDepends fundefs consdefs recdefs = map (\(n,ns) -> (makePrintableName n, map makePrintableName ns))(  initdeps) ++ 
-                                         [(makePrintableName (mod +++ "." +++ consname),[])\\ SaplConsDef mod _ consname _ _ _ <- consdefs]++
-                                         [(makePrintableName (mod +++ "." +++ consname),[])\\ SaplRecordDef mod consname _ <- recdefs]++
-                                         [(makePrintableName (mod +++ "." +++ getset),[makePrintableName (mod +++ "." +++ recname)])\\ SaplRecordDef mod recname fields <- recdefs,
-                                                                                                   field <- fields, 
-                                                                                                   getset <- ["get_"+++ field, "set_"+++ field]]
-where
- initdeps = map fdep fundefs
- fdep (SaplFuncDef name _ _ body _) = (name,removeDup (deps body))  
- deps  (SaplApp left right)     = deps   left ++ deps   right
- deps  (SaplFun name)   | isMember name  ["if","select"]= []
-                                                        = [name] 
- deps  (SaplSelect e sels def)  = sort (deps e ++ flatten [deps se\\(_,_,se) <- sels] ++ flatten (map deps def))
- deps  (AnFunc as e)            = deps e
- deps  (SaplLet as body)        = flatten [deps  e\\ (_,e) <- as] ++ deps body
- deps   e                       = []
 
 
 // Replace non toplevel if & select by a function call
@@ -469,7 +448,6 @@ where
 // Which functions must be extended with a number 
 genFunctionExtension current_mod name mod_index func_index dcl_mods ranges mymod mns
 | current_mod == -1 || mns!!mod_index == mymod = genFunctionExtForMain name func_index ranges
-//| mod_index == current_mod = genFunctionExtForMain name func_index ranges
                            = genFunctionExtForDCL name mod_index func_index dcl_mods
 where                           
 	genFunctionExtForDCL name mod_index func_index dcl_mods = gfn dcl_mods.[mod_index]
@@ -487,19 +465,6 @@ where
 	index_in_ranges index [{ir_from, ir_to}:ranges] = (index>=ir_from && index < ir_to) || index_in_ranges index ranges
 	index_in_ranges index [] = False
 
-/*
-saplsysfuncs = [("<{StdInt_+_6}>","add"),("<{StdInt_-_7}>","sub"),("StdInt_zero_8","0"),("<{StdInt_*_9}>","mult"),("<{StdInt_/_10}>","div"),
-                ("StdInt_one_11","1"),("<{StdInt_==_16}>","eq"),("StdInt_rem_28","mod"),("<{StdChar_==_18}>","eq")]
-                                                               
-saplsysfuncs2 = [("StdInt_+_6","add"),("StdInt_-_7","sub"),("StdInt_zero_8","0"),("StdInt_*_9","mult"),("StdInt_/_10","div"),
-                ("StdInt_one_11","1"),("StdInt_==_16","eq"),("StdInt_rem_28","mod"),("StdChar_==_18","eq")]
-
-makeSaplSysFunc name = msf name saplsysfuncs
-where                                                               
-  msf name [] = name
-  msf name [(n,sf):sfs] | name == n = sf
-                                    = msf name sfs
-*/
 
 
                                     

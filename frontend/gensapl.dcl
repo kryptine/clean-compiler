@@ -20,15 +20,9 @@ instance toString SaplConsDef
 instance toString SaplFuncDef
 instance toString SaplRecordDef
 
-//getSaplFunDefs :: !*{! Group} !Int  {# FunDef}  -> [SaplFuncDef]
-//getSaplConstructors :: CommonDefs -> [SaplConsDef]			
 convertSelects :: [SaplFuncDef] [SaplConsDef] -> [SaplFuncDef]
 renameVars :: SaplFuncDef -> SaplFuncDef
 checkIfSelect :: SaplFuncDef -> [SaplFuncDef]
 
 CleanFunctoSaplFunc  :: Int Int FunDef  [String] String  {#DclModule} [IndexRange] -> SaplFuncDef
 
-// Transform a multicase Expression with optional default to single function body
-//select2func :: SaplExp [SaplConsDef] -> SaplExp
-//checkFuncs :: [SaplFuncDef] [SaplConsDef] [SaplRecordDef]-> [String] 
-genFunDepends :: [SaplFuncDef] [SaplConsDef] [SaplRecordDef] -> [(String,[String])]
