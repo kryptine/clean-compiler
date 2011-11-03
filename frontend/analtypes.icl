@@ -1,7 +1,7 @@
 implementation module analtypes
 
 import StdEnv
-import syntax, checksupport, checktypes, check, typesupport, utilities, analunitypes //, RWSDebug
+import syntax, checksupport, checktypes, check, typesupport, utilities, analunitypes
 
 ::	TypeGroups :== [[GlobalIndex]]
 
@@ -668,25 +668,25 @@ where
 
 	anal_type_def modules gi=:{gi_module,gi_index} (group_properties, conds, as=:{as_error})
 		# {com_type_defs,com_cons_defs} = modules.[gi_module]
-		  {td_ident,td_pos,td_attribute,td_args,td_rhs} = com_type_defs.[gi_index]
+		  {td_ident,td_pos,td_args,td_rhs} = com_type_defs.[gi_index]
 		  as_error = pushErrorAdmin (newPosition td_ident td_pos) as_error
-		  (type_properties, (conds, as)) = anal_rhs_of_type_def modules com_cons_defs td_rhs td_attribute (conds, {as & as_error = as_error})
+		  (type_properties, (conds, as)) = anal_rhs_of_type_def modules com_cons_defs td_rhs (conds, {as & as_error = as_error})
 		= (combineTypeProperties group_properties type_properties, conds, {as & as_error = popErrorAdmin as.as_error })
 	where
-		anal_rhs_of_type_def modules com_cons_defs (AlgType conses) td_attribute conds_as
+		anal_rhs_of_type_def modules com_cons_defs (AlgType conses) conds_as
 			= analTypesOfConstructors modules com_cons_defs conses conds_as
-		anal_rhs_of_type_def modules com_cons_defs (RecordType {rt_constructor}) td_attribute conds_as
+		anal_rhs_of_type_def modules com_cons_defs (RecordType {rt_constructor}) conds_as
 			= analTypesOfConstructor modules com_cons_defs rt_constructor conds_as
-		anal_rhs_of_type_def modules _ (SynType type) td_attribute conds_as
+		anal_rhs_of_type_def modules _ (SynType type) conds_as
 			# (type_kind, cv_props, (conds, as=:{as_kind_heap, as_error})) = analTypes True /* cDummyBool */ modules [] type.at_type conds_as
 			  {uki_kind_heap, uki_error} = unifyKinds type_kind KI_Const {uki_kind_heap = as_kind_heap, uki_error = as_error}
 			= (cv_props, (conds, {as & as_kind_heap = uki_kind_heap, as_error = uki_error}))
-		anal_rhs_of_type_def modules com_cons_defs (NewType cons) td_attribute conds_as
+		anal_rhs_of_type_def modules com_cons_defs (NewType cons) conds_as
 			= analTypesOfConstructor modules com_cons_defs cons conds_as
-		anal_rhs_of_type_def modules com_cons_defs (ExtendableAlgType conses) td_attribute conds_as
+		anal_rhs_of_type_def modules com_cons_defs (ExtendableAlgType conses) conds_as
 			# (cons_properties, (conds,as)) = analTypesOfConstructors modules com_cons_defs conses conds_as
 			= ((cons_properties bitand (bitnot cIsHyperStrict)) /*bitor cIsNonCoercible*/, (conds,as))
-		anal_rhs_of_type_def modules com_cons_defs (AlgConses conses _) td_attribute conds_as
+		anal_rhs_of_type_def modules com_cons_defs (AlgConses conses _) conds_as
 			# (cons_properties, (conds,as)) = analTypesOfConstructors modules com_cons_defs conses conds_as
 			= ((cons_properties bitand (bitnot cIsHyperStrict)) /*bitor cIsNonCoercible*/, (conds,as))
 
@@ -1128,7 +1128,7 @@ where
 		check_kinds_of_dcl_fuction common_defs dcl_functions fun_index (class_infos, as)
 			# {ft_type,ft_ident,ft_pos} = dcl_functions.[fun_index]
 			  as_error = pushErrorAdmin (newPosition ft_ident ft_pos) as.as_error
-			  (class_infos, as) = check_kinds_of_symbol_type common_defs ft_type class_infos {as & as_error = as_error}			  								
+			  (class_infos, as) = check_kinds_of_symbol_type common_defs ft_type class_infos {as & as_error = as_error}
 			= (class_infos, { as & as_error = popErrorAdmin as.as_error})
 
 	check_kinds_of_symbol_type :: !{#CommonDefs} !SymbolType !*ClassDefInfos !*AnalyseState -> (!*ClassDefInfos, !*AnalyseState)
