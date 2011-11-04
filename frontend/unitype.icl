@@ -2,8 +2,7 @@ implementation module unitype
 
 import StdEnv
 
-import syntax, analunitypes, type, utilities, checktypes,
-		compilerSwitches //, RWSDebug
+import syntax, analunitypes, type, utilities, checktypes
 
 AttrUni			:== 0
 AttrMulti		:== 1
@@ -235,12 +234,10 @@ typeIsNonCoercible _ (TempQV _)
 	= True
 typeIsNonCoercible _ (_ --> _)
 	= True
-//AA..	
 typeIsNonCoercible _ TArrow
 	= True
 typeIsNonCoercible _ (TArrow1 t)
 	= True	
-//AA..
 typeIsNonCoercible cons_vars (TempCV tmp_var_id :@: _)
 	= not (isPositive tmp_var_id cons_vars)
 typeIsNonCoercible cons_vars (_ :@: _)
@@ -336,13 +333,11 @@ where
 	lift modules cons_vars type=:(TAS cons_id cons_args _) subst ls=:{ls_type_heaps}
 		# (_, type, ls_type_heaps) = tryToExpand type TA_Multi modules ls_type_heaps
 		= liftTypeApplication modules cons_vars type subst {ls & ls_type_heaps = ls_type_heaps}			
-//AA..
 	lift modules cons_vars type=:(TArrow1 arg_type) subst ls
 		# (changed, arg_type, subst, ls) = lift modules cons_vars arg_type subst ls
 		| changed 
 			= (True, TArrow1 arg_type, subst, ls)
 			= (False, type, subst, ls)	
-//..AA
 	lift modules cons_vars type=:(TempCV temp_var :@: types) subst ls
 		# (changed, var_type, subst, ls) = liftTempTypeVariable modules cons_vars temp_var subst ls
 		  (changed_types, types, subst, ls) = lift_list modules cons_vars types subst ls
@@ -358,7 +353,6 @@ where
 					-> (True, TempQCV tv_number :@: types, subst, ls)
 				cons_var :@: cv_types
 					-> (True, cons_var :@: (cv_types ++ types), subst, ls)
-// AA..
 				TArrow -> case types of
 					[t1, t2] 	-> (True, t1 --> t2, subst, ls)
 					[t1]		-> (True, TArrow1 t1, subst, ls)
@@ -366,7 +360,6 @@ where
 				(TArrow1 t1) -> case types of
 					[t2]		-> (True, t1 --> t2, subst, ls)
 					_			-> (False, type, subst, ls)				
-// ..AA						
 			= (False, type, subst, ls)
 		where
 			lift_list :: !{#CommonDefs} !{# BOOLVECT } ![a] !*{!Type} !*LiftState -> (!Bool,![a], !*{!Type}, !*LiftState) | lift a
@@ -783,18 +776,6 @@ where
 			= TopSign
 		adjust_sign sign (_ --> _) cons_vars
 			= TopSign
-//AA..
-		adjust_sign sign TArrow cons_vars
-			= TopSign
-		adjust_sign sign (TArrow1 _) cons_vars
-			= TopSign					
-//..AA			
-		adjust_sign sign (TempCV tmp_var_id :@: _) cons_vars
-			| isPositive tmp_var_id cons_vars
-				= sign
-				= TopSign
-		adjust_sign sign (_ :@: _) cons_vars
-			= TopSign
 		adjust_sign sign (TA {type_ident, type_prop={tsp_coercible}} _) cons_vars
 			| tsp_coercible
 				= sign
@@ -803,6 +784,16 @@ where
 			| tsp_coercible
 				= sign
 				= TopSign
+		adjust_sign sign TArrow cons_vars
+			= TopSign
+		adjust_sign sign (TArrow1 _) cons_vars
+			= TopSign					
+		adjust_sign sign (TempCV tmp_var_id :@: _) cons_vars
+			| isPositive tmp_var_id cons_vars
+				= sign
+				= TopSign
+		adjust_sign sign (_ :@: _) cons_vars
+			= TopSign
 		adjust_sign sign _ cons_vars
 			= sign
 
