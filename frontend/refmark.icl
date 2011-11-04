@@ -750,8 +750,6 @@ where
 
 		get_type (VI_Type atype _)		= atype
 		get_type (VI_FAType _ atype _)	= atype
-		get_type _						= abort "has_observing_base_type (refmark.icl)"
-		
 
 		make_shared_vars_non_unique vars fun_body coercion_env var_heap expr_heap error
 			= foldl make_shared_var_non_unique (coercion_env, var_heap, expr_heap, error) vars
