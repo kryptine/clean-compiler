@@ -48,31 +48,15 @@ where
 						# (mark, fun_defs, pi) = partitionate_function fc_index max_fun_nr fun_defs  pi
 						= visit_functions funs (min min_dep mark) max_fun_nr fun_defs pi
 						= visit_functions funs (min min_dep mark) max_fun_nr fun_defs pi
-				
-				visit_functions [MacroCall module_index fc_index _:funs] min_dep max_fun_nr fun_defs pi
-					= abort ("visit_functions "+++toString fd.fun_ident+++" "+++toString module_index+++" "+++toString fc_index)
-				
 				visit_functions [DclFunCall module_index fc_index:funs] min_dep max_fun_nr fun_defs pi
 					= visit_functions funs min_dep max_fun_nr fun_defs pi
-
 				visit_functions [] min_dep max_fun_nr fun_defs pi
 					= (min_dep, fun_defs, pi)
 		= try_to_close_group fun_index pi_next_num min_dep max_fun_nr fun_defs pi
 
-/*				  
-	partitionate_function :: !Int !Int !*{# FunDef} !*PartitioningInfo -> *(!Int, !*{# FunDef}, !*PartitioningInfo)
-	partitionate_function fun_index max_fun_nr fun_defs pi=:{pi_next_num}
-		#! fd = fun_defs.[fun_index]
-		| fd.fun_kind
-			# {fi_calls} = fd.fun_info
-			  (min_dep, fun_defs, pi) = visit_functions fi_calls max_fun_nr max_fun_nr fun_defs (push_on_dep_stack fun_index pi)
-			= try_to_close_group fun_index pi_next_num min_dep max_fun_nr fun_defs pi
-			= (max_fun_nr, fun_defs, pi)
-*/
 	push_on_dep_stack :: !Int !*PartitioningInfo -> *PartitioningInfo;
 	push_on_dep_stack fun_index pi=:{pi_deps,pi_marks,pi_next_num}
 		= { pi & pi_deps = [fun_index : pi_deps], pi_marks = { pi_marks & [fun_index] = pi_next_num}, pi_next_num = inc pi_next_num}
-
 
 	try_to_close_group :: !Int !Int !Int !Int !*{# FunDef} !*PartitioningInfo -> *(!Int, !*{# FunDef}, !*PartitioningInfo)
 	try_to_close_group fun_index fun_nr min_dep max_fun_nr fun_defs pi=:{pi_marks, pi_deps, pi_groups, pi_next_group}
@@ -104,8 +88,6 @@ where
 	,	pi_next_group` ::	!Int
 	,	pi_groups` ::		![ComponentMembers]
 	,	pi_deps` ::			![Int]
-	
-//	,	pi_predef` ::		!PredefSymbolsForTransform
 	,	pi_collect` ::		!.CollectState
 	}
 
@@ -179,34 +161,18 @@ where
 				visit_functions [FunCall fc_index _:funs] min_dep max_fun_nr fun_defs pi=:{pi_marks`} 
 					#! mark = pi_marks`.[fc_index]
 					| mark == NotChecked
-						# (mark, fun_defs, pi) = partitionate_function fc_index max_fun_nr fun_defs  pi
+						# (mark, fun_defs, pi) = partitionate_function fc_index max_fun_nr fun_defs pi
 						= visit_functions funs (min min_dep mark) max_fun_nr fun_defs pi
 						= visit_functions funs (min min_dep mark) max_fun_nr fun_defs pi
-				
-				visit_functions [MacroCall module_index fc_index _:funs] min_dep max_fun_nr fun_defs pi
-					= abort ("visit_functions "+++toString fd.fun_ident+++" "+++toString module_index+++" "+++toString fc_index)
-				
 				visit_functions [DclFunCall module_index fc_index:funs] min_dep max_fun_nr fun_defs pi
 					= visit_functions funs min_dep max_fun_nr fun_defs pi
-
 				visit_functions [] min_dep max_fun_nr fun_defs pi
 					= (min_dep, fun_defs, pi)
 		= try_to_close_group fun_index pi_next_num` min_dep max_fun_nr fun_defs pi
 
-/*				  
-	partitionate_function :: !Int !Int !*{# FunDef} !*PartitioningInfo -> *(!Int, !*{# FunDef}, !*PartitioningInfo)
-	partitionate_function fun_index max_fun_nr fun_defs pi=:{pi_next_num}
-		#! fd = fun_defs.[fun_index]
-		| fd.fun_kind
-			# {fi_calls} = fd.fun_info
-			  (min_dep, fun_defs, pi) = visit_functions fi_calls max_fun_nr max_fun_nr fun_defs (push_on_dep_stack fun_index pi)
-			= try_to_close_group fun_index pi_next_num min_dep max_fun_nr fun_defs pi
-			= (max_fun_nr, fun_defs, pi)
-*/
 	push_on_dep_stack :: !Int !*PartitioningInfo` -> *PartitioningInfo`;
 	push_on_dep_stack fun_index pi=:{pi_deps`,pi_marks`,pi_next_num`}
 		= { pi & pi_deps` = [fun_index : pi_deps`], pi_marks` = { pi_marks` & [fun_index] = pi_next_num`}, pi_next_num` = inc pi_next_num`}
-
 
 	try_to_close_group :: !Int !Int !Int !Int !*{# FunDef} !*PartitioningInfo` -> *(!Int, !*{# FunDef}, !*PartitioningInfo`)
 	try_to_close_group fun_index fun_nr min_dep max_fun_nr fun_defs pi=:{pi_marks`, pi_deps`, pi_groups`, pi_next_group`}
@@ -411,8 +377,6 @@ where
 
 :: FindCallsState =
 	{ fun_calls			:: ![FunCall]
-//	, ref_added			:: !Bool
-//	, ref_used_vars		:: !
 	}
 
 class find_calls a :: !FindCallsInfo !a !FindCallsState -> FindCallsState
@@ -542,13 +506,7 @@ where
 	find_calls fc_info {dp_rhs} fc_state
 		= find_calls fc_info dp_rhs fc_state
 
-////////////////////////
-import StdDebug
-
 determine_ref_counts fd=:{fun_body=TransformedBody {tb_args,tb_rhs}} pi_collect
-//	| not (fst (ferror (stderr <<< fd)))
-	
-//	# tb_args = tb_args ---> ("determine_ref_counts",fd.fun_ident,tb_args,tb_rhs)
 	# (new_rhs, new_args, _, _, pi_collect) = determineVariablesAndRefCounts tb_args tb_rhs pi_collect
 	# fd = {fd & fun_body=TransformedBody {tb_args=new_args,tb_rhs=new_rhs}}
 	= (fd,pi_collect)
