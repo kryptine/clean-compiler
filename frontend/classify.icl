@@ -647,6 +647,8 @@ instance consumerRequirements Case where
 			= True
 		is_sorted [h1:t=:[h2:_]]
 			= h1 < h2 && is_sorted t
+		is_sorted []
+			= True
 
 		sort constr_indices unsafe_bits
 			= sortBy smaller (zip3 constr_indices [0..] unsafe_bits)
@@ -714,7 +716,7 @@ where
 			-> True
 		_ -> False //---> ("not ok_pattern_type",patterns)
 	pattern_constructors = case patterns of
-		(AlgebraicPatterns {glob_object, glob_module} algebraic_patterns)
+		(AlgebraicPatterns _ algebraic_patterns)
 			-> [ glob_object.ds_index \\ {ap_symbol={glob_object}}<-algebraic_patterns] //---> ("AlgebraicPatterns")
 		(BasicPatterns BT_Bool basic_patterns)
 			-> [ if bool 1 0 \\ {bp_value=BVB bool}<-basic_patterns ] //---> ("BasicPatterns Bool")
@@ -1367,7 +1369,7 @@ where
 		UStrict	-> CUnusedStrict
 		ULazy	-> CUnusedLazy
 		UMixed	-> CUnusedStrict
-	
+
 	collect_deps :: !UnusedStatus ![!RefCount!] -> UnusedStatus
 	collect_deps s [|]
 		= s
