@@ -71,93 +71,65 @@ instance isTypeSynonym TypeRhs where
 		=	False
 
 add_dcl_type_fun_types :: TypeSymbIdent Int *{#DclModule} *VarHeap *SymbolTable
-							-> (*{#DclModule}, *VarHeap, *SymbolTable)
+										-> (*{#DclModule},*VarHeap,*SymbolTable)
 add_dcl_type_fun_types ctTypeDefSymb add_dcl_type_fun_types dcl_mods var_heap symbols
-	# (n, dcl_mods)
-		=	usize dcl_mods
-	=	add_type_fun_types add_dcl_type_fun_types n ctTypeDefSymb dcl_mods var_heap symbols
+	# (n, dcl_mods) = usize dcl_mods
+	= add_type_fun_types add_dcl_type_fun_types n ctTypeDefSymb dcl_mods var_heap symbols
 	where
 		add_type_fun_types :: Int Int TypeSymbIdent *{#DclModule} *VarHeap *SymbolTable
-									-> (*{#DclModule}, *VarHeap, *SymbolTable)
-		add_type_fun_types i n ctTypeDefSymb dcl_mods var_heap symbols
-			| i >= n
+												-> (*{#DclModule},*VarHeap,*SymbolTable)
+		add_type_fun_types module_n n ctTypeDefSymb dcl_mods var_heap symbols
+			| module_n >= n
 				=	(dcl_mods, var_heap, symbols)
-			| i == cPredefinedModuleIndex
-				=	add_type_fun_types (i+1) n ctTypeDefSymb dcl_mods var_heap symbols
-			// otherwise
-				# (dcl_mod, dcl_mods)
-					=	dcl_mods![i]
+			| module_n == cPredefinedModuleIndex
+				=	add_type_fun_types (module_n+1) n ctTypeDefSymb dcl_mods var_heap symbols
+				# (dcl_mod, dcl_mods) = dcl_mods![module_n]
 				# (dcl_mod, var_heap, symbols)
 					=	add_fun_types ctTypeDefSymb dcl_mod var_heap symbols
-				# dcl_mods
-					=	{dcl_mods & [i] = dcl_mod}
-				=	add_type_fun_types (i+1) n ctTypeDefSymb dcl_mods var_heap symbols
+				# dcl_mods = {dcl_mods & [module_n] = dcl_mod}
+				=	add_type_fun_types (module_n+1) n ctTypeDefSymb dcl_mods var_heap symbols
 
 add_fun_types :: TypeSymbIdent DclModule *VarHeap *SymbolTable
-					-> (DclModule, *VarHeap, *SymbolTable)
-add_fun_types ctTypeDefSymb
-		dcl_mod=:{dcl_name, dcl_functions, dcl_common={com_type_defs}}
-	 			var_heap symbols
-	# n_functions
-		=	size dcl_functions
-	# (type_funs, com_type_defs, var_heap, symbols)
-		=	addTypeFunctionsA dcl_name n_functions ctTypeDefSymb
-						{def \\ def <-: com_type_defs} var_heap symbols
-	# dcl_functions
-		=	{function \\ function <- [e \\ e <-: dcl_functions] ++ type_funs}
-	# dcl_type_funs
-		=	{ir_from = n_functions, ir_to = size dcl_functions}
-	# dcl_mod
-		=	{	dcl_mod
-			&	dcl_functions = dcl_functions
-			,	dcl_common.com_type_defs = com_type_defs
-			,	dcl_type_funs = dcl_type_funs
-			}
-	=	(dcl_mod, var_heap, symbols)
+						   -> (DclModule,*VarHeap,*SymbolTable)
+add_fun_types ctTypeDefSymb dcl_mod=:{dcl_name, dcl_functions, dcl_common={com_type_defs}} var_heap symbols
+	# n_functions = size dcl_functions
+	  (type_funs, com_type_defs, var_heap, symbols)
+		=	addTypeFunctionsA dcl_name n_functions ctTypeDefSymb {def \\ def <-: com_type_defs} var_heap symbols
+	  dcl_functions = {function \\ function <- [e \\ e <-: dcl_functions] ++ type_funs}
+	  dcl_type_funs = {ir_from = n_functions, ir_to = size dcl_functions}
+	  dcl_mod = { dcl_mod	&	dcl_functions = dcl_functions
+							,	dcl_common.com_type_defs = com_type_defs
+							,	dcl_type_funs = dcl_type_funs
+							}
+	= (dcl_mod, var_heap, symbols)
+
+getCTTypeDefSymb predefs
+	# ({pds_module, pds_def}, predefs) = predefs![PD_CTTypeDef]
+	# ident = predefined_idents.[PD_CTTypeDef]
+	# type_symb = {MakeNewTypeSymbIdent ident 0 & type_index.glob_module = pds_module, type_index.glob_object = pds_def}
+	= (type_symb, predefs)
 
 addTypeFunctions :: Ident Int *{#DclModule} *{#FunDef} *CommonDefs *PredefinedSymbols *VarHeap *SymbolTable
-		-> (IndexRange, *{#DclModule}, *{#FunDef}, *CommonDefs, *PredefinedSymbols, *VarHeap, *SymbolTable)
-addTypeFunctions mod_ident nr_cached_dcls dcl_modules icl_functions icl_common
-		predefs var_heap symbols
-	# (ctTypeDefSymb, predefs)
-		=	getCTTypeDefSymb predefs
-		with
-			getCTTypeDefSymb predefs
-				# ({pds_module, pds_def}, predefs)
-					=	predefs![PD_CTTypeDef]
-				# ident
-					=	predefined_idents.[PD_CTTypeDef]
-				# type_symb
-					=	{	MakeNewTypeSymbIdent ident 0
-						&	type_index.glob_module = pds_module
-						,	type_index.glob_object = pds_def
-						}
-				= (type_symb, predefs)
-
+			  -> (IndexRange, *{#DclModule},*{#FunDef},*CommonDefs,*PredefinedSymbols,*VarHeap,*SymbolTable)
+addTypeFunctions mod_ident nr_cached_dcls dcl_modules icl_functions icl_common predefs var_heap symbols
+	# (ctTypeDefSymb, predefs) = getCTTypeDefSymb predefs
 	# (dcl_modules, var_heap, symbols)
 		=	add_dcl_type_fun_types ctTypeDefSymb nr_cached_dcls dcl_modules var_heap symbols
-
 	# (icl_type_fun_range, icl_functions, icl_common, var_heap, symbols)
 		=	add_icl_type_functions icl_functions ctTypeDefSymb icl_common var_heap symbols
 		with
 			add_icl_type_functions :: *{#FunDef} TypeSymbIdent *CommonDefs *VarHeap *SymbolTable
 				-> (IndexRange, *{#FunDef}, *CommonDefs, *VarHeap, *SymbolTable)
 			add_icl_type_functions icl_functions ctTypeDefSymb icl_common=:{com_type_defs} var_heap symbols
-				# (n_functions_before, icl_functions)
-					=	usize icl_functions
+				# (n_functions_before, icl_functions) = usize icl_functions
 				# (type_funs, com_type_defs, var_heap, symbols)
 					=	addTypeFunctionsA mod_ident n_functions_before ctTypeDefSymb com_type_defs var_heap symbols
-				# icl_common
-					=	{icl_common & com_type_defs=com_type_defs}
-				# icl_functions
-					=	{function \\ function <- [e \\ e <-: icl_functions] ++ type_funs}
-				# (n_functions_after, icl_functions)
-					=	usize icl_functions
-				# type_fun_range
-					=	{ir_from=n_functions_before,ir_to=n_functions_after}
+				# icl_common = {icl_common & com_type_defs=com_type_defs}
+				# icl_functions = {function \\ function <- [e \\ e <-: icl_functions] ++ type_funs}
+				# (n_functions_after, icl_functions) = usize icl_functions
+				# type_fun_range = {ir_from=n_functions_before,ir_to=n_functions_after}
 				=	(type_fun_range, icl_functions, icl_common, var_heap, symbols)
-	# (nr_of_functions, icl_functions)
-		=	usize icl_functions		
+	# (nr_of_functions, icl_functions) = usize icl_functions		
 	=	(icl_type_fun_range, dcl_modules, icl_functions, icl_common, predefs, var_heap, symbols)
 
 getSymbol :: Index ((Global Index) -> SymbKind) *PredefinedSymbols -> (SymbIdent, !*PredefinedSymbols)
@@ -180,10 +152,6 @@ predefRecordConstructor record_type_index common_defs predefs
 	# ({pds_module=pds_module1, pds_def=pds_def1}, predefs)
 		=	predefs![record_type_index]
 	# {td_rhs=RecordType {rt_constructor,rt_fields}} = common_defs.[pds_module1].com_type_defs.[pds_def1]
-	# record_cons_symbol
-		= {glob_module = pds_module1, glob_object = rt_constructor}
-	# dynamic_type = {glob_module = pds_module1, glob_object = pds_def1}
-
 	# record_cons_symb_ident
 		= { SymbIdent |
 			symb_ident	= rt_constructor.ds_ident
@@ -206,12 +174,10 @@ buildTypeFunctions main icl_functions common_defs predefs var_heap type_heaps
 		,	bs_var_heap = var_heap
 		,	bs_type_heaps = type_heaps
 		}
-	# type_defs
-		=	common_defs.[main].com_type_defs
+	# type_defs = common_defs.[main].com_type_defs
 	# (type_funs, bs_state)
 		=	build 0 (size type_defs) type_defs icl_functions bs_state 
-	=	(type_funs, bs_state.bs_predefs, bs_state.bs_var_heap, 
-			bs_state.bs_type_heaps)
+	= (type_funs, bs_state.bs_predefs, bs_state.bs_var_heap, bs_state.bs_type_heaps)
 	where
 		build i n type_defs functions bs_state
 			| i < n
@@ -223,7 +189,6 @@ buildTypeFunctions main icl_functions common_defs predefs var_heap type_heaps
 				# (functions, bs_state)
 					=	buildTypeFunction type_defs.[i] functions info bs_state
 				=	build (i+1) n type_defs functions bs_state
-			// otherwise
 				=	(functions, bs_state)
 
 buildTypeFunction :: CheckedTypeDef *{#FunDef} Info *BuildTypeFunState
@@ -235,18 +200,12 @@ buildTypeFunction type_def=:{td_fun_index, td_args} functions info bs_state
 		# (rhs, bs_state)
 			=	numberTypeVarsBeforeRiefy td_args (reify type_def) info bs_state
 		# (new_info_ptr, bs_var_heap) = newPtr VI_Empty bs_state.bs_var_heap
-		# bs_state
-			=	{bs_state & bs_var_heap=bs_var_heap}
-	  	# var_id
-	  		=	{id_name = "_x", id_info = nilPtr}
-	  	  lhs_free_var
-	  	  	=	{fv_def_level = NotALevel, fv_ident = var_id,
-	  	  			fv_info_ptr = new_info_ptr, fv_count = 0}
-		# body
-			=	{tb_args = [lhs_free_var], tb_rhs = rhs}
-		# functions
-			=	{functions & [td_fun_index].fun_body=TransformedBody body}
-		=	(functions, bs_state)
+		# bs_state = {bs_state & bs_var_heap=bs_var_heap}
+	  	# var_id = {id_name = "_x", id_info = nilPtr}
+	  	  lhs_free_var = {fv_def_level = NotALevel, fv_ident = var_id, fv_info_ptr = new_info_ptr, fv_count = 0}
+		# body = {tb_args = [lhs_free_var], tb_rhs = rhs}
+		# functions = {functions & [td_fun_index].fun_body=TransformedBody body}
+		= (functions, bs_state)
 
 numberTypeVarsBeforeRiefy :: a Riefier Info *BuildTypeFunState
 	-> (Expression, *BuildTypeFunState) | numberTypeVars a
@@ -293,46 +252,37 @@ addTypeFunctionsA mod first_td_fun_index ct_type_def type_defs var_heap symbol_t
 			 -> ([a], *{#CheckedTypeDef}, *VarHeap, *SymbolTable) | makeTypeFun a
 		add_td_funs_acc i n index ct_type_def type_defs rev_type_fun_defs var_heap symbol_table
 			| i >= n
-				=	(reverse rev_type_fun_defs, type_defs, var_heap, symbol_table)
-			// otherwise
-				# (type_def, type_defs)
-					=	type_defs![i]
+				= (reverse rev_type_fun_defs, type_defs, var_heap, symbol_table)
+				# (type_def, type_defs) = type_defs![i]
 				| isTypeSynonym type_def || is_dictionary type_def
 					=	add_td_funs_acc (i+1) n index ct_type_def type_defs rev_type_fun_defs var_heap symbol_table
-				// otherwise
 					# (type_fun_def, var_heap, symbol_table)
 						=	add_td_fun_def index ct_type_def type_def var_heap symbol_table
-					# type_defs
-						=	{type_defs & [i].td_fun_index = index}
-					# rev_type_fun_defs
-						=	[type_fun_def : rev_type_fun_defs]
-					=	add_td_funs_acc (i+1) n (index+1) ct_type_def type_defs rev_type_fun_defs var_heap symbol_table
+					# type_defs = {type_defs & [i].td_fun_index = index}
+					# rev_type_fun_defs = [type_fun_def : rev_type_fun_defs]
+					= add_td_funs_acc (i+1) n (index+1) ct_type_def type_defs rev_type_fun_defs var_heap symbol_table
 
 		is_dictionary {td_ident} // FIXME, fragile
 			=	name.[size name - 1] == ';'
 			where
-				name
-					=	td_ident.id_name
+				name = td_ident.id_name
 
 		add_td_fun_def :: Int TypeSymbIdent CheckedTypeDef *VarHeap *SymbolTable
 			-> (a, *VarHeap, *SymbolTable) | makeTypeFun a
 		add_td_fun_def index ct_type_def type_def=:{td_ident, td_pos} var_heap symbol_table
-			#	entry
-					=	{	ste_kind		= STE_Empty
+			#	entry =	{	ste_kind		= STE_Empty
 						,	ste_index		= index
 						,	ste_def_level	= -1
 						,	ste_previous	= EmptySymbolTableEntry
 						}
 			# (fun_ident, symbol_table)
 				=	newPtr entry symbol_table
-			# type_fun_ident
-				=	{id_name=typeFunName td_ident, id_info=fun_ident}
+			# type_fun_ident = {id_name=typeFunName td_ident, id_info=fun_ident}
 
 			# ident = predefined_idents.[PD_CTTypeDef]
 			# type_symb	=	ct_type_def
 
-			# result_type
-				=	TA ct_type_def []
+			# result_type = TA ct_type_def []
 			# symbol_type =
 					{	st_vars = []
 					,	st_args = [{at_attribute= TA_None, at_type = TB BT_Bool}]
@@ -423,8 +373,7 @@ instance reify {#Char} where
 
 instance reify CheckedTypeDef where
 	reify {td_ident, td_arity, td_attribute, td_rhs}
-		=	record PD_CTTypeDef ` quote td_ident.id_name ` td_arity
-					` is_unq_attribute td_attribute ` td_rhs
+		=	record PD_CTTypeDef ` quote td_ident.id_name ` td_arity ` is_unq_attribute td_attribute ` td_rhs
 	where
 		is_unq_attribute (TA_Var _)
 			=	False
@@ -476,8 +425,7 @@ instance reify FieldSymbol where
 					info st
 			where
 				def
-					=	ri_common_defs.[ri_main]
-									.com_selector_defs.[fs_index]
+					=	ri_common_defs.[ri_main].com_selector_defs.[fs_index]
 				vars
 					=	[atv_variable \\ {atv_variable} <- def.sd_exi_vars]
 					++	def.sd_type.st_vars
@@ -513,8 +461,6 @@ instance reify Type where
 		=	reify basic_type
 	reify (TFA vars type)
 		=	numberTypeVarsBeforeRiefy vars (reify type)
-	reify t
-		=	undef //  <<- ("reify", t)
 
 reifyApp :: TypeSymbIdent [AType] Info *BuildTypeFunState
 	-> (Expression, *BuildTypeFunState)
@@ -641,10 +587,8 @@ toTypeCodeConstructor type=:{glob_object=type_index, glob_module=module_index} c
 	| module_index == cPredefinedModuleIndex
 		= GTT_PredefTypeConstructor type
 	// otherwise
-		# type
-			=	common_defs.[module_index].com_type_defs.[type_index]
-		# td_fun_index
-			=	type.td_fun_index
+		# type = common_defs.[module_index].com_type_defs.[type_index]
+		# td_fun_index = type.td_fun_index
 		// sanity check ...
 		| td_fun_index == NoIndex
 			=	fatal "toTypeCodeConstructor" ("no function (" +++ type.td_ident.id_name +++ ")")
