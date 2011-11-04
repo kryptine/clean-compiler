@@ -2,7 +2,7 @@ implementation module analunitypes
 
 import StdEnv
 import syntax, checksupport, analtypes, check, typesupport, checktypes, utilities
-	
+
 instance + SignClassification
 where
 	(+) {sc_pos_vect=sc_pos_vect1,sc_neg_vect=sc_neg_vect1} {sc_pos_vect=sc_pos_vect2,sc_neg_vect=sc_neg_vect2}
@@ -29,8 +29,7 @@ typeProperties type_index module_index hio_signs hio_props defs type_var_heap td
 	  (tsp_propagation, type_var_heap, td_infos) = determinePropClassOfTypeDef type_index module_index td_info hio_props defs type_var_heap td_infos
 	  tsp_coercible = (td_info.tdi_properties bitand cIsNonCoercible) == 0
 	= ({tsp_sign = tsp_sign, tsp_propagation = tsp_propagation, tsp_coercible = tsp_coercible }, type_var_heap, td_infos)
-//		---> ("typeProperties", (defs.[module_index].com_type_defs.[type_index].td_ident, type_index, module_index), tsp_sign, tsp_propagation)
-		
+
 signClassification :: !Index !Index ![SignClassification] !{# CommonDefs } !*TypeVarHeap !*TypeDefInfos
 	-> (!SignClassification, !*TypeVarHeap, !*TypeDefInfos)
 signClassification type_index module_index hio_signs defs type_var_heap td_infos
@@ -38,8 +37,6 @@ signClassification type_index module_index hio_signs defs type_var_heap td_infos
 	# (tsp_sign, type_var_heap, td_infos)
 		= determineSignClassOfTypeDef type_index module_index td_info hio_signs defs type_var_heap td_infos
 	= (tsp_sign, type_var_heap, td_infos)
-//		---> ("signClassification", defs.[module_index].com_type_defs.[type_index].td_ident, tsp_sign)
-
 
 removeTopClasses [cv : cvs] [tc : tcs] 
 	| isATopConsVar cv
@@ -71,9 +68,7 @@ determineSignClassOfTypeDef type_index module_index {tdi_classification,tdi_cons
 		No
 			# signs_of_group_vars = foldSt (determine_signs_of_group_var tdi_cons_vars hio_signs) tdi_group_vars []
 			-> newSignClassOfTypeDefGroup tdi_group_nr { gi_module = module_index, gi_index = type_index}
-//					tdi_group (signs_of_group_vars ---> ("determine_signs_of_group_var", (module_index, type_index), signs_of_group_vars, tdi_group_vars)) ci type_var_heap td_infos
 					tdi_group signs_of_group_vars ci type_var_heap td_infos
-
 where
 	determine_signs_of_group_var cons_vars cons_var_signs gv signs_of_group_vars
 		| sign_determined gv signs_of_group_vars
@@ -124,7 +119,6 @@ where
 			  {sr_hio_signs, sr_classification} = group_signs.[tdi_index_in_group]
 			  tdi_classification = addSignClassification sr_hio_signs sr_classification tdi_classification
 			= { td_infos & [gi_module].[gi_index] = { tdi & tdi_classification = tdi_classification }}
-		
 
 	collect_sign_class_of_type_defs group_nr group signs_of_group_vars ci sign_requirements type_var_heap td_infos
 		= foldSt (collect_sign_class_of_type_def group_nr signs_of_group_vars ci) group (sign_requirements, type_var_heap, td_infos)
@@ -132,7 +126,6 @@ where
 		collect_sign_class_of_type_def group_nr signs_of_group_vars ci {gi_module,gi_index} (sign_requirements, type_var_heap, td_infos)
 			# ({tdi_group_vars,tdi_kinds,tdi_index_in_group},td_infos) = td_infos![gi_module].[gi_index]
 			  {td_ident,td_args,td_rhs} = ci.[gi_module].com_type_defs.[gi_index]
-//			  (rev_hio_signs, type_var_heap) = bind_type_vars_to_signs td_args (tdi_group_vars ---> ("bind_type_vars_to_signs",td_ident, tdi_group_vars)) tdi_kinds signs_of_group_vars ([], type_var_heap)
 			  (rev_hio_signs, type_var_heap) = bind_type_vars_to_signs td_args tdi_group_vars tdi_kinds signs_of_group_vars ([], type_var_heap)
 			  (sign_env, scs) = sign_class_of_type_def gi_module td_rhs group_nr ci 
 		  								{scs_type_var_heap = type_var_heap, scs_type_def_infos = td_infos, scs_rec_appls = [] }
@@ -185,8 +178,7 @@ where
 		# (TVI_SignClass _ _ old_info, type_var_heap) = readPtr tv_info_ptr type_var_heap
 		= type_var_heap <:= (tv_info_ptr, old_info)
 
-	sign_class_of_type_def :: !Int !TypeRhs !Int !{#CommonDefs} !*SignClassState
-		-> (!SignClassification,!*SignClassState)
+	sign_class_of_type_def :: !Int !TypeRhs !Int !{#CommonDefs} !*SignClassState -> (!SignClassification,!*SignClassState)
 	sign_class_of_type_def module_index (AlgType conses) group_nr ci scs
 		= sign_class_of_type_conses module_index conses group_nr ci BottomSignClass scs
 	sign_class_of_type_def _ (SynType {at_type}) group_nr ci scs
@@ -285,7 +277,7 @@ where
 			= determine_cummulative_sign ts tks sign use_top_sign  sign_class sign_classes (inc type_index) ci (sign *+ sign_class + cumm_class) scs
 	determine_cummulative_sign [] _ sign use_top_sign sign_class sign_classes type_index ci cumm_class scs
 		= (cumm_class, scs)
-	
+
 	adjust_sign_class {sc_pos_vect,sc_neg_vect} arity
 		= { sc_pos_vect = sc_pos_vect >> arity, sc_neg_vect = sc_neg_vect >> arity }
 
@@ -466,7 +458,6 @@ where
 	restore_binds_of_type_var {atv_variable={tv_info_ptr}} type_var_heap
 		# (TVI_PropClass _ _ old_info, type_var_heap) = readPtr tv_info_ptr type_var_heap
 		= type_var_heap <:= (tv_info_ptr, old_info)
-
 
 	prop_class_of_type_def :: !Int !TypeRhs !Int !{#CommonDefs} !*PropClassState -> (!PropClassification,!*PropClassState)
 	prop_class_of_type_def module_index (AlgType conses) group_nr ci pcs
