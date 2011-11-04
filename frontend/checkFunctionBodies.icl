@@ -125,7 +125,7 @@ make_case_guards cons_symbol global_type_index alg_patterns expr_heap cs
 		| pd_cons_index==PD_OverloadedConsSymbol || pd_cons_index==PD_OverloadedNilSymbol
 			# (overloaded_list,decons_expr,expr_heap,cs) = make_overloaded_list global_type_index expr_heap cs
 			= (OverloadedListPatterns overloaded_list decons_expr alg_patterns,expr_heap,cs)
-			= (AlgebraicPatterns global_type_index alg_patterns,expr_heap,cs)						
+			= (AlgebraicPatterns global_type_index alg_patterns,expr_heap,cs)
 		= (AlgebraicPatterns global_type_index alg_patterns,expr_heap,cs)
 
 checkFunctionBodies :: !FunctionBody !Ident !.ExpressionInput !*ExpressionState !*ExpressionInfo !*CheckState
