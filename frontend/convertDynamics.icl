@@ -333,7 +333,7 @@ instance convertDynamics Case where
 				->	convertDynamicCase cinp kees ci
 			_
 				# (case_guards, ci) = convertDynamics cinp case_guards ci
-				# kees = {kees & case_guards=case_guards}
+				# kees = {kees & case_explicit=False, case_guards=case_guards}
 				->	(kees, ci)
 
 instance convertDynamics CasePatterns where
@@ -374,7 +374,8 @@ convertDynamicCase cinp=:{cinp_dynamic_representation={dr_dynamic_symbol, dr_dyn
 		,	ap_position	= position alts
 		}
 	# (case_info_ptr, ci) = dummy_case_ptr result_type ci
-	# kees = {kees & case_guards=AlgebraicPatterns dr_dynamic_type [match], case_default=No, case_info_ptr = case_info_ptr}
+	# kees = {kees & case_explicit=False, case_guards=AlgebraicPatterns dr_dynamic_type [match],
+					 case_default=No, case_info_ptr=case_info_ptr}
 	= (kees, ci)
 
 convertDynamicAlts _ _ _ _ _ defoult [] ci
