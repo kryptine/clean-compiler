@@ -335,7 +335,7 @@ cNameLocationDependent :== True
 
 ::	FunSpecials
 	= FSP_ParsedSubstitutions 	![Env Type TypeVar]
-	| FSP_Substitutions 		![SpecialSubstitution]
+	| FSP_Substitutions			![SpecialSubstitution]
 	| FSP_ContextTypes			![Special]
 	| FSP_FunIndex				!Index
 	| FSP_None
@@ -713,7 +713,8 @@ from convertDynamics import :: TypeCodeVariableInfo, :: DynamicValueAliasInfo
 				| VITI_PatternType	[AType] /*module*/!Index /*constructor*/!Index VI_TypeInfo
 
 //::	VarInfo  =	VI_Empty | VI_Type !AType !(Optional CoercionPosition) | VI_FAType ![ATypeVar] !AType !(Optional CoercionPosition) |
-::	VarInfo  =	VI_Empty | VI_Type !AType !VI_TypeInfo | VI_FAType ![ATypeVar] !AType !VI_TypeInfo |
+::	VarInfo  =	VI_Empty | VI_Type !AType !VI_TypeInfo |
+				VI_FAType ![ATypeVar] !AType !VI_TypeInfo |
 				VI_Occurrence !Occurrence | VI_UsedVar !Ident |
 				VI_Expression !Expression | VI_Variable !Ident !VarInfoPtr | VI_LiftedVariable !VarInfoPtr |
 				VI_Count !Int /* the reference count of a variable */ !Bool /* true if the variable is global, false otherwise */ |
@@ -843,9 +844,9 @@ cNotVarNumber :== -1
 
 		/* For handling dynamics */
 
-					| EI_UnmarkedDynamic 		!(Optional DynamicType) ![DynamicPtr]
-					| EI_Dynamic 				!(Optional DynamicType) ![DynamicPtr]
-					| EI_DynamicType			!DynamicType ![DynamicPtr]
+					| EI_UnmarkedDynamic 		!(Optional DynamicType) ![DynamicPtr]	// in expression
+					| EI_Dynamic 				!(Optional DynamicType) ![DynamicPtr]	// in expression
+					| EI_DynamicType			!DynamicType ![DynamicPtr]				// in pattern
 
 		/* Auxiliary, was EI_DynamicType before checking */
 
@@ -855,9 +856,9 @@ cNotVarNumber :== -1
 
 					| EI_TempDynamicType 		!(Optional DynamicType) ![DynamicPtr] !AType ![TypeContext] !ExprInfoPtr !SymbIdent
 					| EI_TempDynamicPattern 	![TypeVar] !DynamicType ![DynamicPtr] ![TempLocalVar] !AType ![TypeContext] !ExprInfoPtr !SymbIdent
-					
-					| EI_TypeOfDynamic 			!TypeCodeExpression				/* Final */
-					| EI_TypeOfDynamicPattern 	![VarInfoPtr] !TypeCodeExpression				/* Final */
+
+					| EI_TypeOfDynamic 			!TypeCodeExpression						/* Final */
+					| EI_TypeOfDynamicPattern 	![VarInfoPtr] !TypeCodeExpression		/* Final */
 
 					| EI_TypeCode 		!TypeCodeExpression
 					| EI_TypeCodes 		![TypeCodeExpression]
@@ -988,7 +989,7 @@ cNotVarNumber :== -1
 			|	(:@:) infixl 9 !ConsVariable ![AType]
 			|	TB !BasicType
 
-			|	TFA [ATypeVar] Type				/* Universally quantified types */
+			|	TFA ![ATypeVar] !Type			/* Universally quantified types */
 
 			| 	GTV !TypeVar
 			| 	TV !TypeVar
@@ -1306,7 +1307,7 @@ cIsNotStrict	:== False
 
 				| TypeSignature !(Int Int -> (AType,Int,Int)) !Expression
 
-				| EE 
+				| EE
 				| NoBind ExprInfoPtr /* auxiliary, to store fields that are not specified in a record expression */ 
 				| FailExpr !Ident // only allowed on (case) root positions
 

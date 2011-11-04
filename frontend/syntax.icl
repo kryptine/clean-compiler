@@ -98,7 +98,7 @@ where
 instance toString AttributeVar
 where
 //	toString {av_ident,av_info_ptr} = toString av_ident + "[" + toString (ptrToInt av_info_ptr) + "]"
-	toString {av_ident,av_info_ptr} = toString av_ident
+	toString {av_ident} = toString av_ident
 
 instance <<< AType
 where
@@ -383,7 +383,6 @@ where
 	(<<<) file (Update expr1 selections expr2) =  file <<< '{' <<< expr1  <<< " & " <<<  selections <<< " = " <<< expr2 <<< '}'
 	(<<<) file (RecordUpdate cons_symbol expression expressions) = file <<< '{' <<< cons_symbol <<< ' ' <<< expression <<< " & " <<< expressions <<< '}'
 	(<<<) file (TupleSelect field field_nr expr) = file <<< expr <<<'.' <<< field_nr
-//	(<<<) file (Lambda vars expr) = file <<< '\\' <<< vars <<< " -> " <<< expr
 	(<<<) file (MatchExpr cons expr) = file <<< cons <<< " =: " <<< expr
 	(<<<) file EE = file <<< "** E **"
 	(<<<) file (NoBind _) = file <<< "** NB **"
@@ -745,7 +744,6 @@ where
 	(<<<) file (PD_Type td) = file <<< td
 	(<<<) file (PD_Generic {gen_ident}) = file <<< "generic " <<< gen_ident
 	(<<<) file (PD_GenericCase {gc_ident,gc_type_cons}) = file <<< gc_ident <<< "{|" <<< gc_type_cons <<< "|}"
-	 
 	(<<<) file _ = file
 
 instance <<< Rhs
@@ -922,12 +920,8 @@ where
 	(<<<) file
 		STE_DclFunction
 			= file <<< "STE_DclFunction"
-	(<<<) file
-		STE_Generic
-			= file <<< "STE_Generic"
-	(<<<) file
-		STE_GenericCase
-			= file <<< "STE_GenericCase"
+	(<<<) file STE_Generic = file <<< "STE_Generic"
+	(<<<) file STE_GenericCase = file <<< "STE_GenericCase"
 	(<<<) file
 		(STE_Module _)
 			= file <<< "STE_Module"
