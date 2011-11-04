@@ -25,9 +25,8 @@ instance GetSetPatternRhs DynamicPattern
 		get_pattern_rhs p = p.dp_rhs
 		set_pattern_rhs p expr = {p & dp_rhs=expr}
 
-
 mergeCases :: !(!Expression, !Position) ![(!Expression, !Position)] !*VarHeap !*ExpressionHeap !*ErrorAdmin
-									-> *(!(!Expression, !Position), !*VarHeap, !*ExpressionHeap, !*ErrorAdmin)
+									-> *(!(!Expression, !Position), !*VarHeap,!*ExpressionHeap,!*ErrorAdmin)
 mergeCases expr_and_pos [] var_heap symbol_heap error
 	= (expr_and_pos, var_heap, symbol_heap, error)
 mergeCases (Let lad=:{let_expr}, pos) exprs var_heap symbol_heap error
