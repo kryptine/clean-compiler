@@ -268,12 +268,12 @@ arg_strictness_annotation :: !Int !StrictnessList -> Annotation;
 arg_strictness_annotation _ NotStrict
 	= AN_None
 arg_strictness_annotation i (Strict s)
-	| i<32 && (s>>i) bitand 1>0
+	| i<32 && (s bitand (1<<i))<>0
 		= AN_Strict
 		= AN_None
 arg_strictness_annotation i (StrictList s l)
 	| i<32
-		| (s>>i) bitand 1>0
+		| (s bitand (1<<i))<>0
 			= AN_Strict
 			= AN_None
 		= arg_strictness_annotation (i-32) l
@@ -282,10 +282,10 @@ arg_is_strict :: !Int !StrictnessList -> Bool;
 arg_is_strict _ NotStrict
 	= False
 arg_is_strict i (Strict s)
-	= i<32 && (s>>i) bitand 1>0
+	= i<32 && (s bitand (1<<i))<>0
 arg_is_strict i (StrictList s l)
 	| i<32
-		= (s>>i) bitand 1>0
+		= (s bitand (1<<i))<>0
 		= arg_is_strict (i-32) l
 
 is_not_strict :: !StrictnessList -> Bool
