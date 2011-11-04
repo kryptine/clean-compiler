@@ -350,19 +350,19 @@ check_context_class tc_class=:(TCQualifiedIdent module_id class_name) tc_types m
 				# ({class_ident,class_arity}, class_index, class_defs, modules) = getClassDef class_index class_module mod_index class_defs modules
 				| class_arity == length tc_types
 					# checked_class = { glob_object = MakeDefinedSymbol class_ident class_index class_arity, glob_module = class_module }
-					-> (TCClass checked_class, class_defs, modules, cs) 
+					-> (TCClass checked_class, class_defs, modules, cs)
 					# cs_error = checkError ("'"+++module_id.id_name+++"'."+++class_name) "class used with wrong arity" cs.cs_error
 					-> (tc_class, class_defs, modules, {cs & cs_error = cs_error})
 			_
 				-> (tc_class, class_defs, modules, {cs & cs_error = checkError ("'"+++module_id.id_name+++"'."+++class_name) "class undefined" cs.cs_error})
-check_context_class (TCGeneric gtc=:{gtc_generic, gtc_kind}) tc_types mod_index class_defs modules cs 			
+check_context_class (TCGeneric gtc=:{gtc_generic, gtc_kind}) tc_types mod_index class_defs modules cs
   	# gen_ident = gtc_generic.glob_object.ds_ident
 	# (entry, cs_symbol_table) = readPtr gen_ident.id_info cs.cs_symbol_table
   	# cs = { cs & cs_symbol_table = cs_symbol_table }
   	# clazz =
   		{ glob_module = -1
-  		, glob_object = { ds_ident = genericIdentToClassIdent gen_ident.id_name gtc_kind, ds_arity = 1, ds_index = -1}
-  		}				  		
+		, glob_object = {ds_ident = genericIdentToClassIdent gen_ident.id_name gtc_kind, ds_arity = 1, ds_index = -1}
+		}
 	# (generic_index, generic_module) = retrieveGlobalDefinition entry STE_Generic mod_index
 	| generic_index <> NotFound
 		| gtc_generic.glob_object.ds_arity == 1
@@ -592,7 +592,7 @@ where
 			= add_universal_attr_vars types (add_attr_vars vars attr_vars)
 		add_universal_attr_vars [type:types] attr_vars
 			= add_universal_attr_vars types attr_vars
-			
+
 		add_attr_vars vars attr_vars
 			= foldSt add_attr_var vars attr_vars
 		where
@@ -959,7 +959,7 @@ checkOpenArgATypes mod_index scope types cot_state
 	= mapSt (checkOpenArgAType mod_index scope DAK_None) types cot_state
 
 add_universal_vars vars oti cs
-	= mapSt add_universal_var vars  (oti, cs) 
+	= mapSt add_universal_var vars (oti, cs)
   where
 	add_universal_var atv=:{atv_variable = tv=:{tv_ident={id_name,id_info}}, atv_attribute} (oti, cs=:{cs_symbol_table,cs_error})
 		# (entry=:{ste_kind,ste_def_level},cs_symbol_table) = readPtr id_info cs_symbol_table
@@ -1778,7 +1778,7 @@ create_class_dictionary mod_index class_index class_defs =:{[class_index] = clas
 		,	td_used_types	= []
 		,	td_fun_index	= NoIndex
 		}
-	
+
 	  symbol_table = symbol_table <:= (type_id_info, { ste_kind = STE_DictType type_def, ste_index = index_type,
 											ste_def_level = NotALevel, ste_previous = abort "empty SymbolTableEntry" })
 								  <:= (cons_id_info, { ste_kind = STE_DictCons cons_def, ste_index = index_cons,
@@ -1798,7 +1798,7 @@ where
 			# (field, var_heap, symbol_table)
 				= build_field field_nr field_name rec_type_index rec_type field_type next_selector_index var_heap symbol_table
 			= build_fields (inc field_nr) nr_of_fields class_members rec_type field_type rec_type_index (inc next_selector_index)
-				 [ field : rev_fields ] var_heap symbol_table
+				 [field : rev_fields] var_heap symbol_table
 			= (rev_fields, var_heap, symbol_table)			
 
 	build_context_fields mod_index field_nr [{tc_class = TCClass {glob_module, glob_object={ds_index}}}:tcs] rec_type rec_type_index
@@ -1807,7 +1807,7 @@ where
 		  type_symb = MakeTypeSymbIdent { glob_object = ds_index, glob_module = glob_module } ds_ident class_arity
 		  field_type = makeAttributedType TA_Multi (TA type_symb [makeAttributedType TA_Multi TE \\ i <- [1..class_arity]])
 		  (field, var_heap, symbol_table)
-		  	= build_field field_nr class_ident.id_name rec_type_index rec_type field_type next_selector_index var_heap symbol_table
+			= build_field field_nr class_ident.id_name rec_type_index rec_type field_type next_selector_index var_heap symbol_table
 		= build_context_fields mod_index (inc field_nr) tcs rec_type rec_type_index (inc next_selector_index) [field : rev_fields]
 				 [field_type : rev_field_types] class_defs modules var_heap symbol_table
 	build_context_fields mod_index field_nr [{tc_class = TCGeneric {gtc_generic,gtc_kind,gtc_generic_dict}} :tcs] rec_type rec_type_index
