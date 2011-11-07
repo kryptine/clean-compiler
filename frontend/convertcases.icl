@@ -1820,34 +1820,34 @@ where
 				# (expr, {cp_free_vars, cp_var_heap, cp_local_vars}) = copy guards_and_default {cp_free_vars = [], cp_var_heap = var_heap, cp_local_vars = []}
 				  (bound_vars, free_typed_vars, var_heap) = retrieve_variables cp_free_vars cp_var_heap
 				-> (False,bound_vars, free_typed_vars, cp_local_vars, expr, old_fv_info_ptr_values,var_heap)
-	
-	store_VI_BoundVar_in_bound_vars_and_save_old_values [({fv_info_ptr},type):bound_vars] old_fv_info_ptr_values var_heap
-		# (old_fv_info_ptr_value,var_heap)=readPtr fv_info_ptr var_heap
-		# var_heap=writePtr fv_info_ptr (VI_BoundVar type) var_heap
-		# (old_fv_info_ptr_values,var_heap) = store_VI_BoundVar_in_bound_vars_and_save_old_values bound_vars old_fv_info_ptr_values var_heap
-		= ([old_fv_info_ptr_value:old_fv_info_ptr_values],var_heap)
-	store_VI_BoundVar_in_bound_vars_and_save_old_values [] old_fv_info_ptr_values var_heap
-		= (old_fv_info_ptr_values,var_heap)
 
-	retrieve_variables cp_free_vars cp_var_heap
-		= foldSt retrieve_variable cp_free_vars ([], [], cp_var_heap)
-	where
-		retrieve_variable (var_info_ptr, type) (bound_vars, free_typed_vars, var_heap)
-			# (VI_FreeVar name new_ptr count type, var_heap) = readPtr var_info_ptr var_heap
-			= ( [Var { var_ident = name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr} : bound_vars],
-				[({ fv_def_level = NotALevel, fv_ident = name, fv_info_ptr = new_ptr, fv_count = count }, type) : free_typed_vars], var_heap)
+store_VI_BoundVar_in_bound_vars_and_save_old_values [({fv_info_ptr},type):bound_vars] old_fv_info_ptr_values var_heap
+	# (old_fv_info_ptr_value,var_heap)=readPtr fv_info_ptr var_heap
+	# var_heap=writePtr fv_info_ptr (VI_BoundVar type) var_heap
+	# (old_fv_info_ptr_values,var_heap) = store_VI_BoundVar_in_bound_vars_and_save_old_values bound_vars old_fv_info_ptr_values var_heap
+	= ([old_fv_info_ptr_value:old_fv_info_ptr_values],var_heap)
+store_VI_BoundVar_in_bound_vars_and_save_old_values [] old_fv_info_ptr_values var_heap
+	= (old_fv_info_ptr_values,var_heap)
+
+retrieve_variables cp_free_vars cp_var_heap
+	= foldSt retrieve_variable cp_free_vars ([], [], cp_var_heap)
+where
+	retrieve_variable (var_info_ptr, type) (bound_vars, free_typed_vars, var_heap)
+		# (VI_FreeVar name new_ptr count type, var_heap) = readPtr var_info_ptr var_heap
+		= ( [Var { var_ident = name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr} : bound_vars],
+			[({ fv_def_level = NotALevel, fv_ident = name, fv_info_ptr = new_ptr, fv_count = count }, type) : free_typed_vars], var_heap)
 
 new_case_function_and_restore_old_fv_info_ptr_values opt_id result_type rhs free_vars local_vars
 	bound_vars old_fv_info_ptr_values group_index common_defs cs
 	# (fun_ident,cs) = new_case_function opt_id result_type rhs free_vars local_vars group_index common_defs cs
 	# cs_var_heap=restore_old_fv_info_ptr_values old_fv_info_ptr_values bound_vars cs.cs_var_heap
 	= (fun_ident,{ cs & cs_var_heap = cs_var_heap});
-where
-	restore_old_fv_info_ptr_values [old_fv_info_ptr_value:old_fv_info_ptr_values] [({fv_info_ptr},type):bound_vars] var_heap
-		# var_heap=writePtr fv_info_ptr old_fv_info_ptr_value var_heap
-		= restore_old_fv_info_ptr_values old_fv_info_ptr_values bound_vars var_heap
-	restore_old_fv_info_ptr_values [] bound_vars var_heap
-		= var_heap
+
+restore_old_fv_info_ptr_values [old_fv_info_ptr_value:old_fv_info_ptr_values] [({fv_info_ptr},type):bound_vars] var_heap
+	# var_heap=writePtr fv_info_ptr old_fv_info_ptr_value var_heap
+	= restore_old_fv_info_ptr_values old_fv_info_ptr_values bound_vars var_heap
+restore_old_fv_info_ptr_values [] bound_vars var_heap
+	= var_heap
 
 new_case_function opt_id result_type rhs free_vars local_vars group_index common_defs cs=:{cs_expr_heap}
 	# body = TransformedBody {tb_args=[var \\ (var, _) <- free_vars], tb_rhs=rhs}
