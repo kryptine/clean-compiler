@@ -489,7 +489,7 @@ where
 	want_rhs_of_def :: !ParseContext !(Optional (Ident, Bool), [ParsedExpr]) !Token !Position !ParseState -> (ParsedDefinition, !ParseState)
 	want_rhs_of_def parseContext (opt_name, []) DoubleColonToken pos pState
 		# (name, is_infix, pState) = check_name_and_fixity opt_name cHasNoPriority pState
-		  (tspec, pState) = want pState		//	SymbolType
+		  (tspec, pState) = wantSymbolType pState
 		| isDclContext parseContext
 			# (specials, pState) = optionalFunSpecials pState
 			= (PD_TypeSpec pos name (if is_infix DefaultPriority NoPrio) (Yes tspec) specials, wantEndOfDefinition "type definition" pState)
@@ -498,7 +498,7 @@ where
 		# (name, _, pState) = check_name_and_fixity opt_name cHasPriority pState
 		  (token, pState) = nextToken TypeContext pState
 		| token == DoubleColonToken
-		  	# (tspec, pState) = want pState
+		  	# (tspec, pState) = wantSymbolType pState
 			| isDclContext parseContext
 				# (specials, pState) = optionalFunSpecials pState
 				= (PD_TypeSpec pos name prio (Yes tspec) specials, wantEndOfDefinition "type definition" pState)
@@ -740,13 +740,13 @@ where
 	want_rhs_of_instance_member_def :: !(Optional (Ident, Bool)) !Token !Position !ParseState -> (ParsedDefinition, !ParseState)
 	want_rhs_of_instance_member_def opt_name DoubleColonToken pos pState
 		# (name, priority, pState) = check_name opt_name pState
-		  (tspec, pState) = want pState // SymbolType
+		  (tspec, pState) = wantSymbolType pState
 		= (PD_TypeSpec pos name priority (Yes tspec) FSP_None, wantEndOfDefinition "type definition" pState)
 	want_rhs_of_instance_member_def opt_name (PriorityToken prio) pos pState
 		# (name,_,pState) = check_name_and_fixity opt_name cHasPriority pState
 		  (token, pState) = nextToken TypeContext pState
 		| token == DoubleColonToken
-		  	# (tspec, pState) = want pState // SymbolType
+		  	# (tspec, pState) = wantSymbolType pState
 			= (PD_TypeSpec pos name prio (Yes tspec) FSP_None, wantEndOfDefinition "type definition" pState)
 			# pState = parseError "type definition" (Yes token) "::" pState
 			= (PD_TypeSpec pos name prio No FSP_None, wantEndOfDefinition "type defenition" pState)
@@ -1385,7 +1385,7 @@ wantClassDefinition parseContext pos pState
 				= ("", parseError "Class Definition" (Yes token) "<identifier>" pState)
 
 		want_overloaded_function pos member_name prio class_arity class_args class_cons_vars contexts pState
-			# (tspec, pState) = want pState
+			# (tspec, pState) = wantSymbolType pState
 			  (member_id, pState) = stringToIdent member_name IC_Expression pState
 			  (class_id, pState) = stringToIdent member_name IC_Class pState
 			  member = PD_TypeSpec pos member_id prio (Yes tspec) FSP_None
@@ -1533,15 +1533,16 @@ optionalContext pState
 	| token == BarToken
 		= want_contexts pState
 		= ([], tokenBack pState)
-where
-	want_contexts pState
-		# (contexts, pState) = want_context pState
-		  (token, pState) = nextToken TypeContext pState
-		| token == AndToken
-			# (more_contexts, pState) = want_contexts pState
-			= (contexts ++ more_contexts, pState)
-			= (contexts, tokenBack pState)
 
+want_contexts :: ParseState -> ([TypeContext],ParseState)
+want_contexts pState
+	# (contexts, pState) = want_context pState
+	  (token, pState) = nextToken TypeContext pState
+	| token == AndToken
+		# (more_contexts, pState) = want_contexts pState
+		= (contexts ++ more_contexts, pState)
+		= (contexts, tokenBack pState)
+where
 /*			
 	want_context pState
 		# (class_names, pState) = wantSequence CommaToken TypeContext pState
@@ -1661,7 +1662,7 @@ wantGenericDefinition parseContext pos pState
 	# (arg_vars, pState) = wantList "generic variable(s)" try_variable pState
 		
 	# pState = wantToken TypeContext "generic definition" DoubleColonToken pState
-	# (type, pState) = want_type pState		//	SymbolType
+	# (type, pState) = wantSymbolType pState
 	# pState = wantEndOfDefinition "generic definition" pState
 	# gen_def = 
 		{	gen_ident = ident
@@ -1677,14 +1678,12 @@ wantGenericDefinition parseContext pos pState
 			# (token, pState) = nextToken TypeContext pState
 			= 	case token of
 				IdentToken name -> (name, pState)
-				_ -> ("", parseError "Generic Definition" (Yes token) "<identifier>" pState)
-		want_type :: !ParseState -> (!SymbolType, !ParseState)
-		want_type pState = want pState // SymbolType 		
+				_ -> ("", parseError "generic definition" (Yes token) "<identifier>" pState)
 
 		try_variable pState
 			# (token, pState) = nextToken TypeContext pState
 			= tryTypeVarT token pState
-			
+
 wantDeriveDefinition :: !ParseContext !Position !*ParseState -> (!ParsedDefinition, !*ParseState)
 wantDeriveDefinition parseContext pos pState
 	| pState.ps_flags bitand PS_SupportGenericsMask==0
@@ -1694,7 +1693,7 @@ wantDeriveDefinition parseContext pos pState
 		= (PD_Erroneous, pState)
 	# (derive_defs, pState) = want_derive_types name pState
 	= (PD_Derive derive_defs, pState)
-where	
+where
 	want_name pState 
 		# (token, pState) = nextToken TypeContext pState
 		= 	case token of
@@ -1801,36 +1800,32 @@ where
 		  (exi_vars, pState)	= optionalExistentialQuantifiedVariables pState
 		  (token, pState)		= nextToken GeneralContext pState // should be TypeContext
 		= case token of
-  			CurlyOpenToken
+			CurlyOpenToken
   				-> want_record_type_rhs name False exi_vars pState
   			ExclamationToken
 			  	# (token, pState) = nextToken TypeContext pState
   				| token==CurlyOpenToken
   					-> want_record_type_rhs name True exi_vars pState
 	 		  		->	(PD_Type td, parseError "Record type" No ("after ! in definition of record type "+name+" { ") pState)
-/*			ColonToken
-				| isEmpty exi_vars
-				->	(PD_Erroneous, parseError "Algebraic type" No "no colon, :," pState)
-				->	(PD_Erroneous, parseError "Algebraic type" No "in this version of Clean no colon, :, after quantified variables" pState)
-*/
-			_	#	(condefs, pState)	= want_constructor_list exi_vars token pState
-					td					= { td & td_rhs = ConsList condefs }
-				|	annot == AN_None
+			_
+				# (condefs, pState)	= want_constructor_list exi_vars token pState
+				# td = {td & td_rhs = ConsList condefs}
+				| annot == AN_None
 	 		  		->	(PD_Type td, pState)
-	 		  		->	(PD_Type td, parseError "Algebraic type" No ("No lhs strictness annotation for the algebraic type "+name) pState)
-		where
-			want_record_type_rhs name is_boxed_record exi_vars pState
-				#	(fields, pState)			= wantFields td_ident pState
-					pState						= wantToken TypeContext "record type def" CurlyCloseToken pState
-				  	(rec_cons_ident, pState)	= stringToIdent ("_" + name) IC_Expression pState
-				=	(PD_Type { td & td_rhs = SelectorList rec_cons_ident exi_vars is_boxed_record fields }, pState)
+					->	(PD_Type td, parseError "Algebraic type" No ("No lhs strictness annotation for the algebraic type "+name) pState)
+	where
+		want_record_type_rhs name is_boxed_record exi_vars pState
+			#	(fields, pState)			= wantFields td_ident pState
+				pState						= wantToken TypeContext "record type def" CurlyCloseToken pState
+			  	(rec_cons_ident, pState)	= stringToIdent ("_" + name) IC_Expression pState
+			=	(PD_Type { td & td_rhs = SelectorList rec_cons_ident exi_vars is_boxed_record fields }, pState)
 
 	want_type_rhs ColonDefinesToken parseContext td=:{td_attribute} annot pState // type synonym
 		# name				= td.td_ident.id_name
 		  pState			= verify_annot_attr annot td_attribute name pState
 		  (atype, pState)	= want pState // Atype
 		  td				= {td & td_rhs = TypeSpec atype}
-		|	annot == AN_None
+		| annot == AN_None
 			= (PD_Type td, pState)
 			= (PD_Type td, parseError "Type synonym" No ("No lhs strictness annotation for the type synonym "+name) pState)
 
@@ -1895,7 +1890,6 @@ where
 			  (token, pState) = nextToken GeneralContext pState
 			  (cons_list, pState) = want_constructor_list exi_vars token pState
 			= ([cons : cons_list], pState)
-		// otherwise
 			= ([cons], tokenBack pState)
 
 	want_constructor :: ![ATypeVar] !Token !ParseState -> (.ParsedConstructor,!ParseState)
@@ -2118,54 +2112,52 @@ where
 makeSymbolType args result context attr_env :==
 	{ st_vars = [], st_args = atypes_from_sptypes args, st_args_strictness = strictness_from_sptypes args,st_arity = length args, st_result = result,
 	  st_context = context, st_attr_env = attr_env, st_attr_vars = [] }
- 
-instance want SymbolType
+
+wantSymbolType pState
+//	# (vars , pState) = optionalUniversalQuantifiedVariables pState // PK
+	# (types, pState) = parseList tryBrackSATypeWithPosition pState
+	  (token, pState) = nextToken TypeContext pState
+	= want_rest_of_symbol_type token types pState
 where
-	want pState
-		# (vars , pState) = optionalUniversalQuantifiedVariables pState // PK
- 		# (types, pState) = parseList tryBrackSATypeWithPosition pState
-		  (token, pState) = nextToken TypeContext pState //-->> ("arg types:",types)
-   		= want_rest_of_symbol_type token types pState
-	where
-		want_rest_of_symbol_type :: !Token ![SATypeWithPosition] !ParseState -> (!SymbolType, !ParseState)
-		want_rest_of_symbol_type ArrowToken types pState
-			# pState				= case types of
-										[]	-> parseWarning "want SymbolType" "types before -> expected" pState
-										_	-> pState
-			# (type, pState)		= want pState
-			  (context, pState)		= optionalContext pState
-			  (attr_env, pState)	= optionalCoercions pState
-			= (makeSymbolType types type context attr_env, pState)
-		want_rest_of_symbol_type token [] pState
-			= (makeSymbolType [] (MakeAttributedType TE) [] [], parseError "symbol type" (Yes token) "type" pState)
-		want_rest_of_symbol_type token [{sp_type=type,sp_annotation}] pState
-			# pState = warnIfStrictAnnot sp_annotation pState
-			# (context, pState) = optionalContext (tokenBack pState)
-			  (attr_env, pState) = optionalCoercions pState
-			= (makeSymbolType [] type context attr_env, pState)
-		want_rest_of_symbol_type token [{sp_type=type=:{at_type = TA type_symb [] },sp_annotation} : types] pState
-			# pState = warnIfStrictAnnot sp_annotation pState
-			# (atypes,pState) = atypes_from_sptypes_and_warn_if_strict types pState
-		 	# type = { type & at_type = TA { type_symb & type_arity = length atypes } atypes }
-			  (context, pState) = optionalContext (tokenBack pState)
-			  (attr_env, pState) = optionalCoercions pState
-			= (makeSymbolType [] type context attr_env, pState)
-		want_rest_of_symbol_type token [{sp_type=type=:{at_type = TV tv},sp_annotation} : types] pState
-			# pState = warnIfStrictAnnot sp_annotation pState
-			# (atypes,pState) = atypes_from_sptypes_and_warn_if_strict types pState
-		 	# type = { type & at_type = CV tv :@: atypes }
-			  (context, pState) = optionalContext (tokenBack pState)
-			  (attr_env, pState) = optionalCoercions pState
-			= (makeSymbolType [] type context attr_env, pState)
-		want_rest_of_symbol_type token [{sp_type=type=:{at_type = TQualifiedIdent module_ident type_name [] },sp_annotation} : types] pState
-			# pState = warnIfStrictAnnot sp_annotation pState
-			# (atypes,pState) = atypes_from_sptypes_and_warn_if_strict types pState
-		 	# type = { type & at_type = TQualifiedIdent module_ident type_name atypes }
-			  (context, pState) = optionalContext (tokenBack pState)
-			  (attr_env, pState) = optionalCoercions pState
-			= (makeSymbolType [] type context attr_env, pState)
-		want_rest_of_symbol_type token types pState
-			= (makeSymbolType [] (MakeAttributedType TE) [] [], parseError "symbol type" (Yes token) "->" pState) -->> types
+	want_rest_of_symbol_type :: !Token ![SATypeWithPosition] !ParseState -> (!SymbolType, !ParseState)
+	want_rest_of_symbol_type ArrowToken types pState
+		# pState				= case types of
+									[]	-> parseWarning "want SymbolType" "types before -> expected" pState
+									_	-> pState
+		# (type, pState)		= want pState
+		  (context, pState)		= optionalContext pState
+		  (attr_env, pState)	= optionalCoercions pState
+		= (makeSymbolType types type context attr_env, pState)
+	want_rest_of_symbol_type token [] pState
+		= (makeSymbolType [] (MakeAttributedType TE) [] [], parseError "symbol type" (Yes token) "type" pState)
+	want_rest_of_symbol_type token [{sp_type=type,sp_annotation}] pState
+		# pState = warnIfStrictAnnot sp_annotation pState
+		# (context, pState) = optionalContext (tokenBack pState)
+		  (attr_env, pState) = optionalCoercions pState
+		= (makeSymbolType [] type context attr_env, pState)
+	want_rest_of_symbol_type token [{sp_type=type=:{at_type = TA type_symb [] },sp_annotation} : types] pState
+		# pState = warnIfStrictAnnot sp_annotation pState
+		# (atypes,pState) = atypes_from_sptypes_and_warn_if_strict types pState
+	 	# type = { type & at_type = TA { type_symb & type_arity = length atypes } atypes }
+		  (context, pState) = optionalContext (tokenBack pState)
+		  (attr_env, pState) = optionalCoercions pState
+		= (makeSymbolType [] type context attr_env, pState)
+	want_rest_of_symbol_type token [{sp_type=type=:{at_type = TV tv},sp_annotation} : types] pState
+		# pState = warnIfStrictAnnot sp_annotation pState
+		# (atypes,pState) = atypes_from_sptypes_and_warn_if_strict types pState
+	 	# type = { type & at_type = CV tv :@: atypes }
+		  (context, pState) = optionalContext (tokenBack pState)
+		  (attr_env, pState) = optionalCoercions pState
+		= (makeSymbolType [] type context attr_env, pState)
+	want_rest_of_symbol_type token [{sp_type=type=:{at_type = TQualifiedIdent module_ident type_name [] },sp_annotation} : types] pState
+		# pState = warnIfStrictAnnot sp_annotation pState
+		# (atypes,pState) = atypes_from_sptypes_and_warn_if_strict types pState
+	 	# type = { type & at_type = TQualifiedIdent module_ident type_name atypes }
+		  (context, pState) = optionalContext (tokenBack pState)
+		  (attr_env, pState) = optionalCoercions pState
+		= (makeSymbolType [] type context attr_env, pState)
+	want_rest_of_symbol_type token types pState
+		= (makeSymbolType [] (MakeAttributedType TE) [] [], parseError "symbol type" (Yes token) "->" pState)
 
 /*
 	Types
@@ -2289,8 +2281,7 @@ tryAnnotatedAType tryAA attr vars pState
 		| isEmpty vars
 			= ( True, atype, pState)
 			= ( True, { atype & at_type = TFA vars atype.at_type }, pState)
-	// otherwise (not that types is non-empty)
-// Sjaak	
+	// otherwise (note that types is non-empty)
 	# (atype, pState) = convertAAType types attr (tokenBack pState)
 	| isEmpty vars
 		= (True, atype, pState)
@@ -2304,6 +2295,7 @@ where
 
 tryBrackSAType :: !ParseState -> (!Bool, SAType, !ParseState)
 tryBrackSAType pState
+	// type of constructor argument
 	# (_, annot, attr, pState)	= optionalAnnotAndAttr pState
 	# (succ, atype, pState) = trySimpleType attr pState
 	= (succ, {s_annotation=annot,s_type=atype}, pState)
@@ -2342,9 +2334,11 @@ wantAType pState
 	# (succ, atype, pState)	= tryAType True TA_None pState
 	| succ
 		= (atype, pState)
-	// otherwise //~ succ
-		# (token, pState) = nextToken TypeContext pState
-		= (atype, parseError "atype" (Yes token) "attributed and annotated type" pState)
+		= (atype, attributed_and_annotated_type_error pState)
+
+attributed_and_annotated_type_error pState
+	# (token, pState) = nextToken TypeContext pState
+	= parseError "atype" (Yes token) "attributed and annotated type" pState
 
 tryType :: !ParseState -> (!Bool,!Type,!ParseState)
 tryType pState
@@ -2516,42 +2510,7 @@ trySimpleTypeT SquareOpenToken attr pState
 		= (False, {at_attribute = attr, at_type = TE}, parseError "List type" (Yes token) "]" pState)
 trySimpleTypeT OpenToken attr pState
 	# (token, pState) = nextToken TypeContext pState
-	| token == CommaToken
-		# (tup_arity, pState)		= determine_arity_of_tuple 2 pState
-		  tuple_symbol = makeTupleTypeSymbol tup_arity 0
-		= (True, {at_attribute = attr, at_type = TA tuple_symbol []}, pState)	
-	| token == ArrowToken
-		# (token, pState) = nextToken TypeContext pState
-		| token == CloseToken
-			= (True, {at_attribute = attr, at_type = TArrow}, pState)
-			= (False,{at_attribute = attr, at_type = TE},
-				parseError "arrow type" (Yes token) ")" pState)
-	// otherwise // token <> CommaToken
-	# (annot_with_pos,atype, pState) = wantAnnotatedATypeWithPosition (tokenBack pState)
-	  (token, pState)	= nextToken TypeContext pState
-	| token == CloseToken
-		# type				= atype.at_type
-		  (attr, pState)	= determAttr  attr  atype.at_attribute type pState
-		  pState = warnIfStrictAnnot annot_with_pos pState
-		= (True, {at_attribute = attr, at_type = type}, pState)
-	| token == CommaToken // TupleType
-		# (satypes, pState)	= wantSequence CommaToken TypeContext pState
-		  pState			= wantToken TypeContext "tuple type" CloseToken pState
-		  satypes			= [{s_annotation=(case annot_with_pos of NoAnnot -> AN_None; StrictAnnotWithPosition _ -> AN_Strict),s_type=atype}:satypes]
-		  arity				= length satypes
-	 	  tuple_symbol = makeTupleTypeSymbol arity arity
-		= (True, {at_attribute = attr, at_type = TAS tuple_symbol (atypes_from_satypes satypes) (strictness_from_satypes satypes)}, pState)
-	// otherwise // token <> CloseToken && token <> CommaToken
-		= (False, atype, parseError "Simple type" (Yes token) "')' or ','" pState)
-where
-	determine_arity_of_tuple :: !Int !ParseState -> (!Int, !ParseState)
-	determine_arity_of_tuple arity pState
-		# (token, pState) = nextToken TypeContext pState
-		| CommaToken == token
-  			= determine_arity_of_tuple (inc arity) pState
-		| CloseToken == token
-			= (arity, pState)
-			= (arity, parseError "tuple type" (Yes token) ")" pState)
+	= trySimpleTypeT_after_OpenToken token attr pState
 trySimpleTypeT CurlyOpenToken attr pState
 	# (token, pState) = nextToken TypeContext pState
 	| token == CurlyCloseToken
@@ -2595,6 +2554,47 @@ trySimpleTypeT token attr pState
 	= case bt of
 		Yes bt	-> (True , {at_attribute = attr, at_type = TB bt}, pState)
 		no		-> (False, {at_attribute = attr, at_type = TE}   , pState)
+
+trySimpleTypeT_after_OpenToken :: !Token !TypeAttribute !ParseState -> (!Bool, !AType, !ParseState)
+trySimpleTypeT_after_OpenToken CommaToken attr pState
+	# (tup_arity, pState)		= determine_arity_of_tuple 2 pState
+	  tuple_symbol = makeTupleTypeSymbol tup_arity 0
+	= (True, {at_attribute = attr, at_type = TA tuple_symbol []}, pState)	
+  where
+	determine_arity_of_tuple :: !Int !ParseState -> (!Int, !ParseState)
+	determine_arity_of_tuple arity pState
+		# (token, pState) = nextToken TypeContext pState
+		| CommaToken == token
+  			= determine_arity_of_tuple (inc arity) pState
+		| CloseToken == token
+			= (arity, pState)
+			= (arity, parseError "tuple type" (Yes token) ")" pState)
+trySimpleTypeT_after_OpenToken ArrowToken attr pState
+	# (token, pState) = nextToken TypeContext pState
+	| token == CloseToken
+		= (True, {at_attribute = attr, at_type = TArrow}, pState)
+		= (False,{at_attribute = attr, at_type = TE},
+			parseError "arrow type" (Yes token) ")" pState)
+trySimpleTypeT_after_OpenToken token attr pState
+	# (annot_with_pos,atype, pState) = wantAnnotatedATypeWithPosition (tokenBack pState)
+	  (token, pState)	= nextToken TypeContext pState
+	= trySimpleTypeT_after_OpenToken_and_type token annot_with_pos atype attr pState
+
+trySimpleTypeT_after_OpenToken_and_type CloseToken annot_with_pos atype attr pState
+	# type				= atype.at_type
+	  (attr, pState)	= determAttr  attr  atype.at_attribute type pState
+	  pState = warnIfStrictAnnot annot_with_pos pState
+	= (True, {at_attribute = attr, at_type = type}, pState)
+trySimpleTypeT_after_OpenToken_and_type CommaToken annot_with_pos atype attr pState
+	// TupleType
+	# (satypes, pState)	= wantSequence CommaToken TypeContext pState
+	  pState			= wantToken TypeContext "tuple type" CloseToken pState
+	  satypes			= [{s_annotation=(case annot_with_pos of NoAnnot -> AN_None; StrictAnnotWithPosition _ -> AN_Strict),s_type=atype}:satypes]
+	  arity				= length satypes
+ 	  tuple_symbol = makeTupleTypeSymbol arity arity
+	= (True, {at_attribute = attr, at_type = TAS tuple_symbol (atypes_from_satypes satypes) (strictness_from_satypes satypes)}, pState)
+trySimpleTypeT_after_OpenToken_and_type token annot_with_pos atype attr pState
+	= (False, atype, parseError "Simple type" (Yes token) "')' or ','" pState)
 
 instance try BasicType
 where
@@ -2662,9 +2662,13 @@ optionalUniversalQuantifiedVariables pState
 	# (token, pState) = nextToken TypeContext pState
 	= case token of
 		ForAllToken
-			# (vars, pState) = wantList "universal quantified variable(s)" tryQuantifiedTypeVar pState
-			-> (vars, wantToken TypeContext "Universal Quantified Variables" ColonToken pState)
+			-> wantUniversalQuantifiedVariables pState 
 		_	-> ([], tokenBack pState)
+
+wantUniversalQuantifiedVariables :: !*ParseState -> *(![ATypeVar],!*ParseState)
+wantUniversalQuantifiedVariables pState
+	# (vars, pState) = wantList "universal quantified variable(s)" tryQuantifiedTypeVar pState
+	= (vars, wantToken TypeContext "Universal Quantified Variables" ColonToken pState)
 
 tryQuantifiedTypeVar :: !ParseState -> (Bool, ATypeVar, ParseState)
 tryQuantifiedTypeVar pState
