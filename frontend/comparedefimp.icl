@@ -40,20 +40,6 @@ where
 
 	compare_rhs_of_types (AlgType dclConstructors) (AlgType iclConstructors) dcl_cons_defs icl_cons_defs comp_st
 		= compare_constructor_lists dclConstructors iclConstructors dcl_cons_defs icl_cons_defs comp_st
-	where
-		compare_constructor_lists [ dcl_cons : dcl_conses ][icl_cons : icl_conses] dcl_cons_defs icl_cons_defs comp_st
-			| dcl_cons.ds_index == icl_cons.ds_index
-				# last_cons = isEmpty dcl_conses
-				# (ok, icl_cons_defs, comp_st) = compare_constructors last_cons dcl_cons.ds_index dcl_cons_defs icl_cons_defs comp_st
-				| ok
-					| last_cons
-						= (isEmpty icl_conses, icl_cons_defs, comp_st) 
-						= compare_constructor_lists dcl_conses icl_conses dcl_cons_defs icl_cons_defs comp_st
-					= (False, icl_cons_defs, comp_st)	
-				= (False, icl_cons_defs, comp_st)	
-		compare_constructor_lists [ dcl_cons : dcl_conses ] [] dcl_cons_defs icl_cons_defs comp_st
-			= (False, icl_cons_defs, comp_st)	
-
 	compare_rhs_of_types (SynType dclType) (SynType iclType) dcl_cons_defs icl_cons_defs comp_st
 		# (ok, comp_st) = compare dclType iclType comp_st
 		= (ok, icl_cons_defs, comp_st)
@@ -89,6 +75,19 @@ where
 	compare_rhs_of_types dcl_type icl_type dcl_cons_defs icl_cons_defs comp_st
 		= (False, icl_cons_defs, comp_st)
 
+	compare_constructor_lists [dcl_cons : dcl_conses] [icl_cons : icl_conses] dcl_cons_defs icl_cons_defs comp_st
+		| dcl_cons.ds_index == icl_cons.ds_index
+			# last_cons = isEmpty dcl_conses
+			# (ok, icl_cons_defs, comp_st) = compare_constructors last_cons dcl_cons.ds_index dcl_cons_defs icl_cons_defs comp_st
+			| ok
+				| last_cons
+					= (isEmpty icl_conses, icl_cons_defs, comp_st) 
+					= compare_constructor_lists dcl_conses icl_conses dcl_cons_defs icl_cons_defs comp_st
+				= (False, icl_cons_defs, comp_st)	
+			= (False, icl_cons_defs, comp_st)
+	compare_constructor_lists [dcl_cons : dcl_conses] [] dcl_cons_defs icl_cons_defs comp_st
+		= (False, icl_cons_defs, comp_st)	
+
 	compare_constructors do_compare_result_types cons_index dcl_cons_defs icl_cons_defs comp_st
 		# dcl_cons_def = dcl_cons_defs.[cons_index]
 		  (icl_cons_def, icl_cons_defs) = icl_cons_defs![cons_index]
@@ -96,16 +95,16 @@ where
 		= (ok, icl_cons_defs, comp_st)
 
 	compare_cons_def_types do_compare_result_types icl_cons_def dcl_cons_def comp_st=:{comp_type_var_heap}
+		| dcl_cons_def.cons_priority<>icl_cons_def.cons_priority
+			= (False,comp_st)
 		# dcl_cons_type = dcl_cons_def.cons_type
 		  icl_cons_type = icl_cons_def.cons_type
 		  comp_type_var_heap = initialyseATypeVars dcl_cons_def.cons_exi_vars icl_cons_def.cons_exi_vars comp_type_var_heap
 		  comp_st = { comp_st & comp_type_var_heap = comp_type_var_heap }
 		  (ok, comp_st) = compare (dcl_cons_type.st_args,dcl_cons_type.st_args_strictness) (icl_cons_type.st_args,icl_cons_type.st_args_strictness) comp_st
-		| dcl_cons_def.cons_priority == icl_cons_def.cons_priority
-			| ok && do_compare_result_types
-				= compare dcl_cons_type.st_result icl_cons_type.st_result comp_st
-				= (ok, comp_st)
-			= (False, comp_st)
+		| ok && do_compare_result_types
+			= compare dcl_cons_type.st_result icl_cons_type.st_result comp_st
+			= (ok, comp_st)
 
 compareClassDefs :: !{#Int} {#Bool} !{# ClassDef} !{# MemberDef} !u:{# ClassDef} !v:{# MemberDef} !*CompareState
 	-> (!u:{# ClassDef}, !v:{# MemberDef}, !*CompareState)
@@ -229,8 +228,8 @@ where
 			  (icl_generic_def, icl_generic_defs) = icl_generic_defs![generic_index]
 			  
 			# (ok1, comp_st) = compare dcl_generic_def.gen_type icl_generic_def.gen_type comp_st
-			# (ok2, comp_st) = compare dcl_generic_def.gen_vars icl_generic_def.gen_vars comp_st			
-			| ok1 && ok2 
+			# (ok2, comp_st) = compare dcl_generic_def.gen_vars icl_generic_def.gen_vars comp_st
+			| ok1 && ok2
 				= (icl_generic_defs, comp_st)
 				# comp_error = compareError generic_def_error (newPosition icl_generic_def.gen_ident icl_generic_def.gen_pos) comp_st.comp_error
 				= (icl_generic_defs, { comp_st & comp_error = comp_error })
@@ -286,24 +285,26 @@ where
 	compare (TV dclVar) (TV iclVar) comp_st
 		= compare dclVar iclVar comp_st
 	compare (TFA dclvars dcltype) (TFA iclvars icltype) comp_st=:{comp_type_var_heap}
-		# comp_type_var_heap = initialyseATypeVars dclvars iclvars comp_type_var_heap 
-		  (ok, comp_st) = compare dcltype icltype { comp_st & comp_type_var_heap = comp_type_var_heap }
-		  type_heaps = foldSt clear_type_var dclvars (comp_st.comp_type_var_heap, comp_st.comp_attr_var_heap)
-		  (comp_type_var_heap, comp_attr_var_heap) = foldSt clear_type_var iclvars type_heaps
-		= (ok, { comp_st & comp_type_var_heap = comp_type_var_heap, comp_attr_var_heap = comp_attr_var_heap })
-	where
-		clear_type_var {atv_variable={tv_info_ptr}, atv_attribute} (type_var_heap,attr_var_heap) 
-			= (type_var_heap <:= (tv_info_ptr, TVI_Empty), clear_attr_var atv_attribute attr_var_heap)
-		
-		clear_attr_var (TA_Var {av_info_ptr}) attr_var_heap
-			= attr_var_heap <:= (av_info_ptr, AVI_Empty)
-		clear_attr_var (TA_RootVar {av_info_ptr}) attr_var_heap
-			= attr_var_heap <:= (av_info_ptr, AVI_Empty)
-		clear_attr_var attr attr_var_heap
-			= attr_var_heap
-
+		# comp_type_var_heap = initialyseATypeVars dclvars iclvars comp_type_var_heap
+		  (ok, comp_st) = compare dcltype icltype {comp_st & comp_type_var_heap = comp_type_var_heap}
+		  type_heaps = clear_type_vars dclvars (comp_st.comp_type_var_heap, comp_st.comp_attr_var_heap)
+		  (comp_type_var_heap, comp_attr_var_heap) = clear_type_vars iclvars type_heaps
+		= (ok, {comp_st & comp_type_var_heap = comp_type_var_heap, comp_attr_var_heap = comp_attr_var_heap})
 	compare _ _ comp_st
 		= (False, comp_st)
+
+clear_type_vars vars type_and_attr_var_heaps
+	= foldSt clear_type_var vars type_and_attr_var_heaps
+where
+	clear_type_var {atv_variable={tv_info_ptr}, atv_attribute} (type_var_heap,attr_var_heap) 
+		= (type_var_heap <:= (tv_info_ptr, TVI_Empty), clear_attr_var atv_attribute attr_var_heap)
+	
+	clear_attr_var (TA_Var {av_info_ptr}) attr_var_heap
+		= attr_var_heap <:= (av_info_ptr, AVI_Empty)
+	clear_attr_var (TA_RootVar {av_info_ptr}) attr_var_heap
+		= attr_var_heap <:= (av_info_ptr, AVI_Empty)
+	clear_attr_var attr attr_var_heap
+		= attr_var_heap
 
 instance compare AType
 where
