@@ -1,6 +1,6 @@
 implementation module hashtable
 
-import predef, syntax, StdCompare, compare_constructor
+import predef, syntax, compare_types, compare_constructor
 
 ::	HashTableEntry
 		= HTE_Ident !BoxedIdent !IdentClass !Int !HashTableEntry !HashTableEntry

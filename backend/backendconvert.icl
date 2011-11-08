@@ -5,7 +5,7 @@ implementation module backendconvert
 
 import code from library "backend_library"
 
-import StdEnv, StdCompare
+import StdEnv, compare_types
 import frontend
 import backend
 import backendsupport, backendpreprocess

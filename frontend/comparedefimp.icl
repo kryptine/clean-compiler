@@ -1,6 +1,6 @@
 implementation module comparedefimp
 
-import syntax, checksupport, compare_constructor, utilities, StdCompare
+import syntax, checksupport, compare_constructor, utilities, compare_types
 
 ::	CompareState =
 	{	comp_type_var_heap	:: !.TypeVarHeap

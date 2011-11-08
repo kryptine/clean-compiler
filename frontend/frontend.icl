@@ -5,7 +5,7 @@ implementation module frontend
 
 import scanner, parse, postparse, check, type, trans, convertcases, overloading, utilities, convertDynamics,
 		convertimportedtypes, compilerSwitches, analtypes, generics1,
-		typereify, StdCompare
+		typereify, compare_types
 
 // trace macro
 (-*->) infixl

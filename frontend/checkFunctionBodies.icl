@@ -1,6 +1,6 @@
 implementation module checkFunctionBodies
 
-import StdEnv, StdCompare
+import StdEnv, compare_types
 import syntax, typesupport, parse, checksupport, utilities, checktypes, transform, predef
 import explicitimports, comparedefimp
 from check import checkFunctions,checkDclMacros
