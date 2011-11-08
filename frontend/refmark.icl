@@ -1,7 +1,7 @@
 implementation module refmark
 
 import StdEnv
-import syntax, Heap, typesupport, check, overloading, unitype, utilities //, RWSDebug
+import syntax, Heap, typesupport, overloading, unitype, utilities
 
 (===>) infix 1
 (===>) a b :== a // --->  b

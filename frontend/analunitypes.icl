@@ -1,7 +1,7 @@
 implementation module analunitypes
 
 import StdEnv
-import syntax, checksupport, analtypes, check, typesupport, checktypes, utilities
+import syntax, checksupport, analtypes, typesupport, checktypes, utilities
 
 instance + SignClassification
 where

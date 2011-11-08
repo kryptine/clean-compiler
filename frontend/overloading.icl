@@ -2,7 +2,7 @@ implementation module overloading
 
 import StdEnv,StdOverloadedList
 
-import syntax, check, type, typesupport, utilities, unitype, predef, checktypes, convertDynamics 
+import syntax, type, typesupport, utilities, unitype, predef, checktypes, convertDynamics 
 import genericsupport, type_io_common
 from trans import addTypesOfDictionaries
 

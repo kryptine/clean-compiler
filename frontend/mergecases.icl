@@ -3,7 +3,7 @@
 */
 implementation module mergecases
 
-import syntax, check, StdCompare, utilities
+import syntax, transform, StdCompare, utilities
 
 class GetSetPatternRhs a
 where
