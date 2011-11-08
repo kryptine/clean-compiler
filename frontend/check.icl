@@ -936,7 +936,7 @@ where
 	(<) fd1 fd2 = fd1.ft_ident.id_name < fd2.ft_ident.id_name
 
 collectCommonDefinitions :: !(CollectedDefinitions ClassInstance) -> (!*{# Int}, ![Declaration])
-collectCommonDefinitions {def_types,def_constructors,def_selectors,def_classes,def_members,def_instances, def_generic_cases, def_generics} 
+collectCommonDefinitions {def_types,def_constructors,def_selectors,def_classes,def_members,def_instances, def_generic_cases, def_generics}
 	// MW: the order in which the declarations appear in the returned list is essential (explicit imports)
 	# sizes = createArray cConversionTableSize 0
 	  (size, defs) = foldSt cons_def_to_dcl def_constructors (0, [])
@@ -1244,7 +1244,7 @@ combineDclAndIclModule MK_Main modules icl_decl_symbols icl_definitions icl_size
 	= ({ copied_type_defs = {}, copied_class_defs = {}, copied_generic_defs = {}}, No, modules, icl_decl_symbols, icl_definitions, icl_sizes, cs)
 combineDclAndIclModule _ modules icl_decl_symbols icl_definitions icl_sizes cs
 	#! main_dcl_module_n=cs.cs_x.x_main_dcl_module_n
-	# (dcl_mod=:{dcl_declared={dcls_local}, dcl_sizes, dcl_common}, modules) =  modules![main_dcl_module_n]
+	# ({dcl_declared={dcls_local}, dcl_sizes, dcl_common}, modules) = modules![main_dcl_module_n]
 
 	  cs = addGlobalDefinitionsToSymbolTable icl_decl_symbols cs
 
@@ -1272,7 +1272,7 @@ combineDclAndIclModule _ modules icl_decl_symbols icl_definitions icl_sizes cs
 			, copied_generic_defs = copied_generic_defs 
 			}
 		, Yes conversion_table
-		, { modules & [main_dcl_module_n].dcl_has_macro_conversions = True}
+		, {modules & [main_dcl_module_n].dcl_has_macro_conversions = True}
 		, icl_decl_symbols
 		, { icl_definitions
 				& def_types			= my_append icl_definitions.def_types new_type_defs
@@ -1559,7 +1559,6 @@ replace_icl_macros_by_dcl_macros _ {ir_from=first_icl_macro_index,ir_to=end_icl_
 			# dcl_n=macro_renumber_table.[decl_index-first_icl_macro_index]
 			# decls = replace_icl_macros_by_dcl_macros decls;
 			| decl_index>=first_icl_macro_index && decl_index<end_icl_macro_index && dcl_n<>NoIndex
-//				| trace_tn ("replace_icl_macros_by_dcl_macros "+++toString decl_record.decl_ident+++" "+++toString decl_index+++" "+++toString (first_macro_n+dcl_n))
 				= [Declaration {decl_record & decl_kind=STE_DclMacroOrLocalMacroFunction [], decl_index=first_macro_n+dcl_n} : decls]
 				= [decl : decls]
 		replace_icl_macros_by_dcl_macros [decl:decls]
@@ -2662,11 +2661,11 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 
 		determine_imported_module_numbers expl_imp_indices main_dcl_module_n dcl_modules
 			# (imported_module_numbers_of_main_dcl_mod, dcl_modules) = dcl_modules![main_dcl_module_n].dcl_imported_module_numbers
-	  		= foldSt compute_used_module_nrs expl_imp_indices (addNr cPredefinedModuleIndex imported_module_numbers_of_main_dcl_mod, dcl_modules)
+			= foldSt compute_used_module_nrs expl_imp_indices (addNr cPredefinedModuleIndex imported_module_numbers_of_main_dcl_mod, dcl_modules)
 
 		determine_explicit_imports component_expl_imp_info expl_imp_indices nr_of_modules modules_in_component_set dcl_modules cs
-	 		# expl_imp_indices_ikh = ikhInsert` False nr_of_modules expl_imp_indices ikhEmpty
-	 		# (imports, (dcl_modules, _, _, cs))
+			# expl_imp_indices_ikh = ikhInsert` False nr_of_modules expl_imp_indices ikhEmpty
+			# (imports, (dcl_modules, _, _, cs))
 				= solveExplicitImports expl_imp_indices_ikh modules_in_component_set nr_of_modules
 										(dcl_modules, bitvectCreate nr_of_modules, component_expl_imp_info, cs)
 			= (imports, dcl_modules, cs)
@@ -3131,7 +3130,7 @@ checkInstancesOfDclModule mod_index	(nr_of_dcl_functions_and_instances, nr_of_dc
 													 , com_class_defs = com_class_defs
 													 , com_member_defs = com_member_defs
 													 , com_gencase_defs = com_gencase_defs
-									 				 }}
+													 }}
 	   dcl_modules = { dcl_modules & [mod_index] = dcl_mod }
 	= (dcl_modules, heaps, cs)
   where
