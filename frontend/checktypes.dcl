@@ -2,11 +2,12 @@ definition module checktypes
 
 import checksupport, typesupport
 
-checkTypeDefs :: !Index !(Optional (CopiedDefinitions, Int)) !*{# CheckedTypeDef} !*{# ConsDef} !*{# SelectorDef} !*{# DclModule} !*Heaps !*CheckState
-	-> (!*{# CheckedTypeDef}, !*{# ConsDef}, !*{# SelectorDef}, !*{# DclModule}, !*Heaps, !*CheckState)
+checkTypeDefs :: !Index !(Optional (CopiedDefinitions, Int))
+		!*{#CheckedTypeDef} !*{#ConsDef} !*{#SelectorDef} !*{#DclModule} !*Heaps !*CheckState
+	-> (!*{#CheckedTypeDef},!*{#ConsDef},!*{#SelectorDef},!*{#DclModule},!*Heaps,!*CheckState)
 
 checkFunctionType :: !Index !SymbolType !FunSpecials !u:{#CheckedTypeDef} !v:{#ClassDef} !u:{#DclModule} !*TypeHeaps !*CheckState
-					   -> (!SymbolType, !FunSpecials,!u:{#CheckedTypeDef},!v:{#ClassDef},!u:{#DclModule},!*TypeHeaps,!*CheckState)
+						-> (!SymbolType,!FunSpecials,!u:{#CheckedTypeDef},!v:{#ClassDef},!u:{#DclModule},!*TypeHeaps,!*CheckState)
 
 checkMemberType :: !Index !SymbolType !u:{# CheckedTypeDef} !v:{# ClassDef} !u:{# DclModule} !*TypeHeaps !*CheckState
 	-> (!SymbolType, !u:{# CheckedTypeDef}, !v:{# ClassDef}, !u:{# DclModule}, !*TypeHeaps, !*CheckState)
@@ -17,8 +18,9 @@ checkInstanceType :: !Index !GlobalIndex !ClassIdent !InstanceType !Specials !u:
 checkSuperClasses :: ![TypeVar] ![TypeContext] !Index !u:{# CheckedTypeDef} !v:{# ClassDef} !u:{# DclModule} !*TypeHeaps !*CheckState
 	-> (![TypeVar], ![TypeContext], !u:{#CheckedTypeDef}, !v:{# ClassDef}, !u:{# DclModule}, !*TypeHeaps, !*CheckState)
 
-checkDynamicTypes :: !Index ![ExprInfoPtr] !(Optional SymbolType) !u:{# CheckedTypeDef} !u:{# DclModule} !*TypeHeaps !*ExpressionHeap !*CheckState
-	-> (!u:{# CheckedTypeDef}, !u:{# DclModule}, !*TypeHeaps, !*ExpressionHeap, !*CheckState)
+checkDynamicTypes :: !Index ![ExprInfoPtr] !(Optional SymbolType)
+		!u:{#CheckedTypeDef} !u:{#DclModule} !*TypeHeaps !*ExpressionHeap !*CheckState
+	-> (!u:{#CheckedTypeDef},!u:{#DclModule},!*TypeHeaps,!*ExpressionHeap,!*CheckState)
 
 createClassDictionaries ::		  !Bool !Index !Index !Index !Index !*{#CheckedTypeDef} !*{# SelectorDef} !*{# ConsDef} !*{#ClassDef} !*{#DclModule} !*TypeVarHeap !*VarHeap !*SymbolTable
 	-> (![CheckedTypeDef],![SelectorDef],![ConsDef],!DictionaryInfo,!*{#CheckedTypeDef},!*{# SelectorDef},!*{# ConsDef},!*{#ClassDef},!*{#DclModule},!*TypeVarHeap,!*VarHeap,!*SymbolTable)
