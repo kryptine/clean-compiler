@@ -1,6 +1,6 @@
 implementation module overloading
 
-import StdEnv, StdCompare
+import StdEnv, compare_types
 
 import syntax, type, typesupport, utilities, unitype, predef, checktypes, convertDynamics 
 import genericsupport, type_io_common

@@ -3,7 +3,7 @@
 */
 implementation module convertcases
 
-import syntax, transform, StdCompare, utilities, typesupport, general
+import syntax, transform, compare_types, utilities, typesupport, general
 from partition import ::Component(..),::ComponentMembers(..)
 from trans import convertSymbolType
 
