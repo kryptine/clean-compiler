@@ -2,7 +2,7 @@ implementation module typeproperties
 
 import StdEnv
 
-import general, StdCompare
+import general, compare_types
 
 ::	TypeClassification = 
 	{	tc_signs	:: TypeSignTree

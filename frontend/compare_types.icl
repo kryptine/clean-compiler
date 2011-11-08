@@ -1,4 +1,4 @@
-implementation module StdCompare
+implementation module compare_types
 
 import StdEnv, compare_constructor
 import syntax
@@ -29,7 +29,6 @@ instance == TypeSymbIdent
 where
 	(==) tsymb_id1 tsymb_id2
 		= tsymb_id1.type_index == tsymb_id2.type_index
-
 
 instance == AType
 where
@@ -160,10 +159,7 @@ where
 		with
 			compare_indexes (SK_Function i1) (SK_Function i2)						= i1 =< i2
 			compare_indexes (SK_LocalMacroFunction i1) (SK_LocalMacroFunction i2) = i1 =< i2
-//			compare_indexes (SK_ClassRecord i1) (SK_ClassRecord i2)					= i1 =< i2
 			compare_indexes (SK_Constructor i1) (SK_Constructor i2)					= i1 =< i2
-//			compare_indexes (SK_DeltaFunction i1) (SK_DeltaFunction i2)				= i1 =< i2
-//			compare_indexes (SK_InternalFunction i1) (SK_InternalFunction i2)		= i1 =< i2
 			compare_indexes (SK_OverloadedFunction i1) (SK_OverloadedFunction i2)	= i1 =< i2
 			compare_indexes (SK_GeneratedFunction _ i1) (SK_GeneratedFunction _ i2)	= i1 =< i2
 			compare_indexes (SK_LocalDclMacroFunction i1) (SK_LocalDclMacroFunction i2) = i1 =< i2
@@ -218,7 +214,6 @@ where
 			compare_arguments (App app1) (App app2)						= app1 =< app2
 			compare_arguments (Var v1) (Var v2)							= v1 =< v2
 			compare_arguments (fun1 @ args1) (fun2 @ args2)				= (fun1,args1) =< (fun2,args2) 
-//			compare_arguments (Lambda vars1 expr1) (Lambda vars2 expr2)	= (vars1,expr1) =< (vars2,expr2)
 			compare_arguments EE EE										= Equal		
 			compare_arguments _ _										= Greater		
 		| less_constructor expr1 expr2
@@ -321,4 +316,3 @@ where
 instance < MemberDef
 where
 	(<) md1 md2 = md1.me_ident.id_name < md2.me_ident.id_name
-

@@ -1,4 +1,4 @@
-definition module StdCompare
+definition module compare_types
 
 import syntax, compare_constructor
 

@@ -1,7 +1,7 @@
 implementation module postparse
 
 import StdEnv
-import syntax, parse, utilities, containers, StdCompare
+import syntax, parse, utilities, containers, compare_types
 import genericsupport
 
 :: *CollectAdmin =

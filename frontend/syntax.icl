@@ -1,7 +1,7 @@
 implementation module syntax
 
 import StdEnv, compare_constructor
-import scanner, general, Heap, typeproperties, utilities, StdCompare
+import scanner, general, Heap, typeproperties, utilities, compare_types
 import syntax
 
 instance toString Ident

@@ -1,9 +1,6 @@
-/*
-	module owner: Ronny Wichers Schreur
-*/
 implementation module convertcases
 
-import syntax, transform, StdCompare, typesupport, utilities, trans, general
+import syntax, transform, compare_types, typesupport, utilities, trans, general
 
 // exactZip fails when its arguments are of unequal length
 exactZip` :: ![.a] ![.b] -> [(.a,.b)]

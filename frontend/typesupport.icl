@@ -1,6 +1,6 @@
 implementation module typesupport
 
-import StdEnv, StdCompare
+import StdEnv, compare_types
 import syntax, parse, unitype, utilities, checktypes, compilerSwitches
 import genericsupport
 

@@ -1,9 +1,6 @@
-/*
-	module owner: Ronny Wichers Schreur
-*/
 implementation module mergecases
 
-import syntax, transform, StdCompare, utilities
+import syntax, transform, compare_types, utilities
 
 class GetSetPatternRhs a
 where

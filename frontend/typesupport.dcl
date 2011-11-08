@@ -1,6 +1,6 @@
 definition module typesupport
 
-import checksupport, StdCompare
+import checksupport, compare_types
 
 from unitype import ::Coercions, ::CoercionTree, ::AttributePartition, CT_Empty
 
