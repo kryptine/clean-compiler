@@ -1,6 +1,6 @@
 implementation module type
 
-import StdEnv, StdCompare
+import StdEnv, compare_types
 import syntax, typesupport, check, analtypes, overloading, unitype, refmark, predef, utilities, compare_constructor
 import genericsupport
 
