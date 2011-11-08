@@ -3,7 +3,9 @@
 */
 implementation module convertcases
 
-import syntax, transform, StdCompare, check, utilities, trans, general; //, RWSDebug
+import syntax, transform, StdCompare, utilities, typesupport, general
+from partition import ::Component(..),::ComponentMembers(..)
+from trans import convertSymbolType
 
 // exactZip fails when its arguments are of unequal length
 exactZip` :: ![.a] ![.b] -> [(.a,.b)]

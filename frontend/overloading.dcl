@@ -1,7 +1,7 @@
 definition module overloading
 
 import StdEnv
-import syntax, check, typesupport
+import syntax, typesupport
 
 ::	InstanceTree = IT_Node !(Global Index) !InstanceTree !InstanceTree | IT_Empty 
 

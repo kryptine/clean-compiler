@@ -1,8 +1,7 @@
 implementation module typesupport
 
 import StdEnv, StdCompare
-import syntax, parse, check, unitype, utilities, checktypes, compilerSwitches
-import genericsupport
+import syntax, unitype, utilities, checktypes
 
 ::	Store	:== Int
 

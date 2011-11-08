@@ -1,8 +1,8 @@
 implementation module overloading
 
-import StdEnv
+import StdEnv, StdCompare
 
-import syntax, check, type, typesupport, utilities, unitype, predef, checktypes, convertDynamics 
+import syntax, type, typesupport, utilities, unitype, predef, checktypes, convertDynamics 
 import genericsupport, type_io_common
 
 ::	LocalTypePatternVariable =

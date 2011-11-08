@@ -4,7 +4,7 @@
 definition module convertDynamics
 
 import syntax , checksupport
-from trans import ::Component
+from partition import ::Component
 
 :: TypeCodeVariableInfo
 :: DynamicValueAliasInfo

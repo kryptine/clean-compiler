@@ -1,7 +1,7 @@
 implementation module analtypes
 
 import StdEnv
-import syntax, checksupport, checktypes, check, typesupport, utilities, analunitypes
+import syntax, checksupport, checktypes, typesupport, utilities, analunitypes
 
 ::	TypeGroups :== [[GlobalIndex]]
 

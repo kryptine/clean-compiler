@@ -1,6 +1,6 @@
 implementation module transform
 
-import syntax, check, StdCompare, utilities, mergecases; //, RWSDebug
+import syntax, utilities, mergecases
 
 ::	LiftState =
 	{	ls_var_heap		:: !.VarHeap

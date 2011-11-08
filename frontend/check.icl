@@ -1,6 +1,6 @@
 implementation module check
 
-import StdEnv
+import StdEnv, StdCompare
 
 import syntax, typesupport, parse, checksupport, utilities, checktypes, transform, predef
 import explicitimports, comparedefimp, checkFunctionBodies, containers
