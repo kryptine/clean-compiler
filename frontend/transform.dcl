@@ -2,10 +2,6 @@ definition module transform
 
 import syntax, checksupport
 
-::	Group =
-	{	group_members	:: ![Int]
-	}
-
 :: PredefSymbolsForTransform = { predef_alias_dummy :: !PredefinedSymbol, predef_and :: !PredefinedSymbol, predef_or :: !PredefinedSymbol };
 
 partitionateDclMacros :: !IndexRange !Index !PredefSymbolsForTransform !*{#*{#FunDef}} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
