@@ -4,7 +4,7 @@
 definition module convertcases
 
 import syntax
-from partition import ::Component
+from checksupport import ::Component
 
 :: LetVarInfo
 :: LetExpressionInfo

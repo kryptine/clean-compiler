@@ -1,10 +1,6 @@
-/*
-	module owner: Ronny Wichers Schreur
-*/
 definition module convertDynamics
 
-import syntax , checksupport
-from partition import ::Component
+import syntax, checksupport
 
 :: TypeCodeVariableInfo
 :: DynamicValueAliasInfo
