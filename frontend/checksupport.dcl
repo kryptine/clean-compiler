@@ -29,6 +29,15 @@ cNeedStdStrictLists		:== 16
 
 ::	CheckStateX = {x_needed_modules :: !BITVECT,x_main_dcl_module_n :: !Int, x_check_dynamic_types :: !Bool }
 
+::	Group = { group_members :: ![Int] }
+
+::	Component = { component_members :: !ComponentMembers }
+
+::	ComponentMembers
+	= ComponentMember !Int !ComponentMembers
+	| GeneratedComponentMember !Int !FunctionInfoPtr !ComponentMembers
+	| NoComponentMembers
+
 instance == STE_Kind
 
 cTypeDefs				:== 0

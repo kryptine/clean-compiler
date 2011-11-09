@@ -1,10 +1,7 @@
-/*
-	module owner: Ronny Wichers Schreur
-*/
 implementation module convertcases
 
-import syntax, transform, compare_types, utilities, typesupport, general
-from partition import ::Component(..),::ComponentMembers(..)
+import syntax, compare_types, utilities, typesupport, general
+from checksupport import ::Component(..),::ComponentMembers(..)
 from trans import convertSymbolType
 
 // exactZip fails when its arguments are of unequal length

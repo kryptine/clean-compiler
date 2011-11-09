@@ -2,13 +2,6 @@ definition module partition
 
 import syntax, transform
 
-::	Component = { component_members	:: !ComponentMembers }
-
-:: ComponentMembers
-	= ComponentMember !Int !ComponentMembers
-	| GeneratedComponentMember !Int !FunctionInfoPtr !ComponentMembers
-	| NoComponentMembers
-
 partitionateFunctions :: !*{# FunDef} ![IndexRange] -> (!*{!Component}, !*{# FunDef})
 
 partitionateFunctions`

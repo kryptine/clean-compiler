@@ -860,10 +860,6 @@ where
 		  new_var = { fv_ident = fv_ident, fv_def_level = NotALevel, fv_info_ptr = new_info, fv_count = 0 }
 		= ([{ lb_src = expr, lb_dst = new_var, lb_position = NoPos} : binds], writePtr fv_info_ptr (VI_Variable fv_ident new_info) var_heap)
 
-::	Group =
-	{	group_members	:: ![Int]
-	}
-
 ::	PartitioningInfo = 
 	{	pi_symbol_table	:: !.SymbolTable
 	,	pi_var_heap		:: !.VarHeap
