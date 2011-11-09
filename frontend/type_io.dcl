@@ -5,7 +5,6 @@ definition module type_io
 
 import scanner, general, Heap, typeproperties, utilities, checksupport
 import StdEnv
-import trans
 
 :: WriteTypeInfoState
 	= { wtis_n_type_vars		:: !Int
