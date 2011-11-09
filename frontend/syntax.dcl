@@ -4,8 +4,9 @@ import StdEnv
 
 import scanner, general, typeproperties, Heap
 import IndexType
-
 from containers import ::NumberSet
+from convertDynamics import :: TypeCodeVariableInfo, :: DynamicValueAliasInfo
+from convertcases import :: LetVarInfo, :: LetExpressionInfo, :: RefCountsInCase, :: SplitsInCase
 
 ::	Ident =
 	{ 	id_name		:: !String

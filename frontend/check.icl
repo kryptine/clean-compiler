@@ -2,7 +2,7 @@ implementation module check
 
 import StdEnv, compare_types
 
-import syntax, typesupport, parse, checksupport, utilities, checktypes, transform, predef
+import syntax, expand_types, parse, checksupport, utilities, checktypes, transform, predef
 import explicitimports, comparedefimp, checkFunctionBodies, containers
 import genericsupport
 import typereify

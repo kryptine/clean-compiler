@@ -3,7 +3,7 @@
 */
 implementation module frontend
 
-import scanner, parse, postparse, check, type, trans, convertcases, overloading, utilities, convertDynamics,
+import scanner, parse, postparse, check, type, trans, partition, convertcases, overloading, utilities, convertDynamics,
 		convertimportedtypes, compilerSwitches, analtypes, generics1,
 		typereify, compare_types
 

@@ -1,8 +1,7 @@
 implementation module convertcases
 
-import syntax, compare_types, utilities, typesupport, general
+import syntax, compare_types, utilities, expand_types, general
 from checksupport import ::Component(..),::ComponentMembers(..)
-from trans import convertSymbolType
 
 // exactZip fails when its arguments are of unequal length
 exactZip` :: ![.a] ![.b] -> [(.a,.b)]

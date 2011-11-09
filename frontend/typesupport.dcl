@@ -6,7 +6,6 @@ from unitype import ::Coercions, ::CoercionTree, ::AttributePartition, CT_Empty
 
 errorHeading :: !String !*ErrorAdmin -> *ErrorAdmin
 
-// MW4 was:class (<::) infixl a :: !*File (!Format, !a) -> *File
 (<::) infixl :: !*File !(!Format, !a, !Optional TypeVarBeautifulizer) -> *File | writeType a
 
 class writeType a :: !*File !(Optional TypeVarBeautifulizer) !(!Format, !a) -> (!*File, !Optional TypeVarBeautifulizer)
@@ -65,11 +64,6 @@ beautifulizeAttributes :: !SymbolType !*AttrVarHeap -> (!SymbolType, !.AttrVarHe
 
 
 updateExpressionTypes :: !SymbolType !SymbolType ![ExprInfoPtr] !*TypeHeaps !*ExpressionHeap -> (!*TypeHeaps, !*ExpressionHeap)
-
-class substitute a :: !a !*TypeHeaps -> (!a, !*TypeHeaps)
-
-instance substitute AType, Type, TypeContext, AttrInequality, CaseType, [a] | substitute a,
-			(a,b) | substitute a & substitute b
 
 substituteType :: !TypeAttribute !TypeAttribute ![ATypeVar] ![AType] !Type !*TypeHeaps -> (!Type, !*TypeHeaps)
 
@@ -134,10 +128,6 @@ initializeToAVI_Empty :: !AttributeVar !*AttrVarHeap -> .AttrVarHeap
 appTypeVarHeap f type_heaps :== let th_vars = f type_heaps.th_vars in { type_heaps & th_vars = th_vars }
 accTypeVarHeap f type_heaps :== let (r, th_vars) = f type_heaps.th_vars in (r, { type_heaps & th_vars = th_vars })
 accAttrVarHeap f type_heaps :== let (r, th_attrs) = f type_heaps.th_attrs in (r, { type_heaps & th_attrs = th_attrs })
-	
-class removeAnnotations a :: !a  -> (!Bool, !a)
-
-instance removeAnnotations Type, SymbolType
 
 foldATypeSt on_atype on_type type st :== fold_atype_st type st
   where

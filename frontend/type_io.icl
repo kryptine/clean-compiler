@@ -1,11 +1,8 @@
-/*
-	module owner: Martijn Vervoort
-*/
 implementation module type_io
 
 import StdEnv, compare_constructor
 import scanner, general, Heap, typeproperties, utilities, checksupport
-from trans import convertSymbolTypeWithoutCollectingImportedConstructors
+from expand_types import convertSymbolTypeWithoutCollectingImportedConstructors
 import type_io_common
 from genericsupport import kind_to_short_string
 
