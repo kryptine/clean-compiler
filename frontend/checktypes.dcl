@@ -1,6 +1,6 @@
 definition module checktypes
 
-import checksupport, typesupport
+import checksupport
 
 checkTypeDefs :: !Index !(Optional (CopiedDefinitions, Int))
 		!*{#CheckedTypeDef} !*{#ConsDef} !*{#SelectorDef} !v:{#ClassDef} !*{#DclModule} !*Heaps !*CheckState

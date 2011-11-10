@@ -4,8 +4,9 @@ import StdEnv
 
 import scanner, general, typeproperties, Heap
 import IndexType
-
 from containers import ::NumberSet
+from convertDynamics import :: TypeCodeVariableInfo, :: DynamicValueAliasInfo
+from convertcases import :: LetVarInfo, :: LetExpressionInfo, :: RefCountsInCase, :: SplitsInCase
 
 ::	Ident =
 	{ 	id_name		:: !String
@@ -733,8 +734,6 @@ pIsSafe			:== True
 
 :: AP_Kind = APK_Constructor !GlobalIndex | APK_NewTypeConstructor !Index | APK_Macro !Bool // is_dcl_macro
 
-from convertDynamics import :: TypeCodeVariableInfo, :: DynamicValueAliasInfo
-
 ::	VI_TypeInfo	= VITI_Empty
 				| VITI_Coercion		CoercionPosition
 				| VITI_PatternType	[AType] /*module*/!Index /*constructor*/!Index VI_TypeInfo
@@ -785,9 +784,6 @@ from convertDynamics import :: TypeCodeVariableInfo, :: DynamicValueAliasInfo
 
 ::	VarHeap :== Heap VarInfo
 ::	VarInfoPtr	:== Ptr VarInfo
-
-from convertcases import :: LetVarInfo, :: LetExpressionInfo,
-							:: RefCountsInCase,	:: SplitsInCase
 
 cNotVarNumber :== -1
 

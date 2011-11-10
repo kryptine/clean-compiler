@@ -1,15 +1,11 @@
-/*
-	module owner: Ronny Wichers Schreur
-*/
 implementation module backendconvert
 
 import code from library "backend_library"
 
-import StdEnv
+import StdEnv, compare_types
 import frontend
 import backend
 import backendsupport, backendpreprocess
-import partition
 
 // trace macro
 (-*->) infixl

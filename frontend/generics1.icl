@@ -4,7 +4,7 @@
 
 implementation module generics1
 
-import StdEnv
+import StdEnv,compare_types
 import check
 from checktypes import createMoreClassDictionaries
 from transform import ::Group

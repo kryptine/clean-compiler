@@ -1,6 +1,6 @@
 implementation module checkgenerics
 
-import syntax,checksupport,checktypes,genericsupport,explicitimports
+import syntax,checksupport,checktypes,genericsupport,explicitimports,compare_types,typesupport
 
 checkGenericDefs :: !Index !(Optional (CopiedDefinitions, Int))
 		!*{#GenericDef} !*{#CheckedTypeDef} !*{#ClassDef} !*{#DclModule} !*Heaps !*CheckState

@@ -1,13 +1,10 @@
-/*
-	module owner: Diederik van Arkel
-*/
 implementation module classify
 
 SwitchMultimatchClassification multi no_multi	:== multi
 SwitchNewOld new old							:== new
 
 import syntax
-from trans import ::Component(..),::ComponentMembers(..)
+from checksupport import ::Component(..),::ComponentMembers(..)
 from containers import arg_is_strict
 import utilities
 import StdStrictLists

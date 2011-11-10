@@ -1,6 +1,6 @@
 implementation module transform
 
-import syntax, compare_types, utilities, mergecases
+import syntax, utilities, mergecases
 
 ::	LiftState =
 	{	ls_var_heap		:: !.VarHeap

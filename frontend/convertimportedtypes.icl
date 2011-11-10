@@ -1,6 +1,6 @@
 implementation module convertimportedtypes
 
-import syntax, trans
+import syntax, expand_types, utilities
 
 cDontRemoveAnnotations :== False
 

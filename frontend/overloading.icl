@@ -1,10 +1,9 @@
 implementation module overloading
 
-import StdEnv,StdOverloadedList
+import StdEnv,StdOverloadedList,compare_types
 
-import syntax, type, typesupport, utilities, unitype, predef, checktypes, convertDynamics 
+import syntax, type, expand_types, utilities, unitype, predef, checktypes
 import genericsupport, type_io_common
-from trans import addTypesOfDictionaries
 
 ::	LocalTypePatternVariable =
 	{	ltpv_var			:: !Int

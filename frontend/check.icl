@@ -1,10 +1,9 @@
 implementation module check
 
-import StdEnv
+import StdEnv, compare_types
 
-import syntax, typesupport, parse, checksupport, utilities, checktypes, transform, predef
-import explicitimports, comparedefimp, checkFunctionBodies, containers
-import genericsupport
+import syntax, expand_types, parse, checksupport, utilities, checktypes, transform, predef
+import explicitimports, comparedefimp, checkFunctionBodies, containers, typesupport
 import typereify
 from checkgenerics import checkGenericDefs,checkGenericCaseDefs,convert_generic_instances,create_gencase_funtypes
 

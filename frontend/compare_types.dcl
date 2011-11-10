@@ -9,7 +9,7 @@ Equal	:== 0
 
 class (=<) infix 4 a :: !a !a -> CompareValue
 
-instance =< Int, Expression, {# Char}, Ident, [a] | =< a, BasicType //, (Global a) | =< a
+instance =< Int, Expression, {# Char}, Ident, [a] | =< a, BasicType
 
 instance =< Type, SymbIdent
 

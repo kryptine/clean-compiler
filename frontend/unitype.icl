@@ -1,6 +1,6 @@
 implementation module unitype
 
-import StdEnv
+import StdEnv, compare_types
 
 import syntax, analunitypes, type, utilities, checktypes
 

@@ -1,6 +1,6 @@
 implementation module checktypes
 
-import StdEnv
+import StdEnv, compare_types
 import syntax, checksupport, typesupport, utilities
 import genericsupport
 from explicitimports import search_qualified_ident,::NameSpaceN,TypeNameSpaceN,ClassNameSpaceN
