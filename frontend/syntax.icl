@@ -2,7 +2,9 @@ implementation module syntax
 
 import StdEnv, compare_constructor
 import scanner, general, Heap, typeproperties, utilities
-import syntax
+import IndexType
+from containers import ::NumberSet
+from convertcases import :: LetVarInfo, :: LetExpressionInfo, :: RefCountsInCase, :: SplitsInCase
 
 instance toString Ident
 where toString {id_name} = id_name

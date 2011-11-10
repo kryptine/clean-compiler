@@ -3,7 +3,7 @@
 */
 implementation module partition
 
-import syntax, transform
+import syntax, transform, utilities
 
 //	PARTITIONING
 

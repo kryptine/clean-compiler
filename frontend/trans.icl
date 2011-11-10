@@ -2,7 +2,7 @@ implementation module trans
 
 import StdEnv
 
-import syntax, transform, checksupport, compare_types, check, utilities, expand_types, unitype, typesupport, type
+import syntax, transform, checksupport, compare_types, utilities, expand_types, unitype, type
 import classify, partition
 
 SwitchCaseFusion			fuse dont_fuse :== fuse

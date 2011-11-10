@@ -11,8 +11,8 @@ convertSymbolTypeWithoutExpandingAbstractSynTypes :: !Bool !{#CommonDefs} !Symbo
 							!*ImportedTypes !ImportedConstructors !*TypeHeaps !*VarHeap 
 	-> (!SymbolType, !Bool, !*ImportedTypes,!ImportedConstructors,!*TypeHeaps,!*VarHeap)
 
-convertSymbolTypeWithoutCollectingImportedConstructors :: !Bool !{# CommonDefs} !SymbolType !Int !*ImportedTypes !*TypeHeaps !*VarHeap 
-																				-> (!SymbolType, !*ImportedTypes,!*TypeHeaps,!*VarHeap)
+convertSymbolTypeWithoutCollectingImportedConstructors :: !Bool !{#CommonDefs} !SymbolType !Int !*ImportedTypes !*TypeHeaps !*VarHeap 
+																				-> (!SymbolType,!*ImportedTypes,!*TypeHeaps,!*VarHeap)
 
 addTypesOfDictionaries :: !{#CommonDefs} ![TypeContext] ![AType] -> [AType]
 
@@ -29,14 +29,14 @@ DontCollectImportedConstructors:==4
 	,	ets_contains_unexpanded_abs_syn_type :: !Bool
 	}
 
-class expandSynTypes a :: !Int !{# CommonDefs} !a !*ExpandTypeState -> (!Bool,!a, !*ExpandTypeState)
+class expandSynTypes a :: !Int !{#CommonDefs} !a !*ExpandTypeState -> (!Bool,!a, !*ExpandTypeState)
 
 instance expandSynTypes (a,b) | expandSynTypes a & expandSynTypes b special a=[AType],b=AType
 
 class substitute a :: !a !*TypeHeaps -> (!a, !*TypeHeaps)
 
 instance substitute Type,AType,TypeContext,AttrInequality,CaseType
-instance substitute [a] | substitute a special a=TypeContext
+instance substitute [a] | substitute a special a=AType; a=AttrInequality; a=TypeContext
 instance substitute (a,b) | substitute a & substitute b special a=[AType],b=AType
 
 class removeAnnotations a :: !a  -> (!Bool, !a)

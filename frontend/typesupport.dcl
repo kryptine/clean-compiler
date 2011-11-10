@@ -1,6 +1,6 @@
 definition module typesupport
 
-import checksupport
+import checksupport,utilities
 
 from unitype import ::Coercions, ::CoercionTree, ::AttributePartition, CT_Empty
 

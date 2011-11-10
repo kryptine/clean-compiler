@@ -1,6 +1,3 @@
-/*
-	module owner: Ronny Wichers Schreur
-*/
 implementation module coclmain
 
 import StdEnv
@@ -9,7 +6,7 @@ import ArgEnv
 import set_return_code
 import CoclSystemDependent
 
-import compile
+import compile,utilities
 
 coclMain :: ![{#Char}] !*World -> *World
 coclMain testArgs world

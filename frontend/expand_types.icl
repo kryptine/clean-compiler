@@ -49,7 +49,7 @@ RemoveAnnotationsMask:==1
 ExpandAbstractSynTypesMask:==2
 DontCollectImportedConstructors:==4
 
-convertSymbolType :: !Bool !{#CommonDefs} !SymbolType !Int !*ImportedTypes !ImportedConstructors !*TypeHeaps !*VarHeap 
+convertSymbolType :: !Bool !{#CommonDefs} !SymbolType !Int !*ImportedTypes !ImportedConstructors !*TypeHeaps !*VarHeap
 										  -> (!SymbolType, !*ImportedTypes,!ImportedConstructors,!*TypeHeaps,!*VarHeap)
 convertSymbolType rem_annots common_defs st main_dcl_module_n imported_types collected_imports type_heaps var_heap
 	# (st, ets_contains_unexpanded_abs_syn_type,ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap)
@@ -57,19 +57,19 @@ convertSymbolType rem_annots common_defs st main_dcl_module_n imported_types col
 	= (st, ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap)
 
 convertSymbolTypeWithoutExpandingAbstractSynTypes :: !Bool !{#CommonDefs} !SymbolType !Int
-							!*ImportedTypes !ImportedConstructors !*TypeHeaps !*VarHeap 
+							!*ImportedTypes !ImportedConstructors !*TypeHeaps !*VarHeap
 	-> (!SymbolType, !Bool, !*ImportedTypes,!ImportedConstructors,!*TypeHeaps,!*VarHeap)
 convertSymbolTypeWithoutExpandingAbstractSynTypes rem_annots common_defs st main_dcl_module_n imported_types collected_imports type_heaps var_heap
-	= convertSymbolType_  (if rem_annots (RemoveAnnotationsMask) 0) common_defs st main_dcl_module_n imported_types collected_imports type_heaps var_heap
+	= convertSymbolType_ (if rem_annots RemoveAnnotationsMask 0) common_defs st main_dcl_module_n imported_types collected_imports type_heaps var_heap
 
-convertSymbolTypeWithoutCollectingImportedConstructors :: !Bool !{# CommonDefs} !SymbolType !Int !*ImportedTypes !*TypeHeaps !*VarHeap 
-																				-> (!SymbolType, !*ImportedTypes,!*TypeHeaps,!*VarHeap)
+convertSymbolTypeWithoutCollectingImportedConstructors :: !Bool !{#CommonDefs} !SymbolType !Int !*ImportedTypes !*TypeHeaps !*VarHeap
+																				-> (!SymbolType,!*ImportedTypes,!*TypeHeaps,!*VarHeap)
 convertSymbolTypeWithoutCollectingImportedConstructors rem_annots common_defs st main_dcl_module_n imported_types type_heaps var_heap
 	# (st, ets_contains_unexpanded_abs_syn_type,ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap)
-		= convertSymbolType_  (if rem_annots (RemoveAnnotationsMask bitor ExpandAbstractSynTypesMask bitor DontCollectImportedConstructors) (ExpandAbstractSynTypesMask bitor DontCollectImportedConstructors)) common_defs st main_dcl_module_n imported_types [] type_heaps var_heap
+		= convertSymbolType_ (if rem_annots (RemoveAnnotationsMask bitor ExpandAbstractSynTypesMask bitor DontCollectImportedConstructors) (ExpandAbstractSynTypesMask bitor DontCollectImportedConstructors)) common_defs st main_dcl_module_n imported_types [] type_heaps var_heap
 	= (st, ets_type_defs, ets_type_heaps, ets_var_heap)
 
-convertSymbolType_ :: !Int !{# CommonDefs} !SymbolType !Int !*ImportedTypes !ImportedConstructors !*TypeHeaps !*VarHeap 
+convertSymbolType_ :: !Int !{# CommonDefs} !SymbolType !Int !*ImportedTypes !ImportedConstructors !*TypeHeaps !*VarHeap
 	-> (!SymbolType, !Bool,!*ImportedTypes, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
 convertSymbolType_  rem_annots common_defs st main_dcl_module_n imported_types collected_imports type_heaps var_heap
 	# ets	=	{ ets_type_defs			= imported_types
@@ -133,7 +133,7 @@ where
 	,	ets_contains_unexpanded_abs_syn_type :: !Bool
 	}
 
-class expandSynTypes a :: !Int !{# CommonDefs} !a !*ExpandTypeState -> (!Bool,!a, !*ExpandTypeState)
+class expandSynTypes a :: !Int !{#CommonDefs} !a !*ExpandTypeState -> (!Bool,!a, !*ExpandTypeState)
 
 instance expandSynTypes Type
 where

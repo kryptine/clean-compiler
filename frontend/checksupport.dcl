@@ -1,7 +1,7 @@
 definition module checksupport
 
 import StdEnv
-import syntax, predef, containers, utilities
+import syntax, predef, containers
 
 CS_NotChecked 	:== -1
 NotFound		:== -1

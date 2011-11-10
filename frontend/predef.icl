@@ -1,7 +1,6 @@
 implementation module predef
 
-import syntax, hashtable, type_io_common
-
+import syntax, hashtable
 
 (<<=) infixl
 (<<=) symbol_table val

@@ -1,6 +1,6 @@
 implementation module scanner
 
-import	StdEnv, compare_constructor, general, compilerSwitches
+import	StdEnv, compare_constructor, general
 
 from utilities import revCharListToString, isSpecialChar
 
