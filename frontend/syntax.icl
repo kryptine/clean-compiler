@@ -4,7 +4,6 @@ import StdEnv, compare_constructor
 import scanner, general, Heap, typeproperties, utilities, compare_types
 import IndexType
 from containers import ::NumberSet
-from convertDynamics import :: TypeCodeVariableInfo, :: DynamicValueAliasInfo
 from convertcases import :: LetVarInfo, :: LetExpressionInfo, :: RefCountsInCase, :: SplitsInCase
 
 instance toString Ident

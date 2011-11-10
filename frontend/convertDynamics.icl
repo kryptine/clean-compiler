@@ -1,21 +1,13 @@
-/*
-	module owner: Ronny Wichers Schreur
-*/
 implementation module convertDynamics
 
 import syntax
 
 from type_io_common import PredefinedModuleName
+
 // Optional
 extended_unify_and_coerce no yes :== no;	// change also _unify and _coerce in StdDynamic
 
 import type_io;
-
-:: TypeCodeVariableInfo = TCI_TypeVar !Expression
-						| TCI_TypePatternVar !Expression
-						| TCI_SelectionsTypePatternVar ![(Expression,[Selection])]
-
-:: DynamicValueAliasInfo :== BoundVar
 
 ::	*ConversionState =
 	{	ci_predef_symb		:: !*PredefinedSymbols

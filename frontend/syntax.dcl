@@ -5,7 +5,6 @@ import StdEnv
 import scanner, general, typeproperties, Heap
 import IndexType
 from containers import ::NumberSet
-from convertDynamics import :: TypeCodeVariableInfo, :: DynamicValueAliasInfo
 from convertcases import :: LetVarInfo, :: LetExpressionInfo, :: RefCountsInCase, :: SplitsInCase
 
 ::	Ident =
@@ -767,7 +766,7 @@ pIsSafe			:== True
 				VI_Record ![AuxiliaryPattern] |
 				VI_Pattern !AuxiliaryPattern |
 				VI_TypeCodeVariable !TypeCodeVariableInfo |
-				VI_DynamicValueAlias !DynamicValueAliasInfo |
+				VI_DynamicValueAlias !BoundVar |
 				VI_Body !SymbIdent !TransformedBody ![FreeVar] | /* used during fusion */
 				VI_ExpressionOrBody !Expression !SymbIdent !TransformedBody ![FreeVar] | /* used during fusion */
 				VI_Dictionary !SymbIdent ![Expression] !Type | /* used during fusion */
@@ -777,6 +776,11 @@ pIsSafe			:== True
 // ... MdM
 				| VI_Labelled_Empty !{#Char} // RWS debugging
 				| VI_LocalLetVar // RWS, mark Let vars during case transformation
+
+::	TypeCodeVariableInfo
+	= TCI_TypeVar !Expression
+	| TCI_TypePatternVar !Expression
+	| TCI_SelectionsTypePatternVar ![(Expression,[Selection])]
 
 ::	ExtendedVarInfo = EVI_VarType !AType
 
