@@ -4,7 +4,7 @@ CLM=clm
 (cd backendC/CleanCompilerSources; make)
 (cd ../libraries/ArgEnvUnix; make ArgEnvC.o)
 (cd main/Unix; make -f Makefile all);
-$CLM -h 20M -nt -nw -ci -ns -nr -I backend -I frontend -I main -I main/Unix \
+$CLM -h 24M -nt -nw -ci -ns -nr -I backend -I frontend -I main -I main/Unix \
 	-I ../libraries/ArgEnvUnix \
 	-l ../libraries/ArgEnvUnix/ArgEnvC.o \
 	-l main/Unix/cDirectory.o \
