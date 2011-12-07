@@ -104,8 +104,9 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_m
 	# hp_var_heap = heaps.hp_var_heap
 	#! n_types_with_type_functions = size ti_common_defs.[main_dcl_module_n].com_type_defs
 	#! n_constructors_with_type_functions = size ti_common_defs.[main_dcl_module_n].com_cons_defs
+	#! ea_ok = error_admin.ea_ok
 	# (fun_defs, predef_symbols, hp_var_heap, type_heaps)
-		= if support_dynamics
+		= if (support_dynamics && ea_ok)
 			(buildTypeFunctions main_dcl_module_n fun_defs ti_common_defs predef_symbols hp_var_heap type_heaps)
 			(fun_defs, predef_symbols, hp_var_heap, type_heaps)
 	# (td_infos, th_vars, error_admin)
