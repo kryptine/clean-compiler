@@ -2598,7 +2598,7 @@ where
 					  			-> ea_file <<< "\"" <<< tc_position <<< "\" "
 					  		_
 					  			-> ea_file
-					  ea_file = ea_file	<<< "attribute at indicated position could not be coerced "
+					  ea_file = ea_file	<<< "attribute at position indicated by ^ could not be coerced "
 					  					 <:: (format, exp_off_type, Yes initialTypeVarBeautifulizer) <<< '\n'
 					-> (coercion_env, { error & ea_file = ea_file })
 		= add_to_coercion_env attr_coercions subst coercion_env common_defs cons_var_vects type_signs type_var_heap error
