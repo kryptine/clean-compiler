@@ -110,14 +110,6 @@ where
 	envLookUp var []
 		= (False, abort "illegal value")
 
-/*
-convertIndex :: !Index !Index !(Optional ConversionTable) -> !Index
-convertIndex index table_index (Yes tables)
-	= tables.[table_index].[index]
-convertIndex index table_index No
-	= index
-*/
-
 retrieveGlobalDefinition :: !SymbolTableEntry !STE_Kind !Index -> (!Index, !Index)
 retrieveGlobalDefinition {ste_kind = STE_Imported kind decl_index, ste_def_level, ste_index} requ_kind mod_index
 	| kind == requ_kind
@@ -329,10 +321,8 @@ where
 
 removeImportedSymbolsFromSymbolTable :: Declaration !*SymbolTable -> .SymbolTable
 removeImportedSymbolsFromSymbolTable (Declaration {decl_ident=decl_ident=:{id_info}, decl_index}) symbol_table
-	# ({ste_kind,ste_def_level,ste_previous}, symbol_table)
-			= readPtr id_info symbol_table
-	  symbol_table
-	  		= symbol_table <:= (id_info, ste_previous)
+	# ({ste_kind,ste_def_level,ste_previous}, symbol_table) = readPtr id_info symbol_table
+	  symbol_table = symbol_table <:= (id_info, ste_previous)
 	= case ste_kind of
 		STE_Imported (STE_Field selector_id) def_mod
 			-> removeFieldFromSelectorDefinition selector_id def_mod decl_index symbol_table
@@ -359,17 +349,20 @@ removeDeclarationsFromSymbolTable decls scope symbol_table
 	= foldSt (remove_declaration scope) decls symbol_table
 where
 	remove_declaration scope decl=:(Declaration {decl_ident={id_info}, decl_index}) symbol_table
-		# ({ste_kind,ste_previous}, symbol_table)
-				= readPtr id_info symbol_table
+		# ({ste_kind,ste_previous,ste_def_level}, symbol_table) = readPtr id_info symbol_table
 		= case ste_kind of
 			STE_Field selector_id
 				# symbol_table = removeFieldFromSelectorDefinition selector_id NoIndex decl_index symbol_table
+				| ste_def_level<>scope && scope==cGlobalScope
+					-> symbol_table
 				| ste_previous.ste_def_level == scope
 					-> symbol_table <:= (id_info, ste_previous.ste_previous)
 					-> symbol_table <:= (id_info, ste_previous)
 			STE_Empty
 				-> symbol_table
 			_
+				| ste_def_level<>scope && scope==cGlobalScope
+					-> symbol_table
 				| ste_previous.ste_def_level == scope
 					-> symbol_table <:= (id_info, ste_previous.ste_previous)
 					-> symbol_table <:= (id_info, ste_previous)
