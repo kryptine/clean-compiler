@@ -1,5 +1,6 @@
 Version: 1.4
 Global
+	ProjectRoot:	.
 	Built:	False
 	Target:	StdEnv 64
 	Exec:	{Project}\CleanCompiler64.exe
@@ -7,7 +8,7 @@ Global
 		CheckStacks:	False
 		CheckIndexes:	True
 	Application
-		HeapSize:	41943040
+		HeapSize:	50331648
 		StackSize:	4194304
 		ExtraMemory:	0
 		IntialHeapSize:	8388608
@@ -47,4 +48,3 @@ Global
 MainModule
 	Name:	cocl
 	Dir:	{Project}\main
-
