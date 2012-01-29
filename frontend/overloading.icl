@@ -986,11 +986,16 @@ convertOverloadedCall defs contexts {symb_ident,symb_kind = SK_OverloadedFunctio
 	= ({heaps & hp_expression_heap = heaps.hp_expression_heap <:= (expr_ptr, inst_expr)}, ptrs, error)
 where
 	adjust_member_application defs contexts {me_ident,me_offset,me_class} (CA_Instance red_contexts) class_exprs heaps_and_ptrs
-		# ({glob_module,glob_object}, red_contexts_appls) = find_instance_of_member me_class me_offset red_contexts
-		  (exprs, heaps_and_ptrs) = convertClassApplsToExpressions defs contexts red_contexts_appls heaps_and_ptrs
-		  class_exprs = exprs ++ class_exprs
-		= (EI_Instance { glob_module = glob_module, glob_object = { ds_ident = me_ident, ds_arity = length class_exprs, ds_index = glob_object }} class_exprs,
-			 heaps_and_ptrs)
+		# (glob_module,cim_index,cim_ident,red_contexts_appls) = find_instance_of_member me_class me_offset red_contexts
+		#! (exprs, heaps_and_ptrs) = convertClassApplsToExpressions defs contexts red_contexts_appls heaps_and_ptrs
+           class_exprs = exprs ++ class_exprs
+           n_class_exprs = length class_exprs
+        | cim_index>=0
+        	= (EI_Instance {glob_module=glob_module, glob_object={ds_ident=me_ident, ds_arity=n_class_exprs, ds_index=cim_index}} class_exprs,
+                                heaps_and_ptrs)
+            # index = -1 - cim_index
+            = (EI_Instance {glob_module=glob_module, glob_object={ds_ident=cim_ident, ds_arity=n_class_exprs, ds_index=index}} class_exprs,
+                                heaps_and_ptrs)
 	adjust_member_application defs contexts  {me_ident,me_offset,me_class={glob_module,glob_object}} (CA_Context tc) class_exprs (heaps=:{hp_type_heaps}, ptrs)
 		# (class_context, address, hp_type_heaps) = determineContextAddress contexts defs tc hp_type_heaps
 		# {class_dictionary={ds_index,ds_ident}} = defs.[glob_module].com_class_defs.[glob_object]
@@ -1003,13 +1008,13 @@ where
 	adjust_member_application defs contexts _ (CA_LocalTypeCode new_var_ptr) _  heaps_and_ptrs
 		= (EI_TypeCode (TCE_Var new_var_ptr), heaps_and_ptrs)
 
-	find_instance_of_member :: (Global Int) Int ReducedContexts -> ((Global Int),[ClassApplication])
+	find_instance_of_member :: (Global Int) Int ReducedContexts -> (!Index,!Index,!Ident,[ClassApplication])
 	find_instance_of_member me_class me_offset { rcs_class_context = {rc_class_index, rc_inst_module, rc_inst_members, rc_red_contexts}, rcs_constraints_contexts}
-		| rc_class_index.gi_module == me_class.glob_module && rc_class_index.gi_index == me_class.glob_object
-			# {cim_index,cim_arity} = rc_inst_members.[me_offset]
+    	| rc_class_index.gi_module == me_class.glob_module && rc_class_index.gi_index == me_class.glob_object
+        	# {cim_index,cim_arity,cim_ident} = rc_inst_members.[me_offset]
 			| cim_index<0
-				= ({ glob_module = cim_arity, glob_object = -1 - cim_index }, rc_red_contexts)
-				= ({ glob_module = rc_inst_module, glob_object = cim_index }, rc_red_contexts)
+				= (cim_arity, cim_index, cim_ident, rc_red_contexts)
+				= (rc_inst_module, cim_index, cim_ident, rc_red_contexts)
 			= find_instance_of_member_in_constraints me_class me_offset rcs_constraints_contexts
 	where
 		find_instance_of_member_in_constraints me_class me_offset [ CA_Instance rcs=:{rcs_constraints_contexts} : rcss ]
