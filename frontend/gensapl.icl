@@ -12,7 +12,7 @@ instance toString SaplFuncDef
 where toString (SaplFuncDef name nrargs args body kind) = makePrintableName name +++ makeArgs args +++ toString kind +++ toString body
 
 instance toString SaplRecordDef
-where toString (SaplRecordDef mod recname fields) = makeGetSets mod  recname fields
+where toString (SaplRecordDef mod recname fields) = makeGetSets mod recname fields
 
 instance toString FunKind
 where toString FK_Macro = " :== "
@@ -209,12 +209,12 @@ where
 	
 	makeSelector  [] e = e
 	makeSelector  [selector:sels] e  = makeSelector  sels (mksel selector e)
-	where mksel (RecordSelection globsel ind)     exp = SaplApp (SaplFun (mns !! globsel.glob_module  +++ ".get_" +++ toString globsel.glob_object.ds_ident)) e 
+	where mksel (RecordSelection globsel ind)     exp = SaplApp (SaplFun (mns !! globsel.glob_module  +++ ".get_" +++ toString globsel.glob_object.ds_ident +++ "_" +++ toString globsel.glob_object.ds_index)) e 
 	      mksel (ArraySelection globsel _ e)      exp = multiApp [SaplFun (mns !! globsel.glob_module +++ "." +++ toString globsel.glob_object.ds_ident +++ "_" +++ toString globsel.glob_object.ds_index),exp, cleanExpToSaplExp e]                             
 	      mksel (DictionarySelection var sels _ e)exp = multiApp [makeSelector sels (getBoundVarName var),exp,cleanExpToSaplExp e]
 	
 	makeRecordUpdate expression [         ]                      = expression
-	makeRecordUpdate expression [upbind:us] | not(isNoBind value)= makeRecordUpdate (multiApp [SaplFun (field_mod +++ ".set_" +++ field),expression,cleanExpToSaplExp value]) us
+	makeRecordUpdate expression [upbind:us] | not(isNoBind value)= makeRecordUpdate (multiApp [SaplFun (field_mod +++ ".set_" +++ field +++ "_" +++ index),expression,cleanExpToSaplExp value]) us
 	                                                             = makeRecordUpdate expression us
 	where field               = toString upbind.bind_dst.glob_object.fs_ident
 	      index               = toString upbind.bind_dst.glob_object.fs_index
@@ -371,13 +371,13 @@ startsWith :: String String -> Bool
 startsWith s1 s2 = s1 == s2%(0,size s1-1)
                                  
 // Record access defintions
-makeGetSets mod recname fields = ":: " +++ makePrintableName (mod +++ "." +++ recname) +++ " = {" +++ makeconsargs (map ((+++) (mod +++ ".")) fields) +++ "}\n" +++
+makeGetSets mod recname fields = ":: " +++ makePrintableName (mod +++ "." +++ recname) +++ " = {" +++ makeconsargs (map ((+++) (mod +++ ".")) (map fst fields)) +++ "}\n" +++
                                  mGets 1 (length fields) fields +++ mSets 1  (length fields) fields
 where
  mGets _ _ [] = ""
- mGets k nf [field:fields] = makePrintableName (mod +++ ".get_" +++ field) +++ " rec = select rec (\\" +++ makeargs nf +++ " = a" +++ toString k +++ ")\n" +++ mGets (k+1) nf fields
+ mGets k nf [(field,idx):fields] = makePrintableName (mod +++ ".get_" +++ field +++ "_" +++ toString idx) +++ " rec = select rec (\\" +++ makeargs nf +++ " = a" +++ toString k +++ ")\n" +++ mGets (k+1) nf fields
  mSets _ _ [] = ""
- mSets k nf [field:fields] = makePrintableName (mod +++ ".set_" +++ field) +++ " rec val = select rec (\\" +++ makeargs nf +++ " = " +++ 
+ mSets k nf [(field,idx):fields] = makePrintableName (mod +++ ".set_" +++ field +++ "_" +++ toString idx) +++ " rec val = select rec (\\" +++ makeargs nf +++ " = " +++ 
                              makePrintableName (mod +++ "." +++ recname) +++ " " +++ makerepargs k nf +++ ")\n"  +++ mSets (k+1) nf fields
  makeconsargs [     ]  = ""
  makeconsargs [a]      = makePrintableName a

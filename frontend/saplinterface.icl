@@ -101,7 +101,7 @@ where collectTypes conses = makeSaplCons  (group eqc (tosapl conses))
       
 getSaplRecords :: CommonDefs String -> [SaplRecordDef]
 getSaplRecords icl_common mymod = map makeRec [rectype\\ type <-: icl_common.com_type_defs, RecordType rectype <-  [type.td_rhs]]
-where makeRec rectype = SaplRecordDef mymod (toString rectype.rt_constructor.ds_ident) [toString field.fs_ident\\ field <-: rectype.rt_fields]
+where makeRec rectype = SaplRecordDef mymod (toString rectype.rt_constructor.ds_ident) [(toString field.fs_ident, field.fs_index) \\ field <-: rectype.rt_fields]
 
 getModNames :: {#DclModule} -> [String]
 getModNames dcl_mods = [dcl_mod.dcl_name.id_name\\ dcl_mod <-: dcl_mods]

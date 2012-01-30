@@ -12,7 +12,8 @@ import StdEnv,syntax,transform
 
 ::SaplConsDef = SaplConsDef String String String Int Int Int
 ::SaplFuncDef = SaplFuncDef String Int [SaplExp] SaplExp FunKind
-::SaplRecordDef = SaplRecordDef String String  [String] 
+// module name, type name, list of field names and global field indeces
+::SaplRecordDef = SaplRecordDef String String [(String, Int)] 
 ::SaplMatchExp = MatchCons String | MatchInt Int | MatchChar String | MatchBool Bool | MatchReal Real | MatchString String | MatchSingleIf
 
 instance toString SaplExp
