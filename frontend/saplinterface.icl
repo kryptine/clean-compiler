@@ -96,7 +96,7 @@ where collectTypes conses = makeSaplCons  (group eqc (tosapl conses))
       group f [x:xs] = let (as,bs) = span (f x) xs in [[x:as] : group f bs]
       eqc (a,_,_) (b,_,_) = a == b
       getName cons = toString cons.cons_ident
-      getNrArgs cons = length cons.cons_type.st_args //length cons.cons_exi_vars
+      getNrArgs cons = length cons.cons_type.st_args + length cons.cons_type.st_context
       getConsType cons = (icl_common.com_type_defs).[cons.cons_type_index].td_ident.id_name 
       
 getSaplRecords :: CommonDefs String -> [SaplRecordDef]
