@@ -354,6 +354,8 @@ makeFuncName current_mod name mod_index func_index dcl_mods ranges mymod mns
               | name.[0] == '\\' = "anon_" +++ toString func_index
               | startsWith "c;" name = "_lc_" +++ toString func_index
               | startsWith "g_" name = "_lc_" +++ toString func_index
+              // FIXME: exception? heuristic for the TD;D case
+              | startsWith "TD;" name = name
                                      = genFunctionExtension  current_mod name mod_index func_index dcl_mods ranges mymod mns
                                  
 makeName name | name.[0] == '\\' = "anon_" 
