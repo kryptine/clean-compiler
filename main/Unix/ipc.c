@@ -52,8 +52,8 @@ ConvertCleanString (CleanString string)
 } /* ConvertCleanString */
 
 static FILE *commands, *results;
-# define COMMAND_BUFFER_SIZE 1024
-static char command_buffer[COMMAND_BUFFER_SIZE];
+static char *command_buffer_p=NULL;
+static int command_buffer_size=0;
 
 static void
 crash (void)
@@ -98,19 +98,51 @@ int open_pipes (CleanString commands_clean, CleanString results_clean)
 int get_command_length (void)
 {
 	log ("reading command\n");
-	if (fgets (command_buffer, COMMAND_BUFFER_SIZE, commands) == NULL)
-		return -1;
-	else	
+
+	if (command_buffer_p==NULL){
+		command_buffer_p = malloc (1024);
+		if (command_buffer_p==NULL)
+			return -1;
+		command_buffer_size=1024;
+	}
+
 	{
-		log ("command = %s", command_buffer);
-		return (strlen (command_buffer));
+		int n_chars,max_n_chars,c;
+
+		n_chars=0;
+		max_n_chars=command_buffer_size-1;
+
+		do {
+			c=fgetc (commands);
+			if (c==EOF)
+				break;
+			command_buffer_p[n_chars++]=c;
+			if (n_chars==max_n_chars){
+				char *new_command_buffer_p;
+
+				new_command_buffer_p = realloc (command_buffer_p,command_buffer_size<<1);
+				if (new_command_buffer_p==NULL){
+					command_buffer_p[n_chars-1]='\0';
+					return -1;
+				}
+				command_buffer_p=new_command_buffer_p;
+				command_buffer_size=command_buffer_size<<1;
+				max_n_chars=command_buffer_size-1;
+			}
+		} while (c!='\n');
+
+		command_buffer_p[n_chars]='\0';
+
+		log ("command = %s", command_buffer_p);
+
+		return n_chars;
 	}
 }
 
 int get_command (CleanString cleanString)
 {
-	log ("%s\n", command_buffer);
-	strncpy (cleanString->chars, command_buffer, cleanString->length);
+	log ("%s\n", command_buffer_p);
+	strncpy (cleanString->chars, command_buffer_p, cleanString->length);
 	return (0);
 }
 
