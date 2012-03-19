@@ -2290,7 +2290,7 @@ typeProgram comps main_dcl_module_n fun_defs specials list_inferred_types icl_de
 			ali_tail_strict_list_first_instance_indices=tail_strict_list_first_instance_indices,
 			ali_instances_range={ ir_from = fun_env_size, ir_to = special_instances.si_next_array_member_index }
 		}
-	# ts_var_heap = clear_var_heap ti_functions ts_var_heap
+	# ts_var_heap = clear_var_heap ti_functions ti_common_defs ts_var_heap
 	= (not type_error, fun_defs, array_and_list_instances, ti_common_defs, ti_functions,
 			ts_td_infos, {hp_var_heap = ts_var_heap, hp_expression_heap = ts_expr_heap, hp_type_heaps = ts_type_heaps, hp_generic_heap=ts_generic_heap },
 			predef_symbols, ts_error.ea_file, out)
@@ -2848,15 +2848,25 @@ where
 			CheckedType _
 				-> ts
 
-	clear_var_heap fun_types var_heap
-		= mapArraySt clear_module fun_types var_heap
+	clear_var_heap fun_types common_defs var_heap
+		# var_heap = mapArraySt clear_functions_in_module fun_types var_heap
+		= mapArraySt clear_members_in_module common_defs var_heap
 	where
-		clear_module module_types var_heap
+		clear_functions_in_module module_types var_heap
 			= mapArraySt clear_function module_types var_heap
+
 		clear_function {ft_type_ptr} var_heap
 			| isNilPtr ft_type_ptr
 				= var_heap
 				= var_heap <:= (ft_type_ptr, VI_Empty)
+
+		clear_members_in_module common_def var_heap
+			= mapArraySt clear_member common_def.com_member_defs var_heap
+
+		clear_member {me_type_ptr} var_heap
+			| isNilPtr me_type_ptr
+				= var_heap
+				= var_heap <:= (me_type_ptr, VI_Empty)
 
 mapArraySt f a s :== map_a_st 0 a s
 where
