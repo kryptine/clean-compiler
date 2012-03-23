@@ -112,9 +112,9 @@ solveExplicitImports :: !(IntKeyHashtable [ExplicitImport]) !{#Int} !Index
 			-> (!.SolvedImports,! (!v:{#DclModule},!.{#Int},!{!.ExplImpInfo},!.CheckState))
 solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod (dcl_modules, visited_modules, expl_imp_info, cs)
 	# import_indices = ikhSearch` importing_mod expl_imp_indices_ikh
-	  expl_imp_indices = [ imports \\ imports=:{ei_symbols=[_:_],ei_qualified=NotQualified} <- import_indices ]
-	  qualified_expl_imp_indices = [ imports \\ imports=:{ei_symbols=[_:_],ei_qualified=Qualified} <- import_indices ]
-	  impl_imports = [ (ei_module_n,ei_position) \\ imports=:{ei_module_n,ei_position,ei_symbols=[]} <- import_indices ]
+
+	  (expl_imp_indices,qualified_expl_imp_indices,impl_imports) = split_imports import_indices
+
 	  state = (dcl_modules, visited_modules, expl_imp_info, cs)
 	  path = [importing_mod]
 	  (expl_imports, state)
@@ -126,8 +126,21 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 	  				qualified_expl_imp_indices state
 	= ({ si_explicit=expl_imports, si_qualified_explicit=qualified_expl_imports, si_implicit=impl_imports }, state)
   where
+	split_imports :: [ExplicitImport] -> (![ExplicitImport],![ExplicitImport],![(Int,Position)])
+	split_imports [imports:import_indices]
+		# (expl_imp_indices,qualified_expl_imp_indices,impl_imports) = split_imports import_indices
+		= case imports of
+			{ei_symbols=ImportSymbolsOnly _,ei_qualified=NotQualified}
+				-> ([imports:expl_imp_indices],qualified_expl_imp_indices,impl_imports)
+			{ei_symbols=ImportSymbolsOnly _}
+				-> (expl_imp_indices,[imports:qualified_expl_imp_indices],impl_imports)
+			{ei_symbols=ImportSymbolsAll,ei_module_n,ei_position}
+				-> (expl_imp_indices,qualified_expl_imp_indices,[(ei_module_n,ei_position):impl_imports])
+	split_imports []
+		= ([],[],[])
+
 	solve_expl_imp_from_module expl_imp_indices_ikh modules_in_component_set path
-			{ei_module_n=imported_mod, ei_position=position, ei_symbols=imported_symbols} (dcl_modules, visited_modules, expl_imp_info, cs)
+			{ei_module_n=imported_mod, ei_position=position, ei_symbols=ImportSymbolsOnly imported_symbols} (dcl_modules, visited_modules, expl_imp_info, cs)
 		# (not_exported_symbols,decl_accu, unsolved_belonging, visited_modules, expl_imp_info)
 				= search_expl_imp_symbols imported_symbols expl_imp_indices_ikh modules_in_component_set path imported_mod
 						([],[], [], visited_modules, expl_imp_info)
@@ -139,7 +152,7 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 		= ((decl_accu, position), (dcl_modules, visited_modules, expl_imp_info, cs))
 
 	solve_qualified_expl_imp_from_module expl_imp_indices_ikh modules_in_component_set path
-			{ei_module_n=imported_mod, ei_position=position, ei_symbols=imported_symbols} (dcl_modules, visited_modules, expl_imp_info, cs)
+			{ei_module_n=imported_mod, ei_position=position, ei_symbols=ImportSymbolsOnly imported_symbols} (dcl_modules, visited_modules, expl_imp_info, cs)
 		# (not_exported_symbols,decl_accu, unsolved_belonging, visited_modules, expl_imp_info)
 				= search_qualified_expl_imp_symbols imported_symbols expl_imp_indices_ikh modules_in_component_set path imported_mod
 						([],[], [], visited_modules, expl_imp_info)
@@ -344,22 +357,24 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 						[imported_mod:path]
 						eii_declaring_modules (bitvectSet imported_mod visited_modules)
 
-	try_children [{ei_module_n=imp_imp_mod,ei_symbols=imp_imp_symbols}:imports] expl_imp_indices_ikh
+	try_children [{ei_module_n=imp_imp_mod,ei_symbols}:imports] expl_imp_indices_ikh
 			modules_in_component_set imported_symbol belong_nr belong_ident path eii_declaring_modules visited_modules
 		| bitvectSelect imp_imp_mod visited_modules
 			= try_children imports expl_imp_indices_ikh modules_in_component_set imported_symbol
 					belong_nr belong_ident path eii_declaring_modules visited_modules
-		| not (isEmpty imp_imp_symbols)
+		= case ei_symbols of
+			ImportSymbolsAll
+				-> continue imp_imp_mod imports expl_imp_indices_ikh modules_in_component_set imported_symbol
+						belong_nr belong_ident path eii_declaring_modules visited_modules
+			ImportSymbolsOnly imp_imp_symbols
 			// follow the path trough an explicit import only if the symbol is listed there
-			# (found, opt_belongs)
-					= search_imported_symbol imported_symbol imp_imp_symbols
-			| not (found && implies (belong_nr<>cUndef) (belong_ident_found belong_ident opt_belongs))
-				= try_children imports expl_imp_indices_ikh modules_in_component_set imported_symbol
-						belong_nr belong_ident path eii_declaring_modules visited_modules
-			= continue imp_imp_mod imports expl_imp_indices_ikh modules_in_component_set imported_symbol
-						belong_nr belong_ident path eii_declaring_modules visited_modules
-		= continue imp_imp_mod imports expl_imp_indices_ikh modules_in_component_set imported_symbol
-						belong_nr belong_ident path eii_declaring_modules visited_modules
+				# (found, opt_belongs)
+						= search_imported_symbol imported_symbol imp_imp_symbols
+				| not (found && implies (belong_nr<>cUndef) (belong_ident_found belong_ident opt_belongs))
+					-> try_children imports expl_imp_indices_ikh modules_in_component_set imported_symbol
+							belong_nr belong_ident path eii_declaring_modules visited_modules
+				-> continue imp_imp_mod imports expl_imp_indices_ikh modules_in_component_set imported_symbol
+							belong_nr belong_ident path eii_declaring_modules visited_modules
 	  where
 		continue imp_imp_mod imports expl_imp_indices_ikh modules_in_component_set imported_symbol
 							belong_nr belong_ident path eii_declaring_modules visited_modules

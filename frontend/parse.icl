@@ -1176,7 +1176,7 @@ wantModuleImports scanContext ident_class pState
 	  (first_ident, pState) = stringToIdent first_name ident_class pState
 	  (file_name, line_nr, pState)	= getFileAndLineNr pState
 	  position = LinePos file_name line_nr
-	  module_import = {import_module = first_ident, import_symbols = [], import_file_position = position, import_qualified = import_qualified}
+	  module_import = {import_module = first_ident, import_symbols = ImportSymbolsAll, import_file_position = position, import_qualified = import_qualified}
 	  (token, pState) = nextToken scanContext pState
 	| token == CommaToken
 		# (rest, pState) = wantModuleImports scanContext ident_class pState
@@ -1193,11 +1193,11 @@ wantFromImports pState
 	| case token of IdentToken "qualified" -> True ; _ -> False
 		# (import_symbols, pState) = wantImportDeclarations pState
 		  pState = wantEndOfDefinition "from imports" pState
-		= ( { import_module = mod_ident, import_symbols = import_symbols,
+		= ( { import_module = mod_ident, import_symbols = ImportSymbolsOnly import_symbols,
 			  import_file_position = LinePos file_name line_nr, import_qualified = Qualified }, pState)
 	# (import_symbols, pState) = wantImportDeclarationsT token pState
 	  pState = wantEndOfDefinition "from imports" pState
-	= ( { import_module = mod_ident, import_symbols = import_symbols,
+	= ( { import_module = mod_ident, import_symbols = ImportSymbolsOnly import_symbols,
 		  import_file_position = LinePos file_name line_nr, import_qualified = NotQualified }, pState)
 where
 	wantImportDeclarations pState

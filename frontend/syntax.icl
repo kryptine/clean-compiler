@@ -825,7 +825,9 @@ where
 	
 instance <<< Import
 where
-	(<<<) file {import_module, import_symbols}
+	(<<<) file {import_module, import_symbols=ImportSymbolsAll}
+		= file <<< "import " <<< import_module
+	(<<<) file {import_module, import_symbols=ImportSymbolsOnly import_symbols}
 		= file <<< "import " <<< import_module <<< import_symbols
 
 instance <<< ImportDeclaration

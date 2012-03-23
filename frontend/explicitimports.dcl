@@ -10,7 +10,7 @@ import syntax, checksupport
 :: ExplicitImport = ! {
 		ei_module_n :: !Int,
 		ei_position :: !Position,
-		ei_symbols  :: ![ImportNrAndIdents],
+		ei_symbols  :: !ImportSymbols [ImportNrAndIdents],
 		ei_qualified:: !ImportQualified
 	}
 

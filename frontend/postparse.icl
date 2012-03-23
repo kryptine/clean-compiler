@@ -1128,7 +1128,7 @@ where
 			= (False, No,NoIndex, [],cached_modules, files, ca)
 			# pdefs = mod.mod_defs
 			# (_, defs, imports, imported_objects,foreign_exports,ca) = reorganiseDefinitionsAndAddTypes mod_ident support_dynamics False pdefs ca
-			# mod  = { mod & mod_imports = imports, mod_imported_objects = imported_objects, mod_defs = defs}
+			# mod = { mod & mod_imports = imports, mod_imported_objects = imported_objects, mod_defs = defs}
 			# cached_modules = [mod.mod_ident:cached_modules]
 			# (import_ok, parsed_modules,files, ca) = scanModules imports [] cached_modules searchPaths support_generics support_dynamics modtimefunction files ca
 			= (import_ok, Yes mod, NoIndex,parsed_modules, cached_modules,files, ca)
@@ -1455,11 +1455,11 @@ determine_symbols_of_conses [{pc_cons_ident,pc_cons_arity} : conses] next_cons_i
 determine_symbols_of_conses [] next_cons_index
 	= ([], next_cons_index)
 
-make_implicit_qualified_imports_explicit [import_=:{import_qualified=Qualified,import_symbols=[],import_module,import_file_position}:imports] hash_table
+make_implicit_qualified_imports_explicit [import_=:{import_qualified=Qualified,import_symbols=ImportSymbolsAll,import_module,import_file_position}:imports] hash_table
 	# (qualified_idents,hash_table) = get_qualified_idents_from_hash_table import_module hash_table
 	# import_declarations = qualified_idents_to_import_declarations qualified_idents
 	# (imports,hash_table) = make_implicit_qualified_imports_explicit imports hash_table
-	= ([{import_ & import_symbols=import_declarations}:imports],hash_table)
+	= ([{import_ & import_symbols=ImportSymbolsOnly import_declarations}:imports],hash_table)
 make_implicit_qualified_imports_explicit [import_:imports] hash_table
 	# (imports,hash_table) = make_implicit_qualified_imports_explicit imports hash_table
 	= ([import_:imports],hash_table)
@@ -1486,7 +1486,7 @@ reorganiseDefinitionsAndAddTypes mod_ident support_dynamics icl_module defs ca
 			=	predefined_idents.[PD_CleanTypes]
 		# clean_types_module =
 			{	import_module = clean_types_module_ident
-			,	import_symbols = []
+			,	import_symbols = ImportSymbolsAll
 			,	import_file_position = NoPos
 			,	import_qualified = NotQualified
 			}
