@@ -1664,9 +1664,16 @@ checkDclModules imports_of_icl_mod dcl_modules macro_defs heaps cs=:{cs_symbol_t
 		get_mod_imports _ imports_of_icl_mod dcl_modules cs_symbol_table
 		 	= (imports_of_icl_mod, dcl_modules, cs_symbol_table)
 
+	get_expl_imp_symbols :: ParsedImport *([Ident],Int,[ExplicitImport],*SymbolTable) -> ([Ident],Int,[ExplicitImport],*SymbolTable)
 	get_expl_imp_symbols {import_module,import_symbols,import_file_position,import_qualified} (expl_imp_symbols_accu, nr_of_expl_imp_symbols, expl_imp_indices_accu, cs_symbol_table)
 		# (expl_imp_symbols_accu, nr_of_expl_imp_symbols, expl_imp_indices, cs_symbol_table)
-				= foldSt get_expl_imp_symbol import_symbols (expl_imp_symbols_accu, nr_of_expl_imp_symbols, [], cs_symbol_table)
+			= case import_symbols of
+				ImportSymbolsOnly import_symbols
+					# (expl_imp_symbols_accu, nr_of_expl_imp_symbols, expl_imp_indices, cs_symbol_table)
+						= foldSt get_expl_imp_symbol import_symbols (expl_imp_symbols_accu, nr_of_expl_imp_symbols, [], cs_symbol_table)
+					-> (expl_imp_symbols_accu, nr_of_expl_imp_symbols, ImportSymbolsOnly expl_imp_indices, cs_symbol_table)
+				ImportSymbolsAll
+					->  (expl_imp_symbols_accu, nr_of_expl_imp_symbols, ImportSymbolsAll, cs_symbol_table)
 		  ({ste_index}, cs_symbol_table) = readPtr import_module.id_info cs_symbol_table
 		  explicit_import = {ei_module_n=ste_index, ei_position=import_file_position,
 		  					 ei_symbols=expl_imp_indices, ei_qualified=import_qualified}
@@ -2135,6 +2142,7 @@ checkModule {mod_defs,mod_ident,mod_type,mod_imports,mod_imported_objects,mod_fo
 			0	# (predef_mod,predef_symbols) = buildPredefinedModule support_dynamics predef_symbols
 				-> (Yes predef_mod,predef_symbols)
 			_	-> (No,predef_symbols)
+
 	# (local_defs,macro_and_function_local_defs,icl_functions,inst_fun_defs,macro_defs,init_dcl_modules,main_dcl_module_n,cdefs,sizes,cs)
 		= check_module1 mod_defs icl_global_function_range fun_defs optional_dcl_mod optional_pre_def_mod scanned_modules dcl_modules cached_dcl_macros dcl_module_n_in_cache predef_symbols symbol_table err_file
 

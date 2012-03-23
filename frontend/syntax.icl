@@ -260,12 +260,14 @@ where
 instance <<< TCClass 
 where
 	(<<<) file (TCClass glob) = file <<< glob
-	(<<<) file (TCGeneric {gtc_generic,gtc_kind}) = file <<< gtc_generic <<< gtc_kind
+	(<<<) file (TCGeneric {gtc_generic,gtc_kind})
+		= file <<< gtc_generic <<< gtc_kind
 
 instance toString TCClass
 where
 	toString (TCClass clazz) = clazz.glob_object.ds_ident.id_name
-	toString (TCGeneric {gtc_generic,gtc_kind}) = gtc_generic.glob_object.ds_ident.id_name +++ toString gtc_kind
+	toString (TCGeneric {gtc_generic,gtc_kind})
+		= gtc_generic.glob_object.ds_ident.id_name +++ toString gtc_kind
 	 
 instance <<< SymbIdent
 where
@@ -834,7 +836,9 @@ where
 	
 instance <<< Import
 where
-	(<<<) file {import_module, import_symbols}
+	(<<<) file {import_module, import_symbols=ImportSymbolsAll}
+		= file <<< "import " <<< import_module
+	(<<<) file {import_module, import_symbols=ImportSymbolsOnly import_symbols}
 		= file <<< "import " <<< import_module <<< import_symbols
 
 instance <<< ImportDeclaration

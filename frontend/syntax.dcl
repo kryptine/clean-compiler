@@ -499,10 +499,14 @@ instance == GenericDependency
 
 ::	Import =
 	{	import_module		:: !Ident
-	,	import_symbols		:: ![ImportDeclaration]
+	,	import_symbols		:: !ImportSymbols [ImportDeclaration]
 	,	import_file_position:: !Position	// for error messages
 	,	import_qualified	:: !ImportQualified
 	}
+
+::	ImportSymbols import_declarations
+	= ImportSymbolsAll
+	| ImportSymbolsOnly !import_declarations
 
 ::	ImportQualified = NotQualified | Qualified
 
