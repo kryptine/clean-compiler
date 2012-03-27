@@ -1411,7 +1411,7 @@ compute_args_strictness new_arg_types_array = compute_args_strictness 0 0 NotStr
 	}
 
 generateFunction :: !SymbIdent !FunDef ![ConsClass] ![Bool] !{! Producer} !FunctionInfoPtr !ReadOnlyTI !Int !*TransformInfo -> (!Index, !Int, !*TransformInfo)
-generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi_group_index}} 
+generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi_group_index},fun_arity} 
 				 cc_args cc_linear_bits prods fun_def_ptr ro n_extra
 				 ti=:{ti_var_heap,ti_next_fun_nr,ti_new_functions,ti_fun_heap,ti_symbol_heap,ti_fun_defs,
 				 		ti_type_heaps,ti_cons_args,ti_cleanup_info, ti_type_def_infos}
@@ -1512,7 +1512,7 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 	  
 	  new_fun_arity
 	  		= length new_fun_args
-	| SwitchArityChecks (new_fun_arity > 32) False
+	| SwitchArityChecks (new_fun_arity > 32 && new_fun_arity >= fun_arity) False
 		# new_gen_fd =
 			{	gf_fun_def			= fd
 			,	gf_instance_info	= II_Empty
