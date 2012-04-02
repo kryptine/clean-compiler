@@ -679,29 +679,32 @@ buildTypeDefInfo1 td_module {td_ident, td_pos, td_arity} alts fields main_module
 	# new_group_index = inc group_index
 
 	# type_def_dsc_index = fun_index
-	# first_cons_dsc_index = fun_index + 1
-	# cons_dsc_indexes = [first_cons_dsc_index .. first_cons_dsc_index + num_conses - 1]
+	# first_gen_type_dsc_index = fun_index + 1
+	# first_cons_dsc_index = first_gen_type_dsc_index + num_conses
 	# first_field_dsc_index = first_cons_dsc_index + num_conses
-	# field_dsc_indexes = [first_field_dsc_index .. first_field_dsc_index + num_fields - 1]
 	# new_fun_index = first_field_dsc_index + num_fields
 
 	# group = {group_members = [fun_index .. new_fun_index - 1]}
 	# new_groups = [group:groups]
 	
 	# type_def_dsc_ds = {ds_arity=0, ds_ident=makeIdent("tdi_"+++td_ident.id_name), ds_index=type_def_dsc_index}
+	# gen_type_dsc_dss = [ {ds_arity=0, ds_ident=makeIdent("gti_"+++ds_ident.id_name), ds_index=i} \\ 
+		{ds_ident} <- alts & i <- [first_gen_type_dsc_index .. first_gen_type_dsc_index + num_conses - 1]]
 	# cons_dsc_dss = [ {ds_arity=0, ds_ident=makeIdent("cdi_"+++ds_ident.id_name), ds_index=i} \\ 
-		{ds_ident} <- alts & i <- cons_dsc_indexes]
+		{ds_ident} <- alts & i <- [first_cons_dsc_index .. first_cons_dsc_index + num_conses - 1]]
 	# field_dsc_dss = [ {ds_arity=0, ds_ident=makeIdent("fdi_"+++fs_ident.id_name), ds_index=i} \\ 
-		{fs_ident} <- fields & i <- field_dsc_indexes]
+		{fs_ident} <- fields & i <- [first_field_dsc_index .. first_field_dsc_index + num_fields - 1]]
 
 	# (type_def_dsc_fun, heaps) = build_type_def_dsc group_index cons_dsc_dss type_def_dsc_ds heaps	
-	
-	# (cons_dsc_funs, (modules, heaps)) = zipWithSt (build_cons_dsc group_index type_def_dsc_ds field_dsc_dss) cons_dsc_dss alts (modules, heaps)
+
+	# (gen_type_dsc_funs, (modules, heaps)) = zipWithSt (build_gen_type_dsc group_index type_def_dsc_ds field_dsc_dss) gen_type_dsc_dss alts (modules, heaps)
+
+	# (cons_dsc_funs, (modules, heaps)) = zipWith3St (build_cons_dsc group_index type_def_dsc_ds field_dsc_dss) cons_dsc_dss gen_type_dsc_dss alts (modules, heaps)
 
 	# (field_dsc_funs, (modules, heaps)) = zipWithSt (build_field_dsc group_index (hd cons_dsc_dss)) field_dsc_dss fields (modules, heaps)
 	 
 	// NOTE: reverse order (new functions are added at the head) 
-	# new_funs = (reverse field_dsc_funs) ++ (reverse cons_dsc_funs) ++ [type_def_dsc_fun] ++ funs 
+	# new_funs = reverse field_dsc_funs ++ reverse cons_dsc_funs ++ reverse gen_type_dsc_funs ++ [type_def_dsc_fun] ++ funs 
 
 	# funs_and_groups = {funs_and_groups & fg_fun_index=new_fun_index, fg_group_index=new_group_index, fg_funs=new_funs, fg_groups=new_groups}
 
@@ -740,43 +743,12 @@ where
 		# fun = makeFunction ds_ident group_index [] body_expr No main_module_index td_pos
 		= (fun, heaps)
 
-	build_cons_dsc group_index type_def_info_ds field_dsc_dss cons_info_ds cons_ds (modules, heaps)
-		# ({cons_ident,cons_type,cons_priority,cons_number,cons_exi_vars}, modules)
-			= modules! [td_module].com_cons_defs.[cons_ds.ds_index]  		
-		# name_expr 			 = makeStringExpr cons_ident.id_name
-		# arity_expr 			 = makeIntExpr cons_type.st_arity
-		# (prio_expr, heaps)	 = make_prio_expr cons_priority heaps
-		# (type_def_expr, heaps) = buildFunApp main_module_index type_def_info_ds [] heaps
-		# (type_expr, heaps) 	 = make_type_expr cons_exi_vars cons_type heaps 			
-		# (field_exprs, heaps)   = mapSt (\x st->buildFunApp main_module_index x [] st) field_dsc_dss heaps
-		# (fields_expr, heaps)   =  makeListExpr field_exprs predefs heaps 
-		# cons_index_expr		 = makeIntExpr cons_number
-		# (body_expr, heaps) 
-			= buildPredefConsApp PD_CGenericConsDescriptor 
-				[ name_expr 
-				, arity_expr
-				, prio_expr
-				, type_def_expr
-				, type_expr
-				, fields_expr 
-				, cons_index_expr
-				]  
-				predefs heaps
-
-		# fun = makeFunction cons_info_ds.ds_ident group_index [] body_expr No main_module_index td_pos		
+	build_gen_type_dsc group_index type_def_info_ds field_dsc_dss cons_info_ds cons_ds (modules, heaps)
+		# ({cons_type,cons_exi_vars}, modules) = modules![td_module].com_cons_defs.[cons_ds.ds_index]
+		# (type_expr, heaps) 	 = make_type_expr cons_exi_vars cons_type heaps
+		# fun = makeFunction cons_info_ds.ds_ident group_index [] type_expr No main_module_index td_pos		
 		= (fun, (modules, heaps))
 	where
-		make_prio_expr NoPrio heaps
-			= buildPredefConsApp PD_CGenConsNoPrio [] predefs heaps
-		make_prio_expr (Prio assoc prio) heaps
-			# assoc_predef = case assoc of
-				NoAssoc 	-> PD_CGenConsAssocNone 
-				LeftAssoc 	-> PD_CGenConsAssocLeft
-				RightAssoc 	-> PD_CGenConsAssocRight
-			# (assoc_expr, heaps) = buildPredefConsApp assoc_predef [] predefs heaps 	
-			# prio_expr = makeIntExpr prio		
-			= buildPredefConsApp PD_CGenConsPrio [assoc_expr, prio_expr] predefs heaps 
-
 		make_type_expr [] {st_vars, st_args, st_result} heaps=:{hp_type_heaps=type_heaps=:{th_vars}}
 			# (_,th_vars) = foldSt (\ {tv_info_ptr} (n, th_vars) -> (n+1, writePtr tv_info_ptr (TVI_GenTypeVarNumber n) th_vars)) st_vars (0,th_vars)
 			# heaps = {heaps & hp_type_heaps={type_heaps & th_vars=th_vars}}
@@ -795,7 +767,7 @@ where
 		
 			make_expr1 :: !AType !*Heaps -> (!Expression, !*Heaps)
 			make_expr1 {at_type} heaps = make_expr at_type heaps
-		
+
 			make_expr :: !Type !*Heaps -> (!Expression, !*Heaps)
 			make_expr (TA type_symb arg_types) heaps
 				# (arg_exprs, heaps) = mapSt make_expr1 arg_types heaps
@@ -858,9 +830,46 @@ where
 			// Error "cannot build a generic representation of an existential type" is reported in buildStructType
 			= make_type_cons "<error>" heaps
 
-	make_type_cons name heaps
-		# name_expr = makeStringExpr name
-		= buildPredefConsApp PD_CGenTypeCons [name_expr] predefs heaps
+		make_type_cons name heaps
+			# name_expr = makeStringExpr name
+			= buildPredefConsApp PD_CGenTypeCons [name_expr] predefs heaps
+
+	build_cons_dsc group_index type_def_info_ds field_dsc_dss cons_info_ds gen_type_info_ds cons_ds (modules, heaps)
+		# ({cons_ident,cons_type,cons_priority,cons_number,cons_exi_vars}, modules)
+			= modules! [td_module].com_cons_defs.[cons_ds.ds_index]  		
+		# name_expr 			 = makeStringExpr cons_ident.id_name
+		# arity_expr 			 = makeIntExpr cons_type.st_arity
+		# (prio_expr, heaps)	 = make_prio_expr cons_priority heaps
+		# (type_def_expr, heaps) = buildFunApp main_module_index type_def_info_ds [] heaps
+		# (type_expr, heaps)	 = buildFunApp main_module_index gen_type_info_ds [] heaps
+		# (field_exprs, heaps)   = mapSt (\x st->buildFunApp main_module_index x [] st) field_dsc_dss heaps
+		# (fields_expr, heaps)   =  makeListExpr field_exprs predefs heaps 
+		# cons_index_expr		 = makeIntExpr cons_number
+		# (body_expr, heaps) 
+			= buildPredefConsApp PD_CGenericConsDescriptor 
+				[ name_expr 
+				, arity_expr
+				, prio_expr
+				, type_def_expr
+				, type_expr
+				, fields_expr 
+				, cons_index_expr
+				]  
+				predefs heaps
+
+		# fun = makeFunction cons_info_ds.ds_ident group_index [] body_expr No main_module_index td_pos		
+		= (fun, (modules, heaps))
+	where
+		make_prio_expr NoPrio heaps
+			= buildPredefConsApp PD_CGenConsNoPrio [] predefs heaps
+		make_prio_expr (Prio assoc prio) heaps
+			# assoc_predef = case assoc of
+				NoAssoc 	-> PD_CGenConsAssocNone 
+				LeftAssoc 	-> PD_CGenConsAssocLeft
+				RightAssoc 	-> PD_CGenConsAssocRight
+			# (assoc_expr, heaps) = buildPredefConsApp assoc_predef [] predefs heaps 	
+			# prio_expr = makeIntExpr prio		
+			= buildPredefConsApp PD_CGenConsPrio [assoc_expr, prio_expr] predefs heaps 
 
 	build_field_dsc group_index cons_dsc_ds field_dsc_ds {fs_ident, fs_index} (modules, heaps)
 		# name_expr = makeStringExpr fs_ident.id_name
@@ -2319,7 +2328,7 @@ where
 	convert_module :: !Index !*Modules !*DclModules (!*Heaps,!*ErrorAdmin)
 						 -> (!*Modules,!*DclModules,(!*Heaps,!*ErrorAdmin))
 	convert_module module_index modules dcl_modules st
-		| inNumberSet module_index gs_used_modules		 
+		| inNumberSet module_index gs_used_modules
 			#! (common_defs, modules) = modules ! [module_index]
 			#! (dcl_module=:{dcl_functions, dcl_common}, dcl_modules) = dcl_modules ! [module_index]
 			
@@ -2333,7 +2342,7 @@ where
 		| otherwise
 			= (modules, dcl_modules, st)	
 	
-	convert_common_defs common_defs=:{com_class_defs,com_member_defs,com_instance_defs,com_cons_defs} modules (heaps, error)	
+	convert_common_defs common_defs=:{com_class_defs,com_member_defs,com_instance_defs,com_cons_defs} modules (heaps, error)
 		# (com_class_defs, st) 
 			= updateArraySt convert_class {x\\x<-:com_class_defs} (modules, heaps, error)
 		# (com_member_defs, st)
@@ -4752,12 +4761,22 @@ zipWith f _ _ = abort "zipWith: lists of different length\n"
 zipWithSt f l1 l2 st
 	:== zipWithSt l1 l2 st
 where
-	zipWithSt [] [] st 
+	zipWithSt [] [] st
 		= ([], st)
 	zipWithSt [x:xs] [y:ys] st
 		# (z, st) = f x y st
 		# (zs, st) = zipWithSt xs ys st
 		= ([z:zs], st) 
+
+zipWith3St f l1 l2 l3 st
+	:== zipWith3St l1 l2 l3 st
+where
+	zipWith3St [] [] [] st
+		= ([], st)
+	zipWith3St [x:xs] [y:ys] [z:zs] st
+		# (r, st) = f x y z st
+		# (rs, st) = zipWith3St xs ys zs st
+		= ([r:rs], st) 
 
 zipWithSt2 f l1 l2 st1 st2
 	:== zipWithSt2 l1 l2 st1 st2
