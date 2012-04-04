@@ -424,13 +424,14 @@ instance == GenericDependency
 :: GenericInfo = 
 	{	gen_classes		:: !GenericClassInfos
 	,	gen_var_kinds	:: ![TypeKind]  	// kinds of all st_vars of the gen_type
-	,	gen_OBJECT_CONS_FIELD_indices	:: !{#OBJECT_CONS_FIELD_index}
+	,	gen_cons_with_info_indices	:: !{#GenericConstructorWithInfoIndex}
+	//	OBJECT, CONS, RECORD, FIELD
 	}
 
-::	OBJECT_CONS_FIELD_index =
-	{	ocf_module	:: !Int
-	,	ocf_index	:: !Int
-	,	ocf_ident	:: !Ident
+::	GenericConstructorWithInfoIndex =
+	{	gcwi_module	:: !Int
+	,	gcwi_index	:: !Int
+	,	gcwi_ident	:: !Ident
 	}
 
 :: GenericInfoPtr :== Ptr GenericInfo	
@@ -596,16 +597,18 @@ NoGlobalIndex :== {gi_module=NoIndex,gi_index=NoIndex}
 	= GTSAppCons TypeKind [GenTypeStruct]
 	| GTSAppVar TypeVar [GenTypeStruct] 
 	| GTSVar TypeVar
- 	| GTSCons DefinedSymbol GenTypeStruct
+ 	| GTSCons !DefinedSymbol !GenTypeStruct
+ 	| GTSRecord !DefinedSymbol !GenTypeStruct
  	| GTSField DefinedSymbol GenTypeStruct
  	| GTSObject DefinedSymbol GenTypeStruct
-	| GTSPair !GenTypeStruct !GenTypeStruct		// for optimizing bimaps
-	| GTSEither !GenTypeStruct !GenTypeStruct	// for optimizing bimaps
-	| GTSArrow GenTypeStruct GenTypeStruct		// for optimizing bimaps
- 	| GTSE
-	| GTSAppConsBimapKindConst					// for optimizing bimaps
-	| GTSAppBimap TypeKind [GenTypeStruct]		// for optimizing bimaps
-	| GTSAppConsSimpleType !GlobalIndex !TypeKind ![GenTypeStruct]	// for optimizing bimaps
+	| GTSE
+	// the following constructors are used for optimizing bimaps
+	| GTSPair !GenTypeStruct !GenTypeStruct
+	| GTSEither !GenTypeStruct !GenTypeStruct
+	| GTSArrow GenTypeStruct GenTypeStruct
+ 	| GTSAppConsBimapKindConst
+	| GTSAppBimap TypeKind [GenTypeStruct]
+	| GTSAppConsSimpleType !GlobalIndex !TypeKind ![GenTypeStruct]
 
 :: GenericTypeRep = 
 	{ gtr_type :: GenTypeStruct		// generic structure type

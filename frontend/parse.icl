@@ -572,6 +572,7 @@ where
 		# (ok, {at_type=type}, pState) = trySimpleType TA_None pState
 		# (ident, pState) = stringToIdent name (IC_GenericCase type) pState				
 		# (type_CONS_ident, pState) = stringToIdent "CONS" IC_Type pState
+		# (type_RECORD_ident, pState) = stringToIdent "RECORD" IC_Type pState
 		# (type_FIELD_ident, pState)= stringToIdent "FIELD" IC_Type pState
 		# (type_OBJECT_ident, pState)= stringToIdent "OBJECT" IC_Type pState
 		# (generic_ident, pState) = stringToIdent name IC_Generic pState					
@@ -604,6 +605,9 @@ where
 							| type_ident == type_CONS_ident
 								# (cons_CONS_ident, pState) = stringToIdent "GenericConsInfo" IC_Expression pState 
 								-> (PE_List [PE_Ident cons_CONS_ident, geninfo_arg], pState)
+							| type_ident == type_RECORD_ident
+								# (cons_RECORD_ident, pState) = stringToIdent "GenericRecordInfo" IC_Expression pState 
+								-> (PE_List [PE_Ident cons_RECORD_ident, geninfo_arg], pState)
 							| type_ident == type_FIELD_ident 
 								# (cons_FIELD_ident, pState) = stringToIdent "GenericFieldInfo" IC_Expression pState 
 								-> (PE_List [PE_Ident cons_FIELD_ident, geninfo_arg], pState)
