@@ -2022,7 +2022,14 @@ checkAndTransformPatternIntoBind free_vars [] e_input e_state e_info cs
 
 transfromPatternIntoBind :: !Index !Level !AuxiliaryPattern !Expression !Position !*VarHeap !*ExpressionHeap !*ExpressionInfo !*CheckState
 	-> *(![LetBind], !*VarHeap, !*ExpressionHeap,  !*ExpressionInfo, !*CheckState)
-transfromPatternIntoBind mod_index def_level (AP_Variable name var_info _) src_expr position var_store expr_heap e_info cs
+transfromPatternIntoBind mod_index def_level (AP_Variable name var_info (Yes {bind_src,bind_dst})) src_expr position var_store expr_heap e_info cs
+	# (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
+	  bound_var = {var_ident = bind_src, var_info_ptr = bind_dst, var_expr_ptr = var_expr_ptr}
+	  free_var = {fv_ident = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0}
+	  bind1 = {lb_src = src_expr, lb_dst = free_var, lb_position = position}
+	  bind2 = {lb_src = Var bound_var, lb_dst = {fv_ident = name, fv_info_ptr = var_info, fv_def_level = NotALevel, fv_count = 0}, lb_position = position}
+	= ([bind1,bind2], var_store, expr_heap, e_info, cs)
+transfromPatternIntoBind mod_index def_level (AP_Variable name var_info No) src_expr position var_store expr_heap e_info cs
 	# bind = {lb_src = src_expr, lb_dst = { fv_ident = name, fv_info_ptr = var_info, fv_def_level = def_level, fv_count = 0 }, lb_position = position }
 	= ([bind], var_store, expr_heap, e_info, cs)
 transfromPatternIntoBind mod_index def_level (AP_Algebraic cons_symbol=:{glob_module,glob_object=ds_cons=:{ds_arity, ds_index, ds_ident}} global_type_index args opt_var)
