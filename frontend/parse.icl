@@ -421,7 +421,7 @@ where
 		| ~(isGlobalContext parseContext)
 			= (False,abort "no def(3)",parseError "definition" No "imports only at the global level" pState)
 			# (imp, pState) = wantFromImports pState
-	   		= (True, PD_Import [imp], pState) -->> imp
+	   		= (True, PD_Import [imp], pState) // -->> imp
 	try_definition parseContext ClassToken pos pState
 		| ~(isGlobalContext parseContext)
 			= (False,abort "no def(2)",parseError "definition" No "class definitions are only at the global level" pState)
@@ -595,39 +595,32 @@ where
 					= (abort "no TypeCons", pState)
 	
 		# (token, pState) = nextToken GenericContext pState
-		# (geninfo_arg, pState) = case token of
+		# (geninfo_arg, gcf_generic_info, pState) = case token of
 			GenericOfToken
 				# (ok, geninfo_arg, pState) = trySimpleLhsExpression pState
 				# pState = wantToken FunctionContext "type argument" GenericCloseToken pState
 				| ok 
 					-> case type_cons of
-						(TypeConsSymb {type_ident})
+						TypeConsSymb {type_ident}
 							| type_ident == type_CONS_ident
-								# (cons_CONS_ident, pState) = stringToIdent "GenericConsInfo" IC_Expression pState 
-								-> (PE_List [PE_Ident cons_CONS_ident, geninfo_arg], pState)
+								-> (geninfo_arg, -1, pState)
 							| type_ident == type_RECORD_ident
-								# (cons_RECORD_ident, pState) = stringToIdent "GenericRecordInfo" IC_Expression pState 
-								-> (PE_List [PE_Ident cons_RECORD_ident, geninfo_arg], pState)
+								-> (geninfo_arg, -1, pState)
 							| type_ident == type_FIELD_ident 
-								# (cons_FIELD_ident, pState) = stringToIdent "GenericFieldInfo" IC_Expression pState 
-								-> (PE_List [PE_Ident cons_FIELD_ident, geninfo_arg], pState)
+								-> (geninfo_arg, -1, pState)
 							| type_ident == type_OBJECT_ident 
-								# (cons_OBJECT_ident, pState) = stringToIdent "GenericTypeDefInfo" IC_Expression pState 
-								-> (PE_List [PE_Ident cons_OBJECT_ident, geninfo_arg], pState)
+								-> (geninfo_arg, -1, pState)
 						_
-							| otherwise
-								-> (geninfo_arg, pState)
+							-> (geninfo_arg, 0, pState)
 				| otherwise
 					# pState = parseError "generic case" No "simple lhs expression" pState
-					-> (PE_Empty, pState)
+					-> (PE_Empty, 0, pState)
 				 
 			GenericCloseToken
-				# (geninfo_ident, pState) =  stringToIdent "geninfo" IC_Expression pState
-				-> (PE_Ident geninfo_ident, pState)
+				-> (PE_WildCard, 0, pState)
 			_ 	
 				# pState = parseError "generic type" (Yes token) "of or |}" pState
-				# (geninfo_ident, pState) =  stringToIdent "geninfo" IC_Expression pState
-				-> (PE_Ident geninfo_ident, pState)
+				-> (PE_WildCard, 0, pState)
 																				
 		//# pState = wantToken FunctionContext "type argument" GenericCloseToken pState
 		# (args, pState) = parseList trySimpleLhsExpression pState
@@ -649,6 +642,7 @@ where
 						gcf_gident = generic_ident,
 						gcf_generic = {gi_module=NoIndex,gi_index=NoIndex},
 						gcf_arity = length args,
+						gcf_generic_info = gcf_generic_info,
 						gcf_body = GCB_ParsedBody args rhs,
 						gcf_kind = KindError
 					}
@@ -1134,7 +1128,7 @@ where
 			  (file_name, line_nr, pState)
 			  					= getFileAndLineNr pState
 			  (rhs_exp, pState) = wantExpression cIsNotAPattern pState
-			  pState			= wantEndRootExpression pState -->> ("#",lhs_exp,"=",rhs_exp)
+			  pState			= wantEndRootExpression pState // -->> ("#",lhs_exp,"=",rhs_exp)
 	  	  	  (locals , pState) = optionalLocals WithToken localsExpected pState
 			=	( True
 				, {	ndwl_strict	= strict
@@ -1748,20 +1742,39 @@ where
 
 	want_derive_types :: String !*ParseState -> ([GenericCaseDef], !*ParseState)			
 	want_derive_types name pState
-		# (derive_def, pState) = want_derive_type name pState
-		# (token, pState) = nextToken TypeContext pState
+		# (derive_def, token, pState) = want_derive_type name pState
 		| token == CommaToken
 			# (derive_defs, pState) = want_derive_types name pState
 			= ([derive_def:derive_defs], pState)
+
+ 			# pState = wantEndOfDefinition "derive definition" (tokenBack pState)
+
 			= ([derive_def], pState)
 
-	want_derive_type :: String !*ParseState -> (GenericCaseDef, !*ParseState)			
+	want_derive_type :: String !*ParseState -> (GenericCaseDef, !Token, !*ParseState)			
 	want_derive_type name pState
-		# (type, pState) = wantType pState
+//		# (type, pState) = wantType pState
+		# (ok, {at_type=type}, pState) = trySimpleType TA_None pState
 		# (ident, pState) = stringToIdent name (IC_GenericCase type) pState
 		# (generic_ident, pState) = stringToIdent name IC_Generic pState
 		# (type_cons, pState) = get_type_cons type pState
-		# derive_def = 
+		# (token, pState) = nextToken GenericContext pState
+		# (gcf_generic_info, token, pState)
+			= case token of
+				// make sure no look ahead occurred in a non GenericContext (defines an offside)
+				GenericOfToken
+					# (next_token, pState) = nextToken FunctionContext pState
+					-> case next_token of
+						IdentToken name
+							| isLowerCaseName name
+								# (token, pState) = nextToken GenericContext pState
+								-> (-1, token, pState)
+						_
+							# pState = parseError "derive definition" (Yes next_token) "lower case ident" pState
+							-> (0, token, pState)
+				_
+					-> (0, token, pState) 
+		# derive_def =
 			{	gc_pos = pos
 			,	gc_type = type
 			,	gc_type_cons = type_cons
@@ -1769,11 +1782,12 @@ where
 				 	gcf_gident = generic_ident,
 				 	gcf_generic = {gi_module=NoIndex,gi_index=NoIndex},
 					gcf_arity = 0,
+					gcf_generic_info = gcf_generic_info,
 					gcf_body = GCB_None,
 					gcf_kind = KindError
 				}
 			}
-		= (derive_def, pState) 
+		= (derive_def, token, pState) 
 
 	want_derive_class_types :: Ident !*ParseState -> ([GenericCaseDef], !*ParseState)			
 	want_derive_class_types class_ident pState
@@ -1782,6 +1796,9 @@ where
 		| token == CommaToken
 			# (derive_defs, pState) = want_derive_class_types class_ident pState
 			= ([derive_def:derive_defs], pState)
+
+ 			# pState = wantEndOfDefinition "derive definition" (tokenBack pState)
+
 			= ([derive_def], pState)
 
 	want_derive_class_type :: Ident !*ParseState -> (GenericCaseDef, !*ParseState)			
@@ -4069,7 +4086,7 @@ skipToEndOfDefinition pState
 		EndGroupToken		-> (token, pState)
 		EndOfFileToken		-> (token, pState)
 //		SemicolonToken		-> (token, pState) // might be useful in non layout mode.
-		_					-> skipToEndOfDefinition pState -->> (token,"skipped")
+		_					-> skipToEndOfDefinition pState // -->> (token,"skipped")
 
 wantEndCodeRhs :: !ParseState -> ParseState
 wantEndCodeRhs pState

@@ -1181,7 +1181,6 @@ renumber_icl_definitions_without_functions_as_dcl_definitions (Yes icl_to_dcl_in
 						= (Declaration {icl_decl_symbol & decl_index=icl_to_dcl_index_table.[cGenericDefs,decl_index]},cdefs)
 					renumber_icl_decl_symbol (Declaration icl_decl_symbol=:{decl_kind = STE_GenericCase, decl_index}) cdefs
 						= (Declaration {icl_decl_symbol & decl_index=icl_to_dcl_index_table.[cGenericCaseDefs,decl_index]},cdefs)
-							//---> ("renumber generic case", icl_decl_symbol.decl_ident, decl_index, icl_to_dcl_index_table.[cGenericCaseDefs,decl_index])		
 					renumber_icl_decl_symbol icl_decl_symbol cdefs
 						= (icl_decl_symbol,cdefs)
 	# {n_dictionary_types,n_dictionary_selectors,n_dictionary_constructors}=dcl_dictionary_info
@@ -2041,9 +2040,20 @@ renumber_icl_module_functions mod_type icl_global_function_range icl_instance_ra
 				  (icl_gencase, icl_gencases) = icl_gencases![icl_index]
 				  dcl_gencase = dcl_gencases.[dcl_index]
 				= case (dcl_gencase,icl_gencase) of
-					({gc_gcf=GCF _ {gcf_body = GCB_FunIndex dcl_fun}},{gc_gcf=GCF _ {gcf_body = GCB_FunIndex icl_fun}})
-						#! new_table = {new_table & [dcl_fun] = icl_fun} 								
-						-> (new_table, icl_gencases, error)
+					({gc_gcf=GCF _ {gcf_body = GCB_FunIndex dcl_fun,gcf_generic_info=dcl_generic_info}},
+					 {gc_gcf=GCF _ {gcf_body = GCB_FunIndex icl_fun,gcf_generic_info=icl_generic_info}})
+						#! new_table = {new_table & [dcl_fun] = icl_fun}
+						| icl_generic_info==dcl_generic_info
+							-> (new_table, icl_gencases, error)
+							# {gc_gcf=GCF gcf_ident _,gc_type_cons,gc_pos} = icl_gencase
+							  error_message = "different generic info for "+++type_cons_to_string gc_type_cons+++" in implementation and definition module"
+							  error = checkErrorWithIdentPos (newPosition gcf_ident gc_pos) error_message error
+							-> (new_table, icl_gencases, error)
+						with
+							type_cons_to_string (TypeConsSymb {type_ident}) = toString type_ident
+							type_cons_to_string (TypeConsBasic bt) = toString bt
+							type_cons_to_string TypeConsArrow = "(->)"
+							type_cons_to_string (TypeConsVar tv) = tv.tv_ident.id_name
 					({gc_gcf=GCFS dcl_gcfs},{gc_gcf=GCFS icl_gcfs})
 						#! new_table = build_conversion_table_for_generic_superclasses dcl_gcfs icl_gcfs new_table
 						-> (new_table, icl_gencases, error)

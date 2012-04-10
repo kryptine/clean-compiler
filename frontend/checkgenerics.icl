@@ -46,7 +46,7 @@ where
 		# initial_info = 
 			{ gen_classes = createArray 32 []
 			, gen_var_kinds = []
-			, gen_cons_with_info_indices = createArray 4 {gcwi_module = -1,gcwi_index = -1,gcwi_ident={id_name="",id_info=nilPtr}}
+			, gen_cons_with_info_indices = createArray 4 {gcwi_module = -1,gcwi_index = -1,gcwi_generic_info = -1,gcwi_ident={id_name="",id_info=nilPtr}}
 			}
 		# (gen_info_ptr, hp_generic_heap) = newPtr initial_info hp_generic_heap 
 		= (	{gen_def & gen_info_ptr = gen_info_ptr}, 
@@ -247,7 +247,6 @@ where
 				# case_def = {case_def & gc_gcf=GCFS gcfs, gc_type=gc_type, gc_type_cons=gc_type_cons}
 				# gen_case_defs = {gen_case_defs & [index] = case_def}
 				-> (gen_case_defs, generic_defs, type_defs, class_defs, modules, heaps, cs)
-//			GCFC {gcfc_class_ident=gcfc_class_ident=:{id_info}}
 			GCFC _ gcfc_class_ident=:{id_info}
 				# cs = pushErrorAdmin (newPosition {id_name="derive generic superclass",id_info=nilPtr} gc_pos) cs
 				# (gc_type, gc_type_cons, type_defs, modules, heaps, cs)
@@ -285,6 +284,7 @@ where
 			gcf_gident = ds_ident,
 		 	gcf_generic = {gi_module=NoIndex,gi_index=NoIndex},
 			gcf_arity = 0,
+			gcf_generic_info = 0,
 			gcf_body = GCB_None,
 			gcf_kind = KindError
 			}
@@ -377,7 +377,6 @@ convert_generic_instances gci next_fun_index gencase_defs class_defs symbol_tabl
 				  (fun_defs,gencase_defs,class_defs,symbol_table,error,dcl_modules)
 					= convert_generic_instances (gci+1) (next_fun_index+1) gencase_defs class_defs symbol_table error dcl_modules
 				-> ([fun_def : fun_defs],gencase_defs,class_defs,symbol_table,error,dcl_modules)
-//			gc=:{gc_gcf=GCFC {gcfc_class_ident=gcfc_class_ident=:{id_info}},gc_type_cons,gc_pos}
 			gc=:{gc_gcf=GCFC _ gcfc_class_ident=:{id_info},gc_type_cons,gc_pos}
 				# (entry,symbol_table) = readPtr id_info symbol_table
 				-> case entry.ste_kind of
@@ -412,6 +411,7 @@ convert_generic_instances gci next_fun_index gencase_defs class_defs symbol_tabl
 				gcf_gident = ds_ident,
 			 	gcf_generic = {gi_module=NoIndex,gi_index=NoIndex},
 				gcf_arity = 0,
+				gcf_generic_info = 0,
 				gcf_body = GCB_FunIndex next_fun_index,
 				gcf_kind = KindError
 				}

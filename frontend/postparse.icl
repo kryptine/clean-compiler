@@ -1177,26 +1177,22 @@ collectFunctionBodies fun_name fun_arity fun_prio fun_kind all_defs=:[PD_Functio
 collectFunctionBodies fun_name fun_arity fun_prio fun_kind defs ca
 	= ([], fun_kind, defs, ca)
 
-collectGenericBodies :: !GenericCaseDef ![ParsedDefinition] !*CollectAdmin
-					 -> (![ParsedBody], ![ParsedDefinition],!*CollectAdmin)
-collectGenericBodies first_case=:{gc_gcf=GCF gc_ident1 first_case_gcf} all_defs=:[PD_GenericCase gc=:{gc_gcf=GCF gc_ident2 gcf} : defs] ca
-	| gc_ident1 == gc_ident2 && first_case.gc_type_cons == gc.gc_type_cons
-		#! (bodies, rest_defs, ca) = collectGenericBodies first_case defs ca
-		# (GCF _ {gcf_body=GCB_ParsedBody args rhs,gcf_arity}) = gc.gc_gcf
-		#! body = 
-			{ pb_args = args
-			, pb_rhs = rhs
-			, pb_position = gc.gc_pos 
-			}
-		| first_case_gcf.gcf_arity == gcf_arity
-			= ([body : bodies ], rest_defs, ca)
+collectGenericBodies :: ![ParsedDefinition] !Ident !Int !TypeCons !*CollectAdmin -> (![ParsedBody], !Int, ![ParsedDefinition],!*CollectAdmin)
+collectGenericBodies all_defs=:[PD_GenericCase gc=:{gc_gcf=GCF gc_ident2 gcf} : defs] gc_ident1 gcf_arity1 gc_type_cons1 ca
+	| gc_ident2==gc_ident1 && gc.gc_type_cons==gc_type_cons1
+		#! (bodies, generic_info, rest_defs, ca) = collectGenericBodies defs gc_ident1 gcf_arity1 gc_type_cons1 ca
+		# (GCF _ {gcf_body=GCB_ParsedBody args rhs,gcf_arity,gcf_generic_info}) = gc.gc_gcf
+		# generic_info = generic_info bitor gcf_generic_info
+		#! body = {pb_args = args, pb_rhs = rhs, pb_position = gc.gc_pos}
+		| gcf_arity==gcf_arity1
+			= ([body : bodies], generic_info, rest_defs, ca)
 			#! msg = "This generic alternative has " +++ toString gcf_arity +++ " argument" 
-				+++ (if (gcf_arity <> 1) "s" "")+++" instead of " +++ toString first_case_gcf.gcf_arity
+					 +++ (if (gcf_arity <> 1) "s" "")+++" instead of " +++ toString gcf_arity1
 			#! ca = postParseError gc.gc_pos msg ca	
-			= ([body : bodies ], rest_defs, ca)
-		= ([], all_defs, ca)		
-collectGenericBodies first_case defs ca
-	= ([], defs, ca)
+			= ([body : bodies], generic_info, rest_defs, ca)
+		= ([], 0, all_defs, ca)
+collectGenericBodies defs gc_ident1 gcf_arity1 gc_type_cons1 ca
+	= ([], 0, defs, ca)
 
 strictness_from_fields :: ![ParsedSelector] -> StrictnessList
 strictness_from_fields fields
@@ -1424,19 +1420,16 @@ reorganiseDefinitions icl_module [PD_Generic gen : defs] cons_count sel_count me
 		c_defs = {c_defs & def_generics = [gen : c_defs.def_generics]}
 	= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)
 reorganiseDefinitions icl_module [PD_GenericCase gc : defs] cons_count sel_count mem_count type_count ca
-	#! (bodies, defs, ca) = collectGenericBodies gc defs ca  
+	# (GCF gc_ident gcf=:{gcf_body=GCB_ParsedBody args rhs,gcf_arity,gcf_generic_info}) = gc.gc_gcf
+	#! (bodies, generic_info, defs, ca) = collectGenericBodies defs gc_ident gcf_arity gc.gc_type_cons ca
 	#! (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) 
 		= reorganiseDefinitions icl_module defs cons_count sel_count mem_count type_count ca
-	# (GCF gc_ident gcf=:{gcf_body=GCB_ParsedBody args rhs}) = gc.gc_gcf
-	# body = 
-		{ pb_args = args
-		, pb_rhs = rhs
-		, pb_position = gc.gc_pos 
-		}
-	#! bodies = [body : bodies ]
+	# generic_info = generic_info bitor gcf_generic_info
+	#! body = { pb_args = args, pb_rhs = rhs, pb_position = gc.gc_pos }
+	# bodies = [body : bodies]
 	#! fun_name = genericIdentToFunIdent gc_ident.id_name /*gcf.gcf_ident.id_name*/ gc.gc_type_cons 
 	#! fun = MakeNewImpOrDefFunction fun_name gcf.gcf_arity bodies (FK_Function cNameNotLocationDependent) NoPrio No gc.gc_pos
-	#! inst = { gc & gc_gcf = GCF gc_ident {gcf & gcf_body = GCB_FunDef fun }} 
+	#! inst = { gc & gc_gcf = GCF gc_ident {gcf & gcf_body = GCB_FunDef fun, gcf_generic_info = generic_info}} 
 	#! c_defs = {c_defs & def_generic_cases = [inst : c_defs.def_generic_cases]}
 	= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)
 reorganiseDefinitions icl_module [PD_Derive derive_defs : defs] cons_count sel_count mem_count type_count ca

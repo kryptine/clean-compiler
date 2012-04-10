@@ -431,6 +431,7 @@ instance == GenericDependency
 ::	GenericConstructorWithInfoIndex =
 	{	gcwi_module	:: !Int
 	,	gcwi_index	:: !Int
+	,	gcwi_generic_info :: !Int
 	,	gcwi_ident	:: !Ident
 	}
 
@@ -459,6 +460,7 @@ instance == GenericDependency
 		gcf_gident	:: !Ident,	  			// name in IC_Generic namespace
 		gcf_generic	:: !GlobalIndex,		// index of the generic
 		gcf_arity	:: !Int,				// arity of the function
+		gcf_generic_info :: !Int,			// 0 = no, -1 = all, generic info for CONS, OBJECT, RECORD or FIELD
 		gcf_body	:: !GenericCaseBody,	// the body function or NoIndex
 		gcf_kind	:: !TypeKind			// kind of the instance type
 	}
