@@ -1,6 +1,6 @@
 implementation module genericsupport
 
-import syntax, checksupport
+import syntax
 
 getGenericClassInfo ::
 	!(Global Index)
@@ -105,4 +105,63 @@ where
 	type_cons_to_str (TypeConsBasic bt) = toString bt
 	type_cons_to_str TypeConsArrow = "ARROW"
 	type_cons_to_str (TypeConsVar tv) = tv.tv_ident.id_name
-		 	
+
+field_n_of_GenericTypeDefDescriptor :: !String -> Int
+field_n_of_GenericTypeDefDescriptor "gtd_name" = 0
+field_n_of_GenericTypeDefDescriptor "gtd_arity" = 1
+field_n_of_GenericTypeDefDescriptor "gtd_num_conses" = 2
+field_n_of_GenericTypeDefDescriptor "gtd_conses" = 3
+field_n_of_GenericTypeDefDescriptor _ = -1
+
+field_n_of_GenericConsDescriptor :: !String -> Int
+field_n_of_GenericConsDescriptor "gcd_name" = 0
+field_n_of_GenericConsDescriptor "gcd_arity" = 1
+field_n_of_GenericConsDescriptor "gcd_prio" = 2
+field_n_of_GenericConsDescriptor "gcd_type_def" = 3
+field_n_of_GenericConsDescriptor "gcd_type" = 4
+field_n_of_GenericConsDescriptor "gcd_index" = 5
+field_n_of_GenericConsDescriptor  _ = -1
+
+field_n_of_GenericFieldDescriptor :: !String -> Int
+field_n_of_GenericFieldDescriptor "gfd_name" = 0
+field_n_of_GenericFieldDescriptor "gfd_index" = 1
+field_n_of_GenericFieldDescriptor "gfd_cons" = 2
+field_n_of_GenericFieldDescriptor _ = -1
+
+field_n_of_GenericRecordDescriptor :: !String -> Int
+field_n_of_GenericRecordDescriptor "grd_name" = 0
+field_n_of_GenericRecordDescriptor "grd_arity" = 1
+field_n_of_GenericRecordDescriptor "grd_type_arity" = 2
+field_n_of_GenericRecordDescriptor "grd_type" = 3
+field_n_of_GenericRecordDescriptor "grd_fields" = 4
+field_n_of_GenericRecordDescriptor _ = -1
+
+field_0_name_of_generic_info :: !Int -> String
+field_0_name_of_generic_info 0 = "gtd_name"
+field_0_name_of_generic_info 1 = "gcd_name"
+field_0_name_of_generic_info 2 = "grd_name"
+field_0_name_of_generic_info 3 = "gfd_name"
+
+field_1_name_of_generic_info :: !Int -> String
+field_1_name_of_generic_info 0 = "gtd_arity"
+field_1_name_of_generic_info 1 = "gcd_arity"
+field_1_name_of_generic_info 2 = "grd_arity"
+field_1_name_of_generic_info 3 = "gfd_index"
+
+field_2_name_of_generic_info :: !Int -> String
+field_2_name_of_generic_info 0 = "gtd_num_conses"
+field_2_name_of_generic_info 1 = "gcd_prio"
+field_2_name_of_generic_info 2 = "grd_type_arity"
+field_2_name_of_generic_info 3 = "gfd_cons"
+
+field_3_name_of_generic_info :: !Int -> String
+field_3_name_of_generic_info 0 = "gtd_conses"
+field_3_name_of_generic_info 1 = "gcd_type_def"
+field_3_name_of_generic_info 2 = "grd_type"
+
+field_4_name_of_generic_info :: !Int -> String
+field_4_name_of_generic_info 1 = "gcd_type"
+field_4_name_of_generic_info 2 = "grd_fields"
+
+field_5_name_of_generic_info :: !Int -> String
+field_5_name_of_generic_info 1 = "gcd_index"

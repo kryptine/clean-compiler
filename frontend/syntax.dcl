@@ -599,10 +599,10 @@ NoGlobalIndex :== {gi_module=NoIndex,gi_index=NoIndex}
 	= GTSAppCons TypeKind [GenTypeStruct]
 	| GTSAppVar TypeVar [GenTypeStruct] 
 	| GTSVar TypeVar
- 	| GTSCons !DefinedSymbol !GenTypeStruct
- 	| GTSRecord !DefinedSymbol !GenTypeStruct
- 	| GTSField DefinedSymbol GenTypeStruct
- 	| GTSObject DefinedSymbol GenTypeStruct
+ 	| GTSCons !DefinedSymbol !GlobalIndex !DefinedSymbol !DefinedSymbol !GenTypeStruct
+ 	| GTSRecord !DefinedSymbol !GlobalIndex !DefinedSymbol !DefinedSymbol !GenTypeStruct
+ 	| GTSField !DefinedSymbol !GlobalIndex !DefinedSymbol !GenTypeStruct
+ 	| GTSObject !DefinedSymbol !GlobalIndex !DefinedSymbol !GenTypeStruct
 	| GTSE
 	// the following constructors are used for optimizing bimaps
 	| GTSPair !GenTypeStruct !GenTypeStruct

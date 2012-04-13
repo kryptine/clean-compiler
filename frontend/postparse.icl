@@ -35,7 +35,7 @@ exprToExprWithLocalDefs expr
 		,	ewl_locals = LocalParsedDefs []
 		,	ewl_position= NoPos
 		}
-					
+
 prefixAndPositionToIdent :: !String !LineAndColumn !*CollectAdmin -> (!Ident, !*CollectAdmin)
 prefixAndPositionToIdent prefix {lc_line, lc_column} ca=:{ca_hash_table}
 	# ({boxed_ident=ident}, ca_hash_table) = putIdentInHashTable (prefix +++ ";" +++ toString lc_line +++ ";" +++ toString lc_column) IC_Expression ca_hash_table
@@ -1194,6 +1194,80 @@ collectGenericBodies all_defs=:[PD_GenericCase gc=:{gc_gcf=GCF gc_ident2 gcf} : 
 collectGenericBodies defs gc_ident1 gcf_arity1 gc_type_cons1 ca
 	= ([], 0, defs, ca)
 
+replace_generic_info_record_by_arguments :: !Int ![ParsedBody] !Int !TypeCons !*CollectAdmin -> (![ParsedBody],!Int,!*CollectAdmin)
+replace_generic_info_record_by_arguments generic_info bodies arity (TypeConsSymb {type_ident={id_name}}) ca
+	# arity = add_n_bits generic_info (arity-1)
+	# (bodies,ca) = replace_generic_info_record_by_arguments_in_bodies bodies generic_info ca
+	= (bodies,arity,ca)
+  where
+	generic_cons_index
+		= case id_name of
+			"OBJECT" -> 0
+			"CONS" -> 1
+			"RECORD" -> 2
+			"FIELD" -> 3
+
+	replace_generic_info_record_by_arguments_in_bodies [body:bodies] generic_info ca
+		# (body,ca) = replace_generic_info_record_by_arguments_in_body body generic_info ca
+		# (bodies,ca) = replace_generic_info_record_by_arguments_in_bodies bodies generic_info ca
+		= ([body : bodies],ca)
+	replace_generic_info_record_by_arguments_in_bodies [] generic_info ca
+		= ([],ca)
+
+	replace_generic_info_record_by_arguments_in_body body=:{pb_args=[PE_Record PE_Empty NoRecordName field_assignments:args]} generic_info ca
+		# (args,ca) = add_fields generic_info field_assignments args ca
+		= ({body & pb_args = args},ca)
+	replace_generic_info_record_by_arguments_in_body body=:{pb_args=[PE_WildCard:args]} generic_info ca
+		# args = add_wild_cards generic_info args
+		= ({body & pb_args = args},ca)
+
+	add_fields :: !Int [FieldAssignment] [ParsedExpr] *CollectAdmin -> (![ParsedExpr],!*CollectAdmin)
+	add_fields generic_info field_assignments args ca
+		| generic_info==0
+			= (args,ca)
+		| generic_info bitand 1<>0
+			= add_field (field_0_name_of_generic_info generic_cons_index) (generic_info bitxor 1) field_assignments args ca
+		| generic_info bitand 2<>0
+			= add_field (field_1_name_of_generic_info generic_cons_index) (generic_info bitxor 2) field_assignments args ca
+		| generic_info bitand 4<>0
+			= add_field (field_2_name_of_generic_info generic_cons_index) (generic_info bitxor 4) field_assignments args ca
+		| generic_info bitand 8<>0
+			= add_field (field_3_name_of_generic_info generic_cons_index) (generic_info bitxor 8) field_assignments args ca
+		| generic_info bitand 16<>0
+			= add_field (field_4_name_of_generic_info generic_cons_index) (generic_info bitxor 16) field_assignments args ca
+		| generic_info bitand 32<>0
+			= add_field (field_5_name_of_generic_info generic_cons_index) (generic_info bitxor 32) field_assignments args ca
+
+	add_field :: !{#Char} !Int [FieldAssignment] [ParsedExpr] *CollectAdmin -> (![ParsedExpr],!*CollectAdmin)
+	add_field field_name generic_info field_assignments args ca
+		# (arg,ca) = field_or_wild_card field_name field_assignments ca
+		# (args,ca) = add_fields generic_info field_assignments args ca
+		= ([arg : args],ca)
+
+	add_wild_cards 0 args
+		= args
+	add_wild_cards generic_info args
+		| generic_info bitand 1<>0
+			= [PE_WildCard : add_wild_cards (generic_info>>1) args]
+			= add_wild_cards (generic_info>>1) args
+
+	field_or_wild_card field_name [{bind_dst=FieldName {id_name},bind_src}:field_assignments] ca
+		| id_name==field_name
+			= case bind_src of
+				PE_Empty
+					# ({boxed_ident=ident}, ca_hash_table) = putIdentInHashTable id_name IC_Expression ca.ca_hash_table
+					-> (PE_Ident ident, {ca & ca_hash_table = ca_hash_table})
+				_ 
+					-> (bind_src,ca)
+			= field_or_wild_card field_name field_assignments ca
+	field_or_wild_card field_name field_assignments ca
+		= (PE_WildCard,ca)
+
+	add_n_bits n c
+		| n>1
+			= add_n_bits (n>>1) (c+(n bitand 1))
+			= c+n
+
 strictness_from_fields :: ![ParsedSelector] -> StrictnessList
 strictness_from_fields fields
 	= add_strictness_for_arguments fields 0 0 NotStrict
@@ -1427,9 +1501,13 @@ reorganiseDefinitions icl_module [PD_GenericCase gc : defs] cons_count sel_count
 	# generic_info = generic_info bitor gcf_generic_info
 	#! body = { pb_args = args, pb_rhs = rhs, pb_position = gc.gc_pos }
 	# bodies = [body : bodies]
+	# (bodies,gcf_arity,ca)
+		= if (generic_info > 0)
+			(replace_generic_info_record_by_arguments generic_info bodies gcf_arity gc.gc_type_cons ca)
+			(bodies,gcf_arity,ca)
 	#! fun_name = genericIdentToFunIdent gc_ident.id_name /*gcf.gcf_ident.id_name*/ gc.gc_type_cons 
-	#! fun = MakeNewImpOrDefFunction fun_name gcf.gcf_arity bodies (FK_Function cNameNotLocationDependent) NoPrio No gc.gc_pos
-	#! inst = { gc & gc_gcf = GCF gc_ident {gcf & gcf_body = GCB_FunDef fun, gcf_generic_info = generic_info}} 
+	#! fun = MakeNewImpOrDefFunction fun_name gcf_arity bodies (FK_Function cNameNotLocationDependent) NoPrio No gc.gc_pos
+	#! inst = { gc & gc_gcf = GCF gc_ident {gcf & gcf_body = GCB_FunDef fun, gcf_generic_info = generic_info, gcf_arity = gcf_arity}} 
 	#! c_defs = {c_defs & def_generic_cases = [inst : c_defs.def_generic_cases]}
 	= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)
 reorganiseDefinitions icl_module [PD_Derive derive_defs : defs] cons_count sel_count mem_count type_count ca

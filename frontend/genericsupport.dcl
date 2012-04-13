@@ -1,6 +1,6 @@
 definition module genericsupport
 
-import syntax, checksupport
+import syntax
 
 lookupGenericClassInfo :: 
 		!TypeKind 
@@ -51,3 +51,15 @@ genericIdentToClassIdent 	:: !String !TypeKind -> Ident
 genericIdentToMemberIdent 	:: !String !TypeKind -> Ident
 genericIdentToFunIdent 		:: !String !TypeCons -> Ident
 kind_to_short_string :: !TypeKind -> {#Char}
+
+field_n_of_GenericTypeDefDescriptor :: !String -> Int
+field_n_of_GenericConsDescriptor :: !String -> Int
+field_n_of_GenericFieldDescriptor :: !String -> Int
+field_n_of_GenericRecordDescriptor :: !String -> Int
+
+field_0_name_of_generic_info :: !Int -> String
+field_1_name_of_generic_info :: !Int -> String
+field_2_name_of_generic_info :: !Int -> String
+field_3_name_of_generic_info :: !Int -> String
+field_4_name_of_generic_info :: !Int -> String
+field_5_name_of_generic_info :: !Int -> String

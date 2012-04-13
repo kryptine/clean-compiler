@@ -1,7 +1,7 @@
 implementation module parse
 
 import StdEnv
-import scanner, syntax, hashtable, utilities, predef, containers
+import scanner, syntax, hashtable, utilities, predef, containers, genericsupport
 
 ParseOnly :== False
 
@@ -570,11 +570,7 @@ where
 	wantGenericFunctionDefinition name pos pState
 		//# (type, pState) = wantType pState
 		# (ok, {at_type=type}, pState) = trySimpleType TA_None pState
-		# (ident, pState) = stringToIdent name (IC_GenericCase type) pState				
-		# (type_CONS_ident, pState) = stringToIdent "CONS" IC_Type pState
-		# (type_RECORD_ident, pState) = stringToIdent "RECORD" IC_Type pState
-		# (type_FIELD_ident, pState)= stringToIdent "FIELD" IC_Type pState
-		# (type_OBJECT_ident, pState)= stringToIdent "OBJECT" IC_Type pState
+		# (ident, pState) = stringToIdent name (IC_GenericCase type) pState
 		# (generic_ident, pState) = stringToIdent name IC_Generic pState					
 	
 		# (type_cons, pState) = get_type_cons type pState
@@ -601,15 +597,27 @@ where
 				# pState = wantToken FunctionContext "type argument" GenericCloseToken pState
 				| ok 
 					-> case type_cons of
-						TypeConsSymb {type_ident}
-							| type_ident == type_CONS_ident
-								-> (geninfo_arg, -1, pState)
-							| type_ident == type_RECORD_ident
-								-> (geninfo_arg, -1, pState)
-							| type_ident == type_FIELD_ident 
-								-> (geninfo_arg, -1, pState)
-							| type_ident == type_OBJECT_ident 
-								-> (geninfo_arg, -1, pState)
+						TypeConsSymb {type_ident=type_ident=:{id_name}}
+							| id_name=="OBJECT"
+								# (generic_constructor_type_ident, pState) = stringToIdent id_name IC_Type pState
+								| type_ident==generic_constructor_type_ident
+									-> (geninfo_arg, generic_info_of_OBJECT_geninfo_arg geninfo_arg, pState)
+									-> (geninfo_arg, 0, pState)
+							| id_name=="CONS"
+								# (generic_constructor_type_ident, pState) = stringToIdent id_name IC_Type pState
+								| type_ident==generic_constructor_type_ident
+									-> (geninfo_arg, generic_info_of_CONS_geninfo_arg geninfo_arg, pState)
+									-> (geninfo_arg, 0, pState)
+							| id_name=="RECORD"
+								# (generic_constructor_type_ident, pState) = stringToIdent id_name IC_Type pState
+								| type_ident==generic_constructor_type_ident
+									-> (geninfo_arg, generic_info_of_RECORD_geninfo_arg geninfo_arg, pState)
+									-> (geninfo_arg, 0, pState)
+							| id_name=="FIELD"
+								# (generic_constructor_type_ident, pState) = stringToIdent id_name IC_Type pState
+								| type_ident==generic_constructor_type_ident
+									-> (geninfo_arg, generic_info_of_FIELD_geninfo_arg geninfo_arg, pState)
+									-> (geninfo_arg, 0, pState)
 						_
 							-> (geninfo_arg, 0, pState)
 				| otherwise
@@ -634,7 +642,7 @@ where
 	    # localsExpected = isNotEmpty args || isGlobalContext parseContext || ~ ss_useLayout
 	    # (rhs, _, pState) = wantRhs localsExpected (ruleDefiningRhsSymbol parseContext) pState
 
-		# generic_case = 
+		# generic_case =
 			{ gc_pos = pos
 			, gc_type = type
 			, gc_type_cons = type_cons
@@ -684,6 +692,74 @@ where
 		where
 			foreign_export_error s pState
 				= (True,PD_Erroneous,tokenBack (parseError "foreign export" No s pState))
+
+generic_info_of_RECORD_geninfo_arg (PE_Record PE_Empty NoRecordName field_assignments)
+	= mark_GenericRecordDescriptor_fields field_assignments 0
+  where
+	mark_GenericRecordDescriptor_fields :: [FieldAssignment] !Int -> Int 
+	mark_GenericRecordDescriptor_fields [{bind_dst=FieldName {id_name}}:field_assignments] generic_info
+		# field_number=field_n_of_GenericRecordDescriptor id_name
+		| field_number>=0 && generic_info bitand (1<<field_number)==0
+			# generic_info = generic_info bitor (1<<field_number)
+			= mark_GenericRecordDescriptor_fields field_assignments generic_info
+			= -1
+	mark_GenericRecordDescriptor_fields [_:_] generic_info
+		= -1
+	mark_GenericRecordDescriptor_fields [] generic_info
+		= generic_info
+generic_info_of_RECORD_geninfo_arg _
+	= -1
+
+generic_info_of_OBJECT_geninfo_arg (PE_Record PE_Empty NoRecordName field_assignments)
+	= mark_GenericTypeDefDescriptor_fields field_assignments 0
+  where
+	mark_GenericTypeDefDescriptor_fields :: [FieldAssignment] !Int -> Int 
+	mark_GenericTypeDefDescriptor_fields [{bind_dst=FieldName {id_name}}:field_assignments] generic_info
+		# field_number=field_n_of_GenericTypeDefDescriptor id_name
+		| field_number>=0 && generic_info bitand (1<<field_number)==0
+			# generic_info = generic_info bitor (1<<field_number)
+			= mark_GenericTypeDefDescriptor_fields field_assignments generic_info
+			= -1
+	mark_GenericTypeDefDescriptor_fields [_:_] generic_info
+		= -1
+	mark_GenericTypeDefDescriptor_fields [] generic_info
+		= generic_info
+generic_info_of_OBJECT_geninfo_arg _
+	= -1
+
+generic_info_of_CONS_geninfo_arg (PE_Record PE_Empty NoRecordName field_assignments)
+	= mark_GenericConsDescriptor_fields field_assignments 0
+  where
+	mark_GenericConsDescriptor_fields :: [FieldAssignment] !Int -> Int
+	mark_GenericConsDescriptor_fields [{bind_dst=FieldName {id_name}}:field_assignments] generic_info
+		# field_number=field_n_of_GenericConsDescriptor id_name
+		| field_number>=0 && generic_info bitand (1<<field_number)==0
+			# generic_info = generic_info bitor (1<<field_number)
+			= mark_GenericConsDescriptor_fields field_assignments generic_info
+			= -1
+	mark_GenericConsDescriptor_fields [_:_] generic_info
+		= -1
+	mark_GenericConsDescriptor_fields [] generic_info
+		= generic_info
+generic_info_of_CONS_geninfo_arg _
+	= -1
+
+generic_info_of_FIELD_geninfo_arg (PE_Record PE_Empty NoRecordName field_assignments)
+	= mark_GenericFieldDescriptor_fields field_assignments 0
+  where
+	mark_GenericFieldDescriptor_fields :: [FieldAssignment] !Int -> Int
+	mark_GenericFieldDescriptor_fields [{bind_dst=FieldName {id_name}}:field_assignments] generic_info
+		# field_number=field_n_of_GenericFieldDescriptor id_name
+		| field_number>=0 && generic_info bitand (1<<field_number)==0
+			# generic_info = generic_info bitor (1<<field_number)
+			= mark_GenericFieldDescriptor_fields field_assignments generic_info
+			= -1
+	mark_GenericFieldDescriptor_fields [_:_] generic_info
+		= -1
+	mark_GenericFieldDescriptor_fields [] generic_info
+		= generic_info
+generic_info_of_FIELD_geninfo_arg _
+	= -1
 
 want_instance_type_definitions :: ![Type] !ParseState -> (![ParsedDefinition], !ParseState)
 want_instance_type_definitions instance_type pState
@@ -1763,17 +1839,33 @@ where
 			= case token of
 				// make sure no look ahead occurred in a non GenericContext (defines an offside)
 				GenericOfToken
-					# (next_token, pState) = nextToken FunctionContext pState
-					-> case next_token of
-						IdentToken name
-							| isLowerCaseName name
-								# (token, pState) = nextToken GenericContext pState
-								-> (-1, token, pState)
+					-> case type_cons of
+						TypeConsSymb {type_ident={id_name}}
+							| id_name=="OBJECT" || id_name=="CONS" || id_name=="RECORD" || id_name=="FIELD"
+								# (next_token, pState) = nextToken FunctionContext pState
+								-> case next_token of
+									IdentToken name
+										| isLowerCaseName name
+											# (token, pState) = nextToken GenericContext pState
+											-> (-1, token, pState)
+									CurlyOpenToken
+										# (token, pState) = nextToken FunctionContext pState
+										-> case token of
+											CurlyCloseToken
+												# (token, pState) = nextToken GenericContext pState
+												-> (0, token, pState)
+											_
+												# (generic_info,pState) = parse_info_fields id_name token pState
+												  (token, pState) = nextToken GenericContext pState
+												-> (generic_info,token,pState)
+									_
+										# pState = parseError "derive definition" (Yes next_token) "{ or lower case ident" pState
+										-> (0, token, pState)
 						_
-							# pState = parseError "derive definition" (Yes next_token) "lower case ident" pState
 							-> (0, token, pState)
 				_
 					-> (0, token, pState) 
+
 		# derive_def =
 			{	gc_pos = pos
 			,	gc_type = type
@@ -1824,6 +1916,99 @@ where
 	get_type_cons type pState 
 		# pState = parseError "generic type" No " type constructor" pState
 		= (abort "no TypeCons", pState)
+
+	parse_info_fields "OBJECT" token pState
+		= parse_OBJECT_info_fields token 0 pState
+	parse_info_fields "CONS" token pState
+		= parse_CONS_info_fields token 0 pState
+	parse_info_fields "RECORD" token pState
+		= parse_RECORD_info_fields token 0 pState
+	parse_info_fields "FIELD" token pState
+		= parse_FIELD_info_fields token 0 pState
+
+	parse_OBJECT_info_fields token=:(IdentToken name) generic_info pState
+		# field_number=field_n_of_GenericTypeDefDescriptor name
+		| field_number<0
+			= (generic_info, parseError "GenericTypeDefDescriptor" (Yes token) "field of GenericTypeDefDescriptor" pState)
+		# field_mask = 1<<field_number
+		  pState = if (generic_info bitand field_mask<>0)
+					(parseErrorSimple "GenericTypeDefDescriptor" "field already defined" pState)
+					pState
+		  generic_info = generic_info bitor field_mask
+		  (token, pState) = nextToken FunctionContext pState
+		= case token of
+			CommaToken
+				# (token,pState) = nextToken FunctionContext pState
+				-> parse_OBJECT_info_fields token generic_info pState
+			CurlyCloseToken
+				-> (generic_info,pState)
+			_
+				-> (generic_info, parseError "GenericTypeDefDescriptor record" (Yes token) ", or }" pState)
+	parse_OBJECT_info_fields token generic_info pState
+		= (generic_info, parseError "GenericTypeDefDescriptor record" (Yes token) "field name" pState)
+
+	parse_CONS_info_fields token=:(IdentToken name) generic_info pState
+		# field_number=field_n_of_GenericConsDescriptor name
+		| field_number<0
+			= (generic_info, parseError "GenericConsDescriptor" (Yes token) "field of GenericConsDescriptor" pState)
+		# field_mask = 1<<field_number
+		  pState = if (generic_info bitand field_mask<>0)
+					(parseErrorSimple "GenericConsDescriptor" "field already defined" pState)
+					pState
+		  generic_info = generic_info bitor field_mask
+		  (token, pState) = nextToken FunctionContext pState
+		= case token of
+			CommaToken
+				# (token,pState) = nextToken FunctionContext pState
+				-> parse_CONS_info_fields token generic_info pState
+			CurlyCloseToken
+				-> (generic_info,pState)
+			_
+				-> (generic_info, parseError "GenericConsDescriptor record" (Yes token) ", or }" pState)
+	parse_CONS_info_fields token generic_info pState
+		= (generic_info, parseError "GenericConsDescriptor record" (Yes token) "field name" pState)
+
+	parse_RECORD_info_fields token=:(IdentToken name) generic_info pState
+		# field_number=field_n_of_GenericRecordDescriptor name
+		| field_number<0
+			= (generic_info, parseError "GenericRecordDescriptor" (Yes token) "field of GenericRecordDescriptor" pState)
+		# field_mask = 1<<field_number
+		  pState = if (generic_info bitand field_mask<>0)
+					(parseErrorSimple "GenericRecordDescriptor" "field already defined" pState)
+					pState
+		  generic_info = generic_info bitor field_mask
+		  (token, pState) = nextToken FunctionContext pState
+		= case token of
+			CommaToken
+				# (token,pState) = nextToken FunctionContext pState
+				-> parse_RECORD_info_fields token generic_info pState
+			CurlyCloseToken
+				-> (generic_info,pState)
+			_
+				-> (generic_info, parseError "GenericRecordDescriptor record" (Yes token) ", or }" pState)
+	parse_RECORD_info_fields token generic_info pState
+		= (generic_info, parseError "GenericRecordDescriptor record" (Yes token) "field name" pState)
+
+	parse_FIELD_info_fields token=:(IdentToken name) generic_info pState
+		# field_number=field_n_of_GenericFieldDescriptor name
+		| field_number<0
+			= (generic_info, parseError "GenericFieldDescriptor" (Yes token) "field of GenericFieldDescriptor" pState)
+		# field_mask = 1<<field_number
+		  pState = if (generic_info bitand field_mask<>0)
+					(parseErrorSimple "GenericFieldDescriptor" "field already defined" pState)
+					pState
+		  generic_info = generic_info bitor field_mask
+		  (token, pState) = nextToken FunctionContext pState
+		= case token of
+			CommaToken
+				# (token,pState) = nextToken FunctionContext pState
+				-> parse_FIELD_info_fields token generic_info pState
+			CurlyCloseToken
+				-> (generic_info,pState)
+			_
+				-> (generic_info, parseError "GenericFieldDescriptor record" (Yes token) ", or }" pState)
+	parse_FIELD_info_fields token generic_info pState
+		= (generic_info, parseError "GenericFieldDescriptor record" (Yes token) "field name" pState)
 
 /*
 	Type definitions
