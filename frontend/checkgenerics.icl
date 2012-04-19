@@ -46,7 +46,11 @@ where
 		# initial_info = 
 			{ gen_classes = createArray 32 []
 			, gen_var_kinds = []
-			, gen_cons_with_info_indices = createArray 4 {gcwi_module = -1,gcwi_index = -1,gcwi_generic_info = -1,gcwi_ident={id_name="",id_info=nilPtr}}
+			, gen_rep_conses
+				= createArray 6 {grc_module = -1, grc_index = -1, grc_generic_info = -1,
+								 grc_generic_instance_deps = AllGenericInstanceDependencies,
+								 grc_ident={id_name="",id_info=nilPtr},
+								 grc_optional_fun_type=No}
 			}
 		# (gen_info_ptr, hp_generic_heap) = newPtr initial_info hp_generic_heap 
 		= (	{gen_def & gen_info_ptr = gen_info_ptr}, 
@@ -286,8 +290,8 @@ where
 			gcf_arity = 0,
 			gcf_generic_info = 0,
 			gcf_body = GCB_None,
-			gcf_kind = KindError
-			}
+			gcf_kind = KindError,
+			gcf_generic_instance_deps = AllGenericInstanceDependencies }
 		# gcfs = convert_generic_contexts type_contexts
 		= [!gcf:gcfs!]
 	convert_generic_contexts [_:type_contexts]
@@ -413,8 +417,8 @@ convert_generic_instances gci next_fun_index gencase_defs class_defs symbol_tabl
 				gcf_arity = 0,
 				gcf_generic_info = 0,
 				gcf_body = GCB_FunIndex next_fun_index,
-				gcf_kind = KindError
-				}
+				gcf_kind = KindError,
+				gcf_generic_instance_deps = AllGenericInstanceDependencies }
 			# (gcfs,next_fun_index,new_fun_defs) = convert_generic_contexts type_contexts type_cons pos (next_fun_index+1) new_fun_defs
 			= ([!gcf:gcfs!],next_fun_index,[fun_def:new_fun_defs])
 		convert_generic_contexts [_:type_contexts] type_cons pos next_fun_index new_fun_defs

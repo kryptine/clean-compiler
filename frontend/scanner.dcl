@@ -110,6 +110,7 @@ instance <<< FilePosition
 	|	GenericOpenToken		//		{|
 	|	GenericCloseToken		//		|}
 	|	GenericOfToken			//		of
+	|	GenericWithToken		//		with
 
 	|	ExistsToken				//		E.
 	|	ForAllToken				//		A.

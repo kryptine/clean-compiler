@@ -424,15 +424,17 @@ instance == GenericDependency
 :: GenericInfo = 
 	{	gen_classes		:: !GenericClassInfos
 	,	gen_var_kinds	:: ![TypeKind]  	// kinds of all st_vars of the gen_type
-	,	gen_cons_with_info_indices	:: !{#GenericConstructorWithInfoIndex}
-	//	OBJECT, CONS, RECORD, FIELD
+	,	gen_rep_conses	:: !{!GenericRepresentationConstructor}
+	//	OBJECT, CONS, RECORD, FIELD, PAIR, EITHER
 	}
 
-::	GenericConstructorWithInfoIndex =
-	{	gcwi_module	:: !Int
-	,	gcwi_index	:: !Int
-	,	gcwi_generic_info :: !Int
-	,	gcwi_ident	:: !Ident
+::	GenericRepresentationConstructor =
+	{	grc_module	:: !Int
+	,	grc_index	:: !Int
+	,	grc_ident	:: !Ident
+	,	grc_generic_info :: !Int
+	,	grc_generic_instance_deps :: !GenericInstanceDependencies
+	,	grc_optional_fun_type :: !Optional SymbolType
 	}
 
 :: GenericInfoPtr :== Ptr GenericInfo	
@@ -462,7 +464,8 @@ instance == GenericDependency
 		gcf_arity	:: !Int,				// arity of the function
 		gcf_generic_info :: !Int,			// 0 = no, -1 = all, generic info for CONS, OBJECT, RECORD or FIELD
 		gcf_body	:: !GenericCaseBody,	// the body function or NoIndex
-		gcf_kind	:: !TypeKind			// kind of the instance type
+		gcf_kind	:: !TypeKind,			// kind of the instance type
+		gcf_generic_instance_deps :: !GenericInstanceDependencies
 	}
 
 :: GenericCaseBody 
@@ -470,6 +473,11 @@ instance == GenericDependency
 	| GCB_FunIndex !Index 
 	| GCB_FunDef !FunDef 
 	| GCB_ParsedBody ![ParsedExpr] !Rhs 
+
+::	GenericInstanceDependencies
+	= AllGenericInstanceDependencies
+	| GenericInstanceDependencies !Int /*n_deps*/ !Int /*deps*/
+	| GenericInstanceUsedArgs !Int /*n_deps*/ !Int /*deps*/
 
 ::	InstanceType =
 	{	it_vars			:: [TypeVar]

@@ -629,7 +629,7 @@ where
 			_ 	
 				# pState = parseError "generic type" (Yes token) "of or |}" pState
 				-> (PE_WildCard, 0, pState)
-																				
+
 		//# pState = wantToken FunctionContext "type argument" GenericCloseToken pState
 		# (args, pState) = parseList trySimpleLhsExpression pState
 		# args = [geninfo_arg : args]
@@ -652,8 +652,8 @@ where
 						gcf_arity = length args,
 						gcf_generic_info = gcf_generic_info,
 						gcf_body = GCB_ParsedBody args rhs,
-						gcf_kind = KindError
-					}
+						gcf_kind = KindError,
+						gcf_generic_instance_deps = AllGenericInstanceDependencies }
 			}
 		= (True, PD_GenericCase generic_case, pState)
 
@@ -1835,7 +1835,7 @@ where
 		# (generic_ident, pState) = stringToIdent name IC_Generic pState
 		# (type_cons, pState) = get_type_cons type pState
 		# (token, pState) = nextToken GenericContext pState
-		# (gcf_generic_info, token, pState)
+		# (gcf_generic_info, generic_instance_deps, token, pState)
 			= case token of
 				// make sure no look ahead occurred in a non GenericContext (defines an offside)
 				GenericOfToken
@@ -1847,37 +1847,38 @@ where
 									IdentToken name
 										| isLowerCaseName name
 											# (token, pState) = nextToken GenericContext pState
-											-> (-1, token, pState)
+											# (generic_instance_deps, token, pState) = parse_optional_generic_instance_deps token pState
+											-> (-1, generic_instance_deps, token, pState)
 									CurlyOpenToken
 										# (token, pState) = nextToken FunctionContext pState
 										-> case token of
 											CurlyCloseToken
 												# (token, pState) = nextToken GenericContext pState
-												-> (0, token, pState)
+												# (generic_instance_deps, token, pState) = parse_optional_generic_instance_deps token pState
+												-> (0, generic_instance_deps, token, pState)
 											_
 												# (generic_info,pState) = parse_info_fields id_name token pState
 												  (token, pState) = nextToken GenericContext pState
-												-> (generic_info,token,pState)
+												# (generic_instance_deps, token, pState) = parse_optional_generic_instance_deps token pState
+												-> (generic_info,generic_instance_deps, token,pState)
 									_
 										# pState = parseError "derive definition" (Yes next_token) "{ or lower case ident" pState
-										-> (0, token, pState)
+										-> (0, AllGenericInstanceDependencies, token, pState)
 						_
-							-> (0, token, pState)
+							-> (0, AllGenericInstanceDependencies, token, pState)
+				GenericWithToken
+					# (generic_instance_deps, token, pState) = parse_generic_instance_deps 0 0 pState
+					-> (0, generic_instance_deps, token, pState)
 				_
-					-> (0, token, pState) 
+					-> (0, AllGenericInstanceDependencies, token, pState)
 
 		# derive_def =
 			{	gc_pos = pos
 			,	gc_type = type
 			,	gc_type_cons = type_cons
-			,	gc_gcf = GCF ident {
-				 	gcf_gident = generic_ident,
-				 	gcf_generic = {gi_module=NoIndex,gi_index=NoIndex},
-					gcf_arity = 0,
-					gcf_generic_info = gcf_generic_info,
-					gcf_body = GCB_None,
-					gcf_kind = KindError
-				}
+			,	gc_gcf = GCF ident {gcf_gident = generic_ident, gcf_generic = {gi_module=NoIndex,gi_index=NoIndex}, gcf_arity = 0,
+									gcf_generic_info = gcf_generic_info, gcf_body = GCB_None, gcf_kind = KindError,
+									gcf_generic_instance_deps = generic_instance_deps}
 			}
 		= (derive_def, token, pState) 
 
@@ -2009,6 +2010,22 @@ where
 				-> (generic_info, parseError "GenericFieldDescriptor record" (Yes token) ", or }" pState)
 	parse_FIELD_info_fields token generic_info pState
 		= (generic_info, parseError "GenericFieldDescriptor record" (Yes token) "field name" pState)
+
+	parse_optional_generic_instance_deps GenericWithToken pState
+		= parse_generic_instance_deps 0 0 pState
+	parse_optional_generic_instance_deps token pState
+		= (AllGenericInstanceDependencies, token, pState)
+
+	parse_generic_instance_deps n_deps deps pState
+		# (token, pState) = nextToken GenericContext pState
+		= case token of
+			WildCardToken
+				-> parse_generic_instance_deps (n_deps+1) deps pState
+			IdentToken name
+			  | isLowerCaseName name
+				-> parse_generic_instance_deps (n_deps+1) (deps bitor (1<<n_deps)) pState
+			_
+				-> (GenericInstanceDependencies n_deps deps, token, pState)
 
 /*
 	Type definitions

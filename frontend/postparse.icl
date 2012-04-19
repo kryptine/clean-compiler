@@ -1194,11 +1194,14 @@ collectGenericBodies all_defs=:[PD_GenericCase gc=:{gc_gcf=GCF gc_ident2 gcf} : 
 collectGenericBodies defs gc_ident1 gcf_arity1 gc_type_cons1 ca
 	= ([], 0, defs, ca)
 
-replace_generic_info_record_by_arguments :: !Int ![ParsedBody] !Int !TypeCons !*CollectAdmin -> (![ParsedBody],!Int,!*CollectAdmin)
+replace_generic_info_record_by_arguments :: !Int ![ParsedBody] !Int !TypeCons !*CollectAdmin -> (![ParsedBody],!Int,!GenericInstanceDependencies,!*CollectAdmin)
 replace_generic_info_record_by_arguments generic_info bodies arity (TypeConsSymb {type_ident={id_name}}) ca
 	# arity = add_n_bits generic_info (arity-1)
-	# (bodies,ca) = replace_generic_info_record_by_arguments_in_bodies bodies generic_info ca
-	= (bodies,arity,ca)
+	# (bodies,n_deps,deps,ca) = replace_generic_info_record_by_arguments_in_bodies bodies generic_info -1 0 ca
+	| n_deps>=0
+		# deps = deps bitand ((1<<n_deps)-1)
+		= (bodies,arity,GenericInstanceUsedArgs n_deps deps,ca)
+		= (bodies,arity,GenericInstanceUsedArgs 0 0,ca)
   where
 	generic_cons_index
 		= case id_name of
@@ -1207,19 +1210,21 @@ replace_generic_info_record_by_arguments generic_info bodies arity (TypeConsSymb
 			"RECORD" -> 2
 			"FIELD" -> 3
 
-	replace_generic_info_record_by_arguments_in_bodies [body:bodies] generic_info ca
-		# (body,ca) = replace_generic_info_record_by_arguments_in_body body generic_info ca
-		# (bodies,ca) = replace_generic_info_record_by_arguments_in_bodies bodies generic_info ca
-		= ([body : bodies],ca)
-	replace_generic_info_record_by_arguments_in_bodies [] generic_info ca
-		= ([],ca)
+	replace_generic_info_record_by_arguments_in_bodies [body:bodies] generic_info n_deps deps ca
+		# (body,n_deps,deps,ca) = replace_generic_info_record_by_arguments_in_body body generic_info n_deps deps ca
+		# (bodies,n_deps,deps,ca) = replace_generic_info_record_by_arguments_in_bodies bodies generic_info n_deps deps ca
+		= ([body : bodies],n_deps,deps,ca)
+	replace_generic_info_record_by_arguments_in_bodies [] generic_info n_deps deps ca
+		= ([],n_deps,deps,ca)
 
-	replace_generic_info_record_by_arguments_in_body body=:{pb_args=[PE_Record PE_Empty NoRecordName field_assignments:args]} generic_info ca
+	replace_generic_info_record_by_arguments_in_body body=:{pb_args=[PE_Record PE_Empty NoRecordName field_assignments:args]} generic_info n_deps deps ca
+		# (n_deps,deps) = mark_deps_in_args args 0 n_deps deps
 		# (args,ca) = add_fields generic_info field_assignments args ca
-		= ({body & pb_args = args},ca)
-	replace_generic_info_record_by_arguments_in_body body=:{pb_args=[PE_WildCard:args]} generic_info ca
+		= ({body & pb_args = args},n_deps,deps,ca)
+	replace_generic_info_record_by_arguments_in_body body=:{pb_args=[PE_WildCard:args]} generic_info n_deps deps ca
+		# (n_deps,deps) = mark_deps_in_args args 0 n_deps deps
 		# args = add_wild_cards generic_info args
-		= ({body & pb_args = args},ca)
+		= ({body & pb_args = args},n_deps,deps,ca)
 
 	add_fields :: !Int [FieldAssignment] [ParsedExpr] *CollectAdmin -> (![ParsedExpr],!*CollectAdmin)
 	add_fields generic_info field_assignments args ca
@@ -1267,6 +1272,43 @@ replace_generic_info_record_by_arguments generic_info bodies arity (TypeConsSymb
 		| n>1
 			= add_n_bits (n>>1) (c+(n bitand 1))
 			= c+n
+
+determine_generic_instance_deps :: ![ParsedBody] !Int !TypeCons !*CollectAdmin -> (![ParsedBody],!Int,!GenericInstanceDependencies,!*CollectAdmin)
+determine_generic_instance_deps bodies arity type_cons ca
+	= case type_cons of
+		TypeConsSymb {type_ident={id_name}}
+			| id_name=="OBJECT" || id_name=="CONS" || id_name=="RECORD" || id_name=="FIELD" || id_name=="PAIR" || id_name=="EITHER"
+				# (n_deps,deps) = determine_generic_instance_deps_in_bodies bodies -1 0
+				| n_deps>=0
+					# deps = deps bitand ((1<<n_deps)-1)
+					-> (bodies,arity,GenericInstanceUsedArgs n_deps deps,ca)
+					-> (bodies,arity,GenericInstanceUsedArgs 0 0,ca)
+		_
+			-> (bodies,arity,AllGenericInstanceDependencies,ca)
+  where
+	determine_generic_instance_deps_in_bodies [body:bodies] n_deps deps
+		# (n_deps,deps) = determine_generic_instance_deps_in_bodies_in_body body n_deps deps
+		= determine_generic_instance_deps_in_bodies bodies n_deps deps
+	determine_generic_instance_deps_in_bodies [] n_deps deps
+		= (n_deps,deps)
+
+	determine_generic_instance_deps_in_bodies_in_body {pb_args=[_:args]} n_deps deps
+		= mark_deps_in_args args 0 n_deps deps
+	determine_generic_instance_deps_in_bodies_in_body body n_deps deps
+		= (0,deps)
+
+mark_deps_in_args :: [ParsedExpr] Int Int Int -> (!Int,!Int)
+mark_deps_in_args [PE_WildCard:args] arg_n n_deps deps
+	= mark_deps_in_args args (arg_n+1) n_deps deps
+mark_deps_in_args [_:args] arg_n n_deps deps
+	# deps = deps bitor (1<<arg_n)
+	= mark_deps_in_args args (arg_n+1) n_deps deps
+mark_deps_in_args [] arg_n n_deps deps
+	| n_deps>=0
+		| arg_n<n_deps
+			= (arg_n,deps)
+			= (n_deps,deps)
+		= (arg_n,deps)
 
 strictness_from_fields :: ![ParsedSelector] -> StrictnessList
 strictness_from_fields fields
@@ -1493,21 +1535,22 @@ reorganiseDefinitions icl_module [PD_Generic gen : defs] cons_count sel_count me
 	# 	(fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs cons_count sel_count mem_count type_count ca
 		c_defs = {c_defs & def_generics = [gen : c_defs.def_generics]}
 	= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)
-reorganiseDefinitions icl_module [PD_GenericCase gc : defs] cons_count sel_count mem_count type_count ca
+reorganiseDefinitions icl_module [PD_GenericCase gc=:{gc_type_cons} : defs] cons_count sel_count mem_count type_count ca
 	# (GCF gc_ident gcf=:{gcf_body=GCB_ParsedBody args rhs,gcf_arity,gcf_generic_info}) = gc.gc_gcf
-	#! (bodies, generic_info, defs, ca) = collectGenericBodies defs gc_ident gcf_arity gc.gc_type_cons ca
+	#! (bodies, generic_info, defs, ca) = collectGenericBodies defs gc_ident gcf_arity gc_type_cons ca
 	#! (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) 
 		= reorganiseDefinitions icl_module defs cons_count sel_count mem_count type_count ca
 	# generic_info = generic_info bitor gcf_generic_info
 	#! body = { pb_args = args, pb_rhs = rhs, pb_position = gc.gc_pos }
 	# bodies = [body : bodies]
-	# (bodies,gcf_arity,ca)
+	# (bodies,gcf_arity,generic_instance_deps,ca)
 		= if (generic_info > 0)
-			(replace_generic_info_record_by_arguments generic_info bodies gcf_arity gc.gc_type_cons ca)
-			(bodies,gcf_arity,ca)
-	#! fun_name = genericIdentToFunIdent gc_ident.id_name /*gcf.gcf_ident.id_name*/ gc.gc_type_cons 
+			(replace_generic_info_record_by_arguments generic_info bodies gcf_arity gc_type_cons ca)
+			(determine_generic_instance_deps bodies gcf_arity gc_type_cons ca)
+	# fun_name = genericIdentToFunIdent gc_ident.id_name /*gcf.gcf_ident.id_name*/ gc.gc_type_cons 
 	#! fun = MakeNewImpOrDefFunction fun_name gcf_arity bodies (FK_Function cNameNotLocationDependent) NoPrio No gc.gc_pos
-	#! inst = { gc & gc_gcf = GCF gc_ident {gcf & gcf_body = GCB_FunDef fun, gcf_generic_info = generic_info, gcf_arity = gcf_arity}} 
+	# gcf & gcf_body=GCB_FunDef fun, gcf_arity=gcf_arity, gcf_generic_info=generic_info, gcf_generic_instance_deps=generic_instance_deps
+	#! inst = {gc & gc_gcf = GCF gc_ident gcf} 
 	#! c_defs = {c_defs & def_generic_cases = [inst : c_defs.def_generic_cases]}
 	= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)
 reorganiseDefinitions icl_module [PD_Derive derive_defs : defs] cons_count sel_count mem_count type_count ca

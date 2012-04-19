@@ -197,6 +197,7 @@ ScanOptionNoNewOffsideForSeqLetBit:==4;
 	|	GenericOpenToken		//		{|
 	|	GenericCloseToken		//		|}
 	|	GenericOfToken			//		of
+	|	GenericWithToken		//		with
 
 	|	ExistsToken				//		E.
 	|	ForAllToken				//		A.
@@ -916,7 +917,8 @@ CheckCodeContext s input
 CheckGenericContext :: !String !Input -> (!Token, !Input)
 CheckGenericContext s input
  = case s of
-	"of"	->	(GenericOfToken		, input)
+	"of"		->	(GenericOfToken,	input)
+	"with"		->	(GenericWithToken,	input)
 	s			->	CheckEveryContext s input	
 
 GetPrio :: !Input -> (!Optional String, !Int, !Input)
