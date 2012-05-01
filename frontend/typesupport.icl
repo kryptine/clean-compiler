@@ -1136,8 +1136,15 @@ where
 	where
 		write_tc_class (TCClass {glob_object={ds_ident}}) file
 			= file <<< ds_ident
-		write_tc_class (TCGeneric {gtc_class={glob_object={ds_ident}}}) file
-			= file <<< ds_ident
+		write_tc_class (TCGeneric {gtc_class={glob_object={ds_ident={id_name}}},gtc_kind}) file
+			= write_generic_class (size id_name-1) id_name gtc_kind
+		where
+			write_generic_class i class_name kind
+				| i>0
+					| class_name.[i]<>'_'
+						= write_generic_class (i-1) class_name kind
+						= file <<< (class_name % (0,i-1)) <<< "{|" <<< gtc_kind <<< "|}"
+					= file <<< class_name
 
 instance writeType SAType
 where
