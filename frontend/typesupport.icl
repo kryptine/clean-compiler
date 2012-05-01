@@ -1154,7 +1154,13 @@ where
 				# (file, opt_beautifulizer)
 					= show_marked_attribute file opt_beautifulizer (form, TA_Multi)
 				= writeType file opt_beautifulizer (form, type)
-				= writeType file opt_beautifulizer (form, type) 
+				= writeType file opt_beautifulizer (form, type)
+		show_attributed_type file opt_beautifulizer form TA_None type
+			| checkProperty form cMarkAttribute
+				# (file, opt_beautifulizer)
+					= show_marked_attribute file opt_beautifulizer (form, TA_None)
+				= writeType file opt_beautifulizer (form, type)
+				= writeType file opt_beautifulizer (form, type)
 		show_attributed_type file opt_beautifulizer form attr type
 			| checkProperty form cAttributed
 				# (file, opt_beautifulizer)
@@ -1213,7 +1219,7 @@ where
 	writeType file opt_beautifulizer (form, arg_type --> res_type)
 		| checkProperty form cBrackets
 			= writeWithinBrackets "(" ")" file opt_beautifulizer
-									(clearProperty (setProperty form cArrowSeparator) cBrackets, [arg_type, res_type])
+									(setProperty form cArrowSeparator, [arg_type, res_type])
 			= writeType file opt_beautifulizer (setProperty form (cBrackets bitor cArrowSeparator), [arg_type, res_type])
 	writeType file opt_beautifulizer (form, type :@: types)
 		| checkProperty form cBrackets
@@ -1317,7 +1323,7 @@ where
 
 writeWithinBrackets br_open br_close file opt_beautifulizer (form, types)
 	# (file, opt_beautifulizer) 
-			= writeType (file <<< br_open) opt_beautifulizer (form, types)
+		= writeType (file <<< br_open) opt_beautifulizer (clearProperty form cBrackets, types)
 	= (file <<< br_close, opt_beautifulizer)
 
 writeBeautifulTypeVar file beautifulizer=:{tvb_visited_type_vars, tvb_fresh_type_vars} type
