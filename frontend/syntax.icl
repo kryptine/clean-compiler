@@ -842,6 +842,8 @@ instance <<< CoercionPosition
 where
 	(<<<) file (CP_FunArg fun_name arg_nr)
 		= file <<< "argument " <<< arg_nr <<< " of " <<< readable fun_name
+	(<<<) file (CP_SymbArg fun_name arg_nr)
+		= file <<< "argument " <<< arg_nr <<< " of " <<< readable fun_name.symb_ident
 	(<<<) file (CP_LiftedFunArg fun_name arg_name)
 		= file <<< "lifted argument " <<< arg_name <<< " of " <<< readable fun_name
 	(<<<) file (CP_Expression expression) = show_expression file expression
