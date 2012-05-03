@@ -587,6 +587,8 @@ where
 			= file <<< "MacroCall "<<< module_index <<<" "<<<fc_index <<< '.' <<< fc_level
 	(<<<) file (DclFunCall module_index fc_index)
 			= file <<< "DclFunCall "<<< module_index <<<" "<<<fc_index
+	(<<<) file (GeneratedFunCall fc_index fun_ptr)
+			= file <<< "GeneratedFunCall "<<< fc_index
 
 instance <<< FreeVar
 where
@@ -853,6 +855,8 @@ instance <<< CoercionPosition
 where
 	(<<<) file (CP_FunArg fun_name arg_nr)
 		= file <<< "argument " <<< arg_nr <<< " of " <<< readable fun_name
+	(<<<) file (CP_SymbArg fun_name arg_nr)
+		= file <<< "argument " <<< arg_nr <<< " of " <<< readable fun_name.symb_ident
 	(<<<) file (CP_LiftedFunArg fun_name arg_name)
 		= file <<< "lifted argument " <<< arg_name <<< " of " <<< readable fun_name
 	(<<<) file (CP_Expression expression) = show_expression file expression

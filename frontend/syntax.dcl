@@ -1499,7 +1499,8 @@ instance == OverloadedListType
 
 ::	CoercionPosition
 	=	CP_Expression !Expression
-	|	CP_FunArg !Ident !Int // Function symbol, argument position (>=1)
+	|	CP_FunArg !Ident !Int // Function or constructor ident, argument position (>=1)
+	|	CP_SymbArg !SymbIdent !Int // Function or constructor symbol, argument position (>=1)
 	|	CP_LiftedFunArg !Ident !Ident // Function symbol, lifted argument ident
 
 ::	IdentPos =

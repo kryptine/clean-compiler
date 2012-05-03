@@ -249,37 +249,44 @@ where
 type_error =: "Type error"
 type_error_format =: { form_properties = cNoProperties, form_attr_position = No }
 
-cannotUnify t1 t2 position=:(CP_Expression expr) err=:{ea_loc=[ip:_]} 
+cannotUnify t1 t2 position=:(CP_Expression expr) common_defs err=:{ea_loc=[ip:_]}
 	= case tryToOptimizePosition expr of
 		Yes (id_name, line)
 			# err = pushErrorAdmin { ip & ip_ident.id_name = id_name, ip_line = line } err
 			  err = errorHeading type_error err
 			  err = popErrorAdmin err
-			# err = { err & ea_file = err.ea_file <<< " cannot unify types:\n" }
-			# err = { err & ea_file = err.ea_file <<< " " <:: (type_error_format, t1, No) <<< '\n' }
-			# err = { err & ea_file = err.ea_file <<< " " <:: (type_error_format, t2, No) <<< '\n' }
-			-> err;
+			  err = { err & ea_file = err.ea_file <<< " cannot unify demanded type with offered type:\n" }
+			  err = { err & ea_file = err.ea_file <<< " " <:: (type_error_format, t1, No) <<< '\n' }
+			  err = { err & ea_file = err.ea_file <<< " " <:: (type_error_format, t2, No) <<< '\n' }
+			-> err
 		_
-			-> cannot_unify t1 t2 position err 
-cannotUnify t1 t2 position err 
-	= cannot_unify t1 t2 position err 
+			-> cannot_unify t1 t2 position common_defs err
+cannotUnify t1 t2 position common_defs err
+	= cannot_unify t1 t2 position common_defs err
 
-cannot_unify t1 t2 position err
+cannot_unify t1 t2 position common_defs err
 	# (err=:{ea_file}) = errorHeading type_error err
 	  ea_file = case position of
 				CP_FunArg _ _
 					-> ea_file <<< "\"" <<< position <<< "\""
+				CP_SymbArg {symb_kind=SK_Constructor {glob_module,glob_object},symb_ident} arg_n
+					-> case common_defs.[glob_module].com_type_defs.[glob_object].td_rhs of
+						RecordType {rt_fields}
+							# field_name = rt_fields.[arg_n-1].fs_ident.id_name
+							  record_name = symb_ident.id_name
+							  record_name = if (record_name.[0]=='_') (record_name % (1,size record_name-1)) record_name
+							-> ea_file <<< "\"" <<< "field " <<< field_name <<< " of " <<< record_name <<< "\""
+						_
+							-> ea_file <<< "\"" <<< position <<< "\""
+				CP_SymbArg _ _
+					-> ea_file <<< "\"" <<< position <<< "\""
 				CP_LiftedFunArg _ _
 					-> ea_file <<< "\"" <<< position <<< "\""
-				_
-					-> ea_file
-
-	  ea_file = case position of
   				CP_Expression _
 	  				-> ea_file <<< " near " <<< position <<< " :"
 	  			_
 	  				-> ea_file
-	  ea_file = ea_file <<< " cannot unify types:\n"
+	  ea_file = ea_file <<< " cannot unify demanded type with offered type:\n"
 	  ea_file = ea_file <<< " " <:: (type_error_format, t1, No) <<< "\n"
 	  ea_file = ea_file <<< " " <:: (type_error_format, t2, No) <<< "\n"
 	= { err & ea_file = ea_file}
@@ -982,7 +989,7 @@ freshSymbolType is_appl fresh_context_vars {st_vars,st_args,st_result,st_context
 			= collect_cons_variables tc_types class_cons_vars collected_cons_vars
 		collect_cons_variables_in_tc common_defs tc=:{tc_class=TCGeneric {gtc_class}} collected_cons_vars
 			= collect_cons_variables_in_tc common_defs {tc & tc_class=TCClass gtc_class} collected_cons_vars 
-		 
+
 		collect_cons_variables [] class_cons_vars collected_cons_vars
 			= collected_cons_vars
 		collect_cons_variables [type : tc_types] class_cons_vars collected_cons_vars
@@ -1548,23 +1555,24 @@ where
 		get_n_lifted_arguments _ _ ts
 			= (0,[],ts)
 
-		requirements_of_lifted_and_normal_args :: !TypeInput !SymbIdent !Int ![FreeVar] ![Expression] ![AType] !(!u:Requirements, !*TypeState) -> (!u:Requirements, !*TypeState)
+		requirements_of_lifted_and_normal_args :: !TypeInput SymbIdent !Int ![FreeVar] ![Expression] ![AType] !(!u:Requirements, !*TypeState) -> (!u:Requirements, !*TypeState)
 		requirements_of_lifted_and_normal_args ti fun_ident arg_nr _ exprs lts reqs_ts
 			| arg_nr>0
 				= requirements_of_args ti fun_ident arg_nr exprs lts reqs_ts
 		requirements_of_lifted_and_normal_args ti fun_ident arg_nr [{fv_ident}:fun_args] [expr:exprs] [lt:lts] reqs_ts
 			# (e_type, opt_expr_ptr, (reqs, ts)) = requirements ti expr reqs_ts
-			  position = CP_LiftedFunArg fun_ident.symb_ident fv_ident
-			  req_type_coercions = [{ tc_demanded = lt, tc_offered = e_type, tc_position = position, tc_coercible = True } : reqs.req_type_coercions ]
+			#! type_coercion = {tc_demanded = lt, tc_offered = e_type, tc_position = CP_LiftedFunArg fun_ident.symb_ident fv_ident, tc_coercible = True}
+			# req_type_coercions = [type_coercion : reqs.req_type_coercions]
 			  ts_expr_heap = storeAttribute opt_expr_ptr lt.at_attribute ts.ts_expr_heap
 			= requirements_of_lifted_and_normal_args ti fun_ident (arg_nr+1) fun_args exprs lts ({reqs & req_type_coercions = req_type_coercions}, {ts & ts_expr_heap = ts_expr_heap})
 
-		requirements_of_args :: !TypeInput !SymbIdent !Int ![Expression] ![AType] !(!u:Requirements, !*TypeState) -> (!u:Requirements, !*TypeState)
+		requirements_of_args :: !TypeInput SymbIdent !Int ![Expression] ![AType] !(!u:Requirements, !*TypeState) -> (!u:Requirements, !*TypeState)
 		requirements_of_args ti _ _ [] [] reqs_ts
 			= reqs_ts
 		requirements_of_args ti fun_ident arg_nr [expr:exprs] [lt:lts] reqs_ts
 			# (e_type, opt_expr_ptr, (reqs, ts)) = requirements ti expr reqs_ts
-			  req_type_coercions = [{tc_demanded = lt, tc_offered = e_type, tc_position = CP_FunArg fun_ident.symb_ident arg_nr, tc_coercible = True} : reqs.req_type_coercions ]
+			#! type_coercion = {tc_demanded = lt, tc_offered = e_type, tc_position = CP_SymbArg fun_ident arg_nr, tc_coercible = True}
+			# req_type_coercions = [type_coercion : reqs.req_type_coercions]
 			  ts_expr_heap = storeAttribute opt_expr_ptr lt.at_attribute ts.ts_expr_heap
 			= requirements_of_args ti fun_ident (arg_nr+1) exprs lts ({reqs & req_type_coercions = req_type_coercions}, {ts & ts_expr_heap = ts_expr_heap})
 
@@ -2160,15 +2168,14 @@ attributedBasicType (BT_String string_type) ts=:{ts_attr_store}
 attributedBasicType bas_type ts=:{ts_attr_store}
 	= ({ at_attribute = TA_TempVar ts_attr_store, at_type = TB bas_type}, {ts & ts_attr_store = inc ts_attr_store})
 
-unify_coercions [{tc_demanded,tc_offered,tc_position}:coercions] modules subst heaps err
-	# (succ, subst, heaps) = unify tc_demanded tc_offered modules subst heaps
+unify_coercions [{tc_demanded,tc_offered,tc_position}:coercions] ti subst heaps err
+	# (succ, subst, heaps) = unify tc_demanded tc_offered ti subst heaps
 	| succ
-		= unify_coercions coercions modules subst heaps err
+		= unify_coercions coercions ti subst heaps err
 		# (_, subst_demanded, subst)	= arraySubst tc_demanded subst
 		  (_, subst_offered, subst)		= arraySubst tc_offered subst
-		= (subst, heaps, cannotUnify subst_demanded subst_offered tc_position err)
-//			---> ("unify_coercions", subst_demanded, subst_offered)
-unify_coercions [] modules subst heaps err
+		= (subst, heaps, cannotUnify subst_demanded subst_offered tc_position ti.ti_common_defs err)
+unify_coercions [] ti subst heaps err
 	= (subst, heaps, err)
 
 InitFunEnv :: !Int -> *{! FunctionType}
@@ -2795,6 +2802,8 @@ where
 					  ea_file = 
 					  	case tc_position of
 					  		CP_FunArg _ _
+					  			-> ea_file <<< "\"" <<< tc_position <<< "\" "
+					  		CP_SymbArg _ _
 					  			-> ea_file <<< "\"" <<< tc_position <<< "\" "
 					  		CP_LiftedFunArg _ _
 					  			-> ea_file <<< "\"" <<< tc_position <<< "\" "
