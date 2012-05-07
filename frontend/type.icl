@@ -231,7 +231,8 @@ cannot_unify t1 t2 position common_defs err
 				CP_FunArg _ _
 					-> ea_file <<< "\"" <<< position <<< "\""
 				CP_SymbArg {symb_kind=SK_Constructor {glob_module,glob_object},symb_ident} arg_n
-					-> case common_defs.[glob_module].com_type_defs.[glob_object].td_rhs of
+					#! type_index = common_defs.[glob_module].com_cons_defs.[glob_object].cons_type_index
+					-> case common_defs.[glob_module].com_type_defs.[type_index].td_rhs of
 						RecordType {rt_fields}
 							# field_name = rt_fields.[arg_n-1].fs_ident.id_name
 							  record_name = symb_ident.id_name
