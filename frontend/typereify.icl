@@ -223,7 +223,7 @@ addTypeFunctionsA mod first_td_fun_index ct_type_def type_defs var_heap symbol_t
 						}
 			# (fun_ident, symbol_table)
 				=	newPtr entry symbol_table
-			# type_fun_ident = {id_name="TD;"+++td_ident, id_info=fun_ident}
+			# type_fun_ident = {id_name="TD;"+++td_ident.id_name, id_info=fun_ident}
 
 			# result_type = TA ct_type_def [{at_attribute = TA_None, at_type = TB BT_Bool}]
 

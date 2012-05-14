@@ -191,7 +191,7 @@ predefined_idents
 					[PD_GenericConsInfo] = i "GenericConsInfo",
 					[PD_GenericFieldInfo] = i "GenericFieldInfo",
 					[PD_GenericTypeInfo] = i "GenericTypeDefInfo",
-					[PD_TGenericConsDescriptor] = i "GenericConsDescriptor",
+//					[PD_TGenericConsDescriptor] = i "GenericConsDescriptor",
 					[PD_CGenericConsDescriptor] = i "_GenericConsDescriptor",
 					[PD_TGenericFieldDescriptor] = i "GenericFieldDescriptor",
 					[PD_CGenericFieldDescriptor] = i "_GenericFieldDescriptor",
@@ -209,8 +209,7 @@ predefined_idents
 					[PD_CGenTypeVar] = i "GenTypeVar",
 					[PD_CGenTypeArrow] = i "GenTypeArrow",
 					[PD_CGenTypeApp] = i "GenTypeApp",
-														
-					
+				
 					[PD_GenericBimap] = i "bimap",
 					[PD_bimapId] = i "bimapId",
 				
