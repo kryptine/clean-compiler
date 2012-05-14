@@ -15,6 +15,3 @@ addTypeFunctions :: Ident Int *{#DclModule} *{#FunDef} *CommonDefs *PredefinedSy
 
 buildTypeFunctions :: !Int !*{#FunDef} !{#CommonDefs} *PredefinedSymbols *VarHeap *TypeHeaps
 									  -> (*{#FunDef}, *PredefinedSymbols,*VarHeap,*TypeHeaps)
-
-sanityCheckTypeFunctions :: !Int !CommonDefs !{#DclModule} !{#FunDef}
-	->	Bool

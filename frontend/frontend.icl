@@ -98,9 +98,6 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_m
 //	# (td_infos, th_vars, error_admin) = analyseTypeDefs ti_common_defs type_groups td_infos type_heaps.th_vars error_admin
 	  ({com_type_defs}, ti_common_defs) = replace ti_common_defs main_dcl_module_n icl_common
 
-	| support_dynamics && not (sanityCheckTypeFunctions main_dcl_module_n icl_common dcl_mods fun_defs)
-		=	abort "frontend: sanityCheckTypeFunctions failed"
-
 	# hp_var_heap = heaps.hp_var_heap
 	#! n_types_with_type_functions = size ti_common_defs.[main_dcl_module_n].com_type_defs
 	#! n_constructors_with_type_functions = size ti_common_defs.[main_dcl_module_n].com_cons_defs

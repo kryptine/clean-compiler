@@ -112,26 +112,61 @@ predefined_idents
 					[PD_Dyn_unify] = i "_unify",
 					[PD_Dyn_normalise] = i "_normalise",
 
-					[PD_Dyn_TypeCodeConstructorInt] = i "TypeCodeConstructorInt",
-					[PD_Dyn_TypeCodeConstructorChar] = i "TypeCodeConstructorChar",
-					[PD_Dyn_TypeCodeConstructorReal] = i "TypeCodeConstructorReal",
-					[PD_Dyn_TypeCodeConstructorBool] = i "TypeCodeConstructorBool",
-					[PD_Dyn_TypeCodeConstructorDynamic] = i "TypeCodeConstructorDynamic",
-					[PD_Dyn_TypeCodeConstructorFile] = i "TypeCodeConstructorFile",
-					[PD_Dyn_TypeCodeConstructorWorld] = i "TypeCodeConstructorWorld",
-					[PD_Dyn_TypeCodeConstructor_Arrow] = i "TypeCodeConstructor_Arrow",
-					[PD_Dyn_TypeCodeConstructor_List] = i "TypeCodeConstructor_List",
-					[PD_Dyn_TypeCodeConstructor_StrictList] = i "TypeCodeConstructor_StrictList",
-					[PD_Dyn_TypeCodeConstructor_UnboxedList] = i "TypeCodeConstructor_UnboxedList",
-					[PD_Dyn_TypeCodeConstructor_TailStrictList] = i "TypeCodeConstructor_TailStrictList",
-					[PD_Dyn_TypeCodeConstructor_StrictTailStrictList] = i "TypeCodeConstructor_StrictTailStrictList",
-					[PD_Dyn_TypeCodeConstructor_UnboxedTailStrictList] = i "TypeCodeConstructor_UnboxedTailStrictList",
-					[PD_Dyn_TypeCodeConstructor_Tuple] = i "TypeCodeConstructor_Tuple",
-					[PD_Dyn_TypeCodeConstructor_LazyArray] = i "TypeCodeConstructor_LazyArray",
-					[PD_Dyn_TypeCodeConstructor_StrictArray] = i "TypeCodeConstructor_StrictArray",
-					[PD_Dyn_TypeCodeConstructor_UnboxedArray] = i "TypeCodeConstructor_UnboxedArray",
-
 					[PD_Dyn__to_TypeCodeConstructor] = i "_to_TypeCodeConstructor",
+					[PD_TypeCodeConstructor] = i "TypeCodeConstructor",
+
+					[PD_TC_Int] = i "TC_Int",
+					[PD_TC_Char] = i "TC_Char",
+					[PD_TC_Real] = i "TC_Real",
+					[PD_TC_Bool] = i "TC_Bool",
+					[PD_TC_Dynamic] = i "TC_Dynamic",
+					[PD_TC_File] = i "TC_File",
+					[PD_TC_World] = i "TC_World",
+
+					[PD_TC__Arrow] = i "TC__Arrow",
+
+					[PD_TC__List] = i "TC__List",
+					[PD_TC__StrictList] = i "TC__StrictList",
+					[PD_TC__UnboxedList] = i "TC__UnboxedList",
+					[PD_TC__TailStrictList] = i "TC__TailStrictList",
+					[PD_TC__StrictTailStrictList] = i "TC__StrictTailStrictList",
+					[PD_TC__UnboxedTailStrictList] = i "TC__UnboxedTailStrictList",
+
+					[PD_TC__Tuple2] = i "TC__Tuple2",
+					[PD_TC__Tuple3] = i "TC__Tuple3",
+					[PD_TC__Tuple4] = i "TC__Tuple4",
+					[PD_TC__Tuple5] = i "TC__Tuple5",
+					[PD_TC__Tuple6] = i "TC__Tuple6",
+					[PD_TC__Tuple7] = i "TC__Tuple7",
+					[PD_TC__Tuple8] = i "TC__Tuple8",
+					[PD_TC__Tuple9] = i "TC__Tuple9",
+					[PD_TC__Tuple10] = i "TC__Tuple10",
+					[PD_TC__Tuple11] = i "TC__Tuple11",
+					[PD_TC__Tuple12] = i "TC__Tuple12",
+					[PD_TC__Tuple13] = i "TC__Tuple13",
+					[PD_TC__Tuple14] = i "TC__Tuple14",
+					[PD_TC__Tuple15] = i "TC__Tuple15",
+					[PD_TC__Tuple16] = i "TC__Tuple16",
+					[PD_TC__Tuple17] = i "TC__Tuple17",
+					[PD_TC__Tuple18] = i "TC__Tuple18",
+					[PD_TC__Tuple19] = i "TC__Tuple19",
+					[PD_TC__Tuple20] = i "TC__Tuple20",
+					[PD_TC__Tuple21] = i "TC__Tuple21",
+					[PD_TC__Tuple22] = i "TC__Tuple22",
+					[PD_TC__Tuple23] = i "TC__Tuple23",
+					[PD_TC__Tuple24] = i "TC__Tuple24",
+					[PD_TC__Tuple25] = i "TC__Tuple25",
+					[PD_TC__Tuple26] = i "TC__Tuple26",
+					[PD_TC__Tuple27] = i "TC__Tuple27",
+					[PD_TC__Tuple28] = i "TC__Tuple28",
+					[PD_TC__Tuple29] = i "TC__Tuple29",
+					[PD_TC__Tuple30] = i "TC__Tuple30",
+					[PD_TC__Tuple31] = i "TC__Tuple31",
+					[PD_TC__Tuple32] = i "TC__Tuple32",
+
+					[PD_TC__LazyArray] = i "TC__LazyArray",
+					[PD_TC__StrictArray] = i "TC__StrictArray",
+					[PD_TC__UnboxedArray] = i "TC__UnboxedArray",
 
 					[PD_StdGeneric] = i "StdGeneric",
 					[PD_TypeBimap] = i "Bimap",
@@ -213,17 +248,7 @@ predefined_idents
 					[PD_FromThenToSTS]= i "_from_then_to_sts",
 					[PD_FromThenToU]= i "_from_then_to_u",
 					[PD_FromThenToUTS]= i "_from_then_to_uts",
-					[PD_FromThenToO]= i "_from_then_to_o",
-
-					[PD_CleanTypes] = i "StdCleanTypes",
-					[PD_CTTypeDef] = i "CTTypeDef",
-					[PD_CTAlgType] = i "CTAlgType",
-					[PD_CTRecordType] = i "CTRecordType",
-					[PD_CTSynType] = i "CTSynType",
-					[PD_CTPredefined] = i "CTPredefined",
-					[PD_CTConsDef] = i "CTConsDef",
-					[PD__CTToCons] = i "CTToCons",
-					[PD_CTFieldDef] = i "CTFieldDef"
+					[PD_FromThenToO]= i "_from_then_to_o"
 
 		}
 	=: idents
@@ -341,10 +366,14 @@ where
 					<<- (local_predefined_idents,	IC_Type, PD_Dyn_DynamicTemp)
 					<<- (local_predefined_idents,	IC_Type, PD_Dyn_TypeCode)
 					<<- (local_predefined_idents,	IC_Type, PD_Dyn_UnificationEnvironment)
-		# hash_table = put_predefined_idents_in_hash_table PD_Dyn_TypeScheme PD_Dyn_TypeCodeConstructor_UnboxedArray IC_Expression local_predefined_idents hash_table
+		# hash_table = put_predefined_idents_in_hash_table PD_Dyn_TypeScheme PD_Dyn_normalise IC_Expression local_predefined_idents hash_table
 					<<- (local_predefined_idents,	IC_Expression, PD_Dyn__to_TypeCodeConstructor)
 
+					<<- (local_predefined_idents,	IC_Type, PD_TypeCodeConstructor)
+
 					<<- (local_predefined_idents,	IC_Module NoQualifiedIdents, PD_StdGeneric)
+		# hash_table = put_predefined_idents_in_hash_table PD_TC_Int PD_TC__UnboxedArray IC_Expression local_predefined_idents hash_table
+
 		# hash_table = put_predefined_idents_in_hash_table PD_TypeBimap PD_TypeGenericDict IC_Type local_predefined_idents hash_table
 		# hash_table = put_predefined_idents_in_hash_table PD_ConsBimap PD_bimapId IC_Expression local_predefined_idents hash_table
 					<<- (local_predefined_idents,	IC_Generic,		PD_GenericBimap)	
@@ -357,17 +386,6 @@ where
 
 					<<- (local_predefined_idents,	IC_Expression, 	PD_abort)
 					<<- (local_predefined_idents,	IC_Expression, 	PD_undef)					
-					
-					<<- (local_predefined_idents,	IC_Module NoQualifiedIdents, PD_CleanTypes)
-
-					<<- (local_predefined_idents,	IC_Type, PD_CTTypeDef)
-					<<- (local_predefined_idents,	IC_Expression, PD_CTAlgType)
-					<<- (local_predefined_idents,	IC_Expression, PD_CTRecordType)
-					<<- (local_predefined_idents,	IC_Expression, PD_CTSynType)
-					<<- (local_predefined_idents,	IC_Expression, PD_CTPredefined)
-					<<- (local_predefined_idents,	IC_Type, PD_CTConsDef)
-					<<- (local_predefined_idents,	IC_Expression, PD__CTToCons)
-					<<- (local_predefined_idents,	IC_Type, PD_CTFieldDef)
 
 					<<- (local_predefined_idents,	IC_Expression, PD_Start)
 

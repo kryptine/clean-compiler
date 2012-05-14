@@ -1483,7 +1483,7 @@ qualified_ident_to_import_declaration IC_Selector ident
 reorganiseDefinitionsAndAddTypes mod_ident support_dynamics icl_module defs ca
 	| support_dynamics
 		# clean_types_module_ident
-			=	predefined_idents.[PD_CleanTypes]
+			=	predefined_idents.[PD_StdDynamic]
 		# clean_types_module =
 			{	import_module = clean_types_module_ident
 			,	import_symbols = ImportSymbolsAll
