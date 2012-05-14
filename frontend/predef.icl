@@ -188,7 +188,7 @@ predefined_idents
 					[PD_ConsFIELD] = i "FIELD",
 					[PD_TypeOBJECT] = i "OBJECT",
 					[PD_ConsOBJECT] = i "OBJECT",
-//					[PD_TGenericConsDescriptor] = i "GenericConsDescriptor",
+					[PD_TGenericConsDescriptor] = i "GenericConsDescriptor",
 					[PD_CGenericConsDescriptor] = i "_GenericConsDescriptor",
 					[PD_TGenericRecordDescriptor] = i "GenericRecordDescriptor",
 					[PD_CGenericRecordDescriptor] = i "_GenericRecordDescriptor",
