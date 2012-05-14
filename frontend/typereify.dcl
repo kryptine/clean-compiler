@@ -17,8 +17,5 @@ addDclTypeFunctions :: !Int !*{#DclModule} !*PredefinedSymbols !*VarHeap !*Symbo
 addIclTypeFunctions :: !Int !Int !*{#FunDef} !*{#CheckedTypeDef} !*{#ClassDef} !*PredefinedSymbols !*VarHeap !*SymbolTable
 				 -> (!IndexRange,!*{#FunDef},!*{#CheckedTypeDef},!*{#ClassDef},!*PredefinedSymbols,!*VarHeap,!*SymbolTable)
 
-buildTypeFunctions :: !Int !*{#FunDef} !{#CommonDefs} *PredefinedSymbols *VarHeap *TypeHeaps
-									  -> (*{#FunDef}, *PredefinedSymbols,*VarHeap,*TypeHeaps)
-
-sanityCheckTypeFunctions :: !Int !CommonDefs !{#DclModule} !{#FunDef}
-	->	Bool
+buildTypeFunctions :: !Int !*{#FunDef} !{#CommonDefs} !*PredefinedSymbols !*VarHeap !*TypeHeaps
+									  -> (!*{#FunDef},!*PredefinedSymbols,!*VarHeap,!*TypeHeaps)

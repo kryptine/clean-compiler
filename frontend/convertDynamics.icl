@@ -20,13 +20,14 @@ import type_io;
 	}
 
 :: DynamicRepresentation =
-	{	dr_type_ident		:: SymbIdent
+	!{	dr_type_ident		:: SymbIdent
 	,	dr_dynamic_type		:: GlobalIndex
 	,	dr_dynamic_symbol	:: Global DefinedSymbol
+	,	dr_type_code_constructor_symb_ident :: SymbIdent
 	}
 
 ::	ConversionInput =
-	{	cinp_dynamic_representation	:: DynamicRepresentation
+	{	cinp_dynamic_representation	:: !DynamicRepresentation
 	,	cinp_st_args		:: ![FreeVar]
 	,	cinp_subst_var		:: !BoundVar
 	}
@@ -510,7 +511,6 @@ convertTypeCode pattern _ (TCE_TypeTerm var_info_ptr) (has_var, binds, ci=:{ci_v
 				# (expr, ci) = createTypePatternVariable ci
 				# ci = {ci & ci_var_heap = writePtr var_info_ptr (VI_TypeCodeVariable (TCI_TypePatternVar expr)) ci.ci_var_heap}
 				->	(expr, (True, binds, ci))
-
 convertTypeCode pattern cinp (TCE_App t arg) (has_var, binds, ci)
 	# (typeapp_symb, ci)
 		=	getSymbol PD_Dyn_TypeApp SK_Constructor 2 ci
@@ -521,7 +521,7 @@ convertTypeCode pattern cinp (TCE_App t arg) (has_var, binds, ci)
 	= (App {app_symb		= typeapp_symb,
 			app_args 		= [typecode_t, typecode_arg],
 			app_info_ptr	= nilPtr}, st)
-convertTypeCode pattern cinp (TCE_Constructor cons []) (has_var, binds, ci)
+convertTypeCode pattern {cinp_dynamic_representation} (TCE_Constructor cons []) (has_var, binds, ci)
 	# (typecons_symb, ci)
 		=	getSymbol PD_Dyn_TypeCons SK_Constructor 1 ci
 	# (constructor, ci)
@@ -539,62 +539,51 @@ where
 		
 	typeConstructor (GTT_PredefTypeConstructor {glob_object=type_index}) ci
 		| PD_Arity2TupleTypeIndex <= type_index && type_index <= PD_Arity32TupleTypeIndex
-			# arity
-				=	type_index - PD_Arity2TupleTypeIndex + 2
-			# (tuple_symb, ci)
-				=	getSymbol PD_Dyn_TypeCodeConstructor_Tuple SK_Function 1 ci 
-			=	(App {app_symb = tuple_symb, app_args = [BasicExpr (BVInt arity)], app_info_ptr = nilPtr}, ci)
+			= type_code_constructor_expression (type_index + (PD_TC__Tuple2 - PD_Arity2TupleTypeIndex)) ci
 		// otherwise
-			# predef_type_index
-				=	type_index + FirstTypePredefinedSymbolIndex
-			=	constructorExp (predefinedTypeConstructor predef_type_index) SK_Function 0 ci
+			# predef_type_index = type_index + FirstTypePredefinedSymbolIndex
+			= case predef_type_index of
+				PD_ListType
+					-> type_code_constructor_expression PD_TC__List ci
+				PD_StrictListType
+					-> type_code_constructor_expression PD_TC__StrictList ci
+				PD_UnboxedListType
+					-> type_code_constructor_expression PD_TC__UnboxedList ci
+				PD_TailStrictListType
+					-> type_code_constructor_expression PD_TC__TailStrictList ci
+				PD_StrictTailStrictListType
+					-> type_code_constructor_expression PD_TC__StrictTailStrictList	ci
+				PD_UnboxedTailStrictListType
+					-> type_code_constructor_expression PD_TC__UnboxedTailStrictList ci
+				PD_LazyArrayType
+					-> type_code_constructor_expression PD_TC__LazyArray ci
+				PD_StrictArrayType
+					-> type_code_constructor_expression PD_TC__StrictArray ci
+				PD_UnboxedArrayType
+					-> type_code_constructor_expression PD_TC__UnboxedArray ci
 	typeConstructor (GTT_Constructor fun_ident) ci
 		# type_fun
 			=	App {app_symb = fun_ident, app_args = [], app_info_ptr = nilPtr}
-		# (to_tc_symb, ci)
-			=	getSymbol PD_Dyn__to_TypeCodeConstructor SK_Function 2 ci 
-		=	(App {app_symb = to_tc_symb, app_args = [type_fun], app_info_ptr = nilPtr}, ci)
-	typeConstructor (GTT_Basic basic_type) ci
-		=	constructorExp (basicTypeConstructor basic_type) SK_Function 0 ci
-	typeConstructor GTT_Function ci
-		=	constructorExp PD_Dyn_TypeCodeConstructor_Arrow SK_Function 0 ci
+		= (App {app_symb = cinp_dynamic_representation.dr_type_code_constructor_symb_ident, app_args = [type_fun], app_info_ptr = nilPtr}, ci)
 
-	basicTypeConstructor BT_Int
-		=	PD_Dyn_TypeCodeConstructorInt
-	basicTypeConstructor BT_Char	
-		=	PD_Dyn_TypeCodeConstructorChar
-	basicTypeConstructor BT_Real	
-		=	PD_Dyn_TypeCodeConstructorReal
-	basicTypeConstructor BT_Bool	
-		=	PD_Dyn_TypeCodeConstructorBool
-	basicTypeConstructor BT_Dynamic	
-		=	PD_Dyn_TypeCodeConstructorDynamic
-	basicTypeConstructor BT_File	
-		=	PD_Dyn_TypeCodeConstructorFile
-	basicTypeConstructor BT_World	
-		=	PD_Dyn_TypeCodeConstructorWorld
-	
-	predefinedTypeConstructor predef_type_index
-		| predef_type_index == PD_ListType
-			=	PD_Dyn_TypeCodeConstructor_List
-		| predef_type_index == PD_StrictListType
-			=	PD_Dyn_TypeCodeConstructor_StrictList
-		| predef_type_index == PD_UnboxedListType
-			=	PD_Dyn_TypeCodeConstructor_UnboxedList
-		| predef_type_index == PD_TailStrictListType
-			=	PD_Dyn_TypeCodeConstructor_TailStrictList
-		| predef_type_index == PD_StrictTailStrictListType
-			=	PD_Dyn_TypeCodeConstructor_StrictTailStrictList
-		| predef_type_index == PD_UnboxedTailStrictListType
-			=	PD_Dyn_TypeCodeConstructor_UnboxedTailStrictList
-		| predef_type_index == PD_LazyArrayType
-			=	PD_Dyn_TypeCodeConstructor_LazyArray
-		| predef_type_index == PD_StrictArrayType
-			=	PD_Dyn_TypeCodeConstructor_StrictArray
-		| predef_type_index == PD_UnboxedArrayType
-			=	PD_Dyn_TypeCodeConstructor_UnboxedArray
-		// otherwise
-			=	fatal "predefinedType" "TC code from predef"
+	typeConstructor (GTT_Basic basic_type) ci
+		#! predefined_TC_basic_type
+			= case basic_type of
+				BT_Int -> PD_TC_Int
+				BT_Char	-> PD_TC_Char
+				BT_Real	-> PD_TC_Real
+				BT_Bool	-> PD_TC_Bool
+				BT_Dynamic -> PD_TC_Dynamic
+				BT_File	-> PD_TC_File
+				BT_World -> PD_TC_World
+		= type_code_constructor_expression predefined_TC_basic_type ci
+	typeConstructor GTT_Function ci
+		=	type_code_constructor_expression PD_TC__Arrow ci
+
+	type_code_constructor_expression predefined_TC_type ci
+		# (cons_TC_Char, ci) = constructorExp predefined_TC_type SK_Constructor 0 ci
+		= (App {app_symb = cinp_dynamic_representation.dr_type_code_constructor_symb_ident, app_args = [cons_TC_Char], app_info_ptr = nilPtr}, ci)
+
 convertTypeCode pattern cinp (TCE_Constructor cons args) st
 	# curried_type
 		=	foldl TCE_App (TCE_Constructor cons []) args
@@ -754,11 +743,11 @@ create_dynamic_and_selector_idents common_defs predefined_symbols
 		=	({	dr_type_ident		= undef
 			,	dr_dynamic_type		= undef
 			,	dr_dynamic_symbol	= undef
+			,	dr_type_code_constructor_symb_ident = undef
 			},predefined_symbols)
-	// otherwise	
+	// otherwise
 		# ({pds_module=pds_module1, pds_def=pds_def1} , predefined_symbols) = predefined_symbols![PD_Dyn_DynamicTemp]
-		# {td_rhs=RecordType {rt_constructor,rt_fields}} = common_defs.[pds_module1].com_type_defs.[pds_def1]
-	
+		# {td_rhs=RecordType {rt_constructor}} = common_defs.[pds_module1].com_type_defs.[pds_def1]
 		# dynamic_defined_symbol
 			= {glob_module = pds_module1, glob_object = rt_constructor}
 		# dynamic_type = {gi_module = pds_module1, gi_index = pds_def1}
@@ -768,8 +757,13 @@ create_dynamic_and_selector_idents common_defs predefined_symbols
 				symb_ident	= rt_constructor.ds_ident
 			,	symb_kind 	= SK_Constructor {glob_module = pds_module1, glob_object = rt_constructor.ds_index} 
 			}
+		# ({pds_module=pds_module2, pds_def=pds_def2}, predefined_symbols) = predefined_symbols![PD_TypeCodeConstructor]
+		# {td_rhs=RecordType {rt_constructor}} = common_defs.[pds_module2].com_type_defs.[pds_def2]
+		# type_code_constructor_symb_ident
+			= {symb_ident = rt_constructor.ds_ident, symb_kind = SK_Constructor {glob_module = pds_module2, glob_object = rt_constructor.ds_index}}
 		= ({	dr_type_ident		= dynamic_temp_symb_ident
 			,	dr_dynamic_type		= dynamic_type
 			,	dr_dynamic_symbol	= dynamic_defined_symbol
+			,	dr_type_code_constructor_symb_ident = type_code_constructor_symb_ident
 			}, predefined_symbols)
 

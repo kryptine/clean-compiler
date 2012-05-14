@@ -2252,7 +2252,6 @@ check_module1 cdefs icl_global_function_range fun_defs optional_dcl_mod optional
 					<=< adjust_predefined_module_symbol PD_StdStrictLists
 					<=< adjust_predefined_module_symbol PD_StdDynamic
 					<=< adjust_predefined_module_symbol PD_StdGeneric
-					<=< adjust_predefined_module_symbol PD_CleanTypes
 					<=< adjust_predefined_module_symbol PD_StdMisc										
 					<=< adjust_predefined_module_symbol PD_PredefinedModule
 			= ([], [], { cs & cs_predef_symbols = cs_predef_symbols, cs_symbol_table = cs_symbol_table})
@@ -3344,8 +3343,10 @@ where
 				<=< adjustPredefSymbol PD_Dyn_UnificationEnvironment	mod_index STE_Type
 				<=< adjust_predef_symbols PD_Dyn_TypeScheme PD_Dyn__TypeFixedVar mod_index STE_Constructor
 				<=< adjust_predef_symbols PD_Dyn_initial_unification_environment PD_Dyn_normalise mod_index STE_DclFunction
-				<=< adjust_predef_symbols PD_Dyn_TypeCodeConstructorInt PD_Dyn_TypeCodeConstructor_UnboxedArray mod_index STE_DclFunction
-				<=< adjustPredefSymbol PD_Dyn__to_TypeCodeConstructor	mod_index STE_DclFunction)
+				<=< adjustPredefSymbol PD_Dyn__to_TypeCodeConstructor	mod_index STE_DclFunction
+				<=< adjustPredefSymbol PD_TypeCodeConstructor mod_index STE_Type
+				<=< adjust_predef_symbols PD_TC_Int PD_TC__UnboxedArray mod_index STE_Constructor
+				)
 		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_StdGeneric]
 		# type_bimap = predefined_idents.[PD_TypeBimap]	
 		| pre_mod.pds_def == mod_index
@@ -3362,18 +3363,6 @@ where
 			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols}
 				<=< adjustPredefSymbol PD_abort				mod_index STE_DclFunction
 				<=< adjustPredefSymbol PD_undef				mod_index STE_DclFunction)
-		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_CleanTypes]	
-		| pre_mod.pds_def == mod_index
-			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols}
-			 <=< adjustPredefSymbol PD_CTTypeDef			mod_index STE_Type
-			 <=< adjustPredefSymbol PD_CTAlgType			mod_index STE_Constructor
-			 <=< adjustPredefSymbol PD_CTRecordType			mod_index STE_Constructor
-			 <=< adjustPredefSymbol PD_CTSynType			mod_index STE_Constructor
-			 <=< adjustPredefSymbol PD_CTPredefined			mod_index STE_Constructor
-			 <=< adjustPredefSymbol PD_CTConsDef			mod_index STE_Type
-			 <=< adjustPredefSymbol PD__CTToCons			mod_index STE_DclFunction
-			 <=< adjustPredefSymbol PD_CTFieldDef			mod_index STE_Type )
-
 			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols})		
 	where
 		unused
