@@ -1289,11 +1289,14 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 						}
 					}
 #ifdef THUNK_LIFT_0_CONSTRUCTORS
-					else if (arg_node->node_arity==0 && arg_node->node_symbol->symb_def->sdef_kind==CONSTRUCTOR){
+					else if (arg_node->node_arity==0 &&
+						(arg_node->node_symbol->symb_def->sdef_kind==CONSTRUCTOR ||
+						 (arg_node->node_symbol->symb_def->sdef_kind!=RECORDTYPE && arg_node->node_symbol->symb_def->sdef_arity>0))
+					){
 						NodeP function_node;
 						ArgP new_arg;
 						
-						function_node=NewNode (arg_node->node_symbol,NULL,arg_node->node_arity);
+						function_node=NewNode (arg_node->node_symbol,NULL,0);
 						function_node->node_state=LazyState;
 						function_node->node_number=0;
 						
@@ -1485,14 +1488,28 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 					call_state_p=node_id->nid_lhs_state_p;
 				} else
 					call_state_p=&node_id->nid_node->node_state;
-			} else
+			} else if (arg_node->node_kind==NormalNode){
 #ifdef STRICT_STATE_FOR_LAZY_TUPLE_CONSTRUCTORS
-				if (arg_node->node_kind==NormalNode && BETWEEN (tuple_symb,nil_symb,arg_node->node_symbol->symb_kind)
+				if (BETWEEN (tuple_symb,nil_symb,arg_node->node_symbol->symb_kind)
 					&& arg_node->node_state.state_type==SimpleState && arg_node->node_state.state_kind==OnA)
 				{
 					call_state_p=&StrictState;
 				} else
 #endif
+				if (arg_node->node_symbol->symb_kind==definition
+					&& arg_node->node_state.state_type==SimpleState && arg_node->node_state.state_kind==OnA)
+				{
+					SymbDef sdef;
+
+					sdef=arg_node->node_symbol->symb_def;
+
+					if (sdef->sdef_kind!=RECORDTYPE && arg_node->node_arity<sdef->sdef_arity)
+						call_state_p=&StrictState;
+					else
+						call_state_p=&arg_node->node_state;
+				} else
+					call_state_p=&arg_node->node_state;
+			} else
 				call_state_p=&arg_node->node_state;
 
 			lhs_arg=NewArgument (NewNodeIdNode (arg_node_id));
@@ -1698,11 +1715,92 @@ static int is_optimisable_argument (NodeP arg_node,StateP function_arg_state_p)
 	return 0;
 }
 
+static int has_optimisable_argument (NodeP node,StateP function_state_p)
+{
+	ArgP arg;
+	int arg_n;
+
+	arg=node->node_arguments;
+
+	for (arg_n=0; arg_n<node->node_arity; ++arg_n){
+		if (is_optimisable_argument (arg->arg_node,&function_state_p[arg_n]))
+			return 1;
+
+		arg=arg->arg_next;
+	}
+	
+	return 0;
+}
+
+static int can_build_strict_constructor_or_record_in_lazy_context (NodeP node_p,StateP demanded_states)
+{
+	ArgP offered_arg;
+	StateP demanded_state_p;
+	
+	for_la (offered_arg,demanded_state_p,node_p->node_arguments,demanded_states,arg_next){
+		Node arg_node;
+		NodeKind node_kind;
+		
+		arg_node=offered_arg->arg_node;
+		node_kind=(NodeKind)arg_node->node_kind;
+
+		if (node_kind!=NodeIdNode){
+			if (node_kind==NormalNode){
+				Symbol symbol;
+
+				symbol=arg_node->node_symbol;
+
+				if (BETWEEN (int_denot,real_denot,symbol->symb_kind) || symbol->symb_kind==string_denot)
+					continue;
+
+				if (symbol->symb_kind==definition){
+					SymbDef sdef;
+
+					sdef=symbol->symb_def;
+					if (sdef->sdef_kind!=RECORDTYPE){
+						if (arg_node->node_arity<sdef->sdef_arity || (arg_node->node_arity==0 && sdef->sdef_kind==CONSTRUCTOR))
+							continue;
+					} else {
+						if (demanded_state_p->state_type==RecordState && arg_node->node_state.state_type==SimpleState){
+							if (arg_node->node_state.state_kind==StrictOnA)
+								continue;
+
+							if (arg_node->node_state.state_kind==OnA){
+								if (!sdef->sdef_strict_constructor)
+									continue;
+								if (can_build_strict_constructor_or_record_in_lazy_context (arg_node,sdef->sdef_record_state.state_record_arguments))
+									continue;
+							}
+						}
+					}
+				}
+			}
+			if (!FirstStateIsStricter (arg_node->node_state,*demanded_state_p))
+				return 0;
+		} else {
+			struct node_id *node_id;
+
+			node_id=arg_node->node_node_id;
+			if (node_id->nid_refcount<0){
+				if (!FirstStateIsStricter (*node_id->nid_lhs_state_p,*demanded_state_p))
+					return 0;
+			} else {
+				if (node_id->nid_node==NULL)
+					error_in_function ("can_build_strict_constructor_or_record_in_lazy_context");
+
+				if (!FirstStateIsStricter (node_id->nid_node->node_state,*demanded_state_p))
+					return 0;
+			}
+		}
+	}
+	
+	return 1;
+}
+
 static void optimise_normal_node (Node node)
 {	
 	Symbol symbol;
 	StateP function_state_p;
-	int arg_n;
 
 	symbol=node->node_symbol;
 
@@ -1742,8 +1840,11 @@ static void optimise_normal_node (Node node)
 
 		sdef=symbol->symb_def;
 
-		if (node->node_arity!=sdef->sdef_arity)
+		if (node->node_arity!=sdef->sdef_arity){
+			if (sdef->sdef_kind!=RECORDTYPE && node->node_arity<sdef->sdef_arity)
+				node->node_state.state_kind=StrictOnA;
 			return;
+		}
 
 		switch (sdef->sdef_kind){
 			case IMPRULE:
@@ -1760,7 +1861,12 @@ static void optimise_normal_node (Node node)
 			case CONSTRUCTOR:
 				if (sdef->sdef_strict_constructor){
 					function_state_p=sdef->sdef_constructor->cl_state_p;
-					break;
+
+					if (has_optimisable_argument (node,function_state_p)
+						&& !can_build_strict_constructor_or_record_in_lazy_context (node,function_state_p))
+						create_new_local_function (node,function_state_p);
+
+					return;
 				} else
 					return;
 			default:
@@ -1768,33 +1874,20 @@ static void optimise_normal_node (Node node)
 		}
 	}
 
-	{
-		ArgP arg;
-
-		arg=node->node_arguments;
-
-		for (arg_n=0; arg_n<node->node_arity; ++arg_n){
-			if (is_optimisable_argument (arg->arg_node,&function_state_p[arg_n]))
-				break;
-
-			arg=arg->arg_next;
-		}
-
-		if (arg!=NULL)
-			create_new_local_function (node,function_state_p);
-	}
+	if (has_optimisable_argument (node,function_state_p))
+		create_new_local_function (node,function_state_p);
 }
 
 static int ChangeArgumentNodeStatesIfStricter (NodeP node_p,StateP demanded_states)
 {
-	ArgP offered_args;
+	ArgP offered_arg;
 	StateP demanded_state_p;
 	
-	for_la (offered_args,demanded_state_p,node_p->node_arguments,demanded_states,arg_next){
+	for_la (offered_arg,demanded_state_p,node_p->node_arguments,demanded_states,arg_next){
 		Node arg_node;
 		NodeKind node_kind;
 		
-		arg_node=offered_args->arg_node;
+		arg_node=offered_arg->arg_node;
 		node_kind=(NodeKind)arg_node->node_kind;
 		
 		if (node_kind!=NodeIdNode){
@@ -1826,11 +1919,11 @@ static int ChangeArgumentNodeStatesIfStricter (NodeP node_p,StateP demanded_stat
 			}
 		}
 	}
-						
-	for_la (offered_args,demanded_state_p,node_p->node_arguments,demanded_states,arg_next){
+
+	for_la (offered_arg,demanded_state_p,node_p->node_arguments,demanded_states,arg_next){
 		Node arg_node;
 		
-		arg_node=offered_args->arg_node;
+		arg_node=offered_arg->arg_node;
 		if (arg_node->node_kind==NormalNode){
 			if (BETWEEN (int_denot,real_denot,arg_node->node_symbol->symb_kind) || arg_node->node_symbol->symb_kind==string_denot)
 				arg_node->node_state=*demanded_state_p;
@@ -1842,7 +1935,7 @@ static int ChangeArgumentNodeStatesIfStricter (NodeP node_p,StateP demanded_stat
 			}							
 		}
 		
-		offered_args->arg_state=*demanded_state_p;
+		offered_arg->arg_state=*demanded_state_p;
 	}
 
 	return 1;
