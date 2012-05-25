@@ -57,10 +57,7 @@ write_tcl_file main_dcl_module_n dcl_mods=:{[main_dcl_module_n] = main_dcl_modul
 		= write_type_info directly_imported_dcl_modules tcl_file write_type_info_state
 
 	#! (tcl_file,write_type_info_state)
-		= write_type_info (help_20_compiler { dcl_name.id_name\\ {dcl_name} <-: dcl_mods }) tcl_file write_type_info_state
-			with 
-				help_20_compiler :: {#{#Char}} -> {#{#Char}}
-				help_20_compiler l = l
+		= write_type_info {# id_name \\ {dcl_name={id_name}} <-: dcl_mods } tcl_file write_type_info_state
 		 
 	#! tcl_file
 		= fwritei (size main_dcl_module.dcl_common.com_type_defs) tcl_file
@@ -329,8 +326,8 @@ instance convertDynamics Case where
 				->	convertDynamicCase cinp kees ci
 			_
 				# (case_guards, ci) = convertDynamics cinp case_guards ci
-				# kees = {kees & case_explicit=False, case_guards=case_guards}
-				->	(kees, ci)
+				# kees & case_guards=case_guards
+				-> (kees, ci)
 
 instance convertDynamics CasePatterns where
 	convertDynamics cinp (BasicPatterns type alts) ci
@@ -713,7 +710,6 @@ dummy_case_ptr result_type ci=:{ci_expr_heap}
 															ct_cons_types = [[empty_attributed_type, empty_attributed_type]]}) ci_expr_heap
 	= (expr_info_ptr, {ci &  ci_expr_heap = ci_expr_heap})
 
-
 let_ptr :: !Int !*ConversionState -> (ExprInfoPtr, !*ConversionState)
 let_ptr nr_of_binds ci=:{ci_expr_heap}
 	= let_ptr2 (repeatn nr_of_binds empty_attributed_type) ci
@@ -725,18 +721,13 @@ typed_let_ptr type_id ci=:{ci_expr_heap}
 let_ptr2 :: [AType] !*ConversionState -> (ExprInfoPtr, !*ConversionState)
 let_ptr2 let_types ci=:{ci_expr_heap}
 	# (expr_info_ptr, ci_expr_heap) = newPtr (EI_LetType let_types) ci_expr_heap
-	= (expr_info_ptr, {ci &  ci_expr_heap = ci_expr_heap})
+	= (expr_info_ptr, {ci & ci_expr_heap = ci_expr_heap})
 
 toAType :: Type -> AType
 toAType type = { at_attribute = TA_Multi, at_type = type }
 
 empty_attributed_type :: AType
 empty_attributed_type = toAType TE
-
-instance <<< (Ptr a)
-where
-	(<<<) file ptr = file <<< ptrToInt ptr  
-
 
 create_dynamic_and_selector_idents common_defs predefined_symbols 
 	| predefined_symbols.[PD_StdDynamic].pds_module == NoIndex
@@ -766,4 +757,3 @@ create_dynamic_and_selector_idents common_defs predefined_symbols
 			,	dr_dynamic_symbol	= dynamic_defined_symbol
 			,	dr_type_code_constructor_symb_ident = type_code_constructor_symb_ident
 			}, predefined_symbols)
-
