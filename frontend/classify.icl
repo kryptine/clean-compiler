@@ -95,14 +95,9 @@ where
 
 //@ Consumer Analysis datatypes...
 
-:: RefCounts
-//	:== {#RefCount}
-	:== {RefCount}
+:: RefCounts :== {!RefCount}
 
 :: RefCount	
-//	:== Int
-//	= RC !Int
-//	= RC !Int [[(!FunIndex,!ArgIndex)]]  // (fun_index,arg_index)
 	= Par !Int !.[!.RefCount!]
 	| Seq !Int !.[!.RefCount!]
 	| Dep !FunIndex !ArgIndex
