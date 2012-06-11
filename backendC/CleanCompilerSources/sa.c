@@ -16,7 +16,7 @@
        
        Author: Eric Nocker
        At: Department of Computer Science
-           University of Nijmegen
+       University of Nijmegen
        Version: 0.9
        Date:    Januari, 1995
 */
@@ -59,7 +59,7 @@
 
 unsigned long StrictMemUse	= NR_BLOCKS * BLOCK_SIZE;
 
-#ifdef CHECK_STACK_OVERFLOW	
+#ifdef CHECK_STACK_OVERFLOW
 char *min_stack;
 int stack_source = 0;
 #endif
@@ -486,7 +486,7 @@ static void SetStartFuel (void)
 }
 
 static Bool OutOfFuel (void)
-{	
+{
 	if (start_fuel == 0)
 		return True;
 
@@ -505,7 +505,7 @@ static StrictKind MaxStrict (StrictKind s1, StrictKind s2)
 }
 
 static Context SimpleContext (Context context, StrictKind kind, Bool spec)
-{	
+{
 	if (! context)
 		context = SAllocType (ContextRepr);
 
@@ -751,8 +751,10 @@ static Exp InstantiateExp2 (Exp e)
 			for (i = 0, j = 0; i < arity; i++){
 				arg_e = InstantiateExp2 (e->e_args[i]);
 				if (arg_e->e_kind == Bottom){
-					e->e_fwd = & bottom;
-					new_e    = & bottom;
+					new_e->e_kind = Bottom;
+					new_e->e_hnf = True;
+					new_e = &bottom;
+					e->e_fwd = new_e;
 					return new_e;
 				} else if (arg_e->e_kind == Top) /* || arg_e->e_hnf) */
 					/* simply skip it */
@@ -766,7 +768,7 @@ static Exp InstantiateExp2 (Exp e)
 				new_e    = NewTop();
 				e->e_fwd = new_e;
 			} else
-				new_e->e_sym = j;				
+				new_e->e_sym = j;
 			break;
 		}
 		case Bottom:
@@ -852,7 +854,7 @@ static Bool LtExp2 (Exp e1, Exp e2)
 {
 	unsigned n, i;
 
-#ifdef CHECK_STACK_OVERFLOW	
+#ifdef CHECK_STACK_OVERFLOW
 	char x;
 
 	if (&x < min_stack)
@@ -909,7 +911,7 @@ static Bool LtExp2 (Exp e1, Exp e2)
 				n = e1->e_fun->fun_arity;
 			} else {
 				if (e1->e_kind!=e2->e_kind || e1->e_sym!=e2->e_sym)
-					break;			
+					break;
 
 				n = e1->e_sym;
 			}
@@ -1053,7 +1055,7 @@ static Bool EqExp2 (Exp e1, Exp e2)
 		if (e2->e_kind == Top)
 			return True;
 		else
-			return False;	
+			return False;
 	case FunValue:
 		if (e2->e_kind == FunValue && e1->e_fun==e2->e_fun)
 			return True;
@@ -1229,7 +1231,7 @@ static Bool EqExp (Exp e1, Exp e2)
 }
 
 static Bool ExtLtExp2 (Exp e1, Exp e2, APath p)
-{	
+{
 	if (e1 == e2)
 		return True;
 	if (e1->e_kind == Bottom || e2->e_kind == Top)
@@ -1256,7 +1258,7 @@ static Bool ExtLtExp2 (Exp e1, Exp e2, APath p)
 			else
 				break;
 		}
-		case Value:		
+		case Value:
 		case Dep:
 		{
 			unsigned n, i;
@@ -1272,7 +1274,7 @@ static Bool ExtLtExp2 (Exp e1, Exp e2, APath p)
 				n=e1->e_fun->fun_arity;
 			} else {
 				if (e1->e_sym != e2->e_sym)
-					break;			
+					break;
 				n=e1->e_sym;
 			}
 
@@ -1372,7 +1374,7 @@ static Bool LtExp (Exp e1, Exp e2)
 	}
 #endif
 
-	if (b == MightBeTrue && StrictDoExtEq){	
+	if (b == MightBeTrue && StrictDoExtEq){
 		b = ExtLtExp2 (e1, e2, (APath) Null);
 
 #ifdef _DB_EQ_
@@ -1654,14 +1656,14 @@ static void SortExpOfKind (Exp e, ExpKind kind)
 			/* JVG: added 16-8-2000 */
 			if (kind==Lub)
 				remove_deps_from_tuple_arguments (e->e_args[i]);
-#endif		
+#endif
 			e->e_args[i] = e->e_args[i+1];
 		} else if (LtExp (e->e_args[i+1], e->e_args[i]) == True){
 #if 1
 			/* JVG: added 16-8-2000 */
 			if (kind==Lub)
 				remove_deps_from_tuple_arguments (e->e_args[i+1]);
-#endif		
+#endif
 			remove = True;
 		} else
 			remove = False;
@@ -1676,14 +1678,14 @@ static void SortExpOfKind (Exp e, ExpKind kind)
 	e->e_sym = n;
 
 	if (n > 20)
-	{	
-#ifdef _DB_			
+	{
+#ifdef _DB_
 		FPrintF (StdOut, "SortLub %d:", n);
 		DumpExp (StdOut, e);
 		FPutC ('\n', StdOut);
 #endif /* _DB_ */
 		e->e_kind = Top;
-		return;		
+		return;
 	}
 	
 	if (n == 1 && kind == Lub)
@@ -1696,7 +1698,7 @@ static void CopyDeps (Dependency fromdep,Dependency *newdeps)
 {
 	Dependency new;
 
-	for (;fromdep; fromdep = fromdep->dep_next){	
+	for (;fromdep; fromdep = fromdep->dep_next){
 		new = SAllocType (DependencyRepr);
 		new->dep_exp     = fromdep->dep_exp;
 		new->dep_next    = *newdeps;
@@ -1708,7 +1710,7 @@ static Dependency AddDeps (Dependency fromdep, Dependency taildeps)
 {	Dependency new;
 
 	for (;fromdep; fromdep = fromdep->dep_next)
-	{	
+	{
 		new = SAllocType (DependencyRepr);
 		new->dep_exp     = fromdep->dep_exp;
 		new->dep_next    = taildeps;
@@ -1884,7 +1886,7 @@ static void UpdateExp (Exp src, Exp dst)
 		dst->e_sym = src->e_sym;
 		arity = 0;
 		break;
-	}	
+	}
 
 	dst->e_args = NewExpArgs (arity);
 	for (i = 0; i < arity; i++)
@@ -1929,8 +1931,8 @@ static Bool HasProcessAnnot (Annotation annot)
 		case LazyParallelAnnot:
 		case InterleavedAnnot:
 		case LazyInterleavedAnnot:
-	    case DeferAnnot:
-	    case WaitAnnot:
+		case DeferAnnot:
+		case WaitAnnot:
 	    case ContInterleavedAnnot:
 		case ParallelNFAnnot:
 		case InterleavedNFAnnot:
@@ -1943,7 +1945,7 @@ static Bool HasProcessAnnot (Annotation annot)
 static Exp ConvertNode (Node node, NodeId node_id);
 
 static void ConvertToApplyNode (Exp e, Node node, unsigned arity)
-{	
+{
 	if (arity==0){
 		e->e_fun  = node->node_symbol->symb_def->sdef_sa_fun;
 		e->e_kind = FunValue;
@@ -2008,7 +2010,7 @@ static Exp ConvertNodeDefs (Node root, NodeDefs defs, StrictNodeIdP strictids)
 	NodeDefs node_def;
 	StrictNodeIdP ids;
 	
-	/* convert node defs */	
+	/* convert node defs */
 	for_l (node_def,defs,def_next)
 		if (node_def->def_node!=NULL)
 			ConvertNode (node_def->def_node,node_def->def_id);
@@ -2107,7 +2109,7 @@ static void InitNode (Node node)
 	if (node->node_kind==NodeIdNode)
 		node->node_node_id->nid_exp_ = NULL;
 	else {
-		Args args;	
+		Args args;
 		
 		if (node->node_kind==IfNode){
 			InitNodeDefs (node->node_then_node_defs);
@@ -2238,7 +2240,7 @@ static Exp ConvertNode (Node node, NodeId nid)
 						break;
 					} else if (node->node_symbol->symb_tail_strictness){
 						e->e_fun = tail_strict_cons_sym0+arity;
-						break;					
+						break;
 					}
 					e->e_hnf = True;
 					e->e_fun = lazy_cons_sym0+arity;
@@ -2491,7 +2493,7 @@ static Exp ConvertNode (Node node, NodeId nid)
 			Symbol symbol;
 
 			symbol=node->node_symbol;
-			if	(symbol->symb_kind==definition && symbol->symb_def->sdef_kind==CONSTRUCTOR && 
+			if	(symbol->symb_kind==definition && symbol->symb_def->sdef_kind==CONSTRUCTOR &&
 				 symbol->symb_def->sdef_arity==1)
 			{
 				Exp selexp;
@@ -2523,7 +2525,7 @@ static Exp ConvertNode (Node node, NodeId nid)
 
 #ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS 
 static void convert_pattern_to_apply_node (Exp e,SymbolP symbol,NodeIdListElementP node_id_list,unsigned arity)
-{	
+{
 	if (arity==0){
 		e->e_fun  = symbol->symb_def->sdef_sa_fun;
 		e->e_kind = FunValue;
@@ -2580,7 +2582,7 @@ static Exp convert_pattern (SymbolP symbol_p,int arity,NodeIdListElementP node_i
 				break;
 			} else if (symbol_p->symb_tail_strictness){
 				e->e_fun = tail_strict_cons_sym0+arity;
-				break;					
+				break;
 			}
 			e->e_hnf = True;
 			e->e_fun = lazy_cons_sym0+arity;
@@ -2654,7 +2656,7 @@ static Exp convert_pattern (SymbolP symbol_p,int arity,NodeIdListElementP node_i
 	e->e_args = NewExpArgs (arity);
 
 	{
-		unsigned int i;	
+		unsigned int i;
 
 		for (i=0,node_id_list_elem=node_id_list; node_id_list_elem!=NULL; node_id_list_elem=node_id_list_elem->nidl_next,++i)
 			e->e_args[i] = ConvertNodeId (node_id_list_elem->nidl_node_id);
@@ -2856,7 +2858,7 @@ static void ConvertStateToStrictInfo (TypeNode node, StrictInfo *s, Bool adopt_a
 		
 		for (i = 0; i < arity; i++, args = args->type_arg_next)
 			ConvertStateToStrictInfo (args->type_arg_node, & GetTupleInfo (s, i),
-			                          adopt_annots);
+									  adopt_annots);
 	}
 }
 
@@ -3506,7 +3508,7 @@ static void convert_imp_rule_type (SymbDef sdef)
 
 	f->fun_kind = Function;
 	f->fun_symbol = sdef;
-	f->fun_arity = arity;	
+	f->fun_arity = arity;
 
 	rule_type = sdef->sdef_rule->rule_type;
 /*
@@ -3655,7 +3657,7 @@ static void UpdateSyntaxTree (void)
 	SymbDef sdef;
 	
 	for_l (sdef,scc_dependency_list,sdef_next_scc)
-		if (sdef->sdef_kind==IMPRULE)			
+		if (sdef->sdef_kind==IMPRULE)		
 			update_function_strictness (sdef);
 }
 
@@ -3853,9 +3855,9 @@ static MatchKind CombineWithPartialMatch (MatchKind m)
 			return PartialInfiniteMatch;
 		case NoMatch:
 			return NoMatch;
-		case LubMatch:	
+		case LubMatch:
 			return LubMatch;
-		case ReduceMatch:	
+		case ReduceMatch:
 			return ReduceMatch;
 		default:	
 			return PartialMatch;
@@ -3976,11 +3978,11 @@ static Bool CheckStrictArgsOfFunction (Exp e, Path p, Context context)
 	}
 	
 	e->e_deps = newdeps;
- 	return False;
+	return False;
 }
 
 static Exp TakeContextLub (ExpP ep1, ExpP ep2, Path p, Context context)
-{	
+{
 	if (*ep1){
 		if (ReduceInContext (ep1, p, context))
 			*ep1 = & bottom;
@@ -4024,7 +4026,7 @@ static MatchKind MatchExp (ExpP ep_act,Exp e_for,Dependency *dep,Exp **e_stopp)
 			m = PartialMatch;
 			break;
 		case FunValue:
-			if ((*ep_act)->e_kind == FunValue){	
+			if ((*ep_act)->e_kind == FunValue){
 				if (e_for->e_fun == (*ep_act)->e_fun){
 					m = TotalMatch;
 					break;
@@ -4616,7 +4618,7 @@ static void RemoveMarksAndLubs (Exp e)
 	
 	/* Only reached if kind is Value or Lub */
 	for (i = 0; i < arity; i++)
-		RemoveMarksAndLubs (e->e_args[i]);	
+		RemoveMarksAndLubs (e->e_args[i]);
 
 	if (e->e_kind == Lub)
 		SortExpOfKind (e, Lub);
@@ -4729,7 +4731,7 @@ static Exp ReduceFunction (Exp e, Path p, Context context)
 	newcontext = StrictInfoToContext (r, context, True);
 
 	result = GetResultOfFunctionApplication (e, p, newcontext);
-/* JVG */	
+/* JVG */
 	if (ReduceInContext (&result, p, newcontext))
 /*
 	if (ReduceInContext (&result, p, context))
@@ -5291,7 +5293,7 @@ static Bool ReduceInContext (ExpP ep, Path p, Context context)
 					if (!ReduceInContext (& (*ep)->e_args[i], p, context))
 						return False;
 				 
-				 	(*ep)->e_args[i] = & bottom;
+					(*ep)->e_args[i] = & bottom;
 				}
 				return True;
 			} else 
@@ -5406,7 +5408,7 @@ static Exp BuildApplicationWithBottom (StrictKind argkind, StrictKind context)
 }
 
 static void SetStrict (StrictInfo *s, StrictKind kind, unsigned k)
-{	
+{
 	unsigned i;
 
 	if (s == &cur_funct->fun_strictargs[cur_argnr])
@@ -5414,7 +5416,7 @@ static void SetStrict (StrictInfo *s, StrictKind kind, unsigned k)
 	
 	if (IsTupleInfo (s))
 		GetTupleStrictKind (s) = kind;
-	else {	
+	else {
 		if (! IsListArg (cur_funct, cur_argnr) && kind != NotStrict)
 			kind = HnfStrict;
 
@@ -5661,7 +5663,7 @@ int init_strictness_analysis (ImpMod imod)
 
 void do_strictness_analysis (void)
 {
-#ifdef CHECK_STACK_OVERFLOW	
+#ifdef CHECK_STACK_OVERFLOW
 	char x;
 
 	min_stack = &x - 20*1024;
