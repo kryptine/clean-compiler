@@ -1387,7 +1387,6 @@ where
 			_
 				-> (fun_defs, symbol_table)
 
-
 expandMacrosInBody :: [.FunCall] CheckedBody ![ExprInfoPtr] PredefSymbolsForTransform *ExpandState -> ([FreeVar],Expression,[FreeVar],[FunCall],![ExprInfoPtr],.ExpandState);
 expandMacrosInBody fi_calls {cb_args,cb_rhs} fi_dynamics predef_symbols_for_transform es=:{es_symbol_table,es_symbol_heap,es_fun_defs,es_macro_defs}
 	# (prev_calls, fun_defs, macro_defs,es_symbol_table)
@@ -1398,19 +1397,16 @@ expandMacrosInBody fi_calls {cb_args,cb_rhs} fi_dynamics predef_symbols_for_tran
 	  		= removeFunctionCallsFromSymbolTable all_calls es.es_fun_defs es.es_symbol_table
 	  ((merged_rhs, _), es_var_heap, es_symbol_heap, es_error)
 	  		= mergeCases rhs rhss es.es_var_heap es.es_symbol_heap es.es_error
-	  (new_rhs, new_args, local_vars, fi_dynamics, {cos_error, cos_var_heap, cos_symbol_heap})
+	  (new_rhs, new_args, local_vars, fi_dynamics, {cos_error, cos_var_heap, cos_expression_heap})
 	  		= determineVariablesAndRefCounts cb_args merged_rhs
-	  				{ cos_error = es_error, cos_var_heap = es_var_heap, cos_symbol_heap = es_symbol_heap,
+	  				{ cos_error = es_error, cos_var_heap = es_var_heap, cos_expression_heap = es_symbol_heap,
 	  					cos_predef_symbols_for_transform = predef_symbols_for_transform }
 	= (new_args, new_rhs, local_vars, all_calls, fi_dynamics,
-		{ es & es_error = cos_error, es_var_heap = cos_var_heap, es_symbol_heap = cos_symbol_heap, es_fun_defs=fun_defs, es_symbol_table = symbol_table })
-//		---> ("expandMacrosInBody", (cb_args, ca_rhs, '\n'), ("merged_rhs", merged_rhs, '\n'), ("new_rhs", new_args, local_vars, (new_rhs, '\n')))
-
+		{ es & es_error = cos_error, es_var_heap = cos_var_heap, es_symbol_heap = cos_expression_heap, es_fun_defs=fun_defs, es_symbol_table = symbol_table })
 
 expandCheckedAlternative {ca_rhs, ca_position} ei
 	# (ca_rhs, ei) = expand ca_rhs ei
 	= ((ca_rhs, ca_position), ei)
-
 
 ::	ExpandInfo :== (![FunCall], !.ExpandState)
 
@@ -1653,9 +1649,9 @@ where
 		= (no, ei)
 
 ::	CollectState =
-	{	cos_var_heap	:: !.VarHeap
-	,	cos_symbol_heap :: !.ExpressionHeap
-	,	cos_error		:: !.ErrorAdmin
+	{	cos_var_heap		:: !.VarHeap
+	,	cos_expression_heap :: !.ExpressionHeap
+	,	cos_error			:: !.ErrorAdmin
 	,	cos_predef_symbols_for_transform :: !PredefSymbolsForTransform
 	}
 
@@ -1736,17 +1732,17 @@ where
 		where
 			if_expression :: !Expression !Expression !Expression !*CollectState -> (!Expression,!.CollectState);
 			if_expression e1 e2 e3 cos
-//				# (new_info_ptr,symbol_heap) = newPtr EI_Empty cos.cos_symbol_heap
+//				# (new_info_ptr,symbol_heap) = newPtr EI_Empty cos.cos_expression_heap
 				# case_type =
 					{	ct_pattern_type	= MakeAttributedType (TB BT_Bool)
 					,	ct_result_type	= MakeAttributedType (TB BT_Bool)
 					,	ct_cons_types 	= [[MakeAttributedType (TB BT_Bool)]]
 					}
-				# (new_info_ptr,symbol_heap) = newPtr (EI_CaseType case_type) cos.cos_symbol_heap
+				# (new_info_ptr,symbol_heap) = newPtr (EI_CaseType case_type) cos.cos_expression_heap
 				# kase = Case {	case_expr=e1, case_guards=BasicPatterns BT_Bool [{bp_value=BVB True,bp_expr=e2,bp_position=NoPos}],
 								case_default=Yes e3, case_ident=No, case_info_ptr=new_info_ptr, case_default_pos = NoPos,
 								case_explicit = False }
-				= (kase,{cos & cos_symbol_heap=symbol_heap});
+				= (kase,{cos & cos_expression_heap=symbol_heap});
 			
 			two_args [_,_]
 				= True;
@@ -1759,11 +1755,11 @@ where
 		# ((expr, exprs), free_vars, dynamics, cos) = collectVariables (expr, exprs) free_vars dynamics cos
 		= (expr @ exprs, free_vars, dynamics, cos)
 	collectVariables (Let lad=:{let_strict_binds, let_lazy_binds, let_expr, let_info_ptr}) free_vars dynamics cos=:{cos_var_heap}
-		# (let_info,cos_symbol_heap)	= readPtr let_info_ptr cos.cos_symbol_heap
+		# (let_info,cos_expression_heap) = readPtr let_info_ptr cos.cos_expression_heap
 		  let_types = case let_info of
 		  				EI_LetType let_types	-> let_types
 		  				_						-> repeat undef
-		  cos = {cos & cos_symbol_heap = cos_symbol_heap}
+		  cos = {cos & cos_expression_heap = cos_expression_heap}
 		  cos_var_heap = cos.cos_var_heap
 
 		# cos_var_heap = determine_aliases let_strict_binds cos_var_heap
@@ -1789,8 +1785,8 @@ where
 				_				-> let_info
 			  let_strict_binds = map snd let_strict_binds
 			  let_lazy_binds = map snd let_lazy_binds
-			  cos_symbol_heap = writePtr let_info_ptr let_info cos.cos_symbol_heap
-			  cos = {cos & cos_symbol_heap = cos_symbol_heap}
+			  cos_expression_heap = writePtr let_info_ptr let_info cos.cos_expression_heap
+			  cos = {cos & cos_expression_heap = cos_expression_heap}
 			= (Let {lad & let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds }, free_vars, dynamics,
 					{ cos & cos_error = checkError "" "cyclic let definition" cos.cos_error})
 //		| otherwise
@@ -1839,8 +1835,8 @@ where
 				# let_info = case let_info of
 					EI_LetType _	-> EI_LetType (let_strict_bind_types ++ let_lazy_bind_types)
 					_				-> let_info
-				  cos_symbol_heap = writePtr let_info_ptr let_info cos.cos_symbol_heap
-				  cos = {cos & cos_symbol_heap = cos_symbol_heap}
+				  cos_expression_heap = writePtr let_info_ptr let_info cos.cos_expression_heap
+				  cos = {cos & cos_expression_heap = cos_expression_heap}
 				= (Let {lad & let_expr = let_expr, let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds}, free_vars, dynamics, cos)
 		where
 		/*	Set the 'var_info_field' of each  bound variable to either 'VI_Alias var' (if
@@ -1894,13 +1890,13 @@ where
 								-> False
 				
 				add_dummy_id_for_strict_alias :: !.Expression !*CollectState -> (!.Expression,!.CollectState)
-				add_dummy_id_for_strict_alias bind_src cos=:{cos_symbol_heap, cos_predef_symbols_for_transform}
-					# (new_app_info_ptr, cos_symbol_heap) = newPtr EI_Empty cos_symbol_heap
+				add_dummy_id_for_strict_alias bind_src cos=:{cos_expression_heap, cos_predef_symbols_for_transform}
+					# (new_app_info_ptr, cos_expression_heap) = newPtr EI_Empty cos_expression_heap
 					  {pds_module, pds_def} = cos_predef_symbols_for_transform.predef_alias_dummy
 					  pds_ident = predefined_idents.[PD_DummyForStrictAliasFun]
 			  		  app_symb = { symb_ident = pds_ident, symb_kind = SK_Function {glob_module = pds_module, glob_object = pds_def} }
 					= (App { app_symb = app_symb, app_args = [bind_src], app_info_ptr = new_app_info_ptr },
-						{ cos & cos_symbol_heap = cos_symbol_heap } )
+						{ cos & cos_expression_heap = cos_expression_heap } )
 								
 		/*	Apply 'collectVariables' to the bound expressions (the 'bind_src' field of 'let'-bind) if
 		    the corresponding bound variable (the 'bind_dst' field) has been used. This can be determined
@@ -2075,22 +2071,22 @@ where
 
 instance collectVariables DynamicPattern
 where
-	collectVariables pattern=:{dp_var,dp_rhs,dp_type} free_vars dynamics cos=:{cos_var_heap,cos_symbol_heap}
+	collectVariables pattern=:{dp_var,dp_rhs,dp_type} free_vars dynamics cos=:{cos_var_heap,cos_expression_heap}
 		# cos_var_heap = clearCount dp_var cIsALocalVar cos_var_heap
-		  (EI_DynamicTypeWithVars vars type _, cos_symbol_heap) = readPtr dp_type cos_symbol_heap
-		  cos = { cos & cos_var_heap = cos_var_heap, cos_symbol_heap = cos_symbol_heap }
+		  (EI_DynamicTypeWithVars vars type _, cos_expression_heap) = readPtr dp_type cos_expression_heap
+		  cos = { cos & cos_var_heap = cos_var_heap, cos_expression_heap = cos_expression_heap }
 		  (dp_rhs, free_vars, local_dynamics, cos) = collectVariables dp_rhs free_vars [] cos
-		  cos_symbol_heap = cos.cos_symbol_heap <:= (dp_type, EI_DynamicTypeWithVars vars type local_dynamics)
+		  cos_expression_heap = cos.cos_expression_heap <:= (dp_type, EI_DynamicTypeWithVars vars type local_dynamics)
 		  (dp_var, cos_var_heap) = retrieveRefCount dp_var cos.cos_var_heap
-		  cos = { cos & cos_var_heap = cos_var_heap, cos_symbol_heap = cos_symbol_heap }
+		  cos = { cos & cos_var_heap = cos_var_heap, cos_expression_heap = cos_expression_heap }
 		= ({ pattern & dp_rhs = dp_rhs, dp_var = dp_var }, free_vars, [dp_type:dynamics], cos)
 
 instance collectVariables DynamicExpr
 where
 	collectVariables dynamic_expr=:{dyn_expr, dyn_info_ptr} free_vars dynamics cos
-		# (dyn_expr, free_vars, local_dynamics, cos=:{cos_symbol_heap}) = collectVariables dyn_expr free_vars [] cos
-		  cos_symbol_heap = mark_used_dynamic dyn_info_ptr local_dynamics (readPtr dyn_info_ptr cos_symbol_heap)
-		= ({dynamic_expr & dyn_expr = dyn_expr}, free_vars, [dyn_info_ptr:dynamics], { cos & cos_symbol_heap = cos_symbol_heap });
+		# (dyn_expr, free_vars, local_dynamics, cos=:{cos_expression_heap}) = collectVariables dyn_expr free_vars [] cos
+		  cos_expression_heap = mark_used_dynamic dyn_info_ptr local_dynamics (readPtr dyn_info_ptr cos_expression_heap)
+		= ({dynamic_expr & dyn_expr = dyn_expr}, free_vars, [dyn_info_ptr:dynamics], { cos & cos_expression_heap = cos_expression_heap });
 	where
 		mark_used_dynamic dyn_info_ptr local_dynamics (EI_UnmarkedDynamic opt_type _, symbol_heap) 
 			= symbol_heap <:= (dyn_info_ptr, EI_Dynamic opt_type local_dynamics)
