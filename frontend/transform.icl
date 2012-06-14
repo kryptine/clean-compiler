@@ -689,13 +689,13 @@ examineFunctionCall {id_info} fc=:(MacroCall macro_module_index fc_index _) (cal
 		is_member _ _ []
 			= False
 			
-::	ExpandState =
-	{	es_symbol_table	:: !.SymbolTable
-	,	es_var_heap		:: !.VarHeap
-	,	es_symbol_heap 	:: !.ExpressionHeap
-	,	es_error 		:: !.ErrorAdmin,
-		es_fun_defs :: !.{#FunDef},
-		es_macro_defs :: !.{#.{#FunDef}},
+::	ExpandState = {
+		es_symbol_table		:: !.SymbolTable,
+		es_var_heap			:: !.VarHeap,
+		es_expression_heap 	:: !.ExpressionHeap,
+		es_error 			:: !.ErrorAdmin,
+		es_fun_defs			:: !.{#FunDef},
+		es_macro_defs		:: !.{#.{#FunDef}},
 		es_new_fun_def_numbers :: ![Int]
 	}
 
@@ -781,7 +781,7 @@ where
 		= calls
 
 copy_macro_or_local_macro_function :: !FunDef !(Optional CopiedLocalFunctions) !*ExpandState -> (!FunDef,!Optional CopiedLocalFunctions,!.ExpandState);
-copy_macro_or_local_macro_function macro=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_kind,fun_info={fi_local_vars,fi_calls}} local_macro_functions es=:{es_var_heap,es_symbol_heap}
+copy_macro_or_local_macro_function macro=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_kind,fun_info={fi_local_vars,fi_calls}} local_macro_functions es=:{es_var_heap,es_expression_heap}
 	# (tb_args,es_var_heap) = create_new_arguments tb_args es_var_heap
 		with
 			create_new_arguments [var=:{fv_ident,fv_info_ptr} : vars] var_heap
@@ -791,7 +791,7 @@ copy_macro_or_local_macro_function macro=:{fun_body = TransformedBody {tb_args,t
 				= ([new_var : new_vars], writePtr fv_info_ptr (VI_Variable fv_ident new_info) var_heap)
 			create_new_arguments [] var_heap
 				= ([],var_heap)
-	# us = { us_symbol_heap = es_symbol_heap, us_var_heap = es_var_heap, us_local_macro_functions = local_macro_functions }
+	# us = { us_symbol_heap = es_expression_heap, us_var_heap = es_var_heap, us_local_macro_functions = local_macro_functions }
 	# (result_expr,{us_local_macro_functions,us_symbol_heap,us_var_heap}) = unfold tb_rhs us
 	# (fi_local_vars,us_var_heap) = update_local_vars fi_local_vars us_var_heap
 		with
@@ -807,19 +807,19 @@ copy_macro_or_local_macro_function macro=:{fun_body = TransformedBody {tb_args,t
 				= ([],var_heap)
 	# fi_calls = update_calls fi_calls us_local_macro_functions
 	= ({macro & fun_body = TransformedBody {tb_args=tb_args,tb_rhs=result_expr},fun_info.fi_local_vars=fi_local_vars,fun_info.fi_calls=fi_calls},us_local_macro_functions,
-		{es & es_var_heap=us_var_heap, es_symbol_heap=us_symbol_heap})
+		{es & es_var_heap=us_var_heap, es_expression_heap=us_symbol_heap})
 
 unfoldMacro :: !FunDef ![Expression] !*ExpandInfo -> (!Expression, !*ExpandInfo)
-unfoldMacro {fun_body =fun_body=: TransformedBody {tb_args,tb_rhs}, fun_info = {fi_calls},fun_kind,fun_ident} args (calls, es=:{es_var_heap,es_symbol_heap,es_fun_defs})
+unfoldMacro {fun_body =fun_body=: TransformedBody {tb_args,tb_rhs}, fun_info = {fi_calls},fun_kind,fun_ident} args (calls, es=:{es_var_heap,es_expression_heap,es_fun_defs})
 	# (let_binds, var_heap) = bind_expressions tb_args args [] es_var_heap
 	#! size_fun_defs = size es_fun_defs
 	# copied_local_functions = Yes { copied_local_functions=[],used_copied_local_functions=[],new_copied_local_functions=[],next_local_function_n=size_fun_defs}
-	# us = { us_symbol_heap = es_symbol_heap, us_var_heap = var_heap, us_local_macro_functions = copied_local_functions }
+	# us = { us_symbol_heap = es_expression_heap, us_var_heap = var_heap, us_local_macro_functions = copied_local_functions }
 	# (result_expr,{us_local_macro_functions,us_symbol_heap,us_var_heap}) = unfold tb_rhs us
-	# es = {es & es_var_heap = us_var_heap, es_symbol_heap = us_symbol_heap}
+	# es = {es & es_var_heap = us_var_heap, es_expression_heap = us_symbol_heap}
 	# fi_calls = update_calls fi_calls us_local_macro_functions
 	# (new_functions,us_local_macro_functions,es) = copy_local_functions_of_macro us_local_macro_functions [] es
-	# {es_symbol_heap,es_symbol_table,es_fun_defs,es_new_fun_def_numbers} = es
+	# {es_expression_heap,es_symbol_table,es_fun_defs,es_new_fun_def_numbers} = es
 	# (es_fun_defs,es_new_fun_def_numbers) = case new_functions of
 		[]
 			-> (es_fun_defs,es_new_fun_def_numbers)
@@ -837,9 +837,9 @@ unfoldMacro {fun_body =fun_body=: TransformedBody {tb_args,tb_rhs}, fun_info = {
 	# (calls, fun_defs, es_symbol_table) = updateFunctionCalls fi_calls calls es_fun_defs es_symbol_table
 	| isEmpty let_binds
 		= (result_expr, (calls, { es & es_symbol_table = es_symbol_table, es_fun_defs=fun_defs,es_new_fun_def_numbers=es_new_fun_def_numbers }))
-		# (new_info_ptr, es_symbol_heap) = newPtr EI_Empty es_symbol_heap
+		# (new_info_ptr, es_expression_heap) = newPtr EI_Empty es_expression_heap
 		# result_expr=Let { let_strict_binds = [], let_lazy_binds = let_binds, let_expr = result_expr, let_info_ptr = new_info_ptr, let_expr_position = NoPos }
-		= (result_expr, (calls, { es & es_symbol_table = es_symbol_table, es_symbol_heap=es_symbol_heap, es_fun_defs=fun_defs,es_new_fun_def_numbers=es_new_fun_def_numbers }))
+		= (result_expr, (calls, { es & es_symbol_table = es_symbol_table, es_expression_heap=es_expression_heap, es_fun_defs=fun_defs,es_new_fun_def_numbers=es_new_fun_def_numbers }))
 where
 	bind_expressions [var : vars] [expr : exprs] binds var_heap
 		# (binds, var_heap) = bind_expressions vars exprs binds var_heap
@@ -900,14 +900,14 @@ expand_simple_macro mod_index macro=:{fun_body = CheckedBody body, fun_info, fun
 		predef_symbols_for_transform pi=:{pi_symbol_table,pi_symbol_heap,pi_var_heap,pi_fun_defs,pi_macro_defs,pi_error}
   	# identPos = newPosition fun_ident fun_pos
 	# es = { es_symbol_table = pi_symbol_table, es_var_heap = pi_var_heap,
-			 es_symbol_heap = pi_symbol_heap, es_error = setErrorAdmin identPos pi_error,
+			 es_expression_heap = pi_symbol_heap, es_error = setErrorAdmin identPos pi_error,
 			 es_fun_defs=pi_fun_defs, es_macro_defs=pi_macro_defs, es_new_fun_def_numbers=[]
 		   }			
-	# (tb_args, tb_rhs, local_vars, fi_calls, fi_dynamics,{es_symbol_table, es_var_heap, es_symbol_heap, es_error,es_fun_defs,es_macro_defs})
+	# (tb_args, tb_rhs, local_vars, fi_calls, fi_dynamics,{es_symbol_table, es_var_heap, es_expression_heap, es_error,es_fun_defs,es_macro_defs})
 			= expandMacrosInBody [] body fun_info.fi_dynamics predef_symbols_for_transform es
 	# macro = { macro & fun_body = TransformedBody { tb_args = tb_args, tb_rhs = tb_rhs},
 	  			fun_info = { fun_info & fi_calls = fi_calls, fi_local_vars = local_vars, fi_dynamics=fi_dynamics }}
-	= ( macro, { pi & pi_symbol_table = es_symbol_table, pi_symbol_heap = es_symbol_heap, pi_var_heap = es_var_heap, pi_fun_defs = es_fun_defs,pi_macro_defs=es_macro_defs,pi_error = es_error })
+	= ( macro, { pi & pi_symbol_table = es_symbol_table, pi_symbol_heap = es_expression_heap, pi_var_heap = es_var_heap, pi_fun_defs = es_fun_defs,pi_macro_defs=es_macro_defs,pi_error = es_error })
 
 expand_dcl_macro_if_simple mod_index macro_index macro=:{fun_body = CheckedBody body, fun_info}
 		predef_symbols_for_transform pi=:{pi_symbol_table,pi_symbol_heap,pi_var_heap,pi_fun_defs,pi_macro_defs,pi_error}
@@ -1273,17 +1273,17 @@ where
 			  {ls_x={x_fun_defs=fun_defs,x_macro_defs}, ls_var_heap=pi_var_heap, ls_expr_heap=pi_symbol_heap}
 			  		= liftFunctions (functions_in_group ++ macros_in_group) pi_next_group main_dcl_module_n fun_defs pi_macro_defs pi_var_heap pi_symbol_heap		  
 			# es = expand_macros_in_group macros_in_group
-			  			{	es_symbol_table = pi_symbol_table, es_var_heap = pi_var_heap, es_symbol_heap = pi_symbol_heap,
+			  			{	es_symbol_table = pi_symbol_table, es_var_heap = pi_var_heap, es_expression_heap = pi_symbol_heap,
 			  				es_fun_defs=fun_defs, es_macro_defs=x_macro_defs, es_new_fun_def_numbers=[],
 				  			es_error = pi_error }
-			# {es_symbol_table, es_var_heap, es_symbol_heap, es_error,es_fun_defs,es_macro_defs,es_new_fun_def_numbers}
+			# {es_symbol_table, es_var_heap, es_expression_heap, es_error,es_fun_defs,es_macro_defs,es_new_fun_def_numbers}
 			  		= expand_macros_in_group functions_in_group es
 			# (n_fun_defs_after_expanding_macros,es_fun_defs) = usize es_fun_defs
 			# (pi_next_group,es_fun_defs,functions_in_group,pi_groups)
 				= add_new_macros_to_groups (reverse es_new_fun_def_numbers) n_fun_defs_after_expanding_macros pi_next_group es_fun_defs functions_in_group pi_groups
 			= (max_fun_nr, { pi & pi_deps = pi_deps, pi_var_heap = es_var_heap,
 						pi_symbol_table = es_symbol_table, pi_fun_defs=es_fun_defs, pi_macro_defs=es_macro_defs,
-						pi_error = es_error, pi_symbol_heap = es_symbol_heap, 
+						pi_error = es_error, pi_symbol_heap = es_expression_heap, 
 						pi_next_group = inc pi_next_group, 
 						pi_groups = [ functions_in_group ++ macros_in_group : pi_groups ],pi_unexpanded_dcl_macros=pi_unexpanded_dcl_macros })
 			= (min_dep, pi)
@@ -1388,21 +1388,21 @@ where
 				-> (fun_defs, symbol_table)
 
 expandMacrosInBody :: [.FunCall] CheckedBody ![ExprInfoPtr] PredefSymbolsForTransform *ExpandState -> ([FreeVar],Expression,[FreeVar],[FunCall],![ExprInfoPtr],.ExpandState);
-expandMacrosInBody fi_calls {cb_args,cb_rhs} fi_dynamics predef_symbols_for_transform es=:{es_symbol_table,es_symbol_heap,es_fun_defs,es_macro_defs}
+expandMacrosInBody fi_calls {cb_args,cb_rhs} fi_dynamics predef_symbols_for_transform es=:{es_symbol_table,es_expression_heap,es_fun_defs,es_macro_defs}
 	# (prev_calls, fun_defs, macro_defs,es_symbol_table)
 			= addFunctionCallsToSymbolTable fi_calls es_fun_defs es_macro_defs es_symbol_table
 	  ([rhs:rhss], (all_calls, es) )
-	  		= mapSt expandCheckedAlternative cb_rhs (prev_calls, { es & es_fun_defs=fun_defs, es_macro_defs=macro_defs,es_symbol_table = es_symbol_table, es_symbol_heap=es_symbol_heap })
+	  		= mapSt expandCheckedAlternative cb_rhs (prev_calls, { es & es_fun_defs=fun_defs, es_macro_defs=macro_defs,es_symbol_table = es_symbol_table, es_expression_heap=es_expression_heap })
 	  (fun_defs, symbol_table)
 	  		= removeFunctionCallsFromSymbolTable all_calls es.es_fun_defs es.es_symbol_table
-	  ((merged_rhs, _), es_var_heap, es_symbol_heap, es_error)
-	  		= mergeCases rhs rhss es.es_var_heap es.es_symbol_heap es.es_error
+	  ((merged_rhs, _), es_var_heap, es_expression_heap, es_error)
+	  		= mergeCases rhs rhss es.es_var_heap es.es_expression_heap es.es_error
 	  (new_rhs, new_args, local_vars, fi_dynamics, {cos_error, cos_var_heap, cos_expression_heap})
 	  		= determineVariablesAndRefCounts cb_args merged_rhs
-	  				{ cos_error = es_error, cos_var_heap = es_var_heap, cos_expression_heap = es_symbol_heap,
+	  				{ cos_error = es_error, cos_var_heap = es_var_heap, cos_expression_heap = es_expression_heap,
 	  					cos_predef_symbols_for_transform = predef_symbols_for_transform }
 	= (new_args, new_rhs, local_vars, all_calls, fi_dynamics,
-		{ es & es_error = cos_error, es_var_heap = cos_var_heap, es_symbol_heap = cos_expression_heap, es_fun_defs=fun_defs, es_symbol_table = symbol_table })
+		{ es & es_error = cos_error, es_var_heap = cos_var_heap, es_expression_heap = cos_expression_heap, es_fun_defs=fun_defs, es_symbol_table = symbol_table })
 
 expandCheckedAlternative {ca_rhs, ca_position} ei
 	# (ca_rhs, ei) = expand ca_rhs ei
@@ -1537,10 +1537,10 @@ where
 
 instance expand Case
 where
- 	expand kees (fundefs, es=:{es_var_heap, es_symbol_heap, es_error})
-		# (kees=:{case_expr,case_guards,case_default}, es_var_heap, es_symbol_heap, es_error)
-			= merge_if_explicit_case kees es_var_heap es_symbol_heap es_error
-		# ei = (fundefs, {es & es_var_heap=es_var_heap, es_symbol_heap=es_symbol_heap, es_error=es_error})
+ 	expand kees (fundefs, es=:{es_var_heap, es_expression_heap, es_error})
+		# (kees=:{case_expr,case_guards,case_default}, es_var_heap, es_expression_heap, es_error)
+			= merge_if_explicit_case kees es_var_heap es_expression_heap es_error
+		# ei = (fundefs, {es & es_var_heap=es_var_heap, es_expression_heap=es_expression_heap, es_error=es_error})
 		# ((case_expr,(case_guards,case_default)), ei) = expand (case_expr,(case_guards,case_default)) ei
 		= ({ kees & case_expr = case_expr,case_guards = case_guards, case_default = case_default }, ei)
 		where
@@ -1700,7 +1700,7 @@ where
 
 instance clearCount FreeVar
 where
-	clearCount{fv_info_ptr} locality var_heap
+	clearCount {fv_info_ptr} locality var_heap
 		= var_heap <:= (fv_info_ptr, VI_Count 0 locality)
 
 instance clearCount (FreeVar,a)
