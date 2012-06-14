@@ -94,11 +94,11 @@ stripStrictLets fun_defs predef_symbols var_heap sym_heap error_admin
 	# collect_state =
 		{ cos_predef_symbols_for_transform	= cs_predef
 		, cos_var_heap						= var_heap
-		, cos_symbol_heap					= sym_heap
+		, cos_expression_heap				= sym_heap
 		, cos_error							= error_admin
 		}
 	# (fun_defs,collect_state) = aMapSt determine_ref_counts fun_defs collect_state
-	= (fun_defs,predef_symbols,collect_state.cos_var_heap, collect_state.cos_symbol_heap, collect_state.cos_error)
+	= (fun_defs,predef_symbols,collect_state.cos_var_heap, collect_state.cos_expression_heap, collect_state.cos_error)
 where
 	aMapSt f a s
 		# (l,s)	= mapSt f [e \\ e <-: a] s
@@ -111,7 +111,7 @@ partitionateFunctions` fun_defs ranges main_dcl_module_n def_min def_max predef_
 	# collect_state =
 		{ cos_predef_symbols_for_transform	= cs_predef
 		, cos_var_heap						= var_heap
-		, cos_symbol_heap					= sym_heap
+		, cos_expression_heap				= sym_heap
 		, cos_error							= error_admin
 		}
 	# partitioning_info =
@@ -125,7 +125,7 @@ partitionateFunctions` fun_defs ranges main_dcl_module_n def_min def_max predef_
 	  (fun_defs, {pi_groups`,pi_next_group`,pi_collect`}) = 
 	  		foldSt (partitionate_functions max_fun_nr) ranges (fun_defs, partitioning_info)
 	  groups = { {component_members = group} \\ group <- reverse pi_groups` }
-	= (groups, fun_defs, predef_symbols, pi_collect`.cos_var_heap, pi_collect`.cos_symbol_heap, pi_collect`.cos_error)
+	= (groups, fun_defs, predef_symbols, pi_collect`.cos_var_heap, pi_collect`.cos_expression_heap, pi_collect`.cos_error)
 where
 	partitionate_functions :: !Index !IndexRange !(!*{# FunDef}, !*PartitioningInfo`) -> (!*{# FunDef}, !*PartitioningInfo`)
 	partitionate_functions max_fun_nr ir=:{ir_from,ir_to} (fun_defs, pi=:{pi_marks`})
@@ -238,7 +238,7 @@ partitionateFunctions`` max_fun_nr next_group fun_defs functions main_dcl_module
 	# collect_state =
 		{ cos_predef_symbols_for_transform	= cs_predef
 		, cos_var_heap						= var_heap
-		, cos_symbol_heap					= sym_heap
+		, cos_expression_heap				= sym_heap
 		, cos_error							= error_admin
 		}
 	# partitioning_info =
@@ -252,7 +252,7 @@ partitionateFunctions`` max_fun_nr next_group fun_defs functions main_dcl_module
 	  (fun_defs, fun_heap, {pi_groups``,pi_next_group``,pi_collect``})
 	  	= partitionate_component functions max_fun_nr (fun_defs, fun_heap, partitioning_info)
 	  groups = [ {component_members = group} \\ group <- reverse pi_groups`` ]
-	= (pi_next_group``,groups, fun_defs, fun_heap, predef_symbols, pi_collect``.cos_var_heap, pi_collect``.cos_symbol_heap, pi_collect``.cos_error)
+	= (pi_next_group``,groups, fun_defs, fun_heap, predef_symbols, pi_collect``.cos_var_heap, pi_collect``.cos_expression_heap, pi_collect``.cos_error)
 where
 	partitionate_component :: !ComponentMembers !Index !(!*{# FunDef}, !*FunctionHeap, !*PartitioningInfo``) -> (!*{# FunDef}, !*FunctionHeap, !*PartitioningInfo``)
 	partitionate_component (ComponentMember member members) max_fun_nr (fun_defs, fun_heap, pi=:{pi_marks``})

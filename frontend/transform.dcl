@@ -16,9 +16,9 @@ partitionateAndLiftFunctions :: ![IndexRange] !Index !PredefSymbolsForTransform 
 ::	CopiedLocalFunctions
 
 ::	CollectState =
-	{	cos_var_heap	:: !.VarHeap
-	,	cos_symbol_heap :: !.ExpressionHeap
-	,	cos_error		:: !.ErrorAdmin
+	{	cos_var_heap		:: !.VarHeap
+	,	cos_expression_heap :: !.ExpressionHeap
+	,	cos_error			:: !.ErrorAdmin
 	,	cos_predef_symbols_for_transform :: !PredefSymbolsForTransform
 	}
 
