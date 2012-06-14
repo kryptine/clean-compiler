@@ -1693,8 +1693,8 @@ convertGenericCases bimap_functions
 	#! first_instance_index = size main_module_instances	
 	#! instance_info = (first_instance_index, [])
 
-	#! (gs_modules, gs_dcl_modules, (fun_info, instance_info, heaps, gs_error)) 
-		= build_exported_main_instances_in_modules 0 gs_modules gs_dcl_modules (fun_info, instance_info, heaps, gs_error)
+	#! (gs_modules, gs_dcl_modules, (instance_info, heaps, gs_error)) 
+		= build_exported_main_instances_in_modules 0 gs_modules gs_dcl_modules (instance_info, heaps, gs_error)
 
 	#! first_main_instance_fun_index = fun_info.fg_fun_index
 
@@ -1734,8 +1734,8 @@ convertGenericCases bimap_functions
 	= (instance_fun_range, gs)
 where
 	build_exported_main_instances_in_modules :: !Index
-			!*{#CommonDefs} !*{#DclModule} !(FunsAndGroups, !(!Index, ![ClassInstance]), !*Heaps, !*ErrorAdmin)
-		-> (!*{#CommonDefs},!*{#DclModule},!(FunsAndGroups, !(!Index, ![ClassInstance]), !*Heaps, !*ErrorAdmin))
+			!*{#CommonDefs} !*{#DclModule} !(!(!Index, ![ClassInstance]), !*Heaps, !*ErrorAdmin)
+		-> (!*{#CommonDefs},!*{#DclModule},!(!(!Index, ![ClassInstance]), !*Heaps, !*ErrorAdmin))
 	build_exported_main_instances_in_modules module_index modules dcl_modules st
 		| module_index == size modules
 			= (modules, dcl_modules, st)
@@ -1754,8 +1754,8 @@ where
 			= foldArraySt (build_exported_main_instance module_index) com_gencase_defs (dcl_functions, modules, st)
 
 		build_exported_main_instance :: !Index !GenericCaseDef
-				(!*{#FunType} ,!*Modules, !(FunsAndGroups, !(!Index, ![ClassInstance]), !*Heaps, !*ErrorAdmin))
-			->	(!*{#FunType} ,!*Modules, !(FunsAndGroups, !(!Index, ![ClassInstance]), !*Heaps, !*ErrorAdmin))					
+				(!*{#FunType} ,!*Modules, !(!(!Index, ![ClassInstance]), !*Heaps, !*ErrorAdmin))
+			->	(!*{#FunType} ,!*Modules, !(!(!Index, ![ClassInstance]), !*Heaps, !*ErrorAdmin))					
 		build_exported_main_instance module_index
 				{gc_gcf=GCF gc_ident {gcf_body = GCB_FunIndex fun_index,gcf_kind,gcf_generic,gcf_generic_info}, gc_type, gc_type_cons,gc_pos} 
 				(dcl_functions, modules, st)
@@ -1783,10 +1783,10 @@ where
 				= (dcl_functions, modules, st)
 
 		build_exported_main_instance_ :: InstanceType Int Ident Int TypeKind GlobalIndex TypeCons Position Int Int
-				!*{#FunType} !*{#CommonDefs} !(FunsAndGroups, !(!Index, ![ClassInstance]), !*Heaps, !*ErrorAdmin)
-			-> (!*{#FunType},!*{#CommonDefs},!(FunsAndGroups, !(!Index, ![ClassInstance]), !*Heaps, !*ErrorAdmin))
+				!*{#FunType} !*{#CommonDefs} !(!(!Index, ![ClassInstance]), !*Heaps, !*ErrorAdmin)
+			-> (!*{#FunType},!*{#CommonDefs},!(!(!Index, ![ClassInstance]), !*Heaps, !*ErrorAdmin))
 		build_exported_main_instance_ ins_type module_index gc_ident fun_index gcf_kind gcf_generic gc_type_cons gc_pos generic_info_index generic_info
-								dcl_functions modules (fun_info, ins_info, heaps, error)
+								dcl_functions modules (ins_info, heaps, error)
 			# (gen_info_ptr, modules) = modules![gcf_generic.gi_module].com_generic_defs.[gcf_generic.gi_index].gen_info_ptr
 			  ({gen_classes,gen_rep_conses}, hp_generic_heap) = readPtr gen_info_ptr heaps.hp_generic_heap
 			  heaps & hp_generic_heap=hp_generic_heap
@@ -1802,7 +1802,7 @@ where
 					= update_dcl_function fun_index fun_ident fun_type dcl_functions heaps
 				# class_instance_member = {cim_ident=fun_ident,cim_arity=module_index,cim_index= -1-fun_index}
 				#! ins_info = build_class_instance class_info.gci_class gc_ident gc_pos gcf_kind class_instance_member ins_type ins_info
-				= (dcl_functions, modules, (fun_info, ins_info, heaps, error))
+				= (dcl_functions, modules, (ins_info, heaps, error))
 
 				# (fun_type,modules,heaps,error)
 					= case gen_rep_conses.[generic_info_index].grc_optional_fun_type of
@@ -1819,7 +1819,7 @@ where
 						fun_type	
 				#! (dcl_functions, heaps)
 					= update_dcl_function fun_index fun_ident fun_type_with_generic_info dcl_functions heaps
-				= (dcl_functions, modules, (fun_info, ins_info, heaps, error))
+				= (dcl_functions, modules, (ins_info, heaps, error))
 
 	build_main_instances_in_main_module :: !Index
 			!*{#CommonDefs} !*{#DclModule} !(FunsAndGroups, !(!Index, ![ClassInstance]), !*{#FunDef}, !*TypeDefInfos, !*Heaps, !*ErrorAdmin)
