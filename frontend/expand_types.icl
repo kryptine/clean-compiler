@@ -261,10 +261,12 @@ where
 				= type_heaps
 	
 			substitute_rhs rem_annots rhs_type type_heaps
-				| (rem_annots bitand RemoveAnnotationsMask)<>0
+				| rem_annots bitand RemoveAnnotationsMask<>0
 					# (_, rhs_type) = removeAnnotations rhs_type
-				  	= substitute rhs_type type_heaps
-				  	= substitute rhs_type type_heaps
+				  	# (_,type,heaps) = substitute rhs_type type_heaps
+				  	= (type,heaps)
+				  	# (_,type,heaps) = substitute rhs_type type_heaps
+				  	= (type,heaps)
 
 	collect_imported_constructors :: !{#.CommonDefs} !.Int !.TypeRhs !*ExpandTypeState -> .ExpandTypeState
 	collect_imported_constructors common_defs mod_index (RecordType {rt_constructor}) ets=:{ets_collected_conses,ets_var_heap}
@@ -290,119 +292,167 @@ where
 		has_been_collected (VI_ExpandedType _)	= True
 		has_been_collected _					= False
 
-class substitute a :: !a !*TypeHeaps -> (!a, !*TypeHeaps)
+class substitute a :: !a !*TypeHeaps -> (!Bool, !a, !*TypeHeaps)
 
 instance substitute AType
 where
 	substitute atype=:{at_attribute,at_type} heaps
-		# ((at_attribute,at_type), heaps)  = substitute (at_attribute,at_type) heaps
-		= ({ atype & at_attribute = at_attribute, at_type = at_type }, heaps)
+		# (changed_attribute, at_attribute_r, heaps) = substitute at_attribute heaps
+		# (changed_type, at_type_r, heaps) = substitute at_type heaps
+		| changed_attribute
+			| changed_type
+				= (True, {at_attribute = at_attribute_r, at_type = at_type_r}, heaps)
+				= (True, {atype & at_attribute = at_attribute_r}, heaps)
+			| changed_type
+				= (True, {atype & at_type = at_type_r}, heaps)
+				= (False, atype, heaps)
 
 instance substitute TypeAttribute
 where
-	substitute (TA_Var {av_ident, av_info_ptr}) heaps=:{th_attrs}
-		#! av_info = sreadPtr av_info_ptr th_attrs
-		= case av_info of
+	substitute (TA_Var {av_info_ptr}) heaps=:{th_attrs}
+		= case sreadPtr av_info_ptr th_attrs of
 			AVI_Attr attr
-				-> (attr, heaps)
+				-> (True, attr, heaps)
 			_
-				-> (TA_Multi, heaps)
+				-> (True, TA_Multi, heaps)
 	substitute (TA_RootVar {av_info_ptr}) heaps=:{th_attrs}
-		#! av_info = sreadPtr av_info_ptr th_attrs
-		= case av_info of
+		= case sreadPtr av_info_ptr th_attrs of
 			AVI_Attr attr
-				-> (attr, heaps)
+				-> (True, attr, heaps)
 			_
-				-> (TA_Multi, heaps)
+				-> (True, TA_Multi, heaps)
 	substitute TA_None heaps
-		= (TA_Multi, heaps)
+		= (True, TA_Multi, heaps)
 	substitute attr heaps
-		= (attr, heaps)
-
-instance substitute (a,b) | substitute a & substitute b
-where
-	substitute (x,y) heaps
-		# (x, heaps) = substitute x heaps
-		  (y, heaps) = substitute y heaps
-		= ((x,y), heaps)
-	
-instance substitute [a] | substitute a
-where
-	substitute [] heaps
-		= ( [], heaps)
-	substitute [t:ts] heaps
-		# (t, heaps) = substitute t heaps
-		  ( ts, heaps) = substitute ts heaps
-		= ([t:ts], heaps)
-
-instance substitute TypeContext
-where
-	substitute tc=:{tc_types} heaps
-		# (tc_types, heaps) = substitute tc_types heaps
-		= ({ tc & tc_types = tc_types }, heaps)
+		= (False, attr, heaps)
 
 instance substitute Type
 where
 	substitute tv=:(TV {tv_info_ptr}) heaps=:{th_vars}
 		# (tv_info, th_vars) = readPtr tv_info_ptr th_vars
-		  heaps = {heaps & th_vars = th_vars}
+		  heaps & th_vars = th_vars
 		= case tv_info of
 			TVI_Type type
-				-> (type, heaps)
+				-> (True, type, heaps)
 			_
-				-> (tv, heaps)
-	substitute (arg_type --> res_type) heaps
-		# ((arg_type, res_type), heaps) = substitute (arg_type, res_type) heaps
-		= (arg_type --> res_type, heaps)
-	substitute (TArrow1 arg_type) heaps
-		# (arg_type, heaps) = substitute arg_type heaps
-		= (TArrow1 arg_type, heaps)
-	substitute (TA cons_id cons_args) heaps
-		# (cons_args, heaps) = substitute cons_args heaps
-		= (TA cons_id cons_args,  heaps)
-	substitute (TAS cons_id cons_args strictness) heaps
-		# (cons_args, heaps) = substitute cons_args heaps
-		= (TAS cons_id cons_args strictness,  heaps)
-	substitute (CV type_var :@: types) heaps=:{th_vars}
+				-> (False, tv, heaps)
+	substitute type=:(arg_type --> res_type) heaps
+		# (changed_arg_type, arg_type_r, heaps) = substitute arg_type heaps
+		# (changed_res_type, res_type_r, heaps) = substitute res_type heaps
+		| changed_arg_type
+			| changed_res_type
+				= (True, arg_type_r --> res_type_r, heaps)
+				= (True, arg_type_r --> res_type, heaps)
+			| changed_res_type
+				= (True, arg_type --> res_type_r, heaps)
+				= (False, type, heaps)
+	substitute type=:(TA cons_id cons_args) heaps
+		# (changed, cons_args_r, heaps) = substitute cons_args heaps
+		| changed
+			= (True, TA cons_id cons_args_r, heaps)
+			= (False, type, heaps)
+	substitute type=:(TAS cons_id cons_args strictness) heaps
+		# (changed, cons_args_r, heaps) = substitute cons_args heaps
+		| changed
+			= (True, TAS cons_id cons_args_r strictness, heaps)
+			= (False, type, heaps)
+	substitute type=:(CV type_var :@: types) heaps=:{th_vars}
 		# (tv_info, th_vars) = readPtr type_var.tv_info_ptr th_vars
-		  heaps = {heaps & th_vars = th_vars}
-		  (types, heaps) = substitute types heaps
-		= case tv_info of
-			TVI_Type type
-				#  (ok, simplified_type) = simplifyAndCheckTypeApplication type types
-				| ok
-					-> (simplified_type, heaps)
-				// otherwise
-					// this will lead to a kind check error later on
-					-> 	(CV type_var :@: types, heaps)
-			-> 	(CV type_var :@: types, heaps)
+		  heaps & th_vars = th_vars
+		  (changed, types_r, heaps) = substitute types heaps
+		| changed
+			= case tv_info of
+				TVI_Type s_type
+					# (ok, simplified_type) = simplifyAndCheckTypeApplication s_type types_r
+					| ok
+						-> (True, simplified_type, heaps)
+						// this will lead to a kind check error later on
+						-> 	(True, CV type_var :@: types_r, heaps)
+				_
+					-> 	(True, CV type_var :@: types_r, heaps)
+			= case tv_info of
+				TVI_Type s_type
+					# (ok, simplified_type) = simplifyAndCheckTypeApplication s_type types
+					| ok
+						-> (True, simplified_type, heaps)
+						// this will lead to a kind check error later on
+						-> 	(False, type, heaps)
+				_
+					-> 	(False, type, heaps)
+	substitute type=:(TArrow1 arg_type) heaps
+		# (changed, arg_type_r, heaps) = substitute arg_type heaps
+		| changed
+			= (True, TArrow1 arg_type_r, heaps)
+			= (False, type, heaps)
 	substitute type heaps
-		= (type, heaps)
+		= (False, type, heaps)
+
+instance substitute [a] | substitute a
+where
+	substitute lt=:[t:ts] heaps
+		# (changed_t, t_r, heaps) = substitute t heaps
+		  (changed_ts, ts_r, heaps) = substitute ts heaps
+		| changed_t
+			| changed_ts
+				= (True, [t_r:ts_r], heaps)
+				= (True, [t_r:ts], heaps)
+			| changed_ts
+				= (True, [t:ts_r], heaps)
+				= (False, lt, heaps)
+	substitute [] heaps
+		= (False, [], heaps)
+
+instance substitute TypeContext
+where
+	substitute tc=:{tc_types} heaps
+		# (changed_tc_types, tc_types_r, heaps) = substitute tc_types heaps
+		| changed_tc_types
+			= (True, {tc & tc_types = tc_types_r}, heaps)
+			= (False, tc, heaps)
 
 instance substitute AttributeVar
 where
 	substitute av=:{av_info_ptr} heaps=:{th_attrs}
-		#! av_info = sreadPtr av_info_ptr th_attrs
-		= case av_info of
+		= case sreadPtr av_info_ptr th_attrs of
 			AVI_Attr (TA_Var attr_var)
-				-> (attr_var, heaps)
+				-> (True, attr_var, heaps)
 			_
-				-> (av, heaps)
+				-> (False, av, heaps)
 
 instance substitute AttrInequality
 where
 	substitute {ai_demanded,ai_offered} heaps
-		# ((ai_demanded, ai_offered), heaps) = substitute (ai_demanded, ai_offered) heaps
-		= ({ai_demanded = ai_demanded, ai_offered = ai_offered}, heaps)
+		# (changed_ai_demanded, ai_demanded_r, heaps) = substitute ai_demanded heaps
+		  (changed_ai_offered, ai_offered_r, heaps) = substitute ai_offered heaps
+		| changed_ai_demanded
+			| changed_ai_offered
+				= (True, {ai_demanded = ai_demanded_r, ai_offered = ai_offered_r}, heaps)
+				= (True, {ai_demanded = ai_demanded_r, ai_offered = ai_offered}, heaps)
+			| changed_ai_offered
+				= (True, {ai_demanded = ai_demanded, ai_offered = ai_offered_r}, heaps)
+				= (False, {ai_demanded = ai_demanded, ai_offered = ai_offered}, heaps)
 
 instance substitute CaseType
 where
-	substitute {ct_pattern_type, ct_result_type, ct_cons_types} heaps 
-		# (ct_pattern_type, heaps) = substitute ct_pattern_type heaps
-		  (ct_result_type, heaps) = substitute ct_result_type heaps
-		  (ct_cons_types, heaps) = substitute ct_cons_types heaps
-		= ({ct_pattern_type = ct_pattern_type, ct_result_type = ct_result_type, 
-								ct_cons_types = ct_cons_types}, heaps)
+	substitute {ct_pattern_type, ct_result_type, ct_cons_types} heaps
+		# (changed_pattern_type, pattern_type_r, heaps) = substitute ct_pattern_type heaps
+		  (changed_result_type, result_type_r, heaps) = substitute ct_result_type heaps
+		  (changed_cons_types, cons_types_r, heaps) = substitute ct_cons_types heaps
+		| changed_pattern_type
+			| changed_result_type
+				| changed_cons_types
+					= (True, {ct_pattern_type=pattern_type_r, ct_result_type=result_type_r, ct_cons_types=cons_types_r}, heaps)
+					= (True, {ct_pattern_type=pattern_type_r, ct_result_type=result_type_r, ct_cons_types=ct_cons_types}, heaps)
+				| changed_cons_types
+					= (True, {ct_pattern_type=pattern_type_r, ct_result_type=ct_result_type, ct_cons_types=cons_types_r}, heaps)
+					= (True, {ct_pattern_type=pattern_type_r, ct_result_type=ct_result_type, ct_cons_types=ct_cons_types}, heaps)
+			| changed_result_type
+				| changed_cons_types
+					= (True, {ct_pattern_type=ct_pattern_type, ct_result_type=result_type_r, ct_cons_types=cons_types_r}, heaps)
+					= (True, {ct_pattern_type=ct_pattern_type, ct_result_type=result_type_r, ct_cons_types=ct_cons_types}, heaps)
+				| changed_cons_types
+					= (True, {ct_pattern_type=ct_pattern_type, ct_result_type=ct_result_type, ct_cons_types=cons_types_r}, heaps)
+					= (False, {ct_pattern_type=ct_pattern_type, ct_result_type=ct_result_type, ct_cons_types=ct_cons_types}, heaps)
 
 class removeAnnotations a :: !a  -> (!Bool, !a)
 

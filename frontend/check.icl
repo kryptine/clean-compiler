@@ -338,15 +338,14 @@ instantiateTypes old_type_vars old_attr_vars types type_contexts attr_env {ss_en
 	  (new_attr_vars, th_attrs) = foldSt build_attr_var_subst ss_attrs ([], th_attrs)
 
 	  type_heaps = foldSt build_type_subst ss_environ { type_heaps & th_vars = th_vars, th_attrs = th_attrs }
-	  (new_ss_context, type_heaps) = substitute ss_context type_heaps
+	  (_, new_ss_context, type_heaps) = substitute ss_context type_heaps
 
 	  (inst_vars, th_vars)			= foldSt determine_free_var old_type_vars (new_type_vars, type_heaps.th_vars) 
 	  (inst_attr_vars, th_attrs)	= foldSt build_attr_var_subst old_attr_vars (new_attr_vars, type_heaps.th_attrs)
 
 	  (inst_types, (ok2, type_heaps))	= mapSt substitue_arg_type types (True, { type_heaps & th_vars = th_vars, th_attrs = th_attrs })
-//	  (ok2, inst_types, type_heaps)		= substitute types { type_heaps & th_vars = th_vars, th_attrs = th_attrs }
-	  (inst_contexts, type_heaps)	= substitute type_contexts type_heaps
-	  (inst_attr_env, type_heaps)	= substitute attr_env type_heaps
+	  (_, inst_contexts, type_heaps)	= substitute type_contexts type_heaps
+	  (_, inst_attr_env, type_heaps)	= substitute attr_env type_heaps
 	  (special_subst_list, th_vars) 	= mapSt adjust_special_subst special_subst_list type_heaps.th_vars
 	= (inst_vars, inst_attr_vars, inst_types, new_ss_context ++ inst_contexts, inst_attr_env, special_subst_list, { type_heaps & th_vars = th_vars }, error)
 where
@@ -361,7 +360,7 @@ where
 				-> (free_vars, type_var_heap)
 
 	build_type_subst {bind_src,bind_dst} type_heaps
-		# (bind_src, type_heaps) = substitute bind_src type_heaps
+		# (_, bind_src, type_heaps) = substitute bind_src type_heaps
 // RWS ...
 /*
 	FIXME: this is a patch for the following incorrect function type (in a dcl module)
@@ -382,10 +381,10 @@ where
 
 	substitue_arg_type at=:{at_type = TFA type_vars type} (was_ok, type_heaps)
 		# (fresh_type_vars, type_heaps) = foldSt build_avar_subst type_vars ([], type_heaps)
-		  (new_at, type_heaps) = substitute {at & at_type = type} type_heaps
+		  (_, new_at, type_heaps) = substitute {at & at_type = type} type_heaps
 		= ({ new_at & at_type = TFA fresh_type_vars new_at.at_type}, (was_ok, type_heaps))
 	substitue_arg_type type (was_ok, type_heaps)
-		# (type, type_heaps) = substitute type type_heaps
+		# (_, type, type_heaps) = substitute type type_heaps
 		= (type, (was_ok, type_heaps))
 		
 	build_var_subst var (free_vars, type_var_heap)
@@ -2267,7 +2266,7 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 
 	  (instance_types, icl_common, dcl_modules, hp_var_heap, hp_type_heaps, cs)
 	  		= checkIclInstances main_dcl_module_n icl_common dcl_modules hp_var_heap hp_type_heaps cs
-	  		  	
+
 	  heaps = { heaps & hp_type_heaps = hp_type_heaps, hp_var_heap = hp_var_heap }
 
 	  e_info = { ef_type_defs = icl_common.com_type_defs, ef_selector_defs = icl_common.com_selector_defs, ef_class_defs = icl_common.com_class_defs, 

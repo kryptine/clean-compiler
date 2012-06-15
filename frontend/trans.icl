@@ -997,7 +997,6 @@ generate_case_function fun_index case_info_ptr new_expr outer_fun_def outer_cons
 	  app_args = free_vars_to_bound_vars tfi_args
 	= ( App {app_symb = app_symb, app_args = app_args, app_info_ptr = nilPtr}, ti)
 
-
 generate_case_function_with_pattern_argument :: !Int !ExprInfoPtr !Expression FunDef .ConsClasses [.Bool] !SymbIdent ![FreeVar] !*TransformInfo
 	-> (!Expression,!*TransformInfo)
 generate_case_function_with_pattern_argument fun_index case_info_ptr 
@@ -1051,7 +1050,7 @@ generate_case_function_with_pattern_argument fun_index case_info_ptr
 								,	fi_local_vars	= []
 								,	fi_dynamics		= []
 								,	fi_properties	= outer_fun_def.fun_info.fi_properties
-								}	
+								}
 				}
 	# cc_args_from_outer_fun		= [ cons_arg \\ cons_arg <- outer_cons_args.cc_args & used <- used_mask | used ]
 	  cc_linear_bits_from_outer_fun	= [ cons_arg \\ cons_arg <- outer_cons_args.cc_linear_bits & used <- used_mask | used ]
@@ -1089,8 +1088,8 @@ determine_case_function_type fun_arity ct_result_type arg_types st_attr_env ti=:
 	# (type_variables, th_vars)				= getTypeVars [ct_result_type:arg_types] ti_type_heaps.th_vars
 	  (fresh_type_vars, th_vars)			= mapSt bind_to_fresh_type_variable type_variables th_vars
 	  ti_type_heaps							= { ti_type_heaps & th_vars = th_vars }
-	  (fresh_arg_types, ti_type_heaps)		= substitute arg_types ti_type_heaps
-	  (fresh_result_type, ti_type_heaps)	= substitute ct_result_type ti_type_heaps
+	  (_, fresh_arg_types, ti_type_heaps)	= substitute arg_types ti_type_heaps
+	  (_, fresh_result_type, ti_type_heaps)	= substitute ct_result_type ti_type_heaps
 	  fun_type =
 	  			{ st_vars					= fresh_type_vars
 	  			, st_args					= fresh_arg_types
@@ -1467,8 +1466,8 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 	  das_AVI_Attr_TA_TempVar_info_ptrs = [st_attr_vars]
 	  ti_type_heaps = {ti_type_heaps & th_attrs = th_attrs, th_vars = th_vars}
 //	| False-!->("before substitute", st_args, "->", st_result)		= undef
-	# ((st_args,st_result), ti_type_heaps)
-	  		= substitute (st_args,st_result) ti_type_heaps
+	# (_, st_args, ti_type_heaps) = substitute st_args ti_type_heaps
+	# (_, st_result, ti_type_heaps) = substitute st_result ti_type_heaps
 //	| False-!->("after substitute", st_args, "->", st_result)		= undef
 // determine args...
 	# das = { das_vars						= []
@@ -1791,9 +1790,9 @@ where
 				= mapSt bind_to_fresh_type_variable st_vars th_vars
 		  (fresh_st_attr_vars, th_attrs)
 				= mapSt bind_to_fresh_attr_variable st_attr_vars th_attrs
-		  ([fresh_st_result:fresh_st_args], ti_type_heaps)
+		  (_, [fresh_st_result:fresh_st_args], ti_type_heaps)
 		  		= substitute [st_result:st_args] { ti_type_heaps & th_vars = th_vars, th_attrs = th_attrs }
-		  (fresh_st_attr_env, ti_type_heaps)
+		  (_, fresh_st_attr_env, ti_type_heaps)
 		  		= substitute st_attr_env ti_type_heaps
 		= (Yes { symbol_type & st_vars = fresh_st_vars, st_attr_vars = fresh_st_attr_vars, st_args = fresh_st_args,
 				st_result = fresh_st_result, st_attr_env = fresh_st_attr_env}, ti_type_heaps)
@@ -1981,7 +1980,7 @@ determine_arg (PR_Class class_app free_vars_and_types class_type) _ {fv_info_ptr
 			  das=:{das_arg_types, das_subst, das_type_heaps, das_predef}
 	# (ws_arg_type, das_arg_types) = das_arg_types![prod_index]
 	# {ats_types=[arg_type:_]} = ws_arg_type
-	  (int_class_type, das_type_heaps)
+	  (_, int_class_type, das_type_heaps)
 	  		= substitute class_type das_type_heaps
 	  class_atype = { empty_atype & at_type = int_class_type }
 	  type_input
@@ -2014,9 +2013,9 @@ determine_arg (PR_Class class_app free_vars_and_types class_type) _ {fv_info_ptr
 		= abort ("sanity check nr 93 in module trans failed\n"--->(class_atype,"\n", arg_type))
 	# (free_vars_and_types,das_type_heaps) = mapSt subFVT free_vars_and_types das_type_heaps
 		with
-			subFVT (fv,ty) th
-				# (ty`,th`)		= substitute ty th
-				= ((fv,ty`),th`)
+			subFVT (fv,ty) type_heaps
+				# (_, ty`,type_heaps) = substitute ty type_heaps
+				= ((fv,ty`),type_heaps)
 
 	# ws_ats_types = [ { empty_atype & at_type = at_type } \\ (_, at_type) <- free_vars_and_types]
 	# ws_arg_type` = {ats_types= ws_ats_types, ats_strictness = first_n_strict (length free_vars_and_types) }
@@ -2057,8 +2056,8 @@ determine_arg producer (Yes {st_args, st_args_strictness, st_result, st_attr_var
 	  // because types in Cases and Lets should not use TA_TempVar's
 	  das_AVI_Attr_TA_TempVar_info_ptrs = [st_attr_vars:das_AVI_Attr_TA_TempVar_info_ptrs]
 	  		// prepare for substitute calls
-	  ((st_args, st_result), das_type_heaps)
-	  		= substitute (st_args, st_result) { das_type_heaps & th_vars = th_vars, th_attrs = th_attrs }
+	  (_, st_args, das_type_heaps) = substitute st_args {das_type_heaps & th_vars = th_vars, th_attrs = th_attrs}
+	  (_, st_result, das_type_heaps) = substitute st_result das_type_heaps
 	  nr_of_applied_args = symbol_arity
 	  (application_type, attr_env, das_next_attr_nr)
 	  		= build_application_type st_arity (length st_context) st_result st_args nr_of_applied_args [] das_next_attr_nr
@@ -4169,11 +4168,6 @@ get_fun_def_and_cons_args (SK_GeneratedFunction fun_info_ptr fun_index) cons_arg
 	= (gf_fun_def, gf_cons_args, cons_args, fun_defs, fun_heap)
 
 //@ <<<
-/*
-instance <<< Group where
-	(<<<) file {group_members}
-	 = file <<< "Group: " <<< group_members
-*/
 
 instance <<< RootCaseMode where
 	(<<<) file mode = case mode of NotRootCase -> file <<< "NotRootCase"; RootCase -> file <<< "RootCase"; RootCaseOfZombie -> file <<< "RootCaseOfZombie";
@@ -4459,7 +4453,7 @@ copy_dictionary_variable app_symb app_args class_type ci cs
 	substitute_class_types class_types No
 		= (class_types, No)
 	substitute_class_types class_types (Yes type_heaps)
-		# (new_class_types, type_heaps) = substitute class_types type_heaps
+		# (_, new_class_types, type_heaps) = substitute class_types type_heaps
 		= (new_class_types, Yes type_heaps)
 
 instance copy DynamicExpr
@@ -4536,7 +4530,7 @@ where
 			= ({ app & app_args = app_args, app_info_ptr = new_info_ptr}, cs) 
 
 		substitute_EI_DictionaryType (EI_DictionaryType class_type) (Yes type_heaps)
-			# (new_class_type, type_heaps) = substitute class_type type_heaps
+			# (_, new_class_type, type_heaps) = substitute class_type type_heaps
 			= (EI_DictionaryType new_class_type, Yes type_heaps)
 		substitute_EI_DictionaryType x opt_type_heaps
 			= (x, opt_type_heaps)
@@ -4684,12 +4678,16 @@ substitute_let_or_case_type	expr_info No
 substitute_let_or_case_type	(EI_Extended extensions expr_info) yes_type_heaps
 	# (new_expr_info, yes_type_heaps) = substitute_let_or_case_type expr_info yes_type_heaps
 	= (EI_Extended extensions new_expr_info, yes_type_heaps)
-substitute_let_or_case_type	(EI_CaseType case_type) (Yes type_heaps)
-	# (new_case_type, type_heaps) = substitute case_type type_heaps
-	= (EI_CaseType new_case_type, Yes type_heaps)
-substitute_let_or_case_type	(EI_LetType let_type) (Yes type_heaps)
-	# (new_let_type, type_heaps) = substitute let_type type_heaps
-	= (EI_LetType new_let_type, Yes type_heaps)
+substitute_let_or_case_type	expr_info=:(EI_CaseType case_type) (Yes type_heaps)
+	# (changed, new_case_type, type_heaps) = substitute case_type type_heaps
+	| changed
+		= (EI_CaseType new_case_type, Yes type_heaps)
+		= (expr_info, Yes type_heaps)
+substitute_let_or_case_type	expr_info=:(EI_LetType let_type) (Yes type_heaps)
+	# (changed, new_let_type, type_heaps) = substitute let_type type_heaps
+	| changed
+		= (EI_LetType new_let_type, Yes type_heaps)
+		= (expr_info, Yes type_heaps)
 
 instance copy CasePatterns
 where

@@ -328,10 +328,10 @@ where
 	where
 		fresh_context :: !TypeContext !*TypeHeaps -> (TypeContext,*TypeHeaps)
 		fresh_context tc=:{tc_types} type_heaps
-			# (tc_types, type_heaps) = substitute tc_types type_heaps
-//			  (tc_var, var_heap) = newPtr VI_Empty var_heap
-//			= ({ tc & tc_types = tc_types, tc_var = tc_var }, (var_heap, type_heaps))
-			= ({ tc & tc_types = tc_types }, type_heaps)
+			# (changed_tc_types, tc_types, type_heaps) = substitute tc_types type_heaps
+			| changed_tc_types
+				= ({tc & tc_types = tc_types}, type_heaps)
+				= (tc, type_heaps)
 
 	is_unboxed_array:: [Type] PredefinedSymbols -> Bool
 	is_unboxed_array [TA {type_index={glob_module,glob_object},type_arity} _ : _] predef_symbols
@@ -851,7 +851,7 @@ where
 			= type_var_heap <:= (tv_info_ptr, TVI_Type type)
 		  
 		subst_context_and_generate_super_classes class_context (super_classes, type_heaps)
-			# (super_class, type_heaps) = substitute class_context type_heaps
+			# (_, super_class, type_heaps) = substitute class_context type_heaps
 			| containsContext super_class super_classes
 				= (super_classes, type_heaps)
 				= generate_super_classes super_class ([super_class : super_classes], type_heaps) 
@@ -1090,7 +1090,7 @@ where
 			# {tc_class=TCClass {glob_object={ds_index},glob_module}} = tc2
 			  {class_args,class_members,class_context,class_dictionary} = defs.[glob_module].com_class_defs.[ds_index]
 			  th_vars = foldr2 (\{tv_info_ptr} type -> writePtr tv_info_ptr (TVI_Type type)) th_vars class_args tc2.tc_types
-			  (super_instances, type_heaps) = substitute class_context { type_heaps & th_vars = th_vars } 
+			  (_, super_instances, type_heaps) = substitute class_context {type_heaps & th_vars = th_vars} 
 			= find_super_instance tc1 super_instances (size class_members) address glob_module class_dictionary.ds_index defs type_heaps
 	where
 		find_super_instance :: !TypeContext ![TypeContext] !Index ![(Int, Global DefinedSymbol)] !Index !Index !{#CommonDefs} !*TypeHeaps

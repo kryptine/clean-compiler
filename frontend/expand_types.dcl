@@ -33,11 +33,10 @@ class expandSynTypes a :: !Int !{#CommonDefs} !a !*ExpandTypeState -> (!Bool,!a,
 
 instance expandSynTypes (a,b) | expandSynTypes a & expandSynTypes b special a=[AType],b=AType
 
-class substitute a :: !a !*TypeHeaps -> (!a, !*TypeHeaps)
+class substitute a :: !a !*TypeHeaps -> (!Bool, !a, !*TypeHeaps)
 
 instance substitute Type,AType,TypeContext,AttrInequality,CaseType
-instance substitute [a] | substitute a special a=AType; a=AttrInequality; a=TypeContext
-instance substitute (a,b) | substitute a & substitute b special a=[AType],b=AType
+instance substitute [a] | substitute a special a=AType; a=TypeContext; a=AttrInequality
 
 class removeAnnotations a :: !a  -> (!Bool, !a)
 

@@ -584,13 +584,17 @@ where
 		# (info, expr_heap) = readPtr expr_ptr expr_heap
 		= case info of
 			EI_CaseType case_type
-				# (case_type, type_heaps) = substitute case_type type_heaps
-				-> (type_heaps, expr_heap <:= (expr_ptr, EI_CaseType case_type))
+				# (changed, case_type_r, type_heaps) = substitute case_type type_heaps
+				| changed
+					-> (type_heaps, expr_heap <:= (expr_ptr, EI_CaseType case_type_r))
+					-> (type_heaps, expr_heap)
 			EI_LetType let_type
-				# (let_type, type_heaps) = substitute let_type type_heaps
-				-> (type_heaps, expr_heap <:= (expr_ptr, EI_LetType let_type))
+				# (changed, let_type_r, type_heaps) = substitute let_type type_heaps
+				| changed
+					-> (type_heaps, expr_heap <:= (expr_ptr, EI_LetType let_type_r))
+					-> (type_heaps, expr_heap)
 			EI_DictionaryType dict_type
-				# (dict_type, type_heaps) = substitute dict_type type_heaps
+				# (_, dict_type, type_heaps) = substitute dict_type type_heaps
 				-> (type_heaps, expr_heap <:= (expr_ptr, EI_DictionaryType dict_type))
 
 class bindInstances a :: !a !a !*TypeVarHeap -> *TypeVarHeap
@@ -640,7 +644,7 @@ instance bindInstances AType
 substituteType :: !TypeAttribute !TypeAttribute ![ATypeVar] ![AType] !Type !*TypeHeaps -> (!Type, !*TypeHeaps)
 substituteType form_root_attribute act_root_attribute form_type_args act_type_args orig_type type_heaps
 	# type_heaps = bindTypeVarsAndAttributes form_root_attribute act_root_attribute form_type_args act_type_args type_heaps
-	  (expanded_type, type_heaps) = substitute orig_type type_heaps
+	  (_, expanded_type, type_heaps) = substitute orig_type type_heaps
 	= (expanded_type, clearBindingsOfTypeVarsAndAttributes form_root_attribute form_type_args type_heaps)
 
 bindTypeVarsAndAttributes :: !TypeAttribute !TypeAttribute ![ATypeVar] ![AType] !*TypeHeaps -> *TypeHeaps
