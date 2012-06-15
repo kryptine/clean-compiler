@@ -645,32 +645,36 @@ where
 		# (info, expr_heap) = readPtr expr_ptr expr_heap
 		= case info of
 			EI_CaseType case_type
-				# (case_type, type_heaps) = substitute case_type type_heaps
-				-> (type_heaps, expr_heap <:= (expr_ptr, EI_CaseType case_type))
+				# (changed, case_type_r, type_heaps) = substitute case_type type_heaps
+				| changed
+					-> (type_heaps, expr_heap <:= (expr_ptr, EI_CaseType case_type_r))
+					-> (type_heaps, expr_heap)
 			EI_LetType let_type
-				# (let_type, type_heaps) = substitute let_type type_heaps
-				-> (type_heaps, expr_heap <:= (expr_ptr, EI_LetType let_type))
+				# (changed, let_type_r, type_heaps) = substitute let_type type_heaps
+				| changed
+					-> (type_heaps, expr_heap <:= (expr_ptr, EI_LetType let_type_r))
+					-> (type_heaps, expr_heap)
 			EI_DictionaryType dict_type
-				# (dict_type, type_heaps) = substitute dict_type type_heaps
+				# (_, dict_type, type_heaps) = substitute dict_type type_heaps
 				-> (type_heaps, expr_heap <:= (expr_ptr, EI_DictionaryType dict_type))
 			EI_ContextWithVarContexts class_expressions var_contexts
 				# (var_contexts,type_heaps) = substitute_var_contexts var_contexts type_heaps
 				-> (type_heaps,writePtr expr_ptr (EI_ContextWithVarContexts class_expressions var_contexts) expr_heap)
 			where
 				substitute_var_contexts (VarContext arg_n type_contexts arg_atype var_contexts) type_heaps
-					# (type_contexts,type_heaps) = substitute type_contexts type_heaps
-					  (arg_atype,type_heaps) = substitute arg_atype type_heaps
+					# (_, type_contexts,type_heaps) = substitute type_contexts type_heaps
+					  (_, arg_atype,type_heaps) = substitute arg_atype type_heaps
 					  (var_contexts,type_heaps) = substitute_var_contexts var_contexts type_heaps
 					= (VarContext arg_n type_contexts arg_atype var_contexts,type_heaps)
 				substitute_var_contexts NoVarContexts type_heaps
 					= (NoVarContexts,type_heaps)
 			EI_CaseTypeWithContexts case_type constructor_contexts
-				# (case_type, type_heaps) = substitute case_type type_heaps
+				# (_,case_type, type_heaps) = substitute case_type type_heaps
 				  (constructor_contexts, type_heaps) = substitute_constructor_contexts constructor_contexts type_heaps
 				-> (type_heaps, expr_heap <:= (expr_ptr, EI_CaseTypeWithContexts case_type constructor_contexts))
 		where
 			substitute_constructor_contexts [(cons_symbol,context):constructor_contexts] type_heaps
-				# (context, type_heaps) = substitute context type_heaps
+				# (_, context, type_heaps) = substitute context type_heaps
 				  (constructor_contexts, type_heaps) = substitute_constructor_contexts constructor_contexts type_heaps
 				= ([(cons_symbol,context):constructor_contexts],type_heaps)
 			substitute_constructor_contexts [] type_heaps
@@ -678,8 +682,10 @@ where
 
 instance substitute DictionaryAndClassType where
 	substitute {dc_var,dc_class_type} type_heaps
-		# (dc_class_type,type_heaps) = substitute dc_class_type type_heaps
-		= ({dc_var=dc_var,dc_class_type=dc_class_type},type_heaps)
+		# (changed,dc_class_type_r,type_heaps) = substitute dc_class_type type_heaps
+		| changed
+			= (True, {dc_var=dc_var,dc_class_type=dc_class_type_r},type_heaps)
+			= (False, {dc_var=dc_var,dc_class_type=dc_class_type},type_heaps)
 
 class bindInstances a :: !a !a !*TypeVarHeap -> *TypeVarHeap
 
@@ -728,7 +734,7 @@ instance bindInstances AType
 substituteType :: !TypeAttribute !TypeAttribute ![ATypeVar] ![AType] !Type !*TypeHeaps -> (!Type, !*TypeHeaps)
 substituteType form_root_attribute act_root_attribute form_type_args act_type_args orig_type type_heaps
 	# type_heaps = bindTypeVarsAndAttributes form_root_attribute act_root_attribute form_type_args act_type_args type_heaps
-	  (expanded_type, type_heaps) = substitute orig_type type_heaps
+	  (_, expanded_type, type_heaps) = substitute orig_type type_heaps
 	= (expanded_type, clearBindingsOfTypeVarsAndAttributes form_root_attribute form_type_args type_heaps)
 
 bindTypeVarsAndAttributes :: !TypeAttribute !TypeAttribute ![ATypeVar] ![AType] !*TypeHeaps -> *TypeHeaps
@@ -757,14 +763,6 @@ where
 		= th_attrs <:= (av_info_ptr, AVI_Empty)
 	clear_attribute _ th_attrs
 		= th_attrs
-
-/*
-expandTypeApplication :: ![ATypeVar] !TypeAttribute !Type ![AType] !TypeAttribute !*TypeHeaps -> (!Type, !*TypeHeaps)
-expandTypeApplication type_args form_attr type_rhs arg_types act_attr type_heaps=:{th_attrs}
-	# type_heaps = bindTypeVarsAndAttributes form_attr act_attr type_args arg_types type_heaps 
-	  (_, exp_type, type_heaps) = substitute type_rhs type_heaps
-	= (exp_type, clearBindingsOfTypeVarsAndAttributes form_attr type_args type_heaps)
-*/
 
 VarIdTable :: {# String}
 VarIdTable =: { "a", "b", "c", "d", "e", "f", "g", "h", "i", "j" }
