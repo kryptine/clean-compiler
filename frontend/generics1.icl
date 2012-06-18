@@ -176,7 +176,10 @@ where
 clearGenericDefs :: !*{#CommonDefs} !*Heaps -> (!*{#CommonDefs},!*Heaps)
 clearGenericDefs modules heaps
 	= clear_module 0 modules  heaps
-where	
+where
+	initial_gen_classes
+		= createArray 32 []
+
 	clear_module n modules heaps
 		| n == size modules
 			= (modules, heaps)
@@ -187,7 +190,7 @@ where
 
 	clear_generic_def generic_def=:{gen_info_ptr} heaps=:{hp_generic_heap}
 		#! (gen_info, hp_generic_heap) = readPtr gen_info_ptr hp_generic_heap
-		#! gen_info = { gen_info & gen_classes = createArray 32 [] }
+		#! gen_info & gen_classes = initial_gen_classes
 		#! hp_generic_heap = writePtr gen_info_ptr gen_info hp_generic_heap
 		= (generic_def, {heaps & hp_generic_heap = hp_generic_heap})
 		
@@ -221,7 +224,7 @@ buildGenericRepresentations gs=:{gs_main_module, gs_modules, gs_funs, gs_groups}
 		  		bimap_RECORD_function = undefined_function_and_ident,
 		  		bimap_FIELD_function = undefined_function_and_ident
 	  		}
-	  funs_and_groups = {fg_fun_index=size_funs, fg_group_index=size_groups, fg_funs=[], fg_groups=[],fg_bimap_functions= bimap_functions}
+	  funs_and_groups = {fg_fun_index=size_funs, fg_group_index=size_groups, fg_funs=[], fg_groups=[],fg_bimap_functions=bimap_functions}
 	#! (funs_and_groups, gs)
 		= foldArraySt build_generic_representation com_gencase_defs (funs_and_groups, gs)
 
@@ -1670,11 +1673,17 @@ where
 
 // Convert generic cases 
 
+:: *SpecializeState = {
+		ss_modules :: !*Modules,
+		ss_td_infos :: !*TypeDefInfos,
+		ss_heaps :: !*Heaps,
+		ss_error :: !*ErrorAdmin
+	}
+
 convertGenericCases :: !BimapFunctions !*GenericState -> (!IndexRange, !*GenericState)
 convertGenericCases bimap_functions
 		gs=:{gs_main_module, gs_used_modules, gs_predefs, gs_funs, gs_groups, gs_modules, gs_dcl_modules, gs_td_infos, 
-			gs_avarh, gs_tvarh, gs_varh, gs_genh, gs_exprh,
-			gs_error}
+			gs_avarh, gs_tvarh, gs_varh, gs_genh, gs_exprh, gs_error}
 
 	# heaps = 
 		{ hp_expression_heap = gs_exprh
@@ -1698,8 +1707,10 @@ convertGenericCases bimap_functions
 
 	#! first_main_instance_fun_index = fun_info.fg_fun_index
 
-	#! (gs_modules, gs_dcl_modules, (fun_info, instance_info, gs_funs, gs_td_infos, heaps, gs_error)) 
-		= build_main_instances_in_main_module gs_main_module gs_modules gs_dcl_modules (fun_info, instance_info, gs_funs, gs_td_infos, heaps, gs_error)
+	# st2 = {ss_modules=gs_modules,ss_td_infos=gs_td_infos,ss_heaps=heaps,ss_error=gs_error}
+	#! (gs_dcl_modules, (fun_info, instance_info, gs_funs), st2)
+		= build_main_instances_in_main_module gs_main_module gs_dcl_modules (fun_info,instance_info,gs_funs) st2
+	# {ss_modules=gs_modules,ss_td_infos=gs_td_infos,ss_heaps=heaps,ss_error=gs_error} = st2
 
 	#! first_shorthand_function_index = fun_info.fg_fun_index
 
@@ -1822,49 +1833,49 @@ where
 				= (dcl_functions, modules, (ins_info, heaps, error))
 
 	build_main_instances_in_main_module :: !Index
-			!*{#CommonDefs} !*{#DclModule} !(FunsAndGroups, !(!Index, ![ClassInstance]), !*{#FunDef}, !*TypeDefInfos, !*Heaps, !*ErrorAdmin)
-		-> (!*{#CommonDefs},!*{#DclModule},!(FunsAndGroups, !(!Index, ![ClassInstance]), !*{#FunDef}, !*TypeDefInfos, !*Heaps, !*ErrorAdmin))
-	build_main_instances_in_main_module gs_main_module modules dcl_modules st
-		#! (com_gencase_defs,modules) = modules![gs_main_module].com_gencase_defs
+			!*{#DclModule} !(FunsAndGroups, !(!Index, ![ClassInstance]), !*{#FunDef}) !*SpecializeState
+		-> (!*{#DclModule},!(FunsAndGroups, !(!Index, ![ClassInstance]), !*{#FunDef}),!*SpecializeState)
+	build_main_instances_in_main_module gs_main_module dcl_modules st1 st2
+		#! (com_gencase_defs,st2) = st2!ss_modules.[gs_main_module].com_gencase_defs
 		| size com_gencase_defs==0
-			= (modules,dcl_modules,st)
+			= (dcl_modules,st1,st2)
 		#! (dcl_functions,dcl_modules) = dcl_modules![gs_main_module].dcl_functions
-		#! (dcl_functions, modules, st)
-			= foldArraySt (build_main_instance gs_main_module) com_gencase_defs ({x\\x<-:dcl_functions}, modules, st)
-		#! dcl_modules = {dcl_modules & [gs_main_module].dcl_functions = dcl_functions} 
-		= (modules,dcl_modules,st)
+		#! (dcl_functions, st1, st2)
+			= foldArraySt (build_main_instance gs_main_module) com_gencase_defs ({x\\x<-:dcl_functions}, st1, st2)
+		#! dcl_modules = {dcl_modules & [gs_main_module].dcl_functions = dcl_functions}
+		= (dcl_modules,st1,st2)
 	where
 		build_main_instance :: !Index !GenericCaseDef
-				(!*{#FunType}, !*Modules, !(FunsAndGroups, !(!Index, ![ClassInstance]), !*{#FunDef}, !*TypeDefInfos, !*Heaps, !*ErrorAdmin))
-			->	(!*{#FunType}, !*Modules, !(FunsAndGroups, !(!Index, ![ClassInstance]), !*{#FunDef}, !*TypeDefInfos, !*Heaps, !*ErrorAdmin))					
+				(!*{#FunType}, !(FunsAndGroups, !(!Index, ![ClassInstance]), !*{#FunDef}), !*SpecializeState)
+			->	(!*{#FunType}, !(FunsAndGroups, !(!Index, ![ClassInstance]), !*{#FunDef}), !*SpecializeState)					
 		build_main_instance module_index
 				{gc_gcf=GCF gc_ident {gcf_body = GCB_FunIndex fun_index,gcf_kind,gcf_generic,gcf_generic_info}, gc_type, gc_type_cons,gc_pos} 
-				(dcl_functions, modules, st)
+				(dcl_functions, st1, st2)
 			#! ins_type = {it_vars = instance_vars_from_type_cons gc_type_cons, it_types = [gc_type], it_attr_vars = [], it_context = []}
 			#! generic_info_index = index_gen_cons_with_info_type gc_type gs_predefs
 			= build_main_instance_ ins_type module_index gc_ident fun_index gcf_kind gcf_generic gc_type_cons gc_pos generic_info_index gcf_generic_info
-									dcl_functions modules st
+									dcl_functions st1 st2
 		build_main_instance module_index
 				{gc_gcf=GCFS gcfs,gc_type,gc_type_cons,gc_pos}
-				(dcl_functions, modules, st)
+				(dcl_functions, st1, st2)
 			#! ins_type = {it_vars = instance_vars_from_type_cons gc_type_cons, it_types = [gc_type], it_attr_vars = [], it_context = []}
 			#! generic_info_index = index_gen_cons_with_info_type gc_type gs_predefs
-			= build_main_instances gcfs ins_type module_index gc_type_cons gc_pos generic_info_index dcl_functions modules st
+			= build_main_instances gcfs ins_type module_index gc_type_cons gc_pos generic_info_index dcl_functions st1 st2
 		where
 			build_main_instances [!{gcf_body = GCB_FunIndex fun_index,gcf_generic,gcf_kind,gcf_gident,gcf_generic_info}:gcfs!] ins_type module_index gc_type_cons gc_pos generic_info_index
-									dcl_functions modules st
-				# (dcl_functions, modules, st)
+									dcl_functions st1 st2
+				# (dcl_functions, st1, st2)
 					= build_main_instance_ ins_type module_index gcf_gident fun_index gcf_kind gcf_generic gc_type_cons gc_pos generic_info_index gcf_generic_info
-											dcl_functions modules st
-				= build_main_instances gcfs ins_type module_index gc_type_cons gc_pos generic_info_index dcl_functions modules st
-			build_main_instances [!!] ins_type module_index gc_type_cons gc_pos generic_info_index dcl_functions modules st
-				= (dcl_functions, modules, st)
+											dcl_functions st1 st2
+				= build_main_instances gcfs ins_type module_index gc_type_cons gc_pos generic_info_index dcl_functions st1 st2
+			build_main_instances [!!] ins_type module_index gc_type_cons gc_pos generic_info_index dcl_functions st1 st2
+				= (dcl_functions, st1, st2)
 
 		build_main_instance_ :: InstanceType Int Ident Int TypeKind GlobalIndex TypeCons Position Int Int
-				!*{#FunType} !*{#CommonDefs} !(FunsAndGroups, !(!Index, ![ClassInstance]), !*{#FunDef}, !*TypeDefInfos, !*Heaps, !*ErrorAdmin)
-			-> (!*{#FunType},!*{#CommonDefs},!(FunsAndGroups, !(!Index, ![ClassInstance]), !*{#FunDef}, !*TypeDefInfos, !*Heaps, !*ErrorAdmin))
+				!*{#FunType} !(FunsAndGroups, !(!Index, ![ClassInstance]), !*{#FunDef}) !*SpecializeState
+			-> (!*{#FunType},!(FunsAndGroups, !(!Index, ![ClassInstance]), !*{#FunDef}),!*SpecializeState)
 		build_main_instance_ ins_type module_index gc_ident fun_index gcf_kind gcf_generic gc_type_cons gc_pos generic_info_index generic_info
-								dcl_functions modules (fun_info,ins_info,fun_defs,td_infos,heaps,error)
+								dcl_functions (fun_info,ins_info,fun_defs) st=:{ss_modules=modules,ss_heaps=heaps,ss_error=error}
 			# (gen_info_ptr, modules) = modules![gcf_generic.gi_module].com_generic_defs.[gcf_generic.gi_index].gen_info_ptr
 			  ({gen_classes,gen_rep_conses}, hp_generic_heap) = readPtr gen_info_ptr heaps.hp_generic_heap
 			  heaps & hp_generic_heap=hp_generic_heap
@@ -1878,13 +1889,14 @@ where
 					= determine_type_of_member_instance member_def ins_type heaps error
 				#! (dcl_functions, heaps)
 					= update_dcl_function fun_index fun_ident fun_type dcl_functions heaps
-				#! (fun_info, fun_defs, td_infos, modules, heaps, error)
+				# st & ss_modules=modules, ss_heaps=heaps, ss_error=error
+				#! (fun_info, fun_defs, st)
 					= update_icl_function fun_index fun_ident gc_pos gc_type_cons gc_ident gcf_generic
 						fun_type generic_info_index -1 AllGenericInstanceDependencies
-						fun_info fun_defs td_infos modules heaps error
+						fun_info fun_defs st
 				# class_instance_member = {cim_ident=fun_ident,cim_arity=module_index,cim_index= -1-fun_index}
 				#! ins_info = build_class_instance class_info.gci_class gc_ident gc_pos gcf_kind class_instance_member ins_type ins_info
-				= (dcl_functions, modules, (fun_info, ins_info, fun_defs, td_infos, heaps, error))
+				= (dcl_functions, (fun_info, ins_info, fun_defs), st)
 
 				# {grc_optional_fun_type,grc_generic_instance_deps} = gen_rep_conses.[generic_info_index]
 				# (fun_type,modules,heaps,error)
@@ -1901,11 +1913,12 @@ where
 						fun_type
 				#! (dcl_functions, heaps)
 					= update_dcl_function fun_index fun_ident fun_type_with_generic_info dcl_functions heaps
-				#! (fun_info, fun_defs, td_infos, modules, heaps, error)
+				# st & ss_modules=modules,ss_heaps=heaps,ss_error=error
+				#! (fun_info, fun_defs, st)
 					= update_icl_function fun_index fun_ident gc_pos gc_type_cons gc_ident gcf_generic
 						fun_type_with_generic_info generic_info_index generic_info grc_generic_instance_deps
-						fun_info fun_defs td_infos modules heaps error
-				= (dcl_functions, modules, (fun_info, ins_info, fun_defs, td_infos, heaps, error))
+						fun_info fun_defs st
+				= (dcl_functions, (fun_info, ins_info, fun_defs), st)
 
 	build_shorthand_instances_in_modules :: !Index
 			!*{#CommonDefs} !*{#DclModule} (FunsAndGroups, (!Index, ![ClassInstance]), !*Heaps, !*ErrorAdmin)
@@ -2018,7 +2031,7 @@ where
 
 			build_context ((_, ident), {gci_class, gci_module, gci_kind}) tv hp_var_heap
 				# (var_info_ptr, hp_var_heap) = newPtr VI_Empty hp_var_heap			
-				# type_context =		
+				# type_context =
 					{	tc_class = TCClass
 							{ glob_module=gci_module // the same as icl module
 							, glob_object =
@@ -2103,11 +2116,12 @@ where
 			= (dcl_functions, heaps)
 
 	update_icl_function :: !Index !Ident !Position !TypeCons !Ident !GlobalIndex !SymbolType !Int !Int !GenericInstanceDependencies
-			!FunsAndGroups !*{#FunDef} !*TypeDefInfos !*{#CommonDefs} !*Heaps !*ErrorAdmin 
-		-> (!FunsAndGroups,!*{#FunDef},!*TypeDefInfos,!*{#CommonDefs},!*Heaps,!*ErrorAdmin)
-	update_icl_function fun_index fun_ident gc_pos gc_type_cons gc_ident gcf_generic st generic_info_index generic_info generic_instance_deps
-			funs_and_groups fun_defs td_infos modules heaps error
-		#! (st, heaps) = fresh_symbol_type st heaps
+			!FunsAndGroups !*{#FunDef} !*SpecializeState
+		-> (!FunsAndGroups,!*{#FunDef},!*SpecializeState)
+	update_icl_function fun_index fun_ident gc_pos gc_type_cons gc_ident gcf_generic symbol_type generic_info_index generic_info generic_instance_deps
+			funs_and_groups fun_defs st
+		#! (symbol_type, heaps) = fresh_symbol_type symbol_type st.ss_heaps
+		# st & ss_heaps=heaps
 		#! (fun=:{fun_body, fun_arity}, fun_defs) = fun_defs![fun_index] 		
 		= case fun_body of
 			TransformedBody {tb_args,tb_rhs}	// user defined case
@@ -2122,10 +2136,10 @@ where
 						// remove generic info argument
 						# tb_args = tl tb_args
 						  fun_arity = fun_arity-1
-						| fun_arity<>st.st_arity + n_unused_dep_args
+						| fun_arity<>symbol_type.st_arity + n_unused_dep_args
 							# error = reportError gc_ident.id_name gc_pos
-										("incorrect arity "+++toString fun_arity+++", expected "+++toString (st.st_arity+n_unused_dep_args)) error
-							-> (funs_and_groups, fun_defs, td_infos, modules, heaps, error)
+										("incorrect arity "+++toString fun_arity+++", expected "+++toString (symbol_type.st_arity+n_unused_dep_args)) st.ss_error
+							-> (funs_and_groups, fun_defs, {st & ss_error=error})
 						# (tb_args,fun_arity)
 							= case generic_instance_deps of
 								GenericInstanceDependencies n_deps deps
@@ -2135,15 +2149,15 @@ where
 								_
 									-> (tb_args,fun_arity)
 						# fun_body = TransformedBody {tb_args = tb_args, tb_rhs = tb_rhs}
-						# fun = {fun & fun_ident = fun_ident, fun_type = Yes st, fun_body = fun_body, fun_arity = fun_arity}
+						# fun = {fun & fun_ident = fun_ident, fun_type = Yes symbol_type, fun_body = fun_body, fun_arity = fun_arity}
 						#! fun_defs & [fun_index] = fun
-						-> (funs_and_groups, fun_defs, td_infos, modules, heaps, error)
+						-> (funs_and_groups, fun_defs, st)
 					| generic_info<0
 						// keep generic info argument
-						| fun_arity<>st.st_arity + n_unused_dep_args
+						| fun_arity<>symbol_type.st_arity + n_unused_dep_args
 							# error = reportError gc_ident.id_name gc_pos
-										("incorrect arity "+++toString (fun_arity-1)+++", expected "+++toString (st.st_arity+n_unused_dep_args-1)) error
-							-> (funs_and_groups, fun_defs, td_infos, modules, heaps, error)
+										("incorrect arity "+++toString (fun_arity-1)+++", expected "+++toString (symbol_type.st_arity+n_unused_dep_args-1)) st.ss_error
+							-> (funs_and_groups, fun_defs, {st & ss_error=error})
 						# (fun_body,fun_arity)
 							= case generic_instance_deps of
 								GenericInstanceDependencies n_deps deps
@@ -2153,15 +2167,15 @@ where
 									-> (TransformedBody {tb_args = tb_args, tb_rhs = tb_rhs},fun_arity)
 								_
 									-> (fun_body,fun_arity)
-						# fun = {fun & fun_ident = fun_ident, fun_type = Yes st, fun_body = fun_body, fun_arity = fun_arity}
+						# fun = {fun & fun_ident = fun_ident, fun_type = Yes symbol_type, fun_body = fun_body, fun_arity = fun_arity}
 						#! fun_defs & [fun_index] = fun
-						-> (funs_and_groups, fun_defs, td_infos, modules, heaps, error)
+						-> (funs_and_groups, fun_defs, st)
 						// generic info record already replaced by fields
 						# n_generic_info_field = add_n_bits generic_info 0						
-						| fun_arity<>st.st_arity + n_unused_dep_args
+						| fun_arity<>symbol_type.st_arity + n_unused_dep_args
 							# error = reportError gc_ident.id_name gc_pos
-										("incorrect arity "+++toString (fun_arity-n_generic_info_field)+++", expected "+++toString (st.st_arity+n_unused_dep_args-n_generic_info_field)) error
-							-> (funs_and_groups, fun_defs, td_infos, modules, heaps, error)
+										("incorrect arity "+++toString (fun_arity-n_generic_info_field)+++", expected "+++toString (symbol_type.st_arity+n_unused_dep_args-n_generic_info_field)) st.ss_error
+							-> (funs_and_groups, fun_defs, {st & ss_error=error})
 						# (fun_body,fun_arity)
 							= case generic_instance_deps of
 								GenericInstanceDependencies n_deps deps
@@ -2171,29 +2185,29 @@ where
 									-> (TransformedBody {tb_args = tb_args, tb_rhs = tb_rhs},fun_arity)
 								_
 									-> (fun_body,fun_arity)	
-						# fun = {fun & fun_ident = fun_ident, fun_type = Yes st, fun_body = fun_body, fun_arity = fun_arity}
+						# fun = {fun & fun_ident = fun_ident, fun_type = Yes symbol_type, fun_body = fun_body, fun_arity = fun_arity}
 						#! fun_defs & [fun_index] = fun
-						-> (funs_and_groups, fun_defs, td_infos, modules, heaps, error)
+						-> (funs_and_groups, fun_defs, st)
 					// not a special generic instance, remove generic info argument		
 					# tb_args = tl tb_args
 					  fun_arity = fun_arity-1
 					# fun_body = TransformedBody {tb_args = tb_args, tb_rhs = tb_rhs}
-					| fun_arity<>st.st_arity
+					| fun_arity<>symbol_type.st_arity
 						# error = reportError gc_ident.id_name gc_pos
-									("incorrect arity "+++toString fun_arity+++", expected "+++toString st.st_arity) error
-						-> (funs_and_groups, fun_defs, td_infos, modules, heaps, error)						
-					# fun = {fun & fun_ident = fun_ident, fun_body = fun_body, fun_type = Yes st, fun_arity=fun_arity}
+									("incorrect arity "+++toString fun_arity+++", expected "+++toString symbol_type.st_arity) st.ss_error
+						-> (funs_and_groups, fun_defs, {st & ss_error=error})
+					# fun = {fun & fun_ident = fun_ident, fun_body = fun_body, fun_type = Yes symbol_type, fun_arity=fun_arity}
 					#! fun_defs & [fun_index] = fun
-					-> (funs_and_groups, fun_defs, td_infos, modules, heaps, error)
+					-> (funs_and_groups, fun_defs, st)
 			GeneratedBody		// derived case
-				#! (TransformedBody {tb_args, tb_rhs}, funs_and_groups, td_infos, modules, heaps, error)  
-					= buildGenericCaseBody gs_main_module gc_pos gc_type_cons gc_ident generic_info_index gcf_generic gs_predefs funs_and_groups td_infos modules heaps error
+				#! (TransformedBody {tb_args, tb_rhs}, funs_and_groups, st)
+					= buildGenericCaseBody gs_main_module gc_pos gc_type_cons gc_ident generic_info_index gcf_generic gs_predefs funs_and_groups st
 				# {fg_group_index,fg_groups} = funs_and_groups
-				#! fun = makeFunction fun_ident fg_group_index tb_args tb_rhs (Yes st) gs_main_module gc_pos
+				#! fun = makeFunction fun_ident fg_group_index tb_args tb_rhs (Yes symbol_type) gs_main_module gc_pos
 				#! fun_defs = {fun_defs & [fun_index] = fun}
 				# group = {group_members=[fun_index]}
 				  funs_and_groups = {funs_and_groups & fg_group_index=fg_group_index+1,fg_groups=[group:fg_groups]}
-				-> (funs_and_groups, fun_defs, td_infos, modules, heaps, error)
+				-> (funs_and_groups, fun_defs, st)
 	where
 		add_n_bits n c
 			| n>1
@@ -2402,11 +2416,11 @@ buildGenericCaseBody ::
 		!Index					// current icl module
 		!Position !TypeCons !Ident !Int !GlobalIndex
 		!PredefinedSymbols
-		!FunsAndGroups !*TypeDefInfos !*{#CommonDefs} !*Heaps !*ErrorAdmin 
+		!FunsAndGroups !*SpecializeState
 	-> (!FunctionBody,
-		!FunsAndGroups, !*TypeDefInfos,!*{#CommonDefs},!*Heaps,!*ErrorAdmin)
+		!FunsAndGroups, !*SpecializeState)
 buildGenericCaseBody main_module_index gc_pos (TypeConsSymb {type_ident,type_index}) gc_ident generic_info_index gcf_generic predefs
-					funs_and_groups td_infos modules heaps error
+					funs_and_groups st=:{ss_modules=modules,ss_td_infos=td_infos,ss_heaps=heaps}
 	#! (gen_def, modules) = modules![gcf_generic.gi_module].com_generic_defs.[gcf_generic.gi_index]
 	#! (td_info=:{tdi_gen_rep}, td_infos) = td_infos![type_index.glob_module, type_index.glob_object]
 	# (gen_type_rep=:{gtr_type}) = case tdi_gen_rep of
@@ -2425,13 +2439,16 @@ buildGenericCaseBody main_module_index gc_pos (TypeConsSymb {type_ident,type_ind
 			 in (arg_vars,heaps_))
 			(arg_vars,heaps)
 
-	#! (specialized_expr, funs_and_groups, modules, td_infos, heaps, error)
-		= build_specialized_expr gc_pos gc_ident gcf_generic gen_def.gen_deps gtr_type td_args generated_arg_exprss gen_def.gen_info_ptr funs_and_groups modules td_infos heaps error
+	# st & ss_modules=modules,ss_td_infos=td_infos,ss_heaps=heaps
+	#! (specialized_expr, funs_and_groups, st)
+		= build_specialized_expr gc_pos gc_ident gcf_generic gen_def.gen_deps gtr_type td_args generated_arg_exprss gen_def.gen_info_ptr funs_and_groups st
 
+	# {ss_modules=modules,ss_td_infos=td_infos,ss_heaps=heaps,ss_error=error} = st
 	#! (body_expr, funs_and_groups, modules, td_infos, heaps, error)
 		= adapt_specialized_expr gc_pos gen_def gen_type_rep original_arg_exprs specialized_expr funs_and_groups modules td_infos heaps error
+	# st & ss_modules=modules,ss_td_infos=td_infos,ss_heaps=heaps,ss_error=error
 
-	= (TransformedBody {tb_args=arg_vars, tb_rhs=body_expr}, funs_and_groups, td_infos, modules, heaps, error)	
+	= (TransformedBody {tb_args=arg_vars, tb_rhs=body_expr}, funs_and_groups, st)
 where
 	build_generic_info_arg heaps=:{hp_var_heap}
 		// generic arg is never referenced in the generated body
@@ -2457,7 +2474,7 @@ where
 				= ident.id_name +++ gvarsName +++ indexName +++ "_" +++ atv.tv_ident.id_name
 
 	// generic function specialized to the generic representation of the type
-	build_specialized_expr gc_pos gc_ident gcf_generic gen_deps gtr_type td_args generated_arg_exprss gen_info_ptr funs_and_groups modules td_infos heaps error
+	build_specialized_expr gc_pos gc_ident gcf_generic gen_deps gtr_type td_args generated_arg_exprss gen_info_ptr funs_and_groups st
                 // TODO: TvN: bimap_spec_env is hacked to fit the original description of a spec_env, taking the hd of the generated_arg_exprss, change it?
 		#! bimap_spec_env = [(atv_variable, TVI_Expr False (hd exprs)) \\ {atv_variable} <- td_args & exprs <- generated_arg_exprss]
                 // TODO: TvN: very quick and dirty implementation, must include generic dependency variables as well to look up right argument with 
@@ -2468,18 +2485,19 @@ where
 		| gcf_generic.gi_module==generic_bimap.pds_module && gcf_generic.gi_index==generic_bimap.pds_def
 
 			// JvG: can probably make special version of simplify_bimap_GenTypeStruct that doesn't simplify if any var occurs, because all vars are passed
-			# (gtr_type, heaps) = simplify_bimap_GenTypeStruct [atv_variable \\ {atv_variable} <- td_args] gtr_type heaps
+			# (gtr_type, heaps) = simplify_bimap_GenTypeStruct [atv_variable \\ {atv_variable} <- td_args] gtr_type st.ss_heaps
 
 			# (expr,funs_and_groups,heaps,error)
-				= specialize_generic_bimap gcf_generic gtr_type bimap_spec_env gc_ident gc_pos main_module_index predefs funs_and_groups heaps error
-			= (expr,funs_and_groups,modules,td_infos,heaps,error)
+				= specialize_generic_bimap gcf_generic gtr_type bimap_spec_env gc_ident gc_pos main_module_index predefs funs_and_groups heaps st.ss_error
+			= (expr,funs_and_groups,{st & ss_heaps=heaps,ss_error=error})
 
+			# heaps = st.ss_heaps
 			# ({gen_rep_conses},generic_heap) = readPtr gen_info_ptr heaps.hp_generic_heap
-			  heaps = {heaps & hp_generic_heap=generic_heap}
+			  st & ss_heaps = {heaps & hp_generic_heap=generic_heap}
 
-			# (expr,modules,td_infos,heaps,error)
-				= specializeGeneric gcf_generic gtr_type spec_env gc_ident gc_pos gen_deps gen_rep_conses main_module_index predefs modules td_infos heaps error
-			= (expr,funs_and_groups,modules,td_infos,heaps,error)
+			# (expr,st)
+				= specializeGeneric gcf_generic gtr_type spec_env gc_ident gc_pos gen_deps gen_rep_conses main_module_index predefs st
+			= (expr,funs_and_groups,st)
 
 	// adaptor that converts a function for the generic representation into a 
 	// function for the type itself
@@ -2541,9 +2559,9 @@ where
 				#! (expr, heaps)
 					= buildGenericApp bimap_module bimap_index bimap_ident kind [] heaps		
 				= ((non_gen_var, TVI_Expr False expr), funs_and_groups, heaps)
-buildGenericCaseBody main_module_index gc_pos gc_type_cons gc_ident generic_info_index gcf_generic predefs funs_and_groups td_infos modules heaps error
-	# error = reportError gc_ident.id_name gc_pos "cannot specialize to this type" error
-	= (TransformedBody {tb_args=[], tb_rhs=EE}, funs_and_groups, td_infos, modules, heaps, error)
+buildGenericCaseBody main_module_index gc_pos gc_type_cons gc_ident generic_info_index gcf_generic predefs funs_and_groups st
+	# error = reportError gc_ident.id_name gc_pos "cannot specialize to this type" st.ss_error
+	= (TransformedBody {tb_args=[], tb_rhs=EE}, funs_and_groups, {st & ss_error=error})
 
 //  convert generic type contexts into normal type contexts
 
@@ -2747,15 +2765,15 @@ specializeGeneric ::
 		!{!GenericRepresentationConstructor}
 		!Index 					// main_module index
 		!PredefinedSymbols
-		!*Modules !*TypeDefInfos !*Heaps !*ErrorAdmin
+		!*SpecializeState
 	-> (!Expression,
-		!*Modules,!*TypeDefInfos,!*Heaps,!*ErrorAdmin)
-specializeGeneric gen_index type spec_env gen_ident gen_pos gen_deps gen_rep_conses main_module_index predefs modules td_infos heaps error
-	#! heaps = set_tvs spec_env heaps
-	#! (expr, (modules, td_infos, heaps, error)) 
-		= specialize gen_index gen_ident gen_deps gen_rep_conses type (modules, td_infos, heaps, error)
-	#! heaps = clear_tvs spec_env heaps
-	= (expr, modules, td_infos, heaps, error)
+		!*SpecializeState)
+specializeGeneric gen_index type spec_env gen_ident gen_pos gen_deps gen_rep_conses main_module_index predefs st
+	#! st & ss_heaps = set_tvs spec_env st.ss_heaps
+	#! (expr, st)
+		= specialize gen_index gen_ident gen_deps gen_rep_conses type st
+	#! st & ss_heaps = clear_tvs spec_env st.ss_heaps
+	= (expr, st)
 where
 	specialize gen_index gen_ident gen_deps gen_rep_conses (GTSAppCons kind arg_types) st
 		#! (arg_exprs, st) = specialize_with_deps gen_index gen_ident gen_deps gen_rep_conses arg_types st
@@ -2771,114 +2789,115 @@ where
 		= build_generic_app (KindArrow [KindConst, KindConst]) arg_exprs gen_index gen_ident st
 	specialize gen_index gen_ident gen_deps gen_rep_conses (GTSPair x y) st
 		# gen_PAIR_index=:{grc_generic_info,grc_generic_instance_deps} = gen_rep_conses.[4]
-		# (arg_exprs, (modules, td_infos, heaps, error))
+		# (arg_exprs, st)
 			= specialize_with_partial_or_all_deps gen_index gen_ident gen_deps gen_rep_conses [x,y] grc_generic_instance_deps st
 		| gen_PAIR_index.grc_module>=0
 			#! (expr, heaps)
-				= buildFunApp2 gen_PAIR_index.grc_module gen_PAIR_index.grc_index gen_PAIR_index.grc_ident arg_exprs heaps
-			= (expr, (modules, td_infos, heaps, error))
-			#! error = reportError gen_ident.id_name gen_pos "cannot specialize because there is no instance of PAIR" error 
-			= (EE, (modules, td_infos, heaps, error))
+				= buildFunApp2 gen_PAIR_index.grc_module gen_PAIR_index.grc_index gen_PAIR_index.grc_ident arg_exprs st.ss_heaps
+			= (expr, {st & ss_heaps=heaps})
+			#! error = reportError gen_ident.id_name gen_pos "cannot specialize because there is no instance of PAIR" st.ss_error
+			= (EE, {st & ss_error=error})
 	specialize gen_index gen_ident gen_deps gen_rep_conses (GTSEither x y) st
 		# gen_EITHER_index=:{grc_generic_info,grc_generic_instance_deps} = gen_rep_conses.[5]
-		# (arg_exprs, (modules, td_infos, heaps, error))
+		# (arg_exprs, st)
 			= specialize_with_partial_or_all_deps gen_index gen_ident gen_deps gen_rep_conses [x,y] grc_generic_instance_deps st
 		| gen_EITHER_index.grc_module>=0
 			#! (expr, heaps)
-				= buildFunApp2 gen_EITHER_index.grc_module gen_EITHER_index.grc_index gen_EITHER_index.grc_ident arg_exprs heaps
-			= (expr, (modules, td_infos, heaps, error))
-			#! error = reportError gen_ident.id_name gen_pos "cannot specialize because there is no instance of EITHER" error 
-			= (EE, (modules, td_infos, heaps, error))
+				= buildFunApp2 gen_EITHER_index.grc_module gen_EITHER_index.grc_index gen_EITHER_index.grc_ident arg_exprs st.ss_heaps
+			= (expr, {st & ss_heaps=heaps})
+			#! error = reportError gen_ident.id_name gen_pos "cannot specialize because there is no instance of EITHER" st.ss_error
+			= (EE, {st & ss_error=error})
 	specialize gen_index gen_ident gen_deps gen_rep_conses (GTSCons cons_info_ds cons_index type_def_info gen_type_ds arg_type) st
 		# gen_CONS_index=:{grc_generic_info,grc_generic_instance_deps} = gen_rep_conses.[1]
-		# (arg_exprs, (modules, td_infos, heaps, error))
+		# (arg_exprs, st)
 			= specialize_with_partial_or_all_deps gen_index gen_ident gen_deps gen_rep_conses [arg_type] grc_generic_instance_deps st
 		| gen_CONS_index.grc_module>=0
-			# (arg_exprs,modules,heaps)
+			# (arg_exprs,st)
 				= case grc_generic_info of
 					0
-						-> (arg_exprs,modules,heaps)
+						-> (arg_exprs,st)
 					-1 
-						#! (generic_info_expr, heaps) = buildFunApp main_module_index cons_info_ds [] heaps
-						-> ([generic_info_expr:arg_exprs],modules,heaps)
+						#! (generic_info_expr, heaps) = buildFunApp main_module_index cons_info_ds [] st.ss_heaps
+						-> ([generic_info_expr:arg_exprs],{st & ss_heaps=heaps})
 					_
-						# (cons_def, modules) = modules![cons_index.gi_module].com_cons_defs.[cons_index.gi_index]
-						# (arg_exprs,heaps) = add_CONS_info_args grc_generic_info cons_def type_def_info gen_type_ds arg_exprs main_module_index predefs heaps
-						-> (arg_exprs,modules,heaps)
+						# (cons_def, modules) = (st.ss_modules)![cons_index.gi_module].com_cons_defs.[cons_index.gi_index]
+						# (arg_exprs,heaps) = add_CONS_info_args grc_generic_info cons_def type_def_info gen_type_ds arg_exprs main_module_index predefs st.ss_heaps
+						-> (arg_exprs,{st & ss_modules=modules,ss_heaps=heaps})
 			#! (expr, heaps)
-				= buildFunApp2 gen_CONS_index.grc_module gen_CONS_index.grc_index gen_CONS_index.grc_ident arg_exprs heaps
-			= (expr, (modules, td_infos, heaps, error))
-			#! error = reportError gen_ident.id_name gen_pos "cannot specialize because there is no instance of CONS" error 
-			= (EE, (modules, td_infos, heaps, error))
+				= buildFunApp2 gen_CONS_index.grc_module gen_CONS_index.grc_index gen_CONS_index.grc_ident arg_exprs st.ss_heaps
+			= (expr, {st & ss_heaps=heaps})
+			#! error = reportError gen_ident.id_name gen_pos "cannot specialize because there is no instance of CONS" st.ss_error
+			= (EE, {st & ss_error=error})
 	specialize gen_index gen_ident gen_deps gen_rep_conses (GTSRecord record_info_ds type_index gen_type_ds field_list_ds arg_type) st
 		# gen_RECORD_index=:{grc_generic_info,grc_generic_instance_deps} = gen_rep_conses.[2]
-		# (arg_exprs, (modules, td_infos, heaps, error))
+		# (arg_exprs, st)
 			= specialize_with_partial_or_all_deps gen_index gen_ident gen_deps gen_rep_conses [arg_type] grc_generic_instance_deps st
 		| gen_RECORD_index.grc_module>=0
-			# (arg_exprs,modules,heaps)
+			# (arg_exprs,st)
 				= case grc_generic_info of
 					0
-						-> (arg_exprs,modules,heaps)
+						-> (arg_exprs,st)
 					-1 
-						#! (generic_info_expr, heaps) = buildFunApp main_module_index record_info_ds [] heaps
-						-> ([generic_info_expr:arg_exprs],modules,heaps)
+						#! (generic_info_expr, heaps) = buildFunApp main_module_index record_info_ds [] st.ss_heaps
+						-> ([generic_info_expr:arg_exprs],{st & ss_heaps=heaps})
 					_
-						# (type_def, modules) = modules![type_index.gi_module].com_type_defs.[type_index.gi_index]
-						-> add_RECORD_info_args grc_generic_info type_def gen_type_ds field_list_ds type_index.gi_module arg_exprs main_module_index modules heaps
+						# (type_def, modules) = (st.ss_modules)![type_index.gi_module].com_type_defs.[type_index.gi_index]
+						# (arg_exprs,modules,heaps) = add_RECORD_info_args grc_generic_info type_def gen_type_ds field_list_ds type_index.gi_module arg_exprs main_module_index modules st.ss_heaps
+						-> (arg_exprs,{st & ss_modules=modules,ss_heaps=heaps})
 			#! (expr, heaps)
-				= buildFunApp2 gen_RECORD_index.grc_module gen_RECORD_index.grc_index gen_RECORD_index.grc_ident arg_exprs heaps
-			= (expr, (modules, td_infos, heaps, error))
-			#! error = reportError gen_ident.id_name gen_pos "cannot specialize because there is no instance of RECORD" error 
-			= (EE, (modules, td_infos, heaps, error))
+				= buildFunApp2 gen_RECORD_index.grc_module gen_RECORD_index.grc_index gen_RECORD_index.grc_ident arg_exprs st.ss_heaps
+			= (expr, {st & ss_heaps=heaps})
+			#! error = reportError gen_ident.id_name gen_pos "cannot specialize because there is no instance of RECORD" st.ss_error
+			= (EE, {st & ss_error=error})
 	specialize gen_index gen_ident gen_deps gen_rep_conses (GTSField field_info_ds field_index record_info_ds arg_type) st
 		# gen_FIELD_index=:{grc_generic_info,grc_generic_instance_deps} = gen_rep_conses.[3]
-		# (arg_exprs, (modules, td_infos, heaps, error))
+		# (arg_exprs, st)
 			= specialize_with_partial_or_all_deps gen_index gen_ident gen_deps gen_rep_conses [arg_type] grc_generic_instance_deps st
 		| gen_FIELD_index.grc_module>=0
-			# (arg_exprs,modules,heaps)
+			# (arg_exprs,st)
 				= case grc_generic_info of
 					0
-						-> (arg_exprs,modules,heaps)
+						-> (arg_exprs,st)
 					-1 
-						#! (generic_info_expr, heaps) = buildFunApp main_module_index field_info_ds [] heaps
-						-> ([generic_info_expr:arg_exprs],modules,heaps)
+						#! (generic_info_expr, heaps) = buildFunApp main_module_index field_info_ds [] st.ss_heaps
+						-> ([generic_info_expr:arg_exprs],{st & ss_heaps=heaps})
 					_
-						# (field_def, modules) = modules![field_index.gi_module].com_selector_defs.[field_index.gi_index]
-						# (arg_exprs,heaps) = add_FIELD_info_args grc_generic_info field_def record_info_ds arg_exprs main_module_index heaps
-						-> (arg_exprs,modules,heaps)
+						# (field_def, modules) = (st.ss_modules)![field_index.gi_module].com_selector_defs.[field_index.gi_index]
+						# (arg_exprs,heaps) = add_FIELD_info_args grc_generic_info field_def record_info_ds arg_exprs main_module_index st.ss_heaps
+						-> (arg_exprs,{st & ss_modules=modules,ss_heaps=heaps})
 			#! (expr, heaps)
-				= buildFunApp2 gen_FIELD_index.grc_module gen_FIELD_index.grc_index gen_FIELD_index.grc_ident arg_exprs heaps
-			= (expr, (modules, td_infos, heaps, error))
-			#! error = reportError gen_ident.id_name gen_pos "cannot specialize because there is no instance of FIELD" error 
-			= (EE, (modules, td_infos, heaps, error))
+				= buildFunApp2 gen_FIELD_index.grc_module gen_FIELD_index.grc_index gen_FIELD_index.grc_ident arg_exprs st.ss_heaps
+			= (expr, {st & ss_heaps=heaps})
+			#! error = reportError gen_ident.id_name gen_pos "cannot specialize because there is no instance of FIELD" st.ss_error
+			= (EE, {st & ss_error=error})
 	specialize gen_index gen_ident gen_deps gen_rep_conses (GTSObject type_info_ds type_index cons_desc_list_ds arg_type) st
 		# gen_OBJECT_index=:{grc_generic_info,grc_generic_instance_deps} = gen_rep_conses.[0]
-		# (arg_exprs, (modules, td_infos, heaps, error))
+		# (arg_exprs, st)
 			= specialize_with_partial_or_all_deps gen_index gen_ident gen_deps gen_rep_conses [arg_type] grc_generic_instance_deps st
 		| gen_OBJECT_index.grc_module>=0
-			# (arg_exprs,modules,heaps)
+			# (arg_exprs,st)
 				= case grc_generic_info of
 					0
-						-> (arg_exprs,modules,heaps)
+						-> (arg_exprs,st)
 					-1 
-						#! (generic_info_expr, heaps) = buildFunApp main_module_index type_info_ds [] heaps
-						-> ([generic_info_expr:arg_exprs],modules,heaps)
+						#! (generic_info_expr, heaps) = buildFunApp main_module_index type_info_ds [] st.ss_heaps
+						-> ([generic_info_expr:arg_exprs],{st & ss_heaps=heaps})
 					_
-						# (type_def, modules) = modules![type_index.gi_module].com_type_defs.[type_index.gi_index]
-						  (arg_exprs,heaps) = add_OBJECT_info_args grc_generic_info type_def cons_desc_list_ds arg_exprs main_module_index heaps
-						-> (arg_exprs,modules,heaps)
+						# (type_def, modules) = (st.ss_modules)![type_index.gi_module].com_type_defs.[type_index.gi_index]
+						  (arg_exprs,heaps) = add_OBJECT_info_args grc_generic_info type_def cons_desc_list_ds arg_exprs main_module_index st.ss_heaps
+						-> (arg_exprs,{st & ss_modules=modules,ss_heaps=heaps})
 			#! (expr, heaps)
-				= buildFunApp2 gen_OBJECT_index.grc_module gen_OBJECT_index.grc_index gen_OBJECT_index.grc_ident arg_exprs heaps
-			= (expr, (modules, td_infos, heaps, error))
-			#! error = reportError gen_ident.id_name gen_pos "cannot specialize because there is no instance of OBJECT" error 
-			= (EE, (modules, td_infos, heaps, error))
-	specialize gen_index gen_ident gen_deps gen_rep_conses type (modules, td_infos, heaps, error)
-		#! error = reportError gen_ident.id_name gen_pos "cannot specialize " error 
-		= (EE, (modules, td_infos, heaps, error))
+				= buildFunApp2 gen_OBJECT_index.grc_module gen_OBJECT_index.grc_index gen_OBJECT_index.grc_ident arg_exprs st.ss_heaps
+			= (expr, {st & ss_heaps=heaps})
+			#! error = reportError gen_ident.id_name gen_pos "cannot specialize because there is no instance of OBJECT" st.ss_error
+			= (EE, {st & ss_error=error})
+	specialize gen_index gen_ident gen_deps gen_rep_conses type st
+		#! error = reportError gen_ident.id_name gen_pos "cannot specialize " st.ss_error
+		= (EE, {st & ss_error=error})
 
-	specialize_type_var {tv_info_ptr} gen_index (modules, td_infos, heaps=:{hp_type_heaps=th=:{th_vars}}, error)		
+	specialize_type_var {tv_info_ptr} gen_index st=:{ss_heaps=heaps=:{hp_type_heaps=th=:{th_vars}}}
 		# (expr, th_vars) = readPtr tv_info_ptr th_vars
-		# heaps = {heaps & hp_type_heaps = {th & th_vars = th_vars}}
+		# heaps & hp_type_heaps = {th & th_vars = th_vars}
 		= case expr of
             // TODO: TvN: Now we use the gen_index to look up the right argument expression, but this fails when you have a duplicate dependency on
             // the same generic function with different generic variables. The generic variables must be included in the spec_env as well, but this
@@ -2888,11 +2907,11 @@ where
             // generic g c :: c -> c
             // See functions: build_specialized_expr and checkgenerics.check_dependency
 			TVI_Exprs exprs
-				# (argExpr, error) = lookupArgExpr gen_index exprs error
-				-> (argExpr, (modules, td_infos, heaps, error))
+				# (argExpr, error) = lookupArgExpr gen_index exprs st.ss_error
+				-> (argExpr, {st & ss_heaps=heaps,ss_error=error})
 			TVI_Iso iso_ds to_ds from_ds
 				# (expr,heaps) = buildFunApp main_module_index iso_ds [] heaps
-				-> (expr, (modules, td_infos, heaps, error))
+				-> (expr, {st & ss_heaps=heaps})
 	where
 		lookupArgExpr x [(k, v):kvs] error
 			| k == x
@@ -2922,16 +2941,16 @@ where
 	collect_dependency_infos gen_deps st
 		= mapSt collect_dependency_info gen_deps st
 	where
-		collect_dependency_info gen_dep (modules, td_infos, heap, error)
-			# ({gen_ident, gen_deps, gen_info_ptr}, modules) = lookupDependencyDef gen_dep modules
-			# ({gen_rep_conses}, generic_heap) = readPtr gen_info_ptr heap.hp_generic_heap
-			# heap = {heap & hp_generic_heap = generic_heap}
-			= ((gen_dep.gd_index, gen_ident, gen_deps, gen_rep_conses), (modules, td_infos, heap, error))
+		collect_dependency_info gen_dep st=:{ss_modules,ss_heaps}
+			# ({gen_ident, gen_deps, gen_info_ptr}, modules) = lookupDependencyDef gen_dep ss_modules
+			# ({gen_rep_conses}, generic_heap) = readPtr gen_info_ptr ss_heaps.hp_generic_heap
+			# ss_heaps & hp_generic_heap = generic_heap
+			= ((gen_dep.gd_index, gen_ident, gen_deps, gen_rep_conses), {st & ss_modules=modules, ss_heaps=ss_heaps})
 
-	build_generic_app kind arg_exprs gen_index gen_ident (modules, td_infos, heaps, error)
+	build_generic_app kind arg_exprs gen_index gen_ident st=:{ss_heaps}
 		#! (expr, heaps)
-			= buildGenericApp gen_index.gi_module gen_index.gi_index gen_ident kind arg_exprs heaps 
-		= (expr, (modules, td_infos, heaps, error))
+			= buildGenericApp gen_index.gi_module gen_index.gi_index gen_ident kind arg_exprs ss_heaps
+		= (expr, {st & ss_heaps=heaps})
 
 add_OBJECT_info_args :: Int CheckedTypeDef DefinedSymbol [Expression] Int *Heaps -> (![Expression],*Heaps)
 add_OBJECT_info_args generic_info type_def cons_desc_list_ds arg_exprs main_module_index heaps
@@ -3066,7 +3085,7 @@ where
 	specialize (GTSAppCons KindConst []) (funs_and_groups, heaps, error)
 		# (expr, funs_and_groups, heaps)
 			= bimap_id_expression main_module_index predefs funs_and_groups heaps
-		= (expr ,(funs_and_groups, heaps, error))
+		= (expr, (funs_and_groups, heaps, error))
 	specialize (GTSAppCons kind arg_types) st
 		#! (arg_exprs, st) = mapSt specialize arg_types st
 		= build_generic_app kind arg_exprs gen_index gen_ident st
@@ -4967,7 +4986,7 @@ makeFunction ident group_index arg_vars body_expr opt_sym_type main_dcl_module_n
 		, fun_pos = fun_pos
 		, fun_kind  = FK_Function cNameNotLocationDependent
 		, fun_lifted = 0
-		, fun_info = 
+		, fun_info =
 			{ fi_calls = collectCalls main_dcl_module_n body_expr
 			, fi_group_index = group_index
 			, fi_def_level = NotALevel
