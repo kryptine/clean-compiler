@@ -14,15 +14,16 @@ convertGenerics ::
 		!*HashTable 
 		!*PredefinedSymbols 
 		!u:{# DclModule}
-		!*ErrorAdmin 
+		!*{#*{#FunDef}}
+		!*ErrorAdmin
 	-> (  !{#CommonDefs}
 		, !{!Group}
 		, !*{# FunDef}
-		, ![IndexRange]
 		, !*TypeDefInfos
 		, !*Heaps
 		, !*HashTable
 		, !*PredefinedSymbols
 		, !u:{# DclModule}
+		, !*{#*{#FunDef}}
 		, !*ErrorAdmin
 		)

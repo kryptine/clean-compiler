@@ -1044,13 +1044,14 @@ where
 	scan_dcl_module dcl_module mod=:{mod_defs = pdefs} parsed_modules searchPaths modtimefunction files ca
 		# (_, defs, imports, imported_objects,foreign_exports,ca)
 			= reorganiseDefinitionsAndAddTypes dcl_module support_dynamics False pdefs ca
-	  	  (def_macros, ca) = collectFunctions defs.def_macros False {ca & ca_fun_count=0,ca_rev_fun_defs=[]}
-		  (range, ca) = addFunctionsRange def_macros ca
+		  n_macros = length defs.def_macros
+  	  	  (def_macros, ca) = collectFunctions defs.def_macros False {ca & ca_fun_count=n_macros,ca_rev_fun_defs=[]}
+		  range = {ir_from=0,ir_to=n_macros}
 		  (rev_fun_defs,ca) = ca!ca_rev_fun_defs
-		  ca = {ca & ca_rev_fun_defs=[]}
+		  def_macros = def_macros++reverse rev_fun_defs
 		  (pea_ok,ca) = ca!ca_error.pea_ok
-		  mod = { mod & mod_imports = imports, mod_imported_objects = imported_objects, mod_defs = { defs & def_macros=reverse rev_fun_defs,def_macro_indices = range }}
 		  ca = {ca & ca_rev_fun_defs=[]}
+		  mod = { mod & mod_imports = imports, mod_imported_objects = imported_objects, mod_defs = { defs & def_macros=def_macros,def_macro_indices = range }}
 		  (import_ok, parsed_modules,files, ca)
 			= scanModules imports [mod : parsed_modules] cached_modules searchPaths support_generics support_dynamics modtimefunction files ca
 		= (pea_ok && import_ok, parsed_modules,files, ca)
@@ -1136,12 +1137,14 @@ where
 			= (import_ok, Yes mod, NoIndex,parsed_modules, cached_modules,files, ca)
 
 	collect_main_dcl_module (Yes mod=:{mod_defs=defs}) dcl_module_n ca
-	 #	(macro_defs, ca) = collectFunctions defs.def_macros False {ca & ca_fun_count=0,ca_rev_fun_defs=[]}
-		(range, ca)	= addFunctionsRange macro_defs ca
+	 #	n_macros = length defs.def_macros
+	 	(def_macros, ca) = collectFunctions defs.def_macros False {ca & ca_fun_count=n_macros,ca_rev_fun_defs=[]}
+		range = {ir_from=0,ir_to=n_macros}
 		(rev_fun_defs,ca) = ca!ca_rev_fun_defs
+		def_macros = def_macros++reverse rev_fun_defs
 		ca = {ca & ca_rev_fun_defs=[]}
 		(pea_ok,ca) = ca!ca_error.pea_ok
-		mod  = { mod & mod_defs = { defs & def_macros=reverse rev_fun_defs,def_macro_indices = range }}
+		mod  = { mod & mod_defs = { defs & def_macros=def_macros,def_macro_indices = range }}
 	 = (pea_ok,Yes mod,ca)
 	collect_main_dcl_module No dcl_module_n ca
 		| dcl_module_n==NoIndex
@@ -1178,7 +1181,7 @@ collectFunctionBodies fun_name fun_arity fun_prio fun_kind defs ca
 	= ([], fun_kind, defs, ca)
 
 collectGenericBodies :: ![ParsedDefinition] !Ident !Int !TypeCons !*CollectAdmin -> (![ParsedBody], !Int, ![ParsedDefinition],!*CollectAdmin)
-collectGenericBodies all_defs=:[PD_GenericCase gc=:{gc_gcf=GCF gc_ident2 gcf} : defs] gc_ident1 gcf_arity1 gc_type_cons1 ca
+collectGenericBodies all_defs=:[PD_GenericCase gc=:{gc_gcf=GCF gc_ident2 gcf} _ : defs] gc_ident1 gcf_arity1 gc_type_cons1 ca
 	| gc_ident2==gc_ident1 && gc.gc_type_cons==gc_type_cons1
 		#! (bodies, generic_info, rest_defs, ca) = collectGenericBodies defs gc_ident1 gcf_arity1 gc_type_cons1 ca
 		# (GCF _ {gcf_body=GCB_ParsedBody args rhs,gcf_arity,gcf_generic_info}) = gc.gc_gcf
@@ -1277,7 +1280,7 @@ determine_generic_instance_deps :: ![ParsedBody] !Int !TypeCons !*CollectAdmin -
 determine_generic_instance_deps bodies arity type_cons ca
 	= case type_cons of
 		TypeConsSymb {type_ident={id_name}}
-			| id_name=="OBJECT" || id_name=="CONS" || id_name=="RECORD" || id_name=="FIELD" || id_name=="PAIR" || id_name=="EITHER"
+			| id_name=="OBJECT" || id_name=="CONS" || id_name=="RECORD" || id_name=="FIELD" || id_name=="PAIR" || id_name=="EITHER" || id_name=="UNIT"
 				# (n_deps,deps) = determine_generic_instance_deps_in_bodies bodies -1 0
 				| n_deps>=0
 					# deps = deps bitand ((1<<n_deps)-1)
@@ -1287,15 +1290,41 @@ determine_generic_instance_deps bodies arity type_cons ca
 			-> (bodies,arity,AllGenericInstanceDependencies,ca)
   where
 	determine_generic_instance_deps_in_bodies [body:bodies] n_deps deps
-		# (n_deps,deps) = determine_generic_instance_deps_in_bodies_in_body body n_deps deps
+		# (n_deps,deps) = determine_generic_instance_deps_in_body body n_deps deps
 		= determine_generic_instance_deps_in_bodies bodies n_deps deps
 	determine_generic_instance_deps_in_bodies [] n_deps deps
 		= (n_deps,deps)
 
-	determine_generic_instance_deps_in_bodies_in_body {pb_args=[_:args]} n_deps deps
+	determine_generic_instance_deps_in_body {pb_args=[_:args]} n_deps deps
 		= mark_deps_in_args args 0 n_deps deps
-	determine_generic_instance_deps_in_bodies_in_body body n_deps deps
-		= (0,deps)
+	determine_generic_instance_deps_in_body body n_deps deps
+		= (n_deps,deps)
+
+remove_generic_info_and_determine_generic_instance_deps :: ![ParsedBody] !Int !TypeCons !*CollectAdmin -> (![ParsedBody],!Int,!GenericInstanceDependencies,!*CollectAdmin)
+remove_generic_info_and_determine_generic_instance_deps bodies arity type_cons ca
+	= case type_cons of
+		TypeConsSymb {type_ident={id_name}}
+			| id_name=="OBJECT" || id_name=="CONS" || id_name=="RECORD" || id_name=="FIELD" || id_name=="PAIR" || id_name=="EITHER" || id_name=="UNIT"
+				# (bodies,n_deps,deps) = remove_generic_info_and_determine_generic_instance_deps_in_bodies bodies -1 0
+				| n_deps>=0
+					# deps = deps bitand ((1<<n_deps)-1)
+					-> (bodies,arity-1,GenericInstanceUsedArgs n_deps deps,ca)
+					-> (bodies,arity-1,GenericInstanceUsedArgs 0 0,ca)
+		_
+			-> (bodies,arity-1,AllGenericInstanceDependencies,ca)
+  where
+	remove_generic_info_and_determine_generic_instance_deps_in_bodies [body:bodies] n_deps deps
+		# (body,n_deps,deps) = remove_generic_info_and_determine_generic_instance_deps_in_body body n_deps deps
+		# (bodies,n_deps,deps) = remove_generic_info_and_determine_generic_instance_deps_in_bodies bodies n_deps deps
+		= ([body:bodies],n_deps,deps)
+	remove_generic_info_and_determine_generic_instance_deps_in_bodies [] n_deps deps
+		= ([],n_deps,deps)
+
+	remove_generic_info_and_determine_generic_instance_deps_in_body body=:{pb_args=[_:args]} n_deps deps
+		# (n_deps,deps) = mark_deps_in_args args 0 n_deps deps
+		= ({body & pb_args=args},n_deps,deps)
+	remove_generic_info_and_determine_generic_instance_deps_in_body body n_deps deps
+		= (body,n_deps,deps)
 
 mark_deps_in_args :: [ParsedExpr] Int Int Int -> (!Int,!Int)
 mark_deps_in_args [PE_WildCard:args] arg_n n_deps deps
@@ -1330,20 +1359,23 @@ where
 	cons_count	:: !Int,
 	sel_count	:: !Int,
 	mem_count	:: !Int,
-	type_count	:: !Int
+	type_count	:: !Int,
+	macro_count	:: !Int
    }
 
 reorganiseDefinitions :: Bool [ParsedDefinition] !DefCounts *CollectAdmin -> (![FunDef],!CollectedDefinitions (ScannedInstanceAndMembersR FunDef), ![ParsedImport], ![ImportedObject],![ParsedForeignExport],!*CollectAdmin)
-reorganiseDefinitions icl_module [PD_Function pos name is_infix args rhs fun_kind : defs] def_counts ca
+reorganiseDefinitions icl_module [PD_Function pos name is_infix args rhs fun_kind : defs] def_counts=:{macro_count} ca
 	# prio = if is_infix (Prio NoAssoc 9) NoPrio
 	  fun_arity = length args
 	  (bodies, fun_kind, defs, ca) = collectFunctionBodies name fun_arity prio fun_kind defs ca
 	  fun = MakeNewImpOrDefFunction name fun_arity [{ pb_args = args, pb_rhs = rhs, pb_position = pos } : bodies] fun_kind prio No pos
-	  (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs def_counts ca
 	| fun_kind == FK_Macro
+		# def_counts & macro_count=macro_count+1
+		  (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs def_counts ca
 		= (fun_defs, { c_defs & def_macros = [ fun : c_defs.def_macros ]}, imports, imported_objects,foreign_exports, ca)
+		# (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs def_counts ca
 		= ([ fun : fun_defs ], c_defs, imports, imported_objects,foreign_exports, ca)
-reorganiseDefinitions icl_module [PD_TypeSpec fun_pos fun_name prio No specials : defs] def_counts ca
+reorganiseDefinitions icl_module [PD_TypeSpec fun_pos fun_name prio No specials : defs] def_counts=:{macro_count} ca
 	= case defs of
 		[PD_Function pos name is_infix args rhs fun_kind : defs]
 			| fun_name <> name
@@ -1353,10 +1385,12 @@ reorganiseDefinitions icl_module [PD_TypeSpec fun_pos fun_name prio No specials 
 			//	| belongsToTypeSpec fun_name prio name is_infix
   				# fun_arity = length args
 				  (bodies, fun_kind, defs, ca) = collectFunctionBodies name fun_arity prio fun_kind defs ca
-	  			  (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs def_counts ca
 				  fun = MakeNewImpOrDefFunction name fun_arity [{ pb_args = args, pb_rhs = rhs, pb_position = pos } : bodies ] fun_kind prio No fun_pos
 				| fun_kind == FK_Macro
+					# def_counts & macro_count=macro_count+1
+	  				  (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs def_counts ca
 					-> (fun_defs, { c_defs & def_macros = [ fun : c_defs.def_macros]}, imports, imported_objects,foreign_exports, ca)
+				  	# (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs def_counts ca
 					-> ([ fun : fun_defs ], c_defs, imports, imported_objects,foreign_exports, ca)
 			//	-> reorganiseDefinitions icl_module defs cons_count sel_count mem_count (postParseError fun_pos "function body expected (1)" ca)
 		_
@@ -1443,12 +1477,12 @@ reorganiseDefinitions icl_module [PD_Type type_def=:{td_rhs = MoreConses type_ex
 	  type_def & td_rhs = UncheckedAlgConses type_ext_ident cons_symbs
 	  c_defs & def_types = [type_def : c_defs.def_types], def_constructors = mapAppend ParsedConstructorToConsDef cons_defs c_defs.def_constructors
 	= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)  
-reorganiseDefinitions icl_module [PD_Class class_def=:{class_ident,class_arity,class_args} members : defs] def_counts=:{mem_count} ca
+reorganiseDefinitions icl_module [PD_Class class_def=:{class_ident,class_arity,class_args} members : defs] def_counts=:{mem_count,macro_count} ca
 	# type_context = { tc_class = TCClass {glob_module = NoIndex, glob_object = {ds_ident = class_ident, ds_arity = class_arity, ds_index = NoIndex }},
 					   tc_types = [ TV tv \\ tv <- class_args ], tc_var = nilPtr}
 	  (mem_defs, mem_macros, ca) = check_symbols_of_class_members members type_context ca
 	  (mem_symbs, mem_defs, class_size) = reorganise_member_defs mem_defs mem_count
-	  def_counts & mem_count=mem_count + class_size
+	  def_counts & mem_count=mem_count + class_size, macro_count=macro_count + length mem_macros
 	  (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs def_counts ca
 	  class_def = { class_def & class_members = { member \\ member <- mem_symbs }}
 	  c_defs = { c_defs & def_classes = [class_def : c_defs.def_classes], def_macros = mem_macros ++ c_defs.def_macros,
@@ -1550,24 +1584,40 @@ reorganiseDefinitions icl_module [PD_Generic gen : defs] def_counts ca
 	# 	(fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs def_counts ca
 		c_defs = {c_defs & def_generics = [gen : c_defs.def_generics]}
 	= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)
-reorganiseDefinitions icl_module [PD_GenericCase gc=:{gc_type_cons} : defs] def_counts ca
+reorganiseDefinitions icl_module [PD_GenericCase gc=:{gc_type_cons} generic_fun_ident : defs] def_counts=:{macro_count} ca
 	# (GCF gc_ident gcf=:{gcf_body=GCB_ParsedBody args rhs,gcf_arity,gcf_generic_info}) = gc.gc_gcf
 	#! (bodies, generic_info, defs, ca) = collectGenericBodies defs gc_ident gcf_arity gc_type_cons ca
-	#! (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) 
-		= reorganiseDefinitions icl_module defs def_counts ca
 	# generic_info = generic_info bitor gcf_generic_info
 	#! body = { pb_args = args, pb_rhs = rhs, pb_position = gc.gc_pos }
 	# bodies = [body : bodies]
-	# (bodies,gcf_arity,generic_instance_deps,ca)
-		= if (generic_info > 0)
-			(replace_generic_info_record_by_arguments generic_info bodies gcf_arity gc_type_cons ca)
-			(determine_generic_instance_deps bodies gcf_arity gc_type_cons ca)
-	# fun_name = genericIdentToFunIdent gc_ident.id_name /*gcf.gcf_ident.id_name*/ gc.gc_type_cons 
-	#! fun = MakeNewImpOrDefFunction fun_name gcf_arity bodies (FK_Function cNameNotLocationDependent) NoPrio No gc.gc_pos
-	# gcf & gcf_body=GCB_FunDef fun, gcf_arity=gcf_arity, gcf_generic_info=generic_info, gcf_generic_instance_deps=generic_instance_deps
-	#! inst = {gc & gc_gcf = GCF gc_ident gcf} 
-	#! c_defs = {c_defs & def_generic_cases = [inst : c_defs.def_generic_cases]}
-	= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)
+	# fun_name = genericIdentToFunIdent gc_ident.id_name /*gcf.gcf_ident.id_name*/ gc.gc_type_cons
+	| icl_module
+		# (bodies,gcf_arity,generic_instance_deps,ca)
+			= if (generic_info > 0)
+				(replace_generic_info_record_by_arguments generic_info bodies gcf_arity gc_type_cons ca)
+				(determine_generic_instance_deps bodies gcf_arity gc_type_cons ca)
+		#! (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) 
+			= reorganiseDefinitions icl_module defs def_counts ca
+		#! fun = MakeNewImpOrDefFunction fun_name gcf_arity bodies (FK_Function cNameNotLocationDependent) NoPrio No gc.gc_pos
+		# gcf & gcf_body=GCB_FunDef fun, gcf_arity=gcf_arity, gcf_generic_info=generic_info, gcf_generic_instance_deps=generic_instance_deps
+		#! inst = {gc & gc_gcf = GCF gc_ident gcf}
+		#! c_defs & def_generic_cases = [inst : c_defs.def_generic_cases]
+		= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)
+
+		# (bodies,gcf_arity,generic_instance_deps,ca)
+			= if (generic_info > 0)
+				(replace_generic_info_record_by_arguments generic_info bodies gcf_arity gc_type_cons ca)
+				(if (generic_info < 0)
+					(determine_generic_instance_deps bodies gcf_arity gc_type_cons ca)
+					(remove_generic_info_and_determine_generic_instance_deps bodies gcf_arity gc_type_cons ca))
+		# def_counts & macro_count=macro_count+1
+		#! (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) 
+			= reorganiseDefinitions icl_module defs def_counts ca
+		#! macro = MakeNewImpOrDefFunction generic_fun_ident gcf_arity bodies (FK_Function False) NoPrio No gc.gc_pos
+		# gcf & gcf_body=GCB_MacroIndex macro_count, gcf_arity=gcf_arity, gcf_generic_info=generic_info, gcf_generic_instance_deps=generic_instance_deps
+		#! inst = {gc & gc_gcf = GCF gc_ident gcf}
+		#! c_defs & def_generic_cases = [inst : c_defs.def_generic_cases], def_macros = [macro : c_defs.def_macros]
+		= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)
 reorganiseDefinitions icl_module [PD_Derive derive_defs : defs] def_counts=:{type_count} ca
 	# def_counts & type_count=type_count+1
 	#! (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs def_counts ca
@@ -1625,7 +1675,7 @@ qualified_ident_to_import_declaration IC_Selector ident
 	= abort "qualified_ident_to_import_declaration IC_Selector not yet implemented"
 
 reorganiseDefinitionsAndAddTypes mod_ident support_dynamics icl_module defs ca
-	# def_counts = {cons_count=0, sel_count=0, mem_count=0, type_count=0}
+	# def_counts = {cons_count=0, sel_count=0, mem_count=0, type_count=0, macro_count=0}
 	| support_dynamics
 		# clean_types_module_ident
 			=	predefined_idents.[PD_StdDynamic]

@@ -267,7 +267,7 @@ cIsNotAFunction :== False
 	|	PD_ImportedObjects [ImportedObject]
 	|	PD_ForeignExport !Ident !{#Char} !Int !Bool /* if stdcall */
 	|	PD_Generic GenericDef
-	| 	PD_GenericCase GenericCaseDef
+	| 	PD_GenericCase GenericCaseDef Ident
 	|	PD_Derive [GenericCaseDef]
 	|	PD_Erroneous
 
@@ -430,7 +430,8 @@ instance == GenericDependency
 
 ::	GenericRepresentationConstructor =
 	{	grc_module	:: !Int
-	,	grc_index	:: !Int
+	,	grc_index	:: !GenericCaseBody // GCB_FunIndex, GCB_FunAndMacroIndex or GCB_None
+	,	grc_local_fun_index :: !Int
 	,	grc_ident	:: !Ident
 	,	grc_generic_info :: !Int
 	,	grc_generic_instance_deps :: !GenericInstanceDependencies
@@ -470,9 +471,11 @@ instance == GenericDependency
 
 :: GenericCaseBody 
 	= GCB_None 									// to be generated
-	| GCB_FunIndex !Index 
-	| GCB_FunDef !FunDef 
-	| GCB_ParsedBody ![ParsedExpr] !Rhs 
+	| GCB_FunIndex !Index
+	| GCB_FunAndMacroIndex !Index !Index
+	| GCB_MacroIndex !Index
+	| GCB_FunDef !FunDef
+	| GCB_ParsedBody ![ParsedExpr] !Rhs
 
 ::	GenericInstanceDependencies
 	= AllGenericInstanceDependencies

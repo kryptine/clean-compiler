@@ -121,24 +121,17 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_m
       type_heaps = { type_heaps & th_vars = th_vars }
 
 	# heaps = { heaps & hp_type_heaps = type_heaps, hp_expression_heap = hp_expression_heap, hp_generic_heap = gen_heap, hp_var_heap=hp_var_heap }
-	# (saved_main_dcl_common, ti_common_defs) = replace (dcl_common_defs dcl_mods) main_dcl_module_n icl_common
-		with 
-			dcl_common_defs :: .{#DclModule} -> .{#CommonDefs} // needed for Clean 2.0 to disambiguate overloading
-			dcl_common_defs dcl_mods
-				=	{dcl_common \\ {dcl_common} <-: dcl_mods }
+	# (saved_main_dcl_common, ti_common_defs) = replace {#dcl_common \\ {dcl_common}<-:dcl_mods} main_dcl_module_n icl_common
 
-	#! (ti_common_defs, groups, fun_defs, generic_ranges, td_infos, heaps, hash_table, predef_symbols, dcl_mods, error_admin)
+	#! (ti_common_defs, groups, fun_defs, td_infos, heaps, hash_table, predef_symbols, dcl_mods, cached_dcl_macros, error_admin)
 		= case options.feo_generics of
 			True
 				-> convertGenerics main_dcl_module_n icl_used_module_numbers ti_common_defs groups fun_defs
-									td_infos heaps hash_table predef_symbols dcl_mods error_admin
+									td_infos heaps hash_table predef_symbols dcl_mods cached_dcl_macros error_admin
 			False
-				-> (ti_common_defs, groups, fun_defs, [], td_infos, heaps, hash_table, predef_symbols, dcl_mods, error_admin)
+				-> (ti_common_defs, groups, fun_defs, td_infos, heaps, hash_table, predef_symbols, dcl_mods, cached_dcl_macros, error_admin)
 
-	# (icl_common, ti_common_defs) = replace copied_ti_common_defs main_dcl_module_n saved_main_dcl_common		
-		with 
-			copied_ti_common_defs :: .{#CommonDefs} // needed for Clean 2.0 to disambiguate overloading of replace
-			copied_ti_common_defs = {x \\ x <-: ti_common_defs}
+	# (icl_common, ti_common_defs) = replace {#x \\ x<-:ti_common_defs} main_dcl_module_n saved_main_dcl_common		
 
 	# dcl_mods = { {dcl_mod & dcl_common = common} \\ dcl_mod <-: dcl_mods & common <-: ti_common_defs }
 
@@ -170,7 +163,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_m
 	| not ok
 		= (No,{},{},main_dcl_module_n,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
 
-	# icl_gencase_indices = icl_function_indices.ifi_gencase_indices++generic_ranges
+	# icl_gencase_indices = icl_function_indices.ifi_gencase_indices
 	# icl_function_indices = {icl_function_indices & ifi_gencase_indices = icl_gencase_indices }
 
 	# (fun_def_size, fun_defs) = usize fun_defs

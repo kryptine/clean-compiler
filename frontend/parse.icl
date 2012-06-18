@@ -571,25 +571,29 @@ where
 		//# (type, pState) = wantType pState
 		# (ok, {at_type=type}, pState) = trySimpleType TA_None pState
 		# (ident, pState) = stringToIdent name (IC_GenericCase type) pState
-		# (generic_ident, pState) = stringToIdent name IC_Generic pState					
-	
-		# (type_cons, pState) = get_type_cons type pState
+		# (generic_ident, pState) = stringToIdent name IC_Generic pState	
+		# (type_cons, generic_fun_ident, pState) = get_type_cons type pState
 			with
 				get_type_cons (TA type_symb []) pState
-					= (TypeConsSymb type_symb, pState)
+					= make_generic_fun_ident (TypeConsSymb type_symb) pState
 				get_type_cons (TA type_symb _) pState
 					# pState = parseError "generic type, no constructor arguments allowed" No " |}" pState
-					= (abort "no TypeCons", pState)
-				get_type_cons (TB tb) pState 
-					= (TypeConsBasic tb, pState)
+					= (abort_no_TypeCons, abort_no_TypeCons, pState)
+				get_type_cons (TB tb) pState
+					= make_generic_fun_ident (TypeConsBasic tb) pState
 				get_type_cons TArrow pState
-					= (TypeConsArrow, pState)				 
+					= make_generic_fun_ident TypeConsArrow pState
 				get_type_cons (TV tv) pState
-					= (TypeConsVar tv, pState)				 
+					= make_generic_fun_ident (TypeConsVar tv) pState
 				get_type_cons _ pState 
 					# pState = parseError "generic type" No " |}" pState
-					= (abort "no TypeCons", pState)
-	
+					= (abort_no_TypeCons, abort_no_TypeCons, pState)
+				
+				make_generic_fun_ident type_cons pState
+					# generic_fun_ident = genericIdentToFunIdent name type_cons
+					  (generic_fun_ident,pState) = stringToIdent generic_fun_ident.id_name IC_Expression pState
+					= (type_cons, generic_fun_ident, pState)
+
 		# (token, pState) = nextToken GenericContext pState
 		# (geninfo_arg, gcf_generic_info, pState) = case token of
 			GenericOfToken
@@ -623,7 +627,7 @@ where
 				| otherwise
 					# pState = parseError "generic case" No "simple lhs expression" pState
 					-> (PE_Empty, 0, pState)
-				 
+
 			GenericCloseToken
 				-> (PE_WildCard, 0, pState)
 			_ 	
@@ -655,7 +659,9 @@ where
 						gcf_kind = KindError,
 						gcf_generic_instance_deps = AllGenericInstanceDependencies }
 			}
-		= (True, PD_GenericCase generic_case, pState)
+		= (True, PD_GenericCase generic_case generic_fun_ident, pState)
+
+	abort_no_TypeCons => abort "no TypeCons"
 
 	wantForeignExportDefinition pState
 		# (token, pState) = nextToken GeneralContext pState

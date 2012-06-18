@@ -47,7 +47,7 @@ where
 			{ gen_classes = createArray 32 []
 			, gen_var_kinds = []
 			, gen_rep_conses
-				= createArray 7 {grc_module = -1, grc_index = -1, grc_generic_info = -1,
+				= createArray 7 {grc_module = -1, grc_index = GCB_None, grc_local_fun_index = -1, grc_generic_info = -1,
 								 grc_generic_instance_deps = AllGenericInstanceDependencies,
 								 grc_ident={id_name="",id_info=nilPtr},
 								 grc_optional_fun_type=No}
@@ -438,19 +438,26 @@ where
 			= (fun_index, [], gencase_defs, hp_var_heap)
 		# (gencase_def,gencase_defs) = gencase_defs![gc_index]
 		= case gencase_def of
-			{gc_gcf=GCF gc_ident gcf,gc_pos,gc_type_cons}
-	  			# gencase_def = {gencase_def & gc_gcf=GCF gc_ident {gcf & gcf_body = GCB_FunIndex fun_index}}
-	  			# gencase_defs = {gencase_defs & [gc_index] = gencase_def} 
-				# (fun,hp_var_heap) = create_gencase_function_type gc_ident gc_type_cons gc_pos hp_var_heap
-				# (fun_index,funs,gencase_defs,hp_var_heap)
+			{gc_gcf=GCF gc_ident gcf=:{gcf_body=GCB_MacroIndex macro_index},gc_pos,gc_type_cons}
+				# gencase_def & gc_gcf=GCF gc_ident {gcf & gcf_body = GCB_FunAndMacroIndex fun_index macro_index}
+				  gencase_defs & [gc_index] = gencase_def 
+				  (fun,hp_var_heap) = create_gencase_function_type gc_ident gc_type_cons gc_pos hp_var_heap
+				  (fun_index,funs,gencase_defs,hp_var_heap)
 					= create_funs (gc_index+1) (fun_index+1) gencase_defs hp_var_heap
 				-> (fun_index, [fun:funs], gencase_defs, hp_var_heap)
-	   		{gc_gcf=GCFS gcfs,gc_pos,gc_type_cons}
+			{gc_gcf=GCF gc_ident gcf,gc_pos,gc_type_cons}
+				# gencase_def & gc_gcf=GCF gc_ident {gcf & gcf_body = GCB_FunIndex fun_index}
+				  gencase_defs & [gc_index] = gencase_def
+				  (fun,hp_var_heap) = create_gencase_function_type gc_ident gc_type_cons gc_pos hp_var_heap
+				  (fun_index,funs,gencase_defs,hp_var_heap)
+					= create_funs (gc_index+1) (fun_index+1) gencase_defs hp_var_heap
+				-> (fun_index, [fun:funs], gencase_defs, hp_var_heap)
+			{gc_gcf=GCFS gcfs,gc_pos,gc_type_cons}
 				# (gcfs,superclass_funs,fun_index,hp_var_heap)
 					= create_functions_for_generic_superclasses gcfs gc_type_cons gc_pos fun_index hp_var_heap
-	  			# gencase_def = {gencase_def & gc_gcf=GCFS gcfs}
-	  			# gencase_defs = {gencase_defs & [gc_index] = gencase_def} 
-				# (fun_index,funs,gencase_defs,hp_var_heap) 
+				  gencase_def & gc_gcf=GCFS gcfs
+				  gencase_defs & [gc_index] = gencase_def 
+				  (fun_index,funs,gencase_defs,hp_var_heap) 
 					= create_funs (gc_index+1) fun_index gencase_defs hp_var_heap
 				-> (fun_index,superclass_funs++funs,gencase_defs,hp_var_heap)
 		where

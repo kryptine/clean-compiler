@@ -250,6 +250,10 @@ where
 		| otherwise
 			= (icl_generic_defs, comp_st)
 
+collectGenericCaseDefMacros :: !{#GenericCaseDef} -> [(GenericCaseBody,Int)]
+collectGenericCaseDefMacros dcl_generic_case_defs
+	= [(gcf_body,gcf_generic_info) \\ {gc_gcf=GCF _ {gcf_body=gcf_body=:GCB_FunAndMacroIndex _ _,gcf_generic_info}} <-: dcl_generic_case_defs]
+
 class compare a :: !a !a !*CompareState -> (!Bool, !*CompareState)
 
 instance compare (a,b) | compare a & compare b
@@ -459,6 +463,7 @@ initialyseAttributeVars [] [] type_var_heap
 
 AllowFirstMoreStrictness:==1;
 FirstHasMoreStrictness:==2;
+CompareGenericCaseMacro:==4; // only used from ec_tc_state
 
 :: TypesCorrespondMonad
 		:==	*TypesCorrespondState -> *(!Bool, !*TypesCorrespondState)
@@ -542,9 +547,9 @@ compareDefImp main_dcl_module_n main_dcl_module (Yes macro_conversion_table) {co
 	  		= compareInstanceDefs main_dcl_module.dcl_sizes dcl_common.com_instance_defs icl_com_instance_defs icl_functions comp_st
 
 	  (icl_com_generic_defs, comp_st)
-	  		= compareGenericDefs 
-	  			main_dcl_module.dcl_sizes copied_generic_defs 
-	  			dcl_common.com_generic_defs icl_com_generic_defs comp_st
+	  		= compareGenericDefs main_dcl_module.dcl_sizes copied_generic_defs dcl_common.com_generic_defs icl_com_generic_defs comp_st
+
+	  generic_case_def_macros = collectGenericCaseDefMacros dcl_common.com_gencase_defs
 
 	  {	comp_type_var_heap = th_vars, comp_attr_var_heap = th_attrs, comp_error = error_admin } = comp_st
 
@@ -554,7 +559,7 @@ compareDefImp main_dcl_module_n main_dcl_module (Yes macro_conversion_table) {co
 				, tc_strictness_flags = 0
 				}
 	  (icl_functions, macro_defs, hp_var_heap, hp_expression_heap, tc_state, error_admin)
-			= compareMacrosWithConversion main_dcl_module_n macro_conversion_table dcl_macros icl_functions macro_defs hp_var_heap hp_expression_heap tc_state error_admin
+			= compareMacrosWithConversion main_dcl_module_n macro_conversion_table dcl_macros generic_case_def_macros icl_functions macro_defs hp_var_heap hp_expression_heap tc_state error_admin
 	  (icl_functions, tc_state, error_admin)
 	  		= compareFunctionTypes n_exported_global_functions dcl_functions icl_functions tc_state error_admin
 	  { tc_type_vars, tc_attr_vars } 
@@ -642,7 +647,7 @@ generate_error message iclDef iclDefs tc_state error_admin
 	  error_admin = checkError ident_pos.ip_ident message error_admin
 	= (iclDefs, tc_state, popErrorAdmin error_admin)
 
-compareMacrosWithConversion main_dcl_module_n conversions macro_range icl_functions macro_defs var_heap expr_heap tc_state error_admin
+compareMacrosWithConversion main_dcl_module_n conversions macro_range generic_case_def_macros icl_functions macro_defs var_heap expr_heap tc_state error_admin
 	#! n_icl_functions = size icl_functions
 	#! n_dcl_macros_and_functions = size macro_defs.[main_dcl_module_n]
 	# ec_state = {	ec_icl_correspondences = createArray n_icl_functions cNoCorrespondence,
@@ -655,8 +660,15 @@ compareMacrosWithConversion main_dcl_module_n conversions macro_range icl_functi
 	  	with
 	  		compareMacroWithConversion conversions ir_from dclIndex ec_state=:{ec_main_dcl_module_n}
 				= compareTwoMacroFuns ec_main_dcl_module_n dclIndex conversions.[dclIndex-ir_from] ec_state
-	  {ec_icl_functions,ec_macro_defs,ec_var_heap, ec_expr_heap, ec_error_admin, ec_tc_state} = ec_state
-	= (ec_icl_functions,ec_macro_defs, ec_var_heap.hwn_heap, ec_expr_heap, ec_tc_state, ec_error_admin)
+	  ec_state = compare_generic_case_def_macros generic_case_def_macros ec_state
+	    with
+			compare_generic_case_def_macros [(GCB_FunAndMacroIndex fun_index macro_index,generic_info):gcbs] ec_state=:{ec_main_dcl_module_n}
+				# ec_state = compare_generic_case_def_macro_and_function macro_index fun_index generic_info ec_state
+				= compare_generic_case_def_macros gcbs ec_state
+			compare_generic_case_def_macros [] ec_state
+				= ec_state
+	  {ec_icl_functions,ec_macro_defs,ec_var_heap,ec_expr_heap,ec_error_admin,ec_tc_state} = ec_state
+	= (ec_icl_functions,ec_macro_defs,ec_var_heap.hwn_heap,ec_expr_heap,ec_tc_state,ec_error_admin)
 
 compareTwoMacroFuns :: !Int !Int !Int !*ExpressionsCorrespondState -> .ExpressionsCorrespondState;
 compareTwoMacroFuns macro_module_index dclIndex iclIndex ec_state=:{ec_icl_functions,ec_macro_defs,ec_main_dcl_module_n}
@@ -680,12 +692,43 @@ compareTwoMacroFuns macro_module_index dclIndex iclIndex ec_state=:{ec_icl_funct
 	# ident_pos = getIdentPos dcl_function
 	  ec_error_admin = pushErrorAdmin ident_pos ec_state.ec_error_admin
 	  ec_state = { ec_state & ec_error_admin = ec_error_admin }
-	| dcl_function.fun_info.fi_properties bitand FI_IsMacroFun <> icl_function.fun_info.fi_properties bitand FI_IsMacroFun ||
+	| (dcl_function.fun_info.fi_properties bitand FI_IsMacroFun <> icl_function.fun_info.fi_properties bitand FI_IsMacroFun
+		&& (ec_state.ec_tc_state.tc_strictness_flags bitand CompareGenericCaseMacro==0 && dcl_function.fun_info.fi_properties bitand FI_IsMacroFun<>0)) ||
 	  dcl_function.fun_priority<>icl_function.fun_priority
 		# ec_state = give_error dcl_function.fun_ident ec_state
 		= { ec_state & ec_error_admin = popErrorAdmin ec_state.ec_error_admin } 
 	# ec_state = e_corresponds dcl_function.fun_body icl_function.fun_body ec_state
 	= { ec_state & ec_error_admin = popErrorAdmin ec_state.ec_error_admin }
+
+compare_generic_case_def_macro_and_function :: !Int !Int !Int !*ExpressionsCorrespondState -> .ExpressionsCorrespondState;
+compare_generic_case_def_macro_and_function dclIndex iclIndex generic_info ec_state=:{ec_icl_functions,ec_macro_defs,ec_main_dcl_module_n}
+	| iclIndex==NoIndex
+		= ec_state
+	# (dcl_function, ec_macro_defs) = ec_macro_defs![ec_main_dcl_module_n,dclIndex]
+	  (icl_function, ec_icl_functions) = ec_icl_functions![iclIndex]
+	  ec_state & ec_icl_correspondences.[iclIndex]=dclIndex, ec_dcl_correspondences.[dclIndex]=iclIndex,
+				 ec_icl_functions = ec_icl_functions,ec_macro_defs=ec_macro_defs
+	  ident_pos = getIdentPos dcl_function
+	  ec_state & ec_error_admin = pushErrorAdmin ident_pos ec_state.ec_error_admin
+
+	  dcl_args_and_rhs = from_body dcl_function.fun_body
+	  icl_args_and_rhs = from_body icl_function.fun_body
+
+	  icl_args_and_rhs
+	  	= if (generic_info==0)
+	  		(remove_generic_info_arg icl_args_and_rhs)
+	  		icl_args_and_rhs
+	  {ec_tc_state} = ec_state
+	  ec_state & ec_tc_state = {ec_tc_state & tc_strictness_flags = ec_tc_state.tc_strictness_flags bitor CompareGenericCaseMacro}
+	  ec_state = e_corresponds dcl_args_and_rhs icl_args_and_rhs ec_state
+	  {ec_tc_state} = ec_state
+	  ec_state & ec_tc_state = {ec_tc_state & tc_strictness_flags = ec_tc_state.tc_strictness_flags bitand (bitnot CompareGenericCaseMacro)}
+	= {ec_state & ec_error_admin = popErrorAdmin ec_state.ec_error_admin}
+where
+	remove_generic_info_arg ([generic_info_arg:args],rhs)
+		= (args,rhs)
+	remove_generic_info_arg args_and_rhs
+		= args_and_rhs
 
 instance getIdentPos (TypeDef a) where
 	getIdentPos {td_ident, td_pos}
@@ -1107,9 +1150,9 @@ instance e_corresponds FunctionBody where
 	// both bodies are either CheckedBodies or TransformedBodies
 	e_corresponds dclDef iclDef
 		=	e_corresponds (from_body dclDef) (from_body iclDef)
-	  where
-		from_body (TransformedBody {tb_args, tb_rhs}) = (tb_args, [tb_rhs])
-		from_body (CheckedBody {cb_args, cb_rhs}) = (cb_args, [ca_rhs \\ {ca_rhs} <- cb_rhs])
+
+from_body (TransformedBody {tb_args, tb_rhs}) = (tb_args, [tb_rhs])
+from_body (CheckedBody {cb_args, cb_rhs}) = (cb_args, [ca_rhs \\ {ca_rhs} <- cb_rhs])
 		
 instance e_corresponds FreeVar where
 	e_corresponds dclVar iclVar
@@ -1317,13 +1360,16 @@ e_corresponds_app_symb {symb_ident, symb_kind=SK_Generic dcl_glob_index dcl_kind
 		= give_error symb_ident ec_state
 	= ec_state
 e_corresponds_app_symb dcl_app_symb=:{symb_kind=SK_DclMacro dcl_glob_index} icl_app_symb=:{symb_kind=SK_IclMacro icl_index} ec_state
-	= continuation_for_possibly_twice_defined_macros dcl_app_symb dcl_glob_index.glob_module dcl_glob_index.glob_object icl_app_symb icl_index ec_state
+	= continuation_for_possibly_twice_defined_macros dcl_app_symb dcl_glob_index icl_app_symb icl_index ec_state
 e_corresponds_app_symb {symb_ident,symb_kind=SK_DclMacro dcl_glob_index} {symb_kind=SK_DclMacro icl_glob_index} ec_state
 	| dcl_glob_index==icl_glob_index
 		= ec_state
 		= give_error symb_ident ec_state
 e_corresponds_app_symb dcl_app_symb=:{symb_kind=SK_LocalDclMacroFunction dcl_glob_index} icl_app_symb=:{symb_kind=SK_LocalMacroFunction icl_index} ec_state
-	= continuation_for_possibly_twice_defined_macros dcl_app_symb dcl_glob_index.glob_module dcl_glob_index.glob_object icl_app_symb icl_index ec_state
+	= continuation_for_possibly_twice_defined_macros dcl_app_symb dcl_glob_index icl_app_symb icl_index ec_state
+e_corresponds_app_symb dcl_app_symb=:{symb_kind=SK_LocalDclMacroFunction dcl_glob_index} icl_app_symb=:{symb_kind=SK_Function {glob_module,glob_object=icl_index}} ec_state
+	| glob_module==ec_state.ec_main_dcl_module_n && ec_state.ec_tc_state.tc_strictness_flags bitand CompareGenericCaseMacro<>0
+		= continuation_for_possibly_twice_defined_macros dcl_app_symb dcl_glob_index icl_app_symb icl_index ec_state
 e_corresponds_app_symb {symb_ident=dcl_symb_name, symb_kind=SK_Constructor dcl_glob_index} {symb_ident=icl_symb_name, symb_kind=SK_Constructor icl_glob_index} ec_state
 	| dcl_glob_index.glob_module==icl_glob_index.glob_module && dcl_symb_name.id_name==icl_symb_name.id_name
 		= ec_state
@@ -1335,7 +1381,7 @@ e_corresponds_app_symb {symb_ident=dcl_symb_name, symb_kind=SK_NewTypeConstructo
 e_corresponds_app_symb {symb_ident,symb_kind} {symb_kind=symb_kind2} ec_state
 	= give_error symb_ident ec_state
 
-continuation_for_possibly_twice_defined_macros dcl_app_symb dcl_module_index dcl_index icl_app_symb icl_index ec_state
+continuation_for_possibly_twice_defined_macros dcl_app_symb {glob_module=dcl_module_index, glob_object=dcl_index} icl_app_symb icl_index ec_state
 	| icl_index==NoIndex
 		= ec_state
 	// two different functions were referenced. In case of macro functions they still could correspond
@@ -1405,32 +1451,3 @@ do_nothing ec_state
 
 give_error s ec_state
 	= { ec_state & ec_error_admin = checkError s ErrorMessage ec_state.ec_error_admin }
-
-/*
-instance <<< Priority
-	where
-		(<<<) file NoPrio = file <<< "NoPrio"		
-		(<<<) file (Prio LeftAssoc i) = file <<< "Prio LeftAssoc " <<< i
-		(<<<) file (Prio RightAssoc i) = file <<< "Prio RightAssoc " <<< i
-		(<<<) file (Prio NoAssoc i) = file <<< "Prio NoAssoc " <<< i
-
-Trace_array a
-	= trace_array 0
-	where
-		trace_array i
-			| i<size a
-				= Trace_tn i && Trace_tn a.[i] && trace_array (i+1)
-				= True;
-
-Trace_tn d
-	= file_to_true (stderr <<< d <<< '\n')
-
-file_to_true :: !File -> Bool;
-file_to_true file = code {
-  .inline file_to_true
-          pop_b 2
-          pushB TRUE
-  .end
- };
-
-*/
