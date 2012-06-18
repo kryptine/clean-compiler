@@ -135,15 +135,15 @@ Max a m [|d:ds]
 		= Max a s ds
 		= Max a m ds
 
-Sum a [|]
-	= a
-Sum a [|d:ds]
-	| a >= 2
-		= 2
-		= Sum (a + score d) ds
-
 score (Par i d)		= Max i 0 d
 score (Seq i d)		= Sum i d
+where
+	Sum a [|]
+		= a
+	Sum a [|d:ds]
+		| a >= 2
+			= 2
+			= Sum (a + score d) ds
 score (Dep f a)		= 0
 
 Max` a m [|]
@@ -216,6 +216,10 @@ unify_counts c1 c2
 where
 	unify (Seq 0 [|]) rc2 = rc2
 	unify rc1 (Seq 0 [|]) = rc1
+	unify rc1=:(Seq i1 [|]) rc2=:(Seq i2 [|])
+		| i1>=i2
+			= rc1
+			= rc2
 	unify rc1 rc2 = Par 0 [|rc1,rc2]
 
 show_counts component_members group_counts
