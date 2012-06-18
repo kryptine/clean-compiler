@@ -47,7 +47,7 @@ where
 			{ gen_classes = createArray 32 []
 			, gen_var_kinds = []
 			, gen_rep_conses
-				= createArray 6 {grc_module = -1, grc_index = -1, grc_generic_info = -1,
+				= createArray 7 {grc_module = -1, grc_index = -1, grc_generic_info = -1,
 								 grc_generic_instance_deps = AllGenericInstanceDependencies,
 								 grc_ident={id_name="",id_info=nilPtr},
 								 grc_optional_fun_type=No}

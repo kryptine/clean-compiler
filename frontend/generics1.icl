@@ -529,6 +529,8 @@ where
 	simplify (GTSObject type_info_ds type_index cons_desc_list_ds x) st
 		# (x, st) = simplify x st
 		= (GTSObject type_info_ds type_index cons_desc_list_ds x, st)
+	simplify GTSUnit st
+		= (GTSUnit, st)
 
 	occurs (GTSAppCons _ args) st 	= occurs_list args st
 	occurs (GTSAppConsSimpleType _ _ args) st 	= occurs_list args st
@@ -542,6 +544,7 @@ where
 	occurs (GTSRecord _ _ _ _ arg) st = occurs arg st
 	occurs (GTSField _ _ _ arg) st	= occurs arg st	
 	occurs (GTSObject _ _ _ arg) st	= occurs arg st	
+	occurs GTSUnit st				= False
 	occurs GTSE st 					= False
 
 	occurs2 x y st
@@ -615,8 +618,8 @@ where
 		= listToBin build_pair build_unit types	
 	where
 		build_pair x y = GTSPair x y
-		build_unit = GTSAppCons KindConst []	
-		
+		build_unit = GTSUnit // GTSAppCons KindConst []	
+
 	build_sum_type :: [GenTypeStruct] -> GenTypeStruct
 	build_sum_type types
 		= listToBin build_either build_void types
@@ -1671,7 +1674,7 @@ where
 		    }
 		= class_def
 
-// Convert generic cases 
+// Convert generic cases
 
 :: *SpecializeState = {
 		ss_modules :: !*Modules,
@@ -2394,6 +2397,8 @@ index_gen_cons_with_info_type (TA {type_index={glob_module,glob_object}} []) pre
 			= 4
 		| glob_object==predefs.[PD_TypeEITHER].pds_def
 			= 5
+		| glob_object==predefs.[PD_TypeUNIT].pds_def
+			= 6
 			= -1
 		= -1
 index_gen_cons_with_info_type _ predefs
@@ -2408,6 +2413,7 @@ is_gen_cons_without_instances (TA {type_index={glob_module,glob_object}} []) pre
 		|| glob_object==predefs.[PD_TypeFIELD].pds_def
 		|| glob_object==predefs.[PD_TypePAIR].pds_def
 		|| glob_object==predefs.[PD_TypeEITHER].pds_def
+		|| glob_object==predefs.[PD_TypeUNIT].pds_def
 		= False
 is_gen_cons_without_instances _ predefs
 	= False
@@ -2891,6 +2897,16 @@ where
 			= (expr, {st & ss_heaps=heaps})
 			#! error = reportError gen_ident.id_name gen_pos "cannot specialize because there is no instance of OBJECT" st.ss_error
 			= (EE, {st & ss_error=error})
+	specialize gen_index gen_ident gen_deps gen_rep_conses GTSUnit st
+		# gen_UNIT_index=:{grc_generic_info,grc_generic_instance_deps} = gen_rep_conses.[6]
+		# (arg_exprs, st)
+			= specialize_with_partial_or_all_deps gen_index gen_ident gen_deps gen_rep_conses [] grc_generic_instance_deps st
+		| gen_UNIT_index.grc_module>=0
+			#! (expr, heaps)
+				= buildFunApp2 gen_UNIT_index.grc_module gen_UNIT_index.grc_index gen_UNIT_index.grc_ident arg_exprs st.ss_heaps
+			= (expr, {st & ss_heaps=heaps})
+			#! error = reportError gen_ident.id_name gen_pos "cannot specialize because there is no instance of UNIT" st.ss_error
+			= (EE, {st & ss_error=error})
 	specialize gen_index gen_ident gen_deps gen_rep_conses type st
 		#! error = reportError gen_ident.id_name gen_pos "cannot specialize " st.ss_error
 		= (EE, {st & ss_error=error})
@@ -3152,6 +3168,10 @@ where
 		# (expr, funs_and_groups, heaps)
 			= bimap_id_expression main_module_index predefs funs_and_groups heaps
 		= (expr ,(funs_and_groups, heaps, error))
+	specialize GTSUnit (funs_and_groups, heaps, error)
+		# (expr, funs_and_groups, heaps)
+			= bimap_id_expression main_module_index predefs funs_and_groups heaps
+		= (expr, (funs_and_groups, heaps, error))
 	specialize type (funs_and_groups, heaps, error)
 		#! error = reportError gen_ident.id_name gen_pos "cannot specialize " error 
 		= (EE, (funs_and_groups, heaps, error))

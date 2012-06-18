@@ -425,7 +425,7 @@ instance == GenericDependency
 	{	gen_classes		:: !GenericClassInfos
 	,	gen_var_kinds	:: ![TypeKind]  	// kinds of all st_vars of the gen_type
 	,	gen_rep_conses	:: !{!GenericRepresentationConstructor}
-	//	OBJECT, CONS, RECORD, FIELD, PAIR, EITHER
+	//	OBJECT, CONS, RECORD, FIELD, PAIR, EITHER, UNIT
 	}
 
 ::	GenericRepresentationConstructor =
@@ -615,6 +615,7 @@ NoGlobalIndex :== {gi_module=NoIndex,gi_index=NoIndex}
 	// the following constructors are used for optimizing bimaps
 	| GTSPair !GenTypeStruct !GenTypeStruct
 	| GTSEither !GenTypeStruct !GenTypeStruct
+	| GTSUnit
 	| GTSArrow GenTypeStruct GenTypeStruct
  	| GTSAppConsBimapKindConst
 	| GTSAppBimap TypeKind [GenTypeStruct]
@@ -1051,7 +1052,6 @@ cNotVarNumber :== -1
 ::	TempAttrId		:== Int
 ::	TempVarId		:== Int
 
-
 ::	Type	=	TA !TypeSymbIdent ![AType]
 			|	TAS !TypeSymbIdent ![AType] !StrictnessList
 			|	(-->) infixr 9 !AType !AType
@@ -1167,7 +1167,7 @@ cNotVarNumber :== -1
 					| TA_Anonymous | TA_None
 					| TA_List !Int !TypeAttribute | TA_Locked !TypeAttribute
 					| TA_MultiOfPropagatingConsVar // only filled in after type checking, semantically equal to TA_Multi
-							
+
 ::	AttributeVar =
 	{	av_ident			:: !Ident
 	,	av_info_ptr		:: !AttrVarInfoPtr
