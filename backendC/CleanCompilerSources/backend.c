@@ -150,9 +150,6 @@ STRUCT (be_state, BEState)
 
 static BEStateS	gBEState = {False /* ... */};
 
-/* +++ dynamic allocation */
-# define	kMaxNumberOfNodeIds	1000
-
 STRUCT (be_locally_generated_function_info, BELocallyGeneratedFunction)
 {
 	char	*lgf_name;
@@ -164,7 +161,8 @@ static BELocallyGeneratedFunctionS gLocallyGeneratedFunctions[] = {{"_dictionary
 # define	kDictionaryUpdate	1
 
 // +++ put in gBEState
-static NodeIdP	gCurrentNodeIds [kMaxNumberOfNodeIds];
+static NodeIdP (*gCurrentNodeIds)=NULL;
+static int n_gCurrentNodeIds = 0;
 static SymbolP	gBasicSymbols [Nr_Of_Predef_FunsOrConses];
 static SymbolP	gTupleSelectSymbols [MaxNodeArity];
 
@@ -2154,13 +2152,34 @@ BEArgs (BENodeP node, BEArgP nextArgs)
 	return (arg);
 } /* BEArgs */
 
+static void increase_number_of_node_ids (int sequenceNumber)
+{
+	if (n_gCurrentNodeIds==0){
+		gCurrentNodeIds = malloc (1000*sizeof (NodeId *));
+		if (gCurrentNodeIds!=NULL)
+			n_gCurrentNodeIds = 1000;
+	}
+	
+	while (sequenceNumber>=n_gCurrentNodeIds){
+		static NodeIdP (*new_gCurrentNodeIds);
+
+		new_gCurrentNodeIds = realloc (gCurrentNodeIds,(n_gCurrentNodeIds+(n_gCurrentNodeIds>>1)) * sizeof (NodeId *));
+		if (new_gCurrentNodeIds==NULL)
+			return;
+		
+		gCurrentNodeIds = new_gCurrentNodeIds;
+		n_gCurrentNodeIds += (n_gCurrentNodeIds>>1);
+	}
+}
+
 void
 BEDeclareNodeId (int sequenceNumber, int lhsOrRhs, CleanString name)
 {
 	IdentP	newIdent;
 	NodeIdP	newNodeId;
 
-	Assert (sequenceNumber < kMaxNumberOfNodeIds);
+	if (sequenceNumber>=n_gCurrentNodeIds)
+		increase_number_of_node_ids (sequenceNumber);
 
 	/* +++ ifdef DEBUG */
 	if (sequenceNumber>=number_of_node_ids){
@@ -2199,8 +2218,6 @@ BENodeIdP
 BENodeId (int sequenceNumber)
 {
 	NodeIdP		nodeId;
-
-	Assert ((unsigned)sequenceNumber < (unsigned)kMaxNumberOfNodeIds);
 
 	/* +++ ifdef DEBUG */
 	if (sequenceNumber>=number_of_node_ids){
@@ -2257,8 +2274,6 @@ BENodeDef (int sequenceNumber, BENodeP node)
 {
 	NodeIdP		nodeId;
 	NodeDefP	nodeDef;
-
-	Assert ((unsigned)sequenceNumber < (unsigned)kMaxNumberOfNodeIds);
 
 	/* +++ ifdef DEBUG */
 	if (sequenceNumber>=number_of_node_ids){
@@ -3854,14 +3869,8 @@ BECloseFiles (void)
 		std_error_file_p = stderr;
 #else
 		fclose (StdError);
-#endif
-		StdErrorReopened = False;
-	}
-	if (StdOutReopened){
-#ifdef _SUN_
-		fclose (std_out_file_p);
-		std_out_file_p = stdout;
-#else
+	StdErrorReopened = False;
+	if (StdOutReopened)
 		fclose (StdOut);
 #endif
 		StdOutReopened = False;
