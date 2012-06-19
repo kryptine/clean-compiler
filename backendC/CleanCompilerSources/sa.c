@@ -52,7 +52,7 @@
 
 #define for_l(v,l,n) for(v=(l);v!=NULL;v=v->n)
 
-#define NR_BLOCKS 200
+#define NR_BLOCKS 1000
 #define NR_BLOCKS_FOR_ANALYSIS 100
 
 #define BLOCK_SIZE (unsigned long) (16 * KBYTE)
@@ -85,7 +85,7 @@ Bool DoStrictRelated      = False;
 #define Bool MyBool
 
 static Bool StrictWarning		= False;	/* general warnings					*/
-static Bool StrictAllWarning	= True;	/* warnings per function			*/
+static Bool StrictAllWarning	= True;		/* warnings per function			*/
 static Bool StrictChecks      	= False;	/* warns for strange strictness		*/
 static Bool StrictExportChecks	= False;	/* do export checks					*/
 
@@ -1731,7 +1731,7 @@ static Dependency CombineDependencies (Dependency deps1, Dependency deps2)
 
 	CopyDeps (deps1,&new);
 	CopyDeps (deps2,&new);
-/*	
+/*
 	for (; deps1; deps1 = deps1->dep_next)
 	{	Dependency dep;
 		Exp e;
@@ -1749,7 +1749,7 @@ static Dependency CombineDependencies (Dependency deps1, Dependency deps2)
 			}
 		}
 	}
-*/	
+*/
 	return new;
 }
 
@@ -3091,7 +3091,7 @@ static void UpdateStateInfoWithStrictInfo (TypeNode node, StrictInfo *s,Bool *st
 }
 
 static void UpdateStateInfosWithStrictInfos (TypeAlts rule, unsigned arity, StrictInfo *strict_args,
-	 										 StrictInfo *result, Bool *strict_added, Bool *warning)
+											 StrictInfo *result, Bool *strict_added, Bool *warning)
 {	unsigned	i;
 	TypeArgs	args;
 
@@ -3342,7 +3342,7 @@ static void init_predefined_symbols (void)
 		
 		shared_strict_infos=InitNewStrictInfos (MaxNrAnnots+1,HnfStrict);
 		
-#endif	
+#endif
 	/* initialise the function table with strict functions */
 	for (i = 0; i < MaxNrAnnots; i++,f++){
 		strict_sym[i] = f;
@@ -3657,7 +3657,7 @@ static void UpdateSyntaxTree (void)
 	SymbDef sdef;
 	
 	for_l (sdef,scc_dependency_list,sdef_next_scc)
-		if (sdef->sdef_kind==IMPRULE)		
+		if (sdef->sdef_kind==IMPRULE)
 			update_function_strictness (sdef);
 }
 
@@ -3770,7 +3770,7 @@ static Bool CheckRelation (Exp e, Path p, Context context)
 }
 
 static Bool IsInPath (Exp e, Path p, Exp *r, Context context)
-{	
+{
 	for ( ; p; p = p->p_next){
 		Bool b;
 		
@@ -4180,7 +4180,7 @@ static MatchKind MatchAlternative (Exp *ep,Exp *args_act,Exp *args_for,Alts alt,
 			break;
 		case PartialMatch:
 		case TotalMatch:	
-#ifdef _DB_			
+#ifdef _DB_
 # ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
 			if (alt->fun_switch_alts==NULL)
 # endif
@@ -4197,7 +4197,7 @@ static MatchKind MatchAlternative (Exp *ep,Exp *args_act,Exp *args_for,Alts alt,
 				FPutC ('\n', StdError);
 				/* Assume (False, "Not all args bound", "MatchAlternative"); */
 			}
-#endif			
+#endif
 
 #ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
 			if (alt->fun_switch_alts==NULL){
@@ -4350,7 +4350,7 @@ static MatchKind MatchAlternative (Exp *ep,Exp *args_act,Exp *args_for,Alts alt,
 										
 					*ep=new_e;
 				}
-			}	
+			}
 #endif
 			break;
 		default:
@@ -4742,7 +4742,7 @@ static Exp ReduceFunction (Exp e, Path p, Context context)
 }
 
 static Exp ReduceStrictFunction (Exp e, Path p, Context context)
-{	
+{
 	int arity;
 	
 	arity = e->e_fun->fun_arity;
@@ -4850,7 +4850,7 @@ static Exp ReduceAp (Exp e, Path p, Context context)
 }
 
 static Exp GetSelection (Exp tuple_exp, unsigned n, Path p, Context context)
-{	
+{
 	switch (tuple_exp->e_kind){
 		case Top:
 		case Dep:
@@ -4997,7 +4997,7 @@ static void Reduce (ExpP ep, Path p, Context context)
 	}
 #ifdef DIVIDE_FUEL
 	}
-#endif	
+#endif
 
 	/* NOTE: the arguments have to be reduced before the next switches
 		   statement, because 'ep' itself might be reduced by the above call
@@ -5146,7 +5146,7 @@ static Bool ReduceInContext (ExpP ep, Path p, Context context)
 	unsigned e_fuel = start_fuel;
 #endif
 
-#ifdef CHECK_STACK_OVERFLOW	
+#ifdef CHECK_STACK_OVERFLOW
 	char x;
 
 	if (&x < min_stack){
