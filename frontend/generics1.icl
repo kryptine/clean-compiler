@@ -2173,7 +2173,7 @@ where
 						# fun = {fun & fun_ident = fun_ident, fun_type = Yes symbol_type, fun_body = fun_body, fun_arity = fun_arity}
 						-> {st & ss_funs.[fun_index] = fun}
 						// generic info record already replaced by fields
-						# n_generic_info_field = add_n_bits generic_info 0						
+						# n_generic_info_field = add_n_bits generic_info 0
 						| fun_arity<>symbol_type.st_arity + n_unused_dep_args
 							# error = reportError gc_ident.id_name gc_pos
 										("incorrect arity "+++toString (fun_arity-n_generic_info_field)+++", expected "+++toString (symbol_type.st_arity+n_unused_dep_args-n_generic_info_field)) st.ss_error
@@ -2207,21 +2207,6 @@ where
 				# group = {group_members=[fun_index]}
 				  funs_and_groups & fg_group_index=fg_group_index+1,fg_groups=[group:fg_groups]
 				-> {st & ss_funs.[fun_index] = fun, ss_funs_and_groups = funs_and_groups}
-	where
-		add_n_bits n c
-			| n>1
-				= add_n_bits (n>>1) (c+(n bitand 1))
-				= c+n
-
-		remove_unused_dep_args :: ![FreeVar] !Int !Int !Int -> [FreeVar]
-		remove_unused_dep_args args=:[arg:r_args] arg_n n_deps deps
-			| arg_n>=n_deps
-				= args
-			| deps bitand (1<<arg_n)<>0
-				= [arg : remove_unused_dep_args r_args (arg_n+1) n_deps deps]
-				= remove_unused_dep_args r_args (arg_n+1) n_deps deps
-		remove_unused_dep_args [] arg_n n_deps deps
-			= []
 
 	build_class_instance :: Int Ident Position TypeKind ClassInstanceMember InstanceType !(!Int,![ClassInstance]) -> (!Int,![ClassInstance])
 	build_class_instance class_index gc_ident gc_pos gc_kind class_instance_member ins_type (ins_index, instances)
@@ -2237,6 +2222,22 @@ where
 			,	ins_pos		= gc_pos
 			}
 		= (ins_index+1, [ins:instances])
+
+add_n_bits :: !Int !Int -> Int
+add_n_bits n c
+	| n>1
+		= add_n_bits (n>>1) (c+(n bitand 1))
+		= c+n
+
+remove_unused_dep_args :: ![FreeVar] !Int !Int !Int -> [FreeVar]
+remove_unused_dep_args args=:[arg:r_args] arg_n n_deps deps
+	| arg_n>=n_deps
+		= args
+	| deps bitand (1<<arg_n)<>0
+		= [arg : remove_unused_dep_args r_args (arg_n+1) n_deps deps]
+		= remove_unused_dep_args r_args (arg_n+1) n_deps deps
+remove_unused_dep_args [] arg_n n_deps deps
+	= []
 
 determine_type_of_member_instance_from_symbol_type :: !SymbolType !InstanceType !*TypeHeaps !*VarHeap !*ErrorAdmin
 	-> (!SymbolType, !*TypeHeaps, !*VarHeap, !*ErrorAdmin)
@@ -2988,11 +2989,12 @@ where
 			= (main_module_index,local_fun_index,gen_rep_conses,st)
 		# heaps = st.ss_heaps
 		  (gen_info=:{gen_rep_conses}, generic_heap) = readPtr gen_info_ptr heaps.hp_generic_heap
-		  {grc_local_fun_index,grc_optional_fun_type,grc_generic_info} = gen_rep_conses.[gen_cons_index]
+		  {grc_local_fun_index,grc_optional_fun_type,grc_generic_info,grc_generic_instance_deps} = gen_rep_conses.[gen_cons_index]
 		  st & ss_heaps = {heaps & hp_generic_heap = generic_heap}
 		| grc_local_fun_index>=0
 			= (main_module_index,grc_local_fun_index,gen_rep_conses,st)
-		# (fun_index,st) = copy_generic_case_macro module_index macro_index grc_optional_fun_type gen_cons_index grc_generic_info main_module_index st
+		# (fun_index,st)
+			= copy_generic_case_macro module_index macro_index grc_optional_fun_type gen_cons_index grc_generic_info grc_generic_instance_deps main_module_index st
 		  gen_rep_conses = {gen_rep_cons\\gen_rep_cons<-:gen_rep_conses}
 		  gen_rep_conses & [gen_cons_index].grc_local_fun_index = fun_index
 		  heaps = st.ss_heaps
@@ -3000,8 +3002,8 @@ where
 		  st & ss_heaps = {heaps & hp_generic_heap = generic_heap}
 		= (main_module_index,fun_index,gen_rep_conses,st)
 
-	copy_generic_case_macro :: !Int !Int !(Optional SymbolType) !Int !Int !Int !*SpecializeState -> (!Int,!*SpecializeState)
-	copy_generic_case_macro macro_module_index macro_index optional_fun_type gen_cons_index generic_info main_module_index st
+	copy_generic_case_macro :: !Int !Int !(Optional SymbolType) !Int !Int !GenericInstanceDependencies !Int !*SpecializeState -> (!Int,!*SpecializeState)
+	copy_generic_case_macro macro_module_index macro_index optional_fun_type gen_cons_index generic_info generic_instance_deps main_module_index st
 		# {ss_heaps=heaps,ss_funs_and_groups=funs_and_groups,ss_error=error,ss_funs=fun_defs,ss_dcl_macros=dcl_macros,ss_symbol_table=symbol_table} = st
 		  {fg_fun_index = fun_index, fg_funs=funs, fg_groups=groups, fg_group_index=group_index} = funs_and_groups
 
@@ -3020,7 +3022,25 @@ where
 
 		  (fun_index,fun_defs) = usize fun_defs
 
-		  (macro=:{fun_body},dcl_macros) = dcl_macros![macro_module_index,macro_index]
+		  (macro,dcl_macros) = dcl_macros![macro_module_index,macro_index]
+
+		  macro
+		  	= case generic_instance_deps of
+		  		GenericInstanceDependencies n_deps deps
+		  			# m = (1<<n_deps)-1
+		  			| deps bitand m<>m
+		  				# {fun_body=TransformedBody {tb_args,tb_rhs}} = macro
+						# n_generic_info_args
+							= if (generic_info==0) 0 (if (generic_info<0) 1 (add_n_bits generic_info 0))
+						  tb_args = remove_unused_dep_args_after_generic_info_args tb_args n_generic_info_args n_deps deps
+		  				-> {macro & fun_body = TransformedBody {tb_args=tb_args,tb_rhs=tb_rhs}}
+		  			where
+		  				remove_unused_dep_args_after_generic_info_args args 0 n_deps deps
+		  					= remove_unused_dep_args args 0 n_deps deps
+		  				remove_unused_dep_args_after_generic_info_args [arg:args] n_generic_info_args n_deps deps
+		  					= [arg : remove_unused_dep_args_after_generic_info_args args (n_generic_info_args-1) n_deps deps]
+		 		_
+		  			-> macro
 
 		  (fun_def,local_fun_defs,next_fun_index,fun_defs,dcl_macros,var_heap,expression_heap)
 			= copy_macro_and_local_functions macro fun_index fun_defs dcl_macros var_heap expression_heap
