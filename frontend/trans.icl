@@ -154,8 +154,9 @@ cleanup_attributes expr_info_ptr symbol_heap
 	,	tfi_case				:: !SymbIdent		// original function or possibly generated case
 	,	tfi_args				:: ![FreeVar]		// args of above
 	,	tfi_vars				:: ![FreeVar]		// strict variables
-	,	tfi_geni				:: !(!Int,!Int)
 	,	tfi_orig				:: !SymbIdent		// original consumer
+	,	tfi_n_args_before_producer :: !Int
+	,	tfi_n_producer_args		:: !Int
 	}
 
 ::	RootCaseMode = NotRootCase | RootCase | RootCaseOfZombie
@@ -399,12 +400,11 @@ where
 	lift_default No _ _ ti
 		= (No, ti)
 
-	possiblyFoldOuterCase final guard_expr outer_case ro ti
+	possiblyFoldOuterCase final guard_expr outer_case ro=:{ro_tfi} ti
 		| SwitchAutoFoldCaseInCase (isFoldExpression guard_expr ti.ti_fun_defs ti.ti_cons_args) False // otherwise GOTO next alternative
-			| False -!-> ("possiblyFoldOuterCase","Case",bef < 0 || act < 0,ro.ro_tfi.tfi_args,aci.aci_params) = undef
-			| bef < 0 || act < 0
+			| ro_tfi.tfi_n_args_before_producer < 0 || ro_tfi.tfi_n_producer_args < 0
 				= possiblyFoldOuterCase` final guard_expr outer_case ro ti	//abort "possiblyFoldOuterCase: unexpected!\n"
-			= transformApplication { app_symb = folder, app_args = folder_args, app_info_ptr = nilPtr } [] ro ti
+			= transformApplication (make_consumer_application ro_tfi guard_expr) [] ro ti
 		= possiblyFoldOuterCase` final guard_expr outer_case ro ti
 	where
 		isFoldExpression (App app)	ti_fun_defs ti_cons_args = isFoldSymbol app.app_symb.symb_kind
@@ -427,26 +427,6 @@ where
 		isFoldExpression (Var _)	ti_fun_defs ti_cons_args = True
 //		isFoldExpression (Case _)	ti_fun_defs ti_cons_args = True
 		isFoldExpression _			ti_fun_defs ti_cons_args = False
-
-		ro_tfi = ro.ro_tfi
-
-		(bef,act) = ro_tfi.tfi_geni
-		new_f_a_before	= take bef ro_tfi.tfi_args
-		new_f_a_after	= drop (bef+act) ro_tfi.tfi_args
-		
-		f_a_before	= new_f_a_before	//| new_f_a_before <> old_f_a_before	= abort "!!!"
-		f_a_after	= new_f_a_after
-
-		folder		= ro_tfi.tfi_orig
-		folder_args = f_a_before` ++ [guard_expr:f_a_after`]
-		old_f_a_before	= takeWhile (\e -> not (isMember e aci.aci_params)) ro_tfi.tfi_args
-		old_f_a_help	= dropWhile (\e -> not (isMember e aci.aci_params)) ro_tfi.tfi_args
-		old_f_a_after	= dropWhile (\e -> isMember e aci.aci_params) old_f_a_help
-		f_a_before`	= free_vars_to_bound_vars f_a_before
-		f_a_after`	= free_vars_to_bound_vars f_a_after
-
-		isMember x [hd:tl] = hd.fv_info_ptr==x.fv_info_ptr || isMember x tl
-		isMember x []	= False
 
 	possiblyFoldOuterCase` final guard_expr outer_case ro ti
 		| final
@@ -517,33 +497,12 @@ transform_active_root_case aci this_case=:{case_expr = case_expr=:(App app=:{app
 					  (app_args2, ti) = transform app_args1 { ro & ro_root_case_mode = NotRootCase } ti
 					-> (App {app_symb=app_symb, app_args=app_args2, app_info_ptr=nilPtr}, ti)
 where
-	possiblyFoldOuterCase this_case ro ti
+	possiblyFoldOuterCase this_case ro=:{ro_tfi} ti
 		| SwitchAutoFoldAppInCase True False
-			| False -!-> ("possiblyFoldOuterCase","App",bef < 0 || act < 0,ro.ro_tfi.tfi_args,aci.aci_params) = undef
-			| bef < 0 || act < 0
+			| ro_tfi.tfi_n_args_before_producer < 0 || ro_tfi.tfi_n_producer_args < 0
 				= skip_over this_case ro ti	//abort "possiblyFoldOuterCase: unexpected!\n"
-			= transformApplication { app_symb = folder, app_args = folder_args, app_info_ptr = nilPtr } [] ro ti
+			= transformApplication (make_consumer_application ro_tfi case_expr) [] ro ti
 		= skip_over this_case ro ti
-	where
-		ro_tfi = ro.ro_tfi
-		
-		(bef,act)	= ro_tfi.tfi_geni
-		new_f_a_before	= take bef ro_tfi.tfi_args
-		new_f_a_after	= drop (bef+act) ro_tfi.tfi_args
-		
-		f_a_before	= new_f_a_before
-		f_a_after	= new_f_a_after
-
-		folder		= ro_tfi.tfi_orig
-		folder_args = f_a_before` ++ [case_expr:f_a_after`]
-		old_f_a_before	= takeWhile (\e -> not (isMember e aci.aci_params)) ro_tfi.tfi_args
-		old_f_a_help	= dropWhile (\e -> not (isMember e aci.aci_params)) ro_tfi.tfi_args
-		old_f_a_after	= dropWhile (\e -> isMember e aci.aci_params) old_f_a_help
-		f_a_before`	= free_vars_to_bound_vars f_a_before
-		f_a_after`	= free_vars_to_bound_vars f_a_after
-
-		isMember x [hd:tl] = hd.fv_info_ptr==x.fv_info_ptr || isMember x tl
-		isMember x []	= False
 
 	equal (SK_Function glob_index1) (SK_Function glob_index2)
 		= glob_index1==glob_index2
@@ -769,7 +728,11 @@ transform_active_root_case aci this_case=:{case_expr = (Let lad)} ro ti
 
 transform_active_root_case aci this_case ro ti
 	= skip_over this_case ro ti
-	
+
+make_consumer_application {tfi_orig,tfi_args,tfi_n_args_before_producer=bef,tfi_n_producer_args=act} arg_expr
+	# args = free_vars_to_bound_vars (take bef tfi_args) ++ [arg_expr : free_vars_to_bound_vars (drop (bef+act) tfi_args)]
+	= {app_symb = tfi_orig, app_args = args, app_info_ptr = nilPtr}
+
 in_normal_form (Var _)			= True
 in_normal_form (BasicExpr _)	= True
 in_normal_form _				= False
@@ -918,7 +881,8 @@ transform_active_non_root_case kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti=
 	  	# ti = { ti & ti_next_fun_nr = fun_index + 1 }
 		# new_ro = { ro & ro_root_case_mode = RootCaseOfZombie , ro_tfi.tfi_case = fun_ident, ro_tfi.tfi_args = all_args }
 	  	= generate_case_function fun_index case_info_ptr (Case kees) outer_fun_def outer_cons_args used_mask new_ro ti
-	# new_ro = { ro & ro_root_case_mode = RootCaseOfZombie, ro_tfi.tfi_case = fun_ident, ro_tfi.tfi_args = all_args, ro_tfi.tfi_geni = (-1,-1) }
+	# new_ro = { ro & ro_root_case_mode = RootCaseOfZombie,
+				 ro_tfi.tfi_case = fun_ident, ro_tfi.tfi_args = all_args, ro_tfi.tfi_n_args_before_producer = -1,  ro_tfi.tfi_n_producer_args = -1 }
 	  ti = { ti & ti_cons_args = ti_cons_args, ti_fun_defs = ti_fun_defs, ti_fun_heap = ti_fun_heap, ti_recursion_introduced = No }
 	  (new_expr, ti)
 	  		= transformCase kees new_ro ti
@@ -1169,7 +1133,6 @@ where
 removeNeverMatchingSubcases expr ro
 	= expr
 
-	
 instance transform LetBind
 where
 	transform bind=:{lb_src} ro ti
@@ -1727,7 +1690,8 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 				tfi_args = new_fun_args,
 				tfi_vars = uvar ++ [arg \\ arg <- new_fun_args & i <- [0..] | arg_is_strict i new_args_strictness],
 										// evt ++ verwijderde stricte arg...
-				tfi_geni = (length args1,length args2n)
+				tfi_n_args_before_producer = length args1,
+				tfi_n_producer_args = length args2n
 			 }
 	# ro = { ro & ro_root_case_mode = ro_root_case_mode, ro_tfi=tfi}
 				// ---> ("genfun uvars",uvar,[arg \\ arg <- new_fun_args & i <- [0..] | arg_is_strict i new_args_strictness])
@@ -2585,7 +2549,7 @@ where
 		= case opt_expr of
 			No		
 					-> (build_application { app & app_symb = app_symb, app_args = app_args } extra_args, ti)
-			(Yes tb_rhs)
+			Yes tb_rhs
 				| isEmpty extra_args
 					-> (tb_rhs, ti)
 					-> (tb_rhs @ extra_args, ti)
@@ -3486,8 +3450,6 @@ renewVariables exprs normalise_symbol var_heap
 
 	preprocess_local_var :: !FreeVar !RenewState -> (!FreeVar, !RenewState)
 	preprocess_local_var fv=:{fv_ident, fv_info_ptr} (new_vars_accu, free_vars_accu, var_heap)
-//		# (VI_Extended evi _, var_heap)
-//				= readPtr fv_info_ptr var_heap
 		# (evi, var_heap)
 				= readExtendedVarInfo fv_info_ptr var_heap
 		  (new_var, var_heap)
@@ -3709,7 +3671,8 @@ where
 					, tfi_orig				= fun_symb
 					, tfi_args				= tb.tb_args
 					, tfi_vars				= [arg \\ arg <- tb.tb_args & i <- [0..] | arg_is_strict i st_args_strictness]
-					, tfi_geni				= (-1,-1)
+					, tfi_n_args_before_producer = -1
+					, tfi_n_producer_args	= -1
 					}
 			  ro =	{ ro_imported_funs				= imported_funs
 					, ro_common_defs 				= common_defs
