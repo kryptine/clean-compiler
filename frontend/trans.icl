@@ -404,7 +404,11 @@ where
 		| SwitchAutoFoldCaseInCase (isFoldExpression guard_expr ti.ti_fun_defs ti.ti_cons_args) False // otherwise GOTO next alternative
 			| ro_tfi.tfi_n_args_before_producer < 0 || ro_tfi.tfi_n_producer_args < 0
 				= possiblyFoldOuterCase` final guard_expr outer_case ro ti	//abort "possiblyFoldOuterCase: unexpected!\n"
-			= transformApplication (make_consumer_application ro_tfi guard_expr) [] ro ti
+			= case aci.aci_opt_unfolder of
+				No
+					-> possiblyFoldOuterCase` final guard_expr outer_case ro ti
+				Yes _
+					-> transformApplication (make_consumer_application ro_tfi guard_expr) [] ro ti
 		= possiblyFoldOuterCase` final guard_expr outer_case ro ti
 	where
 		isFoldExpression (App app)	ti_fun_defs ti_cons_args = isFoldSymbol app.app_symb.symb_kind
@@ -468,15 +472,15 @@ transform_active_root_case aci this_case=:{case_expr = case_expr=:(App app=:{app
 			# {aci_params,aci_opt_unfolder} = aci
 			-> case aci_opt_unfolder of
 				No
-					-> skip_over this_case ro ti									-!-> ("transform_active_root_case","No opt unfolder")
+					-> skip_over this_case ro ti									// -!-> ("transform_active_root_case","No opt unfolder")
 				Yes unfolder
 					| not (equal app_symb.symb_kind unfolder.symb_kind)
 						// in this case a third function could be fused in
-						-> possiblyFoldOuterCase this_case ro ti					-!-> ("transform_active_root_case","Diff opt unfolder",unfolder,app_symb)
+						-> possiblyFoldOuterCase this_case ro ti					// -!-> ("transform_active_root_case","Diff opt unfolder",unfolder,app_symb)
 					# variables = [ Var {var_ident=fv_ident, var_info_ptr=fv_info_ptr, var_expr_ptr=nilPtr}
 									\\ {fv_ident, fv_info_ptr} <- ro.ro_tfi.tfi_args ]
 					  (app_symb, ti)
-						= case ro.ro_root_case_mode -!-> ("transform_active_root_case","Yes opt unfolder",unfolder) of
+						= case ro.ro_root_case_mode /* -!-> ("transform_active_root_case","Yes opt unfolder",unfolder) */ of
 							RootCaseOfZombie
 								# (recursion_introduced,ti) = ti!ti_recursion_introduced
 								  (ro_fun=:{symb_kind=SK_GeneratedFunction fun_info_ptr _}) = ro.ro_tfi.tfi_case
@@ -486,13 +490,13 @@ transform_active_root_case aci this_case=:{case_expr = case_expr=:(App app=:{app
 										  ri = {ri_fun_index=ti_next_fun_nr, ri_fun_ptr=fun_info_ptr}
 										-> ({ro_fun & symb_kind=SK_GeneratedFunction fun_info_ptr ti_next_fun_nr},
 										    {ti & ti_next_fun_nr = inc ti_next_fun_nr, ti_recursion_introduced = Yes ri})
-											-!-> ("Recursion","RootCaseOfZombie",ti_next_fun_nr,recursion_introduced)
+//											-!-> ("Recursion","RootCaseOfZombie",ti_next_fun_nr,recursion_introduced)
 									Yes {ri_fun_index,ri_fun_ptr}
 										| ri_fun_ptr==fun_info_ptr
 											-> ({ro_fun & symb_kind=SK_GeneratedFunction fun_info_ptr ri_fun_index},ti)
 							RootCase
 								-> (ro.ro_tfi.tfi_root,{ti & ti_recursion_introduced = No})
-									-!-> ("Recursion","RootCase",ro.ro_tfi.tfi_root)
+//									-!-> ("Recursion","RootCase",ro.ro_tfi.tfi_root)
 					  app_args1 = replace_arg [ fv_info_ptr \\ {fv_info_ptr}<-aci_params ] app_args variables
 					  (app_args2, ti) = transform app_args1 { ro & ro_root_case_mode = NotRootCase } ti
 					-> (App {app_symb=app_symb, app_args=app_args2, app_info_ptr=nilPtr}, ti)
@@ -696,7 +700,7 @@ where
 	expr_or_never_matching_case (Yes match_expr) case_ident ti
 		= (match_expr, ti)
 	expr_or_never_matching_case No case_ident ti
-		= (neverMatchingCase never_ident, ti) <-!- ("transform_active_root_case:App:neverMatchingCase",never_ident)
+		= (neverMatchingCase never_ident, ti) // <-!- ("transform_active_root_case:App:neverMatchingCase",never_ident)
 		where
 			never_ident = case ro.ro_root_case_mode of
 							NotRootCase -> case_ident
@@ -4560,16 +4564,26 @@ where
 			# (exprs,cs) = copy exprs ci cs
 			| is_var_list exprs
 				# (var_info,var_heap) = readVarInfo var_info_ptr cs.cs_var_heap
-				  cs = {cs & cs_var_heap=var_heap}
+				  cs & cs_var_heap=var_heap
 				= case var_info of
 					VI_ExpressionOrBody _ fun_ident {tb_args, tb_rhs} new_aci_params
 						# tb_args_ptrs = [fv_info_ptr \\ {fv_info_ptr}<-tb_args] 
 						  (original_bindings, cs_var_heap) = mapSt readPtr tb_args_ptrs cs.cs_var_heap
 						  (extra_exprs,cs_var_heap) = bind_variables tb_args_ptrs new_aci_params exprs cs_var_heap
-						  cs = {cs & cs_var_heap = cs_var_heap}
+						  cs & cs_var_heap = cs_var_heap
 						  (expr,cs) = copy tb_rhs ci cs
+
+						  (case_info, cs_symbol_heap) = readPtr case_info_ptr cs.cs_symbol_heap
+						  cs & cs_symbol_heap
+							= case case_info of
+								EI_Extended (EEI_ActiveCase aci) ei
+									# aci & aci_opt_unfolder = No
+									-> writePtr case_info_ptr (EI_Extended (EEI_ActiveCase aci) ei) cs_symbol_heap
+								_
+									-> cs_symbol_heap
+
 						  cs_var_heap = fold2St writePtr tb_args_ptrs original_bindings cs.cs_var_heap
-						  cs = {cs & cs_var_heap = cs_var_heap}
+						  cs & cs_var_heap = cs_var_heap
 						-> case extra_exprs of
 							[]
 								-> (expr,cs)
