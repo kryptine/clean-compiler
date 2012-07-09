@@ -52,12 +52,9 @@
 
 #define for_l(v,l,n) for(v=(l);v!=NULL;v=v->n)
 
-#define NR_BLOCKS 1000
 #define NR_BLOCKS_FOR_ANALYSIS 100
 
 #define BLOCK_SIZE (unsigned long) (16 * KBYTE)
-
-unsigned long StrictMemUse	= NR_BLOCKS * BLOCK_SIZE;
 
 #ifdef CHECK_STACK_OVERFLOW
 char *min_stack;
@@ -236,7 +233,8 @@ static void GiveStrictWarning (char *f, char *msg)
  * The Storage Allocator for the strictness analysis                           *
  ******************************************************************************/
 
-static char		*SA_store [NR_BLOCKS];		/* the memory blocks				*/
+static char		**SA_store;					/* the memory blocks				*/
+static int		SA_store_size = 0;
 static unsigned n_allocated_blocks = 0;		/* the nr of allocated blocks		*/
 static unsigned usedblocks   = 0;			/* the nr of blocks in use			*/
 static char		*high        = Null;		/* current end position in block	*/
@@ -248,7 +246,29 @@ static void NewBlock (void)
 {
 	if (usedblocks < n_allocated_blocks)
 		++usedblocks;
-	else if (n_allocated_blocks<NR_BLOCKS && (fblocks==0 || n_allocated_blocks<fblocks+NR_BLOCKS_FOR_ANALYSIS) && BLOCK_SIZE*(n_allocated_blocks+1)<StrictMemUse){
+	else if (fblocks==0 || n_allocated_blocks<fblocks+NR_BLOCKS_FOR_ANALYSIS){
+		if (n_allocated_blocks>=SA_store_size){
+			if (SA_store_size==0){
+				SA_store = malloc (100 * (sizeof (char*)));
+				if (SA_store==NULL){
+					free_pos=NULL;
+					return;
+				}
+				SA_store_size = 100;
+			}
+			while (SA_store_size<=n_allocated_blocks){
+				char **new_SA_store;
+				
+				new_SA_store = realloc (SA_store,(SA_store_size<<1) * sizeof(char*));
+				if (new_SA_store==NULL){
+					free_pos=NULL;
+					return;
+				}
+				SA_store=new_SA_store;
+				SA_store_size=SA_store_size<<1;
+			}
+		}
+
 		if (! (free_pos = (char *) Alloc (BLOCK_SIZE, SizeOf (char))))
 			return;
 		
@@ -744,7 +764,7 @@ static Exp InstantiateExp2 (Exp e)
 		{
 			unsigned j;
 			Exp arg_e;
-			
+
 			arity    = e->e_sym;
 			new_e    = NewExp (Dep, e->e_sym, e->e_hnf, arity);
 			e->e_fwd = new_e;
@@ -1891,7 +1911,7 @@ static void UpdateExp (Exp src, Exp dst)
 	dst->e_args = NewExpArgs (arity);
 	for (i = 0; i < arity; i++)
 		dst->e_args[i] = src->e_args[i];
-	
+
 	/* add dependencies of source to destination */
 	dst->e_deps = AddDeps (dst->e_deps, src->e_deps);
 	
@@ -3508,7 +3528,7 @@ static void convert_imp_rule_type (SymbDef sdef)
 
 	f->fun_kind = Function;
 	f->fun_symbol = sdef;
-	f->fun_arity = arity;
+	f->fun_arity  = arity;
 
 	rule_type = sdef->sdef_rule->rule_type;
 /*
@@ -4042,7 +4062,7 @@ static MatchKind MatchExp (ExpP ep_act,Exp e_for,Dependency *dep,Exp **e_stopp)
 				case Ind:
 				{
 					Bool no_patterns;
-					
+
 					/* In case of a constructor with only one alternative we have a TotalMatch */
 					no_patterns = True;
 					BindArgsToTop (e_for->e_args, e_for->e_fun->fun_arity, &no_patterns);
