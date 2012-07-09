@@ -1437,17 +1437,12 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 	  (opt_sound_function_producer_types, ti_type_heaps)
 	  		= mapSt copy_opt_symbol_type opt_sound_function_producer_types ti_type_heaps
 
-	  sound_function_producer_types		// nog even voor determine args....
-	  		= [x \\ Yes x <- opt_sound_function_producer_types]
+	  sound_function_producer_types = [x \\ Yes x <- opt_sound_function_producer_types]
 
-	# {st_attr_vars,st_args,st_args_strictness,st_result,st_attr_env}
-	  		= sound_consumer_symbol_type
+	# {st_attr_vars,st_args,st_args_strictness,st_result,st_attr_env} = sound_consumer_symbol_type
 
-	  (class_types, ti_fun_defs, ti_fun_heap)
-	  		= iFoldSt (accum_class_type prods ro) 0 (size prods) 
-	  				([], ti_fun_defs, ti_fun_heap)
-	  (type_vars_in_class_types, th_vars)
-	  		= mapSt getTypeVars class_types ti_type_heaps.th_vars
+	  class_types = [{at_attribute = TA_Multi, at_type = class_type} \\ PR_Class _ _ class_type <-:prods]
+	  (type_vars_in_class_types, th_vars) = mapSt getTypeVars class_types ti_type_heaps.th_vars
 
 	  all_involved_types
 	  		= class_types ++ (flatten (map (\{st_args, st_result}-> [st_result:st_args]) 
@@ -1834,14 +1829,6 @@ where
 			= (type, ps)
 		# (type, prop_class, ps) = addPropagationAttributesToAType modules type ps
 		= (type, ps)
-
-	accum_class_type :: !{!.Producer} !.ReadOnlyTI !.Int !(!u:[v:AType],!.b,!.c) -> (!w:[x:AType],!.b,!.c), [u <= w,v <= x]
-	accum_class_type prods ro i (type_accu, ti_fun_defs, ti_fun_heap)
-		= case prods.[i] of
-			PR_Class _ _ class_type
-				-> ([{empty_atype & at_type = class_type}  : type_accu ], ti_fun_defs, ti_fun_heap)
-			_
-				-> (type_accu, ti_fun_defs, ti_fun_heap)
 
 	accum_function_producer_type :: !{!.Producer} !.ReadOnlyTI !.Int !*(!u:[v:(Optional .SymbolType)],!*{#.FunDef},!*(Heap FunctionInfo)) -> (!w:[x:(Optional SymbolType)],!.{#FunDef},!.(Heap FunctionInfo)), [u <= w,v <= x]
 	accum_function_producer_type prods ro i (type_accu, ti_fun_defs, ti_fun_heap)
