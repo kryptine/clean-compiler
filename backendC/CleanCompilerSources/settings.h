@@ -43,6 +43,5 @@ extern Bool StrictDoLessEqual;
 extern Bool StrictDoEager;
 extern Bool StrictDoVerbose;
 extern Bool StrictDoAnnots;
-extern unsigned long StrictMemUse;
 
 extern Bool FunctionMayFailIsError;
