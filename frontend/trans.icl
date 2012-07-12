@@ -173,19 +173,10 @@ cleanup_attributes expr_info_ptr symbol_heap
 :: AciFreeVarsHandleMode = LeaveAciFreeVars | RemoveAciFreeVars | SubstituteAciFreeVars
 
 neverMatchingCase (Yes ident)
-	# ident = ident -!-> ("neverMatchingCase",ident)
 	= FailExpr ident
 neverMatchingCase _ 
-	# ident = {id_name = "neverMatchingCase", id_info = nilPtr}  -!-> "neverMatchingCase without ident\n"
+	# ident = {id_name = "neverMatchingCase", id_info = nilPtr}
 	= FailExpr ident
-/*
-	= Case { case_expr = EE, case_guards = NoPattern, case_default = No, case_ident = ident, case_info_ptr = nilPtr, 
-// RWS ...
-						case_explicit = False,
-				//		case_explicit = True,	// DvA better?
-// ... RWS
-						case_default_pos = NoPos }
-*/
 
 store_type_info_of_alg_pattern_in_pattern_variables ct_cons_types patterns var_heap
 	= fold2St store_type_info_of_alg_pattern ct_cons_types patterns var_heap
@@ -878,7 +869,7 @@ transform_active_non_root_case kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti=
 	# (fun_info_ptr, ti_fun_heap) = newPtr FI_Empty ti_fun_heap
 	  fun_ident = { id_name = ro.ro_tfi.tfi_root.symb_ident.id_name+++"_case", id_info = nilPtr }
 	  fun_ident = { symb_ident = fun_ident, symb_kind=SK_GeneratedFunction fun_info_ptr undeff }
-					<-!- ("<<<transformCaseFunction",fun_ident)
+//					<-!- ("<<<transformCaseFunction",fun_ident)
 	| SwitchAlwaysIntroduceCaseFunction True False
 		# ti = { ti & ti_cons_args = ti_cons_args, ti_fun_defs = ti_fun_defs, ti_fun_heap = ti_fun_heap }
 	  	# fun_index = ti.ti_next_fun_nr
@@ -891,7 +882,7 @@ transform_active_non_root_case kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti=
 	  (new_expr, ti)
 	  		= transformCase kees new_ro ti
 	  (ti_recursion_introduced, ti) = ti!ti_recursion_introduced
-	  			<-!- ("transformCaseFunction>>>",fun_ident)
+//	  			<-!- ("transformCaseFunction>>>",fun_ident)
 	  ti = { ti & ti_recursion_introduced = old_ti_recursion_introduced }
 	= case ti_recursion_introduced of
 		Yes {ri_fun_index}
@@ -1087,7 +1078,7 @@ removeNeverMatchingSubcases keesExpr=:(Case kees) ro
 				-> keesExpr // frequent case: all subexpressions can't fail
 			# filtered_case_guards = filter (not o is_never_matching_case o get_alg_rhs) alg_patterns
 			| has_become_never_matching filtered_default filtered_case_guards
-				-> neverMatchingCase never_ident <-!- ("removeNeverMatchingSubcases:AlgebraicPatterns:neverMatchingCase",never_ident)
+				-> neverMatchingCase never_ident
 			| is_default_only filtered_default filtered_case_guards
 				-> fromYes case_default
 			-> Case {kees & case_guards = AlgebraicPatterns i filtered_case_guards, case_default = filtered_default }
@@ -1096,7 +1087,7 @@ removeNeverMatchingSubcases keesExpr=:(Case kees) ro
 				-> keesExpr // frequent case: all subexpressions can't fail
 			# filtered_case_guards = filter (not o is_never_matching_case o get_basic_rhs) basic_patterns
 			| has_become_never_matching filtered_default filtered_case_guards
-				-> neverMatchingCase never_ident <-!- ("removeNeverMatchingSubcases:BasicPatterns:neverMatchingCase",never_ident)
+				-> neverMatchingCase never_ident
 			| is_default_only filtered_default filtered_case_guards
 				-> fromYes case_default
 			-> Case {kees & case_guards = BasicPatterns bt filtered_case_guards, case_default = filtered_default }
@@ -1105,7 +1096,7 @@ removeNeverMatchingSubcases keesExpr=:(Case kees) ro
 				-> keesExpr // frequent case: all subexpressions can't fail
 			# filtered_case_guards = filter (not o is_never_matching_case o get_alg_rhs) alg_patterns
 			| has_become_never_matching filtered_default filtered_case_guards
-				-> neverMatchingCase never_ident <-!- ("removeNeverMatchingSubcases:OverloadedListPatterns:neverMatchingCase",never_ident)
+				-> neverMatchingCase never_ident
 			| is_default_only filtered_default filtered_case_guards
 				-> fromYes case_default
 			-> Case {kees & case_guards = OverloadedListPatterns i decons_expr filtered_case_guards, case_default = filtered_default }
@@ -1505,13 +1496,11 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 
 	# (consumer_attr_inequalities, th_attrs)
 			= mapSt substitute_attr_inequality st_attr_env ti_type_heaps.th_attrs
-	  ti_type_heaps
-	  		= { ti_type_heaps & th_attrs = th_attrs }
+	  ti_type_heaps & th_attrs = th_attrs
 	  
 	  coercions
 	  		= { coer_offered	= {{ CT_Empty \\ i <- [0 .. next_attr_nr - 1] } & [AttrMulti] = CT_NonUnique }
-	  		  , coer_demanded	= {{ CT_Empty \\ i <- [0 .. next_attr_nr - 1] } & [AttrUni] = CT_Unique } 
-	  		  }
+	  		  , coer_demanded	= {{ CT_Empty \\ i <- [0 .. next_attr_nr - 1] } & [AttrUni] = CT_Unique } }
 	  coercions 
 	  		= foldSt new_inequality consumer_attr_inequalities coercions
 	  coercions 
@@ -1583,7 +1572,7 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 /* DvA... STRICT_LET
 					,fun_info.fi_free_vars = strict_free_vars++fd.fun_info.fi_free_vars
 ...DvA */
-	  					}
+			  }
 	  new_fd_cons_args
 //	  		= {cc_args = new_cons_args, cc_size = length new_cons_args, cc_linear_bits=new_linear_bits, cc_producer = False}
 	  		= {cc_args = repeatn (length new_cons_args) CPassive, cc_size = length new_cons_args, cc_linear_bits=new_linear_bits, cc_producer = False}
@@ -1677,14 +1666,7 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 					= ([o:ts],os,ns,var_heap)
 					= ([],[o:os],[n:ns],var_heap)
 			take1 os ns var_heap = ([],os,ns,var_heap)
-/*			take1 [] [] = ([],[],[])
-			take1 [o:os] [n:ns]
-				| o.fv_info_ptr == n.fv_info_ptr
-					# (ts,os,ns)	= take1 os ns
-					= ([o:ts],os,ns)
-					= ([],[o:os],[n:ns])
-*/
-	| False -!-> ("genFun",(tb_args,new_fun_args),args1,(args2o,args2n),args3,(resto,restn)) = undef
+//	| False -!-> ("genFun",(tb_args,new_fun_args),args1,(args2o,args2n),args3,(resto,restn)) = undef
 	| not (isEmpty resto)	= abort "genFun:resto"
 	| not (isEmpty restn)	= abort "genFun:restn"
 
@@ -2124,7 +2106,7 @@ where
 	build_n_named_var_args arity tb_args das_vars das_var_heap
 		# var_names = take arity [fv_ident \\ {fv_ident}<-tb_args]
 		= build_var_args (reverse var_names) das_vars [] das_var_heap
-		
+
 	build_var_args [] form_vars act_vars var_heap
 		= (form_vars, act_vars, var_heap)
 	build_var_args [new_name:new_names] form_vars act_vars var_heap
@@ -2478,8 +2460,7 @@ transformFunctionApplication fun_def instances cc=:{cc_size, cc_args, cc_linear_
 	| cc_size >= 0
 		# is_applied_to_macro_fun = fun_def.fun_info.fi_properties bitand FI_IsMacroFun <> 0
 	  	# consumer_is_curried = cc_size <> length app_args
-		# non_rec_consumer
-			= (fun_def.fun_info.fi_properties bitand FI_IsNonRecursive) <> 0
+		# non_rec_consumer = fun_def.fun_info.fi_properties bitand FI_IsNonRecursive <> 0
 		# safe_args
 			= isEmpty [arg \\ arg <- app_args & cc_arg <- cc_args | unsafe cc_arg && non_var arg]
 						with
@@ -2545,13 +2526,13 @@ where
 
 	transform_trivial_function :: !.App ![.Expression] ![.Expression] !.ReadOnlyTI !*TransformInfo -> *(!Expression,!*TransformInfo)
 	transform_trivial_function app=:{app_symb} app_args extra_args ro ti
-		# (fun_def,ti_fun_defs,ti_fun_heap)		= get_fun_def app_symb.symb_kind ro.ro_main_dcl_module_n ti.ti_fun_defs ti.ti_fun_heap
+		# (fun_def,ti_fun_defs,ti_fun_heap) = get_fun_def app_symb.symb_kind ro.ro_main_dcl_module_n ti.ti_fun_defs ti.ti_fun_heap
 		# {fun_body=fun_body=:TransformedBody {tb_args,tb_rhs},fun_type} = fun_def
 		# (opt_expr, ti_fun_defs, ti_fun_heap, ti_type_heaps, ti_cons_args)
-												= is_trivial_body tb_args tb_rhs app_args fun_type ro ti_fun_defs ti_fun_heap ti.ti_type_heaps ti.ti_cons_args
-		# ti									= { ti & ti_fun_defs = ti_fun_defs, ti_fun_heap = ti_fun_heap, ti_type_heaps = ti_type_heaps, ti_cons_args = ti_cons_args }
+			= is_trivial_body tb_args tb_rhs app_args fun_type ro ti_fun_defs ti_fun_heap ti.ti_type_heaps ti.ti_cons_args
+		# ti & ti_fun_defs = ti_fun_defs, ti_fun_heap = ti_fun_heap, ti_type_heaps = ti_type_heaps, ti_cons_args = ti_cons_args
 		= case opt_expr of
-			No		
+			No
 					-> (build_application { app & app_symb = app_symb, app_args = app_args } extra_args, ti)
 			Yes tb_rhs
 				| isEmpty extra_args
@@ -2712,146 +2693,125 @@ where
 		# arity = ro.ro_common_defs.[glob_module].com_cons_defs.[glob_object].cons_type.st_arity
 		= (arity, fun_defs, fun_heap)
 
-//@ is_trivial_body
-
-:: *MatchState =
-	{ tvar_map			:: ![(TypeVar,TypeVar)]
-	, ms_type_heaps		:: !*TypeHeaps
-	, ms_common_defs	:: !{# CommonDefs}
-	}
-
 is_trivial_body :: ![FreeVar] !Expression ![Expression] !(Optional SymbolType) !.ReadOnlyTI
 							 !*{#FunDef} !*FunctionHeap !*TypeHeaps !*{!ConsClasses}
 	-> (!Optional Expression,!*{#FunDef},!*FunctionHeap,!*TypeHeaps,!*{!ConsClasses})
 is_trivial_body [fv] (Var bv) [arg] type ro fun_defs fun_heap type_heaps cons_args
-	= if (fv.fv_info_ptr == bv.var_info_ptr)
-			(Yes arg, fun_defs, fun_heap, type_heaps, cons_args)
-			(No, fun_defs, fun_heap, type_heaps , cons_args)
-is_trivial_body args (App app) f_args type ro fun_defs fun_heap type_heaps cons_args
+	| fv.fv_info_ptr == bv.var_info_ptr
+		= (Yes arg, fun_defs, fun_heap, type_heaps, cons_args)
+		= (No, fun_defs, fun_heap, type_heaps, cons_args)
+is_trivial_body lhs_args (App app) f_args type ro fun_defs fun_heap type_heaps cons_args
 	| not (is_safe_producer app.app_symb.symb_kind ro fun_heap cons_args)
 		= (No,fun_defs,fun_heap,type_heaps,cons_args)
 	# (type`,fun_defs,fun_heap)	= get_producer_type app.app_symb ro fun_defs fun_heap
-	# match = match_args (length f_args) info args app.app_args []
-	= case match of
+	  lhs_args_var_ptrs = {!fv_info_ptr \\ {fv_info_ptr} <- lhs_args}
+	  n_f_args = length f_args
+	  optional_perm = match_args lhs_args app.app_args 0 n_f_args lhs_args_var_ptrs []
+	= case optional_perm of
 		Yes perm
 			# (match, type_heaps) = match_types type type` perm ro.ro_common_defs type_heaps
 			| match
-				# f_args = permute_args f_args (take (length f_args) perm)
+				# f_args = permute_args f_args perm n_f_args
 				-> (Yes (App {app & app_args = f_args}),fun_defs,fun_heap,type_heaps,cons_args)
 				-> (No,fun_defs,fun_heap,type_heaps,cons_args)
-		_	-> (No,fun_defs,fun_heap,type_heaps,cons_args)
+		_
+			-> (No,fun_defs,fun_heap,type_heaps,cons_args)
 where
-	info :: {!VarInfoPtr}
-	info = {v.fv_info_ptr \\ v <- args}
-	
-	match_args 0 _ [] [] accu
-		= Yes (reverse accu)
-	match_args 0 info [fv:fvs] [Var bv:bvs] accu
-		| fv.fv_info_ptr == bv.var_info_ptr 
-			# index = lookup bv.var_info_ptr info
-			= match_args 0 info fvs bvs [index:accu]
+	match_args :: ![FreeVar] ![Expression] !Int !Int !*{!VarInfoPtr} ![Int] -> Optional [Int]
+	match_args [fv:fvs] [Var bv:bvs] arg_n n_f_args lhs_args_var_ptrs reversed_perm
+		| arg_n<n_f_args
+			# (index,lhs_args_var_ptrs) = lookup_lhs_arg_n 0 bv.var_info_ptr lhs_args_var_ptrs
+			| index<n_f_args
+				= match_args fvs bvs (arg_n+1) n_f_args lhs_args_var_ptrs [index:reversed_perm]
+				= No
+		| fv.fv_info_ptr==bv.var_info_ptr 
+			= match_args fvs bvs (arg_n+1) n_f_args lhs_args_var_ptrs [arg_n:reversed_perm]
 			= No
-	match_args n info [fv:fvs] [Var bv:bvs] accu
-		# index = lookup bv.var_info_ptr info
-		= match_args (dec n) info fvs bvs [index:accu]
-	match_args _ _ _ _ _ = No
-	
-	lookup x d = lookup 0 x d
-	where
-		lookup i x d
-			| d.[i] == x
-				= i
-				= lookup (inc i) x d
-	
-	permute_args args perm = [args!!p \\ p <- perm]
-		
-	match_types type type` perm common_defs type_heaps
-		| not_ok_perm perm
+	match_args [] [] arg_n n_f_args _ reversed_perm
+		| arg_n==n_f_args
+			= Yes (reverse reversed_perm)
+	match_args _ _ _ _ _ _
+		= No
+
+	lookup_lhs_arg_n :: !Int !VarInfoPtr !*{!VarInfoPtr} -> (!Int,!*{!VarInfoPtr})
+	lookup_lhs_arg_n i x a
+		| i<size a
+			# ai=a.[i]
+			| isNilPtr ai || x<>ai
+				= lookup_lhs_arg_n (i+1) x a
+				# a & [i] = nilPtr
+				= (i,a)
+			= (i,a)
+
+	// check if strict values in type are also strict in type`
+	match_types :: !(Optional SymbolType) SymbolType ![Int] !{#CommonDefs} !*TypeHeaps -> (!Bool,!*TypeHeaps)
+	match_types No type` perm common_defs type_heaps
+		= (True,type_heaps)
+	match_types (Yes type) type` perm common_defs type_heaps
+		| is_not_strict type.st_args_strictness 
+			= match_tuple_strictness type.st_result type`.st_result common_defs type_heaps
+		| type.st_arity<>type`.st_arity
 			= (False,type_heaps)
-		= case type of
-			No			-> (True,type_heaps)
-			Yes type	-> match_types type type` perm common_defs type_heaps
+		# (args_strictness_ok,type_heaps)
+			= match_args_strictness 0 type.st_arity type.st_args_strictness type`.st_args_strictness perm type.st_args type`.st_args common_defs type_heaps
+		| not args_strictness_ok
+			= (False,type_heaps)
+			= match_tuple_strictness type.st_result type`.st_result common_defs type_heaps
 	where
-		not_ok_perm perm = length perm <> size info
-		
-		match_types type type` perm common_defs type_heaps
-			| not (match_strictness` (dec type.st_arity) type.st_args_strictness type`.st_args_strictness perm)
+		match_args_strictness :: !Int !Int !StrictnessList !StrictnessList ![Int] ![AType] ![AType] !{#CommonDefs} !*TypeHeaps -> (!Bool,!*TypeHeaps)
+		match_args_strictness arg_n arity s1 s2 perm arg_types1 arg_types2 common_defs type_heaps
+			| arg_n<arity
+				# lhs_arg_n = perm!!arg_n
+				| not (arg_is_strict lhs_arg_n s1)
+					= match_args_strictness (arg_n+1) arity s1 s2 perm arg_types1 arg_types2 common_defs type_heaps
+				| not (arg_is_strict arg_n s2)
+					= (False,type_heaps)
+				# (tuple_strictness_ok,type_heaps) = match_tuple_strictness (arg_types1!!lhs_arg_n) (arg_types2!!arg_n) common_defs type_heaps
+				| not tuple_strictness_ok
+					= (False,type_heaps)
+					= match_args_strictness (arg_n+1) arity s1 s2 perm arg_types1 arg_types2 common_defs type_heaps
+				= (True,type_heaps)
+
+		match_tuple_strictness :: !AType AType !{#CommonDefs} !*TypeHeaps -> (!Bool,!*TypeHeaps)
+		match_tuple_strictness {at_type=TAS _ args1 strictness1} {at_type=TAS _ args2 strictness2} common_defs type_heaps
+			| not (more_or_equal_strictness_lists strictness2 strictness1)
 				= (False,type_heaps)
+				= match_tuple_args_strictness 0 args1 args2 strictness1 strictness2 common_defs type_heaps
+		match_tuple_strictness atype1=:{at_type=TAS _ args1 strictness1} {at_attribute,at_type=type2=:TA _ _} common_defs type_heaps
+			| is_not_strict strictness1
+				= (True,type_heaps)
+			# (ok,type2,type_heaps)	= tryToExpand type2 at_attribute common_defs type_heaps
+			|  ok
+				= match_tuple_strictness atype1 {at_attribute=at_attribute,at_type=type2} common_defs type_heaps
+				= (False,type_heaps)
+		match_tuple_strictness {at_attribute,at_type=type1=:TA _ _} atype2=:{at_type=TAS _ _ _} common_defs type_heaps
+			# (ok,type1,type_heaps)	= tryToExpand type1 at_attribute common_defs type_heaps
+			| ok
+				= match_tuple_strictness {at_attribute=at_attribute,at_type=type1} atype2 common_defs type_heaps
+				= (True,type_heaps)
+		match_tuple_strictness {at_attribute,at_type=type1=:TA _ _} atype2=:{at_type=TA _ _} common_defs type_heaps
+			# (ok,type1,type_heaps)	= tryToExpand type1 at_attribute common_defs type_heaps
+			| ok
+				= match_tuple_strictness {at_attribute=at_attribute,at_type=type1} atype2 common_defs type_heaps
+				= (True,type_heaps)
+		match_tuple_strictness arg_type1 arg_type2 common_defs type_heaps
 			= (True,type_heaps)
-/*			# (ok,args,res)	= make_args (type`.st_arity) type.st_args type.st_result
-			| not ok = (False,type_heaps)
-			# args` = permute_args args perm
-			# ms = {tvar_map=[], ms_type_heaps = type_heaps,ms_common_defs=common_defs}
-			# (match_ok,ms)	= match_arg_types args type`.st_args ms
-			| not match_ok = (False,ms.ms_type_heaps)
-			# (match_ok,ms)	= match_res_type res type`.st_result ms
-			| not match_ok = (False,ms.ms_type_heaps)
-			| type.st_context <> [] || type`.st_context <> []
-				= (False,ms.ms_type_heaps)
-			= (True,ms.ms_type_heaps)
 
-		where
-			make_args n as r
-				# l = length as
-				| n < l		= (False,as,r)
-				| n == l	= (True,as,r)
-				= move_args (n-l) as r []
-			move_args 0 as r accu	= (True,as++(reverse accu),r)
-			move_args n as {at_type = a-->r} accu = move_args (dec n) as r [a:accu]
-			move_args _ as r accu = (False,as,r)
-*/
-		match_strictness` i s1 s2 p
-			| i < 0 = True
-			= arg_is_strict (p!!i) s1 == arg_is_strict i s2 && match_strictness (dec i) s1 s2
+		match_tuple_args_strictness :: !Int ![AType] ![AType] !StrictnessList !StrictnessList !{#CommonDefs} !*TypeHeaps -> (!Bool,!*TypeHeaps)
+		match_tuple_args_strictness arg_n [arg1:args1] [arg2:args2] strictness1 strictness2 common_defs type_heaps
+			| not (arg_is_strict arg_n strictness1)
+				= match_tuple_args_strictness (arg_n+1) args1 args2 strictness1 strictness2 common_defs type_heaps
+			| not (arg_is_strict arg_n strictness2)
+				= (False,type_heaps)
+			# (tuple_strictness_ok,type_heaps) = match_tuple_strictness arg1 arg2 common_defs type_heaps
+			| not tuple_strictness_ok
+				= (False,type_heaps)
+				= match_tuple_args_strictness (arg_n+1) args1 args2 strictness1 strictness2 common_defs type_heaps
+		match_tuple_args_strictness arg_n [] [] strictness1 strictness2 common_defs type_heaps
+			= (True,type_heaps)
 
-	match_strictness i s1 s2
-		| i < 0 = True
-		= arg_is_strict i s1 == arg_is_strict i s2 && match_strictness (dec i) s1 s2
-	
-	match_arg_types [] [] ms
-		= (True,ms)
-	match_arg_types [arg:args] [arg`:args`] ms
-		# (type_ok,ms)	= match_type arg.at_type arg.at_attribute arg`.at_type arg`.at_attribute ms
-		| not type_ok = (False,ms)
-		= match_arg_types args args` ms
-	match_arg_types _ _ ms
-		= (False,ms)
-	
-	match_res_type res res` ms
-		= match_type res.at_type res.at_attribute res`.at_type res`.at_attribute ms
-
-	match_type (TA tsid types) _ (TA tsid` types`) _ ms
-		| tsid == tsid`
-			= match_arg_types types types` ms
-	match_type (TAS tsid types strictl) _ (TAS tsid` types` strictl`) _ ms
-		| tsid == tsid`
-			| not (match_strictness (dec (length types)) strictl strictl`) = (False,ms)
-			= match_arg_types types types` ms
-	match_type (arg --> res) _ (arg` --> res`) _ ms
-		# (type_ok,ms)	= match_type arg.at_type arg.at_attribute arg`.at_type arg`.at_attribute ms
-		| not type_ok = (False,ms)
-		= match_type res.at_type res.at_attribute res`.at_type res`.at_attribute ms
-	match_type (TB bt) _ (TB bt`) _ ms
-		= (bt==bt`,ms)
-	match_type (TV tv) _ (TV tv`) _ ms
-		= match_tvar tv tv` ms
-	match_type t1 a1 t2 a2 ms
-		# type_heaps	= ms.ms_type_heaps
-		# (succ1,t1,type_heaps)	= tryToExpand t1 a1 ms.ms_common_defs type_heaps
-		# (succ2,t2,type_heaps)	= tryToExpand t2 a2 ms.ms_common_defs type_heaps
-		# ms = { ms & ms_type_heaps = type_heaps }
-		| succ1 || succ2 = match_type t1 a1 t2 a2 ms
-		= (False,ms)
-
-	match_tvar x y ms
-		# (r,tvar_map)	= match_tvar x y ms.tvar_map
-		= (r, {ms & tvar_map = tvar_map})
-	where
-		match_tvar x y [] = (True,[(x,y)])
-		match_tvar x y ms=:[(x`,y`):t]
-			| x == x`	= (y==y`, ms)
-			# (res,t)	= match_tvar x y t
-			= (res,[(x`,y`):t])
+	permute_args args perm n_f_args
+		= [args!!p \\ p <- perm & arg_n<-[0..n_f_args-1]]
 is_trivial_body args rhs f_args type ro fun_defs fun_heap type_heaps cons_args
 	= (No,fun_defs,fun_heap,type_heaps,cons_args)
 
@@ -2868,7 +2828,6 @@ is_safe_producer (SK_Function {glob_module, glob_object}) ro fun_heap cons_args
 is_safe_producer (SK_Constructor {glob_module}) ro fun_heap cons_args
 	= SwitchConstructorFusion True (glob_module==ro.ro_StdGeneric_module_n) False
 
-//@ transformApplication
 transformApplication :: !App ![Expression] !ReadOnlyTI !*TransformInfo -> *(!Expression,!*TransformInfo)
 transformApplication app=:{app_symb=symb=:{symb_kind}, app_args} extra_args
 			ro ti=:{ti_cons_args,ti_instances,ti_fun_defs}
@@ -3269,7 +3228,7 @@ determineProducer app=:{app_symb = symb=:{symb_kind}, app_args} _ is_applied_to_
 		#! max_index = size ti.ti_cons_args
 		| glob_module <> ro.ro_main_dcl_module_n || glob_object >= max_index /* Sjaak, to skip array functions */
 			= (producers, [App app : new_args ], ti)
-					-!-> ("Produce2cc_array",symb.symb_ident,if (glob_module <> ro.ro_main_dcl_module_n) "foreign" "array")
+//					-!-> ("Produce2cc_array",symb.symb_ident,if (glob_module <> ro.ro_main_dcl_module_n) "foreign" "array")
 		# ({fun_body,fun_type,fun_info}, ti) = ti!ti_fun_defs.[glob_object]
 		# (is_good_producer,ti)
 			= SwitchFunctionFusion
