@@ -97,7 +97,7 @@ where
 
 :: RefCounts :== {!RefCount}
 
-:: RefCount	
+:: RefCount
 	= Par !Int !.[!.RefCount!]
 	| Seq !Int !.[!.RefCount!]
 	| Dep !FunIndex !ArgIndex
@@ -183,8 +183,6 @@ n_twos_counts n
 	:== createArray n (Seq 2 [|])
 
 inc_ref_count :: !RefCount -> RefCount
-//inc_ref_count (RC ref_count deps)
-//	:== RC (min (ref_count+1) 2) deps
 inc_ref_count rc
 	= case rc of
 		Par i d	-> if (i > 0) (Seq 2 [|]) (Par (i+1) d)
@@ -192,36 +190,129 @@ inc_ref_count rc
 		_ -> abort "classify:inc_ref_count: unexpected Dep\n"
 
 add_dep_count :: !(!Int,!Int) !RefCount -> RefCount
-//add_dep_count dep (RC ref_count deps)
-//	:== RC ref_count (map (\l->[dep:l]) deps)
 add_dep_count (fi,ai) rc
 	= case rc of
 		Par i d	-> Par i [|Dep fi ai:d]
 		Seq i d -> Seq i [|Dep fi ai:d]
 		_ -> abort "classify:add_dep_count: unexpected Dep\n"
 
-combine_counts :: !RefCounts !RefCounts -> .RefCounts
+combine_counts :: !RefCounts !*RefCounts -> *RefCounts
 combine_counts c1 c2
-	= {combine rc1 rc2 \\ rc1 <-: c1 & rc2 <-: c2}
+	# s2 = size c2
+	| s2==0
+		= c2
+		= combine1 c1.[0] 1 c2 c1
 where
-	combine (Seq 0 [|]) rc2 = rc2
-	combine rc1 (Seq 0 [|]) = rc1
-	combine (Seq i1 [|]) (Seq i2 l) = Seq (i1+i2) l
-	combine (Seq i1 l) (Seq i2 [|]) = Seq (i1+i2) l
-	combine rc1 rc2 = Seq 0 [|rc1,rc2]
+	combine1 :: !RefCount !Int !*RefCounts !RefCounts -> *RefCounts
+	combine1 (Seq 0 [|]) i a c1
+		| i<size a
+			= combine1 c1.[i] (i+1) a c1
+			= a
+	combine1 rc1 i a c1
+		#! c2i = a.[i-1]
+		= combine2 rc1 c2i i a c1
 
-unify_counts :: !RefCounts !RefCounts -> RefCounts
+	combine2 :: !RefCount !RefCount !Int !*RefCounts !RefCounts -> *RefCounts
+	combine2 rc1 (Seq 0 [|]) i a c1
+		| i<size a
+			= combine1 c1.[i] (i+1) {a & [i-1]=rc1} c1
+			= {a & [i-1]=rc1}
+	combine2 (Seq i1 [|]) (Seq i2 l) i a c1
+		| i<size a
+			= combine1 c1.[i] (i+1) {a & [i-1]=Seq (i1+i2) l} c1
+			= {a & [i-1]=Seq (i1+i2) l}
+	combine2 (Seq i1 l) (Seq i2 [|]) i a c1
+		| i<size a
+			= combine1 c1.[i] (i+1) {a & [i-1]=Seq (i1+i2) l} c1
+			= {a & [i-1]=Seq (i1+i2) l}
+	combine2 rc1 rc2 i a c1
+		| i<size a
+			= combine1 c1.[i] (i+1) {a & [i-1]=Seq 0 [|rc1,rc2]} c1
+			= {a & [i-1]=Seq 0 [|rc1,rc2]}
+
+unify_counts :: !RefCounts !*RefCounts -> *RefCounts
 unify_counts c1 c2
-	= {unify rc1 rc2 \\ rc1 <-: c1 & rc2 <-: c2}
+	# s2 = size c2
+	| s2==0
+		= c2
+		= unify1 c1.[0] 1 c2 c1
 where
-	unify (Seq 0 [|]) rc2 = rc2
-	unify rc1 (Seq 0 [|]) = rc1
-	unify rc1=:(Seq i1 [|]) rc2=:(Seq i2 [|])
-		| i1>=i2
-			= rc1
-			= rc2
-	unify rc1 rc2 = Par 0 [|rc1,rc2]
+	unify1 :: !RefCount !Int !*RefCounts !RefCounts -> *RefCounts
+	unify1 (Seq 0 [|]) i a c1
+		| i<size a
+			= unify1 c1.[i] (i+1) a c1
+			= a
+	unify1 rc1 i a c1
+		#! c2i = a.[i-1]
+		= unify2 rc1 c2i i a c1
 
+	unify2 :: !RefCount !RefCount !Int !*RefCounts !RefCounts -> *RefCounts
+	unify2 rc1 (Seq 0 [|]) i a c1
+		| i<size a
+			= unify1 c1.[i] (i+1) {a & [i-1]=rc1} c1
+			= {a & [i-1]=rc1}
+	unify2 rc1=:(Seq i1 [|]) rc2=:(Seq i2 [|]) i a c1
+		| i1>=i2
+			| i<size a
+				= unify1 c1.[i] (i+1) {a & [i-1]=rc1} c1
+				= {a & [i-1]=rc1}
+			| i<size a
+				= unify1 c1.[i] (i+1) a/*{a & [i-1]=rc2}*/ c1
+				= a//{a & [i-1]=rc2}
+	unify2 rc1 rc2 i a c1
+		| i<size a
+			= unify1 c1.[i] (i+1) {a & [i-1]=Par 0 [|rc1,rc2]} c1
+			= {a & [i-1]=Par 0 [|rc1,rc2]}
+
+unify_and_zero_counts :: !*RefCounts !*RefCounts -> (!*RefCounts,!*RefCounts)
+unify_and_zero_counts c1 c2
+	# s2 = size c2
+	| s2==0
+		= (c1,c2)
+		#! c10 = c1.[0]
+		= unify1 c10 1 c2 c1 (Seq 0 [|])
+where
+	unify1 :: !RefCount !Int !*RefCounts !*RefCounts !RefCount -> (!*RefCounts,!*RefCounts)
+	unify1 (Seq 0 [|]) i a c1 rc0
+		| i<size a
+			#! c1i = c1.[i]
+			= unify1 c1i (i+1) a c1 rc0
+			= (c1,a)
+	unify1 rc1 i a c1 rc0
+		#! c2i = a.[i-1]
+		= unify2 rc1 c2i i a c1 rc0
+
+	unify2 :: !RefCount !RefCount !Int !*RefCounts !*RefCounts !RefCount -> (!*RefCounts,!*RefCounts)
+	unify2 rc1 (Seq 0 [|]) i a c1 rc0
+		| i<size a
+			# c1 & [i-1] = rc0
+			#! c1i = c1.[i]
+			= unify1 c1i (i+1) {a & [i-1]=rc1} c1 rc0
+			# c1 & [i-1] = rc0
+			= (c1,{a & [i-1]=rc1})
+	unify2 rc1=:(Seq i1 [|]) rc2=:(Seq i2 [|]) i a c1 rc0
+		| i1>=i2
+			| i<size a
+				# c1 & [i-1] = rc0
+				#! c1i = c1.[i]
+				= unify1 c1i (i+1) {a & [i-1]=rc1} c1 rc0
+				# c1 & [i-1] = rc0
+				= (c1,{a & [i-1]=rc1})
+			| i<size a
+				# c1 & [i-1] = rc0
+				#! c1i = c1.[i]
+				= unify1 c1i (i+1) a/*{a & [i-1]=rc2}*/ c1 rc0
+				# c1 & [i-1] = rc0
+				= (c1,a/*{a & [i-1]=rc2}*/)
+	unify2 rc1 rc2 i a c1 rc0
+		| i<size a
+			# c1 & [i-1] = rc0
+			#! c1i = c1.[i]
+			= unify1 c1i (i+1) {a & [i-1]=Par 0 [|rc1,rc2]} c1 rc0
+			# c1 & [i-1] = rc0
+			= (c1,{a & [i-1]=Par 0 [|rc1,rc2]})
+
+/*
 show_counts component_members group_counts
 	# (_,group_counts) = foldSt show component_members (0,group_counts)
 	= group_counts
@@ -235,7 +326,7 @@ where
 					, [is_non_zero rc \\ rc <-: fun_counts]
 					, fun_counts
 					)
-
+*/
 instance <<< [!a!] | <<< a
 where
 	(<<<) s a = s <<< [e \\ e <|- a]
@@ -298,8 +389,6 @@ cNope			:== -1
 ::	UnsafePatternBool :== Bool
 
 not_an_unsafe_pattern (cc, _, ai) = (cc, False, ai)
-
-//@ consumerRequirements
 
 class consumerRequirements a :: !a !ConsumerAnalysisRO !AnalyseInfo -> (!ConsClass, !UnsafePatternBool, !AnalyseInfo)
 
@@ -541,12 +630,16 @@ instance consumerRequirements Case where
 		   zero_array					= n_zero_counts s
 		   ai							= {ai & ai_cur_ref_counts = zero_array}
 		   (ccd, default_is_unsafe, ai)	= consumerRequirements case_default ro ai
-		# (ccgs, unsafe_bits, guard_counts, ai)
-										= consumer_requirements_of_guards case_guards ro ai
-		# default_counts				= ai.ai_cur_ref_counts
-		# (every_constructor_appears_in_safe_pattern, may_be_active)
-		  								= inspect_patterns common_defs_parameter has_default case_guards unsafe_bits
-		  ref_counts = combine_pattern_counts has_default case_guards unsafe_bits guard_counts default_counts
+
+		# (pattern_exprs,ai) = get_pattern_exprs_and_bind_pattern_vars case_guards ai
+		  (ok_pattern_type,sorted_constructors_and_pattern_exprs)
+		  	= sort_pattern_constructors_and_exprs pattern_exprs case_guards
+		  (ccgs, constructors_and_unsafe_bits, ai)
+			= caseAltsConsumerRequirements has_default ok_pattern_type sorted_constructors_and_pattern_exprs case_guards ro ai
+		  ref_counts = ai.ai_cur_ref_counts
+
+		  (every_constructor_appears_in_safe_pattern, may_be_active)
+		  								= inspect_patterns common_defs_parameter has_default case_guards constructors_and_unsafe_bits
 		  ref_counts = combine_counts ref_counts env_counts
 		  ai = {ai & ai_cur_ref_counts = ref_counts }
 		  safe = case_explicit || (has_default && not default_is_unsafe) || every_constructor_appears_in_safe_pattern
@@ -566,18 +659,6 @@ instance consumerRequirements Case where
 						-> { ai & ai_cases_of_vars_for_function=[(safe,kees):ai.ai_cases_of_vars_for_function] }
 						-> ai
 // ...N-WAY
-/*		# ai = case case_guards of
-					OverloadedListPatterns (OverloadedList _ _ _ _) decons_expr=:(App {app_symb={symb_kind=SK_Function _},app_args=[app_arg]}) patterns
-						// decons_expr will be optimized to a decons_u Selector in transform
-						# (cc, _, ai)	= consumerRequirements app_arg ro ai
-						# ai = aiUnifyClassifications CActive cc ai
-						-> ai
-					OverloadedListPatterns _ decons_expr _
-						# (_,_,ai) = consumerRequirements decons_expr ro ai
-						-> ai
-					_
-						-> ai
-*/
 		# ai = handle_overloaded_list_patterns case_guards ai
 		= (combineClasses ccgs ccd, not safe, ai)
 	  where
@@ -600,42 +681,33 @@ instance consumerRequirements Case where
 										  		Yes _ -> True
 										  		_ -> False
 
-		inspect_patterns :: !{#.CommonDefs} !.Bool !.CasePatterns ![.Bool] -> (!.Bool,!Bool)
-		inspect_patterns common_defs has_default (AlgebraicPatterns {glob_object, glob_module} algebraic_patterns) unsafe_bits
+		inspect_patterns :: !{#CommonDefs} !Bool !CasePatterns ![(Int,Bool)] -> (!Bool,!Bool)
+		inspect_patterns common_defs has_default (AlgebraicPatterns {glob_object,glob_module} _) constructors_and_unsafe_bits
 			# type_def						= common_defs.[glob_module].com_type_defs.[glob_object]
 			  defined_symbols				= case type_def.td_rhs of
 													AlgType defined_symbols		-> defined_symbols
 													RecordType {rt_constructor}	-> [rt_constructor]
 			  all_constructors				= [ ds_index \\ {ds_index}<-defined_symbols ]
-			  pattern_constructors			= [ glob_object.ds_index \\ {ap_symbol={glob_object}}<-algebraic_patterns]	
-			  sorted_pattern_constructors	= sort pattern_constructors unsafe_bits
 			  all_sorted_constructors		= if (is_sorted all_constructors)
 			  										all_constructors
 			  										(sortBy (<) all_constructors)
-			= ( appearance_loop all_sorted_constructors sorted_pattern_constructors
-			  , not (multimatch_loop has_default sorted_pattern_constructors)
-			  )
-		inspect_patterns common_defs has_default (BasicPatterns BT_Bool basic_patterns) unsafe_bits
-			# bools_indices					= [ if bool 1 0 \\ {bp_value=BVB bool}<-basic_patterns ]
-			  sorted_pattern_constructors	= sort bools_indices unsafe_bits
-			= (appearance_loop [0,1] sorted_pattern_constructors,
-				not (multimatch_loop has_default sorted_pattern_constructors))
-		inspect_patterns common_defs has_default (OverloadedListPatterns overloaded_list _ algebraic_patterns) unsafe_bits
+			= (appearance_loop all_sorted_constructors constructors_and_unsafe_bits, not (multimatch_loop has_default constructors_and_unsafe_bits))
+		inspect_patterns common_defs has_default (BasicPatterns BT_Bool _) constructors_and_unsafe_bits
+			= (appearance_loop [0,1] constructors_and_unsafe_bits, not (multimatch_loop has_default constructors_and_unsafe_bits))
+		inspect_patterns common_defs has_default (OverloadedListPatterns overloaded_list _ _) constructors_and_unsafe_bits
 			# type_def = case overloaded_list of
-							UnboxedList {glob_object, glob_module} _ _ _
+							UnboxedList {glob_module,glob_object} _ _ _
 								-> common_defs.[glob_module].com_type_defs.[glob_object]
-							UnboxedTailStrictList {glob_object, glob_module} _ _ _
+							UnboxedTailStrictList {glob_object,glob_module} _ _ _
 								-> common_defs.[glob_module].com_type_defs.[glob_object]
-							OverloadedList {glob_object, glob_module} _ _ _
+							OverloadedList {glob_object,glob_module} _ _ _
 								-> common_defs.[glob_module].com_type_defs.[glob_object]
 			  defined_symbols = case type_def.td_rhs of
 									AlgType defined_symbols		-> defined_symbols
 									RecordType {rt_constructor}	-> [rt_constructor]
 			  all_constructors = [ ds_index \\ {ds_index}<-defined_symbols ]
-			  pattern_constructors = [ glob_object.ds_index \\ {ap_symbol={glob_object}}<-algebraic_patterns]	
-			  sorted_pattern_constructors = sort pattern_constructors unsafe_bits
 			  all_sorted_constructors = if (is_sorted all_constructors) all_constructors (sortBy (<) all_constructors)
-			= (appearance_loop all_sorted_constructors sorted_pattern_constructors, not (multimatch_loop has_default sorted_pattern_constructors))
+			= (appearance_loop all_sorted_constructors constructors_and_unsafe_bits, not (multimatch_loop has_default constructors_and_unsafe_bits))
 		inspect_patterns _ _ _ _
 			= (False, False)
 
@@ -646,23 +718,11 @@ instance consumerRequirements Case where
 		is_sorted []
 			= True
 
-		sort constr_indices unsafe_bits
-			= sortBy smaller (zip3 constr_indices [0..] unsafe_bits)
-		  where
-			smaller (i1,si1,_) (i2,si2,_)
-				| i1<i2		= True
-				| i1>i2		= False
-							= si1<si2
-			zip3 [h1:t1] [h2:t2] [h3:t3]
-				= [(h1,h2,h3):zip3 t1 t2 t3]
-			zip3 _ _ _
-				= []
-
 		appearance_loop [] _
 			= True
 		appearance_loop _ []
 			= False
-		appearance_loop l1=:[constructor_in_type:constructors_in_type] [(constructor_in_pattern,_,is_unsafe_pattern):constructors_in_pattern]
+		appearance_loop l1=:[constructor_in_type:constructors_in_type] [(constructor_in_pattern,is_unsafe_pattern):constructors_in_pattern]
 			| constructor_in_type < constructor_in_pattern
 				= False
 			// constructor_in_type==constructor_in_pattern
@@ -670,130 +730,85 @@ instance consumerRequirements Case where
 				 // maybe there is another pattern that is safe for this constructor
 				= appearance_loop l1 constructors_in_pattern
 			// the constructor will match safely. Skip over patterns with the same constructor and test the following constructor
-			= appearance_loop constructors_in_type (dropWhile (\(ds_index,_,_)->ds_index==constructor_in_pattern) constructors_in_pattern)
+			= appearance_loop constructors_in_type (dropWhile (\(ds_index,_)->ds_index==constructor_in_pattern) constructors_in_pattern)
 
 		multimatch_loop has_default []
 			= False
-		multimatch_loop has_default [(cip, _, iup):t]
+		multimatch_loop has_default [(cip, iup):t]
 			= a_loop has_default cip iup t
 		  where
 			a_loop has_default cip iup []
 				= iup && has_default
-			a_loop has_default cip iup [(constructor_in_pattern, _, is_unsafe_pattern):constructors_in_pattern]
+			a_loop has_default cip iup [(constructor_in_pattern, is_unsafe_pattern):constructors_in_pattern]
 				| cip<constructor_in_pattern
 					| iup && has_default
 						= True
 					= a_loop has_default constructor_in_pattern is_unsafe_pattern constructors_in_pattern
 				| iup
 					= True
-				= multimatch_loop has_default (dropWhile (\(ds_index,_,_)->ds_index==cip) constructors_in_pattern)
+				= multimatch_loop has_default (dropWhile (\(ds_index,_)->ds_index==cip) constructors_in_pattern)
 
-combine_pattern_counts :: !.Bool !.CasePatterns ![.Bool] ![RefCounts] !RefCounts -> *RefCounts
-combine_pattern_counts has_default patterns unsafe_bits guard_counts default_counts
+sort_pattern_constructors_and_exprs pattern_exprs case_guards
 	| not ok_pattern_type
-		= n_twos_counts (size default_counts)
-	# sorted_pattern_constructors`	= sort3 pattern_constructors unsafe_bits guard_counts
-	# initial_count					= case has_default of
-	  										True	-> default_counts
-	  										_		-> zero_array
-	= count_loop default_counts initial_count sorted_pattern_constructors`
-	
+		= (False,[(i,i,pattern_expr) \\ pattern_expr<-pattern_exprs & i<-[0..]])
+		= (True,sort pattern_constructors pattern_exprs)
 where
-	ok_pattern_type = case patterns of
-		(AlgebraicPatterns _ _)
-			-> True
-		(BasicPatterns BT_Bool _)
-			-> True
-		(BasicPatterns BT_Int _)
-			-> True
-//		(BasicPatterns (BT_String _) basic_patterns)
-//			-> [ string \\ {bp_value=BVS string}<-basic_patterns ] ---> ("BasicPatterns String")
-		(OverloadedListPatterns overloaded_list _ algebraic_patterns)
-			-> True
-		_ -> False //---> ("not ok_pattern_type",patterns)
-	pattern_constructors = case patterns of
-		(AlgebraicPatterns _ algebraic_patterns)
-			-> [ glob_object.ds_index \\ {ap_symbol={glob_object}}<-algebraic_patterns] //---> ("AlgebraicPatterns")
-		(BasicPatterns BT_Bool basic_patterns)
-			-> [ if bool 1 0 \\ {bp_value=BVB bool}<-basic_patterns ] //---> ("BasicPatterns Bool")
-		(BasicPatterns BT_Int basic_patterns)
-			-> [ int \\ {bp_value=BVInt int}<-basic_patterns ] //---> ("BasicPatterns Int")
-//		(BasicPatterns (BT_String _) basic_patterns)
-//			-> [ string \\ {bp_value=BVS string}<-basic_patterns ] ---> ("BasicPatterns String")
-		(OverloadedListPatterns overloaded_list _ algebraic_patterns)
-			-> [ glob_object.ds_index \\ {ap_symbol={glob_object}}<-algebraic_patterns] //---> ("OverloadedListPatterns")
-		_ -> abort "unsupported?!" ---> ("pattern_constructors",patterns) //[]	// ???
+	ok_pattern_type
+		= case case_guards of
+			AlgebraicPatterns _ _
+				-> True
+			BasicPatterns BT_Bool _
+				-> True
+			BasicPatterns BT_Int _
+				-> True
+//			BasicPatterns (BT_String _) basic_patterns)
+//				-> [ string \\ {bp_value=BVS string}<-basic_patterns ] ---> ("BasicPatterns String")
+			OverloadedListPatterns overloaded_list _ algebraic_patterns
+				-> True
+			_
+				-> False
 
-	count_size					= size default_counts
-	zero_array					= n_zero_counts count_size
+	pattern_constructors
+		= case case_guards of
+			AlgebraicPatterns _ algebraic_patterns
+				-> [glob_object.ds_index \\ {ap_symbol={glob_object}}<-algebraic_patterns]
+			BasicPatterns BT_Bool basic_patterns
+				-> [if bool 1 0 \\ {bp_value=BVB bool}<-basic_patterns ]
+			BasicPatterns BT_Int basic_patterns
+				-> [int \\ {bp_value=BVInt int}<-basic_patterns ]
+//			BasicPatterns (BT_String _) basic_patterns
+//				-> [string \\ {bp_value=BVS string}<-basic_patterns]
+			OverloadedListPatterns overloaded_list _ algebraic_patterns
+				-> [glob_object.ds_index \\ {ap_symbol={glob_object}}<-algebraic_patterns]
 
-	sort3 :: !.[Int] !.[a] !.[b] -> .[(!Int,!Int,!a,!b)]
-	sort3 constr_indices unsafe_bits counts
-		= sortBy smaller (zip4 constr_indices [0..] unsafe_bits counts)
+	sort constr_indices pattern_exprs
+		= sortBy smaller [(e1,e2,e3) \\ e1<-constr_indices & e2<-[0..] & e3<-pattern_exprs]
 	  where
-		smaller (i1,si1,_,_) (i2,si2,_,_)
+		smaller (i1,si1,_) (i2,si2,_)
 			| i1<i2		= True
 			| i1>i2		= False
 						= si1<si2
-		zip4 [h1:t1] [h2:t2] [h3:t3] [h4:t4]
-			= [(h1,h2,h3,h4):zip4 t1 t2 t3 t4]
-		zip4 _ _ _ _
-			= []
 
-	count_loop :: !RefCounts !RefCounts ![(!Int,!Int,!Bool,!RefCounts)] -> *RefCounts
-	count_loop default_counts unified_counts []
-		= {e \\ e <-: unified_counts}
-	count_loop default_counts unified_counts [(c_index,p_index,unsafe,counts):patterns]
-		# (same,next)	= splitWhile (\(ds_index,_,_,_)->ds_index==c_index) patterns
-		# ccount= case unsafe of
-					True 	-> count_constructor default_counts counts same
-					_		-> counts
-		= count_loop default_counts (unify_counts ccount unified_counts) next
-	where
-		splitWhile :: !(a -> .Bool) !u:[a] -> (!.[a],!v:[a]), [u <= v];
-		splitWhile f []
-			= ([],[])
-		splitWhile f cons=:[a:x]
-			| f a
-				# (t,d)	= splitWhile f x
-				= ([a:t],d)
-				= ([],cons)
-	
-	count_constructor :: !RefCounts !RefCounts ![(!Int,!Int,!Bool,!RefCounts)] -> RefCounts
-	count_constructor default_counts combined_counts []
-		= combine_counts combined_counts default_counts
-	count_constructor default_counts combined_counts [(_,_,unsafe,counts):patterns]
-		| unsafe
-			= count_constructor default_counts (combine_counts combined_counts counts) patterns
-			= combine_counts combined_counts counts
-
-//consumer_requirements_of_guards :: !CasePatterns ConsumerAnalysisRO !*AnalyseInfo -> (!Int,.[Bool],!*AnalyseInfo)
-consumer_requirements_of_guards :: !.CasePatterns !.ConsumerAnalysisRO !*AnalyseInfo -> *(!Int,!.[Bool],![RefCounts],!*AnalyseInfo)
-consumer_requirements_of_guards (AlgebraicPatterns type patterns) common_defs ai
-	# pattern_exprs
-			= [ ap_expr \\ {ap_expr}<-patterns]
-	  pattern_vars
-	  		= flatten [ ap_vars \\ {ap_vars}<-patterns]
+get_pattern_exprs_and_bind_pattern_vars :: !CasePatterns !*AnalyseInfo -> *(![Expression],!*AnalyseInfo)
+get_pattern_exprs_and_bind_pattern_vars (AlgebraicPatterns type patterns) ai
+	# pattern_exprs = [ap_expr \\ {ap_expr}<-patterns]
+	  pattern_vars = flatten [ ap_vars \\ {ap_vars}<-patterns]
 	  (ai_next_var, ai_next_var_of_fun, ai_var_heap)
 	  		= bindPatternVars pattern_vars ai.ai_next_var ai.ai_next_var_of_fun ai.ai_var_heap
-	  ai	= { ai & ai_var_heap=ai_var_heap, ai_next_var=ai_next_var, ai_next_var_of_fun = ai_next_var_of_fun }
-	= independentConsumerRequirements pattern_exprs common_defs ai
-	
-consumer_requirements_of_guards (BasicPatterns type patterns) common_defs ai
-	# pattern_exprs
-			= [ bp_expr \\ {bp_expr}<-patterns]
-	= independentConsumerRequirements pattern_exprs common_defs ai
-consumer_requirements_of_guards (OverloadedListPatterns type _ patterns) common_defs ai
-	# pattern_exprs
-			= [ ap_expr \\ {ap_expr}<-patterns]
-	  pattern_vars
-	  		= flatten [ ap_vars \\ {ap_vars}<-patterns]
+	  ai = { ai & ai_var_heap=ai_var_heap, ai_next_var=ai_next_var, ai_next_var_of_fun = ai_next_var_of_fun }
+	= (pattern_exprs,ai)
+get_pattern_exprs_and_bind_pattern_vars (BasicPatterns type patterns) ai
+	# pattern_exprs = [bp_expr \\ {bp_expr}<-patterns]
+	= (pattern_exprs,ai)
+get_pattern_exprs_and_bind_pattern_vars (OverloadedListPatterns type _ patterns) ai
+	# pattern_exprs = [ap_expr \\ {ap_expr}<-patterns]
+	  pattern_vars = flatten [ ap_vars \\ {ap_vars}<-patterns]
 	  (ai_next_var, ai_next_var_of_fun, ai_var_heap)
 	  		= bindPatternVars pattern_vars ai.ai_next_var ai.ai_next_var_of_fun ai.ai_var_heap
-	  ai	= { ai & ai_var_heap=ai_var_heap, ai_next_var=ai_next_var, ai_next_var_of_fun = ai_next_var_of_fun }
-	= independentConsumerRequirements pattern_exprs common_defs ai
-consumer_requirements_of_guards NoPattern common_defs ai
-	= independentConsumerRequirements [] common_defs ai
+	  ai = { ai & ai_var_heap=ai_var_heap, ai_next_var=ai_next_var, ai_next_var_of_fun = ai_next_var_of_fun }
+	= (pattern_exprs,ai)
+get_pattern_exprs_and_bind_pattern_vars NoPattern ai
+	= ([],ai)
 
 bindPatternVars :: !.[FreeVar] !Int !Int !*VarHeap -> (!Int,!Int,!*VarHeap)
 bindPatternVars [fv=:{fv_info_ptr,fv_count} : vars] next_var next_var_of_fun var_heap
@@ -806,23 +821,155 @@ bindPatternVars [fv=:{fv_info_ptr,fv_count} : vars] next_var next_var_of_fun var
 bindPatternVars [] next_var next_var_of_fun var_heap
 	= (next_var, next_var_of_fun, var_heap)
 
-independentConsumerRequirements :: !.[Expression] !ConsumerAnalysisRO !*AnalyseInfo -> (!ConsClass,!.[Bool],![RefCounts],!*AnalyseInfo)
-independentConsumerRequirements exprs info ai
-	# ref_counts					= ai.ai_cur_ref_counts
-	# (count_size,ref_counts)		= usize ref_counts
-	# zero_array					= n_zero_counts count_size
-	# (counts_unsafe,(cc,ai))		= mapSt cons_reqs exprs (CPassive,{ ai & ai_cur_ref_counts = zero_array})
-	# (counts,unsafe)				= unzip counts_unsafe
-	= (cc,unsafe,counts,{ ai & ai_cur_ref_counts = ref_counts})
+caseAltsConsumerRequirements :: !Bool !Bool ![(Int,Int,Expression)] !CasePatterns !ConsumerAnalysisRO !*AnalyseInfo
+	-> (!ConsClass,![(Int,Bool)],!*AnalyseInfo)
+caseAltsConsumerRequirements _ ok_pattern_type=:False exprs case_guards info ai
+	# (constructors_and_unsafe_bits,(cc,ai))
+		= mapSt (cons_reqs_not_ok_pattern_type info) exprs (CPassive, ai)
+	  cur_ref_counts = ai.ai_cur_ref_counts
+	  ref_counts = n_twos_counts (size cur_ref_counts)
+	  ai & ai_cur_ref_counts = ref_counts
+	= (cc,constructors_and_unsafe_bits,ai)
 where
-	cons_reqs :: !Expression !*(!.Int,!*AnalyseInfo) -> *(!.(!RefCounts,!Bool),!*(!Int,!*AnalyseInfo))
-	cons_reqs expr (cc,ai)
-		# (cce, unsafe, ai)		= consumerRequirements expr info ai
-		# cc					= combineClasses cce cc
-		# ref_counts			= ai.ai_cur_ref_counts
-		# count_size			= size ref_counts
-		# zero_array			= n_zero_counts count_size
-		= ((ref_counts,unsafe),(cc, { ai & ai_cur_ref_counts=zero_array }))
+	cons_reqs_not_ok_pattern_type :: !ConsumerAnalysisRO !(Int,Int,Expression) !*(!Int,!*AnalyseInfo) -> *(!(!Int,!Bool),!*(!Int,!*AnalyseInfo))
+	cons_reqs_not_ok_pattern_type info (c_index,_,expr) (cc,ai)
+		# (cce, unsafe, ai) = consumerRequirements expr info ai
+		# cc = combineClasses cce cc
+		# ref_counts = ai.ai_cur_ref_counts
+		#! count_size = size ref_counts
+		# seq_0 = Seq 0 [|]
+		# zero_array = {ref_counts & [i]=seq_0 \\ i<-[0..count_size-1]}
+		= ((c_index,unsafe),(cc, {ai & ai_cur_ref_counts=zero_array}))
+caseAltsConsumerRequirements has_default=:False True exprs case_guards info ai
+	= cons_reqs exprs CPassive info ai
+where
+	cons_reqs :: ![(Int,Int,Expression)] !Int !ConsumerAnalysisRO !*AnalyseInfo -> *(!Int,![(Int,Bool)],!*AnalyseInfo)
+	cons_reqs [(c_index,_,expr)] cc info ai
+		# (cce, unsafe, ai) = consumerRequirements expr info ai
+		  cc = combineClasses cce cc
+		= (cc, [(c_index,unsafe)], ai)
+	cons_reqs [(c_index,_,expr):exprs] cc info ai
+		# (cce, unsafe, ai) = consumerRequirements expr info ai
+		  cc = combineClasses cce cc
+		# (cc,constructors_and_unsafe_bits,ai) = cons_reqs1 c_index cc unsafe exprs info ai
+		= (cc,[(c_index,unsafe):constructors_and_unsafe_bits],ai)
+	cons_reqs [] cc info ai
+		= (cc,[],ai)
+
+	// ai.ai_cur_ref_counts contains reference counts of previous alt(s) with same index
+	cons_reqs1 :: !Int !Int !Bool ![(Int,Int,Expression)] !ConsumerAnalysisRO !*AnalyseInfo -> *(!Int,![(Int,Bool)],!*AnalyseInfo)
+	cons_reqs1 c_index cc unsafe [(c_index2,_,expr2)] info ai
+		# ref_counts = ai.ai_cur_ref_counts
+		#! count_size = size ref_counts
+		# ai & ai_cur_ref_counts = n_zero_counts count_size
+		  (cce, unsafe2, ai) = consumerRequirements expr2 info ai
+		  cc = combineClasses cce cc
+		| c_index<>c_index2
+			# ref_counts = unify_counts ai.ai_cur_ref_counts ref_counts
+			  ai & ai_cur_ref_counts = ref_counts
+			= (cc, [(c_index2,unsafe2)], ai)
+			| not unsafe
+				# ai & ai_cur_ref_counts = ref_counts
+				= (cc, [(c_index2,unsafe2)], ai)
+				# ai & ai_cur_ref_counts = combine_counts ai.ai_cur_ref_counts ref_counts
+				= (cc, [(c_index2,unsafe2)], ai)				
+	cons_reqs1 c_index cc unsafe [(c_index2,_,expr2):exprs] info ai
+		# ref_counts = ai.ai_cur_ref_counts
+		#! count_size = size ref_counts
+		# ai & ai_cur_ref_counts = n_zero_counts count_size
+		  (cce, unsafe2, ai) = consumerRequirements expr2 info ai
+		  cc = combineClasses cce cc
+		| c_index<>c_index2
+			# (cc,constructors_and_unsafe_bits,ai) = cons_reqs2 c_index2 cc unsafe2 exprs ref_counts info ai
+			= (cc,[(c_index2,unsafe2):constructors_and_unsafe_bits],ai)
+			| not unsafe
+				# ai & ai_cur_ref_counts = ref_counts
+				  (cc,constructors_and_unsafe_bits,ai) = cons_reqs1 c_index cc unsafe exprs info ai				
+				= (cc, [(c_index2,unsafe2):constructors_and_unsafe_bits], ai)
+				# ai & ai_cur_ref_counts = combine_counts ai.ai_cur_ref_counts ref_counts
+				  (cc,constructors_and_unsafe_bits,ai) = cons_reqs1 c_index cc unsafe2 exprs info ai				
+				= (cc, [(c_index2,unsafe2):constructors_and_unsafe_bits], ai)
+
+	// ai.ai_cur_ref_counts contains reference counts of previous alt(s) with same index
+	cons_reqs2 :: !Int !Int !Bool ![(Int,Int,Expression)] !*RefCounts !ConsumerAnalysisRO !*AnalyseInfo -> *(!Int,![(Int,Bool)],!*AnalyseInfo)
+	cons_reqs2 c_index cc unsafe [] ref_counts info ai
+		# ai & ai_cur_ref_counts = unify_counts ai.ai_cur_ref_counts ref_counts
+		= (cc, [], ai)
+	cons_reqs2 c_index cc unsafe [(c_index2,_,expr2):exprs] ref_counts info ai
+		| c_index2<>c_index
+			# (zero_counts,ref_counts) = unify_and_zero_counts ai.ai_cur_ref_counts ref_counts
+			  ai & ai_cur_ref_counts = zero_counts  
+			  (cce, unsafe2, ai) = consumerRequirements expr2 info ai
+			  cc = combineClasses cce cc
+			  (cc,constructors_and_unsafe_bits,ai) = cons_reqs2 c_index2 cc unsafe2 exprs ref_counts info ai
+			= (cc,[(c_index2,unsafe2):constructors_and_unsafe_bits],ai)
+			# alt_ref_counts = ai.ai_cur_ref_counts
+			#! count_size = size ref_counts
+			# zero_array = n_zero_counts count_size
+			  ai & ai_cur_ref_counts = zero_array
+			  (cce, unsafe2, ai) = consumerRequirements expr2 info ai
+			  cc = combineClasses cce cc
+			| not unsafe
+				# ai & ai_cur_ref_counts = alt_ref_counts
+				  (cc,constructors_and_unsafe_bits,ai) = cons_reqs2 c_index cc unsafe exprs ref_counts info ai
+				= (cc,[(c_index2,unsafe2):constructors_and_unsafe_bits],ai)
+				# ai & ai_cur_ref_counts = combine_counts ai.ai_cur_ref_counts alt_ref_counts
+				  (cc,constructors_and_unsafe_bits,ai) = cons_reqs2 c_index cc unsafe2 exprs ref_counts info ai
+				= (cc,[(c_index2,unsafe2):constructors_and_unsafe_bits],ai)
+caseAltsConsumerRequirements has_default=:True True exprs case_guards info ai
+	# default_counts = ai.ai_cur_ref_counts
+	  (initial_counts,default_counts) = arrayCopy default_counts
+	  (count_size,default_counts) = usize default_counts
+	  ai & ai_cur_ref_counts = n_zero_counts count_size
+	= cons_reqs exprs CPassive initial_counts default_counts info ai
+where
+	cons_reqs :: ![(Int,Int,Expression)] !Int !*RefCounts !RefCounts !ConsumerAnalysisRO !*AnalyseInfo -> *(!Int,![(Int,Bool)],!*AnalyseInfo)
+	cons_reqs [(c_index,unsafe,expr)] cc ref_counts default_counts info ai
+		# (cce, unsafe, ai) = consumerRequirements expr info ai
+		  cc = combineClasses cce cc
+		  alt_ref_counts = ai.ai_cur_ref_counts
+		  alt_ref_counts = if unsafe (combine_counts default_counts alt_ref_counts) alt_ref_counts
+		  ai & ai_cur_ref_counts = unify_counts alt_ref_counts ref_counts
+		= (cc, [(c_index,unsafe)], ai)
+	cons_reqs [(c_index,_,expr):exprs] cc ref_counts default_counts info ai
+		# (cce, unsafe, ai) = consumerRequirements expr info ai
+		  cc = combineClasses cce cc
+		  (cc,constructors_and_unsafe_bits,ai) = cons_reqs2 c_index cc unsafe exprs ref_counts default_counts info ai
+		= (cc, [(c_index,unsafe):constructors_and_unsafe_bits], ai)
+	cons_reqs [] cc ref_counts default_counts info ai
+		# ai & ai_cur_ref_counts = ref_counts
+		= (cc,[],ai)
+
+	// ai.ai_cur_ref_counts contains reference counts of previous alt(s) with same index
+	cons_reqs2 :: !Int !Int !Bool ![(Int,Int,Expression)] !*RefCounts !RefCounts !ConsumerAnalysisRO !*AnalyseInfo -> *(!Int,![(Int,Bool)],!*AnalyseInfo)
+	cons_reqs2 c_index cc unsafe [] ref_counts default_counts info ai
+		# alt_ref_counts = ai.ai_cur_ref_counts
+		  alt_ref_counts = if unsafe (combine_counts default_counts alt_ref_counts) alt_ref_counts
+		  ai & ai_cur_ref_counts = unify_counts alt_ref_counts ref_counts
+		= (cc, [], ai)
+	cons_reqs2 c_index cc unsafe [(c_index2,_,expr2):exprs] ref_counts default_counts info ai
+		| c_index2<>c_index
+			# alt_ref_counts = ai.ai_cur_ref_counts
+			  alt_ref_counts = if unsafe (combine_counts default_counts alt_ref_counts) alt_ref_counts
+			  (zero_ref_counts,ref_counts) = unify_and_zero_counts alt_ref_counts ref_counts
+			  ai & ai_cur_ref_counts = zero_ref_counts
+			  (cce, unsafe2, ai) = consumerRequirements expr2 info ai
+			  cc = combineClasses cce cc
+			  (cc,constructors_and_unsafe_bits,ai) = cons_reqs2 c_index2 cc unsafe2 exprs ref_counts default_counts info ai
+			= (cc, [(c_index2,unsafe2):constructors_and_unsafe_bits], ai)
+			# alt_ref_counts = ai.ai_cur_ref_counts
+			#! count_size = size ref_counts
+			# zero_array = n_zero_counts count_size
+			  ai & ai_cur_ref_counts = zero_array
+			  (cce, unsafe2, ai) = consumerRequirements expr2 info ai
+			  cc = combineClasses cce cc
+			| not unsafe
+				# ai & ai_cur_ref_counts = alt_ref_counts
+				  (cc,constructors_and_unsafe_bits,ai) = cons_reqs2 c_index cc unsafe exprs ref_counts default_counts info ai
+				= (cc, [(c_index2,unsafe2):constructors_and_unsafe_bits], ai)
+				# ai & ai_cur_ref_counts = combine_counts ai.ai_cur_ref_counts alt_ref_counts
+				  (cc,constructors_and_unsafe_bits,ai) = cons_reqs2 c_index2 cc unsafe2 exprs ref_counts default_counts info ai
+				= (cc,[(c_index2,unsafe2):constructors_and_unsafe_bits],ai)
 
 instance consumerRequirements DynamicExpr where
 	consumerRequirements {dyn_expr} common_defs ai
@@ -1449,8 +1596,6 @@ where
 	length_ComponentMembers (ComponentMember _ members) l = length_ComponentMembers members (l+1)
 	length_ComponentMembers (GeneratedComponentMember _ _ members) l = length_ComponentMembers members (l+1)
 	length_ComponentMembers NoComponentMembers l = l
-
-//@ producerRequirements
 
 :: *PRState =
 	{ prs_group				:: !ComponentMembers
