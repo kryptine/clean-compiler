@@ -508,7 +508,7 @@ where
 		# pState			= want_node_def_token pState token
 		# (ss_useLayout, pState) = accScanState UseLayout pState
 		  localsExpected	= ~ ss_useLayout
-		  (rhs, _, pState)		= wantRhs localsExpected (ruleDefiningRhsSymbol parseContext) (tokenBack pState)
+		  (rhs, _, pState)		= wantRhs localsExpected (ruleDefiningRhsSymbol parseContext (isNotEmpty args)) (tokenBack pState)
 		| isLocalContext parseContext
 			| isNotClassOrInstanceDefsContext parseContext
  				= (PD_NodeDef pos (combine_args args) rhs, pState)
@@ -516,14 +516,13 @@ where
 			= (PD_NodeDef pos (combine_args args) rhs, parseError "RHS" No "<global definition>" pState)
 	where		
 		want_node_def_token s EqualToken		= s
-		want_node_def_token s DefinesColonToken = s // PK replaceToken EqualToken s
-		want_node_def_token s token				= parseError "RHS" (Yes token) "defines token (= or =:)" s
+		want_node_def_token s token				= parseError "RHS" (Yes token) "defines token (=)" s
 
 		combine_args [arg]	= arg
 		combine_args args	= PE_List args
 	want_rhs_of_def parseContext (Yes (name, False), []) definingToken pos pState
 		# code_allowed  = definingToken == EqualToken
-		| isIclContext parseContext && isLocalContext parseContext && (definingToken == EqualToken || definingToken == DefinesColonToken) &&
+		| isIclContext parseContext && isLocalContext parseContext && (definingToken == EqualToken || (definingToken == DefinesColonToken && isGlobalContext parseContext)) &&
 		/* PK isLowerCaseName name.id_name && */ isNotClassOrInstanceDefsContext parseContext
 		  	# (token, pState) = nextToken FunctionContext pState
 			| code_allowed && token == CodeToken
@@ -549,9 +548,10 @@ where
 				= (PD_Function pos name is_infix args rhs (FK_Function cNameNotLocationDependent), parseError "rhs of def" No "no code" pState)
 		# pState = tokenBack (tokenBack pState)
 		  (ss_useLayout, pState) = accScanState UseLayout pState
-		  localsExpected = isNotEmpty args || isGlobalContext parseContext || ~ ss_useLayout
+		  has_args = isNotEmpty args
+		  localsExpected = has_args || isGlobalContext parseContext || ~ ss_useLayout
 		  (rhs, defining_symbol, pState)
-		  		= wantRhs localsExpected (ruleDefiningRhsSymbol parseContext) pState
+		  		= wantRhs localsExpected (ruleDefiningRhsSymbol parseContext has_args) pState
 		  fun_kind = definingSymbolToFunKind defining_symbol
 		= case fun_kind of
 			FK_Function _  | isDclContext parseContext
@@ -634,8 +634,9 @@ where
 		//# pState = tokenBack pState
 	
 	  	# (ss_useLayout, pState) = accScanState UseLayout pState
-	    # localsExpected = isNotEmpty args || isGlobalContext parseContext || ~ ss_useLayout
-	    # (rhs, _, pState) = wantRhs localsExpected (ruleDefiningRhsSymbol parseContext) pState
+	  	# has_args = isNotEmpty args
+	    # localsExpected = has_args || isGlobalContext parseContext || ~ ss_useLayout
+	    # (rhs, _, pState) = wantRhs localsExpected (ruleDefiningRhsSymbol parseContext has_args) pState
 
 		# generic_case = 
 			{ gc_ident = ident
@@ -885,7 +886,7 @@ where
 		= case token of
 			IdentToken name
 				#	(token, pState)	= nextToken CodeContext pState
-				|	token == EqualToken || token == DefinesColonToken
+				|	token == EqualToken
 					#	(token, pState)	= nextToken CodeContext pState
 					->	case token of
 							IdentToken value
@@ -921,15 +922,17 @@ where
 :: RhsDefiningSymbol
 	=	RhsDefiningSymbolExact Token
 	|	RhsDefiningSymbolCase			// '->' or '='
-	|	RhsDefiningSymbolRule			// '=', '=:', '=>'
-	|	RhsDefiningSymbolRuleOrMacro	// '=', '=:', '=>', ':=='
+	|	RhsDefiningSymbolGlobalFunctionOrMacro	// '=', '=:', '=>', ':=='
+	|	RhsDefiningSymbolRule			// '=', '=>'
+	|	RhsDefiningSymbolRuleOrMacro	// '=', '=>', ':=='
 
-ruleDefiningRhsSymbol :: !ParseContext -> RhsDefiningSymbol
-ruleDefiningRhsSymbol parseContext
+ruleDefiningRhsSymbol :: !ParseContext !Bool -> RhsDefiningSymbol
+ruleDefiningRhsSymbol parseContext has_args
 	| isGlobalOrClassOrInstanceDefsContext parseContext
-		=	RhsDefiningSymbolRuleOrMacro
-	// otherwise
-		=	RhsDefiningSymbolRule
+		| has_args
+			= RhsDefiningSymbolRuleOrMacro
+			= RhsDefiningSymbolGlobalFunctionOrMacro
+		= RhsDefiningSymbolRule
 
 isDefiningSymbol :: RhsDefiningSymbol Token -> Bool
 isDefiningSymbol (RhsDefiningSymbolExact wanted) observed
@@ -937,9 +940,11 @@ isDefiningSymbol (RhsDefiningSymbolExact wanted) observed
 isDefiningSymbol RhsDefiningSymbolCase observed
 	=	observed == EqualToken || observed == ArrowToken
 isDefiningSymbol RhsDefiningSymbolRule observed
-	=	observed == EqualToken || observed == DefinesColonToken || observed == DoubleArrowToken
+	=	observed == EqualToken || observed == DoubleArrowToken
+isDefiningSymbol RhsDefiningSymbolGlobalFunctionOrMacro observed
+	=	observed == EqualToken || observed == ColonDefinesToken || observed == DefinesColonToken || observed == DoubleArrowToken
 isDefiningSymbol RhsDefiningSymbolRuleOrMacro observed
-	=	observed == ColonDefinesToken || isDefiningSymbol RhsDefiningSymbolRule observed
+	=	observed == EqualToken || observed == ColonDefinesToken || observed == DoubleArrowToken
 
 definingSymbolToFunKind :: RhsDefiningSymbol -> FunKind
 definingSymbolToFunKind (RhsDefiningSymbolExact defining_token)
