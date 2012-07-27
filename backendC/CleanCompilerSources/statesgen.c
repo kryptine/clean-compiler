@@ -2945,6 +2945,62 @@ static void set_states_in_lhs (ArgP arguments,StateP states)
 }
 #endif
 
+static void mark_is_constructor_function (ImpRuleP rule)
+{
+	RuleAltP alt;
+
+	alt=rule->rule_alts;
+	if (alt->alt_kind==Contractum && alt->alt_next==NULL && alt->alt_rhs_defs==NULL && alt->alt_lhs_defs==NULL){
+		NodeP node_p;
+		ArgP arg_p;
+		
+		arg_p=alt->alt_lhs_root->node_arguments;
+		if (arg_p!=NULL && arg_p->arg_next==NULL && arg_p->arg_node->node_kind==NodeIdNode){
+			node_p=alt->alt_rhs_root;
+			if (node_p->node_kind==SwitchNode){
+				NodeP case_node;
+
+				arg_p=node_p->node_arguments;
+				case_node=arg_p->arg_node;
+				if (case_node->node_kind==CaseNode){
+					struct symbol *symbol;
+					NodeP case_rhs_node;
+
+					case_rhs_node = case_node->node_arguments->arg_node;
+					if (case_rhs_node->node_kind==PushNode)
+						case_rhs_node = case_rhs_node->node_arguments->arg_next->arg_node;
+
+					symbol=case_node->node_symbol;
+					if (((symbol->symb_kind==definition && symbol->symb_def->sdef_kind==CONSTRUCTOR) ||
+						 symbol->symb_kind==nil_symb || symbol->symb_kind==cons_symb) &&
+						case_node->node_node_defs==NULL &&
+						case_rhs_node->node_kind==NormalNode && case_rhs_node->node_symbol->symb_kind==bool_denot &&
+						case_rhs_node->node_symbol->symb_bool==True)
+					{
+						arg_p=arg_p->arg_next;
+						if (arg_p!=NULL){
+							NodeP default_node;
+
+							default_node=arg_p->arg_node;
+							if (arg_p->arg_node->node_kind==DefaultNode){
+								NodeP default_rhs_node;
+								
+								default_rhs_node=default_node->node_arguments->arg_node;
+								if (default_node->node_node_defs==NULL &&
+									default_rhs_node->node_kind==NormalNode && default_rhs_node->node_symbol->symb_kind==bool_denot &&
+									default_rhs_node->node_symbol->symb_bool==False)
+								{
+									rule->rule_root->node_symbol->symb_def->sdef_mark |= SDEF_INLINE_IS_CONSTRUCTOR;
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
 void GenerateStatesForRule (ImpRuleS *rule)
 {
 	SymbDef rule_sdef;
@@ -2975,10 +3031,15 @@ void GenerateStatesForRule (ImpRuleS *rule)
 
 #ifdef OBSERVE_ARRAY_SELECTS_IN_PATTERN
 			set_states_of_array_selects_in_pattern (alt);
-#endif				
+#endif
 		} else if (rule->rule_type==NULL)
 			StaticMessage (True, "%S", ECodeBlock, CurrentSymbol);
 	}
+
+	if (rule_sdef->sdef_arity==1 &&
+			function_state_p[-1].state_type==SimpleState && function_state_p[-1].state_kind==OnB && function_state_p[-1].state_object==BoolObj &&
+			function_state_p[0].state_type==SimpleState && function_state_p[0].state_kind==StrictOnA)
+		mark_is_constructor_function (rule);
 }
 
 void GenerateStates (ImpRules rules)
@@ -4014,7 +4075,7 @@ static void DetermineSharedAndAnnotatedNodesOfRule (ImpRuleP rule)
 	CurrentSymbol=rule->rule_root->node_symbol;
 	
 	rule_sdef=CurrentSymbol->symb_def;
-	
+
 	for_l (alt,rule->rule_alts,alt_next)
 		if (alt->alt_kind==Contractum){
 			CurrentLine = alt->alt_line;

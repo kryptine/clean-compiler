@@ -131,3 +131,4 @@ extern ImpRuleS *create_simple_imp_rule (struct node *lhs_root,struct node *rhs_
 #define unused_node_id(node_id) ((node_id)->nid_refcount!=-1 ? (node_id)->nid_refcount==0 : unused_node_id_ (node_id))
 extern int unused_node_id_ (NodeId node_id);
 
+extern void generate_is_constructor (ImpRuleP rule);
