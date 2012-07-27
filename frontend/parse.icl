@@ -1090,7 +1090,7 @@ where
 					# (id, pState) = stringToIdent name IC_Expression pState
 					# (token, pState) = nextToken FunctionContext pState
 					| token == DefinesColonToken
-						# (succ, expr, pState) = trySimpleExpressionOrPattern cIsAPattern pState
+						# (succ, expr, pState) = trySimplePattern pState
 						| succ
 							# lhs_exp = PE_Bound { bind_dst = id, bind_src = expr }
 							-> parse_let_rhs lhs_exp pState
@@ -1117,7 +1117,7 @@ where
 						  pState = tokenBack pState
 						-> parse_let_rhs lhs_exp pState					
 			_
-				# (succ, lhs_exp, pState) = trySimpleExpressionT token cIsAPattern pState
+				# (succ, lhs_exp, pState) = trySimplePatternT token pState
 				| succ
 					-> parse_let_rhs lhs_exp pState
 					-> (False, abort "no definition", pState)
@@ -2767,39 +2767,39 @@ wantPatternT token pState
 		# (dyn_type, pState) = wantDynamicType pState
 		= (PE_DynamicPattern exp dyn_type, pState)
 		= (exp, tokenBack pState)
-
-wantPatternT2  :: !Token !ParseState -> (!ParsedExpr, !ParseState)
-wantPatternT2 (IdentToken name) pState /* to make a=:C x equivalent to a=:(C x) */
-	| isLowerCaseName name
-		# (id, pState)		= stringToIdent name IC_Expression pState
-		  (token, pState)	= nextToken FunctionContext pState
-		| token == DefinesColonToken 
-			# (token, pState)	= nextToken FunctionContext pState
-			= case token of
-				IdentToken name
-					| ~ (isLowerCaseName name)
-						#	(constructor, pState) = stringToIdent name IC_Expression pState
-							(args, pState)	= parseList trySimplePattern pState
-						->	(PE_Bound { bind_dst = id, bind_src = combineExpressions (PE_Ident constructor) args }, pState)
-				_	# (succ, expr, pState) = trySimplePatternT token pState
-					| succ
-						# expr1 = PE_Bound { bind_dst = id, bind_src = expr }
-						# (exprs, pState) = parseList trySimplePattern pState
-						->	(combineExpressions expr1 exprs, pState)
-					// not succ
-						-> (PE_Empty,  parseError "LHS expression" (Yes token) "<expression>" pState)
-		| token == DoubleColonToken
-			# (dyn_type, pState) = wantDynamicType pState
-			= (PE_DynamicPattern (PE_Ident id) dyn_type, pState)
-		// token <> DefinesColonToken // token back and call to wantPatternT2 would do also.
-		# (exprs, pState) = parseList trySimplePattern (tokenBack pState)
-		= (combineExpressions (PE_Ident id) exprs, pState)
-wantPatternT2 token pState
-	# (succ, expr, pState) = trySimplePatternT token pState
-	| succ
-		# (exprs, pState) = parseList trySimplePattern pState
-		= (combineExpressions expr exprs, pState)
-		= (PE_Empty,  parseError "LHS expression" (Yes token) "<expression>" pState)
+where
+	wantPatternT2  :: !Token !ParseState -> (!ParsedExpr, !ParseState)
+	wantPatternT2 (IdentToken name) pState /* to make a=:C x equivalent to a=:(C x) */
+		| isLowerCaseName name
+			# (id, pState)		= stringToIdent name IC_Expression pState
+			  (token, pState)	= nextToken FunctionContext pState
+			| token == DefinesColonToken 
+				# (token, pState)	= nextToken FunctionContext pState
+				= case token of
+					IdentToken name
+						| ~ (isLowerCaseName name)
+							#	(constructor, pState) = stringToIdent name IC_Expression pState
+								(args, pState)	= parseList trySimplePattern pState
+							->	(PE_Bound { bind_dst = id, bind_src = combineExpressions (PE_Ident constructor) args }, pState)
+					_	# (succ, expr, pState) = trySimplePatternT token pState
+						| succ
+							# expr1 = PE_Bound { bind_dst = id, bind_src = expr }
+							# (exprs, pState) = parseList trySimplePattern pState
+							->	(combineExpressions expr1 exprs, pState)
+						// not succ
+							-> (PE_Empty,  parseError "LHS expression" (Yes token) "<expression>" pState)
+			| token == DoubleColonToken
+				# (dyn_type, pState) = wantDynamicType pState
+				= (PE_DynamicPattern (PE_Ident id) dyn_type, pState)
+			// token <> DefinesColonToken // token back and call to wantPatternT2 would do also.
+			# (exprs, pState) = parseList trySimplePattern (tokenBack pState)
+			= (combineExpressions (PE_Ident id) exprs, pState)
+	wantPatternT2 token pState
+		# (succ, expr, pState) = trySimplePatternT token pState
+		| succ
+			# (exprs, pState) = parseList trySimplePattern pState
+			= (combineExpressions expr exprs, pState)
+			= (PE_Empty,  parseError "LHS expression" (Yes token) "<expression>" pState)
 
 combineExpressions expr []
 	= expr
@@ -2816,14 +2816,6 @@ trySimplePattern pState
 	# (token, pState) = nextToken FunctionContext pState
 	= trySimplePatternT token pState
 
-trySimplePatternT ::  !Token !ParseState -> (!Bool, !ParsedExpr, !ParseState)
-trySimplePatternT token pState
-	# (succ, expr, pState) = trySimpleExpressionT token cIsAPattern pState
-	| succ
-		# (token, pState) = nextToken FunctionContext pState
-		= (True, expr, tokenBack pState)
-		= (False, PE_Empty, pState)
-
 tryExtendedSimpleExpression :: !ParseState -> (!Bool, !ParsedExpr, !ParseState)
 tryExtendedSimpleExpression pState
 	# (token, pState) = nextToken FunctionContext pState
@@ -2831,7 +2823,7 @@ tryExtendedSimpleExpression pState
 
 tryExtendedSimpleExpressionT :: !Token !ParseState -> (!Bool, !ParsedExpr, !ParseState)
 tryExtendedSimpleExpressionT token pState
-	# (succ, expr, pState) = trySimpleExpressionT token cIsNotAPattern pState
+	# (succ, expr, pState) = trySimpleExpressionT token pState
 	| succ
 		# (expr, pState) = extend_expr_with_selectors expr pState
 		= (True, expr, pState)
@@ -2910,41 +2902,77 @@ where
 			_
 				-> ([PS_Erroneous], parseError "record field" (Yes token) "lower case ident" pState)
 
-trySimpleExpressionOrPattern :: !Bool !ParseState -> (!Bool, !ParsedExpr, !ParseState)
-trySimpleExpressionOrPattern is_pattern pState
-	| is_pattern
-		= trySimplePattern pState
-		= tryExtendedSimpleExpression pState
-
-trySimpleExpressionT :: !Token !Bool !ParseState -> (!Bool, !ParsedExpr, !ParseState)
-trySimpleExpressionT (IdentToken name) is_pattern pState
+trySimplePatternT :: !Token !ParseState -> (!Bool, !ParsedExpr, !ParseState)
+trySimplePatternT (IdentToken name) pState
 	# (id, pState) = stringToIdent name IC_Expression pState
 	| isLowerCaseName name
-		| is_pattern
-			# (token, pState) = nextToken FunctionContext pState
-			| token == DefinesColonToken
-				# (succ, expr, pState) = trySimpleExpressionOrPattern is_pattern pState
-				| succ
-					= (True, PE_Bound { bind_dst = id, bind_src = expr }, pState)
-					= (True, PE_Empty, parseError "simple expression" No "expression" pState)
-				= (True, PE_Ident id, tokenBack pState)
-			# (token, pState) = nextToken FunctionContext pState
-			| token == GenericOpenToken
-				# (kind, pState) = wantKind pState	
-				= (True, PE_Generic id kind, pState)
-				= (True, PE_Ident id, tokenBack pState)
-		| is_pattern
-			= (True, PE_Ident id, pState)
-			# (token, pState) = nextToken FunctionContext pState
-			| token == GenericOpenToken
-				# (kind, pState) = wantKind pState	
-				= (True, PE_Generic id kind, pState)
-				= (True, PE_Ident id, tokenBack pState)
-trySimpleExpressionT SquareOpenToken is_pattern pState
-	# (list_expr, pState) = wantListExp is_pattern pState
+		# (token, pState) = nextToken FunctionContext pState
+		| token == DefinesColonToken
+			# (succ, expr, pState) = trySimplePattern pState
+			| succ
+				= (True, PE_Bound { bind_dst = id, bind_src = expr }, pState)
+				= (True, PE_Empty, parseError "simple expression" No "expression" pState)
+			= (True, PE_Ident id, tokenBack pState)
+		= (True, PE_Ident id, pState)
+trySimplePatternT SquareOpenToken pState
+	# (list_expr, pState) = wantListExp cIsAPattern pState
 	= (True, list_expr, pState)
-trySimpleExpressionT OpenToken is_pattern pState
-	# (args=:[exp:exps], pState) = want_expression_list is_pattern pState
+trySimplePatternT OpenToken pState
+	# (args=:[exp:exps], pState) = want_pattern_list pState
+	  pState = wantToken FunctionContext "pattern list" CloseToken pState
+	| isEmpty exps
+		= case exp of
+			PE_Ident id
+				-> (True, PE_List [exp], pState)
+			_
+				-> (True, exp, pState)
+		= (True, PE_Tuple args, pState)
+where
+	want_pattern_list pState
+		# (expr, pState) = wantPattern pState
+		  (token, pState) = nextToken FunctionContext pState
+		| token == CommaToken
+			# (exprs, pState) = want_pattern_list pState
+			= ([expr : exprs], pState)
+			= ([expr], tokenBack pState)
+trySimplePatternT CurlyOpenToken pState
+	# (rec_or_aray_exp, pState) = wantRecordOrArrayExp cIsAPattern pState 
+	= (True, rec_or_aray_exp, pState)
+trySimplePatternT (IntToken int_string) pState
+	# (ok,int) = string_to_int int_string
+	| ok
+		= (True, PE_Basic (BVInt int), pState)
+		= (True, PE_Basic (BVI int_string), pState)
+trySimplePatternT (StringToken string) pState
+	= (True, PE_Basic (BVS string), pState)
+trySimplePatternT (BoolToken bool) pState
+	= (True, PE_Basic (BVB bool), pState)
+trySimplePatternT (CharToken char) pState
+	= (True, PE_Basic (BVC char), pState)
+trySimplePatternT (RealToken real) pState
+	= (True, PE_Basic (BVR real), pState)
+trySimplePatternT (QualifiedIdentToken module_name ident_name) pState
+	| not (isLowerCaseName ident_name)
+		# (module_id, pState) = stringToQualifiedModuleIdent module_name ident_name IC_Expression pState
+		= (True, PE_QualifiedIdent module_id ident_name, pState)
+trySimplePatternT WildCardToken pState
+	= (True, PE_WildCard, pState)
+trySimplePatternT token pState
+	= (False, PE_Empty, tokenBack pState)
+
+trySimpleExpressionT :: !Token !ParseState -> (!Bool, !ParsedExpr, !ParseState)
+trySimpleExpressionT (IdentToken name) pState
+	# (id, pState) = stringToIdent name IC_Expression pState
+	# (token, pState) = nextToken FunctionContext pState
+	| token == GenericOpenToken
+		# (kind, pState) = wantKind pState	
+		= (True, PE_Generic id kind, pState)
+		= (True, PE_Ident id, tokenBack pState)
+trySimpleExpressionT SquareOpenToken pState
+	# (list_expr, pState) = wantListExp cIsNotAPattern pState
+	= (True, list_expr, pState)
+trySimpleExpressionT OpenToken pState
+	# (args=:[exp:exps], pState) = want_expression_list pState
 	  pState = wantToken FunctionContext "expression list" CloseToken pState
 	| isEmpty exps
 		= case exp of
@@ -2954,66 +2982,61 @@ trySimpleExpressionT OpenToken is_pattern pState
 				-> (True, exp, pState)
 		= (True, PE_Tuple args, pState)
 where
-	want_expression_list is_pattern pState
-		# (expr, pState) = wantExpressionOrPattern is_pattern pState
+	want_expression_list pState
+		# (expr, pState) = wantExpression pState
 		  (token, pState) = nextToken FunctionContext pState
 		| token == CommaToken
-			# (exprs, pState) = want_expression_list is_pattern pState
+			# (exprs, pState) = want_expression_list pState
 			= ([expr : exprs], pState)
 			= ([expr], tokenBack pState)
-trySimpleExpressionT CurlyOpenToken is_pattern pState
-	# (rec_or_aray_exp, pState) = wantRecordOrArrayExp is_pattern pState 
+trySimpleExpressionT CurlyOpenToken pState
+	# (rec_or_aray_exp, pState) = wantRecordOrArrayExp cIsNotAPattern pState 
 	= (True, rec_or_aray_exp, pState)
-trySimpleExpressionT (IntToken int_string) is_pattern pState
+trySimpleExpressionT (IntToken int_string) pState
 	# (ok,int) = string_to_int int_string
-		with
-		string_to_int s
-			| len==0
-				= (False,0)
-			| s.[0] == '-'
-				| len>2 && s.[1]=='0' /* octal */
-					= (False,0)
-					# (ok,int) = (string_to_int2 1 0 s)
-					=	(ok,~int)
-			| s.[0] == '+'
-				| len>2&& s.[1]=='0' /* octal */
-					= (False,0)
-					=	string_to_int2 1 0 s
-			| s.[0]=='0' && len>1 /* octal */
-				= (False,0)
-				=	string_to_int2 0 0 s
-		 where
-			len = size s
-
-			string_to_int2:: !Int !Int !{#Char} -> (!Bool,!Int)
-			string_to_int2 posn val s
-				| len==posn
-					= (True,val)
-				# n =	toInt (s.[posn]) - toInt '0'
-				|	0<=n && n<= 9
-					=	string_to_int2 (posn+1) (n+val*10) s
-					=	(False,0)
 	| ok
 		= (True, PE_Basic (BVInt int), pState)
 		= (True, PE_Basic (BVI int_string), pState)
-trySimpleExpressionT (StringToken string) is_pattern pState
+trySimpleExpressionT (StringToken string) pState
 	= (True, PE_Basic (BVS string), pState)
-trySimpleExpressionT (BoolToken bool) is_pattern pState
+trySimpleExpressionT (BoolToken bool) pState
 	= (True, PE_Basic (BVB bool), pState)
-trySimpleExpressionT (CharToken char) is_pattern pState
+trySimpleExpressionT (CharToken char) pState
 	= (True, PE_Basic (BVC char), pState)
-trySimpleExpressionT (RealToken real) is_pattern pState
+trySimpleExpressionT (RealToken real) pState
 	= (True, PE_Basic (BVR real), pState)
-trySimpleExpressionT (QualifiedIdentToken module_name ident_name) is_pattern pState
-	| not is_pattern || not (isLowerCaseName ident_name)
-		# (module_id, pState) = stringToQualifiedModuleIdent module_name ident_name IC_Expression pState
-		= (True, PE_QualifiedIdent module_id ident_name, pState)
-trySimpleExpressionT token is_pattern pState
-	| is_pattern
-		| token == WildCardToken
-			= (True, PE_WildCard, pState)
-			= (False, PE_Empty, tokenBack pState)
-		= trySimpleNonLhsExpressionT token pState
+trySimpleExpressionT (QualifiedIdentToken module_name ident_name) pState
+	# (module_id, pState) = stringToQualifiedModuleIdent module_name ident_name IC_Expression pState
+	= (True, PE_QualifiedIdent module_id ident_name, pState)
+trySimpleExpressionT token pState
+	= trySimpleNonLhsExpressionT token pState
+
+string_to_int s
+	| len==0
+		= (False,0)
+	| s.[0] == '-'
+		| len>2 && s.[1]=='0' /* octal */
+			= (False,0)
+			# (ok,int) = (string_to_int2 1 0 s)
+			=	(ok,~int)
+	| s.[0] == '+'
+		| len>2&& s.[1]=='0' /* octal */
+			= (False,0)
+			=	string_to_int2 1 0 s
+	| s.[0]=='0' && len>1 /* octal */
+		= (False,0)
+		=	string_to_int2 0 0 s
+ where
+	len = size s
+
+	string_to_int2:: !Int !Int !{#Char} -> (!Bool,!Int)
+	string_to_int2 posn val s
+		| len==posn
+			= (True,val)
+		# n =	toInt (s.[posn]) - toInt '0'
+		|	0<=n && n<= 9
+			=	string_to_int2 (posn+1) (n+val*10) s
+			=	(False,0)
 
 trySimpleNonLhsExpressionT :: !Token *ParseState -> *(!Bool,!ParsedExpr,!*ParseState)
 trySimpleNonLhsExpressionT BackSlashToken pState
