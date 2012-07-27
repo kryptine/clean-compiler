@@ -1217,7 +1217,7 @@ static void CallFunction2 (Label label, SymbDef def, Bool isjsr, StateS root_sta
 				CurrentModule = def->sdef_module;
 				CurrentExt    = GetFileExtension (abcFile);
 				
-				StaticMessage (False, "%D", "no inline code for this rule", def);
+				StaticMessage (False, "%D", "no inline code for this function", def);
 
 				CurrentModule = previous_module;
 				CurrentExt = previous_ext;
@@ -1231,31 +1231,41 @@ static void CallFunction2 (Label label, SymbDef def, Bool isjsr, StateS root_sta
 			} else
 				GenJmp (label);
 		}
-	} else if (def->sdef_kind==IMPRULE && IsInlineFromCurrentModule (def)){
-		Instructions instruction, last, first, next;
+		return;
+	}
+	if (def->sdef_kind==IMPRULE){
+		if ((def->sdef_mark & SDEF_INLINE_IS_CONSTRUCTOR)!=0){
+			generate_is_constructor (def->sdef_rule);
+			if (!isjsr)
+				GenRtn (aout, bout, root_state);
+			return;
+		} else if (IsInlineFromCurrentModule (def)){
+			Instructions instruction, last, first, next;
 
-		instruction=def->sdef_rule->rule_alts->alt_rhs_code->co_instr;
-		instruction=instruction->instr_next;
-		first=instruction;
+			instruction=def->sdef_rule->rule_alts->alt_rhs_code->co_instr;
+			instruction=instruction->instr_next;
+			first=instruction;
 
-		last=NULL;
-		for (;(next=instruction->instr_next)!=NULL;instruction=next)
-			last=instruction;
+			last=NULL;
+			for (;(next=instruction->instr_next)!=NULL;instruction=next)
+				last=instruction;
 
-		last->instr_next=NULL;
-		GenInstructions (first);
-		last->instr_next=instruction;
+			last->instr_next=NULL;
+			GenInstructions (first);
+			last->instr_next=instruction;
 
-		if (!isjsr)
-			GenRtn (aout, bout, root_state);
-	} else {
-		GenDStackLayout (ain, bin, fun_args);
-		if (isjsr){
-			GenJsr (label);
-			GenOStackLayoutOfState (aout, bout, root_state);
-		} else
-			GenJmp (label);
-	}	
+			if (!isjsr)
+				GenRtn (aout, bout, root_state);
+			return;
+		}
+	}
+
+	GenDStackLayout (ain, bin, fun_args);
+	if (isjsr){
+		GenJsr (label);
+		GenOStackLayoutOfState (aout, bout, root_state);
+	} else
+		GenJmp (label);
 }
 
 void CallFunction (Label label, SymbDef def, Bool isjsr, Node root)

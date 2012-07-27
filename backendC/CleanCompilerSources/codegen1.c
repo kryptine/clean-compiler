@@ -1340,7 +1340,7 @@ void GenerateCodeForConstructorsAndRecords (Symbol symbols)
 
 					for_l (fields,constructor->cl_fields,fl_next)
 						GenLazyFieldSelectorEntry (fields->fl_symbol->symb_def,def->sdef_record_state, asize, bsize);
-				}	
+				}
 			}
 		}
 	}
@@ -3025,6 +3025,42 @@ static void jump_false_to_next_alternative (LabDef *esclabel,int remove_a,int re
 	}
 }
 
+void generate_is_constructor (ImpRuleP rule)
+{
+	NodeP case_node;
+	LabDef symbol_label;
+
+	case_node = rule->rule_alts->alt_rhs_root->node_arguments->arg_node;
+
+	if (case_node->node_symbol->symb_kind==nil_symb)
+		GenEqDesc (&nil_lab,case_node->node_arity,0);
+	else if (case_node->node_symbol->symb_kind==cons_symb){
+		struct symbol *symbol;
+		
+		symbol=case_node->node_symbol;
+		if (symbol->symb_head_strictness==1 || symbol->symb_head_strictness>=3){
+			GenEqDesc (&nil_lab,0,0);
+			GenNotB();
+		} else
+			GenEqDesc (&cons_lab,case_node->node_arity,0);
+	} else {
+		SymbDef sdef;
+		sdef=case_node->node_symbol->symb_def;
+
+		if (sdef->sdef_kind==CONSTRUCTOR && sdef->sdef_strict_constructor
+			&& sdef->sdef_arity==case_node->node_arity)
+		{
+			ConvertSymbolToKLabel (&symbol_label,sdef);
+			GenEqDesc (&symbol_label,0,0);
+		} else {
+			ConvertSymbolToConstructorDLabel (&symbol_label,sdef);
+			GenEqDesc (&symbol_label,case_node->node_arity,0);
+		}
+	}
+	
+	GenPopA (1);
+}
+
 static void CheckSymbol (Label symblab,int arity,int stackpos,int remove_a,int remove_b,Label esclabel)
 {
 	GenEqDesc (symblab, arity, stackpos);
@@ -3431,7 +3467,7 @@ static int generate_code_for_switch_node (NodeP node,int asp,int bsp,struct esc 
 								
 								GenJmp (&case_label);
 								matches_always=1;
-							} else {	
+							} else {
 								if (sdef->sdef_kind==CONSTRUCTOR && sdef->sdef_strict_constructor
 									&& sdef->sdef_arity==case_node->node_arity)
 								{

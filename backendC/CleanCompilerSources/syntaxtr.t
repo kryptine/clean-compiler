@@ -278,9 +278,7 @@ STRUCT (node_id,NodeId){
 #define SHARED_NODES_COLLECTED_MASK				1
 #define NID_ALIAS_MASK 							2
 #define NID_ALIAS_MARK_MASK						4
-#define NID_COUNTED_AND_USED_IN_INNER_SCOPE		8
 #define NID_EXTRA_REFCOUNT_MASK					16
-#define COPY_NODE_MASK							64
 #define ON_A_CYCLE_MASK							128
 #define NID_VERIFY_MASK							256		/* macros */
 #define NID_THEN_ELSE_NON_LOCAL_NODE_ID			512		/* pattern_match */
@@ -298,7 +296,6 @@ STRUCT (node_id,NodeId){
 #endif
 #define NID_FIELD_NAME_MASK					32			/* typechecker */
 
-#define NID_COMPONENT_DETERMINED_MASK		256				/* optimise_lambda */
 #define NID_LHS_PUSHED						4096			/* codegen1 */
 
 #define NID_HAS_LAZY_SELECTOR_COUNTER		8192			/* statesgen */
@@ -659,6 +656,7 @@ STRUCT (symbol_def,SymbDef){
 #define SDEF_NEXT_IMP_RULE_VERSION_MASK 32
 #define	SDEF_HAS_IMP_RULE_VERSIONS_MASK 64
 #define	SDEF_OPTIMISED_FUNCTION_MASK 128
+#define SDEF_INLINE_IS_CONSTRUCTOR 4096
 
 /* some macros to reuse bit fields */
 

@@ -1,5 +1,4 @@
 
-
 #define for_l(v,l,n) for(v=(l);v!=NULL;v=v->n)
 
 #define SHARE_UPDATE_CODE 0 /* also in codegen1.c */
@@ -667,7 +666,8 @@ static void CodeRule (ImpRuleP rule)
 
 	if (rule_sdef->sdef_exported){
 		GenExportStrictAndEaEntry (rule_sdef);
-	} else if (!(rule_sdef->sdef_mark & (SDEF_USED_CURRIED_MASK | SDEF_USED_LAZILY_MASK | SDEF_USED_STRICTLY_MASK)))
+	} else if (!(rule_sdef->sdef_mark & (SDEF_USED_CURRIED_MASK | SDEF_USED_LAZILY_MASK) ||
+				 (rule_sdef->sdef_mark & SDEF_USED_STRICTLY_MASK && !(rule_sdef->sdef_mark & SDEF_INLINE_IS_CONSTRUCTOR))))
 		return;
 
 	GenFunctionDescriptorAndExportNodeAndDescriptor (rule_sdef);
@@ -882,7 +882,12 @@ static void CodeRule (ImpRuleP rule)
 	}
 #endif
 
-	rule_may_fail=CodeRuleAlt (rule->rule_alts,init_a_stack_top,init_b_stack_top,CurrentAltLabel.lab_post,resultstate);
+	if ((rule_sdef->sdef_mark & SDEF_INLINE_IS_CONSTRUCTOR)!=0){
+		generate_is_constructor (rule);
+		GenRtn (0, 1, BasicSymbolStates[bool_type]);
+		rule_may_fail = False;
+	} else
+		rule_may_fail = CodeRuleAlt (rule->rule_alts,init_a_stack_top,init_b_stack_top,CurrentAltLabel.lab_post,resultstate);
 
 	if (function_called_only_curried_or_lazy_with_one_return){
 		StateS *function_state_p;
