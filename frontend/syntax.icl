@@ -399,7 +399,9 @@ where
 	(<<<) file (Update expr1 selections expr2) =  file <<< '{' <<< expr1  <<< " & " <<<  selections <<< " = " <<< expr2 <<< '}'
 	(<<<) file (RecordUpdate cons_symbol expression expressions) = file <<< '{' <<< cons_symbol <<< ' ' <<< expression <<< " & " <<< expressions <<< '}'
 	(<<<) file (TupleSelect field field_nr expr) = file <<< expr <<<'.' <<< field_nr
-	(<<<) file (MatchExpr cons expr) = file <<< cons <<< " =: " <<< expr
+	(<<<) file (MatchExpr cons expr) = file <<< cons <<< " (M)=: " <<< expr
+	(<<<) file (IsConstructor expr cons_symbol cons_arity global_type_index case_ident position)
+		= file <<< expr <<< " (I)=: " <<< cons_symbol
 	(<<<) file EE = file <<< "** E **"
 	(<<<) file (NoBind _) = file <<< "** NB **"
 	(<<<) file (DynamicExpr {dyn_expr,dyn_type_code})     = file <<< "dynamic " <<< dyn_expr <<< " :: " <<< dyn_type_code 
@@ -887,12 +889,14 @@ where
 			= file <<< "argument " <<< (elem_nr + 1) <<< " of " <<< ds_arity <<< "-tuple"
 		show_expression file (BasicExpr bv)
 			= file <<< bv
-		show_expression file (MatchExpr _ expr)
-			= file <<< "match expression"
-		show_expression file (Let _)
-			= file <<< "(let ... ) or #"
 		show_expression file (RecordUpdate _ _ _)
 			= file <<< "update of record"
+		show_expression file (MatchExpr _ expr)
+			= file <<< "match expression"
+		show_expression file (IsConstructor _ _ _ _ _ _)
+			= file <<< "is constructor expression"
+		show_expression file (Let _)
+			= file <<< "(let ... ) or #"
 		show_expression file _
 			= file
 		

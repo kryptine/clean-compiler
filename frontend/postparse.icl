@@ -159,6 +159,9 @@ where
 		= collectFunctions (transformSequence sequence) icl_module ca
 	collectFunctions (PE_ArrayDenot array_kind exprs) icl_module ca
 		= collectFunctions (transformArrayDenot array_kind exprs) icl_module ca
+	collectFunctions (PE_Matches case_ident expr pattern position) icl_module ca
+		# (expr, ca) = collectFunctions expr icl_module ca
+		= (PE_Matches case_ident expr pattern position, ca)
 	collectFunctions (PE_Dynamic exprs opt_dyn_type) icl_module ca
 		# (exprs, ca) = collectFunctions exprs icl_module ca
 		= (PE_Dynamic exprs opt_dyn_type, ca)
@@ -1108,7 +1111,7 @@ scanModule mod=:{mod_ident,mod_type,mod_defs = pdefs} cached_modules support_gen
 
 	= (reorganise_icl_ok && pea_ok && import_dcl_ok && import_dcls_ok, mod, fun_range, fun_defs, optional_dcl_mod, modules, dcl_module_n,hash_table, err_file, files)
 where
-	scan_main_dcl_module :: Ident ModuleKind (ModTimeFunction *Files) *Files *CollectAdmin -> (!Bool,!Optional (Module (CollectedDefinitions (ScannedInstanceAndMembersR FunDef))),!Int,![ScannedModule],![Ident],!*Files,!*CollectAdmin)
+	scan_main_dcl_module :: Ident ModuleKind (ModTimeFunction *Files) *Files *CollectAdmin -> (!Bool,!Optional ScannedModule,!Int,![ScannedModule],![Ident],!*Files,!*CollectAdmin)
 	scan_main_dcl_module mod_ident MK_Main _ files ca
 		= (True, No,NoIndex,[MakeEmptyModule mod_ident MK_NoMainDcl], cached_modules,files, ca)
 	scan_main_dcl_module mod_ident MK_None _ files ca

@@ -4,13 +4,11 @@ import syntax, compare_types, utilities, expand_types, general
 from checksupport import ::Component(..),::ComponentMembers(..)
 
 // exactZip fails when its arguments are of unequal length
-exactZip` :: ![.a] ![.b] -> [(.a,.b)]
-exactZip` [] []
-	=	[]
-exactZip` [x:xs][y:ys]
+exactZip :: ![.a] ![.b] -> [(.a,.b)]
+exactZip [x:xs][y:ys]
 	=	[(x,y) : exactZip xs ys]
-exactZip
-	:==	exactZip`
+exactZip [] []
+	=	[]
 
 getIdent :: (Optional Ident) Int -> Ident
 getIdent (Yes ident) fun_nr
@@ -238,8 +236,6 @@ where
 		= weightedRefCountOfCase rci case_expr case_info {rs & rcs_expr_heap = rcs_expr_heap}
 	weightedRefCount rci expr=:(BasicExpr _) rs
 		= rs
-	weightedRefCount rci (MatchExpr constructor expr) rs
-		= weightedRefCount rci expr rs
 	weightedRefCount rci (Selection opt_tuple expr selections) rs
 		= weightedRefCount rci (expr, selections) rs
 	weightedRefCount rci (Update expr1 selections expr2) rs
@@ -247,6 +243,10 @@ where
 	weightedRefCount rci (RecordUpdate cons_symbol expr exprs) rs
 		= weightedRefCount rci (expr, exprs) rs
 	weightedRefCount rci (TupleSelect tuple_symbol arg_nr expr) rs
+		= weightedRefCount rci expr rs
+	weightedRefCount rci (MatchExpr constructor expr) rs
+		= weightedRefCount rci expr rs
+	weightedRefCount rci (IsConstructor expr _ _ _ _ _) rs
 		= weightedRefCount rci expr rs
 	weightedRefCount rci (AnyCodeExpr _ _ _) rs
 		= rs
@@ -310,10 +310,8 @@ weightedRefCountOfCase rci=:{rci_depth} this_case=:{case_expr, case_guards, case
 				check_symbol {cii_main_dcl_module_n, cii_common_defs} {glob_module, glob_object={ds_index}} collected_imports var_heap
 					| glob_module <> cii_main_dcl_module_n
 						# {cons_type_ptr} = cii_common_defs.[glob_module].com_cons_defs.[ds_index]
-						  (collected_imports, var_heap) = checkImportedSymbol (SK_Constructor {glob_module = glob_module, glob_object = ds_index})
-								cons_type_ptr (collected_imports, var_heap)
-						= (collected_imports, var_heap)
-					// otherwise
+						= checkImportedSymbol (SK_Constructor {glob_module = glob_module, glob_object = ds_index})
+												cons_type_ptr (collected_imports, var_heap)
 						= (collected_imports, var_heap)
 
 	 	weighted_ref_count_of_decons_expr rci (OverloadedListPatterns _ decons_exp _) rs
@@ -382,6 +380,7 @@ checkImportOfDclFunction {cii_main_dcl_module_n, cii_dcl_functions} mod_index fu
 		= { rs & rcs_imports = rcs_imports, rcs_var_heap = rcs_var_heap }
 	// otherwise
 		= rs
+
 checkRecordSelector {cii_main_dcl_module_n, cii_common_defs} {glob_module, glob_object={ds_index}} rs=:{rcs_imports,rcs_var_heap}
 	| glob_module <> cii_main_dcl_module_n
 		# {com_selector_defs,com_cons_defs,com_type_defs} = cii_common_defs.[glob_module]
@@ -497,9 +496,6 @@ where
 		= (fun_expr @ exprs, ds)
 	distributeLets di expr=:(BasicExpr _) ds
 		= (expr, ds)
-	distributeLets di (MatchExpr constructor expr) ds
-		# (expr, ds) = distributeLets di expr ds
-		= (MatchExpr constructor expr, ds)
 	distributeLets di (Selection opt_tuple expr selectors) ds
 		# (expr, ds) = distributeLets di expr ds
 		# (selectors, ds) = distributeLets di selectors ds
@@ -530,7 +526,7 @@ where
 		// otherwise
 		    = case let_expr of
 		    	Let inner_let=:{let_info_ptr=inner_let_info_ptr}
-		    		# (EI_LetType strict_inner_types, ds_expr_heap) = readPtr inner_let_info_ptr ds.ds_expr_heap
+					# (EI_LetType strict_inner_types, ds_expr_heap) = readPtr inner_let_info_ptr ds.ds_expr_heap
 					# (inner_let_info_ptr, ds_expr_heap)
 						=	newPtr (EI_LetType ((take nr_of_strict_lets let_type)++strict_inner_types)) ds_expr_heap
 					-> (Let { inner_let & let_strict_binds = let_strict_binds++inner_let.let_strict_binds,
@@ -560,6 +556,12 @@ where
 				= distributeLetsInLetExpression di fv_info_ptr lei { ds & ds_var_heap = ds_var_heap }
 				= { ds & ds_var_heap = ds_var_heap }
 
+	distributeLets di (MatchExpr constructor expr) ds
+		# (expr, ds) = distributeLets di expr ds
+		= (MatchExpr constructor expr, ds)
+	distributeLets di (IsConstructor expr cons_symbol cons_arity global_type_index case_ident position) ds
+		# (expr, ds) = distributeLets di expr ds
+		= (IsConstructor expr cons_symbol cons_arity global_type_index case_ident position, ds)
 	distributeLets _ expr=:(TypeCodeExpression _) ds
 		= (expr, ds)
 	distributeLets _ (AnyCodeExpr in_params out_params code_expr) ds=:{ds_var_heap}
@@ -594,11 +596,10 @@ where
 		  		rcc_default_variables = ref_counts_in_default,
 		  		rcc_pattern_variables = ref_counts_in_patterns }) = case_old_info
 		  new_depth = di_depth + 1
-		  new_di
-		  	=	{	di
-		  		&	di_depth = new_depth
-		  		,	di_explicit_case_depth = if case_explicit new_depth di_explicit_case_depth
-		  		}
+		  new_di =	{	di
+					&	di_depth = new_depth
+					,	di_explicit_case_depth = if case_explicit new_depth di_explicit_case_depth
+					}
 		  (local_lets, ds_var_heap) = mark_local_let_vars new_depth tot_ref_counts ds_var_heap
 										  	// -*-> ("ref_counts", case_expr, tot_ref_counts, ref_counts_in_patterns)
 		  	with
@@ -1080,17 +1081,11 @@ nextAlts si=:{si_next_alt=Yes next_alt, si_force_next_alt} kees=:{case_info_ptr,
 		=	findSplitCases {si & si_force_next_alt=jumps} case_default ss
 	| jumps && not (hasOption case_default)
 		// update the info for this case
-		# ss_expr_heap
-			=	ss.ss_expr_heap <:= (case_info_ptr,
-	  	  			EI_CaseTypeAndSplits type {splits & sic_next_alt = Yes next_alt})
+		# ss_expr_heap = ss.ss_expr_heap <:= (case_info_ptr, EI_CaseTypeAndSplits type {splits & sic_next_alt = Yes next_alt})
 		// update the info for the outer case
-		# (EI_CaseTypeAndSplits type splits, ss_expr_heap)
-			=	readPtr next_alt.na_case ss_expr_heap
-		  split
-		  	=	{sc_alt_nr = next_alt.na_alt_nr, sc_call = No}
-	  	  ss_expr_heap
-	  	  	=	ss_expr_heap <:= (next_alt.na_case,
-	  	  			EI_CaseTypeAndSplits type {splits & sic_splits = [split : splits.sic_splits]})
+		# (EI_CaseTypeAndSplits type splits, ss_expr_heap) = readPtr next_alt.na_case ss_expr_heap
+		  split = {sc_alt_nr = next_alt.na_alt_nr, sc_call = No}
+	  	  ss_expr_heap = ss_expr_heap <:= (next_alt.na_case, EI_CaseTypeAndSplits type {splits & sic_splits = [split : splits.sic_splits]})
 		=	{ss & ss_expr_heap = ss_expr_heap}
 		=	ss
 	where
@@ -1116,10 +1111,7 @@ newFunctionWithType :: !(Optional Ident) !FunctionBody ![FreeVar] !SymbolType !I
 newFunctionWithType opt_id fun_bodies local_vars fun_type group_index (cs_next_fun_nr, cs_new_functions, cs_fun_heap)
 	# (fun_def_ptr, cs_fun_heap) = newPtr FI_Empty cs_fun_heap
 	  fun_id = getIdent opt_id cs_next_fun_nr
-
-	  arity
-	  	=	fun_type.st_arity
-
+	  arity = fun_type.st_arity
 	  fun_def = 
 			{	fun_ident		= fun_id
 			,	fun_arity		= arity
@@ -1372,25 +1364,20 @@ instance split SplitCase where
 			=	splitIt sc_alt_nr kees
 		# (case_type1, case_type2)
 			=	splitIt sc_alt_nr case_type
-
 		# case_type_and_splits2
 			=	EI_CaseTypeAndSplits case_type2 {sic_splits = [], sic_next_alt = No, sic_case_kind = CaseKindUnknown}
 		# (case_info_ptr2, cs_expr_heap)
 			=	newPtr case_type_and_splits2 cs_expr_heap
-		# kees2
-			=	{kees2 & case_info_ptr = case_info_ptr2}
 
+		# kees2 = {kees2 & case_info_ptr = case_info_ptr2}
 		# (call, cs)
 			=	convertNonRootCase ci kees2 {cs & cs_expr_heap = cs_expr_heap}
-		# kees1
-			=	{kees1 & case_default = Yes call}
-
+		# kees1 = {kees1 & case_default = Yes call}
 		# (EI_CaseTypeAndSplits _ splits1, cs_expr_heap)
 			=	readPtr kees.case_info_ptr cs.cs_expr_heap
 		# case_type_and_splits1
 			=	EI_CaseTypeAndSplits case_type1 {splits1 & sic_splits = [{split & sc_call = Yes call} : splits1.sic_splits]}
-		# cs_expr_heap
-	  	  	=	cs_expr_heap <:= (kees.case_info_ptr, case_type_and_splits1)
+		# cs_expr_heap = cs_expr_heap <:= (kees.case_info_ptr, case_type_and_splits1)
 		=	(kees1, case_type1, {cs & cs_expr_heap = cs_expr_heap})
 
 class splitIt a :: CaseAltNr a -> (a, a)
@@ -1487,8 +1474,6 @@ convertRootCasesCasePatterns ci (BasicPatterns bt patterns) _ cs
 		=	convertRootCases ci patterns cs
 	=	(BasicPatterns bt patterns, cs)
 convertRootCasesCasePatterns ci (AlgebraicPatterns gi patterns) arg_types cs
-	| length patterns <> length arg_types
-		=	abort ("convertRootCasesCasePatterns error number of cases " +++ toString (length patterns) +++ " <> " +++ toString (length arg_types)) <<- arg_types
 	# (patterns, cs)
 		=	convertRootCasesAlgebraicPatterns ci (exactZip patterns arg_types) cs
 	=	(AlgebraicPatterns gi patterns, cs)
@@ -1524,7 +1509,7 @@ instance convertRootCases BasicPattern where
 			=	convertRootCases ci bp_expr cs
 		=	({pattern & bp_expr=bp_expr}, cs)
 
-class convertCases a :: !ConvertInfo !a  !*ConvertState -> (!a, !*ConvertState)
+class convertCases a :: !ConvertInfo !a !*ConvertState -> (!a, !*ConvertState)
 
 instance convertCases [a] | convertCases a
 where
@@ -1571,9 +1556,6 @@ where
 	convertCases ci (Let lad) cs
 		# (lad, cs) = convertCases ci lad cs
 		= (Let lad, cs)
-	convertCases ci (MatchExpr constructor expr) cs
-		# (expr, cs) = convertCases ci expr cs
-		= (MatchExpr constructor expr, cs)
 	convertCases ci (Selection is_unique expr selectors) cs
 		# (expr, cs) = convertCases ci expr cs
 		  (selectors, cs) = convertCases ci selectors cs
@@ -1597,6 +1579,68 @@ where
 		  				{ss_var_heap=cs.cs_var_heap,ss_expr_heap = cs.cs_expr_heap}
 		  cs = {cs & cs_var_heap=ss_var_heap, cs_expr_heap = ss_expr_heap}
 		= convertNonRootCase ci case_expr cs
+	convertCases ci (MatchExpr constructor expr) cs
+		# (expr, cs) = convertCases ci expr cs
+		= (MatchExpr constructor expr, cs)
+	convertCases ci=:{ci_common_defs} is_cons_expr=:(IsConstructor expr cons_symbol cons_arity global_type_index case_ident position) cs
+		# (expr, cs=:{cs_var_heap,cs_expr_heap}) = convertCases ci expr cs
+
+		  (new_info_ptr, cs_var_heap) = newPtr VI_LocalVar cs_var_heap
+		  var_id = {id_name = "_x", id_info = nilPtr}
+		  case_var = Var {var_ident = var_id, var_info_ptr = new_info_ptr, var_expr_ptr = nilPtr}
+		  case_free_var = {	fv_def_level = NotALevel, fv_ident = var_id, fv_info_ptr = new_info_ptr, fv_count = 0}
+
+		  fail_expr = BasicExpr (BVB False)
+		  true_expr = BasicExpr (BVB True)
+		  (var_args,cs_var_heap) = make_free_vars cons_arity cs_var_heap
+		  pattern = {ap_symbol = cons_symbol, ap_vars = var_args, ap_expr = true_expr, ap_position = position}
+		  patterns = AlgebraicPatterns global_type_index [pattern]
+		  (case_expr_ptr, cs_expr_heap) = newPtr EI_Empty cs_expr_heap
+		  case_expr = Case {case_expr = case_var, case_guards = patterns, case_default = Yes fail_expr, case_ident = No,
+							case_explicit = False, case_info_ptr = case_expr_ptr, case_default_pos = NoPos}
+		  cs & cs_var_heap=cs_var_heap, cs_expr_heap=cs_expr_heap
+
+		  bool_type = {at_attribute = TA_None, at_type = TB BT_Bool}
+
+		  algebraic_type = new_vars_in_algebraic_type ci_common_defs.[cons_symbol.glob_module].com_cons_defs.[cons_symbol.glob_object.ds_index].cons_type.st_result
+
+		  (fun_ident,cs) = new_case_function (Yes case_ident) bool_type case_expr [(case_free_var,algebraic_type)] [] ci.ci_group_index cs
+		= (App {app_symb=fun_ident, app_args=[expr], app_info_ptr=nilPtr}, cs)
+	where
+		make_free_vars :: !Int !*VarHeap -> (![FreeVar],!*VarHeap)
+		make_free_vars n_args var_heap
+			| n_args>0
+				# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
+				  (free_vars,var_heap) = make_free_vars (n_args-1) var_heap
+				= ([{fv_ident = {id_name = "_x", id_info = nilPtr}, fv_info_ptr = new_info_ptr, fv_def_level = NotALevel, fv_count = 0} : free_vars], var_heap)
+				= ([],var_heap)
+
+		new_vars_in_algebraic_type {at_attribute,at_type=TV tv}
+			| no_attribute_var at_attribute
+				= {at_attribute=at_attribute, at_type=TV {tv & tv_info_ptr=nilPtr}}
+				= {at_attribute=new_vars_in_attribute_var at_attribute, at_type=TV {tv & tv_info_ptr=nilPtr}}
+		new_vars_in_algebraic_type {at_attribute,at_type=TA type_symbol type_args}
+			# type_args = new_vars_in_algebraic_type_args type_args
+			| no_attribute_var at_attribute
+				= {at_attribute=at_attribute, at_type=TA type_symbol type_args}
+				= {at_attribute=new_vars_in_attribute_var at_attribute, at_type=TA type_symbol type_args}
+
+		no_attribute_var TA_Unique = True
+		no_attribute_var TA_None = True
+		no_attribute_var TA_Multi = True
+		no_attribute_var TA_Anonymous = True
+		no_attribute_var TA_MultiOfPropagatingConsVar = True
+		no_attribute_var _ = False
+
+		new_vars_in_attribute_var (TA_Var attr_var)
+			= TA_Anonymous
+		new_vars_in_attribute_var (TA_RootVar attr_var)
+			= TA_Anonymous
+
+		new_vars_in_algebraic_type_args [type_arg:type_args]
+			= [new_vars_in_algebraic_type type_arg:new_vars_in_algebraic_type_args type_args]
+		new_vars_in_algebraic_type_args []
+			= []
 	convertCases ci (FailExpr ident) cs
 		# (failExpr, cs)
 			=	convertNonRootFail ci ident cs
@@ -1609,7 +1653,7 @@ where
 		  (bound_vars, free_typed_vars, var_heap) = retrieve_variables cp_free_vars cp_var_heap
 		  (free_typed_dictinary_vars, var_heap) = retrieve_dictionary_variables dictionaries var_heap
 		  cs = {cs & cs_var_heap = var_heap}
-		  (fun_ident,cs) = new_case_function No expr_type expr (free_typed_vars++free_typed_dictinary_vars) cp_local_vars ci.ci_group_index ci.ci_common_defs cs
+		  (fun_ident,cs) = new_case_function No expr_type expr (free_typed_vars++free_typed_dictinary_vars) cp_local_vars ci.ci_group_index cs
 		  cs_var_heap = restore_old_fv_info_ptr_values old_fv_info_ptr_values (dictionaries++ci.ci_bound_vars) cs.cs_var_heap
 		= (App {app_symb=fun_ident, app_args=bound_vars, app_info_ptr=nilPtr}, {cs & cs_var_heap=cs_var_heap})
 	where
@@ -1649,7 +1693,7 @@ convertNonRootFail ci=:{ci_group_index, ci_common_defs} ident cs
 			,	at_type = TV {tv_ident = { id_name = "a", id_info = nilPtr }, tv_info_ptr = nilPtr}
 			}
 	# (fun_ident, cs)
-	  	=	new_case_function (Yes ident) result_type (FailExpr ident) [] [] ci_group_index ci_common_defs cs
+	  	=	new_case_function (Yes ident) result_type (FailExpr ident) [] [] ci_group_index cs
 	= (App { app_symb = fun_ident, app_args = [], app_info_ptr = nilPtr }, cs)
 
 convertNonRootCase ci=:{ci_bound_vars, ci_group_index, ci_common_defs} kees=:{ case_expr, case_ident, case_info_ptr} cs
@@ -1732,12 +1776,14 @@ where
 	case_is_degenerate _
 		=	(False, undef)
 
+	copy_case_expr :: [(FreeVar,AType)] Expression *VarHeap -> ([Expression],[(FreeVar,AType)],[FreeVar],Expression,[VarInfo],*VarHeap)
 	copy_case_expr bound_vars guards_and_default var_heap
 	    # (old_fv_info_ptr_values,var_heap) = store_VI_BoundVar_in_bound_vars_and_save_old_values bound_vars [] var_heap
 		  (expr, {cp_free_vars, cp_var_heap, cp_local_vars}) = copy guards_and_default { cp_free_vars = [], cp_var_heap = var_heap, cp_local_vars = [] }
 		  (bound_vars, free_typed_vars, var_heap) = retrieve_variables cp_free_vars cp_var_heap
 		= (bound_vars, free_typed_vars, cp_local_vars, expr, old_fv_info_ptr_values,var_heap)
 	
+	copy_case_expr_and_use_new_var :: [(FreeVar,AType)] BoundVar VarInfoPtr Expression *VarHeap -> (Bool,[Expression],[(FreeVar,AType)],[FreeVar],Expression,[VarInfo],*VarHeap)
 	copy_case_expr_and_use_new_var bound_vars {var_ident,var_info_ptr} new_info_ptr guards_and_default var_heap
 	    # (old_fv_info_ptr_values,var_heap) = store_VI_BoundVar_in_bound_vars_and_save_old_values bound_vars [] var_heap
 		# (var_info, var_heap) = readPtr var_info_ptr var_heap
@@ -1770,7 +1816,7 @@ where
 
 new_case_function_and_restore_old_fv_info_ptr_values opt_id result_type rhs free_vars local_vars
 	bound_vars old_fv_info_ptr_values group_index common_defs cs
-	# (fun_ident,cs) = new_case_function opt_id result_type rhs free_vars local_vars group_index common_defs cs
+	# (fun_ident,cs) = new_case_function opt_id result_type rhs free_vars local_vars group_index cs
 	# cs_var_heap=restore_old_fv_info_ptr_values old_fv_info_ptr_values bound_vars cs.cs_var_heap
 	= (fun_ident,{ cs & cs_var_heap = cs_var_heap});
 
@@ -1780,12 +1826,12 @@ restore_old_fv_info_ptr_values [old_fv_info_ptr_value:old_fv_info_ptr_values] [(
 restore_old_fv_info_ptr_values [] bound_vars var_heap
 	= var_heap
 
-new_case_function opt_id result_type rhs free_vars local_vars group_index common_defs cs=:{cs_expr_heap}
+new_case_function opt_id result_type rhs free_vars local_vars group_index cs=:{cs_expr_heap}
 	# body = TransformedBody {tb_args=[var \\ (var, _) <- free_vars], tb_rhs=rhs}
 	  (_,type)
 		=	removeAnnotations
 			{	st_vars			= []
-			,	st_args			= [ type \\ (_, type) <- free_vars]
+			,	st_args			= [type \\ (_, type) <- free_vars]
 			,	st_args_strictness=NotStrict
 			,	st_arity		= length free_vars
 			,	st_result		= result_type
@@ -1793,8 +1839,6 @@ new_case_function opt_id result_type rhs free_vars local_vars group_index common
 			,	st_attr_vars	= []
 			,	st_attr_env		= []
 			}
-//	  (body, cs)
-//	  	=	convertCasesInBody body (Yes type) group_index common_defs cs
 	# (fun_ident,  (cs_next_fun_nr, cs_new_functions, cs_fun_heap))
 			= newFunctionWithType opt_id body local_vars type group_index
 					(cs.cs_next_fun_nr, cs.cs_new_functions, cs.cs_fun_heap)
@@ -1864,9 +1908,6 @@ where
 		= (Conditional cond, cp_info)
 	copy expr=:(BasicExpr _) cp_info
 		= (expr, cp_info)
-	copy (MatchExpr constructor expr) cp_info
-		# (expr, cp_info) = copy expr cp_info
-		= (MatchExpr constructor expr, cp_info)
 	copy (Selection is_unique expr selectors) cp_info
 		# (expr, cp_info) = copy expr cp_info
 		  (selectors, cp_info) = copy selectors cp_info
@@ -1883,6 +1924,12 @@ where
 	copy (TupleSelect tuple_symbol arg_nr expr) cp_info
 		# (expr, cp_info) = copy expr cp_info
 		= (TupleSelect tuple_symbol arg_nr expr, cp_info)
+	copy (MatchExpr constructor expr) cp_info
+		# (expr, cp_info) = copy expr cp_info
+		= (MatchExpr constructor expr, cp_info)
+	copy (IsConstructor expr cons_symbol cons_arity global_type_index case_ident position) cp_info
+		# (expr, cp_info) = copy expr cp_info
+		= ((IsConstructor expr cons_symbol cons_arity global_type_index case_ident position), cp_info)
 	copy fail=:(FailExpr _) cp_info
 		= (fail, cp_info)
 	copy EE cp_info
@@ -1994,7 +2041,6 @@ where
 
 (-*->) infixl
 (-*->) a b :== a // ---> b
-//import RWSDebug
 (->>) infixl
 (->>) a b :== a // ---> b
 (<<-) infixl

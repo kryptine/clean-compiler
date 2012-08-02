@@ -86,6 +86,9 @@ where
 	lift (DynamicExpr expr) ls
 		# (expr, ls) = lift expr ls
 		= (DynamicExpr expr, ls)
+	lift (IsConstructor expr cons_symbol cons_arity global_type_index case_ident position) ls
+		# (expr, ls) = lift expr ls
+		= (IsConstructor expr cons_symbol cons_arity global_type_index case_ident position, ls)
 	lift (TypeSignature type_function expr) ls
 		# (expr, ls) = lift expr ls
 		= (TypeSignature type_function expr, ls)
@@ -399,6 +402,9 @@ where
 	unfold (MatchExpr cons_ident expr) us
 		# (expr, us) = unfold expr us
 		= (MatchExpr cons_ident expr, us)
+	unfold (IsConstructor expr cons_symbol cons_arity global_type_index case_ident position) us
+		# (expr, us) = unfold expr us
+		= (IsConstructor expr cons_symbol cons_arity global_type_index case_ident position, us)
 	unfold (DynamicExpr expr) us
 		# (expr, us) = unfold expr us
 		= (DynamicExpr expr, us)
@@ -538,7 +544,7 @@ where
 
 instance unfold Case
 where
-	unfold kees=:{ case_expr,case_guards,case_default,case_info_ptr} us
+	unfold kees=:{case_expr,case_guards,case_default,case_info_ptr} us
 		# (old_case_info, us_symbol_heap) = readPtr case_info_ptr us.us_symbol_heap
 		  new_case_info = old_case_info
 		  (new_info_ptr, us_symbol_heap) = newPtr new_case_info us_symbol_heap
@@ -1149,6 +1155,8 @@ where
 		= has_no_curried_macro_Expression expr
 	has_no_curried_macro_Expression (MatchExpr cons_ident expr)
 		= has_no_curried_macro_Expression expr
+	has_no_curried_macro_Expression (IsConstructor expr cons_symbol cons_arity global_type_index case_ident position)
+		= has_no_curried_macro_Expression expr
 	has_no_curried_macro_Expression (TypeSignature _ expr)
 		= has_no_curried_macro_Expression expr
 	has_no_curried_macro_Expression expr
@@ -1549,6 +1557,9 @@ where
 	expand (MatchExpr cons_ident expr) ei
 		# (expr, ei) = expand expr ei
 		= (MatchExpr cons_ident expr, ei)
+	expand (IsConstructor expr cons_symbol cons_arity global_type_index case_ident position) ei
+		# (expr, ei) = expand expr ei
+		= (IsConstructor expr cons_symbol cons_arity global_type_index case_ident position, ei)
 	expand (DynamicExpr dyn) ei
 		# (dyn, ei) = expand dyn ei
 		= (DynamicExpr dyn, ei)
@@ -1700,7 +1711,8 @@ where
 
 determineVariablesAndRefCounts :: ![FreeVar] !Expression !*CollectState -> (!Expression , ![FreeVar], ![FreeVar], ![DynamicPtr], !*CollectState)
 determineVariablesAndRefCounts free_vars expr cos=:{cos_var_heap}
-	# (expr, local_vars, dynamics, cos) = collectVariables expr [] [] { cos & cos_var_heap = clearCount free_vars cIsAGlobalVar cos_var_heap }
+	# cos = {cos & cos_var_heap = clearCount free_vars cIsAGlobalVar cos_var_heap}
+	  (expr, local_vars, dynamics, cos) = collectVariables expr [] [] cos
 	  (free_vars, cos_var_heap) = retrieveRefCounts free_vars cos.cos_var_heap
 	  (local_vars, cos_var_heap) = retrieveRefCounts local_vars cos_var_heap
 	= (expr, free_vars, local_vars, dynamics, { cos & cos_var_heap = cos_var_heap })
@@ -2027,9 +2039,12 @@ where
 	collectVariables (MatchExpr cons_ident expr) free_vars dynamics cos
 		# (expr, free_vars, dynamics, cos) = collectVariables expr free_vars dynamics cos
 		= (MatchExpr cons_ident expr, free_vars, dynamics, cos)
+	collectVariables (IsConstructor expr cons_symbol cons_arity global_type_index case_ident position) free_vars dynamics cos
+		# (expr, free_vars, dynamics, cos) = collectVariables expr free_vars dynamics cos
+		= (IsConstructor expr cons_symbol cons_arity global_type_index case_ident position, free_vars, dynamics, cos)
 	collectVariables (DynamicExpr dynamic_expr) free_vars dynamics cos
 		# (dynamic_expr, free_vars, dynamics, cos) = collectVariables dynamic_expr free_vars dynamics cos
-		= (DynamicExpr dynamic_expr, free_vars, dynamics, cos);
+		= (DynamicExpr dynamic_expr, free_vars, dynamics, cos)
 	collectVariables (TypeSignature type_function expr) free_vars dynamics cos
 		# (expr, free_vars, dynamics, cos) = collectVariables expr free_vars dynamics cos
 		= (TypeSignature type_function expr, free_vars, dynamics, cos);
@@ -2117,7 +2132,8 @@ where
 instance collectVariables AlgebraicPattern
 where
 	collectVariables pattern=:{ap_vars,ap_expr} free_vars dynamics cos
-		# (ap_expr, free_vars, dynamics, cos) = collectVariables ap_expr free_vars dynamics { cos & cos_var_heap = clearCount ap_vars cIsALocalVar cos.cos_var_heap}
+		# cos = {cos & cos_var_heap = clearCount ap_vars cIsALocalVar cos.cos_var_heap}
+		  (ap_expr, free_vars, dynamics, cos) = collectVariables ap_expr free_vars dynamics cos
 		  (ap_vars, cos_var_heap) = retrieveRefCounts ap_vars cos.cos_var_heap
 		= ({ pattern & ap_expr = ap_expr, ap_vars = ap_vars }, free_vars, dynamics, { cos & cos_var_heap = cos_var_heap })
 	

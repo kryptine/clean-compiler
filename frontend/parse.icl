@@ -3103,6 +3103,15 @@ wantExpression pState
 		_
 			->	wantExpressionT token pState
 
+wantPatternWithoutDefinitions :: !ParseState -> (!ParsedExpr, !ParseState)
+wantPatternWithoutDefinitions pState
+	# (token, pState) = nextToken FunctionContext pState
+	= case token of
+		CharListToken charList // To produce a better error message
+			->	charListError charList pState
+		_
+			->	wantPatternWithoutDefinitionsT token pState
+
 charListError charList pState
 	= (PE_Empty,  parseError "Expression" No ("List brackets, [ and ], around charlist '"+charList+"'") pState)
 
@@ -3170,6 +3179,14 @@ where
 			= (combineExpressions expr exprs, pState)
 			= (PE_Empty,  parseError "LHS expression" (Yes token) "<expression>" pState)
 
+wantPatternWithoutDefinitionsT  :: !Token !ParseState -> (!ParsedExpr, !ParseState)
+wantPatternWithoutDefinitionsT token pState
+	# (succ, expr, pState) = trySimplePatternWithoutDefinitionsT token pState
+	| succ
+		# (exprs, pState) = parseList trySimplePatternWithoutDefinitions pState
+		= (combineExpressions expr exprs, pState)
+		= (PE_Empty,  parseError "pattern" (Yes token) "<pattern>" pState)
+
 combineExpressions expr []
 	= expr
 combineExpressions expr exprs
@@ -3184,6 +3201,11 @@ trySimplePattern :: !ParseState -> (!Bool, !ParsedExpr, !ParseState)
 trySimplePattern pState
 	# (token, pState) = nextToken FunctionContext pState
 	= trySimplePatternT token pState
+
+trySimplePatternWithoutDefinitions :: !ParseState -> (!Bool, !ParsedExpr, !ParseState)
+trySimplePatternWithoutDefinitions pState
+	# (token, pState) = nextToken FunctionContext pState
+	= trySimplePatternWithoutDefinitionsT token pState
 
 tryExtendedSimpleExpression :: !ParseState -> (!Bool, !ParsedExpr, !ParseState)
 tryExtendedSimpleExpression pState
@@ -3201,30 +3223,75 @@ where
 	extend_expr_with_selectors :: !ParsedExpr !ParseState -> (!ParsedExpr, !ParseState)
 	extend_expr_with_selectors exp pState 
    		# (token, pState) = nextToken FunctionContext pState
-		| token == DotToken
-			# (token, pState) = nextToken FunctionContext pState
-			  (selectors, pState) = wantSelectors token pState
-			= (PE_Selection ParsedNormalSelector exp selectors, pState)
-		| token == ExclamationToken
-			# (token, pState) = nextToken FunctionContext pState
+		= case token of
+			DotToken
+				# (token, pState) = nextToken FunctionContext pState
+				  (selectors, token, pState) = wantSelectors token pState
+				  exp = PE_Selection ParsedNormalSelector exp selectors
+				-> case token of
+					DefinesColonToken
+						-> parse_matches_expression exp pState
+					_
+						-> (exp, tokenBack pState)
+			ExclamationToken
+				# (token, pState) = nextToken FunctionContext pState
 // JVG added for strict lists:
-			| token==SquareCloseToken
-				= (exp, tokenBack (tokenBack pState))
+				| token==SquareCloseToken
+					-> (exp, tokenBack (tokenBack pState))
 //			
-			#  (selectors, pState) = wantSelectors token pState
-			= (PE_Selection (ParsedUniqueSelector False) exp selectors, pState)
-		| otherwise
-			= (exp, tokenBack pState)
+				# (selectors, token, pState) = wantSelectors token pState
+				  exp = PE_Selection (ParsedUniqueSelector False) exp selectors
+				-> case token of
+					DefinesColonToken
+						-> parse_matches_expression exp pState
+					_
+						-> (exp, tokenBack pState)
+			DefinesColonToken
+				-> parse_matches_expression exp pState
+			_
+				-> (exp, tokenBack pState)
 
-wantSelectors :: Token *ParseState -> *(![ParsedSelection], !*ParseState)
+	parse_matches_expression exp pState
+		# (token, pState) = nextToken FunctionContext pState
+		= case token of
+			IdentToken name
+				| not (isLowerCaseName name)
+					# (id, pState) = stringToIdent name IC_Expression pState
+					  (pattern_args,pState) = parse_wild_cards pState
+					  pattern = if (isEmpty pattern_args) (PE_Ident id) (PE_List [PE_Ident id:pattern_args])
+					-> matches_expression exp pattern pState
+			// to do: qualified ident
+			_
+				# (succ, pattern, pState) = trySimplePatternWithoutDefinitionsT token pState
+				| succ
+					-> matches_expression exp pattern pState
+					# pState = parseError "pattern" (Yes token) "<pattern>" pState
+					-> matches_expression exp PE_Empty pState
+
+	parse_wild_cards pState
+	 	# (token, pState) = nextToken FunctionContext pState
+	 	= case token of
+	 		WildCardToken
+				# (pattern_args,pState) = parse_wild_cards pState
+	 			-> ([PE_WildCard:pattern_args],pState)
+	 		_
+	 			-> ([],tokenBack pState);
+
+	matches_expression exp pattern pState
+		# (case_ident, pState) = internalIdent "_c" pState
+		  (fname,linenr,pState) = getFileAndLineNr pState
+		  position = LinePos fname linenr
+		= (PE_Matches case_ident exp pattern position, pState)
+
+wantSelectors :: Token *ParseState -> *(![ParsedSelection], !Token, !*ParseState)
 wantSelectors token pState
 	# (selector, pState) = want_selector token pState
 	  (token, pState) = nextToken FunctionContext pState
 	| token == DotToken
 		# (token, pState) = nextToken FunctionContext pState
-		  (selectors, pState) = wantSelectors token pState
-		= (selector ++ selectors, pState)
-		= (selector, tokenBack pState)
+		  (selectors, token, pState) = wantSelectors token pState
+		= (selector ++ selectors, token, pState)
+		= (selector, token, pState)
 where
 	want_selector :: !Token !*ParseState -> *(![ParsedSelection], !*ParseState)
 	want_selector SquareOpenToken pState
@@ -3327,6 +3394,57 @@ trySimplePatternT (QualifiedIdentToken module_name ident_name) pState
 trySimplePatternT WildCardToken pState
 	= (True, PE_WildCard, pState)
 trySimplePatternT token pState
+	= (False, PE_Empty, tokenBack pState)
+
+trySimplePatternWithoutDefinitionsT :: !Token !ParseState -> (!Bool, !ParsedExpr, !ParseState)
+trySimplePatternWithoutDefinitionsT (IdentToken name) pState
+	| not (isLowerCaseName name)
+		# (id, pState) = stringToIdent name IC_Expression pState
+		= (True, PE_Ident id, pState)
+trySimplePatternWithoutDefinitionsT SquareOpenToken pState
+	# (list_expr, pState) = wantListPatternWithoutDefinitions pState
+	= (True, list_expr, pState)
+trySimplePatternWithoutDefinitionsT OpenToken pState
+	# (args=:[exp:exps], pState) = want_pattern_list pState
+	  pState = wantToken FunctionContext "pattern list" CloseToken pState
+	| isEmpty exps
+		= case exp of
+			PE_Ident id
+				-> (True, PE_List [exp], pState)
+			_
+				-> (True, exp, pState)
+		= (True, PE_Tuple args, pState)
+where
+	want_pattern_list pState
+		# (expr, pState) = wantPatternWithoutDefinitions pState
+		  (token, pState) = nextToken FunctionContext pState
+		| token == CommaToken
+			# (exprs, pState) = want_pattern_list pState
+			= ([expr : exprs], pState)
+			= ([expr], tokenBack pState)
+trySimplePatternWithoutDefinitionsT CurlyOpenToken pState
+	# (rec_or_aray_exp, pState) = wantRecordPatternWithoutDefinitions pState 
+	= (True, rec_or_aray_exp, pState)
+trySimplePatternWithoutDefinitionsT (IntToken int_string) pState
+	# (ok,int) = string_to_int int_string
+	| ok
+		= (True, PE_Basic (BVInt int), pState)
+		= (True, PE_Basic (BVI int_string), pState)
+trySimplePatternWithoutDefinitionsT (StringToken string) pState
+	= (True, PE_Basic (BVS string), pState)
+trySimplePatternWithoutDefinitionsT (BoolToken bool) pState
+	= (True, PE_Basic (BVB bool), pState)
+trySimplePatternWithoutDefinitionsT (CharToken char) pState
+	= (True, PE_Basic (BVC char), pState)
+trySimplePatternWithoutDefinitionsT (RealToken real) pState
+	= (True, PE_Basic (BVR real), pState)
+trySimplePatternWithoutDefinitionsT (QualifiedIdentToken module_name ident_name) pState
+	| not (isLowerCaseName ident_name)
+		# (module_id, pState) = stringToQualifiedModuleIdent module_name ident_name IC_Expression pState
+		= (True, PE_QualifiedIdent module_id ident_name, pState)
+trySimplePatternWithoutDefinitionsT WildCardToken pState
+	= (True, PE_WildCard, pState)
+trySimplePatternWithoutDefinitionsT token pState
 	= (False, PE_Empty, tokenBack pState)
 
 trySimpleExpressionT :: !Token !ParseState -> (!Bool, !ParsedExpr, !ParseState)
@@ -3450,27 +3568,109 @@ where
 trySimpleNonLhsExpressionT token pState
 	= (False, PE_Empty, tokenBack pState)
 
+wantListPatternWithoutDefinitions :: !ParseState -> (ParsedExpr, !ParseState)
+wantListPatternWithoutDefinitions pState
+	# pState=appScanState setNoNewOffsideForSeqLetBit pState
+	# (token, pState) = nextToken FunctionContext pState
+	# pState=appScanState clearNoNewOffsideForSeqLetBit pState	
+	# (head_strictness,token,pState) = want_head_strictness token pState
+	| token==ExclamationToken && (head_strictness<>HeadOverloaded && head_strictness<>HeadUnboxedAndTailStrict)
+		# (token, pState) = nextToken FunctionContext pState
+		| token==SquareCloseToken
+			= (makeTailStrictNilExpression head_strictness cIsAPattern,pState)
+			= (PE_Empty,parseError "list" (Yes token) (toString SquareCloseToken) pState)
+	| token==SquareCloseToken
+		| head_strictness==HeadUnboxedAndTailStrict
+			= (makeTailStrictNilExpression HeadUnboxed cIsAPattern,pState)
+		| head_strictness==HeadStrict
+			# (tail_strict,pState) = is_tail_strict_list_or_nil pState
+			| tail_strict
+				= (makeTailStrictNilExpression HeadLazy cIsAPattern,pState)
+				= (makeNilExpression head_strictness cIsAPattern,pState)
+			= (makeNilExpression head_strictness cIsAPattern,pState)
+	| head_strictness==HeadUnboxedAndTailStrict
+		= (PE_Empty,parseError "list" (Yes token) (toString SquareCloseToken) pState)
+	| head_strictness==HeadLazy && (case token of (IdentToken "!!") -> True; _ -> False)
+		# (next_token,pState) = nextToken FunctionContext pState
+		| next_token==SquareCloseToken
+			= (makeTailStrictNilExpression HeadStrict cIsAPattern,pState)
+			= want_LGraphExpr token [] head_strictness (tokenBack pState)
+		= want_LGraphExpr token [] head_strictness pState
+	where
+		want_LGraphExpr token acc head_strictness pState
+			= case token of
+				CharListToken chars
+					->	want_list (add_chars (fromString chars) acc) pState
+				_	#	(exp, pState) = wantPatternWithoutDefinitionsT token pState
+					->	want_list [exp: acc] pState
+		where
+			want_list acc pState
+				# (token, pState) = nextToken FunctionContext pState
+				= case token of
+					SquareCloseToken
+						#	nil_expr = makeNilExpression head_strictness cIsAPattern
+						->	(gen_pattern_cons_nodes acc nil_expr head_strictness,pState)
+					ExclamationToken
+						| head_strictness<>HeadOverloaded
+							# (token, pState) = nextToken FunctionContext pState
+							| token==SquareCloseToken
+								# nil_expr = makeTailStrictNilExpression head_strictness cIsAPattern
+								->	(gen_pattern_tail_strict_cons_nodes acc nil_expr head_strictness,pState)
+								-> (PE_Empty,parseError "list" (Yes token) (toString SquareCloseToken) pState)
+					CommaToken
+						#	(token, pState)	= nextToken FunctionContext pState
+						->	want_LGraphExpr token acc head_strictness pState
+					ColonToken
+						# (exp, pState)		= wantPatternWithoutDefinitions pState
+						# (token,pState)	= nextToken FunctionContext pState
+						| token==SquareCloseToken
+							-> (gen_pattern_cons_nodes acc exp head_strictness,pState)
+						| token==ExclamationToken && head_strictness<>HeadOverloaded
+							# pState = wantToken FunctionContext "list" SquareCloseToken pState
+							-> (gen_pattern_tail_strict_cons_nodes acc exp head_strictness,pState)
+						| token==ColonToken // to allow [1:2:[]] etc.
+							-> want_list [exp:acc] (tokenBack pState)
+							# pState = parseError "list" (Yes token) "] or :" pState
+							-> (gen_pattern_cons_nodes acc exp head_strictness,pState)
+					DotDotToken
+						->	(PE_Empty, parseError "want list expression" No "No dot dot expression in a pattern" pState)
+					DoubleBackSlashToken
+						->	(PE_Empty, parseError "want list expression" No "No \\\\ expression in a pattern" pState)
+					_
+						#	nil_expr = makeNilExpression head_strictness cIsAPattern
+							pState	= parseError "list" (Yes token) "list element separator" pState
+						->	(gen_pattern_cons_nodes acc nil_expr head_strictness,pState)
+
+gen_pattern_cons_nodes [] exp head_strictness
+	= exp
+gen_pattern_cons_nodes l exp head_strictness
+	= gen_pattern_cons_nodes l exp
+where
+	cons_ident_exp = makeConsIdentExpression head_strictness cIsAPattern
+	
+	gen_pattern_cons_nodes [e:r] exp
+		= gen_pattern_cons_nodes r (PE_List [cons_ident_exp,e,exp])
+	gen_pattern_cons_nodes [] exp
+		= exp
+
+gen_pattern_tail_strict_cons_nodes [] exp head_strictness
+	= exp
+gen_pattern_tail_strict_cons_nodes r exp head_strictness
+	= gen_pattern_tail_strict_cons_nodes r exp
+where
+	tail_strict_cons_ident_exp = makeTailStrictConsIdentExpression head_strictness cIsAPattern
+	
+	gen_pattern_tail_strict_cons_nodes [e:r] exp
+		= gen_pattern_tail_strict_cons_nodes r (PE_List [tail_strict_cons_ident_exp,e,exp])
+	gen_pattern_tail_strict_cons_nodes [] exp
+		= exp
+
 wantListExp :: !Bool !ParseState -> (ParsedExpr, !ParseState)
 wantListExp is_pattern pState
 	# pState=appScanState setNoNewOffsideForSeqLetBit pState
 	# (token, pState) = nextToken FunctionContext pState
 	# pState=appScanState clearNoNewOffsideForSeqLetBit pState	
 	# (head_strictness,token,pState) = want_head_strictness token pState
-		with
-			want_head_strictness :: Token *ParseState -> *(!Int,!Token,!*ParseState)
-			want_head_strictness ExclamationToken pState
-				# (token,pState) = nextToken FunctionContext pState
-				= (HeadStrict,token,pState)
-			want_head_strictness (SeqLetToken strict) pState
-				# (token,pState) = nextToken FunctionContext pState
-				| strict
-					= (HeadUnboxedAndTailStrict,token,pState);
-					= (HeadUnboxed,token,pState)
-			want_head_strictness BarToken pState
-				# (token,pState) = nextToken FunctionContext pState
-				= (HeadOverloaded,token,pState)
-			want_head_strictness token pState
-				= (HeadLazy,token,pState)
 	| token==ExclamationToken && (head_strictness<>HeadOverloaded && head_strictness<>HeadUnboxedAndTailStrict)
 		# (token, pState) = nextToken FunctionContext pState
 		| token==SquareCloseToken
@@ -3498,13 +3698,6 @@ wantListExp is_pattern pState
 			= case token of
 				CharListToken chars
 					->	want_list (add_chars (fromString chars) acc) pState
-					with
-						add_chars [] 			acc	= acc
-						add_chars ['\\',c1,c2,c3:r] acc
-							| c1>='0' && c1<='7'
-								= add_chars r [PE_Basic (BVC (toString ['\'','\\',c1,c2,c3,'\''])): acc]
-						add_chars ['\\',c:r] acc = add_chars r [PE_Basic (BVC (toString ['\'','\\',c,'\''])): acc]
-						add_chars [c:r] 		acc	= add_chars r [PE_Basic (BVC (toString ['\'',c,'\''])): acc]
 				_	#	(exp, pState) = (if is_pattern (wantPatternT token) (wantExpressionT token)) pState
 					->	want_list [exp: acc] pState
 		where
@@ -3642,7 +3835,7 @@ wantListExp is_pattern pState
 					= gen_cons_nodes r (PE_List [cons_ident_exp,e,exp])
 				gen_cons_nodes [] exp
 					= exp
-	
+
 			gen_tail_strict_cons_nodes [] exp
 				= exp
 			gen_tail_strict_cons_nodes r exp
@@ -3654,6 +3847,28 @@ wantListExp is_pattern pState
 					= gen_tail_strict_cons_nodes r (PE_List [tail_strict_cons_ident_exp,e,exp])
 				gen_tail_strict_cons_nodes [] exp
 					= exp
+
+want_head_strictness :: Token *ParseState -> *(!Int,!Token,!*ParseState)
+want_head_strictness ExclamationToken pState
+	# (token,pState) = nextToken FunctionContext pState
+	= (HeadStrict,token,pState)
+want_head_strictness (SeqLetToken strict) pState
+	# (token,pState) = nextToken FunctionContext pState
+	| strict
+		= (HeadUnboxedAndTailStrict,token,pState);
+		= (HeadUnboxed,token,pState)
+want_head_strictness BarToken pState
+	# (token,pState) = nextToken FunctionContext pState
+	= (HeadOverloaded,token,pState)
+want_head_strictness token pState
+	= (HeadLazy,token,pState)
+
+add_chars [] 			acc	= acc
+add_chars ['\\',c1,c2,c3:r] acc
+	| c1>='0' && c1<='7'
+		= add_chars r [PE_Basic (BVC (toString ['\'','\\',c1,c2,c3,'\''])): acc]
+add_chars ['\\',c:r] acc = add_chars r [PE_Basic (BVC (toString ['\'','\\',c,'\''])): acc]
+add_chars [c:r] 		acc	= add_chars r [PE_Basic (BVC (toString ['\'',c,'\''])): acc]
 
 makeNilExpression :: Int Bool -> ParsedExpr
 makeNilExpression head_strictness is_pattern
@@ -4013,8 +4228,7 @@ where
 
 	want_update :: Token ParseState -> (NestedUpdate, ParseState)
 	want_update token pState
-		# (selectors, pState) = wantSelectors token pState
-		  (token, pState) = nextToken FunctionContext pState
+		# (selectors, token, pState) = wantSelectors token pState
 		| token == EqualToken
 			# (expr, pState) = wantExpression pState
 			= ({nu_selectors = selectors, nu_update_expr = expr}, pState)
@@ -4260,6 +4474,53 @@ where
 		  pState			= wantToken FunctionContext "record update" AndToken pState
 		  (token, pState)	= nextToken FunctionContext pState
 		= want_update type expr token pState
+
+wantRecordPatternWithoutDefinitions :: !ParseState -> (ParsedExpr, !ParseState)
+wantRecordPatternWithoutDefinitions pState
+	# (token, pState) = nextToken FunctionContext pState
+	| token == CurlyCloseToken
+		= (PE_Empty, parseError "record pattern" No "Array denotation not" pState)
+		= want_record_pattern_without_definitions token pState
+where
+	want_record_pattern_without_definitions (IdentToken name) pState
+		| isUpperCaseName name
+			# pState = wantToken FunctionContext "record pattern" BarToken pState
+			  (type_id, pState) = stringToIdent name IC_Type pState
+			  (token, pState) = nextToken FunctionContext pState
+			  (fields, pState) = want_field_assignments_without_definitions token pState
+			= (PE_Record PE_Empty (RecordNameIdent type_id) fields, wantToken FunctionContext "record pattern" CurlyCloseToken pState)
+	want_record_pattern_without_definitions (QualifiedIdentToken module_name record_name) pState
+		| isUpperCaseName record_name
+			# pState = wantToken FunctionContext "record pattern" BarToken pState
+			  (module_id, pState) = stringToQualifiedModuleIdent module_name record_name IC_Type pState
+			  (token, pState) = nextToken FunctionContext pState
+			  (fields, pState) = want_field_assignments_without_definitions token pState
+			= (PE_Record PE_Empty (RecordNameQualifiedIdent module_id record_name) fields, wantToken FunctionContext "record pattern" CurlyCloseToken pState) 
+	want_record_pattern_without_definitions token pState
+		# (fields, pState) = want_field_assignments_without_definitions token pState
+		= (PE_Record PE_Empty NoRecordName fields, wantToken FunctionContext "record pattern" CurlyCloseToken pState) 
+
+	want_field_assignments_without_definitions token=:(IdentToken field_name) pState
+		| isLowerCaseName field_name
+			# (field_id, pState) = stringToIdent field_name IC_Selector pState
+			= want_more_field_assignments_without_definitions (FieldName field_id) pState
+	want_field_assignments_without_definitions token=:(QualifiedIdentToken module_name field_name) pState
+		| isLowerCaseName field_name
+			# (module_id, pState) = stringToIdent module_name (IC_Module NoQualifiedIdents) pState
+			= want_more_field_assignments_without_definitions (QualifiedFieldName module_id field_name) pState
+	want_field_assignments_without_definitions token pState
+		= ([], parseError "record field assignments" (Yes token) "field name" pState)
+
+	want_more_field_assignments_without_definitions field_name_or_qualified_field_name pState
+		# pState = wantToken FunctionContext "record pattern" EqualToken pState
+		# (field_expr, pState) = wantPattern pState
+		  field = {bind_src = field_expr, bind_dst = field_name_or_qualified_field_name}
+		#  (token, pState) = nextToken FunctionContext pState
+		| token == CommaToken
+			# (token, pState) = nextToken FunctionContext pState
+			  (fields, pState) = want_field_assignments_without_definitions token pState 
+			= ([field : fields], pState)
+			= ([field ], tokenBack pState)
 
 want_update :: !OptionalRecordName !ParsedExpr !Token !ParseState -> (!ParsedExpr, !ParseState)
 want_update type expr token pState

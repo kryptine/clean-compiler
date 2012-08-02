@@ -2024,6 +2024,18 @@ where
 			is_TFAC {at_type=TFAC _ _ _} = True
 			is_TFAC _ = False
 
+	requirements ti (IsConstructor expr {glob_object={ds_arity,ds_index,ds_ident},glob_module} _ _ _ _) (reqs,ts)
+		# cp = CP_Expression expr
+		  ({tst_result,tst_args,tst_attr_env}, ts) = standardLhsConstructorType cp ds_index glob_module ti ts
+		  (e_type, opt_expr_ptr, (reqs, ts)) = requirements ti expr (reqs,ts)
+		  reqs = { reqs & req_attr_coercions =  tst_attr_env ++ reqs.req_attr_coercions,
+		  				  req_type_coercions = [{ tc_demanded = tst_result, tc_offered = e_type, tc_position = cp, tc_coercible = True } : reqs.req_type_coercions ] }
+		  ts_attr_store = ts.ts_attr_store
+		  bool_type = { at_attribute = TA_TempVar ts_attr_store, at_type = basicBoolType.box}
+		  ts & ts_attr_store = inc ts_attr_store,
+		  	   ts_expr_heap = storeAttribute opt_expr_ptr tst_result.at_attribute ts.ts_expr_heap
+		= (bool_type, No, (reqs, ts))
+
 	requirements _ (AnyCodeExpr _ _ _) (reqs, ts)
 		# (fresh_v, ts) = freshAttributedVariable ts
 		= (fresh_v, No, (reqs, ts))
@@ -2470,7 +2482,6 @@ typeProgram :: !{! Group} !Int !*{# FunDef} !IndexRange  !(Optional Bool) !Commo
 	-> (!Bool, !*{# FunDef}, !ArrayAndListInstances, !{# CommonDefs}, !{# {# FunType} }, !*TypeDefInfos,!*Heaps,!*PredefinedSymbols,!*File,!*File)
 typeProgram comps main_dcl_module_n fun_defs specials list_inferred_types icl_defs imports icl_qualified_imports dcl_modules used_module_numbers
 	td_infos heaps=:{hp_var_heap, hp_expression_heap, hp_type_heaps,hp_generic_heap} predef_symbols file out
-
 	#! fun_env_size = size fun_defs
 
 	# ts_error = {ea_file = file, ea_loc = [], ea_ok = True }

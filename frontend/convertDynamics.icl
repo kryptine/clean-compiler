@@ -3,7 +3,6 @@ implementation module convertDynamics
 import syntax
 
 from type_io_common import PredefinedModuleName
-
 // Optional
 extended_unify_and_coerce no yes :== no;	// change also _unify and _coerce in StdDynamic
 
@@ -286,13 +285,16 @@ instance convertDynamics Expression where
 		= (TupleSelect definedSymbol int expression, ci)
 	convertDynamics _ be=:(BasicExpr _) ci
 		= (be, ci)
+	convertDynamics cinp (MatchExpr symb expression) ci
+		# (expression, ci) = convertDynamics cinp expression ci
+		= (MatchExpr symb expression, ci)
+	convertDynamics cinp (IsConstructor expr cons_symbol cons_arity global_type_index case_ident position) ci
+		# (expr, ci) = convertDynamics cinp expr ci
+		= (IsConstructor expr cons_symbol cons_arity global_type_index case_ident position, ci)
 	convertDynamics _ code_expr=:(AnyCodeExpr _ _ _) ci
 		= (code_expr, ci)
 	convertDynamics _ code_expr=:(ABCCodeExpr _ _) ci
 		= (code_expr, ci)
-	convertDynamics cinp (MatchExpr symb expression) ci
-		# (expression, ci) = convertDynamics cinp expression ci
-		= (MatchExpr symb expression, ci)
 	convertDynamics cinp (DynamicExpr dyno) ci
 		= convertDynamic cinp dyno ci
 	convertDynamics cinp EE ci
