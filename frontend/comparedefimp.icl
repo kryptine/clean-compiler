@@ -1126,6 +1126,10 @@ instance e_corresponds Expression where
 				 (MatchExpr icl_cons_symbol icl_src_expr)
 		=	e_corresponds dcl_cons_symbol icl_cons_symbol
 		o`	e_corresponds dcl_src_expr icl_src_expr
+	e_corresponds (IsConstructor dcl_src_expr dcl_cons_symbol _ _ _ _)
+				 (IsConstructor icl_src_expr icl_cons_symbol _ _ _ _)
+		=	e_corresponds dcl_cons_symbol icl_cons_symbol
+		o`	e_corresponds dcl_src_expr icl_src_expr
 	e_corresponds (FreeVar dcl) (FreeVar icl)
 		= e_corresponds dcl icl
 	e_corresponds (DynamicExpr dcl) (DynamicExpr icl)

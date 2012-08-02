@@ -878,7 +878,45 @@ checkExpression free_vars (PE_TypeSignature array_kind expr) e_input e_state e_i
 
 	# expr = TypeSignature strict_array_type expr
 */
+checkExpression free_vars (PE_Matches case_ident expr pattern position) e_input=:{ei_expr_level,ei_mod_index} e_state e_info cs
+	# (expr, free_vars, e_state, e_info, cs) = checkExpression free_vars expr e_input e_state e_info cs
+	  {es_fun_defs,es_var_heap,es_expr_heap} = e_state
+	  ps = {ps_var_heap = es_var_heap,ps_fun_defs = es_fun_defs}
+	  (pattern, (_/*var_env*/, _/*array_patterns*/), {ps_fun_defs,ps_var_heap}, e_info, cs)
+		= checkPattern pattern No { pi_def_level = ei_expr_level, pi_mod_index = ei_mod_index, pi_is_node_pattern = False } ([], []) ps e_info cs
+	| is_single_constructor_pattern pattern
+		= case pattern of
+			AP_Algebraic cons_symbol type_index args _
+				# is_cons_expr = IsConstructor expr cons_symbol (length args) {gi_module=cons_symbol.glob_module,gi_index=type_index} case_ident position
+				  e_state & es_fun_defs=ps_fun_defs, es_var_heap = ps_var_heap, es_expr_heap = es_expr_heap
+				-> (is_cons_expr, free_vars, e_state, e_info, cs)
+		# fail_expr = Yes (No,BasicExpr (BVB False))
+		  true_expr = BasicExpr (BVB True)
+		  (guarded_expr, pattern_scheme, _/*pattern_variables*/, defaul, es_var_heap, es_expr_heap, _/*dynamics_in_patterns*/, cs)
+			= transform_pattern pattern NoPattern NoPattern [] fail_expr true_expr case_ident.id_name position ps_var_heap es_expr_heap [] cs
+		  (case_expr, es_var_heap, es_expr_heap)
+		 	= build_and_share_case guarded_expr defaul expr case_ident cCaseExplicit es_var_heap es_expr_heap
+		  e_state & es_fun_defs=ps_fun_defs, es_var_heap = es_var_heap, es_expr_heap = es_expr_heap
+		= (case_expr, free_vars, e_state, e_info, cs)
+where
+	is_single_constructor_pattern (AP_Algebraic cons_symbol _ args No)
+		| cons_symbol.glob_module==cPredefinedModuleIndex
+			# pd_cons_index=cons_symbol.glob_object.ds_index+FirstConstructorPredefinedSymbolIndex
+			| pd_cons_index==PD_UnboxedConsSymbol || pd_cons_index==PD_UnboxedNilSymbol ||
+			  pd_cons_index==PD_UnboxedTailStrictConsSymbol || pd_cons_index==PD_UnboxedTailStrictNilSymbol ||
+			  pd_cons_index==PD_OverloadedConsSymbol || pd_cons_index==PD_OverloadedNilSymbol
+				= False
+				= all_wild_card_args args
+			= all_wild_card_args args
+	is_single_constructor_pattern _
+		= False
 
+	all_wild_card_args [AP_WildCard No : args]
+		= all_wild_card_args args
+	all_wild_card_args [_:_]
+		= False
+	all_wild_card_args []
+		= True
 checkExpression free_vars expr e_input e_state e_info cs
 	= abort "checkExpression (checkFunctionBodies.icl)" // <<- expr
 

@@ -341,6 +341,8 @@ where
 		= refMark free_vars arg_nr No expr rms 
 	refMark free_vars sel _ (MatchExpr _ expr) rms 
 		= refMark free_vars sel No expr rms 
+	refMark free_vars sel _ (IsConstructor expr _ _ _ _ _) rms 
+		= refMark free_vars sel No expr rms 
 	refMark free_vars sel _ EE rms 
 		= rms 
 	refMark _ _ _ _ rms 
@@ -700,7 +702,6 @@ seqCombineRefCount (RC_Used sec_ref) (RC_Used prim_ref)
 		make_primary_selections_non_unique []
 			= []
 
-
 emptyOccurrence type_info =
 		{	occ_ref_count		= RC_Unused
 		,	occ_previous		= []
@@ -729,7 +730,6 @@ where
 		= make_shared_vars_non_unique variables fun_body coercion_env rms_var_heap expr_heap (setErrorAdmin position error)
 	  var_heap = empty_occurrences variables var_heap
 	= (coercion_env, subst, type_def_infos, var_heap, expr_heap, error)
-	
 	where
 		clear_occurrences vars subst type_def_infos var_heap expr_heap
 			= foldSt initial_occurrence vars (subst, type_def_infos, var_heap, expr_heap)

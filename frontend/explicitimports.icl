@@ -661,8 +661,16 @@ instance check_completeness Expression where
 		= ccs
 	check_completeness (ABCCodeExpr _ _) _ ccs
 		= ccs
+	check_completeness (Update expr1 selections expr2) cci ccs
+		= ( (check_completeness expr1 cci)
+		  o (check_completeness selections cci)
+		  o (check_completeness expr2) cci
+		  ) ccs
 	check_completeness (MatchExpr {glob_module,glob_object={ds_ident,ds_index}} expression) cci ccs
 		= check_completeness expression cci
+		  (check_whether_ident_is_imported ds_ident glob_module ds_index STE_Constructor cci ccs)
+	check_completeness (IsConstructor expr {glob_module,glob_object={ds_ident,ds_index}} _ _ _ _) cci ccs
+		= check_completeness expr cci
 		  (check_whether_ident_is_imported ds_ident glob_module ds_index STE_Constructor cci ccs)
 	check_completeness (FreeVar _) _ ccs
 		= ccs
@@ -670,11 +678,6 @@ instance check_completeness Expression where
 		= check_completeness dynamicExpr cci ccs
 	check_completeness EE _ ccs
 		= ccs
-	check_completeness (Update expr1 selections expr2) cci ccs
-		= ( (check_completeness expr1 cci)
-		  o (check_completeness selections cci)
-		  o (check_completeness expr2) cci
-		  ) ccs
 	check_completeness expr _ _
 		= abort "explicitimports:check_completeness (Expression) does not match" //<<- expr
 

@@ -1515,15 +1515,18 @@ where
 		  (EI_TypeOfDynamic type_code, ui_symbol_heap) = readPtr dyn_info_ptr ui.ui_symbol_heap
 		  ui = { ui & ui_symbol_heap = ui_symbol_heap }
 		= (DynamicExpr { dyn & dyn_expr = dyn_expr, dyn_type_code = type_code }, ui)
+	updateExpression group_index (TupleSelect symbol argn_nr expr) ui
+		# (expr, ui) = updateExpression group_index expr ui
+		= (TupleSelect symbol argn_nr expr, ui)
 	updateExpression group_index (MatchExpr cons_symbol=:{glob_object={ds_arity}} expr) ui
 		| ds_arity <> -2
 			# (expr, ui) = updateExpression group_index expr ui
 			= (MatchExpr cons_symbol expr, ui)
 			// newtype constructor
 			= updateExpression group_index expr ui
-	updateExpression group_index (TupleSelect symbol argn_nr expr) ui
+	updateExpression group_index (IsConstructor expr cons_symbol cons_arity global_type_index case_ident position) ui
 		# (expr, ui) = updateExpression group_index expr ui
-		= (TupleSelect symbol argn_nr expr, ui)
+		= (IsConstructor expr cons_symbol cons_arity global_type_index case_ident position, ui)
 	updateExpression group_index (TypeSignature _ expr) ui
 		= updateExpression group_index expr ui
 	updateExpression group_index expr=:(Var {var_info_ptr}) ui

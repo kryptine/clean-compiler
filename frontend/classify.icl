@@ -442,8 +442,6 @@ instance consumerRequirements Expression where
 		= consumerRequirements case_expr common_defs ai
 	consumerRequirements (BasicExpr _) _ ai
 		= (CPassive, False, ai)
-	consumerRequirements (MatchExpr _ expr) common_defs ai
-		= consumerRequirements expr common_defs ai
 	consumerRequirements (Selection _ expr selectors) common_defs ai
 		# (cc, _, ai) = consumerRequirements expr common_defs ai
 		  ai = aiUnifyClassifications CActive cc ai
@@ -459,6 +457,10 @@ instance consumerRequirements Expression where
 		  (cc, _, ai) = consumerRequirements expressions common_defs ai
 		= (CPassive, False, ai)
 	consumerRequirements (TupleSelect tuple_symbol arg_nr expr) common_defs ai
+		= consumerRequirements expr common_defs ai
+	consumerRequirements (MatchExpr _ expr) common_defs ai
+		= consumerRequirements expr common_defs ai
+	consumerRequirements (IsConstructor expr _ _ _ _ _) common_defs ai
 		= consumerRequirements expr common_defs ai
 	consumerRequirements (AnyCodeExpr _ _ _) _ ai=:{ai_cur_ref_counts}
 		#! s							= size ai_cur_ref_counts
@@ -1427,8 +1429,6 @@ count_locals (Case {case_expr,case_guards,case_default}) n
 	= count_case_locals case_guards (count_locals case_expr (count_optional_locals case_default n))
 count_locals (BasicExpr _) n
 	= n
-count_locals (MatchExpr _ expr) n
-	= count_locals expr n
 count_locals (Selection _ expr selectors) n
 	= count_selector_locals selectors (count_locals expr n)
 count_locals (Update expr1 selectors expr2) n
@@ -1439,6 +1439,10 @@ count_locals (Update expr1 selectors expr2) n
 count_locals (RecordUpdate _ expr exprs) n
 	= foldSt count_bind_locals exprs (count_locals expr n)
 count_locals (TupleSelect _ _ expr) n
+	= count_locals expr n
+count_locals (MatchExpr _ expr) n
+	= count_locals expr n
+count_locals (IsConstructor expr _ _ _ _ _) n
 	= count_locals expr n
 count_locals (AnyCodeExpr _ _ _) n
 	= n
@@ -1748,6 +1752,8 @@ instance producerRequirements Expression where
 	producerRequirements (ABCCodeExpr _ _) prs
 		= (False,prs)
 	producerRequirements (MatchExpr _ expr) prs
+		= producerRequirements expr prs
+	producerRequirements (IsConstructor expr _ _ _ _ _) prs
 		= producerRequirements expr prs
 	producerRequirements (DynamicExpr _) prs
 		= (False,prs)

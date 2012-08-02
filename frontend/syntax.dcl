@@ -252,8 +252,8 @@ cIsAFunction	:== True
 cIsNotAFunction :== False
 
 ::	ParsedDefinition 
-	=	PD_Function  Position Ident Bool [ParsedExpr] Rhs FunKind
-	|	PD_NodeDef  Position ParsedExpr Rhs
+	=	PD_Function Position Ident Bool [ParsedExpr] Rhs FunKind
+	|	PD_NodeDef Position ParsedExpr Rhs
 	|	PD_Type ParsedTypeDef
 	|	PD_TypeSpec Position Ident Priority (Optional SymbolType) FunSpecials
 	|	PD_Class ClassDef [ParsedDefinition]
@@ -1214,6 +1214,7 @@ instance toString 	KindInfo
 				| PE_ArrayCompr !ArrayKind !ParsedExpr ![Qualifier]
 				| PE_Sequ Sequence
 				| PE_WildCard
+				| PE_Matches !Ident /*expr*/!ParsedExpr /*pattern*/!ParsedExpr !Position
 
 				| PE_QualifiedIdent !Ident !String
 
@@ -1302,6 +1303,7 @@ cIsNotStrict	:== False
 				| ABCCodeExpr ![String] !Bool
 
 				| MatchExpr !(Global DefinedSymbol) !Expression
+				| IsConstructor !Expression !(Global DefinedSymbol) /*arity*/!Int !GlobalIndex !Ident !Position
 				| FreeVar FreeVar 
 				| Constant !SymbIdent !Int !Priority		/* auxiliary clause used during checking */
 				| ClassVariable !VarInfoPtr					/* auxiliary clause used during overloading */

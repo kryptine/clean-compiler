@@ -283,6 +283,9 @@ where
 	transform (MatchExpr a1 expr) ro ti
 		# (expr,ti) = transform expr ro ti
 		= (MatchExpr a1 expr,ti)
+	transform (IsConstructor expr cons_symbol cons_arity global_type_index case_ident position) ro ti
+		# (expr,ti) = transform expr ro ti
+		= (IsConstructor expr cons_symbol cons_arity global_type_index case_ident position, ti)
 	transform (DynamicExpr dynamic_expr) ro ti
 		# (dynamic_expr, ti) = transform dynamic_expr ro ti
 		= (DynamicExpr dynamic_expr, ti)
@@ -1240,7 +1243,6 @@ where
 			= index1 =< index2
 		compare_constructor_arguments 	(PR_Class app1 lifted_vars_with_types1 t1) 
 										(PR_Class app2 lifted_vars_with_types2 t2) 
-//			= app1.app_args =< app2.app_args
 			# cmp = smallerOrEqual t1 t2
 			| cmp<>Equal
 				= cmp
@@ -1869,7 +1871,6 @@ get_producer_type {symb_kind=SK_Constructor {glob_module, glob_object}} ro fun_d
 	# (_,cons_type) = removeAnnotations cons_type	// necessary???
 	= (cons_type, fun_defs, fun_heap)
 
-//@ determine_args
 determine_args
 	:: ![Bool] ![ConsClass] !Index !{!Producer} ![Optional SymbolType] ![FreeVar] !ReadOnlyTI !*DetermineArgsState
 	-> *DetermineArgsState
@@ -3819,6 +3820,8 @@ where
 			VI_AccVar _ _			-> writeVarInfo var_info_ptr VI_Empty var_heap
 			VI_ExpressionOrBody _ _	_ _
 				-> writeVarInfo var_info_ptr VI_Empty var_heap
+			VI_Body _ _ _
+				-> writeVarInfo var_info_ptr VI_Empty var_heap
 
 instance clearVariables Expression
 where
@@ -3847,6 +3850,8 @@ where
 	clearVariables (TupleSelect _ arg_nr expr) fvi
 		= clearVariables expr fvi
 	clearVariables (MatchExpr _ expr) fvi
+		= clearVariables expr fvi
+	clearVariables (IsConstructor expr _ _ _ _ _) fvi
 		= clearVariables expr fvi
 	clearVariables EE fvi
 		= fvi
@@ -3986,6 +3991,8 @@ where
 	freeVariables (TupleSelect _ arg_nr expr) fvi
 		= freeVariables expr fvi
 	freeVariables (MatchExpr _ expr) fvi
+		= freeVariables expr fvi
+	freeVariables (IsConstructor expr _ _ _ _ _) fvi
 		= freeVariables expr fvi
 	freeVariables EE fvi
 		= fvi
@@ -4325,6 +4332,9 @@ where
 	copy (MatchExpr cons_ident expr) ci cs
 		# (expr, cs) = copy expr ci cs
 		= (MatchExpr cons_ident expr, cs)
+	copy (IsConstructor expr cons_symbol cons_arity global_type_index case_ident position) ci cs
+		# (expr, cs) = copy expr ci cs
+		= (IsConstructor expr cons_symbol cons_arity global_type_index case_ident position, cs)
 	copy (DynamicExpr expr) ci cs
 		# (expr, cs) = copy expr ci cs
 		= (DynamicExpr expr, cs)

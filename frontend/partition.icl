@@ -207,7 +207,6 @@ where
 	, pi_collect``			:: !.CollectState
 	}
 
-//:: Marks	:== {# Int}
 :: Marks	:== {# Mark}
 :: Mark		= { m_fun :: !Int, m_mark :: !Int}
 
@@ -425,6 +424,8 @@ where
 	find_calls fc_info (ABCCodeExpr _ _) fc_state
 		= fc_state
 	find_calls fc_info (MatchExpr _ expr) fc_state
+		= find_calls fc_info expr fc_state
+	find_calls fc_info (IsConstructor expr _ _ _ _ _) fc_state
 		= find_calls fc_info expr fc_state
 	find_calls fc_info EE fc_state
 		= fc_state

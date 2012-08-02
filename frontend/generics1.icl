@@ -1272,7 +1272,7 @@ where
 		#! gencase = {gencase & gc_kind = kind}
 
 		#! type_index = index_OBJECT_CONS_FIELD_type gencase.gc_type gs.gs_predefs
-		| type_index>=0		
+		| type_index>=0
 			# ({gc_body = GCB_FunIndex fun_index}) = gencase
 			  gen_info_ptr = gen_def.gen_info_ptr
 
@@ -3820,7 +3820,6 @@ where
 curryGenericArgType :: !SymbolType !String !*TypeHeaps 
 	-> (!SymbolType, !*TypeHeaps)
 curryGenericArgType  st=:{st_args, st_result, st_attr_env, st_attr_vars} attr_var_name th=:{th_attrs}
-		
 	#! (atype, attr_env, attr_vars, attr_store, th_attrs) 
 		= buildCurriedType st_args st_result TA_Multi st_attr_env st_attr_vars attr_var_name 1 th_attrs
 
@@ -4414,7 +4413,10 @@ foldExpr f expr=:(Conditional {if_cond,if_then,if_else}) st
 	# st = foldExpr f if_then st	
 	# st = foldOptional (foldExpr f) if_else st	
 	= st
-foldExpr f expr=:(MatchExpr _ expr1) st 
+foldExpr f expr=:(MatchExpr _ expr1) st
+	# st = f expr st
+	= foldExpr f expr1 st
+foldExpr f expr=:(IsConstructor expr1 _ _ _ _ _) st 
 	# st = f expr st
 	= foldExpr f expr1 st
 foldExpr f expr=:(DynamicExpr {dyn_expr}) st 
@@ -4543,7 +4545,7 @@ zipWith f _ _ = abort "zipWith: lists of different length\n"
 zipWithSt f l1 l2 st
 	:== zipWithSt l1 l2 st
 where
-	zipWithSt [] [] st 
+	zipWithSt [] [] st
 		= ([], st)
 	zipWithSt [x:xs] [y:ys] st
 		# (z, st) = f x y st

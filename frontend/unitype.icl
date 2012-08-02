@@ -671,7 +671,6 @@ newInequality off_attr dem_attr coercions=:{coer_demanded, coer_offered}
 		= {coer_demanded = coer_demanded, coer_offered = coer_offered}
 		= {coer_demanded = coer_demanded, coer_offered = coer_offered}
 where
-
 	insert ::  !Int !*CoercionTree -> (!Bool, !*CoercionTree)
 	insert new_attr CT_Empty
 		=  (True, CT_Node new_attr CT_Empty CT_Empty)
@@ -730,9 +729,7 @@ makeNonUnique attr {coer_demanded, coer_offered}
 	# (dem_coercions, coer_demanded) = replace coer_demanded attr CT_Empty
 	  coer_offered = { coer_offered & [attr] = CT_NonUnique }
 	= make_non_unique dem_coercions {coer_offered = coer_offered, coer_demanded = coer_demanded}
-//		---> ("makeNonUnique", attr)
 where
-	// JVG added type:
 	make_non_unique :: !CoercionTree !*Coercions -> *Coercions;
 	make_non_unique (CT_Node this_attr ct_less ct_greater) coercions
 		# coercions = makeNonUnique this_attr coercions
@@ -930,7 +927,7 @@ coerceTypes sign defs cons_vars tpos _ _  cs
 coercions_of_arg_types sign defs cons_vars tpos [t1 : ts1] [t2 : ts2] sign_class arg_number cs
 	# arg_sign = sign * signClassToSign sign_class arg_number
 	  (succ, cs) = coerce arg_sign defs cons_vars [arg_number : tpos] t1 t2 cs
-	| Success succ 
+	| Success succ
 		= coercions_of_arg_types sign defs cons_vars tpos ts1 ts2 sign_class (inc arg_number) cs
 		= (succ, cs)
 coercions_of_arg_types sign defs cons_vars tpos [] [] _ _ cs
@@ -1038,8 +1035,6 @@ where
 		= find_var_position_in_expression expr
 	find_var_position_in_expression (TupleSelect _ _ expr)
 		= find_var_position_in_expression expr
-	find_var_position_in_expression (MatchExpr _ expr)
-		= find_var_position_in_expression expr
 	find_var_position_in_expression (Update expr1 selections expr2)
 		# (found,pos) = find_var_position_in_expression expr1
 		| found
@@ -1061,6 +1056,10 @@ where
 			= find_var_position_in_updated_fields updated_fields
 		find_var_position_in_updated_fields []
 			= (False,NoPos)
+	find_var_position_in_expression (MatchExpr _ expr)
+		= find_var_position_in_expression expr
+	find_var_position_in_expression (IsConstructor expr _ _ _ _ _)
+		= find_var_position_in_expression expr
 	find_var_position_in_expression (Let {let_strict_binds,let_lazy_binds,let_expr})
 		# (found,pos) = find_var_position_in_let_binds let_strict_binds
 		| found
