@@ -360,7 +360,7 @@ where
 
 	lift_patterns default_exists (AlgebraicPatterns type case_guards) case_info_ptr outer_case ro ti
 		# guard_exprs	= [ ap_expr \\ {ap_expr} <- case_guards ]
-		  (EI_CaseType {ct_cons_types,ct_result_type},symbol_heap) = readExprInfo case_info_ptr ti.ti_symbol_heap
+		  (EI_CaseType {ct_cons_types},symbol_heap) = readExprInfo case_info_ptr ti.ti_symbol_heap
 		  var_heap = store_type_info_of_alg_pattern_in_pattern_variables ct_cons_types case_guards ti.ti_var_heap
 		  ti = {ti & ti_symbol_heap=symbol_heap,ti_var_heap=var_heap}
 		  (guard_exprs_with_case, ti) = lift_patterns_2 default_exists guard_exprs outer_case ro ti
@@ -841,7 +841,7 @@ transform_active_non_root_case kees=:{case_info_ptr,case_expr = App {app_symb}} 
 	  	# ti = { ti & ti_next_fun_nr = fun_index + 1 }
 		// JvG: why are dictionaries not the first arguments ?
 		# new_ro = { ro & ro_root_case_mode = RootCaseOfZombie, ro_tfi.tfi_case = fun_ident, ro_tfi.tfi_args = all_args }
-	  	= generate_case_function_with_pattern_argument fun_index case_info_ptr (Case kees) outer_fun_def outer_cons_args used_mask fun_ident all_args ti
+		= generate_case_function_with_pattern_argument fun_index case_info_ptr (Case kees) outer_fun_def outer_cons_args used_mask fun_ident all_args ti
 
 transform_active_non_root_case kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti=:{ti_recursion_introduced=old_ti_recursion_introduced}
 	| not aci.aci_safe
@@ -1042,8 +1042,8 @@ generate_case_function_with_pattern_argument fun_index case_info_ptr
 	  app_args = [old_case_expr : free_vars_to_bound_vars ro_fun_args]
 	= (App {app_symb = app_symb, app_args = app_args, app_info_ptr = nilPtr}, ti)
 
-get_types_of_local_vars n_vars var_heap
-	= mapSt get_type_of_local_var n_vars var_heap
+get_types_of_local_vars vars var_heap
+	= mapSt get_type_of_local_var vars var_heap
 where
 	get_type_of_local_var {fv_info_ptr} var_heap
 		# (EVI_VarType a_type, var_heap)	= readExtendedVarInfo fv_info_ptr var_heap
@@ -1187,12 +1187,10 @@ where
 	transform [] ro ti
 		= ([], ti)
 
-//@ tryToFindInstance: 
-
 cIsANewFunction		:== True
 cIsNotANewFunction	:== False
 
-tryToFindInstance :: !{! Producer} !InstanceInfo !*(Heap FunctionInfo) -> *(!Bool, !FunctionInfoPtr, !InstanceInfo, !.FunctionHeap)
+tryToFindInstance :: !{! Producer} !InstanceInfo !*FunctionHeap -> *(!Bool, !FunctionInfoPtr, !InstanceInfo, !.FunctionHeap)
 tryToFindInstance new_prods II_Empty fun_heap
 	# (fun_def_ptr, fun_heap) = newPtr FI_Empty fun_heap
 	= (cIsANewFunction, fun_def_ptr, II_Node new_prods fun_def_ptr II_Empty II_Empty, fun_heap)
@@ -1464,8 +1462,7 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 	  ti_cons_args				= das.das_cons_args
 	  ti_predef_symbols			= das.das_predef
 	  
-	  new_fun_arity
-	  		= length new_fun_args
+	  new_fun_arity = length new_fun_args
 	| SwitchArityChecks (new_fun_arity > 32 && new_fun_arity >= fun_arity) False
 		# new_gen_fd =
 			{	gf_fun_def			= fd
@@ -1485,8 +1482,7 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 	  
 	  new_args_strictness = compute_args_strictness new_arg_types_array
 	  	  	  
-	  cons_vars
-	  		= createArray (inc (BITINDEX nr_of_all_type_vars)) 0
+	  cons_vars = createArray (inc (BITINDEX nr_of_all_type_vars)) 0
 	  (cons_vars, th_vars)
 			= foldSt set_cons_var_bit propagating_cons_vars (cons_vars, ti_type_heaps.th_vars)
 //	| False--->("subst before", [el\\el<-:subst], "cons_vars", [el\\el<-:cons_vars])		= undef
@@ -1614,63 +1610,9 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 	  						Case _
 	  							-> RootCase
 	  						_	-> NotRootCase
-	
-	# (args1,resto,restn,var_heap) = take1 tb_args new_fun_args var_heap
-		with
-			take1 [o:os] [n:ns] var_heap
-				# (vi,var_heap) = readVarInfo o.fv_info_ptr var_heap
-				# eq = case vi of
-					VI_Variable _ fip	-> fip == n.fv_info_ptr
-					_					-> False
-				| eq
-					# (ts,os,ns,var_heap)	= take1 os ns var_heap
-					= ([o:ts],os,ns,var_heap)
-					= ([],[o:os],[n:ns],var_heap)
-			take1 os ns var_heap = ([],os,ns,var_heap)
-	# (args2o,args2n,resto,restn,var_heap) = take2 resto restn var_heap
-		with
-			take2 [] [] var_heap = ([],[],[],[],var_heap)
-			take2 os ns var_heap
-				# (os`,var_heap) = extend os var_heap 
-				# os`` = map fst os`
-				# ns`` = map (\{fv_info_ptr}->fv_info_ptr) ns
-				# condO = \(o,_) -> not (isMember o ns``)
-				# condN = \{fv_info_ptr} -> not (isMember fv_info_ptr os``)
-				# (ao`,ro`) = (takeWhile condO os`, dropWhile condO os`)
-				# (an,rn) = (takeWhile condN ns, dropWhile condN ns)
-				# ao = shrink ao`
-				# ro = shrink ro`
-				= (ao,an,ro,rn,var_heap)
-			where
-				extend os uvh	= seqList (map ext os) uvh
-				ext o uvh
-					# (vi,uvh) = readVarInfo o.fv_info_ptr uvh
-					= case vi of
-						VI_Variable _ fip	-> ((fip,o),uvh)
-						_					-> ((nilPtr,o),uvh)
-				shrink as = map snd as
 
-				isMember x [hd:tl]
-					| isNilPtr x	= False
-					| isNilPtr hd	= isMember x tl
-					= hd==x || isMember x tl
-				isMember x []	= False
-
-	# (args3,resto,restn,var_heap) = take1 resto restn var_heap
-		with
-			take1 [o:os] [n:ns] var_heap
-				# (vi,var_heap) = readVarInfo o.fv_info_ptr var_heap
-				# eq = case vi of
-					VI_Variable _ fip	-> fip == n.fv_info_ptr
-					_					-> False
-				| eq
-					# (ts,os,ns,var_heap)	= take1 os ns var_heap
-					= ([o:ts],os,ns,var_heap)
-					= ([],[o:os],[n:ns],var_heap)
-			take1 os ns var_heap = ([],os,ns,var_heap)
-//	| False -!-> ("genFun",(tb_args,new_fun_args),args1,(args2o,args2n),args3,(resto,restn)) = undef
-	| not (isEmpty resto)	= abort "genFun:resto"
-	| not (isEmpty restn)	= abort "genFun:restn"
+	# (n_args_before_producer,n_producer_args,var_heap)
+		= n_args_before_producer_and_n_producer_args tb_args new_fun_args var_heap
 
 	# tfi = {	tfi_root = ro_fun,
 				tfi_case = ro_fun,
@@ -1678,8 +1620,8 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 				tfi_args = new_fun_args,
 				tfi_vars = uvar ++ [arg \\ arg <- new_fun_args & i <- [0..] | arg_is_strict i new_args_strictness],
 										// evt ++ verwijderde stricte arg...
-				tfi_n_args_before_producer = length args1,
-				tfi_n_producer_args = length args2n
+				tfi_n_args_before_producer = n_args_before_producer,
+				tfi_n_producer_args = n_producer_args
 			 }
 	# ro = { ro & ro_root_case_mode = ro_root_case_mode, ro_tfi=tfi}
 				// ---> ("genfun uvars",uvar,[arg \\ arg <- new_fun_args & i <- [0..] | arg_is_strict i new_args_strictness])
@@ -1846,6 +1788,64 @@ where
 		  { crc_type_heaps = ti_type_heaps, crc_coercions = coercions, crc_td_infos = ti_type_def_infos }
 		  		= cs
 		= (btype, (coercions, subst, ti_type_heaps, ti_type_def_infos))
+
+	n_args_before_producer_and_n_producer_args :: [FreeVar] [FreeVar] *VarHeap -> (!Int,!Int,!*VarHeap)
+	n_args_before_producer_and_n_producer_args tb_args new_fun_args var_heap
+		# (n_args1,resto,restn,var_heap) = take1 tb_args new_fun_args var_heap
+			with
+				take1 [o:os] [n:ns] var_heap
+					# (vi,var_heap) = readVarInfo o.fv_info_ptr var_heap
+					= case vi of
+						VI_Variable _ fip
+							| fip == n.fv_info_ptr
+								# (n_args1,os,ns,var_heap) = take1 os ns var_heap
+								-> (n_args1+1,os,ns,var_heap)
+						_
+							-> (0,[o:os],[n:ns],var_heap)
+				take1 os ns var_heap
+					= (0,os,ns,var_heap)
+		# (n_args2n,resto,restn,var_heap) = take2 resto restn var_heap
+			with
+				take2 [] [] var_heap
+					= (0,[],[],var_heap)
+				take2 os ns var_heap
+					# (os`,var_heap) = extend os var_heap 
+					# os`` = map fst os`
+					# ns`` = map (\{fv_info_ptr}->fv_info_ptr) ns
+					# condO = \(o,_) -> not (isMember o ns``)
+					# condN = \{fv_info_ptr} -> not (isMember fv_info_ptr os``)
+					# ro` = dropWhile condO os`
+					# an = takeWhile condN ns
+					# rn = dropWhile condN ns
+					# ro = shrink ro`
+					= (length an,ro,rn,var_heap)
+				where
+					extend os uvh = mapSt ext os uvh
+					where
+						ext o uvh
+							# (vi,uvh) = readVarInfo o.fv_info_ptr uvh
+							= case vi of
+								VI_Variable _ fip	-> ((fip,o),uvh)
+								_					-> ((nilPtr,o),uvh)
+
+					shrink as = map snd as
+	
+					isMember x [hd:tl]
+						| isNilPtr x	= False
+						| isNilPtr hd	= isMember x tl
+						= hd==x || isMember x tl
+					isMember x []	= False
+		# var_heap = take3 resto restn var_heap
+			with
+				take3 [o:os] [n:ns] var_heap
+					# (vi,var_heap) = readVarInfo o.fv_info_ptr var_heap
+					= case vi of
+						VI_Variable _ fip
+							| fip == n.fv_info_ptr
+								= take3 os ns var_heap
+				take3 [] [] var_heap
+					= var_heap
+		= (n_args1,n_args2n,var_heap)
 
 // get_producer_type retrieves the type of symbol
 get_producer_type :: !SymbIdent !.ReadOnlyTI !*{#FunDef} !*FunctionHeap -> (!SymbolType,!*{#FunDef},!*FunctionHeap)
@@ -2345,8 +2345,6 @@ where
 			# (FI_Function generated_function, fun_heap) = readPtr fun_ptr fun_heap
 			= (max generated_function.gf_fun_def.fun_info.fi_group_index current_max, fun_defs, fun_heap)
 
-//@ replaceIntegers
-
 class replaceIntegers a :: !a !({!TypeVar}, !{!TypeAttribute}, !AttributePartition) !*{#Bool} -> (!a, !.{#Bool})
 	// get rid of all those TempV and TA_Var things
 
@@ -2479,7 +2477,7 @@ transformFunctionApplication fun_def instances cc=:{cc_size, cc_args, cc_linear_
 	  	| containsProducer cc_size producers || arity_changed
 	  		# (is_new, fun_def_ptr, instances, ti_fun_heap) = tryToFindInstance producers instances ti.ti_fun_heap
 	  		| is_new
-	  			# ti							= update_instance_info app_symb.symb_kind instances { ti & ti_fun_heap = ti_fun_heap }
+				# ti							= update_instance_info app_symb.symb_kind instances { ti & ti_fun_heap = ti_fun_heap }
 	  			# (fun_index, fun_arity, ti)	= generateFunction app_symb fun_def cc_args cc_linear_bits producers fun_def_ptr ro n_extra ti
 				| fun_index == (-1)
 					= (build_application { app & app_args = app_args } extra_args, ti) // ---> ("failed instance")
@@ -3456,8 +3454,6 @@ add_let_binds :: [FreeVar] [Expression] [LetBind] -> [LetBind]
 add_let_binds free_vars rhss original_binds
 	= [{ original_bind & lb_dst = lb_dst, lb_src = lb_src}
 		\\ lb_dst <- free_vars & lb_src <- rhss & original_bind <- original_binds]
-
-//@	transformGroups
 
 transformGroups :: !CleanupInfo !Int !Int !Int !Int !*{!Component} !*{#FunDef} !*{!.ConsClasses} !{# CommonDefs}  !{# {# FunType} }
 		!*ImportedTypes !*TypeDefInfos !*VarHeap !*TypeHeaps !*ExpressionHeap !Bool !*File !*PredefinedSymbols
