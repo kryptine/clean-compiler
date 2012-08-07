@@ -788,8 +788,8 @@ pIsSafe			:== True
 				VI_Pattern !AuxiliaryPattern |
 				VI_TypeCodeVariable !TypeCodeVariableInfo |
 				VI_DynamicValueAlias !BoundVar |
-				VI_Body !SymbIdent !TransformedBody ![FreeVar] | /* used during fusion */
-				VI_ExpressionOrBody !Expression !SymbIdent !TransformedBody ![FreeVar] | /* used during fusion */
+				VI_Body !SymbIdent !TransformedBody ![FreeVar] ![TypeVar] ![TypeVar] | /* used during fusion */
+				VI_ExpressionOrBody !Expression !SymbIdent !TransformedBody ![FreeVar] ![TypeVar] ![TypeVar] | /* used during fusion */
 				VI_Dictionary !SymbIdent ![Expression] !Type | /* used during fusion */
 				VI_Extended !ExtendedVarInfo !VarInfo |
 // MdM

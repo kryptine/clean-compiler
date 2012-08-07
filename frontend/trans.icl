@@ -25,10 +25,12 @@ SwitchHOFusion				fuse dont_fuse :== fuse
 SwitchHOFusion`				fuse dont_fuse :== fuse
 SwitchStrictPossiblyAddLet  strict lazy    :== lazy//strict
 
+/*
 (-!->) infix
 (-!->) a b :== a  // ---> b
 (<-!-) infix
 (<-!-) a b :== a  // <--- b
+*/
 
 fromYes (Yes x) = x
 
@@ -191,9 +193,9 @@ class transform a :: !a !ReadOnlyTI !*TransformInfo -> (!a, !*TransformInfo)
 
 instance transform Expression
 where
-	transform expr=:(App app=:{app_symb,app_args}) ro ti
+	transform (App app=:{app_args}) ro ti
 		# (app_args, ti) = transform app_args ro ti
-		= transformApplication { app & app_args = app_args } [] ro ti
+		= transformApplication {app & app_args = app_args} [] ro ti
 	transform appl_expr=:(expr @ exprs) ro ti
 		# (expr, ti) = transform expr ro ti
 		  (exprs, ti) = transform exprs ro ti
@@ -707,7 +709,7 @@ transform_active_root_case aci this_case=:{case_expr = (BasicExpr basic_value),c
 	| isEmpty may_be_match_pattern
 		= case case_default of
 			Yes default_expr-> transform default_expr { ro & ro_root_case_mode = NotRootCase } ti
-			No				-> (neverMatchingCase never_ident, ti) <-!- ("transform_active_root_case:BasicExpr:neverMatchingCase",never_ident)
+			No				-> (neverMatchingCase never_ident, ti) // <--- ("transform_active_root_case:BasicExpr:neverMatchingCase",never_ident)
 					with
 						never_ident = case ro.ro_root_case_mode of
 							NotRootCase -> this_case.case_ident
@@ -1350,6 +1352,8 @@ compute_args_strictness new_arg_types_array = compute_args_strictness 0 0 NotStr
  * GENERATE FUSED FUNCTION
  */
 
+:: OptionalProducerType = ProducerType !SymbolType ![TypeVar] | NoProducerType
+
 :: *DetermineArgsState =
 	{ das_vars						:: ![FreeVar]
 	, das_arg_types					:: !*{#ATypesWithStrictness}
@@ -1395,7 +1399,7 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 	  (opt_sound_function_producer_types, ti_type_heaps)
 	  		= mapSt copy_opt_symbol_type opt_sound_function_producer_types ti_type_heaps
 
-	  sound_function_producer_types = [x \\ Yes x <- opt_sound_function_producer_types]
+	  sound_function_producer_types = [x \\ ProducerType x _ <- opt_sound_function_producer_types]
 
 	# {st_attr_vars,st_args,st_args_strictness,st_result,st_attr_env} = sound_consumer_symbol_type
 
@@ -1673,9 +1677,9 @@ where
 		# (TVI_Type (TempV i), th_vars) = readPtr tv_info_ptr th_vars 
 		= (set_bit i cons_vars, th_vars)
 
-	copy_opt_symbol_type :: !(Optional .SymbolType) !*TypeHeaps -> (!(Optional .SymbolType),!.TypeHeaps)
+	copy_opt_symbol_type :: !(Optional SymbolType) !*TypeHeaps -> (!OptionalProducerType,!*TypeHeaps)
 	copy_opt_symbol_type No ti_type_heaps
-		= (No, ti_type_heaps)
+		= (NoProducerType, ti_type_heaps)
 	copy_opt_symbol_type (Yes symbol_type=:{st_vars, st_attr_vars, st_args, st_result, st_attr_env})
 				ti_type_heaps=:{th_vars, th_attrs}
 		# (fresh_st_vars, th_vars)
@@ -1686,8 +1690,9 @@ where
 		  		= substitute [st_result:st_args] { ti_type_heaps & th_vars = th_vars, th_attrs = th_attrs }
 		  (_, fresh_st_attr_env, ti_type_heaps)
 		  		= substitute st_attr_env ti_type_heaps
-		= (Yes { symbol_type & st_vars = fresh_st_vars, st_attr_vars = fresh_st_attr_vars, st_args = fresh_st_args,
-				st_result = fresh_st_result, st_attr_env = fresh_st_attr_env}, ti_type_heaps)
+		  symbol_type & st_vars = fresh_st_vars, st_attr_vars = fresh_st_attr_vars, st_args = fresh_st_args,
+						st_result = fresh_st_result, st_attr_env = fresh_st_attr_env
+		= (ProducerType symbol_type st_vars, ti_type_heaps)
 
 	add_propagation_attributes :: !{#.CommonDefs} !(Optional .SymbolType) !*(!*TypeHeaps,!*{#*{#.TypeDefInfo}})
 											  -> (!(Optional .SymbolType),! (!.TypeHeaps,! {#.{# TypeDefInfo}}))
@@ -1875,7 +1880,7 @@ get_producer_type {symb_kind=SK_Constructor {glob_module, glob_object}} ro fun_d
 	= (cons_type, fun_defs, fun_heap)
 
 determine_args
-	:: ![Bool] ![ConsClass] !Index !{!Producer} ![Optional SymbolType] ![FreeVar] !ReadOnlyTI !*DetermineArgsState
+	:: ![Bool] ![ConsClass] !Index !{!Producer} ![OptionalProducerType] ![FreeVar] !ReadOnlyTI !*DetermineArgsState
 	-> *DetermineArgsState
 determine_args _ [] prod_index producers prod_atypes forms _ das=:{das_var_heap}
 	# (vars, das_var_heap)	= new_variables forms das_var_heap
@@ -1888,8 +1893,7 @@ where
 		  (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
 		= ([{ form & fv_info_ptr = new_info_ptr } : vars], writeVarInfo fv_info_ptr (VI_Variable fv_ident new_info_ptr) var_heap)
 
-determine_args [linear_bit : linear_bits] [cons_arg : cons_args] prod_index producers [prod_atype:prod_atypes]
-				[form : forms] input das
+determine_args [linear_bit : linear_bits] [cons_arg : cons_args] prod_index producers [prod_atype:prod_atypes] [form : forms] input das
 	# das = determine_args linear_bits cons_args (inc prod_index) producers prod_atypes forms input das
 //	# producer	= if (cons_arg == CActive) (producers.[prod_index]) PR_Empty
 	# producer	= case cons_arg of
@@ -1900,21 +1904,19 @@ determine_args [linear_bit : linear_bits] [cons_arg : cons_args] prod_index prod
 	= determine_arg producer prod_atype form prod_index ((linear_bit,cons_arg), input) das
 
 determine_arg
-	:: !Producer .(Optional SymbolType) !FreeVar .Int !(!(!Bool,!ConsClass),!ReadOnlyTI) !*DetermineArgsState
+	:: !Producer OptionalProducerType !FreeVar .Int !(!(!Bool,!ConsClass),!ReadOnlyTI) !*DetermineArgsState
 	-> *DetermineArgsState
 
 determine_arg PR_Empty _ form=:{fv_ident,fv_info_ptr} _ ((linear_bit,cons_arg), _) das=:{das_var_heap}
-	# (new_info_ptr, das_var_heap)	= newPtr VI_Empty das_var_heap
-	# das_var_heap					= writeVarInfo fv_info_ptr (VI_Variable fv_ident new_info_ptr) das_var_heap
-	=	{ das 
-		& das_vars				= [{ form & fv_info_ptr = new_info_ptr } : das.das_vars ]
-		, das_new_linear_bits	= [ linear_bit : das.das_new_linear_bits ]
-		, das_new_cons_args		= [ cons_arg : das.das_new_cons_args ]
-		, das_var_heap			= das_var_heap
-		}
+	# (new_info_ptr, das_var_heap) = newPtr VI_Empty das_var_heap
+	# das_var_heap = writeVarInfo fv_info_ptr (VI_Variable fv_ident new_info_ptr) das_var_heap
+	= { das & das_vars				= [{form & fv_info_ptr = new_info_ptr} : das.das_vars]
+			, das_new_linear_bits	= [linear_bit : das.das_new_linear_bits]
+			, das_new_cons_args		= [cons_arg : das.das_new_cons_args]
+			, das_var_heap			= das_var_heap }
 
-determine_arg PR_Unused _ form prod_index (_,ro) das=:{das_var_heap}
-	# no_arg_type				= { ats_types= [], ats_strictness = NotStrict }
+determine_arg PR_Unused _ form prod_index (_,ro) das
+	# no_arg_type = {ats_types= [], ats_strictness = NotStrict}
 	= {das & das_arg_types.[prod_index] = no_arg_type}
 
 determine_arg (PR_Class class_app free_vars_and_types class_type) _ {fv_info_ptr} prod_index (_,ro)
@@ -1974,7 +1976,7 @@ determine_arg (PR_Class class_app free_vars_and_types class_type) _ {fv_info_ptr
 		, das_predef			= das_predef
 		}
 
-determine_arg producer (Yes {st_args, st_args_strictness, st_result, st_attr_vars, st_context, st_attr_env, st_arity})
+determine_arg producer (ProducerType {st_args, st_args_strictness, st_result, st_attr_vars, st_context, st_attr_env, st_arity, st_vars} original_type_vars)
 				{fv_info_ptr,fv_ident} prod_index ((linear_bit, _),ro)
 				das=:{das_subst,das_type_heaps,das_fun_defs,das_fun_heap,das_var_heap,das_cons_args,das_arg_types,das_next_attr_nr,das_AVI_Attr_TA_TempVar_info_ptrs}
 
@@ -2015,13 +2017,12 @@ determine_arg producer (Yes {st_args, st_args_strictness, st_result, st_attr_var
 	# (attr_inequalities, das_type_heaps)
 			= accAttrVarHeap (mapSt substitute_attr_inequality st_attr_env) das_type_heaps
 	  new_uniqueness_requirement
-	  		= { ur_offered		= application_type
-	  		  , ur_demanded		= arg_type
-//	  		  , ur_attr_ineqs	= attr_inequalities 
-	  		  , ur_attr_ineqs	= attr_inequalities ++ attr_env
-	  		  }
+			= { ur_offered		= application_type
+			  , ur_demanded		= arg_type
+			  , ur_attr_ineqs	= attr_inequalities ++ attr_env
+			  }
 	  (expr_to_unfold,form_vars,das_fun_defs,das_fun_heap,das_var_heap)
-		= make_producer_expression_and_args producer das.das_vars das_fun_defs das_fun_heap das_var_heap
+		= make_producer_expression_and_args producer original_type_vars st_vars das.das_vars das_fun_defs das_fun_heap das_var_heap
 /* DvA... STRICT_LET
 	  (expr_to_unfold, das_var_heap, let_bindings)
 			= case arg_type.at_annotation of
@@ -2056,14 +2057,14 @@ determine_arg producer (Yes {st_args, st_args_strictness, st_result, st_attr_var
 		, das_cons_args					= das_cons_args
 		}
 where
-	make_producer_expression_and_args (PR_Constructor symbol=:{symb_kind=SK_Constructor {glob_module}} arity _) das_vars das_fun_defs das_fun_heap das_var_heap
+	make_producer_expression_and_args (PR_Constructor symbol=:{symb_kind=SK_Constructor {glob_module}} arity _) _ _ das_vars das_fun_defs das_fun_heap das_var_heap
 		# (form_vars, act_vars, das_var_heap) = build_n_anonymous_var_args arity das_vars das_var_heap
 		= (VI_Expression (App {app_symb = symbol, app_args = act_vars, app_info_ptr = nilPtr}),form_vars,das_fun_defs,das_fun_heap,das_var_heap)
-	make_producer_expression_and_args (PR_Curried symbol=:{symb_kind=SK_Function {glob_module}} arity) das_vars das_fun_defs das_fun_heap das_var_heap
+	make_producer_expression_and_args (PR_Curried symbol=:{symb_kind=SK_Function {glob_module}} arity) _ _ das_vars das_fun_defs das_fun_heap das_var_heap
 		| glob_module <> ro.ro_main_dcl_module_n
 			# (form_vars, act_vars, das_var_heap) = build_n_anonymous_var_args arity das_vars das_var_heap
 			= (VI_Expression (App {app_symb = symbol, app_args = act_vars, app_info_ptr = nilPtr}),form_vars,das_fun_defs,das_fun_heap,das_var_heap)
-	make_producer_expression_and_args (PR_Curried symbol=:{symb_kind} arity) das_vars das_fun_defs das_fun_heap das_var_heap
+	make_producer_expression_and_args (PR_Curried symbol=:{symb_kind} arity) _ _ das_vars das_fun_defs das_fun_heap das_var_heap
 		# ({fun_body}, das_fun_defs, das_fun_heap)
 			= get_fun_def symb_kind ro.ro_main_dcl_module_n das_fun_defs das_fun_heap
 		= case fun_body of
@@ -2074,23 +2075,23 @@ where
 			_
 				# (form_vars, act_vars, das_var_heap) = build_n_anonymous_var_args arity das_vars das_var_heap
 				-> (VI_Expression (App {app_symb = symbol, app_args = act_vars, app_info_ptr = nilPtr}),form_vars,das_fun_defs,das_fun_heap,das_var_heap)
-	make_producer_expression_and_args (PR_Function symbol=:{symb_kind} arity _) das_vars das_fun_defs das_fun_heap das_var_heap
+	make_producer_expression_and_args (PR_Function symbol=:{symb_kind} arity _) original_type_vars new_type_vars das_vars das_fun_defs das_fun_heap das_var_heap
 		# ({fun_body}, das_fun_defs, das_fun_heap)
 			= get_fun_def symb_kind ro.ro_main_dcl_module_n das_fun_defs das_fun_heap
 		= case fun_body of
 			TransformedBody tb=:{tb_args}
 				# (form_vars, act_vars, das_var_heap)
 					= build_n_named_var_args arity tb_args das_vars das_var_heap
-				-> (VI_Body symbol tb (take arity form_vars), form_vars, das_fun_defs,das_fun_heap,das_var_heap)
-	make_producer_expression_and_args (PR_GeneratedFunction symbol=:{symb_kind} arity _) das_vars das_fun_defs das_fun_heap das_var_heap
+				-> (VI_Body symbol tb (take arity form_vars) original_type_vars new_type_vars, form_vars, das_fun_defs,das_fun_heap,das_var_heap)
+	make_producer_expression_and_args (PR_GeneratedFunction symbol=:{symb_kind} arity _) original_type_vars new_type_vars das_vars das_fun_defs das_fun_heap das_var_heap
 		# ({fun_body}, das_fun_defs, das_fun_heap)
 			= get_fun_def symb_kind ro.ro_main_dcl_module_n das_fun_defs das_fun_heap
 		= case fun_body of
 			TransformedBody tb=:{tb_args}
 				# (form_vars, act_vars, das_var_heap)
 					= build_n_named_var_args arity tb_args das_vars das_var_heap
-				-> (VI_Body symbol tb (take arity form_vars), form_vars, das_fun_defs,das_fun_heap,das_var_heap)
-	make_producer_expression_and_args (PR_CurriedFunction symbol=:{symb_kind} arity _) das_vars das_fun_defs das_fun_heap das_var_heap
+				-> (VI_Body symbol tb (take arity form_vars) original_type_vars new_type_vars, form_vars, das_fun_defs,das_fun_heap,das_var_heap)
+	make_producer_expression_and_args (PR_CurriedFunction symbol=:{symb_kind} arity _) original_type_vars new_type_vars das_vars das_fun_defs das_fun_heap das_var_heap
 		# ({fun_body}, das_fun_defs, das_fun_heap)
 			= get_fun_def symb_kind ro.ro_main_dcl_module_n das_fun_defs das_fun_heap
 		= case fun_body of
@@ -2098,7 +2099,7 @@ where
 				# (form_vars, act_vars, das_var_heap)
 					= build_n_named_var_args arity tb_args das_vars das_var_heap
 				  expr = App {app_symb = symbol, app_args = act_vars, app_info_ptr = nilPtr}
-				-> (VI_ExpressionOrBody expr symbol tb (take arity form_vars), form_vars, das_fun_defs,das_fun_heap,das_var_heap)
+				-> (VI_ExpressionOrBody expr symbol tb (take arity form_vars) original_type_vars new_type_vars, form_vars, das_fun_defs,das_fun_heap,das_var_heap)
 
 	build_n_anonymous_var_args arity das_vars das_var_heap
  		# var_names = repeatn arity {id_name = "_x", id_info = nilPtr}
@@ -2560,7 +2561,7 @@ where
 		= App app
 	build_application app extra_args
 		= App app @ extra_args
-		
+
 is_cons_or_decons_of_UList_or_UTSList glob_object glob_module imported_funs
 	:== let  type = imported_funs.[glob_module].[glob_object].ft_type;
 		  in type.st_arity>0 && not (isEmpty type.st_context);
@@ -3510,7 +3511,7 @@ where
 		= convert_function_types members common_defs s
 	convert_function_types NoComponentMembers common_defs s
 		= s
-
+/*
 	transform_groups_again :: !Int ![Component] ![Component] !{#CommonDefs} !{#{#FunType}} !*TransformInfo -> *(![Component],!*TransformInfo)
 	transform_groups_again group_nr [group:groups] acc_groups common_defs imported_funs ti
 		# {component_members} = group
@@ -3518,7 +3519,7 @@ where
 		= transform_groups_again group_nr groups acc_groups common_defs imported_funs ti
 	transform_groups_again group_nr [] acc_groups common_defs imported_funs ti
 		= (acc_groups, ti)
-
+*/
 	transform_group :: !{#CommonDefs} !{#{#FunType}} !Int !ComponentMembers !u:[Component] !*TransformInfo -> *(!Int,!u:[Component],!*TransformInfo)
 	transform_group common_defs imported_funs group_nr component_members acc_groups ti
 		// assign group_nr to component_members
@@ -3565,11 +3566,6 @@ where
 		transform_groups` common_defs imported_funs group_nr [{component_members}:groups] acc_groups ti
 			# (group_nr,acc_groups,ti) = transform_group common_defs imported_funs group_nr component_members acc_groups ti
 			= transform_groups` common_defs imported_funs group_nr groups acc_groups ti
-	
-		changed_group_classification [] ti
-			= (False,ti)
-		changed_group_classification [fun:funs] ti
-			= (False,ti)
 
 		assign_groups :: !ComponentMembers !Int !*TransformInfo -> *TransformInfo
 		assign_groups (ComponentMember member members) group_nr ti
@@ -3825,9 +3821,9 @@ where
 			VI_Dictionary _ _ _		-> writeVarInfo var_info_ptr VI_Empty var_heap
 			VI_Variable _ _			-> writeVarInfo var_info_ptr VI_Empty var_heap
 			VI_AccVar _ _			-> writeVarInfo var_info_ptr VI_Empty var_heap
-			VI_ExpressionOrBody _ _	_ _
+			VI_ExpressionOrBody _ _	_ _ _ _
 				-> writeVarInfo var_info_ptr VI_Empty var_heap
-			VI_Body _ _ _
+			VI_Body _ _ _ _ _
 				-> writeVarInfo var_info_ptr VI_Empty var_heap
 
 instance clearVariables Expression
@@ -4308,7 +4304,7 @@ where
 			VI_Dictionary app_symb app_args class_type
 				# (expr,cs) = copy_dictionary_variable app_symb app_args class_type ci cs
 				-> (Selection selector_kind expr selectors, cs)
-			VI_Body fun_ident {tb_args, tb_rhs} new_aci_params
+			VI_Body fun_ident {tb_args, tb_rhs} new_aci_params original_type_vars new_type_vars
 				# tb_args_ptrs = [ fv_info_ptr \\ {fv_info_ptr}<-tb_args ] 
 				  (original_bindings, cs_var_heap) = mapSt readPtr tb_args_ptrs cs.cs_var_heap
 				  cs_var_heap = bind_vars tb_args_ptrs new_aci_params cs_var_heap
@@ -4322,7 +4318,7 @@ where
 						# (expr,cs) = copy tb_rhs ci cs
 						  cs_var_heap = fold2St writePtr tb_args_ptrs original_bindings cs.cs_var_heap
 						-> (Selection selector_kind expr selectors, {cs & cs_var_heap = cs_var_heap})
-			VI_ExpressionOrBody expr _ _ _
+			VI_ExpressionOrBody expr _ _ _ _ _
 				-> (Selection selector_kind expr selectors, cs)
 			_
 				-> (Selection selector_kind (Var var) selectors, cs)
@@ -4361,16 +4357,16 @@ copyVariable var=:{var_info_ptr} ci cs
 		VI_Expression expr
 			-> (expr, cs)
 		VI_Variable var_ident var_info_ptr
-		 	# (var_expr_ptr, cs_symbol_heap) = newPtr EI_Empty cs.cs_symbol_heap
+			# (var_expr_ptr, cs_symbol_heap) = newPtr EI_Empty cs.cs_symbol_heap
 			-> (Var {var_ident = var_ident, var_info_ptr = var_info_ptr, var_expr_ptr = var_expr_ptr}, { cs & cs_symbol_heap = cs_symbol_heap})
-		VI_Body fun_ident _ vars
+		VI_Body fun_ident _ vars _ _
 			-> (App {	app_symb = fun_ident,
 						app_args = [ Var { var_ident=fv_ident, var_info_ptr=fv_info_ptr, var_expr_ptr=nilPtr }
 									\\ {fv_ident,fv_info_ptr}<-vars],
 						app_info_ptr = nilPtr }, cs)
 		VI_Dictionary app_symb app_args class_type
 			-> copy_dictionary_variable app_symb app_args class_type ci cs
-		VI_ExpressionOrBody expr _ _ _
+		VI_ExpressionOrBody expr _ _ _ _ _
 			-> (expr, cs)
 		_
 			-> (Var var, cs)
@@ -4511,16 +4507,21 @@ where
 					  (var_info,var_heap) = readVarInfo var_info_ptr cs.cs_var_heap
 					  cs = {cs & cs_var_heap=var_heap}
 					-> case var_info of
-						VI_Body fun_ident {tb_args, tb_rhs} new_aci_params
-							# tb_args_ptrs = [ fv_info_ptr \\ {fv_info_ptr}<-tb_args ] 
+						VI_Body fun_ident {tb_args, tb_rhs} new_aci_params original_type_vars new_type_vars
+							# (old_original_type_vars_values,cs_opt_type_heaps)
+								= forward_old_type_vars_to_new_type_vars original_type_vars new_type_vars cs.cs_opt_type_heaps
+							  // replacing the type variables is only necessary if the consumer is the same function as the producer
+							  tb_args_ptrs = [ fv_info_ptr \\ {fv_info_ptr}<-tb_args ] 
 							  (original_bindings, cs_var_heap) = mapSt readPtr tb_args_ptrs cs.cs_var_heap
 							  cs_var_heap = bind_vars tb_args_ptrs new_aci_params cs_var_heap
-							  (tb_rhs, cs) = copy tb_rhs ci { cs & cs_var_heap = cs_var_heap }
+							  cs & cs_var_heap = cs_var_heap, cs_opt_type_heaps = cs_opt_type_heaps
+							  (tb_rhs, cs) = copy tb_rhs ci cs
 							  cs_var_heap = fold2St writePtr tb_args_ptrs original_bindings cs.cs_var_heap
 							  new_aci = { aci & aci_params = new_aci_params, aci_opt_unfolder = Yes fun_ident, aci_free_vars = new_aci_free_vars }
 							  new_eei = (EI_Extended (EEI_ActiveCase new_aci) ei)
 							  cs_symbol_heap = writePtr case_info_ptr new_eei cs.cs_symbol_heap
-							-> (tb_rhs, { cs & cs_var_heap = cs_var_heap, cs_symbol_heap = cs_symbol_heap })
+							  cs_opt_type_heaps = restore_old_type_vars_values original_type_vars old_original_type_vars_values cs.cs_opt_type_heaps
+							-> (tb_rhs, {cs & cs_var_heap = cs_var_heap, cs_symbol_heap = cs_symbol_heap, cs_opt_type_heaps = cs_opt_type_heaps})
 						_	# new_eei = EI_Extended (EEI_ActiveCase { aci & aci_free_vars = new_aci_free_vars }) ei
 							  cs_symbol_heap = writePtr case_info_ptr new_eei cs.cs_symbol_heap
 							-> copy case_expr ci { cs & cs_symbol_heap = cs_symbol_heap }
@@ -4531,11 +4532,14 @@ where
 				# (var_info,var_heap) = readVarInfo var_info_ptr cs.cs_var_heap
 				  cs & cs_var_heap=var_heap
 				= case var_info of
-					VI_ExpressionOrBody _ fun_ident {tb_args, tb_rhs} new_aci_params
-						# tb_args_ptrs = [fv_info_ptr \\ {fv_info_ptr}<-tb_args] 
+					VI_ExpressionOrBody _ fun_ident {tb_args, tb_rhs} new_aci_params original_type_vars new_type_vars
+						# (old_original_type_vars_values,cs_opt_type_heaps)
+							= forward_old_type_vars_to_new_type_vars original_type_vars new_type_vars cs.cs_opt_type_heaps
+						  // replacing the type variables is only necessary if the consumer is the same function as the producer
+						  tb_args_ptrs = [fv_info_ptr \\ {fv_info_ptr}<-tb_args] 
 						  (original_bindings, cs_var_heap) = mapSt readPtr tb_args_ptrs cs.cs_var_heap
 						  (extra_exprs,cs_var_heap) = bind_variables tb_args_ptrs new_aci_params exprs cs_var_heap
-						  cs & cs_var_heap = cs_var_heap
+						  cs & cs_var_heap = cs_var_heap, cs_opt_type_heaps = cs_opt_type_heaps
 						  (expr,cs) = copy tb_rhs ci cs
 
 						  (case_info, cs_symbol_heap) = readPtr case_info_ptr cs.cs_symbol_heap
@@ -4548,7 +4552,8 @@ where
 									-> cs_symbol_heap
 
 						  cs_var_heap = fold2St writePtr tb_args_ptrs original_bindings cs.cs_var_heap
-						  cs & cs_var_heap = cs_var_heap
+						  cs_opt_type_heaps = restore_old_type_vars_values original_type_vars old_original_type_vars_values cs.cs_opt_type_heaps
+						  cs & cs_var_heap = cs_var_heap, cs_opt_type_heaps = cs_opt_type_heaps
 						-> case extra_exprs of
 							[]
 								-> (expr,cs)
@@ -4593,6 +4598,41 @@ bind_vars dest_info_ptrs src_free_vars var_heap
 where
 	bind fv_info_ptr {fv_ident=name, fv_info_ptr=info_ptr} var_heap
 		= writeVarInfo fv_info_ptr (VI_Expression (Var {var_ident=name, var_info_ptr=info_ptr, var_expr_ptr = nilPtr})) var_heap
+
+forward_old_type_vars_to_new_type_vars :: ![TypeVar] ![TypeVar] !*(Optional *TypeHeaps) -> (![TypeVarInfo],!*Optional *TypeHeaps)
+forward_old_type_vars_to_new_type_vars original_type_vars new_type_vars No
+	= ([],No)
+forward_old_type_vars_to_new_type_vars original_type_vars new_type_vars (Yes type_heaps)
+	# (old_type_vars_values,th_vars) = forward_old_type_vars_to_new_type_vars original_type_vars new_type_vars type_heaps.th_vars
+	= (old_type_vars_values,Yes {type_heaps & th_vars=th_vars})
+where
+	forward_old_type_vars_to_new_type_vars :: ![TypeVar] ![TypeVar] !*TypeVarHeap -> (![TypeVarInfo],!*TypeVarHeap)
+	forward_old_type_vars_to_new_type_vars [original_type_var:original_type_vars] [new_type_var:new_type_vars] type_var_heap
+		# (old_type_vars_values,type_var_heap) = forward_old_type_vars_to_new_type_vars original_type_vars new_type_vars type_var_heap
+		# (old_type_var_value,type_var_heap) = readPtr original_type_var.tv_info_ptr type_var_heap
+		# (new_type_var_value,type_var_heap) = readPtr new_type_var.tv_info_ptr type_var_heap
+		= case new_type_var_value of
+			TVI_Type type
+				# type_var_heap = writePtr original_type_var.tv_info_ptr new_type_var_value type_var_heap
+				-> ([old_type_var_value:old_type_vars_values],type_var_heap)
+			_
+				# type_var_heap = writePtr original_type_var.tv_info_ptr (TVI_Type (TV new_type_var)) type_var_heap
+				-> ([old_type_var_value:old_type_vars_values],type_var_heap)
+	forward_old_type_vars_to_new_type_vars [] [] type_var_heap
+		= ([],type_var_heap)
+
+restore_old_type_vars_values :: ![TypeVar] ![TypeVarInfo] !*(Optional *TypeHeaps) -> *Optional *TypeHeaps
+restore_old_type_vars_values original_type_vars old_original_type_vars_values No
+	= No
+restore_old_type_vars_values original_type_vars old_original_type_vars_values (Yes type_heaps)
+	# type_heaps & th_vars = write_old_type_vars_values original_type_vars old_original_type_vars_values type_heaps.th_vars
+	= Yes type_heaps
+where
+	write_old_type_vars_values [{tv_info_ptr}:type_vars] [type_var_value:type_var_values] type_var_heap
+		# type_var_heap = writePtr tv_info_ptr type_var_value type_var_heap
+		= write_old_type_vars_values type_vars type_var_values type_var_heap
+	write_old_type_vars_values [] [] type_var_heap
+		= type_var_heap
 
 instance copy Let
 where
