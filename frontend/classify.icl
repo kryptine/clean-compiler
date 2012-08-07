@@ -8,6 +8,7 @@ from checksupport import ::Component(..),::ComponentMembers(..)
 from containers import arg_is_strict
 import utilities
 import StdStrictLists
+from StdOverloadedList import !!$
 
 ::	CleanupInfo :== [ExprInfoPtr]
 
@@ -1019,7 +1020,7 @@ analyseGroups common_defs imported_funs {ir_from, ir_to} main_dcl_module_n stdSt
 		, main_dcl_module_n			= main_dcl_module_n
 		, stdStrictLists_module_n	= stdStrictLists_module_n
 		}
-	# class_env = createArray nr_of_funs { cc_size = 0, cc_args = [], cc_linear_bits = [], cc_producer=False}
+	# class_env = createArray nr_of_funs {cc_size=0, cc_args=[], cc_linear_bits=[#!], cc_producer=False}
 	= iFoldSt (analyse_group consumerAnalysisRO) 0 nr_of_groups
 				([], class_env, groups, fun_defs, var_heap, expr_heap)
 where	
@@ -1069,7 +1070,7 @@ where
 			  nr_of_local_vars						= nr_of_local_vars + nr_of_locals
 
 			# (fresh_vars, next_var, var_heap)		= fresh_variables tb_args 0 next_var var_heap
-			# fun_class								= { cc_size = 0, cc_args = fresh_vars, cc_linear_bits=[], cc_producer=False}
+			# fun_class								= { cc_size = 0, cc_args = fresh_vars, cc_linear_bits=[#!], cc_producer=False}
 			  class_env								= { class_env & [fun] = fun_class}
 			= (next_var, nr_of_local_vars, var_heap, class_env, fun_defs)
 
@@ -1122,7 +1123,7 @@ where
 			# (VI_AccVar cc arg_position, var_heap)				= readPtr var_info_ptr var_heap
 			  ({cc_size, cc_args, cc_linear_bits},class_env)	= class_env![fun_index]
 			  (aci_linearity_of_patterns, var_heap)				= get_linearity_info cc_linear_bits case_guards var_heap
-			| ((arg_position>=cc_size && CActive==skip_indirections class_subst cc) || (arg_position<cc_size && cc_args!!arg_position==CActive)) && cc_linear_bits!!arg_position
+			| ((arg_position>=cc_size && CActive==skip_indirections class_subst cc) || (arg_position<cc_size && cc_args!!arg_position==CActive)) && cc_linear_bits!!$arg_position
 				# aci =
 					{ aci_params				= []
 					, aci_opt_unfolder			= No
@@ -1228,7 +1229,7 @@ where
 			  nr_of_locals							= count_locals tb_rhs 0
 			  nr_of_local_vars						= nr_of_local_vars + nr_of_locals
 			  (fresh_vars, next_var, var_heap)		= fresh_variables tb_args 0 next_var var_heap
-			  fun_class								= {cc_size = 0, cc_args = fresh_vars, cc_linear_bits=[], cc_producer=False}
+			  fun_class								= {cc_size = 0, cc_args = fresh_vars, cc_linear_bits=[#!], cc_producer=False}
 			  (old_class,class_env) = replace class_env fun fun_class
 			  old_acc = [old_class:old_acc]
 			= initial_cons_classes members (next_var, nr_of_local_vars, var_heap, class_env, fun_defs, fun_heap, old_acc)
@@ -1238,7 +1239,7 @@ where
 			  nr_of_locals							= count_locals tb_rhs 0
 			  nr_of_local_vars						= nr_of_local_vars + nr_of_locals
 			  (fresh_vars, next_var, var_heap)		= fresh_variables tb_args 0 next_var var_heap
-			  fun_class								= {cc_size = 0, cc_args = fresh_vars, cc_linear_bits=[], cc_producer=False}
+			  fun_class								= {cc_size=0, cc_args=fresh_vars, cc_linear_bits=[#!], cc_producer=False}
 			  old_acc = [gf_cons_args:old_acc]
 			  fun_heap = writePtr fun_ptr (FI_Function {gf & gf_cons_args = fun_class}) fun_heap
 			= initial_cons_classes members (next_var, nr_of_local_vars, var_heap, class_env, fun_defs, fun_heap, old_acc)
@@ -1325,7 +1326,7 @@ where
 			equalCC l r = l == r
 
 			equalCCBits 0 _ _ = True
-			equalCCBits n [l:ls] [r:rs] = l == r && equalCCBits (dec n) ls rs
+			equalCCBits n [#l:ls!] [#r:rs!] = l == r && equalCCBits (dec n) ls rs
 
 		set_case_expr_info ((safe,{case_expr=case_expr=:(Var {var_info_ptr}), case_guards, case_info_ptr}),fun_index)
 				(cleanup_acc, class_env, fun_defs, var_heap, expr_heap, fun_heap)
@@ -1333,7 +1334,7 @@ where
 			  ({cc_size, cc_args, cc_linear_bits},fun_heap,class_env)
 				= get_fun_class_using_function_pointer_or_index fun_index fun_heap class_env
 			  (aci_linearity_of_patterns, var_heap)				= get_linearity_info cc_linear_bits case_guards var_heap
-			| arg_position<cc_size && (arg_position>=cc_size || cc_args!!arg_position==CActive) && cc_linear_bits!!arg_position
+			| arg_position<cc_size && (arg_position>=cc_size || cc_args!!arg_position==CActive) && cc_linear_bits!!$arg_position
 				# aci =
 					{ aci_params				= []
 					, aci_opt_unfolder			= No
@@ -1382,7 +1383,7 @@ get_linearity_info_of_patterns cc_linear_bits algebraic_patterns var_heap
 where
 	get_linearity_info_of_pattern cc_linear_bits {ap_vars} var_heap
 		# (var_indices, var_heap) = mapSt get_var_index ap_vars var_heap
-		= ([if (index==cNope) True (cc_linear_bits!!index) \\ index<-var_indices], var_heap)
+		= ([if (index==cNope) True (cc_linear_bits!!$index) \\ index<-var_indices], var_heap)
 
 	get_var_index {fv_info_ptr} var_heap
 		# (vi, var_heap) = readPtr fv_info_ptr var_heap
@@ -1548,7 +1549,7 @@ where
 :: UnusedStatus = UEmpty | ULazy | UStrict | UMixed
 
 determine_linear_bits ref_counts
-	= [ score` rc < 2 \\ rc <-: ref_counts]
+	= [#score` rc < 2 \\ rc <-: ref_counts!]
 
 substitute_dep_counts component_members ai_group_counts
 	#!	am						= size ai_group_counts.[0]
@@ -1646,7 +1647,7 @@ instance producerRequirements Expression where
 //						# prs = prs  ---> ("Yes cons info for",app_symb,ca.cc_args,ca.cc_linear_bits)
 						-> check_app_arguments ca.cc_args ca.cc_linear_bits app_args prs
 	where
-		check_app_arguments [cc_arg:cc_args] [cc_linear_bit:cc_bits] [app_arg:app_args] prs
+		check_app_arguments [cc_arg:cc_args] [#cc_linear_bit:cc_bits!] [app_arg:app_args] prs
 			| cc_arg == CActive && cc_linear_bit
 				# (rec,prs)	= is_recursive_app app_arg prs
 				| rec		= (False,prs)

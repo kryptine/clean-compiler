@@ -1,5 +1,6 @@
 implementation module convertcases
 
+import StdStrictLists
 import syntax, compare_types, utilities, expand_types, general
 from checksupport import ::Component(..),::ComponentMembers(..)
 
@@ -1121,7 +1122,7 @@ newFunctionWithType opt_id fun_bodies local_vars fun_type group_index (cs_next_f
 	= ({ symb_ident = fun_id, symb_kind = SK_GeneratedFunction fun_def_ptr cs_next_fun_nr },
 			(inc cs_next_fun_nr, [fun_def_ptr : cs_new_functions],
 				cs_fun_heap <:= (fun_def_ptr,  FI_Function { gf_fun_def = fun_def, gf_instance_info = II_Empty,
-	  				  gf_fun_index = cs_next_fun_nr, gf_cons_args = {cc_size=0, cc_args = [], cc_linear_bits = [], cc_producer = False} })))
+	  				  gf_fun_index = cs_next_fun_nr, gf_cons_args = {cc_size=0, cc_args = [], cc_linear_bits = [#!], cc_producer = False} })))
 
 addNewFunctionsToGroups :: !{#.CommonDefs} FunctionHeap ![FunctionInfoPtr] !Int !*{!Component} !*{#{# CheckedTypeDef}} !ImportedFunctions !*TypeHeaps !*VarHeap
 	-> (!*{!Component}, ![FunDef], !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
