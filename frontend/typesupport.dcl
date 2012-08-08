@@ -41,7 +41,7 @@ cleanUpSymbolType :: !Bool !Bool !TempSymbolType ![TypeContext] ![ExprInfoPtr] !
 
 equivalent :: !SymbolType !TempSymbolType !Int !{# CommonDefs} !*AttributeEnv !*TypeHeaps -> (!Bool, !*AttributeEnv, !*TypeHeaps) 
 
-NewAttrVarId :: !Int -> Ident
+NewAttrVar :: !Int !*AttrVarHeap -> (!AttributeVar,!*AttrVarHeap)
 
 beautifulizeAttributes :: !SymbolType !*AttrVarHeap -> (!SymbolType, !.AttrVarHeap)
 

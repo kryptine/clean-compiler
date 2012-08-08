@@ -1,6 +1,6 @@
 implementation module typesupport
 
-import StdEnv, compare_types
+import StdEnv, StdStrictLists, compare_types
 import syntax, expand_types, unitype, utilities, checktypes
 
 ::	Store	:== Int
@@ -105,8 +105,8 @@ where
 			= cus
 
 	clean_up_attribute_variable av_group_nr (TA_None, cus=:{cus_heaps,cus_attr_store,cus_attr_env})
-		# (av_info_ptr, th_attrs) = newPtr AVI_Empty cus_heaps.th_attrs
-		  new_attr_var = TA_Var { av_ident = NewAttrVarId cus_attr_store, av_info_ptr = av_info_ptr }
+		# (av, th_attrs) = NewAttrVar cus_attr_store cus_heaps.th_attrs
+		  new_attr_var = TA_Var av
 		= (new_attr_var, { cus &	cus_attr_env = { cus_attr_env & [av_group_nr] = new_attr_var},
 				 					cus_heaps = { cus_heaps & th_attrs = th_attrs }, cus_attr_store = inc cus_attr_store})	
 	clean_up_attribute_variable av_group_nr attr_and_cus
@@ -338,8 +338,7 @@ newAttributedVariables var_number attributed_variables clean_state=:(_,_,_) /* T
 newAttributedVariable var_number (variables, attributes, type_heaps=:{th_vars,th_attrs})
 	# (tv_info_ptr, th_vars) = newPtr TVI_Empty th_vars
 	  new_var = { tv_ident = NewVarId var_number, tv_info_ptr = tv_info_ptr }
-	  (av_info_ptr, th_attrs) = newPtr AVI_Empty th_attrs
-	  new_attr_var = { av_ident = NewAttrVarId var_number, av_info_ptr = av_info_ptr }
+	  (new_attr_var, th_attrs) = NewAttrVar var_number th_attrs
 	= ({ at_attribute = TA_Var new_attr_var, at_type = TV new_var},
 		([ new_var : variables ], [ new_attr_var : attributes ], { type_heaps & th_vars = th_vars, th_attrs = th_attrs }))
 
@@ -775,14 +774,25 @@ NewVarId var_store
 		= newIdent VarIdTable.[var_store]
 		= newIdent ("v" +++ toString var_store)
  
-AttrVarIdTable :: {# String}
-AttrVarIdTable =: { "u", "v", "w", "x", "y", "z" }
+AttrVarIdTable :: {!Ident}
+AttrVarIdTable =: {newIdent  i \\ i<-: {# "u", "v", "w", "x", "y", "z" }}
 
-NewAttrVarId :: !Int -> Ident
-NewAttrVarId attr_var_store
+AttrVarIdTables :: [#{!Ident}]
+AttrVarIdTables
+	=: [# let first_i=12*(1<<p) in {!newIdent ("u" +++ toString (i-6)) \\ i<-[first_i..first_i+first_i-1]} \\ p<-[0..] ]
+
+NewAttrVar :: !Int !*AttrVarHeap -> (!AttributeVar,!*AttrVarHeap)
+NewAttrVar attr_var_store th_attrs
 	| attr_var_store < size AttrVarIdTable
- 		= newIdent AttrVarIdTable.[attr_var_store]
-		= newIdent ("u" +++ toString attr_var_store)
+		# (av_info_ptr, th_attrs) = newPtr AVI_Empty th_attrs
+ 		= ({av_ident=AttrVarIdTable.[attr_var_store],av_info_ptr=av_info_ptr},th_attrs)
+ 		= getAttrVarId AttrVarIdTables (attr_var_store-6) 12 th_attrs
+where
+	getAttrVarId [#attrVarIds_array:attrVarId_list] i p th_attrs
+		| i<p
+			# (av_info_ptr, th_attrs) = newPtr AVI_Empty th_attrs
+			= ({av_ident=attrVarIds_array.[i],av_info_ptr=av_info_ptr},th_attrs)
+			= getAttrVarId attrVarId_list (i-p) (p+p) th_attrs
 
 class equiv a :: !a !a !*TypeHeaps -> (!Bool, !*TypeHeaps)
 
@@ -1556,7 +1566,6 @@ beautifulizeAttributes symbol_type th_attrs
 					\\ offered <- fst (flattenCoercionTree offered_tree) ]
 				  \\ offered_tree<-:coer_offered & demanded<-[0..] ]
 
-	
 	removeRedundancy :: !AttrCoercion !(!*{#Bool}, !*Coercions) -> (!.{#Bool}, !.Coercions)
 	removeRedundancy {ac_offered, ac_demanded} (visited, attr_env_coercions=:{coer_demanded})
 		// all i:not visited.[i]
