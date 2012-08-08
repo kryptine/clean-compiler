@@ -1536,8 +1536,7 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 
  	  (all_attr_vars2, ti_type_heaps)
  	  		= accAttrVarHeap (getAttrVars (fresh_arg_types, fresh_result_type)) ti_type_heaps
-	  all_attr_vars
-	  		= [ attr_var \\ TA_Var attr_var <- [fresh_attr_vars.[i] \\ i<-[0..size used_attr_vars-1] | used_attr_vars.[i]]]
+	  all_attr_vars = get_used_attr_vars 0 used_attr_vars fresh_attr_vars
  	# (all_fresh_type_vars, ti_type_heaps)
  	  		= accTypeVarHeap (getTypeVars (fresh_arg_types, fresh_result_type)) ti_type_heaps
 	  new_fun_type
@@ -1852,6 +1851,17 @@ where
 				take3 [] [] var_heap
 					= var_heap
 		= (n_args1,n_args2n,var_heap)
+
+	get_used_attr_vars :: !Int !{#Bool} !{!TypeAttribute} -> [AttributeVar]
+	get_used_attr_vars attr_var_n used_attr_vars fresh_attr_vars
+		| attr_var_n<size used_attr_vars
+			| used_attr_vars.[attr_var_n]
+				# (TA_Var used_attr_var) = fresh_attr_vars.[attr_var_n]
+				#! used_attr_var = used_attr_var
+				#! used_attr_vars = get_used_attr_vars (attr_var_n+1) used_attr_vars fresh_attr_vars
+				= [used_attr_var : used_attr_vars]
+				= get_used_attr_vars (attr_var_n+1) used_attr_vars fresh_attr_vars
+			= []
 
 // get_producer_type retrieves the type of symbol
 get_producer_type :: !SymbIdent !.ReadOnlyTI !*{#FunDef} !*FunctionHeap -> (!SymbolType,!*{#FunDef},!*FunctionHeap)
