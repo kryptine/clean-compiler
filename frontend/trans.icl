@@ -1294,8 +1294,8 @@ where
 			CT_NonUnique
 				-> ({ attr_var_array & [i] = TA_Multi}, th_attrs)
 			_
-				# (new_info_ptr, th_attrs) = newPtr AVI_Empty th_attrs
-				-> ({ attr_var_array & [i] = TA_Var { av_ident = NewAttrVarId i, av_info_ptr = new_info_ptr }}, th_attrs)
+				# (av, th_attrs) = NewAttrVar i th_attrs
+				-> ({attr_var_array & [i] = TA_Var av}, th_attrs)
 
 coercionsToAttrEnv :: !{!TypeAttribute} !Coercions -> [AttrInequality]
 coercionsToAttrEnv attr_vars {coer_demanded, coer_offered}
@@ -2254,8 +2254,7 @@ where
 		= (cum_attr, attr_env, attr_store)
 
 freshAttrVar attr_var th_attrs
-	# (new_info_ptr, th_attrs) = newPtr AVI_Empty th_attrs
-	= ({ av_ident = NewAttrVarId attr_var, av_info_ptr = new_info_ptr }, th_attrs)
+	:== NewAttrVar attr_var th_attrs
 
 RepeatnAppendM n a l :== repeatn_append_ n a l
 	where
@@ -3414,10 +3413,8 @@ renewVariables exprs var_heap
 
 	preprocess_local_var :: !FreeVar !RenewState -> (!FreeVar, !RenewState)
 	preprocess_local_var fv=:{fv_ident, fv_info_ptr} (new_vars_accu, free_vars_accu, var_heap)
-		# (evi, var_heap)
-				= readExtendedVarInfo fv_info_ptr var_heap
-		  (new_var, var_heap)
-				= allocate_and_bind_new_var fv_ident fv_info_ptr evi var_heap
+		# (evi, var_heap) = readExtendedVarInfo fv_info_ptr var_heap
+		  (new_var, var_heap) = allocate_and_bind_new_var fv_ident fv_info_ptr evi var_heap
 		= ( { fv & fv_info_ptr = new_var.var_info_ptr }
 		  , (new_vars_accu, free_vars_accu, var_heap))
 
@@ -4168,7 +4165,7 @@ where
 		showTail f [|x]   = f <<< x <<< "] "
 		showTail f [|a:x] = showTail (f <<< a <<< ", ") x
 		showTail f [|]    = f <<< "] "
-	
+
 instance <<< InstanceInfo
   where
 	(<<<) file ii = (write_ii ii (file <<< "[")) <<< "]"
