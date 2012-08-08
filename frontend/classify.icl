@@ -1390,14 +1390,14 @@ get_linearity_info cc_linear_bits (AlgebraicPatterns _ algebraic_patterns) var_h
 get_linearity_info cc_linear_bits (OverloadedListPatterns _ _ algebraic_patterns) var_heap
 	= get_linearity_info_of_patterns cc_linear_bits algebraic_patterns var_heap
 get_linearity_info cc_linear_bits _ var_heap
-	= ([], var_heap)
+	= ([!!], var_heap)
 
 get_linearity_info_of_patterns cc_linear_bits algebraic_patterns var_heap
-	= mapSt (get_linearity_info_of_pattern cc_linear_bits) algebraic_patterns var_heap
+	= mapStStrictR (get_linearity_info_of_pattern cc_linear_bits) algebraic_patterns var_heap
 where
 	get_linearity_info_of_pattern cc_linear_bits {ap_vars} var_heap
 		# (var_indices, var_heap) = mapSt get_var_index ap_vars var_heap
-		= ([if (index==cNope) True (cc_linear_bits!!$index) \\ index<-var_indices], var_heap)
+		= ([#if (index==cNope) True (cc_linear_bits!!$index) \\ index<-var_indices!], var_heap)
 
 	get_var_index {fv_info_ptr} var_heap
 		# (vi, var_heap) = readPtr fv_info_ptr var_heap
@@ -1410,6 +1410,17 @@ set_linearity_info fun fun_index fun_cons_class fun_ref_counts group_strictness
 	   fun_cons_class						= { fun_cons_class & cc_linear_bits=linear_bits }
 	   cc_args								= add_unused_args fun fun_index fun_cons_class.cc_args fun_ref_counts group_strictness
 	= { fun_cons_class & cc_args = cc_args }
+
+mapStStrictR f l s :== map_st l s
+where
+	map_st [x : xs] s
+	 	# (x, s) = f x s
+		  (xs, s) = map_st xs s
+		#! s = s
+		= ([!x : xs!], s)
+	map_st [] s
+		#! s = s
+	 	= ([!!], s)
 
 foldComponentMembersSt op l st :== fold_ComponentMembers_st l st
 	where
