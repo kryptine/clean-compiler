@@ -1022,7 +1022,7 @@ generate_case_function_with_pattern_argument fun_index case_info_ptr
 	  new_cons_args =
 	  			{ cc_size			= fun_arity
 	  			, cc_args			= [CActive : repeatn nr_of_lifted_vars CPassive ++ cc_args_from_outer_fun]
-	  			, cc_linear_bits	= [#True : RepeatnAppendM nr_of_lifted_vars False cc_linear_bits_from_outer_fun!]
+				, cc_linear_bits	= [#True : RepeatnAppendM nr_of_lifted_vars False cc_linear_bits_from_outer_fun!]
 	  			, cc_producer		= False
 	  			}
 	  gf =		{ gf_fun_def		= fun_def
@@ -1298,13 +1298,26 @@ where
 				-> ({attr_var_array & [i] = TA_Var av}, th_attrs)
 
 coercionsToAttrEnv :: !{!TypeAttribute} !Coercions -> [AttrInequality]
-coercionsToAttrEnv attr_vars {coer_demanded, coer_offered}
-	= flatten [ [ {ai_offered = toAttrVar attr_vars.[offered],
-					ai_demanded = toAttrVar attr_vars.[demanded] }
-				\\ offered <- fst (flattenCoercionTree offered_tree) ]
-			  \\ offered_tree<-:coer_offered & demanded<-[0..] ]
-  where
-	toAttrVar (TA_Var av) = av
+coercionsToAttrEnv attr_vars {coer_offered}
+	= coercionsToAttrEnv 0 attr_vars coer_offered
+where
+	coercionsToAttrEnv :: !Int !{!TypeAttribute} !{!CoercionTree} -> [AttrInequality]
+	coercionsToAttrEnv demanded_i attr_vars coer_offered
+		| demanded_i<size coer_offered
+			# (offered,_) = flattenCoercionTree coer_offered.[demanded_i]
+			= coercionsToAttrEnvNextTree offered demanded_i attr_vars coer_offered
+			= []
+
+	coercionsToAttrEnvNextTree :: ![Int] !Int !{!TypeAttribute} !{!CoercionTree} -> [AttrInequality]
+	coercionsToAttrEnvNextTree [offered_i:offered_is] demanded_i attr_vars coer_offered
+		#! attr_inequalities = coercionsToAttrEnvNextTree offered_is demanded_i attr_vars coer_offered
+		# (TA_Var demanded_attr_var) = attr_vars.[demanded_i]
+		#! demanded_attr_var=demanded_attr_var
+		# (TA_Var offered_attr_var) = attr_vars.[offered_i]
+		#! offered_attr_var=offered_attr_var
+		= [{ai_offered = offered_attr_var, ai_demanded = demanded_attr_var} : attr_inequalities]
+	coercionsToAttrEnvNextTree [] demanded_i attr_vars coer_offered
+		= coercionsToAttrEnv (demanded_i+1) attr_vars coer_offered
 
 substitute_attr_inequality {ai_offered, ai_demanded} th_attrs
 	#! ac_offered = pointer_to_int ai_offered th_attrs
@@ -1831,7 +1844,7 @@ where
 								_					-> ((nilPtr,o),uvh)
 
 					shrink as = map snd as
-	
+
 					isMember x [hd:tl]
 						| isNilPtr x	= False
 						| isNilPtr hd	= isMember x tl
