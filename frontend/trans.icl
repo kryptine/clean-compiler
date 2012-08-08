@@ -530,7 +530,7 @@ where
 	match_and_instantiate linearities cons_index app_args (AlgebraicPatterns _ algebraicPatterns) case_default ro ti
 		= match_and_instantiate_algebraic_type linearities cons_index app_args algebraicPatterns case_default ro ti
 		where
-			match_and_instantiate_algebraic_type [linearity:linearities] cons_index app_args
+			match_and_instantiate_algebraic_type [!linearity:linearities!] cons_index app_args
 												 [{ap_symbol={glob_module,glob_object={ds_index}}, ap_vars, ap_expr} : guards] case_default ro ti
 				| cons_index.glob_module == glob_module && cons_index.glob_object == ds_index
 					# {cons_type} = ro.ro_common_defs.[glob_module].com_cons_defs.[ds_index]
@@ -541,7 +541,7 @@ where
 	match_and_instantiate linearities cons_index app_args (OverloadedListPatterns (OverloadedList _ _ _ _) _ algebraicPatterns) case_default ro ti
 		= match_and_instantiate_overloaded_list linearities cons_index app_args algebraicPatterns case_default ro ti
 		where
-			match_and_instantiate_overloaded_list [linearity:linearities] cons_index=:{glob_module=cons_glob_module,glob_object=cons_ds_index} app_args 
+			match_and_instantiate_overloaded_list [!linearity:linearities!] cons_index=:{glob_module=cons_glob_module,glob_object=cons_ds_index} app_args 
 									[{ap_symbol={glob_module,glob_object={ds_index}}, ap_vars, ap_expr} : guards] 
 									case_default ro ti
 				| equal_list_contructor glob_module ds_index cons_glob_module cons_ds_index
@@ -587,7 +587,7 @@ where
 		match_and_instantiate_overloaded_cons cons_function_type linearities app_args (AlgebraicPatterns _ algebraicPatterns) case_default ro ti
 			= match_and_instantiate_overloaded_cons_boxed_match linearities app_args algebraicPatterns case_default ro ti
 			where
-				match_and_instantiate_overloaded_cons_boxed_match [linearity:linearities] app_args
+				match_and_instantiate_overloaded_cons_boxed_match [!linearity:linearities!] app_args
 										[{ap_symbol={glob_module,glob_object={ds_index}}, ap_vars, ap_expr} : guards] 
 										case_default ro ti
 					| glob_module==cPredefinedModuleIndex
@@ -603,7 +603,7 @@ where
 		match_and_instantiate_overloaded_cons cons_function_type linearities app_args (OverloadedListPatterns _ _ algebraicPatterns) case_default ro ti
 			= match_and_instantiate_overloaded_cons_overloaded_match linearities app_args algebraicPatterns case_default ro ti
 			where
-				match_and_instantiate_overloaded_cons_overloaded_match [linearity:linearities] app_args 
+				match_and_instantiate_overloaded_cons_overloaded_match [!linearity:linearities!] app_args 
 										[{ap_symbol={glob_module,glob_object={ds_index}}, ap_vars, ap_expr} : guards] 
 										case_default ro ti
 					| glob_module==cPredefinedModuleIndex
@@ -644,7 +644,7 @@ where
 		  (body_strictness,ti_fun_defs,ti_fun_heap) = body_strict ap_expr ap_vars ro ti.ti_fun_defs ti.ti_fun_heap
 		  ti = {ti & ti_fun_defs = ti_fun_defs, ti_fun_heap = ti_fun_heap}
 		  unfoldables = [ (arg_is_strict i body_strictness || ((not (arg_is_strict i cons_type_args_strictness))) && linear) || in_normal_form app_arg
-		  				 \\ linear <- linearity & app_arg <- app_args & i <- [0..]]
+		  				 \\ linear <|- linearity & app_arg <- app_args & i <- [0..]]
 		  unfoldable_args = filterWith unfoldables zipped_ap_vars_and_args
 		  not_unfoldable = map not unfoldables
 		  ti_var_heap = foldSt (\({fv_info_ptr}, arg) -> writeVarInfo fv_info_ptr (VI_Expression arg)) unfoldable_args ti.ti_var_heap
