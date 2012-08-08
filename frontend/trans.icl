@@ -1,9 +1,10 @@
 implementation module trans
 
-import StdEnv
+import StdEnv, StdStrictLists
 
 import syntax, transform, checksupport, compare_types, utilities, expand_types, unitype, type
 import classify, partition
+from StdOverloadedList import RepeatnM,TakeM,++$
 
 SwitchCaseFusion			fuse dont_fuse :== fuse
 SwitchGeneratedFusion		fuse dont_fuse :== fuse
@@ -940,11 +941,11 @@ generate_case_function fun_index case_info_ptr new_expr outer_fun_def outer_cons
 								}	
 				}
 	# cc_args_from_outer_fun		= [ cons_arg \\ cons_arg <- outer_cons_args.cc_args & used <- used_mask | used ]
-	  cc_linear_bits_from_outer_fun	= [ cons_arg \\ cons_arg <- outer_cons_args.cc_linear_bits & used <- used_mask | used ]
+	  cc_linear_bits_from_outer_fun	= [# cons_arg \\ cons_arg <|- outer_cons_args.cc_linear_bits & used <- used_mask | used !]
 	  new_cons_args =
 				{ cc_size			= fun_arity
 				, cc_args			= repeatn nr_of_lifted_vars CPassive ++ cc_args_from_outer_fun
-				, cc_linear_bits	= repeatn nr_of_lifted_vars    False ++ cc_linear_bits_from_outer_fun
+				, cc_linear_bits	= RepeatnAppendM nr_of_lifted_vars False cc_linear_bits_from_outer_fun
 				, cc_producer		= False
 				}
 	  gf =		{ gf_fun_def		= fun_def
@@ -1020,11 +1021,11 @@ generate_case_function_with_pattern_argument fun_index case_info_ptr
 								}
 				}
 	# cc_args_from_outer_fun		= [ cons_arg \\ cons_arg <- outer_cons_args.cc_args & used <- used_mask | used ]
-	  cc_linear_bits_from_outer_fun	= [ cons_arg \\ cons_arg <- outer_cons_args.cc_linear_bits & used <- used_mask | used ]
+	  cc_linear_bits_from_outer_fun	= [# cons_arg \\ cons_arg <|- outer_cons_args.cc_linear_bits & used <- used_mask | used !]
 	  new_cons_args =
 	  			{ cc_size			= fun_arity
 	  			, cc_args			= [CActive : repeatn nr_of_lifted_vars CPassive ++ cc_args_from_outer_fun]
-	  			, cc_linear_bits	= [True    : repeatn nr_of_lifted_vars    False ++ cc_linear_bits_from_outer_fun]
+	  			, cc_linear_bits	= [#True : RepeatnAppendM nr_of_lifted_vars False cc_linear_bits_from_outer_fun!]
 	  			, cc_producer		= False
 	  			}
 	  gf =		{ gf_fun_def		= fun_def
@@ -1358,7 +1359,7 @@ compute_args_strictness new_arg_types_array = compute_args_strictness 0 0 NotStr
 	{ das_vars						:: ![FreeVar]
 	, das_arg_types					:: !*{#ATypesWithStrictness}
 	, das_next_attr_nr				:: !Int
-	, das_new_linear_bits			:: ![Bool]
+	, das_new_linear_bits			:: ![#Bool!]
 	, das_new_cons_args				:: ![ConsClass]
 	, das_uniqueness_requirements	:: ![UniquenessRequirement]
 	, das_AVI_Attr_TA_TempVar_info_ptrs	:: ![[AttributeVar]]
@@ -1371,7 +1372,7 @@ compute_args_strictness new_arg_types_array = compute_args_strictness 0 0 NotStr
 	, das_predef					:: !*PredefinedSymbols
 	}
 
-generateFunction :: !SymbIdent !FunDef ![ConsClass] ![Bool] !{! Producer} !FunctionInfoPtr !ReadOnlyTI !Int !*TransformInfo -> (!Index, !Int, !*TransformInfo)
+generateFunction :: !SymbIdent !FunDef ![ConsClass] ![#Bool!] !{! Producer} !FunctionInfoPtr !ReadOnlyTI !Int !*TransformInfo -> (!Index, !Int, !*TransformInfo)
 generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_info = {fi_group_index},fun_arity} 
 				 cc_args cc_linear_bits prods fun_def_ptr ro n_extra
 				 ti=:{ti_var_heap,ti_next_fun_nr,ti_new_functions,ti_fun_heap,ti_symbol_heap,ti_fun_defs,
@@ -1433,7 +1434,7 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 	# das = { das_vars						= []
 			, das_arg_types					= st_args_array st_args st_args_strictness
 			, das_next_attr_nr				= next_attr_nr
-			, das_new_linear_bits			= []
+			, das_new_linear_bits			= [#!]
 			, das_new_cons_args				= []
 			, das_uniqueness_requirements	= []
 			, das_AVI_Attr_TA_TempVar_info_ptrs = das_AVI_Attr_TA_TempVar_info_ptrs
@@ -1471,7 +1472,7 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 		# new_gen_fd =
 			{	gf_fun_def			= fd
 			,	gf_instance_info	= II_Empty
-			,	gf_cons_args		= {cc_args = [], cc_size = 0, cc_linear_bits=[], cc_producer = False}
+			,	gf_cons_args		= {cc_args=[], cc_size=0, cc_linear_bits=[#!], cc_producer=False}
 			,	gf_fun_index		= -1
 			}
 		# ti_fun_heap 	= ti_fun_heap <:= (fun_def_ptr, FI_Function new_gen_fd)
@@ -1880,7 +1881,7 @@ get_producer_type {symb_kind=SK_Constructor {glob_module, glob_object}} ro fun_d
 	= (cons_type, fun_defs, fun_heap)
 
 determine_args
-	:: ![Bool] ![ConsClass] !Index !{!Producer} ![OptionalProducerType] ![FreeVar] !ReadOnlyTI !*DetermineArgsState
+	:: ![#Bool!] ![ConsClass] !Index !{!Producer} ![OptionalProducerType] ![FreeVar] !ReadOnlyTI !*DetermineArgsState
 	-> *DetermineArgsState
 determine_args _ [] prod_index producers prod_atypes forms _ das=:{das_var_heap}
 	# (vars, das_var_heap)	= new_variables forms das_var_heap
@@ -1892,8 +1893,7 @@ where
 		# (vars, var_heap) = new_variables forms var_heap
 		  (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
 		= ([{ form & fv_info_ptr = new_info_ptr } : vars], writeVarInfo fv_info_ptr (VI_Variable fv_ident new_info_ptr) var_heap)
-
-determine_args [linear_bit : linear_bits] [cons_arg : cons_args] prod_index producers [prod_atype:prod_atypes] [form : forms] input das
+determine_args [#linear_bit : linear_bits!] [cons_arg : cons_args] prod_index producers [prod_atype:prod_atypes] [form : forms] input das
 	# das = determine_args linear_bits cons_args (inc prod_index) producers prod_atypes forms input das
 //	# producer	= if (cons_arg == CActive) (producers.[prod_index]) PR_Empty
 	# producer	= case cons_arg of
@@ -1911,7 +1911,7 @@ determine_arg PR_Empty _ form=:{fv_ident,fv_info_ptr} _ ((linear_bit,cons_arg), 
 	# (new_info_ptr, das_var_heap) = newPtr VI_Empty das_var_heap
 	# das_var_heap = writeVarInfo fv_info_ptr (VI_Variable fv_ident new_info_ptr) das_var_heap
 	= { das & das_vars				= [{form & fv_info_ptr = new_info_ptr} : das.das_vars]
-			, das_new_linear_bits	= [linear_bit : das.das_new_linear_bits]
+			, das_new_linear_bits	= [#linear_bit : das.das_new_linear_bits!]
 			, das_new_cons_args		= [cons_arg : das.das_new_cons_args]
 			, das_var_heap			= das_var_heap }
 
@@ -1968,7 +1968,7 @@ determine_arg (PR_Class class_app free_vars_and_types class_type) _ {fv_info_ptr
 						-> { fv_ident = var_ident, fv_info_ptr = var_info_ptr, fv_def_level = NotALevel, fv_count = 0 })
 				  			  free_vars_and_types das.das_vars
 		, das_arg_types			= {das_arg_types & [prod_index] = ws_arg_type` }
-		, das_new_linear_bits	= mapAppend (\_ -> True) free_vars_and_types das.das_new_linear_bits
+		, das_new_linear_bits	= MapAppend (\_ -> True) free_vars_and_types das.das_new_linear_bits
 		, das_new_cons_args		= mapAppend (\_ -> CActive) free_vars_and_types das.das_new_cons_args
 		, das_subst				= das_subst
 		, das_type_heaps		= das_type_heaps
@@ -2045,7 +2045,7 @@ determine_arg producer (ProducerType {st_args, st_args_strictness, st_result, st
 		& das_vars						= form_vars
 		, das_arg_types					= das_arg_types 
 		, das_next_attr_nr				= das_next_attr_nr
-		, das_new_linear_bits			= cc_linear_bits ++ das.das_new_linear_bits
+		, das_new_linear_bits			= cc_linear_bits ++$ das.das_new_linear_bits
 		, das_new_cons_args				= cc_args ++ das.das_new_cons_args
 		, das_uniqueness_requirements	= [new_uniqueness_requirement:das.das_uniqueness_requirements]
 		, das_AVI_Attr_TA_TempVar_info_ptrs = das_AVI_Attr_TA_TempVar_info_ptrs
@@ -2147,15 +2147,15 @@ where
 				-> ({ cc_size			= symbol_arity
 					, cc_args			= cc_args
 					, cc_linear_bits	= if curried
-											(repeatn symbol_arity linear_bit)
-											(take symbol_arity cons_classes.cc_linear_bits)
+											(RepeatnM symbol_arity linear_bit)
+											(TakeM symbol_arity cons_classes.cc_linear_bits)
 					, cc_producer		= False
 					}
 		  			, fun_heap, ti_cons_args)
 			No
 				-> ({ cc_size			= symbol_arity
 					, cc_args			= repeatn symbol_arity CPassive
-					, cc_linear_bits	= repeatn symbol_arity linear_bit
+					, cc_linear_bits	= RepeatnM symbol_arity linear_bit
 					, cc_producer		= False
 					}
 					, fun_heap, ti_cons_args)
@@ -2260,6 +2260,17 @@ freshAttrVar attr_var th_attrs
 	# (new_info_ptr, th_attrs) = newPtr AVI_Empty th_attrs
 	= ({ av_ident = NewAttrVarId attr_var, av_info_ptr = new_info_ptr }, th_attrs)
 
+RepeatnAppendM n a l :== repeatn_append_ n a l
+	where
+		repeatn_append_ 0 _ l = l
+		repeatn_append_ n a l = [|a:repeatn_append_ (dec n) a l]
+
+MapAppend f [|x : xs] tail
+	#  x = f x
+	   xs = MapAppend f xs tail
+	= [|x : xs]
+MapAppend f [|] tail
+	= tail
 
 //@ max_group_index
 
@@ -2566,7 +2577,8 @@ is_cons_or_decons_of_UList_or_UTSList glob_object glob_module imported_funs
 	:== let  type = imported_funs.[glob_module].[glob_object].ft_type;
 		  in type.st_arity>0 && not (isEmpty type.st_context);
 
-determineCurriedProducersInExtraArgs :: ![Expression] ![Expression] !Bool !{!.Producer} ![Int] ![Bool] !FunDef !ReadOnlyTI !*TransformInfo -> *(!Bool,![Expression],![Expression],!{!Producer},![Int],![Bool],!FunDef,!Int,!*TransformInfo)
+determineCurriedProducersInExtraArgs :: ![Expression] ![Expression] !Bool !{!.Producer} ![Int] ![#Bool!] !FunDef !ReadOnlyTI !*TransformInfo
+	-> *(!Bool,![Expression],![Expression],!{!Producer},![Int],![#Bool!],!FunDef,!Int,!*TransformInfo)
 determineCurriedProducersInExtraArgs new_args [] is_applied_to_macro_fun producers cc_args cc_linear_bits fun_def ro ti
 	= (False,new_args,[],producers,cc_args,cc_linear_bits,fun_def,0,ti)
 determineCurriedProducersInExtraArgs new_args extra_args is_applied_to_macro_fun producers cc_args cc_linear_bits fun_def ro ti
@@ -2588,7 +2600,7 @@ determineCurriedProducersInExtraArgs new_args extra_args is_applied_to_macro_fun
 													}}
 	# new_producers						= arrayPlusList producers [PR_Empty \\ i<-[0..n_extra_args-1]]
 	# new_cc_args						= cc_args ++ [CPassive \\ i<-[0..n_extra_args-1]]
-	# new_cc_linear_bits				= cc_linear_bits ++ [True \\ i<-[0..n_extra_args-1]]
+	# new_cc_linear_bits				= cc_linear_bits ++$ [#True \\ i<-[0..n_extra_args-1]!]
 	= (True,new_args++extra_args,[],new_producers,new_cc_args,new_cc_linear_bits,fun_def,n_extra_args,ti)
 where
 	get_new_args_types_from_result_type type 0
@@ -3036,10 +3048,10 @@ transformSelection selector_kind selectors expr ro ti
 
 // XXX store linear_bits and cc_args together ?
 
-determineProducers :: !Bool !Bool !Bool !(Optional SymbolType) ![Bool] ![Int] ![Expression] !Int *{!Producer} !ReadOnlyTI !*TransformInfo -> *(!*{!Producer},![Expression],![(LetBind,AType)],!*TransformInfo);
+determineProducers :: !Bool !Bool !Bool !(Optional SymbolType) ![#Bool!] ![Int] ![Expression] !Int *{!Producer} !ReadOnlyTI !*TransformInfo -> *(!*{!Producer},![Expression],![(LetBind,AType)],!*TransformInfo);
 determineProducers _ _ _ _ _ _ [] _ producers _ ti
 	= (producers, [], [], ti)
-determineProducers is_applied_to_macro_fun consumer_is_curried ok_non_rec_consumer fun_type [linear_bit : linear_bits] [ cons_arg : cons_args ] [ arg : args ] prod_index producers ro ti
+determineProducers is_applied_to_macro_fun consumer_is_curried ok_non_rec_consumer fun_type [#linear_bit : linear_bits!] [cons_arg : cons_args] [arg : args] prod_index producers ro ti
  	| cons_arg == CActive
 		# (producers, new_arg, ti) = determine_producer is_applied_to_macro_fun consumer_is_curried ok_non_rec_consumer linear_bit arg [] prod_index producers ro ti
 		| isProducer producers.[prod_index]
@@ -4158,6 +4170,15 @@ where
 instance <<< ConsClasses
 where
 	(<<<) file {cc_args,cc_linear_bits,cc_producer} = file <<< cc_args <<< cc_linear_bits <<< cc_producer
+
+instance <<< [#a!] | UTSList,<<< a
+where
+	(<<<) file [|] = file <<< "[]"
+	(<<<) file l  = showTail (file <<< "[") l
+	where
+		showTail f [|x]   = f <<< x <<< "] "
+		showTail f [|a:x] = showTail (f <<< a <<< ", ") x
+		showTail f [|]    = f <<< "] "
 	
 instance <<< InstanceInfo
   where

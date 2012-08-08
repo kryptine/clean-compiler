@@ -726,7 +726,7 @@ cIsALocalVar	:== False
 ::	ConsClasses =
 	{	cc_size			::!Int
 	,	cc_args			::![ConsClass]
-	,	cc_linear_bits	::![Bool]
+	,	cc_linear_bits	::![#Bool!]
 	,	cc_producer		::!ProdClass
 	}
 
