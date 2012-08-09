@@ -603,7 +603,7 @@ where
 		match_and_instantiate_overloaded_cons cons_function_type linearities app_args (OverloadedListPatterns _ _ algebraicPatterns) case_default ro ti
 			= match_and_instantiate_overloaded_cons_overloaded_match linearities app_args algebraicPatterns case_default ro ti
 			where
-				match_and_instantiate_overloaded_cons_overloaded_match [!linearity:linearities!] app_args 
+				match_and_instantiate_overloaded_cons_overloaded_match [!linearity:linearities!] app_args
 										[{ap_symbol={glob_module,glob_object={ds_index}}, ap_vars, ap_expr} : guards] 
 										case_default ro ti
 					| glob_module==cPredefinedModuleIndex
@@ -907,7 +907,7 @@ generate_case_function fun_index case_info_ptr new_expr outer_fun_def outer_cons
 	  arg_types								= lifted_types++types_from_outer_fun
 
 	# ti = {ti & ti_var_heap = ti_var_heap, ti_symbol_heap = ti_symbol_heap}
-	# (fun_type,ti)							= determine_case_function_type fun_arity ct_result_type arg_types st_attr_env ti
+	# (fun_type,type_variables,ti)			= determine_case_function_type fun_arity ct_result_type arg_types st_attr_env ti
 
 	  // unfold...
 	  cs =		{ cs_var_heap				= ti.ti_var_heap
@@ -917,8 +917,11 @@ generate_case_function fun_index case_info_ptr new_expr outer_fun_def outer_cons
 	  			}
 	  (copied_expr, cs)
 			= copy new_expr {ci_handle_aci_free_vars = SubstituteAciFreeVars} cs
-	  {cs_var_heap=ti_var_heap, cs_symbol_heap=ti_symbol_heap, cs_cleanup_info=ti_cleanup_info, cs_opt_type_heaps = Yes ti_type_heaps}
-	  		= cs
+	  {cs_var_heap=ti_var_heap, cs_symbol_heap=ti_symbol_heap, cs_cleanup_info=ti_cleanup_info, cs_opt_type_heaps = Yes ti_type_heaps} = cs
+
+	  ti_var_heap = remove_VI_Expression_values tfi_args ti_var_heap
+	  ti_type_heaps & th_vars = remove_TVI_Type_values type_variables ti_type_heaps.th_vars
+
 	  // generated function...
 	  fun_def =	{ fun_ident					= tfi_fun.symb_ident
 				, fun_arity					= fun_arity
@@ -979,7 +982,7 @@ generate_case_function_with_pattern_argument fun_index case_info_ptr
 	  arg_types								= lifted_types++types_from_outer_fun
 
 	  ti = {ti & ti_var_heap = ti_var_heap, ti_symbol_heap = ti_symbol_heap}
-	  (fun_type,ti)							= determine_case_function_type fun_arity ct_result_type [ct_pattern_type:arg_types] st_attr_env ti
+	  (fun_type,type_variables,ti)			= determine_case_function_type fun_arity ct_result_type [ct_pattern_type:arg_types] st_attr_env ti
 
 	  // unfold...
 	  cs =		{ cs_var_heap				= ti.ti_var_heap
@@ -989,8 +992,10 @@ generate_case_function_with_pattern_argument fun_index case_info_ptr
 	  			}
 	  (Case copied_kees, cs)
 			= copy (Case {kees & case_expr=EE}) {ci_handle_aci_free_vars = SubstituteAciFreeVars} cs
-	  {cs_var_heap=ti_var_heap, cs_symbol_heap=ti_symbol_heap, cs_cleanup_info=ti_cleanup_info, cs_opt_type_heaps = Yes ti_type_heaps}
-	  		= cs
+	  {cs_var_heap=ti_var_heap, cs_symbol_heap=ti_symbol_heap, cs_cleanup_info=ti_cleanup_info, cs_opt_type_heaps = Yes ti_type_heaps} = cs
+
+	  ti_var_heap = remove_VI_Expression_values ro_fun_args ti_var_heap
+	  ti_type_heaps & th_vars = remove_TVI_Type_values type_variables ti_type_heaps.th_vars
 
 	  (new_info_ptr, ti_var_heap) = newPtr VI_Empty ti_var_heap
 	  var_id = {id_name = "_x", id_info = nilPtr}
@@ -1051,7 +1056,7 @@ where
 
 determine_case_function_type fun_arity ct_result_type arg_types st_attr_env ti=:{ti_type_heaps}
 	# (type_variables, th_vars)				= getTypeVars [ct_result_type:arg_types] ti_type_heaps.th_vars
-	  (fresh_type_vars, th_vars)			= mapSt bind_to_fresh_type_variable type_variables th_vars
+	  (fresh_type_vars, th_vars)			= bind_to_fresh_type_variables type_variables th_vars
 	  ti_type_heaps							= { ti_type_heaps & th_vars = th_vars }
 	  (_, fresh_arg_types, ti_type_heaps)	= substitute arg_types ti_type_heaps
 	  (_, fresh_result_type, ti_type_heaps)	= substitute ct_result_type ti_type_heaps
@@ -1066,7 +1071,7 @@ determine_case_function_type fun_arity ct_result_type arg_types st_attr_env ti=:
 	  			, st_attr_env				= []
 	  			}
 	  ti									= { ti & ti_type_heaps = ti_type_heaps }
-	= (fun_type,ti)
+	= (fun_type,type_variables,ti)
 
 removeNeverMatchingSubcases :: Expression !.ReadOnlyTI -> Expression
 removeNeverMatchingSubcases keesExpr=:(Case kees) ro
@@ -1615,6 +1620,11 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 	# (tb_rhs, {cs_var_heap=var_heap,cs_symbol_heap,cs_opt_type_heaps=Yes ti_type_heaps, cs_cleanup_info})
 			= copy tb_rhs {ci_handle_aci_free_vars = RemoveAciFreeVars} cs
 //	| False ---> ("unfolded:", tb_rhs) = undef
+
+	# th_vars = remove_TVI_Type_values all_type_vars ti_type_heaps.th_vars
+	  th_attrs = foldSt remove_AVI_Attr_values das_AVI_Attr_TA_TempVar_info_ptrs ti_type_heaps.th_attrs
+	  ti_type_heaps & th_vars=th_vars, th_attrs=th_attrs
+
 	# var_heap						= fold2St store_arg_type_info new_fun_args fresh_arg_types var_heap
 		with
 			store_arg_type_info {fv_info_ptr} a_type ti_var_heap
@@ -1692,14 +1702,16 @@ where
 		= (NoProducerType, ti_type_heaps)
 	copy_opt_symbol_type (Yes symbol_type=:{st_vars, st_attr_vars, st_args, st_result, st_attr_env})
 				ti_type_heaps=:{th_vars, th_attrs}
-		# (fresh_st_vars, th_vars)
-				= mapSt bind_to_fresh_type_variable st_vars th_vars
+		# (fresh_st_vars, th_vars) = bind_to_fresh_type_variables st_vars th_vars
 		  (fresh_st_attr_vars, th_attrs)
 				= mapSt bind_to_fresh_attr_variable st_attr_vars th_attrs
 		  (_, [fresh_st_result:fresh_st_args], ti_type_heaps)
 		  		= substitute [st_result:st_args] { ti_type_heaps & th_vars = th_vars, th_attrs = th_attrs }
 		  (_, fresh_st_attr_env, ti_type_heaps)
 		  		= substitute st_attr_env ti_type_heaps
+		  th_vars = remove_TVI_Type_values st_vars ti_type_heaps.th_vars
+		  th_attrs = remove_AVI_Attr_values st_attr_vars ti_type_heaps.th_attrs
+		  ti_type_heaps & th_vars=th_vars, th_attrs=th_attrs	
 		  symbol_type & st_vars = fresh_st_vars, st_attr_vars = fresh_st_attr_vars, st_args = fresh_st_args,
 						st_result = fresh_st_result, st_attr_env = fresh_st_attr_env
 		= (ProducerType symbol_type st_vars, ti_type_heaps)
@@ -2439,15 +2451,34 @@ bind_to_fresh_expr_var {fv_ident, fv_info_ptr} var_heap
 	  act_var = { var_ident = fv_ident, var_info_ptr = new_info_ptr, var_expr_ptr = nilPtr }
 	= (form_var, writeVarInfo fv_info_ptr (VI_Expression (Var act_var)) var_heap)
 
-bind_to_fresh_type_variable {tv_ident, tv_info_ptr} th_vars
-	# (new_tv_info_ptr, th_vars) = newPtr TVI_Empty th_vars
-	  tv = {tv_ident=tv_ident, tv_info_ptr=new_tv_info_ptr}
-	= (tv, writePtr tv_info_ptr (TVI_Type (TV tv)) th_vars)
+remove_VI_Expression_values [{fv_info_ptr}:args] var_heap
+	= remove_VI_Expression_values args (writeVarInfo fv_info_ptr VI_Empty var_heap)
+remove_VI_Expression_values [] var_heap
+	= var_heap 
+
+bind_to_fresh_type_variables type_variables th_vars
+	= mapSt bind_to_fresh_type_variable type_variables th_vars
+where
+	bind_to_fresh_type_variable {tv_ident, tv_info_ptr} th_vars
+		# (new_tv_info_ptr, th_vars) = newPtr TVI_Empty th_vars
+		  tv = {tv_ident=tv_ident, tv_info_ptr=new_tv_info_ptr}
+		= (tv, writePtr tv_info_ptr (TVI_Type (TV tv)) th_vars)
+
+remove_TVI_Type_values [{tv_info_ptr}:type_vars] type_var_heap
+	= remove_TVI_Type_values type_vars (writePtr tv_info_ptr TVI_Empty type_var_heap)
+remove_TVI_Type_values [] type_var_heap
+	= type_var_heap
 
 bind_to_fresh_attr_variable {av_ident, av_info_ptr} th_attrs
 	# (new_av_info_ptr, th_attrs) = newPtr AVI_Empty th_attrs
 	  av = { av_ident=av_ident, av_info_ptr=new_av_info_ptr }
 	= (av, writePtr av_info_ptr (AVI_Attr (TA_Var av)) th_attrs)
+
+remove_AVI_Attr_values [{av_info_ptr}:st_attr_vars] th_attrs
+	# th_attrs = writePtr av_info_ptr AVI_Empty th_attrs
+	= remove_AVI_Attr_values st_attr_vars th_attrs
+remove_AVI_Attr_values [] th_attrs
+	= th_attrs
 
 bind_to_temp_type_var {tv_info_ptr} (next_type_var_nr, th_vars)
 	= (next_type_var_nr+1, writePtr tv_info_ptr (TVI_Type (TempV next_type_var_nr)) th_vars)
