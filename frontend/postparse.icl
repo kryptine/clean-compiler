@@ -1318,6 +1318,20 @@ reorganiseDefinitions icl_module [PD_Type type_def=:{td_rhs = AbstractTypeSpec p
 	  type_def = { type_def & td_rhs = AbstractSynType properties type }
 	  c_defs = { c_defs & def_types = [type_def : c_defs.def_types] }
 	= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)
+reorganiseDefinitions icl_module [PD_Type type_def=:{td_rhs = ExtendableConses cons_defs} : defs] def_counts=:{cons_count,type_count} ca
+	# (cons_symbs, cons_count) = determine_symbols_of_conses cons_defs cons_count
+	  def_counts & cons_count=cons_count, type_count=type_count+1
+	  (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs def_counts ca
+	  type_def & td_rhs = ExtendableAlgType cons_symbs
+	  c_defs & def_types = [type_def : c_defs.def_types], def_constructors = mapAppend ParsedConstructorToConsDef cons_defs c_defs.def_constructors
+	= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)  
+reorganiseDefinitions icl_module [PD_Type type_def=:{td_rhs = MoreConses type_ext_ident cons_defs} : defs] def_counts=:{cons_count,type_count} ca
+	# (cons_symbs, cons_count) = determine_symbols_of_conses cons_defs cons_count
+	  def_counts & cons_count=cons_count, type_count=type_count+1
+	  (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs def_counts ca
+	  type_def & td_rhs = UncheckedAlgConses type_ext_ident cons_symbs
+	  c_defs & def_types = [type_def : c_defs.def_types], def_constructors = mapAppend ParsedConstructorToConsDef cons_defs c_defs.def_constructors
+	= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)  
 reorganiseDefinitions icl_module [PD_Class class_def=:{class_ident,class_arity,class_args} members : defs] def_counts=:{mem_count} ca
 	# type_context = { tc_class = TCClass {glob_module = NoIndex, glob_object = {ds_ident = class_ident, ds_arity = class_arity, ds_index = NoIndex }},
 					   tc_types = [ TV tv \\ tv <- class_args ], tc_var = nilPtr}

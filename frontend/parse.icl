@@ -1806,8 +1806,8 @@ where
   					-> want_record_type_rhs name True exi_vars pState
 	 		  		->	(PD_Type td, parseError "Record type" No ("after ! in definition of record type "+name+" { ") pState)
 			_
-				# (condefs, pState)	= want_constructor_list exi_vars token pState
-				# td = {td & td_rhs = ConsList condefs}
+				# (condefs, extendable_algebraic_type, pState) = want_constructor_list exi_vars token pState
+				# td & td_rhs = if extendable_algebraic_type (ExtendableConses condefs) (ConsList condefs)
 				| annot == AN_None
 	 		  		->	(PD_Type td, pState)
 					->	(PD_Type td, parseError "Algebraic type" No ("No lhs strictness annotation for the algebraic type "+name) pState)
@@ -1851,6 +1851,20 @@ where
 			= (PD_Type td, pState)
 			= (PD_Type td, parseError "abstract type" No ("type attribute "+toString td_attribute+" for abstract type "+name+" is not") (tokenBack pState))
 
+	want_type_rhs BarToken parseContext td=:{td_ident,td_attribute} annot pState
+		# name					= td_ident.id_name
+		  pState				= verify_annot_attr annot td_attribute name pState
+		  (exi_vars, pState)	= optionalExistentialQuantifiedVariables pState
+		  (token, pState)		= nextToken GeneralContext pState // should be TypeContext
+		  (condefs, pState)		= want_more_constructors exi_vars token pState
+		  (file_name, pState) = getFilename pState
+		  module_name = file_name % (0,size file_name-4)
+		  (type_ext_ident, pState) = stringToIdent name (IC_TypeExtension module_name) pState
+		  td & td_rhs			= MoreConses type_ext_ident condefs
+		| annot == AN_None
+	 		= (PD_Type td, pState)
+	 		= (PD_Type td, parseError "Algebraic type" No ("No lhs strictness annotation for the algebraic type "+name) pState)
+
 	want_type_rhs token parseContext td=:{td_attribute} annot pState
 		| isIclContext parseContext
 			= (PD_Erroneous, parseError "type RHS" (Yes token) "type definition" pState)
@@ -1879,14 +1893,27 @@ where
 			= (TA_None, cAllBitsClear)
 			= (attr, cIsNonCoercible)
 
-	want_constructor_list :: ![ATypeVar] !Token !ParseState -> (.[ParsedConstructor],ParseState)
+	want_constructor_list :: ![ATypeVar] !Token !ParseState -> (![ParsedConstructor],!Bool,!ParseState)
+	want_constructor_list exi_vars DotDotToken pState
+		= ([], True, pState)
 	want_constructor_list exi_vars token pState
 		# (cons,pState) = want_constructor exi_vars token pState
 		  (token, pState) = nextToken TypeContext pState
 		| token == BarToken
 			# (exi_vars, pState) = optionalExistentialQuantifiedVariables pState
 			  (token, pState) = nextToken GeneralContext pState
-			  (cons_list, pState) = want_constructor_list exi_vars token pState
+			  (cons_list, extendable_algebraic_type, pState) = want_constructor_list exi_vars token pState
+			= ([cons : cons_list], extendable_algebraic_type, pState)
+			= ([cons], False, tokenBack pState)
+
+	want_more_constructors :: ![ATypeVar] !Token !ParseState -> (![ParsedConstructor],!ParseState)
+	want_more_constructors exi_vars token pState
+		# (cons,pState) = want_constructor exi_vars token pState
+		  (token, pState) = nextToken TypeContext pState
+		| token == BarToken
+			# (exi_vars, pState) = optionalExistentialQuantifiedVariables pState
+			  (token, pState) = nextToken GeneralContext pState
+			  (cons_list, pState) = want_more_constructors exi_vars token pState
 			= ([cons : cons_list], pState)
 			= ([cons], tokenBack pState)
 

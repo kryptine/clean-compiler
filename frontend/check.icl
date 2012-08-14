@@ -951,6 +951,8 @@ collectCommonDefinitions {def_types,def_constructors,def_selectors,def_classes,d
 	  sizes = { sizes & [cGenericCaseDefs] = size }
 	= (sizes, defs)
 where
+	type_def_to_dcl {td_rhs=UncheckedAlgConses type_ext_ident _, td_ident, td_pos} (decl_index, decls)
+		= (inc decl_index, [Declaration {decl_ident = type_ext_ident, decl_pos = td_pos, decl_kind = STE_TypeExtension, decl_index = decl_index} : decls])
 	type_def_to_dcl {td_ident, td_pos} (decl_index, decls)
 		= (inc decl_index, [Declaration {decl_ident = td_ident, decl_pos = td_pos, decl_kind = STE_Type, decl_index = decl_index} : decls])
 
@@ -1187,6 +1189,20 @@ renumber_icl_definitions_as_dcl_definitions (Yes icl_to_dcl_index_table) icl_siz
 							= { td & td_rhs = NewType {cons & ds_index=icl_to_dcl_index_table.[cConstructorDefs,cons.ds_index]} }
 						renumber_type_def td
 							= td
+				renumber_icl_decl_symbol (Declaration icl_decl_symbol=:{decl_kind = STE_TypeExtension, decl_index}) cdefs
+					# (type_def,cdefs) = cdefs!com_type_defs.[decl_index]
+					# type_def = renumber_type_extension_def type_def
+					# cdefs={cdefs & com_type_defs.[decl_index]=type_def}
+					= (Declaration {icl_decl_symbol & decl_index=icl_to_dcl_index_table.[cTypeDefs,decl_index]},cdefs)
+					where
+						renumber_type_extension_def td=:{td_rhs = UncheckedAlgConses type_ext_ident conses}
+							# conses = [{cons & ds_index=icl_to_dcl_index_table.[cConstructorDefs,cons.ds_index]} \\ cons <- conses]
+							= {td & td_rhs = UncheckedAlgConses type_ext_ident conses}
+						renumber_type_extension_def td=:{td_rhs = AlgConses conses type_ext_ident}
+							# conses = [{cons & ds_index=icl_to_dcl_index_table.[cConstructorDefs,cons.ds_index]} \\ cons <- conses]
+							= {td & td_rhs = AlgConses conses type_ext_ident}
+						renumber_type_extension_def td
+							= td
 				renumber_icl_decl_symbol (Declaration icl_decl_symbol=:{decl_kind = STE_Constructor, decl_index}) cdefs
 					= (Declaration {icl_decl_symbol & decl_index=icl_to_dcl_index_table.[cConstructorDefs,decl_index]},cdefs)
 				renumber_icl_decl_symbol (Declaration icl_decl_symbol=:{decl_kind = STE_Field _, decl_index}) cdefs
@@ -1407,6 +1423,18 @@ where
 		# (cop_td_indexes, cop_cd_indexes, cop_gd_indexes) = copied_defs
 		# copied_defs = (cop_td_indexes, cop_cd_indexes, [decl_index:cop_gd_indexes])
 		= (new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, [generic_def:new_generic_defs], copied_defs, conversion_table, icl_sizes, icl_decl_symbols, cs)	
+	add_dcl_definition {com_type_defs,com_cons_defs} dcl=:(Declaration {decl_kind = STE_TypeExtension, decl_index})
+			(new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, new_generic_defs, (cop_td_indexes, cop_cd_indexes, cop_gd_indexes), conversion_table, icl_sizes, icl_decl_symbols, cs)
+		# type_def = com_type_defs.[decl_index]
+		  (new_type_defs,new_cons_defs,new_selector_defs,conversion_table,icl_sizes,icl_decl_symbols,cs) = add_type_def type_def new_type_defs new_cons_defs new_selector_defs conversion_table icl_sizes icl_decl_symbols cs
+		  cop_td_indexes = [decl_index : cop_td_indexes]
+		= (new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, new_generic_defs, (cop_td_indexes, cop_cd_indexes, cop_gd_indexes), conversion_table, icl_sizes, icl_decl_symbols, cs)
+	where
+		add_type_def td=:{td_pos, td_rhs = UncheckedAlgConses type_ext_ident conses} new_type_defs new_cons_defs new_selector_defs conversion_table icl_sizes icl_decl_symbols cs		
+			# (conses,(new_cons_defs,conversion_table,icl_sizes,icl_decl_symbols,cs)) = copy_and_redirect_cons_symbols com_cons_defs td_pos conses (new_cons_defs,conversion_table,icl_sizes,icl_decl_symbols,cs)
+			= ([{ td & td_rhs = UncheckedAlgConses type_ext_ident conses} : new_type_defs],new_cons_defs,new_selector_defs,conversion_table,icl_sizes,icl_decl_symbols,cs)
+		add_type_def td new_type_defs new_cons_defs new_selector_defs conversion_table icl_sizes icl_decl_symbols cs
+			= ([td : new_type_defs],new_cons_defs,new_selector_defs,conversion_table,icl_sizes,icl_decl_symbols,cs) 
 	add_dcl_definition _ _ result = result
 
 	copy_and_redirect_cons_symbols com_cons_defs td_pos [cons:conses] (new_cons_defs,conversion_table,icl_sizes,icl_decl_symbols,cs)

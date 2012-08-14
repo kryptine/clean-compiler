@@ -619,9 +619,9 @@ where
 			  (kinds_in_group, (as_kind_heap, as_td_infos))	= mapSt determine_kinds group (as.as_kind_heap, as.as_td_infos)
 			  as_kind_heap = unify_var_binds conds.con_var_binds as_kind_heap
 			  (normalized_top_vars, (kind_var_store, as_kind_heap)) = normalize_top_vars conds.con_top_var_binds 0 as_kind_heap
-			  (as_kind_heap, as_td_infos)
-			  	= update_type_def_infos modules type_properties normalized_top_vars group kinds_in_group kind_var_store as_kind_heap as_td_infos
-			  as & as_kind_heap = as_kind_heap, as_td_infos = as_td_infos
+			  (as_kind_heap, as_td_infos, as_error)
+				= update_type_def_infos modules type_properties normalized_top_vars group kinds_in_group kind_var_store as_kind_heap as_td_infos as.as_error
+			  as & as_kind_heap = as_kind_heap, as_td_infos = as_td_infos, as_error = as_error
 			= foldSt (check_dcl_properties modules dcl_types dcl_mod_index type_properties) group as
 
 	init_type_def_infos modules gi=:{gi_module,gi_index} (is_abstract_type, type_def_infos, as_type_var_heap, kind_heap)
@@ -633,6 +633,12 @@ where
 			AbstractSynType properties _
 				# type_def_infos = init_abstract_type_def properties td_args gi_module gi_index type_def_infos
 				-> (True, type_def_infos, as_type_var_heap, kind_heap)
+			ExtendableAlgType _
+				# (tdi_kinds, (as_type_var_heap, kind_heap)) = newKindConstVariables td_args (as_type_var_heap, kind_heap)
+				-> (is_abstract_type, {type_def_infos & [gi_module].[gi_index].tdi_kinds = tdi_kinds}, as_type_var_heap, kind_heap)				
+			AlgConses _ _
+				# (tdi_kinds, (as_type_var_heap, kind_heap)) = newKindConstVariables td_args (as_type_var_heap, kind_heap)
+				-> (is_abstract_type, {type_def_infos & [gi_module].[gi_index].tdi_kinds = tdi_kinds}, as_type_var_heap, kind_heap)				
 			_
 				# (tdi_kinds, (as_type_var_heap, kind_heap)) = newKindVariables td_args (as_type_var_heap, kind_heap)
 				-> (is_abstract_type, {type_def_infos & [gi_module].[gi_index].tdi_kinds = tdi_kinds}, as_type_var_heap, kind_heap)
@@ -652,6 +658,14 @@ where
 			# (kind_info_ptr, kind_heap) = newPtr KI_Const kind_heap
 			= (KindVar kind_info_ptr, (type_var_heap <:= (tv_info_ptr, TVI_TypeKind kind_info_ptr), kind_heap <:= (kind_info_ptr, KI_Var kind_info_ptr)))
 
+	newKindConstVariables td_args (type_var_heap, as_kind_heap)
+		= mapSt new_kind_const td_args (type_var_heap, as_kind_heap)
+	where
+		new_kind_const :: ATypeVar *(*TypeVarHeap,*KindHeap) -> (!TypeKind,!(!*TypeVarHeap,!*KindHeap));
+		new_kind_const {atv_variable={tv_info_ptr}} (type_var_heap, kind_heap)
+			# (kind_info_ptr, kind_heap) = newPtr KI_Const kind_heap
+			= (KindVar kind_info_ptr, (writePtr tv_info_ptr (TVI_TypeKind kind_info_ptr) type_var_heap, kind_heap))
+
 	anal_type_def modules gi=:{gi_module,gi_index} (group_properties, conds, as=:{as_error})
 		# {com_type_defs,com_cons_defs} = modules.[gi_module]
 		  {td_ident,td_pos,td_args,td_rhs} = com_type_defs.[gi_index]
@@ -669,6 +683,12 @@ where
 			= (cv_props, (conds, {as & as_kind_heap = uki_kind_heap, as_error = uki_error}))
 		anal_rhs_of_type_def modules com_cons_defs (NewType cons) conds_as
 			= analTypesOfConstructor modules com_cons_defs cons conds_as
+		anal_rhs_of_type_def modules com_cons_defs (ExtendableAlgType conses) conds_as
+			# (cons_properties, (conds,as)) = analTypesOfConstructors modules com_cons_defs conses conds_as
+			= ((cons_properties bitand (bitnot cIsHyperStrict)) /*bitor cIsNonCoercible*/, (conds,as))
+		anal_rhs_of_type_def modules com_cons_defs (AlgConses conses _) conds_as
+			# (cons_properties, (conds,as)) = analTypesOfConstructors modules com_cons_defs conses conds_as
+			= ((cons_properties bitand (bitnot cIsHyperStrict)) /*bitor cIsNonCoercible*/, (conds,as))
 
 	determine_kinds {gi_module,gi_index} (kind_heap, td_infos)
 		# (td_info=:{tdi_kinds}, td_infos) = td_infos![gi_module,gi_index]
@@ -721,17 +741,24 @@ where
 			# (kind_info, kind_heap) = readPtr kind_info_ptr kind_heap
 			= normalize_var kind_info_ptr kind_info (kind_store, kind_heap)
 
-	update_type_def_infos modules type_properties top_vars group updated_kinds_of_group kind_store kind_heap td_infos
-		# (_,as_kind_heap,as_td_infos) = fold2St (update_type_def_info modules (type_properties bitor cIsAnalysed) top_vars) group updated_kinds_of_group (kind_store, kind_heap, td_infos)
-		= (as_kind_heap,as_td_infos)
+	update_type_def_infos modules type_properties top_vars group updated_kinds_of_group kind_store kind_heap td_infos error
+		# (_,as_kind_heap,as_td_infos,error)
+			= fold2St (update_type_def_info modules (type_properties bitor cIsAnalysed) top_vars) group updated_kinds_of_group (kind_store,kind_heap,td_infos,error)
+		= (as_kind_heap,as_td_infos,error)
 	where
 		update_type_def_info modules type_properties top_vars {gi_module,gi_index} updated_kinds
-				(kind_store,kind_heap,td_infos)
+				(kind_store,kind_heap,td_infos,error)
 			# (td_info=:{tdi_kinds}, td_infos) = td_infos![gi_module].[gi_index]
 			# (group_vars, cons_vars, kind_store, kind_heap) = determine_type_def_info tdi_kinds updated_kinds top_vars kind_store kind_heap
 			# td_info & tdi_properties = type_properties, tdi_kinds = updated_kinds, tdi_group_vars = group_vars, tdi_cons_vars = cons_vars
 			#! td_infos & [gi_module,gi_index] = td_info
-			= (kind_store, kind_heap, td_infos)
+			| type_properties bitand cIsNonCoercible<>0
+				# type_def = modules.[gi_module].com_type_defs.[gi_index]
+				| not (isUniqueAttr type_def.td_attribute) && is_ExtendableAlgType_or_AlgConses type_def.td_rhs
+					# error = checkErrorWithPosition type_def.td_ident type_def.td_pos "a non unique extendable algebraic data type must be coercible" error
+					= (kind_store, kind_heap, td_infos, error)
+					= (kind_store, kind_heap, td_infos, error)
+				= (kind_store, kind_heap, td_infos, error)
 
 		determine_type_def_info [KindVar kind_info_ptr : kind_vars] [kind : kinds] top_vars kind_store kind_heap
 			# (kind_info, kind_heap) = readPtr kind_info_ptr kind_heap
@@ -751,6 +778,10 @@ where
 			= var_number == top_var_number || is_a_top_var var_number top_var_numbers
 		is_a_top_var var_number []
 			= False
+
+		is_ExtendableAlgType_or_AlgConses (ExtendableAlgType _) = True 
+		is_ExtendableAlgType_or_AlgConses (AlgConses _ _) = True
+		is_ExtendableAlgType_or_AlgConses _ = False
 
 	check_dcl_properties modules dcl_types dcl_mod_index properties {gi_module, gi_index} as
 		| gi_module == dcl_mod_index && gi_index < size dcl_types
@@ -1166,6 +1197,10 @@ isUniqueTypeRhs common_defs mod_index (RecordType {rt_constructor={ds_index}}) s
 	= constructor_is_unique mod_index ds_index common_defs state
 isUniqueTypeRhs common_defs mod_index (NewType {ds_index}) state
 	= constructor_is_unique mod_index ds_index common_defs state
+isUniqueTypeRhs common_defs mod_index (ExtendableAlgType constructors) state
+	= has_unique_constructor constructors common_defs mod_index state
+isUniqueTypeRhs common_defs mod_index (AlgConses constructors _) state
+	= has_unique_constructor constructors common_defs mod_index state
 isUniqueTypeRhs common_defs mod_index _ state
 	= (False, state)
 

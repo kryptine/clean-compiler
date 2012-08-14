@@ -205,6 +205,8 @@ BEFlatType :: !BESymbolP !BEAttribution !BETypeVarListP !BackEnd -> (!BEFlatType
 // BEFlatTypeP BEFlatType (BESymbolP symbol,BEAttribution attribution,BETypeVarListP arguments);
 BEAlgebraicType :: !BEFlatTypeP !BEConstructorListP !BackEnd -> BackEnd;
 // void BEAlgebraicType (BEFlatTypeP lhs,BEConstructorListP constructors);
+BEExtendableAlgebraicType :: !BEFlatTypeP !BEConstructorListP !BackEnd -> BackEnd;
+// void BEExtendableAlgebraicType (BEFlatTypeP lhs,BEConstructorListP constructors);
 BERecordType :: !Int !BEFlatTypeP !BETypeNodeP !Int !BEFieldListP !BackEnd -> BackEnd;
 // void BERecordType (int moduleIndex,BEFlatTypeP lhs,BETypeNodeP constructorType,int is_boxed_record,BEFieldListP fields);
 BEAbsType :: !BEFlatTypeP !BackEnd -> BackEnd;

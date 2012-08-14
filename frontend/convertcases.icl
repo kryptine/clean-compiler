@@ -1590,7 +1590,7 @@ where
 		  true_expr = BasicExpr (BVB True)
 		  (var_args,cs_var_heap) = make_free_vars cons_arity cs_var_heap
 		  pattern = {ap_symbol = cons_symbol, ap_vars = var_args, ap_expr = true_expr, ap_position = position}
-		  patterns = AlgebraicPatterns {glob_module=global_type_index.gi_module,glob_object=global_type_index.gi_index} [pattern]
+		  patterns = AlgebraicPatterns global_type_index [pattern]
 		  (case_expr_ptr, cs_expr_heap) = newPtr EI_Empty cs_expr_heap
 		  case_expr = Case {case_expr = case_var, case_guards = patterns, case_default = Yes fail_expr, case_ident = No,
 							case_explicit = False, case_info_ptr = case_expr_ptr, case_default_pos = NoPos}

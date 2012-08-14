@@ -21,6 +21,7 @@ where
 	toInt STE_DclFunction			= cFunctionDefs
 	toInt (STE_FunctionOrMacro _)	= cMacroDefs
 	toInt (STE_DclMacroOrLocalMacroFunction _)= cMacroDefs
+	toInt STE_TypeExtension			= cTypeDefs
 	toInt _							= NoIndex
 
 instance Erroradmin ErrorAdmin

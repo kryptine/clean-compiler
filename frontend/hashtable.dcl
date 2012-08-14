@@ -25,6 +25,7 @@ set_hte_mark :: !Int !*HashTable -> *HashTable
 				| IC_InstanceMember ![Type]
 				| IC_Generic
 				| IC_GenericCase !Type
+				| IC_TypeExtension !{#Char}/*module name*/
 				| IC_Unknown
 
 ::	QualifiedIdents	= QualifiedIdents !Ident !IdentClass !QualifiedIdents

@@ -685,11 +685,13 @@ instance consumerRequirements Case where
 										  		_ -> False
 
 		inspect_patterns :: !{#CommonDefs} !Bool !CasePatterns ![(Int,Bool)] -> (!Bool,!Bool)
-		inspect_patterns common_defs has_default (AlgebraicPatterns {glob_object,glob_module} _) constructors_and_unsafe_bits
-			# type_def						= common_defs.[glob_module].com_type_defs.[glob_object]
+		inspect_patterns common_defs has_default (AlgebraicPatterns {gi_index,gi_module} algebraic_patterns) constructors_and_unsafe_bits
+			# type_def						= common_defs.[gi_module].com_type_defs.[gi_index]
 			  defined_symbols				= case type_def.td_rhs of
 													AlgType defined_symbols		-> defined_symbols
 													RecordType {rt_constructor}	-> [rt_constructor]
+													ExtendableAlgType defined_symbols -> defined_symbols
+													AlgConses defined_symbols _	-> defined_symbols
 			  all_constructors				= [ ds_index \\ {ds_index}<-defined_symbols ]
 			  all_sorted_constructors		= if (is_sorted all_constructors)
 			  										all_constructors
@@ -699,15 +701,17 @@ instance consumerRequirements Case where
 			= (appearance_loop [0,1] constructors_and_unsafe_bits, not (multimatch_loop has_default constructors_and_unsafe_bits))
 		inspect_patterns common_defs has_default (OverloadedListPatterns overloaded_list _ _) constructors_and_unsafe_bits
 			# type_def = case overloaded_list of
-							UnboxedList {glob_module,glob_object} _ _ _
-								-> common_defs.[glob_module].com_type_defs.[glob_object]
-							UnboxedTailStrictList {glob_object,glob_module} _ _ _
-								-> common_defs.[glob_module].com_type_defs.[glob_object]
-							OverloadedList {glob_object,glob_module} _ _ _
-								-> common_defs.[glob_module].com_type_defs.[glob_object]
+							UnboxedList {gi_index,gi_module} _ _ _
+								-> common_defs.[gi_module].com_type_defs.[gi_index]
+							UnboxedTailStrictList {gi_index,gi_module} _ _ _
+								-> common_defs.[gi_module].com_type_defs.[gi_index]
+							OverloadedList {gi_index,gi_module} _ _ _
+								-> common_defs.[gi_module].com_type_defs.[gi_index]
 			  defined_symbols = case type_def.td_rhs of
 									AlgType defined_symbols		-> defined_symbols
 									RecordType {rt_constructor}	-> [rt_constructor]
+									ExtendableAlgType defined_symbols -> defined_symbols
+									AlgConses defined_symbols _	-> defined_symbols
 			  all_constructors = [ ds_index \\ {ds_index}<-defined_symbols ]
 			  all_sorted_constructors = if (is_sorted all_constructors) all_constructors (sortBy (<) all_constructors)
 			= (appearance_loop all_sorted_constructors constructors_and_unsafe_bits, not (multimatch_loop has_default constructors_and_unsafe_bits))

@@ -401,7 +401,7 @@ where
 					| can_generate_bimap_to_or_from
 						#! (tdi_kinds,td_infos) = td_infos![glob_module,glob_object].tdi_kinds			
 						#! (args, st) = convert_args args (modules, td_infos, heaps, error)
-						-> (GTSAppConsSimpleType type_index (KindArrow tdi_kinds) args, st)
+						-> (GTSAppConsSimpleType {gi_module=type_index.glob_module,gi_index=type_index.glob_object} (KindArrow tdi_kinds) args, st)
 						-> 	convert_type_app_to_GTSAppCons glob_module glob_object args modules td_infos heaps error
 			_
 				-> 	convert_type_app_to_GTSAppCons glob_module glob_object args modules td_infos heaps error
@@ -976,7 +976,7 @@ where
 	build_expr_for_conses is_record type_def_mod type_def_index cons_def_syms arg_expr heaps error
 		# (case_alts, heaps, error)
 			= build_exprs_for_conses is_record 0 (length cons_def_syms) type_def_mod cons_def_syms  heaps error
-		# case_patterns = AlgebraicPatterns {glob_module = type_def_mod, glob_object = type_def_index} case_alts
+		# case_patterns = AlgebraicPatterns {gi_module = type_def_mod, gi_index = type_def_index} case_alts
 		# (case_expr, heaps) = buildCaseExpr arg_expr case_patterns heaps
 		= (case_expr, heaps, error)
 
@@ -1049,7 +1049,7 @@ buildConversionFrom	::
 		 FunsAndGroups,!*Heaps,!*ErrorAdmin)
 buildConversionFrom
 		type_def_mod 
-		type_def=:{td_rhs, td_ident, td_index, td_pos} 
+		type_def=:{td_rhs, td_ident, td_pos} 
 		main_module_index predefs funs_and_groups heaps error
 	# (body_expr, arg_var, heaps, error) = 
 		build_expr_for_type_rhs type_def_mod td_rhs heaps error
@@ -1148,7 +1148,7 @@ where
 	build_case_unit body_expr heaps
 		# unit_pat = buildPredefConsPattern PD_ConsUNIT [] body_expr predefs
 		# {pds_module, pds_def} = predefs.[PD_TypeUNIT]
-		# case_patterns = AlgebraicPatterns {glob_module = pds_module, glob_object = pds_def} [unit_pat]
+		# case_patterns = AlgebraicPatterns {gi_module = pds_module, gi_index = pds_def} [unit_pat]
 		= build_case_expr case_patterns heaps
 
 build_pair x y predefs heaps
@@ -1172,32 +1172,32 @@ build_field var_expr predefs heaps
 build_case_pair var1 var2 body_expr predefs heaps
 	# pair_pat = buildPredefConsPattern PD_ConsPAIR [var1, var2] body_expr predefs	
 	# {pds_module, pds_def} = predefs.[PD_TypePAIR]
-	# case_patterns = AlgebraicPatterns {glob_module = pds_module, glob_object = pds_def} [pair_pat]	
+	# case_patterns = AlgebraicPatterns {gi_module = pds_module, gi_index = pds_def} [pair_pat]
 	= build_case_expr case_patterns heaps
 
 build_case_either left_var left_expr right_var right_expr predefs heaps
 	# left_pat = buildPredefConsPattern PD_ConsLEFT [left_var] left_expr predefs
 	# right_pat = buildPredefConsPattern PD_ConsRIGHT [right_var] right_expr predefs
 	# {pds_module, pds_def} = predefs.[PD_TypeEITHER]
-	# case_patterns = AlgebraicPatterns {glob_module = pds_module, glob_object = pds_def} [left_pat, right_pat]
+	# case_patterns = AlgebraicPatterns {gi_module = pds_module, gi_index = pds_def} [left_pat, right_pat]
 	= build_case_expr case_patterns heaps
 
 build_case_object var body_expr predefs heaps
 	# pat = buildPredefConsPattern PD_ConsOBJECT [var] body_expr predefs	
 	# {pds_module, pds_def} = predefs.[PD_TypeOBJECT]
-	# case_patterns = AlgebraicPatterns {glob_module = pds_module, glob_object = pds_def} [pat]
+	# case_patterns = AlgebraicPatterns {gi_module = pds_module, gi_index = pds_def} [pat]
 	= build_case_expr case_patterns heaps
 
 build_case_cons var body_expr predefs heaps
 	# pat = buildPredefConsPattern PD_ConsCONS [var] body_expr predefs	
 	# {pds_module, pds_def} = predefs.[PD_TypeCONS]
-	# case_patterns = AlgebraicPatterns {glob_module = pds_module, glob_object = pds_def} [pat]
+	# case_patterns = AlgebraicPatterns {gi_module = pds_module, gi_index = pds_def} [pat]
 	= build_case_expr case_patterns heaps 
 
 build_case_field var body_expr predefs heaps
 	# pat = buildPredefConsPattern PD_ConsFIELD [var] body_expr predefs	
 	# {pds_module, pds_def} = predefs.[PD_TypeFIELD]
-	# case_patterns = AlgebraicPatterns {glob_module = pds_module, glob_object = pds_def} [pat]
+	# case_patterns = AlgebraicPatterns {gi_module = pds_module, gi_index = pds_def} [pat]
 	= build_case_expr case_patterns heaps 
 
 // case with a variable as the selector expression
@@ -2769,13 +2769,13 @@ where
 	build_generic_app kind arg_exprs gen_index gen_ident heaps
 		= buildGenericApp gen_index.gi_module gen_index.gi_index gen_ident kind arg_exprs heaps 
 
-	bimap_to_simple_type :: !(Global Index) !TypeKind ![GenTypeStruct] !Expression !*(!FunsAndGroups,!*{#CommonDefs},!*Heaps,!*ErrorAdmin)
-																  -> *(!Expression,!*(!FunsAndGroups,!*{#CommonDefs},!*Heaps,!*ErrorAdmin))
-	bimap_to_simple_type global_type_def_index=:{glob_module} (KindArrow kinds) arg_types arg (funs_and_groups,modules,heaps,error)
+	bimap_to_simple_type :: !GlobalIndex !TypeKind ![GenTypeStruct] !Expression !*(!FunsAndGroups,!*{#CommonDefs},!*Heaps,!*ErrorAdmin)
+															   -> *(!Expression,!*(!FunsAndGroups,!*{#CommonDefs},!*Heaps,!*ErrorAdmin))
+	bimap_to_simple_type global_type_def_index=:{gi_module} (KindArrow kinds) arg_types arg (funs_and_groups,modules,heaps,error)
 		# (alts,constructors_arg_types,modules,heaps)
 			= determine_constructors_arg_types global_type_def_index arg_types modules heaps
 		# (alg_patterns,funs_and_groups,modules,heaps,error)
-			= build_to_alg_patterns alts constructors_arg_types glob_module funs_and_groups modules heaps error
+			= build_to_alg_patterns alts constructors_arg_types gi_module funs_and_groups modules heaps error
 		= build_bimap_case global_type_def_index arg alg_patterns funs_and_groups modules heaps error
 	where
 		build_to_alg_patterns [cons_ds=:{ds_ident,ds_index,ds_arity}:alts] [constructor_arg_types:constructors_arg_types] type_module_n funs_and_groups modules heaps error
@@ -2804,13 +2804,13 @@ where
 		specialize_to_with_args [] [] st
 			= ([],st)
 
-	bimap_from_simple_type :: !(Global Index) !TypeKind ![GenTypeStruct] !Expression !*(!FunsAndGroups,!*{#CommonDefs},!*Heaps,!*ErrorAdmin)
-																	-> *(!Expression,!*(!FunsAndGroups,!*{#CommonDefs},!*Heaps,!*ErrorAdmin))
-	bimap_from_simple_type global_type_def_index=:{glob_module} (KindArrow kinds) arg_types arg (funs_and_groups,modules,heaps,error)
+	bimap_from_simple_type :: !GlobalIndex !TypeKind ![GenTypeStruct] !Expression !*(!FunsAndGroups,!*{#CommonDefs},!*Heaps,!*ErrorAdmin)
+																 -> *(!Expression,!*(!FunsAndGroups,!*{#CommonDefs},!*Heaps,!*ErrorAdmin))
+	bimap_from_simple_type global_type_def_index=:{gi_module} (KindArrow kinds) arg_types arg (funs_and_groups,modules,heaps,error)
 		# (alts,constructors_arg_types,modules,heaps)
 			= determine_constructors_arg_types global_type_def_index arg_types modules heaps
 		# (alg_patterns,funs_and_groups,modules,heaps,error)
-			= build_from_alg_patterns alts constructors_arg_types glob_module funs_and_groups modules heaps error
+			= build_from_alg_patterns alts constructors_arg_types gi_module funs_and_groups modules heaps error
 		= build_bimap_case global_type_def_index arg alg_patterns funs_and_groups modules heaps error
 	where
 		build_from_alg_patterns [cons_ds=:{ds_ident,ds_index,ds_arity}:alts] [constructor_arg_types:constructors_arg_types] type_module_n funs_and_groups modules heaps error
@@ -2839,16 +2839,16 @@ where
 		specialize_from_with_args [] [] st
 			= ([],st)
 
-	determine_constructors_arg_types :: !(Global Index) ![GenTypeStruct] !*Modules !*Heaps
-								 -> (![DefinedSymbol],![[GenTypeStruct]],!*Modules,!*Heaps)
-	determine_constructors_arg_types {glob_module,glob_object} arg_types modules heaps
-		# ({td_args,td_rhs=AlgType alts},modules) = modules![glob_module].com_type_defs.[glob_object]
+	determine_constructors_arg_types :: !GlobalIndex ![GenTypeStruct] !*Modules !*Heaps
+							  -> (![DefinedSymbol],![[GenTypeStruct]],!*Modules,!*Heaps)
+	determine_constructors_arg_types {gi_module,gi_index} arg_types modules heaps
+		# ({td_args,td_rhs=AlgType alts},modules) = modules![gi_module].com_type_defs.[gi_index]
 
 		# {hp_type_heaps} = heaps
 		# th_vars = number_type_arguments td_args 0 hp_type_heaps.th_vars
 		# arg_types_a = {!arg_type\\arg_type<-arg_types}
 		# (constructors_arg_types,modules,th_vars)
-			= compute_constructors_arg_types alts glob_module arg_types_a modules th_vars
+			= compute_constructors_arg_types alts gi_module arg_types_a modules th_vars
 		# th_vars = remove_type_argument_numbers td_args th_vars
 		# heaps = {heaps & hp_type_heaps={hp_type_heaps & th_vars=th_vars}}
 		= (alts,constructors_arg_types,modules,heaps)
@@ -2876,8 +2876,8 @@ where
 		compute_constructor_arg_types [] arg_types_a th_vars
 			= ([],th_vars)
 
-	build_bimap_case :: !(Global Index) !.Expression ![AlgebraicPattern] !FunsAndGroups !*Modules !*Heaps !*ErrorAdmin
-													   -> (!Expression,!(!FunsAndGroups,!*Modules,!*Heaps,!*ErrorAdmin))
+	build_bimap_case :: !GlobalIndex !.Expression ![AlgebraicPattern] !FunsAndGroups !*Modules !*Heaps !*ErrorAdmin
+													-> (!Expression,!(!FunsAndGroups,!*Modules,!*Heaps,!*ErrorAdmin))
 	build_bimap_case global_type_def_index arg alg_patterns funs_and_groups modules heaps error
 		# case_patterns = AlgebraicPatterns global_type_def_index alg_patterns
 		# (expr_info_ptr, hp_expression_heap) = newPtr EI_Empty heaps.hp_expression_heap
@@ -3834,8 +3834,7 @@ curryGenericArgType  st=:{st_args, st_result, st_attr_env, st_attr_vars} attr_va
 	= (curried_st, {th & th_attrs = th_attrs})	
 		//---> ("curryGenericArgType", st, curried_st)
 
-curryGenericArgType1 :: !SymbolType !String !*TypeHeaps 
-	-> (!SymbolType, !*TypeHeaps)
+curryGenericArgType1 :: !SymbolType !String !*TypeHeaps -> (!SymbolType, !*TypeHeaps)
 curryGenericArgType1  st=:{st_args, st_result, st_attr_env, st_attr_vars} attr_var_name th=:{th_attrs}
 	# (atype, attr_vars, av_num, th_attrs) = curry st_args st_result 1 th_attrs
 	# curried_st = {st & st_args = [], st_arity = 0, st_result = atype, st_attr_vars = attr_vars}
