@@ -690,7 +690,7 @@ instance consumerRequirements Case where
 			  defined_symbols				= case type_def.td_rhs of
 													AlgType defined_symbols		-> defined_symbols
 													RecordType {rt_constructor}	-> [rt_constructor]
-													ExtendableAlgType defined_symbols -> defined_symbols
+													ExtensibleAlgType defined_symbols -> defined_symbols
 													AlgConses defined_symbols _	-> defined_symbols
 			  all_constructors				= [ ds_index \\ {ds_index}<-defined_symbols ]
 			  all_sorted_constructors		= if (is_sorted all_constructors)
@@ -710,7 +710,7 @@ instance consumerRequirements Case where
 			  defined_symbols = case type_def.td_rhs of
 									AlgType defined_symbols		-> defined_symbols
 									RecordType {rt_constructor}	-> [rt_constructor]
-									ExtendableAlgType defined_symbols -> defined_symbols
+									ExtensibleAlgType defined_symbols -> defined_symbols
 									AlgConses defined_symbols _	-> defined_symbols
 			  all_constructors = [ ds_index \\ {ds_index}<-defined_symbols ]
 			  all_sorted_constructors = if (is_sorted all_constructors) all_constructors (sortBy (<) all_constructors)

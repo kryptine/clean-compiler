@@ -434,7 +434,7 @@ where
 	check_rhs_of_TypeDef {td_rhs = AbstractSynType properties type} _ cti ts_ti_cs
 		# (type, type_attr, ts_ti_cs) = bindTypes cti type ts_ti_cs
 		= (AbstractSynType properties type, ts_ti_cs)
-	check_rhs_of_TypeDef {td_ident,td_arity,td_args,td_rhs = td_rhs=:ExtendableAlgType conses} attr_vars cti=:{cti_module_index,cti_type_index,cti_lhs_attribute} class_defs_ts_ti_cs
+	check_rhs_of_TypeDef {td_ident,td_arity,td_args,td_rhs = td_rhs=:ExtensibleAlgType conses} attr_vars cti=:{cti_module_index,cti_type_index,cti_lhs_attribute} class_defs_ts_ti_cs
 		# type_lhs = { at_attribute = cti_lhs_attribute,
 				  	   at_type = TA (MakeTypeSymbIdent {glob_object = cti_type_index, glob_module = cti_module_index} td_ident td_arity)
 									[{at_attribute = atv_attribute,at_type = TV atv_variable} \\ {atv_variable, atv_attribute} <- td_args]}
@@ -447,7 +447,7 @@ where
 		  cs & cs_symbol_table = cs_symbol_table
 		| type_index <> NotFound
 		 	# ts_ti_cs = (ts,ti,cs)
-			// to do check if ExtendableAlgType
+			// to do check if ExtensibleAlgType
 			# type_lhs = { at_attribute = cti_lhs_attribute,
 					  	   at_type = TA (MakeTypeSymbIdent { glob_object = type_index, glob_module = type_module } td_ident td_arity)
 										[{at_attribute = atv_attribute,at_type = TV atv_variable} \\ {atv_variable, atv_attribute} <- td_args]}
