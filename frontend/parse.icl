@@ -2097,8 +2097,8 @@ where
   					-> want_record_type_rhs name True exi_vars pState
 	 		  		->	(PD_Type td, parseError "Record type" No ("after ! in definition of record type "+name+" { ") pState)
 			_
-				# (condefs, extendable_algebraic_type, pState) = want_constructor_list exi_vars token pState
-				# td & td_rhs = if extendable_algebraic_type (ExtendableConses condefs) (ConsList condefs)
+				# (condefs, extensible_algebraic_type, pState) = want_constructor_list exi_vars token pState
+				# td & td_rhs = if extensible_algebraic_type (ExtensibleConses condefs) (ConsList condefs)
 				| annot == AN_None
 	 		  		->	(PD_Type td, pState)
 					->	(PD_Type td, parseError "Algebraic type" No ("No lhs strictness annotation for the algebraic type "+name) pState)
@@ -2193,8 +2193,8 @@ where
 		| token == BarToken
 			# (exi_vars, pState) = optionalExistentialQuantifiedVariables pState
 			  (token, pState) = nextToken GeneralContext pState
-			  (cons_list, extendable_algebraic_type, pState) = want_constructor_list exi_vars token pState
-			= ([cons : cons_list], extendable_algebraic_type, pState)
+			  (cons_list, extensible_algebraic_type, pState) = want_constructor_list exi_vars token pState
+			= ([cons : cons_list], extensible_algebraic_type, pState)
 			= ([cons], False, tokenBack pState)
 
 	want_more_constructors :: ![ATypeVar] !Token !ParseState -> (![ParsedConstructor],!ParseState)

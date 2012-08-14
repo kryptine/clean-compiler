@@ -187,7 +187,7 @@ instance == FunctionOrMacroIndex
 					| NewTypeCons !ParsedConstructor
 					| EmptyRhs !BITVECT
 					| AbstractTypeSpec !BITVECT !AType
-					| ExtendableConses ![ParsedConstructor]
+					| ExtensibleConses ![ParsedConstructor]
 					| MoreConses !Ident ![ParsedConstructor]
 
 ::	CollectedDefinitions instance_kind =
@@ -561,7 +561,7 @@ cIsImportedObject :== False
 			| NewType !DefinedSymbol
 			| AbstractType !BITVECT
 			| AbstractSynType !BITVECT !AType
-			| ExtendableAlgType ![DefinedSymbol]
+			| ExtensibleAlgType ![DefinedSymbol]
 			| AlgConses ![DefinedSymbol] !GlobalIndex
 			| UncheckedAlgConses !Ident ![DefinedSymbol]
 			| UnknownType

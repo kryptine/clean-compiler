@@ -196,7 +196,7 @@ where
 		| properties bitand cIsNonCoercible == 0
 			= (PostiveSignClass, scs)
 			= (TopSignClass, scs)
-	sign_class_of_type_def module_index (ExtendableAlgType conses) group_nr ci scs
+	sign_class_of_type_def module_index (ExtensibleAlgType conses) group_nr ci scs
 		= (TopSignClass, scs)
 	sign_class_of_type_def module_index (AlgConses conses _) group_nr ci scs
 		= (TopSignClass, scs)
@@ -479,7 +479,7 @@ where
 		= (PropClass, pcs)
 	prop_class_of_type_def _ (AbstractSynType properties _) _ _ pcs
 		= (PropClass, pcs)
-	prop_class_of_type_def module_index (ExtendableAlgType conses) group_nr ci pcs
+	prop_class_of_type_def module_index (ExtensibleAlgType conses) group_nr ci pcs
 		= (PropClass, pcs)
 	prop_class_of_type_def module_index (AlgConses conses _) group_nr ci pcs
 		= (PropClass, pcs)

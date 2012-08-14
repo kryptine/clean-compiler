@@ -633,7 +633,7 @@ where
 			AbstractSynType properties _
 				# type_def_infos = init_abstract_type_def properties td_args gi_module gi_index type_def_infos
 				-> (True, type_def_infos, as_type_var_heap, kind_heap)
-			ExtendableAlgType _
+			ExtensibleAlgType _
 				# (tdi_kinds, (as_type_var_heap, kind_heap)) = newKindConstVariables td_args (as_type_var_heap, kind_heap)
 				-> (is_abstract_type, {type_def_infos & [gi_module].[gi_index].tdi_kinds = tdi_kinds}, as_type_var_heap, kind_heap)				
 			AlgConses _ _
@@ -683,7 +683,7 @@ where
 			= (cv_props, (conds, {as & as_kind_heap = uki_kind_heap, as_error = uki_error}))
 		anal_rhs_of_type_def modules com_cons_defs (NewType cons) conds_as
 			= analTypesOfConstructor modules com_cons_defs cons conds_as
-		anal_rhs_of_type_def modules com_cons_defs (ExtendableAlgType conses) conds_as
+		anal_rhs_of_type_def modules com_cons_defs (ExtensibleAlgType conses) conds_as
 			# (cons_properties, (conds,as)) = analTypesOfConstructors modules com_cons_defs conses conds_as
 			= ((cons_properties bitand (bitnot cIsHyperStrict)) /*bitor cIsNonCoercible*/, (conds,as))
 		anal_rhs_of_type_def modules com_cons_defs (AlgConses conses _) conds_as
@@ -754,8 +754,8 @@ where
 			#! td_infos & [gi_module,gi_index] = td_info
 			| type_properties bitand cIsNonCoercible<>0
 				# type_def = modules.[gi_module].com_type_defs.[gi_index]
-				| not (isUniqueAttr type_def.td_attribute) && is_ExtendableAlgType_or_AlgConses type_def.td_rhs
-					# error = checkErrorWithPosition type_def.td_ident type_def.td_pos "a non unique extendable algebraic data type must be coercible" error
+				| not (isUniqueAttr type_def.td_attribute) && is_ExtensibleAlgType_or_AlgConses type_def.td_rhs
+					# error = checkErrorWithPosition type_def.td_ident type_def.td_pos "a non unique extensible algebraic data type must be coercible" error
 					= (kind_store, kind_heap, td_infos, error)
 					= (kind_store, kind_heap, td_infos, error)
 				= (kind_store, kind_heap, td_infos, error)
@@ -779,9 +779,9 @@ where
 		is_a_top_var var_number []
 			= False
 
-		is_ExtendableAlgType_or_AlgConses (ExtendableAlgType _) = True 
-		is_ExtendableAlgType_or_AlgConses (AlgConses _ _) = True
-		is_ExtendableAlgType_or_AlgConses _ = False
+		is_ExtensibleAlgType_or_AlgConses (ExtensibleAlgType _) = True 
+		is_ExtensibleAlgType_or_AlgConses (AlgConses _ _) = True
+		is_ExtensibleAlgType_or_AlgConses _ = False
 
 	check_dcl_properties modules dcl_types dcl_mod_index properties {gi_module, gi_index} as
 		| gi_module == dcl_mod_index && gi_index < size dcl_types
@@ -1215,7 +1215,7 @@ isUniqueTypeRhs common_defs mod_index (RecordType {rt_constructor={ds_index}}) s
 	= constructor_is_unique mod_index ds_index common_defs state
 isUniqueTypeRhs common_defs mod_index (NewType {ds_index}) state
 	= constructor_is_unique mod_index ds_index common_defs state
-isUniqueTypeRhs common_defs mod_index (ExtendableAlgType constructors) state
+isUniqueTypeRhs common_defs mod_index (ExtensibleAlgType constructors) state
 	= has_unique_constructor constructors common_defs mod_index state
 isUniqueTypeRhs common_defs mod_index (AlgConses constructors _) state
 	= has_unique_constructor constructors common_defs mod_index state
