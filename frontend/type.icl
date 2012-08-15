@@ -2557,14 +2557,14 @@ where
 				= (checkError ins_types " instance is overlapping" error, IT_Node ins it_less it_greater)
 
 	check_types_of_instances ins_pos common_defs class_module class_index types state
-		# {class_arity,class_cons_vars} = common_defs.[class_module].com_class_defs.[class_index]
-		= check_instances_of_constructor_variables ins_pos common_defs class_cons_vars (dec class_arity) types state
+		# {class_cons_vars} = common_defs.[class_module].com_class_defs.[class_index]
+		= check_instances_of_constructor_variables ins_pos common_defs class_cons_vars 0 types state
 	where
 		check_instances_of_constructor_variables ins_pos common_defs cons_vars arg_nr [type : types] state
 			| cons_vars bitand (1 << arg_nr) <> 0
 				# state = check_type_of_constructor_variable ins_pos common_defs type state
-				= check_instances_of_constructor_variables ins_pos common_defs cons_vars (dec arg_nr) types state
-				= check_instances_of_constructor_variables ins_pos common_defs cons_vars (dec arg_nr) types state
+				= check_instances_of_constructor_variables ins_pos common_defs cons_vars (arg_nr+1) types state
+				= check_instances_of_constructor_variables ins_pos common_defs cons_vars (arg_nr+1) types state
 		check_instances_of_constructor_variables ins_pos common_defs cons_vars arg_nr [] state
 			= state
 
