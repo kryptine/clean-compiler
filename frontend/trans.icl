@@ -1544,9 +1544,10 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 	  		= accAttrVarHeap (create_fresh_attr_vars demanded (size demanded)) ti_type_heaps
 	  		// the attribute variables stored in the "demanded" graph are represented as integers: 
 	  		// prepare to replace them by pointers
-	  ((fresh_arg_types, fresh_result_type), used_attr_vars) 
-	  		= replaceIntegers (new_arg_types, st_result) (fresh_type_vars_array, fresh_attr_vars, attr_partition)
-	  				 (createArray (size demanded) False)
+	  used_attr_vars = createArray (size demanded) False
+	  replace_input = (fresh_type_vars_array, fresh_attr_vars, attr_partition)
+	  (_, fresh_arg_types, used_attr_vars) = replaceIntegers new_arg_types replace_input used_attr_vars
+	  (_, fresh_result_type, used_attr_vars) = replaceIntegers st_result replace_input used_attr_vars
 			// replace the integer-attribute-variables with pointer-attribute-variables or TA_Unique or TA_Multi
 	  final_coercions
 	  		= removeUnusedAttrVars demanded [i \\ i<-[0..size used_attr_vars-1] | not used_attr_vars.[i]]
@@ -1788,8 +1789,7 @@ where
 	replace_integers_in_substitution :: (!{!.TypeVar},!{!.TypeAttribute},!{#.Int}) !.Int !*(!*{!Type},!*{#.Bool}) -> (!.{!Type},!.{#Bool})
 	replace_integers_in_substitution replace_input i (subst, used)
 		# (subst_i, subst) = subst![i]
-		  (subst_i, used)
-		  		= replaceIntegers subst_i replace_input used
+		  (_, subst_i, used) = replaceIntegers subst_i replace_input used
 		= ({ subst & [i] = subst_i }, used)
 
 	coerce_types common_defs cons_vars {ur_offered, ur_demanded} (subst, coercions, ti_type_def_infos, ti_type_heaps)
@@ -2391,22 +2391,22 @@ where
 			# (FI_Function generated_function, fun_heap) = readPtr fun_ptr fun_heap
 			= (max generated_function.gf_fun_def.fun_info.fi_group_index current_max, fun_defs, fun_heap)
 
-class replaceIntegers a :: !a !({!TypeVar}, !{!TypeAttribute}, !AttributePartition) !*{#Bool} -> (!a, !.{#Bool})
+class replaceIntegers a :: !a !({!TypeVar}, !{!TypeAttribute}, !AttributePartition) !*{#Bool} -> (!Bool, !a, !*{#Bool})
 	// get rid of all those TempV and TA_Var things
 
-instance replaceIntegers (a, b) | replaceIntegers a & replaceIntegers b where
-	replaceIntegers (a, b) input used
-		# (a, used) = replaceIntegers a input used
-		  (b, used) = replaceIntegers b input used
-		= ((a, b), used)
-
 instance replaceIntegers [a] | replaceIntegers a where
+	replaceIntegers l=:[h:t] input used
+		# (h_m, h_r, used) = replaceIntegers h input used
+		  (t_m, t_r, used) = replaceIntegers t input used
+		| h_m
+			| t_m
+				= (True, [h_r:t_r], used)
+				= (True, [h_r:t], used)
+			| t_m
+				= (True, [h:t_r], used)
+				= (False, l, used)
 	replaceIntegers [] input used
-		= ([], used)
-	replaceIntegers [h:t] input used
-		# (h, used) = replaceIntegers h input used
-		  (t, used) = replaceIntegers t input used
-		= ([h:t], used)
+		= (False, [], used)
 
 instance replaceIntegers TypeAttribute where
 	replaceIntegers (TA_TempVar i) (_, attributes, attr_partition) used
@@ -2414,37 +2414,53 @@ instance replaceIntegers TypeAttribute where
 		  attribute = attributes.[index]
 		= case attribute of
 			TA_Var _
-				-> (attribute, {used & [index] = True})
+				-> (True, attribute, {used & [index] = True})
 			_
-				-> (attribute, used)
+				-> (True, attribute, used)
 	replaceIntegers ta _ used
-		= (ta, used)
+		= (False, ta, used)
 
 instance replaceIntegers Type where
-	replaceIntegers (TA type_symb_ident args) input used
-		# (args, used) = replaceIntegers args input used
-		= (TA type_symb_ident args, used)
-	replaceIntegers (TAS type_symb_ident args strictness) input used
-		# (args, used) = replaceIntegers args input used
-		= (TAS type_symb_ident args strictness, used)
-	replaceIntegers (a --> b) input used
-		# (a, used) = replaceIntegers a input used
-		  (b, used) = replaceIntegers b input used
-		= (a --> b, used)
+	replaceIntegers type=:(TA type_symb_ident args) input used
+		# (args_m, args_r, used) = replaceIntegers args input used
+		| args_m
+			= (True, TA type_symb_ident args_r, used)
+			= (False, type, used)
+	replaceIntegers type=:(TAS type_symb_ident args strictness) input used
+		# (args_m, args_r, used) = replaceIntegers args input used
+		| args_m
+			= (True, TAS type_symb_ident args_r strictness, used)
+			= (False, type, used)
+	replaceIntegers type=:(a --> b) input used
+		# (a_m, a_r, used) = replaceIntegers a input used
+		  (b_m, b_r, used) = replaceIntegers b input used
+		| a_m
+			| b_m
+				= (True, a_r --> b_r, used)
+				= (True, a_r --> b, used)
+			| b_m
+				= (True, a --> b_r, used)
+				= (False, type, used)
 	replaceIntegers (consvar :@: args) input=:(fresh_type_vars, _, _) used
 		# (TempCV i) = consvar
-		  (args, used) = replaceIntegers args input used
-		= (CV fresh_type_vars.[i] :@: args, used)
+		  (_, args, used) = replaceIntegers args input used
+		= (True, CV fresh_type_vars.[i] :@: args, used)
 	replaceIntegers (TempV i) (fresh_type_vars, _, _) used
-		= (TV fresh_type_vars.[i], used)
+		= (True, TV fresh_type_vars.[i], used)
 	replaceIntegers type input used
-		= (type, used)
+		= (False, type, used)
 
 instance replaceIntegers AType where
 	replaceIntegers atype=:{at_attribute, at_type} input used
-		# (at_attribute, used) = replaceIntegers at_attribute input used
-		  (at_type, used) = replaceIntegers at_type input used
-		= ({atype & at_attribute = at_attribute, at_type = at_type}, used)
+		# (at_attribute_m, at_attribute_r, used) = replaceIntegers at_attribute input used
+		  (at_type_m, at_type_r, used) = replaceIntegers at_type input used
+		| at_attribute_m
+			| at_type_m
+				= (True, {atype & at_attribute = at_attribute_r, at_type = at_type_r}, used)
+				= (True, {atype & at_attribute = at_attribute_r}, used)
+			| at_type_m
+				= (True, {atype & at_type = at_type_r}, used)
+				= (False, atype, used)
 
 // Variable binding...
 
