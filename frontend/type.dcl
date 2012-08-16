@@ -7,7 +7,7 @@ typeProgram :: !{! Group} !Int !*{# FunDef} !IndexRange  !(Optional Bool) !Commo
   																						 !*TypeDefInfos !*Heaps !*PredefinedSymbols !*File !*File
 	-> (!Bool, !*{# FunDef}, !ArrayAndListInstances, !{# CommonDefs}, !{# {# FunType} }, !*TypeDefInfos,!*Heaps,!*PredefinedSymbols,!*File,!*File)
 
-addPropagationAttributesToAType :: {#CommonDefs} !AType !*PropState -> *(!AType,Int,!*PropState);
+addPropagationAttributesToAType :: {#CommonDefs} !AType !*PropState -> *(!AType,!*PropState);
 
 tryToExpand :: !Type !TypeAttribute !{# CommonDefs} !*TypeHeaps -> (!Bool, !Type, !*TypeHeaps)
 
