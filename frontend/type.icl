@@ -940,7 +940,7 @@ freshSymbolType is_appl fresh_context_vars {st_vars,st_args,st_result,st_context
 			= collect_cons_variables tc_types class_cons_vars collected_cons_vars
 		collect_cons_variables_in_tc common_defs tc=:{tc_class=TCGeneric {gtc_class}} collected_cons_vars
 			= collect_cons_variables_in_tc common_defs {tc & tc_class=TCClass gtc_class} collected_cons_vars 
-		 
+
 		collect_cons_variables [] class_cons_vars collected_cons_vars
 			= collected_cons_vars
 		collect_cons_variables [type : tc_types] class_cons_vars collected_cons_vars
@@ -1133,7 +1133,6 @@ where
 		= case cumm_attr of
 			TA_Unique
 				-> (TA_Unique, attr_var_heap, attr_vars, attr_env, attribute_error attr_var ps_error)
-			
 			TA_Multi
 				-> (TA_Var attr_var, attr_var_heap, attr_vars, attr_env, ps_error)
 			TA_Var _
@@ -1141,13 +1140,17 @@ where
 			_
 				-> abort ("combine_attributes" ---> cumm_attr) 
 	where
-		new_inequality off_attr_var dem_attr_var [] 
-			= [{ ai_demanded = dem_attr_var, ai_offered = off_attr_var }]
-		new_inequality off_attr_var dem_attr_var ins=:[ inequal : iequals ]
-			 | dem_attr_var.av_info_ptr == inequal.ai_demanded.av_info_ptr && off_attr_var.av_info_ptr == inequal.ai_offered.av_info_ptr
-			 	= ins
-			 	= [ inequal : new_inequality off_attr_var dem_attr_var iequals ]
+		new_inequality off_attr_var dem_attr_var inequals
+			| is_new_inequality off_attr_var dem_attr_var inequals
+				= inequals ++ [{ ai_demanded = dem_attr_var, ai_offered = off_attr_var }]
+				= inequals
 
+		is_new_inequality off_attr_var dem_attr_var [inequal : iequals]
+			 | dem_attr_var.av_info_ptr == inequal.ai_demanded.av_info_ptr && off_attr_var.av_info_ptr == inequal.ai_offered.av_info_ptr
+			 	= False
+			 	= is_new_inequality off_attr_var dem_attr_var iequals
+		is_new_inequality off_attr_var dem_attr_var [] 
+			= True
 	combine_attributes _ (TA_Var var) prop_vars attr_var_heap attr_vars attr_env ps_error
 		# (new_attr_ptr, attr_var_heap) = newPtr AVI_Empty attr_var_heap
 		  new_attr_var = { var & av_info_ptr = new_attr_ptr }
