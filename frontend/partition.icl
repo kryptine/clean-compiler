@@ -1,6 +1,3 @@
-/*
-	module owner: Diederik van Arkel
-*/
 implementation module partition
 
 import syntax, transform, utilities
@@ -224,9 +221,16 @@ component_members_to_list NoComponentMembers
 
 get_mark max_fun_nr marks fun
 //	:== marks.[fun]
-	:== case [m_mark \\ {m_fun,m_mark} <-: marks | m_fun == fun] of
-		[]		-> max_fun_nr
-		[m:_]	-> m
+	:== get_mark 0 marks fun max_fun_nr
+where
+	get_mark :: !Int !{#Mark} !Int !Int -> Int
+	get_mark i marks fun max_fun_nr
+		| i<size marks
+			| marks.[i].m_fun<>fun
+				= get_mark (i+1) marks fun max_fun_nr
+				= marks.[i].m_mark
+			= max_fun_nr
+
 set_mark marks fun val
 //	:== { marks & [fun] = val}
 //	:== { if (m_fun==fun) {m & m_mark = val} m \\ m=:{m_fun=m_fun} <-: marks}
