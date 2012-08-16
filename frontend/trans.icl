@@ -1750,8 +1750,7 @@ where
 	add_propagation_attributes_to_atype modules type ps
 		| is_dictionary type ps.prop_td_infos
 			= (type, ps)
-		# (type, prop_class, ps) = addPropagationAttributesToAType modules type ps
-		= (type, ps)
+			= addPropagationAttributesToAType modules type ps
 
 	accum_function_producer_type :: !{!.Producer} !.ReadOnlyTI !.Int !*(!u:[v:(Optional .SymbolType)],!*{#.FunDef},!*(Heap FunctionInfo)) -> (!w:[x:(Optional SymbolType)],!.{#FunDef},!.(Heap FunctionInfo)), [u <= w,v <= x]
 	accum_function_producer_type prods ro i (type_accu, ti_fun_defs, ti_fun_heap)

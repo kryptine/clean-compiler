@@ -1095,13 +1095,6 @@ attribute_error type_attr (Yes err)
 	# err = errorHeading "Type error" err
 	= Yes { err & ea_file = err.ea_file <<< "* attribute expected instead of " <<< type_attr <<< '\n' }
 
-add_propagation_attributes_to_atypes modules [] ps
-	= ([], [], ps) 
-add_propagation_attributes_to_atypes modules [atype : atypes] ps
-	# (atype, prop_class, ps) = addPropagationAttributesToAType modules atype ps
-	  (atypes, prop_classes, ps) = add_propagation_attributes_to_atypes modules atypes ps
-	= ([atype : atypes], [prop_class : prop_classes], ps)
-
 determine_attribute_of_cons modules TA_Unique cons_args prop_class attr_var_heap attr_vars attr_env ps_error
 	= (TA_Unique, prop_class >> length cons_args, attr_var_heap, attr_vars, attr_env, ps_error)
 determine_attribute_of_cons modules cons_attr cons_args prop_class attr_var_heap attr_vars attr_env ps_error
@@ -1161,49 +1154,113 @@ where
 	combine_attributes cons_attr _ _ attr_var_heap attr_vars attr_env ps_error
 		= (cons_attr, attr_var_heap, attr_vars, attr_env, ps_error)
 
-addPropagationAttributesToAType :: {#CommonDefs} !AType !*PropState -> *(!AType,Int,!*PropState);
-addPropagationAttributesToAType modules type=:{at_type = TA cons_id=:{type_index={glob_object,glob_module},type_ident} cons_args, at_attribute} ps
-	# (cons_args, props, ps=:{prop_td_infos,prop_type_heaps,prop_attr_vars,prop_attr_env,prop_error})
-			= add_propagation_attributes_to_atypes modules cons_args ps
-	  (prop_class, th_vars, prop_td_infos) = propClassification glob_object glob_module props modules prop_type_heaps.th_vars prop_td_infos
-	  (at_attribute, prop_class, th_attrs, prop_attr_vars, prop_attr_env, prop_error)
-	  		= determine_attribute_of_cons modules at_attribute cons_args prop_class prop_type_heaps.th_attrs prop_attr_vars prop_attr_env prop_error
-	= ({ type & at_type = TA cons_id cons_args, at_attribute = at_attribute }, prop_class,  { ps & prop_attr_vars = prop_attr_vars,
-			prop_td_infos = prop_td_infos, prop_attr_env = prop_attr_env,
-				prop_type_heaps = { prop_type_heaps & th_vars = th_vars, th_attrs = th_attrs}, prop_error = prop_error })
-addPropagationAttributesToAType modules type=:{at_type = TAS cons_id=:{type_index={glob_object,glob_module},type_ident} cons_args strictness, at_attribute} ps
-	# (cons_args, props, ps=:{prop_td_infos,prop_type_heaps,prop_attr_vars,prop_attr_env,prop_error})
-			= add_propagation_attributes_to_atypes modules cons_args ps
-	  (prop_class, th_vars, prop_td_infos) = propClassification glob_object glob_module props modules prop_type_heaps.th_vars prop_td_infos
-	  (at_attribute, prop_class, th_attrs, prop_attr_vars, prop_attr_env, prop_error)
-	  		= determine_attribute_of_cons modules at_attribute cons_args prop_class prop_type_heaps.th_attrs prop_attr_vars prop_attr_env prop_error
-	= ({ type & at_type = TAS cons_id cons_args strictness, at_attribute = at_attribute }, prop_class,  { ps & prop_attr_vars = prop_attr_vars,
-			prop_td_infos = prop_td_infos, prop_attr_env = prop_attr_env,
-				prop_type_heaps = { prop_type_heaps & th_vars = th_vars, th_attrs = th_attrs}, prop_error = prop_error })
-addPropagationAttributesToAType modules type=:{at_type} ps
-	# (at_type, ps) = addPropagationAttributesToType modules at_type ps
-	= ({ type & at_type = at_type }, NoPropClass, ps)
-
-addPropagationAttributesToType modules (arg_type --> res_type) ps
-	# (arg_type, prop_class, ps) = addPropagationAttributesToAType modules arg_type ps
-	  (res_type, prop_class, ps) = addPropagationAttributesToAType modules res_type ps
-	= (arg_type --> res_type, ps)
-addPropagationAttributesToType modules (type_var :@: types) ps
-	# (types, ps) = addPropagationAttributesToATypes modules types ps
-	= (type_var :@: types, ps)
-addPropagationAttributesToType modules (TArrow1 arg_type) ps
-	# (arg_type, prop_class, ps) = addPropagationAttributesToAType modules arg_type ps
-	= (TArrow1 arg_type, ps)
-addPropagationAttributesToType modules type ps
+addPropagationAttributesToAType :: {#CommonDefs} !AType !*PropState -> *(!AType,!*PropState);
+addPropagationAttributesToAType modules type ps
+	# (_, type, prop_class, ps) = add_propagation_attributes_to_AType modules type ps
 	= (type, ps)
 
 addPropagationAttributesToATypes :: {#CommonDefs} ![AType] !*PropState -> (![AType],!*PropState)
 addPropagationAttributesToATypes modules types ps
-	= mapSt (add_propagation_attributes_to_atype modules) types ps
-where
-	add_propagation_attributes_to_atype modules type ps
-		# (type, prop_class, ps) = addPropagationAttributesToAType modules type ps
-		= (type, ps)
+	= mapSt (addPropagationAttributesToAType modules) types ps
+
+add_propagation_attributes_to_AType :: {#CommonDefs} !AType !*PropState -> *(!Bool, !AType,Int,!*PropState);
+add_propagation_attributes_to_AType modules type=:{at_type = TA cons_id=:{type_index={glob_object,glob_module},type_ident} cons_args, at_attribute} ps
+	# (cons_args_m, cons_args_r, props, ps=:{prop_td_infos,prop_type_heaps,prop_attr_vars,prop_attr_env,prop_error})
+			= add_propagation_attributes_to_atypes modules cons_args ps
+	  (prop_class, th_vars, prop_td_infos) = propClassification glob_object glob_module props modules prop_type_heaps.th_vars prop_td_infos
+	| cons_args_m
+		# (at_attribute, prop_class, th_attrs, prop_attr_vars, prop_attr_env, prop_error)
+		  		= determine_attribute_of_cons modules at_attribute cons_args_r prop_class prop_type_heaps.th_attrs prop_attr_vars prop_attr_env prop_error
+		  prop_type_heaps & th_vars = th_vars, th_attrs = th_attrs
+		  ps & prop_attr_vars = prop_attr_vars, prop_td_infos = prop_td_infos, prop_attr_env = prop_attr_env, prop_type_heaps = prop_type_heaps, prop_error = prop_error
+		= (True, {type & at_type = TA cons_id cons_args_r, at_attribute = at_attribute}, prop_class, ps)
+		# (at_attribute_r, prop_class, th_attrs, prop_attr_vars, prop_attr_env, prop_error)
+		  		= determine_attribute_of_cons modules at_attribute cons_args prop_class prop_type_heaps.th_attrs prop_attr_vars prop_attr_env prop_error
+		  prop_type_heaps & th_vars = th_vars, th_attrs = th_attrs
+		  ps & prop_attr_vars = prop_attr_vars, prop_td_infos = prop_td_infos, prop_attr_env = prop_attr_env, prop_type_heaps = prop_type_heaps, prop_error = prop_error
+		| not (equal_attribute at_attribute at_attribute_r)
+			= (True, {type & at_attribute = at_attribute_r}, prop_class, ps)
+			= (False, type, prop_class, ps)
+add_propagation_attributes_to_AType modules type=:{at_type = TAS cons_id=:{type_index={glob_object,glob_module},type_ident} cons_args strictness, at_attribute} ps
+	# (cons_args_m, cons_args_r, props, ps=:{prop_td_infos,prop_type_heaps,prop_attr_vars,prop_attr_env,prop_error})
+			= add_propagation_attributes_to_atypes modules cons_args ps
+	  (prop_class, th_vars, prop_td_infos) = propClassification glob_object glob_module props modules prop_type_heaps.th_vars prop_td_infos
+	| cons_args_m
+		# (at_attribute, prop_class, th_attrs, prop_attr_vars, prop_attr_env, prop_error)
+		  		= determine_attribute_of_cons modules at_attribute cons_args_r prop_class prop_type_heaps.th_attrs prop_attr_vars prop_attr_env prop_error
+		  prop_type_heaps & th_vars = th_vars, th_attrs = th_attrs
+		  ps & prop_attr_vars = prop_attr_vars, prop_td_infos = prop_td_infos, prop_attr_env = prop_attr_env, prop_type_heaps = prop_type_heaps, prop_error = prop_error
+		= (True, {type & at_type = TAS cons_id cons_args_r strictness, at_attribute = at_attribute}, prop_class, ps)
+		# (at_attribute_r, prop_class, th_attrs, prop_attr_vars, prop_attr_env, prop_error)
+		  		= determine_attribute_of_cons modules at_attribute cons_args prop_class prop_type_heaps.th_attrs prop_attr_vars prop_attr_env prop_error
+		  prop_type_heaps & th_vars = th_vars, th_attrs = th_attrs
+		  ps & prop_attr_vars = prop_attr_vars, prop_td_infos = prop_td_infos, prop_attr_env = prop_attr_env, prop_type_heaps = prop_type_heaps, prop_error = prop_error
+		| not (equal_attribute at_attribute at_attribute_r)
+			= (True, {type & at_attribute = at_attribute_r}, prop_class, ps)
+			= (False, type, prop_class, ps)
+add_propagation_attributes_to_AType modules type=:{at_type} ps
+	# (at_type_m, at_type_r, ps) = addPropagationAttributesToType modules at_type ps
+	| at_type_m
+		= (True, {type & at_type = at_type_r}, NoPropClass, ps)
+		= (False, type, NoPropClass, ps)
+
+addPropagationAttributesToType :: {#CommonDefs} !Type !*PropState -> *(!Bool,!Type,!*PropState);
+addPropagationAttributesToType modules type=:(arg_type --> res_type) ps
+	# (arg_type_m, arg_type_r, _, ps) = add_propagation_attributes_to_AType modules arg_type ps
+	# (res_type_m, res_type_r, _, ps) = add_propagation_attributes_to_AType modules res_type ps
+	| arg_type_m
+		| res_type_m
+			= (True, arg_type_r --> res_type_r, ps)
+			= (True, arg_type_r --> res_type, ps)
+		| res_type_m
+			= (True, arg_type --> res_type_r, ps)
+			= (False, type, ps)
+addPropagationAttributesToType modules type=:(type_var :@: types) ps
+	# (types_m, types_r, ps) = add_propagation_attributes_to_ATypes modules types ps
+	| types_m
+		= (True, type_var :@: types_r, ps)
+		= (False, type, ps)
+addPropagationAttributesToType modules type=:(TArrow1 arg_type) ps
+	# (arg_type_m, arg_type_r, _, ps) = add_propagation_attributes_to_AType modules arg_type ps
+	| arg_type_m
+		= (True, TArrow1 arg_type_r, ps)
+		= (False, type, ps)
+addPropagationAttributesToType modules type ps
+	= (False, type, ps)
+
+add_propagation_attributes_to_atypes :: {#CommonDefs} ![AType] !*PropState -> (!Bool,![AType],[Int],!*PropState)
+add_propagation_attributes_to_atypes modules atypes=:[atype : atypes_t] ps
+	# (atype_m, atype_r, prop_class, ps) = add_propagation_attributes_to_AType modules atype ps
+	  (atypes_t_m, atypes_t_r, prop_classes, ps) = add_propagation_attributes_to_atypes modules atypes_t ps
+	  prop_classes = [prop_class : prop_classes]
+	| atype_m
+		| atypes_t_m
+			= (True, [atype_r : atypes_t_r], prop_classes, ps)
+			= (True, [atype_r : atypes_t], prop_classes, ps)
+		| atypes_t_m
+			= (True, [atype : atypes_t_r], prop_classes, ps)
+			= (False, atypes, prop_classes, ps)
+add_propagation_attributes_to_atypes modules [] ps
+	= (False, [], [], ps) 
+
+add_propagation_attributes_to_ATypes :: {#CommonDefs} ![AType] !*PropState -> (!Bool,![AType],!*PropState)
+add_propagation_attributes_to_ATypes modules atypes=:[atype : atypes_t] ps
+	# (atype_m, atype_r, _, ps) = add_propagation_attributes_to_AType modules atype ps
+	  (atypes_t_m, atypes_t_r, ps) = add_propagation_attributes_to_ATypes modules atypes_t ps
+	| atype_m
+		| atypes_t_m
+			= (True, [atype_r : atypes_t_r], ps)
+			= (True, [atype_r : atypes_t], ps)
+		| atypes_t_m
+			= (True, [atype : atypes_t_r], ps)
+			= (False, atypes, ps)
+add_propagation_attributes_to_ATypes modules [] ps
+	= (False, [], ps) 
+
+equal_attribute TA_Multi TA_Multi = True
+equal_attribute TA_Unique TA_Unique = True
+equal_attribute (TA_Var av1) (TA_Var av2) = av1.av_info_ptr == av2.av_info_ptr
+equal_attribute _ _ = False
 
 :: Base :== {! AType}
 
@@ -1262,11 +1319,11 @@ determineSymbolTypeOfFunction pos ident act_arity st=:{st_args,st_result,st_attr
 		VI_PropagationType symb_type
 	   		# (copy_symb_type, ts) = freshSymbolType (Yes pos) cWithFreshContextVars symb_type common_defs ts 
 			-> currySymbolType copy_symb_type act_arity ts
-		_	
+		_
 			# (st_args, ps) = addPropagationAttributesToATypes common_defs st_args
 					{ prop_type_heaps = ts.ts_type_heaps, prop_td_infos = ts.ts_td_infos,
 					  prop_attr_vars = st_attr_vars, prop_attr_env = st_attr_env, prop_error = Yes ts.ts_error}
-			  (st_result, _, {prop_type_heaps,prop_td_infos,prop_attr_vars,prop_error = Yes ts_error,prop_attr_env})
+			  (st_result, {prop_type_heaps,prop_td_infos,prop_attr_vars,prop_error = Yes ts_error,prop_attr_env})
 			  			= addPropagationAttributesToAType common_defs st_result ps
 			  st = { st & st_args = st_args, st_result = st_result, st_attr_vars = prop_attr_vars, st_attr_env = prop_attr_env }
 			# (copy_symb_type, ts) = freshSymbolType (Yes pos) cWithFreshContextVars st common_defs { ts &
@@ -2086,7 +2143,7 @@ where
 		  (st_args, ps) = addPropagationAttributesToATypes common_defs st_args
 				{ prop_type_heaps = ts_type_heaps, prop_td_infos = ts_td_infos,
 				  prop_attr_vars = st_attr_vars, prop_attr_env = st_attr_env, prop_error = Yes ts_error}
-		  (st_result, _, {prop_type_heaps,prop_td_infos,prop_attr_vars,prop_error = Yes ts_error,prop_attr_env})
+		  (st_result, {prop_type_heaps,prop_td_infos,prop_attr_vars,prop_error = Yes ts_error,prop_attr_env})
 		  		= addPropagationAttributesToAType common_defs st_result ps
 		  ft_with_prop = { ft & st_args = st_args, st_result = st_result, st_attr_vars = prop_attr_vars, st_attr_env = prop_attr_env }
 		  (th_vars, ts_expr_heap) = clear_dynamics fi_dynamics (prop_type_heaps.th_vars, ts.ts_expr_heap)
