@@ -663,6 +663,7 @@ FI_HasTypeSpec	:== 2			// whether the function has u user defined type
 FI_IsNonRecursive :== 4			// used in trans.icl and partition.icl
 FI_IsUnboxedListOfRecordsConsOrNil :== 8
 FI_MemberInstanceRequiresTypeInDefMod :== 16
+FI_GenericFun :== 32
 
 ::	FunInfo =
 	{	fi_calls			:: ![FunCall]
