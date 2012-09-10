@@ -211,7 +211,6 @@ where
 		  (let_lazy_binds, ti) = transform let_lazy_binds ro ti
 		  (let_expr, ti) = transform let_expr ro ti
 		  lad = { lad & let_lazy_binds = let_lazy_binds, let_strict_binds = let_strict_binds, let_expr = let_expr}
-//		  ti = check_type_info lad ti
 		= (Let lad, ti)
 	  where
 		store_type_info_of_bindings_in_heap {let_strict_binds, let_lazy_binds,let_info_ptr} ti
@@ -221,12 +220,7 @@ where
 			= {ti & ti_symbol_heap = ti_symbol_heap, ti_var_heap = ti_var_heap}
 		store_type_info_let_bind (var_type, {lb_dst={fv_info_ptr}}) var_heap
 			= setExtendedVarInfo fv_info_ptr (EVI_VarType var_type) var_heap
-/*
-		check_type_info {let_strict_binds,let_lazy_binds,let_info_ptr} ti
-			# (EI_LetType var_types, ti_symbol_heap) = readExprInfo let_info_ptr ti.ti_symbol_heap
-			= { ti & ti_symbol_heap = ti_symbol_heap }
-				//  ---> ("check_type_info_of_bindings_in_heap",let_strict_binds,let_lazy_binds,var_types)
-*/
+
 	transform (Case kees) ro ti
 		# ti = store_type_info_of_patterns_in_heap kees ti
 		= transformCase kees ro ti
@@ -3588,19 +3582,18 @@ where
 		// assign group_nr to component_members
 		# ti = assign_groups component_members group_nr ti
 
-		# (before,ti) = ti!ti_next_fun_nr
+		# (previous_new_functions,ti) = ti!ti_new_functions
+		# ti & ti_new_functions=[]
 		// transform component_members
 		# ti = transform_functions component_members common_defs imported_funs ti
 		// partitionate group: need to know added functions for this...
-		# (after,ti) = ti!ti_next_fun_nr
-
-		| not (compile_with_fusion || after > before)
+		# (new_functions,ti) = ti!ti_new_functions
+		# ti & ti_new_functions = new_functions ++ previous_new_functions
+		| not (compile_with_fusion || not (isEmpty new_functions))
 			= (inc group_nr,[{component_members=component_members}:acc_groups],ti)
 
-		# (ti_new_functions,ti) = ti!ti_new_functions
-
 		# (new_functions_in_component,ti_fun_heap)
-			= determine_new_functions_in_component (after-before) ti_new_functions before after ti.ti_fun_heap
+			= determine_new_functions_in_component new_functions ti.ti_fun_heap
 		# ti = {ti & ti_fun_heap=ti_fun_heap}
 		# (new_groups,ti) = partition_group group_nr (append_ComponentMembers component_members new_functions_in_component) ti
 		// reanalyse consumers
@@ -3617,7 +3610,7 @@ where
 				, ti_cons_args = ti_cons_args
 				}
 		// if wanted reapply transform_group to all found groups
-		| after>before || length new_groups > 1 || not same
+		| not (isEmpty new_functions) || length new_groups > 1 || not same
 			= transform_groups` common_defs imported_funs group_nr new_groups acc_groups ti
 		// producer annotation for finished components!
 		# ti = reannotate_producers group_nr component_members ti
@@ -3836,15 +3829,14 @@ where
 		= GeneratedComponentMember member fun_ptr (append_ComponentMembers members component_members_to_append)
 	append_ComponentMembers NoComponentMembers component_members_to_append
 		= component_members_to_append
-	
-	determine_new_functions_in_component :: !Int ![FunctionInfoPtr] !Int !Int !*FunctionHeap -> (ComponentMembers,!*FunctionHeap)
-	determine_new_functions_in_component 0 new_functions before after fun_heap
-			= (NoComponentMembers,fun_heap)
-	determine_new_functions_in_component n_functions [fun_ptr:new_functions] before after fun_heap
+
+	determine_new_functions_in_component :: ![FunctionInfoPtr] !*FunctionHeap -> (ComponentMembers,!*FunctionHeap)
+	determine_new_functions_in_component [fun_ptr:new_functions] fun_heap
 		# (FI_Function {gf_fun_index},fun_heap) = readPtr fun_ptr fun_heap
-		| gf_fun_index>=before && gf_fun_index<after
-			# (members,fun_heap) = determine_new_functions_in_component (n_functions-1) new_functions before after fun_heap
-			= (GeneratedComponentMember gf_fun_index fun_ptr members,fun_heap)	
+		# (members,fun_heap) = determine_new_functions_in_component new_functions fun_heap
+		= (GeneratedComponentMember gf_fun_index fun_ptr members,fun_heap)	
+	determine_new_functions_in_component [] fun_heap
+		= (NoComponentMembers,fun_heap)
 
 //@	freeVariables
 
