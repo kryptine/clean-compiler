@@ -3331,8 +3331,6 @@ determineProducer app=:{app_symb = symb=:{ symb_kind = SK_GeneratedFunction fun_
 	  ti & ti_fun_heap=ti_fun_heap
 	  n_app_args = length app_args
 	| n_app_args<>fun_arity
-		| consumer_properties bitand FI_IsMacroFun <> 0
-			= ({producers & [prod_index] = PR_Curried symb n_app_args}, app_args ++ new_args, ti)
 		| SwitchCurriedFusion ro.ro_transform_fusion cc_producer False
 			# (is_good_producer,ti)
 				= SwitchGeneratedFusion
@@ -3340,6 +3338,8 @@ determineProducer app=:{app_symb = symb=:{ symb_kind = SK_GeneratedFunction fun_
 					(False,ti)
 			| cc_producer && is_good_producer
 				= ({producers & [prod_index] = PR_CurriedFunction symb n_app_args fun_index}, app_args ++ new_args, ti)
+			= ({producers & [prod_index] = PR_Curried symb n_app_args}, app_args ++ new_args, ti)
+		| consumer_properties bitand FI_IsMacroFun <> 0
 			= ({producers & [prod_index] = PR_Curried symb n_app_args}, app_args ++ new_args, ti)
 		= (producers, [App app : new_args], ti)
 	# (is_good_producer,ti)
