@@ -362,7 +362,7 @@ case_alt_matches_always (Case {case_default,case_explicit,case_guards}) ro
 					AlgebraicPatterns {gi_module,gi_index} algebraic_patterns
 						-> case ro.ro_common_defs.[gi_module].com_type_defs.[gi_index].td_rhs of
 							AlgType constructors
-								| length constructors == length algebraic_patterns
+								| same_length constructors algebraic_patterns
 									-> algebraic_patterns_match_always algebraic_patterns ro
 							RecordType _
 								-> algebraic_patterns_match_always algebraic_patterns ro
@@ -2604,11 +2604,20 @@ transformFunctionApplication fun_def instances cc=:{cc_size, cc_args, cc_linear_
 //	| False ---> ("transformFunctionApplication",app_symb,app_args,extra_args,fun_def.fun_arity,cc_size) = undef
 	| expanding_consumer
 	 	= (build_application { app & app_args = app_args } extra_args, ti)
+	# {fun_body=TransformedBody {tb_rhs}, fun_kind} = fun_def
 	| cc_size == 0
-		# {fun_body=TransformedBody {tb_rhs}, fun_kind} = fun_def
 		| SwitchTransformConstants (ro.ro_transform_fusion && is_not_caf fun_kind && is_sexy_body tb_rhs) False
 			= transform_trivial_function app app_args extra_args ro ti
 		= (build_application { app & app_args = app_args } extra_args, ti)
+	# (opt_expr,ti) = is_trivial_function app_symb app_args fun_kind tb_rhs ro ti
+	| case opt_expr of No -> False; Yes _ -> True
+		= case opt_expr of
+			Yes (App app)
+				-> transformApplication app extra_args ro ti
+			Yes rhs
+				| isEmpty extra_args
+					-> (rhs, ti)
+					-> (rhs @ extra_args, ti)
 	| cc_size >= 0
 		# consumer_properties = fun_def.fun_info.fi_properties
 	  	# consumer_is_curried = cc_size <> length app_args
@@ -2685,11 +2694,24 @@ where
 		# ti & ti_fun_defs = ti_fun_defs, ti_fun_heap = ti_fun_heap, ti_type_heaps = ti_type_heaps, ti_cons_args = ti_cons_args
 		= case opt_expr of
 			No
-					-> (build_application { app & app_symb = app_symb, app_args = app_args } extra_args, ti)
+				-> (build_application {app & app_symb = app_symb, app_args = app_args} extra_args, ti)
+			Yes (App app)
+				-> transformApplication app extra_args ro ti
 			Yes tb_rhs
 				| isEmpty extra_args
 					-> (tb_rhs, ti)
 					-> (tb_rhs @ extra_args, ti)
+
+	is_trivial_function :: !SymbIdent ![Expression] !FunKind !Expression !ReadOnlyTI !*TransformInfo -> *(!Optional Expression,!*TransformInfo)
+	is_trivial_function app_symb app_args fun_kind rhs ro ti
+		| SwitchTransformConstants (ro.ro_transform_fusion && is_not_caf fun_kind && is_sexy_body rhs) False
+			# (fun_def,ti_fun_defs,ti_fun_heap) = get_fun_def app_symb.symb_kind ro.ro_main_dcl_module_n ti.ti_fun_defs ti.ti_fun_heap
+			# {fun_body=fun_body=:TransformedBody {tb_args,tb_rhs},fun_type} = fun_def
+			# (opt_expr, ti_fun_defs, ti_fun_heap, ti_type_heaps, ti_cons_args)
+				= is_trivial_body tb_args tb_rhs app_args fun_type ro ti_fun_defs ti_fun_heap ti.ti_type_heaps ti.ti_cons_args
+			# ti & ti_fun_defs = ti_fun_defs, ti_fun_heap = ti_fun_heap, ti_type_heaps = ti_type_heaps, ti_cons_args = ti_cons_args
+			= (opt_expr, ti)
+			= (No, ti)
 
 	update_instance_info :: !.SymbKind !.InstanceInfo !*TransformInfo -> *TransformInfo
 	update_instance_info (SK_Function {glob_object}) instances ti=:{ti_instances}
@@ -2965,8 +2987,22 @@ where
 
 	permute_args args perm n_f_args
 		= [args!!p \\ p <- perm & arg_n<-[0..n_f_args-1]]
+is_trivial_body args rhs_expr=:(BasicExpr (BVB _)) f_args type ro fun_defs fun_heap type_heaps cons_args
+	| both_nil args f_args || (same_length args f_args && no_strict_args type)
+		= (Yes rhs_expr,fun_defs,fun_heap,type_heaps,cons_args)
+where
+	no_strict_args (Yes type)
+		= is_not_strict type.st_args_strictness 
+	no_strict_args No
+		= True
 is_trivial_body args rhs f_args type ro fun_defs fun_heap type_heaps cons_args
 	= (No,fun_defs,fun_heap,type_heaps,cons_args)
+	
+same_length [_:l1] [_:l2] = same_length l1 l2
+same_length l1 l2 = both_nil l1 l2
+
+both_nil [] [] = True
+both_nil _ _ = False
 
 is_safe_producer (SK_GeneratedFunction fun_ptr _) ro fun_heap cons_args
 	# (FI_Function {gf_cons_args={cc_producer}}) = sreadPtr fun_ptr fun_heap
