@@ -322,12 +322,63 @@ where
 	is_variable (Var _) = True
 	is_variable _ 		= False
 
+skip_over this_case=:{case_expr=case_expr=:BasicExpr basic_value,case_guards=case_guards=:BasicPatterns _ basicPatterns,case_default} ro ti
+	// currently only active cases are matched at runtime (multimatch problem)
+	# matching_patterns = [pattern \\ pattern=:{bp_value}<-basicPatterns | bp_value==basic_value]
+	= case matching_patterns of
+		[]
+			-> case case_default of
+				Yes default_expr
+					-> transform default_expr {ro & ro_root_case_mode = NotRootCase} ti
+				No
+					# never_ident = case ro.ro_root_case_mode of
+										NotRootCase -> this_case.case_ident
+										_ -> Yes ro.ro_tfi.tfi_case.symb_ident
+					-> (neverMatchingCase never_ident, ti)
+		[{bp_expr}]
+			| case_alt_matches_always bp_expr ro
+				-> transform bp_expr {ro & ro_root_case_mode = NotRootCase} ti
+		_
+			# ro_lost_root = {ro & ro_root_case_mode = NotRootCase}
+			  (new_case_expr, ti) = transform case_expr ro_lost_root ti
+			  (new_case_guards, ti) = transform case_guards ro_lost_root ti
+			  (new_case_default, ti) = transform case_default ro_lost_root ti
+			-> (Case {this_case & case_expr=new_case_expr, case_guards=new_case_guards, case_default=new_case_default}, ti)
 skip_over this_case=:{case_expr,case_guards,case_default} ro ti
 	# ro_lost_root = { ro & ro_root_case_mode = NotRootCase }
 	  (new_case_expr, ti) = transform case_expr ro_lost_root ti
 	  (new_case_guards, ti) = transform case_guards ro_lost_root ti
 	  (new_case_default, ti) = transform case_default ro_lost_root ti
 	= (Case { this_case & case_expr=new_case_expr, case_guards=new_case_guards, case_default=new_case_default }, ti)
+
+case_alt_matches_always (Case {case_default,case_explicit,case_guards}) ro
+	| case_explicit
+		= True
+		= case case_default of
+			Yes _
+				-> True
+			_
+				-> case case_guards of
+					AlgebraicPatterns {gi_module,gi_index} algebraic_patterns
+						-> case ro.ro_common_defs.[gi_module].com_type_defs.[gi_index].td_rhs of
+							AlgType constructors
+								| length constructors == length algebraic_patterns
+									-> algebraic_patterns_match_always algebraic_patterns ro
+							RecordType _
+								-> algebraic_patterns_match_always algebraic_patterns ro
+							_
+								-> False
+					_
+						-> False
+case_alt_matches_always (Let {let_expr}) ro
+	= case_alt_matches_always let_expr ro
+case_alt_matches_always _ ro
+	= True
+
+algebraic_patterns_match_always [{ap_expr}:algebraic_patterns] ro
+	= case_alt_matches_always ap_expr ro && algebraic_patterns_match_always algebraic_patterns ro
+algebraic_patterns_match_always [] ro
+	= True
 
 free_vars_to_bound_vars free_vars
 	= [Var {var_ident = fv_ident, var_info_ptr = fv_info_ptr, var_expr_ptr = nilPtr} \\ {fv_ident,fv_info_ptr} <- free_vars]
@@ -1262,6 +1313,18 @@ where
 			= symb_ident1 =< symb_ident2
 		compare_constructor_arguments (PR_CurriedFunction symb_ident1 _ _) (PR_CurriedFunction symb_ident2 _ _)
 			= symb_ident1 =< symb_ident2
+		compare_constructor_arguments (PR_String s1) (PR_String s2)
+			| s1==s2
+				= Equal
+			| s1<s2
+				= Smaller
+				= Greater
+		compare_constructor_arguments (PR_Int i1) (PR_Int i2)
+			| i1==i2
+				= Equal
+			| i1<i2
+				= Smaller
+				= Greater
 			
 		compare_types [(_, type1):types1] [(_, type2):types2]
 			# cmp = smallerOrEqual type1 type2
@@ -1750,6 +1813,15 @@ where
 				-> ([No:type_accu], ti_fun_defs, ti_fun_heap)
 			PR_Unused
 				-> ([No:type_accu], ti_fun_defs, ti_fun_heap)
+			PR_String _
+				# string_type = TA (MakeTypeSymbIdent {glob_object = PD_StringTypeIndex, glob_module = cPredefinedModuleIndex} predefined_idents.[PD_StringType] 0) []
+				  string_atype = {at_attribute=TA_Multi,at_type=string_type}
+				  symbol_type = {st_vars=[],st_args=[],st_args_strictness=NotStrict,st_arity=0,st_result=string_atype,st_context=[],st_attr_vars=[],st_attr_env=[]}
+				-> ([Yes symbol_type:type_accu], ti_fun_defs, ti_fun_heap)
+			PR_Int _
+				# int_atype = {at_attribute=TA_Multi,at_type=TB BT_Int}
+				  symbol_type = {st_vars=[],st_args=[],st_args_strictness=NotStrict,st_arity=0,st_result=int_atype,st_context=[],st_attr_vars=[],st_attr_env=[]}
+				-> ([Yes symbol_type:type_accu], ti_fun_defs, ti_fun_heap)
 			producer
 				# (symbol,_) = get_producer_symbol producer
 				  (symbol_type, ti_fun_defs, ti_fun_heap)
@@ -1915,12 +1987,14 @@ where
 		= ([{ form & fv_info_ptr = new_info_ptr } : vars], writeVarInfo fv_info_ptr (VI_Variable fv_ident new_info_ptr) var_heap)
 determine_args [#linear_bit : linear_bits!] [cons_arg : cons_args] prod_index producers [prod_atype:prod_atypes] [form : forms] input das
 	# das = determine_args linear_bits cons_args (inc prod_index) producers prod_atypes forms input das
-//	# producer	= if (cons_arg == CActive) (producers.[prod_index]) PR_Empty
-	# producer	= case cons_arg of
-					CActive			-> producers.[prod_index]
-					CUnusedStrict	-> producers.[prod_index]
-					CUnusedLazy		-> producers.[prod_index]
-					_				-> PR_Empty
+	# producer = producers.[prod_index]
+	# producer
+		= if (cons_arg==CActive || cons_arg==CUnusedStrict || cons_arg==CUnusedLazy)
+			producer
+			(case producer of
+				PR_String _			-> producer
+				PR_Int _			-> producer
+				_					-> PR_Empty)
 	= determine_arg producer prod_atype form prod_index ((linear_bit,cons_arg), input) das
 
 determine_arg
@@ -1994,6 +2068,18 @@ determine_arg (PR_Class class_app free_vars_and_types class_type) _ {fv_info_ptr
 		, das_var_heap			= writeVarInfo fv_info_ptr (VI_Dictionary class_app.app_symb class_app.app_args class_type) das.das_var_heap
 		, das_predef			= das_predef
 		}
+
+determine_arg (PR_String s) _ {fv_info_ptr} prod_index (_,ro) das=:{das_var_heap,das_arg_types}
+	# no_arg_type = {ats_types = [], ats_strictness = NotStrict}
+	  das_arg_types & [prod_index] = no_arg_type
+	  das_var_heap = writeVarInfo fv_info_ptr (VI_Expression (BasicExpr (BVS s))) das_var_heap
+	= {das & das_arg_types=das_arg_types, das_var_heap=das_var_heap}
+
+determine_arg (PR_Int i) _ {fv_info_ptr} prod_index (_,ro) das=:{das_var_heap,das_arg_types}
+	# no_arg_type = {ats_types = [], ats_strictness = NotStrict}
+	  das_arg_types & [prod_index] = no_arg_type
+	  das_var_heap = writeVarInfo fv_info_ptr (VI_Expression (BasicExpr (BVInt i))) das_var_heap
+	= {das & das_arg_types=das_arg_types, das_var_heap=das_var_heap}
 
 determine_arg producer (ProducerType {st_args, st_args_strictness, st_result, st_attr_vars, st_context, st_attr_env, st_arity, st_vars} original_type_vars)
 				{fv_info_ptr,fv_ident} prod_index ((linear_bit, _),ro)
@@ -2333,6 +2419,10 @@ where
 	max_group_index_of_producer (PR_CurriedFunction _ _ fun_index)
 								current_max fun_defs fun_heap cons_args
 		# (current_max, fun_defs) = max_group_index_of_fun_with_fun_index fun_index current_max fun_defs
+		= (current_max, cons_args, fun_defs, fun_heap)
+	max_group_index_of_producer (PR_String _) current_max fun_defs fun_heap cons_args
+		= (current_max, cons_args, fun_defs, fun_heap)
+	max_group_index_of_producer (PR_Int _) current_max fun_defs fun_heap cons_args
 		= (current_max, cons_args, fun_defs, fun_heap)
 
 	max_group_index_of_member
@@ -3108,10 +3198,23 @@ determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer f
 		# (producers, new_arg, ti) = determine_producer consumer_properties consumer_is_curried ok_non_rec_consumer linear_bit arg [] prod_index producers ro ti
 		| isProducer producers.[prod_index]
 			= (producers, new_arg++args, [], ti)
-		#! (producers, new_args, lb, ti) = determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args args (inc prod_index) producers ro ti
-		= (producers, new_arg++new_args, lb, ti)
+		| not ro.ro_transform_fusion || consumer_properties bitand FI_GenericFun==0
+			#! (producers, new_args, lb, ti)
+				= determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args args (inc prod_index) producers ro ti
+			= (producers, new_arg++new_args, lb, ti)
+			= case arg of
+				BasicExpr (BVS s)
+					# producers & [prod_index] = PR_String s
+					-> (producers, args, [], ti)
+				BasicExpr (BVInt i)
+					# producers & [prod_index] = PR_Int i
+					-> (producers, args, [], ti)
+				_
+					#! (producers, new_args, lb, ti) = determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args args (inc prod_index) producers ro ti
+					-> (producers, new_arg++new_args, lb, ti)
 	| not ro.ro_transform_fusion
-		#! (producers, new_args, lb, ti) = determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args args (inc prod_index) producers ro ti
+		#! (producers, new_args, lb, ti)
+			= determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args args (inc prod_index) producers ro ti
 		= (producers, [arg : new_args], lb, ti)
 	| SwitchUnusedFusion (cons_arg == CUnusedStrict && isStrictArg fun_type prod_index) False
 		# producers = { producers & [prod_index] = PR_Unused }
@@ -3137,8 +3240,19 @@ determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer f
 	| SwitchUnusedFusion (cons_arg == CUnusedLazy) False
 		# producers = { producers & [prod_index] = PR_Unused }
 		= (producers, args, [], ti)	 // ---> ("UnusedLazy",arg,fun_type)
-	#! (producers, new_args, lb, ti) = determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args args (inc prod_index) producers ro ti
-	= (producers, [arg : new_args], lb, ti)
+		= case arg of
+			BasicExpr (BVS s)
+				| consumer_properties bitand FI_GenericFun<>0
+					# producers & [prod_index] = PR_String s
+					-> (producers, args, [], ti)
+			BasicExpr (BVInt i)
+				| consumer_properties bitand FI_GenericFun<>0
+					# producers & [prod_index] = PR_Int i
+					-> (producers, args, [], ti)
+			_
+				#! (producers, new_args, lb, ti)
+					= determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args args (inc prod_index) producers ro ti
+				-> (producers, [arg : new_args], lb, ti)
 where
 	isProducer PR_Empty	= False
 	isProducer _		= True
@@ -4179,11 +4293,15 @@ instance <<< Producer where
 	(<<<) file (PR_Constructor ident int exprl)
 		= file <<< "(C:" <<< ident <<< ")"
 	(<<<) file (PR_GeneratedFunction ident arity index)
-		= file <<< "(G:" <<< ident <<< ")"
+		= file <<< "(G:" <<< ident <<< ' ' <<< arity <<< ")"
 	(<<<) file (PR_Curried ident arity)
-		= file <<< "(P:" <<< ident <<< ")"
+		= file <<< "(P:" <<< ident <<< ' ' <<< arity <<< ")"
 	(<<<) file (PR_CurriedFunction ident arity index)
-		= file <<< "(CF:" <<< ident <<< ")"
+		= file <<< "(CF:" <<< ident <<< ' ' <<< arity <<< ")"
+	(<<<) file (PR_String _)
+		= file <<< "(S)"
+	(<<<) file (PR_Int _)
+		= file <<< "(I)"
 
 instance <<< {!a} | <<< a
 where
