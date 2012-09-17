@@ -870,6 +870,8 @@ cNotVarNumber :== -1
 				| PR_CurriedFunction !SymbIdent !Int !Index
 				| PR_String !{#Char}
 				| PR_Int !Int
+				| PR_Equal !Int
+				| PR_EqualRemove !Int
 
 ::	InstanceInfo = II_Empty | II_Node !{! Producer} !FunctionInfoPtr !InstanceInfo !InstanceInfo
 

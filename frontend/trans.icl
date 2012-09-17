@@ -1325,7 +1325,19 @@ where
 			| i1<i2
 				= Smaller
 				= Greater
-			
+		compare_constructor_arguments (PR_Equal i1) (PR_Equal i2)
+			| i1==i2
+				= Equal
+			| i1<i2
+				= Smaller
+				= Greater
+		compare_constructor_arguments (PR_EqualRemove i1) (PR_EqualRemove i2)
+			| i1==i2
+				= Equal
+			| i1<i2
+				= Smaller
+				= Greater
+
 		compare_types [(_, type1):types1] [(_, type2):types2]
 			# cmp = smallerOrEqual type1 type2
 			| cmp<>Equal
@@ -1447,6 +1459,7 @@ compute_args_strictness new_arg_types_array = compute_args_strictness 0 0 NotStr
 	, das_var_heap					:: !*VarHeap
 	, das_cons_args					:: !*{!ConsClasses}
 	, das_predef					:: !*PredefinedSymbols
+	, das_removed_equal_info_ptr	:: !VarInfoPtr
 	}
 
 generateFunction :: !SymbIdent !FunDef ![ConsClass] ![#Bool!] !{! Producer} !FunctionInfoPtr !ReadOnlyTI !Int !*TransformInfo -> (!Index, !Int, !*TransformInfo)
@@ -1518,6 +1531,7 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 			, das_var_heap					= ti_var_heap
 			, das_cons_args					= ti_cons_args
 			, das_predef					= ti.ti_predef_symbols
+			, das_removed_equal_info_ptr = nilPtr
 			}
 	# das		= determine_args cc_linear_bits cc_args 0 prods opt_sound_function_producer_types tb_args ro das
 	  uvar		= [arg \\ prod <-: prods & arg <- tb_args | isUnused prod]
@@ -1539,7 +1553,8 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 	  ti_var_heap				= das.das_var_heap
 	  ti_cons_args				= das.das_cons_args
 	  ti_predef_symbols			= das.das_predef
-	  
+	  das_removed_equal_info_ptr = das.das_removed_equal_info_ptr
+
 	  new_fun_arity = length new_fun_args
 	| SwitchArityChecks (new_fun_arity > 32 && new_fun_arity >= fun_arity) False
 		# new_gen_fd =
@@ -1684,6 +1699,9 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 		with
 			store_arg_type_info {fv_info_ptr} a_type ti_var_heap
 				= setExtendedVarInfo fv_info_ptr (EVI_VarType a_type) ti_var_heap
+	# var_heap = if (isNilPtr das_removed_equal_info_ptr)
+					var_heap
+					(writeVarInfo das_removed_equal_info_ptr VI_Empty var_heap)
 	# ro_fun= { symb_ident = fd.fun_ident, symb_kind = SK_GeneratedFunction fun_def_ptr ti_next_fun_nr }
 	# ro_root_case_mode = case tb_rhs of 
 	  						Case _
@@ -1822,6 +1840,10 @@ where
 				# int_atype = {at_attribute=TA_Multi,at_type=TB BT_Int}
 				  symbol_type = {st_vars=[],st_args=[],st_args_strictness=NotStrict,st_arity=0,st_result=int_atype,st_context=[],st_attr_vars=[],st_attr_env=[]}
 				-> ([Yes symbol_type:type_accu], ti_fun_defs, ti_fun_heap)
+			PR_Equal _
+				-> ([No:type_accu], ti_fun_defs, ti_fun_heap)
+			PR_EqualRemove _
+				-> ([No:type_accu], ti_fun_defs, ti_fun_heap)
 			producer
 				# (symbol,_) = get_producer_symbol producer
 				  (symbol_type, ti_fun_defs, ti_fun_heap)
@@ -1994,6 +2016,8 @@ determine_args [#linear_bit : linear_bits!] [cons_arg : cons_args] prod_index pr
 			(case producer of
 				PR_String _			-> producer
 				PR_Int _			-> producer
+				PR_Equal arg_index	-> producer
+				PR_EqualRemove _	-> producer
 				_					-> PR_Empty)
 	= determine_arg producer prod_atype form prod_index ((linear_bit,cons_arg), input) das
 
@@ -2080,6 +2104,28 @@ determine_arg (PR_Int i) _ {fv_info_ptr} prod_index (_,ro) das=:{das_var_heap,da
 	  das_arg_types & [prod_index] = no_arg_type
 	  das_var_heap = writeVarInfo fv_info_ptr (VI_Expression (BasicExpr (BVInt i))) das_var_heap
 	= {das & das_arg_types=das_arg_types, das_var_heap=das_var_heap}
+
+determine_arg (PR_Equal arg_index) _ form=:{fv_ident,fv_info_ptr} prod_index ((linear_bit,cons_arg), ro) das=:{das_var_heap,das_removed_equal_info_ptr}
+	# (new_info_ptr, das_var_heap) = newPtr VI_Empty das_var_heap
+	# var_info = VI_Variable fv_ident new_info_ptr
+	# das_var_heap = writeVarInfo fv_info_ptr var_info das_var_heap
+	# das_var_heap = writeVarInfo das_removed_equal_info_ptr var_info das_var_heap
+	= {das & das_vars				= [{form & fv_info_ptr = new_info_ptr} : das.das_vars]
+		   , das_new_linear_bits	= [#False/*linear_bit*//*?*/ : das.das_new_linear_bits!]
+		   , das_new_cons_args		= [CPassive/*cons_arg*//*?*/ : das.das_new_cons_args]
+		   , das_var_heap = das_var_heap}
+
+determine_arg (PR_EqualRemove arg_index) _ form=:{fv_info_ptr} prod_index (_,ro) das=:{das_subst,das_arg_types,das_type_heaps}
+	# ([prod_type:_], das_arg_types) = das_arg_types![prod_index].ats_types
+	# ([arg_type:_], das_arg_types) = das_arg_types![arg_index].ats_types
+	# type_input = {ti_common_defs = ro.ro_common_defs, ti_functions = ro.ro_imported_funs, ti_main_dcl_module_n = ro.ro_main_dcl_module_n, ti_expand_newtypes = True}
+	# (succ, das_subst, das_type_heaps)
+	  	= unify prod_type arg_type type_input das_subst das_type_heaps
+	| not succ
+		= abort "Error in compiler: unification in module trans failed\n"
+	# no_arg_type = {ats_types = [], ats_strictness = NotStrict}
+	  das_arg_types & [prod_index] = no_arg_type
+	= {das & das_arg_types = das_arg_types, das_subst = das_subst, das_type_heaps = das_type_heaps, das_removed_equal_info_ptr = fv_info_ptr}
 
 determine_arg producer (ProducerType {st_args, st_args_strictness, st_result, st_attr_vars, st_context, st_attr_env, st_arity, st_vars} original_type_vars)
 				{fv_info_ptr,fv_ident} prod_index ((linear_bit, _),ro)
@@ -2423,6 +2469,10 @@ where
 	max_group_index_of_producer (PR_String _) current_max fun_defs fun_heap cons_args
 		= (current_max, cons_args, fun_defs, fun_heap)
 	max_group_index_of_producer (PR_Int _) current_max fun_defs fun_heap cons_args
+		= (current_max, cons_args, fun_defs, fun_heap)
+	max_group_index_of_producer (PR_Equal _) current_max fun_defs fun_heap cons_args
+		= (current_max, cons_args, fun_defs, fun_heap)
+	max_group_index_of_producer (PR_EqualRemove _) current_max fun_defs fun_heap cons_args
 		= (current_max, cons_args, fun_defs, fun_heap)
 
 	max_group_index_of_member
@@ -3277,6 +3327,50 @@ determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer f
 		# producers = { producers & [prod_index] = PR_Unused }
 		= (producers, args, [], ti)	 // ---> ("UnusedLazy",arg,fun_type)
 		= case arg of
+			App {app_symb=symb=:{symb_kind=SK_Function {glob_module,glob_object}},app_args=[]}
+				| glob_module==ro.ro_main_dcl_module_n
+					# ({fun_arity,fun_info,fun_type},ti) = ti!ti_fun_defs.[glob_object]
+					| fun_arity>0
+						# arg_n = find_same_SK_Function_arg args glob_module glob_object (prod_index+1)
+						| arg_n>=0 && is_monomorphic_symbol_type fun_type
+							# producers & [prod_index] = PR_Equal arg_n, [arg_n] = PR_EqualRemove prod_index
+							-> (producers, [arg:remove_arg_n (arg_n-prod_index-1) args], [], ti)
+							-> determineProducersInNextArgs consumer_properties consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args arg args prod_index producers ro ti
+						-> determineProducersInNextArgs consumer_properties consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args arg args prod_index producers ro ti
+				# {st_arity,st_context} = ro.ro_imported_funs.[glob_module].[glob_object].ft_type
+				| (st_arity>0 || not (isEmpty st_context)) && consumer_properties bitand FI_GenericFun<>0
+					# producers & [prod_index] = PR_Curried symb 0
+					-> (producers, args, [], ti)
+					-> determineProducersInNextArgs consumer_properties consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args arg args prod_index producers ro ti
+			App {app_symb=symb=:{symb_kind=SK_LocalMacroFunction fun_index},app_args=[]}
+				# ({fun_arity,fun_info,fun_type},ti) = ti!ti_fun_defs.[fun_index]
+				| fun_arity>0
+					# arg_n = find_same_SK_LocalMacroFunction_arg args fun_index (prod_index+1)
+					| arg_n>=0 && is_monomorphic_symbol_type fun_type
+						# producers & [prod_index] = PR_Equal arg_n, [arg_n] = PR_EqualRemove prod_index
+						-> (producers, [arg:remove_arg_n (arg_n-prod_index-1) args], [], ti)
+						-> determineProducersInNextArgs consumer_properties consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args arg args prod_index producers ro ti
+					-> determineProducersInNextArgs consumer_properties consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args arg args prod_index producers ro ti
+			App {app_symb=symb=:{symb_kind=SK_GeneratedFunction fun_ptr fun_index},app_args=[]}
+				# (FI_Function {gf_fun_def={fun_arity,fun_info,fun_type}},fun_heap) = readPtr fun_ptr ti.ti_fun_heap
+				  ti & ti_fun_heap = fun_heap
+				| fun_arity>0
+					# arg_n = find_same_SK_GeneratedFunction_arg args fun_index (prod_index+1)
+					| arg_n>=0 && is_monomorphic_symbol_type fun_type
+						# producers & [prod_index] = PR_Equal arg_n, [arg_n] = PR_EqualRemove prod_index
+						-> (producers, [arg:remove_arg_n (arg_n-prod_index-1) args], [], ti)
+						-> determineProducersInNextArgs consumer_properties consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args arg args prod_index producers ro ti
+					-> determineProducersInNextArgs consumer_properties consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args arg args prod_index producers ro ti
+			Var {var_info_ptr}
+				| not (cons_arg==CUnusedStrict || cons_arg==CUnusedLazy)
+					# arg_n = find_same_Var args var_info_ptr (prod_index+1)
+					| arg_n>=0
+						# (arg_type1,arg_type2) = get2ArgTypes fun_type prod_index arg_n
+						| equal_non_unique_atype arg_type1 arg_type2
+							# producers & [prod_index] = PR_Equal arg_n, [arg_n] = PR_EqualRemove prod_index
+							-> (producers, [arg:remove_arg_n (arg_n-prod_index-1) args], [], ti)
+							-> determineProducersInNextArgs consumer_properties consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args arg args prod_index producers ro ti
+						-> determineProducersInNextArgs consumer_properties consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args arg args prod_index producers ro ti
 			BasicExpr (BVS s)
 				| consumer_properties bitand FI_GenericFun<>0
 					# producers & [prod_index] = PR_String s
@@ -3286,10 +3380,13 @@ determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer f
 					# producers & [prod_index] = PR_Int i
 					-> (producers, args, [], ti)
 			_
-				#! (producers, new_args, lb, ti)
-					= determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args args (inc prod_index) producers ro ti
-				-> (producers, [arg : new_args], lb, ti)
+				-> determineProducersInNextArgs consumer_properties consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args arg args prod_index producers ro ti
 where
+	determineProducersInNextArgs consumer_properties consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args arg args prod_index producers ro ti
+		#! (producers, new_args, lb, ti)
+			= determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args args (inc prod_index) producers ro ti
+		= (producers, [arg : new_args], lb, ti)
+
 	isProducer PR_Empty	= False
 	isProducer _		= True
 	
@@ -3318,6 +3415,99 @@ where
 		= determineProducer app app_info consumer_properties consumer_is_curried ok_non_rec_consumer linear_bit new_args prod_index producers ro ti
 	determine_producer _ _ _ _ arg new_args _ producers _ ti
 		= (producers, [arg : new_args], ti)
+
+	find_same_SK_Function_arg :: ![Expression] !Int !Int !Int -> Int
+	find_same_SK_Function_arg [App {app_symb={symb_kind=SK_Function {glob_module,glob_object}},app_args=[]}:args] fun_module fun_index arg_n
+		| glob_module==fun_module && glob_object==fun_index
+			= arg_n
+			= find_same_SK_Function_arg args fun_module fun_index (arg_n+1)
+	find_same_SK_Function_arg [arg:args] fun_module fun_index arg_n
+		= find_same_SK_Function_arg args fun_module fun_index (arg_n+1)
+	find_same_SK_Function_arg [] fun_module fun_index arg_n
+		= -1
+
+	find_same_SK_LocalMacroFunction_arg :: ![Expression] !Int !Int -> Int
+	find_same_SK_LocalMacroFunction_arg [App {app_symb={symb_kind=SK_LocalMacroFunction arg_fun_index},app_args=[]}:args] fun_index arg_n
+		| arg_fun_index==fun_index
+			= arg_n
+			= find_same_SK_LocalMacroFunction_arg args fun_index (arg_n+1)
+	find_same_SK_LocalMacroFunction_arg [arg:args] fun_index arg_n
+		= find_same_SK_LocalMacroFunction_arg args fun_index (arg_n+1)
+	find_same_SK_LocalMacroFunction_arg [] fun_index arg_n
+		= -1
+
+	find_same_SK_GeneratedFunction_arg :: ![Expression] !Int !Int -> Int
+	find_same_SK_GeneratedFunction_arg [App {app_symb={symb_kind=SK_GeneratedFunction fun_ptr arg_fun_index},app_args=[]}:args] fun_index arg_n
+		| arg_fun_index==fun_index
+			= arg_n
+			= find_same_SK_GeneratedFunction_arg args fun_index (arg_n+1)
+	find_same_SK_GeneratedFunction_arg [arg:args] fun_index arg_n
+		= find_same_SK_GeneratedFunction_arg args fun_index (arg_n+1)
+	find_same_SK_GeneratedFunction_arg [] fun_index arg_n
+		= -1
+
+	remove_arg_n 0 [_:args] = args
+	remove_arg_n n [arg:args] = [arg : remove_arg_n (n-1) args]
+
+	is_monomorphic_symbol_type (Yes {st_vars=[],st_attr_vars=[]})
+		= True
+	is_monomorphic_symbol_type No
+		= False
+
+	find_same_Var :: ![Expression] !VarInfoPtr !Int -> Int	
+	find_same_Var [Var var:args] var_info_ptr arg_n
+		| var.var_info_ptr==var_info_ptr
+			= arg_n
+			= find_same_Var args var_info_ptr (arg_n+1)
+	find_same_Var [arg:args] var_info_ptr arg_n
+		= find_same_Var args var_info_ptr (arg_n+1)
+	find_same_Var [] var_info_ptr arg_n
+		= -1
+
+	get2ArgTypes :: !(Optional SymbolType) !Int !Int -> (!AType,!AType)
+	get2ArgTypes (Yes {st_args}) arg_n1 arg_n2
+		# (arg1_type,arg_types) = get_arg_type 0 arg_n1 st_args
+		# (arg2_type,_ ) = get_arg_type (arg_n1+1) arg_n2 arg_types
+		= (arg1_type,arg2_type)
+	where
+		get_arg_type arg_i arg_n [arg_type:arg_types]
+			| arg_i<arg_n
+				= get_arg_type (arg_i+1) arg_n arg_types
+				= (arg_type,arg_types)
+
+	equal_non_unique_atype :: !AType !AType -> Bool 
+	equal_non_unique_atype {at_attribute=TA_Multi,at_type=type1} {at_attribute=TA_Multi,at_type=type2}
+		= equal_non_unique_type type1 type2
+	equal_non_unique_atype {at_attribute=TA_None,at_type=type1} {at_attribute=TA_None,at_type=type2}
+		= equal_non_unique_type type1 type2
+	equal_non_unique_atype {at_attribute=TA_Var {av_info_ptr=av_info_ptr1},at_type=type1} {at_attribute=TA_Var {av_info_ptr=av_info_ptr2},at_type=type2}
+		= av_info_ptr1==av_info_ptr2 && equal_non_unique_type type1 type2
+	equal_non_unique_atype type1 type2
+		= False
+
+	equal_non_unique_type :: !Type !Type -> Bool 
+	equal_non_unique_type (TA {type_index=type_index1} atypes1) (TA {type_index=type_index2} atypes2)
+		= type_index1==type_index2 && equal_non_unique_atypes atypes1 atypes2
+	equal_non_unique_type (TAS {type_index=type_index1} atypes1 strictness1) (TAS {type_index=type_index2} atypes2 strictness2)
+		= type_index1==type_index2 && equal_strictness_lists strictness1 strictness2 && equal_non_unique_atypes atypes1 atypes2
+	equal_non_unique_type (a_atype1-->r_atype1) (a_atype2-->r_atype2)
+		= equal_non_unique_atype a_atype1 a_atype2 && equal_non_unique_atype r_atype1 r_atype2
+	equal_non_unique_type (TB BT_Int) (TB BT_Int)
+		= True
+	equal_non_unique_type (TB BT_Char) (TB BT_Char)
+		= True
+	equal_non_unique_type (TB BT_Bool) (TB BT_Bool)
+		= True
+	equal_non_unique_type (TB BT_Real) (TB BT_Real)
+		= True
+	equal_non_unique_type (TV {tv_info_ptr=tv_info_ptr1}) (TV {tv_info_ptr=tv_info_ptr2})
+		= tv_info_ptr1==tv_info_ptr2
+	equal_non_unique_type _ _
+		= False
+
+	equal_non_unique_atypes [atype1:atypes1] [atype2:atypes2] = equal_non_unique_atype atype1 atype2 && equal_non_unique_atypes atypes1 atypes2
+	equal_non_unique_atypes [] [] = True
+	equal_non_unique_atypes _ _ = False
 
 determineProducer :: App ExprInfo BITVECT Bool Bool Bool [Expression] Int *{!Producer} ReadOnlyTI *TransformInfo
 	-> *(!*{!Producer},![Expression],!*TransformInfo)
@@ -4277,22 +4467,16 @@ get_fun_def (SK_GeneratedFunction fun_ptr _) main_dcl_module_n fun_defs fun_heap
 get_fun_def_and_cons_args :: !SymbKind !v:{!ConsClasses} !u:{#FunDef} !*FunctionHeap
 		    -> (!FunDef, !ConsClasses, !v:{!ConsClasses},!u:{#FunDef},!*FunctionHeap)
 get_fun_def_and_cons_args (SK_Function {glob_object}) cons_args fun_defs fun_heap
-//	| glob_object >= size fun_defs
-//		= abort "get_fun_def_and_cons_args:SK_Function"
 	# (fun_def, fun_defs) = fun_defs![glob_object]
 	# (fun_args, cons_args) = cons_args![glob_object]
 	= (fun_def, fun_args, cons_args, fun_defs, fun_heap)
 get_fun_def_and_cons_args (SK_LocalMacroFunction glob_object) cons_args fun_defs fun_heap
-//	| glob_object >= size fun_defs
-//		= abort "get_fun_def_and_cons_args:SK_LocalMacroFunction"
 	# (fun_def, fun_defs) = fun_defs![glob_object]
 	# (fun_args, cons_args) = cons_args![glob_object]
 	= (fun_def, fun_args, cons_args, fun_defs, fun_heap)
 get_fun_def_and_cons_args (SK_GeneratedFunction fun_info_ptr fun_index) cons_args fun_defs fun_heap
 	| fun_index < size fun_defs
 		# (fun_def, fun_defs) = fun_defs![fun_index]
-//		| fun_index >= size cons_args
-//			= abort "get_fun_def_and_cons_args:cons_args"
 		# (fun_args, cons_args) = cons_args![fun_index]
 		= (fun_def, fun_args, cons_args, fun_defs, fun_heap)
 	# (FI_Function {gf_fun_def, gf_cons_args}, fun_heap) = readPtr fun_info_ptr fun_heap
@@ -4341,6 +4525,10 @@ instance <<< Producer where
 		= file <<< "(S)"
 	(<<<) file (PR_Int _)
 		= file <<< "(I)"
+	(<<<) file (PR_Equal i)
+		= file <<< "(=" <<< i <<< ')'
+	(<<<) file (PR_EqualRemove i)
+		= file <<< "(=R" <<< i <<< ')'
 
 instance <<< {!a} | <<< a
 where
