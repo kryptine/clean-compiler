@@ -2016,6 +2016,7 @@ determine_args [#linear_bit : linear_bits!] [cons_arg : cons_args] prod_index pr
 			(case producer of
 				PR_String _			-> producer
 				PR_Int _			-> producer
+				PR_Curried _ 0		-> producer
 				PR_Equal arg_index	-> producer
 				PR_EqualRemove _	-> producer
 				_					-> PR_Empty)
@@ -3065,7 +3066,7 @@ is_safe_producer (SK_Function {glob_module, glob_object}) ro fun_heap cons_args
 		= False
 		= cons_args.[glob_object].cc_producer
 is_safe_producer (SK_Constructor {glob_module}) ro fun_heap cons_args
-	= SwitchConstructorFusion True (glob_module==ro.ro_StdGeneric_module_n) False
+	= SwitchConstructorFusion True True/*(glob_module==ro.ro_StdGeneric_module_n)*/ False
 
 transformApplication :: !App ![Expression] !ReadOnlyTI !*TransformInfo -> *(!Expression,!*TransformInfo)
 transformApplication app=:{app_symb=symb=:{symb_kind}, app_args} extra_args
@@ -3331,6 +3332,9 @@ determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer f
 				| glob_module==ro.ro_main_dcl_module_n
 					# ({fun_arity,fun_info,fun_type},ti) = ti!ti_fun_defs.[glob_object]
 					| fun_arity>0
+						| fun_info.fi_properties bitand FI_IsNonRecursive<>0 && consumer_properties bitand FI_GenericFun<>0
+							# producers & [prod_index] = PR_Curried symb 0
+							-> (producers, args, [], ti)
 						# arg_n = find_same_SK_Function_arg args glob_module glob_object (prod_index+1)
 						| arg_n>=0 && is_monomorphic_symbol_type fun_type
 							# producers & [prod_index] = PR_Equal arg_n, [arg_n] = PR_EqualRemove prod_index
@@ -3345,6 +3349,9 @@ determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer f
 			App {app_symb=symb=:{symb_kind=SK_LocalMacroFunction fun_index},app_args=[]}
 				# ({fun_arity,fun_info,fun_type},ti) = ti!ti_fun_defs.[fun_index]
 				| fun_arity>0
+					| fun_info.fi_properties bitand FI_IsNonRecursive<>0 && consumer_properties bitand FI_GenericFun<>0
+						# producers & [prod_index] = PR_Curried symb 0
+						-> (producers, args, [], ti)
 					# arg_n = find_same_SK_LocalMacroFunction_arg args fun_index (prod_index+1)
 					| arg_n>=0 && is_monomorphic_symbol_type fun_type
 						# producers & [prod_index] = PR_Equal arg_n, [arg_n] = PR_EqualRemove prod_index
@@ -3355,6 +3362,9 @@ determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer f
 				# (FI_Function {gf_fun_def={fun_arity,fun_info,fun_type}},fun_heap) = readPtr fun_ptr ti.ti_fun_heap
 				  ti & ti_fun_heap = fun_heap
 				| fun_arity>0
+					| fun_info.fi_properties bitand FI_IsNonRecursive<>0 && consumer_properties bitand FI_GenericFun<>0
+						# producers & [prod_index] = PR_Curried symb 0
+						-> (producers, args, [], ti)
 					# arg_n = find_same_SK_GeneratedFunction_arg args fun_index (prod_index+1)
 					| arg_n>=0 && is_monomorphic_symbol_type fun_type
 						# producers & [prod_index] = PR_Equal arg_n, [arg_n] = PR_EqualRemove prod_index
@@ -3521,13 +3531,14 @@ determineProducer app=:{app_symb = symb=:{symb_kind = SK_Constructor _}, app_arg
 	  , free_vars++new_args
 	  , {ti & ti_var_heap=ti_var_heap, ti_predef_symbols=ti_predef_symbols}
 	  )
-determineProducer app=:{app_symb = symb=:{symb_kind = SK_Constructor cons_index, symb_ident}, app_args} _ _ _ _ linear_bit
+determineProducer app=:{app_symb = symb=:{symb_kind = SK_Constructor cons_index, symb_ident}, app_args} _ consumer_properties _ _ linear_bit
 				  new_args prod_index producers ro ti
 	# {cons_type}								= ro.ro_common_defs.[cons_index.glob_module].com_cons_defs.[cons_index.glob_object]
 	  rnf										= rnf_args app_args 0 cons_type.st_args_strictness ro
 	| SwitchConstructorFusion
 		(ro.ro_transform_fusion && SwitchRnfConstructorFusion (linear_bit || rnf) linear_bit)
-		(ro.ro_transform_fusion && cons_index.glob_module==ro.ro_StdGeneric_module_n && (linear_bit || rnf))
+		(ro.ro_transform_fusion && (cons_index.glob_module==ro.ro_StdGeneric_module_n || consumer_properties bitand FI_GenericFun<>0)
+								&& (linear_bit || rnf))
 		False
 		# producers = {producers & [prod_index] = PR_Constructor symb (length app_args) app_args }
 		= (producers, app_args ++ new_args, ti)
