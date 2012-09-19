@@ -1709,7 +1709,9 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 	  						_	-> NotRootCase
 
 	# (n_args_before_producer,n_producer_args,var_heap)
-		= n_args_before_producer_and_n_producer_args tb_args new_fun_args var_heap
+		= if (more_unused_producers prods)
+			(-1,-1,var_heap)
+			(n_args_before_producer_and_n_producer_args tb_args new_fun_args var_heap)
 
 	# tfi = {	tfi_root = ro_fun,
 				tfi_case = ro_fun,
@@ -1966,6 +1968,29 @@ where
 				= [used_attr_var : used_attr_vars]
 				= get_used_attr_vars (attr_var_n+1) used_attr_vars fresh_attr_vars
 			= []
+
+more_unused_producers producers
+	= more_unused_producers 0 producers
+where
+	more_unused_producers i producers
+		| i<size producers
+			= case producers.[i] of
+				PR_Empty
+					-> more_unused_producers (i+1) producers
+				PR_Unused
+					-> more_unused_producers2 (i+1) producers
+				_
+					-> False
+			= False
+
+	more_unused_producers2 i producers
+		| i<size producers
+			= case producers.[i] of
+				PR_Empty
+					-> more_unused_producers2 (i+1) producers
+				PR_Unused
+					-> True
+			= False
 
 // get_producer_type retrieves the type of symbol
 get_producer_type :: !SymbIdent !.ReadOnlyTI !*{#FunDef} !*FunctionHeap -> (!SymbolType,!*{#FunDef},!*FunctionHeap)
@@ -3323,10 +3348,10 @@ determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer f
 		= (producers, args, lb, ti)	 // ---> ("UnusedStrict",lb,arg,fun_type)
 	| SwitchUnusedFusion (cons_arg == CUnusedStrict && not (isStrictArg fun_type prod_index) && isStrictVar arg) False
 		# producers = { producers & [prod_index] = PR_Unused }
-		= (producers, args, [], ti)	 // ---> ("UnusedMixed",arg,fun_type)
+		= determineUnusedProducersInNextArgs cons_args args (prod_index+1) producers ro ti
 	| SwitchUnusedFusion (cons_arg == CUnusedLazy) False
 		# producers = { producers & [prod_index] = PR_Unused }
-		= (producers, args, [], ti)	 // ---> ("UnusedLazy",arg,fun_type)
+		= determineUnusedProducersInNextArgs cons_args args (prod_index+1) producers ro ti
 		= case arg of
 			App {app_symb=symb=:{symb_kind=SK_Function {glob_module,glob_object}},app_args=[]}
 				| glob_module==ro.ro_main_dcl_module_n
@@ -3396,6 +3421,29 @@ where
 		#! (producers, new_args, lb, ti)
 			= determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args args (inc prod_index) producers ro ti
 		= (producers, [arg : new_args], lb, ti)
+
+	determineUnusedProducersInNextArgs [cons_arg : cons_args] arg_and_args=:[arg : args] prod_index producers ro ti
+		| SwitchUnusedFusion (cons_arg == CUnusedStrict && isStrictArg fun_type prod_index) False
+			# producers & [prod_index] = PR_Unused
+			# (lb,ti) = case isStrictVarOrSimpleExpression arg of
+							True	-> ([],ti)
+							_		# (info_ptr, ti_var_heap) = newPtr VI_Empty ti.ti_var_heap
+									  ti & ti_var_heap = ti_var_heap
+									  lb =	{lb_dst=
+									  			{ fv_ident = { id_name = "dummy_for_strict_unused", id_info = nilPtr }
+									  			, fv_info_ptr = info_ptr, fv_count = 0, fv_def_level = NotALevel }
+									  		,lb_src=arg, lb_position=NoPos }
+									-> ([(lb,getArgType fun_type prod_index)],ti)
+			= (producers, args, lb, ti)	 // ---> ("UnusedStrict",lb,arg,fun_type)
+		| SwitchUnusedFusion (cons_arg == CUnusedStrict && not (isStrictArg fun_type prod_index) && isStrictVar arg) False
+			# producers & [prod_index] = PR_Unused
+			= determineUnusedProducersInNextArgs cons_args args (prod_index+1) producers ro ti
+		| SwitchUnusedFusion (cons_arg == CUnusedLazy) False
+			# producers & [prod_index] = PR_Unused
+			= determineUnusedProducersInNextArgs cons_args args (prod_index+1) producers ro ti
+			= (producers, arg_and_args, [], ti)
+	determineUnusedProducersInNextArgs _ [] prod_index producers ro ti
+		= (producers, [], [], ti)
 
 	isProducer PR_Empty	= False
 	isProducer _		= True
