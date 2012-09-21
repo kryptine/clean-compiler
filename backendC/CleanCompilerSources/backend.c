@@ -3306,31 +3306,6 @@ RemoveSpecialArrayFunctionsFromSymbolList (SymbolP *symbolH)
 	}
 } /* RemoveSpecialArrayFunctionsFromSymbolList */
 
-/* copied from compiler.c ... */
-
-static Bool
-RemoveExtension (char *name)
-{
-	int len;
-
-	len = strlen (name);
-
-	if (len>=4 && name[len-4]=='.'){
-		name [len-4] = '\0';
-		return True;
-	} else
-		return False;
-}
-
-static void
-AddExtension (char *name)
-{
-	name [strlen (name)] = '.';
-}
-
-/* ... copied from compiler.c */
-
-
 #if 0
 File rules_file;
 #endif
@@ -3342,7 +3317,6 @@ BEGenerateCode (CleanString outputFile)
 {
 	char	*outputFileName;
 	ImpRule	rule;
-	Bool	hadExtension;
 
 	clean_error_string.length=0;
 
@@ -3368,7 +3342,6 @@ BEGenerateCode (CleanString outputFile)
 	gBEState.be_icl.beicl_module->im_rules	=	rule;
 
 	outputFileName	= ConvertCleanString (outputFile);
-	hadExtension = RemoveExtension (outputFileName);
 
 #if 0
 	{
@@ -3394,8 +3367,6 @@ BEGenerateCode (CleanString outputFile)
 #endif
 
 	CodeGeneration (gBEState.be_icl.beicl_module, outputFileName);
-	if (hadExtension)
-		AddExtension (outputFileName);
 
 #if 0
 	fclose (rules_file);
