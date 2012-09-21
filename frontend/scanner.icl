@@ -201,13 +201,13 @@ ScanOptionNoNewOffsideForSeqLetBit:==4;
 	|	ExistsToken				//		E.
 	|	ForAllToken				//		A.
 
-
 ::	ScanContext
 	=	GeneralContext
 	|	TypeContext
 	|	FunctionContext
 	|	CodeContext
 	| 	GenericContext
+	|	ModuleNameContext
 
 instance == ScanContext
 where
@@ -766,55 +766,32 @@ new_exp_char '/' = True // to handle end of comment symbol: */
 new_exp_char c	 = isSpace c
 
 ScanIdentFast :: !Int !Input !ScanContext -> (!Token, !Input)
-ScanIdentFast n input=:{inp_stream=OldLine i line stream,inp_pos} co
-	# (end_i,qualified) = ScanIdentCharsInString i line co
+ScanIdentFast n input=:{inp_stream=OldLine i line stream,inp_pos} ModuleNameContext
+	# end_i = ScanModuleNameCharsInString i line
 		with
-			ScanIdentCharsInString :: !Int !{#Char} !ScanContext -> (!Int,!Bool)
+			ScanModuleNameCharsInString :: !Int !{#Char} -> Int
+			ScanModuleNameCharsInString i line
+				| i<size line
+					| IsModuleNameChar line.[i]
+						= ScanModuleNameCharsInString (i+1) line
+						= i
+					= i
+	# pos = {inp_pos & fp_col = inp_pos.fp_col + (end_i-i)}
+	# input =  {input & inp_stream=OldLine end_i line stream,inp_pos=pos}
+	= (IdentToken (line % (i-n,end_i-1)), input)
+ScanIdentFast n input=:{inp_stream=OldLine i line stream,inp_pos} co
+	# end_i = ScanIdentCharsInString i line co
+		with
+			ScanIdentCharsInString :: !Int !{#Char} !ScanContext -> Int
 			ScanIdentCharsInString i line co
 				| i<size line
 					| IsIdentChar line.[i] co
 						= ScanIdentCharsInString (i+1) line co
-						= (i,line.[i]=='@')
-					= (i,False)
-	| not qualified
-		# pos = {inp_pos & fp_col = inp_pos.fp_col + (end_i-i)}
-		# input =  {input & inp_stream=OldLine end_i line stream,inp_pos=pos}
-		= CheckReservedIdent co (line % (i-n,end_i-1)) input
-	# i2=end_i+1
-	| i2==size line
-		# pos = {inp_pos & fp_col = inp_pos.fp_col + (end_i-i)}
-		# input =  {input & inp_stream=OldLine end_i line stream,inp_pos=pos}
-		= CheckReservedIdent co (line % (i-n,end_i-1)) input
-	# c=line.[i2]
-	| IsIdentChar c co
-		# module_name = line % (i-n,end_i-1)
-		# end_i = ScanIdentCharsInString (i2+1) line co
-			with
-				ScanIdentCharsInString :: !Int !{#Char} !ScanContext -> Int
-				ScanIdentCharsInString i line co
-					| i<size line && IsIdentChar line.[i] co
-						= ScanIdentCharsInString (i+1) line co
 						= i
-		# ident_name = line % (i2,end_i-1)
-		# pos = {inp_pos & fp_col = inp_pos.fp_col + (end_i-i)}
-		# input =  {input & inp_stream=OldLine end_i line stream,inp_pos=pos}
-		= (QualifiedIdentToken module_name ident_name,input)
-	| isSpecialChar c
-		# module_name = line % (i-n,end_i-1)
-		# end_i = ScanSpecialCharsInString (i2+1) line
-			with
-				ScanSpecialCharsInString :: !Int !{#Char} -> Int
-				ScanSpecialCharsInString i line
-					| i<size line && isSpecialChar line.[i]
-						= ScanSpecialCharsInString (i+1) line
-						= i
-		# ident_name = line % (i2,end_i-1)
-		# pos = {inp_pos & fp_col = inp_pos.fp_col + (end_i-i)}
-		# input =  {input & inp_stream=OldLine end_i line stream,inp_pos=pos}
-		= (QualifiedIdentToken module_name ident_name,input)
-		# pos = {inp_pos & fp_col = inp_pos.fp_col + (end_i-i)}
-		# input =  {input & inp_stream=OldLine end_i line stream,inp_pos=pos}
-		= CheckReservedIdent co (line % (i-n,end_i-1)) input
+					= i
+	# pos = {inp_pos & fp_col = inp_pos.fp_col + (end_i-i)}
+	# input =  {input & inp_stream=OldLine end_i line stream,inp_pos=pos}
+	= CheckReservedIdent co (line % (i-n,end_i-1)) input
 
 ScanOperator :: !Int !Input ![Char] !ScanContext -> (!Token, !Input)
 ScanOperator n input token co
@@ -829,6 +806,7 @@ CheckReservedIdent TypeContext      s i = CheckTypeContext s i
 CheckReservedIdent FunctionContext	s i = CheckFunctContext s i
 CheckReservedIdent CodeContext		s i = CheckCodeContext s i
 CheckReservedIdent GenericContext	s i = CheckGenericContext s i
+// not called with ModuleNameContext
 
 CheckReservedOperator :: !String !Input -> (!Token, !Input)
 CheckReservedOperator "!"  input =	(ExclamationToken, input)
@@ -1316,6 +1294,13 @@ IsIdentChar '`'	_					= True
 IsIdentChar '^'	TypeContext			= True
 IsIdentChar  _	_					= False
 
+IsModuleNameChar :: !Char -> Bool
+IsModuleNameChar  c	| isAlphanum c	= True
+IsModuleNameChar '_'				= True
+IsModuleNameChar '`'				= True
+IsModuleNameChar '.'				= True
+IsModuleNameChar _					= False
+
 string_to_list ::!{#Char} -> .[Char]
 string_to_list s = stolacc s (size s - 1) []
 where
@@ -1643,17 +1628,16 @@ where
 	toString LeftAssoc 	= "infixl "
 	toString RightAssoc = "infixr "
 	toString NoAssoc	= "infix "
-	
 
-openScanner :: !String !SearchPaths (ModTimeFunction *Files) !*Files -> (!Optional (ScanState, {#Char}), !*Files) // state, file time
-openScanner file_name searchPaths modtimefunction files
-	= case fopenInSearchPaths file_name searchPaths FReadData modtimefunction files of
+openScanner :: !String !String !SearchPaths (ModTimeFunction *Files) !*Files -> (!Optional (ScanState, {#Char}), !*Files) // state, file time
+openScanner file_name file_name_extension searchPaths modtimefunction files
+	= case fopenInSearchPaths file_name file_name_extension searchPaths FReadData modtimefunction files of
 		(No, files)
 			->	(No, files)
 		(Yes (file, time), files)
 			->  (Yes (ScanState {	ss_input 		= Input
 												{ inp_stream		= InFile file
-									 			, inp_filename		= file_name
+									 			, inp_filename		= file_name +++ file_name_extension
 									 			, inp_pos			= {fp_line = 1, fp_col = 0}
 												, inp_tabsize		= 4
 												}
@@ -1664,37 +1648,37 @@ openScanner file_name searchPaths modtimefunction files
 				, files
 				)
 
-fopenInSearchPaths :: !{#Char} SearchPaths !Int (ModTimeFunction *f) !*f -> (Optional (*File, {#Char}),!*f) | FileSystem f
-fopenInSearchPaths fileName searchPaths mode modtimefunction f
-	# filtered_locations
-		=	filter (\(moduleName,path) -> moduleName == fileName) searchPaths.sp_locations
-	| isEmpty filtered_locations
-		=	fopenAnywhereInSearchPaths fileName searchPaths.sp_paths mode modtimefunction f
-	# (_, path)
-		=	hd filtered_locations
-	# (opened, file, f)
-		=	fopen (path + fileName) mode f
-	| opened
-		=	getModificationTime file path modtimefunction f
-	| otherwise
-		=	(No, f)
+fopenInSearchPaths :: !{#Char} !{#Char} !SearchPaths !Int (ModTimeFunction *f) !*f -> (Optional (*File, {#Char}),!*f) | FileSystem f
+fopenInSearchPaths moduleName fileNameExtension searchPaths mode modtimefunction f
+	# fileName = replace_dots_by_directory_separators moduleName +++ fileNameExtension
+	= case [path \\ (moduleName,path)<-searchPaths.sp_locations | moduleName == fileName] of
+		[path:_]
+			# fullFileName = path +++ fileName
+			# (opened, file, f) = fopen fullFileName mode f
+			| opened
+				-> getModificationTime file fullFileName modtimefunction f
+				-> (No, f)
+		[]
+			-> fopenAnywhereInSearchPaths fileName searchPaths.sp_paths mode modtimefunction f
 	where
 		fopenAnywhereInSearchPaths :: !{#Char} ![{#Char}] !Int (ModTimeFunction *f) *f -> (Optional (*File, {#Char}),!*f) | FileSystem f
+		fopenAnywhereInSearchPaths fileName [path : paths] mode modtimefunction f
+			# fullFileName = path +++ fileName
+			# (opened, file, f) = fopen fullFileName mode f
+			| opened
+				=	getModificationTime file fullFileName modtimefunction f
+				=	fopenAnywhereInSearchPaths fileName paths mode modtimefunction f
 		fopenAnywhereInSearchPaths fileName [] _ _ f
 			=	(No, f)
-		fopenAnywhereInSearchPaths fileName [path : paths] mode modtimefunction f
-			# (opened, file, f)
-				=	fopen (path + fileName) mode f
-			| opened
-				=	getModificationTime file path modtimefunction f
-			// otherwise
-				=	fopenAnywhereInSearchPaths fileName paths mode modtimefunction f
 
 		getModificationTime :: *File {#Char} (ModTimeFunction *f) *f -> (Optional (*File, {#Char}),!*f) | FileSystem f
-		getModificationTime file path modtimefunction f
-			# (time, f)
-				=	modtimefunction (path + fileName) f
+		getModificationTime file fullFileName modtimefunction f
+			# (time, f) = modtimefunction fullFileName f
 			=	(Yes (file, time), f)
+
+		replace_dots_by_directory_separators :: !{#Char} -> *{#Char}
+		replace_dots_by_directory_separators file_name
+			= {if (c=='.') '\\' c \\ c<-:file_name}
 
 closeScanner :: !ScanState !*Files -> *Files
 closeScanner (ScanState scan_state) files = closeScanner_ scan_state files
@@ -1855,7 +1839,7 @@ where
 				, { scanState
 				  & ss_offsides = [ (os, needsNewDefinitionToken token) : ss_offsides ]
 				  }
-				) -->> (token,pos,"New offside defined at ",os_pos,[ (os, token == CaseToken) : ss_offsides ])
+				) // -->> (token,pos,"New offside defined at ",os_pos,[ (os, token == CaseToken) : ss_offsides ])
 	// otherwise // ~ (definesOffside token)
 	= (token, scanState) -->> (token,pos," not offside")
 

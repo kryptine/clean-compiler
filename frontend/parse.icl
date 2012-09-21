@@ -270,7 +270,7 @@ cWantDclFile :== False
 wantModule :: !Bool !Ident !Position !Bool !*HashTable !*File !SearchPaths (ModTimeFunction *Files) !*Files
 	-> (!Bool,!Bool,!ParsedModule, !*HashTable, !*File, !*Files)
 wantModule iclmodule file_id=:{id_name} import_file_position support_generics hash_table error searchPaths modtimefunction files
-	= case openScanner file_name searchPaths modtimefunction files of
+	= case openScanner id_name file_name_extension searchPaths modtimefunction files of
 		(Yes (scanState, modification_time), files)
 			# hash_table=set_hte_mark (if iclmodule 1 0) hash_table
 			# (ok,dynamic_type_used,mod,hash_table,file,files) = initModule file_name modification_time scanState hash_table error files
@@ -280,7 +280,8 @@ wantModule iclmodule file_id=:{id_name} import_file_position support_generics ha
 			-> let mod = { mod_ident = file_id,  mod_modification_time = "", mod_type = MK_None, mod_imports = [], mod_imported_objects = [],mod_foreign_exports=[],mod_defs = [] } in
 			   (False, False, mod, hash_table, error <<< "Error " <<< import_file_position <<< ": "  <<< file_name <<< " could not be imported\n", files)
 where
-	file_name = if iclmodule (id_name +++ ".icl") (id_name +++ ".dcl")
+	file_name = id_name +++ file_name_extension
+	file_name_extension = if iclmodule ".icl" ".dcl"
 
 	initModule :: String String ScanState     !*HashTable !*File  *Files
 				-> (!Bool,!Bool,!ParsedModule,!*HashTable,!*File,!*Files)
@@ -332,7 +333,7 @@ where
 	try_module_token mod_type scanState
 		# (token, scanState) = nextToken GeneralContext scanState
 		| token == ModuleToken
-			# (token, scanState) = nextToken GeneralContext scanState
+			# (token, scanState) = nextToken ModuleNameContext scanState
  			= try_module_name token mod_type scanState
 			= (False, mod_type, "", tokenBack scanState)
 
@@ -4640,7 +4641,7 @@ where
 
 wantModuleName :: !*ParseState -> (!{# Char}, !*ParseState)
 wantModuleName pState
-	# (token, pState) = nextToken GeneralContext pState
+	# (token, pState) = nextToken ModuleNameContext pState
 	= case token of
 		IdentToken name -> (name, pState)
 		UnderscoreIdentToken name -> (name, pState)
@@ -4648,10 +4649,10 @@ wantModuleName pState
 
 wantOptionalQualifiedAndModuleName :: !*ParseState -> (!ImportQualified,!{#Char},!*ParseState)
 wantOptionalQualifiedAndModuleName pState
-	# (token, pState) = nextToken GeneralContext pState
+	# (token, pState) = nextToken ModuleNameContext pState
 	= case token of
 		IdentToken name1=:"qualified"
-			# (token, pState) = nextToken GeneralContext pState
+			# (token, pState) = nextToken ModuleNameContext pState
 			-> case token of
 				IdentToken name
 					-> (Qualified, name, pState)
