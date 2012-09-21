@@ -121,6 +121,7 @@ instance <<< FilePosition
 	|	FunctionContext
 	|	CodeContext
 	| 	GenericContext
+	|	ModuleNameContext
 
 ::	Assoc	= LeftAssoc | RightAssoc | NoAssoc
 
@@ -148,7 +149,7 @@ instance replaceToken ScanState
 class getPosition state :: !*state -> (!FilePosition,!*state)  // Position of current Token (or Char)
 instance getPosition ScanState
 
-openScanner :: !String !SearchPaths (ModTimeFunction *Files) !*Files -> (!Optional (ScanState, {#Char}), !*Files) // state, file time
+openScanner :: !String !String !SearchPaths (ModTimeFunction *Files) !*Files -> (!Optional (ScanState, {#Char}), !*Files) // state, file time
 closeScanner :: !ScanState !*Files -> *Files
 
 setUseLayout :: !Bool !ScanState -> ScanState
