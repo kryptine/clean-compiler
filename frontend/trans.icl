@@ -1580,8 +1580,10 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 //	| False--->("subst before", [el\\el<-:subst], "cons_vars", [el\\el<-:cons_vars])		= undef
 	# ti_type_heaps = { ti_type_heaps & th_vars = th_vars }
 
+	# (next_attr_nr, subst, ti_type_def_infos, ti_type_heaps)
+		= foldSt (lift_offered_substitutions_for_unification ro.ro_common_defs cons_vars) uniqueness_requirements (next_attr_nr, subst, ti_type_def_infos, ti_type_heaps)
 	# (subst, next_attr_nr, ti_type_heaps, ti_type_def_infos)
-	  		= liftSubstitution subst ro.ro_common_defs cons_vars next_attr_nr ti_type_heaps ti_type_def_infos
+  		= liftRemainingSubstitutions subst ro.ro_common_defs cons_vars next_attr_nr ti_type_heaps ti_type_def_infos
 //	| False--->("subst after lifting", [el\\el<-:subst])		= undef
 
 	# (consumer_attr_inequalities, th_attrs)
@@ -1882,6 +1884,9 @@ where
 				-> abort "Error in compiler: determineAttributeCoercions failed in module trans"
 			No
 				-> (subst, coercions, ti_type_def_infos, ti_type_heaps)
+
+	lift_offered_substitutions_for_unification common_defs cons_vars {ur_offered, ur_demanded} (next_attr_nr,subst,ti_type_def_infos,ti_type_heaps)
+		= liftOfferedSubstitutions ur_offered ur_demanded common_defs cons_vars next_attr_nr subst ti_type_def_infos ti_type_heaps
 
 	expand_type :: !{#.CommonDefs} !{#.Int} !.AType !*(!*Coercions,!u:{!.Type},!*TypeHeaps,!*{#*{#.TypeDefInfo}}) -> (!AType,!(!.Coercions,!v:{!Type},!.TypeHeaps,!{#.{#TypeDefInfo}})), [u <= v]
 	expand_type ro_common_defs cons_vars atype (coercions, subst, ti_type_heaps, ti_type_def_infos)

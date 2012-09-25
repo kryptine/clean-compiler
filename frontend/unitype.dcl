@@ -9,9 +9,7 @@ import syntax, analunitypes
 	,	crc_td_infos	:: !.TypeDefInfos
 	}
 
-class coerce a ::  !Sign !{# CommonDefs} !{# BOOLVECT} !TypePosition !a !a !*CoercionState -> (!Optional TypePosition, !*CoercionState)
-
-instance coerce AType
+coerce :: !Sign !{#CommonDefs} !{#BOOLVECT} !TypePosition !AType !AType !*CoercionState -> (!Optional TypePosition, !*CoercionState)
 
 ::	TypePosition :== [Int]
 
@@ -39,9 +37,8 @@ BITINDEX temp_var_id :== temp_var_id >> 5
 BITNUMBER temp_var_id :== temp_var_id bitand 31
 set_bit :: !Int !*{# BOOLVECT} -> .{# BOOLVECT}
 
-determineAttributeCoercions :: !AType !AType !Bool !u:{! Type} !*Coercions !{# CommonDefs } 
-	!{# BOOLVECT } !*TypeDefInfos !*TypeHeaps
-		-> (!Optional (TypePosition, AType), !u:{! Type}, !*Coercions, !*TypeDefInfos, !*TypeHeaps) 
+determineAttributeCoercions :: !AType !AType !Bool !u:{!Type} !*Coercions !{#CommonDefs} !{#BOOLVECT} !*TypeDefInfos !*TypeHeaps
+		-> (!Optional (TypePosition, AType), !u:{!Type}, !*Coercions, !*TypeDefInfos, !*TypeHeaps) 
 
 ::	AttributePartition	:== {# Int}
 
@@ -55,7 +52,12 @@ tryToMakeUnique :: !Int !*Coercions -> (!Bool, !*Coercions)
 
 uniquenessErrorVar :: !FreeVar !FunctionBody !String !*ErrorAdmin -> *ErrorAdmin
 
-liftSubstitution :: !*{! Type} !{# CommonDefs }!{# BOOLVECT } !Int !*TypeHeaps !*TypeDefInfos -> (*{! Type}, !Int, !*TypeHeaps, !*TypeDefInfos)
+liftOfferedSubstitutions :: !AType !AType !{#CommonDefs} !{#BOOLVECT} !Int !*{!Type} !*TypeDefInfos !*TypeHeaps
+																  -> (!Int,!*{!Type},!*TypeDefInfos,!*TypeHeaps)
+
+liftSubstitution :: !*{!Type} !{#CommonDefs}!{#BOOLVECT} !Int !*TypeHeaps !*TypeDefInfos -> (*{!Type}, !Int, !*TypeHeaps, !*TypeDefInfos)
+
+liftRemainingSubstitutions :: !*{!Type} !{#CommonDefs }!{#BOOLVECT} !Int !*TypeHeaps !*TypeDefInfos -> (*{!Type}, !Int, !*TypeHeaps, !*TypeDefInfos)
 
 ::	ExpansionState = 
 	{	es_type_heaps	:: !.TypeHeaps

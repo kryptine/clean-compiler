@@ -1086,6 +1086,8 @@ cNotVarNumber :== -1
 
 			|	TGenericFunctionInDictionary !(Global DefinedSymbol) !TypeKind !GlobalIndex /*GenericDict*/
 
+			|	TLiftedSubst !Type				// Auxiliary, used during fusion when generating a new function type
+
 			|	TE
 
 ::	ConsVariable = CV 		!TypeVar
