@@ -479,7 +479,7 @@ where
 			# new_case = {outer_case & case_expr = guard_expr}
 			= transformCase new_case ro ti // ---> ("possiblyFoldOuterCase`",Case new_case)
 		# cs = {cs_var_heap = ti.ti_var_heap, cs_symbol_heap = ti.ti_symbol_heap, cs_opt_type_heaps = No, cs_cleanup_info=ti.ti_cleanup_info}
-		  (outer_guards, cs=:{cs_cleanup_info})	= copy outer_case.case_guards {ci_handle_aci_free_vars = LeaveAciFreeVars} cs
+		  (outer_guards, cs=:{cs_cleanup_info})	= copyCasePatterns outer_case.case_guards No {ci_handle_aci_free_vars = LeaveAciFreeVars} cs
 		  (expr_info, ti_symbol_heap)			= readPtr outer_case.case_info_ptr cs.cs_symbol_heap
 		  (new_info_ptr, ti_symbol_heap)		= newPtr expr_info ti_symbol_heap
 		  new_cleanup_info 						= case expr_info of
@@ -4759,10 +4759,10 @@ where
 		# ((expr,exprs), cs) = copy (expr,exprs) ci cs
 		= (expr @ exprs, cs)
 	copy (Let lad) ci cs
-		# (lad, cs) = copy lad ci cs
+		# (lad, cs) = copyLet lad No ci cs
 		= (Let lad, cs)
 	copy (Case case_expr) ci cs
-		# (case_expr, cs) = copy case_expr ci cs
+		# (case_expr, cs) = copyCase case_expr No ci cs
 		= (Case case_expr, cs)
 	copy (Selection selector_kind=:NormalSelector (Var var) selectors=:[RecordSelection _ field_n]) ci cs	
 		# (var_info,var_heap) = readVarInfo var.var_info_ptr cs.cs_var_heap
@@ -4948,123 +4948,138 @@ where
 		# (bind_src, cs) = copy bind_src ci cs
 		= ({ bind & bind_src = bind_src }, cs)
 
-instance copy Case
+copyCaseAlt (Let lad) opt_result_type ci cs
+	# (lad, cs) = copyLet lad opt_result_type ci cs
+	= (Let lad, cs)
+copyCaseAlt (Case case_expr) opt_result_type ci cs
+	# (case_expr, cs) = copyCase case_expr opt_result_type ci cs
+	= (Case case_expr, cs)
+copyCaseAlt expr opt_result_type ci cs
+	= copy expr ci cs
+
+copyOptCaseAlt (Yes expr) opt_result_type ci cs
+	# (expr,cs) = copyCaseAlt expr opt_result_type ci cs
+	= (Yes expr, cs)
+copyOptCaseAlt No opt_result_type ci cs
+	= (No, cs)
+
+copyCase :: !Case !(Optional AType) !CopyInfo !*CopyState -> (!Case, !*CopyState)
+copyCase kees=:{case_expr,case_guards,case_default,case_info_ptr} opt_result_type ci cs=:{cs_cleanup_info}
+	# (old_case_info, cs_symbol_heap) = readPtr case_info_ptr cs.cs_symbol_heap
+	  (new_case_info, opt_result_type, cs_opt_type_heaps) = substitute_case_type old_case_info opt_result_type cs.cs_opt_type_heaps
+	  (new_info_ptr, cs_symbol_heap) = newPtr new_case_info cs_symbol_heap
+	  cs_cleanup_info = case old_case_info of
+							EI_Extended _ _	-> [new_info_ptr:cs_cleanup_info]
+							_				-> cs_cleanup_info
+	  cs = { cs & cs_symbol_heap = cs_symbol_heap, cs_opt_type_heaps = cs_opt_type_heaps, cs_cleanup_info=cs_cleanup_info }
+	  (case_guards, cs) = copyCasePatterns case_guards opt_result_type ci cs
+	  (case_default, cs) = copyOptCaseAlt case_default opt_result_type ci cs
+	  (case_expr, cs) = update_active_case_info_and_copy case_expr new_info_ptr cs
+	= ({ kees & case_expr = case_expr,case_guards = case_guards, case_default = case_default, case_info_ptr = new_info_ptr}, cs)
 where
-	copy kees=:{case_expr,case_guards,case_default,case_info_ptr} ci cs=:{cs_cleanup_info}
-		# (old_case_info, cs_symbol_heap) = readPtr case_info_ptr cs.cs_symbol_heap
-		  (new_case_info, cs_opt_type_heaps) = substitute_case_type old_case_info cs.cs_opt_type_heaps
-		  (new_info_ptr, cs_symbol_heap) = newPtr new_case_info cs_symbol_heap
-		  cs_cleanup_info = case old_case_info of
-								EI_Extended _ _	-> [new_info_ptr:cs_cleanup_info]
-								_				-> cs_cleanup_info
-		  cs = { cs & cs_symbol_heap = cs_symbol_heap, cs_opt_type_heaps = cs_opt_type_heaps, cs_cleanup_info=cs_cleanup_info }
-		  ((case_guards,case_default), cs) = copy (case_guards,case_default) ci cs
-		  (case_expr, cs) = update_active_case_info_and_copy case_expr new_info_ptr cs
-		= ({ kees & case_expr = case_expr,case_guards = case_guards, case_default = case_default, case_info_ptr = new_info_ptr}, cs)
-	where
-		update_active_case_info_and_copy case_expr=:(Var {var_info_ptr}) case_info_ptr cs
-			# (case_info, cs_symbol_heap) = readPtr case_info_ptr cs.cs_symbol_heap
-			  cs = { cs & cs_symbol_heap = cs_symbol_heap }
-			= case case_info of
-				EI_Extended (EEI_ActiveCase aci=:{aci_free_vars}) ei
-					# (new_aci_free_vars, cs) = case ci.ci_handle_aci_free_vars of
-													LeaveAciFreeVars
-														-> (aci_free_vars, cs)
-													RemoveAciFreeVars
-														-> (No, cs)
-													SubstituteAciFreeVars
-														-> case aci_free_vars of
-																No		-> (No, cs)
-																Yes fvs	# (fvs_subst, cs) = mapSt copyBoundVar fvs cs
-																		-> (Yes fvs_subst, cs)
-					  (var_info,var_heap) = readVarInfo var_info_ptr cs.cs_var_heap
-					  cs = {cs & cs_var_heap=var_heap}
-					-> case var_info of
-						VI_Body fun_ident {tb_args, tb_rhs} new_aci_params original_type_vars new_type_vars
-							# (old_original_type_vars_values,cs_opt_type_heaps)
-								= forward_old_type_vars_to_new_type_vars original_type_vars new_type_vars cs.cs_opt_type_heaps
-							  // replacing the type variables is only necessary if the consumer is the same function as the producer
-							  tb_args_ptrs = [ fv_info_ptr \\ {fv_info_ptr}<-tb_args ] 
-							  (original_bindings, cs_var_heap) = mapSt readPtr tb_args_ptrs cs.cs_var_heap
-							  cs_var_heap = bind_vars tb_args_ptrs new_aci_params cs_var_heap
-							  cs & cs_var_heap = cs_var_heap, cs_opt_type_heaps = cs_opt_type_heaps
-							  (tb_rhs, cs) = copy tb_rhs ci cs
-							  cs_var_heap = fold2St writePtr tb_args_ptrs original_bindings cs.cs_var_heap
-							  new_aci = { aci & aci_params = new_aci_params, aci_opt_unfolder = Yes fun_ident, aci_free_vars = new_aci_free_vars }
-							  new_eei = (EI_Extended (EEI_ActiveCase new_aci) ei)
-							  cs_symbol_heap = writePtr case_info_ptr new_eei cs.cs_symbol_heap
-							  cs_opt_type_heaps = restore_old_type_vars_values original_type_vars old_original_type_vars_values cs.cs_opt_type_heaps
-							-> (tb_rhs, {cs & cs_var_heap = cs_var_heap, cs_symbol_heap = cs_symbol_heap, cs_opt_type_heaps = cs_opt_type_heaps})
-						_	# new_eei = EI_Extended (EEI_ActiveCase { aci & aci_free_vars = new_aci_free_vars }) ei
-							  cs_symbol_heap = writePtr case_info_ptr new_eei cs.cs_symbol_heap
-							-> copy case_expr ci { cs & cs_symbol_heap = cs_symbol_heap }
-				_	-> copy case_expr ci cs
-		update_active_case_info_and_copy (Var var=:{var_info_ptr} @ exprs) case_info_ptr cs
-			# (exprs,cs) = copy exprs ci cs
-			| is_var_list exprs
-				# (var_info,var_heap) = readVarInfo var_info_ptr cs.cs_var_heap
-				  cs & cs_var_heap=var_heap
-				= case var_info of
-					VI_ExpressionOrBody _ fun_ident {tb_args, tb_rhs} new_aci_params original_type_vars new_type_vars
+	update_active_case_info_and_copy case_expr=:(Var {var_info_ptr}) case_info_ptr cs
+		# (case_info, cs_symbol_heap) = readPtr case_info_ptr cs.cs_symbol_heap
+		  cs = { cs & cs_symbol_heap = cs_symbol_heap }
+		= case case_info of
+			EI_Extended (EEI_ActiveCase aci=:{aci_free_vars}) ei
+				# (new_aci_free_vars, cs) = case ci.ci_handle_aci_free_vars of
+												LeaveAciFreeVars
+													-> (aci_free_vars, cs)
+												RemoveAciFreeVars
+													-> (No, cs)
+												SubstituteAciFreeVars
+													-> case aci_free_vars of
+															No		-> (No, cs)
+															Yes fvs	# (fvs_subst, cs) = mapSt copyBoundVar fvs cs
+																	-> (Yes fvs_subst, cs)
+				  (var_info,var_heap) = readVarInfo var_info_ptr cs.cs_var_heap
+				  cs = {cs & cs_var_heap=var_heap}
+				-> case var_info of
+					VI_Body fun_ident {tb_args, tb_rhs} new_aci_params original_type_vars new_type_vars
 						# (old_original_type_vars_values,cs_opt_type_heaps)
 							= forward_old_type_vars_to_new_type_vars original_type_vars new_type_vars cs.cs_opt_type_heaps
 						  // replacing the type variables is only necessary if the consumer is the same function as the producer
-						  tb_args_ptrs = [fv_info_ptr \\ {fv_info_ptr}<-tb_args] 
+						  tb_args_ptrs = [ fv_info_ptr \\ {fv_info_ptr}<-tb_args ] 
 						  (original_bindings, cs_var_heap) = mapSt readPtr tb_args_ptrs cs.cs_var_heap
-						  (extra_exprs,cs_var_heap) = bind_variables tb_args_ptrs new_aci_params exprs cs_var_heap
+						  cs_var_heap = bind_vars tb_args_ptrs new_aci_params cs_var_heap
 						  cs & cs_var_heap = cs_var_heap, cs_opt_type_heaps = cs_opt_type_heaps
-						  (expr,cs) = copy tb_rhs ci cs
-
-						  (case_info, cs_symbol_heap) = readPtr case_info_ptr cs.cs_symbol_heap
-						  cs & cs_symbol_heap
-							= case case_info of
-								EI_Extended (EEI_ActiveCase aci) ei
-									# aci & aci_opt_unfolder = No
-									-> writePtr case_info_ptr (EI_Extended (EEI_ActiveCase aci) ei) cs_symbol_heap
-								_
-									-> cs_symbol_heap
-
+						  (tb_rhs, cs) = copy tb_rhs ci cs
 						  cs_var_heap = fold2St writePtr tb_args_ptrs original_bindings cs.cs_var_heap
+						  new_aci = { aci & aci_params = new_aci_params, aci_opt_unfolder = Yes fun_ident, aci_free_vars = new_aci_free_vars }
+						  new_eei = (EI_Extended (EEI_ActiveCase new_aci) ei)
+						  cs_symbol_heap = writePtr case_info_ptr new_eei cs.cs_symbol_heap
 						  cs_opt_type_heaps = restore_old_type_vars_values original_type_vars old_original_type_vars_values cs.cs_opt_type_heaps
-						  cs & cs_var_heap = cs_var_heap, cs_opt_type_heaps = cs_opt_type_heaps
-						-> case extra_exprs of
-							[]
-								-> (expr,cs)
-							extra_exprs
-								-> (expr @ extra_exprs, cs)
-						where
-							bind_variables :: [VarInfoPtr] [FreeVar] [Expression] *VarHeap -> (![Expression],!*VarHeap)
-							bind_variables [fv_info_ptr:arg_ptrs] [{fv_ident=name, fv_info_ptr=info_ptr}:new_aci_params] exprs var_heap
-								# (exprs,var_heap) = bind_variables arg_ptrs new_aci_params exprs var_heap
-								# var_heap = writeVarInfo fv_info_ptr (VI_Expression (Var {var_ident=name, var_info_ptr=info_ptr, var_expr_ptr = nilPtr})) var_heap
-								= (exprs,var_heap)
-							bind_variables arg_ptrs=:[_:_] [] exprs var_heap
-								= bind_variables_for_exprs arg_ptrs exprs var_heap
-							bind_variables [] [] exprs var_heap
-								= (exprs,var_heap)
+						-> (tb_rhs, {cs & cs_var_heap = cs_var_heap, cs_symbol_heap = cs_symbol_heap, cs_opt_type_heaps = cs_opt_type_heaps})
+					_	# new_eei = EI_Extended (EEI_ActiveCase { aci & aci_free_vars = new_aci_free_vars }) ei
+						  cs_symbol_heap = writePtr case_info_ptr new_eei cs.cs_symbol_heap
+						-> copy case_expr ci { cs & cs_symbol_heap = cs_symbol_heap }
+			_	-> copy case_expr ci cs
+	update_active_case_info_and_copy (Var var=:{var_info_ptr} @ exprs) case_info_ptr cs
+		# (exprs,cs) = copy exprs ci cs
+		| is_var_list exprs
+			# (var_info,var_heap) = readVarInfo var_info_ptr cs.cs_var_heap
+			  cs & cs_var_heap=var_heap
+			= case var_info of
+				VI_ExpressionOrBody _ fun_ident {tb_args, tb_rhs} new_aci_params original_type_vars new_type_vars
+					# (old_original_type_vars_values,cs_opt_type_heaps)
+						= forward_old_type_vars_to_new_type_vars original_type_vars new_type_vars cs.cs_opt_type_heaps
+					  // replacing the type variables is only necessary if the consumer is the same function as the producer
+					  tb_args_ptrs = [fv_info_ptr \\ {fv_info_ptr}<-tb_args] 
+					  (original_bindings, cs_var_heap) = mapSt readPtr tb_args_ptrs cs.cs_var_heap
+					  (extra_exprs,cs_var_heap) = bind_variables tb_args_ptrs new_aci_params exprs cs_var_heap
+					  cs & cs_var_heap = cs_var_heap, cs_opt_type_heaps = cs_opt_type_heaps
+					  (expr,cs) = copy tb_rhs ci cs
 
-							bind_variables_for_exprs :: [VarInfoPtr] [Expression] *VarHeap -> (![Expression],!*VarHeap)
-							bind_variables_for_exprs [fv_info_ptr:arg_ptrs] [Var {var_ident=name, var_info_ptr=info_ptr}:exprs] var_heap
-								# (exprs,var_heap) = bind_variables_for_exprs arg_ptrs exprs var_heap
-								# var_heap = writeVarInfo fv_info_ptr (VI_Expression (Var {var_ident=name, var_info_ptr=info_ptr, var_expr_ptr = nilPtr})) var_heap
-								= (exprs,var_heap)
-							bind_variables_for_exprs [] exprs var_heap
-								= (exprs,var_heap)
-					_
-						# (expr,cs) = copyVariable var ci cs
-						-> (expr @ exprs, cs)
-				# (expr,cs) = copyVariable var ci cs
-				= (expr @ exprs, cs)
-			where
-				is_var_list [Var _:exprs] = is_var_list exprs
-				is_var_list [_ : _] = False
-				is_var_list [] = True
-		update_active_case_info_and_copy case_expr _ cs
-			= copy case_expr ci cs
+					  (case_info, cs_symbol_heap) = readPtr case_info_ptr cs.cs_symbol_heap
+					  cs & cs_symbol_heap
+						= case case_info of
+							EI_Extended (EEI_ActiveCase aci) ei
+								# aci & aci_opt_unfolder = No
+								-> writePtr case_info_ptr (EI_Extended (EEI_ActiveCase aci) ei) cs_symbol_heap
+							_
+								-> cs_symbol_heap
 
-		copyBoundVar {var_info_ptr} cs
-			# (VI_Expression (Var act_var), cs_var_heap) = readPtr var_info_ptr cs.cs_var_heap
-			= (act_var, { cs & cs_var_heap = cs_var_heap })
+					  cs_var_heap = fold2St writePtr tb_args_ptrs original_bindings cs.cs_var_heap
+					  cs_opt_type_heaps = restore_old_type_vars_values original_type_vars old_original_type_vars_values cs.cs_opt_type_heaps
+					  cs & cs_var_heap = cs_var_heap, cs_opt_type_heaps = cs_opt_type_heaps
+					-> case extra_exprs of
+						[]
+							-> (expr,cs)
+						extra_exprs
+							-> (expr @ extra_exprs, cs)
+					where
+						bind_variables :: [VarInfoPtr] [FreeVar] [Expression] *VarHeap -> (![Expression],!*VarHeap)
+						bind_variables [fv_info_ptr:arg_ptrs] [{fv_ident=name, fv_info_ptr=info_ptr}:new_aci_params] exprs var_heap
+							# (exprs,var_heap) = bind_variables arg_ptrs new_aci_params exprs var_heap
+							# var_heap = writeVarInfo fv_info_ptr (VI_Expression (Var {var_ident=name, var_info_ptr=info_ptr, var_expr_ptr = nilPtr})) var_heap
+							= (exprs,var_heap)
+						bind_variables arg_ptrs=:[_:_] [] exprs var_heap
+							= bind_variables_for_exprs arg_ptrs exprs var_heap
+						bind_variables [] [] exprs var_heap
+							= (exprs,var_heap)
+
+						bind_variables_for_exprs :: [VarInfoPtr] [Expression] *VarHeap -> (![Expression],!*VarHeap)
+						bind_variables_for_exprs [fv_info_ptr:arg_ptrs] [Var {var_ident=name, var_info_ptr=info_ptr}:exprs] var_heap
+							# (exprs,var_heap) = bind_variables_for_exprs arg_ptrs exprs var_heap
+							# var_heap = writeVarInfo fv_info_ptr (VI_Expression (Var {var_ident=name, var_info_ptr=info_ptr, var_expr_ptr = nilPtr})) var_heap
+							= (exprs,var_heap)
+						bind_variables_for_exprs [] exprs var_heap
+							= (exprs,var_heap)
+				_
+					# (expr,cs) = copyVariable var ci cs
+					-> (expr @ exprs, cs)
+			# (expr,cs) = copyVariable var ci cs
+			= (expr @ exprs, cs)
+		where
+			is_var_list [Var _:exprs] = is_var_list exprs
+			is_var_list [_ : _] = False
+			is_var_list [] = True
+	update_active_case_info_and_copy case_expr _ cs
+		= copy case_expr ci cs
+
+	copyBoundVar {var_info_ptr} cs
+		# (VI_Expression (Var act_var), cs_var_heap) = readPtr var_info_ptr cs.cs_var_heap
+		= (act_var, { cs & cs_var_heap = cs_var_heap })
 
 bind_vars dest_info_ptrs src_free_vars var_heap
 	= fold2St bind dest_info_ptrs src_free_vars var_heap
@@ -5107,26 +5122,25 @@ where
 	write_old_type_vars_values [] [] type_var_heap
 		= type_var_heap
 
-instance copy Let
-where
-	copy lad=:{let_strict_binds, let_lazy_binds, let_expr, let_info_ptr} ci cs
-		# (let_strict_binds, cs) = copy_bound_vars let_strict_binds cs
-		# (let_lazy_binds, cs) = copy_bound_vars let_lazy_binds cs
-		# (let_strict_binds, cs) = copy let_strict_binds ci cs
-		# (let_lazy_binds, cs) = copy let_lazy_binds ci cs
-		# (let_expr, cs) = copy let_expr ci cs
-		  (old_let_info, cs_symbol_heap) = readPtr let_info_ptr cs.cs_symbol_heap
-		  (new_let_info, cs_opt_type_heaps) = substitute_let_type old_let_info cs.cs_opt_type_heaps
-		  (new_info_ptr, cs_symbol_heap) = newPtr new_let_info cs_symbol_heap
-		= ({lad & let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds, let_expr = let_expr, let_info_ptr = new_info_ptr},
-			{ cs & cs_symbol_heap = cs_symbol_heap, cs_opt_type_heaps = cs_opt_type_heaps })
-		where
-			copy_bound_vars [bind=:{lb_dst} : binds] cs
-				# (lb_dst, cs) = copy lb_dst ci cs
-				  (binds, cs) = copy_bound_vars binds cs
-				= ([ {bind & lb_dst = lb_dst} : binds ], cs)
-			copy_bound_vars [] cs
-				= ([], cs)
+copyLet :: !Let !(Optional AType) !CopyInfo !*CopyState -> (!Let, !*CopyState)
+copyLet lad=:{let_strict_binds, let_lazy_binds, let_expr, let_info_ptr} optional_result_type ci cs
+	# (let_strict_binds, cs) = copy_bound_vars let_strict_binds cs
+	# (let_lazy_binds, cs) = copy_bound_vars let_lazy_binds cs
+	# (let_strict_binds, cs) = copy let_strict_binds ci cs
+	# (let_lazy_binds, cs) = copy let_lazy_binds ci cs
+	# (let_expr, cs) = copyCaseAlt let_expr optional_result_type ci cs
+	  (old_let_info, cs_symbol_heap) = readPtr let_info_ptr cs.cs_symbol_heap
+	  (new_let_info, cs_opt_type_heaps) = substitute_let_type old_let_info cs.cs_opt_type_heaps
+	  (new_info_ptr, cs_symbol_heap) = newPtr new_let_info cs_symbol_heap
+	= ({lad & let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds, let_expr = let_expr, let_info_ptr = new_info_ptr},
+		{ cs & cs_symbol_heap = cs_symbol_heap, cs_opt_type_heaps = cs_opt_type_heaps })
+	where
+		copy_bound_vars [bind=:{lb_dst} : binds] cs
+			# (lb_dst, cs) = copy lb_dst ci cs
+			  (binds, cs) = copy_bound_vars binds cs
+			= ([ {bind & lb_dst = lb_dst} : binds ], cs)
+		copy_bound_vars [] cs
+			= ([], cs)
 
 substitute_let_type expr_info No
 	= (expr_info, No)
@@ -5139,48 +5153,83 @@ substitute_let_type expr_info=:(EI_LetType let_type) (Yes type_heaps)
 		= (EI_LetType new_let_type, Yes type_heaps)
 		= (expr_info, Yes type_heaps)
 
-substitute_case_type expr_info No
-	= (expr_info, No)
-substitute_case_type (EI_Extended extensions expr_info) yes_type_heaps
-	# (new_expr_info, yes_type_heaps) = substitute_case_type expr_info yes_type_heaps
-	= (EI_Extended extensions new_expr_info, yes_type_heaps)
-substitute_case_type expr_info=:(EI_CaseType case_type) (Yes type_heaps)
-	# (changed, new_case_type, type_heaps) = substitute case_type type_heaps
+substitute_case_type expr_info parent_opt_result_type No
+	= (expr_info, No, No)
+substitute_case_type (EI_Extended extensions expr_info) parent_opt_result_type yes_type_heaps
+	# (new_expr_info, opt_result_type, yes_type_heaps)
+		= substitute_case_type expr_info parent_opt_result_type yes_type_heaps
+	= (EI_Extended extensions new_expr_info, opt_result_type, yes_type_heaps)
+substitute_case_type expr_info=:(EI_CaseType case_type) parent_opt_result_type (Yes type_heaps)
+	# (changed, new_case_type, type_heaps) = substituteCaseType case_type parent_opt_result_type type_heaps
 	| changed
-		= (EI_CaseType new_case_type, Yes type_heaps)
-		= (expr_info, Yes type_heaps)
-
-instance copy CasePatterns
+		= (EI_CaseType new_case_type, Yes new_case_type.ct_result_type, Yes type_heaps)
+		= (expr_info, Yes new_case_type.ct_result_type, Yes type_heaps)
 where
-	copy (AlgebraicPatterns type patterns) ci cs
-		# (patterns, cs) = copy patterns ci cs
-		= (AlgebraicPatterns type patterns, cs)
-	copy (BasicPatterns type patterns) ci cs
-		# (patterns, cs) = copy patterns ci cs
-		= (BasicPatterns type patterns, cs)
-	copy (OverloadedListPatterns type decons_expr patterns) ci cs
-		# (patterns, cs) = copy patterns ci cs
-		# (decons_expr, cs) = copy decons_expr ci cs
-		= (OverloadedListPatterns type decons_expr patterns, cs)
-	copy (NewTypePatterns type patterns) ci cs
-		# (patterns, cs) = copy patterns ci cs
-		= (NewTypePatterns type patterns, cs)
-	copy (DynamicPatterns patterns) ci cs
-		# (patterns, cs) = copy patterns ci cs
-		= (DynamicPatterns patterns, cs)
+	substituteCaseType {ct_pattern_type, ct_result_type, ct_cons_types} parent_opt_result_type heaps
+		# (changed_pattern_type, pattern_type_r, heaps) = substitute ct_pattern_type heaps
+		  (changed_result_type, result_type_r, heaps) = substitute ct_result_type heaps
+		  (changed_cons_types, cons_types_r, heaps) = substitute ct_cons_types heaps
+		| changed_pattern_type
+			| changed_result_type
+				# result_type_r = use_parent_result_type_if_equal parent_opt_result_type result_type_r
+				| changed_cons_types
+					= (True, {ct_pattern_type=pattern_type_r, ct_result_type=result_type_r, ct_cons_types=cons_types_r}, heaps)
+					= (True, {ct_pattern_type=pattern_type_r, ct_result_type=result_type_r, ct_cons_types=ct_cons_types}, heaps)
+				| changed_cons_types
+					= (True, {ct_pattern_type=pattern_type_r, ct_result_type=ct_result_type, ct_cons_types=cons_types_r}, heaps)
+					= (True, {ct_pattern_type=pattern_type_r, ct_result_type=ct_result_type, ct_cons_types=ct_cons_types}, heaps)
+			| changed_result_type
+				# result_type_r = use_parent_result_type_if_equal parent_opt_result_type result_type_r
+				| changed_cons_types
+					= (True, {ct_pattern_type=ct_pattern_type, ct_result_type=result_type_r, ct_cons_types=cons_types_r}, heaps)
+					= (True, {ct_pattern_type=ct_pattern_type, ct_result_type=result_type_r, ct_cons_types=ct_cons_types}, heaps)
+				| changed_cons_types
+					= (True, {ct_pattern_type=ct_pattern_type, ct_result_type=ct_result_type, ct_cons_types=cons_types_r}, heaps)
+					= (False, {ct_pattern_type=ct_pattern_type, ct_result_type=ct_result_type, ct_cons_types=ct_cons_types}, heaps)
 
-instance copy AlgebraicPattern
-where
-	copy guard=:{ap_vars,ap_expr} ci cs
-		# (ap_vars, cs) = copy ap_vars ci cs
-		  (ap_expr, cs) = copy ap_expr ci cs
-		= ({ guard & ap_vars = ap_vars, ap_expr = ap_expr }, cs)
+	use_parent_result_type_if_equal (Yes parent_result_type) result_type_r
+		| equal_atype result_type_r parent_result_type
+			= parent_result_type
+			= result_type_r
+	use_parent_result_type_if_equal No result_type_r
+		= result_type_r
 
-instance copy BasicPattern
-where
-	copy guard=:{bp_expr} ci cs
-		# (bp_expr, cs) = copy bp_expr ci cs
-		= ({ guard & bp_expr = bp_expr }, cs)
+copyCasePatterns :: !CasePatterns !(Optional AType) !CopyInfo !*CopyState -> *(!CasePatterns,!*CopyState)
+copyCasePatterns (AlgebraicPatterns type patterns) opt_result_type ci cs
+	# (patterns, cs) = copyAlgebraicPatterns patterns opt_result_type ci cs
+	= (AlgebraicPatterns type patterns, cs)
+copyCasePatterns (BasicPatterns type patterns) opt_result_type ci cs
+	# (patterns, cs) = copyBasicPatterns patterns opt_result_type ci cs
+	= (BasicPatterns type patterns, cs)
+copyCasePatterns (OverloadedListPatterns type decons_expr patterns) opt_result_type ci cs
+	# (patterns, cs) = copyAlgebraicPatterns patterns opt_result_type ci cs
+	# (decons_expr, cs) = copy decons_expr ci cs
+	= (OverloadedListPatterns type decons_expr patterns, cs)
+copyCasePatterns (NewTypePatterns type patterns) opt_result_type ci cs
+	# (patterns, cs) = copyAlgebraicPatterns patterns opt_result_type ci cs
+	= (NewTypePatterns type patterns, cs)
+copyCasePatterns (DynamicPatterns patterns) opt_result_type ci cs
+	# (patterns, cs) = copy patterns ci cs
+	= (DynamicPatterns patterns, cs)
+
+copyAlgebraicPatterns [guard=:{ap_vars,ap_expr} : guards] opt_result_type ci cs
+	# (ap_vars, cs) = copy ap_vars ci cs
+	# (ap_expr, cs) = copyCaseAlt ap_expr opt_result_type ci cs
+	#! guard & ap_vars = ap_vars, ap_expr = ap_expr
+	# (guards, cs) = copyAlgebraicPatterns guards opt_result_type ci cs
+	#! cs = cs
+	= ([guard : guards], cs)
+copyAlgebraicPatterns [] opt_result_type ci cs
+ 	= ([], cs)
+
+copyBasicPatterns [guard=:{bp_expr} : guards] opt_result_type ci cs
+	# (bp_expr, cs) = copyCaseAlt bp_expr opt_result_type ci cs
+	#! guard & bp_expr = bp_expr
+	# (guards, cs) = copyBasicPatterns guards opt_result_type ci cs
+	#! cs = cs
+	= ([guard : guards], cs)
+copyBasicPatterns [] opt_result_type ci cs
+ 	= ([], cs)
 
 instance copy DynamicPattern
 where
@@ -5216,3 +5265,38 @@ where
 		= (Yes x, cs)
 	copy no ci cs
 		= (no, cs)
+
+equal_atype :: !AType !AType -> Bool
+equal_atype {at_attribute=TA_Multi,at_type=type1} {at_attribute=TA_Multi,at_type=type2}
+	= equal_type type1 type2
+equal_atype {at_attribute=TA_Unique,at_type=type1} {at_attribute=TA_Unique,at_type=type2}
+	= equal_type type1 type2
+equal_atype {at_attribute=TA_Var {av_info_ptr=av_info_ptr1},at_type=type1} {at_attribute=TA_Var {av_info_ptr=av_info_ptr2},at_type=type2}
+	= av_info_ptr1==av_info_ptr2 && equal_type type1 type2
+equal_atype new_type old_type
+	= False
+
+equal_type :: !Type !Type -> Bool
+equal_type (TA {type_index=type_index1} types1) (TA {type_index=type_index2} types2)
+	= type_index1==type_index2 && equal_atypes types1 types2
+equal_type (TAS {type_index=type_index1} types1 strictness1) (TAS {type_index=type_index2} types2 strictness2)
+	= type_index1==type_index2 && equal_strictness_lists strictness1 strictness2 && equal_atypes types1 types2
+equal_type (TB BT_Int) (TB BT_Int)
+	= True
+equal_type (TB BT_Char) (TB BT_Char)
+	= True
+equal_type (TB BT_Bool) (TB BT_Bool)
+	= True
+equal_type (TB BT_Real) (TB BT_Real)
+	= True
+equal_type (TV {tv_info_ptr=tv_info_ptr1}) (TV {tv_info_ptr=tv_info_ptr2})
+	= tv_info_ptr1==tv_info_ptr2
+equal_type new_type old_type
+	= False
+
+equal_atypes [] []
+	= True
+equal_atypes [atype1:atypes1] [atype2:atypes2]
+	= equal_atype atype1 atype2 && equal_atypes atypes1 atypes2
+equal_atypes new_types old_types
+	= False
