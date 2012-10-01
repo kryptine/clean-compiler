@@ -2732,14 +2732,22 @@ transformFunctionApplication fun_def instances cc=:{cc_size, cc_args, cc_linear_
 	  			
 	  			# (expr,ti) = transformApplication { app & app_symb = app_symb, app_args = app_args } extra_args ro ti
 	  			= possiblyAddStrictLetBinds expr strict_let_binds ti
-			# (FI_Function {gf_fun_index, gf_fun_def}, ti_fun_heap) = readPtr fun_def_ptr ti_fun_heap
+			# (FI_Function gf=:{gf_fun_index, gf_fun_def}, ti_fun_heap) = readPtr fun_def_ptr ti_fun_heap
 			# ti = {ti & ti_fun_heap = ti_fun_heap}
 			| gf_fun_index == (-1)
 				= (build_application { app & app_args = app_args } extra_args, ti) // ---> ("known failed instance")
 			# app_symb` = { app_symb & symb_kind = SK_GeneratedFunction fun_def_ptr gf_fun_index }
 			  (app_args, extra_args) = complete_application gf_fun_def.fun_arity new_args extra_args
-			  (expr,ti) = transformApplication {app & app_symb = app_symb`, app_args = app_args} extra_args ro ti
-			= possiblyAddStrictLetBinds expr strict_let_binds ti
+			| gf_fun_def.fun_info.fi_properties bitand FI_Unused<>0
+				# {fi_properties,fi_calls} = gf_fun_def.fun_info
+				  gf & gf_fun_def.fun_info.fi_properties = (fi_properties bitxor FI_Unused) bitor FI_UnusedUsed
+				  ti & ti_fun_heap = writePtr fun_def_ptr (FI_Function gf) ti.ti_fun_heap,
+					   ti_new_functions = [fun_def_ptr : ti.ti_new_functions]
+				  ti = add_unused_calls fi_calls ti
+				  (expr,ti) = transformApplication {app & app_symb = app_symb`, app_args = app_args} extra_args ro ti
+				= possiblyAddStrictLetBinds expr strict_let_binds ti
+				# (expr,ti) = transformApplication {app & app_symb = app_symb`, app_args = app_args} extra_args ro ti
+				= possiblyAddStrictLetBinds expr strict_let_binds ti
 		| SwitchTrivialFusion ro.ro_transform_fusion False
 			= transform_trivial_function app app_args extra_args ro ti
 		= (build_application { app & app_args = app_args } extra_args, ti)
@@ -2816,6 +2824,22 @@ where
 		= App app
 	build_application app extra_args
 		= App app @ extra_args
+
+	add_unused_calls [GeneratedFunCall _ fun_def_ptr:calls] ti=:{ti_fun_heap}
+		# (FI_Function gf, ti_fun_heap) = readPtr fun_def_ptr ti_fun_heap
+		  ti & ti_fun_heap=ti_fun_heap
+		  {fi_properties,fi_calls} = gf.gf_fun_def.fun_info
+		| fi_properties bitand FI_Unused<>0
+			# gf & gf_fun_def.fun_info.fi_properties = (fi_properties bitxor FI_Unused) bitor FI_UnusedUsed
+			  ti & ti_fun_heap = writePtr fun_def_ptr (FI_Function gf) ti.ti_fun_heap,
+				   ti_new_functions = [fun_def_ptr : ti.ti_new_functions]
+			  ti = add_unused_calls fi_calls ti
+			= add_unused_calls calls ti
+			= add_unused_calls calls ti
+	add_unused_calls [_:calls] ti
+		= add_unused_calls calls ti
+	add_unused_calls [] ti
+		= ti
 
 is_cons_or_decons_of_UList_or_UTSList glob_object glob_module imported_funs
 	:== let  type = imported_funs.[glob_module].[glob_object].ft_type;
@@ -3909,8 +3933,6 @@ foldrExprSt f expr st :== foldr_expr_st expr st
 		= f lad st
 	foldr_expr_st sel=:(Selection a expr b) st
 		= f sel (foldr_expr_st expr st)
-		
-	// AA:	
 	foldr_expr_st expr=:(BasicExpr _) st 
 		= f expr st
 
@@ -3918,6 +3940,69 @@ add_let_binds :: [FreeVar] [Expression] [LetBind] -> [LetBind]
 add_let_binds free_vars rhss original_binds
 	= [{ original_bind & lb_dst = lb_dst, lb_src = lb_src}
 		\\ lb_dst <- free_vars & lb_src <- rhss & original_bind <- original_binds]
+
+remove_groups_not_used_by_original_component_members :: ComponentMembers [Component] [Component] -> (![Component],![Component])
+remove_groups_not_used_by_original_component_members original_component_members new_groups removed_groups
+	# last_component = last new_groups
+	| contains_function_in_component last_component.component_members original_component_members
+		= (new_groups,removed_groups)
+		= remove_groups_not_used_by_original_component_members original_component_members (init new_groups) [last_component:removed_groups]
+where
+	contains_function_in_component (GeneratedComponentMember function_n _ component_members) original_component_members
+		| component_contains_generated_function_n original_component_members function_n
+			= True
+			= contains_function_in_component component_members original_component_members
+	contains_function_in_component (ComponentMember function_n component_members) original_component_members
+		| component_contains_function_n original_component_members function_n
+			= True
+			= contains_function_in_component component_members original_component_members
+	contains_function_in_component NoComponentMembers original_component_members
+		= False
+	
+	component_contains_function_n (ComponentMember function_n2 component_members) function_n
+		= function_n==function_n2 || component_contains_function_n component_members function_n
+	component_contains_function_n (GeneratedComponentMember _ _ component_members) function_n
+		= component_contains_function_n component_members function_n
+	component_contains_function_n NoComponentMembers function_n
+		= False
+
+	component_contains_generated_function_n (GeneratedComponentMember function_n2 _ component_members) function_n
+		= function_n==function_n2 || component_contains_generated_function_n component_members function_n
+	component_contains_generated_function_n (ComponentMember _ component_members) function_n
+		= component_contains_generated_function_n component_members function_n
+	component_contains_generated_function_n NoComponentMembers function_n
+		= False
+
+remove_unused_used_functions :: ![FunctionInfoPtr] !*FunctionHeap -> (![FunctionInfoPtr],!*FunctionHeap)
+remove_unused_used_functions [fun_ptr:fun_ptrs] fun_heap
+	# (FI_Function gf, fun_heap) = readPtr fun_ptr fun_heap
+	| gf.gf_fun_def.fun_info.fi_properties bitand FI_UnusedUsed<>0
+		= remove_unused_used_functions fun_ptrs fun_heap
+		# (fun_ptrs, fun_heap) = remove_unused_used_functions fun_ptrs fun_heap
+		= ([fun_ptr:fun_ptrs], fun_heap)
+remove_unused_used_functions [] fun_heap
+	= ([],fun_heap)
+
+mark_unused_functions_in_components :: [Component] *TransformInfo -> *TransformInfo
+mark_unused_functions_in_components [removed_group:removed_groups] ti
+	# ti = mark_unused_functions removed_group.component_members ti
+	= mark_unused_functions_in_components removed_groups ti
+where
+	mark_unused_functions (ComponentMember member members) ti
+		# (fun_info,ti) = ti!ti_fun_defs.[member].fun_info
+		  fun_info & fi_properties = fun_info.fi_properties bitor FI_Unused
+		  ti & ti_fun_defs.[member].fun_info = fun_info
+		= mark_unused_functions members ti
+	mark_unused_functions (GeneratedComponentMember member fun_ptr members) ti=:{ti_fun_heap}	
+		# (FI_Function gf=:{gf_fun_def=fd=:{fun_info},gf_fun_index}, ti_fun_heap) = readPtr fun_ptr ti_fun_heap
+		  fun_info & fi_properties = fun_info.fi_properties bitor FI_Unused
+		  fd & fun_info=fun_info
+		  ti & ti_fun_heap = writePtr fun_ptr (FI_Function {gf & gf_fun_def=fd}) ti_fun_heap
+		= mark_unused_functions members ti
+	mark_unused_functions NoComponentMembers ti
+		= ti
+mark_unused_functions_in_components [] ti
+	= ti
 
 transformGroups :: !CleanupInfo !Int !Int !Int !Int !*{!Component} !*{#FunDef} !*{!.ConsClasses} !{# CommonDefs}  !{# {# FunType} }
 		!*ImportedTypes !*TypeDefInfos !*VarHeap !*TypeHeaps !*ExpressionHeap !Bool !*File !*PredefinedSymbols
@@ -3995,7 +4080,11 @@ where
 		# ti = transform_functions component_members common_defs imported_funs ti
 		// partitionate group: need to know added functions for this...
 		# (new_functions,ti) = ti!ti_new_functions
-		# ti & ti_new_functions = new_functions ++ previous_new_functions
+
+		# (new_generated_functions,ti_fun_heap) = remove_unused_used_functions new_functions ti.ti_fun_heap
+		# ti & ti_fun_heap = ti_fun_heap,
+			   ti_new_functions = new_generated_functions ++ previous_new_functions
+
 		| not (compile_with_fusion || not (isEmpty new_functions))
 			= (inc group_nr,[{component_members=component_members}:acc_groups],ti)
 
@@ -4018,6 +4107,8 @@ where
 				}
 		// if wanted reapply transform_group to all found groups
 		| not (isEmpty new_functions) || length new_groups > 1 || not same
+			# (new_groups,removed_groups) = remove_groups_not_used_by_original_component_members component_members new_groups []
+			  ti = mark_unused_functions_in_components removed_groups ti
 			= transform_groups` common_defs imported_funs group_nr new_groups acc_groups ti
 		// producer annotation for finished components!
 		# ti = reannotate_producers group_nr component_members ti
@@ -4189,13 +4280,16 @@ where
 		#! (_,(st_args,st_result), {ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap})
 				= expandSynTypes (if (fi_properties bitand FI_HasTypeSpec == 0) (RemoveAnnotationsMask bitor ExpandAbstractSynTypesMask) ExpandAbstractSynTypesMask) common_defs (st_args,st_result) ets
 		# ft = { ft &  st_result = st_result, st_args = st_args }
+
+		| fi_properties bitand FI_Unused<>0
+			# gf_fun_def = {gf_fun_def & fun_type = Yes ft}
+			= (groups, [gf_fun_def : fun_defs], ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap)
+
 		| fi_group_index >= size groups
 			= abort ("add_new_function_to_group "+++ toString fi_group_index+++ "," +++ toString (size groups) +++ "," +++ toString gf_fun_index)
 
-		# (group, groups) = groups![fi_group_index]
-		| not (isComponentMember gf_fun_index group.component_members)
+		| not (isComponentMember gf_fun_index groups.[fi_group_index].component_members)
 			= abort ("add_new_function_to_group INSANE!\n" +++ toString gf_fun_index +++ "," +++ toString fi_group_index)
-		# groups = {groups & [fi_group_index] = group}
 		# gf_fun_def = {gf_fun_def & fun_type = Yes ft}
 		= (groups, [gf_fun_def : fun_defs], ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap)
 	where

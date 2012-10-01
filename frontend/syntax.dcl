@@ -664,6 +664,8 @@ FI_IsNonRecursive :== 4			// used in trans.icl and partition.icl
 FI_IsUnboxedListOfRecordsConsOrNil :== 8
 FI_MemberInstanceRequiresTypeInDefMod :== 16
 FI_GenericFun :== 32
+FI_Unused :== 64				// used in module trans
+FI_UnusedUsed :== 128			// used in module trans
 
 ::	FunInfo =
 	{	fi_calls			:: ![FunCall]
