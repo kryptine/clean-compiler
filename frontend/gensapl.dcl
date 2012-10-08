@@ -7,7 +7,8 @@ import StdEnv,syntax,transform
 :: SaplExp = SaplApp SaplExp SaplExp | SaplInt Int |SaplReal Real | SaplBool Bool |
              SaplString String | SaplFun String | AnFunc [SaplExp] SaplExp | SaplVar String VarInfoPtr SaplAnnotation | 
              SaplChar String |
-             SaplSelect SaplExp [(SaplMatchExp,[SaplExp],SaplExp)] [SaplExp] | SaplLet [(SaplExp,SaplExp)] SaplExp | 
+             SaplSelect SaplExp [(SaplMatchExp,[SaplExp],SaplExp)] [SaplExp] | 
+             SaplLet [(SaplAnnotation,SaplExp,SaplExp)] SaplExp | 
              SaplError String | SaplABCCode [String]
 
 ::SaplConsDef = SaplConsDef String String String Int Int Int

@@ -6,25 +6,45 @@ implementation module gensapl
 import StdEnv, syntax, transform, StdDebug
 
 instance toString SaplConsDef  
-where toString (SaplConsDef mod t name alt nrargs nralt) = makePrintableName (mod +++ "." +++ name) +++  makeString [" a"+++toString n\\ n <- [1..nrargs]]
+where 
+	toString (SaplConsDef mod t name alt nrargs nralt) 
+		= makePrintableName (mod +++ "." +++ name) +++  makeString [" a"+++toString n \\ n <- [1..nrargs]]
 
 instance toString SaplFuncDef  
-where toString (SaplFuncDef name nrargs args body kind) = makePrintableName name +++ makeArgs args +++ toString kind +++ toString body
+where 
+	toString (SaplFuncDef name nrargs args body kind) 
+		= makePrintableName name +++ makeArgs args +++ toString kind +++ toString body
 
 instance toString SaplRecordDef
-where toString (SaplRecordDef mod recname fields) = makeGetSets mod recname fields
+where 
+	toString (SaplRecordDef mod recname fields) = makeGetSets mod recname fields
 
 instance toString FunKind
-where toString FK_Macro = " :== "
-      toString FK_Caf = " =: "
-      toString x = " = "
+where 
+	toString FK_Macro = " :== "
+	toString FK_Caf = " =: "
+	toString x = " = "
 
 instance == SaplConsDef
-where == (SaplConsDef _ _ name1 _ _ _) (SaplConsDef _ _ name2 _ _ _) = name1 == name2
+where 
+	== (SaplConsDef _ _ name1 _ _ _) (SaplConsDef _ _ name2 _ _ _) = name1 == name2
  
+// only used for comparing vars
 instance == SaplExp
-where == (SaplVar n1 ip1 a1) (SaplVar n2 ip2 a2) = cmpvar (SaplVar n1 ip1 a1) (SaplVar n2 ip2 a2)
-      == _ _ = False  // only used for comparing vars  !!
+where 
+	== (SaplVar n1 ip1 a1) (SaplVar n2 ip2 a2) = cmpvar (SaplVar n1 ip1 a1) (SaplVar n2 ip2 a2)
+    == _ _                                     = False
+
+instance == SaplAnnotation
+where
+	== SA_None   SA_None   = True
+    == SA_Strict SA_Strict = True
+    == _         _         = False
+
+instance toString SaplAnnotation
+where
+	toString SA_None = ""
+	toString SA_Strict = "!"
 
 makeString :: [String] -> String
 makeString [] = ""
@@ -32,38 +52,47 @@ makeString [a:as] = a +++ makeString as
 
 instance toString SaplExp
 where 
- toString e                                 = exp2string False e
-exp2string b (SaplApp left right)           = bracks b (exp2string False left +++ " " +++ exp2string True right)
-exp2string b (SaplInt i)                    = toString i
-exp2string b (SaplReal r)                   = toString r 
-exp2string b (SaplBool v)                   = toString v
-exp2string b (SaplChar c)                   = c 
-exp2string b (SaplString s)                 = s
-exp2string b (SaplFun f)                    = makePrintableName f // makeSaplSysFunc (makePrintableName f)
-exp2string b (AnFunc [] e)                  = exp2string b e
-exp2string b (AnFunc as e)                  = bracks b ("\\" +++ makeArgs as +++ " = " +++ exp2string False e)
-exp2string b (SaplVar n vi a)               = makePrintableName n // debugging
-exp2string b (SaplSelect e ps def)          = bracks b (selectToString (SaplSelect e ps def))
-exp2string b (SaplLet ves body)             = "" +++ bracks b ("let " +++ multiLet ves body) 
-exp2string b (SaplError m)                  = bracks b ("error \"" +++ m +++ "\"")
-exp2string b (SaplABCCode cs)				= "{" +++ makeCodeString cs +++ "}"
+	toString e = exp2string False e
+	where
+		exp2string b (SaplApp left right)   = bracks b (exp2string False left +++ " " +++ exp2string True right)
+		exp2string b (SaplInt i)            = toString i
+		exp2string b (SaplReal r)           = toString r 
+		exp2string b (SaplBool v)           = toString v
+		exp2string b (SaplChar c)           = c 
+		exp2string b (SaplString s)         = s
+		exp2string b (SaplFun f)            = makePrintableName f
+		exp2string b (AnFunc [] e)          = exp2string b e
+		exp2string b (AnFunc as e)          = bracks b ("\\" +++ makeArgs as +++ " = " +++ exp2string False e)
+		exp2string b (SaplVar n vi a)       = makePrintableName n
+		exp2string b (SaplSelect e ps def)  = bracks b (selectToString (SaplSelect e ps def))
+		exp2string b (SaplLet ves body)     = "" +++ bracks b ("let " +++ multiLet ves body) 
+		exp2string b (SaplError m)          = bracks b ("error \"" +++ m +++ "\"")
+		exp2string b (SaplABCCode cs)		= "{" +++ makeCodeString cs +++ "}"
 
-bracks b e | b = "(" +++ e +++ ")" 
-               = e
-              
-multiLet :: [(SaplExp,SaplExp)] SaplExp -> String
-multiLet []        body      =  toString body // empty let
-multiLet [(arg,e)] body      =  toString arg +++ " = " +++ toString e +++ " in " +++ toString body
-multiLet [(arg,e):ves] body  =  toString arg +++ " = " +++ toString e +++ ", " +++ multiLet ves body
+		bracks b e | b = "(" +++ e +++ ")" 
+    		           = e
+        
+        selectToString :: !SaplExp -> String       
+		selectToString (SaplSelect e ps def) = "select " +++ exp2string True e +++ " " +++ dopats ps +++ dodef def
+		where dopats [] = ""
+		      dopats [(MatchCons name,vars,exp):pats] = "(" +++ name +++ makeString [" "+++arg\\ SaplVar arg _ _<- vars] +++ " -> " +++ toString exp +++ ") "
+		                                                 +++ dopats pats
+		      dodef [] = ""
+		      dodef [def] = "(default -> " +++ toString def +++ ")"
+        
+		multiLet :: ![(SaplAnnotation,SaplExp,SaplExp)] !SaplExp -> String
+		multiLet []                          body  =  toString body // empty let
+		multiLet [(annotation, arg, e)]      body  =  toString annotation +++ toString arg +++ " = " +++ toString e +++ " in " +++ toString body
+		multiLet [(annotation, arg, e): ves] body  =  toString annotation +++ toString arg +++ " = " +++ toString e +++ ", " +++ multiLet ves body
+
+		makeCodeString :: ![String] -> String
+		makeCodeString []     = ""
+		makeCodeString [c:cs] = c +++ ";" +++ makeCodeString cs 
 
 makeArgs :: [SaplExp] -> String
-makeArgs [     ]    = ""
+makeArgs []                     = ""
 makeArgs [SaplVar arg _ a]      = " " +++ makePrintableAnnotatedName (toString arg) a
 makeArgs [SaplVar arg _ a:args] = " " +++ makePrintableAnnotatedName (toString arg) a +++ makeArgs args 
-
-makeCodeString :: [String] -> String
-makeCodeString []     = ""
-makeCodeString [c:cs] = c +++ ";" +++ makeCodeString cs 
 
 // Converting Clean like selects (pre-transformed) to Sapl selects
 convertSelects :: [SaplFuncDef] [SaplConsDef] -> [SaplFuncDef]
@@ -126,7 +155,7 @@ replaceDefaults fname nr vs (AnFunc as body)
  # (newbody,newnr,defaults) = replaceDefaults fname nr (as++vs) body
  = (AnFunc as newbody,newnr,defaults)
 replaceDefaults fname nr vs (SaplLet ves body)              // right hand sides let may not contain selects!!   
- # (newbody,newnr,defaults)= replaceDefaults fname nr (map fst ves ++ vs) body
+ # (newbody,newnr,defaults)= replaceDefaults fname nr (map snd3 ves ++ vs) body
  = (SaplLet ves newbody,newnr,defaults)
 replaceDefaults fname nr vs e   = (e,nr,[])
 
@@ -169,7 +198,15 @@ where
 	                -> printApplicGen app_symb kind   app_args  //  does not apply?
 	            _   -> multiApp [SaplFun (getSymbName app_symb) : map cleanExpToSaplExp  app_args]
 	cleanExpToSaplExp (f_exp @ a_exp)                                           = multiApp [cleanExpToSaplExp f_exp: map cleanExpToSaplExp a_exp]
-	cleanExpToSaplExp (Let {let_info_ptr, let_strict_binds, let_lazy_binds, let_expr}) = SaplLet (orderlets (map letToSapl (let_strict_binds ++ reverse let_lazy_binds)))  (cleanExpToSaplExp let_expr)
+
+	cleanExpToSaplExp (Let {let_info_ptr, let_strict_binds, let_lazy_binds, let_expr}) 
+			= SaplLet (orderlets (map letToSapl bindings)) (cleanExpToSaplExp let_expr)
+	where
+		bindings = zip2 (repeat SA_Strict) let_strict_binds ++ 
+				   zip2 (repeat SA_None) (reverse let_lazy_binds)
+		letToSapl (annotation, binding) = (annotation, getFreeVarName binding.lb_dst, cleanExpToSaplExp binding.lb_src)
+		orderlets lts  =  lts // TODO?	
+		
 	cleanExpToSaplExp (Case {case_expr,case_guards,case_default=No})            = genSaplCase case_expr case_guards []
 	cleanExpToSaplExp (Case {case_expr,case_guards,case_default= Yes def_expr}) = genSaplCase case_expr case_guards [def_expr]
 	cleanExpToSaplExp (BasicExpr basic_value)                                   = basicValueToSapl basic_value
@@ -197,12 +234,7 @@ where
 	cleanExpToSaplExp expr                                                      = SaplError "no cleanToSapl for this case"  
 
 
-	printApplicGen app_symb kind args   = multiApp [SaplFun (getSymbName app_symb  +++ "_generic"):map cleanExpToSaplExp args]
-
-	// Converting let expressions
-	letToSapl lb = (getFreeVarName lb.lb_dst,cleanExpToSaplExp lb.lb_src)
-	orderlets lts  =  lts 
-	
+	printApplicGen app_symb kind args   = multiApp [SaplFun (getSymbName app_symb  +++ "_generic"):map cleanExpToSaplExp args]	
 	                                                
 	// Array and Record updates
 	makeArrayUpdate expr1 sels expr2  = SaplApp (makeSelector sels expr1) expr2
@@ -247,7 +279,7 @@ where
 	getName :: Ident -> String
 	getName {id_name} = id_name 
 	
-	//getSymbName ::  SymbIdent -> String
+	getSymbName :: SymbIdent -> String
 	getSymbName symb=:{symb_kind = SK_Function symb_index } = printOverloaded symb.symb_ident  ( symb_index.glob_object) symb_index.glob_module
 	getSymbName symb=:{symb_kind = SK_LocalMacroFunction symb_index }= printGeneratedFunction symb.symb_ident  ( symb_index)
 	getSymbName symb=:{symb_kind = SK_GeneratedFunction _ symb_index }= printGeneratedFunction symb.symb_ident  ( symb_index)
@@ -297,13 +329,6 @@ basicValueToMatchSapl (BVS string)  = MatchString string
 cmpvar  (SaplVar n1 ip1 a1) (SaplVar n2 ip2 a2) | isNilPtr ip1 || isNilPtr ip2 = n1 == n2
 	                                                                           = ip1 == ip2
 
-// Printing select, they do not occur in final Sapl definitions!!
-selectToString (SaplSelect e ps def) = "select " +++ exp2string True e +++ " " +++ dopats ps  +++ dodef def
-where dopats [] = ""
-      dopats [(MatchCons name,vars,exp):pats] = "(" +++ name +++ makeString [" "+++arg\\ SaplVar arg _ _<- vars] +++ " -> " +++ toString exp +++ ") "
-                                                 +++ dopats pats
-      dodef [] = ""
-      dodef [def] = "(default -> " +++ toString def +++ ")"
       
 getVarPrefix varname  =toString (takeWhile (\a -> a <> 'I' && a <> ';') lname)
 where lname = [c\\c <-: varname]      
@@ -313,8 +338,8 @@ renameVars (SaplFuncDef name nrargs args body kind)
  # renargs = renamevars args 0 
  = SaplFuncDef name nrargs (map snd renargs) (doVarRename 1 renargs body) kind
 
-renamevars vars 0 = [(SaplVar v ip a,SaplVar (getVarPrefix v +++ "_" +++ toString k) ip a)\\ (SaplVar v ip a,k) <- zip(vars,[0..])]
-renamevars vars n = [(SaplVar v ip a,SaplVar (getVarPrefix v +++ "_" +++ toString n +++ "_" +++ toString k) ip a)\\ (SaplVar v ip a,k) <- zip(vars,[0..])]
+renamevars vars 0 = [(SaplVar v ip a, SaplVar (getVarPrefix v +++ "_" +++ toString k) ip a) \\ (SaplVar v ip a,k) <- zip(vars,[0..])]
+renamevars vars n = [(SaplVar v ip a, SaplVar (getVarPrefix v +++ "_" +++ toString n +++ "_" +++ toString k) ip a) \\ (SaplVar v ip a,k) <- zip(vars,[0..])]
 
 doVarRename level rens (SaplApp left right)                  = SaplApp (doVarRename level rens left) (doVarRename level rens right)
 doVarRename level rens (AnFunc as e)                         = AnFunc (map snd renargs) (doVarRename (level+1) (renargs++rens) e) where renargs = renamevars as level
@@ -322,30 +347,35 @@ doVarRename level rens (SaplVar n ip a)                      = findvar (SaplVar 
 doVarRename level rens (SaplLet ves body)                    = doletrename level rens [] ves body
 doVarRename level rens e                                     = e
 
-doletrename level rens _ ves body 
- # renletvars = renamevars [v\\(v,_) <- ves] level
- # renletbodies = [doVarRename (level+1) (renletvars++rens) b\\(_,b) <- ves]
- # renlets = [(rv,b)\\ ((v,rv),b) <- zip (renletvars,renletbodies)]
- = removeVarBodyLets (SaplLet renlets (doVarRename (level+1) (renletvars++rens) body))
+doletrename level rens _ bindings body = removeVarBodyLets (SaplLet renlets renbody)	
+where
+	// extract annotations from let bindings
+	annotations   = map fst3 bindings
+	// apply variable renaming to vars of let bindings, bodies of let bindings and body of let
+	renletvars    = renamevars (map snd3 bindings) level
+	renletbodies  = [doVarRename (level+1) (renletvars++rens) b \\ (_, _ ,b) <- bindings]
+	renbody       = doVarRename (level+1) (renletvars++rens) body
+	// zip them again
+	renlets 	  = [(a,rv,b) \\ a <- annotations & (v, rv) <- renletvars & b <- renletbodies]
 
 // Sapl does not allow let's with only a var on the right hand side
-removeVarBodyLets (SaplLet ves body) 
- # rens = varbodies ves
- # novars = nonvarbodies ves
- # (SaplLet ves body) = varrename rens (SaplLet novars body)
- | ves == [] = body  // no lets left
-             = SaplLet ves body
+removeVarBodyLets (SaplLet bindings body) 
+	# (SaplLet bindings body) = varrename varbindings (SaplLet nonvarbindings body)
+	| bindings == [] = body 
+                     = SaplLet bindings body
+where
+	// filter bindings by their body
+	varbindings    = [(var, SaplVar n ip a) \\ (_, var, SaplVar n ip a) <- bindings]
+	nonvarbindings = filter (noVar o thd3) bindings
 
-varbodies ves = [(v,SaplVar n ip a)\\ (v,SaplVar n ip a) <- ves]
-nonvarbodies ves = [(v,e)\\ (v,e) <- ves| noVar e]
-noVar (SaplVar _ _ _) = False
-noVar _               = True
+	noVar (SaplVar _ _ _) = False
+	noVar _               = True
 
 // Simple var renaming
 varrename rens (SaplApp left right)                  = SaplApp (varrename rens left) (varrename rens right)
 varrename rens (AnFunc as e)                         = AnFunc as (varrename rens e)
 varrename rens (SaplVar n ip a)                      = findvar (SaplVar n ip a) (rens++[(SaplVar n ip a,SaplVar n ip a)])
-varrename rens (SaplLet ves body)                    = SaplLet [(v,varrename rens e)\\ (v,e) <- ves] (varrename rens body)
+varrename rens (SaplLet ves body)                    = SaplLet [(a,v,varrename rens e)\\ (a,v,e) <- ves] (varrename rens body)
 varrename rens e                                     = e
 
 findvar (SaplVar n ip a) rens = hd ([renvar\\ (var,renvar) <- rens| cmpvar (SaplVar n ip a) var]++[SaplVar ("error, " +++ n +++ " not found") nilPtr SA_None])
@@ -414,7 +444,7 @@ where
  = (AnFunc as newbody,newnr,newdefs)
 
  rntls top vs nr (SaplLet ves body)   
- # (newbody,newnr,newdefs) = rntls False (map fst ves++vs) nr body                               
+ # (newbody,newnr,newdefs) = rntls False (map snd3 ves++vs) nr body                               
  = (SaplLet ves newbody,newnr,newdefs)
 
  rntls top vs nr exp=:(SaplApp _ _)
