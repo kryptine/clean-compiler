@@ -267,18 +267,14 @@ isGlobalOrClassOrInstanceDefsContext parseContext	:== parseContext bitand (cGlob
 cWantIclFile :== True
 cWantDclFile :== False
 
-wantModule :: !Bool !Ident !Position !Bool !*HashTable !*File !SearchPaths (ModTimeFunction *Files) !*Files
+wantModule :: !*File !{#Char} !Bool !Ident !Position !Bool !*HashTable !*File !*Files
 	-> (!Bool,!Bool,!ParsedModule, !*HashTable, !*File, !*Files)
-wantModule iclmodule file_id=:{id_name} import_file_position support_generics hash_table error searchPaths modtimefunction files
-	= case openScanner id_name file_name_extension searchPaths modtimefunction files of
-		(Yes (scanState, modification_time), files)
-			# hash_table=set_hte_mark (if iclmodule 1 0) hash_table
-			# (ok,dynamic_type_used,mod,hash_table,file,files) = initModule file_name modification_time scanState hash_table error files
-			# hash_table=set_hte_mark 0 hash_table
-			-> (ok,dynamic_type_used,mod,hash_table,file,files)
-		(No, files)
-			-> let mod = { mod_ident = file_id,  mod_modification_time = "", mod_type = MK_None, mod_imports = [], mod_imported_objects = [],mod_foreign_exports=[],mod_defs = [] } in
-			   (False, False, mod, hash_table, error <<< "Error " <<< import_file_position <<< ": "  <<< file_name <<< " could not be imported\n", files)
+wantModule file modification_time iclmodule file_id=:{id_name} import_file_position support_generics hash_table error files
+	# scanState = openScanner file id_name file_name_extension
+	# hash_table=set_hte_mark (if iclmodule 1 0) hash_table
+	# (ok,dynamic_type_used,mod,hash_table,file,files) = initModule file_name modification_time scanState hash_table error files
+	  hash_table=set_hte_mark 0 hash_table
+	= (ok,dynamic_type_used,mod,hash_table,file,files)
 where
 	file_name = id_name +++ file_name_extension
 	file_name_extension = if iclmodule ".icl" ".dcl"
@@ -373,6 +369,13 @@ where
 				# pState		= parseError "want definitions" (Yes token) "End of file" pState
 				  pState		= wantEndOfDefinition "definitions" pState
 				= want_acc_definitions acc pState
+
+moduleCouldNotBeImportedError :: !Bool !Ident !Position !*File -> *File
+moduleCouldNotBeImportedError iclmodule file_id=:{id_name} import_file_position error
+	# file_name_extension = if iclmodule ".icl" ".dcl"
+	  file_name = id_name +++ file_name_extension
+	= error <<< "Error " <<< import_file_position <<< ": "  <<< file_name <<< " could not be imported\n"
+
 /*
 	[Definition] on local and global level
 */

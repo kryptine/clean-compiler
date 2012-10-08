@@ -1629,26 +1629,20 @@ where
 	toString RightAssoc = "infixr "
 	toString NoAssoc	= "infix "
 
-openScanner :: !String !String !SearchPaths (ModTimeFunction *Files) !*Files -> (!Optional (ScanState, {#Char}), !*Files) // state, file time
-openScanner file_name file_name_extension searchPaths modtimefunction files
-	= case fopenInSearchPaths file_name file_name_extension searchPaths FReadData modtimefunction files of
-		(No, files)
-			->	(No, files)
-		(Yes (file, time), files)
-			->  (Yes (ScanState {	ss_input 		= Input
-												{ inp_stream		= InFile file
-									 			, inp_filename		= file_name +++ file_name_extension
-									 			, inp_pos			= {fp_line = 1, fp_col = 0}
-												, inp_tabsize		= 4
-												}
-						,	ss_offsides		=	[(1,False)] // to generate offsides between global definitions
-						,	ss_scanOptions	=	0
-						,	ss_tokenBuffer	=	Buffer0
-						}, time)
-				, files
-				)
+openScanner :: !*File !String !String -> ScanState
+openScanner file file_name file_name_extension
+	= ScanState {	ss_input 		= Input
+										{ inp_stream		= InFile file
+							 			, inp_filename		= file_name +++ file_name_extension
+							 			, inp_pos			= {fp_line = 1, fp_col = 0}
+										, inp_tabsize		= 4
+										}
+				,	ss_offsides		=	[(1,False)] // to generate offsides between global definitions
+				,	ss_scanOptions	=	0
+				,	ss_tokenBuffer	=	Buffer0
+				}
 
-fopenInSearchPaths :: !{#Char} !{#Char} !SearchPaths !Int (ModTimeFunction *f) !*f -> (Optional (*File, {#Char}),!*f) | FileSystem f
+fopenInSearchPaths :: !{#Char} !{#Char} !SearchPaths !Int (ModTimeFunction *Files) !*Files -> (Optional (*File, {#Char}, {#Char}),!*Files) 
 fopenInSearchPaths moduleName fileNameExtension searchPaths mode modtimefunction f
 	# fileName = replace_dots_by_directory_separators moduleName +++ fileNameExtension
 	= case [path \\ (moduleName,path)<-searchPaths.sp_locations | moduleName == fileName] of
@@ -1656,25 +1650,25 @@ fopenInSearchPaths moduleName fileNameExtension searchPaths mode modtimefunction
 			# fullFileName = path +++ fileName
 			# (opened, file, f) = fopen fullFileName mode f
 			| opened
-				-> getModificationTime file fullFileName modtimefunction f
+				-> getModificationTime file path fullFileName modtimefunction f
 				-> (No, f)
 		[]
 			-> fopenAnywhereInSearchPaths fileName searchPaths.sp_paths mode modtimefunction f
 	where
-		fopenAnywhereInSearchPaths :: !{#Char} ![{#Char}] !Int (ModTimeFunction *f) *f -> (Optional (*File, {#Char}),!*f) | FileSystem f
+		fopenAnywhereInSearchPaths :: !{#Char} ![{#Char}] !Int (ModTimeFunction *f) *f -> (Optional (*File, {#Char}, {#Char}),!*f) | FileSystem f
 		fopenAnywhereInSearchPaths fileName [path : paths] mode modtimefunction f
 			# fullFileName = path +++ fileName
 			# (opened, file, f) = fopen fullFileName mode f
 			| opened
-				=	getModificationTime file fullFileName modtimefunction f
+				=	getModificationTime file path fullFileName modtimefunction f
 				=	fopenAnywhereInSearchPaths fileName paths mode modtimefunction f
 		fopenAnywhereInSearchPaths fileName [] _ _ f
 			=	(No, f)
 
-		getModificationTime :: *File {#Char} (ModTimeFunction *f) *f -> (Optional (*File, {#Char}),!*f) | FileSystem f
-		getModificationTime file fullFileName modtimefunction f
+		getModificationTime :: *File {#Char} {#Char} (ModTimeFunction *f) *f -> (Optional (*File, {#Char}, {#Char}),!*f) | FileSystem f
+		getModificationTime file path fullFileName modtimefunction f
 			# (time, f) = modtimefunction fullFileName f
-			=	(Yes (file, time), f)
+			=	(Yes (file, path, time), f)
 
 		replace_dots_by_directory_separators :: !{#Char} -> *{#Char}
 		replace_dots_by_directory_separators file_name

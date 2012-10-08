@@ -1,4 +1,4 @@
-/*
+		/*
 	module owner: Ronny Wichers Schreur
 */
 implementation module frontend
@@ -28,9 +28,13 @@ frontSyntaxTree cached_dcl_macros cached_dcl_mods main_dcl_module_n predef_symbo
 frontEndInterface :: !FrontEndOptions !Ident !SearchPaths !{#DclModule} !*{#*{#FunDef}} !(Optional Bool) !*PredefinedSymbols !*HashTable (ModTimeFunction *Files) !*Files !*File !*File !*File !(Optional *File) !*Heaps
   	-> ( !Optional *FrontEndSyntaxTree,!*{#*{#FunDef}},!{#DclModule},!Int,!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional *File, !*Heaps) 
 frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_macros list_inferred_types predef_symbols hash_table modtimefunction files error io out tcl_file heaps 
-// 	# files = trace_n ("Compiling "+++mod_ident.id_name) files
+	# (opt_file_dir_time,files) = fopenInSearchPaths mod_ident.id_name ".icl" search_paths FReadData modtimefunction files
+	| case opt_file_dir_time of No -> True; _ -> False
+		# error = moduleCouldNotBeImportedError True mod_ident NoPos error
+		= (No,{},{},0,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
+	# (Yes (mod_file,mod_dir,mod_time)) = opt_file_dir_time
 	# (ok,dynamic_type_used,mod,hash_table,error,files)
-		= wantModule cWantIclFile mod_ident NoPos options.feo_generics(hash_table /* ---> ("Parsing:", mod_ident)*/) error search_paths modtimefunction files
+		= wantModule mod_file mod_time cWantIclFile mod_ident NoPos options.feo_generics hash_table error files
 	| not ok
 		= (No,{},{},0,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
 	# cached_module_idents = [dcl_mod.dcl_name \\ dcl_mod<-:cached_dcl_modules]

@@ -10,5 +10,7 @@ import syntax, hashtable, scanner, predef
 cWantIclFile :== True	
 cWantDclFile :== False	
 
-wantModule :: !Bool !Ident !Position !Bool !*HashTable !*File !SearchPaths (ModTimeFunction *Files) !*Files
+wantModule :: !*File !{#Char} !Bool !Ident !Position !Bool !*HashTable !*File !*Files
 	-> (!Bool,!Bool,!ParsedModule, !*HashTable, !*File, !*Files)
+
+moduleCouldNotBeImportedError :: !Bool !Ident !Position !*File -> *File

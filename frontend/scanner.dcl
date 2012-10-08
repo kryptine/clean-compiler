@@ -148,7 +148,9 @@ instance replaceToken ScanState
 class getPosition state :: !*state -> (!FilePosition,!*state)  // Position of current Token (or Char)
 instance getPosition ScanState
 
-openScanner :: !String !String !SearchPaths (ModTimeFunction *Files) !*Files -> (!Optional (ScanState, {#Char}), !*Files) // state, file time
+fopenInSearchPaths :: !{#Char} !{#Char} !SearchPaths !Int (ModTimeFunction *Files) !*Files -> (Optional (*File, {#Char}, {#Char}),!*Files) 
+
+openScanner :: !*File !String !String -> ScanState
 closeScanner :: !ScanState !*Files -> *Files
 
 setUseLayout :: !Bool !ScanState -> ScanState
