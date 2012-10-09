@@ -1037,7 +1037,14 @@ parseAndScanDclModule :: !Ident !Position ![ScannedModule] ![Ident] !SearchPaths
 	-> *(!Bool, ![ScannedModule],!*Files, !*CollectAdmin)
 parseAndScanDclModule dcl_module import_file_position parsed_modules cached_modules searchPaths support_generics support_dynamics modtimefunction files ca
 	# {ca_error, ca_hash_table} = ca
-	# (parse_ok,dynamic_type_used,mod, ca_hash_table, err_file, files) = wantModule cWantDclFile dcl_module import_file_position support_generics ca_hash_table ca_error.pea_file searchPaths modtimefunction files
+	# (opt_file_dir_time,files) = fopenInSearchPaths dcl_module.id_name ".dcl" searchPaths FReadData modtimefunction files
+	| case opt_file_dir_time of No -> True; _ -> False
+		# err_file = moduleCouldNotBeImportedError False dcl_module import_file_position ca_error.pea_file
+		# ca & ca_error={pea_file=err_file,pea_ok=True}
+		= (False, [MakeEmptyModule dcl_module MK_None: parsed_modules],files, ca)
+	# (Yes (mod_file,mod_dir,mod_time)) = opt_file_dir_time
+	# (parse_ok,dynamic_type_used,mod, ca_hash_table, err_file, files)
+		= wantModule mod_file mod_time cWantDclFile dcl_module import_file_position support_generics ca_hash_table ca_error.pea_file files
 	# ca = {ca & ca_hash_table=ca_hash_table, ca_error={pea_file=err_file,pea_ok=True} }
 	| parse_ok
 		= scan_dcl_module dcl_module mod parsed_modules searchPaths modtimefunction files ca
@@ -1128,7 +1135,14 @@ where
 		| module_n_in_cache<>NoIndex
 			= (True,No,module_n_in_cache,[],cached_modules,files,ca)
 		# {ca_error, ca_hash_table} = ca
-		# (parse_ok,dynamic_type_used,mod, hash_table, err_file, /*predefs,*/ files) = wantModule cWantDclFile mod_ident NoPos support_generics ca_hash_table ca_error.pea_file searchPaths modtimefunction files
+		# (opt_file_dir_time,files) = fopenInSearchPaths mod_ident.id_name ".dcl" searchPaths FReadData modtimefunction files
+		| case opt_file_dir_time of No -> True; _ -> False
+			# err_file = moduleCouldNotBeImportedError False mod_ident NoPos ca_error.pea_file
+			# ca & ca_error={pea_file=err_file,pea_ok=True}
+			= (False, No,NoIndex, [],cached_modules, files, ca)
+		# (Yes (mod_file,mod_dir,mod_time)) = opt_file_dir_time
+		# (parse_ok,dynamic_type_used,mod, hash_table, err_file, files)
+			= wantModule mod_file mod_time cWantDclFile mod_ident NoPos support_generics ca_hash_table ca_error.pea_file files
 		# ca = {ca & ca_hash_table=hash_table, ca_error={pea_file=err_file,pea_ok=True}}
 		| not parse_ok
 			= (False, No,NoIndex, [],cached_modules, files, ca)
