@@ -1,6 +1,3 @@
-/*
-	module owner: Ronny Wichers Schreur
-*/
 implementation module compile
 
 import StdEnv
@@ -8,7 +5,6 @@ import frontend
 import backendinterface
 import filesystem, CoclSystemDependent
 import compilerSwitches
-//import RWSDebug
 
 from CoclSystemDependent import DirectorySeparator, ensureCleanSystemFilesExists
 
@@ -34,18 +30,12 @@ splitBy char string
 		stringSize
 			=	size string
 
-getCsfPath :: !String -> !String
-getCsfPath icl_mod_pathname
-	= directoryName icl_mod_pathname +++ "Clean System Files"
-	
-openTclFile :: !Bool !String !*File !*Files -> (!Bool, !Optional .File, !*File, !*Files)
-openTclFile False icl_mod_pathname error files
-	= (True,No,error,files)
-openTclFile compile_for_dynamics icl_mod_pathname error files
+openTclFile :: !String !String !*File !*Files -> (!Bool, !Optional .File, !*File, !*Files)
+openTclFile mod_name mod_path error files
 	# csf_path
-		= getCsfPath icl_mod_pathname
+		= mod_path +++ {DirectorySeparator} +++ "Clean System Files"
 	# tcl_path
-		= csf_path +++ {DirectorySeparator} +++ baseName icl_mod_pathname +++ ".tcl"
+		= csf_path +++ {DirectorySeparator} +++ mod_name +++ ".tcl"
 	# (opened, tcl_file, files)
 		= fopen tcl_path FWriteData files
 	| opened
@@ -248,7 +238,7 @@ openPath path mode files
 		=	fopen path mode files
 
 compileModule :: CoclOptions [{#Char}] *DclCache *Files -> (!Bool,!*DclCache,!*Files)
-compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,predef_symbols,hash_table,heaps} files
+compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,predef_symbols,hash_table,heaps} files	
 	# (opened, error, files)
 		=	openPath options.errorPath options.errorMode files
 	| not opened
@@ -257,34 +247,38 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 		=	openPath options.outPath options.outMode files
 	| not opened
 		=	abort ("couldn't open out file \"" +++ options.outPath +++ "\"\n")
-	# (optional_tcl_opened, tcl_file, error, files)
-		= openTclFile options.compile_for_dynamics options.pathName error files
+	# (opt_file_dir_time,files) = fopenInSearchPaths options.moduleName ".icl" options.searchPaths FReadData fmodificationtime files
+	# (opt_file_dir_time, optional_tcl_opened, tcl_file, error, files)
+		= case opt_file_dir_time of
+			Yes (_,mod_path,_)
+				| options.compile_for_dynamics
+					# (optional_tcl_opened, tcl_file, error, files) = openTclFile options.moduleName mod_path error files
+					-> (opt_file_dir_time, optional_tcl_opened, tcl_file, error, files)
+			_
+				-> 	(opt_file_dir_time, True,No,error,files)
  	| not optional_tcl_opened
-		# (closed, files)
-			=	fclose out files
+		# (closed, files) = fclose out files
 		| not closed
 			=	abort ("couldn't close stdio")
-		# (closed, files)
-			=	fclose error files
+		# (closed, files) = fclose error files
 		| not closed
 			=	abort ("couldn't close out file \"" +++ options.outPath +++ "\"\n")
 		=	(False, cache, files)
-	# (io, files)
-		=	stdio files
+	# (io, files) = stdio files
 	# ({boxed_ident=moduleIdent}, hash_table) = putIdentInHashTable options.moduleName (IC_Module NoQualifiedIdents) hash_table
 	# list_inferred_types
 		=	if (options.listTypes.lto_listTypesKind == ListTypesInferred)
 				(Yes options.listTypes.lto_showAttributes)
 				No
 	# (optionalSyntaxTree,cached_functions_and_macros,cached_dcl_mods,main_dcl_module_n,predef_symbols, hash_table, files, error, io, out,tcl_file,heaps)
-		= frontEndInterface
+		= frontEndInterface opt_file_dir_time
 			{feo_up_to_phase=FrontEndPhaseAll
 			,feo_generics=options.compile_with_generics
 			,feo_fusion=options.compile_with_fusion
 			,feo_dump_core=options.dump_core
 			,feo_strip_unused=options.strip_unused
 			,feo_generate_sapl=options.generate_sapl
-			} moduleIdent options.searchPaths dcl_modules functions_and_macros list_inferred_types predef_symbols hash_table fmodificationtime files error io out tcl_file heaps (getCsfPath options.pathName)
+			} moduleIdent options.searchPaths dcl_modules functions_and_macros list_inferred_types predef_symbols hash_table fmodificationtime files error io out tcl_file heaps
 
 	# unique_copy_of_predef_symbols={predef_symbol\\predef_symbol<-:predef_symbols}
 	# (closed, files)

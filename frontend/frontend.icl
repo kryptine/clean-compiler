@@ -1,16 +1,9 @@
-		/*
-	module owner: Ronny Wichers Schreur
-*/
 implementation module frontend
 
 import scanner, parse, postparse, check, type, trans, partition, convertcases, overloading, utilities, convertDynamics,
 		convertimportedtypes, compilerSwitches, analtypes, generics1,
 		typereify, compare_types, saplinterface
-
-// trace macro
-(-*->) infixl
-(-*->) value trace
-	:==	value // ---> trace
+from CoclSystemDependent import DirectorySeparator
 
 instance == FrontEndPhase where
 	(==) a b
@@ -25,10 +18,9 @@ frontSyntaxTree cached_dcl_macros cached_dcl_mods main_dcl_module_n predef_symbo
 			},cached_dcl_macros,cached_dcl_mods,main_dcl_module_n,predef_symbols,hash_table,files,error,io,out,tcl_file,heaps
 		)
 
-frontEndInterface :: !FrontEndOptions !Ident !SearchPaths !{#DclModule} !*{#*{#FunDef}} !(Optional Bool) !*PredefinedSymbols !*HashTable (ModTimeFunction *Files) !*Files !*File !*File !*File !(Optional *File) !*Heaps !String
-  	-> ( !Optional *FrontEndSyntaxTree,!*{#*{#FunDef}},!{#DclModule},!Int,!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional *File, !*Heaps) 
-frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_macros list_inferred_types predef_symbols hash_table modtimefunction files error io out tcl_file heaps csf_path
-	# (opt_file_dir_time,files) = fopenInSearchPaths mod_ident.id_name ".icl" search_paths FReadData modtimefunction files
+frontEndInterface :: !(Optional (*File,{#Char},{#Char})) !FrontEndOptions !Ident !SearchPaths !{#DclModule} !*{#*{#FunDef}} !(Optional Bool) !*PredefinedSymbols !*HashTable (ModTimeFunction *Files) !*Files !*File !*File !*File !(Optional *File) !*Heaps
+  	-> ( !Optional *FrontEndSyntaxTree,!*{#*{#FunDef}},!{#DclModule},!Int,!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional *File, !*Heaps)
+frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_modules cached_dcl_macros list_inferred_types predef_symbols hash_table modtimefunction files error io out tcl_file heaps
 	| case opt_file_dir_time of No -> True; _ -> False
 		# error = moduleCouldNotBeImportedError True mod_ident NoPos error
 		= (No,{},{},0,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
@@ -193,7 +185,7 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_m
 	#  (stdStrictLists_module_n,predef_symbols) = get_StdStrictLists_module_n predef_symbols
 
 	# (cleanup_info, acc_args, components, fun_defs, var_heap, expression_heap)
-		 = analyseGroups common_defs imported_funs array_instances.ali_instances_range main_dcl_module_n stdStrictLists_module_n (components -*-> "Analyse") fun_defs var_heap expression_heap
+		 = analyseGroups common_defs imported_funs array_instances.ali_instances_range main_dcl_module_n stdStrictLists_module_n components fun_defs var_heap expression_heap
 
 	# (def_max, acc_args)		= usize acc_args
 	# (def_min, fun_defs)		= usize fun_defs
@@ -247,10 +239,10 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_m
 
 //	  (components, fun_defs, out) = showComponents components 0 False fun_defs out
 	# (used_funs, components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap)
-	  		= convertCasesOfFunctions components main_dcl_module_n imported_funs common_defs fun_defs (dcl_types -*-> "Convert cases") used_conses
+	  		= convertCasesOfFunctions components main_dcl_module_n imported_funs common_defs fun_defs dcl_types used_conses
 					var_heap type_heaps expression_heap
 	#!  (dcl_types, type_heaps, var_heap)
-			= convertImportedTypeSpecifications main_dcl_module_n dcl_mods imported_funs common_defs used_conses used_funs (dcl_types -*-> "Convert types") type_heaps var_heap		
+			= convertImportedTypeSpecifications main_dcl_module_n dcl_mods imported_funs common_defs used_conses used_funs dcl_types type_heaps var_heap		
 //	# (components, fun_defs, error)	= showTypes components 0 fun_defs error
 //	# (dcl_mods, out) = showDclModules dcl_mods out
 //	# (components, fun_defs, out) = showComponents components 0 False fun_defs out
@@ -265,8 +257,11 @@ frontEndInterface options mod_ident search_paths cached_dcl_modules cached_dcl_m
 
 	# (files,components,fun_defs) = 
 		case options.feo_generate_sapl of
-    		True = gensaplfiles files dcl_mods dcl_types components fun_defs icl_common common_defs icl_name icl_global_functions csf_path
-    		_	 = (files,components,fun_defs)
+			True
+				# csf_path = mod_dir +++ {DirectorySeparator} +++ "Clean System Files"
+				-> gensaplfiles files dcl_mods dcl_types components fun_defs icl_common common_defs icl_name icl_global_functions csf_path
+    		_
+    			-> (files,components,fun_defs)
 
 	# heaps = {hp_var_heap = var_heap, hp_expression_heap=expression_heap, hp_type_heaps=type_heaps,hp_generic_heap=heaps.hp_generic_heap}
 	# 	fe ={	fe_icl = {icl_functions=fun_defs, icl_function_indices=icl_function_indices, icl_common=icl_common,
