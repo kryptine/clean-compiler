@@ -2325,15 +2325,33 @@ where
 tryBrackSAType :: !ParseState -> (!Bool, SAType, !ParseState)
 tryBrackSAType pState
 	// type of constructor argument
-	# (_, annot, attr, pState)	= optionalAnnotAndAttr pState
-	# (succ, atype, pState) = trySimpleType attr pState
-	= (succ, {s_annotation=annot,s_type=atype}, pState)
+	# (succ, annot, attr, pState) = optionalAnnotAndAttr pState
+	| succ
+		# (token, pState) = nextToken TypeContext pState
+		# (result, atype, pState) = trySimpleTypeT token attr pState
+		# sa_type = {s_annotation=annot,s_type=atype}
+		| result==ParseOk
+			= (True, sa_type, pState)
+		| result==ParseFailWithError
+			= (False, sa_type, pState)
+			= (False, sa_type, parseError "constructor type" (Yes token) "type" pState)
+		# (succ, atype, pState) = trySimpleType attr pState
+		= (succ, {s_annotation=annot,s_type=atype}, pState)
 
 tryBrackSATypeWithPosition :: !ParseState -> (!Bool, SATypeWithPosition, !ParseState)
 tryBrackSATypeWithPosition pState
-	# (_, annot, attr, pState)	= optionalAnnotAndAttrWithPosition pState
-	# (succ, atype, pState) = trySimpleType attr pState
-	= (succ, {sp_annotation=annot,sp_type=atype}, pState)
+	# (succ, annot, attr, pState) = optionalAnnotAndAttrWithPosition pState
+	| succ
+		# (token, pState) = nextToken TypeContext pState
+		# (result, atype, pState) = trySimpleTypeT token attr pState
+		# sa_type_wp = {sp_annotation=annot,sp_type=atype}
+		| result==ParseOk
+			= (True, sa_type_wp, pState)
+		| result==ParseFailWithError
+			= (False, sa_type_wp, pState)
+			= (False, sa_type_wp, parseError "symbol type" (Yes token) "type" pState)
+		# (succ, atype, pState) = trySimpleType attr pState
+		= (succ, {sp_annotation=annot,sp_type=atype}, pState)
 
 instance want AType
 where
@@ -2464,10 +2482,16 @@ tryBrackAType pState
 	# (_, attr, pState)	= warnAnnotAndOptionalAttr pState
 	= trySimpleType attr pState
 
+:: ParseResult :== Int
+ParseOk:==0
+ParseFailWithError:==1
+ParseFailWithoutError:==2
+
 trySimpleType :: !TypeAttribute !ParseState -> (!Bool, !AType, !ParseState)
 trySimpleType attr pState
 	# (token, pState)		= nextToken TypeContext pState
-	= trySimpleTypeT token attr pState
+	# (result,atype,pState) = trySimpleTypeT token attr pState
+	= (result==ParseOk,atype,pState)
 
 is_tail_strict_list_or_nil pState
 	# (square_close_position, pState) = getPosition pState
@@ -2482,15 +2506,15 @@ is_tail_strict_list_or_nil pState
 		= (True,pState)
 		= (False,pState)
 
-trySimpleTypeT :: !Token !TypeAttribute !ParseState -> (!Bool, !AType, !ParseState)
+trySimpleTypeT :: !Token !TypeAttribute !ParseState -> (!ParseResult, !AType, !ParseState)
 trySimpleTypeT (IdentToken id) attr pState
 	| isLowerCaseName id
 		# (typevar, pState)	= nameToTypeVar id pState
 		  (attr, pState)	= adjustAttribute attr typevar pState
-		= (True, {at_attribute = attr, at_type = typevar}, pState)
+		= (ParseOk, {at_attribute = attr, at_type = typevar}, pState)
 	| otherwise // | isUpperCaseName id || isFunnyIdName id
 	# (type, pState) = stringToType id pState
-	= (True, {at_attribute = attr, at_type = type}, pState)
+	= (ParseOk, {at_attribute = attr, at_type = type}, pState)
 trySimpleTypeT SquareOpenToken attr pState
 	# (token, pState) = nextToken TypeContext pState
 	# (head_strictness,token,pState) = wantHeadStrictness token pState
@@ -2509,34 +2533,34 @@ trySimpleTypeT SquareOpenToken attr pState
 			# (tail_strict,pState) = is_tail_strict_list_or_nil pState
 			| tail_strict
 				# list_symbol = makeTailStrictListTypeSymbol HeadLazy 0
-		  		= (True, {at_attribute = attr, at_type = TA list_symbol []}, pState)					
+		  		= (ParseOk, {at_attribute = attr, at_type = TA list_symbol []}, pState)					
 				# list_symbol = makeListTypeSymbol head_strictness 0
-		  		= (True, {at_attribute = attr, at_type = TA list_symbol []}, pState)
+		  		= (ParseOk, {at_attribute = attr, at_type = TA list_symbol []}, pState)
 		# list_symbol = makeListTypeSymbol head_strictness 0
-  		= (True, {at_attribute = attr, at_type = TA list_symbol []}, pState)
+  		= (ParseOk, {at_attribute = attr, at_type = TA list_symbol []}, pState)
 
 	| token==ExclamationToken
 		# (token,pState) = nextToken TypeContext pState
 		| token==SquareCloseToken
 			# list_symbol = makeTailStrictListTypeSymbol head_strictness 0
-  			= (True, {at_attribute = attr, at_type = TA list_symbol []}, pState)
-			= (False, {at_attribute = attr, at_type = TE}, parseError "List type" (Yes token) "]" pState)
+  			= (ParseOk, {at_attribute = attr, at_type = TA list_symbol []}, pState)
+			= (ParseFailWithError, {at_attribute = attr, at_type = TE}, parseError "List type" (Yes token) "]" pState)
 
 	# (type, pState)	= wantAType (tokenBack pState)
 	  (token, pState)	= nextToken TypeContext pState
 	| token == SquareCloseToken
 		# list_symbol = makeListTypeSymbol head_strictness 1
-		= (True, {at_attribute = attr, at_type = TA list_symbol [type]}, pState)
+		= (ParseOk, {at_attribute = attr, at_type = TA list_symbol [type]}, pState)
 
 	| token==ExclamationToken
 		# (token,pState) = nextToken TypeContext pState
 		| token==SquareCloseToken
 			# list_symbol = makeTailStrictListTypeSymbol head_strictness 1
-			= (True, {at_attribute = attr, at_type = TA list_symbol [type]}, pState)
-			= (False, {at_attribute = attr, at_type = TE}, parseError "List type" (Yes token) "]" pState)
+			= (ParseOk, {at_attribute = attr, at_type = TA list_symbol [type]}, pState)
+			= (ParseFailWithError, {at_attribute = attr, at_type = TE}, parseError "List type" (Yes token) "]" pState)
 
 	// otherwise // token <> SquareCloseToken
-		= (False, {at_attribute = attr, at_type = TE}, parseError "List type" (Yes token) "]" pState)
+		= (ParseFailWithError, {at_attribute = attr, at_type = TE}, parseError "List type" (Yes token) "]" pState)
 trySimpleTypeT OpenToken attr pState
 	# (token, pState) = nextToken TypeContext pState
 	= trySimpleTypeT_after_OpenToken token attr pState
@@ -2544,51 +2568,51 @@ trySimpleTypeT CurlyOpenToken attr pState
 	# (token, pState) = nextToken TypeContext pState
 	| token == CurlyCloseToken
 		# array_symbol = makeLazyArraySymbol 0
-		= (True, {at_attribute = attr, at_type = TA array_symbol []}, pState)
+		= (ParseOk, {at_attribute = attr, at_type = TA array_symbol []}, pState)
 	| token == HashToken
 		# (token, pState) = nextToken TypeContext pState
 		| token == CurlyCloseToken
 			# array_symbol = makeUnboxedArraySymbol 0
-			= (True, {at_attribute = attr, at_type = TA array_symbol []}, pState)
+			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol []}, pState)
 		// otherwise // token <> CurlyCloseToken
 	  		# (atype, pState)			= wantAType (tokenBack pState)
   			  pState					= wantToken TypeContext "unboxed array type" CurlyCloseToken pState
   			  array_symbol = makeUnboxedArraySymbol 1
-  			= (True, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
+  			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
 	| token == ExclamationToken
 		# (token, pState) = nextToken TypeContext pState
 		| token == CurlyCloseToken
 			# array_symbol = makeStrictArraySymbol 0
-			= (True,  {at_attribute = attr, at_type = TA array_symbol []}, pState)
+			= (ParseOk,  {at_attribute = attr, at_type = TA array_symbol []}, pState)
 		// otherwise // token <> CurlyCloseToken
 	  		# (atype,pState)			= wantAType (tokenBack pState)
   			  pState					= wantToken TypeContext "strict array type" CurlyCloseToken pState
   			  array_symbol = makeStrictArraySymbol 1
-  			= (True, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
+  			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
   	// otherwise
   		# (atype,pState)			= wantAType (tokenBack pState)
   		  pState					= wantToken TypeContext "lazy array type" CurlyCloseToken pState
 		  array_symbol = makeLazyArraySymbol 1
-		= (True, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
+		= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
 trySimpleTypeT StringTypeToken attr pState
 	# type = makeStringType
-	= (True, {at_attribute = attr, at_type = type}, pState)
+	= (ParseOk, {at_attribute = attr, at_type = type}, pState)
 trySimpleTypeT (QualifiedIdentToken module_name ident_name) attr pState
 	| not (isLowerCaseName ident_name)
 		# (module_id, pState) = stringToQualifiedModuleIdent module_name ident_name IC_Type pState
 		# type = TQualifiedIdent module_id ident_name []
-		= (True, {at_attribute = attr, at_type = type}, pState)
+		= (ParseOk, {at_attribute = attr, at_type = type}, pState)
 trySimpleTypeT token attr pState
 	# (bt, pState) = try token pState
 	= case bt of
-		Yes bt	-> (True , {at_attribute = attr, at_type = TB bt}, pState)
-		no		-> (False, {at_attribute = attr, at_type = TE}   , pState)
+		Yes bt	-> (ParseOk , {at_attribute = attr, at_type = TB bt}, pState)
+		no		-> (ParseFailWithoutError, {at_attribute = attr, at_type = TE}   , pState)
 
-trySimpleTypeT_after_OpenToken :: !Token !TypeAttribute !ParseState -> (!Bool, !AType, !ParseState)
+trySimpleTypeT_after_OpenToken :: !Token !TypeAttribute !ParseState -> (!ParseResult, !AType, !ParseState)
 trySimpleTypeT_after_OpenToken CommaToken attr pState
 	# (tup_arity, pState)		= determine_arity_of_tuple 2 pState
 	  tuple_symbol = makeTupleTypeSymbol tup_arity 0
-	= (True, {at_attribute = attr, at_type = TA tuple_symbol []}, pState)	
+	= (ParseOk, {at_attribute = attr, at_type = TA tuple_symbol []}, pState)	
   where
 	determine_arity_of_tuple :: !Int !ParseState -> (!Int, !ParseState)
 	determine_arity_of_tuple arity pState
@@ -2601,8 +2625,8 @@ trySimpleTypeT_after_OpenToken CommaToken attr pState
 trySimpleTypeT_after_OpenToken ArrowToken attr pState
 	# (token, pState) = nextToken TypeContext pState
 	| token == CloseToken
-		= (True, {at_attribute = attr, at_type = TArrow}, pState)
-		= (False,{at_attribute = attr, at_type = TE},
+		= (ParseOk, {at_attribute = attr, at_type = TArrow}, pState)
+		= (ParseFailWithError,{at_attribute = attr, at_type = TE},
 			parseError "arrow type" (Yes token) ")" pState)
 trySimpleTypeT_after_OpenToken token attr pState
 	# (annot_with_pos,atype, pState) = wantAnnotatedATypeWithPosition (tokenBack pState)
@@ -2613,7 +2637,7 @@ trySimpleTypeT_after_OpenToken_and_type CloseToken annot_with_pos atype attr pSt
 	# type				= atype.at_type
 	  (attr, pState)	= determAttr  attr  atype.at_attribute type pState
 	  pState = warnIfStrictAnnot annot_with_pos pState
-	= (True, {at_attribute = attr, at_type = type}, pState)
+	= (ParseOk, {at_attribute = attr, at_type = type}, pState)
 trySimpleTypeT_after_OpenToken_and_type CommaToken annot_with_pos atype attr pState
 	// TupleType
 	# (satypes, pState)	= wantSequence CommaToken TypeContext pState
@@ -2621,9 +2645,9 @@ trySimpleTypeT_after_OpenToken_and_type CommaToken annot_with_pos atype attr pSt
 	  satypes			= [{s_annotation=(case annot_with_pos of NoAnnot -> AN_None; StrictAnnotWithPosition _ -> AN_Strict),s_type=atype}:satypes]
 	  arity				= length satypes
  	  tuple_symbol = makeTupleTypeSymbol arity arity
-	= (True, {at_attribute = attr, at_type = TAS tuple_symbol (atypes_from_satypes satypes) (strictness_from_satypes satypes)}, pState)
+	= (ParseOk, {at_attribute = attr, at_type = TAS tuple_symbol (atypes_from_satypes satypes) (strictness_from_satypes satypes)}, pState)
 trySimpleTypeT_after_OpenToken_and_type token annot_with_pos atype attr pState
-	= (False, atype, parseError "Simple type" (Yes token) "')' or ','" pState)
+	= (ParseFailWithError, atype, parseError "Simple type" (Yes token) "')' or ','" pState)
 
 instance try BasicType
 where
