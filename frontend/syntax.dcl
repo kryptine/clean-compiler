@@ -412,13 +412,14 @@ cNameLocationDependent :== True
 :: GenericInfo = 
 	{	gen_classes		:: !GenericClassInfos
 	,	gen_var_kinds	:: ![TypeKind]  	// kinds of all st_vars of the gen_type
-	,	gen_OBJECT_CONS_FIELD_indices	:: !{#OBJECT_CONS_FIELD_index}
+	,	gen_rep_conses	:: !{#GenericRepresentationConstructor}
+	//	OBJECT, CONS, RECORD, FIELD
 	}
 
-::	OBJECT_CONS_FIELD_index =
-	{	ocf_module	:: !Int
-	,	ocf_index	:: !Int
-	,	ocf_ident	:: !Ident
+::	GenericRepresentationConstructor =
+	{	gcf_module	:: !Int
+	,	gcf_index	:: !Int
+	,	gcf_ident	:: !Ident
 	}
 
 :: GenericInfoPtr :== Ptr GenericInfo	
@@ -576,6 +577,7 @@ NoGlobalIndex :== {gi_module=NoIndex,gi_index=NoIndex}
 	| GTSAppVar TypeVar [GenTypeStruct] 
 	| GTSVar TypeVar
  	| GTSCons DefinedSymbol GenTypeStruct
+ 	| GTSRecord DefinedSymbol GenTypeStruct
  	| GTSField DefinedSymbol GenTypeStruct
  	| GTSObject DefinedSymbol GenTypeStruct
 	| GTSPair !GenTypeStruct !GenTypeStruct		// for optimizing bimaps

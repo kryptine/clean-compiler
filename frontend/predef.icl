@@ -182,17 +182,16 @@ predefined_idents
 					[PD_ConsPAIR] = i "PAIR",					
 					[PD_TypeCONS] = i "CONS",
 					[PD_ConsCONS] = i "CONS",
+					[PD_TypeRECORD] = i "RECORD",
+					[PD_ConsRECORD] = i "RECORD",
 					[PD_TypeFIELD] = i "FIELD",
 					[PD_ConsFIELD] = i "FIELD",
 					[PD_TypeOBJECT] = i "OBJECT",
 					[PD_ConsOBJECT] = i "OBJECT",
-					[PD_GenericInfo] = i "GenericInfo",
-					[PD_NoGenericInfo] = i "NoGenericInfo",
-					[PD_GenericConsInfo] = i "GenericConsInfo",
-					[PD_GenericFieldInfo] = i "GenericFieldInfo",
-					[PD_GenericTypeInfo] = i "GenericTypeDefInfo",
-//					[PD_TGenericConsDescriptor] = i "GenericConsDescriptor",
+					[PD_TGenericConsDescriptor] = i "GenericConsDescriptor",
 					[PD_CGenericConsDescriptor] = i "_GenericConsDescriptor",
+					[PD_TGenericRecordDescriptor] = i "GenericRecordDescriptor",
+					[PD_CGenericRecordDescriptor] = i "_GenericRecordDescriptor",
 					[PD_TGenericFieldDescriptor] = i "GenericFieldDescriptor",
 					[PD_CGenericFieldDescriptor] = i "_GenericFieldDescriptor",
 					[PD_TGenericTypeDefDescriptor] = i "GenericTypeDefDescriptor",
@@ -248,7 +247,6 @@ predefined_idents
 					[PD_FromThenToU]= i "_from_then_to_u",
 					[PD_FromThenToUTS]= i "_from_then_to_uts",
 					[PD_FromThenToO]= i "_from_then_to_o"
-
 		}
 	=: idents
 	where

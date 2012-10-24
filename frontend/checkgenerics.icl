@@ -44,7 +44,7 @@ where
 		# initial_info = 
 			{ gen_classes = createArray 32 []
 			, gen_var_kinds = []
-			, gen_OBJECT_CONS_FIELD_indices = createArray 3 {ocf_module = -1,ocf_index = -1,ocf_ident={id_name="",id_info=nilPtr}}
+			, gen_rep_conses = createArray 4 {gcf_module = -1,gcf_index = -1,gcf_ident={id_name="",id_info=nilPtr}}
 			}
 		# (gen_info_ptr, hp_generic_heap) = newPtr initial_info hp_generic_heap 
 		= (	{gen_def & gen_info_ptr = gen_info_ptr}, 
