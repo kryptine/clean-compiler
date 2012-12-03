@@ -4878,6 +4878,10 @@ where
 	// outermost closure gets TA_Multi attribute
 	curry [] res av_num th_attrs
 		= (res, [], av_num, th_attrs)
+	curry [arg=:{at_attribute=TA_Multi}:args] res av_num th_attrs
+		#! (res, avs, av_num, th_attrs) = curry args res av_num th_attrs
+		#! atype = {at_attribute = TA_Multi, at_type = arg --> res}
+		= (atype, avs, av_num, th_attrs)
 	curry [arg:args] res av_num th_attrs
 		#! (res, avs, av_num, th_attrs) = curry1 args res av_num th_attrs
  		#! atype = makeAType (arg --> res) TA_Multi
