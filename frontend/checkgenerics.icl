@@ -155,6 +155,8 @@ where
 	where
 		check_dependency gen_dep=:{gd_ident, gd_vars} (acc, (gen_defs, modules, cs))
 			# (gen_dep, cs) = resolve_dependency_index gen_dep cs
+			| gen_dep.gd_index.gi_index < 0
+				= (acc, (gen_defs, modules, cs))
 			# (gen_dep=:{gd_index, gd_vars}, gen_defs, modules, cs) = check_dependency_vars gen_dep gen_defs modules cs
 			| gd_index.gi_index == index && gd_index.gi_module == mod_index && gd_vars == gen_vars
 				= (acc, (gen_defs, modules, check_generic_dep_error gd_ident "already implicitly depends on itself" cs))
