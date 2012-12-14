@@ -1501,7 +1501,7 @@ toTypeCodeConstructor type=:{glob_object=type_index, glob_module=module_index} c
 			=	fatal "toTypeCodeConstructor" ("no function (" +++ type.td_ident.id_name +++ ")")
 		// ... sanity check
 		# type_fun
-			=	{	symb_ident = {type.td_ident & id_info = nilPtr} // this is wrong but let's give it a try
+			=	{	symb_ident = {id_name = "TD;"+++type.td_ident.id_name, id_info = nilPtr}
 				,	symb_kind = SK_Function {glob_module = module_index, glob_object = td_fun_index}
 				}
 		= GTT_Constructor type_fun
