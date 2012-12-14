@@ -186,7 +186,7 @@ CleanFunctoSaplFunc  :: Int Int FunDef  [String] String {#DclModule} [IndexRange
 CleanFunctoSaplFunc modindex funindex 
                     {fun_ident,fun_body=TransformedBody {tb_args,tb_rhs},fun_info={fi_free_vars,fi_local_vars,fi_def_level,fi_calls},fun_type,fun_kind} 
                     mns mymod dcl_mods icl_function_indices
-        = SaplFuncDef (mymod +++ "." +++ makeFuncName -1 (getName fun_ident) 0 funindex dcl_mods icl_function_indices mymod mns) //(getName fun_ident) +++ toString funindex)   
+        = SaplFuncDef (mymod +++ "." +++ makeFuncName -1 (getName fun_ident) 0 funindex dcl_mods icl_function_indices mymod mns)  
                        (length tb_args) (counterMap (getFreeFuncArgName (getStrictnessList fun_type)) tb_args 0)  
                        (cleanExpToSaplExp tb_rhs) fun_kind
 
@@ -268,36 +268,39 @@ where
                        = SaplVar (toString fv_ident) fv_info_ptr SA_Strict
 	getFreeFuncArgName strictness {fv_ident,fv_info_ptr,fv_count} c
                        = SaplVar (toString fv_ident) fv_info_ptr SA_None
-                                  
+                              
+	// FreeVar e.g. the name of a let binding                                  
 	getFreeVarName :: FreeVar -> SaplExp 
 	getFreeVarName {fv_ident,fv_info_ptr,fv_count} = SaplVar (toString fv_ident) fv_info_ptr SA_None 
 	                                                                                    
 	ptrToString ptr = toString (ptrToInt ptr)
 	
-	getBoundVarName{var_ident,var_info_ptr,var_expr_ptr} = SaplVar (toString var_ident ) var_info_ptr SA_None
+	getBoundVarName{var_ident,var_info_ptr,var_expr_ptr} = SaplVar (toString var_ident) var_info_ptr SA_None
 	
+	// Function names at declaratio (on the left)
 	getName :: Ident -> String
-	getName {id_name} = id_name 
+	getName {id_name} = id_name
 	
 	getSymbName :: SymbIdent -> String
-	getSymbName symb=:{symb_kind = SK_Function symb_index } = printOverloaded symb.symb_ident  ( symb_index.glob_object) symb_index.glob_module
-	getSymbName symb=:{symb_kind = SK_LocalMacroFunction symb_index }= printGeneratedFunction symb.symb_ident  ( symb_index)
-	getSymbName symb=:{symb_kind = SK_GeneratedFunction _ symb_index }= printGeneratedFunction symb.symb_ident  ( symb_index)
-	getSymbName symb=:{symb_kind = SK_LocalDclMacroFunction symb_index }= printOverloaded symb.symb_ident  ( symb_index.glob_object) symb_index.glob_module//= file <<< symb.symb_ident <<<  "[ldm]@" <<< symb_index
-	getSymbName symb=:{symb_kind = SK_OverloadedFunction symb_index }= printOverloaded symb.symb_ident  ( symb_index.glob_object) symb_index.glob_module//=  file <<< symb.symb_ident <<<  "[o]@" <<< symb_index
-	getSymbName symb=:{symb_kind = SK_Constructor symb_index } = printConsName symb.symb_ident  ( symb_index.glob_object) symb_index.glob_module
-	getSymbName symb             = getName symb.symb_ident 
+	getSymbName symb=:{symb_kind = SK_Function symb_index} = printOverloaded symb.symb_ident symb_index.glob_object symb_index.glob_module
+	getSymbName symb=:{symb_kind = SK_LocalMacroFunction symb_index} = printGeneratedFunction symb.symb_ident symb_index
+	getSymbName symb=:{symb_kind = SK_GeneratedFunction _ symb_index} = printGeneratedFunction symb.symb_ident symb_index
+	getSymbName symb=:{symb_kind = SK_LocalDclMacroFunction symb_index} = printOverloaded symb.symb_ident symb_index.glob_object symb_index.glob_module
+	getSymbName symb=:{symb_kind = SK_OverloadedFunction symb_index} = printOverloaded symb.symb_ident symb_index.glob_object symb_index.glob_module
+	getSymbName symb=:{symb_kind = SK_Constructor symb_index} = printConsName symb.symb_ident symb_index.glob_object symb_index.glob_module
+	getSymbName symb             = getName symb.symb_ident
 	
+	// For example: test._f3_3
 	printGeneratedFunction symbol symb_index  = decsymbol (toString symbol)
 	where decsymbol s                         = mymod +++ "."  +++ makeFuncName 0 s 0 symb_index dcl_mods icl_function_indices mymod mns 
-//	where decsymbol s                         = mymod +++ "."  +++ makeName s   +++ symb_index 
 	
+	// Normal case
 	printOverloaded symbol symb_index modnr   = decsymbol (toString symbol)
 	where decsymbol s | startsWith "c;" s     = mymod +++ "._lc_"  +++ toString symb_index 
 	                  | startsWith "g_c;" s   = mymod +++ "._lc_"  +++ toString symb_index 
-	                                          = makemod modnr +++ makeFuncName 0 s modnr symb_index dcl_mods icl_function_indices  mymod mns
-//	                                          = makemod modnr +++ makeName s   +++ toString symb_index 
-	printConsName symbol symb_index modnr     = makemod modnr +++  toString symbol
+	                                          = makemod modnr +++ makeFuncName 0 s modnr symb_index dcl_mods icl_function_indices mymod mns
+
+	printConsName symbol symb_index modnr     = makemod modnr +++ toString symbol
 	
 	getmodnr sym = sym.glob_module
 	makemod n =  mns!! n +++ "."
@@ -384,7 +387,7 @@ makeFuncName current_mod name mod_index func_index dcl_mods ranges mymod mns
               | name.[0] == '\\' = "anon_" +++ toString func_index
               | startsWith "c;" name = "_lc_" +++ toString func_index
               | startsWith "g_" name = "_lc_" +++ toString func_index
-              // FIXME: exception? heuristic for the TD;D case
+              // used for dynamic desription, there is only one per type, no need for numbering
               | startsWith "TD;" name = name
                                      = genFunctionExtension  current_mod name mod_index func_index dcl_mods ranges mymod mns
                                  
@@ -478,6 +481,7 @@ where
 
 
 // Which functions must be extended with a number 
+genFunctionExtension :: !Int !String !Int !Int {#DclModule} [IndexRange] !String ![String] -> String
 genFunctionExtension current_mod name mod_index func_index dcl_mods ranges mymod mns
 | current_mod == -1 || mns!!mod_index == mymod = genFunctionExtForMain name func_index ranges
                            = genFunctionExtForDCL name mod_index func_index dcl_mods
