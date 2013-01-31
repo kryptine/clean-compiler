@@ -21,7 +21,7 @@ where
 
 instance toString FunKind
 where 
-	toString FK_Macro = " :== "
+	toString FK_Macro = " = "
 	toString FK_Caf = " =: "
 	toString x = " = "
 
