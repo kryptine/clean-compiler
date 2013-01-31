@@ -1,6 +1,6 @@
 definition module gensapl
 
-import StdEnv,syntax,transform  
+import StdEnv,syntax,transform,backend
   
 :: SaplAnnotation = SA_None | SA_Strict  
   
@@ -26,5 +26,5 @@ convertSelects :: [SaplFuncDef] [SaplConsDef] -> [SaplFuncDef]
 renameVars :: SaplFuncDef -> SaplFuncDef
 checkIfSelect :: SaplFuncDef -> [SaplFuncDef]
 
-CleanFunctoSaplFunc  :: Int Int FunDef  [String] String  {#DclModule} [IndexRange] -> SaplFuncDef
+CleanFunctoSaplFunc  :: Int Int FunDef  [String] String  {#DclModule} [IndexRange] !*BackEnd -> *(!*BackEnd, !SaplFuncDef)
 

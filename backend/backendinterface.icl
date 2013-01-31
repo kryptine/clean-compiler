@@ -10,6 +10,7 @@ import backend
 import backendpreprocess, backendsupport, backendconvert
 import Version
 import partition
+import saplinterface
 
 checkVersion :: VersionsCompatability *File -> (!Bool, !*File)
 checkVersion VersionsAreCompatible errorFile
@@ -23,8 +24,9 @@ checkVersion VersionObservedIsTooOld errorFile
 			=	fwrites "Error: the back end library is too old\n" errorFile
 	=	(False, errorFile)
 
-backEndInterface :: !{#Char} [{#Char}] !ListTypesOption !{#Char} !PredefinedSymbols !FrontEndSyntaxTree !Int !*VarHeap !*AttrVarHeap !*File !*File -> (!Bool, !*VarHeap, !*AttrVarHeap, !*File, !*File)
-backEndInterface outputFileName commandLineArgs listTypes typesPath predef_symbols syntaxTree=:{fe_icl,fe_components,fe_dcls} main_dcl_module_n var_heap attrHeap errorFile outFile
+backEndInterface :: !{#Char} [{#Char}] !ListTypesOption !{#Char} !PredefinedSymbols !FrontEndSyntaxTree !Int !*VarHeap !*AttrVarHeap !*(Optional *File) !*File !*File -> (!Bool, !*VarHeap, !*AttrVarHeap, !*(Optional *File), !*File, !*File)
+backEndInterface outputFileName commandLineArgs listTypes typesPath predef_symbols syntaxTree=:{fe_icl,fe_components,fe_dcls} main_dcl_module_n var_heap attrHeap sapl_file errorFile outFile
+
 	# (observedCurrent, observedOldestDefinition, observedOldestImplementation)
 		=	BEGetVersion
 	  observedVersion =
@@ -46,7 +48,7 @@ backEndInterface outputFileName commandLineArgs listTypes typesPath predef_symbo
 	# (compatible, errorFile)
 		=	checkVersion (versionCompare expectedVersion observedVersion) errorFile
 	| not compatible
-		=	(False, var_heap, attrHeap, errorFile, outFile)
+		=	(False, var_heap, attrHeap, sapl_file, errorFile, outFile)
 	# varHeap
 		=	backEndPreprocess predefined_idents.[PD_DummyForStrictAliasFun] functionIndices fe_icl var_heap
 		with
@@ -73,13 +75,41 @@ backEndInterface outputFileName commandLineArgs listTypes typesPath predef_symbo
 		=	backEndConvertModules predef_symbols syntaxTree main_dcl_module_n varHeap attrHeap backEnd
 	# (success, backEnd)
 		=	BEGenerateCode outputFileName backEnd
+		
+	# (sapl_file, backEnd) = 
+		case sapl_file of
+
+			(Yes file)
+				
+				# common_defs
+					 = {{dcl_common
+						    \\ {dcl_common} <-: syntaxTree.fe_dcls } & [main_dcl_module_n] = syntaxTree.fe_icl.icl_common }				
+								
+				# (file, backEnd) = 
+						
+						gensaplfiles 
+							syntaxTree.fe_dcls // dcl_mods 
+							syntaxTree.fe_components // components 
+							syntaxTree.fe_icl.icl_functions // fun_defs 
+							syntaxTree.fe_icl.icl_common // icl_common 
+							common_defs 
+							syntaxTree.fe_icl.icl_name // icl_name 
+							syntaxTree.fe_icl.icl_function_indices.ifi_global_function_indices // icl_global_functions 
+							file backEnd
+
+				-> (Yes file, backEnd)
+    		_
+    			-> (sapl_file, backEnd)
+		
+		
+		
 	# backEnd
 		=	BECloseFiles backEnd
 	# (attrHeap, outFile, backEnd)
 		=	optionallyPrintFunctionTypes listTypes typesPath (DictionaryToClassInfo main_dcl_module_n fe_icl fe_dcls) fe_components fe_icl.icl_functions attrHeap outFile backEnd
 	# backEndFiles
 		=	BEFree backEnd backEndFiles
-	=	(backEndFiles == 0 && success, var_heap, attrHeap, errorFile, outFile)
+	=	(backEndFiles == 0 && success, var_heap, attrHeap, sapl_file, errorFile, outFile)
 
 :: DictionaryToClassInfo =
 	{	dtci_iclModuleIndex :: Int

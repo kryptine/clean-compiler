@@ -2,7 +2,7 @@ implementation module frontend
 
 import scanner, parse, postparse, check, type, trans, partition, convertcases, overloading, utilities, convertDynamics,
 		convertimportedtypes, compilerSwitches, analtypes, generics1,
-		typereify, compare_types, saplinterface
+		typereify, compare_types
 from CoclSystemDependent import DirectorySeparator
 
 instance == FrontEndPhase where
@@ -254,14 +254,6 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 	| ok<>ok
 		= abort "";
 */
-
-	# (files,components,fun_defs) = 
-		case options.feo_generate_sapl of
-			True
-				# csf_path = mod_dir +++ {DirectorySeparator} +++ "Clean System Files"
-				-> gensaplfiles files dcl_mods dcl_types components fun_defs icl_common common_defs icl_name icl_global_functions csf_path
-    		_
-    			-> (files,components,fun_defs)
 
 	# heaps = {hp_var_heap = var_heap, hp_expression_heap=expression_heap, hp_type_heaps=type_heaps,hp_generic_heap=heaps.hp_generic_heap}
 	# 	fe ={	fe_icl = {icl_functions=fun_defs, icl_function_indices=icl_function_indices, icl_common=icl_common,

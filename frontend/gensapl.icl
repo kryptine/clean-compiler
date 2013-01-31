@@ -3,7 +3,7 @@ implementation module gensapl
 // Generation of Sapl definition from Clean definition
 // JMJ: May 2007
 
-import StdEnv, syntax, transform, StdDebug
+import StdEnv, syntax, transform, backend, backendinterface
 
 instance toString SaplConsDef  
 where 
@@ -182,13 +182,25 @@ counterMap f [] c = []
 counterMap f [x:xs] c = [f x c : counterMap f xs (c+1)]
 
 // Converting a single Clean function to a Sapl function (case is only pre-transformed)
-CleanFunctoSaplFunc  :: Int Int FunDef  [String] String {#DclModule} [IndexRange] -> SaplFuncDef 
+CleanFunctoSaplFunc  :: Int Int FunDef  [String] String {#DclModule} [IndexRange] !*BackEnd -> *(!*BackEnd, !SaplFuncDef)
 CleanFunctoSaplFunc modindex funindex 
                     {fun_ident,fun_body=TransformedBody {tb_args,tb_rhs},fun_info={fi_free_vars,fi_local_vars,fi_def_level,fi_calls},fun_type,fun_kind} 
-                    mns mymod dcl_mods icl_function_indices
-        = SaplFuncDef (mymod +++ "." +++ makeFuncName -1 (getName fun_ident) 0 funindex dcl_mods icl_function_indices mymod mns)  
-                       (length tb_args) (counterMap (getFreeFuncArgName (getStrictnessList fun_type)) tb_args 0)  
-                       (cleanExpToSaplExp tb_rhs) fun_kind
+                    mns mymod dcl_mods icl_function_indices backEnd
+
+		// Add derived strictness from backEnd
+        # (backEnd, strictnessList) = case fun_type of
+				No = (backEnd, 0)
+        		Yes ft   
+        			# (_, ft, backEnd) = addStrictnessFromBackEnd funindex fun_ident.id_name backEnd ft
+        			# sl = case ft of
+								{st_args_strictness = NotStrict} = 0
+								{st_args_strictness = Strict x} = x
+        			= (backEnd, sl)
+	
+        # funDef = SaplFuncDef (mymod +++ "." +++ makeFuncName -1 (getName fun_ident) 0 funindex dcl_mods icl_function_indices mymod mns)  
+                   		       (length tb_args) (counterMap (getFreeFuncArgName strictnessList) tb_args 0)  
+                       		   (cleanExpToSaplExp tb_rhs) fun_kind
+        = (backEnd, funDef)
 
 where
 	cleanExpToSaplExp (Var ident) = getBoundVarName ident
@@ -255,13 +267,6 @@ where
 	      isNoBind (NoBind _) = True
 	      isNoBind _          = False
 
-	// bitmap!
-	getStrictnessList :: (Optional SymbolType) -> Int
-	getStrictnessList (Yes {st_args_strictness}) = case st_args_strictness of
-														NotStrict = 0
-														Strict x = x
-	getStrictnessList No = 0
-
 	// It uses the stricness bitmap to extract annotation
 	getFreeFuncArgName :: Int FreeVar Int -> SaplExp 
 	getFreeFuncArgName strictness {fv_ident,fv_info_ptr,fv_count} c | ((bitand) strictness (1 << c)) > 0
@@ -296,9 +301,10 @@ where
 	
 	// Normal case
 	printOverloaded symbol symb_index modnr   = decsymbol (toString symbol)
-	where decsymbol s | startsWith "c;" s     = mymod +++ "._lc_"  +++ toString symb_index 
-	                  | startsWith "g_c;" s   = mymod +++ "._lc_"  +++ toString symb_index 
-	                                          = makemod modnr +++ makeFuncName 0 s modnr symb_index dcl_mods icl_function_indices mymod mns
+//	where decsymbol s | startsWith "c;" s     = mymod +++ "._lc_"  +++ toString symb_index 
+//	                  | startsWith "g_c;" s   = mymod +++ "._lc_"  +++ toString symb_index 
+//	                                          = makemod modnr +++ makeFuncName 0 s modnr symb_index dcl_mods icl_function_indices mymod mns
+	where decsymbol s = makemod modnr +++ makeFuncName 0 s modnr symb_index dcl_mods icl_function_indices mymod mns
 
 	printConsName symbol symb_index modnr     = makemod modnr +++ toString symbol
 	
@@ -389,12 +395,7 @@ makeFuncName current_mod name mod_index func_index dcl_mods ranges mymod mns
               | startsWith "g_" name = "_lc_" +++ toString func_index
               // used for dynamic desription, there is only one per type, no need for numbering
               | startsWith "TD;" name = name
-                                     = genFunctionExtension  current_mod name mod_index func_index dcl_mods ranges mymod mns
-                                 
-makeName name | name.[0] == '\\' = "anon_" 
-              | startsWith "c;" name = "_lc_"
-              | startsWith "g_" name = "_lc_"
-                                     = name +++ "_"
+                                     = genFunctionExtension current_mod name mod_index func_index dcl_mods ranges mymod mns
                                  
 multiApp [a]       = a
 multiApp [a:b:as]  = multiApp [(SaplApp a b): as]        
