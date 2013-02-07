@@ -482,8 +482,9 @@ transform_active_root_case aci this_case=:{case_expr = case_expr=:(App app=:{app
 									No
 										# (ti_next_fun_nr, ti) = ti!ti_next_fun_nr
 										  ri = {ri_fun_index=ti_next_fun_nr, ri_fun_ptr=fun_info_ptr}
-										-> ({ro_fun & symb_kind=SK_GeneratedFunction fun_info_ptr ti_next_fun_nr},
-										    {ti & ti_next_fun_nr = inc ti_next_fun_nr, ti_recursion_introduced = Yes ri})
+										  ti & ti_next_fun_nr = inc ti_next_fun_nr, ti_recursion_introduced = Yes ri,
+										  	   ti_new_functions = [fun_info_ptr:ti.ti_new_functions]
+										-> ({ro_fun & symb_kind=SK_GeneratedFunction fun_info_ptr ti_next_fun_nr}, ti)
 //											-!-> ("Recursion","RootCaseOfZombie",ti_next_fun_nr,recursion_introduced)
 									Yes {ri_fun_index,ri_fun_ptr}
 										| ri_fun_ptr==fun_info_ptr
@@ -834,15 +835,15 @@ transform_active_non_root_case kees=:{case_info_ptr,case_expr = App {app_symb}} 
 			= skip_over kees ro ti
 		# (fun_info_ptr, ti_fun_heap) = newPtr FI_Empty ti_fun_heap
 		  fun_ident = { id_name = ro.ro_tfi.tfi_root.symb_ident.id_name+++"_case", id_info = nilPtr }
-		  fun_ident = { symb_ident = fun_ident, symb_kind=SK_GeneratedFunction fun_info_ptr undeff }
+		  fun_symb = { symb_ident = fun_ident, symb_kind=SK_GeneratedFunction fun_info_ptr undeff }
 		# ti = { ti & ti_cons_args = ti_cons_args, ti_fun_defs = ti_fun_defs, ti_fun_heap = ti_fun_heap }
 //				---> ("lifted arguments",[fv_ident\\{fv_ident}<-lifted_arguments],outer_arguments,
 //					'\n',kees.case_expr,kees.case_guards,kees.case_default)
 	  	# fun_index = ti.ti_next_fun_nr
 	  	# ti = { ti & ti_next_fun_nr = fun_index + 1 }
 		// JvG: why are dictionaries not the first arguments ?
-		# new_ro = { ro & ro_root_case_mode = RootCaseOfZombie, ro_tfi.tfi_case = fun_ident, ro_tfi.tfi_args = all_args }
-		= generate_case_function_with_pattern_argument fun_index case_info_ptr (Case kees) outer_fun_def outer_cons_args used_mask fun_ident all_args ti
+		# new_ro = { ro & ro_root_case_mode = RootCaseOfZombie, ro_tfi.tfi_case = fun_symb, ro_tfi.tfi_args = all_args }
+		= generate_case_function_with_pattern_argument fun_index case_info_ptr (Case kees) outer_fun_def outer_cons_args used_mask fun_symb all_args ti
 
 transform_active_non_root_case kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti=:{ti_recursion_introduced=old_ti_recursion_introduced}
 	| not aci.aci_safe
@@ -872,21 +873,21 @@ transform_active_non_root_case kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti=
 		= skip_over kees ro ti
 	# (fun_info_ptr, ti_fun_heap) = newPtr FI_Empty ti_fun_heap
 	  fun_ident = { id_name = ro.ro_tfi.tfi_root.symb_ident.id_name+++"_case", id_info = nilPtr }
-	  fun_ident = { symb_ident = fun_ident, symb_kind=SK_GeneratedFunction fun_info_ptr undeff }
-//					<-!- ("<<<transformCaseFunction",fun_ident)
+	  fun_symb = { symb_ident = fun_ident, symb_kind=SK_GeneratedFunction fun_info_ptr undeff }
+//					<-!- ("<<<transformCaseFunction",fun_symb)
 	| SwitchAlwaysIntroduceCaseFunction True False
-		# ti = { ti & ti_cons_args = ti_cons_args, ti_fun_defs = ti_fun_defs, ti_fun_heap = ti_fun_heap }
 	  	# fun_index = ti.ti_next_fun_nr
-	  	# ti = { ti & ti_next_fun_nr = fun_index + 1 }
-		# new_ro = { ro & ro_root_case_mode = RootCaseOfZombie , ro_tfi.tfi_case = fun_ident, ro_tfi.tfi_args = all_args }
+		# ti &	ti_cons_args = ti_cons_args, ti_fun_defs = ti_fun_defs, ti_fun_heap = ti_fun_heap,
+				ti_next_fun_nr = fun_index + 1, ti_new_functions = [fun_info_ptr:ti.ti_new_functions]
+		# new_ro = { ro & ro_root_case_mode = RootCaseOfZombie , ro_tfi.tfi_case = fun_symb, ro_tfi.tfi_args = all_args }
 	  	= generate_case_function fun_index case_info_ptr (Case kees) outer_fun_def outer_cons_args used_mask new_ro ti
 	# new_ro = { ro & ro_root_case_mode = RootCaseOfZombie,
-				 ro_tfi.tfi_case = fun_ident, ro_tfi.tfi_args = all_args, ro_tfi.tfi_n_args_before_producer = -1,  ro_tfi.tfi_n_producer_args = -1 }
+				 ro_tfi.tfi_case = fun_symb, ro_tfi.tfi_args = all_args, ro_tfi.tfi_n_args_before_producer = -1,  ro_tfi.tfi_n_producer_args = -1 }
 	  ti = { ti & ti_cons_args = ti_cons_args, ti_fun_defs = ti_fun_defs, ti_fun_heap = ti_fun_heap, ti_recursion_introduced = No }
 	  (new_expr, ti)
 	  		= transformCase kees new_ro ti
 	  (ti_recursion_introduced, ti) = ti!ti_recursion_introduced
-//	  			<-!- ("transformCaseFunction>>>",fun_ident)
+//	  			<-!- ("transformCaseFunction>>>",fun_symb)
 	  ti = { ti & ti_recursion_introduced = old_ti_recursion_introduced }
 	= case ti_recursion_introduced of
 		Yes {ri_fun_index}
@@ -955,8 +956,7 @@ generate_case_function fun_index case_info_ptr new_expr outer_fun_def outer_cons
 				, gf_fun_index		= fun_index
 				}
 	  ti_fun_heap = writePtr fun_info_ptr (FI_Function gf) ti.ti_fun_heap
-	  ti = { ti & ti_new_functions	= [fun_info_ptr:ti.ti_new_functions]
-	  			, ti_var_heap		= ti_var_heap
+	  ti = { ti & ti_var_heap		= ti_var_heap
 	  			, ti_fun_heap		= ti_fun_heap
 	  			, ti_symbol_heap	= ti_symbol_heap
 	  			, ti_type_heaps		= ti_type_heaps
