@@ -36,7 +36,7 @@ openTclFile mod_name mod_path error files
 
 openSaplFile :: !String !String !*File !*Files -> (!Bool, !Optional .File, !*File, !*Files)
 openSaplFile mod_name mod_path error files
-	= openFile mod_name mod_path ".gfp" error files
+	= openFile mod_name mod_path ".sapl" error files
 
 openFile :: !String !String !String !*File !*Files -> (!Bool, !Optional .File, !*File, !*Files)
 openFile mod_name mod_path extension error files
@@ -345,7 +345,7 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 	# (closed, files)
 		= closeFile sapl_file files
 	| not closed
-		=   abort ("couldn't close tcl file \"" +++ options.pathName +++ "sapl\"\n")
+		=   abort ("couldn't close sapl file \"" +++ options.pathName +++ "sapl\"\n")
 	
 	# heaps = {heaps & hp_var_heap=var_heap, hp_type_heaps = {hp_type_heaps  & th_attrs = attrHeap}}
 	# (closed, files) = fclose out files
