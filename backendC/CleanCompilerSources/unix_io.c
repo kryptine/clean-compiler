@@ -80,7 +80,7 @@ static void append_file_name_and_ext (char *path_p,char *fname_p,char *ext,int i
 				path_p[i]=fname_p[i];
 				++i;
 			}
-			path_p[i]='\\';
+			path_p[i]='/';
 			
 			path_p+=last_dot_i+1;
 			fname_p+=last_dot_i+1;
@@ -102,7 +102,7 @@ static void append_file_name_and_ext (char *path_p,char *fname_p,char *ext,int i
 
 		i=0;
 		while (c=fname_p[i], c!='\0'){
-			path_p[i] = c=='.' ? '\\' : c;
+			path_p[i] = c=='.' ? '/' : c;
 			++i;
 		}
 		path_p+=i;
@@ -158,7 +158,7 @@ static Bool findfilepath (char *fname,FileKind kind,char *mode,char *path)
 					*dest_p++ = *from_p++;
 				*dest_p = '\0';
 
-				*dest_p++ = '\\';
+				*dest_p++ = '/';
 				append_file_name_and_ext (dest_p,fname,ext,in_clean_system_files_folder);
 				if (file_exists (path))
 					return True;
