@@ -57,6 +57,65 @@ static Bool file_exists (char *path)
 
 extern char *path_parameter;
 
+static void append_file_name_and_ext (char *path_p,char *fname_p,char *ext,int in_clean_system_files_folder)
+{
+	int i;
+	char c;
+	
+	if (in_clean_system_files_folder){
+		int last_dot_i;
+
+		last_dot_i = -1;
+
+		i=0;
+		while (c=fname_p[i], c!='\0'){
+			if (c=='.')
+				last_dot_i=i;
+			++i;
+		}
+
+		if (last_dot_i>=0){
+			i=0;
+			while (i<last_dot_i){
+				path_p[i]=fname_p[i];
+				++i;
+			}
+			path_p[i]='\\';
+			
+			path_p+=last_dot_i+1;
+			fname_p+=last_dot_i+1;
+		}
+		
+
+		strcpy (path_p,"Clean System Files\\");
+		path_p += 19;
+
+		i=0;
+		while (c=fname_p[i], c!='\0'){
+			path_p[i] = c;
+			++i;
+		}
+		path_p+=i;
+	} else {
+		int i;
+		char c;
+
+		i=0;
+		while (c=fname_p[i], c!='\0'){
+			path_p[i] = c=='.' ? '\\' : c;
+			++i;
+		}
+		path_p+=i;
+	}
+
+	i=0;
+	do {
+		c=ext[i];
+		path_p[i]=c;
+		++i;
+	} while (c!='\0');
+}
+
 static Bool findfilepath (char *fname,FileKind kind,char *mode,char *path)
 {
     char *s,*path_elem,c,*pathlist,*ext;
@@ -99,12 +158,8 @@ static Bool findfilepath (char *fname,FileKind kind,char *mode,char *path)
 					*dest_p++ = *from_p++;
 				*dest_p = '\0';
 
-				if (in_clean_system_files_folder)
-					strcat (path,"/Clean System Files/");
-				else
-				    strcat (path,"/");
-			    strcat (path,fname);
-			    strcat (path,ext);
+				*dest_p++ = '\\';
+				append_file_name_and_ext (dest_p,fname,ext,in_clean_system_files_folder);
 				if (file_exists (path))
 					return True;
 		    
@@ -117,15 +172,11 @@ static Bool findfilepath (char *fname,FileKind kind,char *mode,char *path)
 		}
 	}
 
-	if (in_clean_system_files_folder){
-		strcpy (path,"Clean System Files/");
-		strcat (path,fname);
-	} else
-		strcpy (path,fname);
-	strcat (path,ext);
+	append_file_name_and_ext (path,fname,ext,in_clean_system_files_folder);
 
  	return file_exists (path);
 }
+
 #if 0
 static Bool findfilepath (char *fname, FileKind kind, char *mode, char *path)
 {
@@ -213,6 +264,23 @@ static Bool findfilepath (char *fname, FileKind kind, char *mode, char *path)
 }
 #endif
 
+static char *skip_after_last_dot (char *s)
+{
+	int i,after_last_dot_i;
+	char c;
+
+	after_last_dot_i=0;
+
+	i=0;
+	while (c=s[i],c!='\0'){
+		++i;
+		if (c=='.')
+			after_last_dot_i=i;
+	}
+	
+	return &s[after_last_dot_i];
+}
+
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
@@ -257,9 +325,10 @@ File FOpen (char *wname, FileKind kind, char *mode)
 				}
 
 				strcat (after_last_slash,"/");
-				strcat (after_last_slash,wname);
+
+				strcat (after_last_slash,skip_after_last_dot (wname));
 			} else
-				strcpy (after_last_slash,wname);
+				strcpy (after_last_slash,skip_after_last_dot (wname));
 			strcat (after_last_slash,GetFileExtension (kind));
 			
 			return fopen (path,mode);
