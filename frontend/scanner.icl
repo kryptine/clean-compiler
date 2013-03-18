@@ -3,6 +3,7 @@ implementation module scanner
 import	StdEnv, compare_constructor, general
 
 from utilities import revCharListToString, isSpecialChar
+from CoclSystemDependent import DirectorySeparator
 
 // RWS Proof ... ::	SearchPaths	:== [String]
 :: SearchPaths = 
@@ -1672,7 +1673,7 @@ fopenInSearchPaths moduleName fileNameExtension searchPaths mode modtimefunction
 
 		replace_dots_by_directory_separators :: !{#Char} -> *{#Char}
 		replace_dots_by_directory_separators file_name
-			= {if (c=='.') '\\' c \\ c<-:file_name}
+			= {if (c=='.') DirectorySeparator c \\ c<-:file_name}
 
 closeScanner :: !ScanState !*Files -> *Files
 closeScanner (ScanState scan_state) files = closeScanner_ scan_state files
