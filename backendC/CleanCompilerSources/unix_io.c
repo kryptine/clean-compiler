@@ -87,7 +87,7 @@ static void append_file_name_and_ext (char *path_p,char *fname_p,char *ext,int i
 		}
 		
 
-		strcpy (path_p,"Clean System Files\\");
+		strcpy (path_p,"Clean System Files/");
 		path_p += 19;
 
 		i=0;
