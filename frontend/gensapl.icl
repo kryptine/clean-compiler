@@ -104,22 +104,22 @@ convertSelect consdefs (SaplFuncDef fname nrargs args body kind)
 
 select2func args  (SaplSelect case_exp conses newdef) consdefs def 
   | isMatchCons conses = multiApp [SaplApp (SaplFun ("select")) case_exp:[ (findcons args name nrargs conses (newdef++ def) consdefs)  
-                                                   \\SaplConsDef _ type name alt nrargs nralt <- myconstrs (getconstype (getConsName conses)consdefs)consdefs]]
+                                                   \\SaplConsDef _ type name alt nrargs nralt <- myconstrs (getconstype (getConsName conses))]]
                        = makeConstantPats args case_exp conses consdefs (newdef ++ def)
+where
+	getconstype consname =  hd ([(mod,type) \\SaplConsDef mod type name alt nrargs nralt <- consdefs| consname==name] /*++ ["_notype"]*/)
+	myconstrs (mymod,mytype) =   [SaplConsDef mod type name alt nrargs nralt\\SaplConsDef mod type name alt nrargs nralt <- consdefs| mytype==type && mymod==mod]
+	getConsName conses = hd ([name\\(MatchCons name,_,_) <- conses] /*++ ["_nocons"]*/)
 
 select2func args  (SaplApp left right)       consdefs def = SaplApp (select2func args  left consdefs def) (select2func args  right consdefs def)
 select2func args  (AnFunc as e)              consdefs def = AnFunc as (select2func args  e consdefs def)
 select2func args  (SaplLet ves body)         consdefs def = SaplLet ves (select2func args  body consdefs def)
 select2func args  func                       consdefs def = func
 
-myconstrs mytype consdefs  =   [SaplConsDef mod type name alt nrargs nralt\\SaplConsDef mod type name alt nrargs nralt <- consdefs| mytype==type]
-getconstype consname  consdefs =  hd ([type \\SaplConsDef mod type name alt nrargs nralt <- consdefs| consname==name] ++ ["_notype"])
-getConsName conses = hd ([name\\(MatchCons name,_,_) <- conses] ++ ["_nocons"])
-
 findcons args  name nrargs [] []  consdefs   = SaplFun "nomatch"
 findcons args  name nrargs [] def consdefs   | nrargs == 0 = hd def
                                                            = AnFunc [SaplVar ("_uv" +++ toString k) nilPtr SA_None\\ k <- [1..nrargs]] (hd def) 
-
+                                                           
 findcons fargs  name nrargs [(MatchCons consname,args,e):conses] def consdefs | name == consname = AnFunc args (select2func (args++fargs)  e consdefs def)
                                                                                                  = findcons fargs  name nrargs conses def consdefs
 

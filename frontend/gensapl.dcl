@@ -11,6 +11,8 @@ import StdEnv,syntax,transform,backend
              SaplLet [(SaplAnnotation,SaplExp,SaplExp)] SaplExp | 
              SaplError String | SaplABCCode [String]
 
+
+// module name,  type name, constructor name, ?alt?, nrargs, nrconstructors
 ::SaplConsDef = SaplConsDef String String String Int Int Int
 ::SaplFuncDef = SaplFuncDef String Int [SaplExp] SaplExp FunKind
 // module name, type name, list of field names and global field indeces
