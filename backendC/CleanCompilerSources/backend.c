@@ -3840,8 +3840,14 @@ BECloseFiles (void)
 		std_error_file_p = stderr;
 #else
 		fclose (StdError);
-	StdErrorReopened = False;
-	if (StdOutReopened)
+#endif
+		StdErrorReopened = False;
+	}
+	if (StdOutReopened){
+#ifdef _SUN_
+		fclose (std_out_file_p);
+		std_out_file_p = stdout;
+#else
 		fclose (StdOut);
 #endif
 		StdOutReopened = False;
