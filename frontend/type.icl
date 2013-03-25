@@ -681,15 +681,6 @@ freshConsVariable {tv_info_ptr} type_var_heap
 
 instance freshCopy AType
 where
-	freshCopy type=:{at_type = cv :@: types, at_attribute} type_heaps=:{th_attrs}
-		# (fresh_attribute, th_attrs)	= freshCopyOfTypeAttribute at_attribute th_attrs
-		# (fresh_types, type_heaps)		= freshCopy types { type_heaps & th_attrs = th_attrs }
-		= case cv of
-			CV tv
-				# (fresh_cons_var, th_vars)	= freshConsVariable tv type_heaps.th_vars
-				-> ({type & at_type = fresh_cons_var :@: fresh_types, at_attribute = fresh_attribute }, { type_heaps & th_vars = th_vars })
-			_
-				-> ({type & at_type = cv :@: fresh_types, at_attribute = fresh_attribute}, type_heaps)
 	freshCopy type=:{at_type, at_attribute} type_heaps=:{th_attrs}
 		# (fresh_attribute, th_attrs)	= freshCopyOfTypeAttribute at_attribute th_attrs
 		  (fresh_type, type_heaps)		= freshCopy at_type { type_heaps & th_attrs = th_attrs }
@@ -709,6 +700,13 @@ where
 		# (arg_type, type_heaps) = freshCopy arg_type type_heaps
 		  (res_type, type_heaps) = freshCopy res_type type_heaps
 		= (arg_type --> res_type, type_heaps)
+	freshCopy (CV tv :@: types) type_heaps
+		# (fresh_types, type_heaps) = freshCopy types type_heaps
+		# (fresh_cons_var, th_vars)	= freshConsVariable tv type_heaps.th_vars
+		= (fresh_cons_var :@: fresh_types, {type_heaps & th_vars = th_vars})
+	freshCopy (cv :@: types) type_heaps
+		# (fresh_types, type_heaps) = freshCopy types type_heaps
+		= (cv :@: fresh_types, type_heaps)
 	freshCopy (TArrow1 arg_type) type_heaps
 		# (arg_type, type_heaps) = freshCopy arg_type type_heaps
 		= (TArrow1 arg_type, type_heaps)
