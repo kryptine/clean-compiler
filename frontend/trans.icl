@@ -5375,18 +5375,21 @@ equal_type (TA {type_index=type_index1} types1) (TA {type_index=type_index2} typ
 	= type_index1==type_index2 && equal_atypes types1 types2
 equal_type (TAS {type_index=type_index1} types1 strictness1) (TAS {type_index=type_index2} types2 strictness2)
 	= type_index1==type_index2 && equal_strictness_lists strictness1 strictness2 && equal_atypes types1 types2
-equal_type (TB BT_Int) (TB BT_Int)
-	= True
-equal_type (TB BT_Char) (TB BT_Char)
-	= True
-equal_type (TB BT_Bool) (TB BT_Bool)
-	= True
-equal_type (TB BT_Real) (TB BT_Real)
-	= True
+equal_type (TB bt1) (TB bt2)
+	= equal_basic_type bt1 bt2
 equal_type (TV {tv_info_ptr=tv_info_ptr1}) (TV {tv_info_ptr=tv_info_ptr2})
 	= tv_info_ptr1==tv_info_ptr2
 equal_type new_type old_type
 	= False
+
+equal_basic_type BT_Int BT_Int = True
+equal_basic_type BT_Char BT_Char = True
+equal_basic_type BT_Bool BT_Bool = True
+equal_basic_type BT_Real BT_Real = True
+equal_basic_type BT_Dynamic BT_Dynamic = True
+equal_basic_type BT_File BT_File = True
+equal_basic_type BT_World BT_World = True
+equal_basic_type _ _ = False
 
 equal_atypes [] []
 	= True
