@@ -1309,7 +1309,7 @@ toTypeCodeConstructor type=:{glob_object=type_index, glob_module=module_index} c
 			=	fatal "toTypeCodeConstructor" ("no function (" +++ type.td_ident.id_name +++ ")")
 		// ... sanity check
 		# type_fun
-			=	{	symb_ident = {type.td_ident & id_info = nilPtr} // this is wrong but let's give it a try
+			=	{	symb_ident = {id_name = "TD;"+++type.td_ident.id_name, id_info = nilPtr}
 				,	symb_kind = SK_Function {glob_module = module_index, glob_object = td_fun_index}
 				}
 		= GTT_Constructor type_fun
@@ -1792,6 +1792,11 @@ where
 				= getTCDictionary symb_ident var_info_ptr (ui_var_heap, ui_error)
 			# ui = {ui & ui_var_heap = ui_var_heap, ui_error = ui_error}
 			= (TCE_TypeTerm var_info_ptr, ui)
+		adjust_type_code (TCE_Selector selectors var_info_ptr) ui=:{ui_var_heap,ui_error}
+			# (var_info_ptr, (ui_var_heap,ui_error))
+				= getTCDictionary symb_ident var_info_ptr (ui_var_heap, ui_error)
+			# ui = {ui & ui_var_heap = ui_var_heap, ui_error = ui_error}
+			= (TCE_Selector selectors var_info_ptr, ui)
 		adjust_type_code (TCE_Constructor cons typecode_exprs) ui
 			# (typecode_exprs, ui) = mapSt adjust_type_code typecode_exprs ui
 			= (TCE_Constructor cons typecode_exprs, ui)
