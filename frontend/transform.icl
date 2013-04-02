@@ -1722,6 +1722,11 @@ where
 	clearCount {fv_info_ptr} locality var_heap
 		= var_heap <:= (fv_info_ptr, VI_Count 0 locality)
 
+instance clearCount (FreeVar,a)
+where
+	clearCount ({fv_info_ptr},_) locality var_heap
+		= var_heap <:= (fv_info_ptr, VI_Count 0 locality)
+
 /*
 	In 'collectVariables' all local variables are collected. Moreover the reference counts
 	of the local as well as of the global variables are determined. Aliases and unreachable 
@@ -2007,6 +2012,16 @@ where
 	collectVariables (TypeSignature type_function expr) free_vars dynamics cos
 		# (expr, free_vars, dynamics, cos) = collectVariables expr free_vars dynamics cos
 		= (TypeSignature type_function expr, free_vars, dynamics, cos);
+	collectVariables (DictionariesFunction dictionaries expr expr_type) free_vars dynamics cos
+		# cos = {cos & cos_var_heap = clearCount dictionaries cIsALocalVar cos.cos_var_heap}
+		  (expr, free_vars, dynamics, cos) = collectVariables expr free_vars dynamics cos
+		  (dictionaries, var_heap) = mapSt retrieve_ref_count dictionaries cos.cos_var_heap
+		  cos = {cos & cos_var_heap = var_heap}
+		= (DictionariesFunction dictionaries expr expr_type, free_vars, dynamics, cos)
+	where
+		retrieve_ref_count (fv,a_type) var_heap
+			# (fv,var_heap) = retrieveRefCount fv var_heap
+			= ((fv,a_type),var_heap)
 	collectVariables expr free_vars dynamics cos
 		= (expr, free_vars, dynamics, cos)
 

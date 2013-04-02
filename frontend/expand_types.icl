@@ -158,6 +158,11 @@ where
 		| changed
 			= (True,TFA vars type, ets)
 			= (False,tfa_type, ets)
+	expandSynTypes rem_annots common_defs tfac_type=:(TFAC vars type type_context) ets
+		# (changed,type, ets) = expandSynTypes rem_annots common_defs type ets
+		| changed
+			= (True,TFAC vars type type_context, ets)
+			= (False,tfac_type, ets)
 	expandSynTypes rem_annots common_defs type ets
 		= (False,type, ets)
 

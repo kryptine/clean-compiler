@@ -1,6 +1,3 @@
-		/*
-	module owner: Ronny Wichers Schreur
-*/
 implementation module frontend
 
 import scanner, parse, postparse, check, type, trans, partition, convertcases, overloading, utilities, convertDynamics,
@@ -347,17 +344,42 @@ showMacrosInModule dcl_index (macro_defs,file)
 			# (macro,macro_defs) = macro_defs![dcl_index,macro_index]
 			= (macro_defs, file <<< macro_index <<< macro <<< '\n')
 
-showComponents :: !u:{! Group} !Int !Bool !*{# FunDef} !*File  -> (!u:{! Group}, !*{# FunDef},!*File)
+showGroups :: !u:{! Group} !Int !Bool !*{# FunDef} !*File  -> (!u:{! Group}, !*{# FunDef},!*File)
+showGroups comps comp_index show_types fun_defs file
+	| comp_index >= size comps
+		= (comps, fun_defs, file)
+		# (comp, comps) = comps![comp_index]
+		# (fun_defs, file) = show_group comp.group_members show_types fun_defs (file <<< "component " <<< comp_index <<< '\n')
+		= showGroups comps (inc comp_index) show_types fun_defs file
+
+show_group [] show_types fun_defs file
+	= (fun_defs, file <<< '\n')
+show_group [fun:funs] show_types fun_defs file
+	# (fun_def, fun_defs) = fun_defs![fun]
+	# file=file<<<fun<<<'\n'
+	| show_types
+		= show_group funs show_types fun_defs (file <<< fun_def.fun_type <<< '\n' <<< fun_def)
+		= show_group funs show_types fun_defs (file <<< fun_def)
+//		= show_group funs show_types fun_defs (file <<< fun_def.fun_ident)
+
+showComponents :: !u:{!Component} !Int !Bool !*{# FunDef} !*File  -> (!u:{!Component}, !*{# FunDef},!*File)
 showComponents comps comp_index show_types fun_defs file
 	| comp_index >= size comps
 		= (comps, fun_defs, file)
 		# (comp, comps) = comps![comp_index]
-		# (fun_defs, file) = show_component comp.group_members show_types fun_defs (file <<< "component " <<< comp_index <<< '\n')
+		# (fun_defs, file) = show_component comp.component_members show_types fun_defs (file <<< "component " <<< comp_index <<< '\n')
 		= showComponents comps (inc comp_index) show_types fun_defs file
 
-show_component [] show_types fun_defs file
+show_component NoComponentMembers show_types fun_defs file
 	= (fun_defs, file <<< '\n')
-show_component [fun:funs] show_types fun_defs file
+show_component (ComponentMember fun funs) show_types fun_defs file
+	# (fun_def, fun_defs) = fun_defs![fun]
+	# file=file<<<fun<<<'\n'
+	| show_types
+		= show_component funs show_types fun_defs (file <<< fun_def.fun_type <<< '\n' <<< fun_def)
+		= show_component funs show_types fun_defs (file <<< fun_def)
+//		= show_component funs show_types fun_defs (file <<< fun_def.fun_ident)
+show_component (GeneratedComponentMember fun _ funs) show_types fun_defs file
 	# (fun_def, fun_defs) = fun_defs![fun]
 	# file=file<<<fun<<<'\n'
 	| show_types

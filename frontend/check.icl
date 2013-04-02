@@ -383,6 +383,10 @@ where
 		# (fresh_type_vars, type_heaps) = foldSt build_avar_subst type_vars ([], type_heaps)
 		  (_, new_at, type_heaps) = substitute {at & at_type = type} type_heaps
 		= ({ new_at & at_type = TFA fresh_type_vars new_at.at_type}, (was_ok, type_heaps))
+	substitue_arg_type at=:{at_type = TFAC type_vars type type_contexts} (was_ok, type_heaps)
+		# (fresh_type_vars, type_heaps) = foldSt build_avar_subst type_vars ([], type_heaps)
+		  (_, new_at, type_heaps) = substitute {at & at_type = type} type_heaps
+		= ({ new_at & at_type = TFAC fresh_type_vars new_at.at_type type_contexts}, (was_ok, type_heaps))
 	substitue_arg_type type (was_ok, type_heaps)
 		# (_, type, type_heaps) = substitute type type_heaps
 		= (type, (was_ok, type_heaps))
@@ -877,7 +881,7 @@ checkDclMacros :: !Index !Level !Index !Index !*ExpressionInfo !*Heaps !*CheckSt
 										  -> (!*ExpressionInfo,!*Heaps,!*CheckState)
 checkDclMacros mod_index level fun_index to_index e_info heaps cs
 	| fun_index == to_index
-		= ( e_info, heaps, cs)
+		= (e_info, heaps, cs)
 		# (macro_def,e_info) = e_info!ef_macro_defs.[mod_index,fun_index]
 		# (macro_def,_, e_info, heaps, cs) = checkFunction macro_def mod_index (DclMacroIndex mod_index fun_index) level 0 {} e_info heaps cs
 		# e_info = { e_info & ef_macro_defs.[mod_index,fun_index] = macro_def }
@@ -997,11 +1001,11 @@ array_plus_list a l = arrayPlusList a l
 checkCommonDefinitions :: !(Optional (CopiedDefinitions, Int)) !Index !*CommonDefs !*{# DclModule} !*Heaps !*CheckState
 												  -> (!DictionaryInfo,!*CommonDefs,!*{# DclModule},!*Heaps, !*CheckState)
 checkCommonDefinitions opt_icl_info module_index common modules heaps cs
-	# (com_type_defs, com_cons_defs, com_selector_defs, modules, heaps, cs)
+	# (com_type_defs, com_cons_defs, com_selector_defs, com_class_defs, modules, heaps, cs)
 			= checkTypeDefs module_index opt_icl_info
-					common.com_type_defs common.com_cons_defs common.com_selector_defs modules heaps cs
+					common.com_type_defs common.com_cons_defs common.com_selector_defs common.com_class_defs modules heaps cs
 	  (com_class_defs, com_member_defs, com_type_defs, modules, heaps, cs)
-	  		= checkTypeClasses module_index opt_icl_info common.com_class_defs common.com_member_defs com_type_defs modules heaps cs
+	  		= checkTypeClasses module_index opt_icl_info com_class_defs common.com_member_defs com_type_defs modules heaps cs
 	  (com_member_defs, com_type_defs, com_class_defs, modules, heaps, cs)
 	  		= checkMemberTypes module_index opt_icl_info com_member_defs com_type_defs com_class_defs modules heaps cs
 	  (com_instance_defs, com_type_defs, com_class_defs, com_member_defs, modules, heaps, cs)

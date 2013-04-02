@@ -56,6 +56,7 @@ beautifulizeAttributes :: !SymbolType !*AttrVarHeap -> (!SymbolType, !.AttrVarHe
 	,	tst_lifted		:: !Int
 	,	tst_result		:: !AType
 	,	tst_context		:: ![TypeContext]
+	,	tst_var_contexts :: !(VarContexts TypeContext)
 	,	tst_attr_env	:: ![AttrCoercion]
 	}
 
@@ -151,4 +152,3 @@ foldATypeSt on_atype on_type type st :== fold_atype_st type st
 	fold_atype_st atype=:{at_type} st
 		#! st = fold_type_st at_type st
 		= on_atype atype st
-

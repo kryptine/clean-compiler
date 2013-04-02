@@ -1073,6 +1073,7 @@ transform_pattern (AP_Algebraic cons_symbol global_type_index args opt_var) patt
 					# glob_object = {glob_object & ds_index=pds_def,ds_ident=pds_ident}
 					= ({pattern & ap_symbol.glob_object=glob_object},cs)
 					= abort "replace_overloaded_symbol_in_pattern"
+
 transform_pattern (AP_Basic basic_val opt_var) patterns pattern_scheme pattern_variables defaul result_expr _ pos var_store expr_heap opt_dynamics cs
 	# pattern = { bp_value = basic_val, bp_expr = result_expr, bp_position = pos}
 	  pattern_variables = cons_optional opt_var pattern_variables
@@ -1309,6 +1310,10 @@ where
 				SK_Constructor _
 					# app_expr = App {app_symb = symbol, app_args = [], app_info_ptr = nilPtr}
 					-> (app_expr, free_vars, e_state, e_info, cs)
+				SK_OverloadedConstructor cons_index
+					# (new_info_ptr, es_expr_heap) = newPtr EI_Empty e_state.es_expr_heap
+					  app_expr = App {app_symb = {symbol & symb_kind=SK_Constructor cons_index}, app_args = [], app_info_ptr = new_info_ptr}
+					-> (app_expr, free_vars, {e_state & es_expr_heap = es_expr_heap}, e_info, cs)
 				SK_NewTypeConstructor _
 					# cs = { cs & cs_error = checkError id "argument missing (for newtype constructor)" cs.cs_error}
 					# app_expr = App { app_symb = symbol , app_args = [], app_info_ptr = nilPtr }
@@ -1372,18 +1377,22 @@ where
 			# {me_type={st_arity},me_priority} = com_member_defs.[def_index]
 			= (SK_OverloadedFunction { glob_object = def_index, glob_module = mod_index }, st_arity, me_priority)
 		ste_kind_to_symbol_kind STE_Constructor def_index mod_index {dcl_common={com_cons_defs}}
-			# {cons_type={st_arity},cons_priority,cons_number} = com_cons_defs.[def_index]
+			# {cons_type={st_arity,st_args,st_context},cons_priority,cons_number} = com_cons_defs.[def_index]
 			| cons_number <> -2
-				= (SK_Constructor {glob_object = def_index, glob_module = mod_index}, st_arity, cons_priority)
+				| isEmpty st_context && no_TFAC_argument st_args
+					= (SK_Constructor {glob_object = def_index, glob_module = mod_index}, st_arity, cons_priority)
+					= (SK_OverloadedConstructor {glob_object = def_index, glob_module = mod_index}, st_arity, cons_priority)
 				= (SK_NewTypeConstructor {gi_index = def_index, gi_module = mod_index}, st_arity, cons_priority)
 	determine_info_of_symbol {ste_kind=STE_Member, ste_index} _ e_input=:{ei_mod_index} e_state e_info=:{ef_member_defs} cs
 		# ({me_type={st_arity},me_priority}, ef_member_defs) = ef_member_defs![ste_index]
 		= (SK_OverloadedFunction { glob_object = ste_index, glob_module = ei_mod_index}, st_arity, me_priority,
 				e_state, { e_info & ef_member_defs = ef_member_defs }, cs)
 	determine_info_of_symbol {ste_kind=STE_Constructor, ste_index} _ e_input=:{ei_mod_index} e_state e_info cs
-		# ({cons_type={st_arity},cons_priority,cons_number}, e_info) = e_info!ef_cons_defs.[ste_index]
+		# ({cons_type={st_arity,st_args,st_context},cons_priority,cons_number}, e_info) = e_info!ef_cons_defs.[ste_index]
 		| cons_number <> -2
-			= (SK_Constructor {glob_object = ste_index, glob_module =  ei_mod_index}, st_arity, cons_priority, e_state, e_info, cs)
+			| isEmpty st_context && no_TFAC_argument st_args
+				= (SK_Constructor {glob_object = ste_index, glob_module = ei_mod_index}, st_arity, cons_priority, e_state, e_info, cs)
+				= (SK_OverloadedConstructor {glob_object = ste_index, glob_module = ei_mod_index}, st_arity, cons_priority, e_state, e_info, cs)
 			= (SK_NewTypeConstructor {gi_index = ste_index, gi_module = ei_mod_index}, st_arity, cons_priority, e_state, e_info, cs)
 	determine_info_of_symbol {ste_kind=STE_DclFunction, ste_index} _ e_input=:{ei_mod_index} e_state=:{es_calls} e_info=:{ef_is_macro_fun} cs
 		# ({ft_type={st_arity},ft_priority}, e_info) = e_info!ef_modules.[ei_mod_index].dcl_functions.[ste_index]
@@ -1402,6 +1411,10 @@ where
 			= SK_LocalMacroFunction index.glob_object
 			= SK_Function index
 
+	no_TFAC_argument [{at_type=TFAC _ _ _}:_] = False
+	no_TFAC_argument [_:args] = no_TFAC_argument args
+	no_TFAC_argument [] = True
+
 checkQualifiedIdentExpression free_vars module_id ident_name is_expr_list e_input=:{ei_fun_index,ei_mod_index} e_state e_info cs
 	# (found,{decl_kind,decl_ident,decl_index},cs) = search_qualified_ident module_id ident_name ExpressionNameSpaceN cs
 	| not found
@@ -1417,12 +1430,15 @@ checkQualifiedIdentExpression free_vars module_id ident_name is_expr_list e_inpu
 					# e_state = { e_state & es_calls = [DclFunCall mod_index decl_index : e_state.es_calls ]}
 					-> (app_expr, free_vars, e_state, e_info, cs)
 			STE_Imported STE_Constructor mod_index
-				# ({cons_type={st_arity},cons_priority,cons_number}, e_info) = e_info!ef_modules.[mod_index].dcl_common.com_cons_defs.[decl_index]
+				# ({cons_type={st_arity,st_context},cons_priority,cons_number}, e_info) = e_info!ef_modules.[mod_index].dcl_common.com_cons_defs.[decl_index]
 				| cons_number <> -2
 					# kind = SK_Constructor { glob_object = decl_index, glob_module = mod_index }
 					  symbol = { symb_ident = decl_ident, symb_kind = kind }
-					# app_expr = build_application_or_constant_for_constructor symbol st_arity cons_priority
-					-> (app_expr, free_vars, e_state, e_info, cs)
+					| isEmpty st_context
+						# (app_expr,e_state) = build_application_or_constant_for_function symbol st_arity cons_priority e_state
+						-> (app_expr, free_vars, e_state, e_info, cs)
+						# app_expr = build_application_or_constant_for_constructor symbol st_arity cons_priority
+						-> (app_expr, free_vars, e_state, e_info, cs)
 					# kind = SK_NewTypeConstructor { gi_index = decl_index, gi_module = mod_index }
 					# symbol = { symb_ident = decl_ident, symb_kind = kind }
 					# app_expr = build_application_or_constant_for_constructor symbol st_arity cons_priority
@@ -2663,6 +2679,13 @@ buildApplication symbol=:{symb_kind=SK_Constructor _} form_arity act_arity args 
 	| act_arity > form_arity
 		= (app, e_state, checkError symbol.symb_ident "used with too many arguments" error)
 		= (app, e_state, error)
+buildApplication symbol=:{symb_kind=SK_OverloadedConstructor cons_index} form_arity act_arity args e_state error
+	# (new_info_ptr, es_expr_heap) = newPtr EI_Empty e_state.es_expr_heap
+	  e_state = {e_state & es_expr_heap=es_expr_heap}
+	  app = App {app_symb = {symbol & symb_kind=SK_Constructor cons_index}, app_args = args, app_info_ptr = new_info_ptr}
+	| act_arity > form_arity
+		= (app, e_state, checkError symbol.symb_ident "used with too many arguments" error)
+		= (app, e_state, error)
 buildApplication symbol=:{symb_kind=SK_NewTypeConstructor _} form_arity act_arity args e_state error
 	# app = App { app_symb = symbol , app_args = args, app_info_ptr = nilPtr }
 	| act_arity == form_arity
@@ -2682,6 +2705,10 @@ buildApplicationWithoutArguments :: !SymbIdent !*ExpressionState !*ErrorAdmin ->
 buildApplicationWithoutArguments symbol=:{symb_kind=SK_Constructor _} e_state error
 	# app = App { app_symb = symbol , app_args = [], app_info_ptr = nilPtr }
 	= (app, e_state, error)
+buildApplicationWithoutArguments symbol=:{symb_kind=SK_OverloadedConstructor cons_index} e_state error
+	# (new_info_ptr, es_expr_heap) = newPtr EI_Empty e_state.es_expr_heap
+	  app = App {app_symb = {symbol & symb_kind=SK_Constructor cons_index}, app_args = [], app_info_ptr = new_info_ptr}
+	= (app, {e_state & es_expr_heap = es_expr_heap}, error)
 buildApplicationWithoutArguments symbol=:{symb_kind=SK_NewTypeConstructor _} e_state error
 	# app = App { app_symb = symbol , app_args = [], app_info_ptr = nilPtr }
 	= (app, e_state, checkError symbol.symb_ident "argument missing (for newtype constructor)" error)

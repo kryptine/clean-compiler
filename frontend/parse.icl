@@ -425,7 +425,7 @@ where
 		| ~(isGlobalContext parseContext)
 			= (False,abort "no def(3)",parseError "definition" No "imports only at the global level" pState)
 			# (imp, pState) = wantFromImports pState
-	   		= (True, PD_Import [imp], pState) -->> imp
+	   		= (True, PD_Import [imp], pState)
 	try_definition parseContext ClassToken pos pState
 		| ~(isGlobalContext parseContext)
 			= (False,abort "no def(2)",parseError "definition" No "class definitions are only at the global level" pState)
@@ -1131,7 +1131,7 @@ where
 			  (file_name, line_nr, pState)
 			  					= getFileAndLineNr pState
 			  (rhs_exp, pState) = wantExpression pState
-			  pState			= wantEndRootExpression pState -->> ("#",lhs_exp,"=",rhs_exp)
+			  pState			= wantEndRootExpression pState // -->> ("#",lhs_exp,"=",rhs_exp)
 	  	  	  (locals , pState) = optionalLocals WithToken localsExpected pState
 			=	( True
 				, {	ndwl_strict	= strict
@@ -1536,6 +1536,13 @@ optionalContext pState
 		= want_contexts pState
 		= ([], tokenBack pState)
 
+optional_constructor_context :: !ParseState -> ([TypeContext],ParseState)
+optional_constructor_context pState
+	# (token, pState) = nextToken TypeContext pState
+	| token == AndToken
+		= want_contexts pState
+		= ([], tokenBack pState)
+
 want_contexts :: ParseState -> ([TypeContext],ParseState)
 want_contexts pState
 	# (contexts, pState) = want_context pState
@@ -1926,8 +1933,9 @@ where
 		# token = basic_type_to_constructor token
 		# (pc_cons_ident,  pc_cons_prio, pc_cons_pos, pState) = want_cons_name_and_prio token pState
 		  (pc_arg_types, pState) = parseList tryBrackSAType pState
+		  (pc_context,pState) = optional_constructor_context pState
 		  cons = {	pc_cons_ident = pc_cons_ident, pc_arg_types = atypes_from_satypes pc_arg_types, pc_args_strictness=strictness_from_satypes pc_arg_types,
-		  			pc_cons_arity = length pc_arg_types, pc_cons_prio = pc_cons_prio, pc_exi_vars = exi_vars, pc_cons_pos = pc_cons_pos}
+		  			pc_context = pc_context, pc_cons_arity = length pc_arg_types, pc_cons_prio = pc_cons_prio, pc_exi_vars = exi_vars, pc_cons_pos = pc_cons_pos}
 		= (cons,pState)
 
 	want_newtype_constructor :: ![ATypeVar] !Token !ParseState -> (.ParsedConstructor,!ParseState)
@@ -1936,7 +1944,7 @@ where
 		  (pc_cons_ident,  pc_cons_prio, pc_cons_pos, pState) = want_cons_name_and_prio token pState
 		  (succ, pc_arg_type, pState) = trySimpleType TA_Anonymous pState
 		  cons = {	pc_cons_ident = pc_cons_ident, pc_arg_types = [pc_arg_type], pc_args_strictness = NotStrict,
-		  			pc_cons_arity = 1, pc_cons_prio = pc_cons_prio, pc_exi_vars = exi_vars, pc_cons_pos = pc_cons_pos}
+		  			pc_context = [], pc_cons_arity = 1, pc_cons_prio = pc_cons_prio, pc_exi_vars = exi_vars, pc_cons_pos = pc_cons_pos}
 		| succ
 			= (cons,pState)
 			= (cons,parseError "newtype definition" No "type" pState)
@@ -2271,50 +2279,53 @@ where
 
 :: AnnotationWithPosition = NoAnnot | StrictAnnotWithPosition !FilePosition;
 
-wantAnnotatedATypeWithPosition :: !ParseState -> (!AnnotationWithPosition,!AType,!ParseState)
-wantAnnotatedATypeWithPosition pState
-	# (vars , pState)		= optionalUniversalQuantifiedVariables pState	
+wantAnnotatedATypeWithPositionT :: !Token !ParseState -> (!AnnotationWithPosition,!AType,!ParseState)
+wantAnnotatedATypeWithPositionT ForAllToken pState
+	# (vars, pState)		= wantUniversalQuantifiedVariables pState
 	# (_,annotation,pState) = optionalAnnotWithPosition pState
-	# (succ, atype, pState)	= tryAnnotatedAType True TA_None vars pState
+	# (succ, atype, pState)	= tryAnnotatedAType TA_None pState
+	# atype = {atype & at_type = TFA vars atype.at_type}
 	| succ
 		= (annotation, atype, pState)
-	// otherwise //~ succ
-		# (token, pState) = nextToken TypeContext pState
-		= (annotation, atype, parseError "atype" (Yes token) "attributed and annotated type" pState)
+		= (annotation, atype, attributed_and_annotated_type_error pState)
+wantAnnotatedATypeWithPositionT noForAllToken pState
+	= wantAnnotatedATypeWithPosition_noUniversalQuantifiedVariables (tokenBack pState)
+
+wantAnnotatedATypeWithPosition_noUniversalQuantifiedVariables pState
+	# (_,annotation,pState) = optionalAnnotWithPosition pState
+	# (succ, atype, pState)	= tryAnnotatedAType TA_None pState
+	| succ
+		= (annotation, atype, pState)
+		= (annotation, atype, attributed_and_annotated_type_error pState)
 
 wantAnnotatedAType :: !ParseState -> (!Annotation,!AType,!ParseState)
 wantAnnotatedAType pState
 	# (vars , pState)		= optionalUniversalQuantifiedVariables pState	
 	# (_,annotation,pState) = optionalAnnot pState
-	# (succ, atype, pState)	= tryAnnotatedAType True TA_None vars pState
-	| succ
-		= (annotation, atype, pState)
-	// otherwise //~ succ
-		# (token, pState) = nextToken TypeContext pState
-		= (annotation, atype, parseError "atype" (Yes token) "attributed and annotated type" pState)
+	| isEmpty vars
+		# (succ, atype, pState)	= tryAnnotatedAType TA_None pState
+		| succ
+			= (annotation, atype, pState)
+			= (annotation, atype, attributed_and_annotated_type_error pState)
+		# (succ, atype, pState)	= tryAnnotatedAType TA_None pState
+		# atype = {atype & at_type = TFA vars atype.at_type}
+		| succ
+			= (annotation, atype, pState)
+			= (annotation, atype, attributed_and_annotated_type_error pState)
 
-tryAnnotatedAType :: !Bool !TypeAttribute ![ATypeVar] !ParseState -> (!Bool, !AType,!ParseState)
-tryAnnotatedAType tryAA attr vars pState
+tryAnnotatedAType :: !TypeAttribute !ParseState -> (!Bool, !AType,!ParseState)
+tryAnnotatedAType attr pState
 	# (types, pState)		= parseList tryBrackAType pState
 	| isEmpty types
-		| isEmpty vars
-			= (False, {at_attribute = attr, at_type = TE}, pState)
-		// otherwise // PK
-			# (token, pState) = nextToken TypeContext pState
-			= (False, {at_attribute = attr, at_type = TFA vars TE}
-			  , parseError "annotated type" (Yes token) "type" (tokenBack pState))
+		= (False, {at_attribute = attr, at_type = TE}, pState)
 	# (token, pState)		= nextToken TypeContext pState
 	| token == ArrowToken
 		# (rtype, pState)	= wantAType pState
 		  atype = make_curry_type attr types rtype
-		| isEmpty vars
-			= ( True, atype, pState)
-			= ( True, { atype & at_type = TFA vars atype.at_type }, pState)
+		= ( True, atype, pState)
 	// otherwise (note that types is non-empty)
 	# (atype, pState) = convertAAType types attr (tokenBack pState)
-	| isEmpty vars
-		= (True, atype, pState)
-		= (True, { atype & at_type = TFA vars atype.at_type }, pState)
+	= (True, atype, pState)
 where
 	make_curry_type attr [t1] res_type
 		= {at_attribute = attr, at_type = t1 --> res_type}
@@ -2322,36 +2333,80 @@ where
 		= {at_attribute = attr, at_type = t1 --> make_curry_type TA_None tr res_type}
 	make_curry_type _ _ _ = abort "make_curry_type: wrong assumption"
 
-tryBrackSAType :: !ParseState -> (!Bool, SAType, !ParseState)
-tryBrackSAType pState
-	// type of constructor argument
-	# (succ, annot, attr, pState) = optionalAnnotAndAttr pState
-	| succ
-		# (token, pState) = nextToken TypeContext pState
-		# (result, atype, pState) = trySimpleTypeT token attr pState
-		# sa_type = {s_annotation=annot,s_type=atype}
-		| result==ParseOk
-			= (True, sa_type, pState)
-		| result==ParseFailWithError
-			= (False, sa_type, pState)
-			= (False, sa_type, parseError "constructor type" (Yes token) "type" pState)
-		# (succ, atype, pState) = trySimpleType attr pState
-		= (succ, {s_annotation=annot,s_type=atype}, pState)
+:: ParseResult :== Int
+ParseOk:==0
+ParseFailWithError:==1
+ParseFailWithoutError:==2
+
+tryBrackAType_allow_universal_quantifier :: !TypeAttribute !ParseState -> (!Bool, AType, !ParseState)
+tryBrackAType_allow_universal_quantifier attr pState
+	# (token, pState) = nextToken TypeContext pState
+	# (result,atype,pState) = tryBrackATypeT_allow_universal_quantifier token attr pState
+	= (result==ParseOk,atype,pState)
+
+tryBrackATypeT_allow_universal_quantifier :: !Token !TypeAttribute !ParseState -> (!ParseResult, AType, !ParseState)
+tryBrackATypeT_allow_universal_quantifier OpenToken attr pState
+	// type of function or constructor argument
+	# (token, pState) = nextToken TypeContext pState
+	= case token of
+		ForAllToken
+			# (vars,pState) = wantUniversalQuantifiedVariables pState 
+			  (annot_with_pos, atype, pState) = wantAnnotatedATypeWithPosition_noUniversalQuantifiedVariables pState
+			  (token, pState) = nextToken TypeContext pState
+			-> case token of
+				BarToken
+					# (contexts, pState) = want_contexts pState
+					  (token, pState) = nextToken TypeContext pState
+					  (succ,atype,pState)
+						= case token of
+							CloseToken
+								# type = atype.at_type
+								  (attr, pState) = determAttr attr atype.at_attribute type pState
+								  pState = warnIfStrictAnnot annot_with_pos pState
+								-> (ParseOk, {at_attribute = attr, at_type = type}, pState)
+							_
+								-> (ParseFailWithError, atype, parseError "Simple type" (Yes token) "')' or ','" pState)
+					  atype = {atype & at_type = TFAC vars atype.at_type contexts}
+					-> (succ, atype, pState)
+				_
+					# atype = {atype & at_type = TFA vars atype.at_type}
+					-> trySimpleTypeT_after_OpenToken_and_type token annot_with_pos atype attr pState
+		_
+			-> trySimpleTypeT_after_OpenToken token attr pState
+tryBrackATypeT_allow_universal_quantifier token attr pState
+	= trySimpleTypeT token attr pState
 
 tryBrackSATypeWithPosition :: !ParseState -> (!Bool, SATypeWithPosition, !ParseState)
 tryBrackSATypeWithPosition pState
+	// type of function argument
 	# (succ, annot, attr, pState) = optionalAnnotAndAttrWithPosition pState
 	| succ
 		# (token, pState) = nextToken TypeContext pState
-		# (result, atype, pState) = trySimpleTypeT token attr pState
+		# (result, atype, pState) = tryBrackATypeT_allow_universal_quantifier token attr pState
 		# sa_type_wp = {sp_annotation=annot,sp_type=atype}
 		| result==ParseOk
 			= (True, sa_type_wp, pState)
 		| result==ParseFailWithError
 			= (False, sa_type_wp, pState)
 			= (False, sa_type_wp, parseError "symbol type" (Yes token) "type" pState)
-		# (succ, atype, pState) = trySimpleType attr pState
+		# (succ, atype, pState) = tryBrackAType_allow_universal_quantifier attr pState
 		= (succ, {sp_annotation=annot,sp_type=atype}, pState)
+
+tryBrackSAType :: !ParseState -> (!Bool, SAType, !ParseState)
+tryBrackSAType pState
+	// type of constructor argument
+	# (succ, annot, attr, pState) = optionalAnnotAndAttr pState
+	| succ
+		# (token, pState) = nextToken TypeContext pState
+		# (result, atype, pState) = tryBrackATypeT_allow_universal_quantifier token attr pState
+		# sa_type = {s_annotation=annot,s_type=atype}
+		| result==ParseOk
+			= (True, sa_type, pState)
+		| result==ParseFailWithError
+			= (False, sa_type, pState)
+			= (False, sa_type, parseError "constructor type" (Yes token) "type" pState)
+		# (succ, atype, pState) = tryBrackAType_allow_universal_quantifier attr pState
+		= (succ, {s_annotation=annot,s_type=atype}, pState)
 
 instance want AType
 where
@@ -2481,11 +2536,6 @@ tryBrackAType :: !ParseState -> (!Bool, AType, !ParseState)
 tryBrackAType pState
 	# (_, attr, pState)	= warnAnnotAndOptionalAttr pState
 	= trySimpleType attr pState
-
-:: ParseResult :== Int
-ParseOk:==0
-ParseFailWithError:==1
-ParseFailWithoutError:==2
 
 trySimpleType :: !TypeAttribute !ParseState -> (!Bool, !AType, !ParseState)
 trySimpleType attr pState
@@ -2629,7 +2679,7 @@ trySimpleTypeT_after_OpenToken ArrowToken attr pState
 		= (ParseFailWithError,{at_attribute = attr, at_type = TE},
 			parseError "arrow type" (Yes token) ")" pState)
 trySimpleTypeT_after_OpenToken token attr pState
-	# (annot_with_pos,atype, pState) = wantAnnotatedATypeWithPosition (tokenBack pState)
+	# (annot_with_pos,atype, pState) = wantAnnotatedATypeWithPositionT token pState
 	  (token, pState)	= nextToken TypeContext pState
 	= trySimpleTypeT_after_OpenToken_and_type token annot_with_pos atype attr pState
 
@@ -4283,7 +4333,7 @@ skipToEndOfDefinition pState
 		EndGroupToken		-> (token, pState)
 		EndOfFileToken		-> (token, pState)
 //		SemicolonToken		-> (token, pState) // might be useful in non layout mode.
-		_					-> skipToEndOfDefinition pState -->> (token,"skipped")
+		_					-> skipToEndOfDefinition pState // -->> (token,"skipped")
 
 wantEndCodeRhs :: !ParseState -> ParseState
 wantEndCodeRhs pState

@@ -748,8 +748,9 @@ where
 			empty_occurrence {fv_info_ptr} var_heap 
 				= var_heap <:= (fv_info_ptr, VI_Empty)
 
-		get_type (VI_Type atype _)		= atype
-		get_type (VI_FAType _ atype _)	= atype
+		get_type (VI_Type atype _)			= atype
+		get_type (VI_FAType _ atype _)		= atype
+		get_type (VI_FATypeC _ atype _ _)	= atype
 
 		make_shared_vars_non_unique vars fun_body coercion_env var_heap expr_heap error
 			= foldl make_shared_var_non_unique (coercion_env, var_heap, expr_heap, error) vars
@@ -779,6 +780,8 @@ where
 									 ===> ("make_shared_occurrence_non_unique", free_var, var_expr_ptr, sa_attr_nr)
 								-> (coercion_env, expr_heap, error)
 								-> (coercion_env, expr_heap, uniquenessErrorVar free_var fun_body " demanded attribute cannot be offered by shared object" error)
+						EI_FPContext _ var_expr_ptr
+							-> make_shared_occurrence_non_unique free_var var_expr_ptr (coercion_env, expr_heap, error)
 						_
 							-> abort ("make_shared_occurrence_non_unique" ===> ((free_var, var_expr_ptr) )) // <<- expr_info))
 	

@@ -3,8 +3,8 @@ definition module checktypes
 import checksupport
 
 checkTypeDefs :: !Index !(Optional (CopiedDefinitions, Int))
-		!*{#CheckedTypeDef} !*{#ConsDef} !*{#SelectorDef} !*{#DclModule} !*Heaps !*CheckState
-	-> (!*{#CheckedTypeDef},!*{#ConsDef},!*{#SelectorDef},!*{#DclModule},!*Heaps,!*CheckState)
+		!*{#CheckedTypeDef} !*{#ConsDef} !*{#SelectorDef} !v:{#ClassDef} !*{#DclModule} !*Heaps !*CheckState
+	-> (!*{#CheckedTypeDef},!*{#ConsDef},!*{#SelectorDef},!v:{#ClassDef},!*{#DclModule},!*Heaps,!*CheckState)
 
 checkFunctionType :: !Index !SymbolType !FunSpecials !u:{#CheckedTypeDef} !v:{#ClassDef} !u:{#DclModule} !*TypeHeaps !*CheckState
 						-> (!SymbolType,!FunSpecials,!u:{#CheckedTypeDef},!v:{#ClassDef},!u:{#DclModule},!*TypeHeaps,!*CheckState)

@@ -315,6 +315,8 @@ signClassOfType (arg_type --> res_type) sign use_top_sign group_nr ci scs
 
 signClassOfType (TFA vars type) sign use_top_sign group_nr ci scs
 	= signClassOfType type sign use_top_sign group_nr ci scs
+signClassOfType (TFAC vars type _) sign use_top_sign group_nr ci scs
+	= signClassOfType type sign use_top_sign group_nr ci scs
 
 signClassOfType type _ _ _ _ scs
 	= (BottomSignClass, BottomSignClass, scs)
@@ -579,6 +581,8 @@ where
 		= (cumm_class, pcs)
 
 propClassOfType (TFA vars type) group_nr ci pcs
+	= propClassOfType type group_nr ci pcs
+propClassOfType (TFAC vars type _) group_nr ci pcs
 	= propClassOfType type group_nr ci pcs
 
 propClassOfType _ _ _ pcs

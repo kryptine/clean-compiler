@@ -1410,6 +1410,8 @@ convertTypeNode TE
 	=	beNormalTypeNode beDontCareDefinitionSymbol beNoTypeArgs
 convertTypeNode (TFA vars type)
 	=	beAddForAllTypeVariables (convertTypeVars vars) (convertTypeNode type)
+convertTypeNode (TFAC vars type contexts)
+	=	beAddForAllTypeVariables (convertTypeVars vars) (convertTypeNode type)
 convertTypeNode (TGenericFunctionInDictionary gds type_kind generic_dict=:{gi_module,gi_index})
 	= beNormalTypeNode (beTypeSymbol gi_index gi_module) beNoTypeArgs
 convertTypeNode typeNode

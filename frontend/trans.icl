@@ -211,7 +211,6 @@ where
 		  (let_lazy_binds, ti) = transform let_lazy_binds ro ti
 		  (let_expr, ti) = transform let_expr ro ti
 		  lad = { lad & let_lazy_binds = let_lazy_binds, let_strict_binds = let_strict_binds, let_expr = let_expr}
-//		  ti = check_type_info lad ti
 		= (Let lad, ti)
 	  where
 		store_type_info_of_bindings_in_heap {let_strict_binds, let_lazy_binds,let_info_ptr} ti
@@ -221,12 +220,7 @@ where
 			= {ti & ti_symbol_heap = ti_symbol_heap, ti_var_heap = ti_var_heap}
 		store_type_info_let_bind (var_type, {lb_dst={fv_info_ptr}}) var_heap
 			= setExtendedVarInfo fv_info_ptr (EVI_VarType var_type) var_heap
-/*
-		check_type_info {let_strict_binds,let_lazy_binds,let_info_ptr} ti
-			# (EI_LetType var_types, ti_symbol_heap) = readExprInfo let_info_ptr ti.ti_symbol_heap
-			= { ti & ti_symbol_heap = ti_symbol_heap }
-				//  ---> ("check_type_info_of_bindings_in_heap",let_strict_binds,let_lazy_binds,var_types)
-*/
+
 	transform (Case kees) ro ti
 		# ti = store_type_info_of_patterns_in_heap kees ti
 		= transformCase kees ro ti
@@ -292,6 +286,9 @@ where
 	transform (DynamicExpr dynamic_expr) ro ti
 		# (dynamic_expr, ti) = transform dynamic_expr ro ti
 		= (DynamicExpr dynamic_expr, ti)
+	transform (DictionariesFunction dictionaries expr expr_type) ro ti
+		# (expr,ti) = transform expr ro ti
+		= (DictionariesFunction dictionaries expr expr_type,ti)
 	transform expr ro ti
 		= (expr, ti)
 
@@ -1671,7 +1668,6 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 										f2b { fv_ident, fv_info_ptr }
 											= Var { var_ident = fv_ident, var_info_ptr = fv_info_ptr, var_expr_ptr = nilPtr }
 								-> add_args_to_fun_body act_args fresh_result_type tb_rhs ro ti
-
 	  (new_fun_rhs, ti)
 			= transform tb_rhs ro ti
 	  new_fd
@@ -3514,8 +3510,6 @@ foldrExprSt f expr st :== foldr_expr_st expr st
 		= f lad st
 	foldr_expr_st sel=:(Selection a expr b) st
 		= f sel (foldr_expr_st expr st)
-		
-	// AA:	
 	foldr_expr_st expr=:(BasicExpr _) st 
 		= f expr st
 
@@ -4340,6 +4334,8 @@ strip_universal_quantor st=:{st_vars,st_args,st_result}
 where
 	strip :: AType [TypeVar] -> (AType,[TypeVar])
 	strip atype=:{at_type = TFA vars type} tvs
+		= ({atype & at_type = type}, map (\{atv_variable}->atv_variable) vars ++ tvs)
+	strip atype=:{at_type = TFAC vars type contexts} tvs
 		= ({atype & at_type = type}, map (\{atv_variable}->atv_variable) vars ++ tvs)
 	strip atype tvs
 		= (atype,tvs)

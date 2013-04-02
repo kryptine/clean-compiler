@@ -483,6 +483,16 @@ instance consumerRequirements Expression where
 		= (CPassive, False, ai)
 	consumerRequirements (FailExpr _) _ ai
 		= (CPassive, False, ai)
+	consumerRequirements (DictionariesFunction dictionaries expr expr_type) common_defs ai
+		# (new_next_var,new_next_var_of_fun,ai_var_heap) = init_variables dictionaries ai.ai_next_var ai.ai_next_var_of_fun ai.ai_var_heap
+		# ai = {ai & ai_next_var=new_next_var,ai_next_var_of_fun=new_next_var_of_fun,ai_var_heap=ai_var_heap}
+		= consumerRequirements expr common_defs ai
+		where
+			init_variables [({fv_info_ptr},_):dictionaries] ai_next_var ai_next_var_of_fun ai_var_heap
+				# ai_var_heap = writePtr fv_info_ptr (VI_AccVar ai_next_var ai_next_var_of_fun) ai_var_heap
+				= init_variables dictionaries (inc ai_next_var) (inc ai_next_var_of_fun) ai_var_heap
+			init_variables [] ai_next_var ai_next_var_of_fun ai_var_heap
+				= (ai_next_var,ai_next_var_of_fun,ai_var_heap)
 	consumerRequirements expr _ ai
 		= abort ("consumerRequirements [Expression]" ---> expr)
 
@@ -685,7 +695,7 @@ instance consumerRequirements Case where
 										  		_ -> False
 
 		inspect_patterns :: !{#CommonDefs} !Bool !CasePatterns ![(Int,Bool)] -> (!Bool,!Bool)
-		inspect_patterns common_defs has_default (AlgebraicPatterns {gi_index,gi_module} algebraic_patterns) constructors_and_unsafe_bits
+		inspect_patterns common_defs has_default (AlgebraicPatterns {gi_index,gi_module} _) constructors_and_unsafe_bits
 			# type_def						= common_defs.[gi_module].com_type_defs.[gi_index]
 			  defined_symbols				= case type_def.td_rhs of
 													AlgType defined_symbols		-> defined_symbols
@@ -1473,6 +1483,13 @@ count_locals EE n
 count_locals (FailExpr _) n = n
 count_locals (NoBind _) n
 	= n
+count_locals (DictionariesFunction dictionaries expr expr_type) n
+	= count_locals expr (foldSt count_local_dictionary dictionaries n)
+	where
+		count_local_dictionary ({fv_count},_) n
+			| fv_count > 0
+				= n+1
+				= n
 
 count_optional_locals (Yes e) n
 	= count_locals e n
@@ -1781,6 +1798,8 @@ instance producerRequirements Expression where
 		= (True,prs)
 	producerRequirements (FailExpr _) prs
 		= (True,prs)
+	producerRequirements (DictionariesFunction dictionaries expr expr_type) prs
+		= producerRequirements expr prs
 	producerRequirements expr prs
 		= abort ("producerRequirements " ---> expr)
 

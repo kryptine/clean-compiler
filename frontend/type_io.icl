@@ -304,6 +304,11 @@ where
   		# wtis & wtis_type_heaps = {wtis_type_heaps & th_vars = th_vars}
 		= write_type_info type tcl_file wtis
 
+	write_type_info (TFAC uni_vars type _) tcl_file wtis=:{wtis_type_heaps}
+ 		# (_,th_vars) = foldSt normalize_atype_var uni_vars (0,wtis_type_heaps.th_vars)
+  		# wtis & wtis_type_heaps = {wtis_type_heaps & th_vars = th_vars}
+		= write_type_info type tcl_file wtis
+
 	write_type_info TE tcl_file wtis
 		# tcl_file
 			= fwritec TypeTECode tcl_file
@@ -341,6 +346,12 @@ where
 			= write_type_info temp_var_id tcl_file wtis
 		= (tcl_file,wtis)
 	write_type_info (TempQCV temp_var_id) tcl_file wtis
+		# tcl_file
+			= fwritec ConsVariableTempQCVCode tcl_file
+		# (tcl_file,wtis)
+			= write_type_info temp_var_id tcl_file wtis
+		= (tcl_file,wtis)	
+	write_type_info (TempQCDV temp_var_id) tcl_file wtis
 		# tcl_file
 			= fwritec ConsVariableTempQCVCode tcl_file
 		# (tcl_file,wtis)

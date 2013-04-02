@@ -1,6 +1,3 @@
-/*
-	module owner: Ronny Wichers Schreur
-*/
 implementation module mergecases
 
 import syntax, transform, compare_types, utilities
@@ -147,7 +144,7 @@ where
 	
 	has_no_default No 		= True
 	has_no_default (Yes _) 	= False
-	
+
 	skip_alias var_info_ptr var_heap
 		= case sreadPtr var_info_ptr var_heap of
 			VI_Alias bv
@@ -209,7 +206,7 @@ where
 	new_variable fv=:{fv_ident, fv_info_ptr} var_heap
 		# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
 		= ({fv & fv_info_ptr = new_info_ptr}, var_heap <:= (fv_info_ptr, VI_Variable fv_ident new_info_ptr))
-		
+
 	rebuild_let_expression lad expr var_heap expr_heap
 		# (rev_let_lazy_binds, var_heap) = foldSt renew_let_var lad.let_lazy_binds ([], var_heap)
 		  (let_info_ptr, expr_heap) = newPtr EI_Empty expr_heap
@@ -373,14 +370,14 @@ where
 				= ([ pattern : patterns ], var_heap, symbol_heap, error)
 		merge_basic_pattern_with_patterns new_pattern [] var_heap symbol_heap error
 			= ([new_pattern], var_heap, symbol_heap, error)
-	
+
 	replace_variables vars expr ap_vars var_heap symbol_heap
 		# var_heap = build_aliases vars ap_vars var_heap
 		# us = { us_var_heap = var_heap, us_symbol_heap = symbol_heap, us_local_macro_functions = No }
 		  (expr, us) = unfold expr us
 		= (expr, us.us_var_heap, us.us_symbol_heap)
 	where
-		build_aliases [var1 : vars1] [ {fv_ident,fv_info_ptr} : vars2 ] var_heap
+		build_aliases [var1 : vars1] [{fv_ident,fv_info_ptr} : vars2] var_heap
 			= build_aliases vars1 vars2 (writePtr var1.fv_info_ptr (VI_Variable fv_ident fv_info_ptr) var_heap)
 		build_aliases [] [] var_heap
 			= var_heap

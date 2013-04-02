@@ -9,9 +9,7 @@ import syntax, analunitypes
 	,	crc_td_infos	:: !.TypeDefInfos
 	}
 
-class coerce a ::  !Sign !{# CommonDefs} !{# BOOLVECT} !TypePosition !a !a !*CoercionState -> (!Optional TypePosition, !*CoercionState)
-
-instance coerce AType
+coerce :: !Sign !{#CommonDefs} !{#BOOLVECT} !TypePosition !AType !AType !*CoercionState -> (!Optional TypePosition, !*CoercionState)
 
 ::	TypePosition :== [Int]
 
@@ -39,9 +37,8 @@ BITINDEX temp_var_id :== temp_var_id >> 5
 BITNUMBER temp_var_id :== temp_var_id bitand 31
 set_bit :: !Int !*{# BOOLVECT} -> .{# BOOLVECT}
 
-determineAttributeCoercions :: !AType !AType !Bool !u:{! Type} !*Coercions !{# CommonDefs } 
-	!{# BOOLVECT } !*TypeDefInfos !*TypeHeaps
-		-> (!Optional (TypePosition, AType), !u:{! Type}, !*Coercions, !*TypeDefInfos, !*TypeHeaps) 
+determineAttributeCoercions :: !AType !AType !Bool !u:{!Type} !*Coercions !{#CommonDefs} !{#BOOLVECT} !*TypeDefInfos !*TypeHeaps
+		-> (!Optional (TypePosition, AType), !u:{!Type}, !*Coercions, !*TypeDefInfos, !*TypeHeaps)
 
 ::	AttributePartition	:== {# Int}
 

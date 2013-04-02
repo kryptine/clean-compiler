@@ -110,9 +110,14 @@ where
 		  comp_type_var_heap = initialyseATypeVars dcl_cons_def.cons_exi_vars icl_cons_def.cons_exi_vars comp_type_var_heap
 		  comp_st = { comp_st & comp_type_var_heap = comp_type_var_heap }
 		  (ok, comp_st) = compare (dcl_cons_type.st_args,dcl_cons_type.st_args_strictness) (icl_cons_type.st_args,icl_cons_type.st_args_strictness) comp_st
-		| ok && do_compare_result_types
-			= compare dcl_cons_type.st_result icl_cons_type.st_result comp_st
-			= (ok, comp_st)
+		| not ok
+			= (False,comp_st)
+		| do_compare_result_types
+			# (ok,comp_st) = compare dcl_cons_type.st_result icl_cons_type.st_result comp_st
+			| ok
+				= compare dcl_cons_type.st_context icl_cons_type.st_context comp_st
+				= (False,comp_st)
+			= compare dcl_cons_type.st_context icl_cons_type.st_context comp_st
 
 compareClassDefs :: !{#Int} {#Bool} !{# ClassDef} !{# MemberDef} !u:{# ClassDef} !v:{# MemberDef} !*CompareState
 	-> (!u:{# ClassDef}, !v:{# MemberDef}, !*CompareState)
@@ -295,6 +300,12 @@ where
 	compare (TFA dclvars dcltype) (TFA iclvars icltype) comp_st=:{comp_type_var_heap}
 		# comp_type_var_heap = initialyseATypeVars dclvars iclvars comp_type_var_heap
 		  (ok, comp_st) = compare dcltype icltype {comp_st & comp_type_var_heap = comp_type_var_heap}
+		  type_heaps = clear_type_vars dclvars (comp_st.comp_type_var_heap, comp_st.comp_attr_var_heap)
+		  (comp_type_var_heap, comp_attr_var_heap) = clear_type_vars iclvars type_heaps
+		= (ok, {comp_st & comp_type_var_heap = comp_type_var_heap, comp_attr_var_heap = comp_attr_var_heap})
+	compare (TFAC dclvars dcltype dcl_contexts) (TFAC iclvars icltype icl_contexts) comp_st=:{comp_type_var_heap}
+		# comp_type_var_heap = initialyseATypeVars dclvars iclvars comp_type_var_heap
+		  (ok, comp_st) = compare (dcltype,dcl_contexts) (icltype,icl_contexts) {comp_st & comp_type_var_heap = comp_type_var_heap}
 		  type_heaps = clear_type_vars dclvars (comp_st.comp_type_var_heap, comp_st.comp_attr_var_heap)
 		  (comp_type_var_heap, comp_attr_var_heap) = clear_type_vars iclvars type_heaps
 		= (ok, {comp_st & comp_type_var_heap = comp_type_var_heap, comp_attr_var_heap = comp_attr_var_heap})
@@ -940,6 +951,10 @@ instance t_corresponds Type where
 	t_corresponds (TFA dclVars dclType) (TFA iclVars iclType)
 		=	do (init_atype_vars dclVars iclVars)
 		&&&	t_corresponds dclType iclType
+	t_corresponds (TFAC dclVars dclType dclContexts) (TFAC iclVars iclType iclContexts)
+		=	do (init_atype_vars dclVars iclVars)
+		&&&	t_corresponds dclType iclType
+		&&&	t_corresponds dclContexts iclContexts
 	t_corresponds _ _
 		= return False
 		
@@ -1084,9 +1099,9 @@ instance e_corresponds FunctionBody where
 	// both bodies are either CheckedBodies or TransformedBodies
 	e_corresponds dclDef iclDef
 		=	e_corresponds (from_body dclDef) (from_body iclDef)
-	  where
-		from_body (TransformedBody {tb_args, tb_rhs}) = (tb_args, [tb_rhs])
-		from_body (CheckedBody {cb_args, cb_rhs}) = (cb_args, [ca_rhs \\ {ca_rhs} <- cb_rhs])
+
+from_body (TransformedBody {tb_args, tb_rhs}) = (tb_args, [tb_rhs])
+from_body (CheckedBody {cb_args, cb_rhs}) = (cb_args, [ca_rhs \\ {ca_rhs} <- cb_rhs])
 		
 instance e_corresponds FreeVar where
 	e_corresponds dclVar iclVar
@@ -1387,31 +1402,3 @@ do_nothing ec_state
 give_error s ec_state
 	= { ec_state & ec_error_admin = checkError s ErrorMessage ec_state.ec_error_admin }
 
-/*
-instance <<< Priority
-	where
-		(<<<) file NoPrio = file <<< "NoPrio"		
-		(<<<) file (Prio LeftAssoc i) = file <<< "Prio LeftAssoc " <<< i
-		(<<<) file (Prio RightAssoc i) = file <<< "Prio RightAssoc " <<< i
-		(<<<) file (Prio NoAssoc i) = file <<< "Prio NoAssoc " <<< i
-
-Trace_array a
-	= trace_array 0
-	where
-		trace_array i
-			| i<size a
-				= Trace_tn i && Trace_tn a.[i] && trace_array (i+1)
-				= True;
-
-Trace_tn d
-	= file_to_true (stderr <<< d <<< '\n')
-
-file_to_true :: !File -> Bool;
-file_to_true file = code {
-  .inline file_to_true
-          pop_b 2
-          pushB TRUE
-  .end
- };
-
-*/

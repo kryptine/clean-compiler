@@ -301,6 +301,9 @@ instance convertDynamics Expression where
 		= (EE, ci)
 	convertDynamics cinp expr=:(NoBind _) ci
 		= (expr,ci)
+	convertDynamics cinp (DictionariesFunction dictionaries expr expr_type) ci
+		# (expr,ci) = convertDynamics cinp expr ci
+		= (DictionariesFunction dictionaries expr expr_type,ci)
 
 instance convertDynamics App where
 	convertDynamics cinp app=:{app_args} ci
@@ -561,6 +564,7 @@ where
 		# type_fun
 			=	App {app_symb = fun_ident, app_args = [], app_info_ptr = nilPtr}
 		= (App {app_symb = cinp_dynamic_representation.dr_type_code_constructor_symb_ident, app_args = [type_fun], app_info_ptr = nilPtr}, ci)
+
 	typeConstructor (GTT_Basic basic_type) ci
 		#! predefined_TC_basic_type
 			= case basic_type of
@@ -737,7 +741,6 @@ create_dynamic_and_selector_idents common_defs predefined_symbols
 	// otherwise
 		# ({pds_module=pds_module1, pds_def=pds_def1} , predefined_symbols) = predefined_symbols![PD_Dyn_DynamicTemp]
 		# {td_rhs=RecordType {rt_constructor}} = common_defs.[pds_module1].com_type_defs.[pds_def1]
-	
 		# dynamic_defined_symbol
 			= {glob_module = pds_module1, glob_object = rt_constructor}
 		# dynamic_type = {gi_module = pds_module1, gi_index = pds_def1}

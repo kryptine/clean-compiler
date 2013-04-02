@@ -196,6 +196,8 @@ where
 		= file <<< "(->) " <<< t	
 	(<<<) file (TFA vars types)
 		= file <<< "A." <<< vars <<< ':' <<< types
+	(<<<) file (TFAC vars types contexts)
+		= file <<< "A." <<< vars <<< ':' <<< types <<< " | " <<< contexts
 	(<<<) file (TQV varid)
 		= file <<< "E." <<< varid
 	(<<<) file (TempQV tv_number)
@@ -403,6 +405,8 @@ where
 
 	(<<<) file (FailExpr _) = file <<< "** FAIL **"
 	(<<<) file (TypeSignature array_kind expr) = file <<< "TypeSignature " <<< '(' <<< expr <<< ')'
+	(<<<) file (DictionariesFunction dictionaries expr expr_type)
+		= file <<< "DictionariesFunction " <<< dictionaries <<< expr <<< expr_type
 	(<<<) file expr         				= abort ("<<< (Expression)" )
 	
 instance <<< LetBind
@@ -573,11 +577,13 @@ where
 instance <<< FunCall
 where
 	(<<<) file (FunCall fc_index fc_level)
-			= file <<< fc_index <<< '.' <<< fc_level
+		= file <<< fc_index <<< '.' <<< fc_level
 	(<<<) file (MacroCall module_index fc_index fc_level)
-			= file <<< "MacroCall "<<< module_index <<<" "<<<fc_index <<< '.' <<< fc_level
+		= file <<< "MacroCall "<<< module_index <<<" "<<<fc_index <<< '.' <<< fc_level
 	(<<<) file (DclFunCall module_index fc_index)
-			= file <<< "DclFunCall "<<< module_index <<<" "<<<fc_index
+		= file <<< "DclFunCall "<<< module_index <<<" "<<<fc_index
+	(<<<) file (GeneratedFunCall fc_index _)
+		= file <<< "GeneratedFunCall "<<< fc_index
 
 instance <<< FreeVar
 where

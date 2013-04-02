@@ -292,6 +292,7 @@ cNameLocationDependent :== True
 	,	pc_exi_vars		:: ![ATypeVar]
 	,	pc_arg_types	:: ![AType]
 	,	pc_args_strictness	:: !StrictnessList
+	,	pc_context		:: ![TypeContext]
 	,	pc_cons_prio	:: !Priority
 	,	pc_cons_pos		:: !Position
 	}
@@ -725,6 +726,7 @@ pIsSafe			:== True
 //::	VarInfo  =	VI_Empty | VI_Type !AType !(Optional CoercionPosition) | VI_FAType ![ATypeVar] !AType !(Optional CoercionPosition) |
 ::	VarInfo  =	VI_Empty | VI_Type !AType !VI_TypeInfo |
 				VI_FAType ![ATypeVar] !AType !VI_TypeInfo |
+				VI_FATypeC ![ATypeVar] !AType ![TypeContext] !VI_TypeInfo | VI_FPC |
 				VI_Occurrence !Occurrence | VI_UsedVar !Ident |
 				VI_Expression !Expression | VI_Variable !Ident !VarInfoPtr | VI_LiftedVariable !VarInfoPtr |
 				VI_Count !Int /* the reference count of a variable */ !Bool /* true if the variable is global, false otherwise */ |
@@ -737,6 +739,7 @@ pIsSafe			:== True
 				VI_RefFromArrayUpdateOfTupleElem2 !Int ![Selection] |
 				VI_FreeVar !Ident !VarInfoPtr !Int !AType | VI_BoundVar !AType | VI_LocalVar |
 				VI_ClassVar !Ident !VarInfoPtr !Int | /* to hold dictionary variables during overloading */
+				VI_EmptyConstructorClassVar |
 				VI_ForwardClassVar !VarInfoPtr | /* to hold the dictionary variable generated during overloading */
 				VI_Forward !BoundVar | VI_LetVar !LetVarInfo | VI_LetExpression !LetExpressionInfo |
 				VI_CaseOrStrictLetVar !VarInfoPtr | VI_StrictLetVar |
@@ -804,6 +807,10 @@ cNotVarNumber :== -1
 				| SK_NewTypeConstructor !GlobalIndex
 				| SK_Generic !(Global Index) !TypeKind
 				| SK_TypeCode
+				| SK_OverloadedConstructor !(Global Index)
+				| SK_TFACVar !ExprInfoPtr
+				| SK_VarContexts !(VarContexts TypeContext)
+				| SK_TypeCodeAndContexts !(VarContexts TypeContext)
 
 /*	Some auxiliary type definitions used during fusion. Actually, these definitions
 	should have been given in seperate module. Unfortunately, Clean's module system
@@ -849,9 +856,12 @@ cNotVarNumber :== -1
 		/* For handling overloading */
 
 					| EI_Overloaded !OverloadedCall 						/* initial, set by the type checker */
+					| EI_OverloadedWithVarContexts !OverloadedCallWithVarContexts /* initial, set by the type checker */
 					| EI_Instance 	!(Global DefinedSymbol) ![Expression]	/* intermedediate, used during resolving of overloading */ 
 					| EI_Selection 	![Selection] !VarInfoPtr ![Expression]	/* intermedediate, used during resolving of overloading */
 					| EI_Context 	![Expression]							/* intermedediate, used during resolving of overloading */
+					| EI_ContextWithVarContexts ![Expression] !(VarContexts DictionaryAndClassType) /* intermedediate, used during resolving of overloading */
+					| EI_FPContext	![Expression] !ExprInfoPtr				/* intermedediate, used during resolving of overloading */
 
 		/* For handling dynamics */
 
@@ -870,9 +880,11 @@ cNotVarNumber :== -1
 
 					| EI_TypeOfDynamic 			!TypeCodeExpression						/* Final */
 					| EI_TypeOfDynamicPattern 	![VarInfoPtr] !TypeCodeExpression		/* Final */
+					| EI_TypeOfDynamicWithContexts !TypeCodeExpression !(VarContexts DictionaryAndClassType)
 
 					| EI_TypeCode 		!TypeCodeExpression
 					| EI_TypeCodes 		![TypeCodeExpression]
+					| EI_TypeCodesWithContexts ![TypeCodeExpression] !(VarContexts DictionaryAndClassType)
 
 					| EI_Attribute !Int
 
@@ -882,6 +894,7 @@ cNotVarNumber :== -1
 					| EI_DictionaryType !Type
 					| EI_CaseType !CaseType
 					| EI_LetType ![AType]
+					| EI_CaseTypeWithContexts !CaseType ![(DefinedSymbol,[TypeContext])]
 					| EI_CaseTypeAndRefCounts !CaseType !RefCountsInCase
 					| EI_CaseTypeAndSplits !CaseType !SplitsInCase
 					| EI_LetTypeAndRefCounts ![AType] ![Int]
@@ -914,6 +927,21 @@ cNotVarNumber :== -1
 	,	oc_context	:: ![TypeContext]
 	,	oc_specials	:: ![Special]
 	}
+
+::	OverloadedCallWithVarContexts = 
+	{	ocvc_symbol       :: !SymbIdent
+	,	ocvc_context      :: ![TypeContext]
+	,	ocvc_var_contexts :: !VarContexts TypeContext
+	}
+
+::	DictionaryAndClassType =
+	{	dc_var			:: !VarInfoPtr
+	,	dc_class_type	:: !AType
+	}
+
+::	VarContexts type_contexts
+	= VarContext !Int /*arg_n*/ ![type_contexts] !AType !(VarContexts type_contexts)
+	| NoVarContexts
 
 /*
 	CaseType contains the type information needed to type the corresponding case construct:
@@ -991,7 +1019,6 @@ cNotVarNumber :== -1
 ::	TempAttrId		:== Int
 ::	TempVarId		:== Int
 
-
 ::	Type	=	TA !TypeSymbIdent ![AType]
 			|	TAS !TypeSymbIdent ![AType] !StrictnessList
 			|	(-->) infixr 9 !AType !AType
@@ -1004,6 +1031,9 @@ cNotVarNumber :== -1
 
 			| 	GTV !TypeVar
 			| 	TV !TypeVar
+
+			|	TFAC ![ATypeVar] !Type ![TypeContext]	// Universally quantified function argument type with contexts
+
 			|	TempV !TempVarId				/* Auxiliary, used during type checking */
 			
 			|	TQV	TypeVar
@@ -1101,7 +1131,7 @@ cNotVarNumber :== -1
 					| TA_Anonymous | TA_None
 					| TA_List !Int !TypeAttribute | TA_Locked !TypeAttribute
 					| TA_MultiOfPropagatingConsVar // only filled in after type checking, semantically equal to TA_Multi
-							
+
 ::	AttributeVar =
 	{	av_ident			:: !Ident
 	,	av_info_ptr		:: !AttrVarInfoPtr
@@ -1312,6 +1342,8 @@ cIsNotStrict	:== False
 				| MatchExpr !(Global DefinedSymbol) !Expression
 				| IsConstructor !Expression !(Global DefinedSymbol) /*arity*/!Int !GlobalIndex !Ident !Position
 				| FreeVar FreeVar 
+				| DictionariesFunction ![(FreeVar,AType)] !Expression !AType
+
 				| Constant !SymbIdent !Int !Priority		/* auxiliary clause used during checking */
 				| ClassVariable !VarInfoPtr					/* auxiliary clause used during overloading */
 
@@ -1522,7 +1554,7 @@ ParsedSelectorToSelectorDef sd_type_index ps :==
 ParsedConstructorToConsDef pc :==
 	{	cons_ident = pc.pc_cons_ident, cons_pos = pc.pc_cons_pos, cons_priority = pc.pc_cons_prio, cons_number = NoIndex, cons_type_index = NoIndex,
 		cons_type = { st_vars = [], st_args = pc.pc_arg_types, st_args_strictness=pc.pc_args_strictness, st_result = MakeAttributedType TE, 
-				  st_arity = pc.pc_cons_arity, st_context = [], st_attr_env = [], st_attr_vars = []},
+				  st_arity = pc.pc_cons_arity, st_context = pc.pc_context, st_attr_env = [], st_attr_vars = []},
 		cons_exi_vars = pc.pc_exi_vars, cons_type_ptr = nilPtr }
 
 ParsedInstanceToClassInstance pi members member_types :==

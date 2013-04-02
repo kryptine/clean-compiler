@@ -437,6 +437,8 @@ where
 		= fc_state
 	find_calls fc_info (FailExpr _) fc_state
 		= fc_state
+	find_calls fc_info (DictionariesFunction dictionaries expr expr_type) fc_state
+		= find_calls fc_info expr fc_state
 
 instance find_calls App
 where

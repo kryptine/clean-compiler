@@ -16,6 +16,7 @@ import syntax, expand_types, unitype, utilities, checktypes
 	,	tst_lifted		:: !Int
 	,	tst_result		:: !AType
 	,	tst_context		:: ![TypeContext]
+	,	tst_var_contexts :: !(VarContexts TypeContext)
 	,	tst_attr_env	:: ![AttrCoercion]
 	}
 
@@ -192,6 +193,11 @@ instance clean_up [a] | clean_up a
 where
 	clean_up cui l cus = mapSt (clean_up cui) l cus
 
+instance clean_up DictionaryAndClassType where
+	clean_up cui {dc_var,dc_class_type} cus
+		# (dc_class_type,cus) = clean_up cui dc_class_type cus
+		= ({dc_var=dc_var,dc_class_type=dc_class_type},cus)
+
 cleanUpVariable _ TE tv_number cus=:{cus_heaps,cus_var_store,cus_var_env}
 	# (tv_info_ptr, th_vars) = newPtr TVI_Empty cus_heaps.th_vars
 	  new_var = TV {tv_ident = NewVarId cus_var_store, tv_info_ptr = tv_info_ptr}
@@ -211,6 +217,7 @@ cClosed				:== 0
 cDefinedVar			:== 1
 cUndefinedVar		:== 2
 cLiftedVar			:== 4
+cQVar				:== 8
 
 cleanUpClosedVariable TE env
 	= (cUndefinedVar, TE, env)
@@ -255,6 +262,10 @@ where
 			= (cur1, TempCV tv_number :@: types, env)
 			# (cur2, types, env) = cleanUpClosed types env
             = (combineCleanUpResults cur1 cur2, simplifyTypeApplication type types, env)
+	cleanUpClosed t=:(TempQV _) env
+		= (cQVar, t, env)
+	cleanUpClosed t=:(TempQDV _) env
+		= (cQVar, t, env)
 	cleanUpClosed t env
 		= (cClosed, t, env)
 
@@ -380,6 +391,13 @@ where
 			= ({ at & at_type = TFA avars type, at_attribute = at_attribute}, (all_exi_vars, cus))
 			= ({ at & at_type = TFA avars type, at_attribute = at_attribute},
 					(all_exi_vars, {cus & cus_error = existentialError cus.cus_error, cus_exis_vars = []}))
+	clean_up_arg_type cui at=:{at_type = TFAC avars type contexts, at_attribute} (all_exi_vars, cus)
+		# (at_attribute, cus) 	= cleanUpTypeAttribute False cui at_attribute cus
+		  (type, cus)			= clean_up cui type cus
+		| isEmpty cus.cus_exis_vars
+			= ({ at & at_type = TFAC avars type contexts, at_attribute = at_attribute}, (all_exi_vars, cus))
+			= ({ at & at_type = TFAC avars type contexts, at_attribute = at_attribute},
+					(all_exi_vars, {cus & cus_error = existentialError cus.cus_error, cus_exis_vars = []}))
 	clean_up_arg_type cui at (all_exi_vars, cus)
 		# (at, cus) = clean_up cui at cus
 		  (cus_exis_vars, cus) = cus!cus_exis_vars
@@ -412,9 +430,9 @@ where
 		|  spec_type
 			# var_heap = foldSt (mark_specified_context derived_context) spec_context var_heap
 			  (rev_contexts, env, error) = foldSt clean_up_lifted_type_context derived_context ([], env, error)
-			  (rev_contexts, env, error) = foldSt clean_up_type_context spec_context (rev_contexts, env, error)
+			  (rev_contexts, env, var_heap, error) = foldSt clean_up_type_context spec_context (rev_contexts, env, var_heap, error)
 			= (reverse rev_contexts, env, var_heap, error)
-			# (rev_contexts, env, error) = foldSt clean_up_type_context derived_context ([], env, error)
+			# (rev_contexts, env, var_heap, error) = foldSt clean_up_type_context derived_context ([], env, var_heap, error)
 			= (reverse rev_contexts, env, var_heap, error)
 
 	mark_specified_context [] spec_tc var_heap
@@ -426,13 +444,17 @@ where
 				= var_heap <:= (spec_tc.tc_var, VI_ForwardClassVar tc_var)
 			= mark_specified_context tcs spec_tc var_heap
 
-	clean_up_type_context tc=:{tc_types, tc_class} (collected_contexts, env, error)
+	clean_up_type_context tc=:{tc_types,tc_class,tc_var} (collected_contexts, env, var_heap, error)
+		| case sreadPtr tc_var var_heap of VI_EmptyConstructorClassVar-> True; _ -> False
+			= (collected_contexts, env, var_heap, error)
 		# (cur, tc_types, env) = cleanUpClosed tc_types env
 		| checkCleanUpResult cur cUndefinedVar
-			= (collected_contexts, env, error)
+			= (collected_contexts, env, var_heap, error)
 		| checkCleanUpResult cur cLiftedVar
-			= ([{ tc & tc_types = tc_types } : collected_contexts ], env, liftedContextError (toString tc_class) error)
-			= ([{ tc & tc_types = tc_types } : collected_contexts ], env, error)
+			= ([{ tc & tc_types = tc_types } : collected_contexts ], env, var_heap, liftedContextError (toString tc_class) error)
+		| checkCleanUpResult cur cQVar
+			= (collected_contexts, env, var_heap, error)
+			= ([{ tc & tc_types = tc_types } : collected_contexts ], env, var_heap, error)
 
 	clean_up_lifted_type_context tc=:{tc_types} (collected_contexts, env, error)
 		# (cur, tc_types, env) = cleanUpClosed tc.tc_types env
@@ -512,6 +534,35 @@ where
 				EI_DictionaryType dict_type
 					# (dict_type, cus) = clean_up cui dict_type cus
 					-> (expr_heap <:= (expr_ptr, EI_DictionaryType dict_type), cus)
+				EI_ContextWithVarContexts class_expressions var_contexts
+					# (var_contexts,cus) = clean_up_var_contexts var_contexts cus
+					-> (writePtr expr_ptr (EI_ContextWithVarContexts class_expressions var_contexts) expr_heap,cus)
+				where
+					clean_up_var_contexts (VarContext arg_n type_contexts arg_atype var_contexts) cus
+						# (type_contexts,cus) = clean_up cui type_contexts cus
+						  (arg_atype,cus) = clean_up cui arg_atype cus
+						  (var_contexts,cus) = clean_up_var_contexts var_contexts cus
+						= (VarContext arg_n type_contexts arg_atype var_contexts,cus)
+					clean_up_var_contexts NoVarContexts cus
+						= (NoVarContexts,cus)
+				EI_CaseTypeWithContexts case_type constructor_contexts
+					# (case_type, cus) = clean_up cui case_type cus
+					  (constructor_contexts, cus) = clean_up_constructor_contexts cui constructor_contexts cus
+					-> (expr_heap <:= (expr_ptr, EI_CaseTypeWithContexts case_type constructor_contexts), cus)
+				where
+					clean_up_constructor_contexts cui [(ds,type_contexts):constructor_contexts] cus
+						# (type_contexts,cus) = clean_up_type_contexts cui type_contexts cus
+						  (constructor_contexts,cus) = clean_up_constructor_contexts cui constructor_contexts cus
+						= ([(ds,type_contexts):constructor_contexts],cus)
+					clean_up_constructor_contexts cui [] cus
+						= ([],cus)
+
+					clean_up_type_contexts cui [type_contexts=:{tc_types}:constructor_contexts] cus
+						# (tc_types,cus) = clean_up cui tc_types cus
+						  (constructor_contexts,cus) = clean_up_type_contexts cui constructor_contexts cus
+						= ([{type_contexts & tc_types=tc_types}:constructor_contexts],cus)
+					clean_up_type_contexts cui [] cus
+						= ([],cus)
 
  	check_type_of_start_rule is_start_rule {st_context,st_arity,st_args} cus_error
  		| is_start_rule
@@ -540,6 +591,10 @@ where
 			# (at_attribute, cus) 	= cleanUpTypeAttribute False cui at_attribute cus
 			  (type, cus)			= clean_up cui type cus
 			= ({ at & at_type = TFA avars type, at_attribute = at_attribute}, cus)
+		clean_up_arg_type cui at=:{at_type = TFAC avars type contexts, at_attribute} cus
+			# (at_attribute, cus) 	= cleanUpTypeAttribute False cui at_attribute cus
+			  (type, cus)			= clean_up cui type cus
+			= ({ at & at_type = TFAC avars type contexts, at_attribute = at_attribute}, cus)
 		clean_up_arg_type cui at cus
 			= clean_up cui at cus
 
@@ -562,6 +617,9 @@ updateExpressionTypes {st_args,st_vars,st_result,st_attr_vars} st_copy type_ptrs
 	= foldSt update_expression_type type_ptrs ({heaps & th_vars = th_vars}, expr_heap)
 where
 	bind_instances_in_arg_type {at_type = TFA vars type1} {at_type = TFA _ type2} heaps
+		# heaps = clear_atype_vars vars heaps
+		= {heaps & th_vars = bindInstances type1 type2 heaps.th_vars}
+	bind_instances_in_arg_type {at_type = TFAC vars type1 _} {at_type = TFAC _ type2 _} heaps
 		# heaps = clear_atype_vars vars heaps
 		= {heaps & th_vars = bindInstances type1 type2 heaps.th_vars}
 	bind_instances_in_arg_type { at_type } atype2 heaps=:{th_vars}
@@ -594,6 +652,35 @@ where
 			EI_DictionaryType dict_type
 				# (_, dict_type, type_heaps) = substitute dict_type type_heaps
 				-> (type_heaps, expr_heap <:= (expr_ptr, EI_DictionaryType dict_type))
+			EI_ContextWithVarContexts class_expressions var_contexts
+				# (var_contexts,type_heaps) = substitute_var_contexts var_contexts type_heaps
+				-> (type_heaps,writePtr expr_ptr (EI_ContextWithVarContexts class_expressions var_contexts) expr_heap)
+			where
+				substitute_var_contexts (VarContext arg_n type_contexts arg_atype var_contexts) type_heaps
+					# (_, type_contexts,type_heaps) = substitute type_contexts type_heaps
+					  (_, arg_atype,type_heaps) = substitute arg_atype type_heaps
+					  (var_contexts,type_heaps) = substitute_var_contexts var_contexts type_heaps
+					= (VarContext arg_n type_contexts arg_atype var_contexts,type_heaps)
+				substitute_var_contexts NoVarContexts type_heaps
+					= (NoVarContexts,type_heaps)
+			EI_CaseTypeWithContexts case_type constructor_contexts
+				# (_,case_type, type_heaps) = substitute case_type type_heaps
+				  (constructor_contexts, type_heaps) = substitute_constructor_contexts constructor_contexts type_heaps
+				-> (type_heaps, expr_heap <:= (expr_ptr, EI_CaseTypeWithContexts case_type constructor_contexts))
+		where
+			substitute_constructor_contexts [(cons_symbol,context):constructor_contexts] type_heaps
+				# (_, context, type_heaps) = substitute context type_heaps
+				  (constructor_contexts, type_heaps) = substitute_constructor_contexts constructor_contexts type_heaps
+				= ([(cons_symbol,context):constructor_contexts],type_heaps)
+			substitute_constructor_contexts [] type_heaps
+				= ([],type_heaps)
+
+instance substitute DictionaryAndClassType where
+	substitute {dc_var,dc_class_type} type_heaps
+		# (changed,dc_class_type_r,type_heaps) = substitute dc_class_type type_heaps
+		| changed
+			= (True, {dc_var=dc_var,dc_class_type=dc_class_type_r},type_heaps)
+			= (False, {dc_var=dc_var,dc_class_type=dc_class_type},type_heaps)
 
 class bindInstances a :: !a !a !*TypeVarHeap -> *TypeVarHeap
 
@@ -783,6 +870,8 @@ where
 		// should occur only for A. type variables
 		= equiv types1 types2 heaps
 	equiv (TFA vars1 type1) (TFA vars2 type2) heaps
+		= equiv type1 type2 heaps
+	equiv (TFAC vars1 type1 _) (TFAC vars2 type2 _) heaps
 		= equiv type1 type2 heaps
 	equiv type1 type2 heaps
 		= (False, heaps)
@@ -1182,6 +1271,11 @@ where
 		 # (file, opt_beautifulizer) = writeType (file <<< "(A.") opt_beautifulizer (form, vars)
 		 # (file, opt_beautifulizer) = writeType (file <<< ":") opt_beautifulizer (clearProperty form cBrackets, type)
 		 = (file <<< ")", opt_beautifulizer)
+	writeType file opt_beautifulizer (form, TFAC vars type contexts)
+		 # (file, opt_beautifulizer) = writeType (file <<< "(A.") opt_beautifulizer (form, vars)
+		   (file, opt_beautifulizer) = writeType (file <<< ":") opt_beautifulizer (clearProperty form cBrackets, type)
+		   (file, opt_beautifulizer) = show_context form contexts (file,opt_beautifulizer)
+		 = (file <<< ")", opt_beautifulizer)
 	writeType file opt_beautifulizer (form, TQV varid)
 		= (file <<< "E." <<< varid, opt_beautifulizer)
 	writeType file opt_beautifulizer (form, TempQV tv_number)
@@ -1435,6 +1529,8 @@ getImplicitAttrInequalities st=:{st_args, st_result}
 		= get_ineqs_of_atype_list args
 	get_ineqs_of_type (TFA vars type)
 		= get_ineqs_of_type type
+	get_ineqs_of_type (TFAC vars type type_contexts)
+		= get_ineqs_of_type type
 	get_ineqs_of_type _
 		= Empty
 
@@ -1619,6 +1715,9 @@ anonymizeAttrVars st=:{st_attr_vars, st_args, st_result, st_attr_env} implicit_i
 	anonymize_type (TFA vars type) th_attrs
 		# (type, th_attrs) = anonymize_type type th_attrs
 		= (TFA vars type, th_attrs)
+	anonymize_type (TFAC vars type type_contexts) th_attrs
+		# (type, th_attrs) = anonymize_type type th_attrs
+		= (TFAC vars type type_contexts, th_attrs)
 	anonymize_type x th_attrs
 		= (x, th_attrs)
 
@@ -1884,6 +1983,8 @@ instance performOnAttrVars Type
 	performOnAttrVars f (TArrow1 at) st
 		= performOnAttrVars f at st
 	performOnAttrVars f (TFA vars type) st
+		= performOnAttrVars f type st
+	performOnAttrVars f (TFAC vars type type_contexts) st
 		= performOnAttrVars f type st
 	performOnAttrVars f _ st
 		= st
