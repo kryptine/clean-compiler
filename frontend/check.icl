@@ -2244,7 +2244,7 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 	  hp_var_heap = heaps.hp_var_heap
 	# (icl_type_fun_range, dcl_modules, icl_functions, icl_common, cs_predef_symbols, hp_var_heap, cs_symbol_table)
 		= if support_dynamics
-			(addTypeFunctions mod_ident nr_of_cached_modules dcl_modules icl_functions icl_common cs_predef_symbols hp_var_heap cs_symbol_table)
+			(addTypeFunctions nr_of_cached_modules dcl_modules icl_functions icl_common cs_predef_symbols hp_var_heap cs_symbol_table)
 			({ir_from=0,ir_to=0}, dcl_modules, icl_functions, icl_common, cs_predef_symbols, hp_var_heap, cs_symbol_table)
 	# cs = {cs & cs_symbol_table=cs_symbol_table, cs_predef_symbols=cs_predef_symbols}
 	# heaps = {heaps & hp_var_heap=hp_var_heap}

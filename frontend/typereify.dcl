@@ -10,7 +10,7 @@ from syntax import
 from predef import
 	::PredefinedSymbols, ::PredefinedSymbol
 
-addTypeFunctions :: Ident Int *{#DclModule} *{#FunDef} *CommonDefs *PredefinedSymbols *VarHeap *SymbolTable
+addTypeFunctions :: Int *{#DclModule} *{#FunDef} *CommonDefs *PredefinedSymbols *VarHeap *SymbolTable
 			  -> (IndexRange, *{#DclModule},*{#FunDef},*CommonDefs,*PredefinedSymbols,*VarHeap,*SymbolTable)
 
 buildTypeFunctions :: !Int !*{#FunDef} !{#CommonDefs} !*PredefinedSymbols !*VarHeap !*TypeHeaps
