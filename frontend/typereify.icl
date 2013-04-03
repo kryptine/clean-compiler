@@ -144,8 +144,8 @@ addTypeFunctions mod_ident nr_cached_dcls dcl_modules icl_functions icl_common p
 :: Info = { ri_main :: !Int, ri_common_defs :: !{#CommonDefs} }
 
 buildTypeFunctions :: !Int !*{#FunDef} !{#CommonDefs}
-	*PredefinedSymbols *VarHeap *TypeHeaps
-	-> (*{#FunDef}, *PredefinedSymbols, *VarHeap, *TypeHeaps)
+					 !*PredefinedSymbols !*VarHeap !*TypeHeaps
+	-> (!*{#FunDef}, !*PredefinedSymbols,!*VarHeap,!*TypeHeaps)
 buildTypeFunctions main icl_functions common_defs predefs var_heap type_heaps
 	# bs_state =
 		{	bs_predefs = predefs
@@ -153,9 +153,9 @@ buildTypeFunctions main icl_functions common_defs predefs var_heap type_heaps
 		,	bs_type_heaps = type_heaps
 		}
 	# type_defs = common_defs.[main].com_type_defs
-	# (type_funs, bs_state)
+	# (type_funs, {bs_predefs,bs_var_heap,bs_type_heaps})
 		=	build 0 (size type_defs) type_defs icl_functions bs_state 
-	= (type_funs, bs_state.bs_predefs, bs_state.bs_var_heap, bs_state.bs_type_heaps)
+	= (type_funs, bs_predefs, bs_var_heap, bs_type_heaps)
 	where
 		build i n type_defs functions bs_state
 			| i < n
@@ -203,7 +203,7 @@ addTypeFunctionsA mod first_td_fun_index ct_type_def type_defs var_heap symbol_t
 				| isTypeSynonym type_def || is_dictionary type_def
 					=	add_td_funs_acc (i+1) n index ct_type_def type_defs rev_type_fun_defs var_heap symbol_table
 					# (type_fun_def, var_heap, symbol_table)
-						=	add_td_fun_def index ct_type_def type_def var_heap symbol_table
+						=	add_td_fun_def index type_def.td_ident.id_name type_def.td_pos ct_type_def var_heap symbol_table
 					# type_defs = {type_defs & [i].td_fun_index = index}
 					# rev_type_fun_defs = [type_fun_def : rev_type_fun_defs]
 					= add_td_funs_acc (i+1) n (index+1) ct_type_def type_defs rev_type_fun_defs var_heap symbol_table
@@ -213,29 +213,29 @@ addTypeFunctionsA mod first_td_fun_index ct_type_def type_defs var_heap symbol_t
 			where
 				name = td_ident.id_name
 
-		add_td_fun_def :: Int TypeSymbIdent CheckedTypeDef *VarHeap *SymbolTable
-			-> (a, *VarHeap, *SymbolTable) | makeTypeFun a
-		add_td_fun_def index ct_type_def type_def=:{td_ident, td_pos} var_heap symbol_table
-			#	entry =	{	ste_kind		= STE_Empty
-						,	ste_index		= index
-						,	ste_def_level	= -1
-						,	ste_previous	= EmptySymbolTableEntry
-						}
-			# (fun_ident, symbol_table)
-				=	newPtr entry symbol_table
-			# type_fun_ident = {id_name="TD;"+++td_ident.id_name, id_info=fun_ident}
+add_td_fun_def :: Int {#Char} Position TypeSymbIdent *VarHeap  *SymbolTable
+											 -> (!a,!*VarHeap,!*SymbolTable) | makeTypeFun a
+add_td_fun_def type_fun_index type_name pos ct_type_def var_heap symbol_table
+	#	entry =	{	ste_kind		= STE_Empty
+				,	ste_index		= type_fun_index
+				,	ste_def_level	= -1
+				,	ste_previous	= EmptySymbolTableEntry
+				}
+	# (fun_ident, symbol_table)
+		=	newPtr entry symbol_table
+	# type_fun_ident = {id_name="TD;"+++type_name, id_info=fun_ident}
 
-			# result_type = TA ct_type_def [{at_attribute = TA_None, at_type = TB BT_Bool}]
+	# result_type = TA ct_type_def [{at_attribute = TA_None, at_type = TB BT_Bool}]
 
-			# symbol_type =
-					{	st_vars = []
-					,	st_args = [{at_attribute= TA_None, at_type = TB BT_Bool}]
-					,	st_args_strictness = NotStrict
-					,	st_arity = 1
-					,	st_result = {at_attribute = TA_None, at_type = result_type}
-					,	st_context = []
-					,	st_attr_vars = []
-					,	st_attr_env = []
-					}
+	# symbol_type =
+			{	st_vars = []
+			,	st_args = [{at_attribute= TA_None, at_type = TB BT_Bool}]
+			,	st_args_strictness = NotStrict
+			,	st_arity = 1
+			,	st_result = {at_attribute = TA_None, at_type = result_type}
+			,	st_context = []
+			,	st_attr_vars = []
+			,	st_attr_env = []
+			}
 
-			=	makeTypeFun type_fun_ident td_pos symbol_type var_heap symbol_table
+	=	makeTypeFun type_fun_ident pos symbol_type var_heap symbol_table
