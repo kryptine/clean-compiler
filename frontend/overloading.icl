@@ -74,7 +74,7 @@ abstractTypeInDynamicError td_ident err=:{ea_ok}
 	= { err & ea_file = err.ea_file <<< (" derived abstract type '" +++ toString td_ident +++ "' not permitted in a dynamic") <<< '\n' }
 
 typeCodeInDynamicError err=:{ea_ok}
-	# err = errorHeading "Overloading error (warning for now)" err
+	# err = errorHeading "Warning" err
 	  err = {err & ea_ok=ea_ok}
 	= { err & ea_file = err.ea_file <<< "TC context not allowed in dynamic" <<< '\n' }
 
@@ -1350,7 +1350,7 @@ where
 	update_dynamic dyn_ptr (type_code_info, expr_heap, type_pattern_vars, var_heap, error)
 		# (dyn_info, expr_heap) = readPtr dyn_ptr expr_heap 
 		= case dyn_info of
-			EI_TempDynamicType (Yes {dt_global_vars,dt_uni_vars,dt_type}) loc_dynamics _ _ expr_ptr {symb_ident}
+			EI_TempDynamicType (Yes {dt_global_vars,dt_uni_vars,dt_type,dt_contexts}) loc_dynamics _ _ _ expr_ptr {symb_ident}
 				# (expr_info, expr_heap) = readPtr expr_ptr expr_heap
 				-> case expr_info of
 					EI_TypeCodes type_codes
@@ -1371,11 +1371,12 @@ where
 						# (type_var_heap, var_heap, error)
 								= bind_type_vars_to_type_codes symb_ident dt_global_vars type_codes type_code_info.tci_type_var_heap var_heap error
 						  (uni_vars, (type_var_heap, var_heap)) = newTypeVariables dt_uni_vars (type_var_heap, var_heap)
+						  dt_type = add_types_of_dictionaries dt_contexts dt_type type_code_info.tci_common_defs
 						  (type_code_expr, (type_code_info,var_heap,error)) = toTypeCodeExpression (add_universal_vars_to_type dt_uni_vars dt_type)
 						  				({ type_code_info & tci_type_var_heap = type_var_heap }, var_heap, error)
 						  expr_heap = expr_heap <:= (dyn_ptr, EI_TypeOfDynamicWithContexts type_code_expr univ_contexts)
 						-> convert_local_dynamics loc_dynamics (type_code_info, expr_heap, type_pattern_vars, var_heap, error)
-			EI_TempDynamicType No loc_dynamics _ _ expr_ptr {symb_ident}
+			EI_TempDynamicType No loc_dynamics _ _ _ expr_ptr {symb_ident}
 				# (expr_info, expr_heap) = readPtr expr_ptr expr_heap
 				-> case expr_info of
 					EI_TypeCode type_expr
@@ -1386,7 +1387,8 @@ where
 						# (_, var_info_ptr, var_heap, error) = getClassVariable symb_ident record_var var_heap error
 						  expr_heap = expr_heap <:= (dyn_ptr, EI_TypeOfDynamic (convert_selectors selectors var_info_ptr))
 						-> convert_local_dynamics loc_dynamics (type_code_info, expr_heap, type_pattern_vars, var_heap, error)
-			EI_TempDynamicPattern type_vars {dt_global_vars,dt_uni_vars,dt_type} loc_dynamics temp_local_vars _ _ expr_ptr {symb_ident}
+			EI_TempDynamicPattern type_vars {dt_global_vars,dt_uni_vars,dt_type,dt_contexts} loc_dynamics temp_local_vars _ _ expr_ptr {symb_ident}
+				#! no_contexts = isEmpty dt_contexts
 				# (expr_info, expr_heap) = readPtr expr_ptr expr_heap
 				-> case expr_info of
 					EI_TypeCodes type_codes
@@ -1394,20 +1396,30 @@ where
 								= bind_type_vars_to_type_codes symb_ident dt_global_vars type_codes type_code_info.tci_type_var_heap var_heap error
 						  (var_ptrs, (type_pattern_vars, var_heap)) = mapSt addLocalTCInstance temp_local_vars (type_pattern_vars, var_heap)
 						  type_var_heap = bind_type_vars_to_type_var_codes type_vars var_ptrs type_var_heap
+						  dt_type = add_types_of_dictionaries dt_contexts dt_type type_code_info.tci_common_defs
 						  type_code_info = {type_code_info & tci_type_var_heap = type_var_heap}
 						  (type_code_expr, (type_code_info,var_heap,error))
 								= toTypeCodeExpression (add_universal_vars_to_type dt_uni_vars dt_type) (type_code_info, var_heap, error)
-						  expr_heap = expr_heap <:= (dyn_ptr, EI_TypeOfDynamicPattern var_ptrs type_code_expr)
+						  expr_heap = expr_heap <:= (dyn_ptr, EI_TypeOfDynamicPattern var_ptrs type_code_expr no_contexts)
 						-> convert_local_dynamics loc_dynamics (type_code_info, expr_heap, type_pattern_vars, var_heap, error)
 					EI_Empty
 						# (var_ptrs, (type_pattern_vars, var_heap)) = mapSt addLocalTCInstance temp_local_vars (type_pattern_vars, var_heap)
 						  type_var_heap = bind_type_vars_to_type_var_codes type_vars var_ptrs type_code_info.tci_type_var_heap
+  						  dt_type = add_types_of_dictionaries dt_contexts dt_type type_code_info.tci_common_defs
 						  type_code_info = {type_code_info & tci_type_var_heap = type_var_heap}
 						  (type_code_expr, (type_code_info,var_heap,error))
 								= toTypeCodeExpression (add_universal_vars_to_type dt_uni_vars dt_type) (type_code_info, var_heap, error)
-						  expr_heap = expr_heap <:= (dyn_ptr, EI_TypeOfDynamicPattern var_ptrs type_code_expr)
+						  expr_heap = expr_heap <:= (dyn_ptr, EI_TypeOfDynamicPattern var_ptrs type_code_expr no_contexts)
 						-> convert_local_dynamics loc_dynamics (type_code_info, expr_heap, type_pattern_vars, var_heap, error)
 	where
+		add_types_of_dictionaries [{tc_var,tc_class=TCClass {glob_module,glob_object={ds_ident,ds_index}},tc_types}:dictionaries_and_contexts] atype common_defs
+			# {class_dictionary} = common_defs.[glob_module].com_class_defs.[ds_index]
+			  dict_type_symbol = MakeTypeSymbIdent {glob_module=glob_module,glob_object=class_dictionary.ds_index} class_dictionary.ds_ident class_dictionary.ds_arity
+			  class_type = AttributedType (TA dict_type_symbol [AttributedType type \\ type <- tc_types])
+			= {at_attribute=TA_Multi, at_type=class_type --> add_types_of_dictionaries dictionaries_and_contexts atype common_defs}
+		add_types_of_dictionaries [] atype common_defs
+			= atype
+
 		bind_type_vars_to_type_codes symb_ident type_vars type_codes type_var_heap var_heap error
 			= fold2St (bind_type_var_to_type_code symb_ident) type_vars type_codes (type_var_heap, var_heap, error)
 		where
@@ -2041,10 +2053,15 @@ where
 
 instance updateExpression DynamicPattern
 where
-	updateExpression group_index dp=:{dp_type,dp_rhs} ui
-		# (dp_rhs, ui) = updateExpression group_index dp_rhs ui
-		  (EI_TypeOfDynamicPattern type_pattern_vars type_code, ui_symbol_heap) = readPtr dp_type ui.ui_symbol_heap
-		= ({dp & dp_rhs = dp_rhs, dp_type_code = type_code}, {ui & ui_symbol_heap = ui_symbol_heap})
+	updateExpression group_index dp=:{dp_var,dp_type,dp_rhs} ui
+		# (EI_TypeOfDynamicPattern type_pattern_vars type_code no_contexts, ui_symbol_heap) = readPtr dp_type ui.ui_symbol_heap
+		  ui = {ui & ui_symbol_heap = ui_symbol_heap}
+		| no_contexts
+			# (dp_rhs, ui) = updateExpression group_index dp_rhs ui
+			= ({dp & dp_rhs = dp_rhs, dp_type_code = type_code}, ui)
+			# ui = {ui & ui_var_heap = writePtr dp_var.fv_info_ptr VI_FPC ui.ui_var_heap}
+			  (dp_rhs, ui) = updateExpression group_index dp_rhs ui
+			= ({dp & dp_rhs = dp_rhs, dp_type_code = type_code}, ui)
 
 instance updateExpression (a,b) | updateExpression a & updateExpression b
 where

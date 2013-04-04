@@ -793,8 +793,8 @@ checkFunction fun_def=:{fun_ident,fun_pos,fun_body,fun_type,fun_kind} mod_index 
 	  (fun_body, free_vars, e_state, e_info, cs) = checkFunctionBodies fun_body function_ident_for_errors e_input e_state e_info cs
 
 	# {es_fun_defs,es_calls,es_var_heap,es_expr_heap,es_type_heaps,es_generic_heap,es_dynamics} = e_state
-	  (ef_type_defs, ef_modules, es_type_heaps, es_expr_heap, cs) = 
-	  	checkDynamicTypes mod_index es_dynamics fun_type e_info.ef_type_defs e_info.ef_modules es_type_heaps es_expr_heap cs
+	  (ef_type_defs, ef_class_defs, ef_modules, es_type_heaps, es_expr_heap, cs) = 
+	  	checkDynamicTypes mod_index es_dynamics fun_type e_info.ef_type_defs e_info.ef_class_defs e_info.ef_modules es_type_heaps es_expr_heap cs
 	  (fun_body, cs_error) = checkFunctionBodyIfMacro fun_kind fun_body cs.cs_error
 	  cs = { cs & cs_error = popErrorAdmin cs_error }
 	  fi_properties = (if ef_is_macro_fun FI_IsMacroFun 0) bitor (has_type fun_type)
@@ -804,7 +804,7 @@ checkFunction fun_def=:{fun_ident,fun_pos,fun_body,fun_type,fun_kind} mod_index 
 	  fun_def = { fun_def & fun_body = fun_body, fun_info = fun_info, fun_type = fun_type}
 	  (fun_defs,macro_defs,cs_symbol_table) = remove_calls_from_symbol_table fun_index def_level es_calls e_state.es_fun_defs e_info.ef_macro_defs cs.cs_symbol_table
 	= (fun_def,fun_defs,
-			{e_info & ef_type_defs=ef_type_defs, ef_modules=ef_modules, ef_macro_defs=macro_defs},
+			{e_info & ef_type_defs=ef_type_defs, ef_class_defs=ef_class_defs, ef_modules=ef_modules,ef_macro_defs=macro_defs},
 			{heaps & hp_var_heap = es_var_heap, hp_expression_heap = es_expr_heap, hp_type_heaps = es_type_heaps,hp_generic_heap=es_generic_heap},
 			{cs & cs_symbol_table = cs_symbol_table})
 where

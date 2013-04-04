@@ -875,11 +875,11 @@ cNotVarNumber :== -1
 
 		/* Auxiliary, used during type checking */
 
-					| EI_TempDynamicType 		!(Optional DynamicType) ![DynamicPtr] !AType ![TypeContext] !ExprInfoPtr !SymbIdent
+					| EI_TempDynamicType 		!(Optional DynamicType) ![DynamicPtr] !AType ![TypeContext] ![TypeContext] !ExprInfoPtr !SymbIdent
 					| EI_TempDynamicPattern 	![TypeVar] !DynamicType ![DynamicPtr] ![TempLocalVar] !AType ![TypeContext] !ExprInfoPtr !SymbIdent
 
 					| EI_TypeOfDynamic 			!TypeCodeExpression						/* Final */
-					| EI_TypeOfDynamicPattern 	![VarInfoPtr] !TypeCodeExpression		/* Final */
+					| EI_TypeOfDynamicPattern 	![VarInfoPtr] !TypeCodeExpression !Bool	/* Final */
 					| EI_TypeOfDynamicWithContexts !TypeCodeExpression !(VarContexts DictionaryAndClassType)
 
 					| EI_TypeCode 		!TypeCodeExpression
@@ -1056,6 +1056,7 @@ cNotVarNumber :== -1
 	{	dt_uni_vars 	:: ![ATypeVar]
 	,	dt_global_vars	:: ![TypeVar]
 	,	dt_type			:: !AType
+	,	dt_contexts		:: ![TypeContext]
 	}
 
 ::	KindHeap	:== Heap KindInfo

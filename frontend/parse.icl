@@ -2722,17 +2722,28 @@ determAttr attr1    TA_None type pState = adjustAttribute attr1 type pState
 determAttr attr1    attr2   type pState
 	= (attr1, parseError "simple type" No ("More type attributes, "+toString attr1+" and "+toString attr2+", than") pState)
 
-wantDynamicType :: !*ParseState -> *(!DynamicType,!*ParseState)
-wantDynamicType pState 
-	# (type, pState) = want pState
-	# (type_vars, type) = split_vars_and_type type
-	= ({ dt_uni_vars = type_vars, dt_type = type, dt_global_vars = [] }, pState)
-where
-	split_vars_and_type :: AType -> ([ATypeVar], AType)
-	split_vars_and_type atype=:{at_type=TFA vars type}
-		=	(vars, {atype & at_type=type})
-	split_vars_and_type atype
-		=	([], atype)
+wantDynamicTypeInExpression :: !*ParseState -> *(!DynamicType,!*ParseState)
+wantDynamicTypeInExpression pState 
+	# (atype, pState) = want pState
+	= case atype.at_type of
+		TFA vars type
+			# atype = {atype & at_type=type}
+			  (contexts, pState) = optionalContext pState
+			-> ({dt_uni_vars=vars, dt_type=atype, dt_global_vars=[], dt_contexts=contexts}, pState)
+		_
+			-> ({dt_uni_vars=[], dt_type=atype, dt_global_vars=[], dt_contexts=[]}, pState)
+
+wantDynamicTypeInPattern :: !*ParseState -> *(!DynamicType,!*ParseState)
+wantDynamicTypeInPattern pState 
+	# (atype, pState) = want pState
+	= case atype.at_type of
+		TFA vars type
+			# atype = {atype & at_type=type}
+			  (contexts, pState) = optionalContext pState
+			-> ({dt_uni_vars=vars, dt_type=atype, dt_global_vars=[], dt_contexts=contexts}, pState)
+		_
+			 # (contexts, pState) = optionalContext pState
+			-> ({dt_uni_vars=[], dt_type=atype, dt_global_vars=[], dt_contexts=contexts}, pState)
 
 optionalExistentialQuantifiedVariables :: !*ParseState -> *(![ATypeVar],!*ParseState)
 optionalExistentialQuantifiedVariables pState
@@ -2860,7 +2871,7 @@ wantExpressionT DynamicToken pState
 	# (dyn_expr, pState) = wantExpression pState
 	  (token, pState) = nextToken FunctionContext pState
 	| token == DoubleColonToken
-		# (dyn_type, pState) = wantDynamicType pState
+		# (dyn_type, pState) = wantDynamicTypeInPattern/*wantDynamicTypeInExpression*/ pState
 		= (PE_Dynamic dyn_expr (Yes dyn_type), pState)
 		= (PE_Dynamic dyn_expr No, tokenBack pState)
 wantExpressionT token pState
@@ -2878,7 +2889,7 @@ wantPatternT token pState
 	# (exp, pState)	= wantPatternT2 token pState
 	# (token, pState)	= nextToken FunctionContext pState
 	| token == DoubleColonToken
-		# (dyn_type, pState) = wantDynamicType pState
+		# (dyn_type, pState) = wantDynamicTypeInPattern pState
 		= (PE_DynamicPattern exp dyn_type, pState)
 		= (exp, tokenBack pState)
 where
@@ -2903,7 +2914,7 @@ where
 						// not succ
 							-> (PE_Empty,  parseError "LHS expression" (Yes token) "<expression>" pState)
 			| token == DoubleColonToken
-				# (dyn_type, pState) = wantDynamicType pState
+				# (dyn_type, pState) = wantDynamicTypeInPattern pState
 				= (PE_DynamicPattern (PE_Ident id) dyn_type, pState)
 			// token <> DefinesColonToken // token back and call to wantPatternT2 would do also.
 			# (exprs, pState) = parseList trySimplePattern (tokenBack pState)
@@ -3803,7 +3814,7 @@ where
 				# list = PE_List [expr,expr2 : exprs]
 				# (token, pState)	= nextToken FunctionContext pState
 				| token == DoubleColonToken
-					# (dyn_type, pState) = wantDynamicType pState
+					# (dyn_type, pState) = wantDynamicTypeInPattern pState
 					= (True, PE_DynamicPattern list dyn_type, pState)
 					= (True, list, tokenBack pState)
 				= (True, expr, pState)

@@ -1871,17 +1871,27 @@ where
 instance requirements DynamicExpr
 where
 	requirements ti {dyn_expr,dyn_info_ptr} (reqs, ts=:{ts_expr_heap})
-		# (EI_TempDynamicType _ _ dyn_type dyn_context dyn_expr_ptr type_code_symbol, ts_expr_heap) = readPtr dyn_info_ptr ts_expr_heap
+		# (EI_TempDynamicType _ _ dyn_type dyn_context univ_contexts dyn_expr_ptr type_code_symbol, ts_expr_heap) = readPtr dyn_info_ptr ts_expr_heap
 		  (dyn_expr_type, opt_expr_ptr, (reqs, ts)) = requirements ti dyn_expr (reqs, { ts & ts_expr_heap = ts_expr_heap })
 		  ts_expr_heap = storeAttribute opt_expr_ptr dyn_expr_type.at_attribute ts.ts_expr_heap
 		  type_coercion = { tc_demanded = dyn_type, tc_offered = dyn_expr_type, tc_position = CP_Expression dyn_expr, tc_coercible = True }
 		  atype = {at_type = TB BT_Dynamic, at_attribute = TA_Multi}
 		  type_coercions = [type_coercion : reqs.req_type_coercions]
 		| isEmpty dyn_context
-			= (atype, No, ({reqs & req_type_coercions = type_coercions}, {ts & ts_expr_heap = ts_expr_heap}))
-			# dyn_expr_info = EI_Overloaded {oc_symbol = type_code_symbol, oc_context = dyn_context, oc_specials = []}
-			= (atype, No, ({reqs & req_type_coercions = type_coercions, req_overloaded_calls = [dyn_expr_ptr : reqs.req_overloaded_calls]},
-							{ts & ts_expr_heap = ts_expr_heap <:= (dyn_expr_ptr, dyn_expr_info)}))
+			| isEmpty univ_contexts
+				= (atype, No, ({reqs & req_type_coercions = type_coercions}, {ts & ts_expr_heap = ts_expr_heap}))
+				# var_contexts = VarContext 0 univ_contexts dyn_expr_type NoVarContexts
+				# dyn_expr_info = EI_OverloadedWithVarContexts {ocvc_symbol=type_code_symbol, ocvc_context=dyn_context,	ocvc_var_contexts=var_contexts}
+				= (atype, No, ({reqs & req_type_coercions = type_coercions, req_overloaded_calls = [dyn_expr_ptr : reqs.req_overloaded_calls]},
+								{ts & ts_expr_heap = ts_expr_heap <:= (dyn_expr_ptr, dyn_expr_info)}))
+			| isEmpty univ_contexts
+				# dyn_expr_info = EI_Overloaded {oc_symbol = type_code_symbol, oc_context = dyn_context, oc_specials = []}
+				= (atype, No, ({reqs & req_type_coercions = type_coercions, req_overloaded_calls = [dyn_expr_ptr : reqs.req_overloaded_calls]},
+								{ts & ts_expr_heap = ts_expr_heap <:= (dyn_expr_ptr, dyn_expr_info)}))
+				# var_contexts = VarContext 0 univ_contexts dyn_expr_type NoVarContexts
+				# dyn_expr_info = EI_OverloadedWithVarContexts {ocvc_symbol=type_code_symbol, ocvc_context=dyn_context,	ocvc_var_contexts=var_contexts}
+				= (atype, No, ({reqs & req_type_coercions = type_coercions, req_overloaded_calls = [dyn_expr_ptr : reqs.req_overloaded_calls]},
+								{ts & ts_expr_heap = ts_expr_heap <:= (dyn_expr_ptr, dyn_expr_info)}))
 
 instance requirements Expression
 where
@@ -2313,13 +2323,14 @@ where
 		fresh_dynamic dyn_ptr (var_store, type_heaps, var_heap, expr_heap, predef_symbols)
 			# (dyn_info, expr_heap) = readPtr dyn_ptr expr_heap
 			= case dyn_info of
-				EI_Dynamic opt_dyn_type=:(Yes {dt_uni_vars,dt_type,dt_global_vars}) loc_dynamics
+				EI_Dynamic opt_dyn_type=:(Yes {dt_uni_vars,dt_type,dt_global_vars,dt_contexts}) loc_dynamics
 					# (th_vars, var_store)		= fresh_existential_attributed_variables dt_uni_vars (type_heaps.th_vars, var_store)
 					  (th_vars, var_store)		= fresh_type_variables dt_global_vars (th_vars, var_store)
 					  (tdt_type, type_heaps)	= freshCopy dt_type { type_heaps & th_vars = th_vars }
+					  (fresh_univ_contexts, (type_heaps,var_heap)) = freshTypeContexts True dt_contexts (type_heaps,var_heap)
 					  (contexts, expr_ptr, type_code_symbol, (var_heap, expr_heap, type_var_heap, predef_symbols))
 					  		= determine_context_and_expr_ptr dt_global_vars (var_heap, expr_heap, type_heaps.th_vars, predef_symbols)
-					  dyn_info = EI_TempDynamicType opt_dyn_type loc_dynamics tdt_type contexts expr_ptr type_code_symbol
+					  dyn_info = EI_TempDynamicType opt_dyn_type loc_dynamics tdt_type contexts fresh_univ_contexts expr_ptr type_code_symbol
 					-> fresh_local_dynamics loc_dynamics (var_store, { type_heaps & th_vars = type_var_heap }, var_heap,
 							expr_heap <:= (dyn_ptr, dyn_info), predef_symbols)
 				EI_Dynamic No loc_dynamics
@@ -2335,17 +2346,29 @@ where
 			 		  (new_var_ptr, var_heap) = newPtr VI_Empty var_heap
 					  context = {tc_class = TCClass tc_class_symb, tc_types = [fresh_var], tc_var = new_var_ptr}
 			  		  (expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
-					  dyn_info = EI_TempDynamicType No loc_dynamics tdt_type [context] expr_ptr tc_member_symb
+			  		  dyn_info = EI_TempDynamicType No loc_dynamics tdt_type [context] [] expr_ptr tc_member_symb
 					-> fresh_local_dynamics loc_dynamics (inc var_store, type_heaps, var_heap,
 							expr_heap <:= (dyn_ptr, dyn_info), predef_symbols)
-				EI_DynamicTypeWithVars loc_type_vars dt=:{dt_uni_vars,dt_type,dt_global_vars} loc_dynamics
+				EI_DynamicTypeWithVars loc_type_vars dt=:{dt_uni_vars,dt_type,dt_global_vars,dt_contexts} loc_dynamics
 					# (fresh_vars, (th_vars, var_store)) = fresh_existential_dynamic_pattern_variables loc_type_vars (type_heaps.th_vars, var_store)
 					  (th_vars, var_store) = fresh_type_variables dt_global_vars (th_vars, var_store)
-					  (tdt_type, type_heaps) = freshCopy (add_universal_vars_to_type dt_uni_vars dt_type) {type_heaps & th_vars = th_vars}
+					  (tdt_type, type_heaps) = fresh_universal_vars_type_and_contexts dt_uni_vars dt_type dt_contexts {type_heaps & th_vars = th_vars}
 					  (contexts, expr_ptr, type_code_symbol, (var_heap, expr_heap, type_var_heap, predef_symbols))
 					  		= determine_context_and_expr_ptr dt_global_vars (var_heap, expr_heap, type_heaps.th_vars, predef_symbols)
 					  expr_heap = expr_heap <:= (dyn_ptr, EI_TempDynamicPattern loc_type_vars dt loc_dynamics fresh_vars tdt_type contexts expr_ptr type_code_symbol)
 					-> fresh_local_dynamics loc_dynamics (var_store, { type_heaps & th_vars = type_var_heap }, var_heap, expr_heap, predef_symbols)
+					where
+						fresh_universal_vars_type_and_contexts [] at [] type_heaps
+							= freshCopy at type_heaps
+						fresh_universal_vars_type_and_contexts uni_vars at=:{at_attribute,at_type} [] type_heaps
+							# (fresh_attribute, th_attrs)	= freshCopyOfTypeAttribute at_attribute type_heaps.th_attrs
+							  (at_type, type_heaps)			= freshCopyOfTFAType uni_vars at_type {type_heaps & th_attrs = th_attrs}
+							= ({at & at_attribute = fresh_attribute, at_type = at_type}, type_heaps)
+						fresh_universal_vars_type_and_contexts uni_vars at=:{at_attribute,at_type} contexts type_heaps
+							# (fresh_attribute, th_attrs)	= freshCopyOfTypeAttribute at_attribute type_heaps.th_attrs
+							  (at_type, type_heaps)			= freshCopyOfTFACType uni_vars at_type contexts {type_heaps & th_attrs = th_attrs}
+							= ({at & at_attribute = fresh_attribute, at_type = at_type}, type_heaps)
+
 				EI_UnmarkedDynamic _ _
 					-> (var_store, type_heaps, var_heap, expr_heap, predef_symbols)
 		where
@@ -2407,11 +2430,6 @@ where
 
 		clear_type_vars type_vars var_heap
 			= foldSt (\{tv_info_ptr} -> writePtr tv_info_ptr TVI_Empty) type_vars var_heap 
-
-	add_universal_vars_to_type [] at
-		= at
-	add_universal_vars_to_type uni_vars at=:{at_type}
-		= { at & at_type = TFA uni_vars at_type }
 
 specification_error type type1 err
 	# err = errorHeading "Type error" err

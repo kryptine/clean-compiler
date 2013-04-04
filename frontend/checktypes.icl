@@ -1226,12 +1226,12 @@ where
 					 cs_error			= checkError av_ident "attribute variable in context undefined" cs_error}
 
 checkDynamicTypes :: !Index ![ExprInfoPtr] !(Optional SymbolType)
-		!u:{#CheckedTypeDef} !u:{#DclModule} !*TypeHeaps !*ExpressionHeap !*CheckState
-	-> (!u:{#CheckedTypeDef},!u:{#DclModule},!*TypeHeaps,!*ExpressionHeap,!*CheckState)
-checkDynamicTypes mod_index dyn_type_ptrs No type_defs modules type_heaps expr_heap cs
-	# (type_defs, modules, heaps, expr_heap, cs) = checkDynamics mod_index (inc cModuleScope) dyn_type_ptrs type_defs modules type_heaps expr_heap cs
+		!u:{#CheckedTypeDef} !v:{#ClassDef} !u:{#DclModule} !*TypeHeaps !*ExpressionHeap !*CheckState
+	-> (!u:{#CheckedTypeDef},!v:{#ClassDef},!u:{#DclModule},!*TypeHeaps,!*ExpressionHeap,!*CheckState)
+checkDynamicTypes mod_index dyn_type_ptrs No type_defs class_defs modules type_heaps expr_heap cs
+	# (type_defs, class_defs, modules, heaps, expr_heap, cs) = checkDynamics mod_index (inc cModuleScope) dyn_type_ptrs type_defs class_defs modules type_heaps expr_heap cs
 	  (expr_heap, cs_symbol_table) = remove_global_type_variables_in_dynamics dyn_type_ptrs (expr_heap, cs.cs_symbol_table)
-	= (type_defs, modules, heaps, expr_heap, { cs & cs_symbol_table = cs_symbol_table })
+	= (type_defs, class_defs, modules, heaps, expr_heap, { cs & cs_symbol_table = cs_symbol_table })
 where
 	remove_global_type_variables_in_dynamics dyn_info_ptrs expr_heap_and_symbol_table
 		= foldSt remove_global_type_variables_in_dynamic dyn_info_ptrs expr_heap_and_symbol_table
@@ -1254,13 +1254,14 @@ where
 				| entry.ste_kind == STE_Empty
 					= symbol_table
 					= symbol_table <:= (id_info, entry.ste_previous)
-checkDynamicTypes mod_index dyn_type_ptrs (Yes {st_vars}) type_defs modules type_heaps expr_heap cs=:{cs_symbol_table}
+checkDynamicTypes mod_index dyn_type_ptrs (Yes {st_vars}) type_defs class_defs modules type_heaps expr_heap cs=:{cs_symbol_table}
 	# (th_vars, cs_symbol_table) = foldSt add_type_variable_to_symbol_table st_vars (type_heaps.th_vars, cs_symbol_table)
-	  (type_defs, modules, heaps, expr_heap, cs) = checkDynamics mod_index (inc cModuleScope) dyn_type_ptrs type_defs modules
+	  (type_defs, class_defs, modules, heaps, expr_heap, cs)
+	  	= checkDynamics mod_index (inc cModuleScope) dyn_type_ptrs type_defs class_defs modules
 	  		{ type_heaps & th_vars = th_vars } expr_heap { cs & cs_symbol_table = cs_symbol_table }
 	  cs_symbol_table =	removeVariablesFromSymbolTable cModuleScope st_vars cs.cs_symbol_table
 	  (expr_heap, cs) = check_global_type_variables_in_dynamics dyn_type_ptrs (expr_heap, { cs & cs_symbol_table = cs_symbol_table })
-	= (type_defs, modules, heaps, expr_heap, cs) 
+	= (type_defs, class_defs, modules, heaps, expr_heap, cs) 
 where
 	add_type_variable_to_symbol_table {tv_ident={id_info},tv_info_ptr} (var_heap,symbol_table)
 		# (entry, symbol_table) = readPtr id_info symbol_table
@@ -1291,54 +1292,76 @@ where
 					= { cs & cs_symbol_table = cs_symbol_table <:= (id_info, entry.ste_previous),
 							 cs_error = checkError tv_ident.id_name "global type variable not used in type of the function" cs_error }
 
-checkDynamics mod_index scope dyn_type_ptrs type_defs modules type_heaps expr_heap cs
-	= foldSt (check_dynamic mod_index scope) dyn_type_ptrs (type_defs, modules, type_heaps, expr_heap, cs)
+checkDynamics mod_index scope dyn_type_ptrs type_defs class_defs modules type_heaps expr_heap cs
+	= foldSt (check_dynamic mod_index scope) dyn_type_ptrs (type_defs, class_defs, modules, type_heaps, expr_heap, cs)
 where	
-	check_dynamic mod_index scope dyn_info_ptr (type_defs, modules, type_heaps, expr_heap, cs)
+	check_dynamic mod_index scope dyn_info_ptr (type_defs, class_defs, modules, type_heaps, expr_heap, cs)
 		# (dyn_info, expr_heap) = readPtr dyn_info_ptr expr_heap
 		= case dyn_info of
 			EI_UnmarkedDynamic opt_type loc_dynamics
 				-> case opt_type of
 					Yes dyn_type
-						# (dyn_type, loc_type_vars, type_defs, modules, type_heaps, cs) = check_dynamic_type mod_index scope dyn_type type_defs modules type_heaps cs
+						# (dyn_type, loc_type_vars, type_defs, class_defs, modules, type_heaps, cs)
+							= check_dynamic_type_in_pattern mod_index scope dyn_type type_defs class_defs modules type_heaps cs
 						| isEmpty loc_type_vars
 							# expr_heap =  expr_heap <:= (dyn_info_ptr, EI_UnmarkedDynamic (Yes dyn_type) loc_dynamics)
-				  		  	-> check_local_dynamics mod_index scope loc_dynamics type_defs modules type_heaps expr_heap cs
+				  		  	-> check_local_dynamics mod_index scope loc_dynamics type_defs class_defs modules type_heaps expr_heap cs
 				  			# cs_symbol_table = removeVariablesFromSymbolTable scope loc_type_vars cs.cs_symbol_table
 							  cs_error = checkError loc_type_vars "type variable(s) not defined" cs.cs_error
 							  expr_heap = expr_heap <:= (dyn_info_ptr, EI_UnmarkedDynamic (Yes dyn_type) loc_dynamics)
-							-> (type_defs, modules, type_heaps, expr_heap, {cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table})
+							-> (type_defs, class_defs, modules, type_heaps, expr_heap, {cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table})
 					No
-				  		 -> check_local_dynamics mod_index scope loc_dynamics type_defs modules type_heaps expr_heap cs
+				  		 -> check_local_dynamics mod_index scope loc_dynamics type_defs class_defs modules type_heaps expr_heap cs
 			EI_DynamicType dyn_type loc_dynamics
-				# (dyn_type, loc_type_vars, type_defs, modules, type_heaps, cs) = check_dynamic_type mod_index scope dyn_type type_defs modules type_heaps cs
-				  (type_defs, modules, type_heaps, expr_heap, cs) = check_local_dynamics mod_index scope loc_dynamics type_defs modules type_heaps expr_heap cs
+				# (dyn_type, loc_type_vars, type_defs, class_defs, modules, type_heaps, cs)
+					= check_dynamic_type_in_pattern mod_index scope dyn_type type_defs class_defs modules type_heaps cs
+				  (type_defs, class_defs, modules, type_heaps, expr_heap, cs)
+				  	= check_local_dynamics mod_index scope loc_dynamics type_defs class_defs modules type_heaps expr_heap cs
 				  cs_symbol_table = removeVariablesFromSymbolTable scope loc_type_vars cs.cs_symbol_table
 				  expr_heap = expr_heap <:= (dyn_info_ptr, EI_DynamicTypeWithVars loc_type_vars dyn_type loc_dynamics)
-				-> (type_defs, modules, type_heaps, expr_heap, {cs & cs_symbol_table = cs_symbol_table})
+				-> (type_defs, class_defs, modules, type_heaps, expr_heap, {cs & cs_symbol_table = cs_symbol_table}) 
 
-	check_local_dynamics mod_index scope local_dynamics type_defs modules type_heaps expr_heap cs
-		= foldSt (check_dynamic mod_index (inc scope)) local_dynamics (type_defs, modules, type_heaps, expr_heap, cs)
+	check_local_dynamics mod_index scope local_dynamics type_defs class_defs modules type_heaps expr_heap cs
+		= foldSt (check_dynamic mod_index (inc scope)) local_dynamics (type_defs, class_defs, modules, type_heaps, expr_heap, cs)
 
-	check_dynamic_type mod_index scope dt=:{dt_uni_vars,dt_type} type_defs modules type_heaps=:{th_vars} cs
+	check_dynamic_type_in_expression mod_index scope dt=:{dt_uni_vars,dt_type,dt_contexts} type_defs class_defs modules type_heaps=:{th_vars} cs
 		# (dt_uni_vars, (th_vars, cs)) = add_type_variables_to_symbol_table scope dt_uni_vars th_vars cs
 		  ots = { ots_type_defs = type_defs, ots_modules = modules }
 		  oti = { oti_heaps = { type_heaps & th_vars = th_vars }, oti_all_vars = [], oti_all_attrs = [], oti_global_vars = [] }
-		  (dt_type, ( {ots_type_defs, ots_modules}, {oti_heaps,oti_all_vars,oti_all_attrs, oti_global_vars}, cs))
-		  		= checkOpenAType mod_index scope DAK_None dt_type (ots, oti, { cs & cs_x = {cs.cs_x & x_check_dynamic_types = True} })
-		  cs = check_dynamic_uniqueness dt_type.at_attribute cs
-		  
-		  oti = { oti &  oti_all_vars = [], oti_all_attrs = [], oti_global_vars=oti_global_vars, oti_heaps = oti_heaps }
 
-		# cs = { cs & cs_x = {cs.cs_x & x_check_dynamic_types = False} }
+		  (contexts, type_defs, class_defs, modules, heaps, cs)
+		  	= checkTypeContexts dt_contexts mod_index class_defs ots {oti & oti_all_vars=[],oti_all_attrs=[],oti_global_vars=[]} cs
+		  oti = {oti & oti_heaps=heaps}
+		  ots = {ots_modules = modules, ots_type_defs = type_defs}
+
+		  (dt_type, ({ots_type_defs, ots_modules}, oti, cs))
+		  		= checkOpenAType mod_index scope DAK_None dt_type (ots, oti, { cs & cs_x = {cs.cs_x & x_check_dynamic_types = True} })
+		= check_dynamic_type_uniqueness dt_type dt_uni_vars contexts oti ots_type_defs ots_modules class_defs cs
+
+	check_dynamic_type_in_pattern mod_index scope dt=:{dt_uni_vars,dt_type,dt_contexts} type_defs class_defs modules type_heaps=:{th_vars} cs
+		# (dt_uni_vars, (th_vars, cs)) = add_type_variables_to_symbol_table scope dt_uni_vars th_vars cs
+		  ots = { ots_type_defs = type_defs, ots_modules = modules }
+		  oti = { oti_heaps = { type_heaps & th_vars = th_vars }, oti_all_vars = [], oti_all_attrs = [], oti_global_vars = [] }
+		  (dt_type, (ots, oti, cs))
+		  		= checkOpenAType mod_index scope DAK_None dt_type (ots, oti, { cs & cs_x = {cs.cs_x & x_check_dynamic_types = True} })
+
+		  (contexts, type_defs, class_defs, modules, heaps, cs)
+		  	= checkTypeContexts dt_contexts mod_index class_defs ots {oti & oti_all_vars=[],oti_all_attrs=[],oti_global_vars=[]} cs
+		  oti = {oti & oti_heaps=heaps}
+
+		= check_dynamic_type_uniqueness dt_type dt_uni_vars contexts oti type_defs modules class_defs cs
+
+	check_dynamic_type_uniqueness dt_type dt_uni_vars contexts {oti_heaps,oti_all_vars,oti_all_attrs, oti_global_vars} ots_type_defs ots_modules class_defs cs
+		# cs = check_dynamic_uniqueness dt_type.at_attribute cs
+		  cs = { cs & cs_x = {cs.cs_x & x_check_dynamic_types = False} }
 		  th_vars = foldSt (\{tv_info_ptr} -> writePtr tv_info_ptr TVI_Empty) oti_global_vars oti_heaps.th_vars
 	  	  cs_symbol_table = removeAttributedTypeVarsFromSymbolTable scope dt_uni_vars cs.cs_symbol_table
-		  dt = {dt_uni_vars = dt_uni_vars, dt_global_vars = oti_global_vars, dt_type = dt_type}
+		  dt = { dt_uni_vars = dt_uni_vars, dt_global_vars = oti_global_vars, dt_type = dt_type, dt_contexts=contexts }
 		| isEmpty oti_all_attrs
-			= (dt, oti_all_vars, ots_type_defs, ots_modules, {oti_heaps & th_vars = th_vars}, {cs & cs_symbol_table = cs_symbol_table})
+			= (dt, oti_all_vars, ots_type_defs, class_defs, ots_modules, {oti_heaps & th_vars = th_vars}, {cs & cs_symbol_table = cs_symbol_table})
 			# cs_symbol_table = removeAttributesFromSymbolTable oti_all_attrs cs_symbol_table
 			  cs_error = checkError (hd oti_all_attrs).av_ident "type attribute variable not allowed" cs.cs_error
-			= (dt, oti_all_vars, ots_type_defs, ots_modules, {oti_heaps & th_vars = th_vars }, {cs & cs_symbol_table = cs_symbol_table, cs_error = cs_error})
+			= (dt, oti_all_vars, ots_type_defs, class_defs, ots_modules, {oti_heaps & th_vars = th_vars}, {cs & cs_symbol_table = cs_symbol_table, cs_error = cs_error})
 		where
 			check_dynamic_uniqueness TA_None cs
 				=	cs
