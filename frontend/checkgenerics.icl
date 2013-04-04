@@ -190,7 +190,7 @@ where
 			= getTypeDef module_index {glob_module=type_module, glob_object=type_index} type_defs modules
 		# type_cons = { type_cons & type_index = { glob_object = type_index, glob_module = type_module }}
 		| type_synonym_with_arguments type_def.td_rhs type_def.td_arity
-			# cs = {cs & cs_error = checkError type_def.td_ident "synonym type not allowed" cs.cs_error}
+			# cs = {cs & cs_error = checkError type_def.td_ident "type synonym not allowed" cs.cs_error}
 			= (TA type_cons [], TypeConsSymb type_cons, type_defs, modules,{heaps&hp_type_heaps = hp_type_heaps}, cs)
 			= (TA type_cons [], TypeConsSymb type_cons, type_defs, modules,{heaps&hp_type_heaps = hp_type_heaps}, cs)
 		where
@@ -225,30 +225,37 @@ where
 			_	->	( {gi_module=NoIndex,gi_index = NoIndex}
 					, {cs & cs_error = checkError id_name "generic undefined" cs.cs_error})
 
-convert_generic_instances :: !.[GenericCaseDef] !Int -> (!.[FunDef], !.[GenericCaseDef])
-convert_generic_instances [gc=:{gc_ident, gc_body=GCB_FunDef fun_def} : gcs] next_fun_index
-	# (fun_defs, gcs) =  convert_generic_instances gcs (inc next_fun_index)
-	# gc = { gc & gc_body = GCB_FunIndex next_fun_index } 
-	= ([fun_def : fun_defs], [gc:gcs])
-		//---> ("convert generic case: user defined function", gc.gc_ident, gc.gc_type_cons, next_fun_index)
-convert_generic_instances [gc=:{gc_ident,gc_pos, gc_type_cons, gc_body=GCB_None} : gcs] next_fun_index
-	# (fun_defs, gcs) =  convert_generic_instances gcs (inc next_fun_index)
-	# fun_def = 
-			{ fun_ident = genericIdentToFunIdent gc_ident.id_name gc_type_cons
-			, fun_arity = 0
-			, fun_priority = NoPrio
-			, fun_body = GeneratedBody
-			, fun_type = No
-			, fun_pos = gc_pos
-			, fun_kind = FK_Unknown
-			, fun_lifted = 0
-			, fun_info = EmptyFunInfo
-			}
-	# gc = { gc & gc_body = GCB_FunIndex next_fun_index } 
-	= ([fun_def:fun_defs], [gc:gcs])
-		//---> ("convert generic case: function to derive ", gc.gc_ident, gc.gc_type_cons, next_fun_index)
-convert_generic_instances [] next_fun_index 
-	= ([], [])
+convert_generic_instances :: !Int !Int !*{#GenericCaseDef} !*{#ClassDef} !*SymbolTable !*ErrorAdmin !*{#DclModule}
+						-> (!.[FunDef],!*{#GenericCaseDef},!*{#ClassDef},!*SymbolTable,!*ErrorAdmin,!*{#DclModule})
+
+convert_generic_instances gci next_fun_index gencase_defs class_defs symbol_table error dcl_modules
+	| gci<size gencase_defs
+		# (gencase_def,gencase_defs)=gencase_defs![gci]
+		= case gencase_def of
+			gc=:{gc_ident, gc_body=GCB_FunDef fun_def}
+				# gc = { gc & gc_body = GCB_FunIndex next_fun_index } 
+				  gencase_defs = {gencase_defs & [gci]=gc}
+				  (fun_defs,gencase_defs,class_defs,symbol_table,error,dcl_modules)
+					= convert_generic_instances (gci+1) (next_fun_index+1) gencase_defs class_defs symbol_table error dcl_modules
+				-> ([fun_def : fun_defs],gencase_defs,class_defs,symbol_table,error,dcl_modules)
+			gc=:{gc_ident,gc_pos, gc_type_cons, gc_body=GCB_None}
+				# fun_def = 
+						{ fun_ident = genericIdentToFunIdent gc_ident.id_name gc_type_cons
+						, fun_arity = 0
+						, fun_priority = NoPrio
+						, fun_body = GeneratedBody
+						, fun_type = No
+						, fun_pos = gc_pos
+						, fun_kind = FK_Unknown
+						, fun_lifted = 0
+						, fun_info = EmptyFunInfo
+						}
+				# gc = { gc & gc_body = GCB_FunIndex next_fun_index } 
+				  gencase_defs = {gencase_defs & [gci]=gc}
+				  (fun_defs,gencase_defs,class_defs,symbol_table,error,dcl_modules)
+					= convert_generic_instances (gci+1) (next_fun_index+1) gencase_defs class_defs symbol_table error dcl_modules
+				-> ([fun_def : fun_defs],gencase_defs,class_defs,symbol_table,error,dcl_modules)
+		= ([],gencase_defs,class_defs,symbol_table,error,dcl_modules)
 
 create_gencase_funtypes :: !Index !*{#GenericCaseDef} !*Heaps
 			-> (!Index,![FunType],!*{#GenericCaseDef},!*Heaps)

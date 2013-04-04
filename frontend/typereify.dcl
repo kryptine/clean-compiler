@@ -1,17 +1,18 @@
-/*
-	module owner: Ronny Wichers Schreur
-*/
 definition module typereify
 
+from general import ::Optional
 from syntax import
 	::Ident, ::FunDef, ::IndexRange, ::TypeHeaps,
 	::SymbolTable, ::SymbolTableEntry, ::Heap,
-	::DclModule, ::CommonDefs, ::VarHeap, ::VarInfo
+	::DclModule, ::CommonDefs, ::CheckedTypeDef, ::TypeDef, ::TypeRhs, ::ClassDef, ::VarHeap, ::VarInfo
 from predef import
 	::PredefinedSymbols, ::PredefinedSymbol
 
-addTypeFunctions :: Int *{#DclModule} *{#FunDef} *CommonDefs *PredefinedSymbols *VarHeap *SymbolTable
-			  -> (IndexRange, *{#DclModule},*{#FunDef},*CommonDefs,*PredefinedSymbols,*VarHeap,*SymbolTable)
+addDclTypeFunctions :: !Int !*{#DclModule} !*PredefinedSymbols !*VarHeap !*SymbolTable
+						-> (!*{#DclModule},!*PredefinedSymbols,!*VarHeap,!*SymbolTable)
+
+addIclTypeFunctions :: !Int !Int !*{#FunDef} !*{#CheckedTypeDef} !*{#ClassDef} !*PredefinedSymbols !*VarHeap !*SymbolTable
+				 -> (!IndexRange,!*{#FunDef},!*{#CheckedTypeDef},!*{#ClassDef},!*PredefinedSymbols,!*VarHeap,!*SymbolTable)
 
 buildTypeFunctions :: !Int !*{#FunDef} !{#CommonDefs} !*PredefinedSymbols !*VarHeap !*TypeHeaps
 									  -> (!*{#FunDef},!*PredefinedSymbols,!*VarHeap,!*TypeHeaps)

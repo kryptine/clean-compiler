@@ -886,6 +886,9 @@ where
 		make_expr (TFA _ _) heaps
 			// error is reported in convertATypeToGenTypeStruct
 			= make_error_type_cons heaps
+		make_expr (TFAC _ _ _) heaps
+			// error is reported in convertATypeToGenTypeStruct
+			= make_error_type_cons heaps
 		make_expr _ heaps
 			= abort "type does not match\n"
 
@@ -4230,7 +4233,8 @@ buildFunAndGroup2 ident arg_vars body_expr main_dcl_module_n funs_and_groups=:{f
 // Primitive expressions
 
 makeIntExpr :: Int -> Expression
-makeIntExpr value = BasicExpr (BVI (toString value))
+makeIntExpr value
+	= BasicExpr (BVInt value)
 
 makeStringExpr :: String -> Expression
 makeStringExpr str
