@@ -250,10 +250,10 @@ where
 				// needs a generic representation
 				-> case type_def.td_rhs of
 					SynType _
-						#  gs_error = reportError gc_ident gc_pos ("cannot derive a generic instance for a synonym type " +++ type_def.td_ident.id_name) gs.gs_error
+						#  gs_error = reportError gc_ident.id_name gc_pos ("cannot derive a generic instance for a synonym type " +++ type_def.td_ident.id_name) gs.gs_error
 						-> (funs_and_groups, {gs & gs_error = gs_error})	
 					AbstractType _
-						#  gs_error = reportError gc_ident gc_pos ("cannot derive a generic instance for an abstract type "  +++ type_def.td_ident.id_name) gs.gs_error
+						#  gs_error = reportError gc_ident.id_name gc_pos ("cannot derive a generic instance for an abstract type "  +++ type_def.td_ident.id_name) gs.gs_error
 						-> (funs_and_groups, {gs & gs_error = gs_error})	
 					_ 
 						-> case td_info.tdi_gen_rep of
@@ -334,7 +334,7 @@ where
 	convert {at_type=TB _} st
 		= (GTSAppCons KindConst [], st)  
 	convert {at_type=type} (modules, td_infos, heaps, error)
-		# error = reportError ident pos ("can not build generic representation for this type", type) error
+		# error = reportError ident.id_name pos ("can not build generic representation for this type", type) error
 		= (GTSE, (modules, td_infos, heaps, error))
 
 	convert_type_app {type_index} attr args (modules, td_infos, heaps, error)	
@@ -377,7 +377,7 @@ where
 	convert {at_type=TB _} st
 		= (GTSAppCons KindConst [], st)  
 	convert {at_type=type} (modules, td_infos, heaps, error)
-		# error = reportError predefined_idents.[PD_GenericBimap] pos ("can not build generic representation for this type", type) error
+		# error = reportError predefined_idents.[PD_GenericBimap].id_name pos ("can not build generic representation for this type", type) error
 		= (GTSE, (modules, td_infos, heaps, error))
 
 	convert_type_app {type_index=type_index=:{glob_module,glob_object},type_arity} attr args (modules, td_infos, heaps, error)
@@ -584,13 +584,13 @@ where
 			# args = [GTSField fi arg \\ arg <- args & fi <- ci_field_infos]
 			# prod_type = build_prod_type args
 			= (GTSRecord ci_record_info prod_type, st)
-			# error = reportError td_ident td_pos "cannot build a generic representation of an existential type" error
+			# error = reportError td_ident.id_name td_pos "cannot build a generic representation of an existential type" error
 			= (GTSE, (modules, td_infos, heaps, error))
 	build_type {td_rhs=SynType type,td_ident, td_pos} type_infos (modules, td_infos, heaps, error)
-		# error = reportError td_ident td_pos "cannot build a generic representation of a synonym type" error
+		# error = reportError td_ident.id_name td_pos "cannot build a generic representation of a synonym type" error
 		= (GTSE, (modules, td_infos, heaps, error))
 	build_type td=:{td_rhs=(AbstractType _),td_ident, td_arity, td_args, td_pos} type_infos (modules, td_infos, heaps, error)
-		# error = reportError td_ident td_pos "cannot build a generic representation of an abstract type" error
+		# error = reportError td_ident.id_name td_pos "cannot build a generic representation of an abstract type" error
 		= (GTSE, (modules, td_infos, heaps, error))
 
 	build_alt td_ident td_pos cons_def_sym=:{ds_index} cons_info (modules, td_infos, heaps, error)
@@ -599,7 +599,7 @@ where
 			# (args, st) = mapSt (convertATypeToGenTypeStruct td_ident td_pos predefs) st_args (modules, td_infos, heaps, error)	
 			# prod_type = build_prod_type args
 			= (GTSCons cons_info prod_type, st)
-			# error = reportError td_ident td_pos "cannot build a generic representation of an existential type" error
+			# error = reportError td_ident.id_name td_pos "cannot build a generic representation of an existential type" error
 			= (GTSE, (modules, td_infos, heaps, error))
 
 	build_prod_type :: [GenTypeStruct] -> GenTypeStruct
@@ -664,10 +664,10 @@ buildTypeDefInfo td=:{td_rhs = AlgType alts} td_module main_module_index predefs
 buildTypeDefInfo td=:{td_rhs = RecordType {rt_constructor, rt_fields}} td_module main_module_index predefs funs_and_groups modules heaps error
 	= buildRecordTypeDefInfo td rt_constructor [x\\x<-:rt_fields] td_module main_module_index predefs funs_and_groups modules heaps error
 buildTypeDefInfo td=:{td_rhs = SynType type, td_ident, td_pos} td_module main_module_index predefs funs_and_groups modules heaps error
-	# error = reportError td_ident td_pos "cannot build constructor uinformation for a synonym type" error
+	# error = reportError td_ident.id_name td_pos "cannot build constructor uinformation for a synonym type" error
 	= buildAlgebraicTypeDefInfo td [] td_module main_module_index predefs funs_and_groups modules heaps error
 buildTypeDefInfo td=:{td_rhs = AbstractType _, td_ident, td_pos} td_module main_module_index predefs funs_and_groups modules heaps error
-	# error = reportError td_ident td_pos "cannot build constructor uinformation for an abstract type" error
+	# error = reportError td_ident.id_name td_pos "cannot build constructor uinformation for an abstract type" error
 	= buildAlgebraicTypeDefInfo td [] td_module main_module_index predefs funs_and_groups modules heaps error
 
 buildAlgebraicTypeDefInfo {td_ident, td_pos, td_arity} alts td_module main_module_index predefs
@@ -1104,11 +1104,11 @@ where
 		# (expr, var, heaps, error) = build_record type_def_mod [rt_constructor] heaps	error
 		= (expr, var, heaps, error)
 	build_expr_for_type_rhs type_def_mod (AbstractType _) heaps error
-		#! error = reportError td_ident td_pos "cannot build isomorphisms for an abstract type" error
+		#! error = reportError td_ident.id_name td_pos "cannot build isomorphisms for an abstract type" error
 		# dummy_fv = {fv_def_level=(-1), fv_count=0, fv_ident=makeIdent "dummy", fv_info_ptr=nilPtr}
 		= (EE, dummy_fv, heaps, error)
 	build_expr_for_type_rhs type_def_mod (SynType _) heaps error
-		#! error = reportError td_ident td_pos "cannot build isomorphisms for a synonym type" error
+		#! error = reportError td_ident.id_name td_pos "cannot build isomorphisms for a synonym type" error
 		# dummy_fv = {fv_def_level=(-1), fv_count=0, fv_ident=makeIdent "dummy", fv_info_ptr=nilPtr}
 		= (EE, dummy_fv, heaps, error)
 	
@@ -1909,7 +1909,7 @@ where
 			TransformedBody {tb_args,tb_rhs}	// user defined case
 				| has_generic_info
 					| fun_arity<>st.st_arity
-						# error = reportError gc_ident gc_pos ("incorrect arity " +++ toString (fun_arity-1)
+						# error = reportError gc_ident.id_name gc_pos ("incorrect arity " +++ toString (fun_arity-1)
 																+++ ", expected " +++ toString (st.st_arity-1)) error
 						-> (funs_and_groups, fun_defs, td_infos, modules, heaps, error)	
 					#! fun = {fun & fun_ident = fun_ident, fun_type = Yes st}
@@ -1917,7 +1917,7 @@ where
 					-> (funs_and_groups, fun_defs, td_infos, modules, heaps, error)
 					# fun_body = TransformedBody {tb_args = tl tb_args, tb_rhs = tb_rhs}
 					| fun_arity-1<>st.st_arity
-						# error = reportError gc_ident gc_pos ("incorrect arity " +++ toString (fun_arity-1)
+						# error = reportError gc_ident.id_name gc_pos ("incorrect arity " +++ toString (fun_arity-1)
 																+++ ", expected " +++ toString st.st_arity) error
 						-> (funs_and_groups, fun_defs, td_infos, modules, heaps, error)	
 					#! fun = {fun & fun_ident = fun_ident, fun_body = fun_body, fun_type = Yes st}
@@ -2138,9 +2138,8 @@ where
 				#! (expr, heaps)
 					= buildGenericApp bimap_module bimap_index bimap_ident kind [] heaps		
 				= ((non_gen_var, TVI_Expr False expr), funs_and_groups, heaps)
-
 buildGenericCaseBody main_module_index {gc_ident,gc_pos} has_generic_info st predefs funs_and_groups td_infos modules heaps error
-	# error = reportError gc_ident gc_pos "cannot specialize to this type" error
+	# error = reportError gc_ident.id_name gc_pos "cannot specialize to this type" error
 	= (TransformedBody {tb_args=[], tb_rhs=EE}, funs_and_groups, td_infos, modules, heaps, error)
 
 //  convert generic type contexts into normal type contexts
@@ -2279,7 +2278,7 @@ where
 		# opt_class_info = lookupGenericClassInfo gtc_kind gen_classes
 		# (tc_class, error) = case opt_class_info of 
 			No
-				# error = reportError fun_name fun_pos "no generic cases for this kind" error  
+				# error = reportError fun_name.id_name fun_pos "no generic cases for this kind" error  
 				-> (TCGeneric gtc, error)
 			Yes class_info 
 				# clazz = 
@@ -2388,7 +2387,7 @@ where
 				= buildGenericApp gen_index.gi_module gen_index.gi_index gen_ident (KindArrow [KindConst]) [arg_expr] heaps
 			= (expr, (td_infos, heaps, error))
 	specialize type (td_infos, heaps, error)
-		#! error = reportError gen_ident gen_pos "cannot specialize " error 
+		#! error = reportError gen_ident.id_name gen_pos "cannot specialize " error 
 		= (EE, (td_infos, heaps, error))
 
 	specialize_type_var tv=:{tv_info_ptr} (td_infos, heaps=:{hp_type_heaps=th=:{th_vars}}, error)		
@@ -2427,7 +2426,7 @@ where
 	specialize (GTSAppCons KindConst []) (funs_and_groups, heaps, error)
 		# (expr, funs_and_groups, heaps)
 			= bimap_id_expression main_module_index predefs funs_and_groups heaps
-		= (expr ,(funs_and_groups, heaps, error))
+		= (expr, (funs_and_groups, heaps, error))
 	specialize (GTSAppCons kind arg_types) st
 		#! (arg_exprs, st) = mapSt specialize arg_types st
 		= build_generic_app kind arg_exprs gen_index gen_ident st
@@ -2495,7 +2494,7 @@ where
 			= bimap_id_expression main_module_index predefs funs_and_groups heaps
 		= (expr ,(funs_and_groups, heaps, error))
 	specialize type (funs_and_groups, heaps, error)
-		#! error = reportError gen_ident gen_pos "cannot specialize " error 
+		#! error = reportError gen_ident.id_name gen_pos "cannot specialize " error 
 		= (EE, (funs_and_groups, heaps, error))
 
 	specialize_type_var tv=:{tv_info_ptr} (funs_and_groups, heaps=:{hp_type_heaps=th=:{th_vars}}, error)		
@@ -2772,7 +2771,7 @@ where
 			= bimap_id_expression main_module_index predefs funs_and_groups heaps
 		= (expr ,(funs_and_groups, modules, heaps, error))
 	specialize type (funs_and_groups, modules, heaps, error)
-		#! error = reportError gen_ident gen_pos "cannot specialize " error 
+		#! error = reportError gen_ident.id_name gen_pos "cannot specialize " error 
 		= (EE, (funs_and_groups, modules, heaps, error))
 
 	specialize_type_var tv=:{tv_info_ptr} (funs_and_groups, modules, heaps=:{hp_type_heaps=th=:{th_vars}}, error)		
@@ -3402,7 +3401,7 @@ where
 		= (st, [], th, error)
 	build_symbol_type st gatvs (KindArrow kinds) order th error
 		| order > 2
-			# error = reportError ident pos "kinds of order higher then 2 are not supported" error
+			# error = reportError ident.id_name pos "kinds of order higher then 2 are not supported" error
 			= (st, [], th, error)
 		
 		# (arg_sts, arg_gatvss, th, error) 
@@ -3529,7 +3528,7 @@ where
 				= No
 
 reportError name pos msg error=:{ea_file} 
-	# ea_file = ea_file <<< "Error " <<< (newPosition name pos) <<< ":" <<< msg <<< '\n'
+	# ea_file = ea_file <<< "Error " <<< (stringPosition name pos) <<< ":" <<< msg <<< '\n'
 	= { error & ea_file = ea_file , ea_ok = False }
 
 reportWarning name pos msg error=:{ea_file}
