@@ -6,7 +6,7 @@ implementation module generics1
 
 import StdEnv,compare_types
 import check
-from checktypes import createClassDictionaries
+from checktypes import createMoreClassDictionaries
 from transform import ::Group
 import genericsupport
 
@@ -1259,15 +1259,17 @@ buildClasses gs=:{gs_main_module}
 	#! ((classes, members, new_num_classes, new_num_members), gs)
 		= build_modules 0 ([], [], num_classes, num_members) gs
 
+	# first_new_class_index = size com_class_defs
+
 	// obtain common definitions again because com_gencase_defs are updated 
 	#! (common_defs,gs) = gs!gs_modules.[gs_main_module]
 	# common_defs = {common_defs & com_class_defs = arrayPlusRevList com_class_defs classes
 								 , com_member_defs = arrayPlusRevList com_member_defs members}
 
 	#! (common_defs, gs)
-		= build_class_dictionaries common_defs gs
-
-	= {gs & gs_modules.[gs_main_module] = common_defs}
+		= build_class_dictionaries first_new_class_index common_defs gs
+	
+	= {gs & gs_modules.[gs_main_module] = common_defs}  
 where
 	build_modules :: !Index (![ClassDef], ![MemberDef], !Int, !Int) !*GenericState
 		-> ((![ClassDef], ![MemberDef], !Int, !Int), !*GenericState)
@@ -1409,17 +1411,17 @@ where
 		#! gen_classes = addGenericClassInfo class_info gen_classes
 		= writePtr gen_info_ptr {gen_info & gen_classes=gen_classes} gs_genh
 
-	build_class_dictionaries :: !CommonDefs !*GenericState -> (!CommonDefs, !*GenericState)
-	build_class_dictionaries common_defs  
+	build_class_dictionaries :: !Int !CommonDefs !*GenericState -> (!CommonDefs, !*GenericState) 		
+	build_class_dictionaries first_new_class_index common_defs  
 			gs=:{gs_varh, gs_tvarh, gs_main_module, gs_symtab, gs_dcl_modules}
 		#! class_defs = { x \\ x <-: common_defs.com_class_defs } // make unique copy
 		#  type_defs = { x \\ x <-: common_defs.com_type_defs } // make unique copy
 		#  cons_defs = { x \\ x <-: common_defs.com_cons_defs } // make unique copy
 		#  selector_defs = { x \\ x <-: common_defs.com_selector_defs } // make unique copy
 		#  (size_type_defs,type_defs) = usize type_defs 
-		#! (new_type_defs, new_selector_defs, new_cons_defs,_,type_defs,selector_defs,cons_defs,class_defs, gs_dcl_modules, gs_tvarh, gs_varh, gs_symtab) =
-				createClassDictionaries
-					False 
+		#! (new_type_defs, new_selector_defs, new_cons_defs,type_defs,selector_defs,cons_defs,class_defs, gs_dcl_modules, gs_tvarh, gs_varh, gs_symtab)
+			= createMoreClassDictionaries
+					first_new_class_index
 					gs_main_module 
 					size_type_defs
 					(size common_defs.com_selector_defs) 

@@ -1660,6 +1660,18 @@ where
 			= create_exported_icl_class_dictionaries mod_index (inc dcl_class_index) dcl_class_defs type_defs class_defs modules rev_dictionary_list indexes type_var_heap var_heap symbol_table
 			= (type_defs, class_defs, modules, rev_dictionary_list, indexes, type_var_heap, var_heap, symbol_table)
 
+createMoreClassDictionaries ::	   !Int !Index !Index !Index !Index !*{#CheckedTypeDef} !*{#SelectorDef} !*{#ConsDef} !*{#ClassDef} !*{#DclModule} !*TypeVarHeap !*VarHeap !*SymbolTable
+					-> (![CheckedTypeDef],![SelectorDef],![ConsDef],!*{#CheckedTypeDef},!*{#SelectorDef},!*{#ConsDef},!*{#ClassDef},!*{#DclModule},!*TypeVarHeap,!*VarHeap,!*SymbolTable)
+createMoreClassDictionaries first_new_class_index mod_index first_type_index first_selector_index first_cons_index type_defs selector_defs cons_defs class_defs modules type_var_heap var_heap symbol_table
+	# (class_defs,last_type_index_plus1) = number_icl_class_dictionaries first_new_class_index class_defs first_type_index
+	# indexes = { index_type = first_type_index, index_cons= first_cons_index, index_selector = first_selector_index }
+	# (class_defs, modules, rev_dictionary_list, indexes, type_var_heap, var_heap, symbol_table)
+		= create_icl_class_dictionaries mod_index first_new_class_index last_type_index_plus1 first_type_index class_defs modules [] indexes type_var_heap var_heap symbol_table
+	# (size_type_defs,type_defs) = usize type_defs
+	  (type_def_list, sel_def_list, cons_def_list, selector_defs, cons_defs, symbol_table)
+	  	= collect_type_defs_in_icl_module size_type_defs rev_dictionary_list selector_defs cons_defs symbol_table
+	= (type_def_list, sel_def_list, cons_def_list, type_defs, selector_defs, cons_defs, class_defs, modules, type_var_heap, var_heap, symbol_table)
+
 number_icl_class_dictionaries class_index class_defs index_type
 	| class_index < size class_defs
 		| class_defs.[class_index].class_dictionary.ds_index==NoIndex
