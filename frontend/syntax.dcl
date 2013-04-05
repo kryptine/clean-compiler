@@ -432,17 +432,24 @@ cNameLocationDependent :== True
 	| TypeConsArrow
 	| TypeConsVar TypeVar 
 
-:: GenericCaseDef = 
-	{	gc_ident		:: !Ident				// name in IC_GenricCase namespace
-	,	gc_gident		:: !Ident  				// name in IC_Generic namespace
-	,	gc_generic		:: !GlobalIndex  		// index of the generic
-	,	gc_arity		:: !Int					// arity of the function
-	,	gc_pos			:: !Position			// position in the source file
+:: GenericCaseDef =
+	{	gc_pos			:: !Position			// position in the source file
 	,	gc_type			:: !Type				// the instance type
 	,   gc_type_cons	:: !TypeCons			// type constructor of the type argument
-	,	gc_body			:: !GenericCaseBody		// the body function or NoIndex
-	,	gc_kind			:: !TypeKind			// kind of the instance type
+	,	gc_gcf			:: !GenericCaseFunctions
 	}
+
+::	GenericCaseFunctions
+	= GCF !Ident !GCF
+
+::	GCF = {
+		gcf_gident	:: !Ident,				// name in IC_GenricCase namespace
+		gcf_generic	:: !GlobalIndex,		// index of the generic
+		gcf_arity	:: !Int,				// arity of the function
+		gcf_body	:: !GenericCaseBody,	// the body function or NoIndex
+		gcf_kind	:: !TypeKind			// kind of the instance type
+	}
+
 :: GenericCaseBody 
 	= GCB_None 									// to be generated
 	| GCB_FunIndex !Index 

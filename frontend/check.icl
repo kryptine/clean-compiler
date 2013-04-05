@@ -980,7 +980,7 @@ where
 		# member_decl = Declaration { decl_ident = gen_member_ident, decl_pos = gen_pos, decl_kind = STE_Generic, decl_index = decl_index }
 		= (inc decl_index, [generic_decl, member_decl : decls]) 
 
-	gen_case_def_to_dcl {gc_ident, gc_pos} (decl_index, decls)
+	gen_case_def_to_dcl {gc_gcf=GCF gc_ident _, gc_pos} (decl_index, decls)
 		= (inc decl_index, [Declaration {decl_ident = gc_ident, decl_pos = gc_pos, decl_kind = STE_GenericCase, decl_index = decl_index} : decls])
 
 createCommonDefinitions :: (CollectedDefinitions ClassInstance) -> .CommonDefs;
@@ -2027,13 +2027,14 @@ renumber_icl_module_functions mod_type icl_global_function_range icl_instance_ra
 					= (new_table, icl_gencases, error)
 
 			build_conversion_table_for_generic_case dcl_index dcl_gencases icl_gencases new_table error
-				#! icl_index = dcl_index	
-				#! (icl_gencase, icl_gencases) = icl_gencases ! [icl_index]
-				#! dcl_gencase = dcl_gencases.[dcl_index]
-				# (GCB_FunIndex icl_fun) = icl_gencase.gc_body 				
-				# (GCB_FunIndex dcl_fun) = dcl_gencase.gc_body
-				#! new_table = { new_table & [dcl_fun] = icl_fun } 								
-				= (new_table, icl_gencases, error)	
+				# icl_index = dcl_index	
+				  (icl_gencase, icl_gencases) = icl_gencases![icl_index]
+				  dcl_gencase = dcl_gencases.[dcl_index]
+				= case (dcl_gencase,icl_gencase) of
+					({gc_gcf=GCF _ {gcf_body = GCB_FunIndex dcl_fun}},
+					 {gc_gcf=GCF _ {gcf_body = GCB_FunIndex icl_fun}})
+						#! new_table = { new_table & [dcl_fun] = icl_fun } 								
+						-> (new_table, icl_gencases, error)	
 
 			build_conversion_table_for_instances dcl_class_inst_index dcl_instances instances_conversion_table_size icl_instances new_table error
 				| dcl_class_inst_index < instances_conversion_table_size
@@ -2082,10 +2083,11 @@ renumber_icl_module_functions mod_type icl_global_function_range icl_instance_ra
 		where			
 			renumber gencase_index gencases
 				| gencase_index < size gencases
-					# (gencase=:{gc_body = GCB_FunIndex icl_index}, gencases) = gencases ! [gencase_index]
+					# (gencase,gencases) = gencases![gencase_index]
+					# {gc_gcf=GCF gc_ident gcf=:{gcf_body=GCB_FunIndex icl_index}} = gencase
 					# dcl_index = function_conversion_table.[icl_index] 
-					# gencase = { gencase & gc_body = GCB_FunIndex dcl_index }
-					# gencases = { gencases & [gencase_index] = gencase } 
+					# gencase = {gencase & gc_gcf=GCF gc_ident {gcf & gcf_body = GCB_FunIndex dcl_index}}
+					# gencases = {gencases & [gencase_index] = gencase}
 					= renumber (inc gencase_index) gencases
 					= gencases	
 

@@ -360,10 +360,10 @@ instance collectFunctions (ScannedInstanceAndMembersR FunDef) where
 		= ({inst & sim_members = sim_members }, ca)
 
 instance collectFunctions GenericCaseDef where
-	collectFunctions gc=:{gc_body=GCB_FunDef fun_def} icl_module ca
+	collectFunctions gc=:{gc_gcf=GCF gc_ident gcf=:{gcf_body=GCB_FunDef fun_def}} icl_module ca
 		# (fun_def, ca) = collectFunctions fun_def icl_module ca 
-		= ({gc & gc_body = GCB_FunDef fun_def}, ca)
-	collectFunctions gc=:{gc_body=GCB_None} icl_module ca
+		= ({gc & gc_gcf = GCF gc_ident {gcf & gcf_body=GCB_FunDef fun_def}}, ca)
+	collectFunctions gc=:{gc_gcf=GCF _ {gcf_body=GCB_None}} icl_module ca
 		= (gc, ca)
 
 instance collectFunctions FunDef where
@@ -1192,25 +1192,20 @@ collectFunctionBodies fun_name fun_arity fun_prio fun_kind all_defs=:[PD_Functio
 collectFunctionBodies fun_name fun_arity fun_prio fun_kind defs ca
 	= ([], fun_kind, defs, ca)
 
-collectGenericBodies :: !GenericCaseDef ![ParsedDefinition] !*CollectAdmin
-					 -> (![ParsedBody], ![ParsedDefinition],!*CollectAdmin)
-collectGenericBodies first_case all_defs=:[PD_GenericCase gc : defs] ca
-	| first_case.gc_ident == gc.gc_ident && first_case.gc_type_cons == gc.gc_type_cons		
-		#! (bodies, rest_defs, ca) = collectGenericBodies first_case defs ca
-		# (GCB_ParsedBody args rhs) = gc.gc_body
-		#! body = 
-			{ pb_args = args
-			, pb_rhs = rhs
-			, pb_position = gc.gc_pos 
-			}
-		| first_case.gc_arity == gc.gc_arity
-			= ([body : bodies ], rest_defs, ca)
-			#! msg = "This generic alternative has " + toString gc.gc_arity + " argument" 
-				+ (if (gc.gc_arity <> 1) "s" "")+" instead of " + toString first_case.gc_arity
-			#! ca = postParseError gc.gc_pos msg ca	
-			= ([body : bodies ], rest_defs, ca)
-		= ([], all_defs, ca)		
-collectGenericBodies first_case defs ca
+collectGenericBodies :: ![ParsedDefinition] !Ident !Int !TypeCons !*CollectAdmin -> (![ParsedBody], ![ParsedDefinition],!*CollectAdmin)
+collectGenericBodies all_defs=:[PD_GenericCase gc=:{gc_gcf=GCF gc_ident2 gcf} : defs] gc_ident1 gcf_arity1 gc_type_cons1 ca
+	| gc_ident2==gc_ident1 && gc.gc_type_cons == gc_type_cons1
+		#! (bodies, rest_defs, ca) = collectGenericBodies defs gc_ident1 gcf_arity1 gc_type_cons1 ca
+		# (GCF _ {gcf_body=GCB_ParsedBody args rhs,gcf_arity}) = gc.gc_gcf
+		#! body = {pb_args = args, pb_rhs = rhs, pb_position = gc.gc_pos}
+		| gcf_arity==gcf_arity1
+			= ([body : bodies], rest_defs, ca)
+			#! msg = "This generic alternative has " +++ toString gcf_arity +++ " argument"
+				+ (if (gcf_arity <> 1) "s" "")+++" instead of " +++ toString gcf_arity1
+			#! ca = postParseError gc.gc_pos msg ca
+			= ([body : bodies], rest_defs, ca)
+		= ([], all_defs, ca)
+collectGenericBodies defs gc_ident1 gcf_arity1 gc_type_cons1 ca
 	= ([], defs, ca)
 
 strictness_from_fields :: ![ParsedSelector] -> StrictnessList
@@ -1453,20 +1448,17 @@ reorganiseDefinitions icl_module [PD_Generic gen : defs] def_counts ca
 	# 	(fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs def_counts ca
 		c_defs = {c_defs & def_generics = [gen : c_defs.def_generics]}
 	= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)
-reorganiseDefinitions icl_module [PD_GenericCase gc : defs] def_counts ca
-	#! (bodies, defs, ca) = collectGenericBodies gc defs ca  
+reorganiseDefinitions icl_module [PD_GenericCase gc=:{gc_type_cons} : defs] def_counts ca
+	# (GCF gc_ident gcf=:{gcf_body=GCB_ParsedBody args rhs,gcf_arity}) = gc.gc_gcf
+	#! (bodies, defs, ca) = collectGenericBodies defs gc_ident gcf_arity gc_type_cons ca
 	#! (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) 
 		= reorganiseDefinitions icl_module defs def_counts ca
-	# (GCB_ParsedBody args rhs) = gc.gc_body
-	# body = 
-		{ pb_args = args
-		, pb_rhs = rhs
-		, pb_position = gc.gc_pos 
-		}
-	#! bodies = [body : bodies ]
-	#! fun_name = genericIdentToFunIdent gc.gc_ident.id_name gc.gc_type_cons 
-	#! fun = MakeNewImpOrDefFunction fun_name gc.gc_arity bodies (FK_Function cNameNotLocationDependent) NoPrio No gc.gc_pos
-	#! inst = { gc & gc_body = GCB_FunDef fun } 
+	# body = {pb_args = args, pb_rhs = rhs, pb_position = gc.gc_pos}
+	#! bodies = [body : bodies]
+	#! fun_name = genericIdentToFunIdent gc_ident.id_name gc.gc_type_cons
+	#! fun = MakeNewImpOrDefFunction fun_name gcf_arity bodies (FK_Function cNameNotLocationDependent) NoPrio No gc.gc_pos
+	# gcf & gcf_body=GCB_FunDef fun, gcf_arity=gcf_arity
+	#! inst = {gc & gc_gcf = GCF gc_ident gcf}
 	#! c_defs = {c_defs & def_generic_cases = [inst : c_defs.def_generic_cases]}
 	= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)
 reorganiseDefinitions icl_module [PD_Derive derive_defs : defs] def_counts=:{type_count} ca

@@ -753,7 +753,7 @@ where
 	(<<<) file (PD_TypeSpec _ name prio st sp) = file <<< name <<< st
 	(<<<) file (PD_Type td) = file <<< td
 	(<<<) file (PD_Generic {gen_ident}) = file <<< "generic " <<< gen_ident
-	(<<<) file (PD_GenericCase {gc_ident,gc_type_cons}) = file <<< gc_ident <<< "{|" <<< gc_type_cons <<< "|}"
+	(<<<) file (PD_GenericCase {gc_gcf=GCF gc_ident _,gc_type_cons}) = file <<< gc_ident <<< "{|" <<< gc_type_cons <<< "|}"
 	(<<<) file _ = file
 
 instance <<< Rhs

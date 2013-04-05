@@ -635,17 +635,17 @@ where
 	    # localsExpected = has_args || isGlobalContext parseContext || ~ ss_useLayout
 	    # (rhs, _, pState) = wantRhs localsExpected (ruleDefiningRhsSymbol parseContext has_args) pState
 
-		# generic_case = 
-			{ gc_ident = ident
-			, gc_gident = generic_ident
-			, gc_generic = {gi_module=NoIndex,gi_index=NoIndex}
-			, gc_arity = length args
-			, gc_pos = pos
+		# generic_case =
+			{ gc_pos = pos
 			, gc_type = type
 			, gc_type_cons = type_cons
-			, gc_body = GCB_ParsedBody args rhs
-			, gc_kind = KindError	
-			}					
+			, gc_gcf = GCF ident {
+						gcf_gident = generic_ident,
+						gcf_generic = {gi_module=NoIndex,gi_index=NoIndex},
+						gcf_arity = length args,
+						gcf_body = GCB_ParsedBody args rhs,
+						gcf_kind = KindError }
+			}
 		= (True, PD_GenericCase generic_case, pState)
 
 	wantForeignExportDefinition pState
@@ -1724,16 +1724,12 @@ where
 		# (ident, pState) = stringToIdent name (IC_GenericCase type) pState
 		# (generic_ident, pState) = stringToIdent name IC_Generic pState
 		# (type_cons, pState) = get_type_cons type pState
-		# derive_def = 
-			{	gc_ident	= ident
-			, 	gc_gident = generic_ident
-			, 	gc_generic = {gi_module=NoIndex,gi_index=NoIndex}
-			,	gc_arity = 0
-			,	gc_pos = pos
+		# derive_def =
+			{	gc_pos = pos
 			,	gc_type = type
 			,	gc_type_cons = type_cons
-			,	gc_body = GCB_None
-			,	gc_kind = KindError
+			,	gc_gcf = GCF ident {gcf_gident = generic_ident, gcf_generic = {gi_module=NoIndex,gi_index=NoIndex}, gcf_arity = 0,
+									gcf_body = GCB_None, gcf_kind = KindError}
 			}
 		= (derive_def, pState) 
 
