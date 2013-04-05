@@ -950,7 +950,8 @@ ExpressionNameSpaceN:==0
 TypeNameSpaceN:==1
 ClassNameSpaceN:==2
 FieldNameSpaceN:==3
-OtherNameSpaceN:==4
+GenericNameSpaceN:==4
+OtherNameSpaceN:==5
 
 ste_kind_to_name_space_n STE_DclFunction = ExpressionNameSpaceN
 ste_kind_to_name_space_n STE_Constructor = ExpressionNameSpaceN
@@ -959,6 +960,7 @@ ste_kind_to_name_space_n (STE_DclMacroOrLocalMacroFunction _) = ExpressionNameSp
 ste_kind_to_name_space_n STE_Type = TypeNameSpaceN
 ste_kind_to_name_space_n STE_Class = ClassNameSpaceN
 ste_kind_to_name_space_n (STE_Field _) = FieldNameSpaceN
+ste_kind_to_name_space_n STE_Generic = GenericNameSpaceN
 ste_kind_to_name_space_n _ = OtherNameSpaceN
 
 search_qualified_ident :: !Ident {#Char} !NameSpaceN !*CheckState -> (!Bool,!DeclarationRecord,!*CheckState)

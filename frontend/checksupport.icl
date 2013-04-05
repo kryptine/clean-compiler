@@ -4,8 +4,6 @@ import StdEnv, compare_constructor
 import syntax, predef, containers
 import utilities
 
-//import RWSDebug
-
 cUndef			:== -1
 
 instance toInt STE_Kind
@@ -21,6 +19,7 @@ where
 	toInt STE_DclFunction			= cFunctionDefs
 	toInt (STE_FunctionOrMacro _)	= cMacroDefs
 	toInt (STE_DclMacroOrLocalMacroFunction _)= cMacroDefs
+	toInt STE_GenericDeriveClass	= cGenericCaseDefs
 	toInt STE_TypeExtension			= cTypeDefs
 	toInt _							= NoIndex
 

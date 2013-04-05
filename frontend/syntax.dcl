@@ -44,6 +44,7 @@ instance == FunctionOrMacroIndex
 				| STE_Member
 				| STE_Generic
 				| STE_GenericCase
+				| STE_GenericDeriveClass
 				| STE_Instance
 				| STE_Variable !VarInfoPtr
 				| STE_TypeVariable !TypeVarInfoPtr
@@ -441,6 +442,8 @@ cNameLocationDependent :== True
 
 ::	GenericCaseFunctions
 	= GCF !Ident !GCF
+	| GCFS ![!GCF!]
+	| GCFC !Ident !Ident	// IC_GenericDeriveClass IC_Class
 
 ::	GCF = {
 		gcf_gident	:: !Ident,				// name in IC_GenricCase namespace

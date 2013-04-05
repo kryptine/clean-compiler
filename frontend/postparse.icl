@@ -365,6 +365,8 @@ instance collectFunctions GenericCaseDef where
 		= ({gc & gc_gcf = GCF gc_ident {gcf & gcf_body=GCB_FunDef fun_def}}, ca)
 	collectFunctions gc=:{gc_gcf=GCF _ {gcf_body=GCB_None}} icl_module ca
 		= (gc, ca)
+	collectFunctions gc=:{gc_gcf=GCFC _ _} icl_module ca
+		= (gc, ca)
 
 instance collectFunctions FunDef where
 	collectFunctions fun_def=:{fun_body = ParsedBody bodies} icl_module ca
@@ -1194,7 +1196,7 @@ collectFunctionBodies fun_name fun_arity fun_prio fun_kind defs ca
 
 collectGenericBodies :: ![ParsedDefinition] !Ident !Int !TypeCons !*CollectAdmin -> (![ParsedBody], ![ParsedDefinition],!*CollectAdmin)
 collectGenericBodies all_defs=:[PD_GenericCase gc=:{gc_gcf=GCF gc_ident2 gcf} : defs] gc_ident1 gcf_arity1 gc_type_cons1 ca
-	| gc_ident2==gc_ident1 && gc.gc_type_cons == gc_type_cons1
+	| gc_ident2==gc_ident1 && gc.gc_type_cons==gc_type_cons1
 		#! (bodies, rest_defs, ca) = collectGenericBodies defs gc_ident1 gcf_arity1 gc_type_cons1 ca
 		# (GCF _ {gcf_body=GCB_ParsedBody args rhs,gcf_arity}) = gc.gc_gcf
 		#! body = {pb_args = args, pb_rhs = rhs, pb_position = gc.gc_pos}

@@ -23,6 +23,7 @@ import predef, syntax, compare_types, compare_constructor
 				| IC_InstanceMember ![Type]
 				| IC_Generic
 				| IC_GenericCase !Type
+				| IC_GenericDeriveClass !Type
 				| IC_TypeExtension !{#Char}/*module name*/
 				| IC_Unknown
 
@@ -44,6 +45,8 @@ where
 	(=<) (IC_InstanceMember types1) (IC_InstanceMember types2)
 		= compare_types types1 types2
 	(=<) (IC_GenericCase type1) (IC_GenericCase type2)
+		= type1 =< type2
+	(=<) (IC_GenericDeriveClass type1) (IC_GenericDeriveClass type2)
 		= type1 =< type2
 	(=<) (IC_Field typ_id1) (IC_Field typ_id2)
 		= typ_id1 =< typ_id2

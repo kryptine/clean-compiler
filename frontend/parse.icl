@@ -1697,11 +1697,18 @@ wantDeriveDefinition :: !ParseContext !Position !*ParseState -> (!ParsedDefiniti
 wantDeriveDefinition parseContext pos pState
 	| pState.ps_flags bitand PS_SupportGenericsMask==0
 		= (PD_Erroneous, parseErrorSimple "generic definition" "to enable generics use the command line flag -generics" pState)
-	# (name, pState) = want_name pState
-	| name == "" 
-		= (PD_Erroneous, pState)
-	# (derive_defs, pState) = want_derive_types name pState
-	= (PD_Derive derive_defs, pState)
+	# (token, pState) = nextToken TypeContext pState
+	= case token of
+		IdentToken name
+			# (derive_defs, pState) = want_derive_types name pState
+			-> (PD_Derive derive_defs, pState)
+		ClassToken
+			# (class_name, pState) = want pState
+			# (class_ident, pState) = stringToIdent class_name IC_Class pState
+			# (derive_defs, pState) = want_derive_class_types class_ident pState
+			-> (PD_Derive derive_defs, pState)
+		_
+			-> (PD_Erroneous, parseError "Generic Definition" (Yes token) "<identifier>" pState)
 where
 	want_name pState 
 		# (token, pState) = nextToken TypeContext pState
@@ -1711,19 +1718,21 @@ where
 
 	want_derive_types :: String !*ParseState -> ([GenericCaseDef], !*ParseState)			
 	want_derive_types name pState
-		# (derive_def, pState) = want_derive_type name pState
-		# (token, pState) = nextToken TypeContext pState
+		# (derive_def, token, pState) = want_derive_type name pState
 		| token == CommaToken
 			# (derive_defs, pState) = want_derive_types name pState
 			= ([derive_def:derive_defs], pState)
+ 			# pState = wantEndOfDefinition "derive definition" (tokenBack pState)
 			= ([derive_def], pState)
 
-	want_derive_type :: String !*ParseState -> (GenericCaseDef, !*ParseState)			
+	want_derive_type :: String !*ParseState -> (GenericCaseDef, !Token, !*ParseState)			
 	want_derive_type name pState
-		# (type, pState) = wantType pState
+//		# (type, pState) = wantType pState
+		# (ok, {at_type=type}, pState) = trySimpleType TA_None pState
 		# (ident, pState) = stringToIdent name (IC_GenericCase type) pState
 		# (generic_ident, pState) = stringToIdent name IC_Generic pState
 		# (type_cons, pState) = get_type_cons type pState
+		# (token, pState) = nextToken GenericContext pState
 		# derive_def =
 			{	gc_pos = pos
 			,	gc_type = type
@@ -1731,7 +1740,25 @@ where
 			,	gc_gcf = GCF ident {gcf_gident = generic_ident, gcf_generic = {gi_module=NoIndex,gi_index=NoIndex}, gcf_arity = 0,
 									gcf_body = GCB_None, gcf_kind = KindError}
 			}
-		= (derive_def, pState) 
+		= (derive_def, token, pState) 
+
+	want_derive_class_types :: Ident !*ParseState -> ([GenericCaseDef], !*ParseState)			
+	want_derive_class_types class_ident pState
+		# (derive_def, pState) = want_derive_class_type class_ident pState
+		# (token, pState) = nextToken TypeContext pState
+		| token == CommaToken
+			# (derive_defs, pState) = want_derive_class_types class_ident pState
+			= ([derive_def:derive_defs], pState)
+ 			# pState = wantEndOfDefinition "derive definition" (tokenBack pState)
+			= ([derive_def], pState)
+
+	want_derive_class_type :: Ident !*ParseState -> (GenericCaseDef, !*ParseState)			
+	want_derive_class_type class_ident pState
+		# (type, pState) = wantType pState
+		# (ident, pState) = stringToIdent class_ident.id_name (IC_GenericDeriveClass type) pState
+		# (type_cons, pState) = get_type_cons type pState
+		# derive_def = { gc_pos = pos, gc_type = type, gc_type_cons = type_cons, gc_gcf = GCFC ident class_ident}
+		= (derive_def, pState)
 
 	get_type_cons :: Type !*ParseState -> (TypeCons, !*ParseState)	
 	get_type_cons (TA type_symb []) pState 

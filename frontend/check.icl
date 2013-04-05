@@ -982,6 +982,8 @@ where
 
 	gen_case_def_to_dcl {gc_gcf=GCF gc_ident _, gc_pos} (decl_index, decls)
 		= (inc decl_index, [Declaration {decl_ident = gc_ident, decl_pos = gc_pos, decl_kind = STE_GenericCase, decl_index = decl_index} : decls])
+	gen_case_def_to_dcl {gc_gcf=GCFC gcfc_ident _, gc_pos} (decl_index, decls)
+		= (inc decl_index, [Declaration {decl_ident = gcfc_ident, decl_pos = gc_pos, decl_kind = STE_GenericDeriveClass, decl_index = decl_index} : decls]) 
 
 createCommonDefinitions :: (CollectedDefinitions ClassInstance) -> .CommonDefs;
 createCommonDefinitions {def_types,def_constructors,def_selectors,def_classes,def_members,def_instances, def_generics,def_generic_cases}
@@ -1012,8 +1014,8 @@ checkCommonDefinitions opt_icl_info module_index common modules heaps cs
 	  		= checkInstanceDefs module_index common.com_instance_defs com_type_defs com_class_defs com_member_defs modules heaps cs
 	  (com_generic_defs, com_type_defs, com_class_defs, modules, heaps, cs)
 			= checkGenericDefs module_index opt_icl_info common.com_generic_defs com_type_defs com_class_defs modules heaps cs
-	  (com_gencase_defs, com_generic_defs, com_type_defs, modules, heaps, cs)
-			= checkGenericCaseDefs module_index common.com_gencase_defs com_generic_defs com_type_defs modules heaps cs
+	  (com_gencase_defs, com_generic_defs, com_type_defs, com_class_defs, modules, heaps, cs)
+			= checkGenericCaseDefs module_index common.com_gencase_defs com_generic_defs com_type_defs com_class_defs modules heaps cs	  
  	| cs.cs_error.ea_ok
 		# (size_com_type_defs,com_type_defs) = usize com_type_defs
 	 	  (size_com_selector_defs,com_selector_defs) = usize com_selector_defs
@@ -1059,7 +1061,7 @@ where
 		= ([Declaration { decl_ident = fun_ident, decl_pos = fun_pos, decl_kind = STE_FunctionOrMacro [], decl_index = decl_index } : defs], fun_defs)
 
 collectDclMacros {ir_from=from_index,ir_to=to_index} fun_defs (sizes, defs)
-	# (defs, fun_defs) = iFoldSt macro_def_to_dcl from_index to_index (defs, fun_defs)  
+	# (defs, fun_defs) = iFoldSt macro_def_to_dcl from_index to_index (defs, fun_defs)
 	= (fun_defs, ({ sizes & [cMacroDefs] = to_index - from_index }, defs))
 where
 	macro_def_to_dcl decl_index (defs, fun_defs)
@@ -2027,7 +2029,7 @@ renumber_icl_module_functions mod_type icl_global_function_range icl_instance_ra
 					= (new_table, icl_gencases, error)
 
 			build_conversion_table_for_generic_case dcl_index dcl_gencases icl_gencases new_table error
-				# icl_index = dcl_index	
+				# icl_index = dcl_index
 				  (icl_gencase, icl_gencases) = icl_gencases![icl_index]
 				  dcl_gencase = dcl_gencases.[dcl_index]
 				= case (dcl_gencase,icl_gencase) of
@@ -2035,6 +2037,18 @@ renumber_icl_module_functions mod_type icl_global_function_range icl_instance_ra
 					 {gc_gcf=GCF _ {gcf_body = GCB_FunIndex icl_fun}})
 						#! new_table = { new_table & [dcl_fun] = icl_fun } 								
 						-> (new_table, icl_gencases, error)	
+					({gc_gcf=GCFS dcl_gcfs},{gc_gcf=GCFS icl_gcfs})
+						#! new_table = build_conversion_table_for_generic_superclasses dcl_gcfs icl_gcfs new_table
+						-> (new_table, icl_gencases, error)
+					({gc_gcf=GCFS dcl_gcfs},{gc_gcf=GCFC _ _})
+						// error already reported in checkGenericCaseDefs
+						-> (new_table, icl_gencases, error)
+				where
+					build_conversion_table_for_generic_superclasses [!{gcf_body=GCB_FunIndex dcl_fun}:dcl_gcfs!] [!{gcf_body=GCB_FunIndex icl_fun}:icl_gcfs!] new_table
+						# new_table = {new_table & [dcl_fun] = icl_fun}												
+						= build_conversion_table_for_generic_superclasses dcl_gcfs icl_gcfs new_table
+					build_conversion_table_for_generic_superclasses [!!] [!!] new_table
+						= new_table
 
 			build_conversion_table_for_instances dcl_class_inst_index dcl_instances instances_conversion_table_size icl_instances new_table error
 				| dcl_class_inst_index < instances_conversion_table_size
@@ -2079,17 +2093,31 @@ renumber_icl_module_functions mod_type icl_global_function_range icl_instance_ra
 		renumber_members_of_gencases No gencases
 			= gencases
 		renumber_members_of_gencases (Yes function_conversion_table) gencases
-			= renumber 0 gencases
-		where			
-			renumber gencase_index gencases
+			= renumber_gencase_members 0 gencases
+		where
+			renumber_gencase_members gencase_index gencases
 				| gencase_index < size gencases
 					# (gencase,gencases) = gencases![gencase_index]
-					# {gc_gcf=GCF gc_ident gcf=:{gcf_body=GCB_FunIndex icl_index}} = gencase
-					# dcl_index = function_conversion_table.[icl_index] 
-					# gencase = {gencase & gc_gcf=GCF gc_ident {gcf & gcf_body = GCB_FunIndex dcl_index}}
-					# gencases = {gencases & [gencase_index] = gencase}
-					= renumber (inc gencase_index) gencases
-					= gencases	
+					= case gencase of
+						{gc_gcf=GCF gc_ident gcf=:{gcf_body=GCB_FunIndex icl_index}}
+							# dcl_index = function_conversion_table.[icl_index]
+							# gencase = {gencase & gc_gcf=GCF gc_ident {gcf & gcf_body = GCB_FunIndex dcl_index}}
+							# gencases = {gencases & [gencase_index] = gencase}
+							-> renumber_gencase_members (inc gencase_index) gencases
+						{gc_gcf=GCFS gcfs}
+							# gcfs = renumber_gcfs gcfs function_conversion_table
+							# gencase = {gencase & gc_gcf=GCFS gcfs}
+							# gencases = {gencases & [gencase_index] = gencase} 
+							-> renumber_gencase_members (gencase_index+1) gencases
+					= gencases
+
+			renumber_gcfs [!gcf=:{gcf_body=GCB_FunIndex icl_index}:gcfs!] function_conversion_table
+				# dcl_index = function_conversion_table.[icl_index] 
+				# gcf = {gcf & gcf_body=GCB_FunIndex dcl_index}
+				# gcfs = renumber_gcfs gcfs function_conversion_table
+				= [!gcf:gcfs!]
+			renumber_gcfs [!!] function_conversion_table
+				= [!!]
 
 checkModule :: !ScannedModule !IndexRange ![FunDef] !Bool !Bool !Int !(Optional ScannedModule) ![ScannedModule]
 				!{#DclModule} !*{#*{#FunDef}} !*PredefinedSymbols !*SymbolTable !*File !*Heaps
