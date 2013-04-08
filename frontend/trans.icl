@@ -331,10 +331,16 @@ skip_over this_case=:{case_expr=case_expr=:BasicExpr basic_value,case_guards=cas
 				Yes default_expr
 					-> transform default_expr {ro & ro_root_case_mode = NotRootCase} ti
 				No
+					# ro_lost_root = {ro & ro_root_case_mode = NotRootCase}
+					# (new_case_expr, ti) = transform case_expr ro_lost_root ti
+					-> (Case {this_case & case_expr=new_case_expr, case_guards=BasicPatterns basic_type []}, ti)
+/*
+					// The following does not work, because a FailExpr may only occur as else of an if in the backend */
 					# never_ident = case ro.ro_root_case_mode of
 										NotRootCase -> this_case.case_ident
 										_ -> Yes ro.ro_tfi.tfi_case.symb_ident
 					-> (neverMatchingCase never_ident, ti)
+*/
 		[{bp_expr}]
 			| case_alt_matches_always bp_expr ro
 				-> transform bp_expr {ro & ro_root_case_mode = NotRootCase} ti
