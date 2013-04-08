@@ -701,8 +701,12 @@ instance check_completeness FunType where
 		= check_completeness ft_type cci ccs
 
 instance check_completeness GenericDef where
-	check_completeness {gen_type} cci ccs
-		= check_completeness gen_type cci ccs
+	check_completeness {gen_ident, gen_type, gen_deps} cci ccs
+		= (check_completeness gen_type cci o foldSt (flip check_completeness cci) gen_deps) ccs
+
+instance check_completeness GenericDependency where
+	check_completeness {gd_ident=Ident ident, gd_index={gi_module, gi_index}} cci ccs
+		= check_whether_ident_is_imported ident gi_module gi_index STE_Generic cci ccs
 
 instance check_completeness (Global x) | check_completeness x where
 	check_completeness { glob_object } cci ccs

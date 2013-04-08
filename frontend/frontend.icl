@@ -4,11 +4,6 @@ import scanner, parse, postparse, check, type, trans, partition, convertcases, o
 		convertimportedtypes, compilerSwitches, analtypes, generics1,
 		typereify, compare_types
 
-// trace macro
-(-*->) infixl
-(-*->) value trace
-	:==	value // ---> trace
-
 instance == FrontEndPhase where
 	(==) a b
 		=	equal_constructor a b
@@ -23,8 +18,8 @@ frontSyntaxTree cached_dcl_macros cached_dcl_mods main_dcl_module_n predef_symbo
 		)
 
 frontEndInterface :: !(Optional (*File,{#Char},{#Char})) !FrontEndOptions !Ident !SearchPaths !{#DclModule} !*{#*{#FunDef}} !(Optional Bool) !*PredefinedSymbols !*HashTable (ModTimeFunction *Files) !*Files !*File !*File !*File !(Optional *File) !*Heaps
-  	-> ( !Optional *FrontEndSyntaxTree,!*{#*{#FunDef}},!{#DclModule},!Int,!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional *File, !*Heaps) 
-frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_modules cached_dcl_macros list_inferred_types predef_symbols hash_table modtimefunction files error io out tcl_file heaps 
+	-> (!Optional *FrontEndSyntaxTree,!*{#*{#FunDef}},!{#DclModule},!Int,!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional *File, !*Heaps)
+frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_modules cached_dcl_macros list_inferred_types predef_symbols hash_table modtimefunction files error io out tcl_file heaps
 	| case opt_file_dir_time of No -> True; _ -> False
 		# error = moduleCouldNotBeImportedError True mod_ident NoPos error
 		= (No,{},{},0,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
@@ -121,24 +116,17 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
       type_heaps = { type_heaps & th_vars = th_vars }
 
 	# heaps = { heaps & hp_type_heaps = type_heaps, hp_expression_heap = hp_expression_heap, hp_generic_heap = gen_heap, hp_var_heap=hp_var_heap }
-	# (saved_main_dcl_common, ti_common_defs) = replace (dcl_common_defs dcl_mods) main_dcl_module_n icl_common
-		with 
-			dcl_common_defs :: .{#DclModule} -> .{#CommonDefs} // needed for Clean 2.0 to disambiguate overloading
-			dcl_common_defs dcl_mods
-				=	{dcl_common \\ {dcl_common} <-: dcl_mods }
+	# (saved_main_dcl_common, ti_common_defs) = replace {#dcl_common \\ {dcl_common}<-:dcl_mods} main_dcl_module_n icl_common
 
-	#! (ti_common_defs, groups, fun_defs, generic_ranges, td_infos, heaps, hash_table, predef_symbols, dcl_mods, error_admin)
+	#! (ti_common_defs, groups, fun_defs, td_infos, heaps, hash_table, predef_symbols, dcl_mods, cached_dcl_macros, error_admin)
 		= case options.feo_generics of
 			True
 				-> convertGenerics main_dcl_module_n icl_used_module_numbers ti_common_defs groups fun_defs
-									td_infos heaps hash_table predef_symbols dcl_mods error_admin
+									td_infos heaps hash_table predef_symbols dcl_mods cached_dcl_macros error_admin
 			False
-				-> (ti_common_defs, groups, fun_defs, [], td_infos, heaps, hash_table, predef_symbols, dcl_mods, error_admin)
+				-> (ti_common_defs, groups, fun_defs, td_infos, heaps, hash_table, predef_symbols, dcl_mods, cached_dcl_macros, error_admin)
 
-	# (icl_common, ti_common_defs) = replace copied_ti_common_defs main_dcl_module_n saved_main_dcl_common		
-		with 
-			copied_ti_common_defs :: .{#CommonDefs} // needed for Clean 2.0 to disambiguate overloading of replace
-			copied_ti_common_defs = {x \\ x <-: ti_common_defs}
+	# (icl_common, ti_common_defs) = replace {#x \\ x<-:ti_common_defs} main_dcl_module_n saved_main_dcl_common		
 
 	# dcl_mods = { {dcl_mod & dcl_common = common} \\ dcl_mod <-: dcl_mods & common <-: ti_common_defs }
 
@@ -153,7 +141,6 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 	# (ok,files) = fclose genout files
 	| not ok = abort "could not write genout" 
 */
-
 	#! ok = error_admin.ea_ok
 	| not ok
 		= (No,{},{},main_dcl_module_n,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
@@ -163,8 +150,8 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 
 	| not ok
 		= (No,{},{},main_dcl_module_n,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
-			
-	# icl_gencase_indices = icl_function_indices.ifi_gencase_indices++generic_ranges
+
+	# icl_gencase_indices = icl_function_indices.ifi_gencase_indices
 	# icl_function_indices = {icl_function_indices & ifi_gencase_indices = icl_gencase_indices }
 
 	# (fun_def_size, fun_defs) = usize fun_defs
@@ -190,7 +177,7 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 	#  (stdStrictLists_module_n,predef_symbols) = get_StdStrictLists_module_n predef_symbols
 
 	# (cleanup_info, acc_args, components, fun_defs, var_heap, expression_heap)
-		 = analyseGroups common_defs imported_funs array_instances.ali_instances_range main_dcl_module_n stdStrictLists_module_n (components -*-> "Analyse") fun_defs var_heap expression_heap
+		 = analyseGroups common_defs imported_funs array_instances.ali_instances_range main_dcl_module_n stdStrictLists_module_n components fun_defs var_heap expression_heap
 
 	# (def_max, acc_args)		= usize acc_args
 	# (def_min, fun_defs)		= usize fun_defs
@@ -244,10 +231,10 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 
 //	  (components, fun_defs, out) = showComponents components 0 False fun_defs out
 	# (used_funs, components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap)
-	  		= convertCasesOfFunctions components main_dcl_module_n imported_funs common_defs fun_defs (dcl_types -*-> "Convert cases") used_conses
+	  		= convertCasesOfFunctions components main_dcl_module_n imported_funs common_defs fun_defs dcl_types used_conses
 					var_heap type_heaps expression_heap
 	#!  (dcl_types, type_heaps, var_heap)
-			= convertImportedTypeSpecifications main_dcl_module_n dcl_mods imported_funs common_defs used_conses used_funs (dcl_types -*-> "Convert types") type_heaps var_heap		
+			= convertImportedTypeSpecifications main_dcl_module_n dcl_mods imported_funs common_defs used_conses used_funs dcl_types type_heaps var_heap		
 //	# (components, fun_defs, error)	= showTypes components 0 fun_defs error
 //	# (dcl_mods, out) = showDclModules dcl_mods out
 //	# (components, fun_defs, out) = showComponents components 0 False fun_defs out
@@ -411,10 +398,9 @@ where
 		# (size_dcl_mods, dcl_mods) = usize dcl_mods
 		| mod_index == size_dcl_mods
 			= (dcl_mods, file)
-		| otherwise
-			# (dcl_mod, dcl_mods) = dcl_mods ! [mod_index]	
+			# (dcl_mod, dcl_mods) = dcl_mods![mod_index]
 			# file =  show_dcl_mod dcl_mod file
-			= (dcl_mods, file)
+			= show_dcl_mods (mod_index+1) dcl_mods file
 			
 	show_dcl_mod {dcl_name, dcl_functions} file
 		# file = file <<< dcl_name <<< ":\n"

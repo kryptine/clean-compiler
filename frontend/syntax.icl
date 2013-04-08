@@ -1,13 +1,18 @@
 implementation module syntax
 
 import StdEnv, compare_constructor
-import scanner, general, Heap, typeproperties, utilities
+import scanner, general, Heap, typeproperties, utilities, compare_types
 import IndexType
 from containers import ::NumberSet
 from convertcases import :: LetVarInfo, :: LetExpressionInfo, :: RefCountsInCase, :: SplitsInCase
 
 instance toString Ident
 where toString {id_name} = id_name
+
+instance == GenericDependency
+	where
+		(==) gen_dep1 gen_dep2
+			= gen_dep1.gd_index == gen_dep2.gd_index && gen_dep1.gd_vars == gen_dep2.gd_vars
 
 instance toString Import
 where toString {import_module} = toString import_module
@@ -753,7 +758,7 @@ where
 	(<<<) file (PD_TypeSpec _ name prio st sp) = file <<< name <<< st
 	(<<<) file (PD_Type td) = file <<< td
 	(<<<) file (PD_Generic {gen_ident}) = file <<< "generic " <<< gen_ident
-	(<<<) file (PD_GenericCase {gc_gcf=GCF gc_ident _,gc_type_cons}) = file <<< gc_ident <<< "{|" <<< gc_type_cons <<< "|}"
+	(<<<) file (PD_GenericCase {gc_gcf=GCF gc_ident _,gc_type_cons} _) = file <<< gc_ident <<< "{|" <<< gc_type_cons <<< "|}"
 	(<<<) file _ = file
 
 instance <<< Rhs
@@ -938,6 +943,7 @@ where
 			= file <<< "STE_DclFunction"
 	(<<<) file STE_Generic = file <<< "STE_Generic"
 	(<<<) file STE_GenericCase = file <<< "STE_GenericCase"
+	(<<<) file STE_GenericDeriveClass = file <<< "STE_GenericDeriveClass"
 	(<<<) file
 		(STE_Module _)
 			= file <<< "STE_Module"

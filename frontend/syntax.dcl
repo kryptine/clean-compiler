@@ -267,7 +267,7 @@ cIsNotAFunction :== False
 	|	PD_ImportedObjects [ImportedObject]
 	|	PD_ForeignExport !Ident !{#Char} !Int !Bool /* if stdcall */
 	|	PD_Generic GenericDef
-	| 	PD_GenericCase GenericCaseDef
+	| 	PD_GenericCase GenericCaseDef Ident
 	|	PD_Derive [GenericCaseDef]
 	|	PD_Erroneous
 
@@ -400,8 +400,18 @@ cNameLocationDependent :== True
 	, 	gen_pos			:: !Position
 	,	gen_type		:: !SymbolType	// Generic type (st_vars include generic type vars)
 	,	gen_vars		:: ![TypeVar]	// Generic type variables
+	,	gen_deps		:: ![GenericDependency]	   // Generic function dependencies
 	,	gen_info_ptr	:: !GenericInfoPtr
 	}
+
+:: GenericDependency =
+	{	gd_ident		:: !IdentOrQualifiedIdent
+	, 	gd_index		:: !GlobalIndex
+	, 	gd_vars			:: ![TypeVar]
+	,	gd_nums			:: ![Int] // Mapping from dependency variable to generic type variable
+	}
+
+instance == GenericDependency
 
 :: GenericClassInfo = 
 	{	gci_kind	:: !TypeKind	// the kind
@@ -414,14 +424,18 @@ cNameLocationDependent :== True
 :: GenericInfo = 
 	{	gen_classes		:: !GenericClassInfos
 	,	gen_var_kinds	:: ![TypeKind]  	// kinds of all st_vars of the gen_type
-	,	gen_rep_conses	:: !{#GenericRepresentationConstructor}
-	//	OBJECT, CONS, RECORD, FIELD
+	,	gen_rep_conses	:: !{!GenericRepresentationConstructor}
+	//	OBJECT, CONS, RECORD, FIELD, PAIR, EITHER, UNIT
 	}
 
 ::	GenericRepresentationConstructor =
-	{	gcf_module	:: !Int
-	,	gcf_index	:: !Int
-	,	gcf_ident	:: !Ident
+	{	grc_module	:: !Int
+	,	grc_index	:: !GenericCaseBody // GCB_FunIndex, GCB_FunAndMacroIndex or GCB_None
+	,	grc_local_fun_index :: !Int
+	,	grc_ident	:: !Ident
+	,	grc_generic_info :: !Int
+	,	grc_generic_instance_deps :: !GenericInstanceDependencies
+	,	grc_optional_fun_type :: !Optional SymbolType
 	}
 
 :: GenericInfoPtr :== Ptr GenericInfo	
@@ -446,18 +460,27 @@ cNameLocationDependent :== True
 	| GCFC !Ident !Ident	// IC_GenericDeriveClass IC_Class
 
 ::	GCF = {
-		gcf_gident	:: !Ident,				// name in IC_GenricCase namespace
+		gcf_gident	:: !Ident,	  			// name in IC_Generic namespace
 		gcf_generic	:: !GlobalIndex,		// index of the generic
 		gcf_arity	:: !Int,				// arity of the function
+		gcf_generic_info :: !Int,			// 0 = no, -1 = all, generic info for CONS, OBJECT, RECORD or FIELD
 		gcf_body	:: !GenericCaseBody,	// the body function or NoIndex
-		gcf_kind	:: !TypeKind			// kind of the instance type
+		gcf_kind	:: !TypeKind,			// kind of the instance type
+		gcf_generic_instance_deps :: !GenericInstanceDependencies
 	}
 
 :: GenericCaseBody 
 	= GCB_None 									// to be generated
-	| GCB_FunIndex !Index 
-	| GCB_FunDef !FunDef 
-	| GCB_ParsedBody ![ParsedExpr] !Rhs 
+	| GCB_FunIndex !Index
+	| GCB_FunAndMacroIndex !Index !Index
+	| GCB_MacroIndex !Index
+	| GCB_FunDef !FunDef
+	| GCB_ParsedBody ![ParsedExpr] !Rhs
+
+::	GenericInstanceDependencies
+	= AllGenericInstanceDependencies
+	| GenericInstanceDependencies !Int /*n_deps*/ !Int /*deps*/
+	| GenericInstanceUsedArgs !Int /*n_deps*/ !Int /*deps*/
 
 ::	InstanceType =
 	{	it_vars			:: [TypeVar]
@@ -587,17 +610,19 @@ NoGlobalIndex :== {gi_module=NoIndex,gi_index=NoIndex}
 	= GTSAppCons TypeKind [GenTypeStruct]
 	| GTSAppVar TypeVar [GenTypeStruct] 
 	| GTSVar TypeVar
- 	| GTSCons DefinedSymbol GenTypeStruct
- 	| GTSRecord DefinedSymbol GenTypeStruct
- 	| GTSField DefinedSymbol GenTypeStruct
- 	| GTSObject DefinedSymbol GenTypeStruct
-	| GTSPair !GenTypeStruct !GenTypeStruct		// for optimizing bimaps
-	| GTSEither !GenTypeStruct !GenTypeStruct	// for optimizing bimaps
-	| GTSArrow GenTypeStruct GenTypeStruct		// for optimizing bimaps
- 	| GTSE
-	| GTSAppConsBimapKindConst					// for optimizing bimaps
-	| GTSAppBimap TypeKind [GenTypeStruct]		// for optimizing bimaps
-	| GTSAppConsSimpleType !GlobalIndex !TypeKind ![GenTypeStruct]	// for optimizing bimaps
+ 	| GTSCons !DefinedSymbol !GlobalIndex !DefinedSymbol !DefinedSymbol !GenTypeStruct
+ 	| GTSRecord !DefinedSymbol !GlobalIndex !DefinedSymbol !DefinedSymbol !GenTypeStruct
+ 	| GTSField !DefinedSymbol !GlobalIndex !DefinedSymbol !GenTypeStruct
+ 	| GTSObject !DefinedSymbol !GlobalIndex !DefinedSymbol !GenTypeStruct
+	| GTSE
+	// the following constructors are used for optimizing bimaps
+	| GTSPair !GenTypeStruct !GenTypeStruct
+	| GTSEither !GenTypeStruct !GenTypeStruct
+	| GTSUnit
+	| GTSArrow GenTypeStruct GenTypeStruct
+ 	| GTSAppConsBimapKindConst
+	| GTSAppBimap TypeKind [GenTypeStruct]
+	| GTSAppConsSimpleType !GlobalIndex !TypeKind ![GenTypeStruct]
 
 :: GenericTypeRep = 
 	{ gtr_type :: GenTypeStruct		// generic structure type
@@ -1098,9 +1123,11 @@ cNotVarNumber :== -1
 					| TVI_ConsInstance !DefinedSymbol //AA: generic cons instance function 
 					| TVI_Normalized !Int /* MV - position of type variable in its definition */
 					| TVI_Expr !Bool !Expression	/* AA: Expression corresponding to the type var during generic specialization */
+					| TVI_Exprs ![(GlobalIndex, Expression)] /* List of expressions corresponding to the type var during generic specialization */
 					| TVI_Iso !DefinedSymbol !DefinedSymbol !DefinedSymbol
 					| TVI_GenTypeVarNumber !Int
 					| TVI_CPSTypeVar !CheatCompiler /* MdM: a pointer to a variable in CleanProverSystem is stored here, using a cast */
+					| TVI_Attr !TypeAttribute
 
 ::	TypeVarInfoPtr	:== Ptr TypeVarInfo
 ::	TypeVarHeap 	:== Heap TypeVarInfo

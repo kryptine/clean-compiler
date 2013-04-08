@@ -1,6 +1,6 @@
 implementation module checkgenerics
 
-import syntax,checksupport,checktypes,genericsupport,compare_types,typesupport
+import syntax,checksupport,checktypes,genericsupport,explicitimports,compare_types,typesupport
 
 checkGenericDefs :: !Index !(Optional (CopiedDefinitions, Int))
 		!*{#GenericDef} !*{#CheckedTypeDef} !*{#ClassDef} !*{#DclModule} !*Heaps !*CheckState
@@ -35,6 +35,8 @@ where
 		# (gen_def, type_defs, class_defs, modules, heaps, cs)
 			= check_generic_type gen_def mod_index type_defs class_defs modules heaps cs
 
+		# (gen_def, gen_defs, modules, cs) = check_generic_dependencies index mod_index gen_ident gen_def gen_defs modules cs
+
 		# gen_defs = {gen_defs & [index] = gen_def} 
 		# (cs=:{cs_x}) = popErrorAdmin cs
 		#! cs = { cs & cs_x = {cs_x & x_needed_modules = cs_x.x_needed_modules bitor cNeedStdGeneric}}			
@@ -44,7 +46,11 @@ where
 		# initial_info = 
 			{ gen_classes = createArray 32 []
 			, gen_var_kinds = []
-			, gen_rep_conses = createArray 4 {gcf_module = -1,gcf_index = -1,gcf_ident={id_name="",id_info=nilPtr}}
+			, gen_rep_conses
+				= createArray 7 {grc_module = -1, grc_index = GCB_None, grc_local_fun_index = -1, grc_generic_info = -1,
+								 grc_generic_instance_deps = AllGenericInstanceDependencies,
+								 grc_ident={id_name="",id_info=nilPtr},
+								 grc_optional_fun_type=No}
 			}
 		# (gen_info_ptr, hp_generic_heap) = newPtr initial_info hp_generic_heap 
 		= (	{gen_def & gen_info_ptr = gen_info_ptr}, 
@@ -140,6 +146,70 @@ where
 					-> (th_vars, cs_error)
 				_	-> abort ("check_no_generic_vars_in_contexts: wrong TVI" ---> (tv, tv_info))
 
+        // TODO: TvN: check that a generic function also includes all the dependencies of its dependencies, and so on. This is required when
+        // deriving generic functions since then the generated function needs to have all the arguments to all the generic functions called. In a
+        // that process collapses all dependencies.
+	check_generic_dependencies index mod_index gen_ident gen_def=:{gen_vars, gen_deps} gen_defs modules cs
+		# (gen_deps, (gen_defs, modules, cs)) = foldSt check_dependency gen_deps ([], (gen_defs, modules, cs))
+		= ({gen_def & gen_deps = reverse gen_deps}, gen_defs, modules, cs)
+	where
+		check_dependency gen_dep=:{gd_ident, gd_vars} (acc, (gen_defs, modules, cs))
+			# (gen_dep, cs) = resolve_dependency_index gen_dep cs
+			| gen_dep.gd_index.gi_index < 0
+				= (acc, (gen_defs, modules, cs))
+			# (gen_dep=:{gd_index, gd_vars}, gen_defs, modules, cs) = check_dependency_vars gen_dep gen_defs modules cs
+			| gd_index.gi_index == index && gd_index.gi_module == mod_index && gd_vars == gen_vars
+				= (acc, (gen_defs, modules, check_generic_dep_error gd_ident "already implicitly depends on itself" cs))
+			| isMember gen_dep acc
+				= (acc, (gen_defs, modules, check_generic_dep_error gd_ident "duplicate generic dependency" cs))
+                        // TODO: TvN: This check is to prevent duplicate dependencies with different generic dependency variables
+                        // See functions: generics1.build_specialized_expr and generics1.specialize_type_var
+			| isMember gen_dep.gd_index [gd_index \\ {gd_index} <- acc]
+				= (acc, (gen_defs, modules, check_generic_dep_error gd_ident "dependency occurs multiple times with different generic dependency variables, but only one occurrence of the same generic function as a dependency is currently allowed" cs))
+			= ([gen_dep:acc], (gen_defs, modules, cs))
+
+		resolve_dependency_index gen_dep=:{gd_ident} cs 
+			= case gd_ident of
+				Ident ident 
+					# (index, cs) = get_generic_index ident mod_index cs
+					= ({gen_dep & gd_index = index}, cs)
+				QualifiedIdent mod_ident name 
+					# (found, {decl_kind, decl_ident, decl_index}, cs) = search_qualified_ident mod_ident name GenericNameSpaceN cs
+					| not found 
+						= (gen_dep, check_generic_dep_error gd_ident "generic dependency not defined" cs)	
+					= case decl_kind of
+						STE_Imported STE_Generic generic_module
+							-> ({gen_dep & gd_ident = Ident decl_ident, gd_index = {gi_module = generic_module, gi_index = decl_index}}, cs)
+						_ 
+							-> (gen_dep, check_generic_dep_error gd_ident "not a generic function" cs)
+
+		check_dependency_vars gen_dep=:{gd_ident, gd_vars} gen_defs modules cs 
+			# (gen_defs, modules, cs) = check_dependency_arity gen_dep gen_defs modules cs
+			# (gd_vars, gd_nums, cs) = mapY2St (resolve_dependency_var 0 gen_vars) gd_vars cs
+			= ({gen_dep & gd_vars = gd_vars, gd_nums = gd_nums}, gen_defs, modules, cs)
+		where
+			check_dependency_arity {gd_ident, gd_index, gd_vars} gen_defs modules cs
+				# (gen_def, gen_defs, modules) = lookup_dependency_def gd_index gen_defs modules
+				| not (length gd_vars == length gen_def.gen_vars)
+					= (gen_defs, modules, check_generic_dep_error gd_ident "incorrect dependency variable arity" cs)
+				= (gen_defs, modules, cs)
+			where
+				lookup_dependency_def {gi_module, gi_index} gen_defs modules
+					| gi_module == mod_index
+						# (gen_def, gen_defs) = gen_defs![gi_index]
+						= (gen_def, gen_defs, modules)
+					# (gen_def, modules) = modules![gi_module].dcl_common.com_generic_defs.[gi_index]
+					= (gen_def, gen_defs, modules)
+				
+			resolve_dependency_var num [] var cs
+				= (var, -1, check_generic_dep_error gd_ident "generic dependency is indexed by an unbound generic variable" cs)
+			resolve_dependency_var num [gen_var:gen_vars] var cs
+				| var.tv_ident.id_name == gen_var.tv_ident.id_name
+					= (gen_var, num, cs)
+				= resolve_dependency_var (inc num) gen_vars var cs
+
+		check_generic_dep_error ident msg cs = {cs & cs_error = checkError ident msg cs.cs_error}	
+
 checkGenericCaseDefs :: !Index !*{#GenericCaseDef} !*{#GenericDef} !u:{#CheckedTypeDef} !*{#ClassDef} !*{#DclModule} !*Heaps !*CheckState
 						   -> (!*{#GenericCaseDef},!*{#GenericDef},!u:{#CheckedTypeDef},!*{#ClassDef},!*{#DclModule},!.Heaps,!.CheckState)
 checkGenericCaseDefs mod_index gen_case_defs generic_defs type_defs class_defs modules heaps cs
@@ -154,7 +224,7 @@ where
 			= (gen_case_defs, generic_defs, type_defs, class_defs, modules, heaps, cs)	
 			# (gen_case_defs, generic_defs, type_defs, class_defs, modules, heaps, cs) 
 				= check_generic_case_def index mod_index gen_case_defs generic_defs type_defs class_defs modules heaps cs
-			= check_generic_case_defs (inc index)  mod_index gen_case_defs generic_defs type_defs class_defs modules heaps cs
+			= check_generic_case_defs (inc index) mod_index gen_case_defs generic_defs type_defs class_defs modules heaps cs
 
 	check_generic_case_def index mod_index gen_case_defs generic_defs type_defs class_defs modules heaps cs
 		# (case_def=:{gc_pos,gc_type,gc_gcf}, gen_case_defs) = gen_case_defs![index]
@@ -220,8 +290,10 @@ where
 			gcf_gident = ds_ident,
 		 	gcf_generic = {gi_module=NoIndex,gi_index=NoIndex},
 			gcf_arity = 0,
+			gcf_generic_info = 0,
 			gcf_body = GCB_None,
-			gcf_kind = KindError }
+			gcf_kind = KindError,
+			gcf_generic_instance_deps = AllGenericInstanceDependencies }
 		# gcfs = convert_generic_contexts type_contexts
 		= [!gcf:gcfs!]
 	convert_generic_contexts [_:type_contexts]
@@ -345,8 +417,10 @@ convert_generic_instances gci next_fun_index gencase_defs class_defs symbol_tabl
 				gcf_gident = ds_ident,
 			 	gcf_generic = {gi_module=NoIndex,gi_index=NoIndex},
 				gcf_arity = 0,
+				gcf_generic_info = 0,
 				gcf_body = GCB_FunIndex next_fun_index,
-				gcf_kind = KindError }
+				gcf_kind = KindError,
+				gcf_generic_instance_deps = AllGenericInstanceDependencies }
 			# (gcfs,next_fun_index,new_fun_defs) = convert_generic_contexts type_contexts type_cons pos (next_fun_index+1) new_fun_defs
 			= ([!gcf:gcfs!],next_fun_index,[fun_def:new_fun_defs])
 		convert_generic_contexts [_:type_contexts] type_cons pos next_fun_index new_fun_defs
@@ -366,12 +440,19 @@ where
 			= (fun_index, [], gencase_defs, hp_var_heap)
 		# (gencase_def,gencase_defs) = gencase_defs![gc_index]
 		= case gencase_def of
+			{gc_gcf=GCF gc_ident gcf=:{gcf_body=GCB_MacroIndex macro_index},gc_pos,gc_type_cons}
+				# gencase_def & gc_gcf=GCF gc_ident {gcf & gcf_body = GCB_FunAndMacroIndex fun_index macro_index}
+				  gencase_defs & [gc_index] = gencase_def 
+				  (fun,hp_var_heap) = create_gencase_function_type gc_ident gc_type_cons gc_pos hp_var_heap
+				  (fun_index,funs,gencase_defs,hp_var_heap)
+					= create_funs (gc_index+1) (fun_index+1) gencase_defs hp_var_heap
+				-> (fun_index, [fun:funs], gencase_defs, hp_var_heap)
 			{gc_gcf=GCF gc_ident gcf,gc_pos,gc_type_cons}
 				# gencase_def & gc_gcf=GCF gc_ident {gcf & gcf_body = GCB_FunIndex fun_index}
 				  gencase_defs & [gc_index] = gencase_def
 				  (fun,hp_var_heap) = create_gencase_function_type gc_ident gc_type_cons gc_pos hp_var_heap
-				#! (fun_index, funs, gencase_defs,hp_var_heap) 
-					= create_funs (gc_index+1) (inc fun_index) gencase_defs hp_var_heap
+				  (fun_index,funs,gencase_defs,hp_var_heap)
+					= create_funs (gc_index+1) (fun_index+1) gencase_defs hp_var_heap
 				-> (fun_index, [fun:funs], gencase_defs, hp_var_heap)
 			{gc_gcf=GCFS gcfs,gc_pos,gc_type_cons}
 				# (gcfs,superclass_funs,fun_index,hp_var_heap)

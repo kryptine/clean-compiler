@@ -2033,10 +2033,18 @@ renumber_icl_module_functions mod_type icl_global_function_range icl_instance_ra
 				  (icl_gencase, icl_gencases) = icl_gencases![icl_index]
 				  dcl_gencase = dcl_gencases.[dcl_index]
 				= case (dcl_gencase,icl_gencase) of
-					({gc_gcf=GCF _ {gcf_body = GCB_FunIndex dcl_fun}},
-					 {gc_gcf=GCF _ {gcf_body = GCB_FunIndex icl_fun}})
-						#! new_table = { new_table & [dcl_fun] = icl_fun } 								
-						-> (new_table, icl_gencases, error)	
+					({gc_gcf=GCF _ {gcf_body = GCB_FunIndex dcl_fun,gcf_generic_info=dcl_generic_info,gcf_generic_instance_deps=dcl_generic_instance_deps}},
+					 {gc_gcf=GCF _ {gcf_body = GCB_FunIndex icl_fun,gcf_generic_info=icl_generic_info,gcf_generic_instance_deps=icl_generic_instance_deps}})
+						#! new_table = {new_table & [dcl_fun] = icl_fun}
+						# (icl_gencases, error)
+							= compare_icl_and_dcl_generic_info icl_generic_info dcl_generic_info icl_generic_instance_deps dcl_generic_instance_deps icl_gencase dcl_gencase icl_index icl_gencases error
+						-> (new_table, icl_gencases, error)
+					({gc_gcf=GCF _ {gcf_body = GCB_FunAndMacroIndex dcl_fun dcl_macro,gcf_generic_info=dcl_generic_info,gcf_generic_instance_deps=dcl_generic_instance_deps}},
+					 {gc_gcf=GCF _ {gcf_body = GCB_FunIndex icl_fun,gcf_generic_info=icl_generic_info,gcf_generic_instance_deps=icl_generic_instance_deps}})
+						#! new_table & [dcl_fun] = icl_fun
+						# (icl_gencases, error)
+							= compare_icl_and_dcl_generic_info icl_generic_info dcl_generic_info icl_generic_instance_deps dcl_generic_instance_deps icl_gencase dcl_gencase icl_index icl_gencases error
+						-> (new_table, icl_gencases, error)
 					({gc_gcf=GCFS dcl_gcfs},{gc_gcf=GCFS icl_gcfs})
 						#! new_table = build_conversion_table_for_generic_superclasses dcl_gcfs icl_gcfs new_table
 						-> (new_table, icl_gencases, error)
@@ -2044,6 +2052,62 @@ renumber_icl_module_functions mod_type icl_global_function_range icl_instance_ra
 						// error already reported in checkGenericCaseDefs
 						-> (new_table, icl_gencases, error)
 				where
+					compare_icl_and_dcl_generic_info :: Int Int GenericInstanceDependencies GenericInstanceDependencies GenericCaseDef GenericCaseDef Int
+														*{#GenericCaseDef} *ErrorAdmin -> (!*{#GenericCaseDef},!*ErrorAdmin)
+					compare_icl_and_dcl_generic_info icl_generic_info dcl_generic_info icl_generic_instance_deps dcl_generic_instance_deps icl_gencase dcl_gencase icl_index icl_gencases error
+						| icl_generic_info<>dcl_generic_info
+							# {gc_gcf=GCF gcf_ident _,gc_type_cons,gc_pos} = icl_gencase
+							  error_message = "different generic info for "+++type_cons_to_string gc_type_cons+++" in implementation and definition module"
+							  error = checkErrorWithIdentPos (newPosition gcf_ident gc_pos) error_message error
+							= (icl_gencases, error)
+							= case (dcl_generic_instance_deps,icl_generic_instance_deps) of
+								(AllGenericInstanceDependencies,AllGenericInstanceDependencies)
+									-> (icl_gencases, error)
+								(AllGenericInstanceDependencies,_)
+									# (GCF gcf_ident gcf) = icl_gencase.gc_gcf
+									# icl_gencases & [icl_index].gc_gcf = GCF gcf_ident {gcf & gcf_generic_instance_deps=AllGenericInstanceDependencies}
+									-> (icl_gencases, error)
+								(_,AllGenericInstanceDependencies)
+									# {gc_gcf=GCF gcf_ident _,gc_type_cons,gc_pos} = dcl_gencase
+							 		  error_message = "restricting dependent generic functions not allow for type "+++type_cons_to_string gc_type_cons
+									  error = checkErrorWithIdentPos (newPosition gcf_ident gc_pos) error_message error
+									-> (icl_gencases, error)
+								(GenericInstanceDependencies dcl_n_deps dcl_deps,GenericInstanceUsedArgs icl_n_deps icl_deps)
+									| icl_n_deps==dcl_n_deps
+										| icl_deps==dcl_deps
+											# generic_instance_deps = GenericInstanceDependencies icl_n_deps icl_deps
+											# (GCF gcf_ident gcf) = icl_gencase.gc_gcf
+											# icl_gencases & [icl_index].gc_gcf = GCF gcf_ident {gcf & gcf_generic_instance_deps=generic_instance_deps}
+											-> (icl_gencases, error)
+											-> (icl_gencases, different_restriction_error icl_gencase error)										
+									| icl_n_deps>dcl_n_deps
+										# icl_deps = icl_deps bitand ((1<<dcl_n_deps)-1)
+										| icl_deps==dcl_deps
+											# generic_instance_deps = GenericInstanceDependencies dcl_n_deps icl_deps
+											# (GCF gcf_ident gcf) = icl_gencase.gc_gcf
+											# icl_gencases & [icl_index].gc_gcf = GCF gcf_ident {gcf & gcf_generic_instance_deps=generic_instance_deps}
+											-> (icl_gencases, error)
+											-> (icl_gencases, different_restriction_error icl_gencase error)
+										-> (icl_gencases, different_restriction_error icl_gencase error)
+								(GenericInstanceDependencies dcl_n_deps dcl_deps,GenericInstanceDependencies icl_n_deps icl_deps)
+									| icl_n_deps==dcl_n_deps && icl_deps==dcl_deps
+										-> (icl_gencases, error)
+										-> (icl_gencases, different_restriction_error icl_gencase error)
+								(GenericInstanceUsedArgs dcl_n_deps dcl_deps, GenericInstanceUsedArgs icl_n_deps icl_deps)
+									| dcl_n_deps==icl_n_deps && dcl_deps==icl_deps
+										-> (icl_gencases, error)
+										-> (icl_gencases, different_restriction_error icl_gencase error)
+						where
+							type_cons_to_string (TypeConsSymb {type_ident}) = toString type_ident
+							type_cons_to_string (TypeConsBasic bt) = toString bt
+							type_cons_to_string TypeConsArrow = "(->)"
+							type_cons_to_string (TypeConsVar tv) = tv.tv_ident.id_name						
+
+							different_restriction_error icl_gencase error
+								# {gc_gcf=GCF gcf_ident _,gc_type_cons,gc_pos} = icl_gencase
+								  error_message = "different restriction of dependent generic functions for "+++type_cons_to_string gc_type_cons+++" in implementation and definition module"
+								= checkErrorWithIdentPos (newPosition gcf_ident gc_pos) error_message error
+
 					build_conversion_table_for_generic_superclasses [!{gcf_body=GCB_FunIndex dcl_fun}:dcl_gcfs!] [!{gcf_body=GCB_FunIndex icl_fun}:icl_gcfs!] new_table
 						# new_table = {new_table & [dcl_fun] = icl_fun}												
 						= build_conversion_table_for_generic_superclasses dcl_gcfs icl_gcfs new_table
@@ -2107,7 +2171,7 @@ renumber_icl_module_functions mod_type icl_global_function_range icl_instance_ra
 						{gc_gcf=GCFS gcfs}
 							# gcfs = renumber_gcfs gcfs function_conversion_table
 							# gencase = {gencase & gc_gcf=GCFS gcfs}
-							# gencases = {gencases & [gencase_index] = gencase} 
+							# gencases = {gencases & [gencase_index] = gencase}
 							-> renumber_gencase_members (gencase_index+1) gencases
 					= gencases
 
