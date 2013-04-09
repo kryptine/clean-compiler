@@ -3328,6 +3328,14 @@ static void print_result_descriptor_and_offsets (StateS field_state,int a_pos,in
 		} else
 			offset2=0;
 		
+		if (field_state.state_object==FileObj){
+			/* the code generator stores the fields in a FILE node in reversed order */
+			int old_offset1;
+
+			old_offset1=offset1;
+			offset1=offset2;
+			offset2=old_offset1;
+		}		
 		FPrintF (OutFile, "%s %d %d ",result_descriptor_name,offset1,offset2);
 	}
 }
