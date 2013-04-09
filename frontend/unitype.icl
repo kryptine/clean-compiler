@@ -1,7 +1,7 @@
 implementation module unitype
 
-import StdEnv, compare_types
-
+import StdEnv, StdStrictLists, compare_types
+from StdOverloadedList import Any
 import syntax, analunitypes, type, utilities, checktypes
 
 AttrUni			:== 0
@@ -214,6 +214,9 @@ liftTempTypeVariable modules cons_vars tv_number subst ls
 	= case type of
 		TE
 			-> (False, TempV tv_number, subst, ls)
+		TLiftedSubst type
+			# (_, type, subst, ls) = lift modules cons_vars type subst ls
+			-> (True, type, subst, ls)
 		_
 			# (_, type, subst, ls) = lift modules cons_vars type subst ls
 			-> (True, type, subst, ls)
@@ -420,6 +423,8 @@ expandTempTypeVariable tv_number (subst, es)
 	= case type of
 		TE
 			-> (False, TempV tv_number, (subst, es))
+		TLiftedSubst type
+			-> (True, type, (subst, es))
 		_
 			-> (True, type, (subst, es))
 
@@ -1151,3 +1156,235 @@ where
 		= find_var_position_in_selections selections
 	find_var_position_in_selections []
 		= (False,NoPos)
+
+liftOfferedSubstitutions :: !AType !AType !{#CommonDefs} !{#BOOLVECT} !Int !*{!Type} !*TypeDefInfos !*TypeHeaps
+																  -> (!Int,!*{!Type},!*TypeDefInfos,!*TypeHeaps)
+liftOfferedSubstitutions off_type dem_type common_defs cons_vars next_attr_n subst td_infos type_heaps
+	# ls = {ls_next_attr = next_attr_n, ls_td_infos = td_infos, ls_type_heaps = type_heaps}
+	# (subst,ls) = lift_offered_substitutions off_type dem_type common_defs cons_vars subst ls
+	= (ls.ls_next_attr, subst, ls.ls_td_infos, ls.ls_type_heaps)
+
+lift_offered_substitutions :: !AType !AType !{#CommonDefs} !{#BOOLVECT} !*{!Type} !*LiftState
+																	-> (!*{!Type},!*LiftState)
+lift_offered_substitutions {at_type=TA off_cons off_args} {at_type=TA {type_index,type_arity} dem_args} common_defs cons_vars subst ls
+	= lift_offered_substitutions_type_application off_cons.type_index off_args type_index dem_args type_arity common_defs cons_vars subst ls
+lift_offered_substitutions {at_type=TA off_cons off_args} {at_type=TAS {type_index,type_arity} dem_args _} common_defs cons_vars subst ls
+	= lift_offered_substitutions_type_application off_cons.type_index off_args type_index dem_args type_arity common_defs cons_vars subst ls
+lift_offered_substitutions {at_type=TAS off_cons off_args _} {at_type=TA {type_index,type_arity} dem_args} common_defs cons_vars subst ls
+	= lift_offered_substitutions_type_application off_cons.type_index off_args type_index dem_args type_arity common_defs cons_vars subst ls
+lift_offered_substitutions {at_type=TAS off_cons off_args _} {at_type=TAS {type_index,type_arity} dem_args _} common_defs cons_vars subst ls
+	= lift_offered_substitutions_type_application off_cons.type_index off_args type_index dem_args type_arity common_defs cons_vars subst ls
+lift_offered_substitutions {at_type=_ --> atype1} {at_type=_ --> atype2} common_defs cons_vars subst ls
+	= lift_offered_substitutions atype1 atype2 common_defs cons_vars subst ls
+lift_offered_substitutions {at_type=TempV _} {at_type=TempV _} common_defs cons_vars subst ls
+	= (subst,ls)
+lift_offered_substitutions {at_type=off_type} {at_type=TempV tv_number} common_defs cons_vars subst ls
+	# (subst_type,subst) = subst![tv_number]
+	= case subst_type of
+		TLiftedSubst _
+			-> (subst,ls)
+		_
+			# (changed, lifted_subst_type, subst, ls) = lift_pos_type_with_offered_type common_defs cons_vars off_type subst_type subst ls
+			#! lifted_subst_type = lifted_subst_type
+			# subst & [tv_number] = TLiftedSubst lifted_subst_type
+			-> (subst,ls)
+lift_offered_substitutions {at_type=TempV _} _ common_defs cons_vars subst ls
+	= (subst,ls)
+lift_offered_substitutions {at_type=TV {tv_info_ptr},at_attribute} dem_type common_defs cons_vars subst ls=:{ls_type_heaps}
+	# (TVI_Type type, th_vars) = readPtr tv_info_ptr ls_type_heaps.th_vars
+	  ls & ls_type_heaps = {ls_type_heaps & th_vars = th_vars}
+	= lift_offered_substitutions {at_type=type,at_attribute=at_attribute} dem_type common_defs cons_vars subst ls
+lift_offered_substitutions off_type {at_type=TV {tv_info_ptr},at_attribute} common_defs cons_vars subst ls=:{ls_type_heaps}
+	# (TVI_Type type, th_vars) = readPtr tv_info_ptr ls_type_heaps.th_vars
+	  ls & ls_type_heaps = {ls_type_heaps & th_vars = th_vars}
+	= lift_offered_substitutions off_type {at_type=type,at_attribute=at_attribute} common_defs cons_vars subst ls
+lift_offered_substitutions {at_type=TB _} {at_type=TB _} common_defs cons_vars subst ls
+	= (subst,ls)
+lift_offered_substitutions off_type dem_type common_defs cons_vars subst ls
+	= (subst,ls)
+
+has_no_ArrowKind :: ![TypeKind] -> Bool
+has_no_ArrowKind kinds
+	= not (Any IsArrowKind kinds)
+
+lift_offered_substitutions_type_application :: (Global Int) [AType] (Global Int) [AType] Int !{#CommonDefs} !{#Int} !*{!Type} !*LiftState
+																											   -> *(!*{!Type},!*LiftState)
+lift_offered_substitutions_type_application off_type_index off_args dem_type_index=:{glob_module,glob_object} dem_args type_arity common_defs cons_vars subst ls
+	| off_type_index==dem_type_index
+		| has_no_ArrowKind ls.ls_td_infos.[glob_module].[glob_object].tdi_kinds
+			# {ls_type_heaps,ls_td_infos} = ls
+			  ({tsp_sign},th_vars,ls_td_infos) = typeProperties glob_object glob_module [] [] common_defs ls_type_heaps.th_vars ls_td_infos
+			  ls & ls_type_heaps = {ls_type_heaps & th_vars=th_vars}, ls_td_infos=ls_td_infos
+			| is_positive_sign tsp_sign type_arity
+				= lift_offered_substitutions_args off_args dem_args common_defs cons_vars subst ls
+				= (subst,ls)		
+			= (subst,ls)		
+		= (subst,ls)
+where
+	lift_offered_substitutions_args [off_arg:off_args] [dem_arg:dem_args] common_defs cons_vars subst ls
+		# (subst,ls) = lift_offered_substitutions_args off_args dem_args common_defs cons_vars subst ls
+		= lift_offered_substitutions off_arg dem_arg common_defs cons_vars subst ls
+	lift_offered_substitutions_args [] [] common_defs cons_vars subst ls
+		= (subst,ls)
+
+	is_positive_sign {sc_pos_vect,sc_neg_vect} arity
+		| arity==0
+			= True
+	 	| arity<32
+			# m = (1<<arity)-1
+			= (sc_pos_vect bitand m) == m && (sc_neg_vect bitand m) == 0
+			= sc_pos_vect == -1 && sc_neg_vect == 0
+
+lift_pos_atype_with_offered_type :: !{#CommonDefs} !{#BOOLVECT} !AType !AType !*{!Type} !*LiftState -> (!Bool,!AType,!*{!Type},!*LiftState)
+lift_pos_atype_with_offered_type modules cons_vars {at_attribute=TA_Multi,at_type=off_type} attr_type=:{at_attribute=TA_Multi,at_type} subst ls
+	// no new type attribute
+	# (changed, at_type, subst, ls) = lift_pos_type_with_offered_type modules cons_vars off_type at_type subst ls
+	| changed
+		= (True, {attr_type & at_type = at_type},subst, ls)
+		= (False, attr_type,subst, ls)
+lift_pos_atype_with_offered_type modules cons_vars {at_type=off_type} attr_type=:{at_type} subst ls
+	# (changed, at_type, subst, ls) = lift_pos_type_with_offered_type modules cons_vars off_type at_type subst ls
+	| changed
+		| typeIsNonCoercible cons_vars at_type
+			= (True, {attr_type & at_type = at_type},subst, ls)
+			= (True, {attr_type & at_attribute = TA_TempVar ls.ls_next_attr, at_type = at_type}, subst, {ls & ls_next_attr = inc ls.ls_next_attr})
+		| typeIsNonCoercible cons_vars at_type
+			= (False, attr_type,subst, ls)
+			= (True, {attr_type & at_attribute = TA_TempVar ls.ls_next_attr}, subst, {ls & ls_next_attr = inc ls.ls_next_attr})
+
+lift_pos_type_with_offered_type :: !{#CommonDefs} !{#BOOLVECT} !Type !Type !*{!Type} !*LiftState -> (!Bool,!Type,!*{!Type},!*LiftState)
+lift_pos_type_with_offered_type modules cons_vars (TempV _) type subst ls
+	= lift modules cons_vars type subst ls
+lift_pos_type_with_offered_type modules cons_vars (_ :@: _) type subst ls
+	= lift modules cons_vars type subst ls
+lift_pos_type_with_offered_type modules cons_vars off_type type=:(TempV tv_number) subst ls
+	# (type, subst) = subst![tv_number]
+	= case type of
+		TE
+			-> (False, type, subst, ls)
+		TLiftedSubst type
+			# (_, type, subst, ls) = lift_pos_type_with_offered_type modules cons_vars off_type type subst ls
+			-> (True, type, subst, ls)
+		_
+			# (_, type, subst, ls) = lift_pos_type_with_offered_type modules cons_vars off_type type subst ls
+			-> (True, type, subst, ls)
+lift_pos_type_with_offered_type modules cons_vars (_ --> off_res_type) type=:(arg_type0 --> res_type0) subst ls
+	# (changed, arg_type, subst, ls) = lift modules cons_vars arg_type0 subst ls
+	| changed
+		# (changed, res_type, subst, ls) = lift_pos_atype_with_offered_type modules cons_vars off_res_type res_type0 subst ls
+		| changed
+			= (True, arg_type --> res_type, subst, ls)
+			= (True, arg_type --> res_type0, subst, ls)
+		# (changed, res_type, subst, ls) = lift_pos_atype_with_offered_type modules cons_vars off_res_type res_type0 subst ls
+		| changed
+			= (True, arg_type0 --> res_type, subst, ls)
+			= (False, type, subst, ls)
+lift_pos_type_with_offered_type modules cons_vars off_type=:(TA _ _) type=:(TA _ _) subst ls=:{ls_type_heaps}
+	# (_, off_type, ls_type_heaps) = tryToExpand off_type TA_Multi modules ls_type_heaps
+	# (_, type, ls_type_heaps) = tryToExpand type TA_Multi modules ls_type_heaps
+	= lift_pos_type_application_with_offered_type modules cons_vars off_type type subst {ls & ls_type_heaps = ls_type_heaps}
+lift_pos_type_with_offered_type modules cons_vars off_type=:(TA _ _) type=:(TAS _ _ _) subst ls=:{ls_type_heaps}
+	# (_, off_type, ls_type_heaps) = tryToExpand off_type TA_Multi modules ls_type_heaps
+	# (_, type, ls_type_heaps) = tryToExpand type TA_Multi modules ls_type_heaps
+	= lift_pos_type_application_with_offered_type modules cons_vars off_type type subst {ls & ls_type_heaps = ls_type_heaps}
+lift_pos_type_with_offered_type modules cons_vars off_type=:(TAS _ _ _) type=:(TA _ _) subst ls=:{ls_type_heaps}
+	# (_, off_type, ls_type_heaps) = tryToExpand off_type TA_Multi modules ls_type_heaps
+	# (_, type, ls_type_heaps) = tryToExpand type TA_Multi modules ls_type_heaps
+	= lift_pos_type_application_with_offered_type modules cons_vars off_type type subst {ls & ls_type_heaps = ls_type_heaps}			
+lift_pos_type_with_offered_type modules cons_vars off_type=:(TAS _ _ _) type=:(TAS _ _ _) subst ls=:{ls_type_heaps}
+	# (_, off_type, ls_type_heaps) = tryToExpand off_type TA_Multi modules ls_type_heaps
+	# (_, type, ls_type_heaps) = tryToExpand type TA_Multi modules ls_type_heaps
+	= lift_pos_type_application_with_offered_type modules cons_vars off_type type subst {ls & ls_type_heaps = ls_type_heaps}			
+lift_pos_type_with_offered_type modules cons_vars off_type type=:(TArrow1 arg_type) subst ls
+	# (changed, arg_type, subst, ls) = lift modules cons_vars arg_type subst ls
+	| changed
+		= (True, TArrow1 arg_type, subst, ls)
+		= (False, type, subst, ls)	
+lift_pos_type_with_offered_type modules cons_vars off_type type=:(TempCV temp_var :@: types) subst ls
+	= lift modules cons_vars type subst ls
+lift_pos_type_with_offered_type modules cons_vars off_type (TFA vars type) subst ls
+	= abort "lift_pos_type_with_offered_type TFA"
+lift_pos_type_with_offered_type modules cons_vars off_type type subst ls
+	= (False, type, subst, ls)
+
+lift_pos_type_application_with_offered_type :: !{#CommonDefs} !{#Int} !Type !Type !*{!Type} !*LiftState -> *(!Bool,!Type,!*{!Type},!*LiftState)
+lift_pos_type_application_with_offered_type modules cons_vars (TA _ off_type_args) type=:(TA _ _) subst ls
+	= lift_pos_TA_application_with_offered_type modules cons_vars off_type_args type subst ls
+lift_pos_type_application_with_offered_type modules cons_vars (TAS _ off_type_args _) type=:(TA _ _) subst ls
+	= lift_pos_TA_application_with_offered_type modules cons_vars off_type_args type subst ls
+lift_pos_type_application_with_offered_type modules cons_vars (TA _ off_type_args) type=:(TAS _ _ _) subst ls
+	= lift_pos_TAS_application_with_offered_type modules cons_vars off_type_args type subst ls
+lift_pos_type_application_with_offered_type modules cons_vars (TAS _ off_type_args _) type=:(TAS _ _ _) subst ls
+	= lift_pos_TAS_application_with_offered_type modules cons_vars off_type_args type subst ls
+lift_pos_type_application_with_offered_type modules cons_vars off_type type subst ls
+	= lift_pos_type_with_offered_type modules cons_vars off_type type subst ls
+
+lift_pos_TA_application_with_offered_type :: !{#CommonDefs} !{#Int} ![AType] !Type !*{!Type} !*LiftState -> *(!Bool,!Type,!*{!Type},!*LiftState)
+lift_pos_TA_application_with_offered_type modules cons_vars off_type_args t0=:(TA cons_id=:{type_ident,type_index={glob_object,glob_module},type_arity,type_prop=type_prop0} cons_args) subst ls=:{ls_type_heaps}
+	| has_no_ArrowKind ls.ls_td_infos.[glob_module].[glob_object].tdi_kinds
+		# (type_prop, th_vars, ls_td_infos) = typeProperties glob_object glob_module [] [] modules ls_type_heaps.th_vars ls.ls_td_infos
+		  ls & ls_td_infos = ls_td_infos, ls_type_heaps = {ls_type_heaps & th_vars = th_vars}
+		# (changed,cons_args, subst, ls=:{ls_type_heaps}) = lift_pos_list_with_offered_type modules cons_vars off_type_args cons_args type_prop.tsp_sign subst ls
+		| changed
+			| equal_type_prop type_prop type_prop0
+				= (True, TA cons_id cons_args, subst, ls)
+				= (True, TA {cons_id & type_prop = type_prop} cons_args, subst, ls)
+			| equal_type_prop type_prop type_prop0
+				= (False, t0, subst, ls)
+				= (True, TA {cons_id & type_prop = type_prop} cons_args, subst, ls)
+		= liftTypeApplication modules cons_vars t0 subst ls
+
+lift_pos_TAS_application_with_offered_type :: !{#CommonDefs} !{#Int} ![AType] !Type !*{!Type} !*LiftState -> *(!Bool,!Type,!*{!Type},!*LiftState)
+lift_pos_TAS_application_with_offered_type modules cons_vars off_type t0=:(TAS cons_id=:{type_ident,type_index={glob_object,glob_module},type_arity,type_prop=type_prop0} cons_args strictness) subst ls=:{ls_type_heaps}
+	| has_no_ArrowKind ls.ls_td_infos.[glob_module].[glob_object].tdi_kinds
+		# (type_prop, th_vars, ls_td_infos) = typeProperties glob_object glob_module [] [] modules ls_type_heaps.th_vars ls.ls_td_infos
+		  ls & ls_td_infos = ls_td_infos, ls_type_heaps = {ls_type_heaps & th_vars = th_vars}
+		# (changed,cons_args, subst, ls) = lift_pos_list_with_offered_type modules cons_vars off_type cons_args type_prop.tsp_sign subst ls
+		| changed
+			| equal_type_prop type_prop type_prop0
+				= (True, TAS cons_id cons_args strictness, subst, ls)
+				= (True, TAS {cons_id & type_prop = type_prop} cons_args strictness, subst, ls)
+			| equal_type_prop type_prop type_prop0
+				= (False, t0, subst, ls)
+				= (True, TAS {cons_id & type_prop = type_prop} cons_args strictness, subst, ls)
+		= liftTypeApplication modules cons_vars t0 subst ls
+
+lift_pos_list_with_offered_type :: !{#CommonDefs} !{#BOOLVECT} ![AType] ![AType] !SignClassification !*{!Type} !*LiftState -> (!Bool,![AType], !*{!Type}, !*LiftState)
+lift_pos_list_with_offered_type modules cons_vars [off_type:off_types] ts0=:[t0:ts] {sc_pos_vect,sc_neg_vect} subst ls
+	# next_sc = {sc_pos_vect=sc_pos_vect>>1,sc_neg_vect=sc_neg_vect>>1}
+	| sc_pos_vect bitand 1 > sc_neg_vect bitand 1
+		# (changed, t, subst, ls) = lift_pos_atype_with_offered_type modules cons_vars off_type t0 subst ls
+		| changed
+			# (_, ts, subst, ls) = lift_pos_list_with_offered_type modules cons_vars off_types ts next_sc subst ls
+			= (True,[t:ts],subst,ls)
+			# (changed, ts, subst, ls) = lift_pos_list_with_offered_type modules cons_vars off_types ts next_sc subst ls
+			| changed
+				= (True, [t:ts], subst, ls)
+				= (False, ts0, subst, ls)
+		# (changed, t, subst, ls) = lift modules cons_vars t0 subst ls
+		| changed
+			# (_, ts, subst, ls) = lift_pos_list_with_offered_type modules cons_vars ts off_types next_sc subst ls
+			= (True,[t:ts],subst,ls)
+			# (changed, ts, subst, ls) = lift_pos_list_with_offered_type modules cons_vars ts off_types next_sc subst ls
+			| changed
+				= (True, [t:ts], subst, ls)
+				= (False, ts0, subst, ls)
+lift_pos_list_with_offered_type modules cons_vars [] [] sign_class subst ls
+	= (False, [], subst, ls)
+
+
+liftRemainingSubstitutions :: !*{!Type} !{#CommonDefs} !{#BOOLVECT} !Int !*TypeHeaps !*TypeDefInfos -> (*{! Type}, !Int, !*TypeHeaps, !*TypeDefInfos)
+liftRemainingSubstitutions subst modules cons_vars attr_store type_heaps td_infos 
+	# ls = {ls_next_attr = attr_store, ls_td_infos = td_infos, ls_type_heaps = type_heaps}
+	= lift_substitution 0 modules cons_vars subst ls
+where
+	lift_substitution var_index modules cons_vars subst ls
+		| var_index < size subst
+			# (type, subst) = subst![var_index]
+			= case type of
+				TLiftedSubst type
+					-> lift_substitution (inc var_index) modules cons_vars {subst & [var_index] = type} ls
+				_
+					# (_, type, subst, ls) = lift modules cons_vars type subst ls
+					-> lift_substitution (inc var_index) modules cons_vars {subst & [var_index] = type} ls
+			= (subst, ls.ls_next_attr, ls.ls_type_heaps, ls.ls_td_infos)

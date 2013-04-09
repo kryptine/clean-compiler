@@ -3044,6 +3044,8 @@ where
 		  (fun_def,local_fun_defs,next_fun_index,fun_defs,dcl_macros,var_heap,expression_heap)
 			= copy_macro_and_local_functions macro fun_index fun_defs dcl_macros var_heap expression_heap
 
+		  fun_def & fun_info.fi_properties = fun_def.fun_info.fi_properties bitor FI_GenericFun
+
 		  dcl_macros = restore_unexpanded_dcl_macros unexpanded_dcl_macros dcl_macros
 
 		  heaps & hp_var_heap=var_heap,hp_expression_heap=expression_heap
@@ -3085,6 +3087,7 @@ where
 
 	add_functions [(function_n,fun_def):sorted_functions_with_numbers] fun_index funs
 		| function_n==fun_index
+			# fun_def & fun_info.fi_properties = fun_def.fun_info.fi_properties bitor FI_GenericFun
 			= add_functions sorted_functions_with_numbers (fun_index+1) [fun_def:funs]
 	add_functions [] fun_index funs
 		= funs
@@ -5193,7 +5196,7 @@ makeFunction ident group_index arg_vars body_expr opt_sym_type main_dcl_module_n
 			, fi_free_vars =  []
 			, fi_local_vars = local_vars
 			, fi_dynamics = []
-			, fi_properties = 0
+			, fi_properties = FI_GenericFun
 			}	
 		}
 

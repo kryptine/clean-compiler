@@ -52,7 +52,12 @@ tryToMakeUnique :: !Int !*Coercions -> (!Bool, !*Coercions)
 
 uniquenessErrorVar :: !FreeVar !FunctionBody !String !*ErrorAdmin -> *ErrorAdmin
 
-liftSubstitution :: !*{! Type} !{# CommonDefs }!{# BOOLVECT } !Int !*TypeHeaps !*TypeDefInfos -> (*{! Type}, !Int, !*TypeHeaps, !*TypeDefInfos)
+liftOfferedSubstitutions :: !AType !AType !{#CommonDefs} !{#BOOLVECT} !Int !*{!Type} !*TypeDefInfos !*TypeHeaps
+																  -> (!Int,!*{!Type},!*TypeDefInfos,!*TypeHeaps)
+
+liftSubstitution :: !*{!Type} !{#CommonDefs}!{#BOOLVECT} !Int !*TypeHeaps !*TypeDefInfos -> (*{!Type}, !Int, !*TypeHeaps, !*TypeDefInfos)
+
+liftRemainingSubstitutions :: !*{!Type} !{#CommonDefs }!{#BOOLVECT} !Int !*TypeHeaps !*TypeDefInfos -> (*{!Type}, !Int, !*TypeHeaps, !*TypeDefInfos)
 
 ::	ExpansionState = 
 	{	es_type_heaps	:: !.TypeHeaps

@@ -663,6 +663,9 @@ FI_HasTypeSpec	:== 2			// whether the function has u user defined type
 FI_IsNonRecursive :== 4			// used in trans.icl and partition.icl
 FI_IsUnboxedListOfRecordsConsOrNil :== 8
 FI_MemberInstanceRequiresTypeInDefMod :== 16
+FI_GenericFun :== 32
+FI_Unused :== 64				// used in module trans
+FI_UnusedUsed :== 128			// used in module trans
 
 ::	FunInfo =
 	{	fi_calls			:: ![FunCall]
@@ -866,6 +869,10 @@ cNotVarNumber :== -1
 				| PR_Curried !SymbIdent !Int
 				| PR_Unused
 				| PR_CurriedFunction !SymbIdent !Int !Index
+				| PR_String !{#Char}
+				| PR_Int !Int
+				| PR_Equal !Int
+				| PR_EqualRemove !Int
 
 ::	InstanceInfo = II_Empty | II_Node !{! Producer} !FunctionInfoPtr !InstanceInfo !InstanceInfo
 
@@ -1079,6 +1086,8 @@ cNotVarNumber :== -1
 			|	TQualifiedIdent !Ident !String ![AType]
 
 			|	TGenericFunctionInDictionary !(Global DefinedSymbol) !TypeKind !GlobalIndex /*GenericDict*/
+
+			|	TLiftedSubst !Type				// Auxiliary, used during fusion when generating a new function type
 
 			|	TE
 
