@@ -633,14 +633,10 @@ where
 
 		//# pState = wantToken FunctionContext "type argument" GenericCloseToken pState
 		# (args, pState) = parseList trySimplePattern pState
+	  	# has_args = isNotEmpty args || gcf_generic_info<>0
 		# args = [geninfo_arg : args]
-
-		// must be EqualToken or HashToken or ???
-		//# pState = wantToken FunctionContext "generic definition" EqualToken pState
-		//# pState = tokenBack pState
 	
 	  	# (ss_useLayout, pState) = accScanState UseLayout pState
-	  	# has_args = isNotEmpty args
 	    # localsExpected = has_args || isGlobalContext parseContext || ~ ss_useLayout
 	    # (rhs, _, pState) = wantRhs localsExpected (ruleDefiningRhsSymbol parseContext has_args) pState
 
