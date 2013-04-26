@@ -1815,7 +1815,7 @@ checkDclComponent components_array components_importing_module_a expl_imp_indice
 	check_expl_imp_completeness_of_dcl_mod_within_non_trivial_component mod_index {si_explicit,si_qualified_explicit} (dcl_modules, macro_defs,hp_expression_heap, cs)
 		# ({dcl_declared}, dcl_modules) = dcl_modules![mod_index]
 		  ({dcls_local_for_import, dcls_import}) = dcl_declared
-		  cs = addDeclarationsOfDclModToSymbolTable mod_index dcls_local_for_import dcls_import cs
+		  (dcl_modules,cs) = addDeclarationsOfDclModToSymbolTable mod_index dcls_local_for_import dcls_import dcl_modules cs
 		  (dcl_modules, macro_defs,hp_expression_heap, cs=:{cs_symbol_table})
 		  		= checkExplicitImportCompleteness si_explicit si_qualified_explicit dcl_modules macro_defs hp_expression_heap cs
 		  cs_symbol_table = removeImportsAndLocalsOfModuleFromSymbolTable dcl_declared cs.cs_symbol_table
@@ -2607,8 +2607,8 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 			  (modules, heaps, cs)
 					= checkInstancesOfDclModule cPredefinedModuleIndex deferred_stuff (modules, heaps, cs)
 			  ({dcl_declared={dcls_import,dcls_local,dcls_local_for_import}}, modules) = modules![ste_index]
-			= (modules, macro_defs, heaps, 
-			   addDeclarationsOfDclModToSymbolTable ste_index dcls_local_for_import dcls_import cs)
+			  (modules,cs) = addDeclarationsOfDclModToSymbolTable ste_index dcls_local_for_import dcls_import modules cs
+			= (modules, macro_defs, heaps, cs)
 		check_predefined_module No support_dynamics modules macro_defs heaps cs
 			= (modules, macro_defs, heaps, cs)
 			
@@ -2964,22 +2964,21 @@ addImportedSymbolsToSymbolTable importing_mod opt_macro_range modules_in_compone
 		# visited_modules = bitvectSet mod_index visited_modules 
 		  ({ dcls_import, dcls_local_for_import }, dcl_modules)
 				= dcl_modules![mod_index].dcl_declared
-		  (decls_accu, cs)
+		  (decls_accu,dcl_modules,cs)
 		  		= foldlArraySt (add_declaration opt_macro_range importing_mod)
-		  				dcls_local_for_import (decls_accu, cs)
+		  				dcls_local_for_import (decls_accu,dcl_modules,cs)
 		| not (bitvectSelect mod_index modules_in_component_set)
-			// this module is outside of the actual component. All imported symbols are
-			// already known
-			# (decls_accu, cs)
+			// this module is outside of the actual component. All imported symbols are already known
+			# (decls_accu,dcl_modules,cs)
 			  		= foldlArraySt (add_declaration opt_macro_range importing_mod)
-			  				dcls_import (decls_accu, cs)
+			  				dcls_import (decls_accu,dcl_modules,cs)
 			= (decls_accu, visited_modules, dcl_modules, cs)
 		# {si_explicit, si_implicit} = ikhSearch` mod_index imports_ikh
-		  (decls_accu, cs)
+		  (decls_accu,dcl_modules,cs)
 				= foldSt (\(decls, _) state ->
 							foldSt (\decl state -> add_declaration opt_macro_range importing_mod decl state)
 								decls state)
-						si_explicit (decls_accu, cs)
+						si_explicit (decls_accu,dcl_modules,cs)
 		= foldSt (\(mod_index, _) state 
 					-> add_impl_imported_symbols opt_macro_range importing_mod modules_in_component_set
 						 imports_ikh mod_index state)
@@ -2990,26 +2989,26 @@ addImportedSymbolsToSymbolTable importing_mod opt_macro_range modules_in_compone
 		# cs = pushErrorAdmin (newPosition import_ident position) cs
 		  (decls_accu, dcl_modules, cs) = foldSt (add_expl_imp_declaration opt_macro_range importing_mod) decls (decls_accu, dcl_modules, cs)
 		= (decls_accu, dcl_modules, popErrorAdmin cs)		
-		
-	add_declaration :: (Optional IndexRange) Int Declaration *([Declaration],*CheckState) -> (![Declaration],!*CheckState)
-	add_declaration opt_dcl_macro_range importing_mod declaration (decls_accu, cs)
-		# (not_already_imported, cs)
-				= add_declaration_to_symbol_table opt_dcl_macro_range declaration importing_mod cs
+
+	add_declaration :: (Optional IndexRange) Int Declaration *([Declaration],!*{#DclModule},*CheckState) -> (![Declaration],!*{#DclModule},!*CheckState)
+	add_declaration opt_dcl_macro_range importing_mod declaration (decls_accu,dcl_modules,cs)
+		# (not_already_imported,dcl_modules,cs)
+				= add_declaration_to_symbol_table_ opt_dcl_macro_range declaration importing_mod dcl_modules cs
 		| not_already_imported
-			= ([declaration:decls_accu], cs)
-		= (decls_accu, cs)
+			= ([declaration:decls_accu],dcl_modules,cs)
+			= (decls_accu,dcl_modules,cs)
 
 	add_expl_imp_declaration opt_dcl_macro_range importing_mod declaration (decls_accu, dcl_modules, cs)
-		# (not_already_imported, cs)
-				= add_declaration_to_symbol_table opt_dcl_macro_range declaration importing_mod cs
+		# (not_already_imported,dcl_modules,cs)
+				= add_declaration_to_symbol_table_ opt_dcl_macro_range declaration importing_mod dcl_modules cs
 		| not_already_imported
 			= ([declaration:decls_accu], dcl_modules, cs)
 		= (decls_accu, dcl_modules, cs)
 
-add_declaration_to_symbol_table opt_dcl_macro_range (Declaration {decl_kind=STE_FunctionOrMacro _, decl_ident, decl_index}) _ cs
-	= addImportedFunctionOrMacro opt_dcl_macro_range decl_ident decl_index cs
-add_declaration_to_symbol_table yes_for_icl_module (Declaration {decl_kind=decl_kind=:STE_Imported def_kind def_mod, decl_ident, decl_index, decl_pos}) importing_mod cs
-	= addSymbol yes_for_icl_module decl_ident decl_pos decl_kind def_kind decl_index def_mod importing_mod cs
+add_declaration_to_symbol_table_ opt_dcl_macro_range (Declaration {decl_kind=STE_FunctionOrMacro _, decl_ident, decl_index}) _ dcl_modules cs
+	= addImportedFunctionOrMacro opt_dcl_macro_range decl_ident decl_index dcl_modules cs
+add_declaration_to_symbol_table_ yes_for_icl_module (Declaration {decl_kind=decl_kind=:STE_Imported def_kind def_mod, decl_ident, decl_index, decl_pos}) importing_mod dcl_modules cs
+	= addSymbol yes_for_icl_module decl_ident decl_pos decl_kind def_kind decl_index def_mod importing_mod dcl_modules cs
 
 updateExplImpInfo :: [Int] Index {!Declaration} {!Declaration} u:{#DclModule} ExplImpInfos *SymbolTable 
 		-> (u:{#DclModule},!ExplImpInfos,.SymbolTable)

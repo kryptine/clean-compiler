@@ -217,65 +217,64 @@ addDefToSymbolTable level def_index def_ident=:{id_info} def_kind symbol_table e
 		= (symbol_table <:= (id_info,entry), error)
 		= (symbol_table, checkError def_ident "already defined" error)
 
-addDeclarationsOfDclModToSymbolTable :: .Int !{!Declaration} !{!Declaration} !*CheckState -> .CheckState;
-addDeclarationsOfDclModToSymbolTable ste_index locals imported cs
-	# cs=add_imports_in_array_to_symbol_table 0 imported cs
-	= addLocalSymbolsForImportToSymbolTable 0 locals ste_index cs
+addDeclarationsOfDclModToSymbolTable :: Int !{!Declaration} !{!Declaration} !*{#DclModule} !*CheckState -> (!*{#DclModule},!*CheckState)
+addDeclarationsOfDclModToSymbolTable ste_index locals imported dcl_modules cs
+	# (dcl_modules,cs) = add_imports_in_array_to_symbol_table 0 imported dcl_modules cs
+	= addLocalSymbolsForImportToSymbolTable 0 locals ste_index dcl_modules cs
   where
-	add_imports_in_array_to_symbol_table symbol_index symbols cs=:{cs_x}
+	add_imports_in_array_to_symbol_table :: !Int !{!Declaration} !*{#DclModule} !*CheckState -> (!*{#DclModule},!*CheckState)
+	add_imports_in_array_to_symbol_table symbol_index symbols dcl_modules cs=:{cs_x}
 		| symbol_index<size symbols
 			#! (Declaration {decl_ident,decl_pos,decl_kind},symbols) = symbols![symbol_index]
 			= case decl_kind of
 				STE_Imported def_kind def_mod
 					#! declaration = symbols.[symbol_index]
 					# (Declaration {decl_index}) = declaration
-					# (_, cs)
-					   		= addSymbol No decl_ident decl_pos decl_kind
-					   				def_kind decl_index def_mod cUndef cs
-					-> add_imports_in_array_to_symbol_table (symbol_index+1) symbols cs
+					# (_,dcl_modules,cs) = addSymbol No decl_ident decl_pos decl_kind def_kind decl_index def_mod cUndef dcl_modules cs
+					-> add_imports_in_array_to_symbol_table (symbol_index+1) symbols dcl_modules cs
 				STE_FunctionOrMacro _
 					#! declaration = symbols.[symbol_index]
 					# (Declaration {decl_index}) = declaration
-					# (_, cs)
-					   		= addImportedFunctionOrMacro No decl_ident decl_index cs
-					-> add_imports_in_array_to_symbol_table (symbol_index+1) symbols cs
-			= cs
+					# (_,dcl_modules,cs) = addImportedFunctionOrMacro No decl_ident decl_index dcl_modules cs
+					-> add_imports_in_array_to_symbol_table (symbol_index+1) symbols dcl_modules cs
+			= (dcl_modules,cs)
 
-	addLocalSymbolsForImportToSymbolTable :: !Int !{!Declaration} Int !*CheckState -> .CheckState;
-	addLocalSymbolsForImportToSymbolTable symbol_index symbols mod_index cs
+	addLocalSymbolsForImportToSymbolTable :: !Int !{!Declaration} Int !*{#DclModule} !*CheckState -> (!*{#DclModule},!*CheckState)
+	addLocalSymbolsForImportToSymbolTable symbol_index symbols mod_index dcl_modules cs
 		| symbol_index<size symbols
 			# (Declaration {decl_ident,decl_pos,decl_kind,decl_index},symbols) = symbols![symbol_index]
 			= case decl_kind of
 				STE_FunctionOrMacro _
-					# (_, cs)
-							= addImportedFunctionOrMacro No decl_ident decl_index cs
-					-> addLocalSymbolsForImportToSymbolTable (symbol_index+1) symbols mod_index cs
+					# (_,dcl_modules,cs) = addImportedFunctionOrMacro No decl_ident decl_index dcl_modules cs
+					-> addLocalSymbolsForImportToSymbolTable (symbol_index+1) symbols mod_index dcl_modules cs
 				STE_Imported def_kind def_mod
-					# (_, cs)
-							= addSymbol No decl_ident decl_pos decl_kind
-									def_kind decl_index mod_index cUndef cs
-					-> addLocalSymbolsForImportToSymbolTable (symbol_index+1) symbols mod_index cs
-			= cs
-	
-addImportedFunctionOrMacro :: !(Optional IndexRange) !Ident !Int !*CheckState -> (!Bool, !.CheckState)
-addImportedFunctionOrMacro opt_dcl_macro_range ident=:{id_info} def_index cs=:{cs_symbol_table}
+					# (_,dcl_modules,cs) = addSymbol No decl_ident decl_pos decl_kind def_kind decl_index mod_index cUndef dcl_modules cs
+					-> addLocalSymbolsForImportToSymbolTable (symbol_index+1) symbols mod_index dcl_modules cs
+			= (dcl_modules,cs)
+
+addImportedFunctionOrMacro :: !(Optional IndexRange) !Ident !Int !*{#DclModule} !*CheckState -> (!Bool,!*{#DclModule},!.CheckState)
+addImportedFunctionOrMacro opt_dcl_macro_range ident=:{id_info} def_index dcl_modules cs=:{cs_symbol_table}
 	# (entry, cs_symbol_table) = readPtr id_info cs_symbol_table
 	  cs = { cs & cs_symbol_table = cs_symbol_table }
 	= case entry.ste_kind of
 		STE_Empty
-			-> (True, { cs & cs_symbol_table = NewEntry cs.cs_symbol_table id_info (STE_FunctionOrMacro []) 
+			-> (True, dcl_modules, { cs & cs_symbol_table = NewEntry cs.cs_symbol_table id_info (STE_FunctionOrMacro []) 
 													def_index cModuleScope entry})
 		STE_FunctionOrMacro _
 			| entry.ste_index == def_index || within_opt_range opt_dcl_macro_range def_index
-				-> (False, cs)
+				-> (False, dcl_modules, cs)
+		STE_Imported _ module_n
+			| module_n>=0 && module_n<size dcl_modules
+				# (dcl_name,dcl_modules) = dcl_modules![module_n].dcl_name
+				  cs & cs_error = checkError ident ("multiply defined (also defined in module "+++toString dcl_name+++")") cs.cs_error
+				-> (False, dcl_modules, cs)
 		_
-			-> (False, { cs & cs_error = checkError ident "multiply defined" cs.cs_error})
+			-> (False, dcl_modules, { cs & cs_error = checkError ident "multiply defined" cs.cs_error})
   where
 	within_opt_range (Yes {ir_from, ir_to}) i
 		= ir_from<=i && i<ir_to
 	within_opt_range No _
 		= False
-
 
 addFieldToSelectorDefinition :: !Ident (Global .Int) !*CheckState -> .CheckState;
 addFieldToSelectorDefinition {id_info} glob_field_index cs=:{cs_symbol_table}
@@ -287,32 +286,38 @@ addFieldToSelectorDefinition {id_info} glob_field_index cs=:{cs_symbol_table}
 		_
 			-> { cs & cs_symbol_table = NewEntry cs.cs_symbol_table id_info (STE_Selector [glob_field_index]) NoIndex cModuleScope entry }
 
-addSymbol :: !(Optional a) !Ident !Position !STE_Kind !STE_Kind !.Int !.Int !Int !*CheckState -> (!Bool, !.CheckState)
-addSymbol yes_for_icl_module ident pos decl_kind def_kind def_index def_mod importing_mod cs=:{cs_symbol_table}
+addSymbol :: !(Optional a) !Ident !Position !STE_Kind !STE_Kind !.Int !.Int !Int !*{#DclModule} !*CheckState -> (!Bool,!*{#DclModule},!*CheckState)
+addSymbol yes_for_icl_module ident pos decl_kind def_kind def_index def_mod importing_mod dcl_modules cs=:{cs_symbol_table}
 	# (entry, cs_symbol_table) = readPtr ident.id_info cs_symbol_table
 	= add_indirectly_imported_symbol yes_for_icl_module entry ident pos def_kind def_index def_mod 
-			importing_mod { cs & cs_symbol_table = cs_symbol_table }
+			importing_mod dcl_modules {cs & cs_symbol_table = cs_symbol_table}
 	where
-		add_indirectly_imported_symbol _ {ste_kind = STE_Empty} {id_info} _ def_kind def_index def_mod _ cs=:{cs_symbol_table}
+		add_indirectly_imported_symbol _ {ste_kind = STE_Empty} {id_info} _ def_kind def_index def_mod _ dcl_modules cs=:{cs_symbol_table}
 			# (entry, cs_symbol_table) = readPtr id_info cs_symbol_table
 			  cs = { cs & cs_symbol_table = NewEntry cs_symbol_table id_info decl_kind def_index cModuleScope entry}
 			= case def_kind of
 				STE_Field selector_id
-					-> (True, addFieldToSelectorDefinition selector_id	{ glob_module = def_mod, glob_object = def_index } cs)
+					-> (True, dcl_modules, addFieldToSelectorDefinition selector_id	{ glob_module = def_mod, glob_object = def_index } cs)
 				_
-					-> (True, cs)
-		add_indirectly_imported_symbol _ {ste_kind = STE_Imported kind mod_index, ste_index} _ _ def_kind def_index def_mod _ cs
+					-> (True, dcl_modules, cs)
+		add_indirectly_imported_symbol _ {ste_kind = STE_Imported kind mod_index, ste_index} _ _ def_kind def_index def_mod _ dcl_modules cs
 			| kind == def_kind && mod_index == def_mod && ste_index == def_index
-				= (False, cs)
-		add_indirectly_imported_symbol (Yes _) _ _ _ def_kind def_index def_mod _ cs
+				= (False, dcl_modules, cs)
+		add_indirectly_imported_symbol (Yes _) _ _ _ def_kind def_index def_mod _ dcl_modules cs
 			| def_mod == cs.cs_x.x_main_dcl_module_n
 				// an icl module imports one of it's definitions from the dcl module
-				= (False, cs)
-		add_indirectly_imported_symbol _ _ _ _ def_kind def_index def_mod importing_mod cs
+				= (False, dcl_modules, cs)
+		add_indirectly_imported_symbol _ _ _ _ def_kind def_index def_mod importing_mod dcl_modules cs
 			| importing_mod==def_mod // a dcl module imports a definition from itself (cycle)
-				= (False, cs)
-		add_indirectly_imported_symbol _ entry ident pos def_kind def_index def_mod _ cs=:{cs_error}
-			= (False, { cs & cs_error = checkError ident "multiply defined" cs_error})
+				= (False, dcl_modules, cs)
+		add_indirectly_imported_symbol _ {ste_kind = STE_Imported _ mod_index, ste_index} _ _ def_kind def_index def_mod _ dcl_modules cs=:{cs_error}
+			| mod_index>=0 && mod_index<size dcl_modules && def_mod>=0 && def_mod<size dcl_modules
+				# (dcl_name1,dcl_modules) = dcl_modules![def_mod].dcl_name
+				  (dcl_name2,dcl_modules) = dcl_modules![mod_index].dcl_name
+				  cs & cs_error = checkError ident ("multiply defined (in module "+++toString dcl_name1+++" and already in module "+++toString dcl_name2+++")") cs_error
+				= (False, dcl_modules, cs)
+		add_indirectly_imported_symbol _ entry ident pos def_kind def_index def_mod _ dcl_modules cs=:{cs_error}
+			= (False, dcl_modules, { cs & cs_error = checkError ident "multiply defined" cs_error})
 
 addGlobalDefinitionsToSymbolTable :: ![Declaration] !*CheckState -> .CheckState;
 addGlobalDefinitionsToSymbolTable decls cs
