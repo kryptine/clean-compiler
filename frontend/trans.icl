@@ -322,7 +322,7 @@ where
 	is_variable (Var _) = True
 	is_variable _ 		= False
 
-skip_over this_case=:{case_expr=case_expr=:BasicExpr basic_value,case_guards=case_guards=:BasicPatterns _ basicPatterns,case_default} ro ti
+skip_over this_case=:{case_expr=case_expr=:BasicExpr basic_value,case_guards=case_guards=:BasicPatterns basic_type basicPatterns,case_default} ro ti
 	// currently only active cases are matched at runtime (multimatch problem)
 	# matching_patterns = [pattern \\ pattern=:{bp_value}<-basicPatterns | bp_value==basic_value]
 	= case matching_patterns of
