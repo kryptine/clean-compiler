@@ -4921,6 +4921,10 @@ where
 	copy (TypeSignature type_function expr) ci cs
 		# (expr, cs) = copy expr ci cs
 		= (TypeSignature type_function expr, cs)
+	copy (DictionariesFunction dictionaries expr expr_type) ci cs
+		// the variables in dictionaries are not copied
+		# (expr, cs) = copy expr ci cs
+		= (DictionariesFunction dictionaries expr expr_type,cs)
 	copy expr ci cs
 		= (expr, cs)
 
