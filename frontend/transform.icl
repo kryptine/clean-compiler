@@ -1433,19 +1433,22 @@ where
 expandMacrosInBody :: ![.FunCall] !CheckedBody ![ExprInfoPtr] !PredefSymbolsForTransform !Bool !*ExpandState
 	-> (![FreeVar],!Expression,![FreeVar],![FunCall],![ExprInfoPtr],!*ExpandState)
 expandMacrosInBody fi_calls {cb_args,cb_rhs} fi_dynamics predef_symbols_for_transform reset_body_of_rhs_macros
-		es=:{es_symbol_table,es_expression_heap,es_fun_defs,es_macro_defs}
+		es=:{es_symbol_table,es_expression_heap,es_fun_defs,es_macro_defs,es_var_heap}
 	# (prev_calls, fun_defs, macro_defs,es_symbol_table)
 			= addFunctionCallsToSymbolTable fi_calls es_fun_defs es_macro_defs es_symbol_table
+	  es_var_heap = if reset_body_of_rhs_macros
+					(reset_free_var_heap_pointers cb_rhs (reset_free_var_heap_pointers cb_args es_var_heap))
+					es_var_heap
+	  es & es_fun_defs=fun_defs, es_macro_defs=macro_defs, es_symbol_table=es_symbol_table, es_expression_heap=es_expression_heap, es_var_heap=es_var_heap
+
 	  ([rhs:rhss], (all_calls, es) )
-	  		= mapSt expandCheckedAlternative cb_rhs (prev_calls, { es & es_fun_defs=fun_defs, es_macro_defs=macro_defs,es_symbol_table = es_symbol_table, es_expression_heap=es_expression_heap })
+	  		= mapSt expandCheckedAlternative cb_rhs (prev_calls, es)
 	  (fun_defs, symbol_table)
 	  		= removeFunctionCallsFromSymbolTable all_calls es.es_fun_defs es.es_symbol_table
-	  var_heap = es.es_var_heap
-	  var_heap = if reset_body_of_rhs_macros
-	  				(reset_free_var_heap_pointers cb_rhs (reset_free_var_heap_pointers cb_args var_heap))
-	  				var_heap
+
 	  ((merged_rhs, _), es_var_heap, es_expression_heap, es_error)
-	  		= mergeCases rhs rhss var_heap es.es_expression_heap es.es_error
+	  		= mergeCases rhs rhss es.es_var_heap es.es_expression_heap es.es_error
+
 	  (new_rhs, new_args, local_vars, fi_dynamics, {cos_error, cos_var_heap, cos_expression_heap})
 	  		= determineVariablesAndRefCounts cb_args merged_rhs
 	  				{ cos_error = es_error, cos_var_heap = es_var_heap, cos_expression_heap = es_expression_heap,
