@@ -30,36 +30,67 @@ splitBy char string
 		stringSize
 			=	size string
 
+make_clean_system_files_dir_and_file_name :: !{#Char} -> (!{#Char},!{#Char})
+make_clean_system_files_dir_and_file_name dir_and_module_name
+	# last_dir_separator_i = find_last_dir_separator_i dir_and_module_name
+	# last_dot_i = find_last_dot_i last_dir_separator_i dir_and_module_name
+	| last_dot_i<0
+		= ("Clean System Files",dir_and_module_name)
+	# module_name = dir_and_module_name % (last_dot_i+1,size dir_and_module_name-1)
+	| last_dir_separator_i<0
+		# subdir_name = {let c=dir_and_module_name.[i] in if (c=='.') DirectorySeparator c \\ i<-[0..last_dot_i-1] }
+		= (subdir_name +++ {DirectorySeparator} +++ "Clean System Files", module_name)
+	# dir = dir_and_module_name % (0,last_dir_separator_i)
+	| last_dot_i==last_dir_separator_i
+		= (dir +++ "Clean System Files", module_name)
+		# subdir_name = {let c=dir_and_module_name.[i] in if (c=='.') DirectorySeparator c \\ i<-[last_dir_separator_i+1..last_dot_i-1] }
+		= (dir +++ subdir_name +++ {DirectorySeparator} +++ "Clean System Files", module_name)
+where
+	find_last_dir_separator_i s
+		= find_last_dir_separator_i s (size s-1)
+	where
+		find_last_dir_separator_i s i
+			| i>=0 && s.[i]<>DirectorySeparator
+				= find_last_dir_separator_i s (i-1)
+				= i
+
+	find_last_dot_i last_dir_separator_i s
+		= find_last_dot_i s (size s-1)
+	where
+		find_last_dot_i s i
+			| i>last_dir_separator_i && s.[i]<>'.'
+				= find_last_dot_i s (i-1)
+				= i
+
 openTclFile :: !String !String !*File !*Files -> (!Bool, !Optional .File, !*File, !*Files)
-openTclFile mod_name mod_path error files
-	= openFile mod_name mod_path ".tcl" error files
+openTclFile mod_dir mod_name error files
+	= open_file_in_clean_system_files_folder mod_dir mod_name ".tcl" FWriteData error files
 
 openSaplFile :: !String !String !*File !*Files -> (!Bool, !Optional .File, !*File, !*Files)
-openSaplFile mod_name mod_path error files
-	= openFile mod_name mod_path ".sapl" error files
+openSaplFile mod_dir mod_name error files
+	= open_file_in_clean_system_files_folder mod_dir mod_name ".sapl" FWriteData error files
 
-openFile :: !String !String !String !*File !*Files -> (!Bool, !Optional .File, !*File, !*Files)
-openFile mod_name mod_path extension error files
-	# csf_path
-		= mod_path +++ {DirectorySeparator} +++ "Clean System Files"
-	# path
-		= csf_path +++ {DirectorySeparator} +++ mod_name +++ extension
-	# (opened, file, files)
-		= fopen path FWriteData files
+open_file_in_clean_system_files_folder :: !String !String !String !Int !*File !*Files -> (!Bool, !Optional .File, !*File, !*Files)
+open_file_in_clean_system_files_folder mod_dir mod_name file_extension file_mode error files
+	# icl_mod_pathname = mod_dir +++ {DirectorySeparator} +++ mod_name;
+	# (csf_dirictory_path,file_name) = make_clean_system_files_dir_and_file_name icl_mod_pathname
+	# file_path = csf_dirictory_path +++ {DirectorySeparator} +++ file_name +++ file_extension
+	# (opened, tcl_file, files)
+		= fopen file_path file_mode files
 	| opened
-		= (True, Yes file, error, files)
+		= (True, Yes tcl_file, error, files)
 	// try again after creating Clean System Files folder
 	# (ok, files)
-		= ensureCleanSystemFilesExists csf_path files
+		= ensureCleanSystemFilesExists csf_dirictory_path files
 	| not ok
-		# error = fwrites ("can't create folder \"" +++ csf_path +++"\"\n") error
+		# error = fwrites ("can't create folder \"" +++ csf_dirictory_path +++"\"\n") error
 		= (False, No, error, files)
-	# (opened, file, files)
-		= fopen path FWriteData files
+	# (opened, tcl_file, files)
+		= fopen file_path file_mode files
 	| not opened
-		# error = fwrites ("couldn't open file \"" +++ path +++ "\"\n") error
+		# error = fwrites ("couldn't open file \"" +++ file_path +++ "\"\n") error
 		= (False, No, error, files)
-	= (True, Yes file, error, files)
+	= (True, Yes tcl_file, error, files)
 
 closeFile :: !*(Optional *File) *Files -> *(!Bool,*Files)
 closeFile (Yes file) files
@@ -266,14 +297,14 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 		= case mbModPath of
 			Yes mod_path
 				| options.compile_for_dynamics
-					-> openTclFile options.moduleName mod_path error files
+					-> openTclFile mod_path options.moduleName error files
 			_
 				-> 	(True,No,error,files)
 				
 	# (optional_sapl_opened, sapl_file, error, files)
 		= case (options.generate_sapl, mbModPath) of
 			(True, Yes mod_path)
-				-> openSaplFile options.moduleName mod_path error files
+				-> openSaplFile mod_path options.moduleName error files
 			_
 				-> 	(True,No,error,files)
 								
