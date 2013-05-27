@@ -308,6 +308,7 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 			{feo_up_to_phase=FrontEndPhaseAll
 			,feo_generics=options.compile_with_generics
 			,feo_fusion=options.compile_with_fusion
+			,feo_dump_core=options.dump_core
 			,feo_strip_unused=options.strip_unused
 			} moduleIdent options.searchPaths dcl_modules functions_and_macros list_inferred_types predef_symbols hash_table fmodificationtime files error io out tcl_file heaps 
 
