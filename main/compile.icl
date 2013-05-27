@@ -30,26 +30,61 @@ splitBy char string
 		stringSize
 			=	size string
 
+make_clean_system_files_dir_and_file_name :: !{#Char} -> (!{#Char},!{#Char})
+make_clean_system_files_dir_and_file_name dir_and_module_name
+	# last_dir_separator_i = find_last_dir_separator_i dir_and_module_name
+	# last_dot_i = find_last_dot_i last_dir_separator_i dir_and_module_name
+	| last_dot_i<0
+		= ("Clean System Files",dir_and_module_name)
+	# module_name = dir_and_module_name % (last_dot_i+1,size dir_and_module_name-1)
+	| last_dir_separator_i<0
+		# subdir_name = {let c=dir_and_module_name.[i] in if (c=='.') DirectorySeparator c \\ i<-[0..last_dot_i-1] }
+		= (subdir_name +++ {DirectorySeparator} +++ "Clean System Files", module_name)
+	# dir = dir_and_module_name % (0,last_dir_separator_i)
+	| last_dot_i==last_dir_separator_i
+		= (dir +++ "Clean System Files", module_name)
+		# subdir_name = {let c=dir_and_module_name.[i] in if (c=='.') DirectorySeparator c \\ i<-[last_dir_separator_i+1..last_dot_i-1] }
+		= (dir +++ subdir_name +++ {DirectorySeparator} +++ "Clean System Files", module_name)
+where
+	find_last_dir_separator_i s
+		= find_last_dir_separator_i s (size s-1)
+	where
+		find_last_dir_separator_i s i
+			| i>=0 && s.[i]<>DirectorySeparator
+				= find_last_dir_separator_i s (i-1)
+				= i
+
+	find_last_dot_i last_dir_separator_i s
+		= find_last_dot_i s (size s-1)
+	where
+		find_last_dot_i s i
+			| i>last_dir_separator_i && s.[i]<>'.'
+				= find_last_dot_i s (i-1)
+				= i
+
 openTclFile :: !String !String !*File !*Files -> (!Bool, !Optional .File, !*File, !*Files)
-openTclFile mod_name mod_path error files
-	# csf_path
-		= mod_path +++ {DirectorySeparator} +++ "Clean System Files"
-	# tcl_path
-		= csf_path +++ {DirectorySeparator} +++ mod_name +++ ".tcl"
+openTclFile mod_dir mod_name error files
+	= open_file_in_clean_system_files_folder mod_dir mod_name ".tcl" FWriteData error files
+
+open_file_in_clean_system_files_folder :: !String !String !String !Int !*File !*Files -> (!Bool, !Optional .File, !*File, !*Files)
+open_file_in_clean_system_files_folder mod_dir mod_name file_extension file_mode error files
+	# icl_mod_pathname = mod_dir +++ {DirectorySeparator} +++ mod_name;
+	# (csf_directory_path,file_name) = make_clean_system_files_dir_and_file_name icl_mod_pathname
+	# file_path = csf_directory_path +++ {DirectorySeparator} +++ file_name +++ file_extension
 	# (opened, tcl_file, files)
-		= fopen tcl_path FWriteData files
+		= fopen file_path file_mode files
 	| opened
 		= (True, Yes tcl_file, error, files)
 	// try again after creating Clean System Files folder
 	# (ok, files)
-		= ensureCleanSystemFilesExists csf_path files
+		= ensureCleanSystemFilesExists csf_directory_path files
 	| not ok
-		# error = fwrites ("can't create folder \"" +++ csf_path +++"\"\n") error
+		# error = fwrites ("can't create folder \"" +++ csf_directory_path +++"\"\n") error
 		= (False, No, error, files)
 	# (opened, tcl_file, files)
-		= fopen tcl_path FWriteData files
+		= fopen file_path file_mode files
 	| not opened
-		# error = fwrites ("couldn't open file \"" +++ tcl_path +++ "\"\n") error
+		# error = fwrites ("couldn't open file \"" +++ file_path +++ "\"\n") error
 		= (False, No, error, files)
 	= (True, Yes tcl_file, error, files)
 
@@ -243,14 +278,17 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 	| not opened
 		=	abort ("couldn't open out file \"" +++ options.outPath +++ "\"\n")
 	# (opt_file_dir_time,files) = fopenInSearchPaths options.moduleName ".icl" options.searchPaths FReadData fmodificationtime files
-	# (opt_file_dir_time, optional_tcl_opened, tcl_file, error, files)
-		= case opt_file_dir_time of
-			Yes (_,mod_path,_)
+	# (opt_file_dir_time, mbModPath) = 
+			case opt_file_dir_time of
+				Yes (_,mod_path,_) = (opt_file_dir_time, Yes mod_path)
+				No				   = (opt_file_dir_time, No)
+	# (optional_tcl_opened, tcl_file, error, files)
+		= case mbModPath of
+			Yes mod_path
 				| options.compile_for_dynamics
-					# (optional_tcl_opened, tcl_file, error, files) = openTclFile options.moduleName mod_path error files
-					-> (opt_file_dir_time, optional_tcl_opened, tcl_file, error, files)
+					-> openTclFile mod_path options.moduleName error files
 			_
-				-> 	(opt_file_dir_time, True,No,error,files)
+				-> 	(True,No,error,files)
  	| not optional_tcl_opened
 		# (closed, files) = fclose out files
 		| not closed
@@ -270,7 +308,6 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 			{feo_up_to_phase=FrontEndPhaseAll
 			,feo_generics=options.compile_with_generics
 			,feo_fusion=options.compile_with_fusion
-			,feo_dump_core=options.dump_core
 			,feo_strip_unused=options.strip_unused
 			} moduleIdent options.searchPaths dcl_modules functions_and_macros list_inferred_types predef_symbols hash_table fmodificationtime files error io out tcl_file heaps 
 
