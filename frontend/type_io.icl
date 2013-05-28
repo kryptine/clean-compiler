@@ -110,39 +110,31 @@ where
 instance WriteTypeInfo TypeRhs
 where 
 	write_type_info (AlgType defined_symbols) tcl_file wtis
- 		# tcl_file
- 			= fwritec AlgTypeCode tcl_file
-		# defined_symbols
-			= (sortBy (\{ds_ident={id_name=id_name1}} {ds_ident={id_name=id_name2}} -> id_name1 < id_name2) defined_symbols)
-		# (tcl_file,wtis)
-			= write_type_info defined_symbols tcl_file wtis
-		= (tcl_file,wtis)
-
+ 		# tcl_file = fwritec AlgTypeCode tcl_file
+		# defined_symbols = sortBy (\{ds_ident={id_name=id_name1}} {ds_ident={id_name=id_name2}} -> id_name1 < id_name2) defined_symbols
+		= write_type_info defined_symbols tcl_file wtis
 	write_type_info (SynType _) tcl_file wtis
-		# tcl_file
- 			= fwritec SynTypeCode tcl_file;
-  		= (tcl_file,wtis) 
-
+		# tcl_file = fwritec SynTypeCode tcl_file;
+  		= (tcl_file,wtis)
 	write_type_info (RecordType {rt_constructor,rt_fields}) tcl_file wtis
- 		#! tcl_file
- 			= fwritec RecordTypeCode tcl_file;
-		#! (tcl_file,wtis)
-			= write_type_info rt_constructor tcl_file wtis
-		#! (tcl_file,wtis)
-			= write_type_info rt_fields tcl_file wtis
-		= (tcl_file,wtis)
-
+ 		#! tcl_file = fwritec RecordTypeCode tcl_file;
+		#! (tcl_file,wtis) = write_type_info rt_constructor tcl_file wtis
+		= write_type_info rt_fields tcl_file wtis
 	write_type_info (AbstractType _) tcl_file wtis
- 		#! tcl_file
- 			= fwritec AbstractTypeCode tcl_file;
+ 		#! tcl_file = fwritec AbstractTypeCode tcl_file;
  		// unimplemented
 		= (tcl_file,wtis)
-
 	write_type_info (AbstractSynType _ _) tcl_file wtis
  		#! tcl_file	= fwritec AbstractTypeCode tcl_file;
  		// unimplemented
 		= (tcl_file,wtis)
-		
+	write_type_info (ExtensibleAlgType _) tcl_file wtis
+ 		// unimplemented
+		= (tcl_file,wtis)
+	write_type_info (AlgConses _ _) tcl_file wtis
+ 		// unimplemented
+		= (tcl_file,wtis)
+
 instance WriteTypeInfo DefinedSymbol 
 where
 	write_type_info {ds_ident,ds_arity,ds_index} tcl_file wtis
