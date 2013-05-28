@@ -981,7 +981,7 @@ where
 		= (inc decl_index, [generic_decl, member_decl : decls]) 
 
 	gen_case_def_to_dcl {gc_gcf=GCF gc_ident _, gc_pos} (decl_index, decls)
-		= (inc decl_index, [Declaration {decl_ident = gc_ident, decl_pos = gc_pos, decl_kind = STE_GenericCase, decl_index = decl_index} : decls]) 
+		= (inc decl_index, [Declaration {decl_ident = gc_ident, decl_pos = gc_pos, decl_kind = STE_GenericCase, decl_index = decl_index} : decls])
 	gen_case_def_to_dcl {gc_gcf=GCFC gcfc_ident _, gc_pos} (decl_index, decls)
 		= (inc decl_index, [Declaration {decl_ident = gcfc_ident, decl_pos = gc_pos, decl_kind = STE_GenericDeriveClass, decl_index = decl_index} : decls]) 
 
@@ -1138,16 +1138,20 @@ renumber_icl_definitions_without_functions_as_dcl_definitions (Yes icl_to_dcl_in
 						= (Declaration {icl_decl_symbol & decl_index=icl_to_dcl_index_table.[cTypeDefs,decl_index]},cdefs)
 						where
 							renumber_type_def td=:{td_rhs = AlgType conses}
-								# conses = [{cons & ds_index=icl_to_dcl_index_table.[cConstructorDefs,cons.ds_index]} \\ cons <- conses]
-								= { td & td_rhs = AlgType conses}
+								= {td & td_rhs = AlgType (renumber_conses conses icl_to_dcl_index_table)}
 							renumber_type_def td=:{td_rhs = RecordType rt=:{rt_constructor,rt_fields,rt_is_boxed_record}}
 								# rt_constructor = {rt_constructor & ds_index=icl_to_dcl_index_table.[cConstructorDefs,rt_constructor.ds_index]}
 								# rt_fields = {{field & fs_index=icl_to_dcl_index_table.[cSelectorDefs,field.fs_index]} \\ field <-: rt_fields}
 								= {td & td_rhs=RecordType {rt_constructor=rt_constructor,rt_fields=rt_fields,rt_is_boxed_record=rt_is_boxed_record}}
 							renumber_type_def td=:{td_rhs = NewType cons}
-								= { td & td_rhs = NewType {cons & ds_index=icl_to_dcl_index_table.[cConstructorDefs,cons.ds_index]} }
+								= {td & td_rhs = NewType {cons & ds_index=icl_to_dcl_index_table.[cConstructorDefs,cons.ds_index]} }
+							renumber_type_def td=:{td_rhs = ExtensibleAlgType conses}
+								= {td & td_rhs = ExtensibleAlgType (renumber_conses conses icl_to_dcl_index_table)}
 							renumber_type_def td
 								= td
+
+							renumber_conses conses icl_to_dcl_index_table
+								= [{cons & ds_index=icl_to_dcl_index_table.[cConstructorDefs,cons.ds_index]} \\ cons <- conses]
 					renumber_icl_decl_symbol (Declaration icl_decl_symbol=:{decl_kind = STE_TypeExtension, decl_index}) cdefs
 						# (type_def,cdefs) = cdefs!com_type_defs.[decl_index]
 						# type_def = renumber_type_extension_def type_def
@@ -1357,6 +1361,9 @@ where
 			# cs_error = checkError "abstract type not defined in implementation module" ""
 					(setErrorAdmin (newPosition td_ident td_pos) cs.cs_error)
 			= (new_type_defs,new_cons_defs,new_selector_defs,conversion_table,icl_sizes,icl_decl_symbols,{ cs & cs_error = cs_error })
+		add_type_def td=:{td_pos, td_rhs = ExtensibleAlgType conses} new_type_defs new_cons_defs new_selector_defs conversion_table icl_sizes icl_decl_symbols cs		
+			# (conses,(new_cons_defs,conversion_table,icl_sizes,icl_decl_symbols,cs)) = copy_and_redirect_cons_symbols com_cons_defs td_pos conses (new_cons_defs,conversion_table,icl_sizes,icl_decl_symbols,cs)
+			= ([{td & td_rhs = ExtensibleAlgType conses} : new_type_defs],new_cons_defs,new_selector_defs,conversion_table,icl_sizes,icl_decl_symbols,cs)
 		add_type_def td new_type_defs new_cons_defs new_selector_defs conversion_table icl_sizes icl_decl_symbols cs
 			= ([td : new_type_defs],new_cons_defs,new_selector_defs,conversion_table,icl_sizes,icl_decl_symbols,cs) 
 
@@ -1923,7 +1930,6 @@ renumber_icl_module_functions mod_type icl_global_function_range icl_instance_ra
 	# optional_icl_to_dcl_index_table_for_functions = compute_icl_to_dcl_index_table_for_functions dcl_icl_conversions n_functions
 	# class_instances = renumber_member_indexes_of_class_instances optional_icl_to_dcl_index_table_for_functions class_instances
 	# gencase_defs = renumber_members_of_gencases optional_icl_to_dcl_index_table_for_functions gencase_defs
-//	# type_defs = renumber_type_fun_indices optional_icl_to_dcl_index_table type_defs
 
 	# icl_common = {icl_common & com_instance_defs = class_instances, com_gencase_defs = gencase_defs, com_type_defs = type_defs}
 	# (macro_and_function_local_defs,icl_functions)
@@ -2012,7 +2018,6 @@ renumber_icl_module_functions mod_type icl_global_function_range icl_instance_ra
 	  				dcl_function_table instances_conversion_table_size gencase_conversion_table_size
 					dcl_functions dcl_instances icl_instances dcl_gencases icl_gencases dcl_types icl_type_defs error
 				#! nr_of_dcl_functions = size dcl_functions
-//				#! dcl_type_table =  old_conversion_table.[cTypeDefs]
 				#! new_table = { createArray nr_of_dcl_functions NoIndex & [i] = icl_index \\ icl_index <-: dcl_function_table & i <- [0..] }
 				#! index_diff = first_free_index - ir_from
 				#! new_table = { new_table & [i] = i + index_diff \\ i <- [ir_from .. ir_to - 1] }
@@ -2020,11 +2025,7 @@ renumber_icl_module_functions mod_type icl_global_function_range icl_instance_ra
 					= build_conversion_table_for_instances 0 dcl_instances instances_conversion_table_size icl_instances new_table error
 				#! (new_table, icl_gencases, error) 
 					= build_conversion_table_for_generic_cases 0 dcl_gencases gencase_conversion_table_size icl_gencases new_table error
-//				#! (new_table, icl_type_defs)
-//					= fill_conversion_table_for_type_funs 0 dcl_types icl_type_defs dcl_type_table new_table
-
-				#! new_table = fill_conversion_table_for_type_funs icl_type_fun_range dcl_type_funs /*not_exported_type_fun_range*/ new_table
-
+				#! new_table = fill_conversion_table_for_type_funs icl_type_fun_range dcl_type_funs new_table
 				= (new_table, icl_instances, icl_gencases, icl_type_defs, error)
 
 			build_conversion_table_for_generic_cases dcl_index gencase_table gencase_conversion_table_size icl_gencases new_table error
@@ -2149,12 +2150,9 @@ renumber_icl_module_functions mod_type icl_global_function_range icl_instance_ra
 
 		renumber_member_indexes_of_class_instances No class_instances
 			= class_instances
-		//renumber_member_indexes_of_class_instances (Yes icl_to_dcl_index_table) class_instances
 		renumber_member_indexes_of_class_instances (Yes function_conversion_table) class_instances
 			= renumber_member_indexes_of_class_instances 0 class_instances
 			where
-		//		function_conversion_table = icl_to_dcl_index_table.[cFunctionDefs]
-		
 				renumber_member_indexes_of_class_instances class_inst_index class_instances
 					| class_inst_index < size class_instances
 						# (class_instance,class_instances) = class_instances![class_inst_index]
@@ -2162,7 +2160,7 @@ renumber_icl_module_functions mod_type icl_global_function_range icl_instance_ra
 						# class_instances = {class_instances & [class_inst_index]={class_instance & ins_members=new_members}}
 						= renumber_member_indexes_of_class_instances (class_inst_index+1) class_instances
 						= class_instances
-		
+
 		renumber_members_of_gencases No gencases
 			= gencases
 		renumber_members_of_gencases (Yes function_conversion_table) gencases
@@ -2175,12 +2173,12 @@ renumber_icl_module_functions mod_type icl_global_function_range icl_instance_ra
 						{gc_gcf=GCF gc_ident gcf=:{gcf_body=GCB_FunIndex icl_index}}
 							# dcl_index = function_conversion_table.[icl_index]
 							# gencase = {gencase & gc_gcf=GCF gc_ident {gcf & gcf_body = GCB_FunIndex dcl_index}}
-							# gencases = {gencases & [gencase_index] = gencase} 
+							# gencases = {gencases & [gencase_index] = gencase}
 							= renumber_gencase_members (gencase_index+1) gencases
 						{gc_gcf=GCFS gcfs}
 							# gcfs = renumber_gcfs gcfs function_conversion_table
 							# gencase = {gencase & gc_gcf=GCFS gcfs}
-							# gencases = {gencases & [gencase_index] = gencase} 
+							# gencases = {gencases & [gencase_index] = gencase}
 							= renumber_gencase_members (gencase_index+1) gencases
 					= gencases
 
@@ -2289,7 +2287,6 @@ check_module1 cdefs icl_global_function_range fun_defs optional_dcl_mod optional
 		add_module_to_symbol_table mod=:{mod_defs} mod_index cs=:{cs_symbol_table, cs_error}
 			# def_instances	= convert_dcl_class_instances mod_defs.def_instances
 			# mod_defs = { mod_defs & def_instances = def_instances}
-
 			  (sizes,defs) = collectCommonDefinitions mod_defs
 			  sizes_and_defs = collectFunctionTypes mod_defs.def_funtypes (sizes,defs)
 
