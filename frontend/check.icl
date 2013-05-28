@@ -1138,16 +1138,20 @@ renumber_icl_definitions_without_functions_as_dcl_definitions (Yes icl_to_dcl_in
 						= (Declaration {icl_decl_symbol & decl_index=icl_to_dcl_index_table.[cTypeDefs,decl_index]},cdefs)
 						where
 							renumber_type_def td=:{td_rhs = AlgType conses}
-								# conses = [{cons & ds_index=icl_to_dcl_index_table.[cConstructorDefs,cons.ds_index]} \\ cons <- conses]
-								= { td & td_rhs = AlgType conses}
+								= {td & td_rhs = AlgType (renumber_conses conses icl_to_dcl_index_table)}
 							renumber_type_def td=:{td_rhs = RecordType rt=:{rt_constructor,rt_fields,rt_is_boxed_record}}
 								# rt_constructor = {rt_constructor & ds_index=icl_to_dcl_index_table.[cConstructorDefs,rt_constructor.ds_index]}
 								# rt_fields = {{field & fs_index=icl_to_dcl_index_table.[cSelectorDefs,field.fs_index]} \\ field <-: rt_fields}
 								= {td & td_rhs=RecordType {rt_constructor=rt_constructor,rt_fields=rt_fields,rt_is_boxed_record=rt_is_boxed_record}}
 							renumber_type_def td=:{td_rhs = NewType cons}
-								= { td & td_rhs = NewType {cons & ds_index=icl_to_dcl_index_table.[cConstructorDefs,cons.ds_index]} }
+								= {td & td_rhs = NewType {cons & ds_index=icl_to_dcl_index_table.[cConstructorDefs,cons.ds_index]} }
+							renumber_type_def td=:{td_rhs = ExtensibleAlgType conses}
+								= {td & td_rhs = ExtensibleAlgType (renumber_conses conses icl_to_dcl_index_table)}
 							renumber_type_def td
 								= td
+
+							renumber_conses conses icl_to_dcl_index_table
+								= [{cons & ds_index=icl_to_dcl_index_table.[cConstructorDefs,cons.ds_index]} \\ cons <- conses]
 					renumber_icl_decl_symbol (Declaration icl_decl_symbol=:{decl_kind = STE_TypeExtension, decl_index}) cdefs
 						# (type_def,cdefs) = cdefs!com_type_defs.[decl_index]
 						# type_def = renumber_type_extension_def type_def
@@ -1357,6 +1361,9 @@ where
 			# cs_error = checkError "abstract type not defined in implementation module" ""
 					(setErrorAdmin (newPosition td_ident td_pos) cs.cs_error)
 			= (new_type_defs,new_cons_defs,new_selector_defs,conversion_table,icl_sizes,icl_decl_symbols,{ cs & cs_error = cs_error })
+		add_type_def td=:{td_pos, td_rhs = ExtensibleAlgType conses} new_type_defs new_cons_defs new_selector_defs conversion_table icl_sizes icl_decl_symbols cs		
+			# (conses,(new_cons_defs,conversion_table,icl_sizes,icl_decl_symbols,cs)) = copy_and_redirect_cons_symbols com_cons_defs td_pos conses (new_cons_defs,conversion_table,icl_sizes,icl_decl_symbols,cs)
+			= ([{td & td_rhs = ExtensibleAlgType conses} : new_type_defs],new_cons_defs,new_selector_defs,conversion_table,icl_sizes,icl_decl_symbols,cs)
 		add_type_def td new_type_defs new_cons_defs new_selector_defs conversion_table icl_sizes icl_decl_symbols cs
 			= ([td : new_type_defs],new_cons_defs,new_selector_defs,conversion_table,icl_sizes,icl_decl_symbols,cs) 
 
