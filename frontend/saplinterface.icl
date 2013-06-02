@@ -23,7 +23,7 @@ convert2sapl comps fun_defs icl_common comdefs icl_name file modnames mymod dcl_
   # saplfuncs = convertSelects saplfuncs extcons           // convert clean like select to Sapl select
   # saplfuncs = map renameVars saplfuncs                   // give vars a unique name
   # saplfuncs = flatten (map checkIfSelect saplfuncs)      // extract non toplevel if/select
-  # file = file <<< "|| Generated Sapl file for " <<< icl_name <<< ".icl\n"
+  # file = file <<< "|| ?module? " <<< mymod <<< "\n"
   # file = file <<< "\n\n"
   # file = writedef2file saplfuncs file
   # file = writedef2file (consgroups saplcons) (file <<< "\n")
