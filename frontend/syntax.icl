@@ -87,7 +87,7 @@ instance toString BasicType  where
 	toString BT_Dynamic = "Dynamic"
 	toString BT_File = "File"
 	toString BT_World = "World"
-	
+
 instance <<< BasicType
 where
 	(<<<) file bt			= file <<< toString bt
@@ -191,10 +191,10 @@ where
 		= file  <<< consid <<< ' ' <<< strictness <<< ' ' <<< types
 	(<<<) file (arg_type --> res_type)
 		= file <<< arg_type <<< " -> " <<< res_type
-	(<<<) file (type :@: types)
-		= file <<< type <<< " @" <<< types
 	(<<<) file (TB tb)
 		= file <<< tb
+	(<<<) file (type :@: types)
+		= file <<< type <<< " @" <<< types
 	(<<<) file TArrow
 		= file <<< "(->)"	
 	(<<<) file (TArrow1 t)
@@ -512,7 +512,7 @@ where
 	(<<<) file (PE_Lambda _ exprs expr _) = file <<< '\\' <<< exprs <<< " -> " <<< expr
 	(<<<) file (PE_Bound bind) = file <<< bind
 	(<<<) file (PE_Case _ expr alts) = file <<< "case " <<< expr <<< " of\n" <<< alts
-	(<<<) file (PE_Let _ defs expr) = file <<< "let " <<< defs <<< " in\n" <<< expr
+	(<<<) file (PE_Let defs expr) = file <<< "let " <<< defs <<< " in\n" <<< expr
 	(<<<) file (PE_DynamicPattern expr type) = file <<< expr <<< "::" <<< type
 	(<<<) file (PE_Dynamic expr maybetype)
 		= case maybetype of

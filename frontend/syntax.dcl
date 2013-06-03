@@ -768,6 +768,7 @@ pIsSafe			:== True
 				VI_Occurrence !Occurrence | VI_UsedVar !Ident |
 				VI_Expression !Expression | VI_Variable !Ident !VarInfoPtr | VI_LiftedVariable !VarInfoPtr |
 				VI_Count !Int /* the reference count of a variable */ !Bool /* true if the variable is global, false otherwise */ |
+				VI_Ref !Bool /* true if the variable is global, false otherwise */ |
 				VI_AccVar !ConsClass !ArgumentPosition /* used during fusion to determine accumulating parameters of functions */ |
 				VI_Alias !BoundVar /* used for resolving aliases just before type checking (in transform) */ |
 				 /* used during elimination and lifting of cases */
@@ -1293,7 +1294,7 @@ instance toString 	KindInfo
 				| PE_Update !ParsedExpr [ParsedSelection] ParsedExpr
 				| PE_Case !Ident !ParsedExpr [CaseAlt]
 				| PE_If !Ident !ParsedExpr !ParsedExpr !ParsedExpr
-				| PE_Let !Bool !LocalDefs !ParsedExpr
+				| PE_Let !LocalDefs !ParsedExpr
 				| PE_ListCompr /*predef_cons_index:*/ !Int /*predef_nil_index:*/ !Int !ParsedExpr ![Qualifier]
 				| PE_ArrayCompr !ArrayKind !ParsedExpr ![Qualifier]
 				| PE_Sequ Sequence

@@ -3580,7 +3580,7 @@ trySimpleNonLhsExpressionT (LetToken strict) pState // let! is not supported in 
 	# (let_binds, pState)	= wantLocals pState
 	  pState				= wantToken FunctionContext "let expression" InToken pState
 	  (let_expr, pState)	= wantExpression pState
-	= (True, PE_Let strict let_binds let_expr, pState)
+	= (True, PE_Let let_binds let_expr, pState)
 trySimpleNonLhsExpressionT CaseToken pState
    	# (case_exp, pState)		= wantCaseExp pState
 	= (True, case_exp, pState)
@@ -4384,7 +4384,7 @@ transform_record_or_array_update type expr updates level pState
 				build_update record_type No expr assignments
 					=	PE_Record expr record_type assignments
 				build_update record_type (Yes ident) expr assignments
-					=	PE_Let False (LocalParsedDefs [buildNodeDef (PE_Ident ident) expr])
+					=	PE_Let (LocalParsedDefs [buildNodeDef (PE_Ident ident) expr])
 								(PE_Record (PE_Ident ident) record_type assignments)
 				
 				check_field_and_record_types :: OptionalRecordName OptionalRecordName ParseState -> (!OptionalRecordName,!ParseState);
@@ -4438,7 +4438,7 @@ transform_record_or_array_update type expr updates level pState
 								= transform_record_update NoRecordName
 									(PE_Ident element_id)
 									[[{nu_selectors=(reverse record_selectors), nu_update_expr=update_expr}]] (level+1) pState
-							=	(PE_Let False
+							=	(PE_Let
 									(LocalParsedDefs [index_def, select_def])
 									(PE_Update (PE_Ident array_id) (reverse [PS_Array (PE_Ident index_id) : initial_selectors]) updated_element), pState)
 
