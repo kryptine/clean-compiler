@@ -130,7 +130,7 @@ make_case_guards cons_symbol global_type_index alg_patterns expr_heap cs
 		= (AlgebraicPatterns global_type_index alg_patterns,expr_heap,cs)
 
 checkFunctionBodies :: !FunctionBody !Ident !.ExpressionInput !*ExpressionState !*ExpressionInfo !*CheckState
-	-> (!FunctionBody, ![FreeVar], !*ExpressionState, !*ExpressionInfo, !*CheckState)
+							   -> (!FunctionBody, ![FreeVar], !*ExpressionState,!*ExpressionInfo,!*CheckState)
 checkFunctionBodies (ParsedBody [{pb_args,pb_rhs={rhs_alts,rhs_locals}, pb_position} : bodies]) function_ident_for_errors e_input=:{ei_expr_level,ei_mod_index}
 		e_state=:{es_var_heap, es_fun_defs} e_info cs
 
@@ -143,7 +143,7 @@ checkFunctionBodies (ParsedBody [{pb_args,pb_rhs={rhs_alts,rhs_locals}, pb_posit
 			= addArraySelections array_patterns rhs_expr free_vars e_input e_state e_info cs
 	  cs_symbol_table = removeLocalIdentsFromSymbolTable ei_expr_level var_env cs.cs_symbol_table
 	  cs = { cs & cs_symbol_table = cs_symbol_table }
-	  (cb_args, es_var_heap) = mapSt determine_function_arg aux_patterns es_var_heap		
+	  (cb_args, es_var_heap) = mapSt determine_function_arg aux_patterns es_var_heap
 	  (rhss, free_vars, e_state=:{es_dynamics,es_expr_heap,es_var_heap}, e_info, cs)
 	  		= check_function_bodies free_vars cb_args bodies e_input { e_state & es_dynamics = [], es_var_heap = es_var_heap } e_info cs
 	  (rhs, position, es_var_heap, es_expr_heap, dynamics_in_patterns, cs)
@@ -178,7 +178,7 @@ where
 	determine_function_arg _ var_store
 		# ({bind_src,bind_dst}, var_store) = determinePatternVariable No var_store
 		= ({ fv_ident = bind_src, fv_info_ptr = bind_dst, fv_def_level = NotALevel, fv_count = 0 }, var_store)
-	
+
 	check_function_bodies free_vars fun_args [{pb_args,pb_rhs={rhs_alts,rhs_locals},pb_position} : bodies]
 							e_input=:{ei_expr_level,ei_mod_index} e_state=:{es_var_heap,es_fun_defs} e_info cs
 		# cs = pushErrorAdmin (newPosition function_ident_for_errors pb_position) cs
@@ -345,7 +345,8 @@ removeLocalsFromSymbolTable module_index level loc_vars (CollectedLocalDefs {loc
 
 :: LetBinds :== [([LetBind],[LetBind])]
 
-checkRhs :: [FreeVar] OptGuardedAlts LocalDefs ExpressionInput *ExpressionState *ExpressionInfo *CheckState -> *(!Expression,![FreeVar],!*ExpressionState,!*ExpressionInfo,!*CheckState);
+checkRhs :: [FreeVar] OptGuardedAlts LocalDefs ExpressionInput *ExpressionState  *ExpressionInfo  *CheckState
+								  -> *(!Expression,![FreeVar],!*ExpressionState,!*ExpressionInfo,!*CheckState);
 checkRhs free_vars rhs_alts rhs_locals e_input=:{ei_expr_level,ei_mod_index,ei_local_functions_index_offset} e_state e_info cs
 	# ei_expr_level = inc ei_expr_level
 	  (loc_defs, (var_env, array_patterns), e_state, e_info, cs) = checkLhssOfLocalDefs ei_expr_level ei_mod_index rhs_locals ei_local_functions_index_offset e_state e_info cs
@@ -441,7 +442,7 @@ where
 	remove_seq_let_vars level [let_vars : let_vars_list] symbol_table
 		= remove_seq_let_vars (dec level) let_vars_list (removeLocalIdentsFromSymbolTable level let_vars symbol_table)
 	
-	check_sequential_lets :: [FreeVar] [NodeDefWithLocals] u:[[Ident]] !ExpressionInput *ExpressionState  *ExpressionInfo  *CheckState 
+	check_sequential_lets :: [FreeVar] [NodeDefWithLocals] u:[[Ident]] !ExpressionInput *ExpressionState  *ExpressionInfo  *CheckState
 										   -> *(!LetBinds,!u:[[Ident]],!Int,![FreeVar],!*ExpressionState,!*ExpressionInfo,!*CheckState);
 	check_sequential_lets free_vars [seq_let:seq_lets] let_vars_list e_input=:{ei_expr_level,ei_mod_index} e_state e_info cs
 		# ei_expr_level = inc ei_expr_level
@@ -507,7 +508,7 @@ checkLocalFunctions mod_index level (CollectedLocalDefs {loc_functions={ir_from,
 		= (fun_defs,e_info,heaps,cs)
 
 checkExpression :: ![FreeVar] !ParsedExpr !ExpressionInput !*ExpressionState !*ExpressionInfo !*CheckState
-	-> *(!Expression, ![FreeVar], !*ExpressionState, !*ExpressionInfo, !*CheckState);
+							 -> *(!Expression, ![FreeVar], !*ExpressionState,!*ExpressionInfo,!*CheckState);
 checkExpression free_vars (PE_List exprs) e_input e_state e_info cs	
 	# (exprs, free_vars, e_state, e_info, cs) = check_expressions free_vars exprs e_input e_state e_info cs
 	  (expr, e_state, cs_error) = build_expression exprs e_state cs.cs_error
@@ -619,7 +620,7 @@ where
 			# (result_expr, e_state, cs_error) = buildApplication symb arity 2 [left,result_expr] e_state cs_error
 			= build_final_expression left_appls result_expr e_state cs_error
 					
-checkExpression free_vars (PE_Let strict let_locals expr) e_input=:{ei_expr_level,ei_mod_index,ei_local_functions_index_offset} e_state e_info cs
+checkExpression free_vars (PE_Let let_locals expr) e_input=:{ei_expr_level,ei_mod_index,ei_local_functions_index_offset} e_state e_info cs
 	# ei_expr_level = inc ei_expr_level
 	  (loc_defs, (var_env, array_patterns), e_state, e_info, cs)
 	  		= checkLhssOfLocalDefs ei_expr_level ei_mod_index let_locals ei_local_functions_index_offset e_state e_info cs
@@ -2585,15 +2586,14 @@ where
 		  cs = checkPatternVariable pi_def_level entry id new_info_ptr { cs & cs_symbol_table = cs_symbol_table }
 		= (AP_Variable id new_info_ptr opt_var, ([ id : var_env ], array_patterns), { ps & ps_var_heap = ps_var_heap}, e_info, cs)
 	check_local_lhs_pattern pattern opt_var p_input accus var_store e_info cs
-		=	checkPattern pattern opt_var p_input accus var_store e_info cs
+		= checkPattern pattern opt_var p_input accus var_store e_info cs
 
 addArraySelections [] rhs_expr free_vars e_input e_state e_info cs
 	= (rhs_expr, free_vars, e_state, e_info, cs)
 addArraySelections array_patterns rhs_expr free_vars e_input e_state e_info cs
 	# (let_strict_binds, let_lazy_binds, free_vars, e_state, e_info, cs)
 			= buildArraySelections e_input array_patterns free_vars e_state e_info cs
-	  (let_expr_ptr, es_expr_heap)
-	  		= newPtr EI_Empty e_state.es_expr_heap
+	  (let_expr_ptr, es_expr_heap) = newPtr EI_Empty e_state.es_expr_heap
 	= ( Let {let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds,
 				let_expr = rhs_expr, let_info_ptr = let_expr_ptr, let_expr_position = NoPos }
 	  , free_vars , { e_state & es_expr_heap = es_expr_heap} , e_info, cs )
@@ -2641,23 +2641,17 @@ buildSelections e_input {ap_opt_var, ap_array_var, ap_selections}
 		  				-> (unq_select_symb, UniqueSingleArraySelector, cs)
 		  			_	# (select_symb, cs) = getPredefinedGlobalSymbol PD_ArraySelectFun PD_StdArray STE_Member 2 cs
 		  				-> (select_symb, UniqueSelector, cs)
-		  e_state
-		  		= { e_state & es_var_heap = es_var_heap, es_expr_heap = es_expr_heap }
+		  e_state = { e_state & es_var_heap = es_var_heap, es_expr_heap = es_expr_heap }
 		  (index_exprs, (free_vars, e_state, e_info, cs))
 		  		= mapSt (check_index_expr e_input) parsed_index_exprs (free_vars, e_state, e_info, cs)
-		  selections
-		  		= [ ArraySelection glob_select_symb new_expr_ptr index_expr \\ new_expr_ptr<-new_expr_ptrs & index_expr<-index_exprs ]
+		  selections = [ ArraySelection glob_select_symb new_expr_ptr index_expr \\ new_expr_ptr<-new_expr_ptrs & index_expr<-index_exprs ]
 		= (	new_array_var
 		  ,	[ {lb_dst = var_for_uselect_result, lb_src = Selection selector_kind (Var bound_array_var) selections, lb_position = NoPos }
 		    , {lb_dst = new_array_var, lb_src = TupleSelect tuple_cons.glob_object 1 (Var bound_var_for_uselect_result), lb_position = NoPos }
 		    , {lb_dst = array_element_var, lb_src = TupleSelect tuple_cons.glob_object 0 (Var bound_var_for_uselect_result), lb_position = NoPos }
 		  	: binds
 			]
-		  , free_vars
-		  , e_state
-		  , e_info 
-		  , cs
-		  )
+		  , free_vars, e_state, e_info , cs)
 
 	check_index_expr e_input parsed_index_expr (free_vars, e_state, e_info, cs)
 		# (index_expr, free_vars, e_state, e_info, cs) = checkExpression free_vars parsed_index_expr e_input e_state e_info cs
@@ -2802,7 +2796,7 @@ retrieveSelectorIndexes mod_index {ste_kind = STE_Selector selector_list, ste_in
 where
 	adjust_mod_index mod_index selector=:{glob_module}
 		| glob_module == NoIndex
-			= { selector & glob_module = mod_index }
+			= {selector & glob_module = mod_index}
 			= selector
 retrieveSelectorIndexes mod_index off_kind
 	= []

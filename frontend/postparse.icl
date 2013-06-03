@@ -120,7 +120,7 @@ where
 	collectFunctions (PE_Lambda lam_ident args res pos) icl_module ca
 		# ((args,res), ca) = collectFunctions (args,res) icl_module ca
 		# (range, ca) = addFunctionsRange [transformLambda lam_ident args res pos] ca
-		= (PE_Let cIsStrict (CollectedLocalDefs { loc_functions = range, loc_nodes = [], loc_in_icl_module=icl_module })
+		= (PE_Let (CollectedLocalDefs { loc_functions = range, loc_nodes = [], loc_in_icl_module=icl_module })
 				(PE_Ident lam_ident), ca)
 	collectFunctions (PE_Record rec_expr type_ident fields) icl_module ca
 		# ((rec_expr,fields), ca) = collectFunctions (rec_expr,fields) icl_module ca
@@ -143,9 +143,9 @@ where
 		  (c, ca) = collectFunctions c icl_module ca
 		  (case_alts, ca) = collectFunctions case_alts icl_module ca
 		= (PE_Case if_ident c case_alts, ca)
-	collectFunctions (PE_Let strict locals in_expr) icl_module ca
+	collectFunctions (PE_Let locals in_expr) icl_module ca
 		# ((node_defs,in_expr), ca) = collectFunctions (locals,in_expr) icl_module ca
-		= (PE_Let strict node_defs in_expr, ca)
+		= (PE_Let node_defs in_expr, ca)
 	collectFunctions (PE_ListCompr predef_cons_index predef_nil_index expr qualifiers) icl_module ca
 		# (compr, ca) = transformListComprehension predef_cons_index predef_nil_index expr qualifiers ca
 		= collectFunctions compr icl_module ca
@@ -677,17 +677,17 @@ where
 				minimum exp1 ident2=:(PE_Ident _) ca
 					# node_def1 = PD_NodeDef (LinePos qual_filename gen_position.lc_line) ident1 (exprToRhs exp1)
 					# (min_exp,ca) = minimum_of_idents ident1 ident2 ca
-					= (PE_Let cIsNotStrict (LocalParsedDefs [node_def1]) min_exp,ca)
+					= (PE_Let (LocalParsedDefs [node_def1]) min_exp,ca)
 				minimum ident1=:(PE_Ident _) exp2 ca
 					# node_def2 = PD_NodeDef (LinePos qual_filename gen_position.lc_line) ident2 (exprToRhs exp2)
 					# (min_exp,ca) = minimum_of_idents ident1 ident2 ca
-					= (PE_Let cIsNotStrict (LocalParsedDefs [node_def2]) min_exp,ca)
+					= (PE_Let (LocalParsedDefs [node_def2]) min_exp,ca)
 				minimum exp1 exp2 ca
 					# pos = LinePos qual_filename gen_position.lc_line
 					# node_def1 = PD_NodeDef pos ident1 (exprToRhs exp1)
 					# node_def2 = PD_NodeDef pos ident2 (exprToRhs exp2)
 					# (min_exp,ca) = minimum_of_idents ident1 ident2 ca
-					= (PE_Let cIsNotStrict (LocalParsedDefs [node_def1,node_def2]) min_exp,ca)
+					= (PE_Let (LocalParsedDefs [node_def1,node_def2]) min_exp,ca)
 				
 				minimum_of_idents ident1 ident2 ca
 					# smaller_fun = get_predef_id PD_SmallerFun
@@ -733,7 +733,7 @@ add_node_defs_to_exp [] exp
 add_node_defs_to_exp [{tg_expr=([],_)}:generators] exp
 	= add_node_defs_to_exp generators exp
 add_node_defs_to_exp [{tg_expr=(node_defs,_)}:generators] exp
-	= PE_Let cIsNotStrict (LocalParsedDefs node_defs) (add_node_defs_to_exp generators exp)
+	= PE_Let (LocalParsedDefs node_defs) (add_node_defs_to_exp generators exp)
 
 transformQualifier :: Qualifier *CollectAdmin -> (TransformedQualifier, *CollectAdmin) 
 transformQualifier {qual_generators,qual_let_defs,qual_filter, qual_position, qual_filename} ca
@@ -915,7 +915,7 @@ makeComprehensions [{tq_generators,tq_let_defs,tq_filter, tq_end, tq_call, tq_lh
 	# failure		= PE_List [PE_Ident tq_fun_id : threading ++ rhs_continuation_args_from_generators tq_generators]
 	  rhs	 		= build_rhs tq_generators success tq_let_defs tq_filter failure tq_end tq_fun_pos
 	  parsed_def 	= MakeNewParsedDef tq_fun_id tq_lhs_args rhs tq_fun_pos
-	= (PE_Let cIsStrict (LocalParsedDefs [parsed_def]) tq_call, ca)
+	= (PE_Let (LocalParsedDefs [parsed_def]) tq_call, ca)
 	where
 		build_rhs :: [TransformedGenerator] ParsedExpr LocalDefs (Optional ParsedExpr) ParsedExpr ParsedExpr Position -> Rhs
 		build_rhs [generator : generators] success let_defs optional_filter failure end fun_pos
