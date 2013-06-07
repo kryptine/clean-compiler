@@ -3342,14 +3342,14 @@ determineProducers :: !BITVECT !Bool !Bool !(Optional SymbolType) ![#Bool!] ![In
 	-> *(!*{!Producer},![Expression],![(LetBind,AType)],!*TransformInfo)
 determineProducers _ _ _ _ _ _ [] _ producers _ ti
 	= (producers, [], [], ti)
-determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer fun_type [#linear_bit : linear_bits!] [cons_arg : cons_args] [arg : args] prod_index producers ro ti
+determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer consumer_type [#linear_bit : linear_bits!] [cons_arg : cons_args] [arg : args] prod_index producers ro ti
  	| cons_arg == CActive
 		# (producers, new_arg, ti) = determine_producer consumer_properties consumer_is_curried ok_non_rec_consumer linear_bit arg [] prod_index producers ro ti
 		| isProducer producers.[prod_index]
 			= (producers, new_arg++args, [], ti)
 		| not ro.ro_transform_fusion || consumer_properties bitand FI_GenericFun==0
 			#! (producers, new_args, lb, ti)
-				= determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args args (inc prod_index) producers ro ti
+				= determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer consumer_type linear_bits cons_args args (inc prod_index) producers ro ti
 			= (producers, new_arg++new_args, lb, ti)
 			= case arg of
 				BasicExpr (BVS s)
@@ -3359,13 +3359,13 @@ determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer f
 					# producers & [prod_index] = PR_Int i
 					-> (producers, args, [], ti)
 				_
-					#! (producers, new_args, lb, ti) = determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args args (inc prod_index) producers ro ti
+					#! (producers, new_args, lb, ti) = determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer consumer_type linear_bits cons_args args (inc prod_index) producers ro ti
 					-> (producers, new_arg++new_args, lb, ti)
 	| not ro.ro_transform_fusion
 		#! (producers, new_args, lb, ti)
-			= determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args args (inc prod_index) producers ro ti
+			= determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer consumer_type linear_bits cons_args args (inc prod_index) producers ro ti
 		= (producers, [arg : new_args], lb, ti)
-	| SwitchUnusedFusion (cons_arg == CUnusedStrict && isStrictArg fun_type prod_index) False
+	| SwitchUnusedFusion (cons_arg == CUnusedStrict && isStrictArg consumer_type prod_index) False
 		# producers = { producers & [prod_index] = PR_Unused }
 		# (lb,ti) = case isStrictVarOrSimpleExpression arg of
 						True	-> ([],ti)
@@ -3380,10 +3380,10 @@ determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer f
 								  		,lb_src=arg
 								  		,lb_position=NoPos
 								  		}
-								-> ([(lb,getArgType fun_type prod_index)],ti)
+								-> ([(lb,getArgType consumer_type prod_index)],ti)
 		  
 		= (producers, args, lb, ti)	 // ---> ("UnusedStrict",lb,arg,fun_type)
-	| SwitchUnusedFusion (cons_arg == CUnusedStrict && not (isStrictArg fun_type prod_index) && isStrictVar arg) False
+	| SwitchUnusedFusion (cons_arg == CUnusedStrict && not (isStrictArg consumer_type prod_index) && isStrictVar arg) False
 		# producers = { producers & [prod_index] = PR_Unused }
 		= determineUnusedProducersInNextArgs cons_args args (prod_index+1) producers ro ti
 	| SwitchUnusedFusion (cons_arg == CUnusedLazy) False
@@ -3401,13 +3401,13 @@ determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer f
 						| arg_n>=0 && is_monomorphic_symbol_type fun_type
 							# producers & [prod_index] = PR_Equal arg_n, [arg_n] = PR_EqualRemove prod_index
 							-> (producers, [arg:remove_arg_n (arg_n-prod_index-1) args], [], ti)
-							-> determineProducersInNextArgs consumer_properties consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args arg args prod_index producers ro ti
-						-> determineProducersInNextArgs consumer_properties consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args arg args prod_index producers ro ti
+							-> determineProducersInNextArgs consumer_properties consumer_is_curried ok_non_rec_consumer consumer_type linear_bits cons_args arg args prod_index producers ro ti
+						-> determineProducersInNextArgs consumer_properties consumer_is_curried ok_non_rec_consumer consumer_type linear_bits cons_args arg args prod_index producers ro ti
 				# {st_arity,st_context} = ro.ro_imported_funs.[glob_module].[glob_object].ft_type
 				| (st_arity>0 || not (isEmpty st_context)) && consumer_properties bitand FI_GenericFun<>0
 					# producers & [prod_index] = PR_Curried symb 0
 					-> (producers, args, [], ti)
-					-> determineProducersInNextArgs consumer_properties consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args arg args prod_index producers ro ti
+					-> determineProducersInNextArgs consumer_properties consumer_is_curried ok_non_rec_consumer consumer_type linear_bits cons_args arg args prod_index producers ro ti
 			App {app_symb=symb=:{symb_kind=SK_LocalMacroFunction fun_index},app_args=[]}
 				# ({fun_arity,fun_info,fun_type},ti) = ti!ti_fun_defs.[fun_index]
 				| fun_arity>0
@@ -3418,8 +3418,8 @@ determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer f
 					| arg_n>=0 && is_monomorphic_symbol_type fun_type
 						# producers & [prod_index] = PR_Equal arg_n, [arg_n] = PR_EqualRemove prod_index
 						-> (producers, [arg:remove_arg_n (arg_n-prod_index-1) args], [], ti)
-						-> determineProducersInNextArgs consumer_properties consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args arg args prod_index producers ro ti
-					-> determineProducersInNextArgs consumer_properties consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args arg args prod_index producers ro ti
+						-> determineProducersInNextArgs consumer_properties consumer_is_curried ok_non_rec_consumer consumer_type linear_bits cons_args arg args prod_index producers ro ti
+					-> determineProducersInNextArgs consumer_properties consumer_is_curried ok_non_rec_consumer consumer_type linear_bits cons_args arg args prod_index producers ro ti
 			App {app_symb=symb=:{symb_kind=SK_GeneratedFunction fun_ptr fun_index},app_args=[]}
 				# (FI_Function {gf_fun_def={fun_arity,fun_info,fun_type}},fun_heap) = readPtr fun_ptr ti.ti_fun_heap
 				  ti & ti_fun_heap = fun_heap
@@ -3431,18 +3431,18 @@ determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer f
 					| arg_n>=0 && is_monomorphic_symbol_type fun_type
 						# producers & [prod_index] = PR_Equal arg_n, [arg_n] = PR_EqualRemove prod_index
 						-> (producers, [arg:remove_arg_n (arg_n-prod_index-1) args], [], ti)
-						-> determineProducersInNextArgs consumer_properties consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args arg args prod_index producers ro ti
-					-> determineProducersInNextArgs consumer_properties consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args arg args prod_index producers ro ti
+						-> determineProducersInNextArgs consumer_properties consumer_is_curried ok_non_rec_consumer consumer_type linear_bits cons_args arg args prod_index producers ro ti
+					-> determineProducersInNextArgs consumer_properties consumer_is_curried ok_non_rec_consumer consumer_type linear_bits cons_args arg args prod_index producers ro ti
 			Var {var_info_ptr}
 				| not (cons_arg==CUnusedStrict || cons_arg==CUnusedLazy)
 					# arg_n = find_same_Var args var_info_ptr (prod_index+1)
 					| arg_n>=0
-						# (arg_type1,arg_type2) = get2ArgTypes fun_type prod_index arg_n
+						# (arg_type1,arg_type2) = get2ArgTypes consumer_type prod_index arg_n
 						| equal_non_unique_atype arg_type1 arg_type2
 							# producers & [prod_index] = PR_Equal arg_n, [arg_n] = PR_EqualRemove prod_index
 							-> (producers, [arg:remove_arg_n (arg_n-prod_index-1) args], [], ti)
-							-> determineProducersInNextArgs consumer_properties consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args arg args prod_index producers ro ti
-						-> determineProducersInNextArgs consumer_properties consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args arg args prod_index producers ro ti
+							-> determineProducersInNextArgs consumer_properties consumer_is_curried ok_non_rec_consumer consumer_type linear_bits cons_args arg args prod_index producers ro ti
+						-> determineProducersInNextArgs consumer_properties consumer_is_curried ok_non_rec_consumer consumer_type linear_bits cons_args arg args prod_index producers ro ti
 			BasicExpr (BVS s)
 				| consumer_properties bitand FI_GenericFun<>0
 					# producers & [prod_index] = PR_String s
@@ -3452,15 +3452,15 @@ determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer f
 					# producers & [prod_index] = PR_Int i
 					-> (producers, args, [], ti)
 			_
-				-> determineProducersInNextArgs consumer_properties consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args arg args prod_index producers ro ti
+				-> determineProducersInNextArgs consumer_properties consumer_is_curried ok_non_rec_consumer consumer_type linear_bits cons_args arg args prod_index producers ro ti
 where
-	determineProducersInNextArgs consumer_properties consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args arg args prod_index producers ro ti
+	determineProducersInNextArgs consumer_properties consumer_is_curried ok_non_rec_consumer consumer_type linear_bits cons_args arg args prod_index producers ro ti
 		#! (producers, new_args, lb, ti)
-			= determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer fun_type linear_bits cons_args args (inc prod_index) producers ro ti
+			= determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer consumer_type linear_bits cons_args args (inc prod_index) producers ro ti
 		= (producers, [arg : new_args], lb, ti)
 
 	determineUnusedProducersInNextArgs [cons_arg : cons_args] arg_and_args=:[arg : args] prod_index producers ro ti
-		| SwitchUnusedFusion (cons_arg == CUnusedStrict && isStrictArg fun_type prod_index) False
+		| SwitchUnusedFusion (cons_arg == CUnusedStrict && isStrictArg consumer_type prod_index) False
 			# producers & [prod_index] = PR_Unused
 			# (lb,ti) = case isStrictVarOrSimpleExpression arg of
 							True	-> ([],ti)
@@ -3470,9 +3470,9 @@ where
 									  			{ fv_ident = { id_name = "dummy_for_strict_unused", id_info = nilPtr }
 									  			, fv_info_ptr = info_ptr, fv_count = 0, fv_def_level = NotALevel }
 									  		,lb_src=arg, lb_position=NoPos }
-									-> ([(lb,getArgType fun_type prod_index)],ti)
+									-> ([(lb,getArgType consumer_type prod_index)],ti)
 			= (producers, args, lb, ti)	 // ---> ("UnusedStrict",lb,arg,fun_type)
-		| SwitchUnusedFusion (cons_arg == CUnusedStrict && not (isStrictArg fun_type prod_index) && isStrictVar arg) False
+		| SwitchUnusedFusion (cons_arg == CUnusedStrict && not (isStrictArg consumer_type prod_index) && isStrictVar arg) False
 			# producers & [prod_index] = PR_Unused
 			= determineUnusedProducersInNextArgs cons_args args (prod_index+1) producers ro ti
 		| SwitchUnusedFusion (cons_arg == CUnusedLazy) False
