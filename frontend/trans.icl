@@ -4,7 +4,7 @@ import StdEnv, StdStrictLists
 
 import syntax, transform, checksupport, compare_types, utilities, expand_types, unitype, type
 import classify, partition
-from StdOverloadedList import RepeatnM,TakeM,++$
+from StdOverloadedList import RepeatnM,TakeM,++$,Any
 
 SwitchCaseFusion			fuse dont_fuse :== fuse
 SwitchGeneratedFusion		fuse dont_fuse :== fuse
@@ -2782,31 +2782,59 @@ where
 
 	transform_trivial_function :: !.App ![.Expression] ![.Expression] !.ReadOnlyTI !*TransformInfo -> *(!Expression,!*TransformInfo)
 	transform_trivial_function app=:{app_symb} app_args extra_args ro ti
-		# (fun_def,ti_fun_defs,ti_fun_heap) = get_fun_def app_symb.symb_kind ro.ro_main_dcl_module_n ti.ti_fun_defs ti.ti_fun_heap
-		# {fun_body=fun_body=:TransformedBody {tb_args,tb_rhs},fun_type} = fun_def
-		# (opt_expr, ti_fun_defs, ti_fun_heap, ti_type_heaps, ti_cons_args)
-			= is_trivial_body tb_args tb_rhs app_args fun_type ro ti_fun_defs ti_fun_heap ti.ti_type_heaps ti.ti_cons_args
-		# ti & ti_fun_defs = ti_fun_defs, ti_fun_heap = ti_fun_heap, ti_type_heaps = ti_type_heaps, ti_cons_args = ti_cons_args
+		# (opt_expr,ti) = is_trivial_function_call app_symb.symb_kind app_args ro ti
 		= case opt_expr of
 			No
 				-> (build_application {app & app_symb = app_symb, app_args = app_args} extra_args, ti)
-			Yes (App app)
-				-> transformApplication app extra_args ro ti
+			Yes tb_rhs=:(App app)
+				# (is_cycle,ti) = is_cycle_of_trivial_function_calls app.app_symb.symb_kind app_args [app_symb.symb_kind] ro ti
+				| not is_cycle
+					-> transformApplication app extra_args ro ti
+					| isEmpty extra_args
+						-> (tb_rhs, ti)
+						-> (tb_rhs @ extra_args, ti)
 			Yes tb_rhs
 				| isEmpty extra_args
 					-> (tb_rhs, ti)
 					-> (tb_rhs @ extra_args, ti)
 
+	is_cycle_of_trivial_function_calls :: !SymbKind ![Expression] ![SymbKind] !ReadOnlyTI !*TransformInfo -> *(!Bool,!*TransformInfo)
+	is_cycle_of_trivial_function_calls symb_kind app_args previous_function_symb_kinds ro ti
+		| not (is_main_module_function_symbol symb_kind ro.ro_main_dcl_module_n)
+			= (False,ti)
+		| Any (equal_function symb_kind) previous_function_symb_kinds
+			= (True,ti)
+		# (opt_expr,ti) = is_trivial_function_call symb_kind app_args ro ti
+		= case opt_expr of
+			Yes (App {app_symb,app_args})
+				-> is_cycle_of_trivial_function_calls app_symb.symb_kind app_args [symb_kind:previous_function_symb_kinds] ro ti
+			_
+				-> (False,ti)
+	where
+		is_main_module_function_symbol (SK_Function {glob_module})	main_dcl_module_n = glob_module == main_dcl_module_n
+		is_main_module_function_symbol (SK_LocalMacroFunction _)	main_dcl_module_n = True
+		is_main_module_function_symbol (SK_GeneratedFunction _ _)	main_dcl_module_n = True
+		is_main_module_function_symbol _							main_dcl_module_n = False
+
+		equal_function (SK_Function i1) (SK_Function i2) = i1==i2
+		equal_function (SK_LocalMacroFunction i1) (SK_LocalMacroFunction i2) = i1==i2
+		equal_function (SK_GeneratedFunction _ i1) (SK_GeneratedFunction _ i2) = i1==i2
+		equal_function _ _ = False
+
 	is_trivial_function :: !SymbIdent ![Expression] !FunKind !Expression !ReadOnlyTI !*TransformInfo -> *(!Optional Expression,!*TransformInfo)
 	is_trivial_function app_symb app_args fun_kind rhs ro ti
 		| SwitchTransformConstants (ro.ro_transform_fusion && is_not_caf fun_kind && is_sexy_body rhs) False
-			# (fun_def,ti_fun_defs,ti_fun_heap) = get_fun_def app_symb.symb_kind ro.ro_main_dcl_module_n ti.ti_fun_defs ti.ti_fun_heap
-			# {fun_body=fun_body=:TransformedBody {tb_args,tb_rhs},fun_type} = fun_def
-			# (opt_expr, ti_fun_defs, ti_fun_heap, ti_type_heaps, ti_cons_args)
-				= is_trivial_body tb_args tb_rhs app_args fun_type ro ti_fun_defs ti_fun_heap ti.ti_type_heaps ti.ti_cons_args
-			# ti & ti_fun_defs = ti_fun_defs, ti_fun_heap = ti_fun_heap, ti_type_heaps = ti_type_heaps, ti_cons_args = ti_cons_args
-			= (opt_expr, ti)
+			= is_trivial_function_call app_symb.symb_kind app_args ro ti
 			= (No, ti)
+
+	is_trivial_function_call :: !SymbKind ![Expression] !ReadOnlyTI !*TransformInfo -> *(!Optional Expression,!*TransformInfo)
+	is_trivial_function_call symb_kind app_args ro ti
+		# (fun_def,ti_fun_defs,ti_fun_heap) = get_fun_def symb_kind ro.ro_main_dcl_module_n ti.ti_fun_defs ti.ti_fun_heap
+		# {fun_body=fun_body=:TransformedBody {tb_args,tb_rhs},fun_type} = fun_def
+		# (opt_expr, ti_fun_defs, ti_fun_heap, ti_type_heaps, ti_cons_args)
+			= is_trivial_body tb_args tb_rhs app_args fun_type ro ti_fun_defs ti_fun_heap ti.ti_type_heaps ti.ti_cons_args
+		# ti & ti_fun_defs = ti_fun_defs, ti_fun_heap = ti_fun_heap, ti_type_heaps = ti_type_heaps, ti_cons_args = ti_cons_args
+		= (opt_expr, ti)
 
 	update_instance_info :: !.SymbKind !.InstanceInfo !*TransformInfo -> *TransformInfo
 	update_instance_info (SK_Function {glob_object}) instances ti=:{ti_instances}
