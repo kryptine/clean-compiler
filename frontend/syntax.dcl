@@ -179,7 +179,7 @@ instance == FunctionOrMacroIndex
 	,	dcls_local_for_import ::!{!Declaration}
 	}
 
-::	QualifiedDeclaration :== ([Declaration], ModuleN, Position)
+::	QualifiedDeclaration :== ([Declaration], ModuleIdent, Position)
 
 ::	DictionaryInfo = { n_dictionary_types :: !Int, n_dictionary_constructors :: !Int, n_dictionary_selectors :: !Int }
 
