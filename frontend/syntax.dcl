@@ -140,7 +140,7 @@ instance == FunctionOrMacroIndex
 	,	icl_function_indices	:: !IclFunctionIndices
 	,	icl_common				:: !.CommonDefs
 	,	icl_import				:: !{!Declaration}
-	,	icl_qualified_imports	:: ![([Declaration], ModuleN, Position)]
+	,	icl_qualified_imports	:: ![QualifiedDeclaration]
 	,	icl_imported_objects	:: ![ImportedObject]
 	,	icl_foreign_exports		:: ![ForeignExport]
 	,	icl_used_module_numbers :: !NumberSet
@@ -178,6 +178,8 @@ instance == FunctionOrMacroIndex
 	,	dcls_local		::![Declaration]
 	,	dcls_local_for_import ::!{!Declaration}
 	}
+
+::	QualifiedDeclaration :== ([Declaration], ModuleN, Position)
 
 ::	DictionaryInfo = { n_dictionary_types :: !Int, n_dictionary_constructors :: !Int, n_dictionary_selectors :: !Int }
 

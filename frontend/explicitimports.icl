@@ -15,7 +15,7 @@ implies a b :== not a || b
 
 :: SolvedImports =
 	{	si_explicit				:: ![([Declaration], Position)]
-	,	si_qualified_explicit	:: ![([Declaration], ModuleN, Position)]
+	,	si_qualified_explicit	:: ![QualifiedDeclaration]
 	,	si_implicit				:: ![(ModuleN, Position)]
 	}
 
@@ -458,7 +458,7 @@ get_eei_ident (eii=:ExplImpInfo eii_ident _) = (eii_ident, eii)
 
 :: CheckCompletenessInputBox = { box_cci :: !CheckCompletenessInput }
 
-checkExplicitImportCompleteness :: ![([Declaration], Position)] ![([Declaration], Int, Position)]
+checkExplicitImportCompleteness :: ![([Declaration], Position)] ![QualifiedDeclaration]
 										!*{#DclModule} !*{#*{#FunDef}} !*ExpressionHeap !*CheckState
 									-> (!.{#DclModule},!*{#*{#FunDef}},!.ExpressionHeap,!.CheckState)
 checkExplicitImportCompleteness dcls_explicit explicit_qualified_imports dcl_modules macro_defs expr_heap cs=:{cs_symbol_table, cs_error}
@@ -876,7 +876,7 @@ stupid_ident =: { id_name = "stupid", id_info = nilPtr }
 // XXX from m import :: T(..) works also if T is a record type
 
 
-store_qualified_explicitly_imported_symbols_in_symbol_table :: ![([Declaration],Int,Position)] ![SymbolPtr] !*SymbolTable -> (![SymbolPtr],!*SymbolTable)
+store_qualified_explicitly_imported_symbols_in_symbol_table :: ![QualifiedDeclaration] ![SymbolPtr] !*SymbolTable -> (![SymbolPtr],!*SymbolTable)
 store_qualified_explicitly_imported_symbols_in_symbol_table [(declarations,module_n,position):qualified_explicit_imports] modified_symbol_ptrs symbol_table
 	# (modified_symbol_ptrs,symbol_table) = foldSt store_qualified_explicitly_imported_symbol declarations (modified_symbol_ptrs,symbol_table)
 	= store_qualified_explicitly_imported_symbols_in_symbol_table qualified_explicit_imports modified_symbol_ptrs symbol_table
@@ -909,7 +909,7 @@ restore_symbol_table_after_checking_completeness modified_symbol_ptrs symbol_tab
 						= ste_kind
 			= writePtr symbol_ptr {symbol_ste & ste_kind=ste_kind} symbol_table
 
-store_qualified_explicit_imports_in_symbol_table :: ![([Declaration],Int,Position)] ![(SymbolPtr,STE_Kind)] !*SymbolTable !*{#DclModule} -> (![(SymbolPtr,STE_Kind)],!*SymbolTable,!*{#DclModule})
+store_qualified_explicit_imports_in_symbol_table :: ![QualifiedDeclaration] ![(SymbolPtr,STE_Kind)] !*SymbolTable !*{#DclModule} -> (![(SymbolPtr,STE_Kind)],!*SymbolTable,!*{#DclModule})
 store_qualified_explicit_imports_in_symbol_table [(declarations,module_n,position):qualified_explicit_imports] modified_ste_kinds symbol_table modules
 	# (module_symbol_ptr,modules) = modules![module_n].dcl_name.id_info
 	  (module_ste=:{ste_kind},symbol_table) = readPtr module_symbol_ptr symbol_table
