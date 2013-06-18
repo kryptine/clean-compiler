@@ -524,7 +524,7 @@ instance == GenericDependency
 	= ImportSymbolsAll
 	| ImportSymbolsOnly !import_declarations
 
-::	ImportQualified = NotQualified | Qualified
+::	ImportQualified = NotQualified | Qualified | QualifiedAs !Ident
 
 instance toString Import, AttributeVar, TypeAttribute, Annotation
 

@@ -152,7 +152,7 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 		= ((decl_accu, position), (dcl_modules, visited_modules, expl_imp_info, cs))
 
 	solve_qualified_expl_imp_from_module expl_imp_indices_ikh modules_in_component_set path
-			{ei_module_n=imported_mod, ei_position=position, ei_symbols=ImportSymbolsOnly imported_symbols} (dcl_modules, visited_modules, expl_imp_info, cs)
+			{ei_module_n=imported_mod, ei_position=position, ei_symbols=ImportSymbolsOnly imported_symbols, ei_qualified} (dcl_modules, visited_modules, expl_imp_info, cs)
 		# (not_exported_symbols,decl_accu, unsolved_belonging, visited_modules, expl_imp_info)
 				= search_qualified_expl_imp_symbols imported_symbols expl_imp_indices_ikh modules_in_component_set path imported_mod
 						([],[], [], visited_modules, expl_imp_info)
@@ -161,7 +161,11 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 		  (decl_accu, dcl_modules, visited_modules, expl_imp_info, cs)
 		  		= solve_belongings unsolved_belonging position expl_imp_indices_ikh modules_in_component_set path
 		  				(decl_accu, dcl_modules, visited_modules, expl_imp_info, { cs & cs_error = cs_error }) 
-		  (module_ident,dcl_modules) = dcl_modules![imported_mod].dcl_name
+		  (module_ident,dcl_modules) = case ei_qualified of
+		  									QualifiedAs module_ident
+		  										-> (module_ident,dcl_modules)
+		  									_
+												-> dcl_modules![imported_mod].dcl_name
 		= ((decl_accu, module_ident, position), (dcl_modules, visited_modules, expl_imp_info, cs))
 
 	search_expl_imp_symbols imported_symbols expl_imp_indices_ikh modules_in_component_set path imported_mod state
@@ -921,6 +925,8 @@ store_qualified_explicit_imports_in_symbol_table [(declarations,module_symbol,po
 			STE_ClosedModule
 				-> ([(module_symbol_ptr,ste_kind):modified_ste_kinds],EmptySortedQualifiedImports)
 			STE_Module _
+				-> ([(module_symbol_ptr,ste_kind):modified_ste_kinds],EmptySortedQualifiedImports)
+			STE_Empty // for import as
 				-> ([(module_symbol_ptr,ste_kind):modified_ste_kinds],EmptySortedQualifiedImports)
 	  sorted_qualified_imports = foldSt add_qualified_import declarations sorted_qualified_imports
 	  module_ste = {module_ste & ste_kind=STE_ModuleQualifiedImports sorted_qualified_imports}
