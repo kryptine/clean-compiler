@@ -59,7 +59,7 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 	# {icl_common,icl_function_indices,icl_name,icl_import,icl_qualified_imports,icl_imported_objects,icl_foreign_exports,icl_used_module_numbers} = icl_mod
 /*
 	  (_,f,files) = fopen "components" FWriteText files
-	  (components, icl_functions, f) = showComponents components 0 True icl_functions f
+	  (components, icl_functions, f) = showGroups groups 0 True icl_functions f
 	/*	
 	  (n_functions,icl_functions) = usize icl_functions
 	  (icl_functions,f) = showFunctions {ir_from=0,ir_to=n_functions} icl_functions f
@@ -145,7 +145,7 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 	# (_,genout,files) = fopen "genout" FWriteText files
 	# (n_fun_defs,fun_defs) = usize fun_defs
 	# genout = show_class_members icl_mod.icl_common genout 
-	# (groups, fun_defs, genout) = showComponents groups 0 True fun_defs genout
+	# (groups, fun_defs, genout) = showGroups groups 0 True fun_defs genout
 	# (ok,files) = fclose genout files
 	| not ok = abort "could not write genout"
 */
@@ -237,7 +237,7 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 		=	frontSyntaxTree cached_dcl_macros cached_dcl_mods main_dcl_module_n
 							predef_symbols hash_table files error io out tcl_file icl_mod dcl_mods fun_defs components array_instances heaps
 
-//	  (components, fun_defs, out) = showComponents components 0 False fun_defs out
+//	# (components, fun_defs, out) = showComponents components 0 False fun_defs out
 	# (used_funs, components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap)
 	  		= convertCasesOfFunctions components main_dcl_module_n imported_funs common_defs fun_defs dcl_types used_conses
 					var_heap type_heaps expression_heap
@@ -309,7 +309,7 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 	where
 		group_members_to_component_members [e:l] = ComponentMember e (group_members_to_component_members l)
 		group_members_to_component_members [] = NoComponentMembers
-		
+
 newSymbolTable :: !Int -> *{# SymbolTableEntry}
 newSymbolTable size
 	= createArray size {  ste_index = NoIndex, ste_def_level = -1, ste_kind = STE_Empty, ste_previous = abort "PreviousPlaceholder"}
@@ -342,18 +342,18 @@ showGroups comps comp_index show_types fun_defs file
 	| comp_index >= size comps
 		= (comps, fun_defs, file)
 		# (comp, comps) = comps![comp_index]
-		# (fun_defs, file) = show_component comp.group_members show_types fun_defs (file <<< "component " <<< comp_index <<< '\n')
+		# (fun_defs, file) = show_group comp.group_members show_types fun_defs (file <<< "component " <<< comp_index <<< '\n')
 		= showGroups comps (inc comp_index) show_types fun_defs file
 where
-	show_component [] show_types fun_defs file
+	show_group [] show_types fun_defs file
 		= (fun_defs, file <<< '\n')
-	show_component [fun:funs] show_types fun_defs file
+	show_group [fun:funs] show_types fun_defs file
 		# (fun_def, fun_defs) = fun_defs![fun]
 		# file=file<<<fun<<<'\n'
 		| show_types
-			= show_component funs show_types fun_defs (file <<< fun_def.fun_type <<< '\n' <<< fun_def)
-			= show_component funs show_types fun_defs (file <<< fun_def)
-	//		= show_component funs show_types fun_defs (file <<< fun_def.fun_ident)
+			= show_group funs show_types fun_defs (file <<< fun_def.fun_type <<< '\n' <<< fun_def)
+			= show_group funs show_types fun_defs (file <<< fun_def)
+	//		= show_group funs show_types fun_defs (file <<< fun_def.fun_ident)
 
 showComponents :: !u:{!Component} !Int !Bool !*{#FunDef} !*File  -> (!u:{!Component}, !*{#FunDef},!*File)
 showComponents comps comp_index show_types fun_defs file
