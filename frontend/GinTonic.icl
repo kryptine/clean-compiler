@@ -338,19 +338,21 @@ mkGraphAlg inh =
     appC app
       | symIdIsTask app.app_symb  =
           case app.app_symb.symb_ident.id_name of // TODO How are infix functions represented? How do they deal with parenthesis?
-            ">>="       -> mkBind True app inh.inh_graph
-            ">>|"       -> mkBind False app inh.inh_graph
+            ">>="       -> mkBind app inh.inh_graph
+            ">>|"       -> mkBinApp app Nothing inh.inh_graph
             "@:"        -> mkAssign app inh.inh_graph
             "return"    -> mkReturn app inh.inh_graph
             ">>*"       -> mkStep app inh.inh_graph
-            "-||-"      -> mkParallelDis app inh.inh_graph
-            "-&&-"      -> mkParallelCon app inh.inh_graph
-            "anyTask"   -> mkAnyTask app inh.inh_graph
-            "allTasks"  -> mkAllTasks app inh.inh_graph
+            "-||-"      -> mkParBinApp app.app_args (GParallelJoin DisFirstBin) inh.inh_graph
+            "||-"       -> mkParBinApp app.app_args (GParallelJoin DisRight) inh.inh_graph
+            "-||"       -> mkParBinApp app.app_args (GParallelJoin DisLeft) inh.inh_graph
+            "-&&-"      -> mkParBinApp app.app_args (GParallelJoin ConPair) inh.inh_graph
+            "anyTask"   -> mkParApp app.app_args (GParallelJoin DisFirstList) inh.inh_graph
+            "allTasks"  -> mkParApp app.app_args (GParallelJoin ConAll) inh.inh_graph
             _           -> mkTaskApp app inh.inh_graph
       | otherwise               = mkSynExpr` inh.inh_graph
       where
-        mkBind True app g
+        mkBind app g
           # patid =
               case app.app_args of
                 [_:Var bv:_]  ->
@@ -358,15 +360,7 @@ mkGraphAlg inh =
                     [x:_] -> x.fv_ident.id_name
                     _ -> abort "No fun args for bind rhs"
                 _ -> abort "Expression not supported or invalid bind"
-          = mkBind` app (Just patid) g
-        mkBind False app g = mkBind` app Nothing g
-        mkBind` app pat g
-          # g` =  case app.app_args of
-                    [l, r] # synl = exprCata (mkGraphAlg {inh & inh_graph = g}) l
-                           # synr = exprCata (mkGraphAlg {inh & inh_graph = synl.syn_graph}) r
-                           = addEdge` synl.syn_nid synr.syn_nid pat synr.syn_graph
-                    _      = abort "Invalid bind"
-          = mkSynExpr` g`
+          = mkBinApp app (Just patid) g
         mkAssign app g = mkSynExpr` g
         mkReturn app g
           # syn =
@@ -376,10 +370,6 @@ mkGraphAlg inh =
           # node = GReturn (GGraphExpression (GGraph syn.syn_graph))
           = addNode` node g
         mkStep app g = mkSynExpr` g
-        mkParallelDis app g = mkSynExpr` g
-        mkParallelCon app g = mkSynExpr` g
-        mkAnyTask app g = mkSynExpr` g
-        mkAllTasks app g = mkSynExpr` g
         mkTaskApp app g
           = mkSynExpr` g
           // TODO: When do we pprint a Clean expr? And when do we generate a subgraph?
@@ -387,7 +377,26 @@ mkGraphAlg inh =
               //let  syn = exprCata (mkGraphAlg {inh & inh_graph = (GGraph emptyGraph)}) x
               //in   (syn, [GGraphExpression (GGraph syn.syn_graph):xs])) (mkSynExpr` g, []) app.app_args
           //= addNode` (GTaskApp apps) syn.syn_graph
-
+        mkBinApp app pat g
+          # g` =  case app.app_args of
+                    [l, r] # synl = exprCata (mkGraphAlg {inh & inh_graph = g}) l
+                           # synr = exprCata (mkGraphAlg {inh & inh_graph = synl.syn_graph}) r
+                           = addEdge` synl.syn_nid synr.syn_nid pat synr.syn_graph
+                    _      = abort "Should not happen: invalid binary application"
+          = mkSynExpr` g`
+        mkParApp appargs join g
+          # synsplit    = addNode` GParallelSplit g
+          # (g`, nids)  = foldr (f synsplit.syn_nid) (synsplit.syn_graph, []) appargs
+          # synjoin     = addNode` join g`
+          = mkSynExpr` (foldr (\n g_ -> addEdge` (Just n) synjoin.syn_nid Nothing g_) g` [n_ \\ Just n_ <- nids])
+          where f splitId e (gx, xs)
+                  # synx  = exprCata (mkGraphAlg {inh & inh_graph = gx}) e
+                  # g     = addEdge` splitId synx.syn_nid Nothing synx.syn_graph
+                  = (g, [synx.syn_nid : xs])
+        mkParBinApp appargs join g =
+          case appargs of
+            [l, r]  -> mkParApp appargs join g
+            _       -> abort "Should not happen: invalid binary application"
     letC lt
       # syn1  = addNode` (GLet (mkGLet lt)) inh.inh_graph
       // TODO: Represent the bindings in any way possible, not just PP
@@ -477,11 +486,19 @@ mkGLetBinds lb = {GLetBind  | glb_dst = mkPretty lb.lb_dst
   |  GMerge
   |  GLet GLet
   |  GParallelSplit
-  |  GParallelJoin
+  |  GParallelJoin GJoinType
   |  GTaskApp GIdentifier ![GExpression]
   |  GReturn !GExpression
   |  GAssign
   |  GStep
+
+:: GJoinType
+  =  DisFirstBin
+  |  DisFirstList
+  |  DisLeft
+  |  DisRight
+  |  ConAll
+  |  ConPair
 
 :: GEdge = { edge_pattern :: !Maybe GPattern }
 
@@ -536,9 +553,10 @@ getNodeData` n g =
 
 mkTaskDot :: Int Int GGraph -> String
 mkTaskDot startid endid (GGraph g) = "digraph {\n" +++ mkNodes +++ "\n" +++ mkEdges +++ "\n}"
-  where  mkNodes = concatStrings (map (nodeToDot g) (nodeIndices g))
-         mkEdges = concatStrings (map edgeToDot (edgeIndices g))
-         edgeToDot (l, r) = mkDotNodeLbl l +++ " -> " +++ mkDotNodeLbl r +++ ";\n"
+  where
+  mkNodes = concatStrings (map (nodeToDot g) (nodeIndices g))
+  mkEdges = concatStrings (map edgeToDot (edgeIndices g))
+  edgeToDot (l, r) = mkDotNodeLbl l +++ " -> " +++ mkDotNodeLbl r +++ ";\n"
 
 mkDotNodeLbl :: Int -> String
 mkDotNodeLbl n = "node" +++ toString n
@@ -552,20 +570,27 @@ nodeToDot g currIdx =
     GMerge                -> blackNode [shape "diamond"]
     (GLet glt)            -> whiteNode [shape "box", label "(expr goes here)"] // TODO: Rounded corners
     GParallelSplit        -> whiteNode [shape "circle", label "Parallel split"]
-    GParallelJoin         -> whiteNode [shape "circle", label "Parallel join"]
+    (GParallelJoin jt)    -> whiteNode [shape "circle", label (mkJoinLbl jt)]
     (GTaskApp gid exprs)  -> whiteNode [shape "box", label "(task name goes here)"] // TODO: complex contents with extra bar
     (GReturn expr)        -> whiteNode [shape "oval", label "(return expression goes here)"]
     GAssign               -> "user" +++ toString currIdx +++ " [shapefile=\"stick.png\", peripheries=0, style=invis]"
     GStep                 -> whiteNode [shape "circle", label ">>*"]
   where
-    currNode         = getNodeData` currIdx g
-    whiteNode attrs  = mkDotNode [fill "white" : attrs]
-    blackNode attrs  = mkDotNode [fill "black" : attrs]
-    mkDotNode attrs  = mkDotNodeLbl currIdx +++ " [" +++ concatStrings attrs +++ "];\n"
-    shape v   = mkKV "shape" v
-    label v   = mkKV "label" v
-    fill v    = mkKV "fill" v
-    mkKV k v  = k +++ "=" +++ v
+  currNode         = getNodeData` currIdx g
+  whiteNode attrs  = mkDotNode [fill "white" : attrs]
+  blackNode attrs  = mkDotNode [fill "black" : attrs]
+  mkDotNode attrs  = mkDotNodeLbl currIdx +++ " [" +++ concatStrings attrs +++ "];\n"
+  shape v   = mkKV "shape" v
+  label v   = mkKV "label" v
+  fill v    = mkKV "fill" v
+  mkKV k v  = k +++ "=" +++ v
+  mkJoinLbl DisFirstBin   = "First result from two tasks"
+  mkJoinLbl DisFirstList  = "First result from list of tasks"
+  mkJoinLbl DisLeft       = "Left result"
+  mkJoinLbl DisRight      = "Right result"
+  mkJoinLbl ConAll        = "All results"
+  mkJoinLbl ConPair       = "Pair of results"
+
 
 /*
 Task assignment drawing: Needs a stick.png with a stick figure (can be PDF?)
