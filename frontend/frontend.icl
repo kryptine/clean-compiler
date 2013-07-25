@@ -5,6 +5,10 @@ import scanner, parse, postparse, check, type, trans, partition, convertcases, o
 		typereify, compare_types
 from CoclSystemDependent import DirectorySeparator
 
+// TODO START Tonic HACK
+import GinTonic
+// TODO END Tonic HACK
+
 instance == FrontEndPhase where
 	(==) a b
 		=	equal_constructor a b
@@ -29,6 +33,7 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 		= wantModule mod_file mod_time cWantIclFile mod_ident NoPos options.feo_generics hash_table error files
 	| not ok
 		= (No,{},{},0,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
+    # parsedMod = mod
 	# cached_module_idents = [dcl_mod.dcl_name \\ dcl_mod<-:cached_dcl_modules]
 	#! support_dynamics = case tcl_file of Yes _ -> True ; No -> False
 	# (ok, mod, global_fun_range, mod_functions, optional_dcl_mod, modules, dcl_module_n_in_cache,hash_table, error, files)
@@ -141,14 +146,7 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 	| ok<>ok
 		= abort "";
 */
-/*
-	# (_,genout,files) = fopen "genout" FWriteText files
-	# (n_fun_defs,fun_defs) = usize fun_defs
-	# genout = show_class_members icl_mod.icl_common genout 
-	# (groups, fun_defs, genout) = showGroups groups 0 True fun_defs genout
-	# (ok,files) = fclose genout files
-	| not ok = abort "could not write genout"
-*/
+
 	#! ok = error_admin.ea_ok
 	| not ok
 		= (No,{},{},main_dcl_module_n,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
@@ -158,6 +156,17 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 
 	| not ok
 		= (No,{},{},main_dcl_module_n,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
+
+	# (_,f,files) = fopen ("Clean System Files/groups_" +++ icl_mod.icl_name.id_name) FWriteText files
+	  (components, fun_defs, f) = showGroups groups 0 False fun_defs f
+	  (ok,files) = fclose f files
+	| ok<>ok
+		= abort "";
+
+// TODO START GiN Tonic HACK
+    //# (ok, files) = ginTonic files (ok, fun_defs, array_instances, common_defs, imported_funs, type_def_infos, heaps, predef_symbols, error,out)
+    # ((ok, fun_defs, array_instances, common_defs, imported_funs, type_def_infos, heaps, predef_symbols, error,out), files) = ginTonic icl_mod dcl_mods (ok, fun_defs, array_instances, common_defs, imported_funs, type_def_infos, heaps, predef_symbols, error,out) files
+// TODO END GiN Tonic HACK
 
 	# icl_gencase_indices = icl_function_indices.ifi_gencase_indices
 	# icl_function_indices = {icl_function_indices & ifi_gencase_indices = icl_gencase_indices }

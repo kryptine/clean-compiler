@@ -2641,7 +2641,7 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 					# icl_functions = {icl_functions & [spec_index]=new_fun_def}
 					= (icl_functions, heaps)
 					= (icl_functions, heaps)
-		 
+
 			build_function new_fun_index fun_def=:{fun_ident, fun_body = CheckedBody {cb_args}, fun_info} fun_index fun_type
 						(var_heap, type_var_heap, expr_heap)
 				# (tb_args, var_heap) = mapSt new_free_var cb_args var_heap
