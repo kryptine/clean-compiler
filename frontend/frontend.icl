@@ -157,11 +157,11 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 	| not ok
 		= (No,{},{},main_dcl_module_n,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
 
-	# (_,f,files) = fopen ("Clean System Files/groups_" +++ icl_mod.icl_name.id_name) FWriteText files
-	  (components, fun_defs, f) = showGroups groups 0 False fun_defs f
-	  (ok,files) = fclose f files
-	| ok<>ok
-		= abort "";
+	//# (_,f,files) = fopen ("Clean System Files/groups_" +++ icl_mod.icl_name.id_name) FWriteText files
+	  //(components, fun_defs, f) = showGroups groups 0 False fun_defs f
+	  //(ok,files) = fclose f files
+	//| ok<>ok
+		//= abort "";
 
 // TODO START GiN Tonic HACK
     //# (ok, files) = ginTonic files (ok, fun_defs, array_instances, common_defs, imported_funs, type_def_infos, heaps, predef_symbols, error,out)

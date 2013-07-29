@@ -384,8 +384,8 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 		=	abort ("couldn't close out file \"" +++ options.outPath +++ "\"\n")
 	# (closed, files)
 		=	fclose error files
-	| not closed
-		=	abort ("couldn't close error file \"" +++ options.errorPath +++ "\"\n")
+	//| not closed
+		//=	abort ("couldn't close error file \"" +++ options.errorPath +++ "\"\n")
 	| success
 		# dcl_modules={{dcl_module \\ dcl_module<-:cached_dcl_mods} & [main_dcl_module_n].dcl_has_macro_conversions=False}
 		# cache={dcl_modules=dcl_modules,functions_and_macros=cached_functions_and_macros,predef_symbols=unique_copy_of_predef_symbols,hash_table=hash_table,heaps=heaps}

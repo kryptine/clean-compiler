@@ -9,32 +9,31 @@ import Graph, Maybe
 import StdDebug
 
 ginTonic :: IclModule {#DclModule} *FrontendTuple !*Files -> *(*FrontendTuple, !*Files)
-ginTonic iclmod dclmods tpl files
+ginTonic iclmod dcl_modules tpl files
   # (ok, files)          = ensureCleanSystemFilesExists csf_directory_path files
-  # (ok, tonicf, files)  = fopen (csf_directory_path +++ {DirectorySeparator} +++ ("tonic-" +++ iclmod.icl_name.id_name)) FWriteText files
-  # (tstr, tpl)          = ginTonic` iclmod dclmods tpl
+  # (ok, tonicf, files)  = fopen (csf_directory_path +++ {DirectorySeparator} +++ ("tonic-" +++ iclmod.icl_name.id_name +++ ".dot")) FWriteText files
+  # (tstr, tpl)          = ginTonic` iclmod dcl_modules tpl
+  //| True = abort tstr
   # tonicf               = fwrites tstr tonicf
   # (ok, files)          = fclose tonicf files
   = (tpl, files)
   where csf_directory_path = "Clean System Files"
 
+foldrArr :: (a b -> b) b (arr a) -> b | Array arr a
 foldrArr f b arr = foldrArr` 0 f b arr
-  where foldrArr` n f b arr
-          | n < size arr
-            # (elem, arr`) = arr ! [n]
-            = f elem (foldrArr` (n + 1) f b arr`)
+  where arrSz = size arr
+        foldrArr` n f b arr
+          | n < arrSz  = f (select arr n) (foldrArr` (n + 1) f b arr)
           | otherwise  = b
 
 ginTonic` :: IclModule {#DclModule} *FrontendTuple -> *(String, *FrontendTuple)
-ginTonic` iclmod dclmods tpl=:(ok, fun_defs, array_instances, common_defs, imported_funs, type_def_infos, heaps, predef_symbols, error,out)
+ginTonic` iclmod dcl_modules tpl=:(ok, fun_defs, array_instances, common_defs, imported_funs, type_def_infos, heaps, predef_symbols, error,out)
   = (foldrArr appDefInfo "" fun_defs, tpl)
   where appDefInfo def rest
           | funIsTask def && def.fun_info.fi_def_level == 1  = defToStr def +++ "\n" +++ rest
           | otherwise                                        = rest
-        defToStr def  = def.fun_ident.id_name
-        //defToStr def = case def.fun_type of
-                         //Yes t ->  def.fun_ident.id_name +++ " : has type! At level " +++ toString def.fun_info.fi_def_level
-                         //No    ->  def.fun_ident.id_name +++ " : no type :( At level " +++ toString def.fun_info.fi_def_level
+        defToStr def  = optional "Nothing happened" f (funToGraph def iclmod dcl_modules)
+          where f (g, so, si) = mkTaskDot so si g
 
 /*
 To reconstruct lambda functions:
@@ -150,18 +149,10 @@ funIsTask fd = case (fd.fun_type, fd.fun_kind) of
                  _                        -> False
 
 funIsLam :: FunDef -> Bool
-funIsLam fd = fd.fun_ident.id_name.[0] == '\\'
-
-getLamRhs :: FunDef -> Expression
-getLamRhs fd
-  | funIsLam fd =
-      case fd.fun_body of
-        CheckedBody cb ->
-          case cb.cb_rhs of
-            [ca:_] -> ca.ca_rhs
-            _     -> abort "getLamRhs: Ill-defined lambda"
-        _ -> abort "getLamRhs: Illegal FunDef"
-  | otherwise = abort "getLamRhs: FunDef needs to be a lambda"
+funIsLam fd
+  | size fnm > 0  = fd.fun_ident.id_name.[0] == '\\'
+  | otherwise     = False
+  where fnm = fd.fun_ident.id_name
 
 symTyIsTask :: SymbolType -> Bool
 symTyIsTask st =
@@ -184,12 +175,13 @@ from StdMisc import undef
 
 findInArr :: (e -> Bool) (a e) -> Maybe e | Array a e
 findInArr p arr = findInArr` 0 p arr
-  where findInArr` n p arr
-          | n < size arr
-            # (elem, arr`) = arr ! [n]
-            | p elem = Just elem
-            = findInArr` (n + 1) p arr`
-          | otherwise  = Nothing
+  where
+  arrSz = size arr
+  findInArr` n p arr
+    | n < arrSz
+      #  elem = select arr n
+      =  if (p elem) (Just elem) (findInArr` (n + 1) p arr)
+    | otherwise  = Nothing
 
 reifyFunDef :: IclModule {#DclModule} Ident -> FunDef
 reifyFunDef icl_module dcl_modules ident =
@@ -212,14 +204,14 @@ reifyFunDef icl_module dcl_modules ident =
 getFunArgVars :: FunDef -> [FreeVar]
 getFunArgVars fd =
   case fd.fun_body of
-    CheckedBody cb  -> cb.cb_args
-    _               -> []
+    TransformedBody tb  -> tb.tb_args
+    _                   -> []
 
-getFunRhss :: FunDef -> [Expression]
-getFunRhss fd =
+getFunRhs :: FunDef -> Expression
+getFunRhs fd =
   case fd.fun_body of
-    CheckedBody cb  -> map (\rhs -> rhs.ca_rhs) cb.cb_rhs
-    _               -> []
+    TransformedBody tb  -> tb.tb_rhs
+    _                   -> abort "Need TransformedBody"
 
 /*
 TODO:
@@ -478,15 +470,16 @@ addNode` node graph
 mkPretty :: (a -> String) | Pretty a
 mkPretty = 'PP'.display o 'PP'.renderCompact o pretty
 
-funToGraph :: FunDef IclModule {#DclModule} -> Optional GGraph
+funToGraph :: FunDef IclModule {#DclModule} -> Optional (GGraph, Int, Int)
 funToGraph fd icl_module dcl_modules = funBodyToGraph fd.fun_ident.id_name fd.fun_body icl_module dcl_modules
 
-funBodyToGraph :: String FunctionBody IclModule {#DclModule} -> Optional GGraph
-funBodyToGraph fun_name (CheckedBody cb) icl_module dcl_modules = Yes (GGraph (mkBody cb))
+funBodyToGraph :: String FunctionBody IclModule {#DclModule} -> Optional (GGraph, Int, Int)
+funBodyToGraph fun_name (TransformedBody tb) icl_module dcl_modules =
+  Yes (GGraph (mkBody tb), soid, siid)
   where
-  mkBody  cb     = foldr mkAlt ginit cb.cb_rhs // TODO cb.cb_args
-  mkAlt   ca  g
-    # syn = exprCata (mkGraphAlg (inh g)) ca.ca_rhs
+  mkBody  tb     = mkBody` tb.tb_rhs ginit // TODO cb.cb_args
+  mkBody`  expr g
+    # syn = exprCata (mkGraphAlg (inh g)) tb.tb_rhs
     # g`  = syn.syn_graph
     = if (isEmpty syn.syn_rec_nodes) g` (addRecs syn.syn_rec_nodes g`)
   inh         g  = {inh_icl_module = icl_module, inh_dcl_modules = dcl_modules
@@ -610,27 +603,32 @@ nodeToDot g currIdx =
   case currNode of
     GInit                 -> blackNode [shape "triangle"]
     GStop                 -> blackNode [shape "box"]
-    (GDecision _ expr)    -> whiteNode [shape "diamond", label "(expr goes here)"]
-    GMerge                -> blackNode [shape "diamond"]
-    (GLet glt)            -> whiteNode [shape "box", label "(expr goes here)"] // TODO: Rounded corners
+    (GDecision _ expr)    -> whiteNode [shape "diamond", label (mkPretty expr)]
+    GMerge                -> blackNode [shape "diamond", width ".25", height ".25"]
+    (GLet glt)            -> whiteNode [shape "box", label "(let expr goes here)"] // TODO: Rounded corners
     GParallelSplit        -> whiteNode [shape "circle", label "Parallel split"]
     (GParallelJoin jt)    -> whiteNode [shape "circle", label (mkJoinLbl jt)]
-    (GTaskApp gid exprs)  -> whiteNode [shape "box", label "(task name goes here)"] // TODO: complex contents with extra bar
+    (GTaskApp tid exprs)  -> whiteNode [shape "box", label tid] // TODO: complex contents with extra bar
     (GReturn expr)        -> whiteNode [shape "oval", label "(return expression goes here)"]
     (GAssign usr)         -> let  idxStr = toString currIdx
                                   usrStr = "user" +++ idxStr
                              in   "subgraph clusterUser" +++ idxStr +++ "{ label=" +++ usr +++ "; labelloc=b; peripheries=0; " +++ usrStr +++ "}" +++
                                   usrStr +++ " [shapefile=\"stick.png\", peripheries=0, style=invis]"
-    GStep                 -> whiteNode [shape "circle", label ">>*"]
+    GStep                 -> whiteNode [shape "circle", label "Step"]
   where
   currNode         = getNodeData` currIdx g
-  whiteNode attrs  = mkDotNode [fill "white" : attrs]
-  blackNode attrs  = mkDotNode [fill "black" : attrs]
-  mkDotNode attrs  = mkDotNodeLbl currIdx +++ " [" +++ concatStrings attrs +++ "];\n"
-  shape v   = mkKV "shape" v
-  label v   = mkKV "label" v
-  fill v    = mkKV "fill" v
-  mkKV k v  = k +++ "=" +++ v
+  whiteNode attrs  = mkDotNode [fontcolor "black", fillcolor "white", style "filled" : attrs]
+  blackNode attrs  = mkDotNode [fontcolor "white", fillcolor "black", style "filled" : attrs]
+  mkDotNode attrs  = mkDotNodeLbl currIdx +++ " [" +++ concatStrings (intersperse ", " attrs) +++ "];\n"
+  shape v      = mkKV "shape" v
+  label v      = mkKV "label" v
+  color v      = mkKV "color" v
+  fillcolor v  = mkKV "fillcolor" v
+  fontcolor v  = mkKV "fontcolor" v
+  width v      = mkKV "width" v
+  height v     = mkKV "height" v
+  style v      = mkKV "style" v
+  mkKV k v     = k +++ "=" +++ v
   mkJoinLbl DisFirstBin   = "First result from two tasks"
   mkJoinLbl DisFirstList  = "First result from list of tasks"
   mkJoinLbl DisLeft       = "Left result"
