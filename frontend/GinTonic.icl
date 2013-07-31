@@ -5,19 +5,24 @@ implementation module GinTonic
 import syntax, checksupport, StdFile
 from CoclSystemDependent import DirectorySeparator, ensureCleanSystemFilesExists
 
-import Func, Graph, Maybe
+import Func, Graph, Maybe, Text
 import StdDebug
 
 ginTonic :: IclModule {#DclModule} *FrontendTuple !*Files -> *(*FrontendTuple, !*Files)
-ginTonic iclmod dcl_modules tpl files
-  # (ok, files)          = ensureCleanSystemFilesExists csf_directory_path files
-  # (ok, tonicf, files)  = fopen (csf_directory_path +++ {DirectorySeparator} +++ ("tonic-" +++ iclmod.icl_name.id_name +++ ".dot")) FWriteText files
-  # (tstr, tpl)          = ginTonic` iclmod dcl_modules tpl
+ginTonic icl_module dcl_modules tpl files
+  # iclname                = icl_module.icl_name.id_name
+  | isSystemModule iclname = (tpl, files)
+  # (ok, files)            = ensureCleanSystemFilesExists csf_directory_path files
+  # (ok, tonicf, files)    = fopen (csf_directory_path +++ {DirectorySeparator} +++ ("tonic-" +++ iclname +++ ".dot")) FWriteText files
+  # (tstr, tpl)            = ginTonic` icl_module dcl_modules tpl
   //| True = abort tstr
-  # tonicf               = fwrites tstr tonicf
-  # (ok, files)          = fclose tonicf files
+  # tonicf                 = fwrites tstr tonicf
+  # (ok, files)            = fclose tonicf files
   = (tpl, files)
-  where csf_directory_path = "Clean System Files"
+  where
+  csf_directory_path = "Clean System Files"
+  isSystemModule nm = isSystemModule` ["iTasks", "Std", "_"]
+    where isSystemModule` = foldr (\x b -> startsWith x nm || b) False
 
 foldrArr :: (a b -> b) b (arr a) -> b | Array arr a
 foldrArr f b arr = foldrArr` 0 f b arr
@@ -28,14 +33,15 @@ foldrArr f b arr = foldrArr` 0 f b arr
     | otherwise  = b
 
 ginTonic` :: IclModule {#DclModule} *FrontendTuple -> *(String, *FrontendTuple)
-ginTonic` iclmod dcl_modules tpl=:(ok, fun_defs, array_instances, common_defs, imported_funs, type_def_infos, heaps, predef_symbols, error,out)
-  = (foldrArr appDefInfo "" fun_defs, tpl)
+ginTonic` icl_module dcl_modules tpl=:(ok, fun_defs, array_instances, common_defs, imported_funs, type_def_infos, heaps, predef_symbols, error,out)
+  = (mkDotGraph $ foldrArr appDefInfo "" fun_defs, tpl)
   where
   appDefInfo fd rest
     | funIsTask fd && fd.fun_info.fi_def_level == 1  = defToStr fd +++ "\n" +++ rest
     | otherwise                                      = rest
-  defToStr fd  = optional "Nothing happened" f (funToGraph fd fun_defs iclmod dcl_modules)
+  defToStr fd  = optional "Nothing happened" f (funToGraph fd fun_defs icl_module dcl_modules)
     where f (g, so, si) = mkTaskDot fd.fun_ident.id_name so si g
+  mkDotGraph subgraphs = "digraph " +++ icl_module.icl_name.id_name +++ "{\n" +++ subgraphs +++ "\n}"
 
 /*
 To reconstruct lambda functions:
@@ -168,7 +174,7 @@ latter, we must eta-expand `g`.
   ,  typeSignature         :: (Int Int -> (AType,Int,Int)) a -> a                           // TypeSignature
   ,  ee                    :: a                                                             // EE
   ,  noBind                :: ExprInfoPtr -> a                                              // NoBind
-  ,  failExpr              :: !Ident -> a                                                    // FailExpr
+  ,  failExpr              :: Ident -> a                                                    // FailExpr
   }
 
 exprCata :: (ExpressionAlg a) Expression -> a
@@ -574,13 +580,13 @@ getNodeData` n g = fromMaybe err (getNodeData n g)
   where err = abort ("No data for node " +++ toString n)
 
 mkTaskDot :: String Int Int GGraph -> String
-mkTaskDot funnm startid endid (GGraph g) = "digraph " +++ funnm +++ " {\n" +++
+mkTaskDot funnm startid endid (GGraph g) = "subgraph cluster_" +++ funnm +++ " {\n label=\"" +++ funnm  +++ "\"  color=\"black\";\n" +++
   mkNodes +++ "\n" +++
   mkEdges +++ "\n}"
   where
-  mkNodes = concatStrings (map (nodeToDot g) (nodeIndices g))
+  mkNodes = concatStrings (map (nodeToDot funnm g) (nodeIndices g))
   mkEdges = concatStrings (map edgeToDot (edgeIndices g))
-  edgeToDot ei=:(l, r) = mkDotNodeLbl l +++ " -> " +++ mkDotNodeLbl r +++ mkDotArgs [mkDotAttrKV "label" edgeLbl] // TODO: Use different arrow for task assignment
+  edgeToDot ei=:(l, r) = mkDotNodeLbl funnm l +++ " -> " +++ mkDotNodeLbl funnm r +++ mkDotArgs [mkDotAttrKV "label" edgeLbl] // TODO: Use different arrow for task assignment
     where edgeLbl = maybe "" (\e -> fromMaybe "" e.edge_pattern) $ getEdgeData ei g
 
 mkDotAttrKV :: String String -> String
@@ -589,14 +595,14 @@ mkDotAttrKV k v = k +++ "=" +++ "\"" +++ v +++ "\""
 mkDotArgs :: [String] -> String
 mkDotArgs attrs = " [" +++ concatStrings (intersperse ", " attrs) +++ "];\n"
 
-mkDotNodeLbl :: Int -> String
-mkDotNodeLbl n = "node" +++ toString n
+mkDotNodeLbl :: String Int -> String
+mkDotNodeLbl funnm n = funnm +++ "_node_" +++ toString n
 
-nodeToDot :: GinGraph Int -> String
-nodeToDot g currIdx =
+nodeToDot :: String GinGraph Int -> String
+nodeToDot funnm g currIdx =
   case currNode of
-    GInit                 -> blackNode [shape "triangle"]
-    GStop                 -> blackNode [shape "box"]
+    GInit                 -> blackNode [shape "triangle", width ".25", height ".25"]
+    GStop                 -> blackNode [shape "box", width ".2", height ".2"]
     (GDecision _ expr)    -> whiteNode [shape "diamond", label expr]
     GMerge                -> blackNode [shape "diamond", width ".25", height ".25"]
     (GLet glt)            -> whiteNode [shape "box", label "(let expr goes here)"] // TODO: Rounded corners
@@ -606,7 +612,7 @@ nodeToDot g currIdx =
     (GReturn expr)        -> whiteNode [shape "oval", label "(return expression goes here)"]
     (GAssign usr)         -> let  idxStr = toString currIdx
                                   usrStr = "user" +++ idxStr
-                             in   "subgraph clusterUser" +++ idxStr +++ "{ label=" +++ usr +++ "; labelloc=b; peripheries=0; " +++ usrStr +++ "}" +++
+                             in   "subgraph cluster_user" +++ idxStr +++ "{ label=" +++ usr +++ "; labelloc=b; peripheries=0; " +++ usrStr +++ "}" +++
                                   usrStr +++ mkDotArgs [ mkDotAttrKV "shapefile" "\"stick.png\""
                                                        , mkDotAttrKV "peripheries" "0"
                                                        , style "invis" ]
@@ -615,7 +621,7 @@ nodeToDot g currIdx =
   currNode         = getNodeData` currIdx g
   whiteNode attrs  = mkDotNode [fontcolor "black", fillcolor "white", style "filled", label "" : attrs]
   blackNode attrs  = mkDotNode [fontcolor "white", fillcolor "black", style "filled", label "" : attrs]
-  mkDotNode attrs  = mkDotNodeLbl currIdx +++ mkDotArgs attrs
+  mkDotNode attrs  = mkDotNodeLbl funnm currIdx +++ mkDotArgs attrs
   shape v      = mkDotAttrKV "shape" v
   label v      = mkDotAttrKV "label" v
   color v      = mkDotAttrKV "color" v
