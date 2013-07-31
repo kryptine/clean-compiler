@@ -33,8 +33,8 @@ ginTonic` iclmod dcl_modules tpl=:(ok, fun_defs, array_instances, common_defs, i
   where
   appDefInfo fd rest
     | funIsTask fd && fd.fun_info.fi_def_level == 1  = defToStr fd +++ "\n" +++ rest
-    | otherwise                                        = rest
-  defToStr fd  = optional "Nothing happened" f (funToGraph fd iclmod dcl_modules)
+    | otherwise                                      = rest
+  defToStr fd  = optional "Nothing happened" f (funToGraph fd fun_defs iclmod dcl_modules)
     where f (g, so, si) = mkTaskDot fd.fun_ident.id_name so si g
 
 /*
@@ -47,6 +47,7 @@ To reconstruct lambda functions:
 - Replace all occurences of f with the reconstructed expression
 - Repeat
 */
+// funToLam = undef
 
 /*
 To reconstruct list comprehensions:
@@ -58,87 +59,6 @@ To reconstruct list comprehensions:
 - Throw away f
 - Replace all occurences of f with the reconstructed expression
 - Repeat
-*/
-// Reverse transformListComprehension in frontend/postparse.icl
-/*
-makeNilExpression :: Int *CollectAdmin -> (ParsedExpr,*CollectAdmin)
-makeNilExpression predef_nil_index ca
-	#! nil_id = predefined_idents.[predef_nil_index]
-	= (PE_Ident nil_id, ca)
-
-makeConsExpression :: Int ParsedExpr ParsedExpr *CollectAdmin -> (ParsedExpr,*CollectAdmin)
-makeConsExpression predef_cons_index a1 a2 ca
-	#! cons_id = predefined_idents.[predef_cons_index]
-	= (PE_List [PE_Ident cons_id, a1, a2], ca)
-
-transformListComprehension :: Int Int ParsedExpr [Qualifier] *CollectAdmin -> (ParsedExpr, *CollectAdmin)
-transformListComprehension predef_cons_index predef_nil_index expr qualifiers ca
-  # (transformed_qualifiers, ca) = mapSt transformQualifier qualifiers ca
-    (success, ca) = makeConsExpression predef_cons_index expr (last transformed_qualifiers).tq_continue ca
-    (nil, ca) = makeNilExpression predef_nil_index ca
-    transformed_qualifiers
-      =  [  {qual & tq_success = success, tq_end = end}
-         \\  qual <- transformed_qualifiers
-         &  success <- [qual.tq_call \\ qual <- tl transformed_qualifiers] ++ [success]
-         &  end <- [nil : [qual.tq_continue \\ qual <- transformed_qualifiers]]
-         ]
-  = makeComprehensions transformed_qualifiers success [] ca
-
-makeComprehensions :: [TransformedQualifier] ParsedExpr [ParsedExpr] *CollectAdmin -> (ParsedExpr, *CollectAdmin)
-makeComprehensions [] success _ ca
-	=	(success, ca)
-makeComprehensions [{tq_generators,tq_let_defs,tq_filter, tq_end, tq_call, tq_lhs_args, tq_fun_id, tq_fun_pos} : qualifiers] success threading ca
-	# (success, ca) = makeComprehensions qualifiers success threading ca
-	# failure		= PE_List [PE_Ident tq_fun_id : threading ++ rhs_continuation_args_from_generators tq_generators]
-	  rhs	 		= build_rhs tq_generators success tq_let_defs tq_filter failure tq_end tq_fun_pos
-	  parsed_def 	= MakeNewParsedDef tq_fun_id tq_lhs_args rhs tq_fun_pos
-	= (PE_Let (LocalParsedDefs [parsed_def]) tq_call, ca)
-	where
-		build_rhs :: [TransformedGenerator] ParsedExpr LocalDefs (Optional ParsedExpr) ParsedExpr ParsedExpr Position -> Rhs
-		build_rhs [generator : generators] success let_defs optional_filter failure end fun_pos
-			#	rhs2 = foldr (case_end end)
-						(case_with_default generator.tg_case2 generator.tg_element generator.tg_element_is_uselect generator.tg_pattern
-							(foldr (case_pattern failure) rhs generators)
-							failure)
-						generators
-			=	case_with_default generator.tg_case1 generator.tg_case_end_expr False generator.tg_case_end_pattern rhs2 end
-			where
-				rhs
-					=	case optional_filter of
-							Yes filter
-								-> {rhs_alts = GuardedAlts [
-										{alt_nodes = [], alt_guard = filter, alt_expr = UnGuardedExpr
-												{ewl_nodes = [], ewl_expr = success, ewl_locals	= LocalParsedDefs [], ewl_position = NoPos },
-											alt_ident = { id_name ="_f;" +++ toString line_nr +++ ";", id_info = nilPtr },
-										 alt_position = NoPos}] No
-									,	rhs_locals	= let_defs}
-							No
-								-> {rhs_alts=UnGuardedExpr {ewl_nodes=[],ewl_expr=success,ewl_locals=LocalParsedDefs [],ewl_position=NoPos},rhs_locals=let_defs}
-				(LinePos _ line_nr) = fun_pos
-
-		case_end :: ParsedExpr TransformedGenerator Rhs -> Rhs
-		case_end end {tg_case1, tg_case_end_expr, tg_case_end_pattern} rhs
-			=	case_with_default tg_case1 tg_case_end_expr False tg_case_end_pattern rhs end
-	
-		case_pattern :: ParsedExpr TransformedGenerator Rhs -> Rhs
-		case_pattern failure {tg_case2, tg_element,tg_element_is_uselect, tg_pattern} rhs
-			=	case_with_default tg_case2 tg_element tg_element_is_uselect tg_pattern rhs failure
-
-		case_with_default :: Ident ParsedExpr Bool ParsedExpr Rhs ParsedExpr -> Rhs
-		case_with_default case_ident expr expr_is_uselect pattern=:(PE_Ident ident) rhs=:{rhs_alts=UnGuardedExpr ung_exp=:{ewl_nodes,ewl_expr,ewl_locals=LocalParsedDefs [],ewl_position},rhs_locals=LocalParsedDefs []} default_rhs
-			# new_node={ndwl_strict=False,ndwl_def={bind_src=expr,bind_dst=pattern},ndwl_locals=LocalParsedDefs [],ndwl_position=ewl_position}
-			= {rhs & rhs_alts=UnGuardedExpr {ung_exp & ewl_nodes=[new_node:ewl_nodes]}}
-		case_with_default case_ident expr True pattern=:(PE_Tuple [PE_Ident ident1,ident2_exp=:PE_Ident ident2]) rhs=:{rhs_alts=UnGuardedExpr ung_exp=:{ewl_nodes,ewl_expr,ewl_locals=LocalParsedDefs [],ewl_position},rhs_locals=LocalParsedDefs []} default_rhs
-			# new_node1={ndwl_strict=False,ndwl_def={bind_src=expr,bind_dst=pattern},ndwl_locals=LocalParsedDefs [],ndwl_position=ewl_position}
-			# new_node2={ndwl_strict=True,ndwl_def={bind_src=ident2_exp,bind_dst=ident2_exp},ndwl_locals=LocalParsedDefs [],ndwl_position=ewl_position}
-			= {rhs & rhs_alts=UnGuardedExpr {ung_exp & ewl_nodes=[new_node1,new_node2:ewl_nodes]}}
-		case_with_default case_ident expr expr_is_uselect PE_Empty rhs default_rhs
-			= rhs
-		case_with_default case_ident expr expr_is_uselect pattern rhs default_rhs
-			=	exprToRhs (PE_Case case_ident expr
-					[	{calt_pattern = pattern, calt_rhs = rhs, calt_position=NoPos}
-					,	{calt_pattern = PE_WildCard, calt_rhs = exprToRhs default_rhs, calt_position=NoPos}
-					])
 */
 
 //funToListCompr fd
@@ -169,6 +89,7 @@ symIdIsTask :: SymbIdent -> Bool
 symIdIsTask si =
   case si.symb_kind of
     SK_Function gi  -> True // TODO FIXME gi.glob_object :: Global Index
+    SK_GeneratedFunction fiptr idx  -> True // TODO FIXME gi.glob_object :: Global Index
     _               -> False
 
 identIsTask :: Ident -> Bool
@@ -184,11 +105,12 @@ findInArr p arr = findInArr` 0 p arr
       =  if (p elem) (Just elem) (findInArr` (n + 1) p arr)
     | otherwise  = Nothing
 
-reifyFunDef :: IclModule {#DclModule} Ident -> FunDef
-reifyFunDef icl_module dcl_modules ident =
-  case findInArr (\fd -> fd.fun_ident == ident) icl_module.icl_functions of
+reifyFunDef :: {#FunDef} IclModule {#DclModule} SymbIdent -> FunDef
+reifyFunDef fun_defs icl_module dcl_modules si =
+  case findInArr (\fd -> fd.fun_ident == ident) fun_defs of
     Just fd  -> fd
     _        -> abort ("Failed to reify " +++ ident.id_name)
+  where ident = si.symb_ident
 
 //reifyFunType :: IclModule {#DclModule} Ident -> SymbolType
 //reifyFunType icl_module dcl_modules ident =
@@ -222,31 +144,31 @@ latter, we must eta-expand `g`.
 */
 
 :: ExpressionAlg a =
-  {  var                   :: BoundVar -> a                         // Var
-  ,  app                   :: App -> a                              // App
-  ,  at                    :: a [a] -> a                            // (@)
-  ,  letE                  :: Let -> a                              // Let
-  ,  caseE                 :: Case -> a                             // Case
-  ,  selection             :: SelectorKind a [Selection] -> a       // Selection
-  ,  update                :: a [Selection] a -> a                  // Update
+  {  var                   :: BoundVar -> a                                                 // Var
+  ,  app                   :: App -> a                                                      // App
+  ,  at                    :: a [a] -> a                                                    // (@)
+  ,  letE                  :: Let -> a                                                      // Let
+  ,  caseE                 :: Case -> a                                                     // Case
+  ,  selection             :: SelectorKind a [Selection] -> a                               // Selection
+  ,  update                :: a [Selection] a -> a                                          // Update
   ,  recordUpdate          :: (Global DefinedSymbol) a [Bind a (Global FieldSymbol)] -> a   // RecordUpdate
-  ,  tupleSelect           :: DefinedSymbol Int a -> a              // TupleSelect
-  ,  basicExpr             :: BasicValue -> a                       // BasicExpr
-  ,  conditional           :: Conditional -> a                      // Conditional
+  ,  tupleSelect           :: DefinedSymbol Int a -> a                                      // TupleSelect
+  ,  basicExpr             :: BasicValue -> a                                               // BasicExpr
+  ,  conditional           :: Conditional -> a                                              // Conditional
   ,  anyCodeExpr           :: (CodeBinding BoundVar) (CodeBinding FreeVar) [String] -> a    // AnyCodeExpr
-  ,  abcCodeExpr           :: [String] Bool -> a                    // ABCCodeExpr
-  ,  matchExpr             :: (Global DefinedSymbol) a -> a         // MatchExpr
+  ,  abcCodeExpr           :: [String] Bool -> a                                            // ABCCodeExpr
+  ,  matchExpr             :: (Global DefinedSymbol) a -> a                                 // MatchExpr
   ,  isConstructor         :: a (Global DefinedSymbol) Int GlobalIndex Ident Position -> a  // IsConstructor
-  ,  freeVar               :: FreeVar -> a                          // FreeVar
-  ,  dictionariesFunction  :: [(FreeVar,AType)] a AType -> a        // DictionariesFunction
-  ,  constant              :: SymbIdent Int Priority -> a           // Constant
-  ,  classVariable         :: VarInfoPtr -> a                       // ClassVariable
-  ,  dynamicExpr           :: DynamicExpr -> a                      // DynamicExpr
-  ,  typeCodeExpression    :: TypeCodeExpression -> a               // TypeCodeExpression
-  ,  typeSignature         :: (Int Int -> (AType,Int,Int)) a -> a   // TypeSignature
-  ,  ee                    :: a                                     // EE
-  ,  noBind                :: ExprInfoPtr -> a                      // NoBind
-  ,  failExpr              :: Ident -> a                            // FailExpr
+  ,  freeVar               :: FreeVar -> a                                                  // FreeVar
+  ,  dictionariesFunction  :: [(FreeVar,AType)] a AType -> a                                // DictionariesFunction
+  ,  constant              :: SymbIdent Int Priority -> a                                   // Constant
+  ,  classVariable         :: VarInfoPtr -> a                                               // ClassVariable
+  ,  dynamicExpr           :: DynamicExpr -> a                                              // DynamicExpr
+  ,  typeCodeExpression    :: TypeCodeExpression -> a                                       // TypeCodeExpression
+  ,  typeSignature         :: (Int Int -> (AType,Int,Int)) a -> a                           // TypeSignature
+  ,  ee                    :: a                                                             // EE
+  ,  noBind                :: ExprInfoPtr -> a                                              // NoBind
+  ,  failExpr              :: !Ident -> a                                                    // FailExpr
   }
 
 exprCata :: (ExpressionAlg a) Expression -> a
@@ -308,8 +230,11 @@ mkExprAlg defaultC =
 
 :: GinGraph :== Graph GNode GEdge
 
+// InhExpression and SynExpression need strict fields in order to prevent a bus
+// error caused by huge thunks
 :: InhExpression =
-  {  inh_icl_module      :: !IclModule
+  {  inh_fun_defs        :: !{#FunDef}
+  ,  inh_icl_module      :: !IclModule
   ,  inh_dcl_modules     :: !{#DclModule}
   ,  inh_graph           :: !GinGraph
   ,  inh_source_id       :: !Int
@@ -318,20 +243,20 @@ mkExprAlg defaultC =
   }
 
 :: SynExpression =
-  {  syn_nid        :: Maybe Int
+  {  syn_nid        :: !Maybe Int
   ,  syn_graph      :: !GinGraph
-  ,  syn_rec_nodes  :: [NodeIndex]
+  ,  syn_rec_nodes  :: ![NodeIndex]
   }
 
 /*
 Inherited attributes:
-- iclModule :: IclModule
+- icl_module :: IclModule
 
 Chained attributes:
 - graph :: GinGraph
 
 Synthesized attributes:
-- gid :: Maybe Int
+- nid :: Maybe Int
 */
 mkSynExpr :: (Maybe Int) GinGraph -> SynExpression
 mkSynExpr mn gr =
@@ -344,10 +269,11 @@ mkSynExpr mn gr =
 mkSynExpr` :: GinGraph -> SynExpression
 mkSynExpr` gr = mkSynExpr Nothing gr
 
-mkInhExpr :: IclModule {#DclModule} GinGraph Int Int String -> InhExpression
-mkInhExpr icl_module dcl_modules gg so si nm =
+mkInhExpr :: {#FunDef} IclModule {#DclModule} GinGraph Int Int String -> InhExpression
+mkInhExpr fun_defs icl_module dcl_modules gg so si nm =
   {  InhExpression
-  |  inh_icl_module      = icl_module
+  |  inh_fun_defs        = fun_defs
+  ,  inh_icl_module      = icl_module
   ,  inh_dcl_modules     = dcl_modules
   ,  inh_graph           = gg
   ,  inh_source_id       = so
@@ -374,6 +300,8 @@ optional _  f  (Yes x)  = f x
 appFunName :: App -> String
 appFunName app = app.app_symb.symb_ident.id_name
 
+freeVarName :: FreeVar -> String
+freeVarName fv = fv.fv_ident.id_name
 
 // TODO: Check whether nodes already exist. How? Perhaps uniquely number all
 // expressions first and attach that ID to the graph nodes? Or just by task
@@ -407,12 +335,18 @@ mkGraphAlg inh =
     | otherwise               = mkSynExpr` inh.inh_graph
     where
     mkBind app g
-      # patid =
+    // TODO: Rework
+    // The second element of the list is _not_ the lambda variable, but the
+    // reference to the entire lifted lambda expression. (assuming it is even
+    // a lambda expression).
+    // In case of a lambda expression, we first need to reify the function and
+    // do the rest there.
+    // In case of a function...?
+      # argvars  =
           case app.app_args of
-            [_:Var bv:_]  ->
-              withHead  (\x -> x.fv_ident.id_name) (abort "No fun args for bind rhs")
-                        (getFunArgVars (reifyFunDef inh.inh_icl_module inh.inh_dcl_modules bv.var_ident))
-            _ -> abort "Expression not supported or invalid bind"
+            [_:App rhsApp:_]  -> getFunArgVars (reifyFunDef inh.inh_fun_defs inh.inh_icl_module inh.inh_dcl_modules rhsApp.app_symb)
+            _                 -> abort ("Expression not supported or invalid bind: " +++ concatStrings (intersperse " " $ map (\x -> "'" +++ mkPretty x +++ "'") app.app_args))
+      # patid    = withHead freeVarName (abort "Invalid bind") argvars
       = mkBinApp app (Just patid) g
     mkAssign app g =
       let mkAssign` u t
@@ -485,12 +419,17 @@ mkGraphAlg inh =
   &  app = appC, letE = letC, caseE = caseC, conditional = condC
   }
 
-mkEdge :: GEdge
-mkEdge = {GEdge | edge_pattern = Nothing }
+defaultEdge :: GEdge
+defaultEdge = {GEdge | edge_pattern = Nothing }
+
+addDefaultEdge :: (Int, Int) GinGraph -> GinGraph
+addDefaultEdge e g = addEdge defaultEdge e g
 
 addEdge` :: (Maybe Int) (Maybe Int) (Maybe String) GinGraph -> GinGraph
 addEdge` (Just l)  (Just r)  ep  g  = addEdge {edge_pattern = ep} (l, r) g
-addEdge` _         _         _   _  = abort "Invalid edge"
+addEdge` Nothing   Nothing   _   _  = abort "Invalid edge: both nodes missing"
+addEdge` Nothing   _         _   _  = abort "Invalid edge: source node missing"
+addEdge` _         Nothing   _   _  = abort "Invalid edge: target node missing"
 
 addNode` :: GNode GinGraph -> SynExpression
 addNode` node graph
@@ -500,26 +439,26 @@ addNode` node graph
 mkPretty :: (a -> String) | Pretty a
 mkPretty = 'PP'.display o 'PP'.renderCompact o pretty
 
-funToGraph :: FunDef IclModule {#DclModule} -> Optional (GGraph, Int, Int)
-funToGraph fd icl_module dcl_modules = funBodyToGraph fd.fun_ident.id_name fd.fun_body icl_module dcl_modules
-
-funBodyToGraph :: String FunctionBody IclModule {#DclModule} -> Optional (GGraph, Int, Int)
-funBodyToGraph fun_name (TransformedBody tb) icl_module dcl_modules
-  # (soid, g)  = addNode GInit emptyGraph
+funToGraph :: FunDef {#FunDef} IclModule {#DclModule} -> Optional (GGraph, Int, Int)
+funToGraph {fun_ident=fun_ident, fun_body = TransformedBody tb} fun_defs icl_module dcl_modules
+  # (soid, g)  = addNode GInit emptyGraph // TODO: Do this afterwards instead? Would allow us to use the source/sink stuff
   # (siid, g)  = addNode GStop g
   = Yes (GGraph (mkBody soid siid g), soid, siid)
   where
   mkBody soid siid g // TODO cb.cb_args
-    # inh  = mkInhExpr icl_module dcl_modules g soid siid fun_name
+    # inh  = mkInhExpr fun_defs icl_module dcl_modules g soid siid fun_ident.id_name
     # syn  = exprCata (mkGraphAlg inh) tb.tb_rhs
-    # g`   = syn.syn_graph
-    = if (isEmpty syn.syn_rec_nodes) g` (addRecs syn.syn_rec_nodes g`)
+    # g    = syn.syn_graph
+    # g    = if (isEmpty syn.syn_rec_nodes) g (addRecs syn.syn_rec_nodes g)
+    = maybe g (addNewSource g soid) (sourceNode g)
 
   addRecs recs g
     # (nid, g`) = addNode GMerge g
-    = foldr (\n -> addEdge mkEdge (nid, n)) g` recs
+    = foldr (\n -> addEdge defaultEdge (nid, n)) g` recs
 
-funBodyToGraph fun_name _ _ _ = No
+  addNewSource g newSource oldSource = addEdge defaultEdge (newSource, oldSource) g
+
+funToGraph _ _ _ _ = No
 
 :: GPattern :== String
 
@@ -615,30 +554,40 @@ instance Pretty BasicValue where
   pretty (BVR str)  = 'PP'.text str
   pretty (BVS str)  = 'PP'.text str
 
+instance Pretty String where
+  pretty str = 'PP'.text str
+
 prettyAlg :: ExpressionAlg Doc
 prettyAlg =
   let
-    varC bv = pretty bv
+    varC bv = pretty "(Var)" 'PP'. <+> pretty bv
     appC app
       # args = foldr (\x xs -> pretty x 'PP'. <+> xs) 'PP'.empty app.app_args
-      | length app.app_args > 0  = pretty app.app_symb 'PP'. <+> args
-      | otherwise                = pretty app.app_symb
+      | length app.app_args > 0  = pretty "(App)" 'PP'. <+> pretty app.app_symb 'PP'. <+> args
+      | otherwise                = pretty "(App)" 'PP'. <+> pretty app.app_symb
     defaultC = 'PP'.empty
   in {mkExprAlg 'PP'.empty & var = varC, app = appC }
 
 
 getNodeData` :: Int GinGraph -> GNode
-getNodeData` n g =
-  case getNodeData n g of
-    Just x  -> x
-    _       -> abort ("No data for node " +++ toString n)
+getNodeData` n g = fromMaybe err (getNodeData n g)
+  where err = abort ("No data for node " +++ toString n)
 
 mkTaskDot :: String Int Int GGraph -> String
-mkTaskDot funnm startid endid (GGraph g) = "digraph " +++ funnm +++ " {\n" +++ mkNodes +++ "\n" +++ mkEdges +++ "\n}"
+mkTaskDot funnm startid endid (GGraph g) = "digraph " +++ funnm +++ " {\n" +++
+  mkNodes +++ "\n" +++
+  mkEdges +++ "\n}"
   where
   mkNodes = concatStrings (map (nodeToDot g) (nodeIndices g))
   mkEdges = concatStrings (map edgeToDot (edgeIndices g))
-  edgeToDot (l, r) = mkDotNodeLbl l +++ " -> " +++ mkDotNodeLbl r +++ ";\n" // TODO: Use different arrow for task assignment
+  edgeToDot ei=:(l, r) = mkDotNodeLbl l +++ " -> " +++ mkDotNodeLbl r +++ mkDotArgs [mkDotAttrKV "label" edgeLbl] // TODO: Use different arrow for task assignment
+    where edgeLbl = maybe "" (\e -> fromMaybe "" e.edge_pattern) $ getEdgeData ei g
+
+mkDotAttrKV :: String String -> String
+mkDotAttrKV k v = k +++ "=" +++ "\"" +++ v +++ "\""
+
+mkDotArgs :: [String] -> String
+mkDotArgs attrs = " [" +++ concatStrings (intersperse ", " attrs) +++ "];\n"
 
 mkDotNodeLbl :: Int -> String
 mkDotNodeLbl n = "node" +++ toString n
@@ -658,22 +607,23 @@ nodeToDot g currIdx =
     (GAssign usr)         -> let  idxStr = toString currIdx
                                   usrStr = "user" +++ idxStr
                              in   "subgraph clusterUser" +++ idxStr +++ "{ label=" +++ usr +++ "; labelloc=b; peripheries=0; " +++ usrStr +++ "}" +++
-                                  usrStr +++ " [shapefile=\"stick.png\", peripheries=0, style=invis]"
+                                  usrStr +++ mkDotArgs [ mkDotAttrKV "shapefile" "\"stick.png\""
+                                                       , mkDotAttrKV "peripheries" "0"
+                                                       , style "invis" ]
     GStep                 -> whiteNode [shape "circle", label "Step"]
   where
   currNode         = getNodeData` currIdx g
-  whiteNode attrs  = mkDotNode [fontcolor "black", fillcolor "white", style "filled" : attrs]
-  blackNode attrs  = mkDotNode [fontcolor "white", fillcolor "black", style "filled" : attrs]
-  mkDotNode attrs  = mkDotNodeLbl currIdx +++ " [" +++ concatStrings (intersperse ", " attrs) +++ "];\n"
-  shape v      = mkKV "shape" v
-  label v      = mkKV "label" v
-  color v      = mkKV "color" v
-  fillcolor v  = mkKV "fillcolor" v
-  fontcolor v  = mkKV "fontcolor" v
-  width v      = mkKV "width" v
-  height v     = mkKV "height" v
-  style v      = mkKV "style" v
-  mkKV k v     = k +++ "=" +++ v
+  whiteNode attrs  = mkDotNode [fontcolor "black", fillcolor "white", style "filled", label "" : attrs]
+  blackNode attrs  = mkDotNode [fontcolor "white", fillcolor "black", style "filled", label "" : attrs]
+  mkDotNode attrs  = mkDotNodeLbl currIdx +++ mkDotArgs attrs
+  shape v      = mkDotAttrKV "shape" v
+  label v      = mkDotAttrKV "label" v
+  color v      = mkDotAttrKV "color" v
+  fillcolor v  = mkDotAttrKV "fillcolor" v
+  fontcolor v  = mkDotAttrKV "fontcolor" v
+  width v      = mkDotAttrKV "width" v
+  height v     = mkDotAttrKV "height" v
+  style v      = mkDotAttrKV "style" v
   mkJoinLbl DisFirstBin   = "First result from two tasks"
   mkJoinLbl DisFirstList  = "First result from list of tasks"
   mkJoinLbl DisLeft       = "Left result"
