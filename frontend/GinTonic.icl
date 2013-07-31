@@ -111,10 +111,10 @@ findInArr p arr = findInArr` 0 p arr
       =  if (p elem) (Just elem) (findInArr` (n + 1) p arr)
     | otherwise  = Nothing
 
-reifyFunDef :: {#FunDef} IclModule {#DclModule} SymbIdent -> FunDef
+reifyFunDef :: {#FunDef} IclModule {#DclModule} SymbIdent -> GFunDef
 reifyFunDef fun_defs icl_module dcl_modules si =
   case findInArr (\fd -> fd.fun_ident == ident) fun_defs of
-    Just fd  -> fd
+    Just fd  -> mkGFunDef fd
     _        -> abort ("Failed to reify " +++ ident.id_name)
   where ident = si.symb_ident
 
@@ -129,12 +129,6 @@ reifyFunDef fun_defs icl_module dcl_modules si =
   //where failReify = abort ("Failed to reify " +++ ident.id_name)
 // TODO look up in icl_module.icl_common
 // TODO Add DclModule and look up in dcl_module.dcl_functions and dcl_common
-
-getFunArgVars :: FunDef -> [FreeVar]
-getFunArgVars fd =
-  case fd.fun_body of
-    TransformedBody tb  -> tb.tb_args
-    _                   -> []
 
 getFunRhs :: FunDef -> Expression
 getFunRhs fd =
@@ -348,12 +342,15 @@ mkGraphAlg inh =
     // In case of a lambda expression, we first need to reify the function and
     // do the rest there.
     // In case of a function...?
-      # argvars  =
+      # (lhsExpr, rhsApp) =
           case app.app_args of
-            [_:App rhsApp:_]  -> getFunArgVars (reifyFunDef inh.inh_fun_defs inh.inh_icl_module inh.inh_dcl_modules rhsApp.app_symb)
+            [e:App rhsApp:_]  -> (e, rhsApp)
             _                 -> abort ("Expression not supported or invalid bind: " +++ concatStrings (intersperse " " $ map (\x -> "'" +++ mkPretty x +++ "'") app.app_args))
-      # patid    = withHead freeVarName (abort "Invalid bind") argvars
-      = mkBinApp app (Just patid) g
+      # rhsFunDef  = reifyFunDef inh.inh_fun_defs inh.inh_icl_module inh.inh_dcl_modules rhsApp.app_symb
+      # patid      = withHead freeVarName (abort "Invalid bind") rhsFunDef.gfd_args
+      # synl       = exprCata (mkGraphAlg inh) lhsExpr
+      # synr       = exprCata (mkGraphAlg {inh & inh_graph = synl.syn_graph}) rhsFunDef.gfd_rhs
+      = mkSynExpr` $ addEdge` synl.syn_nid synr.syn_nid (Just patid) synr.syn_graph
     mkAssign app g =
       let mkAssign` u t
             # synnd  = addNode` (GAssign (mkPretty u)) g
@@ -361,9 +358,13 @@ mkGraphAlg inh =
             = addEdge` synt.syn_nid synnd.syn_nid Nothing synt.syn_graph
       in  mkSynExpr` (withTwo mkAssign` (abort "Illegal task assignment") app.app_args)
     mkReturn app g
-      # syn   = withHead (exprCata (mkGraphAlg {inh & inh_graph = g})) (abort "Invalid return") app.app_args
-      # node  = GReturn (GGraphExpression (GGraph syn.syn_graph))
+      # node   = GReturn $ withHead f (abort "Invalid return") app.app_args
       = addNode` node g
+      where
+      f (BasicExpr bv)  = GCleanExpression $ mkPretty bv
+      f (Var bv)        = GCleanExpression $ bv.var_ident.id_name
+      f e               = GGraphExpression (GGraph (exprCata (mkGraphAlg {inh & inh_graph = g}) e).syn_graph)
+
     mkStep app g = mkSynExpr` g // TODO
     mkTaskApp app g // TODO: When do we pprint a Clean expr? And when do we generate a subgraph?
       # appArgs  = map (GCleanExpression o mkPretty) app.app_args
@@ -445,6 +446,25 @@ addNode` node graph
 mkPretty :: (a -> String) | Pretty a
 mkPretty = 'PP'.display o 'PP'.renderCompact o pretty
 
+:: GFunDef =
+  {  gfd_name  :: !String
+  ,  gfd_args  :: ![FreeVar]
+  ,  gfd_rhs   :: !Expression
+  }
+
+mkGFunDef :: FunDef -> GFunDef
+mkGFunDef {fun_ident = fun_ident, fun_body = TransformedBody tb} =
+  {  GFunDef
+  |  gfd_name  = fun_ident.id_name
+  ,  gfd_args  = tb.tb_args
+  ,  gfd_rhs   = tb.tb_rhs
+  }
+mkGFunDef _ = abort "mkGFunDef: need a TransformedBody"
+
+// TODO: We need to split this up: one part of this should generate the graph
+// for the FunDef and the other part should generate the init and stop nodes.
+// Yet another part should just get the right-hand side Expression of a FunDef
+// so we can just cata it.
 funToGraph :: FunDef {#FunDef} IclModule {#DclModule} -> Optional (GGraph, Int, Int)
 funToGraph {fun_ident=fun_ident, fun_body = TransformedBody tb} fun_defs icl_module dcl_modules
   # (soid, g)  = addNode GInit emptyGraph // TODO: Do this afterwards instead? Would allow us to use the source/sink stuff
@@ -563,6 +583,13 @@ instance Pretty BasicValue where
 instance Pretty String where
   pretty str = 'PP'.text str
 
+instance Pretty GExpression where
+  pretty GUndefinedExpression      = 'PP'.text "undef"
+  pretty (GGraphExpression graph)  = 'PP'.text "TODO: render a subgraph (and don't PP one)"
+  pretty (GListExpression ges)     = 'PP'.text "TODO: render a list expression (and don't PP one)"
+  pretty (GListComprehensionExpression glc)  = 'PP'.text "TODO: render a list comprehension expression (and don't PP one)"
+  pretty (GCleanExpression ce)     = 'PP'.text ce
+
 prettyAlg :: ExpressionAlg Doc
 prettyAlg =
   let
@@ -609,7 +636,7 @@ nodeToDot funnm g currIdx =
     GParallelSplit        -> whiteNode [shape "circle", label "Parallel split"]
     (GParallelJoin jt)    -> whiteNode [shape "circle", label (mkJoinLbl jt)]
     (GTaskApp tid exprs)  -> whiteNode [shape "box", label tid] // TODO: complex contents with extra bar
-    (GReturn expr)        -> whiteNode [shape "oval", label "(return expression goes here)"]
+    (GReturn expr)        -> whiteNode [shape "oval", label (mkPretty expr)]
     (GAssign usr)         -> let  idxStr = toString currIdx
                                   usrStr = "user" +++ idxStr
                              in   "subgraph cluster_user" +++ idxStr +++ "{ label=" +++ usr +++ "; labelloc=b; peripheries=0; " +++ usrStr +++ "}" +++
