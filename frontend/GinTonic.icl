@@ -303,6 +303,11 @@ appFunName app = app.app_symb.symb_ident.id_name
 freeVarName :: FreeVar -> String
 freeVarName fv = fv.fv_ident.id_name
 
+edgeErr :: String (Maybe Int) Expression (Maybe Int) Expression -> a
+edgeErr errmsg lid lexpr rid rexpr = abort ("Cannot create " +++ errmsg
+  +++ " between left expression\n\t" +++ nodeErr lid lexpr
+  +++ " and right expression\n\t" +++ nodeErr rid rexpr +++ "\n")
+
 // TODO: Check whether nodes already exist. How? Perhaps uniquely number all
 // expressions first and attach that ID to the graph nodes? Or just by task
 // name? Latter probably easiest.
@@ -325,12 +330,12 @@ mkGraphAlg inh =
           "@:"        -> mkAssign app inh.inh_graph
           "return"    -> mkReturn app inh.inh_graph
           ">>*"       -> mkStep app inh.inh_graph
-          "-||-"      -> mkParBinApp app.app_args (GParallelJoin DisFirstBin) inh.inh_graph
-          "||-"       -> mkParBinApp app.app_args (GParallelJoin DisRight) inh.inh_graph
-          "-||"       -> mkParBinApp app.app_args (GParallelJoin DisLeft) inh.inh_graph
-          "-&&-"      -> mkParBinApp app.app_args (GParallelJoin ConPair) inh.inh_graph
-          "anyTask"   -> mkParApp app.app_args (GParallelJoin DisFirstList) inh.inh_graph
-          "allTasks"  -> mkParApp app.app_args (GParallelJoin ConAll) inh.inh_graph
+          "-||-"      -> mkParBinApp app.app_args DisFirstBin inh.inh_graph
+          "||-"       -> mkParBinApp app.app_args DisRight inh.inh_graph
+          "-||"       -> mkParBinApp app.app_args DisLeft inh.inh_graph
+          "-&&-"      -> mkParBinApp app.app_args ConPair inh.inh_graph
+          "anyTask"   -> mkParApp app.app_args DisFirstList inh.inh_graph
+          "allTasks"  -> mkParApp app.app_args ConAll inh.inh_graph
           _           -> mkTaskApp app inh.inh_graph
     | otherwise               = mkSynExpr` inh.inh_graph
     where
@@ -342,27 +347,38 @@ mkGraphAlg inh =
     // In case of a lambda expression, we first need to reify the function and
     // do the rest there.
     // In case of a function...?
+
+    // TODO: Check with funIsLam if the right-hand function is a lambda. If so,
+    // do what we currently do and reify the lambda and continue graph generation.
+    // If not, don't reify and just generate a task application node and be done.
       # (lhsExpr, rhsApp) =
           case app.app_args of
             [e:App rhsApp:_]  -> (e, rhsApp)
-            _                 -> abort ("Expression not supported or invalid bind: " +++ concatStrings (intersperse " " $ map (\x -> "'" +++ mkPretty x +++ "'") app.app_args))
-      # rhsFunDef  = reifyFunDef inh.inh_fun_defs inh.inh_icl_module inh.inh_dcl_modules rhsApp.app_symb
-      # patid      = withHead freeVarName (abort "Invalid bind") rhsFunDef.gfd_args
-      # synl       = exprCata (mkGraphAlg inh) lhsExpr
-      # synr       = exprCata (mkGraphAlg {inh & inh_graph = synl.syn_graph}) rhsFunDef.gfd_rhs
-      = mkSynExpr` $ addEdge` synl.syn_nid synr.syn_nid (Just patid) synr.syn_graph
+            _                 -> abort ("Invalid bind: " +++ concatStrings (intersperse " " $ map (\x -> "'" +++ mkPretty x +++ "'") app.app_args))
+      # rhsfd  = reifyFunDef inh.inh_fun_defs inh.inh_icl_module inh.inh_dcl_modules rhsApp.app_symb
+      # patid  = withHead freeVarName (abort "Invalid bind") rhsfd.gfd_args
+      # synl   = exprCata (mkGraphAlg inh) lhsExpr
+      # synr   = exprCata (mkGraphAlg {inh & inh_graph = synl.syn_graph}) rhsfd.gfd_rhs
+      = case (synl.syn_nid, synr.syn_nid) of
+          (Just l, Just r)  -> mkSynExpr synl.syn_nid $ addEdge (mkEdge patid) (l, r) synr.syn_graph // TODO: Is this always the correct node id to synthesize?
+          (lid, rid)        -> edgeErr "bind edge" lid lhsExpr rid rhsfd.gfd_rhs
     mkAssign app g =
       let mkAssign` u t
             # synnd  = addNode` (GAssign (mkPretty u)) g
             # synt   = exprCata (mkGraphAlg {inh & inh_graph = synnd.syn_graph}) t
-            = addEdge` synt.syn_nid synnd.syn_nid Nothing synt.syn_graph
+            = case (synnd.syn_nid, synt.syn_nid) of
+                (Just l, Just r)  -> addEdge emptyEdge (l, r) synt.syn_graph
+                (lid, rid)        -> edgeErr "assign edge" lid u rid t
       in  mkSynExpr` (withTwo mkAssign` (abort "Illegal task assignment") app.app_args)
     mkReturn app g
       # node   = GReturn $ withHead f (abort "Invalid return") app.app_args
       = addNode` node g
       where
+      // In case of a function application, we want to inspect the type of the
+      // function. If it is a task or a list, treat it differently than any
+      // other type. But how can we get the type of an arbitrary expression?
       f (BasicExpr bv)  = GCleanExpression $ mkPretty bv
-      f (Var bv)        = GCleanExpression $ bv.var_ident.id_name
+      f (Var bv)        = GCleanExpression bv.var_ident.id_name
       f e               = GGraphExpression (GGraph (exprCata (mkGraphAlg {inh & inh_graph = g}) e).syn_graph)
 
     mkStep app g = mkSynExpr` g // TODO
@@ -376,17 +392,19 @@ mkGraphAlg inh =
       let mkBinApp` l r
             # synl = exprCata (mkGraphAlg {inh & inh_graph = g}) l
             # synr = exprCata (mkGraphAlg {inh & inh_graph = synl.syn_graph}) r
-            = addEdge` synl.syn_nid synr.syn_nid pat synr.syn_graph
+            = case (synl.syn_nid, synr.syn_nid) of
+                (Just l, Just r)  -> addEdge (maybe emptyEdge mkEdge pat) (l, r) synr.syn_graph
+                (lid, rid)        -> edgeErr "bin app edge" lid l rid r
       in  mkSynExpr` (withTwo mkBinApp` (abort "Should not happen: invalid binary application") app.app_args)
     mkParApp appargs join g
-      # synsplit    = addNode` GParallelSplit g
-      # (g`, nids)  = foldr (f synsplit.syn_nid) (synsplit.syn_graph, []) appargs
-      # synjoin     = addNode` join g`
-      = mkSynExpr` (foldr (\n g_ -> addEdge` (Just n) synjoin.syn_nid Nothing g_) g` [n_ \\ Just n_ <- nids])
+      # (sid, g`)   = addNode GParallelSplit g
+      # (g`, nids)  = foldr (f sid) (g`, []) appargs
+      # (jid, g`)   = addNode (GParallelJoin join) g`
+      = mkSynExpr` (foldr (\n g_ -> addEdge emptyEdge (n, jid) g_) g` [n_ \\ Just n_ <- nids])
       where
       f splitId e (gx, xs)
         # synx  = exprCata (mkGraphAlg {inh & inh_graph = gx}) e
-        # g     = addEdge` splitId synx.syn_nid Nothing synx.syn_graph
+        # g     = addEdge emptyEdge (splitId, fromMaybe (abort "Failed to add split edge") synx.syn_nid) synx.syn_graph
         = (g, [synx.syn_nid : xs])
     mkParBinApp appargs join g =
       withTwo  (\l r -> mkParApp [l, r] join g)
@@ -395,7 +413,9 @@ mkGraphAlg inh =
     # syn1  = addNode` (GLet (mkGLet lt)) inh.inh_graph
     // TODO: Represent the bindings in any way possible, not just PP
     # syn2  = exprCata (mkGraphAlg {inh & inh_graph = syn1.syn_graph}) lt.let_expr
-    # g     = addEdge` syn1.syn_nid syn2.syn_nid Nothing syn2.syn_graph
+    # g     = case (syn1.syn_nid, syn2.syn_nid) of
+                (Just l, Just r)  -> addEdge emptyEdge (l, r) syn2.syn_graph
+                (lid, rid)        -> abort "Failed to add let edge"
     = mkSynExpr syn1.syn_nid g // TODO: Correct gid?
 
   caseC cs
@@ -419,24 +439,25 @@ mkGraphAlg inh =
     where
     f ni (lbl, e) gx
       # synx = exprCata (mkGraphAlg {inh & inh_graph = gx}) e
-      = addEdge` (Just ni) synx.syn_nid (Just lbl) synx.syn_graph
+      = addEdge (mkEdge lbl) (ni, fromMaybe (abort "Failed to add decision node") synx.syn_nid) synx.syn_graph
 
   in
   {  mkExprAlg (mkSynExpr` inh.inh_graph)
   &  app = appC, letE = letC, caseE = caseC, conditional = condC
   }
 
-defaultEdge :: GEdge
-defaultEdge = {GEdge | edge_pattern = Nothing }
+nodeErr :: (Maybe Int) Expression -> String
+nodeErr mn expr = mkPretty expr +++ "\n" +++
+  maybe "for which its ID is unknown" (\n -> "with node ID " +++ toString n) mn
 
-addDefaultEdge :: (Int, Int) GinGraph -> GinGraph
-addDefaultEdge e g = addEdge defaultEdge e g
+emptyEdge :: GEdge
+emptyEdge = {GEdge | edge_pattern = Nothing }
 
-addEdge` :: (Maybe Int) (Maybe Int) (Maybe String) GinGraph -> GinGraph
-addEdge` (Just l)  (Just r)  ep  g  = addEdge {edge_pattern = ep} (l, r) g
-addEdge` Nothing   Nothing   _   _  = abort "Invalid edge: both nodes missing"
-addEdge` Nothing   _         _   _  = abort "Invalid edge: source node missing"
-addEdge` _         Nothing   _   _  = abort "Invalid edge: target node missing"
+mkEdge :: String -> GEdge
+mkEdge str = {GEdge | edge_pattern = Just str }
+
+addEmptyEdge :: (Int, Int) GinGraph -> GinGraph
+addEmptyEdge e g = addEdge emptyEdge e g
 
 addNode` :: GNode GinGraph -> SynExpression
 addNode` node graph
@@ -480,9 +501,9 @@ funToGraph {fun_ident=fun_ident, fun_body = TransformedBody tb} fun_defs icl_mod
 
   addRecs recs g
     # (nid, g`) = addNode GMerge g
-    = foldr (\n -> addEdge defaultEdge (nid, n)) g` recs
+    = foldr (\n -> addEdge emptyEdge (nid, n)) g` recs
 
-  addNewSource g newSource oldSource = addEdge defaultEdge (newSource, oldSource) g
+  addNewSource g newSource oldSource = addEdge emptyEdge (newSource, oldSource) g
 
 funToGraph _ _ _ _ = No
 
@@ -580,9 +601,6 @@ instance Pretty BasicValue where
   pretty (BVR str)  = 'PP'.text str
   pretty (BVS str)  = 'PP'.text str
 
-instance Pretty String where
-  pretty str = 'PP'.text str
-
 instance Pretty GExpression where
   pretty GUndefinedExpression      = 'PP'.text "undef"
   pretty (GGraphExpression graph)  = 'PP'.text "TODO: render a subgraph (and don't PP one)"
@@ -593,14 +611,13 @@ instance Pretty GExpression where
 prettyAlg :: ExpressionAlg Doc
 prettyAlg =
   let
-    varC bv = pretty "(Var)" 'PP'. <+> pretty bv
+    varC bv = 'PP'.text "<Var>" 'PP'. <+> pretty bv
     appC app
-      # args = foldr (\x xs -> pretty x 'PP'. <+> xs) 'PP'.empty app.app_args
-      | length app.app_args > 0  = pretty "(App)" 'PP'. <+> pretty app.app_symb 'PP'. <+> args
-      | otherwise                = pretty "(App)" 'PP'. <+> pretty app.app_symb
+      # args = 'PP'.hcat $ intersperse ('PP'.text ", ") $ map pretty app.app_args
+      = 'PP'.text "<App>" 'PP'. <+> pretty app.app_symb 'PP'. <+> 'PP'.brackets args
+    basicC bv = 'PP'.text "<BasicValue>" 'PP'. <+> pretty bv
     defaultC = 'PP'.empty
-  in {mkExprAlg 'PP'.empty & var = varC, app = appC }
-
+  in {mkExprAlg 'PP'.empty & var = varC, app = appC, basicExpr = basicC }
 
 getNodeData` :: Int GinGraph -> GNode
 getNodeData` n g = fromMaybe err (getNodeData n g)
