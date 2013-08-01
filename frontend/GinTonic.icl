@@ -111,30 +111,46 @@ findInArr p arr = findInArr` 0 p arr
       =  if (p elem) (Just elem) (findInArr` (n + 1) p arr)
     | otherwise  = Nothing
 
-reifyFunDef :: {#FunDef} IclModule {#DclModule} SymbIdent -> GFunDef
-reifyFunDef fun_defs icl_module dcl_modules si =
-  case findInArr (\fd -> fd.fun_ident == ident) fun_defs of
+reifyFunDef :: {#FunDef} IclModule SymbIdent -> GFunDef
+reifyFunDef fun_defs icl_module si =
+  case findInFunDefs fun_defs of
     Just fd  -> mkGFunDef fd
-    _        -> abort ("Failed to reify " +++ ident.id_name)
-  where ident = si.symb_ident
+    _        ->
+      case findInFunDefs icl_module.icl_functions of
+        Just fd  -> mkGFunDef fd
+        _        -> abort ("Failed to reify " +++ identName)
+  where
+  identName = si.symb_ident.id_name
+  findInFunDefs fds = findInArr (\fd -> fd.fun_ident.id_name == identName) fds
 
-//reifyFunType :: IclModule {#DclModule} Ident -> SymbolType
-//reifyFunType icl_module dcl_modules ident =
-  //case findInArr (\fd -> fd.fun_ident == ident) icl_module.icl_functions of
-    //Just fd  ->
-      //case fd.fun_type of
-        //Yes st  -> undef
-        //_       -> failReify
-    //_        -> failReify
-  //where failReify = abort ("Failed to reify " +++ ident.id_name)
-// TODO look up in icl_module.icl_common
-// TODO Add DclModule and look up in dcl_module.dcl_functions and dcl_common
-
-getFunRhs :: FunDef -> Expression
-getFunRhs fd =
-  case fd.fun_body of
-    TransformedBody tb  -> tb.tb_rhs
-    _                   -> abort "Need TransformedBody"
+// TODO: Clean up
+reifyFunTy :: {#FunDef} {#DclModule} SymbIdent -> SymbolType
+reifyFunTy fun_defs dcl_modules si =
+  case findInArr (\fd -> fd.fun_ident.id_name == identName) fun_defs of
+    Just fd  -> fromOptional findInDcls fd.fun_type
+    _        -> findInDcls
+  where
+  identName = si.symb_ident.id_name
+  fail = abort ("Failed to find type for " +++ identName)
+  findInDcls = fromMaybe fail $ findIn2DArr (\ft -> ft.ft_ident.id_name == identName) dcl_modules
+  findIn2DArr p arr = findInArr` 0
+    where
+    arrSz = size arr
+    findInArr` n
+      | n < arrSz
+        #  dcl = select arr n
+        =  case findInArr_ dcl.dcl_functions of
+            Just x -> Just x
+            Nothing -> findInArr` (n + 1)
+      | otherwise  = Nothing
+    findInArr_ fts = findInArr`` 0
+      where
+      findInArr`` n
+        | n < fdSz
+          #  fun = select fts n
+          = if (p fun) (Just fun.ft_type) (findInArr`` (n + 1))
+        | otherwise  = Nothing
+      fdSz = size fts
 
 /*
 TODO:
@@ -319,6 +335,20 @@ edgeErr errmsg lid lexpr rid rexpr = abort ("Cannot create " +++ errmsg
 // If arguments to a recursive call are somehow different from the variables
 // that have been passed to the original function, an assignment let block must
 // be generated.
+
+// TODO: Look up fun_type in FunDef to get an `Optional SymbolType`. Get the
+// length of the symbol type's st_context to determine how many contexts there
+// are. Drop these from the beginning of the argument list.
+
+dropContexts :: SymbolType [a] -> [a]
+dropContexts st xs
+  # lst = numContexts st
+  | lst > length xs = xs
+  = drop lst xs
+
+numContexts :: SymbolType -> Int
+numContexts st = length st.st_context
+
 mkGraphAlg :: InhExpression -> ExpressionAlg SynExpression
 mkGraphAlg inh =
   let
@@ -326,9 +356,9 @@ mkGraphAlg inh =
     | symIdIsTask app.app_symb  =
         case appFunName app of // TODO `parallel`
           ">>="       -> mkBind app inh.inh_graph
+          "return"    -> mkReturn app inh.inh_graph
           ">>|"       -> mkBinApp app Nothing inh.inh_graph
           "@:"        -> mkAssign app inh.inh_graph
-          "return"    -> mkReturn app inh.inh_graph
           ">>*"       -> mkStep app inh.inh_graph
           "-||-"      -> mkParBinApp app.app_args DisFirstBin inh.inh_graph
           "||-"       -> mkParBinApp app.app_args DisRight inh.inh_graph
@@ -339,7 +369,7 @@ mkGraphAlg inh =
           _           -> mkTaskApp app inh.inh_graph
     | otherwise               = mkSynExpr` inh.inh_graph
     where
-    mkBind app g
+    mkBind app g // TODO: Take dictionary into account
     // TODO: Rework
     // The second element of the list is _not_ the lambda variable, but the
     // reference to the entire lifted lambda expression. (assuming it is even
@@ -351,27 +381,24 @@ mkGraphAlg inh =
     // TODO: Check with funIsLam if the right-hand function is a lambda. If so,
     // do what we currently do and reify the lambda and continue graph generation.
     // If not, don't reify and just generate a task application node and be done.
+      # funTy      = reifyFunTy inh.inh_fun_defs inh.inh_dcl_modules app.app_symb
+      # nodictargs = dropContexts funTy app.app_args
       # (lhsExpr, rhsApp) =
-          case app.app_args of
+          case nodictargs of
             [e:App rhsApp:_]  -> (e, rhsApp)
-            _                 -> abort ("Invalid bind: " +++ concatStrings (intersperse " " $ map (\x -> "'" +++ mkPretty x +++ "'") app.app_args))
-      # rhsfd  = reifyFunDef inh.inh_fun_defs inh.inh_icl_module inh.inh_dcl_modules rhsApp.app_symb
-      # patid  = withHead freeVarName (abort "Invalid bind") rhsfd.gfd_args
+            _                 -> abort ("Invalid bind: " +++ concatStrings (intersperse " " $ map (\x -> "'" +++ mkPretty x +++ "'") nodictargs))
+      # rhsfd  = reifyFunDef inh.inh_fun_defs inh.inh_icl_module rhsApp.app_symb
+      # rhsTy  = reifyFunTy inh.inh_fun_defs inh.inh_dcl_modules rhsApp.app_symb
+      # patid  = withHead freeVarName (abort "Invalid bind") $ dropContexts rhsTy rhsfd.gfd_args
       # synl   = exprCata (mkGraphAlg inh) lhsExpr
       # synr   = exprCata (mkGraphAlg {inh & inh_graph = synl.syn_graph}) rhsfd.gfd_rhs
       = case (synl.syn_nid, synr.syn_nid) of
           (Just l, Just r)  -> mkSynExpr synl.syn_nid $ addEdge (mkEdge patid) (l, r) synr.syn_graph // TODO: Is this always the correct node id to synthesize?
           (lid, rid)        -> edgeErr "bind edge" lid lhsExpr rid rhsfd.gfd_rhs
-    mkAssign app g =
-      let mkAssign` u t
-            # synnd  = addNode` (GAssign (mkPretty u)) g
-            # synt   = exprCata (mkGraphAlg {inh & inh_graph = synnd.syn_graph}) t
-            = case (synnd.syn_nid, synt.syn_nid) of
-                (Just l, Just r)  -> addEdge emptyEdge (l, r) synt.syn_graph
-                (lid, rid)        -> edgeErr "assign edge" lid u rid t
-      in  mkSynExpr` (withTwo mkAssign` (abort "Illegal task assignment") app.app_args)
-    mkReturn app g
-      # node   = GReturn $ withHead f (abort "Invalid return") app.app_args
+
+    mkReturn app g // TODO: Take dictionary into account
+      # funTy  = reifyFunTy inh.inh_fun_defs inh.inh_dcl_modules app.app_symb
+      # node   = GReturn $ withHead f (abort "Invalid return") $ dropContexts funTy app.app_args
       = addNode` node g
       where
       // In case of a function application, we want to inspect the type of the
@@ -380,6 +407,15 @@ mkGraphAlg inh =
       f (BasicExpr bv)  = GCleanExpression $ mkPretty bv
       f (Var bv)        = GCleanExpression bv.var_ident.id_name
       f e               = GGraphExpression (GGraph (exprCata (mkGraphAlg {inh & inh_graph = g}) e).syn_graph)
+
+    mkAssign app g =
+      let mkAssign` u t
+            # synnd  = addNode` (GAssign (mkPretty u)) g
+            # synt   = exprCata (mkGraphAlg {inh & inh_graph = synnd.syn_graph}) t
+            = case (synnd.syn_nid, synt.syn_nid) of
+                (Just l, Just r)  -> addEdge emptyEdge (l, r) synt.syn_graph
+                (lid, rid)        -> edgeErr "assign edge" lid u rid t
+      in  mkSynExpr` (withTwo mkAssign` (abort "Illegal task assignment") app.app_args)
 
     mkStep app g = mkSynExpr` g // TODO
     mkTaskApp app g // TODO: When do we pprint a Clean expr? And when do we generate a subgraph?
@@ -471,14 +507,16 @@ mkPretty = 'PP'.display o 'PP'.renderCompact o pretty
   {  gfd_name  :: !String
   ,  gfd_args  :: ![FreeVar]
   ,  gfd_rhs   :: !Expression
+  ,  gfd_type  :: !Optional SymbolType
   }
 
 mkGFunDef :: FunDef -> GFunDef
-mkGFunDef {fun_ident = fun_ident, fun_body = TransformedBody tb} =
+mkGFunDef {fun_ident = fun_ident, fun_type = fun_type, fun_body = TransformedBody tb} =
   {  GFunDef
   |  gfd_name  = fun_ident.id_name
   ,  gfd_args  = tb.tb_args
   ,  gfd_rhs   = tb.tb_rhs
+  ,  gfd_type  = fun_type
   }
 mkGFunDef _ = abort "mkGFunDef: need a TransformedBody"
 
