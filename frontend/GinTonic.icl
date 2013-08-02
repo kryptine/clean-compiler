@@ -445,18 +445,18 @@ mkGraphAlg inh =
     mkParBinApp appargs join g =
       withTwo  (\l r -> mkParApp [l, r] join g)
                (abort "Should not happen: invalid binary application") appargs
-  letC lt
-    # syn1  = addNode` (GLet (mkGLet lt)) inh.inh_graph
-    // TODO: Represent the bindings in any way possible, not just PP
-    # syn2  = exprCata (mkGraphAlg {inh & inh_graph = syn1.syn_graph}) lt.let_expr
-    # g     = case (syn1.syn_nid, syn2.syn_nid) of
-                (Just l, Just r)  -> addEdge emptyEdge (l, r) syn2.syn_graph
-                (lid, rid)        -> abort "Failed to add let edge"
-    = mkSynExpr syn1.syn_nid g // TODO: Correct gid?
 
-  caseC cs
-    # (ni, g) = addNode` (GDecision CaseDecision (mkPretty cs.case_expr)) inh.inh_graph // TODO: Add edges
-    = mkSynExpr` (mkDecision CaseDecision cs.case_expr (mkAlts cs))
+  letC lt
+    # (lid, g)  = addNode (GLet (mkGLet lt)) inh.inh_graph
+    // TODO: Represent the bindings in any way possible, not just PP
+    # syn2      = exprCata (mkGraphAlg {inh & inh_graph = g}) lt.let_expr
+    # g         = maybe err (\n -> addEdge emptyEdge (lid, n) syn2.syn_graph) syn2.syn_nid
+    = mkSynExpr (Just lid) g // TODO: Correct gid?
+    where err = abort "Failed to add let edge; no synthesized ID from let body"
+
+  // TODO: For cases, if the pattern is a single variable that starts with an
+  // underscore, reify it and get the variables rhs
+  caseC cs = mkDecision CaseDecision cs.case_expr (mkAlts cs)
     where
     mkAlts cs = mkAlts` cs.case_guards ++ optional [] (\e -> [("_", e)]) cs.case_default
     mkAlts` (AlgebraicPatterns _ aps)  = map (\ap -> (mkAp ap.ap_symbol ap.ap_vars, ap.ap_expr)) aps
@@ -467,11 +467,11 @@ mkGraphAlg inh =
 
   condC c
     # if_else = fromOptional (abort "`if` should have two branches") c.if_else
-    = mkSynExpr` (mkDecision IfDecision c.if_cond [("True", c.if_then), ("False", if_else)])
+    = mkDecision IfDecision c.if_cond [("True", c.if_then), ("False", if_else)]
 
   mkDecision dt expr alts
     # (ni, g) = addNode (GDecision dt (mkPretty expr)) inh.inh_graph
-    = foldr (f ni) g alts
+    = mkSynExpr (Just ni) $ foldr (f ni) g alts
     where
     f ni (lbl, e) gx
       # synx = exprCata (mkGraphAlg {inh & inh_graph = gx}) e
@@ -646,6 +646,12 @@ instance Pretty GExpression where
   pretty (GListComprehensionExpression glc)  = 'PP'.text "TODO: render a list comprehension expression (and don't PP one)"
   pretty (GCleanExpression ce)     = 'PP'.text ce
 
+instance Pretty GLet where
+  pretty gl = 'PP'.vcat (map pretty (gl.glet_strict_binds ++ gl.glet_lazy_binds))
+
+instance Pretty GLetBind where
+  pretty lb = 'PP'.text lb.glb_dst 'PP'. <+> 'PP'.equals 'PP'. <+> pretty lb.glb_src
+
 prettyAlg :: ExpressionAlg Doc
 prettyAlg =
   let
@@ -687,7 +693,7 @@ nodeToDot funnm g currIdx =
     GStop                 -> blackNode [shape "box", width ".2", height ".2"]
     (GDecision _ expr)    -> whiteNode [shape "diamond", label expr]
     GMerge                -> blackNode [shape "diamond", width ".25", height ".25"]
-    (GLet glt)            -> whiteNode [shape "box", label "(let expr goes here)"] // TODO: Rounded corners
+    (GLet glt)            -> whiteNode [shape "box", label (mkPretty glt)] // TODO: Rounded corners
     GParallelSplit        -> whiteNode [shape "circle", label "Parallel split"]
     (GParallelJoin jt)    -> whiteNode [shape "circle", label (mkJoinLbl jt)]
     (GTaskApp tid exprs)  -> whiteNode [shape "box", label tid] // TODO: complex contents with extra bar
