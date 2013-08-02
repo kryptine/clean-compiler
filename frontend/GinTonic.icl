@@ -159,60 +159,116 @@ or `f >>| e` bind, but never a `f >>= g` bind. If we want to support the
 latter, we must eta-expand `g`.
 */
 
+//:: ExpressionAlg a =
+  //{  var                   :: BoundVar -> a                                                 // Var
+  //,  app                   :: App -> a                                                      // App
+  //,  at                    :: a [a] -> a                                                    // (@)
+  //,  letE                  :: Let -> a                                                      // Let
+  //,  caseE                 :: Case -> a                                                     // Case
+  //,  selection             :: SelectorKind a [Selection] -> a                               // Selection
+  //,  update                :: a [Selection] a -> a                                          // Update
+  //,  recordUpdate          :: (Global DefinedSymbol) a [Bind a (Global FieldSymbol)] -> a   // RecordUpdate
+  //,  tupleSelect           :: DefinedSymbol Int a -> a                                      // TupleSelect
+  //,  basicExpr             :: BasicValue -> a                                               // BasicExpr
+  //,  conditional           :: Conditional -> a                                              // Conditional
+  //,  anyCodeExpr           :: (CodeBinding BoundVar) (CodeBinding FreeVar) [String] -> a    // AnyCodeExpr
+  //,  abcCodeExpr           :: [String] Bool -> a                                            // ABCCodeExpr
+  //,  matchExpr             :: (Global DefinedSymbol) a -> a                                 // MatchExpr
+  //,  isConstructor         :: a (Global DefinedSymbol) Int GlobalIndex Ident Position -> a  // IsConstructor
+  //,  freeVar               :: FreeVar -> a                                                  // FreeVar
+  //,  dictionariesFunction  :: [(FreeVar,AType)] a AType -> a                                // DictionariesFunction
+  //,  constant              :: SymbIdent Int Priority -> a                                   // Constant
+  //,  classVariable         :: VarInfoPtr -> a                                               // ClassVariable
+  //,  dynamicExpr           :: DynamicExpr -> a                                              // DynamicExpr
+  //,  typeCodeExpression    :: TypeCodeExpression -> a                                       // TypeCodeExpression
+  //,  typeSignature         :: (Int Int -> (AType,Int,Int)) a -> a                           // TypeSignature
+  //,  ee                    :: a                                                             // EE
+  //,  noBind                :: ExprInfoPtr -> a                                              // NoBind
+  //,  failExpr              :: Ident -> a                                                    // FailExpr
+  //}
+
+//exprCata :: (ExpressionAlg a) Expression -> a
+//exprCata alg (Var bv                      ) = alg.var bv
+//exprCata alg (App a                       ) = alg.app a
+//exprCata alg (l @ rs                      ) = alg.at (exprCata alg l) (map (exprCata alg) rs)
+//exprCata alg (Let l                       ) = alg.letE l
+//exprCata alg (Case c                      ) = alg.caseE c
+//exprCata alg (Selection sk e ss           ) = alg.selection sk (exprCata alg e) ss
+//exprCata alg (Update e1 ss e2             ) = alg.update (exprCata alg e1) ss (exprCata alg e2)
+//exprCata alg (RecordUpdate gd e bs        ) = alg.recordUpdate gd (exprCata alg e) (map (\b -> {b & bind_src=exprCata alg b.bind_src}) bs)
+//exprCata alg (TupleSelect ds i e          ) = alg.tupleSelect ds i (exprCata alg e)
+//exprCata alg (BasicExpr bv                ) = alg.basicExpr bv
+//exprCata alg (Conditional c               ) = alg.conditional c
+//exprCata alg (AnyCodeExpr cb cf ss        ) = alg.anyCodeExpr cb cf ss
+//exprCata alg (ABCCodeExpr ss b            ) = alg.abcCodeExpr ss b
+//exprCata alg (MatchExpr gd e              ) = alg.matchExpr gd (exprCata alg e)
+//exprCata alg (IsConstructor e gd n gi i p ) = alg.isConstructor (exprCata alg e) gd n gi i p
+//exprCata alg (FreeVar v                   ) = alg.freeVar v
+//exprCata alg (DictionariesFunction xs e at) = alg.dictionariesFunction xs (exprCata alg e) at
+//exprCata alg (Constant si i prio          ) = alg.constant si i prio
+//exprCata alg (ClassVariable vip           ) = alg.classVariable vip
+//exprCata alg (DynamicExpr de              ) = alg.dynamicExpr de
+//exprCata alg (TypeCodeExpression t        ) = alg.typeCodeExpression t
+//exprCata alg (TypeSignature f e           ) = alg.typeSignature f (exprCata alg e)
+//exprCata alg (EE                          ) = alg.ee
+//exprCata alg (NoBind eip                  ) = alg.noBind eip
+//exprCata alg (FailExpr i                  ) = alg.failExpr i
+
 :: ExpressionAlg a =
-  {  var                   :: BoundVar -> a                                                 // Var
-  ,  app                   :: App -> a                                                      // App
-  ,  at                    :: a [a] -> a                                                    // (@)
-  ,  letE                  :: Let -> a                                                      // Let
-  ,  caseE                 :: Case -> a                                                     // Case
-  ,  selection             :: SelectorKind a [Selection] -> a                               // Selection
-  ,  update                :: a [Selection] a -> a                                          // Update
-  ,  recordUpdate          :: (Global DefinedSymbol) a [Bind a (Global FieldSymbol)] -> a   // RecordUpdate
-  ,  tupleSelect           :: DefinedSymbol Int a -> a                                      // TupleSelect
-  ,  basicExpr             :: BasicValue -> a                                               // BasicExpr
-  ,  conditional           :: Conditional -> a                                              // Conditional
-  ,  anyCodeExpr           :: (CodeBinding BoundVar) (CodeBinding FreeVar) [String] -> a    // AnyCodeExpr
-  ,  abcCodeExpr           :: [String] Bool -> a                                            // ABCCodeExpr
-  ,  matchExpr             :: (Global DefinedSymbol) a -> a                                 // MatchExpr
-  ,  isConstructor         :: a (Global DefinedSymbol) Int GlobalIndex Ident Position -> a  // IsConstructor
-  ,  freeVar               :: FreeVar -> a                                                  // FreeVar
-  ,  dictionariesFunction  :: [(FreeVar,AType)] a AType -> a                                // DictionariesFunction
-  ,  constant              :: SymbIdent Int Priority -> a                                   // Constant
-  ,  classVariable         :: VarInfoPtr -> a                                               // ClassVariable
-  ,  dynamicExpr           :: DynamicExpr -> a                                              // DynamicExpr
-  ,  typeCodeExpression    :: TypeCodeExpression -> a                                       // TypeCodeExpression
-  ,  typeSignature         :: (Int Int -> (AType,Int,Int)) a -> a                           // TypeSignature
-  ,  ee                    :: a                                                             // EE
-  ,  noBind                :: ExprInfoPtr -> a                                              // NoBind
-  ,  failExpr              :: Ident -> a                                                    // FailExpr
+  {  var                   :: BoundVar -> a                                                                  // Var
+  ,  app                   :: App -> a                                                                       // App
+  ,  at                    :: Expression [Expression] -> a                                                   // (@)
+  ,  letE                  :: Let -> a                                                                       // Let
+  ,  caseE                 :: Case -> a                                                                      // Case
+  ,  selection             :: SelectorKind Expression [Selection] -> a                                       // Selection
+  ,  update                :: Expression [Selection] Expression -> a                                         // Update
+  ,  recordUpdate          :: (Global DefinedSymbol) Expression [Bind Expression (Global FieldSymbol)] -> a  // RecordUpdate
+  ,  tupleSelect           :: DefinedSymbol Int Expression -> a                                              // TupleSelect
+  ,  basicExpr             :: BasicValue -> a                                                                // BasicExpr
+  ,  conditional           :: Conditional -> a                                                               // Conditional
+  ,  anyCodeExpr           :: (CodeBinding BoundVar) (CodeBinding FreeVar) [String] -> a                     // AnyCodeExpr
+  ,  abcCodeExpr           :: [String] Bool -> a                                                             // ABCCodeExpr
+  ,  matchExpr             :: (Global DefinedSymbol) Expression -> a                                         // MatchExpr
+  ,  isConstructor         :: Expression (Global DefinedSymbol) Int GlobalIndex Ident Position -> a          // IsConstructor
+  ,  freeVar               :: FreeVar -> a                                                                   // FreeVar
+  ,  dictionariesFunction  :: [(FreeVar,AType)] Expression AType -> a                                        // DictionariesFunction
+  ,  constant              :: SymbIdent Int Priority -> a                                                    // Constant
+  ,  classVariable         :: VarInfoPtr -> a                                                                // ClassVariable
+  ,  dynamicExpr           :: DynamicExpr -> a                                                               // DynamicExpr
+  ,  typeCodeExpression    :: TypeCodeExpression -> a                                                        // TypeCodeExpression
+  ,  typeSignature         :: (Int Int -> (AType,Int,Int)) Expression -> a                                   // TypeSignature
+  ,  ee                    :: a                                                                              // EE
+  ,  noBind                :: ExprInfoPtr -> a                                                               // NoBind
+  ,  failExpr              :: Ident -> a                                                                     // FailExpr
   }
 
 exprCata :: (ExpressionAlg a) Expression -> a
 exprCata alg (Var bv                      ) = alg.var bv
 exprCata alg (App a                       ) = alg.app a
-exprCata alg (l @ rs                      ) = alg.at (exprCata alg l) (map (exprCata alg) rs)
+exprCata alg (l @ rs                      ) = alg.at l rs
 exprCata alg (Let l                       ) = alg.letE l
 exprCata alg (Case c                      ) = alg.caseE c
-exprCata alg (Selection sk e ss           ) = alg.selection sk (exprCata alg e) ss
-exprCata alg (Update e1 ss e2             ) = alg.update (exprCata alg e1) ss (exprCata alg e2)
-exprCata alg (RecordUpdate gd e bs        ) = alg.recordUpdate gd (exprCata alg e) (map (\b -> {b & bind_src=exprCata alg b.bind_src}) bs)
-exprCata alg (TupleSelect ds i e          ) = alg.tupleSelect ds i (exprCata alg e)
+exprCata alg (Selection sk e ss           ) = alg.selection sk e ss
+exprCata alg (Update e1 ss e2             ) = alg.update e1 ss e2
+exprCata alg (RecordUpdate gd e bs        ) = alg.recordUpdate gd e bs
+exprCata alg (TupleSelect ds i e          ) = alg.tupleSelect ds i e
 exprCata alg (BasicExpr bv                ) = alg.basicExpr bv
 exprCata alg (Conditional c               ) = alg.conditional c
 exprCata alg (AnyCodeExpr cb cf ss        ) = alg.anyCodeExpr cb cf ss
 exprCata alg (ABCCodeExpr ss b            ) = alg.abcCodeExpr ss b
-exprCata alg (MatchExpr gd e              ) = alg.matchExpr gd (exprCata alg e)
-exprCata alg (IsConstructor e gd n gi i p ) = alg.isConstructor (exprCata alg e) gd n gi i p
+exprCata alg (MatchExpr gd e              ) = alg.matchExpr gd e
+exprCata alg (IsConstructor e gd n gi i p ) = alg.isConstructor e gd n gi i p
 exprCata alg (FreeVar v                   ) = alg.freeVar v
-exprCata alg (DictionariesFunction xs e at) = alg.dictionariesFunction xs (exprCata alg e) at
+exprCata alg (DictionariesFunction xs e at) = alg.dictionariesFunction xs e at
 exprCata alg (Constant si i prio          ) = alg.constant si i prio
 exprCata alg (ClassVariable vip           ) = alg.classVariable vip
 exprCata alg (DynamicExpr de              ) = alg.dynamicExpr de
 exprCata alg (TypeCodeExpression t        ) = alg.typeCodeExpression t
-exprCata alg (TypeSignature f e           ) = alg.typeSignature f (exprCata alg e)
+exprCata alg (TypeSignature f e           ) = alg.typeSignature f e
 exprCata alg (EE                          ) = alg.ee
 exprCata alg (NoBind eip                  ) = alg.noBind eip
 exprCata alg (FailExpr i                  ) = alg.failExpr i
+
 
 mkExprAlg :: a -> ExpressionAlg a
 mkExprAlg defaultC =
@@ -253,15 +309,18 @@ mkExprAlg defaultC =
   ,  inh_icl_module      :: !IclModule
   ,  inh_dcl_modules     :: !{#DclModule}
   ,  inh_graph           :: !GinGraph
-  ,  inh_source_id       :: !Int
-  ,  inh_sink_id         :: !Int
+  ,  inh_init_id         :: !Int
+  ,  inh_stop_id         :: !Int
+  ,  inh_merge_id        :: !Int
   ,  inh_curr_task_name  :: !String
+  ,  inh_case_expr       :: !Maybe Expression
   }
 
 :: SynExpression =
   {  syn_nid        :: !Maybe Int
   ,  syn_graph      :: !GinGraph
-  ,  syn_rec_nodes  :: ![NodeIndex]
+  ,  syn_has_recs   :: !Bool
+  ,  syn_rec_node   :: !Bool
   }
 
 /*
@@ -279,22 +338,25 @@ mkSynExpr mn gr =
   {  SynExpression
   |  syn_nid        = mn
   ,  syn_graph      = gr
-  ,  syn_rec_nodes  = []
+  ,  syn_has_recs   = False
+  ,  syn_rec_node   = False
   }
 
 mkSynExpr` :: GinGraph -> SynExpression
 mkSynExpr` gr = mkSynExpr Nothing gr
 
-mkInhExpr :: {#FunDef} IclModule {#DclModule} GinGraph Int Int String -> InhExpression
-mkInhExpr fun_defs icl_module dcl_modules gg so si nm =
+mkInhExpr :: {#FunDef} IclModule {#DclModule} GinGraph Int Int Int String (Maybe Expression) -> InhExpression
+mkInhExpr fun_defs icl_module dcl_modules gg initId stopId mergeId nm ce =
   {  InhExpression
   |  inh_fun_defs        = fun_defs
   ,  inh_icl_module      = icl_module
   ,  inh_dcl_modules     = dcl_modules
   ,  inh_graph           = gg
-  ,  inh_source_id       = so
-  ,  inh_sink_id         = si
+  ,  inh_init_id         = initId
+  ,  inh_stop_id         = stopId
+  ,  inh_merge_id        = mergeId
   ,  inh_curr_task_name  = nm
+  ,  inh_case_expr       = ce
   }
 
 withHead :: (a -> b) b [a] -> b
@@ -349,6 +411,16 @@ dropContexts st xs
 numContexts :: SymbolType -> Int
 numContexts st = length st.st_context
 
+connectId :: InhExpression SynExpression -> (Maybe Int, SynExpression)
+connectId inh syn
+  | syn.syn_rec_node  = (Just inh.inh_merge_id, { syn & syn_rec_node = False })
+  | otherwise         = (syn.syn_nid, syn)
+
+persistHasRec :: [SynExpression] SynExpression -> SynExpression
+persistHasRec ss syn = { syn & syn_has_recs = has }
+ where has = foldr (\s b -> s.syn_has_recs || b) False ss
+
+// TODO: Check if we need more connectId applications
 mkGraphAlg :: InhExpression -> ExpressionAlg SynExpression
 mkGraphAlg inh =
   let
@@ -393,7 +465,7 @@ mkGraphAlg inh =
       # synl   = exprCata (mkGraphAlg inh) lhsExpr
       # synr   = exprCata (mkGraphAlg {inh & inh_graph = synl.syn_graph}) rhsfd.gfd_rhs
       = case (synl.syn_nid, synr.syn_nid) of
-          (Just l, Just r)  -> mkSynExpr synl.syn_nid $ addEdge (mkEdge patid) (l, r) synr.syn_graph // TODO: Is this always the correct node id to synthesize?
+          (Just l, Just r)  -> persistHasRec [synl, synr] $ mkSynExpr synl.syn_nid $ addEdge (mkEdge patid) (l, r) synr.syn_graph // TODO: Is this always the correct node id to synthesize?
           (lid, rid)        -> edgeErr "bind edge" lid lhsExpr rid rhsfd.gfd_rhs
 
     mkReturn app g // TODO: Take dictionary into account
@@ -410,54 +482,108 @@ mkGraphAlg inh =
 
     mkAssign app g =
       let mkAssign` u t
-            # synnd  = addNode` (GAssign (mkPretty u)) g
-            # synt   = exprCata (mkGraphAlg {inh & inh_graph = synnd.syn_graph}) t
-            = case (synnd.syn_nid, synt.syn_nid) of
-                (Just l, Just r)  -> addEdge emptyEdge (l, r) synt.syn_graph
-                (lid, rid)        -> edgeErr "assign edge" lid u rid t
-      in  mkSynExpr` (withTwo mkAssign` (abort "Illegal task assignment") app.app_args)
+            # (lid, g)  = addNode (GAssign (mkPretty u)) g
+            # synt      = exprCata (mkGraphAlg {inh & inh_graph = g}) t
+            = maybe (err lid) (\r -> persistHasRec [synt] $ mkSynExpr` (addEdge emptyEdge (lid, r) synt.syn_graph)) synt.syn_nid
+            where
+            err lid = edgeErr "assign edge" (Just lid) u Nothing t
+      in withTwo mkAssign` (abort "Illegal task assignment") app.app_args
 
     mkStep app g = mkSynExpr` g // TODO
-    mkTaskApp app g // TODO: When do we pprint a Clean expr? And when do we generate a subgraph?
-      # appArgs  = map (GCleanExpression o mkPretty) app.app_args
-      # syn      = addNode` (GTaskApp (appFunName app) appArgs) g
-      = case (appFunName app == inh.inh_curr_task_name, syn.syn_nid) of
-          (True, Just newid)  -> {syn & syn_rec_nodes = [newid:syn.syn_rec_nodes]}
-          _                   -> syn
+    mkTaskApp app g
+      //| trace_n ("aFN: " +++ appFunName app +++ " ctn: " +++ inh.inh_curr_task_name) $ appFunName app == inh.inh_curr_task_name  = mkRec
+      | appFunName app == inh.inh_curr_task_name  = mkRec
+      | otherwise                                 = mkTask
+      where
+      mkRec = { mkSynExpr` g & syn_has_recs = True, syn_rec_node = True }
+      mkTask
+        # appArgs  = map (GCleanExpression o mkPretty) app.app_args  // TODO: When do we pprint a Clean expr? And when do we generate a subgraph?
+        # (an, g)  = addNode (GTaskApp (appFunName app) appArgs) g
+        = mkSynExpr (Just an) g
+
     mkBinApp app pat g =
       let mkBinApp` l r
             # synl = exprCata (mkGraphAlg {inh & inh_graph = g}) l
             # synr = exprCata (mkGraphAlg {inh & inh_graph = synl.syn_graph}) r
             = case (synl.syn_nid, synr.syn_nid) of
-                (Just l, Just r)  -> addEdge (maybe emptyEdge mkEdge pat) (l, r) synr.syn_graph
+                (Just l, Just r)  -> persistHasRec [synl, synr] $ mkSynExpr` (addEdge (maybe emptyEdge mkEdge pat) (l, r) synr.syn_graph)
                 (lid, rid)        -> edgeErr "bin app edge" lid l rid r
-      in  mkSynExpr` (withTwo mkBinApp` (abort "Should not happen: invalid binary application") app.app_args)
+      in  withTwo mkBinApp` (abort "Should not happen: invalid binary application") app.app_args
+
     mkParApp appargs join g
       # (sid, g`)   = addNode GParallelSplit g
       # (g`, nids)  = foldr (f sid) (g`, []) appargs
       # (jid, g`)   = addNode (GParallelJoin join) g`
-      = mkSynExpr` (foldr (\n g_ -> addEdge emptyEdge (n, jid) g_) g` [n_ \\ Just n_ <- nids])
+      = mkSynExpr (Just sid) (foldr (\n g_ -> addEdge emptyEdge (n, jid) g_) g` [n_ \\ Just n_ <- nids])
       where
       f splitId e (gx, xs)
-        # synx  = exprCata (mkGraphAlg {inh & inh_graph = gx}) e
-        # g     = addEdge emptyEdge (splitId, fromMaybe (abort "Failed to add split edge") synx.syn_nid) synx.syn_graph
-        = (g, [synx.syn_nid : xs])
+        # synx          = exprCata (mkGraphAlg {inh & inh_graph = gx}) e
+        # (mid, synx`)  = connectId inh synx
+        # g             = addEdge emptyEdge (splitId, fromMaybe (abort "Failed to add split edge") mid) synx`.syn_graph
+        = (g, [mid : xs])
+
     mkParBinApp appargs join g =
       withTwo  (\l r -> mkParApp [l, r] join g)
                (abort "Should not happen: invalid binary application") appargs
 
-  letC lt
-    # (lid, g)  = addNode (GLet (mkGLet lt)) inh.inh_graph
-    // TODO: Represent the bindings in any way possible, not just PP
-    # syn2      = exprCata (mkGraphAlg {inh & inh_graph = g}) lt.let_expr
-    # g         = maybe err (\n -> addEdge emptyEdge (lid, n) syn2.syn_graph) syn2.syn_nid
-    = mkSynExpr (Just lid) g // TODO: Correct gid?
-    where err = abort "Failed to add let edge; no synthesized ID from let body"
 
-  // TODO: For cases, if the pattern is a single variable that starts with an
-  // underscore, reify it and get the variables rhs
-  caseC cs = mkDecision CaseDecision cs.case_expr (mkAlts cs)
+  // Transformation for higher-order function application
+  // E.g. f g x = g x becomes f = g @ x
+  // In GiN, there are two ways to introduce a lambda function: either write one
+  // as a host-language expression, or "update a variable", in which case a
+  // lambda is introduced to shadow an existing variable and apply some function
+  // to it.
+  // For Tonic, we need to inspect the lambda and its application. If a lambda
+  // is immediately fully applied, we generate a Let block, like GiN would have.
+  // We then also need to continue including the lambda in the graph, as it can
+  // lead to a recursive function application.
+  // If the lambda is not fully applied, we simply generate a host-language
+  // expression for now.
+  atC e es // TODO: Do something with es
+    # syne = exprCata (mkGraphAlg inh) e
+    = persistHasRec [syne] $ mkSynExpr syne.syn_nid syne.syn_graph //inh.inh_graph
+//:: GLetBind =
+  //{  glb_dst       :: !String
+  //,  glb_src       :: !Expression
+  //}
+  letC lt // TODO: Special case for _case_var
+    # glet         = mkGLet lt
+    # mexpr        = listToMaybe [bnd.glb_src \\ bnd <- glet.glet_strict_binds ++ glet.glet_lazy_binds | bnd.glb_dst == "_case_var"]
+    = case mexpr of
+        Just expr -> exprCata (mkGraphAlg {inh & inh_case_expr = Just expr}) glet.glet_expr
+        _         -> mkLet glet
     where
+    err = abort "Failed to add let edge; no synthesized ID from let body"
+    mkLet glet
+      # (lid, g)     = addNode (GLet glet) inh.inh_graph
+      // TODO: Represent the bindings in any way possible, not just PP
+      # syn2         = exprCata (mkGraphAlg {inh & inh_graph = g}) lt.let_expr
+      # (mid, syn3)  = connectId inh syn2
+      # g            = maybe err (\n -> addEdge emptyEdge (lid, n) syn3.syn_graph) mid
+      = persistHasRec [syn3] $ mkSynExpr (Just lid) g // TODO: Correct gid?
+
+  // TODO: For cases, the compiler introduces a fresh variable in a let for the
+  // matches expression. E.g.
+  //   case x > y of ....
+  // becomes
+  //   let _case_var = x > y
+  //   in case _case_var of ...
+  // We need to reify the fresh z and substitute it in the graphical
+  // representation. These fresh variables can be recognized by an underscore
+  // prefix. We may, however, need to be a bit more clever about this in case
+  // someone actually prefixes their own variables with an underscore.
+  // There is one exception to this rule, and that is if the case already matches
+  // on exactly one _variable_:
+  //   let x = True
+  //   in case x of ....
+  // Howerver, the following code
+  //   case True of ...
+  // Will still be converted to a case with a variable:
+  //   let _case_var = True
+  //   in case _case_var of ...
+  caseC cs = mkDecision CaseDecision caseExpr (mkAlts cs)
+    where
+    caseExpr = fromMaybe cs.case_expr inh.inh_case_expr
     mkAlts cs = mkAlts` cs.case_guards ++ optional [] (\e -> [("_", e)]) cs.case_default
     mkAlts` (AlgebraicPatterns _ aps)  = map (\ap -> (mkAp ap.ap_symbol ap.ap_vars, ap.ap_expr)) aps
       where
@@ -465,21 +591,27 @@ mkGraphAlg inh =
       mkAp sym vars = ('PP'.display o 'PP'.renderCompact) (pretty sym.glob_object.ds_ident 'PP'. <+> pretty vars)
     mkAlts` (BasicPatterns _ bps)      = map (\bp -> (mkPretty bp.bp_value, bp.bp_expr)) bps
 
+  // TODO: It appears as if conditionals are desugared to case blocks before we
+  // get to them... Is this a remnant from old compiler versions?
   condC c
     # if_else = fromOptional (abort "`if` should have two branches") c.if_else
     = mkDecision IfDecision c.if_cond [("True", c.if_then), ("False", if_else)]
 
   mkDecision dt expr alts
+    # inh     = {inh & inh_case_expr = Nothing }
     # (ni, g) = addNode (GDecision dt (mkPretty expr)) inh.inh_graph
-    = mkSynExpr (Just ni) $ foldr (f ni) g alts
+    # (hr, g) = foldr (f ni) (False, g) alts
+    = { mkSynExpr (Just ni) g & syn_has_recs = hr }
     where
-    f ni (lbl, e) gx
-      # synx = exprCata (mkGraphAlg {inh & inh_graph = gx}) e
-      = addEdge (mkEdge lbl) (ni, fromMaybe (abort "Failed to add decision node") synx.syn_nid) synx.syn_graph
+    f ni (lbl, e) (hr, gx)
+      # synx         = exprCata (mkGraphAlg {inh & inh_graph = gx}) e
+      # (mid, synx)  = connectId inh synx
+      =  (  synx.syn_has_recs || hr
+         ,  addEdge (mkEdge lbl) (ni, fromMaybe (abort "Failed to add decision node") mid) synx.syn_graph)
 
   in
   {  mkExprAlg (mkSynExpr` inh.inh_graph)
-  &  app = appC, letE = letC, caseE = caseC, conditional = condC
+  &  app = appC, at = atC, letE = letC, caseE = caseC, conditional = condC
   }
 
 nodeErr :: (Maybe Int) Expression -> String
@@ -526,20 +658,19 @@ mkGFunDef _ = abort "mkGFunDef: need a TransformedBody"
 // so we can just cata it.
 funToGraph :: FunDef {#FunDef} IclModule {#DclModule} -> Optional (GGraph, Int, Int)
 funToGraph {fun_ident=fun_ident, fun_body = TransformedBody tb} fun_defs icl_module dcl_modules
-  # (soid, g)  = addNode GInit emptyGraph // TODO: Do this afterwards instead? Would allow us to use the source/sink stuff
-  # (siid, g)  = addNode GStop g
-  = Yes (GGraph (mkBody soid siid g), soid, siid)
+  # (initId, g)   = addNode GInit emptyGraph // TODO: Do this afterwards instead? Would allow us to use the source/sink stuff
+  # (stopId, g)   = addNode GStop g
+  # (mergeId, g)  = addNode GMerge g
+  = Yes (GGraph (mkBody initId stopId mergeId g), initId, stopId)
   where
-  mkBody soid siid g // TODO cb.cb_args
-    # inh  = mkInhExpr fun_defs icl_module dcl_modules g soid siid fun_ident.id_name
+  mkBody initId stopId mergeId g // TODO cb.cb_args
+    # inh  = mkInhExpr fun_defs icl_module dcl_modules g initId stopId mergeId fun_ident.id_name Nothing
     # syn  = exprCata (mkGraphAlg inh) tb.tb_rhs
     # g    = syn.syn_graph
-    # g    = if (isEmpty syn.syn_rec_nodes) g (addRecs syn.syn_rec_nodes g)
-    = maybe g (addNewSource g soid) (sourceNode g)
-
-  addRecs recs g
-    # (nid, g`) = addNode GMerge g
-    = foldr (\n -> addEdge emptyEdge (nid, n)) g` recs
+    # g    = if syn.syn_has_recs
+               (addEdge emptyEdge (initId, mergeId) g) // TODO: Move all outgoing edges from init to merge
+               (removeNode mergeId g)
+    = maybe g (addNewSource g initId) (sourceNode g)
 
   addNewSource g newSource oldSource = addEdge emptyEdge (newSource, oldSource) g
 
@@ -617,7 +748,7 @@ from PPrint import class Pretty(..), instance Pretty [a], :: Doc
 import qualified PPrint as PP
 
 instance Pretty Expression where
-  pretty expr = exprCata prettyAlg expr
+  pretty expr = exprCata debugPPAlg expr
 
 instance Pretty Ident where
   pretty i = 'PP'.text i.id_name
@@ -654,6 +785,17 @@ instance Pretty GLetBind where
 
 prettyAlg :: ExpressionAlg Doc
 prettyAlg =
+  let
+    varC bv = pretty bv
+    appC app
+      # args = 'PP'.hcat $ intersperse ('PP'.text " ") $ map pretty app.app_args
+      = pretty app.app_symb 'PP'. <+> args
+    basicC bv = pretty bv
+    defaultC = 'PP'.empty
+  in {mkExprAlg 'PP'.empty & var = varC, app = appC, basicExpr = basicC }
+
+debugPPAlg :: ExpressionAlg Doc
+debugPPAlg =
   let
     varC bv = 'PP'.text "<Var>" 'PP'. <+> pretty bv
     appC app
