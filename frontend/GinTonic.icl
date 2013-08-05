@@ -40,7 +40,7 @@ ginTonic` icl_module dcl_modules tpl=:(ok, fun_defs, array_instances, common_def
     | funIsTask fd && fd.fun_info.fi_def_level == 1  = defToStr fd +++ "\n" +++ rest
     | otherwise                                      = rest
   defToStr fd  = optional "Nothing happened" f (funToGraph fd fun_defs icl_module dcl_modules)
-    where f (g, so, si) = mkTaskDot fd.fun_ident.id_name so si g
+    where f (g, so, si) = mkTaskDot (mkInhExpr fun_defs icl_module dcl_modules emptyGraph 0 0 0 "" Nothing) fd.fun_ident.id_name so si g
   mkDotGraph subgraphs = "digraph " +++ icl_module.icl_name.id_name +++ "{\n" +++ subgraphs +++ "\n}"
 
 /*
@@ -111,46 +111,36 @@ findInArr p arr = findInArr` 0 p arr
       =  if (p elem) (Just elem) (findInArr` (n + 1) p arr)
     | otherwise  = Nothing
 
-reifyFunDef :: {#FunDef} IclModule SymbIdent -> GFunDef
+isInfix :: {#FunDef} IclModule {#DclModule} SymbIdent -> Bool
+isInfix fun_defs icl_module dcl_modules si
+  # mfd = reifyFunDef fun_defs icl_module si
+  # mft = reifyFunType dcl_modules si
+  = maybe (maybe (abort "Failed to determine fixity") (\ft -> isInfix` ft.ft_priority) mft) (\fd -> isInfix` fd.gfd_priority) mfd
+  where
+  isInfix` prio =
+    case prio of
+      Prio _ _  -> True
+      _         -> False
+
+reifyFunType :: {#DclModule} SymbIdent -> Maybe FunType
+reifyFunType dcl_modules si = safeHead [ft \\ dcl <-: dcl_modules, ft <-: dcl.dcl_functions | ft.ft_ident.id_name == si.symb_ident.id_name]
+
+reifyFunDef :: {#FunDef} IclModule SymbIdent -> Maybe GFunDef
 reifyFunDef fun_defs icl_module si =
   case findInFunDefs fun_defs of
-    Just fd  -> mkGFunDef fd
-    _        ->
-      case findInFunDefs icl_module.icl_functions of
-        Just fd  -> mkGFunDef fd
-        _        -> abort ("Failed to reify " +++ identName)
+    Just fd  -> Just $ mkGFunDef fd
+    _        -> fmap mkGFunDef $ findInFunDefs icl_module.icl_functions
   where
   identName = si.symb_ident.id_name
-  findInFunDefs fds = findInArr (\fd -> fd.fun_ident.id_name == identName) fds
+  findInFunDefs fds = findInArr (\fd -> trace_n ("fifd: " +++ fd.fun_ident.id_name) $ fd.fun_ident.id_name == identName) fds
 
-// TODO: Clean up
-reifyFunTy :: {#FunDef} {#DclModule} SymbIdent -> SymbolType
-reifyFunTy fun_defs dcl_modules si =
-  case findInArr (\fd -> fd.fun_ident.id_name == identName) fun_defs of
-    Just fd  -> fromOptional findInDcls fd.fun_type
+reifySymbolType :: {#FunDef} {#DclModule} SymbIdent -> Maybe SymbolType
+reifySymbolType fun_defs dcl_modules si =
+  case findInArr (\fd -> fd.fun_ident.id_name == si.symb_ident.id_name) fun_defs of
+    Just fd  -> optional findInDcls Just fd.fun_type
     _        -> findInDcls
   where
-  identName = si.symb_ident.id_name
-  fail = abort ("Failed to find type for " +++ identName)
-  findInDcls = fromMaybe fail $ findIn2DArr (\ft -> ft.ft_ident.id_name == identName) dcl_modules
-  findIn2DArr p arr = findInArr` 0
-    where
-    arrSz = size arr
-    findInArr` n
-      | n < arrSz
-        #  dcl = select arr n
-        =  case findInArr_ dcl.dcl_functions of
-            Just x -> Just x
-            Nothing -> findInArr` (n + 1)
-      | otherwise  = Nothing
-    findInArr_ fts = findInArr`` 0
-      where
-      findInArr`` n
-        | n < fdSz
-          #  fun = select fts n
-          = if (p fun) (Just fun.ft_type) (findInArr`` (n + 1))
-        | otherwise  = Nothing
-      fdSz = size fts
+  findInDcls = maybe Nothing (\ft -> Just ft.ft_type) (reifyFunType dcl_modules si)
 
 /*
 TODO:
@@ -363,6 +353,10 @@ withHead :: (a -> b) b [a] -> b
 withHead _  b  []       = b
 withHead f  _  [x : _]  = f x
 
+safeHead :: [a] -> Maybe a
+safeHead []    = Nothing
+safeHead [x:_] = Just x
+
 withTwo :: (a a -> b) b [a] -> b
 withTwo f  _  [x : y : _]  = f x y
 withTwo _  b  _            = b
@@ -381,10 +375,10 @@ appFunName app = app.app_symb.symb_ident.id_name
 freeVarName :: FreeVar -> String
 freeVarName fv = fv.fv_ident.id_name
 
-edgeErr :: String (Maybe Int) Expression (Maybe Int) Expression -> a
-edgeErr errmsg lid lexpr rid rexpr = abort ("Cannot create " +++ errmsg
-  +++ " between left expression\n\t" +++ nodeErr lid lexpr
-  +++ " and right expression\n\t" +++ nodeErr rid rexpr +++ "\n")
+edgeErr :: InhExpression String (Maybe Int) Expression (Maybe Int) Expression -> a
+edgeErr inh errmsg lid lexpr rid rexpr = abort ("Cannot create " +++ errmsg
+  +++ " between left expression\n\t" +++ nodeErr inh lid lexpr
+  +++ " and right expression\n\t" +++ nodeErr inh rid rexpr +++ "\n")
 
 // TODO: Check whether nodes already exist. How? Perhaps uniquely number all
 // expressions first and attach that ID to the graph nodes? Or just by task
@@ -453,40 +447,44 @@ mkGraphAlg inh =
     // TODO: Check with funIsLam if the right-hand function is a lambda. If so,
     // do what we currently do and reify the lambda and continue graph generation.
     // If not, don't reify and just generate a task application node and be done.
-      # funTy      = reifyFunTy inh.inh_fun_defs inh.inh_dcl_modules app.app_symb
+      # funTy      = fromMaybe (abort "mkGraphAlg: failed to find symbol type (1)") 
+                   $ reifySymbolType inh.inh_fun_defs inh.inh_dcl_modules app.app_symb
       # nodictargs = dropContexts funTy app.app_args
       # (lhsExpr, rhsApp) =
           case nodictargs of
             [e:App rhsApp:_]  -> (e, rhsApp)
-            _                 -> abort ("Invalid bind: " +++ concatStrings (intersperse " " $ map (\x -> "'" +++ mkPretty x +++ "'") nodictargs))
-      # rhsfd  = reifyFunDef inh.inh_fun_defs inh.inh_icl_module rhsApp.app_symb
-      # rhsTy  = reifyFunTy inh.inh_fun_defs inh.inh_dcl_modules rhsApp.app_symb
+            _                 -> abort ("Invalid bind: " +++ concatStrings (intersperse " " $ map (\x -> "'" +++ mkPretty inh x +++ "'") nodictargs))
+      # rhsfd  = fromMaybe (abort "mkGraphAlg: failed to find function definition (1)")
+               $ reifyFunDef inh.inh_fun_defs inh.inh_icl_module rhsApp.app_symb
+      # rhsTy  = fromMaybe (abort "mkGraphAlg: failed to find symbol type (2)")
+               $ reifySymbolType inh.inh_fun_defs inh.inh_dcl_modules rhsApp.app_symb
       # patid  = withHead freeVarName (abort "Invalid bind") $ dropContexts rhsTy rhsfd.gfd_args
       # synl   = exprCata (mkGraphAlg inh) lhsExpr
       # synr   = exprCata (mkGraphAlg {inh & inh_graph = synl.syn_graph}) rhsfd.gfd_rhs
       = case (synl.syn_nid, synr.syn_nid) of
           (Just l, Just r)  -> persistHasRec [synl, synr] $ mkSynExpr synl.syn_nid $ addEdge (mkEdge patid) (l, r) synr.syn_graph // TODO: Is this always the correct node id to synthesize?
-          (lid, rid)        -> edgeErr "bind edge" lid lhsExpr rid rhsfd.gfd_rhs
+          (lid, rid)        -> edgeErr inh "bind edge" lid lhsExpr rid rhsfd.gfd_rhs
 
     mkReturn app g // TODO: Take dictionary into account
-      # funTy  = reifyFunTy inh.inh_fun_defs inh.inh_dcl_modules app.app_symb
+      # funTy  = fromMaybe (abort "mkGraphAlg: failed to find symbol type (3)")
+               $ reifySymbolType inh.inh_fun_defs inh.inh_dcl_modules app.app_symb
       # node   = GReturn $ withHead f (abort "Invalid return") $ dropContexts funTy app.app_args
       = addNode` node g
       where
       // In case of a function application, we want to inspect the type of the
       // function. If it is a task or a list, treat it differently than any
       // other type. But how can we get the type of an arbitrary expression?
-      f (BasicExpr bv)  = GCleanExpression $ mkPretty bv
+      f (BasicExpr bv)  = GCleanExpression $ mkPretty inh bv
       f (Var bv)        = GCleanExpression bv.var_ident.id_name
       f e               = GGraphExpression (GGraph (exprCata (mkGraphAlg {inh & inh_graph = g}) e).syn_graph)
 
     mkAssign app g =
       let mkAssign` u t
-            # (lid, g)  = addNode (GAssign (mkPretty u)) g
+            # (lid, g)  = addNode (GAssign (mkPretty inh u)) g
             # synt      = exprCata (mkGraphAlg {inh & inh_graph = g}) t
             = maybe (err lid) (\r -> persistHasRec [synt] $ mkSynExpr` (addEdge emptyEdge (lid, r) synt.syn_graph)) synt.syn_nid
             where
-            err lid = edgeErr "assign edge" (Just lid) u Nothing t
+            err lid = edgeErr inh "assign edge" (Just lid) u Nothing t
       in withTwo mkAssign` (abort "Illegal task assignment") app.app_args
 
     mkStep app g = mkSynExpr` g // TODO
@@ -497,7 +495,7 @@ mkGraphAlg inh =
       where
       mkRec = { mkSynExpr` g & syn_has_recs = True, syn_rec_node = True }
       mkTask
-        # appArgs  = map (GCleanExpression o mkPretty) app.app_args  // TODO: When do we pprint a Clean expr? And when do we generate a subgraph?
+        # appArgs  = map (GCleanExpression o (mkPretty inh)) app.app_args  // TODO: When do we pprint a Clean expr? And when do we generate a subgraph?
         # (an, g)  = addNode (GTaskApp (appFunName app) appArgs) g
         = mkSynExpr (Just an) g
 
@@ -507,7 +505,7 @@ mkGraphAlg inh =
             # synr = exprCata (mkGraphAlg {inh & inh_graph = synl.syn_graph}) r
             = case (synl.syn_nid, synr.syn_nid) of
                 (Just l, Just r)  -> persistHasRec [synl, synr] $ mkSynExpr` (addEdge (maybe emptyEdge mkEdge pat) (l, r) synr.syn_graph)
-                (lid, rid)        -> edgeErr "bin app edge" lid l rid r
+                (lid, rid)        -> edgeErr inh "bin app edge" lid l rid r
       in  withTwo mkBinApp` (abort "Should not happen: invalid binary application") app.app_args
 
     mkParApp appargs join g
@@ -547,7 +545,7 @@ mkGraphAlg inh =
   //,  glb_src       :: !Expression
   //}
   letC lt // TODO: Special case for _case_var
-    # glet         = mkGLet lt
+    # glet         = mkGLet inh lt
     # mexpr        = listToMaybe [bnd.glb_src \\ bnd <- glet.glet_strict_binds ++ glet.glet_lazy_binds | bnd.glb_dst == "_case_var"]
     = case mexpr of
         Just expr -> exprCata (mkGraphAlg {inh & inh_case_expr = Just expr}) glet.glet_expr
@@ -587,9 +585,9 @@ mkGraphAlg inh =
     mkAlts cs = mkAlts` cs.case_guards ++ optional [] (\e -> [("_", e)]) cs.case_default
     mkAlts` (AlgebraicPatterns _ aps)  = map (\ap -> (mkAp ap.ap_symbol ap.ap_vars, ap.ap_expr)) aps
       where
-      mkAp sym []   = mkPretty sym.glob_object.ds_ident
-      mkAp sym vars = ('PP'.display o 'PP'.renderCompact) (pretty sym.glob_object.ds_ident 'PP'. <+> pretty vars)
-    mkAlts` (BasicPatterns _ bps)      = map (\bp -> (mkPretty bp.bp_value, bp.bp_expr)) bps
+      mkAp sym []   = mkPretty inh sym.glob_object.ds_ident
+      mkAp sym vars = ('PP'.display o 'PP'.renderCompact) (pp inh sym.glob_object.ds_ident 'PP'. <+> pp inh vars)
+    mkAlts` (BasicPatterns _ bps)      = map (\bp -> (mkPretty inh bp.bp_value, bp.bp_expr)) bps
 
   // TODO: It appears as if conditionals are desugared to case blocks before we
   // get to them... Is this a remnant from old compiler versions?
@@ -599,7 +597,7 @@ mkGraphAlg inh =
 
   mkDecision dt expr alts
     # inh     = {inh & inh_case_expr = Nothing }
-    # (ni, g) = addNode (GDecision dt (mkPretty expr)) inh.inh_graph
+    # (ni, g) = addNode (GDecision dt (mkPretty inh expr)) inh.inh_graph
     # (hr, g) = foldr (f ni) (False, g) alts
     = { mkSynExpr (Just ni) g & syn_has_recs = hr }
     where
@@ -614,8 +612,8 @@ mkGraphAlg inh =
   &  app = appC, at = atC, letE = letC, caseE = caseC, conditional = condC
   }
 
-nodeErr :: (Maybe Int) Expression -> String
-nodeErr mn expr = mkPretty expr +++ "\n" +++
+nodeErr :: InhExpression (Maybe Int) Expression -> String
+nodeErr inh mn expr = mkPretty inh expr +++ "\n" +++
   maybe "for which its ID is unknown" (\n -> "with node ID " +++ toString n) mn
 
 emptyEdge :: GEdge
@@ -632,23 +630,25 @@ addNode` node graph
   # (n, g) = addNode node graph
   = mkSynExpr (Just n) g
 
-mkPretty :: (a -> String) | Pretty a
-mkPretty = 'PP'.display o 'PP'.renderCompact o pretty
+mkPretty :: InhExpression -> (a -> String) | PP a
+mkPretty inh = 'PP'.display o 'PP'.renderCompact o (pp inh)
 
 :: GFunDef =
-  {  gfd_name  :: !String
-  ,  gfd_args  :: ![FreeVar]
-  ,  gfd_rhs   :: !Expression
-  ,  gfd_type  :: !Optional SymbolType
+  {  gfd_name      :: !String
+  ,  gfd_args      :: ![FreeVar]
+  ,  gfd_rhs       :: !Expression
+  ,  gfd_type      :: !Optional SymbolType
+  ,  gfd_priority  :: Priority
   }
 
 mkGFunDef :: FunDef -> GFunDef
-mkGFunDef {fun_ident = fun_ident, fun_type = fun_type, fun_body = TransformedBody tb} =
+mkGFunDef fd=:{fun_body = TransformedBody tb} =
   {  GFunDef
-  |  gfd_name  = fun_ident.id_name
-  ,  gfd_args  = tb.tb_args
-  ,  gfd_rhs   = tb.tb_rhs
-  ,  gfd_type  = fun_type
+  |  gfd_name      = fd.fun_ident.id_name
+  ,  gfd_args      = tb.tb_args
+  ,  gfd_rhs       = tb.tb_rhs
+  ,  gfd_type      = fd.fun_type
+  ,  gfd_priority  = fd.fun_priority
   }
 mkGFunDef _ = abort "mkGFunDef: need a TransformedBody"
 
@@ -678,18 +678,18 @@ funToGraph _ _ _ _ = No
 
 :: GPattern :== String
 
-mkGLet :: Let -> GLet
-mkGLet lt =
+mkGLet :: InhExpression Let -> GLet
+mkGLet inh lt =
   {  GLet
-  |  glet_strict_binds  = map mkGLetBinds lt.let_strict_binds
-  ,  glet_lazy_binds    = map mkGLetBinds lt.let_lazy_binds
+  |  glet_strict_binds  = map (mkGLetBinds inh) lt.let_strict_binds
+  ,  glet_lazy_binds    = map (mkGLetBinds inh) lt.let_lazy_binds
   ,  glet_expr          = lt.let_expr
   }
 
-mkGLetBinds :: LetBind -> GLetBind
-mkGLetBinds lb =
+mkGLetBinds :: InhExpression LetBind -> GLetBind
+mkGLetBinds inh lb =
   {  GLetBind
-  |  glb_dst = mkPretty lb.lb_dst
+  |  glb_dst = mkPretty inh lb.lb_dst
   ,  glb_src = lb.lb_src
   }
 
@@ -747,74 +747,110 @@ instance toString GNode where
 from PPrint import class Pretty(..), instance Pretty [a], :: Doc
 import qualified PPrint as PP
 
-instance Pretty Expression where
-  pretty expr = exprCata debugPPAlg expr
+class PP a where
+  pp :: InhExpression a -> Doc
 
-instance Pretty Ident where
-  pretty i = 'PP'.text i.id_name
+instance PP [a] | PP a where
+  pp inh xs = 'PP'.list (map (pp inh) xs)
 
-instance Pretty BoundVar where
-  pretty bv = pretty bv.var_ident
+instance PP Expression where
+  pp inh expr = exprCata (prettyAlg inh) expr
+  //pp expr = exprCata debugPPAlg expr
 
-instance Pretty FreeVar where
-  pretty fv = pretty fv.fv_ident
+instance PP Ident where
+  pp _ i = 'PP'.text i.id_name
 
-instance Pretty SymbIdent where
-  pretty si = pretty si.symb_ident
+instance PP BoundVar where
+  pp inh bv = pp inh bv.var_ident
 
-instance Pretty BasicValue where
-  pretty (BVI str)  = 'PP'.text str
-  pretty (BVInt i)  = 'PP'.int i
-  pretty (BVC str)  = 'PP'.text str
-  pretty (BVB b)    = 'PP'.bool b
-  pretty (BVR str)  = 'PP'.text str
-  pretty (BVS str)  = 'PP'.text str
+instance PP FreeVar where
+  pp inh fv = pp inh fv.fv_ident
 
-instance Pretty GExpression where
-  pretty GUndefinedExpression      = 'PP'.text "undef"
-  pretty (GGraphExpression graph)  = 'PP'.text "TODO: render a subgraph (and don't PP one)"
-  pretty (GListExpression ges)     = 'PP'.text "TODO: render a list expression (and don't PP one)"
-  pretty (GListComprehensionExpression glc)  = 'PP'.text "TODO: render a list comprehension expression (and don't PP one)"
-  pretty (GCleanExpression ce)     = 'PP'.text ce
+instance PP SymbIdent where
+  pp inh si = pp inh si.symb_ident
 
-instance Pretty GLet where
-  pretty gl = 'PP'.vcat (map pretty (gl.glet_strict_binds ++ gl.glet_lazy_binds))
+instance PP BasicValue where
+  pp _ (BVI str)  = 'PP'.text str
+  pp _ (BVInt i)  = 'PP'.int i
+  pp _ (BVC str)  = 'PP'.text str
+  pp _ (BVB b)    = 'PP'.bool b
+  pp _ (BVR str)  = 'PP'.text str
+  pp _ (BVS str)  = 'PP'.text str
 
-instance Pretty GLetBind where
-  pretty lb = 'PP'.text lb.glb_dst 'PP'. <+> 'PP'.equals 'PP'. <+> pretty lb.glb_src
+instance PP DefinedSymbol where
+  pp inh ds = pp inh ds.ds_ident
 
-prettyAlg :: ExpressionAlg Doc
-prettyAlg =
+instance PP (Global a) | PP a where
+  pp inh glob = pp inh glob.glob_object
+
+instance PP Selection where
+  pp inh (RecordSelection gds _)      = pp inh gds
+  pp _ (ArraySelection _ _ _)         = 'PP'.text "TODO: ArraySelection"
+  pp _ (DictionarySelection _ _ _ _)  = 'PP'.text "TODO: DictionarySelection"
+
+instance PP GExpression where
+  pp _ GUndefinedExpression      = 'PP'.text "undef"
+  pp _ (GGraphExpression graph)  = 'PP'.text "TODO: render a subgraph (and don't PP one)"
+  pp _ (GListExpression ges)     = 'PP'.text "TODO: render a list expression (and don't PP one)"
+  pp _ (GListComprehensionExpression glc)  = 'PP'.text "TODO: render a list comprehension expression (and don't PP one)"
+  pp _ (GCleanExpression ce)     = 'PP'.text ce
+
+instance PP GLet where
+  pp inh gl = 'PP'.vcat (map (pp inh) (gl.glet_strict_binds ++ gl.glet_lazy_binds))
+
+instance PP GLetBind where
+  pp inh lb = 'PP'.text lb.glb_dst 'PP'. <+> 'PP'.equals 'PP'. <+> pp inh lb.glb_src
+
+prettyAlg :: InhExpression -> ExpressionAlg Doc
+prettyAlg inh =
   let
-    varC bv = pretty bv
+    varC bv = pp inh bv
     appC app
-      # args = 'PP'.hcat $ intersperse ('PP'.text " ") $ map pretty app.app_args
-      = pretty app.app_symb 'PP'. <+> args
-    basicC bv = pretty bv
+      = let ppargs xs = 'PP'.hcat $ intersperse ('PP'.text " ") $ map (pp inh) xs
+        in  (case app.app_args of
+               []     -> pp inh app.app_symb
+               [x:xs] -> if (isInfix inh.inh_fun_defs inh.inh_icl_module inh.inh_dcl_modules app.app_symb)
+                           (pp inh x 'PP'. <+> pp inh app.app_symb 'PP'. <+> ppargs xs)
+                           (pp inh app.app_symb 'PP'. <+> ppargs app.app_args))
+    basicC bv = pp inh bv
     defaultC = 'PP'.empty
-  in {mkExprAlg 'PP'.empty & var = varC, app = appC, basicExpr = basicC }
+    selectionC _ expr sels = pp inh expr 'PP'. <-> 'PP'.char '.' 'PP'. <-> 'PP'.hcat (intersperse ('PP'.char '.') $ map (pp inh) sels)
+    updateC _ _ _ = 'PP'.text "update"
+    recordUpdateC _ _ _ = 'PP'.text "recordUpdate"
+    tupleSelectC _ _ _ = 'PP'.text "tupleSelect"
 
-debugPPAlg :: ExpressionAlg Doc
-debugPPAlg =
+  in { mkExprAlg 'PP'.empty
+     & var = varC, app = appC, basicExpr = basicC, selection = selectionC
+     , recordUpdate = recordUpdateC, update = updateC, tupleSelect = tupleSelectC }
+
+debugPPAlg :: InhExpression -> ExpressionAlg Doc
+debugPPAlg inh =
   let
-    varC bv = 'PP'.text "<Var>" 'PP'. <+> pretty bv
+    varC bv = 'PP'.text "<Var>" 'PP'. <+> pp inh bv
     appC app
-      # args = 'PP'.hcat $ intersperse ('PP'.text ", ") $ map pretty app.app_args
-      = 'PP'.text "<App>" 'PP'. <+> pretty app.app_symb 'PP'. <+> 'PP'.brackets args
-    basicC bv = 'PP'.text "<BasicValue>" 'PP'. <+> pretty bv
+      # args = 'PP'.hcat $ intersperse ('PP'.text ", ") $ map (pp inh) app.app_args
+      = 'PP'.text "<App>" 'PP'. <+> pp inh app.app_symb 'PP'. <+> 'PP'.brackets args
+    basicC bv = 'PP'.text "<BasicValue>" 'PP'. <+> pp inh bv
     defaultC = 'PP'.empty
-  in {mkExprAlg 'PP'.empty & var = varC, app = appC, basicExpr = basicC }
+    selectionC _ expr sels = 'PP'.text "<Selection>" 'PP'. <+> pp inh expr 'PP'. <-> 'PP'.char '.' 'PP'. <-> 'PP'.hcat (intersperse ('PP'.char '.') $ map (pp inh) sels)
+    //updateC _ _ _ = 'PP'.text "update"
+    //recordUpdateC _ _ _ = 'PP'.text "recordUpdate"
+    //tupleSelectC _ _ _ = 'PP'.text "tupleSelect"
+
+  in { mkExprAlg 'PP'.empty
+     & var = varC, app = appC, basicExpr = basicC, selection = selectionC }
+     //, recordUpdate = recordUpdateC, update = updateC, tupleSelect = tupleSelectC }
 
 getNodeData` :: Int GinGraph -> GNode
 getNodeData` n g = fromMaybe err (getNodeData n g)
   where err = abort ("No data for node " +++ toString n)
 
-mkTaskDot :: String Int Int GGraph -> String
-mkTaskDot funnm startid endid (GGraph g) = "subgraph cluster_" +++ funnm +++ " {\n label=\"" +++ funnm  +++ "\"  color=\"black\";\n" +++
+mkTaskDot :: InhExpression String Int Int GGraph -> String
+mkTaskDot inh funnm startid endid (GGraph g) = "subgraph cluster_" +++ funnm +++ " {\n label=\"" +++ funnm  +++ "\"  color=\"black\";\n" +++
   mkNodes +++ "\n" +++
   mkEdges +++ "\n}"
   where
-  mkNodes = concatStrings (map (nodeToDot funnm g) (nodeIndices g))
+  mkNodes = concatStrings (map (nodeToDot inh funnm g) (nodeIndices g))
   mkEdges = concatStrings (map edgeToDot (edgeIndices g))
   edgeToDot ei=:(l, r) = mkDotNodeLbl funnm l +++ " -> " +++ mkDotNodeLbl funnm r +++ mkDotArgs [mkDotAttrKV "label" edgeLbl] // TODO: Use different arrow for task assignment
     where edgeLbl = maybe "" (\e -> fromMaybe "" e.edge_pattern) $ getEdgeData ei g
@@ -828,18 +864,18 @@ mkDotArgs attrs = " [" +++ concatStrings (intersperse ", " attrs) +++ "];\n"
 mkDotNodeLbl :: String Int -> String
 mkDotNodeLbl funnm n = funnm +++ "_node_" +++ toString n
 
-nodeToDot :: String GinGraph Int -> String
-nodeToDot funnm g currIdx =
+nodeToDot :: InhExpression String GinGraph Int -> String
+nodeToDot inh funnm g currIdx =
   case currNode of
     GInit                 -> blackNode [shape "triangle", width ".25", height ".25"]
     GStop                 -> blackNode [shape "box", width ".2", height ".2"]
     (GDecision _ expr)    -> whiteNode [shape "diamond", label expr]
     GMerge                -> blackNode [shape "diamond", width ".25", height ".25"]
-    (GLet glt)            -> whiteNode [shape "box", label (mkPretty glt)] // TODO: Rounded corners
+    (GLet glt)            -> whiteNode [shape "box", label (mkPretty inh glt)] // TODO: Rounded corners
     GParallelSplit        -> whiteNode [shape "circle", label "Parallel split"]
     (GParallelJoin jt)    -> whiteNode [shape "circle", label (mkJoinLbl jt)]
     (GTaskApp tid exprs)  -> whiteNode [shape "box", label tid] // TODO: complex contents with extra bar
-    (GReturn expr)        -> whiteNode [shape "oval", label (mkPretty expr)]
+    (GReturn expr)        -> whiteNode [shape "oval", label (mkPretty inh expr)]
     (GAssign usr)         -> let  idxStr = toString currIdx
                                   usrStr = "user" +++ idxStr
                              in   "subgraph cluster_user" +++ idxStr +++ "{ label=" +++ usr +++ "; labelloc=b; peripheries=0; " +++ usrStr +++ "}" +++
