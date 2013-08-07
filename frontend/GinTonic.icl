@@ -557,10 +557,6 @@ mkGraphAlg inh =
         let fd       = fromMaybe err $ reifyFunDef inh.inh_fun_defs inh.inh_icl_module app.app_symb.symb_ident
             letargs  = drop (length app.app_args) fd.gfd_args
             binds    = zipWith (\eVar eVal -> mkGLetBind (mkPretty inh eVar) eVal) letargs es
-              //{  GLetBind
-                                               //|  glb_dst = mkPretty inh eVar
-                                               //,  glb_src = eVal
-                                               //} ) letargs es
             err      = abort ("atC: failed to reify " +++ app.app_symb.symb_ident.id_name)
             mkRec
               # (lid, g) = addNode (GLet binds) inh.inh_graph
