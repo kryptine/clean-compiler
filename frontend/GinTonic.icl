@@ -703,11 +703,19 @@ funToGraph {fun_ident=fun_ident, fun_body = TransformedBody tb} fun_defs icl_mod
     # syn  = exprCata (mkGraphAlg inh) tb.tb_rhs
     # g    = syn.syn_graph
     # g    = if syn.syn_has_recs
-               (addEdge emptyEdge (initId, mergeId) g) // TODO: Move all outgoing edges from init to merge
-               (removeNode mergeId g)
+               (mkRec syn.syn_nid initId mergeId g) // TODO: Move all outgoing edges from init to merge
+               (mkNonrec syn.syn_nid initId mergeId g)
     = maybe g (addNewSource g initId) (sourceNode g)
 
   addNewSource g newSource oldSource = addEdge emptyEdge (newSource, oldSource) g
+
+  mkRec mfirstId initId mergeId g
+    # g = addEdge emptyEdge (initId, mergeId) g
+    = maybe g (\firstId -> addEdge emptyEdge (mergeId, firstId) g) mfirstId
+
+  mkNonrec mfirstId initId mergeId g
+    # g = removeNode mergeId g
+    = maybe g (\firstId -> addEdge emptyEdge (initId, firstId) g) mfirstId
 
 funToGraph _ _ _ _ = No
 
