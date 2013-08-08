@@ -46,7 +46,7 @@ ginTonic` icl_module dcl_modules tpl=:(ok, fun_defs, array_instances, common_def
     | funIsTask fd && fd.fun_info.fi_def_level == 1  = defToStr fd +++ "\n" +++ rest
     | otherwise                                      = rest
   defToStr fd  = optional "Nothing happened" f (funToGraph fd fun_defs icl_module dcl_modules)
-    where f (g, so, si) = mkTaskDot (mkInhExpr fun_defs icl_module dcl_modules emptyGraph 0 0 0 "" Nothing) fd.fun_ident.id_name so si g
+    where f g  = mkTaskDot (mkInhExpr fun_defs icl_module dcl_modules emptyGraph 0 "" Nothing) fd.fun_ident.id_name g
   mkDotGraph subgraphs = "digraph " +++ icl_module.icl_name.id_name +++ "{\n" +++ subgraphs +++ "\n}"
 
 /*
@@ -312,8 +312,6 @@ mkExprAlg defaultC =
   ,  inh_icl_module      :: !IclModule
   ,  inh_dcl_modules     :: !{#DclModule}
   ,  inh_graph           :: !GinGraph
-  ,  inh_init_id         :: !Int
-  ,  inh_stop_id         :: !Int
   ,  inh_merge_id        :: !Int
   ,  inh_curr_task_name  :: !String
   ,  inh_case_expr       :: !Maybe Expression
@@ -348,15 +346,13 @@ mkSynExpr mn gr =
 mkSynExpr` :: GinGraph -> SynExpression
 mkSynExpr` gr = mkSynExpr Nothing gr
 
-mkInhExpr :: {#FunDef} IclModule {#DclModule} GinGraph Int Int Int String (Maybe Expression) -> InhExpression
-mkInhExpr fun_defs icl_module dcl_modules gg initId stopId mergeId nm ce =
+mkInhExpr :: {#FunDef} IclModule {#DclModule} GinGraph Int String (Maybe Expression) -> InhExpression
+mkInhExpr fun_defs icl_module dcl_modules gg mergeId nm ce =
   {  InhExpression
   |  inh_fun_defs        = fun_defs
   ,  inh_icl_module      = icl_module
   ,  inh_dcl_modules     = dcl_modules
   ,  inh_graph           = gg
-  ,  inh_init_id         = initId
-  ,  inh_stop_id         = stopId
   ,  inh_merge_id        = mergeId
   ,  inh_curr_task_name  = nm
   ,  inh_case_expr       = ce
@@ -448,15 +444,7 @@ mkGraphAlg inh =
           _           -> mkTaskApp app inh.inh_graph
     | otherwise               = mkSynExpr` inh.inh_graph
     where
-    mkBind app g // TODO: Take dictionary into account
-    // TODO: Rework
-    // The second element of the list is _not_ the lambda variable, but the
-    // reference to the entire lifted lambda expression. (assuming it is even
-    // a lambda expression).
-    // In case of a lambda expression, we first need to reify the function and
-    // do the rest there.
-    // In case of a function...?
-
+    mkBind app g
     // TODO: Check with funIsLam if the right-hand function is a lambda. If so,
     // do what we currently do and reify the lambda and continue graph generation.
     // If not, don't reify and just generate a task application node and be done.
@@ -478,7 +466,7 @@ mkGraphAlg inh =
           (Just l, Just r)  -> persistHasRec [synl, synr] $ mkSynExpr synl.syn_nid $ addEdge (mkEdge patid) (l, r) synr.syn_graph // TODO: Is this always the correct node id to synthesize?
           (lid, rid)        -> edgeErr inh "bind edge" lid lhsExpr rid rhsfd.gfd_rhs
 
-    mkReturn app g // TODO: Take dictionary into account
+    mkReturn app g
       # funTy  = fromMaybe (abort $ "mkGraphAlg #3: failed to find symbol type for " +++ mkPretty inh app.app_symb)
                $ reifySymbolType inh.inh_fun_defs inh.inh_dcl_modules app.app_symb.symb_ident
       # node   = GReturn $ withHead f (abort "Invalid return") $ dropContexts funTy app.app_args
@@ -570,15 +558,8 @@ mkGraphAlg inh =
               _           -> mkAt
     | otherwise    =  abort "atC: otherwise case" // TODO : pretty print function application
   atC _ _ = abort "atC: something else than App"
-  //atC` e es // TODO: Do something with es
-    //# fd = if (exprIsLam e) ()
-    //# syne = exprCata (mkGraphAlg inh) e
-    //= persistHasRec [syne] $ mkSynExpr syne.syn_nid syne.syn_graph //inh.inh_graph
-//:: GLetBind =
-  //{  glb_dst       :: !String
-  //,  glb_src       :: !Expression
-  //}
-  letC lt // TODO: Special case for _case_var
+
+  letC lt
     # glet         = mkGLet inh lt
     # mexpr        = listToMaybe  [  bnd.glb_src \\ bnd <- glet.glet_binds
                                   |  bnd.glb_dst == "_case_var"]
@@ -691,23 +672,25 @@ mkGFunDef _ = abort "mkGFunDef: need a TransformedBody"
 // for the FunDef and the other part should generate the init and stop nodes.
 // Yet another part should just get the right-hand side Expression of a FunDef
 // so we can just cata it.
-funToGraph :: FunDef {#FunDef} IclModule {#DclModule} -> Optional (GGraph, Int, Int)
+funToGraph :: FunDef {#FunDef} IclModule {#DclModule} -> Optional GGraph
 funToGraph {fun_ident=fun_ident, fun_body = TransformedBody tb} fun_defs icl_module dcl_modules
-  # (initId, g)   = addNode GInit emptyGraph // TODO: Do this afterwards instead? Would allow us to use the source/sink stuff
-  # (stopId, g)   = addNode GStop g
-  # (mergeId, g)  = addNode GMerge g
-  = Yes (GGraph (mkBody initId stopId mergeId g), initId, stopId)
+  = Yes $ GGraph mkBody
   where
-  mkBody initId stopId mergeId g // TODO cb.cb_args
-    # inh  = mkInhExpr fun_defs icl_module dcl_modules g initId stopId mergeId fun_ident.id_name Nothing
-    # syn  = exprCata (mkGraphAlg inh) tb.tb_rhs
-    # g    = syn.syn_graph
-    # g    = if syn.syn_has_recs
-               (mkRec syn.syn_nid initId mergeId g) // TODO: Move all outgoing edges from init to merge
-               (mkNonrec syn.syn_nid initId mergeId g)
-    = maybe g (addNewSource g initId) (sourceNode g)
+  mkBody // TODO cb.cb_args
+    # (mergeId, g)  = addNode GMerge emptyGraph
+    # inh           = mkInhExpr fun_defs icl_module dcl_modules g mergeId fun_ident.id_name Nothing
+    # syn           = exprCata (mkGraphAlg inh) tb.tb_rhs
+    # g             = syn.syn_graph
+    # (initId, g)   = addNode GInit g
+    # g             = if syn.syn_has_recs
+                        (mkRec syn.syn_nid initId mergeId g)
+                        (mkNonrec syn.syn_nid initId mergeId g)
+    = addStopEdges g
 
-  addNewSource g newSource oldSource = addEdge emptyEdge (newSource, oldSource) g
+  addStopEdges g
+    # leafs        = leafNodes g
+    # (stopId, g)  = addNode GStop g
+    = foldr (\nid g_ -> addEdge emptyEdge (nid, stopId) g_) g leafs
 
   mkRec mfirstId initId mergeId g
     # g = addEdge emptyEdge (initId, mergeId) g
@@ -890,8 +873,8 @@ getNodeData` :: Int GinGraph -> GNode
 getNodeData` n g = fromMaybe err (getNodeData n g)
   where err = abort ("No data for node " +++ toString n)
 
-mkTaskDot :: InhExpression String Int Int GGraph -> String
-mkTaskDot inh funnm startid endid (GGraph g) = "subgraph cluster_" +++ funnm +++ " {\n label=\"" +++ funnm  +++ "\"  color=\"black\";\n" +++
+mkTaskDot :: InhExpression String GGraph -> String
+mkTaskDot inh funnm (GGraph g) = "subgraph cluster_" +++ funnm +++ " {\n label=\"" +++ funnm  +++ "\"  color=\"black\";\n" +++
   mkNodes +++ "\n" +++
   mkEdges +++ "\n}"
   where
