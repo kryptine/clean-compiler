@@ -1,4 +1,4 @@
-definition module GinTonic
+definition module Tonic.CompilerInterface
 
 import syntax, checksupport
 

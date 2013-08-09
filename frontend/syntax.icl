@@ -358,12 +358,12 @@ where
 
 instance <<< Expression
 where
-	(<<<) file (Var ident) = file <<< ident
+	(<<<) file (Var ident) = file <<< "<Var>" <<< ident
 	(<<<) file (App {app_symb, app_args, app_info_ptr})
 		= case app_symb.symb_kind of
 			SK_Generic _ kind 
-				->  file <<< app_symb <<< kind <<< ' ' <<< app_args
-			_ 	-> file <<< app_symb <<< ' ' <<< app_args
+				->  file <<< "<App>" <<< app_symb <<< kind <<< ' ' <<< app_args
+			_ 	-> file <<< "<App>" <<< app_symb <<< ' ' <<< app_args
 	(<<<) file (f_exp @ a_exp) = file <<< '(' <<< f_exp <<< ") @ (" <<< a_exp <<< ')'
 	(<<<) file (Let {let_info_ptr, let_strict_binds, let_lazy_binds, let_expr}) 
 			= write_binds "" (write_binds "!" (file <<< "let" <<< '\n') let_strict_binds) let_lazy_binds <<< "in\n" <<< let_expr

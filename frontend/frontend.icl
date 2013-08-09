@@ -6,7 +6,7 @@ import scanner, parse, postparse, check, type, trans, partition, convertcases, o
 from CoclSystemDependent import DirectorySeparator
 
 // TODO START Tonic HACK
-import GinTonic
+import Tonic.CompilerInterface
 // TODO END Tonic HACK
 
 instance == FrontEndPhase where

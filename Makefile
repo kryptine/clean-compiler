@@ -1,8 +1,12 @@
 BACKEND_CSF=backend/Clean\ System\ Files
 BACKEND_LIBRARY_SOURCE=backendC/CleanCompilerSources/backend.a
 BACKEND_LIBRARY_TARGET=$(BACKEND_CSF)/backend_library
+TONIC_AG_FILENAME=TonicAG
+TONIC_DIR=frontend/Tonic
+TONIC_AG_FILE=$(TONIC_DIR)/$(TONIC_AG_FILENAME).ag
+TONIC_AG_ICL=$(TONIC_DIR)/$(TONIC_AG_FILENAME).icl
 
-default: frontend/tonic.icl $(BACKEND_LIBRARY)
+default: $(TONIC_AG_ICL) $(BACKEND_LIBRARY)
 	cpm project CleanCompilerMacOSX.prj build
 	cp cocl ~/clean/exe/itasks/cocl-tonic
 
@@ -16,6 +20,6 @@ $(BACKEND_LIBRARY_SOURCE): backendC/CleanCompilerSources/Makefile.linux64
 	cd backendC/CleanCompilerSources & make -f Makefile.linux64
 	cd main/Unix & make -f Makefile all
 
-frontend/tonic.icl: frontend/tonic.ag
-	uuagc --kennedywarren --clean -cfswH frontend/tonic.ag
+$(TONIC_AG_ICL): $(TONIC_AG_FILE)
+	uuagc --kennedywarren --clean -cfswH $(TONIC_AG_FILE)
 

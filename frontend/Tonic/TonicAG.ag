@@ -1,0 +1,96 @@
+{
+implementation module TonicAG
+}
+{
+import Control.Monad.Identity
+import Control.Applicative
+import qualified Control.Monad.Identity as Control.Monad.Identity
+from Control.Monad import class Monad (..)
+from StdClass import class + (..)
+from StdOverloaded import class < (..)
+from StdInt import instance + Int, instance < Int
+from StdList import ++, foldr, map
+import StdMisc
+import Data.Void
+
+from Text.PPrint import class Pretty (..), :: Doc
+import qualified Text.PPrint as P
+
+import syntax
+/*from syntax import :: Expression (..), :: BoundVar, :: App {..}, :: Let, :: Case,*/
+  /*:: SelectorKind, :: Selection, :: FreeVar {..}, :: Global, :: SymbIdent, :: Priority,*/
+  /*:: VarInfoPtr, :: DynamicExpr, :: Ptr, :: VarInfo, :: CodeBinding, :: DefinedSymbol,*/
+  /*:: Bind, :: Position, :: AType, :: Env, :: Ident, :: Level, :: ExprInfoPtr, :: ExprInfo,*/
+  /*:: TypeCodeExpression, :: GlobalIndex, :: Conditional, :: BasicValue, :: FieldSymbol*/
+
+}
+
+type Expressions = [Expression]
+
+data Expression
+  | Var             bv     :: {BoundVar}
+  | App             app    :: {App}
+  | At              expr   :: Expression              exprs :: Expressions
+  | Let             let    :: {Let}
+  | Case            case_  :: {Case}
+  | Selection       skind  :: {SelectorKind}          expr  :: Expression            sels  :: {[Selection]}
+  | Update          exprl  :: Expression              sels  :: {[Selection]}         exprr :: Expression
+  | RecordUpdate    gdsym  :: {Global DefinedSymbol}  expr  :: Expression            binds :: {[Bind Expression (Global FieldSymbol)]}
+  | TupleSelect     dsym   :: {DefinedSymbol}         n     :: {Int}                 expr  :: Expression
+  | BasicExpr       bv     :: {BasicValue}
+  | Conditional     cond   :: {Conditional}
+  | AnyCodeExpr     cbbv   :: {CodeBinding BoundVar}  cbfv  :: {CodeBinding FreeVar} ss :: {[String]}
+  | ABCCodeExpr     ss     :: {[String]}              bl    :: {Bool}
+
+  | MatchExpr       gdfs   :: {Global DefinedSymbol}  expr  :: Expression
+  | IsConstructor   expr   :: Expression              gdfs  :: {Global DefinedSymbol} arity :: {Int} gidx :: {GlobalIndex} ident :: {Ident} pos :: {Position}
+  | FreeVar         fv     :: {FreeVar}
+  | DictionariesFunction  fvat :: {[(FreeVar,AType)]} expr  :: Expression            aty :: {AType}
+
+  | Constant        symid  :: {SymbIdent}             n     :: {Int}                 prio :: {Priority}
+  | ClassVariable   varinfptr :: {VarInfoPtr}
+
+  | DynamicExpr     dynexpr :: {DynamicExpr}
+  | TypeCodeExpression  tycodeexpr :: {TypeCodeExpression}
+
+  | TypeSignature   sigfun :: {Int Int -> (AType,Int,Int)}  expr :: Expression
+
+  | EE
+  | NoBind          exprinfoptr :: {ExprInfoPtr}
+  | FailExpr        ident :: {Ident}
+
+attr Expression Expressions
+  inh moduleEnv                                 :: ModuleEnv
+  syn pp           use {'P'. <$$>} {'P'.empty}  :: Doc
+  syn ppDebug      use {'P'. <$$>} {'P'.empty}  :: Doc
+  -- syn foo use {(+)} {1} :: Int
+   -- inh bar :: Int
+
+  -- varC bv = pp inh bv
+  --   appC app
+  --     # args = dropAppContexts app inh
+  --     = let ppargs xs = 'PP'.hcat $ intersperse ('PP'.text " ") $ map (pp inh) xs
+  --       in  (case args of
+  --              []     -> pp inh app.app_symb
+  --              [x:xs] -> if (isInfix inh.inh_fun_defs inh.inh_icl_module inh.inh_dcl_modules app.app_symb)
+  --                          (pp inh x 'PP'. <+> pp inh app.app_symb 'PP'. <+> ppargs xs)
+  --                          (pp inh app.app_symb 'PP'. <+> ppargs args))
+  --   basicC bv = pp inh bv
+  --   defaultC = 'PP'.empty
+  --   selectionC _ expr sels = 
+  --   updateC _ _ _ = 'PP'.text "update"
+  --   recordUpdateC _ _ _ = 'PP'.text "recordUpdate"
+  --   tupleSelectC _ _ _ = 'PP'.text "tupleSelect"
+
+sem Expression
+  | Var   lhs.pp = 'P'.pretty @bv
+  | App   lhs.pp = let args = dropAppContexts @app @lhs.moduleEnv
+                       ppargs xs = 'P'.hcat $ intersperse ('P'.text " ") $ map (pp inh) xs
+                   in  (case args of
+                          []     -> pp @lhs.moduleEnv @app|app_symb
+                          [x:xs] -> if (isInfix @lhs.moduleEnv @app|app_symb)
+                                      (pp @lhs.moduleEnv x 'P'. <+> pp @lhs.moduleEnv @app|app_symb 'P'. <+> ppargs xs)
+                                      (pp @lhs.moduleEnv @app|app_symb 'P'. <+> ppargs args))
+  | Selection lhs.pp = @expr.pp 'PP'. <-> 'PP'.char '.' 'PP'. <-> 'PP'.hcat (intersperse ('PP'.char '.') $ map (pp @lhs.moduleEnv) sels)
+  | BasicExpr lhs.pp = pp @lhs.moduleEnv @bv
+
