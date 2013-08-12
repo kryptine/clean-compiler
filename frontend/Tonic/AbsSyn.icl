@@ -3,7 +3,7 @@ implementation module Tonic.AbsSyn
 import syntax
 import Data.Graph
 import Data.Maybe
-import Tonic.Pretty
+import Tonic.Tonic
 
 exprCata :: (ExpressionAlg a) Expression -> a
 exprCata alg (Var bv                      ) = alg.var bv
@@ -63,9 +63,13 @@ mkExprAlg defaultC =
   }
 
 mkSynExpr :: (Maybe Int) GinGraph -> SynExpression
-mkSynExpr mn gr =
+mkSynExpr mn gr = mkSynExpr2 mn mn gr
+
+mkSynExpr2 :: (Maybe Int) (Maybe Int) GinGraph -> SynExpression
+mkSynExpr2 mnid mxid gr =
   {  SynExpression
-  |  syn_nid        = mn
+  |  syn_entry_id   = mnid
+  ,  syn_exit_id    = mxid
   ,  syn_graph      = gr
   ,  syn_has_recs   = False
   ,  syn_rec_node   = False

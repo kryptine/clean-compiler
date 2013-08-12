@@ -1,9 +1,8 @@
 implementation module Tonic.CompilerInterface
 
 import Tonic.Util
-//import Tonic.TonicAG
 import Tonic.GraphGen
-import Tonic.Pretty
+import Tonic.Tonic
 import syntax, checksupport, StdFile
 from CoclSystemDependent import DirectorySeparator, ensureCleanSystemFilesExists
 import Text

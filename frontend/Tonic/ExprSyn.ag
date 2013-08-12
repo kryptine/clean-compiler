@@ -1,0 +1,52 @@
+imports
+{
+from syntax import
+  :: Expression (..), :: BoundVar {..}, :: App {..}, :: Let {..}, :: Case,
+  :: SelectorKind, :: Selection (..), :: FreeVar {..}, :: Global {..},
+  :: SymbIdent {..}, :: SymbKind, :: Priority, :: VarInfoPtr, :: DynamicExpr,
+  :: Ptr, :: VarInfo, :: CodeBinding, :: DefinedSymbol {..}, :: Index, :: Bind,
+  :: Position, :: AType, :: Env, :: Ident {..}, :: SymbolPtr,
+  :: SymbolTableEntry, :: Level, :: ExprInfoPtr, :: ExprInfo,
+  :: TypeCodeExpression, :: GlobalIndex, :: Conditional, :: BasicValue (..),
+  :: FieldSymbol, :: IclModule, :: DclModule, :: FunDef, :: Optional,
+  :: SymbolType, :: LetBind
+
+import Tonic.AbsSyn
+}
+
+type Expressions = [Expression]
+
+data Expression
+  | Var             bv                 :: {BoundVar}
+  | App             app                :: {App}
+  | At              expr               :: Expression              exprs :: Expressions
+  | Let             let_               :: {Let}
+  | Case            case_              :: {Case}
+  | Selection       skind              :: {SelectorKind}          expr  :: Expression             sels  :: {[Selection]}
+  | Update          exprl              :: Expression              sels  :: {[Selection]}          exprr :: Expression
+  | RecordUpdate    gdsym              :: {Global DefinedSymbol}  expr  :: Expression             binds :: {[Bind Expression (Global FieldSymbol)]}
+  | TupleSelect     dsym               :: {DefinedSymbol}         n     :: {Int}                  expr  :: Expression
+  | BasicExpr       bv                 :: {BasicValue}
+  | Conditional     cond               :: {Conditional}
+  | AnyCodeExpr     cbbv               :: {CodeBinding BoundVar}  cbfv  :: {CodeBinding FreeVar}  ss    :: {[String]}
+  | ABCCodeExpr     ss                 :: {[String]}              bl    :: {Bool}
+
+  | MatchExpr       gdfs               :: {Global DefinedSymbol}  expr  :: Expression
+  | IsConstructor   expr               :: Expression              gdfs  :: {Global DefinedSymbol} arity :: {Int} gidx :: {GlobalIndex} ident :: {Ident} pos :: {Position}
+  | FreeVar         fv                 :: {FreeVar}
+  | DictionariesFunction  fvat         :: {[(FreeVar,AType)]}     expr  :: Expression             aty   :: {AType}
+
+  | Constant              symid        :: {SymbIdent}             n     :: {Int}                  prio  :: {Priority}
+  | ClassVariable         varinfptr    :: {VarInfoPtr}
+
+  | DynamicExpr           dynexpr      :: {DynamicExpr}
+  | TypeCodeExpression    tycodeexpr   :: {TypeCodeExpression}
+
+  | TypeSignature         sigfun       :: {Int Int -> (AType,Int,Int)}  expr :: Expression
+
+  | EE
+  | NoBind                exprinfoptr  :: {ExprInfoPtr}
+  | FailExpr              ident        :: {Ident}
+
+attr Expression Expressions
+  inh moduleEnv                        :: {ModuleEnv}

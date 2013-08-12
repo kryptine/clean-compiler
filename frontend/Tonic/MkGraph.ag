@@ -1,0 +1,220 @@
+imports
+{
+from StdClass import class + (..)
+from StdOverloaded import class < (..)
+from StdInt import instance + Int, instance < Int
+from StdList import ++, foldr, map
+from StdOverloaded import class +++ (..)
+from StdString import instance +++ {#Char}, instance toString Int, instance == {#Char}
+from StdFunc import o
+from StdBool import ||
+import StdMisc
+import Data.Void
+import Data.Func
+import Data.List
+
+import Data.Graph
+import Data.Maybe
+import Text.PPrint
+import Tonic.AbsSyn
+import Tonic.Util
+from syntax import :: Optional (..)
+}
+
+attr Expression Expressions
+  inh mergeId                            :: {Int}
+  inh currTaskName                       :: {String}
+  inh caseExpr                           :: {Maybe Expression}
+  chn graph                              :: {GinGraph}
+  syn hasRecs       use {||}  {False}    :: {Bool}
+  syn recNode       use {||}  {False}    :: {Bool}
+  syn mNodeId       use {<>}  {Nothing}  :: {Maybe Int}
+
+sem Expression
+  | App
+      lhs.graph = if (identIsTask @lhs.moduleEnv @app|app_symb.symb_ident)
+                    @loc.taskGraph
+                    @lhs.graph
+
+      loc.taskGraph = case appFunName @app of // TODO `parallel`
+                        ">>="       -> @loc.bindGraph
+                        "return"    -> @loc.returnGraph
+                        ">>|"       -> @loc.binAppGraph Nothing
+                        "@:"        -> @loc.assignGraph
+                        ">>*"       -> @loc.stepGraph
+                        "-||-"      -> @loc.parBinAppGraph DisFirstBin
+                        "||-"       -> @loc.parBinAppGraph DisRight
+                        "-||"       -> @loc.parBinAppGraph DisLeft
+                        "-&&-"      -> @loc.parBinAppGraph ConPair
+                        "anyTask"   -> @loc.parListAppGraph DisFirstList
+                        "allTasks"  -> @loc.parListAppGraph ConAll
+                        _           -> @loc.taskAppGraph
+
+      loc.nodictargs = dropAppContexts @app @lhs.moduleEnv
+
+      loc.(bindLhsExpr, bindRhsApp) =
+                            case @loc.nodictargs of
+                              [e:App rhsApp:_]  -> (e, rhsApp)
+                              // TODO: Do not throw an error: bind can be eta-reduced
+                              _                 -> abort ("Invalid bind: " +++ (intercalateString " " $ map (\x -> "'" +++ mkPretty @lhs.moduleEnv x +++ "'") @loc.nodictargs))
+
+      loc.bindGraph = undef // TODO: Check with funIsLam if the right-hand function is a lambda. If so,
+                      // do what we currently do and reify the lambda and continue graph generation.
+                      // If not, don't reify and just generate a task application node and be done.
+                      //let 
+                          //(lhsExpr, rhsApp) =
+                            //case nodictargs of
+                              //[e:App rhsApp:_]  -> (e, rhsApp)
+                              //// TODO: Do not throw an error: bind can be eta-reduced
+                              //_                 -> abort ("Invalid bind: " +++ (intercalateString " " $ map (\x -> "'" +++ mkPretty @lhs.moduleEnv x +++ "'") nodictargs))
+                          //rhsfd  = fromMaybe (abort $ "mkGraphAlg #1: failed to find function definition for " +++ mkPretty @lhs.moduleEnv rhsApp.app_symb)
+                                 //$ reifyFunDef @lhs.moduleEnv rhsApp.app_symb.symb_ident
+                          //rhsTy  = fromMaybe (abort $ "mkGraphAlg #2: failed to find symbol type for " +++ mkPretty @lhs.moduleEnv rhsApp.app_symb)
+                                 //$ reifySymbolType @lhs.moduleEnv rhsApp.app_symb.symb_ident
+                          //patid  = withHead freeVarName (abort "Invalid bind") $ dropContexts rhsTy rhsfd.gfd_args
+                          //synl   = mkGinGraph exprCata (mkGraphAlg inh) lhsExpr
+                          //synr   = exprCata (mkGraphAlg {inh & inh_graph = synl.syn_graph}) rhsfd.gfd_rhs
+                          //case (synl.syn_nid, synr.syn_nid) of
+                            //(Just l, Just r)  -> persistHasRec [synl, synr] $ mkSynExpr synl.syn_nid $ addEdge (mkEdge patid) (l, r) synr.syn_graph // TODO: Is this always the correct node id to synthesize?
+                            //(lid, rid)        -> edgeErr inh.inh_module_env "bind edge" lid lhsExpr rid rhsfd.gfd_rhs
+
+      loc.returnGraph = undef
+
+      loc.binAppGraph = \mPat -> undef
+
+      loc.assignGraph = undef
+
+      loc.stepGraph = abort "Step not implemented yet"
+
+      loc.parBinAppGraph = \join -> undef
+
+      loc.parListAppGraph = \join -> undef
+
+      loc.taskAppGraph = if @loc.isCurrTask
+                           @lhs.graph
+                           (let appArgs  = map (GCleanExpression o (mkPretty @lhs.moduleEnv)) @app|app_args  // TODO: When do we pprint a Clean expr? And when do we generate a subgraph?
+                                (an, g)  = addNode (GTaskApp (appFunName @app) appArgs) g
+                            in  g)
+
+      loc.isCurrTask = appFunName @app == @lhs.currTaskName
+
+  | Let
+      lhs.graph = case @loc.mexpr of
+                    Just e  -> @letExpr.graph
+                    _       -> let glet      = @loc.glet
+                                   (lid, g)  = addNode (GLet glet.glet_binds) @letExpr.graph
+                                   // TODO: Represent the bindings in any way possible, not just PP
+                                   err       = abort "Failed to add let edge; no synthesized ID from let body"
+                               in maybe err (\n -> addEmptyEdge (lid, n) g) @loc.connId
+
+      lhs.recNode = False
+
+      loc.connId = if @letExpr.recNode (Just @lhs.mergeId) @letExpr.mNodeId
+
+      letExpr.caseExpr  = @loc.mexpr
+
+      loc.mexpr = let glet = @loc.glet
+                  in  listToMaybe  [  bnd.glb_src \\ bnd <- glet.glet_binds
+                                   |  bnd.glb_dst == "_case_var"]
+
+      loc.glet = mkGLet @lhs.moduleEnv @let_
+
+      inst.letExpr :: Expression
+      inst.letExpr = @let_|let_expr
+
+{
+
+(<>) infixr 5 :: (Maybe a) (Maybe a) -> Maybe a
+(<>) Nothing  ma  = ma
+(<>) ma       _   = ma
+
+mkGinGraph :: Int String GinGraph ModuleEnv Expression -> GinGraph
+mkGinGraph mid ctn gg menv expr =
+  graph_Syn_Expression (wrap_Expression (sem_Expression expr)
+                       (Inh_Expression Nothing ctn gg mid menv))
+
+listExprToList :: Expression -> [Expression]
+listExprToList (App app) =
+  case app.app_symb.symb_ident.id_name of
+    "_Cons" ->
+      case app.app_args of
+        [head:tail:_] -> [head : listExprToList tail]
+        _             -> abort "listExprToList should not happen"
+    "_Nil"  -> []
+    _       -> abort "listExprToList: App is not a list"
+listExprToList _ = []
+
+nodeErr :: ModuleEnv (Maybe Int) Expression -> String
+nodeErr menv mn expr = mkPretty menv expr +++ "\n" +++
+  maybe "for which its ID is unknown" (\n -> "with node ID " +++ toString n) mn
+
+addEmptyEdge :: (Int, Int) GinGraph -> GinGraph
+addEmptyEdge e g = addEdge emptyEdge e g
+
+addNode` :: GNode GinGraph -> SynExpression
+addNode` node graph
+  # (n, g) = addNode node graph
+  = mkSynExpr (Just n) g
+
+// TODO: We need to split this up: one part of this should generate the graph
+// for the FunDef and the other part should generate the init and stop nodes.
+// Yet another part should just get the right-hand side Expression of a FunDef
+// so we can just cata it.
+/*funToGraph :: FunDef {#FunDef} IclModule {#DclModule} -> Optional GGraph*/
+/*funToGraph {fun_ident=fun_ident, fun_body = TransformedBody tb} fun_defs icl_module dcl_modules*/
+  /*= Yes $ GGraph mkBody*/
+  /*where*/
+  /*mkBody*/
+    /*# (mergeId, g)  = addNode GMerge emptyGraph*/
+    /*# inh           = mkInhExpr (mkModuleEnv fun_defs icl_module dcl_modules) g mergeId fun_ident.id_name Nothing*/
+    /*# syn           = exprCata (mkGraphAlg inh) tb.tb_rhs*/
+    /*# g             = syn.syn_graph*/
+    /*# (initId, g)   = addNode GInit g*/
+    /*# g             = if syn.syn_has_recs*/
+                        /*(mkRec syn.syn_nid initId mergeId g)*/
+                        /*(mkNonrec syn.syn_nid initId mergeId g)*/
+    /*= addStopEdges g*/
+
+  /*addStopEdges g*/
+    /*# leafs        = leafNodes g*/
+    /*# (stopId, g)  = addNode GStop g*/
+    /*= foldr (\nid g_ -> addEmptyEdge (nid, stopId) g_) g leafs*/
+
+  /*mkRec mfirstId initId mergeId g*/
+    /*# g = addEmptyEdge (initId, mergeId) g*/
+    /*= maybe g (\firstId -> addEmptyEdge (mergeId, firstId) g) mfirstId*/
+
+  /*mkNonrec mfirstId initId mergeId g*/
+    /*# g = removeNode mergeId g*/
+    /*= maybe g (\firstId -> addEmptyEdge (initId, firstId) g) mfirstId*/
+
+funToGraph _ _ _ _ = No
+
+instance toString GNode where
+  toString GInit = "GInit"
+  toString GStop = "GStop"
+  toString (GDecision _ _) = "GDecision"
+  toString GMerge = "GMerge"
+  toString (GLet _) = "GLet"
+  toString GParallelSplit = "GParallelSplit"
+  toString (GParallelJoin _) = "GParallelJoin"
+  toString (GTaskApp _ _) = "GTaskApp"
+  toString (GReturn _) = "GReturn"
+  toString (GAssign _) = "GAssign"
+  toString GStep = "GStep"
+  toString GListComprehension = "GListComprehension"
+
+/*
+Task assignment drawing: Needs a stick.png with a stick figure (can be PDF?)
+digraph G {
+   rankdir=LR;
+
+    subgraph clusterUser {label="User"; labelloc="b"; peripheries=0; user};
+    user [shapefile="stick.png", peripheries=0, style=invis];
+
+    login [label="Log In", shape=ellipse];
+
+    user->login [arrowhead=none];
+}
+*/
+}

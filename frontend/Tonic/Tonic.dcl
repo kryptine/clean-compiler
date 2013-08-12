@@ -1,4 +1,4 @@
-definition module Tonic.Pretty
+definition module Tonic.Tonic
 from Text.PPrint import :: Doc
 import Tonic.AbsSyn
 
@@ -69,9 +69,13 @@ mergeId_Inh_Expression :: Inh_Expression -> (Int)
 graph_Inh_Expression :: Inh_Expression -> (GinGraph)
 currTaskName_Inh_Expression :: Inh_Expression -> (String)
 caseExpr_Inh_Expression :: Inh_Expression -> (Maybe Expression)
-:: Syn_Expression  = Syn_Expression (Doc) (Doc)
+:: Syn_Expression  = Syn_Expression (GinGraph) (Bool) (Maybe Int) (Doc) (Doc) (Bool)
+recNode_Syn_Expression :: Syn_Expression -> (Bool)
 ppDebug_Syn_Expression :: Syn_Expression -> (Doc)
 ppAg_Syn_Expression :: Syn_Expression -> (Doc)
+mNodeId_Syn_Expression :: Syn_Expression -> (Maybe Int)
+hasRecs_Syn_Expression :: Syn_Expression -> (Bool)
+graph_Syn_Expression :: Syn_Expression -> (GinGraph)
 wrap_Expression :: T_Expression  Inh_Expression  -> (Syn_Expression )
 
 // cata
@@ -83,11 +87,11 @@ sem_Expression :: Expression  -> T_Expression
 :: T_Expression_s3  = C_Expression_s3
 :: T_Expression_v1  :== (T_Expression_vIn1 ) -> (T_Expression_vOut1 )
 :: T_Expression_vIn1  = T_Expression_vIn1 (Maybe Expression) (String) (GinGraph) (Int) (ModuleEnv)
-:: T_Expression_vOut1  = T_Expression_vOut1 (Doc) (Doc)
+:: T_Expression_vOut1  = T_Expression_vOut1 (GinGraph) (Bool) (Maybe Int) (Doc) (Doc) (Bool)
 sem_Expression_Var  :: (BoundVar) -> T_Expression 
 sem_Expression_App  :: (App) -> T_Expression 
 sem_Expression_At  :: (T_Expression ) (T_Expressions ) -> T_Expression 
-sem_Expression_Let  :: (Let) -> T_Expression 
+sem_Expression_Let  :: (Let)  -> T_Expression 
 sem_Expression_Case  :: (Case) -> T_Expression 
 sem_Expression_Selection  :: (SelectorKind) (T_Expression ) ([Selection]) -> T_Expression 
 sem_Expression_Update  :: (T_Expression ) ([Selection]) (T_Expression ) -> T_Expression 
@@ -118,9 +122,13 @@ mergeId_Inh_Expressions :: Inh_Expressions -> (Int)
 graph_Inh_Expressions :: Inh_Expressions -> (GinGraph)
 currTaskName_Inh_Expressions :: Inh_Expressions -> (String)
 caseExpr_Inh_Expressions :: Inh_Expressions -> (Maybe Expression)
-:: Syn_Expressions  = Syn_Expressions (Doc) (Doc)
+:: Syn_Expressions  = Syn_Expressions (GinGraph) (Bool) (Maybe Int) (Doc) (Doc) (Bool)
+recNode_Syn_Expressions :: Syn_Expressions -> (Bool)
 ppDebug_Syn_Expressions :: Syn_Expressions -> (Doc)
 ppAg_Syn_Expressions :: Syn_Expressions -> (Doc)
+mNodeId_Syn_Expressions :: Syn_Expressions -> (Maybe Int)
+hasRecs_Syn_Expressions :: Syn_Expressions -> (Bool)
+graph_Syn_Expressions :: Syn_Expressions -> (GinGraph)
 wrap_Expressions :: T_Expressions  Inh_Expressions  -> (Syn_Expressions )
 
 // cata
@@ -132,6 +140,6 @@ sem_Expressions :: Expressions  -> T_Expressions
 :: T_Expressions_s6  = C_Expressions_s6
 :: T_Expressions_v4  :== (T_Expressions_vIn4 ) -> (T_Expressions_vOut4 )
 :: T_Expressions_vIn4  = T_Expressions_vIn4 (Maybe Expression) (String) (GinGraph) (Int) (ModuleEnv)
-:: T_Expressions_vOut4  = T_Expressions_vOut4 (Doc) (Doc)
+:: T_Expressions_vOut4  = T_Expressions_vOut4 (GinGraph) (Bool) (Maybe Int) (Doc) (Doc) (Bool)
 sem_Expressions_Cons  :: (T_Expression ) (T_Expressions ) -> T_Expressions 
 sem_Expressions_Nil  ::   T_Expressions 

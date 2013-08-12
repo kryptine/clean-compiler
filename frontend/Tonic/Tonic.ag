@@ -1,0 +1,63 @@
+module {Tonic.Tonic}
+{
+from Text.PPrint import :: Doc
+import Tonic.AbsSyn
+
+from syntax import :: Expression (..), :: BoundVar {..}, :: App {..}, :: Let, :: Case,
+  :: SelectorKind, :: Selection (..), :: FreeVar {..}, :: Global {..}, :: SymbIdent {..}, :: SymbKind, :: Priority,
+  :: VarInfoPtr, :: DynamicExpr, :: Ptr, :: VarInfo, :: CodeBinding, :: DefinedSymbol {..}, :: Index,
+  :: Bind, :: Position, :: AType, :: Env, :: Ident {..}, :: SymbolPtr, :: SymbolTableEntry, :: Level, :: ExprInfoPtr, :: ExprInfo,
+  :: TypeCodeExpression, :: GlobalIndex, :: Conditional, :: BasicValue (..), :: FieldSymbol,
+  :: IclModule, :: DclModule, :: FunDef, :: Optional, :: SymbolType, :: LetBind
+
+:: Expressions :== [Expression]
+
+mkPretty :: ModuleEnv -> (a -> String) | PPAG a
+
+ppCompact :: (Doc -> String)
+
+ppDebugExpression :: ModuleEnv Expression -> Doc
+
+mkPPInh :: ModuleEnv -> Inh_Expression
+
+mkTaskDot :: ModuleEnv String GGraph -> String
+
+mkDotAttrKV :: String String -> String
+
+mkDotArgs :: [String] -> String
+
+mkDotNodeLbl :: String Int -> String
+
+nodeToDot :: ModuleEnv String GinGraph Int -> String
+
+getNodeData` :: Int GinGraph -> GNode
+
+class PPAG a where
+  ppAg :: ModuleEnv a -> Doc
+
+instance PPAG Expression
+
+instance PPAG Ident
+
+instance PPAG BoundVar
+
+instance PPAG FreeVar
+
+instance PPAG SymbIdent
+
+instance PPAG BasicValue
+
+instance PPAG DefinedSymbol
+
+instance PPAG Selection
+
+instance PPAG GExpression
+
+instance PPAG GLet
+
+instance PPAG GLetBind
+}
+{}
+include "ExprSyn.ag"
+include "Pretty.ag"
+include "MkGraph.ag"

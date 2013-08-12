@@ -20,7 +20,7 @@ import Data.Graph
 
 import qualified Text.PPrint as PPrint
 
-import Tonic.Pretty
+import Tonic.Tonic
 
 import StdMisc
 import StdDebug
@@ -89,7 +89,7 @@ edgeErr menv errmsg lid lexpr rid rexpr = abort ("Cannot create " +++ errmsg
 connectId :: InhExpression SynExpression -> (Maybe Int, SynExpression)
 connectId inh syn
   | syn.syn_rec_node  = (Just inh.inh_merge_id, { syn & syn_rec_node = False })
-  | otherwise         = (syn.syn_nid, syn)
+  | otherwise         = (syn.syn_entry_id, syn)
 
 
 // TODO: Check if we need more connectId applications
@@ -130,9 +130,11 @@ mkGraphAlg inh =
       # patid  = withHead freeVarName (abort "Invalid bind") $ dropContexts rhsTy rhsfd.gfd_args
       # synl   = exprCata (mkGraphAlg inh) lhsExpr
       # synr   = exprCata (mkGraphAlg {inh & inh_graph = synl.syn_graph}) rhsfd.gfd_rhs
-      = case (synl.syn_nid, synr.syn_nid) of
-          (Just l, Just r)  -> persistHasRec [synl, synr] $ mkSynExpr synl.syn_nid $ addEdge (mkEdge patid) (l, r) synr.syn_graph // TODO: Is this always the correct node id to synthesize?
-          (lid, rid)        -> edgeErr inh.inh_module_env "bind edge" lid lhsExpr rid rhsfd.gfd_rhs
+      = case (synl.syn_entry_id, synl.syn_exit_id, synr.syn_entry_id, synr.syn_exit_id) of
+          (Just _, Just lx, Just rn, Just _)
+            # g = addEdge (mkEdge patid) (lx, rn) synr.syn_graph
+            = persistHasRec [synl, synr] $ mkSynExpr synl.syn_entry_id g  // TODO: Is this always the correct node id to synthesize?
+          (_, lid, rid, _)        = edgeErr inh.inh_module_env "bind edge" lid lhsExpr rid rhsfd.gfd_rhs
 
     mkReturn app g
       // TODO No error: eta-reduction
@@ -150,7 +152,7 @@ mkGraphAlg inh =
       let mkAssign` u t
             # (lid, g)  = addNode (GAssign (mkPretty inh.inh_module_env u)) g
             # synt      = exprCata (mkGraphAlg {inh & inh_graph = g}) t
-            = maybe (err lid) (\r -> persistHasRec [synt] $ mkSynExpr` (addEmptyEdge (lid, r) synt.syn_graph)) synt.syn_nid
+            = maybe (err lid) (\r -> persistHasRec [synt] $ mkSynExpr` (addEmptyEdge (lid, r) synt.syn_graph)) synt.syn_entry_id
             where
             err lid = edgeErr inh.inh_module_env "assign edge" (Just lid) u Nothing t
       // TODO: If there are no two elems in the list, the expr is eta-reduced, so we need to pprint it instead of throwing an error
@@ -171,7 +173,7 @@ mkGraphAlg inh =
       let mkBinApp` l r
             # synl = exprCata (mkGraphAlg {inh & inh_graph = g}) l
             # synr = exprCata (mkGraphAlg {inh & inh_graph = synl.syn_graph}) r
-            = case (synl.syn_nid, synr.syn_nid) of
+            = case (synl.syn_entry_id, synr.syn_entry_id) of
                 (Just l, Just r)  -> persistHasRec [synl, synr] $ mkSynExpr` (addEdge (maybe emptyEdge mkEdge pat) (l, r) synr.syn_graph)
                 (lid, rid)        -> edgeErr inh.inh_module_env "bin app edge" lid l rid r
       // TODO: If there are no two elems in the list, the expr is eta-reduced, so we need to pprint it instead of throwing an error
@@ -183,7 +185,7 @@ mkGraphAlg inh =
             # (jid, g)  = addNode (GParallelJoin join) g
             # synl      = exprCata (mkGraphAlg {inh & inh_graph = g}) l
             # synr      = exprCata (mkGraphAlg {inh & inh_graph = synl.syn_graph}) r
-            = case (synl.syn_nid, synr.syn_nid) of
+            = case (synl.syn_entry_id, synr.syn_entry_id) of
                 (Just l, Just r)
                   # g = addEmptyEdge (sid, l) synr.syn_graph
                   # g = addEmptyEdge (sid, r) g
@@ -215,10 +217,14 @@ mkGraphAlg inh =
                                    # g = addEmptyEdge (fromMaybe (abort "Failed to add parallel node") mid, jid) synx.syn_graph
                                    = (  synx.syn_has_recs || hr, g)
                               in  foldr (f sid) (False, g) exprs
-                = { mkSynExpr (Just sid) g & syn_has_recs = hr }
+                = { mkSynExpr2 (Just sid) (Just jid) g & syn_has_recs = hr }
             | exprIsListCompr arg
-                # (nid, g) = addNode GListComprehension g
-                = mkSynExpr (Just nid) g // TODO
+                # (sid, g)  = addNode GParallelSplit g
+                # (jid, g)  = addNode (GParallelJoin join) g
+                # (nid, g)  = addNode GListComprehension g
+                # g         = addEmptyEdge (sid, nid) g
+                # g         = addEmptyEdge (nid, jid) g
+                = mkSynExpr2 (Just sid) (Just jid) g // TODO
             | otherwise = mkTaskApp app g
       in withHead mkParApp` (abort "mkParListApp TODO") $ dropAppContexts app inh.inh_module_env
 
@@ -278,7 +284,7 @@ mkGraphAlg inh =
     mkLet glet
       # (lid, g)     = addNode (GLet glet.glet_binds) inh.inh_graph
       // TODO: Represent the bindings in any way possible, not just PP
-      # syn2         = exprCata (mkGraphAlg {inh & inh_graph = g}) lt.let_expr
+      # syn2         = exprCata (mkGraphAlg {inh & inh_graph = g}) glet.glet_expr
       # (mid, syn3)  = connectId inh syn2
       # g            = maybe err (\n -> addEmptyEdge (lid, n) syn3.syn_graph) mid
       = persistHasRec [syn3] $ mkSynExpr (Just lid) g // TODO: Correct gid?
@@ -374,8 +380,8 @@ funToGraph {fun_ident=fun_ident, fun_body = TransformedBody tb} fun_defs icl_mod
     # g             = syn.syn_graph
     # (initId, g)   = addNode GInit g
     # g             = if syn.syn_has_recs
-                        (mkRec syn.syn_nid initId mergeId g)
-                        (mkNonrec syn.syn_nid initId mergeId g)
+                        (mkRec syn.syn_entry_id initId mergeId g)
+                        (mkNonrec syn.syn_entry_id initId mergeId g)
     = addStopEdges g
 
   addStopEdges g

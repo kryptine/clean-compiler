@@ -50,7 +50,8 @@ At e es :== e @ es
   }
 
 :: SynExpression =
-  {  syn_nid        :: !Maybe Int
+  {  syn_entry_id   :: !Maybe Int
+  ,  syn_exit_id    :: !Maybe Int
   ,  syn_graph      :: !GinGraph
   ,  syn_has_recs   :: !Bool
   ,  syn_rec_node   :: !Bool
@@ -117,6 +118,8 @@ exprCata :: (ExpressionAlg a) Expression -> a
 mkExprAlg :: a -> ExpressionAlg a
 
 mkSynExpr :: (Maybe Int) GinGraph -> SynExpression
+
+mkSynExpr2 :: (Maybe Int) (Maybe Int) GinGraph -> SynExpression
 
 mkSynExpr` :: GinGraph -> SynExpression
 
