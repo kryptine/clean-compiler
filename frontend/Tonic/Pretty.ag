@@ -40,24 +40,45 @@ attr Expression Expressions
   --   tupleSelectC _ _ _ = 'PP'.text "tupleSelect"
 
 sem Expression
-  | Var       lhs.ppDebug = text "<Var>" <+> ppAg @lhs.moduleEnv @bv
-              lhs.ppAg    = ppAg @lhs.moduleEnv @bv
+  | Var
+      lhs.ppDebug = text "<Var>" <+> ppAg @lhs.moduleEnv @bv
+      lhs.ppAg    = ppAg @lhs.moduleEnv @bv
 
-  | App       lhs.ppDebug = let args    = dropAppContexts @app @lhs.moduleEnv
-                                argsPP  = hcat $ intersperse (text ", ") $ map (ppDebugExpression @lhs.moduleEnv) args
-                            in  text "<App>" <+> ppAg @lhs.moduleEnv @app|app_symb <+> brackets argsPP
+  | App
+      lhs.ppDebug = let args    = @app|app_args // dropAppContexts @app @lhs.moduleEnv
+                        argsPP  = hcat $ intersperse (text ", ") $ map (ppDebugExpression @lhs.moduleEnv) args
+                    in  text "<App>" <+> ppAg @lhs.moduleEnv @app|app_symb <+> brackets argsPP
 
-              lhs.ppAg    = let args = dropAppContexts @app @lhs.moduleEnv
-                                ppargs xs = hcat $ intersperse (text " ") $ map (ppAg @lhs.moduleEnv) xs
-                            in  (case args of
-                                   []     -> ppAg @lhs.moduleEnv @app|app_symb
-                                   [x:xs] -> if (isInfix @lhs.moduleEnv @app|app_symb)
-                                               (ppAg @lhs.moduleEnv x <+> ppAg @lhs.moduleEnv @app|app_symb <+> ppargs xs)
-                                               (ppAg @lhs.moduleEnv @app|app_symb <+> ppargs args))
+      lhs.ppAg    = let args       = @app|app_args // dropAppContexts @app @lhs.moduleEnv
+                        ppargs xs  = hcat $ intersperse (text " ") $ map (ppAg @lhs.moduleEnv) xs
+                    in  case args of
+                          []     -> ppAg @lhs.moduleEnv @app|app_symb
+                          [x:xs] -> if (isInfix @lhs.moduleEnv @app|app_symb)
+                                      (ppAg @lhs.moduleEnv x <+> ppAg @lhs.moduleEnv @app|app_symb <+> ppargs xs)
+                                      (ppAg @lhs.moduleEnv @app|app_symb <+> ppargs args)
 
-  | Selection lhs.ppDebug = text "<Selection>" <+> @expr.ppDebug <-> char '.' <->
-                            hcat (intersperse (char '.') $ map (ppAg @lhs.moduleEnv) @sels)
-  | BasicExpr lhs.ppDebug = text "<BasicValue>" <+> ppAg @lhs.moduleEnv @bv
+  | Selection
+      lhs.ppDebug = text "<Selection>" <+> @expr.ppDebug <-> char '.' <->
+                    hcat (intersperse (char '.') $ map (ppAg @lhs.moduleEnv) @sels)
+
+      lhs.ppAg    = @expr.ppAg <-> char '.' <->
+                    hcat (intersperse (char '.') $ map (ppAg @lhs.moduleEnv) @sels)
+
+  | Update
+      lhs.ppDebug = text "<Update>"
+      lhs.ppAg    = text "<Update>"
+
+  | RecordUpdate
+      lhs.ppDebug = text "<RecordUpdate>"
+      lhs.ppAg    = text "<RecordUpdate>"
+
+  | TupleSelect
+      lhs.ppDebug = text "<TupleSelect>"
+      lhs.ppAg    = text "<TupleSelect>"
+
+  | BasicExpr
+      lhs.ppDebug = text "<BasicValue>" <+> ppAg @lhs.moduleEnv @bv
+      lhs.ppAg    = ppAg @lhs.moduleEnv @bv
 
 {
 mkPretty :: ModuleEnv -> (a -> String) | PPAG a
@@ -170,7 +191,7 @@ instance PPAG DefinedSymbol where
   ppAg menv ds = ppAg menv ds.ds_ident
 
 instance PPAG Selection where
-  ppAg menv (RecordSelection gds _)     = text "TODO RecordSelection" // ppAg menv gds
+  ppAg menv (RecordSelection gds _)     = ppAg menv gds.glob_object
   ppAg _ (ArraySelection _ _ _)         = text "TODO: ArraySelection"
   ppAg _ (DictionarySelection _ _ _ _)  = text "TODO: DictionarySelection"
 

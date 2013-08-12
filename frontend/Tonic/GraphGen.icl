@@ -127,7 +127,8 @@ mkGraphAlg inh =
                $ reifyFunDef inh.inh_module_env rhsApp.app_symb.symb_ident
       # rhsTy  = fromMaybe (abort $ "mkGraphAlg #2: failed to find symbol type for " +++ mkPretty inh.inh_module_env rhsApp.app_symb)
                $ reifySymbolType inh.inh_module_env rhsApp.app_symb.symb_ident
-      # patid  = withHead freeVarName (abort "Invalid bind") $ dropContexts rhsTy rhsfd.gfd_args
+      # patid  = withHead freeVarName (abort "Invalid bind")
+               $ [x \\ x <- dropContexts rhsTy rhsfd.gfd_args | x.fv_def_level == -1]
       # synl   = exprCata (mkGraphAlg inh) lhsExpr
       # synr   = exprCata (mkGraphAlg {inh & inh_graph = synl.syn_graph}) rhsfd.gfd_rhs
       = case (synl.syn_entry_id, synl.syn_exit_id, synr.syn_entry_id, synr.syn_exit_id) of

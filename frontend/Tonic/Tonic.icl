@@ -162,7 +162,7 @@ digraph G {
 */
 // 164 "frontend/Tonic/Tonic.icl"
 
-// 62 "./frontend/Tonic/Pretty.ag"
+// 83 "./frontend/Tonic/Pretty.ag"
 
 mkPretty :: ModuleEnv -> (a -> String) | PPAG a
 mkPretty menv = ppCompact o (ppAg menv)
@@ -274,7 +274,7 @@ instance PPAG DefinedSymbol where
   ppAg menv ds = ppAg menv ds.ds_ident
 
 instance PPAG Selection where
-  ppAg menv (RecordSelection gds _)     = text "TODO RecordSelection" // ppAg menv gds
+  ppAg menv (RecordSelection gds _)     = ppAg menv gds.glob_object
   ppAg _ (ArraySelection _ _ _)         = text "TODO: ArraySelection"
   ppAg _ (DictionarySelection _ _ _ _)  = text "TODO: DictionarySelection"
 
@@ -378,16 +378,16 @@ sem_Expression_Var arg_bv_ = T_Expression (lift st2) where
                           ag__result_ = T_Expression_vOut1 alhsOgraph alhsOhasRecs alhsOmNodeId alhsOppAg alhsOppDebug alhsOrecNode
                       in ag__result_ )
         in C_Expression_s2 v1
-   /*# LINE 43 "./frontend/Tonic/Pretty.ag" #*/
-   rule0 = \ ((alhsImoduleEnv)) bv_ ->
-                              /*# LINE 43 "./frontend/Tonic/Pretty.ag" #*/
-                              text "<Var>" <+> ppAg alhsImoduleEnv bv_
-                              /*# LINE 386 "frontend/Tonic/Tonic.icl"#*/
    /*# LINE 44 "./frontend/Tonic/Pretty.ag" #*/
+   rule0 = \ ((alhsImoduleEnv)) bv_ ->
+                      /*# LINE 44 "./frontend/Tonic/Pretty.ag" #*/
+                      text "<Var>" <+> ppAg alhsImoduleEnv bv_
+                      /*# LINE 386 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 45 "./frontend/Tonic/Pretty.ag" #*/
    rule1 = \ ((alhsImoduleEnv)) bv_ ->
-                              /*# LINE 44 "./frontend/Tonic/Pretty.ag" #*/
-                              ppAg alhsImoduleEnv bv_
-                              /*# LINE 391 "frontend/Tonic/Tonic.icl"#*/
+                      /*# LINE 45 "./frontend/Tonic/Pretty.ag" #*/
+                      ppAg alhsImoduleEnv bv_
+                      /*# LINE 391 "frontend/Tonic/Tonic.icl"#*/
    rule2 = \  (_) ->
      False
    rule3 = \  (_) ->
@@ -515,24 +515,24 @@ sem_Expression_App arg_app_ = T_Expression (lift st2) where
                          /*# LINE 99 "./frontend/Tonic/MkGraph.ag" #*/
                          appFunName app_ == alhsIcurrTaskName
                          /*# LINE 518 "frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 46 "./frontend/Tonic/Pretty.ag" #*/
+   /*# LINE 48 "./frontend/Tonic/Pretty.ag" #*/
    rule19 = \ ((alhsImoduleEnv)) app_ ->
-                              /*# LINE 46 "./frontend/Tonic/Pretty.ag" #*/
-                              let args    = dropAppContexts app_ alhsImoduleEnv
-                                  argsPP  = hcat $ intersperse (text ", ") $ map (ppDebugExpression alhsImoduleEnv) args
-                              in  text "<App>" <+> ppAg alhsImoduleEnv app_.app_symb <+> brackets argsPP
-                              /*# LINE 525 "frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 50 "./frontend/Tonic/Pretty.ag" #*/
+                      /*# LINE 48 "./frontend/Tonic/Pretty.ag" #*/
+                      let args    = app_.app_args
+                          argsPP  = hcat $ intersperse (text ", ") $ map (ppDebugExpression alhsImoduleEnv) args
+                      in  text "<App>" <+> ppAg alhsImoduleEnv app_.app_symb <+> brackets argsPP
+                      /*# LINE 525 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 52 "./frontend/Tonic/Pretty.ag" #*/
    rule20 = \ ((alhsImoduleEnv)) app_ ->
-                              /*# LINE 50 "./frontend/Tonic/Pretty.ag" #*/
-                              let args = dropAppContexts app_ alhsImoduleEnv
-                                  ppargs xs = hcat $ intersperse (text " ") $ map (ppAg alhsImoduleEnv) xs
-                              in  (case args of
-                                     []     -> ppAg alhsImoduleEnv app_.app_symb
-                                     [x:xs] -> if (isInfix alhsImoduleEnv app_.app_symb)
-                                                 (ppAg alhsImoduleEnv x <+> ppAg alhsImoduleEnv app_.app_symb <+> ppargs xs)
-                                                 (ppAg alhsImoduleEnv app_.app_symb <+> ppargs args))
-                              /*# LINE 536 "frontend/Tonic/Tonic.icl"#*/
+                      /*# LINE 52 "./frontend/Tonic/Pretty.ag" #*/
+                      let args       = app_.app_args
+                          ppargs xs  = hcat $ intersperse (text " ") $ map (ppAg alhsImoduleEnv) xs
+                      in  case args of
+                            []     -> ppAg alhsImoduleEnv app_.app_symb
+                            [x:xs] -> if (isInfix alhsImoduleEnv app_.app_symb)
+                                        (ppAg alhsImoduleEnv x <+> ppAg alhsImoduleEnv app_.app_symb <+> ppargs xs)
+                                        (ppAg alhsImoduleEnv app_.app_symb <+> ppargs args)
+                      /*# LINE 536 "frontend/Tonic/Tonic.icl"#*/
    rule21 = \  (_) ->
      False
    rule22 = \  (_) ->
@@ -743,12 +743,12 @@ sem_Expression_Selection _ arg_expr_ arg_sels_ = T_Expression (lift st2) where
                           (T_Expression_vOut1 aexprIgraph aexprIhasRecs aexprImNodeId aexprIppAg aexprIppDebug aexprIrecNode) = inv_Expression_s2 st_exprX2 (T_Expression_vIn1 aexprOcaseExpr aexprOcurrTaskName aexprOgraph aexprOmergeId aexprOmoduleEnv)
                           alhsOppDebug :: Doc
                           alhsOppDebug = rule61 aexprIppDebug alhsImoduleEnv arg_sels_
-                          alhsOhasRecs :: Bool
-                          alhsOhasRecs = rule62 aexprIhasRecs
-                          alhsOmNodeId :: Maybe Int
-                          alhsOmNodeId = rule63 aexprImNodeId
                           alhsOppAg :: Doc
-                          alhsOppAg = rule64 aexprIppAg
+                          alhsOppAg = rule62 aexprIppAg alhsImoduleEnv arg_sels_
+                          alhsOhasRecs :: Bool
+                          alhsOhasRecs = rule63 aexprIhasRecs
+                          alhsOmNodeId :: Maybe Int
+                          alhsOmNodeId = rule64 aexprImNodeId
                           alhsOrecNode :: Bool
                           alhsOrecNode = rule65 aexprIrecNode
                           alhsOgraph :: GinGraph
@@ -761,18 +761,22 @@ sem_Expression_Selection _ arg_expr_ arg_sels_ = T_Expression (lift st2) where
                           ag__result_ = T_Expression_vOut1 alhsOgraph alhsOhasRecs alhsOmNodeId alhsOppAg alhsOppDebug alhsOrecNode
                       in ag__result_ )
         in C_Expression_s2 v1
-   /*# LINE 58 "./frontend/Tonic/Pretty.ag" #*/
+   /*# LINE 61 "./frontend/Tonic/Pretty.ag" #*/
    rule61 = \ ((aexprIppDebug)) ((alhsImoduleEnv)) sels_ ->
-                              /*# LINE 58 "./frontend/Tonic/Pretty.ag" #*/
-                              text "<Selection>" <+> aexprIppDebug <-> char '.' <->
-                              hcat (intersperse (char '.') $ map (ppAg alhsImoduleEnv) sels_)
-                              /*# LINE 770 "frontend/Tonic/Tonic.icl"#*/
-   rule62 = \ ((aexprIhasRecs)) ->
+                      /*# LINE 61 "./frontend/Tonic/Pretty.ag" #*/
+                      text "<Selection>" <+> aexprIppDebug <-> char '.' <->
+                      hcat (intersperse (char '.') $ map (ppAg alhsImoduleEnv) sels_)
+                      /*# LINE 770 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 64 "./frontend/Tonic/Pretty.ag" #*/
+   rule62 = \ ((aexprIppAg)) ((alhsImoduleEnv)) sels_ ->
+                      /*# LINE 64 "./frontend/Tonic/Pretty.ag" #*/
+                      aexprIppAg <-> char '.' <->
+                      hcat (intersperse (char '.') $ map (ppAg alhsImoduleEnv) sels_)
+                      /*# LINE 776 "frontend/Tonic/Tonic.icl"#*/
+   rule63 = \ ((aexprIhasRecs)) ->
      aexprIhasRecs
-   rule63 = \ ((aexprImNodeId)) ->
+   rule64 = \ ((aexprImNodeId)) ->
      aexprImNodeId
-   rule64 = \ ((aexprIppAg)) ->
-     aexprIppAg
    rule65 = \ ((aexprIrecNode)) ->
      aexprIrecNode
    rule66 = \ ((aexprIgraph)) ->
@@ -798,14 +802,14 @@ sem_Expression_Update arg_exprl_ _ arg_exprr_ = T_Expression (lift st2) where
                           st_exprrX2 = 'Control.Monad.Identity'.runIdentity (attach_T_Expression (arg_exprr_))
                           (T_Expression_vOut1 aexprlIgraph aexprlIhasRecs aexprlImNodeId aexprlIppAg aexprlIppDebug aexprlIrecNode) = inv_Expression_s2 st_exprlX2 (T_Expression_vIn1 aexprlOcaseExpr aexprlOcurrTaskName aexprlOgraph aexprlOmergeId aexprlOmoduleEnv)
                           (T_Expression_vOut1 aexprrIgraph aexprrIhasRecs aexprrImNodeId aexprrIppAg aexprrIppDebug aexprrIrecNode) = inv_Expression_s2 st_exprrX2 (T_Expression_vIn1 aexprrOcaseExpr aexprrOcurrTaskName aexprrOgraph aexprrOmergeId aexprrOmoduleEnv)
-                          alhsOhasRecs :: Bool
-                          alhsOhasRecs = rule72 aexprlIhasRecs aexprrIhasRecs
-                          alhsOmNodeId :: Maybe Int
-                          alhsOmNodeId = rule73 aexprlImNodeId aexprrImNodeId
-                          alhsOppAg :: Doc
-                          alhsOppAg = rule74 aexprlIppAg aexprrIppAg
                           alhsOppDebug :: Doc
-                          alhsOppDebug = rule75 aexprlIppDebug aexprrIppDebug
+                          alhsOppDebug = rule72  Void
+                          alhsOppAg :: Doc
+                          alhsOppAg = rule73  Void
+                          alhsOhasRecs :: Bool
+                          alhsOhasRecs = rule74 aexprlIhasRecs aexprrIhasRecs
+                          alhsOmNodeId :: Maybe Int
+                          alhsOmNodeId = rule75 aexprlImNodeId aexprrImNodeId
                           alhsOrecNode :: Bool
                           alhsOrecNode = rule76 aexprlIrecNode aexprrIrecNode
                           alhsOgraph :: GinGraph
@@ -823,14 +827,20 @@ sem_Expression_Update arg_exprl_ _ arg_exprr_ = T_Expression (lift st2) where
                           ag__result_ = T_Expression_vOut1 alhsOgraph alhsOhasRecs alhsOmNodeId alhsOppAg alhsOppDebug alhsOrecNode
                       in ag__result_ )
         in C_Expression_s2 v1
-   rule72 = \ ((aexprlIhasRecs)) ((aexprrIhasRecs)) ->
+   /*# LINE 68 "./frontend/Tonic/Pretty.ag" #*/
+   rule72 = \  (_) ->
+                      /*# LINE 68 "./frontend/Tonic/Pretty.ag" #*/
+                      text "<Update>"
+                      /*# LINE 835 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 69 "./frontend/Tonic/Pretty.ag" #*/
+   rule73 = \  (_) ->
+                      /*# LINE 69 "./frontend/Tonic/Pretty.ag" #*/
+                      text "<Update>"
+                      /*# LINE 840 "frontend/Tonic/Tonic.icl"#*/
+   rule74 = \ ((aexprlIhasRecs)) ((aexprrIhasRecs)) ->
      aexprlIhasRecs || aexprrIhasRecs
-   rule73 = \ ((aexprlImNodeId)) ((aexprrImNodeId)) ->
+   rule75 = \ ((aexprlImNodeId)) ((aexprrImNodeId)) ->
      aexprlImNodeId <> aexprrImNodeId
-   rule74 = \ ((aexprlIppAg)) ((aexprrIppAg)) ->
-     aexprlIppAg <$$> aexprrIppAg
-   rule75 = \ ((aexprlIppDebug)) ((aexprrIppDebug)) ->
-     aexprlIppDebug <$$> aexprrIppDebug
    rule76 = \ ((aexprlIrecNode)) ((aexprrIrecNode)) ->
      aexprlIrecNode || aexprrIrecNode
    rule77 = \ ((aexprrIgraph)) ->
@@ -864,14 +874,14 @@ sem_Expression_RecordUpdate _ arg_expr_ _ = T_Expression (lift st2) where
                       let
                           st_exprX2 = 'Control.Monad.Identity'.runIdentity (attach_T_Expression (arg_expr_))
                           (T_Expression_vOut1 aexprIgraph aexprIhasRecs aexprImNodeId aexprIppAg aexprIppDebug aexprIrecNode) = inv_Expression_s2 st_exprX2 (T_Expression_vIn1 aexprOcaseExpr aexprOcurrTaskName aexprOgraph aexprOmergeId aexprOmoduleEnv)
-                          alhsOhasRecs :: Bool
-                          alhsOhasRecs = rule88 aexprIhasRecs
-                          alhsOmNodeId :: Maybe Int
-                          alhsOmNodeId = rule89 aexprImNodeId
-                          alhsOppAg :: Doc
-                          alhsOppAg = rule90 aexprIppAg
                           alhsOppDebug :: Doc
-                          alhsOppDebug = rule91 aexprIppDebug
+                          alhsOppDebug = rule88  Void
+                          alhsOppAg :: Doc
+                          alhsOppAg = rule89  Void
+                          alhsOhasRecs :: Bool
+                          alhsOhasRecs = rule90 aexprIhasRecs
+                          alhsOmNodeId :: Maybe Int
+                          alhsOmNodeId = rule91 aexprImNodeId
                           alhsOrecNode :: Bool
                           alhsOrecNode = rule92 aexprIrecNode
                           alhsOgraph :: GinGraph
@@ -884,14 +894,20 @@ sem_Expression_RecordUpdate _ arg_expr_ _ = T_Expression (lift st2) where
                           ag__result_ = T_Expression_vOut1 alhsOgraph alhsOhasRecs alhsOmNodeId alhsOppAg alhsOppDebug alhsOrecNode
                       in ag__result_ )
         in C_Expression_s2 v1
-   rule88 = \ ((aexprIhasRecs)) ->
+   /*# LINE 72 "./frontend/Tonic/Pretty.ag" #*/
+   rule88 = \  (_) ->
+                      /*# LINE 72 "./frontend/Tonic/Pretty.ag" #*/
+                      text "<RecordUpdate>"
+                      /*# LINE 902 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 73 "./frontend/Tonic/Pretty.ag" #*/
+   rule89 = \  (_) ->
+                      /*# LINE 73 "./frontend/Tonic/Pretty.ag" #*/
+                      text "<RecordUpdate>"
+                      /*# LINE 907 "frontend/Tonic/Tonic.icl"#*/
+   rule90 = \ ((aexprIhasRecs)) ->
      aexprIhasRecs
-   rule89 = \ ((aexprImNodeId)) ->
+   rule91 = \ ((aexprImNodeId)) ->
      aexprImNodeId
-   rule90 = \ ((aexprIppAg)) ->
-     aexprIppAg
-   rule91 = \ ((aexprIppDebug)) ->
-     aexprIppDebug
    rule92 = \ ((aexprIrecNode)) ->
      aexprIrecNode
    rule93 = \ ((aexprIgraph)) ->
@@ -915,14 +931,14 @@ sem_Expression_TupleSelect _ _ arg_expr_ = T_Expression (lift st2) where
                       let
                           st_exprX2 = 'Control.Monad.Identity'.runIdentity (attach_T_Expression (arg_expr_))
                           (T_Expression_vOut1 aexprIgraph aexprIhasRecs aexprImNodeId aexprIppAg aexprIppDebug aexprIrecNode) = inv_Expression_s2 st_exprX2 (T_Expression_vIn1 aexprOcaseExpr aexprOcurrTaskName aexprOgraph aexprOmergeId aexprOmoduleEnv)
-                          alhsOhasRecs :: Bool
-                          alhsOhasRecs = rule99 aexprIhasRecs
-                          alhsOmNodeId :: Maybe Int
-                          alhsOmNodeId = rule100 aexprImNodeId
-                          alhsOppAg :: Doc
-                          alhsOppAg = rule101 aexprIppAg
                           alhsOppDebug :: Doc
-                          alhsOppDebug = rule102 aexprIppDebug
+                          alhsOppDebug = rule99  Void
+                          alhsOppAg :: Doc
+                          alhsOppAg = rule100  Void
+                          alhsOhasRecs :: Bool
+                          alhsOhasRecs = rule101 aexprIhasRecs
+                          alhsOmNodeId :: Maybe Int
+                          alhsOmNodeId = rule102 aexprImNodeId
                           alhsOrecNode :: Bool
                           alhsOrecNode = rule103 aexprIrecNode
                           alhsOgraph :: GinGraph
@@ -935,14 +951,20 @@ sem_Expression_TupleSelect _ _ arg_expr_ = T_Expression (lift st2) where
                           ag__result_ = T_Expression_vOut1 alhsOgraph alhsOhasRecs alhsOmNodeId alhsOppAg alhsOppDebug alhsOrecNode
                       in ag__result_ )
         in C_Expression_s2 v1
-   rule99 = \ ((aexprIhasRecs)) ->
+   /*# LINE 76 "./frontend/Tonic/Pretty.ag" #*/
+   rule99 = \  (_) ->
+                      /*# LINE 76 "./frontend/Tonic/Pretty.ag" #*/
+                      text "<TupleSelect>"
+                      /*# LINE 959 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 77 "./frontend/Tonic/Pretty.ag" #*/
+   rule100 = \  (_) ->
+                      /*# LINE 77 "./frontend/Tonic/Pretty.ag" #*/
+                      text "<TupleSelect>"
+                      /*# LINE 964 "frontend/Tonic/Tonic.icl"#*/
+   rule101 = \ ((aexprIhasRecs)) ->
      aexprIhasRecs
-   rule100 = \ ((aexprImNodeId)) ->
+   rule102 = \ ((aexprImNodeId)) ->
      aexprImNodeId
-   rule101 = \ ((aexprIppAg)) ->
-     aexprIppAg
-   rule102 = \ ((aexprIppDebug)) ->
-     aexprIppDebug
    rule103 = \ ((aexprIrecNode)) ->
      aexprIrecNode
    rule104 = \ ((aexprIgraph)) ->
@@ -966,12 +988,12 @@ sem_Expression_BasicExpr arg_bv_ = T_Expression (lift st2) where
                       let
                           alhsOppDebug :: Doc
                           alhsOppDebug = rule110 alhsImoduleEnv arg_bv_
-                          alhsOhasRecs :: Bool
-                          alhsOhasRecs = rule111  Void
-                          alhsOmNodeId :: Maybe Int
-                          alhsOmNodeId = rule112  Void
                           alhsOppAg :: Doc
-                          alhsOppAg = rule113  Void
+                          alhsOppAg = rule111 alhsImoduleEnv arg_bv_
+                          alhsOhasRecs :: Bool
+                          alhsOhasRecs = rule112  Void
+                          alhsOmNodeId :: Maybe Int
+                          alhsOmNodeId = rule113  Void
                           alhsOrecNode :: Bool
                           alhsOrecNode = rule114  Void
                           alhsOgraph :: GinGraph
@@ -979,17 +1001,20 @@ sem_Expression_BasicExpr arg_bv_ = T_Expression (lift st2) where
                           ag__result_ = T_Expression_vOut1 alhsOgraph alhsOhasRecs alhsOmNodeId alhsOppAg alhsOppDebug alhsOrecNode
                       in ag__result_ )
         in C_Expression_s2 v1
-   /*# LINE 60 "./frontend/Tonic/Pretty.ag" #*/
+   /*# LINE 80 "./frontend/Tonic/Pretty.ag" #*/
    rule110 = \ ((alhsImoduleEnv)) bv_ ->
-                              /*# LINE 60 "./frontend/Tonic/Pretty.ag" #*/
-                              text "<BasicValue>" <+> ppAg alhsImoduleEnv bv_
-                              /*# LINE 987 "frontend/Tonic/Tonic.icl"#*/
-   rule111 = \  (_) ->
-     False
+                      /*# LINE 80 "./frontend/Tonic/Pretty.ag" #*/
+                      text "<BasicValue>" <+> ppAg alhsImoduleEnv bv_
+                      /*# LINE 1009 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 81 "./frontend/Tonic/Pretty.ag" #*/
+   rule111 = \ ((alhsImoduleEnv)) bv_ ->
+                      /*# LINE 81 "./frontend/Tonic/Pretty.ag" #*/
+                      ppAg alhsImoduleEnv bv_
+                      /*# LINE 1014 "frontend/Tonic/Tonic.icl"#*/
    rule112 = \  (_) ->
-     Nothing
+     False
    rule113 = \  (_) ->
-     empty
+     Nothing
    rule114 = \  (_) ->
      False
    rule115 = \ ((alhsIgraph)) ->
