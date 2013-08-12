@@ -3,6 +3,7 @@ implementation module Tonic.CompilerInterface
 import Tonic.Util
 //import Tonic.TonicAG
 import Tonic.GraphGen
+import Tonic.Pretty
 import syntax, checksupport, StdFile
 from CoclSystemDependent import DirectorySeparator, ensureCleanSystemFilesExists
 import Text
@@ -41,7 +42,7 @@ ginTonic` icl_module dcl_modules tpl=:(ok, fun_defs, array_instances, common_def
     | funIsTask fd && fd.fun_info.fi_def_level == 1  = defToStr fd +++ "\n" +++ rest
     | otherwise                                      = rest
   defToStr fd  = optional "Nothing happened" f (funToGraph fd fun_defs icl_module dcl_modules)
-    where f g  = mkTaskDot (mkInhExpr (mkModuleEnv fun_defs icl_module dcl_modules) emptyGraph 0 "" Nothing) fd.fun_ident.id_name g
+    where f g  = mkTaskDot (mkModuleEnv fun_defs icl_module dcl_modules) fd.fun_ident.id_name g
   mkDotGraph subgraphs = "digraph " +++ icl_module.icl_name.id_name +++ "{\n" +++ subgraphs +++ "\n}"
 
 

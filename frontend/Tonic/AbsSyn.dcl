@@ -124,11 +124,11 @@ mkInhExpr :: ModuleEnv GinGraph Int String (Maybe Expression) -> InhExpression
 
 mkModuleEnv :: {#FunDef} IclModule {#DclModule} -> ModuleEnv
 
-mkGLet :: InhExpression Let -> GLet
+mkGLet :: ModuleEnv Let -> GLet
 
 mkGLetBind :: String Expression -> GLetBind
 
-mkGLetBinds :: InhExpression LetBind -> GLetBind
+mkGLetBinds :: ModuleEnv LetBind -> GLetBind
 
 mkGFunDef :: FunDef -> GFunDef
 

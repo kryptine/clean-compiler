@@ -1,0 +1,285 @@
+module {Tonic.Pretty}
+{
+from Text.PPrint import :: Doc
+import Tonic.AbsSyn
+
+from syntax import :: Expression (..), :: BoundVar {..}, :: App {..}, :: Let, :: Case,
+  :: SelectorKind, :: Selection (..), :: FreeVar {..}, :: Global {..}, :: SymbIdent {..}, :: SymbKind, :: Priority,
+  :: VarInfoPtr, :: DynamicExpr, :: Ptr, :: VarInfo, :: CodeBinding, :: DefinedSymbol {..}, :: Index,
+  :: Bind, :: Position, :: AType, :: Env, :: Ident {..}, :: SymbolPtr, :: SymbolTableEntry, :: Level, :: ExprInfoPtr, :: ExprInfo,
+  :: TypeCodeExpression, :: GlobalIndex, :: Conditional, :: BasicValue (..), :: FieldSymbol,
+  :: IclModule, :: DclModule, :: FunDef, :: Optional, :: SymbolType, :: LetBind
+
+:: Expressions :== [Expression]
+
+mkPretty :: ModuleEnv -> (a -> String) | PPAG a
+
+ppCompact :: (Doc -> String)
+
+ppDebugExpression :: ModuleEnv Expression -> Doc
+
+mkPPInh :: ModuleEnv -> Inh_Expression
+
+mkTaskDot :: ModuleEnv String GGraph -> String
+
+mkDotAttrKV :: String String -> String
+
+mkDotArgs :: [String] -> String
+
+mkDotNodeLbl :: String Int -> String
+
+nodeToDot :: ModuleEnv String GinGraph Int -> String
+
+getNodeData` :: Int GinGraph -> GNode
+
+class PPAG a where
+  ppAg :: ModuleEnv a -> Doc
+
+instance PPAG Expression
+
+instance PPAG Ident
+
+instance PPAG BoundVar
+
+instance PPAG FreeVar
+
+instance PPAG SymbIdent
+
+instance PPAG BasicValue
+
+instance PPAG DefinedSymbol
+
+instance PPAG Selection
+
+instance PPAG GExpression
+
+instance PPAG GLet
+
+instance PPAG GLetBind
+}
+{
+from StdClass import class + (..)
+from StdOverloaded import class < (..)
+from StdInt import instance + Int, instance < Int
+from StdList import ++, foldr, map
+from StdOverloaded import class +++ (..)
+from StdString import instance +++ {#Char}, instance toString Int
+from StdFunc import o
+import StdMisc
+import Data.Void
+import Data.Func
+import Data.List
+
+import Data.Graph
+import Data.Maybe
+import Text.PPrint
+import Tonic.AbsSyn
+import Tonic.Util
+import Tonic.Pretty
+
+from syntax import :: Expression (..), :: BoundVar {..}, :: App {..}, :: Let, :: Case,
+  :: SelectorKind, :: Selection (..), :: FreeVar {..}, :: Global {..}, :: SymbIdent {..}, :: SymbKind, :: Priority,
+  :: VarInfoPtr, :: DynamicExpr, :: Ptr, :: VarInfo, :: CodeBinding, :: DefinedSymbol {..}, :: Index,
+  :: Bind, :: Position, :: AType, :: Env, :: Ident {..}, :: SymbolPtr, :: SymbolTableEntry, :: Level, :: ExprInfoPtr, :: ExprInfo,
+  :: TypeCodeExpression, :: GlobalIndex, :: Conditional, :: BasicValue (..), :: FieldSymbol,
+  :: IclModule, :: DclModule, :: FunDef, :: Optional, :: SymbolType, :: LetBind
+
+:: Expressions :== [Expression]
+}
+
+type Expressions = [Expression]
+
+data Expression
+  | Var             bv                 :: {BoundVar}
+  | App             app                :: {App}
+  | At              expr               :: Expression              exprs :: Expressions
+  | Let             let                :: {Let}
+  | Case            case_              :: {Case}
+  | Selection       skind              :: {SelectorKind}          expr  :: Expression             sels  :: {[Selection]}
+  | Update          exprl              :: Expression              sels  :: {[Selection]}          exprr :: Expression
+  | RecordUpdate    gdsym              :: {Global DefinedSymbol}  expr  :: Expression             binds :: {[Bind Expression (Global FieldSymbol)]}
+  | TupleSelect     dsym               :: {DefinedSymbol}         n     :: {Int}                  expr  :: Expression
+  | BasicExpr       bv                 :: {BasicValue}
+  | Conditional     cond               :: {Conditional}
+  | AnyCodeExpr     cbbv               :: {CodeBinding BoundVar}  cbfv  :: {CodeBinding FreeVar}  ss    :: {[String]}
+  | ABCCodeExpr     ss                 :: {[String]}              bl    :: {Bool}
+
+  | MatchExpr       gdfs               :: {Global DefinedSymbol}  expr  :: Expression
+  | IsConstructor   expr               :: Expression              gdfs  :: {Global DefinedSymbol} arity :: {Int} gidx :: {GlobalIndex} ident :: {Ident} pos :: {Position}
+  | FreeVar         fv                 :: {FreeVar}
+  | DictionariesFunction  fvat         :: {[(FreeVar,AType)]}     expr  :: Expression             aty   :: {AType}
+
+  | Constant              symid        :: {SymbIdent}             n     :: {Int}                  prio  :: {Priority}
+  | ClassVariable         varinfptr    :: {VarInfoPtr}
+
+  | DynamicExpr           dynexpr      :: {DynamicExpr}
+  | TypeCodeExpression    tycodeexpr   :: {TypeCodeExpression}
+
+  | TypeSignature         sigfun       :: {Int Int -> (AType,Int,Int)}  expr :: Expression
+
+  | EE
+  | NoBind                exprinfoptr  :: {ExprInfoPtr}
+  | FailExpr              ident        :: {Ident}
+
+attr Expression Expressions
+  inh moduleEnv                          :: {ModuleEnv}
+  inh graph                              :: {GinGraph}
+  inh mergeId                            :: {Int}
+  inh currTaskName                       :: {String}
+  inh caseExpr                           :: {Maybe Expression}
+  syn ppAg          use {<$$>}  {empty}  :: {Doc}
+  syn ppDebug       use {<$$>}  {empty}  :: {Doc}
+  -- syn foo use {(+)} {1} :: Int
+   -- inh bar :: Int
+
+  -- varC bv = ppAg inh bv
+  --   appC app
+  --     # args = dropAppContexts app inh
+  --     = let ppargs xs = 'PP'.hcat $ intersperse ('PP'.text " ") $ map (pp inh) xs
+  --       in  (case args of
+  --              []     -> ppAg inh app.app_symb
+  --              [x:xs] -> if (isInfix inh.inh_fun_defs inh.inh_icl_module inh.inh_dcl_modules app.app_symb)
+  --                          (pp inh x 'PP'. <+> ppAg inh app.app_symb 'PP'. <+> ppargs xs)
+  --                          (pp inh app.app_symb 'PP'. <+> ppargs args))
+  --   basicC bv = ppAg inh bv
+  --   defaultC = 'PP'.empty
+  --   selectionC _ expr sels = 
+  --   updateC _ _ _ = 'PP'.text "update"
+  --   recordUpdateC _ _ _ = 'PP'.text "recordUpdate"
+  --   tupleSelectC _ _ _ = 'PP'.text "tupleSelect"
+
+sem Expression
+  | Var       lhs.ppDebug = text "<Var>" <+> ppAg @lhs.moduleEnv @bv
+  | App       lhs.ppDebug = let args    = dropAppContexts @app @lhs.moduleEnv
+                                argsPP  = hcat $ intersperse (text ", ") $ map (ppDebugExpression @lhs.moduleEnv) args
+                            in  text "<App>" <+> ppAg @lhs.moduleEnv @app|app_symb <+> brackets argsPP
+  | Selection lhs.ppDebug = text "<Selection>" <+> @expr.ppDebug <-> char '.' <->
+                            hcat (intersperse (char '.') $ map (ppAg @lhs.moduleEnv) @sels)
+  | BasicExpr lhs.ppDebug = text "<BasicValue>" <+> ppAg @lhs.moduleEnv @bv
+
+{
+mkPretty :: ModuleEnv -> (a -> String) | PPAG a
+mkPretty menv = ppCompact o (ppAg menv)
+
+ppCompact :: (Doc -> String)
+ppCompact = display o renderCompact
+
+ppDebugExpression :: ModuleEnv Expression -> Doc
+ppDebugExpression menv expr = ppDebug_Syn_Expression (wrap_Expression (sem_Expression expr) (mkPPInh menv))
+
+mkPPInh :: ModuleEnv -> Inh_Expression
+mkPPInh me = Inh_Expression Nothing "" emptyGraph 0 me
+
+mkTaskDot :: ModuleEnv String GGraph -> String
+mkTaskDot menv funnm (GGraph g) = "subgraph cluster_" +++ funnm +++ " {\n label=\"" +++ funnm  +++ "\"  color=\"black\";\n" +++
+  mkNodes +++ "\n" +++
+  mkEdges +++ "\n}"
+  where
+  mkNodes = concatStrings (map (nodeToDot menv funnm g) (nodeIndices g))
+  mkEdges = concatStrings (map edgeToDot (edgeIndices g))
+  edgeToDot ei=:(l, r) = mkDotNodeLbl funnm l +++ " -> " +++ mkDotNodeLbl funnm r +++ mkDotArgs [mkDotAttrKV "label" edgeLbl] // TODO: Use different arrow for task assignment
+    where edgeLbl = maybe "" (\e -> fromMaybe "" e.edge_pattern) $ getEdgeData ei g
+
+mkDotAttrKV :: String String -> String
+mkDotAttrKV k v = k +++ "=" +++ "\"" +++ v +++ "\""
+
+mkDotArgs :: [String] -> String
+mkDotArgs attrs = " [" +++ intercalateString ", " attrs +++ "];\n"
+
+mkDotNodeLbl :: String Int -> String
+mkDotNodeLbl funnm n = funnm +++ "_node_" +++ toString n
+
+nodeToDot :: ModuleEnv String GinGraph Int -> String
+nodeToDot menv funnm g currIdx =
+  case currNode of
+    GInit                 -> blackNode [shape "triangle", width ".25", height ".25", orientation "-90.0"]
+    GStop                 -> blackNode [shape "box", width ".2", height ".2"]
+    (GDecision _ expr)    -> whiteNode [shape "diamond", label expr]
+    GMerge                -> blackNode [shape "diamond", width ".25", height ".25"]
+    (GLet glt)            -> whiteNode [shape "box", label (intercalateString "\n" $ map (mkPretty menv) glt)] // TODO: Rounded corners
+    GParallelSplit        -> whiteNode [shape "circle", label "Run in\nparallel"]
+    (GParallelJoin jt)    -> whiteNode [shape "circle", label (mkJoinLbl jt)]
+    (GTaskApp tid exprs)  -> whiteNode [shape "box", label tid] // TODO: complex contents with extra bar
+    (GReturn expr)        -> whiteNode [shape "oval", label (mkPretty menv expr)]
+    (GAssign usr)         -> let  idxStr = toString currIdx
+                                  usrStr = "user" +++ idxStr
+                             in   "subgraph cluster_user" +++ idxStr +++ "{ label=" +++ usr +++ "; labelloc=b; peripheries=0; " +++ usrStr +++ "}" +++
+                                  usrStr +++ mkDotArgs [ mkDotAttrKV "shapefile" "\"stick.png\""
+                                                       , mkDotAttrKV "peripheries" "0"
+                                                       , style "invis" ]
+    GStep                 -> whiteNode [shape "circle", label "Step"]
+    GListComprehension    -> whiteNode [shape "box", style "rounded", label "for each in (listcomprehension)"]
+  where
+  currNode         = getNodeData` currIdx g
+  whiteNode attrs  = mkDotNode [fontcolor "black", fillcolor "white", style "filled", label "" : attrs]
+  blackNode attrs  = mkDotNode [fontcolor "white", fillcolor "black", style "filled", label "" : attrs]
+  mkDotNode attrs  = mkDotNodeLbl funnm currIdx +++ mkDotArgs attrs
+  shape v          = mkDotAttrKV "shape" v
+  label v          = mkDotAttrKV "label" v
+  color v          = mkDotAttrKV "color" v
+  fillcolor v      = mkDotAttrKV "fillcolor" v
+  fontcolor v      = mkDotAttrKV "fontcolor" v
+  width v          = mkDotAttrKV "width" v
+  height v         = mkDotAttrKV "height" v
+  style v          = mkDotAttrKV "style" v
+  orientation v    = mkDotAttrKV "orientation" v
+  mkJoinLbl DisFirstBin   = "Firstly\nfinished\ntask"
+  mkJoinLbl DisFirstList  = "Firstly\nfinished\ntask"
+  mkJoinLbl DisLeft       = "Left\nresult"
+  mkJoinLbl DisRight      = "Right\nresult"
+  mkJoinLbl ConAll        = "All\nresults"
+  mkJoinLbl ConPair       = "Pair\nof results"
+
+getNodeData` :: Int GinGraph -> GNode
+getNodeData` n g = fromMaybe err (getNodeData n g)
+  where err = abort ("No data for node " +++ toString n)
+
+class PPAG a where
+  ppAg :: ModuleEnv a -> Doc
+
+instance PPAG Expression where
+  //ppAg menv expr = ppExpression menv expr
+  ppAg menv expr = ppDebugExpression menv expr
+
+instance PPAG Ident where
+  ppAg _ i = text i.id_name
+
+instance PPAG BoundVar where
+  ppAg menv bv = ppAg menv bv.var_ident
+
+instance PPAG FreeVar where
+  ppAg menv fv = ppAg menv fv.fv_ident
+
+instance PPAG SymbIdent where
+  ppAg menv si = ppAg menv si.symb_ident
+
+instance PPAG BasicValue where
+  ppAg _ (BVI str)  = text str
+  ppAg _ (BVInt i)  = int i
+  ppAg _ (BVC str)  = text str
+  ppAg _ (BVB b)    = bool b
+  ppAg _ (BVR str)  = text str
+  ppAg _ (BVS str)  = text str
+
+instance PPAG DefinedSymbol where
+  ppAg menv ds = ppAg menv ds.ds_ident
+
+instance PPAG Selection where
+  ppAg menv (RecordSelection gds _)     = text "TODO RecordSelection" // ppAg menv gds
+  ppAg _ (ArraySelection _ _ _)         = text "TODO: ArraySelection"
+  ppAg _ (DictionarySelection _ _ _ _)  = text "TODO: DictionarySelection"
+
+instance PPAG GExpression where
+  ppAg _ GUndefinedExpression      = text "undef"
+  ppAg _ (GGraphExpression graph)  = text "TODO: render a subgraph (and don't PP one)"
+  ppAg _ (GListExpression ges)     = text "TODO: render a list expression (and don't PP one)"
+  //ppAg _ (GListComprehensionExpression glc)  = text "TODO: render a list comprehension expression (and don't PP one)"
+  ppAg _ (GCleanExpression ce)     = text ce
+
+instance PPAG GLet where
+  ppAg menv gl = vcat (map (ppAg menv) gl.glet_binds)
+
+instance PPAG GLetBind where
+  ppAg menv lb = text lb.glb_dst <+> equals <+> ppAg menv lb.glb_src
+
+}

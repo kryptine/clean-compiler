@@ -13,7 +13,7 @@ concatStrings :: [String] -> .String
 
 intercalateString :: String [String] -> String
 
-dropAppContexts :: App InhExpression -> [Expression]
+dropAppContexts :: App ModuleEnv -> [Expression]
 
 reifyFunType :: ModuleEnv Ident -> Maybe FunType
 

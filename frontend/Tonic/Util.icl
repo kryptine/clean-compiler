@@ -39,13 +39,12 @@ concatStrings l = updateS 0 l (createArray (sum [size s \\ s <- l]) ' ')
 intercalateString :: String [String] -> String
 intercalateString xs xss = concatStrings (intersperse xs xss)
 
-
-dropAppContexts :: App InhExpression -> [Expression]
-dropAppContexts app inh
+dropAppContexts :: App ModuleEnv -> [Expression]
+dropAppContexts app menv
   | appIsList app = app.app_args
   | otherwise
     # funTy  = fromMaybe (abort err)
-             $ reifySymbolType inh.inh_module_env ident
+             $ reifySymbolType menv ident
     = dropContexts funTy app.app_args
   where
   ident  = app.app_symb.symb_ident

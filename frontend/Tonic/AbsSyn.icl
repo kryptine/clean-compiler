@@ -92,10 +92,10 @@ mkModuleEnv fun_defs icl_module dcl_modules =
   ,  me_fun_defs     = fun_defs
   }
 
-mkGLet :: InhExpression Let -> GLet
-mkGLet inh lt =
+mkGLet :: ModuleEnv Let -> GLet
+mkGLet menv lt =
   {  GLet
-  |  glet_binds  = map (mkGLetBinds inh) (lt.let_lazy_binds ++ lt.let_strict_binds)
+  |  glet_binds  = map (mkGLetBinds menv) (lt.let_lazy_binds ++ lt.let_strict_binds)
   ,  glet_expr   = lt.let_expr
   }
 
@@ -106,10 +106,10 @@ mkGLetBind str expr =
   ,  glb_src = expr
   }
 
-mkGLetBinds :: InhExpression LetBind -> GLetBind
-mkGLetBinds inh lb =
+mkGLetBinds :: ModuleEnv LetBind -> GLetBind
+mkGLetBinds menv lb =
   {  GLetBind
-  |  glb_dst = mkPretty inh lb.lb_dst
+  |  glb_dst = mkPretty menv lb.lb_dst
   ,  glb_src = lb.lb_src
   }
 
