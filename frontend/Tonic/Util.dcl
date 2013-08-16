@@ -43,7 +43,7 @@ fromOptional :: a (Optional a) -> a
 
 optional :: b (a -> b) (Optional a) -> b
 
-appFunName :: App -> String
+//appFunName :: App -> String
 
 freeVarName :: FreeVar -> String
 
@@ -65,4 +65,6 @@ symTyIsTask :: SymbolType -> Bool
 
 identIsTask :: ModuleEnv Ident -> Bool
 
-isInfix :: ModuleEnv SymbIdent -> Bool
+symbIdentIsTask :: ModuleEnv SymbIdent -> Bool
+
+//isInfix :: ModuleEnv SymbIdent -> Bool

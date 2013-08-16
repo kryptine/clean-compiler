@@ -3,40 +3,55 @@ imports
 from syntax import
   :: Expression (..), :: BoundVar {..}, :: App {..}, :: Let {..}, :: Case,
   :: SelectorKind, :: Selection (..), :: FreeVar {..}, :: Global {..},
-  :: SymbIdent {..}, :: SymbKind, :: Priority, :: VarInfoPtr, :: DynamicExpr,
+  :: SymbIdent {..}, :: SymbKind, :: Priority (..), :: Assoc (..), :: VarInfoPtr, :: DynamicExpr,
   :: Ptr, :: VarInfo, :: CodeBinding, :: DefinedSymbol {..}, :: Index, :: Bind,
   :: Position, :: AType, :: Env, :: Ident {..}, :: SymbolPtr,
   :: SymbolTableEntry, :: Level, :: ExprInfoPtr, :: ExprInfo,
   :: TypeCodeExpression, :: GlobalIndex, :: Conditional, :: BasicValue (..),
   :: FieldSymbol, :: IclModule, :: DclModule, :: FunDef, :: Optional,
-  :: SymbolType, :: LetBind
+  :: SymbolType {..}, :: LetBind, :: TypeVar {..}, :: StrictnessList (..),
+  :: TypeContext {..}, :: AttributeVar {..}, :: AttrInequality {..},
+  :: TypeVarInfoPtr {..}, :: AttrVarInfoPtr, :: Type, :: TCClass,
+  :: TypeVarInfo, :: AttrVarInfo, :: FunType {..}, :: FunSpecials
 
 import Tonic.AbsSyn
 }
 
 type Expressions = [Expression]
+type GLetBinds = [GLetBind]
+type Selections = [Selection]
+type GlobalDefinedSymbol = (Global DefinedSymbol)
+type FreeVars = [FreeVar]
+
+record App
+  | App app_symb :: SymbIdent app_args :: Expressions app_info_ptr :: {ExprInfoPtr}
+
+record SymbolType
+  | SymbolType st_vars :: {[TypeVar]} st_args :: {[AType]} st_args_strictness :: {StrictnessList}
+               st_arity :: {Int} st_result :: {AType} st_context :: {[TypeContext]}
+               st_attr_vars :: {[AttributeVar]} st_attr_env :: {[AttrInequality]}
 
 data Expression
-  | Var             bv                 :: {BoundVar}
-  | App             app                :: {App}
+  | Var             bv                 :: BoundVar
+  | App             app                :: App
   | At              expr               :: Expression              exprs :: Expressions
   | Let             let_               :: {Let}
   | Case            case_              :: {Case}
-  | Selection       skind              :: {SelectorKind}          expr  :: Expression             sels  :: {[Selection]}
-  | Update          exprl              :: Expression              sels  :: {[Selection]}          exprr :: Expression
-  | RecordUpdate    gdsym              :: {Global DefinedSymbol}  expr  :: Expression             binds :: {[Bind Expression (Global FieldSymbol)]}
-  | TupleSelect     dsym               :: {DefinedSymbol}         n     :: {Int}                  expr  :: Expression
-  | BasicExpr       bv                 :: {BasicValue}
+  | Selection       skind              :: {SelectorKind}          expr  :: Expression             sels  :: Selections
+  | Update          exprl              :: Expression              sels  :: Selections             exprr :: Expression
+  | RecordUpdate    gdsym              :: GlobalDefinedSymbol     expr  :: Expression             binds :: {[Bind Expression (Global FieldSymbol)]}
+  | TupleSelect     dsym               :: DefinedSymbol           n     :: {Int}                  expr  :: Expression
+  | BasicExpr       bv                 :: BasicValue
   | Conditional     cond               :: {Conditional}
   | AnyCodeExpr     cbbv               :: {CodeBinding BoundVar}  cbfv  :: {CodeBinding FreeVar}  ss    :: {[String]}
   | ABCCodeExpr     ss                 :: {[String]}              bl    :: {Bool}
 
   | MatchExpr       gdfs               :: {Global DefinedSymbol}  expr  :: Expression
-  | IsConstructor   expr               :: Expression              gdfs  :: {Global DefinedSymbol} arity :: {Int} gidx :: {GlobalIndex} ident :: {Ident} pos :: {Position}
-  | FreeVar         fv                 :: {FreeVar}
+  | IsConstructor   expr               :: Expression              gdfs  :: GlobalDefinedSymbol    arity :: {Int} gidx :: {GlobalIndex} ident :: {Ident} pos :: {Position}
+  | FreeVar         fv                 :: FreeVar
   | DictionariesFunction  fvat         :: {[(FreeVar,AType)]}     expr  :: Expression             aty   :: {AType}
 
-  | Constant              symid        :: {SymbIdent}             n     :: {Int}                  prio  :: {Priority}
+  | Constant              symid        :: SymbIdent               n     :: {Int}                  prio  :: {Priority}
   | ClassVariable         varinfptr    :: {VarInfoPtr}
 
   | DynamicExpr           dynexpr      :: {DynamicExpr}
@@ -46,7 +61,54 @@ data Expression
 
   | EE
   | NoBind                exprinfoptr  :: {ExprInfoPtr}
-  | FailExpr              ident        :: {Ident}
+  | FailExpr              ident        :: Ident
 
-attr Expression Expressions
-  inh moduleEnv                        :: {ModuleEnv}
+record Ident
+  | Ident id_name :: {String} id_info :: {SymbolPtr}
+
+record BoundVar
+  | BoundVar var_ident :: Ident var_info_ptr :: {VarInfoPtr} var_expr_ptr :: {ExprInfoPtr}
+
+record FreeVar
+  | FreeVar fv_def_level :: {Level} fv_ident :: Ident fv_info_ptr :: {VarInfoPtr} fv_count :: {Int}
+
+record SymbIdent
+  | SymbIdent symb_ident :: Ident symb_kind :: {SymbKind}
+
+data BasicValue
+  | BVI   str  :: {String}
+  | BVInt i    :: {Int}
+  | BVC   str  :: {String}
+  | BVB   b    :: {Bool}
+  | BVR   str  :: {String}
+  | BVS   str  :: {String}
+
+record DefinedSymbol
+  | DefinedSymbol ds_ident :: Ident ds_arity :: {Int} ds_index :: {Index}
+
+data Selection
+  | RecordSelection     gds :: GlobalDefinedSymbol n     :: {Int}
+  | ArraySelection      gds :: GlobalDefinedSymbol eiptr :: {ExprInfoPtr} expr  :: Expression
+  | DictionarySelection bv  :: BoundVar            sels  :: Selections    eiptr :: {ExprInfoPtr} expr :: Expression
+
+data GExpression
+  | GUndefinedExpression
+  | GGraphExpression gg :: {GGraph}
+  | GListExpression  gexprs :: {[GExpression]}
+  | GCleanExpression gcexpr :: {GCleanExpression}
+
+record GLet
+  | GLet glet_binds :: GLetBinds glet_expr :: Expression
+
+record GLetBind
+  | GLetBind glb_dst :: {String}  glb_src :: Expression
+
+record GFunDef
+  | GFunDef gfd_name :: {String} gfd_args :: FreeVars gfd_rhs :: Expression
+            gfd_type :: {Optional SymbolType} gfd_priority :: {Priority}
+
+attr Expression Expressions Ident BoundVar FreeVar FreeVars SymbIdent
+  BasicValue DefinedSymbol Selection Selections GExpression GLet GLetBind
+  GLetBinds GlobalDefinedSymbol App SymbolType GFunDef
+  inh moduleEnv                          :: {ModuleEnv}
+  syn copy                               :: self

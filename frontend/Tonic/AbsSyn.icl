@@ -113,7 +113,7 @@ mkGLetBind str expr =
 mkGLetBinds :: ModuleEnv LetBind -> GLetBind
 mkGLetBinds menv lb =
   {  GLetBind
-  |  glb_dst = mkPretty menv lb.lb_dst
+  |  glb_dst = ppCompact (ppFreeVar menv lb.lb_dst) // mkPretty menv lb.lb_dst
   ,  glb_src = lb.lb_src
   }
 

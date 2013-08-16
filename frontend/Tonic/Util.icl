@@ -91,8 +91,11 @@ exprIsListConstr (App app) = appIsList app
 exprIsListConstr _         = False
 
 exprIsListCompr :: Expression -> Bool
-exprIsListCompr (App app)  = startsWith "c;" app.app_symb.symb_ident.id_name // TODO: Verify
+exprIsListCompr (App app)  = appIsListComp app
 exprIsListCompr _          = False
+
+appIsListComp :: App -> Bool
+appIsListComp app = startsWith "c;" app.app_symb.symb_ident.id_name // TODO: Verify
 
 withHead :: (a -> b) b [a] -> b
 withHead _  b  []       = b
@@ -113,9 +116,6 @@ fromOptional _  (Yes x)  = x
 optional :: b (a -> b) (Optional a) -> b
 optional b  _  No       = b
 optional _  f  (Yes x)  = f x
-
-appFunName :: App -> String
-appFunName app = app.app_symb.symb_ident.id_name
 
 freeVarName :: FreeVar -> String
 freeVarName fv = fv.fv_ident.id_name
@@ -162,19 +162,22 @@ symTyIsTask st =
 identIsTask :: ModuleEnv Ident -> Bool
 identIsTask menv ident = maybe False symTyIsTask $ reifySymbolType menv ident
 
+symbIdentIsTask :: ModuleEnv SymbIdent -> Bool
+symbIdentIsTask menv sid = identIsTask menv sid.symb_ident
 
-isInfix :: ModuleEnv SymbIdent -> Bool
-isInfix menv si
-  # mfd  = reifyFunDef menv si.symb_ident
-  # mft  = reifyFunType menv si.symb_ident
-  = case mfd of
-      Just fd  -> isInfix` fd.gfd_priority
-      Nothing  ->
-        case mft of
-          Just ft  -> isInfix` ft.ft_priority
-          _        -> abort ("Failed to determine fixity for " +++ si.symb_ident.id_name)
-  where
-  isInfix` prio =
-    case prio of
-      Prio _ _  -> True
-      _         -> False
+
+//isInfix :: ModuleEnv SymbIdent -> Bool
+//isInfix menv si
+  //# mfd  = reifyFunDef menv si.symb_ident
+  //# mft  = reifyFunType menv si.symb_ident
+  //= case mfd of
+      //Just fd  -> isInfix` fd.gfd_priority
+      //Nothing  ->
+        //case mft of
+          //Just ft  -> isInfix` ft.ft_priority
+          //_        -> abort ("Failed to determine fixity for " +++ si.symb_ident.id_name)
+  //where
+  //isInfix` prio =
+    //case prio of
+      //Prio _ _  -> True
+      //_         -> False

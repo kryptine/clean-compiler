@@ -19,9 +19,28 @@ import Tonic.AbsSyn
 import Tonic.Util
 }
 
-attr Expression Expressions
+attr Expression Expressions Ident BoundVar FreeVar SymbIdent BasicValue
+  DefinedSymbol Selection Selections GExpression GLet GLetBind GLetBinds
+  GlobalDefinedSymbol App SymbolType
   syn ppAg          use {<$$>}  {empty}  :: {Doc}
+  syn ppAgs         use {++}    {[]}     :: {[Doc]}
   syn ppDebug       use {<$$>}  {empty}  :: {Doc}
+  syn ppDebugs      use {++}    {[]}     :: {[Doc]}
+
+attr SymbIdent
+  syn isInfix    :: {Bool}
+
+sem SymbIdent
+  | SymbIdent lhs.isInfix    = let mfd  = reifyFunDef @lhs.moduleEnv @symb_ident.copy
+                                   mft  = reifyFunType @lhs.moduleEnv @symb_ident.copy
+                                   isInfix` (Prio _ _) = True
+                                   isInfix` _          = False
+                               in  case mfd of
+                                     Just fd  -> isInfix` fd.gfd_priority
+                                     Nothing  ->
+                                       case mft of
+                                         Just ft  -> isInfix` ft.ft_priority
+                                         _        -> abort ("Failed to determine fixity for " +++ ppCompact @symb_ident.ppAg)
 
   -- varC bv = ppAg inh bv
   --   appC app
@@ -39,30 +58,31 @@ attr Expression Expressions
   --   recordUpdateC _ _ _ = 'PP'.text "recordUpdate"
   --   tupleSelectC _ _ _ = 'PP'.text "tupleSelect"
 
+sem App
+  | App
+      lhs.ppDebug = let argsPP = hcat $ intersperse (text ", ") @app_args.ppAgs
+                    in  text "<App>" <+> @app_symb.ppAg <+> brackets argsPP
+
+      lhs.ppAg    = let appc      = @copy
+                    in  case appc.app_args of
+                          []     -> @app_symb.ppAg
+                          [x:xs] -> if @app_symb.isInfix
+                                      (ppExpression @lhs.moduleEnv x <+> @app_symb.ppAg <+> hcat (intersperse (text " ") (map (ppExpression @lhs.moduleEnv) xs)))
+                                      (@app_symb.ppAg <+> hcat (intersperse (text " ") @app_args.ppAgs))
+
 sem Expression
   | Var
-      lhs.ppDebug = text "<Var>" <+> ppAg @lhs.moduleEnv @bv
-      lhs.ppAg    = ppAg @lhs.moduleEnv @bv
+      lhs.ppDebug = text "<Var>" <+> @bv.ppDebug
+      lhs.ppAg    = @bv.ppAg
 
-  | App
-      lhs.ppDebug = let args    = @app|app_args // dropAppContexts @app @lhs.moduleEnv
-                        argsPP  = hcat $ intersperse (text ", ") $ map (ppDebugExpression @lhs.moduleEnv) args
-                    in  text "<App>" <+> ppAg @lhs.moduleEnv @app|app_symb <+> brackets argsPP
-
-      lhs.ppAg    = let args       = @app|app_args // dropAppContexts @app @lhs.moduleEnv
-                        ppargs xs  = hcat $ intersperse (text " ") $ map (ppAg @lhs.moduleEnv) xs
-                    in  case args of
-                          []     -> ppAg @lhs.moduleEnv @app|app_symb
-                          [x:xs] -> if (isInfix @lhs.moduleEnv @app|app_symb)
-                                      (ppAg @lhs.moduleEnv x <+> ppAg @lhs.moduleEnv @app|app_symb <+> ppargs xs)
-                                      (ppAg @lhs.moduleEnv @app|app_symb <+> ppargs args)
+  | App lhs.ppDebug = @app.ppDebug
+        lhs.ppAg    = @app.ppAg
 
   | Selection
-      lhs.ppDebug = text "<Selection>" <+> @expr.ppDebug <-> char '.' <->
-                    hcat (intersperse (char '.') $ map (ppAg @lhs.moduleEnv) @sels)
+      lhs.ppDebug = text "<Selection>" <+> @expr.ppDebug <-> @loc.recsel
 
-      lhs.ppAg    = @expr.ppAg <-> char '.' <->
-                    hcat (intersperse (char '.') $ map (ppAg @lhs.moduleEnv) @sels)
+      lhs.ppAg    = @expr.ppAg <-> @loc.recsel
+      loc.recsel  = char '.' <-> hcat (intersperse (char '.') $ @sels.ppAgs)
 
   | Update
       lhs.ppDebug = text "<Update>"
@@ -77,24 +97,103 @@ sem Expression
       lhs.ppAg    = text "<TupleSelect>"
 
   | BasicExpr
-      lhs.ppDebug = text "<BasicValue>" <+> ppAg @lhs.moduleEnv @bv
-      lhs.ppAg    = ppAg @lhs.moduleEnv @bv
+      lhs.ppDebug = text "<BasicValue>" <+> @bv.ppDebug
+      lhs.ppAg    = @bv.ppAg
+
+sem Ident
+  | Ident lhs.ppDebug = text @id_name
+          lhs.ppAg    = text @id_name
+
+sem BoundVar
+  | BoundVar lhs.ppDebug = @var_ident.ppDebug
+             lhs.ppAg    = @var_ident.ppAg
+
+sem FreeVar
+  | FreeVar lhs.ppDebug = @fv_ident.ppDebug
+            lhs.ppAg    = @fv_ident.ppAg
+
+sem SymbIdent
+  | SymbIdent lhs.ppDebug = @symb_ident.ppDebug
+              lhs.ppAg    = @symb_ident.ppAg
+
+sem BasicValue
+  | BVI lhs.ppDebug = text @str
+        lhs.ppAg    = text @str
+  | BVInt lhs.ppDebug = int @i
+          lhs.ppAg    = int @i
+  | BVC lhs.ppDebug = text @str
+        lhs.ppAg    = text @str
+  | BVB lhs.ppDebug = bool @b
+        lhs.ppAg    = bool @b
+  | BVR lhs.ppDebug = text @str
+        lhs.ppAg    = text @str
+  | BVS lhs.ppDebug = text @str
+        lhs.ppAg    = text @str
+
+sem DefinedSymbol
+  | DefinedSymbol lhs.ppDebug = @ds_ident.ppDebug
+                  lhs.ppAg    = @ds_ident.ppAg
+
+sem Selection
+  | RecordSelection     lhs.ppDebug = @gds.ppDebug
+                        lhs.ppAg    = @gds.ppAg
+  | ArraySelection      lhs.ppDebug = text "TODO: ArraySelection"
+                        lhs.ppAg    = text "TODO: ArraySelection"
+  | DictionarySelection lhs.ppDebug = text "TODO: DictionarySelection"
+                        lhs.ppAg    = text "TODO: DictionarySelection"
+
+sem GExpression
+  | GUndefinedExpression  lhs.ppDebug = text "undef"
+                          lhs.ppAg    = text "undef"
+  | GGraphExpression      lhs.ppDebug = text "TODO: render a subgraph (and don't PP one)"
+                          lhs.ppAg    = text "TODO: render a subgraph (and don't PP one)"
+  | GListExpression       lhs.ppDebug = text "TODO: render a list expression (and don't PP one)"
+                          lhs.ppAg    = text "TODO: render a list expression (and don't PP one)"
+  | GCleanExpression      lhs.ppDebug = text @gcexpr
+                          lhs.ppAg    = text @gcexpr
+
+sem GLet
+  | GLet lhs.ppDebug = vcat @glet_binds.ppDebugs
+         lhs.ppAg    = vcat @glet_binds.ppAgs
+
+sem GLetBind
+  | GLetBind lhs.ppDebug = text @glb_dst <+> equals <+> @glb_src.ppDebug
+             lhs.ppAg    = text @glb_dst <+> equals <+> @glb_src.ppAg
 
 {
-mkPretty :: ModuleEnv -> (a -> String) | PPAG a
-mkPretty menv = ppCompact o (ppAg menv)
+mkPrettyExpr :: ModuleEnv Expression -> String
+mkPrettyExpr menv expr = ppCompact (ppExpression menv expr)
 
 ppCompact :: (Doc -> String)
 ppCompact = display o renderCompact
 
 ppExpression :: ModuleEnv Expression -> Doc
-ppExpression menv expr = ppAg_Syn_Expression (wrap_Expression (sem_Expression expr) (mkPPInh menv))
+ppExpression menv expr = ppAg_Syn_Expression (wrap_Expression (sem_Expression expr) (mkPPInhExpression menv))
+
+ppGExpression :: ModuleEnv GExpression -> Doc
+ppGExpression menv expr = ppAg_Syn_GExpression (wrap_GExpression (sem_GExpression expr) (mkPPInhGExpression menv))
+
+ppGLetBind :: ModuleEnv GLetBind -> Doc
+ppGLetBind menv expr = ppAg_Syn_GLetBind (wrap_GLetBind (sem_GLetBind expr) (mkPPInhGLetBind menv))
 
 ppDebugExpression :: ModuleEnv Expression -> Doc
-ppDebugExpression menv expr = ppDebug_Syn_Expression (wrap_Expression (sem_Expression expr) (mkPPInh menv))
+ppDebugExpression menv expr = ppDebug_Syn_Expression (wrap_Expression (sem_Expression expr) (mkPPInhExpression menv))
 
-mkPPInh :: ModuleEnv -> Inh_Expression
-mkPPInh me = Inh_Expression Nothing "" emptyGraph 0 me
+ppFreeVar :: ModuleEnv FreeVar -> Doc
+ppFreeVar menv fv = ppAg_Syn_FreeVar (wrap_FreeVar (sem_FreeVar fv) (mkPPInhFreeVar menv))
+
+mkPPInhExpression :: ModuleEnv -> Inh_Expression
+mkPPInhExpression me = Inh_Expression Nothing "" emptyGraph 0 me
+
+mkPPInhGExpression :: ModuleEnv -> Inh_GExpression
+mkPPInhGExpression me = Inh_GExpression Nothing "" emptyGraph 0 me
+
+mkPPInhGLetBind :: ModuleEnv -> Inh_GLetBind
+mkPPInhGLetBind me = Inh_GLetBind Nothing "" emptyGraph 0 me
+
+mkPPInhFreeVar :: ModuleEnv -> Inh_FreeVar
+mkPPInhFreeVar me = Inh_FreeVar Nothing "" emptyGraph 0 me
+
 
 mkTaskDot :: ModuleEnv String GGraph -> String
 mkTaskDot menv funnm (GGraph g) = "subgraph cluster_" +++ funnm +++ " {\n label=\"" +++ funnm  +++ "\"  color=\"black\";\n" +++
@@ -122,11 +221,11 @@ nodeToDot menv funnm g currIdx =
     GStop                 -> blackNode [shape "box", width ".2", height ".2"]
     (GDecision _ expr)    -> whiteNode [shape "diamond", label expr]
     GMerge                -> blackNode [shape "diamond", width ".25", height ".25"]
-    (GLet glt)            -> whiteNode [shape "box", label (intercalateString "\n" $ map (mkPretty menv) glt)] // TODO: Rounded corners
+    (GLet glt)            -> whiteNode [shape "box", label (intercalateString "\n" $ map (ppCompact o ppGLetBind menv) glt)] // TODO: Rounded corners
     GParallelSplit        -> whiteNode [shape "circle", label "Run in\nparallel"]
     (GParallelJoin jt)    -> whiteNode [shape "circle", label (mkJoinLbl jt)]
     (GTaskApp tid exprs)  -> whiteNode [shape "box", label tid] // TODO: complex contents with extra bar
-    (GReturn expr)        -> whiteNode [shape "oval", label (mkPretty menv expr)]
+    (GReturn expr)        -> whiteNode [shape "oval", label (ppCompact $ ppGExpression menv expr)]
     (GAssign usr)         -> let  idxStr = toString currIdx
                                   usrStr = "user" +++ idxStr
                              in   "subgraph cluster_user" +++ idxStr +++ "{ label=" +++ usr +++ "; labelloc=b; peripheries=0; " +++ usrStr +++ "}" +++
@@ -159,53 +258,4 @@ nodeToDot menv funnm g currIdx =
 getNodeData` :: Int GinGraph -> GNode
 getNodeData` n g = fromMaybe err (getNodeData n g)
   where err = abort ("No data for node " +++ toString n)
-
-class PPAG a where
-  ppAg :: ModuleEnv a -> Doc
-
-instance PPAG Expression where
-  ppAg menv expr = ppExpression menv expr
-  /*ppAg menv expr = ppDebugExpression menv expr*/
-
-instance PPAG Ident where
-  ppAg _ i = text i.id_name
-
-instance PPAG BoundVar where
-  ppAg menv bv = ppAg menv bv.var_ident
-
-instance PPAG FreeVar where
-  ppAg menv fv = ppAg menv fv.fv_ident
-
-instance PPAG SymbIdent where
-  ppAg menv si = ppAg menv si.symb_ident
-
-instance PPAG BasicValue where
-  ppAg _ (BVI str)  = text str
-  ppAg _ (BVInt i)  = int i
-  ppAg _ (BVC str)  = text str
-  ppAg _ (BVB b)    = bool b
-  ppAg _ (BVR str)  = text str
-  ppAg _ (BVS str)  = text str
-
-instance PPAG DefinedSymbol where
-  ppAg menv ds = ppAg menv ds.ds_ident
-
-instance PPAG Selection where
-  ppAg menv (RecordSelection gds _)     = ppAg menv gds.glob_object
-  ppAg _ (ArraySelection _ _ _)         = text "TODO: ArraySelection"
-  ppAg _ (DictionarySelection _ _ _ _)  = text "TODO: DictionarySelection"
-
-instance PPAG GExpression where
-  ppAg _ GUndefinedExpression      = text "undef"
-  ppAg _ (GGraphExpression graph)  = text "TODO: render a subgraph (and don't PP one)"
-  ppAg _ (GListExpression ges)     = text "TODO: render a list expression (and don't PP one)"
-  //ppAg _ (GListComprehensionExpression glc)  = text "TODO: render a list comprehension expression (and don't PP one)"
-  ppAg _ (GCleanExpression ce)     = text ce
-
-instance PPAG GLet where
-  ppAg menv gl = vcat (map (ppAg menv) gl.glet_binds)
-
-instance PPAG GLetBind where
-  ppAg menv lb = text lb.glb_dst <+> equals <+> ppAg menv lb.glb_src
-
 }

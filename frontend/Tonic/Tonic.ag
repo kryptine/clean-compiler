@@ -3,22 +3,37 @@ module {Tonic.Tonic}
 from Text.PPrint import :: Doc
 import Tonic.AbsSyn
 
-from syntax import :: Expression (..), :: BoundVar {..}, :: App {..}, :: Let, :: Case,
-  :: SelectorKind, :: Selection (..), :: FreeVar {..}, :: Global {..}, :: SymbIdent {..}, :: SymbKind, :: Priority,
-  :: VarInfoPtr, :: DynamicExpr, :: Ptr, :: VarInfo, :: CodeBinding, :: DefinedSymbol {..}, :: Index,
-  :: Bind, :: Position, :: AType, :: Env, :: Ident {..}, :: SymbolPtr, :: SymbolTableEntry, :: Level, :: ExprInfoPtr, :: ExprInfo,
-  :: TypeCodeExpression, :: GlobalIndex, :: Conditional, :: BasicValue (..), :: FieldSymbol,
-  :: IclModule, :: DclModule, :: FunDef, :: Optional, :: SymbolType, :: LetBind
+from syntax import
+  :: Expression (..), :: BoundVar {..}, :: App {..}, :: Let {..}, :: Case,
+  :: SelectorKind, :: Selection (..), :: FreeVar {..}, :: Global {..},
+  :: SymbIdent {..}, :: SymbKind, :: Priority (..), :: Assoc (..), :: VarInfoPtr, :: DynamicExpr,
+  :: Ptr, :: VarInfo, :: CodeBinding, :: DefinedSymbol {..}, :: Index, :: Bind,
+  :: Position, :: AType, :: Env, :: Ident {..}, :: SymbolPtr,
+  :: SymbolTableEntry, :: Level, :: ExprInfoPtr, :: ExprInfo,
+  :: TypeCodeExpression, :: GlobalIndex, :: Conditional, :: BasicValue (..),
+  :: FieldSymbol, :: IclModule, :: DclModule, :: FunDef, :: Optional,
+  :: SymbolType {..}, :: LetBind, :: TypeVar {..}, :: StrictnessList (..),
+  :: TypeContext {..}, :: AttributeVar {..}, :: AttrInequality {..},
+  :: TypeVarInfoPtr {..}, :: AttrVarInfoPtr, :: Type, :: TCClass,
+  :: TypeVarInfo, :: AttrVarInfo, :: FunType {..}, :: FunSpecials
 
 :: Expressions :== [Expression]
-
-mkPretty :: ModuleEnv -> (a -> String) | PPAG a
+:: GLetBinds :== [GLetBind]
+:: Selections :== [Selection]
+:: GlobalDefinedSymbol :== Global DefinedSymbol
+:: FreeVars :== [FreeVar]
 
 ppCompact :: (Doc -> String)
 
+ppExpression :: ModuleEnv Expression -> Doc
+
 ppDebugExpression :: ModuleEnv Expression -> Doc
 
-mkPPInh :: ModuleEnv -> Inh_Expression
+ppFreeVar :: ModuleEnv FreeVar -> Doc
+
+mkPPInhExpression :: ModuleEnv -> Inh_Expression
+
+mkPPInhFreeVar :: ModuleEnv -> Inh_FreeVar
 
 mkTaskDot :: ModuleEnv String GGraph -> String
 
@@ -32,30 +47,7 @@ nodeToDot :: ModuleEnv String GinGraph Int -> String
 
 getNodeData` :: Int GinGraph -> GNode
 
-class PPAG a where
-  ppAg :: ModuleEnv a -> Doc
-
-instance PPAG Expression
-
-instance PPAG Ident
-
-instance PPAG BoundVar
-
-instance PPAG FreeVar
-
-instance PPAG SymbIdent
-
-instance PPAG BasicValue
-
-instance PPAG DefinedSymbol
-
-instance PPAG Selection
-
-instance PPAG GExpression
-
-instance PPAG GLet
-
-instance PPAG GLetBind
+funToGraph :: FunDef {#FunDef} IclModule {#DclModule} -> Optional GGraph
 }
 {}
 include "ExprSyn.ag"

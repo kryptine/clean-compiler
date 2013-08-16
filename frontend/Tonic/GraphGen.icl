@@ -25,21 +25,6 @@ import Tonic.Tonic
 import StdMisc
 import StdDebug
 
-//import Data.Func, Data.Functor, Data.Graph, Data.Maybe, Text
-//from Data.List import zipWith, intersperse
-//import StdDebug
-/*
-To reconstruct lambda functions:
-- Look for a top-level function starting with \; and call it f
-- Throw away the arguments that came from an outer scope (recognizable, negative index?)
-- Add the remaining arguments as lambda arguments
-- Convert lambda body as usual
-- Throw away f
-- Replace all occurences of f with the reconstructed expression
-- Repeat
-*/
-// funToLam = undef
-
 /*
 To reconstruct list comprehensions:
 - Look for a top-level function starting with c; and call it f
@@ -91,6 +76,11 @@ connectId inh syn
   | syn.syn_rec_node  = (Just inh.inh_merge_id, { syn & syn_rec_node = False })
   | otherwise         = (syn.syn_entry_id, syn)
 
+sugarListCompr :: App ModuleEnv -> GListComprehension
+sugarListCompr app menv
+  # funDef   = fromMaybe (abort $ "sugarListCompr: failed to find function definition for " +++ mkPretty menv app.app_symb)
+             $ reifyFunDef menv app.app_symb.symb_ident
+  = undef
 
 // TODO: Check if we need more connectId applications
 mkGraphAlg :: InhExpression -> ExpressionAlg SynExpression
@@ -111,6 +101,8 @@ mkGraphAlg inh =
           "anyTask"   -> mkParListApp app DisFirstList inh.inh_graph
           "allTasks"  -> mkParListApp app ConAll inh.inh_graph
           _           -> mkTaskApp app inh.inh_graph
+    | exprIsListCompr inh.inh_module_env app
+        = addNode` (GListComprehension $ sugarListCompr app) inh.inh_graph
     | otherwise               = mkSynExpr` inh.inh_graph
     where
     mkBind app g
@@ -133,6 +125,7 @@ mkGraphAlg inh =
       # synr   = exprCata (mkGraphAlg {inh & inh_graph = synl.syn_graph}) rhsfd.gfd_rhs
       = case (synl.syn_entry_id, synl.syn_exit_id, synr.syn_entry_id, synr.syn_exit_id) of
           (Just _, Just lx, Just rn, Just _)
+
             # g = addEdge (mkEdge patid) (lx, rn) synr.syn_graph
             = persistHasRec [synl, synr] $ mkSynExpr synl.syn_entry_id g  // TODO: Is this always the correct node id to synthesize?
           (_, lid, rid, _)        = edgeErr inh.inh_module_env "bind edge" lid lhsExpr rid rhsfd.gfd_rhs
@@ -144,7 +137,7 @@ mkGraphAlg inh =
       where
       // In case of a function application, we want to inspect the type of the
       // function. If it is a task or a list, treat it differently than any
-      // other type. But how can we get the type of an arbitrary expression?
+      // other type.
       f (BasicExpr bv)  = GCleanExpression $ mkPretty inh.inh_module_env bv
       f (Var bv)        = GCleanExpression bv.var_ident.id_name
       f e               = GGraphExpression (GGraph (exprCata (mkGraphAlg {inh & inh_graph = g}) e).syn_graph)
@@ -206,7 +199,7 @@ mkGraphAlg inh =
     // new node (and not even a chain of nodes). We know exactly how many nodes
     // we will get and can therefor link to the join node
     mkParListApp app join g =
-      let mkParApp` arg
+      let mkParApp` arg=:(App app)
             | exprIsListConstr arg
                 # exprs     = listExprToList arg
                 # (sid, g)  = addNode GParallelSplit g
@@ -222,11 +215,12 @@ mkGraphAlg inh =
             | exprIsListCompr arg
                 # (sid, g)  = addNode GParallelSplit g
                 # (jid, g)  = addNode (GParallelJoin join) g
-                # (nid, g)  = addNode GListComprehension g
+                # (nid, g)  = addNode (GListComprehension $ sugarListCompr app) g
                 # g         = addEmptyEdge (sid, nid) g
                 # g         = addEmptyEdge (nid, jid) g
                 = mkSynExpr2 (Just sid) (Just jid) g // TODO
             | otherwise = mkTaskApp app g
+          mkParApp` _ = abort "mkParApp`: should be App"
       in withHead mkParApp` (abort "mkParListApp TODO") $ dropAppContexts app inh.inh_module_env
 
     //# (ni, g) = addNode (GDecision dt (mkPretty inh.inh_module_env expr)) inh.inh_graph
@@ -315,10 +309,10 @@ mkGraphAlg inh =
     mkAlts cs = mkAlts` cs.case_guards ++ optional [] (\e -> [('PPrint'.text "_", e)]) cs.case_default
     mkAlts` (AlgebraicPatterns _ aps)  = map (\ap -> (mkAp ap.ap_symbol ap.ap_vars, ap.ap_expr)) aps
       where
-      mkAp sym []   = ppAg inh.inh_module_env sym.glob_object.ds_ident
-      mkAp sym vars = ppAg inh.inh_module_env sym.glob_object.ds_ident 'PPrint'. <+>
-                      'PPrint'.hcat (map (ppAg inh.inh_module_env) vars)
-    mkAlts` (BasicPatterns _ bps)      = map (\bp -> (ppAg inh.inh_module_env bp.bp_value, bp.bp_expr)) bps
+      mkAp sym []   = inh.inh_module_env sym.glob_object.ds_ident.id_name
+      mkAp sym vars = inh.inh_module_env sym.glob_object.ds_ident.id_name 'PPrint'. <+>
+                      'PPrint'.hcat [] // TODO (map (ppAg inh.inh_module_env) vars)
+    mkAlts` (BasicPatterns _ bps)      = [] // TODO map (\bp -> (ppAg inh.inh_module_env bp.bp_value, bp.bp_expr)) bps
 
   // TODO: It appears as if conditionals are desugared to case blocks before we
   // get to them... Is this a remnant from old compiler versions?
@@ -355,7 +349,7 @@ listExprToList (App app) =
 listExprToList _ = []
 
 nodeErr :: ModuleEnv (Maybe Int) Expression -> String
-nodeErr menv mn expr = mkPretty menv expr +++ "\n" +++
+nodeErr menv mn expr = ppCompact (mkPretty menv expr) +++ "\n" +++
   maybe "for which its ID is unknown" (\n -> "with node ID " +++ toString n) mn
 
 addEmptyEdge :: (Int, Int) GinGraph -> GinGraph
