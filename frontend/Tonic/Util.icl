@@ -39,16 +39,16 @@ concatStrings l = updateS 0 l (createArray (sum [size s \\ s <- l]) ' ')
 intercalateString :: String [String] -> String
 intercalateString xs xss = concatStrings (intersperse xs xss)
 
-dropAppContexts :: App ModuleEnv -> [Expression]
-dropAppContexts app menv
-  | appIsList app = app.app_args
-  | otherwise
-    # funTy  = fromMaybe (abort err)
-             $ reifySymbolType menv ident
-    = dropContexts funTy app.app_args
-  where
-  ident  = app.app_symb.symb_ident
-  err    = "dropAppContexts : failed to find symbol type for " +++ ident.id_name
+//dropAppContexts :: App ModuleEnv -> [Expression]
+//dropAppContexts app menv
+  //| appIsList app = app.app_args
+  //| otherwise
+    //# funTy  = fromMaybe (abort err)
+             //$ reifySymbolType menv ident
+    //= dropContexts funTy app.app_args
+  //where
+  //ident  = app.app_symb.symb_ident
+  //err    = "dropAppContexts : failed to find symbol type for " +++ ident.id_name
 
 reifyFunType :: ModuleEnv Ident -> Maybe FunType
 reifyFunType menv ident =
@@ -83,12 +83,12 @@ appIsCons app = app.app_symb.symb_ident.id_name == "_Cons"
 appIsNil :: App -> Bool
 appIsNil app = app.app_symb.symb_ident.id_name == "_Nil"
 
-appIsList :: App -> Bool
-appIsList app = appIsCons app || appIsNil app
+//appIsList :: App -> Bool
+//appIsList app = appIsCons app || appIsNil app
 
-exprIsListConstr :: Expression -> Bool
-exprIsListConstr (App app) = appIsList app
-exprIsListConstr _         = False
+//exprIsListConstr :: Expression -> Bool
+//exprIsListConstr (App app) = appIsList app
+//exprIsListConstr _         = False
 
 exprIsListCompr :: Expression -> Bool
 exprIsListCompr (App app)  = appIsListComp app

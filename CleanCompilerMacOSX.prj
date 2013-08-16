@@ -322,7 +322,7 @@ OtherModules
 			ListAttributes:	True
 			Warnings:	True
 			Verbose:	True
-			ReadableABC:	False
+			ReadableABC:	True
 			ReuseUniqueNodes:	True
 			Fusion:	False
 	Module

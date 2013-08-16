@@ -13,7 +13,7 @@ concatStrings :: [String] -> .String
 
 intercalateString :: String [String] -> String
 
-dropAppContexts :: App ModuleEnv -> [Expression]
+//dropAppContexts :: App ModuleEnv -> [Expression]
 
 reifyFunType :: ModuleEnv Ident -> Maybe FunType
 
@@ -27,9 +27,9 @@ appIsCons :: App -> Bool
 
 appIsNil :: App -> Bool
 
-appIsList :: App -> Bool
+//appIsList :: App -> Bool
 
-exprIsListConstr :: Expression -> Bool
+//exprIsListConstr :: Expression -> Bool
 
 exprIsListCompr :: Expression -> Bool
 
