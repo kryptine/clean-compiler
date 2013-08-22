@@ -1065,7 +1065,11 @@ static void GenLazyFieldSelectorEntry (SymbDef field_def,StateS recstate,int tot
 	 			GenRtn (1,0,OnAState);
 			} else {
 				if (IsLazyState (offfieldstate)){
-					if (ExpectsResultNode (demfieldstate))
+					if (ExpectsResultNode (demfieldstate)
+#if ABSTRACT_OBJECT
+						&& demfieldstate.state_object!=AbstractObj
+#endif
+					)
 						GenJmpEvalUpdate ();
 					else {
 						GenJsrEval (0);
