@@ -2077,9 +2077,7 @@ void GenerateCodeForLazyTupleSelectorEntries (Bool *selectors)
 
 #define allocate_function_state(arity) (((StateP)(CompAlloc (sizeof(StateS)*((arity)+1))))+1)
 
-#define UPDATE_NODE_IN_STRICT_ENTRY 0
-
-static StateP create_function_state_for_update_function (StateS record_state,int n_arguments)
+static StateP create_function_state_for_update_function (StateP record_state_p,int n_arguments)
 {
 	StateP function_state_p;
 	int arg_n;
@@ -2089,11 +2087,7 @@ static StateP create_function_state_for_update_function (StateS record_state,int
 	for (arg_n=0; arg_n<n_arguments; ++arg_n)
 		function_state_p[arg_n]=LazyState;
 
-#if UPDATE_NODE_IN_STRICT_ENTRY
-	function_state_p[-1]=StrictState;
-#else
-	function_state_p[-1]=record_state;
-#endif
+	function_state_p[-1]=*record_state_p;
 
 	return function_state_p;
 }
@@ -2155,7 +2149,8 @@ SymbDef CreateUpdateFunction (ArgS *record_arg,ArgS *first_field_arg,Node node
 	Node lhs_root,rhs_root;
 	int n_arguments;
 	ImpRuleS *update_imp_rule;
-	StateS record_state;
+	StateS record_state,boxed_record_state;
+	StateP strict_record_state_p;
 
 	sprintf (update_function_name,"_upd%d",next_update_function_n);
 	++next_update_function_n;
@@ -2166,6 +2161,11 @@ SymbDef CreateUpdateFunction (ArgS *record_arg,ArgS *first_field_arg,Node node
 	if (unbox_record)
 		n_arguments=record_state.state_arity;
 #endif
+	if (node->node_symbol->symb_def->sdef_boxed_record){
+		SetUnaryState (&boxed_record_state,StrictOnA,RecordObj);
+		strict_record_state_p = &boxed_record_state;
+	} else
+		strict_record_state_p = &record_state;
 
 	update_function_ident=PutStringInHashTable (update_function_name,SymbolIdTable);
 	update_function_sdef=MakeNewSymbolDefinition (CurrentModule,update_function_ident,n_arguments,IMPRULE);
@@ -2174,13 +2174,13 @@ SymbDef CreateUpdateFunction (ArgS *record_arg,ArgS *first_field_arg,Node node
 	update_function_sdef->sdef_isused=True;
 	update_function_sdef->sdef_mark |= SDEF_USED_LAZILY_MASK;
 
-#if UPDATE_NODE_IN_STRICT_ENTRY
-	update_function_sdef->sdef_returnsnode=True;
-	update_function_sdef->sdef_calledwithrootnode=True;
-#else
-	update_function_sdef->sdef_returnsnode=False;
-	update_function_sdef->sdef_calledwithrootnode=False;
-#endif
+	if (node->node_symbol->symb_def->sdef_boxed_record){
+		update_function_sdef->sdef_returnsnode=True;
+		update_function_sdef->sdef_calledwithrootnode=True;
+	} else {
+		update_function_sdef->sdef_returnsnode=False;
+		update_function_sdef->sdef_calledwithrootnode=False;
+	}
 
 	update_function_symbol=NewSymbol (definition);
 	update_function_symbol->symb_def=update_function_sdef;
@@ -2191,18 +2191,10 @@ SymbDef CreateUpdateFunction (ArgS *record_arg,ArgS *first_field_arg,Node node
 		int field_number;
 		
 		lhs_root=NewNode (update_function_symbol,NULL,n_arguments);
-# if UPDATE_NODE_IN_STRICT_ENTRY
-		lhs_root->node_state=StrictState;
-# else
-		lhs_root->node_state=record_state;
-# endif
+		lhs_root->node_state=*strict_record_state_p;
 
 		rhs_root=NewNode (node->node_symbol,NULL,n_arguments);
-# if UPDATE_NODE_IN_STRICT_ENTRY
-		rhs_root->node_state=StrictState;
-# else
-		rhs_root->node_state=record_state;
-# endif
+		rhs_root->node_state=*strict_record_state_p;
 		rhs_root->node_number=0;
 
 		lhs_old_fields_arg_p=&lhs_root->node_arguments;
@@ -2258,18 +2250,10 @@ SymbDef CreateUpdateFunction (ArgS *record_arg,ArgS *first_field_arg,Node node
 		rhs_record_arg->arg_state=record_state;
 
 		lhs_root=NewNode (update_function_symbol,lhs_record_arg,n_arguments);
-#if UPDATE_NODE_IN_STRICT_ENTRY
-		lhs_root->node_state=StrictState;
-#else
-		lhs_root->node_state=record_state;
-#endif
+		lhs_root->node_state=*strict_record_state_p;
 
 		rhs_root=NewUpdateNode (node->node_symbol,rhs_record_arg,n_arguments);
-#if UPDATE_NODE_IN_STRICT_ENTRY
-		rhs_root->node_state=StrictState;
-#else
-		rhs_root->node_state=record_state;
-#endif
+		rhs_root->node_state=*strict_record_state_p;
 		rhs_root->node_number=0;
 
 		lhs_arg_p=&lhs_record_arg->arg_next;
@@ -2318,7 +2302,7 @@ SymbDef CreateUpdateFunction (ArgS *record_arg,ArgS *first_field_arg,Node node
 
 	update_imp_rule=create_simple_imp_rule (lhs_root,rhs_root,update_function_sdef);
 
-	update_imp_rule->rule_state_p = create_function_state_for_update_function (record_state,n_arguments);
+	update_imp_rule->rule_state_p = create_function_state_for_update_function (strict_record_state_p,n_arguments);
 
 	*update_function_p=update_imp_rule;
 	update_function_p=&update_imp_rule->rule_next;
