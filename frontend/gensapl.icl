@@ -200,6 +200,7 @@ CleanFunctoSaplFunc modindex funindex
         # funDef = SaplFuncDef (mymod +++ "." +++ makeFuncName -1 (getName fun_ident) 0 funindex dcl_mods icl_function_indices mymod mns)  
                    		       (length tb_args) (counterMap (getFreeFuncArgName strictnessList) tb_args 0)  
                        		   (cleanExpToSaplExp tb_rhs) fun_kind
+        
         = (backEnd, funDef)
 
 where
@@ -323,17 +324,17 @@ where
 basicValueToSapl :: BasicValue -> SaplExp
 basicValueToSapl (BVI int)      = SaplInt (toInt int)
 basicValueToSapl (BVInt int)    = SaplInt int
-basicValueToSapl (BVC char)     = SaplChar (char)
+basicValueToSapl (BVC char)     = SaplChar (toSAPLString '\'' char)
 basicValueToSapl (BVB bool)     = SaplBool bool
 basicValueToSapl (BVR real)     = SaplReal (toReal real)
-basicValueToSapl (BVS string)   = SaplString string
+basicValueToSapl (BVS str)      = SaplString (toSAPLString '"' str)
 	
 basicValueToMatchSapl (BVI int)     = MatchInt (toInt int)
 basicValueToMatchSapl (BVInt int)   = MatchInt int
-basicValueToMatchSapl (BVC char)    = MatchChar ( char)
+basicValueToMatchSapl (BVC char)    = MatchChar (toSAPLString '\'' char)
 basicValueToMatchSapl (BVB bool)    = MatchBool bool
 basicValueToMatchSapl (BVR real)    = MatchReal (toReal real)
-basicValueToMatchSapl (BVS string)  = MatchString string
+basicValueToMatchSapl (BVS str)     = MatchString (toSAPLString '"' str)
 
 cmpvar  (SaplVar n1 ip1 a1) (SaplVar n2 ip2 a2) | isNilPtr ip1 || isNilPtr ip2 = n1 == n2
 	                                                                           = ip1 == ip2
@@ -502,7 +503,52 @@ where
 	index_in_ranges index [{ir_from, ir_to}:ranges] = (index>=ir_from && index < ir_to) || index_in_ranges index ranges
 	index_in_ranges index [] = False
 
+// Change String literal representation from ABC to SAPL (JavaScript):
+//
+// For ABC see scanner.icl/ScanChar:
+//
+// Non printable characters are converted to one of them:
+// \n, \r, \f, \t, \", \' and \nnn (octal)
 
+cb :: Int
+cb =: fromChar '\b'
+cv :: Int
+cv =: fromChar '\v' 
+
+toSAPLString :: Char String -> String
+toSAPLString qc str = toString [qc: flatten (fromABCString (tl (init (fromString str))))]
+where
+	fromABCString :: [Char] -> [[Char]]
+	fromABCString [] = [[qc]]
+	fromABCString ['\\':chars] = let (c,chars2) = scanBSChar chars in [c: fromABCString chars2]
+	fromABCString [c   :chars] = [[c]    : fromABCString chars] 
+
+	toHex i
+		| i == 0  = ['\\0']
+		| i == 7  = ['\\a']		
+		| i == cb = ['\\b']
+		| i == cv = ['\\v']	
+
+	toHex i = ['\\x'] ++ ['0' \\ a <- [1..2-length letters]] ++ reverse (toHex` i)
+	where
+		letters = reverse (toHex` i)
+	
+		toHex` 0 = []
+		toHex` i = [hex.[i bitand 15]:toHex` (i >> 4)]  
+		where
+			hex = "0123456789ABCDEF" 
+
+	scanBSChar ['\\':chars] = (['\\\\'], chars)
+	// These are handled by the +1 case at the end
+	//scanBSChar ['n' :chars] = (['\\n'] , chars)
+	//scanBSChar ['r' :chars] = (['\\r'] , chars)
+	//scanBSChar ['f' :chars] = (['\\f'] , chars)
+	//scanBSChar ['t' :chars] = (['\\t'] , chars)
+	//scanBSChar ['"' :chars] = (['\\"'] , chars)
+	//scanBSChar ['\'':chars] = (['\\\''], chars)
+	scanBSChar [f:s:t:chars] | isOctDigit f && isOctDigit s && isOctDigit t
+			= (toHex (digitToInt f << 6 + digitToInt s << 3 + digitToInt t), chars)
+	scanBSChar [c: chars] = (['\\',c], chars)
 
                                     
                      
