@@ -47,7 +47,7 @@ writeVarInfo var_info_ptr new_var_info var_heap
 
 RemoveAnnotationsMask:==1
 ExpandAbstractSynTypesMask:==2
-DontCollectImportedConstructors:==4
+DontCollectImportedConstructorsAndRestorePointers:==4
 
 convertSymbolType :: !Bool !{#CommonDefs} !SymbolType !Int !*ImportedTypes !ImportedConstructors !*TypeHeaps !*VarHeap
 										  -> (!SymbolType, !*ImportedTypes,!ImportedConstructors,!*TypeHeaps,!*VarHeap)
@@ -65,8 +65,12 @@ convertSymbolTypeWithoutExpandingAbstractSynTypes rem_annots common_defs st main
 convertSymbolTypeWithoutCollectingImportedConstructors :: !Bool !{#CommonDefs} !SymbolType !Int !*ImportedTypes !*TypeHeaps !*VarHeap
 																				-> (!SymbolType,!*ImportedTypes,!*TypeHeaps,!*VarHeap)
 convertSymbolTypeWithoutCollectingImportedConstructors rem_annots common_defs st main_dcl_module_n imported_types type_heaps var_heap
+	# rem_annots
+		= if rem_annots
+			(RemoveAnnotationsMask bitor ExpandAbstractSynTypesMask bitor DontCollectImportedConstructorsAndRestorePointers)
+			(ExpandAbstractSynTypesMask bitor DontCollectImportedConstructorsAndRestorePointers)
 	# (st, ets_contains_unexpanded_abs_syn_type,ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap)
-		= convertSymbolType_ (if rem_annots (RemoveAnnotationsMask bitor ExpandAbstractSynTypesMask bitor DontCollectImportedConstructors) (ExpandAbstractSynTypesMask bitor DontCollectImportedConstructors)) common_defs st main_dcl_module_n imported_types [] type_heaps var_heap
+		= convertSymbolType_  rem_annots common_defs st main_dcl_module_n imported_types [] type_heaps var_heap
 	= (st, ets_type_defs, ets_type_heaps, ets_var_heap)
 
 convertSymbolType_ :: !Int !{# CommonDefs} !SymbolType !Int !*ImportedTypes !ImportedConstructors !*TypeHeaps !*VarHeap
@@ -215,15 +219,10 @@ expand_syn_types_in_TA rem_annots common_defs ta_type attribute ets=:{ets_type_d
 	  ets = { ets & ets_type_defs = ets_type_defs }
 	= case td_rhs of
 		SynType rhs_type
-			# (type,ets_type_heaps) = bind_and_substitute_before_expand types td_args td_attribute rhs_type rem_annots attribute ets.ets_type_heaps
-			# (_,type,ets) = expandSynTypes rem_annots common_defs type { ets & ets_type_heaps = ets_type_heaps }
-			-> (True,type,ets)
+			-> expand_type types td_args td_attribute rhs_type rem_annots attribute ets
 		AbstractSynType _ rhs_type
 			| (rem_annots bitand ExpandAbstractSynTypesMask)<>0
-				# (type,ets_type_heaps) = bind_and_substitute_before_expand types td_args td_attribute rhs_type rem_annots attribute ets.ets_type_heaps
-				# (_,type,ets) = expandSynTypes rem_annots common_defs type { ets & ets_type_heaps = ets_type_heaps }
-				-> (True,type,ets)
-
+				-> expand_type types td_args td_attribute rhs_type rem_annots attribute ets
 				# ets = {ets & ets_contains_unexpanded_abs_syn_type=True }
 				#! (changed,types, ets) = expandSynTypes rem_annots common_defs types ets
 				# ta_type = if changed
@@ -236,9 +235,7 @@ expand_syn_types_in_TA rem_annots common_defs ta_type attribute ets=:{ets_type_d
 					-> (changed,ta_type, collect_imported_constructors common_defs glob_module td_rhs ets)
 		NewType {ds_index}
 			# {cons_type={st_args=[arg_type:_]}} = common_defs.[glob_module].com_cons_defs.[ds_index];
-			# (type,ets_type_heaps) = bind_and_substitute_before_expand types td_args td_attribute arg_type rem_annots attribute ets.ets_type_heaps
-			# (_,type,ets) = expandSynTypes rem_annots common_defs type { ets & ets_type_heaps = ets_type_heaps }
-			-> (True,type,ets)
+			-> expand_type types td_args td_attribute arg_type rem_annots attribute ets
 		_
 			#! (changed,types, ets) = expandSynTypes rem_annots common_defs types ets
 			# ta_type = if changed
@@ -246,32 +243,58 @@ expand_syn_types_in_TA rem_annots common_defs ta_type attribute ets=:{ets_type_d
 								TA  type_symb _				-> TA  type_symb types
 								TAS type_symb _ strictness	-> TAS type_symb types strictness
 							) ta_type
-			| glob_module == ets.ets_main_dcl_module_n || (rem_annots bitand DontCollectImportedConstructors)<>0
+			| glob_module == ets.ets_main_dcl_module_n || (rem_annots bitand DontCollectImportedConstructorsAndRestorePointers)<>0
 				-> (changed,ta_type, ets)
 				-> (changed,ta_type, collect_imported_constructors common_defs glob_module td_rhs ets)
 where
-	bind_and_substitute_before_expand types td_args td_attribute rhs_type rem_annots attribute ets_type_heaps
-		# ets_type_heaps = bind_attr td_attribute attribute ets_type_heaps
-		  ets_type_heaps = fold2St bind_var_and_attr td_args types ets_type_heaps
-		= substitute_rhs rem_annots rhs_type.at_type ets_type_heaps
+	expand_type types td_args td_attribute rhs_type rem_annots attribute ets
+		| (rem_annots bitand DontCollectImportedConstructorsAndRestorePointers)==0
+			# (type,ets_type_heaps) = bind_and_substitute_before_expand types td_args td_attribute rhs_type rem_annots attribute ets.ets_type_heaps
+			  (_,type,ets) = expandSynTypes rem_annots common_defs type {ets & ets_type_heaps = ets_type_heaps}
+			= (True,type,ets)
+			# (type,rev_tv_infos,ets_type_heaps) = bind_save_and_substitute_before_expand types td_args td_attribute rhs_type rem_annots attribute ets.ets_type_heaps
+			  (_,type,ets=:{ets_type_heaps}) = expandSynTypes rem_annots common_defs type {ets & ets_type_heaps = ets_type_heaps}
+			  th_vars = fold2St restore_tv_info (reverse rev_tv_infos) td_args ets_type_heaps.th_vars
+			= (True,type,{ets & ets_type_heaps = {ets_type_heaps & th_vars=th_vars}})
+	where
+		bind_and_substitute_before_expand types td_args td_attribute rhs_type rem_annots attribute ets_type_heaps
+			# ets_type_heaps = bind_attr td_attribute attribute ets_type_heaps
+			  ets_type_heaps = fold2St bind_var_and_attr td_args types ets_type_heaps
+			= substitute_rhs rem_annots rhs_type.at_type ets_type_heaps
 		where
-			bind_var_and_attr {	atv_attribute = TA_Var {av_info_ptr},  atv_variable = {tv_info_ptr} } {at_attribute,at_type} type_heaps=:{th_vars,th_attrs}
-				= { type_heaps & th_vars = th_vars <:= (tv_info_ptr, TVI_Type at_type), th_attrs = th_attrs <:= (av_info_ptr, AVI_Attr at_attribute) }
-			bind_var_and_attr { atv_variable  = {tv_info_ptr}} {at_type} type_heaps=:{th_vars}
-				= { type_heaps & th_vars = th_vars <:= (tv_info_ptr, TVI_Type at_type) }
+			bind_var_and_attr {atv_attribute = TA_Var {av_info_ptr}, atv_variable = {tv_info_ptr}} {at_attribute,at_type} type_heaps=:{th_vars,th_attrs}
+				= {type_heaps & th_vars = th_vars <:= (tv_info_ptr, TVI_Type at_type), th_attrs = th_attrs <:= (av_info_ptr, AVI_Attr at_attribute)}
+			bind_var_and_attr {atv_variable = {tv_info_ptr}} {at_type} type_heaps=:{th_vars}
+				= {type_heaps & th_vars = th_vars <:= (tv_info_ptr, TVI_Type at_type)}
 	
-			bind_attr (TA_Var {av_info_ptr}) attribute type_heaps=:{th_attrs}
-				= { type_heaps & th_attrs = th_attrs <:= (av_info_ptr, AVI_Attr attribute) }
-			bind_attr _ attribute type_heaps
-				= type_heaps
+		bind_save_and_substitute_before_expand types td_args td_attribute rhs_type rem_annots attribute ets_type_heaps
+			# ets_type_heaps=:{th_vars,th_attrs} = bind_attr td_attribute attribute ets_type_heaps
+			  (rev_tv_infos,th_vars,th_attrs) = fold2St bind_and_save_var_and_attr td_args types ([],th_vars,th_attrs)
+			  (type,heaps) = substitute_rhs rem_annots rhs_type.at_type {ets_type_heaps & th_vars=th_vars,th_attrs=th_attrs}
+			= (type,rev_tv_infos,heaps)
+		where
+			bind_and_save_var_and_attr {atv_attribute = TA_Var {av_info_ptr}, atv_variable = {tv_info_ptr}} {at_attribute,at_type} (rev_tv_infos,th_vars,th_attrs)
+				# (tv_info,th_vars) = readPtr tv_info_ptr th_vars
+				= ([tv_info:rev_tv_infos],th_vars <:= (tv_info_ptr, TVI_Type at_type), th_attrs <:= (av_info_ptr, AVI_Attr at_attribute))
+			bind_and_save_var_and_attr {atv_variable = {tv_info_ptr}} {at_type} (rev_tv_infos,th_vars,th_attrs)
+				# (tv_info,th_vars) = readPtr tv_info_ptr th_vars
+				= ([tv_info:rev_tv_infos],th_vars <:= (tv_info_ptr, TVI_Type at_type),th_attrs)
 	
-			substitute_rhs rem_annots rhs_type type_heaps
-				| rem_annots bitand RemoveAnnotationsMask<>0
-					# (_, rhs_type) = removeAnnotations rhs_type
-				  	# (_,type,heaps) = substitute rhs_type type_heaps
-				  	= (type,heaps)
-				  	# (_,type,heaps) = substitute rhs_type type_heaps
-				  	= (type,heaps)
+		restore_tv_info tv_info {atv_variable={tv_info_ptr}} th_vars
+			= writePtr tv_info_ptr tv_info th_vars
+
+		bind_attr (TA_Var {av_info_ptr}) attribute type_heaps=:{th_attrs}
+			= {type_heaps & th_attrs = th_attrs <:= (av_info_ptr, AVI_Attr attribute)}
+		bind_attr _ attribute type_heaps
+			= type_heaps
+
+		substitute_rhs rem_annots rhs_type type_heaps
+			| rem_annots bitand RemoveAnnotationsMask<>0
+				# (_, rhs_type) = removeAnnotations rhs_type
+			  	# (_,type,heaps) = substitute rhs_type type_heaps
+			  	= (type,heaps)
+			  	# (_,type,heaps) = substitute rhs_type type_heaps
+			  	= (type,heaps)
 
 	collect_imported_constructors :: !{#.CommonDefs} !.Int !.TypeRhs !*ExpandTypeState -> .ExpandTypeState
 	collect_imported_constructors common_defs mod_index (RecordType {rt_constructor}) ets=:{ets_collected_conses,ets_var_heap}
