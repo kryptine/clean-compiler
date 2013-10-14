@@ -1392,6 +1392,11 @@ where
 	remove_macros_from_group [FunctionOrIclMacroIndex fun:funs] fun_defs
 		# (funs,fun_defs)=remove_macros_from_group funs fun_defs
 		| fun_defs.[fun].fun_info.fi_group_index<NoIndex
+			/*	Macros don't have types, however the parser allows :== for instances, which results in a macro with a type.
+				These types must be checked, because if the type of the expression is incorrect and the instance is exported,
+				an incorrectly typed program can be compiled. Currently using :== in instances probably has no effect,
+				so it might be better to reject this in the parser. */
+			&& case fun_defs.[fun].fun_type of No -> True; _ -> False
 			= (funs,fun_defs)
 			= ([fun:funs],fun_defs)
 	remove_macros_from_group [DclMacroIndex macro_module_index macro_index:funs] fun_defs		
