@@ -103,10 +103,10 @@ where
 			= fwritei (get_type_var_nf_number v) tcl_file
 
   		# wtis & wtis_type_heaps = {wtis_type_heaps & th_vars = th_vars}
- 		= (tcl_file,wtis)	
- 	where 
- 		get_type_var_nf_number (TVI_Normalized i)	= i
-
+ 		= (tcl_file,wtis)
+ 	where
+ 		get_type_var_nf_number (TVI_Normalized i) = i
+ 
 instance WriteTypeInfo TypeRhs
 where 
 	write_type_info (AlgType defined_symbols) tcl_file wtis
@@ -132,6 +132,10 @@ where
  		// unimplemented
 		= (tcl_file,wtis)
 	write_type_info (AlgConses _ _) tcl_file wtis
+ 		// unimplemented
+		= (tcl_file,wtis)
+	write_type_info (NewType _) tcl_file wtis
+ 		#! tcl_file = fwritec AbstractTypeCode tcl_file;
  		// unimplemented
 		= (tcl_file,wtis)
 
@@ -392,7 +396,7 @@ write_type_info_of_array i limit array tcl_file wtis
 	# (tcl_file,wtis)
 		= write_type_info array.[i] tcl_file wtis
 	= write_type_info_of_array (inc i) limit array tcl_file wtis
-	
+
 instance WriteTypeInfo [a] | WriteTypeInfo a
 where
 	write_type_info l tcl_file wtis
