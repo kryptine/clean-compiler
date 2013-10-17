@@ -903,10 +903,10 @@ checkAndPartitionateDclMacros mod_index range e_info=:{ef_is_macro_fun=ef_is_mac
 			= checkDclMacros mod_index cGlobalScope range.ir_from range.ir_to { e_info & ef_is_macro_fun=True } heaps cs
 	  (e_info=:{ef_macro_defs}) = { e_info & ef_is_macro_fun=ef_is_macro_fun_old }
 	# (predef_symbols_for_transform, cs_predef_symbols) = get_predef_symbols_for_transform cs_predef_symbols
-	  (macro_defs, hp_var_heap, hp_expression_heap, cs_symbol_table, cs_error)
-	  		= partitionateDclMacros range mod_index predef_symbols_for_transform ef_macro_defs hp_var_heap hp_expression_heap cs_symbol_table cs_error
-	= ({ e_info & ef_macro_defs=macro_defs }, {heaps &  hp_var_heap = hp_var_heap, hp_expression_heap = hp_expression_heap},
-		{ cs & cs_symbol_table = cs_symbol_table, cs_predef_symbols = cs_predef_symbols, cs_error = cs_error })
+      (macro_defs, hp_var_heap, hp_expression_heap, cs_symbol_table, cs_error)
+              = partitionateDclMacros range mod_index predef_symbols_for_transform ef_macro_defs hp_var_heap hp_expression_heap cs_symbol_table cs_error
+    = ({ e_info & ef_macro_defs=macro_defs }, {heaps &  hp_var_heap = hp_var_heap, hp_expression_heap = hp_expression_heap},
+        { cs & cs_symbol_table = cs_symbol_table, cs_predef_symbols = cs_predef_symbols, cs_error = cs_error })
 
 checkAndPartitionateIclMacros ::  !Index !IndexRange !Int !*{#FunDef} !*ExpressionInfo !*Heaps !*CheckState
 													  -> (!*{#FunDef},!*ExpressionInfo,!*Heaps,!*CheckState);
@@ -915,10 +915,10 @@ checkAndPartitionateIclMacros mod_index range local_functions_index_offset fun_d
 			= checkFunctions mod_index cGlobalScope range.ir_from range.ir_to local_functions_index_offset fun_defs { e_info & ef_is_macro_fun=True } heaps cs
 	  (e_info=:{ef_macro_defs}) = { e_info & ef_is_macro_fun=ef_is_macro_fun_old }
 	# (predef_symbols_for_transform, cs_predef_symbols) = get_predef_symbols_for_transform cs_predef_symbols
-	  (fun_defs, macro_defs, hp_var_heap, hp_expression_heap, cs_symbol_table, cs_error)
-	  		= partitionateIclMacros range mod_index predef_symbols_for_transform fun_defs ef_macro_defs hp_var_heap hp_expression_heap cs_symbol_table cs_error
-	= (fun_defs, { e_info & ef_macro_defs=macro_defs }, {heaps &  hp_var_heap = hp_var_heap, hp_expression_heap = hp_expression_heap},
-			{ cs & cs_symbol_table = cs_symbol_table, cs_predef_symbols = cs_predef_symbols, cs_error = cs_error })
+      (fun_defs, macro_defs, hp_var_heap, hp_expression_heap, cs_symbol_table, cs_error)
+              = partitionateIclMacros range mod_index predef_symbols_for_transform fun_defs ef_macro_defs hp_var_heap hp_expression_heap cs_symbol_table cs_error
+    = (fun_defs, { e_info & ef_macro_defs=macro_defs }, {heaps &  hp_var_heap = hp_var_heap, hp_expression_heap = hp_expression_heap},
+            { cs & cs_symbol_table = cs_symbol_table, cs_predef_symbols = cs_predef_symbols, cs_error = cs_error })
 
 checkInstanceBodies :: ![IndexRange] !Int !*{#FunDef} !*ExpressionInfo !*Heaps !*CheckState
 									  -> (!*{#FunDef},!*ExpressionInfo,!*Heaps, !*CheckState);
@@ -2265,7 +2265,8 @@ check_module1 cdefs icl_global_function_range fun_defs optional_dcl_mod optional
 					<=< adjust_predefined_module_symbol PD_StdStrictLists
 					<=< adjust_predefined_module_symbol PD_StdDynamic
 					<=< adjust_predefined_module_symbol PD_StdGeneric
-					<=< adjust_predefined_module_symbol PD_StdMisc										
+					<=< adjust_predefined_module_symbol PD_StdMisc
+					<=< adjust_predefined_module_symbol PD_iTasks_Framework_Tonic
 					<=< adjust_predefined_module_symbol PD_PredefinedModule
 			= ([], [], { cs & cs_predef_symbols = cs_predef_symbols, cs_symbol_table = cs_symbol_table})
 		where
@@ -3374,6 +3375,10 @@ where
 			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols}
 				<=< adjustPredefSymbol PD_abort				mod_index STE_DclFunction
 				<=< adjustPredefSymbol PD_undef				mod_index STE_DclFunction)
+		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_iTasks_Framework_Tonic]	
+		| pre_mod.pds_def == mod_index
+			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols}
+				<=< adjustPredefSymbol PD_tonicTune				mod_index STE_DclFunction)
 			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols})		
 	where
 		unused

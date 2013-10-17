@@ -11,6 +11,7 @@ from StdBool import ||
 import StdMisc
 import Data.Void
 import Data.Func
+from Data.Functor import class Functor (..)
 import Data.List
 
 import Data.Graph
@@ -18,207 +19,250 @@ import Data.Maybe
 import Text.PPrint
 import Tonic.AbsSyn
 import Tonic.Util
-from syntax import :: Optional (..), :: FunDef {..}, :: FunInfo, :: FunKind,
-  :: FunctionBody {..}, :: TransformedBody {..}, :: CheckedBody, :: ParsedBody,
-  :: AType {..}, :: TypeAttribute, :: Type {..}, :: TypeKind, :: TempVarId,
-  :: ATypeVar, :: BasicType, :: ConsVariable, :: TypeSymbIdent {..},
-  :: TypeSymbProperties
+import StdDebug
+import _SystemArray
+
+from syntax import :: Optional (..), :: FunDef {..}, :: DclModule {..},
+  :: IclModule {..}, :: ForeignExport, :: ImportedObject, :: QualifiedDeclaration,
+  :: Declaration, :: IclFunctionIndices, :: ModuleIdent,
+  :: FunInfo, :: FunKind, :: FunctionBody {..}, :: TransformedBody {..},
+  :: CheckedBody, :: ParsedBody, :: AType {..}, :: TypeAttribute, :: Type {..},
+  :: TypeKind, :: TempVarId, :: ATypeVar, :: BasicType, :: ConsVariable,
+  :: TypeSymbIdent {..}, :: TypeSymbProperties, :: NumberSet, :: ModuleKind,
+  :: Declarations, :: DictionaryInfo, :: CommonDefs, :: IndexRange
 }
 
 attr Expression Expressions Ident BoundVar FreeVar FreeVars SymbIdent
   BasicValue DefinedSymbol Selection Selections GExpression GLet GLetBind
-  GLetBinds GlobalDefinedSymbol App SymbolType GFunDef
-  inh mergeId                            :: {Int}
-  inh currTaskName                       :: {String}
-  inh caseExpr                           :: {Maybe Expression}
-  chn graph                              :: {GinGraph}
+  GLetBinds GlobalDefinedSymbol App SymbolType GFunDef FunType MaybeExpression
   syn hasRecs       use {||}  {False}    :: {Bool}
   syn recNode       use {||}  {False}    :: {Bool}
   syn mEntryId      use {<>}  {Nothing}  :: {Maybe Int}
   syn mExitId       use {<>}  {Nothing}  :: {Maybe Int}
 
-attr App Ident SymbIdent
-  syn reifyFunType    :: {Maybe FunType}
-  syn reifySymbolType :: {Maybe SymbolType}
-  syn reifyFunDef     :: {Maybe GFunDef}
-
-attr App SymbIdent Ident SymbolType
-  syn isTask      :: {Bool}
-
-attr SymbIdent
+attr SymbIdent Ident
   syn isCurrTask :: {Bool}
 
 attr SymbIdent Ident
-  syn ident :: {String}
+  syn ident    :: {String}
 
-sem SymbolType
-  | SymbolType
-      lhs.isTask =  case @st_result|at_type of
-                      TA   tsi _     -> symTyIsTask` tsi
-                      TAS  tsi _  _  -> symTyIsTask` tsi
-                      _              -> False
-                    where symTyIsTask` tsi = tsi.type_ident.id_name == "Task"
+attr App Expressions
+  syn firstArg                                :: MaybeExpression
+  syn secondArg                               :: MaybeExpression
+  syn firstArgIdent                           :: {String}
+  syn secondArgIdent                          :: {String}
+  syn firstArgGraph                           :: {GinGraph}
+  syn secondArgGraph                          :: {GinGraph}
+  syn firstArgMEntryId   use {<>}  {Nothing}  :: {Maybe Int}
+  syn secondArgMEntryId  use {<>}  {Nothing}  :: {Maybe Int}
+  syn firstArgMExitId    use {<>}  {Nothing}  :: {Maybe Int}
+  syn secondArgMExitId   use {<>}  {Nothing}  :: {Maybe Int}
+  syn firstArgHasRecs    use {||}  {False}    :: {Bool}
+  syn secondArgHasRecs   use {||}  {False}    :: {Bool}
+  syn firstArgRecNode    use {||}  {False}    :: {Bool}
+  syn secondArgRecNode   use {||}  {False}    :: {Bool}
+
+attr Expressions
+  inh numContexts :: {Int}
+
+sem Expressions
+  | Cons loc.hasContexts = @lhs.numContexts > 0
+
+         lhs.firstArg    = if @hasContexts @tl.firstArg (Just @hd.copy)
+         lhs.secondArg   = if @hasContexts @tl.secondArg @tl.firstArg
+
+         lhs.firstArgGraph  = if @hasContexts @tl.firstArgGraph @hd.graph
+         lhs.secondArgGraph = if @hasContexts @tl.secondArgGraph @tl.firstArgGraph
+
+         tl.graph  = if @hasContexts @lhs.graph @hd.graph
+         lhs.graph = @tl.graph
+
+         lhs.firstArgMEntryId   = if @hasContexts @tl.firstArgMEntryId @hd.mEntryId
+         lhs.secondArgMEntryId  = if @hasContexts @tl.secondArgMEntryId @tl.firstArgMEntryId
+         lhs.firstArgMExitId    = if @hasContexts @tl.firstArgMExitId @hd.mExitId
+         lhs.secondArgMExitId   = if @hasContexts @tl.secondArgMExitId @tl.secondArgMExitId
+         lhs.firstArgHasRecs    = if @hasContexts @tl.firstArgHasRecs @hd.hasRecs
+         lhs.secondArgHasRecs   = if @hasContexts @tl.secondArgHasRecs @tl.firstArgHasRecs
+         lhs.firstArgRecNode    = if @hasContexts @tl.firstArgRecNode @hd.recNode
+         lhs.secondArgRecNode   = if @hasContexts @tl.secondArgRecNode @tl.secondArgRecNode
+
+         tl.numContexts  = @lhs.numContexts - 1
+
+  | Nil  lhs.firstArg  = Nothing
+         lhs.secondArg = Nothing
+
+         lhs.firstArgIdent    = abort "firstArgIdent: no args"
+         lhs.secondArgIdent   = abort "secondArgIdent: no args"
+
+         lhs.firstArgGraph  = abort "firstArgGraph: no args"
+         lhs.secondArgGraph = abort "secondArgGraph: no args"
+
+         lhs.graph = @lhs.graph
 
 sem Ident
   | Ident
-      lhs.ident  = @id_name
-      lhs.isTask = @identSymbolType.isTask
-
-      inst.identSymbolType :: SymbolType
-      inst.identSymbolType = fromMaybe (abort $ "inst.identSymbolType: " +++ @id_name)
-                             @loc.reifySymbolType
-
-      lhs.reifyFunType    = reifyFunType @lhs.moduleEnv @copy
-      lhs.reifySymbolType = @loc.reifySymbolType
-      loc.reifySymbolType = reifySymbolType @lhs.moduleEnv @copy
-      lhs.reifyFunDef     = reifyFunDef @lhs.moduleEnv @copy
-
-
-sem App
-  | App
-      lhs.reifyFunDef = @app_symb.reifyFunDef
-      lhs.reifySymbolType = @app_symb.reifySymbolType
-
-      loc.noContextArgs = if @loc.isListApp
-                            @app_args.copy
-                            (let funTy  = fromMaybe (abort err) @app_symb.reifySymbolType
-                                 err    = "noContextArgs : failed to find symbol type for " +++ @app_symb.ident
-                             in  dropContexts funTy @app_args.copy)
-
-      loc.isListApp = @app_symb.ident == "_Cons" || @app_symb.ident == "_Nil"
-      lhs.isTask    = @loc.isTask
-      loc.isTask    = @app_symb.isTask
+      lhs.isCurrTask = @id_name == @lhs.currTaskName
+      lhs.ident      = @id_name
 
 sem SymbIdent
   | SymbIdent
-     lhs.reifyFunDef  = reifyFunDef @lhs.moduleEnv @symb_ident.copy
-     lhs.reifySymbolType  = @symb_ident.reifySymbolType
-
-     loc.ident        = @symb_ident.ident
-     lhs.ident        = @loc.ident
-     lhs.isCurrTask   = @loc.ident == @lhs.currTaskName
-     lhs.isTask       = @symb_ident.isTask
+      lhs.ident            = trace_n "SymbIdent.ident" $           @symb_ident.ident
+      lhs.isCurrTask       = trace_n "SymbIdent.isCurrTask" $      @symb_ident.isCurrTask
 
 attr GFunDef
   syn funArgs :: {[FreeVar]}
-  syn funRhs  :: Expression
 
 sem GFunDef
   | GFunDef
-      lhs.funArgs = @gfd_args.copy
-      lhs.funRhs  = @gfd_rhs.copy
+      lhs.funArgs  = @gfd_args.copy
+      lhs.funRhs   = @gfd_rhs.copy
 
       lhs.mEntryId = @gfd_rhs.mEntryId
       lhs.mExitId  = @gfd_rhs.mExitId
 
-      gfd_rhs.graph = @lhs.graph
-      lhs.graph     = @gfd_rhs.graph
+      lhs.graph    = @gfd_rhs.graph
 
+/******************************************************************************/
+/* App: common                                                                */
+/******************************************************************************/
 sem App
   | App
-      lhs.graph = if (symbIdentIsTask @lhs.moduleEnv @app_symb.copy)
+      app_args.numContexts = if @loc.isListApp 0
+                             (let funTy  = fromMaybe (abort err) (reifySymbolType @lhs.moduleEnv @app_symb.ident)
+                                  err    = "numContexts : failed to find symbol type for " +++ @app_symb.ident
+                              in  numContexts funTy)
+
+      lhs.firstArg  = @loc.firstArg
+      loc.firstArg  = @app_args.firstArg
+      lhs.secondArg = @loc.secondArg
+      loc.secondArg = @app_args.firstArg
+
+      lhs.graph = if (trace_n ("App.graph.symb:" +++ @app_symb.ident) $ identIsTask @lhs.moduleEnv @app_symb.ident)
                     @loc.taskGraph
                     @lhs.graph
       lhs.mEntryId = @loc.taskEntryId
       lhs.mExitId  = @loc.taskExitId
 
-      loc.(taskGraph, taskEntryId, taskExitId) = case @app_symb.ident of // TODO `parallel`
-                                                   ">>="       -> (@loc.bindGraph,                    Nothing,                            Nothing)
-                                                   "return"    -> (@loc.returnGraph,                  Just @loc.returnId,                 Just @loc.returnId)
-                                                   ">>|"       -> (@loc.binAppGraph Nothing,          Nothing,                            Nothing)
-                                                   "@:"        -> (@loc.assignGraph,                  Just @loc.assignId,                 Just @loc.assignId)
-                                                   ">>*"       -> (@loc.stepGraph,                    @loc.stepEntryId,                   @loc.stepExitId)
-                                                   "-||-"      -> (@loc.parBinAppGraph DisFirstBin,   Nothing,                            Nothing)
-                                                   "||-"       -> (@loc.parBinAppGraph DisRight,      Nothing,                            Nothing)
-                                                   "-||"       -> (@loc.parBinAppGraph DisLeft,       Nothing,                            Nothing)
-                                                   "-&&-"      -> (@loc.parBinAppGraph ConPair,       Nothing,                            Nothing)
-                                                   "anyTask"   -> (@loc.parListAppGraph DisFirstList, @loc.parListAppEntryId DisFirstBin, @loc.parListAppExitId DisFirstBin)
-                                                   "allTasks"  -> (@loc.parListAppGraph ConAll,       @loc.parListAppEntryId DisFirstBin, @loc.parListAppExitId DisFirstBin)
-                                                   _           -> (@loc.taskAppGraph,                 @loc.taskAppId,                     @loc.taskAppId)
+      loc.(taskGraph, taskEntryId, taskExitId)
+            = case @app_symb.ident of // TODO `parallel`
+                // ">>="       -> trace_n "App: >>="       $ (@loc.bindGraph,                    Nothing,                            Nothing)
+                "return"    -> trace_n "App: return"    $ (@loc.returnGraph,                  Just @loc.returnId,                 Just @loc.returnId)
+                ">>|"       -> trace_n "App: >>|"       $ (@loc.binAppGraph Nothing,          Nothing,                            Nothing)
+                "@:"        -> trace_n "App: @:"        $ (@loc.assignGraph,                  Just @loc.assignId,                 Just @loc.assignId)
+                ">>*"       -> trace_n "App: >>*"       $ (@loc.stepGraph,                    @loc.stepEntryId,                   @loc.stepExitId)
+                "-||-"      -> trace_n "App: -||-"      $ (@loc.parBinAppGraph DisFirstBin,   Nothing,                            Nothing)
+                "||-"       -> trace_n "App: ||-"       $ (@loc.parBinAppGraph DisRight,      Nothing,                            Nothing)
+                "-||"       -> trace_n "App: -||"       $ (@loc.parBinAppGraph DisLeft,       Nothing,                            Nothing)
+                "-&&-"      -> trace_n "App: -&&-"      $ (@loc.parBinAppGraph ConPair,       Nothing,                            Nothing)
+                "anyTask"   -> trace_n "App: anyTask"   $ (@loc.parListAppGraph DisFirstList, @loc.parListAppEntryId DisFirstBin, @loc.parListAppExitId DisFirstBin)
+                "allTasks"  -> trace_n "App: allTasks"  $ (@loc.parListAppGraph ConAll,       @loc.parListAppEntryId DisFirstBin, @loc.parListAppExitId DisFirstBin)
+                _           -> trace_n "App: _"         $ (@loc.taskAppGraph,                 @loc.taskAppId,                     @loc.taskAppId)
 
-      loc.(appArg1, mAppArg2) = case @loc.noContextArgs of
-                                  [e1:e2:_]  -> (e1, Just e2)
-                                  [e1:_]     -> (e1, Nothing)
-                                  _          -> abort ("App has no args: " +++ @app_symb.ident)
+      loc.isListApp = @app_symb.ident == "_Cons" || @app_symb.ident == "_Nil"
 
-      inst.appArg1Expr :: Expression
-      inst.appArg1Expr = @loc.appArg1
-
-      inst.appArg2Expr :: Expression
-      inst.appArg2Expr = fromMaybe (abort "No second argument to app") @loc.mAppArg2
-
-      inst.bindRhsAppI :: App
-      inst.bindRhsAppI = case @loc.mAppArg2 of
-                           Just (App a)  -> a
-                           _             -> abort "Invalid bind"
+/******************************************************************************/
+/* App: >>=                                                                   */
+/******************************************************************************/
+sem App
+  | App
+      loc.bindRhsAppIdent = case @app_args.firstArg of
+                              Just (App a)  -> a.app_symb.symb_ident.id_name
+                              _             -> abort "Invalid bind"
 
       loc.bindRhsSymbolType = fromMaybe (abort "mkGraphAlg #2: failed to find symbol type")
-                              @bindRhsAppI.reifySymbolType
+                              (reifySymbolType @lhs.moduleEnv @loc.bindRhsAppIdent)
+      inst.foobar :: Expression
+      inst.foobar = Var { BoundVar | var_ident = {Ident | id_name = "", id_info = abort "This should _not_ be evaluated 1" }
+                                   , var_info_ptr = abort "This should _not_ be evaluated 2"
+                                   , var_expr_ptr = abort "This should _not_ be evaluated 3" }
 
-      inst.bindRhsFunDef :: GFunDef
-      inst.bindRhsFunDef = fromMaybe (abort "mkGraphAlg #1: failed to find function definition")
-                           @bindRhsAppI.reifyFunDef
 
-      inst.bindRhsSymbolTypeI :: SymbolType
-      inst.bindRhsSymbolTypeI = @loc.bindRhsSymbolType
+      /*inst.bindRhsFunDef :: GFunDef*/
+      /*inst.bindRhsFunDef = abort "bindRhsFunDef too early! :(" // fromMaybe (abort "mkGraphAlg #1: failed to find function definition")*/
+                            //                           (reifyFunDef @lhs.moduleEnv @loc.bindRhsAppIdent)
 
-      bindRhsFunDef.graph = @appArg1Expr.graph
+      /*bindRhsFunDef.graph = @app_args.firstArgGraph*/
 
-      loc.bindGraph = case ( @appArg1Expr.mEntryId, @appArg1Expr.mExitId
-                           , @bindRhsFunDef.mEntryId, @bindRhsFunDef.mExitId) of
-                        (Just _, Just lx, Just rn, Just _)
-                           # patid = withHead freeVarName (abort "Invalid bind")
-                                   $ [x \\ x <- dropContexts @loc.bindRhsSymbolType @bindRhsFunDef.funArgs | x.fv_def_level == -1]
-                           = addEdge (mkEdge patid) (lx, rn) @lhs.graph
-                        (_, lid, rid, _)        = edgeErr @lhs.moduleEnv "bind edge" lid @loc.appArg1 rid @bindRhsFunDef.funRhs
+      /*loc.bindGraph = case ( @app_args.firstArgMEntryId, @app_args.firstArgMExitId*/
+                           /*, @bindRhsFunDef.mEntryId, @bindRhsFunDef.mExitId) of*/
+                        /*(Just _, Just lx, Just rn, Just _)*/
+                           /*# patid = withHead freeVarName (abort "Invalid bind")*/
+                                   /*$ [x \\ x <- dropContexts @loc.bindRhsSymbolType @bindRhsFunDef.funArgs | x.fv_def_level == -1]*/
+                           /*= addEdge (mkEdge patid) (lx, rn) @lhs.graph*/
+                        /*(_, lid, rid, _)        = abort "Failed to create bind edge"*/
 
-      loc.(returnId, returnGraph) = // TODO No error: eta-reduction
-                                    let node   = GReturn $ withHead f (abort "Invalid return") @loc.noContextArgs
-                                        // In case of a function application, we want to inspect the type of the
-                                        // function. If it is a task or a list, treat it differently than any
-                                        // other type.
-                                        f _ = GCleanExpression "(return)"
-                                    in  addNode node @lhs.graph
+/******************************************************************************/
+/* App: return                                                                */
+/******************************************************************************/
+sem App
+  | App
+      loc.(returnId, returnGraph) = undef // TODO No error: eta-reduction
+                                    // let node   = GReturn @loc.firstArg
+                                    //     // In case of a function application, we want to inspect the type of the
+                                    //     // function. If it is a task or a list, treat it differently than any
+                                    //     // other type.
+                                    //     f _ = GCleanExpression "(return)"
+                                    // in  addNode node @lhs.graph
 
-      inst.binAppArg2Expr :: Expression
-      inst.binAppArg2Expr = fromMaybe (abort "No second argument to app") @loc.mAppArg2
+/******************************************************************************/
+/* App: >>|                                                                   */
+/******************************************************************************/
+sem App
+  | App
+      loc.binAppGraph = \mPat -> undef // case ( @app_args.firstArgMEntryId, @app_args.firstArgMExitId
+                                 //      , @app_args.secondArgMEntryId, @app_args.secondArgMExitId) of
+                                 //   (Just _, Just lx, Just rn, Just _)  -> addEdge (maybe emptyEdge mkEdge mPat) (lx, rn) @app_args.firstArgGraph
+                                 //   _                                   -> abort "binAppGraph"
 
-      binAppArg2Expr.graph = @appArg1Expr.graph
+/******************************************************************************/
+/* App: @:                                                                    */
+/******************************************************************************/
+sem App
+  | App
+      loc.(assignId, assignGraph) = undef // let (n, g) = addNode (GAssign "Assign node") @lhs.graph
+                                    // in  case @app_args.firstArgMEntryId of
+                                    //       Just r -> (n, addEmptyEdge (n, r) g)
+                                    //       _      -> abort "Illegal task assignment"
 
-      loc.binAppGraph = \mPat -> case ( @appArg1Expr.mEntryId, @appArg1Expr.mExitId
-                                      , @binAppArg2Expr.mEntryId, @binAppArg2Expr.mExitId) of
-                                   (Just _, Just lx, Just rn, Just _)  -> addEdge (maybe emptyEdge mkEdge mPat) (lx, rn) @appArg1Expr.graph
-                                   _                                   -> abort "binAppGraph"
-
-      loc.(assignId, assignGraph) = let (n, g) = addNode (GAssign "Assign node") @lhs.graph
-                                    in  case @appArg1Expr.mEntryId of
-                                          Just r -> (n, addEmptyEdge (n, r) g)
-                                          _      -> abort "Illegal task assignment"
-
-      loc.stepGraph = abort "Step not implemented yet"
+/******************************************************************************/
+/* App: >>*                                                                   */
+/******************************************************************************/
+sem App
+  | App
+      loc.stepGraph   = abort "Step not implemented yet"
       loc.stepEntryId = Nothing
-      loc.stepExitId = Nothing
+      loc.stepExitId  = Nothing
 
-      inst.parBinAppArg2Expr :: Expression
-      inst.parBinAppArg2Expr = fromMaybe (abort "No second argument to app") @loc.mAppArg2
+/******************************************************************************/
+/* App: -||-, ||-, -||, -&&-                                                  */
+/******************************************************************************/
+sem App
+  | App
+      loc.parBinAppGraph = undef // \join -> let (sid, g1) = addNode GParallelSplit @app_args.graph
+                          //              (jid, g2) = addNode (GParallelJoin join) g1
+                          //          in  case ( @app_args.firstArgMEntryId, @app_args.firstArgMExitId
+                          //                   , @app_args.secondArgMEntryId, @app_args.secondArgMExitId) of
+                          //                (_, Just l, Just r, _)
+                          //                  # g = addEmptyEdge (sid, l) g2
+                          //                  # g = addEmptyEdge (sid, r) g
+                          //                  # g = addEmptyEdge (l, jid) g
+                          //                  = addEmptyEdge (r, jid) g
+                          //                (_, lid, rid, _) = abort "Illegal parBinApp"
 
-      parBinAppArg2Expr.graph = @appArg1Expr.graph
-
-      loc.parBinAppGraph = \join -> let (sid, g1) = addNode GParallelSplit @parBinAppArg2Expr.graph
-                                        (jid, g2) = addNode (GParallelJoin join) g1
-                                    in  case ( @appArg1Expr.mEntryId, @appArg1Expr.mExitId
-                                             , @parBinAppArg2Expr.mEntryId, @parBinAppArg2Expr.mExitId) of
-                                          (_, Just l, Just r, _)
-                                            # g = addEmptyEdge (sid, l) g2
-                                            # g = addEmptyEdge (sid, r) g
-                                            # g = addEmptyEdge (l, jid) g
-                                            = addEmptyEdge (r, jid) g
-                                          (_, lid, rid, _) = abort "Illegal parBinApp"
-
+/******************************************************************************/
+/* App: anyTask, allTasks                                                     */
+/******************************************************************************/
+sem App
+  | App
       loc.parListAppGraph   = \join -> undef
       loc.parListAppEntryId = \join -> undef
       loc.parListAppExitId  = \join -> undef
 
+/******************************************************************************/
+/* App: Task application                                                      */
+/******************************************************************************/
+sem App
+  | App
       loc.(taskAppId, taskAppGraph) = if @app_symb.isCurrTask
                                         (Nothing, @lhs.graph)
                                         (let appArgs = map (GCleanExpression o ppCompact) @app_args.ppAgs  // TODO: When do we pprint a Clean expr? And when do we generate a subgraph?
@@ -284,15 +328,6 @@ listExprToList (App app) =
     _       -> abort "listExprToList: App is not a list"
 listExprToList _ = []
 
-nodeErr :: ModuleEnv (Maybe Int) Expression -> String
-nodeErr menv mn expr = ppCompact (ppExpression menv expr) +++ "\n" +++
-  maybe "for which its ID is unknown" (\n -> "with node ID " +++ toString n) mn
-
-edgeErr :: ModuleEnv String (Maybe Int) Expression (Maybe Int) Expression -> a
-edgeErr menv errmsg lid lexpr rid rexpr = abort ("Cannot create " +++ errmsg
-  +++ " between left expression\n\t" +++ nodeErr menv lid lexpr
-  +++ " and right expression\n\t" +++ nodeErr menv rid rexpr +++ "\n")
-
 addEmptyEdge :: (Int, Int) GinGraph -> GinGraph
 addEmptyEdge e g = addEdge emptyEdge e g
 
@@ -353,6 +388,9 @@ instance toString GNode where
   toString GStep = "GStep"
   toString GListComprehension = "GListComprehension"
 
+instance Functor Optional where
+  fmap _ No      = No
+  fmap f (Yes x) = Yes $ f x
 /*
 Task assignment drawing: Needs a stick.png with a stick figure (can be PDF?)
 digraph G {

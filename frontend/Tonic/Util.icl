@@ -5,9 +5,12 @@ import Data.Func
 import Data.Functor
 import Data.List
 import Data.Maybe
+import Data.Map
 import syntax
 import Tonic.AbsSyn
+import Tonic.Pretty
 import Text
+import iTasks.Framework.Tonic.AbsSyn
 
 foldrArr :: (a b -> b) b (arr a) -> b | Array arr a
 foldrArr f b arr = foldrArr` 0 f b arr
@@ -17,14 +20,14 @@ foldrArr f b arr = foldrArr` 0 f b arr
     | n < arrSz  = f (select arr n) (foldrArr` (n + 1) f b arr)
     | otherwise  = b
 
-findInArr :: (e -> Bool) (a e) -> Maybe e | Array a e
+findInArr :: (e -> Bool) (a e) -> Maybe (Int, e) | Array a e
 findInArr p arr = findInArr` 0 p arr
   where
   arrSz = size arr
   findInArr` n p arr
     | n < arrSz
       #  elem = select arr n
-      =  if (p elem) (Just elem) (findInArr` (n + 1) p arr)
+      =  if (p elem) (Just (n, elem)) (findInArr` (n + 1) p arr)
     | otherwise  = Nothing
 
 concatStrings :: [String] -> .String
@@ -39,75 +42,79 @@ concatStrings l = updateS 0 l (createArray (sum [size s \\ s <- l]) ' ')
 intercalateString :: String [String] -> String
 intercalateString xs xss = concatStrings (intersperse xs xss)
 
-//dropAppContexts :: App ModuleEnv -> [Expression]
-//dropAppContexts app menv
-  //| appIsList app = app.app_args
-  //| otherwise
-    //# funTy  = fromMaybe (abort err)
-             //$ reifySymbolType menv ident
-    //= dropContexts funTy app.app_args
-  //where
-  //ident  = app.app_symb.symb_ident
-  //err    = "dropAppContexts : failed to find symbol type for " +++ ident.id_name
-
-reifyFunType :: ModuleEnv Ident -> Maybe FunType
-reifyFunType menv ident =
-  safeHead  [  ft \\ dcl <-: menv.me_dcl_modules, ft <-: dcl.dcl_functions
-            |  ft.ft_ident.id_name == ident.id_name
-            ]
-
-reifyFunDef :: ModuleEnv Ident -> Maybe GFunDef
-reifyFunDef menv ident =
-  case findInFunDefs menv.me_fun_defs of
-    Just fd  -> Just $ mkGFunDef fd
-    _        -> fmap mkGFunDef $ findInFunDefs menv.me_icl_module.icl_functions
+dropAppContexts :: App *ModuleEnv -> *(([Expression], [Expression]), *ModuleEnv)
+dropAppContexts app menv
+  | appIsList app = (([], app.app_args), menv)
+  | otherwise
+    # (mst, menv)    = reifySymbolType ident menv
+    # funTy          = fromMaybe (abort err) mst
+    = (dropContexts funTy app.app_args, menv)
   where
-  identName = ident.id_name
-  findInFunDefs fds = findInArr (\fd -> fd.fun_ident.id_name == identName) fds
+  ident  = app.app_symb.symb_ident.id_name
+  err    = "dropAppContexts : failed to find symbol type for " +++ ident
 
-reifySymbolType :: ModuleEnv Ident -> Maybe SymbolType
-reifySymbolType menv ident =
-  case findInArr (\fd -> fd.fun_ident.id_name == ident.id_name) menv.me_fun_defs of
-    Just fd  -> optional findInDcls Just fd.fun_type
-    _        -> findInDcls
+extractFunDefs :: !*{#FunDef} -> *(!{#FunDef}, !*{#FunDef})
+extractFunDefs fun_defs
+  # defs = {d \\ d <-: fun_defs}
+  = (defs, {d \\ d <-: defs})
+
+reifyFunType :: String *ModuleEnv -> *(Maybe FunType, *ModuleEnv)
+reifyFunType ident menv=:{me_dcl_modules}
+  = (safeHead  [  ft \\ dcl <-: me_dcl_modules, ft <-: dcl.dcl_functions
+               |  ft.ft_ident.id_name == ident
+               ]
+    , menv)
+
+// Maybe return the index of the fundef in the unique FunDef array
+reifyFunDef :: String *ModuleEnv -> *(Maybe (Int, FunDef), *ModuleEnv)
+reifyFunDef ident menv=:{me_fun_defs}
+  # (fds, fun_defs) = extractFunDefs me_fun_defs
+  # mfd = findInArr (\fd -> fd.fun_ident.id_name == ident) fds
+  = (mfd, { menv & me_fun_defs = fun_defs })
+
+reifySymbolType :: String *ModuleEnv -> *(Maybe SymbolType, *ModuleEnv)
+reifySymbolType ident menv
+  # (mfd, menv) = reifyFunDef ident menv
+  = case mfd of
+      Just (_, fd)  -> case fd.fun_type of
+                         Yes t -> (Just t, menv)
+                         _     -> findInDcls menv
+      _             -> findInDcls menv
   where
-  findInDcls = maybe Nothing (\ft -> Just ft.ft_type) (reifyFunType menv ident)
+  findInDcls menv
+    # (mft, menv) = reifyFunType ident menv
+    = (maybe Nothing (\ft -> Just ft.ft_type) mft, menv)
 
-persistHasRec :: [SynExpression] SynExpression -> SynExpression
-persistHasRec ss syn = { syn & syn_has_recs = has }
- where has = foldr (\s b -> s.syn_has_recs || b) False ss
+fdArrToMap :: .{#FunDef} -> Map String FunDef
+fdArrToMap fds = fromList [(d.fun_ident.id_name, d) \\ d <-: fds]
 
-appIsCons :: App -> Bool
-appIsCons app = app.app_symb.symb_ident.id_name == "_Cons"
+isCons :: String -> Bool
+isCons str = str == "_Cons"
 
-appIsNil :: App -> Bool
-appIsNil app = app.app_symb.symb_ident.id_name == "_Nil"
+isNil :: String -> Bool
+isNil str = str == "_Nil"
 
-//appIsList :: App -> Bool
-//appIsList app = appIsCons app || appIsNil app
+appIsList :: App -> Bool
+appIsList app = isCons ident || isNil ident
+  where ident = app.app_symb.symb_ident.id_name
 
-//exprIsListConstr :: Expression -> Bool
-//exprIsListConstr (App app) = appIsList app
-//exprIsListConstr _         = False
+exprIsListConstr :: Expression -> Bool
+exprIsListConstr (App app) = appIsList app
+exprIsListConstr _         = False
 
 exprIsListCompr :: Expression -> Bool
 exprIsListCompr (App app)  = appIsListComp app
 exprIsListCompr _          = False
 
 appIsListComp :: App -> Bool
-appIsListComp app = startsWith "c;" app.app_symb.symb_ident.id_name // TODO: Verify
+appIsListComp app = isListCompr app.app_symb.symb_ident.id_name
 
-withHead :: (a -> b) b [a] -> b
-withHead _  b  []       = b
-withHead f  _  [x : _]  = f x
+isListCompr :: String -> Bool
+isListCompr str = startsWith "c;" str // TODO: Verify
 
 safeHead :: [a] -> Maybe a
 safeHead []    = Nothing
 safeHead [x:_] = Just x
-
-withTwo :: (a a -> b) b [a] -> b
-withTwo f  _  [x : y : _]  = f x y
-withTwo _  b  _            = b
 
 fromOptional :: a (Optional a) -> a
 fromOptional x  No       = x
@@ -117,20 +124,20 @@ optional :: b (a -> b) (Optional a) -> b
 optional b  _  No       = b
 optional _  f  (Yes x)  = f x
 
+appFunName :: App -> String
+appFunName app = app.app_symb.symb_ident.id_name
+
 freeVarName :: FreeVar -> String
 freeVarName fv = fv.fv_ident.id_name
 
-dropContexts :: SymbolType [a] -> [a]
+dropContexts :: SymbolType [a] -> ([a], [a])
 dropContexts st xs
   # lst = numContexts st
-  | lst > length xs = xs
-  = drop lst xs
+  | lst > length xs = ([], xs)
+  = splitAt lst xs
 
 numContexts :: SymbolType -> Int
 numContexts st = length st.st_context
-
-numFunArgs :: GFunDef -> Int
-numFunArgs fd = length fd.gfd_args
 
 funIsTask :: FunDef -> Bool
 funIsTask fd =
@@ -138,18 +145,16 @@ funIsTask fd =
     (Yes st, FK_Function _)  -> symTyIsTask st
     _                        -> False
 
-symbIdentIsLam :: SymbIdent -> Bool
-symbIdentIsLam si = identIsLam si.symb_ident
-
-identIsLam :: Ident -> Bool
-identIsLam ident
+identIsLambda :: Ident -> Bool
+identIsLambda ident
   | size fnm > 0  = fnm.[0] == '\\'
   | otherwise     = False
   where fnm = ident.id_name
 
-exprIsLam :: Expression -> Bool
-exprIsLam (Var bv)  = identIsLam bv.var_ident
-exprIsLam _         = False
+exprIsLambda :: Expression -> Bool
+exprIsLambda (Var bv)  = identIsLambda bv.var_ident
+exprIsLambda (App app) = identIsLambda app.app_symb.symb_ident
+exprIsLambda _         = False
 
 symTyIsTask :: SymbolType -> Bool
 symTyIsTask st =
@@ -159,25 +164,77 @@ symTyIsTask st =
     _              -> False
   where symTyIsTask` tsi = tsi.type_ident.id_name == "Task"
 
-identIsTask :: ModuleEnv Ident -> Bool
-identIsTask menv ident = maybe False symTyIsTask $ reifySymbolType menv ident
+identIsTask :: String *ModuleEnv -> *(Bool, *ModuleEnv)
+identIsTask ident menv
+  # (mst, menv) = reifySymbolType ident menv
+  = (maybe False symTyIsTask mst, menv)
 
-symbIdentIsTask :: ModuleEnv SymbIdent -> Bool
-symbIdentIsTask menv sid = identIsTask menv sid.symb_ident
+symbIdentIsTask :: SymbIdent *ModuleEnv -> *(Bool, *ModuleEnv)
+symbIdentIsTask sid menv = identIsTask sid.symb_ident.id_name menv
 
+isInfix :: String *ModuleEnv -> *(Bool, *ModuleEnv)
+isInfix ident menv
+  # (mfd, menv)  = reifyFunDef ident menv
+  # (mft, menv)  = reifyFunType ident menv
+  = case mfd of
+      Just (_, fd) -> (isInfix` fd.fun_priority, menv)
+      Nothing  ->
+        case mft of
+          Just ft  -> (isInfix` ft.ft_priority, menv)
+          _        -> abort ("Failed to determine fixity for " +++ ident)
+  where
+  isInfix` prio =
+    case prio of
+      Prio _ _  -> True
+      _         -> False
 
-//isInfix :: ModuleEnv SymbIdent -> Bool
-//isInfix menv si
-  //# mfd  = reifyFunDef menv si.symb_ident
-  //# mft  = reifyFunType menv si.symb_ident
-  //= case mfd of
-      //Just fd  -> isInfix` fd.gfd_priority
-      //Nothing  ->
-        //case mft of
-          //Just ft  -> isInfix` ft.ft_priority
-          //_        -> abort ("Failed to determine fixity for " +++ si.symb_ident.id_name)
-  //where
-  //isInfix` prio =
-    //case prio of
-      //Prio _ _  -> True
-      //_         -> False
+getFunName :: FunDef -> String
+getFunName fd = fd.fun_ident.id_name
+
+getFunArgs :: FunDef -> [FreeVar]
+getFunArgs {fun_body = TransformedBody tb} = tb.tb_args
+getFunArgs _                               = abort "getFunArgs: need a TransformedBody"
+
+getFunRhs :: FunDef -> Expression
+getFunRhs {fun_body = TransformedBody tb} = tb.tb_rhs
+getFunRhs _                               = abort "getFunRhs: need a TransformedBody"
+
+updateWithAnnot :: Int *(SynExpression, *ChnExpression) -> *(SynExpression, *ChnExpression)
+updateWithAnnot fidx (syn=:{syn_annot_expr = Just e}, chn)
+  # menv      = chn.chn_module_env
+  # fun_defs  = menv.me_fun_defs
+  # fun_defs  = updateFunRhs fidx fun_defs e
+  # menv      = { menv & me_fun_defs = fun_defs}
+  = (syn, { chn & chn_module_env = menv })
+updateWithAnnot _ (syn, chn) = (syn, chn)
+
+updateFunRhs :: Int !*{#FunDef} Expression -> !*{#FunDef}
+updateFunRhs n fun_defs e
+  # (fd, fun_defs) = fun_defs![n]
+  # tb = case fd.fun_body of
+           TransformedBody fb -> { fb & tb_rhs = e }
+           _                  -> abort "updateFunRhs: need a TransformedBody"
+  # fd = { fd & fun_body = TransformedBody tb }
+  = { fun_defs & [n] = fd}
+
+emptyEdge :: GEdge
+emptyEdge = {GEdge | edge_pattern = Nothing }
+
+mkEdge :: String -> GEdge
+mkEdge str = {GEdge | edge_pattern = Just str }
+
+getLetBinds :: Let -> [LetBind]
+getLetBinds lt = lt.let_strict_binds ++ lt.let_lazy_binds
+
+mkGLetBinds :: Let *ModuleEnv -> *([(String, String)], *ModuleEnv)
+mkGLetBinds lt menv
+  = foldrSt f (getLetBinds lt) ([], menv)
+  where f bnd (xs, menv)
+          # (pprhs, menv) = ppExpression bnd.lb_src menv
+          = ([(bnd.lb_dst.fv_ident.id_name, ppCompact pprhs):xs], menv)
+
+foldrSt :: !(.a -> .(.st -> .st)) ![.a] !.st -> .st
+foldrSt op l st = foldr_st l
+  where
+    foldr_st []     = st
+    foldr_st [a:as] = op a (foldr_st as)

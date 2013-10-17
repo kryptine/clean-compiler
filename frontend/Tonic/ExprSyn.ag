@@ -22,6 +22,7 @@ type GLetBinds = [GLetBind]
 type Selections = [Selection]
 type GlobalDefinedSymbol = (Global DefinedSymbol)
 type FreeVars = [FreeVar]
+type MaybeExpression = maybe Expression
 
 record App
   | App app_symb :: SymbIdent app_args :: Expressions app_info_ptr :: {ExprInfoPtr}
@@ -47,7 +48,8 @@ data Expression
   | ABCCodeExpr     ss                 :: {[String]}              bl    :: {Bool}
 
   | MatchExpr       gdfs               :: {Global DefinedSymbol}  expr  :: Expression
-  | IsConstructor   expr               :: Expression              gdfs  :: GlobalDefinedSymbol    arity :: {Int} gidx :: {GlobalIndex} ident :: {Ident} pos :: {Position}
+  | IsConstructor   expr               :: Expression              gdfs  :: GlobalDefinedSymbol    arity :: {Int}
+                    gidx               :: {GlobalIndex}           ident :: {Ident}                pos   :: {Position}
   | FreeVar         fv                 :: FreeVar
   | DictionariesFunction  fvat         :: {[(FreeVar,AType)]}     expr  :: Expression             aty   :: {AType}
 
@@ -105,10 +107,20 @@ record GLetBind
 
 record GFunDef
   | GFunDef gfd_name :: {String} gfd_args :: FreeVars gfd_rhs :: Expression
-            gfd_type :: {Optional SymbolType} gfd_priority :: {Priority}
+            gfd_type :: {Optional SymbolType} gfd_priority :: Priority
+
+data Priority
+  | Prio    assoc :: {Assoc} prio :: {Int}
+  | NoPrio
+
+record FunType
+  | FunType ft_ident :: Ident ft_arity :: {Int} ft_priority :: Priority
+            ft_type :: SymbolType ft_pos :: {Position} ft_specials :: {FunSpecials}
+            ft_type_ptr :: {VarInfoPtr}
 
 attr Expression Expressions Ident BoundVar FreeVar FreeVars SymbIdent
   BasicValue DefinedSymbol Selection Selections GExpression GLet GLetBind
-  GLetBinds GlobalDefinedSymbol App SymbolType GFunDef
+  GLetBinds GlobalDefinedSymbol App SymbolType GFunDef Priority FunType
+  MaybeExpression
   inh moduleEnv                          :: {ModuleEnv}
   syn copy                               :: self

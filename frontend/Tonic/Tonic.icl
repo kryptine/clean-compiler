@@ -1,6 +1,6 @@
 implementation module Tonic.Tonic
 
-// 2 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag"
+// 2 "./frontend/Tonic/MkGraph.ag"
 
 from StdClass import class + (..)
 from StdOverloaded import class < (..)
@@ -13,6 +13,7 @@ from StdBool import ||
 import StdMisc
 import Data.Void
 import Data.Func
+from Data.Functor import class Functor (..)
 import Data.List
 
 import Data.Graph
@@ -20,14 +21,20 @@ import Data.Maybe
 import Text.PPrint
 import Tonic.AbsSyn
 import Tonic.Util
-from syntax import :: Optional (..), :: FunDef {..}, :: FunInfo, :: FunKind,
-  :: FunctionBody {..}, :: TransformedBody {..}, :: CheckedBody, :: ParsedBody,
-  :: AType {..}, :: TypeAttribute, :: Type {..}, :: TypeKind, :: TempVarId,
-  :: ATypeVar, :: BasicType, :: ConsVariable, :: TypeSymbIdent {..},
-  :: TypeSymbProperties
-// 29 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"
+import StdDebug
+import _SystemArray
 
-// 2 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag"
+from syntax import :: Optional (..), :: FunDef {..}, :: DclModule {..},
+  :: IclModule {..}, :: ForeignExport, :: ImportedObject, :: QualifiedDeclaration,
+  :: Declaration, :: IclFunctionIndices, :: ModuleIdent,
+  :: FunInfo, :: FunKind, :: FunctionBody {..}, :: TransformedBody {..},
+  :: CheckedBody, :: ParsedBody, :: AType {..}, :: TypeAttribute, :: Type {..},
+  :: TypeKind, :: TempVarId, :: ATypeVar, :: BasicType, :: ConsVariable,
+  :: TypeSymbIdent {..}, :: TypeSymbProperties, :: NumberSet, :: ModuleKind,
+  :: Declarations, :: DictionaryInfo, :: CommonDefs, :: IndexRange
+// 36 "frontend/Tonic/Tonic.icl"
+
+// 2 "./frontend/Tonic/Pretty.ag"
 
 from StdClass import class + (..)
 from StdOverloaded import class < (..)
@@ -46,9 +53,9 @@ import Data.Maybe
 import Text.PPrint
 import Tonic.AbsSyn
 import Tonic.Util
-// 50 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"
+// 57 "frontend/Tonic/Tonic.icl"
 
-// 2 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/ExprSyn.ag"
+// 2 "./frontend/Tonic/ExprSyn.ag"
 
 from syntax import
   :: Expression (..), :: BoundVar {..}, :: App {..}, :: Let {..}, :: Case,
@@ -64,14 +71,15 @@ from syntax import
   :: TypeVarInfoPtr {..}, :: AttrVarInfoPtr, :: Type, :: TCClass,
   :: TypeVarInfo, :: AttrVarInfo, :: FunType {..}, :: FunSpecials
 
+import qualified Data.Maybe as Data.Maybe
 import Tonic.AbsSyn
-// 69 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"
+// 77 "frontend/Tonic/Tonic.icl"
 from Control.Monad.Identity import :: Identity
 import qualified Control.Monad.Identity as Control.Monad.Identity
 import Control.Monad.Identity
 from Control.Applicative import lift
 from Control.Monad import class Monad (..)
-// 265 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag"
+// 308 "./frontend/Tonic/MkGraph.ag"
 
 
 (<>) infixr 5 :: (Maybe a) (Maybe a) -> Maybe a
@@ -93,15 +101,6 @@ listExprToList (App app) =
     "_Nil"  -> []
     _       -> abort "listExprToList: App is not a list"
 listExprToList _ = []
-
-nodeErr :: ModuleEnv (Maybe Int) Expression -> String
-nodeErr menv mn expr = ppCompact (ppExpression menv expr) +++ "\n" +++
-  maybe "for which its ID is unknown" (\n -> "with node ID " +++ toString n) mn
-
-edgeErr :: ModuleEnv String (Maybe Int) Expression (Maybe Int) Expression -> a
-edgeErr menv errmsg lid lexpr rid rexpr = abort ("Cannot create " +++ errmsg
-  +++ " between left expression\n\t" +++ nodeErr menv lid lexpr
-  +++ " and right expression\n\t" +++ nodeErr menv rid rexpr +++ "\n")
 
 addEmptyEdge :: (Int, Int) GinGraph -> GinGraph
 addEmptyEdge e g = addEdge emptyEdge e g
@@ -163,6 +162,9 @@ instance toString GNode where
   toString GStep = "GStep"
   toString GListComprehension = "GListComprehension"
 
+instance Functor Optional where
+  fmap _ No      = No
+  fmap f (Yes x) = Yes $ f x
 /*
 Task assignment drawing: Needs a stick.png with a stick figure (can be PDF?)
 digraph G {
@@ -176,9 +178,9 @@ digraph G {
     user->login [arrowhead=none];
 }
 */
-// 180 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"
+// 182 "frontend/Tonic/Tonic.icl"
 
-// 163 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag"
+// 145 "./frontend/Tonic/Pretty.ag"
 
 mkPrettyExpr :: ModuleEnv Expression -> String
 mkPrettyExpr menv expr = ppCompact (ppExpression menv expr)
@@ -277,7 +279,7 @@ nodeToDot menv funnm g currIdx =
 getNodeData` :: Int GinGraph -> GNode
 getNodeData` n g = fromMaybe err (getNodeData n g)
   where err = abort ("No data for node " +++ toString n)
-// 281 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"
+// 283 "frontend/Tonic/Tonic.icl"
 // App ---------------------------------------------------------
 // wrapper
 moduleEnv_Inh_App :: Inh_App -> (ModuleEnv)
@@ -290,497 +292,374 @@ currTaskName_Inh_App :: Inh_App -> (String)
 currTaskName_Inh_App (Inh_App _ x _ _ _) = x
 caseExpr_Inh_App :: Inh_App -> (Maybe Expression)
 caseExpr_Inh_App (Inh_App x _ _ _ _) = x
-reifySymbolType_Syn_App :: Syn_App -> (Maybe SymbolType)
-reifySymbolType_Syn_App (Syn_App _ _ _ _ _ _ _ _ _ _ _ _ _ x) = x
-reifyFunType_Syn_App :: Syn_App -> (Maybe FunType)
-reifyFunType_Syn_App (Syn_App _ _ _ _ _ _ _ _ _ _ _ _ x _) = x
-reifyFunDef_Syn_App :: Syn_App -> (Maybe GFunDef)
-reifyFunDef_Syn_App (Syn_App _ _ _ _ _ _ _ _ _ _ _ x _ _) = x
+secondArgRecNode_Syn_App :: Syn_App -> (Bool)
+secondArgRecNode_Syn_App (Syn_App _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ x) = x
+secondArgMExitId_Syn_App :: Syn_App -> (Maybe Int)
+secondArgMExitId_Syn_App (Syn_App _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ x _) = x
+secondArgMEntryId_Syn_App :: Syn_App -> (Maybe Int)
+secondArgMEntryId_Syn_App (Syn_App _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ x _ _) = x
+secondArgIdent_Syn_App :: Syn_App -> (String)
+secondArgIdent_Syn_App (Syn_App _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ x _ _ _) = x
+secondArgHasRecs_Syn_App :: Syn_App -> (Bool)
+secondArgHasRecs_Syn_App (Syn_App _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ x _ _ _ _) = x
+secondArgGraph_Syn_App :: Syn_App -> (GinGraph)
+secondArgGraph_Syn_App (Syn_App _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ x _ _ _ _ _) = x
+secondArg_Syn_App :: Syn_App -> (MaybeExpression)
+secondArg_Syn_App (Syn_App _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ x _ _ _ _ _ _) = x
 recNode_Syn_App :: Syn_App -> (Bool)
-recNode_Syn_App (Syn_App _ _ _ _ _ _ _ _ _ _ x _ _ _) = x
+recNode_Syn_App (Syn_App _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ x _ _ _ _ _ _ _) = x
 ppDebugs_Syn_App :: Syn_App -> ([Doc])
-ppDebugs_Syn_App (Syn_App _ _ _ _ _ _ _ _ _ x _ _ _ _) = x
+ppDebugs_Syn_App (Syn_App _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ x _ _ _ _ _ _ _ _) = x
 ppDebug_Syn_App :: Syn_App -> (Doc)
-ppDebug_Syn_App (Syn_App _ _ _ _ _ _ _ _ x _ _ _ _ _) = x
+ppDebug_Syn_App (Syn_App _ _ _ _ _ _ _ _ _ _ _ _ _ _ x _ _ _ _ _ _ _ _ _) = x
 ppAgs_Syn_App :: Syn_App -> ([Doc])
-ppAgs_Syn_App (Syn_App _ _ _ _ _ _ _ x _ _ _ _ _ _) = x
+ppAgs_Syn_App (Syn_App _ _ _ _ _ _ _ _ _ _ _ _ _ x _ _ _ _ _ _ _ _ _ _) = x
 ppAg_Syn_App :: Syn_App -> (Doc)
-ppAg_Syn_App (Syn_App _ _ _ _ _ _ x _ _ _ _ _ _ _) = x
+ppAg_Syn_App (Syn_App _ _ _ _ _ _ _ _ _ _ _ _ x _ _ _ _ _ _ _ _ _ _ _) = x
 mExitId_Syn_App :: Syn_App -> (Maybe Int)
-mExitId_Syn_App (Syn_App _ _ _ _ _ x _ _ _ _ _ _ _ _) = x
+mExitId_Syn_App (Syn_App _ _ _ _ _ _ _ _ _ _ _ x _ _ _ _ _ _ _ _ _ _ _ _) = x
 mEntryId_Syn_App :: Syn_App -> (Maybe Int)
-mEntryId_Syn_App (Syn_App _ _ _ _ x _ _ _ _ _ _ _ _ _) = x
-isTask_Syn_App :: Syn_App -> (Bool)
-isTask_Syn_App (Syn_App _ _ _ x _ _ _ _ _ _ _ _ _ _) = x
+mEntryId_Syn_App (Syn_App _ _ _ _ _ _ _ _ _ _ x _ _ _ _ _ _ _ _ _ _ _ _ _) = x
 hasRecs_Syn_App :: Syn_App -> (Bool)
-hasRecs_Syn_App (Syn_App _ _ x _ _ _ _ _ _ _ _ _ _ _) = x
+hasRecs_Syn_App (Syn_App _ _ _ _ _ _ _ _ _ x _ _ _ _ _ _ _ _ _ _ _ _ _ _) = x
 graph_Syn_App :: Syn_App -> (GinGraph)
-graph_Syn_App (Syn_App _ x _ _ _ _ _ _ _ _ _ _ _ _) = x
+graph_Syn_App (Syn_App _ _ _ _ _ _ _ _ x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) = x
+firstArgRecNode_Syn_App :: Syn_App -> (Bool)
+firstArgRecNode_Syn_App (Syn_App _ _ _ _ _ _ _ x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) = x
+firstArgMExitId_Syn_App :: Syn_App -> (Maybe Int)
+firstArgMExitId_Syn_App (Syn_App _ _ _ _ _ _ x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) = x
+firstArgMEntryId_Syn_App :: Syn_App -> (Maybe Int)
+firstArgMEntryId_Syn_App (Syn_App _ _ _ _ _ x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) = x
+firstArgIdent_Syn_App :: Syn_App -> (String)
+firstArgIdent_Syn_App (Syn_App _ _ _ _ x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) = x
+firstArgHasRecs_Syn_App :: Syn_App -> (Bool)
+firstArgHasRecs_Syn_App (Syn_App _ _ _ x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) = x
+firstArgGraph_Syn_App :: Syn_App -> (GinGraph)
+firstArgGraph_Syn_App (Syn_App _ _ x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) = x
+firstArg_Syn_App :: Syn_App -> (MaybeExpression)
+firstArg_Syn_App (Syn_App _ x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) = x
 copy_Syn_App :: Syn_App -> (App)
-copy_Syn_App (Syn_App x _ _ _ _ _ _ _ _ _ _ _ _ _) = x
+copy_Syn_App (Syn_App x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) = x
 wrap_App :: T_App  Inh_App  -> (Syn_App )
 wrap_App (T_App act) (Inh_App alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
    'Control.Monad.Identity'.runIdentity (
      act >>= \ sem ->
      lift (T_App_vIn1 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) >>= \ arg ->
-     lift (inv_App_s2 sem arg) >>= \ (T_App_vOut1 alhsOcopy alhsOgraph alhsOhasRecs alhsOisTask alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode alhsOreifyFunDef alhsOreifyFunType alhsOreifySymbolType) ->
-     lift (Syn_App alhsOcopy alhsOgraph alhsOhasRecs alhsOisTask alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode alhsOreifyFunDef alhsOreifyFunType alhsOreifySymbolType)
+     lift (inv_App_s2 sem arg) >>= \ (T_App_vOut1 alhsOcopy alhsOfirstArg alhsOfirstArgGraph alhsOfirstArgHasRecs alhsOfirstArgIdent alhsOfirstArgMEntryId alhsOfirstArgMExitId alhsOfirstArgRecNode alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode alhsOsecondArg alhsOsecondArgGraph alhsOsecondArgHasRecs alhsOsecondArgIdent alhsOsecondArgMEntryId alhsOsecondArgMExitId alhsOsecondArgRecNode) ->
+     lift (Syn_App alhsOcopy alhsOfirstArg alhsOfirstArgGraph alhsOfirstArgHasRecs alhsOfirstArgIdent alhsOfirstArgMEntryId alhsOfirstArgMExitId alhsOfirstArgRecNode alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode alhsOsecondArg alhsOsecondArgGraph alhsOsecondArgHasRecs alhsOsecondArgIdent alhsOsecondArgMEntryId alhsOsecondArgMExitId alhsOsecondArgRecNode)
    )
 
 // cata
 sem_App :: App  -> T_App 
-sem_App { App | app_symb = app_symb_,app_args = app_args_,app_info_ptr = app_info_ptr_ } = sem_App_App ( sem_SymbIdent app_symb_ ) ( sem_Expressions app_args_ ) app_info_ptr_       
+sem_App { App | app_symb = app_symb_,app_args = app_args_,app_info_ptr = app_info_ptr_ } = sem_App_App ( sem_SymbIdent app_symb_ ) ( sem_Expressions app_args_ ) app_info_ptr_ 
 
 // semantic domain
+:: T_App  = T_App (Identity (T_App_s2 ))
 attach_T_App (T_App t_App) = t_App
 inv_App_s2 (C_App_s2 x) = x
-sem_App_App  :: (T_SymbIdent ) (T_Expressions ) (ExprInfoPtr)        -> T_App 
-sem_App_App arg_app_symb_ arg_app_args_ arg_app_info_ptr_        = T_App (lift st2) where
+sem_App_App  :: (T_SymbIdent ) (T_Expressions ) (ExprInfoPtr)  -> T_App 
+sem_App_App arg_app_symb_ arg_app_args_ arg_app_info_ptr_  = T_App (lift st2) where
    st2 =
         let
             v1 (T_App_vIn1 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                       let
-                          st_app_symbX53 = 'Control.Monad.Identity'.runIdentity (attach_T_SymbIdent (arg_app_symb_))
+                          st_app_symbX62 = 'Control.Monad.Identity'.runIdentity (attach_T_SymbIdent (arg_app_symb_))
                           st_app_argsX17 = 'Control.Monad.Identity'.runIdentity (attach_T_Expressions (arg_app_args_))
-                          st_appArg1ExprX14 = 'Control.Monad.Identity'.runIdentity (attach_T_Expression ((sem_Expression appArg1Expr_val_)))
-                          st_appArg2ExprX14 = 'Control.Monad.Identity'.runIdentity (attach_T_Expression ((sem_Expression appArg2Expr_val_)))
-                          st_bindRhsAppIX2 = 'Control.Monad.Identity'.runIdentity (attach_T_App ((sem_App bindRhsAppI_val_)))
-                          st_bindRhsFunDefX29 = 'Control.Monad.Identity'.runIdentity (attach_T_GFunDef ((sem_GFunDef bindRhsFunDef_val_)))
-                          st_bindRhsSymbolTypeIX56 = 'Control.Monad.Identity'.runIdentity (attach_T_SymbolType ((sem_SymbolType bindRhsSymbolTypeI_val_)))
-                          st_binAppArg2ExprX14 = 'Control.Monad.Identity'.runIdentity (attach_T_Expression ((sem_Expression binAppArg2Expr_val_)))
-                          st_parBinAppArg2ExprX14 = 'Control.Monad.Identity'.runIdentity (attach_T_Expression ((sem_Expression parBinAppArg2Expr_val_)))
-                          (T_SymbIdent_vOut52 aapp_symbIcopy aapp_symbIgraph aapp_symbIhasRecs aapp_symbIident aapp_symbIisCurrTask aapp_symbIisInfix aapp_symbIisTask aapp_symbImEntryId aapp_symbImExitId aapp_symbIppAg aapp_symbIppAgs aapp_symbIppDebug aapp_symbIppDebugs aapp_symbIrecNode aapp_symbIreifyFunDef aapp_symbIreifyFunType aapp_symbIreifySymbolType) = inv_SymbIdent_s53 st_app_symbX53 (T_SymbIdent_vIn52 aapp_symbOcaseExpr aapp_symbOcurrTaskName aapp_symbOgraph aapp_symbOmergeId aapp_symbOmoduleEnv)
-                          (T_Expressions_vOut16 aapp_argsIcopy aapp_argsIgraph aapp_argsIhasRecs aapp_argsImEntryId aapp_argsImExitId aapp_argsIppAg aapp_argsIppAgs aapp_argsIppDebug aapp_argsIppDebugs aapp_argsIrecNode) = inv_Expressions_s17 st_app_argsX17 (T_Expressions_vIn16 aapp_argsOcaseExpr aapp_argsOcurrTaskName aapp_argsOgraph aapp_argsOmergeId aapp_argsOmoduleEnv)
-                          (T_Expression_vOut13 aappArg1ExprIcopy aappArg1ExprIgraph aappArg1ExprIhasRecs aappArg1ExprImEntryId aappArg1ExprImExitId aappArg1ExprIppAg aappArg1ExprIppAgs aappArg1ExprIppDebug aappArg1ExprIppDebugs aappArg1ExprIrecNode) = inv_Expression_s14 st_appArg1ExprX14 (T_Expression_vIn13 aappArg1ExprOcaseExpr aappArg1ExprOcurrTaskName aappArg1ExprOgraph aappArg1ExprOmergeId aappArg1ExprOmoduleEnv)
-                          (T_Expression_vOut13 aappArg2ExprIcopy aappArg2ExprIgraph aappArg2ExprIhasRecs aappArg2ExprImEntryId aappArg2ExprImExitId aappArg2ExprIppAg aappArg2ExprIppAgs aappArg2ExprIppDebug aappArg2ExprIppDebugs aappArg2ExprIrecNode) = inv_Expression_s14 st_appArg2ExprX14 (T_Expression_vIn13 aappArg2ExprOcaseExpr aappArg2ExprOcurrTaskName aappArg2ExprOgraph aappArg2ExprOmergeId aappArg2ExprOmoduleEnv)
-                          (T_App_vOut1 abindRhsAppIIcopy abindRhsAppIIgraph abindRhsAppIIhasRecs abindRhsAppIIisTask abindRhsAppIImEntryId abindRhsAppIImExitId abindRhsAppIIppAg abindRhsAppIIppAgs abindRhsAppIIppDebug abindRhsAppIIppDebugs abindRhsAppIIrecNode abindRhsAppIIreifyFunDef abindRhsAppIIreifyFunType abindRhsAppIIreifySymbolType) = inv_App_s2 st_bindRhsAppIX2 (T_App_vIn1 abindRhsAppIOcaseExpr abindRhsAppIOcurrTaskName abindRhsAppIOgraph abindRhsAppIOmergeId abindRhsAppIOmoduleEnv)
-                          (T_GFunDef_vOut28 abindRhsFunDefIcopy abindRhsFunDefIfunArgs abindRhsFunDefIfunRhs abindRhsFunDefIgraph abindRhsFunDefIhasRecs abindRhsFunDefImEntryId abindRhsFunDefImExitId abindRhsFunDefIrecNode) = inv_GFunDef_s29 st_bindRhsFunDefX29 (T_GFunDef_vIn28 abindRhsFunDefOcaseExpr abindRhsFunDefOcurrTaskName abindRhsFunDefOgraph abindRhsFunDefOmergeId abindRhsFunDefOmoduleEnv)
-                          (T_SymbolType_vOut55 abindRhsSymbolTypeIIcopy abindRhsSymbolTypeIIgraph abindRhsSymbolTypeIIhasRecs abindRhsSymbolTypeIIisTask abindRhsSymbolTypeIImEntryId abindRhsSymbolTypeIImExitId abindRhsSymbolTypeIIppAg abindRhsSymbolTypeIIppAgs abindRhsSymbolTypeIIppDebug abindRhsSymbolTypeIIppDebugs abindRhsSymbolTypeIIrecNode) = inv_SymbolType_s56 st_bindRhsSymbolTypeIX56 (T_SymbolType_vIn55 abindRhsSymbolTypeIOcaseExpr abindRhsSymbolTypeIOcurrTaskName abindRhsSymbolTypeIOgraph abindRhsSymbolTypeIOmergeId abindRhsSymbolTypeIOmoduleEnv)
-                          (T_Expression_vOut13 abinAppArg2ExprIcopy abinAppArg2ExprIgraph abinAppArg2ExprIhasRecs abinAppArg2ExprImEntryId abinAppArg2ExprImExitId abinAppArg2ExprIppAg abinAppArg2ExprIppAgs abinAppArg2ExprIppDebug abinAppArg2ExprIppDebugs abinAppArg2ExprIrecNode) = inv_Expression_s14 st_binAppArg2ExprX14 (T_Expression_vIn13 abinAppArg2ExprOcaseExpr abinAppArg2ExprOcurrTaskName abinAppArg2ExprOgraph abinAppArg2ExprOmergeId abinAppArg2ExprOmoduleEnv)
-                          (T_Expression_vOut13 aparBinAppArg2ExprIcopy aparBinAppArg2ExprIgraph aparBinAppArg2ExprIhasRecs aparBinAppArg2ExprImEntryId aparBinAppArg2ExprImExitId aparBinAppArg2ExprIppAg aparBinAppArg2ExprIppAgs aparBinAppArg2ExprIppDebug aparBinAppArg2ExprIppDebugs aparBinAppArg2ExprIrecNode) = inv_Expression_s14 st_parBinAppArg2ExprX14 (T_Expression_vIn13 aparBinAppArg2ExprOcaseExpr aparBinAppArg2ExprOcurrTaskName aparBinAppArg2ExprOgraph aparBinAppArg2ExprOmergeId aparBinAppArg2ExprOmoduleEnv)
-                          alhsOreifyFunDef = rule0 aapp_symbIreifyFunDef
-                          alhsOreifySymbolType = rule1 aapp_symbIreifySymbolType
-                          lnoContextArgs = rule2 aapp_argsIcopy aapp_symbIident aapp_symbIreifySymbolType lisListApp
-                          lisListApp = rule3 aapp_symbIident
-                          alhsOisTask = rule4 lisTask
-                          lisTask = rule5 aapp_symbIisTask
-                          alhsOgraph = rule6 aapp_symbIcopy alhsIgraph alhsImoduleEnv ltaskGraph
-                          alhsOmEntryId = rule7 ltaskEntryId
-                          alhsOmExitId = rule8 ltaskExitId
-                          (ltaskGraph,ltaskEntryId,ltaskExitId) = rule9 aapp_symbIident lassignGraph lassignId lbinAppGraph lbindGraph lparBinAppGraph lparListAppEntryId lparListAppExitId lparListAppGraph lreturnGraph lreturnId lstepEntryId lstepExitId lstepGraph ltaskAppGraph ltaskAppId
-                          (lappArg1,lmAppArg2) = rule10 aapp_symbIident lnoContextArgs
-                          appArg1Expr_val_ = rule11 lappArg1
-                          appArg2Expr_val_ = rule12 lmAppArg2
-                          bindRhsAppI_val_ = rule13 lmAppArg2
-                          lbindRhsSymbolType = rule14 abindRhsAppIIreifySymbolType
-                          bindRhsFunDef_val_ = rule15 abindRhsAppIIreifyFunDef
-                          bindRhsSymbolTypeI_val_ = rule16 lbindRhsSymbolType
-                          abindRhsFunDefOgraph = rule17 aappArg1ExprIgraph
-                          lbindGraph = rule18 aappArg1ExprImEntryId aappArg1ExprImExitId abindRhsFunDefIfunArgs abindRhsFunDefIfunRhs abindRhsFunDefImEntryId abindRhsFunDefImExitId alhsIgraph alhsImoduleEnv lappArg1 lbindRhsSymbolType
-                          (lreturnId,lreturnGraph) = rule19 alhsIgraph lnoContextArgs
-                          binAppArg2Expr_val_ = rule20 lmAppArg2
-                          abinAppArg2ExprOgraph = rule21 aappArg1ExprIgraph
-                          lbinAppGraph = rule22 aappArg1ExprIgraph aappArg1ExprImEntryId aappArg1ExprImExitId abinAppArg2ExprImEntryId abinAppArg2ExprImExitId
-                          (lassignId,lassignGraph) = rule23 aappArg1ExprImEntryId alhsIgraph
-                          lstepGraph = rule24  Void
-                          lstepEntryId = rule25  Void
-                          lstepExitId = rule26  Void
-                          parBinAppArg2Expr_val_ = rule27 lmAppArg2
-                          aparBinAppArg2ExprOgraph = rule28 aappArg1ExprIgraph
-                          lparBinAppGraph = rule29 aappArg1ExprImEntryId aappArg1ExprImExitId aparBinAppArg2ExprIgraph aparBinAppArg2ExprImEntryId aparBinAppArg2ExprImExitId
-                          lparListAppGraph = rule30  Void
-                          lparListAppEntryId = rule31  Void
-                          lparListAppExitId = rule32  Void
-                          (ltaskAppId,ltaskAppGraph) = rule33 aapp_argsIppAgs aapp_symbIident aapp_symbIisCurrTask alhsIgraph
-                          alhsOppDebug = rule34 aapp_argsIppAgs aapp_symbIppAg
-                          alhsOppAg = rule35 aapp_argsIppAgs aapp_symbIisInfix aapp_symbIppAg alhsImoduleEnv lcopy
-                          alhsOhasRecs = rule36 aappArg1ExprIhasRecs aappArg2ExprIhasRecs aapp_argsIhasRecs aapp_symbIhasRecs abinAppArg2ExprIhasRecs abindRhsAppIIhasRecs abindRhsFunDefIhasRecs abindRhsSymbolTypeIIhasRecs aparBinAppArg2ExprIhasRecs
-                          alhsOppAgs = rule37 aappArg1ExprIppAgs aappArg2ExprIppAgs aapp_argsIppAgs aapp_symbIppAgs abinAppArg2ExprIppAgs abindRhsAppIIppAgs abindRhsSymbolTypeIIppAgs aparBinAppArg2ExprIppAgs
-                          alhsOppDebugs = rule38 aappArg1ExprIppDebugs aappArg2ExprIppDebugs aapp_argsIppDebugs aapp_symbIppDebugs abinAppArg2ExprIppDebugs abindRhsAppIIppDebugs abindRhsSymbolTypeIIppDebugs aparBinAppArg2ExprIppDebugs
-                          alhsOrecNode = rule39 aappArg1ExprIrecNode aappArg2ExprIrecNode aapp_argsIrecNode aapp_symbIrecNode abinAppArg2ExprIrecNode abindRhsAppIIrecNode abindRhsFunDefIrecNode abindRhsSymbolTypeIIrecNode aparBinAppArg2ExprIrecNode
-                          lcopy = rule40 aapp_argsIcopy aapp_symbIcopy arg_app_info_ptr_
-                          alhsOcopy = rule41 lcopy
-                          alhsOreifyFunType = rule42 abindRhsAppIIreifyFunType
-                          aapp_symbOcaseExpr = rule43 alhsIcaseExpr
-                          aapp_symbOcurrTaskName = rule44 alhsIcurrTaskName
-                          aapp_symbOgraph = rule45 alhsIgraph
-                          aapp_symbOmergeId = rule46 alhsImergeId
-                          aapp_symbOmoduleEnv = rule47 alhsImoduleEnv
-                          aapp_argsOcaseExpr = rule48 alhsIcaseExpr
-                          aapp_argsOcurrTaskName = rule49 alhsIcurrTaskName
-                          aapp_argsOgraph = rule50 aapp_symbIgraph
-                          aapp_argsOmergeId = rule51 alhsImergeId
-                          aapp_argsOmoduleEnv = rule52 alhsImoduleEnv
-                          aappArg1ExprOcaseExpr = rule53 alhsIcaseExpr
-                          aappArg1ExprOcurrTaskName = rule54 alhsIcurrTaskName
-                          aappArg1ExprOgraph = rule55 aapp_argsIgraph
-                          aappArg1ExprOmergeId = rule56 alhsImergeId
-                          aappArg1ExprOmoduleEnv = rule57 alhsImoduleEnv
-                          aappArg2ExprOcaseExpr = rule58 alhsIcaseExpr
-                          aappArg2ExprOcurrTaskName = rule59 alhsIcurrTaskName
-                          aappArg2ExprOgraph = rule60 aappArg1ExprIgraph
-                          aappArg2ExprOmergeId = rule61 alhsImergeId
-                          aappArg2ExprOmoduleEnv = rule62 alhsImoduleEnv
-                          abindRhsAppIOcaseExpr = rule63 alhsIcaseExpr
-                          abindRhsAppIOcurrTaskName = rule64 alhsIcurrTaskName
-                          abindRhsAppIOgraph = rule65 aappArg2ExprIgraph
-                          abindRhsAppIOmergeId = rule66 alhsImergeId
-                          abindRhsAppIOmoduleEnv = rule67 alhsImoduleEnv
-                          abindRhsFunDefOcaseExpr = rule68 alhsIcaseExpr
-                          abindRhsFunDefOcurrTaskName = rule69 alhsIcurrTaskName
-                          abindRhsFunDefOmergeId = rule70 alhsImergeId
-                          abindRhsFunDefOmoduleEnv = rule71 alhsImoduleEnv
-                          abindRhsSymbolTypeIOcaseExpr = rule72 alhsIcaseExpr
-                          abindRhsSymbolTypeIOcurrTaskName = rule73 alhsIcurrTaskName
-                          abindRhsSymbolTypeIOgraph = rule74 abindRhsFunDefIgraph
-                          abindRhsSymbolTypeIOmergeId = rule75 alhsImergeId
-                          abindRhsSymbolTypeIOmoduleEnv = rule76 alhsImoduleEnv
-                          abinAppArg2ExprOcaseExpr = rule77 alhsIcaseExpr
-                          abinAppArg2ExprOcurrTaskName = rule78 alhsIcurrTaskName
-                          abinAppArg2ExprOmergeId = rule79 alhsImergeId
-                          abinAppArg2ExprOmoduleEnv = rule80 alhsImoduleEnv
-                          aparBinAppArg2ExprOcaseExpr = rule81 alhsIcaseExpr
-                          aparBinAppArg2ExprOcurrTaskName = rule82 alhsIcurrTaskName
-                          aparBinAppArg2ExprOmergeId = rule83 alhsImergeId
-                          aparBinAppArg2ExprOmoduleEnv = rule84 alhsImoduleEnv
-                          ag__result_ = T_App_vOut1 alhsOcopy alhsOgraph alhsOhasRecs alhsOisTask alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode alhsOreifyFunDef alhsOreifyFunType alhsOreifySymbolType
+                          st_foobarX14 = 'Control.Monad.Identity'.runIdentity (attach_T_Expression ((sem_Expression foobar_val_)))
+                          (T_SymbIdent_vOut61 aapp_symbIcopy aapp_symbIgraph aapp_symbIhasRecs aapp_symbIident aapp_symbIisCurrTask aapp_symbImEntryId aapp_symbImExitId aapp_symbIppAg aapp_symbIppAgs aapp_symbIppDebug aapp_symbIppDebugs aapp_symbIrecNode) = inv_SymbIdent_s62 st_app_symbX62 (T_SymbIdent_vIn61 aapp_symbOcaseExpr aapp_symbOcurrTaskName aapp_symbOgraph aapp_symbOmergeId aapp_symbOmoduleEnv)
+                          (T_Expressions_vOut16 aapp_argsIcopy aapp_argsIfirstArg aapp_argsIfirstArgGraph aapp_argsIfirstArgHasRecs aapp_argsIfirstArgIdent aapp_argsIfirstArgMEntryId aapp_argsIfirstArgMExitId aapp_argsIfirstArgRecNode aapp_argsIgraph aapp_argsIhasRecs aapp_argsImEntryId aapp_argsImExitId aapp_argsIppAg aapp_argsIppAgs aapp_argsIppDebug aapp_argsIppDebugs aapp_argsIppInfix aapp_argsIppPrefix aapp_argsIppTail aapp_argsIrecNode aapp_argsIsecondArg aapp_argsIsecondArgGraph aapp_argsIsecondArgHasRecs aapp_argsIsecondArgIdent aapp_argsIsecondArgMEntryId aapp_argsIsecondArgMExitId aapp_argsIsecondArgRecNode) = inv_Expressions_s17 st_app_argsX17 (T_Expressions_vIn16 aapp_argsOappSymbDoc aapp_argsOcaseExpr aapp_argsOcurrTaskName aapp_argsOgraph aapp_argsOmergeId aapp_argsOmoduleEnv aapp_argsOnumContexts)
+                          (T_Expression_vOut13 afoobarIcopy afoobarIgraph afoobarIhasRecs afoobarImEntryId afoobarImExitId afoobarIppAg afoobarIppAgs afoobarIppDebug afoobarIppDebugs afoobarIrecNode) = inv_Expression_s14 st_foobarX14 (T_Expression_vIn13 afoobarOcaseExpr afoobarOcurrTaskName afoobarOgraph afoobarOmergeId afoobarOmoduleEnv)
+                          aapp_argsOnumContexts = rule0 aapp_symbIident alhsImoduleEnv lisListApp
+                          alhsOfirstArg = rule1 lfirstArg
+                          lfirstArg = rule2 aapp_argsIfirstArg
+                          alhsOsecondArg = rule3 lsecondArg
+                          lsecondArg = rule4 aapp_argsIfirstArg
+                          alhsOgraph = rule5 aapp_symbIident alhsIgraph alhsImoduleEnv ltaskGraph
+                          alhsOmEntryId = rule6 ltaskEntryId
+                          alhsOmExitId = rule7 ltaskExitId
+                          (ltaskGraph,ltaskEntryId,ltaskExitId) = rule8 aapp_symbIident lassignGraph lassignId lbinAppGraph lparBinAppGraph lparListAppEntryId lparListAppExitId lparListAppGraph lreturnGraph lreturnId lstepEntryId lstepExitId lstepGraph ltaskAppGraph ltaskAppId
+                          lisListApp = rule9 aapp_symbIident
+                          lbindRhsAppIdent = rule10 aapp_argsIfirstArg
+                          lbindRhsSymbolType = rule11 alhsImoduleEnv lbindRhsAppIdent
+                          foobar_val_ = rule12  Void
+                          (lreturnId,lreturnGraph) = rule13  Void
+                          lbinAppGraph = rule14  Void
+                          (lassignId,lassignGraph) = rule15  Void
+                          lstepGraph = rule16  Void
+                          lstepEntryId = rule17  Void
+                          lstepExitId = rule18  Void
+                          lparBinAppGraph = rule19  Void
+                          lparListAppGraph = rule20  Void
+                          lparListAppEntryId = rule21  Void
+                          lparListAppExitId = rule22  Void
+                          (ltaskAppId,ltaskAppGraph) = rule23 aapp_argsIppAgs aapp_symbIident aapp_symbIisCurrTask alhsIgraph
+                          alhsOppDebug = rule24 aapp_argsIppAgs aapp_symbIppAg
+                          alhsOppAg = rule25 aapp_argsIppInfix aapp_argsIppPrefix aapp_symbIident alhsImoduleEnv
+                          aapp_argsOappSymbDoc = rule26 aapp_symbIppAg
+                          alhsOfirstArgHasRecs = rule27 aapp_argsIfirstArgHasRecs
+                          alhsOfirstArgMEntryId = rule28 aapp_argsIfirstArgMEntryId
+                          alhsOfirstArgMExitId = rule29 aapp_argsIfirstArgMExitId
+                          alhsOfirstArgRecNode = rule30 aapp_argsIfirstArgRecNode
+                          alhsOhasRecs = rule31 aapp_argsIhasRecs aapp_symbIhasRecs afoobarIhasRecs
+                          alhsOppAgs = rule32 aapp_argsIppAgs aapp_symbIppAgs afoobarIppAgs
+                          alhsOppDebugs = rule33 aapp_argsIppDebugs aapp_symbIppDebugs afoobarIppDebugs
+                          alhsOrecNode = rule34 aapp_argsIrecNode aapp_symbIrecNode afoobarIrecNode
+                          alhsOsecondArgHasRecs = rule35 aapp_argsIsecondArgHasRecs
+                          alhsOsecondArgMEntryId = rule36 aapp_argsIsecondArgMEntryId
+                          alhsOsecondArgMExitId = rule37 aapp_argsIsecondArgMExitId
+                          alhsOsecondArgRecNode = rule38 aapp_argsIsecondArgRecNode
+                          lcopy = rule39 aapp_argsIcopy aapp_symbIcopy arg_app_info_ptr_
+                          alhsOcopy = rule40 lcopy
+                          alhsOfirstArgGraph = rule41 aapp_argsIfirstArgGraph
+                          alhsOfirstArgIdent = rule42 aapp_argsIfirstArgIdent
+                          alhsOsecondArgGraph = rule43 aapp_argsIsecondArgGraph
+                          alhsOsecondArgIdent = rule44 aapp_argsIsecondArgIdent
+                          aapp_symbOcaseExpr = rule45 alhsIcaseExpr
+                          aapp_symbOcurrTaskName = rule46 alhsIcurrTaskName
+                          aapp_symbOgraph = rule47 alhsIgraph
+                          aapp_symbOmergeId = rule48 alhsImergeId
+                          aapp_symbOmoduleEnv = rule49 alhsImoduleEnv
+                          aapp_argsOcaseExpr = rule50 alhsIcaseExpr
+                          aapp_argsOcurrTaskName = rule51 alhsIcurrTaskName
+                          aapp_argsOgraph = rule52 aapp_symbIgraph
+                          aapp_argsOmergeId = rule53 alhsImergeId
+                          aapp_argsOmoduleEnv = rule54 alhsImoduleEnv
+                          afoobarOcaseExpr = rule55 alhsIcaseExpr
+                          afoobarOcurrTaskName = rule56 alhsIcurrTaskName
+                          afoobarOgraph = rule57 aapp_argsIgraph
+                          afoobarOmergeId = rule58 alhsImergeId
+                          afoobarOmoduleEnv = rule59 alhsImoduleEnv
+                          ag__result_ = T_App_vOut1 alhsOcopy alhsOfirstArg alhsOfirstArgGraph alhsOfirstArgHasRecs alhsOfirstArgIdent alhsOfirstArgMEntryId alhsOfirstArgMExitId alhsOfirstArgRecNode alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode alhsOsecondArg alhsOsecondArgGraph alhsOsecondArgHasRecs alhsOsecondArgIdent alhsOsecondArgMEntryId alhsOsecondArgMExitId alhsOsecondArgRecNode
                       in ag__result_
         in C_App_s2 v1
-   /*# LINE 79 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule0 ((aapp_symbIreifyFunDef)) =
-                          /*# LINE 79 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                          aapp_symbIreifyFunDef
-                          /*# LINE 454 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 80 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule1 ((aapp_symbIreifySymbolType)) =
-                              /*# LINE 80 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                              aapp_symbIreifySymbolType
-                              /*# LINE 459 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 82 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule2 ((aapp_argsIcopy)) ((aapp_symbIident)) ((aapp_symbIreifySymbolType)) lisListApp =
-                            /*# LINE 82 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                            if lisListApp
-                               aapp_argsIcopy
-                              (let funTy  = fromMaybe (abort err) aapp_symbIreifySymbolType
-                                   err    = "noContextArgs : failed to find symbol type for " +++ aapp_symbIident
-                               in  dropContexts funTy aapp_argsIcopy)
-                            /*# LINE 468 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 88 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule3 ((aapp_symbIident)) =
-                        /*# LINE 88 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                        aapp_symbIident == "_Cons" || aapp_symbIident == "_Nil"
-                        /*# LINE 473 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 89 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule4 lisTask =
-                        /*# LINE 89 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                        lisTask
-                        /*# LINE 478 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 90 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule5 ((aapp_symbIisTask)) =
-                        /*# LINE 90 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                        aapp_symbIisTask
-                        /*# LINE 483 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 119 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule6 ((aapp_symbIcopy)) ((alhsIgraph)) ((alhsImoduleEnv)) ltaskGraph =
-                    /*# LINE 119 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                    if (symbIdentIsTask alhsImoduleEnv aapp_symbIcopy)
+   /*# LINE 129 "./frontend/Tonic/MkGraph.ag" #*/
+   rule0 ((aapp_symbIident)) ((alhsImoduleEnv)) lisListApp =
+                               /*# LINE 129 "./frontend/Tonic/MkGraph.ag" #*/
+                               if lisListApp     0
+                               (let funTy  = fromMaybe (abort err) (reifySymbolType alhsImoduleEnv aapp_symbIident)
+                                    err    = "numContexts : failed to find symbol type for " +++ aapp_symbIident
+                                in  numContexts funTy)
+                               /*# LINE 443 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 134 "./frontend/Tonic/MkGraph.ag" #*/
+   rule1 lfirstArg =
+                        /*# LINE 134 "./frontend/Tonic/MkGraph.ag" #*/
+                        lfirstArg
+                        /*# LINE 448 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 135 "./frontend/Tonic/MkGraph.ag" #*/
+   rule2 ((aapp_argsIfirstArg)) =
+                        /*# LINE 135 "./frontend/Tonic/MkGraph.ag" #*/
+                        aapp_argsIfirstArg
+                        /*# LINE 453 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 136 "./frontend/Tonic/MkGraph.ag" #*/
+   rule3 lsecondArg =
+                        /*# LINE 136 "./frontend/Tonic/MkGraph.ag" #*/
+                        lsecondArg
+                        /*# LINE 458 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 137 "./frontend/Tonic/MkGraph.ag" #*/
+   rule4 ((aapp_argsIfirstArg)) =
+                        /*# LINE 137 "./frontend/Tonic/MkGraph.ag" #*/
+                        aapp_argsIfirstArg
+                        /*# LINE 463 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 139 "./frontend/Tonic/MkGraph.ag" #*/
+   rule5 ((aapp_symbIident)) ((alhsIgraph)) ((alhsImoduleEnv)) ltaskGraph =
+                    /*# LINE 139 "./frontend/Tonic/MkGraph.ag" #*/
+                    if (trace_n ("App.graph.symb:" +++ aapp_symbIident) $ identIsTask alhsImoduleEnv aapp_symbIident)
                       ltaskGraph
                       alhsIgraph
-                    /*# LINE 490 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 122 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule7 ltaskEntryId =
-                       /*# LINE 122 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
+                    /*# LINE 470 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 142 "./frontend/Tonic/MkGraph.ag" #*/
+   rule6 ltaskEntryId =
+                       /*# LINE 142 "./frontend/Tonic/MkGraph.ag" #*/
                        ltaskEntryId
-                       /*# LINE 495 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 123 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule8 ltaskExitId =
-                       /*# LINE 123 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
+                       /*# LINE 475 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 143 "./frontend/Tonic/MkGraph.ag" #*/
+   rule7 ltaskExitId =
+                       /*# LINE 143 "./frontend/Tonic/MkGraph.ag" #*/
                        ltaskExitId
-                       /*# LINE 500 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 125 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule9 ((aapp_symbIident)) lassignGraph lassignId lbinAppGraph lbindGraph lparBinAppGraph lparListAppEntryId lparListAppExitId lparListAppGraph lreturnGraph lreturnId lstepEntryId lstepExitId lstepGraph ltaskAppGraph ltaskAppId =
-                                                   /*# LINE 125 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                                                   case aapp_symbIident of
-                                                     ">>="       -> (lbindGraph    ,                    Nothing,                            Nothing)
-                                                     "return"    -> (lreturnGraph    ,                  Just lreturnId    ,                 Just lreturnId    )
-                                                     ">>|"       -> (lbinAppGraph     Nothing,          Nothing,                            Nothing)
-                                                     "@:"        -> (lassignGraph    ,                  Just lassignId    ,                 Just lassignId    )
-                                                     ">>*"       -> (lstepGraph    ,                    lstepEntryId    ,                   lstepExitId    )
-                                                     "-||-"      -> (lparBinAppGraph     DisFirstBin,   Nothing,                            Nothing)
-                                                     "||-"       -> (lparBinAppGraph     DisRight,      Nothing,                            Nothing)
-                                                     "-||"       -> (lparBinAppGraph     DisLeft,       Nothing,                            Nothing)
-                                                     "-&&-"      -> (lparBinAppGraph     ConPair,       Nothing,                            Nothing)
-                                                     "anyTask"   -> (lparListAppGraph     DisFirstList, lparListAppEntryId     DisFirstBin, lparListAppExitId     DisFirstBin)
-                                                     "allTasks"  -> (lparListAppGraph     ConAll,       lparListAppEntryId     DisFirstBin, lparListAppExitId     DisFirstBin)
-                                                     _           -> (ltaskAppGraph    ,                 ltaskAppId    ,                     ltaskAppId    )
-                                                   /*# LINE 517 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 139 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule10 ((aapp_symbIident)) lnoContextArgs =
-                                  /*# LINE 139 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                                  case lnoContextArgs     of
-                                    [e1:e2:_]  -> (e1, Just e2)
-                                    [e1:_]     -> (e1, Nothing)
-                                    _          -> abort ("App has no args: " +++ aapp_symbIident)
-                                  /*# LINE 525 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 145 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule11 lappArg1 =
-                           /*# LINE 145 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                           lappArg1
-                           /*# LINE 530 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 148 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule12 lmAppArg2 =
-                           /*# LINE 148 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                           fromMaybe (abort "No second argument to app") lmAppArg2
-                           /*# LINE 535 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 151 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule13 lmAppArg2 =
-                           /*# LINE 151 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                           case lmAppArg2     of
-                             Just (App a)  -> a
-                             _             -> abort "Invalid bind"
-                           /*# LINE 542 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 155 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule14 ((abindRhsAppIIreifySymbolType)) =
-                                /*# LINE 155 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
+                       /*# LINE 480 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 146 "./frontend/Tonic/MkGraph.ag" #*/
+   rule8 ((aapp_symbIident)) lassignGraph lassignId lbinAppGraph lparBinAppGraph lparListAppEntryId lparListAppExitId lparListAppGraph lreturnGraph lreturnId lstepEntryId lstepExitId lstepGraph ltaskAppGraph ltaskAppId =
+                /*# LINE 146 "./frontend/Tonic/MkGraph.ag" #*/
+                case aapp_symbIident of
+                  "return"    -> trace_n "App: return"    $ (lreturnGraph    ,                  Just lreturnId    ,                 Just lreturnId    )
+                  ">>|"       -> trace_n "App: >>|"       $ (lbinAppGraph     Nothing,          Nothing,                            Nothing)
+                  "@:"        -> trace_n "App: @:"        $ (lassignGraph    ,                  Just lassignId    ,                 Just lassignId    )
+                  ">>*"       -> trace_n "App: >>*"       $ (lstepGraph    ,                    lstepEntryId    ,                   lstepExitId    )
+                  "-||-"      -> trace_n "App: -||-"      $ (lparBinAppGraph     DisFirstBin,   Nothing,                            Nothing)
+                  "||-"       -> trace_n "App: ||-"       $ (lparBinAppGraph     DisRight,      Nothing,                            Nothing)
+                  "-||"       -> trace_n "App: -||"       $ (lparBinAppGraph     DisLeft,       Nothing,                            Nothing)
+                  "-&&-"      -> trace_n "App: -&&-"      $ (lparBinAppGraph     ConPair,       Nothing,                            Nothing)
+                  "anyTask"   -> trace_n "App: anyTask"   $ (lparListAppGraph     DisFirstList, lparListAppEntryId     DisFirstBin, lparListAppExitId     DisFirstBin)
+                  "allTasks"  -> trace_n "App: allTasks"  $ (lparListAppGraph     ConAll,       lparListAppEntryId     DisFirstBin, lparListAppExitId     DisFirstBin)
+                  _           -> trace_n "App: _"         $ (ltaskAppGraph    ,                 ltaskAppId    ,                     ltaskAppId    )
+                /*# LINE 496 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 160 "./frontend/Tonic/MkGraph.ag" #*/
+   rule9 ((aapp_symbIident)) =
+                        /*# LINE 160 "./frontend/Tonic/MkGraph.ag" #*/
+                        aapp_symbIident == "_Cons" || aapp_symbIident == "_Nil"
+                        /*# LINE 501 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 167 "./frontend/Tonic/MkGraph.ag" #*/
+   rule10 ((aapp_argsIfirstArg)) =
+                              /*# LINE 167 "./frontend/Tonic/MkGraph.ag" #*/
+                              case aapp_argsIfirstArg of
+                                Just (App a)  -> a.app_symb.symb_ident.id_name
+                                _             -> abort "Invalid bind"
+                              /*# LINE 508 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 171 "./frontend/Tonic/MkGraph.ag" #*/
+   rule11 ((alhsImoduleEnv)) lbindRhsAppIdent =
+                                /*# LINE 171 "./frontend/Tonic/MkGraph.ag" #*/
                                 fromMaybe (abort "mkGraphAlg #2: failed to find symbol type")
-                                abindRhsAppIIreifySymbolType
-                                /*# LINE 548 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 159 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule15 ((abindRhsAppIIreifyFunDef)) =
-                             /*# LINE 159 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                             fromMaybe (abort "mkGraphAlg #1: failed to find function definition")
-                             abindRhsAppIIreifyFunDef
-                             /*# LINE 554 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 163 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule16 lbindRhsSymbolType =
-                                  /*# LINE 163 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                                  lbindRhsSymbolType
-                                  /*# LINE 559 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 165 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule17 ((aappArg1ExprIgraph)) =
-                              /*# LINE 165 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                              aappArg1ExprIgraph
-                              /*# LINE 564 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 167 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule18 ((aappArg1ExprImEntryId)) ((aappArg1ExprImExitId)) ((abindRhsFunDefIfunArgs)) ((abindRhsFunDefIfunRhs)) ((abindRhsFunDefImEntryId)) ((abindRhsFunDefImExitId)) ((alhsIgraph)) ((alhsImoduleEnv)) lappArg1 lbindRhsSymbolType =
-                        /*# LINE 167 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                        case ( aappArg1ExprImEntryId, aappArg1ExprImExitId
-                             , abindRhsFunDefImEntryId, abindRhsFunDefImExitId) of
-                          (Just _, Just lx, Just rn, Just _)
-                             # patid = withHead freeVarName (abort "Invalid bind")
-                                     $ [x \\ x <- dropContexts lbindRhsSymbolType     abindRhsFunDefIfunArgs | x.fv_def_level == -1]
-                             = addEdge (mkEdge patid) (lx, rn) alhsIgraph
-                          (_, lid, rid, _)        = edgeErr alhsImoduleEnv "bind edge" lid lappArg1     rid abindRhsFunDefIfunRhs
-                        /*# LINE 575 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 175 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule19 ((alhsIgraph)) lnoContextArgs =
-                                      /*# LINE 175 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                                      let node   = GReturn $ withHead f (abort "Invalid return") lnoContextArgs
-                                          f _ = GCleanExpression "(return)"
-                                      in  addNode node alhsIgraph
-                                      /*# LINE 582 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 184 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule20 lmAppArg2 =
-                              /*# LINE 184 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                              fromMaybe (abort "No second argument to app") lmAppArg2
-                              /*# LINE 587 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 186 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule21 ((aappArg1ExprIgraph)) =
-                               /*# LINE 186 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                               aappArg1ExprIgraph
-                               /*# LINE 592 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 188 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule22 ((aappArg1ExprIgraph)) ((aappArg1ExprImEntryId)) ((aappArg1ExprImExitId)) ((abinAppArg2ExprImEntryId)) ((abinAppArg2ExprImExitId)) =
-                          /*# LINE 188 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                          \mPat -> case ( aappArg1ExprImEntryId, aappArg1ExprImExitId
-                                        , abinAppArg2ExprImEntryId, abinAppArg2ExprImExitId) of
-                                     (Just _, Just lx, Just rn, Just _)  -> addEdge (maybe emptyEdge mkEdge mPat) (lx, rn) aappArg1ExprIgraph
-                                     _                                   -> abort "binAppGraph"
-                          /*# LINE 600 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 193 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule23 ((aappArg1ExprImEntryId)) ((alhsIgraph)) =
-                                      /*# LINE 193 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                                      let (n, g) = addNode (GAssign "Assign node") alhsIgraph
-                                      in  case aappArg1ExprImEntryId of
-                                            Just r -> (n, addEmptyEdge (n, r) g)
-                                            _      -> abort "Illegal task assignment"
-                                      /*# LINE 608 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 198 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule24  (_) =
-                        /*# LINE 198 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                        abort "Step not implemented yet"
-                        /*# LINE 613 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 199 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule25  (_) =
-                          /*# LINE 199 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
+                                (reifySymbolType alhsImoduleEnv lbindRhsAppIdent    )
+                                /*# LINE 514 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 174 "./frontend/Tonic/MkGraph.ag" #*/
+   rule12  (_) =
+                      /*# LINE 174 "./frontend/Tonic/MkGraph.ag" #*/
+                      Var { BoundVar | var_ident = {Ident | id_name = "", id_info = abort "This should _not_ be evaluated 1" }
+                                     , var_info_ptr = abort "This should _not_ be evaluated 2"
+                                     , var_expr_ptr = abort "This should _not_ be evaluated 3" }
+                      /*# LINE 521 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 198 "./frontend/Tonic/MkGraph.ag" #*/
+   rule13  (_) =
+                                      /*# LINE 198 "./frontend/Tonic/MkGraph.ag" #*/
+                                      undef
+                                      /*# LINE 526 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 211 "./frontend/Tonic/MkGraph.ag" #*/
+   rule14  (_) =
+                          /*# LINE 211 "./frontend/Tonic/MkGraph.ag" #*/
+                          \mPat -> undef
+                          /*# LINE 531 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 221 "./frontend/Tonic/MkGraph.ag" #*/
+   rule15  (_) =
+                                      /*# LINE 221 "./frontend/Tonic/MkGraph.ag" #*/
+                                      undef
+                                      /*# LINE 536 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 231 "./frontend/Tonic/MkGraph.ag" #*/
+   rule16  (_) =
+                          /*# LINE 231 "./frontend/Tonic/MkGraph.ag" #*/
+                          abort "Step not implemented yet"
+                          /*# LINE 541 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 232 "./frontend/Tonic/MkGraph.ag" #*/
+   rule17  (_) =
+                          /*# LINE 232 "./frontend/Tonic/MkGraph.ag" #*/
                           Nothing
-                          /*# LINE 618 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 200 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule26  (_) =
-                         /*# LINE 200 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                         Nothing
-                         /*# LINE 623 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 203 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule27 lmAppArg2 =
-                                 /*# LINE 203 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                                 fromMaybe (abort "No second argument to app") lmAppArg2
-                                 /*# LINE 628 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 205 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule28 ((aappArg1ExprIgraph)) =
-                                  /*# LINE 205 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                                  aappArg1ExprIgraph
-                                  /*# LINE 633 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 207 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule29 ((aappArg1ExprImEntryId)) ((aappArg1ExprImExitId)) ((aparBinAppArg2ExprIgraph)) ((aparBinAppArg2ExprImEntryId)) ((aparBinAppArg2ExprImExitId)) =
-                             /*# LINE 207 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                             \join -> let (sid, g1) = addNode GParallelSplit aparBinAppArg2ExprIgraph
-                                          (jid, g2) = addNode (GParallelJoin join) g1
-                                      in  case ( aappArg1ExprImEntryId, aappArg1ExprImExitId
-                                               , aparBinAppArg2ExprImEntryId, aparBinAppArg2ExprImExitId) of
-                                            (_, Just l, Just r, _)
-                                              # g = addEmptyEdge (sid, l) g2
-                                              # g = addEmptyEdge (sid, r) g
-                                              # g = addEmptyEdge (l, jid) g
-                                              = addEmptyEdge (r, jid) g
-                                            (_, lid, rid, _) = abort "Illegal parBinApp"
-                             /*# LINE 647 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 218 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule30  (_) =
-                                /*# LINE 218 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
+                          /*# LINE 546 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 233 "./frontend/Tonic/MkGraph.ag" #*/
+   rule18  (_) =
+                          /*# LINE 233 "./frontend/Tonic/MkGraph.ag" #*/
+                          Nothing
+                          /*# LINE 551 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 240 "./frontend/Tonic/MkGraph.ag" #*/
+   rule19  (_) =
+                             /*# LINE 240 "./frontend/Tonic/MkGraph.ag" #*/
+                             undef
+                             /*# LINE 556 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 256 "./frontend/Tonic/MkGraph.ag" #*/
+   rule20  (_) =
+                                /*# LINE 256 "./frontend/Tonic/MkGraph.ag" #*/
                                 \join -> undef
-                                /*# LINE 652 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 219 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule31  (_) =
-                                /*# LINE 219 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
+                                /*# LINE 561 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 257 "./frontend/Tonic/MkGraph.ag" #*/
+   rule21  (_) =
+                                /*# LINE 257 "./frontend/Tonic/MkGraph.ag" #*/
                                 \join -> undef
-                                /*# LINE 657 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 220 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule32  (_) =
-                                /*# LINE 220 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
+                                /*# LINE 566 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 258 "./frontend/Tonic/MkGraph.ag" #*/
+   rule22  (_) =
+                                /*# LINE 258 "./frontend/Tonic/MkGraph.ag" #*/
                                 \join -> undef
-                                /*# LINE 662 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 222 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule33 ((aapp_argsIppAgs)) ((aapp_symbIident)) ((aapp_symbIisCurrTask)) ((alhsIgraph)) =
-                                        /*# LINE 222 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
+                                /*# LINE 571 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 265 "./frontend/Tonic/MkGraph.ag" #*/
+   rule23 ((aapp_argsIppAgs)) ((aapp_symbIident)) ((aapp_symbIisCurrTask)) ((alhsIgraph)) =
+                                        /*# LINE 265 "./frontend/Tonic/MkGraph.ag" #*/
                                         if aapp_symbIisCurrTask
                                           (Nothing, alhsIgraph)
                                           (let appArgs = map (GCleanExpression o ppCompact) aapp_argsIppAgs
                                                (n, g)  = addNode (GTaskApp aapp_symbIident appArgs) alhsIgraph
                                            in (Just n, g))
-                                        /*# LINE 671 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 63 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule34 ((aapp_argsIppAgs)) ((aapp_symbIppAg)) =
-                      /*# LINE 63 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+                                        /*# LINE 580 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 32 "./frontend/Tonic/Pretty.ag" #*/
+   rule24 ((aapp_argsIppAgs)) ((aapp_symbIppAg)) =
+                      /*# LINE 32 "./frontend/Tonic/Pretty.ag" #*/
                       let argsPP = hcat $ intersperse (text ", ") aapp_argsIppAgs
                       in  text "<App>" <+> aapp_symbIppAg <+> brackets argsPP
-                      /*# LINE 677 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 66 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule35 ((aapp_argsIppAgs)) ((aapp_symbIisInfix)) ((aapp_symbIppAg)) ((alhsImoduleEnv)) lcopy =
-                      /*# LINE 66 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-                      let appc      = lcopy
-                      in  case appc.app_args of
-                            []     -> aapp_symbIppAg
-                            [x:xs] -> if aapp_symbIisInfix
-                                        (ppExpression alhsImoduleEnv x <+> aapp_symbIppAg <+> hcat (intersperse (text " ") (map (ppExpression alhsImoduleEnv) xs)))
-                                        (aapp_symbIppAg <+> hcat (intersperse (text " ") aapp_argsIppAgs))
-                      /*# LINE 687 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   rule36 ((aappArg1ExprIhasRecs)) ((aappArg2ExprIhasRecs)) ((aapp_argsIhasRecs)) ((aapp_symbIhasRecs)) ((abinAppArg2ExprIhasRecs)) ((abindRhsAppIIhasRecs)) ((abindRhsFunDefIhasRecs)) ((abindRhsSymbolTypeIIhasRecs)) ((aparBinAppArg2ExprIhasRecs)) =
-     aapp_symbIhasRecs || aapp_argsIhasRecs || aappArg1ExprIhasRecs || aappArg2ExprIhasRecs || abindRhsAppIIhasRecs || abindRhsFunDefIhasRecs || abindRhsSymbolTypeIIhasRecs || abinAppArg2ExprIhasRecs || aparBinAppArg2ExprIhasRecs
-   rule37 ((aappArg1ExprIppAgs)) ((aappArg2ExprIppAgs)) ((aapp_argsIppAgs)) ((aapp_symbIppAgs)) ((abinAppArg2ExprIppAgs)) ((abindRhsAppIIppAgs)) ((abindRhsSymbolTypeIIppAgs)) ((aparBinAppArg2ExprIppAgs)) =
-     aapp_symbIppAgs ++ aapp_argsIppAgs ++ aappArg1ExprIppAgs ++ aappArg2ExprIppAgs ++ abindRhsAppIIppAgs ++ abindRhsSymbolTypeIIppAgs ++ abinAppArg2ExprIppAgs ++ aparBinAppArg2ExprIppAgs
-   rule38 ((aappArg1ExprIppDebugs)) ((aappArg2ExprIppDebugs)) ((aapp_argsIppDebugs)) ((aapp_symbIppDebugs)) ((abinAppArg2ExprIppDebugs)) ((abindRhsAppIIppDebugs)) ((abindRhsSymbolTypeIIppDebugs)) ((aparBinAppArg2ExprIppDebugs)) =
-     aapp_symbIppDebugs ++ aapp_argsIppDebugs ++ aappArg1ExprIppDebugs ++ aappArg2ExprIppDebugs ++ abindRhsAppIIppDebugs ++ abindRhsSymbolTypeIIppDebugs ++ abinAppArg2ExprIppDebugs ++ aparBinAppArg2ExprIppDebugs
-   rule39 ((aappArg1ExprIrecNode)) ((aappArg2ExprIrecNode)) ((aapp_argsIrecNode)) ((aapp_symbIrecNode)) ((abinAppArg2ExprIrecNode)) ((abindRhsAppIIrecNode)) ((abindRhsFunDefIrecNode)) ((abindRhsSymbolTypeIIrecNode)) ((aparBinAppArg2ExprIrecNode)) =
-     aapp_symbIrecNode || aapp_argsIrecNode || aappArg1ExprIrecNode || aappArg2ExprIrecNode || abindRhsAppIIrecNode || abindRhsFunDefIrecNode || abindRhsSymbolTypeIIrecNode || abinAppArg2ExprIrecNode || aparBinAppArg2ExprIrecNode
-   rule40 ((aapp_argsIcopy)) ((aapp_symbIcopy)) app_info_ptr_ =
+                      /*# LINE 586 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 35 "./frontend/Tonic/Pretty.ag" #*/
+   rule25 ((aapp_argsIppInfix)) ((aapp_argsIppPrefix)) ((aapp_symbIident)) ((alhsImoduleEnv)) =
+                      /*# LINE 35 "./frontend/Tonic/Pretty.ag" #*/
+                      if (isInfix alhsImoduleEnv aapp_symbIident)
+                        aapp_argsIppInfix
+                        aapp_argsIppPrefix
+                      /*# LINE 593 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 39 "./frontend/Tonic/Pretty.ag" #*/
+   rule26 ((aapp_symbIppAg)) =
+                              /*# LINE 39 "./frontend/Tonic/Pretty.ag" #*/
+                              aapp_symbIppAg
+                              /*# LINE 598 "frontend/Tonic/Tonic.icl"#*/
+   rule27 ((aapp_argsIfirstArgHasRecs)) =
+     aapp_argsIfirstArgHasRecs
+   rule28 ((aapp_argsIfirstArgMEntryId)) =
+     aapp_argsIfirstArgMEntryId
+   rule29 ((aapp_argsIfirstArgMExitId)) =
+     aapp_argsIfirstArgMExitId
+   rule30 ((aapp_argsIfirstArgRecNode)) =
+     aapp_argsIfirstArgRecNode
+   rule31 ((aapp_argsIhasRecs)) ((aapp_symbIhasRecs)) ((afoobarIhasRecs)) =
+     aapp_symbIhasRecs || aapp_argsIhasRecs || afoobarIhasRecs
+   rule32 ((aapp_argsIppAgs)) ((aapp_symbIppAgs)) ((afoobarIppAgs)) =
+     aapp_symbIppAgs ++ aapp_argsIppAgs ++ afoobarIppAgs
+   rule33 ((aapp_argsIppDebugs)) ((aapp_symbIppDebugs)) ((afoobarIppDebugs)) =
+     aapp_symbIppDebugs ++ aapp_argsIppDebugs ++ afoobarIppDebugs
+   rule34 ((aapp_argsIrecNode)) ((aapp_symbIrecNode)) ((afoobarIrecNode)) =
+     aapp_symbIrecNode || aapp_argsIrecNode || afoobarIrecNode
+   rule35 ((aapp_argsIsecondArgHasRecs)) =
+     aapp_argsIsecondArgHasRecs
+   rule36 ((aapp_argsIsecondArgMEntryId)) =
+     aapp_argsIsecondArgMEntryId
+   rule37 ((aapp_argsIsecondArgMExitId)) =
+     aapp_argsIsecondArgMExitId
+   rule38 ((aapp_argsIsecondArgRecNode)) =
+     aapp_argsIsecondArgRecNode
+   rule39 ((aapp_argsIcopy)) ((aapp_symbIcopy)) app_info_ptr_ =
      {App|app_symb = aapp_symbIcopy , app_args = aapp_argsIcopy , app_info_ptr = app_info_ptr_}
-   rule41 lcopy =
+   rule40 lcopy =
      lcopy
-   rule42 ((abindRhsAppIIreifyFunType)) =
-     abindRhsAppIIreifyFunType
-   rule43 ((alhsIcaseExpr)) =
+   rule41 ((aapp_argsIfirstArgGraph)) =
+     aapp_argsIfirstArgGraph
+   rule42 ((aapp_argsIfirstArgIdent)) =
+     aapp_argsIfirstArgIdent
+   rule43 ((aapp_argsIsecondArgGraph)) =
+     aapp_argsIsecondArgGraph
+   rule44 ((aapp_argsIsecondArgIdent)) =
+     aapp_argsIsecondArgIdent
+   rule45 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule44 ((alhsIcurrTaskName)) =
+   rule46 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule45 ((alhsIgraph)) =
+   rule47 ((alhsIgraph)) =
      alhsIgraph
-   rule46 ((alhsImergeId)) =
+   rule48 ((alhsImergeId)) =
      alhsImergeId
-   rule47 ((alhsImoduleEnv)) =
+   rule49 ((alhsImoduleEnv)) =
      alhsImoduleEnv
-   rule48 ((alhsIcaseExpr)) =
+   rule50 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule49 ((alhsIcurrTaskName)) =
+   rule51 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule50 ((aapp_symbIgraph)) =
+   rule52 ((aapp_symbIgraph)) =
      aapp_symbIgraph
-   rule51 ((alhsImergeId)) =
+   rule53 ((alhsImergeId)) =
      alhsImergeId
-   rule52 ((alhsImoduleEnv)) =
+   rule54 ((alhsImoduleEnv)) =
      alhsImoduleEnv
-   rule53 ((alhsIcaseExpr)) =
+   rule55 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule54 ((alhsIcurrTaskName)) =
+   rule56 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule55 ((aapp_argsIgraph)) =
+   rule57 ((aapp_argsIgraph)) =
      aapp_argsIgraph
-   rule56 ((alhsImergeId)) =
+   rule58 ((alhsImergeId)) =
      alhsImergeId
-   rule57 ((alhsImoduleEnv)) =
-     alhsImoduleEnv
-   rule58 ((alhsIcaseExpr)) =
-     alhsIcaseExpr
-   rule59 ((alhsIcurrTaskName)) =
-     alhsIcurrTaskName
-   rule60 ((aappArg1ExprIgraph)) =
-     aappArg1ExprIgraph
-   rule61 ((alhsImergeId)) =
-     alhsImergeId
-   rule62 ((alhsImoduleEnv)) =
-     alhsImoduleEnv
-   rule63 ((alhsIcaseExpr)) =
-     alhsIcaseExpr
-   rule64 ((alhsIcurrTaskName)) =
-     alhsIcurrTaskName
-   rule65 ((aappArg2ExprIgraph)) =
-     aappArg2ExprIgraph
-   rule66 ((alhsImergeId)) =
-     alhsImergeId
-   rule67 ((alhsImoduleEnv)) =
-     alhsImoduleEnv
-   rule68 ((alhsIcaseExpr)) =
-     alhsIcaseExpr
-   rule69 ((alhsIcurrTaskName)) =
-     alhsIcurrTaskName
-   rule70 ((alhsImergeId)) =
-     alhsImergeId
-   rule71 ((alhsImoduleEnv)) =
-     alhsImoduleEnv
-   rule72 ((alhsIcaseExpr)) =
-     alhsIcaseExpr
-   rule73 ((alhsIcurrTaskName)) =
-     alhsIcurrTaskName
-   rule74 ((abindRhsFunDefIgraph)) =
-     abindRhsFunDefIgraph
-   rule75 ((alhsImergeId)) =
-     alhsImergeId
-   rule76 ((alhsImoduleEnv)) =
-     alhsImoduleEnv
-   rule77 ((alhsIcaseExpr)) =
-     alhsIcaseExpr
-   rule78 ((alhsIcurrTaskName)) =
-     alhsIcurrTaskName
-   rule79 ((alhsImergeId)) =
-     alhsImergeId
-   rule80 ((alhsImoduleEnv)) =
-     alhsImoduleEnv
-   rule81 ((alhsIcaseExpr)) =
-     alhsIcaseExpr
-   rule82 ((alhsIcurrTaskName)) =
-     alhsIcurrTaskName
-   rule83 ((alhsImergeId)) =
-     alhsImergeId
-   rule84 ((alhsImoduleEnv)) =
+   rule59 ((alhsImoduleEnv)) =
      alhsImoduleEnv
 
 // BasicValue --------------------------------------------------
@@ -834,6 +713,7 @@ sem_BasicValue ( BVR str_ ) = sem_BasicValue_BVR str_
 sem_BasicValue ( BVS str_ ) = sem_BasicValue_BVS str_
 
 // semantic domain
+:: T_BasicValue  = T_BasicValue (Identity (T_BasicValue_s5 ))
 attach_T_BasicValue (T_BasicValue t_BasicValue) = t_BasicValue
 inv_BasicValue_s5 (C_BasicValue_s5 x) = x
 sem_BasicValue_BVI  :: (String) -> T_BasicValue 
@@ -842,47 +722,47 @@ sem_BasicValue_BVI arg_str_ = T_BasicValue (lift st5) where
         let
             v4 (T_BasicValue_vIn4 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                       let
-                          alhsOppDebug = rule85 arg_str_
-                          alhsOppAg = rule86 arg_str_
-                          alhsOhasRecs = rule87  Void
-                          alhsOmEntryId = rule88  Void
-                          alhsOmExitId = rule89  Void
-                          alhsOppAgs = rule90  Void
-                          alhsOppDebugs = rule91  Void
-                          alhsOrecNode = rule92  Void
-                          lcopy = rule93 arg_str_
-                          alhsOcopy = rule94 lcopy
-                          alhsOgraph = rule95 alhsIgraph
+                          alhsOppDebug = rule60 arg_str_
+                          alhsOppAg = rule61 arg_str_
+                          alhsOhasRecs = rule62  Void
+                          alhsOmEntryId = rule63  Void
+                          alhsOmExitId = rule64  Void
+                          alhsOppAgs = rule65  Void
+                          alhsOppDebugs = rule66  Void
+                          alhsOrecNode = rule67  Void
+                          lcopy = rule68 arg_str_
+                          alhsOcopy = rule69 lcopy
+                          alhsOgraph = rule70 alhsIgraph
                           ag__result_ = T_BasicValue_vOut4 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                       in ag__result_
         in C_BasicValue_s5 v4
-   /*# LINE 120 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule85 str_ =
-                        /*# LINE 120 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+   /*# LINE 102 "./frontend/Tonic/Pretty.ag" #*/
+   rule60 str_ =
+                        /*# LINE 102 "./frontend/Tonic/Pretty.ag" #*/
                         text str_
-                        /*# LINE 864 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 121 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule86 str_ =
-                        /*# LINE 121 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+                        /*# LINE 744 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 103 "./frontend/Tonic/Pretty.ag" #*/
+   rule61 str_ =
+                        /*# LINE 103 "./frontend/Tonic/Pretty.ag" #*/
                         text str_
-                        /*# LINE 869 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   rule87  (_) =
+                        /*# LINE 749 "frontend/Tonic/Tonic.icl"#*/
+   rule62  (_) =
      False
-   rule88  (_) =
+   rule63  (_) =
      Nothing
-   rule89  (_) =
+   rule64  (_) =
      Nothing
-   rule90  (_) =
+   rule65  (_) =
      []
-   rule91  (_) =
+   rule66  (_) =
      []
-   rule92  (_) =
+   rule67  (_) =
      False
-   rule93 str_ =
+   rule68 str_ =
      BVI str_
-   rule94 lcopy =
+   rule69 lcopy =
      lcopy
-   rule95 ((alhsIgraph)) =
+   rule70 ((alhsIgraph)) =
      alhsIgraph
 sem_BasicValue_BVInt  :: (Int) -> T_BasicValue 
 sem_BasicValue_BVInt arg_i_ = T_BasicValue (lift st5) where
@@ -890,47 +770,47 @@ sem_BasicValue_BVInt arg_i_ = T_BasicValue (lift st5) where
         let
             v4 (T_BasicValue_vIn4 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                       let
-                          alhsOppDebug = rule96 arg_i_
-                          alhsOppAg = rule97 arg_i_
-                          alhsOhasRecs = rule98  Void
-                          alhsOmEntryId = rule99  Void
-                          alhsOmExitId = rule100  Void
-                          alhsOppAgs = rule101  Void
-                          alhsOppDebugs = rule102  Void
-                          alhsOrecNode = rule103  Void
-                          lcopy = rule104 arg_i_
-                          alhsOcopy = rule105 lcopy
-                          alhsOgraph = rule106 alhsIgraph
+                          alhsOppDebug = rule71 arg_i_
+                          alhsOppAg = rule72 arg_i_
+                          alhsOhasRecs = rule73  Void
+                          alhsOmEntryId = rule74  Void
+                          alhsOmExitId = rule75  Void
+                          alhsOppAgs = rule76  Void
+                          alhsOppDebugs = rule77  Void
+                          alhsOrecNode = rule78  Void
+                          lcopy = rule79 arg_i_
+                          alhsOcopy = rule80 lcopy
+                          alhsOgraph = rule81 alhsIgraph
                           ag__result_ = T_BasicValue_vOut4 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                       in ag__result_
         in C_BasicValue_s5 v4
-   /*# LINE 122 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule96 i_ =
-                          /*# LINE 122 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+   /*# LINE 104 "./frontend/Tonic/Pretty.ag" #*/
+   rule71 i_ =
+                          /*# LINE 104 "./frontend/Tonic/Pretty.ag" #*/
                           int i_
-                          /*# LINE 912 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 123 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule97 i_ =
-                          /*# LINE 123 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+                          /*# LINE 792 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 105 "./frontend/Tonic/Pretty.ag" #*/
+   rule72 i_ =
+                          /*# LINE 105 "./frontend/Tonic/Pretty.ag" #*/
                           int i_
-                          /*# LINE 917 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   rule98  (_) =
+                          /*# LINE 797 "frontend/Tonic/Tonic.icl"#*/
+   rule73  (_) =
      False
-   rule99  (_) =
+   rule74  (_) =
      Nothing
-   rule100  (_) =
+   rule75  (_) =
      Nothing
-   rule101  (_) =
+   rule76  (_) =
      []
-   rule102  (_) =
+   rule77  (_) =
      []
-   rule103  (_) =
+   rule78  (_) =
      False
-   rule104 i_ =
+   rule79 i_ =
      BVInt i_
-   rule105 lcopy =
+   rule80 lcopy =
      lcopy
-   rule106 ((alhsIgraph)) =
+   rule81 ((alhsIgraph)) =
      alhsIgraph
 sem_BasicValue_BVC  :: (String) -> T_BasicValue 
 sem_BasicValue_BVC arg_str_ = T_BasicValue (lift st5) where
@@ -938,47 +818,47 @@ sem_BasicValue_BVC arg_str_ = T_BasicValue (lift st5) where
         let
             v4 (T_BasicValue_vIn4 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                       let
-                          alhsOppDebug = rule107 arg_str_
-                          alhsOppAg = rule108 arg_str_
-                          alhsOhasRecs = rule109  Void
-                          alhsOmEntryId = rule110  Void
-                          alhsOmExitId = rule111  Void
-                          alhsOppAgs = rule112  Void
-                          alhsOppDebugs = rule113  Void
-                          alhsOrecNode = rule114  Void
-                          lcopy = rule115 arg_str_
-                          alhsOcopy = rule116 lcopy
-                          alhsOgraph = rule117 alhsIgraph
+                          alhsOppDebug = rule82 arg_str_
+                          alhsOppAg = rule83 arg_str_
+                          alhsOhasRecs = rule84  Void
+                          alhsOmEntryId = rule85  Void
+                          alhsOmExitId = rule86  Void
+                          alhsOppAgs = rule87  Void
+                          alhsOppDebugs = rule88  Void
+                          alhsOrecNode = rule89  Void
+                          lcopy = rule90 arg_str_
+                          alhsOcopy = rule91 lcopy
+                          alhsOgraph = rule92 alhsIgraph
                           ag__result_ = T_BasicValue_vOut4 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                       in ag__result_
         in C_BasicValue_s5 v4
-   /*# LINE 124 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule107 str_ =
-                        /*# LINE 124 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+   /*# LINE 106 "./frontend/Tonic/Pretty.ag" #*/
+   rule82 str_ =
+                        /*# LINE 106 "./frontend/Tonic/Pretty.ag" #*/
                         text str_
-                        /*# LINE 960 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 125 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule108 str_ =
-                        /*# LINE 125 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+                        /*# LINE 840 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 107 "./frontend/Tonic/Pretty.ag" #*/
+   rule83 str_ =
+                        /*# LINE 107 "./frontend/Tonic/Pretty.ag" #*/
                         text str_
-                        /*# LINE 965 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   rule109  (_) =
+                        /*# LINE 845 "frontend/Tonic/Tonic.icl"#*/
+   rule84  (_) =
      False
-   rule110  (_) =
+   rule85  (_) =
      Nothing
-   rule111  (_) =
+   rule86  (_) =
      Nothing
-   rule112  (_) =
+   rule87  (_) =
      []
-   rule113  (_) =
+   rule88  (_) =
      []
-   rule114  (_) =
+   rule89  (_) =
      False
-   rule115 str_ =
+   rule90 str_ =
      BVC str_
-   rule116 lcopy =
+   rule91 lcopy =
      lcopy
-   rule117 ((alhsIgraph)) =
+   rule92 ((alhsIgraph)) =
      alhsIgraph
 sem_BasicValue_BVB  :: (Bool) -> T_BasicValue 
 sem_BasicValue_BVB arg_b_ = T_BasicValue (lift st5) where
@@ -986,47 +866,47 @@ sem_BasicValue_BVB arg_b_ = T_BasicValue (lift st5) where
         let
             v4 (T_BasicValue_vIn4 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                       let
-                          alhsOppDebug = rule118 arg_b_
-                          alhsOppAg = rule119 arg_b_
-                          alhsOhasRecs = rule120  Void
-                          alhsOmEntryId = rule121  Void
-                          alhsOmExitId = rule122  Void
-                          alhsOppAgs = rule123  Void
-                          alhsOppDebugs = rule124  Void
-                          alhsOrecNode = rule125  Void
-                          lcopy = rule126 arg_b_
-                          alhsOcopy = rule127 lcopy
-                          alhsOgraph = rule128 alhsIgraph
+                          alhsOppDebug = rule93 arg_b_
+                          alhsOppAg = rule94 arg_b_
+                          alhsOhasRecs = rule95  Void
+                          alhsOmEntryId = rule96  Void
+                          alhsOmExitId = rule97  Void
+                          alhsOppAgs = rule98  Void
+                          alhsOppDebugs = rule99  Void
+                          alhsOrecNode = rule100  Void
+                          lcopy = rule101 arg_b_
+                          alhsOcopy = rule102 lcopy
+                          alhsOgraph = rule103 alhsIgraph
                           ag__result_ = T_BasicValue_vOut4 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                       in ag__result_
         in C_BasicValue_s5 v4
-   /*# LINE 126 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule118 b_ =
-                        /*# LINE 126 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+   /*# LINE 108 "./frontend/Tonic/Pretty.ag" #*/
+   rule93 b_ =
+                        /*# LINE 108 "./frontend/Tonic/Pretty.ag" #*/
                         bool b_
-                        /*# LINE 1008 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 127 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule119 b_ =
-                        /*# LINE 127 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+                        /*# LINE 888 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 109 "./frontend/Tonic/Pretty.ag" #*/
+   rule94 b_ =
+                        /*# LINE 109 "./frontend/Tonic/Pretty.ag" #*/
                         bool b_
-                        /*# LINE 1013 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   rule120  (_) =
+                        /*# LINE 893 "frontend/Tonic/Tonic.icl"#*/
+   rule95  (_) =
      False
-   rule121  (_) =
+   rule96  (_) =
      Nothing
-   rule122  (_) =
+   rule97  (_) =
      Nothing
-   rule123  (_) =
+   rule98  (_) =
      []
-   rule124  (_) =
+   rule99  (_) =
      []
-   rule125  (_) =
+   rule100  (_) =
      False
-   rule126 b_ =
+   rule101 b_ =
      BVB b_
-   rule127 lcopy =
+   rule102 lcopy =
      lcopy
-   rule128 ((alhsIgraph)) =
+   rule103 ((alhsIgraph)) =
      alhsIgraph
 sem_BasicValue_BVR  :: (String) -> T_BasicValue 
 sem_BasicValue_BVR arg_str_ = T_BasicValue (lift st5) where
@@ -1034,47 +914,47 @@ sem_BasicValue_BVR arg_str_ = T_BasicValue (lift st5) where
         let
             v4 (T_BasicValue_vIn4 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                       let
-                          alhsOppDebug = rule129 arg_str_
-                          alhsOppAg = rule130 arg_str_
-                          alhsOhasRecs = rule131  Void
-                          alhsOmEntryId = rule132  Void
-                          alhsOmExitId = rule133  Void
-                          alhsOppAgs = rule134  Void
-                          alhsOppDebugs = rule135  Void
-                          alhsOrecNode = rule136  Void
-                          lcopy = rule137 arg_str_
-                          alhsOcopy = rule138 lcopy
-                          alhsOgraph = rule139 alhsIgraph
+                          alhsOppDebug = rule104 arg_str_
+                          alhsOppAg = rule105 arg_str_
+                          alhsOhasRecs = rule106  Void
+                          alhsOmEntryId = rule107  Void
+                          alhsOmExitId = rule108  Void
+                          alhsOppAgs = rule109  Void
+                          alhsOppDebugs = rule110  Void
+                          alhsOrecNode = rule111  Void
+                          lcopy = rule112 arg_str_
+                          alhsOcopy = rule113 lcopy
+                          alhsOgraph = rule114 alhsIgraph
                           ag__result_ = T_BasicValue_vOut4 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                       in ag__result_
         in C_BasicValue_s5 v4
-   /*# LINE 128 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule129 str_ =
-                        /*# LINE 128 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+   /*# LINE 110 "./frontend/Tonic/Pretty.ag" #*/
+   rule104 str_ =
+                        /*# LINE 110 "./frontend/Tonic/Pretty.ag" #*/
                         text str_
-                        /*# LINE 1056 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 129 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule130 str_ =
-                        /*# LINE 129 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+                        /*# LINE 936 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 111 "./frontend/Tonic/Pretty.ag" #*/
+   rule105 str_ =
+                        /*# LINE 111 "./frontend/Tonic/Pretty.ag" #*/
                         text str_
-                        /*# LINE 1061 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   rule131  (_) =
+                        /*# LINE 941 "frontend/Tonic/Tonic.icl"#*/
+   rule106  (_) =
      False
-   rule132  (_) =
+   rule107  (_) =
      Nothing
-   rule133  (_) =
+   rule108  (_) =
      Nothing
-   rule134  (_) =
+   rule109  (_) =
      []
-   rule135  (_) =
+   rule110  (_) =
      []
-   rule136  (_) =
+   rule111  (_) =
      False
-   rule137 str_ =
+   rule112 str_ =
      BVR str_
-   rule138 lcopy =
+   rule113 lcopy =
      lcopy
-   rule139 ((alhsIgraph)) =
+   rule114 ((alhsIgraph)) =
      alhsIgraph
 sem_BasicValue_BVS  :: (String) -> T_BasicValue 
 sem_BasicValue_BVS arg_str_ = T_BasicValue (lift st5) where
@@ -1082,47 +962,47 @@ sem_BasicValue_BVS arg_str_ = T_BasicValue (lift st5) where
         let
             v4 (T_BasicValue_vIn4 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                       let
-                          alhsOppDebug = rule140 arg_str_
-                          alhsOppAg = rule141 arg_str_
-                          alhsOhasRecs = rule142  Void
-                          alhsOmEntryId = rule143  Void
-                          alhsOmExitId = rule144  Void
-                          alhsOppAgs = rule145  Void
-                          alhsOppDebugs = rule146  Void
-                          alhsOrecNode = rule147  Void
-                          lcopy = rule148 arg_str_
-                          alhsOcopy = rule149 lcopy
-                          alhsOgraph = rule150 alhsIgraph
+                          alhsOppDebug = rule115 arg_str_
+                          alhsOppAg = rule116 arg_str_
+                          alhsOhasRecs = rule117  Void
+                          alhsOmEntryId = rule118  Void
+                          alhsOmExitId = rule119  Void
+                          alhsOppAgs = rule120  Void
+                          alhsOppDebugs = rule121  Void
+                          alhsOrecNode = rule122  Void
+                          lcopy = rule123 arg_str_
+                          alhsOcopy = rule124 lcopy
+                          alhsOgraph = rule125 alhsIgraph
                           ag__result_ = T_BasicValue_vOut4 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                       in ag__result_
         in C_BasicValue_s5 v4
-   /*# LINE 130 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule140 str_ =
-                        /*# LINE 130 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+   /*# LINE 112 "./frontend/Tonic/Pretty.ag" #*/
+   rule115 str_ =
+                        /*# LINE 112 "./frontend/Tonic/Pretty.ag" #*/
                         text str_
-                        /*# LINE 1104 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 131 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule141 str_ =
-                        /*# LINE 131 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+                        /*# LINE 984 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 113 "./frontend/Tonic/Pretty.ag" #*/
+   rule116 str_ =
+                        /*# LINE 113 "./frontend/Tonic/Pretty.ag" #*/
                         text str_
-                        /*# LINE 1109 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   rule142  (_) =
+                        /*# LINE 989 "frontend/Tonic/Tonic.icl"#*/
+   rule117  (_) =
      False
-   rule143  (_) =
+   rule118  (_) =
      Nothing
-   rule144  (_) =
+   rule119  (_) =
      Nothing
-   rule145  (_) =
+   rule120  (_) =
      []
-   rule146  (_) =
+   rule121  (_) =
      []
-   rule147  (_) =
+   rule122  (_) =
      False
-   rule148 str_ =
+   rule123 str_ =
      BVS str_
-   rule149 lcopy =
+   rule124 lcopy =
      lcopy
-   rule150 ((alhsIgraph)) =
+   rule125 ((alhsIgraph)) =
      alhsIgraph
 
 // BoundVar ----------------------------------------------------
@@ -1171,6 +1051,7 @@ sem_BoundVar :: BoundVar  -> T_BoundVar
 sem_BoundVar { BoundVar | var_ident = var_ident_,var_info_ptr = var_info_ptr_,var_expr_ptr = var_expr_ptr_ } = sem_BoundVar_BoundVar ( sem_Ident var_ident_ ) var_info_ptr_ var_expr_ptr_
 
 // semantic domain
+:: T_BoundVar  = T_BoundVar (Identity (T_BoundVar_s8 ))
 attach_T_BoundVar (T_BoundVar t_BoundVar) = t_BoundVar
 inv_BoundVar_s8 (C_BoundVar_s8 x) = x
 sem_BoundVar_BoundVar  :: (T_Ident ) (VarInfoPtr) (ExprInfoPtr) -> T_BoundVar 
@@ -1179,64 +1060,64 @@ sem_BoundVar_BoundVar arg_var_ident_ arg_var_info_ptr_ arg_var_expr_ptr_ = T_Bou
         let
             v7 (T_BoundVar_vIn7 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                       let
-                          st_var_identX44 = 'Control.Monad.Identity'.runIdentity (attach_T_Ident (arg_var_ident_))
-                          (T_Ident_vOut43 avar_identIcopy avar_identIgraph avar_identIhasRecs avar_identIident avar_identIisTask avar_identImEntryId avar_identImExitId avar_identIppAg avar_identIppAgs avar_identIppDebug avar_identIppDebugs avar_identIrecNode avar_identIreifyFunDef avar_identIreifyFunType avar_identIreifySymbolType) = inv_Ident_s44 st_var_identX44 (T_Ident_vIn43 avar_identOcaseExpr avar_identOcurrTaskName avar_identOgraph avar_identOmergeId avar_identOmoduleEnv)
-                          alhsOppDebug = rule151 avar_identIppDebug
-                          alhsOppAg = rule152 avar_identIppAg
-                          alhsOhasRecs = rule153 avar_identIhasRecs
-                          alhsOmEntryId = rule154 avar_identImEntryId
-                          alhsOmExitId = rule155 avar_identImExitId
-                          alhsOppAgs = rule156 avar_identIppAgs
-                          alhsOppDebugs = rule157 avar_identIppDebugs
-                          alhsOrecNode = rule158 avar_identIrecNode
-                          lcopy = rule159 avar_identIcopy arg_var_expr_ptr_ arg_var_info_ptr_
-                          alhsOcopy = rule160 lcopy
-                          alhsOgraph = rule161 avar_identIgraph
-                          avar_identOcaseExpr = rule162 alhsIcaseExpr
-                          avar_identOcurrTaskName = rule163 alhsIcurrTaskName
-                          avar_identOgraph = rule164 alhsIgraph
-                          avar_identOmergeId = rule165 alhsImergeId
-                          avar_identOmoduleEnv = rule166 alhsImoduleEnv
+                          st_var_identX47 = 'Control.Monad.Identity'.runIdentity (attach_T_Ident (arg_var_ident_))
+                          (T_Ident_vOut46 avar_identIcopy avar_identIgraph avar_identIhasRecs avar_identIident avar_identIisCurrTask avar_identImEntryId avar_identImExitId avar_identIppAg avar_identIppAgs avar_identIppDebug avar_identIppDebugs avar_identIrecNode) = inv_Ident_s47 st_var_identX47 (T_Ident_vIn46 avar_identOcaseExpr avar_identOcurrTaskName avar_identOgraph avar_identOmergeId avar_identOmoduleEnv)
+                          alhsOppDebug = rule126 avar_identIppDebug
+                          alhsOppAg = rule127 avar_identIppAg
+                          alhsOhasRecs = rule128 avar_identIhasRecs
+                          alhsOmEntryId = rule129 avar_identImEntryId
+                          alhsOmExitId = rule130 avar_identImExitId
+                          alhsOppAgs = rule131 avar_identIppAgs
+                          alhsOppDebugs = rule132 avar_identIppDebugs
+                          alhsOrecNode = rule133 avar_identIrecNode
+                          lcopy = rule134 avar_identIcopy arg_var_expr_ptr_ arg_var_info_ptr_
+                          alhsOcopy = rule135 lcopy
+                          alhsOgraph = rule136 avar_identIgraph
+                          avar_identOcaseExpr = rule137 alhsIcaseExpr
+                          avar_identOcurrTaskName = rule138 alhsIcurrTaskName
+                          avar_identOgraph = rule139 alhsIgraph
+                          avar_identOmergeId = rule140 alhsImergeId
+                          avar_identOmoduleEnv = rule141 alhsImoduleEnv
                           ag__result_ = T_BoundVar_vOut7 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                       in ag__result_
         in C_BoundVar_s8 v7
-   /*# LINE 108 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule151 ((avar_identIppDebug)) =
-                             /*# LINE 108 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+   /*# LINE 90 "./frontend/Tonic/Pretty.ag" #*/
+   rule126 ((avar_identIppDebug)) =
+                             /*# LINE 90 "./frontend/Tonic/Pretty.ag" #*/
                              avar_identIppDebug
-                             /*# LINE 1208 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 109 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule152 ((avar_identIppAg)) =
-                             /*# LINE 109 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+                             /*# LINE 1089 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 91 "./frontend/Tonic/Pretty.ag" #*/
+   rule127 ((avar_identIppAg)) =
+                             /*# LINE 91 "./frontend/Tonic/Pretty.ag" #*/
                              avar_identIppAg
-                             /*# LINE 1213 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   rule153 ((avar_identIhasRecs)) =
+                             /*# LINE 1094 "frontend/Tonic/Tonic.icl"#*/
+   rule128 ((avar_identIhasRecs)) =
      avar_identIhasRecs
-   rule154 ((avar_identImEntryId)) =
+   rule129 ((avar_identImEntryId)) =
      avar_identImEntryId
-   rule155 ((avar_identImExitId)) =
+   rule130 ((avar_identImExitId)) =
      avar_identImExitId
-   rule156 ((avar_identIppAgs)) =
+   rule131 ((avar_identIppAgs)) =
      avar_identIppAgs
-   rule157 ((avar_identIppDebugs)) =
+   rule132 ((avar_identIppDebugs)) =
      avar_identIppDebugs
-   rule158 ((avar_identIrecNode)) =
+   rule133 ((avar_identIrecNode)) =
      avar_identIrecNode
-   rule159 ((avar_identIcopy)) var_expr_ptr_ var_info_ptr_ =
+   rule134 ((avar_identIcopy)) var_expr_ptr_ var_info_ptr_ =
      {BoundVar|var_ident = avar_identIcopy , var_info_ptr = var_info_ptr_ , var_expr_ptr = var_expr_ptr_}
-   rule160 lcopy =
+   rule135 lcopy =
      lcopy
-   rule161 ((avar_identIgraph)) =
+   rule136 ((avar_identIgraph)) =
      avar_identIgraph
-   rule162 ((alhsIcaseExpr)) =
+   rule137 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule163 ((alhsIcurrTaskName)) =
+   rule138 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule164 ((alhsIgraph)) =
+   rule139 ((alhsIgraph)) =
      alhsIgraph
-   rule165 ((alhsImergeId)) =
+   rule140 ((alhsImergeId)) =
      alhsImergeId
-   rule166 ((alhsImoduleEnv)) =
+   rule141 ((alhsImoduleEnv)) =
      alhsImoduleEnv
 
 // DefinedSymbol -----------------------------------------------
@@ -1285,6 +1166,7 @@ sem_DefinedSymbol :: DefinedSymbol  -> T_DefinedSymbol
 sem_DefinedSymbol { DefinedSymbol | ds_ident = ds_ident_,ds_arity = ds_arity_,ds_index = ds_index_ } = sem_DefinedSymbol_DefinedSymbol ( sem_Ident ds_ident_ ) ds_arity_ ds_index_
 
 // semantic domain
+:: T_DefinedSymbol  = T_DefinedSymbol (Identity (T_DefinedSymbol_s11 ))
 attach_T_DefinedSymbol (T_DefinedSymbol t_DefinedSymbol) = t_DefinedSymbol
 inv_DefinedSymbol_s11 (C_DefinedSymbol_s11 x) = x
 sem_DefinedSymbol_DefinedSymbol  :: (T_Ident ) (Int) (Index) -> T_DefinedSymbol 
@@ -1293,64 +1175,64 @@ sem_DefinedSymbol_DefinedSymbol arg_ds_ident_ arg_ds_arity_ arg_ds_index_ = T_De
          let
              v10 (T_DefinedSymbol_vIn10 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                        let
-                           st_ds_identX44 = 'Control.Monad.Identity'.runIdentity (attach_T_Ident (arg_ds_ident_))
-                           (T_Ident_vOut43 ads_identIcopy ads_identIgraph ads_identIhasRecs ads_identIident ads_identIisTask ads_identImEntryId ads_identImExitId ads_identIppAg ads_identIppAgs ads_identIppDebug ads_identIppDebugs ads_identIrecNode ads_identIreifyFunDef ads_identIreifyFunType ads_identIreifySymbolType) = inv_Ident_s44 st_ds_identX44 (T_Ident_vIn43 ads_identOcaseExpr ads_identOcurrTaskName ads_identOgraph ads_identOmergeId ads_identOmoduleEnv)
-                           alhsOppDebug = rule167 ads_identIppDebug
-                           alhsOppAg = rule168 ads_identIppAg
-                           alhsOhasRecs = rule169 ads_identIhasRecs
-                           alhsOmEntryId = rule170 ads_identImEntryId
-                           alhsOmExitId = rule171 ads_identImExitId
-                           alhsOppAgs = rule172 ads_identIppAgs
-                           alhsOppDebugs = rule173 ads_identIppDebugs
-                           alhsOrecNode = rule174 ads_identIrecNode
-                           lcopy = rule175 ads_identIcopy arg_ds_arity_ arg_ds_index_
-                           alhsOcopy = rule176 lcopy
-                           alhsOgraph = rule177 ads_identIgraph
-                           ads_identOcaseExpr = rule178 alhsIcaseExpr
-                           ads_identOcurrTaskName = rule179 alhsIcurrTaskName
-                           ads_identOgraph = rule180 alhsIgraph
-                           ads_identOmergeId = rule181 alhsImergeId
-                           ads_identOmoduleEnv = rule182 alhsImoduleEnv
+                           st_ds_identX47 = 'Control.Monad.Identity'.runIdentity (attach_T_Ident (arg_ds_ident_))
+                           (T_Ident_vOut46 ads_identIcopy ads_identIgraph ads_identIhasRecs ads_identIident ads_identIisCurrTask ads_identImEntryId ads_identImExitId ads_identIppAg ads_identIppAgs ads_identIppDebug ads_identIppDebugs ads_identIrecNode) = inv_Ident_s47 st_ds_identX47 (T_Ident_vIn46 ads_identOcaseExpr ads_identOcurrTaskName ads_identOgraph ads_identOmergeId ads_identOmoduleEnv)
+                           alhsOppDebug = rule142 ads_identIppDebug
+                           alhsOppAg = rule143 ads_identIppAg
+                           alhsOhasRecs = rule144 ads_identIhasRecs
+                           alhsOmEntryId = rule145 ads_identImEntryId
+                           alhsOmExitId = rule146 ads_identImExitId
+                           alhsOppAgs = rule147 ads_identIppAgs
+                           alhsOppDebugs = rule148 ads_identIppDebugs
+                           alhsOrecNode = rule149 ads_identIrecNode
+                           lcopy = rule150 ads_identIcopy arg_ds_arity_ arg_ds_index_
+                           alhsOcopy = rule151 lcopy
+                           alhsOgraph = rule152 ads_identIgraph
+                           ads_identOcaseExpr = rule153 alhsIcaseExpr
+                           ads_identOcurrTaskName = rule154 alhsIcurrTaskName
+                           ads_identOgraph = rule155 alhsIgraph
+                           ads_identOmergeId = rule156 alhsImergeId
+                           ads_identOmoduleEnv = rule157 alhsImoduleEnv
                            ag__result_ = T_DefinedSymbol_vOut10 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
          in C_DefinedSymbol_s11 v10
-   /*# LINE 134 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule167 ((ads_identIppDebug)) =
-                                  /*# LINE 134 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+   /*# LINE 116 "./frontend/Tonic/Pretty.ag" #*/
+   rule142 ((ads_identIppDebug)) =
+                                  /*# LINE 116 "./frontend/Tonic/Pretty.ag" #*/
                                   ads_identIppDebug
-                                  /*# LINE 1322 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 135 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule168 ((ads_identIppAg)) =
-                                  /*# LINE 135 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+                                  /*# LINE 1204 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 117 "./frontend/Tonic/Pretty.ag" #*/
+   rule143 ((ads_identIppAg)) =
+                                  /*# LINE 117 "./frontend/Tonic/Pretty.ag" #*/
                                   ads_identIppAg
-                                  /*# LINE 1327 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   rule169 ((ads_identIhasRecs)) =
+                                  /*# LINE 1209 "frontend/Tonic/Tonic.icl"#*/
+   rule144 ((ads_identIhasRecs)) =
      ads_identIhasRecs
-   rule170 ((ads_identImEntryId)) =
+   rule145 ((ads_identImEntryId)) =
      ads_identImEntryId
-   rule171 ((ads_identImExitId)) =
+   rule146 ((ads_identImExitId)) =
      ads_identImExitId
-   rule172 ((ads_identIppAgs)) =
+   rule147 ((ads_identIppAgs)) =
      ads_identIppAgs
-   rule173 ((ads_identIppDebugs)) =
+   rule148 ((ads_identIppDebugs)) =
      ads_identIppDebugs
-   rule174 ((ads_identIrecNode)) =
+   rule149 ((ads_identIrecNode)) =
      ads_identIrecNode
-   rule175 ((ads_identIcopy)) ds_arity_ ds_index_ =
+   rule150 ((ads_identIcopy)) ds_arity_ ds_index_ =
      {DefinedSymbol|ds_ident = ads_identIcopy , ds_arity = ds_arity_ , ds_index = ds_index_}
-   rule176 lcopy =
+   rule151 lcopy =
      lcopy
-   rule177 ((ads_identIgraph)) =
+   rule152 ((ads_identIgraph)) =
      ads_identIgraph
-   rule178 ((alhsIcaseExpr)) =
+   rule153 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule179 ((alhsIcurrTaskName)) =
+   rule154 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule180 ((alhsIgraph)) =
+   rule155 ((alhsIgraph)) =
      alhsIgraph
-   rule181 ((alhsImergeId)) =
+   rule156 ((alhsImergeId)) =
      alhsImergeId
-   rule182 ((alhsImoduleEnv)) =
+   rule157 ((alhsImoduleEnv)) =
      alhsImoduleEnv
 
 // Expression --------------------------------------------------
@@ -1423,6 +1305,7 @@ sem_Expression ( NoBind exprinfoptr_ ) = sem_Expression_NoBind exprinfoptr_
 sem_Expression ( FailExpr ident_ ) = sem_Expression_FailExpr ( sem_Ident ident_ )
 
 // semantic domain
+:: T_Expression  = T_Expression (Identity (T_Expression_s14 ))
 attach_T_Expression (T_Expression t_Expression) = t_Expression
 inv_Expression_s14 (C_Expression_s14 x) = x
 sem_Expression_Var  :: (T_BoundVar ) -> T_Expression 
@@ -1433,62 +1316,62 @@ sem_Expression_Var arg_bv_ = T_Expression (lift st14) where
                        let
                            st_bvX8 = 'Control.Monad.Identity'.runIdentity (attach_T_BoundVar (arg_bv_))
                            (T_BoundVar_vOut7 abvIcopy abvIgraph abvIhasRecs abvImEntryId abvImExitId abvIppAg abvIppAgs abvIppDebug abvIppDebugs abvIrecNode) = inv_BoundVar_s8 st_bvX8 (T_BoundVar_vIn7 abvOcaseExpr abvOcurrTaskName abvOgraph abvOmergeId abvOmoduleEnv)
-                           alhsOppDebug = rule183 abvIppDebug
-                           alhsOppAg = rule184 abvIppAg
-                           alhsOhasRecs = rule185 abvIhasRecs
-                           alhsOmEntryId = rule186 abvImEntryId
-                           alhsOmExitId = rule187 abvImExitId
-                           alhsOppAgs = rule188 abvIppAgs
-                           alhsOppDebugs = rule189 abvIppDebugs
-                           alhsOrecNode = rule190 abvIrecNode
-                           lcopy = rule191 abvIcopy
-                           alhsOcopy = rule192 lcopy
-                           alhsOgraph = rule193 abvIgraph
-                           abvOcaseExpr = rule194 alhsIcaseExpr
-                           abvOcurrTaskName = rule195 alhsIcurrTaskName
-                           abvOgraph = rule196 alhsIgraph
-                           abvOmergeId = rule197 alhsImergeId
-                           abvOmoduleEnv = rule198 alhsImoduleEnv
+                           alhsOppDebug = rule158 abvIppDebug
+                           alhsOppAg = rule159 abvIppAg
+                           alhsOhasRecs = rule160 abvIhasRecs
+                           alhsOmEntryId = rule161 abvImEntryId
+                           alhsOmExitId = rule162 abvImExitId
+                           alhsOppAgs = rule163 abvIppAgs
+                           alhsOppDebugs = rule164 abvIppDebugs
+                           alhsOrecNode = rule165 abvIrecNode
+                           lcopy = rule166 abvIcopy
+                           alhsOcopy = rule167 lcopy
+                           alhsOgraph = rule168 abvIgraph
+                           abvOcaseExpr = rule169 alhsIcaseExpr
+                           abvOcurrTaskName = rule170 alhsIcurrTaskName
+                           abvOgraph = rule171 alhsIgraph
+                           abvOmergeId = rule172 alhsImergeId
+                           abvOmoduleEnv = rule173 alhsImoduleEnv
                            ag__result_ = T_Expression_vOut13 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
          in C_Expression_s14 v13
-   /*# LINE 75 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule183 ((abvIppDebug)) =
-                      /*# LINE 75 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+   /*# LINE 57 "./frontend/Tonic/Pretty.ag" #*/
+   rule158 ((abvIppDebug)) =
+                      /*# LINE 57 "./frontend/Tonic/Pretty.ag" #*/
                       text "<Var>" <+> abvIppDebug
-                      /*# LINE 1460 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 76 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule184 ((abvIppAg)) =
-                      /*# LINE 76 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+                      /*# LINE 1343 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 58 "./frontend/Tonic/Pretty.ag" #*/
+   rule159 ((abvIppAg)) =
+                      /*# LINE 58 "./frontend/Tonic/Pretty.ag" #*/
                       abvIppAg
-                      /*# LINE 1465 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   rule185 ((abvIhasRecs)) =
+                      /*# LINE 1348 "frontend/Tonic/Tonic.icl"#*/
+   rule160 ((abvIhasRecs)) =
      abvIhasRecs
-   rule186 ((abvImEntryId)) =
+   rule161 ((abvImEntryId)) =
      abvImEntryId
-   rule187 ((abvImExitId)) =
+   rule162 ((abvImExitId)) =
      abvImExitId
-   rule188 ((abvIppAgs)) =
+   rule163 ((abvIppAgs)) =
      abvIppAgs
-   rule189 ((abvIppDebugs)) =
+   rule164 ((abvIppDebugs)) =
      abvIppDebugs
-   rule190 ((abvIrecNode)) =
+   rule165 ((abvIrecNode)) =
      abvIrecNode
-   rule191 ((abvIcopy)) =
+   rule166 ((abvIcopy)) =
      Var abvIcopy
-   rule192 lcopy =
+   rule167 lcopy =
      lcopy
-   rule193 ((abvIgraph)) =
+   rule168 ((abvIgraph)) =
      abvIgraph
-   rule194 ((alhsIcaseExpr)) =
+   rule169 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule195 ((alhsIcurrTaskName)) =
+   rule170 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule196 ((alhsIgraph)) =
+   rule171 ((alhsIgraph)) =
      alhsIgraph
-   rule197 ((alhsImergeId)) =
+   rule172 ((alhsImergeId)) =
      alhsImergeId
-   rule198 ((alhsImoduleEnv)) =
+   rule173 ((alhsImoduleEnv)) =
      alhsImoduleEnv
 sem_Expression_App  :: (T_App ) -> T_Expression 
 sem_Expression_App arg_app_ = T_Expression (lift st14) where
@@ -1497,66 +1380,66 @@ sem_Expression_App arg_app_ = T_Expression (lift st14) where
              v13 (T_Expression_vIn13 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                        let
                            st_appX2 = 'Control.Monad.Identity'.runIdentity (attach_T_App (arg_app_))
-                           (T_App_vOut1 aappIcopy aappIgraph aappIhasRecs aappIisTask aappImEntryId aappImExitId aappIppAg aappIppAgs aappIppDebug aappIppDebugs aappIrecNode aappIreifyFunDef aappIreifyFunType aappIreifySymbolType) = inv_App_s2 st_appX2 (T_App_vIn1 aappOcaseExpr aappOcurrTaskName aappOgraph aappOmergeId aappOmoduleEnv)
-                           alhsOgraph = rule199 aappIgraph
-                           alhsOppDebug = rule200 aappIppDebug
-                           alhsOppAg = rule201 aappIppAg
-                           alhsOhasRecs = rule202 aappIhasRecs
-                           alhsOmEntryId = rule203 aappImEntryId
-                           alhsOmExitId = rule204 aappImExitId
-                           alhsOppAgs = rule205 aappIppAgs
-                           alhsOppDebugs = rule206 aappIppDebugs
-                           alhsOrecNode = rule207 aappIrecNode
-                           lcopy = rule208 aappIcopy
-                           alhsOcopy = rule209 lcopy
-                           aappOcaseExpr = rule210 alhsIcaseExpr
-                           aappOcurrTaskName = rule211 alhsIcurrTaskName
-                           aappOgraph = rule212 alhsIgraph
-                           aappOmergeId = rule213 alhsImergeId
-                           aappOmoduleEnv = rule214 alhsImoduleEnv
+                           (T_App_vOut1 aappIcopy aappIfirstArg aappIfirstArgGraph aappIfirstArgHasRecs aappIfirstArgIdent aappIfirstArgMEntryId aappIfirstArgMExitId aappIfirstArgRecNode aappIgraph aappIhasRecs aappImEntryId aappImExitId aappIppAg aappIppAgs aappIppDebug aappIppDebugs aappIrecNode aappIsecondArg aappIsecondArgGraph aappIsecondArgHasRecs aappIsecondArgIdent aappIsecondArgMEntryId aappIsecondArgMExitId aappIsecondArgRecNode) = inv_App_s2 st_appX2 (T_App_vIn1 aappOcaseExpr aappOcurrTaskName aappOgraph aappOmergeId aappOmoduleEnv)
+                           alhsOgraph = rule174 aappIgraph
+                           alhsOppDebug = rule175 aappIppDebug
+                           alhsOppAg = rule176 aappIppAg
+                           alhsOhasRecs = rule177 aappIhasRecs
+                           alhsOmEntryId = rule178 aappImEntryId
+                           alhsOmExitId = rule179 aappImExitId
+                           alhsOppAgs = rule180 aappIppAgs
+                           alhsOppDebugs = rule181 aappIppDebugs
+                           alhsOrecNode = rule182 aappIrecNode
+                           lcopy = rule183 aappIcopy
+                           alhsOcopy = rule184 lcopy
+                           aappOcaseExpr = rule185 alhsIcaseExpr
+                           aappOcurrTaskName = rule186 alhsIcurrTaskName
+                           aappOgraph = rule187 alhsIgraph
+                           aappOmergeId = rule188 alhsImergeId
+                           aappOmoduleEnv = rule189 alhsImoduleEnv
                            ag__result_ = T_Expression_vOut13 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
          in C_Expression_s14 v13
-   /*# LINE 230 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule199 ((aappIgraph)) =
-                    /*# LINE 230 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
+   /*# LINE 273 "./frontend/Tonic/MkGraph.ag" #*/
+   rule174 ((aappIgraph)) =
+                    /*# LINE 273 "./frontend/Tonic/MkGraph.ag" #*/
                     aappIgraph
-                    /*# LINE 1525 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 78 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule200 ((aappIppDebug)) =
-                        /*# LINE 78 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+                    /*# LINE 1408 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 60 "./frontend/Tonic/Pretty.ag" #*/
+   rule175 ((aappIppDebug)) =
+                        /*# LINE 60 "./frontend/Tonic/Pretty.ag" #*/
                         aappIppDebug
-                        /*# LINE 1530 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 79 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule201 ((aappIppAg)) =
-                        /*# LINE 79 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+                        /*# LINE 1413 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 61 "./frontend/Tonic/Pretty.ag" #*/
+   rule176 ((aappIppAg)) =
+                        /*# LINE 61 "./frontend/Tonic/Pretty.ag" #*/
                         aappIppAg
-                        /*# LINE 1535 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   rule202 ((aappIhasRecs)) =
+                        /*# LINE 1418 "frontend/Tonic/Tonic.icl"#*/
+   rule177 ((aappIhasRecs)) =
      aappIhasRecs
-   rule203 ((aappImEntryId)) =
+   rule178 ((aappImEntryId)) =
      aappImEntryId
-   rule204 ((aappImExitId)) =
+   rule179 ((aappImExitId)) =
      aappImExitId
-   rule205 ((aappIppAgs)) =
+   rule180 ((aappIppAgs)) =
      aappIppAgs
-   rule206 ((aappIppDebugs)) =
+   rule181 ((aappIppDebugs)) =
      aappIppDebugs
-   rule207 ((aappIrecNode)) =
+   rule182 ((aappIrecNode)) =
      aappIrecNode
-   rule208 ((aappIcopy)) =
+   rule183 ((aappIcopy)) =
      App aappIcopy
-   rule209 lcopy =
+   rule184 lcopy =
      lcopy
-   rule210 ((alhsIcaseExpr)) =
+   rule185 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule211 ((alhsIcurrTaskName)) =
+   rule186 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule212 ((alhsIgraph)) =
+   rule187 ((alhsIgraph)) =
      alhsIgraph
-   rule213 ((alhsImergeId)) =
+   rule188 ((alhsImergeId)) =
      alhsImergeId
-   rule214 ((alhsImoduleEnv)) =
+   rule189 ((alhsImoduleEnv)) =
      alhsImoduleEnv
 sem_Expression_At  :: (T_Expression ) (T_Expressions ) -> T_Expression 
 sem_Expression_At arg_expr_ arg_exprs_ = T_Expression (lift st14) where
@@ -1567,140 +1450,146 @@ sem_Expression_At arg_expr_ arg_exprs_ = T_Expression (lift st14) where
                            st_exprX14 = 'Control.Monad.Identity'.runIdentity (attach_T_Expression (arg_expr_))
                            st_exprsX17 = 'Control.Monad.Identity'.runIdentity (attach_T_Expressions (arg_exprs_))
                            (T_Expression_vOut13 aexprIcopy aexprIgraph aexprIhasRecs aexprImEntryId aexprImExitId aexprIppAg aexprIppAgs aexprIppDebug aexprIppDebugs aexprIrecNode) = inv_Expression_s14 st_exprX14 (T_Expression_vIn13 aexprOcaseExpr aexprOcurrTaskName aexprOgraph aexprOmergeId aexprOmoduleEnv)
-                           (T_Expressions_vOut16 aexprsIcopy aexprsIgraph aexprsIhasRecs aexprsImEntryId aexprsImExitId aexprsIppAg aexprsIppAgs aexprsIppDebug aexprsIppDebugs aexprsIrecNode) = inv_Expressions_s17 st_exprsX17 (T_Expressions_vIn16 aexprsOcaseExpr aexprsOcurrTaskName aexprsOgraph aexprsOmergeId aexprsOmoduleEnv)
-                           alhsOhasRecs = rule215 aexprIhasRecs aexprsIhasRecs
-                           alhsOmEntryId = rule216 aexprImEntryId aexprsImEntryId
-                           alhsOmExitId = rule217 aexprImExitId aexprsImExitId
-                           alhsOppAg = rule218 aexprIppAg aexprsIppAg
-                           alhsOppAgs = rule219 aexprIppAgs aexprsIppAgs
-                           alhsOppDebug = rule220 aexprIppDebug aexprsIppDebug
-                           alhsOppDebugs = rule221 aexprIppDebugs aexprsIppDebugs
-                           alhsOrecNode = rule222 aexprIrecNode aexprsIrecNode
-                           lcopy = rule223 aexprIcopy aexprsIcopy
-                           alhsOcopy = rule224 lcopy
-                           alhsOgraph = rule225 aexprsIgraph
-                           aexprOcaseExpr = rule226 alhsIcaseExpr
-                           aexprOcurrTaskName = rule227 alhsIcurrTaskName
-                           aexprOgraph = rule228 alhsIgraph
-                           aexprOmergeId = rule229 alhsImergeId
-                           aexprOmoduleEnv = rule230 alhsImoduleEnv
-                           aexprsOcaseExpr = rule231 alhsIcaseExpr
-                           aexprsOcurrTaskName = rule232 alhsIcurrTaskName
-                           aexprsOgraph = rule233 aexprIgraph
-                           aexprsOmergeId = rule234 alhsImergeId
-                           aexprsOmoduleEnv = rule235 alhsImoduleEnv
+                           (T_Expressions_vOut16 aexprsIcopy aexprsIfirstArg aexprsIfirstArgGraph aexprsIfirstArgHasRecs aexprsIfirstArgIdent aexprsIfirstArgMEntryId aexprsIfirstArgMExitId aexprsIfirstArgRecNode aexprsIgraph aexprsIhasRecs aexprsImEntryId aexprsImExitId aexprsIppAg aexprsIppAgs aexprsIppDebug aexprsIppDebugs aexprsIppInfix aexprsIppPrefix aexprsIppTail aexprsIrecNode aexprsIsecondArg aexprsIsecondArgGraph aexprsIsecondArgHasRecs aexprsIsecondArgIdent aexprsIsecondArgMEntryId aexprsIsecondArgMExitId aexprsIsecondArgRecNode) = inv_Expressions_s17 st_exprsX17 (T_Expressions_vIn16 aexprsOappSymbDoc aexprsOcaseExpr aexprsOcurrTaskName aexprsOgraph aexprsOmergeId aexprsOmoduleEnv aexprsOnumContexts)
+                           alhsOhasRecs = rule190 aexprIhasRecs aexprsIhasRecs
+                           alhsOmEntryId = rule191 aexprImEntryId aexprsImEntryId
+                           alhsOmExitId = rule192 aexprImExitId aexprsImExitId
+                           alhsOppAg = rule193 aexprIppAg aexprsIppAg
+                           alhsOppAgs = rule194 aexprIppAgs aexprsIppAgs
+                           alhsOppDebug = rule195 aexprIppDebug aexprsIppDebug
+                           alhsOppDebugs = rule196 aexprIppDebugs aexprsIppDebugs
+                           alhsOrecNode = rule197 aexprIrecNode aexprsIrecNode
+                           lcopy = rule198 aexprIcopy aexprsIcopy
+                           alhsOcopy = rule199 lcopy
+                           alhsOgraph = rule200 aexprsIgraph
+                           aexprOcaseExpr = rule201 alhsIcaseExpr
+                           aexprOcurrTaskName = rule202 alhsIcurrTaskName
+                           aexprOgraph = rule203 alhsIgraph
+                           aexprOmergeId = rule204 alhsImergeId
+                           aexprOmoduleEnv = rule205 alhsImoduleEnv
+                           aexprsOappSymbDoc = rule206  Void
+                           aexprsOcaseExpr = rule207 alhsIcaseExpr
+                           aexprsOcurrTaskName = rule208 alhsIcurrTaskName
+                           aexprsOgraph = rule209 aexprIgraph
+                           aexprsOmergeId = rule210 alhsImergeId
+                           aexprsOmoduleEnv = rule211 alhsImoduleEnv
+                           aexprsOnumContexts = rule212  Void
                            ag__result_ = T_Expression_vOut13 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
          in C_Expression_s14 v13
-   rule215 ((aexprIhasRecs)) ((aexprsIhasRecs)) =
+   rule190 ((aexprIhasRecs)) ((aexprsIhasRecs)) =
      aexprIhasRecs || aexprsIhasRecs
-   rule216 ((aexprImEntryId)) ((aexprsImEntryId)) =
+   rule191 ((aexprImEntryId)) ((aexprsImEntryId)) =
      aexprImEntryId <> aexprsImEntryId
-   rule217 ((aexprImExitId)) ((aexprsImExitId)) =
+   rule192 ((aexprImExitId)) ((aexprsImExitId)) =
      aexprImExitId <> aexprsImExitId
-   rule218 ((aexprIppAg)) ((aexprsIppAg)) =
+   rule193 ((aexprIppAg)) ((aexprsIppAg)) =
      aexprIppAg <$$> aexprsIppAg
-   rule219 ((aexprIppAgs)) ((aexprsIppAgs)) =
+   rule194 ((aexprIppAgs)) ((aexprsIppAgs)) =
      aexprIppAgs ++ aexprsIppAgs
-   rule220 ((aexprIppDebug)) ((aexprsIppDebug)) =
+   rule195 ((aexprIppDebug)) ((aexprsIppDebug)) =
      aexprIppDebug <$$> aexprsIppDebug
-   rule221 ((aexprIppDebugs)) ((aexprsIppDebugs)) =
+   rule196 ((aexprIppDebugs)) ((aexprsIppDebugs)) =
      aexprIppDebugs ++ aexprsIppDebugs
-   rule222 ((aexprIrecNode)) ((aexprsIrecNode)) =
+   rule197 ((aexprIrecNode)) ((aexprsIrecNode)) =
      aexprIrecNode || aexprsIrecNode
-   rule223 ((aexprIcopy)) ((aexprsIcopy)) =
+   rule198 ((aexprIcopy)) ((aexprsIcopy)) =
      At aexprIcopy aexprsIcopy
-   rule224 lcopy =
+   rule199 lcopy =
      lcopy
-   rule225 ((aexprsIgraph)) =
+   rule200 ((aexprsIgraph)) =
      aexprsIgraph
-   rule226 ((alhsIcaseExpr)) =
+   rule201 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule227 ((alhsIcurrTaskName)) =
+   rule202 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule228 ((alhsIgraph)) =
+   rule203 ((alhsIgraph)) =
      alhsIgraph
-   rule229 ((alhsImergeId)) =
+   rule204 ((alhsImergeId)) =
      alhsImergeId
-   rule230 ((alhsImoduleEnv)) =
+   rule205 ((alhsImoduleEnv)) =
      alhsImoduleEnv
-   rule231 ((alhsIcaseExpr)) =
+   rule206  (_) =
+     abort "missing rule: Expression.At.exprs.appSymbDoc"
+   rule207 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule232 ((alhsIcurrTaskName)) =
+   rule208 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule233 ((aexprIgraph)) =
+   rule209 ((aexprIgraph)) =
      aexprIgraph
-   rule234 ((alhsImergeId)) =
+   rule210 ((alhsImergeId)) =
      alhsImergeId
-   rule235 ((alhsImoduleEnv)) =
+   rule211 ((alhsImoduleEnv)) =
      alhsImoduleEnv
+   rule212  (_) =
+     abort "missing rule: Expression.At.exprs.numContexts"
 sem_Expression_Let  :: (Let)  -> T_Expression 
 sem_Expression_Let arg_let__  = T_Expression (lift st14) where
    st14 =
          let
              v13 (T_Expression_vIn13 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                        let
-                           st_gletX32 = 'Control.Monad.Identity'.runIdentity (attach_T_GLet ((sem_GLet glet_val_)))
-                           (T_GLet_vOut31 agletIcopy agletIgraph agletIhasRecs agletImEntryId agletImExitId agletIppAg agletIppAgs agletIppDebug agletIppDebugs agletIrecNode) = inv_GLet_s32 st_gletX32 (T_GLet_vIn31 agletOcaseExpr agletOcurrTaskName agletOgraph agletOmergeId agletOmoduleEnv)
-                           alhsOgraph = rule236 agletIgraph
-                           glet_val_ = rule237 alhsImoduleEnv arg_let__
-                           alhsOhasRecs = rule238 agletIhasRecs
-                           alhsOmEntryId = rule239 agletImEntryId
-                           alhsOmExitId = rule240 agletImExitId
-                           alhsOppAg = rule241 agletIppAg
-                           alhsOppAgs = rule242 agletIppAgs
-                           alhsOppDebug = rule243 agletIppDebug
-                           alhsOppDebugs = rule244 agletIppDebugs
-                           alhsOrecNode = rule245 agletIrecNode
-                           lcopy = rule246 arg_let__
-                           alhsOcopy = rule247 lcopy
-                           agletOcaseExpr = rule248 alhsIcaseExpr
-                           agletOcurrTaskName = rule249 alhsIcurrTaskName
-                           agletOgraph = rule250 alhsIgraph
-                           agletOmergeId = rule251 alhsImergeId
-                           agletOmoduleEnv = rule252 alhsImoduleEnv
+                           st_gletX35 = 'Control.Monad.Identity'.runIdentity (attach_T_GLet ((sem_GLet glet_val_)))
+                           (T_GLet_vOut34 agletIcopy agletIgraph agletIhasRecs agletImEntryId agletImExitId agletIppAg agletIppAgs agletIppDebug agletIppDebugs agletIrecNode) = inv_GLet_s35 st_gletX35 (T_GLet_vIn34 agletOcaseExpr agletOcurrTaskName agletOgraph agletOmergeId agletOmoduleEnv)
+                           alhsOgraph = rule213 agletIgraph
+                           glet_val_ = rule214 alhsImoduleEnv arg_let__
+                           alhsOhasRecs = rule215 agletIhasRecs
+                           alhsOmEntryId = rule216 agletImEntryId
+                           alhsOmExitId = rule217 agletImExitId
+                           alhsOppAg = rule218 agletIppAg
+                           alhsOppAgs = rule219 agletIppAgs
+                           alhsOppDebug = rule220 agletIppDebug
+                           alhsOppDebugs = rule221 agletIppDebugs
+                           alhsOrecNode = rule222 agletIrecNode
+                           lcopy = rule223 arg_let__
+                           alhsOcopy = rule224 lcopy
+                           agletOcaseExpr = rule225 alhsIcaseExpr
+                           agletOcurrTaskName = rule226 alhsIcurrTaskName
+                           agletOgraph = rule227 alhsIgraph
+                           agletOmergeId = rule228 alhsImergeId
+                           agletOmoduleEnv = rule229 alhsImoduleEnv
                            ag__result_ = T_Expression_vOut13 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
          in C_Expression_s14 v13
-   /*# LINE 233 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule236 ((agletIgraph)) =
-                    /*# LINE 233 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
+   /*# LINE 276 "./frontend/Tonic/MkGraph.ag" #*/
+   rule213 ((agletIgraph)) =
+                    /*# LINE 276 "./frontend/Tonic/MkGraph.ag" #*/
                     agletIgraph
-                    /*# LINE 1670 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 236 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule237 ((alhsImoduleEnv)) let__ =
-                    /*# LINE 236 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
+                    /*# LINE 1559 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 279 "./frontend/Tonic/MkGraph.ag" #*/
+   rule214 ((alhsImoduleEnv)) let__ =
+                    /*# LINE 279 "./frontend/Tonic/MkGraph.ag" #*/
                     mkGLet alhsImoduleEnv let__
-                    /*# LINE 1675 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   rule238 ((agletIhasRecs)) =
+                    /*# LINE 1564 "frontend/Tonic/Tonic.icl"#*/
+   rule215 ((agletIhasRecs)) =
      agletIhasRecs
-   rule239 ((agletImEntryId)) =
+   rule216 ((agletImEntryId)) =
      agletImEntryId
-   rule240 ((agletImExitId)) =
+   rule217 ((agletImExitId)) =
      agletImExitId
-   rule241 ((agletIppAg)) =
+   rule218 ((agletIppAg)) =
      agletIppAg
-   rule242 ((agletIppAgs)) =
+   rule219 ((agletIppAgs)) =
      agletIppAgs
-   rule243 ((agletIppDebug)) =
+   rule220 ((agletIppDebug)) =
      agletIppDebug
-   rule244 ((agletIppDebugs)) =
+   rule221 ((agletIppDebugs)) =
      agletIppDebugs
-   rule245 ((agletIrecNode)) =
+   rule222 ((agletIrecNode)) =
      agletIrecNode
-   rule246 let__ =
+   rule223 let__ =
      Let let__
-   rule247 lcopy =
+   rule224 lcopy =
      lcopy
-   rule248 ((alhsIcaseExpr)) =
+   rule225 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule249 ((alhsIcurrTaskName)) =
+   rule226 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule250 ((alhsIgraph)) =
+   rule227 ((alhsIgraph)) =
      alhsIgraph
-   rule251 ((alhsImergeId)) =
+   rule228 ((alhsImergeId)) =
      alhsImergeId
-   rule252 ((alhsImoduleEnv)) =
+   rule229 ((alhsImoduleEnv)) =
      alhsImoduleEnv
 sem_Expression_Case  :: (Case) -> T_Expression 
 sem_Expression_Case arg_case__ = T_Expression (lift st14) where
@@ -1708,41 +1597,41 @@ sem_Expression_Case arg_case__ = T_Expression (lift st14) where
          let
              v13 (T_Expression_vIn13 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                        let
-                           alhsOhasRecs = rule253  Void
-                           alhsOmEntryId = rule254  Void
-                           alhsOmExitId = rule255  Void
-                           alhsOppAg = rule256  Void
-                           alhsOppAgs = rule257  Void
-                           alhsOppDebug = rule258  Void
-                           alhsOppDebugs = rule259  Void
-                           alhsOrecNode = rule260  Void
-                           lcopy = rule261 arg_case__
-                           alhsOcopy = rule262 lcopy
-                           alhsOgraph = rule263 alhsIgraph
+                           alhsOhasRecs = rule230  Void
+                           alhsOmEntryId = rule231  Void
+                           alhsOmExitId = rule232  Void
+                           alhsOppAg = rule233  Void
+                           alhsOppAgs = rule234  Void
+                           alhsOppDebug = rule235  Void
+                           alhsOppDebugs = rule236  Void
+                           alhsOrecNode = rule237  Void
+                           lcopy = rule238 arg_case__
+                           alhsOcopy = rule239 lcopy
+                           alhsOgraph = rule240 alhsIgraph
                            ag__result_ = T_Expression_vOut13 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
          in C_Expression_s14 v13
-   rule253  (_) =
+   rule230  (_) =
      False
-   rule254  (_) =
+   rule231  (_) =
      Nothing
-   rule255  (_) =
+   rule232  (_) =
      Nothing
-   rule256  (_) =
+   rule233  (_) =
      empty
-   rule257  (_) =
+   rule234  (_) =
      []
-   rule258  (_) =
+   rule235  (_) =
      empty
-   rule259  (_) =
+   rule236  (_) =
      []
-   rule260  (_) =
+   rule237  (_) =
      False
-   rule261 case__ =
+   rule238 case__ =
      Case case__
-   rule262 lcopy =
+   rule239 lcopy =
      lcopy
-   rule263 ((alhsIgraph)) =
+   rule240 ((alhsIgraph)) =
      alhsIgraph
 sem_Expression_Selection  :: (SelectorKind) (T_Expression ) (T_Selections ) -> T_Expression 
 sem_Expression_Selection arg_skind_ arg_expr_ arg_sels_ = T_Expression (lift st14) where
@@ -1751,86 +1640,86 @@ sem_Expression_Selection arg_skind_ arg_expr_ arg_sels_ = T_Expression (lift st1
              v13 (T_Expression_vIn13 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                        let
                            st_exprX14 = 'Control.Monad.Identity'.runIdentity (attach_T_Expression (arg_expr_))
-                           st_selsX50 = 'Control.Monad.Identity'.runIdentity (attach_T_Selections (arg_sels_))
+                           st_selsX59 = 'Control.Monad.Identity'.runIdentity (attach_T_Selections (arg_sels_))
                            (T_Expression_vOut13 aexprIcopy aexprIgraph aexprIhasRecs aexprImEntryId aexprImExitId aexprIppAg aexprIppAgs aexprIppDebug aexprIppDebugs aexprIrecNode) = inv_Expression_s14 st_exprX14 (T_Expression_vIn13 aexprOcaseExpr aexprOcurrTaskName aexprOgraph aexprOmergeId aexprOmoduleEnv)
-                           (T_Selections_vOut49 aselsIcopy aselsIgraph aselsIhasRecs aselsImEntryId aselsImExitId aselsIppAg aselsIppAgs aselsIppDebug aselsIppDebugs aselsIrecNode) = inv_Selections_s50 st_selsX50 (T_Selections_vIn49 aselsOcaseExpr aselsOcurrTaskName aselsOgraph aselsOmergeId aselsOmoduleEnv)
-                           alhsOppDebug = rule264 aexprIppDebug lrecsel
-                           alhsOppAg = rule265 aexprIppAg lrecsel
-                           lrecsel = rule266 aselsIppAgs
-                           alhsOhasRecs = rule267 aexprIhasRecs aselsIhasRecs
-                           alhsOmEntryId = rule268 aexprImEntryId aselsImEntryId
-                           alhsOmExitId = rule269 aexprImExitId aselsImExitId
-                           alhsOppAgs = rule270 aexprIppAgs aselsIppAgs
-                           alhsOppDebugs = rule271 aexprIppDebugs aselsIppDebugs
-                           alhsOrecNode = rule272 aexprIrecNode aselsIrecNode
-                           lcopy = rule273 aexprIcopy aselsIcopy arg_skind_
-                           alhsOcopy = rule274 lcopy
-                           alhsOgraph = rule275 aselsIgraph
-                           aexprOcaseExpr = rule276 alhsIcaseExpr
-                           aexprOcurrTaskName = rule277 alhsIcurrTaskName
-                           aexprOgraph = rule278 alhsIgraph
-                           aexprOmergeId = rule279 alhsImergeId
-                           aexprOmoduleEnv = rule280 alhsImoduleEnv
-                           aselsOcaseExpr = rule281 alhsIcaseExpr
-                           aselsOcurrTaskName = rule282 alhsIcurrTaskName
-                           aselsOgraph = rule283 aexprIgraph
-                           aselsOmergeId = rule284 alhsImergeId
-                           aselsOmoduleEnv = rule285 alhsImoduleEnv
+                           (T_Selections_vOut58 aselsIcopy aselsIgraph aselsIhasRecs aselsImEntryId aselsImExitId aselsIppAg aselsIppAgs aselsIppDebug aselsIppDebugs aselsIrecNode) = inv_Selections_s59 st_selsX59 (T_Selections_vIn58 aselsOcaseExpr aselsOcurrTaskName aselsOgraph aselsOmergeId aselsOmoduleEnv)
+                           alhsOppDebug = rule241 aexprIppDebug lrecsel
+                           alhsOppAg = rule242 aexprIppAg lrecsel
+                           lrecsel = rule243 aselsIppAgs
+                           alhsOhasRecs = rule244 aexprIhasRecs aselsIhasRecs
+                           alhsOmEntryId = rule245 aexprImEntryId aselsImEntryId
+                           alhsOmExitId = rule246 aexprImExitId aselsImExitId
+                           alhsOppAgs = rule247 aexprIppAgs aselsIppAgs
+                           alhsOppDebugs = rule248 aexprIppDebugs aselsIppDebugs
+                           alhsOrecNode = rule249 aexprIrecNode aselsIrecNode
+                           lcopy = rule250 aexprIcopy aselsIcopy arg_skind_
+                           alhsOcopy = rule251 lcopy
+                           alhsOgraph = rule252 aselsIgraph
+                           aexprOcaseExpr = rule253 alhsIcaseExpr
+                           aexprOcurrTaskName = rule254 alhsIcurrTaskName
+                           aexprOgraph = rule255 alhsIgraph
+                           aexprOmergeId = rule256 alhsImergeId
+                           aexprOmoduleEnv = rule257 alhsImoduleEnv
+                           aselsOcaseExpr = rule258 alhsIcaseExpr
+                           aselsOcurrTaskName = rule259 alhsIcurrTaskName
+                           aselsOgraph = rule260 aexprIgraph
+                           aselsOmergeId = rule261 alhsImergeId
+                           aselsOmoduleEnv = rule262 alhsImoduleEnv
                            ag__result_ = T_Expression_vOut13 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
          in C_Expression_s14 v13
-   /*# LINE 82 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule264 ((aexprIppDebug)) lrecsel =
-                      /*# LINE 82 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+   /*# LINE 64 "./frontend/Tonic/Pretty.ag" #*/
+   rule241 ((aexprIppDebug)) lrecsel =
+                      /*# LINE 64 "./frontend/Tonic/Pretty.ag" #*/
                       text "<Selection>" <+> aexprIppDebug <-> lrecsel
-                      /*# LINE 1787 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 84 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule265 ((aexprIppAg)) lrecsel =
-                      /*# LINE 84 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+                      /*# LINE 1676 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 66 "./frontend/Tonic/Pretty.ag" #*/
+   rule242 ((aexprIppAg)) lrecsel =
+                      /*# LINE 66 "./frontend/Tonic/Pretty.ag" #*/
                       aexprIppAg <-> lrecsel
-                      /*# LINE 1792 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 85 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule266 ((aselsIppAgs)) =
-                      /*# LINE 85 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+                      /*# LINE 1681 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 67 "./frontend/Tonic/Pretty.ag" #*/
+   rule243 ((aselsIppAgs)) =
+                      /*# LINE 67 "./frontend/Tonic/Pretty.ag" #*/
                       char '.' <-> hcat (intersperse (char '.') $ aselsIppAgs)
-                      /*# LINE 1797 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   rule267 ((aexprIhasRecs)) ((aselsIhasRecs)) =
+                      /*# LINE 1686 "frontend/Tonic/Tonic.icl"#*/
+   rule244 ((aexprIhasRecs)) ((aselsIhasRecs)) =
      aexprIhasRecs || aselsIhasRecs
-   rule268 ((aexprImEntryId)) ((aselsImEntryId)) =
+   rule245 ((aexprImEntryId)) ((aselsImEntryId)) =
      aexprImEntryId <> aselsImEntryId
-   rule269 ((aexprImExitId)) ((aselsImExitId)) =
+   rule246 ((aexprImExitId)) ((aselsImExitId)) =
      aexprImExitId <> aselsImExitId
-   rule270 ((aexprIppAgs)) ((aselsIppAgs)) =
+   rule247 ((aexprIppAgs)) ((aselsIppAgs)) =
      aexprIppAgs ++ aselsIppAgs
-   rule271 ((aexprIppDebugs)) ((aselsIppDebugs)) =
+   rule248 ((aexprIppDebugs)) ((aselsIppDebugs)) =
      aexprIppDebugs ++ aselsIppDebugs
-   rule272 ((aexprIrecNode)) ((aselsIrecNode)) =
+   rule249 ((aexprIrecNode)) ((aselsIrecNode)) =
      aexprIrecNode || aselsIrecNode
-   rule273 ((aexprIcopy)) ((aselsIcopy)) skind_ =
+   rule250 ((aexprIcopy)) ((aselsIcopy)) skind_ =
      Selection skind_ aexprIcopy aselsIcopy
-   rule274 lcopy =
+   rule251 lcopy =
      lcopy
-   rule275 ((aselsIgraph)) =
+   rule252 ((aselsIgraph)) =
      aselsIgraph
-   rule276 ((alhsIcaseExpr)) =
+   rule253 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule277 ((alhsIcurrTaskName)) =
+   rule254 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule278 ((alhsIgraph)) =
+   rule255 ((alhsIgraph)) =
      alhsIgraph
-   rule279 ((alhsImergeId)) =
+   rule256 ((alhsImergeId)) =
      alhsImergeId
-   rule280 ((alhsImoduleEnv)) =
+   rule257 ((alhsImoduleEnv)) =
      alhsImoduleEnv
-   rule281 ((alhsIcaseExpr)) =
+   rule258 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule282 ((alhsIcurrTaskName)) =
+   rule259 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule283 ((aexprIgraph)) =
+   rule260 ((aexprIgraph)) =
      aexprIgraph
-   rule284 ((alhsImergeId)) =
+   rule261 ((alhsImergeId)) =
      alhsImergeId
-   rule285 ((alhsImoduleEnv)) =
+   rule262 ((alhsImoduleEnv)) =
      alhsImoduleEnv
 sem_Expression_Update  :: (T_Expression ) (T_Selections ) (T_Expression ) -> T_Expression 
 sem_Expression_Update arg_exprl_ arg_sels_ arg_exprr_ = T_Expression (lift st14) where
@@ -1839,97 +1728,97 @@ sem_Expression_Update arg_exprl_ arg_sels_ arg_exprr_ = T_Expression (lift st14)
              v13 (T_Expression_vIn13 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                        let
                            st_exprlX14 = 'Control.Monad.Identity'.runIdentity (attach_T_Expression (arg_exprl_))
-                           st_selsX50 = 'Control.Monad.Identity'.runIdentity (attach_T_Selections (arg_sels_))
+                           st_selsX59 = 'Control.Monad.Identity'.runIdentity (attach_T_Selections (arg_sels_))
                            st_exprrX14 = 'Control.Monad.Identity'.runIdentity (attach_T_Expression (arg_exprr_))
                            (T_Expression_vOut13 aexprlIcopy aexprlIgraph aexprlIhasRecs aexprlImEntryId aexprlImExitId aexprlIppAg aexprlIppAgs aexprlIppDebug aexprlIppDebugs aexprlIrecNode) = inv_Expression_s14 st_exprlX14 (T_Expression_vIn13 aexprlOcaseExpr aexprlOcurrTaskName aexprlOgraph aexprlOmergeId aexprlOmoduleEnv)
-                           (T_Selections_vOut49 aselsIcopy aselsIgraph aselsIhasRecs aselsImEntryId aselsImExitId aselsIppAg aselsIppAgs aselsIppDebug aselsIppDebugs aselsIrecNode) = inv_Selections_s50 st_selsX50 (T_Selections_vIn49 aselsOcaseExpr aselsOcurrTaskName aselsOgraph aselsOmergeId aselsOmoduleEnv)
+                           (T_Selections_vOut58 aselsIcopy aselsIgraph aselsIhasRecs aselsImEntryId aselsImExitId aselsIppAg aselsIppAgs aselsIppDebug aselsIppDebugs aselsIrecNode) = inv_Selections_s59 st_selsX59 (T_Selections_vIn58 aselsOcaseExpr aselsOcurrTaskName aselsOgraph aselsOmergeId aselsOmoduleEnv)
                            (T_Expression_vOut13 aexprrIcopy aexprrIgraph aexprrIhasRecs aexprrImEntryId aexprrImExitId aexprrIppAg aexprrIppAgs aexprrIppDebug aexprrIppDebugs aexprrIrecNode) = inv_Expression_s14 st_exprrX14 (T_Expression_vIn13 aexprrOcaseExpr aexprrOcurrTaskName aexprrOgraph aexprrOmergeId aexprrOmoduleEnv)
-                           alhsOppDebug = rule286  Void
-                           alhsOppAg = rule287  Void
-                           alhsOhasRecs = rule288 aexprlIhasRecs aexprrIhasRecs aselsIhasRecs
-                           alhsOmEntryId = rule289 aexprlImEntryId aexprrImEntryId aselsImEntryId
-                           alhsOmExitId = rule290 aexprlImExitId aexprrImExitId aselsImExitId
-                           alhsOppAgs = rule291 aexprlIppAgs aexprrIppAgs aselsIppAgs
-                           alhsOppDebugs = rule292 aexprlIppDebugs aexprrIppDebugs aselsIppDebugs
-                           alhsOrecNode = rule293 aexprlIrecNode aexprrIrecNode aselsIrecNode
-                           lcopy = rule294 aexprlIcopy aexprrIcopy aselsIcopy
-                           alhsOcopy = rule295 lcopy
-                           alhsOgraph = rule296 aexprrIgraph
-                           aexprlOcaseExpr = rule297 alhsIcaseExpr
-                           aexprlOcurrTaskName = rule298 alhsIcurrTaskName
-                           aexprlOgraph = rule299 alhsIgraph
-                           aexprlOmergeId = rule300 alhsImergeId
-                           aexprlOmoduleEnv = rule301 alhsImoduleEnv
-                           aselsOcaseExpr = rule302 alhsIcaseExpr
-                           aselsOcurrTaskName = rule303 alhsIcurrTaskName
-                           aselsOgraph = rule304 aexprlIgraph
-                           aselsOmergeId = rule305 alhsImergeId
-                           aselsOmoduleEnv = rule306 alhsImoduleEnv
-                           aexprrOcaseExpr = rule307 alhsIcaseExpr
-                           aexprrOcurrTaskName = rule308 alhsIcurrTaskName
-                           aexprrOgraph = rule309 aselsIgraph
-                           aexprrOmergeId = rule310 alhsImergeId
-                           aexprrOmoduleEnv = rule311 alhsImoduleEnv
+                           alhsOppDebug = rule263  Void
+                           alhsOppAg = rule264  Void
+                           alhsOhasRecs = rule265 aexprlIhasRecs aexprrIhasRecs aselsIhasRecs
+                           alhsOmEntryId = rule266 aexprlImEntryId aexprrImEntryId aselsImEntryId
+                           alhsOmExitId = rule267 aexprlImExitId aexprrImExitId aselsImExitId
+                           alhsOppAgs = rule268 aexprlIppAgs aexprrIppAgs aselsIppAgs
+                           alhsOppDebugs = rule269 aexprlIppDebugs aexprrIppDebugs aselsIppDebugs
+                           alhsOrecNode = rule270 aexprlIrecNode aexprrIrecNode aselsIrecNode
+                           lcopy = rule271 aexprlIcopy aexprrIcopy aselsIcopy
+                           alhsOcopy = rule272 lcopy
+                           alhsOgraph = rule273 aexprrIgraph
+                           aexprlOcaseExpr = rule274 alhsIcaseExpr
+                           aexprlOcurrTaskName = rule275 alhsIcurrTaskName
+                           aexprlOgraph = rule276 alhsIgraph
+                           aexprlOmergeId = rule277 alhsImergeId
+                           aexprlOmoduleEnv = rule278 alhsImoduleEnv
+                           aselsOcaseExpr = rule279 alhsIcaseExpr
+                           aselsOcurrTaskName = rule280 alhsIcurrTaskName
+                           aselsOgraph = rule281 aexprlIgraph
+                           aselsOmergeId = rule282 alhsImergeId
+                           aselsOmoduleEnv = rule283 alhsImoduleEnv
+                           aexprrOcaseExpr = rule284 alhsIcaseExpr
+                           aexprrOcurrTaskName = rule285 alhsIcurrTaskName
+                           aexprrOgraph = rule286 aselsIgraph
+                           aexprrOmergeId = rule287 alhsImergeId
+                           aexprrOmoduleEnv = rule288 alhsImoduleEnv
                            ag__result_ = T_Expression_vOut13 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
          in C_Expression_s14 v13
-   /*# LINE 88 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule286  (_) =
-                      /*# LINE 88 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+   /*# LINE 70 "./frontend/Tonic/Pretty.ag" #*/
+   rule263  (_) =
+                      /*# LINE 70 "./frontend/Tonic/Pretty.ag" #*/
                       text "<Update>"
-                      /*# LINE 1881 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 89 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule287  (_) =
-                      /*# LINE 89 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+                      /*# LINE 1770 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 71 "./frontend/Tonic/Pretty.ag" #*/
+   rule264  (_) =
+                      /*# LINE 71 "./frontend/Tonic/Pretty.ag" #*/
                       text "<Update>"
-                      /*# LINE 1886 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   rule288 ((aexprlIhasRecs)) ((aexprrIhasRecs)) ((aselsIhasRecs)) =
+                      /*# LINE 1775 "frontend/Tonic/Tonic.icl"#*/
+   rule265 ((aexprlIhasRecs)) ((aexprrIhasRecs)) ((aselsIhasRecs)) =
      aexprlIhasRecs || aselsIhasRecs || aexprrIhasRecs
-   rule289 ((aexprlImEntryId)) ((aexprrImEntryId)) ((aselsImEntryId)) =
+   rule266 ((aexprlImEntryId)) ((aexprrImEntryId)) ((aselsImEntryId)) =
      aexprlImEntryId <> aselsImEntryId <> aexprrImEntryId
-   rule290 ((aexprlImExitId)) ((aexprrImExitId)) ((aselsImExitId)) =
+   rule267 ((aexprlImExitId)) ((aexprrImExitId)) ((aselsImExitId)) =
      aexprlImExitId <> aselsImExitId <> aexprrImExitId
-   rule291 ((aexprlIppAgs)) ((aexprrIppAgs)) ((aselsIppAgs)) =
+   rule268 ((aexprlIppAgs)) ((aexprrIppAgs)) ((aselsIppAgs)) =
      aexprlIppAgs ++ aselsIppAgs ++ aexprrIppAgs
-   rule292 ((aexprlIppDebugs)) ((aexprrIppDebugs)) ((aselsIppDebugs)) =
+   rule269 ((aexprlIppDebugs)) ((aexprrIppDebugs)) ((aselsIppDebugs)) =
      aexprlIppDebugs ++ aselsIppDebugs ++ aexprrIppDebugs
-   rule293 ((aexprlIrecNode)) ((aexprrIrecNode)) ((aselsIrecNode)) =
+   rule270 ((aexprlIrecNode)) ((aexprrIrecNode)) ((aselsIrecNode)) =
      aexprlIrecNode || aselsIrecNode || aexprrIrecNode
-   rule294 ((aexprlIcopy)) ((aexprrIcopy)) ((aselsIcopy)) =
+   rule271 ((aexprlIcopy)) ((aexprrIcopy)) ((aselsIcopy)) =
      Update aexprlIcopy aselsIcopy aexprrIcopy
-   rule295 lcopy =
+   rule272 lcopy =
      lcopy
-   rule296 ((aexprrIgraph)) =
+   rule273 ((aexprrIgraph)) =
      aexprrIgraph
-   rule297 ((alhsIcaseExpr)) =
+   rule274 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule298 ((alhsIcurrTaskName)) =
+   rule275 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule299 ((alhsIgraph)) =
+   rule276 ((alhsIgraph)) =
      alhsIgraph
-   rule300 ((alhsImergeId)) =
+   rule277 ((alhsImergeId)) =
      alhsImergeId
-   rule301 ((alhsImoduleEnv)) =
+   rule278 ((alhsImoduleEnv)) =
      alhsImoduleEnv
-   rule302 ((alhsIcaseExpr)) =
+   rule279 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule303 ((alhsIcurrTaskName)) =
+   rule280 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule304 ((aexprlIgraph)) =
+   rule281 ((aexprlIgraph)) =
      aexprlIgraph
-   rule305 ((alhsImergeId)) =
+   rule282 ((alhsImergeId)) =
      alhsImergeId
-   rule306 ((alhsImoduleEnv)) =
+   rule283 ((alhsImoduleEnv)) =
      alhsImoduleEnv
-   rule307 ((alhsIcaseExpr)) =
+   rule284 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule308 ((alhsIcurrTaskName)) =
+   rule285 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule309 ((aselsIgraph)) =
+   rule286 ((aselsIgraph)) =
      aselsIgraph
-   rule310 ((alhsImergeId)) =
+   rule287 ((alhsImergeId)) =
      alhsImergeId
-   rule311 ((alhsImoduleEnv)) =
+   rule288 ((alhsImoduleEnv)) =
      alhsImoduleEnv
 sem_Expression_RecordUpdate  :: (T_GlobalDefinedSymbol ) (T_Expression ) ([Bind Expression (Global FieldSymbol)]) -> T_Expression 
 sem_Expression_RecordUpdate arg_gdsym_ arg_expr_ arg_binds_ = T_Expression (lift st14) where
@@ -1937,81 +1826,81 @@ sem_Expression_RecordUpdate arg_gdsym_ arg_expr_ arg_binds_ = T_Expression (lift
          let
              v13 (T_Expression_vIn13 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                        let
-                           st_gdsymX41 = 'Control.Monad.Identity'.runIdentity (attach_T_GlobalDefinedSymbol (arg_gdsym_))
+                           st_gdsymX44 = 'Control.Monad.Identity'.runIdentity (attach_T_GlobalDefinedSymbol (arg_gdsym_))
                            st_exprX14 = 'Control.Monad.Identity'.runIdentity (attach_T_Expression (arg_expr_))
-                           (T_GlobalDefinedSymbol_vOut40 agdsymIcopy agdsymIgraph agdsymIhasRecs agdsymImEntryId agdsymImExitId agdsymIppAg agdsymIppAgs agdsymIppDebug agdsymIppDebugs agdsymIrecNode) = inv_GlobalDefinedSymbol_s41 st_gdsymX41 (T_GlobalDefinedSymbol_vIn40 agdsymOcaseExpr agdsymOcurrTaskName agdsymOgraph agdsymOmergeId agdsymOmoduleEnv)
+                           (T_GlobalDefinedSymbol_vOut43 agdsymIcopy agdsymIgraph agdsymIhasRecs agdsymImEntryId agdsymImExitId agdsymIppAg agdsymIppAgs agdsymIppDebug agdsymIppDebugs agdsymIrecNode) = inv_GlobalDefinedSymbol_s44 st_gdsymX44 (T_GlobalDefinedSymbol_vIn43 agdsymOcaseExpr agdsymOcurrTaskName agdsymOgraph agdsymOmergeId agdsymOmoduleEnv)
                            (T_Expression_vOut13 aexprIcopy aexprIgraph aexprIhasRecs aexprImEntryId aexprImExitId aexprIppAg aexprIppAgs aexprIppDebug aexprIppDebugs aexprIrecNode) = inv_Expression_s14 st_exprX14 (T_Expression_vIn13 aexprOcaseExpr aexprOcurrTaskName aexprOgraph aexprOmergeId aexprOmoduleEnv)
-                           alhsOppDebug = rule312  Void
-                           alhsOppAg = rule313  Void
-                           alhsOhasRecs = rule314 aexprIhasRecs agdsymIhasRecs
-                           alhsOmEntryId = rule315 aexprImEntryId agdsymImEntryId
-                           alhsOmExitId = rule316 aexprImExitId agdsymImExitId
-                           alhsOppAgs = rule317 aexprIppAgs agdsymIppAgs
-                           alhsOppDebugs = rule318 aexprIppDebugs agdsymIppDebugs
-                           alhsOrecNode = rule319 aexprIrecNode agdsymIrecNode
-                           lcopy = rule320 aexprIcopy agdsymIcopy arg_binds_
-                           alhsOcopy = rule321 lcopy
-                           alhsOgraph = rule322 aexprIgraph
-                           agdsymOcaseExpr = rule323 alhsIcaseExpr
-                           agdsymOcurrTaskName = rule324 alhsIcurrTaskName
-                           agdsymOgraph = rule325 alhsIgraph
-                           agdsymOmergeId = rule326 alhsImergeId
-                           agdsymOmoduleEnv = rule327 alhsImoduleEnv
-                           aexprOcaseExpr = rule328 alhsIcaseExpr
-                           aexprOcurrTaskName = rule329 alhsIcurrTaskName
-                           aexprOgraph = rule330 agdsymIgraph
-                           aexprOmergeId = rule331 alhsImergeId
-                           aexprOmoduleEnv = rule332 alhsImoduleEnv
+                           alhsOppDebug = rule289  Void
+                           alhsOppAg = rule290  Void
+                           alhsOhasRecs = rule291 aexprIhasRecs agdsymIhasRecs
+                           alhsOmEntryId = rule292 aexprImEntryId agdsymImEntryId
+                           alhsOmExitId = rule293 aexprImExitId agdsymImExitId
+                           alhsOppAgs = rule294 aexprIppAgs agdsymIppAgs
+                           alhsOppDebugs = rule295 aexprIppDebugs agdsymIppDebugs
+                           alhsOrecNode = rule296 aexprIrecNode agdsymIrecNode
+                           lcopy = rule297 aexprIcopy agdsymIcopy arg_binds_
+                           alhsOcopy = rule298 lcopy
+                           alhsOgraph = rule299 aexprIgraph
+                           agdsymOcaseExpr = rule300 alhsIcaseExpr
+                           agdsymOcurrTaskName = rule301 alhsIcurrTaskName
+                           agdsymOgraph = rule302 alhsIgraph
+                           agdsymOmergeId = rule303 alhsImergeId
+                           agdsymOmoduleEnv = rule304 alhsImoduleEnv
+                           aexprOcaseExpr = rule305 alhsIcaseExpr
+                           aexprOcurrTaskName = rule306 alhsIcurrTaskName
+                           aexprOgraph = rule307 agdsymIgraph
+                           aexprOmergeId = rule308 alhsImergeId
+                           aexprOmoduleEnv = rule309 alhsImoduleEnv
                            ag__result_ = T_Expression_vOut13 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
          in C_Expression_s14 v13
-   /*# LINE 92 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule312  (_) =
-                      /*# LINE 92 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+   /*# LINE 74 "./frontend/Tonic/Pretty.ag" #*/
+   rule289  (_) =
+                      /*# LINE 74 "./frontend/Tonic/Pretty.ag" #*/
                       text "<RecordUpdate>"
-                      /*# LINE 1973 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 93 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule313  (_) =
-                      /*# LINE 93 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+                      /*# LINE 1862 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 75 "./frontend/Tonic/Pretty.ag" #*/
+   rule290  (_) =
+                      /*# LINE 75 "./frontend/Tonic/Pretty.ag" #*/
                       text "<RecordUpdate>"
-                      /*# LINE 1978 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   rule314 ((aexprIhasRecs)) ((agdsymIhasRecs)) =
+                      /*# LINE 1867 "frontend/Tonic/Tonic.icl"#*/
+   rule291 ((aexprIhasRecs)) ((agdsymIhasRecs)) =
      agdsymIhasRecs || aexprIhasRecs
-   rule315 ((aexprImEntryId)) ((agdsymImEntryId)) =
+   rule292 ((aexprImEntryId)) ((agdsymImEntryId)) =
      agdsymImEntryId <> aexprImEntryId
-   rule316 ((aexprImExitId)) ((agdsymImExitId)) =
+   rule293 ((aexprImExitId)) ((agdsymImExitId)) =
      agdsymImExitId <> aexprImExitId
-   rule317 ((aexprIppAgs)) ((agdsymIppAgs)) =
+   rule294 ((aexprIppAgs)) ((agdsymIppAgs)) =
      agdsymIppAgs ++ aexprIppAgs
-   rule318 ((aexprIppDebugs)) ((agdsymIppDebugs)) =
+   rule295 ((aexprIppDebugs)) ((agdsymIppDebugs)) =
      agdsymIppDebugs ++ aexprIppDebugs
-   rule319 ((aexprIrecNode)) ((agdsymIrecNode)) =
+   rule296 ((aexprIrecNode)) ((agdsymIrecNode)) =
      agdsymIrecNode || aexprIrecNode
-   rule320 ((aexprIcopy)) ((agdsymIcopy)) binds_ =
+   rule297 ((aexprIcopy)) ((agdsymIcopy)) binds_ =
      RecordUpdate agdsymIcopy aexprIcopy binds_
-   rule321 lcopy =
+   rule298 lcopy =
      lcopy
-   rule322 ((aexprIgraph)) =
+   rule299 ((aexprIgraph)) =
      aexprIgraph
-   rule323 ((alhsIcaseExpr)) =
+   rule300 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule324 ((alhsIcurrTaskName)) =
+   rule301 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule325 ((alhsIgraph)) =
+   rule302 ((alhsIgraph)) =
      alhsIgraph
-   rule326 ((alhsImergeId)) =
+   rule303 ((alhsImergeId)) =
      alhsImergeId
-   rule327 ((alhsImoduleEnv)) =
+   rule304 ((alhsImoduleEnv)) =
      alhsImoduleEnv
-   rule328 ((alhsIcaseExpr)) =
+   rule305 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule329 ((alhsIcurrTaskName)) =
+   rule306 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule330 ((agdsymIgraph)) =
+   rule307 ((agdsymIgraph)) =
      agdsymIgraph
-   rule331 ((alhsImergeId)) =
+   rule308 ((alhsImergeId)) =
      alhsImergeId
-   rule332 ((alhsImoduleEnv)) =
+   rule309 ((alhsImoduleEnv)) =
      alhsImoduleEnv
 sem_Expression_TupleSelect  :: (T_DefinedSymbol ) (Int) (T_Expression ) -> T_Expression 
 sem_Expression_TupleSelect arg_dsym_ arg_n_ arg_expr_ = T_Expression (lift st14) where
@@ -2023,77 +1912,77 @@ sem_Expression_TupleSelect arg_dsym_ arg_n_ arg_expr_ = T_Expression (lift st14)
                            st_exprX14 = 'Control.Monad.Identity'.runIdentity (attach_T_Expression (arg_expr_))
                            (T_DefinedSymbol_vOut10 adsymIcopy adsymIgraph adsymIhasRecs adsymImEntryId adsymImExitId adsymIppAg adsymIppAgs adsymIppDebug adsymIppDebugs adsymIrecNode) = inv_DefinedSymbol_s11 st_dsymX11 (T_DefinedSymbol_vIn10 adsymOcaseExpr adsymOcurrTaskName adsymOgraph adsymOmergeId adsymOmoduleEnv)
                            (T_Expression_vOut13 aexprIcopy aexprIgraph aexprIhasRecs aexprImEntryId aexprImExitId aexprIppAg aexprIppAgs aexprIppDebug aexprIppDebugs aexprIrecNode) = inv_Expression_s14 st_exprX14 (T_Expression_vIn13 aexprOcaseExpr aexprOcurrTaskName aexprOgraph aexprOmergeId aexprOmoduleEnv)
-                           alhsOppDebug = rule333  Void
-                           alhsOppAg = rule334  Void
-                           alhsOhasRecs = rule335 adsymIhasRecs aexprIhasRecs
-                           alhsOmEntryId = rule336 adsymImEntryId aexprImEntryId
-                           alhsOmExitId = rule337 adsymImExitId aexprImExitId
-                           alhsOppAgs = rule338 adsymIppAgs aexprIppAgs
-                           alhsOppDebugs = rule339 adsymIppDebugs aexprIppDebugs
-                           alhsOrecNode = rule340 adsymIrecNode aexprIrecNode
-                           lcopy = rule341 adsymIcopy aexprIcopy arg_n_
-                           alhsOcopy = rule342 lcopy
-                           alhsOgraph = rule343 aexprIgraph
-                           adsymOcaseExpr = rule344 alhsIcaseExpr
-                           adsymOcurrTaskName = rule345 alhsIcurrTaskName
-                           adsymOgraph = rule346 alhsIgraph
-                           adsymOmergeId = rule347 alhsImergeId
-                           adsymOmoduleEnv = rule348 alhsImoduleEnv
-                           aexprOcaseExpr = rule349 alhsIcaseExpr
-                           aexprOcurrTaskName = rule350 alhsIcurrTaskName
-                           aexprOgraph = rule351 adsymIgraph
-                           aexprOmergeId = rule352 alhsImergeId
-                           aexprOmoduleEnv = rule353 alhsImoduleEnv
+                           alhsOppDebug = rule310  Void
+                           alhsOppAg = rule311  Void
+                           alhsOhasRecs = rule312 adsymIhasRecs aexprIhasRecs
+                           alhsOmEntryId = rule313 adsymImEntryId aexprImEntryId
+                           alhsOmExitId = rule314 adsymImExitId aexprImExitId
+                           alhsOppAgs = rule315 adsymIppAgs aexprIppAgs
+                           alhsOppDebugs = rule316 adsymIppDebugs aexprIppDebugs
+                           alhsOrecNode = rule317 adsymIrecNode aexprIrecNode
+                           lcopy = rule318 adsymIcopy aexprIcopy arg_n_
+                           alhsOcopy = rule319 lcopy
+                           alhsOgraph = rule320 aexprIgraph
+                           adsymOcaseExpr = rule321 alhsIcaseExpr
+                           adsymOcurrTaskName = rule322 alhsIcurrTaskName
+                           adsymOgraph = rule323 alhsIgraph
+                           adsymOmergeId = rule324 alhsImergeId
+                           adsymOmoduleEnv = rule325 alhsImoduleEnv
+                           aexprOcaseExpr = rule326 alhsIcaseExpr
+                           aexprOcurrTaskName = rule327 alhsIcurrTaskName
+                           aexprOgraph = rule328 adsymIgraph
+                           aexprOmergeId = rule329 alhsImergeId
+                           aexprOmoduleEnv = rule330 alhsImoduleEnv
                            ag__result_ = T_Expression_vOut13 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
          in C_Expression_s14 v13
-   /*# LINE 96 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule333  (_) =
-                      /*# LINE 96 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+   /*# LINE 78 "./frontend/Tonic/Pretty.ag" #*/
+   rule310  (_) =
+                      /*# LINE 78 "./frontend/Tonic/Pretty.ag" #*/
                       text "<TupleSelect>"
-                      /*# LINE 2055 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 97 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule334  (_) =
-                      /*# LINE 97 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+                      /*# LINE 1944 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 79 "./frontend/Tonic/Pretty.ag" #*/
+   rule311  (_) =
+                      /*# LINE 79 "./frontend/Tonic/Pretty.ag" #*/
                       text "<TupleSelect>"
-                      /*# LINE 2060 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   rule335 ((adsymIhasRecs)) ((aexprIhasRecs)) =
+                      /*# LINE 1949 "frontend/Tonic/Tonic.icl"#*/
+   rule312 ((adsymIhasRecs)) ((aexprIhasRecs)) =
      adsymIhasRecs || aexprIhasRecs
-   rule336 ((adsymImEntryId)) ((aexprImEntryId)) =
+   rule313 ((adsymImEntryId)) ((aexprImEntryId)) =
      adsymImEntryId <> aexprImEntryId
-   rule337 ((adsymImExitId)) ((aexprImExitId)) =
+   rule314 ((adsymImExitId)) ((aexprImExitId)) =
      adsymImExitId <> aexprImExitId
-   rule338 ((adsymIppAgs)) ((aexprIppAgs)) =
+   rule315 ((adsymIppAgs)) ((aexprIppAgs)) =
      adsymIppAgs ++ aexprIppAgs
-   rule339 ((adsymIppDebugs)) ((aexprIppDebugs)) =
+   rule316 ((adsymIppDebugs)) ((aexprIppDebugs)) =
      adsymIppDebugs ++ aexprIppDebugs
-   rule340 ((adsymIrecNode)) ((aexprIrecNode)) =
+   rule317 ((adsymIrecNode)) ((aexprIrecNode)) =
      adsymIrecNode || aexprIrecNode
-   rule341 ((adsymIcopy)) ((aexprIcopy)) n_ =
+   rule318 ((adsymIcopy)) ((aexprIcopy)) n_ =
      TupleSelect adsymIcopy n_ aexprIcopy
-   rule342 lcopy =
+   rule319 lcopy =
      lcopy
-   rule343 ((aexprIgraph)) =
+   rule320 ((aexprIgraph)) =
      aexprIgraph
-   rule344 ((alhsIcaseExpr)) =
+   rule321 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule345 ((alhsIcurrTaskName)) =
+   rule322 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule346 ((alhsIgraph)) =
+   rule323 ((alhsIgraph)) =
      alhsIgraph
-   rule347 ((alhsImergeId)) =
+   rule324 ((alhsImergeId)) =
      alhsImergeId
-   rule348 ((alhsImoduleEnv)) =
+   rule325 ((alhsImoduleEnv)) =
      alhsImoduleEnv
-   rule349 ((alhsIcaseExpr)) =
+   rule326 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule350 ((alhsIcurrTaskName)) =
+   rule327 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule351 ((adsymIgraph)) =
+   rule328 ((adsymIgraph)) =
      adsymIgraph
-   rule352 ((alhsImergeId)) =
+   rule329 ((alhsImergeId)) =
      alhsImergeId
-   rule353 ((alhsImoduleEnv)) =
+   rule330 ((alhsImoduleEnv)) =
      alhsImoduleEnv
 sem_Expression_BasicExpr  :: (T_BasicValue ) -> T_Expression 
 sem_Expression_BasicExpr arg_bv_ = T_Expression (lift st14) where
@@ -2103,62 +1992,62 @@ sem_Expression_BasicExpr arg_bv_ = T_Expression (lift st14) where
                        let
                            st_bvX5 = 'Control.Monad.Identity'.runIdentity (attach_T_BasicValue (arg_bv_))
                            (T_BasicValue_vOut4 abvIcopy abvIgraph abvIhasRecs abvImEntryId abvImExitId abvIppAg abvIppAgs abvIppDebug abvIppDebugs abvIrecNode) = inv_BasicValue_s5 st_bvX5 (T_BasicValue_vIn4 abvOcaseExpr abvOcurrTaskName abvOgraph abvOmergeId abvOmoduleEnv)
-                           alhsOppDebug = rule354 abvIppDebug
-                           alhsOppAg = rule355 abvIppAg
-                           alhsOhasRecs = rule356 abvIhasRecs
-                           alhsOmEntryId = rule357 abvImEntryId
-                           alhsOmExitId = rule358 abvImExitId
-                           alhsOppAgs = rule359 abvIppAgs
-                           alhsOppDebugs = rule360 abvIppDebugs
-                           alhsOrecNode = rule361 abvIrecNode
-                           lcopy = rule362 abvIcopy
-                           alhsOcopy = rule363 lcopy
-                           alhsOgraph = rule364 abvIgraph
-                           abvOcaseExpr = rule365 alhsIcaseExpr
-                           abvOcurrTaskName = rule366 alhsIcurrTaskName
-                           abvOgraph = rule367 alhsIgraph
-                           abvOmergeId = rule368 alhsImergeId
-                           abvOmoduleEnv = rule369 alhsImoduleEnv
+                           alhsOppDebug = rule331 abvIppDebug
+                           alhsOppAg = rule332 abvIppAg
+                           alhsOhasRecs = rule333 abvIhasRecs
+                           alhsOmEntryId = rule334 abvImEntryId
+                           alhsOmExitId = rule335 abvImExitId
+                           alhsOppAgs = rule336 abvIppAgs
+                           alhsOppDebugs = rule337 abvIppDebugs
+                           alhsOrecNode = rule338 abvIrecNode
+                           lcopy = rule339 abvIcopy
+                           alhsOcopy = rule340 lcopy
+                           alhsOgraph = rule341 abvIgraph
+                           abvOcaseExpr = rule342 alhsIcaseExpr
+                           abvOcurrTaskName = rule343 alhsIcurrTaskName
+                           abvOgraph = rule344 alhsIgraph
+                           abvOmergeId = rule345 alhsImergeId
+                           abvOmoduleEnv = rule346 alhsImoduleEnv
                            ag__result_ = T_Expression_vOut13 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
          in C_Expression_s14 v13
-   /*# LINE 100 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule354 ((abvIppDebug)) =
-                      /*# LINE 100 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+   /*# LINE 82 "./frontend/Tonic/Pretty.ag" #*/
+   rule331 ((abvIppDebug)) =
+                      /*# LINE 82 "./frontend/Tonic/Pretty.ag" #*/
                       text "<BasicValue>" <+> abvIppDebug
-                      /*# LINE 2130 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 101 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule355 ((abvIppAg)) =
-                      /*# LINE 101 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+                      /*# LINE 2019 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 83 "./frontend/Tonic/Pretty.ag" #*/
+   rule332 ((abvIppAg)) =
+                      /*# LINE 83 "./frontend/Tonic/Pretty.ag" #*/
                       abvIppAg
-                      /*# LINE 2135 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   rule356 ((abvIhasRecs)) =
+                      /*# LINE 2024 "frontend/Tonic/Tonic.icl"#*/
+   rule333 ((abvIhasRecs)) =
      abvIhasRecs
-   rule357 ((abvImEntryId)) =
+   rule334 ((abvImEntryId)) =
      abvImEntryId
-   rule358 ((abvImExitId)) =
+   rule335 ((abvImExitId)) =
      abvImExitId
-   rule359 ((abvIppAgs)) =
+   rule336 ((abvIppAgs)) =
      abvIppAgs
-   rule360 ((abvIppDebugs)) =
+   rule337 ((abvIppDebugs)) =
      abvIppDebugs
-   rule361 ((abvIrecNode)) =
+   rule338 ((abvIrecNode)) =
      abvIrecNode
-   rule362 ((abvIcopy)) =
+   rule339 ((abvIcopy)) =
      BasicExpr abvIcopy
-   rule363 lcopy =
+   rule340 lcopy =
      lcopy
-   rule364 ((abvIgraph)) =
+   rule341 ((abvIgraph)) =
      abvIgraph
-   rule365 ((alhsIcaseExpr)) =
+   rule342 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule366 ((alhsIcurrTaskName)) =
+   rule343 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule367 ((alhsIgraph)) =
+   rule344 ((alhsIgraph)) =
      alhsIgraph
-   rule368 ((alhsImergeId)) =
+   rule345 ((alhsImergeId)) =
      alhsImergeId
-   rule369 ((alhsImoduleEnv)) =
+   rule346 ((alhsImoduleEnv)) =
      alhsImoduleEnv
 sem_Expression_Conditional  :: (Conditional) -> T_Expression 
 sem_Expression_Conditional arg_cond_ = T_Expression (lift st14) where
@@ -2166,41 +2055,41 @@ sem_Expression_Conditional arg_cond_ = T_Expression (lift st14) where
          let
              v13 (T_Expression_vIn13 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                        let
-                           alhsOhasRecs = rule370  Void
-                           alhsOmEntryId = rule371  Void
-                           alhsOmExitId = rule372  Void
-                           alhsOppAg = rule373  Void
-                           alhsOppAgs = rule374  Void
-                           alhsOppDebug = rule375  Void
-                           alhsOppDebugs = rule376  Void
-                           alhsOrecNode = rule377  Void
-                           lcopy = rule378 arg_cond_
-                           alhsOcopy = rule379 lcopy
-                           alhsOgraph = rule380 alhsIgraph
+                           alhsOhasRecs = rule347  Void
+                           alhsOmEntryId = rule348  Void
+                           alhsOmExitId = rule349  Void
+                           alhsOppAg = rule350  Void
+                           alhsOppAgs = rule351  Void
+                           alhsOppDebug = rule352  Void
+                           alhsOppDebugs = rule353  Void
+                           alhsOrecNode = rule354  Void
+                           lcopy = rule355 arg_cond_
+                           alhsOcopy = rule356 lcopy
+                           alhsOgraph = rule357 alhsIgraph
                            ag__result_ = T_Expression_vOut13 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
          in C_Expression_s14 v13
-   rule370  (_) =
+   rule347  (_) =
      False
-   rule371  (_) =
+   rule348  (_) =
      Nothing
-   rule372  (_) =
+   rule349  (_) =
      Nothing
-   rule373  (_) =
+   rule350  (_) =
      empty
-   rule374  (_) =
+   rule351  (_) =
      []
-   rule375  (_) =
+   rule352  (_) =
      empty
-   rule376  (_) =
+   rule353  (_) =
      []
-   rule377  (_) =
+   rule354  (_) =
      False
-   rule378 cond_ =
+   rule355 cond_ =
      Conditional cond_
-   rule379 lcopy =
+   rule356 lcopy =
      lcopy
-   rule380 ((alhsIgraph)) =
+   rule357 ((alhsIgraph)) =
      alhsIgraph
 sem_Expression_AnyCodeExpr  :: (CodeBinding BoundVar) (CodeBinding FreeVar) ([String]) -> T_Expression 
 sem_Expression_AnyCodeExpr arg_cbbv_ arg_cbfv_ arg_ss_ = T_Expression (lift st14) where
@@ -2208,41 +2097,41 @@ sem_Expression_AnyCodeExpr arg_cbbv_ arg_cbfv_ arg_ss_ = T_Expression (lift st14
          let
              v13 (T_Expression_vIn13 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                        let
-                           alhsOhasRecs = rule381  Void
-                           alhsOmEntryId = rule382  Void
-                           alhsOmExitId = rule383  Void
-                           alhsOppAg = rule384  Void
-                           alhsOppAgs = rule385  Void
-                           alhsOppDebug = rule386  Void
-                           alhsOppDebugs = rule387  Void
-                           alhsOrecNode = rule388  Void
-                           lcopy = rule389 arg_cbbv_ arg_cbfv_ arg_ss_
-                           alhsOcopy = rule390 lcopy
-                           alhsOgraph = rule391 alhsIgraph
+                           alhsOhasRecs = rule358  Void
+                           alhsOmEntryId = rule359  Void
+                           alhsOmExitId = rule360  Void
+                           alhsOppAg = rule361  Void
+                           alhsOppAgs = rule362  Void
+                           alhsOppDebug = rule363  Void
+                           alhsOppDebugs = rule364  Void
+                           alhsOrecNode = rule365  Void
+                           lcopy = rule366 arg_cbbv_ arg_cbfv_ arg_ss_
+                           alhsOcopy = rule367 lcopy
+                           alhsOgraph = rule368 alhsIgraph
                            ag__result_ = T_Expression_vOut13 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
          in C_Expression_s14 v13
-   rule381  (_) =
+   rule358  (_) =
      False
-   rule382  (_) =
+   rule359  (_) =
      Nothing
-   rule383  (_) =
+   rule360  (_) =
      Nothing
-   rule384  (_) =
+   rule361  (_) =
      empty
-   rule385  (_) =
+   rule362  (_) =
      []
-   rule386  (_) =
+   rule363  (_) =
      empty
-   rule387  (_) =
+   rule364  (_) =
      []
-   rule388  (_) =
+   rule365  (_) =
      False
-   rule389 cbbv_ cbfv_ ss_ =
+   rule366 cbbv_ cbfv_ ss_ =
      AnyCodeExpr cbbv_ cbfv_ ss_
-   rule390 lcopy =
+   rule367 lcopy =
      lcopy
-   rule391 ((alhsIgraph)) =
+   rule368 ((alhsIgraph)) =
      alhsIgraph
 sem_Expression_ABCCodeExpr  :: ([String]) (Bool) -> T_Expression 
 sem_Expression_ABCCodeExpr arg_ss_ arg_bl_ = T_Expression (lift st14) where
@@ -2250,41 +2139,41 @@ sem_Expression_ABCCodeExpr arg_ss_ arg_bl_ = T_Expression (lift st14) where
          let
              v13 (T_Expression_vIn13 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                        let
-                           alhsOhasRecs = rule392  Void
-                           alhsOmEntryId = rule393  Void
-                           alhsOmExitId = rule394  Void
-                           alhsOppAg = rule395  Void
-                           alhsOppAgs = rule396  Void
-                           alhsOppDebug = rule397  Void
-                           alhsOppDebugs = rule398  Void
-                           alhsOrecNode = rule399  Void
-                           lcopy = rule400 arg_bl_ arg_ss_
-                           alhsOcopy = rule401 lcopy
-                           alhsOgraph = rule402 alhsIgraph
+                           alhsOhasRecs = rule369  Void
+                           alhsOmEntryId = rule370  Void
+                           alhsOmExitId = rule371  Void
+                           alhsOppAg = rule372  Void
+                           alhsOppAgs = rule373  Void
+                           alhsOppDebug = rule374  Void
+                           alhsOppDebugs = rule375  Void
+                           alhsOrecNode = rule376  Void
+                           lcopy = rule377 arg_bl_ arg_ss_
+                           alhsOcopy = rule378 lcopy
+                           alhsOgraph = rule379 alhsIgraph
                            ag__result_ = T_Expression_vOut13 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
          in C_Expression_s14 v13
-   rule392  (_) =
+   rule369  (_) =
      False
-   rule393  (_) =
+   rule370  (_) =
      Nothing
-   rule394  (_) =
+   rule371  (_) =
      Nothing
-   rule395  (_) =
+   rule372  (_) =
      empty
-   rule396  (_) =
+   rule373  (_) =
      []
-   rule397  (_) =
+   rule374  (_) =
      empty
-   rule398  (_) =
+   rule375  (_) =
      []
-   rule399  (_) =
+   rule376  (_) =
      False
-   rule400 bl_ ss_ =
+   rule377 bl_ ss_ =
      ABCCodeExpr ss_ bl_
-   rule401 lcopy =
+   rule378 lcopy =
      lcopy
-   rule402 ((alhsIgraph)) =
+   rule379 ((alhsIgraph)) =
      alhsIgraph
 sem_Expression_MatchExpr  :: (Global DefinedSymbol) (T_Expression ) -> T_Expression 
 sem_Expression_MatchExpr arg_gdfs_ arg_expr_ = T_Expression (lift st14) where
@@ -2294,56 +2183,56 @@ sem_Expression_MatchExpr arg_gdfs_ arg_expr_ = T_Expression (lift st14) where
                        let
                            st_exprX14 = 'Control.Monad.Identity'.runIdentity (attach_T_Expression (arg_expr_))
                            (T_Expression_vOut13 aexprIcopy aexprIgraph aexprIhasRecs aexprImEntryId aexprImExitId aexprIppAg aexprIppAgs aexprIppDebug aexprIppDebugs aexprIrecNode) = inv_Expression_s14 st_exprX14 (T_Expression_vIn13 aexprOcaseExpr aexprOcurrTaskName aexprOgraph aexprOmergeId aexprOmoduleEnv)
-                           alhsOhasRecs = rule403 aexprIhasRecs
-                           alhsOmEntryId = rule404 aexprImEntryId
-                           alhsOmExitId = rule405 aexprImExitId
-                           alhsOppAg = rule406 aexprIppAg
-                           alhsOppAgs = rule407 aexprIppAgs
-                           alhsOppDebug = rule408 aexprIppDebug
-                           alhsOppDebugs = rule409 aexprIppDebugs
-                           alhsOrecNode = rule410 aexprIrecNode
-                           lcopy = rule411 aexprIcopy arg_gdfs_
-                           alhsOcopy = rule412 lcopy
-                           alhsOgraph = rule413 aexprIgraph
-                           aexprOcaseExpr = rule414 alhsIcaseExpr
-                           aexprOcurrTaskName = rule415 alhsIcurrTaskName
-                           aexprOgraph = rule416 alhsIgraph
-                           aexprOmergeId = rule417 alhsImergeId
-                           aexprOmoduleEnv = rule418 alhsImoduleEnv
+                           alhsOhasRecs = rule380 aexprIhasRecs
+                           alhsOmEntryId = rule381 aexprImEntryId
+                           alhsOmExitId = rule382 aexprImExitId
+                           alhsOppAg = rule383 aexprIppAg
+                           alhsOppAgs = rule384 aexprIppAgs
+                           alhsOppDebug = rule385 aexprIppDebug
+                           alhsOppDebugs = rule386 aexprIppDebugs
+                           alhsOrecNode = rule387 aexprIrecNode
+                           lcopy = rule388 aexprIcopy arg_gdfs_
+                           alhsOcopy = rule389 lcopy
+                           alhsOgraph = rule390 aexprIgraph
+                           aexprOcaseExpr = rule391 alhsIcaseExpr
+                           aexprOcurrTaskName = rule392 alhsIcurrTaskName
+                           aexprOgraph = rule393 alhsIgraph
+                           aexprOmergeId = rule394 alhsImergeId
+                           aexprOmoduleEnv = rule395 alhsImoduleEnv
                            ag__result_ = T_Expression_vOut13 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
          in C_Expression_s14 v13
-   rule403 ((aexprIhasRecs)) =
+   rule380 ((aexprIhasRecs)) =
      aexprIhasRecs
-   rule404 ((aexprImEntryId)) =
+   rule381 ((aexprImEntryId)) =
      aexprImEntryId
-   rule405 ((aexprImExitId)) =
+   rule382 ((aexprImExitId)) =
      aexprImExitId
-   rule406 ((aexprIppAg)) =
+   rule383 ((aexprIppAg)) =
      aexprIppAg
-   rule407 ((aexprIppAgs)) =
+   rule384 ((aexprIppAgs)) =
      aexprIppAgs
-   rule408 ((aexprIppDebug)) =
+   rule385 ((aexprIppDebug)) =
      aexprIppDebug
-   rule409 ((aexprIppDebugs)) =
+   rule386 ((aexprIppDebugs)) =
      aexprIppDebugs
-   rule410 ((aexprIrecNode)) =
+   rule387 ((aexprIrecNode)) =
      aexprIrecNode
-   rule411 ((aexprIcopy)) gdfs_ =
+   rule388 ((aexprIcopy)) gdfs_ =
      MatchExpr gdfs_ aexprIcopy
-   rule412 lcopy =
+   rule389 lcopy =
      lcopy
-   rule413 ((aexprIgraph)) =
+   rule390 ((aexprIgraph)) =
      aexprIgraph
-   rule414 ((alhsIcaseExpr)) =
+   rule391 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule415 ((alhsIcurrTaskName)) =
+   rule392 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule416 ((alhsIgraph)) =
+   rule393 ((alhsIgraph)) =
      alhsIgraph
-   rule417 ((alhsImergeId)) =
+   rule394 ((alhsImergeId)) =
      alhsImergeId
-   rule418 ((alhsImoduleEnv)) =
+   rule395 ((alhsImoduleEnv)) =
      alhsImoduleEnv
 sem_Expression_IsConstructor  :: (T_Expression ) (T_GlobalDefinedSymbol ) (Int) (GlobalIndex) (Ident) (Position) -> T_Expression 
 sem_Expression_IsConstructor arg_expr_ arg_gdfs_ arg_arity_ arg_gidx_ arg_ident_ arg_pos_ = T_Expression (lift st14) where
@@ -2352,74 +2241,74 @@ sem_Expression_IsConstructor arg_expr_ arg_gdfs_ arg_arity_ arg_gidx_ arg_ident_
              v13 (T_Expression_vIn13 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                        let
                            st_exprX14 = 'Control.Monad.Identity'.runIdentity (attach_T_Expression (arg_expr_))
-                           st_gdfsX41 = 'Control.Monad.Identity'.runIdentity (attach_T_GlobalDefinedSymbol (arg_gdfs_))
+                           st_gdfsX44 = 'Control.Monad.Identity'.runIdentity (attach_T_GlobalDefinedSymbol (arg_gdfs_))
                            (T_Expression_vOut13 aexprIcopy aexprIgraph aexprIhasRecs aexprImEntryId aexprImExitId aexprIppAg aexprIppAgs aexprIppDebug aexprIppDebugs aexprIrecNode) = inv_Expression_s14 st_exprX14 (T_Expression_vIn13 aexprOcaseExpr aexprOcurrTaskName aexprOgraph aexprOmergeId aexprOmoduleEnv)
-                           (T_GlobalDefinedSymbol_vOut40 agdfsIcopy agdfsIgraph agdfsIhasRecs agdfsImEntryId agdfsImExitId agdfsIppAg agdfsIppAgs agdfsIppDebug agdfsIppDebugs agdfsIrecNode) = inv_GlobalDefinedSymbol_s41 st_gdfsX41 (T_GlobalDefinedSymbol_vIn40 agdfsOcaseExpr agdfsOcurrTaskName agdfsOgraph agdfsOmergeId agdfsOmoduleEnv)
-                           alhsOhasRecs = rule419 aexprIhasRecs agdfsIhasRecs
-                           alhsOmEntryId = rule420 aexprImEntryId agdfsImEntryId
-                           alhsOmExitId = rule421 aexprImExitId agdfsImExitId
-                           alhsOppAg = rule422 aexprIppAg agdfsIppAg
-                           alhsOppAgs = rule423 aexprIppAgs agdfsIppAgs
-                           alhsOppDebug = rule424 aexprIppDebug agdfsIppDebug
-                           alhsOppDebugs = rule425 aexprIppDebugs agdfsIppDebugs
-                           alhsOrecNode = rule426 aexprIrecNode agdfsIrecNode
-                           lcopy = rule427 aexprIcopy agdfsIcopy arg_arity_ arg_gidx_ arg_ident_ arg_pos_
-                           alhsOcopy = rule428 lcopy
-                           alhsOgraph = rule429 agdfsIgraph
-                           aexprOcaseExpr = rule430 alhsIcaseExpr
-                           aexprOcurrTaskName = rule431 alhsIcurrTaskName
-                           aexprOgraph = rule432 alhsIgraph
-                           aexprOmergeId = rule433 alhsImergeId
-                           aexprOmoduleEnv = rule434 alhsImoduleEnv
-                           agdfsOcaseExpr = rule435 alhsIcaseExpr
-                           agdfsOcurrTaskName = rule436 alhsIcurrTaskName
-                           agdfsOgraph = rule437 aexprIgraph
-                           agdfsOmergeId = rule438 alhsImergeId
-                           agdfsOmoduleEnv = rule439 alhsImoduleEnv
+                           (T_GlobalDefinedSymbol_vOut43 agdfsIcopy agdfsIgraph agdfsIhasRecs agdfsImEntryId agdfsImExitId agdfsIppAg agdfsIppAgs agdfsIppDebug agdfsIppDebugs agdfsIrecNode) = inv_GlobalDefinedSymbol_s44 st_gdfsX44 (T_GlobalDefinedSymbol_vIn43 agdfsOcaseExpr agdfsOcurrTaskName agdfsOgraph agdfsOmergeId agdfsOmoduleEnv)
+                           alhsOhasRecs = rule396 aexprIhasRecs agdfsIhasRecs
+                           alhsOmEntryId = rule397 aexprImEntryId agdfsImEntryId
+                           alhsOmExitId = rule398 aexprImExitId agdfsImExitId
+                           alhsOppAg = rule399 aexprIppAg agdfsIppAg
+                           alhsOppAgs = rule400 aexprIppAgs agdfsIppAgs
+                           alhsOppDebug = rule401 aexprIppDebug agdfsIppDebug
+                           alhsOppDebugs = rule402 aexprIppDebugs agdfsIppDebugs
+                           alhsOrecNode = rule403 aexprIrecNode agdfsIrecNode
+                           lcopy = rule404 aexprIcopy agdfsIcopy arg_arity_ arg_gidx_ arg_ident_ arg_pos_
+                           alhsOcopy = rule405 lcopy
+                           alhsOgraph = rule406 agdfsIgraph
+                           aexprOcaseExpr = rule407 alhsIcaseExpr
+                           aexprOcurrTaskName = rule408 alhsIcurrTaskName
+                           aexprOgraph = rule409 alhsIgraph
+                           aexprOmergeId = rule410 alhsImergeId
+                           aexprOmoduleEnv = rule411 alhsImoduleEnv
+                           agdfsOcaseExpr = rule412 alhsIcaseExpr
+                           agdfsOcurrTaskName = rule413 alhsIcurrTaskName
+                           agdfsOgraph = rule414 aexprIgraph
+                           agdfsOmergeId = rule415 alhsImergeId
+                           agdfsOmoduleEnv = rule416 alhsImoduleEnv
                            ag__result_ = T_Expression_vOut13 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
          in C_Expression_s14 v13
-   rule419 ((aexprIhasRecs)) ((agdfsIhasRecs)) =
+   rule396 ((aexprIhasRecs)) ((agdfsIhasRecs)) =
      aexprIhasRecs || agdfsIhasRecs
-   rule420 ((aexprImEntryId)) ((agdfsImEntryId)) =
+   rule397 ((aexprImEntryId)) ((agdfsImEntryId)) =
      aexprImEntryId <> agdfsImEntryId
-   rule421 ((aexprImExitId)) ((agdfsImExitId)) =
+   rule398 ((aexprImExitId)) ((agdfsImExitId)) =
      aexprImExitId <> agdfsImExitId
-   rule422 ((aexprIppAg)) ((agdfsIppAg)) =
+   rule399 ((aexprIppAg)) ((agdfsIppAg)) =
      aexprIppAg <$$> agdfsIppAg
-   rule423 ((aexprIppAgs)) ((agdfsIppAgs)) =
+   rule400 ((aexprIppAgs)) ((agdfsIppAgs)) =
      aexprIppAgs ++ agdfsIppAgs
-   rule424 ((aexprIppDebug)) ((agdfsIppDebug)) =
+   rule401 ((aexprIppDebug)) ((agdfsIppDebug)) =
      aexprIppDebug <$$> agdfsIppDebug
-   rule425 ((aexprIppDebugs)) ((agdfsIppDebugs)) =
+   rule402 ((aexprIppDebugs)) ((agdfsIppDebugs)) =
      aexprIppDebugs ++ agdfsIppDebugs
-   rule426 ((aexprIrecNode)) ((agdfsIrecNode)) =
+   rule403 ((aexprIrecNode)) ((agdfsIrecNode)) =
      aexprIrecNode || agdfsIrecNode
-   rule427 ((aexprIcopy)) ((agdfsIcopy)) arity_ gidx_ ident_ pos_ =
+   rule404 ((aexprIcopy)) ((agdfsIcopy)) arity_ gidx_ ident_ pos_ =
      IsConstructor aexprIcopy agdfsIcopy arity_ gidx_ ident_ pos_
-   rule428 lcopy =
+   rule405 lcopy =
      lcopy
-   rule429 ((agdfsIgraph)) =
+   rule406 ((agdfsIgraph)) =
      agdfsIgraph
-   rule430 ((alhsIcaseExpr)) =
+   rule407 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule431 ((alhsIcurrTaskName)) =
+   rule408 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule432 ((alhsIgraph)) =
+   rule409 ((alhsIgraph)) =
      alhsIgraph
-   rule433 ((alhsImergeId)) =
+   rule410 ((alhsImergeId)) =
      alhsImergeId
-   rule434 ((alhsImoduleEnv)) =
+   rule411 ((alhsImoduleEnv)) =
      alhsImoduleEnv
-   rule435 ((alhsIcaseExpr)) =
+   rule412 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule436 ((alhsIcurrTaskName)) =
+   rule413 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule437 ((aexprIgraph)) =
+   rule414 ((aexprIgraph)) =
      aexprIgraph
-   rule438 ((alhsImergeId)) =
+   rule415 ((alhsImergeId)) =
      alhsImergeId
-   rule439 ((alhsImoduleEnv)) =
+   rule416 ((alhsImoduleEnv)) =
      alhsImoduleEnv
 sem_Expression_FreeVar  :: (T_FreeVar ) -> T_Expression 
 sem_Expression_FreeVar arg_fv_ = T_Expression (lift st14) where
@@ -2429,56 +2318,56 @@ sem_Expression_FreeVar arg_fv_ = T_Expression (lift st14) where
                        let
                            st_fvX20 = 'Control.Monad.Identity'.runIdentity (attach_T_FreeVar (arg_fv_))
                            (T_FreeVar_vOut19 afvIcopy afvIgraph afvIhasRecs afvImEntryId afvImExitId afvIppAg afvIppAgs afvIppDebug afvIppDebugs afvIrecNode) = inv_FreeVar_s20 st_fvX20 (T_FreeVar_vIn19 afvOcaseExpr afvOcurrTaskName afvOgraph afvOmergeId afvOmoduleEnv)
-                           alhsOhasRecs = rule440 afvIhasRecs
-                           alhsOmEntryId = rule441 afvImEntryId
-                           alhsOmExitId = rule442 afvImExitId
-                           alhsOppAg = rule443 afvIppAg
-                           alhsOppAgs = rule444 afvIppAgs
-                           alhsOppDebug = rule445 afvIppDebug
-                           alhsOppDebugs = rule446 afvIppDebugs
-                           alhsOrecNode = rule447 afvIrecNode
-                           lcopy = rule448 afvIcopy
-                           alhsOcopy = rule449 lcopy
-                           alhsOgraph = rule450 afvIgraph
-                           afvOcaseExpr = rule451 alhsIcaseExpr
-                           afvOcurrTaskName = rule452 alhsIcurrTaskName
-                           afvOgraph = rule453 alhsIgraph
-                           afvOmergeId = rule454 alhsImergeId
-                           afvOmoduleEnv = rule455 alhsImoduleEnv
+                           alhsOhasRecs = rule417 afvIhasRecs
+                           alhsOmEntryId = rule418 afvImEntryId
+                           alhsOmExitId = rule419 afvImExitId
+                           alhsOppAg = rule420 afvIppAg
+                           alhsOppAgs = rule421 afvIppAgs
+                           alhsOppDebug = rule422 afvIppDebug
+                           alhsOppDebugs = rule423 afvIppDebugs
+                           alhsOrecNode = rule424 afvIrecNode
+                           lcopy = rule425 afvIcopy
+                           alhsOcopy = rule426 lcopy
+                           alhsOgraph = rule427 afvIgraph
+                           afvOcaseExpr = rule428 alhsIcaseExpr
+                           afvOcurrTaskName = rule429 alhsIcurrTaskName
+                           afvOgraph = rule430 alhsIgraph
+                           afvOmergeId = rule431 alhsImergeId
+                           afvOmoduleEnv = rule432 alhsImoduleEnv
                            ag__result_ = T_Expression_vOut13 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
          in C_Expression_s14 v13
-   rule440 ((afvIhasRecs)) =
+   rule417 ((afvIhasRecs)) =
      afvIhasRecs
-   rule441 ((afvImEntryId)) =
+   rule418 ((afvImEntryId)) =
      afvImEntryId
-   rule442 ((afvImExitId)) =
+   rule419 ((afvImExitId)) =
      afvImExitId
-   rule443 ((afvIppAg)) =
+   rule420 ((afvIppAg)) =
      afvIppAg
-   rule444 ((afvIppAgs)) =
+   rule421 ((afvIppAgs)) =
      afvIppAgs
-   rule445 ((afvIppDebug)) =
+   rule422 ((afvIppDebug)) =
      afvIppDebug
-   rule446 ((afvIppDebugs)) =
+   rule423 ((afvIppDebugs)) =
      afvIppDebugs
-   rule447 ((afvIrecNode)) =
+   rule424 ((afvIrecNode)) =
      afvIrecNode
-   rule448 ((afvIcopy)) =
+   rule425 ((afvIcopy)) =
      FreeVar afvIcopy
-   rule449 lcopy =
+   rule426 lcopy =
      lcopy
-   rule450 ((afvIgraph)) =
+   rule427 ((afvIgraph)) =
      afvIgraph
-   rule451 ((alhsIcaseExpr)) =
+   rule428 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule452 ((alhsIcurrTaskName)) =
+   rule429 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule453 ((alhsIgraph)) =
+   rule430 ((alhsIgraph)) =
      alhsIgraph
-   rule454 ((alhsImergeId)) =
+   rule431 ((alhsImergeId)) =
      alhsImergeId
-   rule455 ((alhsImoduleEnv)) =
+   rule432 ((alhsImoduleEnv)) =
      alhsImoduleEnv
 sem_Expression_DictionariesFunction  :: ([(FreeVar,AType)]) (T_Expression ) (AType) -> T_Expression 
 sem_Expression_DictionariesFunction arg_fvat_ arg_expr_ arg_aty_ = T_Expression (lift st14) where
@@ -2488,56 +2377,56 @@ sem_Expression_DictionariesFunction arg_fvat_ arg_expr_ arg_aty_ = T_Expression 
                        let
                            st_exprX14 = 'Control.Monad.Identity'.runIdentity (attach_T_Expression (arg_expr_))
                            (T_Expression_vOut13 aexprIcopy aexprIgraph aexprIhasRecs aexprImEntryId aexprImExitId aexprIppAg aexprIppAgs aexprIppDebug aexprIppDebugs aexprIrecNode) = inv_Expression_s14 st_exprX14 (T_Expression_vIn13 aexprOcaseExpr aexprOcurrTaskName aexprOgraph aexprOmergeId aexprOmoduleEnv)
-                           alhsOhasRecs = rule456 aexprIhasRecs
-                           alhsOmEntryId = rule457 aexprImEntryId
-                           alhsOmExitId = rule458 aexprImExitId
-                           alhsOppAg = rule459 aexprIppAg
-                           alhsOppAgs = rule460 aexprIppAgs
-                           alhsOppDebug = rule461 aexprIppDebug
-                           alhsOppDebugs = rule462 aexprIppDebugs
-                           alhsOrecNode = rule463 aexprIrecNode
-                           lcopy = rule464 aexprIcopy arg_aty_ arg_fvat_
-                           alhsOcopy = rule465 lcopy
-                           alhsOgraph = rule466 aexprIgraph
-                           aexprOcaseExpr = rule467 alhsIcaseExpr
-                           aexprOcurrTaskName = rule468 alhsIcurrTaskName
-                           aexprOgraph = rule469 alhsIgraph
-                           aexprOmergeId = rule470 alhsImergeId
-                           aexprOmoduleEnv = rule471 alhsImoduleEnv
+                           alhsOhasRecs = rule433 aexprIhasRecs
+                           alhsOmEntryId = rule434 aexprImEntryId
+                           alhsOmExitId = rule435 aexprImExitId
+                           alhsOppAg = rule436 aexprIppAg
+                           alhsOppAgs = rule437 aexprIppAgs
+                           alhsOppDebug = rule438 aexprIppDebug
+                           alhsOppDebugs = rule439 aexprIppDebugs
+                           alhsOrecNode = rule440 aexprIrecNode
+                           lcopy = rule441 aexprIcopy arg_aty_ arg_fvat_
+                           alhsOcopy = rule442 lcopy
+                           alhsOgraph = rule443 aexprIgraph
+                           aexprOcaseExpr = rule444 alhsIcaseExpr
+                           aexprOcurrTaskName = rule445 alhsIcurrTaskName
+                           aexprOgraph = rule446 alhsIgraph
+                           aexprOmergeId = rule447 alhsImergeId
+                           aexprOmoduleEnv = rule448 alhsImoduleEnv
                            ag__result_ = T_Expression_vOut13 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
          in C_Expression_s14 v13
-   rule456 ((aexprIhasRecs)) =
+   rule433 ((aexprIhasRecs)) =
      aexprIhasRecs
-   rule457 ((aexprImEntryId)) =
+   rule434 ((aexprImEntryId)) =
      aexprImEntryId
-   rule458 ((aexprImExitId)) =
+   rule435 ((aexprImExitId)) =
      aexprImExitId
-   rule459 ((aexprIppAg)) =
+   rule436 ((aexprIppAg)) =
      aexprIppAg
-   rule460 ((aexprIppAgs)) =
+   rule437 ((aexprIppAgs)) =
      aexprIppAgs
-   rule461 ((aexprIppDebug)) =
+   rule438 ((aexprIppDebug)) =
      aexprIppDebug
-   rule462 ((aexprIppDebugs)) =
+   rule439 ((aexprIppDebugs)) =
      aexprIppDebugs
-   rule463 ((aexprIrecNode)) =
+   rule440 ((aexprIrecNode)) =
      aexprIrecNode
-   rule464 ((aexprIcopy)) aty_ fvat_ =
+   rule441 ((aexprIcopy)) aty_ fvat_ =
      DictionariesFunction fvat_ aexprIcopy aty_
-   rule465 lcopy =
+   rule442 lcopy =
      lcopy
-   rule466 ((aexprIgraph)) =
+   rule443 ((aexprIgraph)) =
      aexprIgraph
-   rule467 ((alhsIcaseExpr)) =
+   rule444 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule468 ((alhsIcurrTaskName)) =
+   rule445 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule469 ((alhsIgraph)) =
+   rule446 ((alhsIgraph)) =
      alhsIgraph
-   rule470 ((alhsImergeId)) =
+   rule447 ((alhsImergeId)) =
      alhsImergeId
-   rule471 ((alhsImoduleEnv)) =
+   rule448 ((alhsImoduleEnv)) =
      alhsImoduleEnv
 sem_Expression_Constant  :: (T_SymbIdent ) (Int) (Priority) -> T_Expression 
 sem_Expression_Constant arg_symid_ arg_n_ arg_prio_ = T_Expression (lift st14) where
@@ -2545,58 +2434,58 @@ sem_Expression_Constant arg_symid_ arg_n_ arg_prio_ = T_Expression (lift st14) w
          let
              v13 (T_Expression_vIn13 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                        let
-                           st_symidX53 = 'Control.Monad.Identity'.runIdentity (attach_T_SymbIdent (arg_symid_))
-                           (T_SymbIdent_vOut52 asymidIcopy asymidIgraph asymidIhasRecs asymidIident asymidIisCurrTask asymidIisInfix asymidIisTask asymidImEntryId asymidImExitId asymidIppAg asymidIppAgs asymidIppDebug asymidIppDebugs asymidIrecNode asymidIreifyFunDef asymidIreifyFunType asymidIreifySymbolType) = inv_SymbIdent_s53 st_symidX53 (T_SymbIdent_vIn52 asymidOcaseExpr asymidOcurrTaskName asymidOgraph asymidOmergeId asymidOmoduleEnv)
-                           alhsOhasRecs = rule472 asymidIhasRecs
-                           alhsOmEntryId = rule473 asymidImEntryId
-                           alhsOmExitId = rule474 asymidImExitId
-                           alhsOppAg = rule475 asymidIppAg
-                           alhsOppAgs = rule476 asymidIppAgs
-                           alhsOppDebug = rule477 asymidIppDebug
-                           alhsOppDebugs = rule478 asymidIppDebugs
-                           alhsOrecNode = rule479 asymidIrecNode
-                           lcopy = rule480 asymidIcopy arg_n_ arg_prio_
-                           alhsOcopy = rule481 lcopy
-                           alhsOgraph = rule482 asymidIgraph
-                           asymidOcaseExpr = rule483 alhsIcaseExpr
-                           asymidOcurrTaskName = rule484 alhsIcurrTaskName
-                           asymidOgraph = rule485 alhsIgraph
-                           asymidOmergeId = rule486 alhsImergeId
-                           asymidOmoduleEnv = rule487 alhsImoduleEnv
+                           st_symidX62 = 'Control.Monad.Identity'.runIdentity (attach_T_SymbIdent (arg_symid_))
+                           (T_SymbIdent_vOut61 asymidIcopy asymidIgraph asymidIhasRecs asymidIident asymidIisCurrTask asymidImEntryId asymidImExitId asymidIppAg asymidIppAgs asymidIppDebug asymidIppDebugs asymidIrecNode) = inv_SymbIdent_s62 st_symidX62 (T_SymbIdent_vIn61 asymidOcaseExpr asymidOcurrTaskName asymidOgraph asymidOmergeId asymidOmoduleEnv)
+                           alhsOhasRecs = rule449 asymidIhasRecs
+                           alhsOmEntryId = rule450 asymidImEntryId
+                           alhsOmExitId = rule451 asymidImExitId
+                           alhsOppAg = rule452 asymidIppAg
+                           alhsOppAgs = rule453 asymidIppAgs
+                           alhsOppDebug = rule454 asymidIppDebug
+                           alhsOppDebugs = rule455 asymidIppDebugs
+                           alhsOrecNode = rule456 asymidIrecNode
+                           lcopy = rule457 asymidIcopy arg_n_ arg_prio_
+                           alhsOcopy = rule458 lcopy
+                           alhsOgraph = rule459 asymidIgraph
+                           asymidOcaseExpr = rule460 alhsIcaseExpr
+                           asymidOcurrTaskName = rule461 alhsIcurrTaskName
+                           asymidOgraph = rule462 alhsIgraph
+                           asymidOmergeId = rule463 alhsImergeId
+                           asymidOmoduleEnv = rule464 alhsImoduleEnv
                            ag__result_ = T_Expression_vOut13 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
          in C_Expression_s14 v13
-   rule472 ((asymidIhasRecs)) =
+   rule449 ((asymidIhasRecs)) =
      asymidIhasRecs
-   rule473 ((asymidImEntryId)) =
+   rule450 ((asymidImEntryId)) =
      asymidImEntryId
-   rule474 ((asymidImExitId)) =
+   rule451 ((asymidImExitId)) =
      asymidImExitId
-   rule475 ((asymidIppAg)) =
+   rule452 ((asymidIppAg)) =
      asymidIppAg
-   rule476 ((asymidIppAgs)) =
+   rule453 ((asymidIppAgs)) =
      asymidIppAgs
-   rule477 ((asymidIppDebug)) =
+   rule454 ((asymidIppDebug)) =
      asymidIppDebug
-   rule478 ((asymidIppDebugs)) =
+   rule455 ((asymidIppDebugs)) =
      asymidIppDebugs
-   rule479 ((asymidIrecNode)) =
+   rule456 ((asymidIrecNode)) =
      asymidIrecNode
-   rule480 ((asymidIcopy)) n_ prio_ =
+   rule457 ((asymidIcopy)) n_ prio_ =
      Constant asymidIcopy n_ prio_
-   rule481 lcopy =
+   rule458 lcopy =
      lcopy
-   rule482 ((asymidIgraph)) =
+   rule459 ((asymidIgraph)) =
      asymidIgraph
-   rule483 ((alhsIcaseExpr)) =
+   rule460 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule484 ((alhsIcurrTaskName)) =
+   rule461 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule485 ((alhsIgraph)) =
+   rule462 ((alhsIgraph)) =
      alhsIgraph
-   rule486 ((alhsImergeId)) =
+   rule463 ((alhsImergeId)) =
      alhsImergeId
-   rule487 ((alhsImoduleEnv)) =
+   rule464 ((alhsImoduleEnv)) =
      alhsImoduleEnv
 sem_Expression_ClassVariable  :: (VarInfoPtr) -> T_Expression 
 sem_Expression_ClassVariable arg_varinfptr_ = T_Expression (lift st14) where
@@ -2604,41 +2493,41 @@ sem_Expression_ClassVariable arg_varinfptr_ = T_Expression (lift st14) where
          let
              v13 (T_Expression_vIn13 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                        let
-                           alhsOhasRecs = rule488  Void
-                           alhsOmEntryId = rule489  Void
-                           alhsOmExitId = rule490  Void
-                           alhsOppAg = rule491  Void
-                           alhsOppAgs = rule492  Void
-                           alhsOppDebug = rule493  Void
-                           alhsOppDebugs = rule494  Void
-                           alhsOrecNode = rule495  Void
-                           lcopy = rule496 arg_varinfptr_
-                           alhsOcopy = rule497 lcopy
-                           alhsOgraph = rule498 alhsIgraph
+                           alhsOhasRecs = rule465  Void
+                           alhsOmEntryId = rule466  Void
+                           alhsOmExitId = rule467  Void
+                           alhsOppAg = rule468  Void
+                           alhsOppAgs = rule469  Void
+                           alhsOppDebug = rule470  Void
+                           alhsOppDebugs = rule471  Void
+                           alhsOrecNode = rule472  Void
+                           lcopy = rule473 arg_varinfptr_
+                           alhsOcopy = rule474 lcopy
+                           alhsOgraph = rule475 alhsIgraph
                            ag__result_ = T_Expression_vOut13 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
          in C_Expression_s14 v13
-   rule488  (_) =
+   rule465  (_) =
      False
-   rule489  (_) =
+   rule466  (_) =
      Nothing
-   rule490  (_) =
+   rule467  (_) =
      Nothing
-   rule491  (_) =
+   rule468  (_) =
      empty
-   rule492  (_) =
+   rule469  (_) =
      []
-   rule493  (_) =
+   rule470  (_) =
      empty
-   rule494  (_) =
+   rule471  (_) =
      []
-   rule495  (_) =
+   rule472  (_) =
      False
-   rule496 varinfptr_ =
+   rule473 varinfptr_ =
      ClassVariable varinfptr_
-   rule497 lcopy =
+   rule474 lcopy =
      lcopy
-   rule498 ((alhsIgraph)) =
+   rule475 ((alhsIgraph)) =
      alhsIgraph
 sem_Expression_DynamicExpr  :: (DynamicExpr) -> T_Expression 
 sem_Expression_DynamicExpr arg_dynexpr_ = T_Expression (lift st14) where
@@ -2646,41 +2535,41 @@ sem_Expression_DynamicExpr arg_dynexpr_ = T_Expression (lift st14) where
          let
              v13 (T_Expression_vIn13 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                        let
-                           alhsOhasRecs = rule499  Void
-                           alhsOmEntryId = rule500  Void
-                           alhsOmExitId = rule501  Void
-                           alhsOppAg = rule502  Void
-                           alhsOppAgs = rule503  Void
-                           alhsOppDebug = rule504  Void
-                           alhsOppDebugs = rule505  Void
-                           alhsOrecNode = rule506  Void
-                           lcopy = rule507 arg_dynexpr_
-                           alhsOcopy = rule508 lcopy
-                           alhsOgraph = rule509 alhsIgraph
+                           alhsOhasRecs = rule476  Void
+                           alhsOmEntryId = rule477  Void
+                           alhsOmExitId = rule478  Void
+                           alhsOppAg = rule479  Void
+                           alhsOppAgs = rule480  Void
+                           alhsOppDebug = rule481  Void
+                           alhsOppDebugs = rule482  Void
+                           alhsOrecNode = rule483  Void
+                           lcopy = rule484 arg_dynexpr_
+                           alhsOcopy = rule485 lcopy
+                           alhsOgraph = rule486 alhsIgraph
                            ag__result_ = T_Expression_vOut13 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
          in C_Expression_s14 v13
-   rule499  (_) =
+   rule476  (_) =
      False
-   rule500  (_) =
+   rule477  (_) =
      Nothing
-   rule501  (_) =
+   rule478  (_) =
      Nothing
-   rule502  (_) =
+   rule479  (_) =
      empty
-   rule503  (_) =
+   rule480  (_) =
      []
-   rule504  (_) =
+   rule481  (_) =
      empty
-   rule505  (_) =
+   rule482  (_) =
      []
-   rule506  (_) =
+   rule483  (_) =
      False
-   rule507 dynexpr_ =
+   rule484 dynexpr_ =
      DynamicExpr dynexpr_
-   rule508 lcopy =
+   rule485 lcopy =
      lcopy
-   rule509 ((alhsIgraph)) =
+   rule486 ((alhsIgraph)) =
      alhsIgraph
 sem_Expression_TypeCodeExpression  :: (TypeCodeExpression) -> T_Expression 
 sem_Expression_TypeCodeExpression arg_tycodeexpr_ = T_Expression (lift st14) where
@@ -2688,41 +2577,41 @@ sem_Expression_TypeCodeExpression arg_tycodeexpr_ = T_Expression (lift st14) whe
          let
              v13 (T_Expression_vIn13 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                        let
-                           alhsOhasRecs = rule510  Void
-                           alhsOmEntryId = rule511  Void
-                           alhsOmExitId = rule512  Void
-                           alhsOppAg = rule513  Void
-                           alhsOppAgs = rule514  Void
-                           alhsOppDebug = rule515  Void
-                           alhsOppDebugs = rule516  Void
-                           alhsOrecNode = rule517  Void
-                           lcopy = rule518 arg_tycodeexpr_
-                           alhsOcopy = rule519 lcopy
-                           alhsOgraph = rule520 alhsIgraph
+                           alhsOhasRecs = rule487  Void
+                           alhsOmEntryId = rule488  Void
+                           alhsOmExitId = rule489  Void
+                           alhsOppAg = rule490  Void
+                           alhsOppAgs = rule491  Void
+                           alhsOppDebug = rule492  Void
+                           alhsOppDebugs = rule493  Void
+                           alhsOrecNode = rule494  Void
+                           lcopy = rule495 arg_tycodeexpr_
+                           alhsOcopy = rule496 lcopy
+                           alhsOgraph = rule497 alhsIgraph
                            ag__result_ = T_Expression_vOut13 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
          in C_Expression_s14 v13
-   rule510  (_) =
+   rule487  (_) =
      False
-   rule511  (_) =
+   rule488  (_) =
      Nothing
-   rule512  (_) =
+   rule489  (_) =
      Nothing
-   rule513  (_) =
+   rule490  (_) =
      empty
-   rule514  (_) =
+   rule491  (_) =
      []
-   rule515  (_) =
+   rule492  (_) =
      empty
-   rule516  (_) =
+   rule493  (_) =
      []
-   rule517  (_) =
+   rule494  (_) =
      False
-   rule518 tycodeexpr_ =
+   rule495 tycodeexpr_ =
      TypeCodeExpression tycodeexpr_
-   rule519 lcopy =
+   rule496 lcopy =
      lcopy
-   rule520 ((alhsIgraph)) =
+   rule497 ((alhsIgraph)) =
      alhsIgraph
 sem_Expression_TypeSignature  :: (Int Int -> (AType,Int,Int)) (T_Expression ) -> T_Expression 
 sem_Expression_TypeSignature arg_sigfun_ arg_expr_ = T_Expression (lift st14) where
@@ -2732,56 +2621,56 @@ sem_Expression_TypeSignature arg_sigfun_ arg_expr_ = T_Expression (lift st14) wh
                        let
                            st_exprX14 = 'Control.Monad.Identity'.runIdentity (attach_T_Expression (arg_expr_))
                            (T_Expression_vOut13 aexprIcopy aexprIgraph aexprIhasRecs aexprImEntryId aexprImExitId aexprIppAg aexprIppAgs aexprIppDebug aexprIppDebugs aexprIrecNode) = inv_Expression_s14 st_exprX14 (T_Expression_vIn13 aexprOcaseExpr aexprOcurrTaskName aexprOgraph aexprOmergeId aexprOmoduleEnv)
-                           alhsOhasRecs = rule521 aexprIhasRecs
-                           alhsOmEntryId = rule522 aexprImEntryId
-                           alhsOmExitId = rule523 aexprImExitId
-                           alhsOppAg = rule524 aexprIppAg
-                           alhsOppAgs = rule525 aexprIppAgs
-                           alhsOppDebug = rule526 aexprIppDebug
-                           alhsOppDebugs = rule527 aexprIppDebugs
-                           alhsOrecNode = rule528 aexprIrecNode
-                           lcopy = rule529 aexprIcopy arg_sigfun_
-                           alhsOcopy = rule530 lcopy
-                           alhsOgraph = rule531 aexprIgraph
-                           aexprOcaseExpr = rule532 alhsIcaseExpr
-                           aexprOcurrTaskName = rule533 alhsIcurrTaskName
-                           aexprOgraph = rule534 alhsIgraph
-                           aexprOmergeId = rule535 alhsImergeId
-                           aexprOmoduleEnv = rule536 alhsImoduleEnv
+                           alhsOhasRecs = rule498 aexprIhasRecs
+                           alhsOmEntryId = rule499 aexprImEntryId
+                           alhsOmExitId = rule500 aexprImExitId
+                           alhsOppAg = rule501 aexprIppAg
+                           alhsOppAgs = rule502 aexprIppAgs
+                           alhsOppDebug = rule503 aexprIppDebug
+                           alhsOppDebugs = rule504 aexprIppDebugs
+                           alhsOrecNode = rule505 aexprIrecNode
+                           lcopy = rule506 aexprIcopy arg_sigfun_
+                           alhsOcopy = rule507 lcopy
+                           alhsOgraph = rule508 aexprIgraph
+                           aexprOcaseExpr = rule509 alhsIcaseExpr
+                           aexprOcurrTaskName = rule510 alhsIcurrTaskName
+                           aexprOgraph = rule511 alhsIgraph
+                           aexprOmergeId = rule512 alhsImergeId
+                           aexprOmoduleEnv = rule513 alhsImoduleEnv
                            ag__result_ = T_Expression_vOut13 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
          in C_Expression_s14 v13
-   rule521 ((aexprIhasRecs)) =
+   rule498 ((aexprIhasRecs)) =
      aexprIhasRecs
-   rule522 ((aexprImEntryId)) =
+   rule499 ((aexprImEntryId)) =
      aexprImEntryId
-   rule523 ((aexprImExitId)) =
+   rule500 ((aexprImExitId)) =
      aexprImExitId
-   rule524 ((aexprIppAg)) =
+   rule501 ((aexprIppAg)) =
      aexprIppAg
-   rule525 ((aexprIppAgs)) =
+   rule502 ((aexprIppAgs)) =
      aexprIppAgs
-   rule526 ((aexprIppDebug)) =
+   rule503 ((aexprIppDebug)) =
      aexprIppDebug
-   rule527 ((aexprIppDebugs)) =
+   rule504 ((aexprIppDebugs)) =
      aexprIppDebugs
-   rule528 ((aexprIrecNode)) =
+   rule505 ((aexprIrecNode)) =
      aexprIrecNode
-   rule529 ((aexprIcopy)) sigfun_ =
+   rule506 ((aexprIcopy)) sigfun_ =
      TypeSignature sigfun_ aexprIcopy
-   rule530 lcopy =
+   rule507 lcopy =
      lcopy
-   rule531 ((aexprIgraph)) =
+   rule508 ((aexprIgraph)) =
      aexprIgraph
-   rule532 ((alhsIcaseExpr)) =
+   rule509 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule533 ((alhsIcurrTaskName)) =
+   rule510 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule534 ((alhsIgraph)) =
+   rule511 ((alhsIgraph)) =
      alhsIgraph
-   rule535 ((alhsImergeId)) =
+   rule512 ((alhsImergeId)) =
      alhsImergeId
-   rule536 ((alhsImoduleEnv)) =
+   rule513 ((alhsImoduleEnv)) =
      alhsImoduleEnv
 sem_Expression_EE  ::   T_Expression 
 sem_Expression_EE  = T_Expression (lift st14) where
@@ -2789,41 +2678,41 @@ sem_Expression_EE  = T_Expression (lift st14) where
          let
              v13 (T_Expression_vIn13 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                        let
-                           alhsOhasRecs = rule537  Void
-                           alhsOmEntryId = rule538  Void
-                           alhsOmExitId = rule539  Void
-                           alhsOppAg = rule540  Void
-                           alhsOppAgs = rule541  Void
-                           alhsOppDebug = rule542  Void
-                           alhsOppDebugs = rule543  Void
-                           alhsOrecNode = rule544  Void
-                           lcopy = rule545  Void
-                           alhsOcopy = rule546 lcopy
-                           alhsOgraph = rule547 alhsIgraph
+                           alhsOhasRecs = rule514  Void
+                           alhsOmEntryId = rule515  Void
+                           alhsOmExitId = rule516  Void
+                           alhsOppAg = rule517  Void
+                           alhsOppAgs = rule518  Void
+                           alhsOppDebug = rule519  Void
+                           alhsOppDebugs = rule520  Void
+                           alhsOrecNode = rule521  Void
+                           lcopy = rule522  Void
+                           alhsOcopy = rule523 lcopy
+                           alhsOgraph = rule524 alhsIgraph
                            ag__result_ = T_Expression_vOut13 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
          in C_Expression_s14 v13
-   rule537  (_) =
+   rule514  (_) =
      False
-   rule538  (_) =
+   rule515  (_) =
      Nothing
-   rule539  (_) =
+   rule516  (_) =
      Nothing
-   rule540  (_) =
+   rule517  (_) =
      empty
-   rule541  (_) =
+   rule518  (_) =
      []
-   rule542  (_) =
+   rule519  (_) =
      empty
-   rule543  (_) =
+   rule520  (_) =
      []
-   rule544  (_) =
+   rule521  (_) =
      False
-   rule545  (_) =
+   rule522  (_) =
      EE
-   rule546 lcopy =
+   rule523 lcopy =
      lcopy
-   rule547 ((alhsIgraph)) =
+   rule524 ((alhsIgraph)) =
      alhsIgraph
 sem_Expression_NoBind  :: (ExprInfoPtr) -> T_Expression 
 sem_Expression_NoBind arg_exprinfoptr_ = T_Expression (lift st14) where
@@ -2831,41 +2720,41 @@ sem_Expression_NoBind arg_exprinfoptr_ = T_Expression (lift st14) where
          let
              v13 (T_Expression_vIn13 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                        let
-                           alhsOhasRecs = rule548  Void
-                           alhsOmEntryId = rule549  Void
-                           alhsOmExitId = rule550  Void
-                           alhsOppAg = rule551  Void
-                           alhsOppAgs = rule552  Void
-                           alhsOppDebug = rule553  Void
-                           alhsOppDebugs = rule554  Void
-                           alhsOrecNode = rule555  Void
-                           lcopy = rule556 arg_exprinfoptr_
-                           alhsOcopy = rule557 lcopy
-                           alhsOgraph = rule558 alhsIgraph
+                           alhsOhasRecs = rule525  Void
+                           alhsOmEntryId = rule526  Void
+                           alhsOmExitId = rule527  Void
+                           alhsOppAg = rule528  Void
+                           alhsOppAgs = rule529  Void
+                           alhsOppDebug = rule530  Void
+                           alhsOppDebugs = rule531  Void
+                           alhsOrecNode = rule532  Void
+                           lcopy = rule533 arg_exprinfoptr_
+                           alhsOcopy = rule534 lcopy
+                           alhsOgraph = rule535 alhsIgraph
                            ag__result_ = T_Expression_vOut13 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
          in C_Expression_s14 v13
-   rule548  (_) =
+   rule525  (_) =
      False
-   rule549  (_) =
+   rule526  (_) =
      Nothing
-   rule550  (_) =
+   rule527  (_) =
      Nothing
-   rule551  (_) =
+   rule528  (_) =
      empty
-   rule552  (_) =
+   rule529  (_) =
      []
-   rule553  (_) =
+   rule530  (_) =
      empty
-   rule554  (_) =
+   rule531  (_) =
      []
-   rule555  (_) =
+   rule532  (_) =
      False
-   rule556 exprinfoptr_ =
+   rule533 exprinfoptr_ =
      NoBind exprinfoptr_
-   rule557 lcopy =
+   rule534 lcopy =
      lcopy
-   rule558 ((alhsIgraph)) =
+   rule535 ((alhsIgraph)) =
      alhsIgraph
 sem_Expression_FailExpr  :: (T_Ident ) -> T_Expression 
 sem_Expression_FailExpr arg_ident_ = T_Expression (lift st14) where
@@ -2873,99 +2762,137 @@ sem_Expression_FailExpr arg_ident_ = T_Expression (lift st14) where
          let
              v13 (T_Expression_vIn13 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                        let
-                           st_identX44 = 'Control.Monad.Identity'.runIdentity (attach_T_Ident (arg_ident_))
-                           (T_Ident_vOut43 aidentIcopy aidentIgraph aidentIhasRecs aidentIident aidentIisTask aidentImEntryId aidentImExitId aidentIppAg aidentIppAgs aidentIppDebug aidentIppDebugs aidentIrecNode aidentIreifyFunDef aidentIreifyFunType aidentIreifySymbolType) = inv_Ident_s44 st_identX44 (T_Ident_vIn43 aidentOcaseExpr aidentOcurrTaskName aidentOgraph aidentOmergeId aidentOmoduleEnv)
-                           alhsOhasRecs = rule559 aidentIhasRecs
-                           alhsOmEntryId = rule560 aidentImEntryId
-                           alhsOmExitId = rule561 aidentImExitId
-                           alhsOppAg = rule562 aidentIppAg
-                           alhsOppAgs = rule563 aidentIppAgs
-                           alhsOppDebug = rule564 aidentIppDebug
-                           alhsOppDebugs = rule565 aidentIppDebugs
-                           alhsOrecNode = rule566 aidentIrecNode
-                           lcopy = rule567 aidentIcopy
-                           alhsOcopy = rule568 lcopy
-                           alhsOgraph = rule569 aidentIgraph
-                           aidentOcaseExpr = rule570 alhsIcaseExpr
-                           aidentOcurrTaskName = rule571 alhsIcurrTaskName
-                           aidentOgraph = rule572 alhsIgraph
-                           aidentOmergeId = rule573 alhsImergeId
-                           aidentOmoduleEnv = rule574 alhsImoduleEnv
+                           st_identX47 = 'Control.Monad.Identity'.runIdentity (attach_T_Ident (arg_ident_))
+                           (T_Ident_vOut46 aidentIcopy aidentIgraph aidentIhasRecs aidentIident aidentIisCurrTask aidentImEntryId aidentImExitId aidentIppAg aidentIppAgs aidentIppDebug aidentIppDebugs aidentIrecNode) = inv_Ident_s47 st_identX47 (T_Ident_vIn46 aidentOcaseExpr aidentOcurrTaskName aidentOgraph aidentOmergeId aidentOmoduleEnv)
+                           alhsOhasRecs = rule536 aidentIhasRecs
+                           alhsOmEntryId = rule537 aidentImEntryId
+                           alhsOmExitId = rule538 aidentImExitId
+                           alhsOppAg = rule539 aidentIppAg
+                           alhsOppAgs = rule540 aidentIppAgs
+                           alhsOppDebug = rule541 aidentIppDebug
+                           alhsOppDebugs = rule542 aidentIppDebugs
+                           alhsOrecNode = rule543 aidentIrecNode
+                           lcopy = rule544 aidentIcopy
+                           alhsOcopy = rule545 lcopy
+                           alhsOgraph = rule546 aidentIgraph
+                           aidentOcaseExpr = rule547 alhsIcaseExpr
+                           aidentOcurrTaskName = rule548 alhsIcurrTaskName
+                           aidentOgraph = rule549 alhsIgraph
+                           aidentOmergeId = rule550 alhsImergeId
+                           aidentOmoduleEnv = rule551 alhsImoduleEnv
                            ag__result_ = T_Expression_vOut13 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
          in C_Expression_s14 v13
-   rule559 ((aidentIhasRecs)) =
+   rule536 ((aidentIhasRecs)) =
      aidentIhasRecs
-   rule560 ((aidentImEntryId)) =
+   rule537 ((aidentImEntryId)) =
      aidentImEntryId
-   rule561 ((aidentImExitId)) =
+   rule538 ((aidentImExitId)) =
      aidentImExitId
-   rule562 ((aidentIppAg)) =
+   rule539 ((aidentIppAg)) =
      aidentIppAg
-   rule563 ((aidentIppAgs)) =
+   rule540 ((aidentIppAgs)) =
      aidentIppAgs
-   rule564 ((aidentIppDebug)) =
+   rule541 ((aidentIppDebug)) =
      aidentIppDebug
-   rule565 ((aidentIppDebugs)) =
+   rule542 ((aidentIppDebugs)) =
      aidentIppDebugs
-   rule566 ((aidentIrecNode)) =
+   rule543 ((aidentIrecNode)) =
      aidentIrecNode
-   rule567 ((aidentIcopy)) =
+   rule544 ((aidentIcopy)) =
      FailExpr aidentIcopy
-   rule568 lcopy =
+   rule545 lcopy =
      lcopy
-   rule569 ((aidentIgraph)) =
+   rule546 ((aidentIgraph)) =
      aidentIgraph
-   rule570 ((alhsIcaseExpr)) =
+   rule547 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule571 ((alhsIcurrTaskName)) =
+   rule548 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule572 ((alhsIgraph)) =
+   rule549 ((alhsIgraph)) =
      alhsIgraph
-   rule573 ((alhsImergeId)) =
+   rule550 ((alhsImergeId)) =
      alhsImergeId
-   rule574 ((alhsImoduleEnv)) =
+   rule551 ((alhsImoduleEnv)) =
      alhsImoduleEnv
 
 // Expressions -------------------------------------------------
 // wrapper
+numContexts_Inh_Expressions :: Inh_Expressions -> (Int)
+numContexts_Inh_Expressions (Inh_Expressions _ _ _ _ _ _ x) = x
 moduleEnv_Inh_Expressions :: Inh_Expressions -> (ModuleEnv)
-moduleEnv_Inh_Expressions (Inh_Expressions _ _ _ _ x) = x
+moduleEnv_Inh_Expressions (Inh_Expressions _ _ _ _ _ x _) = x
 mergeId_Inh_Expressions :: Inh_Expressions -> (Int)
-mergeId_Inh_Expressions (Inh_Expressions _ _ _ x _) = x
+mergeId_Inh_Expressions (Inh_Expressions _ _ _ _ x _ _) = x
 graph_Inh_Expressions :: Inh_Expressions -> (GinGraph)
-graph_Inh_Expressions (Inh_Expressions _ _ x _ _) = x
+graph_Inh_Expressions (Inh_Expressions _ _ _ x _ _ _) = x
 currTaskName_Inh_Expressions :: Inh_Expressions -> (String)
-currTaskName_Inh_Expressions (Inh_Expressions _ x _ _ _) = x
+currTaskName_Inh_Expressions (Inh_Expressions _ _ x _ _ _ _) = x
 caseExpr_Inh_Expressions :: Inh_Expressions -> (Maybe Expression)
-caseExpr_Inh_Expressions (Inh_Expressions x _ _ _ _) = x
+caseExpr_Inh_Expressions (Inh_Expressions _ x _ _ _ _ _) = x
+appSymbDoc_Inh_Expressions :: Inh_Expressions -> (Doc)
+appSymbDoc_Inh_Expressions (Inh_Expressions x _ _ _ _ _ _) = x
+secondArgRecNode_Syn_Expressions :: Syn_Expressions -> (Bool)
+secondArgRecNode_Syn_Expressions (Syn_Expressions _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ x) = x
+secondArgMExitId_Syn_Expressions :: Syn_Expressions -> (Maybe Int)
+secondArgMExitId_Syn_Expressions (Syn_Expressions _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ x _) = x
+secondArgMEntryId_Syn_Expressions :: Syn_Expressions -> (Maybe Int)
+secondArgMEntryId_Syn_Expressions (Syn_Expressions _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ x _ _) = x
+secondArgIdent_Syn_Expressions :: Syn_Expressions -> (String)
+secondArgIdent_Syn_Expressions (Syn_Expressions _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ x _ _ _) = x
+secondArgHasRecs_Syn_Expressions :: Syn_Expressions -> (Bool)
+secondArgHasRecs_Syn_Expressions (Syn_Expressions _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ x _ _ _ _) = x
+secondArgGraph_Syn_Expressions :: Syn_Expressions -> (GinGraph)
+secondArgGraph_Syn_Expressions (Syn_Expressions _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ x _ _ _ _ _) = x
+secondArg_Syn_Expressions :: Syn_Expressions -> (MaybeExpression)
+secondArg_Syn_Expressions (Syn_Expressions _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ x _ _ _ _ _ _) = x
 recNode_Syn_Expressions :: Syn_Expressions -> (Bool)
-recNode_Syn_Expressions (Syn_Expressions _ _ _ _ _ _ _ _ _ x) = x
+recNode_Syn_Expressions (Syn_Expressions _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ x _ _ _ _ _ _ _) = x
+ppTail_Syn_Expressions :: Syn_Expressions -> ([Doc])
+ppTail_Syn_Expressions (Syn_Expressions _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ x _ _ _ _ _ _ _ _) = x
+ppPrefix_Syn_Expressions :: Syn_Expressions -> (Doc)
+ppPrefix_Syn_Expressions (Syn_Expressions _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ x _ _ _ _ _ _ _ _ _) = x
+ppInfix_Syn_Expressions :: Syn_Expressions -> (Doc)
+ppInfix_Syn_Expressions (Syn_Expressions _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ x _ _ _ _ _ _ _ _ _ _) = x
 ppDebugs_Syn_Expressions :: Syn_Expressions -> ([Doc])
-ppDebugs_Syn_Expressions (Syn_Expressions _ _ _ _ _ _ _ _ x _) = x
+ppDebugs_Syn_Expressions (Syn_Expressions _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ x _ _ _ _ _ _ _ _ _ _ _) = x
 ppDebug_Syn_Expressions :: Syn_Expressions -> (Doc)
-ppDebug_Syn_Expressions (Syn_Expressions _ _ _ _ _ _ _ x _ _) = x
+ppDebug_Syn_Expressions (Syn_Expressions _ _ _ _ _ _ _ _ _ _ _ _ _ _ x _ _ _ _ _ _ _ _ _ _ _ _) = x
 ppAgs_Syn_Expressions :: Syn_Expressions -> ([Doc])
-ppAgs_Syn_Expressions (Syn_Expressions _ _ _ _ _ _ x _ _ _) = x
+ppAgs_Syn_Expressions (Syn_Expressions _ _ _ _ _ _ _ _ _ _ _ _ _ x _ _ _ _ _ _ _ _ _ _ _ _ _) = x
 ppAg_Syn_Expressions :: Syn_Expressions -> (Doc)
-ppAg_Syn_Expressions (Syn_Expressions _ _ _ _ _ x _ _ _ _) = x
+ppAg_Syn_Expressions (Syn_Expressions _ _ _ _ _ _ _ _ _ _ _ _ x _ _ _ _ _ _ _ _ _ _ _ _ _ _) = x
 mExitId_Syn_Expressions :: Syn_Expressions -> (Maybe Int)
-mExitId_Syn_Expressions (Syn_Expressions _ _ _ _ x _ _ _ _ _) = x
+mExitId_Syn_Expressions (Syn_Expressions _ _ _ _ _ _ _ _ _ _ _ x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) = x
 mEntryId_Syn_Expressions :: Syn_Expressions -> (Maybe Int)
-mEntryId_Syn_Expressions (Syn_Expressions _ _ _ x _ _ _ _ _ _) = x
+mEntryId_Syn_Expressions (Syn_Expressions _ _ _ _ _ _ _ _ _ _ x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) = x
 hasRecs_Syn_Expressions :: Syn_Expressions -> (Bool)
-hasRecs_Syn_Expressions (Syn_Expressions _ _ x _ _ _ _ _ _ _) = x
+hasRecs_Syn_Expressions (Syn_Expressions _ _ _ _ _ _ _ _ _ x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) = x
 graph_Syn_Expressions :: Syn_Expressions -> (GinGraph)
-graph_Syn_Expressions (Syn_Expressions _ x _ _ _ _ _ _ _ _) = x
+graph_Syn_Expressions (Syn_Expressions _ _ _ _ _ _ _ _ x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) = x
+firstArgRecNode_Syn_Expressions :: Syn_Expressions -> (Bool)
+firstArgRecNode_Syn_Expressions (Syn_Expressions _ _ _ _ _ _ _ x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) = x
+firstArgMExitId_Syn_Expressions :: Syn_Expressions -> (Maybe Int)
+firstArgMExitId_Syn_Expressions (Syn_Expressions _ _ _ _ _ _ x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) = x
+firstArgMEntryId_Syn_Expressions :: Syn_Expressions -> (Maybe Int)
+firstArgMEntryId_Syn_Expressions (Syn_Expressions _ _ _ _ _ x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) = x
+firstArgIdent_Syn_Expressions :: Syn_Expressions -> (String)
+firstArgIdent_Syn_Expressions (Syn_Expressions _ _ _ _ x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) = x
+firstArgHasRecs_Syn_Expressions :: Syn_Expressions -> (Bool)
+firstArgHasRecs_Syn_Expressions (Syn_Expressions _ _ _ x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) = x
+firstArgGraph_Syn_Expressions :: Syn_Expressions -> (GinGraph)
+firstArgGraph_Syn_Expressions (Syn_Expressions _ _ x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) = x
+firstArg_Syn_Expressions :: Syn_Expressions -> (MaybeExpression)
+firstArg_Syn_Expressions (Syn_Expressions _ x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) = x
 copy_Syn_Expressions :: Syn_Expressions -> (Expressions)
-copy_Syn_Expressions (Syn_Expressions x _ _ _ _ _ _ _ _ _) = x
+copy_Syn_Expressions (Syn_Expressions x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) = x
 wrap_Expressions :: T_Expressions  Inh_Expressions  -> (Syn_Expressions )
-wrap_Expressions (T_Expressions act) (Inh_Expressions alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
+wrap_Expressions (T_Expressions act) (Inh_Expressions alhsIappSymbDoc alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv alhsInumContexts) =
    'Control.Monad.Identity'.runIdentity (
      act >>= \ sem ->
-     lift (T_Expressions_vIn16 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) >>= \ arg ->
-     lift (inv_Expressions_s17 sem arg) >>= \ (T_Expressions_vOut16 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode) ->
-     lift (Syn_Expressions alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode)
+     lift (T_Expressions_vIn16 alhsIappSymbDoc alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv alhsInumContexts) >>= \ arg ->
+     lift (inv_Expressions_s17 sem arg) >>= \ (T_Expressions_vOut16 alhsOcopy alhsOfirstArg alhsOfirstArgGraph alhsOfirstArgHasRecs alhsOfirstArgIdent alhsOfirstArgMEntryId alhsOfirstArgMExitId alhsOfirstArgRecNode alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOppInfix alhsOppPrefix alhsOppTail alhsOrecNode alhsOsecondArg alhsOsecondArgGraph alhsOsecondArgHasRecs alhsOsecondArgIdent alhsOsecondArgMEntryId alhsOsecondArgMExitId alhsOsecondArgRecNode) ->
+     lift (Syn_Expressions alhsOcopy alhsOfirstArg alhsOfirstArgGraph alhsOfirstArgHasRecs alhsOfirstArgIdent alhsOfirstArgMEntryId alhsOfirstArgMExitId alhsOfirstArgRecNode alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOppInfix alhsOppPrefix alhsOppTail alhsOrecNode alhsOsecondArg alhsOsecondArgGraph alhsOsecondArgHasRecs alhsOsecondArgIdent alhsOsecondArgMEntryId alhsOsecondArgMExitId alhsOsecondArgRecNode)
    )
 
 // cata
@@ -2973,126 +2900,325 @@ sem_Expressions :: Expressions  -> T_Expressions
 sem_Expressions list = foldr sem_Expressions_Cons sem_Expressions_Nil (map sem_Expression list)
 
 // semantic domain
+:: T_Expressions  = T_Expressions (Identity (T_Expressions_s17 ))
 attach_T_Expressions (T_Expressions t_Expressions) = t_Expressions
 inv_Expressions_s17 (C_Expressions_s17 x) = x
 sem_Expressions_Cons  :: (T_Expression ) (T_Expressions ) -> T_Expressions 
 sem_Expressions_Cons arg_hd_ arg_tl_ = T_Expressions (lift st17) where
    st17 =
          let
-             v16 (T_Expressions_vIn16 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
+             v16 (T_Expressions_vIn16 alhsIappSymbDoc alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv alhsInumContexts) =
                        let
                            st_hdX14 = 'Control.Monad.Identity'.runIdentity (attach_T_Expression (arg_hd_))
                            st_tlX17 = 'Control.Monad.Identity'.runIdentity (attach_T_Expressions (arg_tl_))
                            (T_Expression_vOut13 ahdIcopy ahdIgraph ahdIhasRecs ahdImEntryId ahdImExitId ahdIppAg ahdIppAgs ahdIppDebug ahdIppDebugs ahdIrecNode) = inv_Expression_s14 st_hdX14 (T_Expression_vIn13 ahdOcaseExpr ahdOcurrTaskName ahdOgraph ahdOmergeId ahdOmoduleEnv)
-                           (T_Expressions_vOut16 atlIcopy atlIgraph atlIhasRecs atlImEntryId atlImExitId atlIppAg atlIppAgs atlIppDebug atlIppDebugs atlIrecNode) = inv_Expressions_s17 st_tlX17 (T_Expressions_vIn16 atlOcaseExpr atlOcurrTaskName atlOgraph atlOmergeId atlOmoduleEnv)
-                           alhsOhasRecs = rule575 ahdIhasRecs atlIhasRecs
-                           alhsOmEntryId = rule576 ahdImEntryId atlImEntryId
-                           alhsOmExitId = rule577 ahdImExitId atlImExitId
-                           alhsOppAg = rule578 ahdIppAg atlIppAg
-                           alhsOppAgs = rule579 ahdIppAgs atlIppAgs
-                           alhsOppDebug = rule580 ahdIppDebug atlIppDebug
-                           alhsOppDebugs = rule581 ahdIppDebugs atlIppDebugs
-                           alhsOrecNode = rule582 ahdIrecNode atlIrecNode
-                           lcopy = rule583 ahdIcopy atlIcopy
-                           alhsOcopy = rule584 lcopy
-                           alhsOgraph = rule585 atlIgraph
-                           ahdOcaseExpr = rule586 alhsIcaseExpr
-                           ahdOcurrTaskName = rule587 alhsIcurrTaskName
-                           ahdOgraph = rule588 alhsIgraph
-                           ahdOmergeId = rule589 alhsImergeId
-                           ahdOmoduleEnv = rule590 alhsImoduleEnv
-                           atlOcaseExpr = rule591 alhsIcaseExpr
-                           atlOcurrTaskName = rule592 alhsIcurrTaskName
-                           atlOgraph = rule593 ahdIgraph
-                           atlOmergeId = rule594 alhsImergeId
-                           atlOmoduleEnv = rule595 alhsImoduleEnv
-                           ag__result_ = T_Expressions_vOut16 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
+                           (T_Expressions_vOut16 atlIcopy atlIfirstArg atlIfirstArgGraph atlIfirstArgHasRecs atlIfirstArgIdent atlIfirstArgMEntryId atlIfirstArgMExitId atlIfirstArgRecNode atlIgraph atlIhasRecs atlImEntryId atlImExitId atlIppAg atlIppAgs atlIppDebug atlIppDebugs atlIppInfix atlIppPrefix atlIppTail atlIrecNode atlIsecondArg atlIsecondArgGraph atlIsecondArgHasRecs atlIsecondArgIdent atlIsecondArgMEntryId atlIsecondArgMExitId atlIsecondArgRecNode) = inv_Expressions_s17 st_tlX17 (T_Expressions_vIn16 atlOappSymbDoc atlOcaseExpr atlOcurrTaskName atlOgraph atlOmergeId atlOmoduleEnv atlOnumContexts)
+                           lhasContexts = rule552 alhsInumContexts
+                           alhsOfirstArg = rule553 ahdIcopy atlIfirstArg lhasContexts
+                           alhsOsecondArg = rule554 atlIfirstArg atlIsecondArg lhasContexts
+                           alhsOfirstArgGraph = rule555 ahdIgraph atlIfirstArgGraph lhasContexts
+                           alhsOsecondArgGraph = rule556 atlIfirstArgGraph atlIsecondArgGraph lhasContexts
+                           atlOgraph = rule557 ahdIgraph alhsIgraph lhasContexts
+                           alhsOgraph = rule558 atlIgraph
+                           alhsOfirstArgMEntryId = rule559 ahdImEntryId atlIfirstArgMEntryId lhasContexts
+                           alhsOsecondArgMEntryId = rule560 atlIfirstArgMEntryId atlIsecondArgMEntryId lhasContexts
+                           alhsOfirstArgMExitId = rule561 ahdImExitId atlIfirstArgMExitId lhasContexts
+                           alhsOsecondArgMExitId = rule562 atlIsecondArgMExitId lhasContexts
+                           alhsOfirstArgHasRecs = rule563 ahdIhasRecs atlIfirstArgHasRecs lhasContexts
+                           alhsOsecondArgHasRecs = rule564 atlIfirstArgHasRecs atlIsecondArgHasRecs lhasContexts
+                           alhsOfirstArgRecNode = rule565 ahdIrecNode atlIfirstArgRecNode lhasContexts
+                           alhsOsecondArgRecNode = rule566 atlIsecondArgRecNode lhasContexts
+                           atlOnumContexts = rule567 alhsInumContexts
+                           alhsOppInfix = rule568 ahdIppAg alhsIappSymbDoc atlIppTail
+                           alhsOppPrefix = rule569 ahdIppAg alhsIappSymbDoc atlIppTail
+                           alhsOppTail = rule570 ahdIppAg
+                           alhsOhasRecs = rule571 ahdIhasRecs atlIhasRecs
+                           alhsOmEntryId = rule572 ahdImEntryId atlImEntryId
+                           alhsOmExitId = rule573 ahdImExitId atlImExitId
+                           alhsOppAg = rule574 ahdIppAg atlIppAg
+                           alhsOppAgs = rule575 ahdIppAgs atlIppAgs
+                           alhsOppDebug = rule576 ahdIppDebug atlIppDebug
+                           alhsOppDebugs = rule577 ahdIppDebugs atlIppDebugs
+                           alhsOrecNode = rule578 ahdIrecNode atlIrecNode
+                           lcopy = rule579 ahdIcopy atlIcopy
+                           alhsOcopy = rule580 lcopy
+                           alhsOfirstArgIdent = rule581 atlIfirstArgIdent
+                           alhsOsecondArgIdent = rule582 atlIsecondArgIdent
+                           ahdOcaseExpr = rule583 alhsIcaseExpr
+                           ahdOcurrTaskName = rule584 alhsIcurrTaskName
+                           ahdOgraph = rule585 alhsIgraph
+                           ahdOmergeId = rule586 alhsImergeId
+                           ahdOmoduleEnv = rule587 alhsImoduleEnv
+                           atlOappSymbDoc = rule588 alhsIappSymbDoc
+                           atlOcaseExpr = rule589 alhsIcaseExpr
+                           atlOcurrTaskName = rule590 alhsIcurrTaskName
+                           atlOmergeId = rule591 alhsImergeId
+                           atlOmoduleEnv = rule592 alhsImoduleEnv
+                           ag__result_ = T_Expressions_vOut16 alhsOcopy alhsOfirstArg alhsOfirstArgGraph alhsOfirstArgHasRecs alhsOfirstArgIdent alhsOfirstArgMEntryId alhsOfirstArgMExitId alhsOfirstArgRecNode alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOppInfix alhsOppPrefix alhsOppTail alhsOrecNode alhsOsecondArg alhsOsecondArgGraph alhsOsecondArgHasRecs alhsOsecondArgIdent alhsOsecondArgMEntryId alhsOsecondArgMExitId alhsOsecondArgRecNode
                        in ag__result_
          in C_Expressions_s17 v16
-   rule575 ((ahdIhasRecs)) ((atlIhasRecs)) =
+   /*# LINE 69 "./frontend/Tonic/MkGraph.ag" #*/
+   rule552 ((alhsInumContexts)) =
+                             /*# LINE 69 "./frontend/Tonic/MkGraph.ag" #*/
+                             alhsInumContexts > 0
+                             /*# LINE 2965 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 71 "./frontend/Tonic/MkGraph.ag" #*/
+   rule553 ((ahdIcopy)) ((atlIfirstArg)) lhasContexts =
+                             /*# LINE 71 "./frontend/Tonic/MkGraph.ag" #*/
+                             if lhasContexts atlIfirstArg (Just ahdIcopy)
+                             /*# LINE 2970 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 72 "./frontend/Tonic/MkGraph.ag" #*/
+   rule554 ((atlIfirstArg)) ((atlIsecondArg)) lhasContexts =
+                             /*# LINE 72 "./frontend/Tonic/MkGraph.ag" #*/
+                             if lhasContexts atlIsecondArg atlIfirstArg
+                             /*# LINE 2975 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 74 "./frontend/Tonic/MkGraph.ag" #*/
+   rule555 ((ahdIgraph)) ((atlIfirstArgGraph)) lhasContexts =
+                                /*# LINE 74 "./frontend/Tonic/MkGraph.ag" #*/
+                                if lhasContexts atlIfirstArgGraph ahdIgraph
+                                /*# LINE 2980 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 75 "./frontend/Tonic/MkGraph.ag" #*/
+   rule556 ((atlIfirstArgGraph)) ((atlIsecondArgGraph)) lhasContexts =
+                                /*# LINE 75 "./frontend/Tonic/MkGraph.ag" #*/
+                                if lhasContexts atlIsecondArgGraph atlIfirstArgGraph
+                                /*# LINE 2985 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 77 "./frontend/Tonic/MkGraph.ag" #*/
+   rule557 ((ahdIgraph)) ((alhsIgraph)) lhasContexts =
+                       /*# LINE 77 "./frontend/Tonic/MkGraph.ag" #*/
+                       if lhasContexts alhsIgraph ahdIgraph
+                       /*# LINE 2990 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 78 "./frontend/Tonic/MkGraph.ag" #*/
+   rule558 ((atlIgraph)) =
+                       /*# LINE 78 "./frontend/Tonic/MkGraph.ag" #*/
+                       atlIgraph
+                       /*# LINE 2995 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 80 "./frontend/Tonic/MkGraph.ag" #*/
+   rule559 ((ahdImEntryId)) ((atlIfirstArgMEntryId)) lhasContexts =
+                                    /*# LINE 80 "./frontend/Tonic/MkGraph.ag" #*/
+                                    if lhasContexts atlIfirstArgMEntryId ahdImEntryId
+                                    /*# LINE 3000 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 81 "./frontend/Tonic/MkGraph.ag" #*/
+   rule560 ((atlIfirstArgMEntryId)) ((atlIsecondArgMEntryId)) lhasContexts =
+                                    /*# LINE 81 "./frontend/Tonic/MkGraph.ag" #*/
+                                    if lhasContexts atlIsecondArgMEntryId atlIfirstArgMEntryId
+                                    /*# LINE 3005 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 82 "./frontend/Tonic/MkGraph.ag" #*/
+   rule561 ((ahdImExitId)) ((atlIfirstArgMExitId)) lhasContexts =
+                                    /*# LINE 82 "./frontend/Tonic/MkGraph.ag" #*/
+                                    if lhasContexts atlIfirstArgMExitId ahdImExitId
+                                    /*# LINE 3010 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 83 "./frontend/Tonic/MkGraph.ag" #*/
+   rule562 ((atlIsecondArgMExitId)) lhasContexts =
+                                    /*# LINE 83 "./frontend/Tonic/MkGraph.ag" #*/
+                                    if lhasContexts atlIsecondArgMExitId atlIsecondArgMExitId
+                                    /*# LINE 3015 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 84 "./frontend/Tonic/MkGraph.ag" #*/
+   rule563 ((ahdIhasRecs)) ((atlIfirstArgHasRecs)) lhasContexts =
+                                    /*# LINE 84 "./frontend/Tonic/MkGraph.ag" #*/
+                                    if lhasContexts atlIfirstArgHasRecs ahdIhasRecs
+                                    /*# LINE 3020 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 85 "./frontend/Tonic/MkGraph.ag" #*/
+   rule564 ((atlIfirstArgHasRecs)) ((atlIsecondArgHasRecs)) lhasContexts =
+                                    /*# LINE 85 "./frontend/Tonic/MkGraph.ag" #*/
+                                    if lhasContexts atlIsecondArgHasRecs atlIfirstArgHasRecs
+                                    /*# LINE 3025 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 86 "./frontend/Tonic/MkGraph.ag" #*/
+   rule565 ((ahdIrecNode)) ((atlIfirstArgRecNode)) lhasContexts =
+                                    /*# LINE 86 "./frontend/Tonic/MkGraph.ag" #*/
+                                    if lhasContexts atlIfirstArgRecNode ahdIrecNode
+                                    /*# LINE 3030 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 87 "./frontend/Tonic/MkGraph.ag" #*/
+   rule566 ((atlIsecondArgRecNode)) lhasContexts =
+                                    /*# LINE 87 "./frontend/Tonic/MkGraph.ag" #*/
+                                    if lhasContexts atlIsecondArgRecNode atlIsecondArgRecNode
+                                    /*# LINE 3035 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 89 "./frontend/Tonic/MkGraph.ag" #*/
+   rule567 ((alhsInumContexts)) =
+                             /*# LINE 89 "./frontend/Tonic/MkGraph.ag" #*/
+                             alhsInumContexts - 1
+                             /*# LINE 3040 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 48 "./frontend/Tonic/Pretty.ag" #*/
+   rule568 ((ahdIppAg)) ((alhsIappSymbDoc)) ((atlIppTail)) =
+                          /*# LINE 48 "./frontend/Tonic/Pretty.ag" #*/
+                          ahdIppAg <+> alhsIappSymbDoc <+> hcat (intersperse (text " ") atlIppTail
+                          /*# LINE 3045 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 49 "./frontend/Tonic/Pretty.ag" #*/
+   rule569 ((ahdIppAg)) ((alhsIappSymbDoc)) ((atlIppTail)) =
+                          /*# LINE 49 "./frontend/Tonic/Pretty.ag" #*/
+                          alhsIappSymbDoc <+> ahdIppAg <+> hcat (intersperse (text " ") atlIppTail
+                          /*# LINE 3050 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 50 "./frontend/Tonic/Pretty.ag" #*/
+   rule570 ((ahdIppAg)) =
+                          /*# LINE 50 "./frontend/Tonic/Pretty.ag" #*/
+                          [ahdIppAg:@tl.ppTail]
+                          /*# LINE 3055 "frontend/Tonic/Tonic.icl"#*/
+   rule571 ((ahdIhasRecs)) ((atlIhasRecs)) =
      ahdIhasRecs || atlIhasRecs
-   rule576 ((ahdImEntryId)) ((atlImEntryId)) =
+   rule572 ((ahdImEntryId)) ((atlImEntryId)) =
      ahdImEntryId <> atlImEntryId
-   rule577 ((ahdImExitId)) ((atlImExitId)) =
+   rule573 ((ahdImExitId)) ((atlImExitId)) =
      ahdImExitId <> atlImExitId
-   rule578 ((ahdIppAg)) ((atlIppAg)) =
+   rule574 ((ahdIppAg)) ((atlIppAg)) =
      ahdIppAg <$$> atlIppAg
-   rule579 ((ahdIppAgs)) ((atlIppAgs)) =
+   rule575 ((ahdIppAgs)) ((atlIppAgs)) =
      ahdIppAgs ++ atlIppAgs
-   rule580 ((ahdIppDebug)) ((atlIppDebug)) =
+   rule576 ((ahdIppDebug)) ((atlIppDebug)) =
      ahdIppDebug <$$> atlIppDebug
-   rule581 ((ahdIppDebugs)) ((atlIppDebugs)) =
+   rule577 ((ahdIppDebugs)) ((atlIppDebugs)) =
      ahdIppDebugs ++ atlIppDebugs
-   rule582 ((ahdIrecNode)) ((atlIrecNode)) =
+   rule578 ((ahdIrecNode)) ((atlIrecNode)) =
      ahdIrecNode || atlIrecNode
-   rule583 ((ahdIcopy)) ((atlIcopy)) =
+   rule579 ((ahdIcopy)) ((atlIcopy)) =
      (\x xs -> [x:xs]) ahdIcopy atlIcopy
-   rule584 lcopy =
+   rule580 lcopy =
      lcopy
-   rule585 ((atlIgraph)) =
-     atlIgraph
-   rule586 ((alhsIcaseExpr)) =
+   rule581 ((atlIfirstArgIdent)) =
+     atlIfirstArgIdent
+   rule582 ((atlIsecondArgIdent)) =
+     atlIsecondArgIdent
+   rule583 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule587 ((alhsIcurrTaskName)) =
+   rule584 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule588 ((alhsIgraph)) =
+   rule585 ((alhsIgraph)) =
      alhsIgraph
-   rule589 ((alhsImergeId)) =
+   rule586 ((alhsImergeId)) =
      alhsImergeId
-   rule590 ((alhsImoduleEnv)) =
+   rule587 ((alhsImoduleEnv)) =
      alhsImoduleEnv
-   rule591 ((alhsIcaseExpr)) =
+   rule588 ((alhsIappSymbDoc)) =
+     alhsIappSymbDoc
+   rule589 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule592 ((alhsIcurrTaskName)) =
+   rule590 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule593 ((ahdIgraph)) =
-     ahdIgraph
-   rule594 ((alhsImergeId)) =
+   rule591 ((alhsImergeId)) =
      alhsImergeId
-   rule595 ((alhsImoduleEnv)) =
+   rule592 ((alhsImoduleEnv)) =
      alhsImoduleEnv
 sem_Expressions_Nil  ::   T_Expressions 
 sem_Expressions_Nil  = T_Expressions (lift st17) where
    st17 =
          let
-             v16 (T_Expressions_vIn16 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
+             v16 (T_Expressions_vIn16 alhsIappSymbDoc alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv alhsInumContexts) =
                        let
-                           alhsOhasRecs = rule596  Void
-                           alhsOmEntryId = rule597  Void
-                           alhsOmExitId = rule598  Void
-                           alhsOppAg = rule599  Void
-                           alhsOppAgs = rule600  Void
-                           alhsOppDebug = rule601  Void
-                           alhsOppDebugs = rule602  Void
-                           alhsOrecNode = rule603  Void
-                           lcopy = rule604  Void
-                           alhsOcopy = rule605 lcopy
-                           alhsOgraph = rule606 alhsIgraph
-                           ag__result_ = T_Expressions_vOut16 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
+                           alhsOfirstArg = rule593  Void
+                           alhsOsecondArg = rule594  Void
+                           alhsOfirstArgIdent = rule595  Void
+                           alhsOsecondArgIdent = rule596  Void
+                           alhsOfirstArgGraph = rule597  Void
+                           alhsOsecondArgGraph = rule598  Void
+                           alhsOgraph = rule599 alhsIgraph
+                           alhsOppInfix = rule600  Void
+                           alhsOppPrefix = rule601  Void
+                           alhsOppTail = rule602  Void
+                           alhsOfirstArgHasRecs = rule603  Void
+                           alhsOfirstArgMEntryId = rule604  Void
+                           alhsOfirstArgMExitId = rule605  Void
+                           alhsOfirstArgRecNode = rule606  Void
+                           alhsOhasRecs = rule607  Void
+                           alhsOmEntryId = rule608  Void
+                           alhsOmExitId = rule609  Void
+                           alhsOppAg = rule610  Void
+                           alhsOppAgs = rule611  Void
+                           alhsOppDebug = rule612  Void
+                           alhsOppDebugs = rule613  Void
+                           alhsOrecNode = rule614  Void
+                           alhsOsecondArgHasRecs = rule615  Void
+                           alhsOsecondArgMEntryId = rule616  Void
+                           alhsOsecondArgMExitId = rule617  Void
+                           alhsOsecondArgRecNode = rule618  Void
+                           lcopy = rule619  Void
+                           alhsOcopy = rule620 lcopy
+                           ag__result_ = T_Expressions_vOut16 alhsOcopy alhsOfirstArg alhsOfirstArgGraph alhsOfirstArgHasRecs alhsOfirstArgIdent alhsOfirstArgMEntryId alhsOfirstArgMExitId alhsOfirstArgRecNode alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOppInfix alhsOppPrefix alhsOppTail alhsOrecNode alhsOsecondArg alhsOsecondArgGraph alhsOsecondArgHasRecs alhsOsecondArgIdent alhsOsecondArgMEntryId alhsOsecondArgMExitId alhsOsecondArgRecNode
                        in ag__result_
          in C_Expressions_s17 v16
+   /*# LINE 91 "./frontend/Tonic/MkGraph.ag" #*/
+   rule593  (_) =
+                           /*# LINE 91 "./frontend/Tonic/MkGraph.ag" #*/
+                           Nothing
+                           /*# LINE 3141 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 92 "./frontend/Tonic/MkGraph.ag" #*/
+   rule594  (_) =
+                           /*# LINE 92 "./frontend/Tonic/MkGraph.ag" #*/
+                           Nothing
+                           /*# LINE 3146 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 94 "./frontend/Tonic/MkGraph.ag" #*/
+   rule595  (_) =
+                                  /*# LINE 94 "./frontend/Tonic/MkGraph.ag" #*/
+                                  abort "firstArgIdent: no args"
+                                  /*# LINE 3151 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 95 "./frontend/Tonic/MkGraph.ag" #*/
    rule596  (_) =
-     False
+                                  /*# LINE 95 "./frontend/Tonic/MkGraph.ag" #*/
+                                  abort "secondArgIdent: no args"
+                                  /*# LINE 3156 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 97 "./frontend/Tonic/MkGraph.ag" #*/
    rule597  (_) =
-     Nothing
+                                /*# LINE 97 "./frontend/Tonic/MkGraph.ag" #*/
+                                abort "firstArgGraph: no args"
+                                /*# LINE 3161 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 98 "./frontend/Tonic/MkGraph.ag" #*/
    rule598  (_) =
-     Nothing
-   rule599  (_) =
-     empty
+                                /*# LINE 98 "./frontend/Tonic/MkGraph.ag" #*/
+                                abort "secondArgGraph: no args"
+                                /*# LINE 3166 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 100 "./frontend/Tonic/MkGraph.ag" #*/
+   rule599 ((alhsIgraph)) =
+                       /*# LINE 100 "./frontend/Tonic/MkGraph.ag" #*/
+                       alhsIgraph
+                       /*# LINE 3171 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 51 "./frontend/Tonic/Pretty.ag" #*/
    rule600  (_) =
-     []
+                          /*# LINE 51 "./frontend/Tonic/Pretty.ag" #*/
+                          empty
+                          /*# LINE 3176 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 52 "./frontend/Tonic/Pretty.ag" #*/
    rule601  (_) =
-     empty
+                          /*# LINE 52 "./frontend/Tonic/Pretty.ag" #*/
+                          empty
+                          /*# LINE 3181 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 53 "./frontend/Tonic/Pretty.ag" #*/
    rule602  (_) =
-     []
+                          /*# LINE 53 "./frontend/Tonic/Pretty.ag" #*/
+                          []
+                          /*# LINE 3186 "frontend/Tonic/Tonic.icl"#*/
    rule603  (_) =
      False
    rule604  (_) =
+     Nothing
+   rule605  (_) =
+     Nothing
+   rule606  (_) =
+     False
+   rule607  (_) =
+     False
+   rule608  (_) =
+     Nothing
+   rule609  (_) =
+     Nothing
+   rule610  (_) =
+     empty
+   rule611  (_) =
      []
-   rule605 lcopy =
+   rule612  (_) =
+     empty
+   rule613  (_) =
+     []
+   rule614  (_) =
+     False
+   rule615  (_) =
+     False
+   rule616  (_) =
+     Nothing
+   rule617  (_) =
+     Nothing
+   rule618  (_) =
+     False
+   rule619  (_) =
+     []
+   rule620 lcopy =
      lcopy
-   rule606 ((alhsIgraph)) =
-     alhsIgraph
 
 // FreeVar -----------------------------------------------------
 // wrapper
@@ -3140,6 +3266,7 @@ sem_FreeVar :: FreeVar  -> T_FreeVar
 sem_FreeVar { FreeVar | fv_def_level = fv_def_level_,fv_ident = fv_ident_,fv_info_ptr = fv_info_ptr_,fv_count = fv_count_ } = sem_FreeVar_FreeVar fv_def_level_ ( sem_Ident fv_ident_ ) fv_info_ptr_ fv_count_
 
 // semantic domain
+:: T_FreeVar  = T_FreeVar (Identity (T_FreeVar_s20 ))
 attach_T_FreeVar (T_FreeVar t_FreeVar) = t_FreeVar
 inv_FreeVar_s20 (C_FreeVar_s20 x) = x
 sem_FreeVar_FreeVar  :: (Level) (T_Ident ) (VarInfoPtr) (Int) -> T_FreeVar 
@@ -3148,64 +3275,64 @@ sem_FreeVar_FreeVar arg_fv_def_level_ arg_fv_ident_ arg_fv_info_ptr_ arg_fv_coun
          let
              v19 (T_FreeVar_vIn19 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                        let
-                           st_fv_identX44 = 'Control.Monad.Identity'.runIdentity (attach_T_Ident (arg_fv_ident_))
-                           (T_Ident_vOut43 afv_identIcopy afv_identIgraph afv_identIhasRecs afv_identIident afv_identIisTask afv_identImEntryId afv_identImExitId afv_identIppAg afv_identIppAgs afv_identIppDebug afv_identIppDebugs afv_identIrecNode afv_identIreifyFunDef afv_identIreifyFunType afv_identIreifySymbolType) = inv_Ident_s44 st_fv_identX44 (T_Ident_vIn43 afv_identOcaseExpr afv_identOcurrTaskName afv_identOgraph afv_identOmergeId afv_identOmoduleEnv)
-                           alhsOppDebug = rule607 afv_identIppDebug
-                           alhsOppAg = rule608 afv_identIppAg
-                           alhsOhasRecs = rule609 afv_identIhasRecs
-                           alhsOmEntryId = rule610 afv_identImEntryId
-                           alhsOmExitId = rule611 afv_identImExitId
-                           alhsOppAgs = rule612 afv_identIppAgs
-                           alhsOppDebugs = rule613 afv_identIppDebugs
-                           alhsOrecNode = rule614 afv_identIrecNode
-                           lcopy = rule615 afv_identIcopy arg_fv_count_ arg_fv_def_level_ arg_fv_info_ptr_
-                           alhsOcopy = rule616 lcopy
-                           alhsOgraph = rule617 afv_identIgraph
-                           afv_identOcaseExpr = rule618 alhsIcaseExpr
-                           afv_identOcurrTaskName = rule619 alhsIcurrTaskName
-                           afv_identOgraph = rule620 alhsIgraph
-                           afv_identOmergeId = rule621 alhsImergeId
-                           afv_identOmoduleEnv = rule622 alhsImoduleEnv
+                           st_fv_identX47 = 'Control.Monad.Identity'.runIdentity (attach_T_Ident (arg_fv_ident_))
+                           (T_Ident_vOut46 afv_identIcopy afv_identIgraph afv_identIhasRecs afv_identIident afv_identIisCurrTask afv_identImEntryId afv_identImExitId afv_identIppAg afv_identIppAgs afv_identIppDebug afv_identIppDebugs afv_identIrecNode) = inv_Ident_s47 st_fv_identX47 (T_Ident_vIn46 afv_identOcaseExpr afv_identOcurrTaskName afv_identOgraph afv_identOmergeId afv_identOmoduleEnv)
+                           alhsOppDebug = rule621 afv_identIppDebug
+                           alhsOppAg = rule622 afv_identIppAg
+                           alhsOhasRecs = rule623 afv_identIhasRecs
+                           alhsOmEntryId = rule624 afv_identImEntryId
+                           alhsOmExitId = rule625 afv_identImExitId
+                           alhsOppAgs = rule626 afv_identIppAgs
+                           alhsOppDebugs = rule627 afv_identIppDebugs
+                           alhsOrecNode = rule628 afv_identIrecNode
+                           lcopy = rule629 afv_identIcopy arg_fv_count_ arg_fv_def_level_ arg_fv_info_ptr_
+                           alhsOcopy = rule630 lcopy
+                           alhsOgraph = rule631 afv_identIgraph
+                           afv_identOcaseExpr = rule632 alhsIcaseExpr
+                           afv_identOcurrTaskName = rule633 alhsIcurrTaskName
+                           afv_identOgraph = rule634 alhsIgraph
+                           afv_identOmergeId = rule635 alhsImergeId
+                           afv_identOmoduleEnv = rule636 alhsImoduleEnv
                            ag__result_ = T_FreeVar_vOut19 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
          in C_FreeVar_s20 v19
-   /*# LINE 112 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule607 ((afv_identIppDebug)) =
-                            /*# LINE 112 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+   /*# LINE 94 "./frontend/Tonic/Pretty.ag" #*/
+   rule621 ((afv_identIppDebug)) =
+                            /*# LINE 94 "./frontend/Tonic/Pretty.ag" #*/
                             afv_identIppDebug
-                            /*# LINE 3177 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 113 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule608 ((afv_identIppAg)) =
-                            /*# LINE 113 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+                            /*# LINE 3304 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 95 "./frontend/Tonic/Pretty.ag" #*/
+   rule622 ((afv_identIppAg)) =
+                            /*# LINE 95 "./frontend/Tonic/Pretty.ag" #*/
                             afv_identIppAg
-                            /*# LINE 3182 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   rule609 ((afv_identIhasRecs)) =
+                            /*# LINE 3309 "frontend/Tonic/Tonic.icl"#*/
+   rule623 ((afv_identIhasRecs)) =
      afv_identIhasRecs
-   rule610 ((afv_identImEntryId)) =
+   rule624 ((afv_identImEntryId)) =
      afv_identImEntryId
-   rule611 ((afv_identImExitId)) =
+   rule625 ((afv_identImExitId)) =
      afv_identImExitId
-   rule612 ((afv_identIppAgs)) =
+   rule626 ((afv_identIppAgs)) =
      afv_identIppAgs
-   rule613 ((afv_identIppDebugs)) =
+   rule627 ((afv_identIppDebugs)) =
      afv_identIppDebugs
-   rule614 ((afv_identIrecNode)) =
+   rule628 ((afv_identIrecNode)) =
      afv_identIrecNode
-   rule615 ((afv_identIcopy)) fv_count_ fv_def_level_ fv_info_ptr_ =
+   rule629 ((afv_identIcopy)) fv_count_ fv_def_level_ fv_info_ptr_ =
      {FreeVar|fv_def_level = fv_def_level_ , fv_ident = afv_identIcopy , fv_info_ptr = fv_info_ptr_ , fv_count = fv_count_}
-   rule616 lcopy =
+   rule630 lcopy =
      lcopy
-   rule617 ((afv_identIgraph)) =
+   rule631 ((afv_identIgraph)) =
      afv_identIgraph
-   rule618 ((alhsIcaseExpr)) =
+   rule632 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule619 ((alhsIcurrTaskName)) =
+   rule633 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule620 ((alhsIgraph)) =
+   rule634 ((alhsIgraph)) =
      alhsIgraph
-   rule621 ((alhsImergeId)) =
+   rule635 ((alhsImergeId)) =
      alhsImergeId
-   rule622 ((alhsImoduleEnv)) =
+   rule636 ((alhsImoduleEnv)) =
      alhsImoduleEnv
 
 // FreeVars ----------------------------------------------------
@@ -3246,6 +3373,7 @@ sem_FreeVars :: FreeVars  -> T_FreeVars
 sem_FreeVars list = foldr sem_FreeVars_Cons sem_FreeVars_Nil (map sem_FreeVar list)
 
 // semantic domain
+:: T_FreeVars  = T_FreeVars (Identity (T_FreeVars_s23 ))
 attach_T_FreeVars (T_FreeVars t_FreeVars) = t_FreeVars
 inv_FreeVars_s23 (C_FreeVars_s23 x) = x
 sem_FreeVars_Cons  :: (T_FreeVar ) (T_FreeVars ) -> T_FreeVars 
@@ -3258,59 +3386,59 @@ sem_FreeVars_Cons arg_hd_ arg_tl_ = T_FreeVars (lift st23) where
                            st_tlX23 = 'Control.Monad.Identity'.runIdentity (attach_T_FreeVars (arg_tl_))
                            (T_FreeVar_vOut19 ahdIcopy ahdIgraph ahdIhasRecs ahdImEntryId ahdImExitId ahdIppAg ahdIppAgs ahdIppDebug ahdIppDebugs ahdIrecNode) = inv_FreeVar_s20 st_hdX20 (T_FreeVar_vIn19 ahdOcaseExpr ahdOcurrTaskName ahdOgraph ahdOmergeId ahdOmoduleEnv)
                            (T_FreeVars_vOut22 atlIcopy atlIgraph atlIhasRecs atlImEntryId atlImExitId atlIrecNode) = inv_FreeVars_s23 st_tlX23 (T_FreeVars_vIn22 atlOcaseExpr atlOcurrTaskName atlOgraph atlOmergeId atlOmoduleEnv)
-                           alhsOhasRecs = rule623 ahdIhasRecs atlIhasRecs
-                           alhsOmEntryId = rule624 ahdImEntryId atlImEntryId
-                           alhsOmExitId = rule625 ahdImExitId atlImExitId
-                           alhsOrecNode = rule626 ahdIrecNode atlIrecNode
-                           lcopy = rule627 ahdIcopy atlIcopy
-                           alhsOcopy = rule628 lcopy
-                           alhsOgraph = rule629 atlIgraph
-                           ahdOcaseExpr = rule630 alhsIcaseExpr
-                           ahdOcurrTaskName = rule631 alhsIcurrTaskName
-                           ahdOgraph = rule632 alhsIgraph
-                           ahdOmergeId = rule633 alhsImergeId
-                           ahdOmoduleEnv = rule634 alhsImoduleEnv
-                           atlOcaseExpr = rule635 alhsIcaseExpr
-                           atlOcurrTaskName = rule636 alhsIcurrTaskName
-                           atlOgraph = rule637 ahdIgraph
-                           atlOmergeId = rule638 alhsImergeId
-                           atlOmoduleEnv = rule639 alhsImoduleEnv
+                           alhsOhasRecs = rule637 ahdIhasRecs atlIhasRecs
+                           alhsOmEntryId = rule638 ahdImEntryId atlImEntryId
+                           alhsOmExitId = rule639 ahdImExitId atlImExitId
+                           alhsOrecNode = rule640 ahdIrecNode atlIrecNode
+                           lcopy = rule641 ahdIcopy atlIcopy
+                           alhsOcopy = rule642 lcopy
+                           alhsOgraph = rule643 atlIgraph
+                           ahdOcaseExpr = rule644 alhsIcaseExpr
+                           ahdOcurrTaskName = rule645 alhsIcurrTaskName
+                           ahdOgraph = rule646 alhsIgraph
+                           ahdOmergeId = rule647 alhsImergeId
+                           ahdOmoduleEnv = rule648 alhsImoduleEnv
+                           atlOcaseExpr = rule649 alhsIcaseExpr
+                           atlOcurrTaskName = rule650 alhsIcurrTaskName
+                           atlOgraph = rule651 ahdIgraph
+                           atlOmergeId = rule652 alhsImergeId
+                           atlOmoduleEnv = rule653 alhsImoduleEnv
                            ag__result_ = T_FreeVars_vOut22 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOrecNode
                        in ag__result_
          in C_FreeVars_s23 v22
-   rule623 ((ahdIhasRecs)) ((atlIhasRecs)) =
+   rule637 ((ahdIhasRecs)) ((atlIhasRecs)) =
      ahdIhasRecs || atlIhasRecs
-   rule624 ((ahdImEntryId)) ((atlImEntryId)) =
+   rule638 ((ahdImEntryId)) ((atlImEntryId)) =
      ahdImEntryId <> atlImEntryId
-   rule625 ((ahdImExitId)) ((atlImExitId)) =
+   rule639 ((ahdImExitId)) ((atlImExitId)) =
      ahdImExitId <> atlImExitId
-   rule626 ((ahdIrecNode)) ((atlIrecNode)) =
+   rule640 ((ahdIrecNode)) ((atlIrecNode)) =
      ahdIrecNode || atlIrecNode
-   rule627 ((ahdIcopy)) ((atlIcopy)) =
+   rule641 ((ahdIcopy)) ((atlIcopy)) =
      (\x xs -> [x:xs]) ahdIcopy atlIcopy
-   rule628 lcopy =
+   rule642 lcopy =
      lcopy
-   rule629 ((atlIgraph)) =
+   rule643 ((atlIgraph)) =
      atlIgraph
-   rule630 ((alhsIcaseExpr)) =
+   rule644 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule631 ((alhsIcurrTaskName)) =
+   rule645 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule632 ((alhsIgraph)) =
+   rule646 ((alhsIgraph)) =
      alhsIgraph
-   rule633 ((alhsImergeId)) =
+   rule647 ((alhsImergeId)) =
      alhsImergeId
-   rule634 ((alhsImoduleEnv)) =
+   rule648 ((alhsImoduleEnv)) =
      alhsImoduleEnv
-   rule635 ((alhsIcaseExpr)) =
+   rule649 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule636 ((alhsIcurrTaskName)) =
+   rule650 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule637 ((ahdIgraph)) =
+   rule651 ((ahdIgraph)) =
      ahdIgraph
-   rule638 ((alhsImergeId)) =
+   rule652 ((alhsImergeId)) =
      alhsImergeId
-   rule639 ((alhsImoduleEnv)) =
+   rule653 ((alhsImoduleEnv)) =
      alhsImoduleEnv
 sem_FreeVars_Nil  ::   T_FreeVars 
 sem_FreeVars_Nil  = T_FreeVars (lift st23) where
@@ -3318,30 +3446,153 @@ sem_FreeVars_Nil  = T_FreeVars (lift st23) where
          let
              v22 (T_FreeVars_vIn22 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                        let
-                           alhsOhasRecs = rule640  Void
-                           alhsOmEntryId = rule641  Void
-                           alhsOmExitId = rule642  Void
-                           alhsOrecNode = rule643  Void
-                           lcopy = rule644  Void
-                           alhsOcopy = rule645 lcopy
-                           alhsOgraph = rule646 alhsIgraph
+                           alhsOhasRecs = rule654  Void
+                           alhsOmEntryId = rule655  Void
+                           alhsOmExitId = rule656  Void
+                           alhsOrecNode = rule657  Void
+                           lcopy = rule658  Void
+                           alhsOcopy = rule659 lcopy
+                           alhsOgraph = rule660 alhsIgraph
                            ag__result_ = T_FreeVars_vOut22 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOrecNode
                        in ag__result_
          in C_FreeVars_s23 v22
-   rule640  (_) =
+   rule654  (_) =
      False
-   rule641  (_) =
+   rule655  (_) =
      Nothing
-   rule642  (_) =
+   rule656  (_) =
      Nothing
-   rule643  (_) =
+   rule657  (_) =
      False
-   rule644  (_) =
+   rule658  (_) =
      []
-   rule645 lcopy =
+   rule659 lcopy =
      lcopy
-   rule646 ((alhsIgraph)) =
+   rule660 ((alhsIgraph)) =
      alhsIgraph
+
+// FunType -----------------------------------------------------
+// wrapper
+moduleEnv_Inh_FunType :: Inh_FunType -> (ModuleEnv)
+moduleEnv_Inh_FunType (Inh_FunType _ _ _ _ x) = x
+mergeId_Inh_FunType :: Inh_FunType -> (Int)
+mergeId_Inh_FunType (Inh_FunType _ _ _ x _) = x
+graph_Inh_FunType :: Inh_FunType -> (GinGraph)
+graph_Inh_FunType (Inh_FunType _ _ x _ _) = x
+currTaskName_Inh_FunType :: Inh_FunType -> (String)
+currTaskName_Inh_FunType (Inh_FunType _ x _ _ _) = x
+caseExpr_Inh_FunType :: Inh_FunType -> (Maybe Expression)
+caseExpr_Inh_FunType (Inh_FunType x _ _ _ _) = x
+recNode_Syn_FunType :: Syn_FunType -> (Bool)
+recNode_Syn_FunType (Syn_FunType _ _ _ _ _ x) = x
+mExitId_Syn_FunType :: Syn_FunType -> (Maybe Int)
+mExitId_Syn_FunType (Syn_FunType _ _ _ _ x _) = x
+mEntryId_Syn_FunType :: Syn_FunType -> (Maybe Int)
+mEntryId_Syn_FunType (Syn_FunType _ _ _ x _ _) = x
+hasRecs_Syn_FunType :: Syn_FunType -> (Bool)
+hasRecs_Syn_FunType (Syn_FunType _ _ x _ _ _) = x
+graph_Syn_FunType :: Syn_FunType -> (GinGraph)
+graph_Syn_FunType (Syn_FunType _ x _ _ _ _) = x
+copy_Syn_FunType :: Syn_FunType -> (FunType)
+copy_Syn_FunType (Syn_FunType x _ _ _ _ _) = x
+wrap_FunType :: T_FunType  Inh_FunType  -> (Syn_FunType )
+wrap_FunType (T_FunType act) (Inh_FunType alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
+   'Control.Monad.Identity'.runIdentity (
+     act >>= \ sem ->
+     lift (T_FunType_vIn25 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) >>= \ arg ->
+     lift (inv_FunType_s26 sem arg) >>= \ (T_FunType_vOut25 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOrecNode) ->
+     lift (Syn_FunType alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOrecNode)
+   )
+
+// cata
+sem_FunType :: FunType  -> T_FunType 
+sem_FunType { FunType | ft_ident = ft_ident_,ft_arity = ft_arity_,ft_priority = ft_priority_,ft_type = ft_type_,ft_pos = ft_pos_,ft_specials = ft_specials_,ft_type_ptr = ft_type_ptr_ } = sem_FunType_FunType ( sem_Ident ft_ident_ ) ft_arity_ ( sem_Priority ft_priority_ ) ( sem_SymbolType ft_type_ ) ft_pos_ ft_specials_ ft_type_ptr_
+
+// semantic domain
+:: T_FunType  = T_FunType (Identity (T_FunType_s26 ))
+attach_T_FunType (T_FunType t_FunType) = t_FunType
+inv_FunType_s26 (C_FunType_s26 x) = x
+sem_FunType_FunType  :: (T_Ident ) (Int) (T_Priority ) (T_SymbolType ) (Position) (FunSpecials) (VarInfoPtr) -> T_FunType 
+sem_FunType_FunType arg_ft_ident_ arg_ft_arity_ arg_ft_priority_ arg_ft_type_ arg_ft_pos_ arg_ft_specials_ arg_ft_type_ptr_ = T_FunType (lift st26) where
+   st26 =
+         let
+             v25 (T_FunType_vIn25 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
+                       let
+                           st_ft_identX47 = 'Control.Monad.Identity'.runIdentity (attach_T_Ident (arg_ft_ident_))
+                           st_ft_priorityX53 = 'Control.Monad.Identity'.runIdentity (attach_T_Priority (arg_ft_priority_))
+                           st_ft_typeX65 = 'Control.Monad.Identity'.runIdentity (attach_T_SymbolType (arg_ft_type_))
+                           (T_Ident_vOut46 aft_identIcopy aft_identIgraph aft_identIhasRecs aft_identIident aft_identIisCurrTask aft_identImEntryId aft_identImExitId aft_identIppAg aft_identIppAgs aft_identIppDebug aft_identIppDebugs aft_identIrecNode) = inv_Ident_s47 st_ft_identX47 (T_Ident_vIn46 aft_identOcaseExpr aft_identOcurrTaskName aft_identOgraph aft_identOmergeId aft_identOmoduleEnv)
+                           (T_Priority_vOut52 aft_priorityIcopy aft_priorityIgraph) = inv_Priority_s53 st_ft_priorityX53 (T_Priority_vIn52 aft_priorityOcaseExpr aft_priorityOcurrTaskName aft_priorityOgraph aft_priorityOmergeId aft_priorityOmoduleEnv)
+                           (T_SymbolType_vOut64 aft_typeIcopy aft_typeIgraph aft_typeIhasRecs aft_typeImEntryId aft_typeImExitId aft_typeIppAg aft_typeIppAgs aft_typeIppDebug aft_typeIppDebugs aft_typeIrecNode) = inv_SymbolType_s65 st_ft_typeX65 (T_SymbolType_vIn64 aft_typeOcaseExpr aft_typeOcurrTaskName aft_typeOgraph aft_typeOmergeId aft_typeOmoduleEnv)
+                           alhsOhasRecs = rule661 aft_identIhasRecs aft_typeIhasRecs
+                           alhsOmEntryId = rule662 aft_identImEntryId aft_typeImEntryId
+                           alhsOmExitId = rule663 aft_identImExitId aft_typeImExitId
+                           alhsOrecNode = rule664 aft_identIrecNode aft_typeIrecNode
+                           lcopy = rule665 aft_identIcopy aft_priorityIcopy aft_typeIcopy arg_ft_arity_ arg_ft_pos_ arg_ft_specials_ arg_ft_type_ptr_
+                           alhsOcopy = rule666 lcopy
+                           alhsOgraph = rule667 aft_typeIgraph
+                           aft_identOcaseExpr = rule668 alhsIcaseExpr
+                           aft_identOcurrTaskName = rule669 alhsIcurrTaskName
+                           aft_identOgraph = rule670 alhsIgraph
+                           aft_identOmergeId = rule671 alhsImergeId
+                           aft_identOmoduleEnv = rule672 alhsImoduleEnv
+                           aft_priorityOcaseExpr = rule673 alhsIcaseExpr
+                           aft_priorityOcurrTaskName = rule674 alhsIcurrTaskName
+                           aft_priorityOgraph = rule675 aft_identIgraph
+                           aft_priorityOmergeId = rule676 alhsImergeId
+                           aft_priorityOmoduleEnv = rule677 alhsImoduleEnv
+                           aft_typeOcaseExpr = rule678 alhsIcaseExpr
+                           aft_typeOcurrTaskName = rule679 alhsIcurrTaskName
+                           aft_typeOgraph = rule680 aft_priorityIgraph
+                           aft_typeOmergeId = rule681 alhsImergeId
+                           aft_typeOmoduleEnv = rule682 alhsImoduleEnv
+                           ag__result_ = T_FunType_vOut25 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOrecNode
+                       in ag__result_
+         in C_FunType_s26 v25
+   rule661 ((aft_identIhasRecs)) ((aft_typeIhasRecs)) =
+     aft_identIhasRecs || aft_typeIhasRecs
+   rule662 ((aft_identImEntryId)) ((aft_typeImEntryId)) =
+     aft_identImEntryId <> aft_typeImEntryId
+   rule663 ((aft_identImExitId)) ((aft_typeImExitId)) =
+     aft_identImExitId <> aft_typeImExitId
+   rule664 ((aft_identIrecNode)) ((aft_typeIrecNode)) =
+     aft_identIrecNode || aft_typeIrecNode
+   rule665 ((aft_identIcopy)) ((aft_priorityIcopy)) ((aft_typeIcopy)) ft_arity_ ft_pos_ ft_specials_ ft_type_ptr_ =
+     {FunType|ft_ident = aft_identIcopy , ft_arity = ft_arity_ , ft_priority = aft_priorityIcopy , ft_type = aft_typeIcopy , ft_pos = ft_pos_ , ft_specials = ft_specials_ , ft_type_ptr = ft_type_ptr_}
+   rule666 lcopy =
+     lcopy
+   rule667 ((aft_typeIgraph)) =
+     aft_typeIgraph
+   rule668 ((alhsIcaseExpr)) =
+     alhsIcaseExpr
+   rule669 ((alhsIcurrTaskName)) =
+     alhsIcurrTaskName
+   rule670 ((alhsIgraph)) =
+     alhsIgraph
+   rule671 ((alhsImergeId)) =
+     alhsImergeId
+   rule672 ((alhsImoduleEnv)) =
+     alhsImoduleEnv
+   rule673 ((alhsIcaseExpr)) =
+     alhsIcaseExpr
+   rule674 ((alhsIcurrTaskName)) =
+     alhsIcurrTaskName
+   rule675 ((aft_identIgraph)) =
+     aft_identIgraph
+   rule676 ((alhsImergeId)) =
+     alhsImergeId
+   rule677 ((alhsImoduleEnv)) =
+     alhsImoduleEnv
+   rule678 ((alhsIcaseExpr)) =
+     alhsIcaseExpr
+   rule679 ((alhsIcurrTaskName)) =
+     alhsIcurrTaskName
+   rule680 ((aft_priorityIgraph)) =
+     aft_priorityIgraph
+   rule681 ((alhsImergeId)) =
+     alhsImergeId
+   rule682 ((alhsImoduleEnv)) =
+     alhsImoduleEnv
 
 // GExpression -------------------------------------------------
 // wrapper
@@ -3379,8 +3630,8 @@ wrap_GExpression :: T_GExpression  Inh_GExpression  -> (Syn_GExpression )
 wrap_GExpression (T_GExpression act) (Inh_GExpression alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
    'Control.Monad.Identity'.runIdentity (
      act >>= \ sem ->
-     lift (T_GExpression_vIn25 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) >>= \ arg ->
-     lift (inv_GExpression_s26 sem arg) >>= \ (T_GExpression_vOut25 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode) ->
+     lift (T_GExpression_vIn28 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) >>= \ arg ->
+     lift (inv_GExpression_s29 sem arg) >>= \ (T_GExpression_vOut28 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode) ->
      lift (Syn_GExpression alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode)
    )
 
@@ -3392,199 +3643,200 @@ sem_GExpression ( GListExpression gexprs_ ) = sem_GExpression_GListExpression ge
 sem_GExpression ( GCleanExpression gcexpr_ ) = sem_GExpression_GCleanExpression gcexpr_
 
 // semantic domain
+:: T_GExpression  = T_GExpression (Identity (T_GExpression_s29 ))
 attach_T_GExpression (T_GExpression t_GExpression) = t_GExpression
-inv_GExpression_s26 (C_GExpression_s26 x) = x
+inv_GExpression_s29 (C_GExpression_s29 x) = x
 sem_GExpression_GUndefinedExpression  ::   T_GExpression 
-sem_GExpression_GUndefinedExpression  = T_GExpression (lift st26) where
-   st26 =
+sem_GExpression_GUndefinedExpression  = T_GExpression (lift st29) where
+   st29 =
          let
-             v25 (T_GExpression_vIn25 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
+             v28 (T_GExpression_vIn28 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                        let
-                           alhsOppDebug = rule647  Void
-                           alhsOppAg = rule648  Void
-                           alhsOhasRecs = rule649  Void
-                           alhsOmEntryId = rule650  Void
-                           alhsOmExitId = rule651  Void
-                           alhsOppAgs = rule652  Void
-                           alhsOppDebugs = rule653  Void
-                           alhsOrecNode = rule654  Void
-                           lcopy = rule655  Void
-                           alhsOcopy = rule656 lcopy
-                           alhsOgraph = rule657 alhsIgraph
-                           ag__result_ = T_GExpression_vOut25 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
+                           alhsOppDebug = rule683  Void
+                           alhsOppAg = rule684  Void
+                           alhsOhasRecs = rule685  Void
+                           alhsOmEntryId = rule686  Void
+                           alhsOmExitId = rule687  Void
+                           alhsOppAgs = rule688  Void
+                           alhsOppDebugs = rule689  Void
+                           alhsOrecNode = rule690  Void
+                           lcopy = rule691  Void
+                           alhsOcopy = rule692 lcopy
+                           alhsOgraph = rule693 alhsIgraph
+                           ag__result_ = T_GExpression_vOut28 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
-         in C_GExpression_s26 v25
-   /*# LINE 146 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule647  (_) =
-                                          /*# LINE 146 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+         in C_GExpression_s29 v28
+   /*# LINE 128 "./frontend/Tonic/Pretty.ag" #*/
+   rule683  (_) =
+                                          /*# LINE 128 "./frontend/Tonic/Pretty.ag" #*/
                                           text "undef"
-                                          /*# LINE 3422 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 147 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule648  (_) =
-                                          /*# LINE 147 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+                                          /*# LINE 3674 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 129 "./frontend/Tonic/Pretty.ag" #*/
+   rule684  (_) =
+                                          /*# LINE 129 "./frontend/Tonic/Pretty.ag" #*/
                                           text "undef"
-                                          /*# LINE 3427 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   rule649  (_) =
+                                          /*# LINE 3679 "frontend/Tonic/Tonic.icl"#*/
+   rule685  (_) =
      False
-   rule650  (_) =
+   rule686  (_) =
      Nothing
-   rule651  (_) =
+   rule687  (_) =
      Nothing
-   rule652  (_) =
+   rule688  (_) =
      []
-   rule653  (_) =
+   rule689  (_) =
      []
-   rule654  (_) =
+   rule690  (_) =
      False
-   rule655  (_) =
+   rule691  (_) =
      GUndefinedExpression
-   rule656 lcopy =
+   rule692 lcopy =
      lcopy
-   rule657 ((alhsIgraph)) =
+   rule693 ((alhsIgraph)) =
      alhsIgraph
 sem_GExpression_GGraphExpression  :: (GGraph) -> T_GExpression 
-sem_GExpression_GGraphExpression arg_gg_ = T_GExpression (lift st26) where
-   st26 =
+sem_GExpression_GGraphExpression arg_gg_ = T_GExpression (lift st29) where
+   st29 =
          let
-             v25 (T_GExpression_vIn25 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
+             v28 (T_GExpression_vIn28 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                        let
-                           alhsOppDebug = rule658  Void
-                           alhsOppAg = rule659  Void
-                           alhsOhasRecs = rule660  Void
-                           alhsOmEntryId = rule661  Void
-                           alhsOmExitId = rule662  Void
-                           alhsOppAgs = rule663  Void
-                           alhsOppDebugs = rule664  Void
-                           alhsOrecNode = rule665  Void
-                           lcopy = rule666 arg_gg_
-                           alhsOcopy = rule667 lcopy
-                           alhsOgraph = rule668 alhsIgraph
-                           ag__result_ = T_GExpression_vOut25 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
+                           alhsOppDebug = rule694  Void
+                           alhsOppAg = rule695  Void
+                           alhsOhasRecs = rule696  Void
+                           alhsOmEntryId = rule697  Void
+                           alhsOmExitId = rule698  Void
+                           alhsOppAgs = rule699  Void
+                           alhsOppDebugs = rule700  Void
+                           alhsOrecNode = rule701  Void
+                           lcopy = rule702 arg_gg_
+                           alhsOcopy = rule703 lcopy
+                           alhsOgraph = rule704 alhsIgraph
+                           ag__result_ = T_GExpression_vOut28 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
-         in C_GExpression_s26 v25
-   /*# LINE 148 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule658  (_) =
-                                          /*# LINE 148 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+         in C_GExpression_s29 v28
+   /*# LINE 130 "./frontend/Tonic/Pretty.ag" #*/
+   rule694  (_) =
+                                          /*# LINE 130 "./frontend/Tonic/Pretty.ag" #*/
                                           text "TODO: render a subgraph (and don't PP one)"
-                                          /*# LINE 3470 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 149 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule659  (_) =
-                                          /*# LINE 149 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+                                          /*# LINE 3722 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 131 "./frontend/Tonic/Pretty.ag" #*/
+   rule695  (_) =
+                                          /*# LINE 131 "./frontend/Tonic/Pretty.ag" #*/
                                           text "TODO: render a subgraph (and don't PP one)"
-                                          /*# LINE 3475 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   rule660  (_) =
+                                          /*# LINE 3727 "frontend/Tonic/Tonic.icl"#*/
+   rule696  (_) =
      False
-   rule661  (_) =
+   rule697  (_) =
      Nothing
-   rule662  (_) =
+   rule698  (_) =
      Nothing
-   rule663  (_) =
+   rule699  (_) =
      []
-   rule664  (_) =
+   rule700  (_) =
      []
-   rule665  (_) =
+   rule701  (_) =
      False
-   rule666 gg_ =
+   rule702 gg_ =
      GGraphExpression gg_
-   rule667 lcopy =
+   rule703 lcopy =
      lcopy
-   rule668 ((alhsIgraph)) =
+   rule704 ((alhsIgraph)) =
      alhsIgraph
 sem_GExpression_GListExpression  :: ([GExpression]) -> T_GExpression 
-sem_GExpression_GListExpression arg_gexprs_ = T_GExpression (lift st26) where
-   st26 =
+sem_GExpression_GListExpression arg_gexprs_ = T_GExpression (lift st29) where
+   st29 =
          let
-             v25 (T_GExpression_vIn25 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
+             v28 (T_GExpression_vIn28 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                        let
-                           alhsOppDebug = rule669  Void
-                           alhsOppAg = rule670  Void
-                           alhsOhasRecs = rule671  Void
-                           alhsOmEntryId = rule672  Void
-                           alhsOmExitId = rule673  Void
-                           alhsOppAgs = rule674  Void
-                           alhsOppDebugs = rule675  Void
-                           alhsOrecNode = rule676  Void
-                           lcopy = rule677 arg_gexprs_
-                           alhsOcopy = rule678 lcopy
-                           alhsOgraph = rule679 alhsIgraph
-                           ag__result_ = T_GExpression_vOut25 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
+                           alhsOppDebug = rule705  Void
+                           alhsOppAg = rule706  Void
+                           alhsOhasRecs = rule707  Void
+                           alhsOmEntryId = rule708  Void
+                           alhsOmExitId = rule709  Void
+                           alhsOppAgs = rule710  Void
+                           alhsOppDebugs = rule711  Void
+                           alhsOrecNode = rule712  Void
+                           lcopy = rule713 arg_gexprs_
+                           alhsOcopy = rule714 lcopy
+                           alhsOgraph = rule715 alhsIgraph
+                           ag__result_ = T_GExpression_vOut28 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
-         in C_GExpression_s26 v25
-   /*# LINE 150 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule669  (_) =
-                                          /*# LINE 150 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+         in C_GExpression_s29 v28
+   /*# LINE 132 "./frontend/Tonic/Pretty.ag" #*/
+   rule705  (_) =
+                                          /*# LINE 132 "./frontend/Tonic/Pretty.ag" #*/
                                           text "TODO: render a list expression (and don't PP one)"
-                                          /*# LINE 3518 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 151 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule670  (_) =
-                                          /*# LINE 151 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+                                          /*# LINE 3770 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 133 "./frontend/Tonic/Pretty.ag" #*/
+   rule706  (_) =
+                                          /*# LINE 133 "./frontend/Tonic/Pretty.ag" #*/
                                           text "TODO: render a list expression (and don't PP one)"
-                                          /*# LINE 3523 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   rule671  (_) =
+                                          /*# LINE 3775 "frontend/Tonic/Tonic.icl"#*/
+   rule707  (_) =
      False
-   rule672  (_) =
+   rule708  (_) =
      Nothing
-   rule673  (_) =
+   rule709  (_) =
      Nothing
-   rule674  (_) =
+   rule710  (_) =
      []
-   rule675  (_) =
+   rule711  (_) =
      []
-   rule676  (_) =
+   rule712  (_) =
      False
-   rule677 gexprs_ =
+   rule713 gexprs_ =
      GListExpression gexprs_
-   rule678 lcopy =
+   rule714 lcopy =
      lcopy
-   rule679 ((alhsIgraph)) =
+   rule715 ((alhsIgraph)) =
      alhsIgraph
 sem_GExpression_GCleanExpression  :: (GCleanExpression) -> T_GExpression 
-sem_GExpression_GCleanExpression arg_gcexpr_ = T_GExpression (lift st26) where
-   st26 =
+sem_GExpression_GCleanExpression arg_gcexpr_ = T_GExpression (lift st29) where
+   st29 =
          let
-             v25 (T_GExpression_vIn25 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
+             v28 (T_GExpression_vIn28 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                        let
-                           alhsOppDebug = rule680 arg_gcexpr_
-                           alhsOppAg = rule681 arg_gcexpr_
-                           alhsOhasRecs = rule682  Void
-                           alhsOmEntryId = rule683  Void
-                           alhsOmExitId = rule684  Void
-                           alhsOppAgs = rule685  Void
-                           alhsOppDebugs = rule686  Void
-                           alhsOrecNode = rule687  Void
-                           lcopy = rule688 arg_gcexpr_
-                           alhsOcopy = rule689 lcopy
-                           alhsOgraph = rule690 alhsIgraph
-                           ag__result_ = T_GExpression_vOut25 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
+                           alhsOppDebug = rule716 arg_gcexpr_
+                           alhsOppAg = rule717 arg_gcexpr_
+                           alhsOhasRecs = rule718  Void
+                           alhsOmEntryId = rule719  Void
+                           alhsOmExitId = rule720  Void
+                           alhsOppAgs = rule721  Void
+                           alhsOppDebugs = rule722  Void
+                           alhsOrecNode = rule723  Void
+                           lcopy = rule724 arg_gcexpr_
+                           alhsOcopy = rule725 lcopy
+                           alhsOgraph = rule726 alhsIgraph
+                           ag__result_ = T_GExpression_vOut28 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
-         in C_GExpression_s26 v25
-   /*# LINE 152 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule680 gcexpr_ =
-                                          /*# LINE 152 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+         in C_GExpression_s29 v28
+   /*# LINE 134 "./frontend/Tonic/Pretty.ag" #*/
+   rule716 gcexpr_ =
+                                          /*# LINE 134 "./frontend/Tonic/Pretty.ag" #*/
                                           text gcexpr_
-                                          /*# LINE 3566 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 153 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule681 gcexpr_ =
-                                          /*# LINE 153 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+                                          /*# LINE 3818 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 135 "./frontend/Tonic/Pretty.ag" #*/
+   rule717 gcexpr_ =
+                                          /*# LINE 135 "./frontend/Tonic/Pretty.ag" #*/
                                           text gcexpr_
-                                          /*# LINE 3571 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   rule682  (_) =
+                                          /*# LINE 3823 "frontend/Tonic/Tonic.icl"#*/
+   rule718  (_) =
      False
-   rule683  (_) =
+   rule719  (_) =
      Nothing
-   rule684  (_) =
+   rule720  (_) =
      Nothing
-   rule685  (_) =
+   rule721  (_) =
      []
-   rule686  (_) =
+   rule722  (_) =
      []
-   rule687  (_) =
+   rule723  (_) =
      False
-   rule688 gcexpr_ =
+   rule724 gcexpr_ =
      GCleanExpression gcexpr_
-   rule689 lcopy =
+   rule725 lcopy =
      lcopy
-   rule690 ((alhsIgraph)) =
+   rule726 ((alhsIgraph)) =
      alhsIgraph
 
 // GFunDef -----------------------------------------------------
@@ -3600,124 +3852,131 @@ currTaskName_Inh_GFunDef (Inh_GFunDef _ x _ _ _) = x
 caseExpr_Inh_GFunDef :: Inh_GFunDef -> (Maybe Expression)
 caseExpr_Inh_GFunDef (Inh_GFunDef x _ _ _ _) = x
 recNode_Syn_GFunDef :: Syn_GFunDef -> (Bool)
-recNode_Syn_GFunDef (Syn_GFunDef _ _ _ _ _ _ _ x) = x
+recNode_Syn_GFunDef (Syn_GFunDef _ _ _ _ _ _ x) = x
 mExitId_Syn_GFunDef :: Syn_GFunDef -> (Maybe Int)
-mExitId_Syn_GFunDef (Syn_GFunDef _ _ _ _ _ _ x _) = x
+mExitId_Syn_GFunDef (Syn_GFunDef _ _ _ _ _ x _) = x
 mEntryId_Syn_GFunDef :: Syn_GFunDef -> (Maybe Int)
-mEntryId_Syn_GFunDef (Syn_GFunDef _ _ _ _ _ x _ _) = x
+mEntryId_Syn_GFunDef (Syn_GFunDef _ _ _ _ x _ _) = x
 hasRecs_Syn_GFunDef :: Syn_GFunDef -> (Bool)
-hasRecs_Syn_GFunDef (Syn_GFunDef _ _ _ _ x _ _ _) = x
+hasRecs_Syn_GFunDef (Syn_GFunDef _ _ _ x _ _ _) = x
 graph_Syn_GFunDef :: Syn_GFunDef -> (GinGraph)
-graph_Syn_GFunDef (Syn_GFunDef _ _ _ x _ _ _ _) = x
-funRhs_Syn_GFunDef :: Syn_GFunDef -> (Expression)
-funRhs_Syn_GFunDef (Syn_GFunDef _ _ x _ _ _ _ _) = x
+graph_Syn_GFunDef (Syn_GFunDef _ _ x _ _ _ _) = x
 funArgs_Syn_GFunDef :: Syn_GFunDef -> ([FreeVar])
-funArgs_Syn_GFunDef (Syn_GFunDef _ x _ _ _ _ _ _) = x
+funArgs_Syn_GFunDef (Syn_GFunDef _ x _ _ _ _ _) = x
 copy_Syn_GFunDef :: Syn_GFunDef -> (GFunDef)
-copy_Syn_GFunDef (Syn_GFunDef x _ _ _ _ _ _ _) = x
+copy_Syn_GFunDef (Syn_GFunDef x _ _ _ _ _ _) = x
 wrap_GFunDef :: T_GFunDef  Inh_GFunDef  -> (Syn_GFunDef )
 wrap_GFunDef (T_GFunDef act) (Inh_GFunDef alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
    'Control.Monad.Identity'.runIdentity (
      act >>= \ sem ->
-     lift (T_GFunDef_vIn28 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) >>= \ arg ->
-     lift (inv_GFunDef_s29 sem arg) >>= \ (T_GFunDef_vOut28 alhsOcopy alhsOfunArgs alhsOfunRhs alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOrecNode) ->
-     lift (Syn_GFunDef alhsOcopy alhsOfunArgs alhsOfunRhs alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOrecNode)
+     lift (T_GFunDef_vIn31 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) >>= \ arg ->
+     lift (inv_GFunDef_s32 sem arg) >>= \ (T_GFunDef_vOut31 alhsOcopy alhsOfunArgs alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOrecNode) ->
+     lift (Syn_GFunDef alhsOcopy alhsOfunArgs alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOrecNode)
    )
 
 // cata
 sem_GFunDef :: GFunDef  -> T_GFunDef 
-sem_GFunDef { GFunDef | gfd_name = gfd_name_,gfd_args = gfd_args_,gfd_rhs = gfd_rhs_,gfd_type = gfd_type_,gfd_priority = gfd_priority_ } = sem_GFunDef_GFunDef gfd_name_ ( sem_FreeVars gfd_args_ ) ( sem_Expression gfd_rhs_ ) gfd_type_ gfd_priority_
+sem_GFunDef { GFunDef | gfd_name = gfd_name_,gfd_args = gfd_args_,gfd_rhs = gfd_rhs_,gfd_type = gfd_type_,gfd_priority = gfd_priority_ } = sem_GFunDef_GFunDef gfd_name_ ( sem_FreeVars gfd_args_ ) ( sem_Expression gfd_rhs_ ) gfd_type_ ( sem_Priority gfd_priority_ )
 
 // semantic domain
+:: T_GFunDef  = T_GFunDef (Identity (T_GFunDef_s32 ))
 attach_T_GFunDef (T_GFunDef t_GFunDef) = t_GFunDef
-inv_GFunDef_s29 (C_GFunDef_s29 x) = x
-sem_GFunDef_GFunDef  :: (String) (T_FreeVars ) (T_Expression ) (Optional SymbolType) (Priority) -> T_GFunDef 
-sem_GFunDef_GFunDef arg_gfd_name_ arg_gfd_args_ arg_gfd_rhs_ arg_gfd_type_ arg_gfd_priority_ = T_GFunDef (lift st29) where
-   st29 =
+inv_GFunDef_s32 (C_GFunDef_s32 x) = x
+sem_GFunDef_GFunDef  :: (String) (T_FreeVars ) (T_Expression ) (Optional SymbolType) (T_Priority ) -> T_GFunDef 
+sem_GFunDef_GFunDef arg_gfd_name_ arg_gfd_args_ arg_gfd_rhs_ arg_gfd_type_ arg_gfd_priority_ = T_GFunDef (lift st32) where
+   st32 =
          let
-             v28 (T_GFunDef_vIn28 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
+             v31 (T_GFunDef_vIn31 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                        let
                            st_gfd_argsX23 = 'Control.Monad.Identity'.runIdentity (attach_T_FreeVars (arg_gfd_args_))
                            st_gfd_rhsX14 = 'Control.Monad.Identity'.runIdentity (attach_T_Expression (arg_gfd_rhs_))
+                           st_gfd_priorityX53 = 'Control.Monad.Identity'.runIdentity (attach_T_Priority (arg_gfd_priority_))
                            (T_FreeVars_vOut22 agfd_argsIcopy agfd_argsIgraph agfd_argsIhasRecs agfd_argsImEntryId agfd_argsImExitId agfd_argsIrecNode) = inv_FreeVars_s23 st_gfd_argsX23 (T_FreeVars_vIn22 agfd_argsOcaseExpr agfd_argsOcurrTaskName agfd_argsOgraph agfd_argsOmergeId agfd_argsOmoduleEnv)
                            (T_Expression_vOut13 agfd_rhsIcopy agfd_rhsIgraph agfd_rhsIhasRecs agfd_rhsImEntryId agfd_rhsImExitId agfd_rhsIppAg agfd_rhsIppAgs agfd_rhsIppDebug agfd_rhsIppDebugs agfd_rhsIrecNode) = inv_Expression_s14 st_gfd_rhsX14 (T_Expression_vIn13 agfd_rhsOcaseExpr agfd_rhsOcurrTaskName agfd_rhsOgraph agfd_rhsOmergeId agfd_rhsOmoduleEnv)
-                           alhsOfunArgs = rule691 agfd_argsIcopy
-                           alhsOfunRhs = rule692 agfd_rhsIcopy
-                           alhsOmEntryId = rule693 agfd_rhsImEntryId
-                           alhsOmExitId = rule694 agfd_rhsImExitId
-                           agfd_rhsOgraph = rule695 alhsIgraph
-                           alhsOgraph = rule696 agfd_rhsIgraph
-                           alhsOhasRecs = rule697 agfd_argsIhasRecs agfd_rhsIhasRecs
-                           alhsOrecNode = rule698 agfd_argsIrecNode agfd_rhsIrecNode
-                           lcopy = rule699 agfd_argsIcopy agfd_rhsIcopy arg_gfd_name_ arg_gfd_priority_ arg_gfd_type_
-                           alhsOcopy = rule700 lcopy
-                           agfd_argsOcaseExpr = rule701 alhsIcaseExpr
-                           agfd_argsOcurrTaskName = rule702 alhsIcurrTaskName
-                           agfd_argsOgraph = rule703 alhsIgraph
-                           agfd_argsOmergeId = rule704 alhsImergeId
-                           agfd_argsOmoduleEnv = rule705 alhsImoduleEnv
-                           agfd_rhsOcaseExpr = rule706 alhsIcaseExpr
-                           agfd_rhsOcurrTaskName = rule707 alhsIcurrTaskName
-                           agfd_rhsOmergeId = rule708 alhsImergeId
-                           agfd_rhsOmoduleEnv = rule709 alhsImoduleEnv
-                           ag__result_ = T_GFunDef_vOut28 alhsOcopy alhsOfunArgs alhsOfunRhs alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOrecNode
+                           (T_Priority_vOut52 agfd_priorityIcopy agfd_priorityIgraph) = inv_Priority_s53 st_gfd_priorityX53 (T_Priority_vIn52 agfd_priorityOcaseExpr agfd_priorityOcurrTaskName agfd_priorityOgraph agfd_priorityOmergeId agfd_priorityOmoduleEnv)
+                           alhsOfunArgs = rule727 agfd_argsIcopy
+                           alhsOmEntryId = rule728 agfd_rhsImEntryId
+                           alhsOmExitId = rule729 agfd_rhsImExitId
+                           alhsOgraph = rule730 agfd_rhsIgraph
+                           alhsOhasRecs = rule731 agfd_argsIhasRecs agfd_rhsIhasRecs
+                           alhsOrecNode = rule732 agfd_argsIrecNode agfd_rhsIrecNode
+                           lcopy = rule733 agfd_argsIcopy agfd_priorityIcopy agfd_rhsIcopy arg_gfd_name_ arg_gfd_type_
+                           alhsOcopy = rule734 lcopy
+                           agfd_argsOcaseExpr = rule735 alhsIcaseExpr
+                           agfd_argsOcurrTaskName = rule736 alhsIcurrTaskName
+                           agfd_argsOgraph = rule737 alhsIgraph
+                           agfd_argsOmergeId = rule738 alhsImergeId
+                           agfd_argsOmoduleEnv = rule739 alhsImoduleEnv
+                           agfd_rhsOcaseExpr = rule740 alhsIcaseExpr
+                           agfd_rhsOcurrTaskName = rule741 alhsIcurrTaskName
+                           agfd_rhsOgraph = rule742 agfd_argsIgraph
+                           agfd_rhsOmergeId = rule743 alhsImergeId
+                           agfd_rhsOmoduleEnv = rule744 alhsImoduleEnv
+                           agfd_priorityOcaseExpr = rule745 alhsIcaseExpr
+                           agfd_priorityOcurrTaskName = rule746 alhsIcurrTaskName
+                           agfd_priorityOgraph = rule747 agfd_rhsIgraph
+                           agfd_priorityOmergeId = rule748 alhsImergeId
+                           agfd_priorityOmoduleEnv = rule749 alhsImoduleEnv
+                           ag__result_ = T_GFunDef_vOut31 alhsOcopy alhsOfunArgs alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOrecNode
                        in ag__result_
-         in C_GFunDef_s29 v28
-   /*# LINE 108 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule691 ((agfd_argsIcopy)) =
-                      /*# LINE 108 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                      agfd_argsIcopy
-                      /*# LINE 3671 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 109 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule692 ((agfd_rhsIcopy)) =
-                      /*# LINE 109 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                      agfd_rhsIcopy
-                      /*# LINE 3676 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 111 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule693 ((agfd_rhsImEntryId)) =
-                       /*# LINE 111 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
+         in C_GFunDef_s32 v31
+   /*# LINE 117 "./frontend/Tonic/MkGraph.ag" #*/
+   rule727 ((agfd_argsIcopy)) =
+                       /*# LINE 117 "./frontend/Tonic/MkGraph.ag" #*/
+                       agfd_argsIcopy
+                       /*# LINE 3928 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 119 "./frontend/Tonic/MkGraph.ag" #*/
+   rule728 ((agfd_rhsImEntryId)) =
+                       /*# LINE 119 "./frontend/Tonic/MkGraph.ag" #*/
                        agfd_rhsImEntryId
-                       /*# LINE 3681 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 112 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule694 ((agfd_rhsImExitId)) =
-                       /*# LINE 112 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
+                       /*# LINE 3933 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 120 "./frontend/Tonic/MkGraph.ag" #*/
+   rule729 ((agfd_rhsImExitId)) =
+                       /*# LINE 120 "./frontend/Tonic/MkGraph.ag" #*/
                        agfd_rhsImExitId
-                       /*# LINE 3686 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 114 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule695 ((alhsIgraph)) =
-                        /*# LINE 114 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                        alhsIgraph
-                        /*# LINE 3691 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 115 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule696 ((agfd_rhsIgraph)) =
-                        /*# LINE 115 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                        agfd_rhsIgraph
-                        /*# LINE 3696 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   rule697 ((agfd_argsIhasRecs)) ((agfd_rhsIhasRecs)) =
+                       /*# LINE 3938 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 122 "./frontend/Tonic/MkGraph.ag" #*/
+   rule730 ((agfd_rhsIgraph)) =
+                       /*# LINE 122 "./frontend/Tonic/MkGraph.ag" #*/
+                       agfd_rhsIgraph
+                       /*# LINE 3943 "frontend/Tonic/Tonic.icl"#*/
+   rule731 ((agfd_argsIhasRecs)) ((agfd_rhsIhasRecs)) =
      agfd_argsIhasRecs || agfd_rhsIhasRecs
-   rule698 ((agfd_argsIrecNode)) ((agfd_rhsIrecNode)) =
+   rule732 ((agfd_argsIrecNode)) ((agfd_rhsIrecNode)) =
      agfd_argsIrecNode || agfd_rhsIrecNode
-   rule699 ((agfd_argsIcopy)) ((agfd_rhsIcopy)) gfd_name_ gfd_priority_ gfd_type_ =
-     {GFunDef|gfd_name = gfd_name_ , gfd_args = agfd_argsIcopy , gfd_rhs = agfd_rhsIcopy , gfd_type = gfd_type_ , gfd_priority = gfd_priority_}
-   rule700 lcopy =
+   rule733 ((agfd_argsIcopy)) ((agfd_priorityIcopy)) ((agfd_rhsIcopy)) gfd_name_ gfd_type_ =
+     {GFunDef|gfd_name = gfd_name_ , gfd_args = agfd_argsIcopy , gfd_rhs = agfd_rhsIcopy , gfd_type = gfd_type_ , gfd_priority = agfd_priorityIcopy}
+   rule734 lcopy =
      lcopy
-   rule701 ((alhsIcaseExpr)) =
+   rule735 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule702 ((alhsIcurrTaskName)) =
+   rule736 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule703 ((alhsIgraph)) =
+   rule737 ((alhsIgraph)) =
      alhsIgraph
-   rule704 ((alhsImergeId)) =
+   rule738 ((alhsImergeId)) =
      alhsImergeId
-   rule705 ((alhsImoduleEnv)) =
+   rule739 ((alhsImoduleEnv)) =
      alhsImoduleEnv
-   rule706 ((alhsIcaseExpr)) =
+   rule740 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule707 ((alhsIcurrTaskName)) =
+   rule741 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule708 ((alhsImergeId)) =
+   rule742 ((agfd_argsIgraph)) =
+     agfd_argsIgraph
+   rule743 ((alhsImergeId)) =
      alhsImergeId
-   rule709 ((alhsImoduleEnv)) =
+   rule744 ((alhsImoduleEnv)) =
+     alhsImoduleEnv
+   rule745 ((alhsIcaseExpr)) =
+     alhsIcaseExpr
+   rule746 ((alhsIcurrTaskName)) =
+     alhsIcurrTaskName
+   rule747 ((agfd_rhsIgraph)) =
+     agfd_rhsIgraph
+   rule748 ((alhsImergeId)) =
+     alhsImergeId
+   rule749 ((alhsImoduleEnv)) =
      alhsImoduleEnv
 
 // GLet --------------------------------------------------------
@@ -3756,8 +4015,8 @@ wrap_GLet :: T_GLet  Inh_GLet  -> (Syn_GLet )
 wrap_GLet (T_GLet act) (Inh_GLet alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
    'Control.Monad.Identity'.runIdentity (
      act >>= \ sem ->
-     lift (T_GLet_vIn31 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) >>= \ arg ->
-     lift (inv_GLet_s32 sem arg) >>= \ (T_GLet_vOut31 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode) ->
+     lift (T_GLet_vIn34 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) >>= \ arg ->
+     lift (inv_GLet_s35 sem arg) >>= \ (T_GLet_vOut34 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode) ->
      lift (Syn_GLet alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode)
    )
 
@@ -3766,114 +4025,115 @@ sem_GLet :: GLet  -> T_GLet
 sem_GLet { GLet | glet_binds = glet_binds_,glet_expr = glet_expr_ } = sem_GLet_GLet ( sem_GLetBinds glet_binds_ ) ( sem_Expression glet_expr_ )
 
 // semantic domain
+:: T_GLet  = T_GLet (Identity (T_GLet_s35 ))
 attach_T_GLet (T_GLet t_GLet) = t_GLet
-inv_GLet_s32 (C_GLet_s32 x) = x
+inv_GLet_s35 (C_GLet_s35 x) = x
 sem_GLet_GLet  :: (T_GLetBinds ) (T_Expression ) -> T_GLet 
-sem_GLet_GLet arg_glet_binds_ arg_glet_expr_ = T_GLet (lift st32) where
-   st32 =
+sem_GLet_GLet arg_glet_binds_ arg_glet_expr_ = T_GLet (lift st35) where
+   st35 =
          let
-             v31 (T_GLet_vIn31 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
+             v34 (T_GLet_vIn34 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                        let
-                           st_glet_bindsX38 = 'Control.Monad.Identity'.runIdentity (attach_T_GLetBinds (arg_glet_binds_))
+                           st_glet_bindsX41 = 'Control.Monad.Identity'.runIdentity (attach_T_GLetBinds (arg_glet_binds_))
                            st_glet_exprX14 = 'Control.Monad.Identity'.runIdentity (attach_T_Expression (arg_glet_expr_))
-                           (T_GLetBinds_vOut37 aglet_bindsIcopy aglet_bindsIgraph aglet_bindsIhasRecs aglet_bindsImCaseVarExpr aglet_bindsImEntryId aglet_bindsImExitId aglet_bindsIppAg aglet_bindsIppAgs aglet_bindsIppDebug aglet_bindsIppDebugs aglet_bindsIrecNode) = inv_GLetBinds_s38 st_glet_bindsX38 (T_GLetBinds_vIn37 aglet_bindsOcaseExpr aglet_bindsOcurrTaskName aglet_bindsOgraph aglet_bindsOmergeId aglet_bindsOmoduleEnv)
+                           (T_GLetBinds_vOut40 aglet_bindsIcopy aglet_bindsIgraph aglet_bindsIhasRecs aglet_bindsImCaseVarExpr aglet_bindsImEntryId aglet_bindsImExitId aglet_bindsIppAg aglet_bindsIppAgs aglet_bindsIppDebug aglet_bindsIppDebugs aglet_bindsIrecNode) = inv_GLetBinds_s41 st_glet_bindsX41 (T_GLetBinds_vIn40 aglet_bindsOcaseExpr aglet_bindsOcurrTaskName aglet_bindsOgraph aglet_bindsOmergeId aglet_bindsOmoduleEnv)
                            (T_Expression_vOut13 aglet_exprIcopy aglet_exprIgraph aglet_exprIhasRecs aglet_exprImEntryId aglet_exprImExitId aglet_exprIppAg aglet_exprIppAgs aglet_exprIppDebug aglet_exprIppDebugs aglet_exprIrecNode) = inv_Expression_s14 st_glet_exprX14 (T_Expression_vIn13 aglet_exprOcaseExpr aglet_exprOcurrTaskName aglet_exprOgraph aglet_exprOmergeId aglet_exprOmoduleEnv)
-                           alhsOgraph = rule710 aglet_bindsIcopy aglet_exprIgraph lconnId lmCaseVarExpr
-                           lmCaseVarExpr = rule711 aglet_bindsImCaseVarExpr
-                           aglet_exprOcaseExpr = rule712 lmCaseVarExpr
-                           alhsOrecNode = rule713  Void
-                           lconnId = rule714 aglet_exprImEntryId aglet_exprIrecNode alhsImergeId
-                           alhsOppDebug = rule715 aglet_bindsIppDebugs
-                           alhsOppAg = rule716 aglet_bindsIppAgs
-                           alhsOhasRecs = rule717 aglet_bindsIhasRecs aglet_exprIhasRecs
-                           alhsOmEntryId = rule718 aglet_bindsImEntryId aglet_exprImEntryId
-                           alhsOmExitId = rule719 aglet_bindsImExitId aglet_exprImExitId
-                           alhsOppAgs = rule720 aglet_bindsIppAgs aglet_exprIppAgs
-                           alhsOppDebugs = rule721 aglet_bindsIppDebugs aglet_exprIppDebugs
-                           lcopy = rule722 aglet_bindsIcopy aglet_exprIcopy
-                           alhsOcopy = rule723 lcopy
-                           aglet_bindsOcaseExpr = rule724 alhsIcaseExpr
-                           aglet_bindsOcurrTaskName = rule725 alhsIcurrTaskName
-                           aglet_bindsOgraph = rule726 alhsIgraph
-                           aglet_bindsOmergeId = rule727 alhsImergeId
-                           aglet_bindsOmoduleEnv = rule728 alhsImoduleEnv
-                           aglet_exprOcurrTaskName = rule729 alhsIcurrTaskName
-                           aglet_exprOgraph = rule730 aglet_bindsIgraph
-                           aglet_exprOmergeId = rule731 alhsImergeId
-                           aglet_exprOmoduleEnv = rule732 alhsImoduleEnv
-                           ag__result_ = T_GLet_vOut31 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
+                           alhsOgraph = rule750 aglet_exprIgraph lconnId lmCaseVarExpr
+                           lmCaseVarExpr = rule751 aglet_bindsImCaseVarExpr
+                           aglet_exprOcaseExpr = rule752 lmCaseVarExpr
+                           alhsOrecNode = rule753  Void
+                           lconnId = rule754 aglet_exprImEntryId aglet_exprIrecNode alhsImergeId
+                           alhsOppDebug = rule755 aglet_bindsIppDebugs
+                           alhsOppAg = rule756 aglet_bindsIppAgs
+                           alhsOhasRecs = rule757 aglet_bindsIhasRecs aglet_exprIhasRecs
+                           alhsOmEntryId = rule758 aglet_bindsImEntryId aglet_exprImEntryId
+                           alhsOmExitId = rule759 aglet_bindsImExitId aglet_exprImExitId
+                           alhsOppAgs = rule760 aglet_bindsIppAgs aglet_exprIppAgs
+                           alhsOppDebugs = rule761 aglet_bindsIppDebugs aglet_exprIppDebugs
+                           lcopy = rule762 aglet_bindsIcopy aglet_exprIcopy
+                           alhsOcopy = rule763 lcopy
+                           aglet_bindsOcaseExpr = rule764 alhsIcaseExpr
+                           aglet_bindsOcurrTaskName = rule765 alhsIcurrTaskName
+                           aglet_bindsOgraph = rule766 alhsIgraph
+                           aglet_bindsOmergeId = rule767 alhsImergeId
+                           aglet_bindsOmoduleEnv = rule768 alhsImoduleEnv
+                           aglet_exprOcurrTaskName = rule769 alhsIcurrTaskName
+                           aglet_exprOgraph = rule770 aglet_bindsIgraph
+                           aglet_exprOmergeId = rule771 alhsImergeId
+                           aglet_exprOmoduleEnv = rule772 alhsImoduleEnv
+                           ag__result_ = T_GLet_vOut34 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
-         in C_GLet_s32 v31
-   /*# LINE 240 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule710 ((aglet_bindsIcopy)) ((aglet_exprIgraph)) lconnId lmCaseVarExpr =
-                    /*# LINE 240 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
+         in C_GLet_s35 v34
+   /*# LINE 283 "./frontend/Tonic/MkGraph.ag" #*/
+   rule750 ((aglet_exprIgraph)) lconnId lmCaseVarExpr =
+                    /*# LINE 283 "./frontend/Tonic/MkGraph.ag" #*/
                     case lmCaseVarExpr     of
                       Just e  -> aglet_exprIgraph
-                      _       -> let (lid, g)  = addNode (GLet aglet_bindsIcopy) aglet_exprIgraph
+                      _       -> let (lid, g)  = undef
                                      err       = abort "Failed to add let edge; no synthesized ID from let body"
                                  in maybe err (\n -> addEmptyEdge (lid, n) g) lconnId
-                    /*# LINE 3816 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 247 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule711 ((aglet_bindsImCaseVarExpr)) =
-                           /*# LINE 247 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
+                    /*# LINE 4076 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 290 "./frontend/Tonic/MkGraph.ag" #*/
+   rule751 ((aglet_bindsImCaseVarExpr)) =
+                           /*# LINE 290 "./frontend/Tonic/MkGraph.ag" #*/
                            aglet_bindsImCaseVarExpr
-                           /*# LINE 3821 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 249 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule712 lmCaseVarExpr =
-                             /*# LINE 249 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
+                           /*# LINE 4081 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 292 "./frontend/Tonic/MkGraph.ag" #*/
+   rule752 lmCaseVarExpr =
+                             /*# LINE 292 "./frontend/Tonic/MkGraph.ag" #*/
                              lmCaseVarExpr
-                             /*# LINE 3826 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 251 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule713  (_) =
-                      /*# LINE 251 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
+                             /*# LINE 4086 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 294 "./frontend/Tonic/MkGraph.ag" #*/
+   rule753  (_) =
+                      /*# LINE 294 "./frontend/Tonic/MkGraph.ag" #*/
                       False
-                      /*# LINE 3831 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 253 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule714 ((aglet_exprImEntryId)) ((aglet_exprIrecNode)) ((alhsImergeId)) =
-                     /*# LINE 253 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
+                      /*# LINE 4091 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 296 "./frontend/Tonic/MkGraph.ag" #*/
+   rule754 ((aglet_exprImEntryId)) ((aglet_exprIrecNode)) ((alhsImergeId)) =
+                     /*# LINE 296 "./frontend/Tonic/MkGraph.ag" #*/
                      if aglet_exprIrecNode (Just alhsImergeId) aglet_exprImEntryId
-                     /*# LINE 3836 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 156 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule715 ((aglet_bindsIppDebugs)) =
-                         /*# LINE 156 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+                     /*# LINE 4096 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 138 "./frontend/Tonic/Pretty.ag" #*/
+   rule755 ((aglet_bindsIppDebugs)) =
+                         /*# LINE 138 "./frontend/Tonic/Pretty.ag" #*/
                          vcat aglet_bindsIppDebugs
-                         /*# LINE 3841 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 157 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule716 ((aglet_bindsIppAgs)) =
-                         /*# LINE 157 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+                         /*# LINE 4101 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 139 "./frontend/Tonic/Pretty.ag" #*/
+   rule756 ((aglet_bindsIppAgs)) =
+                         /*# LINE 139 "./frontend/Tonic/Pretty.ag" #*/
                          vcat aglet_bindsIppAgs
-                         /*# LINE 3846 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   rule717 ((aglet_bindsIhasRecs)) ((aglet_exprIhasRecs)) =
+                         /*# LINE 4106 "frontend/Tonic/Tonic.icl"#*/
+   rule757 ((aglet_bindsIhasRecs)) ((aglet_exprIhasRecs)) =
      aglet_bindsIhasRecs || aglet_exprIhasRecs
-   rule718 ((aglet_bindsImEntryId)) ((aglet_exprImEntryId)) =
+   rule758 ((aglet_bindsImEntryId)) ((aglet_exprImEntryId)) =
      aglet_bindsImEntryId <> aglet_exprImEntryId
-   rule719 ((aglet_bindsImExitId)) ((aglet_exprImExitId)) =
+   rule759 ((aglet_bindsImExitId)) ((aglet_exprImExitId)) =
      aglet_bindsImExitId <> aglet_exprImExitId
-   rule720 ((aglet_bindsIppAgs)) ((aglet_exprIppAgs)) =
+   rule760 ((aglet_bindsIppAgs)) ((aglet_exprIppAgs)) =
      aglet_bindsIppAgs ++ aglet_exprIppAgs
-   rule721 ((aglet_bindsIppDebugs)) ((aglet_exprIppDebugs)) =
+   rule761 ((aglet_bindsIppDebugs)) ((aglet_exprIppDebugs)) =
      aglet_bindsIppDebugs ++ aglet_exprIppDebugs
-   rule722 ((aglet_bindsIcopy)) ((aglet_exprIcopy)) =
+   rule762 ((aglet_bindsIcopy)) ((aglet_exprIcopy)) =
      {GLet|glet_binds = aglet_bindsIcopy , glet_expr = aglet_exprIcopy}
-   rule723 lcopy =
+   rule763 lcopy =
      lcopy
-   rule724 ((alhsIcaseExpr)) =
+   rule764 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule725 ((alhsIcurrTaskName)) =
+   rule765 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule726 ((alhsIgraph)) =
+   rule766 ((alhsIgraph)) =
      alhsIgraph
-   rule727 ((alhsImergeId)) =
+   rule767 ((alhsImergeId)) =
      alhsImergeId
-   rule728 ((alhsImoduleEnv)) =
+   rule768 ((alhsImoduleEnv)) =
      alhsImoduleEnv
-   rule729 ((alhsIcurrTaskName)) =
+   rule769 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule730 ((aglet_bindsIgraph)) =
+   rule770 ((aglet_bindsIgraph)) =
      aglet_bindsIgraph
-   rule731 ((alhsImergeId)) =
+   rule771 ((alhsImergeId)) =
      alhsImergeId
-   rule732 ((alhsImoduleEnv)) =
+   rule772 ((alhsImoduleEnv)) =
      alhsImoduleEnv
 
 // GLetBind ----------------------------------------------------
@@ -3914,8 +4174,8 @@ wrap_GLetBind :: T_GLetBind  Inh_GLetBind  -> (Syn_GLetBind )
 wrap_GLetBind (T_GLetBind act) (Inh_GLetBind alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
    'Control.Monad.Identity'.runIdentity (
      act >>= \ sem ->
-     lift (T_GLetBind_vIn34 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) >>= \ arg ->
-     lift (inv_GLetBind_s35 sem arg) >>= \ (T_GLetBind_vOut34 alhsOcopy alhsOgraph alhsOhasRecs alhsOmCaseVarExpr alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode) ->
+     lift (T_GLetBind_vIn37 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) >>= \ arg ->
+     lift (inv_GLetBind_s38 sem arg) >>= \ (T_GLetBind_vOut37 alhsOcopy alhsOgraph alhsOhasRecs alhsOmCaseVarExpr alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode) ->
      lift (Syn_GLetBind alhsOcopy alhsOgraph alhsOhasRecs alhsOmCaseVarExpr alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode)
    )
 
@@ -3924,78 +4184,79 @@ sem_GLetBind :: GLetBind  -> T_GLetBind
 sem_GLetBind { GLetBind | glb_dst = glb_dst_,glb_src = glb_src_ } = sem_GLetBind_GLetBind glb_dst_ ( sem_Expression glb_src_ )
 
 // semantic domain
+:: T_GLetBind  = T_GLetBind (Identity (T_GLetBind_s38 ))
 attach_T_GLetBind (T_GLetBind t_GLetBind) = t_GLetBind
-inv_GLetBind_s35 (C_GLetBind_s35 x) = x
+inv_GLetBind_s38 (C_GLetBind_s38 x) = x
 sem_GLetBind_GLetBind  :: (String) (T_Expression ) -> T_GLetBind 
-sem_GLetBind_GLetBind arg_glb_dst_ arg_glb_src_ = T_GLetBind (lift st35) where
-   st35 =
+sem_GLetBind_GLetBind arg_glb_dst_ arg_glb_src_ = T_GLetBind (lift st38) where
+   st38 =
          let
-             v34 (T_GLetBind_vIn34 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
+             v37 (T_GLetBind_vIn37 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                        let
                            st_glb_srcX14 = 'Control.Monad.Identity'.runIdentity (attach_T_Expression (arg_glb_src_))
                            (T_Expression_vOut13 aglb_srcIcopy aglb_srcIgraph aglb_srcIhasRecs aglb_srcImEntryId aglb_srcImExitId aglb_srcIppAg aglb_srcIppAgs aglb_srcIppDebug aglb_srcIppDebugs aglb_srcIrecNode) = inv_Expression_s14 st_glb_srcX14 (T_Expression_vIn13 aglb_srcOcaseExpr aglb_srcOcurrTaskName aglb_srcOgraph aglb_srcOmergeId aglb_srcOmoduleEnv)
-                           alhsOmCaseVarExpr = rule733 aglb_srcIcopy arg_glb_dst_
-                           alhsOppDebug = rule734 aglb_srcIppDebug arg_glb_dst_
-                           alhsOppAg = rule735 aglb_srcIppAg arg_glb_dst_
-                           alhsOhasRecs = rule736 aglb_srcIhasRecs
-                           alhsOmEntryId = rule737 aglb_srcImEntryId
-                           alhsOmExitId = rule738 aglb_srcImExitId
-                           alhsOppAgs = rule739 aglb_srcIppAgs
-                           alhsOppDebugs = rule740 aglb_srcIppDebugs
-                           alhsOrecNode = rule741 aglb_srcIrecNode
-                           lcopy = rule742 aglb_srcIcopy arg_glb_dst_
-                           alhsOcopy = rule743 lcopy
-                           alhsOgraph = rule744 aglb_srcIgraph
-                           aglb_srcOcaseExpr = rule745 alhsIcaseExpr
-                           aglb_srcOcurrTaskName = rule746 alhsIcurrTaskName
-                           aglb_srcOgraph = rule747 alhsIgraph
-                           aglb_srcOmergeId = rule748 alhsImergeId
-                           aglb_srcOmoduleEnv = rule749 alhsImoduleEnv
-                           ag__result_ = T_GLetBind_vOut34 alhsOcopy alhsOgraph alhsOhasRecs alhsOmCaseVarExpr alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
+                           alhsOmCaseVarExpr = rule773 arg_glb_dst_
+                           alhsOppDebug = rule774 aglb_srcIppDebug arg_glb_dst_
+                           alhsOppAg = rule775 aglb_srcIppAg arg_glb_dst_
+                           alhsOhasRecs = rule776 aglb_srcIhasRecs
+                           alhsOmEntryId = rule777 aglb_srcImEntryId
+                           alhsOmExitId = rule778 aglb_srcImExitId
+                           alhsOppAgs = rule779 aglb_srcIppAgs
+                           alhsOppDebugs = rule780 aglb_srcIppDebugs
+                           alhsOrecNode = rule781 aglb_srcIrecNode
+                           lcopy = rule782 aglb_srcIcopy arg_glb_dst_
+                           alhsOcopy = rule783 lcopy
+                           alhsOgraph = rule784 aglb_srcIgraph
+                           aglb_srcOcaseExpr = rule785 alhsIcaseExpr
+                           aglb_srcOcurrTaskName = rule786 alhsIcurrTaskName
+                           aglb_srcOgraph = rule787 alhsIgraph
+                           aglb_srcOmergeId = rule788 alhsImergeId
+                           aglb_srcOmoduleEnv = rule789 alhsImoduleEnv
+                           ag__result_ = T_GLetBind_vOut37 alhsOcopy alhsOgraph alhsOhasRecs alhsOmCaseVarExpr alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
-         in C_GLetBind_s35 v34
-   /*# LINE 263 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule733 ((aglb_srcIcopy)) glb_dst_ =
-                                  /*# LINE 263 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                                  if (glb_dst_ == "_case_var") (Just aglb_srcIcopy) Nothing
-                                  /*# LINE 3962 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 160 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule734 ((aglb_srcIppDebug)) glb_dst_ =
-                             /*# LINE 160 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+         in C_GLetBind_s38 v37
+   /*# LINE 306 "./frontend/Tonic/MkGraph.ag" #*/
+   rule773 glb_dst_ =
+                                  /*# LINE 306 "./frontend/Tonic/MkGraph.ag" #*/
+                                  if (glb_dst_ == "_case_var") undef Nothing
+                                  /*# LINE 4223 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 142 "./frontend/Tonic/Pretty.ag" #*/
+   rule774 ((aglb_srcIppDebug)) glb_dst_ =
+                             /*# LINE 142 "./frontend/Tonic/Pretty.ag" #*/
                              text glb_dst_ <+> equals <+> aglb_srcIppDebug
-                             /*# LINE 3967 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 161 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule735 ((aglb_srcIppAg)) glb_dst_ =
-                             /*# LINE 161 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+                             /*# LINE 4228 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 143 "./frontend/Tonic/Pretty.ag" #*/
+   rule775 ((aglb_srcIppAg)) glb_dst_ =
+                             /*# LINE 143 "./frontend/Tonic/Pretty.ag" #*/
                              text glb_dst_ <+> equals <+> aglb_srcIppAg
-                             /*# LINE 3972 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   rule736 ((aglb_srcIhasRecs)) =
+                             /*# LINE 4233 "frontend/Tonic/Tonic.icl"#*/
+   rule776 ((aglb_srcIhasRecs)) =
      aglb_srcIhasRecs
-   rule737 ((aglb_srcImEntryId)) =
+   rule777 ((aglb_srcImEntryId)) =
      aglb_srcImEntryId
-   rule738 ((aglb_srcImExitId)) =
+   rule778 ((aglb_srcImExitId)) =
      aglb_srcImExitId
-   rule739 ((aglb_srcIppAgs)) =
+   rule779 ((aglb_srcIppAgs)) =
      aglb_srcIppAgs
-   rule740 ((aglb_srcIppDebugs)) =
+   rule780 ((aglb_srcIppDebugs)) =
      aglb_srcIppDebugs
-   rule741 ((aglb_srcIrecNode)) =
+   rule781 ((aglb_srcIrecNode)) =
      aglb_srcIrecNode
-   rule742 ((aglb_srcIcopy)) glb_dst_ =
+   rule782 ((aglb_srcIcopy)) glb_dst_ =
      {GLetBind|glb_dst = glb_dst_ , glb_src = aglb_srcIcopy}
-   rule743 lcopy =
+   rule783 lcopy =
      lcopy
-   rule744 ((aglb_srcIgraph)) =
+   rule784 ((aglb_srcIgraph)) =
      aglb_srcIgraph
-   rule745 ((alhsIcaseExpr)) =
+   rule785 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule746 ((alhsIcurrTaskName)) =
+   rule786 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule747 ((alhsIgraph)) =
+   rule787 ((alhsIgraph)) =
      alhsIgraph
-   rule748 ((alhsImergeId)) =
+   rule788 ((alhsImergeId)) =
      alhsImergeId
-   rule749 ((alhsImoduleEnv)) =
+   rule789 ((alhsImoduleEnv)) =
      alhsImoduleEnv
 
 // GLetBinds ---------------------------------------------------
@@ -4036,8 +4297,8 @@ wrap_GLetBinds :: T_GLetBinds  Inh_GLetBinds  -> (Syn_GLetBinds )
 wrap_GLetBinds (T_GLetBinds act) (Inh_GLetBinds alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
    'Control.Monad.Identity'.runIdentity (
      act >>= \ sem ->
-     lift (T_GLetBinds_vIn37 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) >>= \ arg ->
-     lift (inv_GLetBinds_s38 sem arg) >>= \ (T_GLetBinds_vOut37 alhsOcopy alhsOgraph alhsOhasRecs alhsOmCaseVarExpr alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode) ->
+     lift (T_GLetBinds_vIn40 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) >>= \ arg ->
+     lift (inv_GLetBinds_s41 sem arg) >>= \ (T_GLetBinds_vOut40 alhsOcopy alhsOgraph alhsOhasRecs alhsOmCaseVarExpr alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode) ->
      lift (Syn_GLetBinds alhsOcopy alhsOgraph alhsOhasRecs alhsOmCaseVarExpr alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode)
    )
 
@@ -4046,137 +4307,138 @@ sem_GLetBinds :: GLetBinds  -> T_GLetBinds
 sem_GLetBinds list = foldr sem_GLetBinds_Cons sem_GLetBinds_Nil (map sem_GLetBind list)
 
 // semantic domain
+:: T_GLetBinds  = T_GLetBinds (Identity (T_GLetBinds_s41 ))
 attach_T_GLetBinds (T_GLetBinds t_GLetBinds) = t_GLetBinds
-inv_GLetBinds_s38 (C_GLetBinds_s38 x) = x
+inv_GLetBinds_s41 (C_GLetBinds_s41 x) = x
 sem_GLetBinds_Cons  :: (T_GLetBind ) (T_GLetBinds ) -> T_GLetBinds 
-sem_GLetBinds_Cons arg_hd_ arg_tl_ = T_GLetBinds (lift st38) where
-   st38 =
+sem_GLetBinds_Cons arg_hd_ arg_tl_ = T_GLetBinds (lift st41) where
+   st41 =
          let
-             v37 (T_GLetBinds_vIn37 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
+             v40 (T_GLetBinds_vIn40 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                        let
-                           st_hdX35 = 'Control.Monad.Identity'.runIdentity (attach_T_GLetBind (arg_hd_))
-                           st_tlX38 = 'Control.Monad.Identity'.runIdentity (attach_T_GLetBinds (arg_tl_))
-                           (T_GLetBind_vOut34 ahdIcopy ahdIgraph ahdIhasRecs ahdImCaseVarExpr ahdImEntryId ahdImExitId ahdIppAg ahdIppAgs ahdIppDebug ahdIppDebugs ahdIrecNode) = inv_GLetBind_s35 st_hdX35 (T_GLetBind_vIn34 ahdOcaseExpr ahdOcurrTaskName ahdOgraph ahdOmergeId ahdOmoduleEnv)
-                           (T_GLetBinds_vOut37 atlIcopy atlIgraph atlIhasRecs atlImCaseVarExpr atlImEntryId atlImExitId atlIppAg atlIppAgs atlIppDebug atlIppDebugs atlIrecNode) = inv_GLetBinds_s38 st_tlX38 (T_GLetBinds_vIn37 atlOcaseExpr atlOcurrTaskName atlOgraph atlOmergeId atlOmoduleEnv)
-                           alhsOmCaseVarExpr = rule750 ahdImCaseVarExpr atlImCaseVarExpr
-                           alhsOhasRecs = rule751 ahdIhasRecs atlIhasRecs
-                           alhsOmEntryId = rule752 ahdImEntryId atlImEntryId
-                           alhsOmExitId = rule753 ahdImExitId atlImExitId
-                           alhsOppAg = rule754 ahdIppAg atlIppAg
-                           alhsOppAgs = rule755 ahdIppAgs atlIppAgs
-                           alhsOppDebug = rule756 ahdIppDebug atlIppDebug
-                           alhsOppDebugs = rule757 ahdIppDebugs atlIppDebugs
-                           alhsOrecNode = rule758 ahdIrecNode atlIrecNode
-                           lcopy = rule759 ahdIcopy atlIcopy
-                           alhsOcopy = rule760 lcopy
-                           alhsOgraph = rule761 atlIgraph
-                           ahdOcaseExpr = rule762 alhsIcaseExpr
-                           ahdOcurrTaskName = rule763 alhsIcurrTaskName
-                           ahdOgraph = rule764 alhsIgraph
-                           ahdOmergeId = rule765 alhsImergeId
-                           ahdOmoduleEnv = rule766 alhsImoduleEnv
-                           atlOcaseExpr = rule767 alhsIcaseExpr
-                           atlOcurrTaskName = rule768 alhsIcurrTaskName
-                           atlOgraph = rule769 ahdIgraph
-                           atlOmergeId = rule770 alhsImergeId
-                           atlOmoduleEnv = rule771 alhsImoduleEnv
-                           ag__result_ = T_GLetBinds_vOut37 alhsOcopy alhsOgraph alhsOhasRecs alhsOmCaseVarExpr alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
+                           st_hdX38 = 'Control.Monad.Identity'.runIdentity (attach_T_GLetBind (arg_hd_))
+                           st_tlX41 = 'Control.Monad.Identity'.runIdentity (attach_T_GLetBinds (arg_tl_))
+                           (T_GLetBind_vOut37 ahdIcopy ahdIgraph ahdIhasRecs ahdImCaseVarExpr ahdImEntryId ahdImExitId ahdIppAg ahdIppAgs ahdIppDebug ahdIppDebugs ahdIrecNode) = inv_GLetBind_s38 st_hdX38 (T_GLetBind_vIn37 ahdOcaseExpr ahdOcurrTaskName ahdOgraph ahdOmergeId ahdOmoduleEnv)
+                           (T_GLetBinds_vOut40 atlIcopy atlIgraph atlIhasRecs atlImCaseVarExpr atlImEntryId atlImExitId atlIppAg atlIppAgs atlIppDebug atlIppDebugs atlIrecNode) = inv_GLetBinds_s41 st_tlX41 (T_GLetBinds_vIn40 atlOcaseExpr atlOcurrTaskName atlOgraph atlOmergeId atlOmoduleEnv)
+                           alhsOmCaseVarExpr = rule790 ahdImCaseVarExpr atlImCaseVarExpr
+                           alhsOhasRecs = rule791 ahdIhasRecs atlIhasRecs
+                           alhsOmEntryId = rule792 ahdImEntryId atlImEntryId
+                           alhsOmExitId = rule793 ahdImExitId atlImExitId
+                           alhsOppAg = rule794 ahdIppAg atlIppAg
+                           alhsOppAgs = rule795 ahdIppAgs atlIppAgs
+                           alhsOppDebug = rule796 ahdIppDebug atlIppDebug
+                           alhsOppDebugs = rule797 ahdIppDebugs atlIppDebugs
+                           alhsOrecNode = rule798 ahdIrecNode atlIrecNode
+                           lcopy = rule799 ahdIcopy atlIcopy
+                           alhsOcopy = rule800 lcopy
+                           alhsOgraph = rule801 atlIgraph
+                           ahdOcaseExpr = rule802 alhsIcaseExpr
+                           ahdOcurrTaskName = rule803 alhsIcurrTaskName
+                           ahdOgraph = rule804 alhsIgraph
+                           ahdOmergeId = rule805 alhsImergeId
+                           ahdOmoduleEnv = rule806 alhsImoduleEnv
+                           atlOcaseExpr = rule807 alhsIcaseExpr
+                           atlOcurrTaskName = rule808 alhsIcurrTaskName
+                           atlOgraph = rule809 ahdIgraph
+                           atlOmergeId = rule810 alhsImergeId
+                           atlOmoduleEnv = rule811 alhsImoduleEnv
+                           ag__result_ = T_GLetBinds_vOut40 alhsOcopy alhsOgraph alhsOhasRecs alhsOmCaseVarExpr alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
-         in C_GLetBinds_s38 v37
-   /*# LINE 259 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule750 ((ahdImCaseVarExpr)) ((atlImCaseVarExpr)) =
-                               /*# LINE 259 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
+         in C_GLetBinds_s41 v40
+   /*# LINE 302 "./frontend/Tonic/MkGraph.ag" #*/
+   rule790 ((ahdImCaseVarExpr)) ((atlImCaseVarExpr)) =
+                               /*# LINE 302 "./frontend/Tonic/MkGraph.ag" #*/
                                ahdImCaseVarExpr <> atlImCaseVarExpr
-                               /*# LINE 4091 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   rule751 ((ahdIhasRecs)) ((atlIhasRecs)) =
+                               /*# LINE 4353 "frontend/Tonic/Tonic.icl"#*/
+   rule791 ((ahdIhasRecs)) ((atlIhasRecs)) =
      ahdIhasRecs || atlIhasRecs
-   rule752 ((ahdImEntryId)) ((atlImEntryId)) =
+   rule792 ((ahdImEntryId)) ((atlImEntryId)) =
      ahdImEntryId <> atlImEntryId
-   rule753 ((ahdImExitId)) ((atlImExitId)) =
+   rule793 ((ahdImExitId)) ((atlImExitId)) =
      ahdImExitId <> atlImExitId
-   rule754 ((ahdIppAg)) ((atlIppAg)) =
+   rule794 ((ahdIppAg)) ((atlIppAg)) =
      ahdIppAg <$$> atlIppAg
-   rule755 ((ahdIppAgs)) ((atlIppAgs)) =
+   rule795 ((ahdIppAgs)) ((atlIppAgs)) =
      ahdIppAgs ++ atlIppAgs
-   rule756 ((ahdIppDebug)) ((atlIppDebug)) =
+   rule796 ((ahdIppDebug)) ((atlIppDebug)) =
      ahdIppDebug <$$> atlIppDebug
-   rule757 ((ahdIppDebugs)) ((atlIppDebugs)) =
+   rule797 ((ahdIppDebugs)) ((atlIppDebugs)) =
      ahdIppDebugs ++ atlIppDebugs
-   rule758 ((ahdIrecNode)) ((atlIrecNode)) =
+   rule798 ((ahdIrecNode)) ((atlIrecNode)) =
      ahdIrecNode || atlIrecNode
-   rule759 ((ahdIcopy)) ((atlIcopy)) =
+   rule799 ((ahdIcopy)) ((atlIcopy)) =
      (\x xs -> [x:xs]) ahdIcopy atlIcopy
-   rule760 lcopy =
+   rule800 lcopy =
      lcopy
-   rule761 ((atlIgraph)) =
+   rule801 ((atlIgraph)) =
      atlIgraph
-   rule762 ((alhsIcaseExpr)) =
+   rule802 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule763 ((alhsIcurrTaskName)) =
+   rule803 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule764 ((alhsIgraph)) =
+   rule804 ((alhsIgraph)) =
      alhsIgraph
-   rule765 ((alhsImergeId)) =
+   rule805 ((alhsImergeId)) =
      alhsImergeId
-   rule766 ((alhsImoduleEnv)) =
+   rule806 ((alhsImoduleEnv)) =
      alhsImoduleEnv
-   rule767 ((alhsIcaseExpr)) =
+   rule807 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule768 ((alhsIcurrTaskName)) =
+   rule808 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule769 ((ahdIgraph)) =
+   rule809 ((ahdIgraph)) =
      ahdIgraph
-   rule770 ((alhsImergeId)) =
+   rule810 ((alhsImergeId)) =
      alhsImergeId
-   rule771 ((alhsImoduleEnv)) =
+   rule811 ((alhsImoduleEnv)) =
      alhsImoduleEnv
 sem_GLetBinds_Nil  ::   T_GLetBinds 
-sem_GLetBinds_Nil  = T_GLetBinds (lift st38) where
-   st38 =
+sem_GLetBinds_Nil  = T_GLetBinds (lift st41) where
+   st41 =
          let
-             v37 (T_GLetBinds_vIn37 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
+             v40 (T_GLetBinds_vIn40 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                        let
-                           alhsOmCaseVarExpr = rule772  Void
-                           alhsOhasRecs = rule773  Void
-                           alhsOmEntryId = rule774  Void
-                           alhsOmExitId = rule775  Void
-                           alhsOppAg = rule776  Void
-                           alhsOppAgs = rule777  Void
-                           alhsOppDebug = rule778  Void
-                           alhsOppDebugs = rule779  Void
-                           alhsOrecNode = rule780  Void
-                           lcopy = rule781  Void
-                           alhsOcopy = rule782 lcopy
-                           alhsOgraph = rule783 alhsIgraph
-                           ag__result_ = T_GLetBinds_vOut37 alhsOcopy alhsOgraph alhsOhasRecs alhsOmCaseVarExpr alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
+                           alhsOmCaseVarExpr = rule812  Void
+                           alhsOhasRecs = rule813  Void
+                           alhsOmEntryId = rule814  Void
+                           alhsOmExitId = rule815  Void
+                           alhsOppAg = rule816  Void
+                           alhsOppAgs = rule817  Void
+                           alhsOppDebug = rule818  Void
+                           alhsOppDebugs = rule819  Void
+                           alhsOrecNode = rule820  Void
+                           lcopy = rule821  Void
+                           alhsOcopy = rule822 lcopy
+                           alhsOgraph = rule823 alhsIgraph
+                           ag__result_ = T_GLetBinds_vOut40 alhsOcopy alhsOgraph alhsOhasRecs alhsOmCaseVarExpr alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
-         in C_GLetBinds_s38 v37
-   /*# LINE 260 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule772  (_) =
-                               /*# LINE 260 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
+         in C_GLetBinds_s41 v40
+   /*# LINE 303 "./frontend/Tonic/MkGraph.ag" #*/
+   rule812  (_) =
+                               /*# LINE 303 "./frontend/Tonic/MkGraph.ag" #*/
                                Nothing
-                               /*# LINE 4159 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   rule773  (_) =
+                               /*# LINE 4421 "frontend/Tonic/Tonic.icl"#*/
+   rule813  (_) =
      False
-   rule774  (_) =
+   rule814  (_) =
      Nothing
-   rule775  (_) =
+   rule815  (_) =
      Nothing
-   rule776  (_) =
+   rule816  (_) =
      empty
-   rule777  (_) =
+   rule817  (_) =
      []
-   rule778  (_) =
+   rule818  (_) =
      empty
-   rule779  (_) =
+   rule819  (_) =
      []
-   rule780  (_) =
+   rule820  (_) =
      False
-   rule781  (_) =
+   rule821  (_) =
      []
-   rule782 lcopy =
+   rule822 lcopy =
      lcopy
-   rule783 ((alhsIgraph)) =
+   rule823 ((alhsIgraph)) =
      alhsIgraph
 
 // GlobalDefinedSymbol -----------------------------------------
@@ -4215,8 +4477,8 @@ wrap_GlobalDefinedSymbol :: T_GlobalDefinedSymbol  Inh_GlobalDefinedSymbol  -> (
 wrap_GlobalDefinedSymbol (T_GlobalDefinedSymbol act) (Inh_GlobalDefinedSymbol alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
    'Control.Monad.Identity'.runIdentity (
      act >>= \ sem ->
-     lift (T_GlobalDefinedSymbol_vIn40 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) >>= \ arg ->
-     lift (inv_GlobalDefinedSymbol_s41 sem arg) >>= \ (T_GlobalDefinedSymbol_vOut40 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode) ->
+     lift (T_GlobalDefinedSymbol_vIn43 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) >>= \ arg ->
+     lift (inv_GlobalDefinedSymbol_s44 sem arg) >>= \ (T_GlobalDefinedSymbol_vOut43 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode) ->
      lift (Syn_GlobalDefinedSymbol alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode)
    )
 
@@ -4225,49 +4487,50 @@ sem_GlobalDefinedSymbol :: GlobalDefinedSymbol  -> T_GlobalDefinedSymbol
 sem_GlobalDefinedSymbol (x1) = sem_GlobalDefinedSymbol_Tuple x1
 
 // semantic domain
+:: T_GlobalDefinedSymbol  = T_GlobalDefinedSymbol (Identity (T_GlobalDefinedSymbol_s44 ))
 attach_T_GlobalDefinedSymbol (T_GlobalDefinedSymbol t_GlobalDefinedSymbol) = t_GlobalDefinedSymbol
-inv_GlobalDefinedSymbol_s41 (C_GlobalDefinedSymbol_s41 x) = x
+inv_GlobalDefinedSymbol_s44 (C_GlobalDefinedSymbol_s44 x) = x
 sem_GlobalDefinedSymbol_Tuple  :: (Global DefinedSymbol) -> T_GlobalDefinedSymbol 
-sem_GlobalDefinedSymbol_Tuple arg_x1_ = T_GlobalDefinedSymbol (lift st41) where
-   st41 =
+sem_GlobalDefinedSymbol_Tuple arg_x1_ = T_GlobalDefinedSymbol (lift st44) where
+   st44 =
          let
-             v40 (T_GlobalDefinedSymbol_vIn40 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
+             v43 (T_GlobalDefinedSymbol_vIn43 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                        let
-                           alhsOhasRecs = rule784  Void
-                           alhsOmEntryId = rule785  Void
-                           alhsOmExitId = rule786  Void
-                           alhsOppAg = rule787  Void
-                           alhsOppAgs = rule788  Void
-                           alhsOppDebug = rule789  Void
-                           alhsOppDebugs = rule790  Void
-                           alhsOrecNode = rule791  Void
-                           lcopy = rule792 arg_x1_
-                           alhsOcopy = rule793 lcopy
-                           alhsOgraph = rule794 alhsIgraph
-                           ag__result_ = T_GlobalDefinedSymbol_vOut40 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
+                           alhsOhasRecs = rule824  Void
+                           alhsOmEntryId = rule825  Void
+                           alhsOmExitId = rule826  Void
+                           alhsOppAg = rule827  Void
+                           alhsOppAgs = rule828  Void
+                           alhsOppDebug = rule829  Void
+                           alhsOppDebugs = rule830  Void
+                           alhsOrecNode = rule831  Void
+                           lcopy = rule832 arg_x1_
+                           alhsOcopy = rule833 lcopy
+                           alhsOgraph = rule834 alhsIgraph
+                           ag__result_ = T_GlobalDefinedSymbol_vOut43 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
-         in C_GlobalDefinedSymbol_s41 v40
-   rule784  (_) =
+         in C_GlobalDefinedSymbol_s44 v43
+   rule824  (_) =
      False
-   rule785  (_) =
+   rule825  (_) =
      Nothing
-   rule786  (_) =
+   rule826  (_) =
      Nothing
-   rule787  (_) =
+   rule827  (_) =
      empty
-   rule788  (_) =
+   rule828  (_) =
      []
-   rule789  (_) =
+   rule829  (_) =
      empty
-   rule790  (_) =
+   rule830  (_) =
      []
-   rule791  (_) =
+   rule831  (_) =
      False
-   rule792 x1_ =
+   rule832 x1_ =
      (x1_)
-   rule793 lcopy =
+   rule833 lcopy =
      lcopy
-   rule794 ((alhsIgraph)) =
+   rule834 ((alhsIgraph)) =
      alhsIgraph
 
 // Ident -------------------------------------------------------
@@ -4282,160 +4545,284 @@ currTaskName_Inh_Ident :: Inh_Ident -> (String)
 currTaskName_Inh_Ident (Inh_Ident _ x _ _ _) = x
 caseExpr_Inh_Ident :: Inh_Ident -> (Maybe Expression)
 caseExpr_Inh_Ident (Inh_Ident x _ _ _ _) = x
-reifySymbolType_Syn_Ident :: Syn_Ident -> (Maybe SymbolType)
-reifySymbolType_Syn_Ident (Syn_Ident _ _ _ _ _ _ _ _ _ _ _ _ _ _ x) = x
-reifyFunType_Syn_Ident :: Syn_Ident -> (Maybe FunType)
-reifyFunType_Syn_Ident (Syn_Ident _ _ _ _ _ _ _ _ _ _ _ _ _ x _) = x
-reifyFunDef_Syn_Ident :: Syn_Ident -> (Maybe GFunDef)
-reifyFunDef_Syn_Ident (Syn_Ident _ _ _ _ _ _ _ _ _ _ _ _ x _ _) = x
 recNode_Syn_Ident :: Syn_Ident -> (Bool)
-recNode_Syn_Ident (Syn_Ident _ _ _ _ _ _ _ _ _ _ _ x _ _ _) = x
+recNode_Syn_Ident (Syn_Ident _ _ _ _ _ _ _ _ _ _ _ x) = x
 ppDebugs_Syn_Ident :: Syn_Ident -> ([Doc])
-ppDebugs_Syn_Ident (Syn_Ident _ _ _ _ _ _ _ _ _ _ x _ _ _ _) = x
+ppDebugs_Syn_Ident (Syn_Ident _ _ _ _ _ _ _ _ _ _ x _) = x
 ppDebug_Syn_Ident :: Syn_Ident -> (Doc)
-ppDebug_Syn_Ident (Syn_Ident _ _ _ _ _ _ _ _ _ x _ _ _ _ _) = x
+ppDebug_Syn_Ident (Syn_Ident _ _ _ _ _ _ _ _ _ x _ _) = x
 ppAgs_Syn_Ident :: Syn_Ident -> ([Doc])
-ppAgs_Syn_Ident (Syn_Ident _ _ _ _ _ _ _ _ x _ _ _ _ _ _) = x
+ppAgs_Syn_Ident (Syn_Ident _ _ _ _ _ _ _ _ x _ _ _) = x
 ppAg_Syn_Ident :: Syn_Ident -> (Doc)
-ppAg_Syn_Ident (Syn_Ident _ _ _ _ _ _ _ x _ _ _ _ _ _ _) = x
+ppAg_Syn_Ident (Syn_Ident _ _ _ _ _ _ _ x _ _ _ _) = x
 mExitId_Syn_Ident :: Syn_Ident -> (Maybe Int)
-mExitId_Syn_Ident (Syn_Ident _ _ _ _ _ _ x _ _ _ _ _ _ _ _) = x
+mExitId_Syn_Ident (Syn_Ident _ _ _ _ _ _ x _ _ _ _ _) = x
 mEntryId_Syn_Ident :: Syn_Ident -> (Maybe Int)
-mEntryId_Syn_Ident (Syn_Ident _ _ _ _ _ x _ _ _ _ _ _ _ _ _) = x
-isTask_Syn_Ident :: Syn_Ident -> (Bool)
-isTask_Syn_Ident (Syn_Ident _ _ _ _ x _ _ _ _ _ _ _ _ _ _) = x
+mEntryId_Syn_Ident (Syn_Ident _ _ _ _ _ x _ _ _ _ _ _) = x
+isCurrTask_Syn_Ident :: Syn_Ident -> (Bool)
+isCurrTask_Syn_Ident (Syn_Ident _ _ _ _ x _ _ _ _ _ _ _) = x
 ident_Syn_Ident :: Syn_Ident -> (String)
-ident_Syn_Ident (Syn_Ident _ _ _ x _ _ _ _ _ _ _ _ _ _ _) = x
+ident_Syn_Ident (Syn_Ident _ _ _ x _ _ _ _ _ _ _ _) = x
 hasRecs_Syn_Ident :: Syn_Ident -> (Bool)
-hasRecs_Syn_Ident (Syn_Ident _ _ x _ _ _ _ _ _ _ _ _ _ _ _) = x
+hasRecs_Syn_Ident (Syn_Ident _ _ x _ _ _ _ _ _ _ _ _) = x
 graph_Syn_Ident :: Syn_Ident -> (GinGraph)
-graph_Syn_Ident (Syn_Ident _ x _ _ _ _ _ _ _ _ _ _ _ _ _) = x
+graph_Syn_Ident (Syn_Ident _ x _ _ _ _ _ _ _ _ _ _) = x
 copy_Syn_Ident :: Syn_Ident -> (Ident)
-copy_Syn_Ident (Syn_Ident x _ _ _ _ _ _ _ _ _ _ _ _ _ _) = x
+copy_Syn_Ident (Syn_Ident x _ _ _ _ _ _ _ _ _ _ _) = x
 wrap_Ident :: T_Ident  Inh_Ident  -> (Syn_Ident )
 wrap_Ident (T_Ident act) (Inh_Ident alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
    'Control.Monad.Identity'.runIdentity (
      act >>= \ sem ->
-     lift (T_Ident_vIn43 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) >>= \ arg ->
-     lift (inv_Ident_s44 sem arg) >>= \ (T_Ident_vOut43 alhsOcopy alhsOgraph alhsOhasRecs alhsOident alhsOisTask alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode alhsOreifyFunDef alhsOreifyFunType alhsOreifySymbolType) ->
-     lift (Syn_Ident alhsOcopy alhsOgraph alhsOhasRecs alhsOident alhsOisTask alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode alhsOreifyFunDef alhsOreifyFunType alhsOreifySymbolType)
+     lift (T_Ident_vIn46 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) >>= \ arg ->
+     lift (inv_Ident_s47 sem arg) >>= \ (T_Ident_vOut46 alhsOcopy alhsOgraph alhsOhasRecs alhsOident alhsOisCurrTask alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode) ->
+     lift (Syn_Ident alhsOcopy alhsOgraph alhsOhasRecs alhsOident alhsOisCurrTask alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode)
    )
 
 // cata
 sem_Ident :: Ident  -> T_Ident 
-sem_Ident { Ident | id_name = id_name_,id_info = id_info_ } = sem_Ident_Ident id_name_ id_info_ 
+sem_Ident { Ident | id_name = id_name_,id_info = id_info_ } = sem_Ident_Ident id_name_ id_info_
 
 // semantic domain
+:: T_Ident  = T_Ident (Identity (T_Ident_s47 ))
 attach_T_Ident (T_Ident t_Ident) = t_Ident
-inv_Ident_s44 (C_Ident_s44 x) = x
-sem_Ident_Ident  :: (String) (SymbolPtr)  -> T_Ident 
-sem_Ident_Ident arg_id_name_ arg_id_info_  = T_Ident (lift st44) where
-   st44 =
+inv_Ident_s47 (C_Ident_s47 x) = x
+sem_Ident_Ident  :: (String) (SymbolPtr) -> T_Ident 
+sem_Ident_Ident arg_id_name_ arg_id_info_ = T_Ident (lift st47) where
+   st47 =
          let
-             v43 (T_Ident_vIn43 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
+             v46 (T_Ident_vIn46 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                        let
-                           st_identSymbolTypeX56 = 'Control.Monad.Identity'.runIdentity (attach_T_SymbolType ((sem_SymbolType identSymbolType_val_)))
-                           (T_SymbolType_vOut55 aidentSymbolTypeIcopy aidentSymbolTypeIgraph aidentSymbolTypeIhasRecs aidentSymbolTypeIisTask aidentSymbolTypeImEntryId aidentSymbolTypeImExitId aidentSymbolTypeIppAg aidentSymbolTypeIppAgs aidentSymbolTypeIppDebug aidentSymbolTypeIppDebugs aidentSymbolTypeIrecNode) = inv_SymbolType_s56 st_identSymbolTypeX56 (T_SymbolType_vIn55 aidentSymbolTypeOcaseExpr aidentSymbolTypeOcurrTaskName aidentSymbolTypeOgraph aidentSymbolTypeOmergeId aidentSymbolTypeOmoduleEnv)
-                           alhsOident = rule795 arg_id_name_
-                           alhsOisTask = rule796 aidentSymbolTypeIisTask
-                           identSymbolType_val_ = rule797 arg_id_name_ lreifySymbolType
-                           alhsOreifyFunType = rule798 alhsImoduleEnv lcopy
-                           alhsOreifySymbolType = rule799 lreifySymbolType
-                           lreifySymbolType = rule800 alhsImoduleEnv lcopy
-                           alhsOreifyFunDef = rule801 alhsImoduleEnv lcopy
-                           alhsOppDebug = rule802 arg_id_name_
-                           alhsOppAg = rule803 arg_id_name_
-                           alhsOhasRecs = rule804 aidentSymbolTypeIhasRecs
-                           alhsOmEntryId = rule805 aidentSymbolTypeImEntryId
-                           alhsOmExitId = rule806 aidentSymbolTypeImExitId
-                           alhsOppAgs = rule807 aidentSymbolTypeIppAgs
-                           alhsOppDebugs = rule808 aidentSymbolTypeIppDebugs
-                           alhsOrecNode = rule809 aidentSymbolTypeIrecNode
-                           lcopy = rule810 arg_id_info_ arg_id_name_
-                           alhsOcopy = rule811 lcopy
-                           alhsOgraph = rule812 aidentSymbolTypeIgraph
-                           aidentSymbolTypeOcaseExpr = rule813 alhsIcaseExpr
-                           aidentSymbolTypeOcurrTaskName = rule814 alhsIcurrTaskName
-                           aidentSymbolTypeOgraph = rule815 alhsIgraph
-                           aidentSymbolTypeOmergeId = rule816 alhsImergeId
-                           aidentSymbolTypeOmoduleEnv = rule817 alhsImoduleEnv
-                           ag__result_ = T_Ident_vOut43 alhsOcopy alhsOgraph alhsOhasRecs alhsOident alhsOisTask alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode alhsOreifyFunDef alhsOreifyFunType alhsOreifySymbolType
+                           alhsOisCurrTask = rule835 alhsIcurrTaskName arg_id_name_
+                           alhsOident = rule836 arg_id_name_
+                           alhsOppDebug = rule837 arg_id_name_
+                           alhsOppAg = rule838 arg_id_name_
+                           alhsOhasRecs = rule839  Void
+                           alhsOmEntryId = rule840  Void
+                           alhsOmExitId = rule841  Void
+                           alhsOppAgs = rule842  Void
+                           alhsOppDebugs = rule843  Void
+                           alhsOrecNode = rule844  Void
+                           lcopy = rule845 arg_id_info_ arg_id_name_
+                           alhsOcopy = rule846 lcopy
+                           alhsOgraph = rule847 alhsIgraph
+                           ag__result_ = T_Ident_vOut46 alhsOcopy alhsOgraph alhsOhasRecs alhsOident alhsOisCurrTask alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
-         in C_Ident_s44 v43
-   /*# LINE 64 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule795 id_name_ =
-                     /*# LINE 64 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                     id_name_
-                     /*# LINE 4370 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 65 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule796 ((aidentSymbolTypeIisTask)) =
-                     /*# LINE 65 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                     aidentSymbolTypeIisTask
-                     /*# LINE 4375 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 68 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule797 id_name_ lreifySymbolType =
-                               /*# LINE 68 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                               fromMaybe (abort $ "inst.identSymbolType: " +++ id_name_)
-                               lreifySymbolType
-                               /*# LINE 4381 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 71 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule798 ((alhsImoduleEnv)) lcopy =
-                              /*# LINE 71 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                              reifyFunType alhsImoduleEnv lcopy
-                              /*# LINE 4386 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 72 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule799 lreifySymbolType =
-                              /*# LINE 72 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                              lreifySymbolType
-                              /*# LINE 4391 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 73 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule800 ((alhsImoduleEnv)) lcopy =
-                              /*# LINE 73 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                              reifySymbolType alhsImoduleEnv lcopy
-                              /*# LINE 4396 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 74 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule801 ((alhsImoduleEnv)) lcopy =
-                              /*# LINE 74 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                              reifyFunDef alhsImoduleEnv lcopy
-                              /*# LINE 4401 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 104 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule802 id_name_ =
-                          /*# LINE 104 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+         in C_Ident_s47 v46
+   /*# LINE 104 "./frontend/Tonic/MkGraph.ag" #*/
+   rule835 ((alhsIcurrTaskName)) id_name_ =
+                         /*# LINE 104 "./frontend/Tonic/MkGraph.ag" #*/
+                         id_name_ == alhsIcurrTaskName
+                         /*# LINE 4616 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 105 "./frontend/Tonic/MkGraph.ag" #*/
+   rule836 id_name_ =
+                         /*# LINE 105 "./frontend/Tonic/MkGraph.ag" #*/
+                         id_name_
+                         /*# LINE 4621 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 86 "./frontend/Tonic/Pretty.ag" #*/
+   rule837 id_name_ =
+                          /*# LINE 86 "./frontend/Tonic/Pretty.ag" #*/
                           text id_name_
-                          /*# LINE 4406 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 105 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule803 id_name_ =
-                          /*# LINE 105 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+                          /*# LINE 4626 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 87 "./frontend/Tonic/Pretty.ag" #*/
+   rule838 id_name_ =
+                          /*# LINE 87 "./frontend/Tonic/Pretty.ag" #*/
                           text id_name_
-                          /*# LINE 4411 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   rule804 ((aidentSymbolTypeIhasRecs)) =
-     aidentSymbolTypeIhasRecs
-   rule805 ((aidentSymbolTypeImEntryId)) =
-     aidentSymbolTypeImEntryId
-   rule806 ((aidentSymbolTypeImExitId)) =
-     aidentSymbolTypeImExitId
-   rule807 ((aidentSymbolTypeIppAgs)) =
-     aidentSymbolTypeIppAgs
-   rule808 ((aidentSymbolTypeIppDebugs)) =
-     aidentSymbolTypeIppDebugs
-   rule809 ((aidentSymbolTypeIrecNode)) =
-     aidentSymbolTypeIrecNode
-   rule810 id_info_ id_name_ =
+                          /*# LINE 4631 "frontend/Tonic/Tonic.icl"#*/
+   rule839  (_) =
+     False
+   rule840  (_) =
+     Nothing
+   rule841  (_) =
+     Nothing
+   rule842  (_) =
+     []
+   rule843  (_) =
+     []
+   rule844  (_) =
+     False
+   rule845 id_info_ id_name_ =
      {Ident|id_name = id_name_ , id_info = id_info_}
-   rule811 lcopy =
+   rule846 lcopy =
      lcopy
-   rule812 ((aidentSymbolTypeIgraph)) =
-     aidentSymbolTypeIgraph
-   rule813 ((alhsIcaseExpr)) =
-     alhsIcaseExpr
-   rule814 ((alhsIcurrTaskName)) =
-     alhsIcurrTaskName
-   rule815 ((alhsIgraph)) =
+   rule847 ((alhsIgraph)) =
      alhsIgraph
-   rule816 ((alhsImergeId)) =
+
+// MaybeExpression ---------------------------------------------
+// wrapper
+moduleEnv_Inh_MaybeExpression :: Inh_MaybeExpression -> (ModuleEnv)
+moduleEnv_Inh_MaybeExpression (Inh_MaybeExpression _ _ _ _ x) = x
+mergeId_Inh_MaybeExpression :: Inh_MaybeExpression -> (Int)
+mergeId_Inh_MaybeExpression (Inh_MaybeExpression _ _ _ x _) = x
+graph_Inh_MaybeExpression :: Inh_MaybeExpression -> (GinGraph)
+graph_Inh_MaybeExpression (Inh_MaybeExpression _ _ x _ _) = x
+currTaskName_Inh_MaybeExpression :: Inh_MaybeExpression -> (String)
+currTaskName_Inh_MaybeExpression (Inh_MaybeExpression _ x _ _ _) = x
+caseExpr_Inh_MaybeExpression :: Inh_MaybeExpression -> (Maybe Expression)
+caseExpr_Inh_MaybeExpression (Inh_MaybeExpression x _ _ _ _) = x
+recNode_Syn_MaybeExpression :: Syn_MaybeExpression -> (Bool)
+recNode_Syn_MaybeExpression (Syn_MaybeExpression _ _ _ _ x) = x
+mExitId_Syn_MaybeExpression :: Syn_MaybeExpression -> (Maybe Int)
+mExitId_Syn_MaybeExpression (Syn_MaybeExpression _ _ _ x _) = x
+mEntryId_Syn_MaybeExpression :: Syn_MaybeExpression -> (Maybe Int)
+mEntryId_Syn_MaybeExpression (Syn_MaybeExpression _ _ x _ _) = x
+hasRecs_Syn_MaybeExpression :: Syn_MaybeExpression -> (Bool)
+hasRecs_Syn_MaybeExpression (Syn_MaybeExpression _ x _ _ _) = x
+graph_Syn_MaybeExpression :: Syn_MaybeExpression -> (GinGraph)
+graph_Syn_MaybeExpression (Syn_MaybeExpression x _ _ _ _) = x
+wrap_MaybeExpression :: T_MaybeExpression  Inh_MaybeExpression  -> (Syn_MaybeExpression )
+wrap_MaybeExpression (T_MaybeExpression act) (Inh_MaybeExpression alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
+   'Control.Monad.Identity'.runIdentity (
+     act >>= \ sem ->
+     lift (T_MaybeExpression_vIn49 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) >>= \ arg ->
+     lift (inv_MaybeExpression_s50 sem arg) >>= \ (T_MaybeExpression_vOut49 alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOrecNode) ->
+     lift (Syn_MaybeExpression alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOrecNode)
+   )
+
+// cata
+sem_MaybeExpression :: MaybeExpression  -> T_MaybeExpression 
+sem_MaybeExpression 'Data.Maybe'.Nothing = sem_MaybeExpression_Nothing
+sem_MaybeExpression ('Data.Maybe'.Just just) = sem_MaybeExpression_Just (sem_Expression just)
+
+// semantic domain
+:: T_MaybeExpression  = T_MaybeExpression (Identity (T_MaybeExpression_s50 ))
+attach_T_MaybeExpression (T_MaybeExpression t_MaybeExpression) = t_MaybeExpression
+inv_MaybeExpression_s50 (C_MaybeExpression_s50 x) = x
+sem_MaybeExpression_Just  :: (T_Expression ) -> T_MaybeExpression 
+sem_MaybeExpression_Just arg_just_ = T_MaybeExpression (lift st50) where
+   st50 =
+         let
+             v49 (T_MaybeExpression_vIn49 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
+                       let
+                           st_justX14 = 'Control.Monad.Identity'.runIdentity (attach_T_Expression (arg_just_))
+                           (T_Expression_vOut13 ajustIcopy ajustIgraph ajustIhasRecs ajustImEntryId ajustImExitId ajustIppAg ajustIppAgs ajustIppDebug ajustIppDebugs ajustIrecNode) = inv_Expression_s14 st_justX14 (T_Expression_vIn13 ajustOcaseExpr ajustOcurrTaskName ajustOgraph ajustOmergeId ajustOmoduleEnv)
+                           alhsOhasRecs = rule848 ajustIhasRecs
+                           alhsOmEntryId = rule849 ajustImEntryId
+                           alhsOmExitId = rule850 ajustImExitId
+                           alhsOrecNode = rule851 ajustIrecNode
+                           alhsOgraph = rule852 ajustIgraph
+                           ajustOcaseExpr = rule853 alhsIcaseExpr
+                           ajustOcurrTaskName = rule854 alhsIcurrTaskName
+                           ajustOgraph = rule855 alhsIgraph
+                           ajustOmergeId = rule856 alhsImergeId
+                           ajustOmoduleEnv = rule857 alhsImoduleEnv
+                           ag__result_ = T_MaybeExpression_vOut49 alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOrecNode
+                       in ag__result_
+         in C_MaybeExpression_s50 v49
+   rule848 ((ajustIhasRecs)) =
+     ajustIhasRecs
+   rule849 ((ajustImEntryId)) =
+     ajustImEntryId
+   rule850 ((ajustImExitId)) =
+     ajustImExitId
+   rule851 ((ajustIrecNode)) =
+     ajustIrecNode
+   rule852 ((ajustIgraph)) =
+     ajustIgraph
+   rule853 ((alhsIcaseExpr)) =
+     alhsIcaseExpr
+   rule854 ((alhsIcurrTaskName)) =
+     alhsIcurrTaskName
+   rule855 ((alhsIgraph)) =
+     alhsIgraph
+   rule856 ((alhsImergeId)) =
      alhsImergeId
-   rule817 ((alhsImoduleEnv)) =
+   rule857 ((alhsImoduleEnv)) =
      alhsImoduleEnv
+sem_MaybeExpression_Nothing  ::   T_MaybeExpression 
+sem_MaybeExpression_Nothing  = T_MaybeExpression (lift st50) where
+   st50 =
+         let
+             v49 (T_MaybeExpression_vIn49 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
+                       let
+                           alhsOhasRecs = rule858  Void
+                           alhsOmEntryId = rule859  Void
+                           alhsOmExitId = rule860  Void
+                           alhsOrecNode = rule861  Void
+                           alhsOgraph = rule862 alhsIgraph
+                           ag__result_ = T_MaybeExpression_vOut49 alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOrecNode
+                       in ag__result_
+         in C_MaybeExpression_s50 v49
+   rule858  (_) =
+     False
+   rule859  (_) =
+     Nothing
+   rule860  (_) =
+     Nothing
+   rule861  (_) =
+     False
+   rule862 ((alhsIgraph)) =
+     alhsIgraph
+
+// Priority ----------------------------------------------------
+// wrapper
+moduleEnv_Inh_Priority :: Inh_Priority -> (ModuleEnv)
+moduleEnv_Inh_Priority (Inh_Priority _ _ _ _ x) = x
+mergeId_Inh_Priority :: Inh_Priority -> (Int)
+mergeId_Inh_Priority (Inh_Priority _ _ _ x _) = x
+graph_Inh_Priority :: Inh_Priority -> (GinGraph)
+graph_Inh_Priority (Inh_Priority _ _ x _ _) = x
+currTaskName_Inh_Priority :: Inh_Priority -> (String)
+currTaskName_Inh_Priority (Inh_Priority _ x _ _ _) = x
+caseExpr_Inh_Priority :: Inh_Priority -> (Maybe Expression)
+caseExpr_Inh_Priority (Inh_Priority x _ _ _ _) = x
+graph_Syn_Priority :: Syn_Priority -> (GinGraph)
+graph_Syn_Priority (Syn_Priority _ x) = x
+copy_Syn_Priority :: Syn_Priority -> (Priority)
+copy_Syn_Priority (Syn_Priority x _) = x
+wrap_Priority :: T_Priority  Inh_Priority  -> (Syn_Priority )
+wrap_Priority (T_Priority act) (Inh_Priority alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
+   'Control.Monad.Identity'.runIdentity (
+     act >>= \ sem ->
+     lift (T_Priority_vIn52 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) >>= \ arg ->
+     lift (inv_Priority_s53 sem arg) >>= \ (T_Priority_vOut52 alhsOcopy alhsOgraph) ->
+     lift (Syn_Priority alhsOcopy alhsOgraph)
+   )
+
+// cata
+sem_Priority :: Priority  -> T_Priority 
+sem_Priority ( Prio assoc_ prio_ ) = sem_Priority_Prio assoc_ prio_
+sem_Priority ( NoPrio  ) = sem_Priority_NoPrio 
+
+// semantic domain
+:: T_Priority  = T_Priority (Identity (T_Priority_s53 ))
+attach_T_Priority (T_Priority t_Priority) = t_Priority
+inv_Priority_s53 (C_Priority_s53 x) = x
+sem_Priority_Prio  :: (Assoc) (Int) -> T_Priority 
+sem_Priority_Prio arg_assoc_ arg_prio_ = T_Priority (lift st53) where
+   st53 =
+         let
+             v52 (T_Priority_vIn52 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
+                       let
+                           lcopy = rule863 arg_assoc_ arg_prio_
+                           alhsOcopy = rule864 lcopy
+                           alhsOgraph = rule865 alhsIgraph
+                           ag__result_ = T_Priority_vOut52 alhsOcopy alhsOgraph
+                       in ag__result_
+         in C_Priority_s53 v52
+   rule863 assoc_ prio_ =
+     Prio assoc_ prio_
+   rule864 lcopy =
+     lcopy
+   rule865 ((alhsIgraph)) =
+     alhsIgraph
+sem_Priority_NoPrio  ::   T_Priority 
+sem_Priority_NoPrio  = T_Priority (lift st53) where
+   st53 =
+         let
+             v52 (T_Priority_vIn52 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
+                       let
+                           lcopy = rule866  Void
+                           alhsOcopy = rule867 lcopy
+                           alhsOgraph = rule868 alhsIgraph
+                           ag__result_ = T_Priority_vOut52 alhsOcopy alhsOgraph
+                       in ag__result_
+         in C_Priority_s53 v52
+   rule866  (_) =
+     NoPrio
+   rule867 lcopy =
+     lcopy
+   rule868 ((alhsIgraph)) =
+     alhsIgraph
 
 // Selection ---------------------------------------------------
 // wrapper
@@ -4473,8 +4860,8 @@ wrap_Selection :: T_Selection  Inh_Selection  -> (Syn_Selection )
 wrap_Selection (T_Selection act) (Inh_Selection alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
    'Control.Monad.Identity'.runIdentity (
      act >>= \ sem ->
-     lift (T_Selection_vIn46 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) >>= \ arg ->
-     lift (inv_Selection_s47 sem arg) >>= \ (T_Selection_vOut46 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode) ->
+     lift (T_Selection_vIn55 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) >>= \ arg ->
+     lift (inv_Selection_s56 sem arg) >>= \ (T_Selection_vOut55 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode) ->
      lift (Syn_Selection alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode)
    )
 
@@ -4485,253 +4872,254 @@ sem_Selection ( ArraySelection gds_ eiptr_ expr_ ) = sem_Selection_ArraySelectio
 sem_Selection ( DictionarySelection bv_ sels_ eiptr_ expr_ ) = sem_Selection_DictionarySelection ( sem_BoundVar bv_ ) ( sem_Selections sels_ ) eiptr_ ( sem_Expression expr_ )
 
 // semantic domain
+:: T_Selection  = T_Selection (Identity (T_Selection_s56 ))
 attach_T_Selection (T_Selection t_Selection) = t_Selection
-inv_Selection_s47 (C_Selection_s47 x) = x
+inv_Selection_s56 (C_Selection_s56 x) = x
 sem_Selection_RecordSelection  :: (T_GlobalDefinedSymbol ) (Int) -> T_Selection 
-sem_Selection_RecordSelection arg_gds_ arg_n_ = T_Selection (lift st47) where
-   st47 =
+sem_Selection_RecordSelection arg_gds_ arg_n_ = T_Selection (lift st56) where
+   st56 =
          let
-             v46 (T_Selection_vIn46 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
+             v55 (T_Selection_vIn55 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                        let
-                           st_gdsX41 = 'Control.Monad.Identity'.runIdentity (attach_T_GlobalDefinedSymbol (arg_gds_))
-                           (T_GlobalDefinedSymbol_vOut40 agdsIcopy agdsIgraph agdsIhasRecs agdsImEntryId agdsImExitId agdsIppAg agdsIppAgs agdsIppDebug agdsIppDebugs agdsIrecNode) = inv_GlobalDefinedSymbol_s41 st_gdsX41 (T_GlobalDefinedSymbol_vIn40 agdsOcaseExpr agdsOcurrTaskName agdsOgraph agdsOmergeId agdsOmoduleEnv)
-                           alhsOppDebug = rule818 agdsIppDebug
-                           alhsOppAg = rule819 agdsIppAg
-                           alhsOhasRecs = rule820 agdsIhasRecs
-                           alhsOmEntryId = rule821 agdsImEntryId
-                           alhsOmExitId = rule822 agdsImExitId
-                           alhsOppAgs = rule823 agdsIppAgs
-                           alhsOppDebugs = rule824 agdsIppDebugs
-                           alhsOrecNode = rule825 agdsIrecNode
-                           lcopy = rule826 agdsIcopy arg_n_
-                           alhsOcopy = rule827 lcopy
-                           alhsOgraph = rule828 agdsIgraph
-                           agdsOcaseExpr = rule829 alhsIcaseExpr
-                           agdsOcurrTaskName = rule830 alhsIcurrTaskName
-                           agdsOgraph = rule831 alhsIgraph
-                           agdsOmergeId = rule832 alhsImergeId
-                           agdsOmoduleEnv = rule833 alhsImoduleEnv
-                           ag__result_ = T_Selection_vOut46 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
+                           st_gdsX44 = 'Control.Monad.Identity'.runIdentity (attach_T_GlobalDefinedSymbol (arg_gds_))
+                           (T_GlobalDefinedSymbol_vOut43 agdsIcopy agdsIgraph agdsIhasRecs agdsImEntryId agdsImExitId agdsIppAg agdsIppAgs agdsIppDebug agdsIppDebugs agdsIrecNode) = inv_GlobalDefinedSymbol_s44 st_gdsX44 (T_GlobalDefinedSymbol_vIn43 agdsOcaseExpr agdsOcurrTaskName agdsOgraph agdsOmergeId agdsOmoduleEnv)
+                           alhsOppDebug = rule869 agdsIppDebug
+                           alhsOppAg = rule870 agdsIppAg
+                           alhsOhasRecs = rule871 agdsIhasRecs
+                           alhsOmEntryId = rule872 agdsImEntryId
+                           alhsOmExitId = rule873 agdsImExitId
+                           alhsOppAgs = rule874 agdsIppAgs
+                           alhsOppDebugs = rule875 agdsIppDebugs
+                           alhsOrecNode = rule876 agdsIrecNode
+                           lcopy = rule877 agdsIcopy arg_n_
+                           alhsOcopy = rule878 lcopy
+                           alhsOgraph = rule879 agdsIgraph
+                           agdsOcaseExpr = rule880 alhsIcaseExpr
+                           agdsOcurrTaskName = rule881 alhsIcurrTaskName
+                           agdsOgraph = rule882 alhsIgraph
+                           agdsOmergeId = rule883 alhsImergeId
+                           agdsOmoduleEnv = rule884 alhsImoduleEnv
+                           ag__result_ = T_Selection_vOut55 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
-         in C_Selection_s47 v46
-   /*# LINE 138 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule818 ((agdsIppDebug)) =
-                                        /*# LINE 138 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+         in C_Selection_s56 v55
+   /*# LINE 120 "./frontend/Tonic/Pretty.ag" #*/
+   rule869 ((agdsIppDebug)) =
+                                        /*# LINE 120 "./frontend/Tonic/Pretty.ag" #*/
                                         agdsIppDebug
-                                        /*# LINE 4522 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 139 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule819 ((agdsIppAg)) =
-                                        /*# LINE 139 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+                                        /*# LINE 4910 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 121 "./frontend/Tonic/Pretty.ag" #*/
+   rule870 ((agdsIppAg)) =
+                                        /*# LINE 121 "./frontend/Tonic/Pretty.ag" #*/
                                         agdsIppAg
-                                        /*# LINE 4527 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   rule820 ((agdsIhasRecs)) =
+                                        /*# LINE 4915 "frontend/Tonic/Tonic.icl"#*/
+   rule871 ((agdsIhasRecs)) =
      agdsIhasRecs
-   rule821 ((agdsImEntryId)) =
+   rule872 ((agdsImEntryId)) =
      agdsImEntryId
-   rule822 ((agdsImExitId)) =
+   rule873 ((agdsImExitId)) =
      agdsImExitId
-   rule823 ((agdsIppAgs)) =
+   rule874 ((agdsIppAgs)) =
      agdsIppAgs
-   rule824 ((agdsIppDebugs)) =
+   rule875 ((agdsIppDebugs)) =
      agdsIppDebugs
-   rule825 ((agdsIrecNode)) =
+   rule876 ((agdsIrecNode)) =
      agdsIrecNode
-   rule826 ((agdsIcopy)) n_ =
+   rule877 ((agdsIcopy)) n_ =
      RecordSelection agdsIcopy n_
-   rule827 lcopy =
+   rule878 lcopy =
      lcopy
-   rule828 ((agdsIgraph)) =
+   rule879 ((agdsIgraph)) =
      agdsIgraph
-   rule829 ((alhsIcaseExpr)) =
+   rule880 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule830 ((alhsIcurrTaskName)) =
+   rule881 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule831 ((alhsIgraph)) =
+   rule882 ((alhsIgraph)) =
      alhsIgraph
-   rule832 ((alhsImergeId)) =
+   rule883 ((alhsImergeId)) =
      alhsImergeId
-   rule833 ((alhsImoduleEnv)) =
+   rule884 ((alhsImoduleEnv)) =
      alhsImoduleEnv
 sem_Selection_ArraySelection  :: (T_GlobalDefinedSymbol ) (ExprInfoPtr) (T_Expression ) -> T_Selection 
-sem_Selection_ArraySelection arg_gds_ arg_eiptr_ arg_expr_ = T_Selection (lift st47) where
-   st47 =
+sem_Selection_ArraySelection arg_gds_ arg_eiptr_ arg_expr_ = T_Selection (lift st56) where
+   st56 =
          let
-             v46 (T_Selection_vIn46 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
+             v55 (T_Selection_vIn55 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                        let
-                           st_gdsX41 = 'Control.Monad.Identity'.runIdentity (attach_T_GlobalDefinedSymbol (arg_gds_))
+                           st_gdsX44 = 'Control.Monad.Identity'.runIdentity (attach_T_GlobalDefinedSymbol (arg_gds_))
                            st_exprX14 = 'Control.Monad.Identity'.runIdentity (attach_T_Expression (arg_expr_))
-                           (T_GlobalDefinedSymbol_vOut40 agdsIcopy agdsIgraph agdsIhasRecs agdsImEntryId agdsImExitId agdsIppAg agdsIppAgs agdsIppDebug agdsIppDebugs agdsIrecNode) = inv_GlobalDefinedSymbol_s41 st_gdsX41 (T_GlobalDefinedSymbol_vIn40 agdsOcaseExpr agdsOcurrTaskName agdsOgraph agdsOmergeId agdsOmoduleEnv)
+                           (T_GlobalDefinedSymbol_vOut43 agdsIcopy agdsIgraph agdsIhasRecs agdsImEntryId agdsImExitId agdsIppAg agdsIppAgs agdsIppDebug agdsIppDebugs agdsIrecNode) = inv_GlobalDefinedSymbol_s44 st_gdsX44 (T_GlobalDefinedSymbol_vIn43 agdsOcaseExpr agdsOcurrTaskName agdsOgraph agdsOmergeId agdsOmoduleEnv)
                            (T_Expression_vOut13 aexprIcopy aexprIgraph aexprIhasRecs aexprImEntryId aexprImExitId aexprIppAg aexprIppAgs aexprIppDebug aexprIppDebugs aexprIrecNode) = inv_Expression_s14 st_exprX14 (T_Expression_vIn13 aexprOcaseExpr aexprOcurrTaskName aexprOgraph aexprOmergeId aexprOmoduleEnv)
-                           alhsOppDebug = rule834  Void
-                           alhsOppAg = rule835  Void
-                           alhsOhasRecs = rule836 aexprIhasRecs agdsIhasRecs
-                           alhsOmEntryId = rule837 aexprImEntryId agdsImEntryId
-                           alhsOmExitId = rule838 aexprImExitId agdsImExitId
-                           alhsOppAgs = rule839 aexprIppAgs agdsIppAgs
-                           alhsOppDebugs = rule840 aexprIppDebugs agdsIppDebugs
-                           alhsOrecNode = rule841 aexprIrecNode agdsIrecNode
-                           lcopy = rule842 aexprIcopy agdsIcopy arg_eiptr_
-                           alhsOcopy = rule843 lcopy
-                           alhsOgraph = rule844 aexprIgraph
-                           agdsOcaseExpr = rule845 alhsIcaseExpr
-                           agdsOcurrTaskName = rule846 alhsIcurrTaskName
-                           agdsOgraph = rule847 alhsIgraph
-                           agdsOmergeId = rule848 alhsImergeId
-                           agdsOmoduleEnv = rule849 alhsImoduleEnv
-                           aexprOcaseExpr = rule850 alhsIcaseExpr
-                           aexprOcurrTaskName = rule851 alhsIcurrTaskName
-                           aexprOgraph = rule852 agdsIgraph
-                           aexprOmergeId = rule853 alhsImergeId
-                           aexprOmoduleEnv = rule854 alhsImoduleEnv
-                           ag__result_ = T_Selection_vOut46 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
+                           alhsOppDebug = rule885  Void
+                           alhsOppAg = rule886  Void
+                           alhsOhasRecs = rule887 aexprIhasRecs agdsIhasRecs
+                           alhsOmEntryId = rule888 aexprImEntryId agdsImEntryId
+                           alhsOmExitId = rule889 aexprImExitId agdsImExitId
+                           alhsOppAgs = rule890 aexprIppAgs agdsIppAgs
+                           alhsOppDebugs = rule891 aexprIppDebugs agdsIppDebugs
+                           alhsOrecNode = rule892 aexprIrecNode agdsIrecNode
+                           lcopy = rule893 aexprIcopy agdsIcopy arg_eiptr_
+                           alhsOcopy = rule894 lcopy
+                           alhsOgraph = rule895 aexprIgraph
+                           agdsOcaseExpr = rule896 alhsIcaseExpr
+                           agdsOcurrTaskName = rule897 alhsIcurrTaskName
+                           agdsOgraph = rule898 alhsIgraph
+                           agdsOmergeId = rule899 alhsImergeId
+                           agdsOmoduleEnv = rule900 alhsImoduleEnv
+                           aexprOcaseExpr = rule901 alhsIcaseExpr
+                           aexprOcurrTaskName = rule902 alhsIcurrTaskName
+                           aexprOgraph = rule903 agdsIgraph
+                           aexprOmergeId = rule904 alhsImergeId
+                           aexprOmoduleEnv = rule905 alhsImoduleEnv
+                           ag__result_ = T_Selection_vOut55 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
-         in C_Selection_s47 v46
-   /*# LINE 140 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule834  (_) =
-                                        /*# LINE 140 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+         in C_Selection_s56 v55
+   /*# LINE 122 "./frontend/Tonic/Pretty.ag" #*/
+   rule885  (_) =
+                                        /*# LINE 122 "./frontend/Tonic/Pretty.ag" #*/
                                         text "TODO: ArraySelection"
-                                        /*# LINE 4594 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 141 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule835  (_) =
-                                        /*# LINE 141 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+                                        /*# LINE 4982 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 123 "./frontend/Tonic/Pretty.ag" #*/
+   rule886  (_) =
+                                        /*# LINE 123 "./frontend/Tonic/Pretty.ag" #*/
                                         text "TODO: ArraySelection"
-                                        /*# LINE 4599 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   rule836 ((aexprIhasRecs)) ((agdsIhasRecs)) =
+                                        /*# LINE 4987 "frontend/Tonic/Tonic.icl"#*/
+   rule887 ((aexprIhasRecs)) ((agdsIhasRecs)) =
      agdsIhasRecs || aexprIhasRecs
-   rule837 ((aexprImEntryId)) ((agdsImEntryId)) =
+   rule888 ((aexprImEntryId)) ((agdsImEntryId)) =
      agdsImEntryId <> aexprImEntryId
-   rule838 ((aexprImExitId)) ((agdsImExitId)) =
+   rule889 ((aexprImExitId)) ((agdsImExitId)) =
      agdsImExitId <> aexprImExitId
-   rule839 ((aexprIppAgs)) ((agdsIppAgs)) =
+   rule890 ((aexprIppAgs)) ((agdsIppAgs)) =
      agdsIppAgs ++ aexprIppAgs
-   rule840 ((aexprIppDebugs)) ((agdsIppDebugs)) =
+   rule891 ((aexprIppDebugs)) ((agdsIppDebugs)) =
      agdsIppDebugs ++ aexprIppDebugs
-   rule841 ((aexprIrecNode)) ((agdsIrecNode)) =
+   rule892 ((aexprIrecNode)) ((agdsIrecNode)) =
      agdsIrecNode || aexprIrecNode
-   rule842 ((aexprIcopy)) ((agdsIcopy)) eiptr_ =
+   rule893 ((aexprIcopy)) ((agdsIcopy)) eiptr_ =
      ArraySelection agdsIcopy eiptr_ aexprIcopy
-   rule843 lcopy =
+   rule894 lcopy =
      lcopy
-   rule844 ((aexprIgraph)) =
+   rule895 ((aexprIgraph)) =
      aexprIgraph
-   rule845 ((alhsIcaseExpr)) =
+   rule896 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule846 ((alhsIcurrTaskName)) =
+   rule897 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule847 ((alhsIgraph)) =
+   rule898 ((alhsIgraph)) =
      alhsIgraph
-   rule848 ((alhsImergeId)) =
+   rule899 ((alhsImergeId)) =
      alhsImergeId
-   rule849 ((alhsImoduleEnv)) =
+   rule900 ((alhsImoduleEnv)) =
      alhsImoduleEnv
-   rule850 ((alhsIcaseExpr)) =
+   rule901 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule851 ((alhsIcurrTaskName)) =
+   rule902 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule852 ((agdsIgraph)) =
+   rule903 ((agdsIgraph)) =
      agdsIgraph
-   rule853 ((alhsImergeId)) =
+   rule904 ((alhsImergeId)) =
      alhsImergeId
-   rule854 ((alhsImoduleEnv)) =
+   rule905 ((alhsImoduleEnv)) =
      alhsImoduleEnv
 sem_Selection_DictionarySelection  :: (T_BoundVar ) (T_Selections ) (ExprInfoPtr) (T_Expression ) -> T_Selection 
-sem_Selection_DictionarySelection arg_bv_ arg_sels_ arg_eiptr_ arg_expr_ = T_Selection (lift st47) where
-   st47 =
+sem_Selection_DictionarySelection arg_bv_ arg_sels_ arg_eiptr_ arg_expr_ = T_Selection (lift st56) where
+   st56 =
          let
-             v46 (T_Selection_vIn46 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
+             v55 (T_Selection_vIn55 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                        let
                            st_bvX8 = 'Control.Monad.Identity'.runIdentity (attach_T_BoundVar (arg_bv_))
-                           st_selsX50 = 'Control.Monad.Identity'.runIdentity (attach_T_Selections (arg_sels_))
+                           st_selsX59 = 'Control.Monad.Identity'.runIdentity (attach_T_Selections (arg_sels_))
                            st_exprX14 = 'Control.Monad.Identity'.runIdentity (attach_T_Expression (arg_expr_))
                            (T_BoundVar_vOut7 abvIcopy abvIgraph abvIhasRecs abvImEntryId abvImExitId abvIppAg abvIppAgs abvIppDebug abvIppDebugs abvIrecNode) = inv_BoundVar_s8 st_bvX8 (T_BoundVar_vIn7 abvOcaseExpr abvOcurrTaskName abvOgraph abvOmergeId abvOmoduleEnv)
-                           (T_Selections_vOut49 aselsIcopy aselsIgraph aselsIhasRecs aselsImEntryId aselsImExitId aselsIppAg aselsIppAgs aselsIppDebug aselsIppDebugs aselsIrecNode) = inv_Selections_s50 st_selsX50 (T_Selections_vIn49 aselsOcaseExpr aselsOcurrTaskName aselsOgraph aselsOmergeId aselsOmoduleEnv)
+                           (T_Selections_vOut58 aselsIcopy aselsIgraph aselsIhasRecs aselsImEntryId aselsImExitId aselsIppAg aselsIppAgs aselsIppDebug aselsIppDebugs aselsIrecNode) = inv_Selections_s59 st_selsX59 (T_Selections_vIn58 aselsOcaseExpr aselsOcurrTaskName aselsOgraph aselsOmergeId aselsOmoduleEnv)
                            (T_Expression_vOut13 aexprIcopy aexprIgraph aexprIhasRecs aexprImEntryId aexprImExitId aexprIppAg aexprIppAgs aexprIppDebug aexprIppDebugs aexprIrecNode) = inv_Expression_s14 st_exprX14 (T_Expression_vIn13 aexprOcaseExpr aexprOcurrTaskName aexprOgraph aexprOmergeId aexprOmoduleEnv)
-                           alhsOppDebug = rule855  Void
-                           alhsOppAg = rule856  Void
-                           alhsOhasRecs = rule857 abvIhasRecs aexprIhasRecs aselsIhasRecs
-                           alhsOmEntryId = rule858 abvImEntryId aexprImEntryId aselsImEntryId
-                           alhsOmExitId = rule859 abvImExitId aexprImExitId aselsImExitId
-                           alhsOppAgs = rule860 abvIppAgs aexprIppAgs aselsIppAgs
-                           alhsOppDebugs = rule861 abvIppDebugs aexprIppDebugs aselsIppDebugs
-                           alhsOrecNode = rule862 abvIrecNode aexprIrecNode aselsIrecNode
-                           lcopy = rule863 abvIcopy aexprIcopy aselsIcopy arg_eiptr_
-                           alhsOcopy = rule864 lcopy
-                           alhsOgraph = rule865 aexprIgraph
-                           abvOcaseExpr = rule866 alhsIcaseExpr
-                           abvOcurrTaskName = rule867 alhsIcurrTaskName
-                           abvOgraph = rule868 alhsIgraph
-                           abvOmergeId = rule869 alhsImergeId
-                           abvOmoduleEnv = rule870 alhsImoduleEnv
-                           aselsOcaseExpr = rule871 alhsIcaseExpr
-                           aselsOcurrTaskName = rule872 alhsIcurrTaskName
-                           aselsOgraph = rule873 abvIgraph
-                           aselsOmergeId = rule874 alhsImergeId
-                           aselsOmoduleEnv = rule875 alhsImoduleEnv
-                           aexprOcaseExpr = rule876 alhsIcaseExpr
-                           aexprOcurrTaskName = rule877 alhsIcurrTaskName
-                           aexprOgraph = rule878 aselsIgraph
-                           aexprOmergeId = rule879 alhsImergeId
-                           aexprOmoduleEnv = rule880 alhsImoduleEnv
-                           ag__result_ = T_Selection_vOut46 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
+                           alhsOppDebug = rule906  Void
+                           alhsOppAg = rule907  Void
+                           alhsOhasRecs = rule908 abvIhasRecs aexprIhasRecs aselsIhasRecs
+                           alhsOmEntryId = rule909 abvImEntryId aexprImEntryId aselsImEntryId
+                           alhsOmExitId = rule910 abvImExitId aexprImExitId aselsImExitId
+                           alhsOppAgs = rule911 abvIppAgs aexprIppAgs aselsIppAgs
+                           alhsOppDebugs = rule912 abvIppDebugs aexprIppDebugs aselsIppDebugs
+                           alhsOrecNode = rule913 abvIrecNode aexprIrecNode aselsIrecNode
+                           lcopy = rule914 abvIcopy aexprIcopy aselsIcopy arg_eiptr_
+                           alhsOcopy = rule915 lcopy
+                           alhsOgraph = rule916 aexprIgraph
+                           abvOcaseExpr = rule917 alhsIcaseExpr
+                           abvOcurrTaskName = rule918 alhsIcurrTaskName
+                           abvOgraph = rule919 alhsIgraph
+                           abvOmergeId = rule920 alhsImergeId
+                           abvOmoduleEnv = rule921 alhsImoduleEnv
+                           aselsOcaseExpr = rule922 alhsIcaseExpr
+                           aselsOcurrTaskName = rule923 alhsIcurrTaskName
+                           aselsOgraph = rule924 abvIgraph
+                           aselsOmergeId = rule925 alhsImergeId
+                           aselsOmoduleEnv = rule926 alhsImoduleEnv
+                           aexprOcaseExpr = rule927 alhsIcaseExpr
+                           aexprOcurrTaskName = rule928 alhsIcurrTaskName
+                           aexprOgraph = rule929 aselsIgraph
+                           aexprOmergeId = rule930 alhsImergeId
+                           aexprOmoduleEnv = rule931 alhsImoduleEnv
+                           ag__result_ = T_Selection_vOut55 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
-         in C_Selection_s47 v46
-   /*# LINE 142 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule855  (_) =
-                                        /*# LINE 142 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+         in C_Selection_s56 v55
+   /*# LINE 124 "./frontend/Tonic/Pretty.ag" #*/
+   rule906  (_) =
+                                        /*# LINE 124 "./frontend/Tonic/Pretty.ag" #*/
                                         text "TODO: DictionarySelection"
-                                        /*# LINE 4683 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 143 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule856  (_) =
-                                        /*# LINE 143 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+                                        /*# LINE 5071 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 125 "./frontend/Tonic/Pretty.ag" #*/
+   rule907  (_) =
+                                        /*# LINE 125 "./frontend/Tonic/Pretty.ag" #*/
                                         text "TODO: DictionarySelection"
-                                        /*# LINE 4688 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   rule857 ((abvIhasRecs)) ((aexprIhasRecs)) ((aselsIhasRecs)) =
+                                        /*# LINE 5076 "frontend/Tonic/Tonic.icl"#*/
+   rule908 ((abvIhasRecs)) ((aexprIhasRecs)) ((aselsIhasRecs)) =
      abvIhasRecs || aselsIhasRecs || aexprIhasRecs
-   rule858 ((abvImEntryId)) ((aexprImEntryId)) ((aselsImEntryId)) =
+   rule909 ((abvImEntryId)) ((aexprImEntryId)) ((aselsImEntryId)) =
      abvImEntryId <> aselsImEntryId <> aexprImEntryId
-   rule859 ((abvImExitId)) ((aexprImExitId)) ((aselsImExitId)) =
+   rule910 ((abvImExitId)) ((aexprImExitId)) ((aselsImExitId)) =
      abvImExitId <> aselsImExitId <> aexprImExitId
-   rule860 ((abvIppAgs)) ((aexprIppAgs)) ((aselsIppAgs)) =
+   rule911 ((abvIppAgs)) ((aexprIppAgs)) ((aselsIppAgs)) =
      abvIppAgs ++ aselsIppAgs ++ aexprIppAgs
-   rule861 ((abvIppDebugs)) ((aexprIppDebugs)) ((aselsIppDebugs)) =
+   rule912 ((abvIppDebugs)) ((aexprIppDebugs)) ((aselsIppDebugs)) =
      abvIppDebugs ++ aselsIppDebugs ++ aexprIppDebugs
-   rule862 ((abvIrecNode)) ((aexprIrecNode)) ((aselsIrecNode)) =
+   rule913 ((abvIrecNode)) ((aexprIrecNode)) ((aselsIrecNode)) =
      abvIrecNode || aselsIrecNode || aexprIrecNode
-   rule863 ((abvIcopy)) ((aexprIcopy)) ((aselsIcopy)) eiptr_ =
+   rule914 ((abvIcopy)) ((aexprIcopy)) ((aselsIcopy)) eiptr_ =
      DictionarySelection abvIcopy aselsIcopy eiptr_ aexprIcopy
-   rule864 lcopy =
+   rule915 lcopy =
      lcopy
-   rule865 ((aexprIgraph)) =
+   rule916 ((aexprIgraph)) =
      aexprIgraph
-   rule866 ((alhsIcaseExpr)) =
+   rule917 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule867 ((alhsIcurrTaskName)) =
+   rule918 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule868 ((alhsIgraph)) =
+   rule919 ((alhsIgraph)) =
      alhsIgraph
-   rule869 ((alhsImergeId)) =
+   rule920 ((alhsImergeId)) =
      alhsImergeId
-   rule870 ((alhsImoduleEnv)) =
+   rule921 ((alhsImoduleEnv)) =
      alhsImoduleEnv
-   rule871 ((alhsIcaseExpr)) =
+   rule922 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule872 ((alhsIcurrTaskName)) =
+   rule923 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule873 ((abvIgraph)) =
+   rule924 ((abvIgraph)) =
      abvIgraph
-   rule874 ((alhsImergeId)) =
+   rule925 ((alhsImergeId)) =
      alhsImergeId
-   rule875 ((alhsImoduleEnv)) =
+   rule926 ((alhsImoduleEnv)) =
      alhsImoduleEnv
-   rule876 ((alhsIcaseExpr)) =
+   rule927 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule877 ((alhsIcurrTaskName)) =
+   rule928 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule878 ((aselsIgraph)) =
+   rule929 ((aselsIgraph)) =
      aselsIgraph
-   rule879 ((alhsImergeId)) =
+   rule930 ((alhsImergeId)) =
      alhsImergeId
-   rule880 ((alhsImoduleEnv)) =
+   rule931 ((alhsImoduleEnv)) =
      alhsImoduleEnv
 
 // Selections --------------------------------------------------
@@ -4770,8 +5158,8 @@ wrap_Selections :: T_Selections  Inh_Selections  -> (Syn_Selections )
 wrap_Selections (T_Selections act) (Inh_Selections alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
    'Control.Monad.Identity'.runIdentity (
      act >>= \ sem ->
-     lift (T_Selections_vIn49 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) >>= \ arg ->
-     lift (inv_Selections_s50 sem arg) >>= \ (T_Selections_vOut49 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode) ->
+     lift (T_Selections_vIn58 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) >>= \ arg ->
+     lift (inv_Selections_s59 sem arg) >>= \ (T_Selections_vOut58 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode) ->
      lift (Syn_Selections alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode)
    )
 
@@ -4780,125 +5168,126 @@ sem_Selections :: Selections  -> T_Selections
 sem_Selections list = foldr sem_Selections_Cons sem_Selections_Nil (map sem_Selection list)
 
 // semantic domain
+:: T_Selections  = T_Selections (Identity (T_Selections_s59 ))
 attach_T_Selections (T_Selections t_Selections) = t_Selections
-inv_Selections_s50 (C_Selections_s50 x) = x
+inv_Selections_s59 (C_Selections_s59 x) = x
 sem_Selections_Cons  :: (T_Selection ) (T_Selections ) -> T_Selections 
-sem_Selections_Cons arg_hd_ arg_tl_ = T_Selections (lift st50) where
-   st50 =
+sem_Selections_Cons arg_hd_ arg_tl_ = T_Selections (lift st59) where
+   st59 =
          let
-             v49 (T_Selections_vIn49 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
+             v58 (T_Selections_vIn58 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                        let
-                           st_hdX47 = 'Control.Monad.Identity'.runIdentity (attach_T_Selection (arg_hd_))
-                           st_tlX50 = 'Control.Monad.Identity'.runIdentity (attach_T_Selections (arg_tl_))
-                           (T_Selection_vOut46 ahdIcopy ahdIgraph ahdIhasRecs ahdImEntryId ahdImExitId ahdIppAg ahdIppAgs ahdIppDebug ahdIppDebugs ahdIrecNode) = inv_Selection_s47 st_hdX47 (T_Selection_vIn46 ahdOcaseExpr ahdOcurrTaskName ahdOgraph ahdOmergeId ahdOmoduleEnv)
-                           (T_Selections_vOut49 atlIcopy atlIgraph atlIhasRecs atlImEntryId atlImExitId atlIppAg atlIppAgs atlIppDebug atlIppDebugs atlIrecNode) = inv_Selections_s50 st_tlX50 (T_Selections_vIn49 atlOcaseExpr atlOcurrTaskName atlOgraph atlOmergeId atlOmoduleEnv)
-                           alhsOhasRecs = rule881 ahdIhasRecs atlIhasRecs
-                           alhsOmEntryId = rule882 ahdImEntryId atlImEntryId
-                           alhsOmExitId = rule883 ahdImExitId atlImExitId
-                           alhsOppAg = rule884 ahdIppAg atlIppAg
-                           alhsOppAgs = rule885 ahdIppAgs atlIppAgs
-                           alhsOppDebug = rule886 ahdIppDebug atlIppDebug
-                           alhsOppDebugs = rule887 ahdIppDebugs atlIppDebugs
-                           alhsOrecNode = rule888 ahdIrecNode atlIrecNode
-                           lcopy = rule889 ahdIcopy atlIcopy
-                           alhsOcopy = rule890 lcopy
-                           alhsOgraph = rule891 atlIgraph
-                           ahdOcaseExpr = rule892 alhsIcaseExpr
-                           ahdOcurrTaskName = rule893 alhsIcurrTaskName
-                           ahdOgraph = rule894 alhsIgraph
-                           ahdOmergeId = rule895 alhsImergeId
-                           ahdOmoduleEnv = rule896 alhsImoduleEnv
-                           atlOcaseExpr = rule897 alhsIcaseExpr
-                           atlOcurrTaskName = rule898 alhsIcurrTaskName
-                           atlOgraph = rule899 ahdIgraph
-                           atlOmergeId = rule900 alhsImergeId
-                           atlOmoduleEnv = rule901 alhsImoduleEnv
-                           ag__result_ = T_Selections_vOut49 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
+                           st_hdX56 = 'Control.Monad.Identity'.runIdentity (attach_T_Selection (arg_hd_))
+                           st_tlX59 = 'Control.Monad.Identity'.runIdentity (attach_T_Selections (arg_tl_))
+                           (T_Selection_vOut55 ahdIcopy ahdIgraph ahdIhasRecs ahdImEntryId ahdImExitId ahdIppAg ahdIppAgs ahdIppDebug ahdIppDebugs ahdIrecNode) = inv_Selection_s56 st_hdX56 (T_Selection_vIn55 ahdOcaseExpr ahdOcurrTaskName ahdOgraph ahdOmergeId ahdOmoduleEnv)
+                           (T_Selections_vOut58 atlIcopy atlIgraph atlIhasRecs atlImEntryId atlImExitId atlIppAg atlIppAgs atlIppDebug atlIppDebugs atlIrecNode) = inv_Selections_s59 st_tlX59 (T_Selections_vIn58 atlOcaseExpr atlOcurrTaskName atlOgraph atlOmergeId atlOmoduleEnv)
+                           alhsOhasRecs = rule932 ahdIhasRecs atlIhasRecs
+                           alhsOmEntryId = rule933 ahdImEntryId atlImEntryId
+                           alhsOmExitId = rule934 ahdImExitId atlImExitId
+                           alhsOppAg = rule935 ahdIppAg atlIppAg
+                           alhsOppAgs = rule936 ahdIppAgs atlIppAgs
+                           alhsOppDebug = rule937 ahdIppDebug atlIppDebug
+                           alhsOppDebugs = rule938 ahdIppDebugs atlIppDebugs
+                           alhsOrecNode = rule939 ahdIrecNode atlIrecNode
+                           lcopy = rule940 ahdIcopy atlIcopy
+                           alhsOcopy = rule941 lcopy
+                           alhsOgraph = rule942 atlIgraph
+                           ahdOcaseExpr = rule943 alhsIcaseExpr
+                           ahdOcurrTaskName = rule944 alhsIcurrTaskName
+                           ahdOgraph = rule945 alhsIgraph
+                           ahdOmergeId = rule946 alhsImergeId
+                           ahdOmoduleEnv = rule947 alhsImoduleEnv
+                           atlOcaseExpr = rule948 alhsIcaseExpr
+                           atlOcurrTaskName = rule949 alhsIcurrTaskName
+                           atlOgraph = rule950 ahdIgraph
+                           atlOmergeId = rule951 alhsImergeId
+                           atlOmoduleEnv = rule952 alhsImoduleEnv
+                           ag__result_ = T_Selections_vOut58 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
-         in C_Selections_s50 v49
-   rule881 ((ahdIhasRecs)) ((atlIhasRecs)) =
+         in C_Selections_s59 v58
+   rule932 ((ahdIhasRecs)) ((atlIhasRecs)) =
      ahdIhasRecs || atlIhasRecs
-   rule882 ((ahdImEntryId)) ((atlImEntryId)) =
+   rule933 ((ahdImEntryId)) ((atlImEntryId)) =
      ahdImEntryId <> atlImEntryId
-   rule883 ((ahdImExitId)) ((atlImExitId)) =
+   rule934 ((ahdImExitId)) ((atlImExitId)) =
      ahdImExitId <> atlImExitId
-   rule884 ((ahdIppAg)) ((atlIppAg)) =
+   rule935 ((ahdIppAg)) ((atlIppAg)) =
      ahdIppAg <$$> atlIppAg
-   rule885 ((ahdIppAgs)) ((atlIppAgs)) =
+   rule936 ((ahdIppAgs)) ((atlIppAgs)) =
      ahdIppAgs ++ atlIppAgs
-   rule886 ((ahdIppDebug)) ((atlIppDebug)) =
+   rule937 ((ahdIppDebug)) ((atlIppDebug)) =
      ahdIppDebug <$$> atlIppDebug
-   rule887 ((ahdIppDebugs)) ((atlIppDebugs)) =
+   rule938 ((ahdIppDebugs)) ((atlIppDebugs)) =
      ahdIppDebugs ++ atlIppDebugs
-   rule888 ((ahdIrecNode)) ((atlIrecNode)) =
+   rule939 ((ahdIrecNode)) ((atlIrecNode)) =
      ahdIrecNode || atlIrecNode
-   rule889 ((ahdIcopy)) ((atlIcopy)) =
+   rule940 ((ahdIcopy)) ((atlIcopy)) =
      (\x xs -> [x:xs]) ahdIcopy atlIcopy
-   rule890 lcopy =
+   rule941 lcopy =
      lcopy
-   rule891 ((atlIgraph)) =
+   rule942 ((atlIgraph)) =
      atlIgraph
-   rule892 ((alhsIcaseExpr)) =
+   rule943 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule893 ((alhsIcurrTaskName)) =
+   rule944 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule894 ((alhsIgraph)) =
+   rule945 ((alhsIgraph)) =
      alhsIgraph
-   rule895 ((alhsImergeId)) =
+   rule946 ((alhsImergeId)) =
      alhsImergeId
-   rule896 ((alhsImoduleEnv)) =
+   rule947 ((alhsImoduleEnv)) =
      alhsImoduleEnv
-   rule897 ((alhsIcaseExpr)) =
+   rule948 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule898 ((alhsIcurrTaskName)) =
+   rule949 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule899 ((ahdIgraph)) =
+   rule950 ((ahdIgraph)) =
      ahdIgraph
-   rule900 ((alhsImergeId)) =
+   rule951 ((alhsImergeId)) =
      alhsImergeId
-   rule901 ((alhsImoduleEnv)) =
+   rule952 ((alhsImoduleEnv)) =
      alhsImoduleEnv
 sem_Selections_Nil  ::   T_Selections 
-sem_Selections_Nil  = T_Selections (lift st50) where
-   st50 =
+sem_Selections_Nil  = T_Selections (lift st59) where
+   st59 =
          let
-             v49 (T_Selections_vIn49 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
+             v58 (T_Selections_vIn58 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                        let
-                           alhsOhasRecs = rule902  Void
-                           alhsOmEntryId = rule903  Void
-                           alhsOmExitId = rule904  Void
-                           alhsOppAg = rule905  Void
-                           alhsOppAgs = rule906  Void
-                           alhsOppDebug = rule907  Void
-                           alhsOppDebugs = rule908  Void
-                           alhsOrecNode = rule909  Void
-                           lcopy = rule910  Void
-                           alhsOcopy = rule911 lcopy
-                           alhsOgraph = rule912 alhsIgraph
-                           ag__result_ = T_Selections_vOut49 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
+                           alhsOhasRecs = rule953  Void
+                           alhsOmEntryId = rule954  Void
+                           alhsOmExitId = rule955  Void
+                           alhsOppAg = rule956  Void
+                           alhsOppAgs = rule957  Void
+                           alhsOppDebug = rule958  Void
+                           alhsOppDebugs = rule959  Void
+                           alhsOrecNode = rule960  Void
+                           lcopy = rule961  Void
+                           alhsOcopy = rule962 lcopy
+                           alhsOgraph = rule963 alhsIgraph
+                           ag__result_ = T_Selections_vOut58 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
-         in C_Selections_s50 v49
-   rule902  (_) =
+         in C_Selections_s59 v58
+   rule953  (_) =
      False
-   rule903  (_) =
+   rule954  (_) =
      Nothing
-   rule904  (_) =
+   rule955  (_) =
      Nothing
-   rule905  (_) =
+   rule956  (_) =
      empty
-   rule906  (_) =
+   rule957  (_) =
      []
-   rule907  (_) =
+   rule958  (_) =
      empty
-   rule908  (_) =
+   rule959  (_) =
      []
-   rule909  (_) =
+   rule960  (_) =
      False
-   rule910  (_) =
+   rule961  (_) =
      []
-   rule911 lcopy =
+   rule962 lcopy =
      lcopy
-   rule912 ((alhsIgraph)) =
+   rule963 ((alhsIgraph)) =
      alhsIgraph
 
 // SymbIdent ---------------------------------------------------
@@ -4913,47 +5302,37 @@ currTaskName_Inh_SymbIdent :: Inh_SymbIdent -> (String)
 currTaskName_Inh_SymbIdent (Inh_SymbIdent _ x _ _ _) = x
 caseExpr_Inh_SymbIdent :: Inh_SymbIdent -> (Maybe Expression)
 caseExpr_Inh_SymbIdent (Inh_SymbIdent x _ _ _ _) = x
-reifySymbolType_Syn_SymbIdent :: Syn_SymbIdent -> (Maybe SymbolType)
-reifySymbolType_Syn_SymbIdent (Syn_SymbIdent _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ x) = x
-reifyFunType_Syn_SymbIdent :: Syn_SymbIdent -> (Maybe FunType)
-reifyFunType_Syn_SymbIdent (Syn_SymbIdent _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ x _) = x
-reifyFunDef_Syn_SymbIdent :: Syn_SymbIdent -> (Maybe GFunDef)
-reifyFunDef_Syn_SymbIdent (Syn_SymbIdent _ _ _ _ _ _ _ _ _ _ _ _ _ _ x _ _) = x
 recNode_Syn_SymbIdent :: Syn_SymbIdent -> (Bool)
-recNode_Syn_SymbIdent (Syn_SymbIdent _ _ _ _ _ _ _ _ _ _ _ _ _ x _ _ _) = x
+recNode_Syn_SymbIdent (Syn_SymbIdent _ _ _ _ _ _ _ _ _ _ _ x) = x
 ppDebugs_Syn_SymbIdent :: Syn_SymbIdent -> ([Doc])
-ppDebugs_Syn_SymbIdent (Syn_SymbIdent _ _ _ _ _ _ _ _ _ _ _ _ x _ _ _ _) = x
+ppDebugs_Syn_SymbIdent (Syn_SymbIdent _ _ _ _ _ _ _ _ _ _ x _) = x
 ppDebug_Syn_SymbIdent :: Syn_SymbIdent -> (Doc)
-ppDebug_Syn_SymbIdent (Syn_SymbIdent _ _ _ _ _ _ _ _ _ _ _ x _ _ _ _ _) = x
+ppDebug_Syn_SymbIdent (Syn_SymbIdent _ _ _ _ _ _ _ _ _ x _ _) = x
 ppAgs_Syn_SymbIdent :: Syn_SymbIdent -> ([Doc])
-ppAgs_Syn_SymbIdent (Syn_SymbIdent _ _ _ _ _ _ _ _ _ _ x _ _ _ _ _ _) = x
+ppAgs_Syn_SymbIdent (Syn_SymbIdent _ _ _ _ _ _ _ _ x _ _ _) = x
 ppAg_Syn_SymbIdent :: Syn_SymbIdent -> (Doc)
-ppAg_Syn_SymbIdent (Syn_SymbIdent _ _ _ _ _ _ _ _ _ x _ _ _ _ _ _ _) = x
+ppAg_Syn_SymbIdent (Syn_SymbIdent _ _ _ _ _ _ _ x _ _ _ _) = x
 mExitId_Syn_SymbIdent :: Syn_SymbIdent -> (Maybe Int)
-mExitId_Syn_SymbIdent (Syn_SymbIdent _ _ _ _ _ _ _ _ x _ _ _ _ _ _ _ _) = x
+mExitId_Syn_SymbIdent (Syn_SymbIdent _ _ _ _ _ _ x _ _ _ _ _) = x
 mEntryId_Syn_SymbIdent :: Syn_SymbIdent -> (Maybe Int)
-mEntryId_Syn_SymbIdent (Syn_SymbIdent _ _ _ _ _ _ _ x _ _ _ _ _ _ _ _ _) = x
-isTask_Syn_SymbIdent :: Syn_SymbIdent -> (Bool)
-isTask_Syn_SymbIdent (Syn_SymbIdent _ _ _ _ _ _ x _ _ _ _ _ _ _ _ _ _) = x
-isInfix_Syn_SymbIdent :: Syn_SymbIdent -> (Bool)
-isInfix_Syn_SymbIdent (Syn_SymbIdent _ _ _ _ _ x _ _ _ _ _ _ _ _ _ _ _) = x
+mEntryId_Syn_SymbIdent (Syn_SymbIdent _ _ _ _ _ x _ _ _ _ _ _) = x
 isCurrTask_Syn_SymbIdent :: Syn_SymbIdent -> (Bool)
-isCurrTask_Syn_SymbIdent (Syn_SymbIdent _ _ _ _ x _ _ _ _ _ _ _ _ _ _ _ _) = x
+isCurrTask_Syn_SymbIdent (Syn_SymbIdent _ _ _ _ x _ _ _ _ _ _ _) = x
 ident_Syn_SymbIdent :: Syn_SymbIdent -> (String)
-ident_Syn_SymbIdent (Syn_SymbIdent _ _ _ x _ _ _ _ _ _ _ _ _ _ _ _ _) = x
+ident_Syn_SymbIdent (Syn_SymbIdent _ _ _ x _ _ _ _ _ _ _ _) = x
 hasRecs_Syn_SymbIdent :: Syn_SymbIdent -> (Bool)
-hasRecs_Syn_SymbIdent (Syn_SymbIdent _ _ x _ _ _ _ _ _ _ _ _ _ _ _ _ _) = x
+hasRecs_Syn_SymbIdent (Syn_SymbIdent _ _ x _ _ _ _ _ _ _ _ _) = x
 graph_Syn_SymbIdent :: Syn_SymbIdent -> (GinGraph)
-graph_Syn_SymbIdent (Syn_SymbIdent _ x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) = x
+graph_Syn_SymbIdent (Syn_SymbIdent _ x _ _ _ _ _ _ _ _ _ _) = x
 copy_Syn_SymbIdent :: Syn_SymbIdent -> (SymbIdent)
-copy_Syn_SymbIdent (Syn_SymbIdent x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) = x
+copy_Syn_SymbIdent (Syn_SymbIdent x _ _ _ _ _ _ _ _ _ _ _) = x
 wrap_SymbIdent :: T_SymbIdent  Inh_SymbIdent  -> (Syn_SymbIdent )
 wrap_SymbIdent (T_SymbIdent act) (Inh_SymbIdent alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
    'Control.Monad.Identity'.runIdentity (
      act >>= \ sem ->
-     lift (T_SymbIdent_vIn52 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) >>= \ arg ->
-     lift (inv_SymbIdent_s53 sem arg) >>= \ (T_SymbIdent_vOut52 alhsOcopy alhsOgraph alhsOhasRecs alhsOident alhsOisCurrTask alhsOisInfix alhsOisTask alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode alhsOreifyFunDef alhsOreifyFunType alhsOreifySymbolType) ->
-     lift (Syn_SymbIdent alhsOcopy alhsOgraph alhsOhasRecs alhsOident alhsOisCurrTask alhsOisInfix alhsOisTask alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode alhsOreifyFunDef alhsOreifyFunType alhsOreifySymbolType)
+     lift (T_SymbIdent_vIn61 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) >>= \ arg ->
+     lift (inv_SymbIdent_s62 sem arg) >>= \ (T_SymbIdent_vOut61 alhsOcopy alhsOgraph alhsOhasRecs alhsOident alhsOisCurrTask alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode) ->
+     lift (Syn_SymbIdent alhsOcopy alhsOgraph alhsOhasRecs alhsOident alhsOisCurrTask alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode)
    )
 
 // cata
@@ -4961,126 +5340,85 @@ sem_SymbIdent :: SymbIdent  -> T_SymbIdent
 sem_SymbIdent { SymbIdent | symb_ident = symb_ident_,symb_kind = symb_kind_ } = sem_SymbIdent_SymbIdent ( sem_Ident symb_ident_ ) symb_kind_
 
 // semantic domain
+:: T_SymbIdent  = T_SymbIdent (Identity (T_SymbIdent_s62 ))
 attach_T_SymbIdent (T_SymbIdent t_SymbIdent) = t_SymbIdent
-inv_SymbIdent_s53 (C_SymbIdent_s53 x) = x
+inv_SymbIdent_s62 (C_SymbIdent_s62 x) = x
 sem_SymbIdent_SymbIdent  :: (T_Ident ) (SymbKind) -> T_SymbIdent 
-sem_SymbIdent_SymbIdent arg_symb_ident_ arg_symb_kind_ = T_SymbIdent (lift st53) where
-   st53 =
+sem_SymbIdent_SymbIdent arg_symb_ident_ arg_symb_kind_ = T_SymbIdent (lift st62) where
+   st62 =
          let
-             v52 (T_SymbIdent_vIn52 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
+             v61 (T_SymbIdent_vIn61 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                        let
-                           st_symb_identX44 = 'Control.Monad.Identity'.runIdentity (attach_T_Ident (arg_symb_ident_))
-                           (T_Ident_vOut43 asymb_identIcopy asymb_identIgraph asymb_identIhasRecs asymb_identIident asymb_identIisTask asymb_identImEntryId asymb_identImExitId asymb_identIppAg asymb_identIppAgs asymb_identIppDebug asymb_identIppDebugs asymb_identIrecNode asymb_identIreifyFunDef asymb_identIreifyFunType asymb_identIreifySymbolType) = inv_Ident_s44 st_symb_identX44 (T_Ident_vIn43 asymb_identOcaseExpr asymb_identOcurrTaskName asymb_identOgraph asymb_identOmergeId asymb_identOmoduleEnv)
-                           alhsOreifyFunDef = rule913 alhsImoduleEnv asymb_identIcopy
-                           alhsOreifySymbolType = rule914 asymb_identIreifySymbolType
-                           lident = rule915 asymb_identIident
-                           alhsOident = rule916 lident
-                           alhsOisCurrTask = rule917 alhsIcurrTaskName lident
-                           alhsOisTask = rule918 asymb_identIisTask
-                           alhsOisInfix = rule919 alhsImoduleEnv asymb_identIcopy asymb_identIppAg
-                           alhsOppDebug = rule920 asymb_identIppDebug
-                           alhsOppAg = rule921 asymb_identIppAg
-                           alhsOhasRecs = rule922 asymb_identIhasRecs
-                           alhsOmEntryId = rule923 asymb_identImEntryId
-                           alhsOmExitId = rule924 asymb_identImExitId
-                           alhsOppAgs = rule925 asymb_identIppAgs
-                           alhsOppDebugs = rule926 asymb_identIppDebugs
-                           alhsOrecNode = rule927 asymb_identIrecNode
-                           lcopy = rule928 asymb_identIcopy arg_symb_kind_
-                           alhsOcopy = rule929 lcopy
-                           alhsOgraph = rule930 asymb_identIgraph
-                           alhsOreifyFunType = rule931 asymb_identIreifyFunType
-                           asymb_identOcaseExpr = rule932 alhsIcaseExpr
-                           asymb_identOcurrTaskName = rule933 alhsIcurrTaskName
-                           asymb_identOgraph = rule934 alhsIgraph
-                           asymb_identOmergeId = rule935 alhsImergeId
-                           asymb_identOmoduleEnv = rule936 alhsImoduleEnv
-                           ag__result_ = T_SymbIdent_vOut52 alhsOcopy alhsOgraph alhsOhasRecs alhsOident alhsOisCurrTask alhsOisInfix alhsOisTask alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode alhsOreifyFunDef alhsOreifyFunType alhsOreifySymbolType
+                           st_symb_identX47 = 'Control.Monad.Identity'.runIdentity (attach_T_Ident (arg_symb_ident_))
+                           (T_Ident_vOut46 asymb_identIcopy asymb_identIgraph asymb_identIhasRecs asymb_identIident asymb_identIisCurrTask asymb_identImEntryId asymb_identImExitId asymb_identIppAg asymb_identIppAgs asymb_identIppDebug asymb_identIppDebugs asymb_identIrecNode) = inv_Ident_s47 st_symb_identX47 (T_Ident_vIn46 asymb_identOcaseExpr asymb_identOcurrTaskName asymb_identOgraph asymb_identOmergeId asymb_identOmoduleEnv)
+                           alhsOident = rule964 asymb_identIident
+                           alhsOisCurrTask = rule965 asymb_identIisCurrTask
+                           alhsOppDebug = rule966 asymb_identIppDebug
+                           alhsOppAg = rule967 asymb_identIppAg
+                           alhsOhasRecs = rule968 asymb_identIhasRecs
+                           alhsOmEntryId = rule969 asymb_identImEntryId
+                           alhsOmExitId = rule970 asymb_identImExitId
+                           alhsOppAgs = rule971 asymb_identIppAgs
+                           alhsOppDebugs = rule972 asymb_identIppDebugs
+                           alhsOrecNode = rule973 asymb_identIrecNode
+                           lcopy = rule974 asymb_identIcopy arg_symb_kind_
+                           alhsOcopy = rule975 lcopy
+                           alhsOgraph = rule976 asymb_identIgraph
+                           asymb_identOcaseExpr = rule977 alhsIcaseExpr
+                           asymb_identOcurrTaskName = rule978 alhsIcurrTaskName
+                           asymb_identOgraph = rule979 alhsIgraph
+                           asymb_identOmergeId = rule980 alhsImergeId
+                           asymb_identOmoduleEnv = rule981 alhsImoduleEnv
+                           ag__result_ = T_SymbIdent_vOut61 alhsOcopy alhsOgraph alhsOhasRecs alhsOident alhsOisCurrTask alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
-         in C_SymbIdent_s53 v52
-   /*# LINE 94 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule913 ((alhsImoduleEnv)) ((asymb_identIcopy)) =
-                          /*# LINE 94 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                          reifyFunDef alhsImoduleEnv asymb_identIcopy
-                          /*# LINE 5006 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 95 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule914 ((asymb_identIreifySymbolType)) =
-                              /*# LINE 95 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                              asymb_identIreifySymbolType
-                              /*# LINE 5011 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 97 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule915 ((asymb_identIident)) =
-                          /*# LINE 97 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                          asymb_identIident
-                          /*# LINE 5016 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 98 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule916 lident =
-                          /*# LINE 98 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                          lident
-                          /*# LINE 5021 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 99 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule917 ((alhsIcurrTaskName)) lident =
-                          /*# LINE 99 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                          lident     == alhsIcurrTaskName
-                          /*# LINE 5026 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 100 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule918 ((asymb_identIisTask)) =
-                          /*# LINE 100 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                          asymb_identIisTask
-                          /*# LINE 5031 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 34 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule919 ((alhsImoduleEnv)) ((asymb_identIcopy)) ((asymb_identIppAg)) =
-                                 /*# LINE 34 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-                                 let mfd  = reifyFunDef alhsImoduleEnv asymb_identIcopy
-                                     mft  = reifyFunType alhsImoduleEnv asymb_identIcopy
-                                     isInfix` (Prio _ _) = True
-                                     isInfix` _          = False
-                                 in  case mfd of
-                                       Just fd  -> isInfix` fd.gfd_priority
-                                       Nothing  ->
-                                         case mft of
-                                           Just ft  -> isInfix` ft.ft_priority
-                                           _        -> abort ("Failed to determine fixity for " +++ ppCompact asymb_identIppAg)
-                                 /*# LINE 5045 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 116 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule920 ((asymb_identIppDebug)) =
-                              /*# LINE 116 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+         in C_SymbIdent_s62 v61
+   /*# LINE 109 "./frontend/Tonic/MkGraph.ag" #*/
+   rule964 ((asymb_identIident)) =
+                               /*# LINE 109 "./frontend/Tonic/MkGraph.ag" #*/
+                               trace_n "SymbIdent.ident" $           asymb_identIident
+                               /*# LINE 5380 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 110 "./frontend/Tonic/MkGraph.ag" #*/
+   rule965 ((asymb_identIisCurrTask)) =
+                               /*# LINE 110 "./frontend/Tonic/MkGraph.ag" #*/
+                               trace_n "SymbIdent.isCurrTask" $      asymb_identIisCurrTask
+                               /*# LINE 5385 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 98 "./frontend/Tonic/Pretty.ag" #*/
+   rule966 ((asymb_identIppDebug)) =
+                              /*# LINE 98 "./frontend/Tonic/Pretty.ag" #*/
                               asymb_identIppDebug
-                              /*# LINE 5050 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   /*# LINE 117 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
-   rule921 ((asymb_identIppAg)) =
-                              /*# LINE 117 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Pretty.ag" #*/
+                              /*# LINE 5390 "frontend/Tonic/Tonic.icl"#*/
+   /*# LINE 99 "./frontend/Tonic/Pretty.ag" #*/
+   rule967 ((asymb_identIppAg)) =
+                              /*# LINE 99 "./frontend/Tonic/Pretty.ag" #*/
                               asymb_identIppAg
-                              /*# LINE 5055 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   rule922 ((asymb_identIhasRecs)) =
+                              /*# LINE 5395 "frontend/Tonic/Tonic.icl"#*/
+   rule968 ((asymb_identIhasRecs)) =
      asymb_identIhasRecs
-   rule923 ((asymb_identImEntryId)) =
+   rule969 ((asymb_identImEntryId)) =
      asymb_identImEntryId
-   rule924 ((asymb_identImExitId)) =
+   rule970 ((asymb_identImExitId)) =
      asymb_identImExitId
-   rule925 ((asymb_identIppAgs)) =
+   rule971 ((asymb_identIppAgs)) =
      asymb_identIppAgs
-   rule926 ((asymb_identIppDebugs)) =
+   rule972 ((asymb_identIppDebugs)) =
      asymb_identIppDebugs
-   rule927 ((asymb_identIrecNode)) =
+   rule973 ((asymb_identIrecNode)) =
      asymb_identIrecNode
-   rule928 ((asymb_identIcopy)) symb_kind_ =
+   rule974 ((asymb_identIcopy)) symb_kind_ =
      {SymbIdent|symb_ident = asymb_identIcopy , symb_kind = symb_kind_}
-   rule929 lcopy =
+   rule975 lcopy =
      lcopy
-   rule930 ((asymb_identIgraph)) =
+   rule976 ((asymb_identIgraph)) =
      asymb_identIgraph
-   rule931 ((asymb_identIreifyFunType)) =
-     asymb_identIreifyFunType
-   rule932 ((alhsIcaseExpr)) =
+   rule977 ((alhsIcaseExpr)) =
      alhsIcaseExpr
-   rule933 ((alhsIcurrTaskName)) =
+   rule978 ((alhsIcurrTaskName)) =
      alhsIcurrTaskName
-   rule934 ((alhsIgraph)) =
+   rule979 ((alhsIgraph)) =
      alhsIgraph
-   rule935 ((alhsImergeId)) =
+   rule980 ((alhsImergeId)) =
      alhsImergeId
-   rule936 ((alhsImoduleEnv)) =
+   rule981 ((alhsImoduleEnv)) =
      alhsImoduleEnv
 
 // SymbolType --------------------------------------------------
@@ -5096,34 +5434,32 @@ currTaskName_Inh_SymbolType (Inh_SymbolType _ x _ _ _) = x
 caseExpr_Inh_SymbolType :: Inh_SymbolType -> (Maybe Expression)
 caseExpr_Inh_SymbolType (Inh_SymbolType x _ _ _ _) = x
 recNode_Syn_SymbolType :: Syn_SymbolType -> (Bool)
-recNode_Syn_SymbolType (Syn_SymbolType _ _ _ _ _ _ _ _ _ _ x) = x
+recNode_Syn_SymbolType (Syn_SymbolType _ _ _ _ _ _ _ _ _ x) = x
 ppDebugs_Syn_SymbolType :: Syn_SymbolType -> ([Doc])
-ppDebugs_Syn_SymbolType (Syn_SymbolType _ _ _ _ _ _ _ _ _ x _) = x
+ppDebugs_Syn_SymbolType (Syn_SymbolType _ _ _ _ _ _ _ _ x _) = x
 ppDebug_Syn_SymbolType :: Syn_SymbolType -> (Doc)
-ppDebug_Syn_SymbolType (Syn_SymbolType _ _ _ _ _ _ _ _ x _ _) = x
+ppDebug_Syn_SymbolType (Syn_SymbolType _ _ _ _ _ _ _ x _ _) = x
 ppAgs_Syn_SymbolType :: Syn_SymbolType -> ([Doc])
-ppAgs_Syn_SymbolType (Syn_SymbolType _ _ _ _ _ _ _ x _ _ _) = x
+ppAgs_Syn_SymbolType (Syn_SymbolType _ _ _ _ _ _ x _ _ _) = x
 ppAg_Syn_SymbolType :: Syn_SymbolType -> (Doc)
-ppAg_Syn_SymbolType (Syn_SymbolType _ _ _ _ _ _ x _ _ _ _) = x
+ppAg_Syn_SymbolType (Syn_SymbolType _ _ _ _ _ x _ _ _ _) = x
 mExitId_Syn_SymbolType :: Syn_SymbolType -> (Maybe Int)
-mExitId_Syn_SymbolType (Syn_SymbolType _ _ _ _ _ x _ _ _ _ _) = x
+mExitId_Syn_SymbolType (Syn_SymbolType _ _ _ _ x _ _ _ _ _) = x
 mEntryId_Syn_SymbolType :: Syn_SymbolType -> (Maybe Int)
-mEntryId_Syn_SymbolType (Syn_SymbolType _ _ _ _ x _ _ _ _ _ _) = x
-isTask_Syn_SymbolType :: Syn_SymbolType -> (Bool)
-isTask_Syn_SymbolType (Syn_SymbolType _ _ _ x _ _ _ _ _ _ _) = x
+mEntryId_Syn_SymbolType (Syn_SymbolType _ _ _ x _ _ _ _ _ _) = x
 hasRecs_Syn_SymbolType :: Syn_SymbolType -> (Bool)
-hasRecs_Syn_SymbolType (Syn_SymbolType _ _ x _ _ _ _ _ _ _ _) = x
+hasRecs_Syn_SymbolType (Syn_SymbolType _ _ x _ _ _ _ _ _ _) = x
 graph_Syn_SymbolType :: Syn_SymbolType -> (GinGraph)
-graph_Syn_SymbolType (Syn_SymbolType _ x _ _ _ _ _ _ _ _ _) = x
+graph_Syn_SymbolType (Syn_SymbolType _ x _ _ _ _ _ _ _ _) = x
 copy_Syn_SymbolType :: Syn_SymbolType -> (SymbolType)
-copy_Syn_SymbolType (Syn_SymbolType x _ _ _ _ _ _ _ _ _ _) = x
+copy_Syn_SymbolType (Syn_SymbolType x _ _ _ _ _ _ _ _ _) = x
 wrap_SymbolType :: T_SymbolType  Inh_SymbolType  -> (Syn_SymbolType )
 wrap_SymbolType (T_SymbolType act) (Inh_SymbolType alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
    'Control.Monad.Identity'.runIdentity (
      act >>= \ sem ->
-     lift (T_SymbolType_vIn55 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) >>= \ arg ->
-     lift (inv_SymbolType_s56 sem arg) >>= \ (T_SymbolType_vOut55 alhsOcopy alhsOgraph alhsOhasRecs alhsOisTask alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode) ->
-     lift (Syn_SymbolType alhsOcopy alhsOgraph alhsOhasRecs alhsOisTask alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode)
+     lift (T_SymbolType_vIn64 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) >>= \ arg ->
+     lift (inv_SymbolType_s65 sem arg) >>= \ (T_SymbolType_vOut64 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode) ->
+     lift (Syn_SymbolType alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode)
    )
 
 // cata
@@ -5131,57 +5467,48 @@ sem_SymbolType :: SymbolType  -> T_SymbolType
 sem_SymbolType { SymbolType | st_vars = st_vars_,st_args = st_args_,st_args_strictness = st_args_strictness_,st_arity = st_arity_,st_result = st_result_,st_context = st_context_,st_attr_vars = st_attr_vars_,st_attr_env = st_attr_env_ } = sem_SymbolType_SymbolType st_vars_ st_args_ st_args_strictness_ st_arity_ st_result_ st_context_ st_attr_vars_ st_attr_env_
 
 // semantic domain
+:: T_SymbolType  = T_SymbolType (Identity (T_SymbolType_s65 ))
 attach_T_SymbolType (T_SymbolType t_SymbolType) = t_SymbolType
-inv_SymbolType_s56 (C_SymbolType_s56 x) = x
+inv_SymbolType_s65 (C_SymbolType_s65 x) = x
 sem_SymbolType_SymbolType  :: ([TypeVar]) ([AType]) (StrictnessList) (Int) (AType) ([TypeContext]) ([AttributeVar]) ([AttrInequality]) -> T_SymbolType 
-sem_SymbolType_SymbolType arg_st_vars_ arg_st_args_ arg_st_args_strictness_ arg_st_arity_ arg_st_result_ arg_st_context_ arg_st_attr_vars_ arg_st_attr_env_ = T_SymbolType (lift st56) where
-   st56 =
+sem_SymbolType_SymbolType arg_st_vars_ arg_st_args_ arg_st_args_strictness_ arg_st_arity_ arg_st_result_ arg_st_context_ arg_st_attr_vars_ arg_st_attr_env_ = T_SymbolType (lift st65) where
+   st65 =
          let
-             v55 (T_SymbolType_vIn55 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
+             v64 (T_SymbolType_vIn64 alhsIcaseExpr alhsIcurrTaskName alhsIgraph alhsImergeId alhsImoduleEnv) =
                        let
-                           alhsOisTask = rule937 arg_st_result_
-                           alhsOhasRecs = rule938  Void
-                           alhsOmEntryId = rule939  Void
-                           alhsOmExitId = rule940  Void
-                           alhsOppAg = rule941  Void
-                           alhsOppAgs = rule942  Void
-                           alhsOppDebug = rule943  Void
-                           alhsOppDebugs = rule944  Void
-                           alhsOrecNode = rule945  Void
-                           lcopy = rule946 arg_st_args_ arg_st_args_strictness_ arg_st_arity_ arg_st_attr_env_ arg_st_attr_vars_ arg_st_context_ arg_st_result_ arg_st_vars_
-                           alhsOcopy = rule947 lcopy
-                           alhsOgraph = rule948 alhsIgraph
-                           ag__result_ = T_SymbolType_vOut55 alhsOcopy alhsOgraph alhsOhasRecs alhsOisTask alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
+                           alhsOhasRecs = rule982  Void
+                           alhsOmEntryId = rule983  Void
+                           alhsOmExitId = rule984  Void
+                           alhsOppAg = rule985  Void
+                           alhsOppAgs = rule986  Void
+                           alhsOppDebug = rule987  Void
+                           alhsOppDebugs = rule988  Void
+                           alhsOrecNode = rule989  Void
+                           lcopy = rule990 arg_st_args_ arg_st_args_strictness_ arg_st_arity_ arg_st_attr_env_ arg_st_attr_vars_ arg_st_context_ arg_st_result_ arg_st_vars_
+                           alhsOcopy = rule991 lcopy
+                           alhsOgraph = rule992 alhsIgraph
+                           ag__result_ = T_SymbolType_vOut64 alhsOcopy alhsOgraph alhsOhasRecs alhsOmEntryId alhsOmExitId alhsOppAg alhsOppAgs alhsOppDebug alhsOppDebugs alhsOrecNode
                        in ag__result_
-         in C_SymbolType_s56 v55
-   /*# LINE 56 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-   rule937 st_result_ =
-                      /*# LINE 56 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/MkGraph.ag" #*/
-                      case st_result_.at_type of
-                        TA   tsi _     -> symTyIsTask` tsi
-                        TAS  tsi _  _  -> symTyIsTask` tsi
-                        _              -> False
-                      where symTyIsTask` tsi = tsi.type_ident.id_name == "Task"
-                      /*# LINE 5166 "/Users/norm2782/Documents/PhD/Projects/clean-compiler/branches/itask-tonic/frontend/Tonic/Tonic.icl"#*/
-   rule938  (_) =
+         in C_SymbolType_s65 v64
+   rule982  (_) =
      False
-   rule939  (_) =
+   rule983  (_) =
      Nothing
-   rule940  (_) =
+   rule984  (_) =
      Nothing
-   rule941  (_) =
+   rule985  (_) =
      empty
-   rule942  (_) =
+   rule986  (_) =
      []
-   rule943  (_) =
+   rule987  (_) =
      empty
-   rule944  (_) =
+   rule988  (_) =
      []
-   rule945  (_) =
+   rule989  (_) =
      False
-   rule946 st_args_ st_args_strictness_ st_arity_ st_attr_env_ st_attr_vars_ st_context_ st_result_ st_vars_ =
+   rule990 st_args_ st_args_strictness_ st_arity_ st_attr_env_ st_attr_vars_ st_context_ st_result_ st_vars_ =
      {SymbolType|st_vars = st_vars_ , st_args = st_args_ , st_args_strictness = st_args_strictness_ , st_arity = st_arity_ , st_result = st_result_ , st_context = st_context_ , st_attr_vars = st_attr_vars_ , st_attr_env = st_attr_env_}
-   rule947 lcopy =
+   rule991 lcopy =
      lcopy
-   rule948 ((alhsIgraph)) =
+   rule992 ((alhsIgraph)) =
      alhsIgraph

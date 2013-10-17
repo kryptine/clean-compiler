@@ -297,7 +297,10 @@ PD_TC__LazyArray	:== 290
 PD_TC__StrictArray	:== 291
 PD_TC__UnboxedArray	:== 292
 
-PD_NrOfPredefSymbols		:== 293
+PD_iTasks_Framework_Tonic		:== 293
+PD_tonicTune					:== 294
+
+PD_NrOfPredefSymbols		:== 295
 
 GetTupleConsIndex tup_arity :== PD_Arity2TupleSymbol + tup_arity - 2
 GetTupleTypeIndex tup_arity :== PD_Arity2TupleType + tup_arity - 2

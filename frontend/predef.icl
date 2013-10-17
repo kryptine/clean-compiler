@@ -246,7 +246,10 @@ predefined_idents
 					[PD_FromThenToSTS]= i "_from_then_to_sts",
 					[PD_FromThenToU]= i "_from_then_to_u",
 					[PD_FromThenToUTS]= i "_from_then_to_uts",
-					[PD_FromThenToO]= i "_from_then_to_o"
+					[PD_FromThenToO]= i "_from_then_to_o",
+
+                    [PD_iTasks_Framework_Tonic] = i "iTasks.Framework.Tonic",
+                    [PD_tonicTune] = i "tonicTune"
 		}
 	=: idents
 	where
@@ -386,6 +389,9 @@ where
 					<<- (local_predefined_idents,	IC_Expression, 	PD_undef)					
 
 					<<- (local_predefined_idents,	IC_Expression, PD_Start)
+
+					<<- (local_predefined_idents,	IC_Module NoQualifiedIdents, PD_iTasks_Framework_Tonic)
+					<<- (local_predefined_idents,	IC_Expression, 	PD_tonicTune)
 
 		# hash_table = put_predefined_idents_in_hash_table PD_FromS PD_FromThenToO IC_Expression local_predefined_idents hash_table
 

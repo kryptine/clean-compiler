@@ -2,25 +2,16 @@ definition module Tonic.Tonic
 from Text.PPrint import :: Doc
 import Tonic.AbsSyn
 
-from syntax import
-  :: Expression (..), :: BoundVar {..}, :: App {..}, :: Let {..}, :: Case,
-  :: SelectorKind, :: Selection (..), :: FreeVar {..}, :: Global {..},
-  :: SymbIdent {..}, :: SymbKind, :: Priority (..), :: Assoc (..), :: VarInfoPtr, :: DynamicExpr,
-  :: Ptr, :: VarInfo, :: CodeBinding, :: DefinedSymbol {..}, :: Index, :: Bind,
-  :: Position, :: AType, :: Env, :: Ident {..}, :: SymbolPtr,
-  :: SymbolTableEntry, :: Level, :: ExprInfoPtr, :: ExprInfo,
-  :: TypeCodeExpression, :: GlobalIndex, :: Conditional, :: BasicValue (..),
-  :: FieldSymbol, :: IclModule, :: DclModule, :: FunDef, :: Optional,
-  :: SymbolType {..}, :: LetBind, :: TypeVar {..}, :: StrictnessList (..),
-  :: TypeContext {..}, :: AttributeVar {..}, :: AttrInequality {..},
-  :: TypeVarInfoPtr {..}, :: AttrVarInfoPtr, :: Type, :: TCClass,
-  :: TypeVarInfo, :: AttrVarInfo, :: FunType {..}, :: FunSpecials
+from syntax import :: FunType, :: Index, :: FunSpecials, :: SymbolPtr,
+  :: Assoc, :: SymbKind, :: TypeVar, :: StrictnessList, :: TypeContext,
+  :: AttributeVar, :: AttrInequality, :: SymbolTableEntry
 
 :: Expressions :== [Expression]
 :: GLetBinds :== [GLetBind]
 :: Selections :== [Selection]
 :: GlobalDefinedSymbol :== Global DefinedSymbol
 :: FreeVars :== [FreeVar]
+:: MaybeExpression :== Maybe Expression
 
 ppCompact :: (Doc -> String)
 
@@ -61,10 +52,14 @@ mergeId_Inh_App :: Inh_App -> (Int)
 graph_Inh_App :: Inh_App -> (GinGraph)
 currTaskName_Inh_App :: Inh_App -> (String)
 caseExpr_Inh_App :: Inh_App -> (Maybe Expression)
-:: Syn_App  = Syn_App (App) (GinGraph) (Bool) (Bool) (Maybe Int) (Maybe Int) (Doc) ([Doc]) (Doc) ([Doc]) (Bool) (Maybe GFunDef) (Maybe FunType) (Maybe SymbolType)
-reifySymbolType_Syn_App :: Syn_App -> (Maybe SymbolType)
-reifyFunType_Syn_App :: Syn_App -> (Maybe FunType)
-reifyFunDef_Syn_App :: Syn_App -> (Maybe GFunDef)
+:: Syn_App  = Syn_App (App) (MaybeExpression) (GinGraph) (Bool) (String) (Maybe Int) (Maybe Int) (Bool) (GinGraph) (Bool) (Maybe Int) (Maybe Int) (Doc) ([Doc]) (Doc) ([Doc]) (Bool) (MaybeExpression) (GinGraph) (Bool) (String) (Maybe Int) (Maybe Int) (Bool)
+secondArgRecNode_Syn_App :: Syn_App -> (Bool)
+secondArgMExitId_Syn_App :: Syn_App -> (Maybe Int)
+secondArgMEntryId_Syn_App :: Syn_App -> (Maybe Int)
+secondArgIdent_Syn_App :: Syn_App -> (String)
+secondArgHasRecs_Syn_App :: Syn_App -> (Bool)
+secondArgGraph_Syn_App :: Syn_App -> (GinGraph)
+secondArg_Syn_App :: Syn_App -> (MaybeExpression)
 recNode_Syn_App :: Syn_App -> (Bool)
 ppDebugs_Syn_App :: Syn_App -> ([Doc])
 ppDebug_Syn_App :: Syn_App -> (Doc)
@@ -72,9 +67,15 @@ ppAgs_Syn_App :: Syn_App -> ([Doc])
 ppAg_Syn_App :: Syn_App -> (Doc)
 mExitId_Syn_App :: Syn_App -> (Maybe Int)
 mEntryId_Syn_App :: Syn_App -> (Maybe Int)
-isTask_Syn_App :: Syn_App -> (Bool)
 hasRecs_Syn_App :: Syn_App -> (Bool)
 graph_Syn_App :: Syn_App -> (GinGraph)
+firstArgRecNode_Syn_App :: Syn_App -> (Bool)
+firstArgMExitId_Syn_App :: Syn_App -> (Maybe Int)
+firstArgMEntryId_Syn_App :: Syn_App -> (Maybe Int)
+firstArgIdent_Syn_App :: Syn_App -> (String)
+firstArgHasRecs_Syn_App :: Syn_App -> (Bool)
+firstArgGraph_Syn_App :: Syn_App -> (GinGraph)
+firstArg_Syn_App :: Syn_App -> (MaybeExpression)
 copy_Syn_App :: Syn_App -> (App)
 wrap_App :: T_App  Inh_App  -> (Syn_App )
 
@@ -87,8 +88,8 @@ sem_App :: App  -> T_App
 :: T_App_s3  = C_App_s3
 :: T_App_v1  :== (T_App_vIn1 ) -> (T_App_vOut1 )
 :: T_App_vIn1  = T_App_vIn1 (Maybe Expression) (String) (GinGraph) (Int) (ModuleEnv)
-:: T_App_vOut1  = T_App_vOut1 (App) (GinGraph) (Bool) (Bool) (Maybe Int) (Maybe Int) (Doc) ([Doc]) (Doc) ([Doc]) (Bool) (Maybe GFunDef) (Maybe FunType) (Maybe SymbolType)
-sem_App_App  :: (T_SymbIdent ) (T_Expressions ) (ExprInfoPtr)        -> T_App 
+:: T_App_vOut1  = T_App_vOut1 (App) (MaybeExpression) (GinGraph) (Bool) (String) (Maybe Int) (Maybe Int) (Bool) (GinGraph) (Bool) (Maybe Int) (Maybe Int) (Doc) ([Doc]) (Doc) ([Doc]) (Bool) (MaybeExpression) (GinGraph) (Bool) (String) (Maybe Int) (Maybe Int) (Bool)
+sem_App_App  :: (T_SymbIdent ) (T_Expressions ) (ExprInfoPtr)  -> T_App 
 
 // BasicValue --------------------------------------------------
 // wrapper
@@ -253,14 +254,26 @@ sem_Expression_FailExpr  :: (T_Ident ) -> T_Expression
 
 // Expressions -------------------------------------------------
 // wrapper
-:: Inh_Expressions  = Inh_Expressions (Maybe Expression) (String) (GinGraph) (Int) (ModuleEnv)
+:: Inh_Expressions  = Inh_Expressions (Doc) (Maybe Expression) (String) (GinGraph) (Int) (ModuleEnv) (Int)
+numContexts_Inh_Expressions :: Inh_Expressions -> (Int)
 moduleEnv_Inh_Expressions :: Inh_Expressions -> (ModuleEnv)
 mergeId_Inh_Expressions :: Inh_Expressions -> (Int)
 graph_Inh_Expressions :: Inh_Expressions -> (GinGraph)
 currTaskName_Inh_Expressions :: Inh_Expressions -> (String)
 caseExpr_Inh_Expressions :: Inh_Expressions -> (Maybe Expression)
-:: Syn_Expressions  = Syn_Expressions (Expressions) (GinGraph) (Bool) (Maybe Int) (Maybe Int) (Doc) ([Doc]) (Doc) ([Doc]) (Bool)
+appSymbDoc_Inh_Expressions :: Inh_Expressions -> (Doc)
+:: Syn_Expressions  = Syn_Expressions (Expressions) (MaybeExpression) (GinGraph) (Bool) (String) (Maybe Int) (Maybe Int) (Bool) (GinGraph) (Bool) (Maybe Int) (Maybe Int) (Doc) ([Doc]) (Doc) ([Doc]) (Doc) (Doc) ([Doc]) (Bool) (MaybeExpression) (GinGraph) (Bool) (String) (Maybe Int) (Maybe Int) (Bool)
+secondArgRecNode_Syn_Expressions :: Syn_Expressions -> (Bool)
+secondArgMExitId_Syn_Expressions :: Syn_Expressions -> (Maybe Int)
+secondArgMEntryId_Syn_Expressions :: Syn_Expressions -> (Maybe Int)
+secondArgIdent_Syn_Expressions :: Syn_Expressions -> (String)
+secondArgHasRecs_Syn_Expressions :: Syn_Expressions -> (Bool)
+secondArgGraph_Syn_Expressions :: Syn_Expressions -> (GinGraph)
+secondArg_Syn_Expressions :: Syn_Expressions -> (MaybeExpression)
 recNode_Syn_Expressions :: Syn_Expressions -> (Bool)
+ppTail_Syn_Expressions :: Syn_Expressions -> ([Doc])
+ppPrefix_Syn_Expressions :: Syn_Expressions -> (Doc)
+ppInfix_Syn_Expressions :: Syn_Expressions -> (Doc)
 ppDebugs_Syn_Expressions :: Syn_Expressions -> ([Doc])
 ppDebug_Syn_Expressions :: Syn_Expressions -> (Doc)
 ppAgs_Syn_Expressions :: Syn_Expressions -> ([Doc])
@@ -269,6 +282,13 @@ mExitId_Syn_Expressions :: Syn_Expressions -> (Maybe Int)
 mEntryId_Syn_Expressions :: Syn_Expressions -> (Maybe Int)
 hasRecs_Syn_Expressions :: Syn_Expressions -> (Bool)
 graph_Syn_Expressions :: Syn_Expressions -> (GinGraph)
+firstArgRecNode_Syn_Expressions :: Syn_Expressions -> (Bool)
+firstArgMExitId_Syn_Expressions :: Syn_Expressions -> (Maybe Int)
+firstArgMEntryId_Syn_Expressions :: Syn_Expressions -> (Maybe Int)
+firstArgIdent_Syn_Expressions :: Syn_Expressions -> (String)
+firstArgHasRecs_Syn_Expressions :: Syn_Expressions -> (Bool)
+firstArgGraph_Syn_Expressions :: Syn_Expressions -> (GinGraph)
+firstArg_Syn_Expressions :: Syn_Expressions -> (MaybeExpression)
 copy_Syn_Expressions :: Syn_Expressions -> (Expressions)
 wrap_Expressions :: T_Expressions  Inh_Expressions  -> (Syn_Expressions )
 
@@ -280,8 +300,8 @@ sem_Expressions :: Expressions  -> T_Expressions
 :: T_Expressions_s17  = C_Expressions_s17 (T_Expressions_v16 )
 :: T_Expressions_s18  = C_Expressions_s18
 :: T_Expressions_v16  :== (T_Expressions_vIn16 ) -> (T_Expressions_vOut16 )
-:: T_Expressions_vIn16  = T_Expressions_vIn16 (Maybe Expression) (String) (GinGraph) (Int) (ModuleEnv)
-:: T_Expressions_vOut16  = T_Expressions_vOut16 (Expressions) (GinGraph) (Bool) (Maybe Int) (Maybe Int) (Doc) ([Doc]) (Doc) ([Doc]) (Bool)
+:: T_Expressions_vIn16  = T_Expressions_vIn16 (Doc) (Maybe Expression) (String) (GinGraph) (Int) (ModuleEnv) (Int)
+:: T_Expressions_vOut16  = T_Expressions_vOut16 (Expressions) (MaybeExpression) (GinGraph) (Bool) (String) (Maybe Int) (Maybe Int) (Bool) (GinGraph) (Bool) (Maybe Int) (Maybe Int) (Doc) ([Doc]) (Doc) ([Doc]) (Doc) (Doc) ([Doc]) (Bool) (MaybeExpression) (GinGraph) (Bool) (String) (Maybe Int) (Maybe Int) (Bool)
 sem_Expressions_Cons  :: (T_Expression ) (T_Expressions ) -> T_Expressions 
 sem_Expressions_Nil  ::   T_Expressions 
 
@@ -348,6 +368,35 @@ sem_FreeVars :: FreeVars  -> T_FreeVars
 sem_FreeVars_Cons  :: (T_FreeVar ) (T_FreeVars ) -> T_FreeVars 
 sem_FreeVars_Nil  ::   T_FreeVars 
 
+// FunType -----------------------------------------------------
+// wrapper
+:: Inh_FunType  = Inh_FunType (Maybe Expression) (String) (GinGraph) (Int) (ModuleEnv)
+moduleEnv_Inh_FunType :: Inh_FunType -> (ModuleEnv)
+mergeId_Inh_FunType :: Inh_FunType -> (Int)
+graph_Inh_FunType :: Inh_FunType -> (GinGraph)
+currTaskName_Inh_FunType :: Inh_FunType -> (String)
+caseExpr_Inh_FunType :: Inh_FunType -> (Maybe Expression)
+:: Syn_FunType  = Syn_FunType (FunType) (GinGraph) (Bool) (Maybe Int) (Maybe Int) (Bool)
+recNode_Syn_FunType :: Syn_FunType -> (Bool)
+mExitId_Syn_FunType :: Syn_FunType -> (Maybe Int)
+mEntryId_Syn_FunType :: Syn_FunType -> (Maybe Int)
+hasRecs_Syn_FunType :: Syn_FunType -> (Bool)
+graph_Syn_FunType :: Syn_FunType -> (GinGraph)
+copy_Syn_FunType :: Syn_FunType -> (FunType)
+wrap_FunType :: T_FunType  Inh_FunType  -> (Syn_FunType )
+
+// cata
+sem_FunType :: FunType  -> T_FunType 
+
+// semantic domain
+:: T_FunType  = T_FunType (Identity (T_FunType_s26 ))
+:: T_FunType_s26  = C_FunType_s26 (T_FunType_v25 )
+:: T_FunType_s27  = C_FunType_s27
+:: T_FunType_v25  :== (T_FunType_vIn25 ) -> (T_FunType_vOut25 )
+:: T_FunType_vIn25  = T_FunType_vIn25 (Maybe Expression) (String) (GinGraph) (Int) (ModuleEnv)
+:: T_FunType_vOut25  = T_FunType_vOut25 (FunType) (GinGraph) (Bool) (Maybe Int) (Maybe Int) (Bool)
+sem_FunType_FunType  :: (T_Ident ) (Int) (T_Priority ) (T_SymbolType ) (Position) (FunSpecials) (VarInfoPtr) -> T_FunType 
+
 // GExpression -------------------------------------------------
 // wrapper
 :: Inh_GExpression  = Inh_GExpression (Maybe Expression) (String) (GinGraph) (Int) (ModuleEnv)
@@ -373,12 +422,12 @@ wrap_GExpression :: T_GExpression  Inh_GExpression  -> (Syn_GExpression )
 sem_GExpression :: GExpression  -> T_GExpression 
 
 // semantic domain
-:: T_GExpression  = T_GExpression (Identity (T_GExpression_s26 ))
-:: T_GExpression_s26  = C_GExpression_s26 (T_GExpression_v25 )
-:: T_GExpression_s27  = C_GExpression_s27
-:: T_GExpression_v25  :== (T_GExpression_vIn25 ) -> (T_GExpression_vOut25 )
-:: T_GExpression_vIn25  = T_GExpression_vIn25 (Maybe Expression) (String) (GinGraph) (Int) (ModuleEnv)
-:: T_GExpression_vOut25  = T_GExpression_vOut25 (GExpression) (GinGraph) (Bool) (Maybe Int) (Maybe Int) (Doc) ([Doc]) (Doc) ([Doc]) (Bool)
+:: T_GExpression  = T_GExpression (Identity (T_GExpression_s29 ))
+:: T_GExpression_s29  = C_GExpression_s29 (T_GExpression_v28 )
+:: T_GExpression_s30  = C_GExpression_s30
+:: T_GExpression_v28  :== (T_GExpression_vIn28 ) -> (T_GExpression_vOut28 )
+:: T_GExpression_vIn28  = T_GExpression_vIn28 (Maybe Expression) (String) (GinGraph) (Int) (ModuleEnv)
+:: T_GExpression_vOut28  = T_GExpression_vOut28 (GExpression) (GinGraph) (Bool) (Maybe Int) (Maybe Int) (Doc) ([Doc]) (Doc) ([Doc]) (Bool)
 sem_GExpression_GUndefinedExpression  ::   T_GExpression 
 sem_GExpression_GGraphExpression  :: (GGraph) -> T_GExpression 
 sem_GExpression_GListExpression  :: ([GExpression]) -> T_GExpression 
@@ -392,13 +441,12 @@ mergeId_Inh_GFunDef :: Inh_GFunDef -> (Int)
 graph_Inh_GFunDef :: Inh_GFunDef -> (GinGraph)
 currTaskName_Inh_GFunDef :: Inh_GFunDef -> (String)
 caseExpr_Inh_GFunDef :: Inh_GFunDef -> (Maybe Expression)
-:: Syn_GFunDef  = Syn_GFunDef (GFunDef) ([FreeVar]) (Expression) (GinGraph) (Bool) (Maybe Int) (Maybe Int) (Bool)
+:: Syn_GFunDef  = Syn_GFunDef (GFunDef) ([FreeVar]) (GinGraph) (Bool) (Maybe Int) (Maybe Int) (Bool)
 recNode_Syn_GFunDef :: Syn_GFunDef -> (Bool)
 mExitId_Syn_GFunDef :: Syn_GFunDef -> (Maybe Int)
 mEntryId_Syn_GFunDef :: Syn_GFunDef -> (Maybe Int)
 hasRecs_Syn_GFunDef :: Syn_GFunDef -> (Bool)
 graph_Syn_GFunDef :: Syn_GFunDef -> (GinGraph)
-funRhs_Syn_GFunDef :: Syn_GFunDef -> (Expression)
 funArgs_Syn_GFunDef :: Syn_GFunDef -> ([FreeVar])
 copy_Syn_GFunDef :: Syn_GFunDef -> (GFunDef)
 wrap_GFunDef :: T_GFunDef  Inh_GFunDef  -> (Syn_GFunDef )
@@ -407,13 +455,13 @@ wrap_GFunDef :: T_GFunDef  Inh_GFunDef  -> (Syn_GFunDef )
 sem_GFunDef :: GFunDef  -> T_GFunDef 
 
 // semantic domain
-:: T_GFunDef  = T_GFunDef (Identity (T_GFunDef_s29 ))
-:: T_GFunDef_s29  = C_GFunDef_s29 (T_GFunDef_v28 )
-:: T_GFunDef_s30  = C_GFunDef_s30
-:: T_GFunDef_v28  :== (T_GFunDef_vIn28 ) -> (T_GFunDef_vOut28 )
-:: T_GFunDef_vIn28  = T_GFunDef_vIn28 (Maybe Expression) (String) (GinGraph) (Int) (ModuleEnv)
-:: T_GFunDef_vOut28  = T_GFunDef_vOut28 (GFunDef) ([FreeVar]) (Expression) (GinGraph) (Bool) (Maybe Int) (Maybe Int) (Bool)
-sem_GFunDef_GFunDef  :: (String) (T_FreeVars ) (T_Expression ) (Optional SymbolType) (Priority) -> T_GFunDef 
+:: T_GFunDef  = T_GFunDef (Identity (T_GFunDef_s32 ))
+:: T_GFunDef_s32  = C_GFunDef_s32 (T_GFunDef_v31 )
+:: T_GFunDef_s33  = C_GFunDef_s33
+:: T_GFunDef_v31  :== (T_GFunDef_vIn31 ) -> (T_GFunDef_vOut31 )
+:: T_GFunDef_vIn31  = T_GFunDef_vIn31 (Maybe Expression) (String) (GinGraph) (Int) (ModuleEnv)
+:: T_GFunDef_vOut31  = T_GFunDef_vOut31 (GFunDef) ([FreeVar]) (GinGraph) (Bool) (Maybe Int) (Maybe Int) (Bool)
+sem_GFunDef_GFunDef  :: (String) (T_FreeVars ) (T_Expression ) (Optional SymbolType) (T_Priority ) -> T_GFunDef 
 
 // GLet --------------------------------------------------------
 // wrapper
@@ -440,12 +488,12 @@ wrap_GLet :: T_GLet  Inh_GLet  -> (Syn_GLet )
 sem_GLet :: GLet  -> T_GLet 
 
 // semantic domain
-:: T_GLet  = T_GLet (Identity (T_GLet_s32 ))
-:: T_GLet_s32  = C_GLet_s32 (T_GLet_v31 )
-:: T_GLet_s33  = C_GLet_s33
-:: T_GLet_v31  :== (T_GLet_vIn31 ) -> (T_GLet_vOut31 )
-:: T_GLet_vIn31  = T_GLet_vIn31 (Maybe Expression) (String) (GinGraph) (Int) (ModuleEnv)
-:: T_GLet_vOut31  = T_GLet_vOut31 (GLet) (GinGraph) (Bool) (Maybe Int) (Maybe Int) (Doc) ([Doc]) (Doc) ([Doc]) (Bool)
+:: T_GLet  = T_GLet (Identity (T_GLet_s35 ))
+:: T_GLet_s35  = C_GLet_s35 (T_GLet_v34 )
+:: T_GLet_s36  = C_GLet_s36
+:: T_GLet_v34  :== (T_GLet_vIn34 ) -> (T_GLet_vOut34 )
+:: T_GLet_vIn34  = T_GLet_vIn34 (Maybe Expression) (String) (GinGraph) (Int) (ModuleEnv)
+:: T_GLet_vOut34  = T_GLet_vOut34 (GLet) (GinGraph) (Bool) (Maybe Int) (Maybe Int) (Doc) ([Doc]) (Doc) ([Doc]) (Bool)
 sem_GLet_GLet  :: (T_GLetBinds ) (T_Expression ) -> T_GLet 
 
 // GLetBind ----------------------------------------------------
@@ -474,12 +522,12 @@ wrap_GLetBind :: T_GLetBind  Inh_GLetBind  -> (Syn_GLetBind )
 sem_GLetBind :: GLetBind  -> T_GLetBind 
 
 // semantic domain
-:: T_GLetBind  = T_GLetBind (Identity (T_GLetBind_s35 ))
-:: T_GLetBind_s35  = C_GLetBind_s35 (T_GLetBind_v34 )
-:: T_GLetBind_s36  = C_GLetBind_s36
-:: T_GLetBind_v34  :== (T_GLetBind_vIn34 ) -> (T_GLetBind_vOut34 )
-:: T_GLetBind_vIn34  = T_GLetBind_vIn34 (Maybe Expression) (String) (GinGraph) (Int) (ModuleEnv)
-:: T_GLetBind_vOut34  = T_GLetBind_vOut34 (GLetBind) (GinGraph) (Bool) (Maybe Expression) (Maybe Int) (Maybe Int) (Doc) ([Doc]) (Doc) ([Doc]) (Bool)
+:: T_GLetBind  = T_GLetBind (Identity (T_GLetBind_s38 ))
+:: T_GLetBind_s38  = C_GLetBind_s38 (T_GLetBind_v37 )
+:: T_GLetBind_s39  = C_GLetBind_s39
+:: T_GLetBind_v37  :== (T_GLetBind_vIn37 ) -> (T_GLetBind_vOut37 )
+:: T_GLetBind_vIn37  = T_GLetBind_vIn37 (Maybe Expression) (String) (GinGraph) (Int) (ModuleEnv)
+:: T_GLetBind_vOut37  = T_GLetBind_vOut37 (GLetBind) (GinGraph) (Bool) (Maybe Expression) (Maybe Int) (Maybe Int) (Doc) ([Doc]) (Doc) ([Doc]) (Bool)
 sem_GLetBind_GLetBind  :: (String) (T_Expression ) -> T_GLetBind 
 
 // GLetBinds ---------------------------------------------------
@@ -508,12 +556,12 @@ wrap_GLetBinds :: T_GLetBinds  Inh_GLetBinds  -> (Syn_GLetBinds )
 sem_GLetBinds :: GLetBinds  -> T_GLetBinds 
 
 // semantic domain
-:: T_GLetBinds  = T_GLetBinds (Identity (T_GLetBinds_s38 ))
-:: T_GLetBinds_s38  = C_GLetBinds_s38 (T_GLetBinds_v37 )
-:: T_GLetBinds_s39  = C_GLetBinds_s39
-:: T_GLetBinds_v37  :== (T_GLetBinds_vIn37 ) -> (T_GLetBinds_vOut37 )
-:: T_GLetBinds_vIn37  = T_GLetBinds_vIn37 (Maybe Expression) (String) (GinGraph) (Int) (ModuleEnv)
-:: T_GLetBinds_vOut37  = T_GLetBinds_vOut37 (GLetBinds) (GinGraph) (Bool) (Maybe Expression) (Maybe Int) (Maybe Int) (Doc) ([Doc]) (Doc) ([Doc]) (Bool)
+:: T_GLetBinds  = T_GLetBinds (Identity (T_GLetBinds_s41 ))
+:: T_GLetBinds_s41  = C_GLetBinds_s41 (T_GLetBinds_v40 )
+:: T_GLetBinds_s42  = C_GLetBinds_s42
+:: T_GLetBinds_v40  :== (T_GLetBinds_vIn40 ) -> (T_GLetBinds_vOut40 )
+:: T_GLetBinds_vIn40  = T_GLetBinds_vIn40 (Maybe Expression) (String) (GinGraph) (Int) (ModuleEnv)
+:: T_GLetBinds_vOut40  = T_GLetBinds_vOut40 (GLetBinds) (GinGraph) (Bool) (Maybe Expression) (Maybe Int) (Maybe Int) (Doc) ([Doc]) (Doc) ([Doc]) (Bool)
 sem_GLetBinds_Cons  :: (T_GLetBind ) (T_GLetBinds ) -> T_GLetBinds 
 sem_GLetBinds_Nil  ::   T_GLetBinds 
 
@@ -542,12 +590,12 @@ wrap_GlobalDefinedSymbol :: T_GlobalDefinedSymbol  Inh_GlobalDefinedSymbol  -> (
 sem_GlobalDefinedSymbol :: GlobalDefinedSymbol  -> T_GlobalDefinedSymbol 
 
 // semantic domain
-:: T_GlobalDefinedSymbol  = T_GlobalDefinedSymbol (Identity (T_GlobalDefinedSymbol_s41 ))
-:: T_GlobalDefinedSymbol_s41  = C_GlobalDefinedSymbol_s41 (T_GlobalDefinedSymbol_v40 )
-:: T_GlobalDefinedSymbol_s42  = C_GlobalDefinedSymbol_s42
-:: T_GlobalDefinedSymbol_v40  :== (T_GlobalDefinedSymbol_vIn40 ) -> (T_GlobalDefinedSymbol_vOut40 )
-:: T_GlobalDefinedSymbol_vIn40  = T_GlobalDefinedSymbol_vIn40 (Maybe Expression) (String) (GinGraph) (Int) (ModuleEnv)
-:: T_GlobalDefinedSymbol_vOut40  = T_GlobalDefinedSymbol_vOut40 (GlobalDefinedSymbol) (GinGraph) (Bool) (Maybe Int) (Maybe Int) (Doc) ([Doc]) (Doc) ([Doc]) (Bool)
+:: T_GlobalDefinedSymbol  = T_GlobalDefinedSymbol (Identity (T_GlobalDefinedSymbol_s44 ))
+:: T_GlobalDefinedSymbol_s44  = C_GlobalDefinedSymbol_s44 (T_GlobalDefinedSymbol_v43 )
+:: T_GlobalDefinedSymbol_s45  = C_GlobalDefinedSymbol_s45
+:: T_GlobalDefinedSymbol_v43  :== (T_GlobalDefinedSymbol_vIn43 ) -> (T_GlobalDefinedSymbol_vOut43 )
+:: T_GlobalDefinedSymbol_vIn43  = T_GlobalDefinedSymbol_vIn43 (Maybe Expression) (String) (GinGraph) (Int) (ModuleEnv)
+:: T_GlobalDefinedSymbol_vOut43  = T_GlobalDefinedSymbol_vOut43 (GlobalDefinedSymbol) (GinGraph) (Bool) (Maybe Int) (Maybe Int) (Doc) ([Doc]) (Doc) ([Doc]) (Bool)
 sem_GlobalDefinedSymbol_Tuple  :: (Global DefinedSymbol) -> T_GlobalDefinedSymbol 
 
 // Ident -------------------------------------------------------
@@ -558,10 +606,7 @@ mergeId_Inh_Ident :: Inh_Ident -> (Int)
 graph_Inh_Ident :: Inh_Ident -> (GinGraph)
 currTaskName_Inh_Ident :: Inh_Ident -> (String)
 caseExpr_Inh_Ident :: Inh_Ident -> (Maybe Expression)
-:: Syn_Ident  = Syn_Ident (Ident) (GinGraph) (Bool) (String) (Bool) (Maybe Int) (Maybe Int) (Doc) ([Doc]) (Doc) ([Doc]) (Bool) (Maybe GFunDef) (Maybe FunType) (Maybe SymbolType)
-reifySymbolType_Syn_Ident :: Syn_Ident -> (Maybe SymbolType)
-reifyFunType_Syn_Ident :: Syn_Ident -> (Maybe FunType)
-reifyFunDef_Syn_Ident :: Syn_Ident -> (Maybe GFunDef)
+:: Syn_Ident  = Syn_Ident (Ident) (GinGraph) (Bool) (String) (Bool) (Maybe Int) (Maybe Int) (Doc) ([Doc]) (Doc) ([Doc]) (Bool)
 recNode_Syn_Ident :: Syn_Ident -> (Bool)
 ppDebugs_Syn_Ident :: Syn_Ident -> ([Doc])
 ppDebug_Syn_Ident :: Syn_Ident -> (Doc)
@@ -569,7 +614,7 @@ ppAgs_Syn_Ident :: Syn_Ident -> ([Doc])
 ppAg_Syn_Ident :: Syn_Ident -> (Doc)
 mExitId_Syn_Ident :: Syn_Ident -> (Maybe Int)
 mEntryId_Syn_Ident :: Syn_Ident -> (Maybe Int)
-isTask_Syn_Ident :: Syn_Ident -> (Bool)
+isCurrTask_Syn_Ident :: Syn_Ident -> (Bool)
 ident_Syn_Ident :: Syn_Ident -> (String)
 hasRecs_Syn_Ident :: Syn_Ident -> (Bool)
 graph_Syn_Ident :: Syn_Ident -> (GinGraph)
@@ -580,13 +625,68 @@ wrap_Ident :: T_Ident  Inh_Ident  -> (Syn_Ident )
 sem_Ident :: Ident  -> T_Ident 
 
 // semantic domain
-:: T_Ident  = T_Ident (Identity (T_Ident_s44 ))
-:: T_Ident_s44  = C_Ident_s44 (T_Ident_v43 )
-:: T_Ident_s45  = C_Ident_s45
-:: T_Ident_v43  :== (T_Ident_vIn43 ) -> (T_Ident_vOut43 )
-:: T_Ident_vIn43  = T_Ident_vIn43 (Maybe Expression) (String) (GinGraph) (Int) (ModuleEnv)
-:: T_Ident_vOut43  = T_Ident_vOut43 (Ident) (GinGraph) (Bool) (String) (Bool) (Maybe Int) (Maybe Int) (Doc) ([Doc]) (Doc) ([Doc]) (Bool) (Maybe GFunDef) (Maybe FunType) (Maybe SymbolType)
-sem_Ident_Ident  :: (String) (SymbolPtr)  -> T_Ident 
+:: T_Ident  = T_Ident (Identity (T_Ident_s47 ))
+:: T_Ident_s47  = C_Ident_s47 (T_Ident_v46 )
+:: T_Ident_s48  = C_Ident_s48
+:: T_Ident_v46  :== (T_Ident_vIn46 ) -> (T_Ident_vOut46 )
+:: T_Ident_vIn46  = T_Ident_vIn46 (Maybe Expression) (String) (GinGraph) (Int) (ModuleEnv)
+:: T_Ident_vOut46  = T_Ident_vOut46 (Ident) (GinGraph) (Bool) (String) (Bool) (Maybe Int) (Maybe Int) (Doc) ([Doc]) (Doc) ([Doc]) (Bool)
+sem_Ident_Ident  :: (String) (SymbolPtr) -> T_Ident 
+
+// MaybeExpression ---------------------------------------------
+// wrapper
+:: Inh_MaybeExpression  = Inh_MaybeExpression (Maybe Expression) (String) (GinGraph) (Int) (ModuleEnv)
+moduleEnv_Inh_MaybeExpression :: Inh_MaybeExpression -> (ModuleEnv)
+mergeId_Inh_MaybeExpression :: Inh_MaybeExpression -> (Int)
+graph_Inh_MaybeExpression :: Inh_MaybeExpression -> (GinGraph)
+currTaskName_Inh_MaybeExpression :: Inh_MaybeExpression -> (String)
+caseExpr_Inh_MaybeExpression :: Inh_MaybeExpression -> (Maybe Expression)
+:: Syn_MaybeExpression  = Syn_MaybeExpression (GinGraph) (Bool) (Maybe Int) (Maybe Int) (Bool)
+recNode_Syn_MaybeExpression :: Syn_MaybeExpression -> (Bool)
+mExitId_Syn_MaybeExpression :: Syn_MaybeExpression -> (Maybe Int)
+mEntryId_Syn_MaybeExpression :: Syn_MaybeExpression -> (Maybe Int)
+hasRecs_Syn_MaybeExpression :: Syn_MaybeExpression -> (Bool)
+graph_Syn_MaybeExpression :: Syn_MaybeExpression -> (GinGraph)
+wrap_MaybeExpression :: T_MaybeExpression  Inh_MaybeExpression  -> (Syn_MaybeExpression )
+
+// cata
+sem_MaybeExpression :: MaybeExpression  -> T_MaybeExpression 
+
+// semantic domain
+:: T_MaybeExpression  = T_MaybeExpression (Identity (T_MaybeExpression_s50 ))
+:: T_MaybeExpression_s50  = C_MaybeExpression_s50 (T_MaybeExpression_v49 )
+:: T_MaybeExpression_s51  = C_MaybeExpression_s51
+:: T_MaybeExpression_v49  :== (T_MaybeExpression_vIn49 ) -> (T_MaybeExpression_vOut49 )
+:: T_MaybeExpression_vIn49  = T_MaybeExpression_vIn49 (Maybe Expression) (String) (GinGraph) (Int) (ModuleEnv)
+:: T_MaybeExpression_vOut49  = T_MaybeExpression_vOut49 (GinGraph) (Bool) (Maybe Int) (Maybe Int) (Bool)
+sem_MaybeExpression_Just  :: (T_Expression ) -> T_MaybeExpression 
+sem_MaybeExpression_Nothing  ::   T_MaybeExpression 
+
+// Priority ----------------------------------------------------
+// wrapper
+:: Inh_Priority  = Inh_Priority (Maybe Expression) (String) (GinGraph) (Int) (ModuleEnv)
+moduleEnv_Inh_Priority :: Inh_Priority -> (ModuleEnv)
+mergeId_Inh_Priority :: Inh_Priority -> (Int)
+graph_Inh_Priority :: Inh_Priority -> (GinGraph)
+currTaskName_Inh_Priority :: Inh_Priority -> (String)
+caseExpr_Inh_Priority :: Inh_Priority -> (Maybe Expression)
+:: Syn_Priority  = Syn_Priority (Priority) (GinGraph)
+graph_Syn_Priority :: Syn_Priority -> (GinGraph)
+copy_Syn_Priority :: Syn_Priority -> (Priority)
+wrap_Priority :: T_Priority  Inh_Priority  -> (Syn_Priority )
+
+// cata
+sem_Priority :: Priority  -> T_Priority 
+
+// semantic domain
+:: T_Priority  = T_Priority (Identity (T_Priority_s53 ))
+:: T_Priority_s53  = C_Priority_s53 (T_Priority_v52 )
+:: T_Priority_s54  = C_Priority_s54
+:: T_Priority_v52  :== (T_Priority_vIn52 ) -> (T_Priority_vOut52 )
+:: T_Priority_vIn52  = T_Priority_vIn52 (Maybe Expression) (String) (GinGraph) (Int) (ModuleEnv)
+:: T_Priority_vOut52  = T_Priority_vOut52 (Priority) (GinGraph)
+sem_Priority_Prio  :: (Assoc) (Int) -> T_Priority 
+sem_Priority_NoPrio  ::   T_Priority 
 
 // Selection ---------------------------------------------------
 // wrapper
@@ -613,12 +713,12 @@ wrap_Selection :: T_Selection  Inh_Selection  -> (Syn_Selection )
 sem_Selection :: Selection  -> T_Selection 
 
 // semantic domain
-:: T_Selection  = T_Selection (Identity (T_Selection_s47 ))
-:: T_Selection_s47  = C_Selection_s47 (T_Selection_v46 )
-:: T_Selection_s48  = C_Selection_s48
-:: T_Selection_v46  :== (T_Selection_vIn46 ) -> (T_Selection_vOut46 )
-:: T_Selection_vIn46  = T_Selection_vIn46 (Maybe Expression) (String) (GinGraph) (Int) (ModuleEnv)
-:: T_Selection_vOut46  = T_Selection_vOut46 (Selection) (GinGraph) (Bool) (Maybe Int) (Maybe Int) (Doc) ([Doc]) (Doc) ([Doc]) (Bool)
+:: T_Selection  = T_Selection (Identity (T_Selection_s56 ))
+:: T_Selection_s56  = C_Selection_s56 (T_Selection_v55 )
+:: T_Selection_s57  = C_Selection_s57
+:: T_Selection_v55  :== (T_Selection_vIn55 ) -> (T_Selection_vOut55 )
+:: T_Selection_vIn55  = T_Selection_vIn55 (Maybe Expression) (String) (GinGraph) (Int) (ModuleEnv)
+:: T_Selection_vOut55  = T_Selection_vOut55 (Selection) (GinGraph) (Bool) (Maybe Int) (Maybe Int) (Doc) ([Doc]) (Doc) ([Doc]) (Bool)
 sem_Selection_RecordSelection  :: (T_GlobalDefinedSymbol ) (Int) -> T_Selection 
 sem_Selection_ArraySelection  :: (T_GlobalDefinedSymbol ) (ExprInfoPtr) (T_Expression ) -> T_Selection 
 sem_Selection_DictionarySelection  :: (T_BoundVar ) (T_Selections ) (ExprInfoPtr) (T_Expression ) -> T_Selection 
@@ -648,12 +748,12 @@ wrap_Selections :: T_Selections  Inh_Selections  -> (Syn_Selections )
 sem_Selections :: Selections  -> T_Selections 
 
 // semantic domain
-:: T_Selections  = T_Selections (Identity (T_Selections_s50 ))
-:: T_Selections_s50  = C_Selections_s50 (T_Selections_v49 )
-:: T_Selections_s51  = C_Selections_s51
-:: T_Selections_v49  :== (T_Selections_vIn49 ) -> (T_Selections_vOut49 )
-:: T_Selections_vIn49  = T_Selections_vIn49 (Maybe Expression) (String) (GinGraph) (Int) (ModuleEnv)
-:: T_Selections_vOut49  = T_Selections_vOut49 (Selections) (GinGraph) (Bool) (Maybe Int) (Maybe Int) (Doc) ([Doc]) (Doc) ([Doc]) (Bool)
+:: T_Selections  = T_Selections (Identity (T_Selections_s59 ))
+:: T_Selections_s59  = C_Selections_s59 (T_Selections_v58 )
+:: T_Selections_s60  = C_Selections_s60
+:: T_Selections_v58  :== (T_Selections_vIn58 ) -> (T_Selections_vOut58 )
+:: T_Selections_vIn58  = T_Selections_vIn58 (Maybe Expression) (String) (GinGraph) (Int) (ModuleEnv)
+:: T_Selections_vOut58  = T_Selections_vOut58 (Selections) (GinGraph) (Bool) (Maybe Int) (Maybe Int) (Doc) ([Doc]) (Doc) ([Doc]) (Bool)
 sem_Selections_Cons  :: (T_Selection ) (T_Selections ) -> T_Selections 
 sem_Selections_Nil  ::   T_Selections 
 
@@ -665,10 +765,7 @@ mergeId_Inh_SymbIdent :: Inh_SymbIdent -> (Int)
 graph_Inh_SymbIdent :: Inh_SymbIdent -> (GinGraph)
 currTaskName_Inh_SymbIdent :: Inh_SymbIdent -> (String)
 caseExpr_Inh_SymbIdent :: Inh_SymbIdent -> (Maybe Expression)
-:: Syn_SymbIdent  = Syn_SymbIdent (SymbIdent) (GinGraph) (Bool) (String) (Bool) (Bool) (Bool) (Maybe Int) (Maybe Int) (Doc) ([Doc]) (Doc) ([Doc]) (Bool) (Maybe GFunDef) (Maybe FunType) (Maybe SymbolType)
-reifySymbolType_Syn_SymbIdent :: Syn_SymbIdent -> (Maybe SymbolType)
-reifyFunType_Syn_SymbIdent :: Syn_SymbIdent -> (Maybe FunType)
-reifyFunDef_Syn_SymbIdent :: Syn_SymbIdent -> (Maybe GFunDef)
+:: Syn_SymbIdent  = Syn_SymbIdent (SymbIdent) (GinGraph) (Bool) (String) (Bool) (Maybe Int) (Maybe Int) (Doc) ([Doc]) (Doc) ([Doc]) (Bool)
 recNode_Syn_SymbIdent :: Syn_SymbIdent -> (Bool)
 ppDebugs_Syn_SymbIdent :: Syn_SymbIdent -> ([Doc])
 ppDebug_Syn_SymbIdent :: Syn_SymbIdent -> (Doc)
@@ -676,8 +773,6 @@ ppAgs_Syn_SymbIdent :: Syn_SymbIdent -> ([Doc])
 ppAg_Syn_SymbIdent :: Syn_SymbIdent -> (Doc)
 mExitId_Syn_SymbIdent :: Syn_SymbIdent -> (Maybe Int)
 mEntryId_Syn_SymbIdent :: Syn_SymbIdent -> (Maybe Int)
-isTask_Syn_SymbIdent :: Syn_SymbIdent -> (Bool)
-isInfix_Syn_SymbIdent :: Syn_SymbIdent -> (Bool)
 isCurrTask_Syn_SymbIdent :: Syn_SymbIdent -> (Bool)
 ident_Syn_SymbIdent :: Syn_SymbIdent -> (String)
 hasRecs_Syn_SymbIdent :: Syn_SymbIdent -> (Bool)
@@ -689,12 +784,12 @@ wrap_SymbIdent :: T_SymbIdent  Inh_SymbIdent  -> (Syn_SymbIdent )
 sem_SymbIdent :: SymbIdent  -> T_SymbIdent 
 
 // semantic domain
-:: T_SymbIdent  = T_SymbIdent (Identity (T_SymbIdent_s53 ))
-:: T_SymbIdent_s53  = C_SymbIdent_s53 (T_SymbIdent_v52 )
-:: T_SymbIdent_s54  = C_SymbIdent_s54
-:: T_SymbIdent_v52  :== (T_SymbIdent_vIn52 ) -> (T_SymbIdent_vOut52 )
-:: T_SymbIdent_vIn52  = T_SymbIdent_vIn52 (Maybe Expression) (String) (GinGraph) (Int) (ModuleEnv)
-:: T_SymbIdent_vOut52  = T_SymbIdent_vOut52 (SymbIdent) (GinGraph) (Bool) (String) (Bool) (Bool) (Bool) (Maybe Int) (Maybe Int) (Doc) ([Doc]) (Doc) ([Doc]) (Bool) (Maybe GFunDef) (Maybe FunType) (Maybe SymbolType)
+:: T_SymbIdent  = T_SymbIdent (Identity (T_SymbIdent_s62 ))
+:: T_SymbIdent_s62  = C_SymbIdent_s62 (T_SymbIdent_v61 )
+:: T_SymbIdent_s63  = C_SymbIdent_s63
+:: T_SymbIdent_v61  :== (T_SymbIdent_vIn61 ) -> (T_SymbIdent_vOut61 )
+:: T_SymbIdent_vIn61  = T_SymbIdent_vIn61 (Maybe Expression) (String) (GinGraph) (Int) (ModuleEnv)
+:: T_SymbIdent_vOut61  = T_SymbIdent_vOut61 (SymbIdent) (GinGraph) (Bool) (String) (Bool) (Maybe Int) (Maybe Int) (Doc) ([Doc]) (Doc) ([Doc]) (Bool)
 sem_SymbIdent_SymbIdent  :: (T_Ident ) (SymbKind) -> T_SymbIdent 
 
 // SymbolType --------------------------------------------------
@@ -705,7 +800,7 @@ mergeId_Inh_SymbolType :: Inh_SymbolType -> (Int)
 graph_Inh_SymbolType :: Inh_SymbolType -> (GinGraph)
 currTaskName_Inh_SymbolType :: Inh_SymbolType -> (String)
 caseExpr_Inh_SymbolType :: Inh_SymbolType -> (Maybe Expression)
-:: Syn_SymbolType  = Syn_SymbolType (SymbolType) (GinGraph) (Bool) (Bool) (Maybe Int) (Maybe Int) (Doc) ([Doc]) (Doc) ([Doc]) (Bool)
+:: Syn_SymbolType  = Syn_SymbolType (SymbolType) (GinGraph) (Bool) (Maybe Int) (Maybe Int) (Doc) ([Doc]) (Doc) ([Doc]) (Bool)
 recNode_Syn_SymbolType :: Syn_SymbolType -> (Bool)
 ppDebugs_Syn_SymbolType :: Syn_SymbolType -> ([Doc])
 ppDebug_Syn_SymbolType :: Syn_SymbolType -> (Doc)
@@ -713,7 +808,6 @@ ppAgs_Syn_SymbolType :: Syn_SymbolType -> ([Doc])
 ppAg_Syn_SymbolType :: Syn_SymbolType -> (Doc)
 mExitId_Syn_SymbolType :: Syn_SymbolType -> (Maybe Int)
 mEntryId_Syn_SymbolType :: Syn_SymbolType -> (Maybe Int)
-isTask_Syn_SymbolType :: Syn_SymbolType -> (Bool)
 hasRecs_Syn_SymbolType :: Syn_SymbolType -> (Bool)
 graph_Syn_SymbolType :: Syn_SymbolType -> (GinGraph)
 copy_Syn_SymbolType :: Syn_SymbolType -> (SymbolType)
@@ -723,10 +817,10 @@ wrap_SymbolType :: T_SymbolType  Inh_SymbolType  -> (Syn_SymbolType )
 sem_SymbolType :: SymbolType  -> T_SymbolType 
 
 // semantic domain
-:: T_SymbolType  = T_SymbolType (Identity (T_SymbolType_s56 ))
-:: T_SymbolType_s56  = C_SymbolType_s56 (T_SymbolType_v55 )
-:: T_SymbolType_s57  = C_SymbolType_s57
-:: T_SymbolType_v55  :== (T_SymbolType_vIn55 ) -> (T_SymbolType_vOut55 )
-:: T_SymbolType_vIn55  = T_SymbolType_vIn55 (Maybe Expression) (String) (GinGraph) (Int) (ModuleEnv)
-:: T_SymbolType_vOut55  = T_SymbolType_vOut55 (SymbolType) (GinGraph) (Bool) (Bool) (Maybe Int) (Maybe Int) (Doc) ([Doc]) (Doc) ([Doc]) (Bool)
+:: T_SymbolType  = T_SymbolType (Identity (T_SymbolType_s65 ))
+:: T_SymbolType_s65  = C_SymbolType_s65 (T_SymbolType_v64 )
+:: T_SymbolType_s66  = C_SymbolType_s66
+:: T_SymbolType_v64  :== (T_SymbolType_vIn64 ) -> (T_SymbolType_vOut64 )
+:: T_SymbolType_vIn64  = T_SymbolType_vIn64 (Maybe Expression) (String) (GinGraph) (Int) (ModuleEnv)
+:: T_SymbolType_vOut64  = T_SymbolType_vOut64 (SymbolType) (GinGraph) (Bool) (Maybe Int) (Maybe Int) (Doc) ([Doc]) (Doc) ([Doc]) (Bool)
 sem_SymbolType_SymbolType  :: ([TypeVar]) ([AType]) (StrictnessList) (Int) (AType) ([TypeContext]) ([AttributeVar]) ([AttrInequality]) -> T_SymbolType 

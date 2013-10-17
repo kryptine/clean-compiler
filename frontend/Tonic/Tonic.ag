@@ -3,25 +3,16 @@ module {Tonic.Tonic}
 from Text.PPrint import :: Doc
 import Tonic.AbsSyn
 
-from syntax import
-  :: Expression (..), :: BoundVar {..}, :: App {..}, :: Let {..}, :: Case,
-  :: SelectorKind, :: Selection (..), :: FreeVar {..}, :: Global {..},
-  :: SymbIdent {..}, :: SymbKind, :: Priority (..), :: Assoc (..), :: VarInfoPtr, :: DynamicExpr,
-  :: Ptr, :: VarInfo, :: CodeBinding, :: DefinedSymbol {..}, :: Index, :: Bind,
-  :: Position, :: AType, :: Env, :: Ident {..}, :: SymbolPtr,
-  :: SymbolTableEntry, :: Level, :: ExprInfoPtr, :: ExprInfo,
-  :: TypeCodeExpression, :: GlobalIndex, :: Conditional, :: BasicValue (..),
-  :: FieldSymbol, :: IclModule, :: DclModule, :: FunDef, :: Optional,
-  :: SymbolType {..}, :: LetBind, :: TypeVar {..}, :: StrictnessList (..),
-  :: TypeContext {..}, :: AttributeVar {..}, :: AttrInequality {..},
-  :: TypeVarInfoPtr {..}, :: AttrVarInfoPtr, :: Type, :: TCClass,
-  :: TypeVarInfo, :: AttrVarInfo, :: FunType {..}, :: FunSpecials
+from syntax import :: FunType, :: Index, :: FunSpecials, :: SymbolPtr,
+  :: Assoc, :: SymbKind, :: TypeVar, :: StrictnessList, :: TypeContext,
+  :: AttributeVar, :: AttrInequality, :: SymbolTableEntry
 
 :: Expressions :== [Expression]
 :: GLetBinds :== [GLetBind]
 :: Selections :== [Selection]
 :: GlobalDefinedSymbol :== Global DefinedSymbol
 :: FreeVars :== [FreeVar]
+:: MaybeExpression :== Maybe Expression
 
 ppCompact :: (Doc -> String)
 

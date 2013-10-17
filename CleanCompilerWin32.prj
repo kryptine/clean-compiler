@@ -2,7 +2,7 @@ Version: 1.4
 Global
 	ProjectRoot:	.
 	Target:	StdEnv
-	Exec:	{Project}\CleanCompilerTonic.exe
+	Exec:	{Project}\cocl.exe
 	CodeGen
 		CheckStacks:	False
 		CheckIndexes:	True
@@ -37,16 +37,13 @@ Global
 		ExportedNames:	
 	Paths
 		Path:	{Application}\iTasks-SDK\Patches\Platform\OS-Independent
-		Path:	{Application}\Libraries\clean-platform\OS-Independent
-		Path:	{Application}\Libraries\clean-platform\OS-Windows
-		Path:	{Application}\Libraries\clean-platform\OS-Windows-32
-		Path:	{Application}\Libraries\clean-platform\OS-Independent\Deprecated\StdLib
+		Path:	{Application}\lib\clean-platform\OS-Independent
+		Path:	{Application}\lib\clean-platform\OS-Independent\Deprecated\StdLib
 		Path:	{Application}\iTasks-SDK\Patches\Dynamics
 		Path:	{Application}\iTasks-SDK\Patches\Generics
 		Path:	{Application}\iTasks-SDK\Patches\StdEnv
 		Path:	{Application}\iTasks-SDK\Patches\TCPIP
-		Path:	{Application}\iTasks-SDK\Server\lib\SAPL
-		Path:	{Application}\iTasks-SDK\Server\lib\graph_copy
+		Path:	{Application}\iTasks-SDK\Server
 		Path:	{Application}\Libraries\ArgEnv
 		Path:	{Application}\Libraries\StdEnv
 		Path:	{Application}\Libraries\Generics
@@ -58,7 +55,22 @@ Global
 		Path:	{Project}\main
 		Path:	{Project}\main\Windows
 		Path:	{Project}\backend\Windows
-		Path:	{Application}\iTasks-SDK\Server
+	Precompile:	
+	Postlink:	
+MainModule
+	Name:	cocl
+	Dir:	{Project}\main
+	Compiler
+		NeverMemoryProfile:	False
+		NeverTimeProfile:	False
+		StrictnessAnalysis:	True
+		ListTypes:	StrictExportTypes
+		ListAttributes:	True
+		Warnings:	True
+		Verbose:	True
+		ReadableABC:	False
+		ReuseUniqueNodes:	True
+		Fusion:	False
 	Precompile:	
 	Postlink:	
 MainModule

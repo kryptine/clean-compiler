@@ -1479,7 +1479,7 @@ where
 		# (macro, es) = es!es_macro_defs.[glob_module,glob_object]
 		#! macro_group_index=macro.fun_info.fi_group_index
 		# es = {es & es_macro_defs.[glob_module,glob_object].fun_info.fi_group_index= if (macro_group_index>NoIndex) (-2-macro_group_index) macro_group_index}
-		| macro.fun_arity == length app_args
+		| macro.fun_arity == length app_args // If this is False, the compiler will generate a new function for the macro instead of expanding it
 			= unfoldMacro macro app_args (calls, es)
 
 			# macro = {macro & fun_info.fi_group_index=if (macro_group_index<NoIndex) (-2-macro_group_index) macro_group_index}
@@ -1515,7 +1515,7 @@ where
 		# (macro, es) = es!es_fun_defs.[glob_object]
 		#! macro_group_index=macro.fun_info.fi_group_index
 		# es = {es & es_fun_defs.[glob_object].fun_info.fi_group_index= if (macro_group_index>NoIndex) (-2-macro_group_index) macro_group_index}
-		| macro.fun_arity == length app_args
+		| macro.fun_arity == length app_args // If this is False, the compiler will generate a new function for the macro instead of expanding it
 			= unfoldMacro macro app_args (calls, es)
 
 			# macro = {macro & fun_info.fi_group_index=if (macro_group_index<NoIndex) (-2-macro_group_index) macro_group_index}

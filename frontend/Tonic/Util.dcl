@@ -3,68 +3,83 @@ definition module Tonic.Util
 from syntax import :: App, :: FunType
 from StdArray import class Array
 from Data.Maybe import :: Maybe
+from Data.Map import :: Map
 import Tonic.AbsSyn
 
 foldrArr :: (a b -> b) b (arr a) -> b | Array arr a
 
-findInArr :: (e -> Bool) (a e) -> Maybe e | Array a e
+findInArr :: (e -> Bool) (a e) -> Maybe (Int, e) | Array a e
 
 concatStrings :: [String] -> .String
 
 intercalateString :: String [String] -> String
 
-//dropAppContexts :: App ModuleEnv -> [Expression]
+dropAppContexts :: App *ModuleEnv -> *(([Expression], [Expression]), *ModuleEnv)
 
-reifyFunType :: ModuleEnv Ident -> Maybe FunType
+extractFunDefs :: !*{#FunDef} -> *(!{#FunDef}, !*{#FunDef})
 
-reifyFunDef :: ModuleEnv Ident -> Maybe GFunDef
+reifyFunType :: String *ModuleEnv -> *(Maybe FunType, *ModuleEnv)
 
-reifySymbolType :: ModuleEnv Ident -> Maybe SymbolType
+reifyFunDef :: String *ModuleEnv -> *(Maybe (Int, FunDef), *ModuleEnv)
 
-persistHasRec :: [SynExpression] SynExpression -> SynExpression
+reifySymbolType :: String *ModuleEnv -> *(Maybe SymbolType, *ModuleEnv)
 
-appIsCons :: App -> Bool
+isCons :: String -> Bool
 
-appIsNil :: App -> Bool
+isNil :: String -> Bool
 
-//appIsList :: App -> Bool
+appIsList :: App -> Bool
 
-//exprIsListConstr :: Expression -> Bool
+exprIsListConstr :: Expression -> Bool
 
 exprIsListCompr :: Expression -> Bool
 
-withHead :: (a -> b) b [a] -> b
+isListCompr :: String -> Bool
 
 safeHead :: [a] -> Maybe a
-
-withTwo :: (a a -> b) b [a] -> b
 
 fromOptional :: a (Optional a) -> a
 
 optional :: b (a -> b) (Optional a) -> b
 
-//appFunName :: App -> String
+appFunName :: App -> String
 
 freeVarName :: FreeVar -> String
 
-dropContexts :: SymbolType [a] -> [a]
+dropContexts :: SymbolType [a] -> ([a], [a])
 
 numContexts :: SymbolType -> Int
 
-numFunArgs :: GFunDef -> Int
-
 funIsTask :: FunDef -> Bool
 
-symbIdentIsLam :: SymbIdent -> Bool
+identIsLambda :: Ident -> Bool
 
-identIsLam :: Ident -> Bool
-
-exprIsLam :: Expression -> Bool
+exprIsLambda :: Expression -> Bool
 
 symTyIsTask :: SymbolType -> Bool
 
-identIsTask :: ModuleEnv Ident -> Bool
+identIsTask :: String *ModuleEnv -> *(Bool, *ModuleEnv)
 
-symbIdentIsTask :: ModuleEnv SymbIdent -> Bool
+symbIdentIsTask :: SymbIdent *ModuleEnv -> *(Bool, *ModuleEnv)
 
-//isInfix :: ModuleEnv SymbIdent -> Bool
+isInfix :: String *ModuleEnv -> *(Bool, *ModuleEnv)
+
+fdArrToMap :: .{#FunDef} -> Map String FunDef
+
+getFunName :: FunDef -> String
+
+getFunArgs :: FunDef -> [FreeVar]
+
+getFunRhs :: FunDef -> Expression
+
+updateWithAnnot :: Int *(SynExpression, *ChnExpression) -> *(SynExpression, *ChnExpression)
+
+updateFunRhs :: Int !*{#FunDef} Expression -> !*{#FunDef}
+
+emptyEdge :: GEdge
+
+mkEdge :: String -> GEdge
+
+getLetBinds :: Let -> [LetBind]
+
+mkGLetBinds :: Let *ModuleEnv -> *([(String, String)], *ModuleEnv)
