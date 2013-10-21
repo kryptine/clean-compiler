@@ -517,7 +517,7 @@ Clean (BENodeIds:: BENodeIdListP BENodeIdListP BackEnd -> (BENodeIdListP, BackEn
 BENodeIdListP BENoNodeIds (void);
 Clean (BENoNodeIds:: BackEnd -> (BENodeIdListP, BackEnd))
 
-BECodeBlockP BEAbcCodeBlock (int inline, BEStringListP instructions);
+BECodeBlockP BEAbcCodeBlock (int inlineFlag, BEStringListP instructions);
 Clean (BEAbcCodeBlock:: Bool BEStringListP BackEnd -> (BECodeBlockP, BackEnd))
 
 BECodeBlockP BEAnyCodeBlock (BECodeParameterP inParams, BECodeParameterP outParams, BEStringListP instructions);
