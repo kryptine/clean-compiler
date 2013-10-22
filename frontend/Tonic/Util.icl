@@ -172,16 +172,17 @@ identIsTask ident menv
 symbIdentIsTask :: SymbIdent *ModuleEnv -> *(Bool, *ModuleEnv)
 symbIdentIsTask sid menv = identIsTask sid.symb_ident.id_name menv
 
+// TODO Does this work for infix dictionary functions?
 isInfix :: String *ModuleEnv -> *(Bool, *ModuleEnv)
 isInfix ident menv
-  # (mfd, menv)  = reifyFunDef ident menv
-  # (mft, menv)  = reifyFunType ident menv
+  # (mfd, menv) = reifyFunDef ident menv
   = case mfd of
-      Just (_, fd) -> (isInfix` fd.fun_priority, menv)
-      Nothing  ->
-        case mft of
-          Just ft  -> (isInfix` ft.ft_priority, menv)
-          _        -> abort ("Failed to determine fixity for " +++ ident)
+      Just (_, fd) = (isInfix` fd.fun_priority, menv)
+      Nothing
+        # (mft, menv) = reifyFunType ident menv
+        = case mft of
+            Just ft  -> (isInfix` ft.ft_priority, menv)
+            _        -> abort ("Failed to determine fixity for " +++ ident)
   where
   isInfix` prio =
     case prio of
@@ -238,3 +239,5 @@ foldrSt op l st = foldr_st l
   where
     foldr_st []     = st
     foldr_st [a:as] = op a (foldr_st as)
+
+

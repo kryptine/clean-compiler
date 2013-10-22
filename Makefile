@@ -17,7 +17,6 @@ $(BACKEND_LIBRARY_TARGET): $(BACKEND_CSF) $(BACKEND_LIBRARY_SOURCE)
 $(BACKEND_LIBRARY_SOURCE): $(ROOT)/backendC/CleanCompilerSources/Makefile.linux64
 	cd backendC/CleanCompilerSources && make -f Makefile.linux64
 	cd main/Unix && make -f Makefile all
-KEND_LIBRARY_TARGET)
 
 $(BACKEND_LIBRARY_SOURCE): $(ROOT)/backendC/CleanCompilerSources/Makefile.linux64
 	cd backendC/CleanCompilerSources && make -f Makefile.linux64
