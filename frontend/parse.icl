@@ -237,8 +237,10 @@ cICLContext					:== 1
 cGlobalContext				:== 2
 cDCLContext					:== 0
 cLocalContext				:== 1
-cClassOrInstanceDefsContext	:== 4
-
+ClassDefsContext			:== 4
+InstanceDefsContext			:== 8
+GlobalOrClassDefsContext	:== 6 // cGlobalContext bitor ClassDefsContext
+ClassOrInstanceDefsContext	:== 12 // ClassDefsContext bitor InstanceDefsContext
 /*
 	A cClassOrInstanceDefsContext is a further restriction on a
 	local context, because no local node defs are allowed
@@ -252,8 +254,9 @@ SetGlobalContext iclmodule
 		= cICLContext bitor cGlobalContext
 		= cDCLContext bitor cGlobalContext
 
-SetLocalContext					parseContext :== parseContext bitand (bitnot cGlobalContext)
-SetClassOrInstanceDefsContext	parseContext :== SetLocalContext (parseContext bitor cClassOrInstanceDefsContext)
+SetLocalContext			parseContext :== parseContext bitand (bitnot cGlobalContext)
+SetClassDefsContext		parseContext :== SetLocalContext (parseContext bitor ClassDefsContext)
+SetInstanceDefsContext	parseContext :== SetLocalContext (parseContext bitor InstanceDefsContext)
 
 isLocalContext	parseContext	:== parseContext bitand cGlobalContext == 0
 isGlobalContext	parseContext	:== parseContext bitand cGlobalContext <> 0 // not (isLocalContext parseContext)
@@ -261,8 +264,9 @@ isGlobalContext	parseContext	:== parseContext bitand cGlobalContext <> 0 // not 
 isDclContext	parseContext	:== parseContext bitand cICLContext == 0
 isIclContext	parseContext	:== parseContext bitand cICLContext <> 0	// not (isDclContext parseContext)
 
-isNotClassOrInstanceDefsContext parseContext		:== parseContext bitand cClassOrInstanceDefsContext == 0
-isGlobalOrClassOrInstanceDefsContext parseContext	:== parseContext bitand (cGlobalContext bitor cClassOrInstanceDefsContext) <> 0
+isNotClassOrInstanceDefsContext parseContext		:== parseContext bitand ClassOrInstanceDefsContext == 0
+isGlobalOrClassDefsContext parseContext				:== parseContext bitand GlobalOrClassDefsContext <> 0
+isInstanceDefsContext parseContext					:== parseContext bitand InstanceDefsContext <> 0
 
 cWantIclFile :== True
 cWantDclFile :== False
@@ -996,16 +1000,21 @@ where
 :: RhsDefiningSymbol
 	=	RhsDefiningSymbolExact Token
 	|	RhsDefiningSymbolCase			// '->' or '='
+	|	RhsDefiningSymbolGlobalFunction	// '=', '=:', '=>'
 	|	RhsDefiningSymbolGlobalFunctionOrMacro	// '=', '=:', '=>', ':=='
 	|	RhsDefiningSymbolRule			// '=', '=>'
 	|	RhsDefiningSymbolRuleOrMacro	// '=', '=>', ':=='
 
 ruleDefiningRhsSymbol :: !ParseContext !Bool -> RhsDefiningSymbol
 ruleDefiningRhsSymbol parseContext has_args
-	| isGlobalOrClassOrInstanceDefsContext parseContext
+	| isGlobalOrClassDefsContext parseContext
 		| has_args
 			= RhsDefiningSymbolRuleOrMacro
 			= RhsDefiningSymbolGlobalFunctionOrMacro
+	| isInstanceDefsContext parseContext
+		| has_args
+			= RhsDefiningSymbolRule
+			= RhsDefiningSymbolGlobalFunction
 		= RhsDefiningSymbolRule
 
 isDefiningSymbol :: RhsDefiningSymbol Token -> Bool
@@ -1019,6 +1028,8 @@ isDefiningSymbol RhsDefiningSymbolGlobalFunctionOrMacro observed
 	=	observed == EqualToken || observed == ColonDefinesToken || observed == DefinesColonToken || observed == DoubleArrowToken
 isDefiningSymbol RhsDefiningSymbolRuleOrMacro observed
 	=	observed == EqualToken || observed == ColonDefinesToken || observed == DoubleArrowToken
+isDefiningSymbol RhsDefiningSymbolGlobalFunction observed
+	=	observed == EqualToken || observed == ColonDefinesToken || observed == DefinesColonToken
 
 definingSymbolToFunKind :: RhsDefiningSymbol -> FunKind
 definingSymbolToFunKind (RhsDefiningSymbolExact defining_token)
@@ -1407,7 +1418,7 @@ wantClassDefinition parseContext pos pState
 		# (begin_members, pState) = begin_member_group token pState
 		| begin_members
 			# (class_id, pState) = stringToIdent class_or_member_name IC_Class pState
-		 	  (members, pState) = wantDefinitions (SetClassOrInstanceDefsContext parseContext) pState
+		 	  (members, pState) = wantDefinitions (SetClassDefsContext parseContext) pState
   		  	  class_def = { class_ident = class_id, class_arity = class_arity, class_args = class_args,
 	    					class_context = contexts, class_pos = pos, class_members = {}, class_cons_vars = class_cons_vars,
 	    					class_dictionary = { ds_ident = { class_id & id_info = nilPtr }, ds_arity = 0, ds_index = NoIndex}
@@ -1512,7 +1523,7 @@ wantInstanceDeclaration parseContext pi_pos pState
 		# (token, pState) = nextToken TypeContext pState
 		| isIclContext parseContext
 			# pState = want_begin_group token pState
-			  (pi_members, pState) = wantDefinitions (SetClassOrInstanceDefsContext parseContext) pState
+			  (pi_members, pState) = wantDefinitions (SetInstanceDefsContext parseContext) pState
 			  pState = wantEndGroup "instance" pState
 			= (PD_Instance {pim_pi = {pi_class = pi_class, pi_ident = pi_ident, pi_types = pi_types, pi_context = pi_context,
 									  pi_specials = SP_None, pi_pos = pi_pos},
