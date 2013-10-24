@@ -103,7 +103,7 @@ void getCommonFileInfoC(int also_get_file_name,
 {
     struct tm   *pModificationTime;
     int         mask;
-    static int null = 0;
+    static void *null = NULL; /* int 0 with the size of a Clean INT */
 
     *pFileName      = also_get_file_name ? (CleanString) gFileName : (CleanString) &null;
     *pFileSizeLow   = gFileStat.st_size;
