@@ -4,6 +4,7 @@ import StdEnv, CoclSystemDependent, syntax, partition, gensapl, backend
 
 // Generation of Sapl definition from Clean definitions
 // JMJ: May 2007 
+// László Domoszlai: 2011 - 
 
 gensaplfiles :: {#DclModule} !{!Component} !{# FunDef} CommonDefs {#CommonDefs} Ident  [IndexRange] !*File !*BackEnd
                 -> *(!*File, !*BackEnd)
@@ -20,7 +21,6 @@ convert2sapl comps fun_defs icl_common comdefs icl_name file modnames mymod dcl_
   # saplrecs  = getSaplRecords  icl_common mymod
   # saplcons  = remRecs saplcons saplrecs
   # (backEnd, saplfuncs) = getSaplFunDefs comps 0 fun_defs modnames mymod dcl_mods icl_function_indices backEnd
-  # saplfuncs = convertSelects saplfuncs extcons           // convert clean like select to Sapl select
   # saplfuncs = map renameVars saplfuncs                   // give vars a unique name
   # saplfuncs = flatten (map checkIfSelect saplfuncs)      // extract non toplevel if/select
   # file = file <<< "|| ?module? " <<< mymod <<< "\n"
@@ -30,8 +30,8 @@ convert2sapl comps fun_defs icl_common comdefs icl_name file modnames mymod dcl_
   # file = writerecs2file saplrecs (file <<< "\n|| Converted Records\n")
   = (file, backEnd)
 where
-  consgroups conss = [":: " +++ (\ (SaplConsDef mod t _ _ _ _) = mod +++ "." +++ t) (hd a) +++ " = " +++ makeConsGroup a \\ a <- group eqcg conss] 
-  eqcg (SaplConsDef a1 a2 _ _ _ _) (SaplConsDef b1 b2 _ _ _ _) = a1 == b1 && a2 == b2
+  consgroups conss = [":: " +++ (\ (SaplConsDef mod t _ _ _ _ _) = mod +++ "." +++ t) (hd a) +++ " = " +++ makeConsGroup a \\ a <- group eqcg conss] 
+  eqcg (SaplConsDef a1 a2 _ _ _ _ _) (SaplConsDef b1 b2 _ _ _ _ _) = a1 == b1 && a2 == b2
   group f [] = []
   group f [x:xs] = let (as,bs) = span (f x) xs in [[x:as] : group f bs]  
   writedef2file [] file = file
@@ -44,8 +44,10 @@ where
   writedeps2file [(name,names):deps] file = writedeps2file deps (file <<< name <<< "\t\t" <<< mkString names <<< "\n") 
   mkString [] = ""
   mkString [a:as] = " " +++ a +++ mkString as
-  remRecs cs recs = [SaplConsDef mod t name alt nrargs nralt \\ SaplConsDef mod t name alt nrargs nralt <- cs| not (isMember name recnames)]
-  where recnames = [recname\\ SaplRecordDef mod recname fields <- recs]
+//  remRecs cs recs = [SaplConsDef mod t name alt nrargs strictness nralt \\ def =: (SaplConsDef mod t name alt nrargs strictness nralt) <- cs | not (isMember name recnames)]
+  remRecs cs recs = [def \\ def =: (SaplConsDef mod t name alt nrargs strictness nralt) <- cs | not (isMember name recnames)]
+  where 
+  	recnames = [recname \\ SaplRecordDef _ recname _ _ <- recs]
   
 makeConsGroup :: [SaplConsDef] -> String
 makeConsGroup [     ]    = ""
@@ -79,18 +81,24 @@ where lcomdefs = [comdef\\ comdef <-: comdefs]
 getSaplConstructors :: String CommonDefs -> [SaplConsDef]			
 getSaplConstructors mod icl_common = collectTypes [consdef\\ consdef <-: icl_common.com_cons_defs] 
 where collectTypes conses = makeSaplCons  (group eqc (tosapl conses))
-      tosapl conses = [(getConsType cons,getName cons,getNrArgs cons)\\ cons <- conses]
-      makeSaplCons conses = [SaplConsDef mod type name alt nrarg (length css)\\ css <- conses, (alt,(type,name,nrarg)) <- zip ([1..],css)]
+      tosapl conses = [(getConsType cons,getName cons,getNrArgs cons,getStrictness cons) \\ cons <- conses]
+      makeSaplCons conses = [SaplConsDef mod type name alt nrarg sl (length css)\\ css <- conses, (alt,(type,name,nrarg,sl)) <- zip ([1..],css)]
       group f [] = []
       group f [x:xs] = let (as,bs) = span (f x) xs in [[x:as] : group f bs]
-      eqc (a,_,_) (b,_,_) = a == b
-      getName cons = toString cons.cons_ident
-      getNrArgs cons = length cons.cons_type.st_args + length cons.cons_type.st_context
-      getConsType cons = (icl_common.com_type_defs).[cons.cons_type_index].td_ident.id_name 
+      eqc (a,_,_,_) (b,_,_,_) = a == b
+
+      getName cons 			= toString cons.cons_ident
+      getNrArgs cons 		= length cons.cons_type.st_args + length cons.cons_type.st_context
+      getConsType cons 		= icl_common.com_type_defs.[cons.cons_type_index].td_ident.id_name 
+	  getStrictness cons	= cons.cons_type.st_args_strictness
       
 getSaplRecords :: CommonDefs String -> [SaplRecordDef]
-getSaplRecords icl_common mymod = map makeRec [rectype\\ type <-: icl_common.com_type_defs, RecordType rectype <-  [type.td_rhs]]
-where makeRec rectype = SaplRecordDef mymod (toString rectype.rt_constructor.ds_ident) [(toString field.fs_ident, field.fs_index) \\ field <-: rectype.rt_fields]
+getSaplRecords icl_common mymod = map makeRec [rectype \\ type <-: icl_common.com_type_defs, RecordType rectype <- [type.td_rhs]]
+where 
+	makeRec rectype = 
+			SaplRecordDef mymod (toString rectype.rt_constructor.ds_ident) 
+						  (icl_common.com_cons_defs.[rectype.rt_constructor.ds_index].cons_type.st_args_strictness)
+						  [(toString field.fs_ident, field.fs_index) \\ field <-: rectype.rt_fields]
 
 getModNames :: {#DclModule} -> [String]
 getModNames dcl_mods = [dcl_mod.dcl_name.id_name\\ dcl_mod <-: dcl_mods]
