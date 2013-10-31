@@ -142,8 +142,7 @@ where
 		letToSapl (annotation, binding) = (annotation, getFreeVarName binding.lb_dst, cleanExpToSaplExp binding.lb_src)
 		orderlets lts  =  lts // TODO?	
 		
-	cleanExpToSaplExp (Case {case_expr,case_guards,case_default=No})            = genSaplCase case_expr case_guards No
-	cleanExpToSaplExp (Case {case_expr,case_guards,case_default= Yes def_expr}) = genSaplCase case_expr case_guards (Yes def_expr)
+	cleanExpToSaplExp (Case {case_expr,case_guards,case_default})               = genSaplCase case_expr case_guards case_default
 	cleanExpToSaplExp (BasicExpr basic_value)                                   = basicValueToSapl basic_value
 	cleanExpToSaplExp (FreeVar var)                                             = getFreeVarName var
 	cleanExpToSaplExp (Conditional {if_cond,if_then,if_else=No})                = SaplIf (cleanExpToSaplExp if_cond) (cleanExpToSaplExp if_then) (SaplFun "nomatch")
@@ -242,7 +241,7 @@ where
 		getConstPat pat = (makeSingleConstMatch pat.bp_value, cleanExpToSaplExp pat.bp_expr)
 		sapl_case_exp = cleanExpToSaplExp case_exp
 
-		makeIf [] | hasOption def = cleanExpToSaplExp (fromOption def)
+		makeIf [] | hasOption def = cleanExpToSaplExp (fromYes def)
 		makeIf [] = SaplFun "nomatch"
 		makeIf [(cond, body):ps] = SaplIf cond body (makeIf ps)
 
@@ -260,7 +259,7 @@ where
 					  map getFreeVarName pat.ap_vars,
 					  cleanExpToSaplExp pat.ap_expr)
 
-fromOption (Yes x) = x
+fromYes (Yes x) = x
 
 basicValueToSapl :: BasicValue -> SaplExp
 basicValueToSapl (BVI int)      = SaplInt (toInt int)
