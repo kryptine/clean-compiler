@@ -1,6 +1,6 @@
 definition module gensapl
 
-import StdEnv,StdMaybe,syntax,transform,backend
+import StdEnv,syntax,transform,backend
   
 :: SaplAnnotation = SA_None | SA_Strict  
   
@@ -13,7 +13,7 @@ import StdEnv,StdMaybe,syntax,transform,backend
            | SaplFun String 
            | SaplVar String VarInfoPtr SaplAnnotation 
            | SaplIf SaplExp SaplExp SaplExp
-           | SaplSelect SaplExp [(String,[SaplExp],SaplExp)] (Maybe SaplExp)
+           | SaplSelect SaplExp [(String,[SaplExp],SaplExp)] (Optional SaplExp)
            | SaplLet [(SaplAnnotation,SaplExp,SaplExp)] SaplExp 
            | SaplError String 
            | SaplABCCode [String]

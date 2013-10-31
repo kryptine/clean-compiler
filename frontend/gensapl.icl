@@ -4,7 +4,7 @@ implementation module gensapl
 // JMJ: May 2007
 // László Domoszlai: 2011 - 
 
-import StdEnv, StdMaybe, syntax, transform, backend, backendinterface, containers
+import StdEnv, syntax, transform, backend, backendinterface, containers
 
 instance toString SaplConsDef  
 where 
@@ -52,8 +52,8 @@ makeString :: [String] -> String
 makeString [] = ""
 makeString [a:as] = a +++ makeString as 
 
-fmap f (Just a) = Just (f a)
-fmap _ Nothing = Nothing
+fmap f (Yes a) = Yes (f a)
+fmap _ No = No
 
 instance toString SaplExp
 where 
@@ -82,8 +82,8 @@ where
 		      dopats [(name,vars,exp):pats] = "(" +++ name +++ makeString [" "+++arg\\ SaplVar arg _ _<- vars] +++ " -> " +++ toString exp +++ ") "
 		                                                 +++ dopats pats
 		                                                 		                                                 
-		      dodef Nothing = ""
-		      dodef (Just def) = "(_ -> " +++ toString def +++ ")"
+		      dodef No = ""
+		      dodef (Yes def) = "(_ -> " +++ toString def +++ ")"
         
 		multiLet :: ![(SaplAnnotation,SaplExp,SaplExp)] !SaplExp -> String
 		multiLet []                          body  =  toString body // empty let
@@ -142,8 +142,8 @@ where
 		letToSapl (annotation, binding) = (annotation, getFreeVarName binding.lb_dst, cleanExpToSaplExp binding.lb_src)
 		orderlets lts  =  lts // TODO?	
 		
-	cleanExpToSaplExp (Case {case_expr,case_guards,case_default=No})            = genSaplCase case_expr case_guards Nothing
-	cleanExpToSaplExp (Case {case_expr,case_guards,case_default= Yes def_expr}) = genSaplCase case_expr case_guards (Just def_expr)
+	cleanExpToSaplExp (Case {case_expr,case_guards,case_default=No})            = genSaplCase case_expr case_guards No
+	cleanExpToSaplExp (Case {case_expr,case_guards,case_default= Yes def_expr}) = genSaplCase case_expr case_guards (Yes def_expr)
 	cleanExpToSaplExp (BasicExpr basic_value)                                   = basicValueToSapl basic_value
 	cleanExpToSaplExp (FreeVar var)                                             = getFreeVarName var
 	cleanExpToSaplExp (Conditional {if_cond,if_then,if_else=No})                = SaplIf (cleanExpToSaplExp if_cond) (cleanExpToSaplExp if_then) (SaplFun "nomatch")
@@ -242,7 +242,7 @@ where
 		getConstPat pat = (makeSingleConstMatch pat.bp_value, cleanExpToSaplExp pat.bp_expr)
 		sapl_case_exp = cleanExpToSaplExp case_exp
 
-		makeIf [] | isJust def = cleanExpToSaplExp (fromJust def)
+		makeIf [] | hasOption def = cleanExpToSaplExp (fromOption def)
 		makeIf [] = SaplFun "nomatch"
 		makeIf [(cond, body):ps] = SaplIf cond body (makeIf ps)
 
@@ -259,6 +259,8 @@ where
 	getCasePat pat = (makemod (getmodnr pat.ap_symbol) +++ toString pat.ap_symbol.glob_object.ds_ident, 
 					  map getFreeVarName pat.ap_vars,
 					  cleanExpToSaplExp pat.ap_expr)
+
+fromOption (Yes x) = x
 
 basicValueToSapl :: BasicValue -> SaplExp
 basicValueToSapl (BVI int)      = SaplInt (toInt int)
@@ -409,8 +411,8 @@ where
 	# (newexpr,newnr,newdefs1) = maylift vs nr expr // in pattern expression lifting may necessary
 
 	# (newdefpattern,newnr,newdefs2) = case defpattern of
-					Nothing = (Nothing, newnr, [])
-					Just dp = let (a,b,c) = rntls vs newnr dp in (Just a,b,c)
+					No = (No, newnr, [])
+					Yes dp = let (a,b,c) = rntls vs newnr dp in (Yes a,b,c)
 
 	# (newpatterns,newnr,newdefs3) = foldl walkPattern ([],newnr,[]) patterns
 	= (SaplSelect newexpr (reverse newpatterns) newdefpattern,newnr,newdefs1++newdefs2++newdefs3)
