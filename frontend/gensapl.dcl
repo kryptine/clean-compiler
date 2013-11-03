@@ -5,18 +5,23 @@ import StdEnv,syntax,transform,backend
 :: SaplAnnotation = SA_None | SA_Strict  
   
 :: SaplExp = SaplApp SaplExp SaplExp 
-		   | SaplInt Int 
-		   | SaplReal Real 
-		   | SaplBool Bool
-           | SaplChar String	   
-           | SaplString String 
+		   | SaplLit SaplLiteral
            | SaplFun String 
            | SaplVar String VarInfoPtr SaplAnnotation 
            | SaplIf SaplExp SaplExp SaplExp
-           | SaplSelect SaplExp [(String,[SaplExp],SaplExp)] (Optional SaplExp)
+           | SaplSelect SaplExp [(SaplPattern,SaplExp)] (Optional SaplExp)
            | SaplLet [(SaplAnnotation,SaplExp,SaplExp)] SaplExp 
            | SaplError String 
-           | SaplABCCode [String]
+
+:: SaplLiteral = LInt Int
+			   | LReal Real
+			   | LBool Bool
+			   | LChar String
+			   | LString String
+
+:: SaplPattern = PCons String [SaplExp]
+			   | PLit SaplLiteral
+//			   | PDefault
 
 // module name, type name, constructor name, ?alt?, nrargs, strictness info, nrconstructors
 ::SaplConsDef = SaplConsDef !String !String !String !Int !Int !StrictnessList !Int
