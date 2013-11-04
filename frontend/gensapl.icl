@@ -65,7 +65,7 @@ where
 
 instance toString SaplPattern
 where
-	toString (PCons name args) = name +++ makeString [" "+++arg\\ SaplVar arg _ _<- args]
+	toString (PCons name args) = makePrintableName name +++ makeString [" "+++arg\\ SaplVar arg _ _<- args]
 	toString (PLit lit) = toString lit
 
 instance toString SaplExp
