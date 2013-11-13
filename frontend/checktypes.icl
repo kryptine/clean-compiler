@@ -185,7 +185,7 @@ retrieveTypeDefinition type_ptr mod_index symbol_table used_types
 		with
 			retrieve_type_definition (STE_UsedQualifiedType uqt_mod_index uqt_index orig_kind)
 				| uqt_mod_index==mod_index && uqt_index==ste_index
-					= (ste_index, mod_index, symbol_table, used_types)
+					= (ste_index, mod_index, symbol_table, used_types) 
 					= retrieve_type_definition orig_kind
 			retrieve_type_definition (STE_Imported STE_Type ste_mod_index)
 				= (ste_index, ste_mod_index, symbol_table <:= (type_ptr, { entry & ste_kind = STE_UsedType ste_mod_index this_kind }), used_types)
@@ -623,7 +623,7 @@ CS_Checking	:== 0
 
 checkTypeDefs :: !Index !(Optional (CopiedDefinitions, Int))
 		!*{#CheckedTypeDef} !*{#ConsDef} !*{#SelectorDef} !v:{#ClassDef} !*{#DclModule} !*Heaps !*CheckState
-	-> (!*{#CheckedTypeDef},!*{#ConsDef},!*{#SelectorDef},!v:{#ClassDef},!*{#DclModule},!*Heaps,!*CheckState)
+	-> (!*{#CheckedTypeDef}, *{#ConsDef},!*{#SelectorDef},!v:{#ClassDef},!*{#DclModule},!*Heaps,!*CheckState)
 checkTypeDefs module_index opt_icl_info type_defs cons_defs selector_defs class_defs modules heaps=:{hp_type_heaps,hp_var_heap} cs
 	#! nr_of_types = size type_defs
 	#  ts = { ts_type_defs = type_defs, ts_cons_defs = cons_defs, ts_selector_defs = selector_defs, ts_modules = modules }
@@ -1302,7 +1302,7 @@ where
 				-> case opt_type of
 					Yes dyn_type
 						# (dyn_type, loc_type_vars, type_defs, class_defs, modules, type_heaps, cs)
-							= check_dynamic_type_in_pattern mod_index scope dyn_type type_defs class_defs modules type_heaps cs
+							= check_dynamic_type_in_pattern/*check_dynamic_type_in_expression*/ mod_index scope dyn_type type_defs class_defs modules type_heaps cs
 						| isEmpty loc_type_vars
 							# expr_heap =  expr_heap <:= (dyn_info_ptr, EI_UnmarkedDynamic (Yes dyn_type) loc_dynamics)
 				  		  	-> check_local_dynamics mod_index scope loc_dynamics type_defs class_defs modules type_heaps expr_heap cs

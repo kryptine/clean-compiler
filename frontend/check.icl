@@ -2174,12 +2174,12 @@ renumber_icl_module_functions mod_type icl_global_function_range icl_instance_ra
 							# dcl_index = function_conversion_table.[icl_index]
 							# gencase = {gencase & gc_gcf=GCF gc_ident {gcf & gcf_body = GCB_FunIndex dcl_index}}
 							# gencases = {gencases & [gencase_index] = gencase}
-							-> renumber_gencase_members (inc gencase_index) gencases
+							= renumber_gencase_members (gencase_index+1) gencases
 						{gc_gcf=GCFS gcfs}
 							# gcfs = renumber_gcfs gcfs function_conversion_table
 							# gencase = {gencase & gc_gcf=GCFS gcfs}
 							# gencases = {gencases & [gencase_index] = gencase}
-							-> renumber_gencase_members (gencase_index+1) gencases
+							= renumber_gencase_members (gencase_index+1) gencases
 					= gencases
 
 			renumber_gcfs [!gcf=:{gcf_body=GCB_FunIndex icl_index}:gcfs!] function_conversion_table

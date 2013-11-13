@@ -260,12 +260,14 @@ where
 instance <<< TCClass 
 where
 	(<<<) file (TCClass glob) = file <<< glob
-	(<<<) file (TCGeneric {gtc_generic,gtc_kind}) = file <<< gtc_generic <<< gtc_kind
+	(<<<) file (TCGeneric {gtc_generic,gtc_kind})
+		= file <<< gtc_generic <<< gtc_kind
 
 instance toString TCClass
 where
 	toString (TCClass clazz) = clazz.glob_object.ds_ident.id_name
-	toString (TCGeneric {gtc_generic,gtc_kind}) = gtc_generic.glob_object.ds_ident.id_name +++ toString gtc_kind
+	toString (TCGeneric {gtc_generic,gtc_kind})
+		= gtc_generic.glob_object.ds_ident.id_name +++ toString gtc_kind
 	 
 instance <<< SymbIdent
 where
@@ -290,6 +292,7 @@ instance <<< ClassSymbIdent
 where
 	(<<<) file symb	= file <<< symb.cs_name 
 */
+
 instance <<< BoundVar
 where
 	(<<<) file {var_ident,var_info_ptr,var_expr_ptr}
@@ -369,12 +372,16 @@ where
 			= file
 		write_binds x file [bind : binds]
 			= write_binds x (file <<< x <<< " " <<< bind) binds
- 	(<<<) file (Case {case_expr,case_guards,case_default=No})
+ 	(<<<) file (Case {case_expr,case_guards,case_default=No,case_explicit})
 		//= file <<< "case " <<< case_expr <<< " of\n" <<< case_guards
-		= file <<< "case " <<< case_expr <<< " of" <<< case_guards
-	(<<<) file (Case {case_expr,case_guards,case_default= Yes def_expr})
+		| case_explicit
+			= file <<< "case " <<< case_expr <<< " of" <<< case_guards
+			= file <<< "match " <<< case_expr <<< " of" <<< case_guards
+	(<<<) file (Case {case_expr,case_guards,case_default= Yes def_expr,case_explicit})
 		//= file <<< "case " <<< case_expr <<< " of\n" <<< case_guards <<< "\n\t->" <<< def_expr
-		= file <<< "case " <<< case_expr <<< " of" <<< case_guards <<< "\n\t->" <<< def_expr
+		| case_explicit
+			= file <<< "case " <<< case_expr <<< " of" <<< case_guards <<< "\n\t->" <<< def_expr
+			= file <<< "match " <<< case_expr <<< " of" <<< case_guards <<< "\n\t->" <<< def_expr
 	(<<<) file (BasicExpr basic_value) = file <<< basic_value
 	(<<<) file (Conditional {if_cond,if_then,if_else}) =
 			else_part (file <<< "IF " <<< if_cond <<< "\nTHEN\n" <<< if_then) if_else
@@ -556,11 +563,12 @@ where
 instance <<< FunDef
 where
 	(<<<) file {fun_ident,fun_body=ParsedBody bodies} = file <<< fun_ident <<< '.' <<< ' ' <<< bodies 
-	(<<<) file {fun_ident,fun_body=CheckedBody {cb_args,cb_rhs},fun_info={fi_free_vars,fi_def_level,fi_calls}} = file <<< fun_ident <<< '.'
+	(<<<) file {fun_ident,fun_body=CheckedBody {cb_args,cb_rhs},fun_info={fi_free_vars,fi_def_level,fi_calls}}
+		= file <<< fun_ident <<< '.'
 			<<< "C " <<< cb_args <<< " = " <<< cb_rhs <<< '\n'
 //			<<< '.' <<< fi_def_level <<< ' ' <<< '[' <<< fi_free_vars <<< ']' <<< cb_args <<< " = " <<< cb_rhs 
 	(<<<) file {fun_ident,fun_body=TransformedBody {tb_args,tb_rhs},fun_info={fi_free_vars,fi_local_vars,fi_def_level,fi_calls}}
-		= file <<< fun_ident <<< '.' <<< "T "  
+		= file <<< fun_ident <<< '.' <<< "T "
 //			<<< '[' <<< fi_free_vars <<< "]  [" <<< fi_local_vars <<< ']'
 			<<< tb_args <<< '[' <<< fi_calls <<< ']' <<< "\n\t= " <<< tb_rhs <<< '\n'
 //			<<< '.' <<< fi_def_level <<< ' ' <<< '[' <<< fi_free_vars <<< ']' <<< tb_args <<< " = " <<< tb_rhs 
@@ -582,17 +590,17 @@ where
 instance <<< FunCall
 where
 	(<<<) file (FunCall fc_index fc_level)
-		= file <<< fc_index <<< '.' <<< fc_level
+			= file <<< fc_index <<< '.' <<< fc_level
 	(<<<) file (MacroCall module_index fc_index fc_level)
-		= file <<< "MacroCall "<<< module_index <<<" "<<<fc_index <<< '.' <<< fc_level
+			= file <<< "MacroCall "<<< module_index <<<" "<<<fc_index <<< '.' <<< fc_level
 	(<<<) file (DclFunCall module_index fc_index)
-		= file <<< "DclFunCall "<<< module_index <<<" "<<<fc_index
-	(<<<) file (GeneratedFunCall fc_index _)
-		= file <<< "GeneratedFunCall "<<< fc_index
+			= file <<< "DclFunCall "<<< module_index <<<" "<<<fc_index
+	(<<<) file (GeneratedFunCall fc_index fun_ptr)
+			= file <<< "GeneratedFunCall "<<< fc_index
 
 instance <<< FreeVar
 where
-	(<<<) file {fv_ident,fv_info_ptr,fv_count} = file <<< fv_ident <<< '.' <<< fv_count <<< '<' <<< fv_info_ptr <<< '>'
+	(<<<) file {fv_ident,fv_info_ptr,fv_count} = file <<< fv_ident <<< '#' <<< fv_count <<< '<' <<< fv_info_ptr <<< '>'
 
 instance <<< DynamicType
 where

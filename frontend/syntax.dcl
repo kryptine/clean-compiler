@@ -140,7 +140,7 @@ instance == FunctionOrMacroIndex
 	,	icl_function_indices	:: !IclFunctionIndices
 	,	icl_common				:: !.CommonDefs
 	,	icl_import				:: !{!Declaration}
-	,	icl_qualified_imports	:: ![([Declaration], ModuleN, Position)]
+	,	icl_qualified_imports	:: ![QualifiedDeclaration]
 	,	icl_imported_objects	:: ![ImportedObject]
 	,	icl_foreign_exports		:: ![ForeignExport]
 	,	icl_used_module_numbers :: !NumberSet
@@ -178,6 +178,8 @@ instance == FunctionOrMacroIndex
 	,	dcls_local		::![Declaration]
 	,	dcls_local_for_import ::!{!Declaration}
 	}
+
+::	QualifiedDeclaration :== ([Declaration], ModuleIdent, Position)
 
 ::	DictionaryInfo = { n_dictionary_types :: !Int, n_dictionary_constructors :: !Int, n_dictionary_selectors :: !Int }
 
@@ -522,7 +524,7 @@ instance == GenericDependency
 	= ImportSymbolsAll
 	| ImportSymbolsOnly !import_declarations
 
-::	ImportQualified = NotQualified | Qualified
+::	ImportQualified = NotQualified | Qualified | QualifiedAs !Ident
 
 instance toString Import, AttributeVar, TypeAttribute, Annotation
 
@@ -768,6 +770,7 @@ pIsSafe			:== True
 				VI_Occurrence !Occurrence | VI_UsedVar !Ident |
 				VI_Expression !Expression | VI_Variable !Ident !VarInfoPtr | VI_LiftedVariable !VarInfoPtr |
 				VI_Count !Int /* the reference count of a variable */ !Bool /* true if the variable is global, false otherwise */ |
+				VI_Ref !Bool /* true if the variable is global, false otherwise */ |
 				VI_AccVar !ConsClass !ArgumentPosition /* used during fusion to determine accumulating parameters of functions */ |
 				VI_Alias !BoundVar /* used for resolving aliases just before type checking (in transform) */ |
 				 /* used during elimination and lifting of cases */

@@ -1543,7 +1543,6 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 	  uvar		= [arg \\ prod <-: prods & arg <- tb_args | isUnused prod]
 	  				with
 	  					isUnused PR_Unused = True
-//	  					isUnused (PR_EqualRemove _) = True
 	  					isUnused _ = False
 	  
 	  new_fun_args				= das.das_vars
@@ -2160,7 +2159,6 @@ determine_arg (PR_EqualRemove arg_index) _ form=:{fv_info_ptr} prod_index (_,ro)
 	# (succ, das_subst, das_type_heaps)
 	  	= unify prod_type arg_type type_input das_subst das_type_heaps
 	| not succ
-		| False ---> ("prod_type",prod_type,"\narg_type",arg_type) = undef
 		= abort "Error in compiler: unification in module trans failed\n"
 	# no_arg_type = {ats_types = [], ats_strictness = NotStrict}
 	  das_arg_types & [prod_index] = no_arg_type

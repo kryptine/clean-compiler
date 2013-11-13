@@ -330,6 +330,7 @@ where
 	clear_attr_var attr attr_var_heap
 		= attr_var_heap
 
+
 instance compare AType
 where
 	compare at1 at2 comp_st
@@ -1454,4 +1455,3 @@ do_nothing ec_state
 
 give_error s ec_state
 	= { ec_state & ec_error_admin = checkError s ErrorMessage ec_state.ec_error_admin }
-

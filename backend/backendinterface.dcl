@@ -3,6 +3,8 @@
 */
 definition module backendinterface
 
-import frontend
+import frontend, backend
 
-backEndInterface :: !{#Char} [{#Char}] !ListTypesOption !{#Char} !PredefinedSymbols !FrontEndSyntaxTree !Int !*VarHeap !*AttrVarHeap !*File !*File -> (!Bool, !*VarHeap, !*AttrVarHeap, !*File, !*File)
+backEndInterface :: !{#Char} [{#Char}] !ListTypesOption !{#Char} !PredefinedSymbols !FrontEndSyntaxTree !Int !*VarHeap !*AttrVarHeap !*(Optional *File) !*File !*File -> (!Bool, !*VarHeap, !*AttrVarHeap, !*(Optional *File), !*File, !*File)
+
+addStrictnessFromBackEnd :: Int {#Char} *BackEnd SymbolType -> (Bool, SymbolType, *BackEnd)

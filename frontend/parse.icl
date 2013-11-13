@@ -425,7 +425,7 @@ where
 		| ~(isGlobalContext parseContext)
 			= (False,abort "no def(3)",parseError "definition" No "imports only at the global level" pState)
 			# (imp, pState) = wantFromImports pState
-	   		= (True, PD_Import [imp], pState)
+	   		= (True, PD_Import [imp], pState) // -->> imp
 	try_definition parseContext ClassToken pos pState
 		| ~(isGlobalContext parseContext)
 			= (False,abort "no def(2)",parseError "definition" No "class definitions are only at the global level" pState)
@@ -633,10 +633,14 @@ where
 
 		//# pState = wantToken FunctionContext "type argument" GenericCloseToken pState
 		# (args, pState) = parseList trySimplePattern pState
-	  	# has_args = isNotEmpty args || gcf_generic_info<>0
 		# args = [geninfo_arg : args]
+
+		// must be EqualToken or HashToken or ???
+		//# pState = wantToken FunctionContext "generic definition" EqualToken pState
+		//# pState = tokenBack pState
 	
 	  	# (ss_useLayout, pState) = accScanState UseLayout pState
+	  	# has_args = isNotEmpty args
 	    # localsExpected = has_args || isGlobalContext parseContext || ~ ss_useLayout
 	    # (rhs, _, pState) = wantRhs localsExpected (ruleDefiningRhsSymbol parseContext has_args) pState
 
@@ -1245,40 +1249,67 @@ wantLocals pState
 
 wantImports :: !ParseState -> (![ParsedImport], !ParseState)
 wantImports pState
-	# (imports, pState) = wantModuleImports FunctionContext (IC_Module NoQualifiedIdents) pState
+	# (imports, pState) = wantModuleImports (IC_Module NoQualifiedIdents) pState
 	  pState = wantEndOfDefinition "imports" pState
 	= (imports, pState)
 
-wantModuleImports :: !ScanContext !IdentClass !ParseState -> (![Import], !ParseState)
-wantModuleImports scanContext ident_class pState
+wantModuleImports :: !IdentClass !ParseState -> (![Import], !ParseState)
+wantModuleImports ident_class pState
 	# (import_qualified, first_name, pState) = wantOptionalQualifiedAndModuleName pState
 	  (first_ident, pState) = stringToIdent first_name ident_class pState
 	  (file_name, line_nr, pState)	= getFileAndLineNr pState
 	  position = LinePos file_name line_nr
+	  (token, pState) = nextToken FunctionContext pState
+	  (import_qualified,token, pState) = parse_optional_as_module_name import_qualified token pState
 	  module_import = {import_module = first_ident, import_symbols = ImportSymbolsAll, import_file_position = position, import_qualified = import_qualified}
-	  (token, pState) = nextToken scanContext pState
 	| token == CommaToken
-		# (rest, pState) = wantModuleImports scanContext ident_class pState
+		# (rest, pState) = wantModuleImports ident_class pState
 		= ([module_import : rest], pState)
 	= ([module_import], tokenBack pState)
+where
+	parse_optional_as_module_name import_qualified=:Qualified token=:(IdentToken "as") pState
+		# (mod_name, pState) = wantModuleName pState
+		  (mod_ident, pState) = stringToIdent mod_name (IC_Module NoQualifiedIdents) pState
+		  (token, pState) = nextToken FunctionContext pState
+		= (QualifiedAs mod_ident,token,pState)
+	parse_optional_as_module_name import_qualified token pState
+		= (import_qualified,token,pState)
 
 wantFromImports :: !ParseState -> (!ParsedImport, !ParseState)
 wantFromImports pState
 	# (mod_name, pState) = wantModuleName pState
 	  (mod_ident, pState) = stringToIdent mod_name (IC_Module NoQualifiedIdents) pState
-	  pState = wantToken GeneralContext "from imports" ImportToken pState
-	  (file_name, line_nr, pState)	= getFileAndLineNr pState
 	  (token, pState) = nextToken GeneralContext pState
-	| case token of IdentToken "qualified" -> True ; _ -> False
-		# (import_symbols, pState) = wantImportDeclarations pState
+	= case token of
+		ImportToken
+			-> wantOptionalQualifiedAndImportDeclarations mod_ident pState
+		IdentToken "as"
+			# (as_mod_name, pState) = wantModuleName pState
+			  (as_mod_ident, pState) = stringToIdent as_mod_name (IC_Module NoQualifiedIdents) pState
+			  pState = wantToken GeneralContext "from imports" ImportToken pState
+			  pState = wantToken GeneralContext "from imports" (IdentToken "qualified") pState				
+			  (file_name, line_nr, pState) = getFileAndLineNr pState
+			  (import_symbols, pState) = wantImportDeclarations pState
+			  pState = wantEndOfDefinition "from imports" pState
+			-> ({import_module = mod_ident, import_symbols = ImportSymbolsOnly import_symbols,
+				 import_file_position = LinePos file_name line_nr, import_qualified = QualifiedAs as_mod_ident}, pState)
+		_
+			# pState = parseError "from imports" (Yes token) "import or as" pState
+			-> wantOptionalQualifiedAndImportDeclarations mod_ident pState
+	where
+	wantOptionalQualifiedAndImportDeclarations mod_ident pState
+		# (file_name, line_nr, pState)	= getFileAndLineNr pState
+		  (token, pState) = nextToken GeneralContext pState
+		| case token of IdentToken "qualified" -> True ; _ -> False
+			# (import_symbols, pState) = wantImportDeclarations pState
+			  pState = wantEndOfDefinition "from imports" pState
+			= ( { import_module = mod_ident, import_symbols = ImportSymbolsOnly import_symbols,
+				  import_file_position = LinePos file_name line_nr, import_qualified = Qualified }, pState)
+		# (import_symbols, pState) = wantImportDeclarationsT token pState
 		  pState = wantEndOfDefinition "from imports" pState
 		= ( { import_module = mod_ident, import_symbols = ImportSymbolsOnly import_symbols,
-			  import_file_position = LinePos file_name line_nr, import_qualified = Qualified }, pState)
-	# (import_symbols, pState) = wantImportDeclarationsT token pState
-	  pState = wantEndOfDefinition "from imports" pState
-	= ( { import_module = mod_ident, import_symbols = ImportSymbolsOnly import_symbols,
-		  import_file_position = LinePos file_name line_nr, import_qualified = NotQualified }, pState)
-where
+			  import_file_position = LinePos file_name line_nr, import_qualified = NotQualified }, pState)
+
 	wantImportDeclarations pState
 		# (token, pState) = nextToken GeneralContext pState
 		= wantImportDeclarationsT token pState
@@ -1826,7 +1857,9 @@ where
 		| token == CommaToken
 			# (derive_defs, pState) = want_derive_types name pState
 			= ([derive_def:derive_defs], pState)
+
  			# pState = wantEndOfDefinition "derive definition" (tokenBack pState)
+
 			= ([derive_def], pState)
 
 	want_derive_type :: String !*ParseState -> (GenericCaseDef, !Token, !*ParseState)			
@@ -1891,7 +1924,9 @@ where
 		| token == CommaToken
 			# (derive_defs, pState) = want_derive_class_types class_ident pState
 			= ([derive_def:derive_defs], pState)
+
  			# pState = wantEndOfDefinition "derive definition" (tokenBack pState)
+
 			= ([derive_def], pState)
 
 	want_derive_class_type :: Ident !*ParseState -> (GenericCaseDef, !*ParseState)			
@@ -1900,6 +1935,7 @@ where
 		# (ident, pState) = stringToIdent class_ident.id_name (IC_GenericDeriveClass type) pState
 		# (type_cons, pState) = get_type_cons type pState
 		# derive_def = { gc_pos = pos, gc_type = type, gc_type_cons = type_cons,
+//						 gc_gcf = GCFC {gcfc_ident = ident, gcfc_class_ident = class_ident}}
 						 gc_gcf = GCFC ident class_ident}
 		= (derive_def, pState)
 

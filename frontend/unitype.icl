@@ -34,8 +34,8 @@ isPositive :: !TempVarId !{# BOOLVECT } -> Bool
 isPositive var_id cons_vars
 	= cons_vars.[BITINDEX var_id] bitand (1 << BITNUMBER var_id) <> 0
 
-determineAttributeCoercions :: !AType !AType !Bool !u:{!Type} !*Coercions !{#CommonDefs} !{#BOOLVECT} !*TypeDefInfos !*TypeHeaps
-	-> (!Optional (TypePosition, AType), !u:{! Type}, !*Coercions, !*TypeDefInfos, !*TypeHeaps) 
+determineAttributeCoercions :: !AType !AType !Bool !u:{! Type} !*Coercions !{#CommonDefs} !{#BOOLVECT } !*TypeDefInfos !*TypeHeaps
+		-> (!Optional (TypePosition, AType), !u:{! Type}, !*Coercions, !*TypeDefInfos, !*TypeHeaps)
 determineAttributeCoercions off_type dem_type coercible subst coercions defs cons_vars td_infos type_heaps
 	# (_, exp_off_type, es) = expandType defs cons_vars off_type (subst, { es_type_heaps = type_heaps, es_td_infos = td_infos})
 	  (_, exp_dem_type, (subst, {es_td_infos,es_type_heaps})) = expandType defs cons_vars dem_type es
@@ -240,7 +240,7 @@ typeIsNonCoercible cons_vars (_ :@: _)
 typeIsNonCoercible _ _
 	= False
 
-class lift a :: !{#CommonDefs} !{#BOOLVECT} !a !*{!Type} !*LiftState -> (!Bool,!a, !*{! Type}, !*LiftState)
+class lift a :: !{#CommonDefs } !{#BOOLVECT } !a !*{!Type} !*LiftState -> (!Bool,!a, !*{!Type}, !*LiftState)
 
 liftTypeApplication modules cons_vars t0=:(TA cons_id=:{type_ident,type_index={glob_object,glob_module},type_arity,type_prop=type_prop0} cons_args) subst ls
 	# ({tdi_kinds}, ls) = ls!ls_td_infos.[glob_module].[glob_object]
@@ -748,7 +748,6 @@ Success No		=  True
 Success (Yes _)	=  False
 
 coerce :: !Sign !{#CommonDefs} !{#BOOLVECT} !TypePosition !AType !AType !*CoercionState -> (!Optional TypePosition, !*CoercionState)
-
 coerce sign defs cons_vars tpos at1=:{at_attribute=attr1, at_type = type1} at2=:{at_attribute=attr2} cs=:{crc_coercions}
 	#!attr_sign = adjust_sign sign type1 cons_vars
 	  (succ, crc_coercions) = coerceAttributes attr1 attr2 attr_sign crc_coercions
@@ -830,7 +829,6 @@ tryToExpandTypeSyn defs cons_vars type cons_id=:{type_index={glob_object,glob_mo
 			  (_, expanded_type, (_, {es_type_heaps, es_td_infos})) = expandType defs cons_vars at_type
 			  		({}, { es_type_heaps = type_heaps, es_td_infos = td_infos })
 			-> (True, expanded_type, clearBindingsOfTypeVarsAndAttributes attribute td_args es_type_heaps, es_td_infos)
-
 		_
 			-> (False, type, type_heaps, td_infos)
 
@@ -1371,7 +1369,6 @@ lift_pos_list_with_offered_type modules cons_vars [off_type:off_types] ts0=:[t0:
 				= (False, ts0, subst, ls)
 lift_pos_list_with_offered_type modules cons_vars [] [] sign_class subst ls
 	= (False, [], subst, ls)
-
 
 liftRemainingSubstitutions :: !*{!Type} !{#CommonDefs} !{#BOOLVECT} !Int !*TypeHeaps !*TypeDefInfos -> (*{! Type}, !Int, !*TypeHeaps, !*TypeDefInfos)
 liftRemainingSubstitutions subst modules cons_vars attr_store type_heaps td_infos 

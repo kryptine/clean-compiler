@@ -15,7 +15,7 @@ implies a b :== not a || b
 
 :: SolvedImports =
 	{	si_explicit				:: ![([Declaration], Position)]
-	,	si_qualified_explicit	:: ![([Declaration], ModuleN, Position)]
+	,	si_qualified_explicit	:: ![QualifiedDeclaration]
 	,	si_implicit				:: ![(ModuleN, Position)]
 	}
 
@@ -152,7 +152,7 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 		= ((decl_accu, position), (dcl_modules, visited_modules, expl_imp_info, cs))
 
 	solve_qualified_expl_imp_from_module expl_imp_indices_ikh modules_in_component_set path
-			{ei_module_n=imported_mod, ei_position=position, ei_symbols=ImportSymbolsOnly imported_symbols} (dcl_modules, visited_modules, expl_imp_info, cs)
+			{ei_module_n=imported_mod, ei_position=position, ei_symbols=ImportSymbolsOnly imported_symbols, ei_qualified} (dcl_modules, visited_modules, expl_imp_info, cs)
 		# (not_exported_symbols,decl_accu, unsolved_belonging, visited_modules, expl_imp_info)
 				= search_qualified_expl_imp_symbols imported_symbols expl_imp_indices_ikh modules_in_component_set path imported_mod
 						([],[], [], visited_modules, expl_imp_info)
@@ -161,7 +161,12 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 		  (decl_accu, dcl_modules, visited_modules, expl_imp_info, cs)
 		  		= solve_belongings unsolved_belonging position expl_imp_indices_ikh modules_in_component_set path
 		  				(decl_accu, dcl_modules, visited_modules, expl_imp_info, { cs & cs_error = cs_error }) 
-		= ((decl_accu, imported_mod, position), (dcl_modules, visited_modules, expl_imp_info, cs))
+		  (module_ident,dcl_modules) = case ei_qualified of
+		  									QualifiedAs module_ident
+		  										-> (module_ident,dcl_modules)
+		  									_
+												-> dcl_modules![imported_mod].dcl_name
+		= ((decl_accu, module_ident, position), (dcl_modules, visited_modules, expl_imp_info, cs))
 
 	search_expl_imp_symbols imported_symbols expl_imp_indices_ikh modules_in_component_set path imported_mod state
 		= foldSt (search_expl_imp_symbol expl_imp_indices_ikh modules_in_component_set path imported_mod)
@@ -458,7 +463,7 @@ get_eei_ident (eii=:ExplImpInfo eii_ident _) = (eii_ident, eii)
 
 :: CheckCompletenessInputBox = { box_cci :: !CheckCompletenessInput }
 
-checkExplicitImportCompleteness :: ![([Declaration], Position)] ![([Declaration], Int, Position)]
+checkExplicitImportCompleteness :: ![([Declaration], Position)] ![QualifiedDeclaration]
 										!*{#DclModule} !*{#*{#FunDef}} !*ExpressionHeap !*CheckState
 									-> (!.{#DclModule},!*{#*{#FunDef}},!.ExpressionHeap,!.CheckState)
 checkExplicitImportCompleteness dcls_explicit explicit_qualified_imports dcl_modules macro_defs expr_heap cs=:{cs_symbol_table, cs_error}
@@ -876,7 +881,7 @@ stupid_ident =: { id_name = "stupid", id_info = nilPtr }
 // XXX from m import :: T(..) works also if T is a record type
 
 
-store_qualified_explicitly_imported_symbols_in_symbol_table :: ![([Declaration],Int,Position)] ![SymbolPtr] !*SymbolTable -> (![SymbolPtr],!*SymbolTable)
+store_qualified_explicitly_imported_symbols_in_symbol_table :: ![QualifiedDeclaration] ![SymbolPtr] !*SymbolTable -> (![SymbolPtr],!*SymbolTable)
 store_qualified_explicitly_imported_symbols_in_symbol_table [(declarations,module_n,position):qualified_explicit_imports] modified_symbol_ptrs symbol_table
 	# (modified_symbol_ptrs,symbol_table) = foldSt store_qualified_explicitly_imported_symbol declarations (modified_symbol_ptrs,symbol_table)
 	= store_qualified_explicitly_imported_symbols_in_symbol_table qualified_explicit_imports modified_symbol_ptrs symbol_table
@@ -909,9 +914,9 @@ restore_symbol_table_after_checking_completeness modified_symbol_ptrs symbol_tab
 						= ste_kind
 			= writePtr symbol_ptr {symbol_ste & ste_kind=ste_kind} symbol_table
 
-store_qualified_explicit_imports_in_symbol_table :: ![([Declaration],Int,Position)] ![(SymbolPtr,STE_Kind)] !*SymbolTable !*{#DclModule} -> (![(SymbolPtr,STE_Kind)],!*SymbolTable,!*{#DclModule})
-store_qualified_explicit_imports_in_symbol_table [(declarations,module_n,position):qualified_explicit_imports] modified_ste_kinds symbol_table modules
-	# (module_symbol_ptr,modules) = modules![module_n].dcl_name.id_info
+store_qualified_explicit_imports_in_symbol_table :: ![QualifiedDeclaration] ![(SymbolPtr,STE_Kind)] !*SymbolTable !*{#DclModule} -> (![(SymbolPtr,STE_Kind)],!*SymbolTable,!*{#DclModule})
+store_qualified_explicit_imports_in_symbol_table [(declarations,module_symbol,position):qualified_explicit_imports] modified_ste_kinds symbol_table modules
+	# module_symbol_ptr = module_symbol.id_info
 	  (module_ste=:{ste_kind},symbol_table) = readPtr module_symbol_ptr symbol_table
 	  (modified_ste_kinds,sorted_qualified_imports)
 		= case ste_kind of
@@ -920,6 +925,8 @@ store_qualified_explicit_imports_in_symbol_table [(declarations,module_n,positio
 			STE_ClosedModule
 				-> ([(module_symbol_ptr,ste_kind):modified_ste_kinds],EmptySortedQualifiedImports)
 			STE_Module _
+				-> ([(module_symbol_ptr,ste_kind):modified_ste_kinds],EmptySortedQualifiedImports)
+			STE_Empty // for import as
 				-> ([(module_symbol_ptr,ste_kind):modified_ste_kinds],EmptySortedQualifiedImports)
 	  sorted_qualified_imports = foldSt add_qualified_import declarations sorted_qualified_imports
 	  module_ste = {module_ste & ste_kind=STE_ModuleQualifiedImports sorted_qualified_imports}

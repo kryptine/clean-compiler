@@ -3,6 +3,7 @@ implementation module frontend
 import scanner, parse, postparse, check, type, trans, partition, convertcases, overloading, utilities, convertDynamics,
 		convertimportedtypes, compilerSwitches, analtypes, generics1,
 		typereify, compare_types
+from CoclSystemDependent import DirectorySeparator
 
 instance == FrontEndPhase where
 	(==) a b
@@ -18,7 +19,7 @@ frontSyntaxTree cached_dcl_macros cached_dcl_mods main_dcl_module_n predef_symbo
 		)
 
 frontEndInterface :: !(Optional (*File,{#Char},{#Char})) !FrontEndOptions !Ident !SearchPaths !{#DclModule} !*{#*{#FunDef}} !(Optional Bool) !*PredefinedSymbols !*HashTable (ModTimeFunction *Files) !*Files !*File !*File !*File !(Optional *File) !*Heaps
-	-> (!Optional *FrontEndSyntaxTree,!*{#*{#FunDef}},!{#DclModule},!Int,!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional *File, !*Heaps)
+  	-> ( !Optional *FrontEndSyntaxTree,!*{#*{#FunDef}},!{#DclModule},!Int,!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional *File, !*Heaps)
 frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_modules cached_dcl_macros list_inferred_types predef_symbols hash_table modtimefunction files error io out tcl_file heaps
 	| case opt_file_dir_time of No -> True; _ -> False
 		# error = moduleCouldNotBeImportedError True mod_ident NoPos error
@@ -58,7 +59,7 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 	# {icl_common,icl_function_indices,icl_name,icl_import,icl_qualified_imports,icl_imported_objects,icl_foreign_exports,icl_used_module_numbers} = icl_mod
 /*
 	  (_,f,files) = fopen "components" FWriteText files
-	  (components, icl_functions, f) = showComponents components 0 True icl_functions f
+	  (components, icl_functions, f) = showGroups groups 0 True icl_functions f
 	/*	
 	  (n_functions,icl_functions) = usize icl_functions
 	  (icl_functions,f) = showFunctions {ir_from=0,ir_to=n_functions} icl_functions f
@@ -93,7 +94,7 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 //	# (td_infos, th_vars, error_admin) = analyseTypeDefs ti_common_defs type_groups td_infos type_heaps.th_vars error_admin
 	  ({com_type_defs}, ti_common_defs) = replace ti_common_defs main_dcl_module_n icl_common
 
-	# hp_var_heap = heaps.hp_var_heap
+	# {hp_var_heap,hp_expression_heap} = heaps
 	#! n_types_with_type_functions = size ti_common_defs.[main_dcl_module_n].com_type_defs
 	#! n_constructors_with_type_functions = size ti_common_defs.[main_dcl_module_n].com_cons_defs
 	#! ea_ok = error_admin.ea_ok
@@ -111,7 +112,7 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 	# (fun_defs, dcl_mods, td_infos, th_vars, hp_expression_heap, gen_heap, error_admin)
 		= checkKindsOfCommonDefsAndFunctions n_cached_dcl_modules main_dcl_module_n icl_used_module_numbers
 				(icl_global_functions++[icl_function_indices.ifi_local_function_indices])
-				ti_common_defs fun_defs dcl_mods td_infos class_infos th_vars heaps.hp_expression_heap heaps.hp_generic_heap error_admin
+				ti_common_defs fun_defs dcl_mods td_infos class_infos th_vars hp_expression_heap heaps.hp_generic_heap error_admin
 
       type_heaps = { type_heaps & th_vars = th_vars }
 
@@ -133,13 +134,20 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 	# icl_mod = {icl_mod & icl_common = icl_common} 
 		
 	# error = error_admin.ea_file
-
+/*
+	# (_,f,files) = fopen "modules" FWriteText files
+	# (dcl_mods, f) = showDclModules dcl_mods f
+	  (ok,files) = fclose f files
+	| ok<>ok
+		= abort "";
+*/
 /*
 	# (_,genout,files) = fopen "genout" FWriteText files
 	# (n_fun_defs,fun_defs) = usize fun_defs
-	# (fun_defs, genout) = show_component [0..n_fun_defs-1] True fun_defs genout
+	# genout = show_class_members icl_mod.icl_common genout 
+	# (groups, fun_defs, genout) = showGroups groups 0 True fun_defs genout
 	# (ok,files) = fclose genout files
-	| not ok = abort "could not write genout" 
+	| not ok = abort "could not write genout"
 */
 	#! ok = error_admin.ea_ok
 	| not ok
@@ -229,7 +237,7 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 		=	frontSyntaxTree cached_dcl_macros cached_dcl_mods main_dcl_module_n
 							predef_symbols hash_table files error io out tcl_file icl_mod dcl_mods fun_defs components array_instances heaps
 
-//	  (components, fun_defs, out) = showComponents components 0 False fun_defs out
+//	# (components, fun_defs, out) = showComponents components 0 False fun_defs out
 	# (used_funs, components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap)
 	  		= convertCasesOfFunctions components main_dcl_module_n imported_funs common_defs fun_defs dcl_types used_conses
 					var_heap type_heaps expression_heap
@@ -246,8 +254,6 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 	| ok<>ok
 		= abort "";
 */
-
-//	# (fun_defs,out,var_heap,predef_symbols) = sa components main_dcl_module_n dcl_mods fun_defs out var_heap predef_symbols;
 
 	# heaps = {hp_var_heap = var_heap, hp_expression_heap=expression_heap, hp_type_heaps=type_heaps,hp_generic_heap=heaps.hp_generic_heap}
 	# 	fe ={	fe_icl = {icl_functions=fun_defs, icl_function_indices=icl_function_indices, icl_common=icl_common,
@@ -303,7 +309,7 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 	where
 		group_members_to_component_members [e:l] = ComponentMember e (group_members_to_component_members l)
 		group_members_to_component_members [] = NoComponentMembers
-		
+
 newSymbolTable :: !Int -> *{# SymbolTableEntry}
 newSymbolTable size
 	= createArray size {  ste_index = NoIndex, ste_def_level = -1, ste_kind = STE_Empty, ste_previous = abort "PreviousPlaceholder"}
@@ -338,41 +344,55 @@ showGroups comps comp_index show_types fun_defs file
 		# (comp, comps) = comps![comp_index]
 		# (fun_defs, file) = show_group comp.group_members show_types fun_defs (file <<< "component " <<< comp_index <<< '\n')
 		= showGroups comps (inc comp_index) show_types fun_defs file
+where
+	show_group [] show_types fun_defs file
+		= (fun_defs, file <<< '\n')
+	show_group [fun:funs] show_types fun_defs file
+		# (fun_def, fun_defs) = fun_defs![fun]
+		# file=file<<<fun<<<'\n'
+		| show_types
+			= show_group funs show_types fun_defs (file <<< fun_def.fun_type <<< '\n' <<< fun_def)
+			= show_group funs show_types fun_defs (file <<< fun_def)
+	//		= show_group funs show_types fun_defs (file <<< fun_def.fun_ident)
 
-show_group [] show_types fun_defs file
-	= (fun_defs, file <<< '\n')
-show_group [fun:funs] show_types fun_defs file
-	# (fun_def, fun_defs) = fun_defs![fun]
-	# file=file<<<fun<<<'\n'
-	| show_types
-		= show_group funs show_types fun_defs (file <<< fun_def.fun_type <<< '\n' <<< fun_def)
-		= show_group funs show_types fun_defs (file <<< fun_def)
-//		= show_group funs show_types fun_defs (file <<< fun_def.fun_ident)
-
-showComponents :: !u:{!Component} !Int !Bool !*{# FunDef} !*File  -> (!u:{!Component}, !*{# FunDef},!*File)
+showComponents :: !u:{!Component} !Int !Bool !*{#FunDef} !*File  -> (!u:{!Component}, !*{#FunDef},!*File)
 showComponents comps comp_index show_types fun_defs file
 	| comp_index >= size comps
 		= (comps, fun_defs, file)
 		# (comp, comps) = comps![comp_index]
 		# (fun_defs, file) = show_component comp.component_members show_types fun_defs (file <<< "component " <<< comp_index <<< '\n')
 		= showComponents comps (inc comp_index) show_types fun_defs file
+where
+	show_component (ComponentMember fun funs) show_types fun_defs file
+		# (fun_def, fun_defs) = fun_defs![fun]
+		# file=file<<<"function "<<<fun<<<'\n'
+		| show_types
+			= show_component funs show_types fun_defs (file <<< fun_def.fun_type <<< '\n' <<< fun_def)
+			= show_component funs show_types fun_defs (file <<< fun_def)
+	show_component (GeneratedComponentMember fun _ funs) show_types fun_defs file
+//		# file=file<<<"generated function "<<<fun<<<'\n'
+//		= show_component funs show_types fun_defs file
 
-show_component NoComponentMembers show_types fun_defs file
-	= (fun_defs, file <<< '\n')
-show_component (ComponentMember fun funs) show_types fun_defs file
-	# (fun_def, fun_defs) = fun_defs![fun]
-	# file=file<<<fun<<<'\n'
-	| show_types
-		= show_component funs show_types fun_defs (file <<< fun_def.fun_type <<< '\n' <<< fun_def)
-		= show_component funs show_types fun_defs (file <<< fun_def)
-//		= show_component funs show_types fun_defs (file <<< fun_def.fun_ident)
-show_component (GeneratedComponentMember fun _ funs) show_types fun_defs file
-	# (fun_def, fun_defs) = fun_defs![fun]
-	# file=file<<<fun<<<'\n'
-	| show_types
-		= show_component funs show_types fun_defs (file <<< fun_def.fun_type <<< '\n' <<< fun_def)
-		= show_component funs show_types fun_defs (file <<< fun_def)
-//		= show_component funs show_types fun_defs (file <<< fun_def.fun_ident)
+		# (fun_def, fun_defs) = fun_defs![fun]
+		# file=file<<<"generated function "<<<fun<<<'\n'
+		| show_types
+			= show_component funs show_types fun_defs (file <<< fun_def.fun_type <<< '\n' <<< fun_def)
+			= show_component funs show_types fun_defs (file <<< fun_def)
+
+	show_component NoComponentMembers show_types fun_defs file
+		= (fun_defs, file <<< '\n')
+
+show_class_members :: !CommonDefs !*File -> *File
+show_class_members {com_member_defs} file
+	= show_class_members 0 com_member_defs file
+	where
+	show_class_members i member_a file
+		| i<size member_a
+		# ({me_ident,me_type},member_a) = member_a![i]
+		# properties = { form_properties = cAttributed bitor cAnnotated, form_attr_position = No }
+		# file = file <<< me_ident <<< " :: " <:: (properties, me_type, No) <<< '\n'
+		= show_class_members (i+1) member_a file
+		= file 
 
 showTypes :: !*{! Group} !Int !*{# FunDef} !*File  -> (!*{! Group}, !*{# FunDef},!*File)
 showTypes comps comp_index fun_defs file
@@ -401,17 +421,20 @@ where
 			# (dcl_mod, dcl_mods) = dcl_mods![mod_index]
 			# file =  show_dcl_mod dcl_mod file
 			= show_dcl_mods (mod_index+1) dcl_mods file
-			
-	show_dcl_mod {dcl_name, dcl_functions} file
+
+	show_dcl_mod {dcl_name, dcl_functions, dcl_common} file
 		# file = file <<< dcl_name <<< ":\n"
+		# file = show_class_members dcl_common file
 		# file = show_dcl_functions 0 dcl_functions file
 		= file <<< "\n"
+
 	show_dcl_functions fun_index dcl_functions file					 				
 		| fun_index == size dcl_functions
 			= file
 		| otherwise
 			# file = show_dcl_function dcl_functions.[fun_index] file
 			= show_dcl_functions (inc fun_index) dcl_functions file 
+
 	show_dcl_function {ft_ident, ft_type} file
 		= file <<< ft_ident <<< " :: " <<< ft_type <<< "\n"			
 		

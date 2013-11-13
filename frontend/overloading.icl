@@ -510,7 +510,7 @@ where
 			| containsContext tc rtcs_new_contexts
 				= (CA_Context tc, rtcs_state)
 				= (CA_Context tc, {rtcs_state & rtcs_new_contexts = [tc : rtcs_new_contexts]})
-		reduce_tc_context defs type_code_class (TempQDV var_number) rtcs_state=:{rtcs_type_pattern_vars, rtcs_var_heap}
+		reduce_tc_context defs type_code_class (TempQDV var_number) rtcs_state=:{rtcs_type_pattern_vars,rtcs_var_heap,rtcs_new_contexts}
 			# (inst_var, (rtcs_type_pattern_vars, rtcs_var_heap))
 				= addLocalTCInstance var_number (rtcs_type_pattern_vars, rtcs_var_heap)
 			# rtcs_state = {rtcs_state & rtcs_type_pattern_vars=rtcs_type_pattern_vars, rtcs_var_heap=rtcs_var_heap}
@@ -1034,19 +1034,23 @@ convertOverloadedCall defs contexts symbol=:{symb_ident, symb_kind = SK_Generic 
 convertOverloadedCall defs contexts {symb_ident,symb_kind = SK_TypeCode} expr_info_ptr class_appls (heaps, ptrs, error)
 	# (class_expressions, (heaps, ptrs)) = convertClassApplsToExpressions defs contexts class_appls (heaps, ptrs)
 	= ({heaps & hp_expression_heap = heaps.hp_expression_heap <:= (expr_info_ptr, EI_TypeCodes (map expressionToTypeCodeExpression class_expressions))}, ptrs, error)
+
 convertOverloadedCall defs contexts {symb_kind=SK_TFACVar var_expr_ptr,symb_ident} expr_info_ptr appls (heaps,ptrs, error)
 	# (class_expressions, (heaps, ptrs)) = convertClassApplsToExpressions defs contexts appls (heaps,ptrs)
 	= ({heaps & hp_expression_heap = heaps.hp_expression_heap <:= (expr_info_ptr, EI_FPContext class_expressions var_expr_ptr)}, ptrs, error)
+
 convertOverloadedCall defs contexts {symb_kind=SK_VarContexts var_contexts} expr_info_ptr appls (heaps,ptrs, error)
 	# (var_contexts,error) = get_var_contexts var_contexts defs contexts error
 	  (class_expressions, (heaps, ptrs)) = convertClassApplsToExpressions defs contexts appls (heaps,ptrs)
 	  expr_info = EI_ContextWithVarContexts class_expressions var_contexts
 	= ({heaps & hp_expression_heap = writePtr expr_info_ptr expr_info heaps.hp_expression_heap}, [expr_info_ptr:ptrs], error)
+
 convertOverloadedCall defs contexts {symb_ident,symb_kind = SK_TypeCodeAndContexts univ_contexts} expr_info_ptr class_appls (heaps, ptrs, error)
 	# (univ_contexts,error) = get_var_contexts univ_contexts defs contexts error
 	  (class_expressions, (heaps, ptrs)) = convertClassApplsToExpressions defs contexts class_appls (heaps, ptrs)
 	  expr_info = EI_TypeCodesWithContexts (expressionsToTypeCodeExpressions class_expressions) univ_contexts
 	= ({heaps & hp_expression_heap = writePtr expr_info_ptr expr_info heaps.hp_expression_heap}, ptrs, error)
+
 convertOverloadedCall defs contexts symbol expr_info_ptr appls (heaps,ptrs, error)
 	# (class_expressions, (heaps, ptrs)) = convertClassApplsToExpressions defs contexts appls (heaps,ptrs)
 	= ({heaps & hp_expression_heap = heaps.hp_expression_heap <:= (expr_info_ptr, EI_Context class_expressions)}, ptrs, error)
@@ -1376,7 +1380,10 @@ where
 						# (type_var_heap, var_heap, error)
 								= bind_type_vars_to_type_codes symb_ident dt_global_vars type_codes type_code_info.tci_type_var_heap var_heap error
 						  (uni_vars, (type_var_heap, var_heap)) = newTypeVariables dt_uni_vars (type_var_heap, var_heap)
+
+//						  dt_type = add_types_of_dictionaries dictionaries_and_contexts dt_type
 						  dt_type = add_types_of_dictionaries dt_contexts dt_type type_code_info.tci_common_defs
+
 						  (type_code_expr, (type_code_info,var_heap,error)) = toTypeCodeExpression (add_universal_vars_to_type dt_uni_vars dt_type)
 						  				({ type_code_info & tci_type_var_heap = type_var_heap }, var_heap, error)
 						  expr_heap = expr_heap <:= (dyn_ptr, EI_TypeOfDynamicWithContexts type_code_expr univ_contexts)
@@ -1401,7 +1408,9 @@ where
 								= bind_type_vars_to_type_codes symb_ident dt_global_vars type_codes type_code_info.tci_type_var_heap var_heap error
 						  (var_ptrs, (type_pattern_vars, var_heap)) = mapSt addLocalTCInstance temp_local_vars (type_pattern_vars, var_heap)
 						  type_var_heap = bind_type_vars_to_type_var_codes type_vars var_ptrs type_var_heap
+
 						  dt_type = add_types_of_dictionaries dt_contexts dt_type type_code_info.tci_common_defs
+						  
 						  type_code_info = {type_code_info & tci_type_var_heap = type_var_heap}
 						  (type_code_expr, (type_code_info,var_heap,error))
 								= toTypeCodeExpression (add_universal_vars_to_type dt_uni_vars dt_type) (type_code_info, var_heap, error)
@@ -1410,10 +1419,12 @@ where
 					EI_Empty
 						# (var_ptrs, (type_pattern_vars, var_heap)) = mapSt addLocalTCInstance temp_local_vars (type_pattern_vars, var_heap)
 						  type_var_heap = bind_type_vars_to_type_var_codes type_vars var_ptrs type_code_info.tci_type_var_heap
+
   						  dt_type = add_types_of_dictionaries dt_contexts dt_type type_code_info.tci_common_defs
+
 						  type_code_info = {type_code_info & tci_type_var_heap = type_var_heap}
 						  (type_code_expr, (type_code_info,var_heap,error))
-								= toTypeCodeExpression (add_universal_vars_to_type dt_uni_vars dt_type) (type_code_info, var_heap, error)
+						  		= toTypeCodeExpression (add_universal_vars_to_type dt_uni_vars dt_type) (type_code_info, var_heap, error)
 						  expr_heap = expr_heap <:= (dyn_ptr, EI_TypeOfDynamicPattern var_ptrs type_code_expr no_contexts)
 						-> convert_local_dynamics loc_dynamics (type_code_info, expr_heap, type_pattern_vars, var_heap, error)
 	where
@@ -2062,10 +2073,10 @@ where
 		# (EI_TypeOfDynamicPattern type_pattern_vars type_code no_contexts, ui_symbol_heap) = readPtr dp_type ui.ui_symbol_heap
 		  ui = {ui & ui_symbol_heap = ui_symbol_heap}
 		| no_contexts
-			# (dp_rhs, ui) = updateExpression group_index dp_rhs ui
+			# (dp_rhs, ui) =  updateExpression group_index dp_rhs ui
 			= ({dp & dp_rhs = dp_rhs, dp_type_code = type_code}, ui)
 			# ui = {ui & ui_var_heap = writePtr dp_var.fv_info_ptr VI_FPC ui.ui_var_heap}
-			  (dp_rhs, ui) = updateExpression group_index dp_rhs ui
+			  (dp_rhs, ui) =  updateExpression group_index dp_rhs ui
 			= ({dp & dp_rhs = dp_rhs, dp_type_code = type_code}, ui)
 
 instance updateExpression (a,b) | updateExpression a & updateExpression b

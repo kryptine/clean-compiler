@@ -1,6 +1,5 @@
 Version: 1.4
 Global
-	ProjectRoot:	.
 	Built:	False
 	Target:	StdEnv
 	Exec:	{Project}\cocl.exe
@@ -8,7 +7,7 @@ Global
 		CheckStacks:	False
 		CheckIndexes:	True
 	Application
-		HeapSize:	25165824
+		HeapSize:	20971520
 		StackSize:	2097152
 		ExtraMemory:	0
 		IntialHeapSize:	8388608
@@ -49,3 +48,4 @@ Global
 MainModule
 	Name:	cocl
 	Dir:	{Project}\main
+

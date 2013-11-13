@@ -223,6 +223,8 @@ cleanUpClosedVariable TE env
 	= (cUndefinedVar, TE, env)
 cleanUpClosedVariable (TLifted tvar) env
 	= (cLiftedVar, TV tvar, env)
+cleanUpClosedVariable tvar=:(TQV _) env
+	= (cQVar, tvar, env)
 cleanUpClosedVariable tvar env
 	= (cDefinedVar, tvar, env)
 
@@ -462,6 +464,7 @@ where
 			| checkCleanUpResult cur cDefinedVar
 				= (collected_contexts, env, liftedContextError (toString tc.tc_class) error)
 				= ([{ tc & tc_types = tc_types } : collected_contexts], env, error)
+		| otherwise
 			= (collected_contexts, env, error)
 
 	build_attribute_environment :: !LargeBitvect !Index !Index !{! CoercionTree} !*LargeBitvect !*AttributeEnv ![AttributeVar] ![AttrInequality] !*ErrorAdmin
@@ -578,6 +581,7 @@ where
 					= cus_error						
 	 			= startRuleError "Start rule cannot be overloaded.\n" cus_error
 	 		= cus_error
+	 
 	 	
 instance clean_up CaseType
 where
@@ -758,14 +762,6 @@ where
 		= th_attrs <:= (av_info_ptr, AVI_Empty)
 	clear_attribute _ th_attrs
 		= th_attrs
-
-/*
-expandTypeApplication :: ![ATypeVar] !TypeAttribute !Type ![AType] !TypeAttribute !*TypeHeaps -> (!Type, !*TypeHeaps)
-expandTypeApplication type_args form_attr type_rhs arg_types act_attr type_heaps=:{th_attrs}
-	# type_heaps = bindTypeVarsAndAttributes form_attr act_attr type_args arg_types type_heaps 
-	  (_, exp_type, type_heaps) = substitute type_rhs type_heaps
-	= (exp_type, clearBindingsOfTypeVarsAndAttributes form_attr type_args type_heaps)
-*/
 
 VarIdTable :: {# String}
 VarIdTable =: { "a", "b", "c", "d", "e", "f", "g", "h", "i", "j" }

@@ -1671,6 +1671,11 @@ make_implicit_qualified_imports_explicit [import_=:{import_qualified=Qualified,i
 	# import_declarations = qualified_idents_to_import_declarations qualified_idents
 	# (imports,hash_table) = make_implicit_qualified_imports_explicit imports hash_table
 	= ([{import_ & import_symbols=ImportSymbolsOnly import_declarations}:imports],hash_table)
+make_implicit_qualified_imports_explicit [import_=:{import_qualified=QualifiedAs as_module_ident,import_symbols=ImportSymbolsAll,import_module,import_file_position}:imports] hash_table
+	# (qualified_idents,hash_table) = get_qualified_idents_from_hash_table as_module_ident hash_table
+	# import_declarations = qualified_idents_to_import_declarations qualified_idents
+	# (imports,hash_table) = make_implicit_qualified_imports_explicit imports hash_table
+	= ([{import_ & import_symbols=ImportSymbolsOnly import_declarations}:imports],hash_table)
 make_implicit_qualified_imports_explicit [import_:imports] hash_table
 	# (imports,hash_table) = make_implicit_qualified_imports_explicit imports hash_table
 	= ([import_:imports],hash_table)

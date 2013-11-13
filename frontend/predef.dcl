@@ -173,8 +173,8 @@ PD_TypeCONS					:== 181
 PD_TypeRECORD				:== 182
 PD_TypeFIELD				:== 183
 PD_TypeOBJECT				:== 184
-PD_TGenericConsDescriptor	:== 185
-PD_TGenericRecordDescriptor	:== 186
+PD_TGenericConsDescriptor 	:== 185
+PD_TGenericRecordDescriptor :== 186
 PD_TGenericFieldDescriptor 	:== 187
 PD_TGenericTypeDefDescriptor :== 188
 PD_TGenConsPrio				:== 189

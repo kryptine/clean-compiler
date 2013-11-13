@@ -16,7 +16,7 @@ import syntax, checksupport
 
 :: SolvedImports =
 	{	si_explicit				:: ![([Declaration], Position)]
-	,	si_qualified_explicit	:: ![([Declaration], ModuleN, Position)]
+	,	si_qualified_explicit	:: ![QualifiedDeclaration]
 	,	si_implicit				:: ![(ModuleN, Position)]
 	}
 
@@ -29,11 +29,11 @@ solveExplicitImports :: !(IntKeyHashtable [ExplicitImport]) !{#Int} !Index
 								!*(!v:{#DclModule},!*{#Int},!{!*ExplImpInfo},!*CheckState)
 			-> (!.SolvedImports,! (!v:{#DclModule},!.{#Int},!{!.ExplImpInfo},!.CheckState))
 
-checkExplicitImportCompleteness :: ![([Declaration], Position)] ![([Declaration], Int, Position)]
+checkExplicitImportCompleteness :: ![([Declaration], Position)] ![QualifiedDeclaration]
 										!*{#DclModule} !*{#*{#FunDef}} !*ExpressionHeap !*CheckState
 									-> (!.{#DclModule},!*{#*{#FunDef}},!.ExpressionHeap,!.CheckState)
 
-store_qualified_explicit_imports_in_symbol_table :: ![([Declaration],Int,Position)] ![(SymbolPtr,STE_Kind)] !*SymbolTable !*{#DclModule} -> (![(SymbolPtr,STE_Kind)],!*SymbolTable,!*{#DclModule})
+store_qualified_explicit_imports_in_symbol_table :: ![QualifiedDeclaration] ![(SymbolPtr,STE_Kind)] !*SymbolTable !*{#DclModule} -> (![(SymbolPtr,STE_Kind)],!*SymbolTable,!*{#DclModule})
 
 :: NameSpaceN:==Int
 

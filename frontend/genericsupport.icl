@@ -87,7 +87,7 @@ genericIdentToClassIdent id_name kind
 
 kind_to_short_string :: !TypeKind -> {#Char}
 kind_to_short_string KindConst = "s"
-kind_to_short_string (KindArrow kinds) = kinds_to_str kinds +++ "s"
+kind_to_short_string (KindArrow kinds) = kinds_to_str  kinds +++ "s"
 where
 	kinds_to_str [] = ""
 	kinds_to_str [KindConst:ks] = "s" +++ kinds_to_str ks

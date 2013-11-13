@@ -384,6 +384,7 @@ backEndConvertModulesH predefs {fe_icl =
 				icl_imported_objects, icl_foreign_exports, icl_used_module_numbers, icl_modification_time},
 	fe_components, fe_dcls, fe_arrayInstances}
 	main_dcl_module_n backEnd
+
 	// sanity check ...
 //	| cIclModIndex <> kIclModuleIndex || cPredefinedModuleIndex <> kPredefinedModuleIndex
 //		=	undef <<- "backendconvert, backEndConvertModules: module index mismatch"

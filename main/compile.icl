@@ -66,20 +66,24 @@ openTclFile :: !String !String !*File !*Files -> (!Bool, !Optional .File, !*File
 openTclFile mod_dir mod_name error files
 	= open_file_in_clean_system_files_folder mod_dir mod_name ".tcl" FWriteData error files
 
+openSaplFile :: !String !String !*File !*Files -> (!Bool, !Optional .File, !*File, !*Files)
+openSaplFile mod_dir mod_name error files
+	= open_file_in_clean_system_files_folder mod_dir mod_name ".sapl" FWriteData error files
+
 open_file_in_clean_system_files_folder :: !String !String !String !Int !*File !*Files -> (!Bool, !Optional .File, !*File, !*Files)
 open_file_in_clean_system_files_folder mod_dir mod_name file_extension file_mode error files
 	# icl_mod_pathname = mod_dir +++ {DirectorySeparator} +++ mod_name;
-	# (csf_directory_path,file_name) = make_clean_system_files_dir_and_file_name icl_mod_pathname
-	# file_path = csf_directory_path +++ {DirectorySeparator} +++ file_name +++ file_extension
+	# (csf_dirictory_path,file_name) = make_clean_system_files_dir_and_file_name icl_mod_pathname
+	# file_path = csf_dirictory_path +++ {DirectorySeparator} +++ file_name +++ file_extension
 	# (opened, tcl_file, files)
 		= fopen file_path file_mode files
 	| opened
 		= (True, Yes tcl_file, error, files)
 	// try again after creating Clean System Files folder
 	# (ok, files)
-		= ensureCleanSystemFilesExists csf_directory_path files
+		= ensureCleanSystemFilesExists csf_dirictory_path files
 	| not ok
-		# error = fwrites ("can't create folder \"" +++ csf_directory_path +++"\"\n") error
+		# error = fwrites ("can't create folder \"" +++ csf_dirictory_path +++"\"\n") error
 		= (False, No, error, files)
 	# (opened, tcl_file, files)
 		= fopen file_path file_mode files
@@ -88,10 +92,10 @@ open_file_in_clean_system_files_folder mod_dir mod_name file_extension file_mode
 		= (False, No, error, files)
 	= (True, Yes tcl_file, error, files)
 
-closeTclFile :: !*(Optional *File) *Files -> *(!Bool,*Files)
-closeTclFile (Yes tcl_file) files
-	= fclose tcl_file files
-closeTclFile _ files
+closeFile :: !*(Optional *File) *Files -> *(!Bool,*Files)
+closeFile (Yes file) files
+	= fclose file files
+closeFile _ files
 	= (True,files);
 
 ::	CoclOptions =
@@ -109,6 +113,7 @@ closeTclFile _ files
 	,	dump_core				:: !Bool
 	,	strip_unused			:: !Bool
 	,	compile_with_generics   :: !Bool
+	,	generate_sapl           :: !Bool
 	}
 
 StdErrPathName :== "_stderr_"
@@ -129,6 +134,7 @@ InitialCoclOptions =
 	,	dump_core				= False
 	,	strip_unused			= False
 	,	compile_with_generics 	= True 
+	,	generate_sapl       	= False
 	}
 
 :: DclCache = {
@@ -203,6 +209,9 @@ parseCommandLine ["-lset":args] options
 	= parseCommandLine args {options & listTypes.lto_listTypesKind = ListTypesStrictExports}
 parseCommandLine ["-lat":args] options
 	= parseCommandLine args {options & listTypes.lto_listTypesKind = ListTypesAll}
+	// enable sapl	
+parseCommandLine ["-sapl":args] options
+	= parseCommandLine args {options & generate_sapl = True}
 parseCommandLine [arg : args] options
 	| arg.[0] == '-'
 		# (args,modules,options)=	parseCommandLine args options
@@ -278,10 +287,12 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 	| not opened
 		=	abort ("couldn't open out file \"" +++ options.outPath +++ "\"\n")
 	# (opt_file_dir_time,files) = fopenInSearchPaths options.moduleName ".icl" options.searchPaths FReadData fmodificationtime files
+
 	# (opt_file_dir_time, mbModPath) = 
 			case opt_file_dir_time of
 				Yes (_,mod_path,_) = (opt_file_dir_time, Yes mod_path)
 				No				   = (opt_file_dir_time, No)
+
 	# (optional_tcl_opened, tcl_file, error, files)
 		= case mbModPath of
 			Yes mod_path
@@ -289,7 +300,15 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 					-> openTclFile mod_path options.moduleName error files
 			_
 				-> 	(True,No,error,files)
- 	| not optional_tcl_opened
+				
+	# (optional_sapl_opened, sapl_file, error, files)
+		= case (options.generate_sapl, mbModPath) of
+			(True, Yes mod_path)
+				-> openSaplFile mod_path options.moduleName error files
+			_
+				-> 	(True,No,error,files)
+								
+ 	| not (optional_tcl_opened && optional_sapl_opened)
 		# (closed, files) = fclose out files
 		| not closed
 			=	abort ("couldn't close stdio")
@@ -310,11 +329,12 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 			,feo_fusion=options.compile_with_fusion
 			,feo_dump_core=options.dump_core
 			,feo_strip_unused=options.strip_unused
-			} moduleIdent options.searchPaths dcl_modules functions_and_macros list_inferred_types predef_symbols hash_table fmodificationtime files error io out tcl_file heaps 
+			,feo_generate_sapl=options.generate_sapl
+			} moduleIdent options.searchPaths dcl_modules functions_and_macros list_inferred_types predef_symbols hash_table fmodificationtime files error io out tcl_file heaps
 
 	# unique_copy_of_predef_symbols={predef_symbol\\predef_symbol<-:predef_symbols}
 	# (closed, files)
-		= closeTclFile tcl_file files
+		= closeFile tcl_file files
 	| not closed
 		=   abort ("couldn't close tcl file \"" +++ options.pathName +++ "tcl\"\n")
 	# (closed, files)
@@ -324,13 +344,13 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 	# var_heap=heaps.hp_var_heap
 	  hp_type_heaps=heaps.hp_type_heaps
 	  attrHeap=hp_type_heaps.th_attrs
-	# (success,functions_and_macros,var_heap,attrHeap,error, out)
+	# (success,functions_and_macros,var_heap,attrHeap,sapl_file,error,out)
 		= case optionalSyntaxTree of
 			Yes syntaxTree
 				# functions_and_macros = syntaxTree.fe_icl.icl_functions
-				# (success, var_heap, attrHeap, error, out)
-				 	 = backEndInterface outputPath (map appendRedirection backendArgs) options.listTypes options.outPath predef_symbols syntaxTree main_dcl_module_n var_heap attrHeap error out
-				-> (success,functions_and_macros,var_heap,attrHeap, error, out)
+				# (success, var_heap, attrHeap, sapl_file, error, out)
+				 	 = backEndInterface outputPath (map appendRedirection backendArgs) options.listTypes options.outPath predef_symbols syntaxTree main_dcl_module_n var_heap attrHeap sapl_file error out
+				-> (success,functions_and_macros,var_heap,attrHeap,sapl_file,error,out)
 				with
 					appendRedirection arg
 						= case arg of
@@ -341,7 +361,7 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 							arg
 								->	arg
 			No
-				-> (False,{},var_heap,attrHeap,error, out)
+				-> (False,{},var_heap,attrHeap,sapl_file,error,out)
 		with
 /*
 			outputPath
@@ -352,6 +372,12 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 			outputPath
 	//				=	/* directoryName options.pathName +++ "Clean System Files" +++ {DirectorySeparator} +++ */ baseName options.pathName
 				=	baseName options.pathName
+				
+	# (closed, files)
+		= closeFile sapl_file files
+	| not closed
+		=   abort ("couldn't close sapl file \"" +++ options.pathName +++ "sapl\"\n")
+	
 	# heaps = {heaps & hp_var_heap=var_heap, hp_type_heaps = {hp_type_heaps  & th_attrs = attrHeap}}
 	# (closed, files) = fclose out files
 	| not closed

@@ -830,7 +830,7 @@ where
 
 	build_field_dsc group_index record_dsc_ds field_dsc_ds {fs_ident, fs_index} (modules, heaps)
 		# ({sd_field_nr}, modules)
-			= modules![td_module].com_selector_defs.[fs_index]
+			= modules![td_module].com_selector_defs.[fs_index]  		
 		# name_expr = makeStringExpr fs_ident.id_name // gfd_name
 		# index_expr = makeIntExpr sd_field_nr // gfd_index
 		# (cons_expr, heaps) = buildFunApp main_module_index record_dsc_ds [] heaps // gfd_cons
@@ -996,7 +996,7 @@ where
  	build_expr_for_type_rhs type_def_mod type_def_index (AlgType def_symbols) arg_expr heaps error
 		= build_expr_for_conses type_def_mod type_def_index def_symbols arg_expr heaps error
 	build_expr_for_type_rhs type_def_mod type_def_index (RecordType {rt_constructor}) arg_expr heaps error		
-		= build_expr_for_record type_def_mod type_def_index rt_constructor arg_expr heaps error
+		= build_expr_for_record type_def_mod type_def_index rt_constructor arg_expr  heaps error
 	build_expr_for_type_rhs type_def_mod type_def_index (AbstractType _) arg_expr  heaps error
 		#! error = checkErrorWithIdentPos (newPosition td_ident td_pos) "cannot build isomorphisms for an abstract type" error
 		= (EE, heaps, error)
@@ -1029,7 +1029,7 @@ where
 		#! names = ["x" +++ toString (i+1) +++ toString k \\ k <- [1..ds_arity]]
 		#! (var_exprs, vars, heaps) = buildVarExprs names heaps 
 
-		#! arg_exprs = var_exprs
+		#! (arg_exprs, heaps) = (var_exprs, heaps)
 
 		#! (expr, heaps) = build_prod arg_exprs predefs heaps
 		#! (expr, heaps) = build_cons expr predefs heaps
@@ -1069,7 +1069,7 @@ where
 		# case_patterns = AlgebraicPatterns {gi_module = type_def_mod, gi_index = type_def_index} [alg_pattern]
 		# (case_expr, heaps) = buildCaseExpr arg_expr case_patterns heaps
 		= (case_expr, heaps, error)
-
+				
 	build_prod :: ![Expression] !PredefinedSymbols !*Heaps -> (!Expression, !*Heaps)
 	build_prod [] predefs heaps = build_unit heaps
 	where
@@ -1502,7 +1502,8 @@ where
 		# gs = { gs & gs_tvarh = gs_tvarh
 					, gs_varh = gs_varh
 					, gs_dcl_modules = gs_dcl_modules
-					, gs_symtab = gs_symtab }
+					, gs_symtab = gs_symtab
+					}
 		= (common_defs, gs)
 
 instance_vars_from_type_cons (TypeConsVar tv)
