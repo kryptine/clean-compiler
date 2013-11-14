@@ -149,10 +149,10 @@ where
 		letToSapl (annotation, binding) = (annotation, getFreeVarName binding.lb_dst, cleanExpToSaplExp binding.lb_src)
 		orderlets lts  =  lts // TODO?	
 		
-	cleanExpToSaplExp (Case {case_expr,case_guards,case_default})               = genSaplCase case_expr case_guards case_default
+	cleanExpToSaplExp (Case {case_expr,case_guards,case_default,case_explicit}) = genSaplCase case_expr case_guards case_default case_explicit
 	cleanExpToSaplExp (BasicExpr basic_value)                                   = SaplLit (basicValueToSapl basic_value)
 	cleanExpToSaplExp (FreeVar var)                                             = getFreeVarName var
-	cleanExpToSaplExp (Conditional {if_cond,if_then,if_else=No})                = SaplIf (cleanExpToSaplExp if_cond) (cleanExpToSaplExp if_then) (SaplFun "nomatch")
+	cleanExpToSaplExp (Conditional {if_cond,if_then,if_else=No})                = SaplSelect (cleanExpToSaplExp if_cond) [(PLit (LBool True), cleanExpToSaplExp if_then)] No
 	cleanExpToSaplExp (Conditional {if_cond,if_then,if_else=Yes else_exp})      = SaplIf (cleanExpToSaplExp if_cond) (cleanExpToSaplExp if_then) (cleanExpToSaplExp else_exp)
 	cleanExpToSaplExp (Selection _ expr selectors)                              = makeSelector selectors (cleanExpToSaplExp expr)  
 	cleanExpToSaplExp (Update expr1 selections expr2)                           = makeArrayUpdate (cleanExpToSaplExp expr1) selections (cleanExpToSaplExp expr2)  
@@ -240,11 +240,15 @@ where
 	makemod n =  mns!! n +++ "."
 	
 	// Converting Case definitions
-	genSaplCase case_exp (AlgebraicPatterns gindex pats) def = SaplSelect (cleanExpToSaplExp case_exp) (map getCasePat pats) (fmap cleanExpToSaplExp def) 
-	genSaplCase case_exp (OverloadedListPatterns listtype exp pats) def  = SaplSelect (cleanExpToSaplExp case_exp) (map getCasePat pats) (fmap cleanExpToSaplExp def) 
-	genSaplCase case_exp (BasicPatterns gindex pats) def = SaplSelect (cleanExpToSaplExp case_exp) (map getConstPat pats) (fmap cleanExpToSaplExp def)
-	genSaplCase case_exp  other  def  = SaplError "no matching rule found" 
+	genSaplCase case_exp (AlgebraicPatterns gindex pats) def explicit = SaplSelect (cleanExpToSaplExp case_exp) (map getCasePat pats) (handleDef def explicit) 
+	genSaplCase case_exp (OverloadedListPatterns listtype exp pats) def explicit = SaplSelect (cleanExpToSaplExp case_exp) (map getCasePat pats) (handleDef def explicit)
+	genSaplCase case_exp (BasicPatterns gindex pats) def explicit = SaplSelect (cleanExpToSaplExp case_exp) (map getConstPat pats) (handleDef def explicit)
+	genSaplCase case_exp  _ _ _ = SaplError "no matching rule found" 
 
+	handleDef (Yes def) _ 	= Yes (cleanExpToSaplExp def)
+	handleDef _ True 		= Yes (SaplFun "nomatch")
+	handleDef _ _ 			= No
+	
 	getConstPat pat = (PLit (basicValueToSapl pat.bp_value), cleanExpToSaplExp pat.bp_expr) 			
 	getCasePat pat = (PCons (makemod (getmodnr pat.ap_symbol) +++ toString pat.ap_symbol.glob_object.ds_ident)
 					 		(map getFreeVarName pat.ap_vars),
