@@ -117,64 +117,109 @@ CleanFunctoSaplFunc modindex funindex
                     mns mymod dcl_mods icl_function_indices backEnd
 
 		// Add derived strictness from backEnd
-        # (backEnd, strictnessList) = case fun_type of
-				No = (backEnd, 0)
+        # (backEnd, strictnessList, tupleReturn) = case fun_type of
+				No = (backEnd, 0, No)
         		Yes ft   
         			# (_, ft, backEnd) = addStrictnessFromBackEnd funindex fun_ident.id_name backEnd ft
         			# sl = case ft of
 								{st_args_strictness = NotStrict} = 0
 								{st_args_strictness = Strict x} = x
-        			= (backEnd, sl)
+								
+					// If the return type is a strict tuple, a special name is generated for it,
+					// indicating which argument is strict. Later the references to the orignal
+					// Tuple constructor must be replaced by the special one (see changeTuple).
+					// The necessity of the change is indicated by the Optional (from, to) value.
+					# pf = case ft of 
+								{st_result = {at_type = TAS ti _ (Strict x)}} 
+									| startsWith "_Tuple" ti.type_ident.id_name
+										= Yes (ti.type_ident.id_name, ti.type_ident.id_name+++"!"+++toString x)
+										= No
+								= No
+        			= (backEnd, sl, pf)
 	
         # funDef = SaplFuncDef (mymod +++ "." +++ makeFuncName -1 (getName fun_ident) 0 funindex dcl_mods icl_function_indices mymod mns)  
                    		       (length tb_args) (counterMap (getFreeFuncArgName strictnessList) tb_args 0)  
-                       		   (cleanExpToSaplExp tb_rhs) fun_kind
+                       		   (cleanExpToSaplExp tupleReturn tb_rhs) fun_kind
         
         = (backEnd, funDef)
 
 where
-	cleanExpToSaplExp (Var ident) = getBoundVarName ident
-	cleanExpToSaplExp (App {app_symb, app_args, app_info_ptr})
+	cleanExpToSaplExp tupleReturn (Var ident) = getBoundVarName ident
+			
+	cleanExpToSaplExp tupleReturn (App {app_symb, app_args, app_info_ptr})
 	        = case app_symb.symb_kind of
 	            SK_Generic _ kind
-	                -> printApplicGen app_symb kind   app_args  //  does not apply?
-	            _   -> multiApp [SaplFun (getSymbName app_symb) : map cleanExpToSaplExp  app_args]
-	cleanExpToSaplExp (f_exp @ a_exp)                                           = multiApp [cleanExpToSaplExp f_exp: map cleanExpToSaplExp a_exp]
+	                -> printApplicGen app_symb kind app_args  //  does not apply?
+	            _   -> multiApp [SaplFun (changeTuple tupleReturn app_symb) : map (cleanExpToSaplExp No) app_args]
 
-	cleanExpToSaplExp (Let {let_info_ptr, let_strict_binds, let_lazy_binds, let_expr}) 
-			= SaplLet (orderlets (map letToSapl bindings)) (cleanExpToSaplExp let_expr)
+	cleanExpToSaplExp tupleReturn (f_exp @ a_exp) = multiApp [cleanExpToSaplExp tupleReturn f_exp: map (cleanExpToSaplExp No) a_exp]
+
+	cleanExpToSaplExp tupleReturn (Let {let_info_ptr, let_strict_binds, let_lazy_binds, let_expr}) 
+			= SaplLet (map letToSapl bindings) (cleanExpToSaplExp tupleReturn let_expr)
 	where
 		bindings = zip2 (repeat SA_Strict) let_strict_binds ++ 
 				   zip2 (repeat SA_None) (reverse let_lazy_binds)
-		letToSapl (annotation, binding) = (annotation, getFreeVarName binding.lb_dst, cleanExpToSaplExp binding.lb_src)
-		orderlets lts  =  lts // TODO?	
+		letToSapl (annotation, binding) = (annotation, getFreeVarName binding.lb_dst, cleanExpToSaplExp No binding.lb_src)
 		
-	cleanExpToSaplExp (Case {case_expr,case_guards,case_default,case_explicit}) = genSaplCase case_expr case_guards case_default case_explicit
-	cleanExpToSaplExp (BasicExpr basic_value)                                   = SaplLit (basicValueToSapl basic_value)
-	cleanExpToSaplExp (FreeVar var)                                             = getFreeVarName var
-	cleanExpToSaplExp (Conditional {if_cond,if_then,if_else=No})                = SaplSelect (cleanExpToSaplExp if_cond) [(PLit (LBool True), cleanExpToSaplExp if_then)] No
-	cleanExpToSaplExp (Conditional {if_cond,if_then,if_else=Yes else_exp})      = SaplIf (cleanExpToSaplExp if_cond) (cleanExpToSaplExp if_then) (cleanExpToSaplExp else_exp)
-	cleanExpToSaplExp (Selection _ expr selectors)                              = makeSelector selectors (cleanExpToSaplExp expr)  
-	cleanExpToSaplExp (Update expr1 selections expr2)                           = makeArrayUpdate (cleanExpToSaplExp expr1) selections (cleanExpToSaplExp expr2)  
-	cleanExpToSaplExp (RecordUpdate cons_symbol expression expressions)         = makeRecordUpdate (cleanExpToSaplExp expression) expressions 
-	cleanExpToSaplExp (TupleSelect cons field_nr expr)                          = SaplApp (SaplFun ("_predefined.tupsels" +++ toString cons.ds_arity +++ "v" +++ toString field_nr)) (cleanExpToSaplExp expr)
-	cleanExpToSaplExp (MatchExpr cons expr)  |cons.glob_object.ds_arity == 1    = SaplApp (SaplFun ("_predefined.tupsels1v0"))(cleanExpToSaplExp expr) 
-	                                                                            = cleanExpToSaplExp expr
-	cleanExpToSaplExp EE                                                        = SaplError "no EE"  
-	cleanExpToSaplExp (DynamicExpr {dyn_expr,dyn_type_code})                    = SaplError "no DynamicExpr"   
-	cleanExpToSaplExp (TypeCodeExpression type_code)                            = SaplError "no TypeCodeExpression" 
-	
-	cleanExpToSaplExp (ABCCodeExpr code_sequence do_inline)                     = SaplError "no AnyCodeExpr" //SaplABCCode code_sequence
-	cleanExpToSaplExp (AnyCodeExpr input output code_sequence)                  = SaplError "no AnyCodeExpr" 
-	
-	cleanExpToSaplExp (FailExpr _)                                              = SaplError "no FailExpr" 
-	
-	cleanExpToSaplExp (ClassVariable info_ptr)                                  = SaplError "ClassVariable may not occur"
-	cleanExpToSaplExp (NoBind _)                                                = SaplError "noBind may not occur" 
-	cleanExpToSaplExp (Constant symb _ _)                                       = SaplError "Constant may not occur"
-	cleanExpToSaplExp expr                                                      = SaplError "no cleanToSapl for this case"  
+	cleanExpToSaplExp tupleReturn (Case {case_expr,case_guards,case_default,case_explicit}) 
+			= genSaplCase case_expr case_guards case_default case_explicit
+	where
+		// Converting Case definitions
+		genSaplCase case_exp (AlgebraicPatterns gindex pats) def explicit = SaplSelect (cleanExpToSaplExp No case_exp) (map getCasePat pats) (handleDef def explicit) 
+		genSaplCase case_exp (OverloadedListPatterns listtype exp pats) def explicit = SaplSelect (cleanExpToSaplExp No case_exp) (map getCasePat pats) (handleDef def explicit)
+		genSaplCase case_exp (BasicPatterns gindex pats) def explicit = SaplSelect (cleanExpToSaplExp No case_exp) (map getConstPat pats) (handleDef def explicit)
+		genSaplCase case_exp  _ _ _ = SaplError "no matching rule found" 
 
-	printApplicGen app_symb kind args   = multiApp [SaplFun (getSymbName app_symb  +++ "_generic"):map cleanExpToSaplExp args]	
+		handleDef (Yes def) _ 	= Yes (cleanExpToSaplExp tupleReturn def)
+		handleDef _ True 		= Yes (SaplFun "nomatch")
+		handleDef _ _ 			= No		
+		
+		getConstPat pat = (PLit (basicValueToSapl pat.bp_value), cleanExpToSaplExp tupleReturn pat.bp_expr) 			
+		getCasePat pat = (PCons (printConsName pat.ap_symbol.glob_object.ds_ident (getmodnr pat.ap_symbol))
+					 		(map getFreeVarName pat.ap_vars),
+					  cleanExpToSaplExp tupleReturn pat.ap_expr)	
+			
+	cleanExpToSaplExp tupleReturn (BasicExpr basic_value)                                   
+			= SaplLit (basicValueToSapl basic_value)
+	cleanExpToSaplExp tupleReturn (FreeVar var)                                             
+			= getFreeVarName var
+	cleanExpToSaplExp tupleReturn (Conditional {if_cond,if_then,if_else=No})                
+			= SaplSelect (cleanExpToSaplExp No if_cond) [(PLit (LBool True), cleanExpToSaplExp tupleReturn if_then)] No
+	cleanExpToSaplExp tupleReturn (Conditional {if_cond,if_then,if_else=Yes else_exp})      
+			= SaplIf (cleanExpToSaplExp No if_cond) (cleanExpToSaplExp tupleReturn if_then) (cleanExpToSaplExp tupleReturn else_exp)
+	cleanExpToSaplExp tupleReturn (Selection _ expr selectors)                              
+			= makeSelector selectors (cleanExpToSaplExp No expr)  
+	cleanExpToSaplExp tupleReturn (Update expr1 selections expr2)                           
+			= makeArrayUpdate (cleanExpToSaplExp No expr1) selections (cleanExpToSaplExp No expr2)  
+	cleanExpToSaplExp tupleReturn (RecordUpdate cons_symbol expression expressions)         
+			= makeRecordUpdate (cleanExpToSaplExp No expression) expressions 
+	cleanExpToSaplExp tupleReturn (TupleSelect cons field_nr expr)                          
+			= SaplApp (SaplFun ("_predefined.tupsels" +++ toString cons.ds_arity +++ "v" +++ toString field_nr)) (cleanExpToSaplExp No expr)
+	cleanExpToSaplExp tupleReturn (MatchExpr cons expr)  
+			| cons.glob_object.ds_arity == 1 
+				= SaplApp (SaplFun ("_predefined.tupsels1v0"))(cleanExpToSaplExp No expr) 
+	            = cleanExpToSaplExp tupleReturn expr
+	            
+	cleanExpToSaplExp _ EE                                                        = SaplError "no EE"  
+	cleanExpToSaplExp _ (DynamicExpr {dyn_expr,dyn_type_code})                    = SaplError "no DynamicExpr"   
+	cleanExpToSaplExp _ (TypeCodeExpression type_code)                            = SaplError "no TypeCodeExpression" 
+	
+	cleanExpToSaplExp _ (ABCCodeExpr code_sequence do_inline)                     = SaplError "no AnyCodeExpr" //SaplABCCode code_sequence
+	cleanExpToSaplExp _ (AnyCodeExpr input output code_sequence)                  = SaplError "no AnyCodeExpr" 
+	
+	cleanExpToSaplExp _ (FailExpr _)                                              = SaplError "no FailExpr" 
+	
+	cleanExpToSaplExp _ (ClassVariable info_ptr)                                  = SaplError "ClassVariable may not occur"
+	cleanExpToSaplExp _ (NoBind _)                                                = SaplError "noBind may not occur" 
+	cleanExpToSaplExp _ (Constant symb _ _)                                       = SaplError "Constant may not occur"
+	cleanExpToSaplExp _ expr                                                      = SaplError "no cleanToSapl for this case"  
+
+	// See the comment above
+	changeTuple (Yes (fromi, toi)) {symb_ident={id_name}} | fromi == id_name
+		= toi
+	changeTuple _ app_symb = getSymbName app_symb 	
+
+	printApplicGen app_symb kind args   = multiApp [SaplFun (getSymbName app_symb  +++ "_generic"):map (cleanExpToSaplExp No) args]	
 	                                                
 	// Array and Record updates
 	makeArrayUpdate expr1 sels expr2  = SaplApp (makeSelector sels expr1) expr2
@@ -182,11 +227,11 @@ where
 	makeSelector  [] e = e
 	makeSelector  [selector:sels] e  = makeSelector  sels (mksel selector e)
 	where mksel (RecordSelection globsel ind)     exp = SaplApp (SaplFun (mns !! globsel.glob_module  +++ ".get_" +++ toString globsel.glob_object.ds_ident +++ "_" +++ toString globsel.glob_object.ds_index)) e 
-	      mksel (ArraySelection globsel _ e)      exp = multiApp [SaplFun (mns !! globsel.glob_module +++ "." +++ toString globsel.glob_object.ds_ident +++ "_" +++ toString globsel.glob_object.ds_index),exp, cleanExpToSaplExp e]                             
-	      mksel (DictionarySelection var sels _ e)exp = multiApp [makeSelector sels (getBoundVarName var),exp,cleanExpToSaplExp e]
+	      mksel (ArraySelection globsel _ e)      exp = multiApp [SaplFun (mns !! globsel.glob_module +++ "." +++ toString globsel.glob_object.ds_ident +++ "_" +++ toString globsel.glob_object.ds_index),exp, cleanExpToSaplExp No e]  
+	      mksel (DictionarySelection var sels _ e)exp = multiApp [makeSelector sels (getBoundVarName var),exp,cleanExpToSaplExp No e]
 	
 	makeRecordUpdate expression [         ]                      = expression
-	makeRecordUpdate expression [upbind:us] | not(isNoBind value)= makeRecordUpdate (multiApp [SaplFun (field_mod +++ ".set_" +++ field +++ "_" +++ index),expression,cleanExpToSaplExp value]) us
+	makeRecordUpdate expression [upbind:us] | not(isNoBind value)= makeRecordUpdate (multiApp [SaplFun (field_mod +++ ".set_" +++ field +++ "_" +++ index),expression,cleanExpToSaplExp No value]) us
 	                                                             = makeRecordUpdate expression us
 	where field               = toString upbind.bind_dst.glob_object.fs_ident
 	      index               = toString upbind.bind_dst.glob_object.fs_index
@@ -207,8 +252,8 @@ where
 	getFreeVarName {fv_ident,fv_info_ptr,fv_count} = SaplVar (toString fv_ident) fv_info_ptr SA_None 
 	                                                                                    
 	ptrToString ptr = toString (ptrToInt ptr)
-	
-	getBoundVarName{var_ident,var_info_ptr,var_expr_ptr} = SaplVar (toString var_ident) var_info_ptr SA_None
+
+	getBoundVarName {var_ident,var_info_ptr} = SaplVar (toString var_ident) var_info_ptr SA_None
 	
 	// Function names at declaratio (on the left)
 	getName :: Ident -> String
@@ -220,7 +265,7 @@ where
 	getSymbName symb=:{symb_kind = SK_GeneratedFunction _ symb_index} = printGeneratedFunction symb.symb_ident symb_index
 	getSymbName symb=:{symb_kind = SK_LocalDclMacroFunction symb_index} = printOverloaded symb.symb_ident symb_index.glob_object symb_index.glob_module
 	getSymbName symb=:{symb_kind = SK_OverloadedFunction symb_index} = printOverloaded symb.symb_ident symb_index.glob_object symb_index.glob_module
-	getSymbName symb=:{symb_kind = SK_Constructor symb_index} = printConsName symb.symb_ident symb_index.glob_object symb_index.glob_module
+	getSymbName symb=:{symb_kind = SK_Constructor symb_index} = printConsName symb.symb_ident symb_index.glob_module
 	getSymbName symb             = getName symb.symb_ident
 	
 	// For example: test._f3_3
@@ -234,26 +279,16 @@ where
 //	                                          = makemod modnr +++ makeFuncName 0 s modnr symb_index dcl_mods icl_function_indices mymod mns
 	where decsymbol s = makemod modnr +++ makeFuncName 0 s modnr symb_index dcl_mods icl_function_indices mymod mns
 
-	printConsName symbol symb_index modnr     = makemod modnr +++ toString symbol
+	printConsName symbol modnr
+		| startsWith "_Tuple" symbstr
+			= symbstr
+			= makemod modnr +++ symbstr
+	where
+		symbstr = toString symbol
 	
 	getmodnr sym = sym.glob_module
 	makemod n =  mns!! n +++ "."
-	
-	// Converting Case definitions
-	genSaplCase case_exp (AlgebraicPatterns gindex pats) def explicit = SaplSelect (cleanExpToSaplExp case_exp) (map getCasePat pats) (handleDef def explicit) 
-	genSaplCase case_exp (OverloadedListPatterns listtype exp pats) def explicit = SaplSelect (cleanExpToSaplExp case_exp) (map getCasePat pats) (handleDef def explicit)
-	genSaplCase case_exp (BasicPatterns gindex pats) def explicit = SaplSelect (cleanExpToSaplExp case_exp) (map getConstPat pats) (handleDef def explicit)
-	genSaplCase case_exp  _ _ _ = SaplError "no matching rule found" 
-
-	handleDef (Yes def) _ 	= Yes (cleanExpToSaplExp def)
-	handleDef _ True 		= Yes (SaplFun "nomatch")
-	handleDef _ _ 			= No
-	
-	getConstPat pat = (PLit (basicValueToSapl pat.bp_value), cleanExpToSaplExp pat.bp_expr) 			
-	getCasePat pat = (PCons (makemod (getmodnr pat.ap_symbol) +++ toString pat.ap_symbol.glob_object.ds_ident)
-					 		(map getFreeVarName pat.ap_vars),
-					  cleanExpToSaplExp pat.ap_expr)
-
+		
 fromYes (Yes x) = x
 
 basicValueToSapl :: BasicValue -> SaplLiteral
@@ -335,8 +370,8 @@ findvar (SaplVar n ip a) rens = hd ([renvar\\ (var,renvar) <- rens| cmpvar (Sapl
 
 makeFuncName current_mod name mod_index func_index dcl_mods ranges mymod mns
               | name.[0] == '\\' = "anon_" +++ toString func_index
-              | startsWith "c;" name = "_lc_" +++ toString func_index
-              | startsWith "g_" name = "_lc_" +++ toString func_index
+              //| startsWith "c;" name = "_lc_" +++ toString func_index
+              //| startsWith "g_" name = "_lc_" +++ toString func_index
               // used for dynamic desription, there is only one per type, no need for numbering
               | startsWith "TD;" name = name
                                      = genFunctionExtension current_mod name mod_index func_index dcl_mods ranges mymod mns
