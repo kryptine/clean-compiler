@@ -3966,10 +3966,7 @@ static void repl_overloaded_cons_arguments (NodeP node_p,int *asp_p,int *bsp_p,S
 	ab_node_ids_p->a_node_ids=code_gen_node_ids.a_node_ids;
 	ab_node_ids_p->b_node_ids=code_gen_node_ids.b_node_ids;
 
-	GenDAStackLayout (2);
-	MakeSymbolLabel (&apply_label,ApplyDef->sdef_module,s_pref,ApplyDef, 0);
-	GenJsr (&apply_label);
-	GenOAStackLayout (1);
+	GenJsrAp (1);
 
 	GenReplArgs (2,2);
 }

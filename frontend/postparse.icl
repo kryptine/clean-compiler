@@ -387,20 +387,20 @@ transformLambda lam_ident args result pos
 	  lam_body = [{pb_args = args, pb_rhs = lam_rhs, pb_position = pos }]
 	= MakeNewImpOrDefFunction lam_ident (length args) lam_body (FK_Function cNameLocationDependent) NoPrio No pos
 
-makeConsExpressionForGenerator :: GeneratorKind ParsedExpr ParsedExpr *CollectAdmin -> (ParsedExpr,*CollectAdmin)
-makeConsExpressionForGenerator gen_kind a1 a2 ca
+makeConsExpressionForGenerator :: GeneratorKind ParsedExpr ParsedExpr -> ParsedExpr
+makeConsExpressionForGenerator gen_kind a1 a2
 	#! cons_id = predefined_idents.[case gen_kind of IsListGenerator -> PD_ConsSymbol ; _ -> PD_OverloadedConsSymbol]
-	= (PE_List [PE_Ident cons_id, a1, a2], ca)
+	= PE_List [PE_Ident cons_id, a1, a2]
 
-makeNilExpression :: Int *CollectAdmin -> (ParsedExpr,*CollectAdmin)
-makeNilExpression predef_nil_index ca
+makeNilExpression :: Int -> ParsedExpr
+makeNilExpression predef_nil_index
 	#! nil_id = predefined_idents.[predef_nil_index]
-	= (PE_Ident nil_id, ca)
+	= PE_Ident nil_id
 
-makeConsExpression :: Int ParsedExpr ParsedExpr *CollectAdmin -> (ParsedExpr,*CollectAdmin)
-makeConsExpression predef_cons_index a1 a2 ca
+makeConsExpression :: Int ParsedExpr ParsedExpr -> ParsedExpr
+makeConsExpression predef_cons_index a1 a2
 	#! cons_id = predefined_idents.[predef_cons_index]
-	= (PE_List [PE_Ident cons_id, a1, a2], ca)
+	= PE_List [PE_Ident cons_id, a1, a2]
 
 //get_predef_id :: Int -> Ident
 get_predef_id predef_index :== predefined_idents.[predef_index]
@@ -610,7 +610,7 @@ transformGenerator {gen_kind, gen_expr, gen_pattern, gen_position} qual_filename
 	  (tl, ca) = prefixAndPositionToIdentExp "g_t" gen_position ca
 	  (gen_var_case1, ca) = prefixAndPositionToIdent "g_c1" gen_position ca
 	  (gen_var_case2, ca) = prefixAndPositionToIdent "g_c2" gen_position ca
-	  (cons, ca) = makeConsExpressionForGenerator gen_kind hd tl ca
+	  cons = makeConsExpressionForGenerator gen_kind hd tl
 	# transformed_generator
 	  	=	{	tg_expr = ([],[gen_expr])
 	  		,	tg_lhs_arg = [list]
@@ -774,15 +774,15 @@ CreateTransformedQualifierFromTransformedGenerators transformedGenerators array 
 transformListComprehension :: Int Int ParsedExpr [Qualifier] *CollectAdmin -> (ParsedExpr, *CollectAdmin)
 transformListComprehension predef_cons_index predef_nil_index expr qualifiers ca
 	# (transformed_qualifiers, ca) = mapSt transformQualifier qualifiers ca
-	  (success, ca) = makeConsExpression predef_cons_index expr (last transformed_qualifiers).tq_continue ca
-	  (nil, ca) = makeNilExpression predef_nil_index ca
+	  success = makeConsExpression predef_cons_index expr (last transformed_qualifiers).tq_continue
+	  nil = makeNilExpression predef_nil_index
 	  transformed_qualifiers
 	  	=	[	{qual & tq_success = success, tq_end = end}
 	  		\\	qual <- transformed_qualifiers
 	  		&	success <- [qual.tq_call \\ qual <- tl transformed_qualifiers] ++ [success]
 	  		&	end <- [nil : [qual.tq_continue \\ qual <- transformed_qualifiers]]
 	  		]
-	= makeComprehensions transformed_qualifiers success [] ca
+	= (makeComprehensions transformed_qualifiers success [],ca)
 
 transformArrayComprehension :: ArrayKind ParsedExpr [Qualifier] *CollectAdmin -> (ParsedExpr, *CollectAdmin)
 transformArrayComprehension array_kind expr qualifiers ca
@@ -801,7 +801,7 @@ transformArrayComprehension array_kind expr qualifiers ca
 			# new_array = PE_List [create_array_expr,size_exp]
 			  new_array = cast_array_kind array_kind new_array
 			# (transformed_qualifier,ca) = CreateTransformedQualifierFromTransformedGenerators transformedGenerators [c_a_ident_exp] [new_array] qual_let_defs qual_filter qual_position qual_filename ca
-			= makeUpdateComprehensionFromTransFormedQualifiers [update] [c_a_ident_exp] c_a_ident_exp [transformed_qualifier] ca
+			= (makeUpdateComprehensionFromTransFormedQualifiers [update] [c_a_ident_exp] c_a_ident_exp [transformed_qualifier],ca)
 
 			# (length, ca) = computeSize qualifiers qual_position hd_qualifier.qual_filename ca
 			# new_array = PE_List [create_array_expr,length]
@@ -843,14 +843,14 @@ transformUpdateQualifiers identExprs exprs [first_qualifier:rest_qualifiers] ca
 	  (transformed_rest_qualifiers,ca) = mapSt (transformUpdateQualifier identExprs identExprs) rest_qualifiers ca
 	= ([transformed_first_qualifier : transformed_rest_qualifiers],ca)
 
-makeUpdateOrSizeComprehension transformed_qualifiers success identExprs result_expr ca
+makeUpdateOrSizeComprehension transformed_qualifiers success identExprs result_expr
 	# transformed_qualifiers
 	  	=	[	{qual & tq_success = success, tq_end = end}
 	  		\\	qual <- transformed_qualifiers
 	  		&	success <- [qual.tq_call \\ qual <- tl transformed_qualifiers] ++ [success]
 	  		&	end <- [result_expr : [qual.tq_continue \\ qual <- transformed_qualifiers]]
 	  		]
- 	= makeComprehensions transformed_qualifiers success identExprs ca
+ 	= makeComprehensions transformed_qualifiers success identExprs
 
 size_of_generator_can_be_computed_quickly {gen_pattern,gen_kind=IsArrayGenerator}
 	= pattern_will_always_match gen_pattern
@@ -886,15 +886,15 @@ computeSize qualifiers qual_position qual_filename ca
 				with
 					insert_inc_in_inner_loop (PE_List [f, a : args])
 						= PE_List [f, PE_List  [PE_Ident inc,a] : args]
-	= makeUpdateOrSizeComprehension transformed_qualifiers success [counter_ident_exp] counter_ident_exp ca
+	= (makeUpdateOrSizeComprehension transformed_qualifiers success [counter_ident_exp] counter_ident_exp,ca)
 
 transformUpdateComprehension :: [ParsedExpr] [ParsedExpr] [ParsedExpr] ParsedExpr [Qualifier] *CollectAdmin -> (!ParsedExpr,!*CollectAdmin)
 transformUpdateComprehension exprs updateExprs identExprs result_expr qualifiers ca
 	# (transformed_qualifiers,ca) = transformUpdateQualifiers identExprs exprs qualifiers ca
-	= makeUpdateComprehensionFromTransFormedQualifiers updateExprs identExprs result_expr transformed_qualifiers ca
+	= (makeUpdateComprehensionFromTransFormedQualifiers updateExprs identExprs result_expr transformed_qualifiers,ca)
 
-makeUpdateComprehensionFromTransFormedQualifiers :: [ParsedExpr] [ParsedExpr] ParsedExpr [TransformedQualifier] *CollectAdmin -> *(!ParsedExpr,!*CollectAdmin);
-makeUpdateComprehensionFromTransFormedQualifiers updateExprs identExprs result_expr transformed_qualifiers ca
+makeUpdateComprehensionFromTransFormedQualifiers :: [ParsedExpr] [ParsedExpr] ParsedExpr [TransformedQualifier] -> ParsedExpr
+makeUpdateComprehensionFromTransFormedQualifiers updateExprs identExprs result_expr transformed_qualifiers
 	# success
 	  	// +++ remove hack
 	  	=	this_is_definitely_a_hack (last transformed_qualifiers).tq_continue updateExprs
@@ -904,18 +904,17 @@ makeUpdateComprehensionFromTransFormedQualifiers updateExprs identExprs result_e
 					with
 						replace_args [] args = args
 						replace_args [e:l] [a:args] = [e:replace_args l args]
-	= makeUpdateOrSizeComprehension transformed_qualifiers success identExprs result_expr ca
+	= makeUpdateOrSizeComprehension transformed_qualifiers success identExprs result_expr
 
-// +++ rewrite threading
-makeComprehensions :: [TransformedQualifier] ParsedExpr [ParsedExpr] *CollectAdmin -> (ParsedExpr, *CollectAdmin)
-makeComprehensions [] success _ ca
-	=	(success, ca)
-makeComprehensions [{tq_generators,tq_let_defs,tq_filter, tq_end, tq_call, tq_lhs_args, tq_fun_id, tq_fun_pos} : qualifiers] success threading ca
-	# (success, ca) = makeComprehensions qualifiers success threading ca
-	# failure		= PE_List [PE_Ident tq_fun_id : threading ++ rhs_continuation_args_from_generators tq_generators]
+makeComprehensions :: [TransformedQualifier] ParsedExpr [ParsedExpr] -> ParsedExpr
+makeComprehensions [] success _
+	= success
+makeComprehensions [{tq_generators,tq_let_defs,tq_filter, tq_end, tq_call, tq_lhs_args, tq_fun_id, tq_fun_pos} : qualifiers] success threading
+	# success		= makeComprehensions qualifiers success threading
+	  failure		= PE_List [PE_Ident tq_fun_id : threading ++ rhs_continuation_args_from_generators tq_generators]
 	  rhs	 		= build_rhs tq_generators success tq_let_defs tq_filter failure tq_end tq_fun_pos
 	  parsed_def 	= MakeNewParsedDef tq_fun_id tq_lhs_args rhs tq_fun_pos
-	= (PE_Let (LocalParsedDefs [parsed_def]) tq_call, ca)
+	= PE_Let (LocalParsedDefs [parsed_def]) tq_call
 	where
 		build_rhs :: [TransformedGenerator] ParsedExpr LocalDefs (Optional ParsedExpr) ParsedExpr ParsedExpr Position -> Rhs
 		build_rhs [generator : generators] success let_defs optional_filter failure end fun_pos
@@ -949,8 +948,9 @@ makeComprehensions [{tq_generators,tq_let_defs,tq_filter, tq_end, tq_call, tq_lh
 
 		case_with_default :: Ident ParsedExpr Bool ParsedExpr Rhs ParsedExpr -> Rhs
 		case_with_default case_ident expr expr_is_uselect pattern=:(PE_Ident ident) rhs=:{rhs_alts=UnGuardedExpr ung_exp=:{ewl_nodes,ewl_expr,ewl_locals=LocalParsedDefs [],ewl_position},rhs_locals=LocalParsedDefs []} default_rhs
-			# new_node={ndwl_strict=False,ndwl_def={bind_src=expr,bind_dst=pattern},ndwl_locals=LocalParsedDefs [],ndwl_position=ewl_position}
-			= {rhs & rhs_alts=UnGuardedExpr {ung_exp & ewl_nodes=[new_node:ewl_nodes]}}
+			| isLowerCaseName ident.id_name
+				# new_node={ndwl_strict=False,ndwl_def={bind_src=expr,bind_dst=pattern},ndwl_locals=LocalParsedDefs [],ndwl_position=ewl_position}
+				= {rhs & rhs_alts=UnGuardedExpr {ung_exp & ewl_nodes=[new_node:ewl_nodes]}}
 		case_with_default case_ident expr True pattern=:(PE_Tuple [PE_Ident ident1,ident2_exp=:PE_Ident ident2]) rhs=:{rhs_alts=UnGuardedExpr ung_exp=:{ewl_nodes,ewl_expr,ewl_locals=LocalParsedDefs [],ewl_position},rhs_locals=LocalParsedDefs []} default_rhs
 			# new_node1={ndwl_strict=False,ndwl_def={bind_src=expr,bind_dst=pattern},ndwl_locals=LocalParsedDefs [],ndwl_position=ewl_position}
 			# new_node2={ndwl_strict=True,ndwl_def={bind_src=ident2_exp,bind_dst=ident2_exp},ndwl_locals=LocalParsedDefs [],ndwl_position=ewl_position}
