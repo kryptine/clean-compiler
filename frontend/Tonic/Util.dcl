@@ -1,6 +1,6 @@
 definition module Tonic.Util
 
-from syntax import :: App, :: FunType
+from syntax import :: App, :: FunType, :: ConsDef
 from StdArray import class Array
 from Data.Maybe import :: Maybe
 from Data.Map import :: Map
@@ -17,6 +17,8 @@ intercalateString :: String [String] -> String
 dropAppContexts :: App *ModuleEnv -> *(([Expression], [Expression]), *ModuleEnv)
 
 extractFunDefs :: !*{#FunDef} -> *(!{#FunDef}, !*{#FunDef})
+
+reifyConsDef :: String *ModuleEnv -> *(Maybe ConsDef, *ModuleEnv)
 
 reifyFunType :: String *ModuleEnv -> *(Maybe FunType, *ModuleEnv)
 
@@ -64,6 +66,8 @@ symbIdentIsTask :: SymbIdent *ModuleEnv -> *(Bool, *ModuleEnv)
 
 isInfix :: String *ModuleEnv -> *(Bool, *ModuleEnv)
 
+prioIsInfix :: Priority -> Bool
+
 fdArrToMap :: .{#FunDef} -> Map String FunDef
 
 getFunName :: FunDef -> String
@@ -72,7 +76,7 @@ getFunArgs :: FunDef -> [FreeVar]
 
 getFunRhs :: FunDef -> Expression
 
-updateWithAnnot :: Int *(SynExpression, *ChnExpression) -> *(SynExpression, *ChnExpression)
+updateWithAnnot :: Int (Maybe Expression) *ModuleEnv -> *ModuleEnv
 
 updateFunRhs :: Int !*{#FunDef} Expression -> !*{#FunDef}
 

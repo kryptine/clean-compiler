@@ -44,11 +44,13 @@ intercalateString xs xss = concatStrings (intersperse xs xss)
 
 dropAppContexts :: App *ModuleEnv -> *(([Expression], [Expression]), *ModuleEnv)
 dropAppContexts app menv
-  | appIsList app = (([], app.app_args), menv)
-  | otherwise
-    # (mst, menv)    = reifySymbolType ident menv
-    # funTy          = fromMaybe (abort err) mst
-    = (dropContexts funTy app.app_args, menv)
+  # (mcd, menv) = reifyConsDef ident menv
+  = case mcd of
+      Just cd = (dropContexts cd.cons_type app.app_args, menv)
+      Nothing
+        # (mst, menv) = reifySymbolType ident menv
+        # funTy       = fromMaybe (abort err) mst
+        = (dropContexts funTy app.app_args, menv)
   where
   ident  = app.app_symb.symb_ident.id_name
   err    = "dropAppContexts : failed to find symbol type for " +++ ident
@@ -57,6 +59,21 @@ extractFunDefs :: !*{#FunDef} -> *(!{#FunDef}, !*{#FunDef})
 extractFunDefs fun_defs
   # defs = {d \\ d <-: fun_defs}
   = (defs, {d \\ d <-: defs})
+
+reifyConsDef :: String *ModuleEnv -> *(Maybe ConsDef, *ModuleEnv)
+reifyConsDef ident menv
+  # (common, iclmod) = (menv.me_icl_module)!icl_common
+  # dcls             = menv.me_dcl_modules
+  # menv             = {menv & me_icl_module=iclmod}
+  = case searchConsDefs ident common.com_cons_defs of
+      Just cd = (Just cd, menv)
+      _
+        # cds = [cd \\ Just cd <- [searchConsDefs ident common.com_cons_defs \\ common <- [dclmod.dcl_common \\ dclmod <-: dcls]]]
+        = (listToMaybe cds, menv)
+
+  where
+    searchConsDefs :: String .{# ConsDef} -> Maybe ConsDef
+    searchConsDefs ident defs = listToMaybe [cd \\ cd <-: defs | cd.cons_ident.id_name == ident]
 
 reifyFunType :: String *ModuleEnv -> *(Maybe FunType, *ModuleEnv)
 reifyFunType ident menv=:{me_dcl_modules}
@@ -172,22 +189,27 @@ identIsTask ident menv
 symbIdentIsTask :: SymbIdent *ModuleEnv -> *(Bool, *ModuleEnv)
 symbIdentIsTask sid menv = identIsTask sid.symb_ident.id_name menv
 
-// TODO Does this work for infix dictionary functions?
+// TODO Look ident up in CommonDefs (for type constructors)
 isInfix :: String *ModuleEnv -> *(Bool, *ModuleEnv)
 isInfix ident menv
   # (mfd, menv) = reifyFunDef ident menv
   = case mfd of
-      Just (_, fd) = (isInfix` fd.fun_priority, menv)
+      Just (_, fd) = (prioIsInfix fd.fun_priority, menv)
       Nothing
         # (mft, menv) = reifyFunType ident menv
         = case mft of
-            Just ft  -> (isInfix` ft.ft_priority, menv)
-            _        -> abort ("Failed to determine fixity for " +++ ident)
-  where
-  isInfix` prio =
-    case prio of
-      Prio _ _  -> True
-      _         -> False
+            Just ft  = (prioIsInfix ft.ft_priority, menv)
+            _
+              # (mcd, menv) = reifyConsDef ident menv
+              = case mcd of
+                  Just cd -> (prioIsInfix cd.cons_priority, menv)
+                  Nothing -> abort ("Failed to determine fixity for " +++ ident)
+
+prioIsInfix :: Priority -> Bool
+prioIsInfix prio =
+  case prio of
+    Prio _ _  -> True
+    _         -> False
 
 getFunName :: FunDef -> String
 getFunName fd = fd.fun_ident.id_name
@@ -200,14 +222,12 @@ getFunRhs :: FunDef -> Expression
 getFunRhs {fun_body = TransformedBody tb} = tb.tb_rhs
 getFunRhs _                               = abort "getFunRhs: need a TransformedBody"
 
-updateWithAnnot :: Int *(SynExpression, *ChnExpression) -> *(SynExpression, *ChnExpression)
-updateWithAnnot fidx (syn=:{syn_annot_expr = Just e}, chn)
-  # menv      = chn.chn_module_env
-  # fun_defs  = menv.me_fun_defs
-  # fun_defs  = updateFunRhs fidx fun_defs e
-  # menv      = { menv & me_fun_defs = fun_defs}
-  = (syn, { chn & chn_module_env = menv })
-updateWithAnnot _ (syn, chn) = (syn, chn)
+updateWithAnnot :: Int (Maybe Expression) *ModuleEnv -> *ModuleEnv
+updateWithAnnot fidx (Just e) menv
+  # fun_defs = menv.me_fun_defs
+  # fun_defs = updateFunRhs fidx fun_defs e
+  = { menv & me_fun_defs = fun_defs}
+updateWithAnnot _ _ menv = menv
 
 updateFunRhs :: Int !*{#FunDef} Expression -> !*{#FunDef}
 updateFunRhs n fun_defs e

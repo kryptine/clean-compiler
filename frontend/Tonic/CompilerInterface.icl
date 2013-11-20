@@ -23,7 +23,6 @@ ginTonic fun_defs icl_module dcl_modules common_defs predef_symbols files
   | not ok                            = (fun_defs, predef_symbols, files)
   # (ok, tonicf, files)               = fopen (csf_directory_path +++ {DirectorySeparator} +++ iclname +++ ".tonic") FWriteText files
   | not ok                            = (fun_defs, predef_symbols, files)
-  //# (tstr, fun_defs, predef_symbols)  = ginTonic` toDotString fun_defs icl_module dcl_modules common_defs predef_symbols
   # (tstr, fun_defs, predef_symbols)  = ginTonic` toJSONString fun_defs icl_module dcl_modules common_defs predef_symbols
   # tonicf                            = fwrites tstr tonicf
   # (_, files)                        = fclose tonicf files
@@ -38,7 +37,7 @@ ginTonic fun_defs icl_module dcl_modules common_defs predef_symbols files
                     , "Text"
                     ]
 
-foldUArr :: (a v:(b, u:(arr a)) -> v:(b, u:(arr a))) v:(b, u:(arr a))
+foldUArr :: (Int a v:(b, u:(arr a)) -> v:(b, u:(arr a))) v:(b, u:(arr a))
          -> v:(b, u:(arr a)) | Array arr a, [v <= u]
 foldUArr f (b, arr)
   # (sz, arr) = usize arr
@@ -47,7 +46,7 @@ foldUArr f (b, arr)
           | idx < sz
               # (elem, arr) = uselect arr idx
               # (res, arr) = foldUArr` sz (idx + 1) b arr
-              = f elem (res, arr)
+              = f idx elem (res, arr)
           | otherwise = (b, arr)
 
 toJSONString :: (Map String GinGraph) IclModule *ModuleEnv -> *(String, *ModuleEnv)
@@ -76,10 +75,11 @@ ginTonic` repsToString fun_defs icl_module dcl_modules common_defs predef_symbol
   # (str, menv)            = repsToString reps icl_module menv
   = (str, menv.me_fun_defs, predef_symbols)
   where
-  appDefInfo pds fd (reps, fun_defs)
+  appDefInfo pds idx fd (reps, fun_defs)
     | funIsTask fd && fd.fun_info.fi_def_level == 1
-      # menv       = mkModuleEnv fun_defs icl_module dcl_modules
-      # (mg, menv) = funToGraph pds fd menv
+      # menv             = mkModuleEnv fun_defs icl_module dcl_modules
+      # ((mg, me), menv) = funToGraph pds fd menv
+      # menv             = updateWithAnnot idx me menv
       = ( case mg of
             Just g -> put fd.fun_ident.id_name g reps
             _      -> reps
