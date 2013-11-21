@@ -1,7 +1,7 @@
 Version: 1.4
 Global
 	ProjectRoot:	.
-	Target:	StdEnvTonic
+	Target:	StdEnv
 	Exec:	{Project}/cocl
 	CodeGen
 		CheckStacks:	False
@@ -36,14 +36,14 @@ Global
 		GenerateDLL:	False
 		ExportedNames:	
 	Paths
-		Path:	{Application}/iTasks-SDK/Patches/Platform/OS-Independent
+		Path:	{Application}/lib/iTasks-SDK/Patches/Platform/OS-Independent
 		Path:	{Application}/lib/clean-platform/OS-Independent
 		Path:	{Application}/lib/clean-platform/OS-Independent/Deprecated/StdLib
-		Path:	{Application}/iTasks-SDK/Patches/Dynamics
-		Path:	{Application}/iTasks-SDK/Patches/Generics
-		Path:	{Application}/iTasks-SDK/Patches/StdEnv
-		Path:	{Application}/iTasks-SDK/Patches/TCPIP
-		Path:	{Application}/iTasks-SDK/Server
+		Path:	{Application}/lib/iTasks-SDK/Patches/Dynamics
+		Path:	{Application}/lib/iTasks-SDK/Patches/Generics
+		Path:	{Application}/lib/iTasks-SDK/Patches/StdEnv
+		Path:	{Application}/lib/iTasks-SDK/Patches/TCPIP
+		Path:	{Application}/lib/iTasks-SDK/Server
 		Path:	{Application}/lib/ArgEnv
 		Path:	{Application}/lib/StdEnv
 		Path:	{Application}/lib/Generics
@@ -73,7 +73,7 @@ MainModule
 OtherModules
 	Module
 		Name:	Text.JSON
-		Dir:	{Application}/iTasks-SDK/Patches/Platform/OS-Independent
+		Dir:	{Application}/lib/iTasks-SDK/Patches/Platform/OS-Independent
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -254,22 +254,8 @@ OtherModules
 			ReuseUniqueNodes:	True
 			Fusion:	False
 	Module
-		Name:	_SystemDynamic
-		Dir:	{Application}/iTasks-SDK/Patches/Dynamics
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	StrictExportTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	False
-			ReuseUniqueNodes:	True
-			Fusion:	False
-	Module
 		Name:	GenEq
-		Dir:	{Application}/iTasks-SDK/Patches/Generics
+		Dir:	{Application}/lib/iTasks-SDK/Patches/Generics
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -283,7 +269,7 @@ OtherModules
 			Fusion:	False
 	Module
 		Name:	StdGeneric
-		Dir:	{Application}/iTasks-SDK/Patches/StdEnv
+		Dir:	{Application}/lib/iTasks-SDK/Patches/StdEnv
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -297,7 +283,7 @@ OtherModules
 			Fusion:	False
 	Module
 		Name:	iTasks.Framework.Tonic.AbsSyn
-		Dir:	{Application}/iTasks-SDK/Server
+		Dir:	{Application}/lib/iTasks-SDK/Server
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
