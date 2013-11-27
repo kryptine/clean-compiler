@@ -1768,6 +1768,10 @@ anonymizeAttrVars st=:{st_attr_vars, st_args, st_result, st_attr_env} implicit_i
 			= count_attr_vars_of_atype t th_attrs
 		count_attr_vars_of_type (_ :@: args) th_attrs
 			= foldSt count_attr_vars_of_atype args th_attrs
+		count_attr_vars_of_type (TFA _ type) th_attrs
+			= count_attr_vars_of_type type th_attrs
+		count_attr_vars_of_type (TFAC _ type _) th_attrs
+			= count_attr_vars_of_type type th_attrs
 		count_attr_vars_of_type _ th_attrs
 			= th_attrs
 
