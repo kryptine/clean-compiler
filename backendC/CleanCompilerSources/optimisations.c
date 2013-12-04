@@ -3438,8 +3438,24 @@ static void ExamineSymbolApplication (struct node *node)
 		if (symbol->symb_kind==cons_symb && symbol->symb_head_strictness==4){
 			if (node->node_arity<2)
 				symbol->symb_unboxed_cons_sdef_p->sdef_mark |= SDEF_USED_CURRIED_MASK;
-			else if (IsLazyState (node->node_state))
-				symbol->symb_unboxed_cons_sdef_p->sdef_mark |= SDEF_USED_LAZILY_MASK;
+			else {
+				StateP unboxed_cons_state_p;
+				int mark;
+				
+				if (IsLazyState (node->node_state)){
+					symbol->symb_unboxed_cons_sdef_p->sdef_mark |= SDEF_USED_LAZILY_MASK;
+					mark = SDEF_USED_LAZILY_MASK;
+				} else {
+					mark = SDEF_USED_STRICTLY_MASK;
+				}
+				unboxed_cons_state_p = symbol->symb_unboxed_cons_state_p;
+				if (unboxed_cons_state_p->state_type==SimpleState){
+					if (BETWEEN (IntObj,FileObj,unboxed_cons_state_p->state_object))
+						unboxed_cons_mark[unboxed_cons_state_p->state_object-IntObj][symbol->symb_tail_strictness] |= mark;
+				} else if (unboxed_cons_state_p->state_type==ArrayState){
+					unboxed_cons_array_mark |= mark;				
+				}
+			}
 		} else if (symbol->symb_kind==seq_symb){
 			if (node->node_arity!=2)
 				SeqDef->sdef_mark |= SDEF_USED_CURRIED_MASK;
@@ -3532,7 +3548,7 @@ static void ExamineSymbolApplication (struct node *node)
 
 				sdef->sdef_mark |= SDEF_USED_STRICTLY_MASK;
 			}
-		}	
+		}
 	} else {
 		if ((sdef->sdef_kind==RECORDTYPE ? sdef->sdef_cons_arity : sdef->sdef_arity) != node->node_arity)
 			sdef->sdef_mark |= SDEF_USED_CURRIED_MASK;
@@ -3768,20 +3784,40 @@ static void ReorderNodeDefinitionsAndDetermineUsedEntries (NodeDefs *def_p,Node 
 			error_in_function ("ReorderNodeDefinitionsAndDetermineUsedEntries");
 		
 		for_l (arg,root->node_arguments,arg_next){
-			if (arg->arg_node->node_kind==OverloadedCaseNode){
-				NodeP overloaded_case_node_p,case_node_p;
-				
-				overloaded_case_node_p=arg->arg_node;
-				MarkDependentNodeDefs (overloaded_case_node_p->node_arguments->arg_node);
-				MarkDependentNodeDefs (overloaded_case_node_p->node_arguments->arg_next->arg_node);
+			switch (arg->arg_node->node_kind){
+				case CaseNode:
+				{
+					SymbolP symbol;
 
-				case_node_p=overloaded_case_node_p->node_node;
-				ReorderNodeDefinitionsAndDetermineUsedEntries (&case_node_p->node_node_defs,case_node_p->node_arguments->arg_node);
-			} else {
-				if (arg->arg_node->node_kind!=CaseNode && arg->arg_node->node_kind!=DefaultNode && arg->arg_node->node_kind!=OverloadedCaseNode)
+					symbol=arg->arg_node->node_symbol;
+					if (symbol->symb_kind==definition){
+						SymbDef sdef;
+	
+						sdef=symbol->symb_def;
+						if (sdef->sdef_kind==CONSTRUCTOR){
+							sdef->sdef_isused=True;
+							sdef->sdef_mark |= SDEF_USED_STRICTLY_MASK;
+						}
+					}		
+					/* no break */
+				}
+				case DefaultNode:
+					ReorderNodeDefinitionsAndDetermineUsedEntries (&arg->arg_node->node_node_defs,arg->arg_node->node_arguments->arg_node);
+					break;
+				case OverloadedCaseNode:
+				{
+					NodeP overloaded_case_node_p,case_node_p;
+					
+					overloaded_case_node_p=arg->arg_node;
+					MarkDependentNodeDefs (overloaded_case_node_p->node_arguments->arg_node);
+					MarkDependentNodeDefs (overloaded_case_node_p->node_arguments->arg_next->arg_node);
+
+					case_node_p=overloaded_case_node_p->node_node;
+					ReorderNodeDefinitionsAndDetermineUsedEntries (&case_node_p->node_node_defs,case_node_p->node_arguments->arg_node);
+					break;
+				}
+				default:
 					error_in_function ("ReorderNodeDefinitionsAndDetermineUsedEntries");
-				
-				ReorderNodeDefinitionsAndDetermineUsedEntries (&arg->arg_node->node_node_defs,arg->arg_node->node_arguments->arg_node);
 			}
 		}
 		

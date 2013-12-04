@@ -18,6 +18,7 @@ extern void DetermineSharedAndAnnotatedNodes (ImpRules rules,SymbolP *im_symbols
 extern void DetermineStateOfArrayElem (Symbol elemtype, States state);
 extern void ExamineTypesAndLhsOfSymbols (Symbol symbs);
 extern void ImportSymbols (Symbol symbols);
+extern void import_not_yet_imported_record_r_labels (Symbol symbols);
 extern void DetermineStatesOfRootNodeAndDefs (Node root_node,NodeDefs *rootdef,StateS demstate,int local_scope);
 
 extern unsigned next_def_number;

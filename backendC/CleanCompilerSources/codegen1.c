@@ -95,7 +95,7 @@ LabDef conss_lab			= {NULL, "", False, "_Conss", 0};
 LabDef consts_lab			= {NULL, "", False, "_Consts", 0};
 LabDef conssts_lab			= {NULL, "", False, "_Conssts", 0};
 
-LabDef unboxed_cons_labels[][2] = {
+LabDef unboxed_cons_labels[5][2] = {
 	/*IntObj*/	{{NULL, "", False, "_Consi", 0}, {NULL, "", False, "_Consits", 0}},
 	/*BoolObj*/	{{NULL, "", False, "_Consb", 0}, {NULL, "", False, "_Consbts", 0}},
 	/*CharObj*/	{{NULL, "", False, "_Consc", 0}, {NULL, "", False, "_Conscts", 0}},
@@ -104,6 +104,9 @@ LabDef unboxed_cons_labels[][2] = {
 	};
 
 LabDef unboxed_cons_array_label = {NULL, "", False, "_Consa", 0};
+
+int unboxed_cons_mark[5][2];
+int unboxed_cons_array_mark;
 
 #endif
 #ifdef CLEAN2
@@ -251,9 +254,16 @@ void ConvertSymbolToRLabel (LabDef *slab,SymbDef sdef)
 
 	if (!sdef->sdef_exported && sdef->sdef_module==CurrentModule && !ExportLocalLabels)
 		modname = NULL;
-	else
+	else {
 		modname = sdef->sdef_module;
+		if ((sdef->sdef_mark & SDEF_RECORD_R_LABEL_IMPORTED_MASK)!=0){
+			sdef->sdef_mark |= SDEF_USED_STRICTLY_MASK;
+		} else {
+			sdef->sdef_mark |= SDEF_USED_STRICTLY_MASK | SDEF_RECORD_R_LABEL_IMPORTED_MASK;
 
+			GenImpRecordDesc (modname,sdef->sdef_ident->ident_name);
+		}
+	}
 	MakeSymbolLabel (slab,modname,r_pref,sdef,0);
 }
 
@@ -802,91 +812,84 @@ static void CallEvalArgsEntryUnboxed (int args_a_size,int args_b_size,ArgP argum
 	GenOStackLayoutOfState (result_asize,result_bsize,function_state_p[-1]);
 }
 
-static void GenerateConstructorDescriptorAndFunction (ConstructorList constructor)
+static void GenerateLazyConstructorDescriptorAndFunctionForStrictConstructor (ConstructorList constructor)
 {
-	Symbol constructor_symbol;
 	SymbDef constructor_def;
 
-	constructor_symbol=constructor->cl_constructor->type_node_symbol;
-	constructor_def=constructor_symbol->symb_def;
-	
-	if (constructor_def->sdef_kind==CONSTRUCTOR && constructor_def->sdef_strict_constructor){
-		GenStrictConstructorDescriptor (constructor_def,constructor->cl_state_p);
-		
-		if (constructor_def->sdef_exported || (constructor_def->sdef_mark & (SDEF_USED_LAZILY_MASK | SDEF_USED_CURRIED_MASK)) || ExportLocalLabels){
-			LabDef constructor_label,ealab,n_lab,d_lab;
-			int maxasize,asize,bsize;
-			int asp,bsp,arity;
+	constructor_def=constructor->cl_constructor->type_node_symbol->symb_def;
 
-			asp = constructor_def->sdef_arity;
-			bsp = 0;
-			arity = asp;
-			
-			ConvertSymbolToLabel (&CurrentAltLabel,constructor_def);
-						
-			if (constructor_def->sdef_exported)
-				GenExportEaEntry (constructor_def);
-			
-			GenConstructorFunctionDescriptorAndExportNodeAndDescriptor (constructor_def);
+	if (constructor_def->sdef_exported || (constructor_def->sdef_mark & (SDEF_USED_LAZILY_MASK | SDEF_USED_CURRIED_MASK)) || ExportLocalLabels){
+		LabDef constructor_label,ealab,n_lab,d_lab;
+		int maxasize,asize,bsize;
+		int asp,bsp,arity;
+
+		asp = constructor_def->sdef_arity;
+		bsp = 0;
+		arity = asp;
+		
+		ConvertSymbolToLabel (&CurrentAltLabel,constructor_def);
+					
+		if (constructor_def->sdef_exported)
+			GenExportEaEntry (constructor_def);
+		
+		GenConstructorFunctionDescriptorAndExportNodeAndDescriptor (constructor_def);
+
+		if (DoTimeProfiling)
+			GenPB (constructor_def->sdef_ident->ident_name);
+
+		MakeSymbolLabel (&ealab,constructor_def->sdef_exported ? CurrentModule : NULL,ea_pref,constructor_def,0);
+		
+		if (constructor_def->sdef_exported || (constructor_def->sdef_mark & SDEF_USED_CURRIED_MASK) || ExportLocalLabels){
+			CurrentAltLabel.lab_pref  = l_pref;
 
 			if (DoTimeProfiling)
-				GenPB (constructor_def->sdef_ident->ident_name);
-
-			MakeSymbolLabel (&ealab,constructor_def->sdef_exported ? CurrentModule : NULL,ea_pref,constructor_def,0);
-			
-			if (constructor_def->sdef_exported || (constructor_def->sdef_mark & SDEF_USED_CURRIED_MASK) || ExportLocalLabels){
-				CurrentAltLabel.lab_pref  = l_pref;
-
-				if (DoTimeProfiling)
-					GenPL();
+				GenPL();
 
 #ifdef NEW_APPLY
-				if (arity>=2)
-					GenApplyEntryDirective (arity,&ealab);
+			if (arity>=2)
+				GenApplyEntryDirective (arity,&ealab);
 #endif
 
-				GenOAStackLayout (2);
-				GenLabelDefinition (&CurrentAltLabel);
-				
-				GenPushArgs (0,arity-1,arity-1);
-				GenUpdateA (arity,arity-1);	
-				GenCreate (-1);
-				GenUpdateA (0,arity+1);
-				GenPopA (1);
-				JmpEvalArgsEntry (arity+1,&ealab);
-			}
+			GenOAStackLayout (2);
+			GenLabelDefinition (&CurrentAltLabel);
+			
+			GenPushArgs (0,arity-1,arity-1);
+			GenUpdateA (arity,arity-1);	
+			GenCreate (-1);
+			GenUpdateA (0,arity+1);
+			GenPopA (1);
+			JmpEvalArgsEntry (arity+1,&ealab);
+		}
 
-			ConvertSymbolToConstructorDandNLabel (&d_lab,&n_lab,constructor_def);
+		ConvertSymbolToConstructorDandNLabel (&d_lab,&n_lab,constructor_def);
 
-			GenNodeEntryDirective (arity,&d_lab,&ealab);
-			GenOAStackLayout (1);
-			GenLabelDefinition (&n_lab);
-			GenPushNode (ReduceError,asp);
+		GenNodeEntryDirective (arity,&d_lab,&ealab);
+		GenOAStackLayout (1);
+		GenLabelDefinition (&n_lab);
+		GenPushNode (ReduceError,asp);
 
-			GenOAStackLayout (arity+1);
-			if (DoTimeProfiling)
-				GenPN();
-			GenLabelDefinition (&ealab);
+		GenOAStackLayout (arity+1);
+		if (DoTimeProfiling)
+			GenPN();
+		GenLabelDefinition (&ealab);
 
-			asize=0;
-			bsize=0;
-			maxasize=0;
+		asize=0;
+		bsize=0;
+		maxasize=0;
 
-			AddStateSizesAndMaxFrameSizes (arity,constructor->cl_state_p,&maxasize,&asize,&bsize);
+		AddStateSizesAndMaxFrameSizes (arity,constructor->cl_state_p,&maxasize,&asize,&bsize);
 
-			EvaluateAndMoveStateArguments (arity,constructor->cl_state_p,asp,maxasize);
+		EvaluateAndMoveStateArguments (arity,constructor->cl_state_p,asp,maxasize);
 
-			ConvertSymbolToKLabel (&constructor_label,constructor_def);
+		ConvertSymbolToKLabel (&constructor_label,constructor_def);
 
-			GenFillR (&constructor_label,asize,bsize,asize,0,0,ReleaseAndFill,True);		
+		GenFillR (&constructor_label,asize,bsize,asize,0,0,ReleaseAndFill,True);		
 
-		 	GenRtn (1,0,OnAState);
- 	
-	 		if (DoTimeProfiling)
-				GenPE();
-		 }
-	} else
-		GenConstructorDescriptorAndExport (constructor_def);
+	 	GenRtn (1,0,OnAState);
+
+ 		if (DoTimeProfiling)
+			GenPE();
+	 }
 }
 
 static void GenLazyRecordEntry (SymbDef rdef)
@@ -1313,9 +1316,25 @@ void GenerateCodeForConstructorsAndRecords (Symbol symbols)
 							GenConstructor0DescriptorAndExport (alt->cl_constructor->type_node_symbol->symb_def,constructor_n);
 							++constructor_n;
 						}
-					} else
-						for_l (alt,def->sdef_type->type_constructors,cl_next)
-							GenerateConstructorDescriptorAndFunction (alt);
+					} else {
+						for_l (alt,def->sdef_type->type_constructors,cl_next){
+							SymbDef constructor_def;
+
+							constructor_def=alt->cl_constructor->type_node_symbol->symb_def;
+							if (constructor_def->sdef_kind==CONSTRUCTOR && constructor_def->sdef_strict_constructor)
+								GenerateLazyConstructorDescriptorAndFunctionForStrictConstructor (alt);
+						}
+
+						for_l (alt,def->sdef_type->type_constructors,cl_next){
+							SymbDef constructor_def;
+
+							constructor_def=alt->cl_constructor->type_node_symbol->symb_def;							
+							if (constructor_def->sdef_kind==CONSTRUCTOR && constructor_def->sdef_strict_constructor)
+								GenStrictConstructorDescriptor (constructor_def,alt->cl_state_p);
+							else
+								GenConstructorDescriptorAndExport (constructor_def);
+						}
+					}
 				} else if (def->sdef_kind==RECORDTYPE){
 					FieldList fields;
 					int asize, bsize;
@@ -1378,7 +1397,7 @@ Bool NodeEntry (StateS *const function_state_p,int arity,Label ealab,SymbDef roo
 
 	if (update_root_node && DoTimeProfiling && !function_called_only_curried_or_lazy_with_one_return)
 		GenPD();
-	
+
 	if (rootsymb->sdef_calledwithrootnode){
 		if (update_root_node){
 			newealab = *ealab;

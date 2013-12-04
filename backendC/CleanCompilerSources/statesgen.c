@@ -1242,10 +1242,14 @@ void ExamineTypesAndLhsOfSymbols (Symbol symbs)
 
 PolyList UserDefinedArrayFunctions;
 
+char *current_imported_module; /* also used by instructions.c */
+
 void ImportSymbols (Symbol symbols)
 {
 	Symbol symbol;	
 	PolyList array_fun;
+
+	current_imported_module = NULL;
 	
 	for_l (array_fun,UserDefinedArrayFunctions,pl_next){
 		SymbDef fun_def;
@@ -1259,14 +1263,20 @@ void ImportSymbols (Symbol symbols)
 	for_l (symbol,symbols,symb_next){
 		SymbDef sdef;
 
-		if (symbol->symb_kind==definition)
-			sdef=symbol->symb_def;
-		else
+		if (symbol->symb_kind!=definition)
 			continue;
 
+		sdef=symbol->symb_def;
 		if (sdef->sdef_module!=CurrentModule){
-			if (sdef->sdef_isused)
+			if (sdef->sdef_isused
+				&& sdef->sdef_mark & (SDEF_USED_STRICTLY_MASK | SDEF_USED_LAZILY_MASK | SDEF_USED_CURRIED_MASK)
+			){
+				if (sdef->sdef_module!=current_imported_module){
+					current_imported_module=sdef->sdef_module;
+					GenImpMod (current_imported_module);
+				}
 				GenImport (sdef);
+			}
 
 			if (sdef->sdef_kind==RECORDTYPE){
 				FieldList fields;
@@ -1276,9 +1286,36 @@ void ImportSymbols (Symbol symbols)
 
 					field_sdef=fields->fl_symbol->symb_def;
 
-					if (field_sdef->sdef_isused)
+					if (field_sdef->sdef_isused && field_sdef->sdef_mark & SDEF_USED_LAZILY_MASK){
+						if (sdef->sdef_module!=current_imported_module){
+							current_imported_module=sdef->sdef_module;
+							GenImpMod (current_imported_module);
+						}
 						GenImport (field_sdef);
+					}
 				}
+			}
+		}
+	}
+}
+
+void import_not_yet_imported_record_r_labels (Symbol symbols)
+{
+	Symbol symbol;	
+	
+	for_l (symbol,symbols,symb_next){
+		if (symbol->symb_kind==definition){
+			SymbDef sdef;
+
+			sdef=symbol->symb_def;
+			if ((sdef->sdef_mark & (SDEF_USED_STRICTLY_MASK | SDEF_RECORD_R_LABEL_IMPORTED_MASK))==SDEF_USED_STRICTLY_MASK
+				&& sdef->sdef_kind==RECORDTYPE && sdef->sdef_module!=CurrentModule)
+			{
+				if (sdef->sdef_module!=current_imported_module){
+					current_imported_module=sdef->sdef_module;
+					GenImpMod (current_imported_module);
+				}
+				GenImport (sdef);
 			}
 		}
 	}
