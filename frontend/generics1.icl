@@ -4478,7 +4478,7 @@ adjust_forall curry_st=:{st_result} forall_atvs
 	#! st_result = {st_result & at_type = TFA forall_atvs st_result.at_type}
  	= 	{ curry_st 
 		& st_result = st_result
-		, st_attr_vars 
+		, st_attr_vars
 			= curry_st.st_attr_vars -- [av \\ {atv_attribute=TA_Var av} <- forall_atvs]
 		, st_vars 
 			= curry_st.st_vars -- [atv_variable \\ {atv_variable} <- forall_atvs]
@@ -4947,11 +4947,9 @@ where
 	collect_type_var (CV tv :@: _) st = add_type_var tv st
 	collect_type_var (TFA forall_atvs type) (tvs, avs, th_vars) 
 		#! forall_tvs = [atv_variable\\{atv_variable}<-forall_atvs]
-		#! forall_avs = [av \\ {atv_attribute=TA_Var av}<-forall_atvs]
-		= (tvs -- forall_tvs, avs -- forall_avs, th_vars)
-				//---> ("collectTypeVarsAndAttrVars TFA", tvs, forall_tvs, tvs -- forall_tvs)
+		= (tvs -- forall_tvs, avs, th_vars)
 	collect_type_var t st = st
-		
+
 	add_type_var tv (tvs, avs, th=:{th_vars})
 		# (was_used, th_vars) = markTypeVarUsed tv th_vars
 		# th = {th & th_vars = th_vars}
