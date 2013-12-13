@@ -32,7 +32,7 @@ import genericsupport, type_io_common
 						| CA_Context !TypeContext
 						| CA_LocalTypeCode !VarInfoPtr			/* for (local) type pattern variables */
 						| CA_GlobalTypeCode !TypeCodeInstance	/* for (global) type constructors */
-		
+
 instanceError symbol types err
 	# err = errorHeading "Overloading error" err
 	  format = { form_properties = cNoProperties, form_attr_position = No }
@@ -1004,7 +1004,12 @@ where
 				({ heaps & hp_type_heaps = hp_type_heaps }, ptrs))
 	adjust_member_application defs contexts  _ (CA_GlobalTypeCode {tci_constructor,tci_contexts}) _ heaps_and_ptrs
 		# (exprs, heaps_and_ptrs) = convertClassApplsToExpressions defs contexts tci_contexts heaps_and_ptrs
-		= (EI_TypeCode (TCE_Constructor tci_constructor (expressionsToTypeCodeExpressions exprs)), heaps_and_ptrs)
+		  typeCodeExpressions = expressionsToTypeCodeExpressions exprs
+		= case tci_constructor of
+			GTT_Constructor _ True
+				-> (EI_TypeCode (TCE_UnqType (TCE_Constructor tci_constructor typeCodeExpressions)), heaps_and_ptrs)
+			_
+				-> (EI_TypeCode (TCE_Constructor tci_constructor typeCodeExpressions), heaps_and_ptrs)
 	adjust_member_application defs contexts _ (CA_LocalTypeCode new_var_ptr) _  heaps_and_ptrs
 		= (EI_TypeCode (TCE_Var new_var_ptr), heaps_and_ptrs)
 
@@ -1117,7 +1122,12 @@ where
 		= (TypeCodeExpression (TCE_Var new_var_ptr), heaps_and_ptrs)
 	convert_class_appl_to_expression defs contexts (CA_GlobalTypeCode {tci_constructor,tci_contexts}) heaps_and_ptrs
 		# (exprs, heaps_and_ptrs) = convertClassApplsToExpressions defs contexts tci_contexts heaps_and_ptrs
-		= (TypeCodeExpression (TCE_Constructor tci_constructor (expressionsToTypeCodeExpressions exprs)), heaps_and_ptrs)
+		  typeCodeExpressions = expressionsToTypeCodeExpressions exprs
+		= case tci_constructor of
+			GTT_Constructor _ True
+				-> (TypeCodeExpression (TCE_UnqType (TCE_Constructor tci_constructor typeCodeExpressions)), heaps_and_ptrs)
+			_
+				-> (TypeCodeExpression (TCE_Constructor tci_constructor typeCodeExpressions), heaps_and_ptrs)
 
 	convert_reduced_contexts_to_expression defs contexts {rcs_class_context,rcs_constraints_contexts} heaps_and_ptrs
 		# (rcs_exprs, heaps_and_ptrs) = mapSt (convert_class_appl_to_expression defs contexts) rcs_constraints_contexts heaps_and_ptrs
@@ -1493,7 +1503,11 @@ toTypeCodeConstructor type=:{glob_object=type_index, glob_module=module_index} c
 			=	{	symb_ident = {id_name = "TD;"+++type.td_ident.id_name, id_info = nilPtr}
 				,	symb_kind = SK_Function {glob_module = module_index, glob_object = td_fun_index}
 				}
-		= GTT_Constructor type_fun
+		# is_unique_type
+			= case type.td_attribute of
+				TA_Unique -> True
+				_ -> False
+		= GTT_Constructor type_fun is_unique_type
 
 fatal :: {#Char} {#Char} -> .a
 fatal function_name message
@@ -1511,7 +1525,7 @@ instance toTypeCodeExpression Type where
 			=	toTypeCodeExpression type (tci,var_heap,error)
 		# type_constructor = toTypeCodeConstructor type_index tci_common_defs
 		  (type_code_args, tci)
-		  	=	mapSt (toTypeCodeExpression) type_args (tci,var_heap,error)
+		  	=	mapSt toTypeCodeExpression type_args (tci,var_heap,error)
 		= (TCE_Constructor type_constructor type_code_args, tci)
 	toTypeCodeExpression (TAS cons_id type_args _) state
 		=	toTypeCodeExpression (TA cons_id type_args) state
