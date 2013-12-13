@@ -455,6 +455,8 @@ where
 		= file <<< "TCE_Selector " <<< selectors <<< "VAR " <<< info_ptr
 	(<<<) file (TCE_UniType vars type_code)
 		= file <<< "TCE_UniType " <<< vars <<< " " <<< type_code
+	(<<<) file (TCE_UnqType type_code)
+		= file <<< "TCE_UnqType " <<< type_code
 
 instance <<< (Ptr a)
 where
