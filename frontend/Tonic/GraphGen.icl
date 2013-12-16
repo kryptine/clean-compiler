@@ -120,45 +120,46 @@ withTwo :: App [Expression] (Expression Expression *ChnExpression -> *(SynExpres
 withTwo app [x1:x2:_] f inh chn = f x1 x2 chn
 withTwo app _         _ inh chn = ({mkSynExpr & syn_annot_expr = Just (App app)}, chn) // annotExpr (App app) inh chn mkSynExpr
 
+// Annotation functionality temporarily disabled
 annotExpr :: (Int, Int) Expression InhExpression *ChnExpression SynExpression -> *(SynExpression, *ChnExpression)
-annotExpr (entry, exit) expr inh chn syn
-  | inh.inh_tune_symb.pds_def == NoIndex || inh.inh_tune_symb.pds_module == NoIndex = (syn, chn)
-  | otherwise
-      # (papp, menv) = partialApp expr chn.chn_module_env
-      # chn          = {chn & chn_module_env = menv}
-      | papp         = (syn, chn)
-      | otherwise
-        # (app, chn)   = mkTuneApp chn
-        = ({syn & syn_annot_expr = Just (App app)}, chn)
-  where
-  mkTuneApp chn
-    # (mod, menv) = (chn.chn_module_env)!me_icl_module
-    = ({ App
-       | app_symb = { SymbIdent
-                    | symb_ident = { Ident
-                                   | id_name = "tonicTune"
-                                   , id_info = nilPtr}
-                    , symb_kind  = SK_Function
-                                     { Global
-                                     | glob_object = inh.inh_tune_symb.pds_def
-                                     , glob_module = inh.inh_tune_symb.pds_module}}
-       , app_args = [ mkStr mod.icl_name.id_name
-                    , mkStr inh.inh_curr_task_name
-                    , mkInt entry
-                    , mkInt exit
-                    , expr]
-       , app_info_ptr = nilPtr}
-      , { chn & chn_module_env = menv })
-  mkStr str = BasicExpr (BVS ("\"" +++ str +++ "\""))
-  mkInt i   = BasicExpr (BVInt i)
-  partialApp (App app) menv
-    # (mft, menv) = reifyFunType app.app_symb.symb_ident.id_name menv
-    = case mft of
-        Just ft
-          # ((_, args), menv) = dropAppContexts app menv
-          = (length args < ft.ft_arity, menv)
-        _ = (False, menv)
-  partialApp _ menv        = (False, menv)
+annotExpr (entry, exit) expr inh chn syn = (syn, chn)
+  //| inh.inh_tune_symb.pds_def == NoIndex || inh.inh_tune_symb.pds_module == NoIndex = (syn, chn)
+  //| otherwise
+      //# (papp, menv) = partialApp expr chn.chn_module_env
+      //# chn          = {chn & chn_module_env = menv}
+      //| papp         = (syn, chn)
+      //| otherwise
+        //# (app, chn)   = mkTuneApp chn
+        //= ({syn & syn_annot_expr = Just (App app)}, chn)
+  //where
+  //mkTuneApp chn
+    //# (mod, menv) = (chn.chn_module_env)!me_icl_module
+    //= ({ App
+       //| app_symb = { SymbIdent
+                    //| symb_ident = { Ident
+                                   //| id_name = "tonicTune"
+                                   //, id_info = nilPtr}
+                    //, symb_kind  = SK_Function
+                                     //{ Global
+                                     //| glob_object = inh.inh_tune_symb.pds_def
+                                     //, glob_module = inh.inh_tune_symb.pds_module}}
+       //, app_args = [ mkStr mod.icl_name.id_name
+                    //, mkStr inh.inh_curr_task_name
+                    //, mkInt entry
+                    //, mkInt exit
+                    //, expr]
+       //, app_info_ptr = nilPtr}
+      //, { chn & chn_module_env = menv })
+  //mkStr str = BasicExpr (BVS ("\"" +++ str +++ "\""))
+  //mkInt i   = BasicExpr (BVInt i)
+  //partialApp (App app) menv
+    //# (mft, menv) = reifyFunType app.app_symb.symb_ident.id_name menv
+    //= case mft of
+        //Just ft
+          //# ((_, args), menv) = dropAppContexts app menv
+          //= (length args < ft.ft_arity, menv)
+        //_ = (False, menv)
+  //partialApp _ menv        = (False, menv)
 
 mkGraphAlg :: *(ExpressionAlg InhExpression *ChnExpression SynExpression)
 mkGraphAlg
@@ -384,8 +385,11 @@ mkGraphAlg
         # chn           = { chn & chn_module_env = menv }
         # (lid, g)      = addNode (mkNode app (GLet {GLet | glet_binds = binds})) chn.chn_graph
         # (syne, chn)   = exprCata mkGraphAlg (getFunRhs fd) inh { chn & chn_graph = g }
+        # g             = case syne.syn_entry_id of
+                            Just eid -> addEmptyEdge (lid, eid) chn.chn_graph
+                            _        -> chn.chn_graph
         # menv          = updateWithAnnot fidx syne.syn_annot_expr chn.chn_module_env
-        # chn           = { chn & chn_module_env = menv }
+        # chn           = { chn & chn_module_env = menv, chn_graph = g }
         = annotExpr (lid, lid) (e @ es) inh chn ({syne & syn_entry_id = Just lid, syn_exit_id = Just lid}) // mkSingleIdSynExpr (Just lid)) // TODO Do something with syne?
     | otherwise    =  abort "atC: otherwise case" // TODO : pretty print function application
     where
