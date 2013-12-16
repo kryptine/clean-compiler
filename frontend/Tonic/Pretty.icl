@@ -163,8 +163,8 @@ ppDefinedSymbol ds menv = ppIdent ds.ds_ident menv
 
 ppGExpression :: GExpression *ModuleEnv -> *(Doc, *ModuleEnv)
 ppGExpression GUndefinedExpression  menv = (text "undef", menv)
-ppGExpression (GGraphExpression _)  menv = (text "TODO: render a subgraph (and don't PP one)", menv)
-ppGExpression (GListExpression _)   menv = (text "TODO: render a list expression (and don't PP one)", menv)
+ppGExpression (GGraphExpression _)  menv = (text "<complex subgraph; consider refactoring>", menv)
+//ppGExpression (GListExpression _)   menv = (text "TODO: render a list expression (and don't PP one)", menv)
 ppGExpression (GCleanExpression e)  menv = (text e, menv)
 
 ppGLet :: GLet -> Doc
