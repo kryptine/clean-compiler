@@ -560,7 +560,7 @@ where
 					-> type_code_constructor_expression PD_TC__StrictArray ci
 				PD_UnboxedArrayType
 					-> type_code_constructor_expression PD_TC__UnboxedArray ci
-	typeConstructor (GTT_Constructor fun_ident) ci
+	typeConstructor (GTT_Constructor fun_ident _) ci
 		# type_fun
 			=	App {app_symb = fun_ident, app_args = [], app_info_ptr = nilPtr}
 		= (App {app_symb = cinp_dynamic_representation.dr_type_code_constructor_symb_ident, app_args = [type_fun], app_info_ptr = nilPtr}, ci)
