@@ -9,5 +9,5 @@ from Text.PPrint import :: Doc
 from Data.Map import :: Map
 from predef import :: PredefinedSymbol
 
-funToGraph :: PredefinedSymbol FunDef *ModuleEnv -> *((Maybe GinGraph, Maybe Expression), *ModuleEnv)
+funToGraph :: PredefinedSymbol FunDef *ModuleEnv -> *(([String], Maybe GinGraph, Maybe Expression), *ModuleEnv)
 

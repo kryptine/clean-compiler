@@ -23,7 +23,7 @@ import iTasks.Framework.Tonic.AbsSyn
 from syntax import
   :: Expression (..), :: BoundVar {..}, :: App {..}, :: Let {..}, :: Case,
   :: SelectorKind, :: Selection (..), :: FreeVar {..}, :: Global {..},
-  :: SymbIdent {..}, :: SymbKind, :: Priority (..), :: Assoc (..), :: VarInfoPtr, :: DynamicExpr,
+  :: SymbIdent {..}, :: SymbKind (..), :: VarContexts, :: TypeKind, :: FunctionInfoPtr, :: FunctionInfo, :: Priority (..), :: Assoc (..), :: VarInfoPtr, :: DynamicExpr,
   :: Ptr, :: VarInfo, :: CodeBinding, :: DefinedSymbol {..}, :: Index, :: Bind,
   :: Position, :: AType, :: Env, :: Ident {..}, :: SymbolPtr,
   :: SymbolTableEntry, :: Level, :: ExprInfoPtr, :: ExprInfo,
@@ -74,10 +74,19 @@ ppPrefix app=:{App|app_symb} menv
   # (esd, menv)       = mapSt ppExpression args menv
   = (psi <+> hcat (intersperse (text " ") esd), menv)
 
+//import StdDebug
+
 ppInfix :: App *ModuleEnv -> *(Doc, *ModuleEnv)
 ppInfix app=:{App|app_symb,app_args} menv
-  # ((_, args), menv) = dropAppContexts app menv
-  = case args of
+  # ((ctxs, args), menv) = dropAppContexts app menv
+  =
+    //trace_n (app_symb.symb_ident.id_name +++ " has " +++
+             //toString (length app_args) +++ " args, of which " +++
+             //toString (length ctxs) +++ " are contexts and " +++
+             //toString (length args) +++ " are actual arguments. It has SymbKind of " +++
+             //toString app_symb.symb_kind)
+                      //$
+    case args of
       [l:r:_]
         # (ld, menv)           = ppExpression l menv
         # (psi, menv)          = ppSymbIdent app_symb menv

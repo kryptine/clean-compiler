@@ -42,6 +42,8 @@ concatStrings l = updateS 0 l (createArray (sum [size s \\ s <- l]) ' ')
 intercalateString :: String [String] -> String
 intercalateString xs xss = concatStrings (intersperse xs xss)
 
+//import StdDebug
+
 dropAppContexts :: App *ModuleEnv -> *(([Expression], [Expression]), *ModuleEnv)
 dropAppContexts app menv
   # (mcd, menv) = reifyConsDef ident menv
@@ -50,7 +52,9 @@ dropAppContexts app menv
       Nothing
         # (mst, menv) = reifySymbolType ident menv
         # funTy       = fromMaybe (abort err) mst
-        = (dropContexts funTy app.app_args, menv)
+        =
+          //trace_n (ident +++ " has arity " +++ toString funTy.st_arity) $
+           (dropContexts funTy app.app_args, menv)
   where
   ident  = app.app_symb.symb_ident.id_name
   err    = "dropAppContexts : failed to find symbol type for " +++ ident
@@ -149,9 +153,9 @@ freeVarName fv = fv.fv_ident.id_name
 
 dropContexts :: SymbolType [a] -> ([a], [a])
 dropContexts st xs
-  # lst = numContexts st
-  | lst > length xs = ([], xs)
-  = splitAt lst xs
+  # args    = keep st.st_arity xs
+  # numargs = length args
+  = splitAt (length xs - numargs) xs
 
 numContexts :: SymbolType -> Int
 numContexts st = length st.st_context

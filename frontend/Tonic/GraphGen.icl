@@ -511,17 +511,17 @@ addNode` node annot chn
 // for the FunDef and the other part should generate the init and stop nodes.
 // Yet another part should just get the right-hand side Expression of a FunDef
 // so we can just cata it.
-funToGraph :: PredefinedSymbol FunDef *ModuleEnv -> *((Maybe GinGraph, Maybe Expression), *ModuleEnv)
+funToGraph :: PredefinedSymbol FunDef *ModuleEnv -> *(([String], Maybe GinGraph, Maybe Expression), *ModuleEnv)
 funToGraph pds fd=:{fun_ident=fun_ident, fun_body = TransformedBody tb} menv = mkBody
   where
-  mkBody // TODO cb.cb_args
+  mkBody
     # inh          = mkInhExpr fun_ident.id_name pds
     # chn          = mkChnExpr emptyGraph [0..] menv
     # (syn, chn)   = exprCata mkGraphAlg tb.tb_rhs inh chn
     # (initId, g)  = addNode {GNode|nodeType=GInit} chn.chn_graph
     # g            = addStartEdge syn.syn_entry_id initId g
     # g            = addStopEdges g
-    = ((Just g, syn.syn_annot_expr), chn.chn_module_env)
+    = ((map (\x -> x.fv_ident.id_name) tb.tb_args, Just g, syn.syn_annot_expr), chn.chn_module_env)
 
   addStopEdges g
     # leafs        = leafNodes g
@@ -531,7 +531,7 @@ funToGraph pds fd=:{fun_ident=fun_ident, fun_body = TransformedBody tb} menv = m
   addStartEdge mfirstId initId g
     = maybe g (\firstId -> addEmptyEdge (initId, firstId) g) mfirstId
 
-funToGraph _ _ fun_defs = ((Nothing, Nothing), fun_defs)
+funToGraph _ _ fun_defs = (([], Nothing, Nothing), fun_defs)
 
 instance toString GNode where
 	toString n = toString n.nodeType

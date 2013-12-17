@@ -49,23 +49,23 @@ foldUArr f (b, arr)
               = f idx elem (res, arr)
           | otherwise = (b, arr)
 
-toJSONString :: (Map String GinGraph) IclModule *ModuleEnv -> *(String, *ModuleEnv)
+toJSONString :: (Map String TonicTask) IclModule *ModuleEnv -> *(String, *ModuleEnv)
 toJSONString rs icl_module menv
   = (toString $ toJSON { TonicModule
                        | tm_name  = icl_module.icl_name.id_name
                        , tm_tasks = rs}
     , menv)
 
-toDotString :: (Map String GinGraph) IclModule *ModuleEnv -> *(String, *ModuleEnv)
+toDotString :: (Map String TonicTask) IclModule *ModuleEnv -> *(String, *ModuleEnv)
 toDotString rs icl_module menv
   # (dots, menv) = foldrWithKey tf ([], menv) rs
   = ( "digraph " +++ icl_module.icl_name.id_name +++ "{\n" +++ foldr (\x str -> x +++ "\n" +++ str) "" dots +++ "\n}"
     , menv)
-  where tf tn g (xs, menv)
+  where tf tn {tt_graph=g} (xs, menv)
           # (dot, menv) = mkTaskDot tn g menv
           = ([dot : xs], menv)
 
-ginTonic` :: ((Map String GinGraph) IclModule *ModuleEnv -> *(String, *ModuleEnv))
+ginTonic` :: ((Map String TonicTask) IclModule *ModuleEnv -> *(String, *ModuleEnv))
              !*{#FunDef} IclModule {#DclModule} !{#CommonDefs} !*PredefinedSymbols
           -> *(String, !*{#FunDef}, !*PredefinedSymbols)
 ginTonic` repsToString fun_defs icl_module dcl_modules common_defs predef_symbols
@@ -77,11 +77,11 @@ ginTonic` repsToString fun_defs icl_module dcl_modules common_defs predef_symbol
   where
   appDefInfo pds idx fd (reps, fun_defs)
     | funIsTask fd && fd.fun_info.fi_def_level == 1
-      # menv             = mkModuleEnv fun_defs icl_module dcl_modules
-      # ((mg, me), menv) = funToGraph pds fd menv
-      # menv             = updateWithAnnot idx me menv
+      # menv                   = mkModuleEnv fun_defs icl_module dcl_modules
+      # ((args, mg, me), menv) = funToGraph pds fd menv
+      # menv                   = updateWithAnnot idx me menv
       = ( case mg of
-            Just g -> put fd.fun_ident.id_name g reps
+            Just g -> put fd.fun_ident.id_name {TonicTask | tt_args = args, tt_graph = g} reps
             _      -> reps
         , menv.me_fun_defs)
     | otherwise        = (reps, fun_defs)
