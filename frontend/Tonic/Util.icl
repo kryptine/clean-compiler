@@ -52,9 +52,7 @@ dropAppContexts app menv
       Nothing
         # (mst, menv) = reifySymbIdentType app.app_symb menv
         # funTy       = fromMaybe (abort err) mst
-        =
-          //trace_n (ident +++ " has arity " +++ toString funTy.st_arity) $
-           (dropContexts funTy app.app_args, menv)
+        = (dropContexts funTy app.app_args, menv)
   where
   ident  = app.app_symb.symb_ident.id_name
   err    = "dropAppContexts : failed to find symbol type for " +++ ident
@@ -64,6 +62,7 @@ extractFunDefs fun_defs
   # defs = {d \\ d <-: fun_defs}
   = (defs, {d \\ d <-: defs})
 
+// TODO Get rid of this in favour of a more general reification?
 reifyConsDef :: String *ModuleEnv -> *(Maybe ConsDef, *ModuleEnv)
 reifyConsDef ident menv
   # (common, iclmod) = (menv.me_icl_module)!icl_common
@@ -98,16 +97,36 @@ optionalToMaybe (Yes x) = Just x
 optionalToMaybe No      = Nothing
 
 reifySymbIdentType :: SymbIdent *ModuleEnv -> *(Maybe SymbolType, *ModuleEnv)
-reifySymbIdentType {symb_ident,symb_kind=SK_Function glob} menv
-  | glob.glob_module == menv.me_main_dcl_module_n
-    # (fd, fds) = (menv.me_fun_defs)![glob.glob_object]
-    = (optionalToMaybe fd.fun_type, {menv & me_fun_defs = fds})
-  | otherwise
-    # (dcl, dcls) = (menv.me_dcl_modules)![glob.glob_module]
-    # mod         = dcls.[glob.glob_module]
-    # funTy       = mod.dcl_functions.[glob.glob_object]
-    = (Just funTy.ft_type, {menv & me_dcl_modules = dcls})
+reifySymbIdentType {symb_kind=SK_Function glob} menv
+  | glob.glob_module == menv.me_main_dcl_module_n                 = reifyFunDefsIdx glob.glob_object menv
+  | otherwise                                                     = reifyDclModulesIdx glob menv
+reifySymbIdentType {symb_kind=SK_IclMacro idx}               menv = reifyFunDefsIdx idx menv
+reifySymbIdentType {symb_kind=SK_LocalMacroFunction idx}     menv = reifyFunDefsIdx idx menv
+reifySymbIdentType {symb_kind=SK_DclMacro glob}              menv = reifyDclModulesIdx glob menv
+reifySymbIdentType {symb_kind=SK_LocalDclMacroFunction glob} menv = reifyDclModulesIdx glob menv
+reifySymbIdentType {symb_kind=SK_OverloadedFunction glob}    menv = reifyDclModulesIdx glob menv
+reifySymbIdentType {symb_kind=SK_GeneratedFunction fip idx}  menv = reifyFunDefsIdx idx menv
+reifySymbIdentType {symb_kind=SK_Constructor glob}           menv = reifyDclModulesIdx glob menv
+//reifySymbIdentType {symb_kind=SK_NewTypeConstructor globi}   menv = 
+reifySymbIdentType {symb_kind=SK_Generic glob tk}            menv = reifyDclModulesIdx glob menv
+reifySymbIdentType {symb_kind=SK_OverloadedConstructor glob} menv = reifyDclModulesIdx glob menv
+//reifySymbIdentType {symb_kind=SK_TFACVar eip}                menv = 
+//reifySymbIdentType {symb_kind=SK_VarContexts vcs}            menv = 
+//reifySymbIdentType {symb_kind=SK_TypeCodeAndContexts vcs}    menv = 
 reifySymbIdentType si menv = (Nothing, menv)
+
+reifyDclModulesIdx :: (Global Index) *ModuleEnv -> *(Maybe SymbolType, *ModuleEnv)
+reifyDclModulesIdx {glob_module,glob_object} menv
+  # (dcl, dcls) = (menv.me_dcl_modules)![glob_module]
+  # funTy       = dcl.dcl_functions.[glob_object]
+  = (Just funTy.ft_type, {menv & me_dcl_modules = dcls})
+
+reifyFunDefsIdx :: Index *ModuleEnv -> *(Maybe SymbolType, *ModuleEnv)
+reifyFunDefsIdx idx menv
+  # (fd, fds) = (menv.me_fun_defs)![idx]
+  = (optionalToMaybe fd.fun_type, {menv & me_fun_defs = fds})
+
+//import StdDebug
 
 foldUArr :: (Int a v:(w:b, u:(arr a)) -> v:(w:b, u:(arr a))) v:(w:b, u:(arr a))
          -> v:(w:b, u:(arr a)) | Array arr a, [v <= u, v <= w]
