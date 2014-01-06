@@ -48,10 +48,9 @@ At e es :== e @ es
 // InhExpression and ChnExpression need strict fields in order to prevent a bus
 // error caused by huge thunks
 :: InhExpression =
-  { inh_main_dcl_module_n :: !Int
-  , inh_curr_task_name    :: !String
-  , inh_case_expr         :: !Maybe Expression
-  , inh_tune_symb         :: !PredefinedSymbol
+  { inh_curr_task_name  :: !String
+  , inh_case_expr       :: !Maybe Expression
+  , inh_tune_symb       :: !PredefinedSymbol
   }
 
 :: *ChnExpression =
@@ -68,16 +67,17 @@ At e es :== e @ es
   }
 
 :: *ModuleEnv =
-  { me_fun_defs     :: !*{#FunDef}
-  , me_icl_module   :: !IclModule
-  , me_dcl_modules  :: !{#DclModule}
+  { me_main_dcl_module_n  :: !Int
+  , me_fun_defs           :: !*{#FunDef}
+  , me_icl_module         :: !IclModule
+  , me_dcl_modules        :: !{#DclModule}
   }
 
 exprCata :: *(ExpressionAlg inh *chn syn) Expression inh *chn -> *(syn, *chn)
 
 mkExprAlg :: syn -> *ExpressionAlg inh *chn syn
 
-mkInhExpr :: ModuleN String PredefinedSymbol -> InhExpression
+mkInhExpr :: String PredefinedSymbol -> InhExpression
 
 mkChnExpr :: *GinGraph *[Int] *ModuleEnv *Heaps -> *ChnExpression
 
@@ -87,4 +87,4 @@ mkSingleIdSynExpr :: (Maybe Int) -> SynExpression
 
 mkDualIdSynExpr :: (Maybe Int) (Maybe Int) -> SynExpression
 
-mkModuleEnv :: !*{#FunDef} IclModule {#DclModule} -> *ModuleEnv
+mkModuleEnv :: ModuleN !*{#FunDef} IclModule {#DclModule} -> *ModuleEnv

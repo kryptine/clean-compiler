@@ -169,8 +169,7 @@ mkGraphAlg
   where
   appC app inh chn // TODO Take arity into account: if a task is partially applied, wrap it in a lambda and annotate that
     //# (idIsTask, menv) = identIsTask app.app_symb.symb_ident.id_name chn.chn_module_env
-    # (idIsTask, menv) = symbIdentIsTask inh.inh_main_dcl_module_n app.app_symb chn.chn_module_env
-    # menv = trace_n (app.app_symb.symb_ident.id_name +++ " is a task? " +++ if idIsTask "yes" "no") menv
+    # (idIsTask, menv) = symbIdentIsTask app.app_symb chn.chn_module_env
     # chn = {chn & chn_module_env = menv}
     | idIsTask
       # ((ctxs, args), menv)  = dropAppContexts app chn.chn_module_env
@@ -180,7 +179,7 @@ mkGraphAlg
           "return"    -> mkReturn     app ctxs args              inh chn
           ">>|"       -> mkBindNoLam  app ctxs args              inh chn
           "@:"        -> mkAssign     app ctxs args              inh chn
-          ">>*"       -> mkStep       app ctxs args              inh chn
+          //">>*"       -> mkStep       app ctxs args              inh chn
           "-||-"      -> mkParBinApp  app ctxs args DisFirstBin  inh chn
           "||-"       -> mkParBinApp  app ctxs args DisRight     inh chn
           "-||"       -> mkParBinApp  app ctxs args DisLeft      inh chn
@@ -521,11 +520,11 @@ addNode` node annot chn
 // for the FunDef and the other part should generate the init and stop nodes.
 // Yet another part should just get the right-hand side Expression of a FunDef
 // so we can just cata it.
-funToGraph :: ModuleN PredefinedSymbol FunDef *ModuleEnv *Heaps -> *(([String], Maybe GinGraph, Maybe Expression), *ModuleEnv, *Heaps)
-funToGraph main_dcl_module_n pds fd=:{fun_ident=fun_ident, fun_body = TransformedBody tb} menv heaps = mkBody
+funToGraph :: PredefinedSymbol FunDef *ModuleEnv *Heaps -> *(([String], Maybe GinGraph, Maybe Expression), *ModuleEnv, *Heaps)
+funToGraph pds fd=:{fun_ident=fun_ident, fun_body = TransformedBody tb} menv heaps = mkBody
   where
   mkBody
-    # inh          = mkInhExpr main_dcl_module_n fun_ident.id_name pds
+    # inh          = mkInhExpr fun_ident.id_name pds
     # chn          = mkChnExpr emptyGraph [0..] menv heaps
     # (syn, chn)   = exprCata mkGraphAlg tb.tb_rhs inh chn
     # (initId, g)  = addNode {GNode|nodeType=GInit} chn.chn_graph
@@ -541,7 +540,7 @@ funToGraph main_dcl_module_n pds fd=:{fun_ident=fun_ident, fun_body = Transforme
   addStartEdge mfirstId initId g
     = maybe g (\firstId -> addEmptyEdge (initId, firstId) g) mfirstId
 
-funToGraph _ _ _ menv heaps = (([], Nothing, Nothing), menv, heaps)
+funToGraph _ _ menv heaps = (([], Nothing, Nothing), menv, heaps)
 
 instance toString GNode where
 	toString n = toString n.nodeType

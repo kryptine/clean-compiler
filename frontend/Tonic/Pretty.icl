@@ -79,14 +79,7 @@ ppPrefix app=:{App|app_symb} menv
 ppInfix :: App *ModuleEnv -> *(Doc, *ModuleEnv)
 ppInfix app=:{App|app_symb,app_args} menv
   # ((ctxs, args), menv) = dropAppContexts app menv
-  =
-    //trace_n (app_symb.symb_ident.id_name +++ " has " +++
-             //toString (length app_args) +++ " args, of which " +++
-             //toString (length ctxs) +++ " are contexts and " +++
-             //toString (length args) +++ " are actual arguments. It has SymbKind of " +++
-             //toString app_symb.symb_kind)
-                      //$
-    case args of
+  = case args of
       [l:r:_]
         # (ld, menv)           = ppExpression l menv
         # (psi, menv)          = ppSymbIdent app_symb menv

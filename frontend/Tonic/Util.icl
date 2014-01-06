@@ -50,7 +50,7 @@ dropAppContexts app menv
   = case mcd of
       Just cd = (dropContexts cd.cons_type app.app_args, menv)
       Nothing
-        # (mst, menv) = reifySymbolType ident menv
+        # (mst, menv) = reifySymbIdentType app.app_symb menv
         # funTy       = fromMaybe (abort err) mst
         =
           //trace_n (ident +++ " has arity " +++ toString funTy.st_arity) $
@@ -97,9 +97,9 @@ optionalToMaybe :: (Optional a) -> Maybe a
 optionalToMaybe (Yes x) = Just x
 optionalToMaybe No      = Nothing
 
-reifySymbIdentType :: ModuleN SymbIdent *ModuleEnv -> *(Maybe SymbolType, *ModuleEnv)
-reifySymbIdentType main_dcl_module_n {symb_ident,symb_kind=SK_Function glob} menv
-  | glob.glob_module == main_dcl_module_n
+reifySymbIdentType :: SymbIdent *ModuleEnv -> *(Maybe SymbolType, *ModuleEnv)
+reifySymbIdentType {symb_ident,symb_kind=SK_Function glob} menv
+  | glob.glob_module == menv.me_main_dcl_module_n
     # (fd, fds) = (menv.me_fun_defs)![glob.glob_object]
     = (optionalToMaybe fd.fun_type, {menv & me_fun_defs = fds})
   | otherwise
@@ -107,7 +107,7 @@ reifySymbIdentType main_dcl_module_n {symb_ident,symb_kind=SK_Function glob} men
     # mod         = dcls.[glob.glob_module]
     # funTy       = mod.dcl_functions.[glob.glob_object]
     = (Just funTy.ft_type, {menv & me_dcl_modules = dcls})
-reifySymbIdentType _ si menv = abort ("Failed to reify SymbIdent for " +++ si.symb_ident.id_name)
+reifySymbIdentType si menv = (Nothing, menv)
 
 foldUArr :: (Int a v:(w:b, u:(arr a)) -> v:(w:b, u:(arr a))) v:(w:b, u:(arr a))
          -> v:(w:b, u:(arr a)) | Array arr a, [v <= u, v <= w]
@@ -234,9 +234,9 @@ symTyIsTask st =
     _              -> False
   where symTyIsTask` tsi = tsi.type_ident.id_name == "Task"
 
-symbIdentIsTask :: ModuleN SymbIdent *ModuleEnv -> *(Bool, *ModuleEnv)
-symbIdentIsTask main_dcl_module_n si menv
-  # (mst, menv) = reifySymbIdentType main_dcl_module_n si menv
+symbIdentIsTask :: SymbIdent *ModuleEnv -> *(Bool, *ModuleEnv)
+symbIdentIsTask si menv
+  # (mst, menv) = reifySymbIdentType si menv
   = (maybe False symTyIsTask mst, menv)
   where ident = si.symb_ident.id_name
 

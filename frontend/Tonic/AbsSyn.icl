@@ -65,11 +65,10 @@ mkExprAlg syn =
   ,  failExpr              = \_           inh chn -> (syn, chn)
   }
 
-mkInhExpr :: ModuleN String PredefinedSymbol -> InhExpression
-mkInhExpr main_dcl_module_n ctn predef =
+mkInhExpr :: String PredefinedSymbol -> InhExpression
+mkInhExpr ctn predef =
   { InhExpression
-  | inh_main_dcl_module_n = main_dcl_module_n
-  , inh_curr_task_name = ctn
+  | inh_curr_task_name = ctn
   , inh_case_expr = Nothing
   , inh_tune_symb = predef
   }
@@ -107,10 +106,11 @@ mkDualIdSynExpr n m =
   , syn_annot_expr = Nothing
   }
 
-mkModuleEnv :: !*{#FunDef} IclModule {#DclModule} -> *ModuleEnv
-mkModuleEnv fun_defs icl_module dcl_modules =
+mkModuleEnv :: ModuleN !*{#FunDef} IclModule {#DclModule} -> *ModuleEnv
+mkModuleEnv main_dcl_module_n fun_defs icl_module dcl_modules =
   {  ModuleEnv
-  |  me_dcl_modules  = dcl_modules
+  |  me_main_dcl_module_n = main_dcl_module_n
+  ,  me_dcl_modules  = dcl_modules
   ,  me_icl_module   = icl_module
   ,  me_fun_defs     = fun_defs
   }
