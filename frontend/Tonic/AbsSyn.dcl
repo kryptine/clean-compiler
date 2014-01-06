@@ -5,7 +5,9 @@ from syntax import :: Expression (..), :: BoundVar, :: App {..}, :: Let, :: Case
   :: VarInfoPtr, :: DynamicExpr, :: Ptr, :: VarInfo, :: CodeBinding, :: DefinedSymbol,
   :: Bind, :: Position, :: AType, :: Env, :: Ident, :: Level, :: ExprInfoPtr, :: ExprInfo,
   :: TypeCodeExpression, :: GlobalIndex, :: Conditional, :: BasicValue, :: FieldSymbol,
-  :: IclModule, :: DclModule, :: FunDef, :: Optional, :: SymbolType, :: LetBind
+  :: IclModule, :: DclModule, :: FunDef, :: Optional, :: SymbolType, :: LetBind,
+  :: ModuleN
+from checksupport import :: Heaps
 from Data.Graph import :: Graph
 from Data.Maybe import :: Maybe
 from Text.JSON import generic JSONEncode, :: JSONNode
@@ -46,15 +48,17 @@ At e es :== e @ es
 // InhExpression and ChnExpression need strict fields in order to prevent a bus
 // error caused by huge thunks
 :: InhExpression =
-  { inh_curr_task_name  :: !String
-  , inh_case_expr       :: !Maybe Expression
-  , inh_tune_symb       :: !PredefinedSymbol
+  { inh_main_dcl_module_n :: !Int
+  , inh_curr_task_name    :: !String
+  , inh_case_expr         :: !Maybe Expression
+  , inh_tune_symb         :: !PredefinedSymbol
   }
 
 :: *ChnExpression =
   { chn_graph       :: !*GinGraph
   , chn_module_env  :: !*ModuleEnv
   , chn_uniqs       :: *[Int]
+  , chn_heaps       :: *Heaps
   }
 
 :: SynExpression =
@@ -73,9 +77,9 @@ exprCata :: *(ExpressionAlg inh *chn syn) Expression inh *chn -> *(syn, *chn)
 
 mkExprAlg :: syn -> *ExpressionAlg inh *chn syn
 
-mkInhExpr :: String PredefinedSymbol -> InhExpression
+mkInhExpr :: ModuleN String PredefinedSymbol -> InhExpression
 
-mkChnExpr :: *GinGraph *[Int] *ModuleEnv -> *ChnExpression
+mkChnExpr :: *GinGraph *[Int] *ModuleEnv *Heaps -> *ChnExpression
 
 mkSynExpr :: SynExpression
 

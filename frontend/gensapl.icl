@@ -482,7 +482,7 @@ genFunctionExtension :: !Int !String !Int !Int {#DclModule} [IndexRange] !String
 genFunctionExtension current_mod name mod_index func_index dcl_mods ranges mymod mns
 | current_mod == -1 || mns!!mod_index == mymod = genFunctionExtForMain name func_index ranges
                            = genFunctionExtForDCL name mod_index func_index dcl_mods
-where                           
+where
 	genFunctionExtForDCL name mod_index func_index dcl_mods = gfn dcl_mods.[mod_index]
 	where
 	 	gfn {dcl_name, dcl_common, dcl_functions, dcl_type_funs, dcl_instances}

@@ -93,6 +93,34 @@ reifyFunDef ident menv=:{me_fun_defs}
   # mfd = findInArr (\fd -> fd.fun_ident.id_name == ident) fds
   = (mfd, { menv & me_fun_defs = fun_defs })
 
+optionalToMaybe :: (Optional a) -> Maybe a
+optionalToMaybe (Yes x) = Just x
+optionalToMaybe No      = Nothing
+
+reifySymbIdentType :: ModuleN SymbIdent *ModuleEnv -> *(Maybe SymbolType, *ModuleEnv)
+reifySymbIdentType main_dcl_module_n {symb_ident,symb_kind=SK_Function glob} menv
+  | glob.glob_module == main_dcl_module_n
+    # (fd, fds) = (menv.me_fun_defs)![glob.glob_object]
+    = (optionalToMaybe fd.fun_type, {menv & me_fun_defs = fds})
+  | otherwise
+    # (dcl, dcls) = (menv.me_dcl_modules)![glob.glob_module]
+    # mod         = dcls.[glob.glob_module]
+    # funTy       = mod.dcl_functions.[glob.glob_object]
+    = (Just funTy.ft_type, {menv & me_dcl_modules = dcls})
+reifySymbIdentType _ si menv = abort ("Failed to reify SymbIdent for " +++ si.symb_ident.id_name)
+
+foldUArr :: (Int a v:(w:b, u:(arr a)) -> v:(w:b, u:(arr a))) v:(w:b, u:(arr a))
+         -> v:(w:b, u:(arr a)) | Array arr a, [v <= u, v <= w]
+foldUArr f (b, arr)
+  # (sz, arr) = usize arr
+  = foldUArr` sz 0 b arr
+  where foldUArr` sz idx b arr
+          | idx < sz
+              # (elem, arr) = uselect arr idx
+              # (res, arr) = foldUArr` sz (idx + 1) b arr
+              = f idx elem (res, arr)
+          | otherwise = (b, arr)
+
 reifySymbolType :: String *ModuleEnv -> *(Maybe SymbolType, *ModuleEnv)
 reifySymbolType ident menv
   # (mfd, menv) = reifyFunDef ident menv
@@ -177,6 +205,27 @@ exprIsLambda (Var bv)  = identIsLambda bv.var_ident
 exprIsLambda (App app) = identIsLambda app.app_symb.symb_ident
 exprIsLambda _         = False
 
+ppType (TA tsi ats) = "TA"
+ppType (TAS tsi ats sl) = "TAS"
+ppType (at1 --> at2) = "-->"
+ppType (TArrow) = "TArrow"
+ppType (TArrow1	at) = "TArrow1"
+ppType (cv :@: ats) = ":@:"
+ppType (TB bt) = "TB"
+ppType (TFA ats t) = "TFA"
+ppType (GTV tv) = "GTV"
+ppType (TV tv) = "TV"
+ppType (TFAC atvs t tcs) = "TFAC"
+ppType (TempV tvi) = "TempV"
+ppType (TQV tv) = "TQV"
+ppType (TempQV tvi) = "TempQV"
+ppType (TempQDV tvi) = "TempQDV"
+ppType (TLifted tv) = "TypeVar"
+ppType (TQualifiedIdent i s ats) = "TQualifiedIdent"
+ppType (TGenericFunctionInDictionary gds tk gi) = "TGenericFunctionInDictionary"
+ppType (TLiftedSubst t) = "TLiftedSubst"
+ppType TE = "TE"
+
 symTyIsTask :: SymbolType -> Bool
 symTyIsTask st =
   case st.st_result.at_type of
@@ -185,13 +234,11 @@ symTyIsTask st =
     _              -> False
   where symTyIsTask` tsi = tsi.type_ident.id_name == "Task"
 
-identIsTask :: String *ModuleEnv -> *(Bool, *ModuleEnv)
-identIsTask ident menv
-  # (mst, menv) = reifySymbolType ident menv
+symbIdentIsTask :: ModuleN SymbIdent *ModuleEnv -> *(Bool, *ModuleEnv)
+symbIdentIsTask main_dcl_module_n si menv
+  # (mst, menv) = reifySymbIdentType main_dcl_module_n si menv
   = (maybe False symTyIsTask mst, menv)
-
-symbIdentIsTask :: SymbIdent *ModuleEnv -> *(Bool, *ModuleEnv)
-symbIdentIsTask sid menv = identIsTask sid.symb_ident.id_name menv
+  where ident = si.symb_ident.id_name
 
 // TODO Look ident up in CommonDefs (for type constructors)
 isInfix :: String *ModuleEnv -> *(Bool, *ModuleEnv)

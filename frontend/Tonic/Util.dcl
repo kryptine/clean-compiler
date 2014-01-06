@@ -60,9 +60,7 @@ exprIsLambda :: Expression -> Bool
 
 symTyIsTask :: SymbolType -> Bool
 
-identIsTask :: String *ModuleEnv -> *(Bool, *ModuleEnv)
-
-symbIdentIsTask :: SymbIdent *ModuleEnv -> *(Bool, *ModuleEnv)
+symbIdentIsTask :: ModuleN SymbIdent *ModuleEnv -> *(Bool, *ModuleEnv)
 
 isInfix :: String *ModuleEnv -> *(Bool, *ModuleEnv)
 

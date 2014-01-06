@@ -2,4 +2,4 @@ definition module Tonic.CompilerInterface
 
 import syntax, checksupport
 
-ginTonic :: !*{#FunDef} IclModule {#DclModule} !{#CommonDefs} !*PredefinedSymbols !*Files -> *(!*{#FunDef}, !*PredefinedSymbols, !*Files)
+ginTonic :: ModuleN !*{#FunDef} IclModule {#DclModule} !{#CommonDefs} !*PredefinedSymbols !*Files !*Heaps -> *(!*{#FunDef}, !*PredefinedSymbols, !*Files, !*Heaps)

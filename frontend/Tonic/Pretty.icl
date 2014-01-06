@@ -140,8 +140,29 @@ ppExpression (Selection sk e ss)  menv
   # (ed, menv)    = ppExpression e menv
   # (selsd, menv) = mapSt ppSelection ss menv
   = (ed <-> mkRecSel selsd, menv)
-ppExpression (BasicExpr bv)       menv = ppBasicValue bv menv
-ppExpression _                    menv = (text "ppExpression: _", menv) // empty
+ppExpression (BasicExpr bv)               menv = ppBasicValue bv menv
+ppExpression (Let _)                      menv = (text "ppExpression: Let", menv) // empty
+ppExpression (Case _)                     menv = (text "ppExpression: Case", menv) // empty
+ppExpression (Selection _ _ _)            menv = (text "ppExpression: Selection", menv) // empty
+ppExpression (Update _ _ _)               menv = (text "ppExpression: Update", menv) // empty
+ppExpression (RecordUpdate _ _ _)         menv = (text "ppExpression: RecordUpdate", menv) // empty
+ppExpression (TupleSelect _ _ _)          menv = (text "ppExpression: TupleSelect", menv) // empty
+ppExpression (Conditional _)              menv = (text "ppExpression: Conditional", menv) // empty
+ppExpression (AnyCodeExpr _ _ _)          menv = (text "ppExpression: AnyCodeExpr", menv) // empty
+ppExpression (ABCCodeExpr _ _)            menv = (text "ppExpression: ABCCodeExpr", menv) // empty
+ppExpression (MatchExpr _ _)              menv = (text "ppExpression: MatchExpr", menv) // empty
+ppExpression (IsConstructor _ _ _ _ _ _)  menv = (text "ppExpression: IsConstructor", menv) // empty
+ppExpression (FreeVar _)                  menv = (text "ppExpression: FreeVar", menv) // empty
+ppExpression (DictionariesFunction _ _ _) menv = (text "ppExpression: DictionariesFunction", menv) // empty
+ppExpression (Constant _ _ _)             menv = (text "ppExpression: Constant", menv) // empty
+ppExpression (ClassVariable _)            menv = (text "ppExpression: ClassVariable", menv) // empty
+ppExpression (DynamicExpr _)              menv = (text "ppExpression: DynamicExpr", menv) // empty
+ppExpression (TypeCodeExpression _)       menv = (text "ppExpression: TypeCodeExpression", menv) // empty
+ppExpression (TypeSignature _ _)          menv = (text "ppExpression: TypeSignature", menv) // empty
+ppExpression EE                           menv = (text "ppExpression: EE", menv) // empty
+ppExpression (NoBind _)                   menv = (text "ppExpression: NoBind", menv) // empty
+ppExpression (FailExpr _)                 menv = (text "ppExpression: FailExpr", menv) // empty
+ppExpression _                            menv = (text "ppExpression: _", menv) // empty
 
 mkRecSel :: [Doc] -> Doc
 mkRecSel ds = char '.' <-> hcat (intersperse (char '.') ds)

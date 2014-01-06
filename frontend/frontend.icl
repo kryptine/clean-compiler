@@ -164,7 +164,7 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
         = abort "";
 
 // TODO START GiN Tonic HACK
-    # (fun_defs, predef_symbols, files) = ginTonic fun_defs icl_mod dcl_mods common_defs predef_symbols files
+    # (fun_defs, predef_symbols, files, heaps) = ginTonic main_dcl_module_n fun_defs icl_mod dcl_mods common_defs predef_symbols files heaps
 // TODO END GiN Tonic HACK
 
 	# icl_gencase_indices = icl_function_indices.ifi_gencase_indices

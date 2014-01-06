@@ -1,6 +1,6 @@
 implementation module Tonic.AbsSyn
 
-import syntax, predef
+import syntax, predef, checksupport
 import Data.Func
 import Data.Graph
 import Data.Maybe
@@ -65,20 +65,22 @@ mkExprAlg syn =
   ,  failExpr              = \_           inh chn -> (syn, chn)
   }
 
-mkInhExpr :: String PredefinedSymbol -> InhExpression
-mkInhExpr ctn predef =
+mkInhExpr :: ModuleN String PredefinedSymbol -> InhExpression
+mkInhExpr main_dcl_module_n ctn predef =
   { InhExpression
-  | inh_curr_task_name = ctn
+  | inh_main_dcl_module_n = main_dcl_module_n
+  , inh_curr_task_name = ctn
   , inh_case_expr = Nothing
   , inh_tune_symb = predef
   }
 
-mkChnExpr :: *GinGraph *[Int] *ModuleEnv -> *ChnExpression
-mkChnExpr gg uniqs menv =
+mkChnExpr :: *GinGraph *[Int] *ModuleEnv *Heaps -> *ChnExpression
+mkChnExpr gg uniqs menv heaps =
   { ChnExpression
   | chn_graph           = gg
   , chn_module_env      = menv
   , chn_uniqs           = uniqs
+  , chn_heaps           = heaps
   }
 
 mkSynExpr :: SynExpression

@@ -5,7 +5,7 @@ implementation module Tonic.GraphGen
 //import syntax, checksupport, StdFile
 //from CoclSystemDependent import DirectorySeparator, ensureCleanSystemFilesExists
 
-import syntax, predef
+import syntax, predef, checksupport
 
 import StdFunc
 from StdList import last
@@ -168,7 +168,9 @@ mkGraphAlg
      }
   where
   appC app inh chn // TODO Take arity into account: if a task is partially applied, wrap it in a lambda and annotate that
-    # (idIsTask, menv) = identIsTask app.app_symb.symb_ident.id_name chn.chn_module_env
+    //# (idIsTask, menv) = identIsTask app.app_symb.symb_ident.id_name chn.chn_module_env
+    # (idIsTask, menv) = symbIdentIsTask inh.inh_main_dcl_module_n app.app_symb chn.chn_module_env
+    # menv = trace_n (app.app_symb.symb_ident.id_name +++ " is a task? " +++ if idIsTask "yes" "no") menv
     # chn = {chn & chn_module_env = menv}
     | idIsTask
       # ((ctxs, args), menv)  = dropAppContexts app chn.chn_module_env
@@ -202,12 +204,19 @@ mkGraphAlg
               # g = addEdge emptyEdge (lx, rn) chnr.chn_graph
               = annotExpr (lx, rn) (App app) inh { chnr & chn_graph = g } (mkSingleIdSynExpr synl.syn_entry_id)
             (_, lid, rid, _)
-              = edgeErr "bind edge" lid lhsExpr rid rhsExpr chnr
+              = edgeErr "bind edge (>>|)" lid lhsExpr rid rhsExpr chnr
 
     mkBind app ctxs args inh chn
+      //# (d, menv) = ppDebugApp app chn.chn_module_env
+      //# menv = trace_n ("\nmkBind trace:\n" +++ ppCompact d +++ "\n") menv
+      //= withTwo app args f inh {chn & chn_module_env = menv}
       = withTwo app args f inh chn
       where
       f lhsExpr rhsExpr chn
+        //# (dl, menv) = ppDebugExpression lhsExpr chn.chn_module_env
+        //# (dr, menv) = ppDebugExpression rhsExpr menv
+        //# menv = trace_n ("\nmkBind trace:\n- " +++ ppCompact dl +++ "\n- " +++ ppCompact dr) menv
+        //# (synl, chnl)    = exprCata mkGraphAlg lhsExpr inh {chn & chn_module_env = menv}
         # (synl, chnl)    = exprCata mkGraphAlg lhsExpr inh chn
         # ((synr, chnr), edge)
             = case (exprIsLambda rhsExpr, rhsExpr) of
@@ -232,7 +241,7 @@ mkGraphAlg
                          _                  -> app
               = annotExpr (lx, rn) (App app`) inh { chnr & chn_graph = g } (mkSingleIdSynExpr synl.syn_entry_id)
             (_, lid, rid, _)
-              = edgeErr "bind edge" lid lhsExpr rid rhsExpr chnr
+              = edgeErr "bind edge (>>=)" lid lhsExpr rid rhsExpr chnr
 
     mkReturn app ctxs args inh chn
       # (ppd, chn) = case args of
@@ -286,6 +295,7 @@ mkGraphAlg
 
     mkTaskApp app ctxs args inh chn
       # (ps, menv) = mapSt ppExpression args chn.chn_module_env
+      //# menv       = trace_n ("\nmkTaskApp trace:\n" +++ foldr (\x xs -> ppCompact x +++ xs) "" ps +++ "\n") menv
       # chn        = {chn & chn_module_env = menv}
       # appArgs    = map (GCleanExpression o ppCompact) ps  // TODO: When do we pprint a Clean expr? And when do we generate a subgraph?
       # (an, g)    = addNode (mkNode app ((GTaskApp (appFunName app)) appArgs)) chn.chn_graph
@@ -511,17 +521,17 @@ addNode` node annot chn
 // for the FunDef and the other part should generate the init and stop nodes.
 // Yet another part should just get the right-hand side Expression of a FunDef
 // so we can just cata it.
-funToGraph :: PredefinedSymbol FunDef *ModuleEnv -> *(([String], Maybe GinGraph, Maybe Expression), *ModuleEnv)
-funToGraph pds fd=:{fun_ident=fun_ident, fun_body = TransformedBody tb} menv = mkBody
+funToGraph :: ModuleN PredefinedSymbol FunDef *ModuleEnv *Heaps -> *(([String], Maybe GinGraph, Maybe Expression), *ModuleEnv, *Heaps)
+funToGraph main_dcl_module_n pds fd=:{fun_ident=fun_ident, fun_body = TransformedBody tb} menv heaps = mkBody
   where
   mkBody
-    # inh          = mkInhExpr fun_ident.id_name pds
-    # chn          = mkChnExpr emptyGraph [0..] menv
+    # inh          = mkInhExpr main_dcl_module_n fun_ident.id_name pds
+    # chn          = mkChnExpr emptyGraph [0..] menv heaps
     # (syn, chn)   = exprCata mkGraphAlg tb.tb_rhs inh chn
     # (initId, g)  = addNode {GNode|nodeType=GInit} chn.chn_graph
     # g            = addStartEdge syn.syn_entry_id initId g
     # g            = addStopEdges g
-    = ((map (\x -> x.fv_ident.id_name) tb.tb_args, Just g, syn.syn_annot_expr), chn.chn_module_env)
+    = ((map (\x -> x.fv_ident.id_name) tb.tb_args, Just g, syn.syn_annot_expr), chn.chn_module_env, chn.chn_heaps)
 
   addStopEdges g
     # leafs        = leafNodes g
@@ -531,7 +541,7 @@ funToGraph pds fd=:{fun_ident=fun_ident, fun_body = TransformedBody tb} menv = m
   addStartEdge mfirstId initId g
     = maybe g (\firstId -> addEmptyEdge (initId, firstId) g) mfirstId
 
-funToGraph _ _ fun_defs = (([], Nothing, Nothing), fun_defs)
+funToGraph _ _ _ menv heaps = (([], Nothing, Nothing), menv, heaps)
 
 instance toString GNode where
 	toString n = toString n.nodeType
