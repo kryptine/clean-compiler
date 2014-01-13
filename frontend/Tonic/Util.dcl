@@ -1,6 +1,6 @@
 definition module Tonic.Util
 
-from syntax import :: App, :: FunType, :: ConsDef
+from syntax import :: App, :: FunType, :: ConsDef, :: Index
 from StdArray import class Array
 from Data.Maybe import :: Maybe
 from Data.Map import :: Map
@@ -18,13 +18,17 @@ dropAppContexts :: App *ModuleEnv -> *(([Expression], [Expression]), *ModuleEnv)
 
 extractFunDefs :: !*{#FunDef} -> *(!{#FunDef}, !*{#FunDef})
 
-reifyConsDef :: String *ModuleEnv -> *(Maybe ConsDef, *ModuleEnv)
+reifyConsDef :: SymbIdent *ModuleEnv -> *(Maybe ConsDef, *ModuleEnv)
 
-reifyFunType :: String *ModuleEnv -> *(Maybe FunType, *ModuleEnv)
+reifyFunType :: SymbIdent *ModuleEnv -> *(Maybe FunType, *ModuleEnv)
 
-reifyFunDef :: String *ModuleEnv -> *(Maybe (Int, FunDef), *ModuleEnv)
+symbIdentModuleIdx :: SymbIdent -> Maybe Index
 
-reifySymbolType :: String *ModuleEnv -> *(Maybe SymbolType, *ModuleEnv)
+symbIdentObjectIdx :: SymbIdent -> Maybe Index
+
+reifyFunDef :: SymbIdent *ModuleEnv -> *(Maybe FunDef, *ModuleEnv)
+
+reifySymbIdentType :: SymbIdent *ModuleEnv -> *(SymbolType, *ModuleEnv)
 
 isCons :: String -> Bool
 
@@ -62,7 +66,7 @@ symTyIsTask :: SymbolType -> Bool
 
 symbIdentIsTask :: SymbIdent *ModuleEnv -> *(Bool, *ModuleEnv)
 
-isInfix :: String *ModuleEnv -> *(Bool, *ModuleEnv)
+isInfix :: SymbIdent *ModuleEnv -> *(Bool, *ModuleEnv)
 
 prioIsInfix :: Priority -> Bool
 

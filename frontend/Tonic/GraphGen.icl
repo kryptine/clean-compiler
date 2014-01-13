@@ -80,12 +80,20 @@ sugarListCompr :: App *ModuleEnv -> *(GListComprehension, *ModuleEnv)
 sugarListCompr app menv
   # ((_, xs), menv) = dropAppContexts app menv
   # gen             = last xs
-  # (mfd, menv)     = reifyFunDef app.app_symb.symb_ident.id_name menv
-  # (fidx, funDef)  = fromMaybe (abort $ "sugarListCompr: failed to find function definition for " +++ app.app_symb.symb_ident.id_name) mfd
+  # (mfd, menv)     = reifyFunDef app.app_symb menv
+  # funDef          = fromMaybe (abort $ "sugarListCompr: failed to find function definition for " +++ app.app_symb.symb_ident.id_name) mfd
   = case getFunRhs funDef of
       Case {Case | case_guards=(AlgebraicPatterns _
              [{AlgebraicPattern | ap_vars=[sel:_], ap_expr=(App {App | app_args=[expr:_]})}:_])}
                = mkLC sel expr gen menv
+      Case {Case | case_guards=(AlgebraicPatterns _
+             [{AlgebraicPattern | ap_vars=[sel:_], ap_expr=(Case _)}:_])}
+               = abort "sugar Algebraic Case"
+      Case {Case | case_guards=(BasicPatterns _ _)} = abort "sugar Basic"
+      Case {Case | case_guards=(NewTypePatterns _ _)} = abort "sugar NewType"
+      Case {Case | case_guards=(DynamicPatterns _)} = abort "sugar Dynamic"
+      Case {Case | case_guards=(OverloadedListPatterns _ _ _)} = abort "sugar OverloadedList"
+      Case {Case | case_guards=(NoPattern)} = abort "sugar NoPattern"
       _        = (err, menv)
   where
   err     = abort "Invalid list comprehension"
@@ -168,7 +176,6 @@ mkGraphAlg
      }
   where
   appC app inh chn // TODO Take arity into account: if a task is partially applied, wrap it in a lambda and annotate that
-    //# (idIsTask, menv) = identIsTask app.app_symb.symb_ident.id_name chn.chn_module_env
     # (idIsTask, menv) = symbIdentIsTask app.app_symb chn.chn_module_env
     # chn = {chn & chn_module_env = menv}
     | idIsTask
@@ -220,16 +227,17 @@ mkGraphAlg
         # ((synr, chnr), edge)
             = case (exprIsLambda rhsExpr, rhsExpr) of
                 (True, App rhsApp)
-                  # (mfd, menv)    = reifyFunDef rhsApp.app_symb.symb_ident.id_name chnl.chn_module_env
+                  # (mfd, menv)    = reifyFunDef rhsApp.app_symb chnl.chn_module_env
                   # (rSym, menv)   = ppSymbIdent rhsApp.app_symb menv
-                  # (fidx, rhsfd)  = fromMaybe (abort $ "mkGraphAlg #1: failed to find function definition for " +++ ppCompact rSym) mfd
-                  # (mst, menv)    = reifySymbolType rhsApp.app_symb.symb_ident.id_name menv
-                  # rhsTy          = fromMaybe (abort $ "mkGraphAlg #2: failed to find symbol type for " +++ ppCompact rSym) mst
+                  # rhsfd          = fromMaybe (abort $ "mkGraphAlg #1: failed to find function definition for " +++ ppCompact rSym) mfd
+                  # (rhsTy, menv)  = reifySymbIdentType rhsApp.app_symb menv
                   # patid          = case [x \\ x <- snd $ dropContexts rhsTy (getFunArgs rhsfd) | x.fv_def_level == -1] of
                                        [x:_] -> freeVarName x
                                        _     -> abort "Invalid bind"
                   # (syne, chn)    = exprCata mkGraphAlg (getFunRhs rhsfd) inh { chnl & chn_module_env = menv }
-                  # menv           = updateWithAnnot fidx syne.syn_annot_expr chn.chn_module_env
+                  # menv           = case symbIdentObjectIdx rhsApp.app_symb of
+                                       Just sid -> updateWithAnnot sid syne.syn_annot_expr chn.chn_module_env
+                                       _        -> abort "mkBind: cannot reify symb ident"
                   = ((syne, {chn & chn_module_env = menv}), mkEdge patid)
                 _ = (exprCata mkGraphAlg rhsExpr inh chnl, emptyEdge)
         = case (synl.syn_entry_id, synl.syn_exit_id, synr.syn_entry_id, synr.syn_exit_id) of
@@ -322,14 +330,14 @@ mkGraphAlg
         # (jid, g)      = addNode (mkNode app (GParallelJoin join)) g
         # (synl, chnl)  = exprCata mkGraphAlg l inh {chn & chn_graph = g}
         # (synr, chnr)  = exprCata mkGraphAlg r inh chnl
-        = case (synl.syn_entry_id, synr.syn_entry_id) of
-            (Just l, Just r)
-              # g = addEmptyEdge (sid, l) chnr.chn_graph
-              # g = addEmptyEdge (sid, r) g
-              # g = addEmptyEdge (l, jid) g
-              # g = addEmptyEdge (r, jid) g
-              = annotExpr (l, r) (App app) inh { chnr & chn_graph = g} synr
-            (lid, rid)
+        = case (synl.syn_entry_id, synl.syn_exit_id, synr.syn_entry_id, synr.syn_exit_id) of //(synl.syn_entry_id, synr.syn_entry_id) of
+            (Just le, Just lx, Just re, Just rx)
+              # g = addEmptyEdge (sid, le) chnr.chn_graph
+              # g = addEmptyEdge (sid, re) g
+              # g = addEmptyEdge (lx, jid) g
+              # g = addEmptyEdge (rx, jid) g
+              = annotExpr (sid, jid) (App app) inh { chnr & chn_graph = g} (mkDualIdSynExpr (Just sid) (Just jid))
+            (_, lid, rid, _)
               = edgeErr "bin app edge" lid l rid r chnr
         // TODO: If there are no two elems in the list, the expr is eta-reduced, so we need to pprint it instead of throwing an error
 
@@ -387,8 +395,8 @@ mkGraphAlg
   atC e=:(App app) es inh chn
     // TODO: Introduce lets in the graph for all variables that are being applied
     | identIsLambda app.app_symb.symb_ident
-        # (mfd, menv)   = reifyFunDef app.app_symb.symb_ident.id_name chn.chn_module_env
-        # (fidx, fd)    = fromMaybe (abort ("atC: failed to reify " +++ app.app_symb.symb_ident.id_name)) mfd
+        # (mfd, menv)   = reifyFunDef app.app_symb chn.chn_module_env
+        # fd            = fromMaybe (abort ("atC: failed to reify " +++ app.app_symb.symb_ident.id_name)) mfd
         # letargs       = drop (length app.app_args) (getFunArgs fd)
         # (binds, menv) = zipWithSt zwf letargs es menv
         # chn           = { chn & chn_module_env = menv }
@@ -397,7 +405,9 @@ mkGraphAlg
         # g             = case syne.syn_entry_id of
                             Just eid -> addEmptyEdge (lid, eid) chn.chn_graph
                             _        -> chn.chn_graph
-        # menv          = updateWithAnnot fidx syne.syn_annot_expr chn.chn_module_env
+        # menv          = case symbIdentObjectIdx app.app_symb of
+                            Just sid -> updateWithAnnot sid syne.syn_annot_expr chn.chn_module_env
+                            _        -> abort "atC: no app_symb idx"
         # chn           = { chn & chn_module_env = menv, chn_graph = g }
         = annotExpr (lid, lid) (e @ es) inh chn ({syne & syn_entry_id = Just lid, syn_exit_id = Just lid}) // mkSingleIdSynExpr (Just lid)) // TODO Do something with syne?
     | otherwise    =  abort "atC: otherwise case" // TODO : pretty print function application
@@ -406,7 +416,35 @@ mkGraphAlg
         # (fvl, menv) = ppFreeVar eVar menv
         # (fvr, menv) = ppExpression eVal menv
         = ((ppCompact fvl, ppCompact fvr), menv)
-  atC _ _ _ _ = abort "atC: something else than App"
+
+  atC e es _ chn = ({mkSynExpr & syn_annot_expr = Just (e @ es)}, chn)
+  //atC _ _ _ _ = abort "atC: something else than App"
+
+  //atC (Var _)                       _ _ _ = abort "atC: var"
+  //atC (App _)                       _ _ _ = abort "atC: app"
+  //atC (_ @ _)                       _ _ _ = abort "atC: @"
+  //atC (Let _)                       _ _ _ = abort "atC: let"
+  //atC (Case _)                      _ _ _ = abort "atC: case"
+  //atC (Selection _ _ _)             _ _ _ = abort "atC: selection"
+  //atC (Update _ _ _)                _ _ _ = abort "atC: update"
+  //atC (RecordUpdate _ _ _)          _ _ _ = abort "atC: recordupdate"
+  //atC (TupleSelect _ _ _)           _ _ _ = abort "atC: tupleselect"
+  //atC (BasicExpr _)                 _ _ _ = abort "atC: basicExpr"
+  //atC (Conditional _)               _ _ _ = abort "atC: conditional"
+  //atC (AnyCodeExpr _ _ _)           _ _ _ = abort "atC: anycodeexpr"
+  //atC (ABCCodeExpr _ _)             _ _ _ = abort "atC: abccodeexpr"
+  //atC (MatchExpr _ _)               _ _ _ = abort "atC: matchexpr"
+  //atC (IsConstructor _ _ _ _ _ _)   _ _ _ = abort "atC: isConstructor"
+  //atC (FreeVar _)                   _ _ _ = abort "atC: FreeVar"
+  //atC (DictionariesFunction  _ _ _) _ _ _ = abort "atC: DictionariesFunction"
+  //atC (Constant _ _ _)              _ _ _ = abort "atC: Constant"
+  //atC (ClassVariable _)             _ _ _ = abort "atC: ClassVariable"
+  //atC (DynamicExpr _)               _ _ _ = abort "atC: DynamicExpr"
+  //atC (TypeCodeExpression _)        _ _ _ = abort "atC: TypeCodeExpression"
+  //atC (TypeSignature _ _)           _ _ _ = abort "atC: TypeSignature"
+  //atC EE                            _ _ _ = abort "atC: EE"
+  //atC (NoBind _)                    _ _ _ = abort "atC: NoBind"
+  //atC (FailExpr _)                  _ _ _ = abort "atC: FailExpr"
 
   letC lt inh chn
     # mexpr = listToMaybe [ bnd.lb_src \\ bnd <- getLetBinds lt

@@ -46,16 +46,12 @@ intercalateString xs xss = concatStrings (intersperse xs xss)
 
 dropAppContexts :: App *ModuleEnv -> *(([Expression], [Expression]), *ModuleEnv)
 dropAppContexts app menv
-  # (mcd, menv) = reifyConsDef ident menv
+  # (mcd, menv) = reifyConsDef app.app_symb menv
   = case mcd of
       Just cd = (dropContexts cd.cons_type app.app_args, menv)
       Nothing
-        # (mst, menv) = reifySymbIdentType app.app_symb menv
-        # funTy       = fromMaybe (abort err) mst
+        # (funTy, menv) = reifySymbIdentType app.app_symb menv
         = (dropContexts funTy app.app_args, menv)
-  where
-  ident  = app.app_symb.symb_ident.id_name
-  err    = "dropAppContexts : failed to find symbol type for " +++ ident
 
 extractFunDefs :: !*{#FunDef} -> *(!{#FunDef}, !*{#FunDef})
 extractFunDefs fun_defs
@@ -63,8 +59,14 @@ extractFunDefs fun_defs
   = (defs, {d \\ d <-: defs})
 
 // TODO Get rid of this in favour of a more general reification?
-reifyConsDef :: String *ModuleEnv -> *(Maybe ConsDef, *ModuleEnv)
-reifyConsDef ident menv
+reifyConsDef :: SymbIdent *ModuleEnv -> *(Maybe ConsDef, *ModuleEnv)
+reifyConsDef si menv
+  //= case (symbIdentModuleIdx si, symbIdentObjectIdx si) of
+      //(Just mi, Just oi)
+        //# (ft, menv) = reifyDclModulesIdxFunType` mi oi menv
+        //= (Just ft, menv)
+      //_ = (Nothing, menv)
+
   # (common, iclmod) = (menv.me_icl_module)!icl_common
   # dcls             = menv.me_dcl_modules
   # menv             = {menv & me_icl_module=iclmod}
@@ -78,53 +80,135 @@ reifyConsDef ident menv
     searchConsDefs :: String .{# ConsDef} -> Maybe ConsDef
     searchConsDefs ident defs = listToMaybe [cd \\ cd <-: defs | cd.cons_ident.id_name == ident]
 
-reifyFunType :: String *ModuleEnv -> *(Maybe FunType, *ModuleEnv)
-reifyFunType ident menv=:{me_dcl_modules}
-  = (safeHead  [  ft \\ dcl <-: me_dcl_modules, ft <-: dcl.dcl_functions
-               |  ft.ft_ident.id_name == ident
-               ]
-    , menv)
+    ident = si.symb_ident.id_name
 
-// Maybe return the index of the fundef in the unique FunDef array
-reifyFunDef :: String *ModuleEnv -> *(Maybe (Int, FunDef), *ModuleEnv)
-reifyFunDef ident menv=:{me_fun_defs}
-  # (fds, fun_defs) = extractFunDefs me_fun_defs
-  # mfd = findInArr (\fd -> fd.fun_ident.id_name == ident) fds
-  = (mfd, { menv & me_fun_defs = fun_defs })
+reifyFunType :: SymbIdent *ModuleEnv -> *(Maybe FunType, *ModuleEnv)
+reifyFunType si menv=:{me_dcl_modules}
+  = case (symbIdentModuleIdx si, symbIdentObjectIdx si) of
+      (Just mi, Just oi)
+        # (ft, menv) = reifyDclModulesIdxFunType` mi oi menv
+        = (Just ft, menv)
+      _ = (Nothing, menv)
+
+symbIdentModuleIdx :: SymbIdent -> Maybe Index
+symbIdentModuleIdx {symb_kind=SK_Function glob}              = Just glob.glob_module
+symbIdentModuleIdx {symb_kind=SK_DclMacro glob}              = Just glob.glob_module
+symbIdentModuleIdx {symb_kind=SK_LocalDclMacroFunction glob} = Just glob.glob_module
+symbIdentModuleIdx {symb_kind=SK_OverloadedFunction glob}    = Just glob.glob_module
+symbIdentModuleIdx {symb_kind=SK_Constructor glob}           = Just glob.glob_module
+symbIdentModuleIdx {symb_kind=SK_NewTypeConstructor globi}   = abort "symbIdentModuleIdx: SK_NewTypeConstructor"
+symbIdentModuleIdx {symb_kind=SK_Generic glob tk}            = Just glob.glob_module
+symbIdentModuleIdx {symb_kind=SK_OverloadedConstructor glob} = Just glob.glob_module
+symbIdentModuleIdx _                                         = Nothing
+
+symbIdentObjectIdx :: SymbIdent -> Maybe Index
+symbIdentObjectIdx {symb_kind=SK_Function glob}              = Just glob.glob_object
+symbIdentObjectIdx {symb_kind=SK_IclMacro idx}               = Just idx
+symbIdentObjectIdx {symb_kind=SK_LocalMacroFunction idx}     = Just idx
+symbIdentObjectIdx {symb_kind=SK_DclMacro glob}              = Just glob.glob_object
+symbIdentObjectIdx {symb_kind=SK_LocalDclMacroFunction glob} = Just glob.glob_object
+symbIdentObjectIdx {symb_kind=SK_OverloadedFunction glob}    = Just glob.glob_object
+symbIdentObjectIdx {symb_kind=SK_GeneratedFunction fip idx}  = Just idx
+symbIdentObjectIdx {symb_kind=SK_Constructor glob}           = Just glob.glob_object
+symbIdentObjectIdx {symb_kind=SK_NewTypeConstructor globi}   = abort "symbIdentObjectIdx: SK_NewTypeConstructor"
+symbIdentObjectIdx {symb_kind=SK_Generic glob tk}            = Just glob.glob_object
+symbIdentObjectIdx {symb_kind=SK_OverloadedConstructor glob} = Just glob.glob_object
+symbIdentObjectIdx _                                         = Nothing
+
+reifyFunDef :: SymbIdent *ModuleEnv -> *(Maybe FunDef, *ModuleEnv)
+reifyFunDef si menv
+  = case symbIdentObjectIdx si of
+      Just idx
+        # (fd, menv) = reifyFunDefsIdxFunDef idx menv
+        = (Just fd, menv)
+      _ = (Nothing, menv)
 
 optionalToMaybe :: (Optional a) -> Maybe a
 optionalToMaybe (Yes x) = Just x
 optionalToMaybe No      = Nothing
 
-reifySymbIdentType :: SymbIdent *ModuleEnv -> *(Maybe SymbolType, *ModuleEnv)
-reifySymbIdentType {symb_kind=SK_Function glob} menv
-  | glob.glob_module == menv.me_main_dcl_module_n                 = reifyFunDefsIdx glob.glob_object menv
-  | otherwise                                                     = reifyDclModulesIdx glob menv
-reifySymbIdentType {symb_kind=SK_IclMacro idx}               menv = reifyFunDefsIdx idx menv
-reifySymbIdentType {symb_kind=SK_LocalMacroFunction idx}     menv = reifyFunDefsIdx idx menv
-reifySymbIdentType {symb_kind=SK_DclMacro glob}              menv = reifyDclModulesIdx glob menv
-reifySymbIdentType {symb_kind=SK_LocalDclMacroFunction glob} menv = reifyDclModulesIdx glob menv
-reifySymbIdentType {symb_kind=SK_OverloadedFunction glob}    menv = reifyDclModulesIdx glob menv
-reifySymbIdentType {symb_kind=SK_GeneratedFunction fip idx}  menv = reifyFunDefsIdx idx menv
-reifySymbIdentType {symb_kind=SK_Constructor glob}           menv = reifyDclModulesIdx glob menv
-//reifySymbIdentType {symb_kind=SK_NewTypeConstructor globi}   menv = 
-reifySymbIdentType {symb_kind=SK_Generic glob tk}            menv = reifyDclModulesIdx glob menv
-reifySymbIdentType {symb_kind=SK_OverloadedConstructor glob} menv = reifyDclModulesIdx glob menv
-//reifySymbIdentType {symb_kind=SK_TFACVar eip}                menv = 
-//reifySymbIdentType {symb_kind=SK_VarContexts vcs}            menv = 
-//reifySymbIdentType {symb_kind=SK_TypeCodeAndContexts vcs}    menv = 
-reifySymbIdentType si menv = (Nothing, menv)
+symbIdentInMain :: SymbIdent *ModuleEnv -> *(Bool, *ModuleEnv)
+symbIdentInMain {symb_kind=SK_Function glob}              menv = globIdxInMain glob menv
+symbIdentInMain {symb_kind=SK_DclMacro glob}              menv = globIdxInMain glob menv
+symbIdentInMain {symb_kind=SK_LocalDclMacroFunction glob} menv = globIdxInMain glob menv
+symbIdentInMain {symb_kind=SK_OverloadedFunction glob}    menv = globIdxInMain glob menv
+symbIdentInMain {symb_kind=SK_Constructor glob}           menv = globIdxInMain glob menv
+symbIdentInMain {symb_kind=SK_Generic glob _}             menv = globIdxInMain glob menv
+symbIdentInMain {symb_kind=SK_OverloadedConstructor glob} menv = globIdxInMain glob menv
+symbIdentInMain _                                         menv = (False, menv)
 
-reifyDclModulesIdx :: (Global Index) *ModuleEnv -> *(Maybe SymbolType, *ModuleEnv)
-reifyDclModulesIdx {glob_module,glob_object} menv
+globIdxInMain :: (Global Index) *ModuleEnv -> *(Bool, *ModuleEnv)
+globIdxInMain glob menv
+  # (main_dcl_module_n, menv) = menv!me_main_dcl_module_n
+  = (glob.glob_module == main_dcl_module_n, menv)
+
+reifySymbIdentType :: SymbIdent *ModuleEnv -> *(SymbolType, *ModuleEnv)
+reifySymbIdentType {symb_kind=SK_Function glob} menv
+  | glob.glob_module == menv.me_main_dcl_module_n                 = reifyFunDefsIdxSymbolType glob.glob_object menv
+  | otherwise                                                     = reifyDclModulesIdxSymbolType glob menv
+reifySymbIdentType {symb_kind=SK_IclMacro idx}               menv = reifyFunDefsIdxSymbolType idx menv
+reifySymbIdentType {symb_kind=SK_LocalMacroFunction idx}     menv = reifyFunDefsIdxSymbolType idx menv
+reifySymbIdentType {symb_kind=SK_DclMacro glob}              menv = reifyDclModulesIdxSymbolType glob menv
+reifySymbIdentType {symb_kind=SK_LocalDclMacroFunction glob} menv = reifyDclModulesIdxSymbolType glob menv
+reifySymbIdentType {symb_kind=SK_OverloadedFunction glob}    menv = reifyDclModulesIdxSymbolType glob menv
+reifySymbIdentType {symb_kind=SK_GeneratedFunction fip idx}  menv = reifyFunDefsIdxSymbolType idx menv
+reifySymbIdentType {symb_kind=SK_Constructor glob}           menv = reifyDclModulesIdxSymbolType glob menv
+reifySymbIdentType {symb_kind=SK_NewTypeConstructor globi}   menv = abort "reifySymbIdentType: SK_NewTypeConstructor" // reifyDclModulesIdx` globi.gi_module globi.gi_index menv
+reifySymbIdentType {symb_kind=SK_Generic glob tk}            menv = reifyDclModulesIdxSymbolType glob menv
+reifySymbIdentType {symb_kind=SK_OverloadedConstructor glob} menv = reifyDclModulesIdxSymbolType glob menv
+reifySymbIdentType si menv = abort "reifySymbIdentType: unsupported"
+
+reifyDclModulesIdxSymbolType :: (Global Index) *ModuleEnv -> *(SymbolType, *ModuleEnv)
+reifyDclModulesIdxSymbolType {glob_module,glob_object} menv = reifyDclModulesIdxSymbolType` glob_module glob_object menv
+
+reifyDclModulesIdxSymbolType` :: Index Index *ModuleEnv -> *(SymbolType, *ModuleEnv)
+reifyDclModulesIdxSymbolType` glob_module glob_object menv
+  # (funTy, menv) = reifyDclModulesIdxFunType` glob_module glob_object menv
+  = (funTy.ft_type, menv)
+
+reifyDclModulesIdxFunType :: (Global Index) *ModuleEnv -> *(FunType, *ModuleEnv)
+reifyDclModulesIdxFunType {glob_module,glob_object} menv = reifyDclModulesIdxFunType` glob_module glob_object menv
+
+reifyDclModulesIdxFunType` :: Index Index *ModuleEnv -> *(FunType, *ModuleEnv)
+reifyDclModulesIdxFunType` glob_module glob_object menv
   # (dcl, dcls) = (menv.me_dcl_modules)![glob_module]
   # funTy       = dcl.dcl_functions.[glob_object]
-  = (Just funTy.ft_type, {menv & me_dcl_modules = dcls})
+  = (funTy, {menv & me_dcl_modules = dcls})
 
-reifyFunDefsIdx :: Index *ModuleEnv -> *(Maybe SymbolType, *ModuleEnv)
-reifyFunDefsIdx idx menv
+  //# (common, iclmod) = (menv.me_icl_module)!icl_common
+  //# dcls             = menv.me_dcl_modules
+  //# menv             = {menv & me_icl_module=iclmod}
+  //= case searchConsDefs ident common.com_cons_defs of
+      //Just cd = (Just cd, menv)
+      //_
+        //# cds = [cd \\ Just cd <- [searchConsDefs ident common.com_cons_defs \\ common <- [dclmod.dcl_common \\ dclmod <-: dcls]]]
+        //= (listToMaybe cds, menv)
+
+  //where
+    //searchConsDefs :: String .{# ConsDef} -> Maybe ConsDef
+    //searchConsDefs ident defs = listToMaybe [cd \\ cd <-: defs | cd.cons_ident.id_name == ident]
+
+    //ident = si.symb_ident.id_name
+reifyIclModuleGlobConsDef :: (Global Index) *ModuleEnv -> *(ConsDef, *ModuleEnv)
+reifyIclModuleGlobConsDef {glob_object} menv = reifyIclModuleIdxConsDef glob_object menv
+
+reifyIclModuleIdxConsDef :: Index *ModuleEnv -> *(ConsDef, *ModuleEnv)
+reifyIclModuleIdxConsDef glob_object menv
+  # (icl, menv) = menv!me_icl_module
+  # cd          = icl.icl_common.com_cons_defs.[glob_object]
+  = (cd, menv)
+
+reifyFunDefsIdxSymbolType :: Index *ModuleEnv -> *(SymbolType, *ModuleEnv)
+reifyFunDefsIdxSymbolType idx menv
   # (fd, fds) = (menv.me_fun_defs)![idx]
-  = (optionalToMaybe fd.fun_type, {menv & me_fun_defs = fds})
+  = case fd.fun_type of
+      Yes st -> (st, {menv & me_fun_defs = fds})
+      _      -> abort "reifyFunDefsIdxSymbolType: No fun type"
+
+reifyFunDefsIdxFunDef :: Index *ModuleEnv -> *(FunDef, *ModuleEnv)
+reifyFunDefsIdxFunDef idx menv
+  # (fd, fds) = (menv.me_fun_defs)![idx]
+  = (fd, {menv & me_fun_defs = fds})
 
 //import StdDebug
 
@@ -139,19 +223,6 @@ foldUArr f (b, arr)
               # (res, arr) = foldUArr` sz (idx + 1) b arr
               = f idx elem (res, arr)
           | otherwise = (b, arr)
-
-reifySymbolType :: String *ModuleEnv -> *(Maybe SymbolType, *ModuleEnv)
-reifySymbolType ident menv
-  # (mfd, menv) = reifyFunDef ident menv
-  = case mfd of
-      Just (_, fd)  -> case fd.fun_type of
-                         Yes t -> (Just t, menv)
-                         _     -> findInDcls menv
-      _             -> findInDcls menv
-  where
-  findInDcls menv
-    # (mft, menv) = reifyFunType ident menv
-    = (maybe Nothing (\ft -> Just ft.ft_type) mft, menv)
 
 fdArrToMap :: .{#FunDef} -> Map String FunDef
 fdArrToMap fds = fromList [(d.fun_ident.id_name, d) \\ d <-: fds]
@@ -255,25 +326,23 @@ symTyIsTask st =
 
 symbIdentIsTask :: SymbIdent *ModuleEnv -> *(Bool, *ModuleEnv)
 symbIdentIsTask si menv
-  # (mst, menv) = reifySymbIdentType si menv
-  = (maybe False symTyIsTask mst, menv)
-  where ident = si.symb_ident.id_name
+  # (st, menv) = reifySymbIdentType si menv
+  = (symTyIsTask st, menv)
 
-// TODO Look ident up in CommonDefs (for type constructors)
-isInfix :: String *ModuleEnv -> *(Bool, *ModuleEnv)
-isInfix ident menv
-  # (mfd, menv) = reifyFunDef ident menv
+isInfix :: SymbIdent *ModuleEnv -> *(Bool, *ModuleEnv)
+isInfix si menv
+  # (mfd, menv) = reifyFunDef si menv
   = case mfd of
-      Just (_, fd) = (prioIsInfix fd.fun_priority, menv)
+      Just fd = (prioIsInfix fd.fun_priority, menv)
       Nothing
-        # (mft, menv) = reifyFunType ident menv
+        # (mft, menv) = reifyFunType si menv
         = case mft of
             Just ft  = (prioIsInfix ft.ft_priority, menv)
             _
-              # (mcd, menv) = reifyConsDef ident menv
+              # (mcd, menv) = reifyConsDef si menv
               = case mcd of
                   Just cd -> (prioIsInfix cd.cons_priority, menv)
-                  Nothing -> abort ("Failed to determine fixity for " +++ ident)
+                  Nothing -> abort ("Failed to determine fixity for " +++ si.symb_ident.id_name)
 
 prioIsInfix :: Priority -> Bool
 prioIsInfix prio =

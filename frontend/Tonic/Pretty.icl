@@ -49,7 +49,7 @@ ppApp app menv
       # (d, menv)         = ppList args menv
       = (brackets d, menv)
   | otherwise
-      # (ifx, menv) = isInfix ident menv
+      # (ifx, menv) = isInfix app.app_symb menv
       | ifx         = ppInfix app menv
       | otherwise   = ppPrefix app menv
   where
@@ -101,12 +101,6 @@ ppDebugExpression (Var bv)             menv
   # (bvd, menv) = ppBoundVar bv menv
   = (text "<Var>" <+> bvd, menv)
 ppDebugExpression (App app)            menv = ppDebugApp app menv
-ppDebugExpression (e=:(Var bv) @ [e1, e2])      menv
-  # (ifx, menv) = isInfix bv.var_ident.id_name menv
-  # (ed, menv)  = ppDebugExpression e menv
-  # (e1d, menv) = ppDebugExpression e1 menv
-  # (e2d, menv) = ppDebugExpression e2 menv
-  = (if ifx (e1d <+> ed <+> e2d) (ed <+> e1d <+> e2d), menv)
 ppDebugExpression (Selection sk e ss)  menv
   # (ed, menv) = ppDebugExpression e menv
   # (sd, menv) = mapSt ppSelection ss menv
@@ -119,12 +113,7 @@ ppDebugExpression _                    menv = (text "ppDebugExpression: _", menv
 ppExpression :: Expression *ModuleEnv -> *(Doc, *ModuleEnv)
 ppExpression (Var bv)             menv = ppBoundVar bv menv
 ppExpression (App app)            menv = ppApp app menv
-ppExpression (e=:(Var bv) @ [e1, e2])      menv
-  # (ifx, menv) = isInfix bv.var_ident.id_name menv
-  # (ed, menv)  = ppExpression e menv
-  # (e1d, menv) = ppExpression e1 menv
-  # (e2d, menv) = ppExpression e2 menv
-  = (if ifx (e1d <+> ed <+> e2d) (ed <+> e1d <+> e2d), menv)
+// TODO Add infix case for @ with 2 arguments
 ppExpression (e @ es)             menv
   # (ed, menv)  = ppExpression e menv
   # (esd, menv) = mapSt ppExpression es menv
@@ -244,27 +233,27 @@ nodeToDot funnm g currIdx menv =
       # lxp = "<TABLE><TR><TD>" +++ fe +++ "</TD></TR><TR><TD>" +++ ppCompact ged2 +++ "</TD></TR></TABLE>"
       = mkDotNode [shape "none", margin "0", html lxp] menv
   where
-  currNode         = getNodeData` currIdx g
-  whiteNode attrs menv = mkDotNode [fontcolor "black", fillcolor "white", style "filled", label "" : attrs] menv
-  blackNode attrs menv = mkDotNode [fontcolor "white", fillcolor "black", style "filled", label "" : attrs] menv
-  mkDotNode attrs menv = (mkDotNodeLbl funnm currIdx +++ mkDotArgs attrs, menv)
-  shape v          = mkDotAttrKV "shape" v
-  label v          = mkDotAttrKV "label" v
-  color v          = mkDotAttrKV "color" v
-  fillcolor v      = mkDotAttrKV "fillcolor" v
-  fontcolor v      = mkDotAttrKV "fontcolor" v
-  width v          = mkDotAttrKV "width" v
-  height v         = mkDotAttrKV "height" v
-  style v          = mkDotAttrKV "style" v
-  orientation v    = mkDotAttrKV "orientation" v
-  html v           = "label=<" +++ v +++ ">"
-  margin v           = mkDotAttrKV "margin" v
-  mkJoinLbl DisFirstBin   = "First\nfinished\ntask"
-  mkJoinLbl DisFirstList  = "First\nfinished\ntask"
-  mkJoinLbl DisLeft       = "Left\nresult"
-  mkJoinLbl DisRight      = "Right\nresult"
-  mkJoinLbl ConAll        = "All\nresults"
-  mkJoinLbl ConPair       = "Pair\nof results"
+  currNode               = getNodeData` currIdx g
+  whiteNode attrs menv   = mkDotNode [fontcolor "black", fillcolor "white", style "filled", label "" : attrs] menv
+  blackNode attrs menv   = mkDotNode [fontcolor "white", fillcolor "black", style "filled", label "" : attrs] menv
+  mkDotNode attrs menv   = (mkDotNodeLbl funnm currIdx +++ mkDotArgs attrs, menv)
+  shape v                = mkDotAttrKV "shape" v
+  label v                = mkDotAttrKV "label" v
+  color v                = mkDotAttrKV "color" v
+  fillcolor v            = mkDotAttrKV "fillcolor" v
+  fontcolor v            = mkDotAttrKV "fontcolor" v
+  width v                = mkDotAttrKV "width" v
+  height v               = mkDotAttrKV "height" v
+  style v                = mkDotAttrKV "style" v
+  orientation v          = mkDotAttrKV "orientation" v
+  html v                 = "label=<" +++ v +++ ">"
+  margin v               = mkDotAttrKV "margin" v
+  mkJoinLbl DisFirstBin  = "First\nfinished\ntask"
+  mkJoinLbl DisFirstList = "First\nfinished\ntask"
+  mkJoinLbl DisLeft      = "Left\nresult"
+  mkJoinLbl DisRight     = "Right\nresult"
+  mkJoinLbl ConAll       = "All\nresults"
+  mkJoinLbl ConPair      = "Pair\nof results"
 
 getNodeData` :: Int GinGraph -> GNode
 getNodeData` n g = fromMaybe err (getNodeData n g)
