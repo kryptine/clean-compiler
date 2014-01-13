@@ -328,15 +328,15 @@ mkGraphAlg
       f l r chn
         # (sid, g)      = addNode (mkNode app GParallelSplit) chn.chn_graph
         # (jid, g)      = addNode (mkNode app (GParallelJoin join)) g
-        # (synl, chnl)  = exprCata mkGraphAlg l inh {chn & chn_graph = g}
-        # (synr, chnr)  = exprCata mkGraphAlg r inh chnl
+        # (synr, chnr)  = exprCata mkGraphAlg r inh {chn & chn_graph = g}
+        # (synl, chnl)  = exprCata mkGraphAlg l inh chnr
         = case (synl.syn_entry_id, synl.syn_exit_id, synr.syn_entry_id, synr.syn_exit_id) of //(synl.syn_entry_id, synr.syn_entry_id) of
             (Just le, Just lx, Just re, Just rx)
-              # g = addEmptyEdge (sid, le) chnr.chn_graph
+              # g = addEmptyEdge (sid, le) chnl.chn_graph
               # g = addEmptyEdge (sid, re) g
               # g = addEmptyEdge (lx, jid) g
               # g = addEmptyEdge (rx, jid) g
-              = annotExpr (sid, jid) (App app) inh { chnr & chn_graph = g} (mkDualIdSynExpr (Just sid) (Just jid))
+              = annotExpr (sid, jid) (App app) inh { chnl & chn_graph = g} (mkDualIdSynExpr (Just sid) (Just jid))
             (_, lid, rid, _)
               = edgeErr "bin app edge" lid l rid r chnr
         // TODO: If there are no two elems in the list, the expr is eta-reduced, so we need to pprint it instead of throwing an error
