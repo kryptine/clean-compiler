@@ -76,6 +76,53 @@ edgeErr errmsg lid lexpr rid rexpr chn
 // length of the symbol type's st_context to determine how many contexts there
 // are. Drop these from the beginning of the argument list.
 
+
+/*
+
+[(x, y) \\ x <- xs & y <- ys]
+==
+for each x in xs
+together with y in ys
+(x, y)
+
+[(x, y, z) \\ x <- xs & y <- ys & z <- zs]
+==
+for each x in xs
+together with y in ys
+together with z in zs
+(x, y, z)
+
+[(x, y, z) \\ x <- xs & y <- ys & z <- zs | x == y && y == z]
+==
+for each x in xs
+together with y in ys
+together with z in zs
+given x == y && y == z
+(x, y, z)
+
+
+[(x, y) \\ x <- xs, y <- ys]
+==
+for each x in xs
+after y in ys
+(x, y)
+
+[(x, y, z) \\ x <- xs, y <- ys, z <- zs]
+==
+for each x in xs
+after y in ys
+after z in zs
+(x, y, z)
+
+[(x, y, z) \\ x <- xs, y <- ys, z <- zs | x == y && y == z]
+==
+for each x in xs
+after y in ys
+after z in zs
+given x == y && y == z
+(x, y, z)
+*/
+
 sugarListCompr :: App *ModuleEnv -> *(GListComprehension, *ModuleEnv)
 sugarListCompr app menv
   # ((_, xs), menv) = dropAppContexts app menv
@@ -104,8 +151,9 @@ sugarListCompr app menv
     = ({ GListComprehension
       | output = GCleanExpression $ ppCompact od
       , guard = Nothing
-      , selector = ppCompact fvd
-      , input = GCleanExpression $ ppCompact gd
+      , comprElem = [{cePattern = ppCompact fvd, ceType = SeqComp /* TODO */, ceInput = GCleanExpression (ppCompact gd)}]
+       //selector = 
+      //, input = GCleanExpression $ ppCompact gd
       }, menv)
 
   //{ GListComprehension
@@ -114,6 +162,12 @@ sugarListCompr app menv
   //, selector = "selector"
   //, input = GCleanExpression "input"
   //}
+
+/*
+
+
+
+*/
 
 class MkNode e where
   mkNode :: e GNodeType -> GNode
@@ -130,49 +184,71 @@ withTwo app _         _ inh chn = ({mkSynExpr & syn_annot_expr = Just (App app)}
 
 // Annotation functionality temporarily disabled
 annotExpr :: (Int, Int) Expression InhExpression *ChnExpression SynExpression -> *(SynExpression, *ChnExpression)
-annotExpr (entry, exit) expr inh chn syn = (syn, chn)
-  //| inh.inh_tune_symb.pds_def == NoIndex || inh.inh_tune_symb.pds_module == NoIndex = (syn, chn)
-  //| otherwise
-      //# (papp, menv) = partialApp expr chn.chn_module_env
-      //# chn          = {chn & chn_module_env = menv}
-      //| papp         = (syn, chn)
-      //| otherwise
-        //# (app, chn)   = mkTuneApp chn
-        //= ({syn & syn_annot_expr = Just (App app)}, chn)
-  //where
-  //mkTuneApp chn
-    //# (mod, menv) = (chn.chn_module_env)!me_icl_module
-    //= ({ App
-       //| app_symb = { SymbIdent
-                    //| symb_ident = { Ident
-                                   //| id_name = "tonicTune"
-                                   //, id_info = nilPtr}
-                    //, symb_kind  = SK_Function
-                                     //{ Global
-                                     //| glob_object = inh.inh_tune_symb.pds_def
-                                     //, glob_module = inh.inh_tune_symb.pds_module}}
-       //, app_args = [ mkStr mod.icl_name.id_name
-                    //, mkStr inh.inh_curr_task_name
-                    //, mkInt entry
-                    //, mkInt exit
-                    //, expr]
-       //, app_info_ptr = nilPtr}
-      //, { chn & chn_module_env = menv })
-  //mkStr str = BasicExpr (BVS ("\"" +++ str +++ "\""))
-  //mkInt i   = BasicExpr (BVInt i)
-  //partialApp (App app) menv
-    //# (mft, menv) = reifyFunType app.app_symb.symb_ident.id_name menv
-    //= case mft of
-        //Just ft
-          //# ((_, args), menv) = dropAppContexts app menv
-          //= (length args < ft.ft_arity, menv)
-        //_ = (False, menv)
-  //partialApp _ menv        = (False, menv)
+//annotExpr (entry, exit) expr inh chn syn = (syn, chn)
+annotExpr (entry, exit) expr inh chn syn
+  | inh.inh_tune_symb.pds_def == NoIndex || inh.inh_tune_symb.pds_module == NoIndex = (syn, chn)
+  | otherwise
+      # (papp, menv) = partialApp expr chn.chn_module_env
+      # chn          = {chn & chn_module_env = menv}
+      | papp         = (syn, chn)
+      | otherwise
+        # (app, chn)   = mkTuneApp chn
+        = ({syn & syn_annot_expr = Just (App app)}, chn)
+  where
+  mkTuneApp chn
+    # (mod, menv) = (chn.chn_module_env)!me_icl_module
+    = ({ App
+       | app_symb = { SymbIdent
+                    | symb_ident = { Ident
+                                   | id_name = "tonicTune"
+                                   , id_info = nilPtr}
+                    , symb_kind  = SK_Function
+                                     { Global
+                                     | glob_object = inh.inh_tune_symb.pds_def
+                                     , glob_module = inh.inh_tune_symb.pds_module}}
+       , app_args = [ mkStr mod.icl_name.id_name
+                    , mkStr inh.inh_curr_task_name
+                    , mkInt entry
+                    , mkInt exit
+                    , expr]
+       , app_info_ptr = nilPtr}
+      , { chn & chn_module_env = menv })
+  mkStr str = BasicExpr (BVS ("\"" +++ str +++ "\""))
+  mkInt i   = BasicExpr (BVInt i)
+  partialApp (App app) menv
+    # (mft, menv) = reifyFunType app.app_symb menv
+    = case mft of
+        Just ft
+          # ((_, args), menv) = dropAppContexts app menv
+          = (length args < ft.ft_arity, menv)
+        _ = (False, menv)
+  partialApp _ menv        = (False, menv)
 
 mkGraphAlg :: *(ExpressionAlg InhExpression *ChnExpression SynExpression)
 mkGraphAlg
   =  {  mkExprAlg mkSynExpr
-     &  app = appC, at = atC, letE = letC,  caseE = caseC
+     &  app = appC, at = atC, letE = letC, caseE = caseC
+     ,  var                   = \bv             inh chn -> ({mkSynExpr & syn_annot_expr = Just (Var bv)}, chn)
+     ,  selection             = \sk e ss        inh chn -> ({mkSynExpr & syn_annot_expr = Just (Selection sk e ss)},    chn)
+     ,  update                = \e1 ss e2       inh chn -> ({mkSynExpr & syn_annot_expr = Just (Update e1 ss e2)},      chn)
+     ,  recordUpdate          = \gd e bs        inh chn -> ({mkSynExpr & syn_annot_expr = Just (RecordUpdate gd e bs)}, chn)
+     ,  tupleSelect           = \ds i e         inh chn -> ({mkSynExpr & syn_annot_expr = Just (TupleSelect ds i e)},   chn)
+     ,  basicExpr             = \bv             inh chn -> ({mkSynExpr & syn_annot_expr = Just (BasicExpr bv)},  chn)
+     ,  conditional           = \c              inh chn -> ({mkSynExpr & syn_annot_expr = Just (Conditional c)}, chn)
+     ,  anyCodeExpr           = \cb cf ss       inh chn -> ({mkSynExpr & syn_annot_expr = Just (AnyCodeExpr cb cf ss)}, chn)
+     ,  abcCodeExpr           = \ss b           inh chn -> ({mkSynExpr & syn_annot_expr = Just (ABCCodeExpr ss b)}, chn)
+     ,  matchExpr             = \gd e           inh chn -> ({mkSynExpr & syn_annot_expr = Just (MatchExpr gd e)},   chn)
+     ,  isConstructor         = \e gd n gi i p  inh chn -> ({mkSynExpr & syn_annot_expr = Just (IsConstructor e gd n gi i p)},  chn)
+     ,  freeVar               = \v              inh chn -> ({mkSynExpr & syn_annot_expr = Just (FreeVar v)}, chn)
+     ,  dictionariesFunction  = \xs e at        inh chn -> ({mkSynExpr & syn_annot_expr = Just (DictionariesFunction xs e at)}, chn)
+     ,  constant              = \si i prio      inh chn -> ({mkSynExpr & syn_annot_expr = Just (Constant si i prio)},   chn)
+     ,  classVariable         = \vip            inh chn -> ({mkSynExpr & syn_annot_expr = Just (ClassVariable vip)},    chn)
+     ,  dynamicExpr           = \de             inh chn -> ({mkSynExpr & syn_annot_expr = Just (DynamicExpr de)},       chn)
+     ,  typeCodeExpression    = \t              inh chn -> ({mkSynExpr & syn_annot_expr = Just (TypeCodeExpression t)}, chn)
+     ,  typeSignature         = \f e            inh chn -> ({mkSynExpr & syn_annot_expr = Just (TypeSignature f e)},    chn)
+     ,  ee                    = \               inh chn -> ({mkSynExpr & syn_annot_expr = Just EE},           chn)
+     ,  noBind                = \eip            inh chn -> ({mkSynExpr & syn_annot_expr = Just (NoBind eip)}, chn)
+     ,  failExpr              = \i              inh chn -> ({mkSynExpr & syn_annot_expr = Just (FailExpr i)}, chn)
      }
   where
   appC app inh chn // TODO Take arity into account: if a task is partially applied, wrap it in a lambda and annotate that
@@ -230,7 +306,10 @@ mkGraphAlg
                   # (mfd, menv)    = reifyFunDef rhsApp.app_symb chnl.chn_module_env
                   # (rSym, menv)   = ppSymbIdent rhsApp.app_symb menv
                   # rhsfd          = fromMaybe (abort $ "mkGraphAlg #1: failed to find function definition for " +++ ppCompact rSym) mfd
-                  # (rhsTy, menv)  = reifySymbIdentType rhsApp.app_symb menv
+                  # (mRhsTy, menv) = reifySymbIdentSymbolType rhsApp.app_symb menv
+                  # rhsTy          = case mRhsTy of
+                                       Just t -> t
+                                       _      -> abort "mkBind: failed to reify symboltype"
                   # patid          = case [x \\ x <- snd $ dropContexts rhsTy (getFunArgs rhsfd) | x.fv_def_level == -1] of
                                        [x:_] -> freeVarName x
                                        _     -> abort "Invalid bind"
@@ -330,7 +409,7 @@ mkGraphAlg
         # (jid, g)      = addNode (mkNode app (GParallelJoin join)) g
         # (synr, chnr)  = exprCata mkGraphAlg r inh {chn & chn_graph = g}
         # (synl, chnl)  = exprCata mkGraphAlg l inh chnr
-        = case (synl.syn_entry_id, synl.syn_exit_id, synr.syn_entry_id, synr.syn_exit_id) of //(synl.syn_entry_id, synr.syn_entry_id) of
+        = case (synl.syn_entry_id, synl.syn_exit_id, synr.syn_entry_id, synr.syn_exit_id) of
             (Just le, Just lx, Just re, Just rx)
               # g = addEmptyEdge (sid, le) chnl.chn_graph
               # g = addEmptyEdge (sid, re) g

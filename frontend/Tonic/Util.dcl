@@ -28,7 +28,7 @@ symbIdentObjectIdx :: SymbIdent -> Maybe Index
 
 reifyFunDef :: SymbIdent *ModuleEnv -> *(Maybe FunDef, *ModuleEnv)
 
-reifySymbIdentType :: SymbIdent *ModuleEnv -> *(SymbolType, *ModuleEnv)
+reifySymbIdentSymbolType :: SymbIdent *ModuleEnv -> *(Maybe SymbolType, *ModuleEnv)
 
 isCons :: String -> Bool
 
