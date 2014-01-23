@@ -42,11 +42,9 @@ concatStrings l = updateS 0 l (createArray (sum [size s \\ s <- l]) ' ')
 intercalateString :: String [String] -> String
 intercalateString xs xss = concatStrings (intersperse xs xss)
 
-//import StdDebug
-
 dropAppContexts :: App *ModuleEnv -> *(([Expression], [Expression]), *ModuleEnv)
 dropAppContexts app menv
-  # (mcd, menv) = trace_n ("dropAppContexts " +++ app.app_symb.symb_ident.id_name) reifyConsDef app.app_symb menv
+  # (mcd, menv) = reifyConsDef app.app_symb menv
   = case mcd of
       Just cd = (dropContexts cd.cons_type app.app_args, menv)
       Nothing
@@ -84,11 +82,9 @@ reifyConsDef si menv
 
     ident = si.symb_ident.id_name
 
-import StdDebug
-
 reifyFunType :: SymbIdent *ModuleEnv -> *(Maybe FunType, *ModuleEnv)
 reifyFunType si menv=:{me_dcl_modules}
-  = trace_n ("reifyFunType " +++ si.symb_ident.id_name) $ case (symbIdentModuleIdx si, symbIdentObjectIdx si) of
+  = case (symbIdentModuleIdx si, symbIdentObjectIdx si) of
       (Just mi, Just oi) -> reifyDclModulesIdxFunType` mi oi menv
       _                  -> (Nothing, menv)
 
@@ -120,10 +116,8 @@ symbIdentObjectIdx _                                         = Nothing
 reifyFunDef :: SymbIdent *ModuleEnv -> *(Maybe FunDef, *ModuleEnv)
 reifyFunDef si menv
   = case symbIdentObjectIdx si of
-      Just idx
-        # (fd, menv) = reifyFunDefsIdxFunDef idx menv
-        = (Just fd, menv)
-      _ = (Nothing, menv)
+      Just idx -> reifyFunDefsIdxFunDef idx menv
+      _        -> (Nothing, menv)
 
 optionalToMaybe :: (Optional a) -> Maybe a
 optionalToMaybe (Yes x) = Just x
@@ -143,6 +137,11 @@ globIdxInMain :: (Global Index) *ModuleEnv -> *(Bool, *ModuleEnv)
 globIdxInMain glob menv
   # (main_dcl_module_n, menv) = menv!me_main_dcl_module_n
   = (glob.glob_module == main_dcl_module_n, menv)
+
+idxIsMain :: Index *ModuleEnv -> *(Bool, *ModuleEnv)
+idxIsMain idx menv
+  # (main_dcl_module_n, menv) = menv!me_main_dcl_module_n
+  = (idx == main_dcl_module_n, menv)
 
 reifySymbIdentSymbolType :: SymbIdent *ModuleEnv -> *(Maybe SymbolType, *ModuleEnv)
 reifySymbIdentSymbolType {symb_kind=SK_Function glob} menv
@@ -177,10 +176,10 @@ reifyDclModulesIdxFunType` :: Index Index *ModuleEnv -> *(Maybe FunType, *Module
 reifyDclModulesIdxFunType` glob_module glob_object menv
   | glob_module == menv.me_main_dcl_module_n = (Nothing, menv)
   | otherwise
-    # (mdcl, dcls) = trace_n ("reifyDclModulesIdxFunType m " +++ toString glob_module +++ " o " +++ toString glob_object) muselect menv.me_dcl_modules glob_module
+    # (mdcl, dcls) = muselect menv.me_dcl_modules glob_module
     # menv         = {menv & me_dcl_modules = dcls}
     = case mdcl of
-        Just dcl -> trace_n ("reifyDclModulesIdxFunType o " +++ toString glob_object) (mselect dcl.dcl_functions glob_object, menv)
+        Just dcl -> (mselect dcl.dcl_functions glob_object, menv)
         _        -> (Nothing, menv)
 
   //# (common, iclmod) = (menv.me_icl_module)!icl_common
@@ -199,11 +198,12 @@ reifyDclModulesIdxFunType` glob_module glob_object menv
     //ident = si.symb_ident.id_name
 
 arrHasIdx :: (a e) Int -> Bool | Array a e
-arrHasIdx arr idx = size arr > idx
+arrHasIdx arr idx = idx < size arr
 
 muselect :: !u:(a e) !Int -> *(Maybe e, !u:(a e)) | Array a e
 muselect arr idx
   | arrHasIdx arr idx
+    # (sz, arr)   = usize arr
     # (elem, arr) = arr![idx]
     = (Just elem, arr)
   | otherwise     = (Nothing, arr)
@@ -213,18 +213,17 @@ mselect arr idx
   | arrHasIdx arr idx = Just arr.[idx]
   | otherwise         = Nothing
 
-reifyIclModuleGlobConsDef :: (Global Index) *ModuleEnv -> *(ConsDef, *ModuleEnv)
+reifyIclModuleGlobConsDef :: (Global Index) *ModuleEnv -> *(Maybe ConsDef, *ModuleEnv)
 reifyIclModuleGlobConsDef {glob_object} menv = reifyIclModuleIdxConsDef glob_object menv
 
-reifyIclModuleIdxConsDef :: Index *ModuleEnv -> *(ConsDef, *ModuleEnv)
+reifyIclModuleIdxConsDef :: Index *ModuleEnv -> *(Maybe ConsDef, *ModuleEnv)
 reifyIclModuleIdxConsDef glob_object menv
   # (icl, menv) = menv!me_icl_module
-  # cd          = trace_n ("reifyIclModuleIdxConsDef " +++ toString glob_object) icl.icl_common.com_cons_defs.[glob_object]
-  = (cd, menv)
+  = (mselect icl.icl_common.com_cons_defs glob_object, menv)
 
 reifyFunDefsIdxSymbolType :: Index *ModuleEnv -> *(Maybe SymbolType, *ModuleEnv)
 reifyFunDefsIdxSymbolType idx menv
-  # (mfd, fds) = trace_n ("reifyFunDefsIdxSymbolType " +++ toString idx) muselect menv.me_fun_defs idx
+  # (mfd, fds) = muselect menv.me_fun_defs idx
   # menv = {menv & me_fun_defs = fds}
   = case mfd of
       Just fd -> case fd.fun_type of
@@ -232,12 +231,10 @@ reifyFunDefsIdxSymbolType idx menv
                    _      -> (Nothing, menv)
       _       -> (Nothing, menv)
 
-reifyFunDefsIdxFunDef :: Index *ModuleEnv -> *(FunDef, *ModuleEnv)
+reifyFunDefsIdxFunDef :: Index *ModuleEnv -> *(Maybe FunDef, *ModuleEnv)
 reifyFunDefsIdxFunDef idx menv
-  # (fd, fds) = trace_n ("reifyFunDefsIdxFunDef " +++ toString idx) (menv.me_fun_defs)![idx]
-  = (fd, {menv & me_fun_defs = fds})
-
-//import StdDebug
+  # (mfd, fds) = muselect menv.me_fun_defs idx
+  = (mfd, {menv & me_fun_defs = fds})
 
 foldUArr :: (Int a v:(w:b, u:(arr a)) -> v:(w:b, u:(arr a))) v:(w:b, u:(arr a))
          -> v:(w:b, u:(arr a)) | Array arr a, [v <= u, v <= w]
@@ -379,9 +376,6 @@ prioIsInfix prio =
     Prio _ _  -> True
     _         -> False
 
-getFunName :: FunDef -> String
-getFunName fd = fd.fun_ident.id_name
-
 getFunArgs :: FunDef -> [FreeVar]
 getFunArgs {fun_body = TransformedBody tb} = tb.tb_args
 getFunArgs _                               = abort "getFunArgs: need a TransformedBody"
@@ -390,21 +384,31 @@ getFunRhs :: FunDef -> Expression
 getFunRhs {fun_body = TransformedBody tb} = tb.tb_rhs
 getFunRhs _                               = abort "getFunRhs: need a TransformedBody"
 
-updateWithAnnot :: Int (Maybe Expression) *ModuleEnv -> *ModuleEnv
-updateWithAnnot fidx (Just e) menv
-  # fun_defs = menv.me_fun_defs
-  # fun_defs = updateFunRhs fidx fun_defs e
-  = { menv & me_fun_defs = fun_defs}
+updateWithAnnot :: SymbIdent (Maybe Expression) *ModuleEnv -> *ModuleEnv
+updateWithAnnot si (Just expr) menv =
+  case (symbIdentModuleIdx si, symbIdentObjectIdx si) of
+    (Just midx, Just oidx) -> if (midx == menv.me_main_dcl_module_n)
+                                (doUpdate oidx)
+                                menv
+    _                      -> menv
+  where
+  doUpdate oidx
+    # fds = menv.me_fun_defs
+    # fds = updateFunRhs oidx fds expr
+    = {menv & me_fun_defs = fds}
 updateWithAnnot _ _ menv = menv
 
-updateFunRhs :: Int !*{#FunDef} Expression -> !*{#FunDef}
-updateFunRhs n fun_defs e
-  # (fd, fun_defs) = fun_defs![n]
-  # tb = case fd.fun_body of
-           TransformedBody fb -> { fb & tb_rhs = e }
-           _                  -> abort "updateFunRhs: need a TransformedBody"
-  # fd = { fd & fun_body = TransformedBody tb }
-  = { fun_defs & [n] = fd}
+updateFunRhs :: Index !*{#FunDef} Expression -> !*{#FunDef}
+updateFunRhs idx fun_defs e
+  # (mfd, fun_defs) = muselect fun_defs idx
+  = case mfd of
+      Just fd
+        # tb = case fd.fun_body of
+                 TransformedBody fb -> { fb & tb_rhs = e }
+                 _                  -> abort "updateFunRhs: need a TransformedBody"
+        # fd = { fd & fun_body = TransformedBody tb }
+        = { fun_defs & [idx] = fd}
+      _ = fun_defs
 
 emptyEdge :: GEdge
 emptyEdge = {GEdge | edge_pattern = Nothing }

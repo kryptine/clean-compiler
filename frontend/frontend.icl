@@ -167,6 +167,12 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
     # (fun_defs, predef_symbols, files, heaps) = ginTonic main_dcl_module_n fun_defs icl_mod dcl_mods common_defs predef_symbols files heaps
 // TODO END GiN Tonic HACK
 
+    # (_,f,files) = fopen ("Clean System Files/groups_posttonic_" +++ icl_mod.icl_name.id_name) FWriteText files
+      (components, fun_defs, f) = showGroups groups 0 False fun_defs f
+      (ok,files) = fclose f files
+    | ok<>ok
+        = abort "";
+
 	# icl_gencase_indices = icl_function_indices.ifi_gencase_indices
 	# icl_function_indices = {icl_function_indices & ifi_gencase_indices = icl_gencase_indices }
 
@@ -175,7 +181,7 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 		= partitionateFunctions fun_defs (icl_global_functions++icl_function_indices.ifi_instance_indices
 											++[icl_function_indices.ifi_specials_indices
 											  : icl_gencase_indices++icl_function_indices.ifi_type_function_indices])
-		
+
 	| options.feo_up_to_phase == FrontEndPhaseTypeCheck
 		=	frontSyntaxTree cached_dcl_macros cached_dcl_mods main_dcl_module_n
 							predef_symbols hash_table files error io out tcl_file icl_mod dcl_mods fun_defs components array_instances heaps

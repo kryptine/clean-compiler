@@ -72,15 +72,13 @@ prioIsInfix :: Priority -> Bool
 
 fdArrToMap :: .{#FunDef} -> Map String FunDef
 
-getFunName :: FunDef -> String
-
 getFunArgs :: FunDef -> [FreeVar]
 
 getFunRhs :: FunDef -> Expression
 
-updateWithAnnot :: Int (Maybe Expression) *ModuleEnv -> *ModuleEnv
+updateWithAnnot :: SymbIdent (Maybe Expression) *ModuleEnv -> *ModuleEnv
 
-updateFunRhs :: Int !*{#FunDef} Expression -> !*{#FunDef}
+updateFunRhs :: Index !*{#FunDef} Expression -> !*{#FunDef}
 
 emptyEdge :: GEdge
 

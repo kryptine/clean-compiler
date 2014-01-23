@@ -44,8 +44,8 @@ foldUArr f (b, arr)
   = foldUArr` sz 0 b arr
   where foldUArr` sz idx b arr
           | idx < sz
-              # (elem, arr) = uselect arr idx
-              # (res, arr) = foldUArr` sz (idx + 1) b arr
+              #! (elem, arr) = uselect arr idx
+              #! (res, arr)  = foldUArr` sz (idx + 1) b arr
               = f idx elem (res, arr)
           | otherwise = (b, arr)
 
@@ -69,6 +69,7 @@ ginTonic` :: ModuleN ((Map String TonicTask) IclModule *ModuleEnv -> *(String, *
              !*{#FunDef} IclModule {#DclModule} !{#CommonDefs} !*PredefinedSymbols *Heaps
           -> *(String, !*{#FunDef}, !*PredefinedSymbols, !*Heaps)
 ginTonic` main_dcl_module_n repsToString fun_defs icl_module dcl_modules common_defs predef_symbols heaps
+  # (pss, predef_symbols)     = usize predef_symbols
   # (pds, predef_symbols)     = predef_symbols![PD_tonicTune]
   # ((reps, heaps), fun_defs) = foldUArr (appDefInfo pds) ((newMap, heaps), fun_defs)
   # menv                      = mkModuleEnv main_dcl_module_n fun_defs icl_module dcl_modules
@@ -85,3 +86,11 @@ ginTonic` main_dcl_module_n repsToString fun_defs icl_module dcl_modules common_
             _      -> reps
         , heaps), menv.me_fun_defs)
     | otherwise        = ((reps, heaps), fun_defs)
+
+updateWithAnnot :: Int (Maybe Expression) *ModuleEnv -> *ModuleEnv
+updateWithAnnot fidx (Just e) menv
+  # fun_defs = menv.me_fun_defs
+  # fun_defs = updateFunRhs fidx fun_defs e
+  = { menv & me_fun_defs = fun_defs}
+updateWithAnnot _ _ menv = menv
+

@@ -25,7 +25,6 @@ import iTasks.Framework.Tonic.AbsSyn
 //import Tonic.Tonic
 
 import StdMisc
-import StdDebug
 
 /*
 To reconstruct list comprehensions:
@@ -228,27 +227,27 @@ mkGraphAlg :: *(ExpressionAlg InhExpression *ChnExpression SynExpression)
 mkGraphAlg
   =  {  mkExprAlg mkSynExpr
      &  app = appC, at = atC, letE = letC, caseE = caseC
-     ,  var                   = \bv             inh chn -> ({mkSynExpr & syn_annot_expr = Just (Var bv)}, chn)
-     ,  selection             = \sk e ss        inh chn -> ({mkSynExpr & syn_annot_expr = Just (Selection sk e ss)},    chn)
-     ,  update                = \e1 ss e2       inh chn -> ({mkSynExpr & syn_annot_expr = Just (Update e1 ss e2)},      chn)
-     ,  recordUpdate          = \gd e bs        inh chn -> ({mkSynExpr & syn_annot_expr = Just (RecordUpdate gd e bs)}, chn)
-     ,  tupleSelect           = \ds i e         inh chn -> ({mkSynExpr & syn_annot_expr = Just (TupleSelect ds i e)},   chn)
-     ,  basicExpr             = \bv             inh chn -> ({mkSynExpr & syn_annot_expr = Just (BasicExpr bv)},  chn)
-     ,  conditional           = \c              inh chn -> ({mkSynExpr & syn_annot_expr = Just (Conditional c)}, chn)
-     ,  anyCodeExpr           = \cb cf ss       inh chn -> ({mkSynExpr & syn_annot_expr = Just (AnyCodeExpr cb cf ss)}, chn)
-     ,  abcCodeExpr           = \ss b           inh chn -> ({mkSynExpr & syn_annot_expr = Just (ABCCodeExpr ss b)}, chn)
-     ,  matchExpr             = \gd e           inh chn -> ({mkSynExpr & syn_annot_expr = Just (MatchExpr gd e)},   chn)
-     ,  isConstructor         = \e gd n gi i p  inh chn -> ({mkSynExpr & syn_annot_expr = Just (IsConstructor e gd n gi i p)},  chn)
-     ,  freeVar               = \v              inh chn -> ({mkSynExpr & syn_annot_expr = Just (FreeVar v)}, chn)
-     ,  dictionariesFunction  = \xs e at        inh chn -> ({mkSynExpr & syn_annot_expr = Just (DictionariesFunction xs e at)}, chn)
-     ,  constant              = \si i prio      inh chn -> ({mkSynExpr & syn_annot_expr = Just (Constant si i prio)},   chn)
-     ,  classVariable         = \vip            inh chn -> ({mkSynExpr & syn_annot_expr = Just (ClassVariable vip)},    chn)
-     ,  dynamicExpr           = \de             inh chn -> ({mkSynExpr & syn_annot_expr = Just (DynamicExpr de)},       chn)
-     ,  typeCodeExpression    = \t              inh chn -> ({mkSynExpr & syn_annot_expr = Just (TypeCodeExpression t)}, chn)
-     ,  typeSignature         = \f e            inh chn -> ({mkSynExpr & syn_annot_expr = Just (TypeSignature f e)},    chn)
-     ,  ee                    = \               inh chn -> ({mkSynExpr & syn_annot_expr = Just EE},           chn)
-     ,  noBind                = \eip            inh chn -> ({mkSynExpr & syn_annot_expr = Just (NoBind eip)}, chn)
-     ,  failExpr              = \i              inh chn -> ({mkSynExpr & syn_annot_expr = Just (FailExpr i)}, chn)
+     ,  var                   = \bv             _ chn -> ({mkSynExpr & syn_annot_expr = Just (Var bv)}, chn)
+     ,  selection             = \sk e ss        _ chn -> ({mkSynExpr & syn_annot_expr = Just (Selection sk e ss)},    chn)
+     ,  update                = \e1 ss e2       _ chn -> ({mkSynExpr & syn_annot_expr = Just (Update e1 ss e2)},      chn)
+     ,  recordUpdate          = \gd e bs        _ chn -> ({mkSynExpr & syn_annot_expr = Just (RecordUpdate gd e bs)}, chn)
+     ,  tupleSelect           = \ds i e         _ chn -> ({mkSynExpr & syn_annot_expr = Just (TupleSelect ds i e)},   chn)
+     ,  basicExpr             = \bv             _ chn -> ({mkSynExpr & syn_annot_expr = Just (BasicExpr bv)},  chn)
+     ,  conditional           = \c              _ chn -> ({mkSynExpr & syn_annot_expr = Just (Conditional c)}, chn)
+     ,  anyCodeExpr           = \cb cf ss       _ chn -> ({mkSynExpr & syn_annot_expr = Just (AnyCodeExpr cb cf ss)}, chn)
+     ,  abcCodeExpr           = \ss b           _ chn -> ({mkSynExpr & syn_annot_expr = Just (ABCCodeExpr ss b)}, chn)
+     ,  matchExpr             = \gd e           _ chn -> ({mkSynExpr & syn_annot_expr = Just (MatchExpr gd e)},   chn)
+     ,  isConstructor         = \e gd n gi i p  _ chn -> ({mkSynExpr & syn_annot_expr = Just (IsConstructor e gd n gi i p)},  chn)
+     ,  freeVar               = \v              _ chn -> ({mkSynExpr & syn_annot_expr = Just (FreeVar v)}, chn)
+     ,  dictionariesFunction  = \xs e at        _ chn -> ({mkSynExpr & syn_annot_expr = Just (DictionariesFunction xs e at)}, chn)
+     ,  constant              = \si i prio      _ chn -> ({mkSynExpr & syn_annot_expr = Just (Constant si i prio)},   chn)
+     ,  classVariable         = \vip            _ chn -> ({mkSynExpr & syn_annot_expr = Just (ClassVariable vip)},    chn)
+     ,  dynamicExpr           = \de             _ chn -> ({mkSynExpr & syn_annot_expr = Just (DynamicExpr de)},       chn)
+     ,  typeCodeExpression    = \t              _ chn -> ({mkSynExpr & syn_annot_expr = Just (TypeCodeExpression t)}, chn)
+     ,  typeSignature         = \f e            _ chn -> ({mkSynExpr & syn_annot_expr = Just (TypeSignature f e)},    chn)
+     ,  ee                    = \               _ chn -> ({mkSynExpr & syn_annot_expr = Just EE},           chn)
+     ,  noBind                = \eip            _ chn -> ({mkSynExpr & syn_annot_expr = Just (NoBind eip)}, chn)
+     ,  failExpr              = \i              _ chn -> ({mkSynExpr & syn_annot_expr = Just (FailExpr i)}, chn)
      }
   where
   appC app inh chn // TODO Take arity into account: if a task is partially applied, wrap it in a lambda and annotate that
@@ -314,10 +313,8 @@ mkGraphAlg
                                        [x:_] -> freeVarName x
                                        _     -> abort "Invalid bind"
                   # (syne, chn)    = exprCata mkGraphAlg (getFunRhs rhsfd) inh { chnl & chn_module_env = menv }
-                  # menv           = case symbIdentObjectIdx rhsApp.app_symb of
-                                       Just sid -> updateWithAnnot sid syne.syn_annot_expr chn.chn_module_env
-                                       _        -> abort "mkBind: cannot reify symb ident"
-                  = ((syne, {chn & chn_module_env = menv}), mkEdge patid)
+                  # menv           = updateWithAnnot rhsApp.app_symb syne.syn_annot_expr chn.chn_module_env
+                  = (({syne & syn_annot_expr = Nothing}, {chn & chn_module_env = menv}), mkEdge patid)
                 _ = (exprCata mkGraphAlg rhsExpr inh chnl, emptyEdge)
         = case (synl.syn_entry_id, synl.syn_exit_id, synr.syn_entry_id, synr.syn_exit_id) of
             (Just _, Just lx, Just rn, Just _)
@@ -484,9 +481,7 @@ mkGraphAlg
         # g             = case syne.syn_entry_id of
                             Just eid -> addEmptyEdge (lid, eid) chn.chn_graph
                             _        -> chn.chn_graph
-        # menv          = case symbIdentObjectIdx app.app_symb of
-                            Just sid -> updateWithAnnot sid syne.syn_annot_expr chn.chn_module_env
-                            _        -> abort "atC: no app_symb idx"
+        # menv          = updateWithAnnot app.app_symb syne.syn_annot_expr chn.chn_module_env
         # chn           = { chn & chn_module_env = menv, chn_graph = g }
         = annotExpr (lid, lid) (e @ es) inh chn ({syne & syn_entry_id = Just lid, syn_exit_id = Just lid}) // mkSingleIdSynExpr (Just lid)) // TODO Do something with syne?
     | otherwise    =  abort "atC: otherwise case" // TODO : pretty print function application
@@ -535,8 +530,8 @@ mkGraphAlg
       # l          = case syn.syn_annot_expr of
                        Just ae -> {lt & let_expr = ae}
                        _       -> lt
-      //= annotExpr (Let l) inh chn syn // TODO WHY DOESNT THIS WORK?
-      = (syn, chn)
+      = annotExpr (0, 0) (Let l) inh chn syn // TODO Check IDs
+      //= (syn, chn)
     mkLet Nothing lt inh chn
       # (binds, menv) = mkGLetBinds lt chn.chn_module_env
       # (lid, g)      = addNode (mkNode lt (GLet {GLet | glet_binds = binds})) chn.chn_graph
