@@ -124,6 +124,7 @@ CleanFunctoSaplFunc modindex funindex
         			# sl = case ft of
 								{st_args_strictness = NotStrict} = 0
 								{st_args_strictness = Strict x} = x
+								{st_args_strictness = StrictList x _} = x // TODO: the others?
 								
 					// If the return type is a strict tuple, a special name is generated for it,
 					// indicating which argument is strict. Later the references to the orignal
@@ -224,12 +225,27 @@ where
 	// Array and Record updates
 	makeArrayUpdate expr1 sels expr2  = SaplApp (makeSelector sels expr1) expr2
 	
+	/* 
+	TODO: DictionarySelection is possibly broken. The following example (without the type) generates
+	wrong code:
+	
+	//g :: {!e} -> [e]
+	g {[0]=x} = [x]
+
+	a :: {Int}
+	a = {2}
+
+	Start :: [Int]
+	Start = g a
+	*/
+	
 	makeSelector  [] e = e
 	makeSelector  [selector:sels] e  = makeSelector  sels (mksel selector e)
 	where mksel (RecordSelection globsel ind)     exp = SaplApp (SaplFun (mns !! globsel.glob_module  +++ ".get_" +++ toString globsel.glob_object.ds_ident +++ "_" +++ toString globsel.glob_object.ds_index)) e 
 	      mksel (ArraySelection globsel _ e)      exp = multiApp [SaplFun (mns !! globsel.glob_module +++ "." +++ toString globsel.glob_object.ds_ident +++ "_" +++ toString globsel.glob_object.ds_index),exp, cleanExpToSaplExp No e]  
 	      mksel (DictionarySelection var sels _ e)exp = multiApp [makeSelector sels (getBoundVarName var),exp,cleanExpToSaplExp No e]
 	
+	// backendconvert.convertSelector (BESelect)
 	makeRecordUpdate expression [         ]                      = expression
 	makeRecordUpdate expression [upbind:us] | not(isNoBind value)= makeRecordUpdate (multiApp [SaplFun (field_mod +++ ".set_" +++ field +++ "_" +++ index),expression,cleanExpToSaplExp No value]) us
 	                                                             = makeRecordUpdate expression us
