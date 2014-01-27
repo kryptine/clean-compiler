@@ -113,7 +113,12 @@ ppDebugExpression _                    menv = (text "ppDebugExpression: _", menv
 ppExpression :: Expression *ModuleEnv -> *(Doc, *ModuleEnv)
 ppExpression (Var bv)             menv = ppBoundVar bv menv
 ppExpression (App app)            menv = ppApp app menv
-// TODO Add infix case for @ with 2 arguments
+// TODO Infix check
+ppExpression (e @ [e1, e2])             menv
+  # (ed, menv)  = ppExpression e menv
+  # (e1d, menv) = ppExpression e1 menv
+  # (e2d, menv) = ppExpression e2 menv
+  = (e1d <+> ed <+> e2d, menv) // TODO: isTask etc
 ppExpression (e @ es)             menv
   # (ed, menv)  = ppExpression e menv
   # (esd, menv) = mapSt ppExpression es menv
@@ -125,7 +130,6 @@ ppExpression (Selection sk e ss)  menv
 ppExpression (BasicExpr bv)               menv = ppBasicValue bv menv
 ppExpression (Let _)                      menv = (text "ppExpression: Let", menv) // empty
 ppExpression (Case _)                     menv = (text "ppExpression: Case", menv) // empty
-ppExpression (Selection _ _ _)            menv = (text "ppExpression: Selection", menv) // empty
 ppExpression (Update _ _ _)               menv = (text "ppExpression: Update", menv) // empty
 ppExpression (RecordUpdate _ _ _)         menv = (text "ppExpression: RecordUpdate", menv) // empty
 ppExpression (TupleSelect _ _ _)          menv = (text "ppExpression: TupleSelect", menv) // empty
