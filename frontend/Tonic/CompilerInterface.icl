@@ -69,17 +69,18 @@ ginTonic` :: ModuleN ((Map String TonicTask) IclModule *ModuleEnv -> *(String, *
              !*{#FunDef} IclModule {#DclModule} !{#CommonDefs} !*PredefinedSymbols *Heaps
           -> *(String, !*{#FunDef}, !*PredefinedSymbols, !*Heaps)
 ginTonic` main_dcl_module_n repsToString fun_defs icl_module dcl_modules common_defs predef_symbols heaps
-  # (pss, predef_symbols)     = usize predef_symbols
-  # (pds, predef_symbols)     = predef_symbols![PD_tonicTune]
-  # ((reps, heaps), fun_defs) = foldUArr (appDefInfo pds) ((newMap, heaps), fun_defs)
-  # menv                      = mkModuleEnv main_dcl_module_n fun_defs icl_module dcl_modules
-  # (str, menv)               = repsToString reps icl_module menv
+  # (pss, predef_symbols)        = usize predef_symbols
+  # (tonicTune, predef_symbols)  = predef_symbols![PD_tonicTune]
+  # (tonicBind, predef_symbols)  = predef_symbols![PD_tonicBind]
+  # ((reps, heaps), fun_defs)    = foldUArr (appDefInfo tonicTune tonicBind) ((newMap, heaps), fun_defs)
+  # menv                         = mkModuleEnv main_dcl_module_n fun_defs icl_module dcl_modules
+  # (str, menv)                  = repsToString reps icl_module menv
   = (str, menv.me_fun_defs, predef_symbols, heaps)
   where
-  appDefInfo pds idx fd ((reps, heaps), fun_defs)
+  appDefInfo tonicTune tonicBind idx fd ((reps, heaps), fun_defs)
     | funIsTask fd && fd.fun_info.fi_def_level == 1
       # menv                          = mkModuleEnv main_dcl_module_n fun_defs icl_module dcl_modules
-      # ((args, mg, me), menv, heaps) = funToGraph pds fd menv heaps
+      # ((args, mg, me), menv, heaps) = funToGraph tonicTune tonicBind fd menv heaps
       # menv                          = updateWithAnnot idx me menv
       = ( (case mg of
             Just g -> put fd.fun_ident.id_name {TonicTask | tt_args = args, tt_graph = g} reps

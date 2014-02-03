@@ -51,12 +51,14 @@ At e es :== e @ es
   { inh_curr_task_name  :: !String
   , inh_case_expr       :: !Maybe Expression
   , inh_tune_symb       :: !PredefinedSymbol
+  , inh_bind_symb       :: !PredefinedSymbol
+  , inh_is_bind_lam     :: Bool
   }
 
 :: *ChnExpression =
   { chn_graph       :: !*GinGraph
   , chn_module_env  :: !*ModuleEnv
-  , chn_uniqs       :: *[Int]
+  //, chn_uniqs       :: *[Int]
   , chn_heaps       :: *Heaps
   }
 
@@ -77,7 +79,7 @@ exprCata :: *(ExpressionAlg inh *chn syn) Expression inh *chn -> *(syn, *chn)
 
 mkExprAlg :: syn -> *ExpressionAlg inh *chn syn
 
-mkInhExpr :: String PredefinedSymbol -> InhExpression
+mkInhExpr :: String PredefinedSymbol PredefinedSymbol -> InhExpression
 
 mkChnExpr :: *GinGraph *[Int] *ModuleEnv *Heaps -> *ChnExpression
 

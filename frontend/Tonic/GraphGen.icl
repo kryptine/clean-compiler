@@ -203,8 +203,6 @@ annotExpr (entry, exit) expr inh chn syn
                     , expr]
        , app_info_ptr = nilPtr}
       , { chn & chn_module_env = menv })
-  mkStr str = BasicExpr (BVS ("\"" +++ str +++ "\""))
-  mkInt i   = BasicExpr (BVInt i)
   partialApp (App app) menv
     # (mft, menv) = reifyFunType app.app_symb menv
     = case mft of
@@ -213,6 +211,9 @@ annotExpr (entry, exit) expr inh chn syn
           = (length args < ft.ft_arity, menv)
         _ = (False, menv)
   partialApp _ menv        = (False, menv)
+
+mkStr str = BasicExpr (BVS ("\"" +++ str +++ "\""))
+mkInt i   = BasicExpr (BVInt i)
 
 mkTonicInfo :: String Int Int (Maybe String) InhExpression -> TonicInfo
 mkTonicInfo modname euid xuid mval inh =
@@ -231,6 +232,10 @@ getModuleName chn
   # menv = {menv & me_icl_module = icl}
   # chn  = {chn & chn_module_env = menv}
   = (nm, chn)
+
+lastElem :: [a] -> a
+lastElem [x]    = x
+lastElem [_:xs] = lastElem xs
 
 mkGraphAlg :: *(ExpressionAlg InhExpression *ChnExpression SynExpression)
 mkGraphAlg
@@ -293,10 +298,10 @@ mkGraphAlg
             (Just _, Just lx, Just rn, Just _)
               # g    = addEdge emptyEdge (lx, rn) chnr.chn_graph
               # app` = case (synl.syn_annot_expr, synr.syn_annot_expr) of
-                         (Just la, Just ra) -> { app & app_args = ctxs ++ [la, ra] }
-                         (Just la, _)       -> { app & app_args = ctxs ++ [la, rhsExpr] }
+                         (Just la, Just ra) -> { app & app_args = ctxs ++ [la, ra]}
+                         (Just la, _)       -> { app & app_args = ctxs ++ [la, rhsExpr]}
                          _                  -> app
-              = ({mkSingleIdSynExpr synl.syn_entry_id & syn_annot_expr = Just (App app`)}, { chnr & chn_graph = g})
+              = ({mkSingleIdSynExpr synl.syn_entry_id & syn_annot_expr = Just (App app`)}, chnr)
             (_, lid, rid, _)
               = edgeErr "bind edge (>>|)" lid lhsExpr rid rhsExpr chnr
 
@@ -312,14 +317,12 @@ mkGraphAlg
                 (True, App rhsApp)
                   # (mfd, menv)    = reifyFunDef rhsApp.app_symb chnl.chn_module_env
                   # (rSym, menv)   = ppSymbIdent rhsApp.app_symb menv
-                  # rhsfd          = fromMaybe (abort $ "mkGraphAlg #1: failed to find function definition for " +++ ppCompact rSym) mfd
                   # (mRhsTy, menv) = reifySymbIdentSymbolType rhsApp.app_symb menv
-                  # rhsTy          = case mRhsTy of
-                                       Just t -> t
-                                       _      -> abort "mkBind: failed to reify symboltype"
-                  # patid          = case [x \\ x <- snd $ dropContexts rhsTy (getFunArgs rhsfd) | x.fv_def_level == -1] of
-                                       [x:_] -> freeVarName x
-                                       _     -> abort "Invalid bind"
+                  # rhsfd          = fromMaybe (abort $ "mkBind: failed to find function definition for " +++ ppCompact rSym) mfd
+                  # args           = getFunArgs rhsfd
+                  # rhsTy          = fromMaybe (abort "mkBind: failed to reify SymbolType") mRhsTy
+                  # funArgs        = snd $ dropContexts rhsTy args
+                  # patid          = lastElem [freeVarName x \\ x <- funArgs| x.fv_def_level == -1]
                   # (syne, chn)    = exprCata mkGraphAlg (getFunRhs rhsfd) inh { chnl & chn_module_env = menv }
                   # menv           = updateWithAnnot rhsApp.app_symb syne.syn_annot_expr chn.chn_module_env
                   = (({syne & syn_annot_expr = Nothing}, {chn & chn_module_env = menv}), mkEdge patid)
@@ -327,11 +330,27 @@ mkGraphAlg
         = case (synl.syn_entry_id, synl.syn_exit_id, synr.syn_entry_id, synr.syn_exit_id) of
             (Just _, Just lx, Just rn, Just _)
               # g    = addEdge edge (lx, rn) chnr.chn_graph
+              # chnr        = { chnr & chn_graph = g}
+              # (mod, menv) = (chnr.chn_module_env)!me_icl_module
+              # chnr        = { chnr & chn_module_env = menv }
+              # bs   = { SymbIdent
+                       | symb_ident = { Ident
+                                      | id_name = "tonicBind"
+                                      , id_info = nilPtr}
+                       , symb_kind = SK_Function
+                                      { Global
+                                      | glob_object = inh.inh_bind_symb.pds_def
+                                      , glob_module = inh.inh_bind_symb.pds_module
+                                      }
+                       }
+              # pref = [ mkStr mod.icl_name.id_name, mkStr inh.inh_curr_task_name
+                       , mkInt lx, mkInt rn
+                       ]
               # app` = case (synl.syn_annot_expr, synr.syn_annot_expr) of
-                         (Just la, Just ra) -> { app & app_args = ctxs ++ [la, ra] }
-                         (Just la, _)       -> { app & app_args = ctxs ++ [la, rhsExpr] }
+                         (Just la, Just ra) -> { app & app_symb = bs, app_args = ctxs ++ pref ++ [la, ra] }
+                         (Just la, _)       -> { app & app_symb = bs, app_args = ctxs ++ pref ++ [la, rhsExpr] }
                          _                  -> app
-              = ({mkSingleIdSynExpr synl.syn_entry_id & syn_annot_expr = Just (App app`)}, {chnr & chn_graph = g })
+              = ({mkSingleIdSynExpr synl.syn_entry_id & syn_annot_expr = Just (App app`)}, chnr)
             (_, lid, rid, _)
               = edgeErr "bind edge (>>=)" lid lhsExpr rid rhsExpr chnr
 
@@ -340,7 +359,8 @@ mkGraphAlg
       # (ppd, chn) = case args of
                        [x:_] -> mkRet x chn
                        _     -> (GCleanExpression "", chn)
-      # (n, g)     = addNodeWithIndex (\ni -> { GNode|nodeType = GReturn ppd
+      # (n, g)     = addNodeWithIndex (\ni -> { GNode
+                                              | nodeType      = GReturn ppd
                                               , nodeTonicInfo = Just $ mkTonicInfo mn ni ni Nothing inh
                                               }) chn.chn_graph
       = annotExpr (n, n) (App app) inh {chn & chn_graph = g} (mkSingleIdSynExpr (Just n))
@@ -389,11 +409,15 @@ mkGraphAlg
         // TODO: If there are no two elems in the list, the expr is eta-reduced, so we need to pprint it instead of throwing an error
 
     mkTaskApp app ctxs args inh chn
+      # (mn, chn)  = getModuleName chn
       # (ps, menv) = mapSt ppExpression args chn.chn_module_env
       //# menv       = trace_n ("\nmkTaskApp trace:\n" +++ foldr (\x xs -> ppCompact x +++ xs) "" ps +++ "\n") menv
       # chn        = {chn & chn_module_env = menv}
       # appArgs    = map (GCleanExpression o ppCompact) ps  // TODO: When do we pprint a Clean expr? And when do we generate a subgraph?
-      # (an, g)    = addNode (mkGNode ((GTaskApp (appFunName app)) appArgs)) chn.chn_graph
+      # (an, g)    = addNodeWithIndex (\ni -> { GNode
+                                              | nodeType      = GTaskApp (appFunName app) appArgs
+                                              , nodeTonicInfo = Just $ mkTonicInfo mn ni ni Nothing inh
+                                              }) chn.chn_graph
       = annotExpr (an, an) (App app) inh { chn & chn_graph = g } (mkSingleIdSynExpr (Just an))
 
     mkBinApp app ctxs args pat inh chn
@@ -644,11 +668,11 @@ addNode` node annot chn
 // for the FunDef and the other part should generate the init and stop nodes.
 // Yet another part should just get the right-hand side Expression of a FunDef
 // so we can just cata it.
-funToGraph :: PredefinedSymbol FunDef *ModuleEnv *Heaps -> *(([String], Maybe GinGraph, Maybe Expression), *ModuleEnv, *Heaps)
-funToGraph pds fd=:{fun_ident=fun_ident, fun_body = TransformedBody tb} menv heaps = mkBody
+funToGraph :: PredefinedSymbol PredefinedSymbol FunDef *ModuleEnv *Heaps -> *(([String], Maybe GinGraph, Maybe Expression), *ModuleEnv, *Heaps)
+funToGraph tonicTune tonicBind fd=:{fun_ident=fun_ident, fun_body = TransformedBody tb} menv heaps = mkBody
   where
   mkBody
-    # inh          = mkInhExpr fun_ident.id_name pds
+    # inh          = mkInhExpr fun_ident.id_name tonicTune tonicBind
     # chn          = mkChnExpr emptyGraph [0..] menv heaps
     # (syn, chn)   = exprCata mkGraphAlg tb.tb_rhs inh chn
     # (initId, g)  = addNode (mkGNode GInit) chn.chn_graph
@@ -664,7 +688,7 @@ funToGraph pds fd=:{fun_ident=fun_ident, fun_body = TransformedBody tb} menv hea
   addStartEdge mfirstId initId g
     = maybe g (\firstId -> addEmptyEdge (initId, firstId) g) mfirstId
 
-funToGraph _ _ menv heaps = (([], Nothing, Nothing), menv, heaps)
+funToGraph _ _ _ menv heaps = (([], Nothing, Nothing), menv, heaps)
 
 instance toString GNode where
 	toString n = toString n.nodeType

@@ -10,5 +10,5 @@ from Text.PPrint import :: Doc
 from Data.Map import :: Map
 from predef import :: PredefinedSymbol
 
-funToGraph :: PredefinedSymbol FunDef *ModuleEnv *Heaps -> *(([String], Maybe GinGraph, Maybe Expression), *ModuleEnv, *Heaps)
+funToGraph :: PredefinedSymbol PredefinedSymbol FunDef *ModuleEnv *Heaps -> *(([String], Maybe GinGraph, Maybe Expression), *ModuleEnv, *Heaps)
 

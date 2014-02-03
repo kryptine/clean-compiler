@@ -299,8 +299,9 @@ PD_TC__UnboxedArray	:== 292
 
 PD_iTasks_Framework_Tonic		:== 293
 PD_tonicTune					:== 294
+PD_tonicBind					:== 295
 
-PD_NrOfPredefSymbols		:== 295
+PD_NrOfPredefSymbols		:== 296
 
 GetTupleConsIndex tup_arity :== PD_Arity2TupleSymbol + tup_arity - 2
 GetTupleTypeIndex tup_arity :== PD_Arity2TupleType + tup_arity - 2
