@@ -17,25 +17,31 @@ import iTasks.Framework.Tonic.AbsSyn
 
 ginTonic :: ModuleN !*{#FunDef} IclModule {#DclModule} !{#CommonDefs} !*PredefinedSymbols !*Files !*Heaps -> *(!*{#FunDef}, !*PredefinedSymbols, !*Files, !*Heaps)
 ginTonic main_dcl_module_n fun_defs icl_module dcl_modules common_defs predef_symbols files heaps
-  # iclname                                  = icl_module.icl_name.id_name
-  | isSystemModule iclname                   = (fun_defs, predef_symbols, files, heaps)
-  # (ok, files)                              = ensureDirectoryExists csf_directory_path files
-  | not ok                                   = (fun_defs, predef_symbols, files, heaps)
-  # (ok, tonicf, files)                      = fopen (csf_directory_path +++ {DirectorySeparator} +++ iclname +++ ".tonic") FWriteText files
-  | not ok                                   = (fun_defs, predef_symbols, files, heaps)
-  # (tstr, fun_defs, predef_symbols, heaps)  = ginTonic` main_dcl_module_n toJSONString fun_defs icl_module dcl_modules common_defs predef_symbols heaps
-  # tonicf                                   = fwrites tstr tonicf
-  # (_, files)                               = fclose tonicf files
+  # iclname                                 = icl_module.icl_name.id_name
+  | isSystemModule iclname                  = (fun_defs, predef_symbols, files, heaps)
+  # (ok, files)                             = ensureDirectoryExists csf_directory_path files
+  | not ok                                  = (fun_defs, predef_symbols, files, heaps)
+  # (tstr, fun_defs, predef_symbols, heaps) = ginTonic` (isITasksModule iclname) main_dcl_module_n toJSONString fun_defs icl_module dcl_modules common_defs predef_symbols heaps
+  # files                                   = writeTonicFile iclname tstr files
   = (fun_defs, predef_symbols, files, heaps)
   where
   csf_directory_path = "tonic"
+  isITasksModule nm = startsWith "iTasks" nm
   isSystemModule nm = foldr (\x b -> startsWith x nm || b) False sysmods
-    where sysmods = [ "iTasks", "Sapl"
+    where sysmods = [ "Sapl"
                     , "Std", "_"
                     , "Control", "Crypto", "Data", "Database", "Deprecated"
                     , "GUI", "Internet", "Math", "Network", "System", "TCP"
                     , "Test", "Text"
                     ]
+  writeTonicFile iclname tstr files
+    | isITasksModule iclname  = files
+    | otherwise
+        # (ok, tonicf, files) = fopen (csf_directory_path +++ {DirectorySeparator} +++ iclname +++ ".tonic") FWriteText files
+        | not ok              = files
+        # tonicf              = fwrites tstr tonicf
+        # (_, files)          = fclose tonicf files
+        = files
 
 foldUArr :: (Int a v:(w:b, u:(arr a)) -> v:(w:b, u:(arr a))) v:(w:b, u:(arr a))
          -> v:(w:b, u:(arr a)) | Array arr a, [v <= u, v <= w]
@@ -65,27 +71,34 @@ toDotString rs icl_module menv
           # (dot, menv) = mkTaskDot tn g menv
           = ([dot : xs], menv)
 
-ginTonic` :: ModuleN ((Map String TonicTask) IclModule *ModuleEnv -> *(String, *ModuleEnv))
+ginTonic` :: Bool ModuleN ((Map String TonicTask) IclModule *ModuleEnv -> *(String, *ModuleEnv))
              !*{#FunDef} IclModule {#DclModule} !{#CommonDefs} !*PredefinedSymbols *Heaps
           -> *(String, !*{#FunDef}, !*PredefinedSymbols, !*Heaps)
-ginTonic` main_dcl_module_n repsToString fun_defs icl_module dcl_modules common_defs predef_symbols heaps
-  # (pss, predef_symbols)        = usize predef_symbols
-  # (tonicTune, predef_symbols)  = predef_symbols![PD_tonicTune]
-  # (tonicBind, predef_symbols)  = predef_symbols![PD_tonicBind]
-  # ((reps, heaps), fun_defs)    = foldUArr (appDefInfo tonicTune tonicBind) ((newMap, heaps), fun_defs)
-  # menv                         = mkModuleEnv main_dcl_module_n fun_defs icl_module dcl_modules
-  # (str, menv)                  = repsToString reps icl_module menv
+ginTonic` is_itasks_mod main_dcl_module_n repsToString fun_defs icl_module dcl_modules common_defs predef_symbols heaps
+  # (pss, predef_symbols)             = usize predef_symbols
+  # (tonicTune, predef_symbols)       = predef_symbols![PD_tonicTune]
+  # (tonicBind, predef_symbols)       = predef_symbols![PD_tonicBind]
+  # (tonicReflection, predef_symbols) = predef_symbols![PD_tonicReflection]
+  # ((reps, heaps), fun_defs)         = foldUArr (appDefInfo tonicTune tonicBind tonicReflection) ((newMap, heaps), fun_defs)
+  # menv                              = mkModuleEnv main_dcl_module_n fun_defs icl_module dcl_modules
+  # (str, menv)                       = repsToString reps icl_module menv
   = (str, menv.me_fun_defs, predef_symbols, heaps)
   where
-  appDefInfo tonicTune tonicBind idx fd ((reps, heaps), fun_defs)
-    | funIsTask fd && fd.fun_info.fi_def_level == 1
+  appDefInfo tonicTune tonicBind tonicReflection idx fd ((reps, heaps), fun_defs)
+    | not is_itasks_mod && funIsTask fd && fd.fun_info.fi_def_level == 1
       # menv                          = mkModuleEnv main_dcl_module_n fun_defs icl_module dcl_modules
       # ((args, mg, me), menv, heaps) = funToGraph tonicTune tonicBind fd menv heaps
       # menv                          = updateWithAnnot idx me menv
+      # menv                          = addReflection icl_module idx tonicReflection menv
       = ( (case mg of
             Just g -> put fd.fun_ident.id_name {TonicTask | tt_args = args, tt_graph = g} reps
             _      -> reps
         , heaps), menv.me_fun_defs)
+    // TODO FIXME There are still some problems with this when compiling iTasks itself
+    //| is_itasks_mod && funIsTask fd && fd.fun_info.fi_def_level == 1
+      //# menv = mkModuleEnv main_dcl_module_n fun_defs icl_module dcl_modules
+      //# menv = addReflection icl_module idx tonicReflection menv
+      //= ((reps, heaps), menv.me_fun_defs)
     | otherwise        = ((reps, heaps), fun_defs)
 
 updateWithAnnot :: Int (Maybe Expression) *ModuleEnv -> *ModuleEnv
@@ -95,3 +108,30 @@ updateWithAnnot fidx (Just e) menv
   = { menv & me_fun_defs = fun_defs}
 updateWithAnnot _ _ menv = menv
 
+addReflection :: IclModule Index PredefinedSymbol *ModuleEnv -> *ModuleEnv
+addReflection icl_module idx tonic_reflection menv
+  | predefIsUndefined tonic_reflection = menv
+  | otherwise
+      # (mfd, fun_defs) = muselect menv.me_fun_defs idx
+      # menv            = {menv & me_fun_defs = fun_defs}
+      = case mfd of
+          Just fd
+            = case fd.fun_body of
+                TransformedBody fb
+                  # (isPartialApp, menv) = isPartialApp fb.tb_rhs menv
+                  # (retsNonFun, menv)   = returnsNonFun fb.tb_rhs menv
+                  = case (isPartialApp, retsNonFun) of
+                      (False, True)
+                        # fun_defs = menv.me_fun_defs
+                        # fun_defs = updateFunRhs idx fun_defs (addReflection` fd fb.tb_rhs)
+                        = { menv & me_fun_defs = fun_defs}
+                      _ = menv
+                _ = menv
+          _ = menv
+  where
+  addReflection` fd expr
+    = App (appPredefinedSymbol "tonicReflection" tonic_reflection
+             [ mkStr icl_module.icl_name.id_name
+             , mkStr fd.fun_ident.id_name
+             , expr
+             ])

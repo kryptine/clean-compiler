@@ -6,7 +6,7 @@ import Data.Functor
 import Data.List
 import Data.Maybe
 import Data.Map
-import syntax
+import syntax, predef
 import Tonic.AbsSyn
 import Tonic.Pretty
 import Text
@@ -432,4 +432,54 @@ foldrSt op l st = foldr_st l
     foldr_st []     = st
     foldr_st [a:as] = op a (foldr_st as)
 
+predefIsUndefined :: PredefinedSymbol -> Bool
+predefIsUndefined pds = pds.pds_def == NoIndex || pds.pds_module == NoIndex
 
+isPartialApp :: Expression *ModuleEnv -> *(Bool, *ModuleEnv)
+isPartialApp (App app) menv
+  # (mft, menv) = reifyFunType app.app_symb menv
+  = case mft of
+      Just ft
+        # ((_, args), menv) = dropAppContexts app menv
+        = (length args < ft.ft_arity, menv)
+      _ = (False, menv)
+isPartialApp _ menv        = (True, menv) // True: better safe than sorry
+
+returnsNonFun :: Expression *ModuleEnv -> *(Bool, *ModuleEnv)
+returnsNonFun (App app) menv
+  # (mft, menv) = reifyFunType app.app_symb menv
+  = case mft of
+      Just ft
+        # retNF             = returnsNonFun` ft.ft_type.st_result.at_type
+        # ((_, args), menv) = dropAppContexts app menv
+        = (not (length args < ft.ft_arity) || retNF, menv)
+      _ = (False, menv)
+  where
+  returnsNonFun` (TA _ _)    = True
+  returnsNonFun` (TAS _ _ _) = True
+  returnsNonFun` _           = False
+returnsNonFun _ menv        = (False, menv)
+
+mkStr :: String -> Expression
+mkStr str = BasicExpr (BVS ("\"" +++ str +++ "\""))
+
+mkInt :: Int -> Expression
+mkInt i   = BasicExpr (BVInt i)
+
+appPredefinedSymbol :: String PredefinedSymbol [Expression] -> App
+appPredefinedSymbol funName pds args
+  = { App
+    | app_symb     = { SymbIdent
+                     | symb_ident = { Ident
+                                    | id_name = funName
+                                    , id_info = nilPtr
+                                    }
+                     , symb_kind  = SK_Function
+                                      { Global
+                                      | glob_object = pds.pds_def
+                                      , glob_module = pds.pds_module
+                                      }
+                     }
+    , app_args     = args
+    , app_info_ptr = nilPtr
+    }

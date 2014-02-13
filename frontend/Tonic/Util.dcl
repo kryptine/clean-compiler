@@ -18,6 +18,8 @@ dropAppContexts :: App *ModuleEnv -> *(([Expression], [Expression]), *ModuleEnv)
 
 extractFunDefs :: !*{#FunDef} -> *(!{#FunDef}, !*{#FunDef})
 
+muselect :: !u:(a e) !Int -> *(Maybe e, !u:(a e)) | Array a e
+
 reifyConsDef :: SymbIdent *ModuleEnv -> *(Maybe ConsDef, *ModuleEnv)
 
 reifyFunType :: SymbIdent *ModuleEnv -> *(Maybe FunType, *ModuleEnv)
@@ -87,3 +89,15 @@ mkEdge :: String -> GEdge
 getLetBinds :: Let -> [LetBind]
 
 mkGLetBinds :: Let *ModuleEnv -> *([(String, String)], *ModuleEnv)
+
+predefIsUndefined :: PredefinedSymbol -> Bool
+
+isPartialApp :: Expression *ModuleEnv -> *(Bool, *ModuleEnv)
+
+mkStr :: String -> Expression
+
+mkInt :: Int -> Expression
+
+appPredefinedSymbol :: String PredefinedSymbol [Expression] -> App
+
+returnsNonFun :: Expression *ModuleEnv -> *(Bool, *ModuleEnv)

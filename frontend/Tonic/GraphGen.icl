@@ -176,9 +176,9 @@ withTwo app _         _ inh chn = ({mkSynExpr & syn_annot_expr = Just (App app)}
 annotExpr :: (Int, Int) Expression InhExpression *ChnExpression SynExpression -> *(SynExpression, *ChnExpression)
 //annotExpr (entry, exit) expr inh chn syn = (syn, chn)
 annotExpr (entry, exit) expr inh chn syn
-  | inh.inh_tune_symb.pds_def == NoIndex || inh.inh_tune_symb.pds_module == NoIndex = (syn, chn)
+  | predefIsUndefined inh.inh_tune_symb = (syn, chn)
   | otherwise
-      # (papp, menv) = partialApp expr chn.chn_module_env
+      # (papp, menv) = isPartialApp expr chn.chn_module_env
       # chn          = {chn & chn_module_env = menv}
       | papp         = (syn, chn)
       | otherwise
@@ -187,33 +187,14 @@ annotExpr (entry, exit) expr inh chn syn
   where
   mkTuneApp chn
     # (mod, menv) = (chn.chn_module_env)!me_icl_module
-    = ({ App
-       | app_symb = { SymbIdent
-                    | symb_ident = { Ident
-                                   | id_name = "tonicTune"
-                                   , id_info = nilPtr}
-                    , symb_kind  = SK_Function
-                                     { Global
-                                     | glob_object = inh.inh_tune_symb.pds_def
-                                     , glob_module = inh.inh_tune_symb.pds_module}}
-       , app_args = [ mkStr mod.icl_name.id_name
-                    , mkStr inh.inh_curr_task_name
-                    , mkInt entry
-                    , mkInt exit
-                    , expr]
-       , app_info_ptr = nilPtr}
+    = (appPredefinedSymbol "tonicTune" inh.inh_tune_symb
+         [ mkStr mod.icl_name.id_name
+         , mkStr inh.inh_curr_task_name
+         , mkInt entry
+         , mkInt exit
+         , expr
+         ]
       , { chn & chn_module_env = menv })
-  partialApp (App app) menv
-    # (mft, menv) = reifyFunType app.app_symb menv
-    = case mft of
-        Just ft
-          # ((_, args), menv) = dropAppContexts app menv
-          = (length args < ft.ft_arity, menv)
-        _ = (False, menv)
-  partialApp _ menv        = (False, menv)
-
-mkStr str = BasicExpr (BVS ("\"" +++ str +++ "\""))
-mkInt i   = BasicExpr (BVInt i)
 
 mkTonicInfo :: String Int Int (Maybe String) InhExpression -> TonicInfo
 mkTonicInfo modname euid xuid mval inh =
