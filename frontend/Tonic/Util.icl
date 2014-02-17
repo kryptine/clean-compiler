@@ -442,23 +442,16 @@ isPartialApp (App app) menv
       Just ft
         # ((_, args), menv) = dropAppContexts app menv
         = (length args < ft.ft_arity, menv)
-      _ = (False, menv)
+      _ = (True, menv) // True: better safe than sorry
 isPartialApp _ menv        = (True, menv) // True: better safe than sorry
 
-returnsNonFun :: Expression *ModuleEnv -> *(Bool, *ModuleEnv)
-returnsNonFun (App app) menv
+exprIsTask :: Expression *ModuleEnv -> *(Bool, *ModuleEnv)
+exprIsTask (App app) menv
   # (mft, menv) = reifyFunType app.app_symb menv
   = case mft of
-      Just ft
-        # retNF             = returnsNonFun` ft.ft_type.st_result.at_type
-        # ((_, args), menv) = dropAppContexts app menv
-        = (not (length args < ft.ft_arity) || retNF, menv)
-      _ = (False, menv)
-  where
-  returnsNonFun` (TA _ _)    = True
-  returnsNonFun` (TAS _ _ _) = True
-  returnsNonFun` _           = False
-returnsNonFun _ menv        = (False, menv)
+      Just ft -> (symTyIsTask ft.ft_type, menv)
+      _       -> (False, menv) // False: better safe than sorry
+exprIsTask _ menv = (False, menv) // False: better safe than sorry
 
 mkStr :: String -> Expression
 mkStr str = BasicExpr (BVS ("\"" +++ str +++ "\""))

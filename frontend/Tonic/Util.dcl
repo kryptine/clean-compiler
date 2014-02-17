@@ -94,10 +94,10 @@ predefIsUndefined :: PredefinedSymbol -> Bool
 
 isPartialApp :: Expression *ModuleEnv -> *(Bool, *ModuleEnv)
 
+exprIsTask :: Expression *ModuleEnv -> *(Bool, *ModuleEnv)
+
 mkStr :: String -> Expression
 
 mkInt :: Int -> Expression
 
 appPredefinedSymbol :: String PredefinedSymbol [Expression] -> App
-
-returnsNonFun :: Expression *ModuleEnv -> *(Bool, *ModuleEnv)

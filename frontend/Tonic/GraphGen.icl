@@ -198,11 +198,11 @@ annotExpr (entry, exit) expr inh chn syn
 
 mkTonicInfo :: String Int Int (Maybe String) InhExpression -> TonicInfo
 mkTonicInfo modname euid xuid mval inh =
-  { tonicModuleName  = modname
-  , tonicTaskName    = inh.inh_curr_task_name
-  , tonicEntryUniqId = euid
-  , tonicExitUniqId  = xuid
-  , tonicValAsStr    = mval
+  { tiModuleName   = modname
+  , tiTaskName     = inh.inh_curr_task_name
+  , tiTaskIdent    = UniqueIds {idsEntryUniqId=euid, idsExitUniqId=xuid}
+  , tiValAsStr     = mval
+  , tiIsBind       = False
   }
 
 getModuleName :: *ChnExpression -> *(String, *ChnExpression)
@@ -221,8 +221,8 @@ lastElem [_:xs] = lastElem xs
 mkGraphAlg :: *(ExpressionAlg InhExpression *ChnExpression SynExpression)
 mkGraphAlg
   =  {  mkExprAlg mkSynExpr
-     &  app = appC, at = atC, letE = letC, caseE = caseC
-     ,  var                   = \bv             _ chn -> ({mkSynExpr & syn_annot_expr = Just (Var bv)}, chn)
+     &  app = appC, at = atC, letE = letC, caseE = caseC, var = varC
+     //,  var                   = \bv             _ chn -> ({mkSynExpr & syn_annot_expr = Just (Var bv)}, chn)
      ,  selection             = \sk e ss        _ chn -> ({mkSynExpr & syn_annot_expr = Just (Selection sk e ss)},    chn)
      ,  update                = \e1 ss e2       _ chn -> ({mkSynExpr & syn_annot_expr = Just (Update e1 ss e2)},      chn)
      ,  recordUpdate          = \gd e bs        _ chn -> ({mkSynExpr & syn_annot_expr = Just (RecordUpdate gd e bs)}, chn)
@@ -469,6 +469,13 @@ mkGraphAlg
                 # g           = addEmptyEdge (nid, jid) g
                 = annotExpr (sid, jid) (App app) inh {chn & chn_graph = g, chn_module_env = menv} (mkDualIdSynExpr (Just sid) (Just jid))
             | otherwise = mkTaskApp app ctxs args inh chn
+          [args=:(Var bv):_]
+            # (sid, g) = addNode (mkGNode GParallelSplit) chn.chn_graph
+            # (jid, g) = addNode (mkGNode (GParallelJoin join)) g
+            # (nid, g) = addNode (mkGNode (GVar bv.var_ident.id_name)) g
+            # g        = addEmptyEdge (sid, nid) g
+            # g        = addEmptyEdge (nid, jid) g
+            = annotExpr (sid, jid) (App app) inh {chn & chn_graph = g} (mkDualIdSynExpr (Just sid) (Just jid))
           _ = ({mkSynExpr & syn_annot_expr = Just (App app)}, chn)
 
   // Transformation for higher-order function application
@@ -617,6 +624,10 @@ mkGraphAlg
       where f bp menv
               # (bvd, menv) = ppBasicValue bp.bp_value menv
               = ((bvd, bp.bp_expr), menv)
+
+  varC bv inh chn
+    # (ni, g) = addNode (mkGNode (GVar bv.var_ident.id_name)) chn.chn_graph
+    = (mkSingleIdSynExpr (Just ni), {chn & chn_graph = g})
 
 listExprToList :: Expression -> [Expression]
 listExprToList (App app) =

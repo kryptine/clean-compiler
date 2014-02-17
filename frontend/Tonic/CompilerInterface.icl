@@ -119,8 +119,8 @@ addReflection icl_module idx tonic_reflection menv
             = case fd.fun_body of
                 TransformedBody fb
                   # (isPartialApp, menv) = isPartialApp fb.tb_rhs menv
-                  # (retsNonFun, menv)   = returnsNonFun fb.tb_rhs menv
-                  = case (isPartialApp, retsNonFun) of
+                  # (isTask, menv)       = exprIsTask fb.tb_rhs menv
+                  = case (isPartialApp, isTask) of
                       (False, True)
                         # fun_defs = menv.me_fun_defs
                         # fun_defs = updateFunRhs idx fun_defs (addReflection` fd fb.tb_rhs)
