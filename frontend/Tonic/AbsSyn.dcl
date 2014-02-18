@@ -12,7 +12,7 @@ from Data.Graph import :: Graph
 from Data.Maybe import :: Maybe
 from Text.JSON import generic JSONEncode, :: JSONNode
 from Data.Map import :: Map
-from predef import :: PredefinedSymbol
+from predef import :: PredefinedSymbol, :: PredefinedSymbols
 from iTasks.Framework.Tonic.AbsSyn import :: GinGraph, :: GEdge, :: GNode
 
 At e es :== e @ es
@@ -50,16 +50,14 @@ At e es :== e @ es
 :: InhExpression =
   { inh_curr_task_name  :: !String
   , inh_case_expr       :: !Maybe Expression
-  , inh_tune_symb       :: !PredefinedSymbol
-  , inh_bind_symb       :: !PredefinedSymbol
   , inh_is_bind_lam     :: Bool
   }
 
 :: *ChnExpression =
-  { chn_graph       :: !*GinGraph
-  , chn_module_env  :: !*ModuleEnv
-  //, chn_uniqs       :: *[Int]
-  , chn_heaps       :: *Heaps
+  { chn_graph          :: !*GinGraph
+  , chn_module_env     :: !*ModuleEnv
+  , chn_heaps          :: *Heaps
+  , chn_predef_symbols :: !*PredefinedSymbols
   }
 
 :: SynExpression =
@@ -79,9 +77,9 @@ exprCata :: *(ExpressionAlg inh *chn syn) Expression inh *chn -> *(syn, *chn)
 
 mkExprAlg :: syn -> *ExpressionAlg inh *chn syn
 
-mkInhExpr :: String PredefinedSymbol PredefinedSymbol -> InhExpression
+mkInhExpr :: String -> InhExpression
 
-mkChnExpr :: *GinGraph *[Int] *ModuleEnv *Heaps -> *ChnExpression
+mkChnExpr :: *GinGraph *PredefinedSymbols *ModuleEnv *Heaps -> *ChnExpression
 
 mkSynExpr :: SynExpression
 

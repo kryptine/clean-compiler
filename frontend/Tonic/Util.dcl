@@ -92,7 +92,7 @@ mkGLetBinds :: Let *ModuleEnv -> *([(String, String)], *ModuleEnv)
 
 predefIsUndefined :: PredefinedSymbol -> Bool
 
-isPartialApp :: Expression *ModuleEnv -> *(Bool, *ModuleEnv)
+isPartialApp :: App *ModuleEnv -> *(Bool, *ModuleEnv)
 
 exprIsTask :: Expression *ModuleEnv -> *(Bool, *ModuleEnv)
 
@@ -101,3 +101,5 @@ mkStr :: String -> Expression
 mkInt :: Int -> Expression
 
 appPredefinedSymbol :: String PredefinedSymbol [Expression] -> App
+
+mkPredefSymbIdent :: String PredefinedSymbol -> SymbIdent

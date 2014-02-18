@@ -65,23 +65,21 @@ mkExprAlg syn =
   ,  failExpr              = \_           inh chn -> (syn, chn)
   }
 
-mkInhExpr :: String PredefinedSymbol PredefinedSymbol -> InhExpression
-mkInhExpr ctn tonicTune tonicBind =
+mkInhExpr :: String -> InhExpression
+mkInhExpr ctn =
   { InhExpression
   | inh_curr_task_name = ctn
   , inh_case_expr      = Nothing
-  , inh_tune_symb      = tonicTune
-  , inh_bind_symb      = tonicBind
   , inh_is_bind_lam    = False
   }
 
-mkChnExpr :: *GinGraph *[Int] *ModuleEnv *Heaps -> *ChnExpression
-mkChnExpr gg uniqs menv heaps =
+mkChnExpr :: *GinGraph *PredefinedSymbols *ModuleEnv *Heaps -> *ChnExpression
+mkChnExpr gg predef_symbols menv heaps =
   { ChnExpression
-  | chn_graph           = gg
-  , chn_module_env      = menv
-  //, chn_uniqs           = uniqs
-  , chn_heaps           = heaps
+  | chn_graph          = gg
+  , chn_module_env     = menv
+  , chn_predef_symbols = predef_symbols
+  , chn_heaps          = heaps
   }
 
 mkSynExpr :: SynExpression

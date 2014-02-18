@@ -75,31 +75,28 @@ ginTonic` :: Bool ModuleN ((Map String TonicTask) IclModule *ModuleEnv -> *(Stri
              !*{#FunDef} IclModule {#DclModule} !{#CommonDefs} !*PredefinedSymbols *Heaps
           -> *(String, !*{#FunDef}, !*PredefinedSymbols, !*Heaps)
 ginTonic` is_itasks_mod main_dcl_module_n repsToString fun_defs icl_module dcl_modules common_defs predef_symbols heaps
-  # (pss, predef_symbols)             = usize predef_symbols
-  # (tonicTune, predef_symbols)       = predef_symbols![PD_tonicTune]
-  # (tonicBind, predef_symbols)       = predef_symbols![PD_tonicBind]
-  # (tonicReflection, predef_symbols) = predef_symbols![PD_tonicReflection]
-  # ((reps, heaps), fun_defs)         = foldUArr (appDefInfo tonicTune tonicBind tonicReflection) ((newMap, heaps), fun_defs)
-  # menv                              = mkModuleEnv main_dcl_module_n fun_defs icl_module dcl_modules
-  # (str, menv)                       = repsToString reps icl_module menv
+  # (tonicReflection, predef_symbols)         = predef_symbols![PD_tonicReflection]
+  # ((reps, heaps, predef_symbols), fun_defs) = foldUArr (appDefInfo tonicReflection) ((newMap, heaps, predef_symbols), fun_defs)
+  # menv        = mkModuleEnv main_dcl_module_n fun_defs icl_module dcl_modules
+  # (str, menv) = repsToString reps icl_module menv
   = (str, menv.me_fun_defs, predef_symbols, heaps)
   where
-  appDefInfo tonicTune tonicBind tonicReflection idx fd ((reps, heaps), fun_defs)
+  appDefInfo tonicReflection idx fd ((reps, heaps, predef_symbols), fun_defs)
     | not is_itasks_mod && funIsTask fd && fd.fun_info.fi_def_level == 1
-      # menv                          = mkModuleEnv main_dcl_module_n fun_defs icl_module dcl_modules
-      # ((args, mg, me), menv, heaps) = funToGraph tonicTune tonicBind fd menv heaps
-      # menv                          = updateWithAnnot idx me menv
-      # menv                          = addReflection icl_module idx tonicReflection menv
-      = ( (case mg of
-            Just g -> put fd.fun_ident.id_name {TonicTask | tt_args = args, tt_graph = g} reps
-            _      -> reps
-        , heaps), menv.me_fun_defs)
+      # menv = mkModuleEnv main_dcl_module_n fun_defs icl_module dcl_modules
+      # ((args, mg, me), menv, heaps, predef_symbols) = funToGraph fd menv heaps predef_symbols
+      # menv = updateWithAnnot idx me menv
+      # menv = addReflection icl_module idx tonicReflection menv
+      = (( case mg of
+             Just g -> put fd.fun_ident.id_name {TonicTask | tt_args = args, tt_graph = g} reps
+             _      -> reps
+        , heaps, predef_symbols), menv.me_fun_defs)
     // TODO FIXME There are still some problems with this when compiling iTasks itself
     //| is_itasks_mod && funIsTask fd && fd.fun_info.fi_def_level == 1
       //# menv = mkModuleEnv main_dcl_module_n fun_defs icl_module dcl_modules
       //# menv = addReflection icl_module idx tonicReflection menv
       //= ((reps, heaps), menv.me_fun_defs)
-    | otherwise        = ((reps, heaps), fun_defs)
+    | otherwise        = ((reps, heaps, predef_symbols), fun_defs)
 
 updateWithAnnot :: Int (Maybe Expression) *ModuleEnv -> *ModuleEnv
 updateWithAnnot fidx (Just e) menv
@@ -118,7 +115,9 @@ addReflection icl_module idx tonic_reflection menv
           Just fd
             = case fd.fun_body of
                 TransformedBody fb
-                  # (isPartialApp, menv) = isPartialApp fb.tb_rhs menv
+                  # (isPartialApp, menv) = case fb.tb_rhs of
+                                             App app -> isPartialApp app menv
+                                             _       -> (True, menv)
                   # (isTask, menv)       = exprIsTask fb.tb_rhs menv
                   = case (isPartialApp, isTask) of
                       (False, True)

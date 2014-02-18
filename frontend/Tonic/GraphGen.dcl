@@ -8,7 +8,7 @@ from checksupport import :: Heaps
 from Tonic.AbsSyn import :: GinGraph, :: GEdge, :: GNode, :: ModuleEnv
 from Text.PPrint import :: Doc
 from Data.Map import :: Map
-from predef import :: PredefinedSymbol
+from predef import :: PredefinedSymbol, :: PredefinedSymbols
 
-funToGraph :: PredefinedSymbol PredefinedSymbol FunDef *ModuleEnv *Heaps -> *(([String], Maybe GinGraph, Maybe Expression), *ModuleEnv, *Heaps)
+funToGraph :: FunDef *ModuleEnv *Heaps *PredefinedSymbols -> *(([String], Maybe GinGraph, Maybe Expression), *ModuleEnv, *Heaps, *PredefinedSymbols)
 

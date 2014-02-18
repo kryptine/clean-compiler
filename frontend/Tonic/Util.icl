@@ -435,15 +435,14 @@ foldrSt op l st = foldr_st l
 predefIsUndefined :: PredefinedSymbol -> Bool
 predefIsUndefined pds = pds.pds_def == NoIndex || pds.pds_module == NoIndex
 
-isPartialApp :: Expression *ModuleEnv -> *(Bool, *ModuleEnv)
-isPartialApp (App app) menv
+isPartialApp :: App *ModuleEnv -> *(Bool, *ModuleEnv)
+isPartialApp app menv
   # (mft, menv) = reifyFunType app.app_symb menv
   = case mft of
       Just ft
         # ((_, args), menv) = dropAppContexts app menv
         = (length args < ft.ft_arity, menv)
       _ = (True, menv) // True: better safe than sorry
-isPartialApp _ menv        = (True, menv) // True: better safe than sorry
 
 exprIsTask :: Expression *ModuleEnv -> *(Bool, *ModuleEnv)
 exprIsTask (App app) menv
@@ -462,17 +461,21 @@ mkInt i   = BasicExpr (BVInt i)
 appPredefinedSymbol :: String PredefinedSymbol [Expression] -> App
 appPredefinedSymbol funName pds args
   = { App
-    | app_symb     = { SymbIdent
-                     | symb_ident = { Ident
-                                    | id_name = funName
-                                    , id_info = nilPtr
-                                    }
-                     , symb_kind  = SK_Function
-                                      { Global
-                                      | glob_object = pds.pds_def
-                                      , glob_module = pds.pds_module
-                                      }
-                     }
+    | app_symb     = mkPredefSymbIdent funName pds
     , app_args     = args
     , app_info_ptr = nilPtr
+    }
+
+mkPredefSymbIdent :: String PredefinedSymbol -> SymbIdent
+mkPredefSymbIdent funName pds
+  = { SymbIdent
+    | symb_ident = { Ident
+                   | id_name = funName
+                   , id_info = nilPtr
+                   }
+    , symb_kind  = SK_Function
+                     { Global
+                     | glob_object = pds.pds_def
+                     , glob_module = pds.pds_module
+                     }
     }
