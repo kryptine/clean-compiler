@@ -122,6 +122,53 @@ ObjectNotFound 	:== { glob_module = NotFound, glob_object = NotFound }
 	,	rtcs_error :: !.ErrorAdmin
 	}
 
+collect_variable_and_contexts :: [ClassApplication] [(Int,Int)] [TypeContext] -> [(Int,Int)]
+collect_variable_and_contexts [CA_Context {tc_class,tc_types=[TempV type_var_n]}:constraints] variables_and_contexts class_context
+	# context_index = determine_index_in_class_context tc_class class_context 0
+	| context_index<0
+		= collect_variable_and_contexts constraints variables_and_contexts class_context
+		# variables_and_contexts = add_variable_and_context type_var_n (1<<context_index) variables_and_contexts
+		= collect_variable_and_contexts constraints variables_and_contexts class_context
+where
+	determine_index_in_class_context :: !TCClass ![TypeContext] !Int -> Int
+	determine_index_in_class_context tc_class [class_context:class_contexts] class_index
+		| class_context.tc_class==tc_class
+			= class_index
+			= determine_index_in_class_context tc_class class_contexts (class_index+1)
+	determine_index_in_class_context tc_class [] class_index
+		= -1;
+
+	add_variable_and_context :: !Int !Int ![(Int,Int)] -> [(Int,Int)]
+	add_variable_and_context type_var_n tv_context [variable_and_context=:(variable,context):variables_and_contexts]
+		| type_var_n==variable
+			#! context=context bitor tv_context
+			= [(variable,context) : variables_and_contexts]
+			= [variable_and_context : add_variable_and_context type_var_n tv_context variables_and_contexts]
+	add_variable_and_context type_var_n tv_context []
+		= [(type_var_n,tv_context)]
+collect_variable_and_contexts [CA_Instance {rcs_class_context={rc_red_contexts},rcs_constraints_contexts}:constraints] variables_and_contexts class_context
+	# variables_and_contexts = collect_variable_and_contexts rc_red_contexts variables_and_contexts class_context
+	# variables_and_contexts = collect_variable_and_contexts rcs_constraints_contexts variables_and_contexts class_context
+	= collect_variable_and_contexts constraints variables_and_contexts class_context
+collect_variable_and_contexts [CA_GlobalTypeCode {tci_contexts}:constraints] variables_and_contexts class_context
+	# variables_and_contexts = collect_variable_and_contexts tci_contexts variables_and_contexts class_context
+	= collect_variable_and_contexts constraints variables_and_contexts class_context
+collect_variable_and_contexts [_:constraints] variables_and_contexts class_context
+	= collect_variable_and_contexts constraints variables_and_contexts class_context
+collect_variable_and_contexts [] variables_and_contexts class_context
+	= variables_and_contexts
+
+add_unexpanded_contexts :: ![Int] !TCClass !*ReduceState -> *ReduceState
+add_unexpanded_contexts [variable:variables] tc_class rs_state=:{rs_new_contexts,rs_var_heap}
+	# tc = {tc_class = tc_class, tc_types = [TempV variable], tc_var = nilPtr}
+	| containsContext tc rs_new_contexts
+		= add_unexpanded_contexts variables tc_class rs_state
+		# (tc_var, rs_var_heap) = newPtr VI_Empty rs_var_heap
+		# rs_new_contexts = [{tc & tc_var = tc_var} : rs_new_contexts]
+		= add_unexpanded_contexts variables tc_class {rs_state & rs_new_contexts=rs_new_contexts, rs_var_heap=rs_var_heap}
+add_unexpanded_contexts [] tc_class rs_state
+	= rs_state 
+
 reduceContexts :: !ReduceInfo ![TypeContext] !*ReduceState -> (![ClassApplication], !*ReduceState)
 reduceContexts info tcs rs_state
 	= mapSt (try_to_reduce_context info) tcs rs_state
@@ -157,7 +204,7 @@ where
 	reduce_context :: !ReduceInfo !TypeContext !*ReduceState -> *(!ReducedContexts, !*ReduceState)
 	reduce_context info tc=:{tc_class=TCGeneric {gtc_class}} rs_state
 		= reduce_context info {tc & tc_class = TCClass gtc_class} rs_state
-	reduce_context info=:{ri_defs,ri_instance_info,ri_main_dcl_module_n} {tc_class=TCClass class_symb=:{glob_object={ds_index},glob_module},tc_types}
+	reduce_context info=:{ri_defs,ri_instance_info,ri_main_dcl_module_n} {tc_class=tc_class=:TCClass class_symb=:{glob_object={ds_index},glob_module},tc_types}
 			rs_state
 		# {class_members,class_context,class_args,class_ident} = ri_defs.[glob_module].com_class_defs.[ds_index]
 		| size class_members > 0
@@ -207,6 +254,23 @@ where
 					= ({ rcs_class_context = rcs_class_context, rcs_constraints_contexts = []}, rs_state)
 			# (constraints, rs_state)
 				= reduce_contexts_in_constraints info tc_types class_args class_context rs_state
+
+			| case tc_types of [_] -> False; _ -> True
+			|| case class_context of [] -> True; [_] -> True; _ -> False 
+				// not implemented for multiparameter type classes or fewer than 2 class constraints
+				= ({ rcs_class_context = { rc_class_index = {gi_module=glob_module,gi_index=ds_index}, rc_inst_module = NoIndex, rc_inst_members = {}, rc_types = tc_types, rc_red_contexts = [] },
+					rcs_constraints_contexts = constraints }, rs_state)
+
+			// if a constraint of a class without members is reduced, and all classes in the constraint of that class appear
+			// in the reduced constraints for a variable, add a constraint for the original class for that variable
+			// (this causes removal of the other constraints later), to prevent functions with too many constraints
+			# n_contexts = length class_context
+			  required_used_contexts = (2<<(n_contexts-1))-1 // beware of 1<<32==0 on IA32
+			  variables_and_contexts = collect_variable_and_contexts constraints [] class_context
+			  variables = [variable \\ (variable,used_contexts)<-variables_and_contexts | used_contexts==required_used_contexts]		
+
+			  rs_state = add_unexpanded_contexts variables tc_class rs_state
+			
 			= ({ rcs_class_context = { rc_class_index = {gi_module=glob_module,gi_index=ds_index}, rc_inst_module = NoIndex, rc_inst_members = {}, rc_types = tc_types, rc_red_contexts = [] },
 				rcs_constraints_contexts = constraints }, rs_state)
 
