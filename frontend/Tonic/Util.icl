@@ -341,8 +341,11 @@ ppType (TLiftedSubst t) = "TLiftedSubst"
 ppType TE = "TE"
 
 symTyIsTask :: SymbolType -> Bool
-symTyIsTask st =
-  case st.st_result.at_type of
+symTyIsTask st = atypeIsTask st.st_result
+
+atypeIsTask :: AType -> Bool
+atypeIsTask aty =
+  case aty.at_type of
     TA   tsi _     -> symTyIsTask` tsi
     TAS  tsi _  _  -> symTyIsTask` tsi
     _              -> False
@@ -435,22 +438,29 @@ foldrSt op l st = foldr_st l
 predefIsUndefined :: PredefinedSymbol -> Bool
 predefIsUndefined pds = pds.pds_def == NoIndex || pds.pds_module == NoIndex
 
-isPartialApp :: App *ModuleEnv -> *(Bool, *ModuleEnv)
-isPartialApp app menv
-  # (mft, menv) = reifyFunType app.app_symb menv
+symbIdentArity :: SymbIdent *ModuleEnv -> *(Maybe Int, *ModuleEnv)
+symbIdentArity si menv
+  # (mft, menv) = reifyFunType si menv
   = case mft of
       Just ft
-        # ((_, args), menv) = dropAppContexts app menv
-        = (length args < ft.ft_arity, menv)
-      _ = (True, menv) // True: better safe than sorry
+        = (Just ft.ft_arity, menv)
+      _
+        # (mfd, menv) = reifyFunDef si menv
+        = case mfd of
+            Just fd -> (Just fd.fun_arity, menv)
+            _       -> (Nothing, menv)
+
+isPartialApp :: App *ModuleEnv -> *(Bool, *ModuleEnv)
+isPartialApp app menv
+  # ((_, args), menv) = dropAppContexts app menv
+  # (marity, menv)    = symbIdentArity app.app_symb menv
+  = case marity of
+      Just arity -> (length args < arity, menv)
+      _          -> (True, menv) // True: better safe than sorry
 
 exprIsTask :: Expression *ModuleEnv -> *(Bool, *ModuleEnv)
-exprIsTask (App app) menv
-  # (mft, menv) = reifyFunType app.app_symb menv
-  = case mft of
-      Just ft -> (symTyIsTask ft.ft_type, menv)
-      _       -> (False, menv) // False: better safe than sorry
-exprIsTask _ menv = (False, menv) // False: better safe than sorry
+exprIsTask (App app) menv = symbIdentIsTask app.app_symb menv
+exprIsTask _         menv = (False, menv) // False: better safe than sorry
 
 mkStr :: String -> Expression
 mkStr str = BasicExpr (BVS ("\"" +++ str +++ "\""))

@@ -301,8 +301,8 @@ PD_iTasks_Framework_Tonic		:== 293
 PD_tonicTune					:== 294
 PD_tonicBind					:== 295
 PD_tonicReflection				:== 296
-PD_tonicReplaceSingleTaskVar    :== 297
-PD_tonicAnyTask                 :== 298
+PD_tonicVarToSingleTask			:== 297
+PD_tonicVarToListOfTask			:== 298
 
 PD_NrOfPredefSymbols		:== 299
 

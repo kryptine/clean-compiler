@@ -216,6 +216,25 @@ lastElem :: [a] -> a
 lastElem [x]    = x
 lastElem [_:xs] = lastElem xs
 
+varIsTask :: VarInfoPtr *ChnExpression -> *(Bool, *ChnExpression)
+varIsTask varptr chn
+  # heaps = chn.chn_heaps
+  # (vi, var_heap) = readPtr varptr heaps.hp_var_heap
+  # chn = {chn & chn_heaps = {heaps & hp_var_heap = var_heap}}
+  = case vi of
+      VI_Type aty _ -> (atypeIsTask aty, chn)
+      _             -> (False, chn)
+
+varIsTaskFun :: VarInfoPtr *ChnExpression -> *(Bool, *ChnExpression)
+varIsTaskFun varptr chn
+  # heaps = chn.chn_heaps
+  # (vi, var_heap) = readPtr varptr heaps.hp_var_heap
+  # chn = {chn & chn_heaps = {heaps & hp_var_heap = var_heap}}
+  = case vi of
+      VI_FAType _ aty _    -> (atypeIsTask aty, chn)
+      VI_FATypeC _ aty _ _ -> (atypeIsTask aty, chn)
+      _                    -> (False, chn)
+
 mkGraphAlg :: *(ExpressionAlg InhExpression *ChnExpression SynExpression)
 mkGraphAlg
   =  {  mkExprAlg mkSynExpr
@@ -270,7 +289,7 @@ mkGraphAlg
     mkBindNoLam app ctxs args inh chn
       = withTwo app args f inh chn
       where
-      f lhsExpr rhsExpr chn
+      f lhsExpr rhsExpr chn // TODO We probably need a two-pass scheme to properly deal with replacing variables in the graph, since we need both the successor and predecessor ID
         # (synl, chnl)  = exprCata mkGraphAlg lhsExpr inh chn
         # (synr, chnr)  = exprCata mkGraphAlg rhsExpr inh chnl
         = case (synl.syn_entry_id, synl.syn_exit_id, synr.syn_entry_id, synr.syn_exit_id) of
@@ -457,17 +476,16 @@ mkGraphAlg
                 # g          = addEmptyEdge (sid, nid) g
                 # g          = addEmptyEdge (nid, jid) g
                 = annotExpr (sid, jid) app Nothing Nothing inh {chn & chn_graph = g, chn_module_env = menv} (mkDualIdSynExpr (Just sid) (Just jid))
-          [vararg=:(Var bv):as]
-          // TODO We currently apply tonicAnyTask, but this code needs to hold for all parallel combinators (allTasks etc) as well
+          [vararg=:(Var bv):as] // TODO test
             # (syn, chn)  = exprCata mkGraphAlg vararg inh {chn & chn_graph = g}
             # nid         = fromMaybe -1 syn.syn_entry_id
             # g           = addEmptyEdge (sid, nid) chn.chn_graph
             # g           = addEmptyEdge (nid, jid) g
             # (mod, menv) = (chn.chn_module_env)!me_icl_module
             # chn         = {chn & chn_graph = g, chn_module_env = menv}
-            # (tonicAnyTask_symb, predefs) = (chn.chn_predef_symbols)![PD_tonicAnyTask]
-            # tatSI = mkPredefSymbIdent "tonicAnyTask" tonicAnyTask_symb
-            = annotExpr (sid, jid) app (Just tatSI) (Just (ctxs ++ [mkStr mod.icl_name.id_name, mkStr inh.inh_curr_task_name, mkInt nid, vararg])) inh {chn & chn_predef_symbols = predefs} (mkDualIdSynExpr (Just sid) (Just jid))
+            # (tonicVarToListOfTask_symb, predefs) = (chn.chn_predef_symbols)![PD_tonicVarToListOfTask]
+            # tatSI = mkPredefSymbIdent "tonicVarToListOfTask" tonicVarToListOfTask_symb
+            = annotExpr (sid, jid) app Nothing (Just (ctxs ++ [App (appPredefinedSymbol "tonicVarToListOfTask" tonicVarToListOfTask_symb [mkStr mod.icl_name.id_name, mkStr inh.inh_curr_task_name, mkInt nid, mkInt sid, mkInt jid, vararg])])) inh {chn & chn_predef_symbols = predefs} (mkDualIdSynExpr (Just sid) (Just jid))
           _ = ({mkSynExpr & syn_annot_expr = Just (App app)}, chn)
 
   // Transformation for higher-order function application
@@ -550,7 +568,7 @@ mkGraphAlg
     mkLet Nothing lt inh chn
       # (binds, menv) = mkGLetBinds lt chn.chn_module_env
       # (lid, g)      = addNode (mkGNode (GLet {GLet | glet_binds = binds})) chn.chn_graph
-      // TODO: Represent the bindings in any way possible, not just PP
+      // TODO : Represent the bindings in any way possible, not just PP
       # (syn, chn)    = exprCata mkGraphAlg lt.let_expr inh {chn & chn_graph = g, chn_module_env = menv}
       = case syn.syn_entry_id of
           Just n
@@ -590,7 +608,6 @@ mkGraphAlg
     # (ed, menv)   = ppExpression caseExpr chn.chn_module_env
     # (ni, g)      = addNode (mkGNode (GDecision CaseDecision (ppCompact ed))) chn.chn_graph
     # chn          = foldr (mkAlt ni) {chn & chn_module_env = menv, chn_graph = g} alts
-    //= annotExpr (Case cs) inh chn (mkSingleIdSynExpr (Just ni)) // TODO FIXME: This fails...:(
     = (mkSingleIdSynExpr (Just ni), chn)
     where
     mkAlt ni (lbl, e) chn
@@ -615,10 +632,47 @@ mkGraphAlg
       where f bp menv
               # (bvd, menv) = ppBasicValue bp.bp_value menv
               = ((bvd, bp.bp_expr), menv)
-
+// tonicVarToSingleTask
+  // TODO Determine whether it's a Task a or [Task a]
   varC bv inh chn
-    # (ni, g) = addNode (mkGNode (GVar bv.var_ident.id_name)) chn.chn_graph
-    = (mkSingleIdSynExpr (Just ni), {chn & chn_graph = g})
+    # (isTask, chn) = varIsTask bv.var_info_ptr chn
+    # (nid, g) = addNode (mkGNode (GVar bv.var_ident.id_name)) chn.chn_graph
+    # chn = {chn & chn_graph = g}
+    = case isTask of
+        True
+          # (tonicVarToSingleTask_symb, predefs) = (chn.chn_predef_symbols)![PD_tonicVarToSingleTask]
+          # chn = {chn & chn_predef_symbols = predefs}
+          # tatSI = mkPredefSymbIdent "tonicVarToSingleTask" tonicVarToSingleTask_symb
+          # (mod, menv) = (chn.chn_module_env)!me_icl_module
+          # chn = {chn & chn_module_env = menv}
+          // TODO Replace -1s with proper predecessor and successor IDs
+          # varexpr = App (appPredefinedSymbol "tonicVarToSingleTask" tonicVarToSingleTask_symb [mkStr mod.icl_name.id_name, mkStr inh.inh_curr_task_name, mkInt nid, mkInt -1, mkInt -1, Var bv])
+          = ({mkSingleIdSynExpr (Just nid) & syn_annot_expr = Just varexpr}, chn)
+        _ = (mkSingleIdSynExpr (Just nid), chn)
+
+/*
+
+a >>| b >>| c
+
+==
+
+(>>|) ((>>|) a b) c
+
+==
+
+(>>|)
+  ((>>|)
+    a
+    b)
+  c
+
+~
+
+a -- b -- c
+
+b: pred a, succ c
+
+*/
 
 listExprToList :: Expression -> [Expression]
 listExprToList (App app) =

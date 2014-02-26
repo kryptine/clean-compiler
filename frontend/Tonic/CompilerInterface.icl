@@ -115,16 +115,11 @@ addReflection icl_module idx tonic_reflection menv
           Just fd
             = case fd.fun_body of
                 TransformedBody fb
-                  # (isPartialApp, menv) = case fb.tb_rhs of
-                                             App app -> isPartialApp app menv
-                                             _       -> (True, menv)
-                  # (isTask, menv)       = exprIsTask fb.tb_rhs menv
-                  = case (isPartialApp, isTask) of
-                      (False, True)
-                        # fun_defs = menv.me_fun_defs
-                        # fun_defs = updateFunRhs idx fun_defs (addReflection` fd fb.tb_rhs)
-                        = { menv & me_fun_defs = fun_defs}
-                      _ = menv
+                  # (isPA, menv)   = case fb.tb_rhs of
+                                       App app -> isPartialApp app menv
+                                       // TODO Add a case for @ ?
+                                       _       -> (False, menv)
+                  = if isPA menv (doAddRefl fd fb menv)
                 _ = menv
           _ = menv
   where
@@ -134,3 +129,8 @@ addReflection icl_module idx tonic_reflection menv
              , mkStr fd.fun_ident.id_name
              , expr
              ])
+
+  doAddRefl fd fb menv
+    # fun_defs = menv.me_fun_defs
+    # fun_defs = updateFunRhs idx fun_defs (addReflection` fd fb.tb_rhs)
+    = { menv & me_fun_defs = fun_defs}
