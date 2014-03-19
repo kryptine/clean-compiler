@@ -58,13 +58,14 @@ partionateAndExpandTypes used_module_numbers main_dcl_module_index icl_common=:{
 	  icl_cons_defs = com_cons_defs
 	  new_cons_defs = { {} \\ module_n <- [0..nr_of_modules-1] }
 
+	  reversed_groups = reverse pi_groups
 	  (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
-			= expand_synonym_types_of_groups main_dcl_module_index pi_groups
+			= expand_synonym_types_of_groups main_dcl_module_index reversed_groups
 					(new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, pi_error)
 
 	  icl_common = {icl_common & com_type_defs = icl_type_defs, com_cons_defs = icl_cons_defs}
 	  (dcl_modules, common_defs) = update_modules_and_create_commondefs used_module_numbers new_type_defs new_cons_defs nr_of_modules dcl_modules
-	= (reverse pi_groups, common_defs, pi_type_def_infos, icl_common, dcl_modules, type_heaps, error)
+	= (reversed_groups, common_defs, pi_type_def_infos, icl_common, dcl_modules, type_heaps, error)
 where
 	create_type_defs_marks_and_infos :: NumberSet Int Int Int (*{#CheckedTypeDef},*{#DclModule}) -> (!*{#DclModule},!*{#*{#CheckedTypeDef}},!*{#*{#Int}},!*TypeDefInfos)
 	create_type_defs_marks_and_infos used_module_numbers main_dcl_module_index n_types_without_not_exported_dictionaries nr_of_modules  (icl_type_defs, dcl_modules)
