@@ -1289,31 +1289,32 @@ where
 
 writeTypeTA :: !*File !(Optional TypeVarBeautifulizer) !Format !TypeSymbIdent !a -> (!*File, !Optional TypeVarBeautifulizer) | writeType a
 writeTypeTA	file opt_beautifulizer form {type_ident,type_index,type_arity} types
-	| is_predefined type_index
-		| type_ident.id_name=="_List"
-			= writeWithinBrackets "[" "]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-		| type_ident.id_name=="_!List"
-			= writeWithinBrackets "[!" "]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-		| type_ident.id_name=="_#List"
-			= writeWithinBrackets "[#" "]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-		| type_ident.id_name=="_List!"
-			= writeWithinBrackets "[" "!]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-		| type_ident.id_name=="_!List!"
-			= writeWithinBrackets "[!" "!]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-		| type_ident.id_name=="_#List!"
-			= writeWithinBrackets "[#" "!]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-		| is_lazy_array type_ident
-			= writeWithinBrackets "{" "}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-		| is_strict_array type_ident
-			= writeWithinBrackets "{!" "}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-		| is_unboxed_array type_ident
-			= writeWithinBrackets "{#" "}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-		| is_tuple type_ident type_arity
-			= writeWithinBrackets "(" ")" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-		| is_string_type type_ident
-			= (file <<< "String", opt_beautifulizer)
+	| type_index.glob_module == cPredefinedModuleIndex
+		# predef_index = type_index.glob_object+FirstTypePredefinedSymbolIndex
 		| type_arity == 0
-			= (file <<< type_ident, opt_beautifulizer)
+			| predef_index==PD_StringType
+				= (file <<< "String", opt_beautifulizer)
+				= (file <<< type_ident, opt_beautifulizer)
+		| predef_index==PD_ListType
+			= writeWithinBrackets "[" "]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
+		| predef_index==PD_StrictListType
+			= writeWithinBrackets "[!" "]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
+		| predef_index==PD_UnboxedListType
+			= writeWithinBrackets "[#" "]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
+		| predef_index==PD_TailStrictListType
+			= writeWithinBrackets "[" "!]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
+		| predef_index==PD_StrictTailStrictListType
+			= writeWithinBrackets "[!" "!]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
+		| predef_index==PD_UnboxedTailStrictListType
+			= writeWithinBrackets "[#" "!]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
+		| predef_index==PD_LazyArrayType
+			= writeWithinBrackets "{" "}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
+		| predef_index==PD_StrictArrayType
+			= writeWithinBrackets "{!" "}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
+		| predef_index==PD_UnboxedArrayType
+			= writeWithinBrackets "{#" "}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
+		| predef_index>=PD_Arity2TupleType && predef_index<=PD_Arity32TupleType
+			= writeWithinBrackets "(" ")" file opt_beautifulizer (setProperty form cCommaSeparator, types)
 		| checkProperty form cBrackets
 			# (file, opt_beautifulizer)
 					= writeType (file <<< '(' <<< type_ident <<< ' ') opt_beautifulizer (form, types)
@@ -1326,14 +1327,6 @@ writeTypeTA	file opt_beautifulizer form {type_ident,type_index,type_arity} types
 				= writeType (file <<< '(' <<< type_ident <<< ' ') opt_beautifulizer (form, types)
 		= (file <<< ')', opt_beautifulizer)
 		= writeType (file <<< type_ident <<< ' ') opt_beautifulizer (setProperty form cBrackets, types)
-where
-		is_predefined {glob_module} 	= glob_module == cPredefinedModuleIndex
-
-		is_tuple {id_name} tup_arity	= id_name == "_Tuple" +++ toString tup_arity
-		is_lazy_array {id_name} 		= id_name == "_Array"
-		is_strict_array {id_name} 		= id_name == "_!Array"
-		is_unboxed_array {id_name} 		= id_name == "_#Array"
-		is_string_type {id_name}		= id_name == "_String"
 
 instance writeType ATypeVar
 where
