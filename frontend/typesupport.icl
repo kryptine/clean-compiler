@@ -1294,6 +1294,8 @@ writeTypeTA	file opt_beautifulizer form {type_ident,type_index,type_arity} types
 		| type_arity == 0
 			| predef_index==PD_StringType
 				= (file <<< "String", opt_beautifulizer)
+			| predef_index==PD_UnitType
+				= (file <<< "()", opt_beautifulizer)
 				= (file <<< type_ident, opt_beautifulizer)
 		| predef_index==PD_ListType
 			= writeWithinBrackets "[" "]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
