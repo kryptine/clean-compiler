@@ -3330,8 +3330,8 @@ where
 				<=< adjustPredefSymbolAndCheckIndex PD_StringType mod_index PD_StringTypeIndex STE_Type
 				<=< adjust_predef_symbols PD_ListType PD_OverloadedListType mod_index STE_Type
 				<=< adjust_predef_symbols_and_check_indices PD_Arity2TupleType PD_Arity32TupleType PD_Arity2TupleTypeIndex mod_index STE_Type
-				<=< adjust_predef_symbols PD_LazyArrayType PD_UnboxedArrayType mod_index STE_Type
-				<=< adjust_predef_symbols PD_ConsSymbol PD_Arity32TupleSymbol mod_index STE_Constructor
+				<=< adjust_predef_symbols PD_LazyArrayType PD_UnitType mod_index STE_Type
+				<=< adjust_predef_symbols PD_ConsSymbol PD_UnitConsSymbol mod_index STE_Constructor
 				<=< (if tc_class_defined (adjustPredefSymbol PD_TypeCodeClass mod_index STE_Class) (\x->x))
 				<=< (if tc_class_defined (adjustPredefSymbol PD_TypeCodeMember mod_index STE_Member) (\x->x))
 				<=< adjustPredefSymbol PD_DummyForStrictAliasFun mod_index STE_DclFunction)
@@ -3356,7 +3356,7 @@ where
 				<=< adjust_predef_symbols PD_Dyn_initial_unification_environment PD_Dyn_normalise mod_index STE_DclFunction
 				<=< adjustPredefSymbol PD_Dyn__to_TypeCodeConstructor	mod_index STE_DclFunction
 				<=< adjustPredefSymbol PD_TypeCodeConstructor mod_index STE_Type
-				<=< adjust_predef_symbols PD_TC_Int PD_TC__UnboxedArray mod_index STE_Constructor
+				<=< adjust_predef_symbols PD_TC_Int PD_TC__Unit mod_index STE_Constructor
 				)
 		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_StdGeneric]
 		# type_bimap = predefined_idents.[PD_TypeBimap]	

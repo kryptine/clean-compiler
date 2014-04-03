@@ -917,6 +917,24 @@ declareDynamicTemp :: PredefinedSymbols -> BackEnder
 declareDynamicTemp predefs
 	=	appBackEnd (BEDeclareDynamicTypeSymbol predefs.[PD_StdDynamic].pds_def predefs.[PD_Dyn_DynamicTemp].pds_def)
 
+^= v be
+	:== (v,be)
+
+@^ f f1 be
+	# (v1,be) = f1 be
+	:== f v1 be
+
+@^^ f f1 f2 be
+	# (v1,be) = f1 be
+	  (v2,be) = f2 be
+	:== f v1 v2 be
+
+@^^^ f f1 f2 f3 be
+	# (v1,be) = f1 be
+	  (v2,be) = f2 be
+	  (v3,be) = f3 be
+	:== f v1 v2 v3 be
+
 predefineSymbols :: DclModule PredefinedSymbols -> BackEnder
 predefineSymbols {dcl_common} predefs
 	=	appBackEnd (BEDeclarePredefinedModule (size dcl_common.com_type_defs) (size dcl_common.com_cons_defs))
@@ -924,6 +942,7 @@ predefineSymbols {dcl_common} predefs
 	o`	foldState predefineType types
 	o`	foldState predefine_list_constructor list_constructors
 	o`	foldState predefineConstructor constructors
+	o`	define_unit_type
 	where
 		list_types :: [(Int,Int,Int)]
 		list_types
@@ -997,6 +1016,16 @@ predefineSymbols {dcl_common} predefs
 			// ... sanity check
 			=	appBackEnd (BEPredefineConstructorSymbol arity predefs.[index].pds_def cPredefinedModuleIndex symbolKind)
 
+		define_unit_type
+			# constructor_symbol_be_f = BEConstructorSymbol predefs.[PD_UnitConsSymbol].pds_def cPredefinedModuleIndex
+			  type_be_f = @^^ BENormalTypeNode constructor_symbol_be_f BENoTypeArgs
+			  constructors_be_f = @^^ BEConstructors (@^ BEConstructor type_be_f) BENoConstructors
+			  type_symbol_be_f = BETypeSymbol predefs.[PD_UnitType].pds_def cPredefinedModuleIndex
+			  flat_type_be_f = @^^^ BEFlatType type_symbol_be_f (^= BENoUniAttr) BENoTypeVars
+			= appBackEnd
+				(  BEDeclareConstructor predefs.[PD_UnitConsSymbol].pds_def cPredefinedModuleIndex "_Unit"
+			  	o` BEDeclareType predefs.[PD_UnitType].pds_def cPredefinedModuleIndex "_Unit"
+				o` @^^ BEAlgebraicType flat_type_be_f constructors_be_f)
 
 bindSpecialIdents :: PredefinedSymbols NumberSet -> BackEnder
 bindSpecialIdents predefs usedModules
