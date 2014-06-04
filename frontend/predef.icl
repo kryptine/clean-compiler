@@ -33,7 +33,8 @@ predefined_idents
 					[PD_StrictTailStrictNilSymbol] = i "_!Nil!",
 					[PD_UnboxedTailStrictNilSymbol] = i "_#Nil!",
 					[PD_OverloadedNilSymbol] = i "_|Nil",
-			
+					[PD_UnitConsSymbol] = i "_Unit",
+
 					[PD_PredefinedModule] = i "_predefined",
 					[PD_StringType] = i "_String",
 					[PD_ListType] = i PD_ListType_String,
@@ -46,6 +47,7 @@ predefined_idents
 					[PD_LazyArrayType] = i "_Array",
 					[PD_StrictArrayType] = i "_!Array",
 					[PD_UnboxedArrayType] = i PD_UnboxedArray_String,
+					[PD_UnitType] = i "_Unit",
 					[PD_TypeCodeMember] = i "_type_code",
 					[PD_DummyForStrictAliasFun] = i "_dummyForStrictAlias"
 				}
@@ -167,6 +169,8 @@ predefined_idents
 					[PD_TC__LazyArray] = i "TC__LazyArray",
 					[PD_TC__StrictArray] = i "TC__StrictArray",
 					[PD_TC__UnboxedArray] = i "TC__UnboxedArray",
+
+					[PD_TC__Unit] = i "TC__Unit",
 
 					[PD_StdGeneric] = i "StdGeneric",
 					[PD_TypeBimap] = i "Bimap",
@@ -316,6 +320,7 @@ where
 			<<= (local_predefined_idents, PD_LazyArrayType)
 			<<= (local_predefined_idents, PD_StrictArrayType)
 			<<= (local_predefined_idents, PD_UnboxedArrayType)
+			<<= (local_predefined_idents, PD_UnitType) <<= (local_predefined_idents, PD_UnitConsSymbol)
 			<<= (local_predefined_idents, PD_TypeCodeMember)
 			<<= (local_predefined_idents, PD_DummyForStrictAliasFun) // MW++
 	where
@@ -376,8 +381,7 @@ where
 					<<- (local_predefined_idents,	IC_Type, PD_TypeCodeConstructor)
 
 					<<- (local_predefined_idents,	IC_Module NoQualifiedIdents, PD_StdGeneric)
-
-		# hash_table = put_predefined_idents_in_hash_table PD_TC_Int PD_TC__UnboxedArray IC_Expression local_predefined_idents hash_table
+		# hash_table = put_predefined_idents_in_hash_table PD_TC_Int PD_TC__Unit IC_Expression local_predefined_idents hash_table
 
 		# hash_table = put_predefined_idents_in_hash_table PD_TypeBimap PD_TypeGenericDict IC_Type local_predefined_idents hash_table
 		# hash_table = put_predefined_idents_in_hash_table PD_ConsBimap PD_bimapId IC_Expression local_predefined_idents hash_table
@@ -436,6 +440,15 @@ make_list_definition list_type_pre_def_symbol_index cons_pre_def_symbol_index ni
 	  				pc_cons_prio =  NoPrio, pc_exi_vars = [], pc_cons_pos = PreDefPos pre_mod_id}
 	= (list_def,ParsedConstructorToConsDef cons_def,ParsedConstructorToConsDef nil_def,pre_def_symbols);
 
+make_unit_definition :: Ident *{#PredefinedSymbol} -> (!TypeDef TypeRhs,!ConsDef,!.{#PredefinedSymbol})
+make_unit_definition pre_mod_id pre_def_symbols
+	# unit_cons_ident = predefined_idents.[PD_UnitConsSymbol]
+	  unit_cons_symb = {ds_ident = unit_cons_ident, ds_arity=0 ,ds_index = PD_UnitConsSymbol-FirstConstructorPredefinedSymbolIndex}
+	  (unit_type_def, pre_def_symbols) = make_type_def PD_UnitType [] (AlgType [unit_cons_symb]) pre_def_symbols	
+	  unit_cons_def = {pc_cons_ident = unit_cons_ident, pc_cons_arity = 0, pc_arg_types = [], pc_args_strictness=NotStrict, pc_context = [],
+		  			   pc_cons_prio =  NoPrio, pc_exi_vars = [], pc_cons_pos = PreDefPos pre_mod_id}
+	= (unit_type_def,ParsedConstructorToConsDef unit_cons_def,pre_def_symbols);
+
 buildPredefinedModule :: !Bool !*PredefinedSymbols -> (!ScannedModule, !.PredefinedSymbols)
 buildPredefinedModule support_dynamics pre_def_symbols 
 	# type_var_ident = predefined_idents.[PD_TypeVar_a0]
@@ -469,7 +482,11 @@ buildPredefinedModule support_dynamics pre_def_symbols
 	  (strict_def, pre_def_symbols)		= make_type_def PD_StrictArrayType [type_var] (AbstractType cAllBitsClear) pre_def_symbols
 	  (unboxed_def, pre_def_symbols)	= make_type_def PD_UnboxedArrayType [type_var] (AbstractType cAllBitsClear) pre_def_symbols
 
-	  (type_defs, cons_defs, pre_def_symbols)	= add_tuple_defs pre_mod_ident MaxTupleArity [array_def,strict_def,unboxed_def] [] pre_def_symbols
+	  (unit_type_def,unit_cons_def,pre_def_symbols) = make_unit_definition pre_mod_ident pre_def_symbols
+
+	  array_and_unit_type_defs = [array_def,strict_def,unboxed_def,unit_type_def]
+	  (type_defs, cons_defs, pre_def_symbols)	= add_tuple_defs pre_mod_ident MaxTupleArity array_and_unit_type_defs [unit_cons_def] pre_def_symbols
+
 	  alias_dummy_type = make_identity_fun_type alias_dummy_ident type_var
 	  (def_classes, def_members) = make_predefined_classes_and_members support_dynamics 
 	= ({ mod_ident = pre_mod_ident, mod_modification_time = "", mod_type = MK_System, mod_imports = [],mod_foreign_exports=[], mod_imported_objects = [],

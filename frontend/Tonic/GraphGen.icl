@@ -216,11 +216,61 @@ lastElem :: [a] -> a
 lastElem [x]    = x
 lastElem [_:xs] = lastElem xs
 
+import StdDebug
+
+instance toString VarInfo where
+  toString (VI_Empty) = "VI_Empty"
+  toString (VI_Type _ _) = "VI_Type"
+  toString (VI_FAType _ _ _) = "VI_FAType"
+  toString (VI_FATypeC _ _ _ _) = "VI_FATypeC"
+  toString (VI_FPC) = "VI_FPC"
+  toString (VI_Occurrence _) = "VI_Occurrence"
+  toString (VI_UsedVar _) = "VI_UsedVar"
+  toString (VI_Expression _) = "VI_Expression"
+  toString (VI_Variable _ _) = "VI_Variable"
+  toString (VI_LiftedVariable _) = "VI_LiftedVariable"
+  toString (VI_Count _ _) = "VI_Count"
+  toString (VI_Ref _) = "VI_Ref"
+  toString (VI_AccVar _ _) = "VI_AccVar"
+  toString (VI_Alias _) = "VI_Alias"
+  toString (VI_RefFromTupleSel0 _) = "VI_RefFromTupleSel0"
+  toString (VI_RefFromArrayUpdate _ _) = "VI_RefFromArrayUpdate"
+  toString (VI_RefFromArrayUpdateToTupleSelector2 _ _ _) = "VI_RefFromArrayUpdateToTupleSelector2"
+  toString (VI_RefFromArrayUpdateOfTupleElem2 _ _) = "VI_RefFromArrayUpdateOfTupleElem2"
+  toString (VI_FreeVar _ _ _ _) = "VI_FreeVar"
+  toString (VI_BoundVar _) = "VI_BoundVar"
+  toString (VI_LocalVar) = "VI_LocalVar"
+  toString (VI_ClassVar _ _ _) = "VI_ClassVar"
+  toString (VI_EmptyConstructorClassVar) = "VI_EmptyConstructorClassVar"
+  toString (VI_ForwardClassVar _) = "VI_ForwardClassVar"
+  toString (VI_Forward _) = "VI_Forward"
+  toString (VI_LetVar _) = "VI_LetVar"
+  toString (VI_LetExpression _) = "VI_LetExpression"
+  toString (VI_CaseOrStrictLetVar _) = "VI_CaseOrStrictLetVar"
+  toString (VI_StrictLetVar) = "VI_StrictLetVar"
+  toString (VI_CorrespondenceNumber _) = "VI_CorrespondenceNumber"
+  toString (VI_SequenceNumber _) = "VI_SequenceNumber"
+  toString (VI_AliasSequenceNumber _) = "VI_AliasSequenceNumber"
+  toString (VI_Used) = "VI_Used"
+  toString (VI_PropagationType _) = "VI_PropagationType"
+  toString (VI_ExpandedType _) = "VI_ExpandedType"
+  toString (VI_Record _) = "VI_Record"
+  toString (VI_Pattern _) = "VI_Pattern"
+  toString (VI_TypeCodeVariable _) = "VI_TypeCodeVariable"
+  toString (VI_DynamicValueAlias _) = "VI_DynamicValueAlias"
+  toString (VI_Body _ _ _ _ _) = "VI_Body"
+  toString (VI_ExpressionOrBody _ _ _ _ _ _) = "VI_ExpressionOrBody"
+  toString (VI_Dictionary _ _ _) = "VI_Dictionary"
+  toString (VI_Extended _ _) = "VI_Extended"
+  toString (VI_CPSExprVar _) = "VI_CPSExprVar"
+  toString (VI_Labelled_Empty _) = "VI_Labelled_Empty"
+  toString (VI_LocalLetVar) = "VI_LocalLetVar"
+
 varIsTask :: VarInfoPtr *ChnExpression -> *(Bool, *ChnExpression)
 varIsTask varptr chn
   # heaps = chn.chn_heaps
   # (vi, var_heap) = readPtr varptr heaps.hp_var_heap
-  # chn = {chn & chn_heaps = {heaps & hp_var_heap = var_heap}}
+  # chn = {chn & chn_heaps = trace_n (toString vi) {heaps & hp_var_heap = var_heap}}
   = case vi of
       VI_Type aty _ -> (atypeIsTask aty, chn)
       _             -> (False, chn)
@@ -636,7 +686,11 @@ mkGraphAlg
   // TODO Determine whether it's a Task a or [Task a]
   varC bv inh chn
     # (isTask, chn) = varIsTask bv.var_info_ptr chn
-    # (nid, g) = addNode (mkGNode (GVar bv.var_ident.id_name)) chn.chn_graph
+    # (mn, chn)     = getModuleName chn
+    # (nid, g)      = addNodeWithIndex (\ni -> { GNode
+                                            | nodeType      = GVar bv.var_ident.id_name
+                                            , nodeTonicInfo = Just $ mkTonicInfo mn ni ni Nothing inh
+                                            }) chn.chn_graph
     # chn = {chn & chn_graph = g}
     = case isTask of
         True

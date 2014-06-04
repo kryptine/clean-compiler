@@ -3000,6 +3000,9 @@ trySimpleTypeT_after_OpenToken ArrowToken attr pState
 		= (ParseOk, {at_attribute = attr, at_type = TArrow}, pState)
 		= (ParseFailWithError,{at_attribute = attr, at_type = TE},
 			parseError "arrow type" (Yes token) ")" pState)
+trySimpleTypeT_after_OpenToken CloseToken attr pState
+	#! unit_type_ident = predefined_idents.[PD_UnitType]
+	= (ParseOk,{at_attribute=attr,at_type=TA (MakeNewTypeSymbIdent unit_type_ident 0) []},pState)
 trySimpleTypeT_after_OpenToken token attr pState
 	# (annot_with_pos,atype, pState) = wantAnnotatedATypeWithPositionT token pState
 	  (token, pState)	= nextToken TypeContext pState
@@ -3423,19 +3426,37 @@ trySimplePatternT SquareOpenToken pState
 	# (list_expr, pState) = wantListExp cIsAPattern pState
 	= (True, list_expr, pState)
 trySimplePatternT OpenToken pState
-	# (args=:[exp:exps], pState) = want_pattern_list pState
-	  pState = wantToken FunctionContext "pattern list" CloseToken pState
-	| isEmpty exps
-		= case exp of
-			PE_Ident id
-				-> (True, PE_List [exp], pState)
-			_
-				-> (True, exp, pState)
-		= (True, PE_Tuple args, pState)
+	# (token, pState) = nextToken FunctionContext pState
+	= case token of
+		CloseToken
+			#! unit_cons_ident = predefined_idents.[PD_UnitConsSymbol]
+			-> (True,PE_Ident unit_cons_ident,pState)
+		_
+			# (args=:[exp:exps], pState) = want_pattern_list_t token pState
+			  pState = wantToken FunctionContext "pattern list" CloseToken pState
+			| isEmpty exps
+				-> case exp of
+					PE_Ident id
+						-> (True, PE_List [exp], pState)
+					_
+						-> (True, exp, pState)
+				-> (True, PE_Tuple args, pState)
 where
+	want_pattern_list_t token pState
+		# (expr, pState)
+			= case token of
+				CharListToken charList // To produce a better error message
+					->	charListError charList pState
+				_
+					->	wantPatternT token pState
+		= want_pattern_list_rest expr pState
+
 	want_pattern_list pState
 		# (expr, pState) = wantPattern pState
-		  (token, pState) = nextToken FunctionContext pState
+		= want_pattern_list_rest expr pState
+
+	want_pattern_list_rest expr pState
+		# (token, pState) = nextToken FunctionContext pState
 		| token == CommaToken
 			# (exprs, pState) = want_pattern_list pState
 			= ([expr : exprs], pState)
@@ -3528,19 +3549,38 @@ trySimpleExpressionT SquareOpenToken pState
 	# (list_expr, pState) = wantListExp cIsNotAPattern pState
 	= (True, list_expr, pState)
 trySimpleExpressionT OpenToken pState
-	# (args=:[exp:exps], pState) = want_expression_list pState
-	  pState = wantToken FunctionContext "expression list" CloseToken pState
-	| isEmpty exps
-		= case exp of
-			PE_Ident id
-				-> (True, PE_List [exp], pState)
-			_
-				-> (True, exp, pState)
-		= (True, PE_Tuple args, pState)
+	# (token, pState) = nextToken FunctionContext pState
+	= case token of
+		CloseToken
+			#! unit_cons_ident = predefined_idents.[PD_UnitConsSymbol]
+			-> (True,PE_Ident unit_cons_ident,pState)
+		_
+			# (args=:[exp:exps], pState) = want_expression_list_t token pState
+			  pState = wantToken FunctionContext "expression list" CloseToken pState
+			| isEmpty exps
+				-> case exp of
+					PE_Ident id
+						-> (True, PE_List [exp], pState)
+					_
+						-> (True, exp, pState)
+				-> (True, PE_Tuple args, pState)
 where
+	want_expression_list_t token pState
+		# (expr, pState)
+			= case token of
+				CharListToken charList
+					 // To produce a better error message
+					->	charListError charList pState
+				_
+					-> wantExpressionT token pState
+		= want_expression_list_rest expr pState
+
 	want_expression_list pState
 		# (expr, pState) = wantExpression pState
-		  (token, pState) = nextToken FunctionContext pState
+		= want_expression_list_rest expr pState
+
+	want_expression_list_rest expr pState
+		# (token, pState) = nextToken FunctionContext pState
 		| token == CommaToken
 			# (exprs, pState) = want_expression_list pState
 			= ([expr : exprs], pState)

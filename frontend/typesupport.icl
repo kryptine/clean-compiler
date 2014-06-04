@@ -1285,8 +1285,15 @@ where
 
 writeTypeTA :: !*File !(Optional TypeVarBeautifulizer) !Format !TypeSymbIdent !a -> (!*File, !Optional TypeVarBeautifulizer) | writeType a
 writeTypeTA	file opt_beautifulizer form {type_ident,type_index,type_arity} types
-	| is_predefined type_index
-		| type_ident.id_name=="_List"
+	| type_index.glob_module == cPredefinedModuleIndex
+		# predef_index = type_index.glob_object+FirstTypePredefinedSymbolIndex
+		| type_arity == 0
+			| predef_index==PD_StringType
+				= (file <<< "String", opt_beautifulizer)
+			| predef_index==PD_UnitType
+				= (file <<< "()", opt_beautifulizer)
+				= (file <<< type_ident, opt_beautifulizer)
+		| predef_index==PD_ListType
 			= writeWithinBrackets "[" "]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
 		| type_ident.id_name=="_!List"
 			= writeWithinBrackets "[!" "]" file opt_beautifulizer (setProperty form cCommaSeparator, types)

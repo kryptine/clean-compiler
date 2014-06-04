@@ -560,6 +560,8 @@ where
 					-> type_code_constructor_expression PD_TC__StrictArray ci
 				PD_UnboxedArrayType
 					-> type_code_constructor_expression PD_TC__UnboxedArray ci
+				PD_UnitType
+					-> type_code_constructor_expression PD_TC__Unit ci
 	typeConstructor (GTT_Constructor fun_ident _) ci
 		# type_fun
 			=	App {app_symb = fun_ident, app_args = [], app_info_ptr = nilPtr}
