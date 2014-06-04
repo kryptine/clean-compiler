@@ -474,24 +474,26 @@ mkGraphAlg
               = annotExpr (l, r) app Nothing Nothing inh { chnr & chn_graph = g } synr
             (lid, rid)
               = edgeErr "bin app edge" lid l rid r chnr
-        // TODO: If there are no two elems in the list, the expr is eta-reduced, so we need to pprint it instead of throwing an error
+        // TODO : If there are no two elems in the list, the expr is eta-reduced, so we need to pprint it instead of throwing an error
 
     mkParBinApp app ctxs args join inh chn
       = withTwo app args f inh chn
       where
       f l r chn
-        # (synr, chnr)  = exprCata mkGraphAlg r inh chn // TODO Create new graph here
-        # (synl, chnl)  = exprCata mkGraphAlg l inh chnr // TODO Create new graph here
-        # (pid, g)      = addNode (mkGNode (GParallel join [])) chnl.chn_graph // TODO [chnl.chn_graph, chnr.chn_graph])) chnl.chn_graph
+        # (synr, chnr) = exprCata mkGraphAlg r inh {chn & chn_graph = emptyGraphWithLastId (getLastId chn.chn_graph)}
+        # g            = addStartStop synr.syn_entry_id chnr.chn_graph
+        # (synl, chnl) = exprCata mkGraphAlg l inh {chnr & chn_graph = emptyGraphWithLastId (getLastId chnr.chn_graph)}
+        # g            = addStartStop synl.syn_entry_id chnl.chn_graph
+        # (pid, g)     = addNode (mkGNode (GParallel join [chnl.chn_graph, chnr.chn_graph])) (setLastId chn.chn_graph (getLastId chnl.chn_graph))
         = case (synl.syn_entry_id, synl.syn_exit_id, synr.syn_entry_id, synr.syn_exit_id) of
             (Just le, Just lx, Just re, Just rx)
               = annotExpr (pid, pid) app Nothing Nothing inh { chnl & chn_graph = g} (mkSingleIdSynExpr (Just pid))
             (_, lid, rid, _)
               = edgeErr "bin app edge" lid l rid r chnl
-        // TODO: If there are no two elems in the list, the expr is eta-reduced, so we need to pprint it instead of throwing an error
+        // TODO : If there are no two elems in the list, the expr is eta-reduced, so we need to pprint it instead of throwing an error
 
-    // TODO: Can be eta-reduced
-    // TODO: In the case where we have
+    // TODO : Can be eta-reduced
+    // TODO : In the case where we have
     //    anyTask [someTask, otherTask]
     // we just split, have two nodes someTask and otherTask, then a merge again.
     // Only when the list anyTask is applied to is a list comprehension we generate
@@ -499,41 +501,33 @@ mkGraphAlg
     // new node (and not even a chain of nodes). We know exactly how many nodes
     // we will get and can therefore link to the join node
     mkParListApp app ctxs args join inh chn
-      //# (sid, g) = addNode (mkGNode GParallelSplit) chn.chn_graph
-      //# (jid, g) = addNode (mkGNode (GParallelJoin join)) g
-      # (sid, jid) = (0, 0) // TODO
-      # g = chn.chn_graph
       = case args of
           [arg=:(App app):_]
             | exprIsListConstr arg
-                # exprs      = listExprToList arg
-                # chn        = {chn & chn_graph = g}
-                # (aes, chn) = let f sid e (xs, chn)
-                                    # (syn, chn)  = exprCata mkGraphAlg e inh chn
-                                    # g           = addEmptyEdge (sid, fromMaybe (abort "Failed to add parallel node") syn.syn_entry_id) chn.chn_graph
-                                    # g           = addEmptyEdge (fromMaybe (abort "Failed to add parallel node") syn.syn_entry_id, jid) g
-                                    # aes         = case syn.syn_annot_expr of
-                                                      Just ae -> [ae:xs]
-                                                      _       -> xs
-                                    = (aes, {chn & chn_graph = g})
-                               in  foldr (f sid) ([], chn) exprs
-                = annotExpr (sid, jid) app Nothing (Just exprs) inh chn (mkDualIdSynExpr (Just sid) (Just jid))
+                # exprs          = listExprToList arg
+                # (aes, gs, chn) = let f e (xs, gs, chn)
+                                         # (syn, chn`) = exprCata mkGraphAlg e inh {chn & chn_graph = emptyGraphWithLastId (getLastId chn.chn_graph)}
+                                         # g           = addStartStop syn.syn_entry_id chn`.chn_graph
+                                         # aes         = case syn.syn_annot_expr of
+                                                           Just ae -> [ae:xs]
+                                                           _       -> xs
+                                         = (aes, [chn`.chn_graph:gs], {chn` & chn_graph = setLastId chn.chn_graph (getLastId chn`.chn_graph)})
+                                    in  foldr f ([], [], chn) exprs
+                # (pid, g)       = addNode (mkGNode (GParallel join gs)) chn.chn_graph
+                = annotExpr (pid, pid) app Nothing (Just exprs) inh {chn & chn_graph = g} (mkSingleIdSynExpr (Just pid))
             | isListCompr app.app_symb.symb_ident.id_name
                 # (lc, menv) = sugarListCompr app chn.chn_module_env
-                # (nid, g)   = addNode (mkGNode (GListComprehension lc)) g
-                # g          = addEmptyEdge (sid, nid) g
-                # g          = addEmptyEdge (nid, jid) g
-                = annotExpr (sid, jid) app Nothing Nothing inh {chn & chn_graph = g, chn_module_env = menv} (mkDualIdSynExpr (Just sid) (Just jid))
+                # (nid, g)   = addNode (mkGNode (GListComprehension lc)) (emptyGraphWithLastId (getLastId chn.chn_graph))
+                # (pid, g)   = addNode (mkGNode (GParallel join [g])) chn.chn_graph
+                = annotExpr (pid, pid) app Nothing Nothing inh {chn & chn_graph = g, chn_module_env = menv} (mkSingleIdSynExpr (Just pid))
           [vararg=:(Var bv):as] // TODO test
-            # (syn, chn)  = exprCata mkGraphAlg vararg inh {chn & chn_graph = g}
+            # (syn, chn)  = exprCata mkGraphAlg vararg inh chn
             # nid         = fromMaybe -1 syn.syn_entry_id
-            # g           = addEmptyEdge (sid, nid) chn.chn_graph
-            # g           = addEmptyEdge (nid, jid) g
             # (mod, menv) = (chn.chn_module_env)!me_icl_module
-            # chn         = {chn & chn_graph = g, chn_module_env = menv}
+            # chn         = {chn & chn_module_env = menv}
             # (tonicVarToListOfTask_symb, predefs) = (chn.chn_predef_symbols)![PD_tonicVarToListOfTask]
             # tatSI = mkPredefSymbIdent "tonicVarToListOfTask" tonicVarToListOfTask_symb
-            = annotExpr (sid, jid) app Nothing (Just (ctxs ++ [App (appPredefinedSymbol "tonicVarToListOfTask" tonicVarToListOfTask_symb [mkStr mod.icl_name.id_name, mkStr inh.inh_curr_task_name, mkInt nid, mkInt sid, mkInt jid, vararg])])) inh {chn & chn_predef_symbols = predefs} (mkDualIdSynExpr (Just sid) (Just jid))
+            = annotExpr (nid, nid) app Nothing (Just (ctxs ++ [App (appPredefinedSymbol "tonicVarToListOfTask" tonicVarToListOfTask_symb [mkStr mod.icl_name.id_name, mkStr inh.inh_curr_task_name, mkInt nid, mkInt nid, mkInt nid, vararg])])) inh {chn & chn_predef_symbols = predefs} (mkSingleIdSynExpr (Just nid))
           _ = ({mkSynExpr & syn_annot_expr = Just (App app)}, chn)
 
   // Transformation for higher-order function application
@@ -761,24 +755,20 @@ funToGraph :: FunDef *ModuleEnv *Heaps *PredefinedSymbols -> *(([String], Maybe 
 funToGraph fd=:{fun_ident=fun_ident, fun_body = TransformedBody tb} menv heaps predef_symbols = mkBody
   where
   mkBody
-    # inh          = mkInhExpr fun_ident.id_name
-    # chn          = mkChnExpr emptyGraph predef_symbols menv heaps
-    # (syn, chn)   = exprCata mkGraphAlg tb.tb_rhs inh chn
-    # (initId, g)  = addNode (mkGNode GInit) chn.chn_graph
-    # g            = addStartEdge syn.syn_entry_id initId g
-    # g            = addStopEdges g
+    # inh        = mkInhExpr fun_ident.id_name
+    # chn        = mkChnExpr emptyGraph predef_symbols menv heaps
+    # (syn, chn) = exprCata mkGraphAlg tb.tb_rhs inh chn
+    # g          = addStartStop syn.syn_entry_id chn.chn_graph
     = ( (map (\x -> x.fv_ident.id_name) tb.tb_args, Just g, syn.syn_annot_expr)
       , chn.chn_module_env, chn.chn_heaps, chn.chn_predef_symbols)
-
-  addStopEdges g
-    # leafs        = leafNodes g
-    # (stopId, g)  = addNode (mkGNode GStop) g
-    = foldr (\nid g_ -> addEmptyEdge (nid, stopId) g_) g leafs
-
-  addStartEdge mfirstId initId g
-    = maybe g (\firstId -> addEmptyEdge (initId, firstId) g) mfirstId
-
 funToGraph _ menv heaps predef_symbols = (([], Nothing, Nothing), menv, heaps, predef_symbols)
+
+addStartStop eid g
+  # (initId, g)  = addNode (mkGNode GInit) g
+  # g            = maybe g (\firstId -> addEmptyEdge (initId, firstId) g) eid
+  # leafs        = leafNodes g
+  # (stopId, g)  = addNode (mkGNode GStop) g
+  = foldr (\nid g_ -> addEmptyEdge (nid, stopId) g_) g leafs
 
 instance toString GNode where
 	toString n = toString n.nodeType
