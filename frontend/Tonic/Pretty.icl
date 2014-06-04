@@ -177,11 +177,11 @@ ppDebugSelection (DictionarySelection bv ss einf e)  menv = (text" TODO: Diction
 ppDefinedSymbol :: DefinedSymbol *ModuleEnv -> *(Doc, *ModuleEnv)
 ppDefinedSymbol ds menv = ppIdent ds.ds_ident menv
 
-ppGExpression :: GExpression *ModuleEnv -> *(Doc, *ModuleEnv)
-ppGExpression GUndefinedExpression  menv = (text "undef", menv)
-ppGExpression (GGraphExpression _)  menv = (text "<complex subgraph; consider refactoring>", menv)
+//ppGExpression :: GExpression *ModuleEnv -> *(Doc, *ModuleEnv)
+//ppGExpression GUndefinedExpression  menv = (text "undef", menv)
+//ppGExpression (GGraphExpression _)  menv = (text "<complex subgraph; consider refactoring>", menv)
 //ppGExpression (GListExpression _)   menv = (text "TODO: render a list expression (and don't PP one)", menv)
-ppGExpression (GCleanExpression e)  menv = (text e, menv)
+//ppGExpression (GCleanExpression e)  menv = (text e, menv)
 
 ppGLet :: GLet -> Doc
 ppGLet gl
@@ -215,21 +215,18 @@ nodeToDot funnm g currIdx menv =
     GInit                   = blackNode [shape "triangle", width ".25", height ".25", orientation "-90.0"] menv
     GStop                   = blackNode [shape "box", width ".2", height ".2"] menv
     (GDecision _ expr)      = whiteNode [shape "diamond", label expr] menv
-    (GLet glt)
-      = whiteNode [shape "box", ppCompact (ppGLet glt)] menv // TODO: Rounded corners
-    GParallelSplit          = whiteNode [shape "circle", label "Run in\nparallel"] menv
-    (GParallelJoin jt)      = whiteNode [shape "circle", label (mkJoinLbl jt)] menv
+    (GLet glt)              = whiteNode [shape "box", ppCompact (ppGLet glt)] menv // TODO: Rounded corners
+    //GParallelSplit          = whiteNode [shape "circle", label "Run in\nparallel"] menv
+    //(GParallelJoin jt)      = whiteNode [shape "circle", label (mkJoinLbl jt)] menv
     (GTaskApp tid exprs)    = whiteNode [shape "box", label tid] menv // TODO: complex contents with extra bar
-    (GReturn expr)
-      # (ged, menv) = ppGExpression expr menv
-      = whiteNode [shape "oval", label (ppCompact ged)] menv
+    (GReturn expr)          = whiteNode [shape "oval", label expr] menv
     (GAssign usr)           = let  idxStr = toString currIdx
                                    usrStr = "user" +++ idxStr
                               in   ("subgraph cluster_user" +++ idxStr +++ "{ label=" +++ usr +++ "; labelloc=b; peripheries=0; " +++ usrStr +++ "}" +++
                                     usrStr +++ mkDotArgs [ mkDotAttrKV "shapefile" "\"stick.png\""
                                                          , mkDotAttrKV "peripheries" "0"
                                                          , style "invis" ], menv)
-    GStep                   = whiteNode [shape "circle", label "Step"] menv
+    (GStep es)              = whiteNode [shape "circle", label "Step"] menv
     (GListComprehension lc)
       // TODO : Factor out dot rendering and fix this
       //# (ged1, menv) = ppGExpression lc.input menv

@@ -146,9 +146,9 @@ sugarListCompr app menv
     # (gd, menv)  = ppExpression gen menv
     # (fvd, menv) = ppFreeVar sel menv
     = ({ GListComprehension
-      | output = GCleanExpression $ ppCompact od
+      | output = ppCompact od
       , guard = Nothing
-      , comprElem = [{cePattern = ppCompact fvd, ceType = SeqComp /* TODO */, ceInput = GCleanExpression (ppCompact gd)}]
+      , comprElem = [{cePattern = ppCompact fvd, ceType = SeqComp /* TODO */, ceInput = ppCompact gd}]
        //selector = 
       //, input = GCleanExpression $ ppCompact gd
       }, menv)
@@ -196,11 +196,12 @@ annotExpr (entry, exit) app mbRepSI mbArgs inh chn syn
 
 mkTonicInfo :: String Int Int (Maybe String) InhExpression -> TonicInfo
 mkTonicInfo modname euid xuid mval inh =
-  { tiModuleName  = modname
-  , tiTaskName    = inh.inh_curr_task_name
-  , tiValAsStr    = mval
-  , tiIsBind      = False
-  , tiIdent       = TEntryExitIds euid xuid
+  { tonicModuleName  = modname
+  , tonicTaskName    = inh.inh_curr_task_name
+  , tonicValAsStr    = mval
+  //, tonicIsBind      = False
+  , tonicEntryUniqId = euid
+  , tonicExitUniqId  = xuid
   }
 
 getModuleName :: *ChnExpression -> *(String, *ChnExpression)
@@ -399,7 +400,7 @@ mkGraphAlg
       # (mn, chn)  = getModuleName chn
       # (ppd, chn) = case args of
                        [x:_] -> mkRet x chn
-                       _     -> (GCleanExpression "", chn)
+                       _     -> ("", chn)
       # (n, g)     = addNodeWithIndex (\ni -> { GNode
                                               | nodeType      = GReturn ppd
                                               , nodeTonicInfo = Just $ mkTonicInfo mn ni ni Nothing inh
@@ -411,11 +412,11 @@ mkGraphAlg
       // other type.
       mkRet (BasicExpr bv) chn
         # (bvd, menv) = ppBasicValue bv chn.chn_module_env
-        = (GCleanExpression $ ppCompact bvd, {chn & chn_module_env = menv})
-      mkRet (Var bv)       chn = (GCleanExpression bv.var_ident.id_name, chn)
+        = (ppCompact bvd, {chn & chn_module_env = menv})
+      mkRet (Var bv)       chn = (bv.var_ident.id_name, chn)
       mkRet e              chn
         # (d, menv) = ppExpression e chn.chn_module_env
-        = (GCleanExpression $ ppCompact d, {chn & chn_module_env = menv})
+        = (ppCompact d, {chn & chn_module_env = menv})
          //# chn = exprCata mkGraphAlg e chn
          //= (GGraphExpression (GGraph chn.chn_graph), chn)
 
@@ -454,7 +455,7 @@ mkGraphAlg
       # (ps, menv) = mapSt ppExpression args chn.chn_module_env
       //# menv       = trace_n ("\nmkTaskApp trace:\n" +++ foldr (\x xs -> ppCompact x +++ xs) "" ps +++ "\n") menv
       # chn        = {chn & chn_module_env = menv}
-      # appArgs    = map (GCleanExpression o ppCompact) ps  // TODO: When do we pprint a Clean expr? And when do we generate a subgraph?
+      # appArgs    = map ppCompact ps  // TODO: When do we pprint a Clean expr? And when do we generate a subgraph?
       # (an, g)    = addNodeWithIndex (\ni -> { GNode
                                               | nodeType      = GTaskApp (appFunName app) appArgs
                                               , nodeTonicInfo = Just $ mkTonicInfo mn ni ni Nothing inh
@@ -479,19 +480,14 @@ mkGraphAlg
       = withTwo app args f inh chn
       where
       f l r chn
-        # (sid, g)      = addNode (mkGNode GParallelSplit) chn.chn_graph
-        # (jid, g)      = addNode (mkGNode (GParallelJoin join)) g
-        # (synr, chnr)  = exprCata mkGraphAlg r inh {chn & chn_graph = g}
-        # (synl, chnl)  = exprCata mkGraphAlg l inh chnr
+        # (synr, chnr)  = exprCata mkGraphAlg r inh chn // TODO Create new graph here
+        # (synl, chnl)  = exprCata mkGraphAlg l inh chnr // TODO Create new graph here
+        # (pid, g)      = addNode (mkGNode (GParallel join [])) chnl.chn_graph // TODO [chnl.chn_graph, chnr.chn_graph])) chnl.chn_graph
         = case (synl.syn_entry_id, synl.syn_exit_id, synr.syn_entry_id, synr.syn_exit_id) of
             (Just le, Just lx, Just re, Just rx)
-              # g = addEmptyEdge (sid, le) chnl.chn_graph
-              # g = addEmptyEdge (sid, re) g
-              # g = addEmptyEdge (lx, jid) g
-              # g = addEmptyEdge (rx, jid) g
-              = annotExpr (sid, jid) app Nothing Nothing inh { chnl & chn_graph = g} (mkDualIdSynExpr (Just sid) (Just jid))
+              = annotExpr (pid, pid) app Nothing Nothing inh { chnl & chn_graph = g} (mkSingleIdSynExpr (Just pid))
             (_, lid, rid, _)
-              = edgeErr "bin app edge" lid l rid r chnr
+              = edgeErr "bin app edge" lid l rid r chnl
         // TODO: If there are no two elems in the list, the expr is eta-reduced, so we need to pprint it instead of throwing an error
 
     // TODO: Can be eta-reduced
@@ -503,8 +499,10 @@ mkGraphAlg
     // new node (and not even a chain of nodes). We know exactly how many nodes
     // we will get and can therefore link to the join node
     mkParListApp app ctxs args join inh chn
-      # (sid, g) = addNode (mkGNode GParallelSplit) chn.chn_graph
-      # (jid, g) = addNode (mkGNode (GParallelJoin join)) g
+      //# (sid, g) = addNode (mkGNode GParallelSplit) chn.chn_graph
+      //# (jid, g) = addNode (mkGNode (GParallelJoin join)) g
+      # (sid, jid) = (0, 0) // TODO
+      # g = chn.chn_graph
       = case args of
           [arg=:(App app):_]
             | exprIsListConstr arg
@@ -790,11 +788,12 @@ instance toString GNodeType where
   toString GStop = "GStop"
   toString (GDecision _ _) = "GDecision"
   toString (GLet _) = "GLet"
-  toString GParallelSplit = "GParallelSplit"
-  toString (GParallelJoin _) = "GParallelJoin"
+  //toString GParallelSplit = "GParallelSplit"
+  //toString (GParallelJoin _) = "GParallelJoin"
   toString (GTaskApp _ _) = "GTaskApp"
   toString (GReturn _) = "GReturn"
   toString (GAssign _) = "GAssign"
-  toString GStep = "GStep"
+  toString (GStep _) = "GStep"
   toString (GListComprehension _) = "GListComprehension"
+  toString (GVar _) = "GVar"
 

@@ -5,7 +5,7 @@ from syntax import :: App, :: SymbIdent, :: Ident, :: BoundVar, :: Expression,
   :: FreeVar, :: BasicValue, :: DefinedSymbol, :: Selection, :: SymbIdent
 from Tonic.AbsSyn import :: ModuleEnv
 from iTasks.Framework.Tonic.AbsSyn import :: GinGraph, :: GLet,
-  :: GExpression, :: GinGraph, :: GNode, :: Graph, :: GEdge
+  :: GinGraph, :: GNode, :: Graph, :: GEdge
 
 ppDebugApp :: App *ModuleEnv -> *(Doc, *ModuleEnv)
 
@@ -32,8 +32,6 @@ ppSelection :: Selection *ModuleEnv -> *(Doc, *ModuleEnv)
 ppDebugSelection :: Selection *ModuleEnv -> *(Doc, *ModuleEnv)
 
 ppDefinedSymbol :: DefinedSymbol *ModuleEnv -> *(Doc, *ModuleEnv)
-
-ppGExpression :: GExpression *ModuleEnv -> *(Doc, *ModuleEnv)
 
 ppGLet :: GLet -> Doc
 
