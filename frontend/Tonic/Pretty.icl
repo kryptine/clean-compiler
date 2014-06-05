@@ -219,10 +219,10 @@ nodeToDot funnm g currIdx menv =
     //GParallelSplit          = whiteNode [shape "circle", label "Run in\nparallel"] menv
     //(GParallelJoin jt)      = whiteNode [shape "circle", label (mkJoinLbl jt)] menv
     (GTaskApp tid exprs)    = whiteNode [shape "box", label tid] menv // TODO: complex contents with extra bar
-    (GReturn expr)          = whiteNode [shape "oval", label expr] menv
+    (GReturn expr)          = whiteNode [shape "oval", label "TODO: Return expr goes here"] menv
     (GAssign usr)           = let  idxStr = toString currIdx
                                    usrStr = "user" +++ idxStr
-                              in   ("subgraph cluster_user" +++ idxStr +++ "{ label=" +++ usr +++ "; labelloc=b; peripheries=0; " +++ usrStr +++ "}" +++
+                              in   ("subgraph cluster_user" +++ idxStr +++ "{ label=" +++ "TODO usr pp goes here" +++ "; labelloc=b; peripheries=0; " +++ usrStr +++ "}" +++
                                     usrStr +++ mkDotArgs [ mkDotAttrKV "shapefile" "\"stick.png\""
                                                          , mkDotAttrKV "peripheries" "0"
                                                          , style "invis" ], menv)

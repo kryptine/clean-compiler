@@ -61,9 +61,8 @@ At e es :== e @ es
   }
 
 :: SynExpression =
-  { syn_entry_id    :: !Maybe Int
-  , syn_exit_id     :: !Maybe Int
-  , syn_annot_expr  :: !Maybe Expression
+  { syn_node_id    :: !Maybe Int
+  , syn_annot_expr :: !Maybe Expression
   }
 
 :: *ModuleEnv =
@@ -84,7 +83,5 @@ mkChnExpr :: *GinGraph *PredefinedSymbols *ModuleEnv *Heaps -> *ChnExpression
 mkSynExpr :: SynExpression
 
 mkSingleIdSynExpr :: (Maybe Int) -> SynExpression
-
-mkDualIdSynExpr :: (Maybe Int) (Maybe Int) -> SynExpression
 
 mkModuleEnv :: ModuleN !*{#FunDef} IclModule {#DclModule} -> *ModuleEnv

@@ -85,24 +85,14 @@ mkChnExpr gg predef_symbols menv heaps =
 mkSynExpr :: SynExpression
 mkSynExpr =
   { SynExpression
-  | syn_entry_id   = Nothing
-  , syn_exit_id    = Nothing
+  | syn_node_id    = Nothing
   , syn_annot_expr = Nothing
   }
 
 mkSingleIdSynExpr :: (Maybe Int) -> SynExpression
 mkSingleIdSynExpr n =
   { SynExpression
-  | syn_entry_id   = n
-  , syn_exit_id    = n
-  , syn_annot_expr = Nothing
-  }
-
-mkDualIdSynExpr :: (Maybe Int) (Maybe Int) -> SynExpression
-mkDualIdSynExpr n m =
-  { SynExpression
-  | syn_entry_id   = n
-  , syn_exit_id    = m
+  | syn_node_id    = n
   , syn_annot_expr = Nothing
   }
 
