@@ -498,7 +498,7 @@ mkGraphAlg
                 # (pid, g)       = addNode (mkGNode (GParallel join gs)) chn.chn_graph
                 = annotExpr pid app Nothing (Just exprs) inh {chn & chn_graph = g} (mkSingleIdSynExpr (Just pid))
             | otherwise
-                # (n, g) = addNode (mkGNode GArbitraryExpression) chn.chn_graph
+                # (n, g) = addNode (mkGNode (GParallel join [ArbitraryOrUnknownExpr])) chn.chn_graph
                 = (mkSingleIdSynExpr (Just n), {chn & chn_graph = g})
             //| isListCompr app.app_symb.symb_ident.id_name
                 //# (lc, menv) = sugarListCompr app chn.chn_module_env
