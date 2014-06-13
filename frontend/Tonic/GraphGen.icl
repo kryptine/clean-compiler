@@ -497,11 +497,14 @@ mkGraphAlg
                                     in  foldr f ([], [], chn) exprs
                 # (pid, g)       = addNode (mkGNode (GParallel join gs)) chn.chn_graph
                 = annotExpr pid app Nothing (Just exprs) inh {chn & chn_graph = g} (mkSingleIdSynExpr (Just pid))
-            | isListCompr app.app_symb.symb_ident.id_name
-                # (lc, menv) = sugarListCompr app chn.chn_module_env
-                # (nid, g)   = addNode (mkGNode (GListComprehension lc)) (emptyGraphWithLastId (getLastId chn.chn_graph))
-                # (pid, g)   = addNode (mkGNode (GParallel join [Subgraph g])) chn.chn_graph
-                = annotExpr pid app Nothing Nothing inh {chn & chn_graph = g, chn_module_env = menv} (mkSingleIdSynExpr (Just pid))
+            | otherwise
+                # (n, g) = addNode (mkGNode GArbitraryExpression) chn.chn_graph
+                = (mkSingleIdSynExpr (Just n), {chn & chn_graph = g})
+            //| isListCompr app.app_symb.symb_ident.id_name
+                //# (lc, menv) = sugarListCompr app chn.chn_module_env
+                //# (nid, g)   = addNode (mkGNode (GListComprehension lc)) (emptyGraphWithLastId (getLastId chn.chn_graph))
+                //# (pid, g)   = addNode (mkGNode (GParallel join [Subgraph g])) chn.chn_graph
+                //= annotExpr pid app Nothing Nothing inh {chn & chn_graph = g, chn_module_env = menv} (mkSingleIdSynExpr (Just pid))
           [vararg=:(Var bv):as] // TODO test
             # (syn, chn)  = exprCata mkGraphAlg vararg inh chn
             # nid         = fromMaybe -1 syn.syn_node_id
@@ -679,13 +682,14 @@ mkGraphAlg
     mkAlts` :: Int Doc Expression ChnExpression -> (SynExpression, ChnExpression)
     mkAlts` ni lblDoc expr chn
       # (syn, chn) = exprCata mkGraphAlg expr inh chn
-      # menv        = chn.chn_module_env
+      # menv       = chn.chn_module_env
       # (d, menv)  = ppExpression expr menv
-      # chn         = {chn & chn_module_env = menv}
+      # chn        = {chn & chn_module_env = menv}
       # g          = addEdge (mkEdge (ppCompact lblDoc)) (ni, fromMaybe (trace_n (ppCompact d) abort "Failed to add edge from decision node to branch") syn.syn_node_id) chn.chn_graph
       = (syn, {chn & chn_graph = g})
 
   // TODO Determine whether it's a Task a or [Task a]
+  // We can do so by maintaining an environment. At lets and lambdas, store the bound variable and its type in the env
   varC bv inh chn
     # (isTask, chn) = varIsTask bv.var_info_ptr chn
     # (mn, chn)     = getModuleName chn
@@ -794,6 +798,6 @@ instance toString GNodeType where
   toString (GReturn _) = "GReturn"
   toString (GAssign _) = "GAssign"
   toString (GStep _) = "GStep"
-  toString (GListComprehension _) = "GListComprehension"
+  //toString (GListComprehension _) = "GListComprehension"
   toString (GVar _) = "GVar"
 

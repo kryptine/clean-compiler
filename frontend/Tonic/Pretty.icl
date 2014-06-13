@@ -227,14 +227,14 @@ nodeToDot funnm g currIdx menv =
                                                          , mkDotAttrKV "peripheries" "0"
                                                          , style "invis" ], menv)
     (GStep es)              = whiteNode [shape "circle", label "Step"] menv
-    (GListComprehension lc)
+    //(GListComprehension lc)
       // TODO : Factor out dot rendering and fix this
       //# (ged1, menv) = ppGExpression lc.input menv
       //# (ged2, menv) = ppGExpression lc.output menv
       //# fe  = "<B>for each</B> " +++ lc.selector +++ "<BR/><B>in</B> " +++ ppCompact ged1
       //# lxp = "<TABLE><TR><TD>" +++ fe +++ "</TD></TR><TR><TD>" +++ ppCompact ged2 +++ "</TD></TR></TABLE>"
       //= mkDotNode [shape "none", margin "0", html lxp] menv
-      = mkDotNode [shape "none", margin "0", html "TODO List Comprehension"] menv
+      //= mkDotNode [shape "none", margin "0", html "TODO List Comprehension"] menv
   where
   currNode               = getNodeData` currIdx g
   whiteNode attrs menv   = mkDotNode [fontcolor "black", fillcolor "white", style "filled", label "" : attrs] menv
