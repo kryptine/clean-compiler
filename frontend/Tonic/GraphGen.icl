@@ -321,7 +321,7 @@ mkGraphAlg
           "return"    -> mkReturn     app ctxs args              inh chn
           ">>|"       -> mkBindNoLam  app ctxs args              inh chn
           "@:"        -> mkAssign     app ctxs args              inh chn
-          //">>*"       -> mkStep       app ctxs args              inh chn
+          ">>*"       -> mkStep       app ctxs args              inh chn
           "-||-"      -> mkParBinApp  app ctxs args DisFirstBin  inh chn
           "||-"       -> mkParBinApp  app ctxs args DisRight     inh chn
           "-||"       -> mkParBinApp  app ctxs args DisLeft      inh chn
@@ -415,36 +415,68 @@ mkGraphAlg
         | otherwise
             = (ArbitraryOrUnknownExpr, chn)
 
+    // TODO Delimit assigned task somehow. Subgraph?
     mkAssign app ctxs args inh chn
       = withTwo app args f inh chn
       where
       f u t chn
-         # (ud, menv)  = ppExpression u chn.chn_module_env
-         # (lid, g)    = addNode (mkGNode (GAssign (ppCompact ud))) chn.chn_graph
-         # (syn, chn)  = exprCata mkGraphAlg t inh {chn & chn_graph = g, chn_module_env = menv}
-         = case syn.syn_node_id of
-             Just r
-               # g = addEmptyEdge (lid, r) chn.chn_graph
-               = annotExpr r app Nothing Nothing inh {chn & chn_graph = g} syn
-             _ = edgeErr "assign edge" (Just lid) u Nothing t chn
+        # (syn, chn)  = exprCata mkGraphAlg t inh chn
+        # (ud, menv)  = ppExpression u chn.chn_module_env
+        # chn         = {chn & chn_module_env = menv}
+        # (lid, g)    = addNode (mkGNode (GAssign (ppCompact ud))) chn.chn_graph
+        # chn         = {chn & chn_graph = g}
+        //# (syn, chn)  = exprCata mkGraphAlg t inh {chn & chn_graph = g, chn_module_env = menv}
+        = case syn.syn_node_id of
+            Just r
+              # g = addEmptyEdge (r, lid) chn.chn_graph
+              = annotExpr r app Nothing Nothing inh {chn & chn_graph = g} syn
+            _ = edgeErr "assign edge" (Just lid) u Nothing t chn
 
     // TODO : Implement this correctly
     mkStep app ctxs args inh chn
       = withTwo app args f inh chn
       where
       f l r chn
-        # (synl, chnl) = exprCata mkGraphAlg l inh chn
-        // The second argument to step can be any list; a hardcoded list, a list comprehension, a reference to a list constant or a list function, you name it....
-        // For example, in the case of a list comprehension, would we generate subgraphs in the comprehsion body?
-        // If it is a function/constant, we should reify it and inline it
-        # (synr, chnr) = exprCata mkGraphAlg r inh chnl // TODO: This needs heavy work; is completely wrong, copied from mkbinapp
-        = case (synl.syn_node_id, synr.syn_node_id) of
-            (Just l, Just r)
-              # g = addEdge emptyEdge (l, r) chnr.chn_graph
-              = annotExpr l app Nothing Nothing inh { chnr & chn_graph = g} synr
-            (lid, rid)
-              = edgeErr "step edge" lid l rid r chnr
-        // TODO : If there are no two elems in the list, the expr is eta-reduced, so we need to pprint it instead of throwing an error
+        = case r of
+            (arg=:(App app))
+              | exprIsListConstr arg
+                  # exprs          = listExprToList arg
+                  # (aes, gs, chn) = let f e (xs, gs, chn)
+                                           # (syn, chn`) = exprCata mkGraphAlg e inh {chn & chn_graph = emptyGraphWithLastId (getLastId chn.chn_graph)}
+                                           # aes         = case syn.syn_annot_expr of
+                                                             Just ae -> [ae:xs]
+                                                             _       -> xs
+                                           = (aes, [ArbitraryOrUnknownExpr:gs], {chn` & chn_graph = setLastId chn.chn_graph (getLastId chn`.chn_graph)})
+                                     in  foldr f ([], [], chn) exprs
+                  # (pid, g)       = addNode (mkGNode (GStep (map (\g` -> StepElem (StepOnValue {stepContFilter = StepAlways, stepContLbl = Nothing, stepContNode = GArbitraryExpression /* TODO */})) gs))) chn.chn_graph
+                  = annotExpr pid app Nothing (Just exprs) inh {chn & chn_graph = g} (mkSingleIdSynExpr (Just pid))
+              | otherwise
+                  # (n, g) = addNode (mkGNode (GStep [])) chn.chn_graph // TODO
+                  = (mkSingleIdSynExpr (Just n), {chn & chn_graph = g})
+                  // TODO
+            //(vararg=:(Var bv))
+              //# (syn, chn)  = exprCata mkGraphAlg vararg inh chn
+              //# nid         = fromMaybe -1 syn.syn_node_id
+              //# (mod, menv) = (chn.chn_module_env)!me_icl_module
+              //# chn         = {chn & chn_module_env = menv}
+              //= annotExpr nid app Nothing (Just (App app)) inh chn (mkSingleIdSynExpr (Just nid))
+            _ = ({mkSynExpr & syn_annot_expr = Just (App app)}, chn)
+
+
+
+
+        //# (synl, chnl) = exprCata mkGraphAlg l inh chn
+        //// The second argument to step can be any list; a hardcoded list, a list comprehension, a reference to a list constant or a list function, you name it....
+        //// For example, in the case of a list comprehension, would we generate subgraphs in the comprehsion body?
+        //// If it is a function/constant, we should reify it and inline it
+        //# (synr, chnr) = exprCata mkGraphAlg r inh chnl // TODO: This needs heavy work; is completely wrong, copied from mkbinapp
+        //= case (synl.syn_node_id, synr.syn_node_id) of
+            //(Just l, Just r)
+              //# g = addEdge emptyEdge (l, r) chnr.chn_graph
+              //= annotExpr l app Nothing Nothing inh { chnr & chn_graph = g} synr
+            //(lid, rid)
+              //= edgeErr "step edge" lid l rid r chnr
+        //// TODO : If there are no two elems in the list, the expr is eta-reduced, so we need to pprint it instead of throwing an error
 
     mkTaskApp app ctxs args inh chn
       # (mn, chn)  = getModuleName chn
@@ -493,7 +525,7 @@ mkGraphAlg
                                          # aes         = case syn.syn_annot_expr of
                                                            Just ae -> [ae:xs]
                                                            _       -> xs
-                                         = (aes, [Subgraph chn`.chn_graph:gs], {chn` & chn_graph = setLastId chn.chn_graph (getLastId chn`.chn_graph)})
+                                         = (aes, [Subgraph chn`.chn_graph /* TODO g */:gs], {chn` & chn_graph = setLastId chn.chn_graph (getLastId chn`.chn_graph)})
                                     in  foldr f ([], [], chn) exprs
                 # (pid, g)       = addNode (mkGNode (GParallel join gs)) chn.chn_graph
                 = annotExpr pid app Nothing (Just exprs) inh {chn & chn_graph = g} (mkSingleIdSynExpr (Just pid))
