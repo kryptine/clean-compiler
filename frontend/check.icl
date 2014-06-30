@@ -3379,11 +3379,10 @@ where
 		| pre_mod.pds_def == mod_index
 			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols}
 				<=< adjustPredefSymbol PD_tonicTune						mod_index STE_DclFunction
-				<=< adjustPredefSymbol PD_tonicBind						mod_index STE_DclFunction
 				<=< adjustPredefSymbol PD_tonicVarToSingleTask			mod_index STE_DclFunction
 				<=< adjustPredefSymbol PD_tonicVarToListOfTask			mod_index STE_DclFunction
+				<=< adjustPredefSymbol PD_tonicViewInformation			mod_index STE_DclFunction
 				<=< adjustPredefSymbol PD_tonicWrapTask					mod_index STE_DclFunction)
-			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols})		
 	where
 		unused
 			= { id_name = "unused", id_info = nilPtr }

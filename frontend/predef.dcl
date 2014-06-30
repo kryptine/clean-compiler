@@ -305,9 +305,9 @@ PD_TC__Unit			:== 295
 
 PD_iTasks_Framework_Tonic		:== 296
 PD_tonicTune					:== 297
-PD_tonicBind					:== 298
-PD_tonicVarToSingleTask			:== 299
-PD_tonicVarToListOfTask			:== 300
+PD_tonicVarToSingleTask			:== 298
+PD_tonicVarToListOfTask			:== 299
+PD_tonicViewInformation			:== 300
 PD_tonicWrapTask				:== 301
 
 PD_NrOfPredefSymbols		:== 302

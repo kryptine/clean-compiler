@@ -468,21 +468,21 @@ mkStr str = BasicExpr (BVS ("\"" +++ str +++ "\""))
 mkInt :: Int -> Expression
 mkInt i   = BasicExpr (BVInt i)
 
-appPredefinedSymbol :: String PredefinedSymbol [Expression] -> App
-appPredefinedSymbol funName pds args
-  = { App
-    | app_symb     = mkPredefSymbIdent funName pds
+appPredefinedSymbol :: Int [Expression] *PredefinedSymbols -> *(App, *PredefinedSymbols)
+appPredefinedSymbol pds_idx args pdss
+  # (pds, pdss) = pdss![pds_idx]
+  # ident       = predefined_idents.[pds_idx]
+  = (
+    { App
+    | app_symb     = mkPredefSymbIdent ident pds
     , app_args     = args
     , app_info_ptr = nilPtr
-    }
+    }, pdss)
 
-mkPredefSymbIdent :: String PredefinedSymbol -> SymbIdent
-mkPredefSymbIdent funName pds
+mkPredefSymbIdent :: Ident PredefinedSymbol -> SymbIdent
+mkPredefSymbIdent ident pds
   = { SymbIdent
-    | symb_ident = { Ident
-                   | id_name = funName
-                   , id_info = nilPtr
-                   }
+    | symb_ident = ident
     , symb_kind  = SK_Function
                      { Global
                      | glob_object = pds.pds_def
@@ -503,14 +503,17 @@ listExprToList _ = []
 
 listToListExpr :: [Expression] *PredefinedSymbols -> *(Expression, *PredefinedSymbols)
 listToListExpr [] pdss
-  # (nil_symb, pdss) = pdss![PD_NilSymbol]
-  = (App (appPredefinedSymbol "_Nil" nil_symb []), pdss)
+  # (app, pdss) = appPredefinedSymbol PD_NilSymbol [] pdss
+  = (App app, pdss)
 listToListExpr [x:xs] pdss
-  # (cons_symb, pdss) = pdss![PD_ConsSymbol]
-  # (texpr, pdss)     = listToListExpr xs pdss
-  = (App (appPredefinedSymbol "_Cons" cons_symb [x,texpr]), pdss)
+  # (texpr, pdss)  = listToListExpr xs pdss
+  # (cons, pdss)   = appPredefinedSymbol PD_ConsSymbol [x,texpr] pdss
+  = (App cons, pdss)
 
 tupleToTupleExpr :: (Expression, Expression) *PredefinedSymbols -> *(Expression, *PredefinedSymbols)
 tupleToTupleExpr (e1, e2) pdss
-  # (tup_symb, pdss) = pdss![PD_Arity2TupleSymbol]
-  = (App (appPredefinedSymbol "PD_Arity2TupleSymbol" tup_symb [e1, e2]), pdss)
+  # (tup, pdss) = appPredefinedSymbol PD_Arity2TupleSymbol [e1, e2] pdss
+  = (App tup, pdss)
+
+valToViewInfo :: Expression *PredefinedSymbols -> *(Expression, *PredefinedSymbols)
+valToViewInfo e pdss = (e, pdss)

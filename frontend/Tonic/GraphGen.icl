@@ -179,19 +179,24 @@ annotExpr nodeId app mbRepSI mbArgs inh chn syn
       # chn          = {chn & chn_module_env = menv, chn_predef_symbols = predefs}
       | papp         = (syn, chn)
       | otherwise
-        # (app, chn) = mkTuneApp tune_symb chn
+        # (app, chn) = mkTuneApp chn
         = ({syn & syn_annot_expr = Just (App app)}, chn)
   where
-  mkTuneApp tune_symb chn
-    # (mod, menv) = (chn.chn_module_env)!me_icl_module
-    = (appPredefinedSymbol "tonicTune" tune_symb
-         [ mkStr mod.icl_name.id_name
-         , mkStr inh.inh_curr_task_name
-         , mkInt nodeId
-         , App {app & app_symb = fromMaybe app.app_symb mbRepSI
-                    , app_args = fromMaybe app.app_args mbArgs}
-         ]
-      , { chn & chn_module_env = menv})
+  mkTuneApp chn
+    # menv = chn.chn_module_env
+    # icl  = menv.me_icl_module
+    # nm   = icl.icl_name.id_name
+    # menv = {menv & me_icl_module = icl}
+    # chn         = {chn & chn_module_env = menv}
+    # (app, pdss) = appPredefinedSymbol PD_tonicTune
+                      [ mkStr nm
+                      , mkStr inh.inh_curr_task_name
+                      , mkInt nodeId
+                      , App {app & app_symb = fromMaybe app.app_symb mbRepSI
+                                 , app_args = fromMaybe app.app_args mbArgs}
+                      ] chn.chn_predef_symbols
+    # chn         = {chn & chn_predef_symbols = pdss}
+    = (app, chn)
 
 mkTonicInfo :: String Int (Maybe String) InhExpression -> TonicInfo
 mkTonicInfo modname nodeId mval inh =
@@ -374,21 +379,12 @@ mkGraphAlg
                 _ = (exprCata mkGraphAlg rhsExpr inh chnl, emptyEdge)
         = case (synl.syn_node_id, synr.syn_node_id) of
             (Just lx, Just rn)
-              # g                    = addEdge edge (lx, rn) chnr.chn_graph
-              # chnr                 = {chnr & chn_graph = g}
-              # (mod, menv)          = (chnr.chn_module_env)!me_icl_module
-              # chnr                 = {chnr & chn_module_env = menv}
-              # (bind_symb, predefs) = (chnr.chn_predef_symbols)![PD_tonicBind]
-              # chnr                 = {chnr & chn_predef_symbols = predefs}
-              # bs                   = mkPredefSymbIdent "tonicBind" bind_symb
-              # pref                 = [ mkStr mod.icl_name.id_name, mkStr inh.inh_curr_task_name
-                                       , mkInt lx, mkInt rn
-                                       ]
-              # app`                 = case (synl.syn_annot_expr, synr.syn_annot_expr) of
-                                         (Just la, Just ra) -> { app & app_symb = bs, app_args = ctxs ++ pref ++ [la, ra] }
-                                         (Just la, _)       -> { app & app_symb = bs, app_args = ctxs ++ pref ++ [la, rhsExpr] }
-                                         _                  -> app
-              = ({mkSingleIdSynExpr synl.syn_node_id & syn_annot_expr = Just (App app`)}, chnr)
+              # g     = addEdge edge (lx, rn) chnr.chn_graph
+              # app`  = case (synl.syn_annot_expr, synr.syn_annot_expr) of
+                          (Just la, Just ra) -> { app & app_args = ctxs ++ [la, ra] }
+                          (Just la, _)       -> { app & app_args = ctxs ++ [la, rhsExpr] }
+                          _                  -> app
+              = ({mkSingleIdSynExpr synl.syn_node_id & syn_annot_expr = Just (App app`)}, {chnr & chn_graph = g})
             (lid, rid)
               = edgeErr "bind edge (>>=)" lid lhsExpr rid rhsExpr chnr
 
@@ -555,9 +551,8 @@ mkGraphAlg
             # nid         = fromMaybe -1 syn.syn_node_id
             # (mod, menv) = (chn.chn_module_env)!me_icl_module
             # chn         = {chn & chn_module_env = menv}
-            # (tonicVarToListOfTask_symb, predefs) = (chn.chn_predef_symbols)![PD_tonicVarToListOfTask]
-            # tatSI = mkPredefSymbIdent "tonicVarToListOfTask" tonicVarToListOfTask_symb
-            = annotExpr nid app Nothing (Just (ctxs ++ [App (appPredefinedSymbol "tonicVarToListOfTask" tonicVarToListOfTask_symb [mkStr mod.icl_name.id_name, mkStr inh.inh_curr_task_name, mkInt nid, vararg])])) inh {chn & chn_predef_symbols = predefs} (mkSingleIdSynExpr (Just nid))
+            # (app, predefs) = appPredefinedSymbol PD_tonicVarToListOfTask [mkStr mod.icl_name.id_name, mkStr inh.inh_curr_task_name, mkInt nid, vararg] chn.chn_predef_symbols
+            = annotExpr nid app Nothing (Just (ctxs ++ [App app])) inh {chn & chn_predef_symbols = predefs} (mkSingleIdSynExpr (Just nid))
           _ = ({mkSynExpr & syn_annot_expr = Just (App app)}, chn)
 
   // Transformation for higher-order function application
@@ -748,10 +743,11 @@ mkGraphAlg
         True
           # (tonicVarToSingleTask_symb, predefs) = (chn.chn_predef_symbols)![PD_tonicVarToSingleTask]
           # chn         = {chn & chn_predef_symbols = predefs}
-          # tatSI       = mkPredefSymbIdent "tonicVarToSingleTask" tonicVarToSingleTask_symb
           # (mod, menv) = (chn.chn_module_env)!me_icl_module
           # chn         = {chn & chn_module_env = menv}
-          # varexpr     = App (appPredefinedSymbol "tonicVarToSingleTask" tonicVarToSingleTask_symb [mkStr mod.icl_name.id_name, mkStr inh.inh_curr_task_name, mkInt nid, Var bv])
+          # (app, pdss) = appPredefinedSymbol PD_tonicVarToSingleTask [mkStr mod.icl_name.id_name, mkStr inh.inh_curr_task_name, mkInt nid, Var bv] chn.chn_predef_symbols
+          # chn         = {chn & chn_predef_symbols = pdss}
+          # varexpr     = App app
           = ({syn & syn_annot_expr = Just varexpr}, chn)
         _ = (syn, chn)
 

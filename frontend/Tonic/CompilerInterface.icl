@@ -139,17 +139,19 @@ addTonicWrap icl_module idx tonic_wraptask menv pdss
           _ = (menv, pdss)
   where
   addTonicWrap` fd { tb_args, tb_rhs } pdss
-    # (args, pdss) = foldr mkArgs ([], pdss) tb_args
-    # (xs, pdss) = listToListExpr args pdss
-    = (App (appPredefinedSymbol "tonicWrapTask" tonic_wraptask
-              [ mkStr icl_module.icl_name.id_name
-              , mkStr fd.fun_ident.id_name
-              , xs
-              , tb_rhs
-              ]), pdss)
+    # (args, pdss) = foldr mkArg ([], pdss) tb_args
+    //# (xs, pdss)   = listToListExpr [] pdss
+    # (xs, pdss)   = listToListExpr args pdss
+    # (wrap, pdss) = appPredefinedSymbol PD_tonicWrapTask [ mkStr icl_module.icl_name.id_name
+                                                          , mkStr fd.fun_ident.id_name
+                                                          , xs
+                                                          , tb_rhs
+                                                          ] pdss
+    = (App wrap, pdss)
     where
-    mkArgs arg=:{fv_ident} (xs, pdss)
-      # (texpr, pdss) = tupleToTupleExpr (mkStr fv_ident.id_name, FreeVar arg) pdss
+    mkArg arg=:{fv_ident} (xs, pdss)
+      # (fvexpr, pdss) = valToViewInfo (FreeVar arg) pdss
+      # (texpr, pdss)  = tupleToTupleExpr (mkStr fv_ident.id_name, fvexpr) pdss
       = ([texpr:xs], pdss)
 
   doAddRefl fd fb menv pdss

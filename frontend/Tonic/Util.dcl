@@ -102,12 +102,14 @@ mkStr :: String -> Expression
 
 mkInt :: Int -> Expression
 
-appPredefinedSymbol :: String PredefinedSymbol [Expression] -> App
+appPredefinedSymbol :: Int [Expression] *PredefinedSymbols -> *(App, *PredefinedSymbols)
 
-mkPredefSymbIdent :: String PredefinedSymbol -> SymbIdent
+mkPredefSymbIdent :: Ident PredefinedSymbol -> SymbIdent
 
 listExprToList :: Expression -> [Expression]
 
 listToListExpr :: [Expression] *PredefinedSymbols -> *(Expression, *PredefinedSymbols)
 
 tupleToTupleExpr :: (Expression, Expression) *PredefinedSymbols -> *(Expression, *PredefinedSymbols)
+
+valToViewInfo :: Expression *PredefinedSymbols -> *(Expression, *PredefinedSymbols)
