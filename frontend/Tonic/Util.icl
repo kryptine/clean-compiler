@@ -512,5 +512,5 @@ listToListExpr [x:xs] pdss
 
 tupleToTupleExpr :: (Expression, Expression) *PredefinedSymbols -> *(Expression, *PredefinedSymbols)
 tupleToTupleExpr (e1, e2) pdss
-  # (tup_symb, pdss) = pdss![PD_TC__Tuple2]
-  = (App (appPredefinedSymbol "TC__Tuple2" tup_symb [e1, e2]), pdss)
+  # (tup_symb, pdss) = pdss![PD_Arity2TupleSymbol]
+  = (App (appPredefinedSymbol "PD_Arity2TupleSymbol" tup_symb [e1, e2]), pdss)
