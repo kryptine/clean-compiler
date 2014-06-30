@@ -105,3 +105,9 @@ mkInt :: Int -> Expression
 appPredefinedSymbol :: String PredefinedSymbol [Expression] -> App
 
 mkPredefSymbIdent :: String PredefinedSymbol -> SymbIdent
+
+listExprToList :: Expression -> [Expression]
+
+listToListExpr :: [Expression] *PredefinedSymbols -> *(Expression, *PredefinedSymbols)
+
+tupleToTupleExpr :: (Expression, Expression) *PredefinedSymbols -> *(Expression, *PredefinedSymbols)

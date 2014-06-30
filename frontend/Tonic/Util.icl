@@ -489,3 +489,28 @@ mkPredefSymbIdent funName pds
                      , glob_module = pds.pds_module
                      }
     }
+
+listExprToList :: Expression -> [Expression]
+listExprToList (App app) =
+  case app.app_symb.symb_ident.id_name of
+    "_Cons" ->
+      case app.app_args of
+        [head:tail:_] -> [head : listExprToList tail]
+        _             -> abort "listExprToList should not happen"
+    "_Nil"  -> []
+    _       -> abort "listExprToList: App is not a list"
+listExprToList _ = []
+
+listToListExpr :: [Expression] *PredefinedSymbols -> *(Expression, *PredefinedSymbols)
+listToListExpr [] pdss
+  # (nil_symb, pdss) = pdss![PD_NilSymbol]
+  = (App (appPredefinedSymbol "_Nil" nil_symb []), pdss)
+listToListExpr [x:xs] pdss
+  # (cons_symb, pdss) = pdss![PD_ConsSymbol]
+  # (texpr, pdss)     = listToListExpr xs pdss
+  = (App (appPredefinedSymbol "_Cons" cons_symb [x,texpr]), pdss)
+
+tupleToTupleExpr :: (Expression, Expression) *PredefinedSymbols -> *(Expression, *PredefinedSymbols)
+tupleToTupleExpr (e1, e2) pdss
+  # (tup_symb, pdss) = pdss![PD_TC__Tuple2]
+  = (App (appPredefinedSymbol "TC__Tuple2" tup_symb [e1, e2]), pdss)
