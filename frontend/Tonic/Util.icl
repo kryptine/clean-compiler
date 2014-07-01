@@ -319,10 +319,23 @@ exprIsLambda (Var bv)  = identIsLambda bv.var_ident
 exprIsLambda (App app) = identIsLambda app.app_symb.symb_ident
 exprIsLambda _         = False
 
-ppType (TA tsi ats) = "TA"
-ppType (TAS tsi ats sl) = "TAS"
-ppType (at1 --> at2) = "-->"
-ppType (TArrow) = "TArrow"
+ppAType :: AType -> String
+ppAType {at_type} = ppType at_type
+
+ppTypeSymbIdent :: TypeSymbIdent -> String
+ppTypeSymbIdent tsi = tsi.type_ident.id_name
+
+
+intersperse` :: String (a -> String) [a] -> String
+intersperse` _ _ [] = ""
+intersperse` _ pp [x] = pp x
+intersperse` sep pp [x:xs] = pp x +++ sep +++ intersperse` sep pp xs
+
+ppType :: Type -> String
+ppType (TA tsi ats)     = ppTypeSymbIdent tsi +++ (intersperse` " " ppAType ats)
+ppType (TAS tsi ats sl) = ppTypeSymbIdent tsi +++ (intersperse` " " ppAType ats)
+ppType (at1 --> at2)    = ppAType at1 +++ " --> " +++ ppAType at2
+ppType (TArrow) = "->"
 ppType (TArrow1	at) = "TArrow1"
 ppType (cv :@: ats) = ":@:"
 ppType (TB bt) = "TB"

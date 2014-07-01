@@ -1,6 +1,6 @@
 definition module Tonic.Util
 
-from syntax import :: App, :: FunType, :: ConsDef, :: Index, :: SymbKind
+from syntax import :: App, :: FunType, :: ConsDef, :: Index, :: SymbKind, :: Type, :: TypeSymbIdent
 from StdArray import class Array
 from Data.Maybe import :: Maybe
 from Data.Map import :: Map
@@ -119,3 +119,9 @@ instance FromStatic [Expression]
 instance ToStatic (Expression, Expression)
 
 freeVarToVar :: FreeVar -> BoundVar
+
+ppAType :: AType -> String
+
+ppTypeSymbIdent :: TypeSymbIdent -> String
+
+ppType :: Type -> String

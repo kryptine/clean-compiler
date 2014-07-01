@@ -128,38 +128,46 @@ addTonicWrap icl_module idx menv pdss
       # menv            = {menv & me_fun_defs = fun_defs}
       = case mfd of
           Just fd
-            = case fd.fun_body of
-                TransformedBody fb
+            = case (fd.fun_body, fd.fun_type) of
+                (TransformedBody fb, Yes _)
                   # (isPA, menv) = case fb.tb_rhs of
                                      App app -> isPartialApp app menv
                                      // TODO Add a case for @ ?
                                      _       -> (False, menv)
-                  = if isPA (menv, pdss) (doAddRefl fd fb menv pdss)
+                  = if isPA (menv, pdss) (doAddRefl fd menv pdss)
                 _ = (menv, pdss)
           _ = (menv, pdss)
   where
-  addTonicWrap` fd { tb_args, tb_rhs } pdss
-    # (args, pdss) = foldr mkArg ([], pdss) tb_args
+  doAddRefl {fun_ident, fun_body=TransformedBody { tb_args, tb_rhs }, fun_type=Yes symbty} menv pdss
+    # fun_defs    = menv.me_fun_defs
+    //# args = symbty.st_args
+    # (args, pdss) = foldr mkArg ([], pdss) (zip2 tb_args symbty.st_args)
     # (xs, pdss)   = toStatic args pdss
     # (wrap, pdss) = appPredefinedSymbol PD_tonicWrapTask
                        [ mkStr icl_module.icl_name.id_name
-                       , mkStr fd.fun_ident.id_name
+                       , mkStr fun_ident.id_name
                        , xs
                        , tb_rhs
                        ] SK_Function pdss
-    = (App wrap, pdss)
-    where
-    mkArg arg=:{fv_ident} (xs, pdss)
-      // TODO : Do I need to pass a dictionary here as well? My guess is yes..
-      # (fvexpr, pdss) = appPredefinedSymbol PD_tonicViewInformation
-                            [ mkStr fv_ident.id_name
-                            , Var (freeVarToVar arg)
-                            ] SK_Function pdss
-      # (texpr, pdss)  = toStatic (mkStr fv_ident.id_name, App fvexpr) pdss
-      = ([texpr:xs], pdss)
-
-  doAddRefl fd fb menv pdss
-    # fun_defs    = menv.me_fun_defs
-    # (app, pdss) = addTonicWrap` fd fb pdss
-    # fun_defs    = updateFunRhs idx fun_defs app
+    # fun_defs    = updateFunRhs idx fun_defs (App wrap)
     = ({ menv & me_fun_defs = fun_defs}, pdss)
+    where
+    mkArg (arg=:{fv_ident}, {at_type}) (xs, pdss)
+      # viewName = "tonicViewInformation" +++ ppType at_type
+      # (viewApp, pdss) = appPredefinedSymbol (luPD viewName)
+                            [ Var (freeVarToVar arg)
+                            ] SK_Function pdss
+      # (texpr, pdss) = toStatic (mkStr fv_ident.id_name, App viewApp) pdss
+      = ([texpr:xs], pdss)
+      where
+      luPD "tonicViewInformationEmergency"     = PD_tonicViewInformationEmergency
+      luPD "tonicViewInformationCallInfo"      = PD_tonicViewInformationCallInfo
+      luPD "tonicViewInformationAddress"       = PD_tonicViewInformationAddress
+      luPD "tonicViewInformationAuthority"     = PD_tonicViewInformationAuthority
+      luPD "tonicViewInformationPhoneNo"       = PD_tonicViewInformationPhoneNo
+      luPD "tonicViewInformationVerdict"       = PD_tonicViewInformationVerdict
+      luPD "tonicViewInformation_ListVerdict"  = PD_tonicViewInformation_ListVerdict
+      luPD "tonicViewInformationTaskEmergency" = PD_tonicViewInformationTaskEmergency
+      luPD "tonicViewInformationDateTime"      = PD_tonicViewInformationDateTime
+      luPD str = abort ("luPD " +++ str)
+  doAddRefl _ menv pdss = (menv, pdss)

@@ -305,10 +305,20 @@ PD_TC__Unit			:== 295
 
 PD_iTasks_Framework_Tonic		:== 296
 PD_tonicTune					:== 297
-PD_tonicViewInformation			:== 298
-PD_tonicWrapTask				:== 299
+PD_tonicWrapTask				:== 298
 
-PD_NrOfPredefSymbols		:== 300
+PD_EmergencyExample		:== 305
+PD_tonicViewInformationEmergency    :== 299
+PD_tonicViewInformationCallInfo     :== 300
+PD_tonicViewInformationAddress      :== 301
+PD_tonicViewInformationAuthority    :== 302
+PD_tonicViewInformationPhoneNo  :== 303
+PD_tonicViewInformationVerdict      :== 304
+PD_tonicViewInformation_ListVerdict :== 306
+PD_tonicViewInformationTaskEmergency :== 307
+PD_tonicViewInformationDateTime :== 308
+
+PD_NrOfPredefSymbols		:== 309
 
 GetTupleConsIndex tup_arity :== PD_Arity2TupleSymbol + tup_arity - 2
 GetTupleTypeIndex tup_arity :== PD_Arity2TupleType + tup_arity - 2
