@@ -90,18 +90,17 @@ ginTonic` :: Bool ModuleN ((Map String TonicTask) IclModule *ModuleEnv -> *(Stri
              !*{#FunDef} IclModule {#DclModule} !{#CommonDefs} !*PredefinedSymbols *Heaps
           -> *(String, !*{#FunDef}, !*PredefinedSymbols, !*Heaps)
 ginTonic` is_itasks_mod main_dcl_module_n repsToString fun_defs icl_module dcl_modules common_defs predef_symbols heaps
-  # (tonicWrap, predef_symbols)               = predef_symbols![PD_tonicWrapTask]
-  # ((reps, heaps, predef_symbols), fun_defs) = foldUArr (appDefInfo tonicWrap) ((newMap, heaps, predef_symbols), fun_defs)
+  # ((reps, heaps, predef_symbols), fun_defs) = foldUArr appDefInfo ((newMap, heaps, predef_symbols), fun_defs)
   # menv                                      = mkModuleEnv main_dcl_module_n fun_defs icl_module dcl_modules
   # (str, menv)                               = repsToString reps icl_module menv
   = (str, menv.me_fun_defs, predef_symbols, heaps)
   where
-  appDefInfo tonicWrap idx fd ((reps, heaps, predef_symbols), fun_defs)
+  appDefInfo idx fd ((reps, heaps, predef_symbols), fun_defs)
     | not is_itasks_mod && funIsTask fd && fd.fun_info.fi_def_level == 1
       # menv = mkModuleEnv main_dcl_module_n fun_defs icl_module dcl_modules
       # ((args, mg, me), menv, heaps, predef_symbols) = funToGraph fd menv heaps predef_symbols
       # menv = updateWithAnnot idx me menv
-      # (menv, predef_symbols) = addTonicWrap icl_module idx tonicWrap menv predef_symbols
+      # (menv, predef_symbols) = addTonicWrap icl_module idx menv predef_symbols
       = (( case mg of
              Just g -> put fd.fun_ident.id_name {TonicTask | tt_args = args, tt_graph = g} reps
              _      -> reps
@@ -109,7 +108,7 @@ ginTonic` is_itasks_mod main_dcl_module_n repsToString fun_defs icl_module dcl_m
     // TODO FIXME There are still some problems with this when compiling iTasks itself
     //| is_itasks_mod && funIsTask fd && fd.fun_info.fi_def_level == 1
       //# menv = mkModuleEnv main_dcl_module_n fun_defs icl_module dcl_modules
-      //# menv = addTonicWrap icl_module idx tonicWrap menv
+      //# menv = addTonicWrap icl_module idx menv
       //= ((reps, heaps), menv.me_fun_defs)
     | otherwise        = ((reps, heaps, predef_symbols), fun_defs)
 
@@ -120,9 +119,10 @@ updateWithAnnot fidx (Just e) menv
   = { menv & me_fun_defs = fun_defs}
 updateWithAnnot _ _ menv = menv
 
-addTonicWrap :: IclModule Index PredefinedSymbol *ModuleEnv *PredefinedSymbols -> *(*ModuleEnv, *PredefinedSymbols)
-addTonicWrap icl_module idx tonic_wraptask menv pdss
-  | predefIsUndefined tonic_wraptask = (menv, pdss)
+addTonicWrap :: IclModule Index *ModuleEnv *PredefinedSymbols -> *(*ModuleEnv, *PredefinedSymbols)
+addTonicWrap icl_module idx menv pdss
+  # (tonicWrapTask, pdss) = pdss![PD_tonicWrapTask]
+  | predefIsUndefined tonicWrapTask = (menv, pdss)
   | otherwise
       # (mfd, fun_defs) = muselect menv.me_fun_defs idx
       # menv            = {menv & me_fun_defs = fun_defs}
@@ -130,28 +130,28 @@ addTonicWrap icl_module idx tonic_wraptask menv pdss
           Just fd
             = case fd.fun_body of
                 TransformedBody fb
-                  # (isPA, menv)   = case fb.tb_rhs of
-                                       App app -> isPartialApp app menv
-                                       // TODO Add a case for @ ?
-                                       _       -> (False, menv)
+                  # (isPA, menv) = case fb.tb_rhs of
+                                     App app -> isPartialApp app menv
+                                     // TODO Add a case for @ ?
+                                     _       -> (False, menv)
                   = if isPA (menv, pdss) (doAddRefl fd fb menv pdss)
                 _ = (menv, pdss)
           _ = (menv, pdss)
   where
   addTonicWrap` fd { tb_args, tb_rhs } pdss
     # (args, pdss) = foldr mkArg ([], pdss) tb_args
-    //# (xs, pdss)   = listToListExpr [] pdss
-    # (xs, pdss)   = listToListExpr args pdss
+    # (xs, pdss)   = toStatic args pdss
+    // TODO : Do I need to pass a dictionary here as well? My guess is yes..
     # (wrap, pdss) = appPredefinedSymbol PD_tonicWrapTask [ mkStr icl_module.icl_name.id_name
                                                           , mkStr fd.fun_ident.id_name
                                                           , xs
                                                           , tb_rhs
-                                                          ] pdss
+                                                          ] SK_Function pdss
     = (App wrap, pdss)
     where
     mkArg arg=:{fv_ident} (xs, pdss)
-      # (fvexpr, pdss) = valToViewInfo (FreeVar arg) pdss
-      # (texpr, pdss)  = tupleToTupleExpr (mkStr fv_ident.id_name, fvexpr) pdss
+      # (fvexpr, pdss) = valToViewInfo (Var (freeVarToVar arg)) pdss
+      # (texpr, pdss)  = toStatic (mkStr fv_ident.id_name, fvexpr) pdss
       = ([texpr:xs], pdss)
 
   doAddRefl fd fb menv pdss

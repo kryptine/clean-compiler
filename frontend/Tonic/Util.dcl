@@ -1,6 +1,6 @@
 definition module Tonic.Util
 
-from syntax import :: App, :: FunType, :: ConsDef, :: Index
+from syntax import :: App, :: FunType, :: ConsDef, :: Index, :: SymbKind
 from StdArray import class Array
 from Data.Maybe import :: Maybe
 from Data.Map import :: Map
@@ -102,14 +102,22 @@ mkStr :: String -> Expression
 
 mkInt :: Int -> Expression
 
-appPredefinedSymbol :: Int [Expression] *PredefinedSymbols -> *(App, *PredefinedSymbols)
+appPredefinedSymbol :: Int [Expression] ((Global Index) -> SymbKind) *PredefinedSymbols -> *(App, *PredefinedSymbols)
 
-mkPredefSymbIdent :: Ident PredefinedSymbol -> SymbIdent
-
-listExprToList :: Expression -> [Expression]
-
-listToListExpr :: [Expression] *PredefinedSymbols -> *(Expression, *PredefinedSymbols)
-
-tupleToTupleExpr :: (Expression, Expression) *PredefinedSymbols -> *(Expression, *PredefinedSymbols)
+mkPredefSymbIdent :: Ident PredefinedSymbol ((Global Index) -> SymbKind) -> SymbIdent
 
 valToViewInfo :: Expression *PredefinedSymbols -> *(Expression, *PredefinedSymbols)
+
+class ToStatic a where
+  toStatic :: a *PredefinedSymbols -> *(Expression, *PredefinedSymbols)
+
+class FromStatic a where
+  fromStatic :: Expression -> a
+
+instance ToStatic [Expression]
+
+instance FromStatic [Expression]
+
+instance ToStatic (Expression, Expression)
+
+freeVarToVar :: FreeVar -> BoundVar

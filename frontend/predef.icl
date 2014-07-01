@@ -254,8 +254,6 @@ predefined_idents
 
                     [PD_iTasks_Framework_Tonic] = i "iTasks.Framework.Tonic",
                     [PD_tonicTune]       = i "tonicTune",
-                    [PD_tonicVarToSingleTask] = i "tonicVarToSingleTask",
-                    [PD_tonicVarToListOfTask] = i "tonicVarToListOfTask",
                     [PD_tonicViewInformation] = i "tonicViewInformation",
                     [PD_tonicWrapTask] = i "tonicWrapTask"
 		}
@@ -400,8 +398,6 @@ where
 
 					<<- (local_predefined_idents,	IC_Module NoQualifiedIdents, PD_iTasks_Framework_Tonic)
 					<<- (local_predefined_idents,	IC_Expression, 	PD_tonicTune)
-					<<- (local_predefined_idents,	IC_Expression, 	PD_tonicVarToSingleTask)
-					<<- (local_predefined_idents,	IC_Expression, 	PD_tonicVarToListOfTask)
 					<<- (local_predefined_idents,	IC_Expression, 	PD_tonicViewInformation)
 					<<- (local_predefined_idents,	IC_Expression, 	PD_tonicWrapTask)
 

@@ -305,12 +305,10 @@ PD_TC__Unit			:== 295
 
 PD_iTasks_Framework_Tonic		:== 296
 PD_tonicTune					:== 297
-PD_tonicVarToSingleTask			:== 298
-PD_tonicVarToListOfTask			:== 299
-PD_tonicViewInformation			:== 300
-PD_tonicWrapTask				:== 301
+PD_tonicViewInformation			:== 298
+PD_tonicWrapTask				:== 299
 
-PD_NrOfPredefSymbols		:== 302
+PD_NrOfPredefSymbols		:== 300
 
 GetTupleConsIndex tup_arity :== PD_Arity2TupleSymbol + tup_arity - 2
 GetTupleTypeIndex tup_arity :== PD_Arity2TupleType + tup_arity - 2

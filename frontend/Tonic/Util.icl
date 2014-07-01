@@ -468,52 +468,71 @@ mkStr str = BasicExpr (BVS ("\"" +++ str +++ "\""))
 mkInt :: Int -> Expression
 mkInt i   = BasicExpr (BVInt i)
 
-appPredefinedSymbol :: Int [Expression] *PredefinedSymbols -> *(App, *PredefinedSymbols)
-appPredefinedSymbol pds_idx args pdss
+appPredefinedSymbol :: Int [Expression] ((Global Index) -> SymbKind) *PredefinedSymbols -> *(App, *PredefinedSymbols)
+appPredefinedSymbol pds_idx args mkKind pdss
   # (pds, pdss) = pdss![pds_idx]
   # ident       = predefined_idents.[pds_idx]
   = (
     { App
-    | app_symb     = mkPredefSymbIdent ident pds
+    | app_symb     = mkPredefSymbIdent ident pds mkKind
     , app_args     = args
     , app_info_ptr = nilPtr
     }, pdss)
 
-mkPredefSymbIdent :: Ident PredefinedSymbol -> SymbIdent
-mkPredefSymbIdent ident pds
+mkPredefSymbIdent :: Ident PredefinedSymbol ((Global Index) -> SymbKind) -> SymbIdent
+mkPredefSymbIdent ident pds mkKind
   = { SymbIdent
     | symb_ident = ident
-    , symb_kind  = SK_Function
+    , symb_kind  = mkKind
                      { Global
                      | glob_object = pds.pds_def
                      , glob_module = pds.pds_module
                      }
     }
 
+class ToStatic a where
+  toStatic :: a *PredefinedSymbols -> *(Expression, *PredefinedSymbols)
+
+class FromStatic a where
+  fromStatic :: Expression -> a
+
+instance ToStatic [Expression] where
+  toStatic xs pdss = listToListExpr xs pdss
+
+instance FromStatic [Expression] where
+  fromStatic expr = listExprToList expr
+
+instance ToStatic (Expression, Expression) where
+  toStatic tup pdss = tupleToTupleExpr tup pdss
+
 listExprToList :: Expression -> [Expression]
 listExprToList (App app) =
   case app.app_symb.symb_ident.id_name of
-    "_Cons" ->
+    PD_ConsSymbol_String ->
       case app.app_args of
         [head:tail:_] -> [head : listExprToList tail]
         _             -> abort "listExprToList should not happen"
-    "_Nil"  -> []
+    PD_NilSymbol_String  -> []
     _       -> abort "listExprToList: App is not a list"
 listExprToList _ = []
 
 listToListExpr :: [Expression] *PredefinedSymbols -> *(Expression, *PredefinedSymbols)
 listToListExpr [] pdss
-  # (app, pdss) = appPredefinedSymbol PD_NilSymbol [] pdss
+  # (app, pdss) = appPredefinedSymbol PD_NilSymbol [] SK_Constructor pdss
   = (App app, pdss)
 listToListExpr [x:xs] pdss
   # (texpr, pdss)  = listToListExpr xs pdss
-  # (cons, pdss)   = appPredefinedSymbol PD_ConsSymbol [x,texpr] pdss
+  # (cons, pdss)   = appPredefinedSymbol PD_ConsSymbol [x,texpr] SK_Constructor pdss
   = (App cons, pdss)
 
 tupleToTupleExpr :: (Expression, Expression) *PredefinedSymbols -> *(Expression, *PredefinedSymbols)
 tupleToTupleExpr (e1, e2) pdss
-  # (tup, pdss) = appPredefinedSymbol PD_Arity2TupleSymbol [e1, e2] pdss
+  # (tup, pdss) = appPredefinedSymbol PD_Arity2TupleSymbol [e1, e2] SK_Constructor pdss
   = (App tup, pdss)
 
 valToViewInfo :: Expression *PredefinedSymbols -> *(Expression, *PredefinedSymbols)
 valToViewInfo e pdss = (e, pdss)
+
+freeVarToVar :: FreeVar -> BoundVar
+freeVarToVar {fv_ident, fv_info_ptr}
+  = { var_ident = fv_ident,  var_info_ptr = fv_info_ptr, var_expr_ptr = nilPtr}

@@ -194,7 +194,7 @@ annotExpr nodeId app mbRepSI mbArgs inh chn syn
                       , mkInt nodeId
                       , App {app & app_symb = fromMaybe app.app_symb mbRepSI
                                  , app_args = fromMaybe app.app_args mbArgs}
-                      ] chn.chn_predef_symbols
+                      ] SK_Function chn.chn_predef_symbols
     # chn         = {chn & chn_predef_symbols = pdss}
     = (app, chn)
 
@@ -436,7 +436,7 @@ mkGraphAlg
         = case r of
             (arg=:(App app))
               | exprIsListConstr arg
-                  # exprs          = listExprToList arg
+                  # exprs          = fromStatic arg
                   # (aes, gs, chn) = let f e=:(App app`=:{app_args=[App app``:contExpr]}) (xs, gs, chn)
                                            | app`.app_symb.symb_ident.id_name == "OnAction"
                                            # action = extractAction app``
@@ -527,7 +527,7 @@ mkGraphAlg
       = case args of
           [arg=:(App app):_]
             | exprIsListConstr arg
-                # exprs          = listExprToList arg
+                # exprs          = fromStatic arg
                 # (aes, gs, chn) = let f e (xs, gs, chn)
                                          # (syn, chn`) = exprCata mkGraphAlg e inh {chn & chn_graph = emptyGraphWithLastId (getLastId chn.chn_graph)}
                                          # g           = addStartStop syn.syn_node_id chn`.chn_graph
@@ -549,10 +549,7 @@ mkGraphAlg
           [vararg=:(Var bv):as] // TODO test
             # (syn, chn)  = exprCata mkGraphAlg vararg inh chn
             # nid         = fromMaybe -1 syn.syn_node_id
-            # (mod, menv) = (chn.chn_module_env)!me_icl_module
-            # chn         = {chn & chn_module_env = menv}
-            # (app, predefs) = appPredefinedSymbol PD_tonicVarToListOfTask [mkStr mod.icl_name.id_name, mkStr inh.inh_curr_task_name, mkInt nid, vararg] chn.chn_predef_symbols
-            = annotExpr nid app Nothing (Just (ctxs ++ [App app])) inh {chn & chn_predef_symbols = predefs} (mkSingleIdSynExpr (Just nid))
+            = annotExpr nid app Nothing (Just [App app]) inh chn (mkSingleIdSynExpr (Just nid))
           _ = ({mkSynExpr & syn_annot_expr = Just (App app)}, chn)
 
   // Transformation for higher-order function application
@@ -741,14 +738,7 @@ mkGraphAlg
     # chn           = {chn & chn_graph = g}
     = case isTask of
         True
-          # (tonicVarToSingleTask_symb, predefs) = (chn.chn_predef_symbols)![PD_tonicVarToSingleTask]
-          # chn         = {chn & chn_predef_symbols = predefs}
-          # (mod, menv) = (chn.chn_module_env)!me_icl_module
-          # chn         = {chn & chn_module_env = menv}
-          # (app, pdss) = appPredefinedSymbol PD_tonicVarToSingleTask [mkStr mod.icl_name.id_name, mkStr inh.inh_curr_task_name, mkInt nid, Var bv] chn.chn_predef_symbols
-          # chn         = {chn & chn_predef_symbols = pdss}
-          # varexpr     = App app
-          = ({syn & syn_annot_expr = Just varexpr}, chn)
+          = ({syn & syn_annot_expr = Just (Var bv)}, chn)
         _ = (syn, chn)
 
 /*
