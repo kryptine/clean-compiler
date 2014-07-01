@@ -530,9 +530,6 @@ tupleToTupleExpr (e1, e2) pdss
   # (tup, pdss) = appPredefinedSymbol PD_Arity2TupleSymbol [e1, e2] SK_Constructor pdss
   = (App tup, pdss)
 
-valToViewInfo :: Expression *PredefinedSymbols -> *(Expression, *PredefinedSymbols)
-valToViewInfo e pdss = (e, pdss)
-
 freeVarToVar :: FreeVar -> BoundVar
 freeVarToVar {fv_ident, fv_info_ptr}
   = { var_ident = fv_ident,  var_info_ptr = fv_info_ptr, var_expr_ptr = nilPtr}

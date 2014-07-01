@@ -106,8 +106,6 @@ appPredefinedSymbol :: Int [Expression] ((Global Index) -> SymbKind) *Predefined
 
 mkPredefSymbIdent :: Ident PredefinedSymbol ((Global Index) -> SymbKind) -> SymbIdent
 
-valToViewInfo :: Expression *PredefinedSymbols -> *(Expression, *PredefinedSymbols)
-
 class ToStatic a where
   toStatic :: a *PredefinedSymbols -> *(Expression, *PredefinedSymbols)
 

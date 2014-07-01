@@ -141,17 +141,21 @@ addTonicWrap icl_module idx menv pdss
   addTonicWrap` fd { tb_args, tb_rhs } pdss
     # (args, pdss) = foldr mkArg ([], pdss) tb_args
     # (xs, pdss)   = toStatic args pdss
-    // TODO : Do I need to pass a dictionary here as well? My guess is yes..
-    # (wrap, pdss) = appPredefinedSymbol PD_tonicWrapTask [ mkStr icl_module.icl_name.id_name
-                                                          , mkStr fd.fun_ident.id_name
-                                                          , xs
-                                                          , tb_rhs
-                                                          ] SK_Function pdss
+    # (wrap, pdss) = appPredefinedSymbol PD_tonicWrapTask
+                       [ mkStr icl_module.icl_name.id_name
+                       , mkStr fd.fun_ident.id_name
+                       , xs
+                       , tb_rhs
+                       ] SK_Function pdss
     = (App wrap, pdss)
     where
     mkArg arg=:{fv_ident} (xs, pdss)
-      # (fvexpr, pdss) = valToViewInfo (Var (freeVarToVar arg)) pdss
-      # (texpr, pdss)  = toStatic (mkStr fv_ident.id_name, fvexpr) pdss
+      // TODO : Do I need to pass a dictionary here as well? My guess is yes..
+      # (fvexpr, pdss) = appPredefinedSymbol PD_tonicViewInformation
+                            [ mkStr fv_ident.id_name
+                            , Var (freeVarToVar arg)
+                            ] SK_Function pdss
+      # (texpr, pdss)  = toStatic (mkStr fv_ident.id_name, App fvexpr) pdss
       = ([texpr:xs], pdss)
 
   doAddRefl fd fb menv pdss
