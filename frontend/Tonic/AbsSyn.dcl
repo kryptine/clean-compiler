@@ -13,7 +13,7 @@ from Data.Maybe import :: Maybe
 from Text.JSON import generic JSONEncode, :: JSONNode
 from Data.Map import :: Map
 from predef import :: PredefinedSymbol, :: PredefinedSymbols
-from iTasks.Framework.Tonic.AbsSyn import :: GinGraph, :: GEdge, :: GNode
+from iTasks.Framework.Tonic.AbsSyn import :: GinGraph, :: GEdge, :: GNode, :: TypeName, :: ModuleName, :: TaskName, :: VariableName
 
 At e es :== e @ es
 

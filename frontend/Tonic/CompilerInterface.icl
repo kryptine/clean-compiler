@@ -55,7 +55,7 @@ foldUArr f (b, arr)
               = f idx elem (res, arr)
           | otherwise = (b, arr)
 
-toTikzString :: (Map String TonicTask) IclModule *ModuleEnv -> *(String, *ModuleEnv)
+toTikzString :: (Map TaskName TonicTask) IclModule *ModuleEnv -> *(String, *ModuleEnv)
 toTikzString rs icl_module menv
   # (tikzs, menv) = foldrWithKey tf ([], menv) rs
   = (foldr (\x str -> x +++ "\n\n" +++ str) "" tikzs, menv)
@@ -67,8 +67,8 @@ toTikzString rs icl_module menv
   tikzDef str [] bdy = "\tonicdefnoarg{td}{0,0}{$\mbox{" +++ str +++ "}$}"
   tikzDef str xs bdy = "\tonicdef{td}{0,0}{$\mbox{" +++ str +++ "}$}{" +++ foldr (\x xs -> x +++ "\n" xs) "" xs +++ "}"
 
-mkTaskTikz :: String [String] GinGraph *ModuleEnv -> *(String, *ModuleEnv)
-mkTaskTikz tn args g menv = (tn +++ " " +++ (foldr (+++) "" args), menv)
+mkTaskTikz :: TaskName [(VariableName, TypeName)] GinGraph *ModuleEnv -> *(String, *ModuleEnv)
+mkTaskTikz tn args g menv = (tn +++ " " +++ (foldr (\(vn, vt) xs -> vn +++ " is a " +++ tn +++ "\n" +++ xs) "" args), menv)
 
 toJSONString :: (Map String TonicTask) IclModule *ModuleEnv -> *(String, *ModuleEnv)
 toJSONString rs icl_module menv
@@ -102,7 +102,7 @@ ginTonic` is_itasks_mod main_dcl_module_n repsToString fun_defs icl_module dcl_m
       # menv = updateWithAnnot idx me menv
       # (menv, predef_symbols) = addTonicWrap icl_module idx menv predef_symbols
       = (( case mg of
-             Just g -> put fd.fun_ident.id_name {TonicTask | tt_args = args, tt_graph = g} reps
+             Just g -> put fd.fun_ident.id_name {TonicTask | tt_name = fd.fun_ident.id_name, tt_resty = ppType (funTy fd), tt_args = args, tt_graph = g} reps
              _      -> reps
         , heaps, predef_symbols), menv.me_fun_defs)
     // TODO FIXME There are still some problems with this when compiling iTasks itself

@@ -60,6 +60,10 @@ numContexts :: SymbolType -> Int
 
 funIsTask :: FunDef -> Bool
 
+funTy :: FunDef -> Type
+
+funArgTys :: FunDef -> [Type]
+
 identIsLambda :: Ident -> Bool
 
 exprIsLambda :: Expression -> Bool

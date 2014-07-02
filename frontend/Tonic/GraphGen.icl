@@ -785,7 +785,7 @@ addNode` node annot chn
 // for the FunDef and the other part should generate the init and stop nodes.
 // Yet another part should just get the right-hand side Expression of a FunDef
 // so we can just cata it.
-funToGraph :: FunDef *ModuleEnv *Heaps *PredefinedSymbols -> *(([String], Maybe GinGraph, Maybe Expression), *ModuleEnv, *Heaps, *PredefinedSymbols)
+funToGraph :: FunDef *ModuleEnv *Heaps *PredefinedSymbols -> *(([(VariableName, TypeName)], Maybe GinGraph, Maybe Expression), *ModuleEnv, *Heaps, *PredefinedSymbols)
 funToGraph fd=:{fun_ident=fun_ident, fun_body = TransformedBody tb} menv heaps predef_symbols = mkBody
   where
   mkBody
@@ -793,7 +793,7 @@ funToGraph fd=:{fun_ident=fun_ident, fun_body = TransformedBody tb} menv heaps p
     # chn        = mkChnExpr emptyGraph predef_symbols menv heaps
     # (syn, chn) = exprCata mkGraphAlg tb.tb_rhs inh chn
     # g          = addStartStop syn.syn_node_id chn.chn_graph
-    = ( (map (\x -> x.fv_ident.id_name) tb.tb_args, Just g, syn.syn_annot_expr)
+    = ( (map (\(arg, ty) -> (arg.fv_ident.id_name, ppType ty)) (zip2 tb.tb_args (funArgTys fd)), Just g, syn.syn_annot_expr)
       , chn.chn_module_env, chn.chn_heaps, chn.chn_predef_symbols)
 funToGraph _ menv heaps predef_symbols = (([], Nothing, Nothing), menv, heaps, predef_symbols)
 
