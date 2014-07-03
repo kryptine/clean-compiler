@@ -434,31 +434,31 @@ mkGraphAlg
       where
       f l r chn
         = case r of
-            (arg=:(App app))
-              | exprIsListConstr arg
-                  # exprs          = fromStatic arg
-                  # (aes, gs, chn) = let f e=:(App app`=:{app_args=[App app``:contExpr]}) (xs, gs, chn)
-                                           | app`.app_symb.symb_ident.id_name == "OnAction"
-                                           # action = extractAction app``
-                                           // TODO do not recurse on e, but on the inner expression
-                                           # (syn, chn`) = exprCata mkGraphAlg e inh {chn & chn_graph = emptyGraphWithLastId (getLastId chn.chn_graph)}
-                                           # aes         = case syn.syn_annot_expr of
-                                                             Just ae -> [ae:xs]
-                                                             _       -> xs
-                                           = (aes, [ArbitraryOrUnknownExpr:gs], {chn` & chn_graph = setLastId chn.chn_graph (getLastId chn`.chn_graph)})
-                                           | app`.app_symb.symb_ident.id_name == "OnValue"
-                                           // TODO : Implement
-                                           = (xs , gs, chn)
-                                           | app`.app_symb.symb_ident.id_name == "OnException"
-                                           // TODO : Implement
-                                           = (xs , gs, chn)
-                                         f _ (xs, gs, chn) = (xs, gs, chn)
-                                     in  foldr f ([], [], chn) exprs
-                  # (pid, g)       = addNode (mkGNode (GStep (map (\g` -> StepElem (StepOnValue {stepContFilter = StepAlways, stepContLbl = Nothing, stepContNode = GArbitraryExpression /* TODO */})) gs))) chn.chn_graph
-                  = annotExpr pid app Nothing (Just exprs) inh {chn & chn_graph = g} (mkSingleIdSynExpr (Just pid))
-              | otherwise
-                  # (n, g) = addNode (mkGNode (GStep [])) chn.chn_graph // TODO
-                  = (mkSingleIdSynExpr (Just n), {chn & chn_graph = g})
+            //(arg=:(App app))
+              //| exprIsListConstr arg
+                  //# exprs          = fromStatic arg
+                  //# (aes, gs, chn) = let f e=:(App app`=:{app_args=[App app``:contExpr]}) (xs, gs, chn)
+                                           //| app`.app_symb.symb_ident.id_name == "OnAction"
+                                           //# action = extractAction app``
+                                           //// TODO do not recurse on e, but on the inner expression
+                                           //# (syn, chn`) = exprCata mkGraphAlg e inh {chn & chn_graph = emptyGraphWithLastId (getLastId chn.chn_graph)}
+                                           //# aes         = case syn.syn_annot_expr of
+                                                             //Just ae -> [ae:xs]
+                                                             //_       -> xs
+                                           //= (aes, [ArbitraryOrUnknownExpr:gs], {chn` & chn_graph = setLastId chn.chn_graph (getLastId chn`.chn_graph)})
+                                           //| app`.app_symb.symb_ident.id_name == "OnValue"
+                                           //// TODO : Implement
+                                           //= (xs , gs, chn)
+                                           //| app`.app_symb.symb_ident.id_name == "OnException"
+                                           //// TODO : Implement
+                                           //= (xs , gs, chn)
+                                         //f _ (xs, gs, chn) = (xs, gs, chn)
+                                     //in  foldr f ([], [], chn) exprs
+                  //# (pid, g)       = addNode (mkGNode (GStep (map (\g` -> StepElem (StepOnValue {stepContFilter = StepAlways, stepContLbl = Nothing, stepContNode = GArbitraryExpression [> TODO <]})) gs))) chn.chn_graph
+                  //= annotExpr pid app Nothing (Just (App app)) inh {chn & chn_graph = g} (mkSingleIdSynExpr (Just pid))
+              //| otherwise
+                  //# (n, g) = addNode (mkGNode (GStep [])) chn.chn_graph // TODO
+                  //= (mkSingleIdSynExpr (Just n), {chn & chn_graph = g})
                   // TODO
             //(vararg=:(Var bv))
               //# (syn, chn)  = exprCata mkGraphAlg vararg inh chn
