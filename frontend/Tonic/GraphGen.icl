@@ -172,7 +172,7 @@ withTwo app _         _ inh chn = ({mkSynExpr & syn_annot_expr = Just (App app)}
 
 annotExpr :: Int App (Maybe SymbIdent) (Maybe [Expression]) InhExpression *ChnExpression SynExpression -> *(SynExpression, *ChnExpression)
 annotExpr nodeId app mbRepSI mbArgs inh chn syn
-  # (tune_symb, predefs) = (chn.chn_predef_symbols)![PD_tonicTune]
+  # (tune_symb, predefs) = (chn.chn_predef_symbols)![PD_tonicWrapApp]
   | predefIsUndefined tune_symb = (syn, {chn & chn_predef_symbols = predefs})
   | otherwise
       # (papp, menv) = isPartialApp app chn.chn_module_env
@@ -188,7 +188,7 @@ annotExpr nodeId app mbRepSI mbArgs inh chn syn
     # nm   = icl.icl_name.id_name
     # menv = {menv & me_icl_module = icl}
     # chn         = {chn & chn_module_env = menv}
-    # (app, pdss) = appPredefinedSymbol PD_tonicTune
+    # (app, pdss) = appPredefinedSymbol PD_tonicWrapApp
                       [ mkStr nm
                       , mkStr inh.inh_curr_task_name
                       , mkInt nodeId

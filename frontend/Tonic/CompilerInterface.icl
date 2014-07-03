@@ -106,7 +106,7 @@ updateWithAnnot _ _ menv = menv
 
 addTonicWrap :: IclModule Index *ModuleEnv *PredefinedSymbols -> *(*ModuleEnv, *PredefinedSymbols)
 addTonicWrap icl_module idx menv pdss
-  # (tonicWrapTask, pdss) = pdss![PD_tonicWrapTask]
+  # (tonicWrapTask, pdss) = pdss![PD_tonicWrapTaskBody]
   | predefIsUndefined tonicWrapTask = (menv, pdss)
   | otherwise
       # (mfd, fun_defs) = muselect menv.me_fun_defs idx
@@ -129,7 +129,7 @@ addTonicWrap icl_module idx menv pdss
     # (args, pdss) = foldr mkArg ([], pdss) (zip2 tb_args symbty.st_args)
     # (xs, pdss)   = toStatic args pdss
     # (dict, pdss) = appPredefinedSymbol (luDict ("tonicTaskDict" +++ ppType symbty.st_result.at_type)) [] SK_Function pdss
-    # (wrap, pdss) = appPredefinedSymbol PD_tonicWrapTask
+    # (wrap, pdss) = appPredefinedSymbol PD_tonicWrapTaskBody
                        [ mkStr icl_module.icl_name.id_name
                        , mkStr fun_ident.id_name
                        , xs

@@ -3379,8 +3379,8 @@ where
 		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_iTasks_Framework_Tonic]	
 		| pre_mod.pds_def == mod_index
 			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols}
-				<=< adjustPredefSymbol PD_tonicTune						mod_index STE_DclFunction
-				<=< adjustPredefSymbol PD_tonicWrapTask					mod_index STE_DclFunction
+				<=< adjustPredefSymbol PD_tonicWrapApp					mod_index STE_DclFunction
+				<=< adjustPredefSymbol PD_tonicWrapTaskBody				mod_index STE_DclFunction
                 )
 		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_EmergencyExample]	
 		| pre_mod.pds_def == mod_index

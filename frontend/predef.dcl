@@ -304,8 +304,8 @@ PD_TC__UnboxedArray	:== 294
 PD_TC__Unit			:== 295
 
 PD_iTasks_Framework_Tonic		:== 296
-PD_tonicTune					:== 297
-PD_tonicWrapTask				:== 298
+PD_tonicWrapApp					:== 297
+PD_tonicWrapTaskBody			:== 298
 
 PD_EmergencyExample		:== 305
 PD_tonicViewInformationEmergency    :== 299

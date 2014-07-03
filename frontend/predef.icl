@@ -253,18 +253,18 @@ predefined_idents
 					[PD_FromThenToO]= i "_from_then_to_o",
 
                     [PD_iTasks_Framework_Tonic] = i "iTasks.Framework.Tonic",
-                    [PD_tonicTune]       = i "tonicTune",
-                    [PD_tonicWrapTask] = i "tonicWrapTask",
-                    [PD_EmergencyExample] = i "EmergencyExample",
-                    [PD_tonicViewInformationEmergency]   = i "tonicViewInformationEmergency",
-                    [PD_tonicViewInformationCallInfo]    = i "tonicViewInformationCallInfo",
-                    [PD_tonicViewInformationAddress]     = i "tonicViewInformationAddress",
-                    [PD_tonicViewInformationAuthority]   = i "tonicViewInformationAuthority",
-                    [PD_tonicViewInformationPhoneNo] = i "tonicViewInformationPhoneNo",
-                    [PD_tonicViewInformationVerdict]     = i "tonicViewInformationVerdict",
-                    [PD_tonicViewInformation_ListVerdict]     = i "tonicViewInformation_ListVerdict",
-                    [PD_tonicViewInformationTaskEmergency]     = i "tonicViewInformationTaskEmergency",
-                    [PD_tonicViewInformationDateTime]     = i "tonicViewInformationDateTime",
+                    [PD_tonicWrapApp]      = i "tonicWrapApp",
+                    [PD_tonicWrapTaskBody] = i "tonicWrapTaskBody",
+                    [PD_EmergencyExample]  = i "EmergencyExample",
+                    [PD_tonicViewInformationEmergency]     = i "tonicViewInformationEmergency",
+                    [PD_tonicViewInformationCallInfo]      = i "tonicViewInformationCallInfo",
+                    [PD_tonicViewInformationAddress]       = i "tonicViewInformationAddress",
+                    [PD_tonicViewInformationAuthority]     = i "tonicViewInformationAuthority",
+                    [PD_tonicViewInformationPhoneNo]       = i "tonicViewInformationPhoneNo",
+                    [PD_tonicViewInformationVerdict]       = i "tonicViewInformationVerdict",
+                    [PD_tonicViewInformation_ListVerdict]  = i "tonicViewInformation_ListVerdict",
+                    [PD_tonicViewInformationTaskEmergency] = i "tonicViewInformationTaskEmergency",
+                    [PD_tonicViewInformationDateTime]      = i "tonicViewInformationDateTime",
                     [PD_tonicTaskDictTaskEmergency]     = i "tonicTaskDictTaskEmergency",
                     [PD_tonicTaskDictTaskCallInfo]      = i "tonicTaskDictTaskCallInfo",
                     [PD_tonicTaskDictTaskAddress]       = i "tonicTaskDictTaskAddress",
@@ -416,8 +416,8 @@ where
 					<<- (local_predefined_idents,	IC_Expression, PD_Start)
 
 					<<- (local_predefined_idents,	IC_Module NoQualifiedIdents, PD_iTasks_Framework_Tonic)
-					<<- (local_predefined_idents,	IC_Expression,	PD_tonicTune)
-					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapTask)
+					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapApp)
+					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapTaskBody)
 					<<- (local_predefined_idents,	IC_Module NoQualifiedIdents, PD_EmergencyExample)
                     <<- (local_predefined_idents,  IC_Expression, PD_tonicViewInformationEmergency)
                     <<- (local_predefined_idents,  IC_Expression, PD_tonicViewInformationCallInfo)
