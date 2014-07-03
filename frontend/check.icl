@@ -3394,6 +3394,16 @@ where
                 <=< adjustPredefSymbol PD_tonicViewInformation_ListVerdict mod_index STE_DclFunction
                 <=< adjustPredefSymbol PD_tonicViewInformationTaskEmergency mod_index STE_DclFunction
                 <=< adjustPredefSymbol PD_tonicViewInformationDateTime mod_index STE_DclFunction
+                <=< adjustPredefSymbol PD_tonicTaskDictTaskEmergency     mod_index STE_DclFunction
+                <=< adjustPredefSymbol PD_tonicTaskDictTaskCallInfo      mod_index STE_DclFunction
+                <=< adjustPredefSymbol PD_tonicTaskDictTaskAddress       mod_index STE_DclFunction
+                <=< adjustPredefSymbol PD_tonicTaskDictTaskAuthority     mod_index STE_DclFunction
+                <=< adjustPredefSymbol PD_tonicTaskDictTaskPhoneNo       mod_index STE_DclFunction
+                <=< adjustPredefSymbol PD_tonicTaskDictTaskVerdict       mod_index STE_DclFunction
+                <=< adjustPredefSymbol PD_tonicTaskDictTask_ListVerdict  mod_index STE_DclFunction
+                <=< adjustPredefSymbol PD_tonicTaskDictTaskTaskEmergency mod_index STE_DclFunction
+                <=< adjustPredefSymbol PD_tonicTaskDictTaskDateTime      mod_index STE_DclFunction
+                <=< adjustPredefSymbol PD_tonicTaskDictTask_Unit         mod_index STE_DclFunction
                 )
 			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols})
 	where

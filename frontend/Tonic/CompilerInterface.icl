@@ -21,7 +21,7 @@ ginTonic main_dcl_module_n fun_defs icl_module dcl_modules common_defs predef_sy
   | isSystemModule iclname                  = (fun_defs, predef_symbols, files, heaps)
   # (ok, files)                             = ensureDirectoryExists csf_directory_path files
   | not ok                                  = (fun_defs, predef_symbols, files, heaps)
-  # (tstr, fun_defs, predef_symbols, heaps) = ginTonic` (isITasksModule iclname) main_dcl_module_n toTikzString fun_defs icl_module dcl_modules common_defs predef_symbols heaps
+  # (tstr, fun_defs, predef_symbols, heaps) = ginTonic` (isITasksModule iclname) main_dcl_module_n toJSONString fun_defs icl_module dcl_modules common_defs predef_symbols heaps
   # files                                   = writeTonicFile iclname tstr files
   = (fun_defs, predef_symbols, files, heaps)
   where
@@ -54,21 +54,6 @@ foldUArr f (b, arr)
               #! (res, arr)  = foldUArr` sz (idx + 1) b arr
               = f idx elem (res, arr)
           | otherwise = (b, arr)
-
-toTikzString :: (Map TaskName TonicTask) IclModule *ModuleEnv -> *(String, *ModuleEnv)
-toTikzString rs icl_module menv
-  # (tikzs, menv) = foldrWithKey tf ([], menv) rs
-  = (foldr (\x str -> x +++ "\n\n" +++ str) "" tikzs, menv)
-  where
-  tf tn {tt_args, tt_graph} (xs, menv)
-    # (tikz, menv) = mkTaskTikz tn tt_args tt_graph menv
-    = ([tikz : xs], menv)
-  tikzPicture str = "\\begin{tikzpicture}\n" +++ str +++ "\n\\end{tikzpicture}"
-  tikzDef str [] bdy = "\tonicdefnoarg{td}{0,0}{$\mbox{" +++ str +++ "}$}"
-  tikzDef str xs bdy = "\tonicdef{td}{0,0}{$\mbox{" +++ str +++ "}$}{" +++ foldr (\x xs -> x +++ "\n" xs) "" xs +++ "}"
-
-mkTaskTikz :: TaskName [(VariableName, TypeName)] GinGraph *ModuleEnv -> *(String, *ModuleEnv)
-mkTaskTikz tn args g menv = (tn +++ " " +++ (foldr (\(vn, vt) xs -> vn +++ " is a " +++ tn +++ "\n" +++ xs) "" args), menv)
 
 toJSONString :: (Map String TonicTask) IclModule *ModuleEnv -> *(String, *ModuleEnv)
 toJSONString rs icl_module menv
@@ -143,18 +128,19 @@ addTonicWrap icl_module idx menv pdss
     //# args = symbty.st_args
     # (args, pdss) = foldr mkArg ([], pdss) (zip2 tb_args symbty.st_args)
     # (xs, pdss)   = toStatic args pdss
+    # (dict, pdss) = appPredefinedSymbol (luDict ("tonicTaskDict" +++ ppType symbty.st_result.at_type)) [] SK_Function pdss
     # (wrap, pdss) = appPredefinedSymbol PD_tonicWrapTask
                        [ mkStr icl_module.icl_name.id_name
                        , mkStr fun_ident.id_name
                        , xs
+                       , App dict
                        , tb_rhs
                        ] SK_Function pdss
     # fun_defs    = updateFunRhs idx fun_defs (App wrap)
     = ({ menv & me_fun_defs = fun_defs}, pdss)
     where
     mkArg (arg=:{fv_ident}, {at_type}) (xs, pdss)
-      # viewName = "tonicViewInformation" +++ ppType at_type
-      # (viewApp, pdss) = appPredefinedSymbol (luPD viewName)
+      # (viewApp, pdss) = appPredefinedSymbol (luPD ("tonicViewInformation" +++ ppType at_type))
                             [ Var (freeVarToVar arg)
                             ] SK_Function pdss
       # (texpr, pdss) = toStatic (mkStr fv_ident.id_name, App viewApp) pdss
@@ -170,4 +156,16 @@ addTonicWrap icl_module idx menv pdss
       luPD "tonicViewInformationTaskEmergency" = PD_tonicViewInformationTaskEmergency
       luPD "tonicViewInformationDateTime"      = PD_tonicViewInformationDateTime
       luPD str = abort ("luPD " +++ str)
+
+    luDict "tonicTaskDictTaskEmergency"     = PD_tonicTaskDictTaskEmergency
+    luDict "tonicTaskDictTaskCallInfo"      = PD_tonicTaskDictTaskCallInfo
+    luDict "tonicTaskDictTaskAddress"       = PD_tonicTaskDictTaskAddress
+    luDict "tonicTaskDictTaskAuthority"     = PD_tonicTaskDictTaskAuthority
+    luDict "tonicTaskDictTaskPhoneNo"       = PD_tonicTaskDictTaskPhoneNo
+    luDict "tonicTaskDictTaskVerdict"       = PD_tonicTaskDictTaskVerdict
+    luDict "tonicTaskDictTask_ListVerdict"  = PD_tonicTaskDictTask_ListVerdict
+    luDict "tonicTaskDictTaskTaskEmergency" = PD_tonicTaskDictTaskTaskEmergency
+    luDict "tonicTaskDictTaskDateTime"      = PD_tonicTaskDictTaskDateTime
+    luDict "tonicTaskDictTask_Unit"         = PD_tonicTaskDictTask_Unit
+    luDict str = abort ("luDict " +++ str)
   doAddRefl _ menv pdss = (menv, pdss)
