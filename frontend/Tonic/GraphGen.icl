@@ -198,14 +198,6 @@ annotExpr nodeId app mbRepSI mbArgs inh chn syn
     # chn         = {chn & chn_predef_symbols = pdss}
     = (app, chn)
 
-mkTonicInfo :: String Int (Maybe String) InhExpression -> TonicInfo
-mkTonicInfo modname nodeId mval inh =
-  { tonicModuleName  = modname
-  , tonicTaskName    = inh.inh_curr_task_name
-  , tonicValAsStr    = mval
-  , tonicNodeId      = nodeId
-  }
-
 getModuleName :: *ChnExpression -> *(String, *ChnExpression)
 getModuleName chn
   # menv = chn.chn_module_env
@@ -326,6 +318,7 @@ mkGraphAlg
           "return"    -> mkReturn     app ctxs args              inh chn
           ">>|"       -> mkBindNoLam  app ctxs args              inh chn
           "@:"        -> mkAssign     app ctxs args              inh chn
+          "@"         -> mkTransform  app ctxs args              inh chn
           ">>*"       -> mkStep       app ctxs args              inh chn
           "-||-"      -> mkParBinApp  app ctxs args DisFirstBin  inh chn
           "||-"       -> mkParBinApp  app ctxs args DisRight     inh chn
@@ -394,8 +387,7 @@ mkGraphAlg
                        [x:_] -> mkRet x chn
                        _     -> (ArbitraryOrUnknownExpr, chn)
       # (n, g)     = addNodeWithIndex (\ni -> { GNode
-                                              | nodeType      = GReturn ppd
-                                              , nodeTonicInfo = Just $ mkTonicInfo mn ni Nothing inh
+                                              | nodeType = GReturn ppd
                                               }) chn.chn_graph
       = ({mkSingleIdSynExpr (Just n) & syn_annot_expr = Just (App app)}, {chn & chn_graph = g})
       where
@@ -494,10 +486,21 @@ mkGraphAlg
       # chn        = {chn & chn_module_env = menv}
       # appArgs    = map ppCompact ps  // TODO: When do we pprint a Clean expr? And when do we generate a subgraph?
       # (an, g)    = addNodeWithIndex (\ni -> { GNode
-                                              | nodeType      = GTaskApp (appFunName app) appArgs
-                                              , nodeTonicInfo = Just $ mkTonicInfo mn ni Nothing inh
+                                              | nodeType = GTaskApp (appFunName app) appArgs
                                               }) chn.chn_graph
       = annotExpr an app Nothing Nothing inh { chn & chn_graph = g } (mkSingleIdSynExpr (Just an))
+
+    mkTransform app ctxs args inh chn
+      = withTwo app args f inh chn
+      where
+      f l r chn
+        # (syn, chn)  = exprCata mkGraphAlg l inh chn
+        # (ppl, menv) = ppExpression r chn.chn_module_env
+        # chn         = {chn & chn_module_env = menv}
+        # (an, g)     = addNodeWithIndex (\ni -> { GNode
+                                                 | nodeType = GTransform (ppCompact ppl)
+                                                 }) chn.chn_graph
+        = annotExpr an app Nothing Nothing inh { chn & chn_graph = g } (mkSingleIdSynExpr (Just an))
 
     mkParBinApp app ctxs args join inh chn
       = withTwo app args f inh chn
@@ -731,8 +734,7 @@ mkGraphAlg
     # (isTask, chn) = varIsTask bv.var_info_ptr chn
     # (mn, chn)     = getModuleName chn
     # (nid, g)      = addNodeWithIndex (\ni -> { GNode
-                                               | nodeType      = GVar bv.var_ident.id_name
-                                               , nodeTonicInfo = Just $ mkTonicInfo mn ni Nothing inh
+                                               | nodeType = GVar bv.var_ident.id_name
                                                }) chn.chn_graph
     # syn           = mkSingleIdSynExpr (Just nid)
     # chn           = {chn & chn_graph = g}
