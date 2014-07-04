@@ -500,7 +500,11 @@ mkGraphAlg
         # (an, g)     = addNodeWithIndex (\ni -> { GNode
                                                  | nodeType = GTransform (ppCompact ppl)
                                                  }) chn.chn_graph
-        = annotExpr an app Nothing Nothing inh { chn & chn_graph = g } (mkSingleIdSynExpr (Just an))
+        = case syn.syn_node_id of
+            Just nid
+              # g = addEmptyEdge (nid, an) g
+              = annotExpr an app Nothing Nothing inh { chn & chn_graph = g } (mkSingleIdSynExpr (Just nid))
+            _ = ({mkSynExpr & syn_annot_expr = Just (App app)}, chn)
 
     mkParBinApp app ctxs args join inh chn
       = withTwo app args f inh chn
@@ -551,9 +555,10 @@ mkGraphAlg
                 //= annotExpr pid app Nothing Nothing inh {chn & chn_graph = g, chn_module_env = menv} (mkSingleIdSynExpr (Just pid))
           [vararg=:(Var bv):as] // TODO test
             # (syn, chn)  = exprCata mkGraphAlg vararg inh chn
-            # nid         = fromMaybe -1 syn.syn_node_id
-            = annotExpr nid app Nothing (Just [App app]) inh chn (mkSingleIdSynExpr (Just nid))
-          _ = ({mkSynExpr & syn_annot_expr = Just (App app)}, chn)
+            = case syn.syn_node_id of
+                Just nid
+                  = annotExpr nid app Nothing (Just [App app]) inh chn (mkSingleIdSynExpr (Just nid))
+                _ = ({mkSynExpr & syn_annot_expr = Just (App app)}, chn)
 
   // Transformation for higher-order function application
   // E.g. f g x = g x becomes f = g @ x
