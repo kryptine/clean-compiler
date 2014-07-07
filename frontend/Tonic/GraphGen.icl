@@ -425,6 +425,7 @@ mkGraphAlg
       = withTwo app args f inh chn
       where
       f l r chn
+        # (syn, chn) = exprCata mkGraphAlg l inh chn
         = case r of
             //(arg=:(App app))
               //| exprIsListConstr arg
@@ -458,7 +459,7 @@ mkGraphAlg
               //# (mod, menv) = (chn.chn_module_env)!me_icl_module
               //# chn         = {chn & chn_module_env = menv}
               //= annotExpr nid app Nothing (Just (App app)) inh chn (mkSingleIdSynExpr (Just nid))
-            _ = ({mkSynExpr & syn_annot_expr = Just (App app)}, chn)
+            _ = ({syn & syn_annot_expr = Just (App app)}, chn)
       extractAction app=:{app_args=[BasicExpr (BVS str):_]}
         | app.app_symb.symb_ident.id_name == "Action" = str
       extractAction _ = "(no action)"
