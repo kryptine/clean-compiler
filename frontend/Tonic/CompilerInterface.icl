@@ -62,14 +62,14 @@ toJSONString rs icl_module menv
                        , tm_tasks = rs}
     , menv)
 
-toDotString :: (Map String TonicTask) IclModule *ModuleEnv -> *(String, *ModuleEnv)
-toDotString rs icl_module menv
-  # (dots, menv) = foldrWithKey tf ([], menv) rs
-  = ( "digraph " +++ icl_module.icl_name.id_name +++ "{\n" +++ foldr (\x str -> x +++ "\n" +++ str) "" dots +++ "\n}"
-    , menv)
-  where tf tn {tt_graph=g} (xs, menv)
-          # (dot, menv) = mkTaskDot tn g menv
-          = ([dot : xs], menv)
+//toDotString :: (Map String TonicTask) IclModule *ModuleEnv -> *(String, *ModuleEnv)
+//toDotString rs icl_module menv
+  //# (dots, menv) = foldrWithKey tf ([], menv) rs
+  //= ( "digraph " +++ icl_module.icl_name.id_name +++ "{\n" +++ foldr (\x str -> x +++ "\n" +++ str) "" dots +++ "\n}"
+    //, menv)
+  //where tf tn {tt_graph=g} (xs, menv)
+          //# (dot, menv) = mkTaskDot tn g menv
+          //= ([dot : xs], menv)
 
 ginTonic` :: Bool ModuleN ((Map String TonicTask) IclModule *ModuleEnv -> *(String, *ModuleEnv))
              !*{#FunDef} IclModule {#DclModule} !{#CommonDefs} !*PredefinedSymbols *Heaps

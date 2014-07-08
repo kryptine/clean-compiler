@@ -190,73 +190,73 @@ ppGLet gl
 ppCompact :: (Doc -> String)
 ppCompact = display o renderCompact
 
-mkTaskDot :: String GinGraph *ModuleEnv -> *(String, *ModuleEnv)
-mkTaskDot funnm g menv
-  # (ns, menv) = mapSt (nodeToDot funnm g) (nodeIndices g) menv
-  = ("subgraph cluster_" +++ funnm +++ " {\n label=\"" +++ funnm  +++ "\"  color=\"black\";\n" +++
-    concatStrings ns +++ "\n" +++ mkEdges +++ "\n}", menv)
-  where
-  mkEdges = concatStrings (map edgeToDot (edgeIndices g))
-  edgeToDot ei=:(l, r) = mkDotNodeLbl funnm l +++ " -> " +++ mkDotNodeLbl funnm r +++ mkDotArgs [mkDotAttrKV "label" edgeLbl] // TODO: Use different arrow for task assignment
-    where edgeLbl = maybe "" (\e -> fromMaybe "" e.edge_pattern) $ getEdgeData ei g
+//mkTaskDot :: String GinGraph *ModuleEnv -> *(String, *ModuleEnv)
+//mkTaskDot funnm g menv
+  //# (ns, menv) = mapSt (nodeToDot funnm g) (nodeIndices g) menv
+  //= ("subgraph cluster_" +++ funnm +++ " {\n label=\"" +++ funnm  +++ "\"  color=\"black\";\n" +++
+    //concatStrings ns +++ "\n" +++ mkEdges +++ "\n}", menv)
+  //where
+  //mkEdges = concatStrings (map edgeToDot (edgeIndices g))
+  //edgeToDot ei=:(l, r) = mkDotNodeLbl funnm l +++ " -> " +++ mkDotNodeLbl funnm r +++ mkDotArgs [mkDotAttrKV "label" edgeLbl] // TODO: Use different arrow for task assignment
+    //where edgeLbl = maybe "" (\e -> fromMaybe "" e.edge_pattern) $ getEdgeData ei g
 
-mkDotAttrKV :: String String -> String
-mkDotAttrKV k v = k +++ "=" +++ "\"" +++ v +++ "\""
+//mkDotAttrKV :: String String -> String
+//mkDotAttrKV k v = k +++ "=" +++ "\"" +++ v +++ "\""
 
-mkDotArgs :: [String] -> String
-mkDotArgs attrs = " [" +++ intercalateString ", " attrs +++ "];\n"
+//mkDotArgs :: [String] -> String
+//mkDotArgs attrs = " [" +++ intercalateString ", " attrs +++ "];\n"
 
-mkDotNodeLbl :: String Int -> String
-mkDotNodeLbl funnm n = funnm +++ "_node_" +++ toString n
+//mkDotNodeLbl :: String Int -> String
+//mkDotNodeLbl funnm n = funnm +++ "_node_" +++ toString n
 
-nodeToDot :: String GinGraph Int *ModuleEnv -> *(String, *ModuleEnv)
-nodeToDot funnm g currIdx menv =
-  case currNode.nodeType of
-    GInit                   = blackNode [shape "triangle", width ".25", height ".25", orientation "-90.0"] menv
-    GStop                   = blackNode [shape "box", width ".2", height ".2"] menv
-    (GDecision _ expr)      = whiteNode [shape "diamond", label expr] menv
-    (GLet glt)              = whiteNode [shape "box", ppCompact (ppGLet glt)] menv // TODO: Rounded corners
-    //GParallelSplit          = whiteNode [shape "circle", label "Run in\nparallel"] menv
-    //(GParallelJoin jt)      = whiteNode [shape "circle", label (mkJoinLbl jt)] menv
-    (GTaskApp tid exprs)    = whiteNode [shape "box", label tid] menv // TODO: complex contents with extra bar
-    (GReturn expr)          = whiteNode [shape "oval", label "TODO: Return expr goes here"] menv
-    (GAssign usr)           = let  idxStr = toString currIdx
-                                   usrStr = "user" +++ idxStr
-                              in   ("subgraph cluster_user" +++ idxStr +++ "{ label=" +++ "TODO usr pp goes here" +++ "; labelloc=b; peripheries=0; " +++ usrStr +++ "}" +++
-                                    usrStr +++ mkDotArgs [ mkDotAttrKV "shapefile" "\"stick.png\""
-                                                         , mkDotAttrKV "peripheries" "0"
-                                                         , style "invis" ], menv)
-    (GStep es)              = whiteNode [shape "circle", label "Step"] menv
-    //(GListComprehension lc)
-      // TODO : Factor out dot rendering and fix this
-      //# (ged1, menv) = ppGExpression lc.input menv
-      //# (ged2, menv) = ppGExpression lc.output menv
-      //# fe  = "<B>for each</B> " +++ lc.selector +++ "<BR/><B>in</B> " +++ ppCompact ged1
-      //# lxp = "<TABLE><TR><TD>" +++ fe +++ "</TD></TR><TR><TD>" +++ ppCompact ged2 +++ "</TD></TR></TABLE>"
-      //= mkDotNode [shape "none", margin "0", html lxp] menv
-      //= mkDotNode [shape "none", margin "0", html "TODO List Comprehension"] menv
-  where
-  currNode               = getNodeData` currIdx g
-  whiteNode attrs menv   = mkDotNode [fontcolor "black", fillcolor "white", style "filled", label "" : attrs] menv
-  blackNode attrs menv   = mkDotNode [fontcolor "white", fillcolor "black", style "filled", label "" : attrs] menv
-  mkDotNode attrs menv   = (mkDotNodeLbl funnm currIdx +++ mkDotArgs attrs, menv)
-  shape v                = mkDotAttrKV "shape" v
-  label v                = mkDotAttrKV "label" v
-  color v                = mkDotAttrKV "color" v
-  fillcolor v            = mkDotAttrKV "fillcolor" v
-  fontcolor v            = mkDotAttrKV "fontcolor" v
-  width v                = mkDotAttrKV "width" v
-  height v               = mkDotAttrKV "height" v
-  style v                = mkDotAttrKV "style" v
-  orientation v          = mkDotAttrKV "orientation" v
-  html v                 = "label=<" +++ v +++ ">"
-  margin v               = mkDotAttrKV "margin" v
-  mkJoinLbl DisFirstBin  = "First\nfinished\ntask"
-  mkJoinLbl DisFirstList = "First\nfinished\ntask"
-  mkJoinLbl DisLeft      = "Left\nresult"
-  mkJoinLbl DisRight     = "Right\nresult"
-  mkJoinLbl ConAll       = "All\nresults"
-  mkJoinLbl ConPair      = "Pair\nof results"
+//nodeToDot :: String GinGraph Int *ModuleEnv -> *(String, *ModuleEnv)
+//nodeToDot funnm g currIdx menv =
+  //case currNode.nodeType of
+    //GInit                   = blackNode [shape "triangle", width ".25", height ".25", orientation "-90.0"] menv
+    //GStop                   = blackNode [shape "box", width ".2", height ".2"] menv
+    //(GDecision _ expr)      = whiteNode [shape "diamond", label expr] menv
+    //(GLet glt)              = whiteNode [shape "box", ppCompact (ppGLet glt)] menv // TODO: Rounded corners
+    ////GParallelSplit          = whiteNode [shape "circle", label "Run in\nparallel"] menv
+    ////(GParallelJoin jt)      = whiteNode [shape "circle", label (mkJoinLbl jt)] menv
+    //(GTaskApp tid exprs)    = whiteNode [shape "box", label tid] menv // TODO: complex contents with extra bar
+    //(GReturn expr)          = whiteNode [shape "oval", label "TODO: Return expr goes here"] menv
+    //(GAssign usr expr)      = let  idxStr = toString currIdx
+                                   //usrStr = "user" +++ idxStr
+                              //in   ("subgraph cluster_user" +++ idxStr +++ "{ label=" +++ "TODO usr pp goes here" +++ "; labelloc=b; peripheries=0; " +++ usrStr +++ "}" +++
+                                    //usrStr +++ mkDotArgs [ mkDotAttrKV "shapefile" "\"stick.png\""
+                                                         //, mkDotAttrKV "peripheries" "0"
+                                                         //, style "invis" ], menv)
+    //(GStep es)              = whiteNode [shape "circle", label "Step"] menv
+    ////(GListComprehension lc)
+      //// TODO : Factor out dot rendering and fix this
+      ////# (ged1, menv) = ppGExpression lc.input menv
+      ////# (ged2, menv) = ppGExpression lc.output menv
+      ////# fe  = "<B>for each</B> " +++ lc.selector +++ "<BR/><B>in</B> " +++ ppCompact ged1
+      ////# lxp = "<TABLE><TR><TD>" +++ fe +++ "</TD></TR><TR><TD>" +++ ppCompact ged2 +++ "</TD></TR></TABLE>"
+      ////= mkDotNode [shape "none", margin "0", html lxp] menv
+      ////= mkDotNode [shape "none", margin "0", html "TODO List Comprehension"] menv
+  //where
+  //currNode               = getNodeData` currIdx g
+  //whiteNode attrs menv   = mkDotNode [fontcolor "black", fillcolor "white", style "filled", label "" : attrs] menv
+  //blackNode attrs menv   = mkDotNode [fontcolor "white", fillcolor "black", style "filled", label "" : attrs] menv
+  //mkDotNode attrs menv   = (mkDotNodeLbl funnm currIdx +++ mkDotArgs attrs, menv)
+  //shape v                = mkDotAttrKV "shape" v
+  //label v                = mkDotAttrKV "label" v
+  //color v                = mkDotAttrKV "color" v
+  //fillcolor v            = mkDotAttrKV "fillcolor" v
+  //fontcolor v            = mkDotAttrKV "fontcolor" v
+  //width v                = mkDotAttrKV "width" v
+  //height v               = mkDotAttrKV "height" v
+  //style v                = mkDotAttrKV "style" v
+  //orientation v          = mkDotAttrKV "orientation" v
+  //html v                 = "label=<" +++ v +++ ">"
+  //margin v               = mkDotAttrKV "margin" v
+  //mkJoinLbl DisFirstBin  = "First\nfinished\ntask"
+  //mkJoinLbl DisFirstList = "First\nfinished\ntask"
+  //mkJoinLbl DisLeft      = "Left\nresult"
+  //mkJoinLbl DisRight     = "Right\nresult"
+  //mkJoinLbl ConAll       = "All\nresults"
+  //mkJoinLbl ConPair      = "Pair\nof results"
 
 getNodeData` :: Int GinGraph -> GNode
 getNodeData` n g = fromMaybe err (getNodeData n g)

@@ -403,17 +403,17 @@ mkGraphAlg
         | otherwise
             = (ArbitraryOrUnknownExpr, chn)
 
-    // TODO Delimit assigned task somehow. Subgraph?
     mkAssign app ctxs args inh chn
       = withTwo app args f inh chn
       where
       f u t chn
-        # (syn, chn)  = exprCata mkGraphAlg t inh chn
+        # (syn, chn`) = exprCata mkGraphAlg t inh {chn & chn_graph = emptyGraphWithLastId (getLastId chn.chn_graph)}
+        # g`          = chn`.chn_graph
+        # chn         = {chn` & chn_graph = setLastId chn.chn_graph (getLastId chn`.chn_graph)}
         # (ud, menv)  = ppExpression u chn.chn_module_env
         # chn         = {chn & chn_module_env = menv}
-        # (lid, g)    = addNode (mkGNode (GAssign (ppCompact ud))) chn.chn_graph
+        # (lid, g)    = addNode (mkGNode (GAssign (ppCompact ud) (Subgraph g`))) chn.chn_graph
         # chn         = {chn & chn_graph = g}
-        //# (syn, chn)  = exprCata mkGraphAlg t inh {chn & chn_graph = g, chn_module_env = menv}
         = case syn.syn_node_id of
             Just r
               # g = addEmptyEdge (r, lid) chn.chn_graph
@@ -824,7 +824,7 @@ instance toString GNodeType where
   //toString (GParallelJoin _) = "GParallelJoin"
   toString (GTaskApp _ _) = "GTaskApp"
   toString (GReturn _) = "GReturn"
-  toString (GAssign _) = "GAssign"
+  toString (GAssign _ _) = "GAssign"
   toString (GStep _) = "GStep"
   //toString (GListComprehension _) = "GListComprehension"
   toString (GVar _) = "GVar"

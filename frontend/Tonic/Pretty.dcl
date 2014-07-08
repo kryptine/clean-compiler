@@ -37,14 +37,14 @@ ppGLet :: GLet -> Doc
 
 ppCompact :: (Doc -> String)
 
-mkTaskDot :: String GinGraph *ModuleEnv -> *(String, *ModuleEnv)
+//mkTaskDot :: String GinGraph *ModuleEnv -> *(String, *ModuleEnv)
 
-mkDotAttrKV :: String String -> String
+//mkDotAttrKV :: String String -> String
 
-mkDotArgs :: [String] -> String
+//mkDotArgs :: [String] -> String
 
-mkDotNodeLbl :: String Int -> String
+//mkDotNodeLbl :: String Int -> String
 
-nodeToDot :: String GinGraph Int *ModuleEnv -> *(String, *ModuleEnv)
+//nodeToDot :: String GinGraph Int *ModuleEnv -> *(String, *ModuleEnv)
 
 getNodeData` :: Int GinGraph -> GNode
