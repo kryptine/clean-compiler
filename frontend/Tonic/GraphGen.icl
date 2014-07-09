@@ -385,7 +385,7 @@ mkGraphAlg
       # (mn, chn)  = getModuleName chn
       # (ppd, chn) = case args of
                        [x:_] -> mkRet x chn
-                       _     -> (ArbitraryOrUnknownExpr, chn)
+                       _     -> abort "mkReturn: should not happen"
       # (n, g)     = addNodeWithIndex (\ni -> { GNode
                                               | nodeType = GReturn ppd
                                               }) chn.chn_graph
@@ -401,7 +401,9 @@ mkGraphAlg
       mkRet e              chn
         | False /* TODO Check if e is Task */ = (Subgraph undef, chn)
         | otherwise
-            = (ArbitraryOrUnknownExpr, chn)
+            # (d, menv) = ppExpression e chn.chn_module_env
+            # chn = {chn & chn_module_env = menv}
+            = (VarOrExpr (ppCompact d), chn)
 
     mkAssign app ctxs args inh chn
       = withTwo app args f inh chn
@@ -427,28 +429,56 @@ mkGraphAlg
       f l r chn
         # (syn, chn) = exprCata mkGraphAlg l inh chn
         = case r of
-            //(arg=:(App app))
-              //| exprIsListConstr arg
-                  //# exprs          = fromStatic arg
-                  //# (aes, gs, chn) = let f e=:(App app`=:{app_args=[App app``:contExpr]}) (xs, gs, chn)
-                                           //| app`.app_symb.symb_ident.id_name == "OnAction"
-                                           //# action = extractAction app``
-                                           //// TODO do not recurse on e, but on the inner expression
-                                           //# (syn, chn`) = exprCata mkGraphAlg e inh {chn & chn_graph = emptyGraphWithLastId (getLastId chn.chn_graph)}
-                                           //# aes         = case syn.syn_annot_expr of
-                                                             //Just ae -> [ae:xs]
-                                                             //_       -> xs
-                                           //= (aes, [ArbitraryOrUnknownExpr:gs], {chn` & chn_graph = setLastId chn.chn_graph (getLastId chn`.chn_graph)})
-                                           //| app`.app_symb.symb_ident.id_name == "OnValue"
-                                           //// TODO : Implement
-                                           //= (xs , gs, chn)
-                                           //| app`.app_symb.symb_ident.id_name == "OnException"
-                                           //// TODO : Implement
-                                           //= (xs , gs, chn)
-                                         //f _ (xs, gs, chn) = (xs, gs, chn)
-                                     //in  foldr f ([], [], chn) exprs
-                  //# (pid, g)       = addNode (mkGNode (GStep (map (\g` -> StepElem (StepOnValue {stepContFilter = StepAlways, stepContLbl = Nothing, stepContNode = GArbitraryExpression [> TODO <]})) gs))) chn.chn_graph
-                  //= annotExpr pid app Nothing (Just (App app)) inh {chn & chn_graph = g} (mkSingleIdSynExpr (Just pid))
+            (arg=:(App _))
+              | exprIsListConstr arg
+                  # exprs           = fromStatic arg
+                  # (star1id, g)    = addNode (mkGNode GStepStar) chn.chn_graph
+                  # (star2id, g)    = addNode (mkGNode GStepStar) g
+                  # chn             = {chn & chn_graph = g}
+                  # (gs, syns, chn) = let f e=:(App a=:{app_args=[App btnOrCont:es]}) (gs, syns, chn)
+                                            | appFunName a == "OnAction"
+                                            # action = extractAction btnOrCont
+                                            # [App contApp:_] = es // TODO bluh
+                                            # (seId, (syn, chn)) =
+                                                case appFunName contApp of
+                                                  "ifValue"
+                                                    # [(App fargApp):t:_] = contApp.app_args // TODO Bah
+                                                    # (syn, chn)          = exprCata mkGraphAlg t inh chn
+                                                    # (ps, menv)          = mapSt ppExpression app.app_args chn.chn_module_env
+                                                    # chn                 = {chn & chn_module_env = menv}
+                                                    # (mfd, menv)         = reifyFunDef fargApp.app_symb chn.chn_module_env
+                                                    # (rSym, menv)        = ppSymbIdent fargApp.app_symb menv
+                                                    # (mFArgTy, menv)     = reifySymbIdentSymbolType fargApp.app_symb menv
+                                                    # rhsfd               = fromMaybe (abort $ "mkStep failed to find function definition for " +++ ppCompact rSym) mfd
+                                                    # args                = getFunArgs rhsfd
+                                                    # rhsTy               = fromMaybe (abort "mkStep failed to reify SymbolType") mFArgTy
+                                                    # funArgs             = snd $ dropContexts rhsTy args
+                                                    # ([a:as], menv)      = mapSt ppFreeVar funArgs menv
+                                                    # chn                 = {chn & chn_module_env = menv}
+                                                    # (seId, g)           = addNode (mkGNode (GStepElem (StepOnAction action StepIfValue))) chn.chn_graph
+                                                    # (cndId, g)          = addNode (mkGNode (GStepCond {tifv_funName = appFunName fargApp, tifv_args = map ppCompact [a:as]})) g
+                                                    # g                   = addEdge (mkEdge (ppCompact a)) (seId, cndId) g
+                                                    # chn                 = {chn & chn_graph = g}
+                                                    = (seId, (syn, chn))
+                                                  "always"
+                                                    # [t:_]      = contApp.app_args // TODO This too
+                                                    # (syn, chn) = exprCata mkGraphAlg t inh chn
+                                                    # (seId, g)  = addNode (mkGNode (GStepElem (StepOnAction action StepAlways))) chn.chn_graph
+                                                    # chn        = {chn & chn_graph = g}
+                                                    = (seId, (syn, chn))
+                                            = ([seId:gs], [syn:syns], chn)
+                                            | appFunName a == "OnValue"
+                                            // TODO : Implement
+                                            = (gs, syns, chn)
+                                            | appFunName a == "OnException"
+                                            // TODO : Implement
+                                            = (gs, syns, chn)
+                                            | appFunName a == "OnAllExceptions"
+                                            // TODO : Implement
+                                            = (gs, syns, chn)
+                                          f _ (gs, syns, chn) = (gs, syns, chn)
+                                      in  foldr f ([], [], chn) exprs
+                  = annotExpr star1id app Nothing Nothing inh chn (mkSingleIdSynExpr (Just star1id))
               //| otherwise
                   //# (n, g) = addNode (mkGNode (GStep [])) chn.chn_graph // TODO
                   //= (mkSingleIdSynExpr (Just n), {chn & chn_graph = g})
@@ -487,7 +517,7 @@ mkGraphAlg
       # chn        = {chn & chn_module_env = menv}
       # appArgs    = map ppCompact ps  // TODO: When do we pprint a Clean expr? And when do we generate a subgraph?
       # (an, g)    = addNodeWithIndex (\ni -> { GNode
-                                              | nodeType = GTaskApp (appFunName app) appArgs
+                                              | nodeType = GTaskApp {taskApp_taskName = appFunName app, taskApp_args = appArgs}
                                               }) chn.chn_graph
       = annotExpr an app Nothing Nothing inh { chn & chn_graph = g } (mkSingleIdSynExpr (Just an))
 
@@ -538,16 +568,16 @@ mkGraphAlg
                 # exprs          = fromStatic arg
                 # (aes, gs, chn) = let f e (xs, gs, chn)
                                          # (syn, chn`) = exprCata mkGraphAlg e inh {chn & chn_graph = emptyGraphWithLastId (getLastId chn.chn_graph)}
-                                         # g           = addStartStop syn.syn_node_id chn`.chn_graph
                                          # aes         = case syn.syn_annot_expr of
                                                            Just ae -> [ae:xs]
                                                            _       -> xs
-                                         = (aes, [Subgraph chn`.chn_graph /* TODO g */:gs], {chn` & chn_graph = setLastId chn.chn_graph (getLastId chn`.chn_graph)})
+                                         //= (aes, [NodeTaskApp chn`.chn_graph :gs], {chn` & chn_graph = setLastId chn.chn_graph (getLastId chn`.chn_graph)})
+                                         = (aes, [VarOrExpr "TODO mkParListApp isList" :gs], {chn` & chn_graph = setLastId chn.chn_graph (getLastId chn`.chn_graph)})
                                     in  foldr f ([], [], chn) exprs
                 # (pid, g)       = addNode (mkGNode (GParallel join gs)) chn.chn_graph
                 = annotExpr pid app Nothing (Just exprs) inh {chn & chn_graph = g} (mkSingleIdSynExpr (Just pid))
             | otherwise
-                # (n, g) = addNode (mkGNode (GParallel join [ArbitraryOrUnknownExpr])) chn.chn_graph
+                # (n, g) = addNode (mkGNode (GParallel join [VarOrExpr "TODO mkParListApp otherwise"])) chn.chn_graph
                 = (mkSingleIdSynExpr (Just n), {chn & chn_graph = g})
             //| isListCompr app.app_symb.symb_ident.id_name
                 //# (lc, menv) = sugarListCompr app chn.chn_module_env
@@ -822,10 +852,10 @@ instance toString GNodeType where
   toString (GLet _) = "GLet"
   //toString GParallelSplit = "GParallelSplit"
   //toString (GParallelJoin _) = "GParallelJoin"
-  toString (GTaskApp _ _) = "GTaskApp"
+  toString (GTaskApp _) = "GTaskApp"
   toString (GReturn _) = "GReturn"
   toString (GAssign _ _) = "GAssign"
-  toString (GStep _) = "GStep"
+  //toString (GStep _) = "GStep"
   //toString (GListComprehension _) = "GListComprehension"
   toString (GVar _) = "GVar"
 
