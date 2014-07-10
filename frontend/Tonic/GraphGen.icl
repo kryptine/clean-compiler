@@ -524,16 +524,24 @@ mkGraphAlg
     mkTransform app ctxs args inh chn
       = withTwo app args f inh chn
       where
-      f l r chn
-        # (syn, chn)  = exprCata mkGraphAlg l inh chn
-        # (ppl, menv) = ppExpression r chn.chn_module_env
-        # chn         = {chn & chn_module_env = menv}
-        # (an, g)     = addNodeWithIndex (\ni -> { GNode
-                                                 | nodeType = GTransform (ppCompact ppl)
-                                                 }) chn.chn_graph
+      f l (App {app_symb, app_args}) chn
+        # (syn, chn)       = exprCata mkGraphAlg l inh chn
+        # (ppl, menv)      = mapSt ppExpression app_args chn.chn_module_env
+        # (mfd, menv)      = reifyFunDef app_symb menv
+        # (rSym, menv)     = ppSymbIdent app_symb menv
+        # (mFArgTy, menv)  = reifySymbIdentSymbolType app_symb menv
+        # rhsfd            = fromMaybe (abort $ "mkTransform failed to find function definition for " +++ ppCompact rSym) mfd
+        # args             = getFunArgs rhsfd
+        # rhsTy            = fromMaybe (abort "mkTransform failed to reify SymbolType") mFArgTy
+        # funArgs          = snd $ dropContexts rhsTy args
+        # ([_:a:as], menv) = mapSt ppFreeVar funArgs menv
+        # chn              = {chn & chn_module_env = menv}
+        # (an, g)          = addNodeWithIndex (\ni -> { GNode
+                                                      | nodeType = GTransform app_symb.symb_ident.id_name (map ppCompact (ppl ++ [a:as]))
+                                                      }) chn.chn_graph
         = case syn.syn_node_id of
             Just nid
-              # g = addEmptyEdge (nid, an) g
+              # g = addEdge (mkEdge (ppCompact a)) (nid, an) g
               = annotExpr an app Nothing Nothing inh { chn & chn_graph = g } (mkSingleIdSynExpr (Just nid))
             _ = ({mkSynExpr & syn_annot_expr = Just (App app)}, chn)
 
