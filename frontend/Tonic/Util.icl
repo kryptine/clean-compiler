@@ -312,6 +312,11 @@ funTy :: FunDef -> Type
 funTy {fun_type=Yes {st_result={at_type}}} = at_type
 funTy {fun_ident={id_name}} = abort ("Tonic.Util.funTy: type of " +++ id_name +++ " is unknown.")
 
+functorContent :: Type -> Maybe Type
+functorContent (TA _ [{at_type}:_])    = Just at_type
+functorContent (TAS _ [{at_type}:_] _) = Just at_type
+functorContent _                       = Nothing
+
 funArgTys :: FunDef -> [Type]
 funArgTys {fun_type=Yes {st_args}} = map (\x -> x.at_type) st_args
 funArgTys {fun_ident={id_name}} = abort ("Tonic.Util.funArgTys argument types of " +++ id_name +++ " are unknown.")

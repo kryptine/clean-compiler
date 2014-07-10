@@ -9,6 +9,7 @@ from CoclSystemDependent import DirectorySeparator
 from filesystem import ensureDirectoryExists
 import Text
 import Data.Func
+import Data.Functor
 import Data.Graph
 import Data.Maybe
 import Data.Map
@@ -87,7 +88,7 @@ ginTonic` is_itasks_mod main_dcl_module_n repsToString fun_defs icl_module dcl_m
       # menv = updateWithAnnot idx me menv
       # (menv, predef_symbols) = addTonicWrap icl_module idx menv predef_symbols
       = (( case mg of
-             Just g -> put fd.fun_ident.id_name {TonicTask | tt_name = fd.fun_ident.id_name, tt_resty = ppType (funTy fd), tt_args = args, tt_graph = g} reps
+             Just g -> put fd.fun_ident.id_name {TonicTask | tt_name = fd.fun_ident.id_name, tt_resty = fromMaybe "" (fmap ppType (functorContent (funTy fd))), tt_args = args, tt_graph = g} reps
              _      -> reps
         , heaps, predef_symbols), menv.me_fun_defs)
     //| is_itasks_mod && funIsTask fd && fd.fun_info.fi_def_level == 1

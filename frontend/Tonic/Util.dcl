@@ -62,6 +62,8 @@ funIsTask :: FunDef -> Bool
 
 funTy :: FunDef -> Type
 
+functorContent :: Type -> Maybe Type
+
 funArgTys :: FunDef -> [Type]
 
 identIsLambda :: Ident -> Bool
