@@ -248,6 +248,16 @@ foldUArr f (b, arr)
               = f idx elem (res, arr)
           | otherwise = (b, arr)
 
+reifyArgsAndDef :: SymbIdent *ModuleEnv -> *(([FreeVar], FunDef), *ModuleEnv)
+reifyArgsAndDef app_symb menv
+  # (mfd, menv)      = reifyFunDef app_symb menv
+  # (rSym, menv)     = ppSymbIdent app_symb menv
+  # (mFArgTy, menv)  = reifySymbIdentSymbolType app_symb menv
+  # rhsfd            = fromMaybe (abort $ "reifyArgs failed to find function definition for " +++ ppCompact rSym) mfd
+  # args             = getFunArgs rhsfd
+  # rhsTy            = fromMaybe (abort "reifyArgs failed to reify SymbolType") mFArgTy
+  = ((snd (dropContexts rhsTy args), rhsfd), menv)
+
 fdArrToMap :: .{#FunDef} -> Map String FunDef
 fdArrToMap fds = fromList [(d.fun_ident.id_name, d) \\ d <-: fds]
 

@@ -358,13 +358,7 @@ mkGraphAlg
         # ((synr, chnr), edge)
             = case (exprIsLambda rhsExpr, rhsExpr) of
                 (True, App rhsApp)
-                  # (mfd, menv)    = reifyFunDef rhsApp.app_symb chnl.chn_module_env
-                  # (rSym, menv)   = ppSymbIdent rhsApp.app_symb menv
-                  # (mRhsTy, menv) = reifySymbIdentSymbolType rhsApp.app_symb menv
-                  # rhsfd          = fromMaybe (abort $ "mkBind: failed to find function definition for " +++ ppCompact rSym) mfd
-                  # args           = getFunArgs rhsfd
-                  # rhsTy          = fromMaybe (abort "mkBind: failed to reify SymbolType") mRhsTy
-                  # funArgs        = snd $ dropContexts rhsTy args
+                  # ((funArgs, rhsfd), menv) = reifyArgsAndDef rhsApp.app_symb chnl.chn_module_env
                   # patid          = lastElem [freeVarName x \\ x <- funArgs| x.fv_def_level == -1]
                   # (syne, chn)    = exprCata mkGraphAlg (getFunRhs rhsfd) inh { chnl & chn_module_env = menv }
                   # menv           = updateWithAnnot rhsApp.app_symb syne.syn_annot_expr chn.chn_module_env
@@ -442,23 +436,16 @@ mkGraphAlg
                                             # (seId, (syn, chn)) =
                                                 case appFunName contApp of
                                                   "ifValue"
-                                                    # [(App fargApp):t:_] = contApp.app_args // TODO Bah
-                                                    # (syn, chn)          = exprCata mkGraphAlg t inh chn
-                                                    # (ps, menv)          = mapSt ppExpression app.app_args chn.chn_module_env
-                                                    # chn                 = {chn & chn_module_env = menv}
-                                                    # (mfd, menv)         = reifyFunDef fargApp.app_symb chn.chn_module_env
-                                                    # (rSym, menv)        = ppSymbIdent fargApp.app_symb menv
-                                                    # (mFArgTy, menv)     = reifySymbIdentSymbolType fargApp.app_symb menv
-                                                    # rhsfd               = fromMaybe (abort $ "mkStep failed to find function definition for " +++ ppCompact rSym) mfd
-                                                    # args                = getFunArgs rhsfd
-                                                    # rhsTy               = fromMaybe (abort "mkStep failed to reify SymbolType") mFArgTy
-                                                    # funArgs             = snd $ dropContexts rhsTy args
-                                                    # ([a:as], menv)      = mapSt ppFreeVar funArgs menv
-                                                    # chn                 = {chn & chn_module_env = menv}
-                                                    # (seId, g)           = addNode (mkGNode (GStepElem (StepOnAction action StepIfValue))) chn.chn_graph
-                                                    # (cndId, g)          = addNode (mkGNode (GStepCond {tifv_funName = appFunName fargApp, tifv_args = map ppCompact [a:as]})) g
-                                                    # g                   = addEdge (mkEdge (ppCompact a)) (seId, cndId) g
-                                                    # chn                 = {chn & chn_graph = g}
+                                                    # [(App fargApp):t:_]  = contApp.app_args // TODO Bah
+                                                    # (syn, chn)           = exprCata mkGraphAlg t inh chn
+                                                    # (ps, menv)           = mapSt ppExpression app.app_args chn.chn_module_env
+                                                    # ((funArgs, _), menv) = reifyArgsAndDef fargApp.app_symb menv
+                                                    # ([a:as], menv)       = mapSt ppFreeVar funArgs menv
+                                                    # chn                  = {chn & chn_module_env = menv}
+                                                    # (seId, g)            = addNode (mkGNode (GStepElem (StepOnAction action StepIfValue))) chn.chn_graph
+                                                    # (cndId, g)           = addNode (mkGNode (GStepCond {tifv_funName = appFunName fargApp, tifv_args = map ppCompact [a:as]})) g
+                                                    # g                    = addEdge (mkEdge (ppCompact a)) (seId, cndId) g
+                                                    # chn                  = {chn & chn_graph = g}
                                                     = (seId, (syn, chn))
                                                   "always"
                                                     # [t:_]      = contApp.app_args // TODO This too
@@ -525,20 +512,14 @@ mkGraphAlg
       = withTwo app args f inh chn
       where
       f l (App {app_symb, app_args}) chn
-        # (syn, chn)       = exprCata mkGraphAlg l inh chn
-        # (ppl, menv)      = mapSt ppExpression app_args chn.chn_module_env
-        # (mfd, menv)      = reifyFunDef app_symb menv
-        # (rSym, menv)     = ppSymbIdent app_symb menv
-        # (mFArgTy, menv)  = reifySymbIdentSymbolType app_symb menv
-        # rhsfd            = fromMaybe (abort $ "mkTransform failed to find function definition for " +++ ppCompact rSym) mfd
-        # args             = getFunArgs rhsfd
-        # rhsTy            = fromMaybe (abort "mkTransform failed to reify SymbolType") mFArgTy
-        # funArgs          = snd $ dropContexts rhsTy args
-        # ([_:a:as], menv) = mapSt ppFreeVar funArgs menv
-        # chn              = {chn & chn_module_env = menv}
-        # (an, g)          = addNodeWithIndex (\ni -> { GNode
-                                                      | nodeType = GTransform app_symb.symb_ident.id_name (map ppCompact (ppl ++ [a:as]))
-                                                      }) chn.chn_graph
+        # (syn, chn)           = exprCata mkGraphAlg l inh chn
+        # (ppl, menv)          = mapSt ppExpression app_args chn.chn_module_env
+        # ((funArgs, _), menv) = reifyArgsAndDef app_symb menv
+        # ([_:a:as], menv)     = mapSt ppFreeVar funArgs menv
+        # chn                  = {chn & chn_module_env = menv}
+        # (an, g)              = addNodeWithIndex (\ni -> { GNode
+                                                          | nodeType = GTransform app_symb.symb_ident.id_name (map ppCompact (ppl ++ [a:as]))
+                                                          }) chn.chn_graph
         = case syn.syn_node_id of
             Just nid
               # g = addEdge (mkEdge (ppCompact a)) (nid, an) g
