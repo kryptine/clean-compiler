@@ -88,19 +88,19 @@ ginTonic` is_itasks_mod main_dcl_module_n repsToString fun_defs icl_module dcl_m
       # menv = updateWithAnnot idx me menv
       # (menv, predef_symbols) = addTonicWrap icl_module idx menv predef_symbols
       = (( case mg of
-             Just g -> put fd.fun_ident.id_name {TonicTask | tt_name = fd.fun_ident.id_name, tt_resty = fromMaybe "" (fmap ppType (functorContent (funTy fd))), tt_args = args, tt_graph = g} reps
+             Just g -> put fd.fun_ident.id_name {TonicTask | tt_name = fd.fun_ident.id_name, tt_resty = fromMaybe "" (fmap ppType (functorContent (funTy fd))), tt_args = args, tt_body = g} reps
              _      -> reps
         , heaps, predef_symbols), menv.me_fun_defs)
-    | is_itasks_mod && funIsTask fd && fd.fun_info.fi_def_level == 1
-      # (menv, predef_symbols) = trace_n ("at " +++ fd.fun_ident.id_name) addTonicWrap icl_module idx menv predef_symbols
-      = ((reps, heaps, predef_symbols), menv.me_fun_defs)
+    //| is_itasks_mod && funIsTask fd && fd.fun_info.fi_def_level == 1
+      //# (menv, predef_symbols) = trace_n ("at " +++ fd.fun_ident.id_name) addTonicWrap icl_module idx menv predef_symbols
+      //= ((reps, heaps, predef_symbols), menv.me_fun_defs)
     // TODO FIXME There are still some problems with this when compiling iTasks itself
     //| is_itasks_mod && funIsTask fd && fd.fun_info.fi_def_level == 1
       //# menv = mkModuleEnv main_dcl_module_n fun_defs icl_module dcl_modules
       //# menv = addTonicWrap icl_module idx menv
       //= ((reps, heaps), menv.me_fun_defs)
     | otherwise        = ((reps, heaps, predef_symbols), fun_defs)
-import StdDebug
+
 updateWithAnnot :: Int (Maybe Expression) *ModuleEnv -> *ModuleEnv
 updateWithAnnot fidx (Just e) menv
   # fun_defs = menv.me_fun_defs
@@ -144,7 +144,7 @@ addTonicWrap icl_module idx menv pdss
                                  , App dict
                                  , tb_rhs
                                  ] SK_Function pdss
-              # fun_defs    = trace_n ("mn: " +++ icl_module.icl_name.id_name +++ " " +++ fun_ident.id_name) updateFunRhs idx fun_defs (App wrap)
+              # fun_defs    = updateFunRhs idx fun_defs (App wrap)
               = ({ menv & me_fun_defs = fun_defs}, pdss)
             _ = (menv, pdss)
     | otherwise = (menv, pdss)

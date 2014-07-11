@@ -40,22 +40,13 @@ To reconstruct list comprehensions:
   //| fd.fun_ident.id_name.[0] == "c" =  // Is a list comprehension
   //| otherwise                       = Nothing
 
-
-/*
-TODO:
-GiN does not do eta-reduction. I.e., it only supports either a `f >>= \x -> e`
-or `f >>| e` bind, but never a `f >>= g` bind. If we want to support the
-latter, we must eta-expand `g`.
-*/
-
-
-edgeErr :: String (Maybe Int) Expression (Maybe Int) Expression *ChnExpression -> *(SynExpression, *ChnExpression)
-edgeErr errmsg lid lexpr rid rexpr chn
-  # (err1, chn) = nodeErr lid lexpr chn
-  # (err2, chn) = nodeErr rid rexpr chn
-  = abort ("Cannot create " +++ errmsg
-           +++ " between left expression\n\t" +++ err1
-           +++ " and right expression\n\t" +++ err2 +++ "\n")
+//edgeErr :: String (Maybe Int) Expression (Maybe Int) Expression *ChnExpression -> *(SynExpression, *ChnExpression)
+//edgeErr errmsg lid lexpr rid rexpr chn
+  //# (err1, chn) = nodeErr lid lexpr chn
+  //# (err2, chn) = nodeErr rid rexpr chn
+  //= abort ("Cannot create " +++ errmsg
+           //+++ " between left expression\n\t" +++ err1
+           //+++ " and right expression\n\t" +++ err2 +++ "\n")
 
 // TODO: Check whether nodes already exist. How? Perhaps uniquely number all
 // expressions first and attach that ID to the graph nodes? Or just by task
@@ -120,58 +111,15 @@ given x == y && y == z
 (x, y, z)
 */
 
-sugarListCompr :: App *ModuleEnv -> *(GListComprehension, *ModuleEnv)
-sugarListCompr app menv
-  # ((_, xs), menv) = dropAppContexts app menv
-  # gen             = last xs
-  # (mfd, menv)     = reifyFunDef app.app_symb menv
-  # funDef          = fromMaybe (abort $ "sugarListCompr: failed to find function definition for " +++ app.app_symb.symb_ident.id_name) mfd
-  = case getFunRhs funDef of
-      Case {Case | case_guards=(AlgebraicPatterns _
-             [{AlgebraicPattern | ap_vars=[sel:_], ap_expr=(App {App | app_args=[expr:_]})}:_])}
-               = mkLC sel expr gen menv
-      Case {Case | case_guards=(AlgebraicPatterns _
-             [{AlgebraicPattern | ap_vars=[sel:_], ap_expr=(Case _)}:_])}
-               = abort "sugar Algebraic Case"
-      Case {Case | case_guards=(BasicPatterns _ _)} = abort "sugar Basic"
-      Case {Case | case_guards=(NewTypePatterns _ _)} = abort "sugar NewType"
-      Case {Case | case_guards=(DynamicPatterns _)} = abort "sugar Dynamic"
-      Case {Case | case_guards=(OverloadedListPatterns _ _ _)} = abort "sugar OverloadedList"
-      Case {Case | case_guards=(NoPattern)} = abort "sugar NoPattern"
-      _        = (err, menv)
-  where
-  err     = abort "Invalid list comprehension"
-  mkLC sel expr gen menv
-    # (od, menv)  = ppExpression expr menv
-    # (gd, menv)  = ppExpression gen menv
-    # (fvd, menv) = ppFreeVar sel menv
-    = ({ GListComprehension
-      | output = ppCompact od
-      , guard = Nothing
-      , comprElem = [{cePattern = ppCompact fvd, ceType = SeqComp /* TODO */, ceInput = ppCompact gd}]
-       //selector = 
-      //, input = GCleanExpression $ ppCompact gd
-      }, menv)
-
-  //{ GListComprehension
-  //| output = GCleanExpression "output"
-  //, guard = Nothing
-  //, selector = "selector"
-  //, input = GCleanExpression "input"
-  //}
-
-/*
-
-
-
-*/
 
 withTwo :: App [Expression] (Expression Expression *ChnExpression -> *(SynExpression, *ChnExpression)) InhExpression *ChnExpression -> *(SynExpression, *ChnExpression)
 withTwo app [x1:x2:_] f inh chn = f x1 x2 chn
-withTwo app _         _ inh chn = ({mkSynExpr & syn_annot_expr = Just (App app)}, chn)
+withTwo app _         _ inh chn = ({syn_annot_expr = App app, syn_texpr = Nothing}, chn)
 
-annotExpr :: Int App (Maybe SymbIdent) (Maybe [Expression]) InhExpression *ChnExpression SynExpression -> *(SynExpression, *ChnExpression)
-annotExpr nodeId app mbRepSI mbArgs inh chn syn
+annotExpr :: App (Maybe SymbIdent) (Maybe [Expression]) InhExpression
+             *ChnExpression SynExpression
+          -> *(SynExpression, *ChnExpression)
+annotExpr app mbRepSI mbArgs inh chn syn
   # (tune_symb, predefs) = (chn.chn_predef_symbols)![PD_tonicWrapApp]
   | predefIsUndefined tune_symb = (syn, {chn & chn_predef_symbols = predefs})
   | otherwise
@@ -180,7 +128,7 @@ annotExpr nodeId app mbRepSI mbArgs inh chn syn
       | papp         = (syn, chn)
       | otherwise
         # (app, chn) = mkTuneApp chn
-        = ({syn & syn_annot_expr = Just (App app)}, chn)
+        = ({syn & syn_annot_expr = App app}, chn)
   where
   mkTuneApp chn
     # menv = chn.chn_module_env
@@ -191,12 +139,15 @@ annotExpr nodeId app mbRepSI mbArgs inh chn syn
     # (app, pdss) = appPredefinedSymbol PD_tonicWrapApp
                       [ mkStr nm
                       , mkStr inh.inh_curr_task_name
-                      , mkInt nodeId
+                      , mkStr (ppExprId inh.inh_ids)
                       , App {app & app_symb = fromMaybe app.app_symb mbRepSI
                                  , app_args = fromMaybe app.app_args mbArgs}
                       ] SK_Function chn.chn_predef_symbols
     # chn         = {chn & chn_predef_symbols = pdss}
     = (app, chn)
+
+ppExprId :: ExprId -> String
+ppExprId eid = foldr (\x xs -> toString x +++ "." +++ xs) "" eid
 
 getModuleName :: *ChnExpression -> *(String, *ChnExpression)
 getModuleName chn
@@ -211,61 +162,11 @@ lastElem :: [a] -> a
 lastElem [x]    = x
 lastElem [_:xs] = lastElem xs
 
-import StdDebug
-
-instance toString VarInfo where
-  toString (VI_Empty) = "VI_Empty"
-  toString (VI_Type _ _) = "VI_Type"
-  toString (VI_FAType _ _ _) = "VI_FAType"
-  toString (VI_FATypeC _ _ _ _) = "VI_FATypeC"
-  toString (VI_FPC) = "VI_FPC"
-  toString (VI_Occurrence _) = "VI_Occurrence"
-  toString (VI_UsedVar _) = "VI_UsedVar"
-  toString (VI_Expression _) = "VI_Expression"
-  toString (VI_Variable _ _) = "VI_Variable"
-  toString (VI_LiftedVariable _) = "VI_LiftedVariable"
-  toString (VI_Count _ _) = "VI_Count"
-  toString (VI_Ref _) = "VI_Ref"
-  toString (VI_AccVar _ _) = "VI_AccVar"
-  toString (VI_Alias _) = "VI_Alias"
-  toString (VI_RefFromTupleSel0 _) = "VI_RefFromTupleSel0"
-  toString (VI_RefFromArrayUpdate _ _) = "VI_RefFromArrayUpdate"
-  toString (VI_RefFromArrayUpdateToTupleSelector2 _ _ _) = "VI_RefFromArrayUpdateToTupleSelector2"
-  toString (VI_RefFromArrayUpdateOfTupleElem2 _ _) = "VI_RefFromArrayUpdateOfTupleElem2"
-  toString (VI_FreeVar _ _ _ _) = "VI_FreeVar"
-  toString (VI_BoundVar _) = "VI_BoundVar"
-  toString (VI_LocalVar) = "VI_LocalVar"
-  toString (VI_ClassVar _ _ _) = "VI_ClassVar"
-  toString (VI_EmptyConstructorClassVar) = "VI_EmptyConstructorClassVar"
-  toString (VI_ForwardClassVar _) = "VI_ForwardClassVar"
-  toString (VI_Forward _) = "VI_Forward"
-  toString (VI_LetVar _) = "VI_LetVar"
-  toString (VI_LetExpression _) = "VI_LetExpression"
-  toString (VI_CaseOrStrictLetVar _) = "VI_CaseOrStrictLetVar"
-  toString (VI_StrictLetVar) = "VI_StrictLetVar"
-  toString (VI_CorrespondenceNumber _) = "VI_CorrespondenceNumber"
-  toString (VI_SequenceNumber _) = "VI_SequenceNumber"
-  toString (VI_AliasSequenceNumber _) = "VI_AliasSequenceNumber"
-  toString (VI_Used) = "VI_Used"
-  toString (VI_PropagationType _) = "VI_PropagationType"
-  toString (VI_ExpandedType _) = "VI_ExpandedType"
-  toString (VI_Record _) = "VI_Record"
-  toString (VI_Pattern _) = "VI_Pattern"
-  toString (VI_TypeCodeVariable _) = "VI_TypeCodeVariable"
-  toString (VI_DynamicValueAlias _) = "VI_DynamicValueAlias"
-  toString (VI_Body _ _ _ _ _) = "VI_Body"
-  toString (VI_ExpressionOrBody _ _ _ _ _ _) = "VI_ExpressionOrBody"
-  toString (VI_Dictionary _ _ _) = "VI_Dictionary"
-  toString (VI_Extended _ _) = "VI_Extended"
-  toString (VI_CPSExprVar _) = "VI_CPSExprVar"
-  toString (VI_Labelled_Empty _) = "VI_Labelled_Empty"
-  toString (VI_LocalLetVar) = "VI_LocalLetVar"
-
 varIsTask :: VarInfoPtr *ChnExpression -> *(Bool, *ChnExpression)
 varIsTask varptr chn
   # heaps = chn.chn_heaps
   # (vi, var_heap) = readPtr varptr heaps.hp_var_heap
-  # chn = {chn & chn_heaps = trace_n (toString vi) {heaps & hp_var_heap = var_heap}}
+  # chn = {chn & chn_heaps = {heaps & hp_var_heap = var_heap}}
   = case vi of
       VI_Type aty _ -> (atypeIsTask aty, chn)
       _             -> (False, chn)
@@ -282,153 +183,118 @@ varIsTaskFun varptr chn
 
 mkGraphAlg :: *(ExpressionAlg InhExpression *ChnExpression SynExpression)
 mkGraphAlg
-  =  {  mkExprAlg mkSynExpr
-     &  app = appC, at = atC, letE = letC, caseE = caseC, var = varC
-     //,  var                   = \bv             _ chn -> ({mkSynExpr & syn_annot_expr = Just (Var bv)}, chn)
-     ,  selection             = \sk e ss        _ chn -> ({mkSynExpr & syn_annot_expr = Just (Selection sk e ss)},    chn)
-     ,  update                = \e1 ss e2       _ chn -> ({mkSynExpr & syn_annot_expr = Just (Update e1 ss e2)},      chn)
-     ,  recordUpdate          = \gd e bs        _ chn -> ({mkSynExpr & syn_annot_expr = Just (RecordUpdate gd e bs)}, chn)
-     ,  tupleSelect           = \ds i e         _ chn -> ({mkSynExpr & syn_annot_expr = Just (TupleSelect ds i e)},   chn)
-     ,  basicExpr             = \bv             _ chn -> ({mkSynExpr & syn_annot_expr = Just (BasicExpr bv)},  chn)
-     ,  conditional           = \c              _ chn -> ({mkSynExpr & syn_annot_expr = Just (Conditional c)}, chn)
-     ,  anyCodeExpr           = \cb cf ss       _ chn -> ({mkSynExpr & syn_annot_expr = Just (AnyCodeExpr cb cf ss)}, chn)
-     ,  abcCodeExpr           = \ss b           _ chn -> ({mkSynExpr & syn_annot_expr = Just (ABCCodeExpr ss b)}, chn)
-     ,  matchExpr             = \gd e           _ chn -> ({mkSynExpr & syn_annot_expr = Just (MatchExpr gd e)},   chn)
-     ,  isConstructor         = \e gd n gi i p  _ chn -> ({mkSynExpr & syn_annot_expr = Just (IsConstructor e gd n gi i p)},  chn)
-     ,  freeVar               = \v              _ chn -> ({mkSynExpr & syn_annot_expr = Just (FreeVar v)}, chn)
-     ,  dictionariesFunction  = \xs e at        _ chn -> ({mkSynExpr & syn_annot_expr = Just (DictionariesFunction xs e at)}, chn)
-     ,  constant              = \si i prio      _ chn -> ({mkSynExpr & syn_annot_expr = Just (Constant si i prio)},   chn)
-     ,  classVariable         = \vip            _ chn -> ({mkSynExpr & syn_annot_expr = Just (ClassVariable vip)},    chn)
-     ,  dynamicExpr           = \de             _ chn -> ({mkSynExpr & syn_annot_expr = Just (DynamicExpr de)},       chn)
-     ,  typeCodeExpression    = \t              _ chn -> ({mkSynExpr & syn_annot_expr = Just (TypeCodeExpression t)}, chn)
-     ,  typeSignature         = \f e            _ chn -> ({mkSynExpr & syn_annot_expr = Just (TypeSignature f e)},    chn)
-     ,  ee                    = \               _ chn -> ({mkSynExpr & syn_annot_expr = Just EE},           chn)
-     ,  noBind                = \eip            _ chn -> ({mkSynExpr & syn_annot_expr = Just (NoBind eip)}, chn)
-     ,  failExpr              = \i              _ chn -> ({mkSynExpr & syn_annot_expr = Just (FailExpr i)}, chn)
+  =  {  app = appC, at = atC, letE = letC, caseE = caseC, var = varC
+     ,  selection            = \sk e ss       _ chn -> (mkSynExpr (Selection sk e ss           ), chn)
+     ,  update               = \e1 ss e2      _ chn -> (mkSynExpr (Update e1 ss e2             ), chn)
+     ,  recordUpdate         = \gd e bs       _ chn -> (mkSynExpr (RecordUpdate gd e bs        ), chn)
+     ,  tupleSelect          = \ds i e        _ chn -> (mkSynExpr (TupleSelect ds i e          ), chn)
+     ,  basicExpr            = \bv            _ chn -> (mkSynExpr (BasicExpr bv                ), chn)
+     ,  conditional          = \c             _ chn -> (mkSynExpr (Conditional c               ), chn)
+     ,  anyCodeExpr          = \cb cf ss      _ chn -> (mkSynExpr (AnyCodeExpr cb cf ss        ), chn)
+     ,  abcCodeExpr          = \ss b          _ chn -> (mkSynExpr (ABCCodeExpr ss b            ), chn)
+     ,  matchExpr            = \gd e          _ chn -> (mkSynExpr (MatchExpr gd e              ), chn)
+     ,  isConstructor        = \e gd n gi i p _ chn -> (mkSynExpr (IsConstructor e gd n gi i p ), chn)
+     ,  freeVar              = \v             _ chn -> (mkSynExpr (FreeVar v                   ), chn)
+     ,  dictionariesFunction = \xs e at       _ chn -> (mkSynExpr (DictionariesFunction xs e at), chn)
+     ,  constant             = \si i prio     _ chn -> (mkSynExpr (Constant si i prio          ), chn)
+     ,  classVariable        = \vip           _ chn -> (mkSynExpr (ClassVariable vip           ), chn)
+     ,  dynamicExpr          = \de            _ chn -> (mkSynExpr (DynamicExpr de              ), chn)
+     ,  typeCodeExpression   = \t             _ chn -> (mkSynExpr (TypeCodeExpression t        ), chn)
+     ,  typeSignature        = \f e           _ chn -> (mkSynExpr (TypeSignature f e           ), chn)
+     ,  ee                   = \              _ chn -> (mkSynExpr (EE                          ), chn)
+     ,  noBind               = \eip           _ chn -> (mkSynExpr (NoBind eip                  ), chn)
+     ,  failExpr             = \i             _ chn -> (mkSynExpr (FailExpr i                  ), chn)
      }
   where
   appC app inh chn // TODO Take arity into account: if a task is partially applied, wrap it in a lambda and annotate that
     # (idIsTask, menv) = symbIdentIsTask app.app_symb chn.chn_module_env
     # chn = {chn & chn_module_env = menv}
     | idIsTask
-      # ((ctxs, args), menv)  = dropAppContexts app chn.chn_module_env
-      # chn                   = { chn & chn_module_env = menv }
-      = case appFunName app of // TODO `parallel`
+      # ((ctxs, args), menv) = dropAppContexts app chn.chn_module_env
+      # chn                  = { chn & chn_module_env = menv }
+      = case appFunName app of
           ">>="       -> mkBind       app ctxs args              inh chn
+          ">>|"       -> mkBind       app ctxs args              inh chn
           "return"    -> mkReturn     app ctxs args              inh chn
-          ">>|"       -> mkBindNoLam  app ctxs args              inh chn
           "@:"        -> mkAssign     app ctxs args              inh chn
           "@"         -> mkTransform  app ctxs args              inh chn
           ">>*"       -> mkStep       app ctxs args              inh chn
-          "-||-"      -> mkParBinApp  app ctxs args DisFirstBin  inh chn
-          "||-"       -> mkParBinApp  app ctxs args DisRight     inh chn
-          "-||"       -> mkParBinApp  app ctxs args DisLeft      inh chn
-          "-&&-"      -> mkParBinApp  app ctxs args ConPair      inh chn
-          "anyTask"   -> mkParListApp app ctxs args DisFirstList inh chn
-          "allTasks"  -> mkParListApp app ctxs args ConAll       inh chn
+          "-||-"      -> mkParBinApp  app ctxs args "sumn"       inh chn // TODO Ugh
+          "||-"       -> mkParBinApp  app ctxs args "sumr"       inh chn // TODO Ugh
+          "-||"       -> mkParBinApp  app ctxs args "suml"       inh chn // TODO Ugh
+          "-&&-"      -> mkParBinApp  app ctxs args "prod"       inh chn // TODO Ugh
+          "anyTask"   -> mkParListApp app ctxs args "sumn"       inh chn // TODO Ugh
+          "allTasks"  -> mkParListApp app ctxs args "prod"       inh chn // TODO Ugh
           _           -> mkTaskApp    app ctxs args              inh chn
-    | otherwise
-        # (nid, g) = addNode (mkGNode GArbitraryExpression) chn.chn_graph
-        = ({mkSingleIdSynExpr (Just nid) & syn_annot_expr = Just (App app)}, {chn & chn_graph = g})
+    | otherwise = (mkSynExpr (App app), chn)
     where
-    mkBindNoLam app ctxs args inh chn
-      = withTwo app args f inh chn
-      where
-      f lhsExpr rhsExpr chn // TODO We probably need a two-pass scheme to properly deal with replacing variables in the graph, since we need both the successor and predecessor ID
-        # (synl, chnl)  = exprCata mkGraphAlg lhsExpr inh chn
-        # (synr, chnr)  = exprCata mkGraphAlg rhsExpr inh chnl
-        = case (synl.syn_node_id, synr.syn_node_id) of
-            (Just lx, Just rn)
-              # g    = addEdge emptyEdge (lx, rn) chnr.chn_graph
-              # app` = case (synl.syn_annot_expr, synr.syn_annot_expr) of
-                         (Just la, Just ra) -> { app & app_args = ctxs ++ [la, ra]}
-                         (Just la, _)       -> { app & app_args = ctxs ++ [la, rhsExpr]}
-                         _                  -> app
-              = ({mkSingleIdSynExpr synl.syn_node_id & syn_annot_expr = Just (App app`)}, chnr)
-            (lid, rid)
-              = edgeErr "bind edge (>>|)" lid lhsExpr rid rhsExpr chnr
-
-    // TODO Combine the nolam and lam cases? They are very similar...
-    // when the RHS is not a lambda, it is simply the nolam case
     mkBind app ctxs args inh chn
       = withTwo app args f inh chn
       where
       f lhsExpr rhsExpr chn
-        # (synl, chnl)    = exprCata mkGraphAlg lhsExpr inh chn
-        # ((synr, chnr), edge)
+        # (synl, chnl) = exprCata mkGraphAlg lhsExpr {inh & inh_ids = inh.inh_ids ++ [0]} chn
+        # (edgeLbl, (synr, chnr))
             = case (exprIsLambda rhsExpr, rhsExpr) of
                 (True, App rhsApp)
                   # ((funArgs, rhsfd), menv) = reifyArgsAndDef rhsApp.app_symb chnl.chn_module_env
-                  # patid          = lastElem [freeVarName x \\ x <- funArgs| x.fv_def_level == -1]
-                  # (syne, chn)    = exprCata mkGraphAlg (getFunRhs rhsfd) inh { chnl & chn_module_env = menv }
-                  # menv           = updateWithAnnot rhsApp.app_symb syne.syn_annot_expr chn.chn_module_env
-                  = (({syne & syn_annot_expr = Nothing}, {chn & chn_module_env = menv}), mkEdge patid)
-                _ = (exprCata mkGraphAlg rhsExpr inh chnl, emptyEdge)
-        = case (synl.syn_node_id, synr.syn_node_id) of
-            (Just lx, Just rn)
-              # g     = addEdge edge (lx, rn) chnr.chn_graph
-              # app`  = case (synl.syn_annot_expr, synr.syn_annot_expr) of
-                          (Just la, Just ra) -> { app & app_args = ctxs ++ [la, ra] }
-                          (Just la, _)       -> { app & app_args = ctxs ++ [la, rhsExpr] }
-                          _                  -> app
-              = ({mkSingleIdSynExpr synl.syn_node_id & syn_annot_expr = Just (App app`)}, {chnr & chn_graph = g})
-            (lid, rid)
-              = edgeErr "bind edge (>>=)" lid lhsExpr rid rhsExpr chnr
+                  # patid       = lastElem [freeVarName x \\ x <- funArgs| x.fv_def_level == -1]
+                  # (syne, chn) = exprCata mkGraphAlg (getFunRhs rhsfd) {inh & inh_ids = inh.inh_ids ++ [1]} { chnl & chn_module_env = menv }
+                  # menv        = updateWithAnnot rhsApp.app_symb syne.syn_annot_expr chn.chn_module_env
+                  = (Just patid, (({syne & syn_annot_expr = rhsExpr}, {chn & chn_module_env = menv})))
+                _ = (Nothing, (exprCata mkGraphAlg rhsExpr {inh & inh_ids = inh.inh_ids ++ [1]} chnl))
+        # app` = { app & app_args = ctxs ++ [synl.syn_annot_expr, synr.syn_annot_expr] }
+        = case (synl.syn_texpr, synr.syn_texpr) of
+            (Just l, Just r) -> ({syn_annot_expr = App app`, syn_texpr = Just (TBind (T l) edgeLbl (T r))}, chnr)
+            (Just l, _)      -> ({syn_annot_expr = App app`, syn_texpr = Just (TBind (T l) edgeLbl (PP "TODO PP RHS"))}, chnr)
+            (_, Just r)      -> ({syn_annot_expr = App app`, syn_texpr = Just (TBind (PP "TODO PP LHS") edgeLbl (T r))}, chnr)
+            (_, _)           -> ({syn_annot_expr = App app`, syn_texpr = Just (TBind (PP "TODO PP LHS") edgeLbl (PP "TODO PP RHS"))}, chnr)
 
+    // TODO Support subgraphs in return
     mkReturn app ctxs args inh chn
       # (mn, chn)  = getModuleName chn
       # (ppd, chn) = case args of
                        [x:_] -> mkRet x chn
                        _     -> abort "mkReturn: should not happen"
-      # (n, g)     = addNodeWithIndex (\ni -> { GNode
-                                              | nodeType = GReturn ppd
-                                              }) chn.chn_graph
-      = ({mkSingleIdSynExpr (Just n) & syn_annot_expr = Just (App app)}, {chn & chn_graph = g})
+      = ({syn_annot_expr = App app, syn_texpr = Just (TReturn (PP ppd))}, chn)
       where
       // In case of a function application, we want to inspect the type of the
       // function. If it is a task or a list, treat it differently than any
       // other type.
       mkRet (BasicExpr bv) chn
         # (bvd, menv) = ppBasicValue bv chn.chn_module_env
-        = (VarOrExpr (ppCompact bvd), {chn & chn_module_env = menv})
-      mkRet (Var bv)       chn = (VarOrExpr bv.var_ident.id_name, chn)
+        = (ppCompact bvd, {chn & chn_module_env = menv})
+      mkRet (Var bv)       chn = (bv.var_ident.id_name, chn)
       mkRet e              chn
-        | False /* TODO Check if e is Task */ = (Subgraph undef, chn)
-        | otherwise
-            # (d, menv) = ppExpression e chn.chn_module_env
-            # chn = {chn & chn_module_env = menv}
-            = (VarOrExpr (ppCompact d), chn)
+        # (d, menv) = ppExpression e chn.chn_module_env
+        # chn = {chn & chn_module_env = menv}
+        = (ppCompact d, chn)
 
     mkAssign app ctxs args inh chn
       = withTwo app args f inh chn
       where
       f u t chn
-        # (syn, chn`) = exprCata mkGraphAlg t inh {chn & chn_graph = emptyGraphWithLastId (getLastId chn.chn_graph)}
-        # g`          = chn`.chn_graph
-        # chn         = {chn` & chn_graph = setLastId chn.chn_graph (getLastId chn`.chn_graph)}
-        # (ud, menv)  = ppExpression u chn.chn_module_env
-        # chn         = {chn & chn_module_env = menv}
-        # (lid, g)    = addNode (mkGNode (GAssign (ppCompact ud) (Subgraph g`))) chn.chn_graph
-        # chn         = {chn & chn_graph = g}
-        = case syn.syn_node_id of
-            Just r
-              # g = addEmptyEdge (r, lid) chn.chn_graph
-              = annotExpr r app Nothing Nothing inh {chn & chn_graph = g} syn
-            _ = edgeErr "assign edge" (Just lid) u Nothing t chn
+        # (syn, chn) = exprCata mkGraphAlg t {inh & inh_ids = inh.inh_ids ++ [0]} chn
+        // TODO Complex user parsing
+        # (ud, menv) = ppExpression u chn.chn_module_env
+        # chn        = {chn & chn_module_env = menv}
+        = case syn.syn_texpr of
+            Just texpr
+              -> annotExpr app Nothing Nothing inh chn {syn & syn_texpr = Just (TAssign (TUUserWithIdent (ppCompact ud)) (T texpr))}
+            _ -> abort "mkAssign: no texpr for rhs"
 
     // TODO : Implement this correctly
     mkStep app ctxs args inh chn
       = withTwo app args f inh chn
       where
       f l r chn
-        # (syn, chn) = exprCata mkGraphAlg l inh chn
+        # (syn, chn) = exprCata mkGraphAlg l {inh & inh_ids = inh.inh_ids ++ [0]} chn
         = case r of
             (arg=:(App _))
               | exprIsListConstr arg
                   # exprs           = fromStatic arg
-                  # (star1id, g)    = addNode (mkGNode GStepStar) chn.chn_graph
-                  # (star2id, g)    = addNode (mkGNode GStepStar) g
-                  # chn             = {chn & chn_graph = g}
+                  //# (star1id, g)    = addNode (mkGNode GStepStar) chn.chn_graph
+                  //# (star2id, g)    = addNode (mkGNode GStepStar) g
+                  //# chn             = {chn & chn_graph = g}
                   # (gs, syns, chn) = let f e=:(App a=:{app_args=[App btnOrCont:es]}) (gs, syns, chn)
                                             | appFunName a == "OnAction"
                                             # action = extractAction btnOrCont
@@ -442,17 +308,17 @@ mkGraphAlg
                                                     # ((funArgs, _), menv) = reifyArgsAndDef fargApp.app_symb menv
                                                     # ([a:as], menv)       = mapSt ppFreeVar funArgs menv
                                                     # chn                  = {chn & chn_module_env = menv}
-                                                    # (seId, g)            = addNode (mkGNode (GStepElem (StepOnAction action StepIfValue))) chn.chn_graph
-                                                    # (cndId, g)           = addNode (mkGNode (GStepCond {tifv_funName = appFunName fargApp, tifv_args = map ppCompact [a:as]})) g
-                                                    # g                    = addEdge (mkEdge (ppCompact a)) (seId, cndId) g
-                                                    # chn                  = {chn & chn_graph = g}
-                                                    = (seId, (syn, chn))
+                                                    //# (seId, g)            = addNode (mkGNode (GStepElem (StepOnAction action StepIfValue))) chn.chn_graph
+                                                    //# (cndId, g)           = addNode (mkGNode (GStepCond {tifv_funName = appFunName fargApp, tifv_args = map ppCompact [a:as]})) g
+                                                    //# g                    = addEdge (mkEdge (ppCompact a)) (seId, cndId) g
+                                                    //# chn                  = {chn & chn_graph = g}
+                                                    = (0, (syn, chn))
                                                   "always"
                                                     # [t:_]      = contApp.app_args // TODO This too
                                                     # (syn, chn) = exprCata mkGraphAlg t inh chn
-                                                    # (seId, g)  = addNode (mkGNode (GStepElem (StepOnAction action StepAlways))) chn.chn_graph
-                                                    # chn        = {chn & chn_graph = g}
-                                                    = (seId, (syn, chn))
+                                                    //# (seId, g)  = addNode (mkGNode (GStepElem (StepOnAction action StepAlways))) chn.chn_graph
+                                                    //# chn        = {chn & chn_graph = g}
+                                                    = (0, (syn, chn))
                                             = ([seId:gs], [syn:syns], chn)
                                             | appFunName a == "OnValue"
                                             // TODO : Implement
@@ -465,7 +331,7 @@ mkGraphAlg
                                             = (gs, syns, chn)
                                           f _ (gs, syns, chn) = (gs, syns, chn)
                                       in  foldr f ([], [], chn) exprs
-                  = annotExpr star1id app Nothing Nothing inh chn (mkSingleIdSynExpr (Just star1id))
+                  = annotExpr app Nothing Nothing inh chn (mkSynExpr (App app))
               //| otherwise
                   //# (n, g) = addNode (mkGNode (GStep [])) chn.chn_graph // TODO
                   //= (mkSingleIdSynExpr (Just n), {chn & chn_graph = g})
@@ -476,37 +342,16 @@ mkGraphAlg
               //# (mod, menv) = (chn.chn_module_env)!me_icl_module
               //# chn         = {chn & chn_module_env = menv}
               //= annotExpr nid app Nothing (Just (App app)) inh chn (mkSingleIdSynExpr (Just nid))
-            _ = ({syn & syn_annot_expr = Just (App app)}, chn)
+            _ = (mkSynExpr (App app), chn)
       extractAction app=:{app_args=[BasicExpr (BVS str):_]}
         | app.app_symb.symb_ident.id_name == "Action" = str
       extractAction _ = "(no action)"
 
-
-
-
-        //# (synl, chnl) = exprCata mkGraphAlg l inh chn
-        //// The second argument to step can be any list; a hardcoded list, a list comprehension, a reference to a list constant or a list function, you name it....
-        //// For example, in the case of a list comprehension, would we generate subgraphs in the comprehsion body?
-        //// If it is a function/constant, we should reify it and inline it
-        //# (synr, chnr) = exprCata mkGraphAlg r inh chnl // TODO: This needs heavy work; is completely wrong, copied from mkbinapp
-        //= case (synl.syn_node_id, synr.syn_node_id) of
-            //(Just l, Just r)
-              //# g = addEdge emptyEdge (l, r) chnr.chn_graph
-              //= annotExpr l app Nothing Nothing inh { chnr & chn_graph = g} synr
-            //(lid, rid)
-              //= edgeErr "step edge" lid l rid r chnr
-        //// TODO : If there are no two elems in the list, the expr is eta-reduced, so we need to pprint it instead of throwing an error
-
     mkTaskApp app ctxs args inh chn
-      # (mn, chn)  = getModuleName chn
       # (ps, menv) = mapSt ppExpression args chn.chn_module_env
-      //# menv       = trace_n ("\nmkTaskApp trace:\n" +++ foldr (\x xs -> ppCompact x +++ xs) "" ps +++ "\n") menv
       # chn        = {chn & chn_module_env = menv}
-      # appArgs    = map ppCompact ps  // TODO: When do we pprint a Clean expr? And when do we generate a subgraph?
-      # (an, g)    = addNodeWithIndex (\ni -> { GNode
-                                              | nodeType = GTaskApp {taskApp_taskName = appFunName app, taskApp_args = appArgs}
-                                              }) chn.chn_graph
-      = annotExpr an app Nothing Nothing inh { chn & chn_graph = g } (mkSingleIdSynExpr (Just an))
+      # appArgs    = map ppCompact ps  // TODO : When do we pprint a Clean expr? And when do we generate a subgraph?
+      = annotExpr app Nothing Nothing inh chn {syn_annot_expr = App app, syn_texpr = Just (TTaskApp inh.inh_ids (appFunName app) appArgs)}
 
     mkTransform app ctxs args inh chn
       = withTwo app args f inh chn
@@ -515,31 +360,26 @@ mkGraphAlg
         # (syn, chn)           = exprCata mkGraphAlg l inh chn
         # (ppl, menv)          = mapSt ppExpression app_args chn.chn_module_env
         # ((funArgs, _), menv) = reifyArgsAndDef app_symb menv
-        # ([_:a:as], menv)     = mapSt ppFreeVar funArgs menv
+        # ([_:a:as], menv)     = mapSt ppFreeVar funArgs menv // FIXME : Dirty patter matching
         # chn                  = {chn & chn_module_env = menv}
-        # (an, g)              = addNodeWithIndex (\ni -> { GNode
-                                                          | nodeType = GTransform app_symb.symb_ident.id_name (map ppCompact (ppl ++ [a:as]))
-                                                          }) chn.chn_graph
-        = case syn.syn_node_id of
-            Just nid
-              # g = addEdge (mkEdge (ppCompact a)) (nid, an) g
-              = annotExpr an app Nothing Nothing inh { chn & chn_graph = g } (mkSingleIdSynExpr (Just nid))
-            _ = ({mkSynExpr & syn_annot_expr = Just (App app)}, chn)
+        = case syn.syn_texpr of
+            Just t -> ({syn_annot_expr = App app, syn_texpr = Just (TTransform (T t) (ppCompact a) (map ppCompact (ppl ++ [a:as]))) }, chn)
+            _      -> (mkSynExpr (App app), chn)
 
-    mkParBinApp app ctxs args join inh chn
+    mkParBinApp app ctxs args t inh chn
       = withTwo app args f inh chn
       where
       f l r chn
-        # (synr, chnr) = exprCata mkGraphAlg r inh {chn & chn_graph = emptyGraphWithLastId (getLastId chn.chn_graph)}
-        # g            = addStartStop synr.syn_node_id chnr.chn_graph
-        # (synl, chnl) = exprCata mkGraphAlg l inh {chnr & chn_graph = emptyGraphWithLastId (getLastId chnr.chn_graph)}
-        # g            = addStartStop synl.syn_node_id chnl.chn_graph
-        # (pid, g)     = addNode (mkGNode (GParallel join [Subgraph chnl.chn_graph, Subgraph chnr.chn_graph])) (setLastId chn.chn_graph (getLastId chnl.chn_graph))
-        = case (synl.syn_node_id, synr.syn_node_id) of
-            (Just _, Just _)
-              = annotExpr pid app Nothing Nothing inh { chnl & chn_graph = g} (mkSingleIdSynExpr (Just pid))
-            (lid, rid)
-              = edgeErr "bin app edge" lid l rid r chnl
+        # (synr, chnr) = exprCata mkGraphAlg r inh chn // & chn_graph = emptyGraphWithLastId (getLastId chn.chn_graph)}
+        //# g            = addStartStop synr.syn_node_id chnr.chn_graph
+        # (synl, chnl) = exprCata mkGraphAlg l inh chnr // {chnr & chn_graph = emptyGraphWithLastId (getLastId chnr.chn_graph)}
+        //# g            = addStartStop synl.syn_node_id chnl.chn_graph
+        //# (pid, g)     = addNode (mkGNode (GParallel join [Subgraph chnl.chn_graph, Subgraph chnr.chn_graph])) (setLastId chn.chn_graph (getLastId chnl.chn_graph))
+        //= case (synl.syn_node_id, synr.syn_node_id) of
+            //(Just _, Just _)
+        = annotExpr app Nothing Nothing inh chnl (mkSynExpr (App app))
+            //(lid, rid)
+              //= edgeErr "bin app edge" lid l rid r chnl
         // TODO : If there are no two elems in the list, the expr is eta-reduced, so we need to pprint it instead of throwing an error
 
     // TODO : Can be eta-reduced
@@ -550,35 +390,44 @@ mkGraphAlg
     // a more detailed graph with content. Only in that case, there is just one
     // new node (and not even a chain of nodes). We know exactly how many nodes
     // we will get and can therefore link to the join node
-    mkParListApp app ctxs args join inh chn
+    mkParListApp app ctxs args t inh chn
       = case args of
-          [arg=:(App app):_]
+          [arg=:(App _):_]
             | exprIsListConstr arg
-                # exprs          = fromStatic arg
-                # (aes, gs, chn) = let f e (xs, gs, chn)
-                                         # (syn, chn`) = exprCata mkGraphAlg e inh {chn & chn_graph = emptyGraphWithLastId (getLastId chn.chn_graph)}
-                                         # aes         = case syn.syn_annot_expr of
-                                                           Just ae -> [ae:xs]
-                                                           _       -> xs
-                                         //= (aes, [NodeTaskApp chn`.chn_graph :gs], {chn` & chn_graph = setLastId chn.chn_graph (getLastId chn`.chn_graph)})
-                                         = (aes, [VarOrExpr "TODO mkParListApp isList" :gs], {chn` & chn_graph = setLastId chn.chn_graph (getLastId chn`.chn_graph)})
-                                    in  foldr f ([], [], chn) exprs
-                # (pid, g)       = addNode (mkGNode (GParallel join gs)) chn.chn_graph
-                = annotExpr pid app Nothing (Just exprs) inh {chn & chn_graph = g} (mkSingleIdSynExpr (Just pid))
+                # exprs        = fromStatic arg
+                # (ss, _, chn) = let f e (ss, n, chn)
+                                      # (syn, chn) = exprCata mkGraphAlg e {inh & inh_ids = inh.inh_ids ++ [n]} chn
+                                      = ([syn:ss], n + 1, chn)
+                                 in  foldr f ([], 0, chn) exprs
+                # (listArg, pdss) = toStatic (map (\s -> s.syn_annot_expr) ss) chn.chn_predef_symbols
+                # tExpr = case (t, map (\s -> s.syn_texpr) ss) of // TODO Bah
+                            ("suml", [Just l:Just r:_])
+                              = ParSum (T (ParSumL (T l) (T r)))
+                            ("sumr", [Just l:Just r:_])
+                              = ParSum (T (ParSumR (T l) (T r)))
+                            ("sumn", ss`)
+                              = ParSum (T (ParSumN (T (map fromJust ss`)))) // TODO Bah
+                            ("prod", ss`)
+                              = ParProd (T (map fromJust ss`)) // TODO Bah
+                = ({syn_annot_expr = App {app & app_args = [listArg]}, syn_texpr = Just (TParallel tExpr)}, {chn & chn_predef_symbols = pdss}) // annotExpr app Nothing (Just exprs) inh chn (mkSynExpr (App app))
             | otherwise
-                # (n, g) = addNode (mkGNode (GParallel join [VarOrExpr "TODO mkParListApp otherwise"])) chn.chn_graph
-                = (mkSingleIdSynExpr (Just n), {chn & chn_graph = g})
-            //| isListCompr app.app_symb.symb_ident.id_name
-                //# (lc, menv) = sugarListCompr app chn.chn_module_env
-                //# (nid, g)   = addNode (mkGNode (GListComprehension lc)) (emptyGraphWithLastId (getLastId chn.chn_graph))
-                //# (pid, g)   = addNode (mkGNode (GParallel join [Subgraph g])) chn.chn_graph
-                //= annotExpr pid app Nothing Nothing inh {chn & chn_graph = g, chn_module_env = menv} (mkSingleIdSynExpr (Just pid))
-          [vararg=:(Var bv):as] // TODO test
-            # (syn, chn)  = exprCata mkGraphAlg vararg inh chn
-            = case syn.syn_node_id of
-                Just nid
-                  = annotExpr nid app Nothing (Just [App app]) inh chn (mkSingleIdSynExpr (Just nid))
-                _ = ({mkSynExpr & syn_annot_expr = Just (App app)}, chn)
+                # (doc, menv) = ppExpression arg chn.chn_module_env
+                # ppStr       = ppCompact doc
+                # chn         = {chn & chn_module_env = menv}
+                # tExpr = case t of // TODO Bah
+                            "prod"
+                              = ParProd (PP ppStr)
+                            _ = ParSum (PP ppStr)
+                = ({syn_annot_expr = App app, syn_texpr = Just (TParallel tExpr)}, chn)
+          [arg=:(Var _):_] // TODO test
+            # (doc, menv) = ppExpression arg chn.chn_module_env
+            # ppStr       = ppCompact doc
+            # chn         = {chn & chn_module_env = menv}
+            # tExpr = case t of // TODO Bah
+                        "prod"
+                          = ParProd (PP ppStr)
+                        _ = ParSum (PP ppStr)
+            = ({syn_annot_expr = App app, syn_texpr = Just (TParallel tExpr)}, chn)
 
   // Transformation for higher-order function application
   // E.g. f g x = g x becomes f = g @ x
@@ -602,14 +451,14 @@ mkGraphAlg
         # letargs       = drop (length app.app_args) (getFunArgs fd)
         # (binds, menv) = zipWithSt zwf letargs es menv
         # chn           = { chn & chn_module_env = menv }
-        # (lid, g)      = addNode (mkGNode (GLet {GLet | glet_binds = binds})) chn.chn_graph
-        # (syne, chn)   = exprCata mkGraphAlg (getFunRhs fd) inh { chn & chn_graph = g }
-        # g             = case syne.syn_node_id of
-                            Just eid -> addEmptyEdge (lid, eid) chn.chn_graph
-                            _        -> chn.chn_graph
+        //# (lid, g)      = addNode (mkGNode (GLet {GLet | glet_binds = binds})) chn.chn_graph
+        # (syne, chn)   = exprCata mkGraphAlg (getFunRhs fd) inh chn // { chn & chn_graph = g }
+        //# g             = case syne.syn_node_id of
+                            //Just eid -> addEmptyEdge (lid, eid) chn.chn_graph
+                            //_        -> chn.chn_graph
         # menv          = updateWithAnnot app.app_symb syne.syn_annot_expr chn.chn_module_env
-        # chn           = { chn & chn_module_env = menv, chn_graph = g }
-        = ({mkSingleIdSynExpr (Just lid) & syn_annot_expr = Just (e @ es)}, chn)
+        # chn           = { chn & chn_module_env = menv} //, chn_graph = g }
+        = (mkSynExpr (e @ es), chn)
     | otherwise    =  abort "atC: otherwise case" // TODO : pretty print function application
     where
       zwf eVar eVal menv
@@ -617,7 +466,7 @@ mkGraphAlg
         # (fvr, menv) = ppExpression eVal menv
         = ((ppCompact fvl, ppCompact fvr), menv)
 
-  atC e es _ chn = ({mkSynExpr & syn_annot_expr = Just (e @ es)}, chn)
+  atC e es _ chn = (mkSynExpr (e @ es), chn)
   //atC _ _ _ _ = abort "atC: something else than App"
 
   //atC (Var _)                       _ _ _ = abort "atC: var"
@@ -653,23 +502,17 @@ mkGraphAlg
     where
     mkLet (Just expr) lt inh chn
       # (syn, chn) = exprCata mkGraphAlg lt.let_expr {inh & inh_case_expr = Just expr } chn
-      # l          = case syn.syn_annot_expr of
-                       Just ae -> {lt & let_expr = ae}
-                       _       -> lt
-      = ({syn & syn_annot_expr = Just (Let l)}, chn)
+      # l          = {lt & let_expr = syn.syn_annot_expr}
+      = ({syn & syn_annot_expr = Let l}, chn)
     mkLet Nothing lt inh chn
       # (binds, menv) = mkGLetBinds lt chn.chn_module_env
-      # (lid, g)      = addNode (mkGNode (GLet {GLet | glet_binds = binds})) chn.chn_graph
       // TODO : Represent the bindings in any way possible, not just PP
-      # (syn, chn)    = exprCata mkGraphAlg lt.let_expr inh {chn & chn_graph = g, chn_module_env = menv}
-      = case syn.syn_node_id of
-          Just n
-            # g = addEmptyEdge (lid, n) chn.chn_graph
-            # l = case syn.syn_annot_expr of
-                    Just ae -> {lt & let_expr = ae}
-                    _       -> lt
-            = ({syn & syn_annot_expr = Just (Let l)}, {chn & chn_graph = g})
-          _ = abort "Failed to add let edge; no synthesized ID from let body"
+      # (syn, chn)    = exprCata mkGraphAlg lt.let_expr inh {chn & chn_module_env = menv}
+      # l = {lt & let_expr = syn.syn_annot_expr}
+      # t = case syn.syn_texpr of
+              Just t -> T t
+              _      -> PP "TODO: PP the expression insted"
+      = ({syn & syn_annot_expr = Let l, syn_texpr = Just (TLet binds t)}, chn)
 
   // TODO: For cases, the compiler introduces a fresh variable in a let for the
   // matches expression. E.g.
@@ -698,17 +541,15 @@ mkGraphAlg
   caseC cs inh chn
     # inh           = {inh & inh_case_expr = Nothing }
     # (ed, menv)    = ppExpression caseExpr chn.chn_module_env
-    # (ni, g)       = addNode (mkGNode (GDecision CaseDecision (ppCompact ed))) chn.chn_graph
-    # (guards, chn) = mkAlts ni cs.case_guards {chn & chn_module_env = menv, chn_graph = g}
+    //# (ni, g)       = addNode (mkGNode (GDecision CaseDecision (ppCompact ed))) chn.chn_graph
+    # (guards, chn) = mkAlts 0 cs.case_guards {chn & chn_module_env = menv} //, chn_graph = g}
     # (def, chn)    = case cs.case_default of
                         Yes def
-                          # (syn, chn) = mkAlts` ni ('PPrint'.text "_") def chn
-                          = case syn.syn_annot_expr of
-                              Just e -> (Yes e, chn)
-                              _      -> (No, chn)
+                          # (syn, chn) = mkAlts` 0 ('PPrint'.text "_") def chn
+                          = (Yes syn.syn_annot_expr, chn)
                         _ = (No, chn)
     # cs`           = {cs & case_default = def, case_guards = guards}
-    = ({mkSingleIdSynExpr (Just ni) & syn_annot_expr = Just (Case cs`)}, chn)
+    = (mkSynExpr (Case cs`), chn)
     where
     caseExpr = fromMaybe cs.case_expr inh.inh_case_expr
     mkAlts ni c=:(AlgebraicPatterns gi aps) chn
@@ -719,10 +560,8 @@ mkGraphAlg
           # menv        = chn.chn_module_env
           # (apd, menv) = mkAp ap.ap_symbol ap.ap_vars menv
           # chn         = {chn & chn_module_env = menv}
-          # (syn, chn)  = mkAlts` ni apd ap.ap_expr chn
-          # ap          = case syn.syn_annot_expr of
-                            Just e -> {ap & ap_expr = e}
-                            _      -> ap
+          # (syn, chn)  = mkAlts` 0 apd ap.ap_expr chn
+          # ap          = {ap & ap_expr = syn.syn_annot_expr}
           = ([ap:aps], chn)
           where
           mkAp sym []   menv = ('PPrint'.text sym.glob_object.ds_ident.id_name, menv)
@@ -738,9 +577,7 @@ mkGraphAlg
           # (bvd, menv) = ppBasicValue bp.bp_value menv
           # chn         = {chn & chn_module_env = menv}
           # (syn, chn)  = mkAlts` ni bvd bp.bp_expr chn
-          # bp          = case syn.syn_annot_expr of
-                            Just e -> {bp & bp_expr = e}
-                            _      -> bp
+          # bp          = {bp & bp_expr = syn.syn_annot_expr}
           = ([bp:bps], chn)
     mkAlts ni c chn = (c, chn)
 
@@ -750,101 +587,27 @@ mkGraphAlg
       # menv       = chn.chn_module_env
       # (d, menv)  = ppExpression expr menv
       # chn        = {chn & chn_module_env = menv}
-      # g          = addEdge (mkEdge (ppCompact lblDoc)) (ni, fromMaybe (trace_n (ppCompact d) abort "Failed to add edge from decision node to branch") syn.syn_node_id) chn.chn_graph
-      = (syn, {chn & chn_graph = g})
+      //# g          = addEdge (mkEdge (ppCompact lblDoc)) (ni, fromMaybe (trace_n (ppCompact d) abort "Failed to add edge from decision node to branch") syn.syn_node_id) chn.chn_graph
+      = (syn, chn) // {chn & chn_graph = g})
 
   // TODO Determine whether it's a Task a or [Task a]
   // We can do so by maintaining an environment. At lets and lambdas, store the bound variable and its type in the env
   varC bv inh chn
     # (isTask, chn) = varIsTask bv.var_info_ptr chn
-    # (mn, chn)     = getModuleName chn
-    # (nid, g)      = addNodeWithIndex (\ni -> { GNode
-                                               | nodeType = GVar bv.var_ident.id_name
-                                               }) chn.chn_graph
-    # syn           = mkSingleIdSynExpr (Just nid)
-    # chn           = {chn & chn_graph = g}
-    = case isTask of
-        True
-          = ({syn & syn_annot_expr = Just (Var bv)}, chn)
-        _ = (syn, chn)
-
-/*
-
-a >>| b >>| c
-
-==
-
-(>>|) ((>>|) a b) c
-
-==
-
-(>>|)
-  ((>>|)
-    a
-    b)
-  c
-
-~
-
-a -- b -- c
-
-b: pred a, succ c
-
-*/
-
-nodeErr :: (Maybe Int) Expression *ChnExpression -> *(String, *ChnExpression)
-nodeErr mn expr chn
-  # (doc, menv) = ppExpression expr chn.chn_module_env
-  # chn = { chn & chn_module_env = menv}
-  = (ppCompact doc +++ "\n" +++
-    (maybe "for which its ID is unknown" (\n -> "with node ID " +++ toString n) mn)
-    , chn)
-
-addEmptyEdge :: (Int,Int) u:GinGraph -> v:GinGraph, [u <= v]
-addEmptyEdge e g = addEdge emptyEdge e g
-
-addNode` :: GNode Expression *ChnExpression -> *(SynExpression, *ChnExpression)
-addNode` node annot chn
-  # (n, g) = addNode node chn.chn_graph
-  = (mkSingleIdSynExpr (Just n), { chn & chn_graph = g })
+    | isTask    = ({syn_annot_expr = Var bv, syn_texpr = Just (TVar bv.var_ident.id_name)}, chn)
+    | otherwise = ({syn_annot_expr = Var bv, syn_texpr = Just (TVar bv.var_ident.id_name)}, chn)
 
 // TODO: We need to split this up: one part of this should generate the graph
 // for the FunDef and the other part should generate the init and stop nodes.
 // Yet another part should just get the right-hand side Expression of a FunDef
 // so we can just cata it.
-funToGraph :: FunDef *ModuleEnv *Heaps *PredefinedSymbols -> *(([(VariableName, TypeName)], Maybe GinGraph, Maybe Expression), *ModuleEnv, *Heaps, *PredefinedSymbols)
+funToGraph :: FunDef *ModuleEnv *Heaps *PredefinedSymbols -> *(([(VariableName, TypeName)], Maybe TExpr, Maybe Expression), *ModuleEnv, *Heaps, *PredefinedSymbols)
 funToGraph fd=:{fun_ident=fun_ident, fun_body = TransformedBody tb} menv heaps predef_symbols = mkBody
   where
   mkBody
     # inh        = mkInhExpr fun_ident.id_name
-    # chn        = mkChnExpr emptyGraph predef_symbols menv heaps
+    # chn        = mkChnExpr predef_symbols menv heaps
     # (syn, chn) = exprCata mkGraphAlg tb.tb_rhs inh chn
-    # g          = addStartStop syn.syn_node_id chn.chn_graph
-    = ( (map (\(arg, ty) -> (arg.fv_ident.id_name, ppType ty)) (zip2 tb.tb_args (funArgTys fd)), Just g, syn.syn_annot_expr)
+    = ( (map (\(arg, ty) -> (arg.fv_ident.id_name, ppType ty)) (zip2 tb.tb_args (funArgTys fd)), syn.syn_texpr, Just syn.syn_annot_expr) //Just g, syn.syn_annot_expr)
       , chn.chn_module_env, chn.chn_heaps, chn.chn_predef_symbols)
 funToGraph _ menv heaps predef_symbols = (([], Nothing, Nothing), menv, heaps, predef_symbols)
-
-addStartStop eid g
-  # (initId, g)  = addNode (mkGNode GInit) g
-  # g            = maybe g (\firstId -> addEmptyEdge (initId, firstId) g) eid
-  # leafs        = leafNodes g
-  # (stopId, g)  = addNode (mkGNode GStop) g
-  = foldr (\nid g_ -> addEmptyEdge (nid, stopId) g_) g leafs
-
-instance toString GNode where
-	toString n = toString n.nodeType
-
-instance toString GNodeType where
-  toString GInit = "GInit"
-  toString GStop = "GStop"
-  toString (GDecision _ _) = "GDecision"
-  toString (GLet _) = "GLet"
-  //toString GParallelSplit = "GParallelSplit"
-  //toString (GParallelJoin _) = "GParallelJoin"
-  toString (GTaskApp _) = "GTaskApp"
-  toString (GReturn _) = "GReturn"
-  toString (GAssign _ _) = "GAssign"
-  //toString (GStep _) = "GStep"
-  //toString (GListComprehension _) = "GListComprehension"
-  toString (GVar _) = "GVar"
-

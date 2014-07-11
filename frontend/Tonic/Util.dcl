@@ -88,13 +88,13 @@ getFunArgs :: FunDef -> [FreeVar]
 
 getFunRhs :: FunDef -> Expression
 
-updateWithAnnot :: SymbIdent (Maybe Expression) *ModuleEnv -> *ModuleEnv
+updateWithAnnot :: SymbIdent Expression *ModuleEnv -> *ModuleEnv
 
 updateFunRhs :: Index !*{#FunDef} Expression -> !*{#FunDef}
 
-emptyEdge :: GEdge
+//emptyEdge :: GEdge
 
-mkEdge :: String -> GEdge
+//mkEdge :: String -> GEdge
 
 getLetBinds :: Let -> [LetBind]
 

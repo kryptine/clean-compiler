@@ -262,10 +262,10 @@ fdArrToMap :: .{#FunDef} -> Map String FunDef
 fdArrToMap fds = fromList [(d.fun_ident.id_name, d) \\ d <-: fds]
 
 isCons :: String -> Bool
-isCons str = str == "_Cons"
+isCons str = str == PD_ConsSymbol_String
 
 isNil :: String -> Bool
-isNil str = str == "_Nil"
+isNil str = str == PD_NilSymbol_String
 
 appIsList :: App -> Bool
 appIsList app = isCons ident || isNil ident
@@ -424,8 +424,8 @@ getFunRhs :: FunDef -> Expression
 getFunRhs {fun_body = TransformedBody tb} = tb.tb_rhs
 getFunRhs _                               = abort "getFunRhs: need a TransformedBody"
 
-updateWithAnnot :: SymbIdent (Maybe Expression) *ModuleEnv -> *ModuleEnv
-updateWithAnnot si (Just expr) menv =
+updateWithAnnot :: SymbIdent Expression *ModuleEnv -> *ModuleEnv
+updateWithAnnot si expr menv =
   case (symbIdentModuleIdx si, symbIdentObjectIdx si) of
     (Just midx, Just oidx) -> if (midx == menv.me_main_dcl_module_n)
                                 (doUpdate oidx)
@@ -436,7 +436,6 @@ updateWithAnnot si (Just expr) menv =
     # fds = menv.me_fun_defs
     # fds = updateFunRhs oidx fds expr
     = {menv & me_fun_defs = fds}
-updateWithAnnot _ _ menv = menv
 
 updateFunRhs :: Index !*{#FunDef} Expression -> !*{#FunDef}
 updateFunRhs idx fun_defs e
@@ -450,11 +449,11 @@ updateFunRhs idx fun_defs e
         = { fun_defs & [idx] = fd}
       _ = fun_defs
 
-emptyEdge :: GEdge
-emptyEdge = {GEdge | edge_pattern = Nothing }
+//emptyEdge :: GEdge
+//emptyEdge = {GEdge | edge_pattern = Nothing }
 
-mkEdge :: String -> GEdge
-mkEdge str = {GEdge | edge_pattern = Just str }
+//mkEdge :: String -> GEdge
+//mkEdge str = {GEdge | edge_pattern = Just str }
 
 getLetBinds :: Let -> [LetBind]
 getLetBinds lt = lt.let_strict_binds ++ lt.let_lazy_binds

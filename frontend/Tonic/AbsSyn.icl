@@ -35,65 +35,29 @@ exprCata alg (EE                          ) inh chn = alg.ee inh chn
 exprCata alg (NoBind eip                  ) inh chn = alg.noBind eip inh chn
 exprCata alg (FailExpr i                  ) inh chn = alg.failExpr i inh chn
 
-mkExprAlg :: syn -> *ExpressionAlg inh *chn syn
-mkExprAlg syn =
-  {  ExpressionAlg
-  |  var                   = \_           inh chn -> (syn, chn)
-  ,  app                   = \_           inh chn -> (syn, chn)
-  ,  at                    = \_ _         inh chn -> (syn, chn)
-  ,  letE                  = \_           inh chn -> (syn, chn)
-  ,  caseE                 = \_           inh chn -> (syn, chn)
-  ,  selection             = \_ _ _       inh chn -> (syn, chn)
-  ,  update                = \_ _ _       inh chn -> (syn, chn)
-  ,  recordUpdate          = \_ _ _       inh chn -> (syn, chn)
-  ,  tupleSelect           = \_ _ _       inh chn -> (syn, chn)
-  ,  basicExpr             = \_           inh chn -> (syn, chn)
-  ,  conditional           = \_           inh chn -> (syn, chn)
-  ,  anyCodeExpr           = \_ _ _       inh chn -> (syn, chn)
-  ,  abcCodeExpr           = \_ _         inh chn -> (syn, chn)
-  ,  matchExpr             = \_ _         inh chn -> (syn, chn)
-  ,  isConstructor         = \_ _ _ _ _ _ inh chn -> (syn, chn)
-  ,  freeVar               = \_           inh chn -> (syn, chn)
-  ,  dictionariesFunction  = \_ _ _       inh chn -> (syn, chn)
-  ,  constant              = \_ _ _       inh chn -> (syn, chn)
-  ,  classVariable         = \_           inh chn -> (syn, chn)
-  ,  dynamicExpr           = \_           inh chn -> (syn, chn)
-  ,  typeCodeExpression    = \_           inh chn -> (syn, chn)
-  ,  typeSignature         = \_ _         inh chn -> (syn, chn)
-  ,  ee                    = \            inh chn -> (syn, chn)
-  ,  noBind                = \_           inh chn -> (syn, chn)
-  ,  failExpr              = \_           inh chn -> (syn, chn)
-  }
-
 mkInhExpr :: String -> InhExpression
 mkInhExpr ctn =
   { InhExpression
   | inh_curr_task_name = ctn
   , inh_case_expr      = Nothing
   , inh_is_bind_lam    = False
+  , inh_ids            = [0]
   }
 
-mkChnExpr :: *GinGraph *PredefinedSymbols *ModuleEnv *Heaps -> *ChnExpression
-mkChnExpr gg predef_symbols menv heaps =
+mkChnExpr :: *PredefinedSymbols *ModuleEnv *Heaps -> *ChnExpression
+mkChnExpr predef_symbols menv heaps =
   { ChnExpression
-  | chn_graph          = gg
-  , chn_module_env     = menv
+  | //chn_graph          = gg
+    chn_module_env     = menv
   , chn_predef_symbols = predef_symbols
   , chn_heaps          = heaps
   }
 
-mkSynExpr :: SynExpression
-mkSynExpr =
+mkSynExpr :: Expression -> SynExpression
+mkSynExpr e =
   { SynExpression
-  | syn_node_id    = Nothing
-  , syn_annot_expr = Nothing
-  }
-
-mkSingleIdSynExpr :: (Maybe Int) -> SynExpression
-mkSingleIdSynExpr n =
-  { SynExpression
-  | syn_node_id    = n
-  , syn_annot_expr = Nothing
+  | syn_texpr      = Nothing
+  , syn_annot_expr = e
   }
 
 mkModuleEnv :: ModuleN !*{#FunDef} IclModule {#DclModule} -> *ModuleEnv
