@@ -458,18 +458,21 @@ updateFunRhs idx fun_defs e
 getLetBinds :: Let -> [LetBind]
 getLetBinds lt = lt.let_strict_binds ++ lt.let_lazy_binds
 
-mkGLetBinds :: Let *ModuleEnv -> *([(String, String)], *ModuleEnv)
+mkGLetBinds :: Let *ModuleEnv -> *([(String, PPOr TExpr)], *ModuleEnv)
 mkGLetBinds lt menv
   = foldrSt f (getLetBinds lt) ([], menv)
   where f bnd (xs, menv)
           # (pprhs, menv) = ppExpression bnd.lb_src menv
-          = ([(bnd.lb_dst.fv_ident.id_name, ppCompact pprhs):xs], menv)
+          = ([(bnd.lb_dst.fv_ident.id_name, PP (ppCompact pprhs)):xs], menv)
 
 foldrSt :: !(.a -> .(.st -> .st)) ![.a] !.st -> .st
 foldrSt op l st = foldr_st l
   where
     foldr_st []     = st
     foldr_st [a:as] = op a (foldr_st as)
+
+addInhId :: InhExpression Int -> InhExpression
+addInhId inh n = {inh & inh_ids = inh.inh_ids ++ [n]}
 
 predefIsUndefined :: PredefinedSymbol -> Bool
 predefIsUndefined pds = pds.pds_def == NoIndex || pds.pds_module == NoIndex

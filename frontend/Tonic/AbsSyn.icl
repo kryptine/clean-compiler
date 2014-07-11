@@ -53,13 +53,6 @@ mkChnExpr predef_symbols menv heaps =
   , chn_heaps          = heaps
   }
 
-mkSynExpr :: Expression -> SynExpression
-mkSynExpr e =
-  { SynExpression
-  | syn_texpr      = Nothing
-  , syn_annot_expr = e
-  }
-
 mkModuleEnv :: ModuleN !*{#FunDef} IclModule {#DclModule} -> *ModuleEnv
 mkModuleEnv main_dcl_module_n fun_defs icl_module dcl_modules =
   {  ModuleEnv

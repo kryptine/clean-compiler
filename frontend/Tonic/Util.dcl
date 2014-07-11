@@ -5,6 +5,7 @@ from StdArray import class Array
 from Data.Maybe import :: Maybe
 from Data.Map import :: Map
 import Tonic.AbsSyn
+from iTasks.Framework.Tonic.AbsSyn import :: PPOr
 
 foldrArr :: (a b -> b) b (arr a) -> b | Array arr a
 
@@ -98,7 +99,9 @@ updateFunRhs :: Index !*{#FunDef} Expression -> !*{#FunDef}
 
 getLetBinds :: Let -> [LetBind]
 
-mkGLetBinds :: Let *ModuleEnv -> *([(String, String)], *ModuleEnv)
+mkGLetBinds :: Let *ModuleEnv -> *([(String, PPOr TExpr)], *ModuleEnv)
+
+addInhId :: InhExpression Int -> InhExpression
 
 predefIsUndefined :: PredefinedSymbol -> Bool
 

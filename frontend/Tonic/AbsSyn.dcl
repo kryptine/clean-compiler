@@ -62,7 +62,7 @@ At e es :== e @ es
   }
 
 :: SynExpression =
-  { syn_texpr      :: !Maybe TExpr
+  { syn_texpr      :: !TExpr
   , syn_annot_expr :: !Expression
   }
 
@@ -78,7 +78,5 @@ exprCata :: *(ExpressionAlg inh *chn syn) Expression inh *chn -> *(syn, *chn)
 mkInhExpr :: String -> InhExpression
 
 mkChnExpr :: *PredefinedSymbols *ModuleEnv *Heaps -> *ChnExpression
-
-mkSynExpr :: Expression -> SynExpression
 
 mkModuleEnv :: ModuleN !*{#FunDef} IclModule {#DclModule} -> *ModuleEnv
