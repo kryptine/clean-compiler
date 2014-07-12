@@ -288,36 +288,40 @@ mkGraphAlg
         = case r of
             (arg=:(App _))
               | exprIsListConstr arg
-                  # exprs       = fromStatic arg
-                  # (syns, chn) = let f e=:(App a=:{app_args=[App btnOrCont:es]}) (syns, chn)
-                                        | appFunName a == "OnAction"
-                                        # action = extractAction btnOrCont
-                                        # [App contApp:_] = es // TODO bluh
-                                        # (syn, chn) =
-                                            case appFunName contApp of
-                                              "ifValue"
-                                                # [(App fargApp):t:_]  = contApp.app_args // TODO Bah
-                                                # (syn, chn)           = exprCata mkGraphAlg t inh chn
-                                                # (ps, menv)           = mapSt ppExpression app.app_args chn.chn_module_env
-                                                # ((funArgs, _), menv) = reifyArgsAndDef fargApp.app_symb menv
-                                                # ([a:as], menv)       = mapSt ppFreeVar funArgs menv
-                                                # chn                  = {chn & chn_module_env = menv}
-                                                = (syn, chn)
-                                              "always"
-                                                = exprCata mkGraphAlg (hd contApp.app_args) inh chn
-                                        = ([syn:syns], chn)
-                                        | appFunName a == "OnValue"
-                                        // TODO : Implement
-                                        = (syns, chn)
-                                        | appFunName a == "OnException"
-                                        // TODO : Implement
-                                        = (syns, chn)
-                                        | appFunName a == "OnAllExceptions"
-                                        // TODO : Implement
-                                        = (syns, chn)
-                                      f _ (syns, chn) = (syns, chn)
-                                  in  foldr f ([], chn) exprs
-                  = annotExpr app Nothing Nothing inh chn {syn_annot_expr = App app, syn_texpr = TVar "TODO mkStep"}
+                  # exprs            = fromStatic arg
+                  # (scs, syns, chn) = let f e=:(App a=:{app_args=[App btnOrCont:es]}) (scs, syns, chn)
+                                             | appFunName a == "OnAction"
+                                             # action = extractAction btnOrCont
+                                             # [App contApp:_] = es // TODO bluh
+                                             # (sf, syn, chn) =
+                                                 case appFunName contApp of
+                                                   "ifValue"
+                                                     # [(App fargApp):t:_]  = contApp.app_args // TODO Bah
+                                                     # (syn, chn)           = exprCata mkGraphAlg t inh chn
+                                                     # (ps, menv)           = mapSt ppExpression app.app_args chn.chn_module_env
+                                                     # ((funArgs, _), menv) = reifyArgsAndDef fargApp.app_symb menv
+                                                     # ([a:as], menv)       = mapSt ppFreeVar funArgs menv
+                                                     # chn                  = {chn & chn_module_env = menv}
+                                                     = (IfValue (ppCompact a) (ppCompact a) /*TODO*/ (map ppCompact as) Nothing /*TODO*/ (T syn.syn_texpr), syn, chn)
+                                                   "always"
+                                                     # (syn, chn) = exprCata mkGraphAlg (hd contApp.app_args) inh chn
+                                                     = (Always (T syn.syn_texpr), syn, chn)
+                                             = ([StepOnAction action (T sf):scs], [syn:syns], chn)
+                                             | appFunName a == "OnValue"
+                                             // TODO : Implement
+                                             = (scs, syns, chn)
+                                             | appFunName a == "OnException"
+                                             // TODO : Implement
+                                             = (scs, syns, chn)
+                                             | appFunName a == "OnAllExceptions"
+                                             // TODO : Implement
+                                             = (scs, syns, chn)
+                                           f _ (scs, syns, chn) = (scs, syns, chn)
+                                       in  foldr f ([], [], chn) exprs
+                  # (stArgs, pdss) = toStatic (map (\s -> s.syn_annot_expr) syns) chn.chn_predef_symbols
+                  = ({syn_annot_expr = App {app & app_args = ctxs ++ [synl.syn_annot_expr, stArgs]}
+                    , syn_texpr = TStep (T synl.syn_texpr) (map T scs)}
+                    , {chn & chn_predef_symbols = pdss})
               | otherwise = doPP synl chn arg
             (arg=:(Var _)) = doPP synl chn arg
         where
@@ -325,7 +329,8 @@ mkGraphAlg
           # (doc, menv) = ppExpression arg chn.chn_module_env
           # ppStr       = ppCompact doc
           # chn         = {chn & chn_module_env = menv}
-          = ({syn_annot_expr = App app, syn_texpr = TStep (T synl.syn_texpr) [PP ppStr]}, chn)
+          = ({syn_annot_expr = App {app & app_args = ctxs ++ [synl.syn_annot_expr, arg]}
+            , syn_texpr = TStep (T synl.syn_texpr) [PP ppStr]}, chn)
       extractAction app=:{app_args=[BasicExpr (BVS str):_]}
         | app.app_symb.symb_ident.id_name == "Action" = str
       extractAction _ = "(no action)"
