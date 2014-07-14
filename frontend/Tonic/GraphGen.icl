@@ -234,7 +234,7 @@ mkGraphAlg
         # (synl, chnl)      = exprCata mkGraphAlg lhsExpr (addInhId inh 0) chn
         # (lbl, synr, chnr) = mkEdge rhsApp 1 inh chnl
         = ({ syn_annot_expr = App { app & app_args = ctxs ++ [synl.syn_annot_expr, synr.syn_annot_expr] }
-           , syn_texpr = TBind (T synl.syn_texpr) lbl (T synr.syn_texpr)}, chnr)
+           , syn_texpr = TBind synl.syn_texpr lbl synr.syn_texpr}, chnr)
       f lhsExpr rhsExpr chn
         # (d, menv) = ppExpression rhsExpr chn.chn_module_env
         = ({ syn_annot_expr = App { app & app_args = ctxs ++ [lhsExpr, rhsExpr] }
@@ -275,7 +275,7 @@ mkGraphAlg
         # chn        = {chn & chn_module_env = menv}
         = annotExpr app Nothing Nothing inh chn
           { syn_annot_expr = App {app & app_args = ctxs ++ [u, syn.syn_annot_expr] }
-          , syn_texpr = TAssign (TUUserWithIdent (ppCompact ud)) (T syn.syn_texpr)}
+          , syn_texpr = TAssign (TUUserWithIdent (ppCompact ud)) syn.syn_texpr}
 
     // TODO : Test
     mkStep app ctxs args inh chn
@@ -307,7 +307,7 @@ mkGraphAlg
                                           in  foldr f ([], [], chn, 0) exprs
                   # (stArgs, pdss) = toStatic (map (\s -> s.syn_annot_expr) syns) chn.chn_predef_symbols
                   = ({syn_annot_expr = App {app & app_args = ctxs ++ [synl.syn_annot_expr, stArgs]}
-                    , syn_texpr = TStep (T synl.syn_texpr) (map T scs)}
+                    , syn_texpr = TStep synl.syn_texpr (map T scs)}
                     , {chn & chn_predef_symbols = pdss})
               | otherwise = doPP synl chn arg
             (arg=:(Var _)) = doPP synl chn arg
@@ -317,7 +317,7 @@ mkGraphAlg
           # ppStr       = ppCompact doc
           # chn         = {chn & chn_module_env = menv}
           = ({syn_annot_expr = App {app & app_args = ctxs ++ [synl.syn_annot_expr, arg]}
-            , syn_texpr = TStep (T synl.syn_texpr) [PP ppStr]}, chn)
+            , syn_texpr = TStep synl.syn_texpr [PP ppStr]}, chn)
       extractAction app=:{app_args=[BasicExpr (BVS str):_]}
         | app.app_symb.symb_ident.id_name == "Action" = str
       extractAction _ = "(no action)"
@@ -374,7 +374,7 @@ mkGraphAlg
         # ([_:a:as], menv)     = mapSt ppFreeVar funArgs menv // FIXME : Dirty patter matching
         # chn                  = {chn & chn_module_env = menv}
         = ({ syn_annot_expr = App {app & app_args = ctxs ++ [syn.syn_annot_expr, r]}
-           , syn_texpr = TTransform (T syn.syn_texpr) (ppCompact a) (map ppCompact (ppl ++ [a:as])) }, chn)
+           , syn_texpr = TTransform syn.syn_texpr (ppCompact a) (map ppCompact (ppl ++ [a:as])) }, chn)
 
     mkParSumN = mkParN (\ss -> ParSum (T (ParSumN (T ss))))
 
@@ -519,7 +519,7 @@ mkGraphAlg
       // TODO : Represent the bindings in any way possible, not just PP
       # (syn, chn)    = exprCata mkGraphAlg lt.let_expr inh {chn & chn_module_env = menv}
       # l = {lt & let_expr = syn.syn_annot_expr}
-      = ({syn & syn_annot_expr = Let l, syn_texpr = TLet binds (T syn.syn_texpr)}, chn)
+      = ({syn & syn_annot_expr = Let l, syn_texpr = TLet binds syn.syn_texpr}, chn)
 
   // TODO: For cases, the compiler introduces a fresh variable in a let for the
   // matches expression. E.g.
@@ -554,7 +554,7 @@ mkGraphAlg
                                 _ = ((No, syns), chn)
     # cs`                   = {cs & case_default = def, case_guards = guards}
     = ({ syn_annot_expr = Case cs`
-       , syn_texpr = TCaseOrIf (ppCompact ed) (map (\(d, s) -> (d, T s.syn_texpr)) syns)}, chn)
+       , syn_texpr = TCaseOrIf (ppCompact ed) (map (\(d, s) -> (d, s.syn_texpr)) syns)}, chn)
     where
     caseExpr = fromMaybe cs.case_expr inh.inh_case_expr
     mkAlts c=:(AlgebraicPatterns gi aps) chn
