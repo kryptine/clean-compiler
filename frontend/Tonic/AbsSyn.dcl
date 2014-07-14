@@ -6,7 +6,7 @@ from syntax import :: Expression (..), :: BoundVar, :: App {..}, :: Let, :: Case
   :: Bind, :: Position, :: AType, :: Env, :: Ident, :: Level, :: ExprInfoPtr, :: ExprInfo,
   :: TypeCodeExpression, :: GlobalIndex, :: Conditional, :: BasicValue, :: FieldSymbol,
   :: IclModule, :: DclModule, :: FunDef, :: Optional, :: SymbolType, :: LetBind,
-  :: ModuleN
+  :: ModuleN, :: Type
 from checksupport import :: Heaps
 from Data.Graph import :: Graph
 from Data.Maybe import :: Maybe
@@ -50,8 +50,9 @@ At e es :== e @ es
 :: InhExpression =
   { inh_curr_task_name  :: !String
   , inh_case_expr       :: !Maybe Expression
-  , inh_is_bind_lam     :: Bool
-  , inh_ids             :: ExprId
+  , inh_is_bind_lam     :: !Bool
+  , inh_ids             :: !ExprId
+  , inh_tyenv           :: !Map String Type
   }
 
 :: *ChnExpression =

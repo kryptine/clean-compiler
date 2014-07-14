@@ -230,20 +230,15 @@ mkGraphAlg
     mkBind app ctxs args inh chn
       = withTwo app args f inh chn
       where
-      f lhsExpr rhsExpr chn
-        # (synl, chnl) = exprCata mkGraphAlg lhsExpr (addInhId inh 0) chn
-        # (edgeLbl, (synr, chnr))
-            = case (exprIsLambda rhsExpr, rhsExpr) of
-                (True, App rhsApp)
-                  # ((funArgs, rhsfd), menv) = reifyArgsAndDef rhsApp.app_symb chnl.chn_module_env
-                  # patid       = lastElem [freeVarName x \\ x <- funArgs| x.fv_def_level == -1]
-                  # (syne, chn) = exprCata mkGraphAlg (getFunRhs rhsfd) (addInhId inh 1) { chnl & chn_module_env = menv }
-                  # menv        = updateWithAnnot rhsApp.app_symb syne.syn_annot_expr chn.chn_module_env
-                  = (Just patid, (({syne & syn_annot_expr = rhsExpr}, {chn & chn_module_env = menv})))
-                _ = (Nothing, (exprCata mkGraphAlg rhsExpr (addInhId inh 0) chnl))
-        # app` = { app & app_args = ctxs ++ [synl.syn_annot_expr, synr.syn_annot_expr] }
-        = ({ syn_annot_expr = App app`
+      f lhsExpr rhsExpr=:(App rhsApp) chn
+        # (synl, chnl)            = exprCata mkGraphAlg lhsExpr (addInhId inh 0) chn
+        # (edgeLbl, (synr, chnr)) = mkEdge rhsApp 1 inh chnl
+        = ({ syn_annot_expr = App { app & app_args = ctxs ++ [synl.syn_annot_expr, synr.syn_annot_expr] }
            , syn_texpr = TBind (T synl.syn_texpr) edgeLbl (T synr.syn_texpr)}, chnr)
+      f lhsExpr rhsExpr chn
+        # (d, menv) = ppExpression rhsExpr chn.chn_module_env
+        = ({ syn_annot_expr = App { app & app_args = ctxs ++ [lhsExpr, rhsExpr] }
+           , syn_texpr = TVar (ppCompact d)}, {chn & chn_module_env = menv})
 
     // TODO Support subgraphs in return
     mkReturn app ctxs args inh chn
@@ -288,13 +283,15 @@ mkGraphAlg
             (arg=:(App _))
               | exprIsListConstr arg
                   # exprs               = fromStatic arg
-                  # (scs, syns, chn, _) = let f e=:(App a=:{app_args=[App btnOrCont:es=:(App contApp):_]}) (scs, syns, chn, n)
+                  # (scs, syns, chn, _) = let f e=:(App a=:{app_args=[App btnOrCont:asTl]}) (scs, syns, chn, n)
                                                 | appFunName a == "OnAction"
-                                                # (sf, syn, chn) = mkStepCont contApp n chn
+                                                # [App contApp:_] = asTl // TODO Bah
+                                                # (sf, syn, chn)  = mkStepCont contApp n chn
                                                 # action = extractAction btnOrCont
                                                 = ([StepOnAction action (T sf):scs], [syn:syns], chn, n + 1)
                                                 | appFunName a == "OnValue"
-                                                # (sf, syn, chn) = mkStepCont contApp n chn
+                                                # [App contApp:_] = asTl // TODO Bah
+                                                # (sf, syn, chn)  = mkStepCont contApp n chn
                                                 = ([StepOnValue (T sf):scs], [syn:syns], chn, n + 1)
                                                 | appFunName a == "OnException"
                                                 // TODO : Implement
@@ -330,63 +327,23 @@ mkGraphAlg
             # remFArgFunArgs             = drop (length fArgAppArgs) fArgFunArgs
             # (ppHdRemFArgFunArgs, menv) = ppFreeVar (hd remFArgFunArgs) menv // TODO Bah
             # (ppTlRemFArgFunArgs, menv) = mapSt ppFreeVar (tl remFArgFunArgs) menv // TODO Bah
-            # (edgeLbl, (syn, chn))      =
-                 case exprIsLambda t of
-                   True
-                     # ((funArgs, tFd), menv) = reifyArgsAndDef tApp.app_symb menv
-                     # patid       = lastElem [freeVarName x \\ x <- funArgs| x.fv_def_level == -1]
-                     # (syne, chn) = exprCata mkGraphAlg (getFunRhs tFd) (addInhId inh n) { chn & chn_module_env = menv }
-                     # menv        = updateWithAnnot tApp.app_symb syne.syn_annot_expr chn.chn_module_env
-                     = (Just patid, (({syne & syn_annot_expr = t}, {chn & chn_module_env = menv})))
-                   _ = (Nothing, (exprCata mkGraphAlg t /*TODO reify edge label; discern between actual task functions and expressions like (return o id)*/ (addInhId inh n) chn))
+            # (edgeLbl, (syn, chn))      = mkEdge tApp n inh {chn & chn_module_env = menv}
             = (IfValue (ppCompact ppHdRemFArgFunArgs) fArgApp.app_symb.symb_ident.id_name (map ppCompact (ppFArgAppArgs ++ [ppHdRemFArgFunArgs:ppTlRemFArgFunArgs])) edgeLbl (T syn.syn_texpr), syn, chn)
           "hasValue"
-            # [t=:(App tApp):_] = contApp.app_args // TODO Bah
-            # (edgeLbl, (syn, chn))      =
-                 case exprIsLambda t of
-                   True
-                     # ((funArgs, tFd), menv) = reifyArgsAndDef tApp.app_symb chn.chn_module_env
-                     # patid       = lastElem [freeVarName x \\ x <- funArgs| x.fv_def_level == -1]
-                     # (syne, chn) = exprCata mkGraphAlg (getFunRhs tFd) (addInhId inh n) { chn & chn_module_env = menv }
-                     # menv        = updateWithAnnot tApp.app_symb syne.syn_annot_expr chn.chn_module_env
-                     = (Just patid, (({syne & syn_annot_expr = t}, {chn & chn_module_env = menv})))
-                   _ = (Nothing, (exprCata mkGraphAlg t /*TODO reify edge label; discern between actual task functions and expressions like (return o id)*/ (addInhId inh n) chn))
+            # [t=:(App tApp):_]     = contApp.app_args // TODO Bah
+            # (edgeLbl, (syn, chn)) = mkEdge tApp n inh chn
             = (HasValue edgeLbl (T syn.syn_texpr), syn, chn)
           "ifStable"
-            # [t=:(App tApp):_] = contApp.app_args // TODO Bah
-            # (edgeLbl, (syn, chn))      =
-                 case exprIsLambda t of
-                   True
-                     # ((funArgs, tFd), menv) = reifyArgsAndDef tApp.app_symb chn.chn_module_env
-                     # patid       = lastElem [freeVarName x \\ x <- funArgs| x.fv_def_level == -1]
-                     # (syne, chn) = exprCata mkGraphAlg (getFunRhs tFd) (addInhId inh n) { chn & chn_module_env = menv }
-                     # menv        = updateWithAnnot tApp.app_symb syne.syn_annot_expr chn.chn_module_env
-                     = (Just patid, (({syne & syn_annot_expr = t}, {chn & chn_module_env = menv})))
-                   _ = (Nothing, (exprCata mkGraphAlg t /*TODO reify edge label; discern between actual task functions and expressions like (return o id)*/ (addInhId inh n) chn))
+            # [t=:(App tApp):_]     = contApp.app_args // TODO Bah
+            # (edgeLbl, (syn, chn)) = mkEdge tApp n inh chn
             = (IfStable edgeLbl (T syn.syn_texpr), syn, chn)
           "ifUnstable"
-            # [t=:(App tApp):_] = contApp.app_args // TODO Bah
-            # (edgeLbl, (syn, chn))      =
-                 case exprIsLambda t of
-                   True
-                     # ((funArgs, tFd), menv) = reifyArgsAndDef tApp.app_symb chn.chn_module_env
-                     # patid       = lastElem [freeVarName x \\ x <- funArgs| x.fv_def_level == -1]
-                     # (syne, chn) = exprCata mkGraphAlg (getFunRhs tFd) (addInhId inh n) { chn & chn_module_env = menv }
-                     # menv        = updateWithAnnot tApp.app_symb syne.syn_annot_expr chn.chn_module_env
-                     = (Just patid, (({syne & syn_annot_expr = t}, {chn & chn_module_env = menv})))
-                   _ = (Nothing, (exprCata mkGraphAlg t /*TODO reify edge label; discern between actual task functions and expressions like (return o id)*/ (addInhId inh n) chn))
+            # [t=:(App tApp):_]     = contApp.app_args // TODO Bah
+            # (edgeLbl, (syn, chn)) = mkEdge tApp n inh chn
             = (IfUnstable edgeLbl (T syn.syn_texpr), syn, chn)
           "ifCond"
             # [cond:t=:(App tApp):_] = contApp.app_args // TODO Bah
-            # (edgeLbl, (syn, chn))      =
-                 case exprIsLambda t of
-                   True
-                     # ((funArgs, tFd), menv) = reifyArgsAndDef tApp.app_symb chn.chn_module_env
-                     # patid       = lastElem [freeVarName x \\ x <- funArgs| x.fv_def_level == -1]
-                     # (syne, chn) = exprCata mkGraphAlg (getFunRhs tFd) (addInhId inh n) { chn & chn_module_env = menv }
-                     # menv        = updateWithAnnot tApp.app_symb syne.syn_annot_expr chn.chn_module_env
-                     = (Just patid, (({syne & syn_annot_expr = t}, {chn & chn_module_env = menv})))
-                   _ = (Nothing, (exprCata mkGraphAlg t /*TODO reify edge label; discern between actual task functions and expressions like (return o id)*/ (addInhId inh n) chn))
+            # (edgeLbl, (syn, chn))  = mkEdge tApp n inh chn
             # (d, menv) = ppExpression cond chn.chn_module_env
             = (IfCond (ppCompact d) edgeLbl (T syn.syn_texpr), syn
               , { chn & chn_module_env = menv })
@@ -616,6 +573,28 @@ mkGraphAlg
     # (isTask, chn) = varIsTask bv.var_info_ptr chn
     | isTask    = ({syn_annot_expr = Var bv, syn_texpr = TVar bv.var_ident.id_name}, chn)
     | otherwise = ({syn_annot_expr = Var bv, syn_texpr = TVar bv.var_ident.id_name}, chn)
+
+mkEdge :: App Int InhExpression *ChnExpression -> *(Maybe String, *(SynExpression, *ChnExpression))
+mkEdge app=:{app_symb, app_args} n inh chn
+  # (siIsTask, menv) = symbIdentIsTask app_symb chn.chn_module_env
+  | identIsLambda app_symb.symb_ident
+    # ((args, tFd), menv) = reifyArgsAndDef app_symb menv
+    # patid               = lastElem [freeVarName x \\ x <- args| x.fv_def_level == -1]
+    # (syne, chn)         = exprCata mkGraphAlg (getFunRhs tFd) (addInhId inh n) { chn & chn_module_env = menv }
+    # menv                = updateWithAnnot app_symb syne.syn_annot_expr chn.chn_module_env
+    = (Just patid, (({syne & syn_annot_expr = App app}, {chn & chn_module_env = menv})))
+  | siIsTask
+    # ((args, tFd), menv) = reifyArgsAndDef app_symb menv
+    # (lbl, menv) = case drop (length app_args) args of
+                      [] = (Nothing, menv)
+                      [x:_]
+                        # (d, menv) = ppFreeVar x menv
+                        = (Just (ppCompact d), menv)
+    = (lbl, (exprCata mkGraphAlg (App app) (addInhId inh n) {chn & chn_module_env = menv}))
+  | otherwise
+    # (d, menv) = ppApp app menv
+    = (Nothing, ({syn_annot_expr = App app, syn_texpr = TVar (ppCompact d)}
+      , {chn & chn_module_env = menv}))
 
 // TODO: We need to split this up: one part of this should generate the graph
 // for the FunDef and the other part should generate the init and stop nodes.

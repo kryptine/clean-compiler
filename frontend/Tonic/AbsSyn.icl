@@ -4,6 +4,7 @@ import syntax, predef, checksupport
 import Data.Func
 import Data.Graph
 import Data.Maybe
+import Data.Map
 //import Tonic.Tonic
 import Tonic.Pretty
 import iTasks.Framework.Tonic.AbsSyn
@@ -42,6 +43,7 @@ mkInhExpr ctn =
   , inh_case_expr      = Nothing
   , inh_is_bind_lam    = False
   , inh_ids            = [0]
+  , inh_tyenv          = newMap
   }
 
 mkChnExpr :: *PredefinedSymbols *ModuleEnv *Heaps -> *ChnExpression
