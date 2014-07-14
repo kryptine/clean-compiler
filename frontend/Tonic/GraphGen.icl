@@ -292,11 +292,11 @@ mkGraphAlg
                                                 # [App contApp:_] = asTl // TODO Bah
                                                 # (sf, syn, chn)  = mkStepCont contApp n chn
                                                 # action          = extractAction btnOrCont
-                                                = ([StepOnAction action (T sf):scs], [syn:syns], chn, n + 1)
+                                                = ([StepOnAction action sf:scs], [syn:syns], chn, n + 1)
                                                 | appFunName a == "OnValue"
                                                 # [App contApp:_] = asTl // TODO Bah
                                                 # (sf, syn, chn)  = mkStepCont contApp n chn
-                                                = ([StepOnValue (T sf):scs], [syn:syns], chn, n + 1)
+                                                = ([StepOnValue sf:scs], [syn:syns], chn, n + 1)
                                                 | appFunName a == "OnException"
                                                 # (lbl, syn, chn) = mkEdge btnOrCont n inh chn
                                                 = ([StepOnException lbl syn.syn_texpr:scs], [syn:syns], chn, n + 1)
@@ -333,28 +333,28 @@ mkGraphAlg
             # (ppTlRemFArgs, menv)      = mapSt ppFreeVar (tl remFArgs) menv // TODO Bah
             # (lbl, syn, chn)           = mkEdge tApp n inh {chn & chn_module_env = menv}
             = (IfValue (ppCompact ppHdRemFArgs) fApp.app_symb.symb_ident.id_name
-                (map ppCompact (ppFAppArgs ++ [ppHdRemFArgs:ppTlRemFArgs])) lbl (T syn.syn_texpr)
+                (map ppCompact (ppFAppArgs ++ [ppHdRemFArgs:ppTlRemFArgs])) lbl syn.syn_texpr
               , syn, chn)
           "hasValue"
             # [(App tApp):_]  = contApp.app_args // TODO Bah
             # (lbl, syn, chn) = mkEdge tApp n inh chn
-            = (HasValue lbl (T syn.syn_texpr), syn, chn)
+            = (HasValue lbl syn.syn_texpr, syn, chn)
           "ifStable"
             # [(App tApp):_]  = contApp.app_args // TODO Bah
             # (lbl, syn, chn) = mkEdge tApp n inh chn
-            = (IfStable lbl (T syn.syn_texpr), syn, chn)
+            = (IfStable lbl syn.syn_texpr, syn, chn)
           "ifUnstable"
             # [(App tApp):_]  = contApp.app_args // TODO Bah
             # (lbl, syn, chn) = mkEdge tApp n inh chn
-            = (IfUnstable lbl (T syn.syn_texpr), syn, chn)
+            = (IfUnstable lbl syn.syn_texpr, syn, chn)
           "ifCond"
             # [cond:(App tApp):_] = contApp.app_args // TODO Bah
             # (lbl, syn, chn)     = mkEdge tApp n inh chn
             # (d, menv) = ppExpression cond chn.chn_module_env
-            = (IfCond (ppCompact d) lbl (T syn.syn_texpr), syn, { chn & chn_module_env = menv })
+            = (IfCond (ppCompact d) lbl syn.syn_texpr, syn, { chn & chn_module_env = menv })
           "always"
             # (syn, chn) = exprCata mkGraphAlg (hd contApp.app_args) inh chn
-            = (Always (T syn.syn_texpr), syn, chn)
+            = (Always syn.syn_texpr, syn, chn)
 
     mkTaskApp app ctxs args inh chn
       # (ps, menv) = mapSt ppExpression args chn.chn_module_env
@@ -376,15 +376,15 @@ mkGraphAlg
         = ({ syn_annot_expr = App {app & app_args = ctxs ++ [syn.syn_annot_expr, r]}
            , syn_texpr = TTransform syn.syn_texpr (ppCompact a) (map ppCompact (ppl ++ [a:as])) }, chn)
 
-    mkParSumN = mkParN (\ss -> ParSum (T (ParSumN (T ss))))
+    mkParSumN = mkParN ParSumN
 
-    mkParProdN = mkParN (\ss -> ParProd (T ss))
+    mkParSum2 = mkParBin (\l r -> ParSumN (T [l, r]))
 
-    mkParSum2 = mkParBin (\l r -> ParSum (T (ParSumN (T [l, r]))))
+    mkParSumR = mkParBin ParSumR
 
-    mkParSumR = mkParBin (\l r -> ParSum (T (ParSumR (T l) (T r))))
+    mkParSumL = mkParBin ParSumL
 
-    mkParSumL = mkParBin (\l r -> ParSum (T (ParSumL (T l) (T r))))
+    mkParProdN = mkParN ParProd
 
     mkParProd2 = mkParBin (\l r -> ParProd (T [l, r]))
 
@@ -409,7 +409,7 @@ mkGraphAlg
                                in  foldr f ([], 0, chn) exprs
               # (listArg, pdss) = toStatic (map (\s -> s.syn_annot_expr) ss) chn.chn_predef_symbols
               = ( { syn_annot_expr = App {app & app_args = [listArg]}
-                  , syn_texpr = TParallel (mkPar (map (\s -> s.syn_texpr) ss))}
+                  , syn_texpr = TParallel (mkPar (T (map (\s -> s.syn_texpr) ss)))}
                 , {chn & chn_predef_symbols = pdss}) // annotExpr app Nothing (Just exprs) inh chn (mkSynExpr (App app))
             | otherwise = doPP arg
           [arg=:(Var _):_] = doPP arg
@@ -418,7 +418,7 @@ mkGraphAlg
         # (doc, menv) = ppExpression arg chn.chn_module_env
         # ppStr       = ppCompact doc
         # chn         = {chn & chn_module_env = menv}
-        = ({syn_annot_expr = App app, syn_texpr = TParallel (ParProd (PP ppStr))}, chn)
+        = ({syn_annot_expr = App app, syn_texpr = TParallel (mkPar (PP ppStr))}, chn)
 
     mkGetShare app ctxs args=:[App {app_symb, app_args}:_] inh chn
       = mkShare app Get app_symb app_args chn
