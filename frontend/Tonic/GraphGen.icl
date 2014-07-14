@@ -226,7 +226,7 @@ mkGraphAlg
           "set"         -> mkSetShare  app ctxs args inh chn
           "upd"         -> mkUpdShare  app ctxs args inh chn
           _             -> mkTaskApp   app ctxs args inh chn
-    | otherwise = ({syn_annot_expr = App app, syn_texpr = TVar (ppCompact appD)}, chn)
+    | otherwise = ({syn_annot_expr = App app, syn_texpr = TCleanExpr (ppCompact appD)}, chn)
     where
     mkBind app ctxs args inh chn
       = withTwo app args f inh chn
