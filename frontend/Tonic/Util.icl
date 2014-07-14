@@ -142,7 +142,7 @@ idxIsMain :: Index *ModuleEnv -> *(Bool, *ModuleEnv)
 idxIsMain idx menv
   # (main_dcl_module_n, menv) = menv!me_main_dcl_module_n
   = (idx == main_dcl_module_n, menv)
-
+import StdDebug
 reifySymbIdentSymbolType :: SymbIdent *ModuleEnv -> *(Maybe SymbolType, *ModuleEnv)
 reifySymbIdentSymbolType {symb_kind=SK_Function glob} menv
   | glob.glob_module == menv.me_main_dcl_module_n                       = reifyFunDefsIdxSymbolType glob.glob_object menv
@@ -153,7 +153,9 @@ reifySymbIdentSymbolType {symb_kind=SK_DclMacro glob}              menv = reifyD
 reifySymbIdentSymbolType {symb_kind=SK_LocalDclMacroFunction glob} menv = reifyDclModulesIdxSymbolType glob menv
 reifySymbIdentSymbolType {symb_kind=SK_OverloadedFunction glob}    menv = reifyDclModulesIdxSymbolType glob menv
 reifySymbIdentSymbolType {symb_kind=SK_GeneratedFunction fip idx}  menv = reifyFunDefsIdxSymbolType idx menv
-reifySymbIdentSymbolType {symb_kind=SK_Constructor glob}           menv = reifyDclModulesIdxSymbolType glob menv
+reifySymbIdentSymbolType {symb_ident, symb_kind=SK_Constructor glob} menv
+  # (mcd, menv) = reifyIclModuleGlobConsDef glob menv
+  = (fmap (\cd -> cd.cons_type) mcd, menv)
 reifySymbIdentSymbolType {symb_kind=SK_NewTypeConstructor globi}   menv = abort "reifySymbIdentType: SK_NewTypeConstructor" // reifyDclModulesIdx` globi.gi_module globi.gi_index menv
 reifySymbIdentSymbolType {symb_kind=SK_Generic glob tk}            menv = reifyDclModulesIdxSymbolType glob menv
 reifySymbIdentSymbolType {symb_kind=SK_OverloadedConstructor glob} menv = reifyDclModulesIdxSymbolType glob menv
@@ -393,7 +395,7 @@ symbIdentIsTask si menv
   # (mst, menv) = reifySymbIdentSymbolType si menv
   = case mst of
       Just st -> (symTyIsTask st, menv)
-      _       -> abort "symbIdentIsTask: failed to reify smybIdent"
+      _       -> abort ("symbIdentIsTask: failed to reify symbIdent '" +++ si.symb_ident.id_name +++ "'")
 
 isInfix :: SymbIdent *ModuleEnv -> *(Bool, *ModuleEnv)
 isInfix si menv

@@ -204,6 +204,7 @@ mkGraphAlg
   // TODO Add share support
   appC app inh chn // TODO Take arity into account: if a task is partially applied, wrap it in a lambda and annotate that
     # (idIsTask, menv) = symbIdentIsTask app.app_symb chn.chn_module_env
+    # (appD, menv) = ppApp app menv
     # chn = {chn & chn_module_env = menv}
     | idIsTask
       # ((ctxs, args), menv) = dropAppContexts app chn.chn_module_env
@@ -225,7 +226,7 @@ mkGraphAlg
           "set"         -> mkSetShare  app ctxs args inh chn
           "upd"         -> mkUpdShare  app ctxs args inh chn
           _             -> mkTaskApp   app ctxs args inh chn
-    | otherwise = ({syn_annot_expr = App app, syn_texpr = TVar "TODO appC otherwise"}, chn)
+    | otherwise = ({syn_annot_expr = App app, syn_texpr = TVar (ppCompact appD)}, chn)
     where
     mkBind app ctxs args inh chn
       = withTwo app args f inh chn
@@ -240,30 +241,10 @@ mkGraphAlg
         = ({ syn_annot_expr = App { app & app_args = ctxs ++ [lhsExpr, rhsExpr] }
            , syn_texpr = TVar (ppCompact d)}, {chn & chn_module_env = menv})
 
-    // TODO Add and test subgraphs in return 
-    //mkReturn app ctxs args=:[App app`:_] inh chn
-      //# (syn, chn) = exprCata mkGraphAlg (App app`) (addInhId inh 0) chn
-      //= ({ syn_annot_expr = App {app & app_args = ctxs ++ [syn.syn_annot_expr]}
-         //, syn_texpr = TReturn (T syn.syn_texpr)}, chn)
-
-    mkReturn app ctxs args inh chn
-      # (ppd, chn) = case args of
-                       [x:_] -> mkRet x chn
-                       _     -> abort "mkReturn: should not happen"
-      = ({ syn_annot_expr = App app
-         , syn_texpr = TReturn (PP ppd)}, chn)
-      where
-      // In case of a function application, we want to inspect the type of the
-      // function. If it is a task or a list, treat it differently than any
-      // other type.
-      mkRet (BasicExpr bv) chn
-        # (bvd, menv) = ppBasicValue bv chn.chn_module_env
-        = (ppCompact bvd, {chn & chn_module_env = menv})
-      mkRet (Var bv)       chn = (bv.var_ident.id_name, chn)
-      mkRet e              chn
-        # (d, menv) = ppExpression e chn.chn_module_env
-        # chn = {chn & chn_module_env = menv}
-        = (ppCompact d, chn)
+    mkReturn app ctxs args=:[e:_] inh chn
+      # (syn, chn) = exprCata mkGraphAlg e inh chn
+      = ({ syn_annot_expr = App {app & app_args = ctxs ++ [syn.syn_annot_expr]}
+         , syn_texpr = TReturn syn.syn_texpr}, chn)
 
     mkAssign app ctxs args inh chn
       = withTwo app args f inh chn
