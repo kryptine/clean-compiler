@@ -277,7 +277,7 @@ mkGraphAlg
           { syn_annot_expr = App {app & app_args = ctxs ++ [u, syn.syn_annot_expr] }
           , syn_texpr = TAssign (TUUserWithIdent (ppCompact ud)) (T syn.syn_texpr)}
 
-    // TODO : Implement this correctly
+    // TODO : Test
     mkStep app ctxs args inh chn
       = withTwo app args f inh chn
       where
@@ -421,19 +421,25 @@ mkGraphAlg
         = ({syn_annot_expr = App app, syn_texpr = TParallel (ParProd (PP ppStr))}, chn)
 
     mkGetShare app ctxs args=:[App {app_symb, app_args}:_] inh chn
-      = mkShare Get app_symb app_args chn
+      = mkShare app Get app_symb app_args chn
 
     mkSetShare app ctxs args=:[a1=:(App _):App {app_symb, app_args}:_] inh chn
       # (ppe1, menv) = ppExpression a1 chn.chn_module_env
-      = mkShare (Set (ppCompact ppe1)) app_symb app_args {chn & chn_module_env = menv}
+      = mkShare app (Set (ppCompact ppe1)) app_symb app_args {chn & chn_module_env = menv}
 
     mkUpdShare app ctxs args=:[a1=:(App _):App {app_symb, app_args}:_] inh chn
       # (ppe1, menv) = ppExpression a1 chn.chn_module_env
-      = mkShare (Upd (ppCompact ppe1)) app_symb app_args {chn & chn_module_env = menv}
+      = mkShare app (Upd (ppCompact ppe1)) app_symb app_args {chn & chn_module_env = menv}
 
-    mkShare tsh app_symb app_args chn
+    mkShare app tsh app_symb app_args chn
       # (ads, menv) = mapSt ppExpression app_args chn.chn_module_env
-      = ({syn_annot_expr = App app, syn_texpr = TShare tsh app_symb.symb_ident.id_name (map ppCompact ads)}
+      # (var, vars) =
+          if (app_symb.symb_ident.id_name == "sharedStore")
+            (case ads of
+               []       -> ("mkShare: should not happen", [])
+               [ad:ads] -> (ppCompact ad, ads))
+            (app_symb.symb_ident.id_name, ads)
+      = ({syn_annot_expr = App app, syn_texpr = TShare tsh var (map ppCompact vars)}
         , {chn & chn_module_env = menv})
 
   // Transformation for higher-order function application
