@@ -285,7 +285,7 @@ mkGraphAlg
                                                 # (lbl, syn, chn) = mkEdge btnOrCont n inh chn
                                                 = ([StepOnException lbl syn.syn_texpr:scs], [syn:syns], chn, n + 1)
                                               f _ (scs, syns, chn, n) = (scs, syns, chn, n + 1)
-                                          in  foldr f ([], [], chn, 0) exprs
+                                          in  foldr f ([], [], chn, 1) exprs
                   # (stArgs, pdss) = toStatic (map (\s -> s.syn_annot_expr) syns) chn.chn_predef_symbols
                   = ({syn_annot_expr = App {app & app_args = ctxs ++ [synl.syn_annot_expr, stArgs]}
                     , syn_texpr = TStep synl.syn_texpr (map T scs)}
@@ -331,10 +331,10 @@ mkGraphAlg
           "ifCond"
             # [cond:(App tApp):_] = contApp.app_args // TODO Bah
             # (lbl, syn, chn)     = mkEdge tApp n inh chn
-            # (d, menv) = ppExpression cond chn.chn_module_env
+            # (d, menv)           = ppExpression cond chn.chn_module_env
             = (IfCond (ppCompact d) lbl syn.syn_texpr, syn, { chn & chn_module_env = menv })
           "always"
-            # (syn, chn) = exprCata mkGraphAlg (hd contApp.app_args) inh chn
+            # (syn, chn) = exprCata mkGraphAlg (hd contApp.app_args) (addInhId inh n) chn
             = (Always syn.syn_texpr, syn, chn)
 
     mkTaskApp app ctxs args inh chn
