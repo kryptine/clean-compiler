@@ -390,6 +390,7 @@ typeIsTask ty =
   case ty of
     TA   tsi _     -> symTyIsTask` tsi
     TAS  tsi _  _  -> symTyIsTask` tsi
+    _ --> t        -> typeIsTask t.at_type
     _              -> False
   where symTyIsTask` tsi = tsi.type_ident.id_name == "Task"
 
@@ -433,14 +434,9 @@ updateWithAnnot :: SymbIdent Expression *ModuleEnv -> *ModuleEnv
 updateWithAnnot si expr menv =
   case (symbIdentModuleIdx si, symbIdentObjectIdx si) of
     (Just midx, Just oidx) -> if (midx == menv.me_main_dcl_module_n)
-                                (doUpdate oidx)
+                                {menv & me_fun_defs = updateFunRhs oidx menv.me_fun_defs expr}
                                 menv
     _                      -> menv
-  where
-  doUpdate oidx
-    # fds = menv.me_fun_defs
-    # fds = updateFunRhs oidx fds expr
-    = {menv & me_fun_defs = fds}
 
 updateFunRhs :: Index !*{#FunDef} Expression -> !*{#FunDef}
 updateFunRhs idx fun_defs e
@@ -450,8 +446,7 @@ updateFunRhs idx fun_defs e
         # tb = case fd.fun_body of
                  TransformedBody fb -> { fb & tb_rhs = e }
                  _                  -> abort "updateFunRhs: need a TransformedBody"
-        # fd = { fd & fun_body = TransformedBody tb }
-        = { fun_defs & [idx] = fd}
+        = { fun_defs & [idx] = { fd & fun_body = TransformedBody tb }}
       _ = fun_defs
 
 //emptyEdge :: GEdge
