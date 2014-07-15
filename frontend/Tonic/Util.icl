@@ -345,39 +345,10 @@ exprIsLambda (Var bv)  = identIsLambda bv.var_ident
 exprIsLambda (App app) = identIsLambda app.app_symb.symb_ident
 exprIsLambda _         = False
 
-ppAType :: AType -> String
-ppAType {at_type} = ppType at_type
-
-ppTypeSymbIdent :: TypeSymbIdent -> String
-ppTypeSymbIdent tsi = tsi.type_ident.id_name
-
-
 intersperse` :: String (a -> String) [a] -> String
 intersperse` _ _ [] = ""
 intersperse` _ pp [x] = pp x
 intersperse` sep pp [x:xs] = pp x +++ sep +++ intersperse` sep pp xs
-
-ppType :: Type -> String
-ppType (TA tsi ats)      = ppTypeSymbIdent tsi +++ (intersperse` " " ppAType ats)
-ppType (TAS tsi ats sl)  = ppTypeSymbIdent tsi +++ (intersperse` " " ppAType ats)
-ppType (at1 --> at2)     = ppAType at1 +++ " --> " +++ ppAType at2
-ppType (TArrow)          = "->"
-ppType (TArrow1	at)      = "TArrow1"
-ppType (cv :@: ats)      = ":@:"
-ppType (TB bt)           = toString bt
-ppType (TFA ats t)       = "TFA"
-ppType (GTV tv)          = tv.tv_ident.id_name
-ppType (TV tv)           = tv.tv_ident.id_name
-ppType (TFAC atvs t tcs) = "TFAC"
-ppType (TempV tvi)       = "TempV"
-ppType (TQV tv)          = "TQV"
-ppType (TempQV tvi)      = "TempQV"
-ppType (TempQDV tvi)     = "TempQDV"
-ppType (TLifted tv)      = "TypeVar"
-ppType (TQualifiedIdent i s ats) = "TQualifiedIdent"
-ppType (TGenericFunctionInDictionary gds tk gi) = "TGenericFunctionInDictionary"
-ppType (TLiftedSubst t) = "TLiftedSubst"
-ppType TE = "TE"
 
 symTyIsTask :: SymbolType -> Bool
 symTyIsTask st = atypeIsTask st.st_result
@@ -448,22 +419,6 @@ updateFunRhs idx fun_defs e
                  _                  -> abort "updateFunRhs: need a TransformedBody"
         = { fun_defs & [idx] = { fd & fun_body = TransformedBody tb }}
       _ = fun_defs
-
-//emptyEdge :: GEdge
-//emptyEdge = {GEdge | edge_pattern = Nothing }
-
-//mkEdge :: String -> GEdge
-//mkEdge str = {GEdge | edge_pattern = Just str }
-
-getLetBinds :: Let -> [LetBind]
-getLetBinds lt = lt.let_strict_binds ++ lt.let_lazy_binds
-
-mkGLetBinds :: Let *ModuleEnv -> *([(String, PPOr TExpr)], *ModuleEnv)
-mkGLetBinds lt menv
-  = foldrSt f (getLetBinds lt) ([], menv)
-  where f bnd (xs, menv)
-          # (pprhs, menv) = ppExpression bnd.lb_src menv
-          = ([(bnd.lb_dst.fv_ident.id_name, PP (ppCompact pprhs)):xs], menv)
 
 foldrSt :: !(.a -> .(.st -> .st)) ![.a] !.st -> .st
 foldrSt op l st = foldr_st l

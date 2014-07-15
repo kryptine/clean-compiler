@@ -2,7 +2,8 @@ definition module Tonic.Pretty
 
 from Text.PPrint import :: Doc
 from syntax import :: App, :: SymbIdent, :: Ident, :: BoundVar, :: Expression,
-  :: FreeVar, :: BasicValue, :: DefinedSymbol, :: Selection, :: SymbIdent
+  :: FreeVar, :: BasicValue, :: DefinedSymbol, :: Selection, :: SymbIdent,
+  :: Type, :: AType, :: TypeSymbIdent
 from Tonic.AbsSyn import :: ModuleEnv
 
 ppDebugApp :: App *ModuleEnv -> *(Doc, *ModuleEnv)
@@ -32,3 +33,9 @@ ppDebugSelection :: Selection *ModuleEnv -> *(Doc, *ModuleEnv)
 ppDefinedSymbol :: DefinedSymbol *ModuleEnv -> *(Doc, *ModuleEnv)
 
 ppCompact :: (Doc -> String)
+
+ppType :: Type -> Doc
+
+ppAType :: AType -> Doc
+
+ppTypeSymbIdent :: TypeSymbIdent -> Doc

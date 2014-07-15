@@ -89,7 +89,7 @@ ginTonic` is_itasks_mod main_dcl_module_n repsToString fun_defs icl_module dcl_m
       = ((case mres of
             Just (args, g, e)
               # menv = updateWithAnnot idx e menv
-              = put fd.fun_ident.id_name {TonicTask | tt_name = fd.fun_ident.id_name, tt_resty = fromMaybe "" (fmap ppType (functorContent (funTy fd))), tt_args = args, tt_body = g} reps
+              = put fd.fun_ident.id_name {TonicTask | tt_name = fd.fun_ident.id_name, tt_resty = fromMaybe "" (fmap (ppCompact o ppType) (functorContent (funTy fd))), tt_args = args, tt_body = g} reps
             _ = reps
         , heaps, predef_symbols), menv.me_fun_defs)
     //| is_itasks_mod && funIsTask fd && fd.fun_info.fi_def_level == 1
@@ -133,7 +133,7 @@ addTonicWrap icl_module idx menv pdss
     # (args, pdss) = foldr mkArg ([], pdss) (zip2 tb_args symbty.st_args)
     | length args == length tb_args
         # (xs, pdss) = toStatic args pdss
-        # mdictPDS   = luDict ("tonicTaskDict" +++ ppType symbty.st_result.at_type)
+        # mdictPDS   = luDict ("tonicTaskDict" +++ ppCompact (ppType symbty.st_result.at_type))
         = case mdictPDS of
             Just dictPDS
               # (dict, pdss) = appPredefinedSymbol dictPDS [] SK_Function pdss
@@ -150,7 +150,7 @@ addTonicWrap icl_module idx menv pdss
     | otherwise = (menv, pdss)
     where
     mkArg (arg=:{fv_ident}, {at_type}) (xs, pdss)
-      # mviPDS = luPD ("tonicViewInformation" +++ ppType at_type)
+      # mviPDS = luPD ("tonicViewInformation" +++ ppCompact (ppType at_type))
       = case mviPDS of
           Just viPDS
             # (viewApp, pdss) = appPredefinedSymbol viPDS

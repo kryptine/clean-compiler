@@ -95,14 +95,6 @@ updateWithAnnot :: SymbIdent Expression *ModuleEnv -> *ModuleEnv
 
 updateFunRhs :: Index !*{#FunDef} Expression -> !*{#FunDef}
 
-//emptyEdge :: GEdge
-
-//mkEdge :: String -> GEdge
-
-getLetBinds :: Let -> [LetBind]
-
-mkGLetBinds :: Let *ModuleEnv -> *([(String, PPOr TExpr)], *ModuleEnv)
-
 addInhId :: InhExpression Int -> InhExpression
 
 predefIsUndefined :: PredefinedSymbol -> Bool
@@ -133,8 +125,6 @@ instance ToStatic (Expression, Expression)
 
 freeVarToVar :: FreeVar -> BoundVar
 
-ppAType :: AType -> String
+foldrSt :: !(.a -> .(.st -> .st)) ![.a] !.st -> .st
 
-ppTypeSymbIdent :: TypeSymbIdent -> String
-
-ppType :: Type -> String
+intersperse` :: String (a -> String) [a] -> String

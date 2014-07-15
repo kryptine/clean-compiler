@@ -25,14 +25,16 @@ from syntax import
   :: SelectorKind, :: Selection (..), :: FreeVar {..}, :: Global {..},
   :: SymbIdent {..}, :: SymbKind (..), :: VarContexts, :: TypeKind, :: FunctionInfoPtr, :: FunctionInfo, :: Priority (..), :: Assoc (..), :: VarInfoPtr, :: DynamicExpr,
   :: Ptr, :: VarInfo, :: CodeBinding, :: DefinedSymbol {..}, :: Index, :: Bind,
-  :: Position, :: AType, :: Env, :: Ident {..}, :: SymbolPtr,
+  :: Position, :: AType {..}, :: Env, :: Ident {..}, :: SymbolPtr,
   :: SymbolTableEntry, :: Level, :: ExprInfoPtr, :: ExprInfo,
   :: TypeCodeExpression, :: GlobalIndex, :: Conditional, :: BasicValue (..),
   :: FieldSymbol, :: IclModule, :: DclModule, :: FunDef, :: Optional,
   :: SymbolType {..}, :: LetBind, :: TypeVar {..}, :: StrictnessList (..),
   :: TypeContext {..}, :: AttributeVar {..}, :: AttrInequality {..},
-  :: TypeVarInfoPtr {..}, :: AttrVarInfoPtr, :: Type, :: TCClass,
-  :: TypeVarInfo, :: AttrVarInfo, :: FunType {..}, :: FunSpecials
+  :: TypeVarInfoPtr {..}, :: AttrVarInfoPtr, :: Type (..), :: TCClass,
+  :: TypeVarInfo, :: AttrVarInfo, :: FunType {..}, :: FunSpecials, :: TempVarId,
+  :: ATypeVar, :: BasicType, :: ConsVariable, :: TypeAttribute, :: TypeSymbIdent {..},
+  :: TypeSymbProperties, instance toString BasicType
 
 ppDebugApp :: App *ModuleEnv -> *(Doc, *ModuleEnv)
 ppDebugApp app menv
@@ -179,3 +181,31 @@ ppDefinedSymbol ds menv = ppIdent ds.ds_ident menv
 
 ppCompact :: (Doc -> String)
 ppCompact = display o renderCompact
+
+ppType :: Type -> Doc
+ppType (TA tsi ats)      = ppTypeSymbIdent tsi <-> hcat (intersperse (char ' ') (map ppAType ats))
+ppType (TAS tsi ats sl)  = ppTypeSymbIdent tsi <-> hcat (intersperse (char ' ') (map ppAType ats))
+ppType (at1 --> at2)     = ppAType at1 <-> text " --> " <-> ppAType at2
+ppType (TArrow)          = text "->"
+ppType (TArrow1	at)      = text "TArrow1"
+ppType (cv :@: ats)      = text ":@:"
+ppType (TB bt)           = text (toString bt)
+ppType (TFA ats t)       = text "TFA"
+ppType (GTV tv)          = text tv.tv_ident.id_name
+ppType (TV tv)           = text tv.tv_ident.id_name
+ppType (TFAC atvs t tcs) = text "TFAC"
+ppType (TempV tvi)       = text "TempV"
+ppType (TQV tv)          = text "TQV"
+ppType (TempQV tvi)      = text "TempQV"
+ppType (TempQDV tvi)     = text "TempQDV"
+ppType (TLifted tv)      = text "TypeVar"
+ppType (TQualifiedIdent i s ats) = text "TQualifiedIdent"
+ppType (TGenericFunctionInDictionary gds tk gi) = text "TGenericFunctionInDictionary"
+ppType (TLiftedSubst t)  = text "TLiftedSubst"
+ppType TE                = text "TE"
+
+ppAType :: AType -> Doc
+ppAType {at_type} = ppType at_type
+
+ppTypeSymbIdent :: TypeSymbIdent -> Doc
+ppTypeSymbIdent tsi = text tsi.type_ident.id_name

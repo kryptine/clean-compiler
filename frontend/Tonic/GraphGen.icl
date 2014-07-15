@@ -173,7 +173,6 @@ varIsTask bv inh
       Nothing -> False
       Just t  -> typeIsTask t
 
-import StdDebug
 mkGraphAlg :: *(ExpressionAlg InhExpression *ChnExpression SynExpression)
 mkGraphAlg
   =  {  app = appC, at = atC, letE = letC, caseE = caseC, var = varC
@@ -443,10 +442,9 @@ mkGraphAlg
         # letargs       = drop (length app.app_args) (getFunArgs fd)
         # (binds, menv) = zipWithSt zwf letargs es menv
         # chn           = { chn & chn_module_env = menv }
-        //# (lid, g)      = addNode (mkGNode (GLet {GLet | glet_binds = binds})) chn.chn_graph
-        # (syne, chn)   = exprCata mkGraphAlg (getFunRhs fd) inh chn // { chn & chn_graph = g }
+        # (syne, chn)   = exprCata mkGraphAlg (getFunRhs fd) inh chn
         # menv          = updateWithAnnot app.app_symb syne.syn_annot_expr chn.chn_module_env
-        # chn           = { chn & chn_module_env = menv} //, chn_graph = g }
+        # chn           = { chn & chn_module_env = menv}
         = ({syn_annot_expr = e @ es, syn_texpr = TVar "TODO @"}, chn)
     | otherwise    =  abort "atC: otherwise case" // TODO : pretty print function application
     where
@@ -495,12 +493,21 @@ mkGraphAlg
       = ({syn & syn_annot_expr = Let l}, chn)
     mkLet Nothing lt inh chn
       # (tys, chn)    = letTypes lt.let_info_ptr chn
-      # (binds, menv) = mkGLetBinds lt chn.chn_module_env
+      # (binds, menv) = flattenBinds lt chn.chn_module_env
       # tyenv         = zipSt (\(v, _) t tyenv -> put v t tyenv) binds tys inh.inh_tyenv // TODO This probably won't work for arbitrary patterns, so we actually need to be a bit smarter here and extract all variables from the patterns, instead of just PP'ing the pattern and using that as index
       // TODO : Represent the bindings in any way possible, not just PP
       # (syn, chn)    = exprCata mkGraphAlg lt.let_expr {inh & inh_tyenv = tyenv} {chn & chn_module_env = menv}
       = ({syn & syn_annot_expr = Let {lt & let_expr = syn.syn_annot_expr}
          , syn_texpr = TLet binds syn.syn_texpr}, chn)
+      where
+      flattenBinds lt menv
+        = foldrSt f (getLetBinds lt) ([], menv)
+        where
+        f bnd (xs, menv)
+          # (pprhs, menv) = ppExpression bnd.lb_src menv
+          = ([(bnd.lb_dst.fv_ident.id_name, PP (ppCompact pprhs)):xs], menv)
+     getLetBinds lt = lt.let_strict_binds ++ lt.let_lazy_binds
+
 
   // TODO: For cases, the compiler introduces a fresh variable in a let for the
   // matches expression. E.g.
@@ -577,10 +584,9 @@ mkGraphAlg
 
   // TODO Determine whether it's a Task a or [Task a]
   // We can do so by maintaining an environment. At lets and lambdas, store the bound variable and its type in the env
-  // TODO Also fill type env at fun binds
   varC bv inh chn
-    | varIsTask bv inh = trace_n ("varIsTask TRUE: " +++ bv.var_ident.id_name) ({syn_annot_expr = Var bv, syn_texpr = TVar bv.var_ident.id_name}, chn)
-    | otherwise        = trace_n ("varIsTask FALSE: " +++ bv.var_ident.id_name) ({syn_annot_expr = Var bv, syn_texpr = TVar bv.var_ident.id_name}, chn)
+    | varIsTask bv inh = ({syn_annot_expr = Var bv, syn_texpr = TVar bv.var_ident.id_name}, chn)
+    | otherwise        = ({syn_annot_expr = Var bv, syn_texpr = TVar bv.var_ident.id_name}, chn)
 
 mkEdge :: App Int InhExpression *ChnExpression -> *(Maybe String, SynExpression, *ChnExpression)
 mkEdge app=:{app_symb, app_args} n inh chn
@@ -617,6 +623,6 @@ funToGraph fd=:{fun_ident=fun_ident, fun_body = TransformedBody tb} menv heaps p
     # chn             = mkChnExpr predef_symbols menv heaps
     # (argTys, tyenv) = zipWithSt (\arg t st -> ((arg, t), put arg.fv_ident.id_name t st)) tb.tb_args (funArgTys fd) newMap
     # (syn, chn)      = exprCata mkGraphAlg tb.tb_rhs {inh & inh_tyenv = tyenv} chn
-    = ( Just (map (\(arg, ty) -> (arg.fv_ident.id_name, ppType ty)) argTys, syn.syn_texpr, syn.syn_annot_expr) //Just g, syn.syn_annot_expr)
+    = ( Just (map (\(arg, ty) -> (arg.fv_ident.id_name, ppCompact (ppType ty))) argTys, syn.syn_texpr, syn.syn_annot_expr) //Just g, syn.syn_annot_expr)
       , chn.chn_module_env, chn.chn_heaps, chn.chn_predef_symbols)
 funToGraph _ menv heaps predef_symbols = (Nothing, menv, heaps, predef_symbols)
