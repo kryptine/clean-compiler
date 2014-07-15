@@ -122,10 +122,10 @@ addTonicWrap icl_module idx menv pdss
           Just fd
             = case (fd.fun_body, fd.fun_type) of
                 (TransformedBody fb, Yes _)
-                  # ((isPA, rem), menv) = case fb.tb_rhs of
-                                            App app -> isPartialApp app menv
-                                            // TODO Add a case for @ ?
-                                            _       -> ((False, -1), menv)
+                  # (isPA, menv) = case fb.tb_rhs of
+                                     App app -> isPartialApp app menv
+                                     // TODO Add a case for @ ?
+                                     _       -> (False, menv)
                   = if isPA (menv, pdss) (doAddRefl fd menv pdss)
                 _ = (menv, pdss)
           _ = (menv, pdss)

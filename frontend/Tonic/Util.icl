@@ -456,14 +456,19 @@ symbIdentArity si menv
             Just fd -> (Just fd.fun_arity, menv)
             _       -> (Nothing, menv)
 
-isPartialApp :: App *ModuleEnv -> *((Bool, Int), *ModuleEnv)
-isPartialApp app menv
+argsRemaining :: App *ModuleEnv -> *(Int, *ModuleEnv)
+argsRemaining app menv
   # ((_, args), menv) = dropAppContexts app menv
   # argsLength        = length args
   # (marity, menv)    = symbIdentArity app.app_symb menv
   = case marity of
-      Just arity -> ((argsLength < arity, arity - argsLength), menv)
-      _          -> ((True, 0), menv) // True: better safe than sorry
+      Just arity -> (arity - argsLength, menv)
+      _          -> (0, menv)
+
+isPartialApp :: App *ModuleEnv -> *(Bool, *ModuleEnv)
+isPartialApp app menv
+  # (rem, menv) = argsRemaining app menv
+  = (rem > 0, menv)
 
 exprIsTask :: Expression *ModuleEnv -> *(Bool, *ModuleEnv)
 exprIsTask (App app) menv = symbIdentIsTask app.app_symb menv

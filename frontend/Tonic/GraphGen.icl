@@ -119,11 +119,11 @@ withTwo app _         _ inh chn = ({syn_annot_expr = App app, syn_texpr = TVar "
 annotExpr :: App TExpr InhExpression *ChnExpression -> *(SynExpression, *ChnExpression)
 annotExpr origApp texpr inh chn
   # (tune_symb, predefs) = (chn.chn_predef_symbols)![PD_tonicWrapApp]
-  | predefIsUndefined tune_symb = ({syn_annot_expr = App origApp, syn_texpr = texpr}, {chn & chn_predef_symbols = predefs})
+  # chn                  = {chn & chn_predef_symbols = predefs}
+  | predefIsUndefined tune_symb = ({syn_annot_expr = App origApp, syn_texpr = texpr}, chn)
   | otherwise
-    # ((_, rem), menv) = isPartialApp origApp chn.chn_module_env
-    # chn              = {chn & chn_module_env = menv, chn_predef_symbols = predefs}
-    # (app, chn)       = mkTuneApp rem origApp chn
+    # (rem, menv)      = argsRemaining origApp chn.chn_module_env
+    # (app, chn)       = mkTuneApp rem origApp {chn & chn_module_env = menv}
     = ({syn_annot_expr = App app, syn_texpr = texpr}, chn)
   where
   mkTuneApp rem app chn

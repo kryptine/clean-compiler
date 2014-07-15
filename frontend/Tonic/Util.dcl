@@ -103,7 +103,9 @@ addInhId :: InhExpression Int -> InhExpression
 
 predefIsUndefined :: PredefinedSymbol -> Bool
 
-isPartialApp :: App *ModuleEnv -> *((Bool, Int), *ModuleEnv)
+argsRemaining :: App *ModuleEnv -> *(Int, *ModuleEnv)
+
+isPartialApp :: App *ModuleEnv -> *(Bool, *ModuleEnv)
 
 exprIsTask :: Expression *ModuleEnv -> *(Bool, *ModuleEnv)
 
