@@ -79,6 +79,10 @@ atypeIsTask :: AType -> Bool
 
 typeIsTask :: Type -> Bool
 
+atypeIsListOfTask :: AType -> Bool
+
+typeIsListOfTask :: Type -> Bool
+
 symbIdentIsTask :: SymbIdent *ModuleEnv -> *(Bool, *ModuleEnv)
 
 isInfix :: SymbIdent *ModuleEnv -> *(Bool, *ModuleEnv)

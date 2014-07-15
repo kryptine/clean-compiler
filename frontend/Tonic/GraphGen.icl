@@ -173,6 +173,12 @@ varIsTask bv inh
       Nothing -> False
       Just t  -> typeIsTask t
 
+varIsListOfTask :: BoundVar InhExpression -> Bool
+varIsListOfTask bv inh
+  = case get bv.var_ident.id_name inh.inh_tyenv of
+      Nothing -> False
+      Just t  -> typeIsListOfTask t
+
 mkGraphAlg :: *(ExpressionAlg InhExpression *ChnExpression SynExpression)
 mkGraphAlg
   =  {  app = appC, at = atC, letE = letC, caseE = caseC, var = varC
@@ -585,8 +591,9 @@ mkGraphAlg
   // TODO Determine whether it's a Task a or [Task a]
   // We can do so by maintaining an environment. At lets and lambdas, store the bound variable and its type in the env
   varC bv inh chn
-    | varIsTask bv inh = ({syn_annot_expr = Var bv, syn_texpr = TVar bv.var_ident.id_name}, chn)
-    | otherwise        = ({syn_annot_expr = Var bv, syn_texpr = TVar bv.var_ident.id_name}, chn)
+    | varIsTask bv inh       = ({syn_annot_expr = Var bv, syn_texpr = TVar bv.var_ident.id_name}, chn)
+    | varIsListOfTask bv inh = ({syn_annot_expr = Var bv, syn_texpr = TVar bv.var_ident.id_name}, chn)
+    | otherwise              = ({syn_annot_expr = Var bv, syn_texpr = TVar bv.var_ident.id_name}, chn)
 
 mkEdge :: App Int InhExpression *ChnExpression -> *(Maybe String, SynExpression, *ChnExpression)
 mkEdge app=:{app_symb, app_args} n inh chn

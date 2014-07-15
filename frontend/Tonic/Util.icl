@@ -365,6 +365,18 @@ typeIsTask ty =
     _              -> False
   where symTyIsTask` tsi = tsi.type_ident.id_name == "Task"
 
+atypeIsListOfTask :: AType -> Bool
+atypeIsListOfTask aty = typeIsListOfTask aty.at_type
+
+typeIsListOfTask :: Type -> Bool
+typeIsListOfTask ty =
+  case ty of
+    TA   tsi [x:_]    -> symTyIsTask` tsi && atypeIsTask x
+    TAS  tsi [x:_] _  -> symTyIsTask` tsi && atypeIsTask x
+    _ --> t           -> typeIsListOfTask t.at_type
+    _                 -> False
+  where symTyIsTask` tsi = tsi.type_ident.id_name == PD_ListType_String
+
 symbIdentIsTask :: SymbIdent *ModuleEnv -> *(Bool, *ModuleEnv)
 symbIdentIsTask si menv
   # (mst, menv) = reifySymbIdentSymbolType si menv
