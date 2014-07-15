@@ -255,9 +255,9 @@ predefined_idents
                     [PD_iTasks_Framework_Tonic] = i "iTasks.Framework.Tonic",
                     [PD_tonicWrapApp]      = i "tonicWrapApp",
                     [PD_tonicWrapTaskBody] = i "tonicWrapTaskBody",
-                    [PD_tonicWrapLam1] = i "tonicWrapLam1",
-                    [PD_tonicWrapLam2] = i "tonicWrapLam2",
-                    [PD_tonicWrapLam3] = i "tonicWrapLam3",
+                    [PD_tonicWrapAppLam1] = i "tonicWrapAppLam1",
+                    [PD_tonicWrapAppLam2] = i "tonicWrapAppLam2",
+                    [PD_tonicWrapAppLam3] = i "tonicWrapAppLam3",
                     [PD_EmergencyExample]  = i "EmergencyExample",
                     [PD_tonicViewInformationEmergency]     = i "tonicViewInformationEmergency",
                     [PD_tonicViewInformationCallInfo]      = i "tonicViewInformationCallInfo",
@@ -421,9 +421,9 @@ where
 					<<- (local_predefined_idents,	IC_Module NoQualifiedIdents, PD_iTasks_Framework_Tonic)
 					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapApp)
 					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapTaskBody)
-					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapLam1)
-					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapLam2)
-					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapLam3)
+					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapAppLam1)
+					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapAppLam2)
+					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapAppLam3)
 					<<- (local_predefined_idents,	IC_Module NoQualifiedIdents, PD_EmergencyExample)
                     <<- (local_predefined_idents,  IC_Expression, PD_tonicViewInformationEmergency)
                     <<- (local_predefined_idents,  IC_Expression, PD_tonicViewInformationCallInfo)

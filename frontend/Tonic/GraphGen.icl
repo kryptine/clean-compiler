@@ -121,37 +121,30 @@ annotExpr origApp texpr inh chn
   # (tune_symb, predefs) = (chn.chn_predef_symbols)![PD_tonicWrapApp]
   | predefIsUndefined tune_symb = ({syn_annot_expr = App origApp, syn_texpr = texpr}, {chn & chn_predef_symbols = predefs})
   | otherwise
-      # ((papp, rem), menv) = isPartialApp origApp chn.chn_module_env
-      # chn                 = {chn & chn_module_env = menv, chn_predef_symbols = predefs}
-      | papp
-        # (app, pdss) = etaExpand rem origApp chn.chn_predef_symbols
-        # chn         = {chn & chn_predef_symbols = pdss}
-        # (app, chn)  = mkTuneApp app chn
-        = ({syn_annot_expr = App app, syn_texpr = texpr}, chn)
-      | otherwise
-        # (app, chn) = mkTuneApp origApp chn
-        = ({syn_annot_expr = App app, syn_texpr = texpr}, chn)
+    # ((_, rem), menv) = isPartialApp origApp chn.chn_module_env
+    # chn              = {chn & chn_module_env = menv, chn_predef_symbols = predefs}
+    # (app, chn)       = mkTuneApp rem origApp chn
+    = ({syn_annot_expr = App app, syn_texpr = texpr}, chn)
   where
-  mkTuneApp app chn
+  mkTuneApp rem app chn
     # menv        = chn.chn_module_env
     # icl         = menv.me_icl_module
     # nm          = icl.icl_name.id_name
     # menv        = {menv & me_icl_module = icl}
     # chn         = {chn & chn_module_env = menv}
-    # (app, pdss) = appPredefinedSymbol PD_tonicWrapApp
+    # (app, pdss) = appPredefinedSymbol (findWrap rem)
                       [ mkStr nm
                       , mkStr inh.inh_curr_task_name
                       , mkStr (ppExprId inh.inh_ids)
-                      , App app
+                      , App origApp
                       ] SK_Function chn.chn_predef_symbols
     # chn         = {chn & chn_predef_symbols = pdss}
     = (app, chn)
-  etaExpand rem app = appPredefinedSymbol (findWrap rem) [App app] SK_Function
-    where
-    findWrap 1 = PD_tonicWrapLam1
-    findWrap 2 = PD_tonicWrapLam1
-    findWrap 3 = PD_tonicWrapLam1
-    findWrap n = abort ("No tonicWrapLam" +++ toString n)
+  findWrap 0 = PD_tonicWrapApp
+  findWrap 1 = PD_tonicWrapAppLam1
+  findWrap 2 = PD_tonicWrapAppLam1
+  findWrap 3 = PD_tonicWrapAppLam1
+  findWrap n = abort ("No tonicWrapLam" +++ toString n)
 
 ppExprId :: ExprId -> String
 ppExprId eid = foldr (\x xs -> toString x +++ "." +++ xs) "" eid

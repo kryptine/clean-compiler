@@ -329,9 +329,9 @@ PD_tonicTaskDictTaskTaskEmergency :== 316
 PD_tonicTaskDictTaskDateTime      :== 317
 PD_tonicTaskDictTask_Unit         :== 318
 
-PD_tonicWrapLam1			:== 319
-PD_tonicWrapLam2			:== 320
-PD_tonicWrapLam3			:== 321
+PD_tonicWrapAppLam1			:== 319
+PD_tonicWrapAppLam2			:== 320
+PD_tonicWrapAppLam3			:== 321
 
 PD_NrOfPredefSymbols		:== 322
 
