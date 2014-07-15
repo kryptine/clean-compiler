@@ -609,7 +609,7 @@ mkEdge app=:{app_symb, app_args} n inh chn
 // for the FunDef and the other part should generate the init and stop nodes.
 // Yet another part should just get the right-hand side Expression of a FunDef
 // so we can just cata it.
-funToGraph :: FunDef *ModuleEnv *Heaps *PredefinedSymbols -> *(([(VariableName, TypeName)], Maybe TExpr, Maybe Expression), *ModuleEnv, *Heaps, *PredefinedSymbols)
+funToGraph :: FunDef *ModuleEnv *Heaps *PredefinedSymbols -> *(Maybe ([(VariableName, TypeName)], TExpr, Expression), *ModuleEnv, *Heaps, *PredefinedSymbols)
 funToGraph fd=:{fun_ident=fun_ident, fun_body = TransformedBody tb} menv heaps predef_symbols = mkBody
   where
   mkBody
@@ -617,6 +617,6 @@ funToGraph fd=:{fun_ident=fun_ident, fun_body = TransformedBody tb} menv heaps p
     # chn             = mkChnExpr predef_symbols menv heaps
     # (argTys, tyenv) = zipWithSt (\arg t st -> ((arg, t), put arg.fv_ident.id_name t st)) tb.tb_args (funArgTys fd) newMap
     # (syn, chn)      = exprCata mkGraphAlg tb.tb_rhs {inh & inh_tyenv = tyenv} chn
-    = ( (map (\(arg, ty) -> (arg.fv_ident.id_name, ppType ty)) argTys, Just syn.syn_texpr, Just syn.syn_annot_expr) //Just g, syn.syn_annot_expr)
+    = ( Just (map (\(arg, ty) -> (arg.fv_ident.id_name, ppType ty)) argTys, syn.syn_texpr, syn.syn_annot_expr) //Just g, syn.syn_annot_expr)
       , chn.chn_module_env, chn.chn_heaps, chn.chn_predef_symbols)
-funToGraph _ menv heaps predef_symbols = (([], Nothing, Nothing), menv, heaps, predef_symbols)
+funToGraph _ menv heaps predef_symbols = (Nothing, menv, heaps, predef_symbols)

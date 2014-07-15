@@ -84,12 +84,13 @@ ginTonic` is_itasks_mod main_dcl_module_n repsToString fun_defs icl_module dcl_m
   appDefInfo idx fd ((reps, heaps, predef_symbols), fun_defs)
     # menv = mkModuleEnv main_dcl_module_n fun_defs icl_module dcl_modules
     | not is_itasks_mod && funIsTask fd && fd.fun_info.fi_def_level == 1
-      # ((args, mg, me), menv, heaps, predef_symbols) = funToGraph fd menv heaps predef_symbols
-      # menv = updateWithAnnot idx me menv
+      # (mres, menv, heaps, predef_symbols) = funToGraph fd menv heaps predef_symbols
       # (menv, predef_symbols) = addTonicWrap icl_module idx menv predef_symbols
-      = (( case mg of
-             Just g -> put fd.fun_ident.id_name {TonicTask | tt_name = fd.fun_ident.id_name, tt_resty = fromMaybe "" (fmap ppType (functorContent (funTy fd))), tt_args = args, tt_body = g} reps
-             _      -> reps
+      = ((case mres of
+            Just (args, g, e)
+              # menv = updateWithAnnot idx e menv
+              = put fd.fun_ident.id_name {TonicTask | tt_name = fd.fun_ident.id_name, tt_resty = fromMaybe "" (fmap ppType (functorContent (funTy fd))), tt_args = args, tt_body = g} reps
+            _ = reps
         , heaps, predef_symbols), menv.me_fun_defs)
     //| is_itasks_mod && funIsTask fd && fd.fun_info.fi_def_level == 1
       //# (menv, predef_symbols) = trace_n ("at " +++ fd.fun_ident.id_name) addTonicWrap icl_module idx menv predef_symbols
@@ -101,12 +102,11 @@ ginTonic` is_itasks_mod main_dcl_module_n repsToString fun_defs icl_module dcl_m
       //= ((reps, heaps), menv.me_fun_defs)
     | otherwise        = ((reps, heaps, predef_symbols), fun_defs)
 
-updateWithAnnot :: Int (Maybe Expression) *ModuleEnv -> *ModuleEnv
-updateWithAnnot fidx (Just e) menv
+updateWithAnnot :: Int Expression *ModuleEnv -> *ModuleEnv
+updateWithAnnot fidx e menv
   # fun_defs = menv.me_fun_defs
   # fun_defs = updateFunRhs fidx fun_defs e
   = { menv & me_fun_defs = fun_defs}
-updateWithAnnot _ _ menv = menv
 
 addTonicWrap :: IclModule Index *ModuleEnv *PredefinedSymbols -> *(*ModuleEnv, *PredefinedSymbols)
 addTonicWrap icl_module idx menv pdss
