@@ -213,8 +213,8 @@ mkGraphAlg
   where
   appC app inh chn
     # (idIsTask, menv) = symbIdentIsTask app.app_symb chn.chn_module_env
-    # (appD, menv) = ppApp app menv
-    # chn = {chn & chn_module_env = menv}
+    # (appD, menv)     = ppApp app menv
+    # chn              = {chn & chn_module_env = menv}
     | idIsTask
       # ((ctxs, args), menv) = dropAppContexts app chn.chn_module_env
       # chn                  = { chn & chn_module_env = menv }
@@ -596,7 +596,8 @@ mkEdge app=:{app_symb, app_args} n inh chn
 // for the FunDef and the other part should generate the init and stop nodes.
 // Yet another part should just get the right-hand side Expression of a FunDef
 // so we can just cata it.
-funToGraph :: FunDef *ModuleEnv *Heaps *PredefinedSymbols -> *(Maybe ([(VariableName, TypeName)], TExpr, Expression), *ModuleEnv, *Heaps, *PredefinedSymbols)
+funToGraph :: FunDef *ModuleEnv *Heaps *PredefinedSymbols
+           -> *(Maybe ([(VariableName, TypeName)], TExpr, Expression), *ModuleEnv, *Heaps, *PredefinedSymbols)
 funToGraph fd=:{fun_ident=fun_ident, fun_body = TransformedBody tb} menv heaps predef_symbols = mkBody
   where
   mkBody

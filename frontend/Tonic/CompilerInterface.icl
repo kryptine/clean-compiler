@@ -85,12 +85,15 @@ ginTonic` is_itasks_mod main_dcl_module_n repsToString fun_defs icl_module dcl_m
     # menv = mkModuleEnv main_dcl_module_n fun_defs icl_module dcl_modules
     | not is_itasks_mod && funIsTask fd && fd.fun_info.fi_def_level == 1
       # (mres, menv, heaps, predef_symbols) = funToGraph fd menv heaps predef_symbols
+      # menv = case mres of
+                 Just (_, _, e)
+                   -> updateWithAnnot idx e menv
+                 _ -> menv
       # (menv, predef_symbols) = addTonicWrap icl_module idx menv predef_symbols
       = ((case mres of
-            Just (args, g, e)
-              # menv = updateWithAnnot idx e menv
-              = put fd.fun_ident.id_name {TonicTask | tt_name = fd.fun_ident.id_name, tt_resty = fromMaybe "" (fmap (ppCompact o ppType) (functorContent (funTy fd))), tt_args = args, tt_body = g} reps
-            _ = reps
+            Just (args, g, _)
+              -> put fd.fun_ident.id_name {TonicTask | tt_name = fd.fun_ident.id_name, tt_resty = fromMaybe "" (fmap (ppCompact o ppType) (functorContent (funTy fd))), tt_args = args, tt_body = g} reps
+            _ -> reps
         , heaps, predef_symbols), menv.me_fun_defs)
     //| is_itasks_mod && funIsTask fd && fd.fun_info.fi_def_level == 1
       //# (menv, predef_symbols) = trace_n ("at " +++ fd.fun_ident.id_name) addTonicWrap icl_module idx menv predef_symbols
