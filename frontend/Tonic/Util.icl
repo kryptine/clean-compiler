@@ -364,7 +364,7 @@ ppType (at1 --> at2)     = ppAType at1 +++ " --> " +++ ppAType at2
 ppType (TArrow)          = "->"
 ppType (TArrow1	at)      = "TArrow1"
 ppType (cv :@: ats)      = ":@:"
-ppType (TB bt)           = "TB"
+ppType (TB bt)           = toString bt
 ppType (TFA ats t)       = "TFA"
 ppType (GTV tv)          = tv.tv_ident.id_name
 ppType (TV tv)           = tv.tv_ident.id_name
@@ -383,8 +383,11 @@ symTyIsTask :: SymbolType -> Bool
 symTyIsTask st = atypeIsTask st.st_result
 
 atypeIsTask :: AType -> Bool
-atypeIsTask aty =
-  case aty.at_type of
+atypeIsTask aty = typeIsTask aty.at_type
+
+typeIsTask :: Type -> Bool
+typeIsTask ty =
+  case ty of
     TA   tsi _     -> symTyIsTask` tsi
     TAS  tsi _  _  -> symTyIsTask` tsi
     _              -> False

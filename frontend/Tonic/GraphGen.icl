@@ -18,6 +18,7 @@ import Data.Func
 import Data.Maybe
 import Data.List
 import Data.Graph
+import Data.Map
 
 import qualified Text.PPrint as PPrint
 import iTasks.Framework.Tonic.AbsSyn
@@ -157,25 +158,22 @@ getModuleName chn
   # chn  = {chn & chn_module_env = menv}
   = (nm, chn)
 
-varIsTask :: VarInfoPtr *ChnExpression -> *(Bool, *ChnExpression)
-varIsTask varptr chn
+letTypes :: ExprInfoPtr *ChnExpression -> *([Type], *ChnExpression)
+letTypes exprPtr chn
   # heaps = chn.chn_heaps
-  # (vi, var_heap) = readPtr varptr heaps.hp_var_heap
-  # chn = {chn & chn_heaps = {heaps & hp_var_heap = var_heap}}
-  = case vi of
-      VI_Type aty _ -> (atypeIsTask aty, chn)
-      _             -> (False, chn)
+  # (ei, expr_heap) = readPtr exprPtr heaps.hp_expression_heap
+  # chn = {chn & chn_heaps = {heaps & hp_expression_heap = expr_heap}}
+  = case ei of
+      EI_LetType atys -> (map (\x -> x.at_type) atys, chn)
+      _               -> ([], chn)
 
-varIsTaskFun :: VarInfoPtr *ChnExpression -> *(Bool, *ChnExpression)
-varIsTaskFun varptr chn
-  # heaps = chn.chn_heaps
-  # (vi, var_heap) = readPtr varptr heaps.hp_var_heap
-  # chn = {chn & chn_heaps = {heaps & hp_var_heap = var_heap}}
-  = case vi of
-      VI_FAType _ aty _    -> (atypeIsTask aty, chn)
-      VI_FATypeC _ aty _ _ -> (atypeIsTask aty, chn)
-      _                    -> (False, chn)
+varIsTask :: BoundVar InhExpression -> Bool
+varIsTask bv inh
+  = case get bv.var_ident.id_name inh.inh_tyenv of
+      Nothing -> False
+      Just t  -> typeIsTask t
 
+import StdDebug
 mkGraphAlg :: *(ExpressionAlg InhExpression *ChnExpression SynExpression)
 mkGraphAlg
   =  {  app = appC, at = atC, letE = letC, caseE = caseC, var = varC
@@ -496,11 +494,13 @@ mkGraphAlg
       # l          = {lt & let_expr = syn.syn_annot_expr}
       = ({syn & syn_annot_expr = Let l}, chn)
     mkLet Nothing lt inh chn
+      # (tys, chn)    = letTypes lt.let_info_ptr chn
       # (binds, menv) = mkGLetBinds lt chn.chn_module_env
+      # tyenv         = zipSt (\(v, _) t tyenv -> put v t tyenv) binds tys inh.inh_tyenv // TODO This probably won't work for arbitrary patterns, so we actually need to be a bit smarter here and extract all variables from the patterns, instead of just PP'ing the pattern and using that as index
       // TODO : Represent the bindings in any way possible, not just PP
-      # (syn, chn)    = exprCata mkGraphAlg lt.let_expr inh {chn & chn_module_env = menv}
-      # l = {lt & let_expr = syn.syn_annot_expr}
-      = ({syn & syn_annot_expr = Let l, syn_texpr = TLet binds syn.syn_texpr}, chn)
+      # (syn, chn)    = exprCata mkGraphAlg lt.let_expr {inh & inh_tyenv = tyenv} {chn & chn_module_env = menv}
+      = ({syn & syn_annot_expr = Let {lt & let_expr = syn.syn_annot_expr}
+         , syn_texpr = TLet binds syn.syn_texpr}, chn)
 
   // TODO: For cases, the compiler introduces a fresh variable in a let for the
   // matches expression. E.g.
@@ -577,10 +577,10 @@ mkGraphAlg
 
   // TODO Determine whether it's a Task a or [Task a]
   // We can do so by maintaining an environment. At lets and lambdas, store the bound variable and its type in the env
+  // TODO Also fill type env at fun binds
   varC bv inh chn
-    # (isTask, chn) = varIsTask bv.var_info_ptr chn
-    | isTask    = ({syn_annot_expr = Var bv, syn_texpr = TVar bv.var_ident.id_name}, chn)
-    | otherwise = ({syn_annot_expr = Var bv, syn_texpr = TVar bv.var_ident.id_name}, chn)
+    | varIsTask bv inh = trace_n ("varIsTask TRUE: " +++ bv.var_ident.id_name) ({syn_annot_expr = Var bv, syn_texpr = TVar bv.var_ident.id_name}, chn)
+    | otherwise        = trace_n ("varIsTask FALSE: " +++ bv.var_ident.id_name) ({syn_annot_expr = Var bv, syn_texpr = TVar bv.var_ident.id_name}, chn)
 
 mkEdge :: App Int InhExpression *ChnExpression -> *(Maybe String, SynExpression, *ChnExpression)
 mkEdge app=:{app_symb, app_args} n inh chn
@@ -613,9 +613,10 @@ funToGraph :: FunDef *ModuleEnv *Heaps *PredefinedSymbols -> *(([(VariableName, 
 funToGraph fd=:{fun_ident=fun_ident, fun_body = TransformedBody tb} menv heaps predef_symbols = mkBody
   where
   mkBody
-    # inh        = mkInhExpr fun_ident.id_name
-    # chn        = mkChnExpr predef_symbols menv heaps
-    # (syn, chn) = exprCata mkGraphAlg tb.tb_rhs inh chn
-    = ( (map (\(arg, ty) -> (arg.fv_ident.id_name, ppType ty)) (zip2 tb.tb_args (funArgTys fd)), Just syn.syn_texpr, Just syn.syn_annot_expr) //Just g, syn.syn_annot_expr)
+    # inh             = mkInhExpr fun_ident.id_name
+    # chn             = mkChnExpr predef_symbols menv heaps
+    # (argTys, tyenv) = zipWithSt (\arg t st -> ((arg, t), put arg.fv_ident.id_name t st)) tb.tb_args (funArgTys fd) newMap
+    # (syn, chn)      = exprCata mkGraphAlg tb.tb_rhs {inh & inh_tyenv = tyenv} chn
+    = ( (map (\(arg, ty) -> (arg.fv_ident.id_name, ppType ty)) argTys, Just syn.syn_texpr, Just syn.syn_annot_expr) //Just g, syn.syn_annot_expr)
       , chn.chn_module_env, chn.chn_heaps, chn.chn_predef_symbols)
 funToGraph _ menv heaps predef_symbols = (([], Nothing, Nothing), menv, heaps, predef_symbols)

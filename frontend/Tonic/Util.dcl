@@ -77,6 +77,8 @@ symTyIsTask :: SymbolType -> Bool
 
 atypeIsTask :: AType -> Bool
 
+typeIsTask :: Type -> Bool
+
 symbIdentIsTask :: SymbIdent *ModuleEnv -> *(Bool, *ModuleEnv)
 
 isInfix :: SymbIdent *ModuleEnv -> *(Bool, *ModuleEnv)
