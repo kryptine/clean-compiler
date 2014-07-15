@@ -329,7 +329,11 @@ PD_tonicTaskDictTaskTaskEmergency :== 316
 PD_tonicTaskDictTaskDateTime      :== 317
 PD_tonicTaskDictTask_Unit         :== 318
 
-PD_NrOfPredefSymbols		:== 319
+PD_tonicWrapLam1			:== 319
+PD_tonicWrapLam2			:== 320
+PD_tonicWrapLam3			:== 321
+
+PD_NrOfPredefSymbols		:== 322
 
 GetTupleConsIndex tup_arity :== PD_Arity2TupleSymbol + tup_arity - 2
 GetTupleTypeIndex tup_arity :== PD_Arity2TupleType + tup_arity - 2

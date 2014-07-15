@@ -116,35 +116,42 @@ withTwo :: App [Expression] (Expression Expression *ChnExpression -> *(SynExpres
 withTwo app [x1:x2:_] f inh chn = f x1 x2 chn
 withTwo app _         _ inh chn = ({syn_annot_expr = App app, syn_texpr = TVar "withTwo TODO"}, chn)
 
-annotExpr :: App (Maybe SymbIdent) (Maybe [Expression]) InhExpression
-             *ChnExpression SynExpression
-          -> *(SynExpression, *ChnExpression)
-annotExpr app mbRepSI mbArgs inh chn syn
+annotExpr :: App TExpr InhExpression *ChnExpression -> *(SynExpression, *ChnExpression)
+annotExpr origApp texpr inh chn
   # (tune_symb, predefs) = (chn.chn_predef_symbols)![PD_tonicWrapApp]
-  | predefIsUndefined tune_symb = (syn, {chn & chn_predef_symbols = predefs})
+  | predefIsUndefined tune_symb = ({syn_annot_expr = App origApp, syn_texpr = texpr}, {chn & chn_predef_symbols = predefs})
   | otherwise
-      # (papp, menv) = isPartialApp app chn.chn_module_env
-      # chn          = {chn & chn_module_env = menv, chn_predef_symbols = predefs}
-      | papp         = (syn, chn)
+      # ((papp, rem), menv) = isPartialApp origApp chn.chn_module_env
+      # chn                 = {chn & chn_module_env = menv, chn_predef_symbols = predefs}
+      | papp
+        # (app, pdss) = etaExpand rem origApp chn.chn_predef_symbols
+        # chn         = {chn & chn_predef_symbols = pdss}
+        # (app, chn)  = mkTuneApp app chn
+        = ({syn_annot_expr = App app, syn_texpr = texpr}, chn)
       | otherwise
-        # (app, chn) = mkTuneApp chn
-        = ({syn & syn_annot_expr = App app}, chn)
+        # (app, chn) = mkTuneApp origApp chn
+        = ({syn_annot_expr = App app, syn_texpr = texpr}, chn)
   where
-  mkTuneApp chn
-    # menv = chn.chn_module_env
-    # icl  = menv.me_icl_module
-    # nm   = icl.icl_name.id_name
-    # menv = {menv & me_icl_module = icl}
+  mkTuneApp app chn
+    # menv        = chn.chn_module_env
+    # icl         = menv.me_icl_module
+    # nm          = icl.icl_name.id_name
+    # menv        = {menv & me_icl_module = icl}
     # chn         = {chn & chn_module_env = menv}
     # (app, pdss) = appPredefinedSymbol PD_tonicWrapApp
                       [ mkStr nm
                       , mkStr inh.inh_curr_task_name
                       , mkStr (ppExprId inh.inh_ids)
-                      , App {app & app_symb = fromMaybe app.app_symb mbRepSI
-                                 , app_args = fromMaybe app.app_args mbArgs}
+                      , App app
                       ] SK_Function chn.chn_predef_symbols
     # chn         = {chn & chn_predef_symbols = pdss}
     = (app, chn)
+  etaExpand rem app = appPredefinedSymbol (findWrap rem) [App app] SK_Function
+    where
+    findWrap 1 = PD_tonicWrapLam1
+    findWrap 2 = PD_tonicWrapLam1
+    findWrap 3 = PD_tonicWrapLam1
+    findWrap n = abort ("No tonicWrapLam" +++ toString n)
 
 ppExprId :: ExprId -> String
 ppExprId eid = foldr (\x xs -> toString x +++ "." +++ xs) "" eid
@@ -182,30 +189,29 @@ varIsListOfTask bv inh
 mkGraphAlg :: *(ExpressionAlg InhExpression *ChnExpression SynExpression)
 mkGraphAlg
   =  {  app = appC, at = atC, letE = letC, caseE = caseC, var = varC
-     ,  selection            = \sk e ss       _ chn -> ({syn_annot_expr = Selection sk e ss           , syn_texpr = TVar "Selection sk e ss           "}, chn)
-     ,  update               = \e1 ss e2      _ chn -> ({syn_annot_expr = Update e1 ss e2             , syn_texpr = TVar "Update e1 ss e2             "}, chn)
-     ,  recordUpdate         = \gd e bs       _ chn -> ({syn_annot_expr = RecordUpdate gd e bs        , syn_texpr = TVar "RecordUpdate gd e bs        "}, chn)
-     ,  tupleSelect          = \ds i e        _ chn -> ({syn_annot_expr = TupleSelect ds i e          , syn_texpr = TVar "TupleSelect ds i e          "}, chn)
-     ,  basicExpr            = \bv            _ chn -> ({syn_annot_expr = BasicExpr bv                , syn_texpr = TVar "BasicExpr bv                "}, chn)
-     ,  conditional          = \c             _ chn -> ({syn_annot_expr = Conditional c               , syn_texpr = TVar "Conditional c               "}, chn)
-     ,  anyCodeExpr          = \cb cf ss      _ chn -> ({syn_annot_expr = AnyCodeExpr cb cf ss        , syn_texpr = TVar "AnyCodeExpr cb cf ss        "}, chn)
-     ,  abcCodeExpr          = \ss b          _ chn -> ({syn_annot_expr = ABCCodeExpr ss b            , syn_texpr = TVar "ABCCodeExpr ss b            "}, chn)
-     ,  matchExpr            = \gd e          _ chn -> ({syn_annot_expr = MatchExpr gd e              , syn_texpr = TVar "MatchExpr gd e              "}, chn)
-     ,  isConstructor        = \e gd n gi i p _ chn -> ({syn_annot_expr = IsConstructor e gd n gi i p , syn_texpr = TVar "IsConstructor e gd n gi i p "}, chn)
-     ,  freeVar              = \v             _ chn -> ({syn_annot_expr = FreeVar v                   , syn_texpr = TVar "FreeVar v                   "}, chn)
-     ,  dictionariesFunction = \xs e at       _ chn -> ({syn_annot_expr = DictionariesFunction xs e at, syn_texpr = TVar "DictionariesFunction xs e at"}, chn)
-     ,  constant             = \si i prio     _ chn -> ({syn_annot_expr = Constant si i prio          , syn_texpr = TVar "Constant si i prio          "}, chn)
-     ,  classVariable        = \vip           _ chn -> ({syn_annot_expr = ClassVariable vip           , syn_texpr = TVar "ClassVariable vip           "}, chn)
-     ,  dynamicExpr          = \de            _ chn -> ({syn_annot_expr = DynamicExpr de              , syn_texpr = TVar "DynamicExpr de              "}, chn)
-     ,  typeCodeExpression   = \t             _ chn -> ({syn_annot_expr = TypeCodeExpression t        , syn_texpr = TVar "TypeCodeExpression t        "}, chn)
-     ,  typeSignature        = \f e           _ chn -> ({syn_annot_expr = TypeSignature f e           , syn_texpr = TVar "TypeSignature f e           "}, chn)
-     ,  ee                   = \              _ chn -> ({syn_annot_expr = EE                          , syn_texpr = TVar "EE                          "}, chn)
-     ,  noBind               = \eip           _ chn -> ({syn_annot_expr = NoBind eip                  , syn_texpr = TVar "NoBind eip                  "}, chn)
-     ,  failExpr             = \i             _ chn -> ({syn_annot_expr = FailExpr i                  , syn_texpr = TVar "FailExpr i                  "}, chn)
+     ,  selection            = \sk e ss       _ chn -> ({syn_annot_expr = Selection sk e ss           , syn_texpr = TCleanExpr "Selection sk e ss           "}, chn)
+     ,  update               = \e1 ss e2      _ chn -> ({syn_annot_expr = Update e1 ss e2             , syn_texpr = TCleanExpr "Update e1 ss e2             "}, chn)
+     ,  recordUpdate         = \gd e bs       _ chn -> ({syn_annot_expr = RecordUpdate gd e bs        , syn_texpr = TCleanExpr "RecordUpdate gd e bs        "}, chn)
+     ,  tupleSelect          = \ds i e        _ chn -> ({syn_annot_expr = TupleSelect ds i e          , syn_texpr = TCleanExpr "TupleSelect ds i e          "}, chn)
+     ,  basicExpr            = \bv            _ chn -> ({syn_annot_expr = BasicExpr bv                , syn_texpr = TCleanExpr "BasicExpr bv                "}, chn)
+     ,  conditional          = \c             _ chn -> ({syn_annot_expr = Conditional c               , syn_texpr = TCleanExpr "Conditional c               "}, chn)
+     ,  anyCodeExpr          = \cb cf ss      _ chn -> ({syn_annot_expr = AnyCodeExpr cb cf ss        , syn_texpr = TCleanExpr "AnyCodeExpr cb cf ss        "}, chn)
+     ,  abcCodeExpr          = \ss b          _ chn -> ({syn_annot_expr = ABCCodeExpr ss b            , syn_texpr = TCleanExpr "ABCCodeExpr ss b            "}, chn)
+     ,  matchExpr            = \gd e          _ chn -> ({syn_annot_expr = MatchExpr gd e              , syn_texpr = TCleanExpr "MatchExpr gd e              "}, chn)
+     ,  isConstructor        = \e gd n gi i p _ chn -> ({syn_annot_expr = IsConstructor e gd n gi i p , syn_texpr = TCleanExpr "IsConstructor e gd n gi i p "}, chn)
+     ,  freeVar              = \v             _ chn -> ({syn_annot_expr = FreeVar v                   , syn_texpr = TCleanExpr "FreeVar v                   "}, chn)
+     ,  dictionariesFunction = \xs e at       _ chn -> ({syn_annot_expr = DictionariesFunction xs e at, syn_texpr = TCleanExpr "DictionariesFunction xs e at"}, chn)
+     ,  constant             = \si i prio     _ chn -> ({syn_annot_expr = Constant si i prio          , syn_texpr = TCleanExpr "Constant si i prio          "}, chn)
+     ,  classVariable        = \vip           _ chn -> ({syn_annot_expr = ClassVariable vip           , syn_texpr = TCleanExpr "ClassVariable vip           "}, chn)
+     ,  dynamicExpr          = \de            _ chn -> ({syn_annot_expr = DynamicExpr de              , syn_texpr = TCleanExpr "DynamicExpr de              "}, chn)
+     ,  typeCodeExpression   = \t             _ chn -> ({syn_annot_expr = TypeCodeExpression t        , syn_texpr = TCleanExpr "TypeCodeExpression t        "}, chn)
+     ,  typeSignature        = \f e           _ chn -> ({syn_annot_expr = TypeSignature f e           , syn_texpr = TCleanExpr "TypeSignature f e           "}, chn)
+     ,  ee                   = \              _ chn -> ({syn_annot_expr = EE                          , syn_texpr = TCleanExpr "EE                          "}, chn)
+     ,  noBind               = \eip           _ chn -> ({syn_annot_expr = NoBind eip                  , syn_texpr = TCleanExpr "NoBind eip                  "}, chn)
+     ,  failExpr             = \i             _ chn -> ({syn_annot_expr = FailExpr i                  , syn_texpr = TCleanExpr "FailExpr i                  "}, chn)
      }
   where
-  // TODO Add share support
-  appC app inh chn // TODO Take arity into account: if a task is partially applied, wrap it in a lambda and annotate that
+  appC app inh chn
     # (idIsTask, menv) = symbIdentIsTask app.app_symb chn.chn_module_env
     # (appD, menv) = ppApp app menv
     # chn = {chn & chn_module_env = menv}
@@ -257,9 +263,7 @@ mkGraphAlg
         // TODO Complex user parsing
         # (ud, menv) = ppExpression u chn.chn_module_env
         # chn        = {chn & chn_module_env = menv}
-        = annotExpr app Nothing Nothing inh chn
-          { syn_annot_expr = App {app & app_args = ctxs ++ [u, syn.syn_annot_expr] }
-          , syn_texpr = TAssign (TUUserWithIdent (ppCompact ud)) syn.syn_texpr}
+        = annotExpr {app & app_args = ctxs ++ [u, syn.syn_annot_expr]} (TAssign (TUUserWithIdent (ppCompact ud)) syn.syn_texpr) inh chn
 
     // TODO : Test
     mkStep app ctxs args inh chn
@@ -344,9 +348,7 @@ mkGraphAlg
       # (ps, menv) = mapSt ppExpression args chn.chn_module_env
       # chn        = {chn & chn_module_env = menv}
       # appArgs    = map ppCompact ps  // TODO : When do we pprint a Clean expr? And when do we generate a subgraph?
-      = annotExpr app Nothing Nothing inh chn
-        { syn_annot_expr = App app
-        , syn_texpr = TTaskApp inh.inh_ids (appFunName app) appArgs}
+      = annotExpr app (TTaskApp inh.inh_ids (appFunName app) appArgs) inh chn
 
     mkTransform app ctxs args inh chn
       = withTwo app args f inh chn
@@ -378,8 +380,8 @@ mkGraphAlg
       f l r chn
         # (synl, chnl) = exprCata mkGraphAlg l (addInhId inh 0) chn
         # (synr, chnr) = exprCata mkGraphAlg r (addInhId inh 1) chnl
-        # app`         = {app & app_args = ctxs ++ [synl.syn_annot_expr, synr.syn_annot_expr]}
-        = ( {syn_annot_expr = App app`, syn_texpr = TParallel (mkPar synl.syn_texpr synr.syn_texpr)}
+        = ( { syn_annot_expr = App {app & app_args = ctxs ++ [synl.syn_annot_expr, synr.syn_annot_expr]}
+            , syn_texpr = TParallel (mkPar synl.syn_texpr synr.syn_texpr)}
           , chnr)
 
     mkParN mkPar app ctxs args inh chn
@@ -394,7 +396,7 @@ mkGraphAlg
               # (listArg, pdss) = toStatic (map (\s -> s.syn_annot_expr) ss) chn.chn_predef_symbols
               = ( { syn_annot_expr = App {app & app_args = [listArg]}
                   , syn_texpr = TParallel (mkPar (T (map (\s -> s.syn_texpr) ss)))}
-                , {chn & chn_predef_symbols = pdss}) // annotExpr app Nothing (Just exprs) inh chn (mkSynExpr (App app))
+                , {chn & chn_predef_symbols = pdss})
             | otherwise = doPP arg
           [arg=:(Var _):_] = doPP arg
       where
@@ -460,33 +462,6 @@ mkGraphAlg
         = ((ppCompact fvl, ppCompact fvr), menv)
 
   atC e es _ chn = ({syn_annot_expr = e @ es, syn_texpr = TVar "TODO @"}, chn)
-  //atC _ _ _ _ = abort "atC: something else than App"
-
-  //atC (Var _)                       _ _ _ = abort "atC: var"
-  //atC (App _)                       _ _ _ = abort "atC: app"
-  //atC (_ @ _)                       _ _ _ = abort "atC: @"
-  //atC (Let _)                       _ _ _ = abort "atC: let"
-  //atC (Case _)                      _ _ _ = abort "atC: case"
-  //atC (Selection _ _ _)             _ _ _ = abort "atC: selection"
-  //atC (Update _ _ _)                _ _ _ = abort "atC: update"
-  //atC (RecordUpdate _ _ _)          _ _ _ = abort "atC: recordupdate"
-  //atC (TupleSelect _ _ _)           _ _ _ = abort "atC: tupleselect"
-  //atC (BasicExpr _)                 _ _ _ = abort "atC: basicExpr"
-  //atC (Conditional _)               _ _ _ = abort "atC: conditional"
-  //atC (AnyCodeExpr _ _ _)           _ _ _ = abort "atC: anycodeexpr"
-  //atC (ABCCodeExpr _ _)             _ _ _ = abort "atC: abccodeexpr"
-  //atC (MatchExpr _ _)               _ _ _ = abort "atC: matchexpr"
-  //atC (IsConstructor _ _ _ _ _ _)   _ _ _ = abort "atC: isConstructor"
-  //atC (FreeVar _)                   _ _ _ = abort "atC: FreeVar"
-  //atC (DictionariesFunction  _ _ _) _ _ _ = abort "atC: DictionariesFunction"
-  //atC (Constant _ _ _)              _ _ _ = abort "atC: Constant"
-  //atC (ClassVariable _)             _ _ _ = abort "atC: ClassVariable"
-  //atC (DynamicExpr _)               _ _ _ = abort "atC: DynamicExpr"
-  //atC (TypeCodeExpression _)        _ _ _ = abort "atC: TypeCodeExpression"
-  //atC (TypeSignature _ _)           _ _ _ = abort "atC: TypeSignature"
-  //atC EE                            _ _ _ = abort "atC: EE"
-  //atC (NoBind _)                    _ _ _ = abort "atC: NoBind"
-  //atC (FailExpr _)                  _ _ _ = abort "atC: FailExpr"
 
   letC lt inh chn
     # mexpr = listToMaybe [ bnd.lb_src \\ bnd <- getLetBinds lt
@@ -503,7 +478,7 @@ mkGraphAlg
       # tyenv         = zipSt (\(v, _) t tyenv -> put v t tyenv) binds tys inh.inh_tyenv // TODO This probably won't work for arbitrary patterns, so we actually need to be a bit smarter here and extract all variables from the patterns, instead of just PP'ing the pattern and using that as index
       // TODO : Represent the bindings in any way possible, not just PP
       # (syn, chn)    = exprCata mkGraphAlg lt.let_expr {inh & inh_tyenv = tyenv} {chn & chn_module_env = menv}
-      = ({syn & syn_annot_expr = Let {lt & let_expr = syn.syn_annot_expr}
+      = ({ syn_annot_expr = Let {lt & let_expr = syn.syn_annot_expr}
          , syn_texpr = TLet binds syn.syn_texpr}, chn)
       where
       flattenBinds lt menv
@@ -546,8 +521,7 @@ mkGraphAlg
                                   # (syn, chn) = mkAlts` def chn
                                   = ((Yes syn.syn_annot_expr, [("_", syn):syns]), chn)
                                 _ = ((No, syns), chn)
-    # cs`                   = {cs & case_default = def, case_guards = guards}
-    = ({ syn_annot_expr = Case cs`
+    = ({ syn_annot_expr = Case {cs & case_default = def, case_guards = guards}
        , syn_texpr = TCaseOrIf (ppCompact ed) (map (\(d, s) -> (d, s.syn_texpr)) syns)}, chn)
     where
     caseExpr = fromMaybe cs.case_expr inh.inh_case_expr
