@@ -130,12 +130,13 @@ annotExpr origApp texpr inh chn
     # menv        = chn.chn_module_env
     # icl         = menv.me_icl_module
     # nm          = icl.icl_name.id_name
+    # (ids, pdss) = toStatic (map mkInt inh.inh_ids) chn.chn_predef_symbols
     # (app, pdss) = appPredefinedSymbol (findWrap rem)
                       [ mkStr nm
                       , mkStr inh.inh_curr_task_name
-                      , mkStr (ppExprId inh.inh_ids)
+                      , ids
                       , App origApp
-                      ] SK_Function chn.chn_predef_symbols
+                      ] SK_Function pdss
     = (app, {chn & chn_predef_symbols = pdss
                  , chn_module_env = {menv & me_icl_module = icl}})
   findWrap 0 = PD_tonicWrapApp
@@ -143,9 +144,6 @@ annotExpr origApp texpr inh chn
   findWrap 2 = PD_tonicWrapAppLam2
   findWrap 3 = PD_tonicWrapAppLam3
   findWrap n = abort ("No tonicWrapLam" +++ toString n)
-
-ppExprId :: ExprId -> String
-ppExprId eid = foldr (\x xs -> toString x +++ "." +++ xs) "" eid
 
 letTypes :: ExprInfoPtr *ChnExpression -> *([Type], *ChnExpression)
 letTypes exprPtr chn
