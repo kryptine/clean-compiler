@@ -116,34 +116,67 @@ withTwo :: App [Expression] (Expression Expression *ChnExpression -> *(SynExpres
 withTwo app [x1:x2:_] f inh chn = f x1 x2 chn
 withTwo app _         _ inh chn = ({syn_annot_expr = App app, syn_texpr = TVar "withTwo TODO"}, chn)
 
-annotExpr :: App TExpr InhExpression *ChnExpression -> *(SynExpression, *ChnExpression)
-annotExpr origApp texpr inh chn
-  # (tune_symb, predefs) = (chn.chn_predef_symbols)![PD_tonicWrapApp]
-  # chn                  = {chn & chn_predef_symbols = predefs}
-  | predefIsUndefined tune_symb = ({syn_annot_expr = App origApp, syn_texpr = texpr}, chn)
-  | otherwise
-    # (rem, menv) = argsRemaining origApp chn.chn_module_env
-    # (app, chn)  = mkTuneApp rem origApp {chn & chn_module_env = menv}
-    = ({syn_annot_expr = App app, syn_texpr = texpr}, chn)
+annotExpr :: Expression TExpr InhExpression *ChnExpression -> *(SynExpression, *ChnExpression)
+annotExpr origExpr texpr inh chn
+  # (tune_symb, predefs)        = (chn.chn_predef_symbols)![PD_tonicWrapApp]
+  # chn                         = {chn & chn_predef_symbols = predefs}
+  | predefIsUndefined tune_symb = ({syn_annot_expr = origExpr, syn_texpr = texpr}, chn)
+  | otherwise                   = annotExpr` origExpr texpr inh chn
   where
-  mkTuneApp rem app chn
-    # menv        = chn.chn_module_env
-    # icl         = menv.me_icl_module
-    # nm          = icl.icl_name.id_name
-    # (ids, pdss) = toStatic (map mkInt inh.inh_ids) chn.chn_predef_symbols
-    # (app, pdss) = appPredefinedSymbol (findWrap rem)
-                      [ mkStr nm
-                      , mkStr inh.inh_curr_task_name
-                      , ids
-                      , App origApp
-                      ] SK_Function pdss
-    = (app, {chn & chn_predef_symbols = pdss
-                 , chn_module_env = {menv & me_icl_module = icl}})
+  annotExpr` origApp=:(App app) texpr inh chn
+    # (rem, menv)   = argsRemaining app chn.chn_module_env
+    # (appApp, chn) = mkTuneApp rem origApp {chn & chn_module_env = menv}
+    = ({syn_annot_expr = App appApp, syn_texpr = texpr}, chn)
+  annotExpr` origVar=:(Var _) texpr inh chn
+    # (bvApp, chn) = mkTuneApp 0 origVar chn
+    = ({syn_annot_expr = App bvApp, syn_texpr = texpr}, chn)
+  mkTuneApp rem origExpr chn
+    # menv         = chn.chn_module_env
+    # icl          = menv.me_icl_module
+    # nm           = icl.icl_name.id_name
+    # (ids, pdss)  = toStatic (map mkInt inh.inh_ids) chn.chn_predef_symbols
+    # (expr, pdss) = appPredefinedSymbol (findWrap rem)
+                       [ mkStr nm
+                       , mkStr inh.inh_curr_task_name
+                       , ids
+                       , origExpr
+                       ] SK_Function pdss
+    = (expr, {chn & chn_predef_symbols = pdss
+                  , chn_module_env = {menv & me_icl_module = icl}})
   findWrap 0 = PD_tonicWrapApp
   findWrap 1 = PD_tonicWrapAppLam1
   findWrap 2 = PD_tonicWrapAppLam2
   findWrap 3 = PD_tonicWrapAppLam3
   findWrap n = abort ("No tonicWrapLam" +++ toString n)
+
+//annotExpr :: App TExpr InhExpression *ChnExpression -> *(SynExpression, *ChnExpression)
+//annotExpr origApp texpr inh chn
+  //# (tune_symb, predefs) = (chn.chn_predef_symbols)![PD_tonicWrapApp]
+  //# chn                  = {chn & chn_predef_symbols = predefs}
+  //| predefIsUndefined tune_symb = ({syn_annot_expr = App origApp, syn_texpr = texpr}, chn)
+  //| otherwise
+    //# (rem, menv) = argsRemaining origApp chn.chn_module_env
+    //# (app, chn)  = mkTuneApp rem origApp {chn & chn_module_env = menv}
+    //= ({syn_annot_expr = App app, syn_texpr = texpr}, chn)
+  //where
+  //mkTuneApp rem app chn
+    //# menv        = chn.chn_module_env
+    //# icl         = menv.me_icl_module
+    //# nm          = icl.icl_name.id_name
+    //# (ids, pdss) = toStatic (map mkInt inh.inh_ids) chn.chn_predef_symbols
+    //# (app, pdss) = appPredefinedSymbol (findWrap rem)
+                      //[ mkStr nm
+                      //, mkStr inh.inh_curr_task_name
+                      //, ids
+                      //, App origApp
+                      //] SK_Function pdss
+    //= (app, {chn & chn_predef_symbols = pdss
+                 //, chn_module_env = {menv & me_icl_module = icl}})
+  //findWrap 0 = PD_tonicWrapApp
+  //findWrap 1 = PD_tonicWrapAppLam1
+  //findWrap 2 = PD_tonicWrapAppLam2
+  //findWrap 3 = PD_tonicWrapAppLam3
+  //findWrap n = abort ("No tonicWrapLam" +++ toString n)
 
 letTypes :: ExprInfoPtr *ChnExpression -> *([Type], *ChnExpression)
 letTypes exprPtr chn
@@ -243,7 +276,7 @@ mkGraphAlg
         // TODO Complex user parsing
         # (ud, menv) = ppExpression u chn.chn_module_env
         # chn        = {chn & chn_module_env = menv}
-        = annotExpr {app & app_args = ctxs ++ [u, syn.syn_annot_expr]} (TAssign (TUUserWithIdent (ppCompact ud)) syn.syn_texpr) inh chn
+        = annotExpr (App {app & app_args = ctxs ++ [u, syn.syn_annot_expr]}) (TAssign (TUUserWithIdent (ppCompact ud)) syn.syn_texpr) inh chn
 
     // TODO : Test
     mkStep app ctxs args inh chn
@@ -328,7 +361,7 @@ mkGraphAlg
       # (ps, menv) = mapSt ppExpression args chn.chn_module_env
       # chn        = {chn & chn_module_env = menv}
       # appArgs    = map ppCompact ps  // TODO : When do we pprint a Clean expr? And when do we generate a subgraph?
-      = annotExpr app (TTaskApp inh.inh_ids (appFunName app) appArgs) inh chn
+      = annotExpr (App app) (TTaskApp inh.inh_ids (appFunName app) appArgs) inh chn
 
     mkTransform app ctxs args inh chn
       = withTwo app args f inh chn
@@ -545,7 +578,9 @@ mkGraphAlg
   // TODO Determine whether it's a Task a or [Task a]
   // We can do so by maintaining an environment. At lets and lambdas, store the bound variable and its type in the env
   varC bv inh chn
-    | varIsTask bv inh       = ({syn_annot_expr = Var bv, syn_texpr = TVar bv.var_ident.id_name}, chn)
+    | varIsTask bv inh
+      = annotExpr (Var bv) (TVar bv.var_ident.id_name) inh chn
+      //= ({syn_annot_expr = Var bv, syn_texpr = TVar bv.var_ident.id_name}, chn)
     | varIsListOfTask bv inh = ({syn_annot_expr = Var bv, syn_texpr = TVar bv.var_ident.id_name}, chn)
     | otherwise              = ({syn_annot_expr = Var bv, syn_texpr = TVar bv.var_ident.id_name}, chn)
 
