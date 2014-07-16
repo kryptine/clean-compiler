@@ -358,10 +358,17 @@ mkGraphAlg
             = (Always syn.syn_texpr, syn, chn)
 
     mkTaskApp app ctxs args inh chn
+    // TODO Cata the args
       # (ps, menv) = mapSt ppExpression args chn.chn_module_env
       # chn        = {chn & chn_module_env = menv}
       # appArgs    = map ppCompact ps  // TODO : When do we pprint a Clean expr? And when do we generate a subgraph?
-      = annotExpr (App app) (TTaskApp inh.inh_ids (appFunName app) appArgs) inh chn
+      = annotExpr (App app) (TTaskApp inh.inh_ids (appFunName app) (map TVar appArgs)) inh chn
+      //# (ss, chn) = let f e (ss, chn)
+                         //# (syn, chn) = exprCata mkGraphAlg e inh chn
+                         //= ([syn:ss], chn)
+                    //in  foldr f ([], chn) args
+      //= annotExpr (App {app & app_args = ctxs ++ map (\s -> s.syn_annot_expr) ss})
+                  //(TTaskApp inh.inh_ids (appFunName app) (map (\s -> s.syn_texpr) ss)) inh chn
 
     mkTransform app ctxs args inh chn
       = withTwo app args f inh chn
@@ -578,10 +585,8 @@ mkGraphAlg
   // TODO Determine whether it's a Task a or [Task a]
   // We can do so by maintaining an environment. At lets and lambdas, store the bound variable and its type in the env
   varC bv inh chn
-    | varIsTask bv inh
-      = annotExpr (Var bv) (TVar bv.var_ident.id_name) inh chn
-      //= ({syn_annot_expr = Var bv, syn_texpr = TVar bv.var_ident.id_name}, chn)
-    | varIsListOfTask bv inh = ({syn_annot_expr = Var bv, syn_texpr = TVar bv.var_ident.id_name}, chn)
+    | varIsTask bv inh       = annotExpr (Var bv) (TVar bv.var_ident.id_name) inh chn
+    | varIsListOfTask bv inh = ({syn_annot_expr = Var bv, syn_texpr = TVar bv.var_ident.id_name}, chn) // TODO Annotate with special wrapper (or just wrap with a map... have to see)
     | otherwise              = ({syn_annot_expr = Var bv, syn_texpr = TVar bv.var_ident.id_name}, chn)
 
 mkEdge :: App Int InhExpression *ChnExpression -> *(Maybe String, SynExpression, *ChnExpression)
