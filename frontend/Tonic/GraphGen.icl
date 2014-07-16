@@ -122,41 +122,30 @@ annotExpr origApp texpr inh chn
   # chn                  = {chn & chn_predef_symbols = predefs}
   | predefIsUndefined tune_symb = ({syn_annot_expr = App origApp, syn_texpr = texpr}, chn)
   | otherwise
-    # (rem, menv)      = argsRemaining origApp chn.chn_module_env
-    # (app, chn)       = mkTuneApp rem origApp {chn & chn_module_env = menv}
+    # (rem, menv) = argsRemaining origApp chn.chn_module_env
+    # (app, chn)  = mkTuneApp rem origApp {chn & chn_module_env = menv}
     = ({syn_annot_expr = App app, syn_texpr = texpr}, chn)
   where
   mkTuneApp rem app chn
     # menv        = chn.chn_module_env
     # icl         = menv.me_icl_module
     # nm          = icl.icl_name.id_name
-    # menv        = {menv & me_icl_module = icl}
-    # chn         = {chn & chn_module_env = menv}
     # (app, pdss) = appPredefinedSymbol (findWrap rem)
                       [ mkStr nm
                       , mkStr inh.inh_curr_task_name
                       , mkStr (ppExprId inh.inh_ids)
                       , App origApp
                       ] SK_Function chn.chn_predef_symbols
-    # chn         = {chn & chn_predef_symbols = pdss}
-    = (app, chn)
+    = (app, {chn & chn_predef_symbols = pdss
+                 , chn_module_env = {menv & me_icl_module = icl}})
   findWrap 0 = PD_tonicWrapApp
   findWrap 1 = PD_tonicWrapAppLam1
-  findWrap 2 = PD_tonicWrapAppLam1
-  findWrap 3 = PD_tonicWrapAppLam1
+  findWrap 2 = PD_tonicWrapAppLam2
+  findWrap 3 = PD_tonicWrapAppLam3
   findWrap n = abort ("No tonicWrapLam" +++ toString n)
 
 ppExprId :: ExprId -> String
 ppExprId eid = foldr (\x xs -> toString x +++ "." +++ xs) "" eid
-
-getModuleName :: *ChnExpression -> *(String, *ChnExpression)
-getModuleName chn
-  # menv = chn.chn_module_env
-  # icl  = menv.me_icl_module
-  # nm   = icl.icl_name.id_name
-  # menv = {menv & me_icl_module = icl}
-  # chn  = {chn & chn_module_env = menv}
-  = (nm, chn)
 
 letTypes :: ExprInfoPtr *ChnExpression -> *([Type], *ChnExpression)
 letTypes exprPtr chn
