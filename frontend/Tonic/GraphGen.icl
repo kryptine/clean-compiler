@@ -237,7 +237,7 @@ mkGraphAlg
           "return"      -> mkReturn    app ctxs args inh chn
           "@:"          -> mkAssign    app ctxs args inh chn
           "@"           -> mkTransform app ctxs args inh chn
-          ">>*"         -> mkStep      app ctxs args inh chn
+          //">>*"         -> mkStep      app ctxs args inh chn
           "anyTask"     -> mkParSumN   app ctxs args inh chn
           "-||-"        -> mkParSum2   app ctxs args inh chn
           "||-"         -> mkParSumR   app ctxs args inh chn

@@ -70,6 +70,7 @@ At e es :== e @ es
 :: *ModuleEnv =
   { me_main_dcl_module_n  :: !Int
   , me_fun_defs           :: !*{#FunDef}
+  , me_fun_defs_cpy       :: !*{#FunDef}
   , me_icl_module         :: !IclModule
   , me_dcl_modules        :: !{#DclModule}
   }
@@ -80,4 +81,4 @@ mkInhExpr :: String -> InhExpression
 
 mkChnExpr :: *PredefinedSymbols *ModuleEnv *Heaps -> *ChnExpression
 
-mkModuleEnv :: ModuleN !*{#FunDef} IclModule {#DclModule} -> *ModuleEnv
+mkModuleEnv :: ModuleN !*{#FunDef} !*{#FunDef} IclModule {#DclModule} -> *ModuleEnv

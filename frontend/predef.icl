@@ -258,26 +258,7 @@ predefined_idents
                     [PD_tonicWrapAppLam1] = i "tonicWrapAppLam1",
                     [PD_tonicWrapAppLam2] = i "tonicWrapAppLam2",
                     [PD_tonicWrapAppLam3] = i "tonicWrapAppLam3",
-                    [PD_EmergencyExample]  = i "EmergencyExample",
-                    [PD_tonicViewInformationEmergency]     = i "tonicViewInformationEmergency",
-                    [PD_tonicViewInformationCallInfo]      = i "tonicViewInformationCallInfo",
-                    [PD_tonicViewInformationAddress]       = i "tonicViewInformationAddress",
-                    [PD_tonicViewInformationAuthority]     = i "tonicViewInformationAuthority",
-                    [PD_tonicViewInformationPhoneNo]       = i "tonicViewInformationPhoneNo",
-                    [PD_tonicViewInformationVerdict]       = i "tonicViewInformationVerdict",
-                    [PD_tonicViewInformation_ListVerdict]  = i "tonicViewInformation_ListVerdict",
-                    [PD_tonicViewInformationTaskEmergency] = i "tonicViewInformationTaskEmergency",
-                    [PD_tonicViewInformationDateTime]      = i "tonicViewInformationDateTime",
-                    [PD_tonicTaskDictTaskEmergency]     = i "tonicTaskDictTaskEmergency",
-                    [PD_tonicTaskDictTaskCallInfo]      = i "tonicTaskDictTaskCallInfo",
-                    [PD_tonicTaskDictTaskAddress]       = i "tonicTaskDictTaskAddress",
-                    [PD_tonicTaskDictTaskAuthority]     = i "tonicTaskDictTaskAuthority",
-                    [PD_tonicTaskDictTaskPhoneNo]       = i "tonicTaskDictTaskPhoneNo",
-                    [PD_tonicTaskDictTaskVerdict]       = i "tonicTaskDictTaskVerdict",
-                    [PD_tonicTaskDictTask_ListVerdict]  = i "tonicTaskDictTask_ListVerdict",
-                    [PD_tonicTaskDictTaskTaskEmergency] = i "tonicTaskDictTaskTaskEmergency",
-                    [PD_tonicTaskDictTaskDateTime]      = i "tonicTaskDictTaskDateTime",
-                    [PD_tonicTaskDictTask_Unit]         = i "tonicTaskDictTask_Unit"
+                    [PD_tonicViewInformation] = i "tonicViewInformation"
 		}
 	=: idents
 	where
@@ -424,26 +405,7 @@ where
 					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapAppLam1)
 					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapAppLam2)
 					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapAppLam3)
-					<<- (local_predefined_idents,	IC_Module NoQualifiedIdents, PD_EmergencyExample)
-                    <<- (local_predefined_idents,  IC_Expression, PD_tonicViewInformationEmergency)
-                    <<- (local_predefined_idents,  IC_Expression, PD_tonicViewInformationCallInfo)
-                    <<- (local_predefined_idents,  IC_Expression, PD_tonicViewInformationAddress)
-                    <<- (local_predefined_idents,  IC_Expression, PD_tonicViewInformationAuthority)
-                    <<- (local_predefined_idents,  IC_Expression, PD_tonicViewInformationPhoneNo)
-                    <<- (local_predefined_idents,  IC_Expression, PD_tonicViewInformationVerdict)
-                    <<- (local_predefined_idents,  IC_Expression, PD_tonicViewInformation_ListVerdict)
-                    <<- (local_predefined_idents,  IC_Expression, PD_tonicViewInformationTaskEmergency)
-                    <<- (local_predefined_idents,  IC_Expression, PD_tonicViewInformationDateTime)
-                    <<- (local_predefined_idents,  IC_Expression, PD_tonicTaskDictTaskEmergency    )
-                    <<- (local_predefined_idents,  IC_Expression, PD_tonicTaskDictTaskCallInfo     )
-                    <<- (local_predefined_idents,  IC_Expression, PD_tonicTaskDictTaskAddress      )
-                    <<- (local_predefined_idents,  IC_Expression, PD_tonicTaskDictTaskAuthority    )
-                    <<- (local_predefined_idents,  IC_Expression, PD_tonicTaskDictTaskPhoneNo      )
-                    <<- (local_predefined_idents,  IC_Expression, PD_tonicTaskDictTaskVerdict      )
-                    <<- (local_predefined_idents,  IC_Expression, PD_tonicTaskDictTask_ListVerdict )
-                    <<- (local_predefined_idents,  IC_Expression, PD_tonicTaskDictTaskTaskEmergency)
-                    <<- (local_predefined_idents,  IC_Expression, PD_tonicTaskDictTaskDateTime     )
-                    <<- (local_predefined_idents,  IC_Expression, PD_tonicTaskDictTask_Unit        )
+					<<- (local_predefined_idents,	IC_Expression,	PD_tonicViewInformation)
 
 		# hash_table = put_predefined_idents_in_hash_table PD_FromS PD_FromThenToO IC_Expression local_predefined_idents hash_table
 

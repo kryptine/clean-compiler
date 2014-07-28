@@ -306,34 +306,13 @@ PD_TC__Unit			:== 295
 PD_iTasks_Framework_Tonic		:== 296
 PD_tonicWrapApp					:== 297
 PD_tonicWrapTaskBody			:== 298
+PD_tonicWrapAppLam1			:== 299
+PD_tonicWrapAppLam2			:== 300
+PD_tonicWrapAppLam3			:== 301
 
-PD_EmergencyExample		:== 305
-PD_tonicViewInformationEmergency    :== 299
-PD_tonicViewInformationCallInfo     :== 300
-PD_tonicViewInformationAddress      :== 301
-PD_tonicViewInformationAuthority    :== 302
-PD_tonicViewInformationPhoneNo      :== 303
-PD_tonicViewInformationVerdict      :== 304
-PD_tonicViewInformation_ListVerdict :== 306
-PD_tonicViewInformationTaskEmergency :== 307
-PD_tonicViewInformationDateTime     :== 308
+PD_tonicViewInformation		:== 302
 
-PD_tonicTaskDictTaskEmergency     :== 309
-PD_tonicTaskDictTaskCallInfo      :== 310
-PD_tonicTaskDictTaskAddress       :== 311
-PD_tonicTaskDictTaskAuthority     :== 312
-PD_tonicTaskDictTaskPhoneNo       :== 313
-PD_tonicTaskDictTaskVerdict       :== 314
-PD_tonicTaskDictTask_ListVerdict  :== 315
-PD_tonicTaskDictTaskTaskEmergency :== 316
-PD_tonicTaskDictTaskDateTime      :== 317
-PD_tonicTaskDictTask_Unit         :== 318
-
-PD_tonicWrapAppLam1			:== 319
-PD_tonicWrapAppLam2			:== 320
-PD_tonicWrapAppLam3			:== 321
-
-PD_NrOfPredefSymbols		:== 322
+PD_NrOfPredefSymbols		:== 303
 
 GetTupleConsIndex tup_arity :== PD_Arity2TupleSymbol + tup_arity - 2
 GetTupleTypeIndex tup_arity :== PD_Arity2TupleType + tup_arity - 2

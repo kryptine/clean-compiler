@@ -1,12 +1,12 @@
 implementation module Tonic.Util
 
 import StdEnv
-import Data.Func
+from Data.Func import $
 import Data.Functor
 import Data.List
 import Data.Maybe
 import Data.Map
-import syntax, predef
+import syntax, predef, typesupport
 import Tonic.AbsSyn
 import Tonic.Pretty
 import Text
@@ -53,10 +53,15 @@ dropAppContexts app menv
             Just funTy -> (dropContexts funTy app.app_args, menv)
             _          -> abort "dropAppContexts: no function type"
 
-extractFunDefs :: !*{#FunDef} -> *(!{#FunDef}, !*{#FunDef})
-extractFunDefs fun_defs
+copyFunDefs :: !*{#FunDef} -> *(!*{#FunDef}, !*{#FunDef})
+copyFunDefs fun_defs
   # defs = {d \\ d <-: fun_defs}
-  = (defs, {d \\ d <-: defs})
+  # l = mkCopy defs
+  # r = mkCopy defs
+  = (l, r)
+  where
+  mkCopy :: !{#FunDef} -> !*{#FunDef}
+  mkCopy defs = {d \\ d <-: defs}
 
 // TODO Get rid of this in favour of a more general reification?
 reifyConsDef :: SymbIdent *ModuleEnv -> *(Maybe ConsDef, *ModuleEnv)
@@ -225,8 +230,8 @@ reifyIclModuleIdxConsDef glob_object menv
 
 reifyFunDefsIdxSymbolType :: Index *ModuleEnv -> *(Maybe SymbolType, *ModuleEnv)
 reifyFunDefsIdxSymbolType idx menv
-  # (mfd, fds) = muselect menv.me_fun_defs idx
-  # menv = {menv & me_fun_defs = fds}
+  # (mfd, fds) = muselect menv.me_fun_defs_cpy idx
+  # menv = {menv & me_fun_defs_cpy = fds}
   = case mfd of
       Just fd -> case fd.fun_type of
                    Yes st -> (Just st, menv)
@@ -235,8 +240,8 @@ reifyFunDefsIdxSymbolType idx menv
 
 reifyFunDefsIdxFunDef :: Index *ModuleEnv -> *(Maybe FunDef, *ModuleEnv)
 reifyFunDefsIdxFunDef idx menv
-  # (mfd, fds) = muselect menv.me_fun_defs idx
-  = (mfd, {menv & me_fun_defs = fds})
+  # (mfd, fds) = muselect menv.me_fun_defs_cpy idx
+  = (mfd, {menv & me_fun_defs_cpy = fds})
 
 foldUArr :: (Int a v:(w:b, u:(arr a)) -> v:(w:b, u:(arr a))) v:(w:b, u:(arr a))
          -> v:(w:b, u:(arr a)) | Array arr a, [v <= u, v <= w]

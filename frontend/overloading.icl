@@ -1330,6 +1330,44 @@ getClassVariable symb var_info_ptr var_heap error
 			# error = overloadingError symb error
 			-> (symb, new_info_ptr, var_heap <:= (var_info_ptr, VI_ClassVar symb new_info_ptr 1), error)
 
+removeOverloadedFunctionsWithoutUpdatingFunctions :: ![Index] ![LocalTypePatternVariable] !Int !*{#FunDef} !*{! FunctionType} !*ExpressionHeap
+	!*TypeCodeInfo !*VarHeap !*ErrorAdmin !*{#PredefinedSymbol}
+		-> (!*{#FunDef}, !*{! FunctionType}, !*ExpressionHeap, !*TypeCodeInfo, !*VarHeap, !*ErrorAdmin, !*{#PredefinedSymbol})
+removeOverloadedFunctionsWithoutUpdatingFunctions group type_pattern_vars main_dcl_module_n fun_defs fun_env symbol_heap type_code_info var_heap error predef_symbols
+	#! ok = error.ea_ok
+	# (_, fun_defs, fun_env, symbol_heap, type_code_info, var_heap, error, predef_symbols)
+		= foldSt (remove_overloaded_function type_pattern_vars) group (ok, fun_defs, fun_env, symbol_heap, type_code_info, var_heap, error, predef_symbols)
+	= (fun_defs, fun_env, symbol_heap, type_code_info, var_heap, error, predef_symbols)
+where
+	remove_overloaded_function type_pattern_vars fun_index (ok, fun_defs, fun_env, symbol_heap, type_code_info, var_heap, error, predef_symbols)
+		| ok
+			# (fun_def, fun_defs) = fun_defs![fun_index]  
+			  (CheckedType st=:{st_context,st_args}, fun_env) = fun_env![fun_index]
+			  {fun_body = TransformedBody {tb_args,tb_rhs},fun_info,fun_arity,fun_ident,fun_pos} = fun_def
+			  
+			  var_heap = mark_FPC_arguments st_args tb_args var_heap
+			  
+			  error = setErrorAdmin (newPosition fun_ident fun_pos) error
+			  (rev_variables,var_heap,error) = determine_class_arguments st_context var_heap error
+			  (type_code_info, symbol_heap, type_pattern_vars, var_heap, error)
+			  		= convertDynamicTypes fun_info.fi_dynamics (type_code_info, symbol_heap, type_pattern_vars, var_heap, error)
+			 
+			  (_ /*tb_rhs*/, ui)
+			  		= updateExpression fun_info.fi_group_index tb_rhs {ui_instance_calls = [], ui_local_vars = fun_info.fi_local_vars, ui_symbol_heap = symbol_heap,
+			  				ui_var_heap = var_heap, ui_fun_defs = fun_defs, ui_fun_env = fun_env, ui_error = error,
+							ui_has_type_codes = False,
+						    ui_x = {x_type_code_info=type_code_info, x_predef_symbols=predef_symbols,x_main_dcl_module_n=main_dcl_module_n}}
+
+			#  {ui_instance_calls, ui_local_vars, ui_symbol_heap, ui_var_heap, ui_fun_defs, ui_fun_env, ui_has_type_codes, ui_error, ui_x = {x_type_code_info = type_code_info, x_predef_symbols = predef_symbols}}
+				=	ui
+			# (tb_args, var_heap) = retrieve_class_arguments rev_variables tb_args ui_var_heap 
+			  fun_info = mark_type_codes ui_has_type_codes fun_info
+			  // fun_body and fun_arity not updated
+			  fun_def & fun_info = { fun_info & fi_calls = fun_info.fi_calls ++ ui_instance_calls, fi_local_vars = ui_local_vars }
+			#! ok = ui_error.ea_ok
+			= (ok, { ui_fun_defs & [fun_index] = fun_def }, ui_fun_env, ui_symbol_heap, type_code_info, var_heap, ui_error, predef_symbols)
+			= (False, fun_defs, fun_env, symbol_heap, type_code_info, var_heap, error, predef_symbols)
+
 removeOverloadedFunctions :: ![Index] ![LocalTypePatternVariable] !Int !*{#FunDef} !*{! FunctionType} !*ExpressionHeap
 	!*TypeCodeInfo !*VarHeap !*ErrorAdmin !*{#PredefinedSymbol}
 		-> (!*{#FunDef}, !*{! FunctionType}, !*ExpressionHeap, !*TypeCodeInfo, !*VarHeap, !*ErrorAdmin, !*{#PredefinedSymbol})
@@ -1348,7 +1386,7 @@ where
 			  var_heap = mark_FPC_arguments st_args tb_args var_heap
 			  
 			  error = setErrorAdmin (newPosition fun_ident fun_pos) error
-			  (rev_variables,var_heap,error) = foldSt determine_class_argument st_context ([],var_heap,error)
+			  (rev_variables,var_heap,error) = determine_class_arguments st_context var_heap error
 			  (type_code_info, symbol_heap, type_pattern_vars, var_heap, error)
 			  		= convertDynamicTypes fun_info.fi_dynamics (type_code_info, symbol_heap, type_pattern_vars, var_heap, error)
 			 
@@ -1360,27 +1398,30 @@ where
 
 			#  {ui_instance_calls, ui_local_vars, ui_symbol_heap, ui_var_heap, ui_fun_defs, ui_fun_env, ui_has_type_codes, ui_error, ui_x = {x_type_code_info = type_code_info, x_predef_symbols = predef_symbols}}
 				=	ui
-			# (tb_args, var_heap) = foldSt retrieve_class_argument rev_variables (tb_args, ui_var_heap) 
+			# (tb_args, var_heap) = retrieve_class_arguments rev_variables tb_args ui_var_heap 
 			  fun_info = mark_type_codes ui_has_type_codes fun_info
 			  fun_def = { fun_def & fun_body = TransformedBody {tb_args = tb_args, tb_rhs = tb_rhs}, fun_arity = length tb_args,
 			  						fun_info = { fun_info & fi_calls = fun_info.fi_calls ++ ui_instance_calls, fi_local_vars = ui_local_vars } }
 			#! ok = ui_error.ea_ok
 			= (ok, { ui_fun_defs & [fun_index] = fun_def }, ui_fun_env, ui_symbol_heap, type_code_info, var_heap, ui_error, predef_symbols)
 			= (False, fun_defs, fun_env, symbol_heap, type_code_info, var_heap, error, predef_symbols)
-			where
-				// this is a ugly way to mark this function for conversion in convertDynamics
-				// FIXME: find a better way to mark the function
-				mark_type_codes True info=:{fi_dynamics=[]}
-					=	{info & fi_dynamics = [nilPtr]}
-				mark_type_codes _ info
-					=	info
 
-	mark_FPC_arguments :: ![AType] ![FreeVar] !*VarHeap -> *VarHeap
-	mark_FPC_arguments st_args tb_args var_heap
-		| has_TFAC st_args
-			= mark_FPC_vars st_args tb_args var_heap
-			= var_heap
+// this is a ugly way to mark this function for conversion in convertDynamics
+// FIXME: find a better way to mark the function
+mark_type_codes True info=:{fi_dynamics=[]}
+	=	{info & fi_dynamics = [nilPtr]}
+mark_type_codes _ info
+	=	info
 
+mark_FPC_arguments :: ![AType] ![FreeVar] !*VarHeap -> *VarHeap
+mark_FPC_arguments st_args tb_args var_heap
+	| has_TFAC st_args
+		= mark_FPC_vars st_args tb_args var_heap
+		= var_heap
+
+determine_class_arguments st_context var_heap error
+	= foldSt determine_class_argument st_context ([],var_heap,error)
+where
 	determine_class_argument {tc_class, tc_var} (variables,var_heap,error)
 		# (var_info, var_heap) = readPtr tc_var var_heap
 		= case var_info of
@@ -1405,9 +1446,12 @@ where
 			  var_heap = writePtr var (VI_ClassVar (build_var_name (toString tc_class)) new_info_ptr 0) var_heap
 			= ([var : variables],var_heap,error)
 
-	build_var_name id_name
-		= { id_name = "_v" +++ id_name, id_info = nilPtr }
+		build_var_name id_name
+			= { id_name = "_v" +++ id_name, id_info = nilPtr }
 
+retrieve_class_arguments rev_variables tb_args var_heap
+	= foldSt retrieve_class_argument rev_variables (tb_args, var_heap) 
+where
 	retrieve_class_argument var_info_ptr (args, var_heap)
 		# (VI_ClassVar var_ident new_info_ptr count, var_heap) = readPtr var_info_ptr var_heap
 		= ([{fv_ident = var_ident, fv_info_ptr = new_info_ptr, fv_def_level = NotALevel, fv_count = count } : args], var_heap <:= (var_info_ptr, VI_Empty))

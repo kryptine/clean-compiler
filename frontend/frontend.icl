@@ -151,23 +151,36 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 	| not ok
 		= (No,{},{},main_dcl_module_n,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
 
-	# (ok, fun_defs, array_instances, common_defs, imported_funs, type_def_infos, heaps, predef_symbols, error,out)
+// TODO START GiN Tonic HACK
+
+    # (fun_defs_cpy, fun_defs) = copyFunDefs fun_defs
+
+    # (ok, fun_tys, fun_defs_cpy, common_defs, imported_funs, td_infos, heaps, predef_symbols, error,out)
+        = typeProgramWithoutUpdatingFunctions groups main_dcl_module_n fun_defs_cpy icl_function_indices.ifi_specials_indices list_inferred_types icl_common icl_import icl_qualified_imports dcl_mods icl_used_module_numbers td_infos heaps predef_symbols error out
+
+    | not ok
+        = (No,{},{},main_dcl_module_n,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
+
+    # (fun_defs_cpy, _) = update_function_types 0 groups fun_tys fun_defs_cpy
+
+    # (fun_defs, predef_symbols, files, heaps) = ginTonic main_dcl_module_n fun_defs fun_defs_cpy icl_mod dcl_mods common_defs predef_symbols files heaps
+
+    # (_,f,files) = fopen ("Clean System Files/groups_posttonic_" +++ icl_mod.icl_name.id_name) FWriteText files
+      (components, fun_defs, f) = showGroups groups 0 False fun_defs f
+      (ok,files) = fclose f files
+    | ok<>ok
+        = abort "";
+
+// TODO END GiN Tonic HACK
+
+
+	# (ok, fun_defs, array_instances, common_defs, imported_funs, td_infos, heaps, predef_symbols, error,out)
 		= typeProgram groups main_dcl_module_n fun_defs icl_function_indices.ifi_specials_indices list_inferred_types icl_common icl_import icl_qualified_imports dcl_mods icl_used_module_numbers td_infos heaps predef_symbols error out
 
 	| not ok
 		= (No,{},{},main_dcl_module_n,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
 
     # (_,f,files) = fopen ("Clean System Files/groups_" +++ icl_mod.icl_name.id_name) FWriteText files
-      (components, fun_defs, f) = showGroups groups 0 False fun_defs f
-      (ok,files) = fclose f files
-    | ok<>ok
-        = abort "";
-
-// TODO START GiN Tonic HACK
-    # (fun_defs, predef_symbols, files, heaps) = ginTonic main_dcl_module_n fun_defs icl_mod dcl_mods common_defs predef_symbols files heaps
-// TODO END GiN Tonic HACK
-
-    # (_,f,files) = fopen ("Clean System Files/groups_posttonic_" +++ icl_mod.icl_name.id_name) FWriteText files
       (components, fun_defs, f) = showGroups groups 0 False fun_defs f
       (ok,files) = fclose f files
     | ok<>ok
@@ -205,7 +218,7 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 	# (def_min, fun_defs)		= usize fun_defs
 
 	  (components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap, error, predef_symbols)
-	  	= transformGroups cleanup_info main_dcl_module_n stdStrictLists_module_n def_min def_max components fun_defs acc_args common_defs imported_funs dcl_types type_def_infos var_heap type_heaps expression_heap options.feo_fusion error predef_symbols
+	  	= transformGroups cleanup_info main_dcl_module_n stdStrictLists_module_n def_min def_max components fun_defs acc_args common_defs imported_funs dcl_types td_infos var_heap type_heaps expression_heap options.feo_fusion error predef_symbols
 
 	# error_admin = {ea_file = error, ea_loc = [], ea_ok = True }
 	# {dcl_instances,dcl_specials,dcl_gencases,dcl_type_funs} = dcl_mods.[main_dcl_module_n]

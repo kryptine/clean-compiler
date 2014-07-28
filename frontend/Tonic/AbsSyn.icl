@@ -55,13 +55,14 @@ mkChnExpr predef_symbols menv heaps =
   , chn_heaps          = heaps
   }
 
-mkModuleEnv :: ModuleN !*{#FunDef} IclModule {#DclModule} -> *ModuleEnv
-mkModuleEnv main_dcl_module_n fun_defs icl_module dcl_modules =
+mkModuleEnv :: ModuleN !*{#FunDef} !*{#FunDef} IclModule {#DclModule} -> *ModuleEnv
+mkModuleEnv main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules =
   {  ModuleEnv
   |  me_main_dcl_module_n = main_dcl_module_n
   ,  me_dcl_modules  = dcl_modules
   ,  me_icl_module   = icl_module
   ,  me_fun_defs     = fun_defs
+  ,  me_fun_defs_cpy = fun_defs_cpy
   }
 
 //mkGLet :: Let *ModuleEnv -> *(GLet, *ModuleEnv)

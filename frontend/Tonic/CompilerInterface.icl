@@ -16,13 +16,13 @@ import Data.Map
 import Text.JSON
 import iTasks.Framework.Tonic.AbsSyn
 
-ginTonic :: ModuleN !*{#FunDef} IclModule {#DclModule} !{#CommonDefs} !*PredefinedSymbols !*Files !*Heaps -> *(!*{#FunDef}, !*PredefinedSymbols, !*Files, !*Heaps)
-ginTonic main_dcl_module_n fun_defs icl_module dcl_modules common_defs predef_symbols files heaps
+ginTonic :: ModuleN !*{#FunDef} !*{#FunDef} IclModule {#DclModule} !{#CommonDefs} !*PredefinedSymbols !*Files !*Heaps -> *(!*{#FunDef}, !*PredefinedSymbols, !*Files, !*Heaps)
+ginTonic main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules common_defs predef_symbols files heaps
   # iclname                                 = icl_module.icl_name.id_name
   | isSystemModule iclname                  = (fun_defs, predef_symbols, files, heaps)
   # (ok, files)                             = ensureDirectoryExists csf_directory_path files
   | not ok                                  = (fun_defs, predef_symbols, files, heaps)
-  # (tstr, fun_defs, predef_symbols, heaps) = ginTonic` (isITasksModule iclname) main_dcl_module_n toJSONString fun_defs icl_module dcl_modules common_defs predef_symbols heaps
+  # (tstr, fun_defs, predef_symbols, heaps) = ginTonic` (isITasksModule iclname) main_dcl_module_n toJSONString fun_defs fun_defs_cpy icl_module dcl_modules common_defs predef_symbols heaps
   # files                                   = writeTonicFile iclname tstr files
   = (fun_defs, predef_symbols, files, heaps)
   where
@@ -73,16 +73,16 @@ toJSONString rs icl_module menv
           //= ([dot : xs], menv)
 
 ginTonic` :: Bool ModuleN ((Map String TonicTask) IclModule *ModuleEnv -> *(String, *ModuleEnv))
-             !*{#FunDef} IclModule {#DclModule} !{#CommonDefs} !*PredefinedSymbols *Heaps
+             !*{#FunDef} !*{#FunDef} IclModule {#DclModule} !{#CommonDefs} !*PredefinedSymbols *Heaps
           -> *(String, !*{#FunDef}, !*PredefinedSymbols, !*Heaps)
-ginTonic` is_itasks_mod main_dcl_module_n repsToString fun_defs icl_module dcl_modules common_defs predef_symbols heaps
-  # ((reps, heaps, predef_symbols), fun_defs) = foldUArr appDefInfo ((newMap, heaps, predef_symbols), fun_defs)
-  # menv                                      = mkModuleEnv main_dcl_module_n fun_defs icl_module dcl_modules
-  # (str, menv)                               = repsToString reps icl_module menv
+ginTonic` is_itasks_mod main_dcl_module_n repsToString fun_defs fun_defs_cpy icl_module dcl_modules common_defs predef_symbols heaps
+  # ((reps, heaps, predef_symbols, fun_defs_cpy), fun_defs) = foldUArr appDefInfo ((newMap, heaps, predef_symbols, fun_defs_cpy), fun_defs)
+  # menv        = mkModuleEnv main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules
+  # (str, menv) = repsToString reps icl_module menv
   = (str, menv.me_fun_defs, predef_symbols, heaps)
   where
-  appDefInfo idx fd ((reps, heaps, predef_symbols), fun_defs)
-    # menv = mkModuleEnv main_dcl_module_n fun_defs icl_module dcl_modules
+  appDefInfo idx fd ((reps, heaps, predef_symbols, fun_defs_cpy), fun_defs)
+    # menv = mkModuleEnv main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules
     | not is_itasks_mod && funIsTask fd && fd.fun_info.fi_def_level == 1
       # (mres, menv, heaps, predef_symbols) = funToGraph fd menv heaps predef_symbols
       # menv = case mres of
@@ -94,7 +94,7 @@ ginTonic` is_itasks_mod main_dcl_module_n repsToString fun_defs icl_module dcl_m
             Just (args, g, _)
               -> put fd.fun_ident.id_name {TonicTask | tt_name = fd.fun_ident.id_name, tt_resty = fromMaybe "" (fmap (ppCompact o ppType) (functorContent (funTy fd))), tt_args = args, tt_body = g} reps
             _ -> reps
-        , heaps, predef_symbols), menv.me_fun_defs)
+        , heaps, predef_symbols, menv.me_fun_defs_cpy), menv.me_fun_defs)
     //| is_itasks_mod && funIsTask fd && fd.fun_info.fi_def_level == 1
       //# (menv, predef_symbols) = trace_n ("at " +++ fd.fun_ident.id_name) addTonicWrap icl_module idx menv predef_symbols
       //= ((reps, heaps, predef_symbols), menv.me_fun_defs)
@@ -103,7 +103,7 @@ ginTonic` is_itasks_mod main_dcl_module_n repsToString fun_defs icl_module dcl_m
       //# menv = mkModuleEnv main_dcl_module_n fun_defs icl_module dcl_modules
       //# menv = addTonicWrap icl_module idx menv
       //= ((reps, heaps), menv.me_fun_defs)
-    | otherwise        = ((reps, heaps, predef_symbols), fun_defs)
+    | otherwise        = ((reps, heaps, predef_symbols, fun_defs_cpy), fun_defs)
 
 updateWithAnnot :: Int Expression *ModuleEnv -> *ModuleEnv
 updateWithAnnot fidx e menv
@@ -131,58 +131,25 @@ addTonicWrap icl_module idx menv pdss
           _ = (menv, pdss)
   where
   doAddRefl {fun_ident, fun_body=TransformedBody { tb_args, tb_rhs }, fun_type=Yes symbty} menv pdss
-    # fun_defs    = menv.me_fun_defs
-    //# args = symbty.st_args
+    # fun_defs     = menv.me_fun_defs
     # (args, pdss) = foldr mkArg ([], pdss) (zip2 tb_args symbty.st_args)
     | length args == length tb_args
-        # (xs, pdss) = toStatic args pdss
-        # mdictPDS   = luDict ("tonicTaskDict" +++ ppCompact (ppType symbty.st_result.at_type))
-        = case mdictPDS of
-            Just dictPDS
-              # (dict, pdss) = appPredefinedSymbol dictPDS [] SK_Function pdss
-              # (wrap, pdss) = appPredefinedSymbol PD_tonicWrapTaskBody
-                                 [ mkStr icl_module.icl_name.id_name
-                                 , mkStr fun_ident.id_name
-                                 , xs
-                                 , App dict
-                                 , tb_rhs
-                                 ] SK_Function pdss
-              # fun_defs    = updateFunRhs idx fun_defs (App wrap)
-              = ({ menv & me_fun_defs = fun_defs}, pdss)
-            _ = (menv, pdss)
+        # (xs, pdss)   = toStatic args pdss
+        # (wrap, pdss) = appPredefinedSymbol PD_tonicWrapTaskBody
+                           [ mkStr icl_module.icl_name.id_name
+                           , mkStr fun_ident.id_name
+                           , xs
+                           , tb_rhs
+                           ] SK_Function pdss
+        # fun_defs     = updateFunRhs idx fun_defs (tb_rhs)
+        = ({ menv & me_fun_defs = fun_defs}, pdss)
     | otherwise = (menv, pdss)
     where
+    mkArg :: (FreeVar, AType) ([Expression], *PredefinedSymbols) -> *([Expression], *PredefinedSymbols)
     mkArg (arg=:{fv_ident}, {at_type}) (xs, pdss)
-      # mviPDS = luPD ("tonicViewInformation" +++ ppCompact (ppType at_type))
-      = case mviPDS of
-          Just viPDS
-            # (viewApp, pdss) = appPredefinedSymbol viPDS
-                                  [ Var (freeVarToVar arg)
-                                  ] SK_Function pdss
-            # (texpr, pdss) = toStatic (mkStr fv_ident.id_name, App viewApp) pdss
-            = ([texpr:xs], pdss)
-          _ = (xs, pdss)
-      where
-      luPD "tonicViewInformationEmergency"     = Just PD_tonicViewInformationEmergency
-      luPD "tonicViewInformationCallInfo"      = Just PD_tonicViewInformationCallInfo
-      luPD "tonicViewInformationAddress"       = Just PD_tonicViewInformationAddress
-      luPD "tonicViewInformationAuthority"     = Just PD_tonicViewInformationAuthority
-      luPD "tonicViewInformationPhoneNo"       = Just PD_tonicViewInformationPhoneNo
-      luPD "tonicViewInformationVerdict"       = Just PD_tonicViewInformationVerdict
-      luPD "tonicViewInformation_ListVerdict"  = Just PD_tonicViewInformation_ListVerdict
-      luPD "tonicViewInformationTaskEmergency" = Just PD_tonicViewInformationTaskEmergency
-      luPD "tonicViewInformationDateTime"      = Just PD_tonicViewInformationDateTime
-      luPD str = Nothing // abort ("luPD " +++ str)
-
-    luDict "tonicTaskDictTaskEmergency"     = Just PD_tonicTaskDictTaskEmergency
-    luDict "tonicTaskDictTaskCallInfo"      = Just PD_tonicTaskDictTaskCallInfo
-    luDict "tonicTaskDictTaskAddress"       = Just PD_tonicTaskDictTaskAddress
-    luDict "tonicTaskDictTaskAuthority"     = Just PD_tonicTaskDictTaskAuthority
-    luDict "tonicTaskDictTaskPhoneNo"       = Just PD_tonicTaskDictTaskPhoneNo
-    luDict "tonicTaskDictTaskVerdict"       = Just PD_tonicTaskDictTaskVerdict
-    luDict "tonicTaskDictTask_ListVerdict"  = Just PD_tonicTaskDictTask_ListVerdict
-    luDict "tonicTaskDictTaskTaskEmergency" = Just PD_tonicTaskDictTaskTaskEmergency
-    luDict "tonicTaskDictTaskDateTime"      = Just PD_tonicTaskDictTaskDateTime
-    luDict "tonicTaskDictTask_Unit"         = Just PD_tonicTaskDictTask_Unit
-    luDict str = Nothing // abort ("luDict " +++ str)
+      # (viewApp, pdss) = appPredefinedSymbol PD_tonicViewInformation
+                            [ Var (freeVarToVar arg)
+                            ] SK_Function pdss
+      # (texpr, pdss) = toStatic (mkStr fv_ident.id_name, App viewApp) pdss
+      = ([texpr:xs], pdss)
   doAddRefl _ menv pdss = (menv, pdss)

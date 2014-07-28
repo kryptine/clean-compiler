@@ -1,6 +1,7 @@
 definition module Tonic.Util
 
 from syntax import :: App, :: FunType, :: ConsDef, :: Index, :: SymbKind, :: Type, :: TypeSymbIdent
+from typesupport import :: FunctionType
 from StdArray import class Array
 from Data.Maybe import :: Maybe
 from Data.Map import :: Map
@@ -17,7 +18,7 @@ intercalateString :: String [String] -> String
 
 dropAppContexts :: App *ModuleEnv -> *(([Expression], [Expression]), *ModuleEnv)
 
-extractFunDefs :: !*{#FunDef} -> *(!{#FunDef}, !*{#FunDef})
+copyFunDefs :: !*{#FunDef} -> *(!*{#FunDef}, !*{#FunDef})
 
 muselect :: !u:(a e) !Int -> *(Maybe e, !u:(a e)) | Array a e
 
