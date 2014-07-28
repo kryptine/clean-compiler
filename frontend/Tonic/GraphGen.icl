@@ -339,20 +339,20 @@ mkGraphAlg
           "hasValue"
             # [(App tApp):_]  = contApp.app_args // TODO Bah
             # (lbl, syn, chn) = mkEdge tApp n inh chn
-            = (HasValue lbl syn.syn_texpr, contApp /* TODO */, chn)
+            = (HasValue lbl syn.syn_texpr, {contApp & app_args = [syn.syn_annot_expr]}, chn)
           "ifStable"
             # [(App tApp):_]  = contApp.app_args // TODO Bah
             # (lbl, syn, chn) = mkEdge tApp n inh chn
-            = (IfStable lbl syn.syn_texpr, contApp /* TODO */, chn)
+            = (IfStable lbl syn.syn_texpr, {contApp & app_args = [syn.syn_annot_expr]}, chn)
           "ifUnstable"
             # [(App tApp):_]  = contApp.app_args // TODO Bah
             # (lbl, syn, chn) = mkEdge tApp n inh chn
-            = (IfUnstable lbl syn.syn_texpr, contApp /* TODO */, chn)
+            = (IfUnstable lbl syn.syn_texpr, {contApp & app_args = [syn.syn_annot_expr]}, chn)
           "ifCond"
             # [cond:(App tApp):_] = contApp.app_args // TODO Bah
             # (lbl, syn, chn)     = mkEdge tApp n inh chn
             # (d, menv)           = ppExpression cond chn.chn_module_env
-            = (IfCond (ppCompact d) lbl syn.syn_texpr, contApp /* TODO */, { chn & chn_module_env = menv })
+            = (IfCond (ppCompact d) lbl syn.syn_texpr, {contApp & app_args = [cond, syn.syn_annot_expr]}, { chn & chn_module_env = menv })
           "always"
             # (syn, chn) = exprCata mkGraphAlg (hd contApp.app_args) (addInhId inh n) chn
             = (Always syn.syn_texpr, {contApp & app_args = [syn.syn_annot_expr]}, chn)
