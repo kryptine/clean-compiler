@@ -237,7 +237,7 @@ mkGraphAlg
           "return"      -> mkReturn    app ctxs args inh chn
           "@:"          -> mkAssign    app ctxs args inh chn
           "@"           -> mkTransform app ctxs args inh chn
-          //">>*"         -> mkStep      app ctxs args inh chn
+          ">>*"         -> mkStep      app ctxs args inh chn
           "anyTask"     -> mkParSumN   app ctxs args inh chn
           "-||-"        -> mkParSum2   app ctxs args inh chn
           "||-"         -> mkParSumR   app ctxs args inh chn
@@ -288,25 +288,25 @@ mkGraphAlg
             (arg=:(App _))
               | exprIsListConstr arg
                   # exprs               = fromStatic arg
-                  # (scs, syns, chn, _) = let f e=:(App a=:{app_args=[App btnOrCont:asTl]}) (scs, syns, chn, n)
-                                                | appFunName a == "OnAction"
-                                                # [App contApp:_] = asTl // TODO Bah
-                                                # (sf, syn, chn)  = mkStepCont contApp n chn
-                                                # action          = extractAction btnOrCont
-                                                = ([StepOnAction action sf:scs], [syn:syns], chn, n + 1)
-                                                | appFunName a == "OnValue"
-                                                # [App contApp:_] = asTl // TODO Bah
-                                                # (sf, syn, chn)  = mkStepCont contApp n chn
-                                                = ([StepOnValue sf:scs], [syn:syns], chn, n + 1)
-                                                | appFunName a == "OnException"
-                                                # (lbl, syn, chn) = mkEdge btnOrCont n inh chn
-                                                = ([StepOnException lbl syn.syn_texpr:scs], [syn:syns], chn, n + 1)
-                                                | appFunName a == "OnAllExceptions"
-                                                # (lbl, syn, chn) = mkEdge btnOrCont n inh chn
-                                                = ([StepOnException lbl syn.syn_texpr:scs], [syn:syns], chn, n + 1)
-                                              f _ (scs, syns, chn, n) = (scs, syns, chn, n + 1)
-                                          in  foldr f ([], [], chn, 1) exprs
-                  # (stArgs, pdss) = toStatic (map (\s -> s.syn_annot_expr) syns) chn.chn_predef_symbols
+                  // TODO FIXME : RHS of step is not updated properly
+                  # (scs, aes, chn, _) = let f e=:(App a=:{app_args=[App btnOrCont:asTl]}) (scs, aes, chn, n)
+                                               | appFunName a == "OnAction"
+                                               # [App contApp:_] = asTl // TODO Bah
+                                               # (sf, syn, chn)  = mkStepCont contApp n chn
+                                               # action          = extractAction btnOrCont
+                                               = ([StepOnAction action sf:scs], [App {a & app_args = [App btnOrCont, App syn]} : aes], chn, n + 1)
+                                               | appFunName a == "OnValue"
+                                               # (sf, syn, chn)  = mkStepCont btnOrCont n chn
+                                               = ([StepOnValue sf:scs], [App {a & app_args = [App syn]} : aes], chn, n + 1)
+                                               | appFunName a == "OnException"
+                                               # (lbl, syn, chn) = mkEdge btnOrCont n inh chn
+                                               = ([StepOnException lbl syn.syn_texpr:scs], [App {a & app_args = [syn.syn_annot_expr]} : aes], chn, n + 1)
+                                               | appFunName a == "OnAllExceptions"
+                                               # (lbl, syn, chn) = mkEdge btnOrCont n inh chn
+                                               = ([StepOnException lbl syn.syn_texpr:scs], [App {a & app_args = [syn.syn_annot_expr]} : aes], chn, n + 1)
+                                             f _ (scs, aes, chn, n) = (scs, aes, chn, n + 1)
+                                         in  foldr f ([], [], chn, 1) exprs
+                  # (stArgs, pdss) = toStatic aes chn.chn_predef_symbols
                   = ({syn_annot_expr = App {app & app_args = ctxs ++ [synl.syn_annot_expr, stArgs]}
                     , syn_texpr = TStep synl.syn_texpr (map T scs)}
                     , {chn & chn_predef_symbols = pdss})
@@ -335,27 +335,27 @@ mkGraphAlg
             # (lbl, syn, chn)           = mkEdge tApp n inh {chn & chn_module_env = menv}
             = (IfValue (ppCompact ppHdRemFArgs) fApp.app_symb.symb_ident.id_name
                 (map ppCompact (ppFAppArgs ++ [ppHdRemFArgs:ppTlRemFArgs])) lbl syn.syn_texpr
-              , syn, chn)
+              , contApp /* TODO */, chn)
           "hasValue"
             # [(App tApp):_]  = contApp.app_args // TODO Bah
             # (lbl, syn, chn) = mkEdge tApp n inh chn
-            = (HasValue lbl syn.syn_texpr, syn, chn)
+            = (HasValue lbl syn.syn_texpr, contApp /* TODO */, chn)
           "ifStable"
             # [(App tApp):_]  = contApp.app_args // TODO Bah
             # (lbl, syn, chn) = mkEdge tApp n inh chn
-            = (IfStable lbl syn.syn_texpr, syn, chn)
+            = (IfStable lbl syn.syn_texpr, contApp /* TODO */, chn)
           "ifUnstable"
             # [(App tApp):_]  = contApp.app_args // TODO Bah
             # (lbl, syn, chn) = mkEdge tApp n inh chn
-            = (IfUnstable lbl syn.syn_texpr, syn, chn)
+            = (IfUnstable lbl syn.syn_texpr, contApp /* TODO */, chn)
           "ifCond"
             # [cond:(App tApp):_] = contApp.app_args // TODO Bah
             # (lbl, syn, chn)     = mkEdge tApp n inh chn
             # (d, menv)           = ppExpression cond chn.chn_module_env
-            = (IfCond (ppCompact d) lbl syn.syn_texpr, syn, { chn & chn_module_env = menv })
+            = (IfCond (ppCompact d) lbl syn.syn_texpr, contApp /* TODO */, { chn & chn_module_env = menv })
           "always"
             # (syn, chn) = exprCata mkGraphAlg (hd contApp.app_args) (addInhId inh n) chn
-            = (Always syn.syn_texpr, syn, chn)
+            = (Always syn.syn_texpr, {contApp & app_args = [syn.syn_annot_expr]}, chn)
 
     mkTaskApp app ctxs args inh chn
     // TODO Cata the args
