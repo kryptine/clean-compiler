@@ -1,6 +1,6 @@
 definition module Tonic.Util
 
-from syntax import :: App, :: FunType, :: ConsDef, :: Index, :: SymbKind, :: Type, :: TypeSymbIdent
+from syntax import :: App, :: FunType, :: ConsDef, :: Index, :: SymbKind, :: Type, :: TypeSymbIdent, :: TypeDefInfos, :: TypeDefInfo
 from typesupport import :: FunctionType
 from StdArray import class Array
 from Data.Maybe import :: Maybe
@@ -114,6 +114,8 @@ mkStr :: String -> Expression
 
 mkInt :: Int -> Expression
 
+appPredefinedSymbolWithEI :: Int [Expression] ((Global Index) -> SymbKind) *Heaps *PredefinedSymbols -> *(App, *Heaps, *PredefinedSymbols)
+
 appPredefinedSymbol :: Int [Expression] ((Global Index) -> SymbKind) *PredefinedSymbols -> *(App, *PredefinedSymbols)
 
 mkPredefSymbIdent :: Ident PredefinedSymbol ((Global Index) -> SymbKind) -> SymbIdent
@@ -130,7 +132,7 @@ instance FromStatic [Expression]
 
 instance ToStatic (Expression, Expression)
 
-freeVarToVar :: FreeVar -> BoundVar
+freeVarToVar :: FreeVar *Heaps -> *(BoundVar, *Heaps)
 
 foldrSt :: !(.a -> .(.st -> .st)) ![.a] !.st -> .st
 

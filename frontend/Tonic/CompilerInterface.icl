@@ -89,7 +89,7 @@ ginTonic` is_itasks_mod main_dcl_module_n repsToString fun_defs fun_defs_cpy icl
                  Just (_, _, e)
                    -> updateWithAnnot idx e menv
                  _ -> menv
-      # (menv, predef_symbols) = addTonicWrap icl_module idx menv predef_symbols
+      # (menv, heaps, predef_symbols) = addTonicWrap icl_module idx menv heaps predef_symbols
       = ((case mres of
             Just (args, g, _)
               -> put fd.fun_ident.id_name {TonicTask | tt_name = fd.fun_ident.id_name, tt_resty = fromMaybe "" (fmap (ppCompact o ppType) (functorContent (funTy fd))), tt_args = args, tt_body = g} reps
@@ -111,45 +111,49 @@ updateWithAnnot fidx e menv
   # fun_defs = updateFunRhs fidx fun_defs e
   = { menv & me_fun_defs = fun_defs}
 
-addTonicWrap :: IclModule Index *ModuleEnv *PredefinedSymbols -> *(*ModuleEnv, *PredefinedSymbols)
-addTonicWrap icl_module idx menv pdss
+addTonicWrap :: IclModule Index *ModuleEnv !*Heaps *PredefinedSymbols -> *(*ModuleEnv, *Heaps, *PredefinedSymbols)
+addTonicWrap icl_module idx menv heaps pdss
   # (tonicWrapTask, pdss) = pdss![PD_tonicWrapTaskBody]
-  | predefIsUndefined tonicWrapTask = (menv, pdss)
+  | predefIsUndefined tonicWrapTask = (menv, heaps, pdss)
   | otherwise
-      # (mfd, fun_defs) = muselect menv.me_fun_defs idx
-      # menv            = {menv & me_fun_defs = fun_defs}
-      = case mfd of
-          Just fd
-            = case (fd.fun_body, fd.fun_type) of
+      # (mfdnt, fun_defs)    = muselect menv.me_fun_defs idx
+      # menv                 = {menv & me_fun_defs = fun_defs}
+      # (mfdt, fun_defs_cpy) = muselect menv.me_fun_defs_cpy idx
+      # menv                 = {menv & me_fun_defs_cpy = fun_defs_cpy}
+      = case (mfdnt, mfdt) of
+          (Just fdnt, Just fdt)
+            = case (fdnt.fun_body, fdt.fun_type) of
                 (TransformedBody fb, Yes _)
                   # (isPA, menv) = case fb.tb_rhs of
                                      App app -> isPartialApp app menv
                                      // TODO Add a case for @ ?
                                      _       -> (False, menv)
-                  = if isPA (menv, pdss) (doAddRefl fd menv pdss)
-                _ = (menv, pdss)
-          _ = (menv, pdss)
+                  = if isPA (menv, heaps, pdss) (doAddRefl fdnt fdt.fun_type menv heaps pdss)
+                _ = (menv, heaps, pdss)
+          _ = (menv, heaps, pdss)
   where
-  doAddRefl {fun_ident, fun_body=TransformedBody { tb_args, tb_rhs }, fun_type=Yes symbty} menv pdss
+  doAddRefl {fun_ident, fun_body=TransformedBody { tb_args, tb_rhs }} (Yes symbty) menv heaps pdss
     # fun_defs     = menv.me_fun_defs
-    # (args, pdss) = foldr mkArg ([], pdss) (zip2 tb_args symbty.st_args)
+    # (args, heaps, pdss) = foldr mkArg ([], heaps, pdss) (zip2 tb_args symbty.st_args)
     | length args == length tb_args
         # (xs, pdss)   = toStatic args pdss
-        # (wrap, pdss) = appPredefinedSymbol PD_tonicWrapTaskBody
-                           [ mkStr icl_module.icl_name.id_name
-                           , mkStr fun_ident.id_name
-                           , xs
-                           , tb_rhs
-                           ] SK_Function pdss
-        # fun_defs     = updateFunRhs idx fun_defs (tb_rhs)
-        = ({ menv & me_fun_defs = fun_defs}, pdss)
-    | otherwise = (menv, pdss)
+        # (wrap, heaps, pdss) = appPredefinedSymbolWithEI PD_tonicWrapTaskBody
+                                  [ mkStr icl_module.icl_name.id_name
+                                  , mkStr fun_ident.id_name
+                                  , xs
+                                  , tb_rhs
+                                  ] SK_Function heaps pdss
+        # fun_defs     = updateFunRhs idx fun_defs (App wrap)
+        = ({ menv & me_fun_defs = fun_defs}, heaps, pdss)
+    | otherwise = (menv, heaps, pdss)
     where
-    mkArg :: (FreeVar, AType) ([Expression], *PredefinedSymbols) -> *([Expression], *PredefinedSymbols)
-    mkArg (arg=:{fv_ident}, {at_type}) (xs, pdss)
-      # (viewApp, pdss) = appPredefinedSymbol PD_tonicViewInformation
-                            [ Var (freeVarToVar arg)
-                            ] SK_Function pdss
+    mkArg :: (FreeVar, AType) ([Expression], *Heaps, *PredefinedSymbols) -> *([Expression], *Heaps, *PredefinedSymbols)
+    mkArg (arg=:{fv_ident}, {at_type}) (xs, heaps, pdss)
+      # (bv, heaps) = freeVarToVar arg heaps
+      # (viewApp, heaps, pdss) = appPredefinedSymbolWithEI PD_tonicViewInformation
+                                   [ mkStr fv_ident.id_name
+                                   , Var bv
+                                   ] SK_Function heaps pdss
       # (texpr, pdss) = toStatic (mkStr fv_ident.id_name, App viewApp) pdss
-      = ([texpr:xs], pdss)
-  doAddRefl _ menv pdss = (menv, pdss)
+      = ([texpr:xs], heaps, pdss)
+  doAddRefl _ _ menv heaps pdss = (menv, heaps, pdss)

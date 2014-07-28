@@ -60,7 +60,7 @@ copyFunDefs fun_defs
   # r = mkCopy defs
   = (l, r)
   where
-  mkCopy :: !{#FunDef} -> !*{#FunDef}
+  mkCopy :: !{#FunDef} -> *{#FunDef}
   mkCopy defs = {d \\ d <-: defs}
 
 // TODO Get rid of this in favour of a more general reification?
@@ -147,7 +147,7 @@ idxIsMain :: Index *ModuleEnv -> *(Bool, *ModuleEnv)
 idxIsMain idx menv
   # (main_dcl_module_n, menv) = menv!me_main_dcl_module_n
   = (idx == main_dcl_module_n, menv)
-import StdDebug
+
 reifySymbIdentSymbolType :: SymbIdent *ModuleEnv -> *(Maybe SymbolType, *ModuleEnv)
 reifySymbIdentSymbolType {symb_kind=SK_Function glob} menv
   | glob.glob_module == menv.me_main_dcl_module_n                       = reifyFunDefsIdxSymbolType glob.glob_object menv
@@ -485,6 +485,19 @@ mkStr str = BasicExpr (BVS ("\"" +++ str +++ "\""))
 mkInt :: Int -> Expression
 mkInt i   = BasicExpr (BVInt i)
 
+appPredefinedSymbolWithEI :: Int [Expression] ((Global Index) -> SymbKind) *Heaps *PredefinedSymbols -> *(App, *Heaps, *PredefinedSymbols)
+appPredefinedSymbolWithEI pds_idx args mkKind heaps pdss
+  # (pds, pdss) = pdss![pds_idx]
+  # ident       = predefined_idents.[pds_idx]
+  # (ptr, expr_heap) = newPtr EI_Empty heaps.hp_expression_heap
+  # heaps = { heaps & hp_expression_heap = expr_heap }
+  = (
+    { App
+    | app_symb     = mkPredefSymbIdent ident pds mkKind
+    , app_args     = args
+    , app_info_ptr = ptr
+    }, heaps, pdss)
+
 appPredefinedSymbol :: Int [Expression] ((Global Index) -> SymbKind) *PredefinedSymbols -> *(App, *PredefinedSymbols)
 appPredefinedSymbol pds_idx args mkKind pdss
   # (pds, pdss) = pdss![pds_idx]
@@ -547,6 +560,8 @@ tupleToTupleExpr (e1, e2) pdss
   # (tup, pdss) = appPredefinedSymbol PD_Arity2TupleSymbol [e1, e2] SK_Constructor pdss
   = (App tup, pdss)
 
-freeVarToVar :: FreeVar -> BoundVar
-freeVarToVar {fv_ident, fv_info_ptr}
-  = { var_ident = fv_ident,  var_info_ptr = fv_info_ptr, var_expr_ptr = nilPtr}
+freeVarToVar :: FreeVar *Heaps -> *(BoundVar, *Heaps)
+freeVarToVar {fv_ident, fv_info_ptr} heaps
+  # (ptr, expr_heap) = newPtr EI_Empty heaps.hp_expression_heap
+  # heaps = { heaps & hp_expression_heap = expr_heap }
+  = ({ var_ident = fv_ident,  var_info_ptr = fv_info_ptr, var_expr_ptr = ptr}, heaps)
