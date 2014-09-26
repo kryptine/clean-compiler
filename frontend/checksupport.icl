@@ -4,8 +4,6 @@ import StdEnv, compare_constructor
 import syntax, predef, containers
 import utilities
 
-//import RWSDebug
-
 cUndef			:== -1
 
 instance toInt STE_Kind
