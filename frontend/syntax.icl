@@ -203,8 +203,6 @@ where
 		= file <<< "A." <<< vars <<< ':' <<< types
 	(<<<) file (TFAC vars types contexts)
 		= file <<< "A." <<< vars <<< ':' <<< types <<< " | " <<< contexts
-	(<<<) file (TQV varid)
-		= file <<< "E." <<< varid
 	(<<<) file (TempQV tv_number)
 		= file  <<< "E.#" <<< tv_number <<< ' ' 
 	(<<<) file (TempQDV tv_number)

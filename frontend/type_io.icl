@@ -285,13 +285,6 @@ where
 			= write_type_info type_var tcl_file wtis
 		= (tcl_file,wtis)
 
-	write_type_info (TQV type_var) tcl_file wtis
-		# tcl_file
-			= fwritec TypeTQVCode tcl_file
-		# (tcl_file,wtis)
-			= write_type_info type_var tcl_file wtis
-		= (tcl_file,wtis)	
-
 	// FIXME: the universally quantifier and type vars are ignored here
 	// this is really just a hack to prevent the compiler from crashing
 	// on rank>1 types
