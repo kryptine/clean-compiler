@@ -330,7 +330,6 @@ where
 	clear_attr_var attr attr_var_heap
 		= attr_var_heap
 
-
 instance compare AType
 where
 	compare at1 at2 comp_st
