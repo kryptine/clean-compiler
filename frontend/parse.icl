@@ -429,7 +429,7 @@ where
 		| ~(isGlobalContext parseContext)
 			= (False,abort "no def(3)",parseError "definition" No "imports only at the global level" pState)
 			# (imp, pState) = wantFromImports pState
-	   		= (True, PD_Import [imp], pState) // -->> imp
+	   		= (True, PD_Import [imp], pState)
 	try_definition parseContext ClassToken pos pState
 		| ~(isGlobalContext parseContext)
 			= (False,abort "no def(2)",parseError "definition" No "class definitions are only at the global level" pState)
@@ -637,14 +637,10 @@ where
 
 		//# pState = wantToken FunctionContext "type argument" GenericCloseToken pState
 		# (args, pState) = parseList trySimplePattern pState
+	  	# has_args = isNotEmpty args || gcf_generic_info<>0
 		# args = [geninfo_arg : args]
 
-		// must be EqualToken or HashToken or ???
-		//# pState = wantToken FunctionContext "generic definition" EqualToken pState
-		//# pState = tokenBack pState
-	
 	  	# (ss_useLayout, pState) = accScanState UseLayout pState
-	  	# has_args = isNotEmpty args
 	    # localsExpected = has_args || isGlobalContext parseContext || ~ ss_useLayout
 	    # (rhs, _, pState) = wantRhs localsExpected (ruleDefiningRhsSymbol parseContext has_args) pState
 
@@ -1868,9 +1864,7 @@ where
 		| token == CommaToken
 			# (derive_defs, pState) = want_derive_types name pState
 			= ([derive_def:derive_defs], pState)
-
  			# pState = wantEndOfDefinition "derive definition" (tokenBack pState)
-
 			= ([derive_def], pState)
 
 	want_derive_type :: String !*ParseState -> (GenericCaseDef, !Token, !*ParseState)			
@@ -1935,9 +1929,7 @@ where
 		| token == CommaToken
 			# (derive_defs, pState) = want_derive_class_types class_ident pState
 			= ([derive_def:derive_defs], pState)
-
  			# pState = wantEndOfDefinition "derive definition" (tokenBack pState)
-
 			= ([derive_def], pState)
 
 	want_derive_class_type :: Ident !*ParseState -> (GenericCaseDef, !*ParseState)			
@@ -1946,7 +1938,6 @@ where
 		# (ident, pState) = stringToIdent class_ident.id_name (IC_GenericDeriveClass type) pState
 		# (type_cons, pState) = get_type_cons type pState
 		# derive_def = { gc_pos = pos, gc_type = type, gc_type_cons = type_cons,
-//						 gc_gcf = GCFC {gcfc_ident = ident, gcfc_class_ident = class_ident}}
 						 gc_gcf = GCFC ident class_ident}
 		= (derive_def, pState)
 
