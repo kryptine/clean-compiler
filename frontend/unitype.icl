@@ -34,8 +34,8 @@ isPositive :: !TempVarId !{# BOOLVECT } -> Bool
 isPositive var_id cons_vars
 	= cons_vars.[BITINDEX var_id] bitand (1 << BITNUMBER var_id) <> 0
 
-determineAttributeCoercions :: !AType !AType !Bool !u:{! Type} !*Coercions !{#CommonDefs} !{#BOOLVECT } !*TypeDefInfos !*TypeHeaps
-		-> (!Optional (TypePosition, AType), !u:{! Type}, !*Coercions, !*TypeDefInfos, !*TypeHeaps)
+determineAttributeCoercions :: !AType !AType !Bool !u:{!Type} !*Coercions !{#CommonDefs} !{#BOOLVECT} !*TypeDefInfos !*TypeHeaps
+	-> (!Optional (TypePosition, AType), !u:{! Type}, !*Coercions, !*TypeDefInfos, !*TypeHeaps) 
 determineAttributeCoercions off_type dem_type coercible subst coercions defs cons_vars td_infos type_heaps
 	# (_, exp_off_type, es) = expandType defs cons_vars off_type (subst, { es_type_heaps = type_heaps, es_td_infos = td_infos})
 	  (_, exp_dem_type, (subst, {es_td_infos,es_type_heaps})) = expandType defs cons_vars dem_type es
@@ -117,12 +117,14 @@ where
 		push_on_dep_stack attr pi=:{pi_deps,pi_marks,pi_next_num}
 			= { pi & pi_deps = [attr : pi_deps], pi_marks = { pi_marks & [attr] = pi_next_num }, pi_next_num = inc pi_next_num}
 
+		try_to_close_group :: !Int !Int !Int !Int !*PartitioningInfo -> (!Int,!*PartitioningInfo)
 		try_to_close_group attr attr_nr min_dep max_attr_nr pi=:{pi_marks, pi_deps, pi_groups}
 			| attr_nr <= min_dep
 				# (pi_deps, pi_marks, group) = close_group attr pi_deps pi_marks [] max_attr_nr
 				= (max_attr_nr, { pi & pi_deps = pi_deps, pi_marks = pi_marks, pi_groups = [group : pi_groups] })
 				= (min_dep, pi)
 		where
+			close_group :: !Int ![Int] !*{#Int} ![Int] Int -> (![Int],!*{#Int},![Int])
 			close_group attr [d:ds] marks group max_attr_nr
 				# marks = { marks & [d] = max_attr_nr }
 				| d == attr
@@ -240,7 +242,7 @@ typeIsNonCoercible cons_vars (_ :@: _)
 typeIsNonCoercible _ _
 	= False
 
-class lift a :: !{#CommonDefs } !{#BOOLVECT } !a !*{!Type} !*LiftState -> (!Bool,!a, !*{!Type}, !*LiftState)
+class lift a :: !{#CommonDefs} !{#BOOLVECT} !a !*{!Type} !*LiftState -> (!Bool,!a, !*{!Type}, !*LiftState)
 
 liftTypeApplication modules cons_vars t0=:(TA cons_id=:{type_ident,type_index={glob_object,glob_module},type_arity,type_prop=type_prop0} cons_args) subst ls
 	# ({tdi_kinds}, ls) = ls!ls_td_infos.[glob_module].[glob_object]
@@ -613,26 +615,11 @@ coerceAttributes (TA_TempVar av_number1) (TA_TempVar av_number2) {pos_sign,neg_s
 		= (True, coercions)
 	| pos_sign
 		| neg_sign
-			# (ok, coercions) = new_inequality av_number1 av_number2 coercions
-			| ok
-				= new_inequality av_number2 av_number1 coercions
-				= (False, coercions)
+			= equalize_attribute_vars av_number1 av_number2 coercions
 			= new_inequality av_number1 av_number2 coercions
 	| neg_sign
 		= new_inequality av_number2 av_number1 coercions
 		= (True, coercions)
-where
-	new_inequality :: !Int !Int !*Coercions  -> (!Bool, !*Coercions)
-	new_inequality off_attr dem_attr coercions=:{coer_demanded, coer_offered}
-		| isNonUnique coer_offered.[off_attr]
-			| isUnique coer_demanded.[dem_attr]
-				= (False, coercions)
-				= (True, makeNonUnique dem_attr coercions)
-		| isUnique coer_demanded.[dem_attr]
-			= (True, makeUnique off_attr coercions)
-		| isNonUnique coer_offered.[dem_attr] || isUnique coer_demanded.[off_attr]
-			= (True, coercions)
-			= (True, newInequality off_attr dem_attr coercions)
 coerceAttributes TA_Unique (TA_TempVar av_number) {neg_sign} coercions=:{coer_offered}
 	| isNonUnique coer_offered.[av_number]
 		= (False, coercions)
@@ -655,6 +642,25 @@ coerceAttributes TA_Multi TA_Unique _ coercions
 	= (False, coercions)
 coerceAttributes off_attr dem_attr _ coercions
 	= (True, coercions)
+
+equalize_attribute_vars :: !Int !Int !*Coercions  -> (!Bool, !*Coercions)
+equalize_attribute_vars av_number1 av_number2 coercions
+	# (ok, coercions) = new_inequality av_number1 av_number2 coercions
+	| ok
+		= new_inequality av_number2 av_number1 coercions
+		= (False, coercions)
+
+new_inequality :: !Int !Int !*Coercions  -> (!Bool, !*Coercions)
+new_inequality off_attr dem_attr coercions=:{coer_demanded, coer_offered}
+	| isNonUnique coer_offered.[off_attr]
+		| isUnique coer_demanded.[dem_attr]
+			= (False, coercions)
+			= (True, makeNonUnique dem_attr coercions)
+	| isUnique coer_demanded.[dem_attr]
+		= (True, makeUnique off_attr coercions)
+	| isNonUnique coer_offered.[dem_attr] || isUnique coer_demanded.[off_attr]
+		= (True, coercions)
+		= (True, newInequality off_attr dem_attr coercions)
 
 newInequality :: !Int !Int !*Coercions -> *Coercions 
 newInequality off_attr dem_attr coercions=:{coer_demanded, coer_offered}
