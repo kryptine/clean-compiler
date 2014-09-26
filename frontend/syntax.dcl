@@ -391,7 +391,7 @@ cNameLocationDependent :== True
 	,	me_offset		:: !Index
 	,	me_type			:: !SymbolType
 	,	me_type_ptr		:: !VarInfoPtr
-	,	me_class_vars	:: ![TypeVar]
+	,	me_class_vars	:: ![ATypeVar]
 	,	me_pos			:: !Position
 	,	me_priority 	:: !Priority
 	}
@@ -770,7 +770,6 @@ pIsSafe			:== True
 				VI_Occurrence !Occurrence | VI_UsedVar !Ident |
 				VI_Expression !Expression | VI_Variable !Ident !VarInfoPtr | VI_LiftedVariable !VarInfoPtr |
 				VI_Count !Int /* the reference count of a variable */ !Bool /* true if the variable is global, false otherwise */ |
-				VI_Ref !Bool /* true if the variable is global, false otherwise */ |
 				VI_AccVar !ConsClass !ArgumentPosition /* used during fusion to determine accumulating parameters of functions */ |
 				VI_Alias !BoundVar /* used for resolving aliases just before type checking (in transform) */ |
 				 /* used during elimination and lifting of cases */

@@ -623,7 +623,7 @@ CS_Checking	:== 0
 
 checkTypeDefs :: !Index !(Optional (CopiedDefinitions, Int))
 		!*{#CheckedTypeDef} !*{#ConsDef} !*{#SelectorDef} !v:{#ClassDef} !*{#DclModule} !*Heaps !*CheckState
-	-> (!*{#CheckedTypeDef}, *{#ConsDef},!*{#SelectorDef},!v:{#ClassDef},!*{#DclModule},!*Heaps,!*CheckState)
+	-> (!*{#CheckedTypeDef},!*{#ConsDef},!*{#SelectorDef},!v:{#ClassDef},!*{#DclModule},!*Heaps,!*CheckState)
 checkTypeDefs module_index opt_icl_info type_defs cons_defs selector_defs class_defs modules heaps=:{hp_type_heaps,hp_var_heap} cs
 	#! nr_of_types = size type_defs
 	#  ts = { ts_type_defs = type_defs, ts_cons_defs = cons_defs, ts_selector_defs = selector_defs, ts_modules = modules }
@@ -1078,11 +1078,22 @@ checkFunctionType mod_index st specials type_defs class_defs modules heaps cs
 	= checkSymbolType True mod_index st specials type_defs class_defs modules heaps cs
 
 checkMemberType :: !Index !SymbolType !u:{# CheckedTypeDef} !v:{# ClassDef} !u:{# DclModule} !*TypeHeaps !*CheckState
-	-> (!SymbolType, !u:{# CheckedTypeDef}, !v:{# ClassDef}, !u:{# DclModule}, !*TypeHeaps, !*CheckState)
+	-> (!SymbolType, ![ATypeVar], !u:{# CheckedTypeDef}, !v:{# ClassDef}, !u:{# DclModule}, !*TypeHeaps, !*CheckState)
 checkMemberType mod_index st type_defs class_defs modules heaps cs
 	# (checked_st, specials, type_defs, class_defs, modules, heaps, cs) 
 			= checkSymbolType False mod_index st FSP_None type_defs class_defs modules heaps cs
-	= (checked_st, type_defs, class_defs, modules, heaps, cs) 
+
+	  (atype_class_vars,th_vars) = add_attrs_to_class_vars (hd checked_st.st_context).tc_types heaps.th_vars
+	  heaps & th_vars = th_vars
+
+	= (checked_st, atype_class_vars, type_defs, class_defs, modules, heaps, cs) 
+	where
+		add_attrs_to_class_vars [TV type_var=:{tv_info_ptr}:tv_type_vars] th_vars
+			# (TVI_AttrAndRefCount attr ref_count, th_vars) = readPtr tv_info_ptr th_vars
+			# (atype_class_vars,th_vars) = add_attrs_to_class_vars tv_type_vars th_vars
+			= ([{atv_attribute = attr, atv_variable = type_var}:atype_class_vars],th_vars)
+		add_attrs_to_class_vars [] th_vars
+			= ([],th_vars)
 
 checkSymbolType :: !Bool !Index !SymbolType !FunSpecials !u:{#CheckedTypeDef} !v:{#ClassDef} !u:{#DclModule} !*TypeHeaps !*CheckState
 							-> (!SymbolType,!FunSpecials,!u:{#CheckedTypeDef},!v:{#ClassDef},!u:{#DclModule},!*TypeHeaps,!*CheckState)

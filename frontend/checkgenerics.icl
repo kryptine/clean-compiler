@@ -224,7 +224,7 @@ where
 			= (gen_case_defs, generic_defs, type_defs, class_defs, modules, heaps, cs)	
 			# (gen_case_defs, generic_defs, type_defs, class_defs, modules, heaps, cs) 
 				= check_generic_case_def index mod_index gen_case_defs generic_defs type_defs class_defs modules heaps cs
-			= check_generic_case_defs (inc index)  mod_index gen_case_defs generic_defs type_defs class_defs modules heaps cs			
+			= check_generic_case_defs (inc index) mod_index gen_case_defs generic_defs type_defs class_defs modules heaps cs
 
 	check_generic_case_def index mod_index gen_case_defs generic_defs type_defs class_defs modules heaps cs
 		# (case_def=:{gc_pos,gc_type,gc_gcf}, gen_case_defs) = gen_case_defs![index]
@@ -232,14 +232,14 @@ where
 			GCF gc_ident gcf=:{gcf_gident}
 				# cs = pushErrorAdmin (newPosition gc_ident gc_pos) cs
 				# (gc_type, gc_type_cons, type_defs, modules, heaps, cs)
-					= check_instance_type mod_index gc_type type_defs modules heaps cs 
+					= check_instance_type mod_index gc_type type_defs modules heaps cs
 				# (generic_gi, cs) = get_generic_index gcf_gident mod_index cs
 				| not cs.cs_error.ea_ok
 					# cs = popErrorAdmin cs
 					-> (gen_case_defs, generic_defs, type_defs, class_defs, modules, heaps, cs)
 				# case_def = {case_def & gc_gcf=GCF gc_ident {gcf & gcf_generic = generic_gi}, gc_type=gc_type, gc_type_cons=gc_type_cons}
 				# gen_case_defs = {gen_case_defs & [index] = case_def}
-				# cs = popErrorAdmin cs	
+				# cs = popErrorAdmin cs
 				-> (gen_case_defs, generic_defs, type_defs, class_defs, modules, heaps, cs)
 			GCFS gcfs
 				# cs = pushErrorAdmin (newPosition {id_name="derive generic superclass",id_info=nilPtr} gc_pos) cs
@@ -475,15 +475,15 @@ where
 	create_gencase_function_type {id_name} gc_type_cons gc_pos var_heap
 		#! fun_ident = genericIdentToFunIdent id_name gc_type_cons
 	 	#! (var_info_ptr, var_heap) = newPtr VI_Empty var_heap
- 		#! fun = 
-  			{ ft_ident = fun_ident
-  			, ft_arity = 0
-  			, ft_priority = NoPrio
-  			, ft_type = {st_vars=[],st_attr_vars=[],st_arity=0,st_args=[],st_result={at_type=TE,at_attribute=TA_Multi},st_attr_env=[],st_context=[],st_args_strictness=NotStrict}
-  			, ft_pos = gc_pos
-  			, ft_specials = FSP_None
-  			, ft_type_ptr = var_info_ptr
-  			}
+		#! fun =
+			{ ft_ident = fun_ident
+			, ft_arity = 0
+			, ft_priority = NoPrio
+			, ft_type = {st_vars=[],st_attr_vars=[],st_arity=0,st_args=[],st_result={at_type=TE,at_attribute=TA_Multi},st_attr_env=[],st_context=[],st_args_strictness=NotStrict}
+			, ft_pos = gc_pos
+			, ft_specials = FSP_None
+			, ft_type_ptr = var_info_ptr
+			}
 		= (fun,var_heap)
 
 NewEntry symbol_table symb_ptr def_kind def_index level previous :==

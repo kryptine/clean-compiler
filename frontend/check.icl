@@ -54,7 +54,7 @@ checkSpecial mod_index fun_type=:{ft_type} fun_index subst (next_inst_index, spe
 where	
 	substitute_type st=:{st_vars,st_attr_vars,st_args,st_result,st_context,st_attr_env} environment type_heaps error
 		# (st_vars, st_attr_vars, [st_result : st_args], st_context, st_attr_env, _, type_heaps, error)
-			= instantiateTypes st_vars st_attr_vars [ st_result : st_args ] st_context st_attr_env environment [] type_heaps error
+			= instantiateTypes st_vars st_attr_vars [st_result:st_args] st_context st_attr_env environment [] type_heaps error
 		= ({st & st_vars = st_vars, st_args = st_args, st_result = st_result, st_attr_vars = st_attr_vars,
 			st_context = st_context, st_attr_env = st_attr_env }, type_heaps, error)
 
@@ -174,9 +174,8 @@ where
 		| has_to_be_checked opt_icl_info me_class
 			# position = newPosition me_ident me_pos
 			  cs = { cs & cs_error = setErrorAdmin position cs.cs_error }
-			  (me_type, type_defs, class_defs, modules, type_heaps, cs)
+			  (me_type, me_class_vars, type_defs, class_defs, modules, type_heaps, cs)
 			   		= checkMemberType module_index me_type type_defs class_defs modules type_heaps cs
-			  me_class_vars = [ type_var \\ (TV type_var) <- (hd me_type.st_context).tc_types ]
 			  (me_type_ptr, var_heap) = newPtr VI_Empty var_heap		   
 			= ({ member_defs & [member_index] = { member_def & me_type = me_type, me_class_vars = me_class_vars, me_type_ptr = me_type_ptr }},
 					type_defs, class_defs, modules, type_heaps, var_heap, cs)
@@ -402,7 +401,7 @@ where
 		  th_vars = th_vars <:= (atv_variable.tv_info_ptr, TVI_Type (TV new_fv))
 		  (new_attr, th_attrs) = build_attr_subst atv_attribute type_heaps.th_attrs
 		= ([ { atv & atv_variable = new_fv, atv_attribute = new_attr } : free_vars], { type_heaps & th_vars = th_vars, th_attrs = th_attrs })
-	where		  
+	where
 		 build_attr_subst (TA_Var avar) attr_var_heap
 			# (new_info_ptr, attr_var_heap) = newPtr AVI_Empty attr_var_heap
 			  new_attr = { avar & av_info_ptr = new_info_ptr}
@@ -423,10 +422,10 @@ where
 		# (TVI_Type (TV new_tv), type_var_heap) = readPtr tv_info_ptr type_var_heap
 		= ({ bind & bind_dst = new_tv }, type_var_heap)
 
-determineTypeOfMemberInstance :: !SymbolType ![TypeVar] !InstanceType !Specials !*TypeHeaps !u:(Optional (v:{#DclModule}, w:{#CheckedTypeDef}, Index)) !*ErrorAdmin
+determineTypeOfMemberInstance :: !SymbolType ![ATypeVar] !InstanceType !Specials !*TypeHeaps !u:(Optional (v:{#DclModule}, w:{#CheckedTypeDef}, Index)) !*ErrorAdmin
 												 -> (!SymbolType, !FunSpecials, !*TypeHeaps,!u: Optional (v:{#DclModule}, w:{#CheckedTypeDef}), !*ErrorAdmin)
 determineTypeOfMemberInstance mem_st class_vars {it_types,it_vars,it_attr_vars,it_context} specials type_heaps opt_modules error
-	# env = { ss_environ = foldl2 (\binds var type -> [ {bind_src = type, bind_dst = var} : binds]) [] class_vars it_types,
+	# env = { ss_environ = foldl2 (\binds var type -> [ {bind_src = type, bind_dst = var.atv_variable} : binds]) [] class_vars it_types,
 			  ss_context = it_context, ss_vars = it_vars, ss_attrs = it_attr_vars} 
 	  (st, specials, type_heaps, error)
 	  		= determine_type_of_member_instance mem_st env specials type_heaps error
@@ -436,11 +435,11 @@ determineTypeOfMemberInstance mem_st class_vars {it_types,it_vars,it_attr_vars,i
 where
 	determine_type_of_member_instance mem_st=:{st_context} env (SP_Substitutions substs) type_heaps error
 		# (mem_st, substs, type_heaps, error) 
-				= substitute_symbol_type { mem_st &  st_context = tl st_context } env substs type_heaps error
+				= substitute_symbol_type {mem_st & st_context = tl st_context} env substs type_heaps error
 		= (mem_st, FSP_Substitutions substs, type_heaps, error) 
 	determine_type_of_member_instance mem_st=:{st_context} env SP_None type_heaps error
 		# (mem_st, _, type_heaps, error)
-				= substitute_symbol_type { mem_st &  st_context = tl st_context } env [] type_heaps error
+				= substitute_symbol_type {mem_st & st_context = tl st_context} env [] type_heaps error
 		= (mem_st, FSP_None, type_heaps, error)
 
 	substitute_symbol_type st=:{st_vars,st_attr_vars,st_args,st_result,st_context,st_attr_env} environment specials type_heaps error
@@ -2174,12 +2173,12 @@ renumber_icl_module_functions mod_type icl_global_function_range icl_instance_ra
 							# dcl_index = function_conversion_table.[icl_index]
 							# gencase = {gencase & gc_gcf=GCF gc_ident {gcf & gcf_body = GCB_FunIndex dcl_index}}
 							# gencases = {gencases & [gencase_index] = gencase}
-							= renumber_gencase_members (gencase_index+1) gencases
+							-> renumber_gencase_members (gencase_index+1) gencases
 						{gc_gcf=GCFS gcfs}
 							# gcfs = renumber_gcfs gcfs function_conversion_table
 							# gencase = {gencase & gc_gcf=GCFS gcfs}
 							# gencases = {gencases & [gencase_index] = gencase}
-							= renumber_gencase_members (gencase_index+1) gencases
+							-> renumber_gencase_members (gencase_index+1) gencases
 					= gencases
 
 			renumber_gcfs [!gcf=:{gcf_body=GCB_FunIndex icl_index}:gcfs!] function_conversion_table
@@ -3000,21 +2999,21 @@ addImportedSymbolsToSymbolTable importing_mod opt_macro_range modules_in_compone
 	add_declaration :: (Optional IndexRange) Int Declaration *([Declaration],!*{#DclModule},*CheckState) -> (![Declaration],!*{#DclModule},!*CheckState)
 	add_declaration opt_dcl_macro_range importing_mod declaration (decls_accu,dcl_modules,cs)
 		# (not_already_imported,dcl_modules,cs)
-				= add_declaration_to_symbol_table_ opt_dcl_macro_range declaration importing_mod dcl_modules cs
+				= add_declaration_to_symbol_table opt_dcl_macro_range declaration importing_mod dcl_modules cs
 		| not_already_imported
 			= ([declaration:decls_accu],dcl_modules,cs)
 			= (decls_accu,dcl_modules,cs)
 
 	add_expl_imp_declaration opt_dcl_macro_range importing_mod declaration (decls_accu, dcl_modules, cs)
 		# (not_already_imported,dcl_modules,cs)
-				= add_declaration_to_symbol_table_ opt_dcl_macro_range declaration importing_mod dcl_modules cs
+				= add_declaration_to_symbol_table opt_dcl_macro_range declaration importing_mod dcl_modules cs
 		| not_already_imported
 			= ([declaration:decls_accu], dcl_modules, cs)
 		= (decls_accu, dcl_modules, cs)
 
-add_declaration_to_symbol_table_ opt_dcl_macro_range (Declaration {decl_kind=STE_FunctionOrMacro _, decl_ident, decl_index}) _ dcl_modules cs
+add_declaration_to_symbol_table opt_dcl_macro_range (Declaration {decl_kind=STE_FunctionOrMacro _, decl_ident, decl_index}) _ dcl_modules cs
 	= addImportedFunctionOrMacro opt_dcl_macro_range decl_ident decl_index dcl_modules cs
-add_declaration_to_symbol_table_ yes_for_icl_module (Declaration {decl_kind=decl_kind=:STE_Imported def_kind def_mod, decl_ident, decl_index, decl_pos}) importing_mod dcl_modules cs
+add_declaration_to_symbol_table yes_for_icl_module (Declaration {decl_kind=decl_kind=:STE_Imported def_kind def_mod, decl_ident, decl_index, decl_pos}) importing_mod dcl_modules cs
 	= addSymbol yes_for_icl_module decl_ident decl_pos decl_kind def_kind decl_index def_mod importing_mod dcl_modules cs
 
 updateExplImpInfo :: [Int] Index {!Declaration} {!Declaration} u:{#DclModule} ExplImpInfos *SymbolTable 
