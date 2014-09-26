@@ -895,8 +895,6 @@ where
 			= make_type_var tv_info_ptr heaps 
 		make_expr (GTV {tv_info_ptr}) heaps
 			= make_type_var tv_info_ptr heaps 
-		make_expr (TQV {tv_info_ptr}) heaps 
-			= make_type_var tv_info_ptr heaps
 		make_expr TE heaps
 			= make_error_type_cons heaps
 		make_expr (TFA _ _) heaps

@@ -1276,8 +1276,6 @@ where
 		   (file, opt_beautifulizer) = writeType (file <<< ":") opt_beautifulizer (clearProperty form cBrackets, type)
 		   (file, opt_beautifulizer) = show_context form contexts (file,opt_beautifulizer)
 		 = (file <<< ")", opt_beautifulizer)
-	writeType file opt_beautifulizer (form, TQV varid)
-		= (file <<< "E." <<< varid, opt_beautifulizer)
 	writeType file opt_beautifulizer (form, TempQV tv_number)
 		= (file  <<< "E." <<< tv_number <<< ' ', opt_beautifulizer)
 	writeType file opt_beautifulizer (form, TempQDV tv_number)
@@ -1733,8 +1731,6 @@ anonymizeAttrVars st=:{st_attr_vars, st_args, st_result, st_attr_env} implicit_i
 							-> count_attr_vars_of_type at_type (writePtr av_info_ptr (AVI_CountVar tv_info_ptr) th_attrs)
 						GTV {tv_info_ptr}
 							-> count_attr_vars_of_type at_type (writePtr av_info_ptr (AVI_CountVar tv_info_ptr) th_attrs)
-						TQV {tv_info_ptr}
-							-> count_attr_vars_of_type at_type (writePtr av_info_ptr (AVI_CountVar tv_info_ptr) th_attrs)
 						_
 							-> count_attr_vars_of_type at_type (writePtr av_info_ptr AVI_CountOne th_attrs)
 				AVI_CountVar previous_tv_info_ptr
@@ -1743,9 +1739,6 @@ anonymizeAttrVars st=:{st_attr_vars, st_args, st_result, st_attr_env} implicit_i
 							| tv_info_ptr==previous_tv_info_ptr
 								-> count_attr_vars_of_type at_type (writePtr av_info_ptr (AVI_CountVar tv_info_ptr) th_attrs)
 						GTV {tv_info_ptr}
-							| tv_info_ptr==previous_tv_info_ptr
-								-> count_attr_vars_of_type at_type (writePtr av_info_ptr (AVI_CountVar tv_info_ptr) th_attrs)
-						TQV {tv_info_ptr}
 							| tv_info_ptr==previous_tv_info_ptr
 								-> count_attr_vars_of_type at_type (writePtr av_info_ptr (AVI_CountVar tv_info_ptr) th_attrs)
 						_
@@ -1943,8 +1936,6 @@ instance performOnTypeVars AType
 	performOnTypeVars f {at_attribute, at_type=TV type_var} st
 		= f at_attribute type_var st
 	performOnTypeVars f {at_attribute, at_type=GTV type_var} st
-		= f at_attribute type_var st
-	performOnTypeVars f {at_attribute, at_type=TQV type_var} st
 		= f at_attribute type_var st
 	performOnTypeVars f {at_attribute, at_type} st
 		= performOnTypeVars f at_type st
