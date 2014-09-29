@@ -12,7 +12,7 @@ checkFunctionType :: !Index !SymbolType !FunSpecials !u:{#CheckedTypeDef} !v:{#C
 checkMemberType :: !Index !SymbolType !u:{#CheckedTypeDef} !v:{#ClassDef} !u:{#DclModule} !*TypeHeaps !*CheckState
 		  -> (!SymbolType,![ATypeVar],!u:{#CheckedTypeDef},!v:{#ClassDef},!u:{#DclModule},!*TypeHeaps,!*CheckState)
 
-checkInstanceType :: !Index !GlobalIndex !ClassIdent
+checkInstanceType :: !Index !GlobalIndex !ClassIdent !BITVECT
 		!InstanceType !Specials !u:{# CheckedTypeDef} !v:{# ClassDef} !u:{# DclModule} !*TypeHeaps !*CheckState
 	-> (!InstanceType,!Specials,!u:{# CheckedTypeDef},!v:{# ClassDef},!u:{# DclModule},!*TypeHeaps,!*CheckState)
 
