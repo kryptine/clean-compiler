@@ -33,3 +33,6 @@ instance unify AType
 class arraySubst type :: !type !u:{!Type} -> (!Bool,!type, !u:{! Type})
 
 instance arraySubst AType
+instance arraySubst Type
+instance arraySubst TypeContext
+instance arraySubst [a] | arraySubst a special a=TypeContext

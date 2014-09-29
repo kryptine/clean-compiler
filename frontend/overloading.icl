@@ -18,25 +18,47 @@ import genericsupport, type_io_common
 	,	cid_red_contexts	:: ![ClassApplication]
 	}
 
-::	ReducedContexts = 
-	{	rcs_class_context			:: !ClassInstanceDescr
-	,	rcs_constraints_contexts	:: ![ClassApplication]
+:: 	ReducedContext  = RC_Class		!ClassInstanceDescr [ReducedContext]
+					| RC_TC_Global	!GlobalTCType ![ClassApplication]
+					| RC_TC_Local	!VarInfoPtr
+
+::	ClassApplication	= CA_Instance	!ReducedContext
+						| CA_Context 	!TypeContext
+
+:: ReducedOverloadedApplication =
+	{	roa_symbol 		:: !SymbIdent
+	,	roa_fun_index	:: !Index
+	,	roa_expr_ptr	:: !ExprInfoPtr
+	,	roa_rcs			:: ![ClassApplication]
 	}
 
-::	TypeCodeInstance =
-	{	tci_constructor		:: !GlobalTCType
-	,	tci_contexts		:: ![ClassApplication]
+:: ReducedOverloadedContext =
+	{	roc_fun_index	:: !Index
+	,	roc_expr_ptr	:: !ExprInfoPtr
+	,	roc_rcs			:: ![RC]
 	}
 
-::	ClassApplication	= CA_Instance !ReducedContexts
-						| CA_Context !TypeContext
-						| CA_LocalTypeCode !VarInfoPtr			/* for (local) type pattern variables */
-						| CA_GlobalTypeCode !TypeCodeInstance	/* for (global) type constructors */
+::	RC  = RC_Context  !TypeContext
+		| RC_Instance !CI
+
+::	CI	= CI_Class !(Optional CD) ![CI]
+		| CI_TC
+
+::  CD  = { cd_inst_symbol		:: ! Global Int
+		  , cd_inst_contexts	:: ![RC]
+		  , cd_new_vars :: ![(TypeVarInfoPtr,Int)]
+		  }						
 
 instanceError symbol types err
 	# err = errorHeading "Overloading error" err
 	  format = { form_properties = cNoProperties, form_attr_position = No }
 	= { err & ea_file = err.ea_file <<< " \"" <<< symbol <<< "\" no instance available of type "
+									<:: (format, types, Yes initialTypeVarBeautifulizer) <<< '\n' }
+
+cycleInTypeContextError symbol types err
+	# err = errorHeading "Overloading error" err
+	  format = { form_properties = cNoProperties, form_attr_position = No }
+	= { err & ea_file = err.ea_file <<< " \"" <<< symbol <<< "\" context depends on context with the same class and type, for type "
 									<:: (format, types, Yes initialTypeVarBeautifulizer) <<< '\n' }
 
 uniqueError :: a b *ErrorAdmin -> *ErrorAdmin | writeType b & <<< a
@@ -83,6 +105,15 @@ cycleAfterRemovingNewTypeConstructorsError ident err
 	# err = errorHeading "Error" err
 	= { err & ea_file = err.ea_file <<< (" cycle in definition of '" +++ toString ident +++ "' after removing newtype constructors") <<< '\n' }
 
+typeImprovementError symbol types1 types2 err
+	# err = errorHeading "Type error" err
+	  format = { form_properties = cNoProperties, form_attr_position = No }
+	= { err & ea_file = err.ea_file
+			<<< " conflicting constraints: "
+			<<< symbol <<< ' ' <:: (format, types1, Yes initialTypeVarBeautifulizer)
+			<<< " and: "
+			<<< symbol <<< ' ' <:: (format, types2, Yes initialTypeVarBeautifulizer)
+			<<< '\n' }
 /*
 	As soon as all overloaded variables in an type context are instantiated, context reduction is carried out.
 	This reduction yields a type class instance (here represented by a an index) and a list of
@@ -104,16 +135,387 @@ ObjectNotFound 	:== { glob_module = NotFound, glob_object = NotFound }
 	,	rs_type_pattern_vars	:: ![LocalTypePatternVariable]
 	,	rs_var_heap				:: !.VarHeap
 	,	rs_type_heaps			:: !.TypeHeaps
+	,	rs_subst				:: !.Subst
 	,	rs_coercions			:: !.Coercions
 	,	rs_predef_symbols		:: !.PredefinedSymbols
 	,	rs_error				:: !.ErrorAdmin
 	}
 
 :: ReduceInfo =
-	{	ri_defs :: !{# CommonDefs}
-	,	ri_instance_info :: !ClassInstanceInfo
-	,	ri_main_dcl_module_n :: !Int
+	{	ri_defs 				:: !{# CommonDefs}
+	,	ri_instance_info 		:: !ClassInstanceInfo
 	}
+
+:: FinReduceInfo =
+	{	fri_defs 				:: !{# CommonDefs}
+	,	fri_main_dcl_module_n 	:: !Int
+	}
+
+::	Subst =
+	{	subst_changed	:: !Bool
+	,	subst_array		:: !.{!Type}
+	,	subst_next_var_n :: !Int
+	,	subst_previous_context_n :: !Int
+	,	subst_context_n_at_last_update :: !Int
+	}
+
+::	SubstC =
+	{	substc_changes	:: ![#Int!]
+	,	substc_array	:: !.{!Type}
+	,	substc_next_var_n :: !Int
+	}
+		
+:: PreRedState =
+	{	prs_var_heap			:: !.VarHeap
+	,	prs_type_heaps			:: !.TypeHeaps
+	,	prs_predef_symbols		:: !.PredefinedSymbols
+	,	prs_subst				:: !.Subst
+	,	prs_error				:: !.ErrorAdmin
+	}
+
+continueContextReduction :: !ReduceInfo ![RC] !*PreRedState -> (!Bool, ![RC], !*PreRedState)
+continueContextReduction info [] prs_state
+	= (False, [], prs_state)
+continueContextReduction info [rc : rcs] prs_state
+	# (changed_rc, rc, prs_state) 		= continue_cr_of_rc info rc prs_state
+	  (changed_rcs , rcs, prs_state)	= continue_cr_of_rcs info rcs prs_state
+	= (changed_rc || changed_rcs, [rc : rcs], prs_state)
+where
+	continue_cr_of_rc info rc=:(RC_Context tc) prs_state=:{prs_predef_symbols, prs_subst}
+		| contextIsReducible tc info.ri_defs prs_predef_symbols prs_subst.subst_array
+			# rdla = {rdla_depth = -1,rdla_previous_context=NoPreviousContext}
+			  (ci, prs_state) = reduceTCorNormalContext info rdla tc prs_state
+			= (True, RC_Instance ci, prs_state)
+			= (False, rc, prs_state)
+	continue_cr_of_rc info rc=:(RC_Instance ci) prs_state
+		# (changed, ci, prs_state) = continue_cr_of_ci info ci prs_state
+		| changed
+			= (True, RC_Instance ci, prs_state)
+			= (False, rc, prs_state)
+
+	continue_cr_of_ci info ci=:(CI_Class ocd cis) prs_state
+		# (changed, ocd, prs_state) = continue_cr_of_opt_cd info ocd prs_state
+		| changed
+			# (_ , cis, prs_state) = continue_cr_of_cis info cis prs_state
+			= (True, CI_Class ocd cis, prs_state)
+			# (changed , cis, prs_state) = continue_cr_of_cis info cis prs_state
+			| changed
+				= (True, CI_Class ocd cis, prs_state)
+				= (False, ci, prs_state)
+	continue_cr_of_ci info ci prs_state
+		= (False, ci, prs_state)
+
+	continue_cr_of_opt_cd info ocd=:(Yes cd=:{cd_inst_contexts}) prs_state
+		# (changed , cd_inst_contexts, prs_state) = continue_cr_of_rcs info cd_inst_contexts prs_state
+		| changed
+			= (True, Yes { cd & cd_inst_contexts = cd_inst_contexts }, prs_state)
+			= (False, ocd, prs_state)
+	continue_cr_of_opt_cd info ocd prs_state
+		= (False, ocd, prs_state)
+	
+	continue_cr_of_cis info [] prs_state
+		= (False, [], prs_state)
+	continue_cr_of_cis info [ci:cis] prs_state
+		# (changed, ci, prs_state) = continue_cr_of_ci info ci prs_state
+		| changed
+			# (_ , cis, prs_state) = continue_cr_of_cis info cis prs_state
+			= (True,  [ci : cis], prs_state)
+			# (changed , cis, prs_state) = continue_cr_of_cis info cis prs_state
+			= (changed , [ci: cis], prs_state)
+		
+	continue_cr_of_rcs info [] prs_state
+		= (False, [], prs_state)
+	continue_cr_of_rcs info [rc : rcs] prs_state
+		# (changed, rc, prs_state) = continue_cr_of_rc info rc prs_state
+		| changed
+			# (_ , rcs, prs_state) = continue_cr_of_rcs info rcs prs_state
+			= (True,  [rc : rcs], prs_state)
+			# (changed , rcs, prs_state) = continue_cr_of_rcs info rcs prs_state
+			= (changed , [rc : rcs], prs_state)
+
+:: DepTypesState =
+	{	dts_contexts			:: ![TypeContext]
+	,	dts_subst				:: !.Subst
+	,	dts_var_heap			:: !.VarHeap
+	,	dts_type_heaps			:: !.TypeHeaps
+	,	dts_error				:: !.ErrorAdmin
+	}
+
+improveDepTypes :: !ReduceInfo ![RC] !*DepTypesState -> *DepTypesState
+improveDepTypes info [] dts_state
+	= dts_state
+improveDepTypes info [rc : rcs] dts_state
+	# dts_state = improve_rc info rc dts_state
+	= improve_rcs info rcs dts_state
+where
+	improve_rc info=:{ri_defs} (RC_Context tc=:{tc_class=TCClass class_symb,tc_types}) dts_state=:{dts_contexts,dts_subst}
+		# class_fun_dep_vars = ri_defs.[class_symb.glob_module].com_class_defs.[class_symb.glob_object.ds_index].class_fun_dep_vars
+		| class_fun_dep_vars<>0
+			# (found,prev_tc_types,dts_subst) = tc_with_dep_type_occurs dts_contexts class_symb tc_types class_fun_dep_vars dts_subst
+			| found // && trace_tn "improve_rc" ---> (class_fun_dep_vars,prev_tc_types,tc_types)
+				# (ok,dts_subst) = improve_dep_type_in_context prev_tc_types tc_types class_fun_dep_vars dts_subst				
+				| ok
+					= {dts_state & dts_subst = dts_subst}
+					# (_, tc_types, subst_array) = arraySubst tc_types dts_subst.subst_array
+					  (_, prev_tc_types, subst_array) = arraySubst prev_tc_types subst_array
+					  dts_subst & subst_array = subst_array
+					  dts_error = typeImprovementError class_symb.glob_object.ds_ident prev_tc_types tc_types dts_state.dts_error
+					= {dts_state & dts_subst = dts_subst, dts_error = dts_error}
+				= {dts_state & dts_contexts = [tc:dts_contexts], dts_subst=dts_subst}
+			= dts_state
+	improve_rc info (RC_Context tc) dts_state
+		= dts_state
+	improve_rc info (RC_Instance ci) dts_state
+		= improve_ci info ci dts_state
+
+	improve_ci info (CI_Class (Yes {cd_inst_contexts}) cis) dts_state
+		# dts_state = improve_rcs info cd_inst_contexts dts_state
+		= improve_cis info cis dts_state
+	improve_ci info (CI_Class ocd cis) dts_state
+		= improve_cis info cis dts_state
+	improve_ci info ci dts_state
+		= dts_state
+	
+	improve_cis info [ci:cis] dts_state
+		# dts_state = improve_ci info ci dts_state
+		= improve_cis info cis dts_state
+	improve_cis info [] dts_state
+		= dts_state
+
+	improve_rcs info [rc:rcs] dts_state
+		# dts_state = improve_rc info rc dts_state
+		= improve_rcs info rcs dts_state
+	improve_rcs info [] dts_state
+		= dts_state
+
+tc_with_dep_type_occurs :: [TypeContext] (Global DefinedSymbol) [Type] Int *Subst -> (!Bool,![Type],!*Subst)
+tc_with_dep_type_occurs [{tc_class=TCClass prev_class_symb,tc_types=prev_tc_types}:contexts] class_symb tc_types fun_dep_vars subst
+	| prev_class_symb==class_symb
+		# (equal,subst) = equal_non_dep_context_types prev_tc_types tc_types fun_dep_vars subst
+		| equal // && trace_tn "tc_with_dep_type_occurs True"
+			= (True,prev_tc_types,subst)
+			= tc_with_dep_type_occurs contexts class_symb tc_types fun_dep_vars subst
+		= tc_with_dep_type_occurs contexts class_symb tc_types fun_dep_vars subst
+tc_with_dep_type_occurs [_:contexts] class_symb tc_types fun_dep_vars subst
+	= tc_with_dep_type_occurs contexts class_symb tc_types fun_dep_vars subst
+tc_with_dep_type_occurs [] class_symb tc_types fun_dep_vars subst
+	= (False,[],subst)
+
+equal_non_dep_context_types :: [Type] [Type] Int *Subst -> (!Bool,!*Subst)
+equal_non_dep_context_types [prev_type:prev_types] [type:types] fun_dep_vars subst
+	| fun_dep_vars bitand 1==0
+		# (equal,subst) = equal_type prev_type type subst
+		| equal
+			= equal_non_dep_context_types prev_types types (fun_dep_vars>>1) subst
+			= (False,subst)
+		= equal_non_dep_context_types prev_types types (fun_dep_vars>>1) subst
+equal_non_dep_context_types [] [] fun_dep_vars subst
+	= (True,subst)
+
+equal_type :: Type Type *Subst -> (!Bool,!*Subst)
+equal_type (TempV tv_number1) type2 subst
+	# (stype1,subst) = subst!subst_array.[tv_number1]
+	= case stype1 of
+		TE
+			-> equal_var_and_type tv_number1 type2 subst
+		_
+			-> equal_type stype1 type2 subst
+equal_type type1 (TempV tv_number2) subst
+	# (stype2,subst) = subst!subst_array.[tv_number2]
+	= case stype2 of
+		TE
+			-> (False,subst) // ---> ("equal_type",type1,tv_number2)
+		_
+			-> equal_type type1 stype2 subst
+equal_type (TA cons_id1 cons_args1) (TA cons_id2 cons_args2) subst
+	| cons_id1==cons_id2
+		= equal_atypes cons_args1 cons_args2 subst
+		= (False,subst)
+equal_type (TA cons_id1 cons_args1) (TAS cons_id2 cons_args2 _) subst
+	| cons_id1==cons_id2
+		= equal_atypes cons_args1 cons_args2 subst
+		= (False,subst)
+equal_type (TAS cons_id1 cons_args1 _) (TAS cons_id2 cons_args2 _) subst
+	| cons_id1==cons_id2
+		= equal_atypes cons_args1 cons_args2 subst
+		= (False,subst)
+equal_type (TAS cons_id1 cons_args1 _) (TA cons_id2 cons_args2) subst
+	| cons_id1==cons_id2
+		= equal_atypes cons_args1 cons_args2 subst
+		= (False,subst)
+equal_type (TB tb1) (TB tb2) subst
+	= (tb1 == tb2,subst)
+equal_type (arg_atype1-->res_atype1) (arg_atype2-->res_atype2) subst
+	# (eq,subst) = equal_type arg_atype1.at_type arg_atype2.at_type subst
+	| eq
+		= equal_type res_atype1.at_type res_atype2.at_type subst
+		= (False,subst)
+equal_type (TempCV tv_n1 :@: atypes1) (TempCV tv_n2 :@: atypes2) subst
+	# (eq,subst) = equal_type_vars1 tv_n1 tv_n2 subst
+	| eq
+		= equal_atypes atypes1 atypes2 subst
+		= (False,subst)
+equal_type (TArrow1 atype1) (TArrow1 atype2) subst
+	= equal_type atype1.at_type atype2.at_type subst
+equal_type TArrow TArrow subst
+	= (True,subst)
+equal_type type1 type2 subst
+	= (False,subst) // ---> ("equal_type",type1,type2)
+
+equal_atypes :: [AType] [AType] *Subst -> (!Bool,!*Subst)
+equal_atypes [atype1:atypes1] [atype2:atypes2] subst
+	# (eq,subst) = equal_type atype1.at_type atype2.at_type subst
+	| eq
+		= equal_atypes atypes1 atypes2 subst
+		= (False,subst)
+equal_atypes [] [] subst
+	= (True,subst)
+	
+equal_var_and_type :: Int Type *Subst -> (!Bool,!*Subst)
+equal_var_and_type tv_number1 (TempV tv_number2) subst
+	| tv_number1==tv_number2 // && trace_tn ("equal_var_and_type True "+++toString tv_number1+++" "+++toString tv_number2)
+		= (True,subst)
+		= equal_type_vars2 tv_number1 tv_number2 subst
+equal_var_and_type tv_number1 type2 subst
+	= (False,subst) // ---> ("equal_var_and_type",tv_number1,type2)
+
+equal_type_vars1 :: !Int !Int !*Subst -> (!Bool,!*Subst)
+equal_type_vars1 tv_n1 tv_n2 subst
+	| tv_n1==tv_n2
+		= (True,subst)
+	# (stype1,subst) = subst!subst_array.[tv_n1]
+	= case stype1 of
+		TempV tv_n1
+			-> equal_type_vars1 tv_n1 tv_n2 subst
+		_
+			-> equal_type_vars2 tv_n1 tv_n2 subst
+
+equal_type_vars2 :: !Int !Int !*Subst -> (!Bool,!*Subst)
+equal_type_vars2 tv_n1 tv_n2 subst
+	# (stype2,subst) = subst!subst_array.[tv_n2]
+	= case stype2 of
+		TempV tv_n2
+			| tv_n1==tv_n2
+				-> (True,subst)
+				-> equal_type_vars2 tv_n1 tv_n2 subst
+		_
+			-> (False,subst) // ---> ("equal_type_vars2",tv_n1,tv_n2)
+
+improve_dep_type_in_context :: [Type] [Type] Int *Subst -> (!Bool,!*Subst)
+improve_dep_type_in_context [prev_type:prev_types] [type:types] fun_dep_vars subst
+	| fun_dep_vars bitand 1<>0
+		# (ok,subst) = improve_type prev_type type subst
+		| ok
+			= improve_dep_type_in_context prev_types types (fun_dep_vars>>1) subst
+			= (False,subst)
+		= improve_dep_type_in_context prev_types types (fun_dep_vars>>1) subst
+where
+	improve_type :: Type Type *Subst -> (!Bool,!*Subst)
+	improve_type (TempV tv_n1) (TempV tv_n2) subst
+		= improve_type_vars tv_n1 tv_n2 subst
+	improve_type (TempV tv_n1) type2 subst
+		# (stype1,subst) = subst!subst_array.[tv_n1]
+		= case stype1 of
+			TE
+				| containsTypeVariable tv_n1 type2 subst.subst_array
+					-> (False,subst)
+					# subst & subst_array.[tv_n1] = type2, subst_changed=True
+					-> (True,subst)
+			_
+				-> improve_type stype1 type2 subst
+	improve_type type1 (TempV tv_n2) subst
+		# (stype2,subst) = subst!subst_array.[tv_n2]
+		= case stype2 of
+			TE
+				| containsTypeVariable tv_n2 type1 subst.subst_array
+					-> (False,subst)
+					# subst & subst_array.[tv_n2] = type1, subst_changed=True
+					-> (True,subst)	// ---> ("improve_type",type1,tv_n2)
+			_
+				-> improve_type type1 stype2 subst
+	improve_type (TA cons_id1 cons_args1) (TA cons_id2 cons_args2) subst
+		| cons_id1==cons_id2
+			= improve_atypes cons_args1 cons_args2 subst
+			= (False,subst)
+	improve_type (TA cons_id1 cons_args1) (TAS cons_id2 cons_args2 _) subst
+		| cons_id1==cons_id2
+			= improve_atypes cons_args1 cons_args2 subst
+			= (False,subst)
+	improve_type (TAS cons_id1 cons_args1 _) (TAS cons_id2 cons_args2 _) subst
+		| cons_id1==cons_id2
+			= improve_atypes cons_args1 cons_args2 subst
+			= (False,subst)
+	improve_type (TAS cons_id1 cons_args1 _) (TA cons_id2 cons_args2) subst
+		| cons_id1==cons_id2
+			= improve_atypes cons_args1 cons_args2 subst
+			= (False,subst)
+	improve_type (TB tb1) (TB tb2) subst
+		= (tb1==tb2,subst)
+	improve_type (arg_atype1-->res_atype1) (arg_atype2-->res_atype2) subst
+		# (ok,subst) = improve_type arg_atype1.at_type arg_atype2.at_type subst
+		| ok
+			= improve_type res_atype1.at_type res_atype2.at_type subst
+			= (False,subst)
+	improve_type (TempCV tv_n1 :@: atypes1) (TempCV tv_n2 :@: atypes2) subst
+		# (ok,subst) = improve_type_vars tv_n1 tv_n2 subst
+		| ok
+			= improve_atypes atypes1 atypes2 subst
+			= (False,subst)
+	improve_type (TArrow1 atype1) (TArrow1 atype2) subst
+		= improve_type atype1.at_type atype2.at_type subst
+	improve_type TArrow TArrow subst
+		= (True,subst)
+	improve_type type1 type2 subst
+		= (False,subst)	// ---> ("improve_type",type1,type2)
+
+	improve_type_vars :: Int Int *Subst -> (!Bool,!*Subst)
+	improve_type_vars tv_n1 tv_n2 subst
+		| tv_n1==tv_n2
+			= (True,subst)
+		# (stype1,subst) = subst!subst_array.[tv_n1]
+		= case stype1 of
+			TempV tv_n1
+				-> improve_type_vars tv_n1 tv_n2 subst
+			_
+				-> improve_type_vars2 tv_n1 tv_n2 stype1 subst
+
+	improve_type_vars2 :: Int Int Type *Subst -> (!Bool,!*Subst)
+	improve_type_vars2 tv_n1 tv_n2 stype1 subst
+		# (stype2,subst) = subst!subst_array.[tv_n2]
+		= case stype2 of
+			TempV tv_n2
+				| tv_n1==tv_n2
+					-> (True,subst)
+					-> improve_type_vars2 tv_n1 tv_n2 stype1 subst
+			TE
+				-> case stype1 of
+					TE	# subst & subst_array.[tv_n2] = TempV tv_n1, subst_changed=True
+						-> (True,subst)
+					_
+						| containsTypeVariable tv_n2 stype1 subst.subst_array
+							-> (False,subst)
+							# subst & subst_array.[tv_n2] = stype1, subst_changed=True
+							-> (True,subst)
+			_
+				-> case stype1 of
+					TE
+						| containsTypeVariable tv_n1 stype2 subst.subst_array
+							-> (False,subst)
+							# subst & subst_array.[tv_n1] = stype2, subst_changed=True
+							-> (True,subst)
+					_
+						-> improve_type stype1 stype2 subst
+
+	improve_atypes :: [AType] [AType] *Subst -> (!Bool,!*Subst)
+	improve_atypes [arg1:args1] [arg2:args2] subst
+		# (ok,subst) = improve_type arg1.at_type arg2.at_type subst
+		| ok
+			= improve_atypes args1 args2 subst
+			= (False,subst)
+	improve_atypes [] [] subst
+		= (True,subst)
+improve_dep_type_in_context [] [] fun_dep_vars subst
+	= (True,subst)
 
 :: ReduceTCState =
 	{	rtcs_new_contexts		:: ![TypeContext]
@@ -123,289 +525,300 @@ ObjectNotFound 	:== { glob_module = NotFound, glob_object = NotFound }
 	,	rtcs_error				:: !.ErrorAdmin
 	}
 
-collect_variable_and_contexts :: [ClassApplication] [(Int,Int)] [TypeContext] -> [(Int,Int)]
-collect_variable_and_contexts [CA_Context {tc_class,tc_types=[TempV type_var_n]}:constraints] variables_and_contexts class_context
-	# context_index = determine_index_in_class_context tc_class class_context 0
-	| context_index<0
-		= collect_variable_and_contexts constraints variables_and_contexts class_context
-		# variables_and_contexts = add_variable_and_context type_var_n (1<<context_index) variables_and_contexts
-		= collect_variable_and_contexts constraints variables_and_contexts class_context
+:: FinalRedState =
+	{	frs_all_contexts		:: ![TypeContext]
+	,	frs_special_instances	:: !.SpecialInstances
+	,	frs_type_pattern_vars	:: ![LocalTypePatternVariable]
+	,	frs_var_heap			:: !.VarHeap
+	,	frs_type_heaps			:: !.TypeHeaps
+	,	frs_predef_symbols		:: !.PredefinedSymbols
+	,	frs_coercions 			:: !.Coercions
+	,	frs_subst				:: !.{!Type}
+	,	frs_error				:: !.ErrorAdmin
+	}
+
+finishContextReduction :: ![ReducedOverloadedContext] ![ExprInfoPtr] !Int !{# CommonDefs } 
+	!*VarHeap !*TypeHeaps !*ExpressionHeap !*PredefinedSymbols !*SpecialInstances !*Coercions !*{!Type} !*ErrorAdmin
+	-> (![ReducedOverloadedApplication], ![TypeContext], ![LocalTypePatternVariable], !*VarHeap, !*TypeHeaps, !*ExpressionHeap, !*PredefinedSymbols,
+		!*SpecialInstances , !*Coercions, !*{!Type}, !*ErrorAdmin)
+finishContextReduction roaps case_with_context_ptrs module_id com_defs var_heap type_heaps expr_heap predef_symbols special_instances coercion_env subst error
+	= finishContextReduction_ roaps case_with_context_ptrs module_id com_defs var_heap type_heaps expr_heap predef_symbols special_instances coercion_env subst error
+
+finishContextReduction_ :: ![ReducedOverloadedContext] ![ExprInfoPtr] !Int !{# CommonDefs } 
+	!*VarHeap !*TypeHeaps !*ExpressionHeap !*PredefinedSymbols !*SpecialInstances !*Coercions !*{!Type} !*ErrorAdmin
+	-> (![ReducedOverloadedApplication], ![TypeContext], ![LocalTypePatternVariable], !*VarHeap, !*TypeHeaps, !*ExpressionHeap, !*PredefinedSymbols,
+		!*SpecialInstances , !*Coercions, !*{!Type}, !*ErrorAdmin)
+finishContextReduction_ roaps case_with_context_ptrs module_id com_defs var_heap type_heaps expr_heap predef_symbols special_instances coercion_env subst error
+	# fr_state = { frs_all_contexts = [], frs_special_instances = special_instances, frs_type_pattern_vars = [], frs_var_heap = var_heap,
+				   frs_subst = subst,
+				   frs_type_heaps = type_heaps, frs_predef_symbols = predef_symbols, frs_coercions = coercion_env, frs_error = error }
+	  (roaps, (expr_heap, fr_state)) = mapSt (get_tc_and_finish_rc {fri_defs = com_defs, fri_main_dcl_module_n = module_id }) roaps (expr_heap, fr_state)
+	  (expr_heap,all_contexts,subst,var_heap,predef_symbols)
+	  	= foldSt (add_case_constructor_contexts com_defs) case_with_context_ptrs
+	  		(expr_heap,fr_state.frs_all_contexts,fr_state.frs_subst,fr_state.frs_var_heap,fr_state.frs_predef_symbols)
+	  fr_state & frs_all_contexts=all_contexts,frs_subst=subst,frs_var_heap=var_heap,frs_predef_symbols=predef_symbols
+	= (roaps, fr_state.frs_all_contexts, fr_state.frs_type_pattern_vars, fr_state.frs_var_heap, fr_state.frs_type_heaps, expr_heap,
+			  fr_state.frs_predef_symbols, fr_state.frs_special_instances, fr_state.frs_coercions, fr_state.frs_subst, fr_state.frs_error)
 where
-	determine_index_in_class_context :: !TCClass ![TypeContext] !Int -> Int
-	determine_index_in_class_context tc_class [class_context:class_contexts] class_index
-		| class_context.tc_class==tc_class
-			= class_index
-			= determine_index_in_class_context tc_class class_contexts (class_index+1)
-	determine_index_in_class_context tc_class [] class_index
-		= -1;
+	get_tc_and_finish_rc info {roc_fun_index, roc_expr_ptr,roc_rcs} (expr_heap, fr_state=:{frs_all_contexts,frs_subst,frs_var_heap})
+		# (over_symbol,act_tcs,expr_heap,all_contexts,subst,var_heap)
+			= get_and_expand_tc roc_expr_ptr expr_heap frs_all_contexts frs_subst frs_var_heap 
+		  fr_state & frs_all_contexts=all_contexts, frs_subst=subst, frs_var_heap=var_heap
+		  (cas, fr_state) = finish_context_reduction info roc_rcs act_tcs fr_state
+		= ({ roa_symbol = over_symbol, roa_fun_index = roc_fun_index, roa_expr_ptr = roc_expr_ptr, roa_rcs = cas },
+				(expr_heap, fr_state))
 
-	add_variable_and_context :: !Int !Int ![(Int,Int)] -> [(Int,Int)]
-	add_variable_and_context type_var_n tv_context [variable_and_context=:(variable,context):variables_and_contexts]
-		| type_var_n==variable
-			#! context=context bitor tv_context
-			= [(variable,context) : variables_and_contexts]
-			= [variable_and_context : add_variable_and_context type_var_n tv_context variables_and_contexts]
-	add_variable_and_context type_var_n tv_context []
-		= [(type_var_n,tv_context)]
-collect_variable_and_contexts [CA_Instance {rcs_class_context={cid_red_contexts},rcs_constraints_contexts}:constraints] variables_and_contexts class_context
-	# variables_and_contexts = collect_variable_and_contexts cid_red_contexts variables_and_contexts class_context
-	# variables_and_contexts = collect_variable_and_contexts rcs_constraints_contexts variables_and_contexts class_context
-	= collect_variable_and_contexts constraints variables_and_contexts class_context
-collect_variable_and_contexts [CA_GlobalTypeCode {tci_contexts}:constraints] variables_and_contexts class_context
-	# variables_and_contexts = collect_variable_and_contexts tci_contexts variables_and_contexts class_context
-	= collect_variable_and_contexts constraints variables_and_contexts class_context
-collect_variable_and_contexts [_:constraints] variables_and_contexts class_context
-	= collect_variable_and_contexts constraints variables_and_contexts class_context
-collect_variable_and_contexts [] variables_and_contexts class_context
-	= variables_and_contexts
+	get_and_expand_tc expr_ptr expr_heap all_contexts subst var_heap
+		= case readPtr expr_ptr expr_heap of
+			(EI_Overloaded info=:{oc_symbol,oc_context},expr_heap)
+				# (changed, oc_context, subst) = arraySubst oc_context subst
+				| changed
+					// update not necessary because EI_Overloaded is not used anymore ?
+					# expr_heap = writePtr expr_ptr (EI_Overloaded {info & oc_context = oc_context}) expr_heap
+					-> (oc_symbol, oc_context, expr_heap, all_contexts, subst, var_heap)
+					-> (oc_symbol, oc_context, expr_heap, all_contexts, subst, var_heap)
+			(EI_OverloadedWithVarContexts info=:{ocvc_symbol,ocvc_context,ocvc_var_contexts},expr_heap)
+				# (changed, ocvc_context, subst) = arraySubst ocvc_context subst
+				  (all_contexts,var_heap) = add_var_contexts ocvc_var_contexts all_contexts var_heap
+				  ocvc_symbol = {ocvc_symbol & symb_kind = case ocvc_symbol.symb_kind of
+															SK_TypeCode
+																-> SK_TypeCodeAndContexts ocvc_var_contexts
+				  											_
+					  											-> SK_VarContexts ocvc_var_contexts
+					  			}
+				| changed
+					// update not necessary because EI_OverloadedWithVarContexts is not used anymore ? 
+					# expr_heap = writePtr expr_ptr (EI_OverloadedWithVarContexts {info & ocvc_context=ocvc_context,ocvc_symbol=ocvc_symbol}) expr_heap
+					-> (ocvc_symbol, ocvc_context, expr_heap, all_contexts, subst, var_heap)
+					// update not necessary because EI_OverloadedWithVarContexts is not used anymore ? 
+					# expr_heap = writePtr expr_ptr (EI_OverloadedWithVarContexts {info & ocvc_symbol=ocvc_symbol}) expr_heap
+					-> (ocvc_symbol, ocvc_context, expr_heap, all_contexts, subst, var_heap)
+	where
+		add_var_contexts NoVarContexts new_contexts var_heap
+			= (new_contexts,var_heap)
+		add_var_contexts (VarContext arg_n contexts arg_atype var_contexts) new_contexts var_heap
+			# (new_contexts,var_heap) = add_contexts contexts new_contexts var_heap
+			= add_var_contexts var_contexts new_contexts var_heap
 
-add_unexpanded_contexts :: ![Int] !TCClass !*ReduceState -> *ReduceState
-add_unexpanded_contexts [variable:variables] tc_class rs_state=:{rs_new_contexts,rs_var_heap}
-	# tc = {tc_class = tc_class, tc_types = [TempV variable], tc_var = nilPtr}
-	| containsContext tc rs_new_contexts
-		= add_unexpanded_contexts variables tc_class rs_state
-		# (tc_var, rs_var_heap) = newPtr VI_Empty rs_var_heap
-		# rs_new_contexts = [{tc & tc_var = tc_var} : rs_new_contexts]
-		= add_unexpanded_contexts variables tc_class {rs_state & rs_new_contexts=rs_new_contexts, rs_var_heap=rs_var_heap}
-add_unexpanded_contexts [] tc_class rs_state
-	= rs_state 
+	add_case_constructor_contexts :: {#CommonDefs} ExprInfoPtr *(*ExpressionHeap,[TypeContext],*{!Type},*VarHeap,*{#PredefinedSymbol})
+															-> *(*ExpressionHeap,[TypeContext],*{!Type},*VarHeap,*{#PredefinedSymbol})
+	add_case_constructor_contexts com_defs expr_ptr (expr_heap,all_contexts,subst,var_heap,predef_symbols)
+		# (EI_CaseTypeWithContexts case_type constructor_contexts,expr_heap) = readPtr expr_ptr expr_heap
+		  (all_contexts,constructor_contexts,predef_symbols,subst,var_heap)
+		  	= add_constructor_contexts constructor_contexts all_contexts predef_symbols subst var_heap
+		  expr_heap = writePtr expr_ptr (EI_CaseTypeWithContexts case_type constructor_contexts) expr_heap
+		= (expr_heap,all_contexts,subst,var_heap,predef_symbols)
+	where
+		add_constructor_contexts [(constructor_symbol,constructor_context):constructor_contexts] new_contexts predef_symbols subst var_heap
+			# (new_contexts,constructor_context,predef_symbols,subst,var_heap)
+				= add_contexts_of_constructor constructor_context new_contexts predef_symbols subst var_heap
+			# (new_contexts,constructor_contexts,predef_symbols,subst,var_heap)
+				= add_constructor_contexts constructor_contexts new_contexts predef_symbols subst var_heap
+			= (new_contexts,[(constructor_symbol,constructor_context):constructor_contexts],predef_symbols,subst,var_heap)
+		add_constructor_contexts [] new_contexts predef_symbols subst var_heap
+			= (new_contexts,[],predef_symbols,subst,var_heap)
 
-reduceContexts :: !ReduceInfo ![TypeContext] !*ReduceState -> (![ClassApplication], !*ReduceState)
-reduceContexts info tcs rs_state
-	= mapSt (try_to_reduce_context info) tcs rs_state
-where
-	try_to_reduce_context :: !ReduceInfo !TypeContext !*ReduceState -> *(!ClassApplication, !*ReduceState)
-	try_to_reduce_context info tc rs_state=:{rs_predef_symbols, rs_new_contexts}
-		| context_is_reducible tc rs_predef_symbols
-			= reduce_any_context info tc rs_state
-		| containsContext tc rs_new_contexts
-			= (CA_Context tc, rs_state)
-			# {rs_var_heap, rs_new_contexts} = rs_state
-			# (tc_var, rs_var_heap) = newPtr VI_Empty rs_var_heap
-			# rs_new_contexts = [{tc & tc_var = tc_var} : rs_new_contexts]
-			= (CA_Context tc, {rs_state & rs_var_heap=rs_var_heap, rs_new_contexts=rs_new_contexts})
+		add_contexts_of_constructor [constructor_context:constructor_contexts] new_contexts predef_symbols subst var_heap
+			# (changed, constructor_context, subst) = arraySubst constructor_context subst
+			| contextIsReducible constructor_context com_defs predef_symbols subst
+				# (new_contexts,constructor_contexts,predef_symbols,subst,var_heap)
+					= add_contexts_of_constructor constructor_contexts new_contexts predef_symbols subst var_heap
+				= (new_contexts,[constructor_context:constructor_contexts],predef_symbols,subst,var_heap)
+			# (found,found_context=:{tc_var}) = lookup_context constructor_context new_contexts
+			| found
+				# var_heap
+					= case readPtr tc_var var_heap of
+						(VI_Empty,var_heap)
+							-> writePtr tc_var VI_EmptyConstructorClassVar var_heap
+						(VI_EmptyConstructorClassVar,var_heap)
+							-> var_heap
+				  (new_contexts,constructor_contexts,predef_symbols,subst,var_heap)
+					= add_contexts_of_constructor constructor_contexts new_contexts predef_symbols subst var_heap
+				  constructor_context = {constructor_context & tc_var=tc_var}
+				= (new_contexts,[constructor_context:constructor_contexts],predef_symbols,subst,var_heap)
+				# var_heap
+					= case readPtr constructor_context.tc_var var_heap of
+						(VI_Empty,var_heap)
+							-> writePtr constructor_context.tc_var VI_EmptyConstructorClassVar var_heap
+						(VI_EmptyConstructorClassVar,var_heap)
+							-> var_heap
+				  new_contexts = [constructor_context : new_contexts]
+				  (new_contexts,constructor_contexts,predef_symbols,subst,var_heap)
+					= add_contexts_of_constructor constructor_contexts new_contexts predef_symbols subst var_heap
+				= (new_contexts,[constructor_context:constructor_contexts],predef_symbols,subst,var_heap)
+			where
+				lookup_context :: !TypeContext ![TypeContext] -> (!Bool,!TypeContext)
+				lookup_context new_tc [tc : tcs]
+					| new_tc==tc
+						= (True,tc)
+						= lookup_context new_tc tcs
+				lookup_context new_tc []
+					= (False,new_tc)
+		add_contexts_of_constructor [] new_contexts predef_symbols subst var_heap
+			= (new_contexts,[],predef_symbols,subst,var_heap)
 
-	reduce_any_context :: !ReduceInfo !TypeContext !*ReduceState -> *(!ClassApplication, !*ReduceState)
-	reduce_any_context info tc=:{tc_class=class_symb=:(TCGeneric {gtc_class})} rs_state
-		= reduce_any_context info {tc & tc_class = TCClass gtc_class} rs_state
-	reduce_any_context info=:{ri_defs} tc=:{tc_class=class_symb=:(TCClass {glob_object={ds_index},glob_module}),tc_types} rs_state=:{rs_predef_symbols}
-		| is_predefined_symbol glob_module ds_index PD_TypeCodeClass rs_predef_symbols
-			# {rs_new_contexts, rs_type_pattern_vars,rs_var_heap, rs_type_heaps, rs_error} = rs_state
-			# rtcs_state = {rtcs_new_contexts=rs_new_contexts, rtcs_type_pattern_vars=rs_type_pattern_vars,
-									rtcs_var_heap=rs_var_heap, rtcs_type_heaps=rs_type_heaps, rtcs_error=rs_error}
-			# (red_context, {rtcs_new_contexts, rtcs_type_pattern_vars,rtcs_var_heap, rtcs_type_heaps, rtcs_error})
-						= reduce_TC_context ri_defs class_symb (hd tc_types) rtcs_state
-			# rs_state = {rs_state & rs_new_contexts=rtcs_new_contexts, rs_type_pattern_vars=rtcs_type_pattern_vars,
-									rs_var_heap=rtcs_var_heap, rs_type_heaps=rtcs_type_heaps, rs_error=rtcs_error}
-			= (red_context, rs_state)
-			# (class_appls, rs_state)
-					= reduce_context info tc rs_state
-			= (CA_Instance class_appls, rs_state)
+	add_contexts contexts all_contexts var_heap
+		= foldSt add_spec_context contexts (all_contexts,var_heap)
+	where
+		add_spec_context tc (contexts, var_heap)
+			| containsContext tc contexts
+				= (contexts, var_heap)
+			  	# (tc_var,var_heap) = newPtr VI_Empty var_heap
+				= ([{tc & tc_var = tc_var} : contexts], var_heap)
 
-	reduce_context :: !ReduceInfo !TypeContext !*ReduceState -> *(!ReducedContexts, !*ReduceState)
-	reduce_context info tc=:{tc_class=TCGeneric {gtc_class}} rs_state
-		= reduce_context info {tc & tc_class = TCClass gtc_class} rs_state
-	reduce_context info=:{ri_defs,ri_instance_info,ri_main_dcl_module_n} {tc_class=tc_class=:TCClass class_symb=:{glob_object={ds_index},glob_module},tc_types}
-			rs_state
-		# {class_members,class_context,class_args,class_ident} = ri_defs.[glob_module].com_class_defs.[ds_index]
-		| size class_members > 0
-			# class_instances = ri_instance_info.[glob_module].[ds_index]
-			# {rs_coercions, rs_type_heaps} = rs_state
-			# ({glob_module,glob_object}, contexts, uni_ok, rs_type_heaps, rs_coercions) = find_instance tc_types class_instances ri_defs rs_type_heaps rs_coercions
-			# rs_state = {rs_state & rs_coercions=rs_coercions, rs_type_heaps=rs_type_heaps}
-			| (glob_module <> NotFound) && uni_ok
-				# {ins_members, ins_class_index} = ri_defs.[glob_module].com_instance_defs.[glob_object]
-				| is_predefined_global_symbol ins_class_index PD_ArrayClass rs_state.rs_predef_symbols &&
-				  is_unboxed_array tc_types rs_state.rs_predef_symbols
-					# {rs_predef_symbols, rs_error,rs_special_instances, rs_type_heaps}
-						=	rs_state
-					# (rcs_class_context, rs_special_instances, (rs_predef_symbols, rs_type_heaps), rs_error)
-						= check_unboxed_array_type ri_main_dcl_module_n glob_module ins_class_index ins_members tc_types class_members ri_defs rs_special_instances (rs_predef_symbols, rs_type_heaps) rs_error
-					# rs_state = {rs_state & rs_predef_symbols=rs_predef_symbols,
-									rs_special_instances=rs_special_instances,rs_type_heaps=rs_type_heaps, rs_error=rs_error}
-					= ({ rcs_class_context = rcs_class_context, rcs_constraints_contexts = []}, rs_state)
-				| is_predefined_global_symbol ins_class_index PD_UListClass rs_state.rs_predef_symbols
-					# {rs_predef_symbols, rs_error,rs_special_instances, rs_type_heaps}
-						=	rs_state
-					# (rcs_class_context, rs_special_instances, (rs_predef_symbols, rs_type_heaps), rs_error)
-						= check_unboxed_list_type ri_main_dcl_module_n glob_module ins_class_index ins_members tc_types class_members ri_defs rs_special_instances (rs_predef_symbols, rs_type_heaps) rs_error
-					# rs_state = {rs_state & rs_predef_symbols=rs_predef_symbols,
-									rs_special_instances=rs_special_instances,rs_type_heaps=rs_type_heaps, rs_error=rs_error}
-					= ({ rcs_class_context = rcs_class_context, rcs_constraints_contexts = []}, rs_state)
-				| is_predefined_global_symbol ins_class_index PD_UTSListClass rs_state.rs_predef_symbols
-					# {rs_predef_symbols, rs_error,rs_special_instances, rs_type_heaps}
-						=	rs_state
-					# (rcs_class_context, rs_special_instances, (rs_predef_symbols, rs_type_heaps), rs_error)
-						= check_unboxed_tail_strict_list_type ri_main_dcl_module_n glob_module ins_class_index ins_members tc_types class_members ri_defs rs_special_instances (rs_predef_symbols, rs_type_heaps) rs_error
-					# rs_state = {rs_state & rs_predef_symbols=rs_predef_symbols,
-									rs_special_instances=rs_special_instances,rs_type_heaps=rs_type_heaps, rs_error=rs_error}
-					= ({ rcs_class_context = rcs_class_context, rcs_constraints_contexts = []}, rs_state)
+	finish_context_reduction :: FinReduceInfo [RC] [TypeContext] *FinalRedState -> *(![ClassApplication],!*FinalRedState)
+	finish_context_reduction info [ ]		 [ ] 	  frs_state
+		= ([], frs_state)
+	finish_context_reduction info [rc : rcs] [tc:tcs] frs_state
+		# (frc, frs_state) 	= finish_cr_of_rc info rc tc frs_state
+		  (frcs, frs_state)	= finish_context_reduction info rcs tcs frs_state
+		= ([frc : frcs], frs_state)
 
-					# (appls, rs_state)
-							= reduceContexts info contexts rs_state
-					  (constraints, rs_state)
-					  		= reduce_contexts_in_constraints info tc_types class_args class_context rs_state
-					= ({ rcs_class_context = { cid_class_index = ins_class_index, cid_inst_module = glob_module, cid_inst_members = ins_members,
-								cid_types = tc_types, cid_red_contexts = appls }, rcs_constraints_contexts = constraints }, rs_state)
-				# rcs_class_context = { cid_class_index = {gi_module=glob_module,gi_index=ds_index}, cid_inst_module = NoIndex, cid_inst_members = {}, cid_types = tc_types, cid_red_contexts = [] }
-				| glob_module <> NotFound
-					# rs_state = {rs_state & rs_error = uniqueError class_ident tc_types rs_state.rs_error}
-					= ({ rcs_class_context = rcs_class_context, rcs_constraints_contexts = []}, rs_state)
-					# rs_state = {rs_state & rs_error = instanceError class_ident tc_types rs_state.rs_error}
-					= ({ rcs_class_context = rcs_class_context, rcs_constraints_contexts = []}, rs_state)
-			# (constraints, rs_state)
-				= reduce_contexts_in_constraints info tc_types class_args class_context rs_state
+	finish_cr_of_rc info (RC_Context _) act_tc frs_state=:{frs_all_contexts, frs_var_heap}
+		| containsContext act_tc frs_all_contexts
+			= (CA_Context act_tc, frs_state)
+			# (tc_var, frs_var_heap) = newPtr VI_Empty frs_var_heap
+			= (CA_Context act_tc, {frs_state & frs_var_heap = frs_var_heap, frs_all_contexts = [{act_tc & tc_var = tc_var} : frs_all_contexts]})
+	finish_cr_of_rc info (RC_Instance ci) act_tc frs_state
+		# (rc, frs_state) = finish_cr_of_ci info ci act_tc frs_state
+		= (CA_Instance rc, frs_state)
 
-			| case tc_types of [_] -> False; _ -> True
-			|| case class_context of [] -> True; [_] -> True; _ -> False 
-				// not implemented for multiparameter type classes or fewer than 2 class constraints
-				= ({ rcs_class_context = { cid_class_index = {gi_module=glob_module,gi_index=ds_index}, cid_inst_module = NoIndex, cid_inst_members = {}, cid_types = tc_types, cid_red_contexts = [] },
-					rcs_constraints_contexts = constraints }, rs_state)
+	finish_cr_of_ci info CI_TC act_tc=:{tc_class,tc_types} frs_state=:{frs_all_contexts, frs_type_pattern_vars, frs_var_heap, frs_type_heaps, frs_error}
+		# (rc, { rtcs_new_contexts, rtcs_type_pattern_vars, rtcs_var_heap, rtcs_type_heaps, rtcs_error })
+			= reduce_tc_context info.fri_defs tc_class (hd tc_types)
+					{ rtcs_new_contexts = frs_all_contexts, rtcs_type_pattern_vars = frs_type_pattern_vars, rtcs_var_heap = frs_var_heap,
+					  rtcs_type_heaps = frs_type_heaps, rtcs_error = frs_error }
+		= (rc, { frs_state & frs_all_contexts = rtcs_new_contexts, frs_type_pattern_vars = rtcs_type_pattern_vars, frs_var_heap = rtcs_var_heap,
+				                      frs_type_heaps = rtcs_type_heaps, frs_error = rtcs_error})
+	finish_cr_of_ci info (CI_Class opt_cd cis) act_tc frs_state
+		# (cid, frs_state) = finish_cr_of_opt_cd info opt_cd act_tc frs_state
+		  (rcs, frs_state) = finish_cr_of_cis info cis act_tc frs_state
+		= (RC_Class cid rcs, frs_state)
 
-			// if a constraint of a class without members is reduced, and all classes in the constraint of that class appear
-			// in the reduced constraints for a variable, add a constraint for the original class for that variable
-			// (this causes removal of the other constraints later), to prevent functions with too many constraints
-			# n_contexts = length class_context
-			  required_used_contexts = (2<<(n_contexts-1))-1 // beware of 1<<32==0 on IA32
-			  variables_and_contexts = collect_variable_and_contexts constraints [] class_context
-			  variables = [variable \\ (variable,used_contexts)<-variables_and_contexts | used_contexts==required_used_contexts]		
+	finish_cr_of_opt_cd info No act_tc=:{tc_class,tc_types} frs_state
+		# {glob_module,glob_object={ds_index}} = getClassSymbol tc_class
+		# cid = { cid_class_index = {gi_module=glob_module,gi_index=ds_index}, cid_inst_module = NoIndex, cid_inst_members = {}, cid_types = tc_types, cid_red_contexts = [] }
+		= (cid, frs_state)
 
-			  rs_state = add_unexpanded_contexts variables tc_class rs_state
+	finish_cr_of_opt_cd info=:{fri_defs} (Yes {cd_inst_symbol={glob_module,glob_object},cd_inst_contexts,cd_new_vars}) act_tc=:{tc_class,tc_types}
+			frs_state=:{frs_type_heaps,frs_coercions,frs_predef_symbols,frs_special_instances,frs_error}
+		# {ins_type={it_vars,it_types,it_context}, ins_members, ins_class_index} = fri_defs.[glob_module].com_instance_defs.[glob_object]
+		| is_predefined_global_symbol ins_class_index PD_ArrayClass frs_predef_symbols && is_unboxed_array tc_types frs_predef_symbols
+			# {class_members} = fri_defs.[ins_class_index.gi_module].com_class_defs.[ins_class_index.gi_index]
+			  (rcs_class_context, frs_special_instances, (frs_predef_symbols, frs_type_heaps), frs_error)
+				= check_unboxed_array_type info.fri_main_dcl_module_n glob_module ins_class_index ins_members tc_types class_members fri_defs
+				 	frs_special_instances (frs_predef_symbols, frs_type_heaps) frs_error
+			= (rcs_class_context,
+					{ frs_state & frs_predef_symbols = frs_predef_symbols, frs_type_heaps = frs_type_heaps, frs_error = frs_error, frs_special_instances = frs_special_instances})
+		| is_predefined_global_symbol ins_class_index PD_UListClass frs_predef_symbols
+			# {class_members} = fri_defs.[ins_class_index.gi_module].com_class_defs.[ins_class_index.gi_index]
+			  (rcs_class_context, frs_special_instances, (frs_predef_symbols, frs_type_heaps), frs_error)
+					= check_unboxed_list_type info.fri_main_dcl_module_n glob_module ins_class_index ins_members tc_types class_members fri_defs 
+					 	frs_special_instances (frs_predef_symbols, frs_type_heaps) frs_error
+			= (rcs_class_context,
+					{ frs_state & frs_predef_symbols = frs_predef_symbols, frs_type_heaps = frs_type_heaps, frs_error = frs_error, frs_special_instances = frs_special_instances})
+		| is_predefined_global_symbol ins_class_index PD_UTSListClass frs_predef_symbols
+			# {class_members} = fri_defs.[ins_class_index.gi_module].com_class_defs.[ins_class_index.gi_index]
+			  (rcs_class_context, frs_special_instances, (frs_predef_symbols, frs_type_heaps), frs_error)
+					= check_unboxed_tail_strict_list_type info.fri_main_dcl_module_n glob_module ins_class_index ins_members tc_types class_members fri_defs 
+					 	frs_special_instances (frs_predef_symbols, frs_type_heaps) frs_error
+			= (rcs_class_context,
+					{ frs_state & frs_predef_symbols = frs_predef_symbols, frs_type_heaps = frs_type_heaps, frs_error = frs_error, frs_special_instances = frs_special_instances})
+		| otherwise
+			# frs_type_heaps & th_vars = clear_binding_of_type_vars it_vars frs_type_heaps.th_vars
+			# (uni_ok, frs_type_heaps, frs_coercions) = bindListsOfTypes fri_defs it_types tc_types frs_type_heaps frs_coercions
+			| uni_ok
+				# frs_subst = frs_state.frs_subst
+				# (frs_subst, frs_type_heaps) = bind_new_vars cd_new_vars frs_subst frs_type_heaps
+				# (new_contexts,frs_type_heaps) = freshContexts it_context frs_type_heaps
+				# frs_state & frs_type_heaps = frs_type_heaps, frs_coercions = frs_coercions, frs_subst = frs_subst
+				# (appls, frs_state) = finish_context_reduction info cd_inst_contexts new_contexts frs_state
+				= ({ cid_class_index = ins_class_index, cid_inst_module = glob_module, cid_inst_members = ins_members, cid_types = tc_types, cid_red_contexts = appls },
+						frs_state)
+				# {class_ident} = fri_defs.[ins_class_index.gi_module].com_class_defs.[ins_class_index.gi_index]
+				= ({ cid_class_index = ins_class_index, cid_inst_module = glob_module, cid_inst_members = ins_members, cid_types = tc_types, cid_red_contexts = [] },
+						{ frs_state & frs_type_heaps = frs_type_heaps, frs_coercions = frs_coercions, frs_error = uniqueError class_ident tc_types frs_error})
+
+	finish_cr_of_cis info [] act_tc frs_state
+		= ([], frs_state)
+	finish_cr_of_cis info cis {tc_class,tc_types} frs_state=:{frs_type_heaps}
+		# {glob_module,glob_object={ds_index}} = getClassSymbol tc_class
+		# {class_context,class_args} = info.fri_defs.[glob_module].com_class_defs.[ds_index]
+		# th_vars = fold2St (\ type {tv_info_ptr} -> writePtr tv_info_ptr (TVI_Type type)) tc_types class_args frs_type_heaps.th_vars
+		# (act_contexts, frs_type_heaps) = freshContexts class_context { frs_type_heaps & th_vars = th_vars }
+		= map2St (finish_cr_of_ci info) cis act_contexts {frs_state & frs_type_heaps = frs_type_heaps}
+
+	getClassSymbol (TCClass class_symbol)	= class_symbol
+	getClassSymbol (TCGeneric {gtc_class})	= gtc_class
+
+	is_predefined_global_symbol :: !GlobalIndex !Int !PredefinedSymbols -> Bool
+	is_predefined_global_symbol {gi_module,gi_index} predef_index predef_symbols
+		# {pds_def,pds_module} = predef_symbols.[predef_index]
+		= gi_module == pds_module && gi_index == pds_def
+
+	reduce_tc_context :: {#CommonDefs} TCClass Type *ReduceTCState -> (ReducedContext, !*ReduceTCState)
+	reduce_tc_context defs type_code_class type=:(TA cons_id=:{type_index} cons_args) rtcs_state=:{rtcs_error,rtcs_type_heaps}
+		# rtcs_error = disallow_abstract_types_in_dynamics defs type_index rtcs_error
+		# (expanded, type, rtcs_type_heaps)
+			=	tryToExpandTypeSyn defs type cons_id cons_args rtcs_type_heaps
+		# rtcs_state = {rtcs_state & rtcs_error=rtcs_error, rtcs_type_heaps=rtcs_type_heaps}
+		| expanded
+			=	reduce_tc_context defs type_code_class type rtcs_state
+		# type_constructor = toTypeCodeConstructor type_index defs
+		  (rc_red_contexts, rtcs_state) = try_to_reduce_tc_contexts defs type_code_class cons_args rtcs_state
+		= (RC_TC_Global type_constructor rc_red_contexts, rtcs_state)
+	reduce_tc_context defs type_code_class (TAS cons_id cons_args _) rtcs_state
+		= reduce_tc_context defs type_code_class (TA cons_id cons_args) rtcs_state
+	reduce_tc_context defs type_code_class (TB basic_type) rtcs_state
+		= (RC_TC_Global (GTT_Basic basic_type) [], rtcs_state)
+	reduce_tc_context defs type_code_class (arg_type --> result_type) rtcs_state
+		#  (rc_red_contexts, rtcs_state) = try_to_reduce_tc_contexts defs type_code_class [arg_type, result_type] rtcs_state
+		= (RC_TC_Global GTT_Function rc_red_contexts, rtcs_state)
+	reduce_tc_context defs type_code_class (TempQDV var_number) rtcs_state=:{rtcs_type_pattern_vars, rtcs_var_heap}
+		# (inst_var, (rtcs_type_pattern_vars, rtcs_var_heap))
+			= addLocalTCInstance var_number (rtcs_type_pattern_vars, rtcs_var_heap)
+		# rtcs_state = {rtcs_state & rtcs_type_pattern_vars=rtcs_type_pattern_vars, rtcs_var_heap=rtcs_var_heap}
+		= (RC_TC_Local inst_var, rtcs_state)
+
+	try_to_reduce_tc_contexts :: {#CommonDefs} TCClass [AType] *ReduceTCState -> (![ClassApplication], !*ReduceTCState)
+	try_to_reduce_tc_contexts defs type_code_class cons_args rtcs_state
+		= mapSt (\{at_type} -> try_to_reduce_tc_context defs type_code_class at_type) cons_args rtcs_state
+	where
+		try_to_reduce_tc_context :: {#CommonDefs} TCClass Type *ReduceTCState -> (!ClassApplication, !*ReduceTCState)
+		try_to_reduce_tc_context defs type_code_class (TempV var_number) rtcs_state=:{rtcs_var_heap, rtcs_new_contexts}
+			# (tc_var, rtcs_var_heap) = newPtr VI_Empty rtcs_var_heap
+			# rtcs_state={rtcs_state & rtcs_var_heap=rtcs_var_heap}
+			  tc = { tc_class = type_code_class, tc_types = [TempV var_number], tc_var = tc_var }
+			| containsContext tc rtcs_new_contexts
+				= (CA_Context tc, rtcs_state)
+				= (CA_Context tc, {rtcs_state & rtcs_new_contexts = [tc : rtcs_new_contexts]})
+		try_to_reduce_tc_context defs type_code_class (TempQV var_number) rtcs_state=:{rtcs_var_heap,rtcs_new_contexts}
+			# (tc_var, rtcs_var_heap) = newPtr VI_Empty rtcs_var_heap
+			# rtcs_state={rtcs_state & rtcs_var_heap=rtcs_var_heap}
+			# tc = { tc_class = type_code_class, tc_types = [TempQV var_number], tc_var = tc_var }
+			| containsContext tc rtcs_new_contexts
+				= (CA_Context tc, rtcs_state)
+				= (CA_Context tc, {rtcs_state & rtcs_new_contexts = [tc : rtcs_new_contexts]})
+		try_to_reduce_tc_context defs type_code_class type=:(TempCV _ :@: _) rtcs_state=:{rtcs_var_heap, rtcs_new_contexts}
+			# (tc_var, rtcs_var_heap) = newPtr VI_Empty rtcs_var_heap
+			# rtcs_state={rtcs_state & rtcs_var_heap=rtcs_var_heap}
+			  tc = { tc_class=type_code_class, tc_types=[type], tc_var=tc_var }
+			| containsContext tc rtcs_new_contexts
+				= (CA_Context tc, rtcs_state)
+				= (CA_Context tc, {rtcs_state & rtcs_new_contexts = [tc : rtcs_new_contexts]})
+		try_to_reduce_tc_context defs type_code_class type rtcs_state
+			# (rc, rtcs_state) = reduce_tc_context  defs type_code_class type rtcs_state
+			= (CA_Instance rc, rtcs_state)
 			
-			= ({ rcs_class_context = { cid_class_index = {gi_module=glob_module,gi_index=ds_index}, cid_inst_module = NoIndex, cid_inst_members = {}, cid_types = tc_types, cid_red_contexts = [] },
-				rcs_constraints_contexts = constraints }, rs_state)
-
-	reduce_contexts_in_constraints :: !ReduceInfo ![Type] ![TypeVar] ![TypeContext] *ReduceState
-		-> *([ClassApplication],*ReduceState)
-	reduce_contexts_in_constraints info types class_args [] rs_state
-		= ([],rs_state)
-	reduce_contexts_in_constraints info types class_args class_context rs_state=:{rs_type_heaps=rs_type_heaps=:{th_vars}}
-		# th_vars = fold2St (\ type {tv_info_ptr} -> writePtr tv_info_ptr (TVI_Type type)) types class_args th_vars
-		  (instantiated_context, rs_type_heaps) = fresh_contexts class_context { rs_type_heaps & th_vars = th_vars }
-		# rs_state = {rs_state & rs_type_heaps=rs_type_heaps}
-		= mapSt (reduce_any_context info) instantiated_context rs_state
-
-	find_instance :: [Type] !InstanceTree {#CommonDefs} *TypeHeaps *Coercions -> *(Global Int,[TypeContext],Bool,*TypeHeaps,*Coercions)
-	find_instance co_types (IT_Node this_inst_index=:{glob_object,glob_module} left right) defs type_heaps coercion_env
-		# (left_index, types, uni_ok, type_heaps, coercion_env) = find_instance co_types left defs type_heaps coercion_env
-		| FoundObject left_index
-			= (left_index, types, uni_ok, type_heaps, coercion_env)
-			# {ins_type={it_types,it_context}, ins_specials} = defs.[glob_module].com_instance_defs.[glob_object]
-			  (matched, type_heaps) = match defs it_types co_types type_heaps
-			| matched
-				# (subst_context, type_heaps) = fresh_contexts it_context type_heaps
-				  (uni_ok, coercion_env, type_heaps) = adjust_type_attributes defs co_types it_types coercion_env type_heaps
-				  (spec_inst, type_heaps) = trySpecializedInstances subst_context (get_specials ins_specials) type_heaps
-				| FoundObject spec_inst
-					= (spec_inst, [], uni_ok, type_heaps, coercion_env)
-					= (this_inst_index, subst_context, uni_ok, type_heaps, coercion_env)
-				= find_instance co_types right defs type_heaps coercion_env
-	find_instance co_types IT_Empty defs heaps coercion_env
-		= (ObjectNotFound, [], True, heaps, coercion_env)
-
-	get_specials :: Specials -> [Special]
-	get_specials (SP_ContextTypes specials) = specials
-	get_specials SP_None 					= []
-
-	adjust_type_attributes :: !{#CommonDefs} ![Type] ![Type] !*Coercions !*TypeHeaps -> (Bool, !*Coercions, !*TypeHeaps)
-	adjust_type_attributes defs act_types form_types coercion_env type_heaps
-		= fold2St (adjust_type_attribute defs) act_types form_types (True, coercion_env, type_heaps)
-
-	adjust_type_attribute :: !{#CommonDefs} !Type !Type !(Bool, !*Coercions, !*TypeHeaps) -> (Bool, !*Coercions, !*TypeHeaps)
-	adjust_type_attribute _ _ (TV _) state
-		= state
-	adjust_type_attribute defs type1=:(TA type_cons1 cons_args1) type2=:(TA type_cons2 cons_args2) (ok, coercion_env, type_heaps)
-		| type_cons1 == type_cons2
-			= adjust_attributes_and_subtypes defs cons_args1 cons_args2 (ok, coercion_env, type_heaps)
-			= expand_types_and_adjust_type_attribute type_cons1 cons_args1 type_cons2 cons_args2 defs type1 type2 ok coercion_env type_heaps
-	adjust_type_attribute defs type1=:(TA type_cons1 cons_args1) type2=:(TAS type_cons2 cons_args2 _) (ok, coercion_env, type_heaps)
-		| type_cons1 == type_cons2
-			= adjust_attributes_and_subtypes defs cons_args1 cons_args2 (ok, coercion_env, type_heaps)
-			= expand_types_and_adjust_type_attribute type_cons1 cons_args1 type_cons2 cons_args2 defs type1 type2 ok coercion_env type_heaps
-	adjust_type_attribute defs type1=:(TA type_cons1 cons_args1) type2 (ok, coercion_env, type_heaps)
-		# (expanded, type1, type_heaps) = tryToExpandTypeSyn defs type1 type_cons1 cons_args1 type_heaps
-		| expanded
-			= adjust_type_attribute defs type1 type2 (ok, coercion_env, type_heaps)
-			= (ok, coercion_env, type_heaps)
-	adjust_type_attribute defs type1=:(TAS type_cons1 cons_args1 _) type2=:(TA type_cons2 cons_args2) (ok, coercion_env, type_heaps)
-		| type_cons1 == type_cons2
-			= adjust_attributes_and_subtypes defs cons_args1 cons_args2 (ok, coercion_env, type_heaps)
-			= expand_types_and_adjust_type_attribute type_cons1 cons_args1 type_cons2 cons_args2 defs type1 type2 ok coercion_env type_heaps
-	adjust_type_attribute defs type1=:(TAS type_cons1 cons_args1 _) type2=:(TAS type_cons2 cons_args2 _) (ok, coercion_env, type_heaps)
-		| type_cons1 == type_cons2
-			= adjust_attributes_and_subtypes defs cons_args1 cons_args2 (ok, coercion_env, type_heaps)
-			= expand_types_and_adjust_type_attribute type_cons1 cons_args1 type_cons2 cons_args2 defs type1 type2 ok coercion_env type_heaps
-	adjust_type_attribute defs type1=:(TAS type_cons1 cons_args1 _) type2 (ok, coercion_env, type_heaps)
-		# (expanded, type1, type_heaps) = tryToExpandTypeSyn defs type1 type_cons1 cons_args1 type_heaps
-		| expanded
-			= adjust_type_attribute defs type1 type2 (ok, coercion_env, type_heaps)
-			= (ok, coercion_env, type_heaps)
-	adjust_type_attribute defs (arg_type1 --> res_type1) (arg_type2 --> res_type2) state
-		= adjust_attributes_and_subtypes defs [arg_type1, res_type1] [arg_type2, res_type2] state
-	adjust_type_attribute defs (TArrow1 x) (TArrow1 y) state
-		= adjust_attributes_and_subtypes defs [x] [y] state
-	adjust_type_attribute defs (_ :@: types1) (_ :@: types2) state
-		= adjust_attributes_and_subtypes defs types1 types2 state
-	adjust_type_attribute defs type1 type2=:(TA type_cons2 cons_args2) (ok, coercion_env, type_heaps)
-		# (expanded, type2, type_heaps) = tryToExpandTypeSyn defs type2 type_cons2 cons_args2 type_heaps
-		| expanded
-			= adjust_type_attribute defs type1 type2 (ok, coercion_env, type_heaps)
-			= (ok, coercion_env, type_heaps)
-	adjust_type_attribute defs type1 type2=:(TAS type_cons2 cons_args2 _) (ok, coercion_env, type_heaps)
-		# (expanded, type2, type_heaps) = tryToExpandTypeSyn defs type2 type_cons2 cons_args2 type_heaps
-		| expanded
-			= adjust_type_attribute defs type1 type2 (ok, coercion_env, type_heaps)
-			= (ok, coercion_env, type_heaps)
-	adjust_type_attribute _ _ _ state
-		= state
-	
-	expand_types_and_adjust_type_attribute type_cons1 cons_args1 type_cons2 cons_args2 defs type1 type2 ok coercion_env type_heaps
-		# (_, type1, type_heaps) = tryToExpandTypeSyn defs type1 type_cons1 cons_args1 type_heaps
-		  (_, type2, type_heaps) = tryToExpandTypeSyn defs type2 type_cons2 cons_args2 type_heaps
-		= adjust_type_attribute defs type1 type2 (ok, coercion_env, type_heaps)
-
-	adjust_attributes_and_subtypes :: !{#CommonDefs} ![AType] ![AType] !(Bool, !*Coercions, !*TypeHeaps) -> (Bool, !*Coercions, !*TypeHeaps)
-	adjust_attributes_and_subtypes defs types1 types2 state
-		= fold2St (adjust_attribute_and_subtypes defs) types1 types2 state
-		
-	adjust_attribute_and_subtypes :: !{#CommonDefs} !AType !AType !(Bool, !*Coercions, !*TypeHeaps) -> (Bool, !*Coercions, !*TypeHeaps)
-	adjust_attribute_and_subtypes defs atype1 atype2 (ok, coercion_env, type_heaps)
-		# (ok, coercion_env) = adjust_attribute atype1.at_attribute atype2.at_attribute (ok, coercion_env)
-		= adjust_type_attribute defs atype1.at_type atype2.at_type (ok, coercion_env, type_heaps)
-	where
-		adjust_attribute :: !TypeAttribute !TypeAttribute !(Bool, !*Coercions) -> (Bool, !*Coercions)
-		adjust_attribute attr1 (TA_Var _) state
-			= state
-		adjust_attribute attr1 TA_Unique (ok, coercion_env)
-			= case attr1 of
-				TA_Unique
-					-> (ok, coercion_env)
-				TA_TempVar av_number
-					# (succ, coercion_env) = tryToMakeUnique av_number coercion_env
-					-> (ok && succ, coercion_env)
-				_
-					-> (False, coercion_env)
-	
-		adjust_attribute attr1 attr (ok, coercion_env)
-			= case attr1 of
-				TA_Multi
-					-> (ok, coercion_env)
-				TA_TempVar av_number
-					# (succ, coercion_env) = tryToMakeNonUnique av_number coercion_env
-					-> (ok && succ, coercion_env)
-				_
-					-> (False, coercion_env)
-
-	fresh_contexts :: ![TypeContext] !*TypeHeaps -> ([TypeContext],*TypeHeaps)
-	fresh_contexts contexts type_heaps
-		= mapSt fresh_context contexts type_heaps
-	where
-		fresh_context :: !TypeContext !*TypeHeaps -> (TypeContext,*TypeHeaps)
-		fresh_context tc=:{tc_types} type_heaps
-			# (changed_tc_types, tc_types, type_heaps) = substitute tc_types type_heaps
-			| changed_tc_types
-				= ({tc & tc_types = tc_types}, type_heaps)
-				= (tc, type_heaps)
+	disallow_abstract_types_in_dynamics :: {#CommonDefs} (Global Index) *ErrorAdmin ->  *ErrorAdmin
+	disallow_abstract_types_in_dynamics defs type_index=:{glob_module,glob_object} error
+		| cPredefinedModuleIndex == glob_module
+			= error			
+		# {td_ident,td_rhs} = defs.[glob_module].com_type_defs.[glob_object]
+		= case td_rhs of
+				AbstractType _			-> abstractTypeInDynamicError td_ident error
+				AbstractSynType _ _		-> abstractTypeInDynamicError td_ident error
+				_						-> error
 
 	is_unboxed_array:: [Type] PredefinedSymbols -> Bool
 	is_unboxed_array [TA {type_index={glob_module,glob_object},type_arity} _ : _] predef_symbols
@@ -516,11 +929,6 @@ where
 	try_to_unbox type _ predef_symbols_type_heaps
 		= (False, No, predef_symbols_type_heaps)
 
-	is_predefined_global_symbol :: !GlobalIndex !Int !PredefinedSymbols -> Bool
-	is_predefined_global_symbol {gi_module,gi_index} predef_index predef_symbols
-		# {pds_def,pds_module} = predef_symbols.[predef_index]
-		= gi_module == pds_module && gi_index == pds_def
-
 	look_up_array_or_list_instance :: !TypeSymbIdent ![ArrayInstance] -> Optional ArrayInstance
 	look_up_array_or_list_instance record []
 		= No
@@ -534,81 +942,343 @@ where
 		= {	ai_members = { {cim_ident=ds_ident,cim_arity=ds_arity,cim_index=next_inst_index} \\ {ds_ident,ds_arity} <-: members & next_inst_index <- [next_member_index .. ]},
 			ai_record = record }
 
-	disallow_abstract_types_in_dynamics :: {#CommonDefs} (Global Index) *ErrorAdmin ->  *ErrorAdmin
-	disallow_abstract_types_in_dynamics defs type_index=:{glob_module,glob_object} error
-		| cPredefinedModuleIndex == glob_module
-			= error
-			
-		#! ({td_ident,td_rhs})
-			= defs.[glob_module].com_type_defs.[glob_object]
-		= case td_rhs of
-				AbstractType _			-> abstractTypeInDynamicError td_ident error
-				AbstractSynType _ _		-> abstractTypeInDynamicError td_ident error
-				_						-> error
+	bind_new_vars [(tv_info_ptr,tv_n):new_vars] subst type_heaps
+		# (tv_info, th_vars) = readPtr tv_info_ptr type_heaps.th_vars
+		= case tv_info of
+			TVI_Empty
+				# (_,type2,subst) = arraySubst (TempV tv_n) subst
+			 	  type_heaps & th_vars = writePtr tv_info_ptr (TVI_Type type2) th_vars
+				-> bind_new_vars new_vars subst type_heaps
+			TVI_Type _
+			 	-> bind_new_vars new_vars subst {type_heaps & th_vars = th_vars}
+	bind_new_vars [] subst type_heaps
+		= (subst,type_heaps)
 
-	reduce_TC_context :: {#CommonDefs} TCClass Type *ReduceTCState -> (ClassApplication, !*ReduceTCState)
-	reduce_TC_context defs type_code_class tc_type rtcs_state
-		= reduce_tc_context defs type_code_class tc_type rtcs_state
-	where
-		reduce_tc_context :: {#CommonDefs} TCClass Type *ReduceTCState -> (ClassApplication, !*ReduceTCState)
-		reduce_tc_context defs type_code_class type=:(TA cons_id=:{type_index} cons_args) rtcs_state=:{rtcs_error,rtcs_type_heaps}
-			# rtcs_error = disallow_abstract_types_in_dynamics defs type_index rtcs_error
-			# (expanded, type, rtcs_type_heaps)
-				=	tryToExpandTypeSyn defs type cons_id cons_args rtcs_type_heaps
-			# rtcs_state = {rtcs_state & rtcs_error=rtcs_error, rtcs_type_heaps=rtcs_type_heaps}
-			| expanded
-				=	reduce_tc_context defs type_code_class type rtcs_state
-			# type_constructor = toTypeCodeConstructor type_index defs
-			  (cid_red_contexts, rtcs_state) = reduce_TC_contexts defs type_code_class cons_args rtcs_state
-			= (CA_GlobalTypeCode { tci_constructor = type_constructor, tci_contexts = cid_red_contexts }, rtcs_state)
-		reduce_tc_context defs type_code_class (TAS cons_id cons_args _) rtcs_state
-			= reduce_tc_context defs type_code_class (TA cons_id cons_args) rtcs_state
-		reduce_tc_context defs type_code_class (TB basic_type) rtcs_state
-			= (CA_GlobalTypeCode { tci_constructor = GTT_Basic basic_type, tci_contexts = [] }, rtcs_state)
-		reduce_tc_context defs type_code_class (arg_type --> result_type) rtcs_state
-			#  (cid_red_contexts, rtcs_state) = reduce_TC_contexts defs type_code_class [arg_type, result_type] rtcs_state
-			= (CA_GlobalTypeCode { tci_constructor = GTT_Function, tci_contexts = cid_red_contexts }, rtcs_state)
-		reduce_tc_context defs type_code_class (TempQV var_number) rtcs_state=:{rtcs_var_heap,rtcs_new_contexts}
-			# (tc_var, rtcs_var_heap) = newPtr VI_Empty rtcs_var_heap
-			# rtcs_state={rtcs_state & rtcs_var_heap=rtcs_var_heap}
-			# tc = { tc_class = type_code_class, tc_types = [TempQV var_number], tc_var = tc_var }
-			| containsContext tc rtcs_new_contexts
-				= (CA_Context tc, rtcs_state)
-				= (CA_Context tc, {rtcs_state & rtcs_new_contexts = [tc : rtcs_new_contexts]})
-		reduce_tc_context defs type_code_class (TempQDV var_number) rtcs_state=:{rtcs_type_pattern_vars,rtcs_var_heap,rtcs_new_contexts}
-			# (inst_var, (rtcs_type_pattern_vars, rtcs_var_heap))
-				= addLocalTCInstance var_number (rtcs_type_pattern_vars, rtcs_var_heap)
-			# rtcs_state = {rtcs_state & rtcs_type_pattern_vars=rtcs_type_pattern_vars, rtcs_var_heap=rtcs_var_heap}
-			= (CA_LocalTypeCode inst_var, rtcs_state)
-		reduce_tc_context defs type_code_class (TempV var_number) rtcs_state=:{rtcs_var_heap, rtcs_new_contexts}
-			# (tc_var, rtcs_var_heap) = newPtr VI_Empty rtcs_var_heap
-			# rtcs_state={rtcs_state & rtcs_var_heap=rtcs_var_heap}
-			  tc = { tc_class = type_code_class, tc_types = [TempV var_number], tc_var = tc_var }
-			| containsContext tc rtcs_new_contexts
-				= (CA_Context tc, rtcs_state)
-				= (CA_Context tc, {rtcs_state & rtcs_new_contexts = [tc : rtcs_new_contexts]})
-		reduce_tc_context defs type_code_class type=:(TempCV _ :@: _) rtcs_state=:{rtcs_var_heap, rtcs_new_contexts}
-			# (tc_var, rtcs_var_heap) = newPtr VI_Empty rtcs_var_heap
-			# rtcs_state={rtcs_state & rtcs_var_heap=rtcs_var_heap}
-			  tc = { tc_class=type_code_class, tc_types=[type], tc_var=tc_var }
-			| containsContext tc rtcs_new_contexts
-				= (CA_Context tc, rtcs_state)
-				= (CA_Context tc, {rtcs_state & rtcs_new_contexts = [tc : rtcs_new_contexts]})
+:: ReduceDLA = { // reduce detect loop arguments
+	rdla_depth :: !Int,
+	rdla_previous_context :: !PreviousContext
+   }
 
-		reduce_TC_contexts :: {#CommonDefs} TCClass [AType] *ReduceTCState -> ([ClassApplication], !*ReduceTCState)
-		reduce_TC_contexts defs type_code_class cons_args rtcs_state
-			= mapSt (\{at_type} -> reduce_tc_context defs type_code_class at_type) cons_args rtcs_state
+:: PreviousContext = NoPreviousContext | PreviousContext !(Global DefinedSymbol) ![Type] /*subst_previous_context_n*/!Int
+ 
+tryToReduceContexts :: !ReduceInfo ![TypeContext] !ReduceDLA !*PreRedState -> (![RC], !*PreRedState)
+tryToReduceContexts info tcs rdla prs_state
+	= mapSt (try_to_reduce_context info rdla) tcs prs_state
+where
+	try_to_reduce_context :: !ReduceInfo !ReduceDLA !TypeContext !*PreRedState -> *(!RC, !*PreRedState)
+	try_to_reduce_context info rdla tc prs_state=:{prs_predef_symbols, prs_subst}
+		| contextIsReducible tc info.ri_defs prs_predef_symbols prs_subst.subst_array
+			# (ci, prs_state) = reduceTCorNormalContext info rdla tc prs_state
+			= (RC_Instance ci, prs_state)
+			= (RC_Context tc, prs_state)
 
-context_is_reducible :: TypeContext PredefinedSymbols -> Bool
-context_is_reducible {tc_class=TCClass class_symb,tc_types = [type : types]} predef_symbols
-	= type_is_reducible type class_symb predef_symbols && types_are_reducible types type class_symb predef_symbols
-context_is_reducible tc=:{tc_class=TCGeneric {gtc_class}, tc_types = [type : types]} predef_symbols
-	= type_is_reducible type gtc_class predef_symbols && types_are_reducible types type gtc_class predef_symbols
+reduceTCorNormalContext :: !ReduceInfo !ReduceDLA !TypeContext !*PreRedState -> *(!CI, !*PreRedState)
+reduceTCorNormalContext info rdla tc=:{tc_class=TCGeneric {gtc_class},tc_types} prs_state=:{prs_subst}
+	#! rdla_depth=rdla.rdla_depth
+	| rdla_depth<32
+		# rdla & rdla_depth=rdla_depth+1
+		= reduceContext info gtc_class tc rdla prs_state
+	# (eq,prs_subst) = equal_previous_context gtc_class tc_types rdla.rdla_previous_context prs_subst
+	| eq
+		# (_, tc_types, subst_array) = arraySubst tc_types prs_subst.subst_array
+		  prs_subst & subst_array = subst_array
+		  prs_state & prs_subst = prs_subst, prs_error = cycleInTypeContextError gtc_class.glob_object.ds_ident tc_types prs_state.prs_error
+		= (CI_Class No [],prs_state)
+	| rdla_depth bitand (rdla_depth-1)<>0
+		# prs_state & prs_subst=prs_subst
+		# rdla & rdla_depth=rdla_depth+1
+		= reduceContext info gtc_class tc rdla prs_state
+		#! subst_previous_context_n = prs_subst.subst_previous_context_n+1
+		# prs_state & prs_subst = {prs_subst & subst_previous_context_n = subst_previous_context_n}
+		# rdla & rdla_depth=rdla_depth+1, rdla_previous_context=PreviousContext gtc_class tc_types subst_previous_context_n
+		= reduceContext info gtc_class tc rdla prs_state
+reduceTCorNormalContext info rdla tc=:{tc_class=TCClass class_symbol,tc_types} prs_state=:{prs_predef_symbols,prs_subst}
+	| is_predefined_class class_symbol PD_TypeCodeClass prs_predef_symbols
+		= (CI_TC, prs_state)
+	#! rdla_depth=rdla.rdla_depth
+	| rdla_depth<32
+		# rdla & rdla_depth=rdla_depth+1
+		= reduceContext info class_symbol tc rdla prs_state
+	# (eq,prs_subst) = equal_previous_context class_symbol tc_types rdla.rdla_previous_context prs_subst
+	| eq
+		# (_, tc_types, subst_array) = arraySubst tc_types prs_subst.subst_array
+		  prs_subst & subst_array = subst_array
+		  prs_state & prs_subst = prs_subst, prs_error = cycleInTypeContextError class_symbol.glob_object.ds_ident tc_types prs_state.prs_error
+		= (CI_Class No [],prs_state)
+	| rdla_depth bitand (rdla_depth-1)<>0
+		# prs_state & prs_subst=prs_subst
+		# rdla & rdla_depth=rdla_depth+1
+		= reduceContext info class_symbol tc rdla prs_state
+		#! subst_previous_context_n = prs_subst.subst_previous_context_n+1
+		# prs_state & prs_subst = {prs_subst & subst_previous_context_n = subst_previous_context_n}
+		# rdla & rdla_depth=rdla_depth+1, rdla_previous_context=PreviousContext class_symbol tc_types subst_previous_context_n
+		= reduceContext info class_symbol tc rdla prs_state
+where
+	is_predefined_class {glob_module,glob_object={ds_index}} prdef_index predef_symbols =
+		is_predefined_symbol glob_module ds_index prdef_index predef_symbols
 
-types_are_reducible :: [Type] Type (Global DefinedSymbol) PredefinedSymbols -> Bool
-types_are_reducible [] _ _ _
+equal_previous_context :: !(Global DefinedSymbol) ![Type] !PreviousContext !*Subst -> (!Bool,!*Subst)
+equal_previous_context tc_class tc_types (PreviousContext ptc_class ptc_types subst_previous_context_n) subst=:{subst_context_n_at_last_update}
+	| subst_context_n_at_last_update>=subst_previous_context_n
+		= (False,subst)	// ---> ("equal_types",subst_context_n_at_last_update,subst_previous_context_n)
+	| tc_class==ptc_class
+		= equal_types tc_types ptc_types subst	// ---> ("equal_types",tc_types,ptc_types)
+		= (False,subst)
+where
+	equal_types :: [Type] [Type] *Subst -> (!Bool,!*Subst)
+	equal_types [type1:types1] [type2:types2] subst
+		# (eq,subst) = equal_type type1 type2 subst
+		| eq
+			= equal_types types1 types2 subst
+			= (False,subst)
+	equal_types [] [] subst
+		= (True,subst)
+equal_previous_context tc_class tc_types NoPreviousContext subst
+	= (False,subst)
+
+reduceContext :: !ReduceInfo !(Global DefinedSymbol) !TypeContext !ReduceDLA !*PreRedState -> *(!CI, !*PreRedState)
+reduceContext info=:{ri_defs,ri_instance_info} class_symbol tc=:{tc_types} rdla prs_state=:{prs_predef_symbols}
+	# {class_ident,class_members,class_args,class_context,class_fun_dep_vars} = getClassDef class_symbol ri_defs
+	# (cis, prs_state) = reduce_contexts_in_constraints info tc_types class_args class_context prs_state
+	| size class_members > 0
+		# class_instances = getClassInstances class_symbol ri_instance_info
+		| class_fun_dep_vars<>0
+			# (opt_cd, prs_state) = reduce_function_context tc class_fun_dep_vars class_ident info class_instances rdla prs_state
+			= (CI_Class opt_cd cis, prs_state)
+			# (opt_cd, prs_state) = reduce_context class_ident info tc class_instances rdla prs_state
+			= (CI_Class opt_cd cis, prs_state)
+		= (CI_Class No cis, prs_state)
+where
+	reduce_context :: !Ident !ReduceInfo !TypeContext  !InstanceTree !ReduceDLA !*PreRedState -> *(!Optional CD, !*PreRedState)
+	reduce_context class_ident info tc=:{tc_types} class_instances rdla prs_state=:{prs_type_heaps,prs_subst}
+		# (gis, ins_contexts, prs_type_heaps, prs_subst) = find_instance tc_types class_instances info.ri_defs prs_type_heaps prs_subst
+		| FoundObject gis
+			# (rcs, prs_state) = tryToReduceContexts info ins_contexts rdla {prs_state & prs_type_heaps = prs_type_heaps, prs_subst = prs_subst}
+			= (Yes {cd_inst_symbol = gis, cd_inst_contexts = rcs, cd_new_vars = []}, prs_state)
+			# (_, tc_types, subst_array) = arraySubst tc_types prs_subst.subst_array
+			# prs_state & prs_type_heaps = prs_type_heaps, prs_subst = {prs_subst & subst_array = subst_array}, prs_error = instanceError class_ident tc_types prs_state.prs_error
+			= (No, prs_state)
+
+	reduce_function_context :: !TypeContext !BITVECT !Ident !ReduceInfo !InstanceTree !ReduceDLA !*PreRedState -> *(!Optional CD, !*PreRedState)
+	reduce_function_context tc class_fun_dep_vars class_ident info class_instances rdla prs_state=:{prs_type_heaps,prs_subst}
+		# (gis, ins_contexts, new_vars, prs_type_heaps, prs_subst) = find_fun_dep_instance tc_types class_instances class_fun_dep_vars info.ri_defs prs_type_heaps prs_subst
+		| FoundObject gis
+			# (rcs, prs_state) = tryToReduceContexts info ins_contexts rdla {prs_state & prs_type_heaps = prs_type_heaps, prs_subst = prs_subst}
+			= (Yes {cd_inst_symbol = gis, cd_inst_contexts = rcs, cd_new_vars = new_vars}, prs_state)
+			# (_, tc_types, subst_array) = arraySubst tc_types prs_subst.subst_array
+			# prs_state & prs_type_heaps = prs_type_heaps, prs_subst = {prs_subst & subst_array = subst_array}, prs_error = instanceError class_ident tc_types prs_state.prs_error
+			= (No, prs_state)
+
+	reduce_contexts_in_constraint :: !ReduceInfo ![Type] ![TypeVar] ![TypeContext] *PreRedState -> *(![CI], !*PreRedState)
+	reduce_contexts_in_constraint info types class_args [] prs_state
+		= ([], prs_state)
+	reduce_contexts_in_constraints info types class_args tcs prs_state=:{prs_type_heaps=prs_type_heaps=:{th_vars}}
+		# th_vars = fold2St (\ type {tv_info_ptr} -> writePtr tv_info_ptr (TVI_Type type)) types class_args th_vars
+		  (ftcs, prs_type_heaps) = freshContexts tcs { prs_type_heaps & th_vars = th_vars }
+		= mapSt (reduceTCorNormalContext info rdla) ftcs {prs_state & prs_type_heaps = prs_type_heaps}
+
+	find_instance ::  [Type] !InstanceTree {#CommonDefs} *TypeHeaps !*Subst -> *(!Global Int, ![TypeContext], !*TypeHeaps, !*Subst)
+	find_instance  co_types (IT_Node this_inst_index=:{glob_object,glob_module} left right) defs type_heaps subst
+		# (left_index, inst_contexts, type_heaps, subst) = find_instance co_types left defs type_heaps subst
+		| FoundObject left_index
+			= (left_index, inst_contexts, type_heaps, subst)
+			# {ins_type={it_vars,it_types,it_context}, ins_specials} = defs.[glob_module].com_instance_defs.[glob_object]
+			  th_vars = clear_binding_of_type_vars it_vars type_heaps.th_vars
+			  substc = {substc_changes=[#!], substc_array=subst.subst_array, substc_next_var_n=subst.subst_next_var_n}
+			  (matched, type_heaps, substc) = matchListsOfTypes defs it_types co_types { type_heaps & th_vars = th_vars } substc
+			| matched // && True ---> ("find_instance",it_types,co_types,[t\\t<-:subst.subst_array])
+				# (subst_changed,subst_context_n_at_last_update)
+					= case substc.substc_changes of
+						[#!]	-> (subst.subst_changed,subst.subst_context_n_at_last_update)
+						_		-> (True,subst.subst_previous_context_n) // ---> ("substc_changes",[e\\e<|-substc.substc_changes])
+				# subst & subst_array=substc.substc_array, subst_changed=subst_changed, subst_next_var_n=substc.substc_next_var_n,
+						  subst_context_n_at_last_update=subst_context_n_at_last_update
+				# (subst_context, type_heaps) = freshContexts it_context type_heaps
+				  (spec_inst, type_heaps, subst) = trySpecializedInstances subst_context (get_specials ins_specials) type_heaps subst
+				| FoundObject spec_inst
+					= (spec_inst, [], type_heaps, subst)
+					= (this_inst_index, subst_context, type_heaps, subst)
+				# subst & subst_array=undo_substitutions substc
+				= find_instance co_types right defs type_heaps subst
+	find_instance  co_types IT_Empty defs heaps  subst
+		= (ObjectNotFound, [], heaps, subst)
+
+	find_fun_dep_instance :: [Type] !InstanceTree BITVECT {#CommonDefs} *TypeHeaps !*Subst
+			-> *(!Global Int, ![TypeContext], ![(TypeVarInfoPtr,Int)], !*TypeHeaps,!*Subst)
+	find_fun_dep_instance co_types (IT_Node this_inst_index=:{glob_object,glob_module} left right) class_fun_dep_vars defs type_heaps subst
+		# (left_index, inst_contexts, new_vars, type_heaps, subst) = find_fun_dep_instance co_types left class_fun_dep_vars defs type_heaps subst
+		| FoundObject left_index
+			= (left_index, inst_contexts, new_vars, type_heaps, subst)
+			# {ins_type={it_vars,it_types,it_context}, ins_specials} = defs.[glob_module].com_instance_defs.[glob_object]
+			  th_vars = clear_binding_of_type_vars it_vars type_heaps.th_vars
+			  substc = {substc_changes=[#!], substc_array=subst.subst_array, substc_next_var_n=subst.subst_next_var_n}
+			  (matched, type_heaps, substc) = matchListsOfNonFunDepTypes defs it_types co_types class_fun_dep_vars {type_heaps & th_vars = th_vars} substc
+			| matched // && True ---> ("find_fun_dep_instance",it_types,expanded_co_types)		
+				# (all_vars_defined,type_var_heap) = check_if_all_vars_defined it_vars type_heaps.th_vars
+				# type_heaps & th_vars = type_var_heap
+			 	# (maybe_non_termination, substc)
+			 		= if (not all_vars_defined)
+						(checkFunDepTypesForPossibleNonTermination it_types co_types class_fun_dep_vars co_types class_fun_dep_vars substc)
+						(False, substc)
+				| maybe_non_termination
+					# subst & subst_array=undo_substitutions substc
+					= find_fun_dep_instance co_types right class_fun_dep_vars defs type_heaps subst
+
+			 	# (matched, type_heaps, substc) = matchListsOfFunDepTypes defs it_types co_types class_fun_dep_vars type_heaps substc
+				| not matched
+					# subst & subst_array=undo_substitutions substc
+					= find_fun_dep_instance co_types right class_fun_dep_vars defs type_heaps subst
+				# (subst_changed,subst_context_n_at_last_update)
+					= case substc.substc_changes of
+						[#!]	-> (subst.subst_changed,subst.subst_context_n_at_last_update)
+						_		-> (True,subst.subst_previous_context_n) // ---> ("substc_changes",[e\\e<|-substc.substc_changes])
+				# subst & subst_array=substc.substc_array, subst_changed=subst_changed, subst_next_var_n=substc.substc_next_var_n,
+						  subst_context_n_at_last_update=subst_context_n_at_last_update
+				# (new_vars,type_heaps,subst)
+					= if (not all_vars_defined)
+						(foldSt fresh_type_var_only_in_context it_vars ([],type_heaps,subst))
+						([],type_heaps,subst)
+				# (subst_context, type_heaps) = freshContexts it_context type_heaps
+				  (spec_inst, type_heaps, subst) = trySpecializedInstances subst_context (get_specials ins_specials) type_heaps subst
+				| FoundObject spec_inst
+					= (spec_inst, [], new_vars, type_heaps, subst)
+					= (this_inst_index, subst_context, new_vars, type_heaps, subst) // ---> ("subst_context",subst_context)
+				# subst & subst_array=undo_substitutions substc
+				= find_fun_dep_instance co_types right class_fun_dep_vars defs type_heaps subst
+	find_fun_dep_instance co_types IT_Empty class_fun_dep_vars defs heaps subst
+		= (ObjectNotFound, [], [], heaps, subst)
+
+	check_if_all_vars_defined [{tv_info_ptr}:vars] type_var_heap
+		# (tv_info,type_var_heap) = readPtr tv_info_ptr type_var_heap
+		= case tv_info of
+			TVI_Type _
+				-> check_if_all_vars_defined vars type_var_heap
+			_
+				-> (False,type_var_heap)
+	check_if_all_vars_defined [] type_var_heap
+		= (True,type_var_heap)
+
+	fresh_type_var_only_in_context {tv_info_ptr,tv_ident} (new_vars,type_heaps,subst)
+		# (tv_info, th_vars) = readPtr tv_info_ptr type_heaps.th_vars
+		  type_heaps & th_vars = th_vars
+		= case tv_info of
+			TVI_Type type
+				-> (new_vars,type_heaps,subst)
+			TVI_Empty
+				# (tv_number,subst_array) = usize subst.subst_array
+				#! subst_next_var_n = subst.subst_next_var_n
+				| subst_next_var_n < tv_number
+					# subst & subst_next_var_n = subst_next_var_n+1
+					  type = TempV subst_next_var_n
+					  type_heaps & th_vars = writePtr tv_info_ptr (TVI_Type type) type_heaps.th_vars
+					  new_vars = [(tv_info_ptr,subst_next_var_n):new_vars]
+					-> (new_vars,type_heaps, subst)
+					# subst & subst_next_var_n = subst_next_var_n+1
+					#! m = tv_number>>2
+					# subst_array = arrayPlusList subst_array [TE \\ i<-[0..m]]
+					  subst & subst_array = subst_array
+					  type = TempV tv_number
+					  type_heaps & th_vars = writePtr tv_info_ptr (TVI_Type type) type_heaps.th_vars					
+					  new_vars = [(tv_info_ptr,tv_number):new_vars]
+					-> (new_vars,type_heaps,subst)
+
+clear_binding_of_type_vars vars type_var_heap
+	= foldSt clear_binding_of_type_var vars type_var_heap
+where
+	clear_binding_of_type_var {tv_info_ptr} type_var_heap
+		= type_var_heap <:= (tv_info_ptr, TVI_Empty)
+
+undo_substitutions {substc_changes=[#!],substc_array}
+	= substc_array
+undo_substitutions subst=:{substc_changes=[#tv_n:substc_changes!],substc_array}
+	= undo_substitutions {subst & substc_changes=substc_changes,substc_array={substc_array & [tv_n]=TE}}
+
+getClassDef :: !(Global DefinedSymbol) !{# CommonDefs} -> ClassDef
+getClassDef {glob_module,glob_object={ds_index,ds_ident}} defs = defs.[glob_module].com_class_defs.[ds_index]
+
+getClassInstances {glob_module,glob_object={ds_index}} instances = instances.[glob_module].[ds_index]
+	
+getClassInstance :: !(Global Int) !{# CommonDefs}  -> ClassInstance
+getClassInstance {glob_module,glob_object} defs = defs.[glob_module].com_instance_defs.[glob_object]
+
+contextIsReducible :: TypeContext !{#CommonDefs} PredefinedSymbols {!Type} -> Bool
+contextIsReducible {tc_class=TCClass class_symb,tc_types = [type : types]} defs predef_symbols subst_array
+	# class_fun_dep_vars = defs.[class_symb.glob_module].com_class_defs.[class_symb.glob_object.ds_index].class_fun_dep_vars
+	| class_fun_dep_vars==0
+		# (type, subst_array) = expandOneStepA type subst_array
+		= type_is_reducible type class_symb predef_symbols && types_are_reducible types type class_symb predef_symbols subst_array
+		| class_fun_dep_vars bitand 1==0
+			# (type, subst_array) = expandOneStepA type subst_array
+			= type_is_reducible type class_symb predef_symbols && typesWithFunDepAreReducible types class_symb (class_fun_dep_vars>>1) predef_symbols subst_array
+			= typesWithFunDepAreReducible types class_symb (class_fun_dep_vars>>1) predef_symbols subst_array
+
+contextIsReducible tc=:{tc_class=TCGeneric {gtc_class}, tc_types = [type : types]} defs predef_symbols subst_array
+	# (type, subst_array) = expandOneStepA type subst_array
+	= type_is_reducible type gtc_class predef_symbols && types_are_reducible types type gtc_class predef_symbols subst_array
+
+// isIndirection same as in module type
+isIndirection TE	= False
+isIndirection type	= True
+
+expandOneStep :: !Type  !u:Subst -> (!Type, !v:Subst), [u <= v]
+expandOneStep type=:(TempV tv_number) subst=:{subst_array}
+	# (stype, subst_array) = subst_array![tv_number]
+	| isIndirection stype
+		= expandOneStep stype { subst & subst_array = subst_array }
+		= (type,  { subst & subst_array = subst_array })
+expandOneStep type=:(TempCV tv_number :@: types)  subst=:{subst_array}
+	# (stype, subst_array) = subst_array![tv_number]
+	| isIndirection stype
+		# (etype, subst) = expandOneStep stype { subst & subst_array = subst_array }
+		  (ok, simplified_type) = simplifyAndCheckTypeApplication etype types
+		| ok 
+			= (simplified_type, subst)
+			= (type, subst)
+		= (type,  { subst & subst_array = subst_array })
+expandOneStep type subst
+	= (type, subst)
+
+expandOneStepC :: !Type !*SubstC -> (!Type, !*SubstC)
+expandOneStepC type=:(TempV tv_number) subst=:{substc_array}
+	# (stype, substc_array) = substc_array![tv_number]
+	| isIndirection stype
+		= expandOneStepC stype { subst & substc_array = substc_array }
+		= (type, {subst & substc_array = substc_array})
+expandOneStepC type=:(TempCV tv_number :@: types)  subst=:{substc_array}
+	# (stype, substc_array) = substc_array![tv_number]
+	| isIndirection stype
+		# (etype, subst) = expandOneStepC stype {subst & substc_array = substc_array}
+		  (ok, simplified_type) = simplifyAndCheckTypeApplication etype types
+		| ok 
+			= (simplified_type, subst)
+			= (type, subst)
+		= (type, {subst & substc_array = substc_array})
+expandOneStepC type subst
+	= (type, subst)
+
+expandOneStepA :: !Type  !u:{!Type} -> (!Type, !v:{!Type}), [u <= v]
+expandOneStepA type=:(TempV tv_number) subst_array
+	# (stype, subst_array) = subst_array![tv_number]
+	| isIndirection stype
+		= expandOneStepA stype subst_array
+		= (type, subst_array)
+expandOneStepA type=:(TempCV tv_number :@: types) subst_array
+	# (stype, subst_array) = subst_array![tv_number]
+	| isIndirection stype
+		# (etype, subst_array) = expandOneStepA stype subst_array
+		  (ok, simplified_type) = simplifyAndCheckTypeApplication etype types
+		| ok 
+			= (simplified_type, subst_array)
+			= (type, subst_array)
+		= (type, subst_array)
+expandOneStepA type subst_array
+	= (type, subst_array)
+
+types_are_reducible :: [Type] Type (Global DefinedSymbol) PredefinedSymbols {!Type} -> Bool
+types_are_reducible [] _ _ _ _
 	= True
-types_are_reducible [type : types] first_type tc_class predef_symbols
+types_are_reducible [type : types] first_type tc_class predef_symbols subst_array
+	# (type, subst_array) = expandOneStepA type subst_array
 	= case type of
 		TempV _
 			->	is_lazy_or_strict_array_or_list_context
@@ -619,7 +1289,7 @@ types_are_reducible [type : types] first_type tc_class predef_symbols
 		TempQDV _
 			->	is_lazy_or_strict_array_or_list_context
 		_
-			-> is_reducible types tc_class predef_symbols
+			-> is_reducible types tc_class predef_symbols subst_array
 where
 	is_lazy_or_strict_array_or_list_context
 		=>	(is_predefined_symbol tc_class.glob_module tc_class.glob_object.ds_index PD_ArrayClass predef_symbols &&
@@ -646,15 +1316,16 @@ where
 	is_lazy_or_strict_list_type _ _
 		= False
 
-	is_reducible :: [Type] (Global DefinedSymbol) PredefinedSymbols -> Bool
-	is_reducible [] tc_class predef_symbols
+	is_reducible :: [Type] (Global DefinedSymbol) PredefinedSymbols {!Type} -> Bool
+	is_reducible [] tc_class predef_symbols subst_array
 		= True
-	is_reducible [type : types] tc_class predef_symbols
-		= type_is_reducible type tc_class predef_symbols && is_reducible types tc_class predef_symbols
+	is_reducible [type : types] tc_class predef_symbols subst_array
+		# (type, subst_array) = expandOneStepA type subst_array
+		= type_is_reducible type tc_class predef_symbols && is_reducible types tc_class predef_symbols subst_array
 
 type_is_reducible :: Type (Global DefinedSymbol) PredefinedSymbols -> Bool
 type_is_reducible (TempV _) tc_class predef_symbols
-	= False
+	= False 
 type_is_reducible (_ :@: _) tc_class predef_symbols
 	= False
 type_is_reducible (TempQV _) tc_class predef_symbols
@@ -664,10 +1335,32 @@ type_is_reducible (TempQDV _) {glob_object={ds_index},glob_module} predef_symbol
 type_is_reducible _ tc_class predef_symbols
 	= True
 
+typesWithFunDepAreReducible :: [Type] (Global DefinedSymbol) BITVECT PredefinedSymbols {!Type} -> Bool
+typesWithFunDepAreReducible [type : types] tc_class class_fun_dep_vars predef_symbols subst_array
+	| class_fun_dep_vars bitand 1==0
+		# (type, subst_array) = expandOneStepA type subst_array
+		= type_is_reducible type tc_class predef_symbols && typesWithFunDepAreReducible types tc_class (class_fun_dep_vars>>1) predef_symbols subst_array
+		= typesWithFunDepAreReducible types tc_class (class_fun_dep_vars>>1) predef_symbols subst_array
+typesWithFunDepAreReducible [] _ _ _ _
+	= True
+
 is_predefined_symbol :: !Int !Int !Int !PredefinedSymbols -> Bool
 is_predefined_symbol mod_index symb_index predef_index predef_symbols
 	# {pds_def,pds_module} = predef_symbols.[predef_index]
 	= mod_index == pds_module && symb_index == pds_def
+
+get_specials :: Specials -> [Special]
+get_specials (SP_ContextTypes specials) = specials
+get_specials SP_None 					= []
+
+freshContexts :: ![TypeContext] !*TypeHeaps -> (![TypeContext],*TypeHeaps)
+freshContexts tcs type_heaps
+	= mapSt fresh_context tcs type_heaps
+
+fresh_context :: !TypeContext !*TypeHeaps -> (TypeContext,*TypeHeaps)
+fresh_context tc=:{tc_types} type_heaps
+	# (_, tc_types, type_heaps) = substitute tc_types type_heaps
+	= ({ tc & tc_types = tc_types }, type_heaps)
 
 addLocalTCInstance :: Int (([LocalTypePatternVariable], *VarHeap)) -> (VarInfoPtr, ([LocalTypePatternVariable], *VarHeap))
 addLocalTCInstance var_number (instances=:[inst : insts], ltp_var_heap)
@@ -693,102 +1386,546 @@ tryToExpandTypeSyn defs type cons_id=:{type_ident,type_index={glob_object,glob_m
 		_
 			-> (False, type, type_heaps)
 
-class match type ::  !{# CommonDefs} !type !type !*TypeHeaps -> (!Bool, !*TypeHeaps)
+class match type :: !{#CommonDefs} !type !type !*TypeHeaps !*SubstC -> (!Bool, !*TypeHeaps, !*SubstC)
 
 instance match AType
 where
-	match defs atype1 atype2 type_heaps = match defs atype1.at_type atype2.at_type type_heaps
+	match defs atype1 atype2 type_heaps subst
+		= matchTypes defs atype1.at_type atype2.at_type type_heaps subst
 
-expand_and_match :: TypeSymbIdent [AType] TypeSymbIdent [AType] {#CommonDefs} Type Type *TypeHeaps -> (Bool, *TypeHeaps)
-expand_and_match cons_id1 cons_args1 cons_id2 cons_args2 defs type1 type2 type_heaps
+expandAndMatch :: TypeSymbIdent [AType] TypeSymbIdent [AType] {#CommonDefs} Type Type *TypeHeaps !*SubstC -> (Bool, *TypeHeaps, !*SubstC)
+expandAndMatch cons_id1 cons_args1 cons_id2 cons_args2 defs type1 type2 type_heaps subst
 	# (succ1, type1, type_heaps) = tryToExpandTypeSyn defs type1 cons_id1 cons_args1 type_heaps
 	# (succ2, type2, type_heaps) = tryToExpandTypeSyn defs type2 cons_id2 cons_args2 type_heaps
 	| succ1 || succ2
-		= match defs type1 type2 type_heaps
-		= (False, type_heaps)
+		= matchTypes defs type1 type2 type_heaps subst
+		= (False, type_heaps, subst)
+
+//
+// match is not symmetric: the first type is the (formal) instance type, the second type is
+// the (actual) expression type.
+//
+
+matchTypes :: {#CommonDefs} Type Type !*TypeHeaps !*SubstC -> (!Bool,!*TypeHeaps,!*SubstC)
+matchTypes defs type1 type2 type_heaps subst
+	# (type2, subst) = expandOneStepC type2 subst
+	= match defs type1 type2 type_heaps subst
+
+matchTVandType defs {tv_info_ptr,tv_ident} type2 type_heaps=:{th_vars} subst
+	# (tv_info, th_vars) = readPtr tv_info_ptr th_vars
+	= case tv_info of
+		TVI_Empty
+			-> (True,  { type_heaps & th_vars = th_vars <:= (tv_info_ptr, TVI_Type type2)}, subst)
+		TVI_Type type1
+			# type_heaps & th_vars = th_vars
+			-> equateTypes type1 type2 defs type_heaps subst // ---> ("equateTypes",tv_ident.id_name,type1,type2)
 
 instance match Type
 where
-	match defs (TV {tv_info_ptr}) type type_heaps=:{th_vars}
-		= (True, { type_heaps & th_vars = th_vars <:= (tv_info_ptr,TVI_Type type)})
-	match defs type1=:(TA cons_id1 cons_args1) type2=:(TA cons_id2 cons_args2) type_heaps
+	match defs (TV tv) type2 type_heaps=:{th_vars} subst
+		= matchTVandType defs tv type2 type_heaps subst
+	match defs type1=:(TA cons_id1 cons_args1) type2=:(TA cons_id2 cons_args2) type_heaps subst
 		| cons_id1 == cons_id2
-			= match defs cons_args1 cons_args2 type_heaps
-			= expand_and_match cons_id1 cons_args1 cons_id2 cons_args2 defs type1 type2 type_heaps
-	match defs type1=:(TA cons_id1 cons_args1) type2=:(TAS cons_id2 cons_args2 _) type_heaps
+			= matchListsOfATypes defs cons_args1 cons_args2 type_heaps subst
+			= expandAndMatch cons_id1 cons_args1 cons_id2 cons_args2 defs type1 type2 type_heaps subst
+	match defs type1=:(TA cons_id1 cons_args1) type2=:(TAS cons_id2 cons_args2 _) type_heaps subst
 		| cons_id1 == cons_id2
-			= match defs cons_args1 cons_args2 type_heaps
-			= expand_and_match cons_id1 cons_args1 cons_id2 cons_args2 defs type1 type2 type_heaps
-	match defs type1=:(TAS cons_id1 cons_args1 _) type2=:(TA cons_id2 cons_args2) type_heaps
+			= matchListsOfATypes defs cons_args1 cons_args2 type_heaps subst
+			= expandAndMatch cons_id1 cons_args1 cons_id2 cons_args2 defs type1 type2 type_heaps subst
+	match defs type1=:(TAS cons_id1 cons_args1 _) type2=:(TA cons_id2 cons_args2) type_heaps subst
 		| cons_id1 == cons_id2
-			= match defs cons_args1 cons_args2 type_heaps
-			= expand_and_match cons_id1 cons_args1 cons_id2 cons_args2 defs type1 type2 type_heaps
-	match defs type1=:(TAS cons_id1 cons_args1 _) type2=:(TAS cons_id2 cons_args2 _) type_heaps
+			= matchListsOfATypes defs cons_args1 cons_args2 type_heaps subst
+			= expandAndMatch cons_id1 cons_args1 cons_id2 cons_args2 defs type1 type2 type_heaps subst
+	match defs type1=:(TAS cons_id1 cons_args1 _) type2=:(TAS cons_id2 cons_args2 _) type_heaps subst
 		| cons_id1 == cons_id2
-			= match defs cons_args1 cons_args2 type_heaps
-			= expand_and_match cons_id1 cons_args1 cons_id2 cons_args2 defs type1 type2 type_heaps
-	match defs (arg_type1 --> res_type1) (arg_type2 --> res_type2) type_heaps
-		= match defs (arg_type1,res_type1) (arg_type2,res_type2) type_heaps
-	match defs (type1 :@: types1) (type2 :@: types2) type_heaps
-		= match defs (type1,types1) (type2,types2) type_heaps
-	match defs (CV tv :@: types) (TA type_cons cons_args) type_heaps
-		# diff = type_cons.type_arity - length types
-		| diff >= 0
-			= match defs (TV tv, types) (TA { type_cons & type_arity = diff } (take diff cons_args), drop diff cons_args) type_heaps
-			= (False, type_heaps)
-	match defs (CV tv :@: types) (TAS type_cons cons_args _) type_heaps
-		# diff = type_cons.type_arity - length types
-		| diff >= 0
-			= match defs (TV tv, types) (TA { type_cons & type_arity = diff } (take diff cons_args), drop diff cons_args) type_heaps
-			= (False, type_heaps)
-	match defs (TB tb1) (TB tb2) type_heaps
-		= (tb1 == tb2, type_heaps)
-	match defs TArrow TArrow type_heaps
-		= (True, type_heaps)
-	match defs (TArrow1 t1) (TArrow1 t2) type_heaps
-		= match defs t1 t2 type_heaps
-	match defs type1=:(TA cons_id cons_args) type2 type_heaps
+			= matchListsOfATypes defs cons_args1 cons_args2 type_heaps subst
+			= expandAndMatch cons_id1 cons_args1 cons_id2 cons_args2 defs type1 type2 type_heaps subst
+	match defs (TB tb1) (TB tb2) type_heaps subst
+		= (tb1 == tb2, type_heaps, subst)
+	match defs (arg_type1 --> res_type1) (arg_type2 --> res_type2) type_heaps subst
+		= matchListsOfATypes defs [arg_type1,res_type1] [arg_type2,res_type2] type_heaps subst
+	match defs (cv1 :@: types1) (cv2 :@: types2) type_heaps subst
+		# type_heaps = matchConsVariable cv1 cv2 type_heaps
+		= matchListsOfATypes defs types1 types2 type_heaps subst
+	match defs type1=:(CV tv :@: types) type2=:(TA type_cons cons_args) type_heaps subst
+		# (succ2, type2e, type_heaps) = tryToExpandTypeSyn defs type2 type_cons cons_args type_heaps
+		| succ2
+			= match defs type1 type2e type_heaps subst
+			# diff = type_cons.type_arity - length types
+			| diff >= 0
+				# (matched, type_heaps, subst)
+					= matchTVandType defs tv (TA {type_cons & type_arity = diff } (take diff cons_args)) type_heaps subst
+				| matched
+					= matchListsOfATypes defs types (drop diff cons_args) type_heaps subst
+					= (False, type_heaps, subst)
+				= (False, type_heaps, subst)
+	match defs type1=:(CV tv :@: types) type2=:(TAS type_cons cons_args sl) type_heaps subst
+		# (succ2, type2e, type_heaps) = tryToExpandTypeSyn defs type2 type_cons cons_args type_heaps
+		| succ2
+			= match defs type1 type2e type_heaps subst
+			# diff = type_cons.type_arity - length types
+			| diff >= 0
+				# (matched, type_heaps, subst)
+					= matchTVandType defs tv (TAS {type_cons & type_arity = diff } (take diff cons_args) sl) type_heaps subst
+				| matched
+					= matchListsOfATypes defs types (drop diff cons_args) type_heaps subst
+					= (False, type_heaps, subst)
+				= (False, type_heaps, subst)
+	match defs TArrow TArrow type_heaps subst
+		= (True, type_heaps, subst)
+	match defs (TArrow1 t1) (TArrow1 t2) type_heaps subst
+		= match defs t1 t2 type_heaps subst
+	match defs type1=:(TA cons_id cons_args) type2 type_heaps subst
 		# (succ, type1, type_heaps) = tryToExpandTypeSyn defs type1 cons_id cons_args type_heaps
 		| succ
-			= match defs type1 type2 type_heaps
-			= (False, type_heaps)
-	match defs type1=:(TAS cons_id cons_args _) type2 type_heaps
+			= match defs type1 type2 type_heaps subst
+			= (False, type_heaps, subst)
+	match defs type1=:(TAS cons_id cons_args _) type2 type_heaps subst
 		# (succ, type1, type_heaps) = tryToExpandTypeSyn defs type1 cons_id cons_args type_heaps
 		| succ
-			= match defs type1 type2 type_heaps
-			= (False, type_heaps)
-	match defs type1 type2=:(TA cons_id cons_args) type_heaps
+			= match defs type1 type2 type_heaps subst
+			= (False, type_heaps, subst)
+	match defs type1 type2=:(TA cons_id cons_args) type_heaps subst
 		# (succ, type2, type_heaps) = tryToExpandTypeSyn defs type2 cons_id cons_args type_heaps
 		| succ
-			= match defs type1 type2 type_heaps
-			= (False, type_heaps)
-	match defs type1 type2=:(TAS cons_id cons_args _) type_heaps
+			= match defs type1 type2 type_heaps subst
+			= (False, type_heaps, subst)
+	match defs type1 type2=:(TAS cons_id cons_args _) type_heaps subst
 		# (succ, type2, type_heaps) = tryToExpandTypeSyn defs type2 cons_id cons_args type_heaps
 		| succ
-			= match defs type1 type2 type_heaps
-			= (False, type_heaps)
-	match defs type1 type2 type_heaps
-		= (False, type_heaps)
+			= match defs type1 type2 type_heaps subst
+			= (False, type_heaps, subst)
+	match defs type1 type2 type_heaps subst
+		= (False, type_heaps, subst)
 
-instance match (!a,!b) | match a & match b
+matchListsOfTypes :: {#CommonDefs} [Type] [Type] *TypeHeaps *SubstC -> (!Bool,!*TypeHeaps,!*SubstC)
+matchListsOfTypes defs [t1 : ts1] [t2 : ts2] type_heaps subst
+	# (matched, type_heaps, subst) = matchTypes defs t1 t2 type_heaps subst
+	| matched
+		= matchListsOfTypes defs ts1 ts2 type_heaps subst
+		= (False, type_heaps, subst)
+matchListsOfTypes defs [] [] type_heaps subst
+	= (True, type_heaps, subst)
+
+matchListsOfATypes :: {#CommonDefs} [AType] [AType] *TypeHeaps *SubstC -> (!Bool,!*TypeHeaps,!*SubstC)
+matchListsOfATypes defs [t1 : ts1] [t2 : ts2] type_heaps subst
+	# (matched, type_heaps, subst) = matchTypes defs t1.at_type t2.at_type type_heaps subst
+	| matched
+		= matchListsOfATypes defs ts1 ts2 type_heaps subst
+		= (False, type_heaps, subst)
+matchListsOfATypes defs [] [] type_heaps subst
+	= (True, type_heaps, subst)
+
+matchConsVariable (CV {tv_info_ptr}) cons_var type_heaps=:{th_vars}
+	= { type_heaps & th_vars = th_vars <:= (tv_info_ptr,TVI_Type (consVariableToType cons_var))}
+
+matchListsOfNonFunDepTypes :: {#CommonDefs} [Type] [Type] Int *TypeHeaps *SubstC -> (!Bool,!*TypeHeaps,!*SubstC)
+matchListsOfNonFunDepTypes defs [t1 : ts1] [t2 : ts2] fun_dep_vars type_heaps subst
+	| fun_dep_vars bitand 1<>0
+		= matchListsOfNonFunDepTypes defs ts1 ts2 (fun_dep_vars>>1) type_heaps subst
+	# (matched, type_heaps, subst) = matchTypes defs t1 t2 type_heaps subst
+	| matched
+		= matchListsOfNonFunDepTypes defs ts1 ts2 (fun_dep_vars>>1) type_heaps subst
+		= (False, type_heaps, subst)
+matchListsOfNonFunDepTypes defs [] [] fun_dep_vars type_heaps subst
+	= (True, type_heaps, subst)
+
+matchListsOfFunDepTypes :: {#CommonDefs} [Type] [Type] Int *TypeHeaps *SubstC -> (!Bool,!*TypeHeaps,!*SubstC)
+matchListsOfFunDepTypes defs [t1 : ts1] [t2 : ts2] fun_dep_vars type_heaps subst
+	| fun_dep_vars bitand 1==0
+		= matchListsOfFunDepTypes defs ts1 ts2 (fun_dep_vars>>1) type_heaps subst
+	# (matched, type_heaps, subst) = matchFunDepTypes t1 t2 defs type_heaps subst // ---> ("matchFunDepTypes",t1,t2)
+	| matched
+		= matchListsOfFunDepTypes defs ts1 ts2 (fun_dep_vars>>1) type_heaps subst
+		= (False, type_heaps, subst)
+matchListsOfFunDepTypes defs [] [] fun_dep_vars type_heaps subst
+	= (True, type_heaps, subst)
+
+checkFunDepTypesForPossibleNonTermination :: [Type] [Type] Int [Type] Int *SubstC -> (!Bool,!*SubstC)
+checkFunDepTypesForPossibleNonTermination [t1 : ts1] [t2 : ts2] fun_dep_vars context_types all_fun_dep_vars substc
+	| fun_dep_vars bitand 1==0
+		= checkFunDepTypesForPossibleNonTermination ts1 ts2 (fun_dep_vars>>1) context_types all_fun_dep_vars substc
+	# (maybe_non_termination, substc) = checkFunDepTypeForPossibleNonTermination t1 t2 context_types all_fun_dep_vars substc
+	| maybe_non_termination
+		= (True, substc)
+		= checkFunDepTypesForPossibleNonTermination ts1 ts2 (fun_dep_vars>>1) context_types all_fun_dep_vars substc
+checkFunDepTypesForPossibleNonTermination [] [] fun_dep_vars context_types all_fun_dep_vars substc
+	= (False, substc)
+
+checkFunDepTypeForPossibleNonTermination (TV _) t2 context_types all_fun_dep_vars substc
+	= (False,substc)
+checkFunDepTypeForPossibleNonTermination instance_type (TempV tv_n) context_types all_fun_dep_vars substc
+	# (subst_type,substc) = substc!substc_array.[tv_n]
+	= case subst_type of
+		TE
+			| funDepTypesContainTypeVariable tv_n context_types all_fun_dep_vars substc
+				-> (True,substc)
+				-> (False,substc)
+		TempV tv_n
+			-> checkFunDepTypeForPossibleNonTermination instance_type (TempV tv_n) context_types all_fun_dep_vars substc
+		_
+			-> (False,substc)
+checkFunDepTypeForPossibleNonTermination _ _ context_types all_fun_dep_vars substc
+	= (False,substc)
+
+funDepTypesContainTypeVariable tv_n [type:types] fun_dep_vars substc
+	| fun_dep_vars bitand 1<>0
+		= funDepTypesContainTypeVariable tv_n types fun_dep_vars substc
+	| containsTypeVariable tv_n type substc.substc_array
+		= True
+		= funDepTypesContainTypeVariable tv_n types (fun_dep_vars>>1) substc
+funDepTypesContainTypeVariable tv_n [] fun_dep_vars substc
+	= False
+
+matchFunDepTypes :: Type Type {#CommonDefs} !*TypeHeaps !*SubstC -> (!Bool,!*TypeHeaps,!*SubstC)
+matchFunDepTypes instance_type type defs type_heaps subst
+	# (type,subst) = expandOneStepC type subst
+	= matchExpandedFunDepTypes instance_type type defs type_heaps subst
 where
-	match defs (x1,y1) (x2,y2) type_heaps
-		# (matched, type_heaps) = match defs x1 x2 type_heaps
-		| matched
-			= match defs y1 y2 type_heaps
-			= (False, type_heaps)
+	matchExpandedFunDepTypes :: Type Type {#CommonDefs} *TypeHeaps *SubstC -> (!Bool,!*TypeHeaps,!*SubstC)
+	matchExpandedFunDepTypes (TV tv) type defs type_heaps substc
+		= matchExpandedFunDepTVandType tv type defs type_heaps substc
+	matchExpandedFunDepTypes instance_type (TempV tv_number) defs type_heaps substc
+		# (ok, instance_type, type_heaps, substc) = addNewTypeVarsInSubstFunDepType instance_type defs type_heaps substc
+		| ok // && True ---> ("matchExpandedFunDepTypes",tv_number,instance_type)
+			| isIndirection substc.substc_array.[tv_number]
+				= abort "matchExpandedFunDepTypes TempV" // impossible because expandOneStepC expands the TempV
+			| is_var tv_number instance_type substc.substc_array
+				= (True,type_heaps,substc)
+			// could also do this contains check in addNewTypeVarsInSubstFunDepType
+			| containsTypeVariable tv_number instance_type substc.substc_array
+				= (False,type_heaps,substc)
+				# substc & substc_changes = [#tv_number:substc.substc_changes!], substc_array.[tv_number] = instance_type
+				= (True,type_heaps,substc)
+			= (False,type_heaps,substc)
+		where
+			is_var tv_number (TempV tv_number2) subst_array
+				= case subst_array.[tv_number2] of
+					TE
+						-> tv_number2==tv_number
+					instance_type
+						-> is_var tv_number instance_type subst_array
+			is_var tv_number instance_type subst_array
+				= False
+	matchExpandedFunDepTypes (TempV tv_number) type defs type_heaps substc
+		# (instance_type,substc) = substc!substc_array.[tv_number]
+		= case instance_type of
+			TE
+				| containsTypeVariable tv_number type substc.substc_array
+					-> (False,type_heaps,substc)
+					# substc & substc_array.[tv_number] = type, substc_changes = [#tv_number:substc.substc_changes!]
+					-> (True,type_heaps,substc)
+			_
+				-> matchExpandedFunDepTypes instance_type type defs type_heaps substc
+	matchExpandedFunDepTypes (TB tb1) (TB tb2) defs type_heaps substc
+		= (tb1==tb2, type_heaps, substc)
+	matchExpandedFunDepTypes (TA instance_cons_id instance_cons_args) (TA cons_id cons_args) defs type_heaps substc
+		| instance_cons_id==cons_id
+			= matchExpandedFunDepListOfATypes instance_cons_args cons_args defs type_heaps substc
+	matchExpandedFunDepTypes (TA instance_cons_id instance_cons_args) (TAS cons_id cons_args _) defs type_heaps substc
+		| instance_cons_id==cons_id
+			= matchExpandedFunDepListOfATypes instance_cons_args cons_args defs type_heaps substc
+	matchExpandedFunDepTypes type1=:(TA instance_cons_id instance_cons_args) type2 defs type_heaps substc
+		# (succ, type1, type_heaps) = tryToExpandTypeSyn defs type1 instance_cons_id instance_cons_args type_heaps
+		| succ
+			= matchExpandedFunDepTypes type1 type2 defs type_heaps substc
+	matchExpandedFunDepTypes (TAS instance_cons_id instance_cons_args _) (TAS cons_id cons_args _) defs type_heaps substc
+		| instance_cons_id==cons_id
+			= matchExpandedFunDepListOfATypes instance_cons_args cons_args defs type_heaps substc
+	matchExpandedFunDepTypes (TAS instance_cons_id instance_cons_args _) (TA cons_id cons_args) defs type_heaps substc
+		| instance_cons_id==cons_id
+			= matchExpandedFunDepListOfATypes instance_cons_args cons_args defs type_heaps substc
+	matchExpandedFunDepTypes (instance_atype_arg-->instance_atype_res) (atype_arg-->atype_res) defs type_heaps substc
+		# (ok,type_heaps,substc) = matchFunDepTypes instance_atype_arg.at_type atype_arg.at_type defs type_heaps substc
+		| ok
+			= matchFunDepTypes instance_atype_res.at_type atype_res.at_type defs type_heaps substc
+			= (False,type_heaps,substc)
+	matchExpandedFunDepTypes (cv1 :@: instance_types) (cv2 :@: types) defs type_heaps substc
+		# (ok,type_heaps,substc) = matchExpandedFunDepConsVariable cv1 cv2 defs type_heaps substc
+		| ok
+			= matchExpandedFunDepListOfATypes instance_types types defs type_heaps substc
+			= (False,type_heaps,substc);
+	matchExpandedFunDepTypes type1=:(CV tv :@: types) type2=:(TA type_cons cons_args) defs type_heaps substc
+		# (succ, type2e, type_heaps) = tryToExpandTypeSyn defs type2 type_cons cons_args type_heaps
+		| succ
+			= matchFunDepTypes type1 type2e defs type_heaps substc
+			# diff = type_cons.type_arity - length types
+			| diff >= 0
+				# (matched, type_heaps, substc)
+					= matchExpandedFunDepTVandType tv (TA {type_cons & type_arity = diff} (take diff cons_args)) defs type_heaps substc
+				| matched
+					= matchExpandedFunDepListOfATypes types (drop diff cons_args) defs type_heaps substc
+					= (False, type_heaps, substc)
+				= (False, type_heaps, substc)
+	matchExpandedFunDepTypes type1=:(CV tv :@: types) type2=:(TAS type_cons cons_args sl) defs type_heaps substc
+		# (succ, type2e, type_heaps) = tryToExpandTypeSyn defs type2 type_cons cons_args type_heaps
+		| succ
+			= matchFunDepTypes type1 type2e defs type_heaps substc
+			# diff = type_cons.type_arity - length types
+			| diff >= 0
+				# (matched, type_heaps, substc)
+					= matchExpandedFunDepTVandType tv (TAS {type_cons & type_arity = diff} (take diff cons_args) sl) defs type_heaps substc
+				| matched
+					= matchExpandedFunDepListOfATypes types (drop diff cons_args) defs type_heaps substc
+					= (False, type_heaps, substc)
+				= (False, type_heaps, substc)
+	matchExpandedFunDepTypes type1 type2=:(TA cons_id cons_args) defs type_heaps substc
+		# (succ, type2, type_heaps) = tryToExpandTypeSyn defs type2 cons_id cons_args type_heaps
+		| succ
+			= matchFunDepTypes type1 type2 defs type_heaps substc
+	matchExpandedFunDepTypes instance_type type defs type_heaps substc
+		= (False,type_heaps,substc) ---> ("matchExpandedFunDepTypes False",instance_type,type)
+	
+	matchExpandedFunDepTVandType :: TypeVar Type {#CommonDefs} *TypeHeaps *SubstC -> *(!Bool,!*TypeHeaps,!*SubstC)
+	matchExpandedFunDepTVandType {tv_info_ptr,tv_ident} type defs type_heaps=:{th_vars} substc
+		# (tv_info, th_vars) = readPtr tv_info_ptr th_vars
+		= case tv_info of
+			TVI_Type instance_type
+				# type_heaps & th_vars = th_vars
+				-> matchExpandedFunDepTypes instance_type type defs type_heaps substc
+			TVI_Empty
+				# type_heaps & th_vars = writePtr tv_info_ptr (TVI_Type type) th_vars
+				-> (True,type_heaps,substc)
+	
+	matchExpandedFunDepListOfATypes :: [AType] [AType] {#CommonDefs} *TypeHeaps *SubstC -> (!Bool,!*TypeHeaps,!*SubstC)
+	matchExpandedFunDepListOfATypes [instance_cons_arg:instance_cons_args] [cons_arg:cons_args] defs type_heaps substc
+		# (ok,type_heaps,substc) = matchFunDepTypes instance_cons_arg.at_type cons_arg.at_type defs type_heaps substc
+		| ok
+			= matchExpandedFunDepListOfATypes instance_cons_args cons_args defs type_heaps substc
+			= (False,type_heaps,substc)
+	matchExpandedFunDepListOfATypes [] [] defs type_heaps substc
+		= (True,type_heaps,substc)
+	
+	matchExpandedFunDepConsVariable :: ConsVariable ConsVariable {#CommonDefs} *TypeHeaps *SubstC -> (!Bool,!*TypeHeaps,!*SubstC)
+	matchExpandedFunDepConsVariable (CV {tv_info_ptr,tv_ident}) cv2 defs type_heaps=:{th_vars} substc
+		# type = consVariableToType cv2
+		# (tv_info, th_vars) = readPtr tv_info_ptr th_vars
+		= case tv_info of
+			TVI_Type instance_type
+				# type_heaps & th_vars = th_vars
+				-> matchExpandedFunDepTypes instance_type type defs type_heaps substc
+			TVI_Empty
+				# type_heaps & th_vars = writePtr tv_info_ptr (TVI_Type type) th_vars
+				-> (True,type_heaps,substc)
+
+	addNewTypeVarsInSubstFunDepType :: Type {#CommonDefs} *TypeHeaps *SubstC -> *(!Bool,!Type,!*TypeHeaps,!*SubstC)
+	addNewTypeVarsInSubstFunDepType (TV tv) defs type_heaps substc
+		= addNewTypeVarsInSubstFunDepTV tv type_heaps substc
+	addNewTypeVarsInSubstFunDepType type=:(TA cons_id cons_args) defs type_heaps substc
+		# (ok, cons_args, type_heaps, substc) = addNewTypeVarsInSubstFunDepTypeArgs cons_args defs type_heaps substc
+		= (ok, TA cons_id cons_args, type_heaps, substc)
+	addNewTypeVarsInSubstFunDepType type=:(TAS cons_id cons_args strictness) defs type_heaps substc
+		# (ok, cons_args, type_heaps, substc) = addNewTypeVarsInSubstFunDepTypeArgs cons_args defs type_heaps substc
+		= (ok, TAS cons_id cons_args strictness, type_heaps, substc)
+	addNewTypeVarsInSubstFunDepType type=:(TB _) defs type_heaps substc
+		= (True, type, type_heaps, substc)
+	addNewTypeVarsInSubstFunDepType type=:(arg_atype --> res_atype) defs type_heaps substc
+		# (ok, arg_type, type_heaps, substc) = addNewTypeVarsInSubstFunDepType arg_atype.at_type defs type_heaps substc
+		| not ok
+			= (False, type, type_heaps, substc)
+		# (ok, res_type, type_heaps, substc) = addNewTypeVarsInSubstFunDepType res_atype.at_type defs type_heaps substc
+		| not ok
+			= (False, type, type_heaps, substc)
+			= (True, {arg_atype & at_type=arg_type} --> {res_atype & at_type=res_type}, type_heaps, substc)
+	addNewTypeVarsInSubstFunDepType type=:(TempV tv_number) defs type_heaps substc
+		# (subst_type,substc) = substc!substc_array.[tv_number]
+		= case subst_type of
+			TE
+				-> (True, type, type_heaps, substc)
+			_
+				-> addNewTypeVarsInSubstFunDepType subst_type defs type_heaps substc
+	addNewTypeVarsInSubstFunDepType type=:(CV tv :@: types) defs type_heaps substc
+		# (ok, type1, type_heaps, substc) = addNewTypeVarsInSubstFunDepTV tv type_heaps substc
+		| not ok
+			= (False, type, type_heaps, substc);
+		# (ok, types, type_heaps, substc) = addNewTypeVarsInSubstFunDepTypeArgs types defs type_heaps substc
+		| not ok
+			= (False, type, type_heaps, substc);
+		# (ok, simplified_type) = simplifyAndCheckTypeApplication type1 types
+		| ok
+			= (True, simplified_type, type_heaps, substc)
+			= abort "addNewTypeVarsInSubstFunDepType :@:" ---> (type,type1,types)
+	addNewTypeVarsInSubstFunDepType type defs type_heaps substc
+		= abort "addNewTypeVarsInSubstFunDepType" ---> type
+
+	addNewTypeVarsInSubstFunDepTV :: TypeVar *TypeHeaps *SubstC -> (!Bool,!Type,!*TypeHeaps,!*SubstC)
+	addNewTypeVarsInSubstFunDepTV {tv_info_ptr,tv_ident} type_heaps substc
+		# (tv_info, th_vars) = readPtr tv_info_ptr type_heaps.th_vars
+		  type_heaps & th_vars = th_vars
+		// to do ? check if type contains TempV of new substc to prevent cycle
+		= case tv_info of
+			TVI_Type type
+				-> (True, type, type_heaps, substc)
+			TVI_Empty
+				# (tv_number,substc_array) = usize substc.substc_array
+				#! substc_next_var_n = substc.substc_next_var_n
+				| substc_next_var_n < tv_number
+					# substc & substc_next_var_n = substc_next_var_n+1
+					  type = TempV substc_next_var_n
+					  type_heaps & th_vars = writePtr tv_info_ptr (TVI_Type type) type_heaps.th_vars
+					-> (True, type, type_heaps, substc)
+					# substc & substc_next_var_n = substc_next_var_n+1
+					#! m = tv_number>>2
+					# substc_array = arrayPlusList substc_array [TE \\ i<-[0..m]]
+					  substc & substc_array = substc_array
+					  type = TempV tv_number
+					  type_heaps & th_vars = writePtr tv_info_ptr (TVI_Type type) type_heaps.th_vars
+					-> (True, type, type_heaps, substc)
+	
+	addNewTypeVarsInSubstFunDepTypeArgs :: [AType] {#CommonDefs} *TypeHeaps *SubstC -> (!Bool,![AType],!*TypeHeaps,!*SubstC)
+	addNewTypeVarsInSubstFunDepTypeArgs atype_args=:[arg_atype:atype_next_args] defs type_heaps substc
+		# (ok, arg_type, type_heaps, substc) = addNewTypeVarsInSubstFunDepType arg_atype.at_type defs type_heaps substc
+		| not ok
+			= (False, atype_args, type_heaps, substc)
+		# (ok, atype_next_args, type_heaps, substc) = addNewTypeVarsInSubstFunDepTypeArgs atype_next_args defs type_heaps substc		
+		= (ok, [{arg_atype & at_type=arg_type}:atype_next_args], type_heaps, substc)
+	addNewTypeVarsInSubstFunDepTypeArgs [] defs type_heaps substc
+		= (True, [], type_heaps, substc)
+
+class equateTypes a :: !a !a !{#CommonDefs} !*TypeHeaps !*SubstC  -> (!Bool, !*TypeHeaps, !*SubstC)
+
+instance equateTypes AType
+where
+	equateTypes atype1 atype2 defs type_heaps subst = equateTypes atype1.at_type atype2.at_type defs type_heaps subst
+
+getSubstitutedType tv_number subst
+	# (stype, subst) = subst![tv_number]
+	| isIndirection stype
+		= case stype of
+			TempV tv_numbers
+				-> getSubstitutedType tv_numbers subst
+			_	-> (stype, subst)
+		= (TempV tv_number, subst)
+
+instance equateTypes Type
+where
+	equateTypes tv=:(TempV tv_number1) type2 defs type_heaps subst=:{substc_array,substc_changes}
+		# (type1s, substc_array) = substc_array![tv_number1]
+		| isIndirection type1s
+			= equateTypes type1s type2 defs type_heaps {subst & substc_array = substc_array}
+			= case type2 of
+				TempV tv_number2
+					# (type2s, substc_array) = getSubstitutedType tv_number2 substc_array
+					-> case type2s of
+						TempV tv_number2s
+							-> (tv_number1 == tv_number2s, type_heaps, {subst & substc_array = substc_array})
+						_
+							| containsTypeVariable tv_number1 type2s substc_array
+								-> (False, type_heaps, {subst & substc_array=substc_array})
+								# subst & substc_changes = [#tv_number1:substc_changes!], substc_array = {substc_array & [tv_number1] = type2s}
+								-> (True, type_heaps, subst)
+				_
+					| containsTypeVariable tv_number1 type2 substc_array
+						-> (False, type_heaps, {subst & substc_array=substc_array})
+						# subst & substc_changes = [#tv_number1:substc_changes!], substc_array = {substc_array & [tv_number1] = type2}
+						-> (True, type_heaps, subst)
+	equateTypes type1 (TempV tv_number2) defs type_heaps subst=:{substc_array,substc_changes}
+		# (type2s, substc_array) = substc_array![tv_number2]
+		| isIndirection type2s
+			= equateTypes type1 type2s defs type_heaps {subst & substc_array = substc_array}
+		| containsTypeVariable tv_number2 type1 substc_array
+			= (False, type_heaps, {subst & substc_array=substc_array})
+			# subst & substc_changes = [#tv_number2:substc_changes!], substc_array = {substc_array & [tv_number2] = type1}
+			= (True, type_heaps, subst)
+	equateTypes type1=:(TA cons_id1 cons_args1) type2=:(TA cons_id2 cons_args2) defs type_heaps subst
+		| cons_id1 == cons_id2
+			= equateTypes cons_args1 cons_args2 defs type_heaps subst
+	equateTypes type1=:(TA cons_id1 cons_args1) type2=:(TAS cons_id2 cons_args2 _) defs type_heaps subst
+		| cons_id1 == cons_id2
+			= equateTypes cons_args1 cons_args2 defs type_heaps subst
+	equateTypes type1=:(TA cons_id1 cons_args1) type2 defs type_heaps subst
+		# (succ, type1, type_heaps) = tryToExpandTypeSyn defs type1 cons_id1 cons_args1 type_heaps
+		| succ
+			= equateTypes type1 type2 defs type_heaps subst
+	equateTypes type1=:(TAS cons_id1 cons_args1 _) type2=:(TA cons_id2 cons_args2) defs type_heaps subst
+		| cons_id1 == cons_id2
+			= equateTypes cons_args1 cons_args2 defs type_heaps subst
+	equateTypes type1=:(TAS cons_id1 cons_args1 _) type2=:(TAS cons_id2 cons_args2 _) defs type_heaps subst
+		| cons_id1 == cons_id2
+			= equateTypes cons_args1 cons_args2 defs type_heaps subst
+	equateTypes (TB tb1) (TB tb2) defs type_heaps subst
+		= (tb1 == tb2, type_heaps, subst)
+	equateTypes (arg_type1 --> res_type1) (arg_type2 --> res_type2) defs type_heaps subst
+		= equateTypes (arg_type1,res_type1) (arg_type2,res_type2) defs type_heaps subst
+	equateTypes (TempCV tv_n1 :@: types1) (TempCV tv_n2 :@: types2) defs type_heaps subst
+		# (succ, type_heaps, subst) = equate_type_vars1 tv_n1 tv_n2 defs type_heaps subst
+		| succ
+			= equateTypes types1 types2 defs type_heaps subst
+			= (False, type_heaps, subst)
+	equateTypes type1=:(TempCV tv_n :@: types) type2=:(TA type_cons cons_args) defs type_heaps subst
+		# (succ, type2e, type_heaps) = tryToExpandTypeSyn defs type2 type_cons cons_args type_heaps
+		| succ
+			= equateTypes type1 type2e defs type_heaps subst
+			# diff = type_cons.type_arity - length types
+			| diff >= 0
+				= equateTypes (TempV tv_n, types) (TA {type_cons & type_arity = diff} (take diff cons_args), drop diff cons_args) defs type_heaps subst
+				= (False, type_heaps, subst)
+	equateTypes type1=:(TempCV tv_n :@: types) type2=:(TAS type_cons cons_args sl) defs type_heaps subst
+		# (succ, type2e, type_heaps) = tryToExpandTypeSyn defs type2 type_cons cons_args type_heaps
+		| succ
+			= equateTypes type1 type2e defs type_heaps subst
+			# diff = type_cons.type_arity - length types
+			| diff >= 0
+				= equateTypes (TempV tv_n, types) (TAS {type_cons & type_arity = diff} (take diff cons_args) sl, drop diff cons_args) defs type_heaps subst
+				= (False, type_heaps, subst)
+	equateTypes type1 type2=:(TA cons_id2 cons_args2) defs type_heaps subst
+		# (succ, type2, type_heaps) = tryToExpandTypeSyn defs type2 cons_id2 cons_args2 type_heaps
+		| succ
+			= equateTypes type1 type2 defs type_heaps subst
+	equateTypes TArrow TArrow defs type_heaps subst
+		= (True, type_heaps, subst)
+	equateTypes (TArrow1 t1) (TArrow1 t2) defs type_heaps subst
+		= equateTypes t1 t2 defs type_heaps subst
+	equateTypes type1 type2 defs type_heaps subst
+		= (False, type_heaps, subst)
+
+equate_type_vars1 :: !Int !Int !{#CommonDefs} !*TypeHeaps !*SubstC -> (!Bool,!*TypeHeaps,!*SubstC)
+equate_type_vars1 tv_n1 tv_n2 defs type_heaps subst=:{substc_array,substc_changes}
+	| tv_n1==tv_n2
+		= (True, type_heaps, subst)
+	# (type1s, substc_array) = substc_array![tv_n1]
+	= case type1s of
+		TempV tv_n1
+			-> equate_type_vars1 tv_n1 tv_n2 defs type_heaps {subst & substc_array = substc_array}
+		TE
+			# (type2s, substc_array) = getSubstitutedType tv_n2 substc_array
+			-> case type2s of
+				TempV tv_n2
+					-> (tv_n1 == tv_n2, type_heaps, {subst & substc_array = substc_array})
+				_
+					| containsTypeVariable tv_n1 type2s substc_array
+						-> (False, type_heaps, {subst & substc_array=substc_array})
+						# subst & substc_changes = [#tv_n1:substc_changes!], substc_array = {substc_array & [tv_n1] = type2s}
+						-> (True, type_heaps, subst)
+		_	-> equate_type_vars2 type1s tv_n2 defs type_heaps {subst & substc_array = substc_array}
+
+equate_type_vars2 :: !Type !Int !{#CommonDefs} !*TypeHeaps !*SubstC -> (!Bool,!*TypeHeaps,!*SubstC)
+equate_type_vars2 type1 tv_n2 defs type_heaps subst=:{substc_array,substc_changes}
+	# (type2s, substc_array) = substc_array![tv_n2]
+	= case type2s of
+		TE
+			| containsTypeVariable tv_n2 type1 substc_array
+				-> (False, type_heaps, {subst & substc_array=substc_array})
+				# subst & substc_changes = [#tv_n2:substc_changes!], substc_array = {substc_array & [tv_n2] = type1}
+				-> (True, type_heaps, subst)
+		TempV tv2
+			-> equate_type_vars2 type1 tv_n2 defs type_heaps {subst & substc_array = substc_array}
+		_	-> equateTypes type1 type2s defs type_heaps {subst & substc_array = substc_array}
+
+instance equateTypes (!a,!b) | equateTypes a & equateTypes b
+where
+	equateTypes (x1,y1) (x2,y2) defs type_heaps subst
+		# (succ, type_heaps, subst) = equateTypes x1 x2 defs type_heaps subst
+		| succ
+			= equateTypes y1 y2 defs type_heaps subst
+			= (False, type_heaps, subst)
 			
-instance match [a] | match a
+instance equateTypes [a] | equateTypes a
 where
-	match defs [t1 : ts1] [t2 : ts2] type_heaps
-		= match defs (t1,ts1) (t2,ts2) type_heaps
-	match defs [] [] type_heaps
-		= (True, type_heaps)
-
-instance match ConsVariable
-where
-	match defs (CV {tv_info_ptr}) cons_var type_heaps=:{th_vars}
-		= (True, { type_heaps & th_vars = th_vars <:= (tv_info_ptr,TVI_Type (consVariableToType cons_var))})
+	equateTypes [t1 : ts1] [t2 : ts2] defs type_heaps subst
+		= equateTypes (t1,ts1) (t2,ts2) defs type_heaps subst
+	equateTypes [] [] defs type_heaps subst
+		= (True, type_heaps, subst)
 
 consVariableToType (TempCV temp_var_id)
 	= TempV temp_var_id
@@ -797,186 +1934,274 @@ consVariableToType (TempQCV temp_var_id)
 consVariableToType (TempQCDV temp_var_id)
 	= TempQDV temp_var_id
 
-trySpecializedInstances :: [TypeContext] [Special] *TypeHeaps -> (!Global Index,!*TypeHeaps)
-trySpecializedInstances type_contexts [] type_heaps
-	= (ObjectNotFound, type_heaps)
-trySpecializedInstances type_contexts specials type_heaps=:{th_vars}
-	# (spec_index, th_vars) = try_specialized_instances (map (\{tc_types} -> tc_types) type_contexts) specials th_vars
-	= (spec_index, { type_heaps & th_vars = th_vars })
+class bindAndAdjustAttrs type ::  !{# CommonDefs} !type !type !*TypeHeaps !*Coercions -> (!Bool, !*TypeHeaps, !*Coercions)
+
+instance bindAndAdjustAttrs AType
 where
-	try_specialized_instances :: [[Type]] [Special] *TypeVarHeap -> (!Global Index,!*TypeVarHeap)
-	try_specialized_instances type_contexts_types [{spec_index,spec_vars,spec_types} : specials] type_var_heap
+	bindAndAdjustAttrs defs atype1 atype2 type_heaps coercion_env
+		# (uni_ok, coercion_env) = adjust_attribute atype2.at_attribute atype1.at_attribute coercion_env
+		| uni_ok		
+			= bindAndAdjustAttrs defs atype1.at_type atype2.at_type type_heaps coercion_env
+			= (False, type_heaps, coercion_env)
+	where
+//
+// BEWARE: attribute arguments are switched compared type arguments of bindAndAdjustAttrs
+//
+		adjust_attribute :: !TypeAttribute !TypeAttribute !*Coercions -> (!Bool, !*Coercions)
+		adjust_attribute attr1 (TA_Var _) coercion_env
+			= (True, coercion_env)
+		adjust_attribute attr1 TA_Unique coercion_env
+			= case attr1 of
+				TA_Unique
+					-> (True, coercion_env)
+				TA_TempVar av_number
+					-> tryToMakeUnique av_number coercion_env
+				_
+					-> (False, coercion_env)
+		adjust_attribute attr1 attr2 coercion_env
+			= case attr1 of
+				TA_Multi
+					-> (True, coercion_env)
+				TA_TempVar av_number
+					-> tryToMakeNonUnique av_number coercion_env
+				_
+					-> (False, coercion_env)
+
+//
+// match is not symmetric: the first type is the (formal) instance type, the second type is
+// the (actual) expression type.
+//
+
+instance bindAndAdjustAttrs Type
+where
+	bindAndAdjustAttrs defs (TV {tv_info_ptr}) type2 type_heaps=:{th_vars} coercion_env
+		# (type_info, th_vars) = readPtr tv_info_ptr th_vars
+		= case type_info of
+			TVI_Empty
+				# type_heaps & th_vars = writePtr tv_info_ptr (TVI_Type type2) th_vars
+				-> (True, type_heaps, coercion_env)
+			TVI_Type type1
+				# (ok, coercion_env) = equalize_type_attributes type1 type2 coercion_env
+				# type_heaps & th_vars = th_vars
+				-> (ok, type_heaps, coercion_env)
+	bindAndAdjustAttrs defs type1=:(TA cons_id1 cons_args1) type2=:(TA cons_id2 cons_args2) type_heaps coercion_env
+		| cons_id1 == cons_id2
+			= bindListsOfTypes defs cons_args1 cons_args2 type_heaps coercion_env
+			= expand_and_bind cons_id1 cons_args1 cons_id2 cons_args2 defs type1 type2 type_heaps coercion_env
+	bindAndAdjustAttrs defs type1=:(TA cons_id1 cons_args1) type2=:(TAS cons_id2 cons_args2 _) type_heaps coercion_env
+		| cons_id1 == cons_id2
+			= bindListsOfTypes defs cons_args1 cons_args2 type_heaps coercion_env
+			= expand_and_bind cons_id1 cons_args1 cons_id2 cons_args2 defs type1 type2 type_heaps coercion_env
+	bindAndAdjustAttrs defs type1=:(TAS cons_id1 cons_args1 _) type2=:(TA cons_id2 cons_args2) type_heaps coercion_env
+		| cons_id1 == cons_id2
+			= bindListsOfTypes defs cons_args1 cons_args2 type_heaps coercion_env
+			= expand_and_bind cons_id1 cons_args1 cons_id2 cons_args2 defs type1 type2 type_heaps coercion_env
+	bindAndAdjustAttrs defs type1=:(TAS cons_id1 cons_args1 _) type2=:(TAS cons_id2 cons_args2 _) type_heaps coercion_env
+		| cons_id1 == cons_id2
+			= bindListsOfTypes defs cons_args1 cons_args2 type_heaps coercion_env
+			= expand_and_bind cons_id1 cons_args1 cons_id2 cons_args2 defs type1 type2 type_heaps coercion_env
+	bindAndAdjustAttrs defs (arg_type1 --> res_type1) (arg_type2 --> res_type2) type_heaps coercion_env
+		= bindListsOfTypes defs [arg_type1,res_type1] [arg_type2,res_type2] type_heaps coercion_env
+	bindAndAdjustAttrs defs (CV {tv_info_ptr} :@: types1) (cv2 :@: types2) type_heaps=:{th_vars} coercion_env
+		# type_heaps = { type_heaps & th_vars = th_vars <:= (tv_info_ptr, TVI_Type (consVariableToType cv2))}
+		= bindListsOfTypes defs types1 types2 type_heaps coercion_env
+	bindAndAdjustAttrs defs (CV {tv_info_ptr} :@: types) (TA type_cons cons_args) type_heaps=:{th_vars} coercion_env
+		# diff = type_cons.type_arity - length types
+		| diff >= 0
+			# tv_type = TA { type_cons & type_arity = diff } (take diff cons_args)
+			= bindListsOfTypes defs types (drop diff cons_args)  { type_heaps & th_vars = th_vars <:= (tv_info_ptr,TVI_Type tv_type)} coercion_env
+			= abort "bindAndAdjustAttrs<Type>: incompatible types (5)"
+	bindAndAdjustAttrs defs (CV {tv_info_ptr} :@: types) (TAS type_cons cons_args _) type_heaps=:{th_vars} coercion_env
+		# diff = type_cons.type_arity - length types
+		| diff >= 0
+			# tv_type = TA { type_cons & type_arity = diff } (take diff cons_args)
+			= bindListsOfTypes defs types (drop diff cons_args)  { type_heaps & th_vars = th_vars <:= (tv_info_ptr,TVI_Type tv_type)} coercion_env
+			= abort "bindAndAdjustAttrs<Type>: incompatible types (6)"
+	bindAndAdjustAttrs defs (TB tb1) (TB tb2) type_heaps coercion_env
+		| tb1 == tb2
+			= (True, type_heaps,  coercion_env)		
+			= abort "bindAndAdjustAttrs<Type>: incompatible types (7)"
+	bindAndAdjustAttrs defs TArrow TArrow type_heaps coercion_env
+		= (True, type_heaps,  coercion_env)
+	bindAndAdjustAttrs defs (TArrow1 t1) (TArrow1 t2) type_heaps coercion_env
+		= bindAndAdjustAttrs defs t1 t2 type_heaps coercion_env
+	bindAndAdjustAttrs defs type1=:(TA cons_id cons_args) type2 type_heaps coercion_env
+		# (succ, type1, type_heaps) = tryToExpandTypeSyn defs type1 cons_id cons_args type_heaps
+		| succ
+			= bindAndAdjustAttrs defs type1 type2 type_heaps coercion_env
+			= abort "bindAndAdjustAttrs<Type>: incompatible types (1)" ---> (type1,type2)
+	bindAndAdjustAttrs defs type1=:(TAS cons_id cons_args _) type2 type_heaps coercion_env
+		# (succ, type1, type_heaps) = tryToExpandTypeSyn defs type1 cons_id cons_args type_heaps
+		| succ
+			= bindAndAdjustAttrs defs type1 type2 type_heaps coercion_env
+			= abort "bindAndAdjustAttrs<Type>: incompatible types (2)"
+	bindAndAdjustAttrs defs type1 type2=:(TA cons_id cons_args) type_heaps coercion_env
+		# (succ, type2, type_heaps) = tryToExpandTypeSyn defs type2 cons_id cons_args type_heaps
+		| succ
+			= bindAndAdjustAttrs defs type1 type2 type_heaps coercion_env
+			= abort "bindAndAdjustAttrs<Type>: incompatible types (3)"
+	bindAndAdjustAttrs defs type1 type2=:(TAS cons_id cons_args _) type_heaps coercion_env
+		# (succ, type2, type_heaps) = tryToExpandTypeSyn defs type2 cons_id cons_args type_heaps
+		| succ
+			= bindAndAdjustAttrs defs type1 type2 type_heaps coercion_env
+			= abort "bindAndAdjustAttrs<Type>: incompatible types (8)"
+	bindAndAdjustAttrs defs type1 type2 type_heaps coercion_env
+		= abort "bindAndAdjustAttrs<Type>: incompatible types (4)"
+
+expand_and_bind :: TypeSymbIdent [AType] TypeSymbIdent [AType] {#CommonDefs} Type Type *TypeHeaps !*Coercions -> (!Bool, !*TypeHeaps, !*Coercions)
+expand_and_bind cons_id1 cons_args1 cons_id2 cons_args2 defs type1 type2 type_heaps coercion_env
+	# (succ1, type1, type_heaps) = tryToExpandTypeSyn defs type1 cons_id1 cons_args1 type_heaps
+	# (succ2, type2, type_heaps) = tryToExpandTypeSyn defs type2 cons_id2 cons_args2 type_heaps
+	| succ1 || succ2
+		= bindAndAdjustAttrs defs type1 type2 type_heaps coercion_env		
+		= abort "expand_and_bind: could not expand type synonyms"
+
+bindListsOfTypes :: !{#CommonDefs} ![a] ![a] !*TypeHeaps !*Coercions -> (!Bool,!*TypeHeaps,!*Coercions) | bindAndAdjustAttrs a
+bindListsOfTypes defs [t1 : ts1] [t2 : ts2] type_heaps coercion_env
+	# (uni_ok, type_heaps, coercion_env) = bindAndAdjustAttrs defs t1 t2 type_heaps coercion_env
+	| uni_ok
+		= bindListsOfTypes defs ts1 ts2 type_heaps coercion_env
+		= (False, type_heaps, coercion_env)
+bindListsOfTypes defs [] [] type_heaps coercion_env
+		= (True, type_heaps, coercion_env)
+
+trySpecializedInstances :: [TypeContext] [Special] *TypeHeaps !*Subst -> (!Global Index, !*TypeHeaps, !*Subst)
+trySpecializedInstances type_contexts [] type_heaps subst
+	= (ObjectNotFound, type_heaps, subst)
+trySpecializedInstances type_contexts specials type_heaps=:{th_vars} subst
+	# (spec_index, th_vars, subst) = try_specialized_instances (map (\{tc_types} -> tc_types) type_contexts) specials th_vars subst
+	= (spec_index, { type_heaps & th_vars = th_vars }, subst)
+where
+	try_specialized_instances :: [[Type]] [Special] *TypeVarHeap !*Subst -> (!Global Index, !*TypeVarHeap, !*Subst)
+	try_specialized_instances type_contexts_types [{spec_index,spec_vars,spec_types} : specials] type_var_heap subst
 		# type_var_heap = foldSt (\tv -> writePtr tv.tv_info_ptr TVI_Empty) spec_vars type_var_heap
-		  (equ, type_var_heap) = specialized_context_matches /*equalTypes*/ spec_types type_contexts_types type_var_heap
+		  (equ, type_var_heap, subst) = specialized_context_matches spec_types type_contexts_types type_var_heap subst
 		| equ
-			= (spec_index, type_var_heap)
-			= try_specialized_instances type_contexts_types specials type_var_heap
-	try_specialized_instances type_contexts_types [] type_var_heap
-		= (ObjectNotFound, type_var_heap)
+			= (spec_index, type_var_heap, subst)
+			= try_specialized_instances type_contexts_types specials type_var_heap subst
+	try_specialized_instances type_contexts_types [] type_var_heap subst
+		= (ObjectNotFound, type_var_heap, subst)
 
-	specialized_context_matches :: [[Type]] ![[Type]] *TypeVarHeap -> (!.Bool,!.TypeVarHeap);
-	specialized_context_matches [spec_context_types:spec_contexts_types] [type_context_types:type_contexts_types] type_var_heap
-		# (equal,type_var_heap) = specialized_types_in_context_match spec_context_types type_context_types type_var_heap;
+	specialized_context_matches :: [[Type]] ![[Type]] *TypeVarHeap !*Subst -> (!.Bool, !*TypeVarHeap, !*Subst)
+	specialized_context_matches [spec_context_types:spec_contexts_types] [type_context_types:type_contexts_types] type_var_heap subst
+		# (equal,type_var_heap, subst) = specialized_types_in_context_match spec_context_types type_context_types type_var_heap subst
 		|  equal
-			= specialized_context_matches spec_contexts_types type_contexts_types type_var_heap
-			= (False,type_var_heap);
-	specialized_context_matches [] [] type_var_heap
-		= (True,type_var_heap);
-	specialized_context_matches _ _ type_var_heap
-		= (False,type_var_heap);
+			= specialized_context_matches spec_contexts_types type_contexts_types type_var_heap subst
+			= (False, type_var_heap, subst)
+	specialized_context_matches [] [] type_var_heap subst
+		= (True, type_var_heap, subst)
+	specialized_context_matches _ _ type_var_heap subst
+		= (False, type_var_heap, subst)
 
-	specialized_types_in_context_match :: [Type] ![Type] *TypeVarHeap -> (!.Bool,!.TypeVarHeap);
-	specialized_types_in_context_match [TV _:spec_context_types] [_:type_context_types] type_var_heap
+	specialized_types_in_context_match :: [Type] ![Type] *TypeVarHeap !*Subst -> (!Bool, !*TypeVarHeap, !*Subst)
+	specialized_types_in_context_match [TV _:spec_context_types] [_:type_context_types] type_var_heap subst
 		// special case for type var in lazy or strict Array or List context
 		// only these typevars are accepted by function checkAndCollectTypesOfContextsOfSpecials in check
-		= specialized_types_in_context_match spec_context_types type_context_types type_var_heap
-	specialized_types_in_context_match [spec_context_type:spec_context_types] [type_context_type:type_context_types] type_var_heap
-		# (equal,type_var_heap) = equalTypes spec_context_type type_context_type type_var_heap;
+		= specialized_types_in_context_match spec_context_types type_context_types type_var_heap subst
+	specialized_types_in_context_match [spec_context_type:spec_context_types] [type_context_type:type_context_types] type_var_heap subst
+		# (equal, type_var_heap, subst) = expandAndCompareTypes spec_context_type type_context_type type_var_heap subst
 		|  equal
-			= specialized_types_in_context_match spec_context_types type_context_types type_var_heap
-			= (False,type_var_heap);
-	specialized_types_in_context_match [] [] type_var_heap
-		= (True,type_var_heap);
-	specialized_types_in_context_match _ _ type_var_heap
-		= (False,type_var_heap);
+			= specialized_types_in_context_match spec_context_types type_context_types type_var_heap subst
+			= (False, type_var_heap, subst)
+	specialized_types_in_context_match [] [] type_var_heap subst
+		= (True, type_var_heap, subst)
+	specialized_types_in_context_match _ _ type_var_heap subst
+		= (False, type_var_heap, subst)
 
-tryToSolveOverloading :: ![(Optional [TypeContext], [ExprInfoPtr], IdentPos, Index)] !Int !{# CommonDefs } !ClassInstanceInfo !*Coercions !*OverloadingState !{# DclModule}
-	-> (![TypeContext], !*Coercions, ![LocalTypePatternVariable], DictionaryTypes, !*OverloadingState)
-tryToSolveOverloading ocs main_dcl_module_n defs instance_info coercion_env os dcl_modules
-	# (reduced_calls, contexts, coercion_env, type_pattern_vars, os) = foldSt (reduce_contexts_of_applications_in_function defs instance_info) ocs ([], [], coercion_env, [], os)
-	| os.os_error.ea_ok
-		# (contexts, os_var_heap) = foldSt add_specified_contexts ocs (contexts,os.os_var_heap)
-		  (contexts, os_type_heaps) = remove_super_classes contexts os.os_type_heaps
-		  ({hp_var_heap, hp_expression_heap, hp_type_heaps,hp_generic_heap}, dict_types, os_error)
-			= foldSt (convert_dictionaries defs contexts) reduced_calls
-		  					({hp_var_heap = os_var_heap, hp_expression_heap = os.os_symbol_heap, hp_type_heaps = os_type_heaps,hp_generic_heap=os.os_generic_heap}, [], os.os_error)
-		= (contexts, coercion_env, type_pattern_vars, dict_types, {os & os_type_heaps = hp_type_heaps, os_symbol_heap = hp_expression_heap, os_var_heap = hp_var_heap, os_generic_heap = hp_generic_heap, os_error = os_error})
-		= ([], coercion_env, type_pattern_vars, [], os)
+startContextReduction :: ![OverloadedExpressions] ![[TypeContext]] !{# CommonDefs } !ClassInstanceInfo 
+	!*VarHeap !*TypeHeaps !*ExpressionHeap !*PredefinedSymbols !*{!Type} !*ErrorAdmin
+	-> (![ReducedOverloadedContext], ![ExprInfoPtr], !*VarHeap, !*TypeHeaps, !*ExpressionHeap, !*PredefinedSymbols, !*{!Type}, !*ErrorAdmin)
+startContextReduction over_exprs specified_contexts_list defs instance_info prs_var_heap prs_type_heaps expr_heap prs_predef_symbols subst prs_error
+	#! subst_next_var_n = size subst
+	# prs_state = { prs_var_heap = prs_var_heap, prs_type_heaps = prs_type_heaps, prs_predef_symbols = prs_predef_symbols, prs_error = prs_error,
+					prs_subst = {subst_changed = False, subst_array = subst, subst_next_var_n = subst_next_var_n,
+								 subst_previous_context_n = -1, subst_context_n_at_last_update = -1}}
+	  ri_info  = {ri_defs = defs, ri_instance_info = instance_info}
+	# (rcss, case_with_context_ptrs, expr_heap, prs_state) = foldSt (try_to_reduce_contexts_in_function ri_info) over_exprs ([], [], expr_heap, prs_state)
+	# (rcss, {prs_var_heap, prs_type_heaps, prs_predef_symbols, prs_error, prs_subst}) = iterate_cr ri_info rcss prs_state
+	# dts_subst = {prs_subst & subst_changed = True}
+	# dts_state
+		= {dts_contexts=flatten specified_contexts_list, dts_subst=dts_subst, dts_var_heap=prs_var_heap, dts_type_heaps=prs_type_heaps, dts_error=prs_error}
+	# (predef_symbols, {dts_contexts,dts_subst,dts_var_heap,dts_type_heaps,dts_error})
+		= iterate_improve_dep_types_and_reduce rcss ri_info prs_predef_symbols dts_state
+	= (rcss, case_with_context_ptrs, dts_var_heap, dts_type_heaps, expr_heap, predef_symbols, dts_subst.subst_array, dts_error)
 where
-	reduce_contexts_of_applications_in_function :: {#CommonDefs} ClassInstanceInfo (.a, [ExprInfoPtr], .b, Index)
-		   ([(SymbIdent,Index,ExprInfoPtr,[ClassApplication])], ![TypeContext], !*Coercions, ![LocalTypePatternVariable], !*OverloadingState)
-		-> ([(SymbIdent,Index,ExprInfoPtr,[ClassApplication])], ![TypeContext], !*Coercions, ![LocalTypePatternVariable], !*OverloadingState)
-	reduce_contexts_of_applications_in_function defs instance_info (opt_spec_contexts, expr_ptrs, pos, index) state
-		= foldSt (reduce_contexts_of_application index defs instance_info) expr_ptrs state
+	try_to_reduce_contexts_in_function ri_info {oe_expr_ptrs,oe_fun_index} rcss_case_with_context_ptrs_expr_heap_prs_state
+		= foldSt (try_to_reduce_contexts_of_application oe_fun_index ri_info) oe_expr_ptrs rcss_case_with_context_ptrs_expr_heap_prs_state
 
-	reduce_contexts_of_application :: !Index !{#CommonDefs} !ClassInstanceInfo  !ExprInfoPtr
-				([(SymbIdent,Index,ExprInfoPtr,[ClassApplication])], ![TypeContext], !*Coercions, ![LocalTypePatternVariable], !*OverloadingState)
-			 -> ([(SymbIdent,Index,ExprInfoPtr,[ClassApplication])], ![TypeContext], !*Coercions, ![LocalTypePatternVariable], !*OverloadingState)
-	reduce_contexts_of_application fun_index defs instance_info over_info_ptr (reduced_calls, new_contexts, coercion_env, type_pattern_vars,
-			os=:{os_symbol_heap,os_type_heaps,os_var_heap,os_special_instances,os_error,os_predef_symbols})
-		= case readPtr over_info_ptr os_symbol_heap of
-			(EI_Overloaded {oc_symbol,oc_context,oc_specials},os_symbol_heap)
-				# (glob_fun, os_type_heaps) = trySpecializedInstances oc_context oc_specials os_type_heaps
+	try_to_reduce_contexts_of_application fun_index ri_info over_info_ptr (rcss, case_with_context_ptrs, expr_heap,
+			prs_state=:{prs_type_heaps,prs_var_heap,prs_subst,prs_predef_symbols})
+		= case readPtr over_info_ptr expr_heap of
+			(EI_Overloaded {oc_symbol,oc_context,oc_specials},expr_heap)
+				# (glob_fun, prs_type_heaps, prs_subst) = trySpecializedInstances oc_context oc_specials prs_type_heaps prs_subst
 				| FoundObject glob_fun
-					# over_info = EI_Instance {glob_module = glob_fun.glob_module, glob_object =
-												{ds_ident = oc_symbol.symb_ident, ds_arity = 0, ds_index = glob_fun.glob_object}} []
-					# os_symbol_heap = os_symbol_heap <:= (over_info_ptr,over_info)
-					-> (reduced_calls,new_contexts,coercion_env,type_pattern_vars,{os & os_type_heaps=os_type_heaps, os_symbol_heap=os_symbol_heap})
-				| otherwise
-					# rs_state = {rs_new_contexts=new_contexts, rs_special_instances = os_special_instances,
-								  rs_type_pattern_vars=type_pattern_vars,rs_var_heap=os_var_heap, 
-								  rs_type_heaps=os_type_heaps, rs_coercions=coercion_env,
-								  rs_predef_symbols=os_predef_symbols, rs_error=os_error}
-					  info = {ri_main_dcl_module_n=main_dcl_module_n, ri_defs=defs, ri_instance_info=instance_info}
-					  (class_applications, rs_state) = reduceContexts info oc_context rs_state
-					  {rs_new_contexts=new_contexts, rs_special_instances = os_special_instances,
-					   rs_type_pattern_vars=type_pattern_vars, rs_var_heap=os_var_heap, rs_type_heaps=os_type_heaps,
-					   rs_coercions=coercion_env, rs_predef_symbols=os_predef_symbols, rs_error=os_error}
-							= rs_state
-					  os = {os & os_type_heaps=os_type_heaps, os_symbol_heap=os_symbol_heap, os_var_heap=os_var_heap,
-								 os_special_instances=os_special_instances, os_error=os_error, os_predef_symbols=os_predef_symbols}
-					-> ([(oc_symbol,fun_index,over_info_ptr,class_applications):reduced_calls],new_contexts,coercion_env,type_pattern_vars,os)
-			(EI_OverloadedWithVarContexts {ocvc_symbol,ocvc_context,ocvc_var_contexts},os_symbol_heap)
-				# rs_state 	= { rs_new_contexts=new_contexts, rs_special_instances = os_special_instances,
-								rs_type_pattern_vars=type_pattern_vars,rs_var_heap=os_var_heap, 
-								rs_type_heaps=os_type_heaps, rs_coercions=coercion_env,
-								rs_predef_symbols=os_predef_symbols, rs_error=os_error}
-				  info = {ri_main_dcl_module_n=main_dcl_module_n, ri_defs=defs, ri_instance_info=instance_info}
-				  (class_applications, rs_state) = reduceContexts info ocvc_context rs_state
-				  {rs_new_contexts=new_contexts, rs_special_instances = os_special_instances,
-				   rs_type_pattern_vars=type_pattern_vars, rs_var_heap=os_var_heap, rs_type_heaps=os_type_heaps,
-				   rs_coercions=coercion_env, rs_predef_symbols=os_predef_symbols, rs_error=os_error}
-						= rs_state
-				  (new_contexts,os_var_heap) = add_var_contexts ocvc_var_contexts new_contexts os_var_heap
-				  os = {os & os_type_heaps=os_type_heaps, os_symbol_heap=os_symbol_heap, os_var_heap=os_var_heap,
-							 os_special_instances=os_special_instances, os_error=os_error, os_predef_symbols=os_predef_symbols}
-				  ocvc_symbol = {ocvc_symbol & symb_kind = case ocvc_symbol.symb_kind of
-															SK_TypeCode
-																-> SK_TypeCodeAndContexts ocvc_var_contexts
-				  											_
-					  											-> SK_VarContexts ocvc_var_contexts
-					  			 }
-				-> ([(ocvc_symbol,fun_index,over_info_ptr,class_applications):reduced_calls],new_contexts,coercion_env,type_pattern_vars,os)
-			(EI_CaseTypeWithContexts case_type constructor_contexts,os_symbol_heap)
-				# (new_contexts,constructor_contexts,os_predef_symbols,os_var_heap) = add_constructor_contexts constructor_contexts new_contexts os_predef_symbols os_var_heap
-				  os_symbol_heap = writePtr over_info_ptr (EI_CaseTypeWithContexts case_type constructor_contexts) os_symbol_heap
-				  os = {os & os_symbol_heap=os_symbol_heap,os_var_heap=os_var_heap,os_predef_symbols=os_predef_symbols}
-				-> (reduced_calls,new_contexts,coercion_env,type_pattern_vars,os)
+					# over_info = EI_Instance {glob_module = glob_fun.glob_module,
+									glob_object = {ds_ident = oc_symbol.symb_ident, ds_arity = 0, ds_index = glob_fun.glob_object}} []
+					# expr_heap = expr_heap <:= (over_info_ptr, over_info)
+					-> (rcss, case_with_context_ptrs, expr_heap, { prs_state & prs_type_heaps = prs_type_heaps, prs_subst = prs_subst })
+					# rdla = {rdla_depth = -1, rdla_previous_context=NoPreviousContext}
+					  (rcs, prs_state) = tryToReduceContexts ri_info oc_context rdla {prs_state & prs_type_heaps = prs_type_heaps, prs_subst = prs_subst}
+					  roc = {roc_fun_index = fun_index, roc_expr_ptr = over_info_ptr, roc_rcs = rcs}
+					-> ([roc:rcss], case_with_context_ptrs, expr_heap, prs_state)
+			(EI_OverloadedWithVarContexts {ocvc_symbol,ocvc_context,ocvc_var_contexts},expr_heap)
+				# rdla = {rdla_depth = -1, rdla_previous_context=NoPreviousContext}
+				  (rcs, prs_state) = tryToReduceContexts ri_info ocvc_context rdla prs_state
+				  roc = {roc_fun_index = fun_index, roc_expr_ptr = over_info_ptr, roc_rcs = rcs}
+				-> ([roc:rcss], case_with_context_ptrs, expr_heap, prs_state)
+			(EI_CaseTypeWithContexts case_type constructor_contexts,expr_heap)
+				-> (rcss, [over_info_ptr:case_with_context_ptrs], expr_heap, prs_state)
+
+	iterate_cr ri_info rcss prs_state=:{prs_subst={subst_changed}}
+		| subst_changed // && trace_tn "iterate_cr"
+			# (rcss, prs_state) = redo_cr ri_info rcss {prs_state & prs_subst.subst_changed = False}
+			= iterate_cr ri_info rcss prs_state
+			= (rcss, prs_state)
+	
+	redo_cr ri_info [] prs_state
+		= ([], prs_state)
+	redo_cr ri_info [roc=:{roc_rcs} : rcss] prs_state
+		# (changed, roc_rcs, prs_state) = continueContextReduction ri_info roc_rcs prs_state
+		  (rcss, prs_state) = redo_cr ri_info rcss prs_state 
+		| changed 
+			= ([{ roc & roc_rcs = roc_rcs } : rcss], prs_state)
+			= ([roc : rcss], prs_state)
+
+	iterate_improve_dep_types_and_reduce rcss ri_info predef_symbols dts_state
+		# dts_state = improve_dep_types rcss ri_info dts_state
+		| dts_state.dts_subst.subst_changed
+			# {dts_contexts,dts_subst,dts_var_heap,dts_type_heaps,dts_error} = dts_state
+			  prs_state = {prs_subst=dts_subst, prs_var_heap=dts_var_heap, prs_type_heaps=dts_type_heaps, prs_error=dts_error, prs_predef_symbols=predef_symbols}
+			  (rcss, {prs_subst,prs_var_heap,prs_type_heaps,prs_error,prs_predef_symbols}) = iterate_cr ri_info rcss prs_state
+			  prs_subst & subst_changed = False
+			  dts_state = {dts_contexts=dts_contexts, dts_subst=prs_subst, dts_var_heap=prs_var_heap, dts_type_heaps=prs_type_heaps, dts_error=prs_error}
+			= iterate_improve_dep_types_and_reduce rcss ri_info prs_predef_symbols dts_state
+			= (predef_symbols,dts_state)
+
+	improve_dep_types [roc=:{roc_rcs} : rcss] ri_info dts_state
+		# dts_state = improveDepTypes ri_info roc_rcs dts_state
+		= improve_dep_types rcss ri_info dts_state 
+	improve_dep_types [] ri_info dts_state
+		= dts_state
+
+addDictionaries :: ![[TypeContext]] ![TypeContext] ![ReducedOverloadedApplication] !{# CommonDefs } 
+	!*Heaps !*{!Type} !*ErrorAdmin -> (![TypeContext], !DictionaryTypes, !*Heaps, !*{!Type}, !*ErrorAdmin)
+addDictionaries spec_contexts contexts reduced_calls defs heaps=:{hp_var_heap,hp_type_heaps} subst os_error
+	# (contexts, hp_var_heap, subst) = foldSt add_specified_contexts spec_contexts (contexts, hp_var_heap, subst)
+	  (contexts, hp_type_heaps) = remove_super_classes contexts hp_type_heaps
+	  (heaps, dict_types, os_error)
+			= foldSt (convert_dictionaries defs contexts) reduced_calls
+		  					({ heaps & hp_var_heap = hp_var_heap, hp_type_heaps = hp_type_heaps }, [], os_error)
+	= (contexts, dict_types, heaps, subst, os_error)
+where
+	add_specified_contexts contexts all_contexts_subst_and_var_heap
+		= foldSt add_spec_context contexts all_contexts_subst_and_var_heap
 	where
-		add_var_contexts NoVarContexts new_contexts var_heap
-			= (new_contexts,var_heap)
-		add_var_contexts (VarContext arg_n contexts arg_atype var_contexts) new_contexts var_heap
-			# (new_contexts,var_heap) = add_contexts contexts new_contexts var_heap
-			= add_var_contexts var_contexts new_contexts var_heap
-
-		add_constructor_contexts [(constructor_symbol,constructor_context):constructor_contexts] new_contexts predef_symbols var_heap
-			# (new_contexts,constructor_context,predef_symbols,var_heap) = add_contexts_of_constructor constructor_context new_contexts predef_symbols var_heap
-			# (new_contexts,constructor_contexts,predef_symbols,var_heap) = add_constructor_contexts constructor_contexts new_contexts predef_symbols var_heap
-			= (new_contexts,[(constructor_symbol,constructor_context):constructor_contexts],predef_symbols,var_heap)
-		add_constructor_contexts [] new_contexts predef_symbols var_heap
-			= (new_contexts,[],predef_symbols,var_heap)
-
-		add_contexts_of_constructor [constructor_context:constructor_contexts] new_contexts predef_symbols var_heap
-			| context_is_reducible constructor_context predef_symbols
-				# (new_contexts,constructor_contexts,predef_symbols,var_heap)
-					= add_contexts_of_constructor constructor_contexts new_contexts predef_symbols var_heap
-				= (new_contexts,[constructor_context:constructor_contexts],predef_symbols,var_heap)
-			# (found,found_context=:{tc_var}) = lookup_context constructor_context new_contexts
-			| found
-				# var_heap
-					= case readPtr tc_var var_heap of
-						(VI_Empty,var_heap)
-							-> writePtr tc_var VI_EmptyConstructorClassVar var_heap
-						(VI_EmptyConstructorClassVar,var_heap)
-							-> var_heap
-				  (new_contexts,constructor_contexts,predef_symbols,var_heap)
-					= add_contexts_of_constructor constructor_contexts new_contexts predef_symbols var_heap
-				  constructor_context = {constructor_context & tc_var=tc_var}
-				= (new_contexts,[constructor_context:constructor_contexts],predef_symbols,var_heap)
-				# var_heap
-					= case readPtr constructor_context.tc_var var_heap of
-						(VI_Empty,var_heap)
-							-> writePtr constructor_context.tc_var VI_EmptyConstructorClassVar var_heap
-						(VI_EmptyConstructorClassVar,var_heap)
-							-> var_heap
-				  new_contexts = [constructor_context : new_contexts]
-				  (new_contexts,constructor_contexts,predef_symbols,var_heap)
-					= add_contexts_of_constructor constructor_contexts new_contexts predef_symbols var_heap
-				= (new_contexts,[constructor_context:constructor_contexts],predef_symbols,var_heap)
-			where
-				lookup_context :: !TypeContext ![TypeContext] -> (!Bool,!TypeContext)
-				lookup_context new_tc [tc : tcs]
-					| new_tc==tc
-						= (True,tc)
-						= lookup_context new_tc tcs
-				lookup_context new_tc []
-					= (False,new_tc)
-		add_contexts_of_constructor [] new_contexts predef_symbols var_heap
-			= (new_contexts,[],predef_symbols,var_heap)
-
-	add_specified_contexts (Yes spec_context, expr_ptrs, pos, index) (contexts,var_heap)
-		= add_contexts spec_context contexts var_heap
-	add_specified_contexts (No, expr_ptrs, pos, index) (contexts,var_heap)
-		= (contexts,var_heap)
-
-	add_contexts contexts all_contexts var_heap
-		= foldSt add_spec_context contexts (all_contexts,var_heap)
-	where
-		add_spec_context tc (contexts, var_heap)
+		add_spec_context tc (contexts, var_heap, subst)
+			# (changed, tc, subst)	= arraySubst tc subst
 			| containsContext tc contexts
-				= (contexts, var_heap)
+				= (contexts, var_heap, subst)
 			  	# (tc_var,var_heap) = newPtr VI_Empty var_heap
-				= ([{tc & tc_var = tc_var} : contexts], var_heap)
+				= ([{tc & tc_var = tc_var} : contexts], var_heap, subst)
 
 	remove_super_classes contexts type_heaps
 		# (super_classes, type_heaps) = foldSt generate_super_classes contexts ([], type_heaps)
@@ -1004,9 +2229,9 @@ where
 			= context
 			= [tc : context]
 
-	convert_dictionaries :: !{#CommonDefs} ![TypeContext] !(!SymbIdent,!Index,!ExprInfoPtr,![ClassApplication]) !(!*Heaps,!DictionaryTypes, !*ErrorAdmin)
+	convert_dictionaries :: !{#CommonDefs} ![TypeContext] !ReducedOverloadedApplication !(!*Heaps,!DictionaryTypes, !*ErrorAdmin)
 		-> (!*Heaps, !DictionaryTypes, !*ErrorAdmin)
-	convert_dictionaries defs contexts (oc_symbol,index,over_info_ptr,class_applications) (heaps, dict_types, error)
+	convert_dictionaries defs contexts {roa_symbol = oc_symbol,roa_fun_index = index,roa_expr_ptr = over_info_ptr,roa_rcs = class_applications} (heaps, dict_types, error)
 		# (heaps, ptrs, error) = convertOverloadedCall defs contexts oc_symbol over_info_ptr class_applications (heaps, [], error)
 		| isEmpty ptrs
 			= (heaps, dict_types, error)
@@ -1024,11 +2249,12 @@ selectFromDictionary  dict_mod dict_index member_index defs
 	  { fs_ident, fs_index } = rt_fields.[member_index]
 	= { glob_module = dict_mod, glob_object = { ds_ident = fs_ident, ds_index = fs_index, ds_arity = 1 }}
 
-getDictionaryTypeAndConstructor :: !GlobalIndex !{#CommonDefs} -> (!DefinedSymbol,!DefinedSymbol)
-getDictionaryTypeAndConstructor {gi_module,gi_index} defs	  
+getDictionaryConstructorAndRecordType :: !GlobalIndex !{#CommonDefs} -> (!DefinedSymbol,!Type)
+getDictionaryConstructorAndRecordType {gi_module,gi_index} defs	  
 	# {class_dictionary} = defs.[gi_module].com_class_defs.[gi_index]
 	  (RecordType {rt_constructor}) = defs.[gi_module].com_type_defs.[class_dictionary.ds_index].td_rhs
-	= (class_dictionary, rt_constructor)
+	  rec_type = defs.[gi_module].com_cons_defs.[rt_constructor.ds_index].cons_type.st_result.at_type
+	= (rt_constructor, rec_type)
 
 AttributedType type :== { at_attribute = TA_Multi, at_type = type }
 
@@ -1039,24 +2265,22 @@ convertOverloadedCall defs contexts {symb_ident,symb_kind = SK_OverloadedFunctio
 	  (inst_expr, (heaps, ptrs)) = adjust_member_application defs contexts mem_def class_appl class_exprs heaps_and_ptrs
 	= ({heaps & hp_expression_heap = heaps.hp_expression_heap <:= (expr_ptr, inst_expr)}, ptrs, error)
 where
-	adjust_member_application defs contexts {me_ident,me_offset,me_class} (CA_Instance red_contexts) class_exprs heaps_and_ptrs
-		# (glob_module,cim_index,cim_ident,red_contexts_appls) = find_instance_of_member me_class me_offset red_contexts
-		#! (exprs, heaps_and_ptrs) = convertClassApplsToExpressions defs contexts red_contexts_appls heaps_and_ptrs
-           class_exprs = exprs ++ class_exprs
-           n_class_exprs = length class_exprs
-        | cim_index>=0
-        	= (EI_Instance {glob_module=glob_module, glob_object={ds_ident=me_ident, ds_arity=n_class_exprs, ds_index=cim_index}} class_exprs,
-                                heaps_and_ptrs)
-            # index = -1 - cim_index
-            = (EI_Instance {glob_module=glob_module, glob_object={ds_ident=cim_ident, ds_arity=n_class_exprs, ds_index=index}} class_exprs,
-                                heaps_and_ptrs)
+	adjust_member_application defs contexts mem_def (CA_Instance rc) class_exprs heaps_and_ptrs
+		= adjust_member_instance  defs contexts mem_def rc class_exprs heaps_and_ptrs
 	adjust_member_application defs contexts  {me_ident,me_offset,me_class={glob_module,glob_object}} (CA_Context tc) class_exprs (heaps=:{hp_type_heaps}, ptrs)
 		# (class_context, address, hp_type_heaps) = determineContextAddress contexts defs tc hp_type_heaps
 		# {class_dictionary={ds_index,ds_ident}} = defs.[glob_module].com_class_defs.[glob_object]
 		  selector = selectFromDictionary glob_module ds_index me_offset defs
 		= (EI_Selection (generateClassSelection address [RecordSelection selector me_offset]) class_context.tc_var class_exprs,
 				({ heaps & hp_type_heaps = hp_type_heaps }, ptrs))
-	adjust_member_application defs contexts  _ (CA_GlobalTypeCode {tci_constructor,tci_contexts}) _ heaps_and_ptrs
+		
+	adjust_member_instance defs contexts {me_ident,me_offset,me_class} (RC_Class cid rcs) class_exprs heaps_and_ptrs
+		# ({glob_module,glob_object}, red_contexts_appls) = find_instance_of_member me_class me_offset cid rcs
+		  (exprs, heaps_and_ptrs) = convertClassApplsToExpressions defs contexts red_contexts_appls heaps_and_ptrs
+		  class_exprs = exprs ++ class_exprs
+		= (EI_Instance { glob_module = glob_module, glob_object = { ds_ident = me_ident, ds_arity = length class_exprs, ds_index = glob_object }} class_exprs,
+			 heaps_and_ptrs)
+	adjust_member_instance defs contexts {me_ident,me_offset,me_class={glob_module,glob_object}} (RC_TC_Global tci_constructor tci_contexts) _ heaps_and_ptrs
 		# (exprs, heaps_and_ptrs) = convertClassApplsToExpressions defs contexts tci_contexts heaps_and_ptrs
 		  typeCodeExpressions = expressionsToTypeCodeExpressions exprs
 		= case tci_constructor of
@@ -1064,20 +2288,20 @@ where
 				-> (EI_TypeCode (TCE_UnqType (TCE_Constructor tci_constructor typeCodeExpressions)), heaps_and_ptrs)
 			_
 				-> (EI_TypeCode (TCE_Constructor tci_constructor typeCodeExpressions), heaps_and_ptrs)
-	adjust_member_application defs contexts _ (CA_LocalTypeCode new_var_ptr) _  heaps_and_ptrs
+	adjust_member_instance defs contexts {me_ident,me_offset,me_class={glob_module,glob_object}} (RC_TC_Local new_var_ptr) _ heaps_and_ptrs
 		= (EI_TypeCode (TCE_Var new_var_ptr), heaps_and_ptrs)
 
-	find_instance_of_member :: (Global Int) Int ReducedContexts -> (!Index,!Index,!Ident,[ClassApplication])
-	find_instance_of_member me_class me_offset { rcs_class_context = {cid_class_index, cid_inst_module, cid_inst_members, cid_red_contexts}, rcs_constraints_contexts}
-    	| cid_class_index.gi_module == me_class.glob_module && cid_class_index.gi_index == me_class.glob_object
-        	# {cim_index,cim_arity,cim_ident} = cid_inst_members.[me_offset]
+	find_instance_of_member :: (Global Int) Int ClassInstanceDescr [ReducedContext] -> ((Global Int),[ClassApplication])
+	find_instance_of_member me_class me_offset {cid_class_index, cid_inst_module, cid_inst_members, cid_red_contexts} constraint_contexts
+		| cid_class_index.gi_module == me_class.glob_module && cid_class_index.gi_index == me_class.glob_object
+			# {cim_index,cim_arity} = cid_inst_members.[me_offset]
 			| cim_index<0
-				= (cim_arity, cim_index, cim_ident, cid_red_contexts)
-				= (cid_inst_module, cim_index, cim_ident, cid_red_contexts)
-			= find_instance_of_member_in_constraints me_class me_offset rcs_constraints_contexts
+				= ({ glob_module = cim_arity, glob_object = -1 - cim_index }, cid_red_contexts)
+				= ({ glob_module = cid_inst_module, glob_object = cim_index }, cid_red_contexts)
+			= find_instance_of_member_in_constraints me_class me_offset constraint_contexts
 	where
-		find_instance_of_member_in_constraints me_class me_offset [ CA_Instance rcs=:{rcs_constraints_contexts} : rcss ]
-			= find_instance_of_member me_class me_offset {rcs & rcs_constraints_contexts = rcs_constraints_contexts ++ rcss}
+		find_instance_of_member_in_constraint me_class me_offset [ RC_Class cid rcs : rcss ]
+			= find_instance_of_member me_class me_offset cid (rcs ++ rcss)
 		find_instance_of_member_in_constraints me_class me_offset [ _ : rcss ]
 			= find_instance_of_member_in_constraints me_class me_offset rcss
 		find_instance_of_member_in_constraints me_class me_offset []
@@ -1157,8 +2381,6 @@ instance toString ClassApplication
 where 
 	toString (CA_Instance _)		= abort "CA_Instance"
 	toString (CA_Context _)			= abort "CA_Context"
-	toString (CA_LocalTypeCode _)	= abort "CA_LocalTypeCode"
-	toString (CA_GlobalTypeCode _) 	= abort "CA_GlobalTypeCode"
 
 convertClassApplsToExpressions :: {#CommonDefs} [TypeContext] [ClassApplication] *( *Heaps, [ExprInfoPtr])
 															-> *(![Expression], !*(!*Heaps,![ExprInfoPtr]))
@@ -1172,9 +2394,10 @@ where
 		| isEmpty context_address
 			= (ClassVariable class_context.tc_var, ({heaps & hp_type_heaps=hp_type_heaps}, ptrs))
 			= (Selection NormalSelector (ClassVariable class_context.tc_var) (generateClassSelection context_address []), ({heaps & hp_type_heaps = hp_type_heaps}, ptrs))
-	convert_class_appl_to_expression defs contexts (CA_LocalTypeCode new_var_ptr) heaps_and_ptrs
+
+	convert_reduced_contexts_to_expression defs contexts (RC_TC_Local new_var_ptr) heaps_and_ptrs
 		= (TypeCodeExpression (TCE_Var new_var_ptr), heaps_and_ptrs)
-	convert_class_appl_to_expression defs contexts (CA_GlobalTypeCode {tci_constructor,tci_contexts}) heaps_and_ptrs
+	convert_reduced_contexts_to_expression defs contexts (RC_TC_Global tci_constructor tci_contexts) heaps_and_ptrs
 		# (exprs, heaps_and_ptrs) = convertClassApplsToExpressions defs contexts tci_contexts heaps_and_ptrs
 		  typeCodeExpressions = expressionsToTypeCodeExpressions exprs
 		= case tci_constructor of
@@ -1182,10 +2405,9 @@ where
 				-> (TypeCodeExpression (TCE_UnqType (TCE_Constructor tci_constructor typeCodeExpressions)), heaps_and_ptrs)
 			_
 				-> (TypeCodeExpression (TCE_Constructor tci_constructor typeCodeExpressions), heaps_and_ptrs)
-
-	convert_reduced_contexts_to_expression defs contexts {rcs_class_context,rcs_constraints_contexts} heaps_and_ptrs
-		# (rcs_exprs, heaps_and_ptrs) = mapSt (convert_class_appl_to_expression defs contexts) rcs_constraints_contexts heaps_and_ptrs
-		= convert_reduced_context_to_expression defs contexts rcs_class_context rcs_exprs heaps_and_ptrs
+	convert_reduced_contexts_to_expression defs contexts (RC_Class cid rcs) heaps_and_ptrs
+		# (rcs_exprs, heaps_and_ptrs) = mapSt (convert_reduced_contexts_to_expression defs contexts) rcs heaps_and_ptrs
+		= convert_reduced_context_to_expression defs contexts cid rcs_exprs heaps_and_ptrs
 	where
 		convert_reduced_context_to_expression :: {#CommonDefs} [TypeContext] ClassInstanceDescr [Expression] *(*Heaps,[Ptr ExprInfo]) -> *(Expression,*(*Heaps,[Ptr ExprInfo]))
 		convert_reduced_context_to_expression defs contexts {cid_class_index, cid_inst_module, cid_inst_members, cid_red_contexts, cid_types} dictionary_args heaps_and_ptrs
@@ -1235,12 +2457,11 @@ where
 					= build_class_members mem_offset ins_members mod_index class_arguments arity [mem_expr : dictionary_args]
 		
 		build_dictionary class_index instance_types dictionary_args defs expr_heap ptrs
-			# (dict_type, dict_cons) = getDictionaryTypeAndConstructor class_index defs
-			  record_symbol = { symb_ident = dict_cons.ds_ident,		  
+			# (dict_cons,TA dict_record_type_symb _) = getDictionaryConstructorAndRecordType class_index defs
+			  record_symbol = { symb_ident = dict_cons.ds_ident,
 			  					symb_kind = SK_Constructor {glob_module = class_index.gi_module, glob_object = dict_cons.ds_index}
 								}
-			  dict_type_symbol = MakeTypeSymbIdent {glob_module = class_index.gi_module, glob_object = dict_type.ds_index} dict_type.ds_ident dict_type.ds_arity
-			  class_type = TA dict_type_symbol [AttributedType type \\ type <- instance_types]
+			  class_type = TA dict_record_type_symb [AttributedType type \\ type <- instance_types]
 			  (app_info_ptr, expr_heap) = newPtr (EI_DictionaryType class_type) expr_heap
 			  rc_record = App {app_symb = record_symbol, app_args = dictionary_args, app_info_ptr = app_info_ptr}
 			= (rc_record, expr_heap, [app_info_ptr : ptrs])
@@ -1316,6 +2537,44 @@ getClassVariable symb var_info_ptr var_heap error
 			# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
 			# error = overloadingError symb error
 			-> (symb, new_info_ptr, var_heap <:= (var_info_ptr, VI_ClassVar symb new_info_ptr 1), error)
+
+removeOverloadedFunctionsWithoutUpdatingFunctions :: ![Index] ![LocalTypePatternVariable] !Int !*{#FunDef} !*{! FunctionType} !*ExpressionHeap
+	!*TypeCodeInfo !*VarHeap !*ErrorAdmin !*{#PredefinedSymbol}
+		-> (!*{#FunDef}, !*{! FunctionType}, !*ExpressionHeap, !*TypeCodeInfo, !*VarHeap, !*ErrorAdmin, !*{#PredefinedSymbol})
+removeOverloadedFunctionsWithoutUpdatingFunctions group type_pattern_vars main_dcl_module_n fun_defs fun_env symbol_heap type_code_info var_heap error predef_symbols
+	#! ok = error.ea_ok
+	# (_, fun_defs, fun_env, symbol_heap, type_code_info, var_heap, error, predef_symbols)
+		= foldSt (remove_overloaded_function type_pattern_vars) group (ok, fun_defs, fun_env, symbol_heap, type_code_info, var_heap, error, predef_symbols)
+	= (fun_defs, fun_env, symbol_heap, type_code_info, var_heap, error, predef_symbols)
+where
+	remove_overloaded_function type_pattern_vars fun_index (ok, fun_defs, fun_env, symbol_heap, type_code_info, var_heap, error, predef_symbols)
+		| ok
+			# (fun_def, fun_defs) = fun_defs![fun_index]  
+			  (CheckedType st=:{st_context,st_args}, fun_env) = fun_env![fun_index]
+			  {fun_body = TransformedBody {tb_args,tb_rhs},fun_info,fun_arity,fun_ident,fun_pos} = fun_def
+			  
+			  var_heap = mark_FPC_arguments st_args tb_args var_heap
+			  
+			  error = setErrorAdmin (newPosition fun_ident fun_pos) error
+			  (rev_variables,var_heap,error) = determine_class_arguments st_context var_heap error
+			  (type_code_info, symbol_heap, type_pattern_vars, var_heap, error)
+			  		= convertDynamicTypes fun_info.fi_dynamics (type_code_info, symbol_heap, type_pattern_vars, var_heap, error)
+			 
+			  (_ /*tb_rhs*/, ui)
+			  		= updateExpression fun_info.fi_group_index tb_rhs {ui_instance_calls = [], ui_local_vars = fun_info.fi_local_vars, ui_symbol_heap = symbol_heap,
+			  				ui_var_heap = var_heap, ui_fun_defs = fun_defs, ui_fun_env = fun_env, ui_error = error,
+							ui_has_type_codes = False,
+						    ui_x = {x_type_code_info=type_code_info, x_predef_symbols=predef_symbols,x_main_dcl_module_n=main_dcl_module_n}}
+
+			#  {ui_instance_calls, ui_local_vars, ui_symbol_heap, ui_var_heap, ui_fun_defs, ui_fun_env, ui_has_type_codes, ui_error, ui_x = {x_type_code_info = type_code_info, x_predef_symbols = predef_symbols}}
+				=	ui
+			# (tb_args, var_heap) = retrieve_class_arguments rev_variables tb_args ui_var_heap 
+			  fun_info = mark_type_codes ui_has_type_codes fun_info
+			  // fun_body and fun_arity not updated
+			  fun_def & fun_info = { fun_info & fi_calls = fun_info.fi_calls ++ ui_instance_calls, fi_local_vars = ui_local_vars }
+			#! ok = ui_error.ea_ok
+			= (ok, { ui_fun_defs & [fun_index] = fun_def }, ui_fun_env, ui_symbol_heap, type_code_info, var_heap, ui_error, predef_symbols)
+			= (False, fun_defs, fun_env, symbol_heap, type_code_info, var_heap, error, predef_symbols)
 
 removeOverloadedFunctions :: ![Index] ![LocalTypePatternVariable] !Int !*{#FunDef} !*{! FunctionType} !*ExpressionHeap
 	!*TypeCodeInfo !*VarHeap !*ErrorAdmin !*{#PredefinedSymbol}
@@ -2248,12 +3507,16 @@ where
 	adjustClassExpression symb_ident  expr ui
 		= (expr, ui)
 
-class equalTypes a :: !a !a !*TypeVarHeap -> (!Bool, !*TypeVarHeap)
+expandAndCompareTypes type unexp_type type_var_heap subst
+	# (exp_type, subst) = expandOneStep unexp_type subst
+	= equalTypes type exp_type type_var_heap subst
+
+class equalTypes a :: !a !a !*TypeVarHeap !*Subst -> (!Bool, !*TypeVarHeap, !*Subst)
 
 instance equalTypes AType
 where
-	equalTypes atype1 atype2 type_var_heap
-		= equalTypes atype1.at_type atype2.at_type type_var_heap
+	equalTypes atype1 atype2 type_var_heap subst
+		= expandAndCompareTypes atype1.at_type atype2.at_type type_var_heap subst
 
 equalTypeVars {tv_info_ptr}	temp_var_id type_var_heap
 	# (tv_info, type_var_heap) = readPtr tv_info_ptr type_var_heap
@@ -2265,56 +3528,55 @@ equalTypeVars {tv_info_ptr}	temp_var_id type_var_heap
 
 instance equalTypes Type
 where
-	equalTypes (TV tv) (TempV var_number) type_var_heap
-		= equalTypeVars tv var_number type_var_heap
-	equalTypes (arg_type1 --> restype1) (arg_type2 --> restype2) type_var_heap
-		= equalTypes (arg_type1,restype1) (arg_type2,restype2) type_var_heap
-	equalTypes (TA tc1 types1) (TA tc2 types2) type_var_heap
+	equalTypes (TV tv) (TempV var_number) type_var_heap subst
+		# (eq, type_var_heap) = equalTypeVars tv var_number type_var_heap
+		= (eq, type_var_heap, subst)
+	equalTypes (arg_type1 --> restype1) (arg_type2 --> restype2) type_var_heap subst
+		# (eq, type_var_heap, subst) = equalTypes arg_type1 arg_type2 type_var_heap subst
+		| eq
+			= equalTypes restype1 restype2 type_var_heap subst
+			= (False, type_var_heap, subst)
+	equalTypes (TA tc1 types1) (TA tc2 types2) type_var_heap subst
 		| tc1 == tc2
-			= equalTypes types1 types2 type_var_heap
-			= (False, type_var_heap)
-	equalTypes (TA tc1 types1) (TAS tc2 types2 _) type_var_heap
+			= equalTypes types1 types2 type_var_heap subst
+			= (False, type_var_heap, subst)
+	equalTypes (TA tc1 types1) (TAS tc2 types2 _) type_var_heap subst
 		| tc1 == tc2
-			= equalTypes types1 types2 type_var_heap
-			= (False, type_var_heap)
-	equalTypes (TAS tc1 types1 _) (TA tc2 types2) type_var_heap
+			= equalTypes types1 types2 type_var_heap subst
+			= (False, type_var_heap, subst)
+	equalTypes (TAS tc1 types1 _) (TA tc2 types2) type_var_heap subst
 		| tc1 == tc2
-			= equalTypes types1 types2 type_var_heap
-			= (False, type_var_heap)
-	equalTypes (TAS tc1 types1 _) (TAS tc2 types2 _) type_var_heap
+			= equalTypes types1 types2 type_var_heap subst
+			= (False, type_var_heap, subst)
+	equalTypes (TAS tc1 types1 _) (TAS tc2 types2 _) type_var_heap subst
 		| tc1 == tc2
-			= equalTypes types1 types2 type_var_heap
-			= (False, type_var_heap)
-	equalTypes (TB basic1) (TB basic2) type_var_heap
-		= (basic1 == basic2, type_var_heap)
-	equalTypes TArrow TArrow type_var_heap
-		= (True, type_var_heap)
-	equalTypes (TArrow1 x) (TArrow1 y) type_var_heap
-		= equalTypes x y type_var_heap		
-	equalTypes (CV tv :@: types1) (TempCV var_number :@: types2) type_var_heap
+			= equalTypes types1 types2 type_var_heap subst
+			= (False, type_var_heap, subst)
+	equalTypes (TB basic1) (TB basic2) type_var_heap subst
+		= (basic1 == basic2, type_var_heap, subst)
+	equalTypes TArrow TArrow type_var_heap subst
+		= (True, type_var_heap, subst)
+	equalTypes (TArrow1 x) (TArrow1 y) type_var_heap subst
+		= equalTypes x y type_var_heap subst		
+	equalTypes (CV tv :@: types1) (TempCV var_number :@: types2) type_var_heap subst
 		# (eq, type_var_heap) = equalTypeVars tv var_number type_var_heap
 		| eq
-			= equalTypes types1 types2 type_var_heap
-			= (False, type_var_heap)
-	equalTypes type1 type2 type_var_heap
-		= (False, type_var_heap)
-
-instance equalTypes (a,b) | equalTypes a & equalTypes b
-where
-	equalTypes (x1,y1) (x2,y2) type_var_heap
-		# (eq, type_var_heap) = equalTypes x1 x2 type_var_heap
-		| eq
-			= equalTypes y1 y2 type_var_heap
-			= (False, type_var_heap)
+			= equalTypes types1 types2 type_var_heap subst
+			= (False, type_var_heap, subst)
+	equalTypes type1 type2 type_var_heap subst
+		= (False, type_var_heap, subst)
 
 instance equalTypes [a] | equalTypes a
 where
-	equalTypes [x:xs] [y:ys] type_var_heap
-		= equalTypes (x,xs) (y,ys) type_var_heap
-	equalTypes [] [] type_var_heap
-		= (True, type_var_heap)
-	equalTypes _ _ type_var_heap
-		= (False, type_var_heap)
+	equalTypes [x:xs] [y:ys] type_var_heap subst
+		# (eq, type_var_heap, subst) = equalTypes x y type_var_heap subst
+		| eq 
+			= equalTypes xs ys type_var_heap subst
+			= (False, type_var_heap, subst)
+	equalTypes [] [] type_var_heap subst
+		= (True, type_var_heap, subst)
+	equalTypes _ _ type_var_heap subst
+		= (False, type_var_heap, subst)
 
 instance <<< TypeContext
 where
@@ -2349,10 +3611,170 @@ instance <<< ClassApplication
 where
 	(<<<) file (CA_Instance rc) = file <<< "CA_Instance"
 	(<<<) file (CA_Context tc) = file <<< "CA_Context " <<< tc
-	(<<<) file (CA_LocalTypeCode tc) = file <<< "CA_LocalTypeCode " <<< tc
-	(<<<) file (CA_GlobalTypeCode tci) = file <<< "CA_GlobalTypeCode " <<< tci
 
-instance <<< TypeCodeInstance
+equalize_atype_attributes :: !AType !AType !*Coercions -> *(!Bool,!*Coercions)
+equalize_atype_attributes {at_attribute=at_attribute1,at_type=at_type1} {at_attribute=at_attribute2,at_type=at_type2} coercions
+	# (ok1,coercions) = equalize_attributes at_attribute1 at_attribute2 coercions
+	# (ok2,coercions) = equalize_type_attributes at_type1 at_type2 coercions
+	= (ok1 && ok2,coercions)
+
+equalize_attributes :: !TypeAttribute !TypeAttribute !*Coercions -> (!Bool,!*Coercions)
+equalize_attributes TA_Multi TA_Multi coercions
+	= (True,coercions)
+equalize_attributes TA_Multi (TA_TempVar av2_n) coercions
+	= tryToMakeNonUnique av2_n coercions
+equalize_attributes TA_Multi TA_Unique coercions
+	= (False,coercions)
+equalize_attributes TA_Unique TA_Unique coercions
+	= (True,coercions)
+equalize_attributes TA_Unique (TA_TempVar av2_n) coercions
+	= tryToMakeUnique av2_n coercions
+equalize_attributes TA_Unique TA_Multi coercions
+	= (False,coercions)
+equalize_attributes (TA_TempVar av1_n) TA_Multi coercions
+	= tryToMakeNonUnique av1_n coercions
+equalize_attributes (TA_TempVar av1_n) TA_Unique coercions
+	= tryToMakeUnique av1_n coercions
+equalize_attributes (TA_TempVar av1_n) (TA_TempVar av2_n) coercions
+	= equalize_attribute_vars av1_n av2_n coercions
+equalize_attributes attribute1 attribute2 coercions
+	= abort "equalize_attributes" ---> (attribute1,attribute2)
+
+equalize_type_attributes :: !Type !Type !*Coercions -> (!Bool,!*Coercions)
+equalize_type_attributes (arg_atype1-->res_atype1) (arg_atype2-->res_atype2) coercions
+	# (ok1,coercions) = equalize_atype_attributes arg_atype1 arg_atype2 coercions
+	# (ok2,coercions) = equalize_atype_attributes res_atype1 res_atype2 coercions
+	= (ok1 && ok2,coercions)
+equalize_type_attributes (TA _ cons_args1) (TA _ cons_args2) coercions
+	= equalize_atypes_attributes cons_args1 cons_args2 coercions
+equalize_type_attributes (TA _ cons_args1) (TAS _ cons_args2 _) coercions
+	= equalize_atypes_attributes cons_args1 cons_args2 coercions
+equalize_type_attributes (TAS _ cons_args1 _) (TAS _ cons_args2 _) coercions
+	= equalize_atypes_attributes cons_args1 cons_args2 coercions
+equalize_type_attributes (TAS _ cons_args1 _) (TA _ cons_args2) coercions
+	= equalize_atypes_attributes cons_args1 cons_args2 coercions
+equalize_type_attributes (_ :@: atypes1) (_ :@: atypes2) coercions
+	= equalize_atypes_attributes atypes1 atypes2 coercions
+equalize_type_attributes (TArrow1 atype1) (TArrow1 atype2) coercions
+	= equalize_atype_attributes atype1 atype2 coercions
+equalize_type_attributes (TB _) (TB _) coercions
+	= (True,coercions)
+equalize_type_attributes (TempV _) (TempV _) coercions
+	= (True,coercions)
+equalize_type_attributes TArrow TArrow coercions
+	= (True,coercions)
+equalize_type_attributes type1 type2 coercions
+	= abort "equalize_type_attributes" ---> (type1,type2)
+
+equalize_atypes_attributes :: ![AType] ![AType] !*Coercions -> *(!Bool,!*Coercions)
+equalize_atypes_attributes [atype1:atypes1] [atype2:atypes2] coercions
+	# (ok1,coercions) = equalize_atype_attributes atype1 atype2 coercions
+	# (ok2,coercions) = equalize_atypes_attributes atypes1 atypes2 coercions
+	= (ok1 && ok2,coercions)
+equalize_atypes_attributes [] [] coercions
+	= (True,coercions)
+
+// containsTypeVariable copied from module type and extended
+class containsTypeVariable a :: !Int !a !{!Type} -> Bool
+
+instance containsTypeVariable [a] | containsTypeVariable a
 where
-	(<<<) file {tci_contexts} = file <<< ' ' <<< tci_contexts
+	containsTypeVariable var_id [elem:list] subst
+		= containsTypeVariable var_id elem subst || containsTypeVariable var_id list subst
+	containsTypeVariable var_id [] _
+		= False
 
+instance containsTypeVariable AType
+where
+	containsTypeVariable var_id {at_type} subst = containsTypeVariable var_id at_type subst
+
+instance containsTypeVariable Type
+where
+	containsTypeVariable var_id (TempV tv_number) subst
+		# type = subst.[tv_number]
+		| isIndirection type
+			= containsTypeVariable var_id type subst 
+			= tv_number == var_id
+	containsTypeVariable var_id (arg_type --> res_type) subst
+		= containsTypeVariable var_id arg_type subst || containsTypeVariable var_id res_type subst
+	containsTypeVariable var_id (TA cons_id cons_args) subst
+		= containsTypeVariable var_id cons_args subst
+	containsTypeVariable var_id (TAS cons_id cons_args _) subst
+		= containsTypeVariable var_id cons_args subst
+	containsTypeVariable var_id (type :@: types) subst
+		= containsTypeVariable var_id type subst || containsTypeVariable var_id types subst
+	containsTypeVariable var_id (TArrow1 arg_type) subst
+		= containsTypeVariable var_id arg_type subst
+	containsTypeVariable _ _ _
+		= False
+
+instance containsTypeVariable ConsVariable
+where
+	containsTypeVariable var_id (TempCV tv_number) subst
+		# type = subst.[tv_number]
+		| isIndirection type
+			= containsTypeVariable var_id type subst 
+			= tv_number == var_id
+	containsTypeVariable var_id _ _
+		= False
+
+liftNewVarSubstitutions :: ![ReducedOverloadedContext] !Int !*{!Type} -> (!*{#BOOLVECT},!*{!Type})
+liftNewVarSubstitutions rocs n_type_variables subst
+	#! size_subst = size subst
+	| n_type_variables==size_subst
+		= ({},subst)
+		# m = createArray (inc (BITINDEX (size_subst-n_type_variables))) 0
+		# (m,subst) = mark_new_vars rocs n_type_variables m subst
+		= (m,subst)
+
+mark_new_vars :: ![ReducedOverloadedContext] !Int !*{#BOOLVECT} !*{!Type} -> (!*{#BOOLVECT},!*{!Type})
+mark_new_vars [{roc_rcs}:rocs] n_type_variables m subst
+	# (m,subst) = mark_new_vars_rcs roc_rcs n_type_variables m subst
+	= mark_new_vars rocs n_type_variables m subst
+where
+	mark_new_vars_rcs [rc:rcs] n_type_variables m subst
+		# (m,subst) = mark_new_vars_rc rc n_type_variables m subst
+		= mark_new_vars_rcs rcs n_type_variables m subst
+	mark_new_vars_rcs [] n_type_variables m subst
+		= (m,subst)
+
+	mark_new_vars_rc (RC_Context _) n_type_variables m subst
+		= (m,subst)
+	mark_new_vars_rc (RC_Instance ci) n_type_variables m subst
+		= mark_new_vars_cr_of_ci ci n_type_variables m subst
+
+	mark_new_vars_cr_of_ci CI_TC n_type_variables m subst
+		= (m,subst)
+	mark_new_vars_cr_of_ci (CI_Class opt_cd cis) n_type_variables m subst
+		# (m,subst) = mark_new_vars_cr_of_opt_cd opt_cd n_type_variables m subst
+		= mark_new_vars_cr_of_cis cis n_type_variables m subst
+
+	mark_new_vars_cr_of_opt_cd No n_type_variables m subst
+		= (m,subst)
+	mark_new_vars_cr_of_opt_cd (Yes {cd_inst_contexts,cd_new_vars}) n_type_variables m subst
+		# (m,subst) = mark_new_vars_new_vars cd_new_vars n_type_variables m subst
+		= mark_new_vars_rcs cd_inst_contexts n_type_variables m subst
+
+	mark_new_vars_cr_of_cis [] n_type_variables m subst
+		= (m,subst)
+	mark_new_vars_cr_of_cis [ci:cis] n_type_variables m subst
+		# (m,subst) = mark_new_vars_cr_of_ci ci n_type_variables m subst
+		= mark_new_vars_cr_of_cis cis n_type_variables m subst
+		
+	mark_new_vars_new_vars [] n_type_variables m subst
+		= (m,subst)
+	mark_new_vars_new_vars [(_,tv_n):new_vars] n_type_variables m subst
+		# (m,subst) = mark_new_vars_new_var tv_n n_type_variables m subst
+		= mark_new_vars_new_vars new_vars n_type_variables m subst
+
+	mark_new_vars_new_var :: !Int !Int !*{#BOOLVECT} !*{!Type} -> (!*{#BOOLVECT},!*{!Type})
+	mark_new_vars_new_var tv_n n_type_variables m subst
+		# i = tv_n - n_type_variables
+		| i<0
+			= (m,subst)
+		# bit_index = BITINDEX i
+		  (m_bit_index,m) = m![bit_index]
+		  m & [bit_index] = m_bit_index bitor (1 << (BITNUMBER i))
+		= (m,subst)
+mark_new_vars [] n_type_variables m subst
+	= (m,subst)

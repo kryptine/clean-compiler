@@ -38,7 +38,7 @@ BITNUMBER temp_var_id :== temp_var_id bitand 31
 set_bit :: !Int !*{# BOOLVECT} -> .{# BOOLVECT}
 
 determineAttributeCoercions :: !AType !AType !Bool !u:{!Type} !*Coercions !{#CommonDefs} !{#BOOLVECT} !*TypeDefInfos !*TypeHeaps
-		-> (!Optional (TypePosition, AType), !u:{!Type}, !*Coercions, !*TypeDefInfos, !*TypeHeaps) 
+		-> (!Optional (TypePosition, AType), !u:{!Type}, !*Coercions, !*TypeDefInfos, !*TypeHeaps)
 
 ::	AttributePartition	:== {# Int}
 
@@ -71,3 +71,7 @@ instance expandType AType
 checkExistentionalAttributeVars :: [TempAttrId] !AttributePartition !*{! CoercionTree} -> (!Bool,!*{! CoercionTree})
 
 copyCoercions :: *Coercions -> (*Coercions, *Coercions)
+
+equalize_attribute_vars :: !Int !Int !*Coercions  -> (!Bool, !*Coercions)
+liftSubstitutionFunDep :: !Int !{#BOOLVECT} !{#CommonDefs} !{#BOOLVECT} !*{!Type} !Int !*TypeHeaps !*TypeDefInfos
+																-> (!*{!Type},!Int,!*TypeHeaps,!*TypeDefInfos)
