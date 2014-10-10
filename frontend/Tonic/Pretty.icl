@@ -157,14 +157,14 @@ mkRecSel ds = char '.' <-> hcat (intersperse (char '.') ds)
 
 ppFreeVar :: FreeVar *ModuleEnv -> *(Doc, *ModuleEnv)
 ppFreeVar fv menv = ppIdent fv.fv_ident menv
-
+import StdDebug
 ppBasicValue :: BasicValue *ModuleEnv -> *(Doc, *ModuleEnv)
-ppBasicValue (BVI   str)  menv = (text str, menv)
-ppBasicValue (BVInt i)    menv = (int i, menv)
-ppBasicValue (BVC   str)  menv = (text str, menv)
-ppBasicValue (BVB   b)    menv = (bool b, menv)
-ppBasicValue (BVR   str)  menv = (text str, menv)
-ppBasicValue (BVS   str)  menv = (text str, menv)
+ppBasicValue (BVI   str)  menv = trace_n ("BVI " +++ str) (text str, menv)
+ppBasicValue (BVInt i)    menv =                          (int i, menv)
+ppBasicValue (BVC   str)  menv = trace_n ("BVC " +++ str) (text str, menv)
+ppBasicValue (BVB   b)    menv =                          (bool b, menv)
+ppBasicValue (BVR   str)  menv = trace_n ("BVR " +++ str) (text str, menv)
+ppBasicValue (BVS   str)  menv = trace_n ("BVS " +++ str) (text str, menv)
 
 ppSelection :: Selection *ModuleEnv -> *(Doc, *ModuleEnv)
 ppSelection (RecordSelection gds n)             menv = ppDefinedSymbol gds.glob_object menv

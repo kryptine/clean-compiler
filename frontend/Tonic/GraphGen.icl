@@ -18,7 +18,8 @@ import Data.Func
 import Data.Maybe
 import Data.List
 import Data.Graph
-import Data.Map
+from Data.Map import :: Map
+import qualified Data.Map as DM
 
 import qualified Text.PPrint as PPrint
 import iTasks.Framework.Tonic.AbsSyn
@@ -189,13 +190,13 @@ letTypes exprPtr chn
 
 varIsTask :: BoundVar InhExpression -> Bool
 varIsTask bv inh
-  = case get bv.var_ident.id_name inh.inh_tyenv of
+  = case 'DM'.get bv.var_ident.id_name inh.inh_tyenv of
       Nothing -> False
       Just t  -> typeIsTask t
 
 varIsListOfTask :: BoundVar InhExpression -> Bool
 varIsListOfTask bv inh
-  = case get bv.var_ident.id_name inh.inh_tyenv of
+  = case 'DM'.get bv.var_ident.id_name inh.inh_tyenv of
       Nothing -> False
       Just t  -> typeIsListOfTask t
 
@@ -495,7 +496,7 @@ mkGraphAlg
     mkLet Nothing lt inh chn
       # (tys, chn)    = letTypes lt.let_info_ptr chn
       # (binds, menv) = flattenBinds lt chn.chn_module_env
-      # tyenv         = zipSt (\(v, _) t tyenv -> put v t tyenv) binds tys inh.inh_tyenv // TODO This probably won't work for arbitrary patterns, so we actually need to be a bit smarter here and extract all variables from the patterns, instead of just PP'ing the pattern and using that as index
+      # tyenv         = zipSt (\(v, _) t tyenv -> 'DM'.put v t tyenv) binds tys inh.inh_tyenv // TODO This probably won't work for arbitrary patterns, so we actually need to be a bit smarter here and extract all variables from the patterns, instead of just PP'ing the pattern and using that as index
       // TODO : Represent the bindings in any way possible, not just PP
       # (syn, chn)    = exprCata mkGraphAlg lt.let_expr {inh & inh_tyenv = tyenv} {chn & chn_module_env = menv}
       = ({ syn_annot_expr = Let {lt & let_expr = syn.syn_annot_expr}
@@ -623,7 +624,7 @@ funToGraph fd=:{fun_ident=fun_ident, fun_body = TransformedBody tb} menv heaps p
   mkBody
     # inh             = mkInhExpr fun_ident.id_name
     # chn             = mkChnExpr predef_symbols menv heaps
-    # (argTys, tyenv) = zipWithSt (\arg t st -> ((arg, t), put arg.fv_ident.id_name t st)) tb.tb_args (funArgTys fd) newMap
+    # (argTys, tyenv) = zipWithSt (\arg t st -> ((arg, t), 'DM'.put arg.fv_ident.id_name t st)) tb.tb_args (funArgTys fd) 'DM'.newMap
     # (syn, chn)      = exprCata mkGraphAlg tb.tb_rhs {inh & inh_tyenv = tyenv} chn
     = ( Just (map (\(arg, ty) -> (arg.fv_ident.id_name, ppCompact (ppType ty))) argTys, syn.syn_texpr, syn.syn_annot_expr) //Just g, syn.syn_annot_expr)
       , chn.chn_module_env, chn.chn_heaps, chn.chn_predef_symbols)

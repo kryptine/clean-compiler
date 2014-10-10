@@ -5,7 +5,8 @@ from Data.Func import $
 import Data.Functor
 import Data.List
 import Data.Maybe
-import Data.Map
+from Data.Map import :: Map
+import qualified Data.Map as DM
 import syntax, predef, typesupport
 import Tonic.AbsSyn
 import Tonic.Pretty
@@ -266,7 +267,7 @@ reifyArgsAndDef app_symb menv
   = ((snd (dropContexts rhsTy args), rhsfd), menv)
 
 fdArrToMap :: .{#FunDef} -> Map String FunDef
-fdArrToMap fds = fromList [(d.fun_ident.id_name, d) \\ d <-: fds]
+fdArrToMap fds = 'DM'.fromList [(d.fun_ident.id_name, d) \\ d <-: fds]
 
 isCons :: String -> Bool
 isCons str = str == PD_ConsSymbol_String
