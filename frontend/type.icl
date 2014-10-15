@@ -2371,6 +2371,7 @@ where
 
 				EI_UnmarkedDynamic _ _
 					-> (var_store, type_heaps, var_heap, expr_heap, predef_symbols)
+
 		where
 			fresh_local_dynamics loc_dynamics state
 				= foldSt fresh_dynamic loc_dynamics state
@@ -2533,6 +2534,43 @@ addLiftedArgumentsToSymbolType st=:{st_arity,st_args,st_args_strictness,st_vars,
 	,	fe_location		:: !IdentPos
 	}
 
+collect_dyn_ptrs_and_values comps ts
+	= type_components 0 comps [] ts
+where
+	type_components group_index comps dyn_ptrs_and_values ts
+		| group_index == size comps
+			= (dyn_ptrs_and_values,ts)
+			#! comp = comps.[group_index]
+			# (dyn_ptrs_and_values,ts) = CreateInitialSymbolTypes comp.group_members dyn_ptrs_and_values ts
+			= type_components (inc group_index) comps dyn_ptrs_and_values ts
+
+	CreateInitialSymbolTypes [] dyn_ptrs_and_values ts
+		= (dyn_ptrs_and_values,ts)
+	CreateInitialSymbolTypes [fun : funs] dyn_ptrs_and_values ts
+		# (dynamics, ts) = ts!ts_fun_defs.[fun].fun_info.fi_dynamics		
+		  (dyn_ptrs_and_values,ts_expr_heap) = clear_dynamics dynamics dyn_ptrs_and_values ts.ts_expr_heap
+		  ts & ts_expr_heap=ts_expr_heap
+		= CreateInitialSymbolTypes funs dyn_ptrs_and_values ts
+
+	clear_dynamics dyn_ptrs dyn_ptrs_and_values expr_heap
+		= foldSt clear_dynamic dyn_ptrs (dyn_ptrs_and_values,expr_heap)
+	where
+		clear_dynamic dyn_ptr (dyn_ptrs_and_values,ts_expr_heap)
+			# (dyn_info, ts_expr_heap) = readPtr dyn_ptr ts_expr_heap
+			  dyn_ptrs_and_values = [(dyn_ptr,dyn_info):dyn_ptrs_and_values]
+			= case dyn_info of
+				EI_Dynamic (Yes {dt_global_vars}) loc_dynamics
+					-> clear_local_dynamics loc_dynamics (dyn_ptrs_and_values,ts_expr_heap)
+				EI_Dynamic No loc_dynamics
+					-> clear_local_dynamics loc_dynamics (dyn_ptrs_and_values,ts_expr_heap)
+				EI_DynamicTypeWithVars loc_type_vars {dt_global_vars} loc_dynamics
+					-> clear_local_dynamics loc_dynamics (dyn_ptrs_and_values,ts_expr_heap)
+				EI_UnmarkedDynamic _ _
+					-> (dyn_ptrs_and_values,ts_expr_heap)
+
+		clear_local_dynamics loc_dynamics state
+			= foldSt clear_dynamic loc_dynamics state
+
 typeProgramWithoutUpdatingFunctions :: !{! Group} !Int !*{# FunDef} !IndexRange  !(Optional Bool) !CommonDefs !{!Declaration} ![QualifiedDeclaration] !{# DclModule} !NumberSet
 																						 !*TypeDefInfos !*Heaps !*PredefinedSymbols !*File !*File
 	-> (!Bool, !*{! FunctionType}, !*{# FunDef}, !{# CommonDefs}, !{# {# FunType} }, !*TypeDefInfos,!*Heaps,!*PredefinedSymbols,!*File,!*File)
@@ -2549,13 +2587,19 @@ typeProgramWithoutUpdatingFunctions comps main_dcl_module_n fun_defs specials li
 	  state = collect_qualified_imported_instances icl_qualified_imports ti_common_defs state
 
 	  (ts_error, class_instances, th_vars, td_infos) = collect_and_check_instances (size icl_defs.com_instance_defs) ti_common_defs main_dcl_module_n state
-	  
+
 	  ts = { ts_fun_env = InitFunEnv fun_env_size, ts_var_heap = hp_var_heap, ts_expr_heap = hp_expression_heap, ts_generic_heap = hp_generic_heap, ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [],
 	  		 ts_type_heaps = { hp_type_heaps & th_vars = th_vars }, ts_td_infos = td_infos, ts_error = ts_error, ts_fun_defs=fun_defs }
+
+      (dyn_ptrs_and_values,ts) = collect_dyn_ptrs_and_values comps ts
+	  {ts_td_infos,ts_fun_env,ts_error,ts_var_heap, ts_expr_heap, ts_type_heaps, ts_generic_heap,ts_fun_defs} = ts
+
 	  ti = { ti_common_defs = ti_common_defs, ti_functions = ti_functions,ti_main_dcl_module_n=main_dcl_module_n, ti_expand_newtypes = False }
 	  special_instances = { si_next_array_member_index = fun_env_size, si_array_instances = [], si_list_instances = [], si_tail_strict_list_instances = [] }
+
 	# (type_error, predef_symbols, special_instances, out, ts) = type_components list_inferred_types 0 comps class_instances ti (False, predef_symbols, special_instances, out, ts)
 	  {ts_td_infos,ts_fun_env,ts_error,ts_var_heap, ts_expr_heap, ts_type_heaps, ts_generic_heap,ts_fun_defs} = ts
+      ts_expr_heap = foldSt (\t acc -> acc <:= t) dyn_ptrs_and_values ts_expr_heap
 	= (not type_error, ts_fun_env, ts_fun_defs, ti_common_defs, ti_functions,
 			ts_td_infos, {hp_var_heap = ts_var_heap, hp_expression_heap = ts_expr_heap, hp_type_heaps = ts_type_heaps, hp_generic_heap=ts_generic_heap },
 			predef_symbols, ts_error.ea_file, out)
