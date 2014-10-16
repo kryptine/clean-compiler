@@ -1099,13 +1099,12 @@ scanModule mod=:{mod_ident,mod_type,mod_defs = pdefs} cached_modules support_gen
 	  n_global_functions = length fun_defs
 
 	  (fun_defs, ca) = collectFunctions fun_defs True {ca & ca_fun_count=n_global_functions,ca_rev_fun_defs=[]}
-//	  (fun_range, ca) = addFunctionsRange fun_defs ca
 	  (macro_defs, ca) = collectFunctions defs.def_macros True ca
-	  (macro_range, ca) = addFunctionsRange macro_defs ca
 	  (def_instances, ca) = collectFunctions defs.def_instances True ca
 	  (def_generic_cases, ca) = collectFunctions defs.def_generic_cases True ca  
+	  (macro_range, ca) = addFunctionsRange macro_defs ca
 
-	  {	ca_error = {pea_file = err_file,pea_ok}, ca_rev_fun_defs, ca_hash_table } = ca
+	  {ca_error = {pea_file = err_file,pea_ok}, ca_rev_fun_defs, ca_hash_table} = ca
 	  mod = { mod & mod_imports = imports, mod_imported_objects = imported_objects, mod_foreign_exports = foreign_exports,
 	  				mod_defs = { defs & def_instances = def_instances,
 	  								def_generic_cases = def_generic_cases,
