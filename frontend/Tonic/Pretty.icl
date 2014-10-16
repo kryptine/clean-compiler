@@ -4,10 +4,11 @@ from StdClass import class + (..)
 from StdOverloaded import class < (..)
 from StdInt import instance + Int, instance < Int
 from StdList import ++, foldr, map
-from StdOverloaded import class +++ (..)
-from StdString import instance +++ {#Char}, instance toString Int
+from StdOverloaded import class +++ (..), class % (..)
+from StdString import instance +++ {#Char}, instance % {#Char}, instance toString Int
 from StdFunc import o
 from StdBool import ||, &&
+import StdArray
 import StdMisc
 import Data.Void
 import Data.Func
@@ -157,14 +158,14 @@ mkRecSel ds = char '.' <-> hcat (intersperse (char '.') ds)
 
 ppFreeVar :: FreeVar *ModuleEnv -> *(Doc, *ModuleEnv)
 ppFreeVar fv menv = ppIdent fv.fv_ident menv
-import StdDebug
+
 ppBasicValue :: BasicValue *ModuleEnv -> *(Doc, *ModuleEnv)
-ppBasicValue (BVI   str)  menv = trace_n ("BVI " +++ str) (text str, menv)
-ppBasicValue (BVInt i)    menv =                          (int i, menv)
-ppBasicValue (BVC   str)  menv = trace_n ("BVC " +++ str) (text str, menv)
-ppBasicValue (BVB   b)    menv =                          (bool b, menv)
-ppBasicValue (BVR   str)  menv = trace_n ("BVR " +++ str) (text str, menv)
-ppBasicValue (BVS   str)  menv = trace_n ("BVS " +++ str) (text str, menv)
+ppBasicValue (BVI   str)  menv = (text str, menv)
+ppBasicValue (BVInt i)    menv = (int i, menv)
+ppBasicValue (BVC   str)  menv = (text str, menv)
+ppBasicValue (BVB   b)    menv = (bool b, menv)
+ppBasicValue (BVR   str)  menv = (text str, menv)
+ppBasicValue (BVS   str)  menv = (text str, menv)
 
 ppSelection :: Selection *ModuleEnv -> *(Doc, *ModuleEnv)
 ppSelection (RecordSelection gds n)             menv = ppDefinedSymbol gds.glob_object menv
@@ -195,7 +196,6 @@ ppType (GTV tv)          = text tv.tv_ident.id_name
 ppType (TV tv)           = text tv.tv_ident.id_name
 ppType (TFAC atvs t tcs) = text "TFAC"
 ppType (TempV tvi)       = text "TempV"
-ppType (TQV tv)          = text "TQV"
 ppType (TempQV tvi)      = text "TempQV"
 ppType (TempQDV tvi)     = text "TempQDV"
 ppType (TLifted tv)      = text "TypeVar"

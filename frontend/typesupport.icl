@@ -111,10 +111,8 @@ where
 				 					cus_heaps = { cus_heaps & th_attrs = th_attrs }, cus_attr_store = inc cus_attr_store})	
 	clean_up_attribute_variable av_group_nr attr_and_cus
 		= attr_and_cus
-		
 cleanUpTypeAttribute _ cui av=:(TA_Var _) cus
-	= (av, cus)			
-
+	= (av, cus)
 cleanUpTypeAttribute _ cui type_attribute cus
 	= abort ("cleanUpTypeAttribute "+++toString type_attribute)
 
@@ -182,13 +180,13 @@ where
 		# (type, cus) = clean_up cui type cus
 		= (TFA vars type, cus)
 	clean_up cui type cus
-		= abort ("clean_up Type (typesupport.icl): unknown type " ---> ("clean_up Type", type))
+		= abort "clean_up Type (typesupport.icl): unknown type"
 
 add_new_variable TE qv_number cus_exis_vars
 	= [(qv_number, TA_None) : cus_exis_vars]
 add_new_variable type qv_number cus_exis_vars
 	= cus_exis_vars
-				
+
 instance clean_up [a] | clean_up a
 where
 	clean_up cui l cus = mapSt (clean_up cui) l cus
@@ -210,7 +208,6 @@ cleanUpVariable top_level (TLifted var) tv_number cus=:{cus_error}
 cleanUpVariable _ type tv_number cus
 	= (type, cus)
 
-
 ::	CleanUpResult :== BITVECT
 
 cClosed				:== 0
@@ -223,8 +220,6 @@ cleanUpClosedVariable TE env
 	= (cUndefinedVar, TE, env)
 cleanUpClosedVariable (TLifted tvar) env
 	= (cLiftedVar, TV tvar, env)
-cleanUpClosedVariable tvar=:(TQV _) env
-	= (cQVar, tvar, env)
 cleanUpClosedVariable tvar env
 	= (cDefinedVar, tvar, env)
 
@@ -464,7 +459,6 @@ where
 			| checkCleanUpResult cur cDefinedVar
 				= (collected_contexts, env, liftedContextError (toString tc.tc_class) error)
 				= ([{ tc & tc_types = tc_types } : collected_contexts], env, error)
-		| otherwise
 			= (collected_contexts, env, error)
 
 	build_attribute_environment :: !LargeBitvect !Index !Index !{! CoercionTree} !*LargeBitvect !*AttributeEnv ![AttributeVar] ![AttrInequality] !*ErrorAdmin
@@ -581,7 +575,6 @@ where
 					= cus_error						
 	 			= startRuleError "Start rule cannot be overloaded.\n" cus_error
 	 		= cus_error
-	 
 	 	
 instance clean_up CaseType
 where
@@ -1272,8 +1265,6 @@ where
 		   (file, opt_beautifulizer) = writeType (file <<< ":") opt_beautifulizer (clearProperty form cBrackets, type)
 		   (file, opt_beautifulizer) = show_context form contexts (file,opt_beautifulizer)
 		 = (file <<< ")", opt_beautifulizer)
-	writeType file opt_beautifulizer (form, TQV varid)
-		= (file <<< "E." <<< varid, opt_beautifulizer)
 	writeType file opt_beautifulizer (form, TempQV tv_number)
 		= (file  <<< "E." <<< tv_number <<< ' ', opt_beautifulizer)
 	writeType file opt_beautifulizer (form, TempQDV tv_number)
@@ -1295,28 +1286,24 @@ writeTypeTA	file opt_beautifulizer form {type_ident,type_index,type_arity} types
 				= (file <<< type_ident, opt_beautifulizer)
 		| predef_index==PD_ListType
 			= writeWithinBrackets "[" "]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-		| type_ident.id_name=="_!List"
+		| predef_index==PD_StrictListType
 			= writeWithinBrackets "[!" "]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-		| type_ident.id_name=="_#List"
+		| predef_index==PD_UnboxedListType
 			= writeWithinBrackets "[#" "]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-		| type_ident.id_name=="_List!"
+		| predef_index==PD_TailStrictListType
 			= writeWithinBrackets "[" "!]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-		| type_ident.id_name=="_!List!"
+		| predef_index==PD_StrictTailStrictListType
 			= writeWithinBrackets "[!" "!]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-		| type_ident.id_name=="_#List!"
+		| predef_index==PD_UnboxedTailStrictListType
 			= writeWithinBrackets "[#" "!]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-		| is_lazy_array type_ident
+		| predef_index==PD_LazyArrayType
 			= writeWithinBrackets "{" "}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-		| is_strict_array type_ident
+		| predef_index==PD_StrictArrayType
 			= writeWithinBrackets "{!" "}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-		| is_unboxed_array type_ident
+		| predef_index==PD_UnboxedArrayType
 			= writeWithinBrackets "{#" "}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-		| is_tuple type_ident type_arity
+		| predef_index>=PD_Arity2TupleType && predef_index<=PD_Arity32TupleType
 			= writeWithinBrackets "(" ")" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-		| is_string_type type_ident
-			= (file <<< "String", opt_beautifulizer)
-		| type_arity == 0
-			= (file <<< type_ident, opt_beautifulizer)
 		| checkProperty form cBrackets
 			# (file, opt_beautifulizer)
 					= writeType (file <<< '(' <<< type_ident <<< ' ') opt_beautifulizer (form, types)
@@ -1329,14 +1316,6 @@ writeTypeTA	file opt_beautifulizer form {type_ident,type_index,type_arity} types
 				= writeType (file <<< '(' <<< type_ident <<< ' ') opt_beautifulizer (form, types)
 		= (file <<< ')', opt_beautifulizer)
 		= writeType (file <<< type_ident <<< ' ') opt_beautifulizer (setProperty form cBrackets, types)
-where
-		is_predefined {glob_module} 	= glob_module == cPredefinedModuleIndex
-
-		is_tuple {id_name} tup_arity	= id_name == "_Tuple" +++ toString tup_arity
-		is_lazy_array {id_name} 		= id_name == "_Array"
-		is_strict_array {id_name} 		= id_name == "_!Array"
-		is_unboxed_array {id_name} 		= id_name == "_#Array"
-		is_string_type {id_name}		= id_name == "_String"
 
 instance writeType ATypeVar
 where
@@ -1741,8 +1720,6 @@ anonymizeAttrVars st=:{st_attr_vars, st_args, st_result, st_attr_env} implicit_i
 							-> count_attr_vars_of_type at_type (writePtr av_info_ptr (AVI_CountVar tv_info_ptr) th_attrs)
 						GTV {tv_info_ptr}
 							-> count_attr_vars_of_type at_type (writePtr av_info_ptr (AVI_CountVar tv_info_ptr) th_attrs)
-						TQV {tv_info_ptr}
-							-> count_attr_vars_of_type at_type (writePtr av_info_ptr (AVI_CountVar tv_info_ptr) th_attrs)
 						_
 							-> count_attr_vars_of_type at_type (writePtr av_info_ptr AVI_CountOne th_attrs)
 				AVI_CountVar previous_tv_info_ptr
@@ -1751,9 +1728,6 @@ anonymizeAttrVars st=:{st_attr_vars, st_args, st_result, st_attr_env} implicit_i
 							| tv_info_ptr==previous_tv_info_ptr
 								-> count_attr_vars_of_type at_type (writePtr av_info_ptr (AVI_CountVar tv_info_ptr) th_attrs)
 						GTV {tv_info_ptr}
-							| tv_info_ptr==previous_tv_info_ptr
-								-> count_attr_vars_of_type at_type (writePtr av_info_ptr (AVI_CountVar tv_info_ptr) th_attrs)
-						TQV {tv_info_ptr}
 							| tv_info_ptr==previous_tv_info_ptr
 								-> count_attr_vars_of_type at_type (writePtr av_info_ptr (AVI_CountVar tv_info_ptr) th_attrs)
 						_
@@ -1951,8 +1925,6 @@ instance performOnTypeVars AType
 	performOnTypeVars f {at_attribute, at_type=TV type_var} st
 		= f at_attribute type_var st
 	performOnTypeVars f {at_attribute, at_type=GTV type_var} st
-		= f at_attribute type_var st
-	performOnTypeVars f {at_attribute, at_type=TQV type_var} st
 		= f at_attribute type_var st
 	performOnTypeVars f {at_attribute, at_type} st
 		= performOnTypeVars f at_type st

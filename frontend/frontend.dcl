@@ -12,7 +12,6 @@ from partition import ::Component(..),::ComponentMembers
 	=	{	feo_up_to_phase			:: !FrontEndPhase
 		,	feo_generics 			:: !Bool
 		,	feo_fusion	 			:: !Bool
-		,	feo_dump_core			:: !Bool
 		,	feo_strip_unused		:: !Bool
 		,	feo_generate_sapl		:: !Bool
 		}

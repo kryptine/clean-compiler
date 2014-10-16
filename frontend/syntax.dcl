@@ -1080,8 +1080,6 @@ cNotVarNumber :== -1
 			|	TFAC ![ATypeVar] !Type ![TypeContext]	// Universally quantified function argument type with contexts
 
 			|	TempV !TempVarId				/* Auxiliary, used during type checking */
-			
-			|	TQV	TypeVar
 			|	TempQV !TempVarId				/* Auxiliary, used during type checking */
 			|	TempQDV !TempVarId				// Auxiliary, used during type checking, existential type variable in dynamic pattern
 

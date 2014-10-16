@@ -9,6 +9,11 @@ default: $(BACKEND_LIBRARY_TARGET)
 	cp cocl ~/clean/lib/exe/cocl-tonic
 	cp cocl ~/clean/exe/cocl-tonic
 
+force: $(BACKEND_LIBRARY_TARGET)
+	cpm project CleanCompilerMacOSX.prj build --force
+	cp cocl ~/clean/lib/exe/cocl-tonic
+	cp cocl ~/clean/exe/cocl-tonic
+
 $(BACKEND_CSF):
 	mkdir -p $(BACKEND_CSF)
 
