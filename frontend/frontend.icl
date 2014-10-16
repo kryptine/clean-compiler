@@ -59,7 +59,7 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 	# {icl_common,icl_function_indices,icl_name,icl_import,icl_qualified_imports,icl_imported_objects,icl_foreign_exports,icl_used_module_numbers} = icl_mod
 /*
 	  (_,f,files) = fopen "components" FWriteText files
-	  (components, icl_functions, f) = showGroups groups 0 True icl_functions f
+	  (groups, icl_functions, f) = showGroups groups 0 True icl_functions f
 	/*	
 	  (n_functions,icl_functions) = usize icl_functions
 	  (icl_functions,f) = showFunctions {ir_from=0,ir_to=n_functions} icl_functions f
@@ -117,6 +117,10 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
       type_heaps = { type_heaps & th_vars = th_vars }
 
 	# heaps = { heaps & hp_type_heaps = type_heaps, hp_expression_heap = hp_expression_heap, hp_generic_heap = gen_heap, hp_var_heap=hp_var_heap }
+
+	| not error_admin.ea_ok
+		= (No,{},dcl_mods,main_dcl_module_n,predef_symbols, hash_table, files, error_admin.ea_file, io, out, tcl_file, heaps)
+
 	# (saved_main_dcl_common, ti_common_defs) = replace {#dcl_common \\ {dcl_common}<-:dcl_mods} main_dcl_module_n icl_common
 
 	#! (ti_common_defs, groups, fun_defs, td_infos, heaps, hash_table, predef_symbols, dcl_mods, cached_dcl_macros, error_admin)
