@@ -507,7 +507,7 @@ mkGraphAlg
         where
         f bnd (xs, menv)
           # (pprhs, menv) = ppExpression bnd.lb_src menv
-          = ([(bnd.lb_dst.fv_ident.id_name, PP (ppCompact pprhs)):xs], menv)
+          = ([(bnd.lb_dst.fv_ident.id_name, ppCompact pprhs):xs], menv)
      getLetBinds lt = lt.let_strict_binds ++ lt.let_lazy_binds
 
 
