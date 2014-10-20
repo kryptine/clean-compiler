@@ -37,7 +37,7 @@ instance toString SaplRecordDef
 renameVars 		:: SaplFuncDef -> SaplFuncDef
 checkIfSelect 	:: SaplFuncDef -> [SaplFuncDef]
 
-CleanFunctoSaplFunc  :: Int Int FunDef  [String] String  {#DclModule} [IndexRange] !*BackEnd -> *(!*BackEnd, !SaplFuncDef)
+CleanFunctoSaplFunc  :: Int Int Int FunDef String {#DclModule} [IndexRange] !*BackEnd -> *(!*BackEnd, !SaplFuncDef)
 
 
 

@@ -6,21 +6,21 @@ import StdEnv, CoclSystemDependent, syntax, partition, gensapl, backend
 // JMJ: May 2007 
 // László Domoszlai: 2011 - 
 
-gensaplfiles :: {#DclModule} !{!Component} !{# FunDef} CommonDefs {#CommonDefs} Ident  [IndexRange] !*File !*BackEnd
+gensaplfiles :: Int {#DclModule} !{!Component} !{# FunDef} CommonDefs {#CommonDefs} Ident  [IndexRange] !*File !*BackEnd
                 -> *(!*File, !*BackEnd)
-gensaplfiles dcl_mods components fun_defs icl_common common_defs icl_name icl_function_indices sapl_file backEnd
+gensaplfiles main_dcl_module_n dcl_mods components fun_defs icl_common common_defs icl_name icl_function_indices sapl_file backEnd
 	
 	# modnames = getModNames dcl_mods // modules used by this Clean module
- 	# (sapl_file, backEnd) = convert2sapl components fun_defs icl_common common_defs icl_name sapl_file modnames (toString icl_name) dcl_mods icl_function_indices backEnd
+ 	# (sapl_file, backEnd) = convert2sapl main_dcl_module_n components fun_defs icl_common common_defs icl_name sapl_file modnames (toString icl_name) dcl_mods icl_function_indices backEnd
 	= (sapl_file, backEnd)
 
-convert2sapl :: !{!Component} !{# FunDef} CommonDefs {#CommonDefs} Ident !*File [String] String {#DclModule} [IndexRange] !*BackEnd -> *(!*File, !*BackEnd)
-convert2sapl comps fun_defs icl_common comdefs icl_name file modnames mymod dcl_mods icl_function_indices backEnd
+convert2sapl :: Int !{!Component} !{# FunDef} CommonDefs {#CommonDefs} Ident !*File [String] String {#DclModule} [IndexRange] !*BackEnd -> *(!*File, !*BackEnd)
+convert2sapl main_dcl_module_n comps fun_defs icl_common comdefs icl_name file modnames mymod dcl_mods icl_function_indices backEnd
   # saplcons  = getSaplConstructors mymod icl_common        // only this module
   # extcons   = getExternalConstructors modnames comdefs     // all including this module!
   # saplrecs  = getSaplRecords  icl_common mymod
   # saplcons  = remRecs saplcons saplrecs
-  # (backEnd, saplfuncs) = getSaplFunDefs comps 0 fun_defs modnames mymod dcl_mods icl_function_indices backEnd
+  # (backEnd, saplfuncs) = getSaplFunDefs main_dcl_module_n comps 0 fun_defs modnames mymod dcl_mods icl_function_indices backEnd
   # saplfuncs = map renameVars saplfuncs                   // give vars a unique name
   # saplfuncs = flatten (map checkIfSelect saplfuncs)      // extract non toplevel if/select
   # file = file <<< "|| ?module? " <<< mymod <<< "\n"
@@ -54,24 +54,24 @@ makeConsGroup [     ]    = ""
 makeConsGroup [arg]      = toString arg
 makeConsGroup [arg:args] = toString arg +++ " | " +++ makeConsGroup args   
 
-getSaplFunDefs :: !{!Component} !Int !{# FunDef} [String] String {#DclModule} [IndexRange] !*BackEnd -> *(!*BackEnd, ![SaplFuncDef])
-getSaplFunDefs comps comp_index fun_defs mod_names mymod dcl_mods icl_function_indices backEnd
+getSaplFunDefs :: Int !{!Component} !Int !{# FunDef} [String] String {#DclModule} [IndexRange] !*BackEnd -> *(!*BackEnd, ![SaplFuncDef])
+getSaplFunDefs main_dcl_module_n comps comp_index fun_defs mod_names mymod dcl_mods icl_function_indices backEnd
 	| comp_index >= size comps
 		= (backEnd, [])
 		# comp = comps.[comp_index]
 		# (backEnd, saplfuncs) = show_component comp.component_members fun_defs [] backEnd
-		# (backEnd, sfuncs) = getSaplFunDefs comps (inc comp_index) fun_defs mod_names mymod dcl_mods icl_function_indices backEnd
+		# (backEnd, sfuncs) = getSaplFunDefs main_dcl_module_n comps (inc comp_index) fun_defs mod_names mymod dcl_mods icl_function_indices backEnd
 		= (backEnd, saplfuncs ++ sfuncs)
 where
 	show_component NoComponentMembers fun_defs sapdefs backEnd
 		= (backEnd, sapdefs)
 	show_component (ComponentMember fun funs) fun_defs sapdefs backEnd
 		# fun_def = fun_defs.[fun]
-		# (backEnd, saplfunc) = CleanFunctoSaplFunc comp_index fun fun_def mod_names mymod dcl_mods icl_function_indices backEnd
+		# (backEnd, saplfunc) = CleanFunctoSaplFunc main_dcl_module_n comp_index fun fun_def mymod dcl_mods icl_function_indices backEnd
 		= show_component funs fun_defs [saplfunc:sapdefs] backEnd
 	show_component (GeneratedComponentMember fun _ funs) fun_defs sapdefs backEnd
 		# fun_def = fun_defs.[fun]
-		# (backEnd, saplfunc) = CleanFunctoSaplFunc comp_index fun fun_def mod_names mymod dcl_mods icl_function_indices backEnd
+		# (backEnd, saplfunc) = CleanFunctoSaplFunc main_dcl_module_n comp_index fun fun_def mymod dcl_mods icl_function_indices backEnd
 		= show_component funs fun_defs [saplfunc:sapdefs] backEnd
 
 getExternalConstructors :: [String] {#CommonDefs} -> [SaplConsDef]			

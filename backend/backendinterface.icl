@@ -88,6 +88,7 @@ backEndInterface outputFileName commandLineArgs listTypes typesPath predef_symbo
 				# (file, backEnd) = 
 						
 						gensaplfiles 
+                            main_dcl_module_n
 							syntaxTree.fe_dcls // dcl_mods 
 							syntaxTree.fe_components // components 
 							syntaxTree.fe_icl.icl_functions // fun_defs 
