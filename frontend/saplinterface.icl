@@ -67,11 +67,11 @@ where
 		= (backEnd, sapdefs)
 	show_component (ComponentMember fun funs) fun_defs sapdefs backEnd
 		# fun_def = fun_defs.[fun]
-		# (backEnd, saplfunc) = CleanFunctoSaplFunc main_dcl_module_n comp_index fun fun_def mod_names mymod dcl_mods icl_function_indices backEnd
+		# (backEnd, saplfunc) = CleanFunctoSaplFunc main_dcl_module_n comp_index fun fun_def mymod dcl_mods icl_function_indices backEnd
 		= show_component funs fun_defs [saplfunc:sapdefs] backEnd
 	show_component (GeneratedComponentMember fun _ funs) fun_defs sapdefs backEnd
 		# fun_def = fun_defs.[fun]
-		# (backEnd, saplfunc) = CleanFunctoSaplFunc main_dcl_module_n comp_index fun fun_def mod_names mymod dcl_mods icl_function_indices backEnd
+		# (backEnd, saplfunc) = CleanFunctoSaplFunc main_dcl_module_n comp_index fun fun_def mymod dcl_mods icl_function_indices backEnd
 		= show_component funs fun_defs [saplfunc:sapdefs] backEnd
 
 getExternalConstructors :: [String] {#CommonDefs} -> [SaplConsDef]			
