@@ -111,8 +111,8 @@ counterMap f [] c = []
 counterMap f [x:xs] c = [f x c : counterMap f xs (c+1)]
 
 // Converting a single Clean function to a Sapl function (case is only pre-transformed)
-CleanFunctoSaplFunc  :: Int Int FunDef  [String] String {#DclModule} [IndexRange] !*BackEnd -> *(!*BackEnd, !SaplFuncDef)
-CleanFunctoSaplFunc modindex funindex 
+CleanFunctoSaplFunc  :: Int Int Int FunDef  [String] String {#DclModule} [IndexRange] !*BackEnd -> *(!*BackEnd, !SaplFuncDef)
+CleanFunctoSaplFunc main_dcl_module_n modindex funindex 
                     {fun_ident,fun_body=TransformedBody {tb_args,tb_rhs},fun_info={fi_free_vars,fi_local_vars,fi_def_level,fi_calls},fun_type,fun_kind} 
                     mns mymod dcl_mods icl_function_indices backEnd
 
@@ -138,7 +138,7 @@ CleanFunctoSaplFunc modindex funindex
 								= No
         			= (backEnd, sl, pf)
 	
-        # funDef = SaplFuncDef (mymod +++ "." +++ makeFuncName -1 (getName fun_ident) 0 funindex dcl_mods icl_function_indices mymod mns)  
+        # funDef = SaplFuncDef (mymod +++ "." +++ makeFuncName main_dcl_module_n -1 (getName fun_ident) 0 funindex dcl_mods icl_function_indices mymod mns)  
                    		       (length tb_args) (counterMap (getFreeFuncArgName strictnessList) tb_args 0)  
                        		   (cleanExpToSaplExp tupleReturn tb_rhs) fun_kind
         
@@ -286,14 +286,14 @@ where
 	
 	// For example: test._f3_3
 	printGeneratedFunction symbol symb_index  = decsymbol (toString symbol)
-	where decsymbol s                         = mymod +++ "."  +++ makeFuncName 0 s 0 symb_index dcl_mods icl_function_indices mymod mns 
+	where decsymbol s                         = mymod +++ "."  +++ makeFuncName main_dcl_module_n 0 s 0 symb_index dcl_mods icl_function_indices mymod mns 
 	
 	// Normal case
 	printOverloaded symbol symb_index modnr   = decsymbol (toString symbol)
 //	where decsymbol s | startsWith "c;" s     = mymod +++ "._lc_"  +++ toString symb_index 
 //	                  | startsWith "g_c;" s   = mymod +++ "._lc_"  +++ toString symb_index 
-//	                                          = makemod modnr +++ makeFuncName 0 s modnr symb_index dcl_mods icl_function_indices mymod mns
-	where decsymbol s = makemod modnr +++ makeFuncName 0 s modnr symb_index dcl_mods icl_function_indices mymod mns
+//	                                          = makemod modnr +++ makeFuncName main_dcl_module_n 0 s modnr symb_index dcl_mods icl_function_indices mymod mns
+	where decsymbol s = makemod modnr +++ makeFuncName main_dcl_module_n 0 s modnr symb_index dcl_mods icl_function_indices mymod mns
 
 	printConsName symbol modnr
 		| startsWith "_Tuple" symbstr
@@ -384,13 +384,13 @@ where
 
 findvar (SaplVar n ip a) rens = hd ([renvar\\ (var,renvar) <- rens| cmpvar (SaplVar n ip a) var]++[SaplVar ("error, " +++ n +++ " not found") nilPtr SA_None])
 
-makeFuncName current_mod name mod_index func_index dcl_mods ranges mymod mns
+makeFuncName main_dcl_module_n current_mod name mod_index func_index dcl_mods ranges mymod mns
               | name.[0] == '\\' = "anon_" +++ toString func_index
               //| startsWith "c;" name = "_lc_" +++ toString func_index
               //| startsWith "g_" name = "_lc_" +++ toString func_index
               // used for dynamic desription, there is only one per type, no need for numbering
               | startsWith "TD;" name = name
-                                     = genFunctionExtension current_mod name mod_index func_index dcl_mods ranges mymod mns
+                                     = genFunctionExtension main_dcl_module_n current_mod name mod_index func_index dcl_mods ranges mymod mns
                                  
 multiApp [a]       = a
 multiApp [a:b:as]  = multiApp [(SaplApp a b): as]        
@@ -494,8 +494,8 @@ where
 		callname newnr = (fname+++"_select" +++ toString newnr)    
 	
 // Which functions must be extended with a number 
-genFunctionExtension :: !Int !String !Int !Int {#DclModule} [IndexRange] !String ![String] -> String
-genFunctionExtension current_mod name mod_index func_index dcl_mods ranges mymod mns
+genFunctionExtension :: !Int !Int !String !Int !Int {#DclModule} [IndexRange] !String ![String] -> String
+genFunctionExtension main_dcl_module_n current_mod name mod_index func_index dcl_mods ranges mymod mns
 | current_mod == -1 || mns!!mod_index == mymod = genFunctionExtForMain name func_index ranges
                            = genFunctionExtForDCL name mod_index func_index dcl_mods
 where                           
