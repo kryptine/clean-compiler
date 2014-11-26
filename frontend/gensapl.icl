@@ -118,14 +118,9 @@ CleanFunctoSaplFunc main_dcl_module_n modindex funindex
 
 		// Add derived strictness from backEnd
         # (backEnd, strictnessList, tupleReturn) = case fun_type of
-				No = (backEnd, 0, No)
+				No = (backEnd, NotStrict, No)
         		Yes ft   
         			# (_, ft, backEnd) = addStrictnessFromBackEnd funindex fun_ident.id_name backEnd ft
-        			# sl = case ft of
-								{st_args_strictness = NotStrict} = 0
-								{st_args_strictness = Strict x} = x
-								{st_args_strictness = StrictList x _} = x // TODO: the others?
-								
 					// If the return type is a strict tuple, a special name is generated for it,
 					// indicating which argument is strict. Later the references to the orignal
 					// Tuple constructor must be replaced by the special one (see changeTuple).
@@ -136,7 +131,7 @@ CleanFunctoSaplFunc main_dcl_module_n modindex funindex
 										= Yes (ti.type_ident.id_name, ti.type_ident.id_name+++"!"+++toString x)
 										= No
 								= No
-        			= (backEnd, sl, pf)
+        			= (backEnd, ft.st_args_strictness, pf)
 	
         # funDef = SaplFuncDef (mymod +++ "." +++ makeFuncName main_dcl_module_n (getName fun_ident) main_dcl_module_n funindex dcl_mods icl_function_indices mymod)
                    		       (length tb_args) (counterMap (getFreeFuncArgName strictnessList) tb_args 0)  
@@ -257,8 +252,8 @@ where
 	      isNoBind _          = False
 
 	// It uses the stricness bitmap to extract annotation
-	getFreeFuncArgName :: Int FreeVar Int -> SaplExp 
-	getFreeFuncArgName strictness {fv_ident,fv_info_ptr,fv_count} c | ((bitand) strictness (1 << c)) > 0
+	getFreeFuncArgName :: StrictnessList FreeVar Int -> SaplExp 
+	getFreeFuncArgName strictness {fv_ident,fv_info_ptr,fv_count} c | arg_is_strict c strictness
                        = SaplVar (toString fv_ident) fv_info_ptr SA_Strict
 	getFreeFuncArgName strictness {fv_ident,fv_info_ptr,fv_count} c
                        = SaplVar (toString fv_ident) fv_info_ptr SA_None
