@@ -184,8 +184,8 @@ ppCompact :: (Doc -> String)
 ppCompact = display o renderCompact
 
 ppType :: Type -> Doc
-ppType (TA tsi ats)      = ppTypeSymbIdent tsi <-> hcat (intersperse (char ' ') (map ppAType ats))
-ppType (TAS tsi ats sl)  = ppTypeSymbIdent tsi <-> hcat (intersperse (char ' ') (map ppAType ats))
+ppType (TA tsi ats)      = ppTypeSymbIdent tsi <-> if (length ats > 0) (text " " <-> hcat (intersperse (char ' ') (map ppAType ats))) (text "")
+ppType (TAS tsi ats sl)  = ppTypeSymbIdent tsi <-> if (length ats > 0) (text " " <-> hcat (intersperse (char ' ') (map ppAType ats))) (text "")
 ppType (at1 --> at2)     = ppAType at1 <-> text " --> " <-> ppAType at2
 ppType (TArrow)          = text "->"
 ppType (TArrow1	at)      = text "TArrow1"
@@ -208,4 +208,7 @@ ppAType :: AType -> Doc
 ppAType {at_type} = ppType at_type
 
 ppTypeSymbIdent :: TypeSymbIdent -> Doc
-ppTypeSymbIdent tsi = text tsi.type_ident.id_name
+ppTypeSymbIdent tsi
+  # nm = tsi.type_ident.id_name
+  # sz = size nm
+  = text (if (sz > 2 && nm.[0] == '_') (nm % (1, sz - 1)) nm)
