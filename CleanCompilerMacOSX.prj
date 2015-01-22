@@ -7,8 +7,8 @@ Global
 		CheckStacks:	False
 		CheckIndexes:	True
 	Application
-		HeapSize:	104900000
-		StackSize:	10490000
+		HeapSize:	250000000
+		StackSize:	10000000
 		ExtraMemory:	81920
 		IntialHeapSize:	8388608
 		HeapSizeMultiplier:	1024
@@ -16,12 +16,13 @@ Global
 		ShowGC:	False
 		ShowStackSize:	False
 		MarkingCollector:	True
+		DisableRTSFlags:	False
 		StandardRuntimeEnv:	True
 		Profile
-			Memory:	False
+			Memory:	True
 			MemoryMinimumHeapSize:	0
-			Time:	False
-			Stack:	False
+			Time:	True
+			Stack:	True
 		Output
 			Output:	NoConsole
 			Font:	MS Sans Serif
@@ -312,20 +313,6 @@ OtherModules
 	Module
 		Name:	Text.PPrint
 		Dir:	{Application}/lib/clean-platform/OS-Independent
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	StrictExportTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	False
-			ReuseUniqueNodes:	True
-			Fusion:	False
-	Module
-		Name:	_SystemDynamic
-		Dir:	{Application}/lib/iTasks-SDK/Patches/Dynamics
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False

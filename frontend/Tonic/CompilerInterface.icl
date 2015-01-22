@@ -29,11 +29,12 @@ ginTonic main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules common_d
   csf_directory_path = "tonic"
   isITasksModule nm = startsWith "iTasks" nm
   isSystemModule nm = foldr (\x b -> startsWith x nm || b) False sysmods
-    where sysmods = [ "Sapl"
-                    , "Std", "_"
+    where sysmods = [ "Sapl", "sapl"
+                    , "Std", "_", "graph_to_", "dynamic_string", "tcp", "ostcp"
+                    , "GenLexOrd", "GenEq"
                     , "Control", "Crypto", "Data", "Database", "Deprecated"
-                    , "GUI", "Internet", "Math", "Network", "System", "TCP"
-                    , "Test", "Text"
+                    , "Email", "Graphics.Scalable", "GUI", "Internet", "Math"
+                    , "Network", "System", "TCP", "Test", "Text"
                     ]
   writeTonicFile iclname tstr files
     | isITasksModule iclname  = files

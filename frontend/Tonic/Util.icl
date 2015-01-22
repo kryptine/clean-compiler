@@ -480,6 +480,12 @@ exprIsTask :: Expression *ModuleEnv -> *(Bool, *ModuleEnv)
 exprIsTask (App app) menv = symbIdentIsTask app.app_symb menv
 exprIsTask _         menv = (False, menv) // False: better safe than sorry
 
+stringContents :: String -> String
+stringContents str
+  # sz = size str
+  | sz > 1 && str.[0] == '"' && str.[sz - 1] == '"' = str % (1, sz - 2)
+  | otherwise                                       = str
+
 mkStr :: String -> Expression
 mkStr str = BasicExpr (BVS ("\"" +++ str +++ "\""))
 

@@ -295,7 +295,7 @@ mkGraphAlg
                                                # [App contApp:_] = asTl // TODO Bah
                                                # (sf, syn, chn)  = mkStepCont contApp n chn
                                                # action          = extractAction btnOrCont
-                                               = ([StepOnAction action sf:scs], [App {a & app_args = [App btnOrCont, App syn]} : aes], chn, n + 1)
+                                               = ([StepOnAction (stringContents action) sf:scs], [App {a & app_args = [App btnOrCont, App syn]} : aes], chn, n + 1)
                                                | appFunName a == "OnValue"
                                                # (sf, syn, chn)  = mkStepCont btnOrCont n chn
                                                = ([StepOnValue sf:scs], [App {a & app_args = [App syn]} : aes], chn, n + 1)
