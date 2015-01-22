@@ -272,12 +272,27 @@ mkGraphAlg
     mkAssign app ctxs args inh chn
       = withTwo app args f inh chn
       where
-      f u t chn
+      f u=:(App a) t chn
         # (syn, chn) = exprCata mkGraphAlg t (addInhId inh 0) chn
-        // TODO Complex user parsing
-        # (ud, menv) = ppExpression u chn.chn_module_env
+        # menv       = chn.chn_module_env
+        # (tu, menv) = case (a.app_symb.symb_ident.id_name, a.app_args) of
+                         ("AnyUser"          , _)
+                           = (TUAnyUser, menv)
+                         ("UserWithId"       , [uid:_])
+                           # (ed, menv) = ppExpression uid menv
+                           = (TUUserWithIdent (stringContents (ppCompact ed)), menv)
+                         ("UserWithRole"     , [r:_])
+                           # (rd, menv) = ppExpression r menv
+                           = (TUUserWithRole (stringContents (ppCompact rd)), menv)
+                         ("SystemUser"       , _)
+                           = (TUSystemUser            , menv)
+                         ("AnonymousUser"    , _)
+                           = (TUAnonymousUser         , menv)
+                         ("AuthenticatedUser", [uid:rs:_])
+                           # (d, menv) = ppExpression uid menv
+                           = (TUAuthenticatedUser (stringContents (ppCompact d)) [], menv) // TODO
         # chn        = {chn & chn_module_env = menv}
-        = annotExpr (App {app & app_args = ctxs ++ [u, syn.syn_annot_expr]}) (TAssign (TUUserWithIdent (ppCompact ud)) syn.syn_texpr) inh chn
+        = annotExpr (App {app & app_args = ctxs ++ [u, syn.syn_annot_expr]}) (TAssign tu syn.syn_texpr) inh chn
 
     // TODO : Test
     mkStep app ctxs args inh chn
