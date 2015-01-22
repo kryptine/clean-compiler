@@ -139,3 +139,5 @@ foldrSt :: !(.a -> .(.st -> .st)) ![.a] !.st -> .st
 intersperse` :: String (a -> String) [a] -> String
 
 stringContents :: String -> String
+
+listExprToList :: Expression -> [Expression]

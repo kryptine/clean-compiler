@@ -289,8 +289,9 @@ mkGraphAlg
                          ("AnonymousUser"    , _)
                            = (TUAnonymousUser         , menv)
                          ("AuthenticatedUser", [uid:rs:_])
-                           # (d, menv) = ppExpression uid menv
-                           = (TUAuthenticatedUser (stringContents (ppCompact d)) [], menv) // TODO
+                           # (d, menv)    = ppExpression uid menv
+                           # (rsds, menv) = mapSt ppExpression (listExprToList rs) menv
+                           = (TUAuthenticatedUser (stringContents (ppCompact d)) (map (stringContents o ppCompact) rsds), menv) // TODO
         # chn        = {chn & chn_module_env = menv}
         = annotExpr (App {app & app_args = ctxs ++ [u, syn.syn_annot_expr]}) (TAssign tu syn.syn_texpr) inh chn
 
