@@ -122,30 +122,22 @@ annotExpr origExpr inh chn
   # (tune_symb, predefs)        = (chn.chn_predef_symbols)![PD_tonicWrapApp]
   # chn                         = {chn & chn_predef_symbols = predefs}
   | predefIsUndefined tune_symb = (origExpr, chn)
-  | otherwise                   = annotExpr` origExpr inh chn
+  | otherwise
+      # (rem, menv)  = case origExpr of
+                         App app -> argsRemaining app chn.chn_module_env
+                         _       -> (0, chn.chn_module_env)
+      # icl          = menv.me_icl_module
+      # nm           = icl.icl_name.id_name
+      # (ids, pdss)  = toStatic (map mkInt inh.inh_ids) chn.chn_predef_symbols
+      # (expr, pdss) = appPredefinedSymbol (findWrap rem)
+                         [ mkStr nm
+                         , mkStr inh.inh_curr_task_name
+                         , ids
+                         , origExpr
+                         ] SK_Function pdss
+      = (App expr, {chn & chn_predef_symbols = pdss
+                        , chn_module_env = {menv & me_icl_module = icl}})
   where
-  annotExpr` :: Expression InhExpression *ChnExpression -> *(Expression, *ChnExpression)
-  annotExpr` origApp=:(App app) inh chn
-    # (rem, menv)   = argsRemaining app chn.chn_module_env
-    # (appApp, chn) = mkTuneApp rem origApp {chn & chn_module_env = menv}
-    = (App appApp, chn)
-  annotExpr` origVar=:(Var _) inh chn
-    # (bvApp, chn) = mkTuneApp 0 origVar chn
-    = (App bvApp, chn)
-  mkTuneApp :: Int Expression *ChnExpression -> *(App, *ChnExpression)
-  mkTuneApp rem origExpr chn
-    # menv         = chn.chn_module_env
-    # icl          = menv.me_icl_module
-    # nm           = icl.icl_name.id_name
-    # (ids, pdss)  = toStatic (map mkInt inh.inh_ids) chn.chn_predef_symbols
-    # (expr, pdss) = appPredefinedSymbol (findWrap rem)
-                       [ mkStr nm
-                       , mkStr inh.inh_curr_task_name
-                       , ids
-                       , origExpr
-                       ] SK_Function pdss
-    = (expr, {chn & chn_predef_symbols = pdss
-                  , chn_module_env = {menv & me_icl_module = icl}})
   findWrap :: Int -> Int
   findWrap 0 = PD_tonicWrapApp
   findWrap 1 = PD_tonicWrapAppLam1
@@ -173,11 +165,11 @@ varIsListOfTask bv inh
   = case 'DM'.get bv.var_ident.id_name inh.inh_tyenv of
       Nothing -> False
       Just t  -> typeIsListOfTask t
-
-
+import StdDebug
 mkBlueprint :: Expression InhExpression *ChnExpression -> *(SynExpression, *ChnExpression)
 mkBlueprint (App app) inh chn
   # (idIsTask, menv) = symbIdentIsTask app.app_symb chn.chn_module_env
+  # menv = trace_n (app.app_symb.symb_ident.id_name +++ " " +++ toString idIsTask) menv
   # (appD, menv)     = ppApp app menv
   # chn              = {chn & chn_module_env = menv}
   | idIsTask
@@ -216,7 +208,7 @@ mkBlueprint (App app) inh chn
          , syn_texpr = TVar (ppCompact d)}, {chn & chn_module_env = menv})
 
   mkReturn app ctxs args=:[e:_] inh chn
-    # (syn, chn) = mkBlueprint e inh chn
+    # (syn, chn) = mkBlueprint e (addInhId inh 0) chn
     = ({ syn_annot_expr = App {app & app_args = ctxs ++ [syn.syn_annot_expr]}
        , syn_texpr = TReturn syn.syn_texpr}, chn)
 
@@ -256,17 +248,17 @@ mkBlueprint (App app) inh chn
       = case r of
           (arg=:(App _))
             | exprIsListConstr arg
-                # exprs               = fromStatic arg
+                # exprs              = fromStatic arg
                 // TODO FIXME : RHS of step is not updated properly
                 # (scs, aes, chn, _) = let f e=:(App a=:{app_args=[App btnOrCont:asTl]}) (scs, aes, chn, n)
                                              | appFunName a == "OnAction"
-                                             # [App contApp:_] = asTl // TODO Bah
-                                             # (sf, syn, chn)  = mkStepCont contApp n chn
-                                             # action          = extractAction btnOrCont
-                                             = ([StepOnAction (stringContents action) sf:scs], [App {a & app_args = [App btnOrCont, App syn]} : aes], chn, n + 1)
+                                             # [App contApp:_]     = asTl // TODO Bah
+                                             # (sf, contApp`, chn) = mkStepCont contApp n chn
+                                             # action              = extractAction btnOrCont
+                                             = ([StepOnAction (stringContents action) sf:scs], [App {a & app_args = [App btnOrCont, App contApp`]} : aes], chn, n + 1)
                                              | appFunName a == "OnValue"
-                                             # (sf, syn, chn)  = mkStepCont btnOrCont n chn
-                                             = ([StepOnValue sf:scs], [App {a & app_args = [App syn]} : aes], chn, n + 1)
+                                             # (sf, btnOrCont`, chn)  = mkStepCont btnOrCont n chn
+                                             = ([StepOnValue sf:scs], [App {a & app_args = [App btnOrCont`]} : aes], chn, n + 1)
                                              | appFunName a == "OnException"
                                              # (lbl, syn, chn) = mkEdge btnOrCont n inh chn
                                              = ([StepOnException lbl syn.syn_texpr:scs], [App {a & app_args = [syn.syn_annot_expr]} : aes], chn, n + 1)
@@ -304,7 +296,7 @@ mkBlueprint (App app) inh chn
           # (lbl, syn, chn)           = mkEdge tApp n inh {chn & chn_module_env = menv}
           = (IfValue (ppCompact ppHdRemFArgs) fApp.app_symb.symb_ident.id_name
               (map ppCompact (ppFAppArgs ++ [ppHdRemFArgs:ppTlRemFArgs])) lbl syn.syn_texpr
-            , contApp /* TODO */, chn)
+            , {contApp & app_args = [App fApp, syn.syn_annot_expr]}, chn)
         "hasValue"
           # [(App tApp):_]  = contApp.app_args // TODO Bah
           # (lbl, syn, chn) = mkEdge tApp n inh chn
@@ -344,7 +336,7 @@ mkBlueprint (App app) inh chn
     = withTwo app args f inh chn
     where
     f l r=:(App {app_symb, app_args}) chn
-      # (syn, chn)           = mkBlueprint l inh chn
+      # (syn, chn)           = mkBlueprint l (addInhId inh 0) chn
       # (ppl, menv)          = mapSt ppExpression app_args chn.chn_module_env
       # ((funArgs, _), menv) = reifyArgsAndDef app_symb menv
       # ([_:a:as], menv)     = mapSt ppFreeVar funArgs menv // FIXME : Dirty patter matching
@@ -380,7 +372,7 @@ mkBlueprint (App app) inh chn
           | exprIsListConstr arg
             # exprs        = fromStatic arg
             # (ss, _, chn) = let f e (ss, n, chn)
-                                  # (syn, chn) = mkBlueprint e {inh & inh_ids = inh.inh_ids ++ [n]} chn
+                                  # (syn, chn) = mkBlueprint e (addInhId inh n) chn
                                   = ([syn:ss], n + 1, chn)
                              in  foldr f ([], 0, chn) exprs
             # (listArg, pdss) = toStatic (map (\s -> s.syn_annot_expr) ss) chn.chn_predef_symbols
@@ -440,7 +432,7 @@ mkBlueprint (e=:(App app) @ es) inh chn
       # letargs       = drop (length app.app_args) (getFunArgs fd)
       # (binds, menv) = zipWithSt zwf letargs es menv
       # chn           = { chn & chn_module_env = menv }
-      # (syne, chn)   = mkBlueprint (getFunRhs fd) inh chn
+      # (syne, chn)   = mkBlueprint (getFunRhs fd) (addInhId inh 0) chn
       # menv          = updateWithAnnot app.app_symb syne.syn_annot_expr chn.chn_module_env
       # chn           = { chn & chn_module_env = menv}
       = ({syn_annot_expr = e @ es, syn_texpr = TVar "TODO @"}, chn)
@@ -457,7 +449,7 @@ mkBlueprint (Let lt) inh chn
   = mkLet mexpr lt inh chn
   where
   mkLet (Just expr) lt inh chn
-    # (syn, chn) = mkBlueprint lt.let_expr {inh & inh_case_expr = Just expr } chn
+    # (syn, chn) = mkBlueprint lt.let_expr (addInhId {inh & inh_case_expr = Just expr} 0) chn
     # l          = {lt & let_expr = syn.syn_annot_expr}
     = ({syn & syn_annot_expr = Let l}, chn)
   mkLet Nothing lt inh chn
@@ -465,7 +457,7 @@ mkBlueprint (Let lt) inh chn
     # (binds, menv) = flattenBinds lt chn.chn_module_env
     # tyenv         = zipSt (\(v, _) t tyenv -> 'DM'.put v t tyenv) binds tys inh.inh_tyenv // TODO This probably won't work for arbitrary patterns, so we actually need to be a bit smarter here and extract all variables from the patterns, instead of just PP'ing the pattern and using that as index
     // TODO : Represent the bindings in any way possible, not just PP
-    # (syn, chn)    = mkBlueprint lt.let_expr {inh & inh_tyenv = tyenv} {chn & chn_module_env = menv}
+    # (syn, chn)    = mkBlueprint lt.let_expr (addInhId {inh & inh_tyenv = tyenv} 0) {chn & chn_module_env = menv}
     = ({ syn_annot_expr = Let {lt & let_expr = syn.syn_annot_expr}
        , syn_texpr = TLet binds syn.syn_texpr}, chn)
     where
@@ -495,7 +487,6 @@ mkBlueprint (Let lt) inh chn
   // Will still be converted to a case with a variable:
   //   let _case_var = True
   //   in case _case_var of ...
-
 
   // TODO Refactor this. Also fix default case for If. Also persist numbering?
 mkBlueprint (Case cs) inh chn
@@ -542,7 +533,7 @@ mkBlueprint (Case cs) inh chn
 
   mkAlts` :: Expression ChnExpression -> (SynExpression, ChnExpression)
   mkAlts` expr chn
-    # (syn, chn) = mkBlueprint expr inh chn
+    # (syn, chn) = mkBlueprint expr (addInhId inh 0) chn
     # menv       = chn.chn_module_env
     # (d, menv)  = ppExpression expr menv
     # chn        = {chn & chn_module_env = menv}
