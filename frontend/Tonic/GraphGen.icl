@@ -276,22 +276,22 @@ mkGraphAlg
         # (syn, chn) = exprCata mkGraphAlg t (addInhId inh 0) chn
         # menv       = chn.chn_module_env
         # (tu, menv) = case (a.app_symb.symb_ident.id_name, a.app_args) of
-                         ("AnyUser"          , _)
+                         ("AnyUser", _)
                            = (TUAnyUser, menv)
-                         ("UserWithId"       , [uid:_])
+                         ("UserWithId", [uid:_])
                            # (ed, menv) = ppExpression uid menv
                            = (TUUserWithIdent (stringContents (ppCompact ed)), menv)
-                         ("UserWithRole"     , [r:_])
+                         ("UserWithRole", [r:_])
                            # (rd, menv) = ppExpression r menv
                            = (TUUserWithRole (stringContents (ppCompact rd)), menv)
-                         ("SystemUser"       , _)
-                           = (TUSystemUser            , menv)
-                         ("AnonymousUser"    , _)
-                           = (TUAnonymousUser         , menv)
+                         ("SystemUser", _)
+                           = (TUSystemUser, menv)
+                         ("AnonymousUser", _)
+                           = (TUAnonymousUser, menv)
                          ("AuthenticatedUser", [uid:rs:_])
                            # (d, menv)    = ppExpression uid menv
                            # (rsds, menv) = mapSt ppExpression (listExprToList rs) menv
-                           = (TUAuthenticatedUser (stringContents (ppCompact d)) (map (stringContents o ppCompact) rsds), menv) // TODO
+                           = (TUAuthenticatedUser (stringContents (ppCompact d)) (map (stringContents o ppCompact) rsds), menv)
         # chn        = {chn & chn_module_env = menv}
         = annotExpr (App {app & app_args = ctxs ++ [u, syn.syn_annot_expr]}) (TAssign tu syn.syn_texpr) inh chn
 
