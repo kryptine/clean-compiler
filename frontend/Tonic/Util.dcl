@@ -98,7 +98,7 @@ getFunRhs :: FunDef -> Expression
 
 updateWithAnnot :: SymbIdent Expression *ModuleEnv -> *ModuleEnv
 
-updateFunRhs :: Index !*{#FunDef} Expression -> !*{#FunDef}
+updateFunRhs :: Index !*{#FunDef} Expression -> *{#FunDef}
 
 addInhId :: InhExpression Int -> InhExpression
 
