@@ -117,8 +117,8 @@ withTwo :: App [Expression] (Expression Expression *ChnExpression -> *(SynExpres
 withTwo app [x1:x2:_] f inh chn = f x1 x2 chn
 withTwo app _         _ inh chn = ({syn_annot_expr = App app, syn_texpr = TVar "withTwo TODO"}, chn)
 
-annotExpr :: Expression InhExpression *ChnExpression -> *(Expression, *ChnExpression)
-annotExpr origExpr inh chn
+wrapTaskApp :: Expression InhExpression *ChnExpression -> *(Expression, *ChnExpression)
+wrapTaskApp origExpr inh chn
   # (tune_symb, predefs)        = (chn.chn_predef_symbols)![PD_tonicWrapApp]
   # chn                         = {chn & chn_predef_symbols = predefs}
   | predefIsUndefined tune_symb = (origExpr, chn)
@@ -145,6 +145,25 @@ annotExpr origExpr inh chn
   findWrap 3 = PD_tonicWrapAppLam3
   findWrap n = abort ("No tonicWrapLam" +++ toString n)
 
+wrapListOfTask :: Expression InhExpression *ChnExpression -> *(Expression, *ChnExpression)
+wrapListOfTask origExpr inh chn
+  # (tune_symb, predefs)        = (chn.chn_predef_symbols)![PD_tonicWrapListOfTask]
+  # chn                         = {chn & chn_predef_symbols = predefs}
+  | predefIsUndefined tune_symb = (origExpr, chn)
+  | otherwise
+      # menv         = chn.chn_module_env
+      # icl          = menv.me_icl_module
+      # nm           = icl.icl_name.id_name
+      # (ids, pdss)  = toStatic (map mkInt inh.inh_ids) chn.chn_predef_symbols
+      # (expr, pdss) = appPredefinedSymbol PD_tonicWrapListOfTask
+                         [ mkStr nm
+                         , mkStr inh.inh_curr_task_name
+                         , ids
+                         , origExpr
+                         ] SK_Function pdss
+      = (App expr, {chn & chn_predef_symbols = pdss
+                        , chn_module_env = {menv & me_icl_module = icl}})
+
 letTypes :: ExprInfoPtr *ChnExpression -> *([Type], *ChnExpression)
 letTypes exprPtr chn
   # heaps = chn.chn_heaps
@@ -165,33 +184,32 @@ varIsListOfTask bv inh
   = case 'DM'.get bv.var_ident.id_name inh.inh_tyenv of
       Nothing -> False
       Just t  -> typeIsListOfTask t
-import StdDebug
+
 mkBlueprint :: Expression InhExpression *ChnExpression -> *(SynExpression, *ChnExpression)
 mkBlueprint (App app) inh chn
   # (idIsTask, menv) = symbIdentIsTask app.app_symb chn.chn_module_env
-  # menv = trace_n (app.app_symb.symb_ident.id_name +++ " " +++ toString idIsTask) menv
   # (appD, menv)     = ppApp app menv
   # chn              = {chn & chn_module_env = menv}
   | idIsTask
     # ((ctxs, args), menv) = dropAppContexts app chn.chn_module_env
     # chn                  = { chn & chn_module_env = menv }
     = case appFunName app of
-        ">>="         -> mkBind      app ctxs args inh chn
-        ">>|"         -> mkBind      app ctxs args inh chn
-        "return"      -> mkReturn    app ctxs args inh chn
-        "@:"          -> mkAssign    app ctxs args inh chn
-        "@"           -> mkTransform app ctxs args inh chn
-        ">>*"         -> mkStep      app ctxs args inh chn
-        "anyTask"     -> mkParSumN   app ctxs args inh chn
-        "-||-"        -> mkParSum2   app ctxs args inh chn
-        "||-"         -> mkParSumR   app ctxs args inh chn
-        "-||"         -> mkParSumL   app ctxs args inh chn
-        "allTasks"    -> mkParProdN  app ctxs args inh chn
-        "-&&-"        -> mkParProd2  app ctxs args inh chn
-        "get"         -> mkGetShare  app ctxs args inh chn
-        "set"         -> mkSetShare  app ctxs args inh chn
-        "upd"         -> mkUpdShare  app ctxs args inh chn
-        _             -> mkTaskApp   app ctxs args inh chn
+        ">>="      -> mkBind      app ctxs args inh chn
+        ">>|"      -> mkBind      app ctxs args inh chn
+        "return"   -> mkReturn    app ctxs args inh chn
+        "@:"       -> mkAssign    app ctxs args inh chn
+        "@"        -> mkTransform app ctxs args inh chn
+        ">>*"      -> mkStep      app ctxs args inh chn
+        "anyTask"  -> mkParSumN   app ctxs args inh chn
+        "-||-"     -> mkParSum2   app ctxs args inh chn
+        "||-"      -> mkParSumR   app ctxs args inh chn
+        "-||"      -> mkParSumL   app ctxs args inh chn
+        "allTasks" -> mkParProdN  app ctxs args inh chn
+        "-&&-"     -> mkParProd2  app ctxs args inh chn
+        "get"      -> mkGetShare  app ctxs args inh chn
+        "set"      -> mkSetShare  app ctxs args inh chn
+        "upd"      -> mkUpdShare  app ctxs args inh chn
+        _          -> mkTaskApp   app ctxs args inh chn
   | otherwise = ({syn_annot_expr = App app, syn_texpr = TCleanExpr (ppCompact appD)}, chn)
   where
   mkBind app ctxs args inh chn
@@ -236,7 +254,7 @@ mkBlueprint (App app) inh chn
                           # (rsds, menv) = mapSt ppExpression (listExprToList rs) menv
                           = (TUAuthenticatedUser (stringContents (ppCompact d)) (map (stringContents o ppCompact) rsds), menv)
       # chn         = {chn & chn_module_env = menv}
-      # (app`, chn) = annotExpr (App {app & app_args = ctxs ++ [u, syn.syn_annot_expr]}) inh chn
+      # (app`, chn) = wrapTaskApp (App {app & app_args = ctxs ++ [u, syn.syn_annot_expr]}) inh chn
       = ({syn_annot_expr = app`, syn_texpr = TAssign tu syn.syn_texpr}, chn)
 
   // TODO : Test
@@ -323,13 +341,13 @@ mkBlueprint (App app) inh chn
     # (ps, menv)  = mapSt ppExpression args chn.chn_module_env
     # chn         = {chn & chn_module_env = menv}
     # appArgs     = map ppCompact ps  // TODO : When do we pprint a Clean expr? And when do we generate a subgraph?
-    # (app`, chn) = annotExpr (App app) inh chn
+    # (app`, chn) = wrapTaskApp (App app) inh chn
     = ({syn_annot_expr = app`, syn_texpr = TTaskApp inh.inh_ids (appFunName app) (map TVar appArgs)}, chn)
     //# (ss, chn) = let f e (ss, chn)
                        //# (syn, chn) = mkBlueprint e inh chn
                        //= ([syn:ss], chn)
                   //in  foldr f ([], chn) args
-    //= annotExpr (App {app & app_args = ctxs ++ map (\s -> s.syn_annot_expr) ss})
+    //= wrapTaskApp (App {app & app_args = ctxs ++ map (\s -> s.syn_annot_expr) ss})
                 //(TTaskApp inh.inh_ids (appFunName app) (map (\s -> s.syn_texpr) ss)) inh chn
 
   mkTransform app ctxs args inh chn
@@ -539,14 +557,14 @@ mkBlueprint (Case cs) inh chn
     # chn        = {chn & chn_module_env = menv}
     = (syn, chn)
 
-  // TODO Determine whether it's a Task a or [Task a]
-  // We can do so by maintaining an environment. At lets and lambdas, store the bound variable and its type in the env
 mkBlueprint (Var bv) inh chn
   | varIsTask bv inh
-      # (var`, chn) = annotExpr (Var bv) inh chn
+      # (var`, chn) = wrapTaskApp (Var bv) inh chn
       = ({syn_annot_expr = var`, syn_texpr = TVar bv.var_ident.id_name}, chn)
-  | varIsListOfTask bv inh = ({syn_annot_expr = Var bv, syn_texpr = TVar bv.var_ident.id_name}, chn) // TODO Annotate with special wrapper (or just wrap with a map... have to see)
-  | otherwise              = ({syn_annot_expr = Var bv, syn_texpr = TVar bv.var_ident.id_name}, chn)
+  | varIsListOfTask bv inh
+      # (var`, chn) = wrapListOfTask (Var bv) inh chn
+      = ({syn_annot_expr = var`, syn_texpr = TVar bv.var_ident.id_name}, chn)
+  | otherwise = ({syn_annot_expr = Var bv, syn_texpr = TVar bv.var_ident.id_name}, chn)
 mkBlueprint expr _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr "(mkBlueprint fallthrough)"}, chn)
 
 mkEdge :: App Int InhExpression *ChnExpression -> *(Maybe String, SynExpression, *ChnExpression)
