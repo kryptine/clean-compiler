@@ -115,7 +115,7 @@ given x == y && y == z
 
 withTwo :: App [Expression] (Expression Expression *ChnExpression -> *(SynExpression, *ChnExpression)) InhExpression *ChnExpression -> *(SynExpression, *ChnExpression)
 withTwo app [x1:x2:_] f inh chn = f x1 x2 chn
-withTwo app _         _ inh chn = ({syn_annot_expr = App app, syn_texpr = TVar "withTwo TODO"}, chn)
+withTwo app _         _ inh chn = ({syn_annot_expr = App app, syn_texpr = TVar [] "withTwo TODO"}, chn)
 
 wrapTaskApp :: Expression InhExpression *ChnExpression -> *(Expression, *ChnExpression)
 wrapTaskApp origExpr inh chn
@@ -210,7 +210,7 @@ mkBlueprint (App app) inh chn
         "set"      -> mkSetShare  app ctxs args inh chn
         "upd"      -> mkUpdShare  app ctxs args inh chn
         _          -> mkTaskApp   app ctxs args inh chn
-  | otherwise = ({syn_annot_expr = App app, syn_texpr = TCleanExpr (ppCompact appD)}, chn)
+  | otherwise = ({syn_annot_expr = App app, syn_texpr = TCleanExpr [] (ppCompact appD)}, chn)
   where
   mkBind app ctxs args inh chn
     = withTwo app args f inh chn
@@ -223,7 +223,7 @@ mkBlueprint (App app) inh chn
     f lhsExpr rhsExpr chn
       # (d, menv) = ppExpression rhsExpr chn.chn_module_env
       = ({ syn_annot_expr = App { app & app_args = ctxs ++ [lhsExpr, rhsExpr] }
-         , syn_texpr = TVar (ppCompact d)}, {chn & chn_module_env = menv})
+         , syn_texpr = TVar inh.inh_ids (ppCompact d)}, {chn & chn_module_env = menv})
 
   mkReturn app ctxs args=:[e:_] inh chn
     # (syn, chn) = mkBlueprint e (addInhId inh 0) chn
@@ -342,7 +342,7 @@ mkBlueprint (App app) inh chn
     # chn         = {chn & chn_module_env = menv}
     # appArgs     = map ppCompact ps  // TODO : When do we pprint a Clean expr? And when do we generate a subgraph?
     # (app`, chn) = wrapTaskApp (App app) inh chn
-    = ({syn_annot_expr = app`, syn_texpr = TTaskApp inh.inh_ids (appFunName app) (map TVar appArgs)}, chn)
+    = ({syn_annot_expr = app`, syn_texpr = TTaskApp inh.inh_ids (appFunName app) (map (TVar []) appArgs)}, chn)
     //# (ss, chn) = let f e (ss, chn)
                        //# (syn, chn) = mkBlueprint e inh chn
                        //= ([syn:ss], chn)
@@ -381,12 +381,13 @@ mkBlueprint (App app) inh chn
       # (synl, chnl) = mkBlueprint l (addInhId inh 0) chn
       # (synr, chnr) = mkBlueprint r (addInhId inh 1) chnl
       = ( { syn_annot_expr = App {app & app_args = ctxs ++ [synl.syn_annot_expr, synr.syn_annot_expr]}
-          , syn_texpr = TParallel (mkPar synl.syn_texpr synr.syn_texpr)}
+          , syn_texpr = TParallel inh.inh_ids (mkPar synl.syn_texpr synr.syn_texpr)}
         , chnr)
 
+// TODO Annotate if parallel of variable.
   mkParN mkPar app ctxs args inh chn
     = case args of
-        [arg=:(App _):_]
+        [arg=:(App _)]
           | exprIsListConstr arg
             # exprs        = fromStatic arg
             # (ss, _, chn) = let f e (ss, n, chn)
@@ -395,16 +396,16 @@ mkBlueprint (App app) inh chn
                              in  foldr f ([], 0, chn) exprs
             # (listArg, pdss) = toStatic (map (\s -> s.syn_annot_expr) ss) chn.chn_predef_symbols
             = ( { syn_annot_expr = App {app & app_args = [listArg]}
-                , syn_texpr = TParallel (mkPar (T (map (\s -> s.syn_texpr) ss)))}
+                , syn_texpr = TParallel inh.inh_ids (mkPar (T (map (\s -> s.syn_texpr) ss)))}
               , {chn & chn_predef_symbols = pdss})
-          | otherwise = doPP arg
-        [arg=:(Var _):_] = doPP arg
-    where
-    doPP arg
-      # (doc, menv) = ppExpression arg chn.chn_module_env
-      # ppStr       = ppCompact doc
-      # chn         = {chn & chn_module_env = menv}
-      = ({syn_annot_expr = App app, syn_texpr = TParallel (mkPar (PP ppStr))}, chn)
+          | otherwise // Is regular function application
+              # (doc, menv) = ppExpression arg chn.chn_module_env
+              # ppStr       = ppCompact doc
+              # chn         = {chn & chn_module_env = menv}
+              # (arg, chn)  = wrapListOfTask arg inh chn
+              = ({ syn_annot_expr = App {app & app_args = [arg]}
+                 , syn_texpr      = TParallel inh.inh_ids (mkPar (PP ppStr))}, chn)
+        _ = abort "mkParN args fallthrough; shouldn't happen"
 
   mkGetShare app ctxs args=:[App {app_symb, app_args}:_] inh chn
     = mkShare app Get app_symb app_args chn
@@ -453,14 +454,14 @@ mkBlueprint (e=:(App app) @ es) inh chn
       # (syne, chn)   = mkBlueprint (getFunRhs fd) (addInhId inh 0) chn
       # menv          = updateWithAnnot app.app_symb syne.syn_annot_expr chn.chn_module_env
       # chn           = { chn & chn_module_env = menv}
-      = ({syn_annot_expr = e @ es, syn_texpr = TVar "TODO @"}, chn)
+      = ({syn_annot_expr = e @ es, syn_texpr = TVar [] "TODO @"}, chn)
   | otherwise    =  abort "atC: otherwise case" // TODO : pretty print function application
   where
     zwf eVar eVal menv
       # (fvl, menv) = ppFreeVar eVar menv
       # (fvr, menv) = ppExpression eVal menv
       = ((ppCompact fvl, ppCompact fvr), menv)
-mkBlueprint (e @ es) _ chn = ({syn_annot_expr = e @ es, syn_texpr = TVar "TODO @"}, chn)
+mkBlueprint (e @ es) _ chn = ({syn_annot_expr = e @ es, syn_texpr = TVar [] "TODO @"}, chn)
 mkBlueprint (Let lt) inh chn
   # mexpr = listToMaybe [ bnd.lb_src \\ bnd <- getLetBinds lt
                         | bnd.lb_dst.fv_ident.id_name == "_case_var"]
@@ -560,12 +561,12 @@ mkBlueprint (Case cs) inh chn
 mkBlueprint (Var bv) inh chn
   | varIsTask bv inh
       # (var`, chn) = wrapTaskApp (Var bv) inh chn
-      = ({syn_annot_expr = var`, syn_texpr = TVar bv.var_ident.id_name}, chn)
+      = ({syn_annot_expr = var`, syn_texpr = TVar inh.inh_ids bv.var_ident.id_name}, chn)
   | varIsListOfTask bv inh
       # (var`, chn) = wrapListOfTask (Var bv) inh chn
-      = ({syn_annot_expr = var`, syn_texpr = TVar bv.var_ident.id_name}, chn)
-  | otherwise = ({syn_annot_expr = Var bv, syn_texpr = TVar bv.var_ident.id_name}, chn)
-mkBlueprint expr _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr "(mkBlueprint fallthrough)"}, chn)
+      = ({syn_annot_expr = var`, syn_texpr = TVar inh.inh_ids bv.var_ident.id_name}, chn)
+  | otherwise = ({syn_annot_expr = Var bv, syn_texpr = TVar [] bv.var_ident.id_name}, chn)
+mkBlueprint expr _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "(mkBlueprint fallthrough)"}, chn)
 
 mkEdge :: App Int InhExpression *ChnExpression -> *(Maybe String, SynExpression, *ChnExpression)
 mkEdge app=:{app_symb, app_args} n inh chn
@@ -587,7 +588,7 @@ mkEdge app=:{app_symb, app_args} n inh chn
     = (lbl, syn, chn)
   | otherwise
     # (d, menv) = ppApp app menv
-    = (Nothing, {syn_annot_expr = App app, syn_texpr = TVar (ppCompact d)}
+    = (Nothing, {syn_annot_expr = App app, syn_texpr = TVar [] (ppCompact d)}
       , {chn & chn_module_env = menv})
 
 // TODO: We need to split this up: one part of this should generate the graph
