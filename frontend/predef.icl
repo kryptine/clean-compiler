@@ -253,7 +253,7 @@ predefined_idents
 					[PD_FromThenToO]= i "_from_then_to_o",
 
                     [PD_iTasks_Framework_Tonic] = i "iTasks.Framework.Tonic",
-                    [PD_tonicWrapListOfTask] = i "tonicWrapListOfTask",
+                    [PD_tonicWrapParallel] = i "tonicWrapParallel",
                     [PD_tonicWrapApp]      = i "tonicWrapApp",
                     [PD_tonicWrapTaskBody] = i "tonicWrapTaskBody",
                     [PD_tonicWrapAppLam1] = i "tonicWrapAppLam1",
@@ -401,7 +401,7 @@ where
 					<<- (local_predefined_idents,	IC_Expression, PD_Start)
 
 					<<- (local_predefined_idents,	IC_Module NoQualifiedIdents, PD_iTasks_Framework_Tonic)
-					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapListOfTask)
+					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapParallel)
 					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapApp)
 					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapTaskBody)
 					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapAppLam1)

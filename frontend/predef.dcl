@@ -309,7 +309,7 @@ PD_tonicWrapTaskBody			:== 298
 PD_tonicWrapAppLam1			:== 299
 PD_tonicWrapAppLam2			:== 300
 PD_tonicWrapAppLam3			:== 301
-PD_tonicWrapListOfTask		:== 302
+PD_tonicWrapParallel		:== 302
 
 PD_tonicViewInformation		:== 303
 

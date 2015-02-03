@@ -145,9 +145,9 @@ wrapTaskApp origExpr inh chn
   findWrap 3 = PD_tonicWrapAppLam3
   findWrap n = abort ("No tonicWrapLam" +++ toString n)
 
-wrapListOfTask :: Expression InhExpression *ChnExpression -> *(Expression, *ChnExpression)
-wrapListOfTask origExpr inh chn
-  # (tune_symb, predefs)        = (chn.chn_predef_symbols)![PD_tonicWrapListOfTask]
+wrapParallel :: Expression InhExpression *ChnExpression -> *(Expression, *ChnExpression)
+wrapParallel origExpr=:(App app) inh chn
+  # (tune_symb, predefs)        = (chn.chn_predef_symbols)![PD_tonicWrapParallel]
   # chn                         = {chn & chn_predef_symbols = predefs}
   | predefIsUndefined tune_symb = (origExpr, chn)
   | otherwise
@@ -155,14 +155,16 @@ wrapListOfTask origExpr inh chn
       # icl          = menv.me_icl_module
       # nm           = icl.icl_name.id_name
       # (ids, pdss)  = toStatic (map mkInt inh.inh_ids) chn.chn_predef_symbols
-      # (expr, pdss) = appPredefinedSymbol PD_tonicWrapListOfTask
+      # (expr, pdss) = appPredefinedSymbol PD_tonicWrapParallel
                          [ mkStr nm
                          , mkStr inh.inh_curr_task_name
                          , ids
-                         , origExpr
+                         , App {app & app_args = []}
+                         , hd app.app_args
                          ] SK_Function pdss
       = (App expr, {chn & chn_predef_symbols = pdss
                         , chn_module_env = {menv & me_icl_module = icl}})
+wrapParallel origExpr inh chn = (origExpr, chn)
 
 letTypes :: ExprInfoPtr *ChnExpression -> *([Type], *ChnExpression)
 letTypes exprPtr chn
@@ -337,18 +339,11 @@ mkBlueprint (App app) inh chn
           = (Always syn.syn_texpr, {contApp & app_args = [syn.syn_annot_expr]}, chn)
 
   mkTaskApp app ctxs args inh chn
-  // TODO Cata the args
     # (ps, menv)  = mapSt ppExpression args chn.chn_module_env
     # chn         = {chn & chn_module_env = menv}
     # appArgs     = map ppCompact ps  // TODO : When do we pprint a Clean expr? And when do we generate a subgraph?
     # (app`, chn) = wrapTaskApp (App app) inh chn
     = ({syn_annot_expr = app`, syn_texpr = TTaskApp inh.inh_ids (appFunName app) (map (TVar []) appArgs)}, chn)
-    //# (ss, chn) = let f e (ss, chn)
-                       //# (syn, chn) = mkBlueprint e inh chn
-                       //= ([syn:ss], chn)
-                  //in  foldr f ([], chn) args
-    //= wrapTaskApp (App {app & app_args = ctxs ++ map (\s -> s.syn_annot_expr) ss})
-                //(TTaskApp inh.inh_ids (appFunName app) (map (\s -> s.syn_texpr) ss)) inh chn
 
   mkTransform app ctxs args inh chn
     = withTwo app args f inh chn
@@ -384,7 +379,6 @@ mkBlueprint (App app) inh chn
           , syn_texpr = TParallel inh.inh_ids (mkPar synl.syn_texpr synr.syn_texpr)}
         , chnr)
 
-// TODO Annotate if parallel of variable.
   mkParN mkPar app ctxs args inh chn
     = case args of
         [arg=:(App _)]
@@ -402,8 +396,8 @@ mkBlueprint (App app) inh chn
               # (doc, menv) = ppExpression arg chn.chn_module_env
               # ppStr       = ppCompact doc
               # chn         = {chn & chn_module_env = menv}
-              # (arg, chn)  = wrapListOfTask arg inh chn
-              = ({ syn_annot_expr = App {app & app_args = [arg]}
+              # (app, chn)  = wrapParallel (App app) inh chn
+              = ({ syn_annot_expr = app
                  , syn_texpr      = TParallel inh.inh_ids (mkPar (PP ppStr))}, chn)
         _ = abort "mkParN args fallthrough; shouldn't happen"
 
@@ -561,9 +555,6 @@ mkBlueprint (Case cs) inh chn
 mkBlueprint (Var bv) inh chn
   | varIsTask bv inh
       # (var`, chn) = wrapTaskApp (Var bv) inh chn
-      = ({syn_annot_expr = var`, syn_texpr = TVar inh.inh_ids bv.var_ident.id_name}, chn)
-  | varIsListOfTask bv inh
-      # (var`, chn) = wrapListOfTask (Var bv) inh chn
       = ({syn_annot_expr = var`, syn_texpr = TVar inh.inh_ids bv.var_ident.id_name}, chn)
   | otherwise = ({syn_annot_expr = Var bv, syn_texpr = TVar [] bv.var_ident.id_name}, chn)
 mkBlueprint expr _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "(mkBlueprint fallthrough)"}, chn)
