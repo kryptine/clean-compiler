@@ -337,6 +337,8 @@ mkBlueprint (App app) inh chn
         "always"
           # (syn, chn) = mkBlueprint (hd contApp.app_args) (addInhId inh n) chn
           = (Always syn.syn_texpr, {contApp & app_args = [syn.syn_annot_expr]}, chn)
+        fn
+          = (CustomFilter fn, contApp, chn)
 
   mkTaskApp app ctxs args inh chn
     # (ps, menv)  = mapSt ppExpression args chn.chn_module_env
