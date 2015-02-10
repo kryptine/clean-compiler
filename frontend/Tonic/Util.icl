@@ -211,7 +211,6 @@ arrHasIdx arr idx = idx < size arr
 muselect :: !u:(a e) !Int -> *(Maybe e, !u:(a e)) | Array a e
 muselect arr idx
   | arrHasIdx arr idx
-    # (sz, arr)   = usize arr
     # (elem, arr) = arr![idx]
     = (Just elem, arr)
   | otherwise     = (Nothing, arr)
@@ -419,13 +418,19 @@ getFunRhs :: FunDef -> Expression
 getFunRhs {fun_body = TransformedBody tb} = tb.tb_rhs
 getFunRhs _                               = abort "getFunRhs: need a TransformedBody"
 
+//updateWithAnnot :: SymbIdent Expression *ModuleEnv -> *ModuleEnv
+//updateWithAnnot si expr menv =
+  //case (symbIdentModuleIdx si, symbIdentObjectIdx si) of
+    //(Just midx, Just oidx) -> if (midx == menv.me_main_dcl_module_n)
+                                //{menv & me_fun_defs = updateFunRhs oidx menv.me_fun_defs expr}
+                                //menv
+    //_                      -> menv
+
 updateWithAnnot :: SymbIdent Expression *ModuleEnv -> *ModuleEnv
 updateWithAnnot si expr menv =
-  case (symbIdentModuleIdx si, symbIdentObjectIdx si) of
-    (Just midx, Just oidx) -> if (midx == menv.me_main_dcl_module_n)
-                                {menv & me_fun_defs = updateFunRhs oidx menv.me_fun_defs expr}
-                                menv
-    _                      -> menv
+  case symbIdentObjectIdx si of
+    Just oidx -> {menv & me_fun_defs = updateFunRhs oidx menv.me_fun_defs expr}
+    _         -> menv
 
 updateFunRhs :: Index !*{#FunDef} Expression -> !*{#FunDef}
 updateFunRhs idx fun_defs e
