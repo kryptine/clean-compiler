@@ -22,7 +22,7 @@ ginTonic main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules common_d
   | isSystemModule iclname                  = (fun_defs, predef_symbols, files, heaps)
   # (ok, files)                             = ensureDirectoryExists csf_directory_path files
   | not ok                                  = (fun_defs, predef_symbols, files, heaps)
-  # (tstr, fun_defs, predef_symbols, heaps) = ginTonic` (isITasksModule iclname) main_dcl_module_n toJSONString fun_defs fun_defs_cpy icl_module dcl_modules common_defs predef_symbols heaps
+  # (tstr, fun_defs, predef_symbols, heaps) = ginTonic` (isITasksModule iclname) main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules common_defs predef_symbols heaps
   # files                                   = writeTonicFile iclname tstr files
   = (fun_defs, predef_symbols, files, heaps)
   where
@@ -64,22 +64,13 @@ toJSONString rs icl_module menv
                        , tm_tasks = rs}
     , menv)
 
-//toDotString :: (Map String TonicTask) IclModule *ModuleEnv -> *(String, *ModuleEnv)
-//toDotString rs icl_module menv
-  //# (dots, menv) = foldrWithKey tf ([], menv) rs
-  //= ( "digraph " +++ icl_module.icl_name.id_name +++ "{\n" +++ foldr (\x str -> x +++ "\n" +++ str) "" dots +++ "\n}"
-    //, menv)
-  //where tf tn {tt_graph=g} (xs, menv)
-          //# (dot, menv) = mkTaskDot tn g menv
-          //= ([dot : xs], menv)
-
-ginTonic` :: Bool ModuleN ((Map String TonicTask) IclModule *ModuleEnv -> *(String, *ModuleEnv))
-             !*{#FunDef} !*{#FunDef} IclModule {#DclModule} !{#CommonDefs} !*PredefinedSymbols *Heaps
+ginTonic` :: Bool ModuleN !*{#FunDef} !*{#FunDef} IclModule {#DclModule}
+             !{#CommonDefs} !*PredefinedSymbols *Heaps
           -> *(String, !*{#FunDef}, !*PredefinedSymbols, !*Heaps)
-ginTonic` is_itasks_mod main_dcl_module_n repsToString fun_defs fun_defs_cpy icl_module dcl_modules common_defs predef_symbols heaps
+ginTonic` is_itasks_mod main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules common_defs predef_symbols heaps
   # ((reps, heaps, predef_symbols, fun_defs_cpy), fun_defs) = foldUArr appDefInfo ((newMap, heaps, predef_symbols, fun_defs_cpy), fun_defs)
   # menv        = mkModuleEnv main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules
-  # (str, menv) = repsToString reps icl_module menv
+  # (str, menv) = toJSONString reps icl_module menv
   = (str, menv.me_fun_defs, predef_symbols, heaps)
   where
   appDefInfo idx fd ((reps, heaps, predef_symbols, fun_defs_cpy), fun_defs)
