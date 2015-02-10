@@ -18,16 +18,15 @@ from iTasks.Framework.Tonic.AbsSyn import :: TExpr, :: ExprId, :: TypeName, :: M
 // InhExpression and ChnExpression need strict fields in order to prevent a bus
 // error caused by huge thunks
 :: InhExpression =
-  { inh_curr_task_name  :: !String
-  , inh_case_expr       :: !Maybe Expression
-  , inh_is_bind_lam     :: !Bool
-  , inh_ids             :: !ExprId
-  , inh_tyenv           :: !Map String Type
+  { inh_curr_task_name   :: !String
+  , inh_case_expr        :: !Maybe Expression
+  , inh_is_bind_lam      :: !Bool
+  , inh_ids              :: !ExprId
+  , inh_tyenv            :: !Map String Type
   }
 
 :: *ChnExpression =
-  {// chn_graph          :: !*GinGraph
-    chn_module_env     :: !*ModuleEnv
+  { chn_module_env     :: !*ModuleEnv
   , chn_heaps          :: *Heaps
   , chn_predef_symbols :: !*PredefinedSymbols
   }

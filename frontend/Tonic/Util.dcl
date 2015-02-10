@@ -36,6 +36,8 @@ reifySymbIdentSymbolType :: SymbIdent *ModuleEnv -> *(Maybe SymbolType, *ModuleE
 
 reifyArgsAndDef :: SymbIdent *ModuleEnv -> *(([FreeVar], FunDef), *ModuleEnv)
 
+reifyDclModule :: SymbIdent *ModuleEnv -> *(Maybe DclModule, *ModuleEnv)
+
 isCons :: String -> Bool
 
 isNil :: String -> Bool

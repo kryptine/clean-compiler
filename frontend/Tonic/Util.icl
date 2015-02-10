@@ -205,6 +205,22 @@ reifyDclModulesIdxFunType` glob_module glob_object menv
 
     //ident = si.symb_ident.id_name
 
+reifyDclModule :: SymbIdent *ModuleEnv -> *(Maybe DclModule, *ModuleEnv)
+reifyDclModule si menv =
+  case symbIdentModuleIdx si of
+    Just mi -> reifyDclModule` mi menv
+    _       -> (Nothing, menv)
+
+reifyDclModule` :: Index *ModuleEnv -> *(Maybe DclModule, *ModuleEnv)
+reifyDclModule` glob_module menv
+  | glob_module == menv.me_main_dcl_module_n = (Nothing, menv)
+  | otherwise
+    # (mdcl, dcls) = muselect menv.me_dcl_modules glob_module
+    # menv         = {menv & me_dcl_modules = dcls}
+    = case mdcl of
+        Just dcl -> (Just dcl, menv)
+        _        -> (Nothing, menv)
+
 arrHasIdx :: (a e) Int -> Bool | Array a e
 arrHasIdx arr idx = idx < size arr
 

@@ -186,7 +186,7 @@ varIsListOfTask bv inh
   = case 'DM'.get bv.var_ident.id_name inh.inh_tyenv of
       Nothing -> False
       Just t  -> typeIsListOfTask t
-
+import StdDebug
 mkBlueprint :: Expression InhExpression *ChnExpression -> *(SynExpression, *ChnExpression)
 mkBlueprint (App app) inh chn
   # (idIsTask, menv) = symbIdentIsTask app.app_symb chn.chn_module_env
@@ -341,11 +341,16 @@ mkBlueprint (App app) inh chn
           = (CustomFilter fn, contApp, chn)
 
   mkTaskApp app ctxs args inh chn
-    # (ps, menv)  = mapSt ppExpression args chn.chn_module_env
-    # chn         = {chn & chn_module_env = menv}
-    # appArgs     = map ppCompact ps  // TODO : When do we pprint a Clean expr? And when do we generate a subgraph?
-    # (app`, chn) = wrapTaskApp (App app) inh chn
-    = ({syn_annot_expr = app`, syn_texpr = TTaskApp inh.inh_ids (appFunName app) (map (TVar []) appArgs)}, chn)
+    # (ps, menv)    = mapSt ppExpression args chn.chn_module_env
+    # (dclnm, menv) = case reifyDclModule app.app_symb menv of
+                        (Just dcl, menv) = (dcl.dcl_name.id_name, menv)
+                        (_       , menv)
+                          # (iclmod, menv) = menv!me_icl_module
+                          = (iclmod.icl_name.id_name, menv)
+    # chn           = {chn & chn_module_env = menv}
+    # appArgs       = map ppCompact ps  // TODO : When do we pprint a Clean expr? And when do we generate a subgraph?
+    # (app`, chn)   = wrapTaskApp (App app) inh chn
+    = ({syn_annot_expr = app`, syn_texpr = TTaskApp inh.inh_ids dclnm (appFunName app) (map (TVar []) appArgs)}, chn)
 
   mkTransform app ctxs args inh chn
     = withTwo app args f inh chn
