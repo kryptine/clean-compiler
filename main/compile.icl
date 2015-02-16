@@ -115,6 +115,7 @@ closeFile _ files
 	,	compile_with_generics   :: !Bool
 	,	generate_sapl           :: !Bool
 	,	generate_ctags          :: !Bool
+	,	tonic                   :: !Bool
 	}
 
 StdErrPathName :== "_stderr_"
@@ -137,6 +138,7 @@ InitialCoclOptions =
 	,	compile_with_generics 	= True 
 	,	generate_sapl       	= False
 	,	generate_ctags       	= False
+	,	tonic                  	= False
 	}
 
 :: DclCache = {
@@ -217,6 +219,8 @@ parseCommandLine ["-sapl":args] options
 	// enable ctags generation
 parseCommandLine ["-ctags":args] options
 	= parseCommandLine args {options & generate_ctags = True}
+parseCommandLine ["-tonic":args] options
+	= parseCommandLine args {options & tonic = True}
 parseCommandLine [arg : args] options
 	| arg.[0] == '-'
 		# (args,modules,options)=	parseCommandLine args options
@@ -335,6 +339,7 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 			,feo_strip_unused=options.strip_unused
 			,feo_generate_sapl=options.generate_sapl
 			,feo_generate_ctags=options.generate_ctags
+			,feo_tonic=options.tonic
 			} moduleIdent options.searchPaths dcl_modules functions_and_macros list_inferred_types predef_symbols hash_table fmodificationtime files error io out tcl_file heaps
 
 	# unique_copy_of_predef_symbols={predef_symbol\\predef_symbol<-:predef_symbols}
