@@ -14,6 +14,7 @@ from partition import ::Component(..),::ComponentMembers
 		,	feo_fusion	 			:: !Bool
 		,	feo_strip_unused		:: !Bool
 		,	feo_generate_sapl		:: !Bool
+        ,   feo_generate_ctags      :: !Bool
 		}
 
 :: FrontEndSyntaxTree
