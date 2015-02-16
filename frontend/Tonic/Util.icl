@@ -448,7 +448,7 @@ updateWithAnnot si expr menv =
     Just oidx -> {menv & me_fun_defs = updateFunRhs oidx menv.me_fun_defs expr}
     _         -> menv
 
-updateFunRhs :: Index !*{#FunDef} Expression -> !*{#FunDef}
+updateFunRhs :: Index !*{#FunDef} Expression -> *{#FunDef}
 updateFunRhs idx fun_defs e
   # (mfd, fun_defs) = muselect fun_defs idx
   = case mfd of
@@ -513,28 +513,29 @@ mkStr str = BasicExpr (BVS ("\"" +++ str +++ "\""))
 mkInt :: Int -> Expression
 mkInt i   = BasicExpr (BVInt i)
 
-appPredefinedSymbolWithEI :: Int [Expression] ((Global Index) -> SymbKind) *Heaps *PredefinedSymbols -> *(App, *Heaps, *PredefinedSymbols)
+appPredefinedSymbolWithEI :: Int [Expression] ((Global Index) -> SymbKind) *Heaps *PredefinedSymbols
+                          -> *(App, *Heaps, *PredefinedSymbols)
 appPredefinedSymbolWithEI pds_idx args mkKind heaps pdss
+  # (ptr, expr_heap) = newPtr EI_Empty heaps.hp_expression_heap
+  # heaps            = { heaps & hp_expression_heap = expr_heap }
+  # (app, pdss)      = appPredefinedSymbol` pds_idx args mkKind ptr pdss
+  = (app, heaps, pdss)
+
+appPredefinedSymbol :: Int [Expression] ((Global Index) -> SymbKind) *PredefinedSymbols
+                    -> *(App, *PredefinedSymbols)
+appPredefinedSymbol pds_idx args mkKind pdss
+  = appPredefinedSymbol` pds_idx args mkKind nilPtr pdss
+
+appPredefinedSymbol` :: Int [Expression] ((Global Index) -> SymbKind) ExprInfoPtr *PredefinedSymbols
+                     -> *(App, *PredefinedSymbols)
+appPredefinedSymbol` pds_idx args mkKind ptr pdss
   # (pds, pdss) = pdss![pds_idx]
   # ident       = predefined_idents.[pds_idx]
-  # (ptr, expr_heap) = newPtr EI_Empty heaps.hp_expression_heap
-  # heaps = { heaps & hp_expression_heap = expr_heap }
   = (
     { App
     | app_symb     = mkPredefSymbIdent ident pds mkKind
     , app_args     = args
     , app_info_ptr = ptr
-    }, heaps, pdss)
-
-appPredefinedSymbol :: Int [Expression] ((Global Index) -> SymbKind) *PredefinedSymbols -> *(App, *PredefinedSymbols)
-appPredefinedSymbol pds_idx args mkKind pdss
-  # (pds, pdss) = pdss![pds_idx]
-  # ident       = predefined_idents.[pds_idx]
-  = (
-    { App
-    | app_symb     = mkPredefSymbIdent ident pds mkKind
-    , app_args     = args
-    , app_info_ptr = nilPtr
     }, pdss)
 
 mkPredefSymbIdent :: Ident PredefinedSymbol ((Global Index) -> SymbKind) -> SymbIdent
@@ -593,3 +594,11 @@ freeVarToVar {fv_ident, fv_info_ptr} heaps
   # (ptr, expr_heap) = newPtr EI_Empty heaps.hp_expression_heap
   # heaps = { heaps & hp_expression_heap = expr_heap }
   = ({ var_ident = fv_ident,  var_info_ptr = fv_info_ptr, var_expr_ptr = ptr}, heaps)
+
+pdssExist :: [Int] *PredefinedSymbols -> *(Bool, *PredefinedSymbols)
+pdssExist [] pdss = (True, pdss)
+pdssExist [pds:xs] pdss
+  # (tune_symb, predefs)        = pdss![pds]
+  | predefIsUndefined tune_symb = (False, pdss)
+  | otherwise                   = pdssExist xs pdss
+

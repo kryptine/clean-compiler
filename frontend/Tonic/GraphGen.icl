@@ -119,9 +119,9 @@ withTwo app _         _ inh chn = ({syn_annot_expr = App app, syn_texpr = TVar [
 
 wrapTaskApp :: Expression InhExpression *ChnExpression -> *(Expression, *ChnExpression)
 wrapTaskApp origExpr inh chn
-  # (tune_symb, predefs)        = (chn.chn_predef_symbols)![PD_tonicWrapApp]
-  # chn                         = {chn & chn_predef_symbols = predefs}
-  | predefIsUndefined tune_symb = (origExpr, chn)
+  # (ok, pdss) = pdssExist [PD_tonicWrapApp, PD_tonicWrapAppLam1, PD_tonicWrapAppLam2, PD_tonicWrapAppLam3] chn.chn_predef_symbols
+  # chn        = {chn & chn_predef_symbols = pdss}
+  | not ok     = (origExpr, chn)
   | otherwise
       # (rem, menv)  = case origExpr of
                          App app -> argsRemaining app chn.chn_module_env

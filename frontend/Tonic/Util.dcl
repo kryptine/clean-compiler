@@ -143,3 +143,5 @@ intersperse` :: String (a -> String) [a] -> String
 stringContents :: String -> String
 
 listExprToList :: Expression -> [Expression]
+
+pdssExist :: [Int] *PredefinedSymbols -> *(Bool, *PredefinedSymbols)

@@ -87,15 +87,11 @@ ginTonic` is_itasks_mod main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_m
               -> put fd.fun_ident.id_name {TonicTask | tt_name = fd.fun_ident.id_name, tt_resty = fromMaybe "" (fmap (ppCompact o ppType) (functorContent (funTy fd))), tt_args = args, tt_body = g} reps
             _ -> reps
         , heaps, predef_symbols, menv.me_fun_defs_cpy), menv.me_fun_defs)
-    //| is_itasks_mod && funIsTask fd && fd.fun_info.fi_def_level == 1
-      //# (menv, predef_symbols) = trace_n ("at " +++ fd.fun_ident.id_name) addTonicWrap icl_module idx menv predef_symbols
-      //= ((reps, heaps, predef_symbols), menv.me_fun_defs)
     // TODO FIXME There are still some problems with this when compiling iTasks itself
-    //| is_itasks_mod && funIsTask fd && fd.fun_info.fi_def_level == 1
-      //# menv = mkModuleEnv main_dcl_module_n fun_defs icl_module dcl_modules
-      //# menv = addTonicWrap icl_module idx menv
-      //= ((reps, heaps), menv.me_fun_defs)
-    | otherwise        = ((reps, heaps, predef_symbols, fun_defs_cpy), fun_defs)
+    | is_itasks_mod && funIsTask fd && fd.fun_info.fi_def_level == 1
+      # (menv, heaps, predef_symbols) = addTonicWrap icl_module idx menv heaps predef_symbols
+      = ((reps, heaps, predef_symbols, menv.me_fun_defs_cpy), menv.me_fun_defs)
+    | otherwise = ((reps, heaps, predef_symbols, fun_defs_cpy), fun_defs)
 
 updateWithAnnot :: Int Expression *ModuleEnv -> *ModuleEnv
 updateWithAnnot fidx e menv
@@ -105,8 +101,8 @@ updateWithAnnot fidx e menv
 
 addTonicWrap :: IclModule Index *ModuleEnv !*Heaps *PredefinedSymbols -> *(*ModuleEnv, *Heaps, *PredefinedSymbols)
 addTonicWrap icl_module idx menv heaps pdss
-  # (tonicWrapTask, pdss) = pdss![PD_tonicWrapTaskBody]
-  | predefIsUndefined tonicWrapTask = (menv, heaps, pdss)
+  # (ok, pdss) = pdssExist [PD_tonicViewInformation, PD_tonicWrapTaskBody] pdss
+  | not ok     = (menv, heaps, pdss)
   | otherwise
       # (mfdnt, fun_defs)    = muselect menv.me_fun_defs idx
       # menv                 = {menv & me_fun_defs = fun_defs}
@@ -125,10 +121,13 @@ addTonicWrap icl_module idx menv heaps pdss
           _ = (menv, heaps, pdss)
   where
   doAddRefl {fun_ident, fun_body=TransformedBody { tb_args, tb_rhs }} (Yes symbty) menv heaps pdss
-    # fun_defs     = menv.me_fun_defs
-    # (args, heaps, pdss) = foldr mkArg ([], heaps, pdss) (zip2 tb_args symbty.st_args)
+    # fun_defs            = menv.me_fun_defs
+    # (pds, pdss)         = pdss![PD_tonicViewInformation]
+    # (args, heaps, pdss) = if (predefIsUndefined pds)
+                              ([], heaps, pdss)
+                              (foldr mkArg ([], heaps, pdss) (zip2 tb_args symbty.st_args))
     | length args == length tb_args
-        # (xs, pdss)   = toStatic args pdss
+        # (xs, pdss)  = toStatic args pdss
         # (wrap, heaps, pdss) = appPredefinedSymbolWithEI PD_tonicWrapTaskBody
                                   [ mkStr icl_module.icl_name.id_name
                                   , mkStr fun_ident.id_name
