@@ -144,4 +144,4 @@ stringContents :: String -> String
 
 listExprToList :: Expression -> [Expression]
 
-pdssExist :: [Int] *PredefinedSymbols -> *(Bool, *PredefinedSymbols)
+pdssAreDefined :: [Int] *PredefinedSymbols -> *(Bool, *PredefinedSymbols)

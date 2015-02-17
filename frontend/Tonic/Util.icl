@@ -600,4 +600,4 @@ pdssAreDefined [] pdss = (True, pdss)
 pdssAreDefined [pds:xs] pdss
   # (tune_symb, predefs)        = pdss![pds]
   | predefIsUndefined tune_symb = (False, pdss)
-  | otherwise                   = pdssExist xs pdss
+  | otherwise                   = pdssAreDefined xs pdss
