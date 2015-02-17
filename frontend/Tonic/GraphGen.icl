@@ -114,8 +114,9 @@ given x == y && y == z
 */
 
 withTwo :: App [Expression] (Expression Expression *ChnExpression -> *(SynExpression, *ChnExpression)) InhExpression *ChnExpression -> *(SynExpression, *ChnExpression)
+withTwo app []        _ inh chn = ({syn_annot_expr = App app, syn_texpr = TVar [] "withTwo TODO"}, chn)
+withTwo app [_:_]     _ inh chn = ({syn_annot_expr = App app, syn_texpr = TVar [] "withTwo TODO"}, chn)
 withTwo app [x1:x2:_] f inh chn = f x1 x2 chn
-withTwo app _         _ inh chn = ({syn_annot_expr = App app, syn_texpr = TVar [] "withTwo TODO"}, chn)
 
 wrapTaskApp :: Expression InhExpression *ChnExpression -> *(Expression, *ChnExpression)
 wrapTaskApp origExpr inh chn
@@ -188,7 +189,7 @@ varIsListOfTask bv inh
   = case 'DM'.get bv.var_ident.id_name inh.inh_tyenv of
       Nothing -> False
       Just t  -> typeIsListOfTask t
-import StdDebug
+
 mkBlueprint :: Expression InhExpression *ChnExpression -> *(SynExpression, *ChnExpression)
 mkBlueprint (App app) inh chn
   # (idIsTask, menv) = symbIdentIsTask app.app_symb chn.chn_module_env
