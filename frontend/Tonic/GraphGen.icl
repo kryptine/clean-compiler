@@ -123,7 +123,7 @@ wrapTaskApp origExpr inh chn
   # chn        = {chn & chn_predef_symbols = pdss}
   | not ok     = (origExpr, chn)
   | otherwise
-      # (rem, menv)  = case origExpr of
+      #! (rem, menv)  = case origExpr of
                          App app -> argsRemaining app chn.chn_module_env
                          _       -> (0, chn.chn_module_env)
       # icl          = menv.me_icl_module
@@ -257,6 +257,8 @@ mkBlueprint (App app) inh chn
                           # (d, menv)    = ppExpression uid menv
                           # (rsds, menv) = mapSt ppExpression (listExprToList rs) menv
                           = (TUAuthenticatedUser (stringContents (ppCompact d)) (map (stringContents o ppCompact) rsds), menv)
+                        (usr, _)
+                          = (TUVariableUser usr, menv)
       # chn         = {chn & chn_module_env = menv}
       # (app`, chn) = wrapTaskApp (App {app & app_args = ctxs ++ [u, syn.syn_annot_expr]}) inh chn
       = ({syn_annot_expr = app`, syn_texpr = TAssign tu syn.syn_texpr}, chn)
