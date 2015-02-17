@@ -580,9 +580,9 @@ listToListExpr [] pdss
   # (app, pdss) = appPredefinedSymbol PD_NilSymbol [] SK_Constructor pdss
   = (App app, pdss)
 listToListExpr [x:xs] pdss
-  # (texpr, pdss)  = listToListExpr xs pdss
-  # (cons, pdss)   = appPredefinedSymbol PD_ConsSymbol [x,texpr] SK_Constructor pdss
-  = (App cons, pdss)
+  # (texpr, pdss) = listToListExpr xs pdss
+  # (app, pdss)   = appPredefinedSymbol PD_ConsSymbol [x,texpr] SK_Constructor pdss
+  = (App app, pdss)
 
 tupleToTupleExpr :: (Expression, Expression) *PredefinedSymbols -> *(Expression, *PredefinedSymbols)
 tupleToTupleExpr (e1, e2) pdss
@@ -595,10 +595,9 @@ freeVarToVar {fv_ident, fv_info_ptr} heaps
   # heaps = { heaps & hp_expression_heap = expr_heap }
   = ({ var_ident = fv_ident,  var_info_ptr = fv_info_ptr, var_expr_ptr = ptr}, heaps)
 
-pdssExist :: [Int] *PredefinedSymbols -> *(Bool, *PredefinedSymbols)
-pdssExist [] pdss = (True, pdss)
-pdssExist [pds:xs] pdss
+pdssAreDefined :: [Int] *PredefinedSymbols -> *(Bool, *PredefinedSymbols)
+pdssAreDefined [] pdss = (True, pdss)
+pdssAreDefined [pds:xs] pdss
   # (tune_symb, predefs)        = pdss![pds]
   | predefIsUndefined tune_symb = (False, pdss)
   | otherwise                   = pdssExist xs pdss
-

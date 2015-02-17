@@ -119,7 +119,7 @@ withTwo app _         _ inh chn = ({syn_annot_expr = App app, syn_texpr = TVar [
 
 wrapTaskApp :: Expression InhExpression *ChnExpression -> *(Expression, *ChnExpression)
 wrapTaskApp origExpr inh chn
-  # (ok, pdss) = pdssExist [PD_tonicWrapApp, PD_tonicWrapAppLam1, PD_tonicWrapAppLam2, PD_tonicWrapAppLam3] chn.chn_predef_symbols
+  # (ok, pdss) = pdssAreDefined [PD_tonicWrapApp, PD_tonicWrapAppLam1, PD_tonicWrapAppLam2, PD_tonicWrapAppLam3, PD_ConsSymbol, PD_NilSymbol] chn.chn_predef_symbols
   # chn        = {chn & chn_predef_symbols = pdss}
   | not ok     = (origExpr, chn)
   | otherwise
@@ -135,8 +135,9 @@ wrapTaskApp origExpr inh chn
                          , ids
                          , origExpr
                          ] SK_Function pdss
-      = (App expr, {chn & chn_predef_symbols = pdss
-                        , chn_module_env = {menv & me_icl_module = icl}})
+      = ( App expr
+        , {chn & chn_predef_symbols = pdss
+               , chn_module_env = {menv & me_icl_module = icl}})
   where
   findWrap :: Int -> Int
   findWrap 0 = PD_tonicWrapApp
@@ -147,9 +148,9 @@ wrapTaskApp origExpr inh chn
 
 wrapParallel :: Expression InhExpression *ChnExpression -> *(Expression, *ChnExpression)
 wrapParallel origExpr=:(App app) inh chn
-  # (tune_symb, predefs)        = (chn.chn_predef_symbols)![PD_tonicWrapParallel]
-  # chn                         = {chn & chn_predef_symbols = predefs}
-  | predefIsUndefined tune_symb = (origExpr, chn)
+  # (ok, pdss) = pdssAreDefined [PD_tonicWrapParallel, PD_ConsSymbol, PD_NilSymbol] chn.chn_predef_symbols
+  # chn        = {chn & chn_predef_symbols = pdss}
+  | not ok     = (origExpr, chn)
   | otherwise
       # menv         = chn.chn_module_env
       # icl          = menv.me_icl_module
@@ -162,8 +163,9 @@ wrapParallel origExpr=:(App app) inh chn
                          , App {app & app_args = []}
                          , hd app.app_args
                          ] SK_Function pdss
-      = (App expr, {chn & chn_predef_symbols = pdss
-                        , chn_module_env = {menv & me_icl_module = icl}})
+      = ( App expr
+        , {chn & chn_predef_symbols = pdss
+               , chn_module_env = {menv & me_icl_module = icl}})
 wrapParallel origExpr inh chn = (origExpr, chn)
 
 letTypes :: ExprInfoPtr *ChnExpression -> *([Type], *ChnExpression)
