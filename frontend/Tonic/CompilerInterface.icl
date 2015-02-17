@@ -16,15 +16,21 @@ import Data.Map
 import Text.JSON
 import iTasks.Framework.Tonic.AbsSyn
 
-ginTonic :: ModuleN !*{#FunDef} !*{#FunDef} IclModule {#DclModule} !{#CommonDefs} !*PredefinedSymbols !*Files !*Heaps -> *(!*{#FunDef}, !*PredefinedSymbols, !*Files, !*Heaps)
-ginTonic main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules common_defs predef_symbols files heaps
-  # iclname                                 = icl_module.icl_name.id_name
-  | isSystemModule iclname                  = (fun_defs, predef_symbols, files, heaps)
-  # (ok, files)                             = ensureDirectoryExists csf_directory_path files
-  | not ok                                  = (fun_defs, predef_symbols, files, heaps)
+ginTonic :: ModuleN !*{#FunDef} !*{#FunDef} IclModule {#DclModule} !{#CommonDefs} !*PredefinedSymbols *HashTable !*Files !*Heaps -> *(!*{#FunDef}, !*PredefinedSymbols, *HashTable, !*Files, !*Heaps)
+ginTonic main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules common_defs predef_symbols hash_table files heaps
+// FIXME Start Tonic presence check hack
+  # (tonic_module, predef_symbols) = predef_symbols![PD_iTasks_Framework_Tonic]
+  | predefIsUndefined tonic_module = (fun_defs, predef_symbols, hash_table, files, heaps)
+  # tonicImp = [0 \\ Declaration imp <-: icl_module.icl_import | imp.decl_ident.id_name == predefined_idents.[PD_tonicWrapTaskBody].id_name]
+  | tonicImp == [] = (fun_defs, predef_symbols, hash_table, files, heaps)
+// FIXME End Tonic presence check hack
+  # iclname                        = icl_module.icl_name.id_name
+  | isSystemModule iclname         = (fun_defs, predef_symbols, hash_table, files, heaps)
+  # (ok, files)                    = ensureDirectoryExists csf_directory_path files
+  | not ok                         = (fun_defs, predef_symbols, hash_table, files, heaps)
   # (tstr, fun_defs, predef_symbols, heaps) = ginTonic` (isITasksModule iclname) main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules common_defs predef_symbols heaps
   # files                                   = writeTonicFile iclname tstr files
-  = (fun_defs, predef_symbols, files, heaps)
+  = (fun_defs, predef_symbols, hash_table, files, heaps)
   where
   csf_directory_path = "tonic"
   isITasksModule nm = startsWith "iTasks" nm
@@ -87,11 +93,9 @@ ginTonic` is_itasks_mod main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_m
               -> put fd.fun_ident.id_name {TonicTask | tt_name = fd.fun_ident.id_name, tt_resty = fromMaybe "" (fmap (ppCompact o ppType) (functorContent (funTy fd))), tt_args = args, tt_body = g} reps
             _ -> reps
         , heaps, predef_symbols, menv.me_fun_defs_cpy), menv.me_fun_defs)
-    // TODO FIXME There are still some problems with this when compiling iTasks itself
-    // TODO We need a better check to determine whether a module has been imported. We need to skip Tonic whenever iTasks.Framework.Tonic isn't imported
-    //| is_itasks_mod && funIsTask fd && fd.fun_info.fi_def_level == 1
-      //# (menv, heaps, predef_symbols) = addTonicWrap icl_module idx menv heaps predef_symbols
-      //= ((reps, heaps, predef_symbols, menv.me_fun_defs_cpy), menv.me_fun_defs)
+    | is_itasks_mod && funIsTask fd && fd.fun_info.fi_def_level == 1
+      # (menv, heaps, predef_symbols) = addTonicWrap icl_module idx menv heaps predef_symbols
+      = ((reps, heaps, predef_symbols, menv.me_fun_defs_cpy), menv.me_fun_defs)
     | otherwise = ((reps, heaps, predef_symbols, fun_defs_cpy), fun_defs)
 
 updateWithAnnot :: Int Expression *ModuleEnv -> *ModuleEnv
