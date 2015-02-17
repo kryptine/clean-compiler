@@ -529,8 +529,11 @@ appPredefinedSymbol pds_idx args mkKind pdss
 appPredefinedSymbol` :: Int [Expression] ((Global Index) -> SymbKind) ExprInfoPtr *PredefinedSymbols
                      -> *(App, *PredefinedSymbols)
 appPredefinedSymbol` pds_idx args mkKind ptr pdss
-  # (pds, pdss) = pdss![pds_idx]
-  # ident       = predefined_idents.[pds_idx]
+  # (size_pdss, pdss) = usize pdss
+  | pds_idx >= size_pdss              = abort ("appPredefinedSymbol`: pds_idx = " +++ toString pds_idx +++ ", size_pdss = " +++ toString size_pdss)
+  | pds_idx >= size predefined_idents = abort ("appPredefinedSymbol`: pds_idx = " +++ toString pds_idx +++ ", size_pdss = " +++ toString (size predefined_idents))
+  # (pds, pdss)       = pdss![pds_idx]
+  # ident             = predefined_idents.[pds_idx]
   = (
     { App
     | app_symb     = mkPredefSymbIdent ident pds mkKind
@@ -598,6 +601,8 @@ freeVarToVar {fv_ident, fv_info_ptr} heaps
 pdssAreDefined :: [Int] *PredefinedSymbols -> *(Bool, *PredefinedSymbols)
 pdssAreDefined [] pdss = (True, pdss)
 pdssAreDefined [pds:xs] pdss
+  # (pdss_size, pdss) = usize pdss
+  | pds >= pdss_size  = (False, pdss)
   # (tune_symb, predefs)        = pdss![pds]
   | predefIsUndefined tune_symb = (False, pdss)
   | otherwise                   = pdssAreDefined xs pdss
