@@ -87,14 +87,14 @@ ginTonic` is_itasks_mod main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_m
                  Just (_, _, e)
                    -> updateWithAnnot idx e menv
                  _ -> menv
-      # (menv, heaps, predef_symbols) = addTonicWrap icl_module idx menv heaps predef_symbols
+      # (menv, heaps, predef_symbols) = addTonicWrap is_itasks_mod icl_module idx menv heaps predef_symbols
       = ((case mres of
             Just (args, g, _)
               -> put fd.fun_ident.id_name {TonicTask | tt_name = fd.fun_ident.id_name, tt_resty = fromMaybe "" (fmap (ppCompact o ppType) (functorContent (funTy fd))), tt_args = args, tt_body = g} reps
             _ -> reps
         , heaps, predef_symbols, menv.me_fun_defs_cpy), menv.me_fun_defs)
     | is_itasks_mod && funIsTask fd && fd.fun_info.fi_def_level == 1
-      # (menv, heaps, predef_symbols) = addTonicWrap icl_module idx menv heaps predef_symbols
+      # (menv, heaps, predef_symbols) = addTonicWrap is_itasks_mod icl_module idx menv heaps predef_symbols
       = ((reps, heaps, predef_symbols, menv.me_fun_defs_cpy), menv.me_fun_defs)
     | otherwise = ((reps, heaps, predef_symbols, fun_defs_cpy), fun_defs)
 
@@ -104,8 +104,8 @@ updateWithAnnot fidx e menv
   # fun_defs = updateFunRhs fidx fun_defs e
   = { menv & me_fun_defs = fun_defs}
 
-addTonicWrap :: IclModule Index *ModuleEnv !*Heaps *PredefinedSymbols -> *(*ModuleEnv, *Heaps, *PredefinedSymbols)
-addTonicWrap icl_module idx menv heaps pdss
+addTonicWrap :: Bool IclModule Index *ModuleEnv !*Heaps *PredefinedSymbols -> *(*ModuleEnv, *Heaps, *PredefinedSymbols)
+addTonicWrap is_itasks_mod icl_module idx menv heaps pdss
   # (ok, pdss) = pdssAreDefined [PD_tonicViewInformation, PD_tonicWrapTaskBody] pdss
   | not ok     = (menv, heaps, pdss)
   | otherwise
@@ -129,9 +129,9 @@ addTonicWrap icl_module idx menv heaps pdss
     # (ok, pdss) = pdssAreDefined [PD_tonicViewInformation, PD_tonicWrapTaskBody, PD_ConsSymbol, PD_NilSymbol] pdss
     | not ok     = (menv, heaps, pdss)
     # fun_defs   = menv.me_fun_defs
-    # (args, heaps, pdss) = foldr mkArg ([], heaps, pdss) (zip2 tb_args symbty.st_args)
+    # (args, heaps, pdss) = foldr (mkArg is_itasks_mod) ([], heaps, pdss) (zip2 tb_args symbty.st_args)
     | length args == length tb_args
-        # (xs, pdss)  = toStatic args pdss
+        # (xs, pdss) = toStatic args pdss
         # (wrap, heaps, pdss) = appPredefinedSymbolWithEI PD_tonicWrapTaskBody
                                   [ mkStr icl_module.icl_name.id_name
                                   , mkStr fun_ident.id_name
@@ -142,12 +142,14 @@ addTonicWrap icl_module idx menv heaps pdss
         = ({ menv & me_fun_defs = fun_defs}, heaps, pdss)
     | otherwise = (menv, heaps, pdss)
     where
-    mkArg :: (FreeVar, AType) ([Expression], *Heaps, *PredefinedSymbols) -> *([Expression], *Heaps, *PredefinedSymbols)
-    mkArg (arg=:{fv_ident}, {at_type}) (xs, heaps, pdss)
+    mkArg :: Bool (FreeVar, AType) ([Expression], *Heaps, *PredefinedSymbols) -> *([Expression], *Heaps, *PredefinedSymbols)
+    mkArg is_itasks_mod (arg=:{fv_ident}, {at_type}) (xs, heaps, pdss)
       # (bv, heaps) = freeVarToVar arg heaps
       # (viewApp, heaps, pdss) = appPredefinedSymbolWithEI PD_tonicViewInformation
                                    [ mkStr fv_ident.id_name
-                                   , Var bv
+                                   , if is_itasks_mod
+                                       (mkStr fv_ident.id_name)
+                                       (Var bv)
                                    ] SK_Function heaps pdss
       # (texpr, pdss) = toStatic (mkStr fv_ident.id_name, App viewApp) pdss
       = ([texpr:xs], heaps, pdss)
