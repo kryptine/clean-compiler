@@ -607,19 +607,12 @@ pdssAreDefined [pds:xs] pdss
   | predefIsUndefined tune_symb = (False, pdss)
   | otherwise                   = pdssAreDefined xs pdss
 
-ppAssoc LeftAssoc  = "LeftAssoc"
-ppAssoc RightAssoc = "RightAssoc"
-ppAssoc NoAssoc    = "NoAssoc"
-
-ppPrio (Prio assoc prio) = "Prio " +++ ppAssoc assoc +++ " " +++ toString prio
-ppPrio NoPrio = "NoPrio"
-
 mkTAssoc :: (Maybe FunType) -> TAssoc
 mkTAssoc Nothing = TNonAssoc
 mkTAssoc (Just ft)
   = case ft.ft_priority of
-      (Prio LeftAssoc _)  -> TLeftAssoc
-      (Prio RightAssoc _) -> TRightAssoc
+      (Prio LeftAssoc n)  -> TLeftAssoc n
+      (Prio RightAssoc n) -> TRightAssoc n
       _                   -> TNonAssoc
 
 exprToTCleanExpr :: Expression *ModuleEnv -> *(TCleanExpr, *ModuleEnv)
