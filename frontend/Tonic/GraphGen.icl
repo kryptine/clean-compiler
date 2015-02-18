@@ -190,6 +190,18 @@ varIsListOfTask bv inh
       Nothing -> False
       Just t  -> typeIsListOfTask t
 
+exprToTCleanExpr :: Expression *ModuleEnv -> *(TCleanExpr, *ModuleEnv)
+exprToTCleanExpr (App app) menv
+  # ((_, args), menv) = dropAppContexts app menv
+  = case args of
+      [] = (PPCleanExpr app.app_symb.symb_ident.id_name, menv)
+      xs
+        # (tces, menv) = mapSt exprToTCleanExpr args menv
+        = (AppCleanExpr app.app_symb.symb_ident.id_name tces, menv)
+exprToTCleanExpr expr menv
+  # (doc, menv) = ppExpression expr menv
+  = (PPCleanExpr (ppCompact doc), menv)
+
 mkBlueprint :: Expression InhExpression *ChnExpression -> *(SynExpression, *ChnExpression)
 mkBlueprint (App app) inh chn
   # (idIsTask, menv) = symbIdentIsTask app.app_symb chn.chn_module_env
