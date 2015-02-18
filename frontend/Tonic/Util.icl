@@ -624,5 +624,9 @@ typeToTCleanExpr (TA tsi []) = PPCleanExpr tsi.type_ident.id_name
 typeToTCleanExpr (TA tsi args)
   # tces = map (typeToTCleanExpr o \arg -> arg.at_type) args
   = AppCleanExpr tsi.type_ident.id_name tces
+typeToTCleanExpr (TAS tsi [] _) = PPCleanExpr tsi.type_ident.id_name
+typeToTCleanExpr (TAS tsi args _)
+  # tces = map (typeToTCleanExpr o \arg -> arg.at_type) args
+  = AppCleanExpr tsi.type_ident.id_name tces
 typeToTCleanExpr ty
   = PPCleanExpr (ppCompact (ppType ty))
