@@ -114,8 +114,8 @@ given x == y && y == z
 */
 
 withTwo :: App [Expression] (Expression Expression *ChnExpression -> *(SynExpression, *ChnExpression)) InhExpression *ChnExpression -> *(SynExpression, *ChnExpression)
-withTwo app []        _ inh chn = ({syn_annot_expr = App app, syn_texpr = TVar [] "withTwo TODO"}, chn)
-withTwo app [_:_]     _ inh chn = ({syn_annot_expr = App app, syn_texpr = TVar [] "withTwo TODO"}, chn)
+withTwo app []        _ _   chn = ({syn_annot_expr = App app, syn_texpr = TVar [] "TODO withTwo []"}, chn)
+withTwo app [_]       _ _   chn = ({syn_annot_expr = App app, syn_texpr = TVar [] "TODO withTwo [_]"}, chn)
 withTwo app [x1:x2:_] f inh chn = f x1 x2 chn
 
 wrapTaskApp :: Expression InhExpression *ChnExpression -> *(Expression, *ChnExpression)
@@ -260,6 +260,13 @@ mkBlueprint (App app) inh chn
                           = (TUAuthenticatedUser (stringContents (ppCompact d)) (map (stringContents o ppCompact) rsds), menv)
                         (usr, _)
                           = (TUVariableUser usr, menv)
+      # chn         = {chn & chn_module_env = menv}
+      # (app`, chn) = wrapTaskApp (App {app & app_args = ctxs ++ [u, syn.syn_annot_expr]}) inh chn
+      = ({syn_annot_expr = app`, syn_texpr = TAssign tu syn.syn_texpr}, chn)
+    f u t chn
+      # (syn, chn)  = mkBlueprint t (addInhId inh 0) chn
+      # (ppu, menv) = ppExpression u chn.chn_module_env
+      # (tu, menv)  = (TUVariableUser (ppCompact ppu), menv)
       # chn         = {chn & chn_module_env = menv}
       # (app`, chn) = wrapTaskApp (App {app & app_args = ctxs ++ [u, syn.syn_annot_expr]}) inh chn
       = ({syn_annot_expr = app`, syn_texpr = TAssign tu syn.syn_texpr}, chn)
@@ -569,6 +576,30 @@ mkBlueprint (Var bv) inh chn
       # (var`, chn) = wrapTaskApp (Var bv) inh chn
       = ({syn_annot_expr = var`, syn_texpr = TVar inh.inh_ids bv.var_ident.id_name}, chn)
   | otherwise = ({syn_annot_expr = Var bv, syn_texpr = TVar [] bv.var_ident.id_name}, chn)
+mkBlueprint expr=:(BasicExpr bv) _ chn
+  # (ppbv, menv) = ppBasicValue bv chn.chn_module_env
+  # chn          = {chn & chn_module_env = menv}
+  = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] (ppCompact ppbv)}, chn)
+
+//mkBlueprint expr=:(DictionariesFunction _ _ _) _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "1"}, chn)
+//mkBlueprint expr=:(Selection _ _ _)            _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "2"}, chn)
+//mkBlueprint expr=:(Update _ _ _)               _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "3"}, chn)
+//mkBlueprint expr=:(RecordUpdate _ _ _)         _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "4"}, chn)
+//mkBlueprint expr=:(TupleSelect _ _ _)          _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "5"}, chn)
+//mkBlueprint expr=:(Conditional _)              _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "7"}, chn)
+//mkBlueprint expr=:(AnyCodeExpr _ _ _)          _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "8"}, chn)
+//mkBlueprint expr=:(ABCCodeExpr _ _)            _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "9"}, chn)
+//mkBlueprint expr=:(MatchExpr _ _)              _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "10"}, chn)
+//mkBlueprint expr=:(IsConstructor _ _ _ _ _ _)  _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "11"}, chn)
+//mkBlueprint expr=:(FreeVar _)                  _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "12"}, chn)
+//mkBlueprint expr=:(Constant _ _ _)             _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "13"}, chn)
+//mkBlueprint expr=:(ClassVariable _)            _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "14"}, chn)
+//mkBlueprint expr=:(DynamicExpr _)              _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "15"}, chn)
+//mkBlueprint expr=:(TypeCodeExpression _)       _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "16"}, chn)
+//mkBlueprint expr=:(TypeSignature _ _)          _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "17"}, chn)
+//mkBlueprint expr=:(EE)                         _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "18"}, chn)
+//mkBlueprint expr=:(NoBind _)                   _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "19"}, chn)
+//mkBlueprint expr=:(FailExpr _)                 _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "20"}, chn)
 mkBlueprint expr _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "(mkBlueprint fallthrough)"}, chn)
 
 mkEdge :: App Int InhExpression *ChnExpression -> *(Maybe String, SynExpression, *ChnExpression)
@@ -576,7 +607,7 @@ mkEdge app=:{app_symb, app_args} n inh chn
   # (siIsTask, menv) = symbIdentIsTask app_symb chn.chn_module_env
   | identIsLambda app_symb.symb_ident
     # ((args, tFd), menv) = reifyArgsAndDef app_symb menv
-    # patid               = last [freeVarName x \\ x <- args| x.fv_def_level == -1]
+    # patid               = last [freeVarName x \\ x <- args | x.fv_def_level == -1]
     # (syne, chn)         = mkBlueprint (getFunRhs tFd) (addInhId inh n) { chn & chn_module_env = menv }
     # menv                = updateWithAnnot app_symb syne.syn_annot_expr chn.chn_module_env
     = (Just patid, {syne & syn_annot_expr = App app}, {chn & chn_module_env = menv})
