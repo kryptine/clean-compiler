@@ -339,7 +339,7 @@ mkBlueprint (App app) inh chn
           # (ppHdRemFArgs, menv)      = ppFreeVar (hd remFArgs) menv // TODO Bah
           # (ppTlRemFArgs, menv)      = mapSt ppFreeVar (tl remFArgs) menv // TODO Bah
           # (lbl, syn, chn)           = mkEdge tApp n inh {chn & chn_module_env = menv}
-          = (IfValue (ppCompact ppHdRemFArgs) fApp.app_symb.symb_ident.id_name
+          = (IfValue (PPCleanExpr (ppCompact ppHdRemFArgs)) fApp.app_symb.symb_ident.id_name
               (map ppCompact (ppFAppArgs ++ [ppHdRemFArgs:ppTlRemFArgs])) lbl syn.syn_texpr
             , {contApp & app_args = [App fApp, syn.syn_annot_expr]}, chn)
         "hasValue"
@@ -499,7 +499,7 @@ mkBlueprint (Let lt) inh chn
   mkLet Nothing lt inh chn
     # (tys, chn)    = letTypes lt.let_info_ptr chn
     # (binds, menv) = flattenBinds lt chn.chn_module_env
-    # tyenv         = zipSt (\(v, _) t tyenv -> 'DM'.put v t tyenv) binds tys inh.inh_tyenv // TODO This probably won't work for arbitrary patterns, so we actually need to be a bit smarter here and extract all variables from the patterns, instead of just PP'ing the pattern and using that as index
+    # tyenv         = zipSt (\(PPCleanExpr v, _) t tyenv -> 'DM'.put v t tyenv) binds tys inh.inh_tyenv // TODO This probably won't work for arbitrary patterns, so we actually need to be a bit smarter here and extract all variables from the patterns, instead of just PP'ing the pattern and using that as index
     // TODO : Represent the bindings in any way possible, not just PP
     # (syn, chn)    = mkBlueprint lt.let_expr (addInhId {inh & inh_tyenv = tyenv} 0) {chn & chn_module_env = menv}
     = ({ syn_annot_expr = Let {lt & let_expr = syn.syn_annot_expr}
@@ -510,7 +510,7 @@ mkBlueprint (Let lt) inh chn
       where
       f bnd (xs, menv)
         # (pprhs, menv) = ppExpression bnd.lb_src menv
-        = ([(bnd.lb_dst.fv_ident.id_name, ppCompact pprhs):xs], menv)
+        = ([(PPCleanExpr bnd.lb_dst.fv_ident.id_name, ppCompact pprhs):xs], menv)
    getLetBinds lt = lt.let_strict_binds ++ lt.let_lazy_binds
   // TODO: For cases, the compiler introduces a fresh variable in a let for the
   // matches expression. E.g.
@@ -540,7 +540,7 @@ mkBlueprint (Case cs) inh chn
   # ((def, syns), chn)    = case cs.case_default of
                               Yes def
                                 # (syn, chn) = mkAlts` def chn
-                                = ((Yes syn.syn_annot_expr, [("_", syn):syns]), chn)
+                                = ((Yes syn.syn_annot_expr, [(PPCleanExpr "_", syn):syns]), chn)
                               _ = ((No, syns), chn)
   = ({ syn_annot_expr = Case {cs & case_default = def, case_guards = guards}
      , syn_texpr = TCaseOrIf (ppCompact ed) (map (\(d, s) -> (d, s.syn_texpr)) syns)}, chn)
@@ -556,12 +556,12 @@ mkBlueprint (Case cs) inh chn
         # chn         = {chn & chn_module_env = menv}
         # (syn, chn)  = mkAlts` ap.ap_expr chn
         # ap          = {ap & ap_expr = syn.syn_annot_expr}
-        = (([ap:aps], [(ppCompact apd, syn):syns]), chn)
+        = (([ap:aps], [(apd, syn):syns]), chn)
         where
-        mkAp sym []   menv = ('PPrint'.text sym.glob_object.ds_ident.id_name, menv)
+        mkAp sym []   menv = (PPCleanExpr (ppCompact ('PPrint'.text sym.glob_object.ds_ident.id_name)), menv)
         mkAp sym vars menv
-          # (fvds, menv) = mapSt ppFreeVar vars menv
-          = ('PPrint'.text sym.glob_object.ds_ident.id_name 'PPrint'. <+> 'PPrint'.hcat fvds, menv)
+          # (fvds, menv) = mapSt (exprToTCleanExpr o FreeVar) vars menv
+          = (AppCleanExpr (ppCompact ('PPrint'.text sym.glob_object.ds_ident.id_name)) fvds, menv)
   mkAlts c=:(BasicPatterns bt bps) chn
     # ((bps, syns), chn) = foldr f (([], []), chn) bps
     = ((BasicPatterns bt bps, syns), chn)
@@ -572,7 +572,7 @@ mkBlueprint (Case cs) inh chn
         # chn         = {chn & chn_module_env = menv}
         # (syn, chn)  = mkAlts` bp.bp_expr chn
         # bp          = {bp & bp_expr = syn.syn_annot_expr}
-        = (([bp:bps], [(ppCompact bvd, syn):syns]), chn)
+        = (([bp:bps], [(PPCleanExpr (ppCompact bvd), syn):syns]), chn)
   mkAlts c chn = ((c, []), chn)
 
   mkAlts` :: Expression ChnExpression -> (SynExpression, ChnExpression)
@@ -614,7 +614,7 @@ mkBlueprint expr=:(BasicExpr bv) _ chn
 //mkBlueprint expr=:(FailExpr _)                 _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "20"}, chn)
 mkBlueprint expr _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] (PPCleanExpr "(mkBlueprint fallthrough)")}, chn)
 
-mkEdge :: App Int InhExpression *ChnExpression -> *(Maybe String, SynExpression, *ChnExpression)
+mkEdge :: App Int InhExpression *ChnExpression -> *(Maybe TCleanExpr, SynExpression, *ChnExpression)
 mkEdge app=:{app_symb, app_args} n inh chn
   # (siIsTask, menv) = symbIdentIsTask app_symb chn.chn_module_env
   | identIsLambda app_symb.symb_ident
@@ -622,14 +622,14 @@ mkEdge app=:{app_symb, app_args} n inh chn
     # patid               = last [freeVarName x \\ x <- args | x.fv_def_level == -1]
     # (syne, chn)         = mkBlueprint (getFunRhs tFd) (addInhId inh n) { chn & chn_module_env = menv }
     # menv                = updateWithAnnot app_symb syne.syn_annot_expr chn.chn_module_env
-    = (Just patid, {syne & syn_annot_expr = App app}, {chn & chn_module_env = menv})
+    = (Just (PPCleanExpr patid), {syne & syn_annot_expr = App app}, {chn & chn_module_env = menv})
   | siIsTask
     # ((args, tFd), menv) = reifyArgsAndDef app_symb menv
     # (lbl, menv) = case drop (length app_args) args of
                       [] = (Nothing, menv)
                       [x:_]
                         # (d, menv) = ppFreeVar x menv
-                        = (Just (ppCompact d), menv)
+                        = (Just (PPCleanExpr (ppCompact d)), menv)
     # (syn, chn)  = mkBlueprint (App app) (addInhId inh n) {chn & chn_module_env = menv}
     = (lbl, syn, chn)
   | otherwise

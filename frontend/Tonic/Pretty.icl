@@ -130,6 +130,7 @@ ppExpression (Selection sk e ss)  menv
   # (ed, menv)    = ppExpression e menv
   # (selsd, menv) = mapSt ppSelection ss menv
   = (ed <-> mkRecSel selsd, menv)
+ppExpression (FreeVar fv)                 menv = ppFreeVar fv menv
 ppExpression (BasicExpr bv)               menv = ppBasicValue bv menv
 ppExpression (Let _)                      menv = (text "ppExpression: Let", menv) // empty
 ppExpression (Case _)                     menv = (text "ppExpression: Case", menv) // empty
@@ -141,7 +142,6 @@ ppExpression (AnyCodeExpr _ _ _)          menv = (text "ppExpression: AnyCodeExp
 ppExpression (ABCCodeExpr _ _)            menv = (text "ppExpression: ABCCodeExpr", menv) // empty
 ppExpression (MatchExpr _ _)              menv = (text "ppExpression: MatchExpr", menv) // empty
 ppExpression (IsConstructor _ _ _ _ _ _)  menv = (text "ppExpression: IsConstructor", menv) // empty
-ppExpression (FreeVar _)                  menv = (text "ppExpression: FreeVar", menv) // empty
 ppExpression (DictionariesFunction _ _ _) menv = (text "ppExpression: DictionariesFunction", menv) // empty
 ppExpression (Constant _ _ _)             menv = (text "ppExpression: Constant", menv) // empty
 ppExpression (ClassVariable _)            menv = (text "ppExpression: ClassVariable", menv) // empty
