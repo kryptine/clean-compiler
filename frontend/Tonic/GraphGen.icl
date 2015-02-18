@@ -190,18 +190,6 @@ varIsListOfTask bv inh
       Nothing -> False
       Just t  -> typeIsListOfTask t
 
-exprToTCleanExpr :: Expression *ModuleEnv -> *(TCleanExpr, *ModuleEnv)
-exprToTCleanExpr (App app) menv
-  # ((_, args), menv) = dropAppContexts app menv
-  = case args of
-      [] = (PPCleanExpr app.app_symb.symb_ident.id_name, menv)
-      xs
-        # (tces, menv) = mapSt exprToTCleanExpr args menv
-        = (AppCleanExpr app.app_symb.symb_ident.id_name tces, menv)
-exprToTCleanExpr expr menv
-  # (doc, menv) = ppExpression expr menv
-  = (PPCleanExpr (ppCompact doc), menv)
-
 mkBlueprint :: Expression InhExpression *ChnExpression -> *(SynExpression, *ChnExpression)
 mkBlueprint (App app) inh chn
   # (idIsTask, menv) = symbIdentIsTask app.app_symb chn.chn_module_env
@@ -642,7 +630,7 @@ mkEdge app=:{app_symb, app_args} n inh chn
 // Yet another part should just get the right-hand side Expression of a FunDef
 // so we can just cata it.
 funToGraph :: FunDef *ModuleEnv *Heaps *PredefinedSymbols
-           -> *(Maybe ([(VariableName, TypeName)], TExpr, Expression), *ModuleEnv, *Heaps, *PredefinedSymbols)
+           -> *(Maybe ([(VariableName, TCleanExpr)], TExpr, Expression), *ModuleEnv, *Heaps, *PredefinedSymbols)
 funToGraph fd=:{fun_ident=fun_ident, fun_body = TransformedBody tb} menv heaps predef_symbols = mkBody
   where
   mkBody
@@ -650,6 +638,6 @@ funToGraph fd=:{fun_ident=fun_ident, fun_body = TransformedBody tb} menv heaps p
     # chn             = mkChnExpr predef_symbols menv heaps
     # (argTys, tyenv) = zipWithSt (\arg t st -> ((arg, t), 'DM'.put arg.fv_ident.id_name t st)) tb.tb_args (funArgTys fd) 'DM'.newMap
     # (syn, chn)      = mkBlueprint tb.tb_rhs {inh & inh_tyenv = tyenv} chn
-    = ( Just (map (\(arg, ty) -> (arg.fv_ident.id_name, ppCompact (ppType ty))) argTys, syn.syn_texpr, syn.syn_annot_expr) //Just g, syn.syn_annot_expr)
+    = ( Just (map (\(arg, ty) -> (arg.fv_ident.id_name, typeToTCleanExpr ty)) argTys, syn.syn_texpr, syn.syn_annot_expr) //Just g, syn.syn_annot_expr)
       , chn.chn_module_env, chn.chn_heaps, chn.chn_predef_symbols)
 funToGraph _ menv heaps predef_symbols = (Nothing, menv, heaps, predef_symbols)

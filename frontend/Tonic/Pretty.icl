@@ -208,7 +208,4 @@ ppAType :: AType -> Doc
 ppAType {at_type} = ppType at_type
 
 ppTypeSymbIdent :: TypeSymbIdent -> Doc
-ppTypeSymbIdent tsi
-  # nm = tsi.type_ident.id_name
-  # sz = size nm
-  = text (if (sz > 2 && nm.[0] == '_') (nm % (1, sz - 1)) nm)
+ppTypeSymbIdent tsi = text (tsi.type_ident.id_name)

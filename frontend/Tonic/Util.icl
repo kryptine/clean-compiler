@@ -606,3 +606,23 @@ pdssAreDefined [pds:xs] pdss
   # (tune_symb, predefs)        = pdss![pds]
   | predefIsUndefined tune_symb = (False, pdss)
   | otherwise                   = pdssAreDefined xs pdss
+
+exprToTCleanExpr :: Expression *ModuleEnv -> *(TCleanExpr, *ModuleEnv)
+exprToTCleanExpr (App app) menv
+  # ((_, args), menv) = dropAppContexts app menv
+  = case args of
+      [] = (PPCleanExpr app.app_symb.symb_ident.id_name, menv)
+      xs
+        # (tces, menv) = mapSt exprToTCleanExpr args menv
+        = (AppCleanExpr app.app_symb.symb_ident.id_name tces, menv)
+exprToTCleanExpr expr menv
+  # (doc, menv) = ppExpression expr menv
+  = (PPCleanExpr (ppCompact doc), menv)
+
+typeToTCleanExpr :: Type -> TCleanExpr
+typeToTCleanExpr (TA tsi []) = PPCleanExpr tsi.type_ident.id_name
+typeToTCleanExpr (TA tsi args)
+  # tces = map (typeToTCleanExpr o \arg -> arg.at_type) args
+  = AppCleanExpr tsi.type_ident.id_name tces
+typeToTCleanExpr ty
+  = PPCleanExpr (ppCompact (ppType ty))

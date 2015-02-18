@@ -90,7 +90,7 @@ ginTonic` is_itasks_mod main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_m
       # (menv, heaps, predef_symbols) = addTonicWrap is_itasks_mod icl_module idx menv heaps predef_symbols
       = ((case mres of
             Just (args, g, _)
-              -> put fd.fun_ident.id_name {TonicTask | tt_name = fd.fun_ident.id_name, tt_resty = fromMaybe "" (fmap (ppCompact o ppType) (functorContent (funTy fd))), tt_args = args, tt_body = g} reps
+              -> put fd.fun_ident.id_name {TonicTask | tt_name = fd.fun_ident.id_name, tt_resty = fromMaybe (PPCleanExpr "") (fmap typeToTCleanExpr (functorContent (funTy fd))), tt_args = args, tt_body = g} reps
             _ -> reps
         , heaps, predef_symbols, menv.me_fun_defs_cpy), menv.me_fun_defs)
     | is_itasks_mod && funIsTask fd && fd.fun_info.fi_def_level == 1
