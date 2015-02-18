@@ -549,7 +549,8 @@ mkBlueprint (Case cs) inh chn
         mkAp sym []   menv = (PPCleanExpr (ppCompact ('PPrint'.text sym.glob_object.ds_ident.id_name)), menv)
         mkAp sym vars menv
           # (fvds, menv) = mapSt (exprToTCleanExpr o FreeVar) vars menv
-          = (AppCleanExpr (ppCompact ('PPrint'.text sym.glob_object.ds_ident.id_name)) fvds, menv)
+          // TODO TNonAssoc?
+          = (AppCleanExpr TNonAssoc (ppCompact ('PPrint'.text sym.glob_object.ds_ident.id_name)) fvds, menv)
   mkAlts c=:(BasicPatterns bt bps) chn
     # ((bps, syns), chn) = foldr f (([], []), chn) bps
     = ((BasicPatterns bt bps, syns), chn)

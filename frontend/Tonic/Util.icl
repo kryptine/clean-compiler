@@ -607,26 +607,43 @@ pdssAreDefined [pds:xs] pdss
   | predefIsUndefined tune_symb = (False, pdss)
   | otherwise                   = pdssAreDefined xs pdss
 
+ppAssoc LeftAssoc  = "LeftAssoc"
+ppAssoc RightAssoc = "RightAssoc"
+ppAssoc NoAssoc    = "NoAssoc"
+
+ppPrio (Prio assoc prio) = "Prio " +++ ppAssoc assoc +++ " " +++ toString prio
+ppPrio NoPrio = "NoPrio"
+
+mkTAssoc :: (Maybe FunType) -> TAssoc
+mkTAssoc Nothing = TNonAssoc
+mkTAssoc (Just ft)
+  = case ft.ft_priority of
+      (Prio LeftAssoc _)  -> TLeftAssoc
+      (Prio RightAssoc _) -> TRightAssoc
+      _                   -> TNonAssoc
+
 exprToTCleanExpr :: Expression *ModuleEnv -> *(TCleanExpr, *ModuleEnv)
 exprToTCleanExpr (App app) menv
   # ((_, args), menv) = dropAppContexts app menv
   = case args of
       [] = (PPCleanExpr app.app_symb.symb_ident.id_name, menv)
       xs
+        # (mft, menv)  = reifyFunType app.app_symb menv
         # (tces, menv) = mapSt exprToTCleanExpr args menv
-        = (AppCleanExpr app.app_symb.symb_ident.id_name tces, menv)
+        = (AppCleanExpr (mkTAssoc mft) app.app_symb.symb_ident.id_name tces, menv)
 exprToTCleanExpr expr menv
   # (doc, menv) = ppExpression expr menv
   = (PPCleanExpr (ppCompact doc), menv)
 
+// TODO Associativity?
 typeToTCleanExpr :: Type -> TCleanExpr
 typeToTCleanExpr (TA tsi []) = PPCleanExpr tsi.type_ident.id_name
 typeToTCleanExpr (TA tsi args)
   # tces = map (typeToTCleanExpr o \arg -> arg.at_type) args
-  = AppCleanExpr tsi.type_ident.id_name tces
+  = AppCleanExpr TNonAssoc tsi.type_ident.id_name tces
 typeToTCleanExpr (TAS tsi [] _) = PPCleanExpr tsi.type_ident.id_name
 typeToTCleanExpr (TAS tsi args _)
   # tces = map (typeToTCleanExpr o \arg -> arg.at_type) args
-  = AppCleanExpr tsi.type_ident.id_name tces
+  = AppCleanExpr TNonAssoc tsi.type_ident.id_name tces
 typeToTCleanExpr ty
   = PPCleanExpr (ppCompact (ppType ty))
