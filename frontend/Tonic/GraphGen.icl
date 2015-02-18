@@ -190,13 +190,23 @@ varIsListOfTask bv inh
       Nothing -> False
       Just t  -> typeIsListOfTask t
 
+exprToTCleanExpr :: Expression *ModuleEnv -> *(TCleanExpr, *ModuleEnv)
+exprToTCleanExpr (App app) menv
+  # ((_, args), menv) = dropAppContexts app menv
+  = case args of
+      [] = (PPCleanExpr app.app_symb.symb_ident.id_name, menv)
+      xs
+        # (tces, menv) = mapSt exprToTCleanExpr args menv
+        = (AppCleanExpr app.app_symb.symb_ident.id_name tces, menv)
+exprToTCleanExpr expr menv
+  # (doc, menv) = ppExpression expr menv
+  = (PPCleanExpr (ppCompact doc), menv)
+
 mkBlueprint :: Expression InhExpression *ChnExpression -> *(SynExpression, *ChnExpression)
 mkBlueprint (App app) inh chn
   # (idIsTask, menv) = symbIdentIsTask app.app_symb chn.chn_module_env
-  # (appD, menv)     = ppApp app menv
-  # chn              = {chn & chn_module_env = menv}
   | idIsTask
-    # ((ctxs, args), menv) = dropAppContexts app chn.chn_module_env
+    # ((ctxs, args), menv) = dropAppContexts app menv
     # chn                  = { chn & chn_module_env = menv }
     = case appFunName app of
         ">>="      -> mkBind      app ctxs args inh chn
@@ -215,7 +225,10 @@ mkBlueprint (App app) inh chn
         "set"      -> mkSetShare  app ctxs args inh chn
         "upd"      -> mkUpdShare  app ctxs args inh chn
         _          -> mkTaskApp   app ctxs args inh chn
-  | otherwise = ({syn_annot_expr = App app, syn_texpr = TCleanExpr [] (ppCompact appD)}, chn)
+  | otherwise
+      # (apptcle, menv) = exprToTCleanExpr (App app) menv
+      # chn             = {chn & chn_module_env = menv}
+      = ({syn_annot_expr = App app, syn_texpr = TCleanExpr [] apptcle}, chn)
   where
   mkBind app ctxs args inh chn
     = withTwo app args f inh chn
@@ -226,9 +239,9 @@ mkBlueprint (App app) inh chn
       = ({ syn_annot_expr = App { app & app_args = ctxs ++ [synl.syn_annot_expr, synr.syn_annot_expr] }
          , syn_texpr = TBind synl.syn_texpr lbl synr.syn_texpr}, chnr)
     f lhsExpr rhsExpr chn
-      # (d, menv) = ppExpression rhsExpr chn.chn_module_env
+      # (tce, menv) = exprToTCleanExpr rhsExpr chn.chn_module_env
       = ({ syn_annot_expr = App { app & app_args = ctxs ++ [lhsExpr, rhsExpr] }
-         , syn_texpr = TVar inh.inh_ids (ppCompact d)}, {chn & chn_module_env = menv})
+         , syn_texpr = TCleanExpr inh.inh_ids tce}, {chn & chn_module_env = menv})
 
   mkReturn app ctxs args=:[e:_] inh chn
     # (syn, chn) = mkBlueprint e (addInhId inh 0) chn
@@ -353,16 +366,15 @@ mkBlueprint (App app) inh chn
           = (CustomFilter fn, contApp, chn)
 
   mkTaskApp app ctxs args inh chn
-    # (ps, menv)    = mapSt ppExpression args chn.chn_module_env
-    # (dclnm, menv) = case reifyDclModule app.app_symb menv of
+    # (dclnm, menv) = case reifyDclModule app.app_symb chn.chn_module_env of
                         (Just dcl, menv) = (dcl.dcl_name.id_name, menv)
                         (_       , menv)
                           # (iclmod, menv) = menv!me_icl_module
                           = (iclmod.icl_name.id_name, menv)
+    # (ps, menv)    = mapSt exprToTCleanExpr args menv
     # chn           = {chn & chn_module_env = menv}
-    # appArgs       = map ppCompact ps  // TODO : When do we pprint a Clean expr? And when do we generate a subgraph?
     # (app`, chn)   = wrapTaskApp (App app) inh chn
-    = ({syn_annot_expr = app`, syn_texpr = TTaskApp inh.inh_ids dclnm (appFunName app) (map (TVar []) appArgs)}, chn)
+    = ({syn_annot_expr = app`, syn_texpr = TTaskApp inh.inh_ids dclnm (appFunName app) (map (TCleanExpr []) ps)}, chn)
 
   mkTransform app ctxs args inh chn
     = withTwo app args f inh chn
@@ -579,7 +591,7 @@ mkBlueprint (Var bv) inh chn
 mkBlueprint expr=:(BasicExpr bv) _ chn
   # (ppbv, menv) = ppBasicValue bv chn.chn_module_env
   # chn          = {chn & chn_module_env = menv}
-  = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] (ppCompact ppbv)}, chn)
+  = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] (PPCleanExpr (ppCompact ppbv))}, chn)
 
 //mkBlueprint expr=:(DictionariesFunction _ _ _) _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "1"}, chn)
 //mkBlueprint expr=:(Selection _ _ _)            _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "2"}, chn)
@@ -600,7 +612,7 @@ mkBlueprint expr=:(BasicExpr bv) _ chn
 //mkBlueprint expr=:(EE)                         _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "18"}, chn)
 //mkBlueprint expr=:(NoBind _)                   _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "19"}, chn)
 //mkBlueprint expr=:(FailExpr _)                 _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "20"}, chn)
-mkBlueprint expr _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "(mkBlueprint fallthrough)"}, chn)
+mkBlueprint expr _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] (PPCleanExpr "(mkBlueprint fallthrough)")}, chn)
 
 mkEdge :: App Int InhExpression *ChnExpression -> *(Maybe String, SynExpression, *ChnExpression)
 mkEdge app=:{app_symb, app_args} n inh chn
