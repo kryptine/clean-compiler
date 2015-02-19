@@ -432,18 +432,26 @@ mkBlueprint (App app) inh chn
                  , syn_texpr      = TParallel inh.inh_ids (mkPar (PP ppStr))}, chn)
         _ = abort "mkParN args fallthrough; shouldn't happen"
 
+  // TODO Look at this some more
   mkGetShare app ctxs args=:[App {app_symb, app_args}:_] inh chn
-    = mkShare app Get app_symb app_args chn
+    = mkShareApp app Get app_symb app_args chn
+  mkGetShare app ctxs args=:[Var v] inh chn
+    = mkShareVar app Get v chn
 
   mkSetShare app ctxs args=:[a1=:(App _):App {app_symb, app_args}:_] inh chn
     # (ppe1, menv) = ppExpression a1 chn.chn_module_env
-    = mkShare app (Set (ppCompact ppe1)) app_symb app_args {chn & chn_module_env = menv}
+    = mkShareApp app (Set (ppCompact ppe1)) app_symb app_args {chn & chn_module_env = menv}
+  mkSetShare app ctxs args=:[Var v] inh chn
+    = mkShareVar app (Set "TODO") v chn
 
   mkUpdShare app ctxs args=:[a1=:(App _):App {app_symb, app_args}:_] inh chn
     # (ppe1, menv) = ppExpression a1 chn.chn_module_env
-    = mkShare app (Upd (ppCompact ppe1)) app_symb app_args {chn & chn_module_env = menv}
+    = mkShareApp app (Upd (ppCompact ppe1)) app_symb app_args {chn & chn_module_env = menv}
+  mkUpdShare app ctxs args=:[a1=:(App _) : Var v : _] inh chn
+    # (ppe1, menv) = ppExpression a1 chn.chn_module_env
+    = mkShareVar app (Upd (ppCompact ppe1)) v {chn & chn_module_env = menv}
 
-  mkShare app tsh app_symb app_args chn
+  mkShareApp app tsh app_symb app_args chn
     # (ads, menv) = mapSt ppExpression app_args chn.chn_module_env
     # (var, vars) =
         if (app_symb.symb_ident.id_name == "sharedStore")
@@ -452,6 +460,11 @@ mkBlueprint (App app) inh chn
              [ad:ads] -> (ppCompact ad, ads))
           (app_symb.symb_ident.id_name, ads)
     = ({syn_annot_expr = App app, syn_texpr = TShare tsh var (map ppCompact vars)}
+      , {chn & chn_module_env = menv})
+
+  mkShareVar app tsh var chn
+    # (bvd, menv) = ppBoundVar var chn.chn_module_env
+    = ({syn_annot_expr = App app, syn_texpr = TShare tsh (ppCompact bvd) []}
       , {chn & chn_module_env = menv})
 
   // Transformation for higher-order function application
@@ -532,7 +545,7 @@ mkBlueprint (Let lt) inh chn
   //   let _case_var = True
   //   in case _case_var of ...
 
-  // TODO Refactor this. Also fix default case for If. Also persist numbering?
+  // TODO Refactor this. Also persist numbering?
 mkBlueprint (Case cs) inh chn
   # inh                   = {inh & inh_case_expr = Nothing }
   # (ed, menv)            = ppExpression caseExpr chn.chn_module_env
@@ -540,7 +553,10 @@ mkBlueprint (Case cs) inh chn
   # ((def, syns), chn)    = case cs.case_default of
                               Yes def
                                 # (syn, chn) = mkAlts` def chn
-                                = ((Yes syn.syn_annot_expr, [(PPCleanExpr "_", syn):syns]), chn)
+                                = case syns of
+                                    [(PPCleanExpr "True", _)]
+                                      = ((Yes syn.syn_annot_expr, [(PPCleanExpr "False", syn):syns]), chn)
+                                    _ = ((Yes syn.syn_annot_expr, [(PPCleanExpr "_", syn):syns]), chn)
                               _ = ((No, syns), chn)
   = ({ syn_annot_expr = Case {cs & case_default = def, case_guards = guards}
      , syn_texpr = TCaseOrIf (ppCompact ed) (map (\(d, s) -> (d, s.syn_texpr)) syns)}, chn)
