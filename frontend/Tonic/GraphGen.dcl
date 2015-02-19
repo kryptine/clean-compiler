@@ -11,5 +11,5 @@ from Text.PPrint import :: Doc
 from Data.Map import :: Map
 from predef import :: PredefinedSymbol, :: PredefinedSymbols
 
-funToGraph :: FunDef *ModuleEnv *Heaps *PredefinedSymbols -> *(Maybe ([(VariableName, TCleanExpr)], TExpr, Expression), *ModuleEnv, *Heaps, *PredefinedSymbols)
+funToGraph :: FunDef *ModuleEnv *Heaps *PredefinedSymbols -> *(Maybe ([(TCleanExpr, TCleanExpr)], TExpr, Expression), *ModuleEnv, *Heaps, *PredefinedSymbols)
 
