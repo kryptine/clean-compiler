@@ -490,7 +490,9 @@ mkBlueprint (App app) inh chn
 
   mkShareVar app tsh var chn
     # (bvd, menv) = ppBoundVar var chn.chn_module_env
-    = ({syn_annot_expr = App app, syn_texpr = TShare tsh (ppCompact bvd) []}
+    = ({ syn_annot_expr = App app
+       , syn_texpr      = TShare tsh (ppCompact bvd) []
+       , syn_pattern_match_vars = []}
       , {chn & chn_module_env = menv})
 
   // Transformation for higher-order function application
