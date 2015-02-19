@@ -488,6 +488,11 @@ mkBlueprint (App app) inh chn
        , syn_pattern_match_vars = []}
       , {chn & chn_module_env = menv})
 
+  mkShareVar app tsh var chn
+    # (bvd, menv) = ppBoundVar var chn.chn_module_env
+    = ({syn_annot_expr = App app, syn_texpr = TShare tsh (ppCompact bvd) []}
+      , {chn & chn_module_env = menv})
+
   // Transformation for higher-order function application
   // E.g. f g x = g x becomes f = g @ x
   // In GiN, there are two ways to introduce a lambda function: either write one
