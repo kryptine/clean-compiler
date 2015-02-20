@@ -109,8 +109,7 @@ ppDebugExpression (Selection sk e ss)  menv
   # (sd, menv) = mapSt ppSelection ss menv
   = (text "<Selection>" <+> ed <-> mkRecSel sd, menv)
 ppDebugExpression (BasicExpr bv)       menv
-  # (bvd, menv) = ppBasicValue bv menv
-  = (text "<BasicValue>" <+> bvd, menv)
+  = (text "<BasicValue>" <+> ppBasicValue bv, menv)
 ppDebugExpression _                    menv = (text "ppDebugExpression: _", menv) // empty
 
 ppExpression :: Expression *ModuleEnv -> *(Doc, *ModuleEnv)
@@ -131,7 +130,7 @@ ppExpression (Selection sk e ss)  menv
   # (selsd, menv) = mapSt ppSelection ss menv
   = (ed <-> mkRecSel selsd, menv)
 ppExpression (FreeVar fv)                 menv = ppFreeVar fv menv
-ppExpression (BasicExpr bv)               menv = ppBasicValue bv menv
+ppExpression (BasicExpr bv)               menv = (ppBasicValue bv, menv)
 ppExpression (Let _)                      menv = (text "ppExpression: Let", menv) // empty
 ppExpression (Case _)                     menv = (text "ppExpression: Case", menv) // empty
 ppExpression (Update _ _ _)               menv = (text "ppExpression: Update", menv) // empty
@@ -159,13 +158,13 @@ mkRecSel ds = char '.' <-> hcat (intersperse (char '.') ds)
 ppFreeVar :: FreeVar *ModuleEnv -> *(Doc, *ModuleEnv)
 ppFreeVar fv menv = ppIdent fv.fv_ident menv
 
-ppBasicValue :: BasicValue *ModuleEnv -> *(Doc, *ModuleEnv)
-ppBasicValue (BVI   str)  menv = (text str, menv)
-ppBasicValue (BVInt i)    menv = (int i, menv)
-ppBasicValue (BVC   str)  menv = (text str, menv)
-ppBasicValue (BVB   b)    menv = (bool b, menv)
-ppBasicValue (BVR   str)  menv = (text str, menv)
-ppBasicValue (BVS   str)  menv = (text str, menv)
+ppBasicValue :: BasicValue -> Doc
+ppBasicValue (BVI   str) = text str
+ppBasicValue (BVInt i)   = int i
+ppBasicValue (BVC   str) = text str
+ppBasicValue (BVB   b)   = bool b
+ppBasicValue (BVR   str) = text str
+ppBasicValue (BVS   str) = text str
 
 ppSelection :: Selection *ModuleEnv -> *(Doc, *ModuleEnv)
 ppSelection (RecordSelection gds n)             menv = ppDefinedSymbol gds.glob_object menv

@@ -27,47 +27,6 @@ import iTasks.Framework.Tonic.AbsSyn
 import StdMisc
 
 /*
-To reconstruct list comprehensions:
-- Look for a top-level function starting with c; and call it f
-- The argument of the lifted function is the list from which you draw elements, but is has a generated name.
-  The original name of the generator variable (if any) can be found in this call site of the comprehension function.
-- The left-hand side (before the \\) of the comprehension is the first argument to the _Cons case
-- ...
-- Throw away f
-- Replace all occurences of f with the reconstructed expression
-- Repeat
-*/
-
-//funToListCompr fd
-  //| fd.fun_ident.id_name.[0] == "c" =  // Is a list comprehension
-  //| otherwise                       = Nothing
-
-//edgeErr :: String (Maybe Int) Expression (Maybe Int) Expression *ChnExpression -> *(SynExpression, *ChnExpression)
-//edgeErr errmsg lid lexpr rid rexpr chn
-  //# (err1, chn) = nodeErr lid lexpr chn
-  //# (err2, chn) = nodeErr rid rexpr chn
-  //= abort ("Cannot create " +++ errmsg
-           //+++ " between left expression\n\t" +++ err1
-           //+++ " and right expression\n\t" +++ err2 +++ "\n")
-
-// TODO: Check whether nodes already exist. How? Perhaps uniquely number all
-// expressions first and attach that ID to the graph nodes? Or just by task
-// name? Latter probably easiest.
-
-// As for recursion: merge nodes map to tail-recursive call of the corresponding
-// function in the let binding in the original Gin paper. Here, we also allow it
-// to recurse to the original function.
-//
-// If arguments to a recursive call are somehow different from the variables
-// that have been passed to the original function, an assignment let block must
-// be generated.
-
-// TODO: Look up fun_type in FunDef to get an `Optional SymbolType`. Get the
-// length of the symbol type's st_context to determine how many contexts there
-// are. Drop these from the beginning of the argument list.
-
-
-/*
 
 [(x, y) \\ x <- xs & y <- ys]
 ==
@@ -112,6 +71,67 @@ after z in zs
 given x == y && y == z
 (x, y, z)
 */
+mkCompr :: ParsedExpr -> TExpr
+mkCompr (PE_ListCompr _ _ expr qualifiers) = TListCompr (TCleanExpr [] (mkLCExpr expr)) [] (PPCleanExpr "TODO GUARDS")
+  where
+  mkLCExpr (PE_Ident ident) = PPCleanExpr ident.id_name
+  mkLCExpr (PE_Basic b)     = PPCleanExpr (ppCompact (ppBasicValue b))
+  mkLCExpr (PE_Tuple es)    = AppCleanExpr TNonAssoc (predefined_idents.[GetTupleConsIndex (length es)].id_name) (map mkLCExpr es)
+  mkLCExpr _                = PPCleanExpr "TODO"
+  //mkLCExpr lc=:(PE_ListCompr _ _ _ _) = "PE_ListCompr"
+  //mkLCExpr (PE_List _) = "PE_List"
+  //mkLCExpr (PE_Bound be) = "PE_Bound"
+  //mkLCExpr (PE_Lambda _ _ _ _) = "PE_Lambda"
+  //mkLCExpr (PE_Record _ _ _) = "PE_Record"
+  //mkLCExpr (PE_ArrayPattern _) = "PE_ArrayPattern"
+  //mkLCExpr (PE_UpdateComprehension _ _ _ _) = "PE_UpdateComprehension"
+  //mkLCExpr (PE_ArrayDenot _ _) = "PE_ArrayDenot"
+  //mkLCExpr (PE_Selection _ _ _) = "PE_Selection"
+  //mkLCExpr (PE_Update _ _ _) = "PE_Update"
+  //mkLCExpr (PE_Case _ _ _) = "PE_Case"
+  //mkLCExpr (PE_If _ _ _ _) = "PE_If"
+  //mkLCExpr (PE_Let _ _) = "PE_Let"
+  //mkLCExpr (PE_ArrayCompr _ _ _) = "PE_ArrayCompr"
+  //mkLCExpr (PE_Sequ _) = "PE_Sequ"
+  //mkLCExpr (PE_WildCard) = "PE_WildCard"
+  //mkLCExpr (PE_Matches _ _ _ _) = "PE_Matches"
+  //mkLCExpr (PE_QualifiedIdent _ _) = "PE_QualifiedIdent"
+  //mkLCExpr (PE_ABC_Code _ _) = "PE_ABC_Code"
+  //mkLCExpr (PE_Any_Code _ _ _) = "PE_Any_Code"
+  //mkLCExpr (PE_DynamicPattern _ _) = "PE_DynamicPattern"
+  //mkLCExpr (PE_Dynamic _ _) = "PE_Dynamic"
+  //mkLCExpr (PE_Generic _ _) = "PE_Generic"
+  //mkLCExpr (PE_TypeSignature _ _) = "PE_TypeSignature"
+  //mkLCExpr (PE_Empty) = "PE_Empty"
+
+ppPE lc=:(PE_ListCompr _ _ _ _) = "PE_ListCompr"
+ppPE (PE_List _) = "PE_List"
+ppPE (PE_Ident ident) = ident.id_name
+ppPE (PE_Basic _) = "PE_Basic"
+ppPE (PE_Bound _) = "PE_Bound"
+ppPE (PE_Lambda _ _ _ _) = "PE_Lambda"
+ppPE (PE_Tuple es) = predefined_idents.[GetTupleConsIndex (length es)].id_name
+ppPE (PE_Record _ _ _) = "PE_Record"
+ppPE (PE_ArrayPattern _) = "PE_ArrayPattern"
+ppPE (PE_UpdateComprehension _ _ _ _) = "PE_UpdateComprehension"
+ppPE (PE_ArrayDenot _ _) = "PE_ArrayDenot"
+ppPE (PE_Selection _ _ _) = "PE_Selection"
+ppPE (PE_Update _ _ _) = "PE_Update"
+ppPE (PE_Case _ _ _) = "PE_Case"
+ppPE (PE_If _ _ _ _) = "PE_If"
+ppPE (PE_Let _ _) = "PE_Let"
+ppPE (PE_ArrayCompr _ _ _) = "PE_ArrayCompr"
+ppPE (PE_Sequ _) = "PE_Sequ"
+ppPE (PE_WildCard) = "PE_WildCard"
+ppPE (PE_Matches _ _ _ _) = "PE_Matches"
+ppPE (PE_QualifiedIdent _ _) = "PE_QualifiedIdent"
+ppPE (PE_ABC_Code _ _) = "PE_ABC_Code"
+ppPE (PE_Any_Code _ _ _) = "PE_Any_Code"
+ppPE (PE_DynamicPattern _ _) = "PE_DynamicPattern"
+ppPE (PE_Dynamic _ _) = "PE_Dynamic"
+ppPE (PE_Generic _ _) = "PE_Generic"
+ppPE (PE_TypeSignature _ _) = "PE_TypeSignature"
+ppPE (PE_Empty) = "PE_Empty"
 
 withTwo :: App [Expression] (Expression Expression *ChnExpression -> *(SynExpression, *ChnExpression)) InhExpression *ChnExpression -> *(SynExpression, *ChnExpression)
 withTwo app []        _ _   chn = ({syn_annot_expr = App app, syn_texpr = TVar [] "TODO withTwo []", syn_pattern_match_vars = []}, chn)
@@ -201,7 +221,7 @@ exprToTCleanExpr (App app) menv
 exprToTCleanExpr expr menv
   # (doc, menv) = ppExpression expr menv
   = (PPCleanExpr (ppCompact doc), menv)
-
+import StdDebug
 mkBlueprint :: Expression InhExpression *ChnExpression -> *(SynExpression, *ChnExpression)
 mkBlueprint (App app) inh chn
   # (idIsTask, menv) = symbIdentIsTask app.app_symb chn.chn_module_env
@@ -488,13 +508,6 @@ mkBlueprint (App app) inh chn
        , syn_pattern_match_vars = []}
       , {chn & chn_module_env = menv})
 
-  mkShareVar app tsh var chn
-    # (bvd, menv) = ppBoundVar var chn.chn_module_env
-    = ({ syn_annot_expr = App app
-       , syn_texpr      = TShare tsh (ppCompact bvd) []
-       , syn_pattern_match_vars = []}
-      , {chn & chn_module_env = menv})
-
   // Transformation for higher-order function application
   // E.g. f g x = g x becomes f = g @ x
   // In GiN, there are two ways to introduce a lambda function: either write one
@@ -537,6 +550,19 @@ mkBlueprint (Let lt) inh chn
                         | bnd.lb_dst.fv_ident.id_name == "_case_var"]
   = mkLet mexpr lt inh chn
   where
+  mkLet (Just expr=:(App app)) lt inh chn
+    | appIsListComp app
+        = case [orig \\ (ident, orig) <- inh.inh_list_compr
+                      | app.app_symb.symb_ident.id_name == ident] of
+            []
+              # (syn, chn) = mkBlueprint lt.let_expr (addInhId {inh & inh_case_expr = Just expr} 0) chn
+              # l          = {lt & let_expr = syn.syn_annot_expr}
+              = ({syn & syn_annot_expr = Let l}, chn)
+              // TODO Reconstruct the LC
+            [orig:_]
+              # (syn, chn) = mkBlueprint lt.let_expr (addInhId {inh & inh_case_expr = Just expr} 0) chn
+              # l          = {lt & let_expr = syn.syn_annot_expr}
+              = ({syn & syn_annot_expr = Let l}, chn)
   mkLet (Just expr) lt inh chn
     # (syn, chn) = mkBlueprint lt.let_expr (addInhId {inh & inh_case_expr = Just expr} 0) chn
     # l          = {lt & let_expr = syn.syn_annot_expr}
@@ -556,7 +582,7 @@ mkBlueprint (Let lt) inh chn
       where
       f bnd (xs, menv)
         # (pprhs, menv) = ppExpression bnd.lb_src menv
-        = ([(PPCleanExpr bnd.lb_dst.fv_ident.id_name, ppCompact pprhs):xs], menv)
+        = ([(PPCleanExpr bnd.lb_dst.fv_ident.id_name, TCleanExpr [] (PPCleanExpr (ppCompact pprhs))):xs], menv)
    getLetBinds lt = lt.let_strict_binds ++ lt.let_lazy_binds
   // TODO: For cases, the compiler introduces a fresh variable in a let for the
   // matches expression. E.g.
@@ -580,10 +606,10 @@ mkBlueprint (Let lt) inh chn
 
   // TODO Refactor this. Also persist numbering?
 mkBlueprint (Case cs) inh chn
-  # inh        = {inh & inh_case_expr = Nothing }
+  # caseExpr   = fromMaybe cs.case_expr inh.inh_case_expr
   # (ed, menv) = ppExpression caseExpr chn.chn_module_env
   # chn        = {chn & chn_module_env = menv}
-  = case (ppCompact ed, caseExpr, cs.case_guards) of
+  = case (ppCompact ed, cs.case_expr, cs.case_guards) of
       ("_x", Var bv, AlgebraicPatterns gi [ap])
         # (syn, chn)   = mkAlts` ap.ap_expr chn
         # (fvds, menv) = mapSt (exprToTCleanExpr o FreeVar) ap.ap_vars chn.chn_module_env
@@ -604,10 +630,9 @@ mkBlueprint (Case cs) inh chn
                                           _ = ((Yes syn.syn_annot_expr, [(PPCleanExpr "_", syn):syns]), chn)
                                     _ = ((No, syns), chn)
         = ({ syn_annot_expr = Case {cs & case_default = def, case_guards = guards}
-           , syn_texpr      = TCaseOrIf (ppCompact ed) (map (\(d, s) -> (d, s.syn_texpr)) syns)
+           , syn_texpr      = TCaseOrIf (TCleanExpr [] (PPCleanExpr (ppCompact ed))) (map (\(d, s) -> (d, s.syn_texpr)) syns)
            , syn_pattern_match_vars = foldr (\(_, syn) acc -> syn.syn_pattern_match_vars ++ acc) [] syns}, chn)
   where
-  caseExpr = fromMaybe cs.case_expr inh.inh_case_expr
   mkAlts c=:(AlgebraicPatterns gi aps) chn
     # ((aps, syns), chn) = foldr f (([], []), chn) aps
     = ((AlgebraicPatterns gi aps, syns), chn)
@@ -630,16 +655,14 @@ mkBlueprint (Case cs) inh chn
     = ((BasicPatterns bt bps, syns), chn)
     where
       f bp ((bps, syns), chn)
-        # menv        = chn.chn_module_env
-        # (bvd, menv) = ppBasicValue bp.bp_value menv
-        # chn         = {chn & chn_module_env = menv}
         # (syn, chn)  = mkAlts` bp.bp_expr chn
         # bp          = {bp & bp_expr = syn.syn_annot_expr}
-        = (([bp:bps], [(PPCleanExpr (ppCompact bvd), syn):syns]), chn)
+        = (([bp:bps], [(PPCleanExpr (ppCompact (ppBasicValue bp.bp_value)), syn):syns]), chn)
   mkAlts c chn = ((c, []), chn)
 
-  mkAlts` :: Expression ChnExpression -> (SynExpression, ChnExpression)
+  mkAlts` :: Expression *ChnExpression -> *(SynExpression, *ChnExpression)
   mkAlts` expr chn
+    # inh        = {inh & inh_case_expr = Nothing }
     # (syn, chn) = mkBlueprint expr (addInhId inh 0) chn
     # menv       = chn.chn_module_env
     # (d, menv)  = ppExpression expr menv
@@ -657,10 +680,8 @@ mkBlueprint (Var bv) inh chn
          , syn_texpr      = TVar [] bv.var_ident.id_name
          , syn_pattern_match_vars = []}, chn)
 mkBlueprint expr=:(BasicExpr bv) _ chn
-  # (ppbv, menv) = ppBasicValue bv chn.chn_module_env
-  # chn          = {chn & chn_module_env = menv}
   = ({ syn_annot_expr = expr
-     , syn_texpr      = TCleanExpr [] (PPCleanExpr (ppCompact ppbv))
+     , syn_texpr      = TCleanExpr [] (PPCleanExpr (ppCompact (ppBasicValue bv)))
      , syn_pattern_match_vars = []}, chn)
 
 //mkBlueprint expr=:(DictionariesFunction _ _ _) _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "1"}, chn)
@@ -713,12 +734,12 @@ mkEdge app=:{app_symb, app_args} n inh chn
       , {chn & chn_module_env = menv})
 
 // TODO Relate the match_vars from the body to the vars from the arguments
-funToGraph :: FunDef *ModuleEnv *Heaps *PredefinedSymbols
+funToGraph :: FunDef [(String, ParsedExpr)] *ModuleEnv *Heaps *PredefinedSymbols
            -> *(Maybe ([(TCleanExpr, TCleanExpr)], TExpr, Expression), *ModuleEnv, *Heaps, *PredefinedSymbols)
-funToGraph fd=:{fun_ident=fun_ident, fun_body = TransformedBody tb} menv heaps predef_symbols = mkBody
+funToGraph fd=:{fun_ident=fun_ident, fun_body = TransformedBody tb} list_comprehensions menv heaps predef_symbols = mkBody
   where
   mkBody
-    # inh             = mkInhExpr fun_ident.id_name
+    # inh             = mkInhExpr fun_ident.id_name list_comprehensions
     # chn             = mkChnExpr predef_symbols menv heaps
     # (argTys, tyenv) = zipWithSt (\arg t st -> ((arg, t), 'DM'.put arg.fv_ident.id_name t st)) tb.tb_args (funArgTys fd) 'DM'.newMap
     # (syn, chn)      = mkBlueprint tb.tb_rhs {inh & inh_tyenv = tyenv} chn
@@ -732,4 +753,4 @@ funToGraph fd=:{fun_ident=fun_ident, fun_body = TransformedBody tb} menv heaps p
               [x:_] -> x
         idnm
           = PPCleanExpr idnm
-funToGraph _ menv heaps predef_symbols = (Nothing, menv, heaps, predef_symbols)
+funToGraph _ _ menv heaps predef_symbols = (Nothing, menv, heaps, predef_symbols)

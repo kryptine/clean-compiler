@@ -6,7 +6,7 @@ from syntax import :: Expression (..), :: BoundVar, :: App {..}, :: Let, :: Case
   :: Bind, :: Position, :: AType, :: Env, :: Ident, :: Level, :: ExprInfoPtr, :: ExprInfo,
   :: TypeCodeExpression, :: GlobalIndex, :: Conditional, :: BasicValue, :: FieldSymbol,
   :: IclModule, :: DclModule, :: FunDef, :: Optional, :: SymbolType, :: LetBind,
-  :: ModuleN, :: Type
+  :: ModuleN, :: Type, :: ParsedExpr
 from checksupport import :: Heaps
 from Data.Graph import :: Graph
 from Data.Maybe import :: Maybe
@@ -18,11 +18,12 @@ from iTasks.Framework.Tonic.AbsSyn import :: TExpr, :: ExprId, :: TypeName, :: M
 // InhExpression and ChnExpression need strict fields in order to prevent a bus
 // error caused by huge thunks
 :: InhExpression =
-  { inh_curr_task_name   :: !String
-  , inh_case_expr        :: !Maybe Expression
-  , inh_is_bind_lam      :: !Bool
-  , inh_ids              :: !ExprId
-  , inh_tyenv            :: !Map String Type
+  { inh_curr_task_name :: !String
+  , inh_case_expr      :: !Maybe Expression
+  , inh_is_bind_lam    :: !Bool
+  , inh_ids            :: !ExprId
+  , inh_tyenv          :: !Map String Type
+  , inh_list_compr     :: ![(String, ParsedExpr)]
   }
 
 :: *ChnExpression =
@@ -38,14 +39,14 @@ from iTasks.Framework.Tonic.AbsSyn import :: TExpr, :: ExprId, :: TypeName, :: M
   }
 
 :: *ModuleEnv =
-  { me_main_dcl_module_n  :: !Int
-  , me_fun_defs           :: !*{#FunDef}
-  , me_fun_defs_cpy       :: !*{#FunDef}
-  , me_icl_module         :: !IclModule
-  , me_dcl_modules        :: !{#DclModule}
+  { me_main_dcl_module_n :: !Int
+  , me_fun_defs          :: !*{#FunDef}
+  , me_fun_defs_cpy      :: !*{#FunDef}
+  , me_icl_module        :: !IclModule
+  , me_dcl_modules       :: !{#DclModule}
   }
 
-mkInhExpr :: String -> InhExpression
+mkInhExpr :: String [(String, ParsedExpr)] -> InhExpression
 
 mkChnExpr :: *PredefinedSymbols *ModuleEnv *Heaps -> *ChnExpression
 

@@ -9,6 +9,7 @@ import genericsupport
 	,	ca_fun_count	:: !Int
 	,	ca_rev_fun_defs	:: ![FunDef]
 	,	ca_hash_table	:: !*HashTable
+	,	ca_compr		:: ![(String, ParsedExpr)]
 	}
 
 cIsAGlobalDef		:== True
@@ -146,8 +147,11 @@ where
 	collectFunctions (PE_Let locals in_expr) icl_module ca
 		# ((node_defs,in_expr), ca) = collectFunctions (locals,in_expr) icl_module ca
 		= (PE_Let node_defs in_expr, ca)
-	collectFunctions (PE_ListCompr predef_cons_index predef_nil_index expr qualifiers) icl_module ca
+	collectFunctions orig=:(PE_ListCompr predef_cons_index predef_nil_index expr qualifiers) icl_module ca
 		# (compr, ca) = transformListComprehension predef_cons_index predef_nil_index expr qualifiers ca
+        # ca = case compr of
+                 PE_Let (LocalParsedDefs [PD_Function _ ident _ _ _ _]) _ -> { ca & ca_compr = [(ident.id_name, orig):ca.ca_compr] }
+                 _ -> ca
 		= collectFunctions compr icl_module ca
 	collectFunctions (PE_ArrayCompr array_kind expr qualifiers) icl_module ca
 		# (compr, ca) = transformArrayComprehension array_kind expr qualifiers ca
@@ -1067,13 +1071,14 @@ where
 		= (pea_ok && import_ok, parsed_modules,files, ca)
 
 scanModule :: !ParsedModule ![Ident] !Bool !Bool !*HashTable !*File !SearchPaths (ModTimeFunction *Files) !*Files
-	-> (!Bool, !ScannedModule, !IndexRange, ![FunDef], !Optional ScannedModule, ![ScannedModule],!Int,!*HashTable, !*File, !*Files)
+	-> (!Bool, !ScannedModule, !IndexRange, ![FunDef], !Optional ScannedModule, ![ScannedModule],!Int, [(String, ParsedExpr)], !*HashTable, !*File, !*Files)
 scanModule mod=:{mod_ident,mod_type,mod_defs = pdefs} cached_modules support_generics support_dynamics hash_table err_file searchPaths /*predefs*/ modtimefunction files
 	# predefIdents = predefined_idents
 	# ca =	{	ca_error		= {pea_file = err_file, pea_ok = True}
 			,	ca_fun_count	= 0
 			,	ca_rev_fun_defs	= []
 			,	ca_hash_table	= hash_table
+			,	ca_compr		= []
 			}
 	  (fun_defs, defs, imports, imported_objects,foreign_exports,ca) = reorganiseDefinitionsAndAddTypes mod_ident support_dynamics True pdefs ca
 
@@ -1099,6 +1104,7 @@ scanModule mod=:{mod_ident,mod_type,mod_defs = pdefs} cached_modules support_gen
 	  n_global_functions = length fun_defs
 
 	  (fun_defs, ca) = collectFunctions fun_defs True {ca & ca_fun_count=n_global_functions,ca_rev_fun_defs=[]}
+
 //	  (fun_range, ca) = addFunctionsRange fun_defs ca
 	  (macro_defs, ca) = collectFunctions defs.def_macros True ca
 	  (macro_range, ca) = addFunctionsRange macro_defs ca
@@ -1116,7 +1122,7 @@ scanModule mod=:{mod_ident,mod_type,mod_defs = pdefs} cached_modules support_gen
 	  fun_defs = fun_defs++reverse ca_rev_fun_defs
 	  fun_range = {ir_from=0,ir_to=n_global_functions}
 
-	= (reorganise_icl_ok && pea_ok && import_dcl_ok && import_dcls_ok, mod, fun_range, fun_defs, optional_dcl_mod, modules, dcl_module_n,hash_table, err_file, files)
+	= (reorganise_icl_ok && pea_ok && import_dcl_ok && import_dcls_ok, mod, fun_range, fun_defs, optional_dcl_mod, modules, dcl_module_n, ca.ca_compr, hash_table, err_file, files)
 where
 	scan_main_dcl_module :: Ident ModuleKind (ModTimeFunction *Files) *Files *CollectAdmin -> (!Bool,!Optional ScannedModule,!Int,![ScannedModule],![Ident],!*Files,!*CollectAdmin)
 	scan_main_dcl_module mod_ident MK_Main _ files ca
@@ -1726,3 +1732,4 @@ sameFixity (Prio _ _) is_infix
 	=	is_infix
 sameFixity NoPrio is_infix
 	=	not is_infix
+

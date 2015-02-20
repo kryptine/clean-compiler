@@ -48,6 +48,8 @@ exprIsListConstr :: Expression -> Bool
 
 exprIsListCompr :: Expression -> Bool
 
+appIsListComp :: App -> Bool
+
 isListCompr :: String -> Bool
 
 safeHead :: [a] -> Maybe a

@@ -16,8 +16,8 @@ import Data.Map
 import Text.JSON
 import iTasks.Framework.Tonic.AbsSyn
 
-ginTonic :: ModuleN !*{#FunDef} !*{#FunDef} IclModule {#DclModule} !{#CommonDefs} !*PredefinedSymbols *HashTable !*Files !*Heaps -> *(!*{#FunDef}, !*PredefinedSymbols, *HashTable, !*Files, !*Heaps)
-ginTonic main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules common_defs predef_symbols hash_table files heaps
+ginTonic :: ModuleN !*{#FunDef} !*{#FunDef} IclModule {#DclModule} !{#CommonDefs} [(String, ParsedExpr)] !*PredefinedSymbols *HashTable !*Files !*Heaps -> *(!*{#FunDef}, !*PredefinedSymbols, *HashTable, !*Files, !*Heaps)
+ginTonic main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules common_defs list_comprehensions predef_symbols hash_table files heaps
 // FIXME Start Tonic presence check hack
   # (tonic_module, predef_symbols) = predef_symbols![PD_iTasks_Framework_Tonic]
   | predefIsUndefined tonic_module = (fun_defs, predef_symbols, hash_table, files, heaps)
@@ -28,7 +28,7 @@ ginTonic main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules common_d
   | isSystemModule iclname         = (fun_defs, predef_symbols, hash_table, files, heaps)
   # (ok, files)                    = ensureDirectoryExists csf_directory_path files
   | not ok                         = (fun_defs, predef_symbols, hash_table, files, heaps)
-  # (tstr, fun_defs, predef_symbols, heaps) = ginTonic` (isITasksModule iclname) main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules common_defs predef_symbols heaps
+  # (tstr, fun_defs, predef_symbols, heaps) = ginTonic` (isITasksModule iclname) main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules common_defs list_comprehensions predef_symbols heaps
   # files                                   = writeTonicFile iclname tstr files
   = (fun_defs, predef_symbols, hash_table, files, heaps)
   where
@@ -71,9 +71,9 @@ toJSONString rs icl_module menv
     , menv)
 
 ginTonic` :: Bool ModuleN !*{#FunDef} !*{#FunDef} IclModule {#DclModule}
-             !{#CommonDefs} !*PredefinedSymbols *Heaps
+             !{#CommonDefs} [(String, ParsedExpr)] !*PredefinedSymbols *Heaps
           -> *(String, !*{#FunDef}, !*PredefinedSymbols, !*Heaps)
-ginTonic` is_itasks_mod main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules common_defs predef_symbols heaps
+ginTonic` is_itasks_mod main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules common_defs list_comprehensions predef_symbols heaps
   # ((reps, heaps, predef_symbols, fun_defs_cpy), fun_defs) = foldUArr appDefInfo ((newMap, heaps, predef_symbols, fun_defs_cpy), fun_defs)
   # menv        = mkModuleEnv main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules
   # (str, menv) = toJSONString reps icl_module menv
@@ -82,7 +82,7 @@ ginTonic` is_itasks_mod main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_m
   appDefInfo idx fd ((reps, heaps, predef_symbols, fun_defs_cpy), fun_defs)
     # menv = mkModuleEnv main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules
     | not is_itasks_mod && funIsTask fd && fd.fun_info.fi_def_level == 1
-      # (mres, menv, heaps, predef_symbols) = funToGraph fd menv heaps predef_symbols
+      # (mres, menv, heaps, predef_symbols) = funToGraph fd list_comprehensions menv heaps predef_symbols
       # menv = case mres of
                  Just (_, _, e)
                    -> updateWithAnnot idx e menv

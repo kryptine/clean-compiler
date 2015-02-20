@@ -24,7 +24,7 @@ mkRecSel :: [Doc] -> Doc
 
 ppFreeVar :: FreeVar *ModuleEnv -> *(Doc, *ModuleEnv)
 
-ppBasicValue :: BasicValue *ModuleEnv -> *(Doc, *ModuleEnv)
+ppBasicValue :: BasicValue -> Doc
 
 ppSelection :: Selection *ModuleEnv -> *(Doc, *ModuleEnv)
 

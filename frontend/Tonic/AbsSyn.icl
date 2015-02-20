@@ -9,14 +9,15 @@ import Data.Map
 import Tonic.Pretty
 import iTasks.Framework.Tonic.AbsSyn
 
-mkInhExpr :: String -> InhExpression
-mkInhExpr ctn =
+mkInhExpr :: String [(String, ParsedExpr)] -> InhExpression
+mkInhExpr ctn list_comprehensions =
   { InhExpression
   | inh_curr_task_name = ctn
   , inh_case_expr      = Nothing
   , inh_is_bind_lam    = False
   , inh_ids            = [0]
   , inh_tyenv          = newMap
+  , inh_list_compr     = list_comprehensions
   }
 
 mkChnExpr :: *PredefinedSymbols *ModuleEnv *Heaps -> *ChnExpression

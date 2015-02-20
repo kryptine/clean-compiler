@@ -34,7 +34,7 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
     # parsedMod = mod
 	# cached_module_idents = [dcl_mod.dcl_name \\ dcl_mod<-:cached_dcl_modules]
 	#! support_dynamics = case tcl_file of Yes _ -> True ; No -> False
-	# (ok, mod, global_fun_range, mod_functions, optional_dcl_mod, modules, dcl_module_n_in_cache,hash_table, error, files)
+	# (ok, mod, global_fun_range, mod_functions, optional_dcl_mod, modules, dcl_module_n_in_cache, list_comprehensions, hash_table, error, files)
 		= scanModule mod cached_module_idents options.feo_generics support_dynamics hash_table error search_paths modtimefunction files
 
 //	# hash_table = {hash_table & hte_entries={}}
@@ -151,7 +151,7 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 
     # (ok, fun_defs, td_infos, main_dcl_module_n, predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
         = if options.feo_tonic
-            (execute_tonic fun_defs td_infos main_dcl_module_n heaps predef_symbols hash_table files icl_mod groups icl_used_module_numbers dcl_mods icl_qualified_imports icl_import list_inferred_types icl_common icl_function_indices tcl_file error io out)
+            (execute_tonic fun_defs td_infos main_dcl_module_n heaps predef_symbols list_comprehensions hash_table files icl_mod groups icl_used_module_numbers dcl_mods icl_qualified_imports icl_import list_inferred_types icl_common icl_function_indices tcl_file error io out)
             (True, fun_defs, td_infos, main_dcl_module_n, predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
     | not ok = (No,{},{},main_dcl_module_n,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
 
@@ -316,7 +316,7 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 		group_members_to_component_members [e:l] = ComponentMember e (group_members_to_component_members l)
 		group_members_to_component_members [] = NoComponentMembers
 
-execute_tonic fun_defs td_infos main_dcl_module_n heaps predef_symbols hash_table files icl_mod groups icl_used_module_numbers dcl_mods icl_qualified_imports icl_import list_inferred_types icl_common icl_function_indices tcl_file error io out
+execute_tonic fun_defs td_infos main_dcl_module_n heaps predef_symbols list_comprehensions hash_table files icl_mod groups icl_used_module_numbers dcl_mods icl_qualified_imports icl_import list_inferred_types icl_common icl_function_indices tcl_file error io out
   # (fun_defs_cpy, fun_defs) = copyFunDefs fun_defs
 
   # (_,f,files) = fopen ("Clean System Files/groups_check_" +++ icl_mod.icl_name.id_name) FWriteText files
@@ -339,7 +339,7 @@ execute_tonic fun_defs td_infos main_dcl_module_n heaps predef_symbols hash_tabl
   | ok<>ok
       = abort "";
 
-  # (fun_defs, predef_symbols, hash_table, files, heaps) = ginTonic main_dcl_module_n fun_defs fun_defs_cpy icl_mod dcl_mods common_defs_cpy predef_symbols hash_table files heaps
+  # (fun_defs, predef_symbols, hash_table, files, heaps) = ginTonic main_dcl_module_n fun_defs fun_defs_cpy icl_mod dcl_mods common_defs_cpy list_comprehensions predef_symbols hash_table files heaps
 
   # (_,f,files) = fopen ("Clean System Files/groups_posttonic_" +++ icl_mod.icl_name.id_name) FWriteText files
     (components, fun_defs, f) = showGroups groups 0 False fun_defs f
