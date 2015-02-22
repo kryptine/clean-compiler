@@ -9,10 +9,10 @@ import Data.Maybe
 mkCtags :: String IclModule !*{# FunDef} !*Files -> *(!*{# FunDef}, !*Files)
 mkCtags mod_dir icl_mod fun_defs files
   # csf_directory_path   = "Clean System Files"
-  # tagsdir              = csf_directory_path +++ {DirectorySeparator} +++ icl_mod.icl_name.id_name +++ {DirectorySeparator}
+  # tagsdir              = csf_directory_path +++ {DirectorySeparator} +++ "ctags" +++ {DirectorySeparator}
   # (ok, files)          = ensureCleanSystemFilesExists csf_directory_path files
   # (ok, files)          = ensureDirectoryExists tagsdir files
-  # (ok, tags, files)    = fopen (tagsdir +++ "tags") FWriteText files
+  # (ok, tags, files)    = fopen (tagsdir +++ icl_mod.icl_name.id_name +++ "_tags") FWriteText files
   | not ok               = (fun_defs, files)
   # (fun_tags, fun_defs) = mkFunTags mod_dir fun_defs
   # cons_tags            = mkTypeTags mod_dir icl_mod
