@@ -144,7 +144,7 @@ wrapTaskApp origExpr inh chn
   # chn        = {chn & chn_predef_symbols = pdss}
   | not ok     = (origExpr, chn)
   | otherwise
-      #! (rem, menv)  = case origExpr of
+      # (rem, menv)  = case origExpr of
                          App app -> argsRemaining app chn.chn_module_env
                          _       -> (0, chn.chn_module_env)
       # icl          = menv.me_icl_module

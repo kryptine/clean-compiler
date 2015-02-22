@@ -489,8 +489,10 @@ argsRemaining app menv
   # argsLength        = length args
   # (marity, menv)    = symbIdentArity app.app_symb menv
   = case marity of
-      Just arity -> (arity - argsLength, menv)
-      _          -> (0, menv)
+      Just arity
+        # n = (arity - argsLength)
+        = (if (n < 0) 0 n, menv) // TODO FIXME hack :(
+      _ = (0, menv)
 
 isPartialApp :: App *ModuleEnv -> *(Bool, *ModuleEnv)
 isPartialApp app menv
