@@ -221,7 +221,7 @@ exprToTCleanExpr (App app) menv
 exprToTCleanExpr expr menv
   # (doc, menv) = ppExpression expr menv
   = (PPCleanExpr (ppCompact doc), menv)
-import StdDebug
+
 mkBlueprint :: Expression InhExpression *ChnExpression -> *(SynExpression, *ChnExpression)
 mkBlueprint (App app) inh chn
   # (idIsTask, menv) = symbIdentIsTask app.app_symb chn.chn_module_env
