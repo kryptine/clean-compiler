@@ -126,15 +126,15 @@ addTonicWrap is_itasks_mod icl_module idx menv heaps pdss
                                      App app -> isPartialApp app menv
                                      // TODO Add a case for @ ?
                                      _       -> (False, menv)
-                  = if isPA (menv, heaps, pdss) (doAddRefl fdnt fdt.fun_type menv heaps pdss)
+                  = if isPA (menv, heaps, pdss) (doAddRefl fdnt menv heaps pdss)
                 _ = (menv, heaps, pdss)
           _ = (menv, heaps, pdss)
   where
-  doAddRefl {fun_ident, fun_body=TransformedBody { tb_args, tb_rhs }} (Yes symbty) menv heaps pdss
+  doAddRefl {fun_ident, fun_type = Yes symbty, fun_body=TransformedBody { tb_args, tb_rhs }} menv heaps pdss
     # (ok, pdss) = pdssAreDefined [PD_tonicViewInformation, PD_tonicWrapTaskBody, PD_ConsSymbol, PD_NilSymbol] pdss
     | not ok     = (menv, heaps, pdss)
     # fun_defs   = menv.me_fun_defs
-    # (args, heaps, pdss) = foldr (mkArg is_itasks_mod) ([], heaps, pdss) (zip2 tb_args symbty.st_args)
+    # (args, heaps, pdss) = foldr (mkArg symbty is_itasks_mod) ([], heaps, pdss) (zip2 tb_args symbty.st_args)
     | length args == length tb_args
         # (xs, pdss) = toStatic args pdss
         # (wrap, heaps, pdss) = appPredefinedSymbolWithEI PD_tonicWrapTaskBody
@@ -147,15 +147,20 @@ addTonicWrap is_itasks_mod icl_module idx menv heaps pdss
         = ({ menv & me_fun_defs = fun_defs}, heaps, pdss)
     | otherwise = (menv, heaps, pdss)
     where
-    mkArg :: Bool (FreeVar, AType) ([Expression], *Heaps, *PredefinedSymbols) -> *([Expression], *Heaps, *PredefinedSymbols)
-    mkArg is_itasks_mod (arg=:{fv_ident}, {at_type}) (xs, heaps, pdss)
+    mkArg :: SymbolType Bool (FreeVar, AType) ([Expression], *Heaps, *PredefinedSymbols) -> *([Expression], *Heaps, *PredefinedSymbols)
+    mkArg symty is_itasks_mod (arg=:{fv_ident}, {at_type}) (xs, heaps, pdss)
       # (bv, heaps) = freeVarToVar arg heaps
       # (viewApp, heaps, pdss) = appPredefinedSymbolWithEI PD_tonicViewInformation
                                    [ mkStr fv_ident.id_name
-                                   , if is_itasks_mod
+                                   , if (is_itasks_mod || noITaskCtx arg symty.st_context)
                                        (mkStr fv_ident.id_name)
                                        (Var bv)
                                    ] SK_Function heaps pdss
       # (texpr, pdss) = toStatic (mkStr fv_ident.id_name, App viewApp) pdss
       = ([texpr:xs], heaps, pdss)
-  doAddRefl _ _ menv heaps pdss = (menv, heaps, pdss)
+    noITaskCtx :: FreeVar [TypeContext] -> Bool
+    noITaskCtx fv tcs = isEmpty [tc \\ tc <- tcs | fv.fv_info_ptr == tc.tc_var && isITaskClass tc.tc_class]
+    isITaskClass :: TCClass -> Bool
+    isITaskClass (TCClass gds) = gds.glob_object.ds_ident.id_name == "iTask" // TODO Make this nicer
+    isITaskClass _             = False
+  doAddRefl _ menv heaps pdss = (menv, heaps, pdss)
