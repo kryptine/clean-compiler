@@ -71,13 +71,13 @@ after z in zs
 given x == y && y == z
 (x, y, z)
 */
-mkCompr :: ParsedExpr -> TExpr
-mkCompr (PE_ListCompr _ _ expr qualifiers) = TListCompr (TCleanExpr [] (mkLCExpr expr)) [] (PPCleanExpr "TODO GUARDS")
-  where
-  mkLCExpr (PE_Ident ident) = PPCleanExpr ident.id_name
-  mkLCExpr (PE_Basic b)     = PPCleanExpr (ppCompact (ppBasicValue b))
-  mkLCExpr (PE_Tuple es)    = AppCleanExpr TNonAssoc (predefined_idents.[GetTupleConsIndex (length es)].id_name) (map mkLCExpr es)
-  mkLCExpr _                = PPCleanExpr "TODO"
+//mkCompr :: ParsedExpr -> TExpr
+//mkCompr (PE_ListCompr _ _ expr qualifiers) = TListCompr (TCleanExpr [] (mkLCExpr expr)) [] (PPCleanExpr "TODO GUARDS")
+  //where
+  //mkLCExpr (PE_Ident ident) = PPCleanExpr ident.id_name
+  //mkLCExpr (PE_Basic b)     = PPCleanExpr (ppCompact (ppBasicValue b))
+  //mkLCExpr (PE_Tuple es)    = AppCleanExpr TNonAssoc (predefined_idents.[GetTupleConsIndex (length es)].id_name) (map mkLCExpr es)
+  //mkLCExpr _                = PPCleanExpr "TODO"
   //mkLCExpr lc=:(PE_ListCompr _ _ _ _) = "PE_ListCompr"
   //mkLCExpr (PE_List _) = "PE_List"
   //mkLCExpr (PE_Bound be) = "PE_Bound"
@@ -104,34 +104,34 @@ mkCompr (PE_ListCompr _ _ expr qualifiers) = TListCompr (TCleanExpr [] (mkLCExpr
   //mkLCExpr (PE_TypeSignature _ _) = "PE_TypeSignature"
   //mkLCExpr (PE_Empty) = "PE_Empty"
 
-ppPE lc=:(PE_ListCompr _ _ _ _) = "PE_ListCompr"
-ppPE (PE_List _) = "PE_List"
-ppPE (PE_Ident ident) = ident.id_name
-ppPE (PE_Basic _) = "PE_Basic"
-ppPE (PE_Bound _) = "PE_Bound"
-ppPE (PE_Lambda _ _ _ _) = "PE_Lambda"
-ppPE (PE_Tuple es) = predefined_idents.[GetTupleConsIndex (length es)].id_name
-ppPE (PE_Record _ _ _) = "PE_Record"
-ppPE (PE_ArrayPattern _) = "PE_ArrayPattern"
-ppPE (PE_UpdateComprehension _ _ _ _) = "PE_UpdateComprehension"
-ppPE (PE_ArrayDenot _ _) = "PE_ArrayDenot"
-ppPE (PE_Selection _ _ _) = "PE_Selection"
-ppPE (PE_Update _ _ _) = "PE_Update"
-ppPE (PE_Case _ _ _) = "PE_Case"
-ppPE (PE_If _ _ _ _) = "PE_If"
-ppPE (PE_Let _ _) = "PE_Let"
-ppPE (PE_ArrayCompr _ _ _) = "PE_ArrayCompr"
-ppPE (PE_Sequ _) = "PE_Sequ"
-ppPE (PE_WildCard) = "PE_WildCard"
-ppPE (PE_Matches _ _ _ _) = "PE_Matches"
-ppPE (PE_QualifiedIdent _ _) = "PE_QualifiedIdent"
-ppPE (PE_ABC_Code _ _) = "PE_ABC_Code"
-ppPE (PE_Any_Code _ _ _) = "PE_Any_Code"
-ppPE (PE_DynamicPattern _ _) = "PE_DynamicPattern"
-ppPE (PE_Dynamic _ _) = "PE_Dynamic"
-ppPE (PE_Generic _ _) = "PE_Generic"
-ppPE (PE_TypeSignature _ _) = "PE_TypeSignature"
-ppPE (PE_Empty) = "PE_Empty"
+//ppPE lc=:(PE_ListCompr _ _ _ _) = "PE_ListCompr"
+//ppPE (PE_List _) = "PE_List"
+//ppPE (PE_Ident ident) = ident.id_name
+//ppPE (PE_Basic _) = "PE_Basic"
+//ppPE (PE_Bound _) = "PE_Bound"
+//ppPE (PE_Lambda _ _ _ _) = "PE_Lambda"
+//ppPE (PE_Tuple es) = predefined_idents.[GetTupleConsIndex (length es)].id_name
+//ppPE (PE_Record _ _ _) = "PE_Record"
+//ppPE (PE_ArrayPattern _) = "PE_ArrayPattern"
+//ppPE (PE_UpdateComprehension _ _ _ _) = "PE_UpdateComprehension"
+//ppPE (PE_ArrayDenot _ _) = "PE_ArrayDenot"
+//ppPE (PE_Selection _ _ _) = "PE_Selection"
+//ppPE (PE_Update _ _ _) = "PE_Update"
+//ppPE (PE_Case _ _ _) = "PE_Case"
+//ppPE (PE_If _ _ _ _) = "PE_If"
+//ppPE (PE_Let _ _) = "PE_Let"
+//ppPE (PE_ArrayCompr _ _ _) = "PE_ArrayCompr"
+//ppPE (PE_Sequ _) = "PE_Sequ"
+//ppPE (PE_WildCard) = "PE_WildCard"
+//ppPE (PE_Matches _ _ _ _) = "PE_Matches"
+//ppPE (PE_QualifiedIdent _ _) = "PE_QualifiedIdent"
+//ppPE (PE_ABC_Code _ _) = "PE_ABC_Code"
+//ppPE (PE_Any_Code _ _ _) = "PE_Any_Code"
+//ppPE (PE_DynamicPattern _ _) = "PE_DynamicPattern"
+//ppPE (PE_Dynamic _ _) = "PE_Dynamic"
+//ppPE (PE_Generic _ _) = "PE_Generic"
+//ppPE (PE_TypeSignature _ _) = "PE_TypeSignature"
+//ppPE (PE_Empty) = "PE_Empty"
 
 withTwo :: App [Expression] (Expression Expression *ChnExpression -> *(SynExpression, *ChnExpression)) InhExpression *ChnExpression -> *(SynExpression, *ChnExpression)
 withTwo app []        _ _   chn = ({syn_annot_expr = App app, syn_texpr = TVar [] "TODO withTwo []", syn_pattern_match_vars = []}, chn)

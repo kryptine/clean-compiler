@@ -98,9 +98,9 @@ ginTonic` is_itasks_mod main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_m
                                           , tt_body   = g} reps
             _ -> reps
         , heaps, predef_symbols, menv.me_fun_defs_cpy), menv.me_fun_defs)
-    | is_itasks_mod && funIsTask fd && fd.fun_info.fi_def_level == 1
-      # (menv, heaps, predef_symbols) = addTonicWrap is_itasks_mod icl_module idx menv heaps predef_symbols
-      = ((reps, heaps, predef_symbols, menv.me_fun_defs_cpy), menv.me_fun_defs)
+    //| is_itasks_mod && funIsTask fd && fd.fun_info.fi_def_level == 1
+      //# (menv, heaps, predef_symbols) = addTonicWrap is_itasks_mod icl_module idx menv heaps predef_symbols
+      //= ((reps, heaps, predef_symbols, menv.me_fun_defs_cpy), menv.me_fun_defs)
     | otherwise = ((reps, heaps, predef_symbols, fun_defs_cpy), fun_defs)
 
 updateWithAnnot :: Int Expression *ModuleEnv -> *ModuleEnv
