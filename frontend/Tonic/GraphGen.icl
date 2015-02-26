@@ -231,7 +231,6 @@ mkBlueprint (App app) inh chn
     = case appFunName app of
         ">>="      -> mkBind      app ctxs args inh chn
         ">>|"      -> mkBind      app ctxs args inh chn
-        "return"   -> mkReturn    app ctxs args inh chn
         "@:"       -> mkAssign    app ctxs args inh chn
         "@"        -> mkTransform app ctxs args inh chn
         ">>*"      -> mkStep      app ctxs args inh chn
@@ -266,12 +265,6 @@ mkBlueprint (App app) inh chn
       = ({ syn_annot_expr = App { app & app_args = ctxs ++ [lhsExpr, rhsExpr] }
          , syn_texpr      = TCleanExpr inh.inh_ids tce
          , syn_pattern_match_vars = []}, {chn & chn_module_env = menv})
-
-  mkReturn app ctxs args=:[e:_] inh chn
-    # (syn, chn) = mkBlueprint e (addInhId inh 0) chn
-    = ({ syn_annot_expr = App {app & app_args = ctxs ++ [syn.syn_annot_expr]}
-       , syn_texpr      = TReturn syn.syn_texpr
-       , syn_pattern_match_vars = syn.syn_pattern_match_vars}, chn)
 
   mkAssign app ctxs args inh chn
     = withTwo app args f inh chn
