@@ -460,6 +460,14 @@ mkBlueprint (App app) inh chn
               = ({ syn_annot_expr = app
                  , syn_texpr      = TParallel inh.inh_ids (mkPar (PP ppStr))
                  , syn_pattern_match_vars = []}, chn)
+        [arg=:(Var _)]
+          # (doc, menv) = ppExpression arg chn.chn_module_env
+          # ppStr       = ppCompact doc
+          # chn         = {chn & chn_module_env = menv}
+          # (app, chn)  = wrapParallel (App app) inh chn
+          = ({ syn_annot_expr = app
+             , syn_texpr      = TParallel inh.inh_ids (mkPar (PP ppStr))
+             , syn_pattern_match_vars = []}, chn)
         _ = abort "mkParN args fallthrough; shouldn't happen"
 
   // TODO Look at this some more
