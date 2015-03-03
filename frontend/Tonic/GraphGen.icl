@@ -261,9 +261,11 @@ mkBlueprint (App app) inh chn
          , syn_texpr      = TBind synl.syn_texpr lbl synr.syn_texpr
          , syn_pattern_match_vars = synl.syn_pattern_match_vars ++ synr.syn_pattern_match_vars}, chnr)
     f lhsExpr rhsExpr chn
+      # (syn, chn)  = mkBlueprint lhsExpr (addInhId inh 0) chn
       # (tce, menv) = exprToTCleanExpr rhsExpr chn.chn_module_env
-      = ({ syn_annot_expr = App { app & app_args = ctxs ++ [lhsExpr, rhsExpr] }
-         , syn_texpr      = TCleanExpr inh.inh_ids tce
+      = ({ syn_annot_expr = App { app & app_args = ctxs ++ [syn.syn_annot_expr, rhsExpr] }
+         //, syn_texpr      = TCleanExpr inh.inh_ids tce
+         , syn_texpr      = TBind syn.syn_texpr Nothing (TCleanExpr inh.inh_ids tce)
          , syn_pattern_match_vars = []}, {chn & chn_module_env = menv})
 
   mkAssign app ctxs args inh chn
