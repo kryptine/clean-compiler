@@ -261,12 +261,11 @@ mkBlueprint (App app) inh chn
          , syn_texpr      = TBind synl.syn_texpr lbl synr.syn_texpr
          , syn_pattern_match_vars = synl.syn_pattern_match_vars ++ synr.syn_pattern_match_vars}, chnr)
     f lhsExpr rhsExpr chn
-      # (syn, chn)  = mkBlueprint lhsExpr (addInhId inh 0) chn
-      # (tce, menv) = exprToTCleanExpr rhsExpr chn.chn_module_env
-      = ({ syn_annot_expr = App { app & app_args = ctxs ++ [syn.syn_annot_expr, rhsExpr] }
-         //, syn_texpr      = TCleanExpr inh.inh_ids tce
-         , syn_texpr      = TBind syn.syn_texpr Nothing (TCleanExpr inh.inh_ids tce)
-         , syn_pattern_match_vars = []}, {chn & chn_module_env = menv})
+      # (synl, chn)  = mkBlueprint lhsExpr (addInhId inh 0) chn
+      # (synr, chn)  = mkBlueprint rhsExpr (addInhId inh 1) chn
+      = ({ syn_annot_expr = App { app & app_args = ctxs ++ [synl.syn_annot_expr, synr.syn_annot_expr] }
+         , syn_texpr      = TBind synl.syn_texpr Nothing synr.syn_texpr
+         , syn_pattern_match_vars = []}, chn)
 
   mkAssign app ctxs args inh chn
     = withTwo app args f inh chn
@@ -686,26 +685,6 @@ mkBlueprint expr=:(BasicExpr bv) _ chn
   = ({ syn_annot_expr = expr
      , syn_texpr      = TCleanExpr [] (PPCleanExpr (ppCompact (ppBasicValue bv)))
      , syn_pattern_match_vars = []}, chn)
-
-//mkBlueprint expr=:(DictionariesFunction _ _ _) _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "1"}, chn)
-//mkBlueprint expr=:(Selection _ _ _)            _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "2"}, chn)
-//mkBlueprint expr=:(Update _ _ _)               _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "3"}, chn)
-//mkBlueprint expr=:(RecordUpdate _ _ _)         _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "4"}, chn)
-//mkBlueprint expr=:(TupleSelect _ _ _)          _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "5"}, chn)
-//mkBlueprint expr=:(Conditional _)              _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "7"}, chn)
-//mkBlueprint expr=:(AnyCodeExpr _ _ _)          _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "8"}, chn)
-//mkBlueprint expr=:(ABCCodeExpr _ _)            _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "9"}, chn)
-//mkBlueprint expr=:(MatchExpr _ _)              _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "10"}, chn)
-//mkBlueprint expr=:(IsConstructor _ _ _ _ _ _)  _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "11"}, chn)
-//mkBlueprint expr=:(FreeVar _)                  _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "12"}, chn)
-//mkBlueprint expr=:(Constant _ _ _)             _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "13"}, chn)
-//mkBlueprint expr=:(ClassVariable _)            _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "14"}, chn)
-//mkBlueprint expr=:(DynamicExpr _)              _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "15"}, chn)
-//mkBlueprint expr=:(TypeCodeExpression _)       _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "16"}, chn)
-//mkBlueprint expr=:(TypeSignature _ _)          _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "17"}, chn)
-//mkBlueprint expr=:(EE)                         _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "18"}, chn)
-//mkBlueprint expr=:(NoBind _)                   _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "19"}, chn)
-//mkBlueprint expr=:(FailExpr _)                 _ chn = ({syn_annot_expr = expr, syn_texpr = TCleanExpr [] "20"}, chn)
 mkBlueprint expr _ chn = ({ syn_annot_expr = expr
                           , syn_texpr      = TCleanExpr [] (PPCleanExpr "(mkBlueprint fallthrough)")
                           , syn_pattern_match_vars = []}, chn)
