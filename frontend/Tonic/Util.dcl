@@ -136,6 +136,10 @@ instance FromStatic [Expression]
 
 instance ToStatic (Expression, Expression)
 
+instance FromStatic (Expression, Expression)
+
+instance FromStatic String
+
 freeVarToVar :: FreeVar *Heaps -> *(BoundVar, *Heaps)
 
 foldrSt :: !(.a -> .(.st -> .st)) ![.a] !.st -> .st
@@ -145,6 +149,10 @@ intersperse` :: String (a -> String) [a] -> String
 stringContents :: String -> String
 
 listExprToList :: Expression -> [Expression]
+
+tupleToTupleExpr :: (Expression, Expression) *PredefinedSymbols -> *(Expression, *PredefinedSymbols)
+
+tupleExprToTuple :: Expression -> (Expression, Expression)
 
 pdssAreDefined :: [Int] *PredefinedSymbols -> *(Bool, *PredefinedSymbols)
 

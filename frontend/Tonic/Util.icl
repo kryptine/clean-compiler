@@ -566,8 +566,15 @@ instance ToStatic [Expression] where
 instance FromStatic [Expression] where
   fromStatic expr = listExprToList expr
 
+instance FromStatic String where
+  fromStatic (BasicExpr (BVS str)) = str
+  fromStatic _                     = ""
+
 instance ToStatic (Expression, Expression) where
   toStatic tup pdss = tupleToTupleExpr tup pdss
+
+instance FromStatic (Expression, Expression) where
+  fromStatic expr = tupleExprToTuple expr
 
 listExprToList :: Expression -> [Expression]
 listExprToList (App app) =
@@ -593,6 +600,10 @@ tupleToTupleExpr :: (Expression, Expression) *PredefinedSymbols -> *(Expression,
 tupleToTupleExpr (e1, e2) pdss
   # (tup, pdss) = appPredefinedSymbol PD_Arity2TupleSymbol [e1, e2] SK_Constructor pdss
   = (App tup, pdss)
+
+tupleExprToTuple :: Expression -> (Expression, Expression)
+tupleExprToTuple (App app=:{app_args = [l : r : _]}) = (l, r)
+tupleExprToTuple _ = abort "tupleExprToTuple"
 
 freeVarToVar :: FreeVar *Heaps -> *(BoundVar, *Heaps)
 freeVarToVar {fv_ident, fv_info_ptr} heaps

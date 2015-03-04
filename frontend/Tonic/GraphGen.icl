@@ -271,40 +271,47 @@ mkBlueprint (App app) inh chn
     = withTwo app args f inh chn
     where
     f u=:(App a) t chn
-      # (syn, chn)  = mkBlueprint t (addInhId inh 0) chn
-      # menv        = chn.chn_module_env
-      # (tu, menv)  = case (a.app_symb.symb_ident.id_name, a.app_args) of
-                        ("AnyUser", _)
-                          = (TUAnyUser, menv)
-                        ("UserWithId", [uid:_])
-                          # (ed, menv) = ppExpression uid menv
-                          = (TUUserWithIdent (stringContents (ppCompact ed)), menv)
-                        ("UserWithRole", [r:_])
-                          # (rd, menv) = ppExpression r menv
-                          = (TUUserWithRole (stringContents (ppCompact rd)), menv)
-                        ("SystemUser", _)
-                          = (TUSystemUser, menv)
-                        ("AnonymousUser", _)
-                          = (TUAnonymousUser, menv)
-                        ("AuthenticatedUser", [uid:rs:_])
-                          # (d, menv)    = ppExpression uid menv
-                          # (rsds, menv) = mapSt ppExpression (listExprToList rs) menv
-                          = (TUAuthenticatedUser (stringContents (ppCompact d)) (map (stringContents o ppCompact) rsds), menv)
-                        (usr, _)
-                          = (TUVariableUser usr, menv)
-      # chn         = {chn & chn_module_env = menv}
-      # (app`, chn) = wrapTaskApp (App {app & app_args = ctxs ++ [u, syn.syn_annot_expr]}) inh chn
-      = ({ syn_annot_expr = app`
-         , syn_texpr      = TAssign tu syn.syn_texpr
-         , syn_pattern_match_vars = syn.syn_pattern_match_vars}, chn)
-    f u t chn
+      | a.app_symb.symb_ident ==
+        predefined_idents.[GetTupleConsIndex 2]
+          # (usr, str) = tupleExprToTuple u
+          = case usr of
+              App a
+                # (syn, chn)  = mkBlueprint t (addInhId inh 0) chn
+                # menv        = chn.chn_module_env
+                # (tu, menv)  = case (a.app_symb.symb_ident.id_name, a.app_args) of
+                                  ("AnyUser", _)
+                                    = (TUAnyUser, menv)
+                                  ("UserWithId", [uid:_])
+                                    # (ed, menv) = ppExpression uid menv
+                                    = (TUUserWithIdent (stringContents (ppCompact ed)), menv)
+                                  ("UserWithRole", [r:_])
+                                    # (rd, menv) = ppExpression r menv
+                                    = (TUUserWithRole (stringContents (ppCompact rd)), menv)
+                                  ("SystemUser", _)
+                                    = (TUSystemUser, menv)
+                                  ("AnonymousUser", _)
+                                    = (TUAnonymousUser, menv)
+                                  ("AuthenticatedUser", [uid:rs:_])
+                                    # (d, menv)    = ppExpression uid menv
+                                    # (rsds, menv) = mapSt ppExpression (listExprToList rs) menv
+                                    = (TUAuthenticatedUser (stringContents (ppCompact d)) (map (stringContents o ppCompact) rsds), menv)
+                                  (usr, _)
+                                    = (TUVariableUser usr, menv)
+                # chn         = {chn & chn_module_env = menv}
+                # (app`, chn) = wrapTaskApp (App {app & app_args = ctxs ++ [u, syn.syn_annot_expr]}) inh chn
+                = ({ syn_annot_expr = app`
+                   , syn_texpr      = TAssign tu (fromStatic str) syn.syn_texpr
+                   , syn_pattern_match_vars = syn.syn_pattern_match_vars}, chn)
+              expr = mkAssDef u (fromStatic str) t chn
+      | otherwise = mkAssDef u "" t chn
+    f u t chn = mkAssDef u "" t chn
+    mkAssDef u str t chn
       # (syn, chn)  = mkBlueprint t (addInhId inh 0) chn
       # (ppu, menv) = ppExpression u chn.chn_module_env
-      # (tu, menv)  = (TUVariableUser (ppCompact ppu), menv)
       # chn         = {chn & chn_module_env = menv}
       # (app`, chn) = wrapTaskApp (App {app & app_args = ctxs ++ [u, syn.syn_annot_expr]}) inh chn
       = ({ syn_annot_expr = app`
-         , syn_texpr      = TAssign tu syn.syn_texpr
+         , syn_texpr      = TAssign (TUVariableUser (ppCompact ppu)) str syn.syn_texpr
          , syn_pattern_match_vars = syn.syn_pattern_match_vars}, chn)
 
   // TODO : Test
