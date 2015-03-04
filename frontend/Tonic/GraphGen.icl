@@ -613,7 +613,7 @@ mkBlueprint (Case cs) inh chn
   # chn        = {chn & chn_module_env = menv}
   = case (ppCompact ed, cs.case_expr, cs.case_guards) of
       ("_x", Var bv, AlgebraicPatterns gi [ap])
-        # (syn, chn)   = mkAlts` ap.ap_expr chn
+        # (syn, chn)   = mkAlts` 0 ap.ap_expr chn
         # (fvds, menv) = mapSt (exprToTCleanExpr o FreeVar) ap.ap_vars chn.chn_module_env
         # clexpr       = case fvds of
                            []   -> PPCleanExpr ""
@@ -625,7 +625,7 @@ mkBlueprint (Case cs) inh chn
         # ((guards, syns), chn) = mkAlts cs.case_guards chn
         # ((def, syns), chn)    = case cs.case_default of
                                     Yes def
-                                      # (syn, chn) = mkAlts` def chn
+                                      # (syn, chn) = mkAlts` (numGuards cs.case_guards) def chn
                                       = case syns of
                                           [(PPCleanExpr "True", _)]
                                             = ((Yes syn.syn_annot_expr, [(PPCleanExpr "False", syn):syns]), chn)
@@ -635,17 +635,23 @@ mkBlueprint (Case cs) inh chn
            , syn_texpr      = TCaseOrIf (TCleanExpr [] (PPCleanExpr (ppCompact ed))) (map (\(d, s) -> (d, s.syn_texpr)) syns)
            , syn_pattern_match_vars = foldr (\(_, syn) acc -> syn.syn_pattern_match_vars ++ acc) [] syns}, chn)
   where
+  numGuards (AlgebraicPatterns _ ps)        = length ps
+  numGuards (BasicPatterns _ ps)            = length ps
+  numGuards (NewTypePatterns _ ps)          = length ps
+  numGuards (DynamicPatterns ps)            = length ps
+  numGuards (OverloadedListPatterns _ _ ps) = length ps
+  numGuards NoPattern                       = 0
   mkAlts c=:(AlgebraicPatterns gi aps) chn
-    # ((aps, syns), chn) = foldr f (([], []), chn) aps
+    # ((aps, syns, _), chn) = foldr f (([], [], 0), chn) aps
     = ((AlgebraicPatterns gi aps, syns), chn)
     where
-      f ap ((aps, syns), chn)
+      f ap ((aps, syns, n), chn)
         # menv        = chn.chn_module_env
         # (apd, menv) = mkAp ap.ap_symbol ap.ap_vars menv
         # chn         = {chn & chn_module_env = menv}
-        # (syn, chn)  = mkAlts` ap.ap_expr chn
+        # (syn, chn)  = mkAlts` n ap.ap_expr chn
         # ap          = {ap & ap_expr = syn.syn_annot_expr}
-        = (([ap:aps], [(apd, syn):syns]), chn)
+        = (([ap:aps], [(apd, syn):syns], n + 1), chn)
         where
         mkAp sym []   menv = (PPCleanExpr (ppCompact ('PPrint'.text sym.glob_object.ds_ident.id_name)), menv)
         mkAp sym vars menv
@@ -653,19 +659,19 @@ mkBlueprint (Case cs) inh chn
           // TODO TNonAssoc?
           = (AppCleanExpr TNonAssoc (ppCompact ('PPrint'.text sym.glob_object.ds_ident.id_name)) fvds, menv)
   mkAlts c=:(BasicPatterns bt bps) chn
-    # ((bps, syns), chn) = foldr f (([], []), chn) bps
+    # ((bps, syns, _), chn) = foldr f (([], [], 0), chn) bps
     = ((BasicPatterns bt bps, syns), chn)
     where
-      f bp ((bps, syns), chn)
-        # (syn, chn)  = mkAlts` bp.bp_expr chn
+      f bp ((bps, syns, n), chn)
+        # (syn, chn)  = mkAlts` n bp.bp_expr chn
         # bp          = {bp & bp_expr = syn.syn_annot_expr}
-        = (([bp:bps], [(PPCleanExpr (ppCompact (ppBasicValue bp.bp_value)), syn):syns]), chn)
+        = (([bp:bps], [(PPCleanExpr (ppCompact (ppBasicValue bp.bp_value)), syn):syns], n + 1), chn)
   mkAlts c chn = ((c, []), chn)
 
-  mkAlts` :: Expression *ChnExpression -> *(SynExpression, *ChnExpression)
-  mkAlts` expr chn
+  mkAlts` :: Int Expression *ChnExpression -> *(SynExpression, *ChnExpression)
+  mkAlts` n expr chn
     # inh        = {inh & inh_case_expr = Nothing }
-    # (syn, chn) = mkBlueprint expr (addInhId inh 0) chn
+    # (syn, chn) = mkBlueprint expr (addInhId inh n) chn
     # menv       = chn.chn_module_env
     # (d, menv)  = ppExpression expr menv
     # chn        = {chn & chn_module_env = menv}
