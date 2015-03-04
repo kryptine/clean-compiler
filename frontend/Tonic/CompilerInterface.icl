@@ -87,7 +87,7 @@ ginTonic` is_itasks_mod main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_m
                  Just (_, _, e)
                    -> updateWithAnnot idx e menv
                  _ -> menv
-      # (menv, heaps, predef_symbols) = addTonicWrap is_itasks_mod icl_module idx menv heaps predef_symbols
+      # (menv, heaps, predef_symbols) = addTonicWrap is_itasks_mod icl_module idx menv heaps predef_symbols common_defs
       = ((case mres of
             Just (args, g, _)
               -> put fd.fun_ident.id_name { TonicTask
@@ -109,8 +109,8 @@ updateWithAnnot fidx e menv
   # fun_defs = updateFunRhs fidx fun_defs e
   = { menv & me_fun_defs = fun_defs}
 
-addTonicWrap :: Bool IclModule Index *ModuleEnv !*Heaps *PredefinedSymbols -> *(*ModuleEnv, *Heaps, *PredefinedSymbols)
-addTonicWrap is_itasks_mod icl_module idx menv heaps pdss
+addTonicWrap :: Bool IclModule Index *ModuleEnv !*Heaps *PredefinedSymbols !{#CommonDefs} -> *(*ModuleEnv, *Heaps, *PredefinedSymbols)
+addTonicWrap is_itasks_mod icl_module idx menv heaps pdss common_defs
   # (ok, pdss) = pdssAreDefined [PD_tonicViewInformation, PD_tonicWrapTaskBody] pdss
   | not ok     = (menv, heaps, pdss)
   | otherwise
@@ -152,12 +152,17 @@ addTonicWrap is_itasks_mod icl_module idx menv heaps pdss
       # (bv, heaps) = freeVarToVar arg heaps
       # (viewApp, heaps, pdss) = appPredefinedSymbolWithEI PD_tonicViewInformation
                                    [ mkStr fv_ident.id_name
-                                   , if (is_itasks_mod || noITaskCtx arg symty.st_context)
+                                   , if (is_itasks_mod || (noConcreteType at_type && noITaskCtx arg symty.st_context))
                                        (mkStr fv_ident.id_name)
                                        (Var bv)
                                    ] SK_Function heaps pdss
       # (texpr, pdss) = toStatic (mkStr fv_ident.id_name, App viewApp) pdss
       = ([texpr:xs], heaps, pdss)
+    noConcreteType :: Type -> Bool
+    noConcreteType (TA _ _)    = False
+    noConcreteType (TAS _ _ _) = False
+    // TODO -> types?
+    noConcreteType _           = True
     noITaskCtx :: FreeVar [TypeContext] -> Bool
     noITaskCtx fv tcs = isEmpty [tc \\ tc <- tcs | fv.fv_info_ptr == tc.tc_var && isITaskClass tc.tc_class]
     isITaskClass :: TCClass -> Bool

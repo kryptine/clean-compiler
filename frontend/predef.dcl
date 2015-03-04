@@ -310,7 +310,6 @@ PD_tonicWrapAppLam1			:== 299
 PD_tonicWrapAppLam2			:== 300
 PD_tonicWrapAppLam3			:== 301
 PD_tonicWrapParallel		:== 302
-
 PD_tonicViewInformation		:== 303
 
 PD_NrOfPredefSymbols		:== 304
