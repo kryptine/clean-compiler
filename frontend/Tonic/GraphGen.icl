@@ -302,14 +302,14 @@ mkBlueprint (App app) inh chn
                 = ({ syn_annot_expr = app`
                    , syn_texpr      = TAssign tu (fromStatic str) syn.syn_texpr
                    , syn_pattern_match_vars = syn.syn_pattern_match_vars}, chn)
-              expr = mkAssDef u (fromStatic str) t chn
-      | otherwise = mkAssDef u "" t chn
-    f u t chn = mkAssDef u "" t chn
-    mkAssDef u str t chn
+              expr = mkAssDef u usr (fromStatic str) t chn
+      | otherwise = mkAssDef u u "" t chn
+    f u t chn = mkAssDef u u "" t chn
+    mkAssDef lhs u str t chn
       # (syn, chn)  = mkBlueprint t (addInhId inh 0) chn
       # (ppu, menv) = ppExpression u chn.chn_module_env
       # chn         = {chn & chn_module_env = menv}
-      # (app`, chn) = wrapTaskApp (App {app & app_args = ctxs ++ [u, syn.syn_annot_expr]}) inh chn
+      # (app`, chn) = wrapTaskApp (App {app & app_args = ctxs ++ [lhs, syn.syn_annot_expr]}) inh chn
       = ({ syn_annot_expr = app`
          , syn_texpr      = TAssign (TUVariableUser (ppCompact ppu)) str syn.syn_texpr
          , syn_pattern_match_vars = syn.syn_pattern_match_vars}, chn)
