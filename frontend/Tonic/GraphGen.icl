@@ -276,30 +276,29 @@ mkBlueprint (App app) inh chn
           # (usr, str) = tupleExprToTuple u
           = case usr of
               App a
-                # (syn, chn)  = mkBlueprint t (addInhId inh 0) chn
-                # menv        = chn.chn_module_env
-                # (tu, menv)  = case (a.app_symb.symb_ident.id_name, a.app_args) of
-                                  ("AnyUser", _)
-                                    = (TUAnyUser, menv)
-                                  ("UserWithId", [uid:_])
-                                    # (ed, menv) = ppExpression uid menv
-                                    = (TUUserWithIdent (stringContents (ppCompact ed)), menv)
-                                  ("UserWithRole", [r:_])
-                                    # (rd, menv) = ppExpression r menv
-                                    = (TUUserWithRole (stringContents (ppCompact rd)), menv)
-                                  ("SystemUser", _)
-                                    = (TUSystemUser, menv)
-                                  ("AnonymousUser", _)
-                                    = (TUAnonymousUser, menv)
-                                  ("AuthenticatedUser", [uid:rs:_])
-                                    # (d, menv)    = ppExpression uid menv
-                                    # (rsds, menv) = mapSt ppExpression (listExprToList rs) menv
-                                    = (TUAuthenticatedUser (stringContents (ppCompact d)) (map (stringContents o ppCompact) rsds), menv)
-                                  (usr, _)
-                                    = (TUVariableUser usr, menv)
-                # chn         = {chn & chn_module_env = menv}
-                # (app`, chn) = wrapTaskApp (App {app & app_args = ctxs ++ [u, syn.syn_annot_expr]}) inh chn
-                = ({ syn_annot_expr = app`
+                # (syn, chn) = mkBlueprint t (addInhId inh 0) chn
+                # menv       = chn.chn_module_env
+                # (tu, menv) = case (a.app_symb.symb_ident.id_name, a.app_args) of
+                                 ("AnyUser", _)
+                                   = (TUAnyUser, menv)
+                                 ("UserWithId", [uid:_])
+                                   # (ed, menv) = ppExpression uid menv
+                                   = (TUUserWithIdent (stringContents (ppCompact ed)), menv)
+                                 ("UserWithRole", [r:_])
+                                   # (rd, menv) = ppExpression r menv
+                                   = (TUUserWithRole (stringContents (ppCompact rd)), menv)
+                                 ("SystemUser", _)
+                                   = (TUSystemUser, menv)
+                                 ("AnonymousUser", _)
+                                   = (TUAnonymousUser, menv)
+                                 ("AuthenticatedUser", [uid:rs:_])
+                                   # (d, menv)    = ppExpression uid menv
+                                   # (rsds, menv) = mapSt ppExpression (listExprToList rs) menv
+                                   = (TUAuthenticatedUser (stringContents (ppCompact d)) (map (stringContents o ppCompact) rsds), menv)
+                                 (usr, _)
+                                   = (TUVariableUser usr, menv)
+                # chn        = {chn & chn_module_env = menv}
+                = ({ syn_annot_expr = App {app & app_args = ctxs ++ [u, syn.syn_annot_expr]}
                    , syn_texpr      = TAssign tu (fromStatic str) syn.syn_texpr
                    , syn_pattern_match_vars = syn.syn_pattern_match_vars}, chn)
               expr = mkAssDef u usr (fromStatic str) t chn
