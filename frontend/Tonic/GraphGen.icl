@@ -167,8 +167,8 @@ wrapTaskApp origExpr inh chn
   findWrap 3 = PD_tonicWrapAppLam3
   findWrap n = abort ("No tonicWrapLam" +++ toString n)
 
-wrapParallel :: Expression InhExpression *ChnExpression -> *(Expression, *ChnExpression)
-wrapParallel origExpr=:(App app) inh chn
+wrapParallelN :: Expression InhExpression *ChnExpression -> *(Expression, *ChnExpression)
+wrapParallelN origExpr=:(App app=:{app_args=[xs:_]}) inh chn
   # (ok, pdss) = pdssAreDefined [PD_tonicWrapParallel, PD_ConsSymbol, PD_NilSymbol] chn.chn_predef_symbols
   # chn        = {chn & chn_predef_symbols = pdss}
   | not ok     = (origExpr, chn)
@@ -182,12 +182,12 @@ wrapParallel origExpr=:(App app) inh chn
                          , mkStr inh.inh_curr_task_name
                          , ids
                          , App {app & app_args = []}
-                         , hd app.app_args
+                         , xs
                          ] SK_Function pdss
       = ( App expr
         , {chn & chn_predef_symbols = pdss
                , chn_module_env = {menv & me_icl_module = icl}})
-wrapParallel origExpr inh chn = (origExpr, chn)
+wrapParallelN origExpr inh chn = (origExpr, chn)
 
 letTypes :: ExprInfoPtr *ChnExpression -> *([Type], *ChnExpression)
 letTypes exprPtr chn
@@ -455,15 +455,16 @@ mkBlueprint (App app) inh chn
                                   = ([syn:ss], n + 1, chn)
                              in  foldr f ([], 0, chn) exprs
             # (listArg, pdss) = toStatic (map (\s -> s.syn_annot_expr) ss) chn.chn_predef_symbols
-            = ( { syn_annot_expr = App {app & app_args = [listArg]}
+            # (app, chn)  = wrapParallelN (App {app & app_args = [listArg]}) inh {chn & chn_predef_symbols = pdss} // TODO  Should this stay?
+            = ( { syn_annot_expr = app
                 , syn_texpr      = TParallel inh.inh_ids (mkPar (T (map (\s -> s.syn_texpr) ss)))
                 , syn_pattern_match_vars = foldr (\syn acc -> syn.syn_pattern_match_vars ++ acc) [] ss}
-              , {chn & chn_predef_symbols = pdss})
+              , chn)
           | otherwise // Is regular function application
               # (doc, menv) = ppExpression arg chn.chn_module_env
               # ppStr       = ppCompact doc
               # chn         = {chn & chn_module_env = menv}
-              # (app, chn)  = wrapParallel (App app) inh chn
+              # (app, chn)  = wrapParallelN (App app) inh chn
               = ({ syn_annot_expr = app
                  , syn_texpr      = TParallel inh.inh_ids (mkPar (PP ppStr))
                  , syn_pattern_match_vars = []}, chn)
@@ -471,7 +472,7 @@ mkBlueprint (App app) inh chn
           # (doc, menv) = ppExpression arg chn.chn_module_env
           # ppStr       = ppCompact doc
           # chn         = {chn & chn_module_env = menv}
-          # (app, chn)  = wrapParallel (App app) inh chn
+          # (app, chn)  = wrapParallelN (App app) inh chn
           = ({ syn_annot_expr = app
              , syn_texpr      = TParallel inh.inh_ids (mkPar (PP ppStr))
              , syn_pattern_match_vars = []}, chn)
@@ -589,8 +590,8 @@ mkBlueprint (Let lt) inh chn
       = foldrSt f (getLetBinds lt) ([], menv)
       where
       f bnd (xs, menv)
-        # (pprhs, menv) = ppExpression bnd.lb_src menv
-        = ([(PPCleanExpr bnd.lb_dst.fv_ident.id_name, TCleanExpr [] (PPCleanExpr (ppCompact pprhs))):xs], menv)
+        # (rhs, menv) = exprToTCleanExpr bnd.lb_src menv
+        = ([(PPCleanExpr bnd.lb_dst.fv_ident.id_name, TCleanExpr [] rhs):xs], menv)
    getLetBinds lt = lt.let_strict_binds ++ lt.let_lazy_binds
   // TODO: For cases, the compiler introduces a fresh variable in a let for the
   // matches expression. E.g.
@@ -676,12 +677,8 @@ mkBlueprint (Case cs) inh chn
 
   mkAlts` :: Int Expression *ChnExpression -> *(SynExpression, *ChnExpression)
   mkAlts` n expr chn
-    # inh        = {inh & inh_case_expr = Nothing }
-    # (syn, chn) = mkBlueprint expr (addInhId inh n) chn
-    # menv       = chn.chn_module_env
-    # (d, menv)  = ppExpression expr menv
-    # chn        = {chn & chn_module_env = menv}
-    = (syn, chn)
+    # inh = {inh & inh_case_expr = Nothing }
+    = mkBlueprint expr (addInhId inh n) chn
 
 mkBlueprint (Var bv) inh chn
   | varIsTask bv inh
