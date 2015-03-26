@@ -4,9 +4,8 @@ import Tonic.Util
 import Tonic.GraphGen
 import Tonic.Pretty
 //import Tonic.Tonic
-import syntax, checksupport, StdFile
+import syntax, checksupport, compile, StdFile
 from CoclSystemDependent import DirectorySeparator
-from filesystem import ensureDirectoryExists
 import Text
 import Data.Func
 import Data.Functor
@@ -16,21 +15,19 @@ import Data.Map
 import Text.JSON
 import iTasks.Framework.Tonic.AbsSyn
 
-ginTonic :: ModuleN !*{#FunDef} !*{#FunDef} IclModule {#DclModule} !{#CommonDefs} [(String, ParsedExpr)] !*PredefinedSymbols *HashTable !*Files !*Heaps -> *(!*{#FunDef}, !*PredefinedSymbols, *HashTable, !*Files, !*Heaps)
-ginTonic main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules common_defs list_comprehensions predef_symbols hash_table files heaps
+ginTonic :: String ModuleN !*{#FunDef} !*{#FunDef} IclModule {#DclModule} !{#CommonDefs} [(String, ParsedExpr)] !*PredefinedSymbols *HashTable !*File !*Files !*Heaps -> *(!*{#FunDef}, !*PredefinedSymbols, *HashTable, !*File, !*Files, !*Heaps)
+ginTonic mod_dir main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules common_defs list_comprehensions predef_symbols hash_table error files heaps
 // FIXME Start Tonic presence check hack
   # (tonic_module, predef_symbols) = predef_symbols![PD_iTasks_Framework_Tonic]
-  | predefIsUndefined tonic_module = (fun_defs, predef_symbols, hash_table, files, heaps)
+  | predefIsUndefined tonic_module = (fun_defs, predef_symbols, hash_table, error, files, heaps)
   # tonicImp = [0 \\ Declaration imp <-: icl_module.icl_import | imp.decl_ident.id_name == predefined_idents.[PD_tonicWrapTaskBody].id_name]
-  | tonicImp == [] = (fun_defs, predef_symbols, hash_table, files, heaps)
+  | tonicImp == [] = (fun_defs, predef_symbols, hash_table, error, files, heaps)
 // FIXME End Tonic presence check hack
   # iclname                        = icl_module.icl_name.id_name
-  | isSystemModule iclname         = (fun_defs, predef_symbols, hash_table, files, heaps)
-  # (ok, files)                    = ensureDirectoryExists csf_directory_path files
-  | not ok                         = (fun_defs, predef_symbols, hash_table, files, heaps)
+  | isSystemModule iclname         = (fun_defs, predef_symbols, hash_table, error, files, heaps)
   # (tstr, fun_defs, predef_symbols, heaps) = ginTonic` (isITasksModule iclname) main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules common_defs list_comprehensions predef_symbols heaps
-  # files                                   = writeTonicFile iclname tstr files
-  = (fun_defs, predef_symbols, hash_table, files, heaps)
+  # (error, files)                 = writeTonicFile mod_dir iclname tstr error files
+  = (fun_defs, predef_symbols, hash_table, error, files, heaps)
   where
   csf_directory_path = "tonic"
   isITasksModule nm = startsWith "iTasks" nm
@@ -42,14 +39,22 @@ ginTonic main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules common_d
                     , "Email", "Graphics.Scalable", "GUI", "Internet", "Math"
                     , "Network", "System", "TCP", "Test", "Text"
                     ]
-  writeTonicFile iclname tstr files
-    | isITasksModule iclname  = files
+  writeTonicFile :: String String String *File *Files -> *(*File, *Files)
+  writeTonicFile mod_dir iclname tstr error files
+    | isITasksModule iclname  = (error, files)
     | otherwise
-        # (ok, tonicf, files) = fopen (csf_directory_path +++ {DirectorySeparator} +++ iclname +++ ".tonic") FWriteText files
-        | not ok              = files
-        # tonicf              = fwrites tstr tonicf
-        # (_, files)          = fclose tonicf files
-        = files
+        # (ok, mtonicf, error, files) = openTonicFile mod_dir iclname error files
+        | not ok                      = (error, files)
+        = case mtonicf of
+            Yes tonicf
+              # tonicf              = fwrites tstr tonicf
+              # (_, files)          = fclose tonicf files
+              = (error, files)
+            _ = (error, files)
+
+openTonicFile :: !String !String !*File !*Files -> (!Bool, !Optional .File, !*File, !*Files)
+openTonicFile mod_dir mod_name error files
+  = open_file_in_clean_system_files_folder mod_dir mod_name ".tonic" FWriteData error files
 
 foldUArr :: (Int a v:(w:b, u:(arr a)) -> v:(w:b, u:(arr a))) v:(w:b, u:(arr a))
          -> v:(w:b, u:(arr a)) | Array arr a, [v <= u, v <= w]

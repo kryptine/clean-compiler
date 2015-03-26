@@ -17,3 +17,5 @@ compile :: ![{#Char}] !*DclCache !*Files -> (!Bool,!*DclCache,!*Files)
  };
 
 empty_cache :: !*SymbolTable -> *DclCache
+
+open_file_in_clean_system_files_folder :: !String !String !String !Int !*File !*Files -> (!Bool, !Optional .File, !*File, !*Files)
