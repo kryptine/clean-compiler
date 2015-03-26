@@ -37,8 +37,8 @@ Global
 		ExportedNames:	
 	Paths
 		Path:	{Application}\iTasks-SDK\Patches\Platform\OS-Independent
-		Path:	{Application}\lib\clean-platform\OS-Independent
-		Path:	{Application}\lib\clean-platform\OS-Independent\Deprecated\StdLib
+		Path:	{Application}\Libraries\clean-platform\OS-Independent
+		Path:	{Application}\Libraries\clean-platform\OS-Independent\Deprecated\StdLib
 		Path:	{Application}\iTasks-SDK\Patches\Dynamics
 		Path:	{Application}\iTasks-SDK\Patches\Generics
 		Path:	{Application}\iTasks-SDK\Patches\StdEnv
