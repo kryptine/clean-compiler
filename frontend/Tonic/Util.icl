@@ -150,28 +150,34 @@ idxIsMain idx menv
   = (idx == main_dcl_module_n, menv)
 
 reifySymbIdentSymbolType :: SymbIdent *ModuleEnv -> *(Maybe SymbolType, *ModuleEnv)
-reifySymbIdentSymbolType {symb_kind=SK_Function glob}                menv
-  | glob.glob_module == menv.me_main_dcl_module_n                         = reifyFunDefsIdxSymbolType glob.glob_object menv
+reifySymbIdentSymbolType {symb_ident, symb_kind=SK_Function glob}                menv
+  | glob.glob_module == menv.me_main_dcl_module_n                         = reifyFunDefsIdxSymbolType symb_ident glob.glob_object menv
   | otherwise                                                             = reifyDclModulesIdxSymbolType glob menv
-reifySymbIdentSymbolType {symb_kind=SK_IclMacro idx}                 menv = reifyFunDefsIdxSymbolType idx menv
-reifySymbIdentSymbolType {symb_kind=SK_LocalMacroFunction idx}       menv = reifyFunDefsIdxSymbolType idx menv
-reifySymbIdentSymbolType {symb_kind=SK_DclMacro glob}                menv
-  | glob.glob_module == menv.me_main_dcl_module_n                         = reifyFunDefsIdxSymbolType glob.glob_object menv
+reifySymbIdentSymbolType {symb_ident, symb_kind=SK_IclMacro idx}                 menv = reifyFunDefsIdxSymbolType symb_ident idx menv
+reifySymbIdentSymbolType {symb_ident, symb_kind=SK_LocalMacroFunction idx}       menv = reifyFunDefsIdxSymbolType symb_ident idx menv
+reifySymbIdentSymbolType {symb_ident, symb_kind=SK_DclMacro glob}                menv
+  | glob.glob_module == menv.me_main_dcl_module_n                         = reifyFunDefsIdxSymbolType symb_ident glob.glob_object menv
   | otherwise                                                             = reifyDclModulesIdxSymbolType glob menv
-reifySymbIdentSymbolType {symb_kind=SK_LocalDclMacroFunction glob}   menv
-  | glob.glob_module == menv.me_main_dcl_module_n                         = reifyFunDefsIdxSymbolType glob.glob_object menv
+reifySymbIdentSymbolType {symb_ident, symb_kind=SK_LocalDclMacroFunction glob}   menv
+  | glob.glob_module == menv.me_main_dcl_module_n                         = reifyFunDefsIdxSymbolType symb_ident glob.glob_object menv
   | otherwise                                                             = reifyDclModulesIdxSymbolType glob menv
-reifySymbIdentSymbolType {symb_kind=SK_OverloadedFunction glob}      menv
-  | glob.glob_module == menv.me_main_dcl_module_n                         = reifyFunDefsIdxSymbolType glob.glob_object menv
-  | otherwise                                                             = reifyDclModulesIdxSymbolType glob menv
-reifySymbIdentSymbolType {symb_kind=SK_GeneratedFunction fip idx}    menv = reifyFunDefsIdxSymbolType idx menv
+reifySymbIdentSymbolType {symb_ident, symb_kind=SK_OverloadedFunction glob=:{glob_module, glob_object} } menv
+  | glob_module == menv.me_main_dcl_module_n
+      # (icl, menv) = menv!me_icl_module
+      # md          = icl.icl_common.com_member_defs.[glob_object]
+      = (Just md.me_type, menv)
+  | otherwise
+      # (dcls, menv) = menv!me_dcl_modules
+      # md           = dcls.[glob_module].dcl_common.com_member_defs.[glob_object]
+      = (Just md.me_type, menv)
+reifySymbIdentSymbolType {symb_ident, symb_kind=SK_GeneratedFunction fip idx}    menv = reifyFunDefsIdxSymbolType symb_ident idx menv
 reifySymbIdentSymbolType {symb_ident, symb_kind=SK_Constructor glob} menv
   # (mcd, menv) = reifyIclModuleGlobConsDef glob menv
   = (fmap (\cd -> cd.cons_type) mcd, menv)
-reifySymbIdentSymbolType {symb_kind=SK_NewTypeConstructor globi}   menv   = abort "reifySymbIdentType: SK_NewTypeConstructor" // reifyDclModulesIdx` globi.gi_module globi.gi_index menv
-reifySymbIdentSymbolType {symb_kind=SK_Generic glob tk}            menv   = reifyDclModulesIdxSymbolType glob menv
-reifySymbIdentSymbolType {symb_kind=SK_OverloadedConstructor glob} menv
-  | glob.glob_module == menv.me_main_dcl_module_n                         = reifyFunDefsIdxSymbolType glob.glob_object menv
+reifySymbIdentSymbolType {symb_ident, symb_kind=SK_NewTypeConstructor globi}   menv   = abort "reifySymbIdentType: SK_NewTypeConstructor" // reifyDclModulesIdx` globi.gi_module globi.gi_index menv
+reifySymbIdentSymbolType {symb_ident, symb_kind=SK_Generic glob tk}            menv   = reifyDclModulesIdxSymbolType glob menv
+reifySymbIdentSymbolType {symb_ident, symb_kind=SK_OverloadedConstructor glob} menv
+  | glob.glob_module == menv.me_main_dcl_module_n                         = reifyFunDefsIdxSymbolType symb_ident glob.glob_object menv
   | otherwise                                                             = reifyDclModulesIdxSymbolType glob menv
 reifySymbIdentSymbolType si menv = abort "reifySymbIdentSymbolType: unsupported"
 
@@ -197,9 +203,6 @@ reifyDclModulesIdxFunType` glob_module glob_object menv
     = case mdcl of
         Just dcl -> (mselect dcl.dcl_functions glob_object, menv)
         _        -> (Nothing, menv)
-
-reifyOverloadedFunType :: (Global Index) *ModuleEnv -> *(Maybe SymbolType, *ModuleEnv)
-reifyOverloadedFunType {glob_module,glob_object} menv = abort "reifyCommonDefsIdxFunType"
 
   //# (common, iclmod) = (menv.me_icl_module)!icl_common
   //# dcls             = menv.me_dcl_modules
@@ -255,8 +258,8 @@ reifyIclModuleIdxConsDef glob_object menv
   # (icl, menv) = menv!me_icl_module
   = (mselect icl.icl_common.com_cons_defs glob_object, menv)
 
-reifyFunDefsIdxSymbolType :: Index *ModuleEnv -> *(Maybe SymbolType, *ModuleEnv)
-reifyFunDefsIdxSymbolType idx menv
+reifyFunDefsIdxSymbolType :: Ident Index *ModuleEnv -> *(Maybe SymbolType, *ModuleEnv)
+reifyFunDefsIdxSymbolType ident idx menv
   # (mfd, fds) = muselect menv.me_fun_defs_cpy idx
   # menv = {menv & me_fun_defs_cpy = fds}
   = case mfd of
@@ -395,6 +398,8 @@ typeIsTask ty =
     TA   tsi _     -> symTyIsTask` tsi
     TAS  tsi _  _  -> symTyIsTask` tsi
     _ --> t        -> typeIsTask t.at_type
+    TFA _ t        -> typeIsTask t
+    TFAC _ t _     -> typeIsTask t
     _              -> False
   where symTyIsTask` tsi = tsi.type_ident.id_name == "Task"
 
