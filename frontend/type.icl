@@ -2598,7 +2598,8 @@ typeProgramWithoutUpdatingFunctions comps main_dcl_module_n fun_defs specials li
 	  special_instances = { si_next_array_member_index = fun_env_size, si_array_instances = [], si_list_instances = [], si_tail_strict_list_instances = [] }
 
 	# (type_error, predef_symbols, special_instances, out, ts) = type_components list_inferred_types 0 comps class_instances ti (False, predef_symbols, special_instances, out, ts)
-	  {ts_td_infos,ts_fun_env,ts_error,ts_var_heap, ts_expr_heap, ts_type_heaps, ts_generic_heap,ts_fun_defs} = ts
+	  (ts_fun_defs,ts_fun_env) = update_function_types 0 comps ts.ts_fun_env ts.ts_fun_defs
+	  {ts_td_infos,ts_fun_env,ts_error,ts_var_heap, ts_expr_heap, ts_type_heaps, ts_generic_heap,ts_fun_defs} = {ts & ts_fun_defs = ts_fun_defs, ts_fun_env = ts_fun_env}
       ts_expr_heap = foldSt (\t acc -> acc <:= t) dyn_ptrs_and_values ts_expr_heap
 	= (not type_error, ts_fun_env, ts_fun_defs, ti_common_defs, ti_functions,
 			ts_td_infos, {hp_var_heap = ts_var_heap, hp_expression_heap = ts_expr_heap, hp_type_heaps = ts_type_heaps, hp_generic_heap=ts_generic_heap },
@@ -2911,22 +2912,22 @@ update_function_types group_index comps fun_env fun_defs
 		= update_function_types (inc group_index) comps fun_env fun_defs
 
 where
-	update_function_types_in_component :: ![Index] !*{!FunctionType} !*{#FunDef} -> (!*{#FunDef}, !*{!FunctionType})
-	update_function_types_in_component [fun_index : funs] fun_env fun_defs
-		# (CheckedType checked_fun_type, fun_env) = fun_env![fun_index]
-		# (fd, fun_defs) = fun_defs![fun_index]
-		= case fd.fun_type of
-			No
-				-> update_function_types_in_component funs fun_env { fun_defs & [fun_index] = { fd & fun_type = Yes checked_fun_type }}
-			Yes fun_type
-				# nr_of_lifted_arguments = checked_fun_type.st_arity - fun_type.st_arity
-				| nr_of_lifted_arguments > 0
-					# fun_type = addLiftedArgumentsToSymbolType fun_type nr_of_lifted_arguments
-								checked_fun_type.st_args checked_fun_type.st_vars checked_fun_type.st_attr_vars checked_fun_type.st_context
-					-> update_function_types_in_component funs fun_env { fun_defs & [fun_index] = { fd & fun_type = Yes fun_type }}
-					-> update_function_types_in_component funs fun_env fun_defs
-	update_function_types_in_component [] fun_env fun_defs
-		= (fun_defs, fun_env)
+    update_function_types_in_component :: ![Index] !*{!FunctionType} !*{#FunDef} -> (!*{#FunDef}, !*{!FunctionType})
+    update_function_types_in_component [fun_index : funs] fun_env fun_defs
+        # (CheckedType checked_fun_type, fun_env) = fun_env![fun_index]
+        # (fd, fun_defs) = fun_defs![fun_index]
+        = case fd.fun_type of
+            No
+                = update_function_types_in_component funs fun_env { fun_defs & [fun_index] = { fd & fun_type = Yes checked_fun_type }}
+            Yes fun_type
+                # nr_of_lifted_arguments = checked_fun_type.st_arity - fun_type.st_arity
+                | nr_of_lifted_arguments > 0
+                    # fun_type = addLiftedArgumentsToSymbolType fun_type nr_of_lifted_arguments
+                    			checked_fun_type.st_args checked_fun_type.st_vars checked_fun_type.st_attr_vars checked_fun_type.st_context
+                    = update_function_types_in_component funs fun_env { fun_defs & [fun_index] = { fd & fun_type = Yes fun_type }}
+                    = update_function_types_in_component funs fun_env fun_defs
+    update_function_types_in_component [] fun_env fun_defs
+    	= (fun_defs, fun_env)
 
 
 add_unicity_of_essentially_unique_types_for_functions ti_common_defs comp coercions ts_error ts_fun_env

@@ -725,14 +725,14 @@ mkEdge app=:{app_symb, app_args} n inh chn
       , {chn & chn_module_env = menv})
 
 // TODO Relate the match_vars from the body to the vars from the arguments
-funToGraph :: FunDef [(String, ParsedExpr)] *ModuleEnv *Heaps *PredefinedSymbols
+funToGraph :: FunDef FunDef [(String, ParsedExpr)] *ModuleEnv *Heaps *PredefinedSymbols
            -> *(Maybe ([(TCleanExpr, TCleanExpr)], TExpr, Expression), *ModuleEnv, *Heaps, *PredefinedSymbols)
-funToGraph fd=:{fun_ident=fun_ident, fun_body = TransformedBody tb} list_comprehensions menv heaps predef_symbols = mkBody
+funToGraph fd=:{fun_ident=fun_ident, fun_body = TransformedBody tb} fd_cpy list_comprehensions menv heaps predef_symbols = mkBody
   where
   mkBody
     # inh             = mkInhExpr fun_ident.id_name list_comprehensions
     # chn             = mkChnExpr predef_symbols menv heaps
-    # (argTys, tyenv) = zipWithSt (\arg t st -> ((arg, t), 'DM'.put arg.fv_ident.id_name t st)) tb.tb_args (funArgTys fd) 'DM'.newMap
+    # (argTys, tyenv) = zipWithSt (\arg t st -> ((arg, t), 'DM'.put arg.fv_ident.id_name t st)) tb.tb_args (funArgTys fd_cpy) 'DM'.newMap
     # (syn, chn)      = mkBlueprint tb.tb_rhs {inh & inh_tyenv = tyenv} chn
     = ( Just (map (\(arg, ty) -> (mkArgPP syn.syn_pattern_match_vars arg, typeToTCleanExpr ty)) argTys, syn.syn_texpr, syn.syn_annot_expr) //Just g, syn.syn_annot_expr)
       , chn.chn_module_env, chn.chn_heaps, chn.chn_predef_symbols)
@@ -744,4 +744,4 @@ funToGraph fd=:{fun_ident=fun_ident, fun_body = TransformedBody tb} list_compreh
               [x:_] -> x
         idnm
           = PPCleanExpr idnm
-funToGraph _ _ menv heaps predef_symbols = (Nothing, menv, heaps, predef_symbols)
+funToGraph _ _ _ menv heaps predef_symbols = (Nothing, menv, heaps, predef_symbols)

@@ -74,7 +74,7 @@ toJSONString rs icl_module menv
                        | tm_name  = icl_module.icl_name.id_name
                        , tm_tasks = rs}
     , menv)
-
+import StdDebug
 ginTonic` :: Bool ModuleN !*{#FunDef} !*{#FunDef} IclModule {#DclModule}
              !{#CommonDefs} [(String, ParsedExpr)] !*PredefinedSymbols *Heaps
           -> *(String, !*{#FunDef}, !*PredefinedSymbols, !*Heaps)
@@ -84,10 +84,12 @@ ginTonic` is_itasks_mod main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_m
   # (str, menv) = toJSONString reps icl_module menv
   = (str, menv.me_fun_defs, predef_symbols, heaps)
   where
+  // fd does not always have a fun_type = Yes
   appDefInfo idx fd ((reps, heaps, predef_symbols, fun_defs_cpy), fun_defs)
+    # (fd_cpy, fun_defs_cpy) = fun_defs_cpy![idx]
     # menv = mkModuleEnv main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules
-    | not is_itasks_mod && funIsTask fd && fd.fun_info.fi_def_level == 1
-      # (mres, menv, heaps, predef_symbols) = funToGraph fd list_comprehensions menv heaps predef_symbols
+    | not is_itasks_mod && funIsTask fd_cpy && fd.fun_info.fi_def_level == 1
+      # (mres, menv, heaps, predef_symbols) = funToGraph fd fd_cpy list_comprehensions menv heaps predef_symbols
       # menv = case mres of
                  Just (_, _, e)
                    -> updateWithAnnot idx e menv
@@ -98,7 +100,7 @@ ginTonic` is_itasks_mod main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_m
               -> put fd.fun_ident.id_name { TonicTask
                                           | tt_module = icl_module.icl_name.id_name
                                           , tt_name   = fd.fun_ident.id_name
-                                          , tt_resty  = fromMaybe (PPCleanExpr "") (fmap typeToTCleanExpr (functorContent (funTy fd)))
+                                          , tt_resty  = fromMaybe (PPCleanExpr "") (fmap typeToTCleanExpr (functorContent (funTy fd_cpy)))
                                           , tt_args   = args
                                           , tt_body   = g} reps
             _ -> reps
