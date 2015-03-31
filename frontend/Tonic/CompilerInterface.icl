@@ -168,6 +168,7 @@ addTonicWrap is_itasks_mod icl_module idx menv heaps pdss common_defs
     noConcreteType :: Type -> Bool
     noConcreteType (TA _ _)    = False
     noConcreteType (TAS _ _ _) = False
+    noConcreteType (TB _)      = False
     // TODO -> types?
     noConcreteType _           = True
     noITaskCtx :: FreeVar [TypeContext] -> Bool
