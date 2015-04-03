@@ -150,15 +150,16 @@ wrapTaskApp origExpr inh chn
       # icl          = menv.me_icl_module
       # nm           = icl.icl_name.id_name
       # (ids, pdss)  = toStatic (map mkInt inh.inh_ids) chn.chn_predef_symbols
-      # (expr, pdss) = appPredefinedSymbol (findWrap rem)
+      # (expr, heaps, pdss) = appPredefinedSymbolWithEI (findWrap rem)
                          [ mkStr nm
                          , mkStr inh.inh_curr_task_name
                          , ids
                          , origExpr
-                         ] SK_Function pdss
+                         ] SK_Function chn.chn_heaps pdss
       = ( App expr
         , {chn & chn_predef_symbols = pdss
-               , chn_module_env = {menv & me_icl_module = icl}})
+               , chn_module_env = {menv & me_icl_module = icl}
+               , chn_heaps = heaps})
   where
   findWrap :: Int -> Int
   findWrap 0 = PD_tonicWrapApp
@@ -177,16 +178,17 @@ wrapParallelN origExpr=:(App app=:{app_args=[xs:_]}) inh chn
       # icl          = menv.me_icl_module
       # nm           = icl.icl_name.id_name
       # (ids, pdss)  = toStatic (map mkInt inh.inh_ids) chn.chn_predef_symbols
-      # (expr, pdss) = appPredefinedSymbol PD_tonicWrapParallel
+      # (expr, heaps, pdss) = appPredefinedSymbolWithEI PD_tonicWrapParallel
                          [ mkStr nm
                          , mkStr inh.inh_curr_task_name
                          , ids
                          , App {app & app_args = []}
                          , xs
-                         ] SK_Function pdss
+                         ] SK_Function chn.chn_heaps pdss
       = ( App expr
         , {chn & chn_predef_symbols = pdss
-               , chn_module_env = {menv & me_icl_module = icl}})
+               , chn_module_env = {menv & me_icl_module = icl}
+               , chn_heaps      = heaps})
 wrapParallelN origExpr inh chn = (origExpr, chn)
 
 letTypes :: ExprInfoPtr *ChnExpression -> *([Type], *ChnExpression)
