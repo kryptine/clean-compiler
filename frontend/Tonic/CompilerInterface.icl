@@ -105,9 +105,6 @@ ginTonic` is_itasks_mod main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_m
                                           , tt_body   = g} reps
             _ -> reps
         , heaps, predef_symbols, menv.me_fun_defs_cpy), menv.me_fun_defs)
-    //| is_itasks_mod && funIsTask fd && fd.fun_info.fi_def_level == 1
-      //# (menv, heaps, predef_symbols) = addTonicWrap is_itasks_mod icl_module idx menv heaps predef_symbols
-      //= ((reps, heaps, predef_symbols, menv.me_fun_defs_cpy), menv.me_fun_defs)
     | otherwise = ((reps, heaps, predef_symbols, fun_defs_cpy), fun_defs)
 
 updateWithAnnot :: Int Expression *ModuleEnv -> *ModuleEnv
@@ -128,16 +125,16 @@ addTonicWrap is_itasks_mod icl_module idx menv heaps pdss common_defs
       = case (mfdnt, mfdt) of
           (Just fdnt, Just fdt)
             = case (fdnt.fun_body, fdt.fun_type) of
-                (TransformedBody fb, Yes _)
+                (TransformedBody fb, Yes symbty)
                   # (isPA, menv) = case fb.tb_rhs of
                                      App app -> isPartialApp app menv
                                      // TODO Add a case for @ ?
                                      _       -> (False, menv)
-                  = if isPA (menv, heaps, pdss) (doAddRefl fdnt menv heaps pdss)
+                  = if isPA (menv, heaps, pdss) (doAddRefl fdnt symbty menv heaps pdss)
                 _ = (menv, heaps, pdss)
           _ = (menv, heaps, pdss)
   where
-  doAddRefl {fun_ident, fun_type = Yes symbty, fun_body=TransformedBody { tb_args, tb_rhs }} menv heaps pdss
+  doAddRefl {fun_ident, fun_body=TransformedBody { tb_args, tb_rhs }} symbty menv heaps pdss
     # (ok, pdss) = pdssAreDefined [PD_tonicViewInformation, PD_tonicWrapTaskBody, PD_ConsSymbol, PD_NilSymbol] pdss
     | not ok     = (menv, heaps, pdss)
     # fun_defs   = menv.me_fun_defs
@@ -176,4 +173,4 @@ addTonicWrap is_itasks_mod icl_module idx menv heaps pdss common_defs
     isITaskClass :: TCClass -> Bool
     isITaskClass (TCClass gds) = gds.glob_object.ds_ident.id_name == "iTask" // TODO Make this nicer
     isITaskClass _             = False
-  doAddRefl _ menv heaps pdss = (menv, heaps, pdss)
+  doAddRefl _ _ menv heaps pdss = (menv, heaps, pdss)

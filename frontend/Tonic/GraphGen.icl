@@ -145,8 +145,9 @@ wrapTaskApp origExpr inh chn
   | not ok     = (origExpr, chn)
   | otherwise
       # (rem, menv)  = case origExpr of
-                         App app -> argsRemaining app chn.chn_module_env
-                         _       -> (0, chn.chn_module_env)
+                         App app
+                           = argsRemaining app chn.chn_module_env
+                         _ = (0, chn.chn_module_env)
       # icl          = menv.me_icl_module
       # nm           = icl.icl_name.id_name
       # (ids, pdss)  = toStatic (map mkInt inh.inh_ids) chn.chn_predef_symbols
@@ -736,7 +737,7 @@ funToGraph fd=:{fun_ident=fun_ident, fun_body = TransformedBody tb} fd_cpy list_
     # chn             = mkChnExpr predef_symbols menv heaps
     # (argTys, tyenv) = zipWithSt (\arg t st -> ((arg, t), 'DM'.put arg.fv_ident.id_name t st)) tb.tb_args (funArgTys fd_cpy) 'DM'.newMap
     # (syn, chn)      = mkBlueprint tb.tb_rhs {inh & inh_tyenv = tyenv} chn
-    = ( Just (map (\(arg, ty) -> (mkArgPP syn.syn_pattern_match_vars arg, typeToTCleanExpr ty)) argTys, syn.syn_texpr, syn.syn_annot_expr) //Just g, syn.syn_annot_expr)
+    = ( Just (map (\(arg, ty) -> (mkArgPP syn.syn_pattern_match_vars arg, typeToTCleanExpr ty)) argTys, syn.syn_texpr, syn.syn_annot_expr)
       , chn.chn_module_env, chn.chn_heaps, chn.chn_predef_symbols)
   mkArgPP pmvars arg
     = case arg.fv_ident.id_name of
