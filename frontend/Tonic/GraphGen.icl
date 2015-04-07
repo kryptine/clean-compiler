@@ -434,10 +434,12 @@ mkBlueprint (App app) inh chn
       # (syn, chn)           = mkBlueprint l (addInhId inh 0) chn
       # (ppl, menv)          = mapSt ppExpression app_args chn.chn_module_env
       # ((funArgs, _), menv) = reifyArgsAndDef app_symb menv
-      # ([_:a:as], menv)     = mapSt ppFreeVar funArgs menv // FIXME : Dirty patter matching
+      # patId                = case drop (length app_args) [freeVarName x \\ x <- funArgs | x.fv_def_level == -1] of
+                                 []    -> []
+                                 [x:_] -> [x]
       # chn                  = {chn & chn_module_env = menv}
       = ({ syn_annot_expr = App {app & app_args = ctxs ++ [syn.syn_annot_expr, r]}
-         , syn_texpr      = TTransform syn.syn_texpr (ppCompact a) (map ppCompact (ppl ++ [a:as]))
+         , syn_texpr      = TTransform syn.syn_texpr app_symb.symb_ident.id_name (map ppCompact ppl ++ patId)
          , syn_pattern_match_vars = syn.syn_pattern_match_vars}, chn)
 
   mkParSumN = mkParN ParSumN
