@@ -224,7 +224,7 @@ exprToTCleanExpr (App app) menv
 exprToTCleanExpr expr menv
   # (doc, menv) = ppExpression expr menv
   = (PPCleanExpr (ppCompact doc), menv)
-
+import StdDebug
 mkBlueprint :: Expression InhExpression *ChnExpression -> *(SynExpression, *ChnExpression)
 mkBlueprint (App app) inh chn
   # (idIsTask, menv) = symbIdentIsTask app.app_symb chn.chn_module_env
@@ -363,40 +363,55 @@ mkBlueprint (App app) inh chn
       | app.app_symb.symb_ident.id_name == "Action" = str
     extractAction _ = "(no action)"
     mkStepCont contApp n chn =
-      case appFunName contApp of
-        "ifValue"
-          # [(App fApp):(App tApp):_] = contApp.app_args // TODO Bah
+      case (appFunName contApp, contApp.app_args) of
+      // TODO FIXME Get rid of copy/paste job
+        ("ifValue", [e1=:((App fApp) @ fAppArgs):(App tApp):_])
           # ((_, fAppArgs), menv)     = dropAppContexts fApp chn.chn_module_env
           # (ppFAppArgs, menv)        = mapSt ppExpression fAppArgs menv
           # ((fArgFunArgs, _), menv)  = reifyArgsAndDef fApp.app_symb menv
           # remFArgs                  = drop (length fAppArgs) fArgFunArgs
-          # (ppHdRemFArgs, menv)      = ppFreeVar (hd remFArgs) menv // TODO Bah
-          # (ppTlRemFArgs, menv)      = mapSt ppFreeVar (tl remFArgs) menv // TODO Bah
+          # ((ppHdRemFArgs, ppTlRemFArgs), menv) = case remFArgs of
+                                                     [x:xs]
+                                                       # (ppHdRemFArgs, menv) = ppFreeVar x menv
+                                                       # (ppTlRemFArgs, menv) = mapSt ppFreeVar xs menv
+                                                       = ((ppHdRemFArgs, ppTlRemFArgs), menv)
+                                                     _ = (('PPrint'.text "FIXME", ['PPrint'.text "FIXME"]), menv)
+          # (lbl, syn, chn)           = mkEdge tApp n inh {chn & chn_module_env = menv}
+          = (IfValue (PPCleanExpr (ppCompact ppHdRemFArgs)) fApp.app_symb.symb_ident.id_name
+              (map ppCompact (ppFAppArgs ++ [ppHdRemFArgs:ppTlRemFArgs])) lbl syn.syn_texpr
+            , {contApp & app_args = [e1, syn.syn_annot_expr]}, chn)
+        ("ifValue", [(App fApp):(App tApp):_])
+          # ((_, fAppArgs), menv)     = dropAppContexts fApp chn.chn_module_env
+          # (ppFAppArgs, menv)        = mapSt ppExpression fAppArgs menv
+          # ((fArgFunArgs, _), menv)  = reifyArgsAndDef fApp.app_symb menv
+          # remFArgs                  = drop (length fAppArgs) fArgFunArgs
+          # ((ppHdRemFArgs, ppTlRemFArgs), menv) = case remFArgs of
+                                                     [x:xs]
+                                                       # (ppHdRemFArgs, menv) = ppFreeVar x menv
+                                                       # (ppTlRemFArgs, menv) = mapSt ppFreeVar xs menv
+                                                       = ((ppHdRemFArgs, ppTlRemFArgs), menv)
+                                                     _ = (('PPrint'.text "FIXME", ['PPrint'.text "FIXME"]), menv)
           # (lbl, syn, chn)           = mkEdge tApp n inh {chn & chn_module_env = menv}
           = (IfValue (PPCleanExpr (ppCompact ppHdRemFArgs)) fApp.app_symb.symb_ident.id_name
               (map ppCompact (ppFAppArgs ++ [ppHdRemFArgs:ppTlRemFArgs])) lbl syn.syn_texpr
             , {contApp & app_args = [App fApp, syn.syn_annot_expr]}, chn)
-        "hasValue"
-          # [(App tApp):_]  = contApp.app_args // TODO Bah
+        ("hasValue", [(App tApp):_])
           # (lbl, syn, chn) = mkEdge tApp n inh chn
           = (HasValue lbl syn.syn_texpr, {contApp & app_args = [syn.syn_annot_expr]}, chn)
-        "ifStable"
-          # [(App tApp):_]  = contApp.app_args // TODO Bah
+        ("ifStable", [(App tApp):_])
           # (lbl, syn, chn) = mkEdge tApp n inh chn
           = (IfStable lbl syn.syn_texpr, {contApp & app_args = [syn.syn_annot_expr]}, chn)
-        "ifUnstable"
-          # [(App tApp):_]  = contApp.app_args // TODO Bah
+        ("ifUnstable", [(App tApp):_])
           # (lbl, syn, chn) = mkEdge tApp n inh chn
           = (IfUnstable lbl syn.syn_texpr, {contApp & app_args = [syn.syn_annot_expr]}, chn)
-        "ifCond"
-          # [cond:(App tApp):_] = contApp.app_args // TODO Bah
+        ("ifCond", [cond:(App tApp):_])
           # (lbl, syn, chn)     = mkEdge tApp n inh chn
           # (d, menv)           = ppExpression cond chn.chn_module_env
           = (IfCond (ppCompact d) lbl syn.syn_texpr, {contApp & app_args = [cond, syn.syn_annot_expr]}, { chn & chn_module_env = menv })
-        "always"
-          # (syn, chn) = mkBlueprint (hd contApp.app_args) (addInhId inh n) chn
+        ("always", [x:_])
+          # (syn, chn) = mkBlueprint x (addInhId inh n) chn
           = (Always syn.syn_texpr, {contApp & app_args = [syn.syn_annot_expr]}, chn)
-        fn
+        (fn, _)
           = (CustomFilter fn, contApp, chn)
 
   mkTaskApp app ctxs args inh chn
