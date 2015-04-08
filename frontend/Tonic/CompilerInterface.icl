@@ -74,7 +74,7 @@ toJSONString rs icl_module menv
                        | tm_name  = icl_module.icl_name.id_name
                        , tm_tasks = rs}
     , menv)
-import StdDebug
+
 ginTonic` :: Bool ModuleN !*{#FunDef} !*{#FunDef} IclModule {#DclModule}
              !{#CommonDefs} [(String, ParsedExpr)] !*PredefinedSymbols *Heaps
           -> *(String, !*{#FunDef}, !*PredefinedSymbols, !*Heaps)
@@ -88,7 +88,7 @@ ginTonic` is_itasks_mod main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_m
   appDefInfo idx fd ((reps, heaps, predef_symbols, fun_defs_cpy), fun_defs)
     # (fd_cpy, fun_defs_cpy) = fun_defs_cpy![idx]
     # menv = mkModuleEnv main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules
-    | not is_itasks_mod && funIsTask fd_cpy && fd.fun_info.fi_def_level == 1
+    | not is_itasks_mod && funIsTask fd_cpy // && fd.fun_info.fi_def_level == 1
       # (mres, menv, heaps, predef_symbols) = funToGraph fd fd_cpy list_comprehensions menv heaps predef_symbols
       # menv = case mres of
                  Just (_, _, e)
@@ -106,6 +106,7 @@ ginTonic` is_itasks_mod main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_m
             _ -> reps
         , heaps, predef_symbols, menv.me_fun_defs_cpy), menv.me_fun_defs)
     | otherwise = ((reps, heaps, predef_symbols, fun_defs_cpy), fun_defs)
+
 
 updateWithAnnot :: Int Expression *ModuleEnv -> *ModuleEnv
 updateWithAnnot fidx e menv
@@ -130,15 +131,15 @@ addTonicWrap is_itasks_mod icl_module idx menv heaps pdss common_defs
                                      App app -> isPartialApp app menv
                                      // TODO Add a case for @ ?
                                      _       -> (False, menv)
-                  = if isPA (menv, heaps, pdss) (doAddRefl fdnt symbty menv heaps pdss)
+                  = if isPA (menv, heaps, pdss) (doAddRefl fdnt symbty menv heaps pdss common_defs)
                 _ = (menv, heaps, pdss)
           _ = (menv, heaps, pdss)
   where
-  doAddRefl {fun_ident, fun_body=TransformedBody { tb_args, tb_rhs }} symbty menv heaps pdss
+  doAddRefl {fun_ident, fun_body=TransformedBody { tb_args, tb_rhs }} symbty menv heaps pdss common_defs
     # (ok, pdss) = pdssAreDefined [PD_tonicViewInformation, PD_tonicWrapTaskBody, PD_ConsSymbol, PD_NilSymbol] pdss
     | not ok     = (menv, heaps, pdss)
+    # (args, heaps, pdss, menv) = foldr (mkArg symbty is_itasks_mod) ([], heaps, pdss, menv) (zip2 tb_args symbty.st_args)
     # fun_defs   = menv.me_fun_defs
-    # (args, heaps, pdss) = foldr (mkArg symbty is_itasks_mod) ([], heaps, pdss) (zip2 tb_args symbty.st_args)
     | length args == length tb_args
         # (xs, pdss) = toStatic args pdss
         # (wrap, heaps, pdss) = appPredefinedSymbolWithEI PD_tonicWrapTaskBody
@@ -151,26 +152,35 @@ addTonicWrap is_itasks_mod icl_module idx menv heaps pdss common_defs
         = ({ menv & me_fun_defs = fun_defs}, heaps, pdss)
     | otherwise = (menv, heaps, pdss)
     where
-    mkArg :: SymbolType Bool (FreeVar, AType) ([Expression], *Heaps, *PredefinedSymbols) -> *([Expression], *Heaps, *PredefinedSymbols)
-    mkArg symty is_itasks_mod (arg=:{fv_ident}, {at_type}) (xs, heaps, pdss)
+    mkArg :: SymbolType Bool (FreeVar, AType) ([Expression], *Heaps, *PredefinedSymbols, *ModuleEnv) -> *([Expression], *Heaps, *PredefinedSymbols, *ModuleEnv)
+    mkArg symty is_itasks_mod (arg=:{fv_ident}, {at_type}) (xs, heaps, pdss, menv)
       # (bv, heaps) = freeVarToVar arg heaps
+      # (ncit, menv) = hasITaskInstance at_type menv
       # (viewApp, heaps, pdss) = appPredefinedSymbolWithEI PD_tonicViewInformation
                                    [ mkStr fv_ident.id_name
-                                   , if (is_itasks_mod || (noConcreteType at_type && noITaskCtx arg symty.st_context))
+                                   , if (is_itasks_mod || (not ncit && noITaskCtx arg symty.st_context))
                                        (mkStr fv_ident.id_name)
                                        (Var bv)
                                    ] SK_Function heaps pdss
       # (texpr, pdss) = toStatic (mkStr fv_ident.id_name, App viewApp) pdss
-      = ([texpr:xs], heaps, pdss)
-    noConcreteType :: Type -> Bool
-    noConcreteType (TA _ _)    = False
-    noConcreteType (TAS _ _ _) = False
-    noConcreteType (TB _)      = False
-    // TODO -> types?
-    noConcreteType _           = True
+      = ([texpr:xs], heaps, pdss, menv)
+    hasITaskInstance :: Type *ModuleEnv -> *(Bool, *ModuleEnv) // TODO Check whether there is an iTask instance for this concrete type
+    hasITaskInstance (TA tsi _)    menv = tsiHasITasks tsi menv
+    hasITaskInstance (TAS tsi _ _) menv = tsiHasITasks tsi menv
+    hasITaskInstance (TB _)        menv = (True, menv)
+    hasITaskInstance _             menv = (False, menv)
+    tsiHasITasks tsi=:{type_index = {glob_module, glob_object}} menv
+      | glob_module == menv.me_main_dcl_module_n
+         # ctd = icl_module.icl_common.com_type_defs.[glob_object]
+         = ctdHasITasks ctd menv
+      | otherwise
+         # ctd = common_defs.[glob_module].com_type_defs.[glob_object]
+         = ctdHasITasks ctd menv
+    ctdHasITasks ctd menv
+      = (False, menv)
     noITaskCtx :: FreeVar [TypeContext] -> Bool
     noITaskCtx fv tcs = isEmpty [tc \\ tc <- tcs | fv.fv_info_ptr == tc.tc_var && isITaskClass tc.tc_class]
     isITaskClass :: TCClass -> Bool
     isITaskClass (TCClass gds) = gds.glob_object.ds_ident.id_name == "iTask" // TODO Make this nicer
     isITaskClass _             = False
-  doAddRefl _ _ menv heaps pdss = (menv, heaps, pdss)
+  doAddRefl _ _ menv heaps pdss _ = (menv, heaps, pdss)

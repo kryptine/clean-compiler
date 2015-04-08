@@ -507,7 +507,7 @@ mkBlueprint (App app) inh chn
   mkSetShare app ctxs args=:[a1=:(App _):App {app_symb, app_args}:_] inh chn
     # (ppe1, menv) = ppExpression a1 chn.chn_module_env
     = mkShareApp app (Set (ppCompact ppe1)) app_symb app_args {chn & chn_module_env = menv}
-  mkSetShare app ctxs args=:[Var v] inh chn
+  mkSetShare app ctxs args=:[Var v:_] inh chn
     = mkShareVar app (Set "TODO") v chn
 
   mkUpdShare app ctxs args=:[a1=:(App _):App {app_symb, app_args}:_] inh chn

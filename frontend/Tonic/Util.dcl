@@ -159,3 +159,5 @@ pdssAreDefined :: [Int] *PredefinedSymbols -> *(Bool, *PredefinedSymbols)
 exprToTCleanExpr :: Expression *ModuleEnv -> *(TCleanExpr, *ModuleEnv)
 
 typeToTCleanExpr :: Type -> TCleanExpr
+
+mselect :: (a e) !Int -> Maybe e | Array a e
