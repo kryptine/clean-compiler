@@ -5,7 +5,7 @@ import Tonic.GraphGen
 import Tonic.Pretty
 //import Tonic.Tonic
 import syntax, checksupport, compile, StdFile
-from CoclSystemDependent import DirectorySeparator
+from CoclSystemDependent import DirectorySeparator, ensureCleanSystemFilesExists
 import Text
 import Data.Func
 import Data.Functor
@@ -29,7 +29,6 @@ ginTonic mod_dir main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules 
   # (error, files)                 = writeTonicFile mod_dir iclname tstr error files
   = (fun_defs, predef_symbols, hash_table, error, files, heaps)
   where
-  csf_directory_path = "tonic"
   isITasksModule nm = startsWith "iTasks" nm
   isSystemModule nm = foldr (\x b -> startsWith x nm || b) False sysmods
     where sysmods = [ "Sapl", "sapl"
@@ -43,14 +42,15 @@ ginTonic mod_dir main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules 
   writeTonicFile mod_dir iclname tstr error files
     | isITasksModule iclname  = (error, files)
     | otherwise
-        # (ok, mtonicf, error, files) = openTonicFile mod_dir iclname error files
-        | not ok                      = (error, files)
-        = case mtonicf of
-            Yes tonicf
-              # tonicf              = fwrites tstr tonicf
-              # (_, files)          = fclose tonicf files
-              = (error, files)
-            _ = (error, files)
+        # targetDir              = mod_dir +++ {DirectorySeparator} +++ "tonic"
+        # (ok, files)            = ensureCleanSystemFilesExists targetDir files
+        | not ok                 = (error, files)
+        # targetFile             = targetDir +++ {DirectorySeparator} +++ iclname +++ ".tonic"
+        # (ok, tonicFile, files) = fopen targetFile FWriteData files
+        | not ok                 = (error, files)
+        # tonicFile              = fwrites tstr tonicFile
+        # (_, files)             = fclose tonicFile files
+        = (error, files)
 
 openTonicFile :: !String !String !*File !*Files -> (!Bool, !Optional .File, !*File, !*Files)
 openTonicFile mod_dir mod_name error files
