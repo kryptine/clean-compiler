@@ -74,7 +74,7 @@ toJSONString rs icl_module menv
                        | tm_name  = icl_module.icl_name.id_name
                        , tm_tasks = rs}
     , menv)
-
+import StdDebug
 ginTonic` :: Bool ModuleN !*{#FunDef} !*{#FunDef} IclModule {#DclModule}
              !{#CommonDefs} [(String, ParsedExpr)] !*PredefinedSymbols *Heaps
           -> *(String, !*{#FunDef}, !*PredefinedSymbols, !*Heaps)
@@ -88,7 +88,7 @@ ginTonic` is_itasks_mod main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_m
   appDefInfo idx fd ((reps, heaps, predef_symbols, fun_defs_cpy), fun_defs)
     # (fd_cpy, fun_defs_cpy) = fun_defs_cpy![idx]
     # menv = mkModuleEnv main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules
-    | not is_itasks_mod && funIsTask fd_cpy // && fd.fun_info.fi_def_level == 1
+    | (not is_itasks_mod) && funIsTask fd_cpy
       # (mres, menv, heaps, predef_symbols) = funToGraph fd fd_cpy list_comprehensions menv heaps predef_symbols
       # menv = case mres of
                  Just (_, _, e)
@@ -129,7 +129,6 @@ addTonicWrap is_itasks_mod icl_module idx menv heaps pdss common_defs
                 (TransformedBody fb, Yes symbty)
                   # (isPA, menv) = case fb.tb_rhs of
                                      App app -> isPartialApp app menv
-                                     // TODO Add a case for @ ?
                                      _       -> (False, menv)
                   = if isPA (menv, heaps, pdss) (doAddRefl fdnt symbty menv heaps pdss common_defs)
                 _ = (menv, heaps, pdss)

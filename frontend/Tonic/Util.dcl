@@ -50,8 +50,6 @@ exprIsListCompr :: Expression -> Bool
 
 appIsListComp :: App -> Bool
 
-isListCompr :: String -> Bool
-
 safeHead :: [a] -> Maybe a
 
 fromOptional :: a (Optional a) -> a

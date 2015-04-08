@@ -325,13 +325,13 @@ exprIsListCompr _          = False
 appIsListComp :: App -> Bool
 appIsListComp app = isListCompr app.app_symb.symb_ident.id_name
 
-isListCompr :: String -> Bool
+isListCompr :: !String -> Bool
 isListCompr str = startsWith "c;" str // TODO: Verify
 
-isLambda :: String -> Bool
-isLambda str = startsWith "\;" str // TODO: Verify
+isLambda :: !String -> Bool
+isLambda str = startsWith "\\\;" str // TODO: Verify
 
-isTD :: String -> Bool
+isTD :: !String -> Bool
 isTD str = startsWith "TD;" str // TODO: Verify
 
 safeHead :: [a] -> Maybe a
@@ -367,12 +367,9 @@ funIsTask fd =
   case (fd.fun_type, fd.fun_kind) of
     (Yes st, FK_Function _) -> symTyIsTask st
                             && fd.fun_info.fi_def_level > 0
-                            && (if (size fd.fun_ident.id_name > 2)
-                                  (  not (isListCompr fd.fun_ident.id_name)
-                                  && not (isLambda fd.fun_ident.id_name)
-                                  && not (isTD fd.fun_ident.id_name)
-                                  )
-                                  True)
+                            && not (isLambda fd.fun_ident.id_name)
+                            && not (isListCompr fd.fun_ident.id_name)
+                            && not (isTD fd.fun_ident.id_name)
     _                       -> False
 
 funTy :: FunDef -> Type
