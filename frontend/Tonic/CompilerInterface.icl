@@ -154,28 +154,41 @@ addTonicWrap is_itasks_mod icl_module idx menv heaps pdss common_defs
     where
     mkArg :: SymbolType Bool (FreeVar, AType) ([Expression], *Heaps, *PredefinedSymbols, *ModuleEnv) -> *([Expression], *Heaps, *PredefinedSymbols, *ModuleEnv)
     mkArg symty is_itasks_mod (arg=:{fv_ident}, {at_type}) (xs, heaps, pdss, menv)
-      # (bv, heaps) = freeVarToVar arg heaps
-      # (ncit, menv) = hasITaskInstance at_type menv
+      # (bv, heaps)       = freeVarToVar arg heaps
+      # (hasITasks, menv) = hasITaskInstance at_type menv
       # (viewApp, heaps, pdss) = appPredefinedSymbolWithEI PD_tonicViewInformation
                                    [ mkStr fv_ident.id_name
-                                   , if (is_itasks_mod || (not ncit && noITaskCtx arg symty.st_context))
+                                   , if (is_itasks_mod || (not hasITasks && noITaskCtx arg symty.st_context))
                                        (mkStr fv_ident.id_name)
                                        (Var bv)
                                    ] SK_Function heaps pdss
       # (texpr, pdss) = toStatic (mkStr fv_ident.id_name, App viewApp) pdss
       = ([texpr:xs], heaps, pdss, menv)
-    hasITaskInstance :: Type *ModuleEnv -> *(Bool, *ModuleEnv) // TODO Check whether there is an iTask instance for this concrete type
-    hasITaskInstance (TA tsi _)    menv = tsiHasITasks tsi menv
-    hasITaskInstance (TAS tsi _ _) menv = tsiHasITasks tsi menv
-    hasITaskInstance (TB _)        menv = (True, menv)
-    hasITaskInstance _             menv = (False, menv)
+    hasITaskInstance :: Type *ModuleEnv -> *(Bool, *ModuleEnv)
+    hasITaskInstance (TA tsi _)         menv = tsiHasITasks tsi menv
+    hasITaskInstance (TAS tsi _ _)      menv = tsiHasITasks tsi menv
+    hasITaskInstance (TB BT_Int)        menv = (True, menv)
+    hasITaskInstance (TB BT_Char)       menv = (True, menv)
+    hasITaskInstance (TB BT_Real)       menv = (True, menv)
+    hasITaskInstance (TB BT_Bool)       menv = (True, menv)
+    hasITaskInstance (TB (BT_String _)) menv = (True, menv)
+    hasITaskInstance _                  menv = (False, menv)
     tsiHasITasks tsi=:{type_index = {glob_module, glob_object}} menv
       | glob_module == menv.me_main_dcl_module_n
-         # ctd = icl_module.icl_common.com_type_defs.[glob_object]
-         = ctdHasITasks ctd menv
+         # cids = icl_module.icl_common.com_instance_defs
+         = cidsHaveITasks tsi cids menv
       | otherwise
-         # ctd = common_defs.[glob_module].com_type_defs.[glob_object]
-         = ctdHasITasks ctd menv
+         # cids = common_defs.[glob_module].com_instance_defs
+         = cidsHaveITasks tsi cids menv
+    cidsHaveITasks tsi cids menv // FIXME This doesn't work for {#Char} and the likes yet...
+      = case [() \\ {ClassInstance | ins_class_ident, ins_ident, ins_type = {it_types = [insTy:_]}} <-: cids | ins_ident.id_name == "gEditor_s" && tsisMatch insTy tsi] of
+          [] -> (False, menv)
+          //xs  -> (True, snd (mapSt (\x menv -> ((), trace_n x menv)) xs menv))
+          _  -> (True, menv)
+      where
+      tsisMatch (TA tsi _)    tsi` = tsi.type_index == tsi`.type_index
+      tsisMatch (TAS tsi _ _) tsi` = tsi.type_index == tsi`.type_index
+      tsisMatch _             _    = False
     ctdHasITasks ctd menv
       = (False, menv)
     noITaskCtx :: FreeVar [TypeContext] -> Bool
@@ -184,3 +197,10 @@ addTonicWrap is_itasks_mod icl_module idx menv heaps pdss common_defs
     isITaskClass (TCClass gds) = gds.glob_object.ds_ident.id_name == "iTask" // TODO Make this nicer
     isITaskClass _             = False
   doAddRefl _ _ menv heaps pdss _ = (menv, heaps, pdss)
+
+instance == (Global a) | == a where
+  (==) g1 g2 = g1.glob_module == g2.glob_module && g1.glob_object == g2.glob_object
+import StdDebug
+instance toString IdentOrQualifiedIdent where
+  toString (Ident ident) = ident.id_name
+  toString (QualifiedIdent _ str) = str
