@@ -496,19 +496,23 @@ predefIsUndefined pds = pds.pds_def == NoIndex || pds.pds_module == NoIndex
 
 symbIdentArity :: SymbIdent *ModuleEnv -> *(Maybe Int, *ModuleEnv)
 symbIdentArity si menv
-  # (mft, menv) = reifyFunType si menv
-  = case mft of
-      Just ft
-        = (Just ft.ft_arity, menv)
+  # (mFunTy, menv) = reifySymbIdentSymbolType si menv
+  = case mFunTy of
+      Just funTy = (Just funTy.st_arity, menv)
       _
-        # (mfd, menv) = reifyFunDef si menv
-        = case mfd of
-            Just fd -> (Just fd.fun_arity, menv)
-            _       -> (Nothing, menv)
+        # (mft, menv) = reifyFunType si menv
+        = case mft of
+            Just ft
+              = (Just ft.ft_arity, menv)
+            _
+              # (mfd, menv) = reifyFunDef si menv
+              = case mfd of
+                  Just fd -> (Just fd.fun_arity, menv)
+                  _       -> (Nothing, menv)
 
 argsRemaining :: App *ModuleEnv -> *(Int, *ModuleEnv)
 argsRemaining app menv
-  # ((_, args), menv) = dropAppContexts app menv
+  # ((ctxs, args), menv) = dropAppContexts app menv
   # argsLength        = length args
   # (marity, menv)    = symbIdentArity app.app_symb menv
   = case marity of
