@@ -259,7 +259,10 @@ predefined_idents
                     [PD_tonicWrapAppLam1] = i "tonicWrapAppLam1",
                     [PD_tonicWrapAppLam2] = i "tonicWrapAppLam2",
                     [PD_tonicWrapAppLam3] = i "tonicWrapAppLam3",
-                    [PD_tonicViewInformation] = i "tonicViewInformation"
+                    [PD_tonicViewInformation] = i "tonicViewInformation",
+                    [PD_tonicWrapTaskBodyLam1] = i "tonicWrapTaskBodyLam1",
+                    [PD_tonicWrapTaskBodyLam2] = i "tonicWrapTaskBodyLam2",
+                    [PD_tonicWrapTaskBodyLam3] = i "tonicWrapTaskBodyLam3"
 		}
 	=: idents
 	where
@@ -408,6 +411,9 @@ where
 					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapAppLam2)
 					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapAppLam3)
 					<<- (local_predefined_idents,	IC_Expression,	PD_tonicViewInformation)
+					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapTaskBodyLam1)
+					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapTaskBodyLam2)
+					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapTaskBodyLam3)
 
 		# hash_table = put_predefined_idents_in_hash_table PD_FromS PD_FromThenToO IC_Expression local_predefined_idents hash_table
 

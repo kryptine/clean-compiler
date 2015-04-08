@@ -136,22 +136,42 @@ addTonicWrap is_itasks_mod icl_module idx menv heaps pdss common_defs
           _ = (menv, heaps, pdss)
   where
   doAddRefl {fun_ident, fun_body=TransformedBody { tb_args, tb_rhs }} symbty menv heaps pdss common_defs
-    # (ok, pdss) = pdssAreDefined [PD_tonicViewInformation, PD_tonicWrapTaskBody, PD_ConsSymbol, PD_NilSymbol] pdss
+    # (ok, pdss) = pdssAreDefined [ PD_tonicViewInformation
+                                  , PD_tonicWrapTaskBody
+                                  , PD_tonicWrapTaskBodyLam1
+                                  , PD_tonicWrapTaskBodyLam2
+                                  , PD_tonicWrapTaskBodyLam3
+                                  , PD_ConsSymbol
+                                  , PD_NilSymbol] pdss
     | not ok     = (menv, heaps, pdss)
     # (args, heaps, pdss, menv) = foldr (mkArg symbty is_itasks_mod) ([], heaps, pdss, menv) (zip2 tb_args symbty.st_args)
-    # fun_defs   = menv.me_fun_defs
     | length args == length tb_args
+        # (rem, menv)  = case tb_rhs of
+                           App {app_symb = {symb_ident}}
+                            | symb_ident == predefined_idents.[PD_tonicWrapAppLam1] = (1, menv)
+                            | symb_ident == predefined_idents.[PD_tonicWrapAppLam2] = (2, menv)
+                            | symb_ident == predefined_idents.[PD_tonicWrapAppLam3] = (3, menv)
+                           App app
+                             = argsRemaining app menv
+                           _ = (0, menv)
         # (xs, pdss) = toStatic args pdss
-        # (wrap, heaps, pdss) = appPredefinedSymbolWithEI PD_tonicWrapTaskBody
+        # (wrap, heaps, pdss) = appPredefinedSymbolWithEI (findBodyWrap rem)
                                   [ mkStr icl_module.icl_name.id_name
                                   , mkStr fun_ident.id_name
                                   , xs
                                   , tb_rhs
                                   ] SK_Function heaps pdss
-        # fun_defs     = updateFunRhs idx fun_defs (App wrap)
+        # fun_defs = updateFunRhs idx menv.me_fun_defs (App wrap)
         = ({ menv & me_fun_defs = fun_defs}, heaps, pdss)
     | otherwise = (menv, heaps, pdss)
     where
+    findBodyWrap :: Int -> Int
+    findBodyWrap 0 = PD_tonicWrapTaskBody
+    findBodyWrap 1 = PD_tonicWrapTaskBodyLam1
+    findBodyWrap 2 = PD_tonicWrapTaskBodyLam2
+    findBodyWrap 3 = PD_tonicWrapTaskBodyLam3
+    findBodyWrap n = abort ("No PD_tonicWrapTaskBodyLam" +++ toString n)
+
     mkArg :: SymbolType Bool (FreeVar, AType) ([Expression], *Heaps, *PredefinedSymbols, *ModuleEnv) -> *([Expression], *Heaps, *PredefinedSymbols, *ModuleEnv)
     mkArg symty is_itasks_mod (arg=:{fv_ident}, {at_type}) (xs, heaps, pdss, menv)
       # (bv, heaps)       = freeVarToVar arg heaps

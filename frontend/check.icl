@@ -3385,6 +3385,9 @@ where
 				<=< adjustPredefSymbol PD_tonicWrapAppLam2				mod_index STE_DclFunction
 				<=< adjustPredefSymbol PD_tonicWrapAppLam3				mod_index STE_DclFunction
 				<=< adjustPredefSymbol PD_tonicViewInformation			mod_index STE_DclFunction
+				<=< adjustPredefSymbol PD_tonicWrapTaskBodyLam1			mod_index STE_DclFunction
+				<=< adjustPredefSymbol PD_tonicWrapTaskBodyLam2			mod_index STE_DclFunction
+				<=< adjustPredefSymbol PD_tonicWrapTaskBodyLam3			mod_index STE_DclFunction
                 )
 			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols})
 	where

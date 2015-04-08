@@ -144,7 +144,7 @@ wrapTaskApp origExpr inh chn
   # chn        = {chn & chn_predef_symbols = pdss}
   | not ok     = (origExpr, chn)
   | otherwise
-      #! (rem, menv)  = case origExpr of
+      # (rem, menv)  = case origExpr of
                          App app
                            = argsRemaining app chn.chn_module_env
                          _ = (0, chn.chn_module_env)
@@ -718,7 +718,6 @@ mkBlueprint expr _ chn = ({ syn_annot_expr = expr
                           , syn_texpr      = TCleanExpr [] (PPCleanExpr "(mkBlueprint fallthrough)")
                           , syn_pattern_match_vars = []}, chn)
 
-import StdDebug
 mkEdge :: App Int InhExpression *ChnExpression -> *(Maybe TCleanExpr, SynExpression, *ChnExpression)
 mkEdge app=:{app_symb, app_args} n inh chn
   # (siIsTask, menv) = symbIdentIsTask app_symb chn.chn_module_env

@@ -311,8 +311,11 @@ PD_tonicWrapAppLam2			:== 300
 PD_tonicWrapAppLam3			:== 301
 PD_tonicWrapParallel		:== 302
 PD_tonicViewInformation		:== 303
+PD_tonicWrapTaskBodyLam1	:== 304
+PD_tonicWrapTaskBodyLam2	:== 305
+PD_tonicWrapTaskBodyLam3	:== 306
 
-PD_NrOfPredefSymbols		:== 304
+PD_NrOfPredefSymbols		:== 307
 
 GetTupleConsIndex tup_arity :== PD_Arity2TupleSymbol + tup_arity - 2
 GetTupleTypeIndex tup_arity :== PD_Arity2TupleType + tup_arity - 2
