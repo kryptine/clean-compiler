@@ -618,14 +618,14 @@ instance FromStatic (Expression, Expression) where
   fromStatic expr = tupleExprToTuple expr
 
 listExprToList :: Expression -> [Expression]
-listExprToList (App app) =
+listExprToList expr=:(App app) =
   case app.app_symb.symb_ident.id_name of
     PD_ConsSymbol_String ->
       case app.app_args of
-        [head:tail:_] -> [head : listExprToList tail]
-        _             -> abort "listExprToList should not happen"
-    PD_NilSymbol_String  -> []
-    _       -> abort "listExprToList: App is not a list"
+        [head:tail:_]   -> [head : listExprToList tail]
+        _               -> abort "listExprToList should not happen"
+    PD_NilSymbol_String -> []
+    _                   -> [expr]
 listExprToList _ = []
 
 listToListExpr :: [Expression] *PredefinedSymbols -> *(Expression, *PredefinedSymbols)
