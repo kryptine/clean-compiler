@@ -227,8 +227,9 @@ exprToTCleanExpr expr menv
 
 mkBlueprint :: Expression InhExpression *ChnExpression -> *(SynExpression, *ChnExpression)
 mkBlueprint (App app) inh chn
+  # afn = appFunName app
   # (idIsTask, menv) = symbIdentIsTask app.app_symb chn.chn_module_env
-  | idIsTask
+  | idIsTask || afn == ">>=" || afn == "return" || afn == "pure"
     # ((ctxs, args), menv) = dropAppContexts app menv
     # chn                  = { chn & chn_module_env = menv }
     = case appFunName app of

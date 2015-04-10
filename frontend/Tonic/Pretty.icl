@@ -35,7 +35,7 @@ from syntax import
   :: TypeVarInfoPtr {..}, :: AttrVarInfoPtr, :: Type (..), :: TCClass,
   :: TypeVarInfo, :: AttrVarInfo, :: FunType {..}, :: FunSpecials, :: TempVarId,
   :: ATypeVar, :: BasicType, :: ConsVariable, :: TypeAttribute, :: TypeSymbIdent {..},
-  :: TypeSymbProperties, instance toString BasicType
+  :: TypeSymbProperties, instance toString BasicType, :: ConsVariable (..)
 
 ppDebugApp :: App *ModuleEnv -> *(Doc, *ModuleEnv)
 ppDebugApp app menv
@@ -185,23 +185,32 @@ ppCompact = display o renderCompact
 ppType :: Type -> Doc
 ppType (TA tsi ats)      = ppTypeSymbIdent tsi <-> if (length ats > 0) (text " " <-> hcat (intersperse (char ' ') (map ppAType ats))) (text "")
 ppType (TAS tsi ats sl)  = ppTypeSymbIdent tsi <-> if (length ats > 0) (text " " <-> hcat (intersperse (char ' ') (map ppAType ats))) (text "")
-ppType (at1 --> at2)     = ppAType at1 <-> text " --> " <-> ppAType at2
-ppType (TArrow)          = text "->"
-ppType (TArrow1	at)      = text "TArrow1"
-ppType (cv :@: ats)      = text ":@:"
+ppType (at1 --> at2)     = ppAType at1 <-> text " -> " <-> ppAType at2
+ppType (TArrow)          = text "TArrow"
+ppType (TArrow1	at)      = text "TArrow1 " <-> ppAType at
+ppType (cv :@: ats)      = ppConsVariable cv <-> text " :@: " <-> hcat (intersperse (char ' ') (map ppAType ats))
 ppType (TB bt)           = text (toString bt)
-ppType (TFA ats t)       = text "TFA"
+ppType (TFA ats t)       = text "TFA "
 ppType (GTV tv)          = text tv.tv_ident.id_name
 ppType (TV tv)           = text tv.tv_ident.id_name
 ppType (TFAC atvs t tcs) = text "TFAC"
 ppType (TempV tvi)       = text "TempV"
 ppType (TempQV tvi)      = text "TempQV"
 ppType (TempQDV tvi)     = text "TempQDV"
-ppType (TLifted tv)      = text "TypeVar"
+ppType (TLifted tv)      = text "TLifted"
 ppType (TQualifiedIdent i s ats) = text "TQualifiedIdent"
 ppType (TGenericFunctionInDictionary gds tk gi) = text "TGenericFunctionInDictionary"
 ppType (TLiftedSubst t)  = text "TLiftedSubst"
 ppType TE                = text "TE"
+
+ppConsVariable :: ConsVariable -> Doc
+ppConsVariable (CV       tyvar  ) = ppTypeVar tyvar
+ppConsVariable (TempCV   tempvar) = text (toString tempvar)
+ppConsVariable (TempQCV  tempvar) = text (toString tempvar)
+ppConsVariable (TempQCDV tempvar) = text (toString tempvar)
+
+ppTypeVar :: TypeVar -> Doc
+ppTypeVar tv = text tv.tv_ident.id_name
 
 ppAType :: AType -> Doc
 ppAType {at_type} = ppType at_type

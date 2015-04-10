@@ -434,9 +434,10 @@ typeIsListOfTask ty =
 symbIdentIsTask :: SymbIdent *ModuleEnv -> *(Bool, *ModuleEnv)
 symbIdentIsTask si menv
   # (mst, menv) = reifySymbIdentSymbolType si menv
-  = case mst of
-      Just st -> (symTyIsTask st, menv)
-      _       -> abort ("symbIdentIsTask: failed to reify symbIdent '" +++ si.symb_ident.id_name +++ "'")
+   = case mst of
+      Just st
+       = (symTyIsTask st, menv)
+      _ = abort ("symbIdentIsTask: failed to reify symbIdent '" +++ si.symb_ident.id_name +++ "'")
 
 isInfix :: SymbIdent *ModuleEnv -> *(Bool, *ModuleEnv)
 isInfix si menv
