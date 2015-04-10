@@ -86,7 +86,7 @@ atypeIsListOfTask :: AType -> Bool
 
 typeIsListOfTask :: Type -> Bool
 
-symbIdentIsTask :: SymbIdent *ModuleEnv -> *(Bool, *ModuleEnv)
+symbIdentIsTask :: SymbIdent *ChnExpression -> *(Bool, *ChnExpression)
 
 isInfix :: SymbIdent *ModuleEnv -> *(Bool, *ModuleEnv)
 
@@ -110,7 +110,7 @@ argsRemaining :: App *ModuleEnv -> *(Int, *ModuleEnv)
 
 isPartialApp :: App *ModuleEnv -> *(Bool, *ModuleEnv)
 
-exprIsTask :: Expression *ModuleEnv -> *(Bool, *ModuleEnv)
+exprIsTask :: Expression *ChnExpression -> *(Bool, *ChnExpression)
 
 mkStr :: String -> Expression
 

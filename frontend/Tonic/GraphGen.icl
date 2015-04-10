@@ -227,10 +227,9 @@ exprToTCleanExpr expr menv
 
 mkBlueprint :: Expression InhExpression *ChnExpression -> *(SynExpression, *ChnExpression)
 mkBlueprint (App app) inh chn
-  # afn = appFunName app
-  # (idIsTask, menv) = symbIdentIsTask app.app_symb chn.chn_module_env
-  | idIsTask || afn == ">>=" || afn == "return" || afn == "pure"
-    # ((ctxs, args), menv) = dropAppContexts app menv
+  # (idIsTask, chn) = symbIdentIsTask app.app_symb chn
+  | idIsTask
+    # ((ctxs, args), menv) = dropAppContexts app chn.chn_module_env
     # chn                  = { chn & chn_module_env = menv }
     = case appFunName app of
         ">>="      -> mkBind      app ctxs args inh chn
@@ -249,7 +248,7 @@ mkBlueprint (App app) inh chn
         "upd"      -> mkUpdShare  app ctxs args inh chn
         _          -> mkTaskApp   app ctxs args inh chn
   | otherwise
-      # (apptcle, menv) = exprToTCleanExpr (App app) menv
+      # (apptcle, menv) = exprToTCleanExpr (App app) chn.chn_module_env
       # chn             = {chn & chn_module_env = menv}
       = ({ syn_annot_expr = App app
          , syn_texpr      = TCleanExpr [] apptcle
@@ -724,15 +723,15 @@ mkBlueprint expr _ chn = ({ syn_annot_expr = expr
 
 mkEdge :: App Int InhExpression *ChnExpression -> *(Maybe TCleanExpr, SynExpression, *ChnExpression)
 mkEdge app=:{app_symb, app_args} n inh chn
-  # (siIsTask, menv) = symbIdentIsTask app_symb chn.chn_module_env
+  # (siIsTask, chn) = symbIdentIsTask app_symb chn
   | identIsLambda app_symb.symb_ident
-    # ((args, tFd), menv) = reifyArgsAndDef app_symb menv
+    # ((args, tFd), menv) = reifyArgsAndDef app_symb chn.chn_module_env
     # patid               = last [freeVarName x \\ x <- args | x.fv_def_level == -1]
     # (syne, chn)         = mkBlueprint (getFunRhs tFd) (addInhId inh n) { chn & chn_module_env = menv }
     # menv                = updateWithAnnot app_symb syne.syn_annot_expr chn.chn_module_env
     = (Just (PPCleanExpr patid), {syne & syn_annot_expr = App app}, {chn & chn_module_env = menv})
   | siIsTask
-    # ((args, tFd), menv) = reifyArgsAndDef app_symb menv
+    # ((args, tFd), menv) = reifyArgsAndDef app_symb chn.chn_module_env
     # (lbl, menv) = case drop (length app_args) args of
                       [] = (Nothing, menv)
                       [x:_]
@@ -741,7 +740,7 @@ mkEdge app=:{app_symb, app_args} n inh chn
     # (syn, chn)  = mkBlueprint (App app) (addInhId inh n) {chn & chn_module_env = menv}
     = (lbl, syn, chn)
   | otherwise
-    # (d, menv) = ppApp app menv
+    # (d, menv) = ppApp app chn.chn_module_env
     = (Nothing
       , { syn_annot_expr = App app
         , syn_texpr      = TVar [] (ppCompact d)

@@ -431,12 +431,30 @@ typeIsListOfTask ty =
     _                 -> False
   where symTyIsTask` tsi = tsi.type_ident.id_name == PD_ListType_String
 
-symbIdentIsTask :: SymbIdent *ModuleEnv -> *(Bool, *ModuleEnv)
-symbIdentIsTask si menv
-  # (mst, menv) = reifySymbIdentSymbolType si menv
+symbIdentIsTask :: SymbIdent *ChnExpression -> *(Bool, *ChnExpression)
+symbIdentIsTask {symb_ident, symb_kind=SK_OverloadedFunction {glob_module, glob_object} } chn
+  # menv = chn.chn_module_env
+  # (md, menv) = case glob_module == menv.me_main_dcl_module_n of
+                   True
+                     # (icl, menv) = menv!me_icl_module
+                     = (icl.icl_common.com_member_defs.[glob_object], menv)
+                   False
+                     # (dcls, menv) = menv!me_dcl_modules
+                     = (dcls.[glob_module].dcl_common.com_member_defs.[glob_object], menv)
+  # chn = {chn & chn_module_env = menv} 
+  # pdss = chn.chn_predef_symbols 
+  # (tmpds, pdss) = pdss![PD_TMonadClass]
+  # (tapds, pdss) = pdss![PD_TApplicativeClass]
+  # (tfpds, pdss) = pdss![PD_TFunctorClass]
+  = (  (md.me_class.glob_module == tmpds.pds_module && md.me_class.glob_object == tmpds.pds_def)
+    || (md.me_class.glob_module == tapds.pds_module && md.me_class.glob_object == tapds.pds_def)
+    || (md.me_class.glob_module == tfpds.pds_module && md.me_class.glob_object == tfpds.pds_def)
+    , {chn & chn_predef_symbols = pdss})
+symbIdentIsTask si chn
+  # (mst, menv) = reifySymbIdentSymbolType si chn.chn_module_env
    = case mst of
       Just st
-       = (symTyIsTask st, menv)
+       = (symTyIsTask st, {chn & chn_module_env = menv})
       _ = abort ("symbIdentIsTask: failed to reify symbIdent '" +++ si.symb_ident.id_name +++ "'")
 
 isInfix :: SymbIdent *ModuleEnv -> *(Bool, *ModuleEnv)
@@ -538,9 +556,9 @@ isPartialApp app menv
   # (rem, menv) = argsRemaining app menv
   = (rem > 0, menv)
 
-exprIsTask :: Expression *ModuleEnv -> *(Bool, *ModuleEnv)
-exprIsTask (App app) menv = symbIdentIsTask app.app_symb menv
-exprIsTask _         menv = (False, menv) // False: better safe than sorry
+exprIsTask :: Expression *ChnExpression -> *(Bool, *ChnExpression)
+exprIsTask (App app) chn = symbIdentIsTask app.app_symb chn
+exprIsTask _         chn = (False, chn) // False: better safe than sorry
 
 stringContents :: String -> String
 stringContents str

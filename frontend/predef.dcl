@@ -316,8 +316,12 @@ PD_tonicWrapTaskBodyLam2	:== 305
 PD_tonicWrapTaskBodyLam3	:== 306
 PD_ITaskClass				:== 307
 PD_iTasks_Framework_Generic	:== 308
+PD_iTasks_API_Core_Types	:== 309
+PD_TMonadClass          	:== 310
+PD_TApplicativeClass       	:== 311
+PD_TFunctorClass          	:== 312
 
-PD_NrOfPredefSymbols		:== 309
+PD_NrOfPredefSymbols		:== 313
 
 GetTupleConsIndex tup_arity :== PD_Arity2TupleSymbol + tup_arity - 2
 GetTupleTypeIndex tup_arity :== PD_Arity2TupleType + tup_arity - 2
