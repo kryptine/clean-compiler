@@ -253,6 +253,7 @@ predefined_idents
 					[PD_FromThenToO]= i "_from_then_to_o",
 
                     [PD_iTasks_Framework_Tonic] = i "iTasks.Framework.Tonic",
+                    [PD_iTasks_Framework_Generic] = i "iTasks.Framework.Generic",
                     [PD_tonicWrapParallel] = i "tonicWrapParallel",
                     [PD_tonicWrapApp]      = i "tonicWrapApp",
                     [PD_tonicWrapTaskBody] = i "tonicWrapTaskBody",
@@ -262,7 +263,8 @@ predefined_idents
                     [PD_tonicViewInformation] = i "tonicViewInformation",
                     [PD_tonicWrapTaskBodyLam1] = i "tonicWrapTaskBodyLam1",
                     [PD_tonicWrapTaskBodyLam2] = i "tonicWrapTaskBodyLam2",
-                    [PD_tonicWrapTaskBodyLam3] = i "tonicWrapTaskBodyLam3"
+                    [PD_tonicWrapTaskBodyLam3] = i "tonicWrapTaskBodyLam3",
+                    [PD_ITaskClass] = i "iTask"
 		}
 	=: idents
 	where
@@ -404,6 +406,7 @@ where
 					<<- (local_predefined_idents,	IC_Expression, PD_Start)
 
 					<<- (local_predefined_idents,	IC_Module NoQualifiedIdents, PD_iTasks_Framework_Tonic)
+					<<- (local_predefined_idents,	IC_Module NoQualifiedIdents, PD_iTasks_Framework_Generic)
 					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapParallel)
 					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapApp)
 					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapTaskBody)
@@ -414,6 +417,7 @@ where
 					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapTaskBodyLam1)
 					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapTaskBodyLam2)
 					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapTaskBodyLam3)
+					<<- (local_predefined_idents,	IC_Class,	PD_ITaskClass)
 
 		# hash_table = put_predefined_idents_in_hash_table PD_FromS PD_FromThenToO IC_Expression local_predefined_idents hash_table
 

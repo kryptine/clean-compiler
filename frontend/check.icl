@@ -2267,6 +2267,7 @@ check_module1 cdefs icl_global_function_range fun_defs optional_dcl_mod optional
 					<=< adjust_predefined_module_symbol PD_StdGeneric
 					<=< adjust_predefined_module_symbol PD_StdMisc
 					<=< adjust_predefined_module_symbol PD_iTasks_Framework_Tonic
+					<=< adjust_predefined_module_symbol PD_iTasks_Framework_Generic
 					<=< adjust_predefined_module_symbol PD_PredefinedModule
 			= ([], [], { cs & cs_predef_symbols = cs_predef_symbols, cs_symbol_table = cs_symbol_table})
 		where
@@ -3388,6 +3389,11 @@ where
 				<=< adjustPredefSymbol PD_tonicWrapTaskBodyLam1			mod_index STE_DclFunction
 				<=< adjustPredefSymbol PD_tonicWrapTaskBodyLam2			mod_index STE_DclFunction
 				<=< adjustPredefSymbol PD_tonicWrapTaskBodyLam3			mod_index STE_DclFunction
+                )
+		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_iTasks_Framework_Generic]	
+		| pre_mod.pds_def == mod_index
+			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols}
+                <=< adjustPredefSymbol PD_ITaskClass					mod_index STE_Class
                 )
 			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols})
 	where
