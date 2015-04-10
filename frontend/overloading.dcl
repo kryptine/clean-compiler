@@ -54,3 +54,5 @@ removeOverloadedFunctions :: ![Index] ![LocalTypePatternVariable] !Int !*{#FunDe
 removeOverloadedFunctionsWithoutUpdatingFunctions :: ![Index] ![LocalTypePatternVariable] !Int !*{#FunDef} !*{! FunctionType} !*ExpressionHeap
 	!*TypeCodeInfo !*VarHeap !*ErrorAdmin !*{#PredefinedSymbol} //!*{#PredefinedSymbol}
 		-> (!*{#FunDef}, !*{! FunctionType}, !*ExpressionHeap, !*TypeCodeInfo, !*VarHeap, !*ErrorAdmin, !*{#PredefinedSymbol})
+
+find_instance :: [Type] !InstanceTree {#CommonDefs} *TypeHeaps *Coercions -> *(Global Int,[TypeContext],Bool,*TypeHeaps,*Coercions)

@@ -2573,7 +2573,7 @@ where
 
 typeProgramWithoutUpdatingFunctions :: !{! Group} !Int !*{# FunDef} !IndexRange  !(Optional Bool) !CommonDefs !{!Declaration} ![QualifiedDeclaration] !{# DclModule} !NumberSet
 																						 !*TypeDefInfos !*Heaps !*PredefinedSymbols !*File !*File
-	-> (!Bool, !*{! FunctionType}, !*{# FunDef}, !{# CommonDefs}, !{# {# FunType} }, !*TypeDefInfos,!*Heaps,!*PredefinedSymbols,!*File,!*File)
+	-> (!Bool, !*{! FunctionType}, !*{# FunDef}, !{# CommonDefs}, !{# {! InstanceTree}}, !{# {# FunType} }, !*TypeDefInfos,!*Heaps,!*PredefinedSymbols,!*File,!*File)
 typeProgramWithoutUpdatingFunctions comps main_dcl_module_n fun_defs specials list_inferred_types icl_defs imports icl_qualified_imports dcl_modules used_module_numbers
 	td_infos heaps=:{hp_var_heap, hp_expression_heap, hp_type_heaps,hp_generic_heap} predef_symbols file out
 	#! fun_env_size = size fun_defs
@@ -2601,7 +2601,7 @@ typeProgramWithoutUpdatingFunctions comps main_dcl_module_n fun_defs specials li
 	  (ts_fun_defs,ts_fun_env) = update_function_types 0 comps ts.ts_fun_env ts.ts_fun_defs
 	  {ts_td_infos,ts_fun_env,ts_error,ts_var_heap, ts_expr_heap, ts_type_heaps, ts_generic_heap,ts_fun_defs} = {ts & ts_fun_defs = ts_fun_defs, ts_fun_env = ts_fun_env}
       ts_expr_heap = foldSt (\t acc -> acc <:= t) dyn_ptrs_and_values ts_expr_heap
-	= (not type_error, ts_fun_env, ts_fun_defs, ti_common_defs, ti_functions,
+	= (not type_error, ts_fun_env, ts_fun_defs, ti_common_defs, class_instances, ti_functions,
 			ts_td_infos, {hp_var_heap = ts_var_heap, hp_expression_heap = ts_expr_heap, hp_type_heaps = ts_type_heaps, hp_generic_heap=ts_generic_heap },
 			predef_symbols, ts_error.ea_file, out)
 where

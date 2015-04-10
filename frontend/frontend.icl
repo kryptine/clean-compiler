@@ -325,7 +325,7 @@ execute_tonic mod_dir fun_defs td_infos main_dcl_module_n heaps predef_symbols l
   //| ok<>ok
       //= abort "";
 
-  # (ok, fun_tys, fun_defs_cpy, common_defs_cpy, _, td_infos, heaps, predef_symbols, error,out)
+  # (ok, fun_tys, fun_defs_cpy, common_defs_cpy, class_instances, _, td_infos, heaps, predef_symbols, error,out)
       = typeProgramWithoutUpdatingFunctions groups main_dcl_module_n fun_defs_cpy icl_function_indices.ifi_specials_indices list_inferred_types icl_common icl_import icl_qualified_imports dcl_mods icl_used_module_numbers td_infos heaps predef_symbols error out
 
   | not ok
@@ -339,7 +339,7 @@ execute_tonic mod_dir fun_defs td_infos main_dcl_module_n heaps predef_symbols l
   //| ok<>ok
       //= abort "";
 
-  # (fun_defs, predef_symbols, hash_table, error, files, heaps) = ginTonic mod_dir main_dcl_module_n fun_defs fun_defs_cpy icl_mod dcl_mods common_defs_cpy list_comprehensions predef_symbols hash_table error files heaps
+  # (fun_defs, predef_symbols, hash_table, error, files, heaps) = ginTonic mod_dir main_dcl_module_n fun_defs fun_defs_cpy icl_mod dcl_mods common_defs_cpy list_comprehensions predef_symbols class_instances hash_table error files heaps
 
   //# (_,f,files) = fopen ("Clean System Files/groups_posttonic_" +++ icl_mod.icl_name.id_name) FWriteText files
     //(components, fun_defs, f) = showGroups groups 0 False fun_defs f

@@ -4,7 +4,9 @@ import Tonic.Util
 import Tonic.GraphGen
 import Tonic.Pretty
 //import Tonic.Tonic
-import syntax, checksupport, compile, StdFile
+import syntax, checksupport, compile, unitype
+from overloading import :: InstanceTree (..), find_instance
+import StdFile
 from CoclSystemDependent import DirectorySeparator, ensureCleanSystemFilesExists
 import Text
 import Data.Func
@@ -15,8 +17,8 @@ import Data.Map
 import Text.JSON
 import iTasks.Framework.Tonic.AbsSyn
 
-ginTonic :: String ModuleN !*{#FunDef} !*{#FunDef} IclModule {#DclModule} !{#CommonDefs} [(String, ParsedExpr)] !*PredefinedSymbols *HashTable !*File !*Files !*Heaps -> *(!*{#FunDef}, !*PredefinedSymbols, *HashTable, !*File, !*Files, !*Heaps)
-ginTonic mod_dir main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules common_defs list_comprehensions predef_symbols hash_table error files heaps
+ginTonic :: String ModuleN !*{#FunDef} !*{#FunDef} IclModule {#DclModule} !{#CommonDefs} [(String, ParsedExpr)] !*PredefinedSymbols !{#{!InstanceTree}} *HashTable !*File !*Files !*Heaps -> *(!*{#FunDef}, !*PredefinedSymbols, *HashTable, !*File, !*Files, !*Heaps)
+ginTonic mod_dir main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules common_defs list_comprehensions predef_symbols class_instances hash_table error files heaps
 // FIXME Start Tonic presence check hack
   # (tonic_module, predef_symbols) = predef_symbols![PD_iTasks_Framework_Tonic]
   | predefIsUndefined tonic_module = (fun_defs, predef_symbols, hash_table, error, files, heaps)
@@ -25,7 +27,7 @@ ginTonic mod_dir main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules 
 // FIXME End Tonic presence check hack
   # iclname                        = icl_module.icl_name.id_name
   | isSystemModule iclname         = (fun_defs, predef_symbols, hash_table, error, files, heaps)
-  # (tstr, fun_defs, predef_symbols, heaps) = ginTonic` (isITasksModule iclname) main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules common_defs list_comprehensions predef_symbols heaps
+  # (tstr, fun_defs, predef_symbols, heaps) = ginTonic` (isITasksModule iclname) main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules common_defs list_comprehensions predef_symbols class_instances heaps
   # (error, files)                 = writeTonicFile mod_dir iclname tstr error files
   = (fun_defs, predef_symbols, hash_table, error, files, heaps)
   where
@@ -76,9 +78,10 @@ toJSONString rs icl_module menv
     , menv)
 import StdDebug
 ginTonic` :: Bool ModuleN !*{#FunDef} !*{#FunDef} IclModule {#DclModule}
-             !{#CommonDefs} [(String, ParsedExpr)] !*PredefinedSymbols *Heaps
+             !{#CommonDefs} [(String, ParsedExpr)] !*PredefinedSymbols
+             !{#{!InstanceTree}} *Heaps
           -> *(String, !*{#FunDef}, !*PredefinedSymbols, !*Heaps)
-ginTonic` is_itasks_mod main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules common_defs list_comprehensions predef_symbols heaps
+ginTonic` is_itasks_mod main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules common_defs list_comprehensions predef_symbols class_instances heaps
   # ((reps, heaps, predef_symbols, fun_defs_cpy), fun_defs) = foldUArr appDefInfo ((newMap, heaps, predef_symbols, fun_defs_cpy), fun_defs)
   # menv        = mkModuleEnv main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules
   # (str, menv) = toJSONString reps icl_module menv
@@ -94,7 +97,7 @@ ginTonic` is_itasks_mod main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_m
                  Just (_, _, e)
                    -> updateWithAnnot idx e menv
                  _ -> menv
-      # (menv, heaps, predef_symbols) = addTonicWrap is_itasks_mod icl_module idx menv heaps predef_symbols common_defs
+      # (menv, heaps, predef_symbols) = addTonicWrap is_itasks_mod icl_module class_instances idx menv heaps predef_symbols common_defs
       = ((case mres of
             Just (args, g, _)
               -> put fd.fun_ident.id_name { TonicTask
@@ -114,8 +117,8 @@ updateWithAnnot fidx e menv
   # fun_defs = updateFunRhs fidx fun_defs e
   = { menv & me_fun_defs = fun_defs}
 
-addTonicWrap :: Bool IclModule Index *ModuleEnv !*Heaps *PredefinedSymbols !{#CommonDefs} -> *(*ModuleEnv, *Heaps, *PredefinedSymbols)
-addTonicWrap is_itasks_mod icl_module idx menv heaps pdss common_defs
+addTonicWrap :: Bool IclModule {#{!InstanceTree}} Index *ModuleEnv !*Heaps *PredefinedSymbols !{#CommonDefs} -> *(*ModuleEnv, *Heaps, *PredefinedSymbols)
+addTonicWrap is_itasks_mod icl_module class_instances idx menv heaps pdss common_defs
   # (ok, pdss) = pdssAreDefined [PD_tonicViewInformation, PD_tonicWrapTaskBody] pdss
   | not ok     = (menv, heaps, pdss)
   | otherwise
@@ -143,7 +146,7 @@ addTonicWrap is_itasks_mod icl_module idx menv heaps pdss common_defs
                                   , PD_ConsSymbol
                                   , PD_NilSymbol] pdss
     | not ok     = (menv, heaps, pdss)
-    # (args, heaps, pdss, menv) = foldr (mkArg symbty is_itasks_mod) ([], heaps, pdss, menv) (zip2 tb_args symbty.st_args)
+    # (args, heaps, pdss, menv) = foldr (mkArg symbty is_itasks_mod class_instances) ([], heaps, pdss, menv) (zip2 tb_args symbty.st_args)
     | length args == length tb_args
         # (rem, menv)  = case tb_rhs of
                            App {app_symb = {symb_ident}}
@@ -171,55 +174,53 @@ addTonicWrap is_itasks_mod icl_module idx menv heaps pdss common_defs
     findBodyWrap 3 = PD_tonicWrapTaskBodyLam3
     findBodyWrap n = abort ("No PD_tonicWrapTaskBodyLam" +++ toString n)
 
-    mkArg :: SymbolType Bool (FreeVar, AType) ([Expression], *Heaps, *PredefinedSymbols, *ModuleEnv) -> *([Expression], *Heaps, *PredefinedSymbols, *ModuleEnv)
-    mkArg symty is_itasks_mod (arg=:{fv_ident}, {at_type}) (xs, heaps, pdss, menv)
-      # (bv, heaps)       = freeVarToVar arg heaps
-      # (hasITasks, menv) = hasITaskInstance at_type menv
+    mkArg :: SymbolType Bool {#{!InstanceTree}} (FreeVar, AType) ([Expression], *Heaps, *PredefinedSymbols, *ModuleEnv) -> *([Expression], *Heaps, *PredefinedSymbols, *ModuleEnv)
+    mkArg symty is_itasks_mod class_instances (arg=:{fv_ident}, {at_type}) (xs, heaps, pdss, menv)
+      # (pds, pdss) = pdss![PD_ITaskClass]
+      # gtcClasses  = [gtc_class \\ {tc_class = TCGeneric {gtc_class}} <- common_defs.[pds.pds_module].com_class_defs.[pds.pds_def].class_context] 
+      # (hasITasks, hp_type_heaps) = tyHasITaskClasses class_instances gtcClasses at_type heaps.hp_type_heaps
+      # heaps         = {heaps & hp_type_heaps = hp_type_heaps}
+      # (noCtx, pdss) = noITaskCtx arg symty.st_context pdss
+      # (bv, heaps)   = freeVarToVar arg heaps
       # (viewApp, heaps, pdss) = appPredefinedSymbolWithEI PD_tonicViewInformation
                                    [ mkStr fv_ident.id_name
-                                   , if (is_itasks_mod || (not hasITasks && noITaskCtx arg symty.st_context))
+                                   , if (is_itasks_mod || (not hasITasks && noCtx))
                                        (mkStr fv_ident.id_name)
                                        (Var bv)
                                    ] SK_Function heaps pdss
       # (texpr, pdss) = toStatic (mkStr fv_ident.id_name, App viewApp) pdss
       = ([texpr:xs], heaps, pdss, menv)
-    hasITaskInstance :: Type *ModuleEnv -> *(Bool, *ModuleEnv)
-    hasITaskInstance (TA tsi _)         menv = tsiHasITasks tsi menv
-    hasITaskInstance (TAS tsi _ _)      menv = tsiHasITasks tsi menv
-    hasITaskInstance (TB BT_Int)        menv = (True, menv)
-    hasITaskInstance (TB BT_Char)       menv = (True, menv)
-    hasITaskInstance (TB BT_Real)       menv = (True, menv)
-    hasITaskInstance (TB BT_Bool)       menv = (True, menv)
-    hasITaskInstance (TB (BT_String _)) menv = (True, menv)
-    hasITaskInstance _                  menv = (False, menv)
-    tsiHasITasks tsi=:{type_index = {glob_module, glob_object}} menv
-      | glob_module == menv.me_main_dcl_module_n
-         # cids = icl_module.icl_common.com_instance_defs
-         = cidsHaveITasks tsi cids menv
-      | otherwise
-         # cids = common_defs.[glob_module].com_instance_defs
-         = cidsHaveITasks tsi cids menv
-    cidsHaveITasks tsi cids menv // FIXME This doesn't work for {#Char} and the likes yet...
-      = case [() \\ {ClassInstance | ins_class_ident, ins_ident, ins_type = {it_types = [insTy:_]}} <-: cids | ins_ident.id_name == "gEditor_s" && tsisMatch insTy tsi] of
-          [] -> (False, menv)
-          //xs  -> (True, snd (mapSt (\x menv -> ((), trace_n x menv)) xs menv))
-          _  -> (True, menv)
-      where
-      tsisMatch (TA tsi _)    tsi` = tsi.type_index == tsi`.type_index
-      tsisMatch (TAS tsi _ _) tsi` = tsi.type_index == tsi`.type_index
-      tsisMatch _             _    = False
-    ctdHasITasks ctd menv
-      = (False, menv)
-    noITaskCtx :: FreeVar [TypeContext] -> Bool
-    noITaskCtx fv tcs = isEmpty [tc \\ tc <- tcs | fv.fv_info_ptr == tc.tc_var && isITaskClass tc.tc_class]
-    isITaskClass :: TCClass -> Bool
-    isITaskClass (TCClass gds) = gds.glob_object.ds_ident.id_name == "iTask" // TODO Make this nicer
-    isITaskClass _             = False
+    tyHasITaskClasses :: {#{!InstanceTree}} [Global DefinedSymbol] Type *TypeHeaps -> *(Bool, *TypeHeaps)
+    tyHasITaskClasses class_instances []     at_type hp_type_heaps = (False, hp_type_heaps)
+    tyHasITaskClasses class_instances [x]    at_type hp_type_heaps = tyHasITaskClasses` class_instances x at_type hp_type_heaps
+    tyHasITaskClasses class_instances [x:xs] at_type hp_type_heaps
+      # (f, hp_type_heaps) = tyHasITaskClasses` class_instances x at_type hp_type_heaps
+      | f         = tyHasITaskClasses class_instances xs at_type hp_type_heaps
+      | otherwise = (False, hp_type_heaps)
+
+    tyHasITaskClasses` :: {#{!InstanceTree}} (Global DefinedSymbol) Type *TypeHeaps -> *(Bool, *TypeHeaps)
+    tyHasITaskClasses` class_instances {glob_module, glob_object} at_type hp_type_heaps
+      # instance_tree = class_instances.[glob_module].[glob_object.ds_index]
+      # coercions     = { Coercions
+                        | coer_demanded = {}
+                        , coer_offered  = {}
+                        }
+      # (inst, ctxs, uni_ok, hp_type_heaps, coercions) = find_instance [at_type] instance_tree common_defs hp_type_heaps coercions
+      = (inst.glob_module <> NotFound && inst.glob_object <> NotFound, hp_type_heaps)
+
+    noITaskCtx :: FreeVar [TypeContext] *PredefinedSymbols -> *(Bool, *PredefinedSymbols)
+    noITaskCtx fv tcs pdss
+      # (pds, pdss) = pdss![PD_ITaskClass]
+      = ( isEmpty [0 \\ {tc_var, tc_class = (TCClass {glob_object, glob_module})} <- tcs
+                      |  fv.fv_info_ptr == tc_var
+                      && glob_module == pds.pds_module
+                      && glob_object.ds_index == pds.pds_def]
+        , pdss)
   doAddRefl _ _ menv heaps pdss _ = (menv, heaps, pdss)
 
 instance == (Global a) | == a where
   (==) g1 g2 = g1.glob_module == g2.glob_module && g1.glob_object == g2.glob_object
-import StdDebug
+
 instance toString IdentOrQualifiedIdent where
   toString (Ident ident) = ident.id_name
   toString (QualifiedIdent _ str) = str
