@@ -234,6 +234,7 @@ mkBlueprint (App app) inh chn
     = case appFunName app of
         ">>="      -> mkBind      app ctxs args inh chn
         ">>|"      -> mkBind      app ctxs args inh chn
+        "return"   -> mkReturn    app ctxs args inh chn
         "@:"       -> mkAssign    app ctxs args inh chn
         "@"        -> mkTransform app ctxs args inh chn
         ">>*"      -> mkStep      app ctxs args inh chn
@@ -269,6 +270,17 @@ mkBlueprint (App app) inh chn
       = ({ syn_annot_expr = App { app & app_args = ctxs ++ [synl.syn_annot_expr, synr.syn_annot_expr] }
          , syn_texpr      = TBind synl.syn_texpr Nothing synr.syn_texpr
          , syn_pattern_match_vars = []}, chn)
+
+  mkReturn app ctxs [] inh chn
+    = ({ syn_annot_expr = App app
+       , syn_texpr      = TReturn inh.inh_ids (TCleanExpr [] (PPCleanExpr ""))
+       , syn_pattern_match_vars = []}, chn)
+  mkReturn app ctxs [expr:_] inh chn
+    # (syn, chn) = mkBlueprint expr (addInhId inh 0) chn
+    = ({ syn_annot_expr = App { app & app_args = ctxs ++ [syn.syn_annot_expr] }
+       , syn_texpr      = TReturn inh.inh_ids syn.syn_texpr
+       , syn_pattern_match_vars = []}, chn)
+
 
   mkAssign app ctxs args inh chn
     = withTwo app args f inh chn
@@ -411,6 +423,18 @@ mkBlueprint (App app) inh chn
         ("always", [x:_])
           # (syn, chn) = mkBlueprint x (addInhId inh n) chn
           = (Always syn.syn_texpr, {contApp & app_args = [syn.syn_annot_expr]}, chn)
+        ("withoutValue", [x:_])
+          # (syn, chn) = mkBlueprint x (addInhId inh n) chn
+          = (WithoutValue syn.syn_texpr, {contApp & app_args = [syn.syn_annot_expr]}, chn)
+        ("withValue", [(App tApp):_])
+          # (lbl, syn, chn) = mkEdge tApp n inh chn
+          = (WithValue lbl syn.syn_texpr, {contApp & app_args = [syn.syn_annot_expr]}, chn)
+        ("withStable", [(App tApp):_])
+          # (lbl, syn, chn) = mkEdge tApp n inh chn
+          = (WithStable lbl syn.syn_texpr, {contApp & app_args = [syn.syn_annot_expr]}, chn)
+        ("withUnstable", [(App tApp):_])
+          # (lbl, syn, chn) = mkEdge tApp n inh chn
+          = (WithUnstable lbl syn.syn_texpr, {contApp & app_args = [syn.syn_annot_expr]}, chn)
         (fn, _)
           = (CustomFilter fn, contApp, chn)
 
