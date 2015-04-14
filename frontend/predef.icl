@@ -268,7 +268,9 @@ predefined_idents
                     [PD_ITaskClass] = i "iTask",
                     [PD_TMonadClass] = i "TMonad",
                     [PD_TApplicativeClass] = i "TApplicative",
-                    [PD_TFunctorClass] = i "TFunctor"
+                    [PD_TFunctorClass] = i "TFunctor",
+                    [PD_TonicTopLevelBlueprintClass] = i "TonicTopLevelBlueprint",
+                    [PD_TonicBlueprintPartClass] = i "TonicBlueprintPart"
 		}
 	=: idents
 	where
@@ -426,6 +428,8 @@ where
 					<<- (local_predefined_idents,	IC_Class,	PD_TMonadClass)
 					<<- (local_predefined_idents,	IC_Class,	PD_TApplicativeClass)
 					<<- (local_predefined_idents,	IC_Class,	PD_TFunctorClass)
+					<<- (local_predefined_idents,	IC_Class,	PD_TonicTopLevelBlueprintClass)
+					<<- (local_predefined_idents,	IC_Class,	PD_TonicBlueprintPartClass)
 
 		# hash_table = put_predefined_idents_in_hash_table PD_FromS PD_FromThenToO IC_Expression local_predefined_idents hash_table
 

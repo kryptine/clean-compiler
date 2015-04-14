@@ -3390,6 +3390,8 @@ where
 				<=< adjustPredefSymbol PD_tonicWrapTaskBodyLam1			mod_index STE_DclFunction
 				<=< adjustPredefSymbol PD_tonicWrapTaskBodyLam2			mod_index STE_DclFunction
 				<=< adjustPredefSymbol PD_tonicWrapTaskBodyLam3			mod_index STE_DclFunction
+                <=< adjustPredefSymbol PD_TonicTopLevelBlueprintClass	mod_index STE_Class
+                <=< adjustPredefSymbol PD_TonicBlueprintPartClass		mod_index STE_Class
                 )
 		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_iTasks_Framework_Generic]	
 		| pre_mod.pds_def == mod_index

@@ -64,7 +64,7 @@ dropContexts :: SymbolType [a] -> ([a], [a])
 
 numContexts :: SymbolType -> Int
 
-funIsTask :: FunDef -> Bool
+funIsTopLevelBlueprint :: FunDef InhExpression *ChnExpression -> *(Bool, *ChnExpression)
 
 funTy :: FunDef -> Type
 

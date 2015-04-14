@@ -795,11 +795,15 @@ where
 		= match defs (t1,ts1) (t2,ts2) type_heaps
 	match defs [] [] type_heaps
 		= (True, type_heaps)
+	match defs type1 type2 type_heaps
+		= (False, type_heaps)
 
 instance match ConsVariable
 where
 	match defs (CV {tv_info_ptr}) cons_var type_heaps=:{th_vars}
 		= (True, { type_heaps & th_vars = th_vars <:= (tv_info_ptr,TVI_Type (consVariableToType cons_var))})
+	match defs type1 type2 type_heaps
+		= (False, type_heaps)
 
 consVariableToType (TempCV temp_var_id)
 	= TempV temp_var_id

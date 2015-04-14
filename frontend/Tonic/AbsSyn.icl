@@ -1,6 +1,7 @@
 implementation module Tonic.AbsSyn
 
 import syntax, predef, checksupport
+from overloading import :: InstanceTree
 import Data.Func
 import Data.Graph
 import Data.Maybe
@@ -9,8 +10,8 @@ import Data.Map
 import Tonic.Pretty
 import iTasks.Framework.Tonic.AbsSyn
 
-mkInhExpr :: String [(String, ParsedExpr)] -> InhExpression
-mkInhExpr ctn list_comprehensions =
+mkInhExpr :: !String ![(String, ParsedExpr)] !{#{!InstanceTree}} !{#CommonDefs} -> InhExpression
+mkInhExpr ctn list_comprehensions tree cds =
   { InhExpression
   | inh_curr_task_name = ctn
   , inh_case_expr      = Nothing
@@ -18,6 +19,8 @@ mkInhExpr ctn list_comprehensions =
   , inh_ids            = [0]
   , inh_tyenv          = newMap
   , inh_list_compr     = list_comprehensions
+  , inh_instance_tree  = tree
+  , inh_common_defs    = cds
   }
 
 mkChnExpr :: *PredefinedSymbols *ModuleEnv *Heaps -> *ChnExpression

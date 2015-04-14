@@ -320,8 +320,10 @@ PD_iTasks_API_Core_Types	:== 309
 PD_TMonadClass          	:== 310
 PD_TApplicativeClass       	:== 311
 PD_TFunctorClass          	:== 312
+PD_TonicTopLevelBlueprintClass	:== 313
+PD_TonicBlueprintPartClass		:== 314
 
-PD_NrOfPredefSymbols		:== 313
+PD_NrOfPredefSymbols		:== 315
 
 GetTupleConsIndex tup_arity :== PD_Arity2TupleSymbol + tup_arity - 2
 GetTupleTypeIndex tup_arity :== PD_Arity2TupleType + tup_arity - 2

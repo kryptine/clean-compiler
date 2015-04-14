@@ -88,16 +88,21 @@ ginTonic` is_itasks_mod main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_m
   = (str, menv.me_fun_defs, predef_symbols, heaps)
   where
   // fd does not always have a fun_type = Yes
-  appDefInfo idx fd ((reps, heaps, predef_symbols, fun_defs_cpy), fun_defs)
+  appDefInfo idx fd=:{fun_ident=fun_ident, fun_body = TransformedBody tb} ((reps, heaps, predef_symbols, fun_defs_cpy), fun_defs)
     # (fd_cpy, fun_defs_cpy) = fun_defs_cpy![idx]
-    # menv = mkModuleEnv main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules
-    | (not is_itasks_mod) && funIsTask fd_cpy
-      # (mres, menv, heaps, predef_symbols) = funToGraph fd fd_cpy list_comprehensions menv heaps predef_symbols
+    # inh         = mkInhExpr fun_ident.id_name list_comprehensions class_instances common_defs
+    # menv        = mkModuleEnv main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules
+    # chn         = mkChnExpr predef_symbols menv heaps
+    # (isTask, chn) = funIsTopLevelBlueprint fd_cpy inh chn
+    | (not is_itasks_mod) && isTask
+      # (mres, chn) = funToGraph fd fd_cpy list_comprehensions class_instances common_defs inh chn
       # menv = case mres of
                  Just (_, _, e)
-                   -> updateWithAnnot idx e menv
-                 _ -> menv
-      # (menv, heaps, predef_symbols) = addTonicWrap is_itasks_mod icl_module class_instances idx menv heaps predef_symbols common_defs
+                   -> updateWithAnnot idx e chn.chn_module_env
+                 _ -> chn.chn_module_env
+      # chn = {chn & chn_module_env = menv}
+      # chn = addTonicWrap is_itasks_mod icl_module class_instances idx common_defs chn
+      # menv = chn.chn_module_env
       = ((case mres of
             Just (args, g, _)
               -> put fd.fun_ident.id_name { TonicTask
@@ -107,9 +112,11 @@ ginTonic` is_itasks_mod main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_m
                                           , tt_args   = args
                                           , tt_body   = g} reps
             _ -> reps
-        , heaps, predef_symbols, menv.me_fun_defs_cpy), menv.me_fun_defs)
-    | otherwise = ((reps, heaps, predef_symbols, fun_defs_cpy), fun_defs)
-
+        , chn.chn_heaps, chn.chn_predef_symbols, menv.me_fun_defs_cpy), menv.me_fun_defs)
+    | otherwise
+      # menv = chn.chn_module_env
+      = ((reps, chn.chn_heaps, chn.chn_predef_symbols, menv.me_fun_defs_cpy), menv.me_fun_defs)
+  appDefInfo _ _ ((reps, heaps, predef_symbols, fun_defs_cpy), fun_defs) = ((reps, heaps, predef_symbols, fun_defs_cpy), fun_defs)
 
 updateWithAnnot :: Int Expression *ModuleEnv -> *ModuleEnv
 updateWithAnnot fidx e menv
@@ -117,27 +124,34 @@ updateWithAnnot fidx e menv
   # fun_defs = updateFunRhs fidx fun_defs e
   = { menv & me_fun_defs = fun_defs}
 
-addTonicWrap :: Bool IclModule {#{!InstanceTree}} Index *ModuleEnv !*Heaps *PredefinedSymbols !{#CommonDefs} -> *(*ModuleEnv, *Heaps, *PredefinedSymbols)
-addTonicWrap is_itasks_mod icl_module class_instances idx menv heaps pdss common_defs
+addTonicWrap :: Bool IclModule {#{!InstanceTree}} Index !{#CommonDefs} *ChnExpression -> *ChnExpression
+addTonicWrap is_itasks_mod icl_module class_instances idx common_defs chn
+  # pdss = chn.chn_predef_symbols
   # (ok, pdss) = pdssAreDefined [PD_tonicViewInformation, PD_tonicWrapTaskBody] pdss
-  | not ok     = (menv, heaps, pdss)
+  # chn = {chn & chn_predef_symbols = pdss}
+  | not ok     = chn
   | otherwise
+      # menv = chn.chn_module_env
       # (mfdnt, fun_defs)    = muselect menv.me_fun_defs idx
       # menv                 = {menv & me_fun_defs = fun_defs}
       # (mfdt, fun_defs_cpy) = muselect menv.me_fun_defs_cpy idx
       # menv                 = {menv & me_fun_defs_cpy = fun_defs_cpy}
+      # chn = {chn & chn_module_env = menv}
       = case (mfdnt, mfdt) of
           (Just fdnt, Just fdt)
             = case (fdnt.fun_body, fdt.fun_type) of
                 (TransformedBody fb, Yes symbty)
+                  # menv = chn.chn_module_env
                   # (isPA, menv) = case fb.tb_rhs of
                                      App app -> isPartialApp app menv
                                      _       -> (False, menv)
-                  = if isPA (menv, heaps, pdss) (doAddRefl fdnt symbty menv heaps pdss common_defs)
-                _ = (menv, heaps, pdss)
-          _ = (menv, heaps, pdss)
+                  # chn = {chn & chn_module_env = menv}
+                  = if isPA chn (doAddRefl fdnt symbty common_defs chn)
+                _ = chn
+          _ = chn
   where
-  doAddRefl {fun_ident, fun_body=TransformedBody { tb_args, tb_rhs }} symbty menv heaps pdss common_defs
+  doAddRefl {fun_ident, fun_body=TransformedBody { tb_args, tb_rhs }} symbty common_defs chn
+    # pdss = chn.chn_predef_symbols
     # (ok, pdss) = pdssAreDefined [ PD_tonicViewInformation
                                   , PD_tonicWrapTaskBody
                                   , PD_tonicWrapTaskBodyLam1
@@ -145,9 +159,11 @@ addTonicWrap is_itasks_mod icl_module class_instances idx menv heaps pdss common
                                   , PD_tonicWrapTaskBodyLam3
                                   , PD_ConsSymbol
                                   , PD_NilSymbol] pdss
-    | not ok     = (menv, heaps, pdss)
-    # (args, heaps, pdss, menv) = foldr (mkArg symbty is_itasks_mod class_instances) ([], heaps, pdss, menv) (zip2 tb_args symbty.st_args)
+    # chn = {chn & chn_predef_symbols = pdss}
+    | not ok     = chn
+    # (args, chn) = foldr (mkArg symbty is_itasks_mod class_instances) ([], chn) (zip2 tb_args symbty.st_args)
     | length args == length tb_args
+        # menv = chn.chn_module_env
         # (rem, menv)  = case tb_rhs of
                            App {app_symb = {symb_ident}}
                             | symb_ident == predefined_idents.[PD_tonicWrapAppLam1] = (1, menv)
@@ -156,16 +172,18 @@ addTonicWrap is_itasks_mod icl_module class_instances idx menv heaps pdss common
                            App app
                              = argsRemaining app menv
                            _ = (0, menv)
-        # (xs, pdss) = toStatic args pdss
+        # (xs, pdss) = toStatic args chn.chn_predef_symbols
         # (wrap, heaps, pdss) = appPredefinedSymbolWithEI (findBodyWrap rem)
                                   [ mkStr icl_module.icl_name.id_name
                                   , mkStr fun_ident.id_name
                                   , xs
                                   , tb_rhs
-                                  ] SK_Function heaps pdss
+                                  ] SK_Function chn.chn_heaps pdss
         # fun_defs = updateFunRhs idx menv.me_fun_defs (App wrap)
-        = ({ menv & me_fun_defs = fun_defs}, heaps, pdss)
-    | otherwise = (menv, heaps, pdss)
+        = {chn & chn_module_env = { menv & me_fun_defs = fun_defs}
+               , chn_heaps = heaps
+               , chn_predef_symbols = pdss}
+    | otherwise = chn
     where
     findBodyWrap :: Int -> Int
     findBodyWrap 0 = PD_tonicWrapTaskBody
@@ -174,10 +192,12 @@ addTonicWrap is_itasks_mod icl_module class_instances idx menv heaps pdss common
     findBodyWrap 3 = PD_tonicWrapTaskBodyLam3
     findBodyWrap n = abort ("No PD_tonicWrapTaskBodyLam" +++ toString n)
 
-    mkArg :: SymbolType Bool {#{!InstanceTree}} (FreeVar, AType) ([Expression], *Heaps, *PredefinedSymbols, *ModuleEnv) -> *([Expression], *Heaps, *PredefinedSymbols, *ModuleEnv)
-    mkArg symty is_itasks_mod class_instances (arg=:{fv_ident}, {at_type}) (xs, heaps, pdss, menv)
-      # (pds, pdss) = pdss![PD_ITaskClass]
-      # gtcClasses  = [gtc_class \\ {tc_class = TCGeneric {gtc_class}} <- common_defs.[pds.pds_module].com_class_defs.[pds.pds_def].class_context] 
+    mkArg :: SymbolType Bool {#{!InstanceTree}} (FreeVar, AType) ([Expression], *ChnExpression) -> *([Expression], *ChnExpression)
+    mkArg symty is_itasks_mod class_instances (arg=:{fv_ident}, {at_type}) (xs, chn)
+      # pdss = chn.chn_predef_symbols
+      # heaps = chn.chn_heaps
+      # (itask_class_symbol, pdss) = pdss![PD_ITaskClass]
+      # gtcClasses  = [gtc_class \\ {tc_class = TCGeneric {gtc_class}} <- common_defs.[itask_class_symbol.pds_module].com_class_defs.[itask_class_symbol.pds_def].class_context] 
       # (hasITasks, hp_type_heaps) = tyHasITaskClasses class_instances gtcClasses at_type heaps.hp_type_heaps
       # heaps         = {heaps & hp_type_heaps = hp_type_heaps}
       # (noCtx, pdss) = noITaskCtx arg symty.st_context pdss
@@ -189,7 +209,7 @@ addTonicWrap is_itasks_mod icl_module class_instances idx menv heaps pdss common
                                        (Var bv)
                                    ] SK_Function heaps pdss
       # (texpr, pdss) = toStatic (mkStr fv_ident.id_name, App viewApp) pdss
-      = ([texpr:xs], heaps, pdss, menv)
+      = ([texpr:xs], {chn & chn_predef_symbols = pdss, chn_heaps = heaps })
     tyHasITaskClasses :: {#{!InstanceTree}} [Global DefinedSymbol] Type *TypeHeaps -> *(Bool, *TypeHeaps)
     tyHasITaskClasses class_instances []     at_type hp_type_heaps = (False, hp_type_heaps)
     tyHasITaskClasses class_instances [x]    at_type hp_type_heaps = tyHasITaskClasses` class_instances x at_type hp_type_heaps
@@ -216,7 +236,7 @@ addTonicWrap is_itasks_mod icl_module class_instances idx menv heaps pdss common
                       && glob_module == pds.pds_module
                       && glob_object.ds_index == pds.pds_def]
         , pdss)
-  doAddRefl _ _ menv heaps pdss _ = (menv, heaps, pdss)
+  doAddRefl _ _ _ chn = chn
 
 instance == (Global a) | == a where
   (==) g1 g2 = g1.glob_module == g2.glob_module && g1.glob_object == g2.glob_object

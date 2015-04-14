@@ -7,7 +7,7 @@ import Data.List
 import Data.Maybe
 from Data.Map import :: Map
 import qualified Data.Map as DM
-import syntax, predef, typesupport
+import syntax, predef, typesupport, overloading, unitype
 import Tonic.AbsSyn
 import Tonic.Pretty
 import Text
@@ -361,16 +361,17 @@ dropContexts st xs
 numContexts :: SymbolType -> Int
 numContexts st = length st.st_context
 
-// TODO Also try the CommonDefs.com_type_defs
-funIsTask :: FunDef -> Bool
-funIsTask fd =
+funIsTopLevelBlueprint :: FunDef InhExpression *ChnExpression -> *(Bool, *ChnExpression)
+funIsTopLevelBlueprint fd inh chn =
   case (fd.fun_type, fd.fun_kind) of
-    (Yes st, FK_Function _) -> symTyIsTask st
-                            && fd.fun_info.fi_def_level > 0
-                            && not (isLambda fd.fun_ident.id_name)
-                            && not (isListCompr fd.fun_ident.id_name)
-                            && not (isTD fd.fun_ident.id_name)
-    _                       -> False
+    (Yes st, FK_Function _)
+      # (hasTLBPInst, chn) = typeHasClassInstance (funTy fd) PD_TonicTopLevelBlueprintClass inh chn
+      = (  hasTLBPInst
+        && fd.fun_info.fi_def_level > 0
+        && not (isLambda fd.fun_ident.id_name)
+        && not (isListCompr fd.fun_ident.id_name)
+        && not (isTD fd.fun_ident.id_name), chn)
+    _ = (False, chn)
 
 funTy :: FunDef -> Type
 funTy {fun_type=Yes {st_result={at_type}}} = at_type
@@ -384,7 +385,6 @@ functorContent _                       = Nothing
 funArgTys :: FunDef -> [Type]
 funArgTys {fun_type=Yes {st_args}} = map (\x -> x.at_type) st_args
 funArgTys {fun_ident={id_name}} = abort ("Tonic.Util.funArgTys argument types of " +++ id_name +++ " are unknown.")
-
 
 identIsLambda :: Ident -> Bool
 identIsLambda ident
@@ -441,8 +441,8 @@ symbIdentIsTask {symb_ident, symb_kind=SK_OverloadedFunction {glob_module, glob_
                    False
                      # (dcls, menv) = menv!me_dcl_modules
                      = (dcls.[glob_module].dcl_common.com_member_defs.[glob_object], menv)
-  # chn = {chn & chn_module_env = menv} 
-  # pdss = chn.chn_predef_symbols 
+  # chn  = {chn & chn_module_env = menv}
+  # pdss = chn.chn_predef_symbols
   # (tmpds, pdss) = pdss![PD_TMonadClass]
   # (tapds, pdss) = pdss![PD_TApplicativeClass]
   # (tfpds, pdss) = pdss![PD_TFunctorClass]
@@ -456,6 +456,54 @@ symbIdentIsTask si chn
       Just st
        = (symTyIsTask st, {chn & chn_module_env = menv})
       _ = abort ("symbIdentIsTask: failed to reify symbIdent '" +++ si.symb_ident.id_name +++ "'")
+
+typeHasClassInstance :: Type Int InhExpression *ChnExpression -> *(Bool, *ChnExpression)
+typeHasClassInstance (TA tsi _)    lookup_symbol inh chn = typeHasClassInstance` (TA tsi []) lookup_symbol inh chn
+typeHasClassInstance (TAS tsi _ _) lookup_symbol inh chn = typeHasClassInstance` (TA tsi []) lookup_symbol inh chn
+typeHasClassInstance _             _             _   chn = (False, chn)
+
+typeHasClassInstance` :: Type Int InhExpression *ChnExpression -> *(Bool, *ChnExpression)
+typeHasClassInstance` ty lookup_symbol inh chn
+  # (lookup_def, predefined_symbols) = (chn.chn_predef_symbols)![lookup_symbol]
+  # instance_tree = inh.inh_instance_tree.[lookup_def.pds_module].[lookup_def.pds_def]
+  # coercions     = { Coercions
+                    | coer_demanded = {}
+                    , coer_offered  = {}
+                    }
+  # heaps = chn.chn_heaps
+  # (inst, ctxs, uni_ok, hp_type_heaps, coercions) = find_instance [ty] instance_tree inh.inh_common_defs heaps.hp_type_heaps coercions
+  # chn   = {chn & chn_heaps = {heaps & hp_type_heaps = hp_type_heaps}}
+  # defs  = inh.inh_common_defs.[lookup_def.pds_module].com_class_defs.[lookup_def.pds_def]
+  = (inst.glob_module <> NotFound && inst.glob_object <> NotFound, chn)
+
+typeHasClassSynonymInstance :: Type Int InhExpression *ChnExpression -> *(Bool, *ChnExpression)
+typeHasClassSynonymInstance ty lookup_symbol inh chn
+  # (lookup_def, predefined_symbols) = (chn.chn_predef_symbols)![lookup_symbol]
+  # chn                  = {chn & chn_predef_symbols = predefined_symbols}
+  # defs                 = inh.inh_common_defs.[lookup_def.pds_module].com_class_defs.[lookup_def.pds_def]
+  # gtcClasses           = [gtc_class \\ {tc_class = TCGeneric {gtc_class}} <- defs.class_context]
+  # contextClasses       = [] // [class_ref \\ {tc_class = TCClass class_ref} <- defs.class_context]
+  # heaps                = chn.chn_heaps
+  # (has, hp_type_heaps) = tyHasClasses inh.inh_instance_tree (gtcClasses ++ contextClasses) ty heaps.hp_type_heaps
+  = (has, {chn & chn_heaps = {heaps & hp_type_heaps = hp_type_heaps}})
+  where
+  tyHasClasses :: {#{!InstanceTree}} [Global DefinedSymbol] Type *TypeHeaps -> *(Bool, *TypeHeaps)
+  tyHasClasses class_instances []     at_type hp_type_heaps = (False, hp_type_heaps)
+  tyHasClasses class_instances [x]    at_type hp_type_heaps = tyHasClasses` class_instances x at_type hp_type_heaps
+  tyHasClasses class_instances [x:xs] at_type hp_type_heaps
+    # (f, hp_type_heaps) = tyHasClasses` class_instances x at_type hp_type_heaps
+    | f         = tyHasClasses class_instances xs at_type hp_type_heaps
+    | otherwise = (False, hp_type_heaps)
+
+  tyHasClasses` :: {#{!InstanceTree}} (Global DefinedSymbol) Type *TypeHeaps -> *(Bool, *TypeHeaps)
+  tyHasClasses` class_instances {glob_module, glob_object} at_type hp_type_heaps
+    # instance_tree = class_instances.[glob_module].[glob_object.ds_index]
+    # coercions     = { Coercions
+                      | coer_demanded = {}
+                      , coer_offered  = {}
+                      }
+    # (inst, ctxs, uni_ok, hp_type_heaps, coercions) = find_instance [at_type] instance_tree inh.inh_common_defs hp_type_heaps coercions
+    = (inst.glob_module <> NotFound && inst.glob_object <> NotFound, hp_type_heaps)
 
 isInfix :: SymbIdent *ModuleEnv -> *(Bool, *ModuleEnv)
 isInfix si menv

@@ -6,8 +6,9 @@ from syntax import :: Expression (..), :: BoundVar, :: App {..}, :: Let, :: Case
   :: Bind, :: Position, :: AType, :: Env, :: Ident, :: Level, :: ExprInfoPtr, :: ExprInfo,
   :: TypeCodeExpression, :: GlobalIndex, :: Conditional, :: BasicValue, :: FieldSymbol,
   :: IclModule, :: DclModule, :: FunDef, :: Optional, :: SymbolType, :: LetBind,
-  :: ModuleN, :: Type, :: ParsedExpr
+  :: ModuleN, :: Type, :: ParsedExpr, :: CommonDefs
 from checksupport import :: Heaps
+from overloading import :: InstanceTree
 from Data.Graph import :: Graph
 from Data.Maybe import :: Maybe
 from Text.JSON import generic JSONEncode, :: JSONNode
@@ -24,6 +25,8 @@ from iTasks.Framework.Tonic.AbsSyn import :: TExpr, :: ExprId, :: TypeName, :: M
   , inh_ids            :: !ExprId
   , inh_tyenv          :: !Map String Type
   , inh_list_compr     :: ![(String, ParsedExpr)]
+  , inh_instance_tree  :: !{#{!InstanceTree}}
+  , inh_common_defs    :: !{#CommonDefs}
   }
 
 :: *ChnExpression =
@@ -46,7 +49,7 @@ from iTasks.Framework.Tonic.AbsSyn import :: TExpr, :: ExprId, :: TypeName, :: M
   , me_dcl_modules       :: !{#DclModule}
   }
 
-mkInhExpr :: String [(String, ParsedExpr)] -> InhExpression
+mkInhExpr :: !String ![(String, ParsedExpr)] !{#{!InstanceTree}} !{#CommonDefs} -> InhExpression
 
 mkChnExpr :: *PredefinedSymbols *ModuleEnv *Heaps -> *ChnExpression
 
