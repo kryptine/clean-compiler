@@ -732,9 +732,9 @@ substituteType form_root_attribute act_root_attribute form_type_args act_type_ar
 bindTypeVarsAndAttributes :: !TypeAttribute !TypeAttribute ![ATypeVar] ![AType] !*TypeHeaps -> *TypeHeaps
 bindTypeVarsAndAttributes form_root_attribute act_root_attribute form_type_args act_type_args type_heaps
 	# th_attrs = bind_attribute form_root_attribute act_root_attribute type_heaps.th_attrs	
-	= fold2St bind_type_and_attr form_type_args act_type_args { type_heaps & th_attrs = th_attrs }
+	= foldSt bind_type_and_attr (zip2 form_type_args act_type_args) { type_heaps & th_attrs = th_attrs }
 where
-	bind_type_and_attr {atv_attribute, atv_variable={tv_info_ptr}} {at_type,at_attribute} type_heaps=:{th_vars,th_attrs}
+	bind_type_and_attr ({atv_attribute, atv_variable={tv_info_ptr}}, {at_type,at_attribute}) type_heaps=:{th_vars,th_attrs}
 		= { type_heaps &	th_vars = th_vars <:= (tv_info_ptr, TVI_Type at_type),
 							th_attrs = bind_attribute atv_attribute at_attribute th_attrs }
 
