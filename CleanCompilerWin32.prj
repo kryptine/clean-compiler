@@ -36,9 +36,8 @@ Global
 		GenerateDLL:	False
 		ExportedNames:	
 	Paths
-		Path:	{Application}\iTasks-SDK\Patches\Platform\OS-Independent
-		Path:	{Application}\Libraries\clean-platform\OS-Independent
-		Path:	{Application}\Libraries\clean-platform\OS-Independent\Deprecated\StdLib
+		Path:	{Application}\iTasks-SDK\Dependencies\Platform\OS-Independent
+		Path:	{Application}\iTasks-SDK\Dependencies\Platform\OS-Independent\Deprecated\StdLib
 		Path:	{Application}\iTasks-SDK\Patches\Dynamics
 		Path:	{Application}\iTasks-SDK\Patches\Generics
 		Path:	{Application}\iTasks-SDK\Patches\StdEnv

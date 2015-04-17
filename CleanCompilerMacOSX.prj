@@ -37,9 +37,8 @@ Global
 		GenerateDLL:	False
 		ExportedNames:	
 	Paths
-		Path:	{Application}/lib/iTasks-SDK/Patches/Platform/OS-Independent
-		Path:	{Application}/lib/clean-platform/OS-Independent
-		Path:	{Application}/lib/clean-platform/OS-Independent/Deprecated/StdLib
+		Path:	{Application}/lib/iTasks-SDK/Dependencies/Platform/OS-Independent
+		Path:	{Application}/lib/iTasks-SDK/Dependencies/Platform/OS-Independent/Deprecated/StdLib
 		Path:	{Application}/lib/iTasks-SDK/Patches/Dynamics
 		Path:	{Application}/lib/iTasks-SDK/Patches/Generics
 		Path:	{Application}/lib/iTasks-SDK/Patches/StdEnv
@@ -73,22 +72,8 @@ MainModule
 		Fusion:	False
 OtherModules
 	Module
-		Name:	Text.JSON
-		Dir:	{Application}/lib/iTasks-SDK/Patches/Platform/OS-Independent
-		Compiler
-			NeverMemoryProfile:	False
-			NeverTimeProfile:	False
-			StrictnessAnalysis:	True
-			ListTypes:	StrictExportTypes
-			ListAttributes:	True
-			Warnings:	True
-			Verbose:	True
-			ReadableABC:	False
-			ReuseUniqueNodes:	True
-			Fusion:	False
-	Module
 		Name:	Control.Applicative
-		Dir:	{Application}/lib/clean-platform/OS-Independent
+		Dir:	{Application}/lib/iTasks-SDK/Dependencies/Platform/OS-Independent
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -102,7 +87,7 @@ OtherModules
 			Fusion:	False
 	Module
 		Name:	Control.Monad
-		Dir:	{Application}/lib/clean-platform/OS-Independent
+		Dir:	{Application}/lib/iTasks-SDK/Dependencies/Platform/OS-Independent
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -116,7 +101,7 @@ OtherModules
 			Fusion:	False
 	Module
 		Name:	Data.Either
-		Dir:	{Application}/lib/clean-platform/OS-Independent
+		Dir:	{Application}/lib/iTasks-SDK/Dependencies/Platform/OS-Independent
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -130,7 +115,7 @@ OtherModules
 			Fusion:	False
 	Module
 		Name:	Data.Foldable
-		Dir:	{Application}/lib/clean-platform/OS-Independent
+		Dir:	{Application}/lib/iTasks-SDK/Dependencies/Platform/OS-Independent
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -144,7 +129,7 @@ OtherModules
 			Fusion:	False
 	Module
 		Name:	Data.Func
-		Dir:	{Application}/lib/clean-platform/OS-Independent
+		Dir:	{Application}/lib/iTasks-SDK/Dependencies/Platform/OS-Independent
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -158,7 +143,7 @@ OtherModules
 			Fusion:	False
 	Module
 		Name:	Data.Functor
-		Dir:	{Application}/lib/clean-platform/OS-Independent
+		Dir:	{Application}/lib/iTasks-SDK/Dependencies/Platform/OS-Independent
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -172,7 +157,7 @@ OtherModules
 			Fusion:	False
 	Module
 		Name:	Data.Graph
-		Dir:	{Application}/lib/clean-platform/OS-Independent
+		Dir:	{Application}/lib/iTasks-SDK/Dependencies/Platform/OS-Independent
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -186,7 +171,7 @@ OtherModules
 			Fusion:	False
 	Module
 		Name:	Data.List
-		Dir:	{Application}/lib/clean-platform/OS-Independent
+		Dir:	{Application}/lib/iTasks-SDK/Dependencies/Platform/OS-Independent
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -200,7 +185,7 @@ OtherModules
 			Fusion:	False
 	Module
 		Name:	Data.Map
-		Dir:	{Application}/lib/clean-platform/OS-Independent
+		Dir:	{Application}/lib/iTasks-SDK/Dependencies/Platform/OS-Independent
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -214,7 +199,7 @@ OtherModules
 			Fusion:	False
 	Module
 		Name:	Data.Maybe
-		Dir:	{Application}/lib/clean-platform/OS-Independent
+		Dir:	{Application}/lib/iTasks-SDK/Dependencies/Platform/OS-Independent
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -228,7 +213,7 @@ OtherModules
 			Fusion:	False
 	Module
 		Name:	Data.Monoid
-		Dir:	{Application}/lib/clean-platform/OS-Independent
+		Dir:	{Application}/lib/iTasks-SDK/Dependencies/Platform/OS-Independent
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -242,7 +227,7 @@ OtherModules
 			Fusion:	False
 	Module
 		Name:	Data.Set
-		Dir:	{Application}/lib/clean-platform/OS-Independent
+		Dir:	{Application}/lib/iTasks-SDK/Dependencies/Platform/OS-Independent
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -256,7 +241,7 @@ OtherModules
 			Fusion:	False
 	Module
 		Name:	Data.Traversable
-		Dir:	{Application}/lib/clean-platform/OS-Independent
+		Dir:	{Application}/lib/iTasks-SDK/Dependencies/Platform/OS-Independent
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -270,7 +255,7 @@ OtherModules
 			Fusion:	False
 	Module
 		Name:	Data.Void
-		Dir:	{Application}/lib/clean-platform/OS-Independent
+		Dir:	{Application}/lib/iTasks-SDK/Dependencies/Platform/OS-Independent
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -284,7 +269,7 @@ OtherModules
 			Fusion:	False
 	Module
 		Name:	System.IO
-		Dir:	{Application}/lib/clean-platform/OS-Independent
+		Dir:	{Application}/lib/iTasks-SDK/Dependencies/Platform/OS-Independent
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -298,7 +283,21 @@ OtherModules
 			Fusion:	False
 	Module
 		Name:	Text
-		Dir:	{Application}/lib/clean-platform/OS-Independent
+		Dir:	{Application}/lib/iTasks-SDK/Dependencies/Platform/OS-Independent
+		Compiler
+			NeverMemoryProfile:	False
+			NeverTimeProfile:	False
+			StrictnessAnalysis:	True
+			ListTypes:	StrictExportTypes
+			ListAttributes:	True
+			Warnings:	True
+			Verbose:	True
+			ReadableABC:	False
+			ReuseUniqueNodes:	True
+			Fusion:	False
+	Module
+		Name:	Text.JSON
+		Dir:	{Application}/lib/iTasks-SDK/Dependencies/Platform/OS-Independent
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
@@ -312,7 +311,7 @@ OtherModules
 			Fusion:	False
 	Module
 		Name:	Text.PPrint
-		Dir:	{Application}/lib/clean-platform/OS-Independent
+		Dir:	{Application}/lib/iTasks-SDK/Dependencies/Platform/OS-Independent
 		Compiler
 			NeverMemoryProfile:	False
 			NeverTimeProfile:	False
