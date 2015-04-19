@@ -366,7 +366,7 @@ OtherModules
 			ReuseUniqueNodes:	True
 			Fusion:	False
 	Module
-		Name:	iTasks.Framework.Tonic.AbsSyn
+		Name:	iTasks._Framework.Tonic.AbsSyn
 		Dir:	{Application}/lib/iTasks-SDK/Server
 		Compiler
 			NeverMemoryProfile:	False

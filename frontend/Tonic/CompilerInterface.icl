@@ -15,7 +15,7 @@ import Data.Graph
 import Data.Maybe
 import Data.Map
 import Text.JSON
-import iTasks.Framework.Tonic.AbsSyn
+import iTasks._Framework.Tonic.AbsSyn
 
 ginTonic :: String ModuleN !*{#FunDef} !*{#FunDef} IclModule {#DclModule} !{#CommonDefs} [(String, ParsedExpr)] !*PredefinedSymbols !{#{!InstanceTree}} *HashTable !*File !*Files !*Heaps -> *(!*{#FunDef}, !*PredefinedSymbols, *HashTable, !*File, !*Files, !*Heaps)
 ginTonic mod_dir main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules common_defs list_comprehensions predef_symbols class_instances hash_table error files heaps

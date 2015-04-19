@@ -11,7 +11,7 @@ import syntax, predef, typesupport, overloading, unitype
 import Tonic.AbsSyn
 import Tonic.Pretty
 import Text
-import iTasks.Framework.Tonic.AbsSyn
+import iTasks._Framework.Tonic.AbsSyn
 
 foldrArr :: (a b -> b) b (arr a) -> b | Array arr a
 foldrArr f b arr = foldrArr` 0 f b arr

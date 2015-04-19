@@ -19,7 +19,7 @@ import Data.Maybe
 import Text.PPrint
 import Tonic.AbsSyn
 import Tonic.Util
-import iTasks.Framework.Tonic.AbsSyn
+import iTasks._Framework.Tonic.AbsSyn
 
 from syntax import
   :: Expression (..), :: BoundVar {..}, :: App {..}, :: Let {..}, :: Case,

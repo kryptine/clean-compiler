@@ -22,7 +22,7 @@ from Data.Map import :: Map
 import qualified Data.Map as DM
 
 import qualified Text.PPrint as PPrint
-import iTasks.Framework.Tonic.AbsSyn
+import iTasks._Framework.Tonic.AbsSyn
 
 import StdMisc
 

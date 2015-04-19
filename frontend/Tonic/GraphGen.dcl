@@ -6,7 +6,7 @@ from syntax import :: Expression, :: FunDef, :: IclModule, :: DclModule, :: Pars
 from general import :: Optional
 from checksupport import :: Heaps
 from Tonic.AbsSyn import :: ModuleEnv, :: TypeName, :: ModuleName, :: TaskName, :: VariableName, :: InhExpression, :: ChnExpression
-from iTasks.Framework.Tonic.AbsSyn import :: TExpr, :: TCleanExpr
+from iTasks._Framework.Tonic.AbsSyn import :: TExpr, :: TCleanExpr
 from Text.PPrint import :: Doc
 from Data.Map import :: Map
 from predef import :: PredefinedSymbol, :: PredefinedSymbols

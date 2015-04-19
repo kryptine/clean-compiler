@@ -252,8 +252,8 @@ predefined_idents
 					[PD_FromThenToUTS]= i "_from_then_to_uts",
 					[PD_FromThenToO]= i "_from_then_to_o",
 
-                    [PD_iTasks_Framework_Tonic] = i "iTasks.Framework.Tonic",
-                    [PD_iTasks_Framework_Generic] = i "iTasks.Framework.Generic",
+                    [PD_iTasks_Framework_Tonic] = i "iTasks._Framework.Tonic",
+                    [PD_iTasks_Framework_Generic] = i "iTasks._Framework.Generic",
                     [PD_iTasks_API_Core_Types] = i "iTasks.API.Core.Types",
                     [PD_tonicWrapParallel] = i "tonicWrapParallel",
                     [PD_tonicWrapApp]      = i "tonicWrapApp",

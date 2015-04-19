@@ -6,7 +6,7 @@ from StdArray import class Array
 from Data.Maybe import :: Maybe
 from Data.Map import :: Map
 import Tonic.AbsSyn
-from iTasks.Framework.Tonic.AbsSyn import :: PPOr, :: TCleanExpr
+from iTasks._Framework.Tonic.AbsSyn import :: PPOr, :: TCleanExpr
 
 foldrArr :: (a b -> b) b (arr a) -> b | Array arr a
 

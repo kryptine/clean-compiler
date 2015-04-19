@@ -8,7 +8,7 @@ import Data.Maybe
 import Data.Map
 //import Tonic.Tonic
 import Tonic.Pretty
-import iTasks.Framework.Tonic.AbsSyn
+import iTasks._Framework.Tonic.AbsSyn
 
 mkInhExpr :: !String ![(String, ParsedExpr)] !{#{!InstanceTree}} !{#CommonDefs} -> InhExpression
 mkInhExpr ctn list_comprehensions tree cds =
