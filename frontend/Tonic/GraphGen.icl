@@ -244,9 +244,6 @@ mkBlueprint (App app) inh chn
         "-||"      -> mkParSumL   app ctxs args inh chn
         "allTasks" -> mkParProdN  app ctxs args inh chn
         "-&&-"     -> mkParProd2  app ctxs args inh chn
-        "get"      -> mkGetShare  app ctxs args inh chn
-        "set"      -> mkSetShare  app ctxs args inh chn
-        "upd"      -> mkUpdShare  app ctxs args inh chn
         _          -> mkTaskApp   app ctxs args inh chn
   | otherwise
       # (apptcle, menv) = exprToTCleanExpr (App app) chn.chn_module_env
@@ -521,48 +518,6 @@ mkBlueprint (App app) inh chn
              , syn_texpr      = TParallel inh.inh_ids (mkPar (PP ppStr))
              , syn_pattern_match_vars = []}, chn)
         _ = abort "mkParN args fallthrough; shouldn't happen"
-
-  // TODO Look at this some more
-  mkGetShare app ctxs args=:[App {app_symb, app_args}:_] inh chn
-    = mkShareApp app Get app_symb app_args chn
-  mkGetShare app ctxs args=:[Var v] inh chn
-    = mkShareVar app Get v chn
-
-  mkSetShare app ctxs args=:[a1=:(App _):App {app_symb, app_args}:_] inh chn
-    # (ppe1, menv) = ppExpression a1 chn.chn_module_env
-    = mkShareApp app (Set (ppCompact ppe1)) app_symb app_args {chn & chn_module_env = menv}
-  mkSetShare app ctxs args=:[a1=:(App _): Var v:_] inh chn
-    # (ppe1, menv) = ppExpression a1 chn.chn_module_env
-    = mkShareVar app (Set (ppCompact ppe1)) v {chn & chn_module_env = menv}
-  mkSetShare app ctxs args=:[Var v:_] inh chn
-    = mkShareVar app (Set "TODO") v chn
-
-  mkUpdShare app ctxs args=:[a1=:(App _):App {app_symb, app_args}:_] inh chn
-    # (ppe1, menv) = ppExpression a1 chn.chn_module_env
-    = mkShareApp app (Upd (ppCompact ppe1)) app_symb app_args {chn & chn_module_env = menv}
-  mkUpdShare app ctxs args=:[a1=:(App _) : Var v : _] inh chn
-    # (ppe1, menv) = ppExpression a1 chn.chn_module_env
-    = mkShareVar app (Upd (ppCompact ppe1)) v {chn & chn_module_env = menv}
-
-  mkShareApp app tsh app_symb app_args chn
-    # (ads, menv) = mapSt ppExpression app_args chn.chn_module_env
-    # (var, vars) =
-        if (app_symb.symb_ident.id_name == "sharedStore")
-          (case ads of
-             []       -> ("mkShare: should not happen", [])
-             [ad:ads] -> (ppCompact ad, ads))
-          (app_symb.symb_ident.id_name, ads)
-    = ({ syn_annot_expr = App app
-       , syn_texpr      = TShare tsh var (map ppCompact vars)
-       , syn_pattern_match_vars = []}
-      , {chn & chn_module_env = menv})
-
-  mkShareVar app tsh var chn
-    # (bvd, menv) = ppBoundVar var chn.chn_module_env
-    = ({ syn_annot_expr = App app
-       , syn_texpr      = TShare tsh (ppCompact bvd) []
-       , syn_pattern_match_vars = []}
-      , {chn & chn_module_env = menv})
 
   // Transformation for higher-order function application
   // E.g. f g x = g x becomes f = g @ x
