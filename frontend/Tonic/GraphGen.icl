@@ -235,8 +235,9 @@ mkBlueprint (App app) inh chn
         ">>="      -> mkBind      app ctxs args inh chn
         ">>|"      -> mkBind      app ctxs args inh chn
         "return"   -> mkReturn    app ctxs args inh chn
+        "@$"       -> mkTFunctor  app ctxs args inh chn
+        "tmap"     -> mkTFunctor  app ctxs args inh chn
         "@:"       -> mkAssign    app ctxs args inh chn
-        "@"        -> mkTransform app ctxs args inh chn
         ">>*"      -> mkStep      app ctxs args inh chn
         "anyTask"  -> mkParSumN   app ctxs args inh chn
         "-||-"     -> mkParSum2   app ctxs args inh chn
@@ -278,6 +279,20 @@ mkBlueprint (App app) inh chn
        , syn_texpr      = TReturn inh.inh_ids syn.syn_texpr
        , syn_pattern_match_vars = []}, chn)
 
+  mkTFunctor app ctxs args inh chn
+    = withTwo app args f inh chn
+    where
+    f l=:(App {app_symb, app_args}) r chn
+      # (syn, chn)           = mkBlueprint r (addInhId inh 0) chn
+      # (ppl, menv)          = mapSt ppExpression app_args chn.chn_module_env
+      # ((funArgs, _), menv) = reifyArgsAndDef app_symb menv
+      # patId                = case drop (length app_args) [freeVarName x \\ x <- funArgs | x.fv_def_level == -1] of
+                                 []    -> []
+                                 [x:_] -> [x]
+      # chn                  = {chn & chn_module_env = menv}
+      = ({ syn_annot_expr = App {app & app_args = ctxs ++ [l, syn.syn_annot_expr]}
+         , syn_texpr      = TFunctor syn.syn_texpr app_symb.symb_ident.id_name (map ppCompact ppl ++ patId)
+         , syn_pattern_match_vars = syn.syn_pattern_match_vars}, chn)
 
   mkAssign app ctxs args inh chn
     = withTwo app args f inh chn
@@ -447,21 +462,6 @@ mkBlueprint (App app) inh chn
     = ({ syn_annot_expr = app`
        , syn_texpr      = TTaskApp inh.inh_ids dclnm (appFunName app) (map (TCleanExpr []) ps)
        , syn_pattern_match_vars = []}, chn)
-
-  mkTransform app ctxs args inh chn
-    = withTwo app args f inh chn
-    where
-    f l r=:(App {app_symb, app_args}) chn
-      # (syn, chn)           = mkBlueprint l (addInhId inh 0) chn
-      # (ppl, menv)          = mapSt ppExpression app_args chn.chn_module_env
-      # ((funArgs, _), menv) = reifyArgsAndDef app_symb menv
-      # patId                = case drop (length app_args) [freeVarName x \\ x <- funArgs | x.fv_def_level == -1] of
-                                 []    -> []
-                                 [x:_] -> [x]
-      # chn                  = {chn & chn_module_env = menv}
-      = ({ syn_annot_expr = App {app & app_args = ctxs ++ [syn.syn_annot_expr, r]}
-         , syn_texpr      = TTransform syn.syn_texpr app_symb.symb_ident.id_name (map ppCompact ppl ++ patId)
-         , syn_pattern_match_vars = syn.syn_pattern_match_vars}, chn)
 
   mkParSumN = mkParN ParSumN
 
