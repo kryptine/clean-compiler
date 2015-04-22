@@ -2275,11 +2275,14 @@ where
 				({ heaps & hp_type_heaps = hp_type_heaps }, ptrs))
 		
 	adjust_member_instance defs contexts {me_ident,me_offset,me_class} (RC_Class cid rcs) class_exprs heaps_and_ptrs
-		# ({glob_module,glob_object}, red_contexts_appls) = find_instance_of_member me_class me_offset cid rcs
+		# (inst_module, inst_index, inst_ident, red_contexts_appls) = find_instance_of_member me_class me_offset cid rcs
 		  (exprs, heaps_and_ptrs) = convertClassApplsToExpressions defs contexts red_contexts_appls heaps_and_ptrs
 		  class_exprs = exprs ++ class_exprs
-		= (EI_Instance { glob_module = glob_module, glob_object = { ds_ident = me_ident, ds_arity = length class_exprs, ds_index = glob_object }} class_exprs,
-			 heaps_and_ptrs)
+		| inst_index>=0
+			= (EI_Instance { glob_module = inst_module, glob_object = { ds_ident = me_ident, ds_arity = length class_exprs, ds_index = inst_index }} class_exprs,
+				 heaps_and_ptrs)
+			= (EI_Instance { glob_module = inst_module, glob_object = { ds_ident = inst_ident, ds_arity = length class_exprs, ds_index = -1 - inst_index }} class_exprs,
+				 heaps_and_ptrs)
 	adjust_member_instance defs contexts {me_ident,me_offset,me_class={glob_module,glob_object}} (RC_TC_Global tci_constructor tci_contexts) _ heaps_and_ptrs
 		# (exprs, heaps_and_ptrs) = convertClassApplsToExpressions defs contexts tci_contexts heaps_and_ptrs
 		  typeCodeExpressions = expressionsToTypeCodeExpressions exprs
@@ -2291,13 +2294,13 @@ where
 	adjust_member_instance defs contexts {me_ident,me_offset,me_class={glob_module,glob_object}} (RC_TC_Local new_var_ptr) _ heaps_and_ptrs
 		= (EI_TypeCode (TCE_Var new_var_ptr), heaps_and_ptrs)
 
-	find_instance_of_member :: (Global Int) Int ClassInstanceDescr [ReducedContext] -> ((Global Int),[ClassApplication])
+	find_instance_of_member :: (Global Int) Int ClassInstanceDescr [ReducedContext] -> (!Int,!Int,Ident,[ClassApplication])
 	find_instance_of_member me_class me_offset {cid_class_index, cid_inst_module, cid_inst_members, cid_red_contexts} constraint_contexts
 		| cid_class_index.gi_module == me_class.glob_module && cid_class_index.gi_index == me_class.glob_object
-			# {cim_index,cim_arity} = cid_inst_members.[me_offset]
+			# {cim_index,cim_arity,cim_ident} = cid_inst_members.[me_offset]
 			| cim_index<0
-				= ({ glob_module = cim_arity, glob_object = -1 - cim_index }, cid_red_contexts)
-				= ({ glob_module = cid_inst_module, glob_object = cim_index }, cid_red_contexts)
+				= (cim_arity, cim_index, cim_ident, cid_red_contexts)
+				= (cid_inst_module, cim_index, cim_ident, cid_red_contexts)
 			= find_instance_of_member_in_constraints me_class me_offset constraint_contexts
 	where
 		find_instance_of_member_in_constraint me_class me_offset [ RC_Class cid rcs : rcss ]
