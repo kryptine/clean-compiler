@@ -733,28 +733,29 @@ mkTAssoc (Just ft)
       (Prio RightAssoc n) -> TRightAssoc n
       _                   -> TNonAssoc
 
-exprToTCleanExpr :: Expression *ModuleEnv -> *(TCleanExpr, *ModuleEnv)
-exprToTCleanExpr (App app) menv
-  # ((_, args), menv) = dropAppContexts app menv
-  = case args of
-      [] = (PPCleanExpr app.app_symb.symb_ident.id_name, menv)
-      xs
-        # (mft, menv)  = reifyFunType app.app_symb menv
-        # (tces, menv) = mapSt exprToTCleanExpr args menv
-        = (AppCleanExpr (mkTAssoc mft) app.app_symb.symb_ident.id_name tces, menv)
-exprToTCleanExpr expr menv
-  # (doc, menv) = ppExpression expr menv
-  = (PPCleanExpr (ppCompact doc), menv)
+//exprToTCleanExpr :: Expression *ModuleEnv -> *(TCleanExpr, *ModuleEnv)
+//exprToTCleanExpr (App app) menv
+  //# ((_, args), menv) = dropAppContexts app menv
+  //= case args of
+      //[] = (PPCleanExpr app.app_symb.symb_ident.id_name, menv)
+      //xs
+        //# (mft, menv)  = reifyFunType app.app_symb menv
+        //# (tces, menv) = mapSt exprToTCleanExpr args menv
+        //= (AppCleanExpr (mkTAssoc mft) app.app_symb.symb_ident.id_name tces, menv)
+//exprToTCleanExpr expr menv
+  //# (doc, menv) = ppExpression expr menv
+  //= (PPCleanExpr (ppCompact doc), menv)
 
 // TODO Associativity?
-typeToTCleanExpr :: Type -> TCleanExpr
-typeToTCleanExpr (TA tsi []) = PPCleanExpr tsi.type_ident.id_name
+typeToTCleanExpr :: Type -> TExpr
+typeToTCleanExpr (TA tsi []) = TVar [] tsi.type_ident.id_name
 typeToTCleanExpr (TA tsi args)
   # tces = map (typeToTCleanExpr o \arg -> arg.at_type) args
-  = AppCleanExpr TNonAssoc tsi.type_ident.id_name tces
-typeToTCleanExpr (TAS tsi [] _) = PPCleanExpr tsi.type_ident.id_name
+  = TFApp TNonAssoc tsi.type_ident.id_name tces
+typeToTCleanExpr (TAS tsi [] _) = TVar [] tsi.type_ident.id_name
 typeToTCleanExpr (TAS tsi args _)
   # tces = map (typeToTCleanExpr o \arg -> arg.at_type) args
-  = AppCleanExpr TNonAssoc tsi.type_ident.id_name tces
+  = TFApp TNonAssoc tsi.type_ident.id_name tces
 typeToTCleanExpr ty
-  = PPCleanExpr (ppCompact (ppType ty))
+  = TVar [] (ppCompact (ppType ty))
+

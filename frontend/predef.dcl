@@ -309,21 +309,20 @@ PD_tonicWrapTaskBody			:== 298
 PD_tonicWrapAppLam1			:== 299
 PD_tonicWrapAppLam2			:== 300
 PD_tonicWrapAppLam3			:== 301
-PD_tonicWrapParallel		:== 302
-PD_tonicViewInformation		:== 303
-PD_tonicWrapTaskBodyLam1	:== 304
-PD_tonicWrapTaskBodyLam2	:== 305
-PD_tonicWrapTaskBodyLam3	:== 306
-PD_ITaskClass				:== 307
-PD_iTasks_Framework_Generic	:== 308
-PD_iTasks_API_Core_Types	:== 309
-PD_TMonadClass          	:== 310
-PD_TApplicativeClass       	:== 311
-PD_TFunctorClass          	:== 312
-PD_TonicTopLevelBlueprintClass	:== 313
-PD_TonicBlueprintPartClass		:== 314
+PD_tonicViewInformation		:== 302
+PD_tonicWrapTaskBodyLam1	:== 303
+PD_tonicWrapTaskBodyLam2	:== 304
+PD_tonicWrapTaskBodyLam3	:== 305
+PD_ITaskClass				:== 306
+PD_iTasks_Framework_Generic	:== 307
+PD_iTasks_API_Core_Types	:== 308
+PD_TMonadClass          	:== 309
+PD_TApplicativeClass       	:== 310
+PD_TFunctorClass          	:== 311
+PD_TonicTopLevelBlueprintClass	:== 312
+PD_TonicBlueprintPartClass		:== 313
 
-PD_NrOfPredefSymbols		:== 315
+PD_NrOfPredefSymbols		:== 314
 
 GetTupleConsIndex tup_arity :== PD_Arity2TupleSymbol + tup_arity - 2
 GetTupleTypeIndex tup_arity :== PD_Arity2TupleType + tup_arity - 2

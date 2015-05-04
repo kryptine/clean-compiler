@@ -134,8 +134,8 @@ given x == y && y == z
 //ppPE (PE_Empty) = "PE_Empty"
 
 withTwo :: App [Expression] (Expression Expression *ChnExpression -> *(SynExpression, *ChnExpression)) InhExpression *ChnExpression -> *(SynExpression, *ChnExpression)
-withTwo app []        _ _   chn = ({syn_annot_expr = App app, syn_texpr = TVar [] "TODO withTwo []", syn_pattern_match_vars = []}, chn)
-withTwo app [_]       _ _   chn = ({syn_annot_expr = App app, syn_texpr = TVar [] "TODO withTwo [_]", syn_pattern_match_vars = []}, chn)
+withTwo app []        _ _   chn = ({syn_annot_expr = App app, syn_texpr = TLit "TODO withTwo []", syn_pattern_match_vars = []}, chn)
+withTwo app [_]       _ _   chn = ({syn_annot_expr = App app, syn_texpr = TLit "TODO withTwo [_]", syn_pattern_match_vars = []}, chn)
 withTwo app [x1:x2:_] f inh chn = f x1 x2 chn
 
 wrapTaskApp :: Expression InhExpression *ChnExpression -> *(Expression, *ChnExpression)
@@ -144,16 +144,28 @@ wrapTaskApp origExpr inh chn
   # chn        = {chn & chn_predef_symbols = pdss}
   | not ok     = (origExpr, chn)
   | otherwise
-      # (rem, menv)  = case origExpr of
-                         App app
-                           = argsRemaining app chn.chn_module_env
-                         _ = (0, chn.chn_module_env)
-      # icl          = menv.me_icl_module
-      # nm           = icl.icl_name.id_name
-      # (ids, pdss)  = toStatic (map mkInt inh.inh_ids) chn.chn_predef_symbols
+      # (rem, menv)    = case origExpr of
+                           App app
+                             = argsRemaining app chn.chn_module_env
+                           _ = (0, chn.chn_module_env)
+      # (icl, menv)    = menv!me_icl_module
+      # nm             = icl.icl_name.id_name
+      # (wrappedFnModNm, menv) = case origExpr of
+                                   App app
+                                     # (mdcl, menv) = reifyDclModule app.app_symb menv
+                                     = case mdcl of
+                                         Just dcl -> (dcl.dcl_name.id_name, menv)
+                                         _        -> (nm, menv)
+                                   _ = (nm, menv)
+      # wrappedFnNm    = case origExpr of
+                           App app -> app.app_symb.symb_ident.id_name
+                           _       -> ""
+      # (ids, pdss)    = toStatic (map mkInt inh.inh_ids) chn.chn_predef_symbols
       # (expr, heaps, pdss) = appPredefinedSymbolWithEI (findWrap rem)
                          [ mkStr nm
                          , mkStr inh.inh_curr_task_name
+                         , mkStr wrappedFnModNm
+                         , mkStr wrappedFnNm
                          , ids
                          , origExpr
                          ] SK_Function chn.chn_heaps pdss
@@ -169,355 +181,60 @@ wrapTaskApp origExpr inh chn
   findWrap 3 = PD_tonicWrapAppLam3
   findWrap n = abort ("No tonicWrapLam" +++ toString n)
 
-wrapParallelN :: Expression InhExpression *ChnExpression -> *(Expression, *ChnExpression)
-wrapParallelN origExpr=:(App app=:{app_args=[xs:_]}) inh chn
-  # (ok, pdss) = pdssAreDefined [PD_tonicWrapParallel, PD_ConsSymbol, PD_NilSymbol] chn.chn_predef_symbols
-  # chn        = {chn & chn_predef_symbols = pdss}
-  | not ok     = (origExpr, chn)
-  | otherwise
-      # menv         = chn.chn_module_env
-      # icl          = menv.me_icl_module
-      # nm           = icl.icl_name.id_name
-      # (ids, pdss)  = toStatic (map mkInt inh.inh_ids) chn.chn_predef_symbols
-      # (expr, heaps, pdss) = appPredefinedSymbolWithEI PD_tonicWrapParallel
-                         [ mkStr nm
-                         , mkStr inh.inh_curr_task_name
-                         , ids
-                         , App {app & app_args = []}
-                         , xs
-                         ] SK_Function chn.chn_heaps pdss
-      = ( App expr
-        , {chn & chn_predef_symbols = pdss
-               , chn_module_env = {menv & me_icl_module = icl}
-               , chn_heaps      = heaps})
-wrapParallelN origExpr inh chn = (origExpr, chn)
-
-letTypes :: ExprInfoPtr *ChnExpression -> *([Type], *ChnExpression)
-letTypes exprPtr chn
-  # heaps = chn.chn_heaps
-  # (ei, expr_heap) = readPtr exprPtr heaps.hp_expression_heap
-  # chn = {chn & chn_heaps = {heaps & hp_expression_heap = expr_heap}}
-  = case ei of
-      EI_LetType atys -> (map (\x -> x.at_type) atys, chn)
-      _               -> ([], chn)
-
-varIsTask :: BoundVar InhExpression -> Bool
-varIsTask bv inh
-  = case 'DM'.get bv.var_ident.id_name inh.inh_tyenv of
-      Nothing -> False
-      Just t  -> typeIsTask t
-
-varIsListOfTask :: BoundVar InhExpression -> Bool
-varIsListOfTask bv inh
-  = case 'DM'.get bv.var_ident.id_name inh.inh_tyenv of
-      Nothing -> False
-      Just t  -> typeIsListOfTask t
-
-exprToTCleanExpr :: Expression *ModuleEnv -> *(TCleanExpr, *ModuleEnv)
-exprToTCleanExpr (App app) menv
-  # ((_, args), menv) = dropAppContexts app menv
-  = case args of
-      [] = (PPCleanExpr app.app_symb.symb_ident.id_name, menv)
-      xs
-        # (tces, menv) = mapSt exprToTCleanExpr args menv
-        = (AppCleanExpr TNonAssoc app.app_symb.symb_ident.id_name tces, menv)
-exprToTCleanExpr expr menv
-  # (doc, menv) = ppExpression expr menv
-  = (PPCleanExpr (ppCompact doc), menv)
-
-mkBlueprint :: Expression InhExpression *ChnExpression -> *(SynExpression, *ChnExpression)
-mkBlueprint (App app) inh chn
-  # (idIsTask, chn) = symbIdentIsTask app.app_symb chn
-  | idIsTask
-    # ((ctxs, args), menv) = dropAppContexts app chn.chn_module_env
-    # chn                  = { chn & chn_module_env = menv }
-    = case appFunName app of
-        ">>="      -> mkBind      app ctxs args inh chn
-        ">>|"      -> mkBind      app ctxs args inh chn
-        "return"   -> mkReturn    app ctxs args inh chn
-        "@$"       -> mkTFunctor  app ctxs args inh chn
-        "tmap"     -> mkTFunctor  app ctxs args inh chn
-        "@:"       -> mkAssign    app ctxs args inh chn
-        ">>*"      -> mkStep      app ctxs args inh chn
-        "anyTask"  -> mkParSumN   app ctxs args inh chn
-        "-||-"     -> mkParSum2   app ctxs args inh chn
-        "||-"      -> mkParSumR   app ctxs args inh chn
-        "-||"      -> mkParSumL   app ctxs args inh chn
-        "allTasks" -> mkParProdN  app ctxs args inh chn
-        "-&&-"     -> mkParProd2  app ctxs args inh chn
-        _          -> mkTaskApp   app ctxs args inh chn
-  | otherwise
-      # (apptcle, menv) = exprToTCleanExpr (App app) chn.chn_module_env
-      # chn             = {chn & chn_module_env = menv}
-      = ({ syn_annot_expr = App app
-         , syn_texpr      = TCleanExpr [] apptcle
-         , syn_pattern_match_vars = []}, chn)
+mkBlueprint :: !Expression !InhExpression !*ChnExpression -> *(!SynExpression, !*ChnExpression)
+mkBlueprint (App app=:{app_symb}) inh chn
+  # (isTonicFunctor, chn) = symbIdentIsTask app.app_symb chn
+  # ((ctxs, args), menv)  = dropAppContexts app chn.chn_module_env
+  # chn                   = { chn & chn_module_env = menv }
+  | identIsLambda app_symb.symb_ident
+      # ((args, tFd), menv) = reifyArgsAndDef app_symb chn.chn_module_env
+      # (syne, chn)         = mkBlueprint (getFunRhs tFd) inh { chn & chn_module_env = menv }
+      # menv                = updateWithAnnot app_symb syne.syn_annot_expr chn.chn_module_env
+      = ( { syn_annot_expr = App app
+          , syn_texpr      = TLam [freeVarName x \\ x <- args | x.fv_def_level == -1] syne.syn_texpr
+          , syn_pattern_match_vars = []
+          }
+        , {chn & chn_module_env = menv})
+  | isTonicFunctor = mkMApp app ctxs args inh chn
+  | otherwise      = mkFApp app ctxs args inh chn
   where
-  mkBind app ctxs args inh chn
-    = withTwo app args f inh chn
-    where
-    f lhsExpr rhsExpr=:(App rhsApp) chn
-      # (synl, chnl)      = mkBlueprint lhsExpr (addInhId inh 0) chn
-      # (lbl, synr, chnr) = mkEdge rhsApp 1 inh chnl
-      = ({ syn_annot_expr = App { app & app_args = ctxs ++ [synl.syn_annot_expr, synr.syn_annot_expr] }
-         , syn_texpr      = TBind synl.syn_texpr lbl synr.syn_texpr
-         , syn_pattern_match_vars = synl.syn_pattern_match_vars ++ synr.syn_pattern_match_vars}, chnr)
-    f lhsExpr rhsExpr chn
-      # (synl, chn)  = mkBlueprint lhsExpr (addInhId inh 0) chn
-      # (synr, chn)  = mkBlueprint rhsExpr (addInhId inh 1) chn
-      = ({ syn_annot_expr = App { app & app_args = ctxs ++ [synl.syn_annot_expr, synr.syn_annot_expr] }
-         , syn_texpr      = TBind synl.syn_texpr Nothing synr.syn_texpr
-         , syn_pattern_match_vars = []}, chn)
-
-  mkReturn app ctxs [] inh chn
-    = ({ syn_annot_expr = App app
-       , syn_texpr      = TReturn inh.inh_ids (TCleanExpr [] (PPCleanExpr ""))
-       , syn_pattern_match_vars = []}, chn)
-  mkReturn app ctxs [expr:_] inh chn
-    # (syn, chn) = mkBlueprint expr (addInhId inh 0) chn
-    = ({ syn_annot_expr = App { app & app_args = ctxs ++ [syn.syn_annot_expr] }
-       , syn_texpr      = TReturn inh.inh_ids syn.syn_texpr
-       , syn_pattern_match_vars = []}, chn)
-
-  mkTFunctor app ctxs args inh chn
-    = withTwo app args f inh chn
-    where
-    f l=:(App {app_symb, app_args}) r chn
-      # (syn, chn)           = mkBlueprint r (addInhId inh 0) chn
-      # (ppl, menv)          = mapSt ppExpression app_args chn.chn_module_env
-      # ((funArgs, _), menv) = reifyArgsAndDef app_symb menv
-      # patId                = case drop (length app_args) [freeVarName x \\ x <- funArgs | x.fv_def_level == -1] of
-                                 []    -> []
-                                 [x:_] -> [x]
-      # chn                  = {chn & chn_module_env = menv}
-      = ({ syn_annot_expr = App {app & app_args = ctxs ++ [l, syn.syn_annot_expr]}
-         , syn_texpr      = TFunctor syn.syn_texpr app_symb.symb_ident.id_name (map ppCompact ppl ++ patId)
-         , syn_pattern_match_vars = syn.syn_pattern_match_vars}, chn)
-
-  mkAssign app ctxs args inh chn
-    = withTwo app args f inh chn
-    where
-    f u=:(App a) t chn
-      | a.app_symb.symb_ident ==
-        predefined_idents.[GetTupleConsIndex 2]
-          # (usr, str) = tupleExprToTuple u
-          = case usr of
-              App a
-                # (syn, chn) = mkBlueprint t (addInhId inh 0) chn
-                # menv       = chn.chn_module_env
-                # (tu, menv) = case (a.app_symb.symb_ident.id_name, a.app_args) of
-                                 ("AnyUser", _)
-                                   = (TUAnyUser, menv)
-                                 ("UserWithId", [uid:_])
-                                   # (ed, menv) = ppExpression uid menv
-                                   = (TUUserWithIdent (stringContents (ppCompact ed)), menv)
-                                 ("UserWithRole", [r:_])
-                                   # (rd, menv) = ppExpression r menv
-                                   = (TUUserWithRole (stringContents (ppCompact rd)), menv)
-                                 ("SystemUser", _)
-                                   = (TUSystemUser, menv)
-                                 ("AnonymousUser", _)
-                                   = (TUAnonymousUser, menv)
-                                 ("AuthenticatedUser", [uid:rs:_])
-                                   # (d, menv)    = ppExpression uid menv
-                                   # (rsds, menv) = mapSt ppExpression (listExprToList rs) menv
-                                   = (TUAuthenticatedUser (stringContents (ppCompact d)) (map (stringContents o ppCompact) rsds), menv)
-                                 (usr, _)
-                                   = (TUVariableUser usr, menv)
-                # chn        = {chn & chn_module_env = menv}
-                = ({ syn_annot_expr = App {app & app_args = ctxs ++ [u, syn.syn_annot_expr]}
-                   , syn_texpr      = TAssign tu (fromStatic str) syn.syn_texpr
-                   , syn_pattern_match_vars = syn.syn_pattern_match_vars}, chn)
-              expr = mkAssDef u usr (fromStatic str) t chn
-      | otherwise = mkAssDef u u "" t chn
-    f u t chn = mkAssDef u u "" t chn
-    mkAssDef lhs u str t chn
-      # (syn, chn)  = mkBlueprint t (addInhId inh 0) chn
-      # (ppu, menv) = ppExpression u chn.chn_module_env
-      # chn         = {chn & chn_module_env = menv}
-      # (app`, chn) = wrapTaskApp (App {app & app_args = ctxs ++ [lhs, syn.syn_annot_expr]}) inh chn
-      = ({ syn_annot_expr = app`
-         , syn_texpr      = TAssign (TUVariableUser (ppCompact ppu)) str syn.syn_texpr
-         , syn_pattern_match_vars = syn.syn_pattern_match_vars}, chn)
-
-  // TODO : Test
-  mkStep app ctxs args inh chn
-    = withTwo app args f inh chn
-    where
-    f l r chn
-      # (synl, chn) = mkBlueprint l (addInhId inh 0) chn
-      = case r of
-          (arg=:(App _))
-            | exprIsListConstr arg
-                # exprs              = fromStatic arg
-                // TODO FIXME : RHS of step is not updated properly
-                # (scs, aes, chn, _) = let f e=:(App a=:{app_args=[App btnOrCont:asTl]}) (scs, aes, chn, n)
-                                             | appFunName a == "OnAction"
-                                             # [App contApp:_]     = asTl // TODO Bah
-                                             # (sf, contApp`, chn) = mkStepCont contApp n chn
-                                             # action              = extractAction btnOrCont
-                                             = ([StepOnAction (stringContents action) sf:scs], [App {a & app_args = [App btnOrCont, App contApp`]} : aes], chn, n + 1)
-                                             | appFunName a == "OnValue"
-                                             # (sf, btnOrCont`, chn)  = mkStepCont btnOrCont n chn
-                                             = ([StepOnValue sf:scs], [App {a & app_args = [App btnOrCont`]} : aes], chn, n + 1)
-                                             | appFunName a == "OnException"
-                                             # (lbl, syn, chn) = mkEdge btnOrCont n inh chn
-                                             = ([StepOnException lbl syn.syn_texpr:scs], [App {a & app_args = [syn.syn_annot_expr]} : aes], chn, n + 1)
-                                             | appFunName a == "OnAllExceptions"
-                                             # (lbl, syn, chn) = mkEdge btnOrCont n inh chn
-                                             = ([StepOnException lbl syn.syn_texpr:scs], [App {a & app_args = [syn.syn_annot_expr]} : aes], chn, n + 1)
-                                           f _ (scs, aes, chn, n) = (scs, aes, chn, n + 1)
-                                       in  foldr f ([], [], chn, 1) exprs
-                # (stArgs, pdss) = toStatic aes chn.chn_predef_symbols
-                = ({syn_annot_expr = App {app & app_args = ctxs ++ [synl.syn_annot_expr, stArgs]}
-                  , syn_texpr      = TStep synl.syn_texpr (map T scs)
-                  , syn_pattern_match_vars = synl.syn_pattern_match_vars}
-                  , {chn & chn_predef_symbols = pdss})
-            | otherwise = doPP synl chn arg
-          (arg=:(Var _)) = doPP synl chn arg
-      where
-      doPP synl chn arg
-        # (doc, menv) = ppExpression arg chn.chn_module_env
-        # ppStr       = ppCompact doc
-        # chn         = {chn & chn_module_env = menv}
-        = ({syn_annot_expr = App {app & app_args = ctxs ++ [synl.syn_annot_expr, arg]}
-          , syn_texpr      = TStep synl.syn_texpr [PP ppStr]
-          , syn_pattern_match_vars = []}, chn)
-    extractAction app=:{app_args=[BasicExpr (BVS str):_]}
-      | app.app_symb.symb_ident.id_name == "Action" = str
-    extractAction _ = "(no action)"
-    mkStepCont contApp n chn =
-      case (appFunName contApp, contApp.app_args) of
-      // TODO FIXME Get rid of copy/paste job
-        ("ifValue", [e1=:((App fApp) @ fAppArgs):(App tApp):_])
-          # ((_, fAppArgs), menv)     = dropAppContexts fApp chn.chn_module_env
-          # (ppFAppArgs, menv)        = mapSt ppExpression fAppArgs menv
-          # ((fArgFunArgs, _), menv)  = reifyArgsAndDef fApp.app_symb menv
-          # remFArgs                  = drop (length fAppArgs) fArgFunArgs
-          # ((ppHdRemFArgs, ppTlRemFArgs), menv) = case remFArgs of
-                                                     [x:xs]
-                                                       # (ppHdRemFArgs, menv) = ppFreeVar x menv
-                                                       # (ppTlRemFArgs, menv) = mapSt ppFreeVar xs menv
-                                                       = ((ppHdRemFArgs, ppTlRemFArgs), menv)
-                                                     _ = (('PPrint'.text "FIXME", ['PPrint'.text "FIXME"]), menv)
-          # (lbl, syn, chn)           = mkEdge tApp n inh {chn & chn_module_env = menv}
-          = (IfValue (PPCleanExpr (ppCompact ppHdRemFArgs)) fApp.app_symb.symb_ident.id_name
-              (map ppCompact (ppFAppArgs ++ [ppHdRemFArgs:ppTlRemFArgs])) lbl syn.syn_texpr
-            , {contApp & app_args = [e1, syn.syn_annot_expr]}, chn)
-        ("ifValue", [(App fApp):(App tApp):_])
-          # ((_, fAppArgs), menv)     = dropAppContexts fApp chn.chn_module_env
-          # (ppFAppArgs, menv)        = mapSt ppExpression fAppArgs menv
-          # ((fArgFunArgs, _), menv)  = reifyArgsAndDef fApp.app_symb menv
-          # remFArgs                  = drop (length fAppArgs) fArgFunArgs
-          # ((ppHdRemFArgs, ppTlRemFArgs), menv) = case remFArgs of
-                                                     [x:xs]
-                                                       # (ppHdRemFArgs, menv) = ppFreeVar x menv
-                                                       # (ppTlRemFArgs, menv) = mapSt ppFreeVar xs menv
-                                                       = ((ppHdRemFArgs, ppTlRemFArgs), menv)
-                                                     _ = (('PPrint'.text "FIXME", ['PPrint'.text "FIXME"]), menv)
-          # (lbl, syn, chn)           = mkEdge tApp n inh {chn & chn_module_env = menv}
-          = (IfValue (PPCleanExpr (ppCompact ppHdRemFArgs)) fApp.app_symb.symb_ident.id_name
-              (map ppCompact (ppFAppArgs ++ [ppHdRemFArgs:ppTlRemFArgs])) lbl syn.syn_texpr
-            , {contApp & app_args = [App fApp, syn.syn_annot_expr]}, chn)
-        ("hasValue", [(App tApp):_])
-          # (lbl, syn, chn) = mkEdge tApp n inh chn
-          = (HasValue lbl syn.syn_texpr, {contApp & app_args = [syn.syn_annot_expr]}, chn)
-        ("ifStable", [(App tApp):_])
-          # (lbl, syn, chn) = mkEdge tApp n inh chn
-          = (IfStable lbl syn.syn_texpr, {contApp & app_args = [syn.syn_annot_expr]}, chn)
-        ("ifUnstable", [(App tApp):_])
-          # (lbl, syn, chn) = mkEdge tApp n inh chn
-          = (IfUnstable lbl syn.syn_texpr, {contApp & app_args = [syn.syn_annot_expr]}, chn)
-        ("ifCond", [cond:(App tApp):_])
-          # (lbl, syn, chn)     = mkEdge tApp n inh chn
-          # (d, menv)           = ppExpression cond chn.chn_module_env
-          = (IfCond (ppCompact d) lbl syn.syn_texpr, {contApp & app_args = [cond, syn.syn_annot_expr]}, { chn & chn_module_env = menv })
-        ("always", [x:_])
-          # (syn, chn) = mkBlueprint x (addInhId inh n) chn
-          = (Always syn.syn_texpr, {contApp & app_args = [syn.syn_annot_expr]}, chn)
-        ("withoutValue", [x:_])
-          # (syn, chn) = mkBlueprint x (addInhId inh n) chn
-          = (WithoutValue syn.syn_texpr, {contApp & app_args = [syn.syn_annot_expr]}, chn)
-        ("withValue", [(App tApp):_])
-          # (lbl, syn, chn) = mkEdge tApp n inh chn
-          = (WithValue lbl syn.syn_texpr, {contApp & app_args = [syn.syn_annot_expr]}, chn)
-        ("withStable", [(App tApp):_])
-          # (lbl, syn, chn) = mkEdge tApp n inh chn
-          = (WithStable lbl syn.syn_texpr, {contApp & app_args = [syn.syn_annot_expr]}, chn)
-        ("withUnstable", [(App tApp):_])
-          # (lbl, syn, chn) = mkEdge tApp n inh chn
-          = (WithUnstable lbl syn.syn_texpr, {contApp & app_args = [syn.syn_annot_expr]}, chn)
-        (fn, _)
-          = (CustomFilter fn, contApp, chn)
-
-  mkTaskApp app ctxs args inh chn
+  mkMApp app ctxs args inh chn
     # (dclnm, menv) = case reifyDclModule app.app_symb chn.chn_module_env of
                         (Just dcl, menv) = (dcl.dcl_name.id_name, menv)
                         (_       , menv)
                           # (iclmod, menv) = menv!me_icl_module
                           = (iclmod.icl_name.id_name, menv)
-    # (ps, menv)    = mapSt exprToTCleanExpr args menv
+    # (mst, menv)   = reifySymbIdentSymbolType app.app_symb menv
+    # mTyStr        = case mst of
+                        Just st -> symTy st
+                        _       -> Nothing
     # chn           = {chn & chn_module_env = menv}
-    # (app`, chn)   = wrapTaskApp (App app) inh chn
+    # (ps, chn)     = mapSt (\(n, arg) -> mkBlueprint arg (addInhId inh n)) (zip2 [0..] args) chn
+    # (app`, chn)   = wrapTaskApp (App {app & app_args = map (\syn -> syn.syn_annot_expr) ps}) inh chn
     = ({ syn_annot_expr = app`
-       , syn_texpr      = TTaskApp inh.inh_ids dclnm (appFunName app) (map (TCleanExpr []) ps)
+       , syn_texpr      = TMApp inh.inh_ids mTyStr dclnm (appFunName app) (map (\syn -> syn.syn_texpr) ps)
        , syn_pattern_match_vars = []}, chn)
-
-  mkParSumN = mkParN ParSumN
-
-  mkParSum2 = mkParBin (\l r -> ParSumN (T [l, r]))
-
-  mkParSumR = mkParBin ParSumR
-
-  mkParSumL = mkParBin ParSumL
-
-  mkParProdN = mkParN ParProd
-
-  mkParProd2 = mkParBin (\l r -> ParProd (T [l, r]))
-
-  mkParBin mkPar app ctxs args inh chn
-    = withTwo app args f inh chn
     where
-    f l r chn
-      # (synl, chnl) = mkBlueprint l (addInhId inh 0) chn
-      # (synr, chnr) = mkBlueprint r (addInhId inh 1) chnl
-      = ( { syn_annot_expr = App {app & app_args = ctxs ++ [synl.syn_annot_expr, synr.syn_annot_expr]}
-          , syn_texpr      = TParallel inh.inh_ids (mkPar synl.syn_texpr synr.syn_texpr)
-          , syn_pattern_match_vars = synl.syn_pattern_match_vars ++ synr.syn_pattern_match_vars }
-        , chnr)
+    symTy {st_result = {at_type}} = symTy` at_type
+    symTy` (TA tsi _)    = Just tsi.type_ident.id_name
+    symTy` (TAS tsi _ _) = Just tsi.type_ident.id_name
+    symTy` (_ --> t)     = symTy` t.at_type
+    symTy` (TFA _ t)     = symTy` t
+    symTy` (TFAC _ t _)  = symTy` t
+    symTy` _             = Nothing
 
-  mkParN mkPar app ctxs args inh chn
-    = case args of
-        [arg=:(App _)]
-          | exprIsListConstr arg
-            # exprs        = fromStatic arg
-            # (ss, _, chn) = let f e (ss, n, chn)
-                                  # (syn, chn) = mkBlueprint e (addInhId inh n) chn
-                                  = ([syn:ss], n + 1, chn)
-                             in  foldr f ([], 0, chn) exprs
-            # (listArg, pdss) = toStatic (map (\s -> s.syn_annot_expr) ss) chn.chn_predef_symbols
-            # (app, chn)  = wrapParallelN (App {app & app_args = [listArg]}) inh {chn & chn_predef_symbols = pdss} // TODO  Should this stay?
-            = ( { syn_annot_expr = app
-                , syn_texpr      = TParallel inh.inh_ids (mkPar (T (map (\s -> s.syn_texpr) ss)))
-                , syn_pattern_match_vars = foldr (\syn acc -> syn.syn_pattern_match_vars ++ acc) [] ss}
-              , chn)
-          | otherwise // Is regular function application
-              # (doc, menv) = ppExpression arg chn.chn_module_env
-              # ppStr       = ppCompact doc
-              # chn         = {chn & chn_module_env = menv}
-              # (app, chn)  = wrapParallelN (App app) inh chn
-              = ({ syn_annot_expr = app
-                 , syn_texpr      = TParallel inh.inh_ids (mkPar (PP ppStr))
-                 , syn_pattern_match_vars = []}, chn)
-        [arg=:(Var _)]
-          # (doc, menv) = ppExpression arg chn.chn_module_env
-          # ppStr       = ppCompact doc
-          # chn         = {chn & chn_module_env = menv}
-          # (app, chn)  = wrapParallelN (App app) inh chn
-          = ({ syn_annot_expr = app
-             , syn_texpr      = TParallel inh.inh_ids (mkPar (PP ppStr))
-             , syn_pattern_match_vars = []}, chn)
-        _ = abort "mkParN args fallthrough; shouldn't happen"
+  mkFApp app ctxs args inh chn
+    # (mFunTy, menv) = reifyFunType app.app_symb chn.chn_module_env
+    # (ps, chn)      = mapSt (\arg -> mkBlueprint arg inh) args {chn & chn_module_env = menv}
+    # assoc          = case mFunTy of
+                         Just {ft_priority = Prio assoc n} -> case assoc of
+                                                                LeftAssoc  -> TLeftAssoc n
+                                                                RightAssoc -> TRightAssoc n
+                                                                NoAssoc    -> TNonAssoc
+                         _ -> TNonAssoc
+    = ({ syn_annot_expr = App {app & app_args = ctxs ++ map (\syn -> syn.syn_annot_expr) ps}
+       , syn_texpr      = TFApp assoc (appFunName app) (map (\syn -> syn.syn_texpr) ps)
+       , syn_pattern_match_vars = []}, chn)
 
   // Transformation for higher-order function application
   // E.g. f g x = g x becomes f = g @ x
@@ -541,20 +258,32 @@ mkBlueprint (e=:(App app) @ es) inh chn
       # letargs       = drop (length app.app_args) (getFunArgs fd)
       # (binds, menv) = zipWithSt zwf letargs es menv
       # chn           = { chn & chn_module_env = menv }
-      # (syne, chn)   = mkBlueprint (getFunRhs fd) (addInhId inh 0) chn
+      //# (syne, chn)   = mkBlueprint (getFunRhs fd) (addInhId inh 0) chn
+      # (syne, chn)   = mkBlueprint (getFunRhs fd) inh chn
       # menv          = updateWithAnnot app.app_symb syne.syn_annot_expr chn.chn_module_env
       # chn           = { chn & chn_module_env = menv}
       = ({ syn_annot_expr = e @ es
-         , syn_texpr      = TVar [] "TODO @"
+         , syn_texpr      = TLit "TODO @"
          , syn_pattern_match_vars = syne.syn_pattern_match_vars}, chn)
-  | otherwise    =  abort "atC: otherwise case" // TODO : pretty print function application
+  | otherwise
+      # (mFunTy, menv) = reifyFunType app.app_symb chn.chn_module_env
+      # assoc          = case mFunTy of
+                           Just {ft_priority = Prio assoc n} -> case assoc of
+                                                                  LeftAssoc  -> TLeftAssoc n
+                                                                  RightAssoc -> TRightAssoc n
+                                                                  NoAssoc    -> TNonAssoc
+                           _ -> TNonAssoc
+      # (es`, chn)     = mapSt (\arg -> mkBlueprint arg inh) es {chn & chn_module_env = menv}
+      = ({ syn_annot_expr = e @ (map (\x -> x.syn_annot_expr) es`)
+         , syn_texpr      = TFApp assoc app.app_symb.symb_ident.id_name (map (\x -> x.syn_texpr) es`)
+         , syn_pattern_match_vars = []}, chn)
   where
     zwf eVar eVal menv
       # (fvl, menv) = ppFreeVar eVar menv
       # (fvr, menv) = ppExpression eVal menv
       = ((ppCompact fvl, ppCompact fvr), menv)
 mkBlueprint (e @ es) _ chn = ({ syn_annot_expr = e @ es
-                              , syn_texpr      = TVar [] "TODO @"
+                              , syn_texpr      = TLit "TODO @"
                               , syn_pattern_match_vars = []}, chn)
 mkBlueprint (Let lt) inh chn
   # mexpr = listToMaybe [ bnd.lb_src \\ bnd <- getLetBinds lt
@@ -579,21 +308,29 @@ mkBlueprint (Let lt) inh chn
     # l          = {lt & let_expr = syn.syn_annot_expr}
     = ({syn & syn_annot_expr = Let l}, chn)
   mkLet Nothing lt inh chn
-    # (tys, chn)    = letTypes lt.let_info_ptr chn
-    # (binds, menv) = flattenBinds lt chn.chn_module_env
-    # tyenv         = zipSt (\(PPCleanExpr v, _) t tyenv -> 'DM'.put v t tyenv) binds tys inh.inh_tyenv // TODO This probably won't work for arbitrary patterns, so we actually need to be a bit smarter here and extract all variables from the patterns, instead of just PP'ing the pattern and using that as index
-    // TODO : Represent the bindings in any way possible, not just PP
-    # (syn, chn)    = mkBlueprint lt.let_expr (addInhId {inh & inh_tyenv = tyenv} 0) {chn & chn_module_env = menv}
+    # (tys, chn)   = letTypes lt.let_info_ptr chn
+    # (binds, chn) = flattenBinds lt chn
+    # tyenv        = zipSt (\(TLit v, _) t tyenv -> 'DM'.put v t tyenv) binds tys inh.inh_tyenv // TODO This probably won't work for arbitrary patterns, so we actually need to be a bit smarter here and extract all variables from the patterns, instead of just PP'ing the pattern and using that as index
+    # (syn, chn)   = mkBlueprint lt.let_expr (addInhId {inh & inh_tyenv = tyenv} 0) chn
     = ({ syn_annot_expr = Let {lt & let_expr = syn.syn_annot_expr}
        , syn_texpr      = TLet binds syn.syn_texpr
        , syn_pattern_match_vars = syn.syn_pattern_match_vars}, chn)
     where
-    flattenBinds lt menv
-      = foldrSt f (getLetBinds lt) ([], menv)
+    letTypes :: ExprInfoPtr *ChnExpression -> *([Type], *ChnExpression)
+    letTypes exprPtr chn
+      # heaps = chn.chn_heaps
+      # (ei, expr_heap) = readPtr exprPtr heaps.hp_expression_heap
+      # chn = {chn & chn_heaps = {heaps & hp_expression_heap = expr_heap}}
+      = case ei of
+          EI_LetType atys -> (map (\x -> x.at_type) atys, chn)
+          _               -> ([], chn)
+
+    flattenBinds lt chn
+      = foldrSt f (getLetBinds lt) ([], chn)
       where
-      f bnd (xs, menv)
-        # (rhs, menv) = exprToTCleanExpr bnd.lb_src menv
-        = ([(PPCleanExpr bnd.lb_dst.fv_ident.id_name, TCleanExpr [] rhs):xs], menv)
+      f bnd (xs, chn)
+        # (rhs, chn) = mkBlueprint bnd.lb_src inh chn
+        = ([(TLit bnd.lb_dst.fv_ident.id_name, rhs.syn_texpr):xs], chn)
    getLetBinds lt = lt.let_strict_binds ++ lt.let_lazy_binds
   // TODO: For cases, the compiler introduces a fresh variable in a let for the
   // matches expression. E.g.
@@ -622,26 +359,26 @@ mkBlueprint (Case cs) inh chn
   # chn        = {chn & chn_module_env = menv}
   = case (ppCompact ed, cs.case_expr, cs.case_guards) of
       ("_x", Var bv, AlgebraicPatterns gi [ap])
-        # (syn, chn)   = mkAlts` 0 ap.ap_expr chn
-        # (fvds, menv) = mapSt (exprToTCleanExpr o FreeVar) ap.ap_vars chn.chn_module_env
-        # clexpr       = case fvds of
-                           []   -> PPCleanExpr ""
-                           args -> AppCleanExpr TNonAssoc ap.ap_symbol.glob_object.ds_ident.id_name args // TODO Associativity
+        # (syn, chn)  = mkAlts` 0 ap.ap_expr chn
+        # (fvds, chn) = mapSt (\x chn -> mkBlueprint (FreeVar x) inh chn) ap.ap_vars chn
+        # clexpr      = case fvds of
+                          []   -> TLit ""
+                          args -> TFApp TNonAssoc ap.ap_symbol.glob_object.ds_ident.id_name (map (\x -> x.syn_texpr) args) // TODO Associativity
         = ({ syn_annot_expr = Case {cs & case_guards = AlgebraicPatterns gi [{ap & ap_expr = syn.syn_annot_expr}]}
            , syn_texpr      = syn.syn_texpr
-           , syn_pattern_match_vars = [(bv, clexpr) : syn.syn_pattern_match_vars]}, {chn & chn_module_env = menv})
+           , syn_pattern_match_vars = [(bv, clexpr) : syn.syn_pattern_match_vars]}, chn)
       _
         # ((guards, syns), chn) = mkAlts cs.case_guards chn
         # ((def, syns), chn)    = case cs.case_default of
                                     Yes def
                                       # (syn, chn) = mkAlts` (numGuards cs.case_guards) def chn
                                       = case syns of
-                                          [(PPCleanExpr "True", _)]
-                                            = ((Yes syn.syn_annot_expr, [(PPCleanExpr "False", syn):syns]), chn)
-                                          _ = ((Yes syn.syn_annot_expr, [(PPCleanExpr "_", syn):syns]), chn)
+                                          [(TVar _ "True", _)]
+                                            = ((Yes syn.syn_annot_expr, [(TLit "False", syn):syns]), chn)
+                                          _ = ((Yes syn.syn_annot_expr, [(TLit "_", syn):syns]), chn)
                                     _ = ((No, syns), chn)
         = ({ syn_annot_expr = Case {cs & case_default = def, case_guards = guards}
-           , syn_texpr      = TCaseOrIf (TCleanExpr [] (PPCleanExpr (ppCompact ed))) (map (\(d, s) -> (d, s.syn_texpr)) syns)
+           , syn_texpr      = TCaseOrIf (TVar [] (ppCompact ed)) (map (\(d, s) -> (d, s.syn_texpr)) syns)
            , syn_pattern_match_vars = foldr (\(_, syn) acc -> syn.syn_pattern_match_vars ++ acc) [] syns}, chn)
   where
   numGuards (AlgebraicPatterns _ ps)        = length ps
@@ -655,18 +392,16 @@ mkBlueprint (Case cs) inh chn
     = ((AlgebraicPatterns gi aps, syns), chn)
     where
       f ap ((aps, syns, n), chn)
-        # menv        = chn.chn_module_env
-        # (apd, menv) = mkAp ap.ap_symbol ap.ap_vars menv
-        # chn         = {chn & chn_module_env = menv}
-        # (syn, chn)  = mkAlts` n ap.ap_expr chn
-        # ap          = {ap & ap_expr = syn.syn_annot_expr}
+        # (apd, chn) = mkAp ap.ap_symbol ap.ap_vars chn
+        # (syn, chn) = mkAlts` n ap.ap_expr chn
+        # ap         = {ap & ap_expr = syn.syn_annot_expr}
         = (([ap:aps], [(apd, syn):syns], n + 1), chn)
         where
-        mkAp sym []   menv = (PPCleanExpr (ppCompact ('PPrint'.text sym.glob_object.ds_ident.id_name)), menv)
-        mkAp sym vars menv
-          # (fvds, menv) = mapSt (exprToTCleanExpr o FreeVar) vars menv
+        mkAp sym []   chn = (TLit (ppCompact ('PPrint'.text sym.glob_object.ds_ident.id_name)), chn)
+        mkAp sym vars chn
+          # (fvds, chn) = mapSt (\x chn -> mkBlueprint (FreeVar x) inh chn) vars chn
           // TODO TNonAssoc?
-          = (AppCleanExpr TNonAssoc (ppCompact ('PPrint'.text sym.glob_object.ds_ident.id_name)) fvds, menv)
+          = (TFApp TNonAssoc (ppCompact ('PPrint'.text sym.glob_object.ds_ident.id_name)) (map (\x -> x.syn_texpr) fvds), chn)
   mkAlts c=:(BasicPatterns bt bps) chn
     # ((bps, syns, _), chn) = foldr f (([], [], 0), chn) bps
     = ((BasicPatterns bt bps, syns), chn)
@@ -674,7 +409,7 @@ mkBlueprint (Case cs) inh chn
       f bp ((bps, syns, n), chn)
         # (syn, chn)  = mkAlts` n bp.bp_expr chn
         # bp          = {bp & bp_expr = syn.syn_annot_expr}
-        = (([bp:bps], [(PPCleanExpr (ppCompact (ppBasicValue bp.bp_value)), syn):syns], n + 1), chn)
+        = (([bp:bps], [(TLit (ppCompact (ppBasicValue bp.bp_value)), syn):syns], n + 1), chn)
   mkAlts c chn = ((c, []), chn)
 
   mkAlts` :: Int Expression *ChnExpression -> *(SynExpression, *ChnExpression)
@@ -692,43 +427,94 @@ mkBlueprint (Var bv) inh chn
       = ({ syn_annot_expr = Var bv
          , syn_texpr      = TVar [] bv.var_ident.id_name
          , syn_pattern_match_vars = []}, chn)
+  where
+  varIsTask :: BoundVar InhExpression -> Bool
+  varIsTask bv inh
+    = case 'DM'.get bv.var_ident.id_name inh.inh_tyenv of
+        Nothing -> False
+        Just t  -> typeIsTask t
+
+mkBlueprint expr=:(FreeVar fv) _ chn
+  = ({ syn_annot_expr = expr
+     , syn_texpr      = TVar [] fv.fv_ident.id_name
+     , syn_pattern_match_vars = []}, chn)
 mkBlueprint expr=:(BasicExpr bv) _ chn
   = ({ syn_annot_expr = expr
-     , syn_texpr      = TCleanExpr [] (PPCleanExpr (ppCompact (ppBasicValue bv)))
+     , syn_texpr      = TLit (ppCompact (ppBasicValue bv))
      , syn_pattern_match_vars = []}, chn)
-mkBlueprint expr _ chn = ({ syn_annot_expr = expr
-                          , syn_texpr      = TCleanExpr [] (PPCleanExpr "(mkBlueprint fallthrough)")
+mkBlueprint expr=:(Selection st selExpr sels) inh chn
+  # (syn, chn)      = mkBlueprint selExpr inh chn
+  # (selExprs, chn) = mapSt (mkSelExprs) sels chn
+  = ({ syn_annot_expr = Selection st selExpr sels
+     , syn_texpr      = TSel syn.syn_texpr selExprs
+     , syn_pattern_match_vars = []}, chn)
+  where
+  mkSelExprs (RecordSelection gds _) chn
+    # (d, menv) = ppDefinedSymbol gds.glob_object chn.chn_module_env
+    = (TLit (ppCompact d), {chn & chn_module_env = menv})
+  mkSelExprs (ArraySelection gds _ e) chn // TODO use e
+    # (d, menv) = ppDefinedSymbol gds.glob_object chn.chn_module_env
+    = (TLit (ppCompact d), {chn & chn_module_env = menv})
+  mkSelExprs (DictionarySelection bv sels _ e) chn
+    = (TLit "TODO mkSelExprs DictionarySelection ", chn)
+mkBlueprint expr=:(Update _ _ _) _ chn = ({ syn_annot_expr = expr
+                          , syn_texpr      = TLit "(mkBlueprint Update fallthrough)"
                           , syn_pattern_match_vars = []}, chn)
-
-mkEdge :: App Int InhExpression *ChnExpression -> *(Maybe TCleanExpr, SynExpression, *ChnExpression)
-mkEdge app=:{app_symb, app_args} n inh chn
-  # (siIsTask, chn) = symbIdentIsTask app_symb chn
-  | identIsLambda app_symb.symb_ident
-    # ((args, tFd), menv) = reifyArgsAndDef app_symb chn.chn_module_env
-    # patid               = last [freeVarName x \\ x <- args | x.fv_def_level == -1]
-    # (syne, chn)         = mkBlueprint (getFunRhs tFd) (addInhId inh n) { chn & chn_module_env = menv }
-    # menv                = updateWithAnnot app_symb syne.syn_annot_expr chn.chn_module_env
-    = (Just (PPCleanExpr patid), {syne & syn_annot_expr = App app}, {chn & chn_module_env = menv})
-  | siIsTask
-    # ((args, tFd), menv) = reifyArgsAndDef app_symb chn.chn_module_env
-    # (lbl, menv) = case drop (length app_args) args of
-                      [] = (Nothing, menv)
-                      [x:_]
-                        # (d, menv) = ppFreeVar x menv
-                        = (Just (PPCleanExpr (ppCompact d)), menv)
-    # (syn, chn)  = mkBlueprint (App app) (addInhId inh n) {chn & chn_module_env = menv}
-    = (lbl, syn, chn)
-  | otherwise
-    # (d, menv) = ppApp app chn.chn_module_env
-    = (Nothing
-      , { syn_annot_expr = App app
-        , syn_texpr      = TVar [] (ppCompact d)
-        , syn_pattern_match_vars = []}
-      , {chn & chn_module_env = menv})
+mkBlueprint expr=:(RecordUpdate _ _ _) _ chn = ({ syn_annot_expr = expr
+                          , syn_texpr      = TLit "(mkBlueprint RecordUpdate fallthrough)"
+                          , syn_pattern_match_vars = []}, chn)
+mkBlueprint expr=:(TupleSelect _ _ _) _ chn = ({ syn_annot_expr = expr
+                          , syn_texpr      = TLit "(mkBlueprint TupleSelect fallthrough)"
+                          , syn_pattern_match_vars = []}, chn)
+mkBlueprint expr=:(Conditional _) _ chn = ({ syn_annot_expr = expr
+                          , syn_texpr      = TLit "(mkBlueprint Conditional fallthrough)"
+                          , syn_pattern_match_vars = []}, chn)
+mkBlueprint expr=:(AnyCodeExpr _ _ _) _ chn = ({ syn_annot_expr = expr
+                          , syn_texpr      = TLit "(mkBlueprint AnyCodeExpr fallthrough)"
+                          , syn_pattern_match_vars = []}, chn)
+mkBlueprint expr=:(ABCCodeExpr _ _) _ chn = ({ syn_annot_expr = expr
+                          , syn_texpr      = TLit "(mkBlueprint ABCCodeExpr fallthrough)"
+                          , syn_pattern_match_vars = []}, chn)
+mkBlueprint expr=:(MatchExpr _ _) _ chn = ({ syn_annot_expr = expr
+                          , syn_texpr      = TLit "(mkBlueprint MatchExpr fallthrough)"
+                          , syn_pattern_match_vars = []}, chn)
+mkBlueprint expr=:(IsConstructor _ _ _ _ _ _) _ chn = ({ syn_annot_expr = expr
+                          , syn_texpr      = TLit "(mkBlueprint IsConstructor fallthrough)"
+                          , syn_pattern_match_vars = []}, chn)
+mkBlueprint expr=:(DictionariesFunction _ _ _) _ chn = ({ syn_annot_expr = expr
+                          , syn_texpr      = TLit "(mkBlueprint DictionariesFunction fallthrough)"
+                          , syn_pattern_match_vars = []}, chn)
+mkBlueprint expr=:(Constant _ _ _) _ chn = ({ syn_annot_expr = expr
+                          , syn_texpr      = TLit "(mkBlueprint Constant fallthrough)"
+                          , syn_pattern_match_vars = []}, chn)
+mkBlueprint expr=:(ClassVariable _) _ chn = ({ syn_annot_expr = expr
+                          , syn_texpr      = TLit "(mkBlueprint ClassVariable fallthrough)"
+                          , syn_pattern_match_vars = []}, chn)
+mkBlueprint expr=:(DynamicExpr _) _ chn = ({ syn_annot_expr = expr
+                          , syn_texpr      = TLit "(mkBlueprint DynamicExpr fallthrough)"
+                          , syn_pattern_match_vars = []}, chn)
+mkBlueprint expr=:(TypeCodeExpression _) _ chn = ({ syn_annot_expr = expr
+                          , syn_texpr      = TLit "(mkBlueprint TypeCodeExpression fallthrough)"
+                          , syn_pattern_match_vars = []}, chn)
+mkBlueprint expr=:(TypeSignature _ _) _ chn = ({ syn_annot_expr = expr
+                          , syn_texpr      = TLit "(mkBlueprint TypeSignature fallthrough)"
+                          , syn_pattern_match_vars = []}, chn)
+mkBlueprint expr=:EE _ chn = ({ syn_annot_expr = expr
+                          , syn_texpr      = TLit "(mkBlueprint EE fallthrough)"
+                          , syn_pattern_match_vars = []}, chn)
+mkBlueprint expr=:(NoBind _) _ chn = ({ syn_annot_expr = expr
+                          , syn_texpr      = TLit "(mkBlueprint NoBind fallthrough)"
+                          , syn_pattern_match_vars = []}, chn)
+mkBlueprint expr=:(FailExpr _) _ chn = ({ syn_annot_expr = expr
+                          , syn_texpr      = TLit "(mkBlueprint FailExpr fallthrough)"
+                          , syn_pattern_match_vars = []}, chn)
+mkBlueprint expr _ chn = ({ syn_annot_expr = expr
+                          , syn_texpr      = TLit "(mkBlueprint fallthrough)"
+                          , syn_pattern_match_vars = []}, chn)
 
 // TODO Relate the match_vars from the body to the vars from the arguments
 funToGraph :: FunDef FunDef [(String, ParsedExpr)] !{#{!InstanceTree}} !{#CommonDefs} InhExpression *ChnExpression
-           -> *(Maybe ([(TCleanExpr, TCleanExpr)], TExpr, Expression), *ChnExpression)
+           -> *(Maybe ([(TExpr, TExpr)], TExpr, Expression), *ChnExpression)
 funToGraph fd=:{fun_ident=fun_ident, fun_body = TransformedBody tb} fd_cpy list_comprehensions instance_tree common_defs inh chn = mkBody
   where
   mkBody
@@ -740,8 +526,8 @@ funToGraph fd=:{fun_ident=fun_ident, fun_body = TransformedBody tb} fd_cpy list_
     = case arg.fv_ident.id_name of
         "_x"
           = case [clexpr \\ (bv, clexpr) <- pmvars | bv.var_info_ptr == arg.fv_info_ptr] of
-              []    -> PPCleanExpr "(shouldn't happen)"
+              []    -> TLit "(shouldn't happen)"
               [x:_] -> x
         idnm
-          = PPCleanExpr idnm
+          = TVar [] idnm
 funToGraph _ _ _ _ _ _ chn = (Nothing, chn)

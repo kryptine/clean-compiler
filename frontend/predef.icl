@@ -255,7 +255,6 @@ predefined_idents
                     [PD_iTasks_Framework_Tonic] = i "iTasks._Framework.Tonic",
                     [PD_iTasks_Framework_Generic] = i "iTasks._Framework.Generic",
                     [PD_iTasks_API_Core_Types] = i "iTasks.API.Core.Types",
-                    [PD_tonicWrapParallel] = i "tonicWrapParallel",
                     [PD_tonicWrapApp]      = i "tonicWrapApp",
                     [PD_tonicWrapTaskBody] = i "tonicWrapTaskBody",
                     [PD_tonicWrapAppLam1] = i "tonicWrapAppLam1",
@@ -414,7 +413,6 @@ where
 					<<- (local_predefined_idents,	IC_Module NoQualifiedIdents, PD_iTasks_Framework_Tonic)
 					<<- (local_predefined_idents,	IC_Module NoQualifiedIdents, PD_iTasks_Framework_Generic)
 					<<- (local_predefined_idents,	IC_Module NoQualifiedIdents, PD_iTasks_API_Core_Types)
-					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapParallel)
 					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapApp)
 					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapTaskBody)
 					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapAppLam1)

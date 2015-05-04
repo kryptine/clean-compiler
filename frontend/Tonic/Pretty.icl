@@ -168,12 +168,12 @@ ppBasicValue (BVS   str) = text str
 
 ppSelection :: Selection *ModuleEnv -> *(Doc, *ModuleEnv)
 ppSelection (RecordSelection gds n)             menv = ppDefinedSymbol gds.glob_object menv
-ppSelection (ArraySelection gds einf e)         menv = (text "TODO: ArraySelection", menv)
+ppSelection (ArraySelection gds einf e)         menv = ppDefinedSymbol gds.glob_object menv // TODO use e
 ppSelection (DictionarySelection bv ss einf e)  menv = (text" TODO: DictionarySelection", menv)
 
 ppDebugSelection :: Selection *ModuleEnv -> *(Doc, *ModuleEnv)
 ppDebugSelection (RecordSelection gds n)             menv = ppDefinedSymbol gds.glob_object menv
-ppDebugSelection (ArraySelection gds einf e)         menv = (text "TODO: ArraySelection", menv)
+ppDebugSelection (ArraySelection gds einf e)         menv = ppDefinedSymbol gds.glob_object menv // TODO use e
 ppDebugSelection (DictionarySelection bv ss einf e)  menv = (text" TODO: DictionarySelection", menv)
 
 ppDefinedSymbol :: DefinedSymbol *ModuleEnv -> *(Doc, *ModuleEnv)

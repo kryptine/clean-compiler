@@ -6,11 +6,11 @@ from syntax import :: Expression, :: FunDef, :: IclModule, :: DclModule, :: Pars
 from general import :: Optional
 from checksupport import :: Heaps
 from Tonic.AbsSyn import :: ModuleEnv, :: TypeName, :: ModuleName, :: TaskName, :: VariableName, :: InhExpression, :: ChnExpression
-from iTasks._Framework.Tonic.AbsSyn import :: TExpr, :: TCleanExpr
+from iTasks._Framework.Tonic.AbsSyn import :: TExpr
 from Text.PPrint import :: Doc
 from Data.Map import :: Map
 from predef import :: PredefinedSymbol, :: PredefinedSymbols
 from overloading import :: InstanceTree
 
 funToGraph :: FunDef FunDef [(String, ParsedExpr)] !{#{!InstanceTree}} !{#CommonDefs} InhExpression *ChnExpression
-           -> *(Maybe ([(TCleanExpr, TCleanExpr)], TExpr, Expression), *ChnExpression)
+           -> *(Maybe ([(TExpr, TExpr)], TExpr, Expression), *ChnExpression)

@@ -14,7 +14,7 @@ from Data.Maybe import :: Maybe
 from Text.JSON import generic JSONEncode, :: JSONNode
 from Data.Map import :: Map
 from predef import :: PredefinedSymbol, :: PredefinedSymbols
-from iTasks._Framework.Tonic.AbsSyn import :: TExpr, :: ExprId, :: TypeName, :: ModuleName, :: TaskName, :: VariableName, :: TCleanExpr
+from iTasks._Framework.Tonic.AbsSyn import :: TExpr, :: ExprId, :: TypeName, :: ModuleName, :: TaskName, :: VariableName //, :: TCleanExpr
 
 // InhExpression and ChnExpression need strict fields in order to prevent a bus
 // error caused by huge thunks
@@ -38,7 +38,7 @@ from iTasks._Framework.Tonic.AbsSyn import :: TExpr, :: ExprId, :: TypeName, :: 
 :: SynExpression =
   { syn_texpr              :: !TExpr
   , syn_annot_expr         :: !Expression
-  , syn_pattern_match_vars :: ![(BoundVar, TCleanExpr)]
+  , syn_pattern_match_vars :: ![(BoundVar, TExpr)]
   }
 
 :: *ModuleEnv =

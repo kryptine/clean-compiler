@@ -6,7 +6,6 @@ from StdArray import class Array
 from Data.Maybe import :: Maybe
 from Data.Map import :: Map
 import Tonic.AbsSyn
-from iTasks._Framework.Tonic.AbsSyn import :: PPOr, :: TCleanExpr
 
 foldrArr :: (a b -> b) b (arr a) -> b | Array arr a
 
@@ -58,6 +57,7 @@ optional :: b (a -> b) (Optional a) -> b
 
 appFunName :: App -> String
 
+typeToTCleanExpr :: Type -> TExpr
 freeVarName :: FreeVar -> String
 
 dropContexts :: SymbolType [a] -> ([a], [a])
@@ -154,8 +154,6 @@ tupleExprToTuple :: Expression -> (Expression, Expression)
 
 pdssAreDefined :: [Int] *PredefinedSymbols -> *(Bool, *PredefinedSymbols)
 
-exprToTCleanExpr :: Expression *ModuleEnv -> *(TCleanExpr, *ModuleEnv)
-
-typeToTCleanExpr :: Type -> TCleanExpr
+//exprToTCleanExpr :: Expression *ModuleEnv -> *(TCleanExpr, *ModuleEnv)
 
 mselect :: (a e) !Int -> Maybe e | Array a e

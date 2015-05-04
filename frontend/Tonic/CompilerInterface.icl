@@ -108,7 +108,7 @@ ginTonic` is_itasks_mod main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_m
               -> put fd.fun_ident.id_name { TonicTask
                                           | tt_module = icl_module.icl_name.id_name
                                           , tt_name   = fd.fun_ident.id_name
-                                          , tt_resty  = fromMaybe (PPCleanExpr "") (fmap typeToTCleanExpr (functorContent (funTy fd_cpy)))
+                                          , tt_resty  = typeToTCleanExpr (funTy fd_cpy)
                                           , tt_args   = args
                                           , tt_body   = g} reps
             _ -> reps
