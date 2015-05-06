@@ -22,7 +22,7 @@ ginTonic mod_dir main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules 
 // FIXME Start Tonic presence check hack
   # (tonic_module, predef_symbols) = predef_symbols![PD_iTasks_Framework_Tonic]
   | predefIsUndefined tonic_module = (fun_defs, predef_symbols, hash_table, error, files, heaps)
-  # tonicImp = [0 \\ Declaration imp <-: icl_module.icl_import | imp.decl_ident.id_name == predefined_idents.[PD_tonicWrapTaskBody].id_name]
+  # tonicImp = [0 \\ Declaration imp <-: icl_module.icl_import | imp.decl_ident.id_name == predefined_idents.[PD_tonicExtWrapBody].id_name]
   | tonicImp == [] = (fun_defs, predef_symbols, hash_table, error, files, heaps)
 // FIXME End Tonic presence check hack
   # iclname                        = icl_module.icl_name.id_name
@@ -127,7 +127,7 @@ updateWithAnnot fidx e menv
 addTonicWrap :: Bool IclModule {#{!InstanceTree}} Index !{#CommonDefs} *ChnExpression -> *ChnExpression
 addTonicWrap is_itasks_mod icl_module class_instances idx common_defs chn
   # pdss = chn.chn_predef_symbols
-  # (ok, pdss) = pdssAreDefined [PD_tonicViewInformation, PD_tonicWrapTaskBody] pdss
+  # (ok, pdss) = pdssAreDefined [PD_tonicExtWrapArg, PD_tonicExtWrapBody] pdss
   # chn = {chn & chn_predef_symbols = pdss}
   | not ok     = chn
   | otherwise
@@ -152,11 +152,11 @@ addTonicWrap is_itasks_mod icl_module class_instances idx common_defs chn
   where
   doAddRefl {fun_ident, fun_body=TransformedBody { tb_args, tb_rhs }} symbty common_defs chn
     # pdss = chn.chn_predef_symbols
-    # (ok, pdss) = pdssAreDefined [ PD_tonicViewInformation
-                                  , PD_tonicWrapTaskBody
-                                  , PD_tonicWrapTaskBodyLam1
-                                  , PD_tonicWrapTaskBodyLam2
-                                  , PD_tonicWrapTaskBodyLam3
+    # (ok, pdss) = pdssAreDefined [ PD_tonicExtWrapArg
+                                  , PD_tonicExtWrapBody
+                                  , PD_tonicExtWrapBodyLam1
+                                  , PD_tonicExtWrapBodyLam2
+                                  , PD_tonicExtWrapBodyLam3
                                   , PD_ConsSymbol
                                   , PD_NilSymbol] pdss
     # chn = {chn & chn_predef_symbols = pdss}
@@ -166,9 +166,9 @@ addTonicWrap is_itasks_mod icl_module class_instances idx common_defs chn
         # menv = chn.chn_module_env
         # (rem, menv)  = case tb_rhs of
                            App {app_symb = {symb_ident}}
-                            | symb_ident == predefined_idents.[PD_tonicWrapAppLam1] = (1, menv)
-                            | symb_ident == predefined_idents.[PD_tonicWrapAppLam2] = (2, menv)
-                            | symb_ident == predefined_idents.[PD_tonicWrapAppLam3] = (3, menv)
+                            | symb_ident == predefined_idents.[PD_tonicExtWrapBodyLam1] = (1, menv)
+                            | symb_ident == predefined_idents.[PD_tonicExtWrapBodyLam2] = (2, menv)
+                            | symb_ident == predefined_idents.[PD_tonicExtWrapBodyLam3] = (3, menv)
                            App app
                              = argsRemaining app menv
                            _ = (0, menv)
@@ -186,11 +186,11 @@ addTonicWrap is_itasks_mod icl_module class_instances idx common_defs chn
     | otherwise = chn
     where
     findBodyWrap :: Int -> Int
-    findBodyWrap 0 = PD_tonicWrapTaskBody
-    findBodyWrap 1 = PD_tonicWrapTaskBodyLam1
-    findBodyWrap 2 = PD_tonicWrapTaskBodyLam2
-    findBodyWrap 3 = PD_tonicWrapTaskBodyLam3
-    findBodyWrap n = abort ("No PD_tonicWrapTaskBodyLam" +++ toString n)
+    findBodyWrap 0 = PD_tonicExtWrapBody
+    findBodyWrap 1 = PD_tonicExtWrapBodyLam1
+    findBodyWrap 2 = PD_tonicExtWrapBodyLam2
+    findBodyWrap 3 = PD_tonicExtWrapBodyLam3
+    findBodyWrap n = abort ("No PD_tonicExtWrapBodyLam" +++ toString n)
 
     mkArg :: SymbolType Bool {#{!InstanceTree}} (FreeVar, AType) ([Expression], *ChnExpression) -> *([Expression], *ChnExpression)
     mkArg symty is_itasks_mod class_instances (arg=:{fv_ident}, {at_type}) (xs, chn)
@@ -202,7 +202,7 @@ addTonicWrap is_itasks_mod icl_module class_instances idx common_defs chn
       # heaps         = {heaps & hp_type_heaps = hp_type_heaps}
       # (noCtx, pdss) = noITaskCtx arg symty.st_context pdss
       # (bv, heaps)   = freeVarToVar arg heaps
-      # (viewApp, heaps, pdss) = appPredefinedSymbolWithEI PD_tonicViewInformation
+      # (viewApp, heaps, pdss) = appPredefinedSymbolWithEI PD_tonicExtWrapArg
                                    [ mkStr fv_ident.id_name
                                    , if (is_itasks_mod || (not hasITasks && noCtx))
                                        (mkStr fv_ident.id_name)

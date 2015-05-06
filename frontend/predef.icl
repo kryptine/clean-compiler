@@ -252,24 +252,27 @@ predefined_idents
 					[PD_FromThenToUTS]= i "_from_then_to_uts",
 					[PD_FromThenToO]= i "_from_then_to_o",
 
-                    [PD_iTasks_Framework_Tonic] = i "iTasks._Framework.Tonic",
+                    [PD_iTasks_Framework_Tonic]   = i "iTasks._Framework.Tonic",
                     [PD_iTasks_Framework_Generic] = i "iTasks._Framework.Generic",
-                    [PD_iTasks_API_Core_Types] = i "iTasks.API.Core.Types",
-                    [PD_tonicWrapApp]      = i "tonicWrapApp",
-                    [PD_tonicWrapTaskBody] = i "tonicWrapTaskBody",
-                    [PD_tonicWrapAppLam1] = i "tonicWrapAppLam1",
-                    [PD_tonicWrapAppLam2] = i "tonicWrapAppLam2",
-                    [PD_tonicWrapAppLam3] = i "tonicWrapAppLam3",
-                    [PD_tonicViewInformation] = i "tonicViewInformation",
-                    [PD_tonicWrapTaskBodyLam1] = i "tonicWrapTaskBodyLam1",
-                    [PD_tonicWrapTaskBodyLam2] = i "tonicWrapTaskBodyLam2",
-                    [PD_tonicWrapTaskBodyLam3] = i "tonicWrapTaskBodyLam3",
-                    [PD_ITaskClass] = i "iTask",
-                    [PD_TMonadClass] = i "TMonad",
-                    [PD_TApplicativeClass] = i "TApplicative",
-                    [PD_TFunctorClass] = i "TFunctor",
+                    [PD_iTasks_API_Core_Types]    = i "iTasks.API.Core.Types",
+                    [PD_Data_Traversable]         = i "Data.Traversable",
+                    [PD_ITaskClass]                  = i "iTask",
+                    [PD_TMonadClass]                 = i "TMonad",
+                    [PD_TApplicativeClass]           = i "TApplicative",
+                    [PD_TFunctorClass]               = i "TFunctor",
+                    [PD_TraversableClass]            = i "Traversable",
                     [PD_TonicTopLevelBlueprintClass] = i "TonicTopLevelBlueprint",
-                    [PD_TonicBlueprintPartClass] = i "TonicBlueprintPart"
+                    [PD_TonicBlueprintPartClass]     = i "TonicBlueprintPart",
+                    [PD_tonicExtWrapArg]         = i "tonicExtWrapArg",
+                    [PD_tonicExtWrapBody]        = i "tonicExtWrapBody",
+                    [PD_tonicExtWrapBodyLam1]    = i "tonicExtWrapBodyLam1",
+                    [PD_tonicExtWrapBodyLam2]    = i "tonicExtWrapBodyLam2",
+                    [PD_tonicExtWrapBodyLam3]    = i "tonicExtWrapBodyLam3",
+                    [PD_tonicExtWrapApp]         = i "tonicExtWrapApp",
+                    [PD_tonicExtWrapAppLam1]     = i "tonicExtWrapAppLam1",
+                    [PD_tonicExtWrapAppLam2]     = i "tonicExtWrapAppLam2",
+                    [PD_tonicExtWrapAppLam3]     = i "tonicExtWrapAppLam3",
+                    [PD_tonicExtWrapTraversable] = i "tonicExtWrapTraversable"
 		}
 	=: idents
 	where
@@ -413,19 +416,22 @@ where
 					<<- (local_predefined_idents,	IC_Module NoQualifiedIdents, PD_iTasks_Framework_Tonic)
 					<<- (local_predefined_idents,	IC_Module NoQualifiedIdents, PD_iTasks_Framework_Generic)
 					<<- (local_predefined_idents,	IC_Module NoQualifiedIdents, PD_iTasks_API_Core_Types)
-					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapApp)
-					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapTaskBody)
-					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapAppLam1)
-					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapAppLam2)
-					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapAppLam3)
-					<<- (local_predefined_idents,	IC_Expression,	PD_tonicViewInformation)
-					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapTaskBodyLam1)
-					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapTaskBodyLam2)
-					<<- (local_predefined_idents,	IC_Expression,	PD_tonicWrapTaskBodyLam3)
+					<<- (local_predefined_idents,	IC_Module NoQualifiedIdents, PD_Data_Traversable)
+					<<- (local_predefined_idents,	IC_Expression,	PD_tonicExtWrapArg)
+					<<- (local_predefined_idents,	IC_Expression,	PD_tonicExtWrapBody)
+					<<- (local_predefined_idents,	IC_Expression,	PD_tonicExtWrapBodyLam1)
+					<<- (local_predefined_idents,	IC_Expression,	PD_tonicExtWrapBodyLam2)
+					<<- (local_predefined_idents,	IC_Expression,	PD_tonicExtWrapBodyLam3)
+					<<- (local_predefined_idents,	IC_Expression,	PD_tonicExtWrapApp)
+					<<- (local_predefined_idents,	IC_Expression,	PD_tonicExtWrapAppLam1)
+					<<- (local_predefined_idents,	IC_Expression,	PD_tonicExtWrapAppLam2)
+					<<- (local_predefined_idents,	IC_Expression,	PD_tonicExtWrapAppLam3)
+					<<- (local_predefined_idents,	IC_Expression,	PD_tonicExtWrapTraversable)
 					<<- (local_predefined_idents,	IC_Class,	PD_ITaskClass)
 					<<- (local_predefined_idents,	IC_Class,	PD_TMonadClass)
 					<<- (local_predefined_idents,	IC_Class,	PD_TApplicativeClass)
 					<<- (local_predefined_idents,	IC_Class,	PD_TFunctorClass)
+					<<- (local_predefined_idents,	IC_Class,	PD_TraversableClass)
 					<<- (local_predefined_idents,	IC_Class,	PD_TonicTopLevelBlueprintClass)
 					<<- (local_predefined_idents,	IC_Class,	PD_TonicBlueprintPartClass)
 

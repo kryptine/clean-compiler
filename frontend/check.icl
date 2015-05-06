@@ -3380,17 +3380,23 @@ where
 		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_iTasks_Framework_Tonic]	
 		| pre_mod.pds_def == mod_index
 			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols}
-				<=< adjustPredefSymbol PD_tonicWrapApp					mod_index STE_DclFunction
-				<=< adjustPredefSymbol PD_tonicWrapTaskBody				mod_index STE_DclFunction
-				<=< adjustPredefSymbol PD_tonicWrapAppLam1				mod_index STE_DclFunction
-				<=< adjustPredefSymbol PD_tonicWrapAppLam2				mod_index STE_DclFunction
-				<=< adjustPredefSymbol PD_tonicWrapAppLam3				mod_index STE_DclFunction
-				<=< adjustPredefSymbol PD_tonicViewInformation			mod_index STE_DclFunction
-				<=< adjustPredefSymbol PD_tonicWrapTaskBodyLam1			mod_index STE_DclFunction
-				<=< adjustPredefSymbol PD_tonicWrapTaskBodyLam2			mod_index STE_DclFunction
-				<=< adjustPredefSymbol PD_tonicWrapTaskBodyLam3			mod_index STE_DclFunction
                 <=< adjustPredefSymbol PD_TonicTopLevelBlueprintClass	mod_index STE_Class
                 <=< adjustPredefSymbol PD_TonicBlueprintPartClass		mod_index STE_Class
+				<=< adjustPredefSymbol PD_tonicExtWrapArg				mod_index STE_DclFunction
+				<=< adjustPredefSymbol PD_tonicExtWrapBody				mod_index STE_DclFunction
+				<=< adjustPredefSymbol PD_tonicExtWrapBodyLam1			mod_index STE_DclFunction
+				<=< adjustPredefSymbol PD_tonicExtWrapBodyLam2			mod_index STE_DclFunction
+				<=< adjustPredefSymbol PD_tonicExtWrapBodyLam3			mod_index STE_DclFunction
+				<=< adjustPredefSymbol PD_tonicExtWrapApp				mod_index STE_DclFunction
+				<=< adjustPredefSymbol PD_tonicExtWrapAppLam1			mod_index STE_DclFunction
+				<=< adjustPredefSymbol PD_tonicExtWrapAppLam2			mod_index STE_DclFunction
+				<=< adjustPredefSymbol PD_tonicExtWrapAppLam3			mod_index STE_DclFunction
+				<=< adjustPredefSymbol PD_tonicExtWrapTraversable		mod_index STE_DclFunction
+                )
+		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_Data_Traversable]	
+		| pre_mod.pds_def == mod_index
+			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols}
+                <=< adjustPredefSymbol PD_TraversableClass				mod_index STE_Class
                 )
 		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_iTasks_Framework_Generic]	
 		| pre_mod.pds_def == mod_index
