@@ -16,20 +16,20 @@ mkInhExpr ctn list_comprehensions tree cds =
   | inh_curr_task_name = ctn
   , inh_case_expr      = Nothing
   , inh_is_bind_lam    = False
-  , inh_ids            = [0]
   , inh_tyenv          = newMap
   , inh_list_compr     = list_comprehensions
   , inh_instance_tree  = tree
   , inh_common_defs    = cds
+  , inh_app_ctx        = ("", "")
   }
 
 mkChnExpr :: *PredefinedSymbols *ModuleEnv *Heaps -> *ChnExpression
 mkChnExpr predef_symbols menv heaps =
   { ChnExpression
-  | //chn_graph          = gg
-    chn_module_env     = menv
+  | chn_module_env     = menv
   , chn_predef_symbols = predef_symbols
   , chn_heaps          = heaps
+  , chn_ids            = 0
   }
 
 mkModuleEnv :: ModuleN !*{#FunDef} !*{#FunDef} IclModule {#DclModule} -> *ModuleEnv

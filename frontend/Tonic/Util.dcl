@@ -74,6 +74,8 @@ funArgTys :: FunDef -> [Type]
 
 identIsLambda :: Ident -> Bool
 
+identIsListComprehension :: Ident -> Bool
+
 exprIsLambda :: Expression -> Bool
 
 symTyIsTask :: SymbolType -> Bool
@@ -102,7 +104,7 @@ updateWithAnnot :: SymbIdent Expression *ModuleEnv -> *ModuleEnv
 
 updateFunRhs :: Index !*{#FunDef} Expression -> *{#FunDef}
 
-addInhId :: InhExpression Int -> InhExpression
+dispenseUnique :: *ChnExpression -> *(Int, *ChnExpression)
 
 predefIsUndefined :: PredefinedSymbol -> Bool
 

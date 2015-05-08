@@ -392,6 +392,13 @@ identIsLambda ident
   | otherwise     = False
   where fnm = ident.id_name
 
+identIsListComprehension :: Ident -> Bool
+identIsListComprehension ident
+  | size fnm > 0  = fnm.[0] == 'c' && fnm.[1] == ';'
+  | otherwise     = False
+  where fnm = ident.id_name
+
+
 exprIsLambda :: Expression -> Bool
 exprIsLambda (Var bv)  = identIsLambda bv.var_ident
 exprIsLambda (App app) = identIsLambda app.app_symb.symb_ident
@@ -565,8 +572,8 @@ foldrSt op l st = foldr_st l
     foldr_st []     = st
     foldr_st [a:as] = op a (foldr_st as)
 
-addInhId :: InhExpression Int -> InhExpression
-addInhId inh n = {inh & inh_ids = inh.inh_ids ++ [n]}
+dispenseUnique :: *ChnExpression -> *(Int, *ChnExpression)
+dispenseUnique chn = (chn.chn_ids, {chn & chn_ids = chn.chn_ids + 1})
 
 predefIsUndefined :: PredefinedSymbol -> Bool
 predefIsUndefined pds = pds.pds_def == NoIndex || pds.pds_module == NoIndex
@@ -748,14 +755,14 @@ mkTAssoc (Just ft)
 
 // TODO Associativity?
 typeToTCleanExpr :: Type -> TExpr
-typeToTCleanExpr (TA tsi []) = TVar [] tsi.type_ident.id_name
+typeToTCleanExpr (TA tsi []) = TVar Nothing tsi.type_ident.id_name
 typeToTCleanExpr (TA tsi args)
   # tces = map (typeToTCleanExpr o \arg -> arg.at_type) args
   = TFApp TNonAssoc tsi.type_ident.id_name tces
-typeToTCleanExpr (TAS tsi [] _) = TVar [] tsi.type_ident.id_name
+typeToTCleanExpr (TAS tsi [] _) = TVar Nothing tsi.type_ident.id_name
 typeToTCleanExpr (TAS tsi args _)
   # tces = map (typeToTCleanExpr o \arg -> arg.at_type) args
   = TFApp TNonAssoc tsi.type_ident.id_name tces
 typeToTCleanExpr ty
-  = TVar [] (ppCompact (ppType ty))
+  = TVar Nothing (ppCompact (ppType ty))
 

@@ -22,17 +22,18 @@ from iTasks._Framework.Tonic.AbsSyn import :: TExpr, :: ExprId, :: TypeName, :: 
   { inh_curr_task_name :: !String
   , inh_case_expr      :: !Maybe Expression
   , inh_is_bind_lam    :: !Bool
-  , inh_ids            :: !ExprId
   , inh_tyenv          :: !Map String Type
   , inh_list_compr     :: ![(String, ParsedExpr)]
   , inh_instance_tree  :: !{#{!InstanceTree}}
   , inh_common_defs    :: !{#CommonDefs}
+  , inh_app_ctx        :: !(String, String)
   }
 
 :: *ChnExpression =
   { chn_module_env     :: !*ModuleEnv
-  , chn_heaps          :: *Heaps
+  , chn_heaps          :: !*Heaps
   , chn_predef_symbols :: !*PredefinedSymbols
+  , chn_ids            :: !ExprId
   }
 
 :: SynExpression =
