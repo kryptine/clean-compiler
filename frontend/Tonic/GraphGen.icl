@@ -151,16 +151,27 @@ wrapTraversable uid app args inh chn
                                      _        -> (iclName, menv)
       # wrappedFnNm  = app.app_symb.symb_ident.id_name
       # (modCtx, fnCtx) = inh.inh_app_ctx
+      # tuple2Idx = GetTupleConsIndex 2
+      # heaps = chn.chn_heaps
+      # (parentInfo, heaps, pdss) = appPredefinedSymbolWithEI tuple2Idx
+                                    [ mkStr iclName
+                                    , mkStr inh.inh_curr_task_name
+                                    ] SK_Constructor heaps pdss
+      # (appInfo, heaps, pdss) = appPredefinedSymbolWithEI tuple2Idx
+                                    [ mkStr modCtx
+                                    , mkStr fnCtx
+                                    ] SK_Constructor heaps pdss
+      # (wrapInfo, heaps, pdss) = appPredefinedSymbolWithEI tuple2Idx
+                                    [ mkStr wrappedFnModNm
+                                    , mkStr wrappedFnNm
+                                    ] SK_Constructor heaps pdss
       # (expr, heaps, pdss) = appPredefinedSymbolWithEI PD_tonicExtWrapTraversable
-                                [ mkStr iclName
-                                , mkStr inh.inh_curr_task_name
-                                , mkStr modCtx
-                                , mkStr fnCtx
-                                , mkStr wrappedFnModNm
-                                , mkStr wrappedFnNm
+                                [ App parentInfo
+                                , App appInfo
+                                , App wrapInfo
                                 , mkInt uid
                                 , App {app & app_args = []}
-                                ] SK_Function chn.chn_heaps pdss
+                                ] SK_Function heaps pdss
       = ( (App expr) @ args
         , {chn & chn_predef_symbols = pdss
                , chn_module_env = {menv & me_icl_module = icl}
@@ -185,16 +196,27 @@ wrapTaskApp uid wrappedFnNm origExpr inh chn
                                          _        -> (iclName, menv)
                                    _ = (iclName, menv)
       # (modCtx, fnCtx) = inh.inh_app_ctx
+      # tuple2Idx = GetTupleConsIndex 2
+      # heaps = chn.chn_heaps
+      # (parentInfo, heaps, pdss) = appPredefinedSymbolWithEI tuple2Idx
+                                    [ mkStr iclName
+                                    , mkStr inh.inh_curr_task_name
+                                    ] SK_Constructor heaps pdss
+      # (appInfo, heaps, pdss) = appPredefinedSymbolWithEI tuple2Idx
+                                    [ mkStr modCtx
+                                    , mkStr fnCtx
+                                    ] SK_Constructor heaps pdss
+      # (wrapInfo, heaps, pdss) = appPredefinedSymbolWithEI tuple2Idx
+                                    [ mkStr wrappedFnModNm
+                                    , mkStr wrappedFnNm
+                                    ] SK_Constructor heaps pdss
       # (expr, heaps, pdss) = appPredefinedSymbolWithEI (findWrap rem)
-                                [ mkStr iclName
-                                , mkStr inh.inh_curr_task_name
-                                , mkStr modCtx
-                                , mkStr fnCtx
-                                , mkStr wrappedFnModNm
-                                , mkStr wrappedFnNm
+                                [ App parentInfo
+                                , App appInfo
+                                , App wrapInfo
                                 , mkInt uid
                                 , origExpr
-                                ] SK_Function chn.chn_heaps pdss
+                                ] SK_Function heaps pdss
       = ( App expr
         , {chn & chn_predef_symbols = pdss
                , chn_module_env = {menv & me_icl_module = icl}
