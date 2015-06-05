@@ -299,15 +299,16 @@ mkBlueprint inh (App app=:{app_symb}) chn
     symTyStr` (TFAC _ t _)  = symTyStr` t
     symTyStr` _             = Nothing
 
+    // TODO FIXME This check is horribly broken
     mkTrav (Just {st_args = [{at_type}]}) ctxs [arg] inh chn
       = (isListTy at_type, chn)
           //= typeHasClassInstance at_type PD_TraversableClass inh chn
       //| (False, chn)
       where
       isListTy :: Type -> Bool
-      isListTy (TA tsi _)    = tsi.type_ident.id_name == PD_ListType_String
-      isListTy (TAS tsi _ _) = tsi.type_ident.id_name == PD_ListType_String
-      isListTy _             = False
+      isListTy (TA tsi [at])    = tsi.type_ident.id_name == PD_ListType_String && atypeIsTask at
+      isListTy (TAS tsi [at] _) = tsi.type_ident.id_name == PD_ListType_String && atypeIsTask at
+      isListTy _                = False
     mkTrav _ _ _ _ chn = (False, chn)
 
   mkFApp app ctxs args inh chn
