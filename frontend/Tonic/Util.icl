@@ -91,8 +91,14 @@ reifyConsDef si menv
 reifyFunType :: SymbIdent *ModuleEnv -> *(Maybe FunType, *ModuleEnv)
 reifyFunType si menv=:{me_dcl_modules}
   = case (symbIdentModuleIdx si, symbIdentObjectIdx si) of
-      (Just mi, Just oi) -> reifyDclModulesIdxFunType` mi oi menv
-      _                  -> (Nothing, menv)
+      (Just mi, Just oi)
+        = reifyDclModulesIdxFunType` mi oi menv
+      (Just mi, _)
+        = (Nothing, menv)
+      (_, Just oi)
+        = (Nothing, menv)
+      _
+        = (Nothing, menv)
 
 symbIdentModuleIdx :: SymbIdent -> Maybe Index
 symbIdentModuleIdx {symb_kind=SK_Function glob}              = Just glob.glob_module
@@ -758,11 +764,11 @@ typeToTCleanExpr :: Type -> TExpr
 typeToTCleanExpr (TA tsi []) = TVar Nothing tsi.type_ident.id_name
 typeToTCleanExpr (TA tsi args)
   # tces = map (typeToTCleanExpr o \arg -> arg.at_type) args
-  = TFApp TNonAssoc tsi.type_ident.id_name tces
+  = TFApp tsi.type_ident.id_name tces TNonAssoc
 typeToTCleanExpr (TAS tsi [] _) = TVar Nothing tsi.type_ident.id_name
 typeToTCleanExpr (TAS tsi args _)
   # tces = map (typeToTCleanExpr o \arg -> arg.at_type) args
-  = TFApp TNonAssoc tsi.type_ident.id_name tces
+  = TFApp tsi.type_ident.id_name tces TNonAssoc
 typeToTCleanExpr ty
   = TVar Nothing (ppCompact (ppType ty))
 

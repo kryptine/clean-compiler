@@ -229,6 +229,18 @@ wrapTaskApp uid wrappedFnNm origExpr inh chn
   findWrap 2 = PD_tonicExtWrapAppLam2
   findWrap 3 = PD_tonicExtWrapAppLam3
   findWrap n = abort ("No tonicExtWrapAppLam" +++ toString n)
+import StdDebug
+
+getAssoc app_symb menv
+  # (mFunTy, menv) = reifyFunType app_symb menv
+  # assoc = case mFunTy of
+              Just {ft_priority = Prio assoc n} -> case assoc of
+                                                     LeftAssoc  -> TLeftAssoc n
+                                                     RightAssoc -> TRightAssoc n
+                                                     NoAssoc    -> TNonAssoc
+              _ -> TNonAssoc
+  = (assoc, menv)
+
 
 mkBlueprint :: !InhExpression !Expression !*ChnExpression -> *(!SynExpression, !*ChnExpression)
 mkBlueprint inh (App app=:{app_symb}) chn
@@ -255,7 +267,9 @@ mkBlueprint inh (App app=:{app_symb}) chn
   mkMApp app ctxs args inh chn
     # appName       = app.app_symb.symb_ident.id_name
     # (uid, chn)    = dispenseUnique chn
-    # (mst, menv)   = reifySymbIdentSymbolType app.app_symb chn.chn_module_env
+    # (mFunTy, menv) = reifyFunType app.app_symb chn.chn_module_env
+    # (assoc, menv)  = getAssoc app.app_symb menv
+    # (mst, menv)   = reifySymbIdentSymbolType app.app_symb menv
     # mTyStr        = case mst of
                         Just st -> symTyStr st
                         _       -> Nothing
@@ -274,7 +288,7 @@ mkBlueprint inh (App app=:{app_symb}) chn
                         (App {app & app_args = args`}, chn)
     # (app`, chn)   = wrapTaskApp uid appName app` inh chn
     = ({ syn_annot_expr = app`
-       , syn_texpr      = TMApp uid mTyStr dclnm (appFunName app) (map (\syn -> syn.syn_texpr) ps)
+       , syn_texpr      = TMApp uid mTyStr dclnm (appFunName app) (map (\syn -> syn.syn_texpr) ps) assoc
        , syn_pattern_match_vars = []}, chn)
     where
     symTyStr {st_result = {at_type}} = symTyStr` at_type
@@ -297,22 +311,16 @@ mkBlueprint inh (App app=:{app_symb}) chn
     mkTrav _ _ _ _ chn = (False, chn)
 
   mkFApp app ctxs args inh chn
-    # appName        = app.app_symb.symb_ident.id_name
-    # (mFunTy, menv) = reifyFunType app.app_symb chn.chn_module_env
-    # (dclnm, menv)  = case reifyDclModule app.app_symb menv of
-                         (Just dcl, menv) = (dcl.dcl_name.id_name, menv)
-                         (_       , menv)
-                           # (iclmod, menv) = menv!me_icl_module
-                           = (iclmod.icl_name.id_name, menv)
-    # (ps, chn)      = mapSt (\x chn -> mkBlueprint inh x chn) args {chn & chn_module_env = menv}
-    # assoc          = case mFunTy of
-                         Just {ft_priority = Prio assoc n} -> case assoc of
-                                                                LeftAssoc  -> TLeftAssoc n
-                                                                RightAssoc -> TRightAssoc n
-                                                                NoAssoc    -> TNonAssoc
-                         _ -> TNonAssoc
+    # appName         = app.app_symb.symb_ident.id_name
+    # (dclnm, menv)   = case reifyDclModule app.app_symb chn.chn_module_env of
+                          (Just dcl, menv) = (dcl.dcl_name.id_name, menv)
+                          (_       , menv)
+                            # (iclmod, menv) = menv!me_icl_module
+                            = (iclmod.icl_name.id_name, menv)
+    # (assoc, menv)   = getAssoc app.app_symb menv
+    # (ps, chn)       = mapSt (\x chn -> mkBlueprint inh x chn) args {chn & chn_module_env = menv}
     = ({ syn_annot_expr = App {app & app_args = ctxs ++ map (\syn -> syn.syn_annot_expr) ps}
-       , syn_texpr      = TFApp assoc appName (map (\syn -> syn.syn_texpr) ps)
+       , syn_texpr      = TFApp appName (map (\syn -> syn.syn_texpr) ps) assoc
        , syn_pattern_match_vars = []}, chn)
 
   // Transformation for higher-order function application
@@ -344,16 +352,10 @@ mkBlueprint inh (e=:(App app) @ es) chn
          , syn_texpr      = TLit "TODO @"
          , syn_pattern_match_vars = syne.syn_pattern_match_vars}, chn)
   | otherwise
-      # (mFunTy, menv) = reifyFunType app.app_symb chn.chn_module_env
-      # assoc          = case mFunTy of
-                           Just {ft_priority = Prio assoc n} -> case assoc of
-                                                                  LeftAssoc  -> TLeftAssoc n
-                                                                  RightAssoc -> TRightAssoc n
-                                                                  NoAssoc    -> TNonAssoc
-                           _ -> TNonAssoc
-      # (es`, chn)     = mapSt (mkBlueprint inh) es {chn & chn_module_env = menv}
+      # (assoc, menv) = getAssoc app.app_symb chn.chn_module_env
+      # (es`, chn)    = mapSt (mkBlueprint inh) es {chn & chn_module_env = menv}
       = ({ syn_annot_expr = e @ (map (\x -> x.syn_annot_expr) es`)
-         , syn_texpr      = TFApp assoc app.app_symb.symb_ident.id_name (map (\x -> x.syn_texpr) es`)
+         , syn_texpr      = TFApp app.app_symb.symb_ident.id_name (map (\x -> x.syn_texpr) es`) assoc
          , syn_pattern_match_vars = []}, chn)
   where
     zwf eVar eVal menv
@@ -441,7 +443,7 @@ mkBlueprint inh (Case cs) chn
         # (fvds, chn) = mapSt (mkBlueprint inh o FreeVar) ap.ap_vars chn
         # clexpr      = case fvds of
                           []   -> TLit ""
-                          args -> TFApp TNonAssoc ap.ap_symbol.glob_object.ds_ident.id_name (map (\x -> x.syn_texpr) args) // TODO Associativity
+                          args -> TFApp ap.ap_symbol.glob_object.ds_ident.id_name (map (\x -> x.syn_texpr) args) TNonAssoc // TODO Associativity
         = ({ syn_annot_expr = Case {cs & case_guards = AlgebraicPatterns gi [{ap & ap_expr = syn.syn_annot_expr}]}
            , syn_texpr      = syn.syn_texpr
            , syn_pattern_match_vars = [(bv, clexpr) : syn.syn_pattern_match_vars]}, chn)
@@ -479,7 +481,7 @@ mkBlueprint inh (Case cs) chn
         mkAp sym vars chn
           # (fvds, chn) = mapSt (mkBlueprint inh o FreeVar) vars chn
           // TODO TNonAssoc?
-          = (TFApp TNonAssoc (ppCompact ('PPrint'.text sym.glob_object.ds_ident.id_name)) (map (\x -> x.syn_texpr) fvds), chn)
+          = (TFApp (ppCompact ('PPrint'.text sym.glob_object.ds_ident.id_name)) (map (\x -> x.syn_texpr) fvds) TNonAssoc, chn)
   mkAlts c=:(BasicPatterns bt bps) chn
     # ((bps, syns, _), chn) = foldr f (([], [], 0), chn) bps
     = ((BasicPatterns bt bps, syns), chn)
