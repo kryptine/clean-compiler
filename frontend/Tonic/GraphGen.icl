@@ -233,13 +233,16 @@ import StdDebug
 
 getAssoc app_symb menv
   # (mFunTy, menv) = reifyFunType app_symb menv
-  # assoc = case mFunTy of
-              Just {ft_priority = Prio assoc n} -> case assoc of
-                                                     LeftAssoc  -> TLeftAssoc n
-                                                     RightAssoc -> TRightAssoc n
-                                                     NoAssoc    -> TNonAssoc
-              _ -> TNonAssoc
+  # assoc = getAssoc` mFunTy
   = (assoc, menv)
+
+getAssoc` mFunTy
+  = case mFunTy of
+      Just {ft_priority = Prio assoc n} -> case assoc of
+                                             LeftAssoc  -> TLeftAssoc n
+                                             RightAssoc -> TRightAssoc n
+                                             NoAssoc    -> TNonAssoc
+      _ -> TNonAssoc
 
 
 mkBlueprint :: !InhExpression !Expression !*ChnExpression -> *(!SynExpression, !*ChnExpression)
@@ -291,14 +294,6 @@ mkBlueprint inh (App app=:{app_symb}) chn
        , syn_texpr      = TMApp uid mTyStr dclnm (appFunName app) (map (\syn -> syn.syn_texpr) ps) assoc
        , syn_pattern_match_vars = []}, chn)
     where
-    symTyStr {st_result = {at_type}} = symTyStr` at_type
-    symTyStr` (TA tsi _)    = Just tsi.type_ident.id_name
-    symTyStr` (TAS tsi _ _) = Just tsi.type_ident.id_name
-    symTyStr` (_ --> t)     = symTyStr` t.at_type
-    symTyStr` (TFA _ t)     = symTyStr` t
-    symTyStr` (TFAC _ t _)  = symTyStr` t
-    symTyStr` _             = Nothing
-
     // TODO FIXME This check is horribly broken
     mkTrav (Just {st_args = [{at_type}]}) ctxs [arg] inh chn
       = (isListTy at_type, chn)
@@ -339,10 +334,9 @@ mkBlueprint inh (App app=:{app_symb}) chn
   // lead to a recursive function application.
 mkBlueprint inh (e @ []) chn = abort "atC: no args" // TODO e is a non-applied higher order function. What do we do with this?
 mkBlueprint inh (e=:(App app) @ es) chn
-  // TODO : Introduce lets in the graph for all variables that are being applied
+  # (mfd, menv) = reifyFunDef app.app_symb chn.chn_module_env
+  # fd          = fromMaybe (abort ("atC: failed to reify " +++ app.app_symb.symb_ident.id_name)) mfd
   | identIsLambda app.app_symb.symb_ident
-      # (mfd, menv)   = reifyFunDef app.app_symb chn.chn_module_env
-      # fd            = fromMaybe (abort ("atC: failed to reify " +++ app.app_symb.symb_ident.id_name)) mfd
       # letargs       = drop (length app.app_args) (getFunArgs fd)
       # (binds, menv) = zipWithSt zwf letargs es menv
       # chn           = { chn & chn_module_env = menv }
@@ -353,16 +347,45 @@ mkBlueprint inh (e=:(App app) @ es) chn
          , syn_texpr      = TLit "TODO @"
          , syn_pattern_match_vars = syne.syn_pattern_match_vars}, chn)
   | otherwise
-      # (assoc, menv) = getAssoc app.app_symb chn.chn_module_env
+      # (assoc, menv) = getAssoc app.app_symb menv
       # (es`, chn)    = mapSt (mkBlueprint inh) es {chn & chn_module_env = menv}
+      # (texpr, chn)  = case fd.fun_type of
+                          Yes ft | symTyIsTask ft
+                            # (uid, chn)    = dispenseUnique chn
+                            # (mst, menv)   = reifySymbIdentSymbolType app.app_symb chn.chn_module_env
+                            # mTyStr        = case mst of
+                                                Just st -> symTyStr st
+                                                _       -> Nothing
+                            # (dclnm, menv) = case reifyDclModule app.app_symb menv of
+                                                (Just dcl, menv) = (dcl.dcl_name.id_name, menv)
+                                                (_       , menv)
+                                                  # (iclmod, menv) = menv!me_icl_module
+                                                  = (iclmod.icl_name.id_name, menv)
+                            = (TMApp uid mTyStr dclnm (appFunName app) (map (\syn -> syn.syn_texpr) es`) assoc, {chn & chn_module_env = menv})
+                          _ = (TFApp app.app_symb.symb_ident.id_name (map (\x -> x.syn_texpr) es`) assoc, chn)
       = ({ syn_annot_expr = e @ (map (\x -> x.syn_annot_expr) es`)
-         , syn_texpr      = TFApp app.app_symb.symb_ident.id_name (map (\x -> x.syn_texpr) es`) assoc
+         , syn_texpr      = texpr
          , syn_pattern_match_vars = []}, chn)
   where
     zwf eVar eVal menv
       # (fvl, menv) = ppFreeVar eVar menv
       # (fvr, menv) = ppExpression eVal menv
       = ((ppCompact fvl, ppCompact fvr), menv)
+mkBlueprint inh (e=:(Var bv) @ es) chn
+  # (bps, chn) = mapSt (mkBlueprint inh) es chn
+  | varIsTask bv inh
+      # (uid, chn)  = dispenseUnique chn
+      # (var`, chn) = wrapTaskApp uid "(Var @ es)" (e @ es) inh chn
+      # mTyStr      = case 'DM'.get bv.var_ident.id_name inh.inh_tyenv of
+                        Just x -> symTyStr` x
+                        _      -> Nothing
+      = ({ syn_annot_expr = var`
+         , syn_texpr      = TMApp uid mTyStr "" bv.var_ident.id_name (map (\syn -> syn.syn_texpr) bps) TNonAssoc
+         , syn_pattern_match_vars = []}, chn)
+  | otherwise
+      = ({ syn_annot_expr = Var bv
+         , syn_texpr      = TFApp bv.var_ident.id_name (map (\syn -> syn.syn_texpr) bps) TNonAssoc
+         , syn_pattern_match_vars = []}, chn)
 mkBlueprint inh (e @ es) chn = ({ syn_annot_expr = e @ es
                               , syn_texpr      = TLit "TODO @"
                               , syn_pattern_match_vars = []}, chn)
@@ -509,13 +532,6 @@ mkBlueprint inh (Var bv) chn
       = ({ syn_annot_expr = Var bv
          , syn_texpr      = TVar Nothing bv.var_ident.id_name
          , syn_pattern_match_vars = []}, chn)
-  where
-  varIsTask :: BoundVar InhExpression -> Bool
-  varIsTask bv inh
-    = case 'DM'.get bv.var_ident.id_name inh.inh_tyenv of
-        Nothing -> False
-        Just t  -> typeIsTask t
-
 mkBlueprint _ expr=:(FreeVar fv) chn
   = ({ syn_annot_expr = expr
      , syn_texpr      = TVar Nothing fv.fv_ident.id_name
@@ -593,6 +609,20 @@ mkBlueprint _ expr=:(FailExpr _) chn = ({ syn_annot_expr = expr
 mkBlueprint _ expr chn = ({ syn_annot_expr = expr
                           , syn_texpr      = TLit "(mkBlueprint fallthrough)"
                           , syn_pattern_match_vars = []}, chn)
+
+symTyStr {st_result = {at_type}} = symTyStr` at_type
+symTyStr` (TA tsi _)    = Just tsi.type_ident.id_name
+symTyStr` (TAS tsi _ _) = Just tsi.type_ident.id_name
+symTyStr` (_ --> t)     = symTyStr` t.at_type
+symTyStr` (TFA _ t)     = symTyStr` t
+symTyStr` (TFAC _ t _)  = symTyStr` t
+symTyStr` _             = Nothing
+
+varIsTask :: BoundVar InhExpression -> Bool
+varIsTask bv inh
+  = case 'DM'.get bv.var_ident.id_name inh.inh_tyenv of
+      Nothing -> False
+      Just t  -> typeIsTask t
 
 // TODO Relate the match_vars from the body to the vars from the arguments
 funToGraph :: FunDef FunDef [(String, ParsedExpr)] !{#{!InstanceTree}} !{#CommonDefs} InhExpression *ChnExpression
