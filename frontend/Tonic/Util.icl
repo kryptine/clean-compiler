@@ -155,8 +155,8 @@ idxIsMain idx menv
   # (main_dcl_module_n, menv) = menv!me_main_dcl_module_n
   = (idx == main_dcl_module_n, menv)
 
-reifyFunDefsIdxPriority :: Ident Index *ModuleEnv -> *(Maybe Priority, *ModuleEnv)
-reifyFunDefsIdxPriority ident idx menv
+reifyFunDefsIdxPriority :: Index *ModuleEnv -> *(Maybe Priority, *ModuleEnv)
+reifyFunDefsIdxPriority idx menv
   # (mfd, fds) = muselect menv.me_fun_defs_cpy idx
   # menv = {menv & me_fun_defs_cpy = fds}
   = case mfd of
@@ -175,15 +175,15 @@ reifyDclModulesIdxPriority` glob_module glob_object menv
 
 reifySymbIdentPriority :: SymbIdent *ModuleEnv -> *(Maybe Priority, *ModuleEnv)
 reifySymbIdentPriority {symb_ident, symb_kind=SK_Function glob} menv
-  | glob.glob_module == menv.me_main_dcl_module_n = reifyFunDefsIdxPriority symb_ident glob.glob_object menv
+  | glob.glob_module == menv.me_main_dcl_module_n = reifyFunDefsIdxPriority glob.glob_object menv
   | otherwise                                     = reifyDclModulesIdxPriority glob menv
-reifySymbIdentPriority {symb_ident, symb_kind=SK_IclMacro idx}           menv = reifyFunDefsIdxPriority symb_ident idx menv
-reifySymbIdentPriority {symb_ident, symb_kind=SK_LocalMacroFunction idx} menv = reifyFunDefsIdxPriority symb_ident idx menv
+reifySymbIdentPriority {symb_ident, symb_kind=SK_IclMacro idx}           menv = reifyFunDefsIdxPriority idx menv
+reifySymbIdentPriority {symb_ident, symb_kind=SK_LocalMacroFunction idx} menv = reifyFunDefsIdxPriority idx menv
 reifySymbIdentPriority {symb_ident, symb_kind=SK_DclMacro glob} menv
-  | glob.glob_module == menv.me_main_dcl_module_n = reifyFunDefsIdxPriority symb_ident glob.glob_object menv
+  | glob.glob_module == menv.me_main_dcl_module_n = reifyFunDefsIdxPriority glob.glob_object menv
   | otherwise                                     = reifyDclModulesIdxPriority glob menv
 reifySymbIdentPriority {symb_ident, symb_kind=SK_LocalDclMacroFunction glob} menv
-  | glob.glob_module == menv.me_main_dcl_module_n = reifyFunDefsIdxPriority symb_ident glob.glob_object menv
+  | glob.glob_module == menv.me_main_dcl_module_n = reifyFunDefsIdxPriority glob.glob_object menv
   | otherwise                                     = reifyDclModulesIdxPriority glob menv
 reifySymbIdentPriority {symb_ident, symb_kind=SK_OverloadedFunction {glob_module, glob_object} } menv
   | glob_module == menv.me_main_dcl_module_n
@@ -194,7 +194,7 @@ reifySymbIdentPriority {symb_ident, symb_kind=SK_OverloadedFunction {glob_module
       # (dcls, menv) = menv!me_dcl_modules
       # md           = dcls.[glob_module].dcl_common.com_member_defs.[glob_object]
       = (Just md.me_priority, menv)
-reifySymbIdentPriority {symb_ident, symb_kind=SK_GeneratedFunction fip idx} menv = reifyFunDefsIdxPriority symb_ident idx menv
+reifySymbIdentPriority {symb_ident, symb_kind=SK_GeneratedFunction fip idx} menv = reifyFunDefsIdxPriority idx menv
 reifySymbIdentPriority {symb_ident, symb_kind=SK_Constructor {glob_module, glob_object}} menv
   | glob_module == menv.me_main_dcl_module_n
       # (icl, menv) = menv!me_icl_module
@@ -208,7 +208,7 @@ reifySymbIdentPriority {symb_ident, symb_kind=SK_NewTypeConstructor globi} menv 
 reifySymbIdentPriority {symb_ident, symb_kind=SK_Generic {glob_module, glob_object} _} menv
   = (Nothing, menv)
 reifySymbIdentPriority {symb_ident, symb_kind=SK_OverloadedConstructor glob} menv
-  | glob.glob_module == menv.me_main_dcl_module_n = reifyFunDefsIdxPriority symb_ident glob.glob_object menv
+  | glob.glob_module == menv.me_main_dcl_module_n = reifyFunDefsIdxPriority glob.glob_object menv
   | otherwise                                     = reifyDclModulesIdxPriority glob menv
 reifySymbIdentPriority si menv = abort "reifySymbIdentPriority: unsupported"
 

@@ -244,11 +244,6 @@ mkPrio (Prio assoc n) =
     NoAssoc    -> TNonAssoc
 mkPrio _ = TNonAssoc
 
-instance toString TAssoc where
-  toString (TLeftAssoc n)  = "TLeftAssoc " +++ toString n
-  toString (TRightAssoc n) = "TRightAssoc " +++ toString n
-  toString TNonAssoc       = "TNonAssoc"
-
 mkBlueprint :: !InhExpression !Expression !*ChnExpression -> *(!SynExpression, !*ChnExpression)
 mkBlueprint inh (App app=:{app_symb}) chn
   # (isTonicFunctor, chn) = symbIdentIsTask app.app_symb chn
@@ -462,16 +457,25 @@ mkBlueprint inh (Let lt) chn
 
   // TODO Refactor this. Also persist numbering?
 mkBlueprint inh (Case cs) chn
-  # caseExpr   = fromMaybe cs.case_expr inh.inh_case_expr
-  # (ed, menv) = ppExpression caseExpr chn.chn_module_env
-  # chn        = {chn & chn_module_env = menv}
-  = case (ppCompact ed, cs.case_expr, cs.case_guards) of
-      ("_x", Var bv, AlgebraicPatterns gi [ap])
-        # (syn, chn)  = mkAlts` 0 ap.ap_expr chn
-        # (fvds, chn) = mapSt (mkBlueprint inh o FreeVar) ap.ap_vars chn
-        # clexpr      = case fvds of
-                          []   -> TLit ""
-                          args -> TFApp ap.ap_symbol.glob_object.ds_ident.id_name (map (\x -> x.syn_texpr) args) TNonAssoc // TODO Associativity
+  # caseExpr     = fromMaybe cs.case_expr inh.inh_case_expr
+  # (cesyn, chn) = mkBlueprint inh caseExpr chn
+  = case (cs.case_expr, cs.case_guards) of
+      (Var bv, AlgebraicPatterns gi [ap])
+        | bv.var_ident.id_name == "_x"
+        # (syn, chn)    = mkAlts` 0 ap.ap_expr chn
+        # (fvds, chn)   = mapSt (mkBlueprint inh o FreeVar) ap.ap_vars chn
+        # (clexpr, chn) = case fvds of
+                            []   = (TLit "", chn)
+                            args
+                              # menv          = chn.chn_module_env
+                              # (mprio, menv) = if (ap.ap_symbol.glob_module == chn.chn_module_env.me_main_dcl_module_n)
+                                                  (reifyFunDefsIdxPriority ap.ap_symbol.glob_object.ds_index menv)
+                                                  (reifyDclModulesIdxPriority` ap.ap_symbol.glob_module ap.ap_symbol.glob_object.ds_index menv)
+                              # assoc         = case mprio of
+                                                  Just p -> mkPrio p
+                                                  _      -> TNonAssoc
+                              # chn           = {chn & chn_module_env = menv}
+                              = (TFApp ap.ap_symbol.glob_object.ds_ident.id_name (map (\x -> x.syn_texpr) args) assoc, chn)
         = ({ syn_annot_expr = Case {cs & case_guards = AlgebraicPatterns gi [{ap & ap_expr = syn.syn_annot_expr}]}
            , syn_texpr      = syn.syn_texpr
            , syn_pattern_match_vars = [(bv, clexpr) : syn.syn_pattern_match_vars]}, chn)
@@ -486,7 +490,7 @@ mkBlueprint inh (Case cs) chn
                                           _ = ((Yes syn.syn_annot_expr, [(TLit "_", syn):syns]), chn)
                                     _ = ((No, syns), chn)
         = ({ syn_annot_expr = Case {cs & case_default = def, case_guards = guards}
-           , syn_texpr      = TCaseOrIf (TVar Nothing (ppCompact ed)) (map (\(d, s) -> (d, s.syn_texpr)) syns)
+           , syn_texpr      = TCaseOrIf cesyn.syn_texpr (map (\(d, s) -> (d, s.syn_texpr)) syns)
            , syn_pattern_match_vars = foldr (\(_, syn) acc -> syn.syn_pattern_match_vars ++ acc) [] syns}, chn)
   where
   numGuards (AlgebraicPatterns _ ps)        = length ps
@@ -508,7 +512,6 @@ mkBlueprint inh (Case cs) chn
         mkAp sym []   chn = (TLit (ppCompact ('PPrint'.text sym.glob_object.ds_ident.id_name)), chn)
         mkAp sym vars chn
           # (fvds, chn) = mapSt (mkBlueprint inh o FreeVar) vars chn
-          // TODO TNonAssoc?
           = (TFApp (ppCompact ('PPrint'.text sym.glob_object.ds_ident.id_name)) (map (\x -> x.syn_texpr) fvds) TNonAssoc, chn)
   mkAlts c=:(BasicPatterns bt bps) chn
     # ((bps, syns, _), chn) = foldr f (([], [], 0), chn) bps
