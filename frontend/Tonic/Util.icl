@@ -155,6 +155,63 @@ idxIsMain idx menv
   # (main_dcl_module_n, menv) = menv!me_main_dcl_module_n
   = (idx == main_dcl_module_n, menv)
 
+reifyFunDefsIdxPriority :: Ident Index *ModuleEnv -> *(Maybe Priority, *ModuleEnv)
+reifyFunDefsIdxPriority ident idx menv
+  # (mfd, fds) = muselect menv.me_fun_defs_cpy idx
+  # menv = {menv & me_fun_defs_cpy = fds}
+  = case mfd of
+      Just fd -> (Just fd.fun_priority, menv)
+      _       -> (Nothing, menv)
+
+reifyDclModulesIdxPriority :: (Global Index) *ModuleEnv -> *(Maybe Priority, *ModuleEnv)
+reifyDclModulesIdxPriority {glob_module,glob_object} menv = reifyDclModulesIdxPriority` glob_module glob_object menv
+
+reifyDclModulesIdxPriority` :: Index Index *ModuleEnv -> *(Maybe Priority, *ModuleEnv)
+reifyDclModulesIdxPriority` glob_module glob_object menv
+  # (mFunTy, menv) = reifyDclModulesIdxFunType` glob_module glob_object menv
+  = case mFunTy of
+      Just funTy -> (Just funTy.ft_priority, menv)
+      _          -> (Nothing, menv)
+
+reifySymbIdentPriority :: SymbIdent *ModuleEnv -> *(Maybe Priority, *ModuleEnv)
+reifySymbIdentPriority {symb_ident, symb_kind=SK_Function glob} menv
+  | glob.glob_module == menv.me_main_dcl_module_n = reifyFunDefsIdxPriority symb_ident glob.glob_object menv
+  | otherwise                                     = reifyDclModulesIdxPriority glob menv
+reifySymbIdentPriority {symb_ident, symb_kind=SK_IclMacro idx}           menv = reifyFunDefsIdxPriority symb_ident idx menv
+reifySymbIdentPriority {symb_ident, symb_kind=SK_LocalMacroFunction idx} menv = reifyFunDefsIdxPriority symb_ident idx menv
+reifySymbIdentPriority {symb_ident, symb_kind=SK_DclMacro glob} menv
+  | glob.glob_module == menv.me_main_dcl_module_n = reifyFunDefsIdxPriority symb_ident glob.glob_object menv
+  | otherwise                                     = reifyDclModulesIdxPriority glob menv
+reifySymbIdentPriority {symb_ident, symb_kind=SK_LocalDclMacroFunction glob} menv
+  | glob.glob_module == menv.me_main_dcl_module_n = reifyFunDefsIdxPriority symb_ident glob.glob_object menv
+  | otherwise                                     = reifyDclModulesIdxPriority glob menv
+reifySymbIdentPriority {symb_ident, symb_kind=SK_OverloadedFunction {glob_module, glob_object} } menv
+  | glob_module == menv.me_main_dcl_module_n
+      # (icl, menv) = menv!me_icl_module
+      # md          = icl.icl_common.com_member_defs.[glob_object]
+      = (Just md.me_priority, menv)
+  | otherwise
+      # (dcls, menv) = menv!me_dcl_modules
+      # md           = dcls.[glob_module].dcl_common.com_member_defs.[glob_object]
+      = (Just md.me_priority, menv)
+reifySymbIdentPriority {symb_ident, symb_kind=SK_GeneratedFunction fip idx} menv = reifyFunDefsIdxPriority symb_ident idx menv
+reifySymbIdentPriority {symb_ident, symb_kind=SK_Constructor {glob_module, glob_object}} menv
+  | glob_module == menv.me_main_dcl_module_n
+      # (icl, menv) = menv!me_icl_module
+      # md          = icl.icl_common.com_cons_defs.[glob_object]
+      = (Just md.cons_priority, menv)
+  | otherwise
+      # (dcls, menv) = menv!me_dcl_modules
+      # md           = dcls.[glob_module].dcl_common.com_cons_defs.[glob_object]
+      = (Just md.cons_priority, menv)
+reifySymbIdentPriority {symb_ident, symb_kind=SK_NewTypeConstructor globi} menv = abort "reifySymbIdentType: SK_NewTypeConstructor" // reifyDclModulesIdx` globi.gi_module globi.gi_index menv
+reifySymbIdentPriority {symb_ident, symb_kind=SK_Generic {glob_module, glob_object} _} menv
+  = (Nothing, menv)
+reifySymbIdentPriority {symb_ident, symb_kind=SK_OverloadedConstructor glob} menv
+  | glob.glob_module == menv.me_main_dcl_module_n = reifyFunDefsIdxPriority symb_ident glob.glob_object menv
+  | otherwise                                     = reifyDclModulesIdxPriority glob menv
+reifySymbIdentPriority si menv = abort "reifySymbIdentPriority: unsupported"
+
 reifySymbIdentSymbolType :: SymbIdent *ModuleEnv -> *(Maybe SymbolType, *ModuleEnv)
 reifySymbIdentSymbolType {symb_ident, symb_kind=SK_Function glob} menv
   | glob.glob_module == menv.me_main_dcl_module_n = reifyFunDefsIdxSymbolType symb_ident glob.glob_object menv

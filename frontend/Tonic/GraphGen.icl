@@ -232,18 +232,22 @@ wrapTaskApp uid wrappedFnNm origExpr inh chn
 import StdDebug
 
 getAssoc app_symb menv
-  # (mFunTy, menv) = reifyFunType app_symb menv
-  # assoc = getAssoc` mFunTy
-  = (assoc, menv)
+  # (mPrio, menv) = reifySymbIdentPriority app_symb menv
+  = case mPrio of
+      Just prio -> (mkPrio prio, menv)
+      _         -> (TNonAssoc, menv)
 
-getAssoc` mFunTy
-  = case mFunTy of
-      Just {ft_priority = Prio assoc n} -> case assoc of
-                                             LeftAssoc  -> TLeftAssoc n
-                                             RightAssoc -> TRightAssoc n
-                                             NoAssoc    -> TNonAssoc
-      _ -> TNonAssoc
+mkPrio (Prio assoc n) =
+  case assoc of
+    LeftAssoc  -> TLeftAssoc n
+    RightAssoc -> TRightAssoc n
+    NoAssoc    -> TNonAssoc
+mkPrio _ = TNonAssoc
 
+instance toString TAssoc where
+  toString (TLeftAssoc n)  = "TLeftAssoc " +++ toString n
+  toString (TRightAssoc n) = "TRightAssoc " +++ toString n
+  toString TNonAssoc       = "TNonAssoc"
 
 mkBlueprint :: !InhExpression !Expression !*ChnExpression -> *(!SynExpression, !*ChnExpression)
 mkBlueprint inh (App app=:{app_symb}) chn
