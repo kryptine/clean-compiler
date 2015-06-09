@@ -357,7 +357,7 @@ foldUArr f (b, arr)
 reifyArgsAndDef :: SymbIdent *ModuleEnv -> *(([FreeVar], FunDef), *ModuleEnv)
 reifyArgsAndDef app_symb menv
   # (mfd, menv)      = reifyFunDef app_symb menv
-  # (rSym, menv)     = ppSymbIdent app_symb menv
+  # rSym             = ppSymbIdent app_symb
   # (mFArgTy, menv)  = reifySymbIdentSymbolType app_symb menv
   # rhsfd            = fromMaybe (abort $ "reifyArgs failed to find function definition for " +++ ppCompact rSym) mfd
   # args             = getFunArgs rhsfd

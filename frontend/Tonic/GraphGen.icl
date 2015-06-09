@@ -245,7 +245,7 @@ mkPrio (Prio assoc n) =
 mkPrio _ = TNonAssoc
 
 mkBlueprint :: !InhExpression !Expression !*ChnExpression -> *(!SynExpression, !*ChnExpression)
-mkBlueprint inh (App app=:{app_symb}) chn
+mkBlueprint inh expr=:(App app=:{app_symb}) chn
   # (isTonicFunctor, chn) = symbIdentIsTask app.app_symb chn
   # ((ctxs, args), menv)  = dropAppContexts app chn.chn_module_env
   # chn                   = { chn & chn_module_env = menv }
@@ -264,6 +264,14 @@ mkBlueprint inh (App app=:{app_symb}) chn
           }
         , {chn & chn_module_env = menv})
   | isTonicFunctor = mkMApp app ctxs args inh chn
+  | appIsListComp app
+      = case [orig \\ (ident, orig) <- inh.inh_list_compr
+                    | app.app_symb.symb_ident.id_name == ident] of
+          [] = mkFApp app ctxs args inh chn
+          [orig:_]
+            = ({ syn_annot_expr = expr
+               , syn_texpr      = TLit (ppCompact (ppParsedExpr orig))
+               , syn_pattern_match_vars = []}, chn)
   | otherwise      = mkFApp app ctxs args inh chn
   where
   mkMApp app ctxs args inh chn
@@ -367,7 +375,7 @@ mkBlueprint inh (e=:(App app) @ es) chn
          , syn_pattern_match_vars = []}, chn)
   where
     zwf eVar eVal menv
-      # (fvl, menv) = ppFreeVar eVar menv
+      # fvl         = ppFreeVar eVar
       # (fvr, menv) = ppExpression eVal menv
       = ((ppCompact fvl, ppCompact fvr), menv)
 mkBlueprint inh (e=:(Var bv) @ es) chn
@@ -405,7 +413,7 @@ mkBlueprint inh (Let lt) chn
             [orig:_]
               # (syn, chn) = mkBlueprint {inh & inh_case_expr = Just expr} lt.let_expr chn
               # l          = {lt & let_expr = syn.syn_annot_expr}
-              = ({syn & syn_annot_expr = Let l}, chn)
+              = ({syn & syn_annot_expr = Let l, syn_texpr = TLit (ppCompact (ppParsedExpr orig))}, chn)
   mkLet (Just expr) lt inh chn
     # (syn, chn) = mkBlueprint {inh & inh_case_expr = Just expr} lt.let_expr chn
     # l          = {lt & let_expr = syn.syn_annot_expr}
@@ -555,11 +563,11 @@ mkBlueprint inh expr=:(Selection st selExpr sels) chn
      , syn_pattern_match_vars = []}, chn)
   where
   mkSelExprs (RecordSelection gds _) chn
-    # (d, menv) = ppDefinedSymbol gds.glob_object chn.chn_module_env
-    = (TLit (ppCompact d), {chn & chn_module_env = menv})
+    # d = ppDefinedSymbol gds.glob_object
+    = (TLit (ppCompact d), chn)
   mkSelExprs (ArraySelection gds _ e) chn // TODO use e
-    # (d, menv) = ppDefinedSymbol gds.glob_object chn.chn_module_env
-    = (TLit (ppCompact d), {chn & chn_module_env = menv})
+    # d = ppDefinedSymbol gds.glob_object
+    = (TLit (ppCompact d), chn)
   mkSelExprs (DictionarySelection bv sels _ e) chn
     = (TLit "TODO mkSelExprs DictionarySelection ", chn)
 mkBlueprint _ expr=:(Update _ _ _) chn = ({ syn_annot_expr = expr

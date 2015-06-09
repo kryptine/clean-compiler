@@ -3,18 +3,18 @@ definition module Tonic.Pretty
 from Text.PPrint import :: Doc
 from syntax import :: App, :: SymbIdent, :: Ident, :: BoundVar, :: Expression,
   :: FreeVar, :: BasicValue, :: DefinedSymbol, :: Selection, :: SymbIdent,
-  :: Type, :: AType, :: TypeSymbIdent
+  :: Type, :: AType, :: TypeSymbIdent, :: ParsedExpr
 from Tonic.AbsSyn import :: ModuleEnv
 
 ppDebugApp :: App *ModuleEnv -> *(Doc, *ModuleEnv)
 
 ppApp :: App *ModuleEnv -> *(Doc, *ModuleEnv)
 
-ppSymbIdent :: SymbIdent *ModuleEnv -> *(Doc, *ModuleEnv)
+ppSymbIdent :: SymbIdent -> Doc
 
-ppIdent :: Ident *ModuleEnv -> *(Doc, *ModuleEnv)
+ppIdent :: Ident -> Doc
 
-ppBoundVar :: BoundVar *ModuleEnv -> *(Doc, *ModuleEnv)
+ppBoundVar :: BoundVar -> Doc
 
 ppDebugExpression :: Expression *ModuleEnv -> *(Doc, *ModuleEnv)
 
@@ -22,15 +22,15 @@ ppExpression :: Expression *ModuleEnv -> *(Doc, *ModuleEnv)
 
 mkRecSel :: [Doc] -> Doc
 
-ppFreeVar :: FreeVar *ModuleEnv -> *(Doc, *ModuleEnv)
+ppFreeVar :: FreeVar -> Doc
 
 ppBasicValue :: BasicValue -> Doc
 
-ppSelection :: Selection *ModuleEnv -> *(Doc, *ModuleEnv)
+ppSelection :: Selection -> Doc
 
-ppDebugSelection :: Selection *ModuleEnv -> *(Doc, *ModuleEnv)
+ppDebugSelection :: Selection -> Doc
 
-ppDefinedSymbol :: DefinedSymbol *ModuleEnv -> *(Doc, *ModuleEnv)
+ppDefinedSymbol :: DefinedSymbol -> Doc
 
 ppCompact :: (Doc -> String)
 
@@ -39,3 +39,5 @@ ppType :: Type -> Doc
 ppAType :: AType -> Doc
 
 ppTypeSymbIdent :: TypeSymbIdent -> Doc
+
+ppParsedExpr :: ParsedExpr -> Doc
