@@ -493,12 +493,12 @@ mkBlueprint inh (Case cs) chn
                                     Yes def
                                       # (syn, chn) = mkAlts` inh (numGuards cs.case_guards) def chn
                                       = case syns of
-                                          [(TVar _ "True", _)]
+                                          [(TLit "True", _)]
                                             = ((Yes syn.syn_annot_expr, [(TLit "False", syn):syns]), chn)
                                           _ = ((Yes syn.syn_annot_expr, [(TLit "_", syn):syns]), chn)
                                     _ = ((No, syns), chn)
         = ({ syn_annot_expr = Case {cs & case_default = def, case_guards = guards}
-           , syn_texpr      = TCaseOrIf cesyn.syn_texpr (map (\(d, s) -> (d, s.syn_texpr)) syns)
+           , syn_texpr      = TCaseOrIf cesyn.syn_texpr (reverse (map (\(d, s) -> (d, s.syn_texpr)) syns))
            , syn_pattern_match_vars = foldr (\(_, syn) acc -> syn.syn_pattern_match_vars ++ acc) [] syns}, chn)
   where
   numGuards (AlgebraicPatterns _ ps)        = length ps
