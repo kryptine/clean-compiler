@@ -76,7 +76,7 @@ given x == y && y == z
   //where
   //mkLCExpr (PE_Ident ident) = PPCleanExpr ident.id_name
   //mkLCExpr (PE_Basic b)     = PPCleanExpr (ppCompact (ppBasicValue b))
-  //mkLCExpr (PE_Tuple es)    = AppCleanExpr TNonAssoc (predefined_idents.[GetTupleConsIndex (length es)].id_name) (map mkLCExpr es)
+  //mkLCExpr (PE_Tuple es)    = AppCleanExpr TNoAssoc (predefined_idents.[GetTupleConsIndex (length es)].id_name) (map mkLCExpr es)
   //mkLCExpr _                = PPCleanExpr "TODO"
   //mkLCExpr lc=:(PE_ListCompr _ _ _ _) = "PE_ListCompr"
   //mkLCExpr (PE_List _) = "PE_List"
@@ -234,15 +234,8 @@ import StdDebug
 getAssoc app_symb menv
   # (mPrio, menv) = reifySymbIdentPriority app_symb menv
   = case mPrio of
-      Just prio -> (mkPrio prio, menv)
-      _         -> (TNonAssoc, menv)
-
-mkPrio (Prio assoc n) =
-  case assoc of
-    LeftAssoc  -> TLeftAssoc n
-    RightAssoc -> TRightAssoc n
-    NoAssoc    -> TNonAssoc
-mkPrio _ = TNonAssoc
+      Just prio -> (fromPriority prio, menv)
+      _         -> (TNoPrio, menv)
 
 mkBlueprint :: !InhExpression !Expression !*ChnExpression -> *(!SynExpression, !*ChnExpression)
 mkBlueprint inh expr=:(App app=:{app_symb}) chn
@@ -388,11 +381,11 @@ mkBlueprint inh (e=:(Var bv) @ es) chn
                         Just x -> symTyStr` x
                         _      -> Nothing
       = ({ syn_annot_expr = var`
-         , syn_texpr      = TMApp uid mTyStr "" bv.var_ident.id_name (map (\syn -> syn.syn_texpr) bps) TNonAssoc
+         , syn_texpr      = TMApp uid mTyStr "" bv.var_ident.id_name (map (\syn -> syn.syn_texpr) bps) TNoPrio
          , syn_pattern_match_vars = []}, chn)
   | otherwise
       = ({ syn_annot_expr = Var bv
-         , syn_texpr      = TFApp bv.var_ident.id_name (map (\syn -> syn.syn_texpr) bps) TNonAssoc
+         , syn_texpr      = TFApp bv.var_ident.id_name (map (\syn -> syn.syn_texpr) bps) TNoPrio
          , syn_pattern_match_vars = []}, chn)
 mkBlueprint inh (e @ es) chn = ({ syn_annot_expr = e @ es
                               , syn_texpr      = TLit "TODO @"
@@ -479,8 +472,8 @@ mkBlueprint inh (Case cs) chn
                                                   (reifyFunDefsIdxPriority ap.ap_symbol.glob_object.ds_index menv)
                                                   (reifyDclModulesIdxPriority` ap.ap_symbol.glob_module ap.ap_symbol.glob_object.ds_index menv)
                               # assoc         = case mprio of
-                                                  Just p -> mkPrio p
-                                                  _      -> TNonAssoc
+                                                  Just p -> fromPriority p
+                                                  _      -> TNoPrio
                               # chn           = {chn & chn_module_env = menv}
                               = (TFApp ap.ap_symbol.glob_object.ds_ident.id_name (map (\x -> x.syn_texpr) args) assoc, chn)
         # (syn, chn)    = mkAlts` inh 0 ap.ap_expr chn
@@ -520,7 +513,7 @@ mkBlueprint inh (Case cs) chn
         mkAp sym []   chn = (TLit (ppCompact ('PPrint'.text sym.glob_object.ds_ident.id_name)), chn)
         mkAp sym vars chn
           # (fvds, chn) = mapSt (mkBlueprint inh o FreeVar) vars chn
-          = (TFApp (ppCompact ('PPrint'.text sym.glob_object.ds_ident.id_name)) (map (\x -> x.syn_texpr) fvds) TNonAssoc, chn)
+          = (TFApp (ppCompact ('PPrint'.text sym.glob_object.ds_ident.id_name)) (map (\x -> x.syn_texpr) fvds) TNoPrio, chn)
   mkAlts c=:(BasicPatterns bt bps) chn
     # ((bps, syns, _), chn) = foldr f (([], [], 0), chn) bps
     = ((BasicPatterns bt bps, syns), chn)

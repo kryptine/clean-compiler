@@ -795,13 +795,15 @@ pdssAreDefined [pds:xs] pdss
   | predefIsUndefined tune_symb = (False, pdss)
   | otherwise                   = pdssAreDefined xs pdss
 
-mkTAssoc :: (Maybe FunType) -> TAssoc
-mkTAssoc Nothing = TNonAssoc
-mkTAssoc (Just ft)
-  = case ft.ft_priority of
-      (Prio LeftAssoc n)  -> TLeftAssoc n
-      (Prio RightAssoc n) -> TRightAssoc n
-      _                   -> TNonAssoc
+mkTAssoc :: (Maybe FunType) -> TPriority
+mkTAssoc Nothing = TNoPrio
+mkTAssoc (Just ft) = fromPriority ft.ft_priority
+
+fromPriority :: Priority -> TPriority
+fromPriority (Prio LeftAssoc n)  = TPrio TLeftAssoc n
+fromPriority (Prio RightAssoc n) = TPrio TRightAssoc n
+fromPriority (Prio NoAssoc n)    = TPrio TNoAssoc n
+fromPriority _                   = TNoPrio
 
 //exprToTCleanExpr :: Expression *ModuleEnv -> *(TCleanExpr, *ModuleEnv)
 //exprToTCleanExpr (App app) menv
@@ -821,11 +823,11 @@ typeToTCleanExpr :: Type -> TExpr
 typeToTCleanExpr (TA tsi []) = TVar Nothing tsi.type_ident.id_name
 typeToTCleanExpr (TA tsi args)
   # tces = map (typeToTCleanExpr o \arg -> arg.at_type) args
-  = TFApp tsi.type_ident.id_name tces TNonAssoc
+  = TFApp tsi.type_ident.id_name tces TNoPrio
 typeToTCleanExpr (TAS tsi [] _) = TVar Nothing tsi.type_ident.id_name
 typeToTCleanExpr (TAS tsi args _)
   # tces = map (typeToTCleanExpr o \arg -> arg.at_type) args
-  = TFApp tsi.type_ident.id_name tces TNonAssoc
+  = TFApp tsi.type_ident.id_name tces TNoPrio
 typeToTCleanExpr ty
   = TVar Nothing (ppCompact (ppType ty))
 

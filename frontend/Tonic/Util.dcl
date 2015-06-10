@@ -6,6 +6,7 @@ from StdArray import class Array
 from Data.Maybe import :: Maybe
 from Data.Map import :: Map
 import Tonic.AbsSyn
+from iTasks._Framework.Tonic.AbsSyn import :: TPriority
 
 foldrArr :: (a b -> b) b (arr a) -> b | Array arr a
 
@@ -169,3 +170,5 @@ pdssAreDefined :: [Int] *PredefinedSymbols -> *(Bool, *PredefinedSymbols)
 mselect :: (a e) !Int -> Maybe e | Array a e
 
 typeHasClassInstance :: Type Int InhExpression *ChnExpression -> *(Bool, *ChnExpression)
+
+fromPriority :: Priority -> TPriority
