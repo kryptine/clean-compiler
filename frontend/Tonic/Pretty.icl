@@ -26,7 +26,7 @@ from syntax import
   :: Expression (..), :: BoundVar {..}, :: App {..}, :: Let {..}, :: Case,
   :: SelectorKind, :: Selection (..), :: FreeVar {..}, :: Global {..},
   :: SymbIdent {..}, :: SymbKind (..), :: VarContexts, :: TypeKind, :: FunctionInfoPtr, :: FunctionInfo, :: Priority (..), :: Assoc (..), :: VarInfoPtr, :: DynamicExpr,
-  :: Ptr, :: VarInfo, :: CodeBinding, :: DefinedSymbol {..}, :: Index, :: Bind,
+  :: Ptr, :: VarInfo, :: CodeBinding, :: DefinedSymbol {..}, :: Index, :: Bind {..},
   :: Position, :: AType {..}, :: Env, :: Ident {..}, :: SymbolPtr,
   :: SymbolTableEntry, :: Level, :: ExprInfoPtr, :: ExprInfo,
   :: TypeCodeExpression, :: GlobalIndex, :: Conditional, :: BasicValue (..),
@@ -37,10 +37,12 @@ from syntax import
   :: TypeVarInfo, :: AttrVarInfo, :: FunType {..}, :: FunSpecials, :: TempVarId,
   :: ATypeVar, :: BasicType, :: ConsVariable, :: TypeAttribute, :: TypeSymbIdent {..},
   :: TypeSymbProperties, instance toString BasicType, :: ConsVariable (..),
-  :: ParsedExpr (..), :: ArrayKind (..), :: DynamicType, :: Sequence (..), :: Qualifier {..},
-  :: LocalDefs, :: FileName, :: LineAndColumn, :: Generator {..}, :: GeneratorKind (..),
-  :: CaseAlt, :: ParsedSelection, :: ParsedSelectorKind, :: ElemAssignment, :: FieldAssignment,
-  :: OptionalRecordName, :: BoundExpr, :: FieldNameOrQualifiedFieldName
+  :: ParsedExpr (..), :: ArrayKind (..), :: DynamicType {..}, :: Sequence (..), :: Qualifier {..},
+  :: LocalDefs (..), :: FileName, :: LineAndColumn, :: Generator {..}, :: GeneratorKind (..),
+  :: CaseAlt {..}, :: ParsedSelection (..), :: ParsedSelectorKind (..), :: ElemAssignment, :: FieldAssignment,
+  :: OptionalRecordName, :: BoundExpr, :: FieldNameOrQualifiedFieldName (..), :: ModuleIdent,
+  :: Rhs {..}, :: OptGuardedAlts (..), :: GuardedExpr {..}, :: NodeDefWithLocals, :: ExprWithLocalDefs,
+  :: ParsedDefinition, :: CollectedLocalDefs
 
 ppDebugApp :: App *ModuleEnv -> *(Doc, *ModuleEnv)
 ppDebugApp app menv
@@ -224,13 +226,13 @@ ppTypeSymbIdent :: TypeSymbIdent -> Doc
 ppTypeSymbIdent tsi = text (tsi.type_ident.id_name)
 
 ppParsedExpr :: ParsedExpr -> Doc
-ppParsedExpr (PE_List exprs) = text "[" <-> hcat (intersperse (text ", ") (map ppParsedExpr exprs)) <-> text "]"
-ppParsedExpr (PE_Tuple args) = text "(" <-> hcat (intersperse (text ", ") (map ppParsedExpr args)) <-> text ")"
+ppParsedExpr (PE_List exprs) = hcat (intersperse (text " ") (map ppParsedExpr exprs))
+ppParsedExpr (PE_Tuple args) = text "(" <-> hcat (intersperse (text " ") (map ppParsedExpr args)) <-> text ")"
 ppParsedExpr (PE_Basic basic_value) = ppBasicValue basic_value
-//ppParsedExpr (PE_Selection selector_kind expr selectors) =  file <<< expr <<< selector_kind <<< selectors
-//ppParsedExpr (PE_Update expr1 selections expr2) =  file <<< '{' <<< expr1  <<< " & " <<<  selections <<< " = " <<< expr2 <<< '}'
-//ppParsedExpr (PE_Record PE_Empty _ fields) = file <<< '{' <<< fields <<< '}'
-//ppParsedExpr (PE_Record rec _ fields) = file <<< '{' <<< rec <<< " & " <<< fields <<< '}'
+ppParsedExpr (PE_Selection selector_kind expr selectors) = ppParsedExpr expr <-> ppSelectorKind selector_kind <-> hcat (intersperse (text " ") (map ppParsedSelection selectors))
+ppParsedExpr (PE_Update expr1 selections expr2) =  char '{' <-> ppParsedExpr expr1 <-> text " & " <-> hcat (intersperse (text " ") (map ppParsedSelection selections)) <-> text " = " <-> ppParsedExpr expr2 <-> char '}'
+ppParsedExpr (PE_Record PE_Empty _ fields) = char '{' <-> hcat (intersperse (text " ") (map ppFieldAssignment fields)) <-> char '}'
+ppParsedExpr (PE_Record rec _ fields) = char '{' <-> ppParsedExpr rec <-> text " & " <-> hcat (intersperse (text " ") (map ppFieldAssignment fields)) <-> char '}'
 ppParsedExpr (PE_ListCompr _ _ expr quals) = text "[" <-> ppParsedExpr expr <-> text " \\\\ " <-> hcat (intersperse (text ", ") (map ppQualifier quals)) <-> text "]"
 ppParsedExpr (PE_ArrayCompr _ expr quals) = text "{" <-> ppParsedExpr expr <-> text " \\\\ " <-> hcat (intersperse (text ", ") (map ppQualifier quals)) <-> text "}"
 ppParsedExpr (PE_Sequ seq)   = text "[" <-> ppSequence seq <-> text "]"
@@ -238,16 +240,16 @@ ppParsedExpr PE_Empty        = text "** E **"
 ppParsedExpr (PE_Ident symb) = ppIdent symb
 ppParsedExpr PE_WildCard     = char '_'
 ppParsedExpr (PE_Lambda _ exprs expr _) = char '\\' <-> hcat (intersperse (text " ") (map ppParsedExpr exprs)) <-> text " -> " <-> ppParsedExpr expr
-//ppParsedExpr (PE_Bound bind) = file <<< bind
-//ppParsedExpr (PE_Case _ expr alts) = file <<< "case " <<< expr <<< " of\n" <<< alts
-//ppParsedExpr (PE_Let defs expr) = file <<< "let " <<< defs <<< " in\n" <<< expr
-//ppParsedExpr (PE_DynamicPattern expr type) = file <<< expr <<< "::" <<< type
-//ppParsedExpr (PE_Dynamic expr maybetype)
-  //= case maybetype of
-    //Yes type
-        //-> file <<< "dynamic " <<< expr <<< "::" <<< type
-    //No
-        //-> file <<< "dynamic " <<< expr
+ppParsedExpr (PE_Bound bind) = ppBoundExpr bind
+ppParsedExpr (PE_Case _ expr alts) = text "case " <-> ppParsedExpr expr <-> text " of\n" <-> hcat (intersperse (text " ") (map ppCaseAlt alts))
+ppParsedExpr (PE_Let defs expr) = text "let " <-> ppLocalDefs defs <-> text " in\n" <-> ppParsedExpr expr
+ppParsedExpr (PE_DynamicPattern expr type) = ppParsedExpr expr <-> text " :: " <-> ppDynamicType type
+ppParsedExpr (PE_Dynamic expr maybetype)
+  = case maybetype of
+    Yes type
+        -> text "dynamic " <-> ppParsedExpr expr <-> text " :: " <-> ppDynamicType type
+    No
+        -> text "dynamic " <-> ppParsedExpr expr
 ppParsedExpr _ = text "some expression"
 
 ppSequence :: Sequence -> Doc
@@ -267,3 +269,42 @@ ppGenerator {gen_kind,gen_pattern,gen_expr} = ppParsedExpr gen_pattern <-> text 
   gen_kind_to_string IsOverloadedListGenerator = " <|- "
   gen_kind_to_string IsArrayGenerator = " <-: "
 
+ppParsedSelection :: ParsedSelection -> Doc
+ppParsedSelection (PS_Record selector _) = ppIdent selector
+ppParsedSelection (PS_QualifiedRecord mi str _) = ppIdent mi <-> text str
+ppParsedSelection (PS_Array index_expr) = char '[' <-> ppParsedExpr index_expr <-> char ']'
+ppParsedSelection PS_Erroneous = text "Erroneous selector"
+
+ppSelectorKind :: ParsedSelectorKind -> Doc
+ppSelectorKind ParsedNormalSelector = text "."
+ppSelectorKind (ParsedUniqueSelector False) = text "!"
+ppSelectorKind (ParsedUniqueSelector True) = text "!*"
+
+ppFieldAssignment :: FieldAssignment -> Doc
+ppFieldAssignment {bind_src, bind_dst} = ppParsedExpr bind_src <-> text " = " <-> ppFieldNameOrQualifiedFieldName bind_dst
+
+ppFieldNameOrQualifiedFieldName :: FieldNameOrQualifiedFieldName -> Doc
+ppFieldNameOrQualifiedFieldName (FieldName ident) = ppIdent ident
+ppFieldNameOrQualifiedFieldName (QualifiedFieldName module_ident field_name) = char '.' <-> ppIdent module_ident <-> text "'." <-> text field_name
+
+ppBoundExpr :: BoundExpr -> Doc
+ppBoundExpr {bind_src, bind_dst} = ppParsedExpr bind_src <-> text " = " <-> ppIdent bind_dst
+
+ppCaseAlt :: CaseAlt -> Doc
+ppCaseAlt {calt_pattern,calt_rhs} = ppParsedExpr calt_pattern <-> text " -> " <-> ppRhs calt_rhs
+
+ppRhs :: Rhs -> Doc
+ppRhs {rhs_alts,rhs_locals} = ppOptGuardedAlts rhs_alts <-> ppLocalDefs rhs_locals <-> char '\n'
+
+ppOptGuardedAlts :: OptGuardedAlts -> Doc
+ppOptGuardedAlts (GuardedAlts guarded_exprs def_expr) = text "TODO GuardedAlts"
+ppOptGuardedAlts (UnGuardedExpr unguarded_expr) = text "TODO UnGuardedExpr"
+
+ppLocalDefs :: LocalDefs -> Doc
+ppLocalDefs (LocalParsedDefs defs) = text "TODO LocalParsedDefs"
+ppLocalDefs (CollectedLocalDefs defs) = text "TODO LocalParsedDefs"
+
+ppDynamicType :: DynamicType -> Doc
+ppDynamicType {dt_uni_vars,dt_type} = text "TODO DynamicType"
+  //| isEmpty dt_uni_vars = text "DynamicType" <-> dt_type
+  //| otherwise           = text "DynamicType A." <-> dt_uni_vars <-> text ":" <-> dt_type
