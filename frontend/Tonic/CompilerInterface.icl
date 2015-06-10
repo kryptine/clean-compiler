@@ -88,7 +88,7 @@ ginTonic` is_itasks_mod main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_m
   = (str, menv.me_fun_defs, predef_symbols, heaps)
   where
   // fd does not always have a fun_type = Yes
-  appDefInfo idx fd=:{fun_ident=fun_ident, fun_body = TransformedBody tb} ((reps, heaps, predef_symbols, fun_defs_cpy), fun_defs)
+  appDefInfo idx fd=:{fun_pos,fun_ident=fun_ident, fun_body = TransformedBody tb} ((reps, heaps, predef_symbols, fun_defs_cpy), fun_defs)
     # (fd_cpy, fun_defs_cpy) = fun_defs_cpy![idx]
     # inh         = mkInhExpr fun_ident.id_name list_comprehensions class_instances common_defs
     # menv        = mkModuleEnv main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules
@@ -106,17 +106,21 @@ ginTonic` is_itasks_mod main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_m
       = ((case mres of
             Just (args, g, _)
               -> put fd.fun_ident.id_name { TonicTask
-                                          | tt_module = icl_module.icl_name.id_name
-                                          , tt_name   = fd.fun_ident.id_name
-                                          , tt_resty  = typeToTCleanExpr (funTy fd_cpy)
-                                          , tt_args   = args
-                                          , tt_body   = g} reps
+                                          | tt_module    = icl_module.icl_name.id_name
+                                          , tt_name      = fd.fun_ident.id_name
+                                          , tt_iclLineNo = mkFunPos fun_pos
+                                          , tt_resty     = typeToTCleanExpr (funTy fd_cpy)
+                                          , tt_args      = args
+                                          , tt_body      = g} reps
             _ -> reps
         , chn.chn_heaps, chn.chn_predef_symbols, menv.me_fun_defs_cpy), menv.me_fun_defs)
     | otherwise
       # menv = chn.chn_module_env
       = ((reps, chn.chn_heaps, chn.chn_predef_symbols, menv.me_fun_defs_cpy), menv.me_fun_defs)
   appDefInfo _ _ ((reps, heaps, predef_symbols, fun_defs_cpy), fun_defs) = ((reps, heaps, predef_symbols, fun_defs_cpy), fun_defs)
+  mkFunPos (FunPos _ n _) = n
+  mkFunPos (LinePos _ n)  = n
+  mkFunPos _              = -1
 
 updateWithAnnot :: Int Expression *ModuleEnv -> *ModuleEnv
 updateWithAnnot fidx e menv
