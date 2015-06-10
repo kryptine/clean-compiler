@@ -226,7 +226,7 @@ ppTypeSymbIdent :: TypeSymbIdent -> Doc
 ppTypeSymbIdent tsi = text (tsi.type_ident.id_name)
 
 ppParsedExpr :: ParsedExpr -> Doc
-ppParsedExpr (PE_List exprs) = hcat (intersperse (text " ") (map ppParsedExpr exprs))
+ppParsedExpr (PE_List exprs) = text "(" <-> hcat (intersperse (text " ") (map ppParsedExpr exprs)) <-> text ")"
 ppParsedExpr (PE_Tuple args) = text "(" <-> hcat (intersperse (text " ") (map ppParsedExpr args)) <-> text ")"
 ppParsedExpr (PE_Basic basic_value) = ppBasicValue basic_value
 ppParsedExpr (PE_Selection selector_kind expr selectors) = ppParsedExpr expr <-> ppSelectorKind selector_kind <-> hcat (intersperse (text " ") (map ppParsedSelection selectors))

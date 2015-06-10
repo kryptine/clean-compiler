@@ -249,17 +249,18 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
   # (isTonicFunctor, chn) = symbIdentIsTask app.app_symb chn
   # ((ctxs, args), menv)  = dropAppContexts app chn.chn_module_env
   # chn                   = { chn & chn_module_env = menv }
-  //| identIsListComprehension app_symb.symb_ident
-      //# ((_, tFd), menv) = reifyArgsAndDef app_symb chn.chn_module_env
-      //# (syne, chn)      = mkBlueprint inh (getFunRhs tFd) { chn & chn_module_env = menv }
-      //# menv             = updateWithAnnot app_symb syne.syn_annot_expr chn.chn_module_env
-      //= mkFApp app ctxs args inh {chn & chn_module_env = menv}
   | identIsLambda app_symb.symb_ident
       # ((args, tFd), menv) = reifyArgsAndDef app_symb chn.chn_module_env
       # (syne, chn)         = mkBlueprint inh (getFunRhs tFd) { chn & chn_module_env = menv }
+      # pats                = [case freeVarName x of
+                                 "_x" -> case syne.syn_pattern_match_vars of
+                                           [(_, e):_] -> e
+                                           _          -> TVar Nothing "_x"
+                                 x    -> TVar Nothing x
+                              \\ x <- args | x.fv_def_level == -1]
       # menv                = updateWithAnnot app_symb syne.syn_annot_expr chn.chn_module_env
       = ( { syn_annot_expr = App app
-          , syn_texpr      = TLam [freeVarName x \\ x <- args | x.fv_def_level == -1] syne.syn_texpr
+          , syn_texpr      = TLam pats syne.syn_texpr
           , syn_pattern_match_vars = []
           }
         , {chn & chn_module_env = menv})
@@ -467,13 +468,11 @@ mkBlueprint inh (Let lt) chn
 mkBlueprint inh (Case cs) chn
   # caseExpr     = fromMaybe cs.case_expr inh.inh_case_expr
   # (cesyn, chn) = mkBlueprint inh caseExpr chn
-  = case (cs.case_expr, cs.case_guards) of
-      (Var bv, AlgebraicPatterns gi [ap])
-        | bv.var_ident.id_name == "_x"
-        # (syn, chn)    = mkAlts` 0 ap.ap_expr chn
+  = case (cs.case_explicit, cs.case_expr, cs.case_guards) of
+      (False, Var bv, AlgebraicPatterns gi [ap:_])
         # (fvds, chn)   = mapSt (mkBlueprint inh o FreeVar) ap.ap_vars chn
         # (clexpr, chn) = case fvds of
-                            []   = (TLit "", chn)
+                            [] = (TLit "", chn)
                             args
                               # menv          = chn.chn_module_env
                               # (mprio, menv) = if (ap.ap_symbol.glob_module == chn.chn_module_env.me_main_dcl_module_n)
@@ -484,6 +483,7 @@ mkBlueprint inh (Case cs) chn
                                                   _      -> TNonAssoc
                               # chn           = {chn & chn_module_env = menv}
                               = (TFApp ap.ap_symbol.glob_object.ds_ident.id_name (map (\x -> x.syn_texpr) args) assoc, chn)
+        # (syn, chn)    = mkAlts` inh 0 ap.ap_expr chn
         = ({ syn_annot_expr = Case {cs & case_guards = AlgebraicPatterns gi [{ap & ap_expr = syn.syn_annot_expr}]}
            , syn_texpr      = syn.syn_texpr
            , syn_pattern_match_vars = [(bv, clexpr) : syn.syn_pattern_match_vars]}, chn)
@@ -491,7 +491,7 @@ mkBlueprint inh (Case cs) chn
         # ((guards, syns), chn) = mkAlts cs.case_guards chn
         # ((def, syns), chn)    = case cs.case_default of
                                     Yes def
-                                      # (syn, chn) = mkAlts` (numGuards cs.case_guards) def chn
+                                      # (syn, chn) = mkAlts` inh (numGuards cs.case_guards) def chn
                                       = case syns of
                                           [(TVar _ "True", _)]
                                             = ((Yes syn.syn_annot_expr, [(TLit "False", syn):syns]), chn)
@@ -513,7 +513,7 @@ mkBlueprint inh (Case cs) chn
     where
       f ap ((aps, syns, n), chn)
         # (apd, chn) = mkAp ap.ap_symbol ap.ap_vars chn
-        # (syn, chn) = mkAlts` n ap.ap_expr chn
+        # (syn, chn) = mkAlts` inh n ap.ap_expr chn
         # ap         = {ap & ap_expr = syn.syn_annot_expr}
         = (([ap:aps], [(apd, syn):syns], n + 1), chn)
         where
@@ -526,13 +526,13 @@ mkBlueprint inh (Case cs) chn
     = ((BasicPatterns bt bps, syns), chn)
     where
       f bp ((bps, syns, n), chn)
-        # (syn, chn)  = mkAlts` n bp.bp_expr chn
+        # (syn, chn)  = mkAlts` inh n bp.bp_expr chn
         # bp          = {bp & bp_expr = syn.syn_annot_expr}
         = (([bp:bps], [(TLit (ppCompact (ppBasicValue bp.bp_value)), syn):syns], n + 1), chn)
   mkAlts c chn = ((c, []), chn)
 
-  mkAlts` :: Int Expression *ChnExpression -> *(SynExpression, *ChnExpression)
-  mkAlts` n expr chn
+  mkAlts` :: InhExpression Int Expression *ChnExpression -> *(SynExpression, *ChnExpression)
+  mkAlts` inh n expr chn
     # inh = {inh & inh_case_expr = Nothing }
     = mkBlueprint inh expr chn
 
