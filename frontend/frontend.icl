@@ -341,11 +341,11 @@ execute_tonic mod_dir fun_defs td_infos main_dcl_module_n heaps predef_symbols l
 
   # (fun_defs, predef_symbols, hash_table, error, files, heaps) = ginTonic mod_dir main_dcl_module_n fun_defs fun_defs_cpy icl_mod dcl_mods common_defs_cpy list_comprehensions predef_symbols class_instances hash_table error files heaps
 
-  # (_,f,files) = fopen ("Clean System Files/groups_posttonic_" +++ icl_mod.icl_name.id_name) FWriteText files
-    (components, fun_defs, f) = showGroups groups 0 False fun_defs f
-    (ok,files) = fclose f files
-  | ok<>ok
-      = abort "";
+  //# (_,f,files) = fopen ("Clean System Files/groups_posttonic_" +++ icl_mod.icl_name.id_name) FWriteText files
+    //(components, fun_defs, f) = showGroups groups 0 False fun_defs f
+    //(ok,files) = fclose f files
+  //| ok<>ok
+      //= abort "";
   = (True, fun_defs, td_infos, main_dcl_module_n, predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
 
 newSymbolTable :: !Int -> *{# SymbolTableEntry}
