@@ -384,7 +384,7 @@ mkBlueprint inh (e=:(Var bv) @ es) chn
          , syn_texpr      = TMApp uid mTyStr "" bv.var_ident.id_name (map (\syn -> syn.syn_texpr) bps) TNoPrio
          , syn_pattern_match_vars = []}, chn)
   | otherwise
-      = ({ syn_annot_expr = Var bv
+      = ({ syn_annot_expr = Var bv @ es
          , syn_texpr      = TFApp bv.var_ident.id_name (map (\syn -> syn.syn_texpr) bps) TNoPrio
          , syn_pattern_match_vars = []}, chn)
 mkBlueprint inh (e @ es) chn = ({ syn_annot_expr = e @ es
