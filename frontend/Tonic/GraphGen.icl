@@ -572,11 +572,20 @@ mkBlueprint inh expr=:(TupleSelect _ i e) chn
   = ({ syn_annot_expr = expr
      , syn_texpr      = te
      , syn_pattern_match_vars = []}, chn)
+mkBlueprint inh expr=:(RecordUpdate {glob_object={ds_ident}} expression expressions) chn
+  # (syn, chn)  = mkBlueprint inh expression chn
+  # (syns, chn) = mapSt (\e -> mkBlueprint inh e.bind_src) expressions chn
+  # te          = TRecUpd ds_ident.id_name syn.syn_texpr (map (\x -> x.syn_texpr) syns)
+  = ({ syn_annot_expr = expr
+     , syn_texpr      = te
+     , syn_pattern_match_vars = []}, chn)
+mkBlueprint _ expr=:(NoBind _) chn
+  = ({ syn_annot_expr = expr
+     , syn_texpr      = TNoBind
+     , syn_pattern_match_vars = []}, chn)
+
 mkBlueprint _ expr=:(Update _ _ _) chn = ({ syn_annot_expr = expr
                           , syn_texpr      = TLit "(mkBlueprint Update fallthrough)"
-                          , syn_pattern_match_vars = []}, chn)
-mkBlueprint _ expr=:(RecordUpdate _ _ _) chn = ({ syn_annot_expr = expr
-                          , syn_texpr      = TLit "(mkBlueprint RecordUpdate fallthrough)"
                           , syn_pattern_match_vars = []}, chn)
 mkBlueprint _ expr=:(Conditional _) chn = ({ syn_annot_expr = expr
                           , syn_texpr      = TLit "(mkBlueprint Conditional fallthrough)"
@@ -613,9 +622,6 @@ mkBlueprint _ expr=:(TypeSignature _ _) chn = ({ syn_annot_expr = expr
                           , syn_pattern_match_vars = []}, chn)
 mkBlueprint _ expr=:EE chn = ({ syn_annot_expr = expr
                           , syn_texpr      = TLit "(mkBlueprint EE fallthrough)"
-                          , syn_pattern_match_vars = []}, chn)
-mkBlueprint _ expr=:(NoBind _) chn = ({ syn_annot_expr = expr
-                          , syn_texpr      = TLit "(mkBlueprint NoBind fallthrough)"
                           , syn_pattern_match_vars = []}, chn)
 mkBlueprint _ expr=:(FailExpr _) chn = ({ syn_annot_expr = expr
                           , syn_texpr      = TLit "(mkBlueprint FailExpr fallthrough)"
