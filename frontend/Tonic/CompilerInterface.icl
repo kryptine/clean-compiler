@@ -14,6 +14,7 @@ import Data.Functor
 import Data.Graph
 import Data.Maybe
 import Data.Map
+import qualified Data.Set as DS
 import Text.JSON
 import iTasks._Framework.Tonic.AbsSyn
 
@@ -90,7 +91,7 @@ ginTonic` is_itasks_mod main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_m
   // fd does not always have a fun_type = Yes
   appDefInfo idx fd=:{fun_pos,fun_ident=fun_ident, fun_body = TransformedBody tb} ((reps, heaps, predef_symbols, fun_defs_cpy), fun_defs)
     # (fd_cpy, fun_defs_cpy) = fun_defs_cpy![idx]
-    # inh         = mkInhExpr fun_ident.id_name list_comprehensions class_instances common_defs
+    # inh         = mkInhExpr ('DS'.fromList (map (\x -> x.fv_ident.id_name) tb.tb_args)) fun_ident.id_name list_comprehensions class_instances common_defs
     # menv        = mkModuleEnv main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules
     # chn         = mkChnExpr predef_symbols menv heaps
     # (isTask, chn) = funIsTopLevelBlueprint fd_cpy inh chn

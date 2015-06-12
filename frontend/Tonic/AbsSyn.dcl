@@ -13,6 +13,7 @@ from Data.Graph import :: Graph
 from Data.Maybe import :: Maybe
 from Text.JSON import generic JSONEncode, :: JSONNode
 from Data.Map import :: Map
+from Data.Set import :: Set
 from predef import :: PredefinedSymbol, :: PredefinedSymbols
 from iTasks._Framework.Tonic.AbsSyn import :: TExpr, :: ExprId, :: TypeName, :: ModuleName, :: TaskName, :: VariableName //, :: TCleanExpr
 
@@ -27,6 +28,7 @@ from iTasks._Framework.Tonic.AbsSyn import :: TExpr, :: ExprId, :: TypeName, :: 
   , inh_instance_tree  :: !{#{!InstanceTree}}
   , inh_common_defs    :: !{#CommonDefs}
   , inh_app_ctx        :: !(String, String)
+  , inh_vars_in_scope  :: !Set String
   }
 
 :: *ChnExpression =
@@ -50,7 +52,7 @@ from iTasks._Framework.Tonic.AbsSyn import :: TExpr, :: ExprId, :: TypeName, :: 
   , me_dcl_modules       :: !{#DclModule}
   }
 
-mkInhExpr :: !String ![(String, ParsedExpr)] !{#{!InstanceTree}} !{#CommonDefs} -> InhExpression
+mkInhExpr :: !(Set String) !String ![(String, ParsedExpr)] !{#{!InstanceTree}} !{#CommonDefs} -> InhExpression
 
 mkChnExpr :: *PredefinedSymbols *ModuleEnv *Heaps -> *ChnExpression
 

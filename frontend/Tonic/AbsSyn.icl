@@ -6,12 +6,14 @@ import Data.Func
 import Data.Graph
 import Data.Maybe
 import Data.Map
+from Data.Set import :: Set
+import qualified Data.Set as DS
 //import Tonic.Tonic
 import Tonic.Pretty
 import iTasks._Framework.Tonic.AbsSyn
 
-mkInhExpr :: !String ![(String, ParsedExpr)] !{#{!InstanceTree}} !{#CommonDefs} -> InhExpression
-mkInhExpr ctn list_comprehensions tree cds =
+mkInhExpr :: !(Set String) !String ![(String, ParsedExpr)] !{#{!InstanceTree}} !{#CommonDefs} -> InhExpression
+mkInhExpr vars ctn list_comprehensions tree cds =
   { InhExpression
   | inh_curr_task_name = ctn
   , inh_case_expr      = Nothing
@@ -21,6 +23,7 @@ mkInhExpr ctn list_comprehensions tree cds =
   , inh_instance_tree  = tree
   , inh_common_defs    = cds
   , inh_app_ctx        = ("", "")
+  , inh_vars_in_scope  = vars
   }
 
 mkChnExpr :: *PredefinedSymbols *ModuleEnv *Heaps -> *ChnExpression

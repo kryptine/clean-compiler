@@ -20,6 +20,8 @@ import Data.List
 import Data.Graph
 from Data.Map import :: Map
 import qualified Data.Map as DM
+from Data.Set import :: Set
+import qualified Data.Set as DS
 
 import qualified Text.PPrint as PPrint
 import iTasks._Framework.Tonic.AbsSyn
@@ -391,9 +393,10 @@ mkBlueprint inh (e @ es) chn = ({ syn_annot_expr = e @ es
                               , syn_texpr      = TLit "TODO @"
                               , syn_pattern_match_vars = []}, chn)
 mkBlueprint inh (Let lt) chn
-  # mexpr = listToMaybe [ bnd.lb_src \\ bnd <- getLetBinds lt
-                        | bnd.lb_dst.fv_ident.id_name == "_case_var"]
-  = mkLet mexpr lt inh chn
+  # boundVars = [bnd.lb_dst.fv_ident.id_name \\ bnd <- getLetBinds lt]
+  # mexpr     = listToMaybe [ bnd.lb_src \\ bnd <- getLetBinds lt
+                            | bnd.lb_dst.fv_ident.id_name == "_case_var"]
+  = mkLet mexpr lt {inh & inh_vars_in_scope = 'DS'.union inh.inh_vars_in_scope ('DS'.fromList boundVars)} chn
   where
   mkLet (Just expr=:(App app)) lt inh chn
     | appIsListComp app
@@ -563,14 +566,17 @@ mkBlueprint inh expr=:(Selection st selExpr sels) chn
     = (TLit (ppCompact d), chn)
   mkSelExprs (DictionarySelection bv sels _ e) chn
     = (TLit "TODO mkSelExprs DictionarySelection ", chn)
+mkBlueprint inh expr=:(TupleSelect _ i e) chn
+  # (syn, chn) = mkBlueprint inh e chn
+  # te         = TSel syn.syn_texpr [TLit (toString i)]
+  = ({ syn_annot_expr = expr
+     , syn_texpr      = te
+     , syn_pattern_match_vars = []}, chn)
 mkBlueprint _ expr=:(Update _ _ _) chn = ({ syn_annot_expr = expr
                           , syn_texpr      = TLit "(mkBlueprint Update fallthrough)"
                           , syn_pattern_match_vars = []}, chn)
 mkBlueprint _ expr=:(RecordUpdate _ _ _) chn = ({ syn_annot_expr = expr
                           , syn_texpr      = TLit "(mkBlueprint RecordUpdate fallthrough)"
-                          , syn_pattern_match_vars = []}, chn)
-mkBlueprint _ expr=:(TupleSelect _ _ _) chn = ({ syn_annot_expr = expr
-                          , syn_texpr      = TLit "(mkBlueprint TupleSelect fallthrough)"
                           , syn_pattern_match_vars = []}, chn)
 mkBlueprint _ expr=:(Conditional _) chn = ({ syn_annot_expr = expr
                           , syn_texpr      = TLit "(mkBlueprint Conditional fallthrough)"
