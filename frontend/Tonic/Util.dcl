@@ -105,6 +105,8 @@ prioIsInfix :: Priority -> Bool
 
 fdArrToMap :: .{#FunDef} -> Map String FunDef
 
+symbIdentArity :: SymbIdent *ModuleEnv -> *(Maybe Int, *ModuleEnv)
+
 getFunArgs :: FunDef -> [FreeVar]
 
 getFunRhs :: FunDef -> Expression

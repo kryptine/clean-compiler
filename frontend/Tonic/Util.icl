@@ -651,13 +651,8 @@ symbIdentArity si menv
         = case mft of
             Just ft
               = (Just ft.ft_arity, menv)
-            _
-              # (mfd, menv) = reifyFunDef si menv
-              = case mfd of
-                  Just fd -> (Just fd.fun_arity, menv)
-                  _       -> (Nothing, menv)
+            _ = (Nothing, menv)
 
-// TODO Do we want to reify the fundef here and look at fun_lifted? It gives the number of lifted arguments, which is actually what we need here...
 argsRemaining :: App *ModuleEnv -> *(Int, *ModuleEnv)
 argsRemaining app menv
   # ((ctxs, args), menv) = dropAppContexts app menv
@@ -819,6 +814,9 @@ fromPriority _                   = TNoPrio
   //= (PPCleanExpr (ppCompact doc), menv)
 
 // TODO Associativity?
+atypeToTCleanExpr :: AType -> TExpr
+atypeToTCleanExpr {at_type} = typeToTCleanExpr at_type
+
 typeToTCleanExpr :: Type -> TExpr
 typeToTCleanExpr (TA tsi []) = TVar Nothing tsi.type_ident.id_name
 typeToTCleanExpr (TA tsi args)
@@ -828,6 +826,7 @@ typeToTCleanExpr (TAS tsi [] _) = TVar Nothing tsi.type_ident.id_name
 typeToTCleanExpr (TAS tsi args _)
   # tces = map (typeToTCleanExpr o \arg -> arg.at_type) args
   = TFApp tsi.type_ident.id_name tces TNoPrio
+typeToTCleanExpr (l --> r) = TFApp "->" [atypeToTCleanExpr l, atypeToTCleanExpr r] (TPrio TNoAssoc 0)
 typeToTCleanExpr ty
   = TVar Nothing (ppCompact (ppType ty))
 
