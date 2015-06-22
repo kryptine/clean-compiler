@@ -272,6 +272,16 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
   where
   mkMApp app ctxs args inh chn
     # appName       = app.app_symb.symb_ident.id_name
+
+    //# (arity, menv) = symbIdentArity app.app_symb chn.chn_module_env
+    ////#! menv = case arity of
+               ////Just a -> trace_n (appName +++ " " +++ toString a) menv
+               ////_      -> trace_n (appName +++ " unknown arity?") menv
+    //# arity         = fromMaybe 0 arity
+    //# remArgs       = arity - length args
+    //# remArgs       = if (remArgs < 0) 0 remArgs
+//     ++ map (\n -> TVar Nothing ("newArg" +++ toString n)) [0..remArgs]
+
     # (uid, chn)    = dispenseUnique chn
     # (mFunTy, menv) = reifyFunType app.app_symb chn.chn_module_env
     # (assoc, menv)  = getAssoc app.app_symb menv
@@ -294,7 +304,7 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
                         (App {app & app_args = args`}, chn)
     # (app`, chn)   = wrapTaskApp uid appName app` inh chn
     = ({ syn_annot_expr = app`
-       , syn_texpr      = TMApp uid mTyStr dclnm (appFunName app) (map (\syn -> syn.syn_texpr) ps) assoc
+       , syn_texpr      = TMApp (Just uid) Nothing mTyStr dclnm (appFunName app) (map (\syn -> syn.syn_texpr) ps) assoc
        , syn_pattern_match_vars = []}, chn)
     where
     // TODO FIXME This check is horribly broken
@@ -310,14 +320,14 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
     mkTrav _ _ _ _ chn = (False, chn)
 
   mkFApp app ctxs args inh chn
-    # appName         = app.app_symb.symb_ident.id_name
-    # (dclnm, menv)   = case reifyDclModule app.app_symb chn.chn_module_env of
-                          (Just dcl, menv) = (dcl.dcl_name.id_name, menv)
-                          (_       , menv)
-                            # (iclmod, menv) = menv!me_icl_module
-                            = (iclmod.icl_name.id_name, menv)
-    # (assoc, menv)   = getAssoc app.app_symb menv
-    # (ps, chn)       = mapSt (\x chn -> mkBlueprint inh x chn) args {chn & chn_module_env = menv}
+    # appName       = app.app_symb.symb_ident.id_name
+    # (dclnm, menv) = case reifyDclModule app.app_symb chn.chn_module_env of
+                        (Just dcl, menv) = (dcl.dcl_name.id_name, menv)
+                        (_       , menv)
+                          # (iclmod, menv) = menv!me_icl_module
+                          = (iclmod.icl_name.id_name, menv)
+    # (assoc, menv) = getAssoc app.app_symb menv
+    # (ps, chn)     = mapSt (\x chn -> mkBlueprint inh x chn) args {chn & chn_module_env = menv}
     = ({ syn_annot_expr = App {app & app_args = ctxs ++ map (\syn -> syn.syn_annot_expr) ps}
        , syn_texpr      = TFApp appName (map (\syn -> syn.syn_texpr) ps) assoc
        , syn_pattern_match_vars = []}, chn)
@@ -364,7 +374,7 @@ mkBlueprint inh (e=:(App app) @ es) chn
                                                 (_       , menv)
                                                   # (iclmod, menv) = menv!me_icl_module
                                                   = (iclmod.icl_name.id_name, menv)
-                            = (TMApp uid mTyStr dclnm (appFunName app) (map (\syn -> syn.syn_texpr) es`) assoc, {chn & chn_module_env = menv})
+                            = (TMApp (Just uid) Nothing mTyStr dclnm (appFunName app) (map (\syn -> syn.syn_texpr) es`) assoc, {chn & chn_module_env = menv})
                           _ = (TFApp app.app_symb.symb_ident.id_name (map (\x -> x.syn_texpr) es`) assoc, chn)
       = ({ syn_annot_expr = e @ (map (\x -> x.syn_annot_expr) es`)
          , syn_texpr      = texpr
@@ -383,7 +393,7 @@ mkBlueprint inh (e=:(Var bv) @ es) chn
                         Just x -> symTyStr` x
                         _      -> Nothing
       = ({ syn_annot_expr = var`
-         , syn_texpr      = TMApp uid mTyStr "" bv.var_ident.id_name (map (\syn -> syn.syn_texpr) bps) TNoPrio
+         , syn_texpr      = TMApp (Just uid) Nothing mTyStr "" bv.var_ident.id_name (map (\syn -> syn.syn_texpr) bps) TNoPrio
          , syn_pattern_match_vars = []}, chn)
   | otherwise
       = ({ syn_annot_expr = Var bv @ es
