@@ -237,7 +237,12 @@ ppParsedExpr (PE_ListCompr _ _ expr quals) = text "[" <-> ppParsedExpr expr <-> 
 ppParsedExpr (PE_ArrayCompr _ expr quals) = text "{" <-> ppParsedExpr expr <-> text " \\\\ " <-> hcat (intersperse (text ", ") (map ppQualifier quals)) <-> text "}"
 ppParsedExpr (PE_Sequ seq)   = text "[" <-> ppSequence seq <-> text "]"
 ppParsedExpr PE_Empty        = text "** E **"
-ppParsedExpr (PE_Ident symb) = ppIdent symb
+ppParsedExpr (PE_Ident symb) = text (case symb.id_name of
+                                       "_Nil"    -> "[]"
+                                       "_Cons"   -> "[:]"
+                                       "_Tuple2" -> "(,)"
+                                       name      -> name
+                                    )
 ppParsedExpr PE_WildCard     = char '_'
 ppParsedExpr (PE_Lambda _ exprs expr _) = char '\\' <-> hcat (intersperse (text " ") (map ppParsedExpr exprs)) <-> text " -> " <-> ppParsedExpr expr
 ppParsedExpr (PE_Bound bind) = ppBoundExpr bind
