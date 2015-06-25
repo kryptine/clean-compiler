@@ -216,6 +216,7 @@ wrapTaskApp uid wrappedFnNm origExpr inh chn
                                 [ App parentInfo
                                 , App appInfo
                                 , App wrapInfo
+                                , mkInt inh.inh_parent_uid
                                 , mkInt uid
                                 , origExpr
                                 ] SK_Function heaps pdss
@@ -272,16 +273,6 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
   where
   mkMApp app ctxs args inh chn
     # appName       = app.app_symb.symb_ident.id_name
-
-    //# (arity, menv) = symbIdentArity app.app_symb chn.chn_module_env
-    ////#! menv = case arity of
-               ////Just a -> trace_n (appName +++ " " +++ toString a) menv
-               ////_      -> trace_n (appName +++ " unknown arity?") menv
-    //# arity         = fromMaybe 0 arity
-    //# remArgs       = arity - length args
-    //# remArgs       = if (remArgs < 0) 0 remArgs
-//     ++ map (\n -> TVar Nothing ("newArg" +++ toString n)) [0..remArgs]
-
     # (uid, chn)    = dispenseUnique chn
     # (mFunTy, menv) = reifyFunType app.app_symb chn.chn_module_env
     # (assoc, menv)  = getAssoc app.app_symb menv
@@ -296,7 +287,7 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
                           # (iclmod, menv) = menv!me_icl_module
                           = (iclmod.icl_name.id_name, menv)
     # chn           = {chn & chn_module_env = menv}
-    # (ps, chn)     = mapSt (\x chn -> mkBlueprint {inh & inh_app_ctx = (dclnm, appName)} x chn) args chn
+    # (ps, chn)     = mapSt (\x chn -> mkBlueprint {inh & inh_parent_uid = uid, inh_app_ctx = (dclnm, appName)} x chn) args chn
     # args`         = map (\syn -> syn.syn_annot_expr) ps
     # (isTraversable, chn) = mkTrav mst ctxs args inh chn
     # (app`, chn)   = if isTraversable
@@ -360,22 +351,26 @@ mkBlueprint inh (e=:(App app) @ es) chn
          , syn_texpr      = TLit "TODO @"
          , syn_pattern_match_vars = syne.syn_pattern_match_vars}, chn)
   | otherwise
-      # (assoc, menv) = getAssoc app.app_symb menv
-      # (es`, chn)    = mapSt (mkBlueprint inh) es {chn & chn_module_env = menv}
-      # (texpr, chn)  = case fd.fun_type of
-                          Yes ft | symTyIsTask ft
-                            # (uid, chn)    = dispenseUnique chn
-                            # (mst, menv)   = reifySymbIdentSymbolType app.app_symb chn.chn_module_env
-                            # mTyStr        = case mst of
-                                                Just st -> symTyStr st
-                                                _       -> Nothing
-                            # (dclnm, menv) = case reifyDclModule app.app_symb menv of
-                                                (Just dcl, menv) = (dcl.dcl_name.id_name, menv)
-                                                (_       , menv)
-                                                  # (iclmod, menv) = menv!me_icl_module
-                                                  = (iclmod.icl_name.id_name, menv)
-                            = (TMApp (Just uid) Nothing mTyStr dclnm (appFunName app) (map (\syn -> syn.syn_texpr) es`) assoc, {chn & chn_module_env = menv})
-                          _ = (TFApp app.app_symb.symb_ident.id_name (map (\x -> x.syn_texpr) es`) assoc, chn)
+      # (assoc, menv)     = getAssoc app.app_symb menv
+      # (texpr, es`, chn) = case fd.fun_type of
+                              Yes ft | symTyIsTask ft
+                                # (uid, chn)    = dispenseUnique {chn & chn_module_env = menv}
+                                # (es`, chn)    = mapSt (mkBlueprint {inh & inh_parent_uid = uid}) es chn
+                                # (mst, menv)   = reifySymbIdentSymbolType app.app_symb chn.chn_module_env
+                                # mTyStr        = case mst of
+                                                    Just st -> symTyStr st
+                                                    _       -> Nothing
+                                # (dclnm, menv) = case reifyDclModule app.app_symb menv of
+                                                    (Just dcl, menv) = (dcl.dcl_name.id_name, menv)
+                                                    (_       , menv)
+                                                      # (iclmod, menv) = menv!me_icl_module
+                                                      = (iclmod.icl_name.id_name, menv)
+                                = ( TMApp (Just uid) Nothing mTyStr dclnm (appFunName app) (map (\syn -> syn.syn_texpr) es`) assoc
+                                  , es`, {chn & chn_module_env = menv})
+                              _
+                                # (es`, chn) = mapSt (mkBlueprint inh) es {chn & chn_module_env = menv}
+                                = ( TFApp app.app_symb.symb_ident.id_name (map (\x -> x.syn_texpr) es`) assoc
+                                  , es`, chn)
       = ({ syn_annot_expr = e @ (map (\x -> x.syn_annot_expr) es`)
          , syn_texpr      = texpr
          , syn_pattern_match_vars = []}, chn)

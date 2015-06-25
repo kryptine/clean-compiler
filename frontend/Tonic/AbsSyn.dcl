@@ -29,6 +29,7 @@ from iTasks._Framework.Tonic.AbsSyn import :: TExpr, :: ExprId, :: TypeName, :: 
   , inh_common_defs    :: !{#CommonDefs}
   , inh_app_ctx        :: !(String, String)
   , inh_vars_in_scope  :: !Set String
+  , inh_parent_uid     :: !Int
   }
 
 :: *ChnExpression =

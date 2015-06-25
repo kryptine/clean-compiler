@@ -24,6 +24,7 @@ mkInhExpr vars ctn list_comprehensions tree cds =
   , inh_common_defs    = cds
   , inh_app_ctx        = ("", "")
   , inh_vars_in_scope  = vars
+  , inh_parent_uid     = -1
   }
 
 mkChnExpr :: *PredefinedSymbols *ModuleEnv *Heaps -> *ChnExpression
