@@ -152,20 +152,14 @@ wrapTraversable uid app args inh chn
                                      Just dcl -> (dcl.dcl_name.id_name, menv)
                                      _        -> (iclName, menv)
       # wrappedFnNm  = app.app_symb.symb_ident.id_name
-      # (modCtx, fnCtx) = inh.inh_app_ctx
       # tuple2Idx = GetTupleConsIndex 2
       # heaps = chn.chn_heaps
-      # (appInfo, heaps, pdss) = appPredefinedSymbolWithEI tuple2Idx
-                                    [ mkStr modCtx
-                                    , mkStr fnCtx
-                                    ] SK_Constructor heaps pdss
       # (wrapInfo, heaps, pdss) = appPredefinedSymbolWithEI tuple2Idx
                                     [ mkStr wrappedFnModNm
                                     , mkStr wrappedFnNm
                                     ] SK_Constructor heaps pdss
       # (expr, heaps, pdss) = appPredefinedSymbolWithEI PD_tonicExtWrapTraversable
-                                [ App appInfo
-                                , App wrapInfo
+                                [ App wrapInfo
                                 , mkInt uid
                                 , App {app & app_args = []}
                                 ] SK_Function heaps pdss
@@ -192,21 +186,14 @@ wrapTaskApp uid wrappedFnNm origExpr inh chn
                                          Just dcl -> (dcl.dcl_name.id_name, menv)
                                          _        -> (iclName, menv)
                                    _ = (iclName, menv)
-      # (modCtx, fnCtx) = inh.inh_app_ctx
       # tuple2Idx = GetTupleConsIndex 2
       # heaps = chn.chn_heaps
-      # (appInfo, heaps, pdss) = appPredefinedSymbolWithEI tuple2Idx
-                                    [ mkStr modCtx
-                                    , mkStr fnCtx
-                                    ] SK_Constructor heaps pdss
       # (wrapInfo, heaps, pdss) = appPredefinedSymbolWithEI tuple2Idx
                                     [ mkStr wrappedFnModNm
                                     , mkStr wrappedFnNm
                                     ] SK_Constructor heaps pdss
       # (expr, heaps, pdss) = appPredefinedSymbolWithEI (findWrap rem)
-                                [ App appInfo
-                                , App wrapInfo
-                                , mkInt inh.inh_parent_uid
+                                [ App wrapInfo
                                 , mkInt uid
                                 , origExpr
                                 ] SK_Function heaps pdss
@@ -277,7 +264,7 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
                           # (iclmod, menv) = menv!me_icl_module
                           = (iclmod.icl_name.id_name, menv)
     # chn           = {chn & chn_module_env = menv}
-    # (ps, chn)     = mapSt (\x chn -> mkBlueprint {inh & inh_parent_uid = uid, inh_app_ctx = (dclnm, appName)} x chn) args chn
+    # (ps, chn)     = mapSt (\x chn -> mkBlueprint inh x chn) args chn
     # args`         = map (\syn -> syn.syn_annot_expr) ps
     # (isTraversable, chn) = mkTrav mst ctxs args inh chn
     # (app`, chn)   = if isTraversable
@@ -345,7 +332,7 @@ mkBlueprint inh (e=:(App app) @ es) chn
       # (texpr, es`, chn) = case fd.fun_type of
                               Yes ft | symTyIsTask ft
                                 # (uid, chn)    = dispenseUnique {chn & chn_module_env = menv}
-                                # (es`, chn)    = mapSt (mkBlueprint {inh & inh_parent_uid = uid}) es chn
+                                # (es`, chn)    = mapSt (mkBlueprint inh) es chn
                                 # (mst, menv)   = reifySymbIdentSymbolType app.app_symb chn.chn_module_env
                                 # mTyStr        = case mst of
                                                     Just st -> symTyStr st
