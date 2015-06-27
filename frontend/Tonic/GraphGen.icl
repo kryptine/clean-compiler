@@ -155,10 +155,6 @@ wrapTraversable uid app args inh chn
       # (modCtx, fnCtx) = inh.inh_app_ctx
       # tuple2Idx = GetTupleConsIndex 2
       # heaps = chn.chn_heaps
-      # (parentInfo, heaps, pdss) = appPredefinedSymbolWithEI tuple2Idx
-                                    [ mkStr iclName
-                                    , mkStr inh.inh_curr_task_name
-                                    ] SK_Constructor heaps pdss
       # (appInfo, heaps, pdss) = appPredefinedSymbolWithEI tuple2Idx
                                     [ mkStr modCtx
                                     , mkStr fnCtx
@@ -168,8 +164,7 @@ wrapTraversable uid app args inh chn
                                     , mkStr wrappedFnNm
                                     ] SK_Constructor heaps pdss
       # (expr, heaps, pdss) = appPredefinedSymbolWithEI PD_tonicExtWrapTraversable
-                                [ App parentInfo
-                                , App appInfo
+                                [ App appInfo
                                 , App wrapInfo
                                 , mkInt uid
                                 , App {app & app_args = []}
@@ -200,10 +195,6 @@ wrapTaskApp uid wrappedFnNm origExpr inh chn
       # (modCtx, fnCtx) = inh.inh_app_ctx
       # tuple2Idx = GetTupleConsIndex 2
       # heaps = chn.chn_heaps
-      # (parentInfo, heaps, pdss) = appPredefinedSymbolWithEI tuple2Idx
-                                    [ mkStr iclName
-                                    , mkStr inh.inh_curr_task_name
-                                    ] SK_Constructor heaps pdss
       # (appInfo, heaps, pdss) = appPredefinedSymbolWithEI tuple2Idx
                                     [ mkStr modCtx
                                     , mkStr fnCtx
@@ -213,8 +204,7 @@ wrapTaskApp uid wrappedFnNm origExpr inh chn
                                     , mkStr wrappedFnNm
                                     ] SK_Constructor heaps pdss
       # (expr, heaps, pdss) = appPredefinedSymbolWithEI (findWrap rem)
-                                [ App parentInfo
-                                , App appInfo
+                                [ App appInfo
                                 , App wrapInfo
                                 , mkInt inh.inh_parent_uid
                                 , mkInt uid
