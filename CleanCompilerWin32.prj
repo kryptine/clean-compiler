@@ -2,7 +2,7 @@ Version: 1.4
 Global
 	ProjectRoot:	.
 	Target:	StdEnv
-	Exec:	{Project}\cocl.exe
+	Exec:	{Project}\CleanCompilerTonic.exe
 	CodeGen
 		CheckStacks:	False
 		CheckIndexes:	True
