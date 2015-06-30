@@ -228,8 +228,8 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
       # pats                = [case freeVarName x of
                                  "_x" -> case syne.syn_pattern_match_vars of
                                            [(_, e):_] -> e
-                                           _          -> TVar Nothing "_x"
-                                 x    -> TVar Nothing x
+                                           _          -> TVar -1 "_x"
+                                 x    -> TVar -1 x
                               \\ x <- args | x.fv_def_level == -1]
       # menv                = updateWithAnnot app_symb syne.syn_annot_expr chn.chn_module_env
       = ( { syn_annot_expr = App app
@@ -272,7 +272,7 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
                         (App {app & app_args = args`}, chn)
     # (app`, chn)   = wrapTaskApp uid appName app` inh chn
     = ({ syn_annot_expr = app`
-       , syn_texpr      = TMApp (Just uid) Nothing mTyStr dclnm (appFunName app) (map (\syn -> syn.syn_texpr) ps) assoc
+       , syn_texpr      = TMApp uid mTyStr dclnm (appFunName app) (map (\syn -> syn.syn_texpr) ps) assoc
        , syn_pattern_match_vars = []}, chn)
     where
     // TODO FIXME This check is horribly broken
@@ -342,7 +342,7 @@ mkBlueprint inh (e=:(App app) @ es) chn
                                                     (_       , menv)
                                                       # (iclmod, menv) = menv!me_icl_module
                                                       = (iclmod.icl_name.id_name, menv)
-                                = ( TMApp (Just uid) Nothing mTyStr dclnm (appFunName app) (map (\syn -> syn.syn_texpr) es`) assoc
+                                = ( TMApp uid mTyStr dclnm (appFunName app) (map (\syn -> syn.syn_texpr) es`) assoc
                                   , es`, {chn & chn_module_env = menv})
                               _
                                 # (es`, chn) = mapSt (mkBlueprint inh) es {chn & chn_module_env = menv}
@@ -365,7 +365,7 @@ mkBlueprint inh (e=:(Var bv) @ es) chn
                         Just x -> symTyStr` x
                         _      -> Nothing
       = ({ syn_annot_expr = var`
-         , syn_texpr      = TMApp (Just uid) Nothing mTyStr "" bv.var_ident.id_name (map (\syn -> syn.syn_texpr) bps) TNoPrio
+         , syn_texpr      = TMApp uid mTyStr "" bv.var_ident.id_name (map (\syn -> syn.syn_texpr) bps) TNoPrio
          , syn_pattern_match_vars = []}, chn)
   | otherwise
       = ({ syn_annot_expr = Var bv @ es
@@ -519,15 +519,15 @@ mkBlueprint inh (Var bv) chn
       # (uid, chn)  = dispenseUnique chn
       # (var`, chn) = wrapTaskApp uid "(Var)" (Var bv) inh chn
       = ({ syn_annot_expr = var`
-         , syn_texpr      = TVar (Just uid) bv.var_ident.id_name
+         , syn_texpr      = TVar uid bv.var_ident.id_name
          , syn_pattern_match_vars = []}, chn)
   | otherwise
       = ({ syn_annot_expr = Var bv
-         , syn_texpr      = TVar Nothing bv.var_ident.id_name
+         , syn_texpr      = TVar -1 bv.var_ident.id_name
          , syn_pattern_match_vars = []}, chn)
 mkBlueprint _ expr=:(FreeVar fv) chn
   = ({ syn_annot_expr = expr
-     , syn_texpr      = TVar Nothing fv.fv_ident.id_name
+     , syn_texpr      = TVar -1 fv.fv_ident.id_name
      , syn_pattern_match_vars = []}, chn)
 mkBlueprint _ expr=:(BasicExpr bv) chn
   = ({ syn_annot_expr = expr
@@ -643,5 +643,5 @@ funToGraph fd=:{fun_ident=fun_ident, fun_body = TransformedBody tb} fd_cpy list_
               []    -> TLit "(shouldn't happen)"
               [x:_] -> x
         idnm
-          = TVar Nothing idnm
+          = TVar -1 idnm
 funToGraph _ _ _ _ _ _ chn = (Nothing, chn)
