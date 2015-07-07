@@ -255,12 +255,10 @@ predefined_idents
                     [PD_iTasks_Framework_Tonic]   = i "iTasks._Framework.Tonic",
                     [PD_iTasks_Framework_Generic] = i "iTasks._Framework.Generic",
                     [PD_iTasks_API_Core_Types]    = i "iTasks.API.Core.Types",
-                    [PD_Data_Traversable]         = i "Data.Traversable",
                     [PD_ITaskClass]                  = i "iTask",
                     [PD_TMonadClass]                 = i "TMonad",
                     [PD_TApplicativeClass]           = i "TApplicative",
                     [PD_TFunctorClass]               = i "TFunctor",
-                    [PD_TraversableClass]            = i "Traversable",
                     [PD_TonicTopLevelBlueprintClass] = i "TonicTopLevelBlueprint",
                     [PD_TonicBlueprintPartClass]     = i "TonicBlueprintPart",
                     [PD_tonicExtWrapArg]         = i "tonicExtWrapArg",
@@ -271,8 +269,7 @@ predefined_idents
                     [PD_tonicExtWrapApp]         = i "tonicExtWrapApp",
                     [PD_tonicExtWrapAppLam1]     = i "tonicExtWrapAppLam1",
                     [PD_tonicExtWrapAppLam2]     = i "tonicExtWrapAppLam2",
-                    [PD_tonicExtWrapAppLam3]     = i "tonicExtWrapAppLam3",
-                    [PD_tonicExtWrapTraversable] = i "tonicExtWrapTraversable"
+                    [PD_tonicExtWrapAppLam3]     = i "tonicExtWrapAppLam3"
 		}
 	=: idents
 	where
@@ -416,7 +413,6 @@ where
 					<<- (local_predefined_idents,	IC_Module NoQualifiedIdents, PD_iTasks_Framework_Tonic)
 					<<- (local_predefined_idents,	IC_Module NoQualifiedIdents, PD_iTasks_Framework_Generic)
 					<<- (local_predefined_idents,	IC_Module NoQualifiedIdents, PD_iTasks_API_Core_Types)
-					<<- (local_predefined_idents,	IC_Module NoQualifiedIdents, PD_Data_Traversable)
 					<<- (local_predefined_idents,	IC_Expression,	PD_tonicExtWrapArg)
 					<<- (local_predefined_idents,	IC_Expression,	PD_tonicExtWrapBody)
 					<<- (local_predefined_idents,	IC_Expression,	PD_tonicExtWrapBodyLam1)
@@ -426,12 +422,10 @@ where
 					<<- (local_predefined_idents,	IC_Expression,	PD_tonicExtWrapAppLam1)
 					<<- (local_predefined_idents,	IC_Expression,	PD_tonicExtWrapAppLam2)
 					<<- (local_predefined_idents,	IC_Expression,	PD_tonicExtWrapAppLam3)
-					<<- (local_predefined_idents,	IC_Expression,	PD_tonicExtWrapTraversable)
 					<<- (local_predefined_idents,	IC_Class,	PD_ITaskClass)
 					<<- (local_predefined_idents,	IC_Class,	PD_TMonadClass)
 					<<- (local_predefined_idents,	IC_Class,	PD_TApplicativeClass)
 					<<- (local_predefined_idents,	IC_Class,	PD_TFunctorClass)
-					<<- (local_predefined_idents,	IC_Class,	PD_TraversableClass)
 					<<- (local_predefined_idents,	IC_Class,	PD_TonicTopLevelBlueprintClass)
 					<<- (local_predefined_idents,	IC_Class,	PD_TonicBlueprintPartClass)
 

@@ -3391,12 +3391,6 @@ where
 				<=< adjustPredefSymbol PD_tonicExtWrapAppLam1			mod_index STE_DclFunction
 				<=< adjustPredefSymbol PD_tonicExtWrapAppLam2			mod_index STE_DclFunction
 				<=< adjustPredefSymbol PD_tonicExtWrapAppLam3			mod_index STE_DclFunction
-				<=< adjustPredefSymbol PD_tonicExtWrapTraversable		mod_index STE_DclFunction
-                )
-		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_Data_Traversable]	
-		| pre_mod.pds_def == mod_index
-			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols}
-                <=< adjustPredefSymbol PD_TraversableClass				mod_index STE_Class
                 )
 		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_iTasks_Framework_Generic]	
 		| pre_mod.pds_def == mod_index

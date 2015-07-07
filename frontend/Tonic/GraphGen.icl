@@ -140,34 +140,6 @@ withTwo app []        _ _   chn = ({syn_annot_expr = App app, syn_texpr = TLit "
 withTwo app [_]       _ _   chn = ({syn_annot_expr = App app, syn_texpr = TLit "TODO withTwo [_]", syn_pattern_match_vars = []}, chn)
 withTwo app [x1:x2:_] f inh chn = f x1 x2 chn
 
-wrapTraversable :: Int App [Expression] InhExpression *ChnExpression -> *(Expression, *ChnExpression)
-wrapTraversable uid app args inh chn
-  # (ok, pdss) = pdssAreDefined [PD_tonicExtWrapTraversable, PD_ConsSymbol, PD_NilSymbol] chn.chn_predef_symbols
-  | not ok     = (App app, {chn & chn_predef_symbols = pdss})
-  | otherwise
-      # (icl, menv)  = (chn.chn_module_env)!me_icl_module
-      # iclName      = icl.icl_name.id_name
-      # (mdcl, menv) = reifyDclModule app.app_symb menv
-      # (wrappedFnModNm, menv) = case mdcl of
-                                     Just dcl -> (dcl.dcl_name.id_name, menv)
-                                     _        -> (iclName, menv)
-      # wrappedFnNm  = app.app_symb.symb_ident.id_name
-      # tuple2Idx = GetTupleConsIndex 2
-      # heaps = chn.chn_heaps
-      # (wrapInfo, heaps, pdss) = appPredefinedSymbolWithEI tuple2Idx
-                                    [ mkStr wrappedFnModNm
-                                    , mkStr wrappedFnNm
-                                    ] SK_Constructor heaps pdss
-      # (expr, heaps, pdss) = appPredefinedSymbolWithEI PD_tonicExtWrapTraversable
-                                [ App wrapInfo
-                                , mkInt uid
-                                , App {app & app_args = []}
-                                ] SK_Function heaps pdss
-      = ( (App expr) @ args
-        , {chn & chn_predef_symbols = pdss
-               , chn_module_env = {menv & me_icl_module = icl}
-               , chn_heaps = heaps})
-
 wrapTaskApp :: Int String Expression InhExpression *ChnExpression -> *(Expression, *ChnExpression)
 wrapTaskApp uid wrappedFnNm origExpr inh chn
   # (ok, pdss) = pdssAreDefined [PD_tonicExtWrapApp, PD_tonicExtWrapAppLam1, PD_tonicExtWrapAppLam2, PD_tonicExtWrapAppLam3, PD_ConsSymbol, PD_NilSymbol] chn.chn_predef_symbols
@@ -266,26 +238,11 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
     # chn           = {chn & chn_module_env = menv}
     # (ps, chn)     = mapSt (\x chn -> mkBlueprint inh x chn) args chn
     # args`         = map (\syn -> syn.syn_annot_expr) ps
-    # (isTraversable, chn) = mkTrav mst ctxs args inh chn
-    # (app`, chn)   = if isTraversable
-                        (wrapTraversable uid app args` inh chn)
-                        (App {app & app_args = args`}, chn)
+    # (app`, chn)   = (App {app & app_args = args`}, chn)
     # (app`, chn)   = wrapTaskApp uid appName app` inh chn
     = ({ syn_annot_expr = app`
        , syn_texpr      = TMApp uid mTyStr dclnm (appFunName app) (map (\syn -> syn.syn_texpr) ps) assoc
        , syn_pattern_match_vars = []}, chn)
-    where
-    // TODO FIXME This check is horribly broken
-    mkTrav (Just {st_args = [{at_type}]}) ctxs [arg] inh chn
-      = (isListTy at_type, chn)
-          //= typeHasClassInstance at_type PD_TraversableClass inh chn
-      //| (False, chn)
-      where
-      isListTy :: Type -> Bool
-      isListTy (TA tsi [at])    = tsi.type_ident.id_name == PD_ListType_String && atypeIsTask at
-      isListTy (TAS tsi [at] _) = tsi.type_ident.id_name == PD_ListType_String && atypeIsTask at
-      isListTy _                = False
-    mkTrav _ _ _ _ chn = (False, chn)
 
   mkFApp app ctxs args inh chn
     # appName       = app.app_symb.symb_ident.id_name

@@ -306,28 +306,25 @@ PD_TC__Unit			:== 295
 PD_iTasks_Framework_Tonic   :== 296
 PD_iTasks_Framework_Generic :== 297
 PD_iTasks_API_Core_Types    :== 298
-PD_Data_Traversable         :== 299
 
-PD_ITaskClass                  :== 300
-PD_TMonadClass                 :== 301
-PD_TApplicativeClass           :== 302
-PD_TFunctorClass               :== 303
-PD_TraversableClass            :== 304
-PD_TonicTopLevelBlueprintClass :== 305
-PD_TonicBlueprintPartClass     :== 306
+PD_ITaskClass                  :== 299
+PD_TMonadClass                 :== 300
+PD_TApplicativeClass           :== 301
+PD_TFunctorClass               :== 302
+PD_TonicTopLevelBlueprintClass :== 303
+PD_TonicBlueprintPartClass     :== 304
 
-PD_tonicExtWrapArg         :== 307
-PD_tonicExtWrapBody        :== 308
-PD_tonicExtWrapBodyLam1    :== 309
-PD_tonicExtWrapBodyLam2    :== 310
-PD_tonicExtWrapBodyLam3    :== 311
-PD_tonicExtWrapApp         :== 312
-PD_tonicExtWrapAppLam1     :== 313
-PD_tonicExtWrapAppLam2     :== 314
-PD_tonicExtWrapAppLam3     :== 315
-PD_tonicExtWrapTraversable :== 316
+PD_tonicExtWrapArg         :== 305
+PD_tonicExtWrapBody        :== 306
+PD_tonicExtWrapBodyLam1    :== 307
+PD_tonicExtWrapBodyLam2    :== 308
+PD_tonicExtWrapBodyLam3    :== 309
+PD_tonicExtWrapApp         :== 310
+PD_tonicExtWrapAppLam1     :== 311
+PD_tonicExtWrapAppLam2     :== 312
+PD_tonicExtWrapAppLam3     :== 313
 
-PD_NrOfPredefSymbols		:== 317
+PD_NrOfPredefSymbols		:== 314
 
 GetTupleConsIndex tup_arity :== PD_Arity2TupleSymbol + tup_arity - 2
 GetTupleTypeIndex tup_arity :== PD_Arity2TupleType + tup_arity - 2
