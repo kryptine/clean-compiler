@@ -2979,7 +2979,7 @@ void GenUnboxedConsRecordDescriptor (SymbDef sdef,int tail_strict)
 	DetermineSizeOfState (tuple_state,&asize,&bsize);
 	
 	if (ExportLocalLabels)
-		FPrintF (OutFile,tail_strict ? " %d %d \"_Cons#!%s\"" : " %d %d \"_Cons#\"",asize,bsize,name);
+		FPrintF (OutFile,tail_strict ? " %d %d \"_Cons#!%s\"" : " %d %d \"_Cons#%s\"",asize,bsize,name);
 	else
 		FPrintF (OutFile,tail_strict ? " %d %d \"[#%s!]\"" : " %d %d \"[#%s]\"",asize,bsize,name);
 }
