@@ -11,7 +11,8 @@ instance makeTypeFun FunDef where
 		=	(function, var_heap, symbol_table)
 		where
 			function =
-				{	fun_ident = ident
+				{	fun_docs = ""
+                , fun_ident = ident
 				,	fun_arity = 1
 				,	fun_priority = NoPrio
 				,	fun_body = GeneratedBody

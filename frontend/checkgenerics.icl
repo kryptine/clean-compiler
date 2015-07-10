@@ -372,7 +372,8 @@ convert_generic_instances gci next_fun_index gencase_defs class_defs symbol_tabl
 				-> ([fun_def : fun_defs],gencase_defs,class_defs,symbol_table,error,dcl_modules)
 			gc=:{gc_pos, gc_type_cons, gc_gcf=GCF gc_ident gcf=:{gcf_body=GCB_None}}
 				# fun_def =
-					{ fun_ident = genericIdentToFunIdent gc_ident.id_name gc_type_cons
+					{ fun_docs = ""
+                    , fun_ident = genericIdentToFunIdent gc_ident.id_name gc_type_cons
 					, fun_arity = 0, fun_priority = NoPrio
 					, fun_body = GeneratedBody, fun_type = No
 					, fun_pos = gc_pos, fun_kind = FK_Unknown
@@ -407,6 +408,7 @@ convert_generic_instances gci next_fun_index gencase_defs class_defs symbol_tabl
 	where
 		convert_generic_contexts [{tc_class=TCGeneric {gtc_generic={glob_object={ds_ident}}}}:type_contexts] type_cons pos next_fun_index new_fun_defs
 			# fun_def = {
+                fun_docs = "",
 				fun_ident = genericIdentToFunIdent ds_ident.id_name type_cons,
 				fun_arity = 0, fun_priority = NoPrio,
 				fun_body = GeneratedBody, fun_type = No,

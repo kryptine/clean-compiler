@@ -107,7 +107,8 @@ ginTonic` is_itasks_mod main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_m
       = ((case mres of
             Just (args, g, _)
               -> put fd.fun_ident.id_name { TonicTask
-                                          | tt_module    = icl_module.icl_name.id_name
+                                          | tt_comments  = fd.fun_docs
+                                          , tt_module    = icl_module.icl_name.id_name
                                           , tt_name      = fd.fun_ident.id_name
                                           , tt_iclLineNo = mkFunPos fun_pos
                                           , tt_resty     = typeToTCleanExpr (funTy fd_cpy)

@@ -2799,7 +2799,7 @@ where
 		  		add_extra_elements_to_fun_def_array n_new_elements fun_defs
 		  			| n_new_elements==0
 		  				= fun_defs
-			  			# dummy_fun_def = { fun_ident = {id_name="",id_info=nilPtr},fun_arity=0,fun_priority=NoPrio,fun_body=NoBody,fun_type=No,fun_pos=NoPos,
+			  			# dummy_fun_def = { fun_docs ="", fun_ident = {id_name="",id_info=nilPtr},fun_arity=0,fun_priority=NoPrio,fun_body=NoBody,fun_type=No,fun_pos=NoPos,
 										  				fun_kind=FK_Unknown,fun_lifted=0,fun_info = {fi_calls=[],fi_group_index=0,fi_def_level=NotALevel,fi_free_vars=[],fi_local_vars=[],fi_dynamics=[],fi_properties=0}}
 			  			= {createArray (size fun_defs+n_new_elements) dummy_fun_def & [i]=fun_defs.[i] \\ i<-[0..size fun_defs-1]}
 		  (array_first_instance_indices,fun_defs, predef_symbols, type_heaps, error)
@@ -2846,7 +2846,8 @@ where
 					  instance_type = makeElemTypeOfArrayFunctionStrict instance_type member_index offset_table
 					  fun_index = first_instance_index+member_index
 					  fun = 
-						{	fun_ident		= me_ident
+						{ fun_docs = ""
+                        , 	fun_ident		= me_ident
 						,	fun_arity		= me_type.st_arity
 						,	fun_priority	= NoPrio
 						,	fun_body		= NoBody
@@ -2888,7 +2889,8 @@ where
 															it_types = [record_type]} SP_None type_heaps No error
 					  fun_index = first_instance_index+member_index
 					  fun = 
-						{	fun_ident		= me_ident
+						{ fun_docs = ""
+                        , 	fun_ident		= me_ident
 						,	fun_arity		= me_type.st_arity
 						,	fun_priority	= NoPrio
 						,	fun_body		= NoBody

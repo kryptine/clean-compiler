@@ -203,6 +203,8 @@ ScanOptionNoNewOffsideForSeqLetBit:==4;
 	|	ExistsToken				//		E.
 	|	ForAllToken				//		A.
 
+	|	DocBlockToken String	//		/**...*/
+
 ::	ScanContext
 	=	GeneralContext
 	|	TypeContext
@@ -493,12 +495,21 @@ TryScanComment :: !Char !Input -> (!Optional String, !Char, !Input)
 TryScanComment c1=:'/' input
 	# (eof,c2, input)		= ReadNormalChar input
 	| eof					= (No, c1, input)
-	= case c2 of
-		'/' -> SkipWhites (SkipToEndOfLine input)
-		'*' -> case ScanComment input of
-				(No,input)	-> SkipWhites input
-				(er,input)	-> (er, c1, input)
-		_   -> (No, c1, charBack input)
+	| c2 == '/'				
+		# (eof,c3,input) = ReadNormalChar input
+		# input = charBack input
+		= case c3 of
+			'/' -> (No, c1, charBack input)
+			_   -> SkipWhites (SkipToEndOfLine input)
+	| c2 == '*'
+		# (eof,c3,input) = ReadNormalChar input
+		# input = charBack input
+		= case c3 of
+			'*' -> (No, c1, charBack input)
+			_   -> case ScanComment input of
+					(No,input)	-> SkipWhites input
+					(er,input)	-> (er, c1, input)
+	= (No, c1, charBack input)
 TryScanComment c input
 	= (No, c, input)
 
@@ -746,6 +757,20 @@ Scan 'A' input TypeContext
 	| eof					= (IdentToken "A", input)
 	| c1 == '.'				= (ForAllToken, input)
 							= ScanIdentFast 1 (charBack input) TypeContext
+
+Scan c=:'/' input co
+	# (eof,c1,input)		= ReadNormalChar input
+	| eof					= CheckReservedOperator (revCharListToString 0 [c]) input
+	| c1 == '*'
+		# (_,c2,input)		= ReadNormalChar input
+		| c2 == '*'			= ScanDocBlock input
+		= abort "Scanner: Error in Scan" //already caught by TryScanComment
+	| c1 == '/'
+		# (_,c2,input)		= ReadNormalChar input
+		| c2 == '/'			= ScanDocLine input
+		= abort "Scanner: Error in Scan" //already caught by TryScanComment
+    | isSpecialChar c1      = ScanOperator 1 input [c1, c] co
+    | otherwise             = CheckReservedOperator (revCharListToString 0 [c]) (charBack input)
 Scan c    input co
 	| IsDigit c				= ScanNumeral 0 input [c]
 	| IsIdentChar c	co	
@@ -946,6 +971,35 @@ stripNewline string
 				-> string%(0,size-3)
 				-> string%(0,size-2)
 			-> string
+
+ScanDocBlock :: !Input -> (!Token, !Input)
+ScanDocBlock input
+	= scan_doc_block [] input
+where
+	scan_doc_block :: ![Char] !Input -> (!Token,!Input)
+	scan_doc_block acc input
+		# (eof, c, input)	= ReadChar input
+		| c == '*'
+			# (eof, c, input) = ReadChar input
+			| c == '/' = (DocBlockToken (toString (reverse acc)), input)
+			= scan_doc_block [c:acc] input
+		| isNewLine c
+			| eof
+				= (ErrorToken "end of file encountered inside documentation block", input)
+			= scan_doc_block [c:acc] input
+		= scan_doc_block [c:acc] input
+
+ScanDocLine :: !Input -> (!Token, !Input)
+ScanDocLine input
+	= scan_doc_line [] input
+where
+	scan_doc_line :: ![Char] !Input -> (!Token,!Input)
+	scan_doc_line acc input
+		# (eof, c, input)	= ReadChar input
+		| isNewLine c
+			= (DocBlockToken (toString (reverse acc)), input)
+		= scan_doc_line [c:acc] input
+
 
 ScanNumeral	:: !Int !Input [Char] -> (!Token, !Input)
 ScanNumeral n input chars=:['0':r]

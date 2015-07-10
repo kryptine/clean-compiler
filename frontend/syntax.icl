@@ -767,6 +767,7 @@ where
 	(<<<) file (PD_Type td) = file <<< td
 	(<<<) file (PD_Generic {gen_ident}) = file <<< "generic " <<< gen_ident
 	(<<<) file (PD_GenericCase {gc_gcf=GCF gc_ident _,gc_type_cons} _) = file <<< gc_ident <<< "{|" <<< gc_type_cons <<< "|}"
+	(<<<) file (PD_Documentation docs) = file <<< docs
 	(<<<) file _ = file
 
 instance <<< Rhs

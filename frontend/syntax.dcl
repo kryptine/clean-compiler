@@ -271,6 +271,7 @@ cIsNotAFunction :== False
 	|	PD_Generic GenericDef
 	| 	PD_GenericCase GenericCaseDef Ident
 	|	PD_Derive [GenericCaseDef]
+	|	PD_Documentation !{#Char}
 	|	PD_Erroneous
 
 :: FunKind = FK_Function !Bool | FK_Macro | FK_Caf | FK_NodeDefOrFunction | FK_Unknown
@@ -287,6 +288,7 @@ cNameLocationDependent :== True
 	,	ps_field_type		:: !AType
 	,	ps_field_var		:: !Ident
 	,	ps_field_pos		:: !Position
+	,	ps_docblock			:: !OptionalDocBlock
 	}
 
 :: ParsedConstructor =
@@ -298,6 +300,7 @@ cNameLocationDependent :== True
 	,	pc_context		:: ![TypeContext]
 	,	pc_cons_prio	:: !Priority
 	,	pc_cons_pos		:: !Position
+	,	pc_docblock		:: !OptionalDocBlock
 	}
 
 :: ParsedInstance =
@@ -714,7 +717,8 @@ FI_UnusedUsed :== 128			// used in module trans
 					| NoBody
 
 :: FunDef =
-	{	fun_ident		:: !Ident
+	{	fun_docs        :: !String
+    ,   fun_ident		:: !Ident
 	,	fun_arity		:: !Int
 	,	fun_priority	:: !Priority
 	,	fun_body		:: !FunctionBody
@@ -1501,6 +1505,8 @@ instance == OverloadedListType
 	,	dp_rhs					:: !Expression
 	,	dp_position				:: !Position
 	}
+
+::	OptionalDocBlock :== Optional String
 	
 /*
 	error handling
