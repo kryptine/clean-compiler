@@ -1620,6 +1620,7 @@ where
 	toString ExistsToken				= "E."
 	toString ForAllToken				= "A."
 
+    toString (DocBlockToken _)          = "docblock"
 	toString token						= "toString (Token) does not know this token"
 
 instance == Token

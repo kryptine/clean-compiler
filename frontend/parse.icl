@@ -390,7 +390,7 @@ wantDefinitions parseContext pState
 
 cHasPriority 	:== True
 cHasNoPriority	:== False
-import StdDebug
+
 tryDefinition :: !ParseContext !ParseState -> (!Bool, ParsedDefinition, !ParseState)
 tryDefinition parseContext pState
 	# (token, pState)			= nextToken GeneralContext pState
