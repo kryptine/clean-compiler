@@ -582,23 +582,3 @@ varIsTask bv inh
   = case 'DM'.get bv.var_ident.id_name inh.inh_tyenv of
       Nothing -> False
       Just t  -> typeIsTask t
-
-// TODO Relate the match_vars from the body to the vars from the arguments
-funToGraph :: FunDef FunDef [(String, ParsedExpr)] !{#{!InstanceTree}} !{#CommonDefs} InhExpression *ChnExpression
-           -> *(Maybe ([(TExpr, TExpr)], TExpr, Expression), *ChnExpression)
-funToGraph fd=:{fun_ident=fun_ident, fun_body = TransformedBody tb} fd_cpy list_comprehensions instance_tree common_defs inh chn = mkBody
-  where
-  mkBody
-    # (argTys, tyenv) = zipWithSt (\arg t st -> ((arg, t), 'DM'.put arg.fv_ident.id_name t st)) tb.tb_args (funArgTys fd_cpy) 'DM'.newMap
-    # (syn, chn)      = mkBlueprint {inh & inh_tyenv = tyenv} tb.tb_rhs chn
-    = ( Just (map (\(arg, ty) -> (mkArgPP syn.syn_pattern_match_vars arg, typeToTCleanExpr ty)) argTys, syn.syn_texpr, syn.syn_annot_expr)
-      , chn)
-  mkArgPP pmvars arg
-    = case arg.fv_ident.id_name of
-        "_x"
-          = case [clexpr \\ (bv, clexpr) <- pmvars | bv.var_info_ptr == arg.fv_info_ptr] of
-              []    -> TLit "(shouldn't happen)"
-              [x:_] -> x
-        idnm
-          = TVar -1 idnm
-funToGraph _ _ _ _ _ _ chn = (Nothing, chn)

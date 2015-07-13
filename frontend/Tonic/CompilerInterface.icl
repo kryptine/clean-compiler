@@ -3,7 +3,6 @@ implementation module Tonic.CompilerInterface
 import Tonic.Util
 import Tonic.GraphGen
 import Tonic.Pretty
-//import Tonic.Tonic
 import syntax, checksupport, compile, unitype
 from overloading import :: InstanceTree (..), find_instance
 import StdFile
@@ -13,7 +12,8 @@ import Data.Func
 import Data.Functor
 import Data.Graph
 import Data.Maybe
-import Data.Map
+import Data.List
+import qualified Data.Map as DM
 import qualified Data.Set as DS
 import Text.JSON
 import iTasks._Framework.Tonic.AbsSyn
@@ -83,7 +83,7 @@ ginTonic` :: Bool ModuleN !*{#FunDef} !*{#FunDef} IclModule {#DclModule}
              !{#{!InstanceTree}} *Heaps
           -> *(String, !*{#FunDef}, !*PredefinedSymbols, !*Heaps)
 ginTonic` is_itasks_mod main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules common_defs list_comprehensions predef_symbols class_instances heaps
-  # ((reps, heaps, predef_symbols, fun_defs_cpy), fun_defs) = foldUArr appDefInfo ((newMap, heaps, predef_symbols, fun_defs_cpy), fun_defs)
+  # ((reps, heaps, predef_symbols, fun_defs_cpy), fun_defs) = foldUArr appDefInfo (('DM'.newMap, heaps, predef_symbols, fun_defs_cpy), fun_defs)
   # menv        = mkModuleEnv main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules
   # (str, menv) = toJSONString reps icl_module menv
   = (str, menv.me_fun_defs, predef_symbols, heaps)
@@ -94,28 +94,36 @@ ginTonic` is_itasks_mod main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_m
     # inh         = mkInhExpr ('DS'.fromList (map (\x -> x.fv_ident.id_name) tb.tb_args)) fun_ident.id_name list_comprehensions class_instances common_defs
     # menv        = mkModuleEnv main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules
     # chn         = mkChnExpr predef_symbols menv heaps
-    # (isTask, chn) = funIsTopLevelBlueprint fd_cpy inh chn
-    | (not is_itasks_mod) && isTask
-      # (mres, chn) = funToGraph fd fd_cpy list_comprehensions class_instances common_defs inh chn
-      # menv = case mres of
-                 Just (_, _, e)
-                   -> updateWithAnnot idx e chn.chn_module_env
-                 _ -> chn.chn_module_env
-      # chn = {chn & chn_module_env = menv}
-      # chn = addTonicWrap is_itasks_mod icl_module class_instances idx common_defs chn
-      # menv = chn.chn_module_env
-      = ((case mres of
-            Just (args, g, _)
-              -> put fd.fun_ident.id_name { TonicTask
-                                          | tt_comments  = fd.fun_docs
-                                          , tt_module    = icl_module.icl_name.id_name
-                                          , tt_name      = fd.fun_ident.id_name
-                                          , tt_iclLineNo = mkFunPos fun_pos
-                                          , tt_resty     = typeToTCleanExpr (funTy fd_cpy)
-                                          , tt_args      = args
-                                          , tt_body      = g} reps
-            _ -> reps
+    # (argTys, tyenv) = zipWithSt (\arg t st -> ((arg, t), 'DM'.put arg.fv_ident.id_name t st)) tb.tb_args (funArgTys fd_cpy) 'DM'.newMap
+    # (isTopLeveLBlueprint, chn) = funIsTopLevelBlueprint fd_cpy inh chn
+    | (not is_itasks_mod) && isTopLeveLBlueprint
+      # (syn, chn) = mkBlueprint {inh & inh_tyenv = tyenv} tb.tb_rhs chn
+      # menv       = updateWithAnnot idx syn.syn_annot_expr chn.chn_module_env
+      # chn        = {chn & chn_module_env = menv}
+      # chn        = addTonicWrap is_itasks_mod icl_module class_instances idx common_defs chn
+      # menv       = chn.chn_module_env
+      # args       = map (\(arg, ty) -> (mkArgPP syn.syn_pattern_match_vars arg, typeToTCleanExpr ty)) argTys
+      = (('DM'.put fd.fun_ident.id_name { TonicTask
+                                        | tt_comments  = fd.fun_docs
+                                        , tt_module    = icl_module.icl_name.id_name
+                                        , tt_name      = fd.fun_ident.id_name
+                                        , tt_iclLineNo = mkFunPos fun_pos
+                                        , tt_resty     = typeToTCleanExpr (funTy fd_cpy)
+                                        , tt_args      = args
+                                        , tt_body      = syn.syn_texpr} reps
         , chn.chn_heaps, chn.chn_predef_symbols, menv.me_fun_defs_cpy), menv.me_fun_defs)
+    //| is_itasks_mod && isTopLeveLBlueprint
+      //# menv = chn.chn_module_env
+      //# args = map (\(arg, ty) -> (mkArgPP [] arg, typeToTCleanExpr ty)) argTys
+      //= (('DM'.put fd.fun_ident.id_name { TonicTask
+                                        //| tt_comments  = fd.fun_docs
+                                        //, tt_module    = icl_module.icl_name.id_name
+                                        //, tt_name      = fd.fun_ident.id_name
+                                        //, tt_iclLineNo = mkFunPos fun_pos
+                                        //, tt_resty     = typeToTCleanExpr (funTy fd_cpy)
+                                        //, tt_args      = args
+                                        //, tt_body      = TLit "Internal iTasks function"} reps
+        //, chn.chn_heaps, chn.chn_predef_symbols, menv.me_fun_defs_cpy), menv.me_fun_defs)
     | otherwise
       # menv = chn.chn_module_env
       = ((reps, chn.chn_heaps, chn.chn_predef_symbols, menv.me_fun_defs_cpy), menv.me_fun_defs)
@@ -123,6 +131,15 @@ ginTonic` is_itasks_mod main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_m
   mkFunPos (FunPos _ n _) = n
   mkFunPos (LinePos _ n)  = n
   mkFunPos _              = -1
+
+mkArgPP pmvars arg
+  = case arg.fv_ident.id_name of
+      "_x"
+        = case [clexpr \\ (bv, clexpr) <- pmvars | bv.var_info_ptr == arg.fv_info_ptr] of
+            []    -> TLit "(shouldn't happen)"
+            [x:_] -> x
+      idnm
+        = TVar -1 idnm
 
 updateWithAnnot :: Int Expression *ModuleEnv -> *ModuleEnv
 updateWithAnnot fidx e menv
