@@ -139,7 +139,7 @@ mkArgPP pmvars arg
             []    -> TLit "(shouldn't happen)"
             [x:_] -> x
       idnm
-        = TVar -1 idnm
+        = TVar [] idnm
 
 updateWithAnnot :: Int Expression *ModuleEnv -> *ModuleEnv
 updateWithAnnot fidx e menv

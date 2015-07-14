@@ -24,7 +24,7 @@ mkInhExpr vars ctn list_comprehensions tree cds =
   , inh_common_defs    = cds
   , inh_app_ctx        = ("", "")
   , inh_vars_in_scope  = vars
-  , inh_parent_uid     = -1
+  , inh_uid            = [0]
   }
 
 mkChnExpr :: *PredefinedSymbols *ModuleEnv *Heaps -> *ChnExpression
@@ -33,7 +33,6 @@ mkChnExpr predef_symbols menv heaps =
   | chn_module_env     = menv
   , chn_predef_symbols = predef_symbols
   , chn_heaps          = heaps
-  , chn_ids            = 0
   }
 
 mkModuleEnv :: ModuleN !*{#FunDef} !*{#FunDef} IclModule {#DclModule} -> *ModuleEnv

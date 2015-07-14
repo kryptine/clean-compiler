@@ -115,8 +115,6 @@ updateWithAnnot :: SymbIdent Expression *ModuleEnv -> *ModuleEnv
 
 updateFunRhs :: Index !*{#FunDef} Expression -> *{#FunDef}
 
-dispenseUnique :: *ChnExpression -> *(Int, *ChnExpression)
-
 predefIsUndefined :: PredefinedSymbol -> Bool
 
 argsRemaining :: App *ModuleEnv -> *(Int, *ModuleEnv)
@@ -150,6 +148,8 @@ instance ToStatic (Expression, Expression)
 instance FromStatic (Expression, Expression)
 
 instance FromStatic String
+
+listToListExpr :: [Expression] *PredefinedSymbols -> *(Expression, *PredefinedSymbols)
 
 freeVarToVar :: FreeVar *Heaps -> *(BoundVar, *Heaps)
 

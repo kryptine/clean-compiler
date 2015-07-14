@@ -140,7 +140,7 @@ withTwo app []        _ _   chn = ({syn_annot_expr = App app, syn_texpr = TLit "
 withTwo app [_]       _ _   chn = ({syn_annot_expr = App app, syn_texpr = TLit "TODO withTwo [_]", syn_pattern_match_vars = []}, chn)
 withTwo app [x1:x2:_] f inh chn = f x1 x2 chn
 
-wrapTaskApp :: Int String Expression InhExpression *ChnExpression -> *(Expression, *ChnExpression)
+wrapTaskApp :: ExprId String Expression InhExpression *ChnExpression -> *(Expression, *ChnExpression)
 wrapTaskApp uid wrappedFnNm origExpr inh chn
   # (ok, pdss) = pdssAreDefined [PD_tonicExtWrapApp, PD_tonicExtWrapAppLam1, PD_tonicExtWrapAppLam2, PD_tonicExtWrapAppLam3, PD_ConsSymbol, PD_NilSymbol] chn.chn_predef_symbols
   | not ok     = (origExpr, {chn & chn_predef_symbols = pdss})
@@ -164,9 +164,10 @@ wrapTaskApp uid wrappedFnNm origExpr inh chn
                                     [ mkStr wrappedFnModNm
                                     , mkStr wrappedFnNm
                                     ] SK_Constructor heaps pdss
+      # (eidExpr, pdss) = listToListExpr (map mkInt uid) pdss
       # (expr, heaps, pdss) = appPredefinedSymbolWithEI (findWrap rem)
                                 [ App wrapInfo
-                                , mkInt uid
+                                , eidExpr
                                 , origExpr
                                 ] SK_Function heaps pdss
       = ( App expr
@@ -200,8 +201,8 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
       # pats                = [case freeVarName x of
                                  "_x" -> case syne.syn_pattern_match_vars of
                                            [(_, e):_] -> e
-                                           _          -> TVar -1 "_x"
-                                 x    -> TVar -1 x
+                                           _          -> TVar [] "_x"
+                                 x    -> TVar [] x
                               \\ x <- args | x.fv_def_level == -1]
       # menv                = updateWithAnnot app_symb syne.syn_annot_expr chn.chn_module_env
       = ( { syn_annot_expr = App app
@@ -221,27 +222,25 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
   | otherwise      = mkFApp app ctxs args inh chn
   where
   mkMApp app ctxs args inh chn
-    # appName       = app.app_symb.symb_ident.id_name
-    # (uid, chn)    = dispenseUnique chn
+    # appName        = app.app_symb.symb_ident.id_name
     # (mFunTy, menv) = reifyFunType app.app_symb chn.chn_module_env
     # (assoc, menv)  = getAssoc app.app_symb menv
-    # (mst, menv)   = reifySymbIdentSymbolType app.app_symb menv
-    # mTyStr        = case mst of
-                        Just st -> symTyStr st
-                        _       -> Nothing
-    # chn           = {chn & chn_module_env = menv}
-    # (dclnm, menv) = case reifyDclModule app.app_symb chn.chn_module_env of
-                        (Just dcl, menv) = (dcl.dcl_name.id_name, menv)
-                        (_       , menv)
-                          # (iclmod, menv) = menv!me_icl_module
-                          = (iclmod.icl_name.id_name, menv)
-    # chn           = {chn & chn_module_env = menv}
-    # (ps, chn)     = mapSt (\x chn -> mkBlueprint inh x chn) args chn
-    # args`         = map (\syn -> syn.syn_annot_expr) ps
-    # (app`, chn)   = (App {app & app_args = args`}, chn)
-    # (app`, chn)   = wrapTaskApp uid appName app` inh chn
+    # (mst, menv)    = reifySymbIdentSymbolType app.app_symb menv
+    # mTyStr         = case mst of
+                         Just st -> symTyStr st
+                         _       -> Nothing
+    # (dclnm, menv)  = case reifyDclModule app.app_symb menv of
+                         (Just dcl, menv) = (dcl.dcl_name.id_name, menv)
+                         (_       , menv)
+                           # (iclmod, menv) = menv!me_icl_module
+                           = (iclmod.icl_name.id_name, menv)
+    # chn            = {chn & chn_module_env = menv}
+    # (ps, chn)      = mapSt (\(x, n) chn -> mkBlueprint (addUnique n inh) x chn) (zip2 args [0..]) chn
+    # args`          = map (\syn -> syn.syn_annot_expr) ps
+    # (app`, chn)    = (App {app & app_args = args`}, chn)
+    # (app`, chn)    = wrapTaskApp inh.inh_uid appName app` inh chn
     = ({ syn_annot_expr = app`
-       , syn_texpr      = TMApp uid mTyStr dclnm (appFunName app) (map (\syn -> syn.syn_texpr) ps) assoc
+       , syn_texpr      = TMApp inh.inh_uid mTyStr dclnm (appFunName app) (map (\syn -> syn.syn_texpr) ps) assoc
        , syn_pattern_match_vars = []}, chn)
 
   mkFApp app ctxs args inh chn
@@ -288,8 +287,7 @@ mkBlueprint inh (e=:(App app) @ es) chn
       # (assoc, menv)     = getAssoc app.app_symb menv
       # (texpr, es`, chn) = case fd.fun_type of
                               Yes ft | symTyIsTask ft
-                                # (uid, chn)    = dispenseUnique {chn & chn_module_env = menv}
-                                # (es`, chn)    = mapSt (mkBlueprint inh) es chn
+                                # (es`, chn)    = mapSt (\(e, n) chn -> mkBlueprint (addUnique n inh) e chn) (zip2 es [0..]) {chn & chn_module_env = menv}
                                 # (mst, menv)   = reifySymbIdentSymbolType app.app_symb chn.chn_module_env
                                 # mTyStr        = case mst of
                                                     Just st -> symTyStr st
@@ -299,7 +297,7 @@ mkBlueprint inh (e=:(App app) @ es) chn
                                                     (_       , menv)
                                                       # (iclmod, menv) = menv!me_icl_module
                                                       = (iclmod.icl_name.id_name, menv)
-                                = ( TMApp uid mTyStr dclnm (appFunName app) (map (\syn -> syn.syn_texpr) es`) assoc
+                                = ( TMApp inh.inh_uid mTyStr dclnm (appFunName app) (map (\syn -> syn.syn_texpr) es`) assoc
                                   , es`, {chn & chn_module_env = menv})
                               _
                                 # (es`, chn) = mapSt (mkBlueprint inh) es {chn & chn_module_env = menv}
@@ -316,13 +314,12 @@ mkBlueprint inh (e=:(App app) @ es) chn
 mkBlueprint inh (e=:(Var bv) @ es) chn
   # (bps, chn) = mapSt (mkBlueprint inh) es chn
   | varIsTask bv inh
-      # (uid, chn)  = dispenseUnique chn
-      # (var`, chn) = wrapTaskApp uid "(Var @ es)" (e @ es) inh chn
+      # (var`, chn) = wrapTaskApp inh.inh_uid "(Var @ es)" (e @ es) inh chn
       # mTyStr      = case 'DM'.get bv.var_ident.id_name inh.inh_tyenv of
                         Just x -> symTyStr` x
                         _      -> Nothing
       = ({ syn_annot_expr = var`
-         , syn_texpr      = TMApp uid mTyStr "" bv.var_ident.id_name (map (\syn -> syn.syn_texpr) bps) TNoPrio
+         , syn_texpr      = TMApp inh.inh_uid mTyStr "" bv.var_ident.id_name (map (\syn -> syn.syn_texpr) bps) TNoPrio
          , syn_pattern_match_vars = []}, chn)
   | otherwise
       = ({ syn_annot_expr = Var bv @ es
@@ -469,22 +466,21 @@ mkBlueprint inh (Case cs) chn
   mkAlts` :: InhExpression Int Expression *ChnExpression -> *(SynExpression, *ChnExpression)
   mkAlts` inh n expr chn
     # inh = {inh & inh_case_expr = Nothing }
-    = mkBlueprint inh expr chn
+    = mkBlueprint (addUnique n inh) expr chn
 
 mkBlueprint inh (Var bv) chn
   | varIsTask bv inh
-      # (uid, chn)  = dispenseUnique chn
-      # (var`, chn) = wrapTaskApp uid "(Var)" (Var bv) inh chn
+      # (var`, chn) = wrapTaskApp inh.inh_uid "(Var)" (Var bv) inh chn
       = ({ syn_annot_expr = var`
-         , syn_texpr      = TVar uid bv.var_ident.id_name
+         , syn_texpr      = TVar inh.inh_uid bv.var_ident.id_name
          , syn_pattern_match_vars = []}, chn)
   | otherwise
       = ({ syn_annot_expr = Var bv
-         , syn_texpr      = TVar -1 bv.var_ident.id_name
+         , syn_texpr      = TVar [] bv.var_ident.id_name
          , syn_pattern_match_vars = []}, chn)
 mkBlueprint _ expr=:(FreeVar fv) chn
   = ({ syn_annot_expr = expr
-     , syn_texpr      = TVar -1 fv.fv_ident.id_name
+     , syn_texpr      = TVar [] fv.fv_ident.id_name
      , syn_pattern_match_vars = []}, chn)
 mkBlueprint _ expr=:(BasicExpr bv) chn
   = ({ syn_annot_expr = expr
@@ -568,6 +564,9 @@ mkBlueprint _ expr=:(FailExpr _) chn = ({ syn_annot_expr = expr
 mkBlueprint _ expr chn = ({ syn_annot_expr = expr
                           , syn_texpr      = TLit "(mkBlueprint fallthrough)"
                           , syn_pattern_match_vars = []}, chn)
+
+addUnique :: !Int !InhExpression -> InhExpression
+addUnique n inh = {inh & inh_uid = inh.inh_uid ++ [n]}
 
 symTyStr {st_result = {at_type}} = symTyStr` at_type
 symTyStr` (TA tsi _)    = Just tsi.type_ident.id_name

@@ -635,9 +635,6 @@ foldrSt op l st = foldr_st l
     foldr_st []     = st
     foldr_st [a:as] = op a (foldr_st as)
 
-dispenseUnique :: *ChnExpression -> *(Int, *ChnExpression)
-dispenseUnique chn = (chn.chn_ids, {chn & chn_ids = chn.chn_ids + 1})
-
 predefIsUndefined :: PredefinedSymbol -> Bool
 predefIsUndefined pds = pds.pds_def == NoIndex || pds.pds_module == NoIndex
 
