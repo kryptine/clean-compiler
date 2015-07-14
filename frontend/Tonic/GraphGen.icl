@@ -332,7 +332,7 @@ mkBlueprint inh (Let lt) chn
   # boundVars = [bnd.lb_dst.fv_ident.id_name \\ bnd <- getLetBinds lt]
   # mexpr     = listToMaybe [ bnd.lb_src \\ bnd <- getLetBinds lt
                             | bnd.lb_dst.fv_ident.id_name == "_case_var"]
-  = mkLet mexpr lt {inh & inh_vars_in_scope = 'DS'.union inh.inh_vars_in_scope ('DS'.fromList boundVars)} chn
+  = mkLet mexpr lt inh chn
   where
   mkLet (Just expr=:(App app)) lt inh chn
     | appIsListComp app

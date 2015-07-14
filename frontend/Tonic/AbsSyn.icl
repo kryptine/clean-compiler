@@ -12,18 +12,14 @@ import qualified Data.Set as DS
 import Tonic.Pretty
 import iTasks._Framework.Tonic.AbsSyn
 
-mkInhExpr :: !(Set String) !String ![(String, ParsedExpr)] !{#{!InstanceTree}} !{#CommonDefs} -> InhExpression
-mkInhExpr vars ctn list_comprehensions tree cds =
+mkInhExpr :: ![(String, ParsedExpr)] !{#{!InstanceTree}} !{#CommonDefs} -> InhExpression
+mkInhExpr list_comprehensions tree cds =
   { InhExpression
-  | inh_curr_task_name = ctn
-  , inh_case_expr      = Nothing
-  , inh_is_bind_lam    = False
+  | inh_case_expr      = Nothing
   , inh_tyenv          = newMap
   , inh_list_compr     = list_comprehensions
   , inh_instance_tree  = tree
   , inh_common_defs    = cds
-  , inh_app_ctx        = ("", "")
-  , inh_vars_in_scope  = vars
   , inh_uid            = [0]
   }
 

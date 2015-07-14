@@ -20,15 +20,11 @@ from iTasks._Framework.Tonic.AbsSyn import :: TExpr, :: ExprId, :: TypeName, :: 
 // InhExpression and ChnExpression need strict fields in order to prevent a bus
 // error caused by huge thunks
 :: InhExpression =
-  { inh_curr_task_name :: !String
-  , inh_case_expr      :: !Maybe Expression
-  , inh_is_bind_lam    :: !Bool
+  { inh_case_expr      :: !Maybe Expression
   , inh_tyenv          :: !Map String Type
   , inh_list_compr     :: ![(String, ParsedExpr)]
   , inh_instance_tree  :: !{#{!InstanceTree}}
   , inh_common_defs    :: !{#CommonDefs}
-  , inh_app_ctx        :: !(String, String)
-  , inh_vars_in_scope  :: !Set String
   , inh_uid            :: ![Int]
   }
 
@@ -52,7 +48,7 @@ from iTasks._Framework.Tonic.AbsSyn import :: TExpr, :: ExprId, :: TypeName, :: 
   , me_dcl_modules       :: !{#DclModule}
   }
 
-mkInhExpr :: !(Set String) !String ![(String, ParsedExpr)] !{#{!InstanceTree}} !{#CommonDefs} -> InhExpression
+mkInhExpr :: ![(String, ParsedExpr)] !{#{!InstanceTree}} !{#CommonDefs} -> InhExpression
 
 mkChnExpr :: *PredefinedSymbols *ModuleEnv *Heaps -> *ChnExpression
 
