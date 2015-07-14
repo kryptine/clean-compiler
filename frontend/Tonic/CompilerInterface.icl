@@ -71,11 +71,11 @@ foldUArr f (b, arr)
               = f idx elem (res, arr)
           | otherwise = (b, arr)
 
-toJSONString :: (Map String TonicTask) IclModule *ModuleEnv -> *(String, *ModuleEnv)
+toJSONString :: (Map String TonicFunc) IclModule *ModuleEnv -> *(String, *ModuleEnv)
 toJSONString rs icl_module menv
   = (toString $ toJSON { TonicModule
                        | tm_name  = icl_module.icl_name.id_name
-                       , tm_tasks = rs}
+                       , tm_funcs = rs}
     , menv)
 import StdDebug
 ginTonic` :: Bool ModuleN !*{#FunDef} !*{#FunDef} IclModule {#DclModule}
@@ -103,14 +103,14 @@ ginTonic` is_itasks_mod main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_m
       # chn        = addTonicWrap is_itasks_mod icl_module class_instances idx common_defs chn
       # menv       = chn.chn_module_env
       # args       = map (\(arg, ty) -> (mkArgPP syn.syn_pattern_match_vars arg, typeToTCleanExpr ty)) argTys
-      = (('DM'.put fd.fun_ident.id_name { TonicTask
-                                        | tt_comments  = fd.fun_docs
-                                        , tt_module    = icl_module.icl_name.id_name
-                                        , tt_name      = fd.fun_ident.id_name
-                                        , tt_iclLineNo = mkFunPos fun_pos
-                                        , tt_resty     = typeToTCleanExpr (funTy fd_cpy)
-                                        , tt_args      = args
-                                        , tt_body      = syn.syn_texpr} reps
+      = (('DM'.put fd.fun_ident.id_name { TonicFunc
+                                        | tf_comments  = fd.fun_docs
+                                        , tf_module    = icl_module.icl_name.id_name
+                                        , tf_name      = fd.fun_ident.id_name
+                                        , tf_iclLineNo = mkFunPos fun_pos
+                                        , tf_resty     = typeToTCleanExpr (funTy fd_cpy)
+                                        , tf_args      = args
+                                        , tf_body      = syn.syn_texpr} reps
         , chn.chn_heaps, chn.chn_predef_symbols, menv.me_fun_defs_cpy), menv.me_fun_defs)
     //| is_itasks_mod && isTopLeveLBlueprint
       //# menv = chn.chn_module_env
