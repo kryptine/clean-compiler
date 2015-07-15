@@ -15,7 +15,7 @@ from Text.JSON import generic JSONEncode, :: JSONNode
 from Data.Map import :: Map
 from Data.Set import :: Set
 from predef import :: PredefinedSymbol, :: PredefinedSymbols
-from iTasks._Framework.Tonic.AbsSyn import :: TExpr, :: ExprId, :: TypeName, :: ModuleName, :: TaskName, :: VariableName //, :: TCleanExpr
+from iTasks._Framework.Tonic.AbsSyn import :: TExpr
 
 // InhExpression and ChnExpression need strict fields in order to prevent a bus
 // error caused by huge thunks
