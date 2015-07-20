@@ -201,8 +201,8 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
       # pats                = [case freeVarName x of
                                  "_x" -> case syne.syn_pattern_match_vars of
                                            [(_, e):_] -> e
-                                           _          -> TVar [] "_x"
-                                 x    -> TVar [] x
+                                           _          -> TVar [] "_x" (ptrToInt x.fv_info_ptr)
+                                 x`    -> TVar [] x` (ptrToInt x.fv_info_ptr)
                               \\ x <- args | x.fv_def_level == -1]
       # menv                = updateWithAnnot app_symb syne.syn_annot_expr chn.chn_module_env
       = ( { syn_annot_expr = App app
@@ -472,15 +472,15 @@ mkBlueprint inh (Var bv) chn
   | varIsTask bv inh
       # (var`, chn) = wrapTaskApp inh.inh_uid "(Var)" (Var bv) inh chn
       = ({ syn_annot_expr = var`
-         , syn_texpr      = TVar inh.inh_uid bv.var_ident.id_name
+         , syn_texpr      = TVar inh.inh_uid bv.var_ident.id_name (ptrToInt bv.var_info_ptr)
          , syn_pattern_match_vars = []}, chn)
   | otherwise
       = ({ syn_annot_expr = Var bv
-         , syn_texpr      = TVar [] bv.var_ident.id_name
+         , syn_texpr      = TVar [] bv.var_ident.id_name (ptrToInt bv.var_info_ptr)
          , syn_pattern_match_vars = []}, chn)
 mkBlueprint _ expr=:(FreeVar fv) chn
   = ({ syn_annot_expr = expr
-     , syn_texpr      = TVar [] fv.fv_ident.id_name
+     , syn_texpr      = TVar [] fv.fv_ident.id_name (ptrToInt fv.fv_info_ptr)
      , syn_pattern_match_vars = []}, chn)
 mkBlueprint _ expr=:(BasicExpr bv) chn
   = ({ syn_annot_expr = expr
