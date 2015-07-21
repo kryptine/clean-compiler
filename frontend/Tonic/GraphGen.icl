@@ -431,7 +431,7 @@ mkBlueprint inh (Case cs) chn
                                        _ = ((No, syns, False), chn)
         = ({ syn_annot_expr = Case {cs & case_default = def, case_guards = guards}
            , syn_texpr      = case (isIf, syns) of
-                                (True, [(_, bt), (_, be)]) -> TIf cesyn.syn_texpr bt.syn_texpr be.syn_texpr
+                                (True, [(_, be), (_, bt)]) -> TIf cesyn.syn_texpr bt.syn_texpr be.syn_texpr
                                 _                          -> TCase cesyn.syn_texpr (reverse (map (\(d, s) -> (d, s.syn_texpr)) syns))
            , syn_pattern_match_vars = foldr (\(_, syn) acc -> syn.syn_pattern_match_vars ++ acc) [] syns}, chn)
   where
@@ -462,7 +462,7 @@ mkBlueprint inh (Case cs) chn
       f bp ((bps, syns, n), chn)
         # (syn, chn)  = mkAlts` inh n bp.bp_expr chn
         # bp          = {bp & bp_expr = syn.syn_annot_expr}
-        = (([bp:bps], [(TPPExpr (ppCompact (ppBasicValue bp.bp_value)), syn):syns], n + 1), chn)
+        = (([bp:bps], [(TLit (fromBasicValue bp.bp_value), syn):syns], n + 1), chn)
   mkAlts c chn = ((c, []), chn)
 
   mkAlts` :: InhExpression Int Expression *ChnExpression -> *(SynExpression, *ChnExpression)
