@@ -682,6 +682,9 @@ mkStr str = BasicExpr (BVS ("\"" +++ str +++ "\""))
 mkInt :: Int -> Expression
 mkInt i   = BasicExpr (BVInt i)
 
+mkBool :: Bool -> Expression
+mkBool b = BasicExpr (BVB b)
+
 appPredefinedSymbolWithEI :: Int [Expression] ((Global Index) -> SymbKind) *Heaps *PredefinedSymbols
                           -> *(App, *Heaps, *PredefinedSymbols)
 appPredefinedSymbolWithEI pds_idx args mkKind heaps pdss
@@ -743,6 +746,12 @@ instance ToStatic (Expression, Expression) where
 instance FromStatic (Expression, Expression) where
   fromStatic expr = tupleExprToTuple expr
 
+instance ToStatic (Expression, Expression, Expression) where
+  toStatic tup pdss = tuple3ToTupleExpr tup pdss
+
+instance FromStatic (Expression, Expression, Expression) where
+  fromStatic expr = tuple3ExprToTuple expr
+
 listExprToList :: Expression -> [Expression]
 listExprToList expr=:(App app) =
   case app.app_symb.symb_ident.id_name of
@@ -771,6 +780,15 @@ tupleToTupleExpr (e1, e2) pdss
 tupleExprToTuple :: Expression -> (Expression, Expression)
 tupleExprToTuple (App app=:{app_args = [l : r : _]}) = (l, r)
 tupleExprToTuple _ = abort "tupleExprToTuple"
+
+tuple3ToTupleExpr :: (Expression, Expression, Expression) *PredefinedSymbols -> *(Expression, *PredefinedSymbols)
+tuple3ToTupleExpr (e1, e2, e3) pdss
+  # (tup, pdss) = appPredefinedSymbol (GetTupleConsIndex 3) [e1, e2, e3] SK_Constructor pdss
+  = (App tup, pdss)
+
+tuple3ExprToTuple :: Expression -> (Expression, Expression, Expression)
+tuple3ExprToTuple (App app=:{app_args = [l : c : r : _]}) = (l, c, r)
+tuple3ExprToTuple _ = abort "tuple3ExprToTuple"
 
 freeVarToVar :: FreeVar *Heaps -> *(BoundVar, *Heaps)
 freeVarToVar {fv_ident, fv_info_ptr} heaps

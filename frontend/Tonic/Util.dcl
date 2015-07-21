@@ -127,6 +127,8 @@ mkStr :: String -> Expression
 
 mkInt :: Int -> Expression
 
+mkBool :: Bool -> Expression
+
 appPredefinedSymbolWithEI :: Int [Expression] ((Global Index) -> SymbKind) *Heaps *PredefinedSymbols -> *(App, *Heaps, *PredefinedSymbols)
 
 appPredefinedSymbol :: Int [Expression] ((Global Index) -> SymbKind) *PredefinedSymbols -> *(App, *PredefinedSymbols)
@@ -146,6 +148,10 @@ instance FromStatic [Expression]
 instance ToStatic (Expression, Expression)
 
 instance FromStatic (Expression, Expression)
+
+instance ToStatic (Expression, Expression, Expression)
+
+instance FromStatic (Expression, Expression, Expression)
 
 instance FromStatic String
 

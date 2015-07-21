@@ -216,7 +216,7 @@ addTonicWrap is_itasks_mod icl_module class_instances idx common_defs chn
     findBodyWrap n = abort ("No PD_tonicExtWrapBodyLam" +++ toString n)
 
     mkArg :: SymbolType Bool {#{!InstanceTree}} (FreeVar, AType) ([Expression], *ChnExpression) -> *([Expression], *ChnExpression)
-    mkArg symty is_itasks_mod class_instances (arg=:{fv_ident}, {at_type}) (xs, chn)
+    mkArg symty is_itasks_mod class_instances (arg=:{fv_info_ptr, fv_ident}, {at_type}) (xs, chn)
       # pdss = chn.chn_predef_symbols
       # heaps = chn.chn_heaps
       # (itask_class_symbol, pdss) = pdss![PD_ITaskClass]
@@ -227,11 +227,12 @@ addTonicWrap is_itasks_mod icl_module class_instances idx common_defs chn
       # (bv, heaps)   = freeVarToVar arg heaps
       # (viewApp, heaps, pdss) = appPredefinedSymbolWithEI PD_tonicExtWrapArg
                                    [ mkStr fv_ident.id_name
+                                   , mkInt (ptrToInt fv_info_ptr)
                                    , if (is_itasks_mod || (not hasITasks && noCtx))
                                        (mkStr fv_ident.id_name)
                                        (Var bv)
                                    ] SK_Function heaps pdss
-      # (texpr, pdss) = toStatic (mkStr fv_ident.id_name, App viewApp) pdss
+      # (texpr, pdss) = toStatic (mkStr fv_ident.id_name, mkInt (ptrToInt fv_info_ptr), App viewApp) pdss
       = ([texpr:xs], {chn & chn_predef_symbols = pdss, chn_heaps = heaps })
     tyHasITaskClasses :: {#{!InstanceTree}} [Global DefinedSymbol] Type *TypeHeaps -> *(Bool, *TypeHeaps)
     tyHasITaskClasses class_instances []     at_type hp_type_heaps = (False, hp_type_heaps)
