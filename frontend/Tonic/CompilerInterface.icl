@@ -136,7 +136,7 @@ mkArgPP pmvars arg
   = case arg.fv_ident.id_name of
       "_x"
         = case [clexpr \\ (bv, clexpr) <- pmvars | bv.var_info_ptr == arg.fv_info_ptr] of
-            []    -> TLit "(shouldn't happen)"
+            []    -> TPPExpr "(shouldn't happen)"
             [x:_] -> x
       idnm
         = TVar [] idnm (ptrToInt arg.FreeVar.fv_info_ptr)

@@ -136,8 +136,8 @@ given x == y && y == z
 //ppPE (PE_Empty) = "PE_Empty"
 
 withTwo :: App [Expression] (Expression Expression *ChnExpression -> *(SynExpression, *ChnExpression)) InhExpression *ChnExpression -> *(SynExpression, *ChnExpression)
-withTwo app []        _ _   chn = ({syn_annot_expr = App app, syn_texpr = TLit "TODO withTwo []", syn_pattern_match_vars = []}, chn)
-withTwo app [_]       _ _   chn = ({syn_annot_expr = App app, syn_texpr = TLit "TODO withTwo [_]", syn_pattern_match_vars = []}, chn)
+withTwo app []        _ _   chn = ({syn_annot_expr = App app, syn_texpr = TPPExpr "TODO withTwo []", syn_pattern_match_vars = []}, chn)
+withTwo app [_]       _ _   chn = ({syn_annot_expr = App app, syn_texpr = TPPExpr "TODO withTwo [_]", syn_pattern_match_vars = []}, chn)
 withTwo app [x1:x2:_] f inh chn = f x1 x2 chn
 
 wrapTaskApp :: ExprId String Expression InhExpression *ChnExpression -> *(Expression, *ChnExpression)
@@ -217,7 +217,7 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
           [] = mkFApp app ctxs args inh chn
           [orig:_]
             = ({ syn_annot_expr = expr
-               , syn_texpr      = TLit (ppCompact (ppParsedExpr orig))
+               , syn_texpr      = TPPExpr (ppCompact (ppParsedExpr orig))
                , syn_pattern_match_vars = []}, chn)
   | otherwise      = mkFApp app ctxs args inh chn
   where
@@ -281,7 +281,7 @@ mkBlueprint inh (e=:(App app) @ es) chn
       # menv          = updateWithAnnot app.app_symb syne.syn_annot_expr chn.chn_module_env
       # chn           = { chn & chn_module_env = menv}
       = ({ syn_annot_expr = e @ es
-         , syn_texpr      = TLit "TODO @"
+         , syn_texpr      = TPPExpr "TODO @"
          , syn_pattern_match_vars = syne.syn_pattern_match_vars}, chn)
   | otherwise
       # (assoc, menv)     = getAssoc app.app_symb menv
@@ -326,7 +326,7 @@ mkBlueprint inh (e=:(Var bv) @ es) chn
          , syn_texpr      = TFApp bv.var_ident.id_name (map (\syn -> syn.syn_texpr) bps) TNoPrio
          , syn_pattern_match_vars = []}, chn)
 mkBlueprint inh (e @ es) chn = ({ syn_annot_expr = e @ es
-                              , syn_texpr      = TLit "TODO @"
+                              , syn_texpr      = TPPExpr "TODO @"
                               , syn_pattern_match_vars = []}, chn)
 mkBlueprint inh (Let lt) chn
   # boundVars = [bnd.lb_dst.fv_ident.id_name \\ bnd <- getLetBinds lt]
@@ -346,7 +346,7 @@ mkBlueprint inh (Let lt) chn
             [orig:_]
               # (syn, chn) = mkBlueprint {inh & inh_case_expr = Just expr} lt.let_expr chn
               # l          = {lt & let_expr = syn.syn_annot_expr}
-              = ({syn & syn_annot_expr = Let l, syn_texpr = TLit (ppCompact (ppParsedExpr orig))}, chn)
+              = ({syn & syn_annot_expr = Let l, syn_texpr = TPPExpr (ppCompact (ppParsedExpr orig))}, chn)
   mkLet (Just expr) lt inh chn
     # (syn, chn) = mkBlueprint {inh & inh_case_expr = Just expr} lt.let_expr chn
     # l          = {lt & let_expr = syn.syn_annot_expr}
@@ -354,7 +354,7 @@ mkBlueprint inh (Let lt) chn
   mkLet Nothing lt inh chn
     # (tys, chn)   = letTypes lt.let_info_ptr chn
     # (binds, chn) = flattenBinds lt chn
-    # tyenv        = zipSt (\(TLit v, _) t tyenv -> 'DM'.put v t tyenv) binds tys inh.inh_tyenv // TODO This probably won't work for arbitrary patterns, so we actually need to be a bit smarter here and extract all variables from the patterns, instead of just PP'ing the pattern and using that as index
+    # tyenv        = zipSt (\(TPPExpr v, _) t tyenv -> 'DM'.put v t tyenv) binds tys inh.inh_tyenv // TODO This probably won't work for arbitrary patterns, so we actually need to be a bit smarter here and extract all variables from the patterns, instead of just PP'ing the pattern and using that as index
     # (syn, chn)   = mkBlueprint {inh & inh_tyenv = tyenv} lt.let_expr chn
     = ({ syn_annot_expr = Let {lt & let_expr = syn.syn_annot_expr}
        , syn_texpr      = TLet binds syn.syn_texpr
@@ -374,7 +374,7 @@ mkBlueprint inh (Let lt) chn
       where
       f bnd (xs, chn)
         # (rhs, chn) = mkBlueprint inh bnd.lb_src chn
-        = ([(TLit bnd.lb_dst.fv_ident.id_name, rhs.syn_texpr):xs], chn)
+        = ([(TVar [] bnd.lb_dst.fv_ident.id_name (ptrToInt bnd.lb_dst.fv_info_ptr), rhs.syn_texpr):xs], chn)
    getLetBinds lt = lt.let_strict_binds ++ lt.let_lazy_binds
   // TODO: For cases, the compiler introduces a fresh variable in a let for the
   // matches expression. E.g.
@@ -404,7 +404,7 @@ mkBlueprint inh (Case cs) chn
       (False, Var bv, AlgebraicPatterns gi [ap:_])
         # (fvds, chn)   = mapSt (mkBlueprint inh o FreeVar) ap.ap_vars chn
         # (clexpr, chn) = case fvds of
-                            [] = (TLit "", chn)
+                            [] = (TPPExpr "", chn)
                             args
                               # menv          = chn.chn_module_env
                               # (mprio, menv) = if (ap.ap_symbol.glob_module == chn.chn_module_env.me_main_dcl_module_n)
@@ -420,17 +420,19 @@ mkBlueprint inh (Case cs) chn
            , syn_texpr      = syn.syn_texpr
            , syn_pattern_match_vars = [(bv, clexpr) : syn.syn_pattern_match_vars]}, chn)
       _
-        # ((guards, syns), chn) = mkAlts cs.case_guards chn
-        # ((def, syns), chn)    = case cs.case_default of
-                                    Yes def
-                                      # (syn, chn) = mkAlts` inh (numGuards cs.case_guards) def chn
-                                      = case syns of
-                                          [(TLit "True", _)]
-                                            = ((Yes syn.syn_annot_expr, [(TLit "False", syn):syns]), chn)
-                                          _ = ((Yes syn.syn_annot_expr, [(TLit "_", syn):syns]), chn)
-                                    _ = ((No, syns), chn)
+        # ((guards, syns), chn)    = mkAlts cs.case_guards chn
+        # ((def, syns, isIf), chn) = case cs.case_default of
+                                       Yes def
+                                         # (syn, chn) = mkAlts` inh (numGuards cs.case_guards) def chn
+                                         = case syns of
+                                             [(TLit (TBool True), _)]
+                                               = ((Yes syn.syn_annot_expr, [(TLit (TBool False), syn):syns], True), chn)
+                                             _ = ((Yes syn.syn_annot_expr, [(TPPExpr "_", syn):syns], False), chn)
+                                       _ = ((No, syns, False), chn)
         = ({ syn_annot_expr = Case {cs & case_default = def, case_guards = guards}
-           , syn_texpr      = TCaseOrIf cesyn.syn_texpr (reverse (map (\(d, s) -> (d, s.syn_texpr)) syns))
+           , syn_texpr      = case (isIf, syns) of
+                                (True, [(_, bt), (_, be)]) -> TIf cesyn.syn_texpr bt.syn_texpr be.syn_texpr
+                                _                          -> TCase cesyn.syn_texpr (reverse (map (\(d, s) -> (d, s.syn_texpr)) syns))
            , syn_pattern_match_vars = foldr (\(_, syn) acc -> syn.syn_pattern_match_vars ++ acc) [] syns}, chn)
   where
   numGuards (AlgebraicPatterns _ ps)        = length ps
@@ -449,7 +451,7 @@ mkBlueprint inh (Case cs) chn
         # ap         = {ap & ap_expr = syn.syn_annot_expr}
         = (([ap:aps], [(apd, syn):syns], n + 1), chn)
         where
-        mkAp sym []   chn = (TLit (ppCompact ('PPrint'.text sym.glob_object.ds_ident.id_name)), chn)
+        mkAp sym []   chn = (TPPExpr (ppCompact ('PPrint'.text sym.glob_object.ds_ident.id_name)), chn)
         mkAp sym vars chn
           # (fvds, chn) = mapSt (mkBlueprint inh o FreeVar) vars chn
           = (TFApp (ppCompact ('PPrint'.text sym.glob_object.ds_ident.id_name)) (map (\x -> x.syn_texpr) fvds) TNoPrio, chn)
@@ -460,7 +462,7 @@ mkBlueprint inh (Case cs) chn
       f bp ((bps, syns, n), chn)
         # (syn, chn)  = mkAlts` inh n bp.bp_expr chn
         # bp          = {bp & bp_expr = syn.syn_annot_expr}
-        = (([bp:bps], [(TLit (ppCompact (ppBasicValue bp.bp_value)), syn):syns], n + 1), chn)
+        = (([bp:bps], [(TPPExpr (ppCompact (ppBasicValue bp.bp_value)), syn):syns], n + 1), chn)
   mkAlts c chn = ((c, []), chn)
 
   mkAlts` :: InhExpression Int Expression *ChnExpression -> *(SynExpression, *ChnExpression)
@@ -484,7 +486,7 @@ mkBlueprint _ expr=:(FreeVar fv) chn
      , syn_pattern_match_vars = []}, chn)
 mkBlueprint _ expr=:(BasicExpr bv) chn
   = ({ syn_annot_expr = expr
-     , syn_texpr      = TLit (ppCompact (ppBasicValue bv))
+     , syn_texpr      = TLit (fromBasicValue bv)
      , syn_pattern_match_vars = []}, chn)
 mkBlueprint inh expr=:(Selection st selExpr sels) chn
   # (syn, chn)      = mkBlueprint inh selExpr chn
@@ -495,15 +497,15 @@ mkBlueprint inh expr=:(Selection st selExpr sels) chn
   where
   mkSelExprs (RecordSelection gds _) chn
     # d = ppDefinedSymbol gds.glob_object
-    = (TLit (ppCompact d), chn)
+    = (TPPExpr (ppCompact d), chn)
   mkSelExprs (ArraySelection gds _ e) chn // TODO use e
     # d = ppDefinedSymbol gds.glob_object
-    = (TLit (ppCompact d), chn)
+    = (TPPExpr (ppCompact d), chn)
   mkSelExprs (DictionarySelection bv sels _ e) chn
-    = (TLit "TODO mkSelExprs DictionarySelection ", chn)
+    = (TPPExpr "TODO mkSelExprs DictionarySelection ", chn)
 mkBlueprint inh expr=:(TupleSelect _ i e) chn
   # (syn, chn) = mkBlueprint inh e chn
-  # te         = TSel syn.syn_texpr [TLit (toString i)]
+  # te         = TSel syn.syn_texpr [TPPExpr (toString i)]
   = ({ syn_annot_expr = expr
      , syn_texpr      = te
      , syn_pattern_match_vars = []}, chn)
@@ -520,50 +522,58 @@ mkBlueprint _ expr=:(NoBind _) chn
      , syn_pattern_match_vars = []}, chn)
 
 mkBlueprint _ expr=:(Update _ _ _) chn = ({ syn_annot_expr = expr
-                          , syn_texpr      = TLit "(mkBlueprint Update fallthrough)"
+                          , syn_texpr      = TPPExpr "(mkBlueprint Update fallthrough)"
                           , syn_pattern_match_vars = []}, chn)
 mkBlueprint _ expr=:(Conditional _) chn = ({ syn_annot_expr = expr
-                          , syn_texpr      = TLit "(mkBlueprint Conditional fallthrough)"
+                          , syn_texpr      = TPPExpr "(mkBlueprint Conditional fallthrough)"
                           , syn_pattern_match_vars = []}, chn)
 mkBlueprint _ expr=:(AnyCodeExpr _ _ _) chn = ({ syn_annot_expr = expr
-                          , syn_texpr      = TLit "(mkBlueprint AnyCodeExpr fallthrough)"
+                          , syn_texpr      = TPPExpr "(mkBlueprint AnyCodeExpr fallthrough)"
                           , syn_pattern_match_vars = []}, chn)
 mkBlueprint _ expr=:(ABCCodeExpr _ _) chn = ({ syn_annot_expr = expr
-                          , syn_texpr      = TLit "(mkBlueprint ABCCodeExpr fallthrough)"
+                          , syn_texpr      = TPPExpr "(mkBlueprint ABCCodeExpr fallthrough)"
                           , syn_pattern_match_vars = []}, chn)
 mkBlueprint _ expr=:(MatchExpr _ _) chn = ({ syn_annot_expr = expr
-                          , syn_texpr      = TLit "(mkBlueprint MatchExpr fallthrough)"
+                          , syn_texpr      = TPPExpr "(mkBlueprint MatchExpr fallthrough)"
                           , syn_pattern_match_vars = []}, chn)
 mkBlueprint _ expr=:(IsConstructor _ _ _ _ _ _) chn = ({ syn_annot_expr = expr
-                          , syn_texpr      = TLit "(mkBlueprint IsConstructor fallthrough)"
+                          , syn_texpr      = TPPExpr "(mkBlueprint IsConstructor fallthrough)"
                           , syn_pattern_match_vars = []}, chn)
 mkBlueprint _ expr=:(DictionariesFunction _ _ _) chn = ({ syn_annot_expr = expr
-                          , syn_texpr      = TLit "(mkBlueprint DictionariesFunction fallthrough)"
+                          , syn_texpr      = TPPExpr "(mkBlueprint DictionariesFunction fallthrough)"
                           , syn_pattern_match_vars = []}, chn)
 mkBlueprint _ expr=:(Constant _ _ _) chn = ({ syn_annot_expr = expr
-                          , syn_texpr      = TLit "(mkBlueprint Constant fallthrough)"
+                          , syn_texpr      = TPPExpr "(mkBlueprint Constant fallthrough)"
                           , syn_pattern_match_vars = []}, chn)
 mkBlueprint _ expr=:(ClassVariable _) chn = ({ syn_annot_expr = expr
-                          , syn_texpr      = TLit "(mkBlueprint ClassVariable fallthrough)"
+                          , syn_texpr      = TPPExpr "(mkBlueprint ClassVariable fallthrough)"
                           , syn_pattern_match_vars = []}, chn)
 mkBlueprint _ expr=:(DynamicExpr _) chn = ({ syn_annot_expr = expr
-                          , syn_texpr      = TLit "(mkBlueprint DynamicExpr fallthrough)"
+                          , syn_texpr      = TPPExpr "(mkBlueprint DynamicExpr fallthrough)"
                           , syn_pattern_match_vars = []}, chn)
 mkBlueprint _ expr=:(TypeCodeExpression _) chn = ({ syn_annot_expr = expr
-                          , syn_texpr      = TLit "(mkBlueprint TypeCodeExpression fallthrough)"
+                          , syn_texpr      = TPPExpr "(mkBlueprint TypeCodeExpression fallthrough)"
                           , syn_pattern_match_vars = []}, chn)
 mkBlueprint _ expr=:(TypeSignature _ _) chn = ({ syn_annot_expr = expr
-                          , syn_texpr      = TLit "(mkBlueprint TypeSignature fallthrough)"
+                          , syn_texpr      = TPPExpr "(mkBlueprint TypeSignature fallthrough)"
                           , syn_pattern_match_vars = []}, chn)
 mkBlueprint _ expr=:EE chn = ({ syn_annot_expr = expr
-                          , syn_texpr      = TLit "(mkBlueprint EE fallthrough)"
+                          , syn_texpr      = TPPExpr "(mkBlueprint EE fallthrough)"
                           , syn_pattern_match_vars = []}, chn)
 mkBlueprint _ expr=:(FailExpr _) chn = ({ syn_annot_expr = expr
-                          , syn_texpr      = TLit "(mkBlueprint FailExpr fallthrough)"
+                          , syn_texpr      = TPPExpr "(mkBlueprint FailExpr fallthrough)"
                           , syn_pattern_match_vars = []}, chn)
 mkBlueprint _ expr chn = ({ syn_annot_expr = expr
-                          , syn_texpr      = TLit "(mkBlueprint fallthrough)"
+                          , syn_texpr      = TPPExpr "(mkBlueprint fallthrough)"
                           , syn_pattern_match_vars = []}, chn)
+
+fromBasicValue :: !BasicValue -> TLit
+fromBasicValue (BVI str) = TInt (toInt str)
+fromBasicValue (BVInt n) = TInt n
+fromBasicValue (BVC c)   = TString c
+fromBasicValue (BVB b)   = TBool b
+fromBasicValue (BVR r)   = TReal (toReal r)
+fromBasicValue (BVS str) = TString str
 
 addUnique :: !Int !InhExpression -> InhExpression
 addUnique n inh = {inh & inh_uid = inh.inh_uid ++ [n]}
