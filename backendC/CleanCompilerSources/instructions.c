@@ -3030,6 +3030,10 @@ void GenArrayFunctionDescriptor (SymbDef arr_fun_def, Label desclab, int arity)
 	if (ExportLocalLabels){
 		put_directive_ (Dexport);
 		FPrintF (OutFile,"e_%s_" D_PREFIX "%s",CurrentModule,name);
+		if (arr_fun_def->sdef_mark & SDEF_USED_LAZILY_MASK){
+			put_directive_ (Dexport);
+			FPrintF (OutFile,"e_%s_" N_PREFIX "%s",CurrentModule,name);		
+		}
 	}
 
 	descriptor_label=*desclab;
@@ -3605,7 +3609,7 @@ void GenSelectorDescriptor (Label sellab,int element_n)
 		put_directive_ (Dexport);
 		FPrintF (OutFile, "e_%s_%s%s.%d",sellab->lab_mod, sellab->lab_pref, name, sellab->lab_post);
 
-	put_directive_ (Ddescs);
+		put_directive_ (Ddescs);
 		FPrintF (OutFile, "e_%s_" D_PREFIX "%s.%d e_%s_%s%s.%d _ %d 0 \"%s.%d\"",
 				sellab->lab_mod, name, sellab->lab_post,
 				sellab->lab_mod, sellab->lab_pref, name, sellab->lab_post,
@@ -3613,11 +3617,11 @@ void GenSelectorDescriptor (Label sellab,int element_n)
 				name, sellab->lab_post);
 	} else {
 		put_directive_ (Ddescs);
-	FPrintF (OutFile, D_PREFIX "%s.%d %s%s.%d _ %d 0 \"%s.%d\"",
-			sellab->lab_name, sellab->lab_post,
-			sellab->lab_pref, sellab->lab_name, sellab->lab_post,
-			element_n+1,
-			sellab->lab_name, sellab->lab_post);
+		FPrintF (OutFile, D_PREFIX "%s.%d %s%s.%d _ %d 0 \"%s.%d\"",
+				sellab->lab_name, sellab->lab_post,
+				sellab->lab_pref, sellab->lab_name, sellab->lab_post,
+				element_n+1,
+				sellab->lab_name, sellab->lab_post);
 	}
 }
 #else
