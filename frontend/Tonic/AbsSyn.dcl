@@ -21,7 +21,7 @@ from iTasks._Framework.Tonic.AbsSyn import :: TExpr
 // error caused by huge thunks
 :: InhExpression =
   { inh_case_expr      :: !Maybe Expression
-  , inh_tyenv          :: !Map String Type
+  , inh_tyenv          :: !Map Int Type
   , inh_list_compr     :: ![(String, ParsedExpr)]
   , inh_instance_tree  :: !{#{!InstanceTree}}
   , inh_common_defs    :: !{#CommonDefs}

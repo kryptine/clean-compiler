@@ -315,7 +315,7 @@ mkBlueprint inh (e=:(Var bv) @ es) chn
   # (bps, chn) = mapSt (mkBlueprint inh) es chn
   | varIsTask bv inh
       # (var`, chn) = wrapTaskApp inh.inh_uid "(Var @ es)" (e @ es) inh chn
-      # mTyStr      = case 'DM'.get bv.var_ident.id_name inh.inh_tyenv of
+      # mTyStr      = case 'DM'.get (ptrToInt bv.var_info_ptr) inh.inh_tyenv of
                         Just x -> symTyStr` x
                         _      -> Nothing
       = ({ syn_annot_expr = var`
@@ -354,7 +354,7 @@ mkBlueprint inh (Let lt) chn
   mkLet Nothing lt inh chn
     # (tys, chn)   = letTypes lt.let_info_ptr chn
     # (binds, chn) = flattenBinds lt chn
-    # tyenv        = zipSt (\(TPPExpr v, _) t tyenv -> 'DM'.put v t tyenv) binds tys inh.inh_tyenv // TODO This probably won't work for arbitrary patterns, so we actually need to be a bit smarter here and extract all variables from the patterns, instead of just PP'ing the pattern and using that as index
+    # tyenv        = zipSt (\(TVar _ _ ptr, _) t tyenv -> 'DM'.put ptr t tyenv) binds tys inh.inh_tyenv // TODO This probably won't work for arbitrary patterns, so we actually need to be a bit smarter here and extract all variables from the patterns, instead of just PP'ing the pattern and using that as index
     # (syn, chn)   = mkBlueprint {inh & inh_tyenv = tyenv} lt.let_expr chn
     = ({ syn_annot_expr = Let {lt & let_expr = syn.syn_annot_expr}
        , syn_texpr      = TLet binds syn.syn_texpr
@@ -588,6 +588,6 @@ symTyStr` _             = Nothing
 
 varIsTask :: BoundVar InhExpression -> Bool
 varIsTask bv inh
-  = case 'DM'.get bv.var_ident.id_name inh.inh_tyenv of
+  = case 'DM'.get (ptrToInt bv.var_info_ptr) inh.inh_tyenv of
       Nothing -> False
       Just t  -> typeIsTask t
