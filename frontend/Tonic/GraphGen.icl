@@ -205,11 +205,15 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
                                  x`    -> TVar [] x` (ptrToInt x.fv_info_ptr)
                               \\ x <- args | x.fv_def_level == -1]
       # menv                = updateWithAnnot app_symb syne.syn_annot_expr chn.chn_module_env
-      = ( { syn_annot_expr = App app
+      # chn                 = {chn & chn_module_env = menv}
+      # (app`, chn)         = if isTonicFunctor
+                                (wrapTaskApp inh.inh_uid app_symb.symb_ident.id_name (App app) inh chn)
+                                (App app, chn)
+      = ( { syn_annot_expr = app`
           , syn_texpr      = TLam pats syne.syn_texpr
           , syn_pattern_match_vars = []
           }
-        , {chn & chn_module_env = menv})
+        , chn)
   | isTonicFunctor = mkMApp app ctxs args inh chn
   | appIsListComp app
       = case [orig \\ (ident, orig) <- inh.inh_list_compr
