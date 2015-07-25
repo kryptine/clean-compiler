@@ -75,6 +75,10 @@ numContexts :: SymbolType -> Int
 
 funIsTopLevelBlueprint :: FunDef InhExpression *ChnExpression -> *(Bool, *ChnExpression)
 
+funIsBlueprintPart :: FunDef InhExpression *ChnExpression -> *(Bool, *ChnExpression)
+
+typeIsBlueprintPart :: Type InhExpression *ChnExpression -> *(Bool, *ChnExpression)
+
 funTy :: FunDef -> Type
 
 functorContent :: Type -> Maybe Type
@@ -87,17 +91,7 @@ identIsListComprehension :: Ident -> Bool
 
 exprIsLambda :: Expression -> Bool
 
-symTyIsTask :: SymbolType -> Bool
-
-atypeIsTask :: AType -> Bool
-
-typeIsTask :: Type -> Bool
-
-atypeIsListOfTask :: AType -> Bool
-
-typeIsListOfTask :: Type -> Bool
-
-symbIdentIsTask :: SymbIdent *ChnExpression -> *(Bool, *ChnExpression)
+symbIdentIsBPPart :: SymbIdent InhExpression *ChnExpression -> *(Bool, *ChnExpression)
 
 isInfix :: SymbIdent *ModuleEnv -> *(Bool, *ModuleEnv)
 
@@ -120,8 +114,6 @@ predefIsUndefined :: PredefinedSymbol -> Bool
 argsRemaining :: App *ModuleEnv -> *(Int, *ModuleEnv)
 
 isPartialApp :: App *ModuleEnv -> *(Bool, *ModuleEnv)
-
-exprIsTask :: Expression *ChnExpression -> *(Bool, *ChnExpression)
 
 mkStr :: String -> Expression
 

@@ -436,6 +436,22 @@ funIsTopLevelBlueprint fd inh chn =
         && not (isTD fd.fun_ident.id_name), chn)
     _ = (False, chn)
 
+funIsBlueprintPart :: FunDef InhExpression *ChnExpression -> *(Bool, *ChnExpression)
+funIsBlueprintPart fd inh chn =
+  case (fd.fun_type, fd.fun_kind) of
+    (Yes st, FK_Function _)
+      # (hasTLBPInst, chn) = typeHasClassInstance (funTy fd) PD_TonicBlueprintPartClass inh chn
+      = (  hasTLBPInst
+        && fd.fun_info.fi_def_level > 0
+        && not (isLambda fd.fun_ident.id_name)
+        && not (isListCompr fd.fun_ident.id_name)
+        && not (isTD fd.fun_ident.id_name), chn)
+    _ = (False, chn)
+
+typeIsBlueprintPart :: Type InhExpression *ChnExpression -> *(Bool, *ChnExpression)
+typeIsBlueprintPart ty inh chn
+  = typeHasClassInstance ty PD_TonicBlueprintPartClass inh chn
+
 funTy :: FunDef -> Type
 funTy {fun_type=Yes {st_result={at_type}}} = at_type
 funTy {fun_ident={id_name}} = abort ("Tonic.Util.funTy: type of " +++ id_name +++ " is unknown.")
@@ -472,37 +488,8 @@ intersperse` _ _ [] = ""
 intersperse` _ pp [x] = pp x
 intersperse` sep pp [x:xs] = pp x +++ sep +++ intersperse` sep pp xs
 
-symTyIsTask :: SymbolType -> Bool
-symTyIsTask st = atypeIsTask st.st_result
-
-atypeIsTask :: AType -> Bool
-atypeIsTask aty = typeIsTask aty.at_type
-
-typeIsTask :: Type -> Bool
-typeIsTask ty =
-  case ty of
-    TA   tsi _     -> symTyIsTask` tsi
-    TAS  tsi _  _  -> symTyIsTask` tsi
-    _ --> t        -> typeIsTask t.at_type
-    TFA _ t        -> typeIsTask t
-    TFAC _ t _     -> typeIsTask t
-    _              -> False
-  where symTyIsTask` tsi = tsi.type_ident.id_name == "Task"
-
-atypeIsListOfTask :: AType -> Bool
-atypeIsListOfTask aty = typeIsListOfTask aty.at_type
-
-typeIsListOfTask :: Type -> Bool
-typeIsListOfTask ty =
-  case ty of
-    TA   tsi [x:_]    -> symTyIsTask` tsi && atypeIsTask x
-    TAS  tsi [x:_] _  -> symTyIsTask` tsi && atypeIsTask x
-    _ --> t           -> typeIsListOfTask t.at_type
-    _                 -> False
-  where symTyIsTask` tsi = tsi.type_ident.id_name == PD_ListType_String
-
-symbIdentIsTask :: SymbIdent *ChnExpression -> *(Bool, *ChnExpression)
-symbIdentIsTask {symb_ident, symb_kind=SK_OverloadedFunction {glob_module, glob_object} } chn
+symbIdentIsBPPart :: SymbIdent InhExpression *ChnExpression -> *(Bool, *ChnExpression)
+symbIdentIsBPPart {symb_ident, symb_kind=SK_OverloadedFunction {glob_module, glob_object} } inh chn
   # menv = chn.chn_module_env
   # (md, menv) = case glob_module == menv.me_main_dcl_module_n of
                    True
@@ -520,12 +507,12 @@ symbIdentIsTask {symb_ident, symb_kind=SK_OverloadedFunction {glob_module, glob_
     || (md.me_class.glob_module == tapds.pds_module && md.me_class.glob_object == tapds.pds_def)
     || (md.me_class.glob_module == tfpds.pds_module && md.me_class.glob_object == tfpds.pds_def)
     , {chn & chn_predef_symbols = pdss})
-symbIdentIsTask si chn
+symbIdentIsBPPart si inh chn
   # (mst, menv) = reifySymbIdentSymbolType si chn.chn_module_env
-   = case mst of
-      Just st
-       = (symTyIsTask st, {chn & chn_module_env = menv})
-      _ = abort ("symbIdentIsTask: failed to reify symbIdent '" +++ si.symb_ident.id_name +++ "'")
+  = case mst of
+     Just st
+       = typeHasClassInstance st.st_result.at_type PD_TonicBlueprintPartClass inh {chn & chn_module_env = menv}
+     _ = abort ("symbIdentIsBPPart: failed to reify symbIdent '" +++ si.symb_ident.id_name +++ "'")
 
 typeHasClassInstance :: Type Int InhExpression *ChnExpression -> *(Bool, *ChnExpression)
 typeHasClassInstance (TA tsi _)    lookup_symbol inh chn = typeHasClassInstance` (TA tsi []) lookup_symbol inh chn
@@ -665,10 +652,6 @@ isPartialApp :: App *ModuleEnv -> *(Bool, *ModuleEnv)
 isPartialApp app menv
   # (rem, menv) = argsRemaining app menv
   = (rem > 0, menv)
-
-exprIsTask :: Expression *ChnExpression -> *(Bool, *ChnExpression)
-exprIsTask (App app) chn = symbIdentIsTask app.app_symb chn
-exprIsTask _         chn = (False, chn) // False: better safe than sorry
 
 stringContents :: String -> String
 stringContents str
