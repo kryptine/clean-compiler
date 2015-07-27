@@ -427,8 +427,8 @@ numContexts st = length st.st_context
 funIsTopLevelBlueprint :: FunDef InhExpression *ChnExpression -> *(Bool, *ChnExpression)
 funIsTopLevelBlueprint fd inh chn =
   case (fd.fun_type, fd.fun_kind) of
-    (Yes st, FK_Function _)
-      # (hasTLBPInst, chn) = typeHasClassInstance (funTy fd) PD_TonicTopLevelBlueprintClass inh chn
+    (Yes {st_result={at_type}}, FK_Function _)
+      # (hasTLBPInst, chn) = typeHasClassInstance at_type PD_TonicTopLevelBlueprintClass inh chn
       = (  hasTLBPInst
         && fd.fun_info.fi_def_level > 0
         && not (isLambda fd.fun_ident.id_name)
@@ -439,8 +439,8 @@ funIsTopLevelBlueprint fd inh chn =
 funIsBlueprintPart :: FunDef InhExpression *ChnExpression -> *(Bool, *ChnExpression)
 funIsBlueprintPart fd inh chn =
   case (fd.fun_type, fd.fun_kind) of
-    (Yes st, FK_Function _)
-      # (hasTLBPInst, chn) = typeHasClassInstance (funTy fd) PD_TonicBlueprintPartClass inh chn
+    (Yes {st_result={at_type}}, FK_Function _)
+      # (hasTLBPInst, chn) = typeHasClassInstance at_type PD_TonicBlueprintPartClass inh chn
       = (  hasTLBPInst
         && fd.fun_info.fi_def_level > 0
         && not (isLambda fd.fun_ident.id_name)
@@ -515,8 +515,8 @@ symbIdentIsBPPart si inh chn
      _ = abort ("symbIdentIsBPPart: failed to reify symbIdent '" +++ si.symb_ident.id_name +++ "'")
 
 typeHasClassInstance :: Type Int InhExpression *ChnExpression -> *(Bool, *ChnExpression)
-typeHasClassInstance (TA tsi _)    lookup_symbol inh chn = typeHasClassInstance` (TA tsi []) lookup_symbol inh chn
-typeHasClassInstance (TAS tsi _ _) lookup_symbol inh chn = typeHasClassInstance` (TA tsi []) lookup_symbol inh chn
+typeHasClassInstance (TA tsi args)    lookup_symbol inh chn = typeHasClassInstance` (TA tsi (init args)) lookup_symbol inh chn
+typeHasClassInstance (TAS tsi args _) lookup_symbol inh chn = typeHasClassInstance` (TA tsi (init args)) lookup_symbol inh chn
 typeHasClassInstance _             _             _   chn = (False, chn)
 
 typeHasClassInstance` :: Type Int InhExpression *ChnExpression -> *(Bool, *ChnExpression)
