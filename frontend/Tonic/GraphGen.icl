@@ -158,15 +158,11 @@ wrapTMApp uid wrappedFnNm origExpr inh chn
                                          Just dcl -> (dcl.dcl_name.id_name, menv)
                                          _        -> (iclName, menv)
                                    _ = (iclName, menv)
-      # tuple2Idx = GetTupleConsIndex 2
       # heaps = chn.chn_heaps
-      # (wrapInfo, heaps, pdss) = appPredefinedSymbolWithEI tuple2Idx
-                                    [ mkStr wrappedFnModNm
-                                    , mkStr wrappedFnNm
-                                    ] SK_Constructor heaps pdss
       # (eidExpr, pdss) = listToListExpr (map mkInt uid) pdss
       # (expr, heaps, pdss) = appPredefinedSymbolWithEI (findWrap rem)
-                                [ App wrapInfo
+                                [ mkStr wrappedFnModNm
+                                , mkStr wrappedFnNm
                                 , eidExpr
                                 , origExpr
                                 ] SK_Function heaps pdss
