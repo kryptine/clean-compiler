@@ -27,3 +27,12 @@ convertGenerics ::
 		, !*{#*{#FunDef}}
 		, !*ErrorAdmin
 		)
+
+foldExpr :: 
+		(Expression -> .st -> .st)  	// function to apply at each node
+		Expression 						// expression to run throuh
+		.st 							// state
+	-> 
+		.st								// updated state 
+
+collectCalls :: !Index !Expression -> [FunCall]

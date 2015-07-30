@@ -18,19 +18,19 @@ import qualified Data.Set as DS
 import Text.JSON
 import iTasks._Framework.Tonic.AbsSyn
 
-ginTonic :: String ModuleN !*{#FunDef} !*{#FunDef} IclModule {#DclModule} !{#CommonDefs} [(String, ParsedExpr)] !*PredefinedSymbols !{#{!InstanceTree}} *HashTable !*File !*Files !*Heaps -> *(!*{#FunDef}, !*PredefinedSymbols, *HashTable, !*File, !*Files, !*Heaps)
-ginTonic mod_dir main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules common_defs list_comprehensions predef_symbols class_instances hash_table error files heaps
+ginTonic :: String ModuleN !*{#FunDef} !*{#FunDef} !{!Group} IclModule {#DclModule} !{#CommonDefs} [(String, ParsedExpr)] !*PredefinedSymbols !{#{!InstanceTree}} *HashTable !*File !*Files !*Heaps -> *(!*{#FunDef}, !*PredefinedSymbols, !{!Group}, *HashTable, !*File, !*Files, !*Heaps)
+ginTonic mod_dir main_dcl_module_n fun_defs fun_defs_cpy groups icl_module dcl_modules common_defs list_comprehensions predef_symbols class_instances hash_table error files heaps
 // FIXME Start Tonic presence check hack
   # (tonic_module, predef_symbols) = predef_symbols![PD_iTasks_Framework_Tonic]
-  | predefIsUndefined tonic_module = (fun_defs, predef_symbols, hash_table, error, files, heaps)
+  | predefIsUndefined tonic_module = (fun_defs, predef_symbols, groups, hash_table, error, files, heaps)
   # tonicImp = [0 \\ Declaration imp <-: icl_module.icl_import | imp.decl_ident.id_name == predefined_idents.[PD_tonicExtWrapBody].id_name]
-  | tonicImp == [] = (fun_defs, predef_symbols, hash_table, error, files, heaps)
+  | tonicImp == [] = (fun_defs, predef_symbols, groups, hash_table, error, files, heaps)
 // FIXME End Tonic presence check hack
   # iclname                        = icl_module.icl_name.id_name
-  | isSystemModule iclname         = (fun_defs, predef_symbols, hash_table, error, files, heaps)
-  # (tstr, fun_defs, predef_symbols, heaps) = ginTonic` (isITasksModule iclname) main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules common_defs list_comprehensions predef_symbols class_instances heaps
+  | isSystemModule iclname         = (fun_defs, predef_symbols, groups, hash_table, error, files, heaps)
+  # (tstr, fun_defs, groups, predef_symbols, heaps) = ginTonic` (isITasksModule iclname) main_dcl_module_n fun_defs fun_defs_cpy groups icl_module dcl_modules common_defs list_comprehensions predef_symbols class_instances heaps
   # (error, files)                 = writeTonicFile mod_dir iclname tstr error files
-  = (fun_defs, predef_symbols, hash_table, error, files, heaps)
+  = (fun_defs, predef_symbols, groups, hash_table, error, files, heaps)
   where
   isITasksModule nm = startsWith "iTasks" nm
   isSystemModule nm = foldr (\x b -> startsWith x nm || b) False sysmods
@@ -78,28 +78,27 @@ toJSONString rs icl_module menv
                        , tm_funcs = rs}
     , menv)
 import StdDebug
-ginTonic` :: Bool ModuleN !*{#FunDef} !*{#FunDef} IclModule {#DclModule}
+ginTonic` :: Bool ModuleN !*{#FunDef} !*{#FunDef} !{!Group} IclModule {#DclModule}
              !{#CommonDefs} [(String, ParsedExpr)] !*PredefinedSymbols
              !{#{!InstanceTree}} *Heaps
-          -> *(String, !*{#FunDef}, !*PredefinedSymbols, !*Heaps)
-ginTonic` is_itasks_mod main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules common_defs list_comprehensions predef_symbols class_instances heaps
-  # ((reps, heaps, predef_symbols, fun_defs_cpy), fun_defs) = foldUArr appDefInfo (('DM'.newMap, heaps, predef_symbols, fun_defs_cpy), fun_defs)
-  # menv        = mkModuleEnv main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules
+          -> *(String, !*{#FunDef}, !{!Group}, !*PredefinedSymbols, !*Heaps)
+ginTonic` is_itasks_mod main_dcl_module_n fun_defs fun_defs_cpy groups icl_module dcl_modules common_defs list_comprehensions predef_symbols class_instances heaps
+  # ((reps, heaps, predef_symbols, groups, fun_defs_cpy), fun_defs) = foldUArr appDefInfo (('DM'.newMap, heaps, predef_symbols, groups, fun_defs_cpy), fun_defs)
+  # menv        = mkModuleEnv main_dcl_module_n fun_defs fun_defs_cpy groups icl_module dcl_modules
   # (str, menv) = toJSONString reps icl_module menv
-  = (str, menv.me_fun_defs, predef_symbols, heaps)
+  = (str, menv.me_fun_defs, groups, predef_symbols, heaps)
   where
   // fd does not always have a fun_type = Yes
-  appDefInfo idx fd=:{fun_pos,fun_ident=fun_ident, fun_body = TransformedBody tb} ((reps, heaps, predef_symbols, fun_defs_cpy), fun_defs)
+  appDefInfo idx fd=:{fun_pos,fun_ident=fun_ident, fun_body = TransformedBody tb} ((reps, heaps, predef_symbols, groups, fun_defs_cpy), fun_defs)
     # (fd_cpy, fun_defs_cpy) = fun_defs_cpy![idx]
-    # inh         = mkInhExpr list_comprehensions class_instances common_defs
-    # menv        = mkModuleEnv main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_modules
-    # chn         = mkChnExpr predef_symbols menv heaps
+    # inh         = mkInhExpr idx list_comprehensions class_instances common_defs
+    # menv        = mkModuleEnv main_dcl_module_n fun_defs fun_defs_cpy groups icl_module dcl_modules
+    # chn         = mkChnExpr fd predef_symbols menv heaps
     # (argTys, tyenv) = zipWithSt (\arg t st -> ((arg, t), 'DM'.put (ptrToInt arg.fv_info_ptr) t st)) tb.tb_args (funArgTys fd_cpy) 'DM'.newMap
     # (isTopLeveLBlueprint, chn) = funIsTopLevelBlueprint fd_cpy inh chn
     | (not is_itasks_mod) && isTopLeveLBlueprint
       # (syn, chn) = mkBlueprint {inh & inh_tyenv = tyenv} tb.tb_rhs chn
-      # menv       = updateWithAnnot idx syn.syn_annot_expr chn.chn_module_env
-      # chn        = {chn & chn_module_env = menv}
+      # chn        = updateWithAnnot idx syn.syn_annot_expr chn //.chn_module_env chn.chn_fundef
       # chn        = addTonicWrap is_itasks_mod icl_module class_instances idx common_defs chn
       # menv       = chn.chn_module_env
       # args       = map (\(arg, ty) -> (mkArgPP syn.syn_pattern_match_vars arg, typeToTCleanExpr ty)) argTys
@@ -111,7 +110,7 @@ ginTonic` is_itasks_mod main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_m
                                         , tf_resty     = typeToTCleanExpr (funTy fd_cpy)
                                         , tf_args      = args
                                         , tf_body      = syn.syn_texpr} reps
-        , chn.chn_heaps, chn.chn_predef_symbols, menv.me_fun_defs_cpy), menv.me_fun_defs)
+        , chn.chn_heaps, chn.chn_predef_symbols, menv.me_groups, menv.me_fun_defs_cpy), menv.me_fun_defs)
     //| is_itasks_mod && isTopLeveLBlueprint
       //# menv = chn.chn_module_env
       //# args = map (\(arg, ty) -> (mkArgPP [] arg, typeToTCleanExpr ty)) argTys
@@ -126,8 +125,8 @@ ginTonic` is_itasks_mod main_dcl_module_n fun_defs fun_defs_cpy icl_module dcl_m
         //, chn.chn_heaps, chn.chn_predef_symbols, menv.me_fun_defs_cpy), menv.me_fun_defs)
     | otherwise
       # menv = chn.chn_module_env
-      = ((reps, chn.chn_heaps, chn.chn_predef_symbols, menv.me_fun_defs_cpy), menv.me_fun_defs)
-  appDefInfo _ _ ((reps, heaps, predef_symbols, fun_defs_cpy), fun_defs) = ((reps, heaps, predef_symbols, fun_defs_cpy), fun_defs)
+      = ((reps, chn.chn_heaps, chn.chn_predef_symbols, menv.me_groups, menv.me_fun_defs_cpy), menv.me_fun_defs)
+  appDefInfo _ _ ((reps, heaps, predef_symbols, groups, fun_defs_cpy), fun_defs) = ((reps, heaps, predef_symbols, groups, fun_defs_cpy), fun_defs)
   mkFunPos (FunPos _ n _) = n
   mkFunPos (LinePos _ n)  = n
   mkFunPos _              = -1
@@ -141,11 +140,16 @@ mkArgPP pmvars arg
       idnm
         = TVar [] idnm (ptrToInt arg.FreeVar.fv_info_ptr)
 
-updateWithAnnot :: Int Expression *ModuleEnv -> *ModuleEnv
-updateWithAnnot fidx e menv
+updateWithAnnot :: Int Expression *ChnExpression -> *ChnExpression
+updateWithAnnot fidx e chn
+  # menv     = chn.chn_module_env
+  # fun_def  = chn.chn_fundef
   # fun_defs = menv.me_fun_defs
+  # fun_defs = updateFun fidx fun_defs (\fd -> {fd & fun_info = fun_def.fun_info})
   # fun_defs = updateFunRhs fidx fun_defs e
-  = { menv & me_fun_defs = fun_defs}
+  # menv     = { menv & me_fun_defs = fun_defs}
+  = {chn & chn_module_env = menv
+         , chn_fundef     = fun_def}
 
 addTonicWrap :: Bool IclModule {#{!InstanceTree}} Index !{#CommonDefs} *ChnExpression -> *ChnExpression
 addTonicWrap is_itasks_mod icl_module class_instances idx common_defs chn

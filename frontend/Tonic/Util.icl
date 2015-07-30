@@ -605,6 +605,15 @@ updateWithAnnot si expr menv =
     Just oidx -> {menv & me_fun_defs = updateFunRhs oidx menv.me_fun_defs expr}
     _         -> menv
 
+updateFun :: Index !*{#FunDef} (FunDef -> FunDef) -> *{#FunDef}
+updateFun idx fun_defs f
+  # (mfd, fun_defs) = muselect fun_defs idx
+  = case mfd of
+      Just fd
+        = { fun_defs & [idx] = f fd }
+      _ = fun_defs
+
+
 updateFunRhs :: Index !*{#FunDef} Expression -> *{#FunDef}
 updateFunRhs idx fun_defs e
   # (mfd, fun_defs) = muselect fun_defs idx

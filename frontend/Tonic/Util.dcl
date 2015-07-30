@@ -107,6 +107,8 @@ getFunRhs :: FunDef -> Expression
 
 updateWithAnnot :: SymbIdent Expression *ModuleEnv -> *ModuleEnv
 
+updateFun :: Index !*{#FunDef} (FunDef -> FunDef) -> *{#FunDef}
+
 updateFunRhs :: Index !*{#FunDef} Expression -> *{#FunDef}
 
 predefIsUndefined :: PredefinedSymbol -> Bool

@@ -7,7 +7,7 @@ from syntax import :: Expression (..), :: BoundVar, :: App {..}, :: Let, :: Case
   :: TypeCodeExpression, :: GlobalIndex, :: Conditional, :: BasicValue, :: FieldSymbol,
   :: IclModule, :: DclModule, :: FunDef, :: Optional, :: SymbolType, :: LetBind,
   :: ModuleN, :: Type, :: ParsedExpr, :: CommonDefs
-from checksupport import :: Heaps
+from checksupport import :: Heaps, :: Group
 from overloading import :: InstanceTree
 from Data.Graph import :: Graph
 from Data.Maybe import :: Maybe
@@ -26,12 +26,14 @@ from iTasks._Framework.Tonic.AbsSyn import :: TExpr
   , inh_instance_tree  :: !{#{!InstanceTree}}
   , inh_common_defs    :: !{#CommonDefs}
   , inh_uid            :: ![Int]
+  , inh_fun_idx        :: !Int
   }
 
 :: *ChnExpression =
   { chn_module_env     :: !*ModuleEnv
   , chn_heaps          :: !*Heaps
   , chn_predef_symbols :: !*PredefinedSymbols
+  , chn_fundef         :: !FunDef
   }
 
 :: SynExpression =
@@ -39,6 +41,7 @@ from iTasks._Framework.Tonic.AbsSyn import :: TExpr
   , syn_annot_expr         :: !Expression
   , syn_pattern_match_vars :: ![(BoundVar, TExpr)]
   , syn_bound_vars         :: !Map Int BoundVar
+  , syn_cases              :: ![(![Int], !(Map Int BoundVar), !Case)]
   }
 
 :: *ModuleEnv =
@@ -47,10 +50,13 @@ from iTasks._Framework.Tonic.AbsSyn import :: TExpr
   , me_fun_defs_cpy      :: !*{#FunDef}
   , me_icl_module        :: !IclModule
   , me_dcl_modules       :: !{#DclModule}
+  , me_groups            :: !{!Group}
   }
 
-mkInhExpr :: ![(String, ParsedExpr)] !{#{!InstanceTree}} !{#CommonDefs} -> InhExpression
+mkInhExpr :: !Int ![(String, ParsedExpr)] !{#{!InstanceTree}} !{#CommonDefs} -> InhExpression
 
-mkChnExpr :: *PredefinedSymbols *ModuleEnv *Heaps -> *ChnExpression
+mkChnExpr :: !FunDef *PredefinedSymbols *ModuleEnv *Heaps -> *ChnExpression
 
-mkModuleEnv :: ModuleN !*{#FunDef} !*{#FunDef} IclModule {#DclModule} -> *ModuleEnv
+mkSynExpr :: !TExpr !Expression -> SynExpression
+
+mkModuleEnv :: ModuleN !*{#FunDef} !*{#FunDef} !{!Group} IclModule {#DclModule} -> *ModuleEnv
