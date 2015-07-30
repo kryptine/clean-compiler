@@ -245,7 +245,7 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
     # (ps, chn)      = mapSt (\(x, n) chn -> mkBlueprint (addUnique n inh) x chn) (zip2 args [0..]) chn
     # allCases       = flatten (map (\syn -> syn.syn_cases) ps)
     # evalableCases  = [(eid, 'DM'.elems vars, cs) \\ (eid, vars, cs) <- allCases | allVarsBound inh vars]
-    # (evalableCases, chn) = mapSt (\(eid, bvs, cs) chn -> mkCaseDetFun eid appName bvs cs inh chn) evalableCases chn
+    # (evalableCases, chn) = mapSt (\(eid, bvs, cs) chn -> mkCaseDetFun eid (ptrToInt app.app_info_ptr) bvs cs inh chn) evalableCases chn
     # args`          = map (\syn -> syn.syn_annot_expr) ps
     # (app`, chn)    = (App {app & app_args = args`}, chn)
     # (app`, chn)    = wrapTMApp inh.inh_uid appName app` evalableCases inh chn
@@ -433,7 +433,9 @@ mkBlueprint inh (Let lt) chn
 
   // TODO Refactor this. Also persist numbering?
 mkBlueprint inh (Case cs) chn
-  # caseExpr     = fromMaybe cs.case_expr inh.inh_case_expr
+  # caseExpr     = case inh.inh_case_expr of
+                     Just e -> e
+                     _      -> cs.case_expr
   # (cesyn, chn) = mkBlueprint inh caseExpr chn
   = case (cs.case_explicit, cs.case_expr, cs.case_guards) of
       (False, Var bv, AlgebraicPatterns gi [ap:_])
@@ -466,13 +468,38 @@ mkBlueprint inh (Case cs) chn
                                                = ((Yes syn.syn_annot_expr, [(TLit (TBool False), syn):syns], True), chn)
                                              _ = ((Yes syn.syn_annot_expr, [(TPPExpr "_", syn):syns], False), chn)
                                        _ = ((No, syns, False), chn)
+        # (syncase, chn) = case inh.inh_case_expr of
+                             Just e
+                               # heaps              = chn.chn_heaps
+                               # (vptr, var_heap)   = newPtr VI_Empty heaps.hp_var_heap
+                               # heaps              = { heaps & hp_var_heap = var_heap }
+                               # fv                 = { fv_def_level = 0
+                                                      , fv_ident     = { id_name = "_case_var"
+                                                                       , id_info = nilPtr }
+                                                      , fv_info_ptr  = vptr
+                                                      , fv_count     = 1
+                                                      }
+                               # casebind           = { lb_dst      = fv
+                                                      , lb_src      = e
+                                                      , lb_position = NoPos }
+                               # (ltptr, expr_heap) = newPtr EI_Empty heaps.hp_expression_heap
+                               # heaps              = { heaps & hp_expression_heap = expr_heap }
+                               # (bv, heaps)        = freeVarToVar fv heaps
+                               # lt = { let_strict_binds  = []
+                                      , let_lazy_binds    = [casebind]
+                                      , let_expr          = Case {cs & case_expr = Var bv}
+                                      , let_info_ptr      = ltptr
+                                      , let_expr_position = NoPos
+                                      }
+                               = (Let lt, {chn & chn_heaps = heaps})
+                             _ = (Case cs, chn)
         = ({ syn_annot_expr = Case {cs & case_default = def, case_guards = guards}
            , syn_texpr      = case (isIf, syns) of
                                 (True, [(_, be), (_, bt)]) -> TIf inh.inh_uid cesyn.syn_texpr bt.syn_texpr be.syn_texpr
                                 _                          -> TCase inh.inh_uid cesyn.syn_texpr (reverse (map (\(d, s) -> (d, s.syn_texpr)) syns))
            , syn_pattern_match_vars = foldr (\(_, syn) acc -> syn.syn_pattern_match_vars ++ acc) [] syns
            , syn_bound_vars = 'DM'.unions [cesyn.syn_bound_vars : map (\(_, x) -> x.syn_bound_vars) syns]
-           , syn_cases      = [(inh.inh_uid, cesyn.syn_bound_vars, cs) : flatten (map (\(_, x) -> x.syn_cases) syns)]
+           , syn_cases      = [(inh.inh_uid, cesyn.syn_bound_vars, syncase) : flatten (map (\(_, x) -> x.syn_cases) syns)]
            }, chn)
   where
   numGuards (AlgebraicPatterns _ ps)        = length ps
@@ -659,11 +686,6 @@ varToFreeVar :: BoundVar -> FreeVar
 varToFreeVar {var_ident, var_info_ptr}
   = {fv_def_level = NotALevel, fv_ident = var_ident, fv_info_ptr = var_info_ptr, fv_count = 0}
 
-freeVarToVar :: FreeVar -> BoundVar
-freeVarToVar {fv_ident, fv_info_ptr}
-  = { var_ident = fv_ident,  var_info_ptr = fv_info_ptr, var_expr_ptr = nilPtr}
-
-
 allVarsBound :: !InhExpression !(Map Int BoundVar) -> Bool
 allVarsBound inh bound = 'DM'.null ('DM'.difference bound inh.inh_tyenv)
 
@@ -671,7 +693,7 @@ tfCase :: !ExprId !Case *ChnExpression -> *(Case, *ChnExpression)
 tfCase eid cs=:{case_guards, case_default, case_explicit = True} chn
   # (guards, chn) = tfGuards case_guards chn
   # (def, chn)    = tfDefault case_default chn
-  = ({cs & case_expr = BasicExpr (BVB True), case_guards = guards, case_default = def}, chn)
+  = ({cs & case_guards = guards, case_default = def}, chn)
   where
   tfGuards (AlgebraicPatterns idx as)       chn
     # (as, chn) = mapSt tfA (zip2 as [0..]) chn
@@ -707,31 +729,41 @@ tfCase eid cs=:{case_guards, case_default, case_explicit = True} chn
                       , chn_predef_symbols = pdss })
 tfCase _ cs chn = (cs, chn)
 
-mkCaseDetFun :: !ExprId !String ![BoundVar] !Case !InhExpression !*ChnExpression -> *(Expression, *ChnExpression)
-mkCaseDetFun eid name boundArgs bdy inh chn
+mkCaseDetFun :: !ExprId !Int ![BoundVar] !Expression !InhExpression !*ChnExpression -> *(Expression, *ChnExpression)
+mkCaseDetFun eid exprPtr boundArgs bdy inh chn
   # freeArgs           = map varToFreeVar boundArgs
-  # name               = "_f_case_" +++ name
-  # (newCase, chn)     = tfCase eid bdy chn
+  # name               = "_f_case_" +++ toString exprPtr
+  # (bdy`, chn)        = case bdy of
+                           Case cs
+                             # (cs, chn) = tfCase eid cs chn
+                             = (Case cs, chn)
+                           Let lt=:{let_expr = Case cs}
+                             # (cs, chn) = tfCase eid cs chn
+                             = (Let {lt & let_expr = Case cs}, chn)
+                           _ = abort "mkCaseDetFun shouldn't happen"
   # arity              = length freeArgs
   # funIdent           = { id_name = name
                          , id_info = nilPtr
                          }
-  # newRhs             = Case newCase
   # menv               = chn.chn_module_env
   # fun_defs           = menv.me_fun_defs
   # mainDclN           = menv.me_main_dcl_module_n
   # (nextFD, fun_defs) = usize fun_defs
+  # (argVars, localVars, freeVars) = collectVars bdy` freeArgs
   # newFunDef          = { fun_docs     = ""
                          , fun_ident    = funIdent
                          , fun_arity    = arity
                          , fun_priority = NoPrio
                          , fun_body     = TransformedBody { tb_args = freeArgs
-                                                          , tb_rhs  = newRhs }
+                                                          , tb_rhs  = bdy` }
                          , fun_type     = No
                          , fun_pos      = NoPos
                          , fun_kind     = FK_Function cNameNotLocationDependent
                          , fun_lifted   = 0
-                         , fun_info     = {EmptyFunInfo & fi_calls = collectCalls mainDclN newRhs}
+                         , fun_info     = {EmptyFunInfo & fi_calls = collectCalls mainDclN bdy`
+                                                        , fi_free_vars = freeVars
+                                                        , fi_local_vars = localVars
+                                                        }
                          }
   # funDefs            = [fd \\ fd <-: fun_defs] ++ [newFunDef]
   # fun_defs           = {fd \\ fd <- funDefs}

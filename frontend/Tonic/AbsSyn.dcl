@@ -41,7 +41,7 @@ from iTasks._Framework.Tonic.AbsSyn import :: TExpr
   , syn_annot_expr         :: !Expression
   , syn_pattern_match_vars :: ![(BoundVar, TExpr)]
   , syn_bound_vars         :: !Map Int BoundVar
-  , syn_cases              :: ![(![Int], !(Map Int BoundVar), !Case)]
+  , syn_cases              :: ![(![Int], !(Map Int BoundVar), !Expression)]
   }
 
 :: *ModuleEnv =
