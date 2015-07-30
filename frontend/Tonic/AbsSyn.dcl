@@ -15,7 +15,7 @@ from Text.JSON import generic JSONEncode, :: JSONNode
 from Data.Map import :: Map
 from Data.Set import :: Set
 from predef import :: PredefinedSymbol, :: PredefinedSymbols
-from iTasks._Framework.Tonic.AbsSyn import :: TExpr
+from iTasks._Framework.Tonic.AbsSyn import :: TExpr, :: ExprId
 
 // InhExpression and ChnExpression need strict fields in order to prevent a bus
 // error caused by huge thunks
@@ -25,7 +25,7 @@ from iTasks._Framework.Tonic.AbsSyn import :: TExpr
   , inh_list_compr     :: ![(String, ParsedExpr)]
   , inh_instance_tree  :: !{#{!InstanceTree}}
   , inh_common_defs    :: !{#CommonDefs}
-  , inh_uid            :: ![Int]
+  , inh_uid            :: !ExprId
   , inh_fun_idx        :: !Int
   }
 
@@ -41,7 +41,7 @@ from iTasks._Framework.Tonic.AbsSyn import :: TExpr
   , syn_annot_expr         :: !Expression
   , syn_pattern_match_vars :: ![(BoundVar, TExpr)]
   , syn_bound_vars         :: !Map Int BoundVar
-  , syn_cases              :: ![(![Int], !(Map Int BoundVar), !Expression)]
+  , syn_cases              :: ![(!ExprId, !(Map Int BoundVar), !Expression)]
   }
 
 :: *ModuleEnv =

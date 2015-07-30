@@ -196,7 +196,9 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
   # chn                   = { chn & chn_module_env = menv }
   | identIsLambda app_symb.symb_ident
       # ((args, tFd), menv) = reifyArgsAndDef app_symb chn.chn_module_env
-      # (syne, chn)         = mkBlueprint inh (getFunRhs tFd) { chn & chn_module_env = menv }
+      # tyenv               = foldr (\(arg, t) st -> 'DM'.put (ptrToInt arg.fv_info_ptr) t st) 'DM'.newMap (zip2 args (funArgTys tFd))
+      # tyenv               = 'DM'.union tyenv inh.inh_tyenv
+      # (syne, chn)         = mkBlueprint {inh & inh_tyenv = tyenv} (getFunRhs tFd) { chn & chn_module_env = menv }
       # pats                = [case freeVarName x of
                                  "_x" -> case syne.syn_pattern_match_vars of
                                            [(_, e):_] -> e
@@ -292,7 +294,9 @@ mkBlueprint inh (e=:(App app) @ es) chn
       # letargs       = drop (length app.app_args) (getFunArgs fd)
       # (binds, menv) = zipWithSt zwf letargs es menv
       # chn           = { chn & chn_module_env = menv }
-      # (syne, chn)   = mkBlueprint inh (getFunRhs fd) chn
+      # tyenv         = foldr (\(arg, t) st -> 'DM'.put (ptrToInt arg.fv_info_ptr) t st) 'DM'.newMap (zip2 args (funArgTys fd))
+      # tyenv         = 'DM'.union tyenv inh.inh_tyenv
+      # (syne, chn)   = mkBlueprint {inh & inh_tyenv = tyenv} (getFunRhs fd) chn
       # menv          = updateWithAnnot app.app_symb syne.syn_annot_expr chn.chn_module_env
       # chn           = { chn & chn_module_env = menv}
       = ({ syn_annot_expr = e @ es
@@ -493,13 +497,14 @@ mkBlueprint inh (Case cs) chn
                                       }
                                = (Let lt, {chn & chn_heaps = heaps})
                              _ = (Case cs, chn)
+        # bvs = 'DM'.unions [cesyn.syn_bound_vars : map (\(_, x) -> x.syn_bound_vars) syns]
         = ({ syn_annot_expr = Case {cs & case_default = def, case_guards = guards}
            , syn_texpr      = case (isIf, syns) of
                                 (True, [(_, be), (_, bt)]) -> TIf inh.inh_uid cesyn.syn_texpr bt.syn_texpr be.syn_texpr
                                 _                          -> TCase inh.inh_uid cesyn.syn_texpr (reverse (map (\(d, s) -> (d, s.syn_texpr)) syns))
            , syn_pattern_match_vars = foldr (\(_, syn) acc -> syn.syn_pattern_match_vars ++ acc) [] syns
-           , syn_bound_vars = 'DM'.unions [cesyn.syn_bound_vars : map (\(_, x) -> x.syn_bound_vars) syns]
-           , syn_cases      = [(inh.inh_uid, cesyn.syn_bound_vars, syncase) : flatten (map (\(_, x) -> x.syn_cases) syns)]
+           , syn_bound_vars = bvs
+           , syn_cases      = [(inh.inh_uid, bvs, syncase) : flatten (map (\(_, x) -> x.syn_cases) syns)]
            }, chn)
   where
   numGuards (AlgebraicPatterns _ ps)        = length ps
@@ -754,7 +759,7 @@ mkCaseDetFun eid exprPtr boundArgs bdy inh chn
                          , fun_ident    = funIdent
                          , fun_arity    = arity
                          , fun_priority = NoPrio
-                         , fun_body     = TransformedBody { tb_args = freeArgs
+                         , fun_body     = TransformedBody { tb_args = argVars
                                                           , tb_rhs  = bdy` }
                          , fun_type     = No
                          , fun_pos      = NoPos
