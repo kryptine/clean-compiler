@@ -265,7 +265,7 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
                           # (iclmod, menv) = menv!me_icl_module
                           = (iclmod.icl_name.id_name, menv)
     # (assoc, menv) = getAssoc app.app_symb menv
-    # (ps, chn)     = mapSt (\x chn -> mkBlueprint inh x chn) args {chn & chn_module_env = menv}
+    # (ps, chn)     = mapSt (\(x, n) chn -> mkBlueprint (addUnique n inh) x chn) (zip2 args [0..]) {chn & chn_module_env = menv}
     = ({ syn_annot_expr = App {app & app_args = ctxs ++ map (\syn -> syn.syn_annot_expr) ps}
        , syn_texpr      = TFApp appName (map (\syn -> syn.syn_texpr) ps) assoc
        , syn_pattern_match_vars = []
@@ -296,7 +296,7 @@ mkBlueprint inh (e=:(App app) @ es) chn
       # chn           = { chn & chn_module_env = menv }
       # tyenv         = foldr (\(arg, t) st -> 'DM'.put (ptrToInt arg.fv_info_ptr) t st) 'DM'.newMap (zip2 args (funArgTys fd))
       # tyenv         = 'DM'.union tyenv inh.inh_tyenv
-      # (syne, chn)   = mkBlueprint {inh & inh_tyenv = tyenv} (getFunRhs fd) chn
+      # (syne, chn)   = mkBlueprint (addUnique 0 {inh & inh_tyenv = tyenv}) (getFunRhs fd) chn
       # menv          = updateWithAnnot app.app_symb syne.syn_annot_expr chn.chn_module_env
       # chn           = { chn & chn_module_env = menv}
       = ({ syn_annot_expr = e @ es
@@ -323,7 +323,7 @@ mkBlueprint inh (e=:(App app) @ es) chn
                                 = ( TMApp inh.inh_uid mTyStr dclnm (appFunName app) (map (\syn -> syn.syn_texpr) es`) assoc
                                   , es`, {chn & chn_module_env = menv})
                               _
-                                # (es`, chn) = mapSt (mkBlueprint inh) es chn
+                                # (es`, chn) = mapSt (\(e, n) chn -> mkBlueprint (addUnique n inh) e chn) (zip2 es [0..]) chn
                                 = ( TFApp app.app_symb.symb_ident.id_name (map (\x -> x.syn_texpr) es`) assoc
                                   , es`, chn)
       = ({ syn_annot_expr = e @ (map (\x -> x.syn_annot_expr) es`)
@@ -337,7 +337,7 @@ mkBlueprint inh (e=:(App app) @ es) chn
       # (fvr, menv) = ppExpression eVal menv
       = ((ppCompact fvl, ppCompact fvr), menv)
 mkBlueprint inh (e=:(Var bv) @ es) chn
-  # (bps, chn)    = mapSt (mkBlueprint inh) es chn
+  # (bps, chn)    = mapSt (\(e, n) chn -> mkBlueprint (addUnique n inh) e chn) (zip2 es [0..]) chn
   # bvs           = 'DM'.unions (map (\syn -> syn.syn_bound_vars) bps)
   # cs            = flatten (map (\syn -> syn.syn_cases) bps)
   # (isPart, chn) = varIsTask bv inh chn
@@ -375,24 +375,24 @@ mkBlueprint inh (Let lt) chn
         = case [orig \\ (ident, orig) <- inh.inh_list_compr
                       | app.app_symb.symb_ident.id_name == ident] of
             []
-              # (syn, chn) = mkBlueprint {inh & inh_case_expr = Just expr} lt.let_expr chn
+              # (syn, chn) = mkBlueprint (addUnique 0 {inh & inh_case_expr = Just expr}) lt.let_expr chn
               # l          = {lt & let_expr = syn.syn_annot_expr}
               = ({syn & syn_annot_expr = Let l}, chn)
             [orig:_]
-              # (syn, chn) = mkBlueprint {inh & inh_case_expr = Just expr} lt.let_expr chn
+              # (syn, chn) = mkBlueprint (addUnique 0 {inh & inh_case_expr = Just expr}) lt.let_expr chn
               # l          = {lt & let_expr = syn.syn_annot_expr}
               = ({ syn
                  & syn_annot_expr = Let l
                  , syn_texpr = TPPExpr (ppCompact (ppParsedExpr orig))}, chn)
   mkLet (Just expr) lt inh chn
-    # (syn, chn) = mkBlueprint {inh & inh_case_expr = Just expr} lt.let_expr chn
+    # (syn, chn) = mkBlueprint (addUnique 0 {inh & inh_case_expr = Just expr}) lt.let_expr chn
     # l          = {lt & let_expr = syn.syn_annot_expr}
     = ({syn & syn_annot_expr = Let l}, chn)
   mkLet Nothing lt inh chn
-    # (tys, chn)   = letTypes lt.let_info_ptr chn
-    # (binds, chn) = flattenBinds lt chn
-    # tyenv        = zipSt (\(TVar _ _ ptr, _) t tyenv -> 'DM'.put ptr t tyenv) binds tys inh.inh_tyenv // TODO This probably won't work for arbitrary patterns, so we actually need to be a bit smarter here and extract all variables from the patterns, instead of just PP'ing the pattern and using that as index
-    # (syn, chn)   = mkBlueprint {inh & inh_tyenv = tyenv} lt.let_expr chn
+    # (tys, chn)      = letTypes lt.let_info_ptr chn
+    # (binds, _, chn) = flattenBinds lt chn
+    # tyenv           = zipSt (\(TVar _ _ ptr, _) t tyenv -> 'DM'.put ptr t tyenv) binds tys inh.inh_tyenv // TODO This probably won't work for arbitrary patterns, so we actually need to be a bit smarter here and extract all variables from the patterns, instead of just PP'ing the pattern and using that as index
+    # (syn, chn)      = mkBlueprint (addUnique 0 {inh & inh_tyenv = tyenv}) lt.let_expr chn
     = ({ syn_annot_expr = Let {lt & let_expr = syn.syn_annot_expr}
        , syn_texpr      = TLet binds syn.syn_texpr
        , syn_pattern_match_vars = syn.syn_pattern_match_vars
@@ -409,11 +409,11 @@ mkBlueprint inh (Let lt) chn
           _               -> ([], chn)
 
     flattenBinds lt chn
-      = foldrSt f (getLetBinds lt) ([], chn)
+      = foldrSt f (getLetBinds lt) ([], 1, chn)
       where
-      f bnd (xs, chn)
-        # (rhs, chn) = mkBlueprint inh bnd.lb_src chn
-        = ([(TVar [] bnd.lb_dst.fv_ident.id_name (ptrToInt bnd.lb_dst.fv_info_ptr), rhs.syn_texpr):xs], chn)
+      f bnd (xs, n, chn)
+        # (rhs, chn) = mkBlueprint (addUnique n inh) bnd.lb_src chn
+        = ([(TVar [] bnd.lb_dst.fv_ident.id_name (ptrToInt bnd.lb_dst.fv_info_ptr), rhs.syn_texpr):xs], n + 1, chn)
    getLetBinds lt = lt.let_strict_binds ++ lt.let_lazy_binds
   // TODO: For cases, the compiler introduces a fresh variable in a let for the
   // matches expression. E.g.
@@ -440,10 +440,10 @@ mkBlueprint inh (Case cs) chn
   # caseExpr     = case inh.inh_case_expr of
                      Just e -> e
                      _      -> cs.case_expr
-  # (cesyn, chn) = mkBlueprint inh caseExpr chn
+  # (cesyn, chn) = mkBlueprint (addUnique 0 inh) caseExpr chn
   = case (cs.case_explicit, cs.case_expr, cs.case_guards) of
       (False, Var bv, AlgebraicPatterns gi [ap:_])
-        # (fvds, chn)   = mapSt (mkBlueprint inh o FreeVar) ap.ap_vars chn
+        # (fvds, chn)   = mapSt (mkBlueprint (addUnique 1 inh) o FreeVar) ap.ap_vars chn
         # (clexpr, chn) = case fvds of
                             [] = (TPPExpr "", chn)
                             args
@@ -525,7 +525,7 @@ mkBlueprint inh (Case cs) chn
         where
         mkAp sym []   chn = (TPPExpr (ppCompact ('PPrint'.text sym.glob_object.ds_ident.id_name)), chn)
         mkAp sym vars chn
-          # (fvds, chn) = mapSt (mkBlueprint inh o FreeVar) vars chn
+          # (fvds, chn) = mapSt (mkBlueprint (addUnique n inh) o FreeVar) vars chn
           = (TFApp (ppCompact ('PPrint'.text sym.glob_object.ds_ident.id_name)) (map (\x -> x.syn_texpr) fvds) TNoPrio, chn)
   mkAlts c=:(BasicPatterns bt bps) chn
     # ((bps, syns, _), chn) = foldr f (([], [], 0), chn) bps
@@ -571,7 +571,7 @@ mkBlueprint _ expr=:(BasicExpr bv) chn
      , syn_bound_vars = 'DM'.newMap
      , syn_cases = []}, chn)
 mkBlueprint inh expr=:(Selection st selExpr sels) chn
-  # (syn, chn)      = mkBlueprint inh selExpr chn
+  # (syn, chn)      = mkBlueprint (addUnique 0 inh) selExpr chn
   # (selExprs, chn) = mapSt (mkSelExprs) sels chn
   = ({ syn_annot_expr = Selection st selExpr sels
      , syn_texpr      = TSel syn.syn_texpr selExprs
@@ -588,7 +588,7 @@ mkBlueprint inh expr=:(Selection st selExpr sels) chn
   mkSelExprs (DictionarySelection bv sels _ e) chn
     = (TPPExpr "TODO mkSelExprs DictionarySelection ", chn)
 mkBlueprint inh expr=:(TupleSelect _ i e) chn
-  # (syn, chn) = mkBlueprint inh e chn
+  # (syn, chn) = mkBlueprint (addUnique 0 inh) e chn
   # te         = TSel syn.syn_texpr [TPPExpr (toString i)]
   = ({ syn_annot_expr = expr
      , syn_texpr      = te
@@ -596,8 +596,8 @@ mkBlueprint inh expr=:(TupleSelect _ i e) chn
      , syn_bound_vars = 'DM'.newMap
      , syn_cases = []}, chn)
 mkBlueprint inh expr=:(RecordUpdate {glob_object={ds_ident}} expression expressions) chn
-  # (syn, chn)  = mkBlueprint inh expression chn
-  # (syns, chn) = mapSt (\e -> mkBlueprint inh e.bind_src) expressions chn
+  # (syn, chn)  = mkBlueprint (addUnique 0 inh) expression chn
+  # (syns, chn) = mapSt (\(n, e) -> mkBlueprint (addUnique n inh) e.bind_src) (zip2 [1..] expressions) chn
   # te          = TRecUpd ds_ident.id_name syn.syn_texpr (map (\x -> x.syn_texpr) syns)
   = ({ syn_annot_expr = expr
      , syn_texpr      = te
