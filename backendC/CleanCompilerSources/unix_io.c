@@ -509,29 +509,38 @@ FileTime FGetFileTime (char *fname, FileKind kind)
 	return (FileTime) buf.st_mtime;
 } /* FGetFileTime */
 
-/* Error Handling */
+
+
+
+/*******************************************************************************
+ *                                                                             *
+ *     Error Handling                                                          *
+ *                                                                             *
+ ******************************************************************************/
 	
 void DoError (char *fmt, ...)
 {	va_list args;
 	
 	va_start (args, fmt);
 
-	(void) vfprintf (StdError, fmt, args);
+	(void) vfprintf (stderr, fmt, args);
 	
 	va_end (args);
-}
+} /* DoError */
+
 
 void DoFatalError (char *fmt, ...)
 {	va_list args;
 	
 	va_start (args, fmt);
 
-	(void) vfprintf (StdError, fmt, args);
+	(void) vfprintf (stderr, fmt, args);
 	
 	va_end (args);
 
 	exit (0);
-}
+} /* DoFatalError */
+
 
 void CmdError (char *errormsg,...)
 {	va_list args;
@@ -543,7 +552,8 @@ void CmdError (char *errormsg,...)
 	fputc ('\n', stdout); 
 		
 	va_end (args);
-}
+} /* CmdError */
+
 
 /*******************************************************************************
  *     Interrupt Handling                                                      *

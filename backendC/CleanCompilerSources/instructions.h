@@ -145,6 +145,7 @@ void GenSetRedId (int offset);
 void GenSetDefer (int offset);
 void SetContinue (int offset);
 void SetContinueOnReducer (int offset);
+void GenImpRecordDesc (char *module_name,char *record_name);
 void GenImport (SymbDef sdef);
 void GenExportRecord (SymbDef sdef);
 void GenExportFieldSelector (SymbDef sdef);
@@ -200,7 +201,9 @@ void GenModuleDescriptor (void);
 void GenDepend (char *modname);
 #endif
 void GenEndInfo (void);
+void GenImpMod (char *module_name);
 void GenSystemImports (void);
+void import_not_yet_imported_system_labels (void);
 void GenerateForeignExports (struct foreign_export_list *foreign_export_p);
 void GenStart (SymbDef startsymb);
 void InitFileInfo (ImpMod imod);

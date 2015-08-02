@@ -1127,6 +1127,7 @@ void CodeGeneration (ImpMod imod, char *fname)
 {
 	if (! CompilerError){
 		int DoStrictnessAnalysis_and_init_ok;
+
 		CurrentPhase = NULL;
 
 #if 0
@@ -1242,7 +1243,7 @@ void CodeGeneration (ImpMod imod, char *fname)
 			ReadInlineCode ();
 
 			CreateStackFrames();
-			
+
 			ImportSymbols (imod->im_symbols);
 
 			GenerateCodeForConstructorsAndRecords (imod->im_symbols);
@@ -1294,6 +1295,10 @@ void CodeGeneration (ImpMod imod, char *fname)
 #if STRICT_LISTS
 			GenerateCodeForLazyUnboxedRecordListFunctions();
 #endif
+
+			import_not_yet_imported_record_r_labels (imod->im_symbols);
+			import_not_yet_imported_system_labels();
+
 			WriteLastNewlineToABCFile();
 
 			CloseABCFile (fname);

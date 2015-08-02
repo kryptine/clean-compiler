@@ -3186,7 +3186,7 @@ static void FillNormalNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 
 						if (lazy_fill){
 							LabDef n_strict_cons_lab;
-								
+							
 							n_strict_cons_lab = *strict_cons_lab_p;
 							n_strict_cons_lab.lab_pref = n_pref;
 							
@@ -4285,7 +4285,9 @@ static void FillUpdateNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 	}
 }
 
-static LabDef selector_m_error_lab = {NULL,"",False,"selector_m_error",0};
+int selector_m_error_lab_used = 0;
+
+LabDef selector_m_error_lab = {NULL,"",False,"selector_m_error",0};
 
 void FillMatchNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_id,CodeGenNodeIdsP code_gen_node_ids_p)
 {
@@ -4415,6 +4417,7 @@ void FillMatchNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_id,CodeGe
 
 		if (branch){
 #if 1
+			selector_m_error_lab_used=1;
 			GenExitFalse (&selector_m_error_lab);
 #else
 			LabDef local_label;
@@ -6583,6 +6586,12 @@ void InitCoding (void)
 
 	for (i=0; i<MaxNodeArity-NrOfGlobalSelectors; i++)
 		LazyTupleSelectors [i] = False;
+	
+	for (i=0; i<5; ++i){
+		unboxed_cons_mark[i][0]=0;
+		unboxed_cons_mark[i][1]=0;
+	}
+	unboxed_cons_array_mark=0;
 
 	next_update_function_n=0;
 	next_match_function_n=0;

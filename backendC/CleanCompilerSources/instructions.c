@@ -504,6 +504,7 @@ enum {
 	Co,
 	Cimpdesc,
 	Cimplab,
+	Cimpmod,
 	Cn
 };
 #endif
@@ -685,6 +686,7 @@ static void put_instruction_code (int instruction_code)
 #define Do "o"
 #define Dimpdesc "impdesc"
 #define Dimplab "implab"
+#define Dimpmod "impmod"
 #define Dexport "export"
 #define Dn "n"
 #define Dnu "nu"
@@ -2498,6 +2500,19 @@ void GenPushArgB (int offset)
 	FPrintF (OutFile, "%d", offset);
 }
 
+extern char *current_imported_module; /* from statesgen.c */
+
+void GenImpRecordDesc (char *module_name,char *record_name)
+{
+	if (current_imported_module!=module_name){
+		current_imported_module = module_name;
+		GenImpMod (module_name);
+	}
+
+	put_directive_b (impdesc);
+	FPrintF (OutFile, "e_%s_" R_PREFIX "%s",module_name,record_name);
+}
+
 void GenImport (SymbDef sdef)
 {
 	if (DoStackLayout){	
@@ -2534,12 +2549,13 @@ void GenImport (SymbDef sdef)
 						FPrintF (OutFile, " e_%s_" EA_PREFIX "%s.%s",sdef->sdef_module,record_name,name);
 					else if (sdef->sdef_returnsnode)
 						FPutS (" _",OutFile);
-				}					
+				}
 				return;
 			case RECORDTYPE:
 				if (sdef->sdef_mark & (SDEF_USED_STRICTLY_MASK | SDEF_USED_LAZILY_MASK)){
-					put_directive_b (impdesc);
-					FPrintF (OutFile, "e_%s_" R_PREFIX "%s",sdef->sdef_module,name);
+					GenImpRecordDesc (sdef->sdef_module,name);
+					
+					sdef->sdef_mark |= SDEF_RECORD_R_LABEL_IMPORTED_MASK;
 				}
 				
 				if (!sdef->sdef_strict_constructor)
@@ -2553,14 +2569,21 @@ void GenImport (SymbDef sdef)
 				}
 				return;
 			case CONSTRUCTOR:
-				if (!sdef->sdef_strict_constructor)
+				if ((sdef->sdef_mark & (SDEF_USED_STRICTLY_MASK | SDEF_USED_LAZILY_MASK | SDEF_USED_CURRIED_MASK))==0)
 					return;
+				
+				if (!sdef->sdef_strict_constructor){
+					put_directive_b (impdesc);
+					FPrintF (OutFile, "e_%s_" D_PREFIX "%s", sdef->sdef_module,name);
+					return;
+				}
 
 				if (sdef->sdef_mark & (SDEF_USED_STRICTLY_MASK | SDEF_USED_LAZILY_MASK)){
 					put_directive_b (impdesc);
 					FPrintF (OutFile, "e_%s_" CONSTRUCTOR_R_PREFIX "%s",sdef->sdef_module,name);
 				}
-				if (sdef->sdef_mark & SDEF_USED_LAZILY_MASK){
+
+				if (sdef->sdef_mark & (SDEF_USED_LAZILY_MASK | SDEF_USED_CURRIED_MASK)){
 					put_directive_b (impdesc);
 					FPrintF (OutFile, "e_%s_" D_PREFIX "%s", sdef->sdef_module,name);
 				}
@@ -2956,7 +2979,7 @@ void GenUnboxedConsRecordDescriptor (SymbDef sdef,int tail_strict)
 	DetermineSizeOfState (tuple_state,&asize,&bsize);
 	
 	if (ExportLocalLabels)
-		FPrintF (OutFile,tail_strict ? " %d %d \"_Cons#!%s\"" : " %d %d \"_Cons#\"",asize,bsize,name);
+		FPrintF (OutFile,tail_strict ? " %d %d \"_Cons#!%s\"" : " %d %d \"_Cons#%s\"",asize,bsize,name);
 	else
 		FPrintF (OutFile,tail_strict ? " %d %d \"[#%s!]\"" : " %d %d \"[#%s]\"",asize,bsize,name);
 }
@@ -3007,6 +3030,10 @@ void GenArrayFunctionDescriptor (SymbDef arr_fun_def, Label desclab, int arity)
 	if (ExportLocalLabels){
 		put_directive_ (Dexport);
 		FPrintF (OutFile,"e_%s_" D_PREFIX "%s",CurrentModule,name);
+		if (arr_fun_def->sdef_mark & SDEF_USED_LAZILY_MASK){
+			put_directive_ (Dexport);
+			FPrintF (OutFile,"e_%s_" N_PREFIX "%s",CurrentModule,name);		
+		}
 	}
 
 	descriptor_label=*desclab;
@@ -3572,12 +3599,30 @@ void GenStart (SymbDef startsymb)
 #ifdef NEW_SELECTOR_DESCRIPTORS
 void GenSelectorDescriptor (Label sellab,int element_n)
 {
-	put_directive_ (Ddescs);
-	FPrintF (OutFile, D_PREFIX "%s.%d %s%s.%d _ %d 0 \"%s.%d\"",
-			sellab->lab_name, sellab->lab_post,
-			sellab->lab_pref, sellab->lab_name, sellab->lab_post,
-			element_n+1,
-			sellab->lab_name, sellab->lab_post);
+	if (sellab->lab_issymbol){
+		char *name;
+		
+		name=sellab->lab_symbol->sdef_ident->ident_name;
+
+		put_directive_ (Dexport);
+		FPrintF (OutFile, "e_%s_" D_PREFIX "%s.%d",sellab->lab_mod, name, sellab->lab_post);
+		put_directive_ (Dexport);
+		FPrintF (OutFile, "e_%s_%s%s.%d",sellab->lab_mod, sellab->lab_pref, name, sellab->lab_post);
+
+		put_directive_ (Ddescs);
+		FPrintF (OutFile, "e_%s_" D_PREFIX "%s.%d e_%s_%s%s.%d _ %d 0 \"%s.%d\"",
+				sellab->lab_mod, name, sellab->lab_post,
+				sellab->lab_mod, sellab->lab_pref, name, sellab->lab_post,
+				element_n+1,
+				name, sellab->lab_post);
+	} else {
+		put_directive_ (Ddescs);
+		FPrintF (OutFile, D_PREFIX "%s.%d %s%s.%d _ %d 0 \"%s.%d\"",
+				sellab->lab_name, sellab->lab_post,
+				sellab->lab_pref, sellab->lab_name, sellab->lab_post,
+				element_n+1,
+				sellab->lab_name, sellab->lab_post);
+	}
 }
 #else
 void GenSelectorDescriptor (Label sellab,char *g_pref)
@@ -3612,6 +3657,8 @@ void InitFileInfo (ImpMod imod)
 	} else
 		FPutS ("_nostart_", OutFile);
 }
+
+static int match_error_lab_used = 0;
 
 void GenNoMatchError (SymbDef sdef,int asp,int bsp,int string_already_generated)
 {
@@ -3650,6 +3697,7 @@ void GenNoMatchError (SymbDef sdef,int asp,int bsp,int string_already_generated)
 	}
 	
 	GenJmp (&match_error_lab);
+	match_error_lab_used = 1;
 	
 	if (!desc_needed && !string_already_generated){
 		put_directive_ (Dstring);
@@ -3674,6 +3722,7 @@ void GenCaseNoMatchError (SymbDefP case_def,int asp,int bsp)
 	FPrintF (OutFile, "case_fail%u",CaseFailNumber);
 
 	GenJmp (&match_error_lab);
+	match_error_lab_used = 1;
 	
 	put_directive_ (Dstring);
 	FPrintF (OutFile, "case_fail%u \"",CaseFailNumber);		
@@ -3696,10 +3745,22 @@ static void GenImpLab_node_entry (char *label_name,char *ea_label_name)
 	FPrintF (OutFile,"%s %s",label_name,ea_label_name);
 }
 
+static void GenImpLab_n_and_ea_label (char *label_name)
+{
+	put_directive_b (implab);
+	FPrintF (OutFile,"n%s ea%s",label_name,label_name);
+}
+
 static void GenImpDesc (char *descriptor_name)
 {
 	put_directive_b (impdesc);
 	FPutS (descriptor_name,OutFile);
+}
+
+void GenImpMod (char *module_name)
+{
+	put_directive_b (impmod);
+	FPutS (module_name,OutFile);
 }
 
 void GenEndInfo (void)
@@ -3709,11 +3770,16 @@ void GenEndInfo (void)
 
 void GenSystemImports (void)
 {
+	match_error_lab_used = 0;
+	selector_m_error_lab_used = 0;
+
 	if (DoStackLayout){
 		 /* system module labels and descriptors */
 
 		int selnum;
-		
+
+		GenImpMod ("_system");
+
 		if (DoParallel){
 			GenImpLab (channel_code);
 			GenImpLab (hnf_reducer_code);
@@ -3736,6 +3802,8 @@ void GenSystemImports (void)
 		GenImpLab_node_entry ("e_system_nAP","e_system_eaAP");
 		GenImpLab ("e_system_sAP");
 
+		GenImpDesc (BasicDescriptors [ArrayObj].lab_name);
+
 		GenImpDesc (nil_lab.lab_name);
 		GenImpDesc (cons_lab.lab_name);
 #if STRICT_LISTS
@@ -3746,6 +3814,33 @@ void GenSystemImports (void)
 		GenImpDesc (conssts_lab.lab_name);
 		GenImpLab_node_entry ("n_Conssts","ea_Conssts");
 #endif
+
+		{
+		int i;
+		
+		for (i=0; i<5; ++i){
+			char *descriptor_label_name;
+
+			if (unboxed_cons_mark[i][0]!=0){
+				descriptor_label_name=unboxed_cons_labels[i][0].lab_name;
+				GenImpDesc (descriptor_label_name);
+				if (unboxed_cons_mark[i][0] & SDEF_USED_LAZILY_MASK)
+					GenImpLab_n_and_ea_label (descriptor_label_name);
+			}
+			if (unboxed_cons_mark[i][1]!=0){
+				descriptor_label_name=unboxed_cons_labels[i][1].lab_name;
+				GenImpDesc (descriptor_label_name);
+				if (unboxed_cons_mark[i][1] & SDEF_USED_LAZILY_MASK)
+					GenImpLab_n_and_ea_label (descriptor_label_name);
+			}
+		}
+		if (unboxed_cons_array_mark!=0){
+			GenImpDesc (unboxed_cons_array_label.lab_name);
+			if (unboxed_cons_array_mark & SDEF_USED_LAZILY_MASK)
+				GenImpLab_n_and_ea_label (unboxed_cons_array_label.lab_name);
+		}
+		}		
+
 		GenImpDesc (tuple_lab.lab_name);
 		for (selnum=1; selnum<=NrOfGlobalSelectors; ++selnum){
 			put_directive_b (impdesc);
@@ -3769,6 +3864,17 @@ void GenSystemImports (void)
 
 		GenImpLab ("_driver");
 	}
+}
+
+void import_not_yet_imported_system_labels (void)
+{
+	if (match_error_lab_used ||
+		selector_m_error_lab_used)
+		GenImpMod ("_system");
+	if (match_error_lab_used)
+		GenImpLab (match_error_lab.lab_name);
+	if (selector_m_error_lab_used)
+		GenImpLab (selector_m_error_lab.lab_name);
 }
 
 static void print_foreign_export_type (TypeNode type)
