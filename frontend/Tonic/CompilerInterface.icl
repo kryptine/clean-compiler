@@ -97,9 +97,10 @@ ginTonic` is_itasks_mod main_dcl_module_n fun_defs fun_defs_cpy groups icl_modul
     # (argTys, tyenv) = zipWithSt (\arg t st -> ((arg, t), 'DM'.put (ptrToInt arg.fv_info_ptr) t st)) tb.tb_args (funArgTys fd_cpy) 'DM'.newMap
     # (isTopLeveLBlueprint, chn) = funIsTopLevelBlueprint fd_cpy inh chn
     | (not is_itasks_mod) && isTopLeveLBlueprint
-      # (syn, chn) = mkBlueprint {inh & inh_tyenv = tyenv} tb.tb_rhs chn
+      # inh        = {inh & inh_tyenv = tyenv}
+      # (syn, chn) = mkBlueprint inh tb.tb_rhs chn
       # chn        = updateWithAnnot idx syn.syn_annot_expr chn //.chn_module_env chn.chn_fundef
-      # chn        = addTonicWrap is_itasks_mod icl_module class_instances idx common_defs chn
+      # chn        = addTonicWrap inh syn is_itasks_mod icl_module class_instances idx common_defs chn
       # menv       = chn.chn_module_env
       # args       = map (\(arg, ty) -> (mkArgPP syn.syn_pattern_match_vars arg, typeToTCleanExpr ty)) argTys
       = (('DM'.put fd.fun_ident.id_name { TonicFunc
@@ -151,8 +152,8 @@ updateWithAnnot fidx e chn
   = {chn & chn_module_env = menv
          , chn_fundef     = fun_def}
 
-addTonicWrap :: Bool IclModule {#{!InstanceTree}} Index !{#CommonDefs} *ChnExpression -> *ChnExpression
-addTonicWrap is_itasks_mod icl_module class_instances idx common_defs chn
+addTonicWrap :: InhExpression SynExpression Bool IclModule {#{!InstanceTree}} Index !{#CommonDefs} *ChnExpression -> *ChnExpression
+addTonicWrap inh syn is_itasks_mod icl_module class_instances idx common_defs chn
   # pdss = chn.chn_predef_symbols
   # (ok, pdss) = pdssAreDefined [PD_tonicExtWrapArg, PD_tonicExtWrapBody] pdss
   # chn = {chn & chn_predef_symbols = pdss}
@@ -190,6 +191,9 @@ addTonicWrap is_itasks_mod icl_module class_instances idx common_defs chn
     | not ok     = chn
     # (args, chn) = foldr (mkArg symbty is_itasks_mod class_instances) ([], chn) (zip2 tb_args symbty.st_args)
     | length args == length tb_args
+        # evalableCases  = [(eid, 'DM'.elems vars, cs) \\ (eid, vars, cs) <- syn.syn_cases | allVarsBound inh vars]
+        # (evalableCases, chn) = mapSt (\(eid, bvs, cs) chn -> mkCaseDetFun eid idx bvs cs inh chn) evalableCases chn
+
         # menv = chn.chn_module_env
         # (rem, menv)  = case tb_rhs of
                            App {app_symb = {symb_ident}}
@@ -200,10 +204,13 @@ addTonicWrap is_itasks_mod icl_module class_instances idx common_defs chn
                              = argsRemaining app menv
                            _ = (0, menv)
         # (xs, pdss) = toStatic args chn.chn_predef_symbols
+        # (casesExpr, pdss) = listToListExpr [] pdss
+        //# (casesExpr, pdss) = listToListExpr evalableCases pdss
         # (wrap, heaps, pdss) = appPredefinedSymbolWithEI (findBodyWrap rem)
                                   [ mkStr icl_module.icl_name.id_name
                                   , mkStr fun_ident.id_name
                                   , xs
+                                  , casesExpr
                                   , tb_rhs
                                   ] SK_Function chn.chn_heaps pdss
         # fun_defs = updateFunRhs idx menv.me_fun_defs (App wrap)

@@ -5,7 +5,7 @@ implementation module Tonic.GraphGen
 //import syntax, checksupport, StdFile
 //from CoclSystemDependent import DirectorySeparator, ensureCleanSystemFilesExists
 
-import syntax, predef, checksupport, generics1
+import syntax, predef, checksupport
 
 import StdFunc
 from StdList import last
@@ -686,114 +686,6 @@ mkBlueprint _ expr chn = ({ syn_annot_expr = expr
                           , syn_pattern_match_vars = []
                           , syn_cases = []
                           , syn_bound_vars = 'DM'.newMap}, chn)
-
-varToFreeVar :: BoundVar -> FreeVar
-varToFreeVar {var_ident, var_info_ptr}
-  = {fv_def_level = NotALevel, fv_ident = var_ident, fv_info_ptr = var_info_ptr, fv_count = 0}
-
-allVarsBound :: !InhExpression !(Map Int BoundVar) -> Bool
-allVarsBound inh bound = 'DM'.null ('DM'.difference bound inh.inh_tyenv)
-
-tfCase :: !ExprId !Case *ChnExpression -> *(Case, *ChnExpression)
-tfCase eid cs=:{case_guards, case_default, case_explicit = True} chn
-  # (guards, chn) = tfGuards case_guards chn
-  # (def, chn)    = tfDefault case_default chn
-  = ({cs & case_guards = guards, case_default = def}, chn)
-  where
-  tfGuards (AlgebraicPatterns idx as)       chn
-    # (as, chn) = mapSt tfA (zip2 as [0..]) chn
-    = (AlgebraicPatterns idx as, chn)
-  tfGuards (BasicPatterns bt bs)            chn
-    # (bs, chn) = mapSt tfB (zip2 bs [0..]) chn
-    = (BasicPatterns bt bs, chn)
-  tfGuards (NewTypePatterns idx as)         chn
-    # (as, chn) = mapSt tfA (zip2 as [0..]) chn
-    = (NewTypePatterns idx as, chn)
-  tfGuards (OverloadedListPatterns ot e as) chn
-    # (as, chn) = mapSt tfA (zip2 as [0..]) chn
-    = (OverloadedListPatterns ot e as, chn)
-  tfA (ap, n) chn
-    # (pair, chn) = mkTuple (BVInt n) chn
-    = ({ap & ap_expr = pair}, chn)
-  tfB (bp, n) chn
-    # (pair, chn) = mkTuple (BVInt n) chn
-    = ({bp & bp_expr = pair}, chn)
-  tfDefault (Yes def) chn
-    # (pair, chn) = mkTuple (BVInt -1) chn
-    = (Yes pair, chn)
-  tfDefault _ chn = (No, chn)
-  mkTuple nexpr chn
-    # heaps               = chn.chn_heaps
-    # pdss                = chn.chn_predef_symbols
-    # (eidExpr, pdss)     = listToListExpr (map mkInt eid) pdss
-    # (pair, heaps, pdss) = appPredefinedSymbolWithEI (GetTupleConsIndex 2)
-                                  [ eidExpr
-                                  , BasicExpr nexpr
-                                  ] SK_Constructor heaps pdss
-    = (App pair, {chn & chn_heaps = heaps
-                      , chn_predef_symbols = pdss })
-tfCase _ cs chn = (cs, chn)
-
-mkCaseDetFun :: !ExprId !Int ![BoundVar] !Expression !InhExpression !*ChnExpression -> *(Expression, *ChnExpression)
-mkCaseDetFun eid exprPtr boundArgs bdy inh chn
-  # freeArgs           = map varToFreeVar boundArgs
-  # name               = "_f_case_" +++ toString exprPtr
-  # (bdy`, chn)        = case bdy of
-                           Case cs
-                             # (cs, chn) = tfCase eid cs chn
-                             = (Case cs, chn)
-                           Let lt=:{let_expr = Case cs}
-                             # (cs, chn) = tfCase eid cs chn
-                             = (Let {lt & let_expr = Case cs}, chn)
-                           _ = abort "mkCaseDetFun shouldn't happen"
-  # arity              = length freeArgs
-  # funIdent           = { id_name = name
-                         , id_info = nilPtr
-                         }
-  # menv               = chn.chn_module_env
-  # fun_defs           = menv.me_fun_defs
-  # mainDclN           = menv.me_main_dcl_module_n
-  # (nextFD, fun_defs) = usize fun_defs
-  # (argVars, localVars, freeVars) = collectVars bdy` freeArgs
-  # newFunDef          = { fun_docs     = ""
-                         , fun_ident    = funIdent
-                         , fun_arity    = arity
-                         , fun_priority = NoPrio
-                         , fun_body     = TransformedBody { tb_args = argVars
-                                                          , tb_rhs  = bdy` }
-                         , fun_type     = No
-                         , fun_pos      = NoPos
-                         , fun_kind     = FK_Function cNameNotLocationDependent
-                         , fun_lifted   = 0
-                         , fun_info     = {EmptyFunInfo & fi_calls = collectCalls mainDclN bdy`
-                                                        , fi_free_vars = freeVars
-                                                        , fi_local_vars = localVars
-                                                        }
-                         }
-  # funDefs            = [fd \\ fd <-: fun_defs] ++ [newFunDef]
-  # fun_defs           = {fd \\ fd <- funDefs}
-
-  # fun_def            = chn.chn_fundef
-  # groups             = menv.me_groups
-  # groups             = [{group_members = [nextFD]} : [grp \\ grp <-: groups]]
-  # groups             = {grp \\ grp <- groups}
-  # fun_def            = {fun_def & fun_info = {fun_def.fun_info & fi_calls = [FunCall nextFD cGlobalScope : fun_def.fun_info.fi_calls]}}
-  # symb               = { symb_ident = funIdent
-                         , symb_kind  = SK_Function { glob_module = mainDclN
-                                                    , glob_object = nextFD }
-                         }
-  # menv               = {menv & me_fun_defs = fun_defs
-                               , me_groups = groups}
-  # chn                = {chn & chn_module_env = menv
-                              , chn_fundef = fun_def}
-  # heaps              = chn.chn_heaps
-  # (ptr, expr_heap)   = newPtr EI_Empty heaps.hp_expression_heap
-  # heaps              = { heaps & hp_expression_heap = expr_heap }
-  # chn                = { chn & chn_heaps = heaps }
-  # app                = { app_symb     = symb
-                         , app_args     = map Var boundArgs
-                         , app_info_ptr = ptr }
-  = (App app, chn)
 
 fromBasicValue :: !BasicValue -> TLit
 fromBasicValue (BVI str) = TInt (toInt str)

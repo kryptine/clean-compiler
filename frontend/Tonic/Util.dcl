@@ -174,3 +174,7 @@ mselect :: (a e) !Int -> Maybe e | Array a e
 typeHasClassInstance :: Type Int InhExpression *ChnExpression -> *(Bool, *ChnExpression)
 
 fromPriority :: Priority -> TPriority
+
+allVarsBound :: !InhExpression !(Map Int BoundVar) -> Bool
+
+mkCaseDetFun :: !ExprId !Int ![BoundVar] !Expression !InhExpression !*ChnExpression -> *(Expression, *ChnExpression)
