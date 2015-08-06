@@ -3,7 +3,7 @@ implementation module Tonic.CompilerInterface
 import Tonic.Util
 import Tonic.GraphGen
 import Tonic.Pretty
-import syntax, checksupport, compile, unitype
+import syntax, checksupport, compile, unitype, generics1
 from overloading import :: InstanceTree (..), find_instance
 import StdFile
 from CoclSystemDependent import DirectorySeparator, ensureCleanSystemFilesExists
@@ -99,8 +99,8 @@ ginTonic` is_itasks_mod main_dcl_module_n fun_defs fun_defs_cpy groups icl_modul
     | (not is_itasks_mod) && isTopLeveLBlueprint
       # inh        = {inh & inh_tyenv = tyenv}
       # (syn, chn) = mkBlueprint inh tb.tb_rhs chn
-      # chn        = updateWithAnnot idx syn.syn_annot_expr chn //.chn_module_env chn.chn_fundef
-      # chn        = addTonicWrap inh syn is_itasks_mod icl_module class_instances idx common_defs chn
+      # (syn, chn) = addTonicWrap inh syn is_itasks_mod icl_module class_instances idx common_defs chn
+      # chn        = updateWithAnnot idx syn.syn_annot_expr inh chn
       # menv       = chn.chn_module_env
       # args       = map (\(arg, ty) -> (mkArgPP syn.syn_pattern_match_vars arg, typeToTCleanExpr ty)) argTys
       = (('DM'.put fd.fun_ident.id_name { TonicFunc
@@ -141,44 +141,69 @@ mkArgPP pmvars arg
       idnm
         = TVar [] idnm (ptrToInt arg.FreeVar.fv_info_ptr)
 
-updateWithAnnot :: Int Expression *ChnExpression -> *ChnExpression
-updateWithAnnot fidx e chn
-  # menv     = chn.chn_module_env
-  # fun_def  = chn.chn_fundef
-  # fun_defs = menv.me_fun_defs
-  # fun_defs = updateFun fidx fun_defs (\fd -> {fd & fun_info = fun_def.fun_info})
-  # fun_defs = updateFunRhs fidx fun_defs e
-  # menv     = { menv & me_fun_defs = fun_defs}
-  = {chn & chn_module_env = menv
-         , chn_fundef     = fun_def}
+//updateWithAnnot :: Int Expression InhExpression *ChnExpression -> *ChnExpression
+//updateWithAnnot fidx e inh chn
+  //# menv     = chn.chn_module_env
+  //# fun_def  = chn.chn_fundef
+  //# fun_defs = menv.me_fun_defs
+  //# fun_defs = updateFun fidx fun_defs (\fd -> {fd & fun_info = fun_def.fun_info})
+  //# fun_defs = updateFunRhs fidx fun_defs e
+  //# menv     = { menv & me_fun_defs = fun_defs}
+  //= {chn & chn_module_env = menv
+         //, chn_fundef     = fun_def}
 
-addTonicWrap :: InhExpression SynExpression Bool IclModule {#{!InstanceTree}} Index !{#CommonDefs} *ChnExpression -> *ChnExpression
+
+updateWithAnnot :: Int Expression InhExpression *ChnExpression -> *ChnExpression
+updateWithAnnot fidx e inh chn
+  # fun_def = chn.chn_fundef
+  = case fun_def of
+      {fun_body = TransformedBody fb}
+        # menv     = chn.chn_module_env
+        # (argVars, localVars, freeVars) = collectVars e fb.tb_args
+        # fun_def = { fun_def & fun_info = { fun_def.fun_info
+                                           & fi_free_vars = freeVars
+                                           , fi_local_vars = localVars
+                                           }
+                              , fun_body = TransformedBody { tb_args = argVars
+                                                           , tb_rhs  = e
+                                                           }
+                    }
+        # fun_defs = menv.me_fun_defs
+        # fun_defs = {fun_defs & [fidx] = fun_def}
+        # menv     = { menv & me_fun_defs = fun_defs}
+        = {chn & chn_fundef = fun_def
+               , chn_module_env = menv}
+      _ = chn
+
+
+addTonicWrap :: InhExpression SynExpression Bool IclModule {#{!InstanceTree}} Index !{#CommonDefs} *ChnExpression -> *(SynExpression, *ChnExpression)
 addTonicWrap inh syn is_itasks_mod icl_module class_instances idx common_defs chn
   # pdss = chn.chn_predef_symbols
   # (ok, pdss) = pdssAreDefined [PD_tonicExtWrapArg, PD_tonicExtWrapBody] pdss
   # chn = {chn & chn_predef_symbols = pdss}
-  | not ok     = chn
+  | not ok     = (syn, chn)
   | otherwise
       # menv = chn.chn_module_env
-      # (mfdnt, fun_defs)    = muselect menv.me_fun_defs idx
-      # menv                 = {menv & me_fun_defs = fun_defs}
+      # fun_def  = chn.chn_fundef
+      //# (mfdnt, fun_defs)    = muselect menv.me_fun_defs idx
+      //# menv                 = {menv & me_fun_defs = fun_defs}
       # (mfdt, fun_defs_cpy) = muselect menv.me_fun_defs_cpy idx
       # menv                 = {menv & me_fun_defs_cpy = fun_defs_cpy}
       # chn = {chn & chn_module_env = menv}
-      = case (mfdnt, mfdt) of
-          (Just fdnt, Just fdt)
-            = case (fdnt.fun_body, fdt.fun_type) of
+      = case mfdt of
+          Just fdt
+            = case (fun_def.fun_body, fdt.fun_type) of
                 (TransformedBody fb, Yes symbty)
                   # menv = chn.chn_module_env
-                  # (isPA, menv) = case fb.tb_rhs of
+                  # (isPA, menv) = case syn.syn_annot_expr of
                                      App app -> isPartialApp app menv
                                      _       -> (False, menv)
                   # chn = {chn & chn_module_env = menv}
-                  = if isPA chn (doAddRefl fdnt symbty common_defs chn)
-                _ = chn
-          _ = chn
+                  = if isPA (syn, chn) (doAddRefl fun_def.fun_ident fb.tb_args symbty common_defs chn)
+                _ = (syn, chn)
+          _ = (syn, chn)
   where
-  doAddRefl {fun_ident, fun_body=TransformedBody { tb_args, tb_rhs }} symbty common_defs chn
+  doAddRefl fun_ident tb_args symbty common_defs chn
     # pdss = chn.chn_predef_symbols
     # (ok, pdss) = pdssAreDefined [ PD_tonicExtWrapArg
                                   , PD_tonicExtWrapBody
@@ -188,36 +213,35 @@ addTonicWrap inh syn is_itasks_mod icl_module class_instances idx common_defs ch
                                   , PD_ConsSymbol
                                   , PD_NilSymbol] pdss
     # chn = {chn & chn_predef_symbols = pdss}
-    | not ok     = chn
+    | not ok     = (syn, chn)
     # (args, chn) = foldr (mkArg symbty is_itasks_mod class_instances) ([], chn) (zip2 tb_args symbty.st_args)
     | length args == length tb_args
         # evalableCases  = [(eid, 'DM'.elems vars, cs) \\ (eid, vars, cs) <- syn.syn_cases | allVarsBound inh vars]
         # (evalableCases, chn) = mapSt (\(eid, bvs, cs) chn -> mkCaseDetFun eid idx bvs cs inh chn) evalableCases chn
 
         # menv = chn.chn_module_env
-        # (rem, menv)  = case tb_rhs of
+        # (rem, menv)  = case syn.syn_annot_expr of
                            App {app_symb = {symb_ident}}
-                            | symb_ident == predefined_idents.[PD_tonicExtWrapBodyLam1] = (1, menv)
-                            | symb_ident == predefined_idents.[PD_tonicExtWrapBodyLam2] = (2, menv)
-                            | symb_ident == predefined_idents.[PD_tonicExtWrapBodyLam3] = (3, menv)
+                             | symb_ident == predefined_idents.[PD_tonicExtWrapBodyLam1] = (1, menv)
+                             | symb_ident == predefined_idents.[PD_tonicExtWrapBodyLam2] = (2, menv)
+                             | symb_ident == predefined_idents.[PD_tonicExtWrapBodyLam3] = (3, menv)
                            App app
                              = argsRemaining app menv
                            _ = (0, menv)
         # (xs, pdss) = toStatic args chn.chn_predef_symbols
-        # (casesExpr, pdss) = listToListExpr [] pdss
-        //# (casesExpr, pdss) = listToListExpr evalableCases pdss
+        # (casesExpr, pdss) = listToListExpr evalableCases pdss
+        //# (casesExpr, pdss) = listToListExpr [] pdss
         # (wrap, heaps, pdss) = appPredefinedSymbolWithEI (findBodyWrap rem)
                                   [ mkStr icl_module.icl_name.id_name
                                   , mkStr fun_ident.id_name
                                   , xs
                                   , casesExpr
-                                  , tb_rhs
+                                  , syn.syn_annot_expr
                                   ] SK_Function chn.chn_heaps pdss
-        # fun_defs = updateFunRhs idx menv.me_fun_defs (App wrap)
-        = {chn & chn_module_env = { menv & me_fun_defs = fun_defs}
-               , chn_heaps = heaps
-               , chn_predef_symbols = pdss}
-    | otherwise = chn
+        = ({syn & syn_annot_expr = App wrap}, {chn & chn_module_env = menv
+                                                   , chn_heaps = heaps
+                                                   , chn_predef_symbols = pdss})
+    | otherwise = (syn, chn)
     where
     findBodyWrap :: Int -> Int
     findBodyWrap 0 = PD_tonicExtWrapBody
@@ -271,7 +295,6 @@ addTonicWrap inh syn is_itasks_mod icl_module class_instances idx common_defs ch
                       && glob_module == pds.pds_module
                       && glob_object.ds_index == pds.pds_def]
         , pdss)
-  doAddRefl _ _ _ chn = chn
 
 instance == (Global a) | == a where
   (==) g1 g2 = g1.glob_module == g2.glob_module && g1.glob_object == g2.glob_object
