@@ -943,3 +943,132 @@ mkCaseDetFun eid exprPtr boundArgs bdy inh chn
                          , app_args     = map Var boundArgs
                          , app_info_ptr = ptr }
   = (App app, chn)
+
+wrapBody :: InhExpression SynExpression Bool *ChnExpression -> *(SynExpression, *ChnExpression)
+wrapBody inh syn is_itasks_mod chn
+  # pdss = chn.chn_predef_symbols
+  # (ok, pdss) = pdssAreDefined [PD_tonicExtWrapArg, PD_tonicExtWrapBody] pdss
+  # chn = {chn & chn_predef_symbols = pdss}
+  | not ok     = (syn, chn)
+  | otherwise
+      # menv                 = chn.chn_module_env
+      # fun_defs             = menv.me_fun_defs
+      # (fun_def, fun_defs)  = fun_defs![inh.inh_fun_idx]
+      # menv                 = {menv & me_fun_defs = fun_defs}
+      # (mfdt, fun_defs_cpy) = muselect menv.me_fun_defs_cpy inh.inh_fun_idx
+      # menv                 = {menv & me_fun_defs_cpy = fun_defs_cpy}
+      # chn = {chn & chn_module_env = menv}
+      = case mfdt of
+          Just fdt
+            = case (fun_def.fun_body, fdt.fun_type) of
+                (TransformedBody fb, Yes symbty)
+                  # menv = chn.chn_module_env
+                  # (isPA, menv) = case syn.syn_annot_expr of
+                                     App app -> isPartialApp app menv
+                                     _       -> (False, menv)
+                  # chn = {chn & chn_module_env = menv}
+                  = if isPA (syn, chn) (doAddRefl fun_def.fun_ident fb.tb_args symbty inh.inh_common_defs chn)
+                _ = (syn, chn)
+          _ = (syn, chn)
+  where
+  doAddRefl fun_ident tb_args symbty common_defs chn
+    # pdss = chn.chn_predef_symbols
+    # (ok, pdss) = pdssAreDefined [ PD_tonicExtWrapArg
+                                  , PD_tonicExtWrapBody
+                                  , PD_tonicExtWrapBodyLam1
+                                  , PD_tonicExtWrapBodyLam2
+                                  , PD_tonicExtWrapBodyLam3
+                                  , PD_ConsSymbol
+                                  , PD_NilSymbol] pdss
+    # chn = {chn & chn_predef_symbols = pdss}
+    | not ok     = (syn, chn)
+    # (args, chn) = foldr (mkArg symbty is_itasks_mod inh.inh_instance_tree) ([], chn) (zip2 tb_args symbty.st_args)
+    | length args == length tb_args
+        # evalableCases  = [(eid, 'DM'.elems vars, cs) \\ (eid, vars, cs) <- syn.syn_cases | allVarsBound inh vars]
+        # (evalableCases, chn) = mapSt (\(eid, bvs, cs) chn -> mkCaseDetFun eid inh.inh_fun_idx bvs cs inh chn) evalableCases chn
+
+        # menv = chn.chn_module_env
+        # (icl, menv) = menv!me_icl_module
+        # iclname = icl.icl_name.id_name
+        # (rem, menv)  = case syn.syn_annot_expr of
+                           App {app_symb = {symb_ident}}
+                             | symb_ident == predefined_idents.[PD_tonicExtWrapBodyLam1] = (1, menv)
+                             | symb_ident == predefined_idents.[PD_tonicExtWrapBodyLam2] = (2, menv)
+                             | symb_ident == predefined_idents.[PD_tonicExtWrapBodyLam3] = (3, menv)
+                           App app
+                             = argsRemaining app menv
+                           _ = (0, menv)
+        # (xs, pdss) = toStatic args chn.chn_predef_symbols
+        # (casesExpr, pdss) = listToListExpr evalableCases pdss
+        //# (casesExpr, pdss) = listToListExpr [] pdss
+        # (wrap, heaps, pdss) = appPredefinedSymbolWithEI (findBodyWrap rem)
+                                  [ mkStr iclname
+                                  , mkStr fun_ident.id_name
+                                  , xs
+                                  , casesExpr
+                                  , syn.syn_annot_expr
+                                  ] SK_Function chn.chn_heaps pdss
+        = ({syn & syn_annot_expr = App wrap}, {chn & chn_module_env = menv
+                                                   , chn_heaps = heaps
+                                                   , chn_predef_symbols = pdss})
+    | otherwise = (syn, chn)
+    where
+    findBodyWrap :: Int -> Int
+    findBodyWrap 0 = PD_tonicExtWrapBody
+    findBodyWrap 1 = PD_tonicExtWrapBodyLam1
+    findBodyWrap 2 = PD_tonicExtWrapBodyLam2
+    findBodyWrap 3 = PD_tonicExtWrapBodyLam3
+    findBodyWrap n = abort ("No PD_tonicExtWrapBodyLam" +++ toString n)
+
+    mkArg :: SymbolType Bool {#{!InstanceTree}} (FreeVar, AType) ([Expression], *ChnExpression) -> *([Expression], *ChnExpression)
+    mkArg symty is_itasks_mod class_instances (arg=:{fv_info_ptr, fv_ident}, {at_type}) (xs, chn)
+      # pdss = chn.chn_predef_symbols
+      # heaps = chn.chn_heaps
+      # (itask_class_symbol, pdss) = pdss![PD_ITaskClass]
+      # gtcClasses  = [gtc_class \\ {tc_class = TCGeneric {gtc_class}} <- common_defs.[itask_class_symbol.pds_module].com_class_defs.[itask_class_symbol.pds_def].class_context] 
+      # (hasITasks, hp_type_heaps) = tyHasITaskClasses class_instances gtcClasses at_type heaps.hp_type_heaps
+      # heaps         = {heaps & hp_type_heaps = hp_type_heaps}
+      # (noCtx, pdss) = noITaskCtx arg symty.st_context pdss
+      # (bv, heaps)   = freeVarToVar arg heaps
+      # (viewApp, heaps, pdss) = appPredefinedSymbolWithEI PD_tonicExtWrapArg
+                                   [ mkStr fv_ident.id_name
+                                   , mkInt (ptrToInt fv_info_ptr)
+                                   , if (is_itasks_mod || (not hasITasks && noCtx))
+                                       (mkStr fv_ident.id_name)
+                                       (Var bv)
+                                   ] SK_Function heaps pdss
+      # (texpr, pdss) = toStatic (mkStr fv_ident.id_name, mkInt (ptrToInt fv_info_ptr), App viewApp) pdss
+      = ([texpr:xs], {chn & chn_predef_symbols = pdss, chn_heaps = heaps })
+    tyHasITaskClasses :: {#{!InstanceTree}} [Global DefinedSymbol] Type *TypeHeaps -> *(Bool, *TypeHeaps)
+    tyHasITaskClasses class_instances []     at_type hp_type_heaps = (False, hp_type_heaps)
+    tyHasITaskClasses class_instances [x]    at_type hp_type_heaps = tyHasITaskClasses` class_instances x at_type hp_type_heaps
+    tyHasITaskClasses class_instances [x:xs] at_type hp_type_heaps
+      # (f, hp_type_heaps) = tyHasITaskClasses` class_instances x at_type hp_type_heaps
+      | f         = tyHasITaskClasses class_instances xs at_type hp_type_heaps
+      | otherwise = (False, hp_type_heaps)
+
+    tyHasITaskClasses` :: {#{!InstanceTree}} (Global DefinedSymbol) Type *TypeHeaps -> *(Bool, *TypeHeaps)
+    tyHasITaskClasses` class_instances {glob_module, glob_object} at_type hp_type_heaps
+      # instance_tree = class_instances.[glob_module].[glob_object.ds_index]
+      # coercions     = { Coercions
+                        | coer_demanded = {}
+                        , coer_offered  = {}
+                        }
+      # (inst, ctxs, uni_ok, hp_type_heaps, coercions) = find_instance [at_type] instance_tree common_defs hp_type_heaps coercions
+      = (inst.glob_module <> NotFound && inst.glob_object <> NotFound, hp_type_heaps)
+
+    noITaskCtx :: FreeVar [TypeContext] *PredefinedSymbols -> *(Bool, *PredefinedSymbols)
+    noITaskCtx fv tcs pdss
+      # (pds, pdss) = pdss![PD_ITaskClass]
+      = ( isEmpty [0 \\ {tc_var, tc_class = (TCClass {glob_object, glob_module})} <- tcs
+                      |  fv.fv_info_ptr == tc_var
+                      && glob_module == pds.pds_module
+                      && glob_object.ds_index == pds.pds_def]
+        , pdss)
+
+instance == (Global a) | == a where
+  (==) g1 g2 = g1.glob_module == g2.glob_module && g1.glob_object == g2.glob_object
+
+instance toString IdentOrQualifiedIdent where
+  toString (Ident ident) = ident.id_name
+  toString (QualifiedIdent _ str) = str

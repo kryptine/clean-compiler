@@ -198,13 +198,19 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
       # ((args, tFd), menv) = reifyArgsAndDef app_symb chn.chn_module_env
       # tyenv               = foldr (\(arg, t) st -> 'DM'.put (ptrToInt arg.fv_info_ptr) t st) 'DM'.newMap (zip2 args (funArgTys tFd))
       # tyenv               = 'DM'.union tyenv inh.inh_tyenv
-      # (syne, chn)         = mkBlueprint {inh & inh_tyenv = tyenv} (getFunRhs tFd) { chn & chn_module_env = menv }
+      # inh                 = {inh & inh_tyenv = tyenv}
+      # (syne, chn)         = mkBlueprint inh (getFunRhs tFd) { chn & chn_module_env = menv }
       # pats                = [case freeVarName x of
                                  "_x" -> case syne.syn_pattern_match_vars of
                                            [(_, e):_] -> e
                                            _          -> TVar [] "_x" (ptrToInt x.fv_info_ptr)
                                  x`    -> TVar [] x` (ptrToInt x.fv_info_ptr)
                               \\ x <- args | x.fv_def_level == -1]
+
+      # (syne, chn)         = case (isTonicFunctor, symbIdentObjectIdx app_symb) of
+                                (True, Just idx)
+                                  = wrapBody {inh & inh_fun_idx = idx} syne True chn
+                                _ = (syne, chn)
       # menv                = updateWithAnnot app_symb syne.syn_annot_expr chn.chn_module_env
       # chn                 = {chn & chn_module_env = menv}
       # (app`, chn)         = if isTonicFunctor
