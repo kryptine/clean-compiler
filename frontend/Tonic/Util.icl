@@ -67,12 +67,6 @@ copyFunDefs fun_defs
 // TODO Get rid of this in favour of a more general reification?
 reifyConsDef :: SymbIdent *ModuleEnv -> *(Maybe ConsDef, *ModuleEnv)
 reifyConsDef si menv
-  //= case (symbIdentModuleIdx si, symbIdentObjectIdx si) of
-      //(Just mi, Just oi)
-        //# (ft, menv) = reifyDclModulesIdxFunType` mi oi menv
-        //= (Just ft, menv)
-      //_ = (Nothing, menv)
-
   # (common, iclmod) = (menv.me_icl_module)!icl_common
   # dcls             = menv.me_dcl_modules
   # menv             = {menv & me_icl_module=iclmod}
@@ -91,14 +85,9 @@ reifyConsDef si menv
 reifyFunType :: SymbIdent *ModuleEnv -> *(Maybe FunType, *ModuleEnv)
 reifyFunType si menv=:{me_dcl_modules}
   = case (symbIdentModuleIdx si, symbIdentObjectIdx si) of
-      (Just mi, Just oi)
+      (Just mi, oi)
         = reifyDclModulesIdxFunType` mi oi menv
-      (Just mi, _)
-        = (Nothing, menv)
-      (_, Just oi)
-        = (Nothing, menv)
-      _
-        = (Nothing, menv)
+      _ = (Nothing, menv)
 
 symbIdentModuleIdx :: SymbIdent -> Maybe Index
 symbIdentModuleIdx {symb_kind=SK_Function glob}              = Just glob.glob_module
@@ -111,25 +100,20 @@ symbIdentModuleIdx {symb_kind=SK_Generic glob tk}            = Just glob.glob_mo
 symbIdentModuleIdx {symb_kind=SK_OverloadedConstructor glob} = Just glob.glob_module
 symbIdentModuleIdx _                                         = Nothing
 
-symbIdentObjectIdx :: SymbIdent -> Maybe Index
-symbIdentObjectIdx {symb_kind=SK_Function glob}              = Just glob.glob_object
-symbIdentObjectIdx {symb_kind=SK_IclMacro idx}               = Just idx
-symbIdentObjectIdx {symb_kind=SK_LocalMacroFunction idx}     = Just idx
-symbIdentObjectIdx {symb_kind=SK_DclMacro glob}              = Just glob.glob_object
-symbIdentObjectIdx {symb_kind=SK_LocalDclMacroFunction glob} = Just glob.glob_object
-symbIdentObjectIdx {symb_kind=SK_OverloadedFunction glob}    = Just glob.glob_object
-symbIdentObjectIdx {symb_kind=SK_GeneratedFunction fip idx}  = Just idx
-symbIdentObjectIdx {symb_kind=SK_Constructor glob}           = Just glob.glob_object
-symbIdentObjectIdx {symb_kind=SK_NewTypeConstructor globi}   = abort "symbIdentObjectIdx: SK_NewTypeConstructor"
-symbIdentObjectIdx {symb_kind=SK_Generic glob tk}            = Just glob.glob_object
-symbIdentObjectIdx {symb_kind=SK_OverloadedConstructor glob} = Just glob.glob_object
-symbIdentObjectIdx _                                         = Nothing
+symbIdentObjectIdx :: SymbIdent -> Index
+symbIdentObjectIdx {symb_kind=SK_Function glob}              = glob.glob_object
+symbIdentObjectIdx {symb_kind=SK_IclMacro idx}               = idx
+symbIdentObjectIdx {symb_kind=SK_LocalMacroFunction idx}     = idx
+symbIdentObjectIdx {symb_kind=SK_DclMacro glob}              = glob.glob_object
+symbIdentObjectIdx {symb_kind=SK_LocalDclMacroFunction glob} = glob.glob_object
+symbIdentObjectIdx {symb_kind=SK_OverloadedFunction glob}    = glob.glob_object
+symbIdentObjectIdx {symb_kind=SK_GeneratedFunction fip idx}  = idx
+symbIdentObjectIdx {symb_kind=SK_Constructor glob}           = glob.glob_object
+symbIdentObjectIdx {symb_kind=SK_Generic glob tk}            = glob.glob_object
+symbIdentObjectIdx {symb_kind=SK_OverloadedConstructor glob} = glob.glob_object
 
 reifyFunDef :: SymbIdent *ModuleEnv -> *(Maybe FunDef, *ModuleEnv)
-reifyFunDef si menv
-  = case symbIdentObjectIdx si of
-      Just idx -> reifyFunDefsIdxFunDef idx menv
-      _        -> (Nothing, menv)
+reifyFunDef si menv = reifyFunDefsIdxFunDef (symbIdentObjectIdx si) menv
 
 optionalToMaybe :: (Optional a) -> Maybe a
 optionalToMaybe (Yes x) = Just x
@@ -591,19 +575,25 @@ getFunRhs :: FunDef -> Expression
 getFunRhs {fun_body = TransformedBody tb} = tb.tb_rhs
 getFunRhs _                               = abort "getFunRhs: need a TransformedBody"
 
-//updateWithAnnot :: SymbIdent Expression *ModuleEnv -> *ModuleEnv
-//updateWithAnnot si expr menv =
-  //case (symbIdentModuleIdx si, symbIdentObjectIdx si) of
-    //(Just midx, Just oidx) -> if (midx == menv.me_main_dcl_module_n)
-                                //{menv & me_fun_defs = updateFunRhs oidx menv.me_fun_defs expr}
-                                //menv
-    //_                      -> menv
-
-updateWithAnnot :: SymbIdent Expression *ModuleEnv -> *ModuleEnv
-updateWithAnnot si expr menv =
-  case symbIdentObjectIdx si of
-    Just oidx -> {menv & me_fun_defs = updateFunRhs oidx menv.me_fun_defs expr}
-    _         -> menv
+updateWithAnnot :: Int Expression InhExpression *ChnExpression -> *ChnExpression
+updateWithAnnot fidx e inh chn
+  # menv = chn.chn_module_env
+  # fun_defs = menv.me_fun_defs
+  # (fun_def, fun_defs) = fun_defs![fidx]
+  = case fun_def of
+      {fun_body = TransformedBody fb}
+        # (argVars, localVars, freeVars) = collectVars e fb.tb_args
+        # fun_def = { fun_def & fun_info = { fun_def.fun_info
+                                           & fi_free_vars = freeVars
+                                           , fi_local_vars = localVars
+                                           }
+                              , fun_body = TransformedBody { tb_args = argVars
+                                                           , tb_rhs  = e
+                                                           }
+                    }
+        # fun_defs = {fun_defs & [fidx] = fun_def}
+        # menv     = { menv & me_fun_defs = fun_defs}
+        = {chn & chn_module_env = menv}
 
 updateFun :: Index !*{#FunDef} (FunDef -> FunDef) -> *{#FunDef}
 updateFun idx fun_defs f
@@ -884,65 +874,65 @@ tfCase eid cs=:{case_guards, case_default} chn
                       , chn_predef_symbols = pdss })
 
 mkCaseDetFun :: !ExprId !Int ![BoundVar] !Expression !InhExpression !*ChnExpression -> *(Expression, *ChnExpression)
-mkCaseDetFun eid exprPtr boundArgs bdy inh chn
-  # freeArgs           = map varToFreeVar boundArgs
-  # name               = "_f_case_" +++ toString exprPtr
-  # (bdy`, chn)        = case bdy of
-                           Case cs
-                             # (cs, chn) = tfCase eid cs chn
-                             = (Case cs, chn)
-                           Let lt=:{let_expr = Case cs}
-                             # (cs, chn) = tfCase eid cs chn
-                             = (Let {lt & let_expr = Case cs}, chn)
-                           _ = abort "mkCaseDetFun shouldn't happen"
-  # arity              = length freeArgs
-  # funIdent           = { id_name = name
-                         , id_info = nilPtr
-                         }
-  # menv               = chn.chn_module_env
-  # fun_defs           = menv.me_fun_defs
-  # mainDclN           = menv.me_main_dcl_module_n
-  # (nextFD, fun_defs) = usize fun_defs
-  # (argVars, localVars, freeVars) = collectVars bdy` freeArgs
-  # newFunDef          = { fun_docs     = ""
-                         , fun_ident    = funIdent
-                         , fun_arity    = arity
-                         , fun_priority = NoPrio
-                         , fun_body     = TransformedBody { tb_args = argVars
-                                                          , tb_rhs  = bdy` }
-                         , fun_type     = No
-                         , fun_pos      = NoPos
-                         , fun_kind     = FK_Function cNameNotLocationDependent
-                         , fun_lifted   = 0
-                         , fun_info     = {EmptyFunInfo & fi_calls = collectCalls mainDclN bdy`
-                                                        , fi_free_vars = freeVars
-                                                        , fi_local_vars = localVars
-                                                        }
-                         }
-  # funDefs            = [fd \\ fd <-: fun_defs] ++ [newFunDef]
-  # fun_defs           = {fd \\ fd <- funDefs}
+mkCaseDetFun eid exprPtr boundArgs bdy inh chn = (bdy, chn)
+  //# freeArgs           = map varToFreeVar boundArgs
+  //# name               = "_f_case_" +++ toString exprPtr
+  //# (bdy`, chn)        = case bdy of
+                           //Case cs
+                             //# (cs, chn) = tfCase eid cs chn
+                             //= (Case cs, chn)
+                           //Let lt=:{let_expr = Case cs}
+                             //# (cs, chn) = tfCase eid cs chn
+                             //= (Let {lt & let_expr = Case cs}, chn)
+                           //_ = abort "mkCaseDetFun shouldn't happen"
+  //# arity              = length freeArgs
+  //# funIdent           = { id_name = name
+                         //, id_info = nilPtr
+                         //}
+  //# menv               = chn.chn_module_env
+  //# fun_defs           = menv.me_fun_defs
+  //# mainDclN           = menv.me_main_dcl_module_n
+  //# (nextFD, fun_defs) = usize fun_defs
+  //# (argVars, localVars, freeVars) = collectVars bdy` freeArgs
+  //# newFunDef          = { fun_docs     = ""
+                         //, fun_ident    = funIdent
+                         //, fun_arity    = arity
+                         //, fun_priority = NoPrio
+                         //, fun_body     = TransformedBody { tb_args = argVars
+                                                          //, tb_rhs  = bdy` }
+                         //, fun_type     = No
+                         //, fun_pos      = NoPos
+                         //, fun_kind     = FK_Function cNameNotLocationDependent
+                         //, fun_lifted   = 0
+                         //, fun_info     = {EmptyFunInfo & fi_calls = collectCalls mainDclN bdy`
+                                                        //, fi_free_vars = freeVars
+                                                        //, fi_local_vars = localVars
+                                                        //}
+                         //}
+  //# funDefs            = [fd \\ fd <-: fun_defs] ++ [newFunDef]
+  //# fun_defs           = {fd \\ fd <- funDefs}
 
-  # fun_def            = chn.chn_fundef
-  # groups             = menv.me_groups
-  # groups             = [{group_members = [nextFD]} : [grp \\ grp <-: groups]]
-  # groups             = {grp \\ grp <- groups}
-  # fun_def            = {fun_def & fun_info = {fun_def.fun_info & fi_calls = [FunCall nextFD cGlobalScope : fun_def.fun_info.fi_calls]}}
-  # symb               = { symb_ident = funIdent
-                         , symb_kind  = SK_Function { glob_module = mainDclN
-                                                    , glob_object = nextFD }
-                         }
-  # menv               = {menv & me_fun_defs = fun_defs
-                               , me_groups = groups}
-  # chn                = {chn & chn_module_env = menv
-                              , chn_fundef = fun_def}
-  # heaps              = chn.chn_heaps
-  # (ptr, expr_heap)   = newPtr EI_Empty heaps.hp_expression_heap
-  # heaps              = { heaps & hp_expression_heap = expr_heap }
-  # chn                = { chn & chn_heaps = heaps }
-  # app                = { app_symb     = symb
-                         , app_args     = map Var boundArgs
-                         , app_info_ptr = ptr }
-  = (App app, chn)
+  //# fun_def            = chn.chn_fundef
+  //# groups             = menv.me_groups
+  //# groups             = [{group_members = [nextFD]} : [grp \\ grp <-: groups]]
+  //# groups             = {grp \\ grp <- groups}
+  //# fun_def            = {fun_def & fun_info = {fun_def.fun_info & fi_calls = [FunCall nextFD cGlobalScope : fun_def.fun_info.fi_calls]}}
+  //# symb               = { symb_ident = funIdent
+                         //, symb_kind  = SK_Function { glob_module = mainDclN
+                                                    //, glob_object = nextFD }
+                         //}
+  //# menv               = {menv & me_fun_defs = fun_defs
+                               //, me_groups = groups}
+  //# chn                = {chn & chn_module_env = menv
+                              //, chn_fundef = fun_def}
+  //# heaps              = chn.chn_heaps
+  //# (ptr, expr_heap)   = newPtr EI_Empty heaps.hp_expression_heap
+  //# heaps              = { heaps & hp_expression_heap = expr_heap }
+  //# chn                = { chn & chn_heaps = heaps }
+  //# app                = { app_symb     = symb
+                         //, app_args     = map Var boundArgs
+                         //, app_info_ptr = ptr }
+  //= (App app, chn)
 
 wrapBody :: InhExpression SynExpression Bool *ChnExpression -> *(SynExpression, *ChnExpression)
 wrapBody inh syn is_itasks_mod chn
@@ -999,8 +989,8 @@ wrapBody inh syn is_itasks_mod chn
                              = argsRemaining app menv
                            _ = (0, menv)
         # (xs, pdss) = toStatic args chn.chn_predef_symbols
-        # (casesExpr, pdss) = listToListExpr evalableCases pdss
-        //# (casesExpr, pdss) = listToListExpr [] pdss
+        //# (casesExpr, pdss) = listToListExpr evalableCases pdss
+        # (casesExpr, pdss) = listToListExpr [] pdss
         # (wrap, heaps, pdss) = appPredefinedSymbolWithEI (findBodyWrap rem)
                                   [ mkStr iclname
                                   , mkStr fun_ident.id_name

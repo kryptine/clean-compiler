@@ -93,7 +93,7 @@ ginTonic` is_itasks_mod main_dcl_module_n fun_defs fun_defs_cpy groups icl_modul
     # (fd_cpy, fun_defs_cpy) = fun_defs_cpy![idx]
     # inh         = mkInhExpr idx list_comprehensions class_instances common_defs
     # menv        = mkModuleEnv main_dcl_module_n fun_defs fun_defs_cpy groups icl_module dcl_modules
-    # chn         = mkChnExpr fd predef_symbols menv heaps
+    # chn         = mkChnExpr predef_symbols menv heaps
     # (argTys, tyenv) = zipWithSt (\arg t st -> ((arg, t), 'DM'.put (ptrToInt arg.fv_info_ptr) t st)) tb.tb_args (funArgTys fd_cpy) 'DM'.newMap
     # (isTopLeveLBlueprint, chn) = funIsTopLevelBlueprint fd_cpy inh chn
     | (not is_itasks_mod) && isTopLeveLBlueprint
@@ -140,39 +140,4 @@ mkArgPP pmvars arg
             [x:_] -> x
       idnm
         = TVar [] idnm (ptrToInt arg.FreeVar.fv_info_ptr)
-
-//updateWithAnnot :: Int Expression InhExpression *ChnExpression -> *ChnExpression
-//updateWithAnnot fidx e inh chn
-  //# menv     = chn.chn_module_env
-  //# fun_def  = chn.chn_fundef
-  //# fun_defs = menv.me_fun_defs
-  //# fun_defs = updateFun fidx fun_defs (\fd -> {fd & fun_info = fun_def.fun_info})
-  //# fun_defs = updateFunRhs fidx fun_defs e
-  //# menv     = { menv & me_fun_defs = fun_defs}
-  //= {chn & chn_module_env = menv
-         //, chn_fundef     = fun_def}
-
-
-updateWithAnnot :: Int Expression InhExpression *ChnExpression -> *ChnExpression
-updateWithAnnot fidx e inh chn
-  # fun_def = chn.chn_fundef
-  = case fun_def of
-      {fun_body = TransformedBody fb}
-        # menv     = chn.chn_module_env
-        # (argVars, localVars, freeVars) = collectVars e fb.tb_args
-        # fun_def = { fun_def & fun_info = { fun_def.fun_info
-                                           & fi_free_vars = freeVars
-                                           , fi_local_vars = localVars
-                                           }
-                              , fun_body = TransformedBody { tb_args = argVars
-                                                           , tb_rhs  = e
-                                                           }
-                    }
-        # fun_defs = menv.me_fun_defs
-        # fun_defs = {fun_defs & [fidx] = fun_def}
-        # menv     = { menv & me_fun_defs = fun_defs}
-        = {chn & chn_fundef = fun_def
-               , chn_module_env = menv}
-      _ = chn
-
 

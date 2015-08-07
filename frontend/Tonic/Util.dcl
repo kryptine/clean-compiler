@@ -28,7 +28,7 @@ reifyFunType :: SymbIdent *ModuleEnv -> *(Maybe FunType, *ModuleEnv)
 
 symbIdentModuleIdx :: SymbIdent -> Maybe Index
 
-symbIdentObjectIdx :: SymbIdent -> Maybe Index
+symbIdentObjectIdx :: SymbIdent -> Index
 
 reifyFunDef :: SymbIdent *ModuleEnv -> *(Maybe FunDef, *ModuleEnv)
 
@@ -105,7 +105,7 @@ getFunArgs :: FunDef -> [FreeVar]
 
 getFunRhs :: FunDef -> Expression
 
-updateWithAnnot :: SymbIdent Expression *ModuleEnv -> *ModuleEnv
+updateWithAnnot :: Int Expression InhExpression *ChnExpression -> *ChnExpression
 
 updateFun :: Index !*{#FunDef} (FunDef -> FunDef) -> *{#FunDef}
 

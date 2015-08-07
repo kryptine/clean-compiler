@@ -33,7 +33,6 @@ from iTasks._Framework.Tonic.AbsSyn import :: TExpr, :: ExprId
   { chn_module_env     :: !*ModuleEnv
   , chn_heaps          :: !*Heaps
   , chn_predef_symbols :: !*PredefinedSymbols
-  , chn_fundef         :: !FunDef
   }
 
 :: SynExpression =
@@ -55,7 +54,7 @@ from iTasks._Framework.Tonic.AbsSyn import :: TExpr, :: ExprId
 
 mkInhExpr :: !Int ![(String, ParsedExpr)] !{#{!InstanceTree}} !{#CommonDefs} -> InhExpression
 
-mkChnExpr :: !FunDef *PredefinedSymbols *ModuleEnv *Heaps -> *ChnExpression
+mkChnExpr :: *PredefinedSymbols *ModuleEnv *Heaps -> *ChnExpression
 
 mkSynExpr :: !TExpr !Expression -> SynExpression
 

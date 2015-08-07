@@ -24,13 +24,12 @@ mkInhExpr funIdx list_comprehensions tree cds =
   , inh_fun_idx        = funIdx
   }
 
-mkChnExpr :: !FunDef *PredefinedSymbols *ModuleEnv *Heaps -> *ChnExpression
-mkChnExpr fd predef_symbols menv heaps =
+mkChnExpr :: *PredefinedSymbols *ModuleEnv *Heaps -> *ChnExpression
+mkChnExpr predef_symbols menv heaps =
   { ChnExpression
   | chn_module_env     = menv
   , chn_predef_symbols = predef_symbols
   , chn_heaps          = heaps
-  , chn_fundef         = fd
   }
 
 mkSynExpr :: !TExpr !Expression -> SynExpression

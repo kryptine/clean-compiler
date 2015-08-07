@@ -160,8 +160,8 @@ wrapTMApp uid wrappedFnNm origExpr evalableCases inh chn
                                    _ = (iclName, menv)
       # heaps = chn.chn_heaps
       # (eidExpr, pdss) = listToListExpr (map mkInt uid) pdss
-      # (casesExpr, pdss) = listToListExpr evalableCases pdss
-      //# (casesExpr, pdss) = listToListExpr [] pdss
+      //# (casesExpr, pdss) = listToListExpr evalableCases pdss
+      # (casesExpr, pdss) = listToListExpr [] pdss
       # (expr, heaps, pdss) = appPredefinedSymbolWithEI (findWrap rem)
                                 [ mkStr wrappedFnModNm
                                 , mkStr wrappedFnNm
@@ -208,11 +208,10 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
                               \\ x <- args | x.fv_def_level == -1]
 
       # (syne, chn)         = case (isTonicFunctor, symbIdentObjectIdx app_symb) of
-                                (True, Just idx)
+                                (True, idx)
                                   = wrapBody {inh & inh_fun_idx = idx} syne True chn
                                 _ = (syne, chn)
-      # menv                = updateWithAnnot app_symb syne.syn_annot_expr chn.chn_module_env
-      # chn                 = {chn & chn_module_env = menv}
+      # chn                 = updateWithAnnot (symbIdentObjectIdx app_symb) syne.syn_annot_expr inh chn
       # (app`, chn)         = if isTonicFunctor
                                 (wrapTMApp inh.inh_uid app_symb.symb_ident.id_name (App app) [] inh chn)
                                 (App app, chn)
@@ -303,8 +302,7 @@ mkBlueprint inh (e=:(App app) @ es) chn
       # tyenv         = foldr (\(arg, t) st -> 'DM'.put (ptrToInt arg.fv_info_ptr) t st) 'DM'.newMap (zip2 args (funArgTys fd))
       # tyenv         = 'DM'.union tyenv inh.inh_tyenv
       # (syne, chn)   = mkBlueprint (addUnique 0 {inh & inh_tyenv = tyenv}) (getFunRhs fd) chn
-      # menv          = updateWithAnnot app.app_symb syne.syn_annot_expr chn.chn_module_env
-      # chn           = { chn & chn_module_env = menv}
+      # chn           = updateWithAnnot (symbIdentObjectIdx app.app_symb) syne.syn_annot_expr inh chn
       = ({ syn_annot_expr = e @ es
          , syn_texpr      = TPPExpr "TODO @"
          , syn_pattern_match_vars = syne.syn_pattern_match_vars
