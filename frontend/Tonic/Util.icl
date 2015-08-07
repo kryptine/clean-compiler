@@ -874,65 +874,65 @@ tfCase eid cs=:{case_guards, case_default} chn
                       , chn_predef_symbols = pdss })
 
 mkCaseDetFun :: !ExprId !Int ![BoundVar] !Expression !InhExpression !*ChnExpression -> *(Expression, *ChnExpression)
-mkCaseDetFun eid exprPtr boundArgs bdy inh chn = (bdy, chn)
-  //# freeArgs           = map varToFreeVar boundArgs
-  //# name               = "_f_case_" +++ toString exprPtr
-  //# (bdy`, chn)        = case bdy of
-                           //Case cs
-                             //# (cs, chn) = tfCase eid cs chn
-                             //= (Case cs, chn)
-                           //Let lt=:{let_expr = Case cs}
-                             //# (cs, chn) = tfCase eid cs chn
-                             //= (Let {lt & let_expr = Case cs}, chn)
-                           //_ = abort "mkCaseDetFun shouldn't happen"
-  //# arity              = length freeArgs
-  //# funIdent           = { id_name = name
-                         //, id_info = nilPtr
-                         //}
-  //# menv               = chn.chn_module_env
-  //# fun_defs           = menv.me_fun_defs
-  //# mainDclN           = menv.me_main_dcl_module_n
-  //# (nextFD, fun_defs) = usize fun_defs
-  //# (argVars, localVars, freeVars) = collectVars bdy` freeArgs
-  //# newFunDef          = { fun_docs     = ""
-                         //, fun_ident    = funIdent
-                         //, fun_arity    = arity
-                         //, fun_priority = NoPrio
-                         //, fun_body     = TransformedBody { tb_args = argVars
-                                                          //, tb_rhs  = bdy` }
-                         //, fun_type     = No
-                         //, fun_pos      = NoPos
-                         //, fun_kind     = FK_Function cNameNotLocationDependent
-                         //, fun_lifted   = 0
-                         //, fun_info     = {EmptyFunInfo & fi_calls = collectCalls mainDclN bdy`
-                                                        //, fi_free_vars = freeVars
-                                                        //, fi_local_vars = localVars
-                                                        //}
-                         //}
-  //# funDefs            = [fd \\ fd <-: fun_defs] ++ [newFunDef]
-  //# fun_defs           = {fd \\ fd <- funDefs}
+mkCaseDetFun eid exprPtr boundArgs bdy inh chn
+  # freeArgs           = map varToFreeVar boundArgs
+  # name               = "_f_case_" +++ toString exprPtr
+  # (bdy`, chn)        = case bdy of
+                           Case cs
+                             # (cs, chn) = tfCase eid cs chn
+                             = (Case cs, chn)
+                           Let lt=:{let_expr = Case cs}
+                             # (cs, chn) = tfCase eid cs chn
+                             = (Let {lt & let_expr = Case cs}, chn)
+                           _ = abort "mkCaseDetFun shouldn't happen"
+  # arity              = length freeArgs
+  # funIdent           = { id_name = name
+                         , id_info = nilPtr
+                         }
+  # menv               = chn.chn_module_env
+  # fun_defs           = menv.me_fun_defs
+  # mainDclN           = menv.me_main_dcl_module_n
+  # (nextFD, fun_defs) = usize fun_defs
+  # (argVars, localVars, freeVars) = collectVars bdy` freeArgs
+  # newFunDef          = { fun_docs     = ""
+                         , fun_ident    = funIdent
+                         , fun_arity    = arity
+                         , fun_priority = NoPrio
+                         , fun_body     = TransformedBody { tb_args = argVars
+                                                          , tb_rhs  = bdy` }
+                         , fun_type     = No
+                         , fun_pos      = NoPos
+                         , fun_kind     = FK_Function cNameNotLocationDependent
+                         , fun_lifted   = 0
+                         , fun_info     = {EmptyFunInfo & fi_calls = collectCalls mainDclN bdy`
+                                                        , fi_free_vars = freeVars
+                                                        , fi_local_vars = localVars
+                                                        }
+                         }
+  # funDefs            = [fd \\ fd <-: fun_defs] ++ [newFunDef]
+  # fun_defs           = {fd \\ fd <- funDefs}
 
-  //# fun_def            = chn.chn_fundef
-  //# groups             = menv.me_groups
-  //# groups             = [{group_members = [nextFD]} : [grp \\ grp <-: groups]]
-  //# groups             = {grp \\ grp <- groups}
-  //# fun_def            = {fun_def & fun_info = {fun_def.fun_info & fi_calls = [FunCall nextFD cGlobalScope : fun_def.fun_info.fi_calls]}}
-  //# symb               = { symb_ident = funIdent
-                         //, symb_kind  = SK_Function { glob_module = mainDclN
-                                                    //, glob_object = nextFD }
-                         //}
-  //# menv               = {menv & me_fun_defs = fun_defs
-                               //, me_groups = groups}
-  //# chn                = {chn & chn_module_env = menv
-                              //, chn_fundef = fun_def}
-  //# heaps              = chn.chn_heaps
-  //# (ptr, expr_heap)   = newPtr EI_Empty heaps.hp_expression_heap
-  //# heaps              = { heaps & hp_expression_heap = expr_heap }
-  //# chn                = { chn & chn_heaps = heaps }
-  //# app                = { app_symb     = symb
-                         //, app_args     = map Var boundArgs
-                         //, app_info_ptr = ptr }
-  //= (App app, chn)
+  # (fun_def, fun_defs) = fun_defs![inh.inh_fun_idx] 
+  # groups             = menv.me_groups
+  # groups             = [{group_members = [nextFD]} : [grp \\ grp <-: groups]]
+  # groups             = {grp \\ grp <- groups}
+  # fun_def            = {fun_def & fun_info = {fun_def.fun_info & fi_calls = [FunCall nextFD cGlobalScope : fun_def.fun_info.fi_calls]}}
+  # symb               = { symb_ident = funIdent
+                         , symb_kind  = SK_Function { glob_module = mainDclN
+                                                    , glob_object = nextFD }
+                         }
+  # fun_defs           = { fun_defs & [inh.inh_fun_idx] = fun_def}
+  # menv               = {menv & me_fun_defs = fun_defs
+                               , me_groups = groups}
+  # chn                = {chn & chn_module_env = menv}
+  # heaps              = chn.chn_heaps
+  # (ptr, expr_heap)   = newPtr EI_Empty heaps.hp_expression_heap
+  # heaps              = { heaps & hp_expression_heap = expr_heap }
+  # chn                = { chn & chn_heaps = heaps }
+  # app                = { app_symb     = symb
+                         , app_args     = map Var boundArgs
+                         , app_info_ptr = ptr }
+  = (App app, chn)
 
 wrapBody :: InhExpression SynExpression Bool *ChnExpression -> *(SynExpression, *ChnExpression)
 wrapBody inh syn is_itasks_mod chn
@@ -989,8 +989,8 @@ wrapBody inh syn is_itasks_mod chn
                              = argsRemaining app menv
                            _ = (0, menv)
         # (xs, pdss) = toStatic args chn.chn_predef_symbols
-        //# (casesExpr, pdss) = listToListExpr evalableCases pdss
-        # (casesExpr, pdss) = listToListExpr [] pdss
+        # (casesExpr, pdss) = listToListExpr evalableCases pdss
+        //# (casesExpr, pdss) = listToListExpr [] pdss
         # (wrap, heaps, pdss) = appPredefinedSymbolWithEI (findBodyWrap rem)
                                   [ mkStr iclname
                                   , mkStr fun_ident.id_name

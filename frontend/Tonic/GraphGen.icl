@@ -160,8 +160,7 @@ wrapTMApp uid wrappedFnNm origExpr evalableCases inh chn
                                    _ = (iclName, menv)
       # heaps = chn.chn_heaps
       # (eidExpr, pdss) = listToListExpr (map mkInt uid) pdss
-      //# (casesExpr, pdss) = listToListExpr evalableCases pdss
-      # (casesExpr, pdss) = listToListExpr [] pdss
+      # (casesExpr, pdss) = listToListExpr evalableCases pdss
       # (expr, heaps, pdss) = appPredefinedSymbolWithEI (findWrap rem)
                                 [ mkStr wrappedFnModNm
                                 , mkStr wrappedFnNm
