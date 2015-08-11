@@ -773,6 +773,9 @@ tfCase eid cs=:{case_guards, case_default} chn
   tfGuards (NewTypePatterns idx as)         chn
     # (as, chn) = mapSt tfA (zip2 as [0..]) chn
     = (NewTypePatterns idx as, chn)
+  tfGuards (DynamicPatterns ds) chn
+    # (ds, chn) = mapSt tfD (zip2 ds [0..]) chn
+    = (DynamicPatterns ds, chn)
   tfGuards (OverloadedListPatterns ot e as) chn
     # (as, chn) = mapSt tfA (zip2 as [0..]) chn
     = (OverloadedListPatterns ot e as, chn)
@@ -782,6 +785,9 @@ tfCase eid cs=:{case_guards, case_default} chn
   tfB (bp, n) chn
     # (pair, chn) = mkTuple (BVInt n) chn
     = ({bp & bp_expr = pair}, chn)
+  tfD (dp, n) chn
+    # (pair, chn) = mkTuple (BVInt n) chn
+    = ({dp & dp_rhs = pair}, chn)
   tfDefault (Yes def) chn
     # (pair, chn) = mkTuple (BVInt -1) chn
     = (Yes pair, chn)
