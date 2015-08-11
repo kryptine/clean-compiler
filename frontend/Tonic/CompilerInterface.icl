@@ -8,6 +8,7 @@ from overloading import :: InstanceTree (..), find_instance
 import StdFile
 from CoclSystemDependent import DirectorySeparator, ensureCleanSystemFilesExists
 import Text
+import Data.Array
 import Data.Func
 import Data.Functor
 import Data.Graph
@@ -59,18 +60,6 @@ openTonicFile :: !String !String !*File !*Files -> (!Bool, !Optional .File, !*Fi
 openTonicFile mod_dir mod_name error files
   = open_file_in_clean_system_files_folder mod_dir mod_name ".tonic" FWriteData error files
 
-foldUArr :: (Int a v:(w:b, u:(arr a)) -> v:(w:b, u:(arr a))) v:(w:b, u:(arr a))
-         -> v:(w:b, u:(arr a)) | Array arr a, [v <= u, v <= w]
-foldUArr f (b, arr)
-  # (sz, arr) = usize arr
-  = foldUArr` sz 0 b arr
-  where foldUArr` sz idx b arr
-          | idx < sz
-              #! (elem, arr) = uselect arr idx
-              #! (res, arr)  = foldUArr` sz (idx + 1) b arr
-              = f idx elem (res, arr)
-          | otherwise = (b, arr)
-
 toJSONString :: (Map String TonicFunc) IclModule *ModuleEnv -> *(String, *ModuleEnv)
 toJSONString rs icl_module menv
   = (toString $ toJSON { TonicModule
@@ -78,18 +67,19 @@ toJSONString rs icl_module menv
                        , tm_funcs = rs}
     , menv)
 import StdDebug
+
 ginTonic` :: Bool ModuleN !*{#FunDef} !*{#FunDef} !{!Group} IclModule {#DclModule}
              !{#CommonDefs} [(String, ParsedExpr)] !*PredefinedSymbols
              !{#{!InstanceTree}} *Heaps
           -> *(String, !*{#FunDef}, !{!Group}, !*PredefinedSymbols, !*Heaps)
 ginTonic` is_itasks_mod main_dcl_module_n fun_defs fun_defs_cpy groups icl_module dcl_modules common_defs list_comprehensions predef_symbols class_instances heaps
-  # ((reps, heaps, predef_symbols, groups, fun_defs_cpy), fun_defs) = foldUArr appDefInfo (('DM'.newMap, heaps, predef_symbols, groups, fun_defs_cpy), fun_defs)
+  # ((reps, heaps, predef_symbols, groups, fun_defs_cpy), fun_defs) = foldrUArrWithKey appDefInfo ('DM'.newMap, heaps, predef_symbols, groups, fun_defs_cpy) fun_defs
   # menv        = mkModuleEnv main_dcl_module_n fun_defs fun_defs_cpy groups icl_module dcl_modules
   # (str, menv) = toJSONString reps icl_module menv
   = (str, menv.me_fun_defs, groups, predef_symbols, heaps)
   where
   // fd does not always have a fun_type = Yes
-  appDefInfo idx fd=:{fun_pos,fun_ident=fun_ident, fun_body = TransformedBody tb} ((reps, heaps, predef_symbols, groups, fun_defs_cpy), fun_defs)
+  appDefInfo idx fd=:{fun_pos,fun_ident=fun_ident, fun_body = TransformedBody tb} (reps, heaps, predef_symbols, groups, fun_defs_cpy) fun_defs
     # (fd_cpy, fun_defs_cpy) = fun_defs_cpy![idx]
     # inh         = mkInhExpr idx list_comprehensions class_instances common_defs
     # menv        = mkModuleEnv main_dcl_module_n fun_defs fun_defs_cpy groups icl_module dcl_modules
@@ -127,7 +117,7 @@ ginTonic` is_itasks_mod main_dcl_module_n fun_defs fun_defs_cpy groups icl_modul
     | otherwise
       # menv = chn.chn_module_env
       = ((reps, chn.chn_heaps, chn.chn_predef_symbols, menv.me_groups, menv.me_fun_defs_cpy), menv.me_fun_defs)
-  appDefInfo _ _ ((reps, heaps, predef_symbols, groups, fun_defs_cpy), fun_defs) = ((reps, heaps, predef_symbols, groups, fun_defs_cpy), fun_defs)
+  appDefInfo _ _ (reps, heaps, predef_symbols, groups, fun_defs_cpy) fun_defs = ((reps, heaps, predef_symbols, groups, fun_defs_cpy), fun_defs)
   mkFunPos (FunPos _ n _) = n
   mkFunPos (LinePos _ n)  = n
   mkFunPos _              = -1

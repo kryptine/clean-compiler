@@ -135,11 +135,6 @@ given x == y && y == z
 //ppPE (PE_TypeSignature _ _) = "PE_TypeSignature"
 //ppPE (PE_Empty) = "PE_Empty"
 
-withTwo :: App [Expression] (Expression Expression *ChnExpression -> *(SynExpression, *ChnExpression)) InhExpression *ChnExpression -> *(SynExpression, *ChnExpression)
-withTwo app []        _ _   chn = ({syn_annot_expr = App app, syn_texpr = TPPExpr "TODO withTwo []",  syn_pattern_match_vars = [], syn_bound_vars = 'DM'.newMap, syn_cases = []}, chn)
-withTwo app [_]       _ _   chn = ({syn_annot_expr = App app, syn_texpr = TPPExpr "TODO withTwo [_]", syn_pattern_match_vars = [], syn_bound_vars = 'DM'.newMap, syn_cases = []}, chn)
-withTwo app [x1:x2:_] f inh chn = f x1 x2 chn
-
 wrapTMApp :: ExprId String Expression [Expression] InhExpression *ChnExpression -> *(Expression, *ChnExpression)
 wrapTMApp uid wrappedFnNm origExpr evalableCases inh chn
   # (ok, pdss) = pdssAreDefined [PD_tonicExtWrapApp, PD_tonicExtWrapAppLam1, PD_tonicExtWrapAppLam2, PD_tonicExtWrapAppLam3, PD_ConsSymbol, PD_NilSymbol] chn.chn_predef_symbols

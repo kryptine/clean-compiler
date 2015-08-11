@@ -13,36 +13,6 @@ import Tonic.Pretty
 import Text
 import iTasks._Framework.Tonic.AbsSyn
 
-foldrArr :: (a b -> b) b (arr a) -> b | Array arr a
-foldrArr f b arr = foldrArr` 0 f b arr
-  where
-  arrSz = size arr
-  foldrArr` n f b arr
-    | n < arrSz  = f (select arr n) (foldrArr` (n + 1) f b arr)
-    | otherwise  = b
-
-findInArr :: (e -> Bool) (a e) -> Maybe (Int, e) | Array a e
-findInArr p arr = findInArr` 0 p arr
-  where
-  arrSz = size arr
-  findInArr` n p arr
-    | n < arrSz
-      #  elem = select arr n
-      =  if (p elem) (Just (n, elem)) (findInArr` (n + 1) p arr)
-    | otherwise  = Nothing
-
-concatStrings :: [String] -> .String
-concatStrings l = updateS 0 l (createArray (sum [size s \\ s <- l]) ' ')
-  where
-    updateS :: !Int [{#Char}] *{#Char} -> *{#Char}
-    updateS i [] s
-      =  s
-    updateS i [h : t] s
-      =  updateS (i + size h) t {s & [pos] = c \\ c <-: h & pos <- [i..]}
-
-intercalateString :: String [String] -> String
-intercalateString xs xss = concatStrings (intersperse xs xss)
-
 dropAppContexts :: App *ModuleEnv -> *(([Expression], [Expression]), *ModuleEnv)
 dropAppContexts app menv
   # (mcd, menv) = reifyConsDef app.app_symb menv
@@ -326,18 +296,6 @@ reifyFunDefsIdxFunDef idx menv
   # (mfd, fds) = muselect menv.me_fun_defs_cpy idx
   = (mfd, {menv & me_fun_defs_cpy = fds})
 
-foldUArr :: (Int a v:(w:b, u:(arr a)) -> v:(w:b, u:(arr a))) v:(w:b, u:(arr a))
-         -> v:(w:b, u:(arr a)) | Array arr a, [v <= u, v <= w]
-foldUArr f (b, arr)
-  # (sz, arr) = usize arr
-  = foldUArr` sz 0 b arr
-  where foldUArr` sz idx b arr
-          | idx < sz
-              # (elem, arr) = uselect arr idx
-              # (res, arr) = foldUArr` sz (idx + 1) b arr
-              = f idx elem (res, arr)
-          | otherwise = (b, arr)
-
 reifyArgsAndDef :: SymbIdent *ModuleEnv -> *(([FreeVar], FunDef), *ModuleEnv)
 reifyArgsAndDef app_symb menv
   # (mfd, menv)      = reifyFunDef app_symb menv
@@ -348,9 +306,6 @@ reifyArgsAndDef app_symb menv
   # rhsTy            = fromMaybe (abort "reifyArgs failed to reify SymbolType") mFArgTy
   = ((snd (dropContexts rhsTy args), rhsfd), menv)
 
-fdArrToMap :: .{#FunDef} -> Map String FunDef
-fdArrToMap fds = 'DM'.fromList [(d.fun_ident.id_name, d) \\ d <-: fds]
-
 isCons :: String -> Bool
 isCons str = str == PD_ConsSymbol_String
 
@@ -360,14 +315,6 @@ isNil str = str == PD_NilSymbol_String
 appIsList :: App -> Bool
 appIsList app = isCons ident || isNil ident
   where ident = app.app_symb.symb_ident.id_name
-
-exprIsListConstr :: Expression -> Bool
-exprIsListConstr (App app) = appIsList app
-exprIsListConstr _         = False
-
-exprIsListCompr :: Expression -> Bool
-exprIsListCompr (App app)  = appIsListComp app
-exprIsListCompr _          = False
 
 appIsListComp :: App -> Bool
 appIsListComp app = isListCompr app.app_symb.symb_ident.id_name
@@ -439,11 +386,6 @@ typeIsBlueprintPart ty inh chn
 funTy :: FunDef -> Type
 funTy {fun_type=Yes {st_result={at_type}}} = at_type
 funTy {fun_ident={id_name}} = abort ("Tonic.Util.funTy: type of " +++ id_name +++ " is unknown.")
-
-functorContent :: Type -> Maybe Type
-functorContent (TA _ [{at_type}:_])    = Just at_type
-functorContent (TAS _ [{at_type}:_] _) = Just at_type
-functorContent _                       = Nothing
 
 funArgTys :: FunDef -> [Type]
 funArgTys {fun_type=Yes {st_args}} = map (\x -> x.at_type) st_args
@@ -787,30 +729,12 @@ pdssAreDefined [pds:xs] pdss
   | predefIsUndefined tune_symb = (False, pdss)
   | otherwise                   = pdssAreDefined xs pdss
 
-mkTAssoc :: (Maybe FunType) -> TPriority
-mkTAssoc Nothing = TNoPrio
-mkTAssoc (Just ft) = fromPriority ft.ft_priority
-
 fromPriority :: Priority -> TPriority
 fromPriority (Prio LeftAssoc n)  = TPrio TLeftAssoc n
 fromPriority (Prio RightAssoc n) = TPrio TRightAssoc n
 fromPriority (Prio NoAssoc n)    = TPrio TNoAssoc n
 fromPriority _                   = TNoPrio
 
-//exprToTCleanExpr :: Expression *ModuleEnv -> *(TCleanExpr, *ModuleEnv)
-//exprToTCleanExpr (App app) menv
-  //# ((_, args), menv) = dropAppContexts app menv
-  //= case args of
-      //[] = (PPCleanExpr app.app_symb.symb_ident.id_name, menv)
-      //xs
-        //# (mft, menv)  = reifyFunType app.app_symb menv
-        //# (tces, menv) = mapSt exprToTCleanExpr args menv
-        //= (AppCleanExpr (mkTAssoc mft) app.app_symb.symb_ident.id_name tces, menv)
-//exprToTCleanExpr expr menv
-  //# (doc, menv) = ppExpression expr menv
-  //= (PPCleanExpr (ppCompact doc), menv)
-
-// TODO Associativity?
 atypeToTCleanExpr :: AType -> TExpr
 atypeToTCleanExpr {at_type} = typeToTCleanExpr at_type
 

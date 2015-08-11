@@ -8,14 +8,6 @@ from Data.Map import :: Map
 import Tonic.AbsSyn
 from iTasks._Framework.Tonic.AbsSyn import :: TPriority
 
-foldrArr :: (a b -> b) b (arr a) -> b | Array arr a
-
-findInArr :: (e -> Bool) (a e) -> Maybe (Int, e) | Array a e
-
-concatStrings :: [String] -> .String
-
-intercalateString :: String [String] -> String
-
 dropAppContexts :: App *ModuleEnv -> *(([Expression], [Expression]), *ModuleEnv)
 
 copyFunDefs :: !*{#FunDef} -> *(!*{#FunDef}, !*{#FunDef})
@@ -52,10 +44,6 @@ isNil :: String -> Bool
 
 appIsList :: App -> Bool
 
-exprIsListConstr :: Expression -> Bool
-
-exprIsListCompr :: Expression -> Bool
-
 appIsListComp :: App -> Bool
 
 safeHead :: [a] -> Maybe a
@@ -67,6 +55,7 @@ optional :: b (a -> b) (Optional a) -> b
 appFunName :: App -> String
 
 typeToTCleanExpr :: Type -> TExpr
+
 freeVarName :: FreeVar -> String
 
 dropContexts :: SymbolType [a] -> ([a], [a])
@@ -81,8 +70,6 @@ typeIsBlueprintPart :: Type InhExpression *ChnExpression -> *(Bool, *ChnExpressi
 
 funTy :: FunDef -> Type
 
-functorContent :: Type -> Maybe Type
-
 funArgTys :: FunDef -> [Type]
 
 identIsLambda :: Ident -> Bool
@@ -96,8 +83,6 @@ symbIdentIsBPPart :: SymbIdent InhExpression *ChnExpression -> *(Bool, *ChnExpre
 isInfix :: SymbIdent *ModuleEnv -> *(Bool, *ModuleEnv)
 
 prioIsInfix :: Priority -> Bool
-
-fdArrToMap :: .{#FunDef} -> Map String FunDef
 
 symbIdentArity :: SymbIdent *ModuleEnv -> *(Maybe Int, *ModuleEnv)
 
@@ -166,8 +151,6 @@ tupleToTupleExpr :: (Expression, Expression) *PredefinedSymbols -> *(Expression,
 tupleExprToTuple :: Expression -> (Expression, Expression)
 
 pdssAreDefined :: [Int] *PredefinedSymbols -> *(Bool, *PredefinedSymbols)
-
-//exprToTCleanExpr :: Expression *ModuleEnv -> *(TCleanExpr, *ModuleEnv)
 
 mselect :: (a e) !Int -> Maybe e | Array a e
 
