@@ -193,7 +193,7 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
       # tyenv               = foldr (\(arg, t) st -> 'DM'.put (ptrToInt arg.fv_info_ptr) t st) 'DM'.newMap (zip2 args (funArgTys tFd))
       # tyenv               = 'DM'.union tyenv inh.inh_tyenv
       # inh                 = {inh & inh_tyenv = tyenv}
-      # (syne, chn)         = mkBlueprint inh (getFunRhs tFd) { chn & chn_module_env = menv }
+      # (syne, chn)         = mkBlueprint {inh & inh_fun_idx = symbIdentObjectIdx app_symb} (getFunRhs tFd) { chn & chn_module_env = menv }
       # pats                = [case freeVarName x of
                                  "_x" -> case syne.syn_pattern_match_vars of
                                            [(_, e):_] -> e

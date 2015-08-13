@@ -802,7 +802,7 @@ tfCase eid cs=:{case_guards, case_default} chn
                                   ] SK_Constructor heaps pdss
     = (App pair, {chn & chn_heaps = heaps
                       , chn_predef_symbols = pdss })
-
+import StdDebug
 mkCaseDetFun :: !ExprId !Int ![BoundVar] !Expression !InhExpression !*ChnExpression -> *(Expression, *ChnExpression)
 mkCaseDetFun eid exprPtr boundArgs bdy inh chn
   # freeArgs           = map varToFreeVar boundArgs
@@ -821,6 +821,11 @@ mkCaseDetFun eid exprPtr boundArgs bdy inh chn
                          }
   # menv               = chn.chn_module_env
   # fun_defs           = menv.me_fun_defs
+  # (fun_def, fun_defs) = fun_defs![inh.inh_fun_idx] 
+  # groups             = menv.me_groups
+  # groups`            = [grp \\ grp <-: groups]
+  # (groupidx, group)  = case [(idx, group) \\ (idx, group) <- zip2 [0..] groups` | elem inh.inh_fun_idx group.group_members] of
+                            [group : _] -> group
   # mainDclN           = menv.me_main_dcl_module_n
   # (nextFD, fun_defs) = usize fun_defs
   # (argVars, localVars, freeVars) = collectVars bdy` freeArgs
@@ -834,18 +839,17 @@ mkCaseDetFun eid exprPtr boundArgs bdy inh chn
                          , fun_pos      = NoPos
                          , fun_kind     = FK_Function cNameNotLocationDependent
                          , fun_lifted   = 0
-                         , fun_info     = {EmptyFunInfo & fi_calls = collectCalls mainDclN bdy`
-                                                        , fi_free_vars = freeVars
-                                                        , fi_local_vars = localVars
+                         , fun_info     = {EmptyFunInfo & fi_calls       = collectCalls mainDclN bdy`
+                                                        , fi_free_vars   = freeVars
+                                                        , fi_local_vars  = localVars
+                                                        , fi_group_index = groupidx
                                                         }
                          }
   # funDefs            = [fd \\ fd <-: fun_defs] ++ [newFunDef]
   # fun_defs           = {fd \\ fd <- funDefs}
-
-  # (fun_def, fun_defs) = fun_defs![inh.inh_fun_idx] 
-  # groups             = menv.me_groups
-  # groups             = [{group_members = [nextFD]} : [grp \\ grp <-: groups]]
-  # groups             = {grp \\ grp <- groups}
+  # (lgrps, rgrps)     = splitAt groupidx groups`
+  # group              = {group_members = [nextFD]}
+  # groups             = {grp \\ grp <- lgrps ++ [group : rgrps]}
   # fun_def            = {fun_def & fun_info = {fun_def.fun_info & fi_calls = [FunCall nextFD cGlobalScope : fun_def.fun_info.fi_calls]}}
   # symb               = { symb_ident = funIdent
                          , symb_kind  = SK_Function { glob_module = mainDclN
