@@ -258,7 +258,6 @@ predefined_idents
                     [PD_ITaskClass]                  = i "iTask",
                     [PD_TMonadClass]                 = i "TMonad",
                     [PD_TApplicativeClass]           = i "TApplicative",
-                    [PD_TFunctorClass]               = i "TFunctor",
                     [PD_TonicTopLevelBlueprintClass] = i "TonicTopLevelBlueprint",
                     [PD_TonicBlueprintPartClass]     = i "TonicBlueprintPart",
                     [PD_tonicExtWrapArg]         = i "tonicExtWrapArg",
@@ -425,7 +424,6 @@ where
 					<<- (local_predefined_idents,	IC_Class,	PD_ITaskClass)
 					<<- (local_predefined_idents,	IC_Class,	PD_TMonadClass)
 					<<- (local_predefined_idents,	IC_Class,	PD_TApplicativeClass)
-					<<- (local_predefined_idents,	IC_Class,	PD_TFunctorClass)
 					<<- (local_predefined_idents,	IC_Class,	PD_TonicTopLevelBlueprintClass)
 					<<- (local_predefined_idents,	IC_Class,	PD_TonicBlueprintPartClass)
 

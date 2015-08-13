@@ -428,10 +428,8 @@ symbIdentIsBPPart {symb_ident, symb_kind=SK_OverloadedFunction {glob_module, glo
   # pdss = chn.chn_predef_symbols
   # (tmpds, pdss) = pdss![PD_TMonadClass]
   # (tapds, pdss) = pdss![PD_TApplicativeClass]
-  # (tfpds, pdss) = pdss![PD_TFunctorClass]
   = (  (md.me_class.glob_module == tmpds.pds_module && md.me_class.glob_object == tmpds.pds_def)
     || (md.me_class.glob_module == tapds.pds_module && md.me_class.glob_object == tapds.pds_def)
-    || (md.me_class.glob_module == tfpds.pds_module && md.me_class.glob_object == tfpds.pds_def)
     , {chn & chn_predef_symbols = pdss})
 symbIdentIsBPPart si inh chn
   # (mst, menv) = reifySymbIdentSymbolType si chn.chn_module_env
