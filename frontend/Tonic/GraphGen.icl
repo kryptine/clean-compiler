@@ -230,31 +230,83 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
   | otherwise      = mkFApp app ctxs args inh chn
   where
   mkMApp app ctxs args inh chn
-    # appName        = app.app_symb.symb_ident.id_name
-    # (mFunTy, menv) = reifyFunType app.app_symb chn.chn_module_env
-    # (assoc, menv)  = getAssoc app.app_symb menv
-    # (mst, menv)    = reifySymbIdentSymbolType app.app_symb menv
-    # mTyStr         = case mst of
-                         Just st -> symTyStr st
-                         _       -> Nothing
-    # (dclnm, menv)  = case reifyDclModule app.app_symb menv of
-                         (Just dcl, menv) = (dcl.dcl_name.id_name, menv)
-                         (_       , menv)
-                           # (iclmod, menv) = menv!me_icl_module
-                           = (iclmod.icl_name.id_name, menv)
-    # chn            = {chn & chn_module_env = menv}
-    # (ps, chn)      = mapSt (\(x, n) chn -> mkBlueprint (addUnique n inh) x chn) (zip2 args [0..]) chn
-    # allCases       = flatten (map (\syn -> syn.syn_cases) ps)
-    # evalableCases  = [(eid, 'DM'.elems vars, cs) \\ (eid, vars, cs) <- allCases | allVarsBound inh vars]
-    # (evalableCases, chn) = mapSt (\(eid, bvs, cs) chn -> mkCaseDetFun eid (ptrToInt app.app_info_ptr) bvs cs inh chn) evalableCases chn
-    # args`          = map (\syn -> syn.syn_annot_expr) ps
-    # (app`, chn)    = (App {app & app_args = args`}, chn)
-    # (app`, chn)    = wrapTMApp inh.inh_uid appName app` evalableCases inh chn
-    = ({ syn_annot_expr = app`
-       , syn_texpr      = TMApp inh.inh_uid mTyStr dclnm (appFunName app) (map (\syn -> syn.syn_texpr) ps) assoc
-       , syn_pattern_match_vars = []
-       , syn_bound_vars = 'DM'.unions (map (\syn -> syn.syn_bound_vars) ps)
-       , syn_cases = allCases}, chn)
+    # predef_symbols               = chn.chn_predef_symbols
+    # (bindSymbol, predef_symbols) = predef_symbols![PD_TMonadBind]
+    # menv                         = chn.chn_module_env
+    # (dcls, menv)                 = menv!me_dcl_modules
+    # bindMemberDef                = dcls.[bindSymbol.pds_module].dcl_common.com_member_defs.[bindSymbol.pds_def]
+    # appIsBind                    = app.app_symb.symb_ident.id_info == bindMemberDef.me_ident.id_info
+    # chn                          = {chn & chn_predef_symbols = predef_symbols
+                                          , chn_module_env = menv}
+    # appName                      = app.app_symb.symb_ident.id_name
+    = case (appIsBind, args) of
+        (True, [lhsExpr, rhsExpr=:(App rhsApp) : _])
+          | identIsLambda rhsApp.app_symb.symb_ident
+          # ((rhsArgs, rhsFd), menv) = reifyArgsAndDef rhsApp.app_symb chn.chn_module_env
+          # bindLamArgFV             = last rhsArgs
+          # (mFunTy, menv)           = reifyFunType app.app_symb menv
+          # (assoc, menv)            = getAssoc app.app_symb menv
+          # (mst, menv)              = reifySymbIdentSymbolType app.app_symb menv
+          # mTyStr                   = case mst of
+                                         Just st -> symTyStr st
+                                         _       -> Nothing
+          # (dclnm, menv)            = case reifyDclModule app.app_symb menv of
+                                         (Just dcl, menv) = (dcl.dcl_name.id_name, menv)
+                                         (_       , menv)
+                                           # (iclmod, menv) = menv!me_icl_module
+                                           = (iclmod.icl_name.id_name, menv)
+          # chn                      = {chn & chn_module_env = menv}
+
+          # (synr, chn)              = mkBlueprint (addUnique 1 inh) rhsExpr chn
+          # (synl, chn)              = mkBlueprint (addUnique 0 {inh & inh_bind_var = Just bindLamArgFV
+                                                                     , inh_cases    = synr.syn_cases}) lhsExpr chn
+          # ps                       = [synl, synr]
+
+
+          //# allCases                 = flatten (map (\syn -> syn.syn_cases) ps)
+          //# evalableCases            = [(eid, 'DM'.elems vars, cs) \\ (eid, vars, cs) <- allCases | allVarsBound inh vars]
+          //# (evalableCases, chn)     = mapSt (\(eid, bvs, cs) chn -> mkCaseDetFun (Just bindLamArgFV) eid (ptrToInt app.app_info_ptr) bvs cs inh chn) evalableCases chn
+          # args`                    = [synl.syn_annot_expr, synr.syn_annot_expr]
+          # (app`, chn)              = (App {app & app_args = args`}, chn)
+          # (app`, chn)              = wrapTMApp inh.inh_uid appName app` [] inh chn
+          = ({ syn_annot_expr = app`
+             , syn_texpr      = TMApp inh.inh_uid mTyStr dclnm (appFunName app) [synl.syn_texpr, synr.syn_texpr] assoc
+             , syn_pattern_match_vars = []
+             , syn_bound_vars = 'DM'.union synl.syn_bound_vars synr.syn_bound_vars
+             , syn_cases = synl.syn_cases ++ synr.syn_cases}, chn)
+        _
+          # (mFunTy, menv) = reifyFunType app.app_symb chn.chn_module_env
+          # (assoc, menv)  = getAssoc app.app_symb menv
+          # (mst, menv)    = reifySymbIdentSymbolType app.app_symb menv
+          # mTyStr         = case mst of
+                               Just st -> symTyStr st
+                               _       -> Nothing
+          # (dclnm, menv)  = case reifyDclModule app.app_symb menv of
+                               (Just dcl, menv) = (dcl.dcl_name.id_name, menv)
+                               (_       , menv)
+                                 # (iclmod, menv) = menv!me_icl_module
+                                 = (iclmod.icl_name.id_name, menv)
+          # chn            = {chn & chn_module_env = menv}
+          # evalableCases  = case inh.inh_bind_var of
+                               Just var
+                                 = [(eid, 'DM'.elems vars, cs) \\ (eid, vars, cs) <- inh.inh_cases | allVarsBound` var inh vars]
+                               _ = []
+          # (evalableCases, chn) = mapSt (\(eid, bvs, cs) chn -> mkCaseDetFun inh.inh_bind_var eid (ptrToInt app.app_info_ptr) bvs cs inh chn) evalableCases chn
+          # (ps, chn)      = mapSt (\(x, n) chn -> mkBlueprint (addUnique n {inh & inh_bind_var = Nothing}) x chn) (zip2 args [0..]) chn
+          # args`          = map (\syn -> syn.syn_annot_expr) ps
+          # (app`, chn)    = (App {app & app_args = args`}, chn)
+          # (app`, chn)    = wrapTMApp inh.inh_uid appName app` evalableCases inh chn
+          = ({ syn_annot_expr = app`
+             , syn_texpr      = TMApp inh.inh_uid mTyStr dclnm (appFunName app) (map (\syn -> syn.syn_texpr) ps) assoc
+             , syn_pattern_match_vars = []
+             , syn_bound_vars = 'DM'.unions (map (\syn -> syn.syn_bound_vars) ps)
+             , syn_cases = flatten (map (\syn -> syn.syn_cases) ps)}, chn)
+          where
+          allVarsBound` fv inh bound
+            # diff = 'DM'.difference bound inh.inh_tyenv
+            = case 'DM'.toList diff of
+                [(k, _)] -> k == ptrToInt fv.fv_info_ptr
+                _ -> False
 
   mkFApp app ctxs args inh chn
     # appName       = app.app_symb.symb_ident.id_name

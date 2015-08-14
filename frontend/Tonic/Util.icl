@@ -801,9 +801,12 @@ tfCase eid cs=:{case_guards, case_default} chn
     = (App pair, {chn & chn_heaps = heaps
                       , chn_predef_symbols = pdss })
 import StdDebug
-mkCaseDetFun :: !ExprId !Int ![BoundVar] !Expression !InhExpression !*ChnExpression -> *(Expression, *ChnExpression)
-mkCaseDetFun eid exprPtr boundArgs bdy inh chn
+mkCaseDetFun :: !(Maybe FreeVar) !ExprId !Int ![BoundVar] !Expression !InhExpression !*ChnExpression -> *(Expression, *ChnExpression)
+mkCaseDetFun mbindfv eid exprPtr boundArgs bdy inh chn
   # freeArgs           = map varToFreeVar boundArgs
+  # freeArgs           = case mbindfv of
+                           Just bindfv -> [arg \\ arg <- freeArgs | arg.fv_info_ptr <> bindfv.fv_info_ptr] ++ [bindfv]
+                           _           -> freeArgs
   # name               = "_f_case_" +++ toString exprPtr
   # (bdy`, chn)        = case bdy of
                            Case cs
@@ -861,8 +864,11 @@ mkCaseDetFun eid exprPtr boundArgs bdy inh chn
   # (ptr, expr_heap)   = newPtr EI_Empty heaps.hp_expression_heap
   # heaps              = { heaps & hp_expression_heap = expr_heap }
   # chn                = { chn & chn_heaps = heaps }
+  # appArgs            = case mbindfv of
+                           Just _ -> init boundArgs
+                           _      -> boundArgs
   # app                = { app_symb     = symb
-                         , app_args     = map Var boundArgs
+                         , app_args     = map Var appArgs
                          , app_info_ptr = ptr }
   = (App app, chn)
 
@@ -907,7 +913,7 @@ wrapBody inh syn is_itasks_mod chn
     # (args, chn) = foldr (mkArg symbty is_itasks_mod inh.inh_instance_tree) ([], chn) (zip2 tb_args symbty.st_args)
     | length args == length tb_args
         # evalableCases  = [(eid, 'DM'.elems vars, cs) \\ (eid, vars, cs) <- syn.syn_cases | allVarsBound inh vars]
-        # (evalableCases, chn) = mapSt (\(eid, bvs, cs) chn -> mkCaseDetFun eid inh.inh_fun_idx bvs cs inh chn) evalableCases chn
+        # (evalableCases, chn) = mapSt (\(eid, bvs, cs) chn -> mkCaseDetFun Nothing eid inh.inh_fun_idx bvs cs inh chn) evalableCases chn
 
         # menv = chn.chn_module_env
         # (icl, menv) = menv!me_icl_module

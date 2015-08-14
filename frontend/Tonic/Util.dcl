@@ -160,6 +160,6 @@ fromPriority :: Priority -> TPriority
 
 allVarsBound :: !InhExpression !(Map Int BoundVar) -> Bool
 
-mkCaseDetFun :: !ExprId !Int ![BoundVar] !Expression !InhExpression !*ChnExpression -> *(Expression, *ChnExpression)
+mkCaseDetFun :: !(Maybe FreeVar) !ExprId !Int ![BoundVar] !Expression !InhExpression !*ChnExpression -> *(Expression, *ChnExpression)
 
 wrapBody :: InhExpression SynExpression Bool *ChnExpression -> *(SynExpression, *ChnExpression)

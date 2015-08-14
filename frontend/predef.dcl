@@ -323,7 +323,9 @@ PD_tonicExtWrapAppLam1     :== 310
 PD_tonicExtWrapAppLam2     :== 311
 PD_tonicExtWrapAppLam3     :== 312
 
-PD_NrOfPredefSymbols		:== 313
+PD_TMonadBind :== 313
+
+PD_NrOfPredefSymbols		:== 314
 
 GetTupleConsIndex tup_arity :== PD_Arity2TupleSymbol + tup_arity - 2
 GetTupleTypeIndex tup_arity :== PD_Arity2TupleType + tup_arity - 2
