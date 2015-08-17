@@ -26,12 +26,17 @@ mkInhExpr funIdx list_comprehensions tree cds =
   , inh_cases          = []
   }
 
-mkChnExpr :: *PredefinedSymbols *ModuleEnv *Heaps -> *ChnExpression
-mkChnExpr predef_symbols menv heaps =
+mkChnExpr :: ModuleN !*{#FunDef} !*{#FunDef} !{!Group} IclModule {#DclModule} *PredefinedSymbols *Heaps -> *ChnExpression
+mkChnExpr main_dcl_module_n fun_defs fun_defs_cpy groups icl_module dcl_modules predef_symbols heaps =
   { ChnExpression
-  | chn_module_env     = menv
-  , chn_predef_symbols = predef_symbols
-  , chn_heaps          = heaps
+  | chn_predef_symbols    = predef_symbols
+  , chn_heaps             = heaps
+  , chn_main_dcl_module_n = main_dcl_module_n
+  , chn_dcl_modules       = dcl_modules
+  , chn_icl_module        = icl_module
+  , chn_fun_defs          = fun_defs
+  , chn_fun_defs_cpy      = fun_defs_cpy
+  , chn_groups            = groups
   }
 
 mkSynExpr :: !TExpr !Expression -> SynExpression
@@ -43,15 +48,3 @@ mkSynExpr te expr =
   , syn_bound_vars         = newMap
   , syn_cases              = []
   }
-
-mkModuleEnv :: ModuleN !*{#FunDef} !*{#FunDef} !{!Group} IclModule {#DclModule} -> *ModuleEnv
-mkModuleEnv main_dcl_module_n fun_defs fun_defs_cpy groups icl_module dcl_modules =
-  { ModuleEnv
-  | me_main_dcl_module_n = main_dcl_module_n
-  , me_dcl_modules       = dcl_modules
-  , me_icl_module        = icl_module
-  , me_fun_defs          = fun_defs
-  , me_fun_defs_cpy      = fun_defs_cpy
-  , me_groups            = groups
-  }
-

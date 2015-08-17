@@ -8,35 +8,35 @@ from Data.Map import :: Map
 import Tonic.AbsSyn
 from iTasks._Framework.Tonic.AbsSyn import :: TPriority
 
-dropAppContexts :: App *ModuleEnv -> *(([Expression], [Expression]), *ModuleEnv)
+dropAppContexts :: App *ChnExpression -> *(([Expression], [Expression]), *ChnExpression)
 
 copyFunDefs :: !*{#FunDef} -> *(!*{#FunDef}, !*{#FunDef})
 
 muselect :: !u:(a e) !Int -> *(Maybe e, !u:(a e)) | Array a e
 
-reifyConsDef :: SymbIdent *ModuleEnv -> *(Maybe ConsDef, *ModuleEnv)
+reifyConsDef :: SymbIdent *ChnExpression -> *(Maybe ConsDef, *ChnExpression)
 
-reifyFunType :: SymbIdent *ModuleEnv -> *(Maybe FunType, *ModuleEnv)
+reifyFunType :: SymbIdent *ChnExpression -> *(Maybe FunType, *ChnExpression)
 
 symbIdentModuleIdx :: SymbIdent -> Maybe Index
 
 symbIdentObjectIdx :: SymbIdent -> Index
 
-reifyFunDef :: SymbIdent *ModuleEnv -> *(Maybe FunDef, *ModuleEnv)
+reifyFunDef :: SymbIdent *ChnExpression -> *(Maybe FunDef, *ChnExpression)
 
-reifyFunDefsIdxPriority :: Index *ModuleEnv -> *(Maybe Priority, *ModuleEnv)
+reifyFunDefsIdxPriority :: Index *ChnExpression -> *(Maybe Priority, *ChnExpression)
 
-reifyDclModulesIdxPriority :: (Global Index) *ModuleEnv -> *(Maybe Priority, *ModuleEnv)
+reifyDclModulesIdxPriority :: (Global Index) *ChnExpression -> *(Maybe Priority, *ChnExpression)
 
-reifyDclModulesIdxPriority` :: Index Index *ModuleEnv -> *(Maybe Priority, *ModuleEnv)
+reifyDclModulesIdxPriority` :: Index Index *ChnExpression -> *(Maybe Priority, *ChnExpression)
 
-reifySymbIdentPriority :: SymbIdent *ModuleEnv -> *(Maybe Priority, *ModuleEnv)
+reifySymbIdentPriority :: SymbIdent *ChnExpression -> *(Maybe Priority, *ChnExpression)
 
-reifySymbIdentSymbolType :: SymbIdent *ModuleEnv -> *(Maybe SymbolType, *ModuleEnv)
+reifySymbIdentSymbolType :: SymbIdent *ChnExpression -> *(Maybe SymbolType, *ChnExpression)
 
-reifyArgsAndDef :: SymbIdent *ModuleEnv -> *(([FreeVar], FunDef), *ModuleEnv)
+reifyArgsAndDef :: SymbIdent *ChnExpression -> *(([FreeVar], FunDef), *ChnExpression)
 
-reifyDclModule :: SymbIdent *ModuleEnv -> *(Maybe DclModule, *ModuleEnv)
+reifyDclModule :: SymbIdent *ChnExpression -> *(Maybe DclModule, *ChnExpression)
 
 isCons :: String -> Bool
 
@@ -80,11 +80,11 @@ exprIsLambda :: Expression -> Bool
 
 symbIdentIsBPPart :: SymbIdent InhExpression *ChnExpression -> *(Bool, *ChnExpression)
 
-isInfix :: SymbIdent *ModuleEnv -> *(Bool, *ModuleEnv)
+isInfix :: SymbIdent *ChnExpression -> *(Bool, *ChnExpression)
 
 prioIsInfix :: Priority -> Bool
 
-symbIdentArity :: SymbIdent *ModuleEnv -> *(Maybe Int, *ModuleEnv)
+symbIdentArity :: SymbIdent *ChnExpression -> *(Maybe Int, *ChnExpression)
 
 getFunArgs :: FunDef -> [FreeVar]
 
@@ -98,9 +98,9 @@ updateFunRhs :: Index !*{#FunDef} Expression -> *{#FunDef}
 
 predefIsUndefined :: PredefinedSymbol -> Bool
 
-argsRemaining :: App *ModuleEnv -> *(Int, *ModuleEnv)
+argsRemaining :: App *ChnExpression -> *(Int, *ChnExpression)
 
-isPartialApp :: App *ModuleEnv -> *(Bool, *ModuleEnv)
+isPartialApp :: App *ChnExpression -> *(Bool, *ChnExpression)
 
 mkStr :: String -> Expression
 
@@ -160,6 +160,6 @@ fromPriority :: Priority -> TPriority
 
 allVarsBound :: !InhExpression !(Map Int BoundVar) -> Bool
 
-mkCaseDetFun :: !(Maybe FreeVar) !ExprId !Int ![BoundVar] !Expression !InhExpression !*ChnExpression -> *(Expression, *ChnExpression)
+mkCaseDetFun :: !(Maybe (FreeVar, Index)) !ExprId !Int ![BoundVar] !Expression !InhExpression !*ChnExpression -> *(Expression, *ChnExpression)
 
 wrapBody :: InhExpression SynExpression Bool *ChnExpression -> *(SynExpression, *ChnExpression)

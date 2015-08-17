@@ -138,23 +138,24 @@ given x == y && y == z
 wrapTMApp :: ExprId String Expression [Expression] InhExpression *ChnExpression -> *(Expression, *ChnExpression)
 wrapTMApp uid wrappedFnNm origExpr evalableCases inh chn
   # (ok, pdss) = pdssAreDefined [PD_tonicExtWrapApp, PD_tonicExtWrapAppLam1, PD_tonicExtWrapAppLam2, PD_tonicExtWrapAppLam3, PD_ConsSymbol, PD_NilSymbol] chn.chn_predef_symbols
-  | not ok     = (origExpr, {chn & chn_predef_symbols = pdss})
+  # chn =  {chn & chn_predef_symbols = pdss}
+  | not ok     = (origExpr, chn)
   | otherwise
-      # (rem, menv)    = case origExpr of
+      # (rem, chn)    = case origExpr of
                            App app
-                             = argsRemaining app chn.chn_module_env
-                           _ = (0, chn.chn_module_env)
-      # (icl, menv)    = menv!me_icl_module
+                             = argsRemaining app chn
+                           _ = (0, chn)
+      # (icl, chn)    = chn!chn_icl_module
       # iclName        = icl.icl_name.id_name
-      # (wrappedFnModNm, menv) = case origExpr of
+      # (wrappedFnModNm, chn) = case origExpr of
                                    App app
-                                     # (mdcl, menv) = reifyDclModule app.app_symb menv
+                                     # (mdcl, chn) = reifyDclModule app.app_symb chn
                                      = case mdcl of
-                                         Just dcl -> (dcl.dcl_name.id_name, menv)
-                                         _        -> (iclName, menv)
-                                   _ = (iclName, menv)
+                                         Just dcl -> (dcl.dcl_name.id_name, chn)
+                                         _        -> (iclName, chn)
+                                   _ = (iclName, chn)
       # heaps = chn.chn_heaps
-      # (eidExpr, pdss) = listToListExpr (map mkInt uid) pdss
+      # (eidExpr, pdss) = listToListExpr (map mkInt uid) chn.chn_predef_symbols
       # (casesExpr, pdss) = listToListExpr evalableCases pdss
       # (expr, heaps, pdss) = appPredefinedSymbolWithEI (findWrap rem)
                                 [ mkStr wrappedFnModNm
@@ -165,7 +166,7 @@ wrapTMApp uid wrappedFnNm origExpr evalableCases inh chn
                                 ] SK_Function heaps pdss
       = ( App expr
         , {chn & chn_predef_symbols = pdss
-               , chn_module_env = {menv & me_icl_module = icl}
+               , chn_icl_module = icl
                , chn_heaps = heaps
                })
   where
@@ -177,23 +178,22 @@ wrapTMApp uid wrappedFnNm origExpr evalableCases inh chn
   findWrap n = abort ("No tonicExtWrapAppLam" +++ toString n)
 import StdDebug
 
-getAssoc app_symb menv
-  # (mPrio, menv) = reifySymbIdentPriority app_symb menv
+getAssoc app_symb chn
+  # (mPrio, chn) = reifySymbIdentPriority app_symb chn
   = case mPrio of
-      Just prio -> (fromPriority prio, menv)
-      _         -> (TNoPrio, menv)
+      Just prio -> (fromPriority prio, chn)
+      _         -> (TNoPrio, chn)
 
 mkBlueprint :: !InhExpression !Expression !*ChnExpression -> *(!SynExpression, !*ChnExpression)
 mkBlueprint inh expr=:(App app=:{app_symb}) chn
   # (isTonicFunctor, chn) = symbIdentIsBPPart app.app_symb inh chn
-  # ((ctxs, args), menv)  = dropAppContexts app chn.chn_module_env
-  # chn                   = { chn & chn_module_env = menv }
+  # ((ctxs, args), chn)  = dropAppContexts app chn
   | identIsLambda app_symb.symb_ident
-      # ((args, tFd), menv) = reifyArgsAndDef app_symb chn.chn_module_env
+      # ((args, tFd), chn) = reifyArgsAndDef app_symb chn
       # tyenv               = foldr (\(arg, t) st -> 'DM'.put (ptrToInt arg.fv_info_ptr) t st) 'DM'.newMap (zip2 args (funArgTys tFd))
       # tyenv               = 'DM'.union tyenv inh.inh_tyenv
       # inh                 = {inh & inh_tyenv = tyenv}
-      # (syne, chn)         = mkBlueprint {inh & inh_fun_idx = symbIdentObjectIdx app_symb} (getFunRhs tFd) { chn & chn_module_env = menv }
+      # (syne, chn)         = mkBlueprint {inh & inh_fun_idx = symbIdentObjectIdx app_symb} (getFunRhs tFd) chn
       # pats                = [case freeVarName x of
                                  "_x" -> case syne.syn_pattern_match_vars of
                                            [(_, e):_] -> e
@@ -232,33 +232,30 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
   mkMApp app ctxs args inh chn
     # predef_symbols               = chn.chn_predef_symbols
     # (bindSymbol, predef_symbols) = predef_symbols![PD_TMonadBind]
-    # menv                         = chn.chn_module_env
-    # (dcls, menv)                 = menv!me_dcl_modules
+    # chn                          = {chn & chn_predef_symbols = predef_symbols}
+    # (dcls, chn)                  = chn!chn_dcl_modules
     # bindMemberDef                = dcls.[bindSymbol.pds_module].dcl_common.com_member_defs.[bindSymbol.pds_def]
     # appIsBind                    = app.app_symb.symb_ident.id_info == bindMemberDef.me_ident.id_info
-    # chn                          = {chn & chn_predef_symbols = predef_symbols
-                                          , chn_module_env = menv}
     # appName                      = app.app_symb.symb_ident.id_name
     = case (appIsBind, args) of
         (True, [lhsExpr, rhsExpr=:(App rhsApp) : _])
           | identIsLambda rhsApp.app_symb.symb_ident
-          # ((rhsArgs, rhsFd), menv) = reifyArgsAndDef rhsApp.app_symb chn.chn_module_env
-          # bindLamArgFV             = last rhsArgs
-          # (mFunTy, menv)           = reifyFunType app.app_symb menv
-          # (assoc, menv)            = getAssoc app.app_symb menv
-          # (mst, menv)              = reifySymbIdentSymbolType app.app_symb menv
+          # ((rhsArgs, rhsFd), chn) = reifyArgsAndDef rhsApp.app_symb chn
+          # bindLamArgFV            = last rhsArgs
+          # (mFunTy, chn)           = reifyFunType app.app_symb chn
+          # (assoc, chn)            = getAssoc app.app_symb chn
+          # (mst, chn)              = reifySymbIdentSymbolType app.app_symb chn
           # mTyStr                   = case mst of
                                          Just st -> symTyStr st
                                          _       -> Nothing
-          # (dclnm, menv)            = case reifyDclModule app.app_symb menv of
-                                         (Just dcl, menv) = (dcl.dcl_name.id_name, menv)
-                                         (_       , menv)
-                                           # (iclmod, menv) = menv!me_icl_module
-                                           = (iclmod.icl_name.id_name, menv)
-          # chn                      = {chn & chn_module_env = menv}
+          # (dclnm, chn)            = case reifyDclModule app.app_symb chn of
+                                         (Just dcl, chn) = (dcl.dcl_name.id_name, chn)
+                                         (_       , chn)
+                                           # (iclmod, chn) = chn!chn_icl_module
+                                           = (iclmod.icl_name.id_name, chn)
 
           # (synr, chn)              = mkBlueprint (addUnique 1 inh) rhsExpr chn
-          # (synl, chn)              = mkBlueprint (addUnique 0 {inh & inh_bind_var = Just bindLamArgFV
+          # (synl, chn)              = mkBlueprint (addUnique 0 {inh & inh_bind_var = Just (bindLamArgFV, symbIdentObjectIdx rhsApp.app_symb)
                                                                      , inh_cases    = synr.syn_cases}) lhsExpr chn
           # ps                       = [synl, synr]
 
@@ -275,20 +272,19 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
              , syn_bound_vars = 'DM'.union synl.syn_bound_vars synr.syn_bound_vars
              , syn_cases = synl.syn_cases ++ synr.syn_cases}, chn)
         _
-          # (mFunTy, menv) = reifyFunType app.app_symb chn.chn_module_env
-          # (assoc, menv)  = getAssoc app.app_symb menv
-          # (mst, menv)    = reifySymbIdentSymbolType app.app_symb menv
+          # (mFunTy, chn) = reifyFunType app.app_symb chn
+          # (assoc, chn)  = getAssoc app.app_symb chn
+          # (mst, chn)    = reifySymbIdentSymbolType app.app_symb chn
           # mTyStr         = case mst of
                                Just st -> symTyStr st
                                _       -> Nothing
-          # (dclnm, menv)  = case reifyDclModule app.app_symb menv of
-                               (Just dcl, menv) = (dcl.dcl_name.id_name, menv)
-                               (_       , menv)
-                                 # (iclmod, menv) = menv!me_icl_module
-                                 = (iclmod.icl_name.id_name, menv)
-          # chn            = {chn & chn_module_env = menv}
+          # (dclnm, chn)  = case reifyDclModule app.app_symb chn of
+                               (Just dcl, chn) = (dcl.dcl_name.id_name, chn)
+                               (_       , chn)
+                                 # (iclmod, chn) = chn!chn_icl_module
+                                 = (iclmod.icl_name.id_name, chn)
           # evalableCases  = case inh.inh_bind_var of
-                               Just var
+                               Just (var, lamIdx)
                                  = [(eid, 'DM'.elems vars, cs) \\ (eid, vars, cs) <- inh.inh_cases | allVarsBound` var inh vars]
                                _ = []
           # (evalableCases, chn) = mapSt (\(eid, bvs, cs) chn -> mkCaseDetFun inh.inh_bind_var eid (ptrToInt app.app_info_ptr) bvs cs inh chn) evalableCases chn
@@ -310,13 +306,13 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
 
   mkFApp app ctxs args inh chn
     # appName       = app.app_symb.symb_ident.id_name
-    # (dclnm, menv) = case reifyDclModule app.app_symb chn.chn_module_env of
-                        (Just dcl, menv) = (dcl.dcl_name.id_name, menv)
-                        (_       , menv)
-                          # (iclmod, menv) = menv!me_icl_module
-                          = (iclmod.icl_name.id_name, menv)
-    # (assoc, menv) = getAssoc app.app_symb menv
-    # (ps, chn)     = mapSt (\(x, n) chn -> mkBlueprint (addUnique n inh) x chn) (zip2 args [0..]) {chn & chn_module_env = menv}
+    # (dclnm, chn) = case reifyDclModule app.app_symb chn of
+                        (Just dcl, chn) = (dcl.dcl_name.id_name, chn)
+                        (_       , chn)
+                          # (iclmod, chn) = chn!chn_icl_module
+                          = (iclmod.icl_name.id_name, chn)
+    # (assoc, chn) = getAssoc app.app_symb chn
+    # (ps, chn)     = mapSt (\(x, n) chn -> mkBlueprint (addUnique n inh) x chn) (zip2 args [0..]) chn
     = ({ syn_annot_expr = App {app & app_args = ctxs ++ map (\syn -> syn.syn_annot_expr) ps}
        , syn_texpr      = TFApp appName (map (\syn -> syn.syn_texpr) ps) assoc
        , syn_pattern_match_vars = []
@@ -338,13 +334,12 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
   // lead to a recursive function application.
 mkBlueprint inh (e @ []) chn = abort "atC: no args"
 mkBlueprint inh (e=:(App app) @ es) chn
-  # (mfd, menv) = reifyFunDef app.app_symb chn.chn_module_env
+  # (mfd, chn) = reifyFunDef app.app_symb chn
   # fd          = fromMaybe (abort ("atC: failed to reify " +++ app.app_symb.symb_ident.id_name)) mfd
   | identIsLambda app.app_symb.symb_ident
-      # ((args, _), menv) = reifyArgsAndDef app.app_symb menv
+      # ((args, _), chn) = reifyArgsAndDef app.app_symb chn
       # letargs       = drop (length app.app_args) (getFunArgs fd)
-      # (binds, menv) = zipWithSt zwf letargs es menv
-      # chn           = { chn & chn_module_env = menv }
+      # (binds, chn) = zipWithSt zwf letargs es chn
       # tyenv         = foldr (\(arg, t) st -> 'DM'.put (ptrToInt arg.fv_info_ptr) t st) 'DM'.newMap (zip2 args (funArgTys fd))
       # tyenv         = 'DM'.union tyenv inh.inh_tyenv
       # (syne, chn)   = mkBlueprint (addUnique 0 {inh & inh_tyenv = tyenv}) (getFunRhs fd) chn
@@ -356,22 +351,22 @@ mkBlueprint inh (e=:(App app) @ es) chn
          , syn_cases      = syne.syn_cases
          }, chn)
   | otherwise
-      # (assoc, menv)     = getAssoc app.app_symb menv
-      # (isPart, chn)     = funIsBlueprintPart fd inh {chn & chn_module_env = menv}
+      # (assoc, chn)     = getAssoc app.app_symb chn
+      # (isPart, chn)     = funIsBlueprintPart fd inh chn
       # (texpr, es`, chn) = case fd.fun_type of
                               Yes ft | isPart
                                 # (es`, chn)    = mapSt (\(e, n) chn -> mkBlueprint (addUnique n inh) e chn) (zip2 es [0..]) chn
-                                # (mst, menv)   = reifySymbIdentSymbolType app.app_symb chn.chn_module_env
+                                # (mst, chn)   = reifySymbIdentSymbolType app.app_symb chn
                                 # mTyStr        = case mst of
                                                     Just st -> symTyStr st
                                                     _       -> Nothing
-                                # (dclnm, menv) = case reifyDclModule app.app_symb menv of
-                                                    (Just dcl, menv) = (dcl.dcl_name.id_name, menv)
-                                                    (_       , menv)
-                                                      # (iclmod, menv) = menv!me_icl_module
-                                                      = (iclmod.icl_name.id_name, menv)
+                                # (dclnm, chn) = case reifyDclModule app.app_symb chn of
+                                                    (Just dcl, chn) = (dcl.dcl_name.id_name, chn)
+                                                    (_       , chn)
+                                                      # (iclmod, chn) = chn!chn_icl_module
+                                                      = (iclmod.icl_name.id_name, chn)
                                 = ( TMApp inh.inh_uid mTyStr dclnm (appFunName app) (map (\syn -> syn.syn_texpr) es`) assoc
-                                  , es`, {chn & chn_module_env = menv})
+                                  , es`, chn)
                               _
                                 # (es`, chn) = mapSt (\(e, n) chn -> mkBlueprint (addUnique n inh) e chn) (zip2 es [0..]) chn
                                 = ( TFApp app.app_symb.symb_ident.id_name (map (\x -> x.syn_texpr) es`) assoc
@@ -382,10 +377,10 @@ mkBlueprint inh (e=:(App app) @ es) chn
          , syn_bound_vars = 'DM'.unions (map (\syn -> syn.syn_bound_vars) es`)
          , syn_cases      = flatten (map (\syn -> syn.syn_cases) es`) }, chn)
   where
-    zwf eVar eVal menv
+    zwf eVar eVal chn
       # fvl         = ppFreeVar eVar
-      # (fvr, menv) = ppExpression eVal menv
-      = ((ppCompact fvl, ppCompact fvr), menv)
+      # (fvr, chn) = ppExpression eVal chn
+      = ((ppCompact fvl, ppCompact fvr), chn)
 mkBlueprint inh (e=:(Var bv) @ es) chn
   # (bps, chn)    = mapSt (\(e, n) chn -> mkBlueprint (addUnique n inh) e chn) (zip2 es [0..]) chn
   # bvs           = 'DM'.unions (map (\syn -> syn.syn_bound_vars) bps)
@@ -497,14 +492,12 @@ mkBlueprint inh (Case cs) chn
         # (clexpr, chn) = case fvds of
                             [] = (TPPExpr "", chn)
                             args
-                              # menv          = chn.chn_module_env
-                              # (mprio, menv) = if (ap.ap_symbol.glob_module == chn.chn_module_env.me_main_dcl_module_n)
-                                                  (reifyFunDefsIdxPriority ap.ap_symbol.glob_object.ds_index menv)
-                                                  (reifyDclModulesIdxPriority` ap.ap_symbol.glob_module ap.ap_symbol.glob_object.ds_index menv)
+                              # (mprio, chn) = if (ap.ap_symbol.glob_module == chn.chn_main_dcl_module_n)
+                                                  (reifyFunDefsIdxPriority ap.ap_symbol.glob_object.ds_index chn)
+                                                  (reifyDclModulesIdxPriority` ap.ap_symbol.glob_module ap.ap_symbol.glob_object.ds_index chn)
                               # assoc         = case mprio of
                                                   Just p -> fromPriority p
                                                   _      -> TNoPrio
-                              # chn           = {chn & chn_module_env = menv}
                               = (TFApp ap.ap_symbol.glob_object.ds_ident.id_name (map (\x -> x.syn_texpr) args) assoc, chn)
         # (syn, chn)    = mkAlts` inh 0 ap.ap_expr chn
         = ({ syn_annot_expr = Case {cs & case_guards = AlgebraicPatterns gi [{ap & ap_expr = syn.syn_annot_expr}]}

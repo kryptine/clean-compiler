@@ -4,11 +4,11 @@ from Text.PPrint import :: Doc
 from syntax import :: App, :: SymbIdent, :: Ident, :: BoundVar, :: Expression,
   :: FreeVar, :: BasicValue, :: DefinedSymbol, :: Selection, :: SymbIdent,
   :: Type, :: AType, :: TypeSymbIdent, :: ParsedExpr
-from Tonic.AbsSyn import :: ModuleEnv
+from Tonic.AbsSyn import :: ChnExpression
 
-ppDebugApp :: App *ModuleEnv -> *(Doc, *ModuleEnv)
+ppDebugApp :: App *ChnExpression -> *(Doc, *ChnExpression)
 
-ppApp :: App *ModuleEnv -> *(Doc, *ModuleEnv)
+ppApp :: App *ChnExpression -> *(Doc, *ChnExpression)
 
 ppSymbIdent :: SymbIdent -> Doc
 
@@ -16,9 +16,9 @@ ppIdent :: Ident -> Doc
 
 ppBoundVar :: BoundVar -> Doc
 
-ppDebugExpression :: Expression *ModuleEnv -> *(Doc, *ModuleEnv)
+ppDebugExpression :: Expression *ChnExpression -> *(Doc, *ChnExpression)
 
-ppExpression :: Expression *ModuleEnv -> *(Doc, *ModuleEnv)
+ppExpression :: Expression *ChnExpression -> *(Doc, *ChnExpression)
 
 mkRecSel :: [Doc] -> Doc
 

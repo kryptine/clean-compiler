@@ -6,7 +6,7 @@ from syntax import :: Expression (..), :: BoundVar, :: App {..}, :: Let, :: Case
   :: Bind, :: Position, :: AType, :: Env, :: Ident, :: Level, :: ExprInfoPtr, :: ExprInfo,
   :: TypeCodeExpression, :: GlobalIndex, :: Conditional, :: BasicValue, :: FieldSymbol,
   :: IclModule, :: DclModule, :: FunDef, :: Optional, :: SymbolType, :: LetBind,
-  :: ModuleN, :: Type, :: ParsedExpr, :: CommonDefs
+  :: ModuleN, :: Type, :: ParsedExpr, :: CommonDefs, :: Index
 from checksupport import :: Heaps, :: Group
 from overloading import :: InstanceTree
 from Data.Graph import :: Graph
@@ -27,14 +27,19 @@ from iTasks._Framework.Tonic.AbsSyn import :: TExpr, :: ExprId
   , inh_common_defs    :: !{#CommonDefs}
   , inh_uid            :: !ExprId
   , inh_fun_idx        :: !Int
-  , inh_bind_var       :: !Maybe FreeVar
+  , inh_bind_var       :: !Maybe (FreeVar, Index)
   , inh_cases          :: ![(!ExprId, !(Map Int BoundVar), !Expression)]
   }
 
 :: *ChnExpression =
-  { chn_module_env     :: !*ModuleEnv
-  , chn_heaps          :: !*Heaps
-  , chn_predef_symbols :: !*PredefinedSymbols
+  { chn_heaps             :: !*Heaps
+  , chn_predef_symbols    :: !*PredefinedSymbols
+  , chn_main_dcl_module_n :: !Int
+  , chn_fun_defs          :: !*{#FunDef}
+  , chn_fun_defs_cpy      :: !*{#FunDef}
+  , chn_icl_module        :: !IclModule
+  , chn_dcl_modules       :: !{#DclModule}
+  , chn_groups            :: !{!Group}
   }
 
 :: SynExpression =
@@ -45,19 +50,8 @@ from iTasks._Framework.Tonic.AbsSyn import :: TExpr, :: ExprId
   , syn_cases              :: ![(!ExprId, !(Map Int BoundVar), !Expression)]
   }
 
-:: *ModuleEnv =
-  { me_main_dcl_module_n :: !Int
-  , me_fun_defs          :: !*{#FunDef}
-  , me_fun_defs_cpy      :: !*{#FunDef}
-  , me_icl_module        :: !IclModule
-  , me_dcl_modules       :: !{#DclModule}
-  , me_groups            :: !{!Group}
-  }
-
 mkInhExpr :: !Int ![(String, ParsedExpr)] !{#{!InstanceTree}} !{#CommonDefs} -> InhExpression
 
-mkChnExpr :: *PredefinedSymbols *ModuleEnv *Heaps -> *ChnExpression
+mkChnExpr :: ModuleN !*{#FunDef} !*{#FunDef} !{!Group} IclModule {#DclModule} *PredefinedSymbols *Heaps -> *ChnExpression
 
 mkSynExpr :: !TExpr !Expression -> SynExpression
-
-mkModuleEnv :: ModuleN !*{#FunDef} !*{#FunDef} !{!Group} IclModule {#DclModule} -> *ModuleEnv

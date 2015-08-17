@@ -44,7 +44,7 @@ from syntax import
   :: Rhs {..}, :: OptGuardedAlts (..), :: GuardedExpr {..}, :: NodeDefWithLocals, :: ExprWithLocalDefs,
   :: ParsedDefinition, :: CollectedLocalDefs
 
-ppDebugApp :: App *ModuleEnv -> *(Doc, *ModuleEnv)
+ppDebugApp :: App *ChnExpression -> *(Doc, *ChnExpression)
 ppDebugApp app menv
   # ((_, args), menv) = dropAppContexts app menv
   # (ads, menv)       = mapSt ppExpression args menv
@@ -52,7 +52,7 @@ ppDebugApp app menv
   = (text "<App>" <+> sid <+> brackets (hcat $ intersperse (text ", ") ads), menv)
   //let argsPP = hcat $ intersperse (text ", ") $ foldr (\x xs -> [ppExpression x menv:xs]) [] app.app_args
 
-ppApp :: App *ModuleEnv -> *(Doc, *ModuleEnv)
+ppApp :: App *ChnExpression -> *(Doc, *ChnExpression)
 ppApp app menv
   | isCons ident || isNil ident
       # ((_, args), menv) = dropAppContexts app menv
@@ -77,7 +77,7 @@ ppApp app menv
         = (if (isnull xs) px (px <+> char ':' <+> ld), menv)
     | otherwise    = (empty, menv)
 
-ppPrefix :: App *ModuleEnv -> *(Doc, *ModuleEnv)
+ppPrefix :: App *ChnExpression -> *(Doc, *ChnExpression)
 ppPrefix app=:{App|app_symb} menv
   # ((_, args), menv) = dropAppContexts app menv
   # psi               = ppSymbIdent app_symb
@@ -86,7 +86,7 @@ ppPrefix app=:{App|app_symb} menv
 
 //import StdDebug
 
-ppInfix :: App *ModuleEnv -> *(Doc, *ModuleEnv)
+ppInfix :: App *ChnExpression -> *(Doc, *ChnExpression)
 ppInfix app=:{App|app_symb,app_args} menv
   # ((ctxs, args), menv) = dropAppContexts app menv
   = case args of
@@ -106,7 +106,7 @@ ppIdent ident = text ident.id_name
 ppBoundVar :: BoundVar -> Doc
 ppBoundVar bv = ppIdent bv.var_ident
 
-ppDebugExpression :: Expression *ModuleEnv -> *(Doc, *ModuleEnv)
+ppDebugExpression :: Expression *ChnExpression -> *(Doc, *ChnExpression)
 ppDebugExpression (Var bv)             menv
   # bvd = ppBoundVar bv
   = (text "<Var>" <+> bvd, menv)
@@ -119,7 +119,7 @@ ppDebugExpression (BasicExpr bv)       menv
   = (text "<BasicValue>" <+> ppBasicValue bv, menv)
 ppDebugExpression _                    menv = (text "ppDebugExpression: _", menv) // empty
 
-ppExpression :: Expression *ModuleEnv -> *(Doc, *ModuleEnv)
+ppExpression :: Expression *ChnExpression -> *(Doc, *ChnExpression)
 ppExpression (Var bv)             menv = (ppBoundVar bv, menv)
 ppExpression (App app)            menv = ppApp app menv
 // TODO Infix check

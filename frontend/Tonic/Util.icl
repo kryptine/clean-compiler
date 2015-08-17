@@ -13,15 +13,15 @@ import Tonic.Pretty
 import Text
 import iTasks._Framework.Tonic.AbsSyn
 
-dropAppContexts :: App *ModuleEnv -> *(([Expression], [Expression]), *ModuleEnv)
-dropAppContexts app menv
-  # (mcd, menv) = reifyConsDef app.app_symb menv
+dropAppContexts :: App *ChnExpression -> *(([Expression], [Expression]), *ChnExpression)
+dropAppContexts app chn
+  # (mcd, chn) = reifyConsDef app.app_symb chn
   = case mcd of
-      Just cd = (dropContexts cd.cons_type app.app_args, menv)
+      Just cd = (dropContexts cd.cons_type app.app_args, chn)
       Nothing
-        # (mFunTy, menv) = reifySymbIdentSymbolType app.app_symb menv
+        # (mFunTy, chn) = reifySymbIdentSymbolType app.app_symb chn
         = case mFunTy of
-            Just funTy -> (dropContexts funTy app.app_args, menv)
+            Just funTy -> (dropContexts funTy app.app_args, chn)
             _          -> abort "dropAppContexts: no function type"
 
 copyFunDefs :: !*{#FunDef} -> *(!*{#FunDef}, !*{#FunDef})
@@ -35,16 +35,16 @@ copyFunDefs fun_defs
   mkCopy defs = {d \\ d <-: defs}
 
 // TODO Get rid of this in favour of a more general reification?
-reifyConsDef :: SymbIdent *ModuleEnv -> *(Maybe ConsDef, *ModuleEnv)
-reifyConsDef si menv
-  # (common, iclmod) = (menv.me_icl_module)!icl_common
-  # dcls             = menv.me_dcl_modules
-  # menv             = {menv & me_icl_module=iclmod}
+reifyConsDef :: SymbIdent *ChnExpression -> *(Maybe ConsDef, *ChnExpression)
+reifyConsDef si chn
+  # (common, iclmod) = (chn.chn_icl_module)!icl_common
+  # dcls             = chn.chn_dcl_modules
+  # chn             = {chn & chn_icl_module=iclmod}
   = case searchConsDefs ident common.com_cons_defs of
-      Just cd = (Just cd, menv)
+      Just cd = (Just cd, chn)
       _
         # cds = [cd \\ Just cd <- [searchConsDefs ident common.com_cons_defs \\ common <- [dclmod.dcl_common \\ dclmod <-: dcls]]]
-        = (listToMaybe cds, menv)
+        = (listToMaybe cds, chn)
 
   where
     searchConsDefs :: String .{# ConsDef} -> Maybe ConsDef
@@ -52,12 +52,12 @@ reifyConsDef si menv
 
     ident = si.symb_ident.id_name
 
-reifyFunType :: SymbIdent *ModuleEnv -> *(Maybe FunType, *ModuleEnv)
-reifyFunType si menv=:{me_dcl_modules}
+reifyFunType :: SymbIdent *ChnExpression -> *(Maybe FunType, *ChnExpression)
+reifyFunType si chn=:{chn_dcl_modules}
   = case (symbIdentModuleIdx si, symbIdentObjectIdx si) of
       (Just mi, oi)
-        = reifyDclModulesIdxFunType` mi oi menv
-      _ = (Nothing, menv)
+        = reifyDclModulesIdxFunType` mi oi chn
+      _ = (Nothing, chn)
 
 symbIdentModuleIdx :: SymbIdent -> Maybe Index
 symbIdentModuleIdx {symb_kind=SK_Function glob}              = Just glob.glob_module
@@ -82,167 +82,167 @@ symbIdentObjectIdx {symb_kind=SK_Constructor glob}           = glob.glob_object
 symbIdentObjectIdx {symb_kind=SK_Generic glob tk}            = glob.glob_object
 symbIdentObjectIdx {symb_kind=SK_OverloadedConstructor glob} = glob.glob_object
 
-reifyFunDef :: SymbIdent *ModuleEnv -> *(Maybe FunDef, *ModuleEnv)
-reifyFunDef si menv = reifyFunDefsIdxFunDef (symbIdentObjectIdx si) menv
+reifyFunDef :: SymbIdent *ChnExpression -> *(Maybe FunDef, *ChnExpression)
+reifyFunDef si chn = reifyFunDefsIdxFunDef (symbIdentObjectIdx si) chn
 
 optionalToMaybe :: (Optional a) -> Maybe a
 optionalToMaybe (Yes x) = Just x
 optionalToMaybe No      = Nothing
 
-symbIdentInMain :: SymbIdent *ModuleEnv -> *(Bool, *ModuleEnv)
-symbIdentInMain {symb_kind=SK_Function glob}              menv = globIdxInMain glob menv
-symbIdentInMain {symb_kind=SK_DclMacro glob}              menv = globIdxInMain glob menv
-symbIdentInMain {symb_kind=SK_LocalDclMacroFunction glob} menv = globIdxInMain glob menv
-symbIdentInMain {symb_kind=SK_OverloadedFunction glob}    menv = globIdxInMain glob menv
-symbIdentInMain {symb_kind=SK_Constructor glob}           menv = globIdxInMain glob menv
-symbIdentInMain {symb_kind=SK_Generic glob _}             menv = globIdxInMain glob menv
-symbIdentInMain {symb_kind=SK_OverloadedConstructor glob} menv = globIdxInMain glob menv
-symbIdentInMain _                                         menv = (False, menv)
+symbIdentInMain :: SymbIdent *ChnExpression -> *(Bool, *ChnExpression)
+symbIdentInMain {symb_kind=SK_Function glob}              chn = globIdxInMain glob chn
+symbIdentInMain {symb_kind=SK_DclMacro glob}              chn = globIdxInMain glob chn
+symbIdentInMain {symb_kind=SK_LocalDclMacroFunction glob} chn = globIdxInMain glob chn
+symbIdentInMain {symb_kind=SK_OverloadedFunction glob}    chn = globIdxInMain glob chn
+symbIdentInMain {symb_kind=SK_Constructor glob}           chn = globIdxInMain glob chn
+symbIdentInMain {symb_kind=SK_Generic glob _}             chn = globIdxInMain glob chn
+symbIdentInMain {symb_kind=SK_OverloadedConstructor glob} chn = globIdxInMain glob chn
+symbIdentInMain _                                         chn = (False, chn)
 
-globIdxInMain :: (Global Index) *ModuleEnv -> *(Bool, *ModuleEnv)
-globIdxInMain glob menv
-  # (main_dcl_module_n, menv) = menv!me_main_dcl_module_n
-  = (glob.glob_module == main_dcl_module_n, menv)
+globIdxInMain :: (Global Index) *ChnExpression -> *(Bool, *ChnExpression)
+globIdxInMain glob chn
+  # (main_dcl_module_n, chn) = chn!chn_main_dcl_module_n
+  = (glob.glob_module == main_dcl_module_n, chn)
 
-idxIsMain :: Index *ModuleEnv -> *(Bool, *ModuleEnv)
-idxIsMain idx menv
-  # (main_dcl_module_n, menv) = menv!me_main_dcl_module_n
-  = (idx == main_dcl_module_n, menv)
+idxIsMain :: Index *ChnExpression -> *(Bool, *ChnExpression)
+idxIsMain idx chn
+  # (main_dcl_module_n, chn) = chn!chn_main_dcl_module_n
+  = (idx == main_dcl_module_n, chn)
 
-reifyFunDefsIdxPriority :: Index *ModuleEnv -> *(Maybe Priority, *ModuleEnv)
-reifyFunDefsIdxPriority idx menv
-  # (mfd, fds) = muselect menv.me_fun_defs_cpy idx
-  # menv = {menv & me_fun_defs_cpy = fds}
+reifyFunDefsIdxPriority :: Index *ChnExpression -> *(Maybe Priority, *ChnExpression)
+reifyFunDefsIdxPriority idx chn
+  # (mfd, fds) = muselect chn.chn_fun_defs_cpy idx
+  # chn = {chn & chn_fun_defs_cpy = fds}
   = case mfd of
-      Just fd -> (Just fd.fun_priority, menv)
-      _       -> (Nothing, menv)
+      Just fd -> (Just fd.fun_priority, chn)
+      _       -> (Nothing, chn)
 
-reifyDclModulesIdxPriority :: (Global Index) *ModuleEnv -> *(Maybe Priority, *ModuleEnv)
-reifyDclModulesIdxPriority {glob_module,glob_object} menv = reifyDclModulesIdxPriority` glob_module glob_object menv
+reifyDclModulesIdxPriority :: (Global Index) *ChnExpression -> *(Maybe Priority, *ChnExpression)
+reifyDclModulesIdxPriority {glob_module,glob_object} chn = reifyDclModulesIdxPriority` glob_module glob_object chn
 
-reifyDclModulesIdxPriority` :: Index Index *ModuleEnv -> *(Maybe Priority, *ModuleEnv)
-reifyDclModulesIdxPriority` glob_module glob_object menv
-  # (mFunTy, menv) = reifyDclModulesIdxFunType` glob_module glob_object menv
+reifyDclModulesIdxPriority` :: Index Index *ChnExpression -> *(Maybe Priority, *ChnExpression)
+reifyDclModulesIdxPriority` glob_module glob_object chn
+  # (mFunTy, chn) = reifyDclModulesIdxFunType` glob_module glob_object chn
   = case mFunTy of
-      Just funTy -> (Just funTy.ft_priority, menv)
-      _          -> (Nothing, menv)
+      Just funTy -> (Just funTy.ft_priority, chn)
+      _          -> (Nothing, chn)
 
-reifySymbIdentPriority :: SymbIdent *ModuleEnv -> *(Maybe Priority, *ModuleEnv)
-reifySymbIdentPriority {symb_ident, symb_kind=SK_Function glob} menv
-  | glob.glob_module == menv.me_main_dcl_module_n = reifyFunDefsIdxPriority glob.glob_object menv
-  | otherwise                                     = reifyDclModulesIdxPriority glob menv
-reifySymbIdentPriority {symb_ident, symb_kind=SK_IclMacro idx}           menv = reifyFunDefsIdxPriority idx menv
-reifySymbIdentPriority {symb_ident, symb_kind=SK_LocalMacroFunction idx} menv = reifyFunDefsIdxPriority idx menv
-reifySymbIdentPriority {symb_ident, symb_kind=SK_DclMacro glob} menv
-  | glob.glob_module == menv.me_main_dcl_module_n = reifyFunDefsIdxPriority glob.glob_object menv
-  | otherwise                                     = reifyDclModulesIdxPriority glob menv
-reifySymbIdentPriority {symb_ident, symb_kind=SK_LocalDclMacroFunction glob} menv
-  | glob.glob_module == menv.me_main_dcl_module_n = reifyFunDefsIdxPriority glob.glob_object menv
-  | otherwise                                     = reifyDclModulesIdxPriority glob menv
-reifySymbIdentPriority {symb_ident, symb_kind=SK_OverloadedFunction {glob_module, glob_object} } menv
-  | glob_module == menv.me_main_dcl_module_n
-      # (icl, menv) = menv!me_icl_module
+reifySymbIdentPriority :: SymbIdent *ChnExpression -> *(Maybe Priority, *ChnExpression)
+reifySymbIdentPriority {symb_ident, symb_kind=SK_Function glob} chn
+  | glob.glob_module == chn.chn_main_dcl_module_n = reifyFunDefsIdxPriority glob.glob_object chn
+  | otherwise                                     = reifyDclModulesIdxPriority glob chn
+reifySymbIdentPriority {symb_ident, symb_kind=SK_IclMacro idx}           chn = reifyFunDefsIdxPriority idx chn
+reifySymbIdentPriority {symb_ident, symb_kind=SK_LocalMacroFunction idx} chn = reifyFunDefsIdxPriority idx chn
+reifySymbIdentPriority {symb_ident, symb_kind=SK_DclMacro glob} chn
+  | glob.glob_module == chn.chn_main_dcl_module_n = reifyFunDefsIdxPriority glob.glob_object chn
+  | otherwise                                     = reifyDclModulesIdxPriority glob chn
+reifySymbIdentPriority {symb_ident, symb_kind=SK_LocalDclMacroFunction glob} chn
+  | glob.glob_module == chn.chn_main_dcl_module_n = reifyFunDefsIdxPriority glob.glob_object chn
+  | otherwise                                     = reifyDclModulesIdxPriority glob chn
+reifySymbIdentPriority {symb_ident, symb_kind=SK_OverloadedFunction {glob_module, glob_object} } chn
+  | glob_module == chn.chn_main_dcl_module_n
+      # (icl, chn) = chn!chn_icl_module
       # md          = icl.icl_common.com_member_defs.[glob_object]
-      = (Just md.me_priority, menv)
+      = (Just md.me_priority, chn)
   | otherwise
-      # (dcls, menv) = menv!me_dcl_modules
+      # (dcls, chn) = chn!chn_dcl_modules
       # md           = dcls.[glob_module].dcl_common.com_member_defs.[glob_object]
-      = (Just md.me_priority, menv)
-reifySymbIdentPriority {symb_ident, symb_kind=SK_GeneratedFunction fip idx} menv = reifyFunDefsIdxPriority idx menv
-reifySymbIdentPriority {symb_ident, symb_kind=SK_Constructor {glob_module, glob_object}} menv
-  | glob_module == menv.me_main_dcl_module_n
-      # (icl, menv) = menv!me_icl_module
+      = (Just md.me_priority, chn)
+reifySymbIdentPriority {symb_ident, symb_kind=SK_GeneratedFunction fip idx} chn = reifyFunDefsIdxPriority idx chn
+reifySymbIdentPriority {symb_ident, symb_kind=SK_Constructor {glob_module, glob_object}} chn
+  | glob_module == chn.chn_main_dcl_module_n
+      # (icl, chn) = chn!chn_icl_module
       # md          = icl.icl_common.com_cons_defs.[glob_object]
-      = (Just md.cons_priority, menv)
+      = (Just md.cons_priority, chn)
   | otherwise
-      # (dcls, menv) = menv!me_dcl_modules
+      # (dcls, chn) = chn!chn_dcl_modules
       # md           = dcls.[glob_module].dcl_common.com_cons_defs.[glob_object]
-      = (Just md.cons_priority, menv)
-reifySymbIdentPriority {symb_ident, symb_kind=SK_NewTypeConstructor globi} menv = abort "reifySymbIdentType: SK_NewTypeConstructor" // reifyDclModulesIdx` globi.gi_module globi.gi_index menv
-reifySymbIdentPriority {symb_ident, symb_kind=SK_Generic {glob_module, glob_object} _} menv
-  = (Nothing, menv)
-reifySymbIdentPriority {symb_ident, symb_kind=SK_OverloadedConstructor glob} menv
-  | glob.glob_module == menv.me_main_dcl_module_n = reifyFunDefsIdxPriority glob.glob_object menv
-  | otherwise                                     = reifyDclModulesIdxPriority glob menv
-reifySymbIdentPriority si menv = abort "reifySymbIdentPriority: unsupported"
+      = (Just md.cons_priority, chn)
+reifySymbIdentPriority {symb_ident, symb_kind=SK_NewTypeConstructor globi} chn = abort "reifySymbIdentType: SK_NewTypeConstructor" // reifyDclModulesIdx` globi.gi_module globi.gi_index chn
+reifySymbIdentPriority {symb_ident, symb_kind=SK_Generic {glob_module, glob_object} _} chn
+  = (Nothing, chn)
+reifySymbIdentPriority {symb_ident, symb_kind=SK_OverloadedConstructor glob} chn
+  | glob.glob_module == chn.chn_main_dcl_module_n = reifyFunDefsIdxPriority glob.glob_object chn
+  | otherwise                                     = reifyDclModulesIdxPriority glob chn
+reifySymbIdentPriority si chn = abort "reifySymbIdentPriority: unsupported"
 
-reifySymbIdentSymbolType :: SymbIdent *ModuleEnv -> *(Maybe SymbolType, *ModuleEnv)
-reifySymbIdentSymbolType {symb_ident, symb_kind=SK_Function glob} menv
-  | glob.glob_module == menv.me_main_dcl_module_n = reifyFunDefsIdxSymbolType symb_ident glob.glob_object menv
-  | otherwise                                     = reifyDclModulesIdxSymbolType glob menv
-reifySymbIdentSymbolType {symb_ident, symb_kind=SK_IclMacro idx}           menv = reifyFunDefsIdxSymbolType symb_ident idx menv
-reifySymbIdentSymbolType {symb_ident, symb_kind=SK_LocalMacroFunction idx} menv = reifyFunDefsIdxSymbolType symb_ident idx menv
-reifySymbIdentSymbolType {symb_ident, symb_kind=SK_DclMacro glob} menv
-  | glob.glob_module == menv.me_main_dcl_module_n = reifyFunDefsIdxSymbolType symb_ident glob.glob_object menv
-  | otherwise                                     = reifyDclModulesIdxSymbolType glob menv
-reifySymbIdentSymbolType {symb_ident, symb_kind=SK_LocalDclMacroFunction glob} menv
-  | glob.glob_module == menv.me_main_dcl_module_n = reifyFunDefsIdxSymbolType symb_ident glob.glob_object menv
-  | otherwise                                     = reifyDclModulesIdxSymbolType glob menv
-reifySymbIdentSymbolType {symb_ident, symb_kind=SK_OverloadedFunction {glob_module, glob_object} } menv
-  | glob_module == menv.me_main_dcl_module_n
-      # (icl, menv) = menv!me_icl_module
+reifySymbIdentSymbolType :: SymbIdent *ChnExpression -> *(Maybe SymbolType, *ChnExpression)
+reifySymbIdentSymbolType {symb_ident, symb_kind=SK_Function glob} chn
+  | glob.glob_module == chn.chn_main_dcl_module_n = reifyFunDefsIdxSymbolType symb_ident glob.glob_object chn
+  | otherwise                                     = reifyDclModulesIdxSymbolType glob chn
+reifySymbIdentSymbolType {symb_ident, symb_kind=SK_IclMacro idx}           chn = reifyFunDefsIdxSymbolType symb_ident idx chn
+reifySymbIdentSymbolType {symb_ident, symb_kind=SK_LocalMacroFunction idx} chn = reifyFunDefsIdxSymbolType symb_ident idx chn
+reifySymbIdentSymbolType {symb_ident, symb_kind=SK_DclMacro glob} chn
+  | glob.glob_module == chn.chn_main_dcl_module_n = reifyFunDefsIdxSymbolType symb_ident glob.glob_object chn
+  | otherwise                                     = reifyDclModulesIdxSymbolType glob chn
+reifySymbIdentSymbolType {symb_ident, symb_kind=SK_LocalDclMacroFunction glob} chn
+  | glob.glob_module == chn.chn_main_dcl_module_n = reifyFunDefsIdxSymbolType symb_ident glob.glob_object chn
+  | otherwise                                     = reifyDclModulesIdxSymbolType glob chn
+reifySymbIdentSymbolType {symb_ident, symb_kind=SK_OverloadedFunction {glob_module, glob_object} } chn
+  | glob_module == chn.chn_main_dcl_module_n
+      # (icl, chn) = chn!chn_icl_module
       # md          = icl.icl_common.com_member_defs.[glob_object]
-      = (Just md.me_type, menv)
+      = (Just md.me_type, chn)
   | otherwise
-      # (dcls, menv) = menv!me_dcl_modules
+      # (dcls, chn) = chn!chn_dcl_modules
       # md           = dcls.[glob_module].dcl_common.com_member_defs.[glob_object]
-      = (Just md.me_type, menv)
-reifySymbIdentSymbolType {symb_ident, symb_kind=SK_GeneratedFunction fip idx} menv = reifyFunDefsIdxSymbolType symb_ident idx menv
-reifySymbIdentSymbolType {symb_ident, symb_kind=SK_Constructor {glob_module, glob_object}} menv
-  | glob_module == menv.me_main_dcl_module_n
-      # (icl, menv) = menv!me_icl_module
+      = (Just md.me_type, chn)
+reifySymbIdentSymbolType {symb_ident, symb_kind=SK_GeneratedFunction fip idx} chn = reifyFunDefsIdxSymbolType symb_ident idx chn
+reifySymbIdentSymbolType {symb_ident, symb_kind=SK_Constructor {glob_module, glob_object}} chn
+  | glob_module == chn.chn_main_dcl_module_n
+      # (icl, chn) = chn!chn_icl_module
       # md          = icl.icl_common.com_cons_defs.[glob_object]
-      = (Just md.cons_type, menv)
+      = (Just md.cons_type, chn)
   | otherwise
-      # (dcls, menv) = menv!me_dcl_modules
+      # (dcls, chn) = chn!chn_dcl_modules
       # md           = dcls.[glob_module].dcl_common.com_cons_defs.[glob_object]
-      = (Just md.cons_type, menv)
-reifySymbIdentSymbolType {symb_ident, symb_kind=SK_NewTypeConstructor globi} menv = abort "reifySymbIdentType: SK_NewTypeConstructor" // reifyDclModulesIdx` globi.gi_module globi.gi_index menv
-reifySymbIdentSymbolType {symb_ident, symb_kind=SK_Generic {glob_module, glob_object} _} menv
-  | glob_module == menv.me_main_dcl_module_n
-      # (icl, menv) = menv!me_icl_module
+      = (Just md.cons_type, chn)
+reifySymbIdentSymbolType {symb_ident, symb_kind=SK_NewTypeConstructor globi} chn = abort "reifySymbIdentType: SK_NewTypeConstructor" // reifyDclModulesIdx` globi.gi_module globi.gi_index chn
+reifySymbIdentSymbolType {symb_ident, symb_kind=SK_Generic {glob_module, glob_object} _} chn
+  | glob_module == chn.chn_main_dcl_module_n
+      # (icl, chn) = chn!chn_icl_module
       # md          = icl.icl_common.com_generic_defs.[glob_object]
-      = (Just md.gen_type, menv)
+      = (Just md.gen_type, chn)
   | otherwise
-      # (dcls, menv) = menv!me_dcl_modules
+      # (dcls, chn) = chn!chn_dcl_modules
       # md           = dcls.[glob_module].dcl_common.com_generic_defs.[glob_object]
-      = (Just md.gen_type, menv)
-reifySymbIdentSymbolType {symb_ident, symb_kind=SK_OverloadedConstructor glob} menv
-  | glob.glob_module == menv.me_main_dcl_module_n = reifyFunDefsIdxSymbolType symb_ident glob.glob_object menv
-  | otherwise                                     = reifyDclModulesIdxSymbolType glob menv
-reifySymbIdentSymbolType si menv = abort "reifySymbIdentSymbolType: unsupported"
+      = (Just md.gen_type, chn)
+reifySymbIdentSymbolType {symb_ident, symb_kind=SK_OverloadedConstructor glob} chn
+  | glob.glob_module == chn.chn_main_dcl_module_n = reifyFunDefsIdxSymbolType symb_ident glob.glob_object chn
+  | otherwise                                     = reifyDclModulesIdxSymbolType glob chn
+reifySymbIdentSymbolType si chn = abort "reifySymbIdentSymbolType: unsupported"
 
-reifyDclModulesIdxSymbolType :: (Global Index) *ModuleEnv -> *(Maybe SymbolType, *ModuleEnv)
-reifyDclModulesIdxSymbolType {glob_module,glob_object} menv = reifyDclModulesIdxSymbolType` glob_module glob_object menv
+reifyDclModulesIdxSymbolType :: (Global Index) *ChnExpression -> *(Maybe SymbolType, *ChnExpression)
+reifyDclModulesIdxSymbolType {glob_module,glob_object} chn = reifyDclModulesIdxSymbolType` glob_module glob_object chn
 
-reifyDclModulesIdxSymbolType` :: Index Index *ModuleEnv -> *(Maybe SymbolType, *ModuleEnv)
-reifyDclModulesIdxSymbolType` glob_module glob_object menv
-  # (mFunTy, menv) = reifyDclModulesIdxFunType` glob_module glob_object menv
+reifyDclModulesIdxSymbolType` :: Index Index *ChnExpression -> *(Maybe SymbolType, *ChnExpression)
+reifyDclModulesIdxSymbolType` glob_module glob_object chn
+  # (mFunTy, chn) = reifyDclModulesIdxFunType` glob_module glob_object chn
   = case mFunTy of
-      Just funTy -> (Just funTy.ft_type, menv)
-      _          -> (Nothing, menv)
+      Just funTy -> (Just funTy.ft_type, chn)
+      _          -> (Nothing, chn)
 
-reifyDclModulesIdxFunType :: (Global Index) *ModuleEnv -> *(Maybe FunType, *ModuleEnv)
-reifyDclModulesIdxFunType {glob_module,glob_object} menv = reifyDclModulesIdxFunType` glob_module glob_object menv
+reifyDclModulesIdxFunType :: (Global Index) *ChnExpression -> *(Maybe FunType, *ChnExpression)
+reifyDclModulesIdxFunType {glob_module,glob_object} chn = reifyDclModulesIdxFunType` glob_module glob_object chn
 
-reifyDclModulesIdxFunType` :: Index Index *ModuleEnv -> *(Maybe FunType, *ModuleEnv)
-reifyDclModulesIdxFunType` glob_module glob_object menv
-  | glob_module == menv.me_main_dcl_module_n = (Nothing, menv)
+reifyDclModulesIdxFunType` :: Index Index *ChnExpression -> *(Maybe FunType, *ChnExpression)
+reifyDclModulesIdxFunType` glob_module glob_object chn
+  | glob_module == chn.chn_main_dcl_module_n = (Nothing, chn)
   | otherwise
-    # (mdcl, dcls) = muselect menv.me_dcl_modules glob_module
-    # menv         = {menv & me_dcl_modules = dcls}
+    # (mdcl, dcls) = muselect chn.chn_dcl_modules glob_module
+    # chn         = {chn & chn_dcl_modules = dcls}
     = case mdcl of
-        Just dcl -> (mselect dcl.dcl_functions glob_object, menv)
-        _        -> (Nothing, menv)
+        Just dcl -> (mselect dcl.dcl_functions glob_object, chn)
+        _        -> (Nothing, chn)
 
-  //# (common, iclmod) = (menv.me_icl_module)!icl_common
-  //# dcls             = menv.me_dcl_modules
-  //# menv             = {menv & me_icl_module=iclmod}
+  //# (common, iclmod) = (chn.chn_icl_module)!icl_common
+  //# dcls             = chn.chn_dcl_modules
+  //# chn             = {chn & chn_icl_module=iclmod}
   //= case searchConsDefs ident common.com_cons_defs of
-      //Just cd = (Just cd, menv)
+      //Just cd = (Just cd, chn)
       //_
         //# cds = [cd \\ Just cd <- [searchConsDefs ident common.com_cons_defs \\ common <- [dclmod.dcl_common \\ dclmod <-: dcls]]]
-        //= (listToMaybe cds, menv)
+        //= (listToMaybe cds, chn)
 
   //where
     //searchConsDefs :: String .{# ConsDef} -> Maybe ConsDef
@@ -250,21 +250,21 @@ reifyDclModulesIdxFunType` glob_module glob_object menv
 
     //ident = si.symb_ident.id_name
 
-reifyDclModule :: SymbIdent *ModuleEnv -> *(Maybe DclModule, *ModuleEnv)
-reifyDclModule si menv =
+reifyDclModule :: SymbIdent *ChnExpression -> *(Maybe DclModule, *ChnExpression)
+reifyDclModule si chn =
   case symbIdentModuleIdx si of
-    Just mi -> reifyDclModule` mi menv
-    _       -> (Nothing, menv)
+    Just mi -> reifyDclModule` mi chn
+    _       -> (Nothing, chn)
 
-reifyDclModule` :: Index *ModuleEnv -> *(Maybe DclModule, *ModuleEnv)
-reifyDclModule` glob_module menv
-  | glob_module == menv.me_main_dcl_module_n = (Nothing, menv)
+reifyDclModule` :: Index *ChnExpression -> *(Maybe DclModule, *ChnExpression)
+reifyDclModule` glob_module chn
+  | glob_module == chn.chn_main_dcl_module_n = (Nothing, chn)
   | otherwise
-    # (mdcl, dcls) = muselect menv.me_dcl_modules glob_module
-    # menv         = {menv & me_dcl_modules = dcls}
+    # (mdcl, dcls) = muselect chn.chn_dcl_modules glob_module
+    # chn         = {chn & chn_dcl_modules = dcls}
     = case mdcl of
-        Just dcl -> (Just dcl, menv)
-        _        -> (Nothing, menv)
+        Just dcl -> (Just dcl, chn)
+        _        -> (Nothing, chn)
 
 arrHasIdx :: (a e) Int -> Bool | Array a e
 arrHasIdx arr idx = idx < size arr
@@ -281,30 +281,30 @@ mselect arr idx
   | arrHasIdx arr idx = Just arr.[idx]
   | otherwise         = Nothing
 
-reifyFunDefsIdxSymbolType :: Ident Index *ModuleEnv -> *(Maybe SymbolType, *ModuleEnv)
-reifyFunDefsIdxSymbolType ident idx menv
-  # (mfd, fds) = muselect menv.me_fun_defs_cpy idx
-  # menv = {menv & me_fun_defs_cpy = fds}
+reifyFunDefsIdxSymbolType :: Ident Index *ChnExpression -> *(Maybe SymbolType, *ChnExpression)
+reifyFunDefsIdxSymbolType ident idx chn
+  # (mfd, fds) = muselect chn.chn_fun_defs_cpy idx
+  # chn = {chn & chn_fun_defs_cpy = fds}
   = case mfd of
       Just fd -> case fd.fun_type of
-                   Yes st -> (Just st, menv)
-                   _      -> (Nothing, menv)
-      _       -> (Nothing, menv)
+                   Yes st -> (Just st, chn)
+                   _      -> (Nothing, chn)
+      _       -> (Nothing, chn)
 
-reifyFunDefsIdxFunDef :: Index *ModuleEnv -> *(Maybe FunDef, *ModuleEnv)
-reifyFunDefsIdxFunDef idx menv
-  # (mfd, fds) = muselect menv.me_fun_defs_cpy idx
-  = (mfd, {menv & me_fun_defs_cpy = fds})
+reifyFunDefsIdxFunDef :: Index *ChnExpression -> *(Maybe FunDef, *ChnExpression)
+reifyFunDefsIdxFunDef idx chn
+  # (mfd, fds) = muselect chn.chn_fun_defs_cpy idx
+  = (mfd, {chn & chn_fun_defs_cpy = fds})
 
-reifyArgsAndDef :: SymbIdent *ModuleEnv -> *(([FreeVar], FunDef), *ModuleEnv)
-reifyArgsAndDef app_symb menv
-  # (mfd, menv)      = reifyFunDef app_symb menv
+reifyArgsAndDef :: SymbIdent *ChnExpression -> *(([FreeVar], FunDef), *ChnExpression)
+reifyArgsAndDef app_symb chn
+  # (mfd, chn)      = reifyFunDef app_symb chn
   # rSym             = ppSymbIdent app_symb
-  # (mFArgTy, menv)  = reifySymbIdentSymbolType app_symb menv
+  # (mFArgTy, chn)  = reifySymbIdentSymbolType app_symb chn
   # rhsfd            = fromMaybe (abort $ "reifyArgs failed to find function definition for " +++ ppCompact rSym) mfd
   # args             = getFunArgs rhsfd
   # rhsTy            = fromMaybe (abort "reifyArgs failed to reify SymbolType") mFArgTy
-  = ((snd (dropContexts rhsTy args), rhsfd), menv)
+  = ((snd (dropContexts rhsTy args), rhsfd), chn)
 
 isCons :: String -> Bool
 isCons str = str == PD_ConsSymbol_String
@@ -416,15 +416,13 @@ intersperse` sep pp [x:xs] = pp x +++ sep +++ intersperse` sep pp xs
 
 symbIdentIsBPPart :: SymbIdent InhExpression *ChnExpression -> *(Bool, *ChnExpression)
 symbIdentIsBPPart {symb_ident, symb_kind=SK_OverloadedFunction {glob_module, glob_object} } inh chn
-  # menv = chn.chn_module_env
-  # (md, menv) = case glob_module == menv.me_main_dcl_module_n of
+  # (md, chn) = case glob_module == chn.chn_main_dcl_module_n of
                    True
-                     # (icl, menv) = menv!me_icl_module
-                     = (icl.icl_common.com_member_defs.[glob_object], menv)
+                     # (icl, chn) = chn!chn_icl_module
+                     = (icl.icl_common.com_member_defs.[glob_object], chn)
                    False
-                     # (dcls, menv) = menv!me_dcl_modules
-                     = (dcls.[glob_module].dcl_common.com_member_defs.[glob_object], menv)
-  # chn  = {chn & chn_module_env = menv}
+                     # (dcls, chn) = chn!chn_dcl_modules
+                     = (dcls.[glob_module].dcl_common.com_member_defs.[glob_object], chn)
   # pdss = chn.chn_predef_symbols
   # (tmpds, pdss) = pdss![PD_TMonadClass]
   # (tapds, pdss) = pdss![PD_TApplicativeClass]
@@ -432,10 +430,10 @@ symbIdentIsBPPart {symb_ident, symb_kind=SK_OverloadedFunction {glob_module, glo
     || (md.me_class.glob_module == tapds.pds_module && md.me_class.glob_object == tapds.pds_def)
     , {chn & chn_predef_symbols = pdss})
 symbIdentIsBPPart si inh chn
-  # (mst, menv) = reifySymbIdentSymbolType si chn.chn_module_env
+  # (mst, chn) = reifySymbIdentSymbolType si chn
   = case mst of
      Just st
-       = typeHasClassInstance st.st_result.at_type PD_TonicBlueprintPartClass inh {chn & chn_module_env = menv}
+       = typeHasClassInstance st.st_result.at_type PD_TonicBlueprintPartClass inh chn
      _ = abort ("symbIdentIsBPPart: failed to reify symbIdent '" +++ si.symb_ident.id_name +++ "'")
 
 typeHasClassInstance :: Type Int InhExpression *ChnExpression -> *(Bool, *ChnExpression)
@@ -486,19 +484,19 @@ typeHasClassSynonymInstance ty lookup_symbol inh chn
     # (inst, ctxs, uni_ok, hp_type_heaps, coercions) = find_instance [at_type] instance_tree inh.inh_common_defs hp_type_heaps coercions
     = (inst.glob_module <> NotFound && inst.glob_object <> NotFound, hp_type_heaps)
 
-isInfix :: SymbIdent *ModuleEnv -> *(Bool, *ModuleEnv)
-isInfix si menv
-  # (mfd, menv) = reifyFunDef si menv
+isInfix :: SymbIdent *ChnExpression -> *(Bool, *ChnExpression)
+isInfix si chn
+  # (mfd, chn) = reifyFunDef si chn
   = case mfd of
-      Just fd = (prioIsInfix fd.fun_priority, menv)
+      Just fd = (prioIsInfix fd.fun_priority, chn)
       Nothing
-        # (mft, menv) = reifyFunType si menv
+        # (mft, chn) = reifyFunType si chn
         = case mft of
-            Just ft  = (prioIsInfix ft.ft_priority, menv)
+            Just ft  = (prioIsInfix ft.ft_priority, chn)
             _
-              # (mcd, menv) = reifyConsDef si menv
+              # (mcd, chn) = reifyConsDef si chn
               = case mcd of
-                  Just cd -> (prioIsInfix cd.cons_priority, menv)
+                  Just cd -> (prioIsInfix cd.cons_priority, chn)
                   Nothing -> abort ("Failed to determine fixity for " +++ si.symb_ident.id_name)
 
 prioIsInfix :: Priority -> Bool
@@ -517,8 +515,7 @@ getFunRhs _                               = abort "getFunRhs: need a Transformed
 
 updateWithAnnot :: Int Expression InhExpression *ChnExpression -> *ChnExpression
 updateWithAnnot fidx e inh chn
-  # menv = chn.chn_module_env
-  # fun_defs = menv.me_fun_defs
+  # fun_defs = chn.chn_fun_defs
   # (fun_def, fun_defs) = fun_defs![fidx]
   = case fun_def of
       {fun_body = TransformedBody fb}
@@ -532,8 +529,7 @@ updateWithAnnot fidx e inh chn
                                                            }
                     }
         # fun_defs = {fun_defs & [fidx] = fun_def}
-        # menv     = { menv & me_fun_defs = fun_defs}
-        = {chn & chn_module_env = menv}
+        = { chn & chn_fun_defs = fun_defs}
 
 updateFun :: Index !*{#FunDef} (FunDef -> FunDef) -> *{#FunDef}
 updateFun idx fun_defs f
@@ -564,33 +560,33 @@ foldrSt op l st = foldr_st l
 predefIsUndefined :: PredefinedSymbol -> Bool
 predefIsUndefined pds = pds.pds_def == NoIndex || pds.pds_module == NoIndex
 
-symbIdentArity :: SymbIdent *ModuleEnv -> *(Maybe Int, *ModuleEnv)
-symbIdentArity si menv
-  # (mFunTy, menv) = reifySymbIdentSymbolType si menv
+symbIdentArity :: SymbIdent *ChnExpression -> *(Maybe Int, *ChnExpression)
+symbIdentArity si chn
+  # (mFunTy, chn) = reifySymbIdentSymbolType si chn
   = case mFunTy of
-      Just funTy = (Just funTy.st_arity, menv)
+      Just funTy = (Just funTy.st_arity, chn)
       _
-        # (mft, menv) = reifyFunType si menv
+        # (mft, chn) = reifyFunType si chn
         = case mft of
             Just ft
-              = (Just ft.ft_arity, menv)
-            _ = (Nothing, menv)
+              = (Just ft.ft_arity, chn)
+            _ = (Nothing, chn)
 
-argsRemaining :: App *ModuleEnv -> *(Int, *ModuleEnv)
-argsRemaining app menv
-  # ((ctxs, args), menv) = dropAppContexts app menv
+argsRemaining :: App *ChnExpression -> *(Int, *ChnExpression)
+argsRemaining app chn
+  # ((ctxs, args), chn) = dropAppContexts app chn
   # argsLength        = length args
-  # (marity, menv)    = symbIdentArity app.app_symb menv
+  # (marity, chn)    = symbIdentArity app.app_symb chn
   = case marity of
       Just arity
         # n = (arity - argsLength)
-        = (if (n < 0) 0 n, menv) // TODO FIXME hack :(
-      _ = (0, menv)
+        = (if (n < 0) 0 n, chn) // TODO FIXME hack :(
+      _ = (0, chn)
 
-isPartialApp :: App *ModuleEnv -> *(Bool, *ModuleEnv)
-isPartialApp app menv
-  # (rem, menv) = argsRemaining app menv
-  = (rem > 0, menv)
+isPartialApp :: App *ChnExpression -> *(Bool, *ChnExpression)
+isPartialApp app chn
+  # (rem, chn) = argsRemaining app chn
+  = (rem > 0, chn)
 
 stringContents :: String -> String
 stringContents str
@@ -801,12 +797,15 @@ tfCase eid cs=:{case_guards, case_default} chn
     = (App pair, {chn & chn_heaps = heaps
                       , chn_predef_symbols = pdss })
 import StdDebug
-mkCaseDetFun :: !(Maybe FreeVar) !ExprId !Int ![BoundVar] !Expression !InhExpression !*ChnExpression -> *(Expression, *ChnExpression)
+mkCaseDetFun :: !(Maybe (FreeVar, Index)) !ExprId !Int ![BoundVar] !Expression !InhExpression !*ChnExpression -> *(Expression, *ChnExpression)
 mkCaseDetFun mbindfv eid exprPtr boundArgs bdy inh chn
   # freeArgs           = map varToFreeVar boundArgs
   # freeArgs           = case mbindfv of
-                           Just bindfv -> [arg \\ arg <- freeArgs | arg.fv_info_ptr <> bindfv.fv_info_ptr] ++ [bindfv]
-                           _           -> freeArgs
+                           Just (bindfv, _) -> [arg \\ arg <- freeArgs | arg.fv_info_ptr <> bindfv.fv_info_ptr] ++ [bindfv]
+                           _                -> freeArgs
+  # parentIdx          = case mbindfv of
+                           Just (_, lamIdx) -> lamIdx
+                           _                -> inh.inh_fun_idx
   # name               = "_f_case_" +++ toString exprPtr
   # (bdy`, chn)        = case bdy of
                            Case cs
@@ -820,14 +819,14 @@ mkCaseDetFun mbindfv eid exprPtr boundArgs bdy inh chn
   # funIdent           = { id_name = name
                          , id_info = nilPtr
                          }
-  # menv               = chn.chn_module_env
-  # fun_defs           = menv.me_fun_defs
-  # (fun_def, fun_defs) = fun_defs![inh.inh_fun_idx] 
-  # groups             = menv.me_groups
+  # fun_defs           = chn.chn_fun_defs
+  # (fun_def, fun_defs) = fun_defs![parentIdx]
+  # groups             = chn.chn_groups
   # groups`            = [grp \\ grp <-: groups]
-  # (groupidx, group)  = case [(idx, group) \\ (idx, group) <- zip2 [0..] groups` | elem inh.inh_fun_idx group.group_members] of
+  # (groupidx, group)  = case [(idx, group) \\ (idx, group) <- zip2 [0..] groups` | elem parentIdx group.group_members] of
                             [group : _] -> group
-  # mainDclN           = menv.me_main_dcl_module_n
+  #! fun_defs = trace_n ("fun_def.fun_info.fi_group_index = " +++ toString fun_def.fun_info.fi_group_index +++ " ; manual lookup idx = " +++ toString groupidx) fun_defs
+  # mainDclN           = chn.chn_main_dcl_module_n
   # (nextFD, fun_defs) = usize fun_defs
   # (argVars, localVars, freeVars) = collectVars bdy` freeArgs
   # newFunDef          = { fun_docs     = ""
@@ -843,7 +842,7 @@ mkCaseDetFun mbindfv eid exprPtr boundArgs bdy inh chn
                          , fun_info     = {EmptyFunInfo & fi_calls       = collectCalls mainDclN bdy`
                                                         , fi_free_vars   = freeVars
                                                         , fi_local_vars  = localVars
-                                                        , fi_group_index = groupidx
+                                                        , fi_group_index = groupidx - 1
                                                         }
                          }
   # funDefs            = [fd \\ fd <-: fun_defs] ++ [newFunDef]
@@ -851,15 +850,14 @@ mkCaseDetFun mbindfv eid exprPtr boundArgs bdy inh chn
   # (lgrps, rgrps)     = splitAt groupidx groups`
   # group              = {group_members = [nextFD]}
   # groups             = {grp \\ grp <- lgrps ++ [group : rgrps]}
-  # fun_def            = {fun_def & fun_info = {fun_def.fun_info & fi_calls = [FunCall nextFD cGlobalScope : fun_def.fun_info.fi_calls]}}
+  # fun_def            = {fun_def & fun_info = {fun_def.fun_info & fi_calls = [FunCall nextFD cModuleScope : fun_def.fun_info.fi_calls]}}
   # symb               = { symb_ident = funIdent
                          , symb_kind  = SK_Function { glob_module = mainDclN
                                                     , glob_object = nextFD }
                          }
-  # fun_defs           = { fun_defs & [inh.inh_fun_idx] = fun_def}
-  # menv               = {menv & me_fun_defs = fun_defs
-                               , me_groups = groups}
-  # chn                = {chn & chn_module_env = menv}
+  # fun_defs           = { fun_defs & [parentIdx] = fun_def}
+  # chn               = {chn & chn_fun_defs = fun_defs
+                               , chn_groups = groups}
   # heaps              = chn.chn_heaps
   # (ptr, expr_heap)   = newPtr EI_Empty heaps.hp_expression_heap
   # heaps              = { heaps & hp_expression_heap = expr_heap }
@@ -879,22 +877,18 @@ wrapBody inh syn is_itasks_mod chn
   # chn = {chn & chn_predef_symbols = pdss}
   | not ok     = (syn, chn)
   | otherwise
-      # menv                 = chn.chn_module_env
-      # fun_defs             = menv.me_fun_defs
+      # fun_defs             = chn.chn_fun_defs
       # (fun_def, fun_defs)  = fun_defs![inh.inh_fun_idx]
-      # menv                 = {menv & me_fun_defs = fun_defs}
-      # (mfdt, fun_defs_cpy) = muselect menv.me_fun_defs_cpy inh.inh_fun_idx
-      # menv                 = {menv & me_fun_defs_cpy = fun_defs_cpy}
-      # chn = {chn & chn_module_env = menv}
+      # chn                 = {chn & chn_fun_defs = fun_defs}
+      # (mfdt, fun_defs_cpy) = muselect chn.chn_fun_defs_cpy inh.inh_fun_idx
+      # chn                 = {chn & chn_fun_defs_cpy = fun_defs_cpy}
       = case mfdt of
           Just fdt
             = case (fun_def.fun_body, fdt.fun_type) of
                 (TransformedBody fb, Yes symbty)
-                  # menv = chn.chn_module_env
-                  # (isPA, menv) = case syn.syn_annot_expr of
-                                     App app -> isPartialApp app menv
-                                     _       -> (False, menv)
-                  # chn = {chn & chn_module_env = menv}
+                  # (isPA, chn) = case syn.syn_annot_expr of
+                                     App app -> isPartialApp app chn
+                                     _       -> (False, chn)
                   = if isPA (syn, chn) (doAddRefl fun_def.fun_ident fb.tb_args symbty inh.inh_common_defs chn)
                 _ = (syn, chn)
           _ = (syn, chn)
@@ -915,17 +909,16 @@ wrapBody inh syn is_itasks_mod chn
         # evalableCases  = [(eid, 'DM'.elems vars, cs) \\ (eid, vars, cs) <- syn.syn_cases | allVarsBound inh vars]
         # (evalableCases, chn) = mapSt (\(eid, bvs, cs) chn -> mkCaseDetFun Nothing eid inh.inh_fun_idx bvs cs inh chn) evalableCases chn
 
-        # menv = chn.chn_module_env
-        # (icl, menv) = menv!me_icl_module
+        # (icl, chn) = chn!chn_icl_module
         # iclname = icl.icl_name.id_name
-        # (rem, menv)  = case syn.syn_annot_expr of
+        # (rem, chn)  = case syn.syn_annot_expr of
                            App {app_symb = {symb_ident}}
-                             | symb_ident == predefined_idents.[PD_tonicExtWrapBodyLam1] = (1, menv)
-                             | symb_ident == predefined_idents.[PD_tonicExtWrapBodyLam2] = (2, menv)
-                             | symb_ident == predefined_idents.[PD_tonicExtWrapBodyLam3] = (3, menv)
+                             | symb_ident == predefined_idents.[PD_tonicExtWrapBodyLam1] = (1, chn)
+                             | symb_ident == predefined_idents.[PD_tonicExtWrapBodyLam2] = (2, chn)
+                             | symb_ident == predefined_idents.[PD_tonicExtWrapBodyLam3] = (3, chn)
                            App app
-                             = argsRemaining app menv
-                           _ = (0, menv)
+                             = argsRemaining app chn
+                           _ = (0, chn)
         # (xs, pdss) = toStatic args chn.chn_predef_symbols
         # (casesExpr, pdss) = listToListExpr evalableCases pdss
         //# (casesExpr, pdss) = listToListExpr [] pdss
@@ -936,8 +929,7 @@ wrapBody inh syn is_itasks_mod chn
                                   , casesExpr
                                   , syn.syn_annot_expr
                                   ] SK_Function chn.chn_heaps pdss
-        = ({syn & syn_annot_expr = App wrap}, {chn & chn_module_env = menv
-                                                   , chn_heaps = heaps
+        = ({syn & syn_annot_expr = App wrap}, {chn & chn_heaps = heaps
                                                    , chn_predef_symbols = pdss})
     | otherwise = (syn, chn)
     where
