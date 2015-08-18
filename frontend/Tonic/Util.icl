@@ -752,50 +752,26 @@ varToFreeVar :: BoundVar -> FreeVar
 varToFreeVar {var_ident, var_info_ptr}
   = {fv_def_level = NotALevel, fv_ident = var_ident, fv_info_ptr = var_info_ptr, fv_count = 0}
 
-tfCase :: !ExprId !Case *ChnExpression -> *(Case, *ChnExpression)
-tfCase eid cs=:{case_guards, case_default} chn
-  # (guards, chn) = tfGuards case_guards chn
-  # (def, chn)    = tfDefault case_default chn
-  = ({cs & case_guards = guards, case_default = def}, chn)
+tfCase :: !ExprId !Case -> Case
+tfCase eid cs=:{case_guards, case_default}
+  = {cs & case_guards = tfGuards case_guards, case_default = tfDefault case_default}
   where
-  tfGuards (AlgebraicPatterns idx as)       chn
-    # (as, chn) = mapSt tfA (zip2 as [0..]) chn
-    = (AlgebraicPatterns idx as, chn)
-  tfGuards (BasicPatterns bt bs)            chn
-    # (bs, chn) = mapSt tfB (zip2 bs [0..]) chn
-    = (BasicPatterns bt bs, chn)
-  tfGuards (NewTypePatterns idx as)         chn
-    # (as, chn) = mapSt tfA (zip2 as [0..]) chn
-    = (NewTypePatterns idx as, chn)
-  tfGuards (DynamicPatterns ds) chn
-    # (ds, chn) = mapSt tfD (zip2 ds [0..]) chn
-    = (DynamicPatterns ds, chn)
-  tfGuards (OverloadedListPatterns ot e as) chn
-    # (as, chn) = mapSt tfA (zip2 as [0..]) chn
-    = (OverloadedListPatterns ot e as, chn)
-  tfA (ap, n) chn
-    # (pair, chn) = mkTuple (BVInt n) chn
-    = ({ap & ap_expr = pair}, chn)
-  tfB (bp, n) chn
-    # (pair, chn) = mkTuple (BVInt n) chn
-    = ({bp & bp_expr = pair}, chn)
-  tfD (dp, n) chn
-    # (pair, chn) = mkTuple (BVInt n) chn
-    = ({dp & dp_rhs = pair}, chn)
-  tfDefault (Yes def) chn
-    # (pair, chn) = mkTuple (BVInt -1) chn
-    = (Yes pair, chn)
-  tfDefault _ chn = (No, chn)
-  mkTuple nexpr chn
-    # heaps               = chn.chn_heaps
-    # pdss                = chn.chn_predef_symbols
-    # (eidExpr, pdss)     = listToListExpr (map mkInt eid) pdss
-    # (pair, heaps, pdss) = appPredefinedSymbolWithEI (GetTupleConsIndex 2)
-                                  [ eidExpr
-                                  , BasicExpr nexpr
-                                  ] SK_Constructor heaps pdss
-    = (App pair, {chn & chn_heaps = heaps
-                      , chn_predef_symbols = pdss })
+  tfGuards (AlgebraicPatterns idx as)
+    = AlgebraicPatterns idx (map tfA (zip2 as [0..]))
+  tfGuards (BasicPatterns bt bs)
+    = BasicPatterns bt (map tfB (zip2 bs [0..]))
+  tfGuards (NewTypePatterns idx as)
+    = NewTypePatterns idx (map tfA (zip2 as [0..]))
+  tfGuards (DynamicPatterns ds)
+    = DynamicPatterns (map tfD (zip2 ds [0..]))
+  tfGuards (OverloadedListPatterns ot e as)
+    = OverloadedListPatterns ot e (map tfA (zip2 as [0..]))
+  tfA (ap, n) = {ap & ap_expr = BasicExpr (BVInt n)}
+  tfB (bp, n) = {bp & bp_expr = BasicExpr (BVInt n)}
+  tfD (dp, n) = {dp & dp_rhs  = BasicExpr (BVInt n)}
+  tfDefault (Yes def) = Yes (BasicExpr (BVInt -1))
+  tfDefault _         = No
+
 import StdDebug
 mkCaseDetFun :: !(Maybe (FreeVar, Index)) !ExprId !Int ![BoundVar] !Expression !InhExpression !*ChnExpression -> *(Expression, *ChnExpression)
 mkCaseDetFun mbindfv eid exprPtr boundArgs bdy inh chn
@@ -804,17 +780,16 @@ mkCaseDetFun mbindfv eid exprPtr boundArgs bdy inh chn
                            Just (bindfv, _) -> [arg \\ arg <- freeArgs | arg.fv_info_ptr <> bindfv.fv_info_ptr] ++ [bindfv]
                            _                -> freeArgs
   # parentIdx          = case mbindfv of
-                           Just (_, lamIdx) -> lamIdx
+                           //Just (_, lamIdx) -> lamIdx
                            _                -> inh.inh_fun_idx
   # name               = "_f_case_" +++ toString exprPtr
-  # (bdy`, chn)        = case bdy of
+  # bdy`               = case bdy of
                            Case cs
-                             # (cs, chn) = tfCase eid cs chn
-                             = (Case cs, chn)
+                             = Case (tfCase eid cs)
                            Let lt=:{let_expr = Case cs}
-                             # (cs, chn) = tfCase eid cs chn
-                             = (Let {lt & let_expr = Case cs}, chn)
+                             = Let {lt & let_expr = Case (tfCase eid cs)}
                            _ = abort "mkCaseDetFun shouldn't happen"
+
   # arity              = length freeArgs
   # funIdent           = { id_name = name
                          , id_info = nilPtr
@@ -825,10 +800,11 @@ mkCaseDetFun mbindfv eid exprPtr boundArgs bdy inh chn
   # groups`            = [grp \\ grp <-: groups]
   # (groupidx, group)  = case [(idx, group) \\ (idx, group) <- zip2 [0..] groups` | elem parentIdx group.group_members] of
                             [group : _] -> group
-  #! fun_defs = trace_n ("fun_def.fun_info.fi_group_index = " +++ toString fun_def.fun_info.fi_group_index +++ " ; manual lookup idx = " +++ toString groupidx) fun_defs
+  #! fun_defs = trace_n (fun_def.fun_ident.id_name +++ ": fun_def.fun_info.fi_group_index = " +++ toString fun_def.fun_info.fi_group_index +++ " ; manual lookup idx = " +++ toString groupidx) fun_defs
   # mainDclN           = chn.chn_main_dcl_module_n
   # (nextFD, fun_defs) = usize fun_defs
   # (argVars, localVars, freeVars) = collectVars bdy` freeArgs
+  #! fun_defs = trace_n (fun_def.fun_ident.id_name +++ ": argVars = " +++ toString (length argVars) +++ " localVars = " +++ toString (length localVars) +++ " freeVars = " +++ toString (length freeVars)) fun_defs
   # newFunDef          = { fun_docs     = ""
                          , fun_ident    = funIdent
                          , fun_arity    = arity
@@ -839,25 +815,28 @@ mkCaseDetFun mbindfv eid exprPtr boundArgs bdy inh chn
                          , fun_pos      = NoPos
                          , fun_kind     = FK_Function cNameNotLocationDependent
                          , fun_lifted   = 0
-                         , fun_info     = {EmptyFunInfo & fi_calls       = collectCalls mainDclN bdy`
-                                                        , fi_free_vars   = freeVars
-                                                        , fi_local_vars  = localVars
-                                                        , fi_group_index = groupidx - 1
-                                                        }
+                         , fun_info     = { fi_calls       = collectCalls mainDclN bdy`
+                                          , fi_group_index = groupidx
+                                          , fi_def_level   = NotALevel
+                                          , fi_free_vars   = freeVars
+                                          , fi_local_vars  = localVars
+                                          , fi_dynamics    = []
+                                          , fi_properties  = FI_IsNonRecursive
+                                          }
                          }
   # funDefs            = [fd \\ fd <-: fun_defs] ++ [newFunDef]
   # fun_defs           = {fd \\ fd <- funDefs}
   # (lgrps, rgrps)     = splitAt groupidx groups`
   # group              = {group_members = [nextFD]}
   # groups             = {grp \\ grp <- lgrps ++ [group : rgrps]}
-  # fun_def            = {fun_def & fun_info = {fun_def.fun_info & fi_calls = [FunCall nextFD cModuleScope : fun_def.fun_info.fi_calls]}}
+  # fun_def            = {fun_def & fun_info = {fun_def.fun_info & fi_calls = [FunCall nextFD NotALevel : fun_def.fun_info.fi_calls]}}
   # symb               = { symb_ident = funIdent
                          , symb_kind  = SK_Function { glob_module = mainDclN
                                                     , glob_object = nextFD }
                          }
   # fun_defs           = { fun_defs & [parentIdx] = fun_def}
-  # chn               = {chn & chn_fun_defs = fun_defs
-                               , chn_groups = groups}
+  # chn                = {chn & chn_fun_defs = fun_defs
+                              , chn_groups = groups}
   # heaps              = chn.chn_heaps
   # (ptr, expr_heap)   = newPtr EI_Empty heaps.hp_expression_heap
   # heaps              = { heaps & hp_expression_heap = expr_heap }
@@ -868,7 +847,16 @@ mkCaseDetFun mbindfv eid exprPtr boundArgs bdy inh chn
   # app                = { app_symb     = symb
                          , app_args     = map Var appArgs
                          , app_info_ptr = ptr }
-  = (App app, chn)
+
+  # heaps               = chn.chn_heaps
+  # pdss                = chn.chn_predef_symbols
+  # (eidExpr, pdss)     = listToListExpr (map mkInt eid) pdss
+  # (pair, heaps, pdss) = appPredefinedSymbolWithEI (GetTupleConsIndex 2)
+                                [ eidExpr
+                                , App app
+                                ] SK_Constructor heaps pdss
+  = (App pair, {chn & chn_heaps = heaps
+                    , chn_predef_symbols = pdss })
 
 wrapBody :: InhExpression SynExpression Bool *ChnExpression -> *(SynExpression, *ChnExpression)
 wrapBody inh syn is_itasks_mod chn
@@ -907,7 +895,7 @@ wrapBody inh syn is_itasks_mod chn
     # (args, chn) = foldr (mkArg symbty is_itasks_mod inh.inh_instance_tree) ([], chn) (zip2 tb_args symbty.st_args)
     | length args == length tb_args
         # evalableCases  = [(eid, 'DM'.elems vars, cs) \\ (eid, vars, cs) <- syn.syn_cases | allVarsBound inh vars]
-        # (evalableCases, chn) = mapSt (\(eid, bvs, cs) chn -> mkCaseDetFun Nothing eid inh.inh_fun_idx bvs cs inh chn) evalableCases chn
+        # (evalableCases, chn) = ([], chn) //  mapSt (\(eid, bvs, cs) chn -> mkCaseDetFun Nothing eid inh.inh_fun_idx bvs cs inh chn) evalableCases chn
 
         # (icl, chn) = chn!chn_icl_module
         # iclname = icl.icl_name.id_name
