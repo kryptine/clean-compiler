@@ -1148,11 +1148,12 @@ static void GenABStackElemsForRecordDesc (StateS state)
 					}
 				}
 				FPutC (')', OutFile);
+				return;
 			case RecordState:
 				argstates = state.state_record_arguments;
 				FPutC ('(', OutFile);
 				for (arity=0; arity < state.state_arity; ++arity)
-					GenABStackElems (argstates[arity]);
+					GenABStackElemsForRecordDesc (argstates[arity]);
 				FPutC (')', OutFile);
 				return;
 			case ArrayState:
