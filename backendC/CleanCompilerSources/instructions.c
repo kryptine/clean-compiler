@@ -3139,9 +3139,9 @@ void GenUnboxedConsRecordDescriptor (SymbDef sdef,int tail_strict)
 		FPrintF (OutFile," %d %d ",asize,bsize);
 		GenUnboxedRecordLabelsReversedForRecord (tuple_arguments_state[0]);
 		if (ExportLocalLabels)
-			FPrintF (OutFile,tail_strict ? "\"_Cons#!%s\"" : "\"_Cons#\"",asize,bsize,name);
+			FPrintF (OutFile,tail_strict ? "\"_Cons#!%s\"" : "\"_Cons#\"",name);
 		else
-			FPrintF (OutFile,tail_strict ? "\"[#%s!]\"" : "\"[#%s]\"",asize,bsize,name);
+			FPrintF (OutFile,tail_strict ? "\"[#%s!]\"" : "\"[#%s]\"",name);
 	}
 }
 #endif
