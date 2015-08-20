@@ -1193,6 +1193,7 @@ static int AddSizeOfStateAndImportRecords (StateS state, int *asize, int *bsize)
 				SymbDef record_sdef;
 
 				record_sdef = state.state_record_symbol;
+/*
 				if (record_sdef->sdef_exported || record_sdef->sdef_module!=CurrentModule || ExportLocalLabels){
 					if ((record_sdef->sdef_mark & SDEF_RECORD_R_LABEL_IMPORTED_MASK)!=0){
 						record_sdef->sdef_mark |= SDEF_USED_STRICTLY_MASK;
@@ -1202,6 +1203,7 @@ static int AddSizeOfStateAndImportRecords (StateS state, int *asize, int *bsize)
 						GenImpRecordDesc (record_sdef->sdef_module,record_sdef->sdef_ident->ident_name);
 					}
 				}
+*/
 
 				(void) AddSizeOfStatesAndImportRecords (state.state_arity, state.state_record_arguments, asize, bsize);
 				return 1;
@@ -3107,19 +3109,22 @@ void GenUnboxedConsRecordDescriptor (SymbDef sdef,int tail_strict)
 	GenABStackElemsOfRecord (tuple_arguments_state[0]);
 	GenABStackElems (tuple_arguments_state[1]);
 	
-	if (!has_unboxed_record){
-		if (ExportLocalLabels)
-			FPrintF (OutFile,tail_strict ? " %d %d \"_Cons#!%s\"" : " %d %d \"_Cons#\"",asize,bsize,name);
-		else
-			FPrintF (OutFile,tail_strict ? " %d %d \"[#%s!]\"" : " %d %d \"[#%s]\"",asize,bsize,name);
-	} else {
-		FPrintF (OutFile," %d %d ",asize,bsize);
+	FPrintF (OutFile," %d %d ",asize,bsize);
+	if (has_unboxed_record)
 		GenUnboxedRecordLabelsReversedForRecord (tuple_arguments_state[0]);
-		if (ExportLocalLabels)
-			FPrintF (OutFile,tail_strict ? "\"_Cons#!%s\"" : "\"_Cons#\"",name);
+	
+	if (!sdef->sdef_exported && sdef->sdef_module==CurrentModule && !ExportLocalLabels){
+		if (DoDebug)
+			FPrintF (OutFile, R_PREFIX "%s ",name);
 		else
-			FPrintF (OutFile,tail_strict ? "\"[#%s!]\"" : "\"[#%s]\"",name);
-	}
+			FPrintF (OutFile, R_PREFIX "%u ",sdef->sdef_number);
+	} else
+		FPrintF (OutFile, "e_%s_" R_PREFIX "%s ",sdef->sdef_module,name);
+
+	if (ExportLocalLabels)
+		FPrintF (OutFile,tail_strict ? "\"_Cons#!%s\"" : "\"_Cons#\"",name);
+	else
+		FPrintF (OutFile,tail_strict ? "\"[#%s!]\"" : "\"[#%s]\"",name);
 }
 #endif
 
