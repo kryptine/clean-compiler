@@ -1089,7 +1089,6 @@ static void GenABStackElems (StateS state)
 			FPutC (BElems [(int) state.state_object], OutFile);
 		else
 			FPutC ('a', OutFile);
-			
 	} else {
 		int arity;
 		States argstates;
@@ -1124,6 +1123,46 @@ static void GenABStackElems (StateS state)
 	}
 }
 
+static void GenABStackElemsForRecordDesc (StateS state)
+{
+	if (IsSimpleState (state)){
+		if (state.state_kind == OnB)
+			FPutC (BElems [(int) state.state_object], OutFile);
+		else
+			FPutC ('a', OutFile);
+	} else {
+		int arity;
+		States argstates;
+		
+		switch (state.state_type){
+			case TupleState:
+				argstates = state.state_tuple_arguments;			
+				FPutC ('(', OutFile);
+				if (state.state_arity>0){
+					GenABStackElemsForRecordDesc (argstates[0]);
+					for (arity=1; arity < state.state_arity; ++arity){
+						FPutC (',', OutFile);
+						GenABStackElemsForRecordDesc (argstates[arity]);
+					}
+				}
+				FPutC (')', OutFile);
+				return;
+			case RecordState:
+				argstates = state.state_record_arguments;
+				FPutC ('(', OutFile);
+				for (arity=0; arity < state.state_arity; ++arity)
+					GenABStackElemsForRecordDesc (argstates[arity]);
+				FPutC (')', OutFile);
+				return;
+			case ArrayState:
+				FPutC ('a', OutFile);
+				return;
+			default:
+				error_in_function ("GenABStackElemsForRecordDesc");
+		}
+	}
+}
+
 static void GenABStackElemsOfRecord (StateS state)
 {
 	if (state.state_type==RecordState){
@@ -1132,9 +1171,111 @@ static void GenABStackElemsOfRecord (StateS state)
 
 		argstates = state.state_record_arguments;
 		for (arity=0; arity < state.state_arity; ++arity)
-			GenABStackElems (argstates[arity]);
+			GenABStackElemsForRecordDesc (argstates[arity]);
 	} else
-		GenABStackElems (state);
+		GenABStackElemsForRecordDesc (state);
+}
+
+static int AddSizeOfStatesAndImportRecords (int arity, States states, int *asize, int *bsize);
+
+static int AddSizeOfStateAndImportRecords (StateS state, int *asize, int *bsize)
+{
+	if (IsSimpleState (state)){
+		if (state.state_kind == OnB)
+			*bsize += ObjectSizes [state.state_object];
+		else if (state.state_kind != Undefined)
+			*asize += SizeOfAStackElem;
+		return 0;
+	} else {
+		switch (state.state_type){
+			case RecordState:
+			{
+				SymbDef record_sdef;
+
+				record_sdef = state.state_record_symbol;
+				if (record_sdef->sdef_exported || record_sdef->sdef_module!=CurrentModule || ExportLocalLabels){
+					if ((record_sdef->sdef_mark & SDEF_RECORD_R_LABEL_IMPORTED_MASK)!=0){
+						record_sdef->sdef_mark |= SDEF_USED_STRICTLY_MASK;
+					} else {
+						record_sdef->sdef_mark |= SDEF_USED_STRICTLY_MASK;
+						record_sdef->sdef_mark |= SDEF_USED_STRICTLY_MASK | SDEF_RECORD_R_LABEL_IMPORTED_MASK;
+						GenImpRecordDesc (record_sdef->sdef_module,record_sdef->sdef_ident->ident_name);
+					}
+				}
+
+				(void) AddSizeOfStatesAndImportRecords (state.state_arity, state.state_record_arguments, asize, bsize);
+				return 1;
+			}
+			case TupleState:
+				return AddSizeOfStatesAndImportRecords (state.state_arity, state.state_tuple_arguments, asize, bsize);
+			case ArrayState:
+				*asize += SizeOfAStackElem;
+				return 0;
+		}
+	}
+	return 0;
+}
+
+static int AddSizeOfStatesAndImportRecords (int arity, States states, int *asize, int *bsize)
+{
+	int has_unboxed_record;
+	
+	has_unboxed_record=0;
+	for (; arity; arity--)
+		has_unboxed_record |= AddSizeOfStateAndImportRecords (states [arity-1], asize, bsize);
+	return has_unboxed_record;
+}
+
+static void GenUnboxedRecordLabelsReversed (StateS state)
+{
+	if (!IsSimpleState (state)){
+		int arity;
+		States argstates;
+		
+		switch (state.state_type){
+			case TupleState:
+				argstates = state.state_tuple_arguments;			
+				for (arity=state.state_arity-1; arity>=0; --arity)
+					GenUnboxedRecordLabelsReversed (argstates[arity]);
+				return;
+			case RecordState:
+			{
+				SymbDef record_sdef;
+
+				argstates = state.state_record_arguments;
+				for (arity=state.state_arity-1; arity>=0 ; --arity)
+					GenUnboxedRecordLabelsReversed (argstates[arity]);
+
+				record_sdef = state.state_record_symbol;
+				if (!record_sdef->sdef_exported && record_sdef->sdef_module==CurrentModule && !ExportLocalLabels){
+					if (DoDebug)
+						FPrintF (OutFile, R_PREFIX "%s ",record_sdef->sdef_ident->ident_name);
+					else
+						FPrintF (OutFile, R_PREFIX "%u ",record_sdef->sdef_number);
+				} else
+					FPrintF (OutFile, "e_%s_" R_PREFIX "%s ",record_sdef->sdef_module,record_sdef->sdef_ident->ident_name);
+				return;
+			}
+			case ArrayState:
+				return;
+			default:
+				error_in_function ("GenUnboxedRecordLabelsReversed");
+				return;
+		}
+	}
+}
+
+static void GenUnboxedRecordLabelsReversedForRecord (StateS state)
+{
+	if (state.state_type==RecordState){
+		int arity;
+		States argstates;
+
+		argstates = state.state_record_arguments;
+		for (arity=state.state_arity-1; arity>=0; --arity)
+			GenUnboxedRecordLabelsReversed (argstates[arity]);
+	} else
+		GenUnboxedRecordLabelsReversed (state);
 }
 
 void GenDStackLayout (int asize,int bsize,Args fun_args)
@@ -2891,12 +3032,21 @@ void GenConstructor0DescriptorAndExport (SymbDef sdef,int constructor_n)
 
 void GenRecordDescriptor (SymbDef sdef)
 {
-	int asize,bsize;
+	int asize,bsize,has_unboxed_record;
 	char *name;
 	StateS recstate;
+	
+	recstate = sdef->sdef_record_state;
+
+	asize=0;
+	bsize=0;
+	if (recstate.state_type==RecordState)
+		has_unboxed_record = AddSizeOfStatesAndImportRecords (recstate.state_arity,recstate.state_record_arguments,&asize,&bsize);
+	 else
+		has_unboxed_record = AddSizeOfStateAndImportRecords (recstate,&asize,&bsize);
 
 	name = sdef->sdef_ident->ident_name;
-	
+
 	if (sdef->sdef_exported || ExportLocalLabels){
 		put_directive_ (Dexport);
 		FPrintF (OutFile, "e_%s_" R_PREFIX "%s",CurrentModule,name);
@@ -2910,21 +3060,32 @@ void GenRecordDescriptor (SymbDef sdef)
 		FPrintF (OutFile, R_PREFIX "%u ",sdef->sdef_number);
 	}
 
-	recstate = sdef->sdef_record_state;
-
 	GenABStackElemsOfRecord (recstate);
-
-	DetermineSizeOfState (recstate,&asize,&bsize);
 	
-	FPrintF (OutFile, " %d %d \"%s\"",asize,bsize,name);
+	if (!has_unboxed_record)
+		FPrintF (OutFile, " %d %d \"%s\"",asize,bsize,name);
+	else {
+		FPrintF (OutFile, " %d %d ",asize,bsize);
+		GenUnboxedRecordLabelsReversedForRecord (recstate); 
+		FPrintF (OutFile, "\"%s\"",name);	
+	}
 }
 
 #ifdef STRICT_LISTS
 void GenUnboxedConsRecordDescriptor (SymbDef sdef,int tail_strict)
 {
-	int asize,bsize;
+	int asize,bsize,has_unboxed_record;
 	char *name,*unboxed_record_cons_prefix;
-	StateS tuple_state,tuple_arguments_state[2];
+	StateS tuple_arguments_state[2];
+
+	tuple_arguments_state[0] = sdef->sdef_record_state;
+	tuple_arguments_state[1] = LazyState;
+
+	DetermineSizeOfState (tuple_arguments_state[1],&asize,&bsize);
+	if (tuple_arguments_state[0].state_type==RecordState)
+		has_unboxed_record = AddSizeOfStatesAndImportRecords (tuple_arguments_state[0].state_arity,tuple_arguments_state[0].state_record_arguments,&asize,&bsize);
+	else
+		has_unboxed_record = AddSizeOfStateAndImportRecords (tuple_arguments_state[0],&asize,&bsize);
 
 	name = sdef->sdef_ident->ident_name;
 	
@@ -2940,32 +3101,41 @@ void GenUnboxedConsRecordDescriptor (SymbDef sdef,int tail_strict)
 		FPrintF (OutFile, "%s%s ",unboxed_record_cons_prefix,name);
 	}
 
-	tuple_state.state_type=TupleState;
-	tuple_state.state_arity=2;
-	tuple_state.state_tuple_arguments=tuple_arguments_state;
-
-	tuple_arguments_state[0] = sdef->sdef_record_state;
-	tuple_arguments_state[1] = LazyState;
-
 	FPutC ('l', OutFile);
 	FPutC ('R', OutFile);
 
 	GenABStackElemsOfRecord (tuple_arguments_state[0]);
 	GenABStackElems (tuple_arguments_state[1]);
-
-	DetermineSizeOfState (tuple_state,&asize,&bsize);
 	
-	if (ExportLocalLabels)
-		FPrintF (OutFile,tail_strict ? " %d %d \"_Cons#!%s\"" : " %d %d \"_Cons#%s\"",asize,bsize,name);
-	else
-		FPrintF (OutFile,tail_strict ? " %d %d \"[#%s!]\"" : " %d %d \"[#%s]\"",asize,bsize,name);
+	if (!has_unboxed_record){
+		if (ExportLocalLabels)
+			FPrintF (OutFile,tail_strict ? " %d %d \"_Cons#!%s\"" : " %d %d \"_Cons#\"",asize,bsize,name);
+		else
+			FPrintF (OutFile,tail_strict ? " %d %d \"[#%s!]\"" : " %d %d \"[#%s]\"",asize,bsize,name);
+	} else {
+		FPrintF (OutFile," %d %d ",asize,bsize);
+		GenUnboxedRecordLabelsReversedForRecord (tuple_arguments_state[0]);
+		if (ExportLocalLabels)
+			FPrintF (OutFile,tail_strict ? "\"_Cons#!%s\"" : "\"_Cons#\"",name);
+		else
+			FPrintF (OutFile,tail_strict ? "\"[#%s!]\"" : "\"[#%s]\"",name);
+	}
 }
 #endif
 
-void GenStrictConstructorDescriptor (SymbDef sdef,StateP constructor_arg_state_p)
+void GenStrictConstructorDescriptor (SymbDef sdef,StateP constructor_arg_states)
 {
-	int asize,bsize,state_arity,arg_n;
+	int asize,bsize,state_arity,arg_n,has_unboxed_record;
+	StateP constructor_arg_state_p;
 	char *name;
+
+	state_arity=sdef->sdef_arity;
+
+	asize = 0;
+	bsize = 0;
+	has_unboxed_record = 0;
+	for (arg_n=0,constructor_arg_state_p=constructor_arg_states; arg_n<state_arity; ++arg_n,++constructor_arg_state_p)
+		has_unboxed_record |= AddSizeOfStateAndImportRecords (*constructor_arg_state_p,&asize,&bsize);
 
 	name = sdef->sdef_ident->ident_name;
 	
@@ -2984,17 +3154,17 @@ void GenStrictConstructorDescriptor (SymbDef sdef,StateP constructor_arg_state_p
 
 	FPutC ('d', OutFile);
 
-	state_arity=sdef->sdef_arity;
-	asize = 0;
-	bsize = 0;
-
-	for (arg_n=0; arg_n<state_arity; ++arg_n){
-		GenABStackElems (*constructor_arg_state_p);
-		AddSizeOfState  (*constructor_arg_state_p,&asize,&bsize);
-		++constructor_arg_state_p;
-	}
+	for (arg_n=0,constructor_arg_state_p=constructor_arg_states; arg_n<state_arity; ++arg_n,++constructor_arg_state_p)
+		 GenABStackElemsForRecordDesc (*constructor_arg_state_p);
 	
-	FPrintF (OutFile, " %d %d \"%s\"", asize, bsize, name);
+	if (!has_unboxed_record)
+		FPrintF (OutFile, " %d %d \"%s\"", asize, bsize, name);
+	else {
+		FPrintF (OutFile, " %d %d ", asize, bsize);
+		for (arg_n=state_arity-1; arg_n>=0; --arg_n)
+			GenUnboxedRecordLabelsReversed (constructor_arg_states[arg_n]);
+		FPrintF (OutFile, "\"%s\"", name);	
+	}
 }
 
 void GenArrayFunctionDescriptor (SymbDef arr_fun_def, Label desclab, int arity)
