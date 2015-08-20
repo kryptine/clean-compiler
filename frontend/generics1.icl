@@ -3012,7 +3012,7 @@ where
 		| size fun_defs<>fun_index
 			= abort "copy_generic_case_macro: incorrect function index"
 
-		# (reversed_groups,unexpanded_dcl_macros,fun_defs,dcl_macros,var_heap,expression_heap,symbol_table,error)
+		# (unexpanded_dcl_macros,fun_defs,dcl_macros,var_heap,expression_heap,symbol_table,error)
 			= partitionateAndLiftMacro macro_module_index macro_index main_module_index predefs group_index
 												 fun_defs dcl_macros var_heap expression_heap symbol_table error
 

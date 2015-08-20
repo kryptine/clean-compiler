@@ -1183,10 +1183,12 @@ partitionateAndLiftFunctions ranges main_dcl_module_n predef_symbols_for_transfo
 							ps_unexpanded_dcl_macros=[] }
 	  {ps_groups, ps_symbol_table, ps_var_heap, ps_symbol_heap, ps_fun_defs, ps_macro_defs, ps_error,ps_unexpanded_dcl_macros}
 	  		= foldSt (partitionate_functions main_dcl_module_n max_fun_nr) ranges partitioning_info
-	# (reversed_ps_groups,fun_defs) = remove_macros_from_groups_and_reverse ps_groups ps_fun_defs []
-	# groups = { {group_members = group} \\ group <- reversed_ps_groups }
+	# (n_groups,revered_groups,fun_defs) = remove_macros_from_groups_and_reverse (reverse ps_groups) 0 ps_fun_defs []
+	# group_a = createArray n_groups {group_members = []};
+	# last_group_n = n_groups-1;
+	# group_a = { group_a & [last_group_n-i] = {group_members = group} \\ i<-[0..last_group_n] & group<-revered_groups }
 	# macro_defs = restore_unexpanded_dcl_macros ps_unexpanded_dcl_macros ps_macro_defs
-	= (groups, fun_defs, macro_defs, ps_var_heap, ps_symbol_heap, ps_symbol_table, ps_error)
+	= (group_a, fun_defs, macro_defs, ps_var_heap, ps_symbol_heap, ps_symbol_table, ps_error)
 where
 	partitionate_functions mod_index max_fun_nr {ir_from,ir_to} ps
 		= iFoldSt (partitionate_global_function mod_index max_fun_nr) ir_from ir_to ps
@@ -1201,7 +1203,7 @@ get_predef_symbols_for_transform predef_symbols
 	= ({predef_alias_dummy=predef_symbols.[PD_DummyForStrictAliasFun],predef_and=predef_symbols.[PD_AndOp],predef_or=predef_symbols.[PD_OrOp]})
 
 partitionateAndLiftMacro :: !Int !Int !Index !PredefinedSymbols !Int !*{#FunDef} !*{#*{#FunDef}} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
-								   -> (![[Int]],!UnexpandedDclMacros,!*{#FunDef},!*{#*{#FunDef}},!*VarHeap,!*ExpressionHeap,!*SymbolTable,!*ErrorAdmin)
+								   -> (!UnexpandedDclMacros,!*{#FunDef},!*{#*{#FunDef}},!*VarHeap,!*ExpressionHeap,!*SymbolTable,!*ErrorAdmin)
 partitionateAndLiftMacro macro_module_index macro_index main_dcl_module_n predef_symbols next_group_n fun_defs macro_defs var_heap symbol_heap symbol_table error
 	# predef_symbols_for_transform = get_predef_symbols_for_transform predef_symbols
 	#! max_fun_nr = cMAXINT
@@ -1211,8 +1213,7 @@ partitionateAndLiftMacro macro_module_index macro_index main_dcl_module_n predef
 	  pi = {pi_predef_symbols_for_transform=predef_symbols_for_transform,pi_main_dcl_module_n=main_dcl_module_n,pi_reset_body_of_rhs_macros=True}
 	  (_, {ps_groups, ps_symbol_table, ps_var_heap, ps_symbol_heap, ps_fun_defs, ps_macro_defs, ps_error,ps_unexpanded_dcl_macros})
 	  		= partitionate_macro main_dcl_module_n max_fun_nr macro_module_index macro_index pi partitioning_state
-	# (reversed_ps_groups,fun_defs) = remove_macros_from_groups_and_reverse ps_groups ps_fun_defs []
-	= (reversed_ps_groups, ps_unexpanded_dcl_macros, fun_defs, ps_macro_defs, ps_var_heap, ps_symbol_heap, ps_symbol_table, ps_error)
+	= (ps_unexpanded_dcl_macros, ps_fun_defs, ps_macro_defs, ps_var_heap, ps_symbol_heap, ps_symbol_table, ps_error)
 
 restore_unexpanded_dcl_macros :: !UnexpandedDclMacros !*{#*{#FunDef}} -> *{#*{#FunDef}}
 restore_unexpanded_dcl_macros [(macro_module_index,macro_index,macro_def):unexpanded_dcl_macros] macro_defs
@@ -1382,24 +1383,25 @@ where
 //								{ps & ps_next_group = ps.ps_next_group}
 					-> ps
 
-remove_macros_from_groups_and_reverse :: ![[FunctionOrMacroIndex]] !*{#FunDef} [[Int]] -> (![[Int]],!*{#FunDef})
-remove_macros_from_groups_and_reverse [group:groups] fun_defs result_groups
+remove_macros_from_groups_and_reverse :: ![[FunctionOrMacroIndex]] !Int !*{#FunDef} [[Int]] -> (!Int,![[Int]],!*{#FunDef})
+remove_macros_from_groups_and_reverse [group:groups] group_n fun_defs result_groups
 	# (group,fun_defs) = remove_macros_from_group group fun_defs
 	= case group of
-		[]	-> remove_macros_from_groups_and_reverse groups fun_defs result_groups
-		_	-> remove_macros_from_groups_and_reverse groups fun_defs [group:result_groups]
+		[]	-> remove_macros_from_groups_and_reverse groups group_n fun_defs result_groups
+		_	-> remove_macros_from_groups_and_reverse groups (group_n+1) fun_defs [group:result_groups]
 where
-	remove_macros_from_group [FunctionOrIclMacroIndex fun:funs] fun_defs
+	remove_macros_from_group [FunctionOrIclMacroIndex fun:funs] fun_defs	
 		# (funs,fun_defs)=remove_macros_from_group funs fun_defs
 		| fun_defs.[fun].fun_info.fi_group_index<NoIndex
 			= (funs,fun_defs)
+			# fun_defs & [fun].fun_info.fi_group_index = group_n;
 			= ([fun:funs],fun_defs)
 	remove_macros_from_group [DclMacroIndex macro_module_index macro_index:funs] fun_defs		
 		= remove_macros_from_group funs fun_defs
 	remove_macros_from_group [] fun_defs
 		= ([],fun_defs);
-remove_macros_from_groups_and_reverse [] fun_defs result_groups
-	= (result_groups,fun_defs);
+remove_macros_from_groups_and_reverse [] group_n fun_defs result_groups
+	= (group_n,result_groups,fun_defs);
 
 addFunctionCallsToSymbolTable calls fun_defs macro_defs symbol_table
 	= foldSt add_function_call_to_symbol_table calls ([], fun_defs,macro_defs, symbol_table)
