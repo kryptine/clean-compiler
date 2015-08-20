@@ -753,24 +753,54 @@ varToFreeVar {var_ident, var_info_ptr}
   = {fv_def_level = NotALevel, fv_ident = var_ident, fv_info_ptr = var_info_ptr, fv_count = 0}
 
 tfCase :: !ExprId !Case -> Case
-tfCase eid cs=:{case_guards, case_default}
-  = {cs & case_guards = tfGuards case_guards, case_default = tfDefault case_default}
+tfCase eid cs = fst (tfCase` eid cs [0..])
+
+tfCase` eid cs=:{case_guards, case_default} branchNums
+  # (gs, branchNums) = tfGuards case_guards branchNums
+  # (d, branchNums)  = tfDefault case_default branchNums
+  = ({cs & case_guards = gs, case_default = d}, branchNums)
   where
-  tfGuards (AlgebraicPatterns idx as)
-    = AlgebraicPatterns idx (map tfA (zip2 as [0..]))
-  tfGuards (BasicPatterns bt bs)
-    = BasicPatterns bt (map tfB (zip2 bs [0..]))
-  tfGuards (NewTypePatterns idx as)
-    = NewTypePatterns idx (map tfA (zip2 as [0..]))
-  tfGuards (DynamicPatterns ds)
-    = DynamicPatterns (map tfD (zip2 ds [0..]))
-  tfGuards (OverloadedListPatterns ot e as)
-    = OverloadedListPatterns ot e (map tfA (zip2 as [0..]))
-  tfA (ap, n) = {ap & ap_expr = BasicExpr (BVInt n)}
-  tfB (bp, n) = {bp & bp_expr = BasicExpr (BVInt n)}
-  tfD (dp, n) = {dp & dp_rhs  = BasicExpr (BVInt n)}
-  tfDefault (Yes def) = Yes (BasicExpr (BVInt -1))
-  tfDefault _         = No
+  tfGuards (AlgebraicPatterns idx as) branchNums
+    # (as, branchNums) = foldr tfA ([], branchNums) as
+    = (AlgebraicPatterns idx as, branchNums)
+  tfGuards (BasicPatterns bt bs) branchNums
+    # (bs, branchNums) = foldr tfB ([], branchNums) bs
+    = (BasicPatterns bt bs, branchNums)
+  tfGuards (NewTypePatterns idx as) branchNums
+    # (as, branchNums) = foldr tfA ([], branchNums) as
+    = (NewTypePatterns idx as, branchNums)
+  tfGuards (DynamicPatterns ds) branchNums
+    # (ds, branchNums) = foldr tfD ([], branchNums) ds
+    = (DynamicPatterns ds, branchNums)
+  tfGuards (OverloadedListPatterns ot e as) branchNums
+    # (as, branchNums) = foldr tfA ([], branchNums) as
+    = (OverloadedListPatterns ot e as, branchNums)
+  tfGuards p branchNums = (p, branchNums)
+  tfA ap (acc, [num : branchNums])
+    = case ap.ap_expr of
+        Case cs`=:{case_explicit = False}
+          # (cs`, branchNums) = tfCase` eid cs` [num:branchNums]
+          = ([{ap & ap_expr = Case cs`} : acc], branchNums)
+        _ = ([{ap & ap_expr = BasicExpr (BVInt num)} : acc], branchNums)
+  tfB bp (acc, [num : branchNums])
+    = case bp.bp_expr of
+        Case cs`=:{case_explicit = False}
+          # (cs`, branchNums) = tfCase` eid cs` [num:branchNums]
+          = ([{bp & bp_expr = Case cs`} : acc], branchNums)
+        _ = ([{bp & bp_expr = BasicExpr (BVInt num)} : acc], branchNums)
+  tfD dp (acc, [num : branchNums])
+    = case dp.dp_rhs of
+        Case cs`=:{case_explicit = False}
+          # (cs`, branchNums) = tfCase` eid cs` [num:branchNums]
+          = ([{dp & dp_rhs = Case cs`} : acc], branchNums)
+        _ = ([{dp & dp_rhs = BasicExpr (BVInt num)} : acc], branchNums)
+  tfDefault (Yes def) [num : branchNums]
+    = case def of
+        Case cs`=:{case_explicit = False}
+          # (cs`, branchNums) = tfCase` eid cs` [num:branchNums]
+          = (Yes (Case cs`), branchNums)
+        _ = (Yes (BasicExpr (BVInt num)), branchNums)
+  tfDefault _ branchNums = (No, branchNums)
 
 refreshVariables :: [FreeVar] Expression *ChnExpression -> *([FreeVar], Expression, *ChnExpression)
 refreshVariables fvs e chn
@@ -795,6 +825,7 @@ refreshVariables fvs e chn
     # (VI_ForwardClassVar newVarPtr, var_heap) = readPtr bv.var_info_ptr var_heap
     = (Var {bv & var_info_ptr = newVarPtr
                , var_expr_ptr = newExprPtr}, (var_heap, expr_heap))
+
   refreshVariables` (App app) (var_heap, expr_heap)
     # (args, (var_heap, expr_heap)) = mapSt refreshVariables` app.app_args (var_heap, expr_heap)
     = (App {app & app_args = args}, (var_heap, expr_heap))
@@ -847,22 +878,15 @@ refreshVariables fvs e chn
       # (as, (var_heap, expr_heap)) = mapSt refreshA as (var_heap, expr_heap)
       = (OverloadedListPatterns ot e as, (var_heap, expr_heap))
     refreshA ap (var_heap, expr_heap)
+      # (ap_vars, var_heap) = mapSt refreshFreeVar ap.ap_vars var_heap
       # (ap_expr, (var_heap, expr_heap)) = refreshVariables` ap.ap_expr (var_heap, expr_heap)
-      = ({ap & ap_expr = ap_expr}, (var_heap, expr_heap))
+      = ({ap & ap_vars = ap_vars, ap_expr = ap_expr}, (var_heap, expr_heap))
     refreshB bp (var_heap, expr_heap)
       # (bp_expr, (var_heap, expr_heap)) = refreshVariables` bp.bp_expr (var_heap, expr_heap)
       = ({bp & bp_expr = bp_expr}, (var_heap, expr_heap))
     refreshD dp (var_heap, expr_heap)
       # (dp_rhs, (var_heap, expr_heap)) = refreshVariables` dp.dp_rhs (var_heap, expr_heap)
       = ({dp & dp_rhs = dp_rhs}, (var_heap, expr_heap))
-  refreshVariables` (FreeVar fv) (var_heap, expr_heap)
-    # (fv, var_heap) = refreshFreeVar fv var_heap
-    # (VI_ForwardClassVar newPtr, var_heap) = readPtr fv.fv_info_ptr var_heap
-    = (FreeVar {fv & fv_info_ptr = newPtr}, (var_heap, expr_heap))
-
-  refreshVariables` (DictionariesFunction as e aty) (var_heap, expr_heap)
-    # (e, (var_heap, expr_heap)) = refreshVariables` e (var_heap, expr_heap)
-    = (DictionariesFunction as e aty, (var_heap, expr_heap))
   refreshVariables` (Selection sk e ss) (var_heap, expr_heap)
     # (e, (var_heap, expr_heap)) = refreshVariables` e (var_heap, expr_heap)
     = (Selection sk e ss, (var_heap, expr_heap))
@@ -881,6 +905,20 @@ refreshVariables fvs e chn
   refreshVariables` (TupleSelect ds n e) (var_heap, expr_heap)
     # (e, (var_heap, expr_heap)) = refreshVariables` e (var_heap, expr_heap)
     = (TupleSelect ds n e, (var_heap, expr_heap))
+  refreshVariables` (MatchExpr gds e) (var_heap, expr_heap)
+    # (e, (var_heap, expr_heap)) = refreshVariables` e (var_heap, expr_heap)
+    = (MatchExpr gds e, (var_heap, expr_heap))
+  refreshVariables` (IsConstructor e gds n gi ident pos) (var_heap, expr_heap)
+    # (e, (var_heap, expr_heap)) = refreshVariables` e (var_heap, expr_heap)
+    = (IsConstructor e gds n gi ident pos, (var_heap, expr_heap))
+  refreshVariables` (FreeVar fv) (var_heap, expr_heap)
+    # (fv, var_heap)                        = refreshFreeVar fv var_heap
+    # (VI_ForwardClassVar newPtr, var_heap) = readPtr fv.fv_info_ptr var_heap
+    = (FreeVar {fv & fv_info_ptr = newPtr}, (var_heap, expr_heap))
+  refreshVariables` (DictionariesFunction as e aty) (var_heap, expr_heap)
+    # (e, (var_heap, expr_heap)) = refreshVariables` e (var_heap, expr_heap)
+    = (DictionariesFunction as e aty, (var_heap, expr_heap))
+
   refreshVariables` e (var_heap, expr_heap) = (e, (var_heap, expr_heap))
 
 
