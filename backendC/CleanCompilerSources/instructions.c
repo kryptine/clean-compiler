@@ -3572,12 +3572,30 @@ void GenStart (SymbDef startsymb)
 #ifdef NEW_SELECTOR_DESCRIPTORS
 void GenSelectorDescriptor (Label sellab,int element_n)
 {
+	if (sellab->lab_issymbol){
+		char *name;
+		
+		name=sellab->lab_symbol->sdef_ident->ident_name;
+
+		put_directive_ (Dexport);
+		FPrintF (OutFile, "e_%s_" D_PREFIX "%s.%d",sellab->lab_mod, name, sellab->lab_post);
+		put_directive_ (Dexport);
+		FPrintF (OutFile, "e_%s_%s%s.%d",sellab->lab_mod, sellab->lab_pref, name, sellab->lab_post);
+
 	put_directive_ (Ddescs);
+		FPrintF (OutFile, "e_%s_" D_PREFIX "%s.%d e_%s_%s%s.%d _ %d 0 \"%s.%d\"",
+				sellab->lab_mod, name, sellab->lab_post,
+				sellab->lab_mod, sellab->lab_pref, name, sellab->lab_post,
+				element_n+1,
+				name, sellab->lab_post);
+	} else {
+		put_directive_ (Ddescs);
 	FPrintF (OutFile, D_PREFIX "%s.%d %s%s.%d _ %d 0 \"%s.%d\"",
 			sellab->lab_name, sellab->lab_post,
 			sellab->lab_pref, sellab->lab_name, sellab->lab_post,
 			element_n+1,
 			sellab->lab_name, sellab->lab_post);
+	}
 }
 #else
 void GenSelectorDescriptor (Label sellab,char *g_pref)

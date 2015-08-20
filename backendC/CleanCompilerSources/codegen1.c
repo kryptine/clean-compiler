@@ -257,12 +257,23 @@ void ConvertSymbolToRLabel (LabDef *slab,SymbDef sdef)
 	MakeSymbolLabel (slab,modname,r_pref,sdef,0);
 }
 
+static SymbDefS lazy_tuple_selector_sdef;
+static IdentS lazy_tuple_selector_ident;
+
 void BuildLazyTupleSelectorLabel (Label slab, int arity, int argnr)
 {
 	if (argnr > NrOfGlobalSelectors){
 		LazyTupleSelectors [argnr - NrOfGlobalSelectors- 1] = True;
-		MakeLabel (slab,loc_sel,argnr,n_pref);
-	} else 
+		if (ExportLocalLabels){
+			lazy_tuple_selector_sdef.sdef_exported=True;
+			lazy_tuple_selector_sdef.sdef_ident=&lazy_tuple_selector_ident;
+			lazy_tuple_selector_ident.ident_name=loc_sel;
+			MakeSymbolLabel (slab,CurrentModule,n_pref,&lazy_tuple_selector_sdef,argnr);
+		} else {
+			LazyTupleSelectors [argnr - NrOfGlobalSelectors- 1] = True;
+			MakeLabel (slab,loc_sel,argnr,n_pref);
+		}
+	} else
 		MakeLabel (slab,glob_sel,argnr,n_pref);
 }
 
