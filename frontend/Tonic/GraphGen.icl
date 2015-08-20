@@ -287,7 +287,7 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
                                Just (var, lamIdx)
                                  = [(eid, 'DM'.elems vars, cs) \\ (eid, vars, cs) <- inh.inh_cases | allVarsBound` var inh vars]
                                _ = []
-          # (evalableCases, chn) = ([], chn) // mapSt (\(eid, bvs, cs) chn -> mkCaseDetFun inh.inh_bind_var eid (ptrToInt app.app_info_ptr) bvs cs inh chn) evalableCases chn
+          # (evalableCases, chn) = mapSt (\(eid, bvs, cs) chn -> mkCaseDetFun inh.inh_bind_var eid (ptrToInt app.app_info_ptr) bvs cs inh chn) evalableCases chn
           # (ps, chn)      = mapSt (\(x, n) chn -> mkBlueprint (addUnique n {inh & inh_bind_var = Nothing}) x chn) (zip2 args [0..]) chn
           # args`          = map (\syn -> syn.syn_annot_expr) ps
           # (app`, chn)    = (App {app & app_args = args`}, chn)

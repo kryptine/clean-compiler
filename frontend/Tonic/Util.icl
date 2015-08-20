@@ -772,6 +772,111 @@ tfCase eid cs=:{case_guards, case_default}
   tfDefault (Yes def) = Yes (BasicExpr (BVInt -1))
   tfDefault _         = No
 
+refreshVariables :: [FreeVar] Expression *ChnExpression -> *([FreeVar], Expression, *ChnExpression)
+refreshVariables fvs e chn
+  # heaps    = chn.chn_heaps
+  # var_heap = heaps.hp_var_heap
+  # (fvs, var_heap) = mapSt refreshFreeVar fvs var_heap
+  # (e, var_heap)   = refreshVariables` e var_heap
+  # heaps    = {heaps & hp_var_heap = var_heap }
+  = (fvs, e, {chn & chn_heaps = heaps})
+  where
+  refreshFreeVar :: FreeVar *VarHeap -> *(FreeVar, *VarHeap)
+  refreshFreeVar fv var_heap
+    # (newPtr, var_heap) = newPtr VI_Empty var_heap
+    # var_heap = var_heap <:= (fv.fv_info_ptr, VI_ForwardClassVar newPtr)
+    = ({fv & fv_info_ptr = newPtr}, var_heap)
+
+  refreshVariables` :: Expression *VarHeap -> *(Expression, *VarHeap)
+  refreshVariables` (Var bv) var_heap
+    # (VI_ForwardClassVar newPtr, var_heap) = readPtr bv.var_info_ptr var_heap
+    = (Var {bv & var_info_ptr = newPtr}, var_heap)
+  refreshVariables` (App app) var_heap
+    # (args, var_heap) = mapSt refreshVariables` app.app_args var_heap
+    = (App {app & app_args = args}, var_heap)
+  refreshVariables` (e @ es) var_heap
+    # (e, var_heap)  = refreshVariables` e var_heap
+    # (es, var_heap) = mapSt refreshVariables` es var_heap
+    = (e @ es, var_heap)
+  refreshVariables` (Let lt) var_heap
+    # (strict_binds, var_heap) = mapSt refreshBind lt.let_strict_binds var_heap
+    # (lazy_binds, var_heap)   = mapSt refreshBind lt.let_lazy_binds var_heap
+    # (e, var_heap)            = refreshVariables` lt.let_expr var_heap
+    = (Let {lt & let_strict_binds = strict_binds
+               , let_lazy_binds   = lazy_binds
+               , let_expr         = e }, var_heap)
+    where
+    refreshBind lb var_heap
+      # (fv, var_heap)  = refreshFreeVar lb.lb_dst var_heap
+      # (rhs, var_heap) = refreshVariables` lb.lb_src var_heap
+      = ({lb & lb_dst = fv
+             , lb_src = rhs}, var_heap)
+  refreshVariables` (Case cs) var_heap
+    # (case_expr, var_heap)    = refreshVariables` cs.case_expr var_heap
+    # (case_guards, var_heap)  = refreshGuards cs.case_guards var_heap
+    # (case_default, var_heap) = case cs.case_default of
+                                   Yes e
+                                     # (e, var_heap) = refreshVariables` e var_heap
+                                     = (Yes e, var_heap)
+                                   _ = (No, var_heap)
+    = (Case {cs & case_expr = case_expr
+                , case_guards = case_guards
+                , case_default = case_default}, var_heap)
+    where
+    refreshGuards (AlgebraicPatterns idx as) var_heap
+      # (as, var_heap) = mapSt refreshA as var_heap
+      = (AlgebraicPatterns idx as, var_heap)
+    refreshGuards (BasicPatterns bt bs) var_heap
+      # (bs, var_heap) = mapSt refreshB bs var_heap
+      = (BasicPatterns bt bs, var_heap)
+    refreshGuards (NewTypePatterns idx as) var_heap
+      # (as, var_heap) = mapSt refreshA as var_heap
+      = (NewTypePatterns idx as, var_heap)
+    refreshGuards (DynamicPatterns ds) var_heap
+      # (ds, var_heap) = mapSt refreshD ds var_heap
+      = (DynamicPatterns ds, var_heap)
+    refreshGuards (OverloadedListPatterns ot e as) var_heap
+      # (as, var_heap) = mapSt refreshA as var_heap
+      = (OverloadedListPatterns ot e as, var_heap)
+    refreshA ap var_heap
+      # (ap_expr, var_heap) = refreshVariables` ap.ap_expr var_heap
+      = ({ap & ap_expr = ap_expr}, var_heap)
+    refreshB bp var_heap
+      # (bp_expr, var_heap) = refreshVariables` bp.bp_expr var_heap
+      = ({bp & bp_expr = bp_expr}, var_heap)
+    refreshD dp var_heap
+      # (dp_rhs, var_heap) = refreshVariables` dp.dp_rhs var_heap
+      = ({dp & dp_rhs = dp_rhs}, var_heap)
+  refreshVariables` (FreeVar fv) var_heap
+    # (fv, var_heap) = refreshFreeVar fv var_heap
+    # (VI_ForwardClassVar newPtr, var_heap) = readPtr fv.fv_info_ptr var_heap
+    = (FreeVar {fv & fv_info_ptr = newPtr}, var_heap)
+
+  refreshVariables` (DictionariesFunction as e aty) var_heap
+    # (e, var_heap) = refreshVariables` e var_heap
+    = (DictionariesFunction as e aty, var_heap)
+  refreshVariables` (Selection sk e ss) var_heap
+    # (e, var_heap) = refreshVariables` e var_heap
+    = (Selection sk e ss, var_heap)
+  refreshVariables` (Update e1 ss e2) var_heap
+    # (e1, var_heap) = refreshVariables` e1 var_heap
+    # (e2, var_heap) = refreshVariables` e2 var_heap
+    = (Update e1 ss e2, var_heap)
+  refreshVariables` (RecordUpdate gds e bs) var_heap
+    # (e, var_heap)  = refreshVariables` e var_heap
+    # (bs, var_heap) = mapSt refreshBind bs var_heap
+    = (RecordUpdate gds e bs, var_heap)
+    where
+    refreshBind bnd var_heap
+      # (bnd_src, var_heap) = refreshVariables` bnd.bind_src var_heap
+      = ({bnd & bind_src = bnd_src}, var_heap)
+  refreshVariables` (TupleSelect ds n e) var_heap
+    # (e, var_heap) = refreshVariables` e var_heap
+    = (TupleSelect ds n e, var_heap)
+  refreshVariables` e var_heap = (e, var_heap)
+
+
+
 import StdDebug
 mkCaseDetFun :: !(Maybe (FreeVar, Index)) !ExprId !Int ![BoundVar] !Expression !InhExpression !*ChnExpression -> *(Expression, *ChnExpression)
 mkCaseDetFun mbindfv eid exprPtr boundArgs bdy inh chn
@@ -789,6 +894,7 @@ mkCaseDetFun mbindfv eid exprPtr boundArgs bdy inh chn
                            Let lt=:{let_expr = Case cs}
                              = Let {lt & let_expr = Case (tfCase eid cs)}
                            _ = abort "mkCaseDetFun shouldn't happen"
+  # (freeArgs, bdy`, chn) = refreshVariables freeArgs bdy` chn
 
   # arity              = length freeArgs
   # funIdent           = { id_name = name
@@ -800,11 +906,9 @@ mkCaseDetFun mbindfv eid exprPtr boundArgs bdy inh chn
   # groups`            = [grp \\ grp <-: groups]
   # (groupidx, group)  = case [(idx, group) \\ (idx, group) <- zip2 [0..] groups` | elem parentIdx group.group_members] of
                             [group : _] -> group
-  #! fun_defs = trace_n (fun_def.fun_ident.id_name +++ ": fun_def.fun_info.fi_group_index = " +++ toString fun_def.fun_info.fi_group_index +++ " ; manual lookup idx = " +++ toString groupidx) fun_defs
   # mainDclN           = chn.chn_main_dcl_module_n
   # (nextFD, fun_defs) = usize fun_defs
   # (argVars, localVars, freeVars) = collectVars bdy` freeArgs
-  #! fun_defs = trace_n (fun_def.fun_ident.id_name +++ ": argVars = " +++ toString (length argVars) +++ " localVars = " +++ toString (length localVars) +++ " freeVars = " +++ toString (length freeVars)) fun_defs
   # newFunDef          = { fun_docs     = ""
                          , fun_ident    = funIdent
                          , fun_arity    = arity
@@ -895,7 +999,7 @@ wrapBody inh syn is_itasks_mod chn
     # (args, chn) = foldr (mkArg symbty is_itasks_mod inh.inh_instance_tree) ([], chn) (zip2 tb_args symbty.st_args)
     | length args == length tb_args
         # evalableCases  = [(eid, 'DM'.elems vars, cs) \\ (eid, vars, cs) <- syn.syn_cases | allVarsBound inh vars]
-        # (evalableCases, chn) = ([], chn) //  mapSt (\(eid, bvs, cs) chn -> mkCaseDetFun Nothing eid inh.inh_fun_idx bvs cs inh chn) evalableCases chn
+        # (evalableCases, chn) = mapSt (\(eid, bvs, cs) chn -> mkCaseDetFun Nothing eid inh.inh_fun_idx bvs cs inh chn) evalableCases chn
 
         # (icl, chn) = chn!chn_icl_module
         # iclname = icl.icl_name.id_name
