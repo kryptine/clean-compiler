@@ -136,11 +136,11 @@ static int string_and_string_begin_equal (char *s1,char *s2_begin,char *s2_passe
 #ifdef CLEAN2
 static char *print_compiler_generated_function_name (char *name, char *name_end, unsigned line_nr, File file)
 {
-	char *passed_digits;
+	char *parsed_digits;
 
 	FPutS (name,file);
 	
-	passed_digits=NULL;
+	parsed_digits=NULL;
 	if (name_end[0]==';' && isdigit (name_end[1])){
 		char *s;
 		
@@ -148,23 +148,23 @@ static char *print_compiler_generated_function_name (char *name, char *name_end,
 		while (isdigit (*s))
 			++s;
 		if (*s==';')
-			passed_digits=s;
+			parsed_digits=s;
 	}
 	
 	if (line_nr>0){
 		FPrintF (file,"[line: %u]", line_nr);
-		if (passed_digits)
-			name_end=passed_digits;
+		if (parsed_digits)
+			name_end=parsed_digits;
 	} else
-		if (passed_digits){
+		if (parsed_digits){
 			char *d_p;
 
 			FPutS ("[line:",file);
-			for (d_p=name_end+1; d_p<passed_digits; ++d_p)
+			for (d_p=name_end+1; d_p<parsed_digits; ++d_p)
 				FPutC (*d_p,file);
 			FPutC (']',file);
 
-			name_end=passed_digits;
+			name_end=parsed_digits;
 		}
 	FPutS (name_end,file);
 
@@ -203,6 +203,8 @@ static char *PrintName (char *name, char *name_end, unsigned line_nr, File file)
 			FPutS ("<array comprehension>", file);
 		else {
 			FPutS (name, file);
+			while (*name_end!='\0')
+				++name_end;
 			return name_end;
 		}
 		FPrintF (file, " [line: %u]", line_nr);
