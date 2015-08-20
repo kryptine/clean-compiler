@@ -3130,19 +3130,22 @@ void GenUnboxedConsRecordDescriptor (SymbDef sdef,int tail_strict)
 	GenABStackElemsOfRecord (tuple_arguments_state[0]);
 	GenABStackElems (tuple_arguments_state[1]);
 	
-	if (!has_unboxed_record){
-		if (ExportLocalLabels)
-			FPrintF (OutFile,tail_strict ? " %d %d \"_Cons#!%s\"" : " %d %d \"_Cons#\"",asize,bsize,name);
-		else
-			FPrintF (OutFile,tail_strict ? " %d %d \"[#%s!]\"" : " %d %d \"[#%s]\"",asize,bsize,name);
-	} else {
-		FPrintF (OutFile," %d %d ",asize,bsize);
+	FPrintF (OutFile," %d %d ",asize,bsize);
+	if (has_unboxed_record)
 		GenUnboxedRecordLabelsReversedForRecord (tuple_arguments_state[0]);
-		if (ExportLocalLabels)
-			FPrintF (OutFile,tail_strict ? "\"_Cons#!%s\"" : "\"_Cons#\"",name);
+	
+	if (!sdef->sdef_exported && sdef->sdef_module==CurrentModule && !ExportLocalLabels){
+		if (DoDebug)
+			FPrintF (OutFile, R_PREFIX "%s ",name);
 		else
-			FPrintF (OutFile,tail_strict ? "\"[#%s!]\"" : "\"[#%s]\"",name);
-	}
+			FPrintF (OutFile, R_PREFIX "%u ",sdef->sdef_number);
+	} else
+		FPrintF (OutFile, "e_%s_" R_PREFIX "%s ",sdef->sdef_module,name);
+
+	if (ExportLocalLabels)
+		FPrintF (OutFile,tail_strict ? "\"_Cons#!%s\"" : "\"_Cons#\"",name);
+	else
+		FPrintF (OutFile,tail_strict ? "\"[#%s!]\"" : "\"[#%s]\"",name);
 }
 #endif
 
