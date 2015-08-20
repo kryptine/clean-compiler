@@ -947,8 +947,6 @@ mkCaseDetFun mbindfv eid exprPtr boundArgs bdy inh chn
   # (fun_def, fun_defs) = fun_defs![inh.inh_fun_idx]
   # groups             = chn.chn_groups
   # groups`            = [grp \\ grp <-: groups]
-  # (groupidx, group)  = case [(idx, group) \\ (idx, group) <- zip2 [0..] groups` | elem inh.inh_fun_idx group.group_members] of
-                            [group : _] -> group
   # mainDclN           = chn.chn_main_dcl_module_n
   # (nextFD, fun_defs) = usize fun_defs
   # (argVars, localVars, freeVars) = collectVars bdy` freeArgs
@@ -963,7 +961,7 @@ mkCaseDetFun mbindfv eid exprPtr boundArgs bdy inh chn
                          , fun_kind     = FK_Function cNameNotLocationDependent
                          , fun_lifted   = 0
                          , fun_info     = { fi_calls       = collectCalls mainDclN bdy`
-                                          , fi_group_index = groupidx
+                                          , fi_group_index = fun_def.fun_info.fi_group_index
                                           , fi_def_level   = NotALevel
                                           , fi_free_vars   = freeVars
                                           , fi_local_vars  = localVars
@@ -972,8 +970,8 @@ mkCaseDetFun mbindfv eid exprPtr boundArgs bdy inh chn
                                           }
                          }
   # funDefs            = [fd \\ fd <-: fun_defs] ++ [newFunDef]
-  # fun_defs           = {fd \\ fd <- funDefs}
-  # (lgrps, rgrps)     = splitAt groupidx groups`
+  # fun_defs           = {{fd & fun_info = {fd.fun_info & fi_group_index = if (fd.fun_info.fi_group_index > fun_def.fun_info.fi_group_index) (fd.fun_info.fi_group_index + 1) fd.fun_info.fi_group_index}} \\ fd <- funDefs}
+  # (lgrps, rgrps)     = splitAt fun_def.fun_info.fi_group_index groups`
   # group              = {group_members = [nextFD]}
   # groups             = {grp \\ grp <- lgrps ++ [group : rgrps]}
   # fun_def            = {fun_def & fun_info = {fun_def.fun_info & fi_calls = [FunCall nextFD NotALevel : fun_def.fun_info.fi_calls]}}
