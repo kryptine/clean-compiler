@@ -774,11 +774,13 @@ tfCase eid cs=:{case_guards, case_default}
 
 refreshVariables :: [FreeVar] Expression *ChnExpression -> *([FreeVar], Expression, *ChnExpression)
 refreshVariables fvs e chn
-  # heaps    = chn.chn_heaps
-  # var_heap = heaps.hp_var_heap
+  # heaps           = chn.chn_heaps
+  # var_heap        = heaps.hp_var_heap
+  # expr_heap       = heaps.hp_expression_heap
   # (fvs, var_heap) = mapSt refreshFreeVar fvs var_heap
-  # (e, var_heap)   = refreshVariables` e var_heap
-  # heaps    = {heaps & hp_var_heap = var_heap }
+  # (e, (var_heap, expr_heap))   = refreshVariables` e (var_heap, expr_heap)
+  # heaps    = {heaps & hp_var_heap = var_heap
+                      , hp_expression_heap = expr_heap }
   = (fvs, e, {chn & chn_heaps = heaps})
   where
   refreshFreeVar :: FreeVar *VarHeap -> *(FreeVar, *VarHeap)
@@ -787,106 +789,109 @@ refreshVariables fvs e chn
     # var_heap = var_heap <:= (fv.fv_info_ptr, VI_ForwardClassVar newPtr)
     = ({fv & fv_info_ptr = newPtr}, var_heap)
 
-  refreshVariables` :: Expression *VarHeap -> *(Expression, *VarHeap)
-  refreshVariables` (Var bv) var_heap
-    # (VI_ForwardClassVar newPtr, var_heap) = readPtr bv.var_info_ptr var_heap
-    = (Var {bv & var_info_ptr = newPtr}, var_heap)
-  refreshVariables` (App app) var_heap
-    # (args, var_heap) = mapSt refreshVariables` app.app_args var_heap
-    = (App {app & app_args = args}, var_heap)
-  refreshVariables` (e @ es) var_heap
-    # (e, var_heap)  = refreshVariables` e var_heap
-    # (es, var_heap) = mapSt refreshVariables` es var_heap
-    = (e @ es, var_heap)
-  refreshVariables` (Let lt) var_heap
-    # (strict_binds, var_heap) = mapSt refreshBind lt.let_strict_binds var_heap
-    # (lazy_binds, var_heap)   = mapSt refreshBind lt.let_lazy_binds var_heap
-    # (e, var_heap)            = refreshVariables` lt.let_expr var_heap
+  refreshVariables` :: Expression *(*VarHeap, *ExpressionHeap) -> *(Expression, *(*VarHeap, *ExpressionHeap))
+  refreshVariables` (Var bv) (var_heap, expr_heap)
+    # (newExprPtr, expr_heap)                  = newPtr EI_Empty expr_heap
+    # (VI_ForwardClassVar newVarPtr, var_heap) = readPtr bv.var_info_ptr var_heap
+    = (Var {bv & var_info_ptr = newVarPtr
+               , var_expr_ptr = newExprPtr}, (var_heap, expr_heap))
+  refreshVariables` (App app) (var_heap, expr_heap)
+    # (args, (var_heap, expr_heap)) = mapSt refreshVariables` app.app_args (var_heap, expr_heap)
+    = (App {app & app_args = args}, (var_heap, expr_heap))
+  refreshVariables` (e @ es) (var_heap, expr_heap)
+    # (e, (var_heap, expr_heap))  = refreshVariables` e (var_heap, expr_heap)
+    # (es, (var_heap, expr_heap)) = mapSt refreshVariables` es (var_heap, expr_heap)
+    = (e @ es, (var_heap, expr_heap))
+  refreshVariables` (Let lt) (var_heap, expr_heap)
+    # (newPtr, expr_heap)                   = newPtr EI_Empty expr_heap
+    # (strict_binds, (var_heap, expr_heap)) = mapSt refreshBind lt.let_strict_binds (var_heap, expr_heap)
+    # (lazy_binds, (var_heap, expr_heap))   = mapSt refreshBind lt.let_lazy_binds (var_heap, expr_heap)
+    # (e, (var_heap, expr_heap))            = refreshVariables` lt.let_expr (var_heap, expr_heap)
     = (Let {lt & let_strict_binds = strict_binds
                , let_lazy_binds   = lazy_binds
-               , let_expr         = e }, var_heap)
+               , let_expr         = e
+               , let_info_ptr     = newPtr }, (var_heap, expr_heap))
     where
-    refreshBind lb var_heap
-      # (fv, var_heap)  = refreshFreeVar lb.lb_dst var_heap
-      # (rhs, var_heap) = refreshVariables` lb.lb_src var_heap
+    refreshBind lb (var_heap, expr_heap)
+      # (fv, var_heap)               = refreshFreeVar lb.lb_dst var_heap
+      # (rhs, (var_heap, expr_heap)) = refreshVariables` lb.lb_src (var_heap, expr_heap)
       = ({lb & lb_dst = fv
-             , lb_src = rhs}, var_heap)
-  refreshVariables` (Case cs) var_heap
-    # (case_expr, var_heap)    = refreshVariables` cs.case_expr var_heap
-    # (case_guards, var_heap)  = refreshGuards cs.case_guards var_heap
-    # (case_default, var_heap) = case cs.case_default of
-                                   Yes e
-                                     # (e, var_heap) = refreshVariables` e var_heap
-                                     = (Yes e, var_heap)
-                                   _ = (No, var_heap)
+             , lb_src = rhs}, (var_heap, expr_heap))
+  refreshVariables` (Case cs) (var_heap, expr_heap)
+    # (newPtr, expr_heap)                   = newPtr EI_Empty expr_heap
+    # (case_expr, (var_heap, expr_heap))    = refreshVariables` cs.case_expr (var_heap, expr_heap)
+    # (case_guards, (var_heap, expr_heap))  = refreshGuards cs.case_guards (var_heap, expr_heap)
+    # (case_default, (var_heap, expr_heap)) = case cs.case_default of
+                                                Yes e
+                                                  # (e, (var_heap, expr_heap)) = refreshVariables` e (var_heap, expr_heap)
+                                                  = (Yes e, (var_heap, expr_heap))
+                                                _ = (No, (var_heap, expr_heap))
     = (Case {cs & case_expr = case_expr
                 , case_guards = case_guards
-                , case_default = case_default}, var_heap)
+                , case_default = case_default
+                , case_info_ptr = newPtr}, (var_heap, expr_heap))
     where
-    refreshGuards (AlgebraicPatterns idx as) var_heap
-      # (as, var_heap) = mapSt refreshA as var_heap
-      = (AlgebraicPatterns idx as, var_heap)
-    refreshGuards (BasicPatterns bt bs) var_heap
-      # (bs, var_heap) = mapSt refreshB bs var_heap
-      = (BasicPatterns bt bs, var_heap)
-    refreshGuards (NewTypePatterns idx as) var_heap
-      # (as, var_heap) = mapSt refreshA as var_heap
-      = (NewTypePatterns idx as, var_heap)
-    refreshGuards (DynamicPatterns ds) var_heap
-      # (ds, var_heap) = mapSt refreshD ds var_heap
-      = (DynamicPatterns ds, var_heap)
-    refreshGuards (OverloadedListPatterns ot e as) var_heap
-      # (as, var_heap) = mapSt refreshA as var_heap
-      = (OverloadedListPatterns ot e as, var_heap)
-    refreshA ap var_heap
-      # (ap_expr, var_heap) = refreshVariables` ap.ap_expr var_heap
-      = ({ap & ap_expr = ap_expr}, var_heap)
-    refreshB bp var_heap
-      # (bp_expr, var_heap) = refreshVariables` bp.bp_expr var_heap
-      = ({bp & bp_expr = bp_expr}, var_heap)
-    refreshD dp var_heap
-      # (dp_rhs, var_heap) = refreshVariables` dp.dp_rhs var_heap
-      = ({dp & dp_rhs = dp_rhs}, var_heap)
-  refreshVariables` (FreeVar fv) var_heap
+    refreshGuards (AlgebraicPatterns idx as) (var_heap, expr_heap)
+      # (as, (var_heap, expr_heap)) = mapSt refreshA as (var_heap, expr_heap)
+      = (AlgebraicPatterns idx as, (var_heap, expr_heap))
+    refreshGuards (BasicPatterns bt bs) (var_heap, expr_heap)
+      # (bs, (var_heap, expr_heap)) = mapSt refreshB bs (var_heap, expr_heap)
+      = (BasicPatterns bt bs, (var_heap, expr_heap))
+    refreshGuards (NewTypePatterns idx as) (var_heap, expr_heap)
+      # (as, (var_heap, expr_heap)) = mapSt refreshA as (var_heap, expr_heap)
+      = (NewTypePatterns idx as, (var_heap, expr_heap))
+    refreshGuards (DynamicPatterns ds) (var_heap, expr_heap)
+      # (ds, (var_heap, expr_heap)) = mapSt refreshD ds (var_heap, expr_heap)
+      = (DynamicPatterns ds, (var_heap, expr_heap))
+    refreshGuards (OverloadedListPatterns ot e as) (var_heap, expr_heap)
+      # (as, (var_heap, expr_heap)) = mapSt refreshA as (var_heap, expr_heap)
+      = (OverloadedListPatterns ot e as, (var_heap, expr_heap))
+    refreshA ap (var_heap, expr_heap)
+      # (ap_expr, (var_heap, expr_heap)) = refreshVariables` ap.ap_expr (var_heap, expr_heap)
+      = ({ap & ap_expr = ap_expr}, (var_heap, expr_heap))
+    refreshB bp (var_heap, expr_heap)
+      # (bp_expr, (var_heap, expr_heap)) = refreshVariables` bp.bp_expr (var_heap, expr_heap)
+      = ({bp & bp_expr = bp_expr}, (var_heap, expr_heap))
+    refreshD dp (var_heap, expr_heap)
+      # (dp_rhs, (var_heap, expr_heap)) = refreshVariables` dp.dp_rhs (var_heap, expr_heap)
+      = ({dp & dp_rhs = dp_rhs}, (var_heap, expr_heap))
+  refreshVariables` (FreeVar fv) (var_heap, expr_heap)
     # (fv, var_heap) = refreshFreeVar fv var_heap
     # (VI_ForwardClassVar newPtr, var_heap) = readPtr fv.fv_info_ptr var_heap
-    = (FreeVar {fv & fv_info_ptr = newPtr}, var_heap)
+    = (FreeVar {fv & fv_info_ptr = newPtr}, (var_heap, expr_heap))
 
-  refreshVariables` (DictionariesFunction as e aty) var_heap
-    # (e, var_heap) = refreshVariables` e var_heap
-    = (DictionariesFunction as e aty, var_heap)
-  refreshVariables` (Selection sk e ss) var_heap
-    # (e, var_heap) = refreshVariables` e var_heap
-    = (Selection sk e ss, var_heap)
-  refreshVariables` (Update e1 ss e2) var_heap
-    # (e1, var_heap) = refreshVariables` e1 var_heap
-    # (e2, var_heap) = refreshVariables` e2 var_heap
-    = (Update e1 ss e2, var_heap)
-  refreshVariables` (RecordUpdate gds e bs) var_heap
-    # (e, var_heap)  = refreshVariables` e var_heap
-    # (bs, var_heap) = mapSt refreshBind bs var_heap
-    = (RecordUpdate gds e bs, var_heap)
+  refreshVariables` (DictionariesFunction as e aty) (var_heap, expr_heap)
+    # (e, (var_heap, expr_heap)) = refreshVariables` e (var_heap, expr_heap)
+    = (DictionariesFunction as e aty, (var_heap, expr_heap))
+  refreshVariables` (Selection sk e ss) (var_heap, expr_heap)
+    # (e, (var_heap, expr_heap)) = refreshVariables` e (var_heap, expr_heap)
+    = (Selection sk e ss, (var_heap, expr_heap))
+  refreshVariables` (Update e1 ss e2) (var_heap, expr_heap)
+    # (e1, (var_heap, expr_heap)) = refreshVariables` e1 (var_heap, expr_heap)
+    # (e2, (var_heap, expr_heap)) = refreshVariables` e2 (var_heap, expr_heap)
+    = (Update e1 ss e2, (var_heap, expr_heap))
+  refreshVariables` (RecordUpdate gds e bs) (var_heap, expr_heap)
+    # (e, (var_heap, expr_heap))  = refreshVariables` e (var_heap, expr_heap)
+    # (bs, (var_heap, expr_heap)) = mapSt refreshBind bs (var_heap, expr_heap)
+    = (RecordUpdate gds e bs, (var_heap, expr_heap))
     where
-    refreshBind bnd var_heap
-      # (bnd_src, var_heap) = refreshVariables` bnd.bind_src var_heap
-      = ({bnd & bind_src = bnd_src}, var_heap)
-  refreshVariables` (TupleSelect ds n e) var_heap
-    # (e, var_heap) = refreshVariables` e var_heap
-    = (TupleSelect ds n e, var_heap)
-  refreshVariables` e var_heap = (e, var_heap)
+    refreshBind bnd (var_heap, expr_heap)
+      # (bnd_src, (var_heap, expr_heap)) = refreshVariables` bnd.bind_src (var_heap, expr_heap)
+      = ({bnd & bind_src = bnd_src}, (var_heap, expr_heap))
+  refreshVariables` (TupleSelect ds n e) (var_heap, expr_heap)
+    # (e, (var_heap, expr_heap)) = refreshVariables` e (var_heap, expr_heap)
+    = (TupleSelect ds n e, (var_heap, expr_heap))
+  refreshVariables` e (var_heap, expr_heap) = (e, (var_heap, expr_heap))
 
 
 
 import StdDebug
-mkCaseDetFun :: !(Maybe (FreeVar, Index)) !ExprId !Int ![BoundVar] !Expression !InhExpression !*ChnExpression -> *(Expression, *ChnExpression)
+mkCaseDetFun :: !(Maybe FreeVar) !ExprId !Int ![BoundVar] !Expression !InhExpression !*ChnExpression -> *(Expression, *ChnExpression)
 mkCaseDetFun mbindfv eid exprPtr boundArgs bdy inh chn
   # freeArgs           = map varToFreeVar boundArgs
   # freeArgs           = case mbindfv of
-                           Just (bindfv, _) -> [arg \\ arg <- freeArgs | arg.fv_info_ptr <> bindfv.fv_info_ptr] ++ [bindfv]
-                           _                -> freeArgs
-  # parentIdx          = case mbindfv of
-                           //Just (_, lamIdx) -> lamIdx
-                           _                -> inh.inh_fun_idx
+                           Just bindfv -> [arg \\ arg <- freeArgs | arg.fv_info_ptr <> bindfv.fv_info_ptr] ++ [bindfv]
+                           _           -> freeArgs
   # name               = "_f_case_" +++ toString exprPtr
   # bdy`               = case bdy of
                            Case cs
@@ -901,10 +906,10 @@ mkCaseDetFun mbindfv eid exprPtr boundArgs bdy inh chn
                          , id_info = nilPtr
                          }
   # fun_defs           = chn.chn_fun_defs
-  # (fun_def, fun_defs) = fun_defs![parentIdx]
+  # (fun_def, fun_defs) = fun_defs![inh.inh_fun_idx]
   # groups             = chn.chn_groups
   # groups`            = [grp \\ grp <-: groups]
-  # (groupidx, group)  = case [(idx, group) \\ (idx, group) <- zip2 [0..] groups` | elem parentIdx group.group_members] of
+  # (groupidx, group)  = case [(idx, group) \\ (idx, group) <- zip2 [0..] groups` | elem inh.inh_fun_idx group.group_members] of
                             [group : _] -> group
   # mainDclN           = chn.chn_main_dcl_module_n
   # (nextFD, fun_defs) = usize fun_defs
@@ -938,7 +943,7 @@ mkCaseDetFun mbindfv eid exprPtr boundArgs bdy inh chn
                          , symb_kind  = SK_Function { glob_module = mainDclN
                                                     , glob_object = nextFD }
                          }
-  # fun_defs           = { fun_defs & [parentIdx] = fun_def}
+  # fun_defs           = { fun_defs & [inh.inh_fun_idx] = fun_def}
   # chn                = {chn & chn_fun_defs = fun_defs
                               , chn_groups = groups}
   # heaps              = chn.chn_heaps

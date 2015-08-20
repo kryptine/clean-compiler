@@ -27,7 +27,7 @@ from iTasks._Framework.Tonic.AbsSyn import :: TExpr, :: ExprId
   , inh_common_defs    :: !{#CommonDefs}
   , inh_uid            :: !ExprId
   , inh_fun_idx        :: !Int
-  , inh_bind_var       :: !Maybe (FreeVar, Index)
+  , inh_bind_var       :: !Maybe FreeVar
   , inh_cases          :: ![(!ExprId, !(Map Int BoundVar), !Expression)]
   }
 

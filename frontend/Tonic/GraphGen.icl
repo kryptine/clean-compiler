@@ -255,7 +255,7 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
                                            = (iclmod.icl_name.id_name, chn)
 
           # (synr, chn)              = mkBlueprint (addUnique 1 inh) rhsExpr chn
-          # (synl, chn)              = mkBlueprint (addUnique 0 {inh & inh_bind_var = Just (bindLamArgFV, symbIdentObjectIdx rhsApp.app_symb)
+          # (synl, chn)              = mkBlueprint (addUnique 0 {inh & inh_bind_var = Just bindLamArgFV
                                                                      , inh_cases    = synr.syn_cases}) lhsExpr chn
           # ps                       = [synl, synr]
 
@@ -284,7 +284,7 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
                                  # (iclmod, chn) = chn!chn_icl_module
                                  = (iclmod.icl_name.id_name, chn)
           # evalableCases  = case inh.inh_bind_var of
-                               Just (var, lamIdx)
+                               Just var
                                  = [(eid, 'DM'.elems vars, cs) \\ (eid, vars, cs) <- inh.inh_cases | allVarsBound` var inh vars]
                                _ = []
           # (evalableCases, chn) = mapSt (\(eid, bvs, cs) chn -> mkCaseDetFun inh.inh_bind_var eid (ptrToInt app.app_info_ptr) bvs cs inh chn) evalableCases chn
@@ -500,11 +500,12 @@ mkBlueprint inh (Case cs) chn
                                                   _      -> TNoPrio
                               = (TFApp ap.ap_symbol.glob_object.ds_ident.id_name (map (\x -> x.syn_texpr) args) assoc, chn)
         # (syn, chn)    = mkAlts` inh 0 ap.ap_expr chn
+        # bvs           = 'DM'.union cesyn.syn_bound_vars syn.syn_bound_vars
         = ({ syn_annot_expr = Case {cs & case_guards = AlgebraicPatterns gi [{ap & ap_expr = syn.syn_annot_expr}]}
            , syn_texpr      = syn.syn_texpr
            , syn_pattern_match_vars = [(bv, clexpr) : syn.syn_pattern_match_vars]
-           , syn_bound_vars = 'DM'.unions [syn.syn_bound_vars : map (\x -> x.syn_bound_vars) fvds]
-           , syn_cases      = syn.syn_cases}, chn)
+           , syn_bound_vars = bvs
+           , syn_cases      = [(inh.inh_uid, cesyn.syn_bound_vars, Case cs) : syn.syn_cases]}, chn)
       _
         # ((guards, syns), chn)    = mkAlts cs.case_guards chn
         # ((def, syns, isIf), chn) = case cs.case_default of
@@ -547,7 +548,7 @@ mkBlueprint inh (Case cs) chn
                                 _                          -> TCase inh.inh_uid cesyn.syn_texpr (reverse (map (\(d, s) -> (d, s.syn_texpr)) syns))
            , syn_pattern_match_vars = foldr (\(_, syn) acc -> syn.syn_pattern_match_vars ++ acc) [] syns
            , syn_bound_vars = bvs
-           , syn_cases      = [(inh.inh_uid, bvs, syncase) : flatten (map (\(_, x) -> x.syn_cases) syns)]
+           , syn_cases      = cesyn.syn_cases ++ [(inh.inh_uid, cesyn.syn_bound_vars, syncase) : flatten (map (\(_, x) -> x.syn_cases) syns)]
            }, chn)
   where
   numGuards (AlgebraicPatterns _ ps)        = length ps
