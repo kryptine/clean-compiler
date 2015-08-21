@@ -391,6 +391,10 @@ funArgTys :: FunDef -> [Type]
 funArgTys {fun_type=Yes {st_args}} = map (\x -> x.at_type) st_args
 funArgTys {fun_ident={id_name}} = abort ("Tonic.Util.funArgTys argument types of " +++ id_name +++ " are unknown.")
 
+funContext :: FunDef -> [TypeContext]
+funContext {fun_type=Yes {st_context}} = st_context
+funContext _ = abort "funContext"
+
 identIsLambda :: Ident -> Bool
 identIsLambda ident
   | size fnm > 0  = fnm.[0] == '\\'

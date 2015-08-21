@@ -83,7 +83,7 @@ ginTonic` is_itasks_mod main_dcl_module_n fun_defs fun_defs_cpy groups icl_modul
     # (fd_cpy, fun_defs_cpy) = fun_defs_cpy![idx]
     # inh             = mkInhExpr idx list_comprehensions class_instances common_defs
     # chn             = mkChnExpr main_dcl_module_n fun_defs fun_defs_cpy groups icl_module dcl_modules predef_symbols heaps
-    # (argTys, tyenv) = zipWithSt (\arg t st -> ((arg, t), 'DM'.put (ptrToInt arg.fv_info_ptr) t st)) tb.tb_args (funArgTys fd_cpy) 'DM'.newMap
+    # (argTys, tyenv) = zipWithSt (\arg t st -> ((arg, t), 'DM'.put (ptrToInt arg.fv_info_ptr) (t, funContext fd) st)) tb.tb_args (funArgTys fd_cpy) 'DM'.newMap
     # (isTopLeveLBlueprint, chn) = funIsTopLevelBlueprint fd_cpy inh chn
     | (not is_itasks_mod) && isTopLeveLBlueprint
       # inh        = {inh & inh_tyenv = tyenv}

@@ -72,6 +72,8 @@ funTy :: FunDef -> Type
 
 funArgTys :: FunDef -> [Type]
 
+funContext :: FunDef -> [TypeContext]
+
 identIsLambda :: Ident -> Bool
 
 identIsListComprehension :: Ident -> Bool

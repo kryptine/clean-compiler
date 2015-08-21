@@ -3,7 +3,7 @@ definition module Tonic.Pretty
 from Text.PPrint import :: Doc
 from syntax import :: App, :: SymbIdent, :: Ident, :: BoundVar, :: Expression,
   :: FreeVar, :: BasicValue, :: DefinedSymbol, :: Selection, :: SymbIdent,
-  :: Type, :: AType, :: TypeSymbIdent, :: ParsedExpr
+  :: Type, :: AType, :: TypeSymbIdent, :: ParsedExpr, :: TypeContext
 from Tonic.AbsSyn import :: ChnExpression
 
 ppDebugApp :: App *ChnExpression -> *(Doc, *ChnExpression)
@@ -41,3 +41,5 @@ ppAType :: AType -> Doc
 ppTypeSymbIdent :: TypeSymbIdent -> Doc
 
 ppParsedExpr :: ParsedExpr -> Doc
+
+ppTypeContext :: TypeContext *ChnExpression -> *(Doc, *ChnExpression)

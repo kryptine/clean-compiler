@@ -6,7 +6,7 @@ from syntax import :: Expression (..), :: BoundVar, :: App {..}, :: Let, :: Case
   :: Bind, :: Position, :: AType, :: Env, :: Ident, :: Level, :: ExprInfoPtr, :: ExprInfo,
   :: TypeCodeExpression, :: GlobalIndex, :: Conditional, :: BasicValue, :: FieldSymbol,
   :: IclModule, :: DclModule, :: FunDef, :: Optional, :: SymbolType, :: LetBind,
-  :: ModuleN, :: Type, :: ParsedExpr, :: CommonDefs, :: Index
+  :: ModuleN, :: Type, :: ParsedExpr, :: CommonDefs, :: Index, :: TypeContext
 from checksupport import :: Heaps, :: Group
 from overloading import :: InstanceTree
 from Data.Graph import :: Graph
@@ -21,7 +21,7 @@ from iTasks._Framework.Tonic.AbsSyn import :: TExpr, :: ExprId
 // error caused by huge thunks
 :: InhExpression =
   { inh_case_expr      :: !Maybe Expression
-  , inh_tyenv          :: !Map Int Type
+  , inh_tyenv          :: !Map Int (Type, [TypeContext])
   , inh_list_compr     :: ![(String, ParsedExpr)]
   , inh_instance_tree  :: !{#{!InstanceTree}}
   , inh_common_defs    :: !{#CommonDefs}

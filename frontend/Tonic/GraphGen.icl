@@ -190,25 +190,25 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
   # ((ctxs, args), chn)  = dropAppContexts app chn
   | identIsLambda app_symb.symb_ident
       # ((args, tFd), chn) = reifyArgsAndDef app_symb chn
-      # tyenv               = foldr (\(arg, t) st -> 'DM'.put (ptrToInt arg.fv_info_ptr) t st) 'DM'.newMap (zip2 args (funArgTys tFd))
-      # tyenv               = 'DM'.union tyenv inh.inh_tyenv
-      # inh                 = {inh & inh_tyenv = tyenv}
-      # (syne, chn)         = mkBlueprint {inh & inh_fun_idx = symbIdentObjectIdx app_symb} (getFunRhs tFd) chn
-      # pats                = [case freeVarName x of
-                                 "_x" -> case syne.syn_pattern_match_vars of
-                                           [(_, e):_] -> e
-                                           _          -> TVar [] "_x" (ptrToInt x.fv_info_ptr)
-                                 x`    -> TVar [] x` (ptrToInt x.fv_info_ptr)
-                              \\ x <- args | x.fv_def_level == -1]
+      # tyenv              = foldr (\(arg, t) st -> 'DM'.put (ptrToInt arg.fv_info_ptr) (t, funContext tFd) st) 'DM'.newMap (zip2 args (funArgTys tFd))
+      # tyenv              = 'DM'.union tyenv inh.inh_tyenv
+      # inh                = {inh & inh_tyenv = tyenv}
+      # (syne, chn)        = mkBlueprint {inh & inh_fun_idx = symbIdentObjectIdx app_symb} (getFunRhs tFd) chn
+      # pats               = [case freeVarName x of
+                                "_x" -> case syne.syn_pattern_match_vars of
+                                          [(_, e):_] -> e
+                                          _          -> TVar [] "_x" (ptrToInt x.fv_info_ptr)
+                                x`    -> TVar [] x` (ptrToInt x.fv_info_ptr)
+                             \\ x <- args | x.fv_def_level == -1]
 
-      # (syne, chn)         = case (isTonicFunctor, symbIdentObjectIdx app_symb) of
-                                (True, idx)
-                                  = wrapBody {inh & inh_fun_idx = idx} syne True chn
-                                _ = (syne, chn)
-      # chn                 = updateWithAnnot (symbIdentObjectIdx app_symb) syne.syn_annot_expr inh chn
-      # (app`, chn)         = if isTonicFunctor
-                                (wrapTMApp inh.inh_uid app_symb.symb_ident.id_name (App app) [] inh chn)
-                                (App app, chn)
+      # (syne, chn)        = case (isTonicFunctor, symbIdentObjectIdx app_symb) of
+                               (True, idx)
+                                 = wrapBody {inh & inh_fun_idx = idx} syne True chn
+                               _ = (syne, chn)
+      # chn                = updateWithAnnot (symbIdentObjectIdx app_symb) syne.syn_annot_expr inh chn
+      # (app`, chn)        = if isTonicFunctor
+                               (wrapTMApp inh.inh_uid app_symb.symb_ident.id_name (App app) [] inh chn)
+                               (App app, chn)
       = ( { syn_annot_expr = app`
           , syn_texpr      = TLam pats syne.syn_texpr
           , syn_pattern_match_vars = []
@@ -340,7 +340,7 @@ mkBlueprint inh (e=:(App app) @ es) chn
       # ((args, _), chn) = reifyArgsAndDef app.app_symb chn
       # letargs       = drop (length app.app_args) (getFunArgs fd)
       # (binds, chn) = zipWithSt zwf letargs es chn
-      # tyenv         = foldr (\(arg, t) st -> 'DM'.put (ptrToInt arg.fv_info_ptr) t st) 'DM'.newMap (zip2 args (funArgTys fd))
+      # tyenv         = foldr (\(arg, t) st -> 'DM'.put (ptrToInt arg.fv_info_ptr) (t, funContext fd) st) 'DM'.newMap (zip2 args (funArgTys fd))
       # tyenv         = 'DM'.union tyenv inh.inh_tyenv
       # (syne, chn)   = mkBlueprint (addUnique 0 {inh & inh_tyenv = tyenv}) (getFunRhs fd) chn
       # chn           = updateWithAnnot (symbIdentObjectIdx app.app_symb) syne.syn_annot_expr inh chn
@@ -389,8 +389,8 @@ mkBlueprint inh (e=:(Var bv) @ es) chn
   | isPart
       # (var`, chn) = wrapTMApp inh.inh_uid "(Var @ es)" (e @ es) [] inh chn
       # mTyStr      = case 'DM'.get (ptrToInt bv.var_info_ptr) inh.inh_tyenv of
-                        Just x -> symTyStr` x
-                        _      -> Nothing
+                        Just (x, _) -> symTyStr` x
+                        _           -> Nothing
       = ({ syn_annot_expr = var`
          , syn_texpr      = TMApp inh.inh_uid mTyStr "" bv.var_ident.id_name (map (\syn -> syn.syn_texpr) bps) TNoPrio
          , syn_pattern_match_vars = []
@@ -436,7 +436,7 @@ mkBlueprint inh (Let lt) chn
   mkLet Nothing lt inh chn
     # (tys, chn)      = letTypes lt.let_info_ptr chn
     # (binds, _, chn) = flattenBinds lt chn
-    # tyenv           = zipSt (\(TVar _ _ ptr, _) t tyenv -> 'DM'.put ptr t tyenv) binds tys inh.inh_tyenv // TODO This probably won't work for arbitrary patterns, so we actually need to be a bit smarter here and extract all variables from the patterns, instead of just PP'ing the pattern and using that as index
+    # tyenv           = zipSt (\(TVar _ _ ptr, _) t tyenv -> 'DM'.put ptr (t, []) tyenv) binds tys inh.inh_tyenv // TODO This probably won't work for arbitrary patterns, so we actually need to be a bit smarter here and extract all variables from the patterns, instead of just PP'ing the pattern and using that as index
     # (syn, chn)      = mkBlueprint (addUnique 0 {inh & inh_tyenv = tyenv}) lt.let_expr chn
     = ({ syn_annot_expr = Let {lt & let_expr = syn.syn_annot_expr}
        , syn_texpr      = TLet binds syn.syn_texpr
@@ -487,7 +487,7 @@ mkBlueprint inh (Case cs) chn
                      _      -> cs.case_expr
   # (cesyn, chn) = mkBlueprint (addUnique 0 inh) caseExpr chn
   = case (cs.case_explicit, cs.case_expr, cs.case_guards) of
-      (False, Var bv, AlgebraicPatterns gi [ap:_])
+      (False, Var bv, AlgebraicPatterns gi [ap])
         # (fvds, chn)   = mapSt (mkBlueprint (addUnique 1 inh) o FreeVar) ap.ap_vars chn
         # (clexpr, chn) = case fvds of
                             [] = (TPPExpr "", chn)
@@ -495,9 +495,9 @@ mkBlueprint inh (Case cs) chn
                               # (mprio, chn) = if (ap.ap_symbol.glob_module == chn.chn_main_dcl_module_n)
                                                   (reifyFunDefsIdxPriority ap.ap_symbol.glob_object.ds_index chn)
                                                   (reifyDclModulesIdxPriority` ap.ap_symbol.glob_module ap.ap_symbol.glob_object.ds_index chn)
-                              # assoc         = case mprio of
-                                                  Just p -> fromPriority p
-                                                  _      -> TNoPrio
+                              # assoc        = case mprio of
+                                                 Just p -> fromPriority p
+                                                 _      -> TNoPrio
                               = (TFApp ap.ap_symbol.glob_object.ds_ident.id_name (map (\x -> x.syn_texpr) args) assoc, chn)
         # (syn, chn)    = mkAlts` inh 0 ap.ap_expr chn
         # bvs           = 'DM'.union cesyn.syn_bound_vars syn.syn_bound_vars
@@ -541,14 +541,16 @@ mkBlueprint inh (Case cs) chn
                                       }
                                = (Let lt, {chn & chn_heaps = heaps})
                              _ = (Case cs, chn)
-        # bvs = 'DM'.unions [cesyn.syn_bound_vars : map (\(_, x) -> x.syn_bound_vars) syns]
+        # bvs      = 'DM'.unions [cesyn.syn_bound_vars : map (\(_, x) -> x.syn_bound_vars) syns]
+        # syncases = flatten (map (\(_, x) -> x.syn_cases) syns)
+        # cases    = if cs.case_explicit [(inh.inh_uid, cesyn.syn_bound_vars, syncase) : syncases] syncases
         = ({ syn_annot_expr = Case {cs & case_default = def, case_guards = guards}
            , syn_texpr      = case (isIf, syns) of
                                 (True, [(_, be), (_, bt)]) -> TIf inh.inh_uid cesyn.syn_texpr bt.syn_texpr be.syn_texpr
                                 _                          -> TCase inh.inh_uid cesyn.syn_texpr (reverse (map (\(d, s) -> (d, s.syn_texpr)) syns))
            , syn_pattern_match_vars = foldr (\(_, syn) acc -> syn.syn_pattern_match_vars ++ acc) [] syns
            , syn_bound_vars = bvs
-           , syn_cases      = cesyn.syn_cases ++ [(inh.inh_uid, cesyn.syn_bound_vars, syncase) : flatten (map (\(_, x) -> x.syn_cases) syns)]
+           , syn_cases      = cesyn.syn_cases ++ cases
            }, chn)
   where
   numGuards (AlgebraicPatterns _ ps)        = length ps
@@ -562,15 +564,26 @@ mkBlueprint inh (Case cs) chn
     = ((AlgebraicPatterns gi aps, syns), chn)
     where
       f ap ((aps, syns, n), chn)
-        # (apd, chn) = mkAp ap.ap_symbol ap.ap_vars chn
+        # (pmvs, apd, chn) = mkAp ap.ap_symbol ap.ap_vars chn
         # (syn, chn) = mkAlts` inh n ap.ap_expr chn
+        # syn        = {syn & syn_pattern_match_vars = pmvs ++ syn.syn_pattern_match_vars}
         # ap         = {ap & ap_expr = syn.syn_annot_expr}
         = (([ap:aps], [(apd, syn):syns], n + 1), chn)
         where
-        mkAp sym []   chn = (TPPExpr (ppCompact ('PPrint'.text sym.glob_object.ds_ident.id_name)), chn)
+        mkAp sym []   chn = ([], TPPExpr (ppCompact ('PPrint'.text sym.glob_object.ds_ident.id_name)), chn)
         mkAp sym vars chn
-          # (fvds, chn) = mapSt (mkBlueprint (addUnique n inh) o FreeVar) vars chn
-          = (TFApp (ppCompact ('PPrint'.text sym.glob_object.ds_ident.id_name)) (map (\x -> x.syn_texpr) fvds) TNoPrio, chn)
+          # (fvds, chn)  = mapSt (mkBlueprint (addUnique n inh) o FreeVar) vars chn
+          # (mprio, chn) = if (ap.ap_symbol.glob_module == chn.chn_main_dcl_module_n)
+                              (reifyFunDefsIdxPriority ap.ap_symbol.glob_object.ds_index chn)
+                              (reifyDclModulesIdxPriority` ap.ap_symbol.glob_module ap.ap_symbol.glob_object.ds_index chn)
+          # assoc        = case mprio of
+                             Just p -> fromPriority p
+                             _      -> TNoPrio
+          # clexpr       = TFApp (ppCompact ('PPrint'.text sym.glob_object.ds_ident.id_name)) (map (\x -> x.syn_texpr) fvds) assoc
+          # pmvs         = case ap.ap_expr of
+                             Var bv -> [(bv, clexpr)]
+                             _      -> []
+          = (pmvs, clexpr, chn)
   mkAlts c=:(BasicPatterns bt bps) chn
     # ((bps, syns, _), chn) = foldr f (([], [], 0), chn) bps
     = ((BasicPatterns bt bps, syns), chn)
@@ -753,5 +766,26 @@ symTyStr` _             = Nothing
 varIsTask :: BoundVar InhExpression *ChnExpression -> *(Bool, *ChnExpression)
 varIsTask bv inh chn
   = case 'DM'.get (ptrToInt bv.var_info_ptr) inh.inh_tyenv of
-      Nothing -> (False, chn)
-      Just t  -> typeIsBlueprintPart t inh chn
+      Nothing
+        = (False, chn)
+      Just (t, context)
+        = typeIsBlueprintPart (simplify t) inh chn
+  where
+  simplify (_ --> r) = simplify r.at_type
+  simplify t         = t
+
+resugarGuards (AlgebraicPatterns gi as) = AlgebraicPatterns gi (flatten (map resugarA as))
+resugarGuards (BasicPatterns bt bs) = BasicPatterns bt (flatten (map resugarB bs))
+resugarGuards (NewTypePatterns gi as) = NewTypePatterns gi (flatten (map resugarA as))
+resugarGuards (DynamicPatterns ds) = DynamicPatterns (flatten (map resugarD ds))
+resugarGuards (OverloadedListPatterns olt e as) = OverloadedListPatterns olt e (flatten (map resugarA as))
+resugarGuards x = x
+
+resugarA {ap_expr = Case {case_guards = AlgebraicPatterns _ as`, case_explicit = False}} = flatten (map resugarA as`)
+resugarA ap = [ap]
+
+resugarB {bp_expr = Case {case_guards = BasicPatterns _ bp`, case_explicit = False}} = flatten (map resugarB bp`)
+resugarB bp = [bp]
+
+resugarD {dp_rhs = Case {case_guards = DynamicPatterns dp`, case_explicit = False}} = flatten (map resugarD dp`)
+resugarD dp = [dp]

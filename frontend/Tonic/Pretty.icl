@@ -42,7 +42,10 @@ from syntax import
   :: CaseAlt {..}, :: ParsedSelection (..), :: ParsedSelectorKind (..), :: ElemAssignment, :: FieldAssignment,
   :: OptionalRecordName, :: BoundExpr, :: FieldNameOrQualifiedFieldName (..), :: ModuleIdent,
   :: Rhs {..}, :: OptGuardedAlts (..), :: GuardedExpr {..}, :: NodeDefWithLocals, :: ExprWithLocalDefs,
-  :: ParsedDefinition, :: CollectedLocalDefs
+  :: ParsedDefinition, :: CollectedLocalDefs, :: TypeContext {..}, :: TCClass (..), :: GenericTypeContext,
+  :: DclModule {..}, :: NumberSet, :: ModuleKind, :: Declarations, :: DictionaryInfo, :: IndexRange,
+  :: CommonDefs {..}, :: GenericCaseDef, :: GenericDef, :: ClassInstance, :: MemberDef, :: ClassDef, :: SelectorDef, :: CheckedTypeDef, :: TypeDef, :: TypeRhs,
+  :: ClassDef {..}, :: BITVECT
 
 ppDebugApp :: App *ChnExpression -> *(Doc, *ChnExpression)
 ppDebugApp app menv
@@ -313,3 +316,16 @@ ppDynamicType :: DynamicType -> Doc
 ppDynamicType {dt_uni_vars,dt_type} = text "TODO DynamicType"
   //| isEmpty dt_uni_vars = text "DynamicType" <-> dt_type
   //| otherwise           = text "DynamicType A." <-> dt_uni_vars <-> text ":" <-> dt_type
+
+ppTypeContext :: TypeContext *ChnExpression -> *(Doc, *ChnExpression)
+ppTypeContext {tc_class, tc_types} chn
+  # (d1, chn) = ppTCClass tc_class chn
+  # ds        = map ppType tc_types
+  = (d1 <-> text ": " <-> hcat (intersperse (text " ") ds), chn)
+
+ppTCClass :: TCClass *ChnExpression -> *(Doc, *ChnExpression)
+ppTCClass (TCClass gds) chn
+  # (cls, chn) = chn!chn_dcl_modules.[gds.glob_module].dcl_common.com_class_defs.[gds.glob_object.ds_index]
+  = (text cls.class_ident.id_name, chn)
+ppTCClass (TCGeneric gen) chn = (text "TCGeneric", chn)
+ppTCClass (TCQualifiedIdent ident str) chn = (text ident.id_name <-> text "." <-> text str, chn)
