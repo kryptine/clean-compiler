@@ -23,7 +23,7 @@ mkInhExpr funIdx list_comprehensions tree cds =
   , inh_uid            = [0]
   , inh_fun_idx        = funIdx
   , inh_bind_var       = Nothing
-  , inh_cases          = []
+  , inh_cases          = newMap
   }
 
 mkChnExpr :: ModuleN !*{#FunDef} !*{#FunDef} !{!Group} IclModule {#DclModule} *PredefinedSymbols *Heaps -> *ChnExpression
@@ -46,5 +46,5 @@ mkSynExpr te expr =
   , syn_annot_expr         = expr
   , syn_pattern_match_vars = []
   , syn_bound_vars         = newMap
-  , syn_cases              = []
+  , syn_cases              = newMap
   }

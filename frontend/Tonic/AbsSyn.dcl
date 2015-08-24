@@ -28,7 +28,7 @@ from iTasks._Framework.Tonic.AbsSyn import :: TExpr, :: ExprId
   , inh_uid            :: !ExprId
   , inh_fun_idx        :: !Int
   , inh_bind_var       :: !Maybe FreeVar
-  , inh_cases          :: ![(!ExprId, !(Map Int BoundVar), !Expression)]
+  , inh_cases          :: !Map ExprId (!Bool, !(Map Int BoundVar), !Expression)
   }
 
 :: *ChnExpression =
@@ -47,7 +47,7 @@ from iTasks._Framework.Tonic.AbsSyn import :: TExpr, :: ExprId
   , syn_annot_expr         :: !Expression
   , syn_pattern_match_vars :: ![(BoundVar, TExpr)]
   , syn_bound_vars         :: !Map Int BoundVar
-  , syn_cases              :: ![(!ExprId, !(Map Int BoundVar), !Expression)]
+  , syn_cases              :: !Map ExprId (!Bool, !(Map Int BoundVar), !Expression)
   }
 
 mkInhExpr :: !Int ![(String, ParsedExpr)] !{#{!InstanceTree}} !{#CommonDefs} -> InhExpression

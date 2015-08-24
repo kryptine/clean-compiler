@@ -33,7 +33,7 @@ from syntax import
   :: FieldSymbol, :: IclModule, :: DclModule, :: FunDef, :: Optional,
   :: SymbolType {..}, :: LetBind, :: TypeVar {..}, :: StrictnessList (..),
   :: TypeContext {..}, :: AttributeVar {..}, :: AttrInequality {..},
-  :: TypeVarInfoPtr {..}, :: AttrVarInfoPtr, :: Type (..), :: TCClass,
+  :: TypeVarInfoPtr {..}, :: AttrVarInfoPtr, :: Type (..),
   :: TypeVarInfo, :: AttrVarInfo, :: FunType {..}, :: FunSpecials, :: TempVarId,
   :: ATypeVar, :: BasicType, :: ConsVariable, :: TypeAttribute, :: TypeSymbIdent {..},
   :: TypeSymbProperties, instance toString BasicType, :: ConsVariable (..),
@@ -42,9 +42,9 @@ from syntax import
   :: CaseAlt {..}, :: ParsedSelection (..), :: ParsedSelectorKind (..), :: ElemAssignment, :: FieldAssignment,
   :: OptionalRecordName, :: BoundExpr, :: FieldNameOrQualifiedFieldName (..), :: ModuleIdent,
   :: Rhs {..}, :: OptGuardedAlts (..), :: GuardedExpr {..}, :: NodeDefWithLocals, :: ExprWithLocalDefs,
-  :: ParsedDefinition, :: CollectedLocalDefs, :: TypeContext {..}, :: TCClass (..), :: GenericTypeContext,
+  :: ParsedDefinition, :: CollectedLocalDefs, :: TypeContext {..}, :: TCClass (..), :: GenericTypeContext {..},
   :: DclModule {..}, :: NumberSet, :: ModuleKind, :: Declarations, :: DictionaryInfo, :: IndexRange,
-  :: CommonDefs {..}, :: GenericCaseDef, :: GenericDef, :: ClassInstance, :: MemberDef, :: ClassDef, :: SelectorDef, :: CheckedTypeDef, :: TypeDef, :: TypeRhs,
+  :: CommonDefs {..}, :: GenericCaseDef, :: GenericDef {..}, :: GenericInfoPtr, :: GenericDependency, :: GenericInfo, :: ClassInstance, :: MemberDef, :: ClassDef, :: SelectorDef, :: CheckedTypeDef, :: TypeDef, :: TypeRhs,
   :: ClassDef {..}, :: BITVECT
 
 ppDebugApp :: App *ChnExpression -> *(Doc, *ChnExpression)
@@ -324,8 +324,10 @@ ppTypeContext {tc_class, tc_types} chn
   = (d1 <-> text ": " <-> hcat (intersperse (text " ") ds), chn)
 
 ppTCClass :: TCClass *ChnExpression -> *(Doc, *ChnExpression)
-ppTCClass (TCClass gds) chn
-  # (cls, chn) = chn!chn_dcl_modules.[gds.glob_module].dcl_common.com_class_defs.[gds.glob_object.ds_index]
+ppTCClass (TCClass {glob_module, glob_object}) chn
+  # (cls, chn) = chn!chn_dcl_modules.[glob_module].dcl_common.com_class_defs.[glob_object.ds_index]
   = (text cls.class_ident.id_name, chn)
-ppTCClass (TCGeneric gen) chn = (text "TCGeneric", chn)
+ppTCClass (TCGeneric {gtc_generic = {glob_module, glob_object}}) chn
+  # (cls, chn) = chn!chn_dcl_modules.[glob_module].dcl_common.com_generic_defs.[glob_object.ds_index]
+  = (text cls.gen_ident.id_name, chn)
 ppTCClass (TCQualifiedIdent ident str) chn = (text ident.id_name <-> text "." <-> text str, chn)

@@ -298,12 +298,12 @@ reifyFunDefsIdxFunDef idx chn
 
 reifyArgsAndDef :: SymbIdent *ChnExpression -> *(([FreeVar], FunDef), *ChnExpression)
 reifyArgsAndDef app_symb chn
-  # (mfd, chn)      = reifyFunDef app_symb chn
-  # rSym             = ppSymbIdent app_symb
-  # (mFArgTy, chn)  = reifySymbIdentSymbolType app_symb chn
-  # rhsfd            = fromMaybe (abort $ "reifyArgs failed to find function definition for " +++ ppCompact rSym) mfd
-  # args             = getFunArgs rhsfd
-  # rhsTy            = fromMaybe (abort "reifyArgs failed to reify SymbolType") mFArgTy
+  # (mfd, chn)     = reifyFunDef app_symb chn
+  # rSym           = ppSymbIdent app_symb
+  # (mFArgTy, chn) = reifySymbIdentSymbolType app_symb chn
+  # rhsfd          = fromMaybe (abort $ "reifyArgs failed to find function definition for " +++ ppCompact rSym) mfd
+  # args           = getFunArgs rhsfd
+  # rhsTy          = fromMaybe (abort "reifyArgs failed to reify SymbolType") mFArgTy
   = ((snd (dropContexts rhsTy args), rhsfd), chn)
 
 isCons :: String -> Bool
@@ -393,7 +393,7 @@ funArgTys {fun_ident={id_name}} = abort ("Tonic.Util.funArgTys argument types of
 
 funContext :: FunDef -> [TypeContext]
 funContext {fun_type=Yes {st_context}} = st_context
-funContext _ = abort "funContext"
+funContext _ = []
 
 identIsLambda :: Ident -> Bool
 identIsLambda ident
@@ -1043,7 +1043,7 @@ wrapBody inh syn is_itasks_mod chn
     | not ok     = (syn, chn)
     # (args, chn) = foldr (mkArg symbty is_itasks_mod inh.inh_instance_tree) ([], chn) (zip2 tb_args symbty.st_args)
     | length args == length tb_args
-        # evalableCases  = [(eid, 'DM'.elems vars, cs) \\ (eid, vars, cs) <- syn.syn_cases | allVarsBound inh vars]
+        # evalableCases  = [(eid, 'DM'.elems vars, cs) \\ (eid, (True, vars, cs)) <- 'DM'.toList syn.syn_cases | allVarsBound inh vars]
         # (evalableCases, chn) = mapSt (\(eid, bvs, cs) chn -> mkCaseDetFun Nothing eid inh.inh_fun_idx bvs cs inh chn) evalableCases chn
 
         # (icl, chn) = chn!chn_icl_module
