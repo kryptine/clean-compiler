@@ -5424,19 +5424,17 @@ where
 	fold_guards f (BasicPatterns gi bps) st = foldSt (foldExpr f) [bp_expr\\{bp_expr}<-bps] st
 	fold_guards f (DynamicPatterns dps) st = foldSt (foldExpr f) [dp_rhs\\{dp_rhs}<-dps] st
 	fold_guards f NoPattern st = st
-foldExpr f expr=:(Selection _ expr1 _) st
+foldExpr f expr=:(Selection _ expr1 sels) st
 	# st = f expr st
-  	= foldExpr f expr1 st 	
+  	# st = foldExpr f expr1 st 	
+	# st = foldSt (fold_sel f) sels st 
+    = st
 foldExpr f expr=:(Update expr1 sels expr2) st
 	# st = f expr st
 	# st = foldExpr f expr1 st 
 	# st = foldSt (fold_sel f) sels st 
 	# st = foldExpr f expr2 st 
 	= st
-where
-	fold_sel f (RecordSelection _ _) st = st
-	fold_sel f (ArraySelection _ _ expr) st = foldExpr f expr st
-	fold_sel f (DictionarySelection _ _ _ expr) st = foldExpr f expr st
 foldExpr f expr=:(RecordUpdate _ expr1 binds) st
 	# st = f expr st
 	# st = foldExpr f expr1 st 
@@ -5462,10 +5460,12 @@ foldExpr f expr=:(IsConstructor expr1 _ _ _ _ _) st
 foldExpr f expr=:(DynamicExpr {dyn_expr}) st 
 	# st = f expr st
 	= foldExpr f dyn_expr st
-foldExpr f EE st 
+foldExpr f _ st 
 	= st
-foldExpr f expr st 
-	= abort "generic.icl: foldExpr does not match\n"
+
+fold_sel f (RecordSelection _ _) st = st
+fold_sel f (ArraySelection _ _ expr) st = foldExpr f expr st
+fold_sel f (DictionarySelection _ _ _ expr) st = foldExpr f expr st
 
 // needed for collectCalls
 instance == FunCall where (==) (FunCall x _) (FunCall y _) = x == y
