@@ -254,10 +254,6 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
                                                                      , inh_cases    = synr.syn_cases}) lhsExpr chn
           # ps                       = [synl, synr]
 
-
-          //# allCases                 = flatten (map (\syn -> syn.syn_cases) ps)
-          //# evalableCases            = [(eid, 'DM'.elems vars, cs) \\ (eid, vars, cs) <- allCases | allVarsBound inh vars]
-          //# (evalableCases, chn)     = mapSt (\(eid, bvs, cs) chn -> mkCaseDetFun (Just bindLamArgFV) eid (ptrToInt app.app_info_ptr) bvs cs inh chn) evalableCases chn
           # args`                    = [synl.syn_annot_expr, synr.syn_annot_expr]
           # (app`, chn)              = (App {app & app_args = args`}, chn)
           # (app`, chn)              = wrapTMApp inh.inh_uid appName app` [] inh chn
@@ -330,15 +326,15 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
 mkBlueprint inh (e @ []) chn = abort "atC: no args"
 mkBlueprint inh (e=:(App app) @ es) chn
   # (mfd, chn) = reifyFunDef app.app_symb chn
-  # fd          = fromMaybe (abort ("atC: failed to reify " +++ app.app_symb.symb_ident.id_name)) mfd
+  # fd         = fromMaybe (abort ("atC: failed to reify " +++ app.app_symb.symb_ident.id_name)) mfd
   | identIsLambda app.app_symb.symb_ident
       # ((args, _), chn) = reifyArgsAndDef app.app_symb chn
-      # letargs       = drop (length app.app_args) (getFunArgs fd)
-      # (binds, chn) = zipWithSt zwf letargs es chn
-      # tyenv         = foldr (\(arg, t) st -> 'DM'.put (ptrToInt arg.fv_info_ptr) (t, funContext fd) st) 'DM'.newMap (zip2 args (funArgTys fd))
-      # tyenv         = 'DM'.union tyenv inh.inh_tyenv
-      # (syne, chn)   = mkBlueprint (addUnique 0 {inh & inh_tyenv = tyenv}) (getFunRhs fd) chn
-      # chn           = updateWithAnnot (symbIdentObjectIdx app.app_symb) syne.syn_annot_expr inh chn
+      # letargs          = drop (length app.app_args) (getFunArgs fd)
+      # (binds, chn)     = zipWithSt zwf letargs es chn
+      # tyenv            = foldr (\(arg, t) st -> 'DM'.put (ptrToInt arg.fv_info_ptr) (t, funContext fd) st) 'DM'.newMap (zip2 args (funArgTys fd))
+      # tyenv            = 'DM'.union tyenv inh.inh_tyenv
+      # (syne, chn)      = mkBlueprint (addUnique 0 {inh & inh_tyenv = tyenv}) (getFunRhs fd) chn
+      # chn              = updateWithAnnot (symbIdentObjectIdx app.app_symb) syne.syn_annot_expr inh chn
       = ({ syn_annot_expr = e @ es
          , syn_texpr      = TPPExpr "TODO @"
          , syn_pattern_match_vars = syne.syn_pattern_match_vars
@@ -346,7 +342,7 @@ mkBlueprint inh (e=:(App app) @ es) chn
          , syn_cases      = syne.syn_cases
          }, chn)
   | otherwise
-      # (assoc, chn)     = getAssoc app.app_symb chn
+      # (assoc, chn)      = getAssoc app.app_symb chn
       # (isPart, chn)     = funIsBlueprintPart fd inh chn
       # (texpr, es`, chn) = case fd.fun_type of
                               Yes ft | isPart
@@ -537,10 +533,11 @@ mkBlueprint inh (Case cs) chn
         # bvs      = 'DM'.unions [cesyn.syn_bound_vars : map (\(_, x) -> x.syn_bound_vars) syns]
         # syncases = 'DM'.unions (map (\(_, x) -> x.syn_cases) syns)
         # cases    = 'DM'.put inh.inh_uid (cs.case_explicit, cesyn.syn_bound_vars, syncase) syncases
+        # texpr    = case (isIf, syns) of
+                       (True, [(_, be), (_, bt)]) -> TIf inh.inh_uid cesyn.syn_texpr bt.syn_texpr be.syn_texpr
+                       _                          -> TCase inh.inh_uid cesyn.syn_texpr (reverse (map (\(d, s) -> (d, s.syn_texpr)) syns))
         = ({ syn_annot_expr = Case {cs & case_default = def, case_guards = guards}
-           , syn_texpr      = case (isIf, syns) of
-                                (True, [(_, be), (_, bt)]) -> TIf inh.inh_uid cesyn.syn_texpr bt.syn_texpr be.syn_texpr
-                                _                          -> TCase inh.inh_uid cesyn.syn_texpr (reverse (map (\(d, s) -> (d, s.syn_texpr)) syns))
+           , syn_texpr      = texpr
            , syn_pattern_match_vars = foldr (\(_, syn) acc -> syn.syn_pattern_match_vars ++ acc) [] syns
            , syn_bound_vars = bvs
            , syn_cases      = 'DM'.union cesyn.syn_cases cases
