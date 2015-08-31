@@ -892,10 +892,12 @@ refreshVariables fvs e chn
       # (dp_rhs, (var_heap, expr_heap)) = refreshVariables` dp.dp_rhs (var_heap, expr_heap)
       = ({dp & dp_rhs = dp_rhs}, (var_heap, expr_heap))
   refreshVariables` (Selection sk e ss) (var_heap, expr_heap)
-    # (e, (var_heap, expr_heap)) = refreshVariables` e (var_heap, expr_heap)
+    # (e,  (var_heap, expr_heap)) = refreshVariables` e (var_heap, expr_heap)
+    # (ss, (var_heap, expr_heap)) = mapSt refreshSelection ss (var_heap, expr_heap)
     = (Selection sk e ss, (var_heap, expr_heap))
   refreshVariables` (Update e1 ss e2) (var_heap, expr_heap)
     # (e1, (var_heap, expr_heap)) = refreshVariables` e1 (var_heap, expr_heap)
+    # (ss, (var_heap, expr_heap)) = mapSt refreshSelection ss (var_heap, expr_heap)
     # (e2, (var_heap, expr_heap)) = refreshVariables` e2 (var_heap, expr_heap)
     = (Update e1 ss e2, (var_heap, expr_heap))
   refreshVariables` (RecordUpdate gds e bs) (var_heap, expr_heap)
@@ -925,9 +927,16 @@ refreshVariables fvs e chn
 
   refreshVariables` e (var_heap, expr_heap) = (e, (var_heap, expr_heap))
 
+  refreshSelection (ArraySelection gds eip e) (var_heap, expr_heap)
+    # (e, (var_heap, expr_heap)) = refreshVariables` e (var_heap, expr_heap)
+    = (ArraySelection gds eip e, (var_heap, expr_heap))
+  refreshSelection (DictionarySelection bv ss eip e) (var_heap, expr_heap)
+    # (Var bv, (var_heap, expr_heap)) = refreshVariables` (Var bv) (var_heap, expr_heap)
+    # (ss, (var_heap, expr_heap))     = mapSt refreshSelection ss (var_heap, expr_heap)
+    # (e, (var_heap, expr_heap))      = refreshVariables` e (var_heap, expr_heap)
+    = (DictionarySelection bv ss eip e, (var_heap, expr_heap))
+  refreshSelection s (var_heap, expr_heap) = (s, (var_heap, expr_heap))
 
-
-import StdDebug
 mkCaseDetFun :: !(Maybe FreeVar) !ExprId !Int ![BoundVar] !Expression !InhExpression !*ChnExpression -> *(Expression, *ChnExpression)
 mkCaseDetFun mbindfv eid exprPtr boundArgs bdy inh chn
   # freeArgs           = map varToFreeVar boundArgs
