@@ -8,11 +8,13 @@ default: $(BACKEND_LIBRARY_TARGET)
 	cpm project CleanCompilerMacOSX.prj build
 	cp cocl ~/clean/lib/exe/cocl-tonic
 	cp cocl ~/clean/exe/cocl-tonic
+	cp cocl ~/clean/lib/iTasks-SDK/Binaries/OS-Mac/cocl-tonic
 
 force: $(BACKEND_LIBRARY_TARGET)
 	cpm project CleanCompilerMacOSX.prj build --force
 	cp cocl ~/clean/lib/exe/cocl-tonic
 	cp cocl ~/clean/exe/cocl-tonic
+	cp cocl ~/clean/lib/iTasks-SDK/Binaries/OS-Mac/cocl-tonic
 
 $(BACKEND_CSF):
 	mkdir -p $(BACKEND_CSF)
