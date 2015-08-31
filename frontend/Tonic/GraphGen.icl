@@ -604,9 +604,11 @@ mkBlueprint _ expr=:(FreeVar fv) chn
 mkBlueprint _ expr=:(BasicExpr bv) chn
   = (mkSynExpr (TLit (fromBasicValue bv)) expr, chn)
 mkBlueprint inh expr=:(Selection st selExpr sels) chn
+  # (syns, chn)     = mapSt (getSelectionBoundVars inh) sels chn
   # (syn, chn)      = mkBlueprint (addUnique 0 inh) selExpr chn
+  # bvs            = 'DM'.unions (map (\x -> x.syn_bound_vars) [syn:syns])
   # (selExprs, chn) = mapSt (mkSelExprs) sels chn
-  = (mkSynExpr (TSel syn.syn_texpr selExprs) (Selection st selExpr sels), chn)
+  = ({mkSynExpr (TSel syn.syn_texpr selExprs) (Selection st selExpr sels) & syn_bound_vars = bvs}, chn)
   where
   mkSelExprs (RecordSelection gds _) chn
     # d = ppDefinedSymbol gds.glob_object
@@ -616,6 +618,12 @@ mkBlueprint inh expr=:(Selection st selExpr sels) chn
     = (TPPExpr (ppCompact d), chn)
   mkSelExprs (DictionarySelection bv sels _ e) chn
     = (TPPExpr "TODO mkSelExprs DictionarySelection ", chn)
+mkBlueprint inh expr=:(Update l sels r) chn
+  # (synl, chn)     = mkBlueprint (addUnique 0 inh) l chn
+  # (synr, chn)     = mkBlueprint (addUnique 1 inh) r chn
+  # (syns, chn)     = mapSt (getSelectionBoundVars inh) sels chn
+  # bvs             = 'DM'.unions (map (\x -> x.syn_bound_vars) [synl:synr:syns])
+  = ({mkSynExpr (TPPExpr "Update") expr & syn_bound_vars = bvs}, chn)
 mkBlueprint inh expr=:(TupleSelect _ i e) chn
   # (syn, chn) = mkBlueprint (addUnique 0 inh) e chn
   # te         = TSel syn.syn_texpr [TPPExpr (toString i)]
@@ -628,9 +636,6 @@ mkBlueprint inh expr=:(RecordUpdate {glob_object={ds_ident}} expression expressi
 mkBlueprint _ expr=:(NoBind _) chn
   = (mkSynExpr TNoBind expr, chn)
 
-mkBlueprint _ expr=:(Update _ _ _) chn
-  # texpr = TPPExpr "(mkBlueprint Update fallthrough)"
-  = (mkSynExpr texpr expr, chn)
 mkBlueprint _ expr=:(Conditional _) chn
   # texpr = TPPExpr "(mkBlueprint Conditional fallthrough)"
   = (mkSynExpr texpr expr, chn)
@@ -673,6 +678,15 @@ mkBlueprint _ expr=:(FailExpr _) chn
 mkBlueprint _ expr chn
   # texpr = TPPExpr "(mkBlueprint fallthrough)"
   = (mkSynExpr texpr expr, chn)
+
+getSelectionBoundVars :: !InhExpression !Selection !*ChnExpression -> *(!SynExpression, !*ChnExpression)
+getSelectionBoundVars inh (ArraySelection _ _ e) chn = mkBlueprint inh e chn
+getSelectionBoundVars inh (DictionarySelection bv sels _ e) chn
+  # (synsels, chn) = mapSt (getSelectionBoundVars inh) sels chn
+  # bvs            = 'DM'.unions (map (\x -> x.syn_bound_vars) synsels)
+  # (syne, chn)    = mkBlueprint inh e chn
+  = ({syne & syn_bound_vars = 'DM'.union ('DM'.put (ptrToInt bv.var_info_ptr) bv syne.syn_bound_vars) bvs}, chn)
+getSelectionBoundVars inh _ chn = (mkSynExpr (TPPExpr "RecordSelection") EE, chn)
 
 fromBasicValue :: !BasicValue -> TLit
 fromBasicValue (BVI str) = TInt (toInt str)
