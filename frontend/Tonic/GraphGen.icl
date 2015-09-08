@@ -135,6 +135,10 @@ given x == y && y == z
 //ppPE (PE_TypeSignature _ _) = "PE_TypeSignature"
 //ppPE (PE_Empty) = "PE_Empty"
 
+arity :: Type -> Int
+arity (l --> r) = 1 + arity r.at_type
+arity _         = 0
+
 wrapTMApp :: ExprId String Expression [Expression] InhExpression *ChnExpression -> *(Expression, *ChnExpression)
 wrapTMApp uid wrappedFnNm origExpr evalableCases inh chn
   # (ok, pdss) = pdssAreDefined [PD_tonicExtWrapApp, PD_tonicExtWrapAppLam1, PD_tonicExtWrapAppLam2, PD_tonicExtWrapAppLam3, PD_ConsSymbol, PD_NilSymbol] chn.chn_predef_symbols
@@ -144,6 +148,10 @@ wrapTMApp uid wrappedFnNm origExpr evalableCases inh chn
       # (rem, chn)    = case origExpr of
                            App app
                              = argsRemaining app chn
+                           Var bv
+                             = case 'DM'.get (ptrToInt bv.var_info_ptr) inh.inh_tyenv of
+                                 Just (ty, _) -> (arity ty, chn)
+                                 _            -> (0, chn)
                            _ = (0, chn)
       # (icl, chn)    = chn!chn_icl_module
       # iclName        = icl.icl_name.id_name
