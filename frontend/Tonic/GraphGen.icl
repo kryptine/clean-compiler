@@ -266,7 +266,7 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
           # (app`, chn)              = (App {app & app_args = args`}, chn)
           # (app`, chn)              = wrapTMApp inh.inh_uid appName app` [] inh chn
           = ({ syn_annot_expr = app`
-             , syn_texpr      = TMApp inh.inh_uid mTyStr dclnm (appFunName app) [synl.syn_texpr, synr.syn_texpr] assoc
+             , syn_texpr      = TMApp inh.inh_uid mTyStr dclnm (appFunName app) [synl.syn_texpr, synr.syn_texpr] assoc Nothing
              , syn_pattern_match_vars = []
              , syn_bound_vars = 'DM'.union synl.syn_bound_vars synr.syn_bound_vars
              , syn_cases = 'DM'.union synl.syn_cases synr.syn_cases}, chn)
@@ -292,7 +292,7 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
           # (app`, chn)    = (App {app & app_args = args`}, chn)
           # (app`, chn)    = wrapTMApp inh.inh_uid appName app` evalableCases inh chn
           = ({ syn_annot_expr = app`
-             , syn_texpr      = TMApp inh.inh_uid mTyStr dclnm (appFunName app) (map (\syn -> syn.syn_texpr) ps) assoc
+             , syn_texpr      = TMApp inh.inh_uid mTyStr dclnm (appFunName app) (map (\syn -> syn.syn_texpr) ps) assoc Nothing
              , syn_pattern_match_vars = []
              , syn_bound_vars = 'DM'.unions (map (\syn -> syn.syn_bound_vars) ps)
              , syn_cases = 'DM'.unions (map (\syn -> syn.syn_cases) ps)}, chn)
@@ -364,7 +364,7 @@ mkBlueprint inh (e=:(App app) @ es) chn
                                                     (_       , chn)
                                                       # (iclmod, chn) = chn!chn_icl_module
                                                       = (iclmod.icl_name.id_name, chn)
-                                = ( TMApp inh.inh_uid mTyStr dclnm (appFunName app) (map (\syn -> syn.syn_texpr) es`) assoc
+                                = ( TMApp inh.inh_uid mTyStr dclnm (appFunName app) (map (\syn -> syn.syn_texpr) es`) assoc Nothing
                                   , es`, chn)
                               _
                                 # (es`, chn) = mapSt (\(e, n) chn -> mkBlueprint (addUnique n inh) e chn) (zip2 es [0..]) chn
@@ -391,7 +391,7 @@ mkBlueprint inh (e=:(Var bv) @ es) chn
                         Just (x, _) -> symTyStr` x
                         _           -> Nothing
       = ({ syn_annot_expr = var`
-         , syn_texpr      = TMApp inh.inh_uid mTyStr "" bv.var_ident.id_name (map (\syn -> syn.syn_texpr) bps) TNoPrio
+         , syn_texpr      = TMApp inh.inh_uid mTyStr "" bv.var_ident.id_name (map (\syn -> syn.syn_texpr) bps) TNoPrio (Just (ptrToInt bv.var_info_ptr))
          , syn_pattern_match_vars = []
          , syn_bound_vars = bvs
          , syn_cases = cs}, chn)
