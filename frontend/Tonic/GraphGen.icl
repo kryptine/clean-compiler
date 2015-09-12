@@ -382,7 +382,7 @@ mkBlueprint inh (e=:(App app) @ es) chn
       = ((ppCompact fvl, ppCompact fvr), chn)
 mkBlueprint inh (e=:(Var bv) @ es) chn
   # (bps, chn)    = mapSt (\(e, n) chn -> mkBlueprint (addUnique n inh) e chn) (zip2 es [0..]) chn
-  # bvs           = 'DM'.unions (map (\syn -> syn.syn_bound_vars) bps)
+  # bvs           = 'DM'.put (ptrToInt bv.var_info_ptr) bv ('DM'.unions (map (\syn -> syn.syn_bound_vars) bps))
   # cs            = 'DM'.unions (map (\syn -> syn.syn_cases) bps)
   # (isPart, chn) = varIsTask bv inh chn
   | isPart
