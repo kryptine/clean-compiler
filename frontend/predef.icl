@@ -269,7 +269,8 @@ predefined_idents
                     [PD_tonicExtWrapAppLam1]     = i "tonicExtWrapAppLam1",
                     [PD_tonicExtWrapAppLam2]     = i "tonicExtWrapAppLam2",
                     [PD_tonicExtWrapAppLam3]     = i "tonicExtWrapAppLam3",
-                    [PD_TMonadBind]              = i ">>="
+                    [PD_TMonadBind]              = i ">>=",
+                    [PD_TMonadBindNoLam]         = i ">>|"
 		}
 	=: idents
 	where
@@ -428,6 +429,7 @@ where
 					<<- (local_predefined_idents,	IC_Class,	PD_TonicTopLevelBlueprintClass)
 					<<- (local_predefined_idents,	IC_Class,	PD_TonicBlueprintPartClass)
 					<<- (local_predefined_idents,	IC_Expression,	PD_TMonadBind)
+					<<- (local_predefined_idents,	IC_Expression,	PD_TMonadBindNoLam)
 
 		# hash_table = put_predefined_idents_in_hash_table PD_FromS PD_FromThenToO IC_Expression local_predefined_idents hash_table
 

@@ -5481,7 +5481,7 @@ where
 			= indexes
 				//---> ("do not collect call ", symb_ident, glob_module, glob_object)
 	get_call _ indexes = indexes
-
+import StdDebug
 // collects variables and computes the refernce counts
 collectVars :: 
 		!Expression 	// expression to collect variables in

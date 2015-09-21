@@ -410,7 +410,7 @@ where
 	(<<<) file (ABCCodeExpr code_sequence do_inline)      = file <<< (if do_inline "code inline\n" "code\n") <<< code_sequence
 	(<<<) file (AnyCodeExpr input output code_sequence)   = file <<< "code\n" <<< input <<< "\n" <<< output <<< "\n" <<< code_sequence
 
-	(<<<) file (FreeVar {fv_ident})         	= file <<< fv_ident
+	(<<<) file (FreeVar {fv_ident})         	= file <<< "<FreeVar>" <<< fv_ident
 	(<<<) file (ClassVariable info_ptr)         	= file <<< "ClassVariable " <<< info_ptr
 
 	(<<<) file (FailExpr _) = file <<< "** FAIL **"
@@ -471,9 +471,9 @@ where
 
 instance <<< Selection
 where
-	(<<<) file (RecordSelection selector _) = file <<< selector
-	(<<<) file (ArraySelection {glob_object={ds_index}} _ index_expr) = file <<< '<' <<< ds_index <<< '>' <<< '[' <<< index_expr <<< ']'
-	(<<<) file (DictionarySelection var selections _ index_expr) = file <<< '(' <<< var <<< '.' <<< selections <<< ')' <<< '[' <<< index_expr <<< ']'
+	(<<<) file (RecordSelection selector _) = file <<< "(RS)" <<< selector
+	(<<<) file (ArraySelection {glob_object={ds_index}} _ index_expr) = file <<< "(AS)" <<< '<' <<< ds_index <<< '>' <<< '[' <<< index_expr <<< ']'
+	(<<<) file (DictionarySelection var selections _ index_expr) = file <<< "(DS)" <<< '(' <<< var <<< '.' <<< selections <<< ')' <<< '[' <<< index_expr <<< ']'
 
 instance <<< LocalDefs
 where
