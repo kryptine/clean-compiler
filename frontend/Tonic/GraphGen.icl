@@ -240,28 +240,26 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
     # bindMemberDef                = dcls.[bindSymbol.pds_module].dcl_common.com_member_defs.[bindSymbol.pds_def]
     # appIsBind                    = app.app_symb.symb_ident.id_info == bindMemberDef.me_ident.id_info
     # appName                      = app.app_symb.symb_ident.id_name
+    # (assoc, chn)                 = getAssoc app.app_symb chn
+    # (mFunTy, chn)                = reifyFunType app.app_symb chn
+    # (mst, chn)                   = reifySymbIdentSymbolType app.app_symb chn
+    # mTyStr                       = case mst of
+                                       Just st -> symTyStr st
+                                       _       -> Nothing
+    # (dclnm, chn)                 = case reifyDclModule app.app_symb chn of
+                                        (Just dcl, chn) = (dcl.dcl_name.id_name, chn)
+                                        (_       , chn)
+                                          # (iclmod, chn) = chn!chn_icl_module
+                                          = (iclmod.icl_name.id_name, chn)
     = case (appIsBind, args) of
         (True, [lhsExpr, rhsExpr=:(App rhsApp) : _])
           | identIsLambda rhsApp.app_symb.symb_ident
           # ((rhsArgs, rhsFd), chn) = reifyArgsAndDef rhsApp.app_symb chn
           # bindLamArgFV            = last rhsArgs
-          # (mFunTy, chn)           = reifyFunType app.app_symb chn
-          # (assoc, chn)            = getAssoc app.app_symb chn
-          # (mst, chn)              = reifySymbIdentSymbolType app.app_symb chn
-          # mTyStr                   = case mst of
-                                         Just st -> symTyStr st
-                                         _       -> Nothing
-          # (dclnm, chn)            = case reifyDclModule app.app_symb chn of
-                                         (Just dcl, chn) = (dcl.dcl_name.id_name, chn)
-                                         (_       , chn)
-                                           # (iclmod, chn) = chn!chn_icl_module
-                                           = (iclmod.icl_name.id_name, chn)
-
           # (synr, chn)              = mkBlueprint (addUnique 1 inh) rhsExpr chn
           # (synl, chn)              = mkBlueprint (addUnique 0 {inh & inh_bind_var = Just bindLamArgFV
                                                                      , inh_cases    = synr.syn_cases}) lhsExpr chn
           # ps                       = [synl, synr]
-
           # args`                    = [synl.syn_annot_expr, synr.syn_annot_expr]
           # (app`, chn)              = (App {app & app_args = args`}, chn)
           # (app`, chn)              = wrapTMApp inh.inh_uid appName app` [] inh chn
@@ -271,17 +269,6 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
              , syn_bound_vars = 'DM'.union synl.syn_bound_vars synr.syn_bound_vars
              , syn_cases = 'DM'.union synl.syn_cases synr.syn_cases}, chn)
         _
-          # (mFunTy, chn) = reifyFunType app.app_symb chn
-          # (assoc, chn)  = getAssoc app.app_symb chn
-          # (mst, chn)    = reifySymbIdentSymbolType app.app_symb chn
-          # mTyStr         = case mst of
-                               Just st -> symTyStr st
-                               _       -> Nothing
-          # (dclnm, chn)  = case reifyDclModule app.app_symb chn of
-                               (Just dcl, chn) = (dcl.dcl_name.id_name, chn)
-                               (_       , chn)
-                                 # (iclmod, chn) = chn!chn_icl_module
-                                 = (iclmod.icl_name.id_name, chn)
           # evalableCases  = case inh.inh_bind_var of
                                Just var
                                  = [(eid, 'DM'.elems vars, cs) \\ (eid, (True, vars, cs)) <- 'DM'.toList inh.inh_cases | allVarsBound` var inh vars]
