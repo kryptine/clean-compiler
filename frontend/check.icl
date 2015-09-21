@@ -3402,6 +3402,7 @@ where
 			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols}
                 <=< adjustPredefSymbol PD_TMonadClass					mod_index STE_Class
                 <=< adjustPredefSymbol PD_TMonadBind					mod_index STE_Member
+                <=< adjustPredefSymbol PD_TMonadBindNoLam				mod_index STE_Member
                 <=< adjustPredefSymbol PD_TApplicativeClass				mod_index STE_Class
                 )
 			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols})

@@ -29,6 +29,7 @@ from iTasks._Framework.Tonic.AbsSyn import :: TExpr, :: ExprId
   , inh_fun_idx        :: !Int
   , inh_bind_var       :: !Maybe FreeVar
   , inh_cases          :: !Map ExprId (!Bool, !(Map Int BoundVar), !Expression)
+  , inh_is_top_bind    :: !Bool
   }
 
 :: *ChnExpression =

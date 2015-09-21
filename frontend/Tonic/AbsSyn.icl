@@ -24,6 +24,7 @@ mkInhExpr funIdx list_comprehensions tree cds =
   , inh_fun_idx        = funIdx
   , inh_bind_var       = Nothing
   , inh_cases          = newMap
+  , inh_is_top_bind    = True
   }
 
 mkChnExpr :: ModuleN !*{#FunDef} !*{#FunDef} !{!Group} IclModule {#DclModule} *PredefinedSymbols *Heaps -> *ChnExpression
