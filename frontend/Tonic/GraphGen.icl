@@ -233,24 +233,26 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
   | otherwise      = mkFApp app ctxs args inh chn
   where
   mkMApp app ctxs args inh chn
-    # predef_symbols               = chn.chn_predef_symbols
-    # (bindSymbol, predef_symbols) = predef_symbols![PD_TMonadBind]
-    # chn                          = {chn & chn_predef_symbols = predef_symbols}
-    # (dcls, chn)                  = chn!chn_dcl_modules
-    # bindMemberDef                = dcls.[bindSymbol.pds_module].dcl_common.com_member_defs.[bindSymbol.pds_def]
-    # appIsBind                    = app.app_symb.symb_ident.id_info == bindMemberDef.me_ident.id_info
-    # appName                      = app.app_symb.symb_ident.id_name
-    # (assoc, chn)                 = getAssoc app.app_symb chn
-    # (mFunTy, chn)                = reifyFunType app.app_symb chn
-    # (mst, chn)                   = reifySymbIdentSymbolType app.app_symb chn
-    # mTyStr                       = case mst of
-                                       Just st -> symTyStr st
-                                       _       -> Nothing
-    # (dclnm, chn)                 = case reifyDclModule app.app_symb chn of
-                                        (Just dcl, chn) = (dcl.dcl_name.id_name, chn)
-                                        (_       , chn)
-                                          # (iclmod, chn) = chn!chn_icl_module
-                                          = (iclmod.icl_name.id_name, chn)
+    # predef_symbols                = chn.chn_predef_symbols
+    # (bindSymbol, predef_symbols)  = predef_symbols![PD_TMonadBind]
+    # (bindSymbol2, predef_symbols) = predef_symbols![PD_TMonadBindNoLam]
+    # chn                           = {chn & chn_predef_symbols = predef_symbols}
+    # (dcls, chn)                   = chn!chn_dcl_modules
+    # bindMemberDef                 = dcls.[bindSymbol.pds_module].dcl_common.com_member_defs.[bindSymbol.pds_def]
+    # bind2MemberDef                = dcls.[bindSymbol2.pds_module].dcl_common.com_member_defs.[bindSymbol2.pds_def]
+    # appIsBind                     = app.app_symb.symb_ident.id_info == bindMemberDef.me_ident.id_info || app.app_symb.symb_ident.id_info == bind2MemberDef.me_ident.id_info
+    # appName                       = app.app_symb.symb_ident.id_name
+    # (assoc, chn)                  = getAssoc app.app_symb chn
+    # (mFunTy, chn)                 = reifyFunType app.app_symb chn
+    # (mst, chn)                    = reifySymbIdentSymbolType app.app_symb chn
+    # mTyStr                        = case mst of
+                                        Just st -> symTyStr st
+                                        _       -> Nothing
+    # (dclnm, chn)                  = case reifyDclModule app.app_symb chn of
+                                         (Just dcl, chn) = (dcl.dcl_name.id_name, chn)
+                                         (_       , chn)
+                                           # (iclmod, chn) = chn!chn_icl_module
+                                           = (iclmod.icl_name.id_name, chn)
     = case (appIsBind, args) of
         (True, [lhsExpr, rhsExpr=:(App rhsApp) : _])
           | identIsLambda rhsApp.app_symb.symb_ident
