@@ -1017,10 +1017,10 @@ mkCaseDetFun mbindfv eid exprPtr boundArgs bdy inh chn
                     , chn_predef_symbols = pdss })
 
 wrapBody :: InhExpression SynExpression Bool *ChnExpression -> *(SynExpression, *ChnExpression)
-wrapBody inh syn is_itasks_mod chn
-  # pdss = chn.chn_predef_symbols
+wrapBody inh syn hasTonic chn
+  # pdss       = chn.chn_predef_symbols
   # (ok, pdss) = pdssAreDefined [PD_tonicExtWrapArg, PD_tonicExtWrapBody] pdss
-  # chn = {chn & chn_predef_symbols = pdss}
+  # chn        = {chn & chn_predef_symbols = pdss}
   | not ok     = (syn, chn)
   | otherwise
       # fun_defs             = chn.chn_fun_defs
@@ -1050,7 +1050,7 @@ wrapBody inh syn is_itasks_mod chn
                                   , PD_NilSymbol] pdss
     # chn = {chn & chn_predef_symbols = pdss}
     | not ok     = (syn, chn)
-    # (args, chn) = foldr (mkArg symbty is_itasks_mod inh.inh_instance_tree) ([], chn) (zip2 tb_args symbty.st_args)
+    # (args, chn) = foldr (mkArg symbty hasTonic inh.inh_instance_tree) ([], chn) (zip2 tb_args symbty.st_args)
     | length args == length tb_args
         # evalableCases  = [(eid, 'DM'.elems vars, cs) \\ (eid, (True, vars, cs)) <- 'DM'.toList syn.syn_cases | allVarsBound inh vars]
         # (evalableCases, chn) = mapSt (\(eid, bvs, cs) chn -> mkCaseDetFun Nothing eid inh.inh_fun_idx bvs cs inh chn) evalableCases chn
@@ -1087,7 +1087,7 @@ wrapBody inh syn is_itasks_mod chn
     findBodyWrap n = abort ("No PD_tonicExtWrapBodyLam" +++ toString n)
 
     mkArg :: SymbolType Bool {#{!InstanceTree}} (FreeVar, AType) ([Expression], *ChnExpression) -> *([Expression], *ChnExpression)
-    mkArg symty is_itasks_mod class_instances (arg=:{fv_info_ptr, fv_ident}, {at_type}) (xs, chn)
+    mkArg symty hasTonic class_instances (arg=:{fv_info_ptr, fv_ident}, {at_type}) (xs, chn)
       # pdss = chn.chn_predef_symbols
       # heaps = chn.chn_heaps
       # (itask_class_symbol, pdss) = pdss![PD_ITaskClass]
@@ -1099,7 +1099,7 @@ wrapBody inh syn is_itasks_mod chn
       # (viewApp, heaps, pdss) = appPredefinedSymbolWithEI PD_tonicExtWrapArg
                                    [ mkStr fv_ident.id_name
                                    , mkInt (ptrToInt fv_info_ptr)
-                                   , if (is_itasks_mod || (not hasITasks && noCtx))
+                                   , if (not hasTonic || (not hasITasks && noCtx))
                                        (mkStr fv_ident.id_name)
                                        (Var bv)
                                    ] SK_Function heaps pdss
