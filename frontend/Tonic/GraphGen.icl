@@ -145,39 +145,40 @@ wrapTMApp uid wrappedFnNm origExpr evalableCases inh chn
   # chn        = {chn & chn_predef_symbols = pdss}
   | not ok     = (origExpr, chn)
   | otherwise
-      # (rem, chn)    = case origExpr of
-                           App app
-                             = argsRemaining app chn
-                           Var bv
-                             = case 'DM'.get (ptrToInt bv.var_info_ptr) inh.inh_tyenv of
-                                 Just (ty, _) -> (arity ty, chn)
-                                 _            -> (0, chn)
-                           _ = (0, chn)
-      # (icl, chn)    = chn!chn_icl_module
-      # iclName        = icl.icl_name.id_name
-      # (wrappedFnModNm, chn) = case origExpr of
-                                   App app
-                                     # (mdcl, chn) = reifyDclModule app.app_symb chn
-                                     = case mdcl of
-                                         Just dcl -> (dcl.dcl_name.id_name, chn)
-                                         _        -> (iclName, chn)
-                                   _ = (iclName, chn)
-      # heaps = chn.chn_heaps
-      # (eidExpr, pdss) = listToListExpr (map mkInt uid) chn.chn_predef_symbols
-      # (casesExpr, pdss) = listToListExpr evalableCases pdss
-      # (expr, heaps, pdss) = appPredefinedSymbolWithEI (findWrap rem)
-                                [ mkBool inh.inh_is_top_bind
-                                , mkStr wrappedFnModNm
-                                , mkStr wrappedFnNm
-                                , eidExpr
-                                , casesExpr
-                                , origExpr
-                                ] SK_Function heaps pdss
-      = ( App expr
-        , {chn & chn_predef_symbols = pdss
-               , chn_icl_module = icl
-               , chn_heaps = heaps
-               })
+      # (rem, chn)          = case origExpr of
+                                App app
+                                  = argsRemaining app chn
+                                Var bv
+                                  = case 'DM'.get (ptrToInt bv.var_info_ptr) inh.inh_tyenv of
+                                      Just (ty, _) -> (arity ty, chn)
+                                      _            -> (0, chn)
+                                _ = (0, chn)
+      # (icl, chn)          = chn!chn_icl_module
+      # iclName             = icl.icl_name.id_name
+      # (modName, chn)      = case origExpr of
+                                App app
+                                  # (mdcl, chn) = reifyDclModule app.app_symb chn
+                                  = case mdcl of
+                                      Just dcl -> (dcl.dcl_name.id_name, chn)
+                                      _        -> (iclName, chn)
+                                _ = (iclName, chn)
+      | inh.inh_is_top_bind || (inh.inh_parent_fun_mod <> "" && not (elem inh.inh_parent_fun_mod inh.inh_tonic_files))
+        # heaps               = chn.chn_heaps
+        # (eidExpr, pdss)     = listToListExpr (map mkInt uid) chn.chn_predef_symbols
+        # (casesExpr, pdss)   = listToListExpr evalableCases pdss
+        # (expr, heaps, pdss) = appPredefinedSymbolWithEI (findWrap rem)
+                                  [ mkStr modName
+                                  , mkStr wrappedFnNm
+                                  , eidExpr
+                                  , casesExpr
+                                  , origExpr
+                                  ] SK_Function heaps pdss
+        = ( App expr
+          , {chn & chn_predef_symbols = pdss
+                 , chn_icl_module = icl
+                 , chn_heaps = heaps
+                 })
+      | otherwise = (origExpr, chn)
   where
   findWrap :: Int -> Int
   findWrap 0 = PD_tonicExtWrapApp
@@ -287,12 +288,18 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
              , syn_bound_vars = 'DM'.union synl.syn_bound_vars synr.syn_bound_vars
              , syn_cases      = 'DM'.union synl.syn_cases synr.syn_cases}, chn)
         _
+          # (icl, chn)           = chn!chn_icl_module
+          # iclName              = icl.icl_name.id_name
+          # (mdcl, chn)          = reifyDclModule app.app_symb chn
+          # (modName, chn)       = case mdcl of
+                                     Just dcl -> (dcl.dcl_name.id_name, chn)
+                                     _        -> (iclName, chn)
           # evalableCases        = case inh.inh_bind_var of
                                      Just var
                                        = [(eid, 'DM'.elems vars, cs) \\ (eid, (True, vars, cs)) <- 'DM'.toList inh.inh_cases | allVarsBound` var inh vars]
                                      _ = []
           # (evalableCases, chn) = mapSt (\(eid, bvs, cs) chn -> mkCaseDetFun inh.inh_bind_var eid (ptrToInt app.app_info_ptr) bvs cs inh chn) evalableCases chn
-          # (ps, chn)            = mapSt (\(x, n) chn -> mkBlueprint (addUnique n {inh & inh_bind_var = Nothing, inh_is_top_bind = False}) x chn) (zip2 args [0..]) chn
+          # (ps, chn)            = mapSt (\(x, n) chn -> mkBlueprint (addUnique n {inh & inh_bind_var = Nothing, inh_is_top_bind = False, inh_parent_fun_mod = modName}) x chn) (zip2 args [0..]) chn
           # args`                = map (\syn -> syn.syn_annot_expr) ps
           # (app`, chn)          = (App {app & app_args = args`}, chn)
           # (app`, chn)          = wrapTMApp inh.inh_uid appName app` evalableCases inh chn

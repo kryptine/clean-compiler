@@ -30,6 +30,8 @@ from iTasks._Framework.Tonic.AbsSyn import :: TExpr, :: ExprId
   , inh_bind_var       :: !Maybe FreeVar
   , inh_cases          :: !Map ExprId (!Bool, !(Map Int BoundVar), !Expression)
   , inh_is_top_bind    :: !Bool
+  , inh_parent_fun_mod :: !String
+  , inh_tonic_files    :: ![String]
   }
 
 :: *ChnExpression =
@@ -51,7 +53,7 @@ from iTasks._Framework.Tonic.AbsSyn import :: TExpr, :: ExprId
   , syn_cases              :: !Map ExprId (!Bool, !(Map Int BoundVar), !Expression)
   }
 
-mkInhExpr :: !Int ![(String, ParsedExpr)] !{#{!InstanceTree}} !{#CommonDefs} -> InhExpression
+mkInhExpr :: !Int ![(String, ParsedExpr)] !{#{!InstanceTree}} !{#CommonDefs} ![String] -> InhExpression
 
 mkChnExpr :: ModuleN !*{#FunDef} !*{#FunDef} !{!Group} IclModule {#DclModule} *PredefinedSymbols *Heaps -> *ChnExpression
 

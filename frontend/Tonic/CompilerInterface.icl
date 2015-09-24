@@ -18,6 +18,10 @@ import qualified Data.Map as DM
 import qualified Data.Set as DS
 import Text.JSON
 import iTasks._Framework.Tonic.AbsSyn
+import System.Directory
+import System.OSError
+import System.FilePath
+import Data.Error
 
 import StdDebug
 
@@ -27,19 +31,21 @@ ginTonic mod mod_dir main_dcl_module_n fun_defs fun_defs_cpy groups icl_module d
   | icl_module.icl_name == predefined_idents.[PD_iTasks_Framework_Tonic] = (fun_defs, predef_symbols, groups, hash_table, error, files, heaps)
   # (tonic_module, predef_symbols) = predef_symbols![PD_iTasks_Framework_Tonic]
   | predefIsUndefined tonic_module = (fun_defs, predef_symbols, groups, hash_table, error, files, heaps)
-  # hasTonic       = [0 \\ {import_module} <- mod.mod_imports | import_module.id_name == predefined_idents.[PD_iTasks_Framework_Tonic].id_name] <> []
-  # ((reps, heaps, predef_symbols, groups, fun_defs_cpy), fun_defs) = foldrUArrWithKey (appDefInfo hasTonic) ('DM'.newMap, heaps, predef_symbols, groups, fun_defs_cpy) fun_defs
-  # (error, files) = if (hasTonic && not ('DM'.null reps))
-                       (writeTonicFile hasTonic mod_dir icl_module.icl_name.id_name (toString (toJSON { TonicModule
-                                                                                                      | tm_name  = icl_module.icl_name.id_name
-                                                                                                      , tm_funcs = reps})) error files)
-                       (error, files)
+  # hasTonic                   = [0 \\ {import_module} <- mod.mod_imports | import_module.id_name == predefined_idents.[PD_iTasks_Framework_Tonic].id_name] <> []
+  # (tonicFiles, files)        = readTonicFiles mod_dir files
+  # tonicFiles                 = [icl_module.icl_name.id_name : tonicFiles]
+  # ((reps, heaps, predef_symbols, groups, fun_defs_cpy), fun_defs) = foldrUArrWithKey (appDefInfo hasTonic tonicFiles) ('DM'.newMap, heaps, predef_symbols, groups, fun_defs_cpy) fun_defs
+  # (error, files)             = if (hasTonic && not ('DM'.null reps))
+                                   (writeTonicFile hasTonic mod_dir icl_module.icl_name.id_name (toString (toJSON { TonicModule
+                                                                                                                  | tm_name  = icl_module.icl_name.id_name
+                                                                                                                  , tm_funcs = reps})) error files)
+                                   (error, files)
   = (fun_defs, predef_symbols, groups, hash_table, error, files, heaps)
   where
   // fd does not always have a fun_type = Yes
-  appDefInfo hasTonic idx fd=:{fun_pos,fun_ident=fun_ident, fun_body = TransformedBody tb} (reps, heaps, predef_symbols, groups, fun_defs_cpy) fun_defs
+  appDefInfo hasTonic tonicFiles idx fd=:{fun_pos,fun_ident=fun_ident, fun_body = TransformedBody tb} (reps, heaps, predef_symbols, groups, fun_defs_cpy) fun_defs
     # (fd_cpy, fun_defs_cpy) = fun_defs_cpy![idx]
-    # inh             = mkInhExpr idx list_comprehensions class_instances common_defs
+    # inh             = mkInhExpr idx list_comprehensions class_instances common_defs tonicFiles
     # chn             = mkChnExpr main_dcl_module_n fun_defs fun_defs_cpy groups icl_module dcl_modules predef_symbols heaps
     # (argTys, tyenv) = zipWithSt (\arg t st -> ((arg, t), 'DM'.put (ptrToInt arg.fv_info_ptr) (t, funContext fd) st)) tb.tb_args (funArgTys fd_cpy) 'DM'.newMap
     # (isTopLeveLBlueprint, chn) = funIsTopLevelBlueprint fd_cpy inh chn
@@ -71,7 +77,8 @@ ginTonic mod mod_dir main_dcl_module_n fun_defs fun_defs_cpy groups icl_module d
         , chn.chn_heaps, chn.chn_predef_symbols, chn.chn_groups, chn.chn_fun_defs_cpy), chn.chn_fun_defs)
     | otherwise
       = ((reps, chn.chn_heaps, chn.chn_predef_symbols, chn.chn_groups, chn.chn_fun_defs_cpy), chn.chn_fun_defs)
-  appDefInfo _ _ _ (reps, heaps, predef_symbols, groups, fun_defs_cpy) fun_defs = ((reps, heaps, predef_symbols, groups, fun_defs_cpy), fun_defs)
+  appDefInfo _ _ _ _ (reps, heaps, predef_symbols, groups, fun_defs_cpy) fun_defs = ((reps, heaps, predef_symbols, groups, fun_defs_cpy), fun_defs)
+
   mkFunPos (FunPos _ n _) = n
   mkFunPos (LinePos _ n)  = n
   mkFunPos _              = -1
@@ -87,7 +94,7 @@ ginTonic mod mod_dir main_dcl_module_n fun_defs fun_defs_cpy groups icl_module d
 
   writeTonicFile :: Bool String String String *File *Files -> *(*File, *Files)
   writeTonicFile hasTonic mod_dir iclname tstr error files
-    # targetDir              = mod_dir +++ {DirectorySeparator} +++ "tonic"
+    # targetDir              = mkTargetDir mod_dir
     # (ok, files)            = ensureCleanSystemFilesExists targetDir files
     | not ok                 = (error, files)
     # targetFile             = targetDir +++ {DirectorySeparator} +++ iclname +++ ".tonic"
@@ -96,3 +103,17 @@ ginTonic mod mod_dir main_dcl_module_n fun_defs fun_defs_cpy groups icl_module d
     # tonicFile              = fwrites tstr tonicFile
     # (_, files)             = fclose tonicFile files
     = (error, files)
+
+  readTonicFiles :: String *Files -> *([String], *Files)
+  readTonicFiles mod_dir files
+    # (mfs, files) = readDirectory (mkTargetDir mod_dir) files
+    = case mfs of
+        Ok fs -> (map (dropDots o dropExtension) fs, files)
+        _     -> ([], files)
+
+  dropDots :: String -> String
+  dropDots str
+    | size str > 0 && str.[0] == '.' = dropDots (str % (1, size str))
+    | otherwise = str
+
+  mkTargetDir mod_dir = mod_dir +++ {DirectorySeparator} +++ "tonic"
