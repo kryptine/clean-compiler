@@ -28,24 +28,22 @@ ginTonic mod mod_dir main_dcl_module_n fun_defs fun_defs_cpy groups icl_module d
   # tonicImp = [0 \\  {import_module} <- mod.mod_imports | import_module.id_name == predefined_idents.[PD_iTasks_Framework_Tonic].id_name]
   # hasTonic = tonicImp <> []
   # (reps, fun_defs, groups, predef_symbols, heaps) = ginTonic` hasTonic main_dcl_module_n fun_defs fun_defs_cpy groups icl_module dcl_modules common_defs list_comprehensions predef_symbols class_instances heaps
-  # (error, files) = if ('DM'.null reps)
-                       (error, files)
+  # (error, files) = if (hasTonic && not ('DM'.null reps))
                        (writeTonicFile hasTonic mod_dir icl_module.icl_name.id_name (toJSONString reps icl_module) error files)
+                       (error, files)
   = (fun_defs, predef_symbols, groups, hash_table, error, files, heaps)
   where
   writeTonicFile :: Bool String String String *File *Files -> *(*File, *Files)
   writeTonicFile hasTonic mod_dir iclname tstr error files
-    | not hasTonic = (error, files)
-    | otherwise
-        # targetDir              = mod_dir +++ {DirectorySeparator} +++ "tonic"
-        # (ok, files)            = ensureCleanSystemFilesExists targetDir files
-        | not ok                 = (error, files)
-        # targetFile             = targetDir +++ {DirectorySeparator} +++ iclname +++ ".tonic"
-        # (ok, tonicFile, files) = fopen targetFile FWriteData files
-        | not ok                 = (error, files)
-        # tonicFile              = fwrites tstr tonicFile
-        # (_, files)             = fclose tonicFile files
-        = (error, files)
+    # targetDir              = mod_dir +++ {DirectorySeparator} +++ "tonic"
+    # (ok, files)            = ensureCleanSystemFilesExists targetDir files
+    | not ok                 = (error, files)
+    # targetFile             = targetDir +++ {DirectorySeparator} +++ iclname +++ ".tonic"
+    # (ok, tonicFile, files) = fopen targetFile FWriteData files
+    | not ok                 = (error, files)
+    # tonicFile              = fwrites tstr tonicFile
+    # (_, files)             = fclose tonicFile files
+    = (error, files)
 
 toJSONString :: (Map String TonicFunc) IclModule -> String
 toJSONString rs icl_module
@@ -93,7 +91,7 @@ ginTonic` hasTonic main_dcl_module_n fun_defs fun_defs_cpy groups icl_module dcl
                                         , tf_iclLineNo = mkFunPos fun_pos
                                         , tf_resty     = typeToTCleanExpr (funTy fd_cpy)
                                         , tf_args      = args
-                                        , tf_body      = TLit (TString "Internal iTasks function")} reps
+                                        , tf_body      = TLit (TString "Unable to capture function body")} reps
         , chn.chn_heaps, chn.chn_predef_symbols, chn.chn_groups, chn.chn_fun_defs_cpy), chn.chn_fun_defs)
     | otherwise
       = ((reps, chn.chn_heaps, chn.chn_predef_symbols, chn.chn_groups, chn.chn_fun_defs_cpy), chn.chn_fun_defs)
