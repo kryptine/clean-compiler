@@ -499,13 +499,13 @@ TryScanComment c1=:'/' input
 		# (eof,c3,input) = ReadNormalChar input
 		# input = charBack input
 		= case c3 of
-			'/' -> (No, c1, charBack input)
+			'-' -> (No, c1, charBack input)
 			_   -> SkipWhites (SkipToEndOfLine input)
 	| c2 == '*'
 		# (eof,c3,input) = ReadNormalChar input
 		# input = charBack input
 		= case c3 of
-			'*' -> (No, c1, charBack input)
+			'-' -> (No, c1, charBack input)
 			_   -> case ScanComment input of
 					(No,input)	-> SkipWhites input
 					(er,input)	-> (er, c1, input)
@@ -763,11 +763,11 @@ Scan c=:'/' input co
 	| eof					= CheckReservedOperator (revCharListToString 0 [c]) input
 	| c1 == '*'
 		# (_,c2,input)		= ReadNormalChar input
-		| c2 == '*'			= ScanDocBlock input
+		| c2 == '-'			= ScanDocBlock input
 		= abort "Scanner: Error in Scan" //already caught by TryScanComment
 	| c1 == '/'
 		# (_,c2,input)		= ReadNormalChar input
-		| c2 == '/'			= ScanDocLine input
+		| c2 == '-'			= ScanDocLine input
 		= abort "Scanner: Error in Scan" //already caught by TryScanComment
     | isSpecialChar c1      = ScanOperator 1 input [c1, c] co
     | otherwise             = CheckReservedOperator (revCharListToString 0 [c]) (charBack input)
