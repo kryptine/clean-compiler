@@ -964,6 +964,7 @@ mkCaseDetFun mbindfv eid exprPtr boundArgs bdy inh chn
   # (nextFD, fun_defs) = usize fun_defs
   # (argVars, localVars, freeVars) = collectVars bdy` freeArgs
   # newFunDef          = { fun_docs     = ""
+                         , fun_pragmas  = []
                          , fun_ident    = funIdent
                          , fun_arity    = arity
                          , fun_priority = NoPrio

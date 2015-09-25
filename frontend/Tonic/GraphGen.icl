@@ -162,7 +162,7 @@ wrapTMApp uid wrappedFnNm origExpr evalableCases inh chn
                                       Just dcl -> (dcl.dcl_name.id_name, chn)
                                       _        -> (iclName, chn)
                                 _ = (iclName, chn)
-      | inh.inh_is_top_bind || (inh.inh_parent_fun_mod <> "" && not (elem inh.inh_parent_fun_mod inh.inh_tonic_files))
+      | inh.inh_is_top_bind
         # heaps               = chn.chn_heaps
         # (eidExpr, pdss)     = listToListExpr (map mkInt uid) chn.chn_predef_symbols
         # (casesExpr, pdss)   = listToListExpr evalableCases pdss
@@ -245,7 +245,6 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
     # appIsBind                     = app.app_symb.symb_ident.id_info == bindMemberDef.me_ident.id_info || app.app_symb.symb_ident.id_info == bind2MemberDef.me_ident.id_info
     # appName                       = app.app_symb.symb_ident.id_name
     # (assoc, chn)                  = getAssoc app.app_symb chn
-    # (mFunTy, chn)                 = reifyFunType app.app_symb chn
     # (mst, chn)                    = reifySymbIdentSymbolType app.app_symb chn
     # mTyStr                        = case mst of
                                         Just st -> symTyStr st
@@ -290,16 +289,16 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
         _
           # (icl, chn)           = chn!chn_icl_module
           # iclName              = icl.icl_name.id_name
-          # (mdcl, chn)          = reifyDclModule app.app_symb chn
-          # (modName, chn)       = case mdcl of
-                                     Just dcl -> (dcl.dcl_name.id_name, chn)
-                                     _        -> (iclName, chn)
+          # (mFunTy, chn)        = reifyFunType app.app_symb chn
+          # isTonicContext       = case mFunTy of
+                                      Just ft -> foldr (\(x, _) acc -> acc || x == "TONIC_CONTEXT") False ft.ft_pragmas
+                                      _ -> False
           # evalableCases        = case inh.inh_bind_var of
                                      Just var
                                        = [(eid, 'DM'.elems vars, cs) \\ (eid, (True, vars, cs)) <- 'DM'.toList inh.inh_cases | allVarsBound` var inh vars]
                                      _ = []
           # (evalableCases, chn) = mapSt (\(eid, bvs, cs) chn -> mkCaseDetFun inh.inh_bind_var eid (ptrToInt app.app_info_ptr) bvs cs inh chn) evalableCases chn
-          # (ps, chn)            = mapSt (\(x, n) chn -> mkBlueprint (addUnique n {inh & inh_bind_var = Nothing, inh_is_top_bind = False, inh_parent_fun_mod = modName}) x chn) (zip2 args [0..]) chn
+          # (ps, chn)            = mapSt (\(x, n) chn -> mkBlueprint (addUnique n {inh & inh_bind_var = Nothing, inh_is_top_bind = isTonicContext}) x chn) (zip2 args [0..]) chn
           # args`                = map (\syn -> syn.syn_annot_expr) ps
           # (app`, chn)          = (App {app & app_args = args`}, chn)
           # (app`, chn)          = wrapTMApp inh.inh_uid appName app` evalableCases inh chn

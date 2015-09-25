@@ -105,7 +105,7 @@ addFunctionsRange fun_defs ca
 				}
 
 MakeNewImpOrDefFunction name arity body kind prio opt_type pos
-	:== { fun_docs = "", fun_ident = name, fun_arity = arity, fun_priority = prio, fun_type = opt_type, fun_kind = kind,
+	:== { fun_docs = "", fun_pragmas = [], fun_ident = name, fun_arity = arity, fun_priority = prio, fun_type = opt_type, fun_kind = kind,
 		  fun_body = ParsedBody body, fun_pos = pos, fun_lifted = 0, fun_info = EmptyFunInfo }
 
 class collectFunctions a :: a Bool !*CollectAdmin -> (a, !*CollectAdmin)
@@ -1390,7 +1390,16 @@ reorganiseDefinitions :: Bool [ParsedDefinition] !DefCounts *CollectAdmin -> (![
 reorganiseDefinitions icl_module [PD_Documentation docs : defs] def_counts ca
   = case reorganiseDefinitions icl_module defs def_counts ca of
       ([ fun : fun_defs ], c_defs, imports, imported_objects,foreign_exports, ca)
-        = ([ {fun & fun_docs = docs} : fun_defs ], c_defs, imports, imported_objects,foreign_exports, ca)
+        | icl_module = ([ {fun & fun_docs = docs} : fun_defs ], c_defs, imports, imported_objects,foreign_exports, ca)
+      (fun_defs, c_defs=:{def_funtypes = [funty : funtys]}, imports, imported_objects,foreign_exports, ca)
+        | not icl_module = (fun_defs, {c_defs & def_funtypes = [{funty & ft_docs = docs} : funtys]}, imports, imported_objects,foreign_exports, ca)
+      res = res
+reorganiseDefinitions icl_module [PD_Pragma pragma val : defs] def_counts ca
+  = case reorganiseDefinitions icl_module defs def_counts ca of
+      ([ fun=:{fun_pragmas} : fun_defs ], c_defs, imports, imported_objects,foreign_exports, ca)
+        | icl_module = ([{fun & fun_pragmas = [(pragma, val) : fun_pragmas]} : fun_defs], c_defs, imports, imported_objects,foreign_exports, ca)
+      (fun_defs, c_defs=:{def_funtypes = [funty : funtys]}, imports, imported_objects,foreign_exports, ca)
+        | not icl_module = (fun_defs, {c_defs & def_funtypes = [{funty & ft_pragmas = [(pragma, val) : funty.ft_pragmas]} : funtys]}, imports, imported_objects,foreign_exports, ca)
       res = res
 reorganiseDefinitions icl_module [PD_Function pos name is_infix args rhs fun_kind : defs] def_counts=:{macro_count} ca
 	# prio = if is_infix (Prio NoAssoc 9) NoPrio

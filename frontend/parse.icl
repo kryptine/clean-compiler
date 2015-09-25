@@ -461,6 +461,11 @@ where
 			= (False,abort "no def",parseErrorSimple "definition" "documentation blocks are only allowed at the global level" pState)
 			# pState = wantEndOfDefinition "imports" pState
 			= (True, PD_Documentation doc, pState)
+	try_definition parseContext (PragmaToken pragma val) pos pState
+		| not (isGlobalContext parseContext)
+			= (False,abort "no def",parseErrorSimple "definition" "pragmas are only allowed at the global level" pState)
+			# pState = wantEndOfDefinition "imports" pState
+			= (True, PD_Pragma pragma val, pState)
 	try_definition parseContext token pos pState
 		| isLhsStartToken token
 			# (lhs, pState) = want_lhs_of_def token pState

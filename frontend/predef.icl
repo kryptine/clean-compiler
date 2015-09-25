@@ -577,7 +577,7 @@ where
 		  id_symbol_type = { st_vars = [], st_args = [a], st_args_strictness = Strict 1, st_arity = 1, st_result = a, st_context = [], 
 							st_attr_vars = [], st_attr_env = [] } // !.a -> .a
 		= { ft_ident = alias_dummy_id, ft_arity = 1, ft_priority = NoPrio, ft_type = id_symbol_type, ft_pos = NoPos,
-			ft_specials = FSP_None, ft_type_ptr = nilPtr }
+			ft_specials = FSP_None, ft_type_ptr = nilPtr, ft_pragmas = [], ft_docs = "" }
 
 DynamicRepresentation_String			:== "DynamicTemp" // "_DynamicTemp"		
 

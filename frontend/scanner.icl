@@ -203,7 +203,8 @@ ScanOptionNoNewOffsideForSeqLetBit:==4;
 	|	ExistsToken				//		E.
 	|	ForAllToken				//		A.
 
-	|	DocBlockToken String	//		/**...*/
+	|	DocBlockToken String	//		/*-...*/ or //-...
+	|	PragmaToken String String	//		//-#
 
 ::	ScanContext
 	=	GeneralContext
@@ -767,7 +768,10 @@ Scan c=:'/' input co
 		= abort "Scanner: Error in Scan" //already caught by TryScanComment
 	| c1 == '/'
 		# (_,c2,input)		= ReadNormalChar input
-		| c2 == '-'			= ScanDocLine input
+		| c2 == '-'
+		  # (_,c3,input)	= ReadNormalChar input
+		  | c3 == '#'		= ScanPragma input
+          | otherwise       = ScanDocLine input
 		= abort "Scanner: Error in Scan" //already caught by TryScanComment
     | isSpecialChar c1      = ScanOperator 1 input [c1, c] co
     | otherwise             = CheckReservedOperator (revCharListToString 0 [c]) (charBack input)
@@ -989,9 +993,18 @@ where
 			= scan_doc_block [c:acc] input
 		= scan_doc_block [c:acc] input
 
+SkipWhites` :: !Input -> (!Optional String, !Char, !Input)
+SkipWhites` input
+	# (eof, c, input)		= ReadChar input
+	| eof					= (No, NewLineChar, input)
+	| IsWhiteSpace c		= SkipWhites` input
+							= (No, c, input)
+
 ScanDocLine :: !Input -> (!Token, !Input)
 ScanDocLine input
-	= scan_doc_line [] input
+    # (_, c, input) = SkipWhites` input
+	| isNewLine c = (DocBlockToken "", input)
+	= scan_doc_line [c] input
 where
 	scan_doc_line :: ![Char] !Input -> (!Token,!Input)
 	scan_doc_line acc input
@@ -999,6 +1012,26 @@ where
 		| isNewLine c
 			= (DocBlockToken (toString (reverse acc)), input)
 		= scan_doc_line [c:acc] input
+
+ScanPragma :: !Input -> (!Token, !Input)
+ScanPragma input
+    # (_, c, input) = SkipWhites` input
+	| isNewLine c = (PragmaToken "" "", input)
+	= scan_pragma [c] input
+where
+	scan_pragma :: ![Char] !Input -> (!Token,!Input)
+	scan_pragma acc input
+		# (eof, c, input) = ReadChar input
+		| isNewLine c
+			= (PragmaToken (toString (reverse acc)) "", input)
+	    | IsWhiteSpace c  = scan_pragma_val (toString (reverse acc)) [] input
+		= scan_pragma [c:acc] input
+
+	scan_pragma_val :: !String ![Char] !Input -> (!Token,!Input)
+	scan_pragma_val pragma acc input
+		# (eof, c, input) = ReadChar input
+	    | IsWhiteSpace c || isNewLine c = (PragmaToken pragma (toString (reverse acc)), input)
+		= scan_pragma_val pragma [c:acc] input
 
 
 ScanNumeral	:: !Int !Input [Char] -> (!Token, !Input)

@@ -115,7 +115,8 @@ instance <<< FilePosition
 	|	ExistsToken				//		E.
 	|	ForAllToken				//		A.
 
-	|	DocBlockToken String	//		/**...*/ or ///...
+	|	DocBlockToken String	//		/*-...*/ or //-...
+	|	PragmaToken String String	//		//-#
 
 :: ScanContext
 	=	GeneralContext

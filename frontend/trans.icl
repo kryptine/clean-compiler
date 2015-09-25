@@ -982,6 +982,7 @@ generate_case_function fun_index case_info_ptr new_expr outer_fun_def outer_cons
 
 	  // generated function...
 	  fun_def =	{ fun_docs = ""
+                , fun_pragmas = []
                 , fun_ident					= tfi_fun.symb_ident
 				, fun_arity					= fun_arity
 				, fun_priority				= NoPrio
@@ -1063,6 +1064,7 @@ generate_case_function_with_pattern_argument fun_index case_info_ptr
 	  fun_arity = fun_arity+1
 	  // generated function...
 	  fun_def =	{ fun_docs = ""
+                , fun_pragmas = []
                 , fun_ident					= ro_fun.symb_ident
 				, fun_arity					= fun_arity
 				, fun_priority				= NoPrio

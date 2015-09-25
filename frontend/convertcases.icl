@@ -1115,6 +1115,7 @@ newFunctionWithType opt_id fun_bodies local_vars fun_type group_index (cs_next_f
 	  arity = fun_type.st_arity
 	  fun_def = 
 			{	fun_docs        = ""
+            ,   fun_pragmas     = []
             ,   fun_ident		= fun_id
 			,	fun_arity		= arity
 			,	fun_priority	= NoPrio

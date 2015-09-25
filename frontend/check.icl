@@ -1995,7 +1995,7 @@ renumber_icl_module_functions mod_type icl_global_function_range icl_instance_ra
 			# n_specials = ir_to-ir_from
 			| n_specials==0
 				= icl_functions
-				# dummy_function = {fun_docs="",fun_ident={id_name="",id_info=nilPtr},fun_arity= -1,fun_priority=NoPrio,fun_body=NoBody,fun_type=No,fun_pos=NoPos,fun_kind=FK_Unknown,fun_lifted=0,fun_info=EmptyFunInfo}
+				# dummy_function = {fun_docs="", fun_pragmas = [], fun_ident={id_name="",id_info=nilPtr},fun_arity= -1,fun_priority=NoPrio,fun_body=NoBody,fun_type=No,fun_pos=NoPos,fun_kind=FK_Unknown,fun_lifted=0,fun_info=EmptyFunInfo}
 				= arrayPlusList icl_functions [dummy_function \\ i<-[0..n_specials-1]]
 
 		add_dcl_instances_generic_cases_and_type_funs_to_conversion_table :: !{#Int} !Int !Int !Index IndexRange /*IndexRange*/ !DclModule

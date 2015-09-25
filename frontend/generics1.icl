@@ -5177,6 +5177,7 @@ makeFunction ident group_index arg_vars body_expr opt_sym_type main_dcl_module_n
 	| not (isEmpty free_vars)
 		= abort "makeFunction: free_vars is not empty\n"
 	=	{ fun_docs = ""
+        , fun_pragmas = []
         , fun_ident = ident
 		, fun_arity = length arg_vars
 		, fun_priority = NoPrio
