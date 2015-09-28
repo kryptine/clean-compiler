@@ -12,8 +12,8 @@ import qualified Data.Set as DS
 import Tonic.Pretty
 import iTasks._Framework.Tonic.AbsSyn
 
-mkInhExpr :: !Int ![(String, ParsedExpr)] !{#{!InstanceTree}} !{#CommonDefs} -> InhExpression
-mkInhExpr funIdx list_comprehensions tree cds =
+mkInhExpr :: !Int ![(String, ParsedExpr)] !{#{!InstanceTree}} !{#CommonDefs} ![String] -> InhExpression
+mkInhExpr funIdx list_comprehensions tree cds tonicFiles =
   { InhExpression
   | inh_case_expr      = Nothing
   , inh_tyenv          = newMap
@@ -25,6 +25,8 @@ mkInhExpr funIdx list_comprehensions tree cds =
   , inh_bind_var       = Nothing
   , inh_cases          = newMap
   , inh_is_top_bind    = True
+  , inh_tonic_files    = tonicFiles
+  , inh_parent_fun_mod = ""
   }
 
 mkChnExpr :: ModuleN !*{#FunDef} !*{#FunDef} !{!Group} IclModule {#DclModule} *PredefinedSymbols *Heaps -> *ChnExpression

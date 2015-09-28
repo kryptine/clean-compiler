@@ -20,16 +20,18 @@ from iTasks._Framework.Tonic.AbsSyn import :: TExpr, :: ExprId
 // InhExpression and ChnExpression need strict fields in order to prevent a bus
 // error caused by huge thunks
 :: InhExpression =
-  { inh_case_expr     :: !Maybe Expression
-  , inh_tyenv         :: !Map Int (Type, [TypeContext])
-  , inh_list_compr    :: ![(String, ParsedExpr)]
-  , inh_instance_tree :: !{#{!InstanceTree}}
-  , inh_common_defs   :: !{#CommonDefs}
-  , inh_uid           :: !ExprId
-  , inh_fun_idx       :: !Int
-  , inh_bind_var      :: !Maybe FreeVar
-  , inh_cases         :: !Map ExprId (!Bool, !(Map Int BoundVar), !Expression)
-  , inh_is_top_bind   :: !Bool
+  { inh_case_expr      :: !Maybe Expression
+  , inh_tyenv          :: !Map Int (Type, [TypeContext])
+  , inh_list_compr     :: ![(String, ParsedExpr)]
+  , inh_instance_tree  :: !{#{!InstanceTree}}
+  , inh_common_defs    :: !{#CommonDefs}
+  , inh_uid            :: !ExprId
+  , inh_fun_idx        :: !Int
+  , inh_bind_var       :: !Maybe FreeVar
+  , inh_cases          :: !Map ExprId (!Bool, !(Map Int BoundVar), !Expression)
+  , inh_is_top_bind    :: !Bool
+  , inh_parent_fun_mod :: !String
+  , inh_tonic_files    :: ![String]
   }
 
 :: *ChnExpression =
@@ -51,7 +53,7 @@ from iTasks._Framework.Tonic.AbsSyn import :: TExpr, :: ExprId
   , syn_cases              :: !Map ExprId (!Bool, !(Map Int BoundVar), !Expression)
   }
 
-mkInhExpr :: !Int ![(String, ParsedExpr)] !{#{!InstanceTree}} !{#CommonDefs} -> InhExpression
+mkInhExpr :: !Int ![(String, ParsedExpr)] !{#{!InstanceTree}} !{#CommonDefs} ![String] -> InhExpression
 
 mkChnExpr :: ModuleN !*{#FunDef} !*{#FunDef} !{!Group} IclModule {#DclModule} *PredefinedSymbols *Heaps -> *ChnExpression
 

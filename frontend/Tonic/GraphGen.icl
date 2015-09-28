@@ -162,7 +162,7 @@ wrapTMApp uid wrappedFnNm origExpr evalableCases inh chn
                                       Just dcl -> (dcl.dcl_name.id_name, chn)
                                       _        -> (iclName, chn)
                                 _ = (iclName, chn)
-      | inh.inh_is_top_bind
+      | inh.inh_is_top_bind || (inh.inh_parent_fun_mod <> "" && not (elem inh.inh_parent_fun_mod inh.inh_tonic_files))
         # heaps               = chn.chn_heaps
         # (eidExpr, pdss)     = listToListExpr (map mkInt uid) chn.chn_predef_symbols
         # (casesExpr, pdss)   = listToListExpr evalableCases pdss
@@ -293,12 +293,16 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
           # isTonicContext       = case mFunTy of
                                       Just ft -> foldr (\(x, _) acc -> acc || x == "TONIC_CONTEXT") False ft.ft_pragmas
                                       _ -> False
+          # (mdcl, chn)          = reifyDclModule app.app_symb chn
+          # (modName, chn)       = case mdcl of
+                                     Just dcl -> (dcl.dcl_name.id_name, chn)
+                                     _        -> (iclName, chn)
           # evalableCases        = case inh.inh_bind_var of
                                      Just var
                                        = [(eid, 'DM'.elems vars, cs) \\ (eid, (True, vars, cs)) <- 'DM'.toList inh.inh_cases | allVarsBound` var inh vars]
                                      _ = []
           # (evalableCases, chn) = mapSt (\(eid, bvs, cs) chn -> mkCaseDetFun inh.inh_bind_var eid (ptrToInt app.app_info_ptr) bvs cs inh chn) evalableCases chn
-          # (ps, chn)            = mapSt (\(x, n) chn -> mkBlueprint (addUnique n {inh & inh_bind_var = Nothing, inh_is_top_bind = isTonicContext}) x chn) (zip2 args [0..]) chn
+          # (ps, chn)            = mapSt (\(x, n) chn -> mkBlueprint (addUnique n {inh & inh_bind_var = Nothing, inh_is_top_bind = isTonicContext, inh_parent_fun_mod = modName}) x chn) (zip2 args [0..]) chn
           # args`                = map (\syn -> syn.syn_annot_expr) ps
           # (app`, chn)          = (App {app & app_args = args`}, chn)
           # (app`, chn)          = wrapTMApp inh.inh_uid appName app` evalableCases inh chn
