@@ -25,14 +25,14 @@ import Data.Error
 
 import StdDebug
 
-ginTonic :: ScannedModule String ModuleN !*{#FunDef} !*{#FunDef} !{!Group} IclModule {#DclModule} !{#CommonDefs} [(String, ParsedExpr)] !*PredefinedSymbols !{#{!InstanceTree}} *HashTable !*File !*Files !*Heaps
+ginTonic :: ScannedModule String SearchPaths ModuleN !*{#FunDef} !*{#FunDef} !{!Group} IclModule {#DclModule} !{#CommonDefs} [(String, ParsedExpr)] !*PredefinedSymbols !{#{!InstanceTree}} *HashTable !*File !*Files !*Heaps
          -> *(!*{#FunDef}, !*PredefinedSymbols, !{!Group}, *HashTable, !*File, !*Files, !*Heaps)
-ginTonic mod mod_dir main_dcl_module_n fun_defs fun_defs_cpy groups icl_module dcl_modules common_defs list_comprehensions predef_symbols class_instances hash_table error files heaps
+ginTonic mod mod_dir search_paths main_dcl_module_n fun_defs fun_defs_cpy groups icl_module dcl_modules common_defs list_comprehensions predef_symbols class_instances hash_table error files heaps
   | icl_module.icl_name == predefined_idents.[PD_iTasks_Framework_Tonic] = (fun_defs, predef_symbols, groups, hash_table, error, files, heaps)
   # (tonic_module, predef_symbols) = predef_symbols![PD_iTasks_Framework_Tonic]
   | predefIsUndefined tonic_module = (fun_defs, predef_symbols, groups, hash_table, error, files, heaps)
   # hasTonic                   = [0 \\ {import_module} <- mod.mod_imports | import_module.id_name == predefined_idents.[PD_iTasks_Framework_Tonic].id_name] <> []
-  # (tonicFiles, files)        = readTonicFiles mod_dir files
+  # (tonicFiles, files)        = readAllTonicFiles files
   # tonicFiles                 = [icl_module.icl_name.id_name : tonicFiles]
   # ((reps, heaps, predef_symbols, groups, fun_defs_cpy), fun_defs) = foldrUArrWithKey (appDefInfo hasTonic tonicFiles) ('DM'.newMap, heaps, predef_symbols, groups, fun_defs_cpy) fun_defs
   # (error, files)             = if (hasTonic && not ('DM'.null reps))
@@ -104,14 +104,15 @@ ginTonic mod mod_dir main_dcl_module_n fun_defs fun_defs_cpy groups icl_module d
     # (_, files)             = fclose tonicFile files
     = (error, files)
 
-  // TODO FIXME: Simply reading Tonic files in the current directory isn't
-  // sufficient. Tonic files may be located elsewhere on the filesystem as
-  // well. We need to find them using the compiler's include path.
-  readTonicFiles :: String *Files -> *([String], *Files)
+  readAllTonicFiles :: *Files -> *([String], *Files)
+  readAllTonicFiles files
+    # (xss, files) = mapSt readTonicFiles search_paths.sp_paths files
+    = (flatten xss, files)
+
   readTonicFiles mod_dir files
     # (mfs, files) = readDirectory (mkTargetDir mod_dir) files
     = case mfs of
-        Ok fs -> (map (dropDots o dropExtension) fs, files)
+        Ok fs -> (filter (\x -> x <> "") (map (dropDots o dropExtension) fs), files)
         _     -> ([], files)
 
   dropDots :: String -> String
