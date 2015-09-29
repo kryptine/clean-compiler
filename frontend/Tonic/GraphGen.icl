@@ -266,7 +266,6 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
           # ps                  = [synl, synr]
           # args`               = [synl.syn_annot_expr, synr.syn_annot_expr]
           # (app`, chn)         = (App {app & app_args = args`}, chn)
-          # (app`, chn)         = wrapTMApp inh.inh_uid appName app` [] inh chn
           = ({ syn_annot_expr = app`
              , syn_texpr      = TMApp inh.inh_uid mTyStr dclnm (appFunName app) [synl.syn_texpr, synr.syn_texpr] assoc Nothing
              , syn_pattern_match_vars = []
@@ -280,7 +279,6 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
           # ps          = [synl, synr]
           # args`       = [synl.syn_annot_expr, synr.syn_annot_expr]
           # (app`, chn) = (App {app & app_args = args`}, chn)
-          # (app`, chn) = wrapTMApp inh.inh_uid appName app` [] inh chn
           = ({ syn_annot_expr = app`
              , syn_texpr      = TMApp inh.inh_uid mTyStr dclnm (appFunName app) [synl.syn_texpr, synr.syn_texpr] assoc Nothing
              , syn_pattern_match_vars = []
@@ -291,8 +289,12 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
           # iclName              = icl.icl_name.id_name
           # (mFunTy, chn)        = reifyFunType app.app_symb chn
           # isTonicContext       = case mFunTy of
-                                      Just ft -> foldr (\(x, _) acc -> acc || x == "TONIC_CONTEXT") False ft.ft_pragmas
-                                      _ -> False
+                                     Just ft
+                                       = foldl (\acc (x, _) -> case x of
+                                                                 "TONIC_CONTEXT"    -> True
+                                                                 "TONIC_NO_CONTEXT" -> False
+                                                                 _                  -> acc) False ft.ft_pragmas
+                                     _ = False
           # (mdcl, chn)          = reifyDclModule app.app_symb chn
           # (modName, chn)       = case mdcl of
                                      Just dcl -> (dcl.dcl_name.id_name, chn)
