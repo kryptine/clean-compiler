@@ -210,8 +210,8 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
                                           _          -> TVar [] "_x" (ptrToInt x.fv_info_ptr)
                                 x`    -> TVar [] x` (ptrToInt x.fv_info_ptr)
                              \\ x <- args | x.fv_def_level == -1]
-
-      # (syne, chn)        = case (isTonicFunctor, symbIdentObjectIdx app_symb) of
+      # (isTLB, chn)       = funIsTopLevelBlueprint tFd inh chn
+      # (syne, chn)        = case (isTLB, symbIdentObjectIdx app_symb) of
                                (True, idx)
                                  = wrapBody {inh & inh_fun_idx = idx} syne True chn
                                _ = (syne, chn)
