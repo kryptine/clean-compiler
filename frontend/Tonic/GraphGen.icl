@@ -210,7 +210,7 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
                                           _          -> TVar [] "_x" (ptrToInt x.fv_info_ptr)
                                 x`    -> TVar [] x` (ptrToInt x.fv_info_ptr)
                              \\ x <- args | x.fv_def_level == -1]
-      # (isTLB, chn)       = funIsTopLevelBlueprint tFd inh chn
+      # (isTLB, chn)       = funIsTopLevelBlueprintOrLam tFd inh chn
       # (syne, chn)        = case (isTLB, symbIdentObjectIdx app_symb) of
                                (True, idx)
                                  = wrapBody {inh & inh_fun_idx = idx} syne True chn
@@ -260,8 +260,8 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
           # ((rhsArgs, _), chn) = reifyArgsAndDef rhsApp.app_symb chn
           # bindLamArgFV        = last rhsArgs
           # (synr, chn)         = mkBlueprint (addUnique 1 inh) rhsExpr chn
-          # (synl, chn)         = mkBlueprint (addUnique 0 {inh & inh_bind_var    = Just bindLamArgFV
-                                                                , inh_cases       = synr.syn_cases
+          # (synl, chn)         = mkBlueprint (addUnique 0 {inh & inh_bind_var = Just bindLamArgFV
+                                                                , inh_cases    = synr.syn_cases
                                                                 }) lhsExpr chn
           # ps                  = [synl, synr]
           # args`               = [synl.syn_annot_expr, synr.syn_annot_expr]
@@ -273,8 +273,8 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
              , syn_cases      = 'DM'.union synl.syn_cases synr.syn_cases}, chn)
         (True, [lhsExpr, rhsExpr])
           # (synr, chn) = mkBlueprint (addUnique 1 inh) rhsExpr chn
-          # (synl, chn) = mkBlueprint (addUnique 0 {inh & inh_bind_var    = Nothing
-                                                        , inh_cases       = synr.syn_cases
+          # (synl, chn) = mkBlueprint (addUnique 0 {inh & inh_bind_var = Nothing
+                                                        , inh_cases    = synr.syn_cases
                                                         }) lhsExpr chn
           # ps          = [synl, synr]
           # args`       = [synl.syn_annot_expr, synr.syn_annot_expr]
@@ -443,9 +443,19 @@ mkBlueprint inh (Let lt) chn
                  & syn_annot_expr = Let l
                  , syn_texpr = TPPExpr (ppCompact (ppParsedExpr orig))}, chn)
   mkLet (Just expr) lt inh chn
-    # (syn, chn) = mkBlueprint (addUnique 0 {inh & inh_case_expr = Just expr}) lt.let_expr chn
+    # (bvs, chn) = getBoundVars lt chn
+    # (syn, chn) = mkBlueprint (addUnique 0 {inh & inh_case_expr = Just expr
+                                                 , inh_bound_vars = bvs}) lt.let_expr chn
     # l          = {lt & let_expr = syn.syn_annot_expr}
     = ({syn & syn_annot_expr = Let l}, chn)
+    where
+    getBoundVars lt chn
+      = foldrSt f (getLetBinds lt) ('DM'.newMap, chn)
+      where
+      f bnd (xs, chn)
+        # (rhs, chn) = mkBlueprint inh bnd.lb_src chn
+        = ('DM'.union rhs.syn_bound_vars xs, chn)
+
   mkLet Nothing lt inh chn
     # (tys, chn)      = letTypes lt.let_info_ptr chn
     # (binds, _, chn) = flattenBinds lt chn
@@ -498,10 +508,10 @@ mkBlueprint inh (Case cs) chn
   # caseExpr     = case inh.inh_case_expr of
                      Just e -> e
                      _      -> cs.case_expr
-  # (cesyn, chn) = mkBlueprint (addUnique 0 inh) caseExpr chn
+  # (cesyn, chn) = mkBlueprint (addUnique 0 {inh & inh_bound_vars = 'DM'.newMap}) caseExpr chn
   = case (cs.case_explicit, cs.case_expr, cs.case_guards) of
       (False, Var bv, AlgebraicPatterns gi [ap])
-        # (fvds, chn)   = mapSt (mkBlueprint (addUnique 1 inh) o FreeVar) ap.ap_vars chn
+        # (fvds, chn)   = mapSt (mkBlueprint (addUnique 1 {inh & inh_bound_vars = 'DM'.newMap}) o FreeVar) ap.ap_vars chn
         # (clexpr, chn) = case fvds of
                             [] = (TPPExpr "", chn)
                             args
@@ -555,9 +565,9 @@ mkBlueprint inh (Case cs) chn
                                       }
                                = (Let lt, {chn & chn_heaps = heaps})
                              _ = (Case cs, chn)
-        # bvs      = 'DM'.unions [cesyn.syn_bound_vars : map (\(_, x) -> x.syn_bound_vars) syns]
-        # syncases = 'DM'.unions (map (\(_, x) -> x.syn_cases) syns)
-        # cases    = 'DM'.put inh.inh_uid (cs.case_explicit, cesyn.syn_bound_vars, syncase) syncases
+        # bvs      = 'DM'.unions [inh.inh_bound_vars : cesyn.syn_bound_vars : map (\(_, x) -> x.syn_bound_vars) syns]
+        # syncases = 'DM'.unions [cesyn.syn_cases : map (\(_, x) -> x.syn_cases) syns]
+        # cases    = 'DM'.put inh.inh_uid (cs.case_explicit, 'DM'.union inh.inh_bound_vars cesyn.syn_bound_vars, syncase) syncases
         # texpr    = case (isIf, syns) of
                        (True, [(_, be), (_, bt)]) -> TIf inh.inh_uid cesyn.syn_texpr bt.syn_texpr be.syn_texpr
                        _                          -> TCase inh.inh_uid cesyn.syn_texpr (reverse (map (\(d, s) -> (d, s.syn_texpr)) syns))
@@ -565,7 +575,7 @@ mkBlueprint inh (Case cs) chn
            , syn_texpr      = texpr
            , syn_pattern_match_vars = foldr (\(_, syn) acc -> syn.syn_pattern_match_vars ++ acc) [] syns
            , syn_bound_vars = bvs
-           , syn_cases      = 'DM'.union cesyn.syn_cases cases
+           , syn_cases      = cases
            }, chn)
   where
   numGuards (AlgebraicPatterns _ ps)        = length ps
@@ -587,7 +597,7 @@ mkBlueprint inh (Case cs) chn
         where
         mkAp sym []   chn = ([], TPPExpr (ppCompact ('PPrint'.text sym.glob_object.ds_ident.id_name)), chn)
         mkAp sym vars chn
-          # (fvds, chn)  = mapSt (mkBlueprint (addUnique n inh) o FreeVar) vars chn
+          # (fvds, chn)  = mapSt (mkBlueprint (addUnique n {inh & inh_bound_vars = 'DM'.newMap}) o FreeVar) vars chn
           # (mprio, chn) = if (ap.ap_symbol.glob_module == chn.chn_main_dcl_module_n)
                               (reifyFunDefsIdxPriority ap.ap_symbol.glob_object.ds_index chn)
                               (reifyDclModulesIdxPriority` ap.ap_symbol.glob_module ap.ap_symbol.glob_object.ds_index chn)
@@ -612,7 +622,7 @@ mkBlueprint inh (Case cs) chn
   mkAlts` :: InhExpression Int Expression *ChnExpression -> *(SynExpression, *ChnExpression)
   mkAlts` inh n expr chn
     # inh = {inh & inh_case_expr = Nothing }
-    = mkBlueprint (addUnique n inh) expr chn
+    = mkBlueprint (addUnique n {inh & inh_bound_vars = 'DM'.newMap}) expr chn
 
 mkBlueprint inh (Var bv) chn
   # (isPart, chn) = varIsTask bv inh chn

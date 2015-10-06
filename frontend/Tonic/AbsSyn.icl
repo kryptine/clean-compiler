@@ -27,6 +27,7 @@ mkInhExpr funIdx list_comprehensions tree cds tonicFiles =
   , inh_is_top_bind    = True
   , inh_tonic_files    = tonicFiles
   , inh_parent_fun_mod = ""
+  , inh_bound_vars     = newMap
   }
 
 mkChnExpr :: ModuleN !*{#FunDef} !*{#FunDef} !{!Group} IclModule {#DclModule} *PredefinedSymbols *Heaps -> *ChnExpression

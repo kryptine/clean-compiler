@@ -64,6 +64,8 @@ numContexts :: SymbolType -> Int
 
 funIsTopLevelBlueprint :: FunDef InhExpression *ChnExpression -> *(Bool, *ChnExpression)
 
+funIsTopLevelBlueprintOrLam :: FunDef InhExpression *ChnExpression -> *(Bool, *ChnExpression)
+
 funIsBlueprintPart :: FunDef InhExpression *ChnExpression -> *(Bool, *ChnExpression)
 
 typeIsBlueprintPart :: Type InhExpression *ChnExpression -> *(Bool, *ChnExpression)

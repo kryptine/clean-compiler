@@ -32,6 +32,7 @@ from iTasks._Framework.Tonic.AbsSyn import :: TExpr, :: ExprId
   , inh_is_top_bind    :: !Bool
   , inh_parent_fun_mod :: !String
   , inh_tonic_files    :: ![String]
+  , inh_bound_vars     :: !Map Int BoundVar
   }
 
 :: *ChnExpression =

@@ -367,6 +367,18 @@ funIsTopLevelBlueprint fd inh chn =
         && not (isTD fd.fun_ident.id_name), chn)
     _ = (False, chn)
 
+funIsTopLevelBlueprintOrLam :: FunDef InhExpression *ChnExpression -> *(Bool, *ChnExpression)
+funIsTopLevelBlueprintOrLam fd inh chn =
+  case (fd.fun_type, fd.fun_kind) of
+    (Yes {st_result={at_type}}, FK_Function _)
+      # (hasTLBPInst, chn) = typeHasClassInstance at_type PD_TonicTopLevelBlueprintClass inh chn
+      = (  hasTLBPInst
+        && fd.fun_info.fi_def_level > 0
+        && not (isListCompr fd.fun_ident.id_name)
+        && not (isTD fd.fun_ident.id_name), chn)
+    _ = (False, chn)
+
+
 funIsBlueprintPart :: FunDef InhExpression *ChnExpression -> *(Bool, *ChnExpression)
 funIsBlueprintPart fd inh chn =
   case (fd.fun_type, fd.fun_kind) of
