@@ -752,12 +752,12 @@ typeToTCleanExpr :: Type -> TExpr
 typeToTCleanExpr (TA tsi []) = TPPExpr tsi.type_ident.id_name
 typeToTCleanExpr (TA tsi args)
   # tces = map (typeToTCleanExpr o \arg -> arg.at_type) args
-  = TFApp tsi.type_ident.id_name tces TNoPrio
+  = TFApp [] tsi.type_ident.id_name tces TNoPrio
 typeToTCleanExpr (TAS tsi [] _) = TPPExpr tsi.type_ident.id_name
 typeToTCleanExpr (TAS tsi args _)
   # tces = map (typeToTCleanExpr o \arg -> arg.at_type) args
-  = TFApp tsi.type_ident.id_name tces TNoPrio
-typeToTCleanExpr (l --> r) = TFApp "->" [atypeToTCleanExpr l, atypeToTCleanExpr r] (TPrio TNoAssoc 0)
+  = TFApp [] tsi.type_ident.id_name tces TNoPrio
+typeToTCleanExpr (l --> r) = TFApp [] "->" [atypeToTCleanExpr l, atypeToTCleanExpr r] (TPrio TNoAssoc 0)
 typeToTCleanExpr ty
   = TPPExpr (ppCompact (ppType ty))
 

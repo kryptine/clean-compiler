@@ -330,7 +330,7 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
     # (assoc, chn) = getAssoc app.app_symb chn
     # (ps, chn)     = mapSt (\(x, n) chn -> mkBlueprint (addUnique n inh) x chn) (zip2 args [0..]) chn
     = ({ syn_annot_expr = App {app & app_args = ctxs ++ map (\syn -> syn.syn_annot_expr) ps}
-       , syn_texpr      = TFApp appName (map (\syn -> syn.syn_texpr) ps) assoc
+       , syn_texpr      = TFApp inh.inh_uid appName (map (\syn -> syn.syn_texpr) ps) assoc
        , syn_pattern_match_vars = []
        , syn_bound_vars = 'DM'.unions (map (\syn -> syn.syn_bound_vars) ps)
        , syn_cases = 'DM'.unions (map (\syn -> syn.syn_cases) ps) }, chn)
@@ -385,7 +385,7 @@ mkBlueprint inh (e=:(App app) @ es) chn
                                   , es`, chn)
                               _
                                 # (es`, chn) = mapSt (\(e, n) chn -> mkBlueprint (addUnique n inh) e chn) (zip2 es [0..]) chn
-                                = ( TFApp app.app_symb.symb_ident.id_name (map (\x -> x.syn_texpr) es`) assoc
+                                = ( TFApp inh.inh_uid app.app_symb.symb_ident.id_name (map (\x -> x.syn_texpr) es`) assoc
                                   , es`, chn)
       = ({ syn_annot_expr = e @ (map (\x -> x.syn_annot_expr) es`)
          , syn_texpr      = texpr
@@ -414,7 +414,7 @@ mkBlueprint inh (e=:(Var bv) @ es) chn
          , syn_cases = cs}, chn)
   | otherwise
       = ({ syn_annot_expr = Var bv @ es
-         , syn_texpr      = TFApp bv.var_ident.id_name (map (\syn -> syn.syn_texpr) bps) TNoPrio
+         , syn_texpr      = TFApp inh.inh_uid bv.var_ident.id_name (map (\syn -> syn.syn_texpr) bps) TNoPrio
          , syn_pattern_match_vars = []
          , syn_bound_vars = bvs
          , syn_cases = cs}, chn)
@@ -521,7 +521,7 @@ mkBlueprint inh (Case cs) chn
                               # assoc        = case mprio of
                                                  Just p -> fromPriority p
                                                  _      -> TNoPrio
-                              = (TFApp ap.ap_symbol.glob_object.ds_ident.id_name (map (\x -> x.syn_texpr) args) assoc, chn)
+                              = (TFApp inh.inh_uid ap.ap_symbol.glob_object.ds_ident.id_name (map (\x -> x.syn_texpr) args) assoc, chn)
         # (syn, chn)    = mkAlts` inh 0 ap.ap_expr chn
         # bvs           = 'DM'.union cesyn.syn_bound_vars syn.syn_bound_vars
         # cases         = 'DM'.put inh.inh_uid (cs.case_explicit, cesyn.syn_bound_vars, Case cs) syn.syn_cases
@@ -604,7 +604,7 @@ mkBlueprint inh (Case cs) chn
           # assoc        = case mprio of
                              Just p -> fromPriority p
                              _      -> TNoPrio
-          # clexpr       = TFApp (ppCompact ('PPrint'.text sym.glob_object.ds_ident.id_name)) (map (\x -> x.syn_texpr) fvds) assoc
+          # clexpr       = TFApp inh.inh_uid (ppCompact ('PPrint'.text sym.glob_object.ds_ident.id_name)) (map (\x -> x.syn_texpr) fvds) assoc
           # pmvs         = case ap.ap_expr of
                              Var bv -> [(bv, clexpr)]
                              _      -> []
