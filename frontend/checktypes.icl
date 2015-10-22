@@ -1446,6 +1446,7 @@ checkTypeContexts tcs fun_dep_determined_vars undefined_contexts_vars mod_index 
 	  cs & cs_symbol_table=cs_symbol_table
 	  fun_dep_determined_vars = if (isEmpty new_fun_dep_determined_vars) fun_dep_determined_vars (fun_dep_determined_vars++reverse new_fun_dep_determined_vars)
 	  (free_vars,cs) = collect_free_contexts_vars undefined_contexts_vars oti.oti_all_vars cs
+	  cs = check_class_variables free_vars cs
 	  cs = check_class_attributes oti.oti_all_attrs cs
 	  cs = check_no_global_type_vars oti.oti_global_vars cs
 	= (tcs, fun_dep_determined_vars, ots_type_defs, class_defs, ots_modules, oti.oti_heaps, cs)
