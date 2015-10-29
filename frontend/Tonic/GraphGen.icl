@@ -221,7 +221,7 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
                                (App app, chn)
       = ( { syn_annot_expr = app`
           , syn_texpr      = TLam pats syne.syn_texpr
-          , syn_pattern_match_vars = []
+          , syn_pattern_match_vars = syne.syn_pattern_match_vars
           , syn_bound_vars = foldr (\x vs -> 'DM'.del (ptrToInt x.fv_info_ptr) vs) syne.syn_bound_vars [x \\ x <- args | x.fv_def_level == -1]
           , syn_cases      = syne.syn_cases
           }

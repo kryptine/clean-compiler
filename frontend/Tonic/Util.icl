@@ -837,8 +837,11 @@ refreshVariables fvs e chn
 
   refreshVariables` :: Expression *(*VarHeap, *ExpressionHeap) -> *(Expression, *(*VarHeap, *ExpressionHeap))
   refreshVariables` (Var bv) (var_heap, expr_heap)
-    # (newExprPtr, expr_heap)                  = newPtr EI_Empty expr_heap
-    # (VI_ForwardClassVar newVarPtr, var_heap) = readPtr bv.var_info_ptr var_heap
+    # (newExprPtr, expr_heap) = newPtr EI_Empty expr_heap
+    # (newVarPtr, var_heap)   = readPtr bv.var_info_ptr var_heap
+    # newVarPtr               = case newVarPtr of
+                                  VI_ForwardClassVar newVarPtr -> newVarPtr
+                                  _                            -> abort "refreshVariables` (1)"
     = (Var {bv & var_info_ptr = newVarPtr
                , var_expr_ptr = newExprPtr}, (var_heap, expr_heap))
 
@@ -930,8 +933,11 @@ refreshVariables fvs e chn
     # (e, (var_heap, expr_heap)) = refreshVariables` e (var_heap, expr_heap)
     = (IsConstructor e gds n gi ident pos, (var_heap, expr_heap))
   refreshVariables` (FreeVar fv) (var_heap, expr_heap)
-    # (fv, var_heap)                        = refreshFreeVar fv var_heap
-    # (VI_ForwardClassVar newPtr, var_heap) = readPtr fv.fv_info_ptr var_heap
+    # (fv, var_heap)     = refreshFreeVar fv var_heap
+    # (newPtr, var_heap) = readPtr fv.fv_info_ptr var_heap
+    # newPtr             = case newPtr of
+                             VI_ForwardClassVar newPtr -> newPtr
+                             _                         -> abort "refreshVariables` (2)"
     = (FreeVar {fv & fv_info_ptr = newPtr}, (var_heap, expr_heap))
   refreshVariables` (DictionariesFunction as e aty) (var_heap, expr_heap)
     # (e, (var_heap, expr_heap)) = refreshVariables` e (var_heap, expr_heap)
@@ -1107,12 +1113,14 @@ wrapBody inh syn hasTonic chn
       # gtcClasses  = [gtc_class \\ {tc_class = TCGeneric {gtc_class}} <- common_defs.[itask_class_symbol.pds_module].com_class_defs.[itask_class_symbol.pds_def].class_context] 
       # (hasITasks, hp_type_heaps) = tyHasITaskClasses class_instances gtcClasses at_type heaps.hp_type_heaps
       # heaps         = {heaps & hp_type_heaps = hp_type_heaps}
-      # (noCtx, pdss) = noITaskCtx arg symty.st_context pdss
+      # (varNoCtx, pdss) = varNoITaskCtx arg symty.st_context pdss
+      # (tvNoITaskCtxs, pdss) = mapSt (tvNoITaskCtx symty.st_context) (getTyVars at_type) pdss
+      # tvNoITaskCtx  = or tvNoITaskCtxs
       # (bv, heaps)   = freeVarToVar arg heaps
       # (viewApp, heaps, pdss) = appPredefinedSymbolWithEI PD_tonicExtWrapArg
                                    [ mkStr fv_ident.id_name
                                    , mkInt (ptrToInt fv_info_ptr)
-                                   , if (not hasTonic || (not hasITasks && noCtx))
+                                   , if (not hasTonic || (not hasITasks && (varNoCtx || tvNoITaskCtx)))
                                        (mkStr fv_ident.id_name)
                                        (Var bv)
                                    ] SK_Function heaps pdss
@@ -1136,14 +1144,42 @@ wrapBody inh syn hasTonic chn
       # (inst, ctxs, uni_ok, hp_type_heaps, coercions) = find_instance [at_type] instance_tree common_defs hp_type_heaps coercions
       = (inst.glob_module <> NotFound && inst.glob_object <> NotFound, hp_type_heaps)
 
-    noITaskCtx :: FreeVar [TypeContext] *PredefinedSymbols -> *(Bool, *PredefinedSymbols)
-    noITaskCtx fv tcs pdss
+    varNoITaskCtx :: FreeVar [TypeContext] *PredefinedSymbols -> *(Bool, *PredefinedSymbols)
+    varNoITaskCtx fv tcs pdss
       # (pds, pdss) = pdss![PD_ITaskClass]
       = ( isEmpty [0 \\ {tc_var, tc_class = (TCClass {glob_object, glob_module})} <- tcs
                       |  fv.fv_info_ptr == tc_var
                       && glob_module == pds.pds_module
                       && glob_object.ds_index == pds.pds_def]
         , pdss)
+    tvNoITaskCtx :: [TypeContext] TypeVar *PredefinedSymbols -> *(Bool, *PredefinedSymbols)
+    tvNoITaskCtx tcs tv pdss
+      # (pds, pdss) = pdss![PD_ITaskClass]
+      = ( isEmpty [0 \\ {tc_types = [ty], tc_class = (TCClass {glob_object, glob_module})} <- tcs
+                      |  getTyVars ty == [tv]
+                      && glob_module == pds.pds_module
+                      && glob_object.ds_index == pds.pds_def]
+        , pdss)
+
+    getTyVars :: Type -> [TypeVar]
+    getTyVars (TA _ atys) = concatMap getTyVars` atys
+    getTyVars (TAS _ atys _) = concatMap getTyVars` atys
+    getTyVars (l --> r) = getTyVars` l ++ getTyVars` r
+    getTyVars (TArrow1 aty) = getTyVars` aty
+    getTyVars (_ :@: atys) = concatMap getTyVars` atys
+    getTyVars (TFA _ t) = getTyVars t
+    getTyVars (GTV t) = [t]
+    getTyVars (TV t) = [t]
+    getTyVars (TLifted t) = [t]
+    getTyVars (TQualifiedIdent _ _ atys) = concatMap getTyVars` atys
+    getTyVars (TLiftedSubst t) = getTyVars t
+    getTyVars _ = []
+
+    getTyVars` :: AType -> [TypeVar]
+    getTyVars` {at_type} = getTyVars at_type
+
+instance == TypeVar where
+  (==) l r = l.tv_info_ptr == r.tv_info_ptr
 
 instance == (Global a) | == a where
   (==) g1 g2 = g1.glob_module == g2.glob_module && g1.glob_object == g2.glob_object

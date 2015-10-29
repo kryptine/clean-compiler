@@ -85,9 +85,9 @@ ginTonic mod mod_dir search_paths main_dcl_module_n fun_defs fun_defs_cpy groups
 
   mkArgPP pmvars arg
     = case arg.fv_ident.id_name of
-        "_x"
+        idnm=:"_x"
           = case [clexpr \\ (bv, clexpr) <- pmvars | bv.var_info_ptr == arg.fv_info_ptr] of
-              []    -> TPPExpr "(shouldn't happen)"
+              []    -> TVar [] idnm (ptrToInt arg.FreeVar.fv_info_ptr)
               [x:_] -> x
         idnm
           = TVar [] idnm (ptrToInt arg.FreeVar.fv_info_ptr)
