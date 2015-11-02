@@ -6,13 +6,13 @@ import StdEnv, CoclSystemDependent, syntax, partition, gensapl, backend
 // JMJ: May 2007 
 // László Domoszlai: 2011 - 
 
-gensaplfiles :: Int {#DclModule} !{!Component} !{# FunDef} CommonDefs {#CommonDefs} Ident  [IndexRange] !*File !*BackEnd
-                -> *(!*File, !*BackEnd)
-gensaplfiles main_dcl_module_n dcl_mods components fun_defs icl_common common_defs icl_name icl_function_indices sapl_file backEnd
+gensaplfiles :: Int {#DclModule} !{!Component} !{# FunDef} CommonDefs {#CommonDefs} Ident  [IndexRange] !*File !*BackEnd !*Heaps
+                -> *(!*File, !*BackEnd, !*Heaps)
+gensaplfiles main_dcl_module_n dcl_mods components fun_defs icl_common common_defs icl_name icl_function_indices sapl_file backEnd heaps
 	
 	# modnames = getModNames dcl_mods // modules used by this Clean module
  	# (sapl_file, backEnd) = convert2sapl main_dcl_module_n components fun_defs icl_common common_defs icl_name sapl_file modnames (toString icl_name) dcl_mods icl_function_indices backEnd
-	= (sapl_file, backEnd)
+	= (sapl_file, backEnd, heaps)
 
 convert2sapl :: Int !{!Component} !{# FunDef} CommonDefs {#CommonDefs} Ident !*File [String] String {#DclModule} [IndexRange] !*BackEnd -> *(!*File, !*BackEnd)
 convert2sapl main_dcl_module_n comps fun_defs icl_common comdefs icl_name file modnames mymod dcl_mods icl_function_indices backEnd

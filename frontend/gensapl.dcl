@@ -1,13 +1,13 @@
 definition module gensapl
 
-import StdEnv,syntax,transform,backend
+import StdEnv,StdMaybe,syntax,transform,backend
   
 :: SaplAnnotation = SA_None | SA_Strict  
-  
+    
 :: SaplExp = SaplApp SaplExp SaplExp 
 		   | SaplLit SaplLiteral
            | SaplFun String 
-           | SaplVar String VarInfoPtr SaplAnnotation 
+           | SaplVar String VarInfoPtr SaplAnnotation (Maybe Type) // VarInfoPtr: for comparison
            | SaplIf SaplExp SaplExp SaplExp
            | SaplSelect SaplExp [(SaplPattern,SaplExp)] (Optional SaplExp)
            | SaplLet [(SaplAnnotation,SaplExp,SaplExp)] SaplExp 
