@@ -24,10 +24,11 @@ import StdEnv,StdMaybe,syntax,transform,backend
 //			   | PDefault
 
 // module name, type name, constructor name, ?alt?, nrargs, strictness info, nrconstructors
-::SaplConsDef = SaplConsDef !String !String !String !Int !Int !StrictnessList !Int
-::SaplFuncDef = SaplFuncDef !String !Int ![SaplExp] !SaplExp !FunKind
+::SaplConsDef = SaplConsDef !String !String !String !Int !Int ![Type] !StrictnessList !Int
+// fun name, nrargs, args, body, type, return type
+::SaplFuncDef = SaplFuncDef !String !Int ![SaplExp] !SaplExp !FunKind !Type
 // module name, type name, list of field names and global field indeces
-::SaplRecordDef = SaplRecordDef !String !String !StrictnessList [(!String, !Int)] 
+::SaplRecordDef = SaplRecordDef !String !String !StrictnessList [(!String, !Int, !Type)] 
 
 instance toString SaplExp
 instance toString SaplConsDef
@@ -37,7 +38,7 @@ instance toString SaplRecordDef
 renameVars 		:: SaplFuncDef -> SaplFuncDef
 checkIfSelect 	:: SaplFuncDef -> [SaplFuncDef]
 
-CleanFunctoSaplFunc  :: Int Int Int FunDef String {#DclModule} [IndexRange] !*BackEnd -> *(!*BackEnd, !SaplFuncDef)
+CleanFunctoSaplFunc  :: Int Int Int FunDef String {#DclModule} [IndexRange] !*BackEnd !*Heaps -> *(!*BackEnd, !*Heaps, !SaplFuncDef)
 
 
 

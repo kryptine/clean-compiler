@@ -6,16 +6,27 @@ implementation module gensapl
 
 import StdEnv, StdMaybe, syntax, transform, backend, backendinterface, containers
 
+genTypeInfo :: Type -> String 
+genTypeInfo (TB BT_Int)  = "::I"
+genTypeInfo (TB BT_Char) = "::C"
+genTypeInfo (TB BT_Real) = "::D"
+genTypeInfo (TB BT_Bool) = "::B"
+genTypeInfo _ = ""
+
+maybeTypeInfo :: (Maybe Type) -> String
+maybeTypeInfo (Just ty) = genTypeInfo ty
+maybeTypeInfo Nothing = ""
+
 instance toString SaplConsDef  
 where 
-	toString (SaplConsDef mod t name alt nrargs strictness nralt) 
+	toString (SaplConsDef mod t name alt nrargs argtys strictness nralt) 
 		= makePrintableName (mod +++ "." +++ name) 
-			+++ makeString [(if (arg_is_strict (n-1) strictness) " !a" " a") +++ toString n \\ n <- [1..nrargs]]
+			+++ makeString [(if (arg_is_strict (n-1) strictness) " !a" " a") +++ toString n +++ genTypeInfo argty \\ n <- [1..nrargs] & argty <- argtys]
 
-instance toString SaplFuncDef  
+instance toString SaplFuncDef 
 where 
-	toString (SaplFuncDef name nrargs args body kind) 
-		= makePrintableName name +++ makeArgs args +++ toString kind +++ toString body
+	toString (SaplFuncDef name nrargs args body kind mbType) 
+		= makePrintableName name +++ genTypeInfo mbType +++ makeArgs args +++ toString kind +++ toString body
 
 instance toString SaplRecordDef
 where 
@@ -29,7 +40,7 @@ where
 
 instance == SaplConsDef
 where 
-	== (SaplConsDef _ _ name1 _ _ _ _) (SaplConsDef _ _ name2 _ _ _ _) = name1 == name2
+	== (SaplConsDef _ _ name1 _ _ _ _ _) (SaplConsDef _ _ name2 _ _ _ _ _) = name1 == name2
  
 // only used for comparing vars
 instance == SaplExp
@@ -72,18 +83,19 @@ instance toString SaplExp
 where 
 	toString e = exp2string False e
 	where
-		exp2string b (SaplApp left right)   = bracks b (exp2string False left +++ " " +++ exp2string True right)
-		exp2string b (SaplLit l)            = toString l
-		exp2string b (SaplFun f)            = makePrintableName f
-		exp2string b (SaplVar n vi a mbt)   = makePrintableName n
-		exp2string b e=:(SaplSelect _ _ _)  = bracks b (selectToString e)
-		exp2string b (SaplIf c l r)   		= bracks b ("if " +++ exp2string True c +++ " " +++ exp2string True l +++ " " +++ exp2string True r)		
-		exp2string b (SaplLet ves body)     = "" +++ bracks b ("let " +++ multiLet ves body) 
-		exp2string b (SaplError m)          = bracks b ("error \"" +++ m +++ "\"")
+		exp2string b (SaplApp left right)       = bracks b (exp2string False left +++ " " +++ exp2string True right)
+		exp2string b (SaplLit l)                = toString l
+		exp2string b (SaplFun f)                = makePrintableName f
+		exp2string b (SaplVar n vi a Nothing)   = makePrintableName n
+		exp2string b (SaplVar n vi a (Just ty)) = makePrintableName n +++ genTypeInfo ty		
+		exp2string b e=:(SaplSelect _ _ _)      = bracks b (selectToString e)
+		exp2string b (SaplIf c l r)   		    = bracks b ("if " +++ exp2string True c +++ " " +++ exp2string True l +++ " " +++ exp2string True r)		
+		exp2string b (SaplLet ves body)         = "" +++ bracks b ("let " +++ multiLet ves body) 
+		exp2string b (SaplError m)              = bracks b ("error \"" +++ m +++ "\"")
 
 		bracks b e | b = "(" +++ e +++ ")" 
     		           = e
-        
+      
         selectToString :: !SaplExp -> String       
 		selectToString (SaplSelect e ps def) = "select " +++ exp2string True e +++ " " +++ dopats ps +++ dodef def
 		where dopats [] = ""
@@ -103,18 +115,18 @@ where
 
 makeArgs :: [SaplExp] -> String
 makeArgs []                         = ""
-makeArgs [SaplVar arg _ a mbt]      = " " +++ makePrintableAnnotatedName (toString arg) a
-makeArgs [SaplVar arg _ a mbt:args] = " " +++ makePrintableAnnotatedName (toString arg) a +++ makeArgs args 
+makeArgs [SaplVar arg _ a mbt]      = " " +++ makePrintableAnnotatedName (toString arg) a +++ maybeTypeInfo mbt
+makeArgs [SaplVar arg _ a mbt:args] = " " +++ makePrintableAnnotatedName (toString arg) a +++ maybeTypeInfo mbt +++ makeArgs args 
 
 counterMap :: (a Int -> b) [a] Int -> [b]
 counterMap f [] c = []
 counterMap f [x:xs] c = [f x c : counterMap f xs (c+1)]
 
 // Converting a single Clean function to a Sapl function (case is only pre-transformed)
-CleanFunctoSaplFunc  :: Int Int Int FunDef String {#DclModule} [IndexRange] !*BackEnd -> *(!*BackEnd, !SaplFuncDef)
+CleanFunctoSaplFunc  :: Int Int Int FunDef String {#DclModule} [IndexRange] !*BackEnd !*Heaps -> *(!*BackEnd, !*Heaps, !SaplFuncDef)
 CleanFunctoSaplFunc main_dcl_module_n modindex funindex 
                     {fun_ident,fun_body=TransformedBody {tb_args,tb_rhs},fun_info={fi_free_vars,fi_local_vars,fi_def_level,fi_calls},fun_type,fun_kind} 
-                    mymod dcl_mods icl_function_indices backEnd
+                    mymod dcl_mods icl_function_indices backEnd heaps
 
 		// Add derived strictness from backEnd
         # (backEnd, strictnessList, tupleReturn) = case fun_type of
@@ -132,12 +144,17 @@ CleanFunctoSaplFunc main_dcl_module_n modindex funindex
 										= No
 								= No
         			= (backEnd, ft.st_args_strictness, pf)
-	
+	 
+		// no type info yet
+		# sapl_fun_args = counterMap (getFreeFuncArgName strictnessList) tb_args 0
+		# (Yes symbty) = fun_type // must be
+		# sapl_fun_args_typed = map (\(SaplVar name vi annot _, {at_type}) -> SaplVar name vi annot (Just at_type)) (zip2 sapl_fun_args symbty.st_args)
+		
         # funDef = SaplFuncDef (mymod +++ "." +++ makeFuncName main_dcl_module_n (getName fun_ident) main_dcl_module_n funindex dcl_mods icl_function_indices mymod)
-                   		       (length tb_args) (counterMap (getFreeFuncArgName strictnessList) tb_args 0)  
-                       		   (cleanExpToSaplExp tupleReturn tb_rhs) fun_kind
+                   		       (length tb_args) sapl_fun_args_typed  
+                       		   (cleanExpToSaplExp tupleReturn tb_rhs) fun_kind symbty.st_result.at_type
         
-        = (backEnd, funDef)
+        = (backEnd, heaps, funDef)
 
 where
 	cleanExpToSaplExp tupleReturn (Var ident) = getBoundVarName ident
@@ -316,8 +333,8 @@ getVarPrefix varname  =toString (takeWhile (\a -> a <> 'I' && a <> ';') lname)
 where lname = [c\\c <-: varname]      
 	
 renameVars :: SaplFuncDef -> SaplFuncDef
-renameVars (SaplFuncDef name nrargs args body kind) 
-	= SaplFuncDef name nrargs (map snd renargs) (doVarRename 1 renargs body) kind
+renameVars (SaplFuncDef name nrargs args body kind mbType) 
+	= SaplFuncDef name nrargs (map snd renargs) (doVarRename 1 renargs body) kind mbType
 where
 	renargs = renamevars args 0
 
@@ -400,21 +417,21 @@ makeGetSets mod recname strictness fields
 			+++ mSets 1 (length fields) fields
 where
 	mGets _ _ [] = ""
-	mGets k nf [(field,idx):fields] 
+	mGets k nf [(field,idx,_):fields] 
 		= makePrintableName (mod +++ ".get_" +++ field +++ "_" +++ toString idx) +++ 
 		  " rec = select rec (" +++ recname_pr +++ makeargs nf +++ " -> a" +++ toString k +++ ")\n" +++ mGets (k+1) nf fields
 		  
 	mSets _ _ [] = ""
-	mSets k nf [(field,idx):fields] 
+	mSets k nf [(field,idx,_):fields] 
 		= makePrintableName (mod +++ ".set_" +++ field +++ "_" +++ toString idx) +++ 
 		  " rec " +++ annotate idx "val" +++ " = select rec (" +++ recname_pr +++ " " +++ makeargs nf +++ " -> " +++ 
           recname_pr +++ makerepargs k nf +++ ")\n"  +++ mSets (k+1) nf fields
 
 	recname_pr = makePrintableName (mod +++ "." +++ recname)
 
-	makeconsargs [     ]  			= ""
-	makeconsargs [(field,idx)]      = annotate idx (makePrintableName (mod +++ "." +++ field))
-	makeconsargs [(field,idx):args] = annotate idx (makePrintableName (mod +++ "." +++ field)) +++ ", " +++ makeconsargs args 
+	makeconsargs [     ]  		   	    = ""
+	makeconsargs [(field,idx,ty)]      = annotate idx (makePrintableName (mod +++ "." +++ field)) +++ genTypeInfo ty
+	makeconsargs [(field,idx,ty):args] = annotate idx (makePrintableName (mod +++ "." +++ field)) +++ genTypeInfo ty +++ ", " +++ makeconsargs args 
  
  	annotate idx name | arg_is_strict idx strictness
  		= "!" +++ name
@@ -439,9 +456,9 @@ where ss f = or [is_ss c \\ c <-: f]
 
 // Replace non toplevel if & select by a function call
 checkIfSelect :: SaplFuncDef -> [SaplFuncDef]
-checkIfSelect (SaplFuncDef fname nrargs vs body kind) 
+checkIfSelect (SaplFuncDef fname nrargs vs body kind mbType) 
 	# (newbody,_,newdefs) = rntls vs 0 body
-	= [SaplFuncDef fname nrargs vs newbody kind:newdefs]
+	= [SaplFuncDef fname nrargs vs newbody kind mbType:newdefs]
 where 
 	rntls vs nr (SaplLet ves body)   
 	# (newbody,newnr,newdefs) = rntls (map snd3 ves++vs) nr body                               
@@ -484,7 +501,7 @@ where
 	lift vs nr e
 	# (newe,newnr,newdefse) = rntls vs nr e
 	= (multiApp [SaplFun (callname newnr):vs],newnr+1,newdefse++
-				[SaplFuncDef (callname newnr) (length vs) vs newe FK_Unknown])
+				[SaplFuncDef (callname newnr) (length vs) vs newe FK_Unknown TE])
 	where
 		callname newnr = (fname+++"_select" +++ toString newnr)    
 	

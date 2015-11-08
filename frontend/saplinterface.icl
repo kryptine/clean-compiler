@@ -11,16 +11,16 @@ gensaplfiles :: Int {#DclModule} !{!Component} !{# FunDef} CommonDefs {#CommonDe
 gensaplfiles main_dcl_module_n dcl_mods components fun_defs icl_common common_defs icl_name icl_function_indices sapl_file backEnd heaps
 	
 	# modnames = getModNames dcl_mods // modules used by this Clean module
- 	# (sapl_file, backEnd) = convert2sapl main_dcl_module_n components fun_defs icl_common common_defs icl_name sapl_file modnames (toString icl_name) dcl_mods icl_function_indices backEnd
+ 	# (sapl_file, backEnd, heaps) = convert2sapl main_dcl_module_n components fun_defs icl_common common_defs icl_name sapl_file modnames (toString icl_name) dcl_mods icl_function_indices backEnd heaps
 	= (sapl_file, backEnd, heaps)
 
-convert2sapl :: Int !{!Component} !{# FunDef} CommonDefs {#CommonDefs} Ident !*File [String] String {#DclModule} [IndexRange] !*BackEnd -> *(!*File, !*BackEnd)
-convert2sapl main_dcl_module_n comps fun_defs icl_common comdefs icl_name file modnames mymod dcl_mods icl_function_indices backEnd
+convert2sapl :: Int !{!Component} !{# FunDef} CommonDefs {#CommonDefs} Ident !*File [String] String {#DclModule} [IndexRange] !*BackEnd !*Heaps -> *(!*File, !*BackEnd, !*Heaps)
+convert2sapl main_dcl_module_n comps fun_defs icl_common comdefs icl_name file modnames mymod dcl_mods icl_function_indices backEnd heaps
   # saplcons  = getSaplConstructors mymod icl_common        // only this module
   # extcons   = getExternalConstructors modnames comdefs     // all including this module!
   # saplrecs  = getSaplRecords  icl_common mymod
   # saplcons  = remRecs saplcons saplrecs
-  # (backEnd, saplfuncs) = getSaplFunDefs main_dcl_module_n comps 0 fun_defs modnames mymod dcl_mods icl_function_indices backEnd
+  # (backEnd, heaps, saplfuncs) = getSaplFunDefs main_dcl_module_n comps 0 fun_defs modnames mymod dcl_mods icl_function_indices backEnd heaps
   # saplfuncs = map renameVars saplfuncs                   // give vars a unique name
   # saplfuncs = flatten (map checkIfSelect saplfuncs)      // extract non toplevel if/select
   # file = file <<< "|| ?module? " <<< mymod <<< "\n"
@@ -28,10 +28,10 @@ convert2sapl main_dcl_module_n comps fun_defs icl_common comdefs icl_name file m
   # file = writedef2file saplfuncs file
   # file = writedef2file (consgroups saplcons) (file <<< "\n")
   # file = writerecs2file saplrecs (file <<< "\n|| Converted Records\n")
-  = (file, backEnd)
+  = (file, backEnd, heaps)
 where
-  consgroups conss = [":: " +++ (\ (SaplConsDef mod t _ _ _ _ _) = mod +++ "." +++ t) (hd a) +++ " = " +++ makeConsGroup a \\ a <- group eqcg conss] 
-  eqcg (SaplConsDef a1 a2 _ _ _ _ _) (SaplConsDef b1 b2 _ _ _ _ _) = a1 == b1 && a2 == b2
+  consgroups conss = [":: " +++ (\ (SaplConsDef mod t _ _ _ _ _ _) = mod +++ "." +++ t) (hd a) +++ " = " +++ makeConsGroup a \\ a <- group eqcg conss] 
+  eqcg (SaplConsDef a1 a2 _ _ _ _ _ _) (SaplConsDef b1 b2 _ _ _ _ _ _) = a1 == b1 && a2 == b2
   group f [] = []
   group f [x:xs] = let (as,bs) = span (f x) xs in [[x:as] : group f bs]  
   writedef2file [] file = file
@@ -45,7 +45,7 @@ where
   mkString [] = ""
   mkString [a:as] = " " +++ a +++ mkString as
 //  remRecs cs recs = [SaplConsDef mod t name alt nrargs strictness nralt \\ def =: (SaplConsDef mod t name alt nrargs strictness nralt) <- cs | not (isMember name recnames)]
-  remRecs cs recs = [def \\ def =: (SaplConsDef mod t name alt nrargs strictness nralt) <- cs | not (isMember name recnames)]
+  remRecs cs recs = [def \\ def =: (SaplConsDef mod t name alt nrargs _ strictness nralt) <- cs | not (isMember name recnames)]
   where 
   	recnames = [recname \\ SaplRecordDef _ recname _ _ <- recs]
   
@@ -54,25 +54,25 @@ makeConsGroup [     ]    = ""
 makeConsGroup [arg]      = toString arg
 makeConsGroup [arg:args] = toString arg +++ " | " +++ makeConsGroup args   
 
-getSaplFunDefs :: Int !{!Component} !Int !{# FunDef} [String] String {#DclModule} [IndexRange] !*BackEnd -> *(!*BackEnd, ![SaplFuncDef])
-getSaplFunDefs main_dcl_module_n comps comp_index fun_defs mod_names mymod dcl_mods icl_function_indices backEnd
+getSaplFunDefs :: Int !{!Component} !Int !{# FunDef} [String] String {#DclModule} [IndexRange] !*BackEnd !*Heaps -> *(!*BackEnd, !*Heaps, ![SaplFuncDef])
+getSaplFunDefs main_dcl_module_n comps comp_index fun_defs mod_names mymod dcl_mods icl_function_indices backEnd heaps
 	| comp_index >= size comps
-		= (backEnd, [])
+		= (backEnd, heaps, [])
 		# comp = comps.[comp_index]
-		# (backEnd, saplfuncs) = show_component comp.component_members fun_defs [] backEnd
-		# (backEnd, sfuncs) = getSaplFunDefs main_dcl_module_n comps (inc comp_index) fun_defs mod_names mymod dcl_mods icl_function_indices backEnd
-		= (backEnd, saplfuncs ++ sfuncs)
+		# (backEnd, heaps, saplfuncs) = show_component comp.component_members fun_defs [] backEnd heaps
+		# (backEnd, heaps, sfuncs) = getSaplFunDefs main_dcl_module_n comps (inc comp_index) fun_defs mod_names mymod dcl_mods icl_function_indices backEnd heaps
+		= (backEnd, heaps, saplfuncs ++ sfuncs)
 where
-	show_component NoComponentMembers fun_defs sapdefs backEnd
-		= (backEnd, sapdefs)
-	show_component (ComponentMember fun funs) fun_defs sapdefs backEnd
+	show_component NoComponentMembers fun_defs sapdefs backEnd heaps
+		= (backEnd, heaps, sapdefs)
+	show_component (ComponentMember fun funs) fun_defs sapdefs backEnd heaps
 		# fun_def = fun_defs.[fun]
-		# (backEnd, saplfunc) = CleanFunctoSaplFunc main_dcl_module_n comp_index fun fun_def mymod dcl_mods icl_function_indices backEnd
-		= show_component funs fun_defs [saplfunc:sapdefs] backEnd
-	show_component (GeneratedComponentMember fun _ funs) fun_defs sapdefs backEnd
+		# (backEnd, heaps, saplfunc) = CleanFunctoSaplFunc main_dcl_module_n comp_index fun fun_def mymod dcl_mods icl_function_indices backEnd heaps
+		= show_component funs fun_defs [saplfunc:sapdefs] backEnd heaps
+	show_component (GeneratedComponentMember fun _ funs) fun_defs sapdefs backEnd heaps
 		# fun_def = fun_defs.[fun]
-		# (backEnd, saplfunc) = CleanFunctoSaplFunc main_dcl_module_n comp_index fun fun_def mymod dcl_mods icl_function_indices backEnd
-		= show_component funs fun_defs [saplfunc:sapdefs] backEnd
+		# (backEnd, heaps, saplfunc) = CleanFunctoSaplFunc main_dcl_module_n comp_index fun fun_def mymod dcl_mods icl_function_indices backEnd heaps
+		= show_component funs fun_defs [saplfunc:sapdefs] backEnd heaps
 
 getExternalConstructors :: [String] {#CommonDefs} -> [SaplConsDef]			
 getExternalConstructors mods comdefs = flatten [getSaplConstructors mod comdef\\(comdef,mod) <-  zip (lcomdefs,mods)]
@@ -81,12 +81,13 @@ where lcomdefs = [comdef\\ comdef <-: comdefs]
 getSaplConstructors :: String CommonDefs -> [SaplConsDef]			
 getSaplConstructors mod icl_common = collectTypes [consdef\\ consdef <-: icl_common.com_cons_defs] 
 where collectTypes conses = makeSaplCons  (group eqc (tosapl conses))
-      tosapl conses = [(getConsType cons,getName cons,getNrArgs cons,getStrictness cons) \\ cons <- conses]
-      makeSaplCons conses = [SaplConsDef mod type name alt nrarg sl (length css)\\ css <- conses, (alt,(type,name,nrarg,sl)) <- zip ([1..],css)]
+      tosapl conses = [(getConsType cons,getName cons,getNrArgs cons,getArgTypes cons,getStrictness cons) \\ cons <- conses]
+      makeSaplCons conses = [SaplConsDef mod type name alt nrarg argtys sl (length css)\\ css <- conses, (alt,(type,name,nrarg,argtys,sl)) <- zip ([1..],css)]
       group f [] = []
       group f [x:xs] = let (as,bs) = span (f x) xs in [[x:as] : group f bs]
-      eqc (a,_,_,_) (b,_,_,_) = a == b
+      eqc (a,_,_,_,_) (b,_,_,_,_) = a == b
 
+	  getArgTypes cons      = map (\{at_type}->at_type) cons.cons_type.st_args
       getName cons 			= toString cons.cons_ident
       getNrArgs cons 		= length cons.cons_type.st_args + length cons.cons_type.st_context
       getConsType cons 		= icl_common.com_type_defs.[cons.cons_type_index].td_ident.id_name 
@@ -98,7 +99,7 @@ where
 	makeRec rectype = 
 			SaplRecordDef mymod (toString rectype.rt_constructor.ds_ident) 
 						  (icl_common.com_cons_defs.[rectype.rt_constructor.ds_index].cons_type.st_args_strictness)
-						  [(toString field.fs_ident, field.fs_index) \\ field <-: rectype.rt_fields]
+						  [(toString field.fs_ident, field.fs_index, atype.at_type) \\ field <-: rectype.rt_fields & atype <- icl_common.com_cons_defs.[rectype.rt_constructor.ds_index].cons_type.st_args]
 
 getModNames :: {#DclModule} -> [String]
 getModNames dcl_mods = [dcl_mod.dcl_name.id_name\\ dcl_mod <-: dcl_mods]
