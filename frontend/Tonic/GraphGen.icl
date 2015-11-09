@@ -208,7 +208,7 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
                                 "_x" -> case syne.syn_pattern_match_vars of
                                           [(_, e):_] -> e
                                           _          -> TVar [] "_x" (ptrToInt x.fv_info_ptr)
-                                x`    -> TVar [] x` (ptrToInt x.fv_info_ptr)
+                                x`   -> TVar [] x` (ptrToInt x.fv_info_ptr)
                              \\ x <- args | x.fv_def_level == -1]
       # (isTLB, chn)       = funIsTopLevelBlueprintOrLam tFd inh chn
       # (syne, chn)        = case (isTLB, symbIdentObjectIdx app_symb) of
@@ -473,8 +473,9 @@ mkBlueprint inh (Let lt) chn
       # (ei, expr_heap) = readPtr exprPtr heaps.hp_expression_heap
       # chn = {chn & chn_heaps = {heaps & hp_expression_heap = expr_heap}}
       = case ei of
-          EI_LetType atys -> (map (\x -> x.at_type) atys, chn)
-          _               -> ([], chn)
+          EI_LetType atys               -> (map (\x -> x.at_type) atys, chn)
+          EI_LetTypeAndRefCounts atys _ -> (map (\x -> x.at_type) atys, chn)
+          _                             -> ([], chn)
 
     flattenBinds lt chn
       = foldrSt f (getLetBinds lt) ([], 1, chn)
