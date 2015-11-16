@@ -24,8 +24,8 @@ checkVersion VersionObservedIsTooOld errorFile
 			=	fwrites "Error: the back end library is too old\n" errorFile
 	=	(False, errorFile)
 
-backEndInterface :: !{#Char} [{#Char}] !ListTypesOption !{#Char} !PredefinedSymbols !FrontEndSyntaxTree !Int !*VarHeap !*AttrVarHeap !*(Optional *File) !*File !*File -> (!Bool, !*VarHeap, !*AttrVarHeap, !*(Optional *File), !*File, !*File)
-backEndInterface outputFileName commandLineArgs listTypes typesPath predef_symbols syntaxTree=:{fe_icl,fe_components,fe_dcls} main_dcl_module_n var_heap attrHeap sapl_file errorFile outFile
+backEndInterface :: !{#Char} [{#Char}] !ListTypesOption !{#Char} !PredefinedSymbols !FrontEndSyntaxTree !Int !*Heaps !*(Optional *File) !*File !*File -> (!Bool, !*Heaps, !*(Optional *File), !*File, !*File)
+backEndInterface outputFileName commandLineArgs listTypes typesPath predef_symbols syntaxTree=:{fe_icl,fe_components,fe_dcls} main_dcl_module_n heaps sapl_file errorFile outFile
 
 	# (observedCurrent, observedOldestDefinition, observedOldestImplementation)
 		=	BEGetVersion
@@ -48,9 +48,10 @@ backEndInterface outputFileName commandLineArgs listTypes typesPath predef_symbo
 	# (compatible, errorFile)
 		=	checkVersion (versionCompare expectedVersion observedVersion) errorFile
 	| not compatible
-		=	(False, var_heap, attrHeap, sapl_file, errorFile, outFile)
-	# varHeap
-		=	backEndPreprocess predefined_idents.[PD_DummyForStrictAliasFun] functionIndices fe_icl var_heap
+		=	(False, heaps, sapl_file, errorFile, outFile)
+				
+	# var_heap
+		=	backEndPreprocess predefined_idents.[PD_DummyForStrictAliasFun] functionIndices fe_icl heaps.hp_var_heap
 		with
 			functionIndices = function_indices 0 fe_components
 
@@ -65,6 +66,13 @@ backEndInterface outputFileName commandLineArgs listTypes typesPath predef_symbo
 				= [member : function_indices2 members i components]
 			function_indices2 NoComponentMembers i components
 				= function_indices (i+1) components
+			
+	# heaps = {heaps & hp_var_heap = var_heap}
+		
+	# var_heap=heaps.hp_var_heap
+	  hp_type_heaps=heaps.hp_type_heaps
+	  attrHeap=hp_type_heaps.th_attrs		
+						
 	# backEndFiles
 		=	0
 	# (backEnd, backEndFiles)
@@ -72,11 +80,14 @@ backEndInterface outputFileName commandLineArgs listTypes typesPath predef_symbo
 	# backEnd
 		=	foldState BEArg commandLineArgs backEnd
 	# (var_heap, attrHeap, backEnd)
-		=	backEndConvertModules predef_symbols syntaxTree main_dcl_module_n varHeap attrHeap backEnd
+		=	backEndConvertModules predef_symbols syntaxTree main_dcl_module_n var_heap attrHeap backEnd
+		
+	# heaps = {heaps & hp_var_heap = var_heap, hp_type_heaps = {hp_type_heaps  & th_attrs = attrHeap}}		
+		
 	# (success, backEnd)
 		=	BEGenerateCode outputFileName backEnd
 		
-	# (sapl_file, backEnd) = 
+	# (sapl_file, backEnd, heaps) = 
 		case sapl_file of
 
 			(Yes file)
@@ -85,7 +96,7 @@ backEndInterface outputFileName commandLineArgs listTypes typesPath predef_symbo
 					 = {{dcl_common
 						    \\ {dcl_common} <-: syntaxTree.fe_dcls } & [main_dcl_module_n] = syntaxTree.fe_icl.icl_common }				
 								
-				# (file, backEnd) = 
+				# (file, backEnd, heaps) = 
 						
 						gensaplfiles 
                             main_dcl_module_n
@@ -96,13 +107,16 @@ backEndInterface outputFileName commandLineArgs listTypes typesPath predef_symbo
 							common_defs 
 							syntaxTree.fe_icl.icl_name // icl_name 
 							syntaxTree.fe_icl.icl_function_indices.ifi_global_function_indices // icl_global_functions 
-							file backEnd
+							file 
+							backEnd 
+							heaps
 
-				-> (Yes file, backEnd)
+				-> (Yes file, backEnd, heaps)
     		_
-    			-> (sapl_file, backEnd)
+    			-> (sapl_file, backEnd, heaps)
 		
-		
+	# hp_type_heaps=heaps.hp_type_heaps
+	  attrHeap=hp_type_heaps.th_attrs		
 		
 	# backEnd
 		=	BECloseFiles backEnd
@@ -110,7 +124,10 @@ backEndInterface outputFileName commandLineArgs listTypes typesPath predef_symbo
 		=	optionallyPrintFunctionTypes listTypes typesPath (DictionaryToClassInfo main_dcl_module_n fe_icl fe_dcls) fe_components fe_icl.icl_functions attrHeap outFile backEnd
 	# backEndFiles
 		=	BEFree backEnd backEndFiles
-	=	(backEndFiles == 0 && success, var_heap, attrHeap, sapl_file, errorFile, outFile)
+		
+	# heaps = {heaps & hp_type_heaps = {hp_type_heaps  & th_attrs = attrHeap}}		
+	
+	=	(backEndFiles == 0 && success, heaps, sapl_file, errorFile, outFile)
 
 :: DictionaryToClassInfo =
 	{	dtci_iclModuleIndex :: Int
