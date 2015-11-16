@@ -327,19 +327,21 @@ basicValueToSapl (BVB bool)     = LBool bool
 basicValueToSapl (BVR real)     = LReal (toReal real)
 basicValueToSapl (BVS str)      = LString (toSAPLString '"' str)
 
-cmpvar  (SaplVar n1 ip1 _ _) (SaplVar n2 ip2 _ _) | isNilPtr ip1 || isNilPtr ip2 = n1 == n2	                                                                           = ip1 == ip2
+cmpvar  (SaplVar n1 ip1 _ _) (SaplVar n2 ip2 _ _) | isNilPtr ip1 || isNilPtr ip2 = n1 == n2	= ip1 == ip2
 
 getVarPrefix varname  =toString (takeWhile (\a -> a <> 'I' && a <> ';') lname)
 where lname = [c\\c <-: varname]      
 	
 renameVars :: SaplFuncDef -> SaplFuncDef
 renameVars (SaplFuncDef name nrargs args body kind mbType) 
-	= SaplFuncDef name nrargs (map snd renargs) (doVarRename 1 renargs body) kind mbType
+	= SaplFuncDef name nrargs renargs (doVarRename 1 renamemap body) kind mbType
 where
-	renargs = renamevars args 0
+	renargs = [SaplVar (getVarPrefix v +++ "_" +++ toString k) ip a mbt \\ (SaplVar v ip a mbt,k) <- zip(args,[0..])]
 
-	renamevars vars 0 = [(SaplVar v ip a mbt, SaplVar (getVarPrefix v +++ "_" +++ toString k) ip a mbt) \\ (SaplVar v ip a mbt,k) <- zip(vars,[0..])]
-	renamevars vars n = [(SaplVar v ip a mbt, SaplVar (getVarPrefix v +++ "_" +++ toString n +++ "_" +++ toString k) ip a mbt) \\ (SaplVar v ip a mbt,k) <- zip(vars,[0..])]
+	renamemap = renamevars args 0
+
+	renamevars vars 0 = [(SaplVar v ip a mbt, SaplVar (getVarPrefix v +++ "_" +++ toString k) ip a Nothing) \\ (SaplVar v ip a mbt,k) <- zip(vars,[0..])]
+	renamevars vars n = [(SaplVar v ip a mbt, SaplVar (getVarPrefix v +++ "_" +++ toString n +++ "_" +++ toString k) ip a Nothing) \\ (SaplVar v ip a mbt,k) <- zip(vars,[0..])]
 
 	doVarRename level rens (SaplApp left right)		= SaplApp (doVarRename level rens left) (doVarRename level rens right)
 	doVarRename level rens var=:(SaplVar _ _ _ _)   = findvar var rens
@@ -379,7 +381,7 @@ where
     	                 = SaplLet bindings body
 	where
 		// filter bindings by their body
-		varbindings    = [(var, SaplVar n ip a mbt) \\ (_, var, SaplVar n ip a mbt) <- bindings]
+		varbindings    = [(var, SaplVar n ip a Nothing) \\ (_, var, SaplVar n ip a mbt) <- bindings]
 		nonvarbindings = filter (noVar o thd3) bindings
 
 		noVar (SaplVar _ _ _ _) = False
@@ -387,7 +389,7 @@ where
 
 	// Simple var renaming
 	varrename rens (SaplApp left right)  = SaplApp (varrename rens left) (varrename rens right)
-	varrename rens (SaplVar n ip a mbt)  = findvar (SaplVar n ip a mbt) (rens++[(SaplVar n ip a mbt,SaplVar n ip a mbt)])
+	varrename rens (SaplVar n ip a mbt)  = findvar (SaplVar n ip a mbt) (rens++[(SaplVar n ip a mbt,SaplVar n ip a Nothing)])
 	varrename rens (SaplLet ves body)    = SaplLet [(a,v,varrename rens e)\\ (a,v,e) <- ves] (varrename rens body)
 	varrename rens (SaplIf c l r)  		 = SaplIf (varrename rens c) (varrename rens l) (varrename rens r)	
 	varrename rens (SaplSelect expr patterns mbDef) 
@@ -459,7 +461,7 @@ checkIfSelect :: SaplFuncDef -> [SaplFuncDef]
 checkIfSelect (SaplFuncDef fname nrargs vs body kind mbType) 
 	# (newbody,_,newdefs) = rntls vs 0 body
 	= [SaplFuncDef fname nrargs vs newbody kind mbType:newdefs]
-where 
+where
 	rntls vs nr (SaplLet ves body)   
 	# (newbody,newnr,newdefs) = rntls (map snd3 ves++vs) nr body                               
 	= (SaplLet ves newbody,newnr,newdefs)
@@ -496,14 +498,17 @@ where
 	maylift vs nr e=:(SaplIf _ _ _) = lift vs nr e	
 	maylift vs nr e=:(SaplSelect _ _ _) = lift vs nr e	
 	maylift vs nr e = rntls vs nr e
-	
+
 	// lift the given expression into a new top level function
 	lift vs nr e
 	# (newe,newnr,newdefse) = rntls vs nr e
-	= (multiApp [SaplFun (callname newnr):vs],newnr+1,newdefse++
+	= (multiApp [SaplFun (callname newnr):map removeTypeInfo vs],newnr+1,newdefse++
 				[SaplFuncDef (callname newnr) (length vs) vs newe FK_Unknown TE])
 	where
 		callname newnr = (fname+++"_select" +++ toString newnr)    
+	
+	removeTypeInfo (SaplVar n vi a _) = SaplVar n vi a Nothing
+	removeTypeInfo expr = expr
 	
 // Which functions must be extended with a number 
 genFunctionExtension :: !Int !String !Int !Int {#DclModule} [IndexRange] !String -> String
