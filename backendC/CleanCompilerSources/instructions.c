@@ -3965,8 +3965,8 @@ void GenSystemImports (void)
 		GenImpLab (type_error_lab.lab_name);
 		GenImpLab (hnf_lab.lab_name);
 
-		GenImpDesc ("_ind");
-		GenImpLab_node_entry (indirection_lab.lab_name,"_eaind");
+		GenImpDesc (ind_lab.lab_name);
+		GenImpLab_node_entry (indirection_lab.lab_name,"e_system_eaind");
 		GenImpDesc ("e_system_dif");
 		GenImpLab_node_entry ("e_system_nif","e_system_eaif");
 		GenImpLab ("e_system_sif");
