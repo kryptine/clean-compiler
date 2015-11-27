@@ -2269,11 +2269,20 @@ where
 	want_constructor :: ![ATypeVar] !Token !ParseState -> (.ParsedConstructor,!ParseState)
 	want_constructor exi_vars token pState
 		# token = basic_type_to_constructor token
-		# (pc_cons_ident,  pc_cons_prio, pc_cons_pos, pState) = want_cons_name_and_prio token pState
+		# (pc_cons_ident, pc_cons_prio, pc_cons_pos, pState) = want_cons_name_and_prio token pState
 		  (pc_arg_types, pState) = parseList tryBrackSAType pState
+		  pState = case pc_cons_prio of
+						NoPrio
+							-> pState
+						Prio _ _
+							-> case pc_arg_types of
+								[_,_]
+									-> pState
+								_
+									-> parseErrorSimple pc_cons_ident.id_name "arity of an infix constructor should be 2" pState
 		  (pc_context,pState) = optional_constructor_context pState
 		  cons = {	pc_cons_ident = pc_cons_ident, pc_arg_types = atypes_from_satypes pc_arg_types, pc_args_strictness=strictness_from_satypes pc_arg_types,
-		  			pc_context = pc_context, pc_cons_arity = length pc_arg_types, pc_cons_prio = pc_cons_prio, pc_exi_vars = exi_vars, pc_cons_pos = pc_cons_pos}
+					pc_context = pc_context, pc_cons_arity = length pc_arg_types, pc_cons_prio = pc_cons_prio, pc_exi_vars = exi_vars, pc_cons_pos = pc_cons_pos}
 		= (cons,pState)
 
 	want_newtype_constructor :: ![ATypeVar] !Token !ParseState -> (.ParsedConstructor,!ParseState)
