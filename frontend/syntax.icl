@@ -502,7 +502,7 @@ where
 	(<<<) file PE_Empty = file <<< "** E **"
 	(<<<) file (PE_Ident symb) = file <<< symb
 	(<<<) file PE_WildCard = file <<< '_'
-	(<<<) file (PE_Lambda _ exprs expr _) = file <<< '\\' <<< exprs <<< " -> " <<< expr
+	(<<<) file (PE_Lambda _ exprs rhs _) = file <<< '\\' <<< exprs <<< rhs
 	(<<<) file (PE_Bound bind) = file <<< bind
 	(<<<) file (PE_Case _ expr alts) = file <<< "case " <<< expr <<< " of\n" <<< alts
 	(<<<) file (PE_Let defs expr) = file <<< "let " <<< defs <<< " in\n" <<< expr
