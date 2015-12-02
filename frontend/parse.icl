@@ -1049,33 +1049,26 @@ definingTokenToFunKind DefinesColonToken
 definingTokenToFunKind _
 	=	FK_Unknown
 
-wantRhs :: !Bool !RhsDefiningSymbol !ParseState -> (!Rhs, !RhsDefiningSymbol, !ParseState) // FunctionAltDefRhs
-wantRhs localsExpected definingSymbol pState
-	# (alts, definingSymbol, pState)	= want_LetsFunctionBody definingSymbol pState
-	  (locals, pState)	= optionalLocals WhereToken localsExpected pState
-	= ({ rhs_alts = alts, rhs_locals = locals}, definingSymbol, pState)
+wantRhs_without_where :: !Token !Bool !RhsDefiningSymbol !ParseState -> (!Rhs, !RhsDefiningSymbol, !ParseState) // FunctionAltDefRhs
+wantRhs_without_where token localsExpected definingSymbol pState
+	# (nodeDefs, token, pState)	= want_LetBefores token localsExpected pState
+	  (alts, definingSymbol, pState) = want_FunctionBody token nodeDefs [] definingSymbol pState
+	= ({ rhs_alts = alts, rhs_locals = LocalParsedDefs []}, definingSymbol, pState)
 where
-	want_LetsFunctionBody :: !RhsDefiningSymbol  !ParseState -> (!OptGuardedAlts, !RhsDefiningSymbol, !ParseState) 
-	want_LetsFunctionBody definingSymbol pState
-		# (token, pState)			= nextToken FunctionContext pState
-		  (nodeDefs, token, pState)	= want_LetBefores token pState
-		= want_FunctionBody token nodeDefs [] definingSymbol pState
-
 	want_FunctionBody :: !Token ![NodeDefWithLocals] ![GuardedExpr] !RhsDefiningSymbol !ParseState -> (!OptGuardedAlts, !RhsDefiningSymbol, !ParseState)
 	want_FunctionBody BarToken nodeDefs alts definingSymbol pState
-//		#	(lets, pState)				= want_StrictLet pState // removed from 2.0
 		#	(file_name, line_nr, pState)= getFileAndLineNr pState
 			(token, pState)				= nextToken FunctionContext pState
 		|	token == OtherwiseToken
 			#	(token, pState)				= nextToken FunctionContext pState
-				(nodeDefs2, token, pState)	= want_LetBefores token pState
+				(nodeDefs2, token, pState)	= want_LetBefores token localsExpected pState
 			= want_FunctionBody token (nodeDefs ++ nodeDefs2) alts definingSymbol pState // to allow | otherwise | c1 = .. | c2 = ..
 		|	token == LetToken True
 			#	pState	= parseError "RHS" No "No 'let!' in this version of Clean" pState
-			=	root_expression True token nodeDefs (reverse alts) definingSymbol pState
+			=	root_expression token nodeDefs (reverse alts) definingSymbol pState
 		#	(guard, pState)				= wantExpressionT token pState
 			(token, pState)				= nextToken FunctionContext pState
-			(nodeDefs2, token, pState)	= want_LetBefores token pState
+			(nodeDefs2, token, pState)	= want_LetBefores token localsExpected pState
 		|	token == BarToken // nested guard
 			#	(position, pState)			= getPosition pState
 				offside						= position.fp_col
@@ -1085,7 +1078,80 @@ where
 				alt							= { alt_nodes = nodeDefs, alt_guard = guard, alt_expr = expr,
 												alt_ident = guard_ident line_nr, alt_position = LinePos file_name line_nr }
 				(token, pState)				= nextToken FunctionContext pState
-				(nodeDefs, token, pState)	= want_LetBefores token pState
+				(nodeDefs, token, pState)	= want_LetBefores token localsExpected pState
+			=	want_FunctionBody token nodeDefs [alt:alts] definingSymbol pState
+		// otherwise
+			#	(expr, definingSymbol, pState)
+											= root_expression token nodeDefs2 [] definingSymbol pState
+				alt							= { alt_nodes = nodeDefs, alt_guard = guard, alt_expr = expr,
+												alt_ident = guard_ident line_nr, alt_position = LinePos file_name line_nr }
+				(token, pState)				= nextToken FunctionContext pState
+				(nodeDefs, token, pState)	= want_LetBefores token localsExpected pState
+			=	want_FunctionBody token nodeDefs [alt:alts] definingSymbol pState
+	  where
+	  	guard_ident line_nr
+			= { id_name = "_g;" +++ toString line_nr +++ ";", id_info = nilPtr }
+	want_FunctionBody token nodeDefs alts definingSymbol pState
+		=	root_expression token nodeDefs (reverse alts) definingSymbol pState
+
+	root_expression :: !Token ![NodeDefWithLocals] ![GuardedExpr] !RhsDefiningSymbol !ParseState -> (!OptGuardedAlts, !RhsDefiningSymbol, !ParseState)
+	root_expression token nodeDefs alts definingSymbol pState
+		# (optional_expr,definingSymbol,pState) = want_OptExprWithLocals token nodeDefs definingSymbol pState
+		= build_root token optional_expr alts nodeDefs definingSymbol pState
+
+	want_OptExprWithLocals :: !Token ![NodeDefWithLocals] !RhsDefiningSymbol !ParseState -> (!Optional ExprWithLocalDefs, !RhsDefiningSymbol, !ParseState)
+	want_OptExprWithLocals token nodeDefs definingSymbol pState
+		| isDefiningSymbol definingSymbol token
+		# (file_name, line_nr, pState)	= getFileAndLineNr pState
+		  (expr, pState)	= wantExpression pState
+		  locals = LocalParsedDefs []
+		= ( Yes	{ ewl_nodes		= nodeDefs
+				, ewl_expr		= expr
+				, ewl_locals	= locals
+				, ewl_position	= LinePos file_name line_nr
+				}
+		  , RhsDefiningSymbolExact token
+		  , pState
+		  )
+		= (No, definingSymbol, tokenBack pState)
+
+wantRhs :: !Bool !RhsDefiningSymbol !ParseState -> (!Rhs, !RhsDefiningSymbol, !ParseState) // FunctionAltDefRhs
+wantRhs localsExpected definingSymbol pState
+	# (alts, definingSymbol, pState)	= want_LetsFunctionBody definingSymbol pState
+	  (locals, pState)	= optionalLocals WhereToken localsExpected pState
+	= ({ rhs_alts = alts, rhs_locals = locals}, definingSymbol, pState)
+where
+	want_LetsFunctionBody :: !RhsDefiningSymbol  !ParseState -> (!OptGuardedAlts, !RhsDefiningSymbol, !ParseState) 
+	want_LetsFunctionBody definingSymbol pState
+		# (token, pState)			= nextToken FunctionContext pState
+		  (nodeDefs, token, pState)	= want_LetBefores token localsExpected pState
+		= want_FunctionBody token nodeDefs [] definingSymbol pState
+
+	want_FunctionBody :: !Token ![NodeDefWithLocals] ![GuardedExpr] !RhsDefiningSymbol !ParseState -> (!OptGuardedAlts, !RhsDefiningSymbol, !ParseState)
+	want_FunctionBody BarToken nodeDefs alts definingSymbol pState
+//		#	(lets, pState)				= want_StrictLet pState // removed from 2.0
+		#	(file_name, line_nr, pState)= getFileAndLineNr pState
+			(token, pState)				= nextToken FunctionContext pState
+		|	token == OtherwiseToken
+			#	(token, pState)				= nextToken FunctionContext pState
+				(nodeDefs2, token, pState)	= want_LetBefores token localsExpected pState
+			= want_FunctionBody token (nodeDefs ++ nodeDefs2) alts definingSymbol pState // to allow | otherwise | c1 = .. | c2 = ..
+		|	token == LetToken True
+			#	pState	= parseError "RHS" No "No 'let!' in this version of Clean" pState
+			=	root_expression True token nodeDefs (reverse alts) definingSymbol pState
+		#	(guard, pState)				= wantExpressionT token pState
+			(token, pState)				= nextToken FunctionContext pState
+			(nodeDefs2, token, pState)	= want_LetBefores token localsExpected pState
+		|	token == BarToken // nested guard
+			#	(position, pState)			= getPosition pState
+				offside						= position.fp_col
+				(expr, definingSymbol, pState)
+											= want_FunctionBody token nodeDefs2 [] definingSymbol pState
+				pState						= wantEndNestedGuard (default_found expr) offside pState
+				alt							= { alt_nodes = nodeDefs, alt_guard = guard, alt_expr = expr,
+												alt_ident = guard_ident line_nr, alt_position = LinePos file_name line_nr }
+				(token, pState)				= nextToken FunctionContext pState
+				(nodeDefs, token, pState)	= want_LetBefores token localsExpected pState
 			=	want_FunctionBody token nodeDefs [alt:alts] definingSymbol pState
 		// otherwise
 			#	(expr, definingSymbol, pState)
@@ -1093,7 +1159,7 @@ where
 				alt							= { alt_nodes = nodeDefs, alt_guard = guard, alt_expr = expr,
 												alt_ident = guard_ident line_nr, alt_position = LinePos file_name line_nr }
 				(token, pState)				= nextToken FunctionContext pState
-				(nodeDefs, token, pState)	= want_LetBefores token pState
+				(nodeDefs, token, pState)	= want_LetBefores token localsExpected pState
 			=	want_FunctionBody token nodeDefs [alt:alts] definingSymbol pState
 	  where
 	  	guard_ident line_nr
@@ -1105,24 +1171,6 @@ where
 	root_expression withExpected token nodeDefs alts definingSymbol pState
 		# (optional_expr,definingSymbol,pState) = want_OptExprWithLocals withExpected token nodeDefs definingSymbol pState
 		= build_root token optional_expr alts nodeDefs definingSymbol pState
-	where
-		build_root :: !Token !(Optional ExprWithLocalDefs) ![GuardedExpr] ![NodeDefWithLocals] !RhsDefiningSymbol !ParseState -> (!OptGuardedAlts, !RhsDefiningSymbol, !ParseState)
-		build_root _ (Yes expr) [] _ definingSymbol pState
-			= ( UnGuardedExpr expr, definingSymbol, pState)
-		build_root _ No alts=:[_:_] [] definingSymbol pState
-			= (GuardedAlts alts No, definingSymbol, pState)
-		build_root _ optional_expr alts=:[_:_] _ definingSymbol pState
-			= (GuardedAlts alts optional_expr, definingSymbol, pState)
-		build_root token _ _ _ definingSymbol pState
-			# (file_name, line_nr, pState)	= getFileAndLineNr pState
-			=	(UnGuardedExpr {ewl_nodes = [], ewl_expr = PE_Empty, ewl_locals = LocalParsedDefs [],
-												ewl_position = LinePos file_name line_nr}
-							, definingSymbol
-							, parseError "RHS: root expression" (Yes token) "= <ExprWithLocals>" pState
-							)
-
-	default_found (GuardedAlts _ No)	= False
-	default_found _						= True
 
 	want_OptExprWithLocals :: !Bool !Token ![NodeDefWithLocals] !RhsDefiningSymbol !ParseState -> (!Optional ExprWithLocalDefs, !RhsDefiningSymbol, !ParseState)
 //	want_OptExprWithLocals withExpected DoubleArrowToken nodeDefs pState
@@ -1143,6 +1191,23 @@ where
 		  )
 		= (No, definingSymbol, tokenBack pState)
 
+build_root :: !Token !(Optional ExprWithLocalDefs) ![GuardedExpr] ![NodeDefWithLocals] !RhsDefiningSymbol !ParseState -> (!OptGuardedAlts, !RhsDefiningSymbol, !ParseState)
+build_root _ (Yes expr) [] _ definingSymbol pState
+	= ( UnGuardedExpr expr, definingSymbol, pState)
+build_root _ No alts=:[_:_] [] definingSymbol pState
+	= (GuardedAlts alts No, definingSymbol, pState)
+build_root _ optional_expr alts=:[_:_] _ definingSymbol pState
+	= (GuardedAlts alts optional_expr, definingSymbol, pState)
+build_root token _ _ _ definingSymbol pState
+	# (file_name, line_nr, pState)	= getFileAndLineNr pState
+	=	(UnGuardedExpr {ewl_nodes = [], ewl_expr = PE_Empty, ewl_locals = LocalParsedDefs [],
+										ewl_position = LinePos file_name line_nr}
+					, definingSymbol
+					, parseError "RHS: root expression" (Yes token) "= <ExprWithLocals>" pState
+					)
+
+default_found (GuardedAlts _ No)	= False
+default_found _						= True
 
 /*	want_StrictLet :: !ParseState -> ([NodeDefWithLocals] , !ParseState) // Removed from the language !?
 	want_StrictLet pState
@@ -1152,26 +1217,24 @@ where
 			  pState				= wantToken FunctionContext "strict let" InToken pState
 			= (let_defs, pState)
 		= ([], tokenBack pState)
-*/ 
-	want_LetBefores :: !Token !ParseState -> (![NodeDefWithLocals], !Token, !ParseState)
-	want_LetBefores (SeqLetToken strict) pState
-		# (let_defs, pState)				= wantList "<sequential node defs>" (try_LetDef strict) pState
-		  (token, pState)					= nextToken FunctionContext pState
-		  (token, pState)					= opt_End_Group token pState
-		  (more_let_defs, token, pState)	= want_LetBefores token pState
-		= (let_defs ++ more_let_defs, token, pState)
-		where
-			opt_End_Group token pState
-			 #	(ss_useLayout, pState) = accScanState UseLayout pState
-			 |	ss_useLayout
-			 	| token == EndGroupToken
-			 		= nextToken FunctionContext pState
-			 	// otherwise // token <> EndGroupToken
-			 		= (ErrorToken "End group missing in let befores", parseError "RHS: Let befores" (Yes token) "Generated End Group (due to layout)" pState)
-			 |	otherwise // not ss_useLayout
-			 =	(token, pState)
-	want_LetBefores token pState
-		= ([], token, pState)
+*/
+want_LetBefores :: !Token !Bool !ParseState -> (![NodeDefWithLocals], !Token, !ParseState)
+want_LetBefores (SeqLetToken strict) localsExpected pState
+	# (let_defs, pState)				= wantList "<sequential node defs>" (try_LetDef strict) pState
+	  (token, pState)					= nextToken FunctionContext pState
+	  (token, pState)					= opt_End_Group token pState
+	  (more_let_defs, token, pState)	= want_LetBefores token localsExpected pState
+	= (let_defs ++ more_let_defs, token, pState)
+where
+	opt_End_Group token pState
+	 #	(ss_useLayout, pState) = accScanState UseLayout pState
+	 |	ss_useLayout
+	 	| token == EndGroupToken
+	 		= nextToken FunctionContext pState
+	 	// otherwise // token <> EndGroupToken
+	 		= (ErrorToken "End group missing in let befores", parseError "RHS: Let befores" (Yes token) "Generated End Group (due to layout)" pState)
+	 |	otherwise // not ss_useLayout
+	 =	(token, pState)
 
 	try_LetDef :: !Bool !ParseState -> (!Bool, NodeDefWithLocals, !ParseState)
 	try_LetDef strict pState
@@ -1232,6 +1295,8 @@ where
 				  }
 				, pState
 				)
+want_LetBefores token localsExpected pState
+	= ([], token, pState)
 
 optionalLocals :: !Token !Bool !ParseState -> (!LocalDefs, !ParseState)
 optionalLocals dem_token localsExpected pState
@@ -3662,21 +3727,22 @@ string_to_int s
 trySimpleNonLhsExpressionT :: !Token *ParseState -> *(!Bool,!ParsedExpr,!*ParseState)
 trySimpleNonLhsExpressionT BackSlashToken pState
 	# (lam_ident, pState)	= internalIdent (toString backslash) pState
-	  (file_name, line_nr, pState)	
+	  (file_name, line_nr, pState)
 	  						= getFileAndLineNr pState
-	  (lam_args, pState) 	= wantList "arguments" trySimplePattern pState
-	  pState				= want_lambda_sep pState
-	  (exp, pState)			= wantExpression pState
 	  position				= FunPos file_name line_nr lam_ident.id_name
-	= (True, PE_Lambda lam_ident lam_args exp position, pState)
-	where
-		want_lambda_sep pState
-			# (token, pState) = nextToken FunctionContext pState
-			= case token of
-				ArrowToken	-> pState
-				EqualToken	-> pState
-				DotToken	-> pState
-	  			_			-> parseError "lambda expression" (Yes token) "-> or =" (tokenBack pState)
+	  (lam_args, pState) 	= wantList "arguments" trySimplePattern pState
+	  (token, pState)		= nextToken FunctionContext pState
+	= case token of
+		DotToken
+			# (file_name, line_nr, pState) = getFileAndLineNr pState
+			  (expr, pState) = wantExpression pState
+			  ewl = {ewl_nodes = [], ewl_expr = expr, ewl_locals = LocalParsedDefs [], ewl_position = LinePos file_name line_nr}
+			  rhs = {rhs_alts = UnGuardedExpr ewl, rhs_locals = LocalParsedDefs []}
+			-> (True, PE_Lambda lam_ident lam_args rhs position, pState)
+		_
+		 	# (rhs, defining_symbol, pState)
+			  						= wantRhs_without_where token True RhsDefiningSymbolCase pState
+			-> (True, PE_Lambda lam_ident lam_args rhs position, pState)
 trySimpleNonLhsExpressionT (LetToken strict) pState // let! is not supported in Clean 2.0
 	| strict				= (False, PE_Empty, parseError "Expression" No "let! (strict let) not supported in this version of Clean, expression" pState)
 	// otherwise
