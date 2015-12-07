@@ -523,7 +523,7 @@ mkBlueprint inh (Case cs) chn
                                                  Just p -> fromPriority p
                                                  _      -> TNoPrio
                               = (TFApp inh.inh_uid ap.ap_symbol.glob_object.ds_ident.id_name (map (\x -> x.syn_texpr) args) assoc, chn)
-        # (syn, chn)    = mkAlts` inh 0 ap.ap_expr chn
+        # (syn, chn)    = mkAlts` inh 1 ap.ap_expr chn
         # bvs           = 'DM'.union cesyn.syn_bound_vars syn.syn_bound_vars
         # cases         = 'DM'.put inh.inh_uid (cs.case_explicit, cesyn.syn_bound_vars, Case cs) syn.syn_cases
         = ({ syn_annot_expr = Case {cs & case_guards = AlgebraicPatterns gi [{ap & ap_expr = syn.syn_annot_expr}]}
@@ -535,7 +535,7 @@ mkBlueprint inh (Case cs) chn
         # ((guards, syns), chn)    = mkAlts cs.case_guards chn
         # ((def, syns, isIf), chn) = case cs.case_default of
                                        Yes def
-                                         # (syn, chn) = mkAlts` inh (numGuards cs.case_guards) def chn
+                                         # (syn, chn) = mkAlts` inh (numGuards cs.case_guards + 1) def chn
                                          = case syns of
                                              [(TLit (TBool True), _)]
                                                = ((Yes syn.syn_annot_expr, [(TLit (TBool False), syn):syns], True), chn)
@@ -586,7 +586,7 @@ mkBlueprint inh (Case cs) chn
   numGuards (OverloadedListPatterns _ _ ps) = length ps
   numGuards NoPattern                       = 0
   mkAlts c=:(AlgebraicPatterns gi aps) chn
-    # ((aps, syns, _), chn) = foldr f (([], [], 0), chn) aps
+    # ((aps, syns, _), chn) = foldr f (([], [], 1), chn) aps
     = ((AlgebraicPatterns gi aps, syns), chn)
     where
       f ap ((aps, syns, n), chn)
@@ -611,7 +611,7 @@ mkBlueprint inh (Case cs) chn
                              _      -> []
           = (pmvs, clexpr, chn)
   mkAlts c=:(BasicPatterns bt bps) chn
-    # ((bps, syns, _), chn) = foldr f (([], [], 0), chn) bps
+    # ((bps, syns, _), chn) = foldr f (([], [], 1), chn) bps
     = ((BasicPatterns bt bps, syns), chn)
     where
       f bp ((bps, syns, n), chn)
