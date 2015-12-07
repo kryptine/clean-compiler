@@ -7,7 +7,7 @@ import StdEnv,StdMaybe,syntax,transform,backend
 :: SaplExp = SaplApp SaplExp SaplExp 
 		   | SaplLit SaplLiteral
            | SaplFun String 
-           | SaplVar String VarInfoPtr SaplAnnotation (Maybe Type) // VarInfoPtr: for comparison
+           | SaplVar String VarInfoPtr SaplAnnotation (Optional Type) // VarInfoPtr: for comparison
            | SaplIf SaplExp SaplExp SaplExp
            | SaplSelect SaplExp [(SaplPattern,SaplExp)] (Optional SaplExp)
            | SaplLet [(SaplAnnotation,SaplExp,SaplExp)] SaplExp 

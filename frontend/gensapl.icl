@@ -4,7 +4,7 @@ implementation module gensapl
 // JMJ: May 2007
 // László Domoszlai: 2011 - 
 
-import StdEnv, StdMaybe, syntax, transform, backend, backendinterface, containers
+import StdEnv, syntax, transform, backend, backendinterface, containers
 
 genTypeInfo :: Type -> String 
 genTypeInfo (TB BT_Int)  = "::I"
@@ -13,9 +13,9 @@ genTypeInfo (TB BT_Real) = "::D"
 genTypeInfo (TB BT_Bool) = "::B"
 genTypeInfo _ = ""
 
-maybeTypeInfo :: (Maybe Type) -> String
-maybeTypeInfo (Just ty) = genTypeInfo ty
-maybeTypeInfo Nothing = ""
+maybeTypeInfo :: (Optional Type) -> String
+maybeTypeInfo (Yes ty) = genTypeInfo ty
+maybeTypeInfo No = ""
 
 instance toString SaplConsDef  
 where 
@@ -86,8 +86,8 @@ where
 		exp2string b (SaplApp left right)       = bracks b (exp2string False left +++ " " +++ exp2string True right)
 		exp2string b (SaplLit l)                = toString l
 		exp2string b (SaplFun f)                = makePrintableName f
-		exp2string b (SaplVar n vi a Nothing)   = makePrintableName n
-		exp2string b (SaplVar n vi a (Just ty)) = makePrintableName n +++ genTypeInfo ty		
+		exp2string b (SaplVar n vi a No)        = makePrintableName n
+		exp2string b (SaplVar n vi a (Yes ty))  = makePrintableName n +++ genTypeInfo ty		
 		exp2string b e=:(SaplSelect _ _ _)      = bracks b (selectToString e)
 		exp2string b (SaplIf c l r)   		    = bracks b ("if " +++ exp2string True c +++ " " +++ exp2string True l +++ " " +++ exp2string True r)		
 		exp2string b (SaplLet ves body)         = "" +++ bracks b ("let " +++ multiLet ves body) 
@@ -148,7 +148,7 @@ CleanFunctoSaplFunc main_dcl_module_n modindex funindex
 		// no type info yet
 		# sapl_fun_args = counterMap (getFreeFuncArgName strictnessList) tb_args 0
 		# (Yes symbty) = fun_type // must be
-		# sapl_fun_args_typed = map (\(SaplVar name vi annot _, {at_type}) -> SaplVar name vi annot (Just at_type)) (zip2 sapl_fun_args symbty.st_args)
+		# sapl_fun_args_typed = map (\(SaplVar name vi annot _, {at_type}) -> SaplVar name vi annot (Yes at_type)) (zip2 sapl_fun_args symbty.st_args)
 		
         # funDef = SaplFuncDef (mymod +++ "." +++ makeFuncName main_dcl_module_n (getName fun_ident) main_dcl_module_n funindex dcl_mods icl_function_indices mymod)
                    		       (length tb_args) sapl_fun_args_typed  
@@ -271,17 +271,17 @@ where
 	// It uses the stricness bitmap to extract annotation
 	getFreeFuncArgName :: StrictnessList FreeVar Int -> SaplExp 
 	getFreeFuncArgName strictness {fv_ident,fv_info_ptr,fv_count} c | arg_is_strict c strictness
-                       = SaplVar (toString fv_ident) fv_info_ptr SA_Strict Nothing
+                       = SaplVar (toString fv_ident) fv_info_ptr SA_Strict No
 	getFreeFuncArgName strictness {fv_ident,fv_info_ptr,fv_count} c
-                       = SaplVar (toString fv_ident) fv_info_ptr SA_None Nothing
+                       = SaplVar (toString fv_ident) fv_info_ptr SA_None No
                               
 	// FreeVar e.g. the name of a let binding                                  
 	getFreeVarName :: FreeVar -> SaplExp 
-	getFreeVarName {fv_ident,fv_info_ptr,fv_count} = SaplVar (toString fv_ident) fv_info_ptr SA_None Nothing
+	getFreeVarName {fv_ident,fv_info_ptr,fv_count} = SaplVar (toString fv_ident) fv_info_ptr SA_None No
 	                                                                                    
 	ptrToString ptr = toString (ptrToInt ptr)
 
-	getBoundVarName {var_ident,var_info_ptr} = SaplVar (toString var_ident) var_info_ptr SA_None Nothing
+	getBoundVarName {var_ident,var_info_ptr} = SaplVar (toString var_ident) var_info_ptr SA_None No
 	
 	// Function names at declaratio (on the left)
 	getName :: Ident -> String
@@ -340,8 +340,8 @@ where
 
 	renamemap = renamevars args 0
 
-	renamevars vars 0 = [(SaplVar v ip a mbt, SaplVar (getVarPrefix v +++ "_" +++ toString k) ip a Nothing) \\ (SaplVar v ip a mbt,k) <- zip(vars,[0..])]
-	renamevars vars n = [(SaplVar v ip a mbt, SaplVar (getVarPrefix v +++ "_" +++ toString n +++ "_" +++ toString k) ip a Nothing) \\ (SaplVar v ip a mbt,k) <- zip(vars,[0..])]
+	renamevars vars 0 = [(SaplVar v ip a mbt, SaplVar (getVarPrefix v +++ "_" +++ toString k) ip a No) \\ (SaplVar v ip a mbt,k) <- zip(vars,[0..])]
+	renamevars vars n = [(SaplVar v ip a mbt, SaplVar (getVarPrefix v +++ "_" +++ toString n +++ "_" +++ toString k) ip a No) \\ (SaplVar v ip a mbt,k) <- zip(vars,[0..])]
 
 	doVarRename level rens (SaplApp left right)		= SaplApp (doVarRename level rens left) (doVarRename level rens right)
 	doVarRename level rens var=:(SaplVar _ _ _ _)   = findvar var rens
@@ -381,7 +381,7 @@ where
     	                 = SaplLet bindings body
 	where
 		// filter bindings by their body
-		varbindings    = [(var, SaplVar n ip a Nothing) \\ (_, var, SaplVar n ip a mbt) <- bindings]
+		varbindings    = [(var, SaplVar n ip a No) \\ (_, var, SaplVar n ip a mbt) <- bindings]
 		nonvarbindings = filter (noVar o thd3) bindings
 
 		noVar (SaplVar _ _ _ _) = False
@@ -389,14 +389,14 @@ where
 
 	// Simple var renaming
 	varrename rens (SaplApp left right)  = SaplApp (varrename rens left) (varrename rens right)
-	varrename rens (SaplVar n ip a mbt)  = findvar (SaplVar n ip a mbt) (rens++[(SaplVar n ip a mbt,SaplVar n ip a Nothing)])
+	varrename rens (SaplVar n ip a mbt)  = findvar (SaplVar n ip a mbt) (rens++[(SaplVar n ip a mbt,SaplVar n ip a No)])
 	varrename rens (SaplLet ves body)    = SaplLet [(a,v,varrename rens e)\\ (a,v,e) <- ves] (varrename rens body)
 	varrename rens (SaplIf c l r)  		 = SaplIf (varrename rens c) (varrename rens l) (varrename rens r)	
 	varrename rens (SaplSelect expr patterns mbDef) 
 			= SaplSelect (varrename rens expr) [(p,varrename rens e)\\ (p,e) <- patterns] (fmap (varrename rens) mbDef)	
 	varrename rens e                     = e
 
-findvar (SaplVar n ip a mbt) rens = hd ([renvar\\ (var,renvar) <- rens| cmpvar (SaplVar n ip a mbt) var]++[SaplVar ("error, " +++ n +++ " not found") nilPtr SA_None Nothing])
+findvar (SaplVar n ip a mbt) rens = hd ([renvar\\ (var,renvar) <- rens| cmpvar (SaplVar n ip a mbt) var]++[SaplVar ("error, " +++ n +++ " not found") nilPtr SA_None No])
 
 makeFuncName main_dcl_module_n name mod_index func_index dcl_mods ranges mymod
               | name.[0] == '\\' = "anon_" +++ toString func_index
@@ -507,7 +507,7 @@ where
 	where
 		callname newnr = (fname+++"_select" +++ toString newnr)    
 	
-	removeTypeInfo (SaplVar n vi a _) = SaplVar n vi a Nothing
+	removeTypeInfo (SaplVar n vi a _) = SaplVar n vi a No
 	removeTypeInfo expr = expr
 	
 // Which functions must be extended with a number 
