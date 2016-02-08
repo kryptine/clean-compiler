@@ -275,7 +275,8 @@ wantModule :: !*File !{#Char} !Bool !Ident !Position !Bool !*HashTable !*File !*
 	-> (!Bool,!Bool,!ParsedModule, !*HashTable, !*File, !*Files)
 wantModule file modification_time iclmodule file_id=:{id_name} import_file_position support_generics hash_table error files
 	# scanState = openScanner file id_name file_name_extension
-	# hash_table=set_hte_mark (if iclmodule 1 0) hash_table
+	# hash_table = set_hte_mark (if iclmodule 1 0) hash_table
+	  hash_table = remove_qualified_idents_from_hash_table hash_table
 	# (ok,dynamic_type_used,mod,hash_table,file,files) = initModule file_name modification_time scanState hash_table error files
 	  hash_table=set_hte_mark 0 hash_table
 	= (ok,dynamic_type_used,mod,hash_table,file,files)
