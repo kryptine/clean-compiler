@@ -66,10 +66,13 @@ makeString [a:as] = a +++ makeString as
 fmap f (Yes a) = Yes (f a)
 fmap _ No = No
 
+toStringR :: Real -> String
+toStringR r = if (r - toReal(entier r) == 0.0) (toString r +++ ".0") (toString r)
+
 instance toString SaplLiteral
 where
 	toString (LInt i) 		= toString i
-	toString (LReal r) 		= toString r
+	toString (LReal r) 		= toStringR r
 	toString (LBool b) 		= toString b
 	toString (LChar c) 		= c
 	toString (LString s) 	= s
