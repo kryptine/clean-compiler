@@ -10,7 +10,7 @@ import StdEnv,StdMaybe,syntax,transform,backend
            | SaplVar String VarInfoPtr SaplAnnotation (Optional Type) // VarInfoPtr: for comparison
            | SaplIf SaplExp SaplExp SaplExp
            | SaplSelect SaplExp [(SaplPattern,SaplExp)] (Optional SaplExp)
-           | SaplLet [(SaplAnnotation,SaplExp,SaplExp)] SaplExp 
+           | SaplLet [((SaplAnnotation,Type),SaplExp,SaplExp)] SaplExp 
            | SaplError String 
 
 :: SaplLiteral = LInt Int

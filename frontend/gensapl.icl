@@ -107,10 +107,10 @@ where
 		      dodef No = ""
 		      dodef (Yes def) = "(_ -> " +++ toString def +++ ")"
         
-		multiLet :: ![(SaplAnnotation,SaplExp,SaplExp)] !SaplExp -> String
-		multiLet []                          body  =  toString body // empty let
-		multiLet [(annotation, arg, e)]      body  =  toString annotation +++ toString arg +++ " = " +++ toString e +++ " in " +++ toString body
-		multiLet [(annotation, arg, e): ves] body  =  toString annotation +++ toString arg +++ " = " +++ toString e +++ ", " +++ multiLet ves body
+		multiLet :: ![((SaplAnnotation,Type),SaplExp,SaplExp)] !SaplExp -> String
+		multiLet []                                body  =  toString body // empty let
+		multiLet [((annotation, type), arg, e)]      body  =  toString annotation +++ toString arg +++ genTypeInfo type +++ " = " +++ toString e +++ " in " +++ toString body
+		multiLet [((annotation, type), arg, e): ves] body  =  toString annotation +++ toString arg +++ genTypeInfo type +++ " = " +++ toString e +++ ", " +++ multiLet ves body
 
 		makeCodeString :: ![String] -> String
 		makeCodeString []     = ""
@@ -153,92 +153,145 @@ CleanFunctoSaplFunc main_dcl_module_n modindex funindex
 		# (Yes symbty) = fun_type // must be
 		# sapl_fun_args_typed = map (\(SaplVar name vi annot _, {at_type}) -> SaplVar name vi annot (Yes at_type)) (zip2 sapl_fun_args symbty.st_args)
 		
+		# (heaps, sapl_rhs) = cleanExpToSaplExp tupleReturn tb_rhs heaps
         # funDef = SaplFuncDef (mymod +++ "." +++ makeFuncName main_dcl_module_n (getName fun_ident) main_dcl_module_n funindex dcl_mods icl_function_indices mymod)
                    		       (length tb_args) sapl_fun_args_typed  
-                       		   (cleanExpToSaplExp tupleReturn tb_rhs) fun_kind symbty.st_result.at_type
+                       		   sapl_rhs fun_kind symbty.st_result.at_type
         
         = (backEnd, heaps, funDef)
 
 where
-	cleanExpToSaplExp tupleReturn (Var ident) = getBoundVarName ident
+	heapsMap f heaps ls = foldl (\(heaps,rs) x -> let (nheaps, y) = f x heaps in (nheaps, [y:rs])) (heaps,[]) (reverse ls)
+
+	cleanExpToSaplExp :: !(Optional (String,String)) !Expression !*Heaps -> (!*Heaps, !SaplExp)
+	cleanExpToSaplExp tupleReturn (Var ident) heaps = (heaps, getBoundVarName ident)
 			
-	cleanExpToSaplExp tupleReturn (App {app_symb, app_args, app_info_ptr})
+	cleanExpToSaplExp tupleReturn (App {app_symb, app_args, app_info_ptr}) heaps
 	        = case app_symb.symb_kind of
 	            SK_Generic _ kind
-	                -> printApplicGen app_symb kind app_args  //  does not apply?
-	            _   -> multiApp [SaplFun (changeTuple tupleReturn app_symb) : map (cleanExpToSaplExp No) app_args]
+	                = printApplicGen app_symb kind app_args heaps  //  does not apply?
+	            _   # (heaps, sapl_app_args) = heapsMap (cleanExpToSaplExp No) heaps app_args
+	                = (heaps, multiApp [SaplFun (changeTuple tupleReturn app_symb) : sapl_app_args])
 
-	cleanExpToSaplExp tupleReturn (f_exp @ a_exp) = multiApp [cleanExpToSaplExp tupleReturn f_exp: map (cleanExpToSaplExp No) a_exp]
+	cleanExpToSaplExp tupleReturn (f_exp @ a_exp) heaps 
+			# (heaps, sapl_f_exp) = cleanExpToSaplExp tupleReturn f_exp heaps
+			# (heaps, sapl_a_exp) = heapsMap (cleanExpToSaplExp No) heaps a_exp
+			= (heaps, multiApp [sapl_f_exp: sapl_a_exp])
 
-	cleanExpToSaplExp tupleReturn (Let {let_info_ptr, let_strict_binds, let_lazy_binds, let_expr}) 
-			= SaplLet (map letToSapl bindings) (cleanExpToSaplExp tupleReturn let_expr)
+	cleanExpToSaplExp tupleReturn (Let {let_info_ptr, let_strict_binds, let_lazy_binds, let_expr}) heaps 
+			# (heaps, sapl_let_expr) = cleanExpToSaplExp tupleReturn let_expr heaps
+
+			# expr_heap = heaps.hp_expression_heap
+			# (let_info, expr_heap) = readPtr let_info_ptr expr_heap
+			# heaps = {heaps & hp_expression_heap = expr_heap}
+			# btypes = case let_info of
+					(EI_LetType atypes) = map (\atype -> atype.at_type) atypes
+
+			# (heaps, sapl_bindings) = heapsMap letToSapl heaps (zip2 bindings btypes)
+			= (heaps, SaplLet sapl_bindings sapl_let_expr)
 	where
 		bindings = zip2 (repeat SA_Strict) let_strict_binds ++ 
 				   zip2 (repeat SA_None) (reverse let_lazy_binds)
-		letToSapl (annotation, binding) = (annotation, getFreeVarName binding.lb_dst, cleanExpToSaplExp No binding.lb_src)
+		letToSapl ((annotation, binding), type) heaps 
+				# (heaps, sapl_lb_src) = cleanExpToSaplExp No binding.lb_src heaps
+				= (heaps, ((annotation, type), getFreeVarName binding.lb_dst, sapl_lb_src))
 				
-	cleanExpToSaplExp tupleReturn (Case {case_expr,case_guards,case_default,case_explicit}) 
-			= genSaplCase case_expr case_guards case_default case_explicit
+	cleanExpToSaplExp tupleReturn (Case {case_expr,case_guards,case_default,case_explicit}) heaps
+			= genSaplCase case_expr case_guards case_default case_explicit heaps
 	where
 		// Converting Case definitions
-		genSaplCase case_exp (AlgebraicPatterns gindex pats) def explicit = SaplSelect (cleanExpToSaplExp No case_exp) (map getCasePat pats) (handleDef def explicit) 
-		genSaplCase case_exp (OverloadedListPatterns listtype exp pats) def explicit = SaplSelect (cleanExpToSaplExp No case_exp) (map getCasePat pats) (handleDef def explicit)
-		genSaplCase case_exp (BasicPatterns gindex pats) def explicit = SaplSelect (cleanExpToSaplExp No case_exp) (map getConstPat pats) (handleDef def explicit)
-		genSaplCase case_exp  _ _ _ = SaplError "no matching rule found" 
+		genSaplCase case_exp (AlgebraicPatterns gindex pats) def explicit heaps 
+			# (heaps, sapl_case_exp) = cleanExpToSaplExp No case_exp heaps
+			# (heaps, sapl_def) = handleDef def explicit heaps
+			# (heaps, sapl_pats) = heapsMap getCasePat heaps pats 
+			= (heaps, SaplSelect sapl_case_exp sapl_pats sapl_def)
+		genSaplCase case_exp (OverloadedListPatterns listtype exp pats) def explicit heaps 
+			# (heaps, sapl_case_exp) = cleanExpToSaplExp No case_exp heaps
+			# (heaps, sapl_def) = handleDef def explicit heaps
+			# (heaps, sapl_pats) = heapsMap getCasePat heaps pats		
+			= (heaps, SaplSelect sapl_case_exp sapl_pats sapl_def)
+		genSaplCase case_exp (BasicPatterns gindex pats) def explicit heaps
+			# (heaps, sapl_case_exp) = cleanExpToSaplExp No case_exp heaps 
+			# (heaps, sapl_def) = handleDef def explicit heaps
+			# (heaps, sapl_pats) = heapsMap getConstPat heaps pats			
+			= (heaps, SaplSelect sapl_case_exp sapl_pats sapl_def)
+		genSaplCase case_exp  _ _ _ heaps = (heaps, SaplError "no matching rule found")
 
-		handleDef (Yes def) _ 	= Yes (cleanExpToSaplExp tupleReturn def)
-		handleDef _ True 		= Yes (SaplFun "nomatch")
-		handleDef _ _ 			= No		
+		handleDef (Yes def) _ heaps	
+			# (heaps, sapl_def) = cleanExpToSaplExp tupleReturn def heaps
+			= (heaps, Yes sapl_def)
+		handleDef _ True heaps		
+			= (heaps, Yes (SaplFun "nomatch"))
+		handleDef _ _ heaps			
+			= (heaps, No)
 		
-		getConstPat pat = (PLit (basicValueToSapl pat.bp_value), cleanExpToSaplExp tupleReturn pat.bp_expr) 			
-		getCasePat pat = (PCons (printConsName pat.ap_symbol.glob_object.ds_ident (getmodnr pat.ap_symbol))
-					 		(map getFreeVarName pat.ap_vars),
-					  cleanExpToSaplExp tupleReturn pat.ap_expr)	
+		getConstPat pat heaps 
+			# (heaps, sapl_bp_expr) = cleanExpToSaplExp tupleReturn pat.bp_expr heaps
+			= (heaps, (PLit (basicValueToSapl pat.bp_value), sapl_bp_expr))
+		getCasePat pat heaps 
+			# (heaps, sapl_ap_expr) = cleanExpToSaplExp tupleReturn pat.ap_expr heaps
+			= (heaps, (PCons (printConsName pat.ap_symbol.glob_object.ds_ident (getmodnr pat.ap_symbol))
+					 		(map getFreeVarName pat.ap_vars), sapl_ap_expr))
 			
-	cleanExpToSaplExp tupleReturn (BasicExpr basic_value)                                   
-			= SaplLit (basicValueToSapl basic_value)
-	cleanExpToSaplExp tupleReturn (FreeVar var)                                             
-			= getFreeVarName var
-	cleanExpToSaplExp tupleReturn (Conditional {if_cond,if_then,if_else=No})                
-			= SaplSelect (cleanExpToSaplExp No if_cond) [(PLit (LBool True), cleanExpToSaplExp tupleReturn if_then)] No
-	cleanExpToSaplExp tupleReturn (Conditional {if_cond,if_then,if_else=Yes else_exp})      
-			= SaplIf (cleanExpToSaplExp No if_cond) (cleanExpToSaplExp tupleReturn if_then) (cleanExpToSaplExp tupleReturn else_exp)
-	cleanExpToSaplExp tupleReturn (Selection _ expr selectors)                              
-			= makeSelector selectors (cleanExpToSaplExp No expr)  
-	cleanExpToSaplExp tupleReturn (Update expr1 selections expr2)                           
-			= makeArrayUpdate (cleanExpToSaplExp No expr1) selections (cleanExpToSaplExp No expr2)  
-	cleanExpToSaplExp tupleReturn (RecordUpdate cons_symbol expression expressions)         
-			= makeRecordUpdate (cleanExpToSaplExp No expression) expressions 
-	cleanExpToSaplExp tupleReturn (TupleSelect cons field_nr expr)                          
-			= SaplApp (SaplFun ("_predefined.tupsels" +++ toString cons.ds_arity +++ "v" +++ toString field_nr)) (cleanExpToSaplExp No expr)
-	cleanExpToSaplExp tupleReturn (MatchExpr cons expr)  
+	cleanExpToSaplExp tupleReturn (BasicExpr basic_value) heaps         
+			= (heaps, SaplLit (basicValueToSapl basic_value))
+	cleanExpToSaplExp tupleReturn (FreeVar var) heaps                             
+			= (heaps, getFreeVarName var)
+	cleanExpToSaplExp tupleReturn (Conditional {if_cond,if_then,if_else=No}) heaps         
+			# (heaps, sapl_if_cond) = cleanExpToSaplExp No if_cond heaps 
+			# (heaps, sapl_if_then) = cleanExpToSaplExp tupleReturn if_then heaps
+			= (heaps, SaplSelect sapl_if_cond [(PLit (LBool True), sapl_if_then)] No)
+	cleanExpToSaplExp tupleReturn (Conditional {if_cond,if_then,if_else=Yes else_exp}) heaps          
+			# (heaps, sapl_if_cond) = cleanExpToSaplExp No if_cond heaps 
+			# (heaps, sapl_if_then) = cleanExpToSaplExp tupleReturn if_then heaps
+			# (heaps, sapl_else_exp) = cleanExpToSaplExp tupleReturn else_exp heaps
+			= (heaps, SaplIf sapl_if_cond sapl_if_then sapl_else_exp)
+	cleanExpToSaplExp tupleReturn (Selection _ expr selectors) heaps         
+			# (heaps, sapl_expr) = cleanExpToSaplExp No expr heaps
+			= makeSelector selectors sapl_expr heaps
+	cleanExpToSaplExp tupleReturn (Update expr1 selections expr2) heaps                        
+			# (heaps, sapl_expr1) = cleanExpToSaplExp No expr1 heaps
+			# (heaps, sapl_expr2) = cleanExpToSaplExp No expr2 heaps			
+			= makeArrayUpdate sapl_expr1 selections sapl_expr2 heaps
+	cleanExpToSaplExp tupleReturn (RecordUpdate cons_symbol expression expressions) heaps  
+			# (heaps, sapl_expression) = cleanExpToSaplExp No expression heaps        
+			= makeRecordUpdate sapl_expression expressions heaps
+	cleanExpToSaplExp tupleReturn (TupleSelect cons field_nr expr) heaps
+			# (heaps, sapl_expr) = cleanExpToSaplExp No expr heaps		   
+			= (heaps, SaplApp (SaplFun ("_predefined.tupsels" +++ toString cons.ds_arity +++ "v" +++ toString field_nr)) sapl_expr)
+	cleanExpToSaplExp tupleReturn (MatchExpr cons expr) heaps
 			| cons.glob_object.ds_arity == 1 
-				= SaplApp (SaplFun ("_predefined.tupsels1v0"))(cleanExpToSaplExp No expr) 
-	            = cleanExpToSaplExp tupleReturn expr
+				# (heaps, idx) = cleanExpToSaplExp No expr heaps
+				= (heaps, SaplApp (SaplFun ("_predefined.tupsels1v0")) idx) 
+	            = cleanExpToSaplExp tupleReturn expr heaps
 	            
-	cleanExpToSaplExp _ EE                                                        = SaplError "no EE"  
-	cleanExpToSaplExp _ (DynamicExpr {dyn_expr,dyn_type_code})                    = SaplError "no DynamicExpr"   
-	cleanExpToSaplExp _ (TypeCodeExpression type_code)                            = SaplError "no TypeCodeExpression" 
+	cleanExpToSaplExp _ EE heaps                                           = (heaps, SaplError "no EE")
+	cleanExpToSaplExp _ (DynamicExpr {dyn_expr,dyn_type_code}) heaps       = (heaps, SaplError "no DynamicExpr")
+	cleanExpToSaplExp _ (TypeCodeExpression type_code) heaps               = (heaps, SaplError "no TypeCodeExpression")
 	
-	cleanExpToSaplExp _ (ABCCodeExpr code_sequence do_inline)                     = SaplError "no AnyCodeExpr" //SaplABCCode code_sequence
-	cleanExpToSaplExp _ (AnyCodeExpr input output code_sequence)                  = SaplError "no AnyCodeExpr" 
+	cleanExpToSaplExp _ (ABCCodeExpr code_sequence do_inline) heaps        = (heaps, SaplError "no AnyCodeExpr") //SaplABCCode code_sequence
+	cleanExpToSaplExp _ (AnyCodeExpr input output code_sequence) heaps     = (heaps, SaplError "no AnyCodeExpr") 
 	
-	cleanExpToSaplExp _ (FailExpr _)                                              = SaplError "no FailExpr" 
+	cleanExpToSaplExp _ (FailExpr _) heaps                                 = (heaps, SaplError "no FailExpr") 
 	
-	cleanExpToSaplExp _ (ClassVariable info_ptr)                                  = SaplError "ClassVariable may not occur"
-	cleanExpToSaplExp _ (NoBind _)                                                = SaplError "noBind may not occur" 
-	cleanExpToSaplExp _ (Constant symb _ _)                                       = SaplError "Constant may not occur"
-	cleanExpToSaplExp _ expr                                                      = SaplError "no cleanToSapl for this case"  
+	cleanExpToSaplExp _ (ClassVariable info_ptr) heaps                     = (heaps, SaplError "ClassVariable may not occur")
+	cleanExpToSaplExp _ (NoBind _) heaps                                   = (heaps, SaplError "noBind may not occur") 
+	cleanExpToSaplExp _ (Constant symb _ _) heaps                          = (heaps, SaplError "Constant may not occur")
+	cleanExpToSaplExp _ expr heaps                                         = (heaps, SaplError "no cleanToSapl for this case")  
 
 	// See the comment above
 	changeTuple (Yes (fromi, toi)) {symb_ident={id_name}} | fromi == id_name
 		= toi
 	changeTuple _ app_symb = getSymbName app_symb 	
 
-	printApplicGen app_symb kind args   = multiApp [SaplFun (getSymbName app_symb  +++ "_generic"):map (cleanExpToSaplExp No) args]	
+	printApplicGen app_symb kind args heaps 
+		# (heaps, sapl_args) = heapsMap (cleanExpToSaplExp No) heaps args
+		= (heaps, multiApp [SaplFun (getSymbName app_symb  +++ "_generic"):sapl_args])
 	                                                
 	// Array and Record updates
-	makeArrayUpdate expr1 sels expr2  = SaplApp (makeSelector sels expr1) expr2
+	makeArrayUpdate expr1 sels expr2 heaps 
+		# (heaps, sapl_expr1) = makeSelector sels expr1 heaps
+		= (heaps, SaplApp sapl_expr1 expr2)
 	
 	/* 
 	TODO: DictionarySelection is possibly broken. The following example (without the type) generates
@@ -254,16 +307,27 @@ where
 	Start = g a
 	*/
 	
-	makeSelector  [] e = e
-	makeSelector  [selector:sels] e  = makeSelector  sels (mksel selector e)
-	where mksel (RecordSelection globsel ind)     exp = SaplApp (SaplFun (dcl_mods.[globsel.glob_module].dcl_name.id_name +++ ".get_" +++ toString globsel.glob_object.ds_ident +++ "_" +++ toString globsel.glob_object.ds_index)) e 
-	      mksel (ArraySelection globsel _ e)      exp = multiApp [SaplFun (dcl_mods.[globsel.glob_module].dcl_name.id_name +++ "." +++ toString globsel.glob_object.ds_ident +++ "_" +++ toString globsel.glob_object.ds_index),exp, cleanExpToSaplExp No e]  
-	      mksel (DictionarySelection var sels _ e)exp = multiApp [makeSelector sels (getBoundVarName var),exp,cleanExpToSaplExp No e]
+	makeSelector [] e heaps = (heaps, e)
+	makeSelector [selector:sels] e heaps 
+		# (heaps, sapl_sel) = mksel selector e heaps
+		= makeSelector  sels sapl_sel heaps
+	where mksel (RecordSelection globsel ind)     exp heaps 
+				= (heaps, SaplApp (SaplFun (dcl_mods.[globsel.glob_module].dcl_name.id_name +++ ".get_" +++ toString globsel.glob_object.ds_ident +++ "_" +++ toString globsel.glob_object.ds_index)) e)
+	      mksel (ArraySelection globsel _ e)      exp heaps 
+	      		# (heaps, sapl_e) = cleanExpToSaplExp No e heaps
+	      		= (heaps, multiApp [SaplFun (dcl_mods.[globsel.glob_module].dcl_name.id_name +++ "." +++ toString globsel.glob_object.ds_ident +++ "_" +++ toString globsel.glob_object.ds_index),exp, sapl_e])
+	      mksel (DictionarySelection var sels _ e)exp heaps
+		      	# (heaps, sapl_e) = cleanExpToSaplExp No e heaps
+		      	# (heaps, sapl_sel) = makeSelector sels (getBoundVarName var) heaps
+	      		= (heaps, multiApp [sapl_sel,exp,sapl_e])
 	
 	// backendconvert.convertSelector (BESelect)
-	makeRecordUpdate expression [         ]                      = expression
-	makeRecordUpdate expression [upbind:us] | not(isNoBind value)= makeRecordUpdate (multiApp [SaplFun (field_mod +++ ".set_" +++ field +++ "_" +++ index),expression,cleanExpToSaplExp No value]) us
-	                                                             = makeRecordUpdate expression us
+	makeRecordUpdate expression [         ] heaps                       
+			= (heaps, expression)
+	makeRecordUpdate expression [upbind:us] heaps | not(isNoBind value) 
+			# (heaps, sapl_value) = cleanExpToSaplExp No value heaps
+			= makeRecordUpdate (multiApp [SaplFun (field_mod +++ ".set_" +++ field +++ "_" +++ index),expression,sapl_value]) us heaps
+			= makeRecordUpdate expression us heaps
 	where field               = toString upbind.bind_dst.glob_object.fs_ident
 	      index               = toString upbind.bind_dst.glob_object.fs_index
 	      field_mod           = dcl_mods.[upbind.bind_dst.glob_module].dcl_name.id_name
@@ -372,7 +436,7 @@ where
 		annotations   = map fst3 bindings
 		// apply variable renaming to vars of let bindings, bodies of let bindings and body of let
 		renletvars    = renamevars (map snd3 bindings) level
-		renletbodies  = [doVarRename (level+1) (renletvars++rens) b \\ (_, _ ,b) <- bindings]
+		renletbodies  = [doVarRename (level+1) (renletvars++rens) b \\ (_ ,_ ,b) <- bindings]
 		renbody       = doVarRename (level+1) (renletvars++rens) body
 		// zip them again
 		renlets 	  = [(a,rv,b) \\ a <- annotations & (v, rv) <- renletvars & b <- renletbodies]
@@ -380,8 +444,8 @@ where
 	// Sapl does not allow let's with only a var on the right hand side
 	removeVarBodyLets (SaplLet bindings body) 
 		# (SaplLet bindings body) = varrename varbindings (SaplLet nonvarbindings body)
-		| bindings == [] = body 
-    	                 = SaplLet bindings body
+		| isEmpty bindings = body 
+    	                   = SaplLet bindings body
 	where
 		// filter bindings by their body
 		varbindings    = [(var, SaplVar n ip a No) \\ (_, var, SaplVar n ip a mbt) <- bindings]
