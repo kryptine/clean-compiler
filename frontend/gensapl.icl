@@ -91,16 +91,16 @@ where
 		exp2string b (SaplFun f)                = makePrintableName f
 		exp2string b (SaplVar n vi a No)        = makePrintableName n
 		exp2string b (SaplVar n vi a (Yes ty))  = makePrintableName n +++ genTypeInfo ty		
-		exp2string b e=:(SaplSelect _ _ _)      = bracks b (selectToString e)
-		exp2string b (SaplIf c l r)   		    = bracks b ("if " +++ exp2string True c +++ " " +++ exp2string True l +++ " " +++ exp2string True r)		
+		exp2string b e=:(SaplCase _ _ _)        = bracks b (caseToString e)
+		exp2string b (SaplSelect expr idx)      = bracks b ("select " +++ exp2string True expr +++ " " +++ toString idx)		
 		exp2string b (SaplLet ves body)         = "" +++ bracks b ("let " +++ multiLet ves body) 
 		exp2string b (SaplError m)              = bracks b ("error \"" +++ m +++ "\"")
 
 		bracks b e | b = "(" +++ e +++ ")" 
     		           = e
       
-        selectToString :: !SaplExp -> String       
-		selectToString (SaplSelect e ps def) = "select " +++ exp2string True e +++ " " +++ dopats ps +++ dodef def
+        caseToString :: !SaplExp -> String       
+		caseToString (SaplCase e ps def) = "case " +++ exp2string True e +++ " " +++ dopats ps +++ dodef def
 		where dopats [] = ""
 		      dopats [(p,exp):pats] = "(" +++ toString p +++ " -> " +++ toString exp +++ ") " +++ dopats pats
 		                                                 		                                                 
@@ -204,17 +204,17 @@ where
 			# (heaps, sapl_case_exp) = cleanExpToSaplExp No case_exp heaps
 			# (heaps, sapl_def) = handleDef def explicit heaps
 			# (heaps, sapl_pats) = heapsMap getCasePat heaps pats 
-			= (heaps, SaplSelect sapl_case_exp sapl_pats sapl_def)
+			= (heaps, SaplCase sapl_case_exp sapl_pats sapl_def)
 		genSaplCase case_exp (OverloadedListPatterns listtype exp pats) def explicit heaps 
 			# (heaps, sapl_case_exp) = cleanExpToSaplExp No case_exp heaps
 			# (heaps, sapl_def) = handleDef def explicit heaps
 			# (heaps, sapl_pats) = heapsMap getCasePat heaps pats		
-			= (heaps, SaplSelect sapl_case_exp sapl_pats sapl_def)
+			= (heaps, SaplCase sapl_case_exp sapl_pats sapl_def)
 		genSaplCase case_exp (BasicPatterns gindex pats) def explicit heaps
 			# (heaps, sapl_case_exp) = cleanExpToSaplExp No case_exp heaps 
 			# (heaps, sapl_def) = handleDef def explicit heaps
 			# (heaps, sapl_pats) = heapsMap getConstPat heaps pats			
-			= (heaps, SaplSelect sapl_case_exp sapl_pats sapl_def)
+			= (heaps, SaplCase sapl_case_exp sapl_pats sapl_def)
 		genSaplCase case_exp  _ _ _ heaps = (heaps, SaplError "no matching rule found")
 
 		handleDef (Yes def) _ heaps	
@@ -240,12 +240,12 @@ where
 	cleanExpToSaplExp tupleReturn (Conditional {if_cond,if_then,if_else=No}) heaps         
 			# (heaps, sapl_if_cond) = cleanExpToSaplExp No if_cond heaps 
 			# (heaps, sapl_if_then) = cleanExpToSaplExp tupleReturn if_then heaps
-			= (heaps, SaplSelect sapl_if_cond [(PLit (LBool True), sapl_if_then)] No)
+			= (heaps, SaplCase sapl_if_cond [(PLit (LBool True), sapl_if_then)] No)
 	cleanExpToSaplExp tupleReturn (Conditional {if_cond,if_then,if_else=Yes else_exp}) heaps          
 			# (heaps, sapl_if_cond) = cleanExpToSaplExp No if_cond heaps 
 			# (heaps, sapl_if_then) = cleanExpToSaplExp tupleReturn if_then heaps
 			# (heaps, sapl_else_exp) = cleanExpToSaplExp tupleReturn else_exp heaps
-			= (heaps, SaplIf sapl_if_cond sapl_if_then sapl_else_exp)
+			= (heaps, SaplCase sapl_if_cond [(PLit (LBool True), sapl_if_then),(PLit (LBool False), sapl_else_exp)] No)
 	cleanExpToSaplExp tupleReturn (Selection _ expr selectors) heaps         
 			# (heaps, sapl_expr) = cleanExpToSaplExp No expr heaps
 			= makeSelector selectors sapl_expr heaps
@@ -258,7 +258,8 @@ where
 			= makeRecordUpdate sapl_expression expressions heaps
 	cleanExpToSaplExp tupleReturn (TupleSelect cons field_nr expr) heaps
 			# (heaps, sapl_expr) = cleanExpToSaplExp No expr heaps		   
-			= (heaps, SaplApp (SaplFun ("_predefined.tupsels" +++ toString cons.ds_arity +++ "v" +++ toString field_nr)) sapl_expr)
+			//= (heaps, SaplApp (SaplFun ("_predefined.tupsels" +++ toString cons.ds_arity +++ "v" +++ toString field_nr)) sapl_expr)
+			= (heaps, SaplSelect sapl_expr field_nr)
 	cleanExpToSaplExp tupleReturn (MatchExpr cons expr) heaps
 			| cons.glob_object.ds_arity == 1 
 				# (heaps, idx) = cleanExpToSaplExp No expr heaps
@@ -309,10 +310,11 @@ where
 	
 	makeSelector [] e heaps = (heaps, e)
 	makeSelector [selector:sels] e heaps 
-		# (heaps, sapl_sel) = mksel selector e heaps
-		= makeSelector  sels sapl_sel heaps
-	where mksel (RecordSelection globsel ind)     exp heaps 
-				= (heaps, SaplApp (SaplFun (dcl_mods.[globsel.glob_module].dcl_name.id_name +++ ".get_" +++ toString globsel.glob_object.ds_ident +++ "_" +++ toString globsel.glob_object.ds_index)) e)
+		# (heaps, sapl_expr) = mksel selector e heaps
+		= makeSelector  sels sapl_expr heaps
+	where mksel (RecordSelection globsel ind) sapl_expr heaps 
+				//= (heaps, SaplApp (SaplFun (dcl_mods.[globsel.glob_module].dcl_name.id_name +++ ".get_" +++ toString globsel.glob_object.ds_ident +++ "_" +++ toString globsel.glob_object.ds_index)) e)
+				= (heaps, SaplSelect sapl_expr ind)
 	      mksel (ArraySelection globsel _ e)      exp heaps 
 	      		# (heaps, sapl_e) = cleanExpToSaplExp No e heaps
 	      		= (heaps, multiApp [SaplFun (dcl_mods.[globsel.glob_module].dcl_name.id_name +++ "." +++ toString globsel.glob_object.ds_ident +++ "_" +++ toString globsel.glob_object.ds_index),exp, sapl_e])
@@ -413,11 +415,11 @@ where
 	doVarRename level rens (SaplApp left right)		= SaplApp (doVarRename level rens left) (doVarRename level rens right)
 	doVarRename level rens var=:(SaplVar _ _ _ _)   = findvar var rens
 	doVarRename level rens (SaplLet ves body)		= doletrename level rens [] ves body
-	doVarRename level rens (SaplSelect e cases def) = doselectrename level rens e cases def
-	doVarRename level rens (SaplIf c l r) 			= SaplIf (doVarRename level rens c) (doVarRename level rens l) (doVarRename level rens r)
+	doVarRename level rens (SaplCase e cases def)   = doselectrename level rens e cases def
+	doVarRename level rens (SaplSelect e idx)       = SaplSelect (doVarRename level rens e) idx
 	doVarRename level rens e                    	= e
 
-	doselectrename level rens e cases def = SaplSelect e` (map renamecase cases) def`
+	doselectrename level rens e cases def = SaplCase e` (map renamecase cases) def`
 	where
 		e` = doVarRename level rens e
 		def` = fmap (doVarRename level rens) def
@@ -458,9 +460,9 @@ where
 	varrename rens (SaplApp left right)  = SaplApp (varrename rens left) (varrename rens right)
 	varrename rens (SaplVar n ip a mbt)  = findvar (SaplVar n ip a mbt) (rens++[(SaplVar n ip a mbt,SaplVar n ip a No)])
 	varrename rens (SaplLet ves body)    = SaplLet [(a,v,varrename rens e)\\ (a,v,e) <- ves] (varrename rens body)
-	varrename rens (SaplIf c l r)  		 = SaplIf (varrename rens c) (varrename rens l) (varrename rens r)	
-	varrename rens (SaplSelect expr patterns mbDef) 
-			= SaplSelect (varrename rens expr) [(p,varrename rens e)\\ (p,e) <- patterns] (fmap (varrename rens) mbDef)	
+	varrename rens (SaplCase expr patterns mbDef) 
+			= SaplCase (varrename rens expr) [(p,varrename rens e)\\ (p,e) <- patterns] (fmap (varrename rens) mbDef)	
+	varrename rens (SaplSelect expr idx) = SaplSelect (varrename rens expr) idx
 	varrename rens e                     = e
 
 findvar (SaplVar n ip a mbt) rens = hd ([renvar\\ (var,renvar) <- rens| cmpvar (SaplVar n ip a mbt) var]++[SaplVar ("error, " +++ n +++ " not found") nilPtr SA_None No])
@@ -481,19 +483,13 @@ startsWith s1 s2 = s1 == s2%(0,size s1-1)
                                  
 // Record access defintions
 makeGetSets mod recname strictness fields 
-	= ":: " +++ recname_pr +++ " = {" +++ makeconsargs fields +++ "}\n" 
-			+++ mGets 1 (length fields) fields 
+	= ":: " +++ recname_pr +++ " = {" +++ makeconsargs fields +++ "}\n"  
 			+++ mSets 1 (length fields) fields
 where
-	mGets _ _ [] = ""
-	mGets k nf [(field,idx,_):fields] 
-		= makePrintableName (mod +++ ".get_" +++ field +++ "_" +++ toString idx) +++ 
-		  " rec = select rec (" +++ recname_pr +++ makeargs nf +++ " -> a" +++ toString k +++ ")\n" +++ mGets (k+1) nf fields
-		  
 	mSets _ _ [] = ""
 	mSets k nf [(field,idx,_):fields] 
 		= makePrintableName (mod +++ ".set_" +++ field +++ "_" +++ toString idx) +++ 
-		  " rec " +++ annotate idx "val" +++ " = select rec (" +++ recname_pr +++ " " +++ makeargs nf +++ " -> " +++ 
+		  " rec " +++ annotate idx "val" +++ " = case rec (" +++ recname_pr +++ " " +++ makeargs nf +++ " -> " +++ 
           recname_pr +++ makerepargs k nf +++ ")\n"  +++ mSets (k+1) nf fields
 
 	recname_pr = makePrintableName (mod +++ "." +++ recname)
@@ -522,60 +518,6 @@ makePrintableName f | ss f = "<{" +++ f +++ "}>"
                            
 where ss f = or [is_ss c \\ c <-: f]
       is_ss c = not (isAlphanum c || c == '_' || c == '.')          
-
-// Replace non toplevel if & select by a function call
-checkIfSelect :: SaplFuncDef -> [SaplFuncDef]
-checkIfSelect (SaplFuncDef fname nrargs vs body kind mbType) 
-	# (newbody,_,newdefs) = rntls vs 0 body
-	= [SaplFuncDef fname nrargs vs newbody kind mbType:newdefs]
-where
-	rntls vs nr (SaplLet ves body)   
-	# (newbody,newnr,newdefs) = rntls (map snd3 ves++vs) nr body                               
-	= (SaplLet ves newbody,newnr,newdefs)
-
-	rntls vs nr (SaplSelect expr patterns defpattern)
-	# (newexpr,newnr,newdefs1) = maylift vs nr expr // in pattern expression lifting may necessary
-
-	# (newdefpattern,newnr,newdefs2) = case defpattern of
-					No = (No, newnr, [])
-					Yes dp = let (a,b,c) = rntls vs newnr dp in (Yes a,b,c)
-
-	# (newpatterns,newnr,newdefs3) = foldl walkPattern ([],newnr,[]) patterns
-	= (SaplSelect newexpr (reverse newpatterns) newdefpattern,newnr,newdefs1++newdefs2++newdefs3)
-	where
-		walkPattern (ps, nr, defs) (p=:(PCons pat args), body) 
-			= let (np,newnr,newdefs) = rntls (args++vs) nr body in ([(p, np):ps], newnr, defs++newdefs)
-		walkPattern (ps, nr, defs) (p, body) 
-			= let (np,newnr,newdefs) = rntls vs nr body in ([(p, np):ps], newnr, defs++newdefs)
-
-	rntls vs nr (SaplIf c l r)
-	# (newc,newnr,newdefsc) = maylift vs nr c // in condition lifting may necessary
-	# (newl,newnr,newdefsl) = rntls vs newnr l
-	# (newr,newnr,newdefsr) = rntls vs newnr r	
-	= (SaplIf newc newl newr,newnr,newdefsc++newdefsl++newdefsr)
-
-	rntls vs nr (SaplApp l r)
-	# (newl,newnr,newdefsl) = rntls vs nr l
-	# (newr,newnr,newdefsr) = rntls vs newnr r	
-	= (SaplApp newl newr,newnr,newdefsl++newdefsr)
-
-	rntls vs nr exp = (exp,nr,[])
-
-	// These expressions must be lifted only	
-	maylift vs nr e=:(SaplIf _ _ _) = lift vs nr e	
-	maylift vs nr e=:(SaplSelect _ _ _) = lift vs nr e	
-	maylift vs nr e = rntls vs nr e
-
-	// lift the given expression into a new top level function
-	lift vs nr e
-	# (newe,newnr,newdefse) = rntls vs nr e
-	= (multiApp [SaplFun (callname newnr):map removeTypeInfo vs],newnr+1,newdefse++
-				[SaplFuncDef (callname newnr) (length vs) vs newe FK_Unknown TE])
-	where
-		callname newnr = (fname+++"_select" +++ toString newnr)    
-	
-	removeTypeInfo (SaplVar n vi a _) = SaplVar n vi a No
-	removeTypeInfo expr = expr
 	
 // Which functions must be extended with a number 
 genFunctionExtension :: !Int !String !Int !Int {#DclModule} [IndexRange] !String -> String

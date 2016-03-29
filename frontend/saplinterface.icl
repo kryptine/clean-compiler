@@ -22,7 +22,6 @@ convert2sapl main_dcl_module_n comps fun_defs icl_common comdefs icl_name file m
   # saplcons  = remRecs saplcons saplrecs
   # (backEnd, heaps, saplfuncs) = getSaplFunDefs main_dcl_module_n comps 0 fun_defs modnames mymod dcl_mods icl_function_indices backEnd heaps
   # saplfuncs = map renameVars saplfuncs                   // give vars a unique name
-  # saplfuncs = flatten (map checkIfSelect saplfuncs)      // extract non toplevel if/select
   # file = file <<< "|| ?module? " <<< mymod <<< "\n"
   # file = file <<< "\n\n"
   # file = writedef2file saplfuncs file
