@@ -7,10 +7,10 @@ import StdEnv,StdMaybe,syntax,transform,backend
 :: SaplExp = SaplApp SaplExp SaplExp 
 		   | SaplLit SaplLiteral
            | SaplFun String 
-           | SaplVar String VarInfoPtr SaplAnnotation (Maybe Type) // VarInfoPtr: for comparison
-           | SaplIf SaplExp SaplExp SaplExp
-           | SaplSelect SaplExp [(SaplPattern,SaplExp)] (Optional SaplExp)
-           | SaplLet [(SaplAnnotation,SaplExp,SaplExp)] SaplExp 
+           | SaplVar String VarInfoPtr SaplAnnotation (Optional Type) // VarInfoPtr: for comparison
+           | SaplCase SaplExp [(SaplPattern,SaplExp)] (Optional SaplExp)
+           | SaplLet [((SaplAnnotation,Type),SaplExp,SaplExp)] SaplExp 
+           | SaplSelect SaplExp Int
            | SaplError String 
 
 :: SaplLiteral = LInt Int
@@ -36,7 +36,6 @@ instance toString SaplFuncDef
 instance toString SaplRecordDef
 
 renameVars 		:: SaplFuncDef -> SaplFuncDef
-checkIfSelect 	:: SaplFuncDef -> [SaplFuncDef]
 
 CleanFunctoSaplFunc  :: Int Int Int FunDef String {#DclModule} [IndexRange] !*BackEnd !*Heaps -> *(!*BackEnd, !*Heaps, !SaplFuncDef)
 
