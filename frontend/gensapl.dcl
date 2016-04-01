@@ -1,6 +1,6 @@
 definition module gensapl
 
-import StdEnv,StdMaybe,syntax,transform,backend
+import StdEnv,syntax,transform,backend
   
 :: SaplAnnotation = SA_None | SA_Strict  
     
