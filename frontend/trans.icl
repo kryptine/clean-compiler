@@ -245,22 +245,7 @@ where
 		= transformSelection opt_type selectors expr ro ti
 	transform (Update expr1 selectors expr2) ro ti
 		# (expr1,ti) = transform expr1 ro ti
-		# (selectors,ti) = transform_expressions_in_selectors selectors ti
-			with
-				transform_expressions_in_selectors [selection=:RecordSelection _ _ : selections] ti
-					# (selections,ti) = transform_expressions_in_selectors selections ti
-					= ([selection:selections],ti)
-				transform_expressions_in_selectors [ArraySelection ds ep expr : selections] ti
-					# (expr,ti) = transform expr ro ti
-					# (selections,ti) = transform_expressions_in_selectors selections ti
-					= ([ArraySelection ds ep expr:selections],ti)
-				transform_expressions_in_selectors [DictionarySelection bv dictionary_selections ep expr : selections] ti
-					# (expr,ti) = transform expr ro ti
-					# (dictionary_selections,ti) = transform_expressions_in_selectors dictionary_selections ti
-					# (selections,ti) = transform_expressions_in_selectors selections ti
-					= ([DictionarySelection bv dictionary_selections ep expr:selections],ti)
-				transform_expressions_in_selectors [] ti
-					= ([],ti)
+		# (selectors,ti) = transform_expressions_in_selectors selectors ro ti
 		# (expr2,ti) = transform expr2 ro ti
 		= (Update expr1 selectors expr2,ti)
 	transform (RecordUpdate cons_symbol expr exprs) ro ti
@@ -291,6 +276,21 @@ where
 		= (DictionariesFunction dictionaries expr expr_type,ti)
 	transform expr ro ti
 		= (expr, ti)
+
+transform_expressions_in_selectors [selection=:RecordSelection _ _ : selections] ro ti
+	# (selections,ti) = transform_expressions_in_selectors selections ro ti
+	= ([selection:selections],ti)
+transform_expressions_in_selectors [ArraySelection ds ep expr : selections] ro ti
+	# (expr,ti) = transform expr ro ti
+	# (selections,ti) = transform_expressions_in_selectors selections ro ti
+	= ([ArraySelection ds ep expr:selections],ti)
+transform_expressions_in_selectors [DictionarySelection bv dictionary_selections ep expr : selections] ro ti
+	# (expr,ti) = transform expr ro ti
+	# (dictionary_selections,ti) = transform_expressions_in_selectors dictionary_selections ro ti
+	# (selections,ti) = transform_expressions_in_selectors selections ro ti
+	= ([DictionarySelection bv dictionary_selections ep expr:selections],ti)
+transform_expressions_in_selectors [] ro ti
+	= ([],ti)
 
 instance transform DynamicExpr where
 	transform dyn=:{dyn_expr} ro ti
@@ -1289,7 +1289,7 @@ where
 	(=<) True False = Smaller
 	(=<) False True = Greater
 	(=<) False False = Equal
-	
+
 instance =< Producer
 where
 	(=<) pr1 pr2
@@ -1303,8 +1303,8 @@ where
 			= index1 =< index2
 		compare_constructor_arguments (PR_GeneratedFunction _ _ index1) (PR_GeneratedFunction _ _ index2)
 			= index1 =< index2
-		compare_constructor_arguments 	(PR_Class app1 lifted_vars_with_types1 t1) 
-										(PR_Class app2 lifted_vars_with_types2 t2) 
+		compare_constructor_arguments 	(PR_Class app1 lifted_vars_with_types1 t1)
+										(PR_Class app2 lifted_vars_with_types2 t2)
 			# cmp = smallerOrEqual t1 t2
 			| cmp<>Equal
 				= cmp
@@ -3309,7 +3309,7 @@ transformSelection NormalSelector s=:[RecordSelection _ field_index : selectors]
 		// urgh: now reevaluates cnf for each nested strict selector :-(
 		| cnf_app_args appi ro
 			= transformSelection NormalSelector selectors (app_args !! field_index) ro ti
-		= (Selection NormalSelector app s, ti)
+			= transform_remaining_selectors_of_normal_record_selector s app ro ti
 	# (app_info, ti_symbol_heap) = readPtr app_info_ptr ti_symbol_heap
 	  ti = { ti & ti_symbol_heap = ti_symbol_heap }
 	= case app_info of
@@ -3319,7 +3319,7 @@ transformSelection NormalSelector s=:[RecordSelection _ field_index : selectors]
 			// urgh: now reevaluates cnf for each nested strict selector :-(
 			| cnf_app_args appi ro
 				-> transformSelection NormalSelector selectors (app_args !! field_index) ro ti
-			-> (Selection NormalSelector app s, ti)
+			-> transform_remaining_selectors_of_normal_record_selector s app ro ti
 where
 	cnf_args [] index strictness ro = True
 	cnf_args [arg:args] index strictness ro
@@ -3346,8 +3346,8 @@ transformSelection NormalSelector s=:[RecordSelection _ field_index : selectors]
 			= case fun_body of
 				TransformedBody {tb_rhs}	-> case tb_rhs of
 					App app						-> transformSelection NormalSelector s tb_rhs ro ti
-					_							-> (Selection NormalSelector app s, ti)
-			= (Selection NormalSelector app s, ti)
+					_							-> transform_remaining_selectors_of_normal_record_selector s app ro ti
+			= transform_remaining_selectors_of_normal_record_selector s app ro ti
 where
 	isOKSymbol (SK_Function {glob_module})	= glob_module == ro.ro_main_dcl_module_n
 	isOKSymbol (SK_LocalMacroFunction _)	= True
@@ -3359,7 +3359,15 @@ where
 transformSelection NormalSelector [] expr ro ti
 	= (expr, ti)
 transformSelection selector_kind selectors expr ro ti
+	# (selectors,ti) = transform_expressions_in_selectors selectors ro ti
 	= (Selection selector_kind expr selectors, ti)
+
+transform_remaining_selectors_of_normal_record_selector :: ![Selection] !Expression ReadOnlyTI *TransformInfo -> (!Expression,!*TransformInfo)
+transform_remaining_selectors_of_normal_record_selector selectors=:[record_selector] app ro ti
+	= (Selection NormalSelector app selectors, ti)
+transform_remaining_selectors_of_normal_record_selector [record_selector:remaining_selectors] app ro ti
+	# (remaining_selectors,ti) = transform_expressions_in_selectors remaining_selectors ro ti
+	= (Selection NormalSelector app [record_selector:remaining_selectors], ti)
 
 //@	determineProducers: finds all legal producers in the argument list.
 // This version finds FIRST legal producer in argument list...
