@@ -20,7 +20,7 @@ convert2sapl main_dcl_module_n comps fun_defs icl_common comdefs icl_name file m
   # extcons   = getExternalConstructors modnames comdefs     // all including this module!
   # saplrecs  = getSaplRecords  icl_common mymod
   # saplcons  = remRecs saplcons saplrecs
-  # (backEnd, heaps, saplfuncs) = getSaplFunDefs main_dcl_module_n comps 0 fun_defs modnames mymod dcl_mods icl_function_indices backEnd heaps
+  # (backEnd, heaps, saplfuncs) = getSaplFunDefs main_dcl_module_n icl_common comps 0 fun_defs modnames mymod dcl_mods icl_function_indices backEnd heaps
   # saplfuncs = map renameVars saplfuncs                   // give vars a unique name
   # file = file <<< "|| ?module? " <<< mymod <<< "\n"
   # file = file <<< "\n\n"
@@ -53,24 +53,24 @@ makeConsGroup [     ]    = ""
 makeConsGroup [arg]      = toString arg
 makeConsGroup [arg:args] = toString arg +++ " | " +++ makeConsGroup args   
 
-getSaplFunDefs :: Int !{!Component} !Int !{# FunDef} [String] String {#DclModule} [IndexRange] !*BackEnd !*Heaps -> *(!*BackEnd, !*Heaps, ![SaplFuncDef])
-getSaplFunDefs main_dcl_module_n comps comp_index fun_defs mod_names mymod dcl_mods icl_function_indices backEnd heaps
+getSaplFunDefs :: Int CommonDefs !{!Component} !Int !{# FunDef} [String] String {#DclModule} [IndexRange] !*BackEnd !*Heaps -> *(!*BackEnd, !*Heaps, ![SaplFuncDef])
+getSaplFunDefs main_dcl_module_n icl_common comps comp_index fun_defs mod_names mymod dcl_mods icl_function_indices backEnd heaps
 	| comp_index >= size comps
 		= (backEnd, heaps, [])
 		# comp = comps.[comp_index]
 		# (backEnd, heaps, saplfuncs) = show_component comp.component_members fun_defs [] backEnd heaps
-		# (backEnd, heaps, sfuncs) = getSaplFunDefs main_dcl_module_n comps (inc comp_index) fun_defs mod_names mymod dcl_mods icl_function_indices backEnd heaps
+		# (backEnd, heaps, sfuncs) = getSaplFunDefs main_dcl_module_n icl_common comps (inc comp_index) fun_defs mod_names mymod dcl_mods icl_function_indices backEnd heaps
 		= (backEnd, heaps, saplfuncs ++ sfuncs)
 where
 	show_component NoComponentMembers fun_defs sapdefs backEnd heaps
 		= (backEnd, heaps, sapdefs)
 	show_component (ComponentMember fun funs) fun_defs sapdefs backEnd heaps
 		# fun_def = fun_defs.[fun]
-		# (backEnd, heaps, saplfunc) = CleanFunctoSaplFunc main_dcl_module_n comp_index fun fun_def mymod dcl_mods icl_function_indices backEnd heaps
+		# (backEnd, heaps, saplfunc) = CleanFunctoSaplFunc main_dcl_module_n icl_common comp_index fun fun_def mymod dcl_mods icl_function_indices backEnd heaps
 		= show_component funs fun_defs [saplfunc:sapdefs] backEnd heaps
 	show_component (GeneratedComponentMember fun _ funs) fun_defs sapdefs backEnd heaps
 		# fun_def = fun_defs.[fun]
-		# (backEnd, heaps, saplfunc) = CleanFunctoSaplFunc main_dcl_module_n comp_index fun fun_def mymod dcl_mods icl_function_indices backEnd heaps
+		# (backEnd, heaps, saplfunc) = CleanFunctoSaplFunc main_dcl_module_n icl_common comp_index fun fun_def mymod dcl_mods icl_function_indices backEnd heaps
 		= show_component funs fun_defs [saplfunc:sapdefs] backEnd heaps
 
 getExternalConstructors :: [String] {#CommonDefs} -> [SaplConsDef]			

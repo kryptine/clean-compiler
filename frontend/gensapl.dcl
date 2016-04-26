@@ -10,7 +10,8 @@ import StdEnv,syntax,transform,backend
            | SaplVar String VarInfoPtr SaplAnnotation (Optional Type) // VarInfoPtr: for comparison
            | SaplCase SaplExp [(SaplPattern,SaplExp)] (Optional SaplExp)
            | SaplLet [((SaplAnnotation,Type),SaplExp,SaplExp)] SaplExp 
-           | SaplSelect SaplExp Int
+           | SaplSelect SaplExp String Int
+           | SaplUpdate SaplExp String [(Int, SaplExp)]
            | SaplError String 
 
 :: SaplLiteral = LInt Int
@@ -37,7 +38,7 @@ instance toString SaplRecordDef
 
 renameVars 		:: SaplFuncDef -> SaplFuncDef
 
-CleanFunctoSaplFunc  :: Int Int Int FunDef String {#DclModule} [IndexRange] !*BackEnd !*Heaps -> *(!*BackEnd, !*Heaps, !SaplFuncDef)
+CleanFunctoSaplFunc  :: Int CommonDefs Int Int FunDef String {#DclModule} [IndexRange] !*BackEnd !*Heaps -> *(!*BackEnd, !*Heaps, !SaplFuncDef)
 
 
 
