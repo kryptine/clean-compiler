@@ -524,14 +524,7 @@ startsWith s1 s2 = s1 == s2%(0,size s1-1)
 // Record access defintions
 makeGetSets mod recname strictness fields 
 	= ":: " +++ recname_pr +++ " = {" +++ makeconsargs fields +++ "}\n"  
-			+++ mSets 1 (length fields) fields
 where
-	mSets _ _ [] = ""
-	mSets k nf [(field,idx,_):fields] 
-		= makePrintableName (mod +++ ".set_" +++ field +++ "_" +++ toString idx) +++ 
-		  " rec " +++ annotate idx "val" +++ " = case rec (" +++ recname_pr +++ " " +++ makeargs nf +++ " -> " +++ 
-          recname_pr +++ makerepargs k nf +++ ")\n"  +++ mSets (k+1) nf fields
-
 	recname_pr = makePrintableName (mod +++ "." +++ recname)
 
 	makeconsargs [     ]  		   	    = ""
