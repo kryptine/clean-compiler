@@ -98,7 +98,7 @@ where
 	makeRec rectype = 
 			SaplRecordDef mymod (toString rectype.rt_constructor.ds_ident) 
 						  (icl_common.com_cons_defs.[rectype.rt_constructor.ds_index].cons_type.st_args_strictness)
-						  [(toString field.fs_ident, field.fs_index, atype.at_type) \\ field <-: rectype.rt_fields & atype <- icl_common.com_cons_defs.[rectype.rt_constructor.ds_index].cons_type.st_args]
+						  [(toString field.fs_ident, icl_common.com_selector_defs.[field.fs_index].sd_field_nr, atype.at_type) \\ field <-: rectype.rt_fields & atype <- icl_common.com_cons_defs.[rectype.rt_constructor.ds_index].cons_type.st_args]
 
 getModNames :: {#DclModule} -> [String]
 getModNames dcl_mods = [dcl_mod.dcl_name.id_name\\ dcl_mod <-: dcl_mods]
