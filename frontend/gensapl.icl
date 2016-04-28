@@ -86,15 +86,16 @@ instance toString SaplExp
 where 
 	toString e = exp2string False e
 	where
-		exp2string b (SaplApp left right)       = bracks b (exp2string False left +++ " " +++ exp2string True right)
-		exp2string b (SaplLit l)                = toString l
-		exp2string b (SaplFun f)                = makePrintableName f
-		exp2string b (SaplVar n vi a No)        = makePrintableName n
-		exp2string b (SaplVar n vi a (Yes ty))  = makePrintableName n +++ genTypeInfo ty		
-		exp2string b e=:(SaplCase _ _ _)        = bracks b (caseToString e)
-		exp2string b (SaplSelect expr idx)      = bracks b ("select " +++ exp2string True expr +++ " " +++ toString idx)		
-		exp2string b (SaplLet ves body)         = "" +++ bracks b ("let " +++ multiLet ves body) 
-		exp2string b (SaplError m)              = bracks b ("error \"" +++ m +++ "\"")
+		exp2string b (SaplApp left right)         = bracks b (exp2string False left +++ " " +++ exp2string True right)
+		exp2string b (SaplLit l)                  = toString l
+		exp2string b (SaplFun f)                  = makePrintableName f
+		exp2string b (SaplVar n vi a No)          = makePrintableName n
+		exp2string b (SaplVar n vi a (Yes ty))    = makePrintableName n +++ genTypeInfo ty		
+		exp2string b e=:(SaplCase _ _ _)          = bracks b (caseToString e)
+		exp2string b (SaplSelect expr cons idx)   = bracks b ("select " +++ exp2string True expr +++ "::" +++ cons +++ " " +++ toString idx)		
+		exp2string b (SaplLet ves body)           = bracks b ("let " +++ multiLet ves body)
+		exp2string b (SaplUpdate expr cons binds) = bracks b ("update " +++ exp2string True expr +++ "::" +++ cons +++ " [" +++ multiUpdate binds +++ "]")
+		exp2string b (SaplError m)                = bracks b ("error \"" +++ m +++ "\"")
 
 		bracks b e | b = "(" +++ e +++ ")" 
     		           = e
@@ -112,6 +113,10 @@ where
 		multiLet [((annotation, type), arg, e)]      body  =  toString annotation +++ toString arg +++ genTypeInfo type +++ " = " +++ toString e +++ " in " +++ toString body
 		multiLet [((annotation, type), arg, e): ves] body  =  toString annotation +++ toString arg +++ genTypeInfo type +++ " = " +++ toString e +++ ", " +++ multiLet ves body
 
+		multiUpdate [] = ""
+		multiUpdate [(idx,expr)] = toString idx +++ ":" +++ toString expr 		
+		multiUpdate [(idx,expr):us] = toString idx +++ ":" +++ toString expr +++ "," +++ multiUpdate us
+
 		makeCodeString :: ![String] -> String
 		makeCodeString []     = ""
 		makeCodeString [c:cs] = c +++ ";" +++ makeCodeString cs 
@@ -126,8 +131,8 @@ counterMap f [] c = []
 counterMap f [x:xs] c = [f x c : counterMap f xs (c+1)]
 
 // Converting a single Clean function to a Sapl function (case is only pre-transformed)
-CleanFunctoSaplFunc  :: Int Int Int FunDef String {#DclModule} [IndexRange] !*BackEnd !*Heaps -> *(!*BackEnd, !*Heaps, !SaplFuncDef)
-CleanFunctoSaplFunc main_dcl_module_n modindex funindex 
+CleanFunctoSaplFunc  :: Int CommonDefs Int Int FunDef String {#DclModule} [IndexRange] !*BackEnd !*Heaps -> *(!*BackEnd, !*Heaps, !SaplFuncDef)
+CleanFunctoSaplFunc main_dcl_module_n icl_common modindex funindex 
                     {fun_ident,fun_body=TransformedBody {tb_args,tb_rhs},fun_info={fi_free_vars,fi_local_vars,fi_def_level,fi_calls},fun_type,fun_kind} 
                     mymod dcl_mods icl_function_indices backEnd heaps
 
@@ -253,17 +258,17 @@ where
 			# (heaps, sapl_expr1) = cleanExpToSaplExp No expr1 heaps
 			# (heaps, sapl_expr2) = cleanExpToSaplExp No expr2 heaps			
 			= makeArrayUpdate sapl_expr1 selections sapl_expr2 heaps
-	cleanExpToSaplExp tupleReturn (RecordUpdate cons_symbol expression expressions) heaps  
-			# (heaps, sapl_expression) = cleanExpToSaplExp No expression heaps        
-			= makeRecordUpdate sapl_expression expressions heaps
+	cleanExpToSaplExp tupleReturn (RecordUpdate cons expression binds) heaps  
+			# (heaps, sapl_expression) = cleanExpToSaplExp No expression heaps
+			# (heaps, updates) = getUpdates binds heaps
+			= (heaps, SaplUpdate sapl_expression (makePrintableName (find_rec_cons_by_cons cons)) updates)
 	cleanExpToSaplExp tupleReturn (TupleSelect cons field_nr expr) heaps
 			# (heaps, sapl_expr) = cleanExpToSaplExp No expr heaps		   
-			//= (heaps, SaplApp (SaplFun ("_predefined.tupsels" +++ toString cons.ds_arity +++ "v" +++ toString field_nr)) sapl_expr)
-			= (heaps, SaplSelect sapl_expr field_nr)
+			= (heaps, SaplSelect sapl_expr (toString cons.ds_ident) field_nr) // TODO: strictness
 	cleanExpToSaplExp tupleReturn (MatchExpr cons expr) heaps
 			| cons.glob_object.ds_arity == 1 
-				# (heaps, idx) = cleanExpToSaplExp No expr heaps
-				= (heaps, SaplApp (SaplFun ("_predefined.tupsels1v0")) idx) 
+				# (heaps, expr) = cleanExpToSaplExp No expr heaps
+				= (heaps, SaplSelect expr "_Tuple1" 0) 
 	            = cleanExpToSaplExp tupleReturn expr heaps
 	            
 	cleanExpToSaplExp _ EE heaps                                           = (heaps, SaplError "no EE")
@@ -312,9 +317,8 @@ where
 	makeSelector [selector:sels] e heaps 
 		# (heaps, sapl_expr) = mksel selector e heaps
 		= makeSelector  sels sapl_expr heaps
-	where mksel (RecordSelection globsel ind) sapl_expr heaps 
-				//= (heaps, SaplApp (SaplFun (dcl_mods.[globsel.glob_module].dcl_name.id_name +++ ".get_" +++ toString globsel.glob_object.ds_ident +++ "_" +++ toString globsel.glob_object.ds_index)) e)
-				= (heaps, SaplSelect sapl_expr ind)
+	where mksel (RecordSelection field idx) sapl_expr heaps 
+				= (heaps, SaplSelect sapl_expr (makePrintableName (find_rec_cons_by_sel field)) idx)
 	      mksel (ArraySelection globsel _ e)      exp heaps 
 	      		# (heaps, sapl_e) = cleanExpToSaplExp No e heaps
 	      		= (heaps, multiApp [SaplFun (dcl_mods.[globsel.glob_module].dcl_name.id_name +++ "." +++ toString globsel.glob_object.ds_ident +++ "_" +++ toString globsel.glob_object.ds_index),exp, sapl_e])
@@ -323,16 +327,45 @@ where
 		      	# (heaps, sapl_sel) = makeSelector sels (getBoundVarName var) heaps
 	      		= (heaps, multiApp [sapl_sel,exp,sapl_e])
 	
+	find_rec_cons_by_sel sel 
+		  # mod = toString dcl_mods.[sel.glob_module].dcl_name		  
+		  # selector_def = getSelectorDef sel.glob_module sel.glob_object.ds_index
+		  # type_def = getTypeDef sel.glob_module selector_def.sd_type_index
+		  # (RecordType {rt_constructor})  = type_def.td_rhs
+		  # rec_var = (hd selector_def.sd_exi_vars).atv_variable		  
+		  = mod +++ "." +++ toString rt_constructor.ds_ident
+		  
+	find_rec_cons_by_cons cons 
+		  # mod = toString dcl_mods.[cons.glob_module].dcl_name		  
+		  # cons_def = getConsDef cons.glob_module cons.glob_object.ds_index
+		  = mod +++ "." +++ toString cons_def.cons_ident
+		
+	getSelectorDef glob_module index | glob_module == main_dcl_module_n
+			= icl_common.com_selector_defs.[index]
+			= dcl_mods.[glob_module].dcl_common.com_selector_defs.[index]			
+
+	getConsDef glob_module index | glob_module == main_dcl_module_n
+			= icl_common.com_cons_defs.[index]
+			= dcl_mods.[glob_module].dcl_common.com_cons_defs.[index]			
+
+	getTypeDef glob_module index | glob_module == main_dcl_module_n
+			= icl_common.com_type_defs.[index]
+			= dcl_mods.[glob_module].dcl_common.com_type_defs.[index]			
+
+    typeName (TAS cons _ _) = toString cons.type_ident
+	typeName (TA cons _) =toString cons.type_ident		
+	typeName _ = "???"
+	
 	// backendconvert.convertSelector (BESelect)
-	makeRecordUpdate expression [         ] heaps                       
-			= (heaps, expression)
-	makeRecordUpdate expression [upbind:us] heaps | not(isNoBind value) 
+	getUpdates [] heaps                       
+			= (heaps, [])
+	getUpdates [upbind:us] heaps | not (isNoBind value)
+			# selector_def = getSelectorDef upbind.bind_dst.glob_module index 
 			# (heaps, sapl_value) = cleanExpToSaplExp No value heaps
-			= makeRecordUpdate (multiApp [SaplFun (field_mod +++ ".set_" +++ field +++ "_" +++ index),expression,sapl_value]) us heaps
-			= makeRecordUpdate expression us heaps
-	where field               = toString upbind.bind_dst.glob_object.fs_ident
-	      index               = toString upbind.bind_dst.glob_object.fs_index
-	      field_mod           = dcl_mods.[upbind.bind_dst.glob_module].dcl_name.id_name
+			# (heaps, updates) = getUpdates us heaps
+			= (heaps, [(selector_def.sd_field_nr, sapl_value):updates])
+			= getUpdates us heaps
+	where index               = upbind.bind_dst.glob_object.fs_index
 	      value               = upbind.bind_src
 	      isNoBind (NoBind _) = True
 	      isNoBind _          = False
@@ -412,14 +445,15 @@ where
 	renamevars vars 0 = [(SaplVar v ip a mbt, SaplVar (getVarPrefix v +++ "_" +++ toString k) ip a No) \\ (SaplVar v ip a mbt,k) <- zip(vars,[0..])]
 	renamevars vars n = [(SaplVar v ip a mbt, SaplVar (getVarPrefix v +++ "_" +++ toString n +++ "_" +++ toString k) ip a No) \\ (SaplVar v ip a mbt,k) <- zip(vars,[0..])]
 
-	doVarRename level rens (SaplApp left right)		= SaplApp (doVarRename level rens left) (doVarRename level rens right)
-	doVarRename level rens var=:(SaplVar _ _ _ _)   = findvar var rens
-	doVarRename level rens (SaplLet ves body)		= doletrename level rens [] ves body
-	doVarRename level rens (SaplCase e cases def)   = doselectrename level rens e cases def
-	doVarRename level rens (SaplSelect e idx)       = SaplSelect (doVarRename level rens e) idx
-	doVarRename level rens e                    	= e
+	doVarRename level rens (SaplApp left right)		 = SaplApp (doVarRename level rens left) (doVarRename level rens right)
+	doVarRename level rens var=:(SaplVar _ _ _ _)    = findvar var rens
+	doVarRename level rens (SaplLet ves body)		 = doletrename level rens [] ves body
+	doVarRename level rens (SaplCase e cases def)    = docaserename level rens e cases def
+	doVarRename level rens (SaplSelect e cons idx)   = SaplSelect (doVarRename level rens e) cons idx
+	doVarRename level rens (SaplUpdate e cons binds) = doupdaterename level rens e cons binds	
+	doVarRename level rens e                    	 = e
 
-	doselectrename level rens e cases def = SaplCase e` (map renamecase cases) def`
+	docaserename level rens e cases def = SaplCase e` (map renamecase cases) def`
 	where
 		e` = doVarRename level rens e
 		def` = fmap (doVarRename level rens) def
@@ -431,6 +465,11 @@ where
 
 		renamecase (p, body) 
 			= (p, doVarRename (level+1) rens body)
+	
+	doupdaterename level rens e cons binds = SaplUpdate e` cons (map renamebind binds)
+	where
+		e` = doVarRename level rens e
+		renamebind (idx, bexpr) = (idx, doVarRename level rens bexpr) 
 	
 	doletrename level rens _ bindings body = removeVarBodyLets (SaplLet renlets renbody)	
 	where
@@ -457,12 +496,13 @@ where
 		noVar _                 = True
 
 	// Simple var renaming
-	varrename rens (SaplApp left right)  = SaplApp (varrename rens left) (varrename rens right)
-	varrename rens (SaplVar n ip a mbt)  = findvar (SaplVar n ip a mbt) (rens++[(SaplVar n ip a mbt,SaplVar n ip a No)])
-	varrename rens (SaplLet ves body)    = SaplLet [(a,v,varrename rens e)\\ (a,v,e) <- ves] (varrename rens body)
+	varrename rens (SaplApp left right) = SaplApp (varrename rens left) (varrename rens right)
+	varrename rens (SaplVar n ip a mbt) = findvar (SaplVar n ip a mbt) (rens++[(SaplVar n ip a mbt,SaplVar n ip a No)])
+	varrename rens (SaplLet ves body) = SaplLet [(a,v,varrename rens e)\\ (a,v,e) <- ves] (varrename rens body)
 	varrename rens (SaplCase expr patterns mbDef) 
 			= SaplCase (varrename rens expr) [(p,varrename rens e)\\ (p,e) <- patterns] (fmap (varrename rens) mbDef)	
-	varrename rens (SaplSelect expr idx) = SaplSelect (varrename rens expr) idx
+	varrename rens (SaplSelect expr cons idx)   = SaplSelect (varrename rens expr) cons idx
+	varrename rens (SaplUpdate expr cons binds) = SaplUpdate (varrename rens expr) cons [(idx,varrename rens bexpr)\\ (idx,bexpr) <- binds]
 	varrename rens e                     = e
 
 findvar (SaplVar n ip a mbt) rens = hd ([renvar\\ (var,renvar) <- rens| cmpvar (SaplVar n ip a mbt) var]++[SaplVar ("error, " +++ n +++ " not found") nilPtr SA_None No])
@@ -484,14 +524,7 @@ startsWith s1 s2 = s1 == s2%(0,size s1-1)
 // Record access defintions
 makeGetSets mod recname strictness fields 
 	= ":: " +++ recname_pr +++ " = {" +++ makeconsargs fields +++ "}\n"  
-			+++ mSets 1 (length fields) fields
 where
-	mSets _ _ [] = ""
-	mSets k nf [(field,idx,_):fields] 
-		= makePrintableName (mod +++ ".set_" +++ field +++ "_" +++ toString idx) +++ 
-		  " rec " +++ annotate idx "val" +++ " = case rec (" +++ recname_pr +++ " " +++ makeargs nf +++ " -> " +++ 
-          recname_pr +++ makerepargs k nf +++ ")\n"  +++ mSets (k+1) nf fields
-
 	recname_pr = makePrintableName (mod +++ "." +++ recname)
 
 	makeconsargs [     ]  		   	    = ""
