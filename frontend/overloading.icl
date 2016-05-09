@@ -683,6 +683,30 @@ where
 		# (rc, frs_state) = finish_cr_of_ci info ci act_tc frs_state
 		= (CA_Instance rc, frs_state)
 
+	finish_cr_of_ci info (CI_Class No cis) act_tc=:{tc_class,tc_types} frs_state
+		# {glob_module,glob_object={ds_index}} = getClassSymbol tc_class
+		# cid = {cid_class_index = {gi_module=glob_module,gi_index=ds_index}, cid_inst_module = NoIndex, cid_inst_members = {}, cid_types = tc_types, cid_red_contexts = []}
+		# (rcs, frs_state) = finish_cr_of_cis info cis act_tc frs_state
+		# {class_members,class_context} = info.fri_defs.[glob_module].com_class_defs.[ds_index]
+		| size class_members==0
+			| (case tc_types of [_] -> False; _ -> True
+			|| case class_context of [_,_:_] -> False; _ -> True)
+				// not implemented for multiparameter type classes or fewer than 2 class constraints
+				= (RC_Class cid rcs, frs_state)
+				// if a constraint of a class without members is reduced, and all classes in the constraint of that class appear
+				// in the reduced constraints for a variable, add a constraint for the original class for that variable
+				// (this causes removal of the other constraints later), to prevent functions with too many constraints
+				# n_contexts = length class_context
+				  required_used_contexts = (2<<(n_contexts-1))-1 // beware of 1<<32==0 on IA32
+				  variables_and_contexts = collect_variable_and_contexts_of_rcs rcs [] class_context
+				  variables = [variable \\ (variable,used_contexts)<-variables_and_contexts | used_contexts==required_used_contexts]		
+				  frs_state = add_unexpanded_contexts variables tc_class frs_state
+				= (RC_Class cid rcs, frs_state)
+		= (RC_Class cid rcs, frs_state)
+	finish_cr_of_ci info (CI_Class (Yes cd) cis) act_tc frs_state
+		# (cid, frs_state) = finish_cr_of_cd info cd act_tc frs_state
+		  (rcs, frs_state) = finish_cr_of_cis info cis act_tc frs_state
+		= (RC_Class cid rcs, frs_state)
 	finish_cr_of_ci info CI_TC act_tc=:{tc_class,tc_types} frs_state=:{frs_all_contexts, frs_type_pattern_vars, frs_var_heap, frs_type_heaps, frs_error}
 		# (rc, { rtcs_new_contexts, rtcs_type_pattern_vars, rtcs_var_heap, rtcs_type_heaps, rtcs_error })
 			= reduce_tc_context info.fri_defs tc_class (hd tc_types)
@@ -690,17 +714,8 @@ where
 					  rtcs_type_heaps = frs_type_heaps, rtcs_error = frs_error }
 		= (rc, { frs_state & frs_all_contexts = rtcs_new_contexts, frs_type_pattern_vars = rtcs_type_pattern_vars, frs_var_heap = rtcs_var_heap,
 				                      frs_type_heaps = rtcs_type_heaps, frs_error = rtcs_error})
-	finish_cr_of_ci info (CI_Class opt_cd cis) act_tc frs_state
-		# (cid, frs_state) = finish_cr_of_opt_cd info opt_cd act_tc frs_state
-		  (rcs, frs_state) = finish_cr_of_cis info cis act_tc frs_state
-		= (RC_Class cid rcs, frs_state)
 
-	finish_cr_of_opt_cd info No act_tc=:{tc_class,tc_types} frs_state
-		# {glob_module,glob_object={ds_index}} = getClassSymbol tc_class
-		# cid = { cid_class_index = {gi_module=glob_module,gi_index=ds_index}, cid_inst_module = NoIndex, cid_inst_members = {}, cid_types = tc_types, cid_red_contexts = [] }
-		= (cid, frs_state)
-
-	finish_cr_of_opt_cd info=:{fri_defs} (Yes {cd_inst_symbol={glob_module,glob_object},cd_inst_contexts,cd_new_vars}) act_tc=:{tc_class,tc_types}
+	finish_cr_of_cd info=:{fri_defs} {cd_inst_symbol={glob_module,glob_object},cd_inst_contexts,cd_new_vars} act_tc=:{tc_class,tc_types}
 			frs_state=:{frs_type_heaps,frs_coercions,frs_predef_symbols,frs_special_instances,frs_error}
 		# {ins_type={it_vars,it_types,it_context}, ins_members, ins_class_index} = fri_defs.[glob_module].com_instance_defs.[glob_object]
 		| is_predefined_global_symbol ins_class_index PD_ArrayClass frs_predef_symbols && is_unboxed_array tc_types frs_predef_symbols
@@ -739,6 +754,7 @@ where
 				= ({ cid_class_index = ins_class_index, cid_inst_module = glob_module, cid_inst_members = ins_members, cid_types = tc_types, cid_red_contexts = [] },
 						{ frs_state & frs_type_heaps = frs_type_heaps, frs_coercions = frs_coercions, frs_error = uniqueError class_ident tc_types frs_error})
 
+	finish_cr_of_cis :: FinReduceInfo [CI] TypeContext *FinalRedState -> *(*[ReducedContext],*FinalRedState)
 	finish_cr_of_cis info [] act_tc frs_state
 		= ([], frs_state)
 	finish_cr_of_cis info cis {tc_class,tc_types} frs_state=:{frs_type_heaps}
@@ -953,6 +969,77 @@ where
 			 	-> bind_new_vars new_vars subst {type_heaps & th_vars = th_vars}
 	bind_new_vars [] subst type_heaps
 		= (subst,type_heaps)
+
+collect_variable_and_contexts_of_rcs :: [ReducedContext] [(Int,Int)] [TypeContext] -> [(Int,Int)]
+collect_variable_and_contexts_of_rcs [rc:rcs] variables_and_contexts class_context
+	# variables_and_contexts = collect_variable_and_contexts_of_rc rc variables_and_contexts class_context
+	= collect_variable_and_contexts_of_rcs rcs variables_and_contexts class_context
+where
+	collect_variable_and_contexts_of_rc :: ReducedContext [(Int,Int)] [TypeContext] -> [(Int,Int)]
+	collect_variable_and_contexts_of_rc (RC_Class cid rcs) variables_and_contexts class_context
+		# variables_and_contexts = collect_variable_and_contexts_of_context cid.cid_class_index cid.cid_types variables_and_contexts class_context
+		# variables_and_contexts = collect_variable_and_contexts_of_cas cid.cid_red_contexts variables_and_contexts class_context
+		= collect_variable_and_contexts_of_rcs rcs variables_and_contexts class_context
+	collect_variable_and_contexts_of_rc (RC_TC_Global _ cas) variables_and_contexts class_context
+		= collect_variable_and_contexts_of_cas cas variables_and_contexts class_context
+	collect_variable_and_contexts_of_rc (RC_TC_Local _) variables_and_contexts class_context
+		= variables_and_contexts
+
+	collect_variable_and_contexts_of_context :: GlobalIndex [Type] [(Int,Int)] [TypeContext] -> [(Int,Int)]
+	collect_variable_and_contexts_of_context cid_class_index [TempV type_var_n] variables_and_contexts class_context
+		# context_index = determine_index_in_class_context cid_class_index class_context 0
+		| context_index<0
+			= variables_and_contexts
+			= add_variable_and_context type_var_n (1<<context_index) variables_and_contexts
+	where
+		determine_index_in_class_context :: !GlobalIndex ![TypeContext] !Int -> Int
+		determine_index_in_class_context cid_class_index=:{gi_module,gi_index} [{tc_class=TCClass {glob_module,glob_object={ds_index}}}:class_contexts] class_index
+			| glob_module==gi_module && ds_index==gi_index
+				= class_index
+				= determine_index_in_class_context cid_class_index class_contexts (class_index+1)
+		determine_index_in_class_context cid_class_index=:{gi_module,gi_index} [{tc_class=TCGeneric {gtc_class={glob_module,glob_object={ds_index}}}}:class_contexts] class_index
+			| glob_module==gi_module && ds_index==gi_index
+				= class_index
+				= determine_index_in_class_context cid_class_index class_contexts (class_index+1)
+		determine_index_in_class_context cid_class_index [] class_index
+			= -1;
+
+		add_variable_and_context :: !Int !Int ![(Int,Int)] -> [(Int,Int)]
+		add_variable_and_context type_var_n tv_context [variable_and_context=:(variable,context):variables_and_contexts]
+			| type_var_n==variable
+				#! context=context bitor tv_context
+				= [(variable,context) : variables_and_contexts]
+				= [variable_and_context : add_variable_and_context type_var_n tv_context variables_and_contexts]
+		add_variable_and_context type_var_n tv_context []
+			= [(type_var_n,tv_context)]
+	collect_variable_and_contexts_of_context _ _ variables_and_contexts class_context
+		= variables_and_contexts
+
+	collect_variable_and_contexts_of_cas :: [ClassApplication] [(Int,Int)] [TypeContext] -> [(Int,Int)]
+	collect_variable_and_contexts_of_cas [CA_Instance rc:cas] variables_and_contexts class_context
+		# variables_and_contexts = collect_variable_and_contexts_of_rc rc variables_and_contexts class_context
+		= collect_variable_and_contexts_of_cas cas variables_and_contexts class_context
+	collect_variable_and_contexts_of_cas [CA_Context {tc_class,tc_types}:cas] variables_and_contexts class_context
+		# tc_index = case tc_class of
+			TCClass {glob_module,glob_object={ds_index}} -> {gi_module=glob_module,gi_index=ds_index}
+			TCGeneric {gtc_class={glob_module,glob_object={ds_index}}} -> {gi_module=glob_module,gi_index=ds_index}
+		# variables_and_contexts = collect_variable_and_contexts_of_context tc_index tc_types variables_and_contexts class_context
+		= collect_variable_and_contexts_of_cas cas variables_and_contexts class_context
+	collect_variable_and_contexts_of_cas [] variables_and_contexts class_context
+		= variables_and_contexts
+collect_variable_and_contexts_of_rcs [] variables_and_contexts class_context
+	= variables_and_contexts
+
+add_unexpanded_contexts :: ![Int] !TCClass !*FinalRedState -> *FinalRedState
+add_unexpanded_contexts [variable:variables] tc_class frs_state=:{frs_all_contexts,frs_var_heap}
+	# tc = {tc_class = tc_class, tc_types = [TempV variable], tc_var = nilPtr}
+	| containsContext tc frs_all_contexts
+		= add_unexpanded_contexts variables tc_class frs_state
+		# (tc_var, frs_var_heap) = newPtr VI_Empty frs_var_heap
+		# frs_all_contexts = [{tc & tc_var = tc_var} : frs_all_contexts]
+		= add_unexpanded_contexts variables tc_class {frs_state & frs_all_contexts=frs_all_contexts, frs_var_heap=frs_var_heap}
+add_unexpanded_contexts [] tc_class frs_state
+	= frs_state
 
 :: ReduceDLA = { // reduce detect loop arguments
 	rdla_depth :: !Int,
