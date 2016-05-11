@@ -207,6 +207,8 @@ where
 		= file  <<< "E.#" <<< tv_number <<< ' ' 
 	(<<<) file (TempQDV tv_number)
 		= file  <<< "E.#" <<< tv_number <<< ' ' 
+	(<<<) file (TGenericFunctionInDictionary _ _ {gi_module,gi_index})
+		= file <<< "TGenericFunctionInDictionary " <<< gi_module <<< ' ' <<< gi_index
 	(<<<) file TE
 		= file <<< "### EMPTY ###"
 /*
@@ -316,7 +318,7 @@ where
 	(<<<) file (BasicPatterns type patterns) = file <<< " " <<<patterns
 	(<<<) file (AlgebraicPatterns type patterns) = file <<< patterns
 	(<<<) file (DynamicPatterns patterns) = file <<< patterns
-	(<<<) file (OverloadedListPatterns type decons_expr patterns) = file <<< decons_expr <<< " " <<< patterns
+	(<<<) file (OverloadedListPatterns type decons_expr patterns) = file <<< ' ' <<< decons_expr <<< " " <<< patterns
 	(<<<) file (NewTypePatterns type patterns) = file <<< patterns
 	(<<<) file NoPattern = file 
 
