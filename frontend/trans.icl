@@ -2088,8 +2088,8 @@ determine_arg (PR_Class class_app free_vars_and_types class_type) _ {fv_info_ptr
 			  }
 	// AA: Dummy generic dictionary does not unify with corresponding class dictionary.
 	// Make it unify
-	# ({pds_module,pds_def},das_predef) = das_predef![PD_TypeGenericDict]
-	# genericGlobalIndex	= {glob_module = pds_module, glob_object = pds_def}
+	#! (defTypeGenericDict,das_predef) = das_predef![PD_TypeGenericDict]
+	#! (defTypeGenericDict0,das_predef) = das_predef![PD_TypeGenericDict0]
 	# (succ, das_subst, das_type_heaps)
 		//AA: = unify class_atype arg_type type_input das_subst das_type_heaps
 		= unify_dict class_atype arg_type type_input das_subst das_type_heaps
@@ -2097,12 +2097,11 @@ determine_arg (PR_Class class_app free_vars_and_types class_type) _ {fv_info_ptr
 			unify_dict class_atype=:{at_type=TA type_symb1 args1} arg_type=:{at_type=TA type_symb2 args2} 
 				| type_symb1 == type_symb2 
 					= unify class_atype arg_type
-				// FIXME: check indexes, not names. Need predefs for that. 	
-//				| type_symb1.type_ident.id_name == "GenericDict"
-				| type_symb1.type_index == genericGlobalIndex
+				#! genericDictGlobalIndex = {glob_module = defTypeGenericDict.pds_module, glob_object = defTypeGenericDict.pds_def}
+				#! genericDict0GlobalIndex = {glob_module = defTypeGenericDict0.pds_module, glob_object = defTypeGenericDict0.pds_def}
+				| type_symb1.type_index == genericDictGlobalIndex || type_symb1.type_index == genericDict0GlobalIndex
 					= unify {class_atype & at_type = TA type_symb2 args1} arg_type	
-//				| type_symb2.type_ident.id_name == "GenericDict"
-				| type_symb2.type_index == genericGlobalIndex
+				| type_symb2.type_index == genericDictGlobalIndex || type_symb2.type_index == genericDict0GlobalIndex
 					= unify class_atype {arg_type & at_type = TA type_symb1 args2} 	  				
 			unify_dict class_atype arg_type 
 				= unify class_atype arg_type
@@ -4071,7 +4070,6 @@ transformGroups cleanup_info main_dcl_module_n ro_StdStrictLists_module_n def_mi
 	# (groups, imported_types, collected_imports, fun_indices_with_abs_syn_types, ti)
 		= transform_groups 0 groups [] common_defs imported_funs imported_types [] [] initial_ti
 	# groups = {group \\ group <- reverse groups}
-
 	  {ti_fun_defs,ti_new_functions,ti_var_heap,ti_symbol_heap,ti_fun_heap,ti_next_fun_nr,ti_type_heaps,ti_cleanup_info} = ti
 	# (fun_defs, imported_types, collected_imports, type_heaps, var_heap) 
 			= foldSt (expand_abstract_syn_types_in_function_type common_defs) (reverse fun_indices_with_abs_syn_types)

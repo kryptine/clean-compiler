@@ -371,14 +371,18 @@ check_context_class (TCGeneric gtc=:{gtc_generic, gtc_kind}) tc_types mod_index 
 				{ glob_module = generic_module
 				, glob_object = {gtc_generic.glob_object & ds_index = generic_index}					
 				}
-			  ({pds_module,pds_def},cs) = cs!cs_predef_symbols.[PD_TypeGenericDict]
+			#! generic_dict_index
+				= if (modules.[generic_module].dcl_common.com_generic_defs.[generic_index].gen_type.st_arity==0)
+					PD_TypeGenericDict0
+					PD_TypeGenericDict
+			# ({pds_module,pds_def},cs) = cs!cs_predef_symbols.[generic_dict_index]
 			  generic_dict = {gi_module=pds_module, gi_index=pds_def}
 			#! tc_class = TCGeneric {gtc & gtc_generic = checked_gen, gtc_class=clazz, gtc_generic_dict=generic_dict}
 			| not cs.cs_x.x_check_dynamic_types
 				= (True, tc_class, 0, class_defs, modules, cs)
 				# cs = {cs & cs_error = checkError gen_ident "a generic context is not allowed in a dynamic type" cs.cs_error}
 				= (True, tc_class, 0, class_defs, modules, cs)
-			# cs_error = checkError gen_ident "generic used with wrong arity: generic has always has one class argument" cs.cs_error  
+			# cs_error = checkError gen_ident "generic used with wrong arity: generic always has one class argument" cs.cs_error  
 			= (False, TCGeneric {gtc & gtc_class=clazz}, 0, class_defs, modules, {cs & cs_error = cs_error})
 		# cs_error = checkError gen_ident "generic undefined" cs.cs_error
 		= (True, TCGeneric {gtc & gtc_class=clazz}, 0, class_defs, modules, {cs & cs_error = cs_error})
@@ -779,7 +783,7 @@ where
 
 	check_attribute var_ident DAK_Ignore (TVI_AttrAndRefCount prev_attr ref_count) this_attr oti cs=:{cs_error}
 		= (TA_Multi, oti, cs)
-	check_attribute var_ident dem_attr (TVI_AttrAndRefCount prev_attr ref_count) this_attr oti cs=:{cs_error}
+	check_attribute var_ident dem_attr (TVI_AttrAndRefCount prev_attr _) this_attr oti cs=:{cs_error}
 		# (new_attr, cs_error) = determine_attribute var_ident dem_attr this_attr cs_error
 		= check_var_attribute prev_attr new_attr oti { cs & cs_error = cs_error }
 	where					
@@ -1150,7 +1154,7 @@ checkMemberType mod_index st type_defs class_defs modules heaps cs
 	= (checked_st, atype_class_vars, type_defs, class_defs, modules, heaps, cs) 
 	where
 		add_attrs_to_class_vars [TV type_var=:{tv_info_ptr}:tv_type_vars] th_vars
-			# (TVI_AttrAndRefCount attr ref_count, th_vars) = readPtr tv_info_ptr th_vars
+			# (TVI_AttrAndRefCount attr _, th_vars) = readPtr tv_info_ptr th_vars
 			# (atype_class_vars,th_vars) = add_attrs_to_class_vars tv_type_vars th_vars
 			= ([{atv_attribute = attr, atv_variable = type_var}:atype_class_vars],th_vars)
 		add_attrs_to_class_vars [] th_vars
@@ -2071,8 +2075,8 @@ collect_fields field_nr fields (sel_defs, symbol_table)
 create_class_dictionary :: !Index !Index !*{#ClassDef} !w:{#DclModule} !u:Indexes !*TypeVarHeap !*VarHeap !*SymbolTable 
 						-> (!*{#ClassDef}, !w:{#DclModule}, !SymbolPtr,!u:Indexes,!*TypeVarHeap,!*VarHeap,!*SymbolTable)
 create_class_dictionary mod_index class_index class_defs =:{[class_index] = class_def } modules indexes type_var_heap var_heap symbol_table
-	# {class_ident,class_args,class_arity,class_members,class_context,class_dictionary=ds=:{ds_ident={id_name,id_info}}} = class_def
-	# (type_id_info, symbol_table) = newPtr EmptySymbolTableEntry symbol_table
+	# {class_ident,class_args,class_arity,class_members,class_context,class_dictionary=ds=:{ds_ident={id_name,id_info}},class_lazy_members} = class_def
+	  (type_id_info, symbol_table) = newPtr EmptySymbolTableEntry symbol_table
 	  nr_of_members = size class_members
 	  nr_of_fields = nr_of_members + length class_context
 
@@ -2102,8 +2106,10 @@ create_class_dictionary mod_index class_index class_defs =:{[class_index] = clas
 
 	  cons_def = 	
 		{	cons_ident		= rec_cons_id
-		,	cons_type		= { st_vars	= [], st_args = reverse rev_field_types, st_args_strictness = first_n_strict nr_of_fields, st_result = rec_type,
-							    st_arity = nr_of_fields, st_context = [], st_attr_vars = [], st_attr_env = [] }
+		,	cons_type		= { st_vars	= [], st_args = reverse rev_field_types,
+								st_args_strictness = if (class_lazy_members==0) (first_n_strict nr_of_fields) NotStrict,
+								st_result = rec_type, st_arity = nr_of_fields,
+							    st_context = [], st_attr_vars = [], st_attr_env = [] }
 		,	cons_priority	= NoPrio
 		,	cons_number		= 0
 		,	cons_type_index	= index_type

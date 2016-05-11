@@ -1626,7 +1626,7 @@ where
 buildClassAndMember :: Int Int Int TypeKind GenericDef *GenericState -> (ClassDef,MemberDef,*GenericState)
 buildClassAndMember
 		module_index class_index member_index kind
-		gen_def=:{gen_ident, gen_pos}
+		gen_def=:{gen_ident, gen_pos, gen_type={st_arity=gen_arity}}
 		gs=:{gs_tvarh}
 	# (class_var, gs_tvarh) = freshTypeVar (makeIdent "class_var") gs_tvarh
 	#! (member_def, gs)
@@ -1661,9 +1661,9 @@ where
 			, ds_index = member_index
 			, ds_arity = me_type.st_arity
 			}
-		#! class_dictionary = 
-			{ ds_ident = class_ident 
-			, ds_arity = 0 
+		#! class_dictionary =
+			{ ds_ident = class_ident
+			, ds_arity = 0
 			, ds_index = NoIndex/*index in the type def table, filled in later*/ 
 			}
 		#! class_def = { 
@@ -1676,7 +1676,7 @@ where
 		    class_cons_vars = 0, // dotted class variables
 		    class_dictionary = class_dictionary,
 		    class_fun_dep_vars = 0,
-			class_lazy_members = 0
+			class_lazy_members = if (gen_arity==0) 1 0
 		    }
 		= class_def
 
@@ -2727,15 +2727,15 @@ where
 	convert_context :: !Ident !Position !TypeContext (!*Modules, !*Heaps, !*ErrorAdmin)
 		-> (!Bool, !TypeContext, (!*Modules, !*Heaps, !*ErrorAdmin))
 	convert_context fun_name fun_pos tc=:{tc_class=TCGeneric gtc=:{gtc_generic, gtc_kind}} (modules, heaps=:{hp_generic_heap}, error)
-		# ({gen_info_ptr}, modules) = modules![gtc_generic.glob_module].com_generic_defs.[gtc_generic.glob_object.ds_index]
+		# ({gen_info_ptr,gen_type}, modules) = modules![gtc_generic.glob_module].com_generic_defs.[gtc_generic.glob_object.ds_index]
 		# ({gen_classes}, hp_generic_heap) = readPtr gen_info_ptr hp_generic_heap		
 		# opt_class_info = lookupGenericClassInfo gtc_kind gen_classes
 		# (tc_class, error) = case opt_class_info of 
 			No
 				# error = reportError fun_name.id_name fun_pos "no generic cases for this kind" error  
 				-> (TCGeneric gtc, error)
-			Yes class_info 
-				# clazz = 
+			Yes class_info
+				# clazz =
 					{ glob_module = class_info.gci_module
 					, glob_object = 
 						{ ds_ident = genericIdentToClassIdent gtc_generic.glob_object.ds_ident.id_name gtc_kind 
@@ -2744,9 +2744,11 @@ where
 						}
 					}
 				// AA HACK: dummy dictionary
-				#! {pds_module,pds_def} = gs_predefs.[PD_TypeGenericDict]
-				# generic_dict = {gi_module=pds_module, gi_index=pds_def}
-				-> (TCGeneric {gtc & gtc_class=clazz, gtc_generic_dict=generic_dict}, error)
+				| gen_type.st_arity==0
+					#! {pds_module,pds_def} = gs_predefs.[PD_TypeGenericDict0]
+					-> (TCGeneric {gtc & gtc_class=clazz, gtc_generic_dict={gi_module=pds_module, gi_index=pds_def}}, error)
+					#! {pds_module,pds_def} = gs_predefs.[PD_TypeGenericDict]
+					-> (TCGeneric {gtc & gtc_class=clazz, gtc_generic_dict={gi_module=pds_module, gi_index=pds_def}}, error)
 		= (True, {tc & tc_class=tc_class}, (modules, {heaps & hp_generic_heap=hp_generic_heap}, error))
 	convert_context fun_name fun_pos tc st 
 		= (False, tc, st)
