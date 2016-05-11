@@ -383,6 +383,7 @@ cNameLocationDependent :== True
 	,	class_pos			:: !Position
 	,	class_cons_vars		:: !BITVECT
 	,	class_fun_dep_vars	:: !BITVECT
+	,	class_lazy_members	:: !BITVECT
 	}
 
 ::	ClassDefInfos :== {# .{! [TypeKind]}}

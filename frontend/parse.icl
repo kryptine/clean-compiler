@@ -1514,7 +1514,7 @@ wantClassDefinition parseContext pos pState
 		 	  (members, pState) = wantDefinitions (SetClassDefsContext parseContext) pState
   		  	  class_def = { class_ident = class_id, class_arity = class_arity, class_args = class_args,
 	    					class_context = contexts, class_pos = pos, class_members = {}, class_cons_vars = class_cons_vars,
-	    					class_fun_dep_vars = class_fun_dep_vars,
+	    					class_fun_dep_vars = class_fun_dep_vars, class_lazy_members = 0,
 	    					class_dictionary = { ds_ident = { class_id & id_info = nilPtr }, ds_arity = 0, ds_index = NoIndex}
 						  }
 	    	  pState = wantEndGroup "class" pState
@@ -1526,7 +1526,7 @@ wantClassDefinition parseContext pos pState
 			  (class_id, pState) = stringToIdent class_or_member_name IC_Class pState
   			  class_def = { class_ident = class_id, class_arity = class_arity, class_args = class_args,
 							class_context = contexts, class_pos = pos, class_members = {}, class_cons_vars = class_cons_vars,
-							class_fun_dep_vars = class_fun_dep_vars,
+							class_fun_dep_vars = class_fun_dep_vars, class_lazy_members = 0,
 							class_dictionary = { ds_ident = { class_id & id_info = nilPtr }, ds_arity = 0, ds_index = NoIndex }
 						  }
 	  		  pState = wantEndOfDefinition "class definition" pState
@@ -1576,7 +1576,7 @@ wantClassDefinition parseContext pos pState
 			  member = PD_TypeSpec pos member_id prio (Yes tspec) FSP_None
 			  class_def = {	class_ident = class_id, class_arity = class_arity, class_args = class_args,
 		    				class_context = contexts, class_pos = pos, class_members = {}, class_cons_vars = class_cons_vars,
-		    				class_fun_dep_vars = class_fun_dep_vars,
+		    				class_fun_dep_vars = class_fun_dep_vars, class_lazy_members = 0,
    							class_dictionary = { ds_ident = { class_id & id_info = nilPtr }, ds_arity = 0, ds_index = NoIndex }
    						  }
 	 		  pState = wantEndOfDefinition "overloaded function" pState
