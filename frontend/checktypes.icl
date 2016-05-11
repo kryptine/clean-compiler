@@ -1077,8 +1077,8 @@ checkFunctionType :: !Index !SymbolType !FunSpecials !u:{#CheckedTypeDef} !v:{#C
 checkFunctionType mod_index st specials type_defs class_defs modules heaps cs
 	= checkSymbolType True mod_index st specials type_defs class_defs modules heaps cs
 
-checkMemberType :: !Index !SymbolType !u:{# CheckedTypeDef} !v:{# ClassDef} !u:{# DclModule} !*TypeHeaps !*CheckState
-	-> (!SymbolType, !u:{# CheckedTypeDef}, !v:{# ClassDef}, !u:{# DclModule}, !*TypeHeaps, !*CheckState)
+checkMemberType :: !Index !SymbolType !u:{#CheckedTypeDef} !v:{#ClassDef} !u:{# DclModule} !*TypeHeaps !*CheckState
+	-> (!SymbolType, !u:{# CheckedTypeDef}, !v:{#ClassDef}, !u:{#DclModule}, !*TypeHeaps, !*CheckState)
 checkMemberType mod_index st type_defs class_defs modules heaps cs
 	# (checked_st, specials, type_defs, class_defs, modules, heaps, cs) 
 			= checkSymbolType False mod_index st FSP_None type_defs class_defs modules heaps cs

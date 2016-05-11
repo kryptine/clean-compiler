@@ -45,7 +45,8 @@ from syntax import
   :: ParsedDefinition, :: CollectedLocalDefs, :: TypeContext {..}, :: TCClass (..), :: GenericTypeContext {..},
   :: DclModule {..}, :: NumberSet, :: ModuleKind, :: Declarations, :: DictionaryInfo, :: IndexRange,
   :: CommonDefs {..}, :: GenericCaseDef, :: GenericDef {..}, :: GenericInfoPtr, :: GenericDependency, :: GenericInfo, :: ClassInstance, :: MemberDef, :: ClassDef, :: SelectorDef, :: CheckedTypeDef, :: TypeDef, :: TypeRhs,
-  :: ClassDef {..}, :: BITVECT
+  :: ClassDef {..}, :: BITVECT, :: MacroMember {..}, :: ClassInstanceR {..}, :: Specials, :: ClassInstanceMember, :: InstanceType, :: ClassIdent, :: MacroIndex,
+  :: CommonDefsR {..}
 
 ppDebugApp :: App *ChnExpression -> *(Doc, *ChnExpression)
 ppDebugApp app menv

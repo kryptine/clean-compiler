@@ -6,7 +6,8 @@ from syntax import :: Expression (..), :: BoundVar, :: App {..}, :: Let, :: Case
   :: Bind, :: Position, :: AType, :: Env, :: Ident, :: Level, :: ExprInfoPtr, :: ExprInfo,
   :: TypeCodeExpression, :: GlobalIndex, :: Conditional, :: BasicValue, :: FieldSymbol,
   :: IclModule, :: DclModule, :: FunDef, :: Optional, :: SymbolType, :: LetBind,
-  :: ModuleN, :: Type, :: ParsedExpr, :: CommonDefs, :: Index, :: TypeContext
+  :: ModuleN, :: Type, :: ParsedExpr, :: CommonDefs, :: Index, :: TypeContext,
+  :: CommonDefsR, :: DclInstanceMemberTypeAndFunction
 from checksupport import :: Heaps, :: Group
 from overloading import :: InstanceTree
 from Data.Graph import :: Graph

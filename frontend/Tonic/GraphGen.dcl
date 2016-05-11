@@ -2,7 +2,7 @@ definition module Tonic.GraphGen
 
 from Data.Graph import :: Graph
 from Data.Maybe import :: Maybe
-from syntax import :: Expression, :: FunDef, :: IclModule, :: DclModule, :: ParsedExpr, :: CommonDefs
+from syntax import :: Expression, :: FunDef, :: IclModule, :: DclModule, :: ParsedExpr, :: CommonDefs, :: CommonDefsR, :: DclInstanceMemberTypeAndFunction
 from general import :: Optional
 from checksupport import :: Heaps
 from Tonic.AbsSyn import :: InhExpression, :: ChnExpression, :: SynExpression

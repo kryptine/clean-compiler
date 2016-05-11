@@ -4,6 +4,7 @@ from general import ::Optional
 from syntax import
 	::Ident, ::FunDef, ::IndexRange, ::TypeHeaps,
 	::SymbolTable, ::SymbolTableEntry, ::Heap,
+	::CommonDefsR, ::DclInstanceMemberTypeAndFunction,
 	::DclModule, ::CommonDefs, ::CheckedTypeDef, ::TypeDef, ::TypeRhs, ::ClassDef, ::VarHeap, ::VarInfo
 from predef import
 	::PredefinedSymbols, ::PredefinedSymbol
