@@ -3923,7 +3923,7 @@ wantListExp is_pattern pState
 						->	wantListComprehension head_strictness (acc!!0)  pState
 						// otherwise // length acc <> 1
 						#	nil_expr = makeNilExpression head_strictness is_pattern
-							pState				= parseError "list comprehension" No "one expressions before \\\\ " pState
+							pState				= parseError "list comprehension" No "one expressions before \\\\" pState
 						->	(gen_cons_nodes acc nil_expr,pState)
 					_	#	nil_expr = makeNilExpression head_strictness is_pattern
 							pState	= parseError "list" (Yes token) "list element separator" pState
