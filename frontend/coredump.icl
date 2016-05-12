@@ -350,8 +350,6 @@ where
 		= pp_state <#< varid
 	(<#<) pp_state (TempV tv_number)
 		= pp_state  <#< "TempV "  <#< tv_number <#< ' ' 
-	(<#<) pp_state (TQV varid)
-		= pp_state <#< "E." <#< varid
 	(<#<) pp_state (TempQV tv_number)
 		= pp_state  <#< "E." <#< tv_number <#< ' ' 
 	(<#<) pp_state (TLifted varid)

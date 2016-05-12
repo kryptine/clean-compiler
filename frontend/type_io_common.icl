@@ -35,7 +35,6 @@ TypeConsApplyCode				:== (toChar 12)		// :@:
 TypeTBCode						:== (toChar 13)		// TB
 TypeGTVCode						:== (toChar 14)		// GTV
 TypeTVCode						:== (toChar 15)		// TV
-TypeTQVCode						:== (toChar 16)		// TempTQV
 TypeTECode						:== (toChar 17)		// TE
 
 // Type; TB
