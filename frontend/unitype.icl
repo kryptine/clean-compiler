@@ -196,6 +196,41 @@ where
 			= lift_substitution (inc var_index) modules cons_vars { subst & [var_index] = type } ls
 			= (subst, ls.ls_next_attr, ls.ls_type_heaps, ls.ls_td_infos)
 
+liftSubstitutionFunDep :: !Int !{#BOOLVECT} !{#CommonDefs} !{#BOOLVECT} !*{!Type} !Int !*TypeHeaps !*TypeDefInfos
+																	-> (!*{!Type},!Int,!*TypeHeaps,!*TypeDefInfos)
+liftSubstitutionFunDep n_type_variables marked_new_vars modules cons_vars subst attr_store type_heaps td_infos 
+	# ls = { ls_next_attr = attr_store, ls_td_infos = td_infos, ls_type_heaps = type_heaps}
+	# (subst,ls) = lift_substitution 0 n_type_variables modules cons_vars subst ls
+	# (subst,ls) = lift_marked_substitutions n_type_variables n_type_variables marked_new_vars modules cons_vars subst ls
+	= remove_unmarked_substitutions n_type_variables n_type_variables marked_new_vars subst ls
+where
+	lift_substitution var_index n_type_variables modules cons_vars subst ls
+		| var_index < n_type_variables
+			# (type, subst) = subst![var_index]
+			# (_, type, subst, ls) = lift modules cons_vars type subst ls
+			= lift_substitution (inc var_index) n_type_variables modules cons_vars { subst & [var_index] = type } ls
+			= (subst, ls)
+
+	lift_marked_substitutions var_index n_type_variables marked_new_vars modules cons_vars subst ls
+		| var_index < size subst
+			# mi = var_index-n_type_variables
+			| marked_new_vars.[BITINDEX mi] bitand (1 << (BITNUMBER mi))<>0
+				# (type, subst) = subst![var_index]
+				  (_, type, subst, ls) = lift modules cons_vars type subst ls
+				  subst & [var_index] = type
+				= lift_marked_substitutions (inc var_index) n_type_variables marked_new_vars modules cons_vars subst ls
+				= lift_marked_substitutions (inc var_index) n_type_variables marked_new_vars modules cons_vars subst ls
+			= (subst, ls)
+
+	remove_unmarked_substitutions var_index n_type_variables marked_new_vars subst ls
+		| var_index < size subst
+			# mi = var_index-n_type_variables
+			| marked_new_vars.[BITINDEX mi] bitand (1 << (BITNUMBER mi))<>0
+				= remove_unmarked_substitutions (inc var_index) n_type_variables marked_new_vars subst ls
+				# subst & [var_index] = TE
+				= remove_unmarked_substitutions (inc var_index) n_type_variables marked_new_vars subst ls
+			= (subst, ls.ls_next_attr, ls.ls_type_heaps, ls.ls_td_infos)
+
 adjustSignClass :: !SignClassification !Int -> SignClassification
 adjustSignClass {sc_pos_vect,sc_neg_vect} arity
 	= { sc_pos_vect = sc_pos_vect >> arity, sc_neg_vect = sc_neg_vect >> arity }

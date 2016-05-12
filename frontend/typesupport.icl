@@ -283,6 +283,122 @@ where
 		# (cur, (t,ts), env) = cleanUpClosed (t,ts) env
 		= (cur, [t:ts], env)
 
+undefinedVarInTypeVariable :: !Type !u:VarEnv -> (!Bool, !u:VarEnv)
+undefinedVarInTypeVariable TE env
+	= (True, env)
+undefinedVarInTypeVariable _ env
+	= (False, env)
+
+undefinedVarInType :: !Type !u:VarEnv -> (!Bool, !u:VarEnv)
+undefinedVarInType (TempV tv_number) env
+	# (type, env) = env![tv_number]
+	= undefinedVarInTypeVariable type env
+undefinedVarInType (TA tc types) env
+	= undefinedVarInATypes types env
+undefinedVarInType (TAS tc types strictness) env
+	= undefinedVarInATypes types env
+undefinedVarInType (argtype --> restype) env
+	# (undefined_var_in_argtype, env) = undefinedVarInType argtype.at_type env
+	| undefined_var_in_argtype
+		= (True, env)
+		= undefinedVarInType restype.at_type env
+undefinedVarInType (TArrow1 argtype) env
+	= undefinedVarInType argtype.at_type env
+undefinedVarInType (TempCV tv_number :@: types) env
+	# (type, env) = env![tv_number]
+	# (undefined_var_in_type_variable, env) = undefinedVarInTypeVariable type env
+	| undefined_var_in_type_variable
+		= (True, env)
+		= undefinedVarInATypes types env
+undefinedVarInType t env
+	= (False, env)
+
+undefinedVarInTypes :: ![Type] !u:VarEnv -> (!Bool, !u:VarEnv)
+undefinedVarInTypes [t:ts] env
+	# (undefined_var_in_t, env) = undefinedVarInType t env
+	| undefined_var_in_t
+		= (True, env)
+		= undefinedVarInTypes ts env
+undefinedVarInTypes [] env
+	= (False, env)
+
+undefinedVarInATypes :: ![AType] !u:VarEnv -> (!Bool, !u:VarEnv)
+undefinedVarInATypes [t:ts] env
+	# (undefined_var_in_t, env) = undefinedVarInType t.at_type env
+	| undefined_var_in_t
+		= (True, env)
+		= undefinedVarInATypes ts env
+undefinedVarInATypes [] env
+	= (False, env)
+
+undefinedVarInNonFunDepTypes :: ![Type] !BITVECT !u:VarEnv -> (!Bool, !u:VarEnv)
+undefinedVarInNonFunDepTypes [t:ts] fun_dep_vars env
+	| fun_dep_vars bitand 1<>0
+		= undefinedVarInNonFunDepTypes ts (fun_dep_vars>>1) env
+	# (undefined_var_in_t, env) = undefinedVarInType t env
+	| undefined_var_in_t
+		= (True, env)
+		= undefinedVarInNonFunDepTypes ts (fun_dep_vars>>1) env
+undefinedVarInNonFunDepTypes [] fun_dep_vars env
+	= (False, env)
+
+defineVarsInTypeVariable :: !Type !Int !*VarEnv !Int !*TypeHeaps -> (!*VarEnv,!Int,!*TypeHeaps)
+defineVarsInTypeVariable TE tv_number env next_var_n type_heaps
+	# (tv_info_ptr, th_vars) = newPtr TVI_Empty type_heaps.th_vars
+	  type_heaps & th_vars = th_vars
+	  env & [tv_number] = TV {tv_ident = NewVarId next_var_n, tv_info_ptr = tv_info_ptr}
+	  next_var_n = next_var_n+1
+	= (env,next_var_n,type_heaps)
+defineVarsInTypeVariable type tv_number env next_var_n type_heaps
+	= (env,next_var_n,type_heaps)
+
+defineVarsInType :: !Type !*VarEnv !Int !*TypeHeaps -> (!*VarEnv,!Int,!*TypeHeaps)
+defineVarsInType (TempV tv_number) env next_var_n type_heaps
+	# (type, env) = env![tv_number]
+	= defineVarsInTypeVariable type tv_number env next_var_n type_heaps
+defineVarsInType (TA tc types) env next_var_n type_heaps
+	= defineVarsInATypes types env next_var_n type_heaps
+defineVarsInType (TAS tc types strictness) env next_var_n type_heaps
+	= defineVarsInATypes types env next_var_n type_heaps
+defineVarsInType (argtype --> restype) env next_var_n type_heaps
+	# (env,next_var_n,type_heaps) = defineVarsInType argtype.at_type env next_var_n type_heaps
+	= defineVarsInType restype.at_type env next_var_n type_heaps
+defineVarsInType (TArrow1 argtype) env next_var_n type_heaps
+	= defineVarsInType argtype.at_type env next_var_n type_heaps
+defineVarsInType (TempCV tv_number :@: types) env next_var_n type_heaps
+	# (type, env) = env![tv_number]
+	# (env,next_var_n,type_heaps) = defineVarsInTypeVariable type tv_number env next_var_n type_heaps
+	= defineVarsInATypes types env next_var_n type_heaps
+defineVarsInType t env next_var_n type_heaps
+	= (env,next_var_n,type_heaps)
+
+defineVarsInTypes :: ![Type] !*VarEnv !Int !*TypeHeaps -> (!*VarEnv,!Int,!*TypeHeaps)
+defineVarsInTypes [t:ts] env next_var_n type_heaps
+	# (env,next_var_n,type_heaps)
+		= defineVarsInType t env next_var_n type_heaps
+	= defineVarsInTypes ts env next_var_n type_heaps
+defineVarsInTypes [] env next_var_n type_heaps
+	= (env,next_var_n,type_heaps)
+
+defineVarsInATypes :: ![AType] !*VarEnv !Int !*TypeHeaps -> (!*VarEnv,!Int,!*TypeHeaps)
+defineVarsInATypes [{at_type}:ts] env next_var_n type_heaps
+	# (env,next_var_n,type_heaps)
+		= defineVarsInType at_type env next_var_n type_heaps
+	= defineVarsInATypes ts env next_var_n type_heaps
+defineVarsInATypes [] env next_var_n type_heaps
+	= (env,next_var_n,type_heaps)
+
+defineVarsInFunDepTypes :: ![Type] !BITVECT !*VarEnv !Int !*TypeHeaps -> (!*VarEnv,!Int,!*TypeHeaps)
+defineVarsInFunDepTypes [t:ts] fun_dep_vars env next_var_n type_heaps
+	| fun_dep_vars bitand 1==0
+		= defineVarsInFunDepTypes ts (fun_dep_vars>>1) env next_var_n type_heaps
+	# (env,next_var_n,type_heaps)
+		= defineVarsInType t env next_var_n type_heaps
+	= defineVarsInFunDepTypes ts (fun_dep_vars>>1) env next_var_n type_heaps
+defineVarsInFunDepTypes [] fun_dep_vars env next_var_n type_heaps
+	= (env,next_var_n,type_heaps)
+
+
 errorHeading :: !String !*ErrorAdmin -> *ErrorAdmin
 errorHeading  error_kind err=:{ea_file,ea_loc = []}
 	= { err & ea_file = ea_file <<< error_kind <<< ':', ea_ok = False }

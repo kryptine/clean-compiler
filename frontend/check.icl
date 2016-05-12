@@ -548,6 +548,20 @@ where
 		# (new_info_ptr, attr_var_heap) = newPtr AVI_Empty attr_var_heap
 		  new_attr = { attr & av_info_ptr = new_info_ptr}
 		= ([new_attr : free_attrs], writePtr attr.av_info_ptr (AVI_Attr (TA_Var new_attr)) attr_var_heap)
+
+	update_subst_av_info_ptrs [subst_av_info_ptr:subst_av_info_ptrs] attr_var_heap
+		# (av_info,attr_var_heap) = readPtr subst_av_info_ptr attr_var_heap
+		= case av_info of
+			AVI_Attr (TA_Var {av_info_ptr})
+				# (av_info,attr_var_heap) = readPtr av_info_ptr attr_var_heap
+				= case av_info of
+					AVI_Attr attr
+						# attr_var_heap = writePtr subst_av_info_ptr av_info attr_var_heap
+						-> update_subst_av_info_ptrs subst_av_info_ptrs attr_var_heap
+					_
+						-> update_subst_av_info_ptrs subst_av_info_ptrs attr_var_heap
+	update_subst_av_info_ptrs [] attr_var_heap
+		= attr_var_heap
 	
 	adjust_special_subst special_subst=:{ss_environ} type_var_heap
 		# (ss_environ, type_var_heap) = mapSt adjust_special_bind ss_environ type_var_heap
@@ -568,6 +582,93 @@ determineTypeOfMemberInstance mem_st class_vars {it_types,it_vars,it_attr_vars,i
 	  		= check_attribution_consistency mem_st type_heaps opt_modules error
 	= (st, specials, type_heaps, opt_modules, error)
 where
+	clear_type_vars :: [TypeVar] *TypeVarHeap -> *TypeVarHeap
+	clear_type_vars type_vars type_var_heap
+		= foldSt (\ {tv_info_ptr} -> writePtr tv_info_ptr TVI_Empty) type_vars type_var_heap
+
+	set_and_check_attribute_substitutions :: ![Type] ![ATypeVar] !Bool !*TypeVarHeap !*ErrorAdmin -> (!Bool,!*TypeVarHeap,!*ErrorAdmin)
+	set_and_check_attribute_substitutions [TV {tv_info_ptr,tv_ident}:types] [{atv_attribute}:class_vars] attr_subst_set type_var_heap error
+		# (type_var_info,type_var_heap) = readPtr tv_info_ptr type_var_heap
+		= case type_var_info of
+			TVI_Empty
+				# type_var_heap = writePtr tv_info_ptr (TVI_TypeAttribute atv_attribute) type_var_heap
+				-> set_and_check_attribute_substitutions types class_vars True type_var_heap error
+			TVI_TypeAttribute attribute
+				| attribute==atv_attribute
+					-> set_and_check_attribute_substitutions types class_vars True type_var_heap error
+					# error = checkError tv_ident.id_name "type variable inconsistently attributed in member type of instance" error 
+					-> set_and_check_attribute_substitutions types class_vars True type_var_heap error
+			_
+				# error = checkWarning tv_ident.id_name "coverage condition fails for type variable in member type of instance" error 
+				# type_var_heap = writePtr tv_info_ptr (TVI_TypeAttribute atv_attribute) type_var_heap
+				-> set_and_check_attribute_substitutions types class_vars True type_var_heap error
+	set_and_check_attribute_substitutions [_:types] [_:class_vars] attr_set type_var_heap error
+		= set_and_check_attribute_substitutions types class_vars attr_set type_var_heap error
+	set_and_check_attribute_substitutions [] [] attr_set type_var_heap error
+		= (attr_set,type_var_heap,error)
+
+	check_attr_substs :: Bool [Type] *TypeHeaps !*ErrorAdmin -> (!*TypeHeaps,!*ErrorAdmin)
+	check_attr_substs attr_subst_set it_types type_heaps error
+		| not attr_subst_set
+			= (type_heaps,error)
+		# (type_var_heap,error) = check_types_type_var_attributes it_types type_heaps.th_vars error
+	  	# type_heaps & th_vars = clear_type_vars it_vars type_var_heap
+		= (type_heaps,error)
+	where
+		check_types_type_var_attributes [type:types] type_var_heap error
+			# (type_var_heap,error) = check_type_type_var_attributes type type_var_heap error
+			= check_types_type_var_attributes types type_var_heap error
+		check_types_type_var_attributes [] type_var_heap error
+			= (type_var_heap,error)
+
+		check_type_type_var_attributes (TA type_ident atypes) type_var_heap error
+			= check_atypes_type_var_attributes atypes type_var_heap error
+		check_type_type_var_attributes (TAS type_ident atypes strictness) type_var_heap error
+			= check_atypes_type_var_attributes atypes type_var_heap error
+		check_type_type_var_attributes (arg_atype-->res_atype) type_var_heap error
+			# (type_var_heap,error) = check_atype_type_var_attributes arg_atype type_var_heap error
+			# (type_var_heap,error) = check_atype_type_var_attributes res_atype type_var_heap error
+			= (type_var_heap,error)
+		check_type_type_var_attributes (cons_var :@: atypes) type_var_heap error
+			// if cons_var is a CV, the attribute is checked in check_atype_type_var_attributes
+			= check_atypes_type_var_attributes atypes type_var_heap error
+		check_type_type_var_attributes (TFA type_vars type) type_var_heap error
+			= check_type_type_var_attributes type type_var_heap error
+		check_type_type_var_attributes (TArrow1 atype) type_var_heap error
+			= check_atype_type_var_attributes atype type_var_heap error
+		check_type_type_var_attributes type type_var_heap error
+			= (type_var_heap,error)
+	
+		check_atypes_type_var_attributes [atype:atypes] type_var_heap error
+			# (type_var_heap,error) = check_atype_type_var_attributes atype type_var_heap error
+			= check_atypes_type_var_attributes atypes type_var_heap error
+		check_atypes_type_var_attributes [] type_var_heap error
+			= (type_var_heap,error)
+	
+		check_atype_type_var_attributes atype=:{at_attribute,at_type=at_type=:TV {tv_info_ptr,tv_ident}} type_var_heap error
+			# (tv_info,type_var_heap) = readPtr tv_info_ptr type_var_heap
+			= case tv_info of
+				TVI_TypeAttribute atv_attribute
+					| atv_attribute==at_attribute
+						-> (type_var_heap,error)
+						# error = checkError tv_ident.id_name "type variable inconsistently attributed in member type of instance" error 
+						-> (type_var_heap,error)
+				_
+					-> (type_var_heap,error)
+		check_atype_type_var_attributes {at_attribute,at_type=(cons_var=:CV {tv_info_ptr,tv_ident}) :@: atypes} type_var_heap error
+			# (type_var_heap,error) = check_atypes_type_var_attributes atypes type_var_heap error
+			  (tv_info,type_var_heap) = readPtr tv_info_ptr type_var_heap
+			= case tv_info of
+				TVI_TypeAttribute atv_attribute
+					| atv_attribute==at_attribute
+						-> (type_var_heap,error)
+						# error = checkError tv_ident.id_name "type variable inconsistently attributed in member type of instance" error 
+						-> (type_var_heap,error)
+				_
+					-> (type_var_heap,error);
+		check_atype_type_var_attributes {at_attribute,at_type} type_var_heap error
+			= check_type_type_var_attributes at_type type_var_heap error
+
 	determine_type_of_member_instance mem_st=:{st_context} env (SP_Substitutions substs) type_heaps error
 		# (mem_st, substs, type_heaps, error) 
 				= substitute_symbol_type { mem_st &  st_context = tl st_context } env substs type_heaps error

@@ -400,6 +400,8 @@ cNameLocationDependent :== True
 	,	class_dictionary	:: !DefinedSymbol
 	,	class_pos			:: !Position
 	,	class_cons_vars		:: !BITVECT
+	,	class_fun_dep_vars	:: !BITVECT
+	,	class_lazy_members	:: !BITVECT
 	}
 
 :: ClassDefInfos :== {# .{! [TypeKind]}}
@@ -1164,6 +1166,7 @@ cNotVarNumber :== -1
 					| TVI_GenTypeVarNumber !Int
 					| TVI_CPSTypeVar !CheatCompiler /* MdM: a pointer to a variable in CleanProverSystem is stored here, using a cast */
 					| TVI_Attr !TypeAttribute
+					| TVI_TypeAttribute !TypeAttribute
 
 :: TypeVarInfoPtr	:== Ptr TypeVarInfo
 :: TypeVarHeap 	:== Heap TypeVarInfo

@@ -40,4 +40,6 @@ putPredefinedIdentInHashTable :: !Ident !IdentClass !*HashTable -> *HashTable
 
 get_qualified_idents_from_hash_table :: !Ident !*HashTable -> (!QualifiedIdents,!*HashTable)
 
+remove_qualified_idents_from_hash_table :: !*HashTable -> *HashTable
+
 remove_icl_symbols_from_hash_table :: !*HashTable -> *HashTable

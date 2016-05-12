@@ -1623,7 +1623,7 @@ where
 buildClassAndMember :: Int Int Int TypeKind GenericDef *GenericState -> (ClassDef,MemberDef,*GenericState)
 buildClassAndMember
 		module_index class_index member_index kind
-		gen_def=:{gen_ident, gen_pos}
+		gen_def=:{gen_ident, gen_pos, gen_type={st_arity=gen_arity}}
 		gs=:{gs_tvarh}
 	# (class_var, gs_tvarh) = freshTypeVar (makeIdent "class_var") gs_tvarh
 	#! (member_def, gs)
@@ -1673,7 +1673,9 @@ where
 		    class_members = createArray 1 class_member,
 		    class_macro_members = {},
 		    class_cons_vars = 0, // dotted class variables
-		    class_dictionary = class_dictionary
+		    class_dictionary = class_dictionary,
+		    class_fun_dep_vars = 0,
+			class_lazy_members = if (gen_arity==0) 1 0
 		    }
 		= class_def
 

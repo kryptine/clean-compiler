@@ -102,7 +102,7 @@ addTypesOfDictionaries common_defs type_contexts type_args
 	= mapAppend (add_types_of_dictionary common_defs) type_contexts type_args
 where
 	add_types_of_dictionary common_defs {tc_class = TCGeneric {gtc_generic_dict={gi_module,gi_index}}, tc_types}
-		#! generict_dict_ident = predefined_idents.[PD_TypeGenericDict]
+		#! generict_dict_ident = common_defs.[gi_module].com_type_defs.[gi_index].td_ident
 		/*
 			AA HACK:
 			Generic classes are always generated locally, 

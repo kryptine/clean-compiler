@@ -41,7 +41,9 @@ set_hte_mark hte_mark ht = {ht & hte_mark=hte_mark}
 instance =< IdentClass
 where
 	(=<) (IC_Instance types1) (IC_Instance types2)
-		= compare_types types1 types2
+		= IF_ALLOW_NON_LINEAR_AND_OVERLAPPING_INSTANCES
+			(compareInstances types1 types2)
+			(compare_types types1 types2)
 	(=<) (IC_InstanceMember types1) (IC_InstanceMember types2)
 		= compare_types types1 types2
 	(=<) (IC_GenericCase type1) (IC_GenericCase type2)
@@ -79,7 +81,10 @@ where
 			= y1 =< y2
 			= cmp
 
-cHashTableSize	:==	1023
+cHashTableSize :== 1023
+// the hte_entries array has an additional entry to store the modules with qualified indents
+HashTableArraySize :== 1024
+ModulesWithQualifiedIdentsHashTableIndex :== 1023
 
 hashValue :: !String -> Int
 hashValue name
@@ -190,13 +195,42 @@ where
 			#! (qualified_idents, hte_right) = find_qualified_idents module_name module_ident_class hte_right
 			= (qualified_idents, HTE_Ident hte_ident hte_class hte_mark hte_left hte_right)
 
+remove_qualified_idents_from_hash_table :: !*HashTable -> *HashTable
+remove_qualified_idents_from_hash_table hash_table=:{hte_entries}
+	# (modules_with_qualified_idents,hte_entries) = hte_entries![ModulesWithQualifiedIdentsHashTableIndex]
+	  hte_entries & [ModulesWithQualifiedIdentsHashTableIndex] = modules_with_qualified_idents
+	  hte_entries = remove_qualified_idents_from_modules modules_with_qualified_idents hte_entries
+	= {hash_table & hte_entries = hte_entries}
+	where
+		remove_qualified_idents_from_modules (HTE_Ident hte_ident=:{boxed_ident={id_name}} hte_class=:(IC_Module NoQualifiedIdents) hte_mark hte_left hte_right) hte_entries
+			# hash_val = hashValue id_name
+			  (entries,hte_entries) = hte_entries![hash_val]
+	  		  (_, entries) = remove_qualified_idents_from_module id_name hte_class entries
+			  hte_entries & [hash_val] = entries
+			= remove_qualified_idents_from_modules hte_right (remove_qualified_idents_from_modules hte_left hte_entries)
+		remove_qualified_idents_from_modules HTE_Empty hte_entries
+			= hte_entries
+
+		remove_qualified_idents_from_module :: !String !IdentClass *HashTableEntry -> (!Bool, !*HashTableEntry)
+		remove_qualified_idents_from_module module_name module_ident_class (HTE_Ident hte_ident=:{boxed_ident={id_name}} hte_class hte_mark hte_left hte_right)
+			# cmp = (module_name,module_ident_class) =< (id_name,hte_class)
+			| cmp == Equal
+				= (True, HTE_Ident hte_ident (IC_Module NoQualifiedIdents) hte_mark hte_left hte_right)
+			| cmp == Smaller
+				#! (found, hte_left) = remove_qualified_idents_from_module module_name module_ident_class hte_left
+				= (found, HTE_Ident hte_ident hte_class hte_mark hte_left hte_right)
+				#! (found, hte_right) = remove_qualified_idents_from_module module_name module_ident_class hte_right
+				= (found, HTE_Ident hte_ident hte_class hte_mark hte_left hte_right)
+		remove_qualified_idents_from_module module_name module_ident_class HTE_Empty
+			= (False, HTE_Empty)
+
 remove_icl_symbols_from_hash_table :: !*HashTable -> *HashTable
 remove_icl_symbols_from_hash_table hash_table=:{hte_entries}
 	# hte_entries=remove_icl_symbols_from_array 0 hte_entries
 	= {hash_table & hte_entries=hte_entries}
 	where
 		remove_icl_symbols_from_array i hte_entries
-			 | i<size hte_entries
+			 | i<cHashTableSize
 			 	# (entries,hte_entries) = hte_entries![i]
 				# (_,entries) = remove_icl_entries_from_tree entries
 				# hte_entries = {hte_entries & [i] = entries}

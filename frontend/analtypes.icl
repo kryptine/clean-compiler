@@ -937,6 +937,12 @@ where
 		determine_kinds_of_context_class modules {tc_class=TCGeneric {gtc_kind}} infos_and_as
 			= infos_and_as 
 
+	bind_kind_avars type_vars kind_ptrs type_var_heap
+		= fold2St bind_kind_avar type_vars kind_ptrs type_var_heap
+	where
+		bind_kind_avar {atv_variable={tv_info_ptr}} kind_info_ptr type_var_heap
+			= type_var_heap <:= (tv_info_ptr, TVI_TypeKind kind_info_ptr)
+
 	bind_kind_vars type_vars kind_ptrs type_var_heap
 		= fold2St bind_kind_var type_vars kind_ptrs type_var_heap
 	where
