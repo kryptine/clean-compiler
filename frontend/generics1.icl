@@ -1371,7 +1371,7 @@ where
 				  
 						  type_heaps = {th_vars = gs.gs_tvarh, th_attrs = gs.gs_avarh}
 						  (fun_type, {th_vars,th_attrs}, var_heap, error)
-						  	= determine_type_of_member_instance_from_symbol_type member_type ins_type type_heaps gs.gs_varh gs.gs_error
+						  	= determine_type_of_member_instance_from_symbol_type member_type class_var_attr ins_type type_heaps gs.gs_varh gs.gs_error
 						  gs & gs_tvarh=th_vars, gs_avarh=th_attrs, gs_varh=var_heap, gs_error=error
 
 						-> (Yes fun_type,gs)
@@ -1648,7 +1648,7 @@ where
 			me_offset = 0,
 			me_type = member_type,
 			me_type_ptr = type_ptr,				// empty
-			me_class_vars = [class_var], 		// the same variable as in the class
+			me_class_vars = [{atv_attribute=class_var_attr,atv_variable=class_var}], // the same variable as in the class
 			me_pos = gen_pos,
 			me_priority = NoPrio,
 			me_default_implementation = No
@@ -2241,11 +2241,11 @@ remove_unused_dep_args args=:[arg:r_args] arg_n n_deps deps
 remove_unused_dep_args [] arg_n n_deps deps
 	= []
 
-determine_type_of_member_instance_from_symbol_type :: !SymbolType !InstanceType !*TypeHeaps !*VarHeap !*ErrorAdmin
+determine_type_of_member_instance_from_symbol_type :: !SymbolType !TypeAttribute !InstanceType !*TypeHeaps !*VarHeap !*ErrorAdmin
 	-> (!SymbolType, !*TypeHeaps, !*VarHeap, !*ErrorAdmin)
-determine_type_of_member_instance_from_symbol_type me_type=:{st_context=[{tc_types = [TV class_var]}:_]} ins_type hp_type_heaps hp_var_heap error
+determine_type_of_member_instance_from_symbol_type me_type=:{st_context=[{tc_types = [TV class_var]}:_]} class_var_attr ins_type hp_type_heaps hp_var_heap error
 	#! (symbol_type, _, hp_type_heaps, _, error) 
-		= determineTypeOfMemberInstance me_type [class_var] ins_type SP_None hp_type_heaps No error
+		= determineTypeOfMemberInstance me_type [{atv_attribute=class_var_attr,atv_variable=class_var}] ins_type SP_None hp_type_heaps No error
 	#! (st_context, hp_var_heap) = initializeContextVariables symbol_type.st_context hp_var_heap
 	#! hp_type_heaps = clearSymbolType me_type hp_type_heaps
 	#! symbol_type = {symbol_type & st_context = st_context}

@@ -248,7 +248,7 @@ ppParsedExpr (PE_Ident symb) = text (case symb.id_name of
                                        name      -> name
                                     )
 ppParsedExpr PE_WildCard     = char '_'
-ppParsedExpr (PE_Lambda _ exprs expr _) = char '\\' <-> hcat (intersperse (text " ") (map ppParsedExpr exprs)) <-> text " -> " <-> ppParsedExpr expr
+ppParsedExpr (PE_Lambda _ exprs rhsexpr _) = char '\\' <-> hcat (intersperse (text " ") (map ppParsedExpr exprs)) <-> text " -> " <-> ppRhs rhsexpr
 ppParsedExpr (PE_Bound bind) = ppBoundExpr bind
 ppParsedExpr (PE_Case _ expr alts) = text "case " <-> ppParsedExpr expr <-> text " of\n" <-> hcat (intersperse (text " ") (map ppCaseAlt alts))
 ppParsedExpr (PE_Let defs expr) = text "let " <-> ppLocalDefs defs <-> text " in\n" <-> ppParsedExpr expr

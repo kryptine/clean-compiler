@@ -3735,19 +3735,20 @@ trySimpleNonLhsExpressionT BackSlashToken pState
 	# (lam_ident, pState)	= internalIdent (toString backslash) pState
 	  (file_name, line_nr, pState)	
 	  						= getFileAndLineNr pState
-	  (lam_args, pState) 	= wantList "arguments" trySimplePattern pState
-	  pState				= want_lambda_sep pState
-	  (exp, pState)			= wantExpression pState
 	  position				= FunPos file_name line_nr lam_ident.id_name
-	= (True, PE_Lambda lam_ident lam_args exp position, pState)
-	where
-		want_lambda_sep pState
-			# (token, pState) = nextToken FunctionContext pState
-			= case token of
-				ArrowToken	-> pState
-				EqualToken	-> pState
-				DotToken	-> pState
-	  			_			-> parseError "lambda expression" (Yes token) "-> or =" (tokenBack pState)
+	  (lam_args, pState) 	= wantList "arguments" trySimplePattern pState
+	  (token, pState)		= nextToken FunctionContext pState
+	= case token of
+		DotToken
+			# (file_name, line_nr, pState) = getFileAndLineNr pState
+			  (expr, pState) = wantExpression pState
+			  ewl = {ewl_nodes = [], ewl_expr = expr, ewl_locals = LocalParsedDefs [], ewl_position = LinePos file_name line_nr}
+			  rhs = {rhs_alts = UnGuardedExpr ewl, rhs_locals = LocalParsedDefs []}
+			-> (True, PE_Lambda lam_ident lam_args rhs position, pState)
+		_
+		 	# (rhs, defining_symbol, pState)
+			  						= wantRhs_without_where token True RhsDefiningSymbolCase pState
+			-> (True, PE_Lambda lam_ident lam_args rhs position, pState)
 trySimpleNonLhsExpressionT (LetToken strict) pState // let! is not supported in Clean 2.0
 	| strict				= (False, PE_Empty, parseError "Expression" No "let! (strict let) not supported in this version of Clean, expression" pState)
 	// otherwise

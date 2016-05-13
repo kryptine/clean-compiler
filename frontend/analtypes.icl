@@ -964,7 +964,7 @@ where
 		  other_contexts = tl st_context
 		  (class_infos, as) = determine_kinds_of_context_classes other_contexts class_infos_and_as
 		  as_type_var_heap = clear_variables st_vars as.as_type_var_heap
-		  as_type_var_heap = bind_kind_vars me_class_vars class_kind_vars as_type_var_heap
+		  as_type_var_heap = bind_kind_avars me_class_vars class_kind_vars as_type_var_heap
 		  (as_type_var_heap, as_kind_heap) = fresh_kind_vars_for_unbound_vars st_vars as_type_var_heap as.as_kind_heap
 		  as = determine_kinds_type_list modules [st_result:st_args] { as & as_type_var_heap = as_type_var_heap, as_kind_heap = as_kind_heap}
 		= determine_kinds_of_type_contexts modules other_contexts class_infos as

@@ -413,7 +413,7 @@ cNameLocationDependent :== True
 	,	me_offset		:: !Index
 	,	me_type			:: !SymbolType
 	,	me_type_ptr		:: !VarInfoPtr
-	,	me_class_vars	:: ![TypeVar]
+	,	me_class_vars	:: ![ATypeVar]
  	,	me_default_implementation :: !(Optional MacroMember)
 	,	me_pos			:: !Position
 	,	me_priority 	:: !Priority
@@ -1314,7 +1314,7 @@ instance toString 	KindInfo
 				| PE_Ident !Ident
 				| PE_Basic !BasicValue
 				| PE_Bound !BoundExpr
-				| PE_Lambda !Ident ![ParsedExpr] !ParsedExpr !Position
+				| PE_Lambda !Ident ![ParsedExpr] !Rhs !Position
 				| PE_Tuple ![ParsedExpr]
 				| PE_Record !ParsedExpr !OptionalRecordName ![FieldAssignment]
 				| PE_ArrayPattern ![ElemAssignment]
