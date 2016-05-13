@@ -16,7 +16,7 @@ partitionateAndLiftFunctions :: ![IndexRange] !Index !PredefSymbolsForTransform 
 :: UnexpandedDclMacros:==[(Int,Int,FunDef)]
 
 partitionateAndLiftMacro :: !Int !Int !Index !PredefinedSymbols !Int !*{#FunDef} !*{#*{#FunDef}} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
-								   -> (!UnexpandedDclMacros,!*{#FunDef},!*{#*{#FunDef}},!*VarHeap,!*ExpressionHeap,!*SymbolTable,!*ErrorAdmin)
+								   -> (![[Int]],!UnexpandedDclMacros,!*{#FunDef},!*{#*{#FunDef}},!*VarHeap,!*ExpressionHeap,!*SymbolTable,!*ErrorAdmin)
 
 restore_unexpanded_dcl_macros :: !UnexpandedDclMacros !*{#*{#FunDef}} -> *{#*{#FunDef}}
 

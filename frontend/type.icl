@@ -2442,6 +2442,8 @@ specification_error type type1 err
 	# err = { err & ea_file = err.ea_file <<< " " <:: (format, type1, Yes initialTypeVarBeautifulizer) <<< '\n' }
 	= err
 
+cleanUpAndCheckFunctionTypes :: [Int] [FunctionRequirements] [(Int,[ExprInfoPtr])] Int (Optional Bool)
+								{#CommonDefs} [TypeContext] {!CoercionTree} {#Int} *{!Type} *{!TypeAttribute} !*(*File,*TypeState) -> (!*File,!*TypeState)
 cleanUpAndCheckFunctionTypes [] _ _ start_index _
 								defs type_contexts coercion_env attr_partition type_var_env attr_var_env (out, ts)
 	= (out, ts)
@@ -2470,7 +2472,7 @@ where
 			ExpandedType fun_type tmp_fun_type exp_fun_type
 				# (clean_fun_type, type_var_env, attr_var_env, ts_type_heaps, ts_var_heap, ts_expr_heap, ts_error)
 					= cleanUpSymbolType is_start_rule cSpecifiedType exp_fun_type type_contexts type_ptrs coercion_env 
-										attr_partition type_var_env attr_var_env ts.ts_type_heaps ts.ts_var_heap ts.ts_expr_heap ts.ts_error
+										attr_partition defs type_var_env attr_var_env ts.ts_type_heaps ts.ts_var_heap ts.ts_expr_heap ts.ts_error
 				  ts_error = check_caf_context (newPosition fun_ident fun_pos) fun_kind clean_fun_type ts_error
 				| ts_error.ea_ok
 					# (ts_fun_env, attr_var_env, ts_type_heaps, ts_expr_heap, ts_error)
@@ -2480,7 +2482,7 @@ where
 		  	UncheckedType exp_fun_type
 				# (clean_fun_type, type_var_env, attr_var_env, ts_type_heaps, ts_var_heap, ts_expr_heap, ts_error)
 					= cleanUpSymbolType is_start_rule cDerivedType exp_fun_type type_contexts type_ptrs coercion_env
-										attr_partition type_var_env attr_var_env ts.ts_type_heaps ts.ts_var_heap ts.ts_expr_heap ts.ts_error
+										attr_partition defs type_var_env attr_var_env ts.ts_type_heaps ts.ts_var_heap ts.ts_expr_heap ts.ts_error
 				  ts_error = check_caf_context (newPosition fun_ident fun_pos) fun_kind clean_fun_type ts_error
 				  th_attrs = ts_type_heaps.th_attrs
 				  (out, th_attrs)
@@ -2793,6 +2795,32 @@ where
 				  	ts_var_heap = ts_var_heap, ts_type_heaps = { ts_type_heaps & th_vars =  tci_type_var_heap, th_attrs =  tci_attr_var_heap },
 				  	ts_fun_env = ts_fun_env, ts_fun_defs=fun_defs})
 
+	update_function_types :: !Index !{!Group} !*{!FunctionType} !*{#FunDef} -> (!*{#FunDef}, !*{!FunctionType})
+	update_function_types group_index comps fun_env fun_defs
+		| group_index == size comps
+			= (fun_defs, fun_env)
+			#! comp = comps.[group_index]	
+			# (fun_defs, fun_env) = update_function_types_in_component comp.group_members fun_env fun_defs
+			= update_function_types (inc group_index) comps fun_env fun_defs
+
+	where
+		update_function_types_in_component :: ![Index] !*{!FunctionType} !*{#FunDef} -> (!*{#FunDef}, !*{!FunctionType})
+		update_function_types_in_component [fun_index : funs] fun_env fun_defs
+			# (CheckedType checked_fun_type, fun_env) = fun_env![fun_index]
+			# (fd, fun_defs) = fun_defs![fun_index]
+			= case fd.fun_type of
+				No
+					-> update_function_types_in_component funs fun_env { fun_defs & [fun_index] = { fd & fun_type = Yes checked_fun_type }}
+				Yes fun_type
+					# nr_of_lifted_arguments = checked_fun_type.st_arity - fun_type.st_arity
+					| nr_of_lifted_arguments > 0
+						# fun_type = addLiftedArgumentsToSymbolType fun_type nr_of_lifted_arguments
+									checked_fun_type.st_args checked_fun_type.st_vars checked_fun_type.st_attr_vars checked_fun_type.st_context
+						-> update_function_types_in_component funs fun_env { fun_defs & [fun_index] = { fd & fun_type = Yes fun_type }}
+						-> update_function_types_in_component funs fun_env fun_defs
+		update_function_types_in_component [] fun_env fun_defs
+			= (fun_defs, fun_env)
+
 	create_special_instances {si_array_instances,si_list_instances,si_tail_strict_list_instances,si_next_array_member_index} fun_env_size common_defs fun_defs predef_symbols type_heaps error
 		# fun_defs = add_extra_elements_to_fun_def_array (si_next_array_member_index-fun_env_size) fun_defs
 		  	with
@@ -2996,18 +3024,27 @@ collect_and_check_instances nr_of_instances common_defs main_dcl_module_n state
 update_instances_of_class common_defs mod_index ins_index (error, class_instances, type_var_heap, td_infos)
 	#!{ins_class_index={gi_module,gi_index},ins_type={it_types},ins_pos} = common_defs.[mod_index].com_instance_defs.[ins_index]
 	  (instances, class_instances) = class_instances![gi_module,gi_index]
-	  (error, instances) = insert it_types ins_index mod_index common_defs error instances
-	  class_instances = {class_instances & [gi_module,gi_index]=instances}
-	  (error, type_var_heap, td_infos)
-				= check_types_of_instances ins_pos common_defs gi_module gi_index it_types (error, type_var_heap, td_infos)
-	= (error, class_instances, type_var_heap, td_infos)
+	# class_fun_dep_vars = common_defs.[gi_module].com_class_defs.[gi_index].class_fun_dep_vars
+	| class_fun_dep_vars==0
+		# (error, instances) = insert it_types ins_index mod_index common_defs error instances
+		  class_instances = {class_instances & [gi_module,gi_index]=instances}
+		  (error, type_var_heap, td_infos)
+					= check_types_of_instances ins_pos common_defs gi_module gi_index it_types (error, type_var_heap, td_infos)
+		= (error, class_instances, type_var_heap, td_infos)
+		# (error, instances) = insert_fun_dep_instance it_types class_fun_dep_vars ins_index mod_index common_defs error instances
+		  class_instances & [gi_module,gi_index]=instances
+		  (error, type_var_heap, td_infos)
+					= check_types_of_instances ins_pos common_defs gi_module gi_index it_types (error, type_var_heap, td_infos)
+		= (error, class_instances, type_var_heap, td_infos)
 where
 	insert ::  ![Type] !Index !Index !{# CommonDefs } !*ErrorAdmin !*InstanceTree -> (!*ErrorAdmin, !*InstanceTree)
 	insert ins_types new_ins_index new_ins_module modules error IT_Empty
 		=  (error, IT_Node {glob_object = new_ins_index,glob_module = new_ins_module}  IT_Empty IT_Empty)
 	insert ins_types new_ins_index new_ins_module modules error (IT_Node ins=:{glob_object,glob_module} it_less it_greater)
 		#! {ins_type={it_types}} = modules.[glob_module].com_instance_defs.[glob_object]
-		# cmp = ins_types =< it_types
+		# cmp = IF_ALLOW_NON_LINEAR_AND_OVERLAPPING_INSTANCES
+					(compareInstances ins_types it_types)
+					(ins_types =< it_types)
 		| cmp == Smaller
 			# (error, it_less) = insert ins_types new_ins_index new_ins_module modules error it_less
 			= (error, IT_Node ins it_less it_greater)
@@ -3016,10 +3053,38 @@ where
 			= (error, IT_Node ins it_less it_greater)
 		| ins.glob_object==new_ins_index && ins.glob_module==new_ins_module
 			= (error, IT_Node ins it_less it_greater)
-			= (checkError ins_types " instance is overlapping" error, IT_Node ins it_less it_greater)
+			# error = overlapping_instance_error new_ins_module new_ins_index glob_module glob_object modules error
+			= (error, IT_Node ins it_less it_greater)
+
+	insert_fun_dep_instance ::  ![Type] !BITVECT !Index !Index !{# CommonDefs } !*ErrorAdmin !*InstanceTree -> (!*ErrorAdmin, !*InstanceTree)
+	insert_fun_dep_instance ins_types class_fun_dep_vars new_ins_index new_ins_module modules error IT_Empty
+		=  (error, IT_Node {glob_object = new_ins_index,glob_module = new_ins_module}  IT_Empty IT_Empty)
+	insert_fun_dep_instance ins_types class_fun_dep_vars new_ins_index new_ins_module modules error (IT_Node ins=:{glob_object,glob_module} it_less it_greater)
+		#! {ins_type={it_types}} = modules.[glob_module].com_instance_defs.[glob_object]
+		# cmp = IF_ALLOW_NON_LINEAR_AND_OVERLAPPING_INSTANCES
+					(compareFunDepInstances ins_types it_types class_fun_dep_vars)
+					(ins_types =< it_types)
+		| cmp == Smaller
+			# (error, it_less) = insert_fun_dep_instance ins_types class_fun_dep_vars new_ins_index new_ins_module modules error it_less
+			= (error, IT_Node ins it_less it_greater)
+		| cmp == Greater
+			# (error, it_greater) = insert_fun_dep_instance ins_types class_fun_dep_vars new_ins_index new_ins_module modules error it_greater
+			= (error, IT_Node ins it_less it_greater)
+		| ins.glob_object==new_ins_index && ins.glob_module==new_ins_module
+			= (error, IT_Node ins it_less it_greater)
+			# error = overlapping_instance_error new_ins_module new_ins_index glob_module glob_object modules error
+			= (error, IT_Node ins it_less it_greater)
+
+	overlapping_instance_error new_ins_module new_ins_index glob_module glob_object modules error
+		# {ins_ident,ins_pos} = modules.[new_ins_module].com_instance_defs.[new_ins_index]
+		  error = checkErrorWithIdentPos (newPosition ins_ident ins_pos) " instance is overlapping with the instance in the next error" error
+		  {ins_ident,ins_pos} = modules.[glob_module].com_instance_defs.[glob_object]
+		= checkErrorWithIdentPos (newPosition ins_ident ins_pos) " instance is overlapping with the instance in the previous" error
 
 	check_types_of_instances ins_pos common_defs class_module class_index types state
 		# {class_cons_vars} = common_defs.[class_module].com_class_defs.[class_index]
+		| class_cons_vars==0
+			= state
 		= check_instances_of_constructor_variables ins_pos common_defs class_cons_vars 0 types state
 	where
 		check_instances_of_constructor_variables ins_pos common_defs cons_vars arg_nr [type : types] state
@@ -3171,14 +3236,35 @@ where
 	add_to_coercion_env []  subst coercion_env common_defs cons_var_vects type_signs type_var_heap error
 		= (subst, coercion_env, type_signs, type_var_heap, error)
 
+check_existential_attributes :: ![(CoercionPosition,[TempAttrId])] !{#Int} !*{!CoercionTree} !*ErrorAdmin -> (!*{!CoercionTree},!*ErrorAdmin)
 check_existential_attributes ts_exis_variables partition coercions ts_error
-	= foldSt (check_existential_attributes_at_pos partition) ts_exis_variables (coercions, ts_error)
+	#! (coercions, ts_error) = foldSt (check_existential_attributes_at_pos partition) ts_exis_variables (coercions, ts_error)
+	#! coercions=coercions
+	#! ts_error=ts_error
+	= (coercions, ts_error)
 where
 	check_existential_attributes_at_pos partition (pos, attr_vars) (coercions, ts_error)
 		# (ok, coercions) = checkExistentionalAttributeVars attr_vars partition coercions
 		| ok
 			= (coercions, ts_error)
 			= (coercions, existentialError pos ts_error)
+
+collect_overloaded_calls_and_user_contexts [] calls contexts subst_and_heap
+	= (calls, contexts, subst_and_heap)
+collect_overloaded_calls_and_user_contexts [{fe_context, fe_requirements={req_overloaded_calls}, fe_location, fe_index}:reqs] calls contexts subst_and_heap
+	= case fe_context of
+		Yes context
+			->	collect_overloaded_calls_and_user_contexts reqs
+					[ { oe_expr_ptrs=req_overloaded_calls, oe_fun_index=fe_index} : calls] [ context : contexts ] subst_and_heap
+		No
+			->	collect_overloaded_calls_and_user_contexts reqs
+					[ { oe_expr_ptrs=req_overloaded_calls, oe_fun_index=fe_index} : calls] contexts subst_and_heap
+
+expand_case_or_let_types_in_requirements [] subst_and_heap
+	= subst_and_heap
+expand_case_or_let_types_in_requirements [{fe_requirements={req_case_and_let_exprs}}:reqs] subst_and_heap
+	# subst_and_heap = expand_case_or_let_types req_case_and_let_exprs subst_and_heap
+	= expand_case_or_let_types_in_requirements reqs subst_and_heap
 
 collect_and_expand_overloaded_calls [] calls subst_and_heap
 	= (calls, subst_and_heap)

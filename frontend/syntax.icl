@@ -207,6 +207,8 @@ where
 		= file  <<< "E.#" <<< tv_number <<< ' ' 
 	(<<<) file (TempQDV tv_number)
 		= file  <<< "E.#" <<< tv_number <<< ' ' 
+	(<<<) file (TGenericFunctionInDictionary _ _ {gi_module,gi_index})
+		= file <<< "TGenericFunctionInDictionary " <<< gi_module <<< ' ' <<< gi_index
 	(<<<) file TE
 		= file <<< "### EMPTY ###"
 /*

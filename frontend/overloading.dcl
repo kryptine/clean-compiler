@@ -37,6 +37,11 @@ import syntax, typesupport
 ::	LocalTypePatternVariable
 ::	DictionaryTypes :== [(Index, [ExprInfoPtr])]
 
+::	OverloadedExpressions = 
+	{	oe_expr_ptrs	:: ![ExprInfoPtr]
+	,	oe_fun_index	:: !Index
+	}
+
 tryToSolveOverloading :: ![(Optional [TypeContext], [ExprInfoPtr], IdentPos, Index)] !Int !{# CommonDefs } !ClassInstanceInfo !*Coercions !*OverloadingState !{# DclModule}
 	-> (![TypeContext], !*Coercions, ![LocalTypePatternVariable], DictionaryTypes, !*OverloadingState)
 

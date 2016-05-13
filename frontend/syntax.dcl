@@ -48,6 +48,7 @@ instance == FunctionOrMacroIndex
 				| STE_Instance
 				| STE_Variable !VarInfoPtr
 				| STE_TypeVariable !TypeVarInfoPtr
+				| STE_FunDepTypeVariable !TypeVarInfoPtr
 				| STE_TypeAttribute !AttrVarInfoPtr
 				| STE_BoundTypeVariable !STE_BoundTypeVariable
 				| STE_Imported !STE_Kind !ModuleN

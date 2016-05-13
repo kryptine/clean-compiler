@@ -1,6 +1,8 @@
 implementation module check
 
-import StdEnv, StdStrictLists, compare_types
+import StdEnv, compare_types
+import StdStrictLists
+from StdOverloadedList import IsMemberM
 
 import syntax, expand_types, parse, checksupport, utilities, checktypes, transform, predef
 import explicitimports, comparedefimp, checkFunctionBodies, containers, typesupport
@@ -178,7 +180,7 @@ where
 		| has_to_be_checked opt_icl_info me_class
 			# position = newPosition me_ident me_pos
 			  cs = { cs & cs_error = setErrorAdmin position cs.cs_error }
-			  (me_type, type_defs, class_defs, modules, type_heaps, cs)
+			  (me_type, me_class_vars, type_defs, class_defs, modules, type_heaps, cs)
 			   		= checkMemberType module_index me_type type_defs class_defs modules type_heaps cs
 			  me_class_vars = [ type_var \\ (TV type_var) <- (hd me_type.st_context).tc_types ]
 			  (me_type_ptr, var_heap) = newPtr VI_Empty var_heap		   
@@ -253,7 +255,7 @@ where
 		| class_def.class_arity == ci_arity
 			# ins_class_index = {gi_index = class_index, gi_module = class_mod_index}
 			  (ins_type, ins_specials, is_type_defs, is_class_defs, is_modules, type_heaps, cs)
-			  		= checkInstanceType module_index ins_class_index ins_class_ident ins_type ins_specials
+			  		= checkInstanceType module_index ins_class_index ins_class_ident class_def.class_fun_dep_vars ins_type ins_specials
 							is.is_type_defs is.is_class_defs is.is_modules type_heaps cs
 			  is = { is & is_type_defs = is_type_defs, is_class_defs = is_class_defs, is_modules = is_modules }
 			= ({ins & ins_class_index = ins_class_index, ins_type = ins_type, ins_specials = ins_specials}, is, type_heaps, cs)
@@ -3662,7 +3664,7 @@ where
 		# type_bimap = predefined_idents.[PD_TypeBimap]	
 		| pre_mod.pds_def == mod_index
 			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols}
-				<=< adjust_predef_symbols PD_TypeBimap PD_TypeGenericDict mod_index STE_Type
+				<=< adjust_predef_symbols PD_TypeBimap PD_TypeGenericDict0 mod_index STE_Type
 				<=< adjustPredefSymbol PD_map_to				mod_index (STE_Field type_bimap)
 				<=< adjustPredefSymbol PD_map_from				mod_index (STE_Field type_bimap)
 				<=< adjust_predef_symbols PD_ConsBimap PD_CGenTypeApp mod_index STE_Constructor

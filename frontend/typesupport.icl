@@ -457,10 +457,10 @@ cSpecifiedType	:== True
 cDerivedType	:== False
 
 cleanUpSymbolType :: !Bool !Bool !TempSymbolType ![TypeContext] ![ExprInfoPtr] !{! CoercionTree} !AttributePartition
-						!*VarEnv !*AttributeEnv !*TypeHeaps !*VarHeap !*ExpressionHeap !*ErrorAdmin
+						!{#CommonDefs} !*VarEnv !*AttributeEnv !*TypeHeaps !*VarHeap !*ExpressionHeap !*ErrorAdmin
 							-> (!SymbolType, !*VarEnv, !*AttributeEnv, !*TypeHeaps, !*VarHeap, !*ExpressionHeap, !*ErrorAdmin)
 cleanUpSymbolType is_start_rule spec_type {tst_arity,tst_args,tst_result,tst_context,tst_lifted} derived_context case_and_let_exprs
-		coercions attr_part var_env attr_var_env heaps var_heap expr_heap error
+		coercions attr_part defs var_env attr_var_env heaps var_heap expr_heap error
 	#! nr_of_temp_vars = size var_env
 	#! max_attr_nr = size attr_var_env
 	# cus = { cus_var_env = var_env, cus_attr_env = attr_var_env, cus_appears_in_lifted_part = bitvectCreate max_attr_nr,
@@ -471,7 +471,9 @@ cleanUpSymbolType is_start_rule spec_type {tst_arity,tst_args,tst_result,tst_con
 	  (lifted_vars, cus_var_env) = determine_type_vars nr_of_temp_vars [] cus_var_env
 	  (st_args, (_, cus))	= mapSt (clean_up_arg_type cui) (drop tst_lifted tst_args) ([], { cus & cus_var_env = cus_var_env })
 	  (st_result, cus) = clean_up_result_type cui tst_result cus
-	  (st_context, cus_var_env, var_heap, cus_error) = clean_up_type_contexts spec_type tst_context derived_context cus.cus_var_env var_heap cus.cus_error
+	  (cus_var_env,cus_var_store,cus_heaps)
+	  	= mark_dependent_type_vars_in_fun_dep_type_contexts spec_type derived_context defs cus.cus_var_env cus.cus_var_store cus.cus_heaps
+	  (st_context, cus_var_env, var_heap, cus_error) = clean_up_type_contexts spec_type tst_context derived_context cus_var_env var_heap cus.cus_error
 	  (st_vars, cus_var_env) = determine_type_vars nr_of_temp_vars lifted_vars cus_var_env
 	  (cus_attr_env, st_attr_vars, st_attr_env, cus_error)
 	  		= build_attribute_environment cus.cus_appears_in_lifted_part 0 max_attr_nr coercions (bitvectCreate max_attr_nr) cus.cus_attr_env [] [] cus_error
@@ -479,6 +481,7 @@ cleanUpSymbolType is_start_rule spec_type {tst_arity,tst_args,tst_result,tst_con
 			= clean_up_expression_types {cui & cui_top_level = False} case_and_let_exprs expr_heap
 					 {cus & cus_var_env = cus_var_env, cus_attr_env = cus_attr_env,
 							cus_appears_in_lifted_part = {el\\el<-:cus.cus_appears_in_lifted_part},
+							cus_var_store = cus_var_store, cus_heaps = cus_heaps,
 							cus_error = cus_error }
 	  st = {st_arity = tst_arity, st_vars = st_vars , st_args = lifted_args ++ st_args, st_args_strictness=NotStrict, st_result = st_result, st_context = st_context,
 			st_attr_env = st_attr_env, st_attr_vars = st_attr_vars }
@@ -576,6 +579,33 @@ where
 				= (collected_contexts, env, liftedContextError (toString tc.tc_class) error)
 				= ([{ tc & tc_types = tc_types } : collected_contexts], env, error)
 			= (collected_contexts, env, error)
+
+	mark_dependent_type_vars_in_fun_dep_type_contexts spec_type derived_context defs env next_var_n type_heaps
+		| spec_type
+			= (env, next_var_n, type_heaps)
+			= mark_dependent_type_vars_in_fun_dep_type_contexts_passes derived_context defs env next_var_n type_heaps
+
+	mark_dependent_type_vars_in_fun_dep_type_contexts_passes contexts defs env next_var_n type_heaps
+		#! previous_next_var_n = next_var_n
+		# (contexts, env, next_var_n, type_heaps)
+			= mark_dependent_type_vars_in_fun_dep_type_contexts_pass derived_context [] defs env next_var_n type_heaps
+		| next_var_n==previous_next_var_n || isEmpty contexts
+			= (env, next_var_n, type_heaps)
+			= mark_dependent_type_vars_in_fun_dep_type_contexts_passes contexts defs env next_var_n type_heaps
+
+	mark_dependent_type_vars_in_fun_dep_type_contexts_pass [tc=:{tc_class=TCClass {glob_object={ds_index,ds_ident},glob_module},tc_types}:tcs] contexts defs env next_var_n type_heaps
+		# class_fun_dep_vars = defs.[glob_module].com_class_defs.[ds_index].class_fun_dep_vars
+		| class_fun_dep_vars<>0
+			# (has_undefined_var, env) = undefinedVarInNonFunDepTypes tc_types class_fun_dep_vars env
+			| has_undefined_var
+				= mark_dependent_type_vars_in_fun_dep_type_contexts_pass tcs [tc:contexts] defs env next_var_n type_heaps
+				# (env,next_var_n,type_heaps) = defineVarsInFunDepTypes tc_types class_fun_dep_vars env next_var_n type_heaps
+				= mark_dependent_type_vars_in_fun_dep_type_contexts_pass tcs contexts defs env next_var_n type_heaps
+			= mark_dependent_type_vars_in_fun_dep_type_contexts_pass tcs contexts defs env next_var_n type_heaps
+	mark_dependent_type_vars_in_fun_dep_type_contexts_pass [_:tcs] contexts defs env next_var_n type_heaps
+		= mark_dependent_type_vars_in_fun_dep_type_contexts_pass tcs contexts defs env next_var_n type_heaps
+	mark_dependent_type_vars_in_fun_dep_type_contexts_pass [] contexts defs env next_var_n type_heaps
+		= (contexts,env,next_var_n,type_heaps)
 
 	build_attribute_environment :: !LargeBitvect !Index !Index !{! CoercionTree} !*LargeBitvect !*AttributeEnv ![AttributeVar] ![AttrInequality] !*ErrorAdmin
 																							-> (!*AttributeEnv,![AttributeVar],![AttrInequality],!*ErrorAdmin)
@@ -763,8 +793,10 @@ where
 					-> (type_heaps, expr_heap <:= (expr_ptr, EI_LetType let_type_r))
 					-> (type_heaps, expr_heap)
 			EI_DictionaryType dict_type
-				# (_, dict_type, type_heaps) = substitute dict_type type_heaps
-				-> (type_heaps, expr_heap <:= (expr_ptr, EI_DictionaryType dict_type))
+				# (changed, dict_type_r, type_heaps) = substitute dict_type type_heaps
+				| changed
+					-> (type_heaps, expr_heap <:= (expr_ptr, EI_DictionaryType dict_type_r))
+					-> (type_heaps, expr_heap)
 			EI_ContextWithVarContexts class_expressions var_contexts
 				# (var_contexts,type_heaps) = substitute_var_contexts var_contexts type_heaps
 				-> (type_heaps,writePtr expr_ptr (EI_ContextWithVarContexts class_expressions var_contexts) expr_heap)
@@ -848,9 +880,9 @@ substituteType form_root_attribute act_root_attribute form_type_args act_type_ar
 bindTypeVarsAndAttributes :: !TypeAttribute !TypeAttribute ![ATypeVar] ![AType] !*TypeHeaps -> *TypeHeaps
 bindTypeVarsAndAttributes form_root_attribute act_root_attribute form_type_args act_type_args type_heaps
 	# th_attrs = bind_attribute form_root_attribute act_root_attribute type_heaps.th_attrs	
-	= foldSt bind_type_and_attr (zip2 form_type_args act_type_args) { type_heaps & th_attrs = th_attrs }
+	= fold2St bind_type_and_attr form_type_args act_type_args { type_heaps & th_attrs = th_attrs }
 where
-	bind_type_and_attr ({atv_attribute, atv_variable={tv_info_ptr}}, {at_type,at_attribute}) type_heaps=:{th_vars,th_attrs}
+	bind_type_and_attr {atv_attribute, atv_variable={tv_info_ptr}} {at_type,at_attribute} type_heaps=:{th_vars,th_attrs}
 		= { type_heaps &	th_vars = th_vars <:= (tv_info_ptr, TVI_Type at_type),
 							th_attrs = bind_attribute atv_attribute at_attribute th_attrs }
 

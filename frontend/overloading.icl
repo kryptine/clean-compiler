@@ -38,7 +38,13 @@ instanceError symbol types err
 	  format = { form_properties = cNoProperties, form_attr_position = No }
 	= { err & ea_file = err.ea_file <<< " \"" <<< symbol <<< "\" no instance available of type "
 									<:: (format, types, Yes initialTypeVarBeautifulizer) <<< '\n' }
+cycleInTypeContextError symbol types err
+	# err = errorHeading "Overloading error" err
+	  format = { form_properties = cNoProperties, form_attr_position = No }
+	= { err & ea_file = err.ea_file <<< " \"" <<< symbol <<< "\" context depends on context with the same class and type, for type "
+									<:: (format, types, Yes initialTypeVarBeautifulizer) <<< '\n' }
 
+uniqueError :: a b *ErrorAdmin -> *ErrorAdmin | writeType b & <<< a
 uniqueError symbol types err
 	# err = errorHeading "Overloading/Uniqueness error" err
 	  format = { form_properties = cAnnotated, form_attr_position = No }
@@ -81,6 +87,16 @@ typeCodeInDynamicError err=:{ea_ok}
 cycleAfterRemovingNewTypeConstructorsError ident err
 	# err = errorHeading "Error" err
 	= { err & ea_file = err.ea_file <<< (" cycle in definition of '" +++ toString ident +++ "' after removing newtype constructors") <<< '\n' }
+
+typeImprovementError symbol types1 types2 err
+	# err = errorHeading "Type error" err
+	  format = { form_properties = cNoProperties, form_attr_position = No }
+	= { err & ea_file = err.ea_file
+			<<< " conflicting constraints: "
+			<<< symbol <<< ' ' <:: (format, types1, Yes initialTypeVarBeautifulizer)
+			<<< " and: "
+			<<< symbol <<< ' ' <:: (format, types2, Yes initialTypeVarBeautifulizer)
+			<<< '\n' }
 
 /*
 	As soon as all overloaded variables in an type context are instantiated, context reduction is carried out.

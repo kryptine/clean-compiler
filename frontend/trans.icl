@@ -245,22 +245,7 @@ where
 		= transformSelection opt_type selectors expr ro ti
 	transform (Update expr1 selectors expr2) ro ti
 		# (expr1,ti) = transform expr1 ro ti
-		# (selectors,ti) = transform_expressions_in_selectors selectors ti
-			with
-				transform_expressions_in_selectors [selection=:RecordSelection _ _ : selections] ti
-					# (selections,ti) = transform_expressions_in_selectors selections ti
-					= ([selection:selections],ti)
-				transform_expressions_in_selectors [ArraySelection ds ep expr : selections] ti
-					# (expr,ti) = transform expr ro ti
-					# (selections,ti) = transform_expressions_in_selectors selections ti
-					= ([ArraySelection ds ep expr:selections],ti)
-				transform_expressions_in_selectors [DictionarySelection bv dictionary_selections ep expr : selections] ti
-					# (expr,ti) = transform expr ro ti
-					# (dictionary_selections,ti) = transform_expressions_in_selectors dictionary_selections ti
-					# (selections,ti) = transform_expressions_in_selectors selections ti
-					= ([DictionarySelection bv dictionary_selections ep expr:selections],ti)
-				transform_expressions_in_selectors [] ti
-					= ([],ti)
+		# (selectors,ti) = transform_expressions_in_selectors selectors ro ti
 		# (expr2,ti) = transform expr2 ro ti
 		= (Update expr1 selectors expr2,ti)
 	transform (RecordUpdate cons_symbol expr exprs) ro ti
@@ -291,6 +276,21 @@ where
 		= (DictionariesFunction dictionaries expr expr_type,ti)
 	transform expr ro ti
 		= (expr, ti)
+
+transform_expressions_in_selectors [selection=:RecordSelection _ _ : selections] ro ti
+	# (selections,ti) = transform_expressions_in_selectors selections ro ti
+	= ([selection:selections],ti)
+transform_expressions_in_selectors [ArraySelection ds ep expr : selections] ro ti
+	# (expr,ti) = transform expr ro ti
+	# (selections,ti) = transform_expressions_in_selectors selections ro ti
+	= ([ArraySelection ds ep expr:selections],ti)
+transform_expressions_in_selectors [DictionarySelection bv dictionary_selections ep expr : selections] ro ti
+	# (expr,ti) = transform expr ro ti
+	# (dictionary_selections,ti) = transform_expressions_in_selectors dictionary_selections ro ti
+	# (selections,ti) = transform_expressions_in_selectors selections ro ti
+	= ([DictionarySelection bv dictionary_selections ep expr:selections],ti)
+transform_expressions_in_selectors [] ro ti
+	= ([],ti)
 
 instance transform DynamicExpr where
 	transform dyn=:{dyn_expr} ro ti
@@ -3361,7 +3361,15 @@ where
 transformSelection NormalSelector [] expr ro ti
 	= (expr, ti)
 transformSelection selector_kind selectors expr ro ti
+	# (selectors,ti) = transform_expressions_in_selectors selectors ro ti
 	= (Selection selector_kind expr selectors, ti)
+
+transform_remaining_selectors_of_normal_record_selector :: ![Selection] !Expression ReadOnlyTI *TransformInfo -> (!Expression,!*TransformInfo)
+transform_remaining_selectors_of_normal_record_selector selectors=:[record_selector] app ro ti
+	= (Selection NormalSelector app selectors, ti)
+transform_remaining_selectors_of_normal_record_selector [record_selector:remaining_selectors] app ro ti
+	# (remaining_selectors,ti) = transform_expressions_in_selectors remaining_selectors ro ti
+	= (Selection NormalSelector app [record_selector:remaining_selectors], ti)
 
 //@	determineProducers: finds all legal producers in the argument list.
 // This version finds FIRST legal producer in argument list...
