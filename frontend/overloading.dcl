@@ -24,19 +24,14 @@ from unitype import ::BOOLVECT
 	,	si_list_instances					:: ![ArrayInstance]
 	,	si_tail_strict_list_instances		:: ![ArrayInstance]
 	}
-	
-::	OverloadingState =
-	{	os_type_heaps			:: !.TypeHeaps
-	,	os_var_heap				:: !.VarHeap
-	,	os_symbol_heap			:: !.ExpressionHeap
-	,	os_generic_heap			:: !.GenericHeap
-	,	os_predef_symbols		:: !.PredefinedSymbols
-	,	os_special_instances	:: !.SpecialInstances
-	,	os_error				:: !.ErrorAdmin				
-	}
 
 ::	LocalTypePatternVariable
 ::	DictionaryTypes :== [(Index, [ExprInfoPtr])]
+
+::	OverloadedExpressions = 
+	{	oe_expr_ptrs	:: ![ExprInfoPtr]
+	,	oe_fun_index	:: !Index
+	}
 
 :: ReducedOverloadedApplication
 :: ReducedOverloadedContext
@@ -55,11 +50,6 @@ addDictionaries :: ![[TypeContext]] ![TypeContext] ![ReducedOverloadedApplicatio
 
 uniqueError :: a b *ErrorAdmin -> *ErrorAdmin | writeType b & <<< a
 
-::	OverloadedExpressions = 
-	{	oe_expr_ptrs	:: ![ExprInfoPtr]
-	,	oe_fun_index	:: !Index
-	}
-
 ::	TypeCodeInfo =
 	{	tci_type_var_heap					:: !.TypeVarHeap
 	,	tci_attr_var_heap					:: !.AttrVarHeap
@@ -67,11 +57,11 @@ uniqueError :: a b *ErrorAdmin -> *ErrorAdmin | writeType b & <<< a
 	,	tci_common_defs						:: !{# CommonDefs }
 	}
 
-liftNewVarSubstitutions :: ![ReducedOverloadedContext] !Int !*{!Type} -> (!*{#BOOLVECT},!*{!Type})
-
 removeOverloadedFunctions :: ![Index] ![LocalTypePatternVariable] !Int !*{#FunDef} !*{! FunctionType} !*ExpressionHeap
 	!*TypeCodeInfo !*VarHeap !*ErrorAdmin !*{#PredefinedSymbol} //!*{#PredefinedSymbol}
 		-> (!*{#FunDef}, !*{! FunctionType}, !*ExpressionHeap, !*TypeCodeInfo, !*VarHeap, !*ErrorAdmin, !*{#PredefinedSymbol})
+
+liftNewVarSubstitutions :: ![ReducedOverloadedContext] !Int !*{!Type} -> (!*{#BOOLVECT},!*{!Type})
 
 removeOverloadedFunctionsWithoutUpdatingFunctions :: ![Index] ![LocalTypePatternVariable] !Int !*{#FunDef} !*{! FunctionType} !*ExpressionHeap
 	!*TypeCodeInfo !*VarHeap !*ErrorAdmin !*{#PredefinedSymbol} //!*{#PredefinedSymbol}

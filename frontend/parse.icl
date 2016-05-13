@@ -1538,8 +1538,8 @@ wantClassDefinition parseContext pos pState
 			  (class_id, pState) = stringToIdent class_or_member_name IC_Class pState
   			  class_def = { class_ident = class_id, class_arity = class_arity, class_args = class_args,
 							class_context = contexts, class_pos = pos, class_members = {}, class_cons_vars = class_cons_vars,
-	    					class_fun_dep_vars = class_fun_dep_vars, class_lazy_members = 0,
-			  				class_macro_members = {},
+							class_fun_dep_vars = class_fun_dep_vars, class_lazy_members = 0,
+							class_macro_members = {},
 							class_dictionary = { ds_ident = { class_id & id_info = nilPtr }, ds_arity = 0, ds_index = NoIndex }
 						  }
 	  		  pState = wantEndOfDefinition "class definition" pState
@@ -3733,7 +3733,7 @@ string_to_int s
 trySimpleNonLhsExpressionT :: !Token *ParseState -> *(!Bool,!ParsedExpr,!*ParseState)
 trySimpleNonLhsExpressionT BackSlashToken pState
 	# (lam_ident, pState)	= internalIdent (toString backslash) pState
-	  (file_name, line_nr, pState)	
+	  (file_name, line_nr, pState)
 	  						= getFileAndLineNr pState
 	  position				= FunPos file_name line_nr lam_ident.id_name
 	  (lam_args, pState) 	= wantList "arguments" trySimplePattern pState

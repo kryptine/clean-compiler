@@ -7,7 +7,7 @@ import IndexType
 from containers import ::NumberSet
 from convertcases import :: LetVarInfo, :: LetExpressionInfo, :: RefCountsInCase, :: SplitsInCase
 
-:: Ident =
+::	Ident =
 	{ 	id_name		:: !String
 	,	id_info 	:: !SymbolPtr
 	}
@@ -18,10 +18,10 @@ instance toString Ident
 	used for binding the identifier with its definition.
 */
 
-:: SymbolTable			:== Heap SymbolTableEntry
-:: SymbolPtr 			:== Ptr SymbolTableEntry
+::	SymbolTable			:== Heap SymbolTableEntry
+::	SymbolPtr 			:== Ptr SymbolTableEntry
 
-:: SymbolTableEntry = 
+::	SymbolTableEntry = 
 	{	ste_kind		:: !STE_Kind
 	,	ste_index		:: !Index
 	,	ste_def_level	:: !Level
@@ -32,9 +32,9 @@ instance toString Ident
 
 instance == FunctionOrMacroIndex
 
-:: STE_BoundTypeVariable	= { stv_attribute :: !TypeAttribute, stv_info_ptr :: !TypeVarInfoPtr }
+::	STE_BoundTypeVariable	= { stv_attribute :: !TypeAttribute, stv_info_ptr :: !TypeVarInfoPtr }
 
-:: STE_Kind	= STE_FunctionOrMacro ![FunctionOrMacroIndex]
+::	STE_Kind	= STE_FunctionOrMacro ![FunctionOrMacroIndex]
 				| STE_DclMacroOrLocalMacroFunction ![FunctionOrMacroIndex]
 				| STE_Type
 				| STE_Constructor
@@ -78,31 +78,31 @@ instance == FunctionOrMacroIndex
 				| STE_BelongingSymbolForExportedSymbol
 				| STE_TypeExtension
 
-:: ModuleN:==Int;
+::	ModuleN:==Int;
 
-:: SortedQualifiedImports	= SortedQualifiedImports !Declaration !SortedQualifiedImports !SortedQualifiedImports
+::	SortedQualifiedImports	= SortedQualifiedImports !Declaration !SortedQualifiedImports !SortedQualifiedImports
 							| EmptySortedQualifiedImports
 
-:: Declaration = Declaration !DeclarationRecord
+::	Declaration = Declaration !DeclarationRecord
 
-:: DeclarationRecord =
+::	DeclarationRecord =
 	{	decl_ident	:: !Ident
 	,	decl_pos	:: !Position
 	,	decl_kind	:: !STE_Kind
 	,	decl_index	:: !Index
 	}
 
-:: ComponentNrAndIndex =
+::	ComponentNrAndIndex =
 	{	cai_component_nr	:: !Int
 	,	cai_index			:: !Int // points into ExplImpInfos
 	}
 
-:: Global object =
+::	Global object =
 	{	glob_object	:: !object
 	,	glob_module	:: !Index
 	}
 
-:: Module defs = 
+::	Module defs = 
 	{	mod_ident		:: !Ident
 	,	mod_modification_time		:: {#Char}
 	,	mod_type		:: !ModuleKind
@@ -112,21 +112,21 @@ instance == FunctionOrMacroIndex
 	,	mod_defs		:: !defs
 	}
 
-:: ParsedForeignExport =
+::	ParsedForeignExport =
 	{	pfe_ident	:: !Ident
 	,	pfe_line	:: !Int
 	,	pfe_file	:: !FileName
 	,	pfe_stdcall	:: !Bool
 	}
 
-:: ParsedModule	:== Module  [ParsedDefinition]
-:: ScannedModule 	:== Module  (CollectedDefinitions (ScannedInstanceAndMembersR FunDef))
+::	ParsedModule	:== Module  [ParsedDefinition]
+::	ScannedModule 	:== Module  (CollectedDefinitions (ScannedInstanceAndMembersR FunDef))
 	
-:: ModuleKind		= MK_Main | MK_Module | MK_System | MK_None | MK_NoMainDcl
+::	ModuleKind		= MK_Main | MK_Module | MK_System | MK_None | MK_NoMainDcl
 
-:: FunDefIndex:==Int
+::	FunDefIndex:==Int
 
-:: IclFunctionIndices =
+::	IclFunctionIndices =
 	{	ifi_global_function_indices	:: ![IndexRange]
 	,	ifi_local_function_indices	:: !IndexRange
 	,	ifi_instance_indices		:: ![IndexRange]
@@ -135,7 +135,7 @@ instance == FunctionOrMacroIndex
 	,	ifi_type_function_indices	:: ![IndexRange]
 	}
 
-:: IclModule  =
+::	IclModule  =
 	{	icl_name				:: !Ident
 	,	icl_functions			:: !.{# FunDef }
 	,	icl_function_indices	:: !IclFunctionIndices
@@ -148,7 +148,7 @@ instance == FunctionOrMacroIndex
 	,	icl_modification_time	:: !{#Char}
 	}
 
-:: DclModule =
+::	DclModule =
 	{	dcl_name			:: !Ident
 	,	dcl_functions		:: !{# FunType }
 	,	dcl_instances		:: !IndexRange
@@ -168,23 +168,23 @@ instance == FunctionOrMacroIndex
 
 :: ForeignExport = {fe_fd_index :: !FunDefIndex, fe_stdcall :: !Bool}
 
-:: CopiedDefinitions =
+::	CopiedDefinitions =
 	{	copied_type_defs	:: {#Bool}
 	,	copied_class_defs	:: {#Bool}
 	,	copied_generic_defs :: {#Bool}
 	}
 
-:: Declarations = {
+::	Declarations = {
 		dcls_import	::!{!Declaration}
 	,	dcls_local		::![Declaration]
 	,	dcls_local_for_import ::!{!Declaration}
 	}
 
-:: QualifiedDeclaration :== ([Declaration], ModuleIdent, Position)
+::	QualifiedDeclaration :== ([Declaration], ModuleIdent, Position)
 
-:: DictionaryInfo = { n_dictionary_types :: !Int, n_dictionary_constructors :: !Int, n_dictionary_selectors :: !Int }
+::	DictionaryInfo = { n_dictionary_types :: !Int, n_dictionary_constructors :: !Int, n_dictionary_selectors :: !Int }
 
-:: RhsDefsOfType	= ConsList ![ParsedConstructor]
+::	RhsDefsOfType	= ConsList ![ParsedConstructor]
 					| SelectorList !Ident ![ATypeVar] !Bool /*is_boxed_record*/ ![ParsedSelector]
 					| TypeSpec !AType
 					| NewTypeCons !ParsedConstructor
@@ -193,7 +193,7 @@ instance == FunctionOrMacroIndex
 					| ExtensibleConses ![ParsedConstructor]
 					| MoreConses !Ident ![ParsedConstructor]
 
-:: CollectedDefinitions instance_kind =
+::	CollectedDefinitions instance_kind =
 	{	def_types 			:: ![TypeDef TypeRhs]
 	,	def_constructors	:: ![ConsDef]
 	,	def_selectors		:: ![SelectorDef]
@@ -220,12 +220,12 @@ instance == FunctionOrMacroIndex
 	,	com_gencase_defs 	:: !.{# GenericCaseDef}
 	}
 
-:: LocalDefs	= LocalParsedDefs [ParsedDefinition]
+::	LocalDefs	= LocalParsedDefs [ParsedDefinition]
 				| CollectedLocalDefs CollectedLocalDefs
 
-:: IndexRange	= { ir_from :: !Index, ir_to :: !Index }
+::	IndexRange	= { ir_from :: !Index, ir_to :: !Index }
 
-:: ArrayAndListInstances = {
+::	ArrayAndListInstances = {
 		ali_array_first_instance_indices :: ![Int],
 		ali_list_first_instance_indices :: ![Int],
 		ali_tail_strict_list_first_instance_indices :: ![Int],
@@ -238,20 +238,20 @@ NoIndex		:== -1
 ::  Level	:== Int
 NotALevel 	:==  -1
 
-:: CollectedLocalDefs =
+::	CollectedLocalDefs =
 	{	loc_functions	:: !IndexRange
 	,	loc_nodes		:: ![NodeDef ParsedExpr]
 	,	loc_in_icl_module :: !Bool // False for local functions in macros in dcl modules, otherwise True
 	}
 
-:: NodeDef dst =
+::	NodeDef dst =
 	{	nd_dst		::!dst,
 		nd_alts		::!OptGuardedAlts,
 		nd_locals	::!LocalDefs,
 		nd_position	::!Position		
 	}
 
-:: Rhs =
+::	Rhs =
 	{	rhs_alts	:: !OptGuardedAlts
 	,	rhs_locals	:: !LocalDefs
 	}
@@ -260,7 +260,7 @@ NotALevel 	:==  -1
 cIsAFunction	:== True
 cIsNotAFunction :== False
 
-:: ParsedDefinition 
+::	ParsedDefinition 
 	=	PD_Function Position Ident Bool [ParsedExpr] Rhs FunKind
 	|	PD_NodeDef Position ParsedExpr Rhs
 	|	PD_Type ParsedTypeDef
@@ -278,14 +278,14 @@ cIsNotAFunction :== False
 	|	PD_Pragma !{#Char} !{#Char}
 	|	PD_Erroneous
 
-:: FunKind = FK_Function !Bool | FK_Macro | FK_Caf | FK_NodeDefOrFunction | FK_Unknown
+::	FunKind = FK_Function !Bool | FK_Macro | FK_Caf | FK_NodeDefOrFunction | FK_Unknown
 
-:: StrictnessList = NotStrict | Strict !Int | StrictList !Int StrictnessList
+::	StrictnessList = NotStrict | Strict !Int | StrictList !Int StrictnessList
 
 cNameNotLocationDependent :== False
 cNameLocationDependent :== True
 
-:: ParsedSelector =
+::	ParsedSelector =
 	{	ps_field_ident		:: !Ident
 	,	ps_selector_ident	:: !Ident
 	,	ps_field_annotation	:: !Annotation
@@ -295,7 +295,7 @@ cNameLocationDependent :== True
 	,	ps_docblock			:: !OptionalDocBlock
 	}
 
-:: ParsedConstructor =
+::	ParsedConstructor =
 	{	pc_cons_ident 	:: !Ident
 	,	pc_cons_arity	:: !Int
 	,	pc_exi_vars		:: ![ATypeVar]
@@ -307,7 +307,7 @@ cNameLocationDependent :== True
 	,	pc_docblock		:: !OptionalDocBlock
 	}
 
-:: ParsedInstance =
+::	ParsedInstance =
 	{	pi_class 	:: !IdentOrQualifiedIdent
 	,	pi_ident	:: !Ident
 	,	pi_types	:: ![Type]
@@ -316,12 +316,12 @@ cNameLocationDependent :== True
 	,	pi_specials	:: !Specials
 	}
 
-:: ParsedInstanceAndMembers =
+::	ParsedInstanceAndMembers =
 	{	pim_pi 		:: !ParsedInstance
 	,	pim_members	:: ![ParsedDefinition]
 	}
 
-:: ScannedInstanceAndMembersR icl_member =
+::	ScannedInstanceAndMembersR icl_member =
 	{	sim_pi 				:: !ParsedInstance
 	,	sim_members			:: ![icl_member]	// for .icl
 	,	sim_member_types	:: ![FunType]	// for .dcl
@@ -332,7 +332,7 @@ cNameLocationDependent :== True
 		dim_function_index	:: !MacroIndex // optional, -1 if no function
 	  }
 
-:: IdentOrQualifiedIdent
+::	IdentOrQualifiedIdent
 	= Ident !Ident
 	| QualifiedIdent /*module*/!Ident !String
 
@@ -345,40 +345,40 @@ cNameLocationDependent :== True
 	to store the index of the function that has been specialized.
 */
 
-:: Specials
+::	Specials
 	= SP_ParsedSubstitutions 	![Env Type TypeVar]
 	| SP_Substitutions 		 	![SpecialSubstitution]
 	| SP_ContextTypes			![Special]
 	| SP_TypeOffset				!Int					// index in SP_Substitutions for specialized instance
 	| SP_None
 
-:: FunSpecials
+::	FunSpecials
 	= FSP_ParsedSubstitutions 	![Env Type TypeVar]
 	| FSP_Substitutions			![SpecialSubstitution]
 	| FSP_ContextTypes			![Special]
 	| FSP_FunIndex				!Index
 	| FSP_None
 
-:: SpecialSubstitution =
+::	SpecialSubstitution =
 	{	ss_environ	:: !Env Type TypeVar
 	,	ss_context	:: ![TypeContext]
 	,	ss_vars		:: ![TypeVar]
 	,	ss_attrs	:: ![AttributeVar]
 	}
 
-:: Special =
+::	Special =
 	{	spec_index	:: !Global Index
 	,	spec_types	:: ![[Type]]
 	,	spec_vars	:: ![TypeVar]
 	, 	spec_attrs	:: ![AttributeVar]
 	}
 
-:: AttrInequality =
+::	AttrInequality =
 	{	ai_demanded :: !AttributeVar
 	,	ai_offered	:: !AttributeVar
 	}
 
-:: DefinedSymbol = 
+::	DefinedSymbol = 
 	{	ds_ident		:: !Ident
 	,	ds_arity		:: !Int
 	,	ds_index		:: !Index
@@ -391,13 +391,13 @@ cNameLocationDependent :== True
 		mm_index :: !MacroIndex // only valid for class in dcl module
 	}
 
-:: ClassDef =
+::	ClassDef =
  	{	class_ident			:: !Ident
 	,	class_arity			:: !Int
 	,	class_args			:: ![TypeVar]
 	,	class_context		:: ![TypeContext]
 	,	class_members		:: !{# DefinedSymbol}
- 	,	class_macro_members	:: {#MacroMember}
+	,	class_macro_members	:: {#MacroMember}
 	,	class_dictionary	:: !DefinedSymbol
 	,	class_pos			:: !Position
 	,	class_cons_vars		:: !BITVECT
@@ -405,16 +405,16 @@ cNameLocationDependent :== True
 	,	class_lazy_members	:: !BITVECT
 	}
 
-:: ClassDefInfos :== {# .{! [TypeKind]}}
+::	ClassDefInfos :== {# .{! [TypeKind]}}
 
-:: MemberDef =
+::	MemberDef =
 	{	me_ident		:: !Ident
 	,	me_class		:: !Global Index
 	,	me_offset		:: !Index
 	,	me_type			:: !SymbolType
 	,	me_type_ptr		:: !VarInfoPtr
 	,	me_class_vars	:: ![ATypeVar]
- 	,	me_default_implementation :: !(Optional MacroMember)
+	,	me_default_implementation :: !(Optional MacroMember)
 	,	me_pos			:: !Position
 	,	me_priority 	:: !Priority
 	}
@@ -453,7 +453,7 @@ instance == GenericDependency
 	//	OBJECT, CONS, RECORD, FIELD, PAIR, EITHER, UNIT
 	}
 
-:: GenericRepresentationConstructor =
+::	GenericRepresentationConstructor =
 	{	grc_module	:: !Int
 	,	grc_index	:: !GenericCaseBody // GCB_FunIndex, GCB_FunAndMacroIndex or GCB_None
 	,	grc_local_fun_index :: !Int
@@ -479,12 +479,12 @@ instance == GenericDependency
 	,	gc_gcf			:: !GenericCaseFunctions
 	}
 
-:: GenericCaseFunctions
+::	GenericCaseFunctions
 	= GCF !Ident !GCF
 	| GCFS ![!GCF!]
 	| GCFC !Ident !Ident	// IC_GenericDeriveClass IC_Class
 
-:: GCF = {
+::	GCF = {
 		gcf_gident	:: !Ident,	  			// name in IC_Generic namespace
 		gcf_generic	:: !GlobalIndex,		// index of the generic
 		gcf_arity	:: !Int,				// arity of the function
@@ -502,12 +502,12 @@ instance == GenericDependency
 	| GCB_FunDef !FunDef
 	| GCB_ParsedBody ![ParsedExpr] !Rhs
 
-:: GenericInstanceDependencies
+::	GenericInstanceDependencies
 	= AllGenericInstanceDependencies
 	| GenericInstanceDependencies !Int /*n_deps*/ !Int /*deps*/
 	| GenericInstanceUsedArgs !Int /*n_deps*/ !Int /*deps*/
 
-:: InstanceType =
+::	InstanceType =
 	{	it_vars			:: [TypeVar]
 	,	it_types		:: ![Type]
 	,	it_attr_vars	:: [AttributeVar]
@@ -527,35 +527,35 @@ instance == GenericDependency
 	,	ins_pos			:: !Position
 	}
 
-:: ClassIdent =
+::	ClassIdent =
 	{	ci_ident		:: !IdentOrQualifiedIdent
 	,	ci_arity		:: !Int
 	}
 
-:: ClassInstanceMember = 
+::	ClassInstanceMember = 
 	{	cim_ident		:: !Ident
 	,	cim_arity		:: !Int		// module number if cim_index<0
 	,	cim_index		:: !Index	// or -1-index
 	}
 
-:: Import =
+::	Import =
 	{	import_module		:: !Ident
 	,	import_symbols		:: !ImportSymbols [ImportDeclaration]
 	,	import_file_position:: !Position	// for error messages
 	,	import_qualified	:: !ImportQualified
 	}
 
-:: ImportSymbols import_declarations
+::	ImportSymbols import_declarations
 	= ImportSymbolsAll
 	| ImportSymbolsOnly !import_declarations
 
-:: ImportQualified = NotQualified | Qualified | QualifiedAs !Ident
+::	ImportQualified = NotQualified | Qualified | QualifiedAs !Ident
 
 instance toString Import, AttributeVar, TypeAttribute, Annotation
 
-:: ParsedImport		:== Import
+::	ParsedImport		:== Import
 
-:: ImportDeclaration	= ID_Function !Ident
+::	ImportDeclaration	= ID_Function !Ident
 						| ID_Class !Ident !(Optional [Ident])
 						| ID_Type !Ident !(Optional [Ident])
 						| ID_Record !Ident !(Optional [Ident])
@@ -570,19 +570,19 @@ cIsImportedObject :== False
 	,	io_name    :: !{#Char}
 	}
 
-:: RecordType =
+::	RecordType =
 	{	rt_constructor	:: !DefinedSymbol
 	,	rt_fields		:: !{# FieldSymbol}
 	,	rt_is_boxed_record :: !Bool
 	}
 
-:: FieldSymbol =
+::	FieldSymbol =
 	{	fs_ident		:: !Ident
 	,	fs_var			:: !Ident
 	,	fs_index		:: !Index
 	}
 
-:: TypeRhs	= AlgType ![DefinedSymbol]
+::	TypeRhs	= AlgType ![DefinedSymbol]
 			| SynType !AType
 			| RecordType !RecordType
 			| NewType !DefinedSymbol
@@ -593,21 +593,21 @@ cIsImportedObject :== False
 			| UncheckedAlgConses !Ident ![DefinedSymbol]
 			| UnknownType
 
-:: ParsedTypeDef	:== TypeDef RhsDefsOfType
-:: CheckedTypeDef	:== TypeDef TypeRhs
+::	ParsedTypeDef	:== TypeDef RhsDefsOfType
+::	CheckedTypeDef	:== TypeDef TypeRhs
 
 cAllBitsClear			:== 0
 cIsHyperStrict			:== 1
 cIsNonCoercible			:== 2
 cIsAnalysed				:== 4
 
-:: GlobalIndex =
+::	GlobalIndex =
 	{	gi_module	::!Int
 	,	gi_index	::!Int
 	}
 NoGlobalIndex :== {gi_module=NoIndex,gi_index=NoIndex}	
 
-:: TypeDef type_rhs =
+::	TypeDef type_rhs =
 	{	td_ident		:: !Ident
 	,	td_index		:: !Int
 	,	td_arity		:: !Int
@@ -620,7 +620,7 @@ NoGlobalIndex :== {gi_module=NoIndex,gi_index=NoIndex}
 	,	td_fun_index	:: !Index
 	}
 
-:: TypeDefInfo =
+::	TypeDefInfo =
 	{	tdi_kinds			:: ![TypeKind]
 	,	tdi_properties		:: !BITVECT
 	,	tdi_group			:: ![GlobalIndex]
@@ -658,9 +658,9 @@ NoGlobalIndex :== {gi_module=NoIndex,gi_index=NoIndex}
 	, gtr_from :: !DefinedSymbol
 	}
 
-:: TypeDefInfos :== {# .{# TypeDefInfo}}
+::	TypeDefInfos :== {# .{# TypeDefInfo}}
 
-:: FunType =
+::	FunType =
 	{	ft_ident		:: !Ident
 	,	ft_arity		:: !Int
 	,	ft_priority		:: !Priority
@@ -672,17 +672,17 @@ NoGlobalIndex :== {gi_module=NoIndex,gi_index=NoIndex}
     ,   ft_docs         :: !String
 	}
 
-:: FreeVar =
+::	FreeVar =
 	{	fv_def_level	:: !Level
 	,	fv_ident		:: !Ident
 	,	fv_info_ptr		:: !VarInfoPtr
 	,	fv_count		:: !Int
 	}
 
-:: ModuleIndex:==Index;
-:: DclFunctionIndex:==Index;
+::	ModuleIndex:==Index;
+::	DclFunctionIndex:==Index;
 
-:: FunCall	= FunCall !Index !Level
+::	FunCall	= FunCall !Index !Level
 			| MacroCall !ModuleIndex !Index Level
 			| DclFunCall !ModuleIndex !DclFunctionIndex
 			| GeneratedFunCall !Index !FunctionInfoPtr;
@@ -696,7 +696,7 @@ FI_GenericFun :== 32
 FI_Unused :== 64				// used in module trans
 FI_UnusedUsed :== 128			// used in module trans
 
-:: FunInfo =
+::	FunInfo =
 	{	fi_calls			:: ![FunCall]
 	,	fi_group_index		:: !Index
 	,	fi_def_level		:: !Level
@@ -706,29 +706,29 @@ FI_UnusedUsed :== 128			// used in module trans
 	,	fi_properties		:: !BITVECT
 	}
 
-:: ParsedBody =
+::	ParsedBody =
 	{	pb_args		:: ![ParsedExpr]
 	,	pb_rhs		:: !Rhs
 	,	pb_position	:: !Position
 	}
 
-:: CheckedBody =
+::	CheckedBody =
 	{	cb_args		:: ![FreeVar]
 	,	cb_rhs		:: ![CheckedAlternative]
 	}
 
-:: CheckedAlternative =
+::	CheckedAlternative =
 	{	ca_rhs		:: !Expression
 	,	ca_position	:: !Position	// the position is NoPos iff the position information for this
 	}								// alternative is already stored in a case alternative
 									// (in ap_position, bp_position or dp_position)
 
-:: TransformedBody =
+::	TransformedBody =
 	{	tb_args			:: ![FreeVar]
 	,	tb_rhs			:: !Expression
 	}
 
-:: FunctionBody	= ParsedBody ![ParsedBody]
+::	FunctionBody	= ParsedBody ![ParsedBody]
 					| CheckedBody !CheckedBody
 	/* The next three constructors are used during macro expansion (module transform) */
 					| PartitioningMacro
@@ -740,7 +740,7 @@ FI_UnusedUsed :== 128			// used in module trans
 					| GeneratedBody // the body will be generated automatically - for generics
 					| NoBody
 
-:: FunDef =
+::	FunDef =
 	{	fun_docs        :: !String
     ,   fun_pragmas     :: ![(String, String)]
     ,   fun_ident		:: !Ident
@@ -757,24 +757,24 @@ FI_UnusedUsed :== 128			// used in module trans
 cIsAGlobalVar	:== True
 cIsALocalVar	:== False
 
-:: ConsClasses =
+::	ConsClasses =
 	{	cc_size			::!Int
 	,	cc_args			::![ConsClass]
 	,	cc_linear_bits	::![#Bool!]
 	,	cc_producer		::!ProdClass
 	}
 
-:: ConsClass	:== Int
+::	ConsClass	:== Int
 
-:: ProdClass	:== Bool
+::	ProdClass	:== Bool
 
 pIsSafe			:== True
 
-:: ImportedConstructors	:== [Global Index]
-:: ImportedFunctions		:== [Global Index]
-:: ImportedTypes			:== {#{# CheckedTypeDef}}
+::	ImportedConstructors	:== [Global Index]
+::	ImportedFunctions		:== [Global Index]
+::	ImportedTypes			:== {#{# CheckedTypeDef}}
 
-:: OptionalVariable :== Optional (Bind Ident VarInfoPtr)
+::	OptionalVariable :== Optional (Bind Ident VarInfoPtr)
 
 :: 	AuxiliaryPattern
 		= AP_Algebraic !(Global DefinedSymbol) !GlobalIndex ![AuxiliaryPattern] !OptionalVariable
@@ -788,12 +788,12 @@ pIsSafe			:== True
 
 :: AP_Kind = APK_Constructor !GlobalIndex | APK_NewTypeConstructor !Index | APK_Macro !Bool // is_dcl_macro
 
-:: VI_TypeInfo	= VITI_Empty
+::	VI_TypeInfo	= VITI_Empty
 				| VITI_Coercion		CoercionPosition
 				| VITI_PatternType	[AType] /*module*/!Index /*constructor*/!Index VI_TypeInfo
 
 //::	VarInfo  =	VI_Empty | VI_Type !AType !(Optional CoercionPosition) | VI_FAType ![ATypeVar] !AType !(Optional CoercionPosition) |
-:: VarInfo  =	VI_Empty | VI_Type !AType !VI_TypeInfo |
+::	VarInfo  =	VI_Empty | VI_Type !AType !VI_TypeInfo |
 				VI_FAType ![ATypeVar] !AType !VI_TypeInfo |
 				VI_FATypeC ![ATypeVar] !AType ![TypeContext] !VI_TypeInfo | VI_FPC |
 				VI_Occurrence !Occurrence | VI_UsedVar !Ident |
@@ -832,40 +832,40 @@ pIsSafe			:== True
 				| VI_Labelled_Empty !{#Char} // RWS debugging
 				| VI_LocalLetVar // RWS, mark Let vars during case transformation
 
-:: TypeCodeVariableInfo
+::	TypeCodeVariableInfo
 	= TCI_TypeVar !Expression
 	| TCI_TypePatternVar !Expression
 	| TCI_SelectionsTypePatternVar ![(Expression,[Selection])]
 
-:: ExtendedVarInfo = EVI_VarType !AType
+::	ExtendedVarInfo = EVI_VarType !AType
 
-:: ArgumentPosition :== Int
+::	ArgumentPosition :== Int
 
-:: VarHeap :== Heap VarInfo
-:: VarInfoPtr	:== Ptr VarInfo
+::	VarHeap :== Heap VarInfo
+::	VarInfoPtr	:== Ptr VarInfo
 
 cNotVarNumber :== -1
 
-:: BoundVar = 
+::	BoundVar = 
 	{	var_ident		:: !Ident
 	,	var_info_ptr	:: !VarInfoPtr
 	,	var_expr_ptr	:: !ExprInfoPtr
 	}
 
-:: TypeSymbIdent =
+::	TypeSymbIdent =
 	{	type_ident		:: !Ident
 	,	type_arity		:: !Int
 	,	type_index		:: !Global Index
 	,	type_prop		:: !TypeSymbProperties
 	}
 
-:: TypeSymbProperties =
+::	TypeSymbProperties =
 	{	tsp_sign		:: !SignClassification
 	,	tsp_propagation	:: !PropClassification
 	,	tsp_coercible	:: !Bool
 	}
 
-:: SymbKind	= SK_Unknown
+::	SymbKind	= SK_Unknown
 				| SK_Function !(Global Index)
 				| SK_IclMacro !Index
 				| SK_LocalMacroFunction !Index
@@ -887,13 +887,13 @@ cNotVarNumber :== -1
 	forbids cyclic dependencies between def modules.
 */
 
-:: FunctionHeap 	:== Heap FunctionInfo
+::	FunctionHeap 	:== Heap FunctionInfo
 
-:: FunctionInfoPtr	:== Ptr FunctionInfo
+::	FunctionInfoPtr	:== Ptr FunctionInfo
 
-:: FunctionInfo	= FI_Empty | FI_Function !GeneratedFunction
+::	FunctionInfo	= FI_Empty | FI_Function !GeneratedFunction
 
-:: Producer	= PR_Empty
+::	Producer	= PR_Empty
 				| PR_Function !SymbIdent !Int !Index
 				| PR_Class !App ![(BoundVar, Type)] !Type
 				| PR_Constructor !SymbIdent !Int ![Expression]
@@ -906,9 +906,9 @@ cNotVarNumber :== -1
 				| PR_Equal !Int
 				| PR_EqualRemove !Int
 
-:: InstanceInfo = II_Empty | II_Node !{! Producer} !FunctionInfoPtr !InstanceInfo !InstanceInfo
+::	InstanceInfo = II_Empty | II_Node !{! Producer} !FunctionInfoPtr !InstanceInfo !InstanceInfo
 
-:: GeneratedFunction = 
+::	GeneratedFunction = 
 	{	gf_fun_def			:: !FunDef
 	,	gf_instance_info	:: !InstanceInfo
 	,	gf_cons_args		:: !ConsClasses
@@ -917,15 +917,15 @@ cNotVarNumber :== -1
 	
 /*	... main type definitions continued .... */
 
-:: ExpressionHeap 	:== Heap ExprInfo
+::	ExpressionHeap 	:== Heap ExprInfo
 
-:: ExprInfoPtr		:== Ptr ExprInfo
+::	ExprInfoPtr		:== Ptr ExprInfo
 
-:: TempLocalVar	:== Int
+::	TempLocalVar	:== Int
 
-:: DynamicPtr		:== ExprInfoPtr
+::	DynamicPtr		:== ExprInfoPtr
 
-:: ExprInfo		= EI_Empty
+::	ExprInfo		= EI_Empty
 
 		/* For handling overloading */
 
@@ -980,10 +980,10 @@ cNotVarNumber :== -1
 					| EI_DefaultFunction !SymbIdent ![Expression]
 					| EI_Extended !ExtendedExprInfo !ExprInfo
 
-:: ExtendedExprInfo
+::	ExtendedExprInfo
 					= EEI_ActiveCase !ActiveCaseInfo
 
-:: ActiveCaseInfo =
+::	ActiveCaseInfo =
 	{	aci_params					:: ![FreeVar]
 	,	aci_opt_unfolder			:: !(Optional SymbIdent)
 	,	aci_free_vars				:: !Optional [BoundVar]
@@ -996,24 +996,24 @@ cNotVarNumber :== -1
 	and used after (standard) unification to insert the proper instances of the corresponding functions.
 */
 
-:: OverloadedCall = 
+::	OverloadedCall = 
 	{	oc_symbol	:: !SymbIdent
 	,	oc_context	:: ![TypeContext]
 	,	oc_specials	:: ![Special]
 	}
 
-:: OverloadedCallWithVarContexts = 
+::	OverloadedCallWithVarContexts = 
 	{	ocvc_symbol       :: !SymbIdent
 	,	ocvc_context      :: ![TypeContext]
 	,	ocvc_var_contexts :: !VarContexts TypeContext
 	}
 
-:: DictionaryAndClassType =
+::	DictionaryAndClassType =
 	{	dc_var			:: !VarInfoPtr
 	,	dc_class_type	:: !AType
 	}
 
-:: VarContexts type_contexts
+::	VarContexts type_contexts
 	= VarContext !Int /*arg_n*/ ![type_contexts] !AType !(VarContexts type_contexts)
 	| NoVarContexts
 
@@ -1024,18 +1024,18 @@ cNotVarNumber :== -1
 		ct_cons_types   : the types of the arguments of each pattern constructor
 */
 
-:: CaseType =
+::	CaseType =
 	{	ct_pattern_type	:: !AType
 	,	ct_result_type	:: !AType
 	,	ct_cons_types 	:: ![[AType]]
 	}
 		
-:: SymbIdent =
+::	SymbIdent =
 	{	symb_ident		:: !Ident
 	,	symb_kind		:: !SymbKind
 	}
 
-:: ConsDef =
+::	ConsDef =
 	{	cons_ident			:: !Ident
 	,	cons_type			:: !SymbolType
 	,	cons_priority		:: !Priority
@@ -1046,7 +1046,7 @@ cNotVarNumber :== -1
 	,	cons_pos			:: !Position
 	}
 
-:: SelectorDef =
+::	SelectorDef =
 	{	sd_ident		:: !Ident
 	,	sd_field		:: !Ident
 	,	sd_type			:: !SymbolType
@@ -1057,7 +1057,7 @@ cNotVarNumber :== -1
 	,	sd_pos			:: !Position
 	}
 
-:: SymbolType =
+::	SymbolType =
 	{	st_vars			:: ![TypeVar]
 	,	st_args			:: ![AType]
 	,	st_args_strictness :: !StrictnessList
@@ -1068,7 +1068,7 @@ cNotVarNumber :== -1
 	,	st_attr_env		:: ![AttrInequality]
 	}
 
-:: TypeContext =
+::	TypeContext =
 	{	tc_class	:: !TCClass
 	,	tc_types	:: ![Type]
 	,	tc_var		:: !VarInfoPtr
@@ -1085,15 +1085,15 @@ cNotVarNumber :== -1
 	, gtc_generic_dict :: !GlobalIndex			// HACK: dictionary different from the one contained in the class
 	}
 
-:: AType =
+::	AType =
 	{	at_attribute	:: !TypeAttribute
 	,	at_type			:: !Type
 	}
 	
-:: TempAttrId		:== Int
-:: TempVarId		:== Int
+::	TempAttrId		:== Int
+::	TempVarId		:== Int
 
-:: Type	=	TA !TypeSymbIdent ![AType]
+::	Type	=	TA !TypeSymbIdent ![AType]
 			|	TAS !TypeSymbIdent ![AType] !StrictnessList
 			|	(-->) infixr 9 !AType !AType
 			| 	TArrow							/* (->) */
@@ -1121,22 +1121,22 @@ cNotVarNumber :== -1
 
 			|	TE
 
-:: ConsVariable = CV 		!TypeVar
+::	ConsVariable = CV 		!TypeVar
 				 | TempCV 	!TempVarId
 				 | TempQCV 	!TempVarId
 				 | TempQCDV !TempVarId	// existential type variable in dynamic pattern
 
-:: DynamicType =
+::	DynamicType =
 	{	dt_uni_vars 	:: ![ATypeVar]
 	,	dt_global_vars	:: ![TypeVar]
 	,	dt_type			:: !AType
 	,	dt_contexts		:: ![TypeContext]
 	}
 
-:: KindHeap	:== Heap KindInfo
-:: KindInfoPtr	:== Ptr KindInfo
+::	KindHeap	:== Heap KindInfo
+::	KindInfoPtr	:== Ptr KindInfo
 
-:: KindInfo	= KI_Var !KindInfoPtr
+::	KindInfo	= KI_Var !KindInfoPtr
 				| KI_Arrow !KindInfo !KindInfo
 				| KI_Const
 				
@@ -1145,7 +1145,7 @@ cNotVarNumber :== -1
 				| KI_VarBind !KindInfoPtr
 				| KI_NormVar !Int
 
-:: TypeVarInfo  	= TVI_Empty
+::	TypeVarInfo  	= TVI_Empty
 					| TVI_Type !Type
 					| TVI_TypeVar !TypeVarInfoPtr // Sjaak: to collect and check universally quantified type variables
 					| TVI_Forward !TempVarId | TVI_TypeKind !KindInfoPtr
@@ -1169,10 +1169,10 @@ cNotVarNumber :== -1
 					| TVI_Attr !TypeAttribute
 					| TVI_TypeAttribute !TypeAttribute
 
-:: TypeVarInfoPtr	:== Ptr TypeVarInfo
-:: TypeVarHeap 	:== Heap TypeVarInfo
+::	TypeVarInfoPtr	:== Ptr TypeVarInfo
+::	TypeVarHeap 	:== Heap TypeVarInfo
 
-:: AttrVarInfo  	= AVI_Empty
+::	AttrVarInfo  	= AVI_Empty
 					| AVI_Attr !TypeAttribute
 					| AVI_AttrVar !AttrVarInfoPtr // Sjaak: to collect universally quantified attribute variables
 					| AVI_Forward !TempAttrId 
@@ -1187,43 +1187,43 @@ cNotVarNumber :== -1
 					| AVI_SequenceNumber !Int // RWS
 					| AVI_Collected // RWS
 
-:: AttrVarInfoPtr	:== Ptr AttrVarInfo
-:: AttrVarHeap 	:== Heap AttrVarInfo
+::	AttrVarInfoPtr	:== Ptr AttrVarInfo
+::	AttrVarHeap 	:== Heap AttrVarInfo
 
-:: TypeHeaps =
+::	TypeHeaps =
 	{	th_vars		:: ! .TypeVarHeap
 	,	th_attrs	:: ! .AttrVarHeap
 	}
 
-:: TypeVar =
+::	TypeVar =
 	{	tv_ident				:: !Ident
 	,	tv_info_ptr			:: !TypeVarInfoPtr
 	}
 
-:: ATypeVar =
+::	ATypeVar =
 	{	atv_attribute		:: !TypeAttribute
 	,	atv_variable		:: !TypeVar
 	}
 
-:: TypeAttribute = TA_Unique | TA_Multi | TA_Var !AttributeVar | TA_RootVar AttributeVar | TA_TempVar !Int // | TA_TempExVar !Int
+::	TypeAttribute = TA_Unique | TA_Multi | TA_Var !AttributeVar | TA_RootVar AttributeVar | TA_TempVar !Int // | TA_TempExVar !Int
 					| TA_Anonymous | TA_None
 					| TA_List !Int !TypeAttribute | TA_Locked !TypeAttribute
 					| TA_MultiOfPropagatingConsVar // only filled in after type checking, semantically equal to TA_Multi
 
-:: AttributeVar =
+::	AttributeVar =
 	{	av_ident			:: !Ident
 	,	av_info_ptr		:: !AttrVarInfoPtr
 	}
 
-:: Annotation	=  AN_Strict | AN_None
+::	Annotation	=  AN_Strict | AN_None
 
-:: BasicType	= BT_Int | BT_Char | BT_Real | BT_Bool | BT_Dynamic
+::	BasicType	= BT_Int | BT_Char | BT_Real | BT_Bool | BT_Dynamic
 				| BT_File | BT_World
 				| BT_String !Type /* the internal string type synonym only used to type string denotations */
 
-:: BasicValue	= BVI !String | BVInt !Int |BVC !String | BVB !Bool | BVR !String | BVS !String
+::	BasicValue	= BVI !String | BVInt !Int |BVC !String | BVB !Bool | BVR !String | BVS !String
 
-:: TypeKind = KindVar !KindInfoPtr | KindConst | KindArrow ![TypeKind] | KindCycle | KindError
+::	TypeKind = KindVar !KindInfoPtr | KindConst | KindArrow ![TypeKind] | KindCycle | KindError
 
 instance toString 	TypeKind
 instance <<< 		TypeKind
@@ -1232,12 +1232,12 @@ instance toString 	KindInfo
 
 /* A few obscure type definitions */
 
-:: PatternVar =
+::	PatternVar =
 	{	pv_var		:: !FreeVar
 	,	pv_arg_nr	:: !Int
 	}
 
-:: Occurrence =
+::	Occurrence =
 	{	occ_ref_count		:: !ReferenceCount
 	,	occ_bind			:: !OccurrenceBinding
 	,	occ_pattern_vars	:: ![[PatternVar]]
@@ -1245,37 +1245,37 @@ instance toString 	KindInfo
 	,	occ_previous 		:: ![ReferenceCount]
 	}
 
-:: ReferenceCount = RC_Used !RC_Used | RC_Unused 
+::	ReferenceCount = RC_Used !RC_Used | RC_Unused 
 
-:: SelectiveUse =
+::	SelectiveUse =
 	{	su_field	:: !Int
 	,	su_multiply :: ![ExprInfoPtr]
 	,	su_uniquely :: ![ExprInfoPtr]
 	}
 
-:: RC_Used =
+::	RC_Used =
 	{ 	rcu_multiply	:: ![ExprInfoPtr]
 	,	rcu_selectively :: ![SelectiveUse]
 	,	rcu_uniquely	:: ![ExprInfoPtr]
 	}
 
-:: CountedFreeVar =
+::	CountedFreeVar =
 	{	cfv_var		:: !FreeVar
 	,	cfv_is_let	:: !Bool
 	,	cfv_count	:: !ReferenceCount
 	}
 
-:: OccurrenceBinding	= OB_Empty 
+::	OccurrenceBinding	= OB_Empty 
 						| OB_OpenLet	!FreeVar !(Optional RefMarkResult)
 						| OB_LockedLet	!OccurrenceBinding
 						| OB_MarkedLet	!OccurrenceBinding
 
-:: RefMarkResult :== ([CountedFreeVar], [FreeVar])
+::	RefMarkResult :== ([CountedFreeVar], [FreeVar])
 
-:: OptGuardedAlts	= GuardedAlts ![GuardedExpr] !(Optional ExprWithLocalDefs)
+::	OptGuardedAlts	= GuardedAlts ![GuardedExpr] !(Optional ExprWithLocalDefs)
 				 	| UnGuardedExpr !ExprWithLocalDefs
 
-:: GuardedExpr =
+::	GuardedExpr =
 	{	alt_nodes	:: ![NodeDefWithLocals]
 	,	alt_guard	:: !ParsedExpr
 	,	alt_expr	:: !OptGuardedAlts
@@ -1283,21 +1283,21 @@ instance toString 	KindInfo
 	,	alt_position:: !Position
 	}
 
-:: ExprWithLocalDefs = 
+::	ExprWithLocalDefs = 
 	{	ewl_nodes	:: ![NodeDefWithLocals]
 	,	ewl_expr	:: !ParsedExpr
 	,	ewl_locals	:: !LocalDefs
 	,	ewl_position:: !Position
 	}
 
-:: NodeDefWithLocals =
+::	NodeDefWithLocals =
 	{	ndwl_strict		:: !Bool
 	,	ndwl_def		:: !Bind ParsedExpr ParsedExpr
 	,	ndwl_locals		:: !LocalDefs
 	,	ndwl_position	:: !Position
 	}
 
-:: CaseAlt =
+::	CaseAlt =
 	{	calt_pattern	:: !ParsedExpr
 	,	calt_rhs		:: !Rhs
 	,	calt_position	:: !Position
@@ -1305,12 +1305,12 @@ instance toString 	KindInfo
 	
 :: LocalDef		:== ParsedDefinition
 
-:: ParsedSelectorKind
+::	ParsedSelectorKind
 		=	ParsedNormalSelector	// .
 		|	ParsedUniqueSelector	// !
 				!Bool					// 	is result element unique?
 
-:: ParsedExpr	= PE_List ![ParsedExpr]
+::	ParsedExpr	= PE_List ![ParsedExpr]
 				| PE_Ident !Ident
 				| PE_Basic !BasicValue
 				| PE_Bound !BoundExpr
@@ -1345,32 +1345,32 @@ instance toString 	KindInfo
 				
 				| PE_Empty
 
-:: ParsedSelection	= PS_Record !Ident !OptionalRecordName
+::	ParsedSelection	= PS_Record !Ident !OptionalRecordName
 					| PS_QualifiedRecord !ModuleIdent !String !OptionalRecordName
 					| PS_Array  !ParsedExpr
 					| PS_Erroneous
 
-:: OptionalRecordName
+::	OptionalRecordName
 	= NoRecordName
 	| RecordNameIdent !Ident
 	| RecordNameQualifiedIdent !ModuleIdent !String
 	
-:: ModuleIdent:==Ident
+::	ModuleIdent:==Ident
 
-:: ArrayKind = OverloadedArray | StrictArray | UnboxedArray;
+::	ArrayKind = OverloadedArray | StrictArray | UnboxedArray;
 
-:: GeneratorKind = IsListGenerator | IsOverloadedListGenerator | IsArrayGenerator
+::	GeneratorKind = IsListGenerator | IsOverloadedListGenerator | IsArrayGenerator
 			
 :: LineAndColumn = {lc_line :: !Int, lc_column :: !Int}
 
-:: Generator =
+::	Generator =
 	{	gen_kind	:: !GeneratorKind
 	,	gen_pattern :: !ParsedExpr
 	,	gen_expr	:: !ParsedExpr
 	,	gen_position :: !LineAndColumn
 	}
 
-:: Qualifier	=
+::	Qualifier	=
 	{	qual_generators	:: ![Generator]
 	,	qual_let_defs	:: !LocalDefs
 	,	qual_filter		:: !Optional ParsedExpr
@@ -1378,31 +1378,31 @@ instance toString 	KindInfo
 	,	qual_filename	:: !FileName
 	}
 
-:: Sequence	= SQ_FromThen !Int ParsedExpr ParsedExpr
+::	Sequence	= SQ_FromThen !Int ParsedExpr ParsedExpr
 				| SQ_FromThenTo !Int ParsedExpr ParsedExpr ParsedExpr
 				| SQ_From !Int ParsedExpr
 				| SQ_FromTo !Int ParsedExpr ParsedExpr
 
-:: BoundExpr	:== Bind ParsedExpr Ident
+::	BoundExpr	:== Bind ParsedExpr Ident
 
-:: FieldAssignment :== Bind ParsedExpr FieldNameOrQualifiedFieldName
+::	FieldAssignment :== Bind ParsedExpr FieldNameOrQualifiedFieldName
 
-:: FieldNameOrQualifiedFieldName = FieldName !Ident | QualifiedFieldName !Ident !String
+::	FieldNameOrQualifiedFieldName = FieldName !Ident | QualifiedFieldName !Ident !String
  
-:: ElemAssignment :== Bind ParsedExpr [ParsedExpr]
+::	ElemAssignment :== Bind ParsedExpr [ParsedExpr]
 
 
 cIsStrict		:== True
 cIsNotStrict	:== False
 
-:: SelectorKind
+::	SelectorKind
 		=	NormalSelector
 		|	UniqueSelector			// !
 		|	UniqueSelectorUniqueElementResult
 		|	UniqueSingleArraySelector
 		|	UniqueSingleArraySelectorUniqueElementResult
 
-:: Expression	= Var !BoundVar 
+::	Expression	= Var !BoundVar 
 				| App !App
 				| (@) infixl 9  !Expression ![Expression]
 				| Let !Let
@@ -1434,15 +1434,15 @@ cIsNotStrict	:== False
 				| NoBind ExprInfoPtr /* auxiliary, to store fields that are not specified in a record expression */ 
 				| FailExpr !Ident // only allowed on (case) root positions
 
-:: CodeBinding	variable :== Env String variable
+::	CodeBinding	variable :== Env String variable
 
-:: App =
+::	App =
 	{	app_symb 		:: !SymbIdent
 	,	app_args 		:: ![Expression]
 	,	app_info_ptr	:: !ExprInfoPtr
 	}
 
-:: Case =
+::	Case =
 	{	case_expr		:: !Expression
 	,	case_guards		:: !CasePatterns
 	,	case_default	:: !Optional Expression
@@ -1452,7 +1452,7 @@ cIsNotStrict	:== False
 	,	case_default_pos:: !Position
 	}
 
-:: Let =
+::	Let =
 	{	let_strict_binds	:: ![LetBind]
 	,	let_lazy_binds		:: ![LetBind]
 	,	let_expr			:: !Expression
@@ -1460,43 +1460,43 @@ cIsNotStrict	:== False
 	,	let_expr_position	:: !Position
 	}
 
-:: LetBind =
+::	LetBind =
 	{	lb_dst		:: !FreeVar
 	,	lb_src		:: !Expression
 	,	lb_position	:: !Position
 	}
 
-:: Conditional =
+::	Conditional =
 	{	if_cond		:: !Expression
 	,	if_then		:: !Expression
 	,	if_else		:: !Optional Expression
 	}
 
-:: DynamicExpr =
+::	DynamicExpr =
 	{	dyn_expr		:: !Expression
 	,	dyn_opt_type	:: !Optional DynamicType
 	,	dyn_info_ptr	:: !ExprInfoPtr
 	,	dyn_type_code	:: !TypeCodeExpression		/* filled after type checking */
 	}	
 
-:: CasePatterns= AlgebraicPatterns !GlobalIndex ![AlgebraicPattern]
+::	CasePatterns= AlgebraicPatterns !GlobalIndex ![AlgebraicPattern]
 				| BasicPatterns !BasicType [BasicPattern]
 				| NewTypePatterns !GlobalIndex ![AlgebraicPattern]
 				| DynamicPatterns [DynamicPattern]						/* auxiliary */
 				| OverloadedListPatterns !OverloadedListType !Expression ![AlgebraicPattern]
 				| NoPattern											/* auxiliary */
 
-:: OverloadedListType	= UnboxedList !GlobalIndex !Index !Index !Index // list_type_symbol StdStrictLists module index, decons_u index, nil_u index
+::	OverloadedListType	= UnboxedList !GlobalIndex !Index !Index !Index // list_type_symbol StdStrictLists module index, decons_u index, nil_u index
 						| UnboxedTailStrictList !GlobalIndex !Index !Index !Index // list_type_symbol StdStrictLists module index, decons_uts index, nil_uts index
 						| OverloadedList !GlobalIndex !Index !Index !Index // list_type_symbol StdStrictLists module index, decons index, nil index
 
 instance == OverloadedListType
 
-:: Selection	= RecordSelection !(Global DefinedSymbol) !Int
+::	Selection	= RecordSelection !(Global DefinedSymbol) !Int
 				| ArraySelection !(Global DefinedSymbol) !ExprInfoPtr !Expression
 				| DictionarySelection !BoundVar ![Selection] !ExprInfoPtr !Expression
 
-:: TypeCodeExpression	= TCE_Empty
+::	TypeCodeExpression	= TCE_Empty
 						| TCE_Var 			!VarInfoPtr
 						| TCE_TypeTerm		!VarInfoPtr
 						| TCE_Constructor	!GlobalTCType		![TypeCodeExpression]
@@ -1505,26 +1505,26 @@ instance == OverloadedListType
 						| TCE_UniType 		![VarInfoPtr] 	!TypeCodeExpression
 						| TCE_UnqType		!TypeCodeExpression
 
-:: GlobalTCType
+::	GlobalTCType
 	=	GTT_Basic !BasicType
 	|	GTT_Constructor !SymbIdent !Bool/*is unique type*/
 	|	GTT_PredefTypeConstructor !(Global Index)
 	|	GTT_Function
 
-:: AlgebraicPattern =
+::	AlgebraicPattern =
 	{	ap_symbol	:: !(Global DefinedSymbol)
 	,	ap_vars		:: ![FreeVar]
 	,	ap_expr		:: !Expression
 	,	ap_position	:: !Position
 	}
 	
-:: BasicPattern =
+::	BasicPattern =
 	{	bp_value	:: !BasicValue
 	,	bp_expr		:: !Expression
 	,	bp_position	:: !Position
 	}
 	
-:: DynamicPattern =
+::	DynamicPattern =
 	{	dp_var					:: !FreeVar
 	,	dp_type					:: !ExprInfoPtr
 	,	dp_type_code			:: !TypeCodeExpression		/* filled after type checking */
@@ -1543,19 +1543,19 @@ instance == OverloadedListType
 					| PreDefPos Ident
 					| NoPos
 
-:: CoercionPosition
+::	CoercionPosition
 	=	CP_Expression !Expression
 	|	CP_FunArg !Ident !Int // Function or constructor ident, argument position (>=1)
 	|	CP_SymbArg !SymbIdent !Int // Function or constructor symbol, argument position (>=1)
 	|	CP_LiftedFunArg !Ident !Ident // Function symbol, lifted argument ident
 
-:: IdentPos =
+::	IdentPos =
 	{	ip_ident	:: !Ident
 	,	ip_line		:: !Int
 	,	ip_file		:: !FileName
 	}
 
-:: StringPos =
+::	StringPos =
 	{	sp_name		:: !String
 	,	sp_line		:: !Int
 	,	sp_file		:: !FileName

@@ -16,8 +16,8 @@ import genericsupport, type_io_common
 	,	cid_inst_module		:: !Index
 	,	cid_inst_members	:: !{#ClassInstanceMember}
 	,	cid_red_contexts	:: ![ClassApplication]
-    }
-    
+	}
+
 :: 	ReducedContext  = RC_Class		!ClassInstanceDescr [ReducedContext]
 					| RC_TC_Global	!GlobalTCType ![ClassApplication]
 					| RC_TC_Local	!VarInfoPtr
@@ -30,13 +30,13 @@ import genericsupport, type_io_common
 	,	roa_fun_index	:: !Index
 	,	roa_expr_ptr	:: !ExprInfoPtr
 	,	roa_rcs			:: ![ClassApplication]
-    }
+	}
 
 :: ReducedOverloadedContext =
 	{	roc_fun_index	:: !Index
 	,	roc_expr_ptr	:: !ExprInfoPtr
 	,	roc_rcs			:: ![RC]
-    }
+	}
 
 ::	RC  = RC_Context  !TypeContext
 		| RC_Instance !CI
@@ -54,6 +54,7 @@ instanceError symbol types err
 	  format = { form_properties = cNoProperties, form_attr_position = No }
 	= { err & ea_file = err.ea_file <<< " \"" <<< symbol <<< "\" no instance available of type "
 									<:: (format, types, Yes initialTypeVarBeautifulizer) <<< '\n' }
+
 cycleInTypeContextError symbol types err
 	# err = errorHeading "Overloading error" err
 	  format = { form_properties = cNoProperties, form_attr_position = No }
@@ -113,7 +114,6 @@ typeImprovementError symbol types1 types2 err
 			<<< " and: "
 			<<< symbol <<< ' ' <:: (format, types2, Yes initialTypeVarBeautifulizer)
 			<<< '\n' }
-
 /*
 	As soon as all overloaded variables in an type context are instantiated, context reduction is carried out.
 	This reduction yields a type class instance (here represented by a an index) and a list of
@@ -139,7 +139,7 @@ ObjectNotFound 	:== { glob_module = NotFound, glob_object = NotFound }
 	,	rs_coercions			:: !.Coercions
 	,	rs_predef_symbols		:: !.PredefinedSymbols
 	,	rs_error				:: !.ErrorAdmin
- 	}
+	}
 
 :: ReduceInfo =
 	{	ri_defs 				:: !{# CommonDefs}
@@ -171,7 +171,7 @@ ObjectNotFound 	:== { glob_module = NotFound, glob_object = NotFound }
 	,	prs_predef_symbols		:: !.PredefinedSymbols
 	,	prs_subst				:: !.Subst
 	,	prs_error				:: !.ErrorAdmin
-    }
+	}
 
 continueContextReduction :: !ReduceInfo ![RC] !*PreRedState -> (!Bool, ![RC], !*PreRedState)
 continueContextReduction info [] prs_state
@@ -1412,7 +1412,7 @@ where
 
 type_is_reducible :: Type (Global DefinedSymbol) PredefinedSymbols -> Bool
 type_is_reducible (TempV _) tc_class predef_symbols
-	= False // is_predefined_symbol tc_class.glob_module tc_class.glob_object.ds_index PD_TypeCodeClass predef_symbols
+	= False 
 type_is_reducible (_ :@: _) tc_class predef_symbols
 	= False
 type_is_reducible (TempQV _) tc_class predef_symbols
@@ -1512,19 +1512,19 @@ where
 	match defs (TV tv) type2 type_heaps=:{th_vars} subst
 		= matchTVandType defs tv type2 type_heaps subst
 	match defs type1=:(TA cons_id1 cons_args1) type2=:(TA cons_id2 cons_args2) type_heaps subst
- 		| cons_id1 == cons_id2
+		| cons_id1 == cons_id2
 			= matchListsOfATypes defs cons_args1 cons_args2 type_heaps subst
 			= expandAndMatch cons_id1 cons_args1 cons_id2 cons_args2 defs type1 type2 type_heaps subst
 	match defs type1=:(TA cons_id1 cons_args1) type2=:(TAS cons_id2 cons_args2 _) type_heaps subst
- 		| cons_id1 == cons_id2
+		| cons_id1 == cons_id2
 			= matchListsOfATypes defs cons_args1 cons_args2 type_heaps subst
 			= expandAndMatch cons_id1 cons_args1 cons_id2 cons_args2 defs type1 type2 type_heaps subst
 	match defs type1=:(TAS cons_id1 cons_args1 _) type2=:(TA cons_id2 cons_args2) type_heaps subst
- 		| cons_id1 == cons_id2
+		| cons_id1 == cons_id2
 			= matchListsOfATypes defs cons_args1 cons_args2 type_heaps subst
 			= expandAndMatch cons_id1 cons_args1 cons_id2 cons_args2 defs type1 type2 type_heaps subst
 	match defs type1=:(TAS cons_id1 cons_args1 _) type2=:(TAS cons_id2 cons_args2 _) type_heaps subst
- 		| cons_id1 == cons_id2
+		| cons_id1 == cons_id2
 			= matchListsOfATypes defs cons_args1 cons_args2 type_heaps subst
 			= expandAndMatch cons_id1 cons_args1 cons_id2 cons_args2 defs type1 type2 type_heaps subst
 	match defs (TB tb1) (TB tb2) type_heaps subst
@@ -1563,23 +1563,23 @@ where
 	match defs (TArrow1 t1) (TArrow1 t2) type_heaps subst
 		= match defs t1 t2 type_heaps subst
 	match defs type1=:(TA cons_id cons_args) type2 type_heaps subst
- 		# (succ, type1, type_heaps) = tryToExpandTypeSyn defs type1 cons_id cons_args type_heaps
- 		| succ
+		# (succ, type1, type_heaps) = tryToExpandTypeSyn defs type1 cons_id cons_args type_heaps
+		| succ
 			= match defs type1 type2 type_heaps subst
 			= (False, type_heaps, subst)
 	match defs type1=:(TAS cons_id cons_args _) type2 type_heaps subst
- 		# (succ, type1, type_heaps) = tryToExpandTypeSyn defs type1 cons_id cons_args type_heaps
- 		| succ
+		# (succ, type1, type_heaps) = tryToExpandTypeSyn defs type1 cons_id cons_args type_heaps
+		| succ
 			= match defs type1 type2 type_heaps subst
 			= (False, type_heaps, subst)
 	match defs type1 type2=:(TA cons_id cons_args) type_heaps subst
- 		# (succ, type2, type_heaps) = tryToExpandTypeSyn defs type2 cons_id cons_args type_heaps
- 		| succ
+		# (succ, type2, type_heaps) = tryToExpandTypeSyn defs type2 cons_id cons_args type_heaps
+		| succ
 			= match defs type1 type2 type_heaps subst
 			= (False, type_heaps, subst)
 	match defs type1 type2=:(TAS cons_id cons_args _) type_heaps subst
- 		# (succ, type2, type_heaps) = tryToExpandTypeSyn defs type2 cons_id cons_args type_heaps
- 		| succ
+		# (succ, type2, type_heaps) = tryToExpandTypeSyn defs type2 cons_id cons_args type_heaps
+		| succ
 			= match defs type1 type2 type_heaps subst
 			= (False, type_heaps, subst)
 	match defs type1 type2 type_heaps subst
@@ -2006,7 +2006,7 @@ where
 		| succ
 			= equateTypes y1 y2 defs type_heaps subst
 			= (False, type_heaps, subst)
-
+			
 instance equateTypes [a] | equateTypes a
 where
 	equateTypes [t1 : ts1] [t2 : ts2] defs type_heaps subst
@@ -2282,12 +2282,12 @@ addDictionaries spec_contexts contexts reduced_calls defs heaps=:{hp_var_heap,hp
 where
 	add_specified_contexts contexts all_contexts_subst_and_var_heap
 		= foldSt add_spec_context contexts all_contexts_subst_and_var_heap
-    where
+	where
 		add_spec_context tc (contexts, var_heap, subst)
 			# (changed, tc, subst)	= arraySubst tc subst
- 			| containsContext tc contexts
+			| containsContext tc contexts
 				= (contexts, var_heap, subst)
- 			  	# (tc_var,var_heap) = newPtr VI_Empty var_heap
+			  	# (tc_var,var_heap) = newPtr VI_Empty var_heap
 				= ([{tc & tc_var = tc_var} : contexts], var_heap, subst)
 
 	remove_super_classes contexts type_heaps
@@ -2330,7 +2330,7 @@ where
 		| new_index == index
 			= [(index, new_ptrs ++ ptrs) : dict_types]
 			= [(new_index, new_ptrs) : dt]
-	
+
 selectFromDictionary  dict_mod dict_index member_index defs
 	# (RecordType {rt_fields}) = defs.[dict_mod].com_type_defs.[dict_index].td_rhs
 	  { fs_ident, fs_index } = rt_fields.[member_index]
@@ -2407,23 +2407,19 @@ convertOverloadedCall defs contexts symbol=:{symb_ident, symb_kind = SK_Generic 
 convertOverloadedCall defs contexts {symb_ident,symb_kind = SK_TypeCode} expr_info_ptr class_appls (heaps, ptrs, error)
 	# (class_expressions, (heaps, ptrs)) = convertClassApplsToExpressions defs contexts class_appls (heaps, ptrs)
 	= ({heaps & hp_expression_heap = heaps.hp_expression_heap <:= (expr_info_ptr, EI_TypeCodes (map expressionToTypeCodeExpression class_expressions))}, ptrs, error)
-
 convertOverloadedCall defs contexts {symb_kind=SK_TFACVar var_expr_ptr,symb_ident} expr_info_ptr appls (heaps,ptrs, error)
 	# (class_expressions, (heaps, ptrs)) = convertClassApplsToExpressions defs contexts appls (heaps,ptrs)
 	= ({heaps & hp_expression_heap = heaps.hp_expression_heap <:= (expr_info_ptr, EI_FPContext class_expressions var_expr_ptr)}, ptrs, error)
-
 convertOverloadedCall defs contexts {symb_kind=SK_VarContexts var_contexts} expr_info_ptr appls (heaps,ptrs, error)
 	# (var_contexts,error) = get_var_contexts var_contexts defs contexts error
 	  (class_expressions, (heaps, ptrs)) = convertClassApplsToExpressions defs contexts appls (heaps,ptrs)
 	  expr_info = EI_ContextWithVarContexts class_expressions var_contexts
 	= ({heaps & hp_expression_heap = writePtr expr_info_ptr expr_info heaps.hp_expression_heap}, [expr_info_ptr:ptrs], error)
-
 convertOverloadedCall defs contexts {symb_ident,symb_kind = SK_TypeCodeAndContexts univ_contexts} expr_info_ptr class_appls (heaps, ptrs, error)
 	# (univ_contexts,error) = get_var_contexts univ_contexts defs contexts error
 	  (class_expressions, (heaps, ptrs)) = convertClassApplsToExpressions defs contexts class_appls (heaps, ptrs)
 	  expr_info = EI_TypeCodesWithContexts (expressionsToTypeCodeExpressions class_expressions) univ_contexts
 	= ({heaps & hp_expression_heap = writePtr expr_info_ptr expr_info heaps.hp_expression_heap}, ptrs, error)
-
 convertOverloadedCall defs contexts symbol expr_info_ptr appls (heaps,ptrs, error)
 	# (class_expressions, (heaps, ptrs)) = convertClassApplsToExpressions defs contexts appls (heaps,ptrs)
 	= ({heaps & hp_expression_heap = heaps.hp_expression_heap <:= (expr_info_ptr, EI_Context class_expressions)}, ptrs, error)
@@ -2800,10 +2796,7 @@ where
 						# (type_var_heap, var_heap, error)
 								= bind_type_vars_to_type_codes symb_ident dt_global_vars type_codes type_code_info.tci_type_var_heap var_heap error
 						  (uni_vars, (type_var_heap, var_heap)) = newTypeVariables dt_uni_vars (type_var_heap, var_heap)
-
-//						  dt_type = add_types_of_dictionaries dictionaries_and_contexts dt_type
 						  dt_type = add_types_of_dictionaries dt_contexts dt_type type_code_info.tci_common_defs
-
 						  (type_code_expr, (type_code_info,var_heap,error)) = toTypeCodeExpression (add_universal_vars_to_type dt_uni_vars dt_type)
 						  				({ type_code_info & tci_type_var_heap = type_var_heap }, var_heap, error)
 						  expr_heap = expr_heap <:= (dyn_ptr, EI_TypeOfDynamicWithContexts type_code_expr univ_contexts)
@@ -2828,9 +2821,7 @@ where
 								= bind_type_vars_to_type_codes symb_ident dt_global_vars type_codes type_code_info.tci_type_var_heap var_heap error
 						  (var_ptrs, (type_pattern_vars, var_heap)) = mapSt addLocalTCInstance temp_local_vars (type_pattern_vars, var_heap)
 						  type_var_heap = bind_type_vars_to_type_var_codes type_vars var_ptrs type_var_heap
-
 						  dt_type = add_types_of_dictionaries dt_contexts dt_type type_code_info.tci_common_defs
-						  
 						  type_code_info = {type_code_info & tci_type_var_heap = type_var_heap}
 						  (type_code_expr, (type_code_info,var_heap,error))
 								= toTypeCodeExpression (add_universal_vars_to_type dt_uni_vars dt_type) (type_code_info, var_heap, error)
@@ -2839,9 +2830,7 @@ where
 					EI_Empty
 						# (var_ptrs, (type_pattern_vars, var_heap)) = mapSt addLocalTCInstance temp_local_vars (type_pattern_vars, var_heap)
 						  type_var_heap = bind_type_vars_to_type_var_codes type_vars var_ptrs type_code_info.tci_type_var_heap
-
   						  dt_type = add_types_of_dictionaries dt_contexts dt_type type_code_info.tci_common_defs
-
 						  type_code_info = {type_code_info & tci_type_var_heap = type_var_heap}
 						  (type_code_expr, (type_code_info,var_heap,error))
 								= toTypeCodeExpression (add_universal_vars_to_type dt_uni_vars dt_type) (type_code_info, var_heap, error)
@@ -2946,7 +2935,7 @@ instance toTypeCodeExpression Type where
 			=	toTypeCodeExpression type (tci,var_heap,error)
 		# type_constructor = toTypeCodeConstructor type_index tci_common_defs
 		  (type_code_args, tci)
-		  	=	mapSt toTypeCodeExpression type_args (tci,var_heap,error)
+			=	mapSt toTypeCodeExpression type_args (tci,var_heap,error)
 		= (TCE_Constructor type_constructor type_code_args, tci)
 	toTypeCodeExpression (TAS cons_id type_args _) state
 		=	toTypeCodeExpression (TA cons_id type_args) state
@@ -3497,10 +3486,10 @@ where
 		# (EI_TypeOfDynamicPattern type_pattern_vars type_code no_contexts, ui_symbol_heap) = readPtr dp_type ui.ui_symbol_heap
 		  ui = {ui & ui_symbol_heap = ui_symbol_heap}
 		| no_contexts
-			# (dp_rhs, ui) =  updateExpression group_index dp_rhs ui
+			# (dp_rhs, ui) = updateExpression group_index dp_rhs ui
 			= ({dp & dp_rhs = dp_rhs, dp_type_code = type_code}, ui)
 			# ui = {ui & ui_var_heap = writePtr dp_var.fv_info_ptr VI_FPC ui.ui_var_heap}
-			  (dp_rhs, ui) =  updateExpression group_index dp_rhs ui
+			  (dp_rhs, ui) = updateExpression group_index dp_rhs ui
 			= ({dp & dp_rhs = dp_rhs, dp_type_code = type_code}, ui)
 
 instance updateExpression (a,b) | updateExpression a & updateExpression b
@@ -3638,19 +3627,19 @@ where
 			= equalTypes restype1 restype2 type_var_heap subst
 			= (False, type_var_heap, subst)
 	equalTypes (TA tc1 types1) (TA tc2 types2) type_var_heap subst
- 		| tc1 == tc2
+		| tc1 == tc2
 			= equalTypes types1 types2 type_var_heap subst
 			= (False, type_var_heap, subst)
 	equalTypes (TA tc1 types1) (TAS tc2 types2 _) type_var_heap subst
- 		| tc1 == tc2
+		| tc1 == tc2
 			= equalTypes types1 types2 type_var_heap subst
 			= (False, type_var_heap, subst)
 	equalTypes (TAS tc1 types1 _) (TA tc2 types2) type_var_heap subst
- 		| tc1 == tc2
+		| tc1 == tc2
 			= equalTypes types1 types2 type_var_heap subst
 			= (False, type_var_heap, subst)
 	equalTypes (TAS tc1 types1 _) (TAS tc2 types2 _) type_var_heap subst
- 		| tc1 == tc2
+		| tc1 == tc2
 			= equalTypes types1 types2 type_var_heap subst
 			= (False, type_var_heap, subst)
 	equalTypes (TB basic1) (TB basic2) type_var_heap subst
@@ -3660,8 +3649,8 @@ where
 	equalTypes (TArrow1 x) (TArrow1 y) type_var_heap subst
 		= equalTypes x y type_var_heap subst		
 	equalTypes (CV tv :@: types1) (TempCV var_number :@: types2) type_var_heap subst
- 		# (eq, type_var_heap) = equalTypeVars tv var_number type_var_heap
- 		| eq
+		# (eq, type_var_heap) = equalTypeVars tv var_number type_var_heap
+		| eq
 			= equalTypes types1 types2 type_var_heap subst
 			= (False, type_var_heap, subst)
 	equalTypes type1 type2 type_var_heap subst

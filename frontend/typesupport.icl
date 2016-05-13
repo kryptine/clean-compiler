@@ -398,7 +398,6 @@ defineVarsInFunDepTypes [t:ts] fun_dep_vars env next_var_n type_heaps
 defineVarsInFunDepTypes [] fun_dep_vars env next_var_n type_heaps
 	= (env,next_var_n,type_heaps)
 
-
 errorHeading :: !String !*ErrorAdmin -> *ErrorAdmin
 errorHeading  error_kind err=:{ea_file,ea_loc = []}
 	= { err & ea_file = ea_file <<< error_kind <<< ':', ea_ok = False }
@@ -2164,11 +2163,9 @@ foldATypeSt on_atype on_type type st :== fold_atype_st type st
 		#! st
 				= fold_atype_st r (fold_atype_st l st)
 		= on_type type st
-//AA..
 	fold_type_st type=:(TArrow1 t) st
 		#! st = fold_atype_st t st
 		= on_type type st	
-//..AA		
 	fold_type_st type=:(_ :@: args) st
 		#! st
 				= foldSt fold_atype_st args st

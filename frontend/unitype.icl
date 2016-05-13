@@ -277,7 +277,7 @@ typeIsNonCoercible cons_vars (_ :@: _)
 typeIsNonCoercible _ _
 	= False
 
-class lift a :: !{#CommonDefs} !{#BOOLVECT} !a !*{!Type} !*LiftState -> (!Bool,!a, !*{!Type}, !*LiftState)
+class lift a :: !{#CommonDefs} !{#BOOLVECT} !a !*{!Type} !*LiftState -> (!Bool, !a, !*{!Type}, !*LiftState)
 
 liftTypeApplication modules cons_vars t0=:(TA cons_id=:{type_ident,type_index={glob_object,glob_module},type_arity,type_prop=type_prop0} cons_args) subst ls
 	# ({tdi_kinds}, ls) = ls!ls_td_infos.[glob_module].[glob_object]

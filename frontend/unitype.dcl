@@ -38,7 +38,7 @@ BITNUMBER temp_var_id :== temp_var_id bitand 31
 set_bit :: !Int !*{# BOOLVECT} -> .{# BOOLVECT}
 
 determineAttributeCoercions :: !AType !AType !Bool !u:{!Type} !*Coercions !{#CommonDefs} !{#BOOLVECT} !*TypeDefInfos !*TypeHeaps
-		-> (!Optional (TypePosition, AType), !u:{!Type}, !*Coercions, !*TypeDefInfos, !*TypeHeaps) 
+		-> (!Optional (TypePosition, AType), !u:{!Type}, !*Coercions, !*TypeDefInfos, !*TypeHeaps)
 
 ::	AttributePartition	:== {# Int}
 

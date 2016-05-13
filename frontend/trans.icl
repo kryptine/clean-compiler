@@ -1293,7 +1293,7 @@ where
 	(=<) True False = Smaller
 	(=<) False True = Greater
 	(=<) False False = Equal
-	
+
 instance =< Producer
 where
 	(=<) pr1 pr2
@@ -1307,8 +1307,8 @@ where
 			= index1 =< index2
 		compare_constructor_arguments (PR_GeneratedFunction _ _ index1) (PR_GeneratedFunction _ _ index2)
 			= index1 =< index2
-		compare_constructor_arguments 	(PR_Class app1 lifted_vars_with_types1 t1) 
-										(PR_Class app2 lifted_vars_with_types2 t2) 
+		compare_constructor_arguments 	(PR_Class app1 lifted_vars_with_types1 t1)
+										(PR_Class app2 lifted_vars_with_types2 t2)
 			# cmp = smallerOrEqual t1 t2
 			| cmp<>Equal
 				= cmp
@@ -4074,7 +4074,6 @@ transformGroups cleanup_info main_dcl_module_n ro_StdStrictLists_module_n def_mi
 	# (groups, imported_types, collected_imports, fun_indices_with_abs_syn_types, ti)
 		= transform_groups 0 groups [] common_defs imported_funs imported_types [] [] initial_ti
 	# groups = {group \\ group <- reverse groups}
-
 	  {ti_fun_defs,ti_new_functions,ti_var_heap,ti_symbol_heap,ti_fun_heap,ti_next_fun_nr,ti_type_heaps,ti_cleanup_info} = ti
 	# (fun_defs, imported_types, collected_imports, type_heaps, var_heap) 
 			= foldSt (expand_abstract_syn_types_in_function_type common_defs) (reverse fun_indices_with_abs_syn_types)

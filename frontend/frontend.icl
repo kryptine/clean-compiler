@@ -148,7 +148,14 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 	| ok<>ok
 		= abort "";
 */
-
+/*
+	# (_,genout,files) = fopen "genout" FWriteText files
+	# (n_fun_defs,fun_defs) = usize fun_defs
+	# genout = show_class_members icl_mod.icl_common genout 
+	# (groups, fun_defs, genout) = showGroups groups 0 True fun_defs genout
+	# (ok,files) = fclose genout files
+	| not ok = abort "could not write genout"
+*/
 	#! ok = error_admin.ea_ok
 	| not ok
 		= (No,{},{},main_dcl_module_n,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
@@ -177,7 +184,6 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 		= partitionateFunctions fun_defs (icl_global_functions++icl_function_indices.ifi_instance_indices
 											++[icl_function_indices.ifi_specials_indices
 											  : icl_gencase_indices++icl_function_indices.ifi_type_function_indices])
-
 	| options.feo_up_to_phase == FrontEndPhaseTypeCheck
 		=	frontSyntaxTree cached_dcl_macros cached_dcl_mods main_dcl_module_n
 							predef_symbols hash_table files error io out tcl_file icl_mod dcl_mods fun_defs components array_instances heaps
@@ -256,12 +262,6 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 //	# (components, fun_defs, error)	= showTypes components 0 fun_defs error
 //	# (dcl_mods, out) = showDclModules dcl_mods out
 //	# (components, fun_defs, out) = showComponents components 0 False fun_defs out
-
-  //# (_,f,files) = fopen ("Clean System Files/components_" +++ icl_mod.icl_name.id_name) FWriteText files
-    //(components, fun_defs, f) = showComponents components 0 False fun_defs f
-    //(ok,files) = fclose f files
-  //| ok<>ok
-      //= abort "";
 
 /*
 	# (_,f,files) = fopen "components2" FWriteText files

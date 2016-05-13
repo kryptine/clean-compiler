@@ -473,13 +473,11 @@ instantiateTypes old_type_vars old_attr_vars types type_contexts attr_env {ss_en
 	  (new_type_vars, th_vars) = foldSt build_var_subst ss_vars ([], th_vars)
 	  (new_attr_vars, th_attrs) = foldSt build_attr_var_subst ss_attrs ([], th_attrs)
 	  (inst_attr_vars, th_attrs) = foldSt build_attr_var_subst old_attr_vars (new_attr_vars, th_attrs)
-
 	  type_heaps = foldSt build_type_subst ss_environ { type_heaps & th_vars = th_vars, th_attrs = th_attrs }
 	  (_, new_ss_context, type_heaps) = substitute ss_context type_heaps
 
 	  (inst_vars, th_vars)			= foldSt determine_free_var old_type_vars (new_type_vars, type_heaps.th_vars) 
 	  th_attrs = update_subst_av_info_ptrs subst_av_info_ptrs type_heaps.th_attrs
-
 	  (inst_types, (ok2, type_heaps))	= mapSt substitue_arg_type types (True, { type_heaps & th_vars = th_vars, th_attrs = th_attrs })
 	  (_, inst_contexts, type_heaps)	= substitute type_contexts type_heaps
 	  (_, inst_attr_env, type_heaps)	= substitute attr_env type_heaps
@@ -539,7 +537,7 @@ where
 		  th_vars = th_vars <:= (atv_variable.tv_info_ptr, TVI_Type (TV new_fv))
 		  (new_attr, th_attrs) = build_attr_subst atv_attribute type_heaps.th_attrs
 		= ([ { atv & atv_variable = new_fv, atv_attribute = new_attr } : free_vars], { type_heaps & th_vars = th_vars, th_attrs = th_attrs })
-	where		  
+	where
 		 build_attr_subst (TA_Var avar) attr_var_heap
 			# (new_info_ptr, attr_var_heap) = newPtr AVI_Empty attr_var_heap
 			  new_attr = { avar & av_info_ptr = new_info_ptr}
@@ -565,7 +563,7 @@ where
 						-> update_subst_av_info_ptrs subst_av_info_ptrs attr_var_heap
 	update_subst_av_info_ptrs [] attr_var_heap
 		= attr_var_heap
-	
+
 	adjust_special_subst special_subst=:{ss_environ} type_var_heap
 		# (ss_environ, type_var_heap) = mapSt adjust_special_bind ss_environ type_var_heap
 		= ({ special_subst & ss_environ = ss_environ }, type_var_heap)
@@ -1144,10 +1142,10 @@ checkAndPartitionateDclMacros mod_index range e_info=:{ef_is_macro_fun=ef_is_mac
 			= checkDclMacros mod_index cGlobalScope range.ir_from range.ir_to { e_info & ef_is_macro_fun=True } heaps cs
 	  (e_info=:{ef_macro_defs}) = { e_info & ef_is_macro_fun=ef_is_macro_fun_old }
 	# (predef_symbols_for_transform, cs_predef_symbols) = get_predef_symbols_for_transform cs_predef_symbols
-      (macro_defs, hp_var_heap, hp_expression_heap, cs_symbol_table, cs_error)
-              = partitionateDclMacros range mod_index predef_symbols_for_transform ef_macro_defs hp_var_heap hp_expression_heap cs_symbol_table cs_error
-    = ({ e_info & ef_macro_defs=macro_defs }, {heaps &  hp_var_heap = hp_var_heap, hp_expression_heap = hp_expression_heap},
-        { cs & cs_symbol_table = cs_symbol_table, cs_predef_symbols = cs_predef_symbols, cs_error = cs_error })
+	  (macro_defs, hp_var_heap, hp_expression_heap, cs_symbol_table, cs_error)
+	  		= partitionateDclMacros range mod_index predef_symbols_for_transform ef_macro_defs hp_var_heap hp_expression_heap cs_symbol_table cs_error
+	= ({ e_info & ef_macro_defs=macro_defs }, {heaps &  hp_var_heap = hp_var_heap, hp_expression_heap = hp_expression_heap},
+		{ cs & cs_symbol_table = cs_symbol_table, cs_predef_symbols = cs_predef_symbols, cs_error = cs_error })
 
 checkAndPartitionateIclMacros ::  !Index !IndexRange !Int !*{#FunDef} !*ExpressionInfo !*Heaps !*CheckState
 													  -> (!*{#FunDef},!*ExpressionInfo,!*Heaps,!*CheckState);
@@ -1156,10 +1154,10 @@ checkAndPartitionateIclMacros mod_index range local_functions_index_offset fun_d
 			= checkFunctions mod_index cGlobalScope range.ir_from range.ir_to local_functions_index_offset fun_defs { e_info & ef_is_macro_fun=True } heaps cs
 	  (e_info=:{ef_macro_defs}) = { e_info & ef_is_macro_fun=ef_is_macro_fun_old }
 	# (predef_symbols_for_transform, cs_predef_symbols) = get_predef_symbols_for_transform cs_predef_symbols
-      (fun_defs, macro_defs, hp_var_heap, hp_expression_heap, cs_symbol_table, cs_error)
-              = partitionateIclMacros range mod_index predef_symbols_for_transform fun_defs ef_macro_defs hp_var_heap hp_expression_heap cs_symbol_table cs_error
-    = (fun_defs, { e_info & ef_macro_defs=macro_defs }, {heaps &  hp_var_heap = hp_var_heap, hp_expression_heap = hp_expression_heap},
-            { cs & cs_symbol_table = cs_symbol_table, cs_predef_symbols = cs_predef_symbols, cs_error = cs_error })
+	  (fun_defs, macro_defs, hp_var_heap, hp_expression_heap, cs_symbol_table, cs_error)
+	  		= partitionateIclMacros range mod_index predef_symbols_for_transform fun_defs ef_macro_defs hp_var_heap hp_expression_heap cs_symbol_table cs_error
+	= (fun_defs, { e_info & ef_macro_defs=macro_defs }, {heaps &  hp_var_heap = hp_var_heap, hp_expression_heap = hp_expression_heap},
+			{ cs & cs_symbol_table = cs_symbol_table, cs_predef_symbols = cs_predef_symbols, cs_error = cs_error })
 
 checkInstanceBodies :: ![IndexRange] !Int !*{#FunDef} !*ExpressionInfo !*Heaps !*CheckState
 									  -> (!*{#FunDef},!*ExpressionInfo,!*Heaps, !*CheckState);
@@ -2243,8 +2241,8 @@ renumber_icl_module_functions mod_type icl_global_function_range icl_instance_ra
 				= arrayPlusList icl_functions [dummy_function \\ i<-[0..n_functions-1]]
 
 		add_dcl_instances_generic_cases_and_type_funs_to_conversion_table :: !{#Int} !Int !Int !Index IndexRange /*IndexRange*/ !DclModule
-									 !*{# ClassInstance} !*{# GenericCaseDef} !*{# CheckedTypeDef} *ErrorAdmin
-			-> (!*Optional *{#Index}, !Index, !*{# ClassInstance},!*{# GenericCaseDef},!*{# CheckedTypeDef},*ErrorAdmin)
+										  !*{# ClassInstance} !*{# GenericCaseDef} !*{# CheckedTypeDef} *ErrorAdmin
+			-> (!*Optional *{#Index},!Int,!*{# ClassInstance},!*{# GenericCaseDef},!*{# CheckedTypeDef},*ErrorAdmin)
  		add_dcl_instances_generic_cases_and_type_funs_to_conversion_table
  				dcl_function_table instances_conversion_table_size gencase_conversion_table_size first_free_index icl_type_fun_range /*not_exported_type_fun_range*/
  				dcl_mod=:{dcl_specials,dcl_functions,dcl_common,dcl_has_macro_conversions,dcl_type_funs}
@@ -2453,12 +2451,12 @@ renumber_icl_module_functions mod_type icl_global_function_range icl_instance_ra
 							# dcl_index = function_conversion_table.[icl_index]
 							# gencase = {gencase & gc_gcf=GCF gc_ident {gcf & gcf_body = GCB_FunIndex dcl_index}}
 							# gencases = {gencases & [gencase_index] = gencase}
-							= renumber_gencase_members (gencase_index+1) gencases
+							-> renumber_gencase_members (gencase_index+1) gencases
 						{gc_gcf=GCFS gcfs}
 							# gcfs = renumber_gcfs gcfs function_conversion_table
 							# gencase = {gencase & gc_gcf=GCFS gcfs}
 							# gencases = {gencases & [gencase_index] = gencase}
-							= renumber_gencase_members (gencase_index+1) gencases
+							-> renumber_gencase_members (gencase_index+1) gencases
 					= gencases
 
 			renumber_gcfs [!gcf=:{gcf_body=GCB_FunIndex icl_index}:gcfs!] function_conversion_table
@@ -2541,7 +2539,7 @@ check_module1 cdefs icl_global_function_range fun_defs optional_dcl_mod optional
 					<=< adjust_predefined_module_symbol PD_StdStrictLists
 					<=< adjust_predefined_module_symbol PD_StdDynamic
 					<=< adjust_predefined_module_symbol PD_StdGeneric
-					<=< adjust_predefined_module_symbol PD_StdMisc
+					<=< adjust_predefined_module_symbol PD_StdMisc										
 					<=< adjust_predefined_module_symbol PD_iTasks_Framework_Tonic
 					<=< adjust_predefined_module_symbol PD_iTasks_Framework_Generic
 					<=< adjust_predefined_module_symbol PD_iTasks_API_Core_Types
@@ -2938,7 +2936,7 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 					# icl_functions = {icl_functions & [spec_index]=new_fun_def}
 					= (icl_functions, heaps)
 					= (icl_functions, heaps)
-
+		 
 			build_function new_fun_index fun_def=:{fun_ident, fun_body = CheckedBody {cb_args}, fun_info} fun_index fun_type
 						(var_heap, type_var_heap, expr_heap)
 				# (tb_args, var_heap) = mapSt new_free_var cb_args var_heap
@@ -3297,21 +3295,21 @@ addImportedSymbolsToSymbolTable importing_mod opt_macro_range modules_in_compone
 	add_declaration :: (Optional IndexRange) Int Declaration *([Declaration],!*{#DclModule},*CheckState) -> (![Declaration],!*{#DclModule},!*CheckState)
 	add_declaration opt_dcl_macro_range importing_mod declaration (decls_accu,dcl_modules,cs)
 		# (not_already_imported,dcl_modules,cs)
-				= add_declaration_to_symbol_table_ opt_dcl_macro_range declaration importing_mod dcl_modules cs
+				= add_declaration_to_symbol_table opt_dcl_macro_range declaration importing_mod dcl_modules cs
 		| not_already_imported
 			= ([declaration:decls_accu],dcl_modules,cs)
 			= (decls_accu,dcl_modules,cs)
 
 	add_expl_imp_declaration opt_dcl_macro_range importing_mod declaration (decls_accu, dcl_modules, cs)
 		# (not_already_imported,dcl_modules,cs)
-				= add_declaration_to_symbol_table_ opt_dcl_macro_range declaration importing_mod dcl_modules cs
+				= add_declaration_to_symbol_table opt_dcl_macro_range declaration importing_mod dcl_modules cs
 		| not_already_imported
 			= ([declaration:decls_accu], dcl_modules, cs)
 		= (decls_accu, dcl_modules, cs)
 
-add_declaration_to_symbol_table_ opt_dcl_macro_range (Declaration {decl_kind=STE_FunctionOrMacro _, decl_ident, decl_index}) _ dcl_modules cs
+add_declaration_to_symbol_table opt_dcl_macro_range (Declaration {decl_kind=STE_FunctionOrMacro _, decl_ident, decl_index}) _ dcl_modules cs
 	= addImportedFunctionOrMacro opt_dcl_macro_range decl_ident decl_index dcl_modules cs
-add_declaration_to_symbol_table_ yes_for_icl_module (Declaration {decl_kind=decl_kind=:STE_Imported def_kind def_mod, decl_ident, decl_index, decl_pos}) importing_mod dcl_modules cs
+add_declaration_to_symbol_table yes_for_icl_module (Declaration {decl_kind=decl_kind=:STE_Imported def_kind def_mod, decl_ident, decl_index, decl_pos}) importing_mod dcl_modules cs
 	= addSymbol yes_for_icl_module decl_ident decl_pos decl_kind def_kind decl_index def_mod importing_mod dcl_modules cs
 
 updateExplImpInfo :: [Int] Index {!Declaration} {!Declaration} u:{#DclModule} ExplImpInfos *SymbolTable 

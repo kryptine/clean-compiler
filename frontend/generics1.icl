@@ -1365,7 +1365,7 @@ where
 						  gs & gs_tvarh=gs_tvarh
 						  unused_class = TCClass {glob_module = -1, glob_object = {ds_index = -1, ds_ident = {id_name="",id_info=nilPtr}, ds_arity = 1}}
 						  (member_type, class_var_attr, gs)
-                            = buildMemberTypeWithPartialDependencies gen_def kind class_var unused_class deps gs
+							= buildMemberTypeWithPartialDependencies gen_def kind class_var unused_class deps gs
 
 						  ins_type = {it_vars = instance_vars_from_type_cons gc_type_cons, it_types = [gc_type], it_attr_vars = [], it_context = []}
 				  
@@ -1514,6 +1514,7 @@ lookupDependencyDef {gd_index} modules = modules![gd_index.gi_module].com_generi
 
 // limitations:
 // - context restrictions on generic variables are not allowed
+
 buildMemberType :: !GenericDef !TypeKind !TypeVar !TCClass !*GenericState -> (!SymbolType, !TypeAttribute, !*GenericState)
 buildMemberType gen_def=:{gen_ident,gen_pos,gen_type,gen_vars,gen_deps} kind class_var tc_class gs=:{gs_varh}
 	# (tc_var_ptr, gs_varh) = newPtr VI_Empty gs_varh
@@ -1548,7 +1549,7 @@ buildMemberTypeWithPartialDependencies gen_def=:{gen_ident,gen_pos,gen_type,gen_
 	#! (kind_indexed_st, gatvs, th, modules, error)
 		= buildKindIndexedTypeWithPartialDependencies gen_type gen_vars gen_deps kind deps gen_ident gen_pos th gs.gs_modules gs.gs_error
 
-	#! (member_st, class_var_attr, th) 
+	#! (member_st, class_var_attr, th)
 		= replace_generic_vars_with_class_var kind_indexed_st gatvs class_var th
 
 	#! th = assertSymbolType member_st th // just paranoied about cleared variables
@@ -1661,9 +1662,9 @@ where
 			, ds_index = member_index
 			, ds_arity = me_type.st_arity
 			}
-		#! class_dictionary = 
-			{ ds_ident = class_ident 
-			, ds_arity = 0 
+		#! class_dictionary =
+			{ ds_ident = class_ident
+			, ds_arity = 0
 			, ds_index = NoIndex/*index in the type def table, filled in later*/ 
 			}
 		#! class_def = { 
@@ -2738,7 +2739,7 @@ where
 			Yes class_info
 				# clazz =
 					{ glob_module = class_info.gci_module
-					, glob_object =
+					, glob_object = 
 						{ ds_ident = genericIdentToClassIdent gtc_generic.glob_object.ds_ident.id_name gtc_kind 
 						, ds_arity = 1
 						, ds_index = class_info.gci_class
@@ -5490,7 +5491,7 @@ where
 			= indexes
 				//---> ("do not collect call ", symb_ident, glob_module, glob_object)
 	get_call _ indexes = indexes
-import StdDebug
+
 // collects variables and computes the refernce counts
 collectVars :: 
 		!Expression 	// expression to collect variables in

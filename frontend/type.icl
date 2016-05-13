@@ -2368,7 +2368,6 @@ where
 							# (fresh_attribute, th_attrs)	= freshCopyOfTypeAttribute at_attribute type_heaps.th_attrs
 							  (at_type, type_heaps)			= freshCopyOfTFACType uni_vars at_type contexts {type_heaps & th_attrs = th_attrs}
 							= ({at & at_attribute = fresh_attribute, at_type = at_type}, type_heaps)
-
 				EI_UnmarkedDynamic _ _
 					-> (var_store, type_heaps, var_heap, expr_heap, predef_symbols)
 
@@ -2985,7 +2984,7 @@ where
 
 add_unicity_of_essentially_unique_types_for_functions ti_common_defs comp coercions ts_error ts_fun_env
 	= foldSt (add_unicity_of_essentially_unique_types_for_function ti_common_defs)
-  				comp (coercions,ts_error,ts_fun_env)
+				comp (coercions,ts_error,ts_fun_env)
 where
 	add_unicity_of_essentially_unique_types_for_function ti_common_defs fun (coercions,ts_error,ts_fun_env)
 		# (env_type, ts_fun_env) = ts_fun_env![fun]
@@ -3115,7 +3114,7 @@ where
 				= check_instances_of_constructor_variables ins_pos common_defs cons_vars (arg_nr+1) types state
 		check_instances_of_constructor_variables ins_pos common_defs cons_vars arg_nr [] state
 			= state
-	
+
 		check_type_of_constructor_variable ins_pos common_defs type=:(TA {type_index={glob_module,glob_object},type_arity} types) (error, type_var_heap, td_infos)
 			= check_type_of_constructor_variable_for_TA glob_module glob_object type_arity types ins_pos common_defs type error type_var_heap td_infos
 		check_type_of_constructor_variable ins_pos common_defs type=:(TAS {type_index={glob_module,glob_object},type_arity} types _) (error, type_var_heap, td_infos)
@@ -3156,14 +3155,7 @@ where
 					| neg_signs bitand 1 == 0
 						= check_sign type (neg_signs >> 1) (dec arg_nr) error
 						= checkError type " all arguments of an instance type should have a non-negative sign" error
-/*
-show_component comp fun_defs
-	= foldSt show_fun comp ([], fun_defs)
-where
-	show_fun fun_index (names, fun_defs)
-		# ({fun_ident}, fun_defs) = fun_defs![fun_index]
-		= ([fun_ident : names], fun_defs)
-*/
+
 get_index_of_start_rule main_dcl_module_n predef_symbols
 	# ({pds_def, pds_module}, predef_symbols) = predef_symbols![PD_Start]
 	| pds_def <> NoIndex && pds_module == main_dcl_module_n
@@ -3176,7 +3168,7 @@ unify_requirements_of_functions [{fe_requirements={req_type_coercion_groups},fe_
 	= unify_requirements_of_functions reqs_list ti subst heaps ts_error
 where
 	unify_requirements_within_one_position :: !Ident !TypeInput !TypeCoercionGroup !(*{!Type}, !*TypeHeaps, !*ErrorAdmin)
-							-> (*{!Type}, !*TypeHeaps, !*ErrorAdmin)
+						-> (*{!Type}, !*TypeHeaps, !*ErrorAdmin)
 	unify_requirements_within_one_position _ ti {tcg_type_coercions, tcg_position=NoPos} (subst, heaps, ts_error)
 		= unify_coercions tcg_type_coercions ti subst heaps ts_error
 	unify_requirements_within_one_position fun_ident ti {tcg_type_coercions, tcg_position} (subst, heaps, ts_error)
@@ -3386,7 +3378,6 @@ where
 		  ts_var_heap = makeBase fun_ident tb_args temp_fun_type.tst_args ts_var_heap
 		  fe_location = newPosition fun_ident fun_pos
 		  ts_error = setErrorAdmin fe_location ts_error
-//		  ts = { ts & ts_var_heap = ts_var_heap, ts_error = ts_error}
 		  ts = { ts & ts_var_heap = ts_var_heap, ts_error = ts_error, ts_fun_defs = ts_fun_defs, ts_fun_env = ts_fun_env}
 		  reqs = { req_overloaded_calls = [], req_type_coercion_groups = [], req_type_coercions = [],
 		  			 req_attr_coercions = [], req_case_and_let_exprs = [] }

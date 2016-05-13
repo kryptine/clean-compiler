@@ -11,7 +11,7 @@ from explicitimports import search_qualified_ident,::NameSpaceN,TypeNameSpaceN,C
 	,	ts_selector_defs	:: !.{# SelectorDef}
 	,	ts_modules			:: !.{# DclModule}
 	}
-	
+
 ::	TypeInfo =
 	{	ti_var_heap			:: !.VarHeap
 	,	ti_type_heaps		:: !.TypeHeaps
@@ -186,7 +186,7 @@ retrieveTypeDefinition type_ptr mod_index symbol_table used_types
 		with
 			retrieve_type_definition (STE_UsedQualifiedType uqt_mod_index uqt_index orig_kind)
 				| uqt_mod_index==mod_index && uqt_index==ste_index
-					= (ste_index, mod_index, symbol_table, used_types) 
+					= (ste_index, mod_index, symbol_table, used_types)
 					= retrieve_type_definition orig_kind
 			retrieve_type_definition (STE_Imported STE_Type ste_mod_index)
 				= (ste_index, ste_mod_index, symbol_table <:= (type_ptr, { entry & ste_kind = STE_UsedType ste_mod_index this_kind }), used_types)
@@ -640,7 +640,7 @@ CS_Checking	:== 0
 
 checkTypeDefs :: !Index !(Optional (CopiedDefinitions, Int))
 		!*{#CheckedTypeDef} !*{#ConsDef} !*{#SelectorDef} !v:{#ClassDef} !*{#DclModule} !*Heaps !*CheckState
-	-> (!*{#CheckedTypeDef}, *{#ConsDef},!*{#SelectorDef},!v:{#ClassDef},!*{#DclModule},!*Heaps,!*CheckState)
+	-> (!*{#CheckedTypeDef},!*{#ConsDef},!*{#SelectorDef},!v:{#ClassDef},!*{#DclModule},!*Heaps,!*CheckState)
 checkTypeDefs module_index opt_icl_info type_defs cons_defs selector_defs class_defs modules heaps=:{hp_type_heaps,hp_var_heap} cs
 	#! nr_of_types = size type_defs
 	#  ts = { ts_type_defs = type_defs, ts_cons_defs = cons_defs, ts_selector_defs = selector_defs, ts_modules = modules }
@@ -684,11 +684,11 @@ determineAttributeVariable attr_var=:{av_ident=attr_name=:{id_info}} oti=:{oti_h
 		= ({ attr_var & av_info_ptr = attr_ptr}, oti, symbol_table)
 
 ::	DemandedAttributeKind = DAK_Ignore | DAK_Unique | DAK_None
+
 instance toString DemandedAttributeKind where
 	toString DAK_Ignore = "DAK_Ignore"
 	toString DAK_Unique = "DAK_Unique"
 	toString DAK_None = "DAK_None"
-	
 
 newAttribute :: !DemandedAttributeKind {#Char} TypeAttribute !*OpenTypeInfo !*CheckState -> (!TypeAttribute, !*OpenTypeInfo, !*CheckState)
 newAttribute DAK_Ignore var_ident attr oti cs
@@ -720,7 +720,6 @@ newAttribute DAK_None var_ident TA_Unique oti cs
 	= (TA_Unique, oti, cs)
 newAttribute DAK_None var_ident attr oti cs
 	= (TA_Multi, oti, cs)
-			
 
 getTypeDef :: !Index !Index !Index !u:{# CheckedTypeDef} !v:{# DclModule} -> (!CheckedTypeDef, !Index , !u:{# CheckedTypeDef}, !v:{# DclModule})
 getTypeDef type_index type_module module_index type_defs modules
@@ -778,7 +777,7 @@ checkTypeVar scope dem_attr tv=:{tv_ident=var_ident=:{id_name,id_info}} tv_attr 
 				-> (tv, attr, ({oti & oti_heaps = {oti_heaps & th_vars = th_vars}, oti_all_vars = [tv : oti_all_vars]}, cs))
 where
 	incr_ref_count tv_info_ptr (TVI_AttrAndRefCount prev_attr ref_count) th_vars
-		= th_vars <:=	(tv_info_ptr, TVI_AttrAndRefCount prev_attr (inc ref_count))			
+		= th_vars <:= (tv_info_ptr, TVI_AttrAndRefCount prev_attr (inc ref_count))
 	incr_ref_count tv_info_ptr _ th_vars
 		= th_vars
 
@@ -1075,7 +1074,7 @@ checkInstanceType mod_index ins_class_index ins_class_ident class_fun_dep_vars i
 		  oti & oti_all_vars = free_non_dep_vars
 		  free_dep_vars = if (isEmpty free_dep_vars) [] [free_dep_vars]
 		= (it_types, free_dep_vars, (ots, oti, cs))
-	
+
 	check_linearity_of_type_vars vars heaps=:{th_vars} cs=:{cs_error}
 		# (th_vars, cs_error) = foldSt check_linearity vars (th_vars, cs_error)
 		= ({heaps & th_vars = th_vars}, {cs & cs_error = cs_error})
@@ -1086,6 +1085,7 @@ checkInstanceType mod_index ins_class_index ins_class_ident class_fun_dep_vars i
 				= IF_ALLOW_NON_LINEAR_AND_OVERLAPPING_INSTANCES
 					(th_vars, error)
 					(th_vars, checkError tv_ident ": this type variable occurs more than once in an instance type" error)
+				= (th_vars, error)
 
 	compare_context_and_instance_types ins_class_index ins_class_ident it_types {tc_class=TCGeneric _, tc_types} cs_error
 		= cs_error
