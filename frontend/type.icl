@@ -2641,28 +2641,6 @@ where
 		  coer_demanded ={{ CT_Empty \\ i <- [0 .. nr_of_attr_vars - 1] } & [AttrUni] = CT_Unique }
 		  coer_offered = {{ CT_Empty \\ i <- [0 .. nr_of_attr_vars - 1] } & [AttrMulti] = CT_NonUnique }
 		  coercion_env = build_initial_coercion_env fun_reqs {coer_demanded = coer_demanded, coer_offered = coer_offered }
-// TODO FIXME Enable?
-//		  (subst, ts_expr_heap)	= expand_case_or_let_types_in_requirements fun_reqs (subst, ts_expr_heap) 
-//		  (fin_red_apps, contexts, local_pattern_variables, ts_var_heap, ts_type_heaps, ts_expr_heap, predef_symbols, special_instances, coercion_env, subst, ts_error)
-//		  		= finishContextReduction red_apps case_with_context_ptrs main_dcl_module_n ti_common_defs ts_var_heap ts_type_heaps ts_expr_heap predef_symbols special_instances
-//		  				coercion_env subst ts_error
-//		| not ts_error.ea_ok 
-//			= (True, predef_symbols, special_instances, out, create_erroneous_function_types comp { ts & ts_type_heaps = ts_type_heaps,
-//					ts_error = { ts_error & ea_ok = True }, ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [], 
-//					ts_td_infos = ts_td_infos, ts_expr_heap = ts_expr_heap, ts_var_heap = ts_var_heap })
-//		# (contexts, dict_types, {hp_var_heap=ts_var_heap, hp_expression_heap=ts_expr_heap, hp_type_heaps=ts_type_heaps, hp_generic_heap}, subst, ts_error)
-//		  		= addDictionaries user_contexts contexts fin_red_apps ti_common_defs 
-//			  		{hp_var_heap= ts_var_heap, hp_expression_heap = ts_expr_heap, hp_type_heaps = ts_type_heaps, hp_generic_heap = ts_generic_heap}
-//			  		 subst ts_error
-//		| not ts_error.ea_ok
-//			= (True, predef_symbols, special_instances, out, create_erroneous_function_types comp { ts & ts_type_heaps = ts_type_heaps,
-//					ts_error = { ts_error & ea_ok = True }, ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [], 
-//					ts_td_infos = ts_td_infos, ts_expr_heap = ts_expr_heap, ts_var_heap = ts_var_heap, ts_generic_heap=hp_generic_heap})
-//
-//		# (fun_defs, coercion_env, subst, ts_td_infos, ts_var_heap, ts_expr_heap, ts_error)
-//		  		= makeSharedReferencesNonUnique comp ts.ts_fun_defs coercion_env subst ts_td_infos ts_var_heap ts_expr_heap ts_error
-//		  (subst, coercions, ts_td_infos, ts_type_heaps, ts_error)
-//		  		= build_coercion_env fun_reqs subst coercion_env ti_common_defs cons_var_vects ts_td_infos ts_type_heaps ts_error
 		  (subst, ts_expr_heap)	= expand_case_or_let_types_in_requirements fun_reqs (subst, ts_expr_heap) 
 		  (fin_red_apps, contexts, local_pattern_variables, ts_var_heap, ts_type_heaps, ts_expr_heap, predef_symbols, special_instances, coercion_env, subst, ts_error)
 		  		= finishContextReduction red_apps case_with_context_ptrs main_dcl_module_n ti_common_defs ts_var_heap ts_type_heaps ts_expr_heap predef_symbols special_instances
@@ -2703,7 +2681,7 @@ where
 		  type_code_info = {	tci_type_var_heap = ts_type_heaps.th_vars, tci_attr_var_heap = ts_type_heaps.th_attrs,
 								tci_dcl_modules = dcl_modules, tci_common_defs = ti_common_defs } 
 		  (fun_defs, ts_fun_env, ts_expr_heap, {tci_type_var_heap,tci_attr_var_heap}, ts_var_heap, ts_error, predef_symbols)
-		  		= removeOverloadedFunctionsWithoutUpdatingFunctions comp local_pattern_variables main_dcl_module_n ts.ts_fun_defs ts.ts_fun_env
+		  		= removeOverloadedFunctions comp local_pattern_variables main_dcl_module_n ts.ts_fun_defs ts.ts_fun_env
 		  								ts.ts_expr_heap type_code_info ts.ts_var_heap ts.ts_error predef_symbols
 		= (	type_error || not ts_error.ea_ok,
 			predef_symbols, special_instances, out,
@@ -2711,7 +2689,6 @@ where
 					ts_expr_heap = ts_expr_heap, ts_error = { ts_error & ea_ok = True },
 				  	ts_var_heap = ts_var_heap, ts_type_heaps = { ts_type_heaps & th_vars =  tci_type_var_heap, th_attrs =  tci_attr_var_heap },
 				  	ts_fun_env = ts_fun_env, ts_fun_defs=fun_defs})
-
 
 typeProgram :: !{! Group} !Int !*{# FunDef} !IndexRange  !(Optional Bool) !CommonDefs !{!Declaration} ![QualifiedDeclaration] !{# DclModule} !NumberSet
 																						 !*TypeDefInfos !*Heaps !*PredefinedSymbols !*File !*File
