@@ -2,6 +2,7 @@ definition module overloading
 
 import StdEnv
 import syntax, typesupport
+from unitype import ::BOOLVECT
 
 ::	InstanceTree = IT_Node !(Global Index) !InstanceTree !InstanceTree | IT_Empty 
 
@@ -37,13 +38,27 @@ import syntax, typesupport
 ::	LocalTypePatternVariable
 ::	DictionaryTypes :== [(Index, [ExprInfoPtr])]
 
+:: ReducedOverloadedApplication
+:: ReducedOverloadedContext
+
+finishContextReduction :: ![ReducedOverloadedContext] ![ExprInfoPtr] !Int !{# CommonDefs } 
+	!*VarHeap !*TypeHeaps !*ExpressionHeap  !*PredefinedSymbols !*SpecialInstances !*Coercions !*{!Type} !*ErrorAdmin
+	-> (![ReducedOverloadedApplication], ![TypeContext], ![LocalTypePatternVariable], !*VarHeap, !*TypeHeaps, !*ExpressionHeap, !*PredefinedSymbols,
+		!*SpecialInstances , !*Coercions, !*{!Type}, !*ErrorAdmin)
+
+startContextReduction :: ![OverloadedExpressions] ![[TypeContext]] !{# CommonDefs } !ClassInstanceInfo 
+	!*VarHeap !*TypeHeaps !*ExpressionHeap  !*PredefinedSymbols !*{!Type} !*ErrorAdmin
+	-> (![ReducedOverloadedContext], ![ExprInfoPtr], !*VarHeap, !*TypeHeaps, !*ExpressionHeap, !*PredefinedSymbols, !*{!Type}, !*ErrorAdmin)
+
+addDictionaries :: ![[TypeContext]] ![TypeContext] ![ReducedOverloadedApplication] !{# CommonDefs } 
+	!*Heaps !*{!Type} !*ErrorAdmin -> (![TypeContext], !DictionaryTypes, !*Heaps, !*{!Type}, !*ErrorAdmin)
+
+uniqueError :: a b *ErrorAdmin -> *ErrorAdmin | writeType b & <<< a
+
 ::	OverloadedExpressions = 
 	{	oe_expr_ptrs	:: ![ExprInfoPtr]
 	,	oe_fun_index	:: !Index
 	}
-
-tryToSolveOverloading :: ![(Optional [TypeContext], [ExprInfoPtr], IdentPos, Index)] !Int !{# CommonDefs } !ClassInstanceInfo !*Coercions !*OverloadingState !{# DclModule}
-	-> (![TypeContext], !*Coercions, ![LocalTypePatternVariable], DictionaryTypes, !*OverloadingState)
 
 ::	TypeCodeInfo =
 	{	tci_type_var_heap					:: !.TypeVarHeap
@@ -51,6 +66,8 @@ tryToSolveOverloading :: ![(Optional [TypeContext], [ExprInfoPtr], IdentPos, Ind
 	,	tci_dcl_modules						:: !{# DclModule}
 	,	tci_common_defs						:: !{# CommonDefs }
 	}
+
+liftNewVarSubstitutions :: ![ReducedOverloadedContext] !Int !*{!Type} -> (!*{#BOOLVECT},!*{!Type})
 
 removeOverloadedFunctions :: ![Index] ![LocalTypePatternVariable] !Int !*{#FunDef} !*{! FunctionType} !*ExpressionHeap
 	!*TypeCodeInfo !*VarHeap !*ErrorAdmin !*{#PredefinedSymbol} //!*{#PredefinedSymbol}
@@ -60,4 +77,12 @@ removeOverloadedFunctionsWithoutUpdatingFunctions :: ![Index] ![LocalTypePattern
 	!*TypeCodeInfo !*VarHeap !*ErrorAdmin !*{#PredefinedSymbol} //!*{#PredefinedSymbol}
 		-> (!*{#FunDef}, !*{! FunctionType}, !*ExpressionHeap, !*TypeCodeInfo, !*VarHeap, !*ErrorAdmin, !*{#PredefinedSymbol})
 
-find_instance :: [Type] !InstanceTree {#CommonDefs} *TypeHeaps *Coercions -> *(Global Int,[TypeContext],Bool,*TypeHeaps,*Coercions)
+::	Subst =
+	{	subst_changed	:: !Bool
+	,	subst_array		:: !.{!Type}
+	,	subst_next_var_n :: !Int
+	,	subst_previous_context_n :: !Int
+	,	subst_context_n_at_last_update :: !Int
+	}
+
+find_instance :: [Type] !InstanceTree {#CommonDefs} *TypeHeaps !*Subst -> *(!Global Int, ![TypeContext], !*TypeHeaps, !*Subst)

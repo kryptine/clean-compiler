@@ -465,8 +465,15 @@ typeHasClassInstance` ty lookup_symbol inh chn
                     | coer_demanded = {}
                     , coer_offered  = {}
                     }
+  # subst = { Subst
+            |  subst_changed  = False
+            ,  subst_array    = {}
+            ,  subst_next_var_n = 0
+            ,  subst_previous_context_n = -1
+            ,  subst_context_n_at_last_update = -1
+            }
   # heaps = chn.chn_heaps
-  # (inst, ctxs, uni_ok, hp_type_heaps, coercions) = find_instance [ty] instance_tree inh.inh_common_defs heaps.hp_type_heaps coercions
+  # (inst, ctxs, hp_type_heaps, _) = find_instance [ty] instance_tree inh.inh_common_defs heaps.hp_type_heaps subst
   # chn   = {chn & chn_heaps = {heaps & hp_type_heaps = hp_type_heaps}}
   # defs  = inh.inh_common_defs.[lookup_def.pds_module].com_class_defs.[lookup_def.pds_def]
   = (inst.glob_module <> NotFound && inst.glob_object <> NotFound, chn)
@@ -493,11 +500,14 @@ typeHasClassSynonymInstance ty lookup_symbol inh chn
   tyHasClasses` :: {#{!InstanceTree}} (Global DefinedSymbol) Type *TypeHeaps -> *(Bool, *TypeHeaps)
   tyHasClasses` class_instances {glob_module, glob_object} at_type hp_type_heaps
     # instance_tree = class_instances.[glob_module].[glob_object.ds_index]
-    # coercions     = { Coercions
-                      | coer_demanded = {}
-                      , coer_offered  = {}
-                      }
-    # (inst, ctxs, uni_ok, hp_type_heaps, coercions) = find_instance [at_type] instance_tree inh.inh_common_defs hp_type_heaps coercions
+    # subst = { Subst
+              |  subst_changed  = False
+              ,  subst_array    = {}
+              ,  subst_next_var_n = 0
+              ,  subst_previous_context_n = -1
+              ,  subst_context_n_at_last_update = -1
+              }
+    # (inst, ctxs, hp_type_heaps, coercions) = find_instance [at_type] instance_tree inh.inh_common_defs hp_type_heaps subst
     = (inst.glob_module <> NotFound && inst.glob_object <> NotFound, hp_type_heaps)
 
 isInfix :: SymbIdent *ChnExpression -> *(Bool, *ChnExpression)
@@ -1137,11 +1147,14 @@ wrapBody inh syn hasTonic chn
     tyHasITaskClasses` :: {#{!InstanceTree}} (Global DefinedSymbol) Type *TypeHeaps -> *(Bool, *TypeHeaps)
     tyHasITaskClasses` class_instances {glob_module, glob_object} at_type hp_type_heaps
       # instance_tree = class_instances.[glob_module].[glob_object.ds_index]
-      # coercions     = { Coercions
-                        | coer_demanded = {}
-                        , coer_offered  = {}
-                        }
-      # (inst, ctxs, uni_ok, hp_type_heaps, coercions) = find_instance [at_type] instance_tree common_defs hp_type_heaps coercions
+      # subst = { Subst
+                |  subst_changed  = False
+                ,  subst_array    = {}
+                ,  subst_next_var_n = 0
+                ,  subst_previous_context_n = -1
+                ,  subst_context_n_at_last_update = -1
+                }
+      # (inst, ctxs, hp_type_heaps, _) = find_instance [at_type] instance_tree common_defs hp_type_heaps subst
       = (inst.glob_module <> NotFound && inst.glob_object <> NotFound, hp_type_heaps)
 
     varNoITaskCtx :: FreeVar [TypeContext] *PredefinedSymbols -> *(Bool, *PredefinedSymbols)

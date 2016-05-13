@@ -757,16 +757,25 @@ checkTypeVar scope dem_attr tv=:{tv_ident=var_ident=:{id_name,id_info}} tv_attr 
 		# (new_attr, oti=:{oti_heaps,oti_all_vars}, cs) = newAttribute dem_attr id_name tv_attr oti {cs & cs_symbol_table = cs_symbol_table}
 		  (new_var_ptr, th_vars) = newPtr (TVI_AttrAndRefCount new_attr 1) oti_heaps.th_vars
 		  new_var = { tv & tv_info_ptr = new_var_ptr }
-		= (new_var, new_attr, ({ oti & oti_heaps = { oti_heaps & th_vars = th_vars }, oti_all_vars = [new_var : oti_all_vars]},
-				{ cs & cs_symbol_table = cs.cs_symbol_table <:= (id_info, {ste_index = NoIndex, ste_kind = STE_TypeVariable new_var_ptr,
-								ste_def_level = scope, ste_previous = entry })}))
-		# (STE_TypeVariable tv_info_ptr) = ste_kind
-		  {oti_heaps} = oti
-		  (tv_info, th_vars) = readPtr tv_info_ptr oti_heaps.th_vars
-		  th_vars = incr_ref_count tv_info_ptr tv_info th_vars	
-		  (var_attr, oti, cs) = check_attribute id_name dem_attr tv_info tv_attr {oti & oti_heaps = {oti_heaps & th_vars = th_vars}}
-		  								{cs & cs_symbol_table = cs_symbol_table}
-		= ({tv & tv_info_ptr = tv_info_ptr}, var_attr, (oti, cs))
+		  entry = {ste_index = NoIndex, ste_kind = STE_TypeVariable new_var_ptr, ste_def_level = scope, ste_previous = entry}
+		  cs & cs_symbol_table = writePtr id_info entry cs.cs_symbol_table
+		= (new_var, new_attr, ({ oti & oti_heaps = { oti_heaps & th_vars = th_vars }, oti_all_vars = [new_var : oti_all_vars]}, cs))
+		= case ste_kind of
+			STE_TypeVariable tv_info_ptr
+				# {oti_heaps} = oti
+				  (tv_info, th_vars) = readPtr tv_info_ptr oti_heaps.th_vars
+				  th_vars = incr_ref_count tv_info_ptr tv_info th_vars	
+				  (var_attr, oti, cs) = check_attribute id_name dem_attr tv_info tv_attr {oti & oti_heaps = {oti_heaps & th_vars = th_vars}}
+				  								{cs & cs_symbol_table = cs_symbol_table}
+				-> ({tv & tv_info_ptr = tv_info_ptr}, var_attr, (oti, cs))
+			STE_FunDepTypeVariable tv_info_ptr
+				# {oti_heaps,oti_all_vars} = oti
+				  (TVI_AttrAndRefCount attr ref_count, th_vars) = readPtr tv_info_ptr oti_heaps.th_vars
+				  th_vars = writePtr tv_info_ptr (TVI_AttrAndRefCount attr (inc ref_count)) th_vars
+				  entry & ste_kind = STE_TypeVariable tv_info_ptr, ste_def_level = scope
+				  cs & cs_symbol_table = writePtr id_info entry cs_symbol_table
+				  tv & tv_info_ptr=tv_info_ptr
+				-> (tv, attr, ({oti & oti_heaps = {oti_heaps & th_vars = th_vars}, oti_all_vars = [tv : oti_all_vars]}, cs))
 where
 	incr_ref_count tv_info_ptr (TVI_AttrAndRefCount prev_attr ref_count) th_vars
 		= th_vars <:=	(tv_info_ptr, TVI_AttrAndRefCount prev_attr (inc ref_count))			
@@ -775,7 +784,7 @@ where
 
 	check_attribute var_ident DAK_Ignore (TVI_AttrAndRefCount prev_attr ref_count) this_attr oti cs=:{cs_error}
 		= (TA_Multi, oti, cs)
-	check_attribute var_ident dem_attr (TVI_AttrAndRefCount prev_attr ref_count) this_attr oti cs=:{cs_error}
+	check_attribute var_ident dem_attr (TVI_AttrAndRefCount prev_attr _) this_attr oti cs=:{cs_error}
 		# (new_attr, cs_error) = determine_attribute var_ident dem_attr this_attr cs_error
 		= check_var_attribute prev_attr new_attr oti { cs & cs_error = cs_error }
 	where					
@@ -2097,8 +2106,10 @@ create_class_dictionary mod_index class_index class_defs =:{[class_index] = clas
 
 	  cons_def = 	
 		{	cons_ident		= rec_cons_id
-		,	cons_type		= { st_vars	= [], st_args = reverse rev_field_types, st_args_strictness = first_n_strict nr_of_fields, st_result = rec_type,
-							    st_arity = nr_of_fields, st_context = [], st_attr_vars = [], st_attr_env = [] }
+		,	cons_type		= { st_vars	= [], st_args = reverse rev_field_types,
+								st_args_strictness = if (class_lazy_members==0) (first_n_strict nr_of_fields) NotStrict,
+								st_result = rec_type, st_arity = nr_of_fields,
+							    st_context = [], st_attr_vars = [], st_attr_env = [] }
 		,	cons_priority	= NoPrio
 		,	cons_number		= 0
 		,	cons_type_index	= index_type

@@ -2629,27 +2629,62 @@ where
 			= (True, predef_symbols, special_instances, out, create_erroneous_function_types comp
 				{ ts & ts_type_heaps = ts_type_heaps, ts_error = { ts_error & ea_ok = True },
 					ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = []})
-		# {ts_attr_store,ts_var_heap,ts_var_store,ts_expr_heap,ts_td_infos,ts_cons_variables,ts_exis_variables} = ts
+		# {ts_attr_store,ts_var_heap,ts_var_store,ts_expr_heap,ts_generic_heap,ts_td_infos,ts_cons_variables,ts_exis_variables} = ts
+		  (calls, user_contexts, (subst, ts_expr_heap)) = collect_overloaded_calls_and_user_contexts fun_reqs [] [] (subst, ts_expr_heap)
+
+		  (red_apps, case_with_context_ptrs, ts_var_heap, ts_type_heaps, ts_expr_heap, predef_symbols, subst, ts_error)
+		  		= startContextReduction calls user_contexts ti_common_defs class_instances
+		  				ts_var_heap ts_type_heaps ts_expr_heap predef_symbols subst ts_error
 		  (cons_var_vects, subst) = determine_cons_variables ts_cons_variables (createArray (inc (BITINDEX nr_of_type_variables)) 0, subst)
-		  (subst, nr_of_attr_vars, ts_type_heaps, ts_td_infos) = liftSubstitution subst ti_common_defs cons_var_vects ts_attr_store ts_type_heaps ts_td_infos
+		  (marked_new_vars,subst) = liftNewVarSubstitutions red_apps nr_of_type_variables subst
+		  (subst, nr_of_attr_vars, ts_type_heaps, ts_td_infos)
+		  	= liftSubstitutionFunDep nr_of_type_variables marked_new_vars ti_common_defs cons_var_vects subst ts_attr_store ts_type_heaps ts_td_infos
 		  coer_demanded ={{ CT_Empty \\ i <- [0 .. nr_of_attr_vars - 1] } & [AttrUni] = CT_Unique }
 		  coer_offered = {{ CT_Empty \\ i <- [0 .. nr_of_attr_vars - 1] } & [AttrMulti] = CT_NonUnique }
 		  coercion_env = build_initial_coercion_env fun_reqs {coer_demanded = coer_demanded, coer_offered = coer_offered }
-		  (over_info, (subst, ts_expr_heap)) = collect_and_expand_overloaded_calls fun_reqs [] (subst, ts_expr_heap)
-		  (contexts, coercion_env, local_pattern_variables, dict_types,
-		  	{os_type_heaps, os_var_heap, os_symbol_heap, os_generic_heap, os_predef_symbols, os_special_instances, os_error})
-		  		= tryToSolveOverloading over_info main_dcl_module_n ti_common_defs class_instances coercion_env
-		  			{	os_type_heaps = ts_type_heaps, os_var_heap = ts_var_heap, os_symbol_heap = ts_expr_heap, os_generic_heap = ts.ts_generic_heap,
-		  				os_predef_symbols = predef_symbols, os_error = ts_error, os_special_instances = special_instances } dcl_modules
-		  //ts = {ts & ts_generic_heap = os_generic_heap}
-		| not os_error.ea_ok
-			= (True, os_predef_symbols, os_special_instances, out, create_erroneous_function_types comp { ts & ts_type_heaps = os_type_heaps,
-					ts_error = { os_error & ea_ok = True }, ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [], 
-					ts_td_infos = ts_td_infos, ts_expr_heap = os_symbol_heap, ts_var_heap = os_var_heap,ts_generic_heap=os_generic_heap})
-		# (fun_defs, coercion_env, subst, ts_td_infos, os_var_heap, os_symbol_heap, os_error)
-		  		= makeSharedReferencesNonUnique comp ts.ts_fun_defs coercion_env subst ts_td_infos os_var_heap os_symbol_heap os_error
-		# (subst, coercions, ts_td_infos, ts_type_heaps, ts_error)
-		  		= build_coercion_env fun_reqs subst coercion_env ti_common_defs cons_var_vects ts_td_infos os_type_heaps os_error
+// TODO FIXME Enable?
+//		  (subst, ts_expr_heap)	= expand_case_or_let_types_in_requirements fun_reqs (subst, ts_expr_heap) 
+//		  (fin_red_apps, contexts, local_pattern_variables, ts_var_heap, ts_type_heaps, ts_expr_heap, predef_symbols, special_instances, coercion_env, subst, ts_error)
+//		  		= finishContextReduction red_apps case_with_context_ptrs main_dcl_module_n ti_common_defs ts_var_heap ts_type_heaps ts_expr_heap predef_symbols special_instances
+//		  				coercion_env subst ts_error
+//		| not ts_error.ea_ok 
+//			= (True, predef_symbols, special_instances, out, create_erroneous_function_types comp { ts & ts_type_heaps = ts_type_heaps,
+//					ts_error = { ts_error & ea_ok = True }, ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [], 
+//					ts_td_infos = ts_td_infos, ts_expr_heap = ts_expr_heap, ts_var_heap = ts_var_heap })
+//		# (contexts, dict_types, {hp_var_heap=ts_var_heap, hp_expression_heap=ts_expr_heap, hp_type_heaps=ts_type_heaps, hp_generic_heap}, subst, ts_error)
+//		  		= addDictionaries user_contexts contexts fin_red_apps ti_common_defs 
+//			  		{hp_var_heap= ts_var_heap, hp_expression_heap = ts_expr_heap, hp_type_heaps = ts_type_heaps, hp_generic_heap = ts_generic_heap}
+//			  		 subst ts_error
+//		| not ts_error.ea_ok
+//			= (True, predef_symbols, special_instances, out, create_erroneous_function_types comp { ts & ts_type_heaps = ts_type_heaps,
+//					ts_error = { ts_error & ea_ok = True }, ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [], 
+//					ts_td_infos = ts_td_infos, ts_expr_heap = ts_expr_heap, ts_var_heap = ts_var_heap, ts_generic_heap=hp_generic_heap})
+//
+//		# (fun_defs, coercion_env, subst, ts_td_infos, ts_var_heap, ts_expr_heap, ts_error)
+//		  		= makeSharedReferencesNonUnique comp ts.ts_fun_defs coercion_env subst ts_td_infos ts_var_heap ts_expr_heap ts_error
+//		  (subst, coercions, ts_td_infos, ts_type_heaps, ts_error)
+//		  		= build_coercion_env fun_reqs subst coercion_env ti_common_defs cons_var_vects ts_td_infos ts_type_heaps ts_error
+		  (subst, ts_expr_heap)	= expand_case_or_let_types_in_requirements fun_reqs (subst, ts_expr_heap) 
+		  (fin_red_apps, contexts, local_pattern_variables, ts_var_heap, ts_type_heaps, ts_expr_heap, predef_symbols, special_instances, coercion_env, subst, ts_error)
+		  		= finishContextReduction red_apps case_with_context_ptrs main_dcl_module_n ti_common_defs ts_var_heap ts_type_heaps ts_expr_heap predef_symbols special_instances
+		  				coercion_env subst ts_error
+		| not ts_error.ea_ok 
+			= (True, predef_symbols, special_instances, out, create_erroneous_function_types comp { ts & ts_type_heaps = ts_type_heaps,
+					ts_error = { ts_error & ea_ok = True }, ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [], 
+					ts_td_infos = ts_td_infos, ts_expr_heap = ts_expr_heap, ts_var_heap = ts_var_heap })
+		# (contexts, dict_types, {hp_var_heap=ts_var_heap, hp_expression_heap=ts_expr_heap, hp_type_heaps=ts_type_heaps, hp_generic_heap}, subst, ts_error)
+		  		= addDictionaries user_contexts contexts fin_red_apps ti_common_defs 
+			  		{hp_var_heap= ts_var_heap, hp_expression_heap = ts_expr_heap, hp_type_heaps = ts_type_heaps, hp_generic_heap = ts_generic_heap}
+			  		 subst ts_error
+		| not ts_error.ea_ok
+			= (True, predef_symbols, special_instances, out, create_erroneous_function_types comp { ts & ts_type_heaps = ts_type_heaps,
+					ts_error = { ts_error & ea_ok = True }, ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [], 
+					ts_td_infos = ts_td_infos, ts_expr_heap = ts_expr_heap, ts_var_heap = ts_var_heap, ts_generic_heap=hp_generic_heap})
+
+		# (fun_defs, coercion_env, subst, ts_td_infos, ts_var_heap, ts_expr_heap, ts_error)
+		  		= makeSharedReferencesNonUnique comp ts.ts_fun_defs coercion_env subst ts_td_infos ts_var_heap ts_expr_heap ts_error
+		  (subst, coercions, ts_td_infos, ts_type_heaps, ts_error)
+		  		= build_coercion_env fun_reqs subst coercion_env ti_common_defs cons_var_vects ts_td_infos ts_type_heaps ts_error
 		  (subst, ts_fun_env) = expand_function_types comp subst ts.ts_fun_env
 		  ({coer_offered,coer_demanded},ts_error,ts_fun_env)
 		  		= add_unicity_of_essentially_unique_types_for_functions ti_common_defs comp coercions ts_error ts_fun_env
@@ -2658,25 +2693,26 @@ where
 		  attr_var_env = createArray nr_of_attr_vars TA_None
 		  var_env = { subst & [i] = TE \\ i <- [0..dec ts_var_store]}
 		  ts = {ts & ts_error = ts_error, ts_fun_env = ts_fun_env, ts_type_heaps = ts_type_heaps, ts_td_infos = ts_td_infos,
-					 ts_var_heap = os_var_heap, ts_expr_heap = os_symbol_heap,ts_generic_heap=os_generic_heap,ts_fun_defs=fun_defs}
+					 ts_var_heap = ts_var_heap, ts_expr_heap = ts_expr_heap, ts_generic_heap=hp_generic_heap, ts_fun_defs=fun_defs}
 		  (out, ts)
 			= cleanUpAndCheckFunctionTypes comp fun_reqs dict_types start_index list_inferred_types ti_common_defs contexts coer_demanded attr_partition var_env attr_var_env
 				(out,ts)
 		| not ts.ts_error.ea_ok
-			= (True, os_predef_symbols, os_special_instances, out, create_erroneous_function_types comp
+			= (True, predef_symbols, special_instances, out, create_erroneous_function_types comp
 					{ ts & ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [], ts_error = { ts.ts_error & ea_ok = True }})
 		# ts_type_heaps = ts.ts_type_heaps
 		  type_code_info = {	tci_type_var_heap = ts_type_heaps.th_vars, tci_attr_var_heap = ts_type_heaps.th_attrs,
 								tci_dcl_modules = dcl_modules, tci_common_defs = ti_common_defs } 
-		  (fun_defs, ts_fun_env, ts_expr_heap, {tci_type_var_heap,tci_attr_var_heap}, ts_var_heap, ts_error, os_predef_symbols)
+		  (fun_defs, ts_fun_env, ts_expr_heap, {tci_type_var_heap,tci_attr_var_heap}, ts_var_heap, ts_error, predef_symbols)
 		  		= removeOverloadedFunctionsWithoutUpdatingFunctions comp local_pattern_variables main_dcl_module_n ts.ts_fun_defs ts.ts_fun_env
-		  								ts.ts_expr_heap type_code_info ts.ts_var_heap ts.ts_error os_predef_symbols
+		  								ts.ts_expr_heap type_code_info ts.ts_var_heap ts.ts_error predef_symbols
 		= (	type_error || not ts_error.ea_ok,
-			os_predef_symbols, os_special_instances, out,
+			predef_symbols, special_instances, out,
 			{ ts & ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [],
 					ts_expr_heap = ts_expr_heap, ts_error = { ts_error & ea_ok = True },
 				  	ts_var_heap = ts_var_heap, ts_type_heaps = { ts_type_heaps & th_vars =  tci_type_var_heap, th_attrs =  tci_attr_var_heap },
 				  	ts_fun_env = ts_fun_env, ts_fun_defs=fun_defs})
+
 
 typeProgram :: !{! Group} !Int !*{# FunDef} !IndexRange  !(Optional Bool) !CommonDefs !{!Declaration} ![QualifiedDeclaration] !{# DclModule} !NumberSet
 																						 !*TypeDefInfos !*Heaps !*PredefinedSymbols !*File !*File
@@ -2722,7 +2758,7 @@ where
 			= funs_and_state
 			# funs_and_state = type_component list_inferred_types [ir_from] class_instances ti funs_and_state
 			= type_instances list_inferred_types (inc ir_from) ir_to class_instances ti funs_and_state
-	
+
 	type_components list_inferred_types group_index comps class_instances ti funs_and_state
 		| group_index == size comps
 			= funs_and_state
@@ -2732,7 +2768,6 @@ where
 
 	type_component list_inferred_types comp class_instances ti=:{ti_common_defs} (type_error, predef_symbols, special_instances, out, ts)
 		# (start_index, predef_symbols) = get_index_of_start_rule main_dcl_module_n predef_symbols
-//		# (functions, fun_defs) = show_component comp fun_defs
 		# (predef_symbols, ts) = CreateInitialSymbolTypes start_index ti_common_defs comp (predef_symbols, ts)
 		| not ts.ts_error.ea_ok
 			= (True, predef_symbols, special_instances, out, create_erroneous_function_types comp
@@ -2746,27 +2781,40 @@ where
 			= (True, predef_symbols, special_instances, out, create_erroneous_function_types comp
 				{ ts & ts_type_heaps = ts_type_heaps, ts_error = { ts_error & ea_ok = True },
 					ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = []})
-		# {ts_attr_store,ts_var_heap,ts_var_store,ts_expr_heap,ts_td_infos,ts_cons_variables,ts_exis_variables} = ts
+		# {ts_attr_store,ts_var_heap,ts_var_store,ts_expr_heap,ts_generic_heap,ts_td_infos,ts_cons_variables,ts_exis_variables} = ts
+		  (calls, user_contexts, (subst, ts_expr_heap)) = collect_overloaded_calls_and_user_contexts fun_reqs [] [] (subst, ts_expr_heap)
+
+		  (red_apps, case_with_context_ptrs, ts_var_heap, ts_type_heaps, ts_expr_heap, predef_symbols, subst, ts_error)
+		  		= startContextReduction calls user_contexts ti_common_defs class_instances
+		  				ts_var_heap ts_type_heaps ts_expr_heap predef_symbols subst ts_error
 		  (cons_var_vects, subst) = determine_cons_variables ts_cons_variables (createArray (inc (BITINDEX nr_of_type_variables)) 0, subst)
-		  (subst, nr_of_attr_vars, ts_type_heaps, ts_td_infos) = liftSubstitution subst ti_common_defs cons_var_vects ts_attr_store ts_type_heaps ts_td_infos
+		  (marked_new_vars,subst) = liftNewVarSubstitutions red_apps nr_of_type_variables subst
+		  (subst, nr_of_attr_vars, ts_type_heaps, ts_td_infos)
+		  	= liftSubstitutionFunDep nr_of_type_variables marked_new_vars ti_common_defs cons_var_vects subst ts_attr_store ts_type_heaps ts_td_infos
 		  coer_demanded ={{ CT_Empty \\ i <- [0 .. nr_of_attr_vars - 1] } & [AttrUni] = CT_Unique }
 		  coer_offered = {{ CT_Empty \\ i <- [0 .. nr_of_attr_vars - 1] } & [AttrMulti] = CT_NonUnique }
 		  coercion_env = build_initial_coercion_env fun_reqs {coer_demanded = coer_demanded, coer_offered = coer_offered }
-		  (over_info, (subst, ts_expr_heap)) = collect_and_expand_overloaded_calls fun_reqs [] (subst, ts_expr_heap)
-		  (contexts, coercion_env, local_pattern_variables, dict_types,
-		  	{os_type_heaps, os_var_heap, os_symbol_heap, os_generic_heap, os_predef_symbols, os_special_instances, os_error})
-		  		= tryToSolveOverloading over_info main_dcl_module_n ti_common_defs class_instances coercion_env
-		  			{	os_type_heaps = ts_type_heaps, os_var_heap = ts_var_heap, os_symbol_heap = ts_expr_heap, os_generic_heap = ts.ts_generic_heap,
-		  				os_predef_symbols = predef_symbols, os_error = ts_error, os_special_instances = special_instances } dcl_modules
-		  //ts = {ts & ts_generic_heap = os_generic_heap}
-		| not os_error.ea_ok
-			= (True, os_predef_symbols, os_special_instances, out, create_erroneous_function_types comp { ts & ts_type_heaps = os_type_heaps,
-					ts_error = { os_error & ea_ok = True }, ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [], 
-					ts_td_infos = ts_td_infos, ts_expr_heap = os_symbol_heap, ts_var_heap = os_var_heap,ts_generic_heap=os_generic_heap})
-		# (fun_defs, coercion_env, subst, ts_td_infos, os_var_heap, os_symbol_heap, os_error)
-		  		= makeSharedReferencesNonUnique comp ts.ts_fun_defs coercion_env subst ts_td_infos os_var_heap os_symbol_heap os_error
-		# (subst, coercions, ts_td_infos, ts_type_heaps, ts_error)
-		  		= build_coercion_env fun_reqs subst coercion_env ti_common_defs cons_var_vects ts_td_infos os_type_heaps os_error
+		  (subst, ts_expr_heap)	= expand_case_or_let_types_in_requirements fun_reqs (subst, ts_expr_heap) 
+		  (fin_red_apps, contexts, local_pattern_variables, ts_var_heap, ts_type_heaps, ts_expr_heap, predef_symbols, special_instances, coercion_env, subst, ts_error)
+		  		= finishContextReduction red_apps case_with_context_ptrs main_dcl_module_n ti_common_defs ts_var_heap ts_type_heaps ts_expr_heap predef_symbols special_instances
+		  				coercion_env subst ts_error
+		| not ts_error.ea_ok 
+			= (True, predef_symbols, special_instances, out, create_erroneous_function_types comp { ts & ts_type_heaps = ts_type_heaps,
+					ts_error = { ts_error & ea_ok = True }, ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [], 
+					ts_td_infos = ts_td_infos, ts_expr_heap = ts_expr_heap, ts_var_heap = ts_var_heap })
+		# (contexts, dict_types, {hp_var_heap=ts_var_heap, hp_expression_heap=ts_expr_heap, hp_type_heaps=ts_type_heaps, hp_generic_heap}, subst, ts_error)
+		  		= addDictionaries user_contexts contexts fin_red_apps ti_common_defs 
+			  		{hp_var_heap= ts_var_heap, hp_expression_heap = ts_expr_heap, hp_type_heaps = ts_type_heaps, hp_generic_heap = ts_generic_heap}
+			  		 subst ts_error
+		| not ts_error.ea_ok
+			= (True, predef_symbols, special_instances, out, create_erroneous_function_types comp { ts & ts_type_heaps = ts_type_heaps,
+					ts_error = { ts_error & ea_ok = True }, ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [], 
+					ts_td_infos = ts_td_infos, ts_expr_heap = ts_expr_heap, ts_var_heap = ts_var_heap, ts_generic_heap=hp_generic_heap})
+
+		# (fun_defs, coercion_env, subst, ts_td_infos, ts_var_heap, ts_expr_heap, ts_error)
+		  		= makeSharedReferencesNonUnique comp ts.ts_fun_defs coercion_env subst ts_td_infos ts_var_heap ts_expr_heap ts_error
+		  (subst, coercions, ts_td_infos, ts_type_heaps, ts_error)
+		  		= build_coercion_env fun_reqs subst coercion_env ti_common_defs cons_var_vects ts_td_infos ts_type_heaps ts_error
 		  (subst, ts_fun_env) = expand_function_types comp subst ts.ts_fun_env
 		  ({coer_offered,coer_demanded},ts_error,ts_fun_env)
 		  		= add_unicity_of_essentially_unique_types_for_functions ti_common_defs comp coercions ts_error ts_fun_env
@@ -2775,51 +2823,25 @@ where
 		  attr_var_env = createArray nr_of_attr_vars TA_None
 		  var_env = { subst & [i] = TE \\ i <- [0..dec ts_var_store]}
 		  ts = {ts & ts_error = ts_error, ts_fun_env = ts_fun_env, ts_type_heaps = ts_type_heaps, ts_td_infos = ts_td_infos,
-					 ts_var_heap = os_var_heap, ts_expr_heap = os_symbol_heap,ts_generic_heap=os_generic_heap,ts_fun_defs=fun_defs}
+					 ts_var_heap = ts_var_heap, ts_expr_heap = ts_expr_heap, ts_generic_heap=hp_generic_heap, ts_fun_defs=fun_defs}
 		  (out, ts)
 			= cleanUpAndCheckFunctionTypes comp fun_reqs dict_types start_index list_inferred_types ti_common_defs contexts coer_demanded attr_partition var_env attr_var_env
 				(out,ts)
 		| not ts.ts_error.ea_ok
-			= (True, os_predef_symbols, os_special_instances, out, create_erroneous_function_types comp
+			= (True, predef_symbols, special_instances, out, create_erroneous_function_types comp
 					{ ts & ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [], ts_error = { ts.ts_error & ea_ok = True }})
 		# ts_type_heaps = ts.ts_type_heaps
 		  type_code_info = {	tci_type_var_heap = ts_type_heaps.th_vars, tci_attr_var_heap = ts_type_heaps.th_attrs,
 								tci_dcl_modules = dcl_modules, tci_common_defs = ti_common_defs } 
-		  (fun_defs, ts_fun_env, ts_expr_heap, {tci_type_var_heap,tci_attr_var_heap}, ts_var_heap, ts_error, os_predef_symbols)
+		  (fun_defs, ts_fun_env, ts_expr_heap, {tci_type_var_heap,tci_attr_var_heap}, ts_var_heap, ts_error, predef_symbols)
 		  		= removeOverloadedFunctions comp local_pattern_variables main_dcl_module_n ts.ts_fun_defs ts.ts_fun_env
-		  								ts.ts_expr_heap type_code_info ts.ts_var_heap ts.ts_error os_predef_symbols
+		  								ts.ts_expr_heap type_code_info ts.ts_var_heap ts.ts_error predef_symbols
 		= (	type_error || not ts_error.ea_ok,
-			os_predef_symbols, os_special_instances, out,
+			predef_symbols, special_instances, out,
 			{ ts & ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [],
 					ts_expr_heap = ts_expr_heap, ts_error = { ts_error & ea_ok = True },
 				  	ts_var_heap = ts_var_heap, ts_type_heaps = { ts_type_heaps & th_vars =  tci_type_var_heap, th_attrs =  tci_attr_var_heap },
 				  	ts_fun_env = ts_fun_env, ts_fun_defs=fun_defs})
-
-	update_function_types :: !Index !{!Group} !*{!FunctionType} !*{#FunDef} -> (!*{#FunDef}, !*{!FunctionType})
-	update_function_types group_index comps fun_env fun_defs
-		| group_index == size comps
-			= (fun_defs, fun_env)
-			#! comp = comps.[group_index]	
-			# (fun_defs, fun_env) = update_function_types_in_component comp.group_members fun_env fun_defs
-			= update_function_types (inc group_index) comps fun_env fun_defs
-
-	where
-		update_function_types_in_component :: ![Index] !*{!FunctionType} !*{#FunDef} -> (!*{#FunDef}, !*{!FunctionType})
-		update_function_types_in_component [fun_index : funs] fun_env fun_defs
-			# (CheckedType checked_fun_type, fun_env) = fun_env![fun_index]
-			# (fd, fun_defs) = fun_defs![fun_index]
-			= case fd.fun_type of
-				No
-					-> update_function_types_in_component funs fun_env { fun_defs & [fun_index] = { fd & fun_type = Yes checked_fun_type }}
-				Yes fun_type
-					# nr_of_lifted_arguments = checked_fun_type.st_arity - fun_type.st_arity
-					| nr_of_lifted_arguments > 0
-						# fun_type = addLiftedArgumentsToSymbolType fun_type nr_of_lifted_arguments
-									checked_fun_type.st_args checked_fun_type.st_vars checked_fun_type.st_attr_vars checked_fun_type.st_context
-						-> update_function_types_in_component funs fun_env { fun_defs & [fun_index] = { fd & fun_type = Yes fun_type }}
-						-> update_function_types_in_component funs fun_env fun_defs
-		update_function_types_in_component [] fun_env fun_defs
-			= (fun_defs, fun_env)
 
 	create_special_instances {si_array_instances,si_list_instances,si_tail_strict_list_instances,si_next_array_member_index} fun_env_size common_defs fun_defs predef_symbols type_heaps error
 		# fun_defs = add_extra_elements_to_fun_def_array (si_next_array_member_index-fun_env_size) fun_defs
@@ -2827,7 +2849,7 @@ where
 		  		add_extra_elements_to_fun_def_array n_new_elements fun_defs
 		  			| n_new_elements==0
 		  				= fun_defs
-			  			# dummy_fun_def = { fun_docs ="", fun_pragmas = [], fun_ident = {id_name="",id_info=nilPtr},fun_arity=0,fun_priority=NoPrio,fun_body=NoBody,fun_type=No,fun_pos=NoPos,
+			  			# dummy_fun_def = { fun_docs = "", fun_pragmas = [], fun_ident = {id_name="",id_info=nilPtr},fun_arity=0,fun_priority=NoPrio,fun_body=NoBody,fun_type=No,fun_pos=NoPos,
 										  				fun_kind=FK_Unknown,fun_lifted=0,fun_info = {fi_calls=[],fi_group_index=0,fi_def_level=NotALevel,fi_free_vars=[],fi_local_vars=[],fi_dynamics=[],fi_properties=0}}
 			  			= {createArray (size fun_defs+n_new_elements) dummy_fun_def & [i]=fun_defs.[i] \\ i<-[0..size fun_defs-1]}
 		  (array_first_instance_indices,fun_defs, predef_symbols, type_heaps, error)
@@ -2874,9 +2896,9 @@ where
 					  instance_type = makeElemTypeOfArrayFunctionStrict instance_type member_index offset_table
 					  fun_index = first_instance_index+member_index
 					  fun = 
-						{ fun_docs = ""
-                        , fun_pragmas = []
-                        , 	fun_ident		= me_ident
+						{	fun_docs		= ""
+						,	fun_pragmas		= []
+						,	fun_ident		= me_ident
 						,	fun_arity		= me_type.st_arity
 						,	fun_priority	= NoPrio
 						,	fun_body		= NoBody
@@ -2918,9 +2940,9 @@ where
 															it_types = [record_type]} SP_None type_heaps No error
 					  fun_index = first_instance_index+member_index
 					  fun = 
-						{ fun_docs = ""
-                        , fun_pragmas = []
-                        , 	fun_ident		= me_ident
+						{	fun_docs		= ""
+						,	fun_pragmas		= []
+						,	fun_ident		= me_ident
 						,	fun_arity		= me_type.st_arity
 						,	fun_priority	= NoPrio
 						,	fun_body		= NoBody
@@ -2944,23 +2966,22 @@ update_function_types group_index comps fun_env fun_defs
 		= update_function_types (inc group_index) comps fun_env fun_defs
 
 where
-    update_function_types_in_component :: ![Index] !*{!FunctionType} !*{#FunDef} -> (!*{#FunDef}, !*{!FunctionType})
-    update_function_types_in_component [fun_index : funs] fun_env fun_defs
-        # (CheckedType checked_fun_type, fun_env) = fun_env![fun_index]
-        # (fd, fun_defs) = fun_defs![fun_index]
-        = case fd.fun_type of
-            No
-                = update_function_types_in_component funs fun_env { fun_defs & [fun_index] = { fd & fun_type = Yes checked_fun_type }}
-            Yes fun_type
-                # nr_of_lifted_arguments = checked_fun_type.st_arity - fun_type.st_arity
-                | nr_of_lifted_arguments > 0
-                    # fun_type = addLiftedArgumentsToSymbolType fun_type nr_of_lifted_arguments
-                    			checked_fun_type.st_args checked_fun_type.st_vars checked_fun_type.st_attr_vars checked_fun_type.st_context
-                    = update_function_types_in_component funs fun_env { fun_defs & [fun_index] = { fd & fun_type = Yes fun_type }}
-                    = update_function_types_in_component funs fun_env fun_defs
-    update_function_types_in_component [] fun_env fun_defs
-    	= (fun_defs, fun_env)
-
+	update_function_types_in_component :: ![Index] !*{!FunctionType} !*{#FunDef} -> (!*{#FunDef}, !*{!FunctionType})
+	update_function_types_in_component [fun_index : funs] fun_env fun_defs
+		# (CheckedType checked_fun_type, fun_env) = fun_env![fun_index]
+		# (fd, fun_defs) = fun_defs![fun_index]
+		= case fd.fun_type of
+			No
+				-> update_function_types_in_component funs fun_env { fun_defs & [fun_index] = { fd & fun_type = Yes checked_fun_type }}
+			Yes fun_type
+				# nr_of_lifted_arguments = checked_fun_type.st_arity - fun_type.st_arity
+				| nr_of_lifted_arguments > 0
+					# fun_type = addLiftedArgumentsToSymbolType fun_type nr_of_lifted_arguments
+								checked_fun_type.st_args checked_fun_type.st_vars checked_fun_type.st_attr_vars checked_fun_type.st_context
+					-> update_function_types_in_component funs fun_env { fun_defs & [fun_index] = { fd & fun_type = Yes fun_type }}
+					-> update_function_types_in_component funs fun_env fun_defs
+	update_function_types_in_component [] fun_env fun_defs
+		= (fun_defs, fun_env)
 
 add_unicity_of_essentially_unique_types_for_functions ti_common_defs comp coercions ts_error ts_fun_env
 	= foldSt (add_unicity_of_essentially_unique_types_for_function ti_common_defs)

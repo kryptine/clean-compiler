@@ -2092,8 +2092,8 @@ determine_arg (PR_Class class_app free_vars_and_types class_type) _ {fv_info_ptr
 			  }
 	// AA: Dummy generic dictionary does not unify with corresponding class dictionary.
 	// Make it unify
-	# ({pds_module,pds_def},das_predef) = das_predef![PD_TypeGenericDict]
-	# genericGlobalIndex	= {glob_module = pds_module, glob_object = pds_def}
+	#! (defTypeGenericDict,das_predef) = das_predef![PD_TypeGenericDict]
+	#! (defTypeGenericDict0,das_predef) = das_predef![PD_TypeGenericDict0]
 	# (succ, das_subst, das_type_heaps)
 		//AA: = unify class_atype arg_type type_input das_subst das_type_heaps
 		= unify_dict class_atype arg_type type_input das_subst das_type_heaps
@@ -2101,12 +2101,11 @@ determine_arg (PR_Class class_app free_vars_and_types class_type) _ {fv_info_ptr
 			unify_dict class_atype=:{at_type=TA type_symb1 args1} arg_type=:{at_type=TA type_symb2 args2} 
 				| type_symb1 == type_symb2 
 					= unify class_atype arg_type
-				// FIXME: check indexes, not names. Need predefs for that. 	
-//				| type_symb1.type_ident.id_name == "GenericDict"
-				| type_symb1.type_index == genericGlobalIndex
+				#! genericDictGlobalIndex = {glob_module = defTypeGenericDict.pds_module, glob_object = defTypeGenericDict.pds_def}
+				#! genericDict0GlobalIndex = {glob_module = defTypeGenericDict0.pds_module, glob_object = defTypeGenericDict0.pds_def}
+				| type_symb1.type_index == genericDictGlobalIndex || type_symb1.type_index == genericDict0GlobalIndex
 					= unify {class_atype & at_type = TA type_symb2 args1} arg_type	
-//				| type_symb2.type_ident.id_name == "GenericDict"
-				| type_symb2.type_index == genericGlobalIndex
+				| type_symb2.type_index == genericDictGlobalIndex || type_symb2.type_index == genericDict0GlobalIndex
 					= unify class_atype {arg_type & at_type = TA type_symb1 args2} 	  				
 			unify_dict class_atype arg_type 
 				= unify class_atype arg_type
@@ -3311,7 +3310,7 @@ transformSelection NormalSelector s=:[RecordSelection _ field_index : selectors]
 		// urgh: now reevaluates cnf for each nested strict selector :-(
 		| cnf_app_args appi ro
 			= transformSelection NormalSelector selectors (app_args !! field_index) ro ti
-		= (Selection NormalSelector app s, ti)
+			= transform_remaining_selectors_of_normal_record_selector s app ro ti
 	# (app_info, ti_symbol_heap) = readPtr app_info_ptr ti_symbol_heap
 	  ti = { ti & ti_symbol_heap = ti_symbol_heap }
 	= case app_info of
@@ -3321,7 +3320,7 @@ transformSelection NormalSelector s=:[RecordSelection _ field_index : selectors]
 			// urgh: now reevaluates cnf for each nested strict selector :-(
 			| cnf_app_args appi ro
 				-> transformSelection NormalSelector selectors (app_args !! field_index) ro ti
-			-> (Selection NormalSelector app s, ti)
+			-> transform_remaining_selectors_of_normal_record_selector s app ro ti
 where
 	cnf_args [] index strictness ro = True
 	cnf_args [arg:args] index strictness ro
@@ -3348,8 +3347,8 @@ transformSelection NormalSelector s=:[RecordSelection _ field_index : selectors]
 			= case fun_body of
 				TransformedBody {tb_rhs}	-> case tb_rhs of
 					App app						-> transformSelection NormalSelector s tb_rhs ro ti
-					_							-> (Selection NormalSelector app s, ti)
-			= (Selection NormalSelector app s, ti)
+					_							-> transform_remaining_selectors_of_normal_record_selector s app ro ti
+			= transform_remaining_selectors_of_normal_record_selector s app ro ti
 where
 	isOKSymbol (SK_Function {glob_module})	= glob_module == ro.ro_main_dcl_module_n
 	isOKSymbol (SK_LocalMacroFunction _)	= True
