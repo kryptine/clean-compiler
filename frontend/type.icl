@@ -2681,7 +2681,7 @@ where
 		  type_code_info = {	tci_type_var_heap = ts_type_heaps.th_vars, tci_attr_var_heap = ts_type_heaps.th_attrs,
 								tci_dcl_modules = dcl_modules, tci_common_defs = ti_common_defs } 
 		  (fun_defs, ts_fun_env, ts_expr_heap, {tci_type_var_heap,tci_attr_var_heap}, ts_var_heap, ts_error, predef_symbols)
-		  		= removeOverloadedFunctions comp local_pattern_variables main_dcl_module_n ts.ts_fun_defs ts.ts_fun_env
+		  		= removeOverloadedFunctionsWithoutUpdatingFunctions comp local_pattern_variables main_dcl_module_n ts.ts_fun_defs ts.ts_fun_env
 		  								ts.ts_expr_heap type_code_info ts.ts_var_heap ts.ts_error predef_symbols
 		= (	type_error || not ts_error.ea_ok,
 			predef_symbols, special_instances, out,
