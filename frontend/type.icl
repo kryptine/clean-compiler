@@ -1471,7 +1471,7 @@ getSymbolType pos ti=:{ti_functions,ti_common_defs,ti_main_dcl_module_n} {symb_k
 				  (fun_type_copy,ts) = currySymbolType fun_type_copy n_app_args ts
 				-> (fun_type_copy, [], ts)
 			_
-				-> abort ("getSymbolType: SK_Function "+++toString symb_ident+++" "+++toString glob_object)
+				-> abort ("getSymbolType: SK_Function "+++toString symb_ident+++" glob_module = "+++ toString glob_module +++ " glob_object = " +++ toString glob_object +++ " ti_main_dcl_module_n = " +++ toString ti_main_dcl_module_n)
 //				-> abort "getSymbolType (type.icl)" ---> (symb_ident, glob_object, fun_type)
 		# {ft_type,ft_type_ptr,ft_specials} = ti_functions.[glob_module].[glob_object]
 		| glob_module>=size ti_functions || glob_object>=size ti_functions.[glob_module]

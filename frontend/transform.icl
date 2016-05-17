@@ -1185,11 +1185,8 @@ partitionateAndLiftFunctions ranges main_dcl_module_n predef_symbols_for_transfo
 	  		= foldSt (partitionate_functions main_dcl_module_n max_fun_nr) ranges partitioning_info
 	# (n_groups,reversed_ps_groups,fun_defs) = remove_macros_from_groups_and_reverse ps_groups 0 ps_fun_defs []
 	# groups = { {group_members = group} \\ group <- reversed_ps_groups }
-	# group_a = createArray n_groups {group_members = []};
-	# last_group_n = n_groups-1;
-	# group_a = { group_a & [last_group_n-i] = {group_members = group} \\ i<-[0..last_group_n] & group<-reversed_ps_groups }
 	# macro_defs = restore_unexpanded_dcl_macros ps_unexpanded_dcl_macros ps_macro_defs
-	= (group_a, fun_defs, macro_defs, ps_var_heap, ps_symbol_heap, ps_symbol_table, ps_error)
+	= (groups, fun_defs, macro_defs, ps_var_heap, ps_symbol_heap, ps_symbol_table, ps_error)
 where
 	partitionate_functions mod_index max_fun_nr {ir_from,ir_to} ps
 		= iFoldSt (partitionate_global_function mod_index max_fun_nr) ir_from ir_to ps
