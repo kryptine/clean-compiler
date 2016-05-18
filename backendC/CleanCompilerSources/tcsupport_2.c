@@ -22,40 +22,6 @@
 #include "comparser.h"
 #include "buildtree.h"
 
-BITVECT DetermineUniPropOfTypeCons (SymbDef typecons)
-{
-	if (typecons -> sdef_kind == TYPE || typecons -> sdef_kind == RECORDTYPE)
-		return (typecons -> sdef_type) ? typecons -> sdef_type -> type_uniprop : ALLBITSSET;
-	else
-		return (typecons -> sdef_kind == TYPESYN) ? typecons -> sdef_syn_type -> syntype_uniprop : ALLBITSSET;
-		
-} /* DetermineUniPropOfTypeCons */
-
-BITVECT DetermineConsVarsOfTypeCons (SymbDef typecons, ConsVarList * cons_vars)
-{
-	if (typecons -> sdef_kind == TYPE || typecons -> sdef_kind == RECORDTYPE)
-	{	if (typecons -> sdef_type)
-		{	* cons_vars = NULL;
-			return typecons -> sdef_type -> type_consvars;
-		}
-		else
-		{	* cons_vars = NULL;
-			return ALLBITSCLEAR;
-		}
-	}
-	else if (typecons -> sdef_kind == TYPESYN)
-	{	 * cons_vars =  NULL;
-		return typecons -> sdef_syn_type -> syn_consvars;
-	}
-	else
-	{	* cons_vars = NULL;
-		return ALLBITSCLEAR;
-	}
-		
-} /* DetermineConsVarsOfTypeCons */
-
-#define SubstitutedType(typeargs) ((typeargs)[-1])
-
 void PrintNodeSymbol (Node node, int arg_nr, File file)
 {
 	Symbol rootsymb;
