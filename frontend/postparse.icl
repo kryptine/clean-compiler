@@ -46,6 +46,13 @@ prefixAndPositionToIdentExp prefix {lc_line, lc_column} ca=:{ca_hash_table}
 	# ({boxed_ident=ident}, ca_hash_table) = putIdentInHashTable (prefix +++ ";" +++ toString lc_line +++ ";" +++ toString lc_column) IC_Expression ca_hash_table
 	= (PE_Ident ident, { ca & ca_hash_table = ca_hash_table } )
 
+patternPrefixAndPositionToIdentExp :: !ParsedExpr !String !LineAndColumn !*CollectAdmin -> (!ParsedExpr, !*CollectAdmin)
+patternPrefixAndPositionToIdentExp (PE_Ident ident) prefix gen_position ca
+	| isLowerCaseName ident.id_name
+		= prefixAndPositionToIdentExp (ident.id_name+++";"+++prefix) gen_position ca
+patternPrefixAndPositionToIdentExp _ prefix gen_position ca
+	= prefixAndPositionToIdentExp prefix gen_position ca
+
 (`) infixl 9
 (`) f a
 	:== apply f (toParsedExpr a)
@@ -440,7 +447,7 @@ transformGenerator {gen_kind=IsArrayGenerator, gen_expr, gen_pattern, gen_positi
 	  pattern = PE_Tuple [gen_pattern, array]
 	= case index_generator of
 		No
-			# (i, ca) = prefixAndPositionToIdentExp "g_i" gen_position ca
+			# (i, ca) = patternPrefixAndPositionToIdentExp pattern "g_i" gen_position ca
 			  inc = get_predef_id PD_IncFun
 			# dec_n = PE_List [n,PE_Ident sub,PE_Basic (BVInt 1)]
 			# transformed_generator
@@ -496,7 +503,7 @@ transformGenerator {gen_kind, gen_expr=PE_Sequ (SQ_FromTo pd_from_to_index from_
 		| is_zero_expression from_exp
 			= case index_generator of
 				No
-					# (i, ca) = prefixAndPositionToIdentExp "g_i" gen_position ca
+					# (i, ca) = patternPrefixAndPositionToIdentExp gen_pattern "g_i" gen_position ca
 					# inc = get_predef_id PD_IncFun
 					  less_or_equal = get_predef_id PD_LessOrEqualFun
 					# transformed_generator
@@ -539,7 +546,7 @@ transformGenerator {gen_kind, gen_expr=PE_Sequ (SQ_FromTo pd_from_to_index from_
 							,	tg_case1 = gen_var_case1, tg_case2 = gen_var_case2
 							}
 					-> (transformed_generator,Yes (i,[([],to_exp,n):size_expressions]),0,ca)
-			# (i, ca) = prefixAndPositionToIdentExp "g_i" gen_position ca
+			# (i, ca) = patternPrefixAndPositionToIdentExp gen_pattern "g_i" gen_position ca
 			# inc = get_predef_id PD_IncFun
 			  less_or_equal = get_predef_id PD_LessOrEqualFun
 			# transformed_generator
@@ -561,7 +568,7 @@ transformGenerator {gen_kind, gen_expr=PE_Sequ (SQ_From pd_from_index from_exp),
 		| is_zero_expression from_exp
 			= case index_generator of
 				No
-					# (i, ca) = prefixAndPositionToIdentExp "g_i" gen_position ca
+					# (i, ca) = patternPrefixAndPositionToIdentExp gen_pattern "g_i" gen_position ca
 					# inc = get_predef_id PD_IncFun
 					# transformed_generator
 					  	=	{	tg_expr = ([],[from_exp])
@@ -588,7 +595,7 @@ transformGenerator {gen_kind, gen_expr=PE_Sequ (SQ_From pd_from_index from_exp),
 							,	tg_case1 = gen_var_case1, tg_case2 = gen_var_case2
 							}
 					-> (transformed_generator,index_generator,0,ca)
-			# (i, ca) = prefixAndPositionToIdentExp "g_i" gen_position ca
+			# (i, ca) = patternPrefixAndPositionToIdentExp gen_pattern "g_i" gen_position ca
 			# inc = get_predef_id PD_IncFun
 			# transformed_generator
 			  	=	{	tg_expr = ([],[from_exp])
@@ -604,7 +611,7 @@ transformGenerator {gen_kind, gen_expr=PE_Sequ (SQ_From pd_from_index from_exp),
 			= (transformed_generator,index_generator,0,ca)
 transformGenerator {gen_kind, gen_expr, gen_pattern, gen_position} qual_filename index_generator ca
 	# (list, ca) = prefixAndPositionToIdentExp "g_l" gen_position ca
-	  (hd, ca) = prefixAndPositionToIdentExp "g_h" gen_position ca
+	  (hd, ca) = patternPrefixAndPositionToIdentExp gen_pattern "g_h" gen_position ca
 	  (tl, ca) = prefixAndPositionToIdentExp "g_t" gen_position ca
 	  (gen_var_case1, ca) = prefixAndPositionToIdent "g_c1" gen_position ca
 	  (gen_var_case2, ca) = prefixAndPositionToIdent "g_c2" gen_position ca
@@ -866,9 +873,9 @@ size_of_generator_can_be_computed_quickly _
 size_of_generators_can_be_computed_quickly qualifiers=:[qualifier=:{qual_generators,qual_filter=No}]
 	= All size_of_generator_can_be_computed_quickly qual_generators && not (All is_from_generator qual_generators)
 	where
-		is_from_generator {gen_pattern,gen_kind=IsListGenerator,gen_expr=PE_Sequ (SQ_From _ from_exp)}
+		is_from_generator {gen_kind=IsListGenerator,gen_expr=PE_Sequ (SQ_From _ from_exp)}
 			= True
-		is_from_generator {gen_pattern,gen_kind=IsOverloadedListGenerator,gen_expr=PE_Sequ (SQ_From _ from_exp)}
+		is_from_generator {gen_kind=IsOverloadedListGenerator,gen_expr=PE_Sequ (SQ_From _ from_exp)}
 			= True
 		is_from_generator _
 			= False
