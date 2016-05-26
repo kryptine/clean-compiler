@@ -125,8 +125,9 @@ void GenTypeError (void);
 void BuildArg (Args arg,int *asp_p,int *bsp_p,CodeGenNodeIdsP code_gen_node_ids_p);
 Bool NodeOnACycleIsInRootNormalForm (Node node);
 void UpdateStackPointers (int old_asp,int old_bsp,int new_asp,int new_bsp);
-void UpdateNodeAndAddSelectorsToUpdateNode
-	(ArgS *record_arg,ArgS *first_field_arg,StateS *field_states,int record_a_size,int record_b_size,int *asp_p,int *bsp_p);
+void UpdateRecordAndAddSelectorsToUpdateNode
+	(ArgS *record_arg,ArgS *first_field_arg,StateS *field_states,int record_a_size,int record_b_size,int *end_args_a_offset_p,int *end_args_b_offset_p);
+void RemoveFieldsFromStackAfterUpdate (int arg_a_offset,int arg_b_offset,int record_a_size,int record_b_size,int *asp_p,int *bsp_p);
 void RemoveSelectorsFromUpdateNode (ArgS *previous_arg,ArgS *arg);
 void BuildOrFillLazyFieldSelector (SymbDef selector_sdef,StateKind result_state_kind,int *asp_p,NodeId update_node_id);
 void CoerceArgumentOnTopOfStack (int *asp_p,int *bsp_p,StateS argstate,StateS nodestate,int asize,int bsize);

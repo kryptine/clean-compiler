@@ -249,7 +249,6 @@ void RedirectResultAndReturn (int asp,int bsp,int source_a_index,int source_b_in
 			}
 		}
 	} else if (IsSimpleState (demstate)){
-#if 1 /*JVG 29-5-2000 for Clean 2.0*/
 		if (demstate.state_kind==StrictRedirection){
 			switch (offstate.state_type){
 				case TupleState:
@@ -267,25 +266,22 @@ void RedirectResultAndReturn (int asp,int bsp,int source_a_index,int source_b_in
 			GenUpdatePopA (0,asp);
 			GenPopB (bsp);
 		} else {
-#endif
-		switch (offstate.state_type){
-			case TupleState:
-				BuildTuple (source_a_index,source_b_index,asp,bsp,
-					offstate.state_arity, offstate.state_tuple_arguments,
-					offasize, offbsize, 0, ReleaseAndFill,False);
-				break;
-			case RecordState:
-				BuildRecord (offstate.state_record_symbol,source_a_index,source_b_index, asp, bsp,
-					offasize, offbsize, 0, ReleaseAndFill,False);
-				break;
-			case ArrayState:			
-				GenFillArray (asp-source_a_index,asp,ReleaseAndFill);
+			switch (offstate.state_type){
+				case TupleState:
+					BuildTuple (source_a_index,source_b_index,asp,bsp,
+						offstate.state_arity, offstate.state_tuple_arguments,
+						offasize, offbsize, 0, ReleaseAndFill,False);
+					break;
+				case RecordState:
+					BuildRecord (offstate.state_record_symbol,source_a_index,source_b_index, asp, bsp,
+						offasize, offbsize, 0, ReleaseAndFill,False);
+					break;
+				case ArrayState:			
+					GenFillArray (asp-source_a_index,asp,ReleaseAndFill);
+			}
+			GenPopA (asp);
+			GenPopB (bsp);
 		}
-		GenPopA (asp);
-		GenPopB (bsp);
-#if 1 /*JVG 29-5-2000 for Clean 2.0*/
-		}
-#endif
 	} else {
 		switch (demstate.state_type){
 			case RecordState:
@@ -1404,11 +1400,13 @@ static void CodeRootUpdateNode (Node root,NodeId rootid,int asp,int bsp,CodeGenN
 
 		if (IsSimpleState (root->node_state)){
 			LabDef record_label;
+			int end_args_a_offset,end_args_b_offset;
 
 			DetermineSizeOfState (*record_state_p,&record_a_size,&record_b_size);
 
-			UpdateNodeAndAddSelectorsToUpdateNode (record_arg,first_field_arg,
-				record_state_p->state_record_arguments,record_a_size,record_b_size,&asp,&bsp);
+			UpdateRecordAndAddSelectorsToUpdateNode (record_arg,first_field_arg,
+				record_state_p->state_record_arguments,record_a_size,record_b_size,&end_args_a_offset,&end_args_b_offset);
+			RemoveFieldsFromStackAfterUpdate (end_args_a_offset,end_args_b_offset,record_a_size,record_b_size,&asp,&bsp);
 
 			ConvertSymbolToRLabel (&record_label,record_sdef);
 			
@@ -1418,10 +1416,13 @@ static void CodeRootUpdateNode (Node root,NodeId rootid,int asp,int bsp,CodeGenN
 			GenPopB	(bsp);
 			GenRtn (1,0, OnAState);
 		} else {
+			int end_args_a_offset,end_args_b_offset;
+
 			DetermineSizeOfState (result_state,&record_a_size,&record_b_size);
 
-			UpdateNodeAndAddSelectorsToUpdateNode (record_arg,first_field_arg,
-				result_state.state_record_arguments,record_a_size,record_b_size,&asp,&bsp);
+			UpdateRecordAndAddSelectorsToUpdateNode (record_arg,first_field_arg,
+				result_state.state_record_arguments,record_a_size,record_b_size,&end_args_a_offset,&end_args_b_offset);
+			RemoveFieldsFromStackAfterUpdate (end_args_a_offset,end_args_b_offset,record_a_size,record_b_size,&asp,&bsp);
 
 			if (!function_called_only_curried_or_lazy_with_one_return)
 				GenRtn (record_a_size,record_b_size,result_state);

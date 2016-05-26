@@ -698,12 +698,7 @@ void CoerceArgumentOnTopOfStack (int *asp_p,int *bsp_p,StateS argstate,StateS no
 				++*asp_p;
 				break;
 		}
-#if UPDATE_POP
 		GenUpdatePopA (0,asize);
-#else
-		GenUpdateA (0,asize);
-		GenPopA (asize);
-#endif
 		*asp_p-=asize;
 		GenPopB (bsize);
 		*bsp_p-=bsize;
@@ -3400,9 +3395,8 @@ void RemoveSelectorsFromUpdateNode (ArgS *previous_arg,ArgS *arg)
 	previous_arg->arg_next=NULL;
 }
 
-#if UPDATE_RECORD_NOT_ON_TOP
 void UpdateRecordAndAddSelectorsToUpdateNode
-	(ArgS *record_arg,ArgS *first_field_arg,StateS *field_states,int record_a_size,int record_b_size,int *n_a_elements_above_record_p,int *n_b_elements_above_record_p)
+	(ArgS *record_arg,ArgS *first_field_arg,StateS *field_states,int record_a_size,int record_b_size,int *end_args_a_offset_p,int *end_args_b_offset_p)
 {
 	ArgS *arg,*previous_arg;
 	int a_offset,b_offset,arg_a_offset,arg_b_offset,previous_field_number;
@@ -3452,149 +3446,50 @@ void UpdateRecordAndAddSelectorsToUpdateNode
 	}
 	previous_arg->arg_next=NULL;
 	
-	*n_a_elements_above_record_p = arg_a_offset-record_a_size;
-	*n_b_elements_above_record_p = arg_b_offset-record_b_size;
+	*end_args_a_offset_p = arg_a_offset;
+	*end_args_b_offset_p = arg_b_offset;
 }
 
-void RemoveFieldsFromStackAfterUpdate (int n_a_elements_above_record,int n_b_elements_above_record,int record_a_size,int record_b_size,int *asp_p,int *bsp_p)
+void RemoveFieldsFromStackAfterUpdate (int arg_a_offset,int arg_b_offset,int record_a_size,int record_b_size,int *asp_p,int *bsp_p)
 {
-	if (n_a_elements_above_record!=0){
-		int arg_a_offset,a_offset;
-	
-		arg_a_offset=record_a_size+n_a_elements_above_record;
-		a_offset=record_a_size;
-		while (a_offset>0){
-			--a_offset;
-			--arg_a_offset;
-#if UPDATE_POP
-			if (a_offset==0)
-				GenUpdatePopA (a_offset,arg_a_offset);
-			else
-#endif
-			GenUpdateA (a_offset,arg_a_offset);
-		}
-#if UPDATE_POP
-		if (record_a_size==0)
-#endif
-			GenPopA (arg_a_offset);
-
-		*asp_p -= arg_a_offset;
-	}
-	
-	if (n_b_elements_above_record!=0){
-		int arg_b_offset,b_offset;
-		
-		arg_b_offset=record_b_size+n_b_elements_above_record;
-		b_offset=record_b_size;
-		while (b_offset>0){
-			--b_offset;
-			--arg_b_offset;
-#if UPDATE_POP
-			if (b_offset==0)
-				GenUpdatePopB (b_offset,arg_b_offset);
-			else
-#endif
-			GenUpdateB (b_offset,arg_b_offset);
-		}
-#if UPDATE_POP
-		if (record_b_size==0)
-#endif
-			GenPopB (arg_b_offset);
-		*bsp_p -= arg_b_offset;
-	}
-}
-#else
-void UpdateNodeAndAddSelectorsToUpdateNode
-	(ArgS *record_arg,ArgS *first_field_arg,StateS *field_states,int record_a_size,int record_b_size,int *asp_p,int *bsp_p)
-{
-	ArgS *arg,*previous_arg;
-	int a_offset,b_offset,arg_a_offset,arg_b_offset,previous_field_number;
-	
-	a_offset=0;
-	b_offset=0;
-	arg_a_offset=record_a_size;
-	arg_b_offset=record_b_size;
-	
-	previous_field_number=0;
-	
-	previous_arg=record_arg;
-	for_l (arg,first_field_arg,arg_next){
-		int field_number,arg_a_size,arg_b_size;
-		Node field_node;
-		
-		field_node=arg->arg_node;
-		field_node->node_arguments->arg_next=NULL;
-		
-		field_number=field_node->node_symbol->symb_def->sdef_sel_field_number;
-		
-		while (field_number!=previous_field_number){
-			AddSizeOfState (field_states[previous_field_number],&a_offset,&b_offset);
-			++previous_field_number;
-		}
-		
-		DetermineSizeOfState (field_states[field_number],&arg_a_size,&arg_b_size);
-		
-		while (arg_a_size){
-			GenUpdateA (arg_a_offset,a_offset);
-			++arg_a_offset;
-			++a_offset;
-			--arg_a_size;
-		}
-	
-		while (arg_b_size){
-			GenUpdateB (arg_b_offset,b_offset);
-			++arg_b_offset;
-			++b_offset;
-			--arg_b_size;
-		}
-	
-		++previous_field_number;
-						
-		previous_arg->arg_next=arg;
-		previous_arg=arg;
-	}
-	previous_arg->arg_next=NULL;
-
 	if (arg_a_offset!=record_a_size){
-		a_offset=record_a_size;
-		while (a_offset>0){
-			--a_offset;
-			--arg_a_offset;
-#if UPDATE_POP
-			if (a_offset==0)
-				GenUpdatePopA (a_offset,arg_a_offset);
-			else
-#endif
-			GenUpdateA (a_offset,arg_a_offset);
-		}
-#if UPDATE_POP
-		if (record_a_size==0)
-#endif
+		if (record_a_size!=0){
+			int a_offset;
+
+			a_offset=record_a_size;
+			while (a_offset>0){
+				--a_offset;
+				--arg_a_offset;
+				if (a_offset==0)
+					GenUpdatePopA (a_offset,arg_a_offset);
+				else
+					GenUpdateA (a_offset,arg_a_offset);
+			}
+		} else
 			GenPopA (arg_a_offset);
 
 		*asp_p -= arg_a_offset;
 	}
 	
 	if (arg_b_offset!=record_b_size){
-		b_offset=record_b_size;
-		while (b_offset>0){
-			--b_offset;
-			--arg_b_offset;
-#if UPDATE_POP
-			if (b_offset==0)
-				GenUpdatePopB (b_offset,arg_b_offset);
-			else
-#endif
-			GenUpdateB (b_offset,arg_b_offset);
-		}
-#if UPDATE_POP
-		if (record_b_size==0)
-#endif
+		if (record_b_size!=0){
+			int b_offset;
+
+			b_offset=record_b_size;
+			while (b_offset>0){
+				--b_offset;
+				--arg_b_offset;
+				if (b_offset==0)
+					GenUpdatePopB (b_offset,arg_b_offset);
+				else
+					GenUpdateB (b_offset,arg_b_offset);
+			}
+		} else
 			GenPopB (arg_b_offset);
+
 		*bsp_p -= arg_b_offset;
 	}
 }
-#endif
 
 #ifdef DESTRUCTIVE_RECORD_UPDATES
 void compute_bits_and_add_selectors_to_update_node
@@ -4020,41 +3915,27 @@ static void FillUpdateNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 #endif
 			DetermineSizeOfState (*record_state_p,&record_a_size,&record_b_size);
 
-#if UPDATE_RECORD_NOT_ON_TOP
 			{
-			int n_a_elements_above_record,n_b_elements_above_record;
+			int end_args_a_offset,end_args_b_offset;
 			
 			UpdateRecordAndAddSelectorsToUpdateNode (record_arg,first_field_arg,
-				record_state_p->state_record_arguments,record_a_size,record_b_size,&n_a_elements_above_record,&n_b_elements_above_record);
-#else
-			UpdateNodeAndAddSelectorsToUpdateNode (record_arg,first_field_arg,
-				record_state_p->state_record_arguments,record_a_size,record_b_size,asp_p,bsp_p);
-#endif
+				record_state_p->state_record_arguments,record_a_size,record_b_size,&end_args_a_offset,&end_args_b_offset);
+
 			if (update_node_id==NULL){
 				BuildRecord (record_state_p->state_record_symbol,*asp_p,*bsp_p,*asp_p,*bsp_p,record_a_size,record_b_size,
 						0,node->node_state.state_kind==SemiStrict ? PartialFill : NormalFill,True);
-				*asp_p+=1;
-#if UPDATE_RECORD_NOT_ON_TOP
-				GenUpdateA (0,record_a_size+n_a_elements_above_record);
-#else
-				GenUpdateA (0,record_a_size);
-#endif
-			} else
+				GenUpdatePopA (0,end_args_a_offset);
+				*asp_p+=1-end_args_a_offset;
+			} else {
 				BuildRecord (record_state_p->state_record_symbol,*asp_p,*bsp_p,*asp_p,*bsp_p,record_a_size,record_b_size,
 						*asp_p-update_node_id->nid_a_index,node->node_state.state_kind==SemiStrict ? PartialFill : NormalFill,False);
-
-#if UPDATE_RECORD_NOT_ON_TOP
-			GenPopA (record_a_size+n_a_elements_above_record);
-			*asp_p-=record_a_size+n_a_elements_above_record;
-			GenPopB (record_b_size+n_b_elements_above_record);
-			*bsp_p-=record_b_size+n_b_elements_above_record;
+				GenPopA (end_args_a_offset);
+				*asp_p-=end_args_a_offset;
 			}
-#else
-			GenPopA (record_a_size);
-			*asp_p-=record_a_size;
-			GenPopB (record_b_size);
-			*bsp_p-=record_b_size;
-#endif
+			GenPopB (end_args_b_offset);
+			*bsp_p-=end_args_b_offset;
+			}
+
 			return;
 #if DESTRUCTIVE_RECORD_UPDATES
 		}
@@ -4264,9 +4145,7 @@ static void FillUpdateNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 			*asp_p-=n_arguments;
 		}
 	} else {
-#if UPDATE_RECORD_NOT_ON_TOP
-		int n_a_elements_above_record,n_b_elements_above_record;
-#endif
+		int end_args_a_offset,end_args_b_offset;
 
 #if BOXED_RECORDS
 		node->node_arguments->arg_state=node->node_symbol->symb_def->sdef_record_state;
@@ -4274,14 +4153,9 @@ static void FillUpdateNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 		BuildArgs (node->node_arguments,asp_p,bsp_p,code_gen_node_ids_p);
 
 		DetermineSizeOfState (node->node_state,&record_a_size,&record_b_size);
-#if UPDATE_RECORD_NOT_ON_TOP
 		UpdateRecordAndAddSelectorsToUpdateNode (record_arg,first_field_arg,
-			node->node_state.state_record_arguments,record_a_size,record_b_size,&n_a_elements_above_record,&n_b_elements_above_record);
-		RemoveFieldsFromStackAfterUpdate (n_a_elements_above_record,n_b_elements_above_record,record_a_size,record_b_size,asp_p,bsp_p);
-#else
-		UpdateNodeAndAddSelectorsToUpdateNode (record_arg,first_field_arg,
-			node->node_state.state_record_arguments,record_a_size,record_b_size,asp_p,bsp_p);
-#endif
+			node->node_state.state_record_arguments,record_a_size,record_b_size,&end_args_a_offset,&end_args_b_offset);
+		RemoveFieldsFromStackAfterUpdate (end_args_a_offset,end_args_b_offset,record_a_size,record_b_size,asp_p,bsp_p);
 	}
 }
 
