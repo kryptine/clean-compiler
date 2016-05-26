@@ -6,8 +6,4 @@ Author: Sjaak Smetsers
 
 */
 
-extern BITVECT DetermineUniPropOfTypeCons (SymbDef typecons);
-
-extern BITVECT DetermineConsVarsOfTypeCons (SymbDef typecons, ConsVarList * cons_vars);
-
 extern void PrintNodeSymbol (Node node, int arg_nr, File file);
