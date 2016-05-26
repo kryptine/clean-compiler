@@ -1323,9 +1323,7 @@ static void CodeRootUpdateNode (Node root,NodeId rootid,int asp,int bsp,CodeGenN
 		
 		RemoveSelectorsFromUpdateNode (record_arg,first_field_arg);
 
-#if 1
 		BuildArgs (record_arg->arg_next,&asp,&bsp,code_gen_node_ids_p);
-#endif
 
 		if (IsSimpleState (root->node_state) && record_arg->arg_node->node_kind==NodeIdNode){
 			NodeIdP record_node_id;
@@ -1388,16 +1386,11 @@ static void CodeRootUpdateNode (Node root,NodeId rootid,int asp,int bsp,CodeGenN
 		record_state_p=&root->node_symbol->symb_def->sdef_record_state;
 
 		record_arg->arg_state=*record_state_p;
-#if 1
-		BuildArg (record_arg,&asp,&bsp,code_gen_node_ids_p);
-#else
-		BuildArgs (record_arg,&asp,&bsp,code_gen_node_ids_p);
-#endif
-		DetermineSizeOfArguments (record_arg,&a_size,&b_size);
-		UpdateAAndBStack (asp,bsp,a_size,b_size,&asp,&bsp);
-		
-		/* BuildNewStackFrame (record_arg,asp,bsp,False,code_gen_node_ids_p); */
 
+		BuildArg (record_arg,&asp,&bsp,code_gen_node_ids_p);
+
+		DetermineSizeOfArguments (record_arg,&a_size,&b_size);
+		
 		if (IsSimpleState (root->node_state)){
 			LabDef record_label;
 			int end_args_a_offset,end_args_b_offset;
@@ -1406,10 +1399,8 @@ static void CodeRootUpdateNode (Node root,NodeId rootid,int asp,int bsp,CodeGenN
 
 			UpdateRecordAndAddSelectorsToUpdateNode (record_arg,first_field_arg,
 				record_state_p->state_record_arguments,record_a_size,record_b_size,&end_args_a_offset,&end_args_b_offset);
-			RemoveFieldsFromStackAfterUpdate (end_args_a_offset,end_args_b_offset,record_a_size,record_b_size,&asp,&bsp);
 
 			ConvertSymbolToRLabel (&record_label,record_sdef);
-			
 			GenFillR (&record_label,record_a_size,record_b_size,asp,0,0,ReleaseAndFill,False);
 
 			GenPopA	(asp);
@@ -1422,10 +1413,25 @@ static void CodeRootUpdateNode (Node root,NodeId rootid,int asp,int bsp,CodeGenN
 
 			UpdateRecordAndAddSelectorsToUpdateNode (record_arg,first_field_arg,
 				result_state.state_record_arguments,record_a_size,record_b_size,&end_args_a_offset,&end_args_b_offset);
-			RemoveFieldsFromStackAfterUpdate (end_args_a_offset,end_args_b_offset,record_a_size,record_b_size,&asp,&bsp);
 
-			if (!function_called_only_curried_or_lazy_with_one_return)
+			if (!function_called_only_curried_or_lazy_with_one_return){
+				UpdateAAndBStack (asp,bsp,record_a_size,record_b_size,&asp,&bsp);
 				GenRtn (record_a_size,record_b_size,result_state);
+			} else {
+				if (CurrentSymbol->symb_def->sdef_mark & SDEF_USED_LAZILY_MASK){
+					BuildRecord (record_state_p->state_record_symbol,asp,bsp,asp,bsp,record_a_size,record_b_size,
+									0,ReleaseAndFill,False);
+					GenPopA (asp);
+				} else {
+					BuildRecord (record_state_p->state_record_symbol,asp,bsp,asp,bsp,record_a_size,record_b_size,
+									asp,NormalFill,True);
+					GenUpdatePopA (0,asp);
+				}
+				GenPopB (bsp);
+				GenRtn (1,0,OnAState);
+
+				function_called_only_curried_or_lazy_with_one_return = 0;
+			}
 		}
 	}
 
