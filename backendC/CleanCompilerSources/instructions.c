@@ -3122,7 +3122,7 @@ void GenUnboxedConsRecordDescriptor (SymbDef sdef,int tail_strict)
 		FPrintF (OutFile, "e_%s_" R_PREFIX "%s ",sdef->sdef_module,name);
 
 	if (ExportLocalLabels)
-		FPrintF (OutFile,tail_strict ? "\"_Cons#!%s\"" : "\"_Cons#\"",name);
+		FPrintF (OutFile,tail_strict ? "\"_Cons#!%s\"" : "\"_Cons#%s\"",name);
 	else
 		FPrintF (OutFile,tail_strict ? "\"[#%s!]\"" : "\"[#%s]\"",name);
 }
