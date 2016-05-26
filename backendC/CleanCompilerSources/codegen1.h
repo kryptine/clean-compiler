@@ -17,12 +17,15 @@ extern LabDef
 	cycle_lab, reserve_lab, type_error_lab, indirection_lab, ind_lab,
 	hnf_lab, cons_lab, nil_lab, tuple_lab, empty_lab, add_arg_lab, match_error_lab,
 #if STRICT_LISTS
-	conss_lab,consts_lab,conssts_lab,unboxed_cons_labels[][2],unboxed_cons_array_label,
+	conss_lab,consts_lab,conssts_lab,unboxed_cons_labels[5][2],unboxed_cons_array_label,
 #endif
 #ifdef CLEAN2
 	select_with_dictionary_lab, update_with_dictionary_lab,
 #endif
 	CurrentAltLabel;
+
+extern int unboxed_cons_mark[5][2];
+extern int unboxed_cons_array_mark;
 
 extern Label ReduceError;
 
