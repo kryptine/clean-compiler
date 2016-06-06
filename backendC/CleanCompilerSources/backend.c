@@ -2647,7 +2647,7 @@ BEDeclareRuleType (int functionIndex, int moduleIndex, CleanString name)
 
 	if (module->bem_isSystemModule)
 		/* for inline code */
-		newIdent	= PutStringInHashTable (ConvertCleanString (name), SymbolIdTable);
+		newIdent	= PutStringInHashTable (ConvertCleanString (name), FirstSystemModuleTable + moduleIndex);
 	else
 	{
 		newIdent	= ConvertAllocType (IdentS);
