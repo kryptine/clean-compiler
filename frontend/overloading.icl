@@ -2659,9 +2659,9 @@ where
 			#  {ui_instance_calls, ui_local_vars, ui_symbol_heap, ui_var_heap, ui_fun_defs, ui_fun_env, ui_has_type_codes, ui_error, ui_x = {x_type_code_info = type_code_info, x_predef_symbols = predef_symbols}}
 				=	ui
 			# (tb_args, var_heap) = retrieve_class_arguments rev_variables tb_args ui_var_heap 
-			  fun_info = mark_type_codes ui_has_type_codes fun_info
 			  // fun_body and fun_arity not updated
-			  fun_def & fun_info = { fun_info & fi_calls = fun_info.fi_calls ++ ui_instance_calls, fi_local_vars = ui_local_vars }
+			  fun_def & fun_info = {fun_info & fi_calls = fun_info.fi_calls ++ ui_instance_calls, fi_local_vars = ui_local_vars,
+											   fi_properties = fun_info.fi_properties bitor FI_HasTypeCodes}
 			#! ok = ui_error.ea_ok
 			= (ok, { ui_fun_defs & [fun_index] = fun_def }, ui_fun_env, ui_symbol_heap, type_code_info, var_heap, ui_error, predef_symbols)
 			= (False, fun_defs, fun_env, symbol_heap, type_code_info, var_heap, error, predef_symbols)
@@ -2702,13 +2702,6 @@ where
 			#! ok = ui_error.ea_ok
 			= (ok, { ui_fun_defs & [fun_index] = fun_def }, ui_fun_env, ui_symbol_heap, type_code_info, var_heap, ui_error, predef_symbols)
 			= (False, fun_defs, fun_env, symbol_heap, type_code_info, var_heap, error, predef_symbols)
-
-// this is a ugly way to mark this function for conversion in convertDynamics
-// FIXME: find a better way to mark the function
-mark_type_codes True info=:{fi_dynamics=[]}
-	=	{info & fi_dynamics = [nilPtr]}
-mark_type_codes _ info
-	=	info
 
 mark_FPC_arguments :: ![AType] ![FreeVar] !*VarHeap -> *VarHeap
 mark_FPC_arguments st_args tb_args var_heap
