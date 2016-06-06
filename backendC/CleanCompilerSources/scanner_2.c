@@ -185,17 +185,15 @@ PutKeyWordInTable (KeyWordInfoP keyWord)
 	identString->ident		= ident;
 } /* PutKeyWordInTable */
 
-IdentP
-RetrieveFromSymbolTable (char *string)
+static IdentP RetrieveFromSymbolTable (char *string)
 {
 	char *s;
 	unsigned long hash;
 	IdentStringP identString;
 	IdentP ident;
 
-	hash	= 0;
-	for (s = string; *s != '\0'; s++)
-	{
+	hash = 0;
+	for (s = string; *s != '\0'; s++){
         hash <<= 2;
         hash  += *s;
 	}
@@ -208,8 +206,7 @@ RetrieveFromSymbolTable (char *string)
 
 	identString	= gIdentStringTable [hash];
 
-	while (identString != NIL)
-	{
+	while (identString != NIL){
 		int		compare;
 
 		compare	= strcmp (identString->string, string);
@@ -223,17 +220,15 @@ RetrieveFromSymbolTable (char *string)
 			identString	= identString->right;
 	}
 	
-	if (identString != NIL)
-	{
+	if (identString != NIL){
 		for (ident = identString->ident; ident != NIL; ident = ident->ident_next)
 			if (ident->ident_table == SymbolIdTable)
 				break;
-	}
-	else
+	} else
 		ident	= NIL;
 
-	return (ident);
-} /* RetrieveFromSymbolTable */
+	return ident;
+}
 
 /*
 	+-----------------------------------------------------------------------+
@@ -688,20 +683,6 @@ void
 ScanInitialise (void)
 {
 	int i;
-#ifndef CLEAN2
-	gCharTypeTable	= (unsigned char*)CompAlloc (256 * sizeof (unsigned char)),
-	InitialiseCharTypeTable (gCharTypeTable);
-
-	gStateNormalTable	= (ScanState*)CompAlloc (256 * sizeof (ScanState)),
-	InitialiseStateNormalTable (gStateNormalTable);
-
-	gStateInstructionsTable	= (ScanState*)CompAlloc (256 * sizeof (ScanState)),
-	InitialiseStateInstructionTable (gStateInstructionsTable);
-
-	ScanSetMode (kScanModeNormal);
-
-	gInputBuffer	= (unsigned char*)CompAlloc (kInputBufferSize);
-#endif
 
 	ScanInitIdentStringTable();
 

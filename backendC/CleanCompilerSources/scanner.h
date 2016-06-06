@@ -1,11 +1,3 @@
-/*
-     +---------------------------------------------------------------------+
-     |    For each identifier stored in the symbol table a structure of    |
-     |    type 'Ident' is reserved.								|
-     +---------------------------------------------------------------------+
-*/
-
-extern char *ConvertNextTokenToString (void);
 
 typedef
 	enum
@@ -21,7 +13,7 @@ typedef
 
 		atsym,boolsym, codesym, charsym,defsym,
 		falsesym, filesym, fromsym, ifsym, impsym,
-/* RWS */
+
 		allsym,
 		importsym, intsym, macrosym, modulesym, procidsym, redidsym,
 		realsym, rulesym, stringsym,
@@ -65,51 +57,15 @@ extern char 	**ReservedWords;
 		kTokenDefault, kTokenResync
 	};
 
-typedef	unsigned int		Token;
+typedef	unsigned int Token;
 
-STRUCT (tokenValue, TokenValue)
-{
-	Token	token;	
-	long	lineNumber;
-	union {
-		char			*literal;
-		IdentStringP	identString;
-	} value;
-};
-
-typedef	enum { kScanModeNormal,kScanModeTypes,kScanModeInstructions } ScanMode;
-
-extern	IdentP	RetrieveFromSymbolTable (char *name);
 extern	IdentP	PutStringInHashTable (char *string, TableKind tabkind);
 extern	IdentP	PutIdentStringInTable (IdentStringP identString, TableKind tabkind);
 
-
 extern	void	InitScanner (void);
 
-extern	void	ScanInit (void);
-extern	void	ScanSetMode (ScanMode scanMode);
-enum {kOffsideOnHardBrace = True, kNoOffsideOnHardBrace = False};
-extern	void	ScanSetOffside (Bool offsideOnHardBrace);
-extern	Bool	ScanUnsetOffside (void);
-extern	void	ScanSetLayoutOption (void);
-extern	Bool	ScanOpenFile (char *fileName, FileKind fileKind);
-#if WRITE_DCL_MODIFICATION_TIME
-extern	Bool	ScanOpenFileWithModificationTime (char *fileName, FileKind fileKind, FileTime *file_time_p);
-#endif
-extern	void	ScanCloseFile (void);
-extern	Bool	ScanTokenToString (Token token, char *string);
+extern	void	ScanInitialise (void);
 
-/*
-	ScanCleanToken fills the global structure gCurrentToken.
-*/
-extern	void		ScanInitialise (void);
-
-#ifdef CLEAN2
 extern	void ScanInitIdentStringTable (void);
-#endif
 
-extern	void		ScanCleanToken (void);
-extern	TokenValueS	gCurrentToken;
 extern void ScanInlineFile (char *fname);
-
-extern Bool	gApplyLayoutRule;
