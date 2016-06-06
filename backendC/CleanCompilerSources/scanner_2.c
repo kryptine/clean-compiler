@@ -185,17 +185,15 @@ PutKeyWordInTable (KeyWordInfoP keyWord)
 	identString->ident		= ident;
 } /* PutKeyWordInTable */
 
-IdentP
-RetrieveFromSymbolTable (char *string)
+static IdentP RetrieveFromSymbolTable (char *string,TableKind table_kind)
 {
 	char *s;
 	unsigned long hash;
 	IdentStringP identString;
 	IdentP ident;
 
-	hash	= 0;
-	for (s = string; *s != '\0'; s++)
-	{
+	hash = 0;
+	for (s = string; *s != '\0'; s++){
         hash <<= 2;
         hash  += *s;
 	}
@@ -208,8 +206,7 @@ RetrieveFromSymbolTable (char *string)
 
 	identString	= gIdentStringTable [hash];
 
-	while (identString != NIL)
-	{
+	while (identString != NIL){
 		int		compare;
 
 		compare	= strcmp (identString->string, string);
@@ -223,17 +220,15 @@ RetrieveFromSymbolTable (char *string)
 			identString	= identString->right;
 	}
 	
-	if (identString != NIL)
-	{
+	if (identString != NIL){
 		for (ident = identString->ident; ident != NIL; ident = ident->ident_next)
-			if (ident->ident_table == SymbolIdTable)
+			if (ident->ident_table == table_kind)
 				break;
-	}
-	else
+	} else
 		ident	= NIL;
 
-	return (ident);
-} /* RetrieveFromSymbolTable */
+	return ident;
+}
 
 /*
 	+-----------------------------------------------------------------------+
@@ -430,7 +425,7 @@ void clear_inline_cache (void)
 }
 #endif
 
-void ScanInlineFile (char *fname)
+void ScanInlineFile (char *fname,TableKind system_module_table_kind)
 {
 	register char *tail, *instr, *importingModule, *importingExtension;
 	IdentP instrid;
@@ -490,7 +485,7 @@ void ScanInlineFile (char *fname)
 			continue;
 
 		*tail = '\0';
-		if (! (instrid = RetrieveFromSymbolTable (instr)))
+		if (! (instrid = RetrieveFromSymbolTable (instr,system_module_table_kind)))
 			continue;
 		if (instrid->ident_environ!=importingModule)
 			continue;
@@ -688,20 +683,6 @@ void
 ScanInitialise (void)
 {
 	int i;
-#ifndef CLEAN2
-	gCharTypeTable	= (unsigned char*)CompAlloc (256 * sizeof (unsigned char)),
-	InitialiseCharTypeTable (gCharTypeTable);
-
-	gStateNormalTable	= (ScanState*)CompAlloc (256 * sizeof (ScanState)),
-	InitialiseStateNormalTable (gStateNormalTable);
-
-	gStateInstructionsTable	= (ScanState*)CompAlloc (256 * sizeof (ScanState)),
-	InitialiseStateInstructionTable (gStateInstructionsTable);
-
-	ScanSetMode (kScanModeNormal);
-
-	gInputBuffer	= (unsigned char*)CompAlloc (kInputBufferSize);
-#endif
 
 	ScanInitIdentStringTable();
 

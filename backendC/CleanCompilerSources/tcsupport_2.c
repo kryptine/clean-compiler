@@ -4,8 +4,6 @@
 	Author:  Sjaak Smetsers
 */
 
-#pragma options (!macsbug_names)
-
 #include "compiledefines.h"
 #include "types.t"
 #include "system.h"

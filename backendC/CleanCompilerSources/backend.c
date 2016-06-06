@@ -470,6 +470,7 @@ BEDeclareDclModule (int moduleIndex, CleanString name, CleanString modificationT
 	dclModule->dm_modification_time	= ConvertCleanString (modificationTime);
 	dclModule->dm_system_module	= isSystemModule;
 	dclModule->dm_symbols		= gBEState.be_allSymbols; /* ??? too many symbols? */
+	dclModule->dm_system_module_table_kind = FirstSystemModuleTable + moduleIndex;
 
 	AddOpenDefinitionModule (moduleNameSymbol, dclModule);
 
@@ -2646,7 +2647,7 @@ BEDeclareRuleType (int functionIndex, int moduleIndex, CleanString name)
 
 	if (module->bem_isSystemModule)
 		/* for inline code */
-		newIdent	= PutStringInHashTable (ConvertCleanString (name), SymbolIdTable);
+		newIdent	= PutStringInHashTable (ConvertCleanString (name), FirstSystemModuleTable + moduleIndex);
 	else
 	{
 		newIdent	= ConvertAllocType (IdentS);

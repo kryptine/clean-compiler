@@ -38,8 +38,6 @@ extern int selector_m_error_lab_used;
 extern LabDef selector_m_error_lab;
 extern LabDef *unboxed_cons_label (SymbolP cons_symbol_p);
 
-extern void ScanInlineFile (char *fname);
-
 extern Bool EqualState (StateS st1, StateS st2);
 extern void DetermineSizeOfArguments (ArgS *args,int *a_offset_p,int *b_offset_p);
 extern void SubSizeOfState (StateS state,int *a_offset_p,int *b_offset_p);
