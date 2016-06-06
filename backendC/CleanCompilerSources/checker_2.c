@@ -96,7 +96,6 @@ void ReadInlineCode (void)
 	}
 }
 
-
 Ident AnnotatedId, ListId, TupleId, ConsId, NilId, ApplyId, SelectId,
 #ifdef CLEAN2
 	DynamicId,
@@ -230,21 +229,19 @@ void InitChecker (void)
 	OpenDefinitionModules	= NIL;
 }
 
-#ifdef CLEAN2
-	void ClearOpenDefinitionModules (void)
-	{
-		OpenDefinitionModules	= NULL;
-	}
-	
-	void AddOpenDefinitionModule (SymbolP moduleNameSymbol, DefMod definitionModule)
-	{
-		DefModList	openModule;
-	
-		openModule = CompAllocType (DefModElem);
-		openModule->mod_name	= moduleNameSymbol;
-		openModule->mod_body	= definitionModule;
-		openModule->mod_next	= OpenDefinitionModules;
-	
-		OpenDefinitionModules  = openModule;
-	}
-#endif
+void ClearOpenDefinitionModules (void)
+{
+	OpenDefinitionModules	= NULL;
+}
+
+void AddOpenDefinitionModule (SymbolP moduleNameSymbol, DefMod definitionModule)
+{
+	DefModList	openModule;
+
+	openModule = CompAllocType (DefModElem);
+	openModule->mod_name	= moduleNameSymbol;
+	openModule->mod_body	= definitionModule;
+	openModule->mod_next	= OpenDefinitionModules;
+
+	OpenDefinitionModules  = openModule;
+}
