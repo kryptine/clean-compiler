@@ -122,17 +122,22 @@ where
 	convert_function group_nr dynamic_representation fun (fun_defs, ci)
 		# (fun_def, fun_defs) = fun_defs![fun]
 		  {fun_body, fun_type, fun_info} = fun_def
-		| isEmpty fun_info.fi_dynamics
+		| fun_info.fi_properties bitand FI_HasTypeCodes==0 && isEmpty fun_info.fi_dynamics
 			= (fun_defs, ci)
-
-			# (unify_subst_var, ci) = newVariable "unify_subst" VI_Empty ci
+			# (unify_subst_var, ci) = newVariable "unify_subst" VI_NotUsed ci
 			# ci = {ci & ci_type_pattern_var_count = 0, ci_type_var_count = 0}
-
 			# (fun_body, ci) = convertDynamics {cinp_st_args = [], cinp_dynamic_representation = dynamic_representation,
 					cinp_subst_var = unify_subst_var} fun_body ci
-
 			= ({fun_defs & [fun] = {fun_def & fun_body = fun_body, fun_info = {fun_info & fi_local_vars = ci.ci_new_variables ++ fun_info.fi_local_vars }}},
 				{ci & ci_new_variables = []})
+
+mark_cinp_subst_var :: !BoundVar !*VarHeap -> *VarHeap;
+mark_cinp_subst_var {var_info_ptr} var_heap
+	= case sreadPtr var_info_ptr var_heap of
+		VI_NotUsed
+			-> writePtr var_info_ptr VI_Empty var_heap
+		_
+			-> var_heap
 
 class convertDynamics a :: !ConversionInput !a !*ConversionState -> (!a, !*ConversionState)
 
@@ -153,55 +158,58 @@ instance convertDynamics FunctionBody where
 		= (TransformedBody body, ci)
 
 instance convertDynamics TransformedBody where
-	convertDynamics cinp body=:{tb_args,tb_rhs} ci=:{ci_var_heap}
-		// this actually marks all arguments as type terms (also the regular arguments
-		// and dictionaries)
+	convertDynamics cinp=:{cinp_subst_var} body=:{tb_args,tb_rhs} ci=:{ci_var_heap}
+		// this actually marks all arguments as type terms (also the regular arguments and dictionaries)
 //		# ci_var_heap
 //			=	foldSt mark_var tb_args ci_var_heap
 		# (tb_rhs, ci)
-			=	convertDynamics cinp tb_rhs {ci & ci_var_heap = ci_var_heap}
+			= convertDynamics cinp tb_rhs {ci & ci_var_heap = ci_var_heap}
 		# (global_tpvs, subst, ci)
-			=	foldSt collect_global_type_pattern_var tb_args ([], cinp.cinp_subst_var, ci)
-		# (tb_rhs, ci)
-			=	share_init_subst subst global_tpvs tb_rhs ci
-		=	({body & tb_rhs = tb_rhs}, ci)
+			= foldSt collect_global_type_pattern_var tb_args ([], cinp_subst_var, ci)
+		= case sreadPtr cinp_subst_var.var_info_ptr ci.ci_var_heap of
+			VI_NotUsed
+				-> ({body & tb_rhs = tb_rhs}, ci)
+			_
+				# (tb_rhs, ci) = share_init_subst subst global_tpvs tb_rhs ci
+				-> ({body & tb_rhs = tb_rhs}, ci)
 		where
 //			mark_var :: FreeVar *VarHeap -> *VarHeap
 //			mark_var {fv_info_ptr} var_heap
 //				=	writePtr fv_info_ptr (VI_TypeCodeVariable TCI_TypeTerm) var_heap
 
 			collect_global_type_pattern_var :: FreeVar ([LetBind], BoundVar, *ConversionState) -> ([LetBind], BoundVar, *ConversionState)
-			collect_global_type_pattern_var {fv_info_ptr} (let_binds, subst, ci)
+			collect_global_type_pattern_var {fv_info_ptr} (let_binds, subst_var, ci)
 			  #	(var_info, ci_var_heap) = readPtr fv_info_ptr ci.ci_var_heap
 				ci = {ci & ci_var_heap = ci_var_heap}
 			  =	case var_info of
 					VI_TypeCodeVariable (TCI_TypePatternVar tpv)
 						# type_code = Var {var_ident = a_ij_var_name, var_info_ptr = fv_info_ptr, var_expr_ptr = nilPtr}
-						-> bind_global_type_pattern_var tpv type_code let_binds subst ci
+						-> bind_global_type_pattern_var tpv type_code let_binds subst_var ci
 					VI_TypeCodeVariable (TCI_SelectionsTypePatternVar tc_selections)
-						-> collect_global_type_pattern_var_selections tc_selections fv_info_ptr let_binds subst ci
+						-> collect_global_type_pattern_var_selections tc_selections fv_info_ptr let_binds subst_var ci
 					_
-						-> (let_binds, subst, ci)
+						-> (let_binds, subst_var, ci)
 			where
-				bind_global_type_pattern_var tpv type_code let_binds subst ci
+				bind_global_type_pattern_var tpv type_code let_binds subst_var ci
 				  #	(bind_global_tpv_symb, ci)
 						= getSymbol PD_Dyn_bind_global_type_pattern_var SK_Function 3 ci
 					(unify_subst_var, ci) = newVariable "gtpv_subst" VI_Empty ci
+					ci & ci_var_heap = mark_cinp_subst_var cinp_subst_var ci.ci_var_heap
 					let_bind
 						= { lb_src = App {	app_symb		= bind_global_tpv_symb,
 											app_args 		= [tpv, type_code, Var unify_subst_var],
 											app_info_ptr	= nilPtr }
-						,	lb_dst =  varToFreeVar subst 1
+						,	lb_dst =  varToFreeVar subst_var 1
 						,	lb_position = NoPos }
 				  =	([let_bind:let_binds], unify_subst_var, ci)
 
-				collect_global_type_pattern_var_selections [(tpv,selections):tc_selections] fv_info_ptr let_binds subst ci
+				collect_global_type_pattern_var_selections [(tpv,selections):tc_selections] fv_info_ptr let_binds subst_var ci
 				  #	dictionary = Var {var_ident = a_ij_var_name, var_info_ptr = fv_info_ptr, var_expr_ptr = nilPtr}
 					type_code = Selection NormalSelector dictionary selections
-					(let_binds,subst,ci) = bind_global_type_pattern_var tpv type_code let_binds subst ci
-				  =	collect_global_type_pattern_var_selections tc_selections fv_info_ptr let_binds subst ci
-				collect_global_type_pattern_var_selections [] fv_info_ptr let_binds subst ci
-				  =	(let_binds,subst,ci)
+					(let_binds,subst_var,ci) = bind_global_type_pattern_var tpv type_code let_binds subst_var ci
+				  =	collect_global_type_pattern_var_selections tc_selections fv_info_ptr let_binds subst_var ci
+				collect_global_type_pattern_var_selections [] fv_info_ptr let_binds subst_var ci
+				  =	(let_binds,subst_var,ci)
 
 			share_init_subst :: BoundVar [LetBind] Expression *ConversionState
 					-> (Expression, *ConversionState)
@@ -375,14 +383,14 @@ convertDynamicCase cinp=:{cinp_dynamic_representation={dr_dynamic_symbol, dr_dyn
 
 convertDynamicAlts _ _ _ _ _ defoult [] ci
 	=	(defoult, ci)
-convertDynamicAlts cinp kees type_var value_var result_type defoult [{dp_rhs, dp_position, dp_type_code, dp_var}:alts] ci
+convertDynamicAlts cinp=:{cinp_subst_var} kees type_var value_var result_type defoult [{dp_rhs, dp_position, dp_type_code, dp_var}:alts] ci
 	# (type_code, binds, ci)
 		=	convertPatternTypeCode cinp dp_type_code ci
 
 	#  (unify_symb, ci) 
 		=	getSymbol PD_Dyn_unify SK_Function (extended_unify_and_coerce 3 4) /*3 was 2 */ ci
-
-	# unify_call = App {app_symb = unify_symb, app_args = [Var cinp.cinp_subst_var,Var type_var,type_code], app_info_ptr = nilPtr}
+	# ci & ci_var_heap = mark_cinp_subst_var cinp_subst_var ci.ci_var_heap
+	# unify_call = App {app_symb = unify_symb, app_args = [Var cinp_subst_var,Var type_var,type_code], app_info_ptr = nilPtr}
 
 	// FIXME, more precise types (not all TEs)
 	# (let_info_ptr, ci) = let_ptr (/* 4 */ 3+length binds) ci
@@ -458,25 +466,21 @@ instance convertDynamics Selection where
 		# (expr, ci) = convertDynamics cinp expr ci
 		= (DictionarySelection var selectors expr_ptr expr, ci)
 
-convertExprTypeCode
-	::	!ConversionInput !TypeCodeExpression !*ConversionState
+convertExprTypeCode :: !ConversionInput !TypeCodeExpression !*ConversionState
 	->	(!Expression, !*ConversionState)
-convertExprTypeCode cinp tce ci
+convertExprTypeCode cinp=:{cinp_subst_var} tce ci
 	# (type_code, (has_var, binds, ci))
 		=	convertTypeCode False cinp tce (False, [], ci)
-	// sanity check ...
 	| not (isEmpty binds)
 		=	abort "unexpected binds in expression type code"
-	// ... sanity check	
 	| has_var
+		# ci & ci_var_heap = mark_cinp_subst_var cinp_subst_var ci.ci_var_heap
 		# (normalise_symb, ci) 
 			=	getSymbol PD_Dyn_normalise SK_Function 2 ci
 		# type_code
-			=	App { app_symb = normalise_symb,
-					app_args = [ Var cinp.cinp_subst_var, type_code],  app_info_ptr = nilPtr }
-		=	(type_code, ci)
-	// otherwise
-		=	(type_code, ci)
+			=	App {app_symb = normalise_symb, app_args = [Var cinp.cinp_subst_var, type_code], app_info_ptr = nilPtr}
+		= (type_code, ci)
+		= (type_code, ci)
 
 convertPatternTypeCode :: !ConversionInput !TypeCodeExpression !*ConversionState
 										-> (!Expression, ![LetBind], !*ConversionState)
@@ -678,7 +682,6 @@ varToFreeVar {var_ident, var_info_ptr} count
 freeVarToVar ::  FreeVar -> BoundVar
 freeVarToVar {fv_ident, fv_info_ptr}
 	= { var_ident = fv_ident,  var_info_ptr = fv_info_ptr, var_expr_ptr = nilPtr}
-
 
 getResultType :: ExprInfoPtr !*ConversionState -> (!AType, !*ConversionState)
 getResultType case_info_ptr ci=:{ci_expr_heap}
