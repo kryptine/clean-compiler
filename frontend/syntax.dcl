@@ -671,6 +671,7 @@ FI_MemberInstanceRequiresTypeInDefMod :== 16
 FI_GenericFun :== 32
 FI_Unused :== 64				// used in module trans
 FI_UnusedUsed :== 128			// used in module trans
+FI_HasTypeCodes :== 256
 
 ::	FunInfo =
 	{	fi_calls			:: ![FunCall]
@@ -799,6 +800,7 @@ pIsSafe			:== True
 				VI_ExpressionOrBody !Expression !SymbIdent !TransformedBody ![FreeVar] ![TypeVar] ![TypeVar] | /* used during fusion */
 				VI_Dictionary !SymbIdent ![Expression] !Type | /* used during fusion */
 				VI_Extended !ExtendedVarInfo !VarInfo |
+				VI_NotUsed |
 // MdM
 				VI_CPSExprVar !CheatCompiler /* a pointer to a variable in CleanProverSystem is stored here, using a cast */
 // ... MdM
