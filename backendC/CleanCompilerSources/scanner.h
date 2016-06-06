@@ -68,4 +68,4 @@ extern	void	ScanInitialise (void);
 
 extern	void ScanInitIdentStringTable (void);
 
-extern void ScanInlineFile (char *fname);
+extern void ScanInlineFile (char *fname,TableKind table_kind);

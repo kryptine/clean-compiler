@@ -470,6 +470,7 @@ BEDeclareDclModule (int moduleIndex, CleanString name, CleanString modificationT
 	dclModule->dm_modification_time	= ConvertCleanString (modificationTime);
 	dclModule->dm_system_module	= isSystemModule;
 	dclModule->dm_symbols		= gBEState.be_allSymbols; /* ??? too many symbols? */
+	dclModule->dm_system_module_table_kind = FirstSystemModuleTable + moduleIndex;
 
 	AddOpenDefinitionModule (moduleNameSymbol, dclModule);
 

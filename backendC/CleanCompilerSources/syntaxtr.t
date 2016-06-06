@@ -51,7 +51,7 @@ typedef enum {
 
 typedef enum {
 	int_type, bool_type, char_type, real_type,
-	file_type, string_type,world_type, procid_type,
+	file_type, string_type, world_type, procid_type,
 	redid_type,
 #ifdef CLEAN2
 	rational_denot,
@@ -114,7 +114,7 @@ typedef struct record_state_descr {
 } *RecordStateDescr;
 
 typedef enum {
-	SymbolIdTable, TypeSymbolIdTable, TypeVarIdTable, ModuleIdTable, FieldIdTable, KeyWordTable, InternalIdTable
+	SymbolIdTable, TypeSymbolIdTable, ModuleIdTable, KeyWordTable, FirstSystemModuleTable, LastSystemModuleTable=0x7fff
 } TableKind;
 
 typedef union symb_value {
@@ -720,6 +720,7 @@ struct def_repr {
 	SynTypes	dm_syn_types;
 	AbsTypes	dm_abs_types;
 	RuleTypes	dm_rules;
+	TableKind	dm_system_module_table_kind;
 	Bool		dm_system_module;
 #if WRITE_DCL_MODIFICATION_TIME
 	ModuleFileTime	dm_modification_time;

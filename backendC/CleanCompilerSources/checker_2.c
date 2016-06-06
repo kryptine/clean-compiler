@@ -91,7 +91,7 @@ void ReadInlineCode (void)
 			
 			if (symbol!=NULL && d_mod->mod_name->symb_ident->ident_name!=CurrentModule)
 				/* Get the inline instructions of all the rules that are defined in this module */
-				ScanInlineFile (d_mod->mod_name->symb_ident->ident_name);
+				ScanInlineFile (d_mod->mod_name->symb_ident->ident_name,def_mod->dm_system_module_table_kind);
 		}
 	}
 }

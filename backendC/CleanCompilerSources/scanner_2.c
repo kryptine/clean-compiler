@@ -185,7 +185,7 @@ PutKeyWordInTable (KeyWordInfoP keyWord)
 	identString->ident		= ident;
 } /* PutKeyWordInTable */
 
-static IdentP RetrieveFromSymbolTable (char *string)
+static IdentP RetrieveFromSymbolTable (char *string,TableKind table_kind)
 {
 	char *s;
 	unsigned long hash;
@@ -222,7 +222,7 @@ static IdentP RetrieveFromSymbolTable (char *string)
 	
 	if (identString != NIL){
 		for (ident = identString->ident; ident != NIL; ident = ident->ident_next)
-			if (ident->ident_table == SymbolIdTable)
+			if (ident->ident_table == table_kind)
 				break;
 	} else
 		ident	= NIL;
@@ -425,7 +425,7 @@ void clear_inline_cache (void)
 }
 #endif
 
-void ScanInlineFile (char *fname)
+void ScanInlineFile (char *fname,TableKind system_module_table_kind)
 {
 	register char *tail, *instr, *importingModule, *importingExtension;
 	IdentP instrid;
@@ -485,7 +485,7 @@ void ScanInlineFile (char *fname)
 			continue;
 
 		*tail = '\0';
-		if (! (instrid = RetrieveFromSymbolTable (instr)))
+		if (! (instrid = RetrieveFromSymbolTable (instr,system_module_table_kind)))
 			continue;
 		if (instrid->ident_environ!=importingModule)
 			continue;
