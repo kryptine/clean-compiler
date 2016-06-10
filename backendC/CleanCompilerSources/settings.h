@@ -22,6 +22,7 @@ extern Bool ListOptimizations;
 
 extern Bool ExportLocalLabels;
 extern Bool AddStrictnessToExportedFunctionTypes;
+extern Bool Dynamics;
 
 extern Bool DoProfiling;
 extern Bool DoTimeProfiling;
