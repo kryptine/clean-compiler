@@ -54,9 +54,10 @@ static void error_in_function (char *m)
 #define N_System				8
 #define N_DoFusion				9
 #define N_Do64BitArch			10
+#define N_Dynamics				11
 
 #define MINIMUM_N_OPTIONS 9
-#define N_OPTIONS 11
+#define N_OPTIONS 12
 
 static void ConvertOptionsToString (char *optstring)
 {
@@ -78,9 +79,10 @@ static void ConvertOptionsToString (char *optstring)
 	optstring[N_DoWarning]            = DoWarning ? '1' : '0';
 	optstring[N_System]               = '0';
 
-	if (DoFusion || ObjectSizes[RealObj]!=2){
+	if (DoFusion || ObjectSizes[RealObj]!=2 || Dynamics){
 		optstring[N_DoFusion] = DoFusion ? '1' : '0';
 		optstring[N_Do64BitArch] = ObjectSizes[RealObj]!=2 ? '1' : '0';
+		optstring[N_Dynamics] = Dynamics ? '1' : '0';
 		optstring[N_OPTIONS]='\0';
 	} else
 		optstring[MINIMUM_N_OPTIONS]='\0';

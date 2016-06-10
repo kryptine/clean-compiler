@@ -24,6 +24,7 @@ Bool ListOptimizations		= False;
 Bool DoDescriptors			= False;
 Bool ExportLocalLabels		= False;
 Bool AddStrictnessToExportedFunctionTypes = False;
+Bool Dynamics = False;
 
 Bool DoProfiling=False; /* no longer used by memory profiler */
 Bool DoTimeProfiling=False;
