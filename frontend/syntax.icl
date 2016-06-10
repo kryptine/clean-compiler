@@ -716,7 +716,6 @@ instance <<< ParsedSelector
 where
 	(<<<) file {ps_field_ident,ps_field_type} = file <<< ps_field_ident <<< ps_field_type
 
-
 instance <<< ModuleKind
 where
 	(<<<) file kind 		= file
@@ -772,7 +771,15 @@ where
 
 instance <<< ExprWithLocalDefs
 where
-	(<<<) file {ewl_expr,ewl_locals} = file <<< ewl_expr <<< ewl_locals
+	(<<<) file {ewl_expr,ewl_locals,ewl_nodes=[]} = file <<< ewl_expr <<< ewl_locals
+	(<<<) file {ewl_expr,ewl_locals,ewl_nodes} = file <<< ewl_nodes <<< '\n' <<< ewl_expr <<< ewl_locals
+
+instance <<< NodeDefWithLocals
+where
+	(<<<) file {ndwl_strict,ndwl_def,ndwl_locals}
+		| ndwl_strict
+			= file <<< "\n#! " <<< ndwl_def <<< ndwl_locals;
+			= file <<< "\n# " <<< ndwl_def <<< ndwl_locals;
 
 instance <<< GuardedExpr
 where
@@ -855,43 +862,43 @@ instance <<< CoercionPosition
 where
 	(<<<) file (CP_FunArg fun_name arg_nr)
 		= file <<< "argument " <<< arg_nr <<< " of " <<< readable fun_name
-	(<<<) file (CP_SymbArg fun_name arg_nr)
-		= file <<< "argument " <<< arg_nr <<< " of " <<< readable fun_name.symb_ident
+	(<<<) file (CP_SymbArgAndExpression fun_name arg_nr expression)
+		= show_expression (file <<< "argument " <<< arg_nr <<< " of " <<< readable fun_name.symb_ident <<< " : ") expression 
 	(<<<) file (CP_LiftedFunArg fun_name arg_name)
 		= file <<< "lifted argument " <<< arg_name <<< " of " <<< readable fun_name
 	(<<<) file (CP_Expression expression) = show_expression file expression
-	where
-		show_expression file (Var {var_ident})
-			= file <<< var_ident
-		show_expression file (FreeVar {fv_ident})
-			= file <<< fv_ident
-		show_expression file (App {app_symb={symb_ident}, app_args})
-			| symb_ident.id_name=="_dummyForStrictAlias"
-				= show_expression file (hd app_args)
-			= file <<< readable symb_ident
-		show_expression file (fun @ fun_args)
-			= show_expression file fun
-		show_expression file (Case {case_ident=No})
-			= file <<< "(case ... )"
-		show_expression file (Selection _ expr selectors)
-			= file <<< "selection"
-		show_expression file (Update expr1 selectors expr2)
-			= file <<< "update"
-		show_expression file (TupleSelect {ds_arity} elem_nr expr)
-			= file <<< "argument " <<< (elem_nr + 1) <<< " of " <<< ds_arity <<< "-tuple"
-		show_expression file (BasicExpr bv)
-			= file <<< bv
-		show_expression file (RecordUpdate _ _ _)
-			= file <<< "update of record"
-		show_expression file (MatchExpr _ expr)
-			= file <<< "match expression"
-		show_expression file (IsConstructor _ _ _ _ _ _)
-			= file <<< "is constructor expression"
-		show_expression file (Let _)
-			= file <<< "(let ... ) or #"
-		show_expression file _
-			= file
-		
+
+show_expression file (Var {var_ident})
+	= file <<< var_ident
+show_expression file (FreeVar {fv_ident})
+	= file <<< fv_ident
+show_expression file (App {app_symb={symb_ident}, app_args})
+	| symb_ident.id_name=="_dummyForStrictAlias"
+		= show_expression file (hd app_args)
+	= file <<< readable symb_ident
+show_expression file (fun @ fun_args)
+	= show_expression file fun
+show_expression file (Case {case_ident=No})
+	= file <<< "(case ... )"
+show_expression file (Selection _ expr selectors)
+	= file <<< "selection"
+show_expression file (Update expr1 selectors expr2)
+	= file <<< "update"
+show_expression file (TupleSelect {ds_arity} elem_nr expr)
+	= file <<< "argument " <<< (elem_nr + 1) <<< " of " <<< ds_arity <<< "-tuple"
+show_expression file (BasicExpr bv)
+	= file <<< bv
+show_expression file (RecordUpdate _ _ _)
+	= file <<< "update of record"
+show_expression file (MatchExpr _ expr)
+	= file <<< "match expression"
+show_expression file (IsConstructor _ _ _ _ _ _)
+	= file <<< "is constructor expression"
+show_expression file (Let _)
+	= file <<< "(let ... ) or #"
+show_expression file _
+	= file
+
 instance <<< Declaration
   where
 	(<<<) file (Declaration { decl_ident, decl_kind })

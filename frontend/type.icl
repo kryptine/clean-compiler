@@ -269,17 +269,18 @@ cannot_unify t1 t2 position common_defs err
 	  ea_file = case position of
 				CP_FunArg _ _
 					-> ea_file <<< "\"" <<< position <<< "\""
-				CP_SymbArg {symb_kind=SK_Constructor {glob_module,glob_object},symb_ident} arg_n
+				CP_SymbArgAndExpression {symb_kind=SK_Constructor {glob_module,glob_object},symb_ident} arg_n expression
 					#! type_index = common_defs.[glob_module].com_cons_defs.[glob_object].cons_type_index
 					-> case common_defs.[glob_module].com_type_defs.[type_index].td_rhs of
 						RecordType {rt_fields}
 							# field_name = rt_fields.[arg_n-1].fs_ident.id_name
 							  record_name = symb_ident.id_name
 							  record_name = if (record_name.[0]=='_') (record_name % (1,size record_name-1)) record_name
-							-> ea_file <<< "\"" <<< "field " <<< field_name <<< " of " <<< record_name <<< "\""
+							-> ea_file <<< "\"" <<< "field " <<< field_name <<< " of " <<< record_name 
+								<<< " : " <<< CP_Expression expression <<< "\""
 						_
 							-> ea_file <<< "\"" <<< position <<< "\""
-				CP_SymbArg _ _
+				CP_SymbArgAndExpression _ _ _
 					-> ea_file <<< "\"" <<< position <<< "\""
 				CP_LiftedFunArg _ _
 					-> ea_file <<< "\"" <<< position <<< "\""
@@ -1630,7 +1631,7 @@ where
 			= reqs_ts
 		requirements_of_args ti fun_ident arg_nr [expr:exprs] [lt:lts] reqs_ts
 			# (e_type, opt_expr_ptr, (reqs, ts)) = requirements ti expr reqs_ts
-			#! type_coercion = {tc_demanded = lt, tc_offered = e_type, tc_position = CP_SymbArg fun_ident arg_nr, tc_coercible = True}
+			#! type_coercion = {tc_demanded = lt, tc_offered = e_type, tc_position = CP_SymbArgAndExpression fun_ident arg_nr expr, tc_coercible = True}
 			# req_type_coercions = [type_coercion : reqs.req_type_coercions]
 			  ts_expr_heap = storeAttribute opt_expr_ptr lt.at_attribute ts.ts_expr_heap
 			= requirements_of_args ti fun_ident (arg_nr+1) exprs lts ({reqs & req_type_coercions = req_type_coercions}, {ts & ts_expr_heap = ts_expr_heap})
@@ -2675,7 +2676,7 @@ where
 		| group_index == size comps
 			= funs_and_state
 			#! comp = comps.[group_index]	
-			# funs_and_state = type_component list_inferred_types comp.group_members  class_instances ti funs_and_state
+			# funs_and_state = type_component list_inferred_types comp.group_members class_instances ti funs_and_state
 			= type_components list_inferred_types (inc group_index) comps class_instances ti funs_and_state
 /*
 	show_component comp fun_defs
@@ -2871,7 +2872,7 @@ where
 					  	case tc_position of
 					  		CP_FunArg _ _
 					  			-> ea_file <<< "\"" <<< tc_position <<< "\" "
-					  		CP_SymbArg _ _
+					  		CP_SymbArgAndExpression _ _ _
 					  			-> ea_file <<< "\"" <<< tc_position <<< "\" "
 					  		CP_LiftedFunArg _ _
 					  			-> ea_file <<< "\"" <<< tc_position <<< "\" "
