@@ -189,7 +189,8 @@ parseCommandLine ["-id",compiler_id_string : args] options
 		= parseCommandLine args options
 parseCommandLine [arg1=:"-dynamics":args] options
 	// generates for each .icl module a .tcl file (which contains the type information for that module)
-	=	parseCommandLine args {options & compile_for_dynamics = True}
+	# (args,modules,options) = parseCommandLine args {options & compile_for_dynamics = True}
+	= ([arg1:args],modules,options)
 parseCommandLine [arg1=:"-fusion":args] options
 	// switch on fusion transformations
 	# (args,modules,options) = parseCommandLine args {options & compile_with_fusion = True}
