@@ -2658,10 +2658,12 @@ where
 
 			#  {ui_instance_calls, ui_local_vars, ui_symbol_heap, ui_var_heap, ui_fun_defs, ui_fun_env, ui_has_type_codes, ui_error, ui_x = {x_type_code_info = type_code_info, x_predef_symbols = predef_symbols}}
 				=	ui
-			# (tb_args, var_heap) = retrieve_class_arguments rev_variables tb_args ui_var_heap 
+			# (tb_args, var_heap) = retrieve_class_arguments rev_variables tb_args ui_var_heap
 			  // fun_body and fun_arity not updated
 			  fun_def & fun_info = {fun_info & fi_calls = fun_info.fi_calls ++ ui_instance_calls, fi_local_vars = ui_local_vars,
-											   fi_properties = fun_info.fi_properties bitor FI_HasTypeCodes}
+											   fi_properties = if ui_has_type_codes
+											   					(fun_info.fi_properties bitor FI_HasTypeCodes)
+											   					fun_info.fi_properties}
 			#! ok = ui_error.ea_ok
 			= (ok, { ui_fun_defs & [fun_index] = fun_def }, ui_fun_env, ui_symbol_heap, type_code_info, var_heap, ui_error, predef_symbols)
 			= (False, fun_defs, fun_env, symbol_heap, type_code_info, var_heap, error, predef_symbols)
@@ -2695,10 +2697,12 @@ where
 
 			#  {ui_instance_calls, ui_local_vars, ui_symbol_heap, ui_var_heap, ui_fun_defs, ui_fun_env, ui_has_type_codes, ui_error, ui_x = {x_type_code_info = type_code_info, x_predef_symbols = predef_symbols}}
 				=	ui
-			# (tb_args, var_heap) = retrieve_class_arguments rev_variables tb_args ui_var_heap 
+			# (tb_args, var_heap) = retrieve_class_arguments rev_variables tb_args ui_var_heap
 			  fun_def & fun_body = TransformedBody {tb_args = tb_args, tb_rhs = tb_rhs}, fun_arity = length tb_args,
-			 			fun_info = {fun_info & fi_calls = fun_info.fi_calls ++ ui_instance_calls, fi_local_vars = ui_local_vars,
-											   fi_properties = fun_info.fi_properties bitor FI_HasTypeCodes}
+			  			fun_info = {fun_info & fi_calls = fun_info.fi_calls ++ ui_instance_calls, fi_local_vars = ui_local_vars,
+											   fi_properties = if ui_has_type_codes
+																	(fun_info.fi_properties bitor FI_HasTypeCodes)
+																	fun_info.fi_properties}
 			#! ok = ui_error.ea_ok
 			= (ok, { ui_fun_defs & [fun_index] = fun_def }, ui_fun_env, ui_symbol_heap, type_code_info, var_heap, ui_error, predef_symbols)
 			= (False, fun_defs, fun_env, symbol_heap, type_code_info, var_heap, error, predef_symbols)
