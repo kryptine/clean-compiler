@@ -124,7 +124,6 @@ EXPORTS
  BEExportConstructor
  BEExportField
  BEExportFunction
- BELabelWithoutNumberFunctions
  BEDefineImportedObjsAndLibs
  BESetMainDclModuleN
  BEStrictPositions
