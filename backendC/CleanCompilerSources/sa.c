@@ -628,7 +628,7 @@ static Context StrictInfoToContext (StrictInfo *s, Context curcontext, Bool resu
 	return context;
 }
 
-static Context CopyContext (Context curcontext)
+static Context copy_context (Context curcontext)
 {
 	Context context;
 
@@ -647,7 +647,7 @@ static Context CopyContext (Context curcontext)
 		context->context_args = SAllocArrayType (n,Context);
 	
 		for (i = 0; i < n; i++)
-			context->context_args[i] = CopyContext (curcontext->context_args[i]);
+			context->context_args[i] = copy_context (curcontext->context_args[i]);
 	} else
 		context->context_args  = NULL;
 	
@@ -3777,7 +3777,7 @@ static Bool CheckRelation (Exp e, Path p, Context context)
 #endif
 	
 	old_fuel   = start_fuel;
-	result     = ReduceInContext (&exp_new, (Path) Null, CopyContext (context));
+	result     = ReduceInContext (&exp_new, (Path) Null, copy_context (context));
 	start_fuel = old_fuel;
 	
 #ifdef _DB_RED_
