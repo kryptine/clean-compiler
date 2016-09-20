@@ -11,5 +11,5 @@ OBJECTS = \
 	typeconv_2.o version.o
 
 backend.dll: $(OBJECTS)
-	gcc -shared -o ../backend.dll $(OBJECTS) ../backend.def
-#	gcc -shared -o ../backend.dll $(OBJECTS) ../backend.def -Wl,--output-def,backend.output.def -Wl,--out-implib,backend.a
+	gcc -shared -o ../backend.dll $(OBJECTS) -static-libgcc ../backend.def
+#	gcc -shared -o ../backend.dll $(OBJECTS) -static-libgcc ../backend.def -Wl,--output-def,backend.output.def -Wl,--out-implib,backend.a
