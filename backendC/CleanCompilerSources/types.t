@@ -35,7 +35,6 @@ typedef enum
 		 otherFile, hsFile
 		} FileKind;
 
-#define EndOfFile		((int) -1)
 #define FileNameMax		256
 #define SeekSet
 #define SeekCur
