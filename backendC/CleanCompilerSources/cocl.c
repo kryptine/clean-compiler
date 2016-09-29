@@ -8,7 +8,7 @@
 
 #include "MAIN_CLM.d"
 
-#ifdef _SUN_
+#if defined (_MSC_VER) || defined (_SUN_)
 FILE *std_out_file_p,*std_error_file_p;
 #endif
 
@@ -95,7 +95,7 @@ Bool CallCompiler (int argc, char **argv)
 	char *fname,*output_file_name;
 	int i;
 
-# ifdef _SUN_
+# if defined (_MSC_VER) || defined (_SUN_)
 	std_out_file_p = stdout;
 	std_error_file_p = stderr;
 # endif
@@ -218,7 +218,7 @@ Bool CallCompiler (int argc, char **argv)
 				}
 			} else if (strcmp (argv_i, "-RE") == 0){
 				if (++i < argc){
-#ifdef _SUN_
+# if defined (_MSC_VER) || defined (_SUN_)
 					std_error_file_p = fopen (argv[i],"w");
 					if (std_error_file_p!=NULL)
 						StdErrorReopened = True;
@@ -236,7 +236,7 @@ Bool CallCompiler (int argc, char **argv)
 				}
 			} else if (strcmp (argv_i, "-RAE") == 0){
 				if (++i < argc){
-#ifdef _SUN_
+#if defined (_MSC_VER) || defined (_SUN_)
 					std_error_file_p = fopen (argv[i],"a");
 					if (std_error_file_p!=NULL)
 						StdErrorReopened = True;
@@ -254,7 +254,7 @@ Bool CallCompiler (int argc, char **argv)
 				}
 			} else if (strcmp (argv_i, "-RO") == 0){
 				if (++i < argc){
-#ifdef _SUN_
+#if defined (_MSC_VER) || defined (_SUN_)
 					std_out_file_p = fopen (argv[i],"w");
 					if (std_out_file_p!=NULL)
 						StdOutReopened = True;
@@ -272,7 +272,7 @@ Bool CallCompiler (int argc, char **argv)
 				}
 			} else if (strcmp (argv_i, "-RAO") == 0){
 				if (++i < argc){
-#ifdef _SUN_
+#if defined (_MSC_VER) || defined (_SUN_)
 					std_out_file_p = fopen (argv[i],"a");
 					if (std_out_file_p!=NULL)
 						StdOutReopened = True;
@@ -340,7 +340,7 @@ Bool CallCompiler (int argc, char **argv)
 #if ! defined (MAIN_CLM)
 int main (int argc, char *argv[])
 {
-# ifdef _SUN_
+# if defined (_MSC_VER) || defined (_SUN_)
 	std_out_file_p = stdout;
 	std_error_file_p = stderr;
 # endif
