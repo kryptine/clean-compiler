@@ -400,14 +400,13 @@ where
 		# (new_info_ptr, th_vars) = newPtr TVI_Empty type_heaps.th_vars
 		  new_fv = { atv_variable & tv_info_ptr = new_info_ptr}
 		  th_vars = th_vars <:= (atv_variable.tv_info_ptr, TVI_Type (TV new_fv))
-		  (new_attr, th_attrs) = build_attr_subst atv_attribute type_heaps.th_attrs
+		  (new_attr, th_attrs) = subst_attr atv_attribute type_heaps.th_attrs
 		= ([ { atv & atv_variable = new_fv, atv_attribute = new_attr } : free_vars], { type_heaps & th_vars = th_vars, th_attrs = th_attrs })
-	where		  
-		 build_attr_subst (TA_Var avar) attr_var_heap
-			# (new_info_ptr, attr_var_heap) = newPtr AVI_Empty attr_var_heap
-			  new_attr = { avar & av_info_ptr = new_info_ptr}
-			= (TA_Var new_attr, attr_var_heap <:= (avar.av_info_ptr, AVI_Attr (TA_Var new_attr)))
-		 build_attr_subst attr attr_var_heap
+	where
+		 subst_attr (TA_Var {av_info_ptr}) attr_var_heap
+			# (AVI_Attr ta_var_new_attr, attr_var_heap) = readPtr av_info_ptr attr_var_heap
+			= (ta_var_new_attr, attr_var_heap)
+		 subst_attr attr attr_var_heap
 			= (attr, attr_var_heap)
 
 	build_attr_var_subst attr (free_attrs, attr_var_heap)
@@ -3511,11 +3510,11 @@ reverseDAG { dag_nr_of_nodes, dag_get_children }
 		# children
 				= dag_get_children parent_node_nr
 		= foldSt (reverse_arrow parent_node_nr) children reversed_children
+
 	reverse_arrow parent_node_nr child_node_nr reversed_children
 		# (current_parents, reversed_children)
 				= reversed_children![child_node_nr]
 		= { reversed_children & [child_node_nr] = [parent_node_nr : current_parents] }
-		  
 
 groupify :: !DAG !{#ComponentNr} !Int -> .{![ComponentNr]}
 groupify { dag_nr_of_nodes, dag_get_children } component_numbers nr_of_components
@@ -3534,6 +3533,7 @@ groupify { dag_nr_of_nodes, dag_get_children } component_numbers nr_of_component
 		  visited_array
 		  		= foldSt (\i visited_array->{ visited_array & [i] = False }) visited_list visited_array
 		= (visited_array, node_to_components)
+
 	groupifyPerArrow :: !{#ComponentNr} !Int !Int !(!*{#Bool}, ![Int], !*{![ComponentNr]})
 					-> (!.{#Bool}, ![Int], !.{![ComponentNr]})
 	groupifyPerArrow component_numbers node_nr child_node_nr (visited_array, visited_list, node_to_components)
