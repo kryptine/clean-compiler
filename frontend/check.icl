@@ -400,14 +400,13 @@ where
 		# (new_info_ptr, th_vars) = newPtr TVI_Empty type_heaps.th_vars
 		  new_fv = { atv_variable & tv_info_ptr = new_info_ptr}
 		  th_vars = th_vars <:= (atv_variable.tv_info_ptr, TVI_Type (TV new_fv))
-		  (new_attr, th_attrs) = build_attr_subst atv_attribute type_heaps.th_attrs
+		  (new_attr, th_attrs) = subst_attr atv_attribute type_heaps.th_attrs
 		= ([ { atv & atv_variable = new_fv, atv_attribute = new_attr } : free_vars], { type_heaps & th_vars = th_vars, th_attrs = th_attrs })
 	where
-		 build_attr_subst (TA_Var avar) attr_var_heap
-			# (new_info_ptr, attr_var_heap) = newPtr AVI_Empty attr_var_heap
-			  new_attr = { avar & av_info_ptr = new_info_ptr}
-			= (TA_Var new_attr, attr_var_heap <:= (avar.av_info_ptr, AVI_Attr (TA_Var new_attr)))
-		 build_attr_subst attr attr_var_heap
+		 subst_attr (TA_Var {av_info_ptr}) attr_var_heap
+			# (AVI_Attr ta_var_new_attr, attr_var_heap) = readPtr av_info_ptr attr_var_heap
+			= (ta_var_new_attr, attr_var_heap)
+		 subst_attr attr attr_var_heap
 			= (attr, attr_var_heap)
 
 	build_attr_var_subst attr (free_attrs, attr_var_heap)
