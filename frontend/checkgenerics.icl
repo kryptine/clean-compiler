@@ -178,7 +178,7 @@ where
 					| not found 
 						= (gen_dep, check_generic_dep_error gd_ident "generic dependency not defined" cs)	
 					= case decl_kind of
-						STE_Imported STE_Generic generic_module
+						STE_Imported (STE_Generic _) generic_module
 							-> ({gen_dep & gd_ident = Ident decl_ident, gd_index = {gi_module = generic_module, gi_index = decl_index}}, cs)
 						_ 
 							-> (gen_dep, check_generic_dep_error gd_ident "not a generic function" cs)
@@ -351,9 +351,9 @@ get_generic_index {id_name,id_info} mod_index cs=:{cs_symbol_table}
 	# (ste, cs_symbol_table) = readPtr id_info cs_symbol_table
 	# cs = {cs & cs_symbol_table = cs_symbol_table}
 	= case ste.ste_kind of
-		STE_Generic
+		STE_Generic _
 			-> ({gi_module=mod_index,gi_index = ste.ste_index}, cs) 
-		STE_Imported STE_Generic imported_generic_module
+		STE_Imported (STE_Generic _) imported_generic_module
 			-> ({gi_module=imported_generic_module,gi_index = ste.ste_index}, cs)
 		_	->	( {gi_module=NoIndex,gi_index = NoIndex}
 				, {cs & cs_error = checkError id_name "undefined generic function" cs.cs_error})

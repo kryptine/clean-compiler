@@ -42,7 +42,7 @@ instance == FunctionOrMacroIndex
 				| STE_Field !Ident
 				| STE_Class
 				| STE_Member
-				| STE_Generic
+				| STE_Generic !Int /*arity*/
 				| STE_GenericCase
 				| STE_GenericDeriveClass
 				| STE_Instance

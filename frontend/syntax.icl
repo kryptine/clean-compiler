@@ -958,7 +958,7 @@ where
 	(<<<) file
 		STE_DclFunction
 			= file <<< "STE_DclFunction"
-	(<<<) file STE_Generic = file <<< "STE_Generic"
+	(<<<) file (STE_Generic _) = file <<< "STE_Generic"
 	(<<<) file STE_GenericCase = file <<< "STE_GenericCase"
 	(<<<) file STE_GenericDeriveClass = file <<< "STE_GenericDeriveClass"
 	(<<<) file

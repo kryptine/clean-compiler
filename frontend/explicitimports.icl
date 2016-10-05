@@ -513,7 +513,7 @@ checkExplicitImportCompleteness dcls_explicit explicit_qualified_imports dcl_mod
 		continuation (STE_DclMacroOrLocalMacroFunction _) dcl_common dcl_functions cci ccs
 			# (macro,ccs) = ccs!box_ccs.ccs_macro_defs.[mod_index,decl_index]
 			= check_completeness macro cci ccs
-		continuation STE_Generic dcl_common dcl_functions cci ccs
+		continuation (STE_Generic _) dcl_common dcl_functions cci ccs
 			= check_completeness dcl_common.com_generic_defs.[decl_index] cci ccs
 
 instance toString STE_Kind where
@@ -524,7 +524,7 @@ instance toString STE_Kind where
 	toString (STE_Field _) 				= "field"
 	toString STE_Class 					= "class"
 	toString STE_Member 				= "class member"
-	toString STE_Generic 				= "generic"			//AA
+	toString (STE_Generic _)			= "generic"
 	toString STE_Instance				= "instance"
 	toString ste						= "<<unknown symbol kind>>"
 
@@ -711,7 +711,7 @@ instance check_completeness GenericDef where
 
 instance check_completeness GenericDependency where
 	check_completeness {gd_ident=Ident ident, gd_index={gi_module, gi_index}} cci ccs
-		= check_whether_ident_is_imported ident gi_module gi_index STE_Generic cci ccs
+		= check_whether_ident_is_imported ident gi_module gi_index (STE_Generic -1) cci ccs
 
 instance check_completeness (Global x) | check_completeness x where
 	check_completeness { glob_object } cci ccs
@@ -827,7 +827,7 @@ instance check_completeness TypeContext where
 		  (check_whether_ident_is_imported ds_ident glob_module ds_index STE_Class cci ccs)
 	check_completeness {tc_class=TCGeneric {gtc_generic={glob_module,glob_object={ds_ident,ds_index}}}, tc_types} cci ccs
 		= check_completeness tc_types cci
-		  (check_whether_ident_is_imported ds_ident glob_module ds_index STE_Generic cci ccs)
+		  (check_whether_ident_is_imported ds_ident glob_module ds_index (STE_Generic -1) cci ccs)
 
 instance check_completeness (TypeDef TypeRhs) where
 	check_completeness td=:{td_rhs}	cci ccs
@@ -971,7 +971,7 @@ ste_kind_to_name_space_n (STE_DclMacroOrLocalMacroFunction _) = ExpressionNameSp
 ste_kind_to_name_space_n STE_Type = TypeNameSpaceN
 ste_kind_to_name_space_n STE_Class = ClassNameSpaceN
 ste_kind_to_name_space_n (STE_Field _) = FieldNameSpaceN
-ste_kind_to_name_space_n STE_Generic = GenericNameSpaceN
+ste_kind_to_name_space_n (STE_Generic _) = GenericNameSpaceN
 ste_kind_to_name_space_n _ = OtherNameSpaceN
 
 search_qualified_ident :: !Ident {#Char} !NameSpaceN !*CheckState -> (!Bool,!DeclarationRecord,!*CheckState)

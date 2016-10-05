@@ -12,7 +12,7 @@ where
 	toInt STE_Constructor			= cConstructorDefs
 	toInt (STE_Field _)				= cSelectorDefs
 	toInt STE_Class					= cClassDefs
-	toInt STE_Generic				= cGenericDefs
+	toInt (STE_Generic _)			= cGenericDefs
 	toInt STE_GenericCase			= cGenericCaseDefs
 	toInt STE_Member				= cMemberDefs
 	toInt STE_Instance				= cInstanceDefs
@@ -129,6 +129,15 @@ retrieveGlobalDefinition {ste_kind,ste_def_level,ste_index} requ_kind mod_index
 	| ste_kind == requ_kind && ste_def_level == cGlobalScope
 		= (ste_index, mod_index)
 		= (NotFound, mod_index)
+
+retrieveGlobalGenericDefinition :: !SymbolTableEntry !Index -> (!Index, !Index, !Int)
+retrieveGlobalGenericDefinition {ste_kind = STE_Imported (STE_Generic arity) decl_index, ste_def_level, ste_index} mod_index
+	= (ste_index, decl_index, arity)
+retrieveGlobalGenericDefinition {ste_kind = STE_Generic arity,ste_def_level,ste_index} mod_index
+	| ste_def_level == cGlobalScope
+		= (ste_index, mod_index, arity)
+retrieveGlobalGenericDefinition _ mod_index
+	= (NotFound, mod_index ,-1)
 
 getBelongingSymbols :: !Declaration !v:{#DclModule} -> (!BelongingSymbols, !v:{#DclModule})
 getBelongingSymbols (Declaration {decl_kind=STE_Imported STE_Type def_mod_index, decl_index}) dcl_modules
