@@ -6,13 +6,13 @@ TONIC_DIR=$(ROOT)/frontend/Tonic
 
 default: $(BACKEND_LIBRARY_TARGET)
 	cpm project CleanCompilerMacOSX.prj build
-	cp cocl ~/clean/lib/exe/cocl
-	cp cocl ~/clean/exe/cocl
+	cp cocl $(CLEAN_HOME)/lib/exe/cocl
+	cp cocl $(CLEAN_HOME)/exe/cocl
 
 force: $(BACKEND_LIBRARY_TARGET)
 	cpm project CleanCompilerMacOSX.prj build --force
-	cp cocl ~/clean/lib/exe/cocl
-	cp cocl ~/clean/exe/cocl
+	cp cocl $(CLEAN_HOME)/lib/exe/cocl
+	cp cocl $(CLEAN_HOME)/exe/cocl
 
 $(BACKEND_CSF):
 	mkdir -p $(BACKEND_CSF)

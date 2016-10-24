@@ -8,19 +8,20 @@ from general import ::Optional (Yes, No)
 import checksupport, overloading
 from partition import ::Component(..),::ComponentMembers
 
-:: FrontEndOptions 
+:: FrontEndOptions
 	=	{	feo_up_to_phase			:: !FrontEndPhase
-		,	feo_generics 			:: !Bool
-		,	feo_fusion	 			:: !Bool
+		,	feo_generics				:: !Bool
+		,	feo_fusion					:: !Bool
 		,	feo_strip_unused		:: !Bool
 		,	feo_generate_sapl		:: !Bool
+		,	feo_generate_ctags	:: !Bool
 		}
 
 :: FrontEndSyntaxTree
-	=	{	fe_icl					:: !IclModule
-		,	fe_dcls					:: !{#DclModule}
+	=	{	fe_icl						:: !IclModule
+		,	fe_dcls						:: !{#DclModule}
 		,	fe_components			:: !{!Component}
-		,	fe_arrayInstances		:: !ArrayAndListInstances
+		,	fe_arrayInstances	:: !ArrayAndListInstances
 		}
 
 :: FrontEndPhase

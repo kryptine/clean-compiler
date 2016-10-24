@@ -1,6 +1,6 @@
 implementation module postparse
 
-import StdEnv
+import StdEnv,StdStrictLists
 import syntax, parse, utilities, containers, compare_types
 import genericsupport
 
@@ -79,7 +79,7 @@ instance toParsedExpr ParsedExpr where
 
 instance toParsedExpr Int where
 	toParsedExpr x
-		=	PE_Basic (BVInt x)
+		=	PE_Basic (BVInt x) NoPos
 
 postParseError :: Position {#Char} *CollectAdmin -> *CollectAdmin
 postParseError pos msg ps=:{ca_error={pea_file}}
@@ -145,8 +145,8 @@ where
 		# ((pattern_expr,case_alts), ca) = collectFunctions (pattern_expr,case_alts) icl_module ca
 		= (PE_Case case_ident pattern_expr case_alts, ca)
 	collectFunctions (PE_If if_ident c t e) icl_module ca
-		# case_alts			= [ {calt_pattern = PE_Basic (BVB True), calt_rhs = exprToRhs t, calt_position=NoPos}
-							  , {calt_pattern = PE_WildCard        , calt_rhs = exprToRhs e, calt_position=NoPos}]
+		# case_alts			= [ {calt_pattern = PE_Basic (BVB True) NoPos, calt_rhs = exprToRhs t, calt_position=NoPos}
+							  , {calt_pattern = PE_WildCard              , calt_rhs = exprToRhs e, calt_position=NoPos}]
 		  (c, ca) = collectFunctions c icl_module ca
 		  (case_alts, ca) = collectFunctions case_alts icl_module ca
 		= (PE_Case if_ident c case_alts, ca)
@@ -426,8 +426,8 @@ get_predef_id predef_index :== predefined_idents.[predef_index]
 
 :: IndexGenerator :== Optional (ParsedExpr,[([ParsedDefinition],ParsedExpr,ParsedExpr)])
 
-is_zero_expression (PE_Basic (BVI "0")) = True
-is_zero_expression (PE_Basic (BVInt 0)) = True
+is_zero_expression (PE_Basic (BVI "0") _) = True
+is_zero_expression (PE_Basic (BVInt 0) _) = True
 is_zero_expression _ = False
 
 is_overloaded_list_generator IsOverloadedListGenerator = True
@@ -449,13 +449,13 @@ transformGenerator {gen_kind=IsArrayGenerator, gen_expr, gen_pattern, gen_positi
 		No
 			# (i, ca) = patternPrefixAndPositionToIdentExp pattern "g_i" gen_position ca
 			  inc = get_predef_id PD_IncFun
-			# dec_n = PE_List [n,PE_Ident sub,PE_Basic (BVInt 1)]
+			# dec_n = PE_List [n,PE_Ident sub,PE_Basic (BVInt 1) NoPos]
 			# transformed_generator
 			  	=	{	tg_expr =	([PD_NodeDef (LinePos qual_filename gen_position.lc_line) (PE_Tuple [n,a2]) (exprToRhs (PE_List [PE_Ident usize, gen_expr]))],
-				  					[PE_Basic (BVInt 0),dec_n,a2])
+				  					[PE_Basic (BVInt 0) NoPos,dec_n,a2])
 			  		,	tg_lhs_arg = [i, n, array]
 			  		,	tg_case_end_expr = PE_List [i,PE_Ident less_or_equal, n]
-			  		,	tg_case_end_pattern = PE_Basic (BVB True)
+			  		,	tg_case_end_pattern = PE_Basic (BVB True) NoPos
 					,	tg_element = PE_Selection (ParsedUniqueSelector True) array [PS_Array i]
 					,	tg_element_is_uselect=True
 					,	tg_pattern = pattern
@@ -465,13 +465,13 @@ transformGenerator {gen_kind=IsArrayGenerator, gen_expr, gen_pattern, gen_positi
 			-> (transformed_generator,Yes (i,[([],dec_n,n2)]),2,ca)
 		Yes (i,[])
 			# inc = get_predef_id PD_IncFun
-			# dec_n = PE_List [n,PE_Ident sub,PE_Basic (BVInt 1)]
+			# dec_n = PE_List [n,PE_Ident sub,PE_Basic (BVInt 1) NoPos]
 			# transformed_generator
 			  	=	{	tg_expr =	([PD_NodeDef (LinePos qual_filename gen_position.lc_line) (PE_Tuple [n,a2]) (exprToRhs (PE_List [PE_Ident usize, gen_expr]))],
 				  					[dec_n,a2])
 			  		,	tg_lhs_arg = [n,array]
 			  		,	tg_case_end_expr = PE_List [i,PE_Ident less_or_equal, n]
-			  		,	tg_case_end_pattern = PE_Basic (BVB True)
+			  		,	tg_case_end_pattern = PE_Basic (BVB True) NoPos
 					,	tg_element = PE_Selection (ParsedUniqueSelector True) array [PS_Array i]
 					,	tg_element_is_uselect=True
 					,	tg_pattern = pattern
@@ -493,7 +493,7 @@ transformGenerator {gen_kind=IsArrayGenerator, gen_expr, gen_pattern, gen_positi
 					}
 			# size_expression
 				=([PD_NodeDef (LinePos qual_filename gen_position.lc_line) (PE_Tuple [n,a2]) (exprToRhs (PE_List [PE_Ident usize, gen_expr]))],
-				  					(PE_List [n,PE_Ident sub,PE_Basic (BVInt 1)]),n2)
+				  					(PE_List [n,PE_Ident sub,PE_Basic (BVInt 1) NoPos]),n2)
 			-> (transformed_generator,Yes (i,[size_expression:size_expressions]),0,ca)
 transformGenerator {gen_kind, gen_expr=PE_Sequ (SQ_FromTo pd_from_to_index from_exp to_exp), gen_pattern, gen_position} qual_filename index_generator ca
 	| is_overloaded_list_generator gen_kind || pd_from_to_index==PD_FromTo
@@ -510,7 +510,7 @@ transformGenerator {gen_kind, gen_expr=PE_Sequ (SQ_FromTo pd_from_to_index from_
 					  	=	{	tg_expr = ([],[from_exp,to_exp])
 					  		,	tg_lhs_arg = [i,n]
 					  		,	tg_case_end_expr = PE_List [i,PE_Ident less_or_equal,n]
-					  		,	tg_case_end_pattern = PE_Basic (BVB True)
+					  		,	tg_case_end_pattern = PE_Basic (BVB True) NoPos
 							,	tg_element = i
 							,	tg_element_is_uselect=False
 							,	tg_pattern = gen_pattern
@@ -525,7 +525,7 @@ transformGenerator {gen_kind, gen_expr=PE_Sequ (SQ_FromTo pd_from_to_index from_
 					  	=	{	tg_expr = ([],[to_exp])
 					  		,	tg_lhs_arg = [n]
 					  		,	tg_case_end_expr = PE_List [i,PE_Ident less_or_equal,n]
-					  		,	tg_case_end_pattern = PE_Basic (BVB True)
+					  		,	tg_case_end_pattern = PE_Basic (BVB True) NoPos
 							,	tg_element = i
 							,	tg_element_is_uselect=False
 							,	tg_pattern = gen_pattern
@@ -553,7 +553,7 @@ transformGenerator {gen_kind, gen_expr=PE_Sequ (SQ_FromTo pd_from_to_index from_
 			  	=	{	tg_expr = ([],[from_exp,to_exp])
 			  		,	tg_lhs_arg = [i,n]
 			  		,	tg_case_end_expr = PE_List [i,PE_Ident less_or_equal,n]
-			  		,	tg_case_end_pattern = PE_Basic (BVB True)
+			  		,	tg_case_end_pattern = PE_Basic (BVB True) NoPos
 					,	tg_element = i
 					,	tg_element_is_uselect=False
 					,	tg_pattern = gen_pattern
@@ -699,7 +699,7 @@ where
 					# (case_ident,ca) = prefixAndPositionToIdent ("g_s"+++toString n) gen_position ca
 					# pos = LinePos qual_filename gen_position.lc_line
 					= (PE_Case case_ident (PE_List [ident1,PE_Ident smaller_fun,ident2])
-						[{calt_pattern = PE_Basic (BVB True), calt_rhs = exprToRhs ident1, calt_position=pos},
+						[{calt_pattern = PE_Basic (BVB True) NoPos, calt_rhs = exprToRhs ident1, calt_position=pos},
 						 {calt_pattern = PE_WildCard, calt_rhs = exprToRhs ident2, calt_position=pos}],ca)
 		= (node_defs,to_exp,ident1,ca)
 
@@ -797,7 +797,7 @@ transformArrayComprehension array_kind expr qualifiers ca
 	  (c_a_ident_exp, ca) = prefixAndPositionToIdentExp "c_a" qual_position ca
 	  create_array_expr = predef_ident_expr PD__CreateArrayFun
 	| same_index_for_update_and_array_generators qualifiers
-		# index_generator = {gen_kind=IsListGenerator, gen_pattern=c_i_ident_exp, gen_expr=PE_Sequ (SQ_From PD_From (PE_Basic (BVInt 0))), gen_position=qual_position}
+		# index_generator = {gen_kind=IsListGenerator, gen_pattern=c_i_ident_exp, gen_expr=PE_Sequ (SQ_From PD_From (PE_Basic (BVInt 0) NoPos)), gen_position=qual_position}
 		# update = PE_Update c_a_ident_exp [PS_Array  c_i_ident_exp] expr
 		| size_of_generators_can_be_computed_quickly qualifiers
 			# {qual_generators,qual_let_defs,qual_filter,qual_position,qual_filename} = hd_qualifier
@@ -818,7 +818,7 @@ transformArrayComprehension array_kind expr qualifiers ca
 		# new_array = PE_List [create_array_expr,length]
 		  new_array = cast_array_kind array_kind new_array
 		# inc = get_predef_id PD_IncFun
-		  new_array_and_index =	[new_array,PE_Basic (BVInt 0)]
+		  new_array_and_index =	[new_array,PE_Basic (BVInt 0) NoPos]
 		  update = [PE_Update c_a_ident_exp [PS_Array  c_i_ident_exp] expr,PE_List [PE_Ident inc,c_i_ident_exp]]
 		= transformUpdateComprehension new_array_and_index update [c_a_ident_exp,c_i_ident_exp] c_a_ident_exp qualifiers ca
 
@@ -859,11 +859,11 @@ makeUpdateOrSizeComprehension transformed_qualifiers success identExprs result_e
 
 size_of_generator_can_be_computed_quickly {gen_pattern,gen_kind=IsArrayGenerator}
 	= pattern_will_always_match gen_pattern
-size_of_generator_can_be_computed_quickly {gen_pattern,gen_kind=IsListGenerator,gen_expr=PE_Sequ (SQ_FromTo PD_FromTo (PE_Basic (BVInt 0)) to_exp)}
+size_of_generator_can_be_computed_quickly {gen_pattern,gen_kind=IsListGenerator,gen_expr=PE_Sequ (SQ_FromTo PD_FromTo (PE_Basic (BVInt 0) NoPos) to_exp)}
 	= pattern_will_always_match gen_pattern	
 size_of_generator_can_be_computed_quickly {gen_pattern,gen_kind=IsListGenerator,gen_expr=PE_Sequ (SQ_From PD_From from_exp)}
 	= pattern_will_always_match gen_pattern	
-size_of_generator_can_be_computed_quickly {gen_pattern,gen_kind=IsOverloadedListGenerator,gen_expr=PE_Sequ (SQ_FromTo _ (PE_Basic (BVInt 0)) to_exp)}
+size_of_generator_can_be_computed_quickly {gen_pattern,gen_kind=IsOverloadedListGenerator,gen_expr=PE_Sequ (SQ_FromTo _ (PE_Basic (BVInt 0) NoPos) to_exp)}
 	= pattern_will_always_match gen_pattern	
 size_of_generator_can_be_computed_quickly {gen_pattern,gen_kind=IsOverloadedListGenerator,gen_expr=PE_Sequ (SQ_From _ from_exp)}
 	= pattern_will_always_match gen_pattern	
@@ -885,7 +885,7 @@ size_of_generators_can_be_computed_quickly _
 computeSize :: [Qualifier] LineAndColumn FileName *CollectAdmin -> (!ParsedExpr,!*CollectAdmin)
 computeSize qualifiers qual_position qual_filename ca
 	# (counter_ident_exp, ca) = prefixAndPositionToIdentExp "c_l_i" qual_position ca
-	  (transformed_qualifiers,ca) = transformUpdateQualifiers [counter_ident_exp] [PE_Basic (BVInt 0)] qualifiers ca
+	  (transformed_qualifiers,ca) = transformUpdateQualifiers [counter_ident_exp] [PE_Basic (BVInt 0) NoPos] qualifiers ca
 	  inc = get_predef_id PD_IncFun
 	  success = insert_inc_in_inner_loop (last transformed_qualifiers).tq_continue
 				with
@@ -1501,49 +1501,101 @@ reorganiseDefinitions icl_module [PD_Type type_def=:{td_rhs = MoreConses type_ex
 reorganiseDefinitions icl_module [PD_Class class_def=:{class_ident,class_arity,class_args} members : defs] def_counts=:{mem_count,macro_count} ca
 	# type_context = { tc_class = TCClass {glob_module = NoIndex, glob_object = {ds_ident = class_ident, ds_arity = class_arity, ds_index = NoIndex }},
 					   tc_types = [ TV tv \\ tv <- class_args ], tc_var = nilPtr}
-	  (mem_defs, mem_macros, ca) = check_symbols_of_class_members members type_context ca
+	  (mem_defs,mem_macros,default_members_without_type,macro_members,macro_count,ca)
+			= check_symbols_of_class_members members type_context macro_count ca
+	  (mem_defs,ca) = add_default_members_without_type default_members_without_type mem_defs ca
 	  (mem_symbs, mem_defs, class_size) = reorganise_member_defs mem_defs mem_count
-	  def_counts & mem_count=mem_count + class_size, macro_count=macro_count + length mem_macros
+	  def_counts & mem_count=mem_count + class_size, macro_count=macro_count
 	  (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs def_counts ca
-	  class_def = { class_def & class_members = { member \\ member <- mem_symbs }}
+	  class_def = { class_def & class_members = {member \\ member <- mem_symbs}
+	  						  , class_macro_members = {macro_member \\ macro_member<|-macro_members}
+	  			  }
 	  c_defs = { c_defs & def_classes = [class_def : c_defs.def_classes], def_macros = mem_macros ++ c_defs.def_macros,
 	  			 def_members = mem_defs ++ c_defs.def_members }
 	= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)  
 where
-	check_symbols_of_class_members :: ![ParsedDefinition] !TypeContext !*CollectAdmin -> (![MemberDef], ![FunDef], !*CollectAdmin)
-	check_symbols_of_class_members [PD_TypeSpec pos name prio opt_type=:(Yes type=:{st_context,st_arity}) specials : defs] type_context ca
+	check_symbols_of_class_members :: ![ParsedDefinition] !TypeContext !Int !*CollectAdmin
+									-> (![MemberDef],![FunDef],![(Ident,MacroMember,Position)],[!MacroMember!],!Int,!*CollectAdmin)
+	check_symbols_of_class_members [PD_TypeSpec pos name prio opt_type=:(Yes type=:{st_context,st_arity}) specials : defs] type_context macro_count ca
 		# (bodies, fun_kind, defs, ca) = collectFunctionBodies name st_arity prio FK_Unknown defs ca
 		| isEmpty bodies
 			# mem_def = {	me_ident = name, me_type = { type & st_context = [type_context : st_context ]}, me_pos = pos, me_priority = prio,
+							me_default_implementation = No,
 							me_offset = NoIndex, me_class_vars = [], me_class = { glob_module = NoIndex, glob_object = NoIndex}, me_type_ptr = nilPtr }
-			  ( mem_defs, mem_macros, ca) = check_symbols_of_class_members defs type_context ca
-			= ([mem_def : mem_defs], mem_macros, ca)
+			  (mem_defs,mem_macros,default_members_without_type,macro_members,new_macro_count,ca)
+					= check_symbols_of_class_members defs type_context macro_count ca
+			= ([mem_def : mem_defs],mem_macros,default_members_without_type,macro_members,new_macro_count,ca)
+		= case fun_kind of
+		   FK_Macro
 			# macro = MakeNewImpOrDefFunction name st_arity bodies FK_Macro prio opt_type pos
-			  (mem_defs, mem_macros,ca) = check_symbols_of_class_members defs type_context ca
-			= (mem_defs, [macro : mem_macros], ca)
-	check_symbols_of_class_members [PD_TypeSpec fun_pos fun_name prio No specials : defs] type_context ca
+			  (mem_defs,mem_macros,default_members_without_type,macro_members,new_macro_count,ca)
+					= check_symbols_of_class_members defs type_context (macro_count+1) ca
+			  macro_member = {mm_ident=name,mm_index=macro_count}
+			= (mem_defs,[macro : mem_macros],default_members_without_type,[|macro_member : macro_members],new_macro_count,ca)
+		   FK_Function _
+		    # macro_name = class_ident.id_name+++"_"+++name.id_name
+			# ({boxed_ident=macro_ident}, ca_hash_table) = putIdentInHashTable macro_name IC_Expression ca.ca_hash_table
+			# ca = { ca & ca_hash_table = ca_hash_table }
+			# macro = MakeNewImpOrDefFunction macro_ident st_arity bodies FK_Macro prio opt_type pos
+			# mem_def = {	me_ident = name, me_type = { type & st_context = [type_context : st_context ]}, me_pos = pos, me_priority = prio,
+							me_offset = NoIndex, me_class_vars = [], me_class = { glob_module = NoIndex, glob_object = NoIndex},
+			 				me_default_implementation = Yes {mm_ident=macro_ident,mm_index=macro_count}, me_type_ptr = nilPtr }
+			  (mem_defs,mem_macros,default_members_without_type,macro_members,macro_count,ca)
+					= check_symbols_of_class_members defs type_context (macro_count+1) ca
+			= ([mem_def : mem_defs],[macro : mem_macros],default_members_without_type,macro_members,macro_count,ca)
+	check_symbols_of_class_members [PD_TypeSpec fun_pos fun_name prio No specials : defs] type_context macro_count ca
 		= case defs of
 			[PD_Function pos name is_infix args rhs fun_kind : defs]
 				| belongsToTypeSpec fun_name prio name is_infix
   					# fun_arity = length args
   					  (bodies, fun_kind, defs, ca) = collectFunctionBodies name fun_arity prio fun_kind defs ca
-		  			  (mem_defs, mem_macros, ca) = check_symbols_of_class_members defs type_context ca
+					  (mem_defs,mem_macros,default_members_without_type,macro_members,new_macro_count,ca)
+							= check_symbols_of_class_members defs type_context macro_count ca
 					  macro = MakeNewImpOrDefFunction name fun_arity bodies FK_Macro prio No fun_pos
-					-> (mem_defs, [macro : mem_macros], ca)
-					-> check_symbols_of_class_members defs type_context (postParseError fun_pos "macro body expected" ca)
+					-> (mem_defs,[macro : mem_macros],default_members_without_type,macro_members,new_macro_count,ca)
+					-> check_symbols_of_class_members defs type_context macro_count (postParseError fun_pos "macro body expected" ca)
 			_
-				-> check_symbols_of_class_members defs type_context (postParseError fun_pos "macro body expected" ca)
-	check_symbols_of_class_members [PD_Function fun_pos name is_infix args rhs fun_kind : defs] type_context ca
+				-> check_symbols_of_class_members defs type_context macro_count (postParseError fun_pos "macro body expected" ca)
+	check_symbols_of_class_members [PD_Function fun_pos name is_infix args rhs fun_kind : defs] type_context macro_count ca
 		# prio = if is_infix (Prio NoAssoc 9) NoPrio
 		  fun_arity = length args
 		  (bodies, fun_kind, defs, ca) = collectFunctionBodies name fun_arity prio fun_kind defs ca
-		  (mem_defs, mem_macros, ca) = check_symbols_of_class_members defs type_context ca
-		  macro = MakeNewImpOrDefFunction name fun_arity [{ pb_args = args, pb_rhs = rhs, pb_position = fun_pos } : bodies] FK_Macro prio No fun_pos
-		= (mem_defs, [macro : mem_macros], ca)
-	check_symbols_of_class_members [def : _] type_context ca
+		  bodies = [{ pb_args = args, pb_rhs = rhs, pb_position = fun_pos } : bodies]
+		  (mem_defs,mem_macros,default_members_without_type,macro_members,new_macro_count,ca)
+				= check_symbols_of_class_members defs type_context (macro_count+1) ca
+		= case fun_kind of
+			FK_Macro
+				# macro = MakeNewImpOrDefFunction name fun_arity bodies FK_Macro prio No fun_pos
+				  macro_member = {mm_ident=name,mm_index=macro_count}
+				-> (mem_defs,[macro : mem_macros],default_members_without_type,[|macro_member : macro_members],new_macro_count,ca)
+			FK_Function _
+				# macro_name = class_ident.id_name+++"_"+++name.id_name
+				  ({boxed_ident=macro_ident}, ca_hash_table) = putIdentInHashTable macro_name IC_Expression ca.ca_hash_table
+				  ca = { ca & ca_hash_table = ca_hash_table }
+				  macro = MakeNewImpOrDefFunction macro_ident fun_arity bodies FK_Macro prio No fun_pos
+				  macro_member = {mm_ident=macro_ident,mm_index=macro_count}
+				-> (mem_defs,[macro : mem_macros],[(name,macro_member,fun_pos) : default_members_without_type],macro_members,new_macro_count,ca)
+	check_symbols_of_class_members [def : _] type_context macro_count ca
 		= abort "postparse.check_symbols_of_class_members: unknown def"  // <<- def
-	check_symbols_of_class_members [] type_context ca
-		= ([], [], ca)
+	check_symbols_of_class_members [] type_context macro_count ca
+		= ([],[],[],[!!],macro_count,ca)
+
+	add_default_members_without_type :: ![(Ident,MacroMember,Position)] [MemberDef] *CollectAdmin -> *(![MemberDef],!*CollectAdmin)
+	add_default_members_without_type [(name,macro_member,fun_pos):default_members_without_type] mem_defs ca
+		# (mem_defs,ca) = add_default_member mem_defs name ca
+		= add_default_members_without_type default_members_without_type mem_defs ca
+	where
+		add_default_member [mem_def:mem_defs] name ca
+			| mem_def.me_ident==name && case mem_def.me_default_implementation of No -> True; _ -> False
+				# mem_def = {mem_def & me_default_implementation = Yes macro_member}
+				= ([mem_def:mem_defs],ca)
+				# (mem_defs,ca) = add_default_member mem_defs name ca
+				= ([mem_def:mem_defs],ca)
+		add_default_member [] name ca
+			# ca = postParseError fun_pos "type missing of default implementation" ca
+			= ([],ca)
+	add_default_members_without_type [] mem_defs ca
+		= (mem_defs,ca)
 
 	reorganise_member_defs :: [MemberDef] Index -> ([DefinedSymbol], [MemberDef], Index)
 	reorganise_member_defs mem_defs first_mem_index

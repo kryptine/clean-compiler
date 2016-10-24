@@ -500,7 +500,7 @@ instance <<< ParsedExpr
 where
 	(<<<) file (PE_List exprs) = file <<< exprs
 	(<<<) file (PE_Tuple args) = file <<< '(' <<< args <<< ')'
-	(<<<) file (PE_Basic basic_value) = file <<< basic_value
+	(<<<) file (PE_Basic basic_value _) = file <<< basic_value
 	(<<<) file (PE_Selection selector_kind expr selectors) =  file <<< expr <<< selector_kind <<< selectors
 	(<<<) file (PE_Update expr1 selections expr2) =  file <<< '{' <<< expr1  <<< " & " <<<  selections <<< " = " <<< expr2 <<< '}'
 	(<<<) file (PE_Record PE_Empty _ fields) = file <<< '{' <<< fields <<< '}'
