@@ -717,7 +717,7 @@ where
 
 	finish_cr_of_cd info=:{fri_defs} {cd_inst_symbol={glob_module,glob_object},cd_inst_contexts,cd_new_vars} act_tc=:{tc_class,tc_types}
 			frs_state=:{frs_type_heaps,frs_coercions,frs_predef_symbols,frs_special_instances,frs_error}
-		# {ins_type={it_vars,it_types,it_context}, ins_members, ins_class_index} = fri_defs.[glob_module].com_instance_defs.[glob_object]
+		# {ins_type={it_vars,it_attr_vars,it_types,it_context}, ins_members, ins_class_index} = fri_defs.[glob_module].com_instance_defs.[glob_object]
 		| is_predefined_global_symbol ins_class_index PD_ArrayClass frs_predef_symbols && is_unboxed_array tc_types frs_predef_symbols
 			# {class_members} = fri_defs.[ins_class_index.gi_module].com_class_defs.[ins_class_index.gi_index]
 			  (rcs_class_context, frs_special_instances, (frs_predef_symbols, frs_type_heaps), frs_error)
@@ -740,7 +740,11 @@ where
 			= (rcs_class_context,
 					{ frs_state & frs_predef_symbols = frs_predef_symbols, frs_type_heaps = frs_type_heaps, frs_error = frs_error, frs_special_instances = frs_special_instances})
 		| otherwise
-			# frs_type_heaps & th_vars = clear_binding_of_type_vars it_vars frs_type_heaps.th_vars
+			# frs_type_heaps & th_vars = clear_binding_of_type_vars it_vars frs_type_heaps.th_vars,
+							   th_attrs = clear_attr_vars it_attr_vars frs_type_heaps.th_attrs
+				with
+					clear_attr_vars [{av_info_ptr}:attrs] attrs_heap = clear_attr_vars attrs (writePtr av_info_ptr AVI_Empty attrs_heap)
+					clear_attr_vars [] attrs_heap = attrs_heap
 			# (uni_ok, frs_type_heaps, frs_coercions) = bindListsOfTypes fri_defs it_types tc_types frs_type_heaps frs_coercions
 			| uni_ok
 				# frs_subst = frs_state.frs_subst
@@ -2026,31 +2030,65 @@ class bindAndAdjustAttrs type ::  !{# CommonDefs} !type !type !*TypeHeaps !*Coer
 instance bindAndAdjustAttrs AType
 where
 	bindAndAdjustAttrs defs atype1 atype2 type_heaps coercion_env
-		# (uni_ok, coercion_env) = adjust_attribute atype1.at_attribute atype2.at_attribute coercion_env
+		# (uni_ok,type_heaps,coercion_env) = adjust_attribute atype1.at_attribute atype2.at_attribute type_heaps coercion_env
 		| uni_ok		
 			= bindAndAdjustAttrs defs atype1.at_type atype2.at_type type_heaps coercion_env
 			= (False, type_heaps, coercion_env)
 	where
 		// first attribute is attribute from instance type
-		adjust_attribute :: !TypeAttribute !TypeAttribute !*Coercions -> (!Bool, !*Coercions)
-		adjust_attribute (TA_Var _) attr2 coercion_env
-			= (True, coercion_env)
-		adjust_attribute TA_Unique attr2 coercion_env
+		adjust_attribute :: !TypeAttribute !TypeAttribute !*TypeHeaps !*Coercions -> (!Bool, !*TypeHeaps, !*Coercions)
+		adjust_attribute (TA_Var {av_info_ptr}) attr2 type_heaps coercion_env
+			# (av_info,th_attrs) = readPtr av_info_ptr type_heaps.th_attrs
+			= case av_info of
+				AVI_Empty
+					# type_heaps & th_attrs=writePtr av_info_ptr (AVI_Attr attr2) th_attrs
+					-> (True,type_heaps,coercion_env)
+				AVI_Attr var_attr
+					# type_heaps & th_attrs=th_attrs
+					-> case var_attr of
+						TA_Unique
+							-> adjust_attribute TA_Unique attr2 type_heaps coercion_env
+						TA_Multi
+							-> adjust_attribute TA_Multi attr2 type_heaps coercion_env
+						TA_TempVar av_number
+							-> case attr2 of
+							TA_Unique
+								# (ok,coercion_env) = tryToMakeUnique av_number coercion_env
+								| ok
+									# type_heaps & th_attrs=writePtr av_info_ptr (AVI_Attr TA_Unique) type_heaps.th_attrs
+									-> (ok,type_heaps,coercion_env)									
+									-> (ok,type_heaps,coercion_env)									
+							TA_Multi
+								# (ok,coercion_env) = tryToMakeNonUnique av_number coercion_env
+								| ok
+									# type_heaps & th_attrs=writePtr av_info_ptr (AVI_Attr TA_Multi) type_heaps.th_attrs
+									-> (ok,type_heaps,coercion_env)									
+									-> (ok,type_heaps,coercion_env)									
+							TA_TempVar av_number2
+							  	# (ok,coercion_env) = equalize_attribute_vars av_number av_number2 coercion_env
+								-> (ok,type_heaps,coercion_env)
+							_
+								-> (True,type_heaps,coercion_env)
+						_
+							-> (True,type_heaps,coercion_env)
+		adjust_attribute TA_Unique attr2 type_heaps coercion_env
 			= case attr2 of
 				TA_Unique
-					-> (True, coercion_env)
+					-> (True,type_heaps,coercion_env)
 				TA_TempVar av_number
-					-> tryToMakeUnique av_number coercion_env
+					# (ok,coercion_env) = tryToMakeUnique av_number coercion_env
+					-> (ok,type_heaps,coercion_env)
 				_
-					-> (False, coercion_env)
-		adjust_attribute attr1 attr2 coercion_env
+					-> (False,type_heaps,coercion_env)
+		adjust_attribute attr1 attr2 type_heaps coercion_env
 			= case attr2 of
 				TA_Multi
-					-> (True, coercion_env)
+					-> (True,type_heaps,coercion_env)
 				TA_TempVar av_number
-					-> tryToMakeNonUnique av_number coercion_env
+					# (ok,coercion_env) = tryToMakeNonUnique av_number coercion_env
+					-> (ok,type_heaps,coercion_env)
 				_
-					-> (False, coercion_env)
+					-> (False,type_heaps,coercion_env)
 
 //
 // match is not symmetric: the first type is the (formal) instance type, the second type is
