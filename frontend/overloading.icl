@@ -2026,19 +2026,17 @@ class bindAndAdjustAttrs type ::  !{# CommonDefs} !type !type !*TypeHeaps !*Coer
 instance bindAndAdjustAttrs AType
 where
 	bindAndAdjustAttrs defs atype1 atype2 type_heaps coercion_env
-		# (uni_ok, coercion_env) = adjust_attribute atype2.at_attribute atype1.at_attribute coercion_env
+		# (uni_ok, coercion_env) = adjust_attribute atype1.at_attribute atype2.at_attribute coercion_env
 		| uni_ok		
 			= bindAndAdjustAttrs defs atype1.at_type atype2.at_type type_heaps coercion_env
 			= (False, type_heaps, coercion_env)
 	where
-//
-// BEWARE: attribute arguments are switched compared type arguments of bindAndAdjustAttrs
-//
+		// first attribute is attribute from instance type
 		adjust_attribute :: !TypeAttribute !TypeAttribute !*Coercions -> (!Bool, !*Coercions)
-		adjust_attribute attr1 (TA_Var _) coercion_env
+		adjust_attribute (TA_Var _) attr2 coercion_env
 			= (True, coercion_env)
-		adjust_attribute attr1 TA_Unique coercion_env
-			= case attr1 of
+		adjust_attribute TA_Unique attr2 coercion_env
+			= case attr2 of
 				TA_Unique
 					-> (True, coercion_env)
 				TA_TempVar av_number
@@ -2046,7 +2044,7 @@ where
 				_
 					-> (False, coercion_env)
 		adjust_attribute attr1 attr2 coercion_env
-			= case attr1 of
+			= case attr2 of
 				TA_Multi
 					-> (True, coercion_env)
 				TA_TempVar av_number
