@@ -1037,7 +1037,7 @@ checkInstanceType mod_index ins_class_index ins_class_ident class_fun_dep_vars i
 	  oti = { oti_heaps = heaps, oti_all_vars = [], oti_all_attrs = [], oti_global_vars= [] }
 	  (it_types, undefined_contexts_vars, (ots, oti=:{oti_all_vars = it_vars, oti_all_attrs = it_attr_vars}, cs))
 		= check_instance_type class_fun_dep_vars mod_index it_types (ots, oti, {cs & cs_error = cs_error})
-	  (heaps, cs) = IF_ALLOW_NON_LINEAR_AND_OVERLAPPING_INSTANCES
+	  (heaps, cs) = IF_ALLOW_NON_LINEAR_INSTANCES
 						(oti.oti_heaps, cs)
 						(check_linearity_of_type_vars it_vars oti.oti_heaps cs)
 	  oti = {oti & oti_all_vars = [], oti_all_attrs = [], oti_heaps = heaps}
@@ -1056,7 +1056,7 @@ checkInstanceType mod_index ins_class_index ins_class_ident class_fun_dep_vars i
   where
 	check_fully_polymorphity it_types it_context cs_error
 		| all is_type_var it_types && not (isEmpty it_context)
-			= IF_ALLOW_NON_LINEAR_AND_OVERLAPPING_INSTANCES
+			= IF_ALLOW_NON_TERMINATING_AND_OVERLAPPING_INSTANCES
 				cs_error
 				(checkError "context restriction not allowed for fully polymorph instance" "" cs_error)
 		= cs_error
@@ -1396,7 +1396,7 @@ checkInstanceTypeContexts tcs instance_type_vars instance_type undefined_context
 	  cs & cs_symbol_table=cs_symbol_table
 	  fun_dep_determined_vars = if (isEmpty new_fun_dep_determined_vars) fun_dep_determined_vars (fun_dep_determined_vars++reverse new_fun_dep_determined_vars)
 	  (free_vars,cs) = collect_free_contexts_vars_error undefined_contexts_vars oti.oti_all_vars cs
-	  cs = IF_ALLOW_NON_LINEAR_AND_OVERLAPPING_INSTANCES
+	  cs = IF_ALLOW_NON_TERMINATING_AND_OVERLAPPING_INSTANCES
 			cs
 			(add_errors_for_type_variables_only_in_constraints_and_dependent_part fun_dep_determined_vars cs)
 	  cs = check_class_attributes oti.oti_all_attrs cs

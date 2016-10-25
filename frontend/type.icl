@@ -2878,7 +2878,7 @@ where
 		=  (error, IT_Node {glob_object = new_ins_index,glob_module = new_ins_module}  IT_Empty IT_Empty)
 	insert ins_types new_ins_index new_ins_module modules error (IT_Node ins=:{glob_object,glob_module} it_less it_greater)
 		#! {ins_type={it_types}} = modules.[glob_module].com_instance_defs.[glob_object]
-		# cmp = IF_ALLOW_NON_LINEAR_AND_OVERLAPPING_INSTANCES
+		# cmp = IF_ALLOW_NON_TERMINATING_AND_OVERLAPPING_INSTANCES
 					(compareInstances ins_types it_types)
 					(ins_types =< it_types)
 		| cmp == Smaller
@@ -2897,7 +2897,7 @@ where
 		=  (error, IT_Node {glob_object = new_ins_index,glob_module = new_ins_module}  IT_Empty IT_Empty)
 	insert_fun_dep_instance ins_types class_fun_dep_vars new_ins_index new_ins_module modules error (IT_Node ins=:{glob_object,glob_module} it_less it_greater)
 		#! {ins_type={it_types}} = modules.[glob_module].com_instance_defs.[glob_object]
-		# cmp = IF_ALLOW_NON_LINEAR_AND_OVERLAPPING_INSTANCES
+		# cmp = IF_ALLOW_NON_TERMINATING_AND_OVERLAPPING_INSTANCES
 					(compareFunDepInstances ins_types it_types class_fun_dep_vars)
 					(ins_types =< it_types)
 		| cmp == Smaller
