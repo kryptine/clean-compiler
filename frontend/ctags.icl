@@ -4,7 +4,8 @@ import syntax, checksupport, StdFile, StdOrdList, _SystemArray
 
 from CoclSystemDependent import DirectorySeparator, ensureCleanSystemFilesExists
 from filesystem import ensureDirectoryExists
-import Data.Maybe
+
+:: Maybe a = Just a | Nothing
 
 mkCtags :: String IclModule !*{# FunDef} !*Files -> *(!*{# FunDef}, !*Files)
 mkCtags mod_dir icl_mod fun_defs files
