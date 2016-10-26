@@ -1,8 +1,6 @@
 implementation module check
 
-import StdEnv, compare_types
-import StdStrictLists
-from StdOverloadedList import IsMemberM
+import StdEnv, StdStrictLists, compare_types
 
 import syntax, expand_types, parse, checksupport, utilities, checktypes, transform, predef
 import explicitimports, comparedefimp, checkFunctionBodies, containers, typesupport
@@ -57,7 +55,7 @@ checkSpecial mod_index fun_type=:{ft_type} fun_index subst (next_inst_index, spe
 where	
 	substitute_type st=:{st_vars,st_attr_vars,st_args,st_result,st_context,st_attr_env} environment type_heaps error
 		# (st_vars, st_attr_vars, [st_result : st_args], st_context, st_attr_env, _, type_heaps, error)
-			= instantiateTypes st_vars st_attr_vars [st_result:st_args] st_context st_attr_env environment [] [] type_heaps error
+			= instantiateTypes st_vars st_attr_vars [ st_result : st_args ] st_context st_attr_env environment [] type_heaps error
 		= ({st & st_vars = st_vars, st_args = st_args, st_result = st_result, st_attr_vars = st_attr_vars,
 			st_context = st_context, st_attr_env = st_attr_env }, type_heaps, error)
 
@@ -180,9 +178,9 @@ where
 		| has_to_be_checked opt_icl_info me_class
 			# position = newPosition me_ident me_pos
 			  cs = { cs & cs_error = setErrorAdmin position cs.cs_error }
-			  (me_type, me_class_vars, type_defs, class_defs, modules, type_heaps, cs)
+			  (me_type, type_defs, class_defs, modules, type_heaps, cs)
 			   		= checkMemberType module_index me_type type_defs class_defs modules type_heaps cs
-			  me_class_vars = [ {atv_attribute = TA_None, atv_variable = type_var} \\ (TV type_var) <- (hd me_type.st_context).tc_types ]
+			  me_class_vars = [ type_var \\ (TV type_var) <- (hd me_type.st_context).tc_types ]
 			  (me_type_ptr, var_heap) = newPtr VI_Empty var_heap		   
 			= ({ member_defs & [member_index] = { member_def & me_type = me_type, me_class_vars = me_class_vars, me_type_ptr = me_type_ptr }},
 					type_defs, class_defs, modules, type_heaps, var_heap, cs)
@@ -255,7 +253,7 @@ where
 		| class_def.class_arity == ci_arity
 			# ins_class_index = {gi_index = class_index, gi_module = class_mod_index}
 			  (ins_type, ins_specials, is_type_defs, is_class_defs, is_modules, type_heaps, cs)
-			  		= checkInstanceType module_index ins_class_index ins_class_ident class_def.class_fun_dep_vars ins_type ins_specials
+			  		= checkInstanceType module_index ins_class_index ins_class_ident ins_type ins_specials
 							is.is_type_defs is.is_class_defs is.is_modules type_heaps cs
 			  is = { is & is_type_defs = is_type_defs, is_class_defs = is_class_defs, is_modules = is_modules }
 			= ({ins & ins_class_index = ins_class_index, ins_type = ins_type, ins_specials = ins_specials}, is, type_heaps, cs)
@@ -345,7 +343,7 @@ where
 										instance_types n_icl_functions new_instance_members member_defs type_defs icl_functions modules var_heap type_heaps cs
 			= (ins_members,instance_types,n_icl_functions,new_instance_members,member_defs,type_defs,icl_functions,modules,var_heap,type_heaps,cs)
 
-	make_class_member_instance_type :: InstanceType SymbolType [ATypeVar] z:{#CheckedTypeDef}  u:{#DclModule}  *VarHeap  *TypeHeaps  *CheckState
+	make_class_member_instance_type :: InstanceType SymbolType [TypeVar] z:{#CheckedTypeDef}  u:{#DclModule}  *VarHeap  *TypeHeaps  *CheckState
 													    -> *(!SymbolType,!z:{#CheckedTypeDef},!u:{#DclModule},!*VarHeap,!*TypeHeaps,!*CheckState)
 	make_class_member_instance_type ins_type me_type me_class_vars type_defs modules var_heap type_heaps cs
 		# (instance_type, _, type_heaps, Yes (modules, type_defs), cs_error)
@@ -402,7 +400,7 @@ where
 				# cs = { cs & cs_error = checkErrorWithPosition class_member.ds_ident ins_pos "instance of class member expected" cs.cs_error}
 				= (instance_member_n,ins_members,n_icl_functions,new_instance_members,instance_types,member_defs,type_defs,modules,var_heap,type_heaps,cs)
 
-	make_default_instance :: Ident SymbolType [ATypeVar] Priority Position DefinedSymbol InstanceType Int
+	make_default_instance :: Ident SymbolType [TypeVar] Priority Position DefinedSymbol InstanceType Int
 										 ![(Int,SymbolType)] !z:{#CheckedTypeDef} !u:{#DclModule} !*VarHeap !*TypeHeaps !*CheckState
 		-> (!ClassInstanceMember,!FunDef,![(Int,SymbolType)],!z:{#CheckedTypeDef},!u:{#DclModule},!*VarHeap,!*TypeHeaps,!*CheckState)
 	make_default_instance default_class_member_ident me_type me_class_vars me_priority ins_pos
@@ -465,19 +463,20 @@ getMemberDef mem_mod mem_index mod_index member_defs modules
 		# (dcl_mod,modules) = modules![mem_mod]
 		= (dcl_mod.dcl_common.com_member_defs.[mem_index], member_defs, modules)
 
-instantiateTypes :: ![TypeVar] ![AttributeVar] ![AType] ![TypeContext] ![AttrInequality] !SpecialSubstitution ![AttrVarInfoPtr] ![SpecialSubstitution] !*TypeHeaps !*ErrorAdmin
+instantiateTypes :: ![TypeVar] ![AttributeVar] ![AType] ![TypeContext] ![AttrInequality] !SpecialSubstitution ![SpecialSubstitution] !*TypeHeaps !*ErrorAdmin
 	-> (![TypeVar], ![AttributeVar], ![AType], ![TypeContext], ![AttrInequality], ![SpecialSubstitution], !*TypeHeaps, !*ErrorAdmin)
-instantiateTypes old_type_vars old_attr_vars types type_contexts attr_env {ss_environ,ss_vars,ss_attrs,ss_context} subst_av_info_ptrs special_subst_list type_heaps=:{th_vars, th_attrs} error
+instantiateTypes old_type_vars old_attr_vars types type_contexts attr_env {ss_environ, ss_vars, ss_attrs, ss_context} special_subst_list type_heaps=:{th_vars, th_attrs} error
 	# th_vars = clear_vars old_type_vars th_vars
 
 	  (new_type_vars, th_vars) = foldSt build_var_subst ss_vars ([], th_vars)
 	  (new_attr_vars, th_attrs) = foldSt build_attr_var_subst ss_attrs ([], th_attrs)
-	  (inst_attr_vars, th_attrs) = foldSt build_attr_var_subst old_attr_vars (new_attr_vars, th_attrs)
+
 	  type_heaps = foldSt build_type_subst ss_environ { type_heaps & th_vars = th_vars, th_attrs = th_attrs }
 	  (_, new_ss_context, type_heaps) = substitute ss_context type_heaps
 
 	  (inst_vars, th_vars)			= foldSt determine_free_var old_type_vars (new_type_vars, type_heaps.th_vars) 
-	  th_attrs = update_subst_av_info_ptrs subst_av_info_ptrs type_heaps.th_attrs
+	  (inst_attr_vars, th_attrs)	= foldSt build_attr_var_subst old_attr_vars (new_attr_vars, type_heaps.th_attrs)
+
 	  (inst_types, (ok2, type_heaps))	= mapSt substitue_arg_type types (True, { type_heaps & th_vars = th_vars, th_attrs = th_attrs })
 	  (_, inst_contexts, type_heaps)	= substitute type_contexts type_heaps
 	  (_, inst_attr_env, type_heaps)	= substitute attr_env type_heaps
@@ -537,7 +536,7 @@ where
 		  th_vars = th_vars <:= (atv_variable.tv_info_ptr, TVI_Type (TV new_fv))
 		  (new_attr, th_attrs) = build_attr_subst atv_attribute type_heaps.th_attrs
 		= ([ { atv & atv_variable = new_fv, atv_attribute = new_attr } : free_vars], { type_heaps & th_vars = th_vars, th_attrs = th_attrs })
-	where
+	where		  
 		 build_attr_subst (TA_Var avar) attr_var_heap
 			# (new_info_ptr, attr_var_heap) = newPtr AVI_Empty attr_var_heap
 			  new_attr = { avar & av_info_ptr = new_info_ptr}
@@ -549,21 +548,7 @@ where
 		# (new_info_ptr, attr_var_heap) = newPtr AVI_Empty attr_var_heap
 		  new_attr = { attr & av_info_ptr = new_info_ptr}
 		= ([new_attr : free_attrs], writePtr attr.av_info_ptr (AVI_Attr (TA_Var new_attr)) attr_var_heap)
-
-	update_subst_av_info_ptrs [subst_av_info_ptr:subst_av_info_ptrs] attr_var_heap
-		# (av_info,attr_var_heap) = readPtr subst_av_info_ptr attr_var_heap
-		= case av_info of
-			AVI_Attr (TA_Var {av_info_ptr})
-				# (av_info,attr_var_heap) = readPtr av_info_ptr attr_var_heap
-				= case av_info of
-					AVI_Attr attr
-						# attr_var_heap = writePtr subst_av_info_ptr av_info attr_var_heap
-						-> update_subst_av_info_ptrs subst_av_info_ptrs attr_var_heap
-					_
-						-> update_subst_av_info_ptrs subst_av_info_ptrs attr_var_heap
-	update_subst_av_info_ptrs [] attr_var_heap
-		= attr_var_heap
-
+	
 	adjust_special_subst special_subst=:{ss_environ} type_var_heap
 		# (ss_environ, type_var_heap) = mapSt adjust_special_bind ss_environ type_var_heap
 		= ({ special_subst & ss_environ = ss_environ }, type_var_heap)
@@ -572,119 +557,29 @@ where
 		# (TVI_Type (TV new_tv), type_var_heap) = readPtr tv_info_ptr type_var_heap
 		= ({ bind & bind_dst = new_tv }, type_var_heap)
 
-determineTypeOfMemberInstance :: !SymbolType ![ATypeVar] !InstanceType !Specials !*TypeHeaps !u:(Optional (v:{#DclModule}, w:{#CheckedTypeDef}, Index)) !*ErrorAdmin
+determineTypeOfMemberInstance :: !SymbolType ![TypeVar] !InstanceType !Specials !*TypeHeaps !u:(Optional (v:{#DclModule}, w:{#CheckedTypeDef}, Index)) !*ErrorAdmin
 												 -> (!SymbolType, !FunSpecials, !*TypeHeaps,!u: Optional (v:{#DclModule}, w:{#CheckedTypeDef}), !*ErrorAdmin)
 determineTypeOfMemberInstance mem_st class_vars {it_types,it_vars,it_attr_vars,it_context} specials type_heaps opt_modules error
-	# type_var_heap = clear_type_vars it_vars type_heaps.th_vars
-	  (attr_set,type_var_heap,error) = set_and_check_attribute_substitutions it_types class_vars False type_var_heap error
-	  type_heaps & th_vars = type_var_heap
-	  (type_heaps,error) = check_attr_substs attr_set it_types type_heaps error
-	  env = { ss_environ = foldl2 (\binds {atv_variable=var} type -> [ {bind_src = type, bind_dst = var} : binds]) [] class_vars it_types,
+	# env = { ss_environ = foldl2 (\binds var type -> [ {bind_src = type, bind_dst = var} : binds]) [] class_vars it_types,
 			  ss_context = it_context, ss_vars = it_vars, ss_attrs = it_attr_vars} 
 	  (st, specials, type_heaps, error)
-	  		= determine_type_of_member_instance mem_st env [] specials type_heaps error
+	  		= determine_type_of_member_instance mem_st env specials type_heaps error
 	  (type_heaps, opt_modules, error)
 	  		= check_attribution_consistency mem_st type_heaps opt_modules error
 	= (st, specials, type_heaps, opt_modules, error)
 where
-	clear_type_vars :: [TypeVar] *TypeVarHeap -> *TypeVarHeap
-	clear_type_vars type_vars type_var_heap
-		= foldSt (\ {tv_info_ptr} -> writePtr tv_info_ptr TVI_Empty) type_vars type_var_heap
-
-	set_and_check_attribute_substitutions :: ![Type] ![ATypeVar] !Bool !*TypeVarHeap !*ErrorAdmin -> (!Bool,!*TypeVarHeap,!*ErrorAdmin)
-	set_and_check_attribute_substitutions [TV {tv_info_ptr,tv_ident}:types] [{atv_attribute}:class_vars] attr_subst_set type_var_heap error
-		# (type_var_info,type_var_heap) = readPtr tv_info_ptr type_var_heap
-		= case type_var_info of
-			TVI_Empty
-				# type_var_heap = writePtr tv_info_ptr (TVI_TypeAttribute atv_attribute) type_var_heap
-				-> set_and_check_attribute_substitutions types class_vars True type_var_heap error
-			TVI_TypeAttribute attribute
-				| attribute==atv_attribute
-					-> set_and_check_attribute_substitutions types class_vars True type_var_heap error
-					# error = checkError tv_ident.id_name "type variable inconsistently attributed in member type of instance" error 
-					-> set_and_check_attribute_substitutions types class_vars True type_var_heap error
-			_
-				# error = checkWarning tv_ident.id_name "coverage condition fails for type variable in member type of instance" error 
-				# type_var_heap = writePtr tv_info_ptr (TVI_TypeAttribute atv_attribute) type_var_heap
-				-> set_and_check_attribute_substitutions types class_vars True type_var_heap error
-	set_and_check_attribute_substitutions [_:types] [_:class_vars] attr_set type_var_heap error
-		= set_and_check_attribute_substitutions types class_vars attr_set type_var_heap error
-	set_and_check_attribute_substitutions [] [] attr_set type_var_heap error
-		= (attr_set,type_var_heap,error)
-
-	check_attr_substs :: Bool [Type] *TypeHeaps !*ErrorAdmin -> (!*TypeHeaps,!*ErrorAdmin)
-	check_attr_substs attr_subst_set it_types type_heaps error
-		| not attr_subst_set
-			= (type_heaps,error)
-		# (type_var_heap,error) = check_types_type_var_attributes it_types type_heaps.th_vars error
-	  	# type_heaps & th_vars = clear_type_vars it_vars type_var_heap
-		= (type_heaps,error)
-	where
-		check_types_type_var_attributes [type:types] type_var_heap error
-			# (type_var_heap,error) = check_type_type_var_attributes type type_var_heap error
-			= check_types_type_var_attributes types type_var_heap error
-		check_types_type_var_attributes [] type_var_heap error
-			= (type_var_heap,error)
-
-		check_type_type_var_attributes (TA type_ident atypes) type_var_heap error
-			= check_atypes_type_var_attributes atypes type_var_heap error
-		check_type_type_var_attributes (TAS type_ident atypes strictness) type_var_heap error
-			= check_atypes_type_var_attributes atypes type_var_heap error
-		check_type_type_var_attributes (arg_atype-->res_atype) type_var_heap error
-			# (type_var_heap,error) = check_atype_type_var_attributes arg_atype type_var_heap error
-			# (type_var_heap,error) = check_atype_type_var_attributes res_atype type_var_heap error
-			= (type_var_heap,error)
-		check_type_type_var_attributes (cons_var :@: atypes) type_var_heap error
-			// if cons_var is a CV, the attribute is checked in check_atype_type_var_attributes
-			= check_atypes_type_var_attributes atypes type_var_heap error
-		check_type_type_var_attributes (TFA type_vars type) type_var_heap error
-			= check_type_type_var_attributes type type_var_heap error
-		check_type_type_var_attributes (TArrow1 atype) type_var_heap error
-			= check_atype_type_var_attributes atype type_var_heap error
-		check_type_type_var_attributes type type_var_heap error
-			= (type_var_heap,error)
-	
-		check_atypes_type_var_attributes [atype:atypes] type_var_heap error
-			# (type_var_heap,error) = check_atype_type_var_attributes atype type_var_heap error
-			= check_atypes_type_var_attributes atypes type_var_heap error
-		check_atypes_type_var_attributes [] type_var_heap error
-			= (type_var_heap,error)
-	
-		check_atype_type_var_attributes atype=:{at_attribute,at_type=at_type=:TV {tv_info_ptr,tv_ident}} type_var_heap error
-			# (tv_info,type_var_heap) = readPtr tv_info_ptr type_var_heap
-			= case tv_info of
-				TVI_TypeAttribute atv_attribute
-					| atv_attribute==at_attribute
-						-> (type_var_heap,error)
-						# error = checkError tv_ident.id_name "type variable inconsistently attributed in member type of instance" error 
-						-> (type_var_heap,error)
-				_
-					-> (type_var_heap,error)
-		check_atype_type_var_attributes {at_attribute,at_type=(cons_var=:CV {tv_info_ptr,tv_ident}) :@: atypes} type_var_heap error
-			# (type_var_heap,error) = check_atypes_type_var_attributes atypes type_var_heap error
-			  (tv_info,type_var_heap) = readPtr tv_info_ptr type_var_heap
-			= case tv_info of
-				TVI_TypeAttribute atv_attribute
-					| atv_attribute==at_attribute
-						-> (type_var_heap,error)
-						# error = checkError tv_ident.id_name "type variable inconsistently attributed in member type of instance" error 
-						-> (type_var_heap,error)
-				_
-					-> (type_var_heap,error);
-		check_atype_type_var_attributes {at_attribute,at_type} type_var_heap error
-			= check_type_type_var_attributes at_type type_var_heap error
-	determine_type_of_member_instance mem_st=:{st_context} env subst_av_info_ptrs (SP_Substitutions substs) type_heaps error
+	determine_type_of_member_instance mem_st=:{st_context} env (SP_Substitutions substs) type_heaps error
 		# (mem_st, substs, type_heaps, error) 
-				= substitute_symbol_type {mem_st & st_context = tl st_context} env subst_av_info_ptrs substs type_heaps error
-		= (mem_st, FSP_Substitutions substs, type_heaps, error)
-	determine_type_of_member_instance mem_st=:{st_context} env subst_av_info_ptrs SP_None type_heaps error
+				= substitute_symbol_type { mem_st &  st_context = tl st_context } env substs type_heaps error
+		= (mem_st, FSP_Substitutions substs, type_heaps, error) 
+	determine_type_of_member_instance mem_st=:{st_context} env SP_None type_heaps error
 		# (mem_st, _, type_heaps, error)
-				= substitute_symbol_type {mem_st & st_context = tl st_context} env subst_av_info_ptrs [] type_heaps error
+				= substitute_symbol_type { mem_st &  st_context = tl st_context } env [] type_heaps error
 		= (mem_st, FSP_None, type_heaps, error)
 
-	substitute_symbol_type st=:{st_vars,st_attr_vars,st_args,st_result,st_context,st_attr_env} environment subst_av_info_ptrs specials type_heaps error
+	substitute_symbol_type st=:{st_vars,st_attr_vars,st_args,st_result,st_context,st_attr_env} environment specials type_heaps error
 		# (st_vars, st_attr_vars, [st_result : st_args], st_context, st_attr_env, specials, type_heaps, error)
-			= instantiateTypes st_vars st_attr_vars [st_result:st_args] st_context st_attr_env environment subst_av_info_ptrs specials type_heaps error
+			= instantiateTypes st_vars st_attr_vars [ st_result : st_args ] st_context st_attr_env environment specials type_heaps error
 		= ({st & st_vars = st_vars, st_args = st_args, st_result = st_result, st_attr_vars = st_attr_vars,
 			st_context = st_context, st_attr_env = st_attr_env }, specials, type_heaps, error)
 
@@ -838,7 +733,7 @@ where
 			substitute_instance_type :: !InstanceType !SpecialSubstitution !*TypeHeaps !*ErrorAdmin -> (!InstanceType,!*TypeHeaps,!.ErrorAdmin)
 			substitute_instance_type it=:{it_vars,it_attr_vars,it_types,it_context} environment type_heaps cs_error
 				# (it_vars, it_attr_vars, it_atypes, it_context, _, _, type_heaps, cs_error)	
-					= instantiateTypes it_vars it_attr_vars [MakeAttributedType type \\ type <- it_types] it_context [] environment [] [] type_heaps cs_error
+					= instantiateTypes it_vars it_attr_vars [MakeAttributedType type \\ type <- it_types] it_context [] environment [] type_heaps cs_error
 				= ({it & it_vars = it_vars, it_types = [ at_type \\ {at_type} <- it_atypes ], it_attr_vars = it_attr_vars, it_context = it_context }, type_heaps, cs_error)			
 		check_specials mod_index inst=:{ins_type} type_offset [] list_of_specials next_inst_index all_instances type_heaps predef_symbols error
 			= (list_of_specials,  next_inst_index, all_instances, type_heaps, predef_symbols, error)
@@ -1142,10 +1037,10 @@ checkAndPartitionateDclMacros mod_index range e_info=:{ef_is_macro_fun=ef_is_mac
 			= checkDclMacros mod_index cGlobalScope range.ir_from range.ir_to { e_info & ef_is_macro_fun=True } heaps cs
 	  (e_info=:{ef_macro_defs}) = { e_info & ef_is_macro_fun=ef_is_macro_fun_old }
 	# (predef_symbols_for_transform, cs_predef_symbols) = get_predef_symbols_for_transform cs_predef_symbols
-	  (macro_defs, hp_var_heap, hp_expression_heap, cs_symbol_table, cs_error)
-	  		= partitionateDclMacros range mod_index predef_symbols_for_transform ef_macro_defs hp_var_heap hp_expression_heap cs_symbol_table cs_error
-	= ({ e_info & ef_macro_defs=macro_defs }, {heaps &  hp_var_heap = hp_var_heap, hp_expression_heap = hp_expression_heap},
-		{ cs & cs_symbol_table = cs_symbol_table, cs_predef_symbols = cs_predef_symbols, cs_error = cs_error })
+      (macro_defs, hp_var_heap, hp_expression_heap, cs_symbol_table, cs_error)
+              = partitionateDclMacros range mod_index predef_symbols_for_transform ef_macro_defs hp_var_heap hp_expression_heap cs_symbol_table cs_error
+    = ({ e_info & ef_macro_defs=macro_defs }, {heaps &  hp_var_heap = hp_var_heap, hp_expression_heap = hp_expression_heap},
+        { cs & cs_symbol_table = cs_symbol_table, cs_predef_symbols = cs_predef_symbols, cs_error = cs_error })
 
 checkAndPartitionateIclMacros ::  !Index !IndexRange !Int !*{#FunDef} !*ExpressionInfo !*Heaps !*CheckState
 													  -> (!*{#FunDef},!*ExpressionInfo,!*Heaps,!*CheckState);
@@ -1154,10 +1049,10 @@ checkAndPartitionateIclMacros mod_index range local_functions_index_offset fun_d
 			= checkFunctions mod_index cGlobalScope range.ir_from range.ir_to local_functions_index_offset fun_defs { e_info & ef_is_macro_fun=True } heaps cs
 	  (e_info=:{ef_macro_defs}) = { e_info & ef_is_macro_fun=ef_is_macro_fun_old }
 	# (predef_symbols_for_transform, cs_predef_symbols) = get_predef_symbols_for_transform cs_predef_symbols
-	  (fun_defs, macro_defs, hp_var_heap, hp_expression_heap, cs_symbol_table, cs_error)
-	  		= partitionateIclMacros range mod_index predef_symbols_for_transform fun_defs ef_macro_defs hp_var_heap hp_expression_heap cs_symbol_table cs_error
-	= (fun_defs, { e_info & ef_macro_defs=macro_defs }, {heaps &  hp_var_heap = hp_var_heap, hp_expression_heap = hp_expression_heap},
-			{ cs & cs_symbol_table = cs_symbol_table, cs_predef_symbols = cs_predef_symbols, cs_error = cs_error })
+      (fun_defs, macro_defs, hp_var_heap, hp_expression_heap, cs_symbol_table, cs_error)
+              = partitionateIclMacros range mod_index predef_symbols_for_transform fun_defs ef_macro_defs hp_var_heap hp_expression_heap cs_symbol_table cs_error
+    = (fun_defs, { e_info & ef_macro_defs=macro_defs }, {heaps &  hp_var_heap = hp_var_heap, hp_expression_heap = hp_expression_heap},
+            { cs & cs_symbol_table = cs_symbol_table, cs_predef_symbols = cs_predef_symbols, cs_error = cs_error })
 
 checkInstanceBodies :: ![IndexRange] !Int !*{#FunDef} !*ExpressionInfo !*Heaps !*CheckState
 									  -> (!*{#FunDef},!*ExpressionInfo,!*Heaps, !*CheckState);
@@ -2241,8 +2136,8 @@ renumber_icl_module_functions mod_type icl_global_function_range icl_instance_ra
 				= arrayPlusList icl_functions [dummy_function \\ i<-[0..n_functions-1]]
 
 		add_dcl_instances_generic_cases_and_type_funs_to_conversion_table :: !{#Int} !Int !Int !Index IndexRange /*IndexRange*/ !DclModule
-										  !*{# ClassInstance} !*{# GenericCaseDef} !*{# CheckedTypeDef} *ErrorAdmin
-			-> (!*Optional *{#Index},!Int,!*{# ClassInstance},!*{# GenericCaseDef},!*{# CheckedTypeDef},*ErrorAdmin)
+									 !*{# ClassInstance} !*{# GenericCaseDef} !*{# CheckedTypeDef} *ErrorAdmin
+			-> (!*Optional *{#Index}, !Index, !*{# ClassInstance},!*{# GenericCaseDef},!*{# CheckedTypeDef},*ErrorAdmin)
  		add_dcl_instances_generic_cases_and_type_funs_to_conversion_table
  				dcl_function_table instances_conversion_table_size gencase_conversion_table_size first_free_index icl_type_fun_range /*not_exported_type_fun_range*/
  				dcl_mod=:{dcl_specials,dcl_functions,dcl_common,dcl_has_macro_conversions,dcl_type_funs}
@@ -2451,12 +2346,12 @@ renumber_icl_module_functions mod_type icl_global_function_range icl_instance_ra
 							# dcl_index = function_conversion_table.[icl_index]
 							# gencase = {gencase & gc_gcf=GCF gc_ident {gcf & gcf_body = GCB_FunIndex dcl_index}}
 							# gencases = {gencases & [gencase_index] = gencase}
-							-> renumber_gencase_members (gencase_index+1) gencases
+							= renumber_gencase_members (gencase_index+1) gencases
 						{gc_gcf=GCFS gcfs}
 							# gcfs = renumber_gcfs gcfs function_conversion_table
 							# gencase = {gencase & gc_gcf=GCFS gcfs}
 							# gencases = {gencases & [gencase_index] = gencase}
-							-> renumber_gencase_members (gencase_index+1) gencases
+							= renumber_gencase_members (gencase_index+1) gencases
 					= gencases
 
 			renumber_gcfs [!gcf=:{gcf_body=GCB_FunIndex icl_index}:gcfs!] function_conversion_table
@@ -2539,7 +2434,7 @@ check_module1 cdefs icl_global_function_range fun_defs optional_dcl_mod optional
 					<=< adjust_predefined_module_symbol PD_StdStrictLists
 					<=< adjust_predefined_module_symbol PD_StdDynamic
 					<=< adjust_predefined_module_symbol PD_StdGeneric
-					<=< adjust_predefined_module_symbol PD_StdMisc										
+					<=< adjust_predefined_module_symbol PD_StdMisc
 					<=< adjust_predefined_module_symbol PD_iTasks_Framework_Tonic
 					<=< adjust_predefined_module_symbol PD_iTasks_Framework_Generic
 					<=< adjust_predefined_module_symbol PD_iTasks_API_Core_Types
@@ -2936,7 +2831,7 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 					# icl_functions = {icl_functions & [spec_index]=new_fun_def}
 					= (icl_functions, heaps)
 					= (icl_functions, heaps)
-		 
+
 			build_function new_fun_index fun_def=:{fun_ident, fun_body = CheckedBody {cb_args}, fun_info} fun_index fun_type
 						(var_heap, type_var_heap, expr_heap)
 				# (tb_args, var_heap) = mapSt new_free_var cb_args var_heap
@@ -3295,21 +3190,21 @@ addImportedSymbolsToSymbolTable importing_mod opt_macro_range modules_in_compone
 	add_declaration :: (Optional IndexRange) Int Declaration *([Declaration],!*{#DclModule},*CheckState) -> (![Declaration],!*{#DclModule},!*CheckState)
 	add_declaration opt_dcl_macro_range importing_mod declaration (decls_accu,dcl_modules,cs)
 		# (not_already_imported,dcl_modules,cs)
-				= add_declaration_to_symbol_table opt_dcl_macro_range declaration importing_mod dcl_modules cs
+				= add_declaration_to_symbol_table_ opt_dcl_macro_range declaration importing_mod dcl_modules cs
 		| not_already_imported
 			= ([declaration:decls_accu],dcl_modules,cs)
 			= (decls_accu,dcl_modules,cs)
 
 	add_expl_imp_declaration opt_dcl_macro_range importing_mod declaration (decls_accu, dcl_modules, cs)
 		# (not_already_imported,dcl_modules,cs)
-				= add_declaration_to_symbol_table opt_dcl_macro_range declaration importing_mod dcl_modules cs
+				= add_declaration_to_symbol_table_ opt_dcl_macro_range declaration importing_mod dcl_modules cs
 		| not_already_imported
 			= ([declaration:decls_accu], dcl_modules, cs)
 		= (decls_accu, dcl_modules, cs)
 
-add_declaration_to_symbol_table opt_dcl_macro_range (Declaration {decl_kind=STE_FunctionOrMacro _, decl_ident, decl_index}) _ dcl_modules cs
+add_declaration_to_symbol_table_ opt_dcl_macro_range (Declaration {decl_kind=STE_FunctionOrMacro _, decl_ident, decl_index}) _ dcl_modules cs
 	= addImportedFunctionOrMacro opt_dcl_macro_range decl_ident decl_index dcl_modules cs
-add_declaration_to_symbol_table yes_for_icl_module (Declaration {decl_kind=decl_kind=:STE_Imported def_kind def_mod, decl_ident, decl_index, decl_pos}) importing_mod dcl_modules cs
+add_declaration_to_symbol_table_ yes_for_icl_module (Declaration {decl_kind=decl_kind=:STE_Imported def_kind def_mod, decl_ident, decl_index, decl_pos}) importing_mod dcl_modules cs
 	= addSymbol yes_for_icl_module decl_ident decl_pos decl_kind def_kind decl_index def_mod importing_mod dcl_modules cs
 
 updateExplImpInfo :: [Int] Index {!Declaration} {!Declaration} u:{#DclModule} ExplImpInfos *SymbolTable 
@@ -3666,7 +3561,7 @@ where
 		# type_bimap = predefined_idents.[PD_TypeBimap]	
 		| pre_mod.pds_def == mod_index
 			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols}
-				<=< adjust_predef_symbols PD_TypeBimap PD_TypeGenericDict0 mod_index STE_Type
+				<=< adjust_predef_symbols PD_TypeBimap PD_TypeGenericDict mod_index STE_Type
 				<=< adjustPredefSymbol PD_map_to				mod_index (STE_Field type_bimap)
 				<=< adjustPredefSymbol PD_map_from				mod_index (STE_Field type_bimap)
 				<=< adjust_predef_symbols PD_ConsBimap PD_CGenTypeApp mod_index STE_Constructor

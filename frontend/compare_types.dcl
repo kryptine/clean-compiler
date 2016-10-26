@@ -20,7 +20,3 @@ instance == BasicType, TypeVar, AttributeVar, AttrInequality, TypeSymbIdent, Def
 instance < MemberDef
 
 smallerOrEqual :: !Type !Type -> CompareValue
-
-IF_ALLOW_NON_LINEAR_AND_OVERLAPPING_INSTANCES yes no :== no
-compareInstances :: ![Type] ![Type] -> CompareValue
-compareFunDepInstances :: ![Type] ![Type] !BITVECT -> CompareValue

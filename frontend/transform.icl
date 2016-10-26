@@ -1183,10 +1183,12 @@ partitionateAndLiftFunctions ranges main_dcl_module_n predef_symbols_for_transfo
 							ps_unexpanded_dcl_macros=[] }
 	  {ps_groups, ps_symbol_table, ps_var_heap, ps_symbol_heap, ps_fun_defs, ps_macro_defs, ps_error,ps_unexpanded_dcl_macros}
 	  		= foldSt (partitionate_functions main_dcl_module_n max_fun_nr) ranges partitioning_info
-	# (n_groups,reversed_ps_groups,fun_defs) = remove_macros_from_groups_and_reverse ps_groups 0 ps_fun_defs []
-	# groups = { {group_members = group} \\ group <- reversed_ps_groups }
+	# (n_groups,revered_groups,fun_defs) = remove_macros_from_groups_and_reverse (reverse ps_groups) 0 ps_fun_defs []
+	# group_a = createArray n_groups {group_members = []};
+	# last_group_n = n_groups-1;
+	# group_a = { group_a & [last_group_n-i] = {group_members = group} \\ i<-[0..last_group_n] & group<-revered_groups }
 	# macro_defs = restore_unexpanded_dcl_macros ps_unexpanded_dcl_macros ps_macro_defs
-	= (groups, fun_defs, macro_defs, ps_var_heap, ps_symbol_heap, ps_symbol_table, ps_error)
+	= (group_a, fun_defs, macro_defs, ps_var_heap, ps_symbol_heap, ps_symbol_table, ps_error)
 where
 	partitionate_functions mod_index max_fun_nr {ir_from,ir_to} ps
 		= iFoldSt (partitionate_global_function mod_index max_fun_nr) ir_from ir_to ps
@@ -1201,7 +1203,7 @@ get_predef_symbols_for_transform predef_symbols
 	= ({predef_alias_dummy=predef_symbols.[PD_DummyForStrictAliasFun],predef_and=predef_symbols.[PD_AndOp],predef_or=predef_symbols.[PD_OrOp]})
 
 partitionateAndLiftMacro :: !Int !Int !Index !PredefinedSymbols !Int !*{#FunDef} !*{#*{#FunDef}} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
-								   -> (![[Int]],!UnexpandedDclMacros,!*{#FunDef},!*{#*{#FunDef}},!*VarHeap,!*ExpressionHeap,!*SymbolTable,!*ErrorAdmin)
+								   -> (!UnexpandedDclMacros,!*{#FunDef},!*{#*{#FunDef}},!*VarHeap,!*ExpressionHeap,!*SymbolTable,!*ErrorAdmin)
 partitionateAndLiftMacro macro_module_index macro_index main_dcl_module_n predef_symbols next_group_n fun_defs macro_defs var_heap symbol_heap symbol_table error
 	# predef_symbols_for_transform = get_predef_symbols_for_transform predef_symbols
 	#! max_fun_nr = cMAXINT
@@ -1211,8 +1213,7 @@ partitionateAndLiftMacro macro_module_index macro_index main_dcl_module_n predef
 	  pi = {pi_predef_symbols_for_transform=predef_symbols_for_transform,pi_main_dcl_module_n=main_dcl_module_n,pi_reset_body_of_rhs_macros=True}
 	  (_, {ps_groups, ps_symbol_table, ps_var_heap, ps_symbol_heap, ps_fun_defs, ps_macro_defs, ps_error,ps_unexpanded_dcl_macros})
 	  		= partitionate_macro main_dcl_module_n max_fun_nr macro_module_index macro_index pi partitioning_state
-	# (_,reversed_ps_groups,fun_defs) = remove_macros_from_groups_and_reverse ps_groups 0 ps_fun_defs []
-	= (reversed_ps_groups, ps_unexpanded_dcl_macros, fun_defs, ps_macro_defs, ps_var_heap, ps_symbol_heap, ps_symbol_table, ps_error)
+	= (ps_unexpanded_dcl_macros, ps_fun_defs, ps_macro_defs, ps_var_heap, ps_symbol_heap, ps_symbol_table, ps_error)
 
 restore_unexpanded_dcl_macros :: !UnexpandedDclMacros !*{#*{#FunDef}} -> *{#*{#FunDef}}
 restore_unexpanded_dcl_macros [(macro_module_index,macro_index,macro_def):unexpanded_dcl_macros] macro_defs
@@ -1480,7 +1481,7 @@ where
 		# (macro, es) = es!es_macro_defs.[glob_module,glob_object]
 		#! macro_group_index=macro.fun_info.fi_group_index
 		# es = {es & es_macro_defs.[glob_module,glob_object].fun_info.fi_group_index= if (macro_group_index>NoIndex) (-2-macro_group_index) macro_group_index}
-		| macro.fun_arity == length app_args
+		| macro.fun_arity == length app_args // If this is False, the compiler will generate a new function for the macro instead of expanding it
 			= unfoldMacro macro app_args (calls, es)
 
 			# macro = {macro & fun_info.fi_group_index=if (macro_group_index<NoIndex) (-2-macro_group_index) macro_group_index}
@@ -1516,7 +1517,7 @@ where
 		# (macro, es) = es!es_fun_defs.[glob_object]
 		#! macro_group_index=macro.fun_info.fi_group_index
 		# es = {es & es_fun_defs.[glob_object].fun_info.fi_group_index= if (macro_group_index>NoIndex) (-2-macro_group_index) macro_group_index}
-		| macro.fun_arity == length app_args
+		| macro.fun_arity == length app_args // If this is False, the compiler will generate a new function for the macro instead of expanding it
 			= unfoldMacro macro app_args (calls, es)
 
 			# macro = {macro & fun_info.fi_group_index=if (macro_group_index<NoIndex) (-2-macro_group_index) macro_group_index}

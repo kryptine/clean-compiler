@@ -1364,14 +1364,13 @@ where
 						# (class_var, gs_tvarh) = freshTypeVar (makeIdent "class_var") gs.gs_tvarh
 						  gs & gs_tvarh=gs_tvarh
 						  unused_class = TCClass {glob_module = -1, glob_object = {ds_index = -1, ds_ident = {id_name="",id_info=nilPtr}, ds_arity = 1}}
-						  (member_type, class_var_attr, gs)
-							= buildMemberTypeWithPartialDependencies gen_def kind class_var unused_class deps gs
+						  (member_type, gs) = buildMemberTypeWithPartialDependencies gen_def kind class_var unused_class deps gs
 
 						  ins_type = {it_vars = instance_vars_from_type_cons gc_type_cons, it_types = [gc_type], it_attr_vars = [], it_context = []}
 				  
 						  type_heaps = {th_vars = gs.gs_tvarh, th_attrs = gs.gs_avarh}
 						  (fun_type, {th_vars,th_attrs}, var_heap, error)
-						  	= determine_type_of_member_instance_from_symbol_type member_type class_var_attr ins_type type_heaps gs.gs_varh gs.gs_error
+						  	= determine_type_of_member_instance_from_symbol_type member_type ins_type type_heaps gs.gs_varh gs.gs_error
 						  gs & gs_tvarh=th_vars, gs_avarh=th_attrs, gs_varh=var_heap, gs_error=error
 
 						-> (Yes fun_type,gs)
@@ -1514,8 +1513,7 @@ lookupDependencyDef {gd_index} modules = modules![gd_index.gi_module].com_generi
 
 // limitations:
 // - context restrictions on generic variables are not allowed
-
-buildMemberType :: !GenericDef !TypeKind !TypeVar !TCClass !*GenericState -> (!SymbolType, !TypeAttribute, !*GenericState)
+buildMemberType :: !GenericDef !TypeKind !TypeVar !TCClass !*GenericState -> (!SymbolType, !*GenericState)
 buildMemberType gen_def=:{gen_ident,gen_pos,gen_type,gen_vars,gen_deps} kind class_var tc_class gs=:{gs_varh}
 	# (tc_var_ptr, gs_varh) = newPtr VI_Empty gs_varh
 	# gs & gs_varh = gs_varh
@@ -1526,7 +1524,8 @@ buildMemberType gen_def=:{gen_ident,gen_pos,gen_type,gen_vars,gen_deps} kind cla
 	#! th = {th_vars = gs.gs_tvarh, th_attrs = gs.gs_avarh}
 	#! (kind_indexed_st, gatvs, th, modules, error)
 		= buildKindIndexedType gen_type gen_vars gen_deps kind gen_ident gen_pos th gs.gs_modules gs.gs_error
-	#! (member_st, class_var_attr, th)
+
+	#! (member_st, th) 
 		= replace_generic_vars_with_class_var kind_indexed_st gatvs class_var th
 
 	#! th = assertSymbolType member_st th // just paranoied about cleared variables
@@ -1535,9 +1534,9 @@ buildMemberType gen_def=:{gen_ident,gen_pos,gen_type,gen_vars,gen_deps} kind cla
 	# member_st & st_context = [type_context : member_st.st_context]	
 	
 	# gs = {gs & gs_avarh = th.th_attrs, gs_tvarh = th.th_vars, gs_modules = modules, gs_error = error }
-	= (member_st, class_var_attr, gs)
+	= (member_st, gs)
 
-buildMemberTypeWithPartialDependencies :: !GenericDef !TypeKind !TypeVar !TCClass !Int !*GenericState -> (!SymbolType, !TypeAttribute, !*GenericState)
+buildMemberTypeWithPartialDependencies :: !GenericDef !TypeKind !TypeVar !TCClass !Int !*GenericState -> (!SymbolType, !*GenericState)
 buildMemberTypeWithPartialDependencies gen_def=:{gen_ident,gen_pos,gen_type,gen_vars,gen_deps} kind class_var unused_class deps gs=:{gs_varh}
 	# (tc_var_ptr, gs_varh) = newPtr VI_Empty gs_varh
 	# gs & gs_varh = gs_varh
@@ -1549,7 +1548,7 @@ buildMemberTypeWithPartialDependencies gen_def=:{gen_ident,gen_pos,gen_type,gen_
 	#! (kind_indexed_st, gatvs, th, modules, error)
 		= buildKindIndexedTypeWithPartialDependencies gen_type gen_vars gen_deps kind deps gen_ident gen_pos th gs.gs_modules gs.gs_error
 
-	#! (member_st, class_var_attr, th)
+	#! (member_st, th) 
 		= replace_generic_vars_with_class_var kind_indexed_st gatvs class_var th
 
 	#! th = assertSymbolType member_st th // just paranoied about cleared variables
@@ -1558,7 +1557,7 @@ buildMemberTypeWithPartialDependencies gen_def=:{gen_ident,gen_pos,gen_type,gen_
 	# member_st & st_context = [type_context : member_st.st_context]	
 	
 	# gs = {gs & gs_avarh = th.th_attrs, gs_tvarh = th.th_vars, gs_modules = modules, gs_error = error }
-	= (member_st, class_var_attr, gs)
+	= (member_st, gs)
 
 add_bimap_contexts :: GenericDef *GenericState -> (!SymbolType,!*GenericState)
 add_bimap_contexts 
@@ -1598,11 +1597,10 @@ where
 			}
 		=({tc_class = tc_class, tc_types = [TV tv], tc_var = var_info_ptr}, gs_varh)	
 
-replace_generic_vars_with_class_var :: SymbolType [ATypeVar] TypeVar *TypeHeaps -> (!SymbolType,!TypeAttribute,!*TypeHeaps)
+replace_generic_vars_with_class_var :: SymbolType [ATypeVar] TypeVar *TypeHeaps -> (!SymbolType,!*TypeHeaps)
 replace_generic_vars_with_class_var st atvs class_var th
-	#! (class_var_attr, th) = subst_gvs atvs th
-	# (new_st,th) = applySubstInSymbolType st th
-	= (new_st,class_var_attr,th)
+	#! th = subst_gvs atvs th
+	= applySubstInSymbolType st th
 where
 	subst_gvs atvs th=:{th_vars, th_attrs}
 		#! tvs = [atv_variable \\ {atv_variable} <- atvs ]
@@ -1614,8 +1612,7 @@ where
 		# th_attrs = case avs of 
 			[av:avs]	-> foldSt (subst_av av) avs th_attrs
 			[] 			-> th_attrs
-		# class_var_attr = case avs of [av:_] -> TA_Var av; [] -> TA_Multi
-		= (class_var_attr, { th & th_vars = th_vars, th_attrs = th_attrs })
+		= { th & th_vars = th_vars, th_attrs = th_attrs }
 	
 	subst_tv {tv_info_ptr} th_vars
 		= writePtr tv_info_ptr (TVI_Type (TV class_var)) th_vars
@@ -1626,7 +1623,7 @@ where
 buildClassAndMember :: Int Int Int TypeKind GenericDef *GenericState -> (ClassDef,MemberDef,*GenericState)
 buildClassAndMember
 		module_index class_index member_index kind
-		gen_def=:{gen_ident, gen_pos, gen_type={st_arity=gen_arity}}
+		gen_def=:{gen_ident, gen_pos}
 		gs=:{gs_tvarh}
 	# (class_var, gs_tvarh) = freshTypeVar (makeIdent "class_var") gs_tvarh
 	#! (member_def, gs)
@@ -1639,7 +1636,7 @@ where
 	class_ds = {ds_index = class_index, ds_ident = class_ident, ds_arity = 1}
 
 	build_class_member class_var gs
-		#! (member_type, class_var_attr, gs) 
+		#! (member_type, gs) 
 			= buildMemberType gen_def kind class_var (TCClass {glob_module = module_index, glob_object=class_ds}) gs
 		#! (type_ptr, gs_varh) = newPtr VI_Empty gs.gs_varh 
 		#! gs & gs_varh = gs_varh
@@ -1649,7 +1646,7 @@ where
 			me_offset = 0,
 			me_type = member_type,
 			me_type_ptr = type_ptr,				// empty
-			me_class_vars = [{atv_attribute=class_var_attr,atv_variable=class_var}], // the same variable as in the class
+			me_class_vars = [class_var], 		// the same variable as in the class
 			me_pos = gen_pos,
 			me_priority = NoPrio,
 			me_default_implementation = No
@@ -1662,9 +1659,9 @@ where
 			, ds_index = member_index
 			, ds_arity = me_type.st_arity
 			}
-		#! class_dictionary =
-			{ ds_ident = class_ident
-			, ds_arity = 0
+		#! class_dictionary = 
+			{ ds_ident = class_ident 
+			, ds_arity = 0 
 			, ds_index = NoIndex/*index in the type def table, filled in later*/ 
 			}
 		#! class_def = { 
@@ -1676,9 +1673,7 @@ where
 		    class_members = createArray 1 class_member,
 		    class_macro_members = {},
 		    class_cons_vars = 0, // dotted class variables
-		    class_dictionary = class_dictionary,
-		    class_fun_dep_vars = 0,
-			class_lazy_members = if (gen_arity==0) 1 0
+		    class_dictionary = class_dictionary
 		    }
 		= class_def
 
@@ -2242,11 +2237,11 @@ remove_unused_dep_args args=:[arg:r_args] arg_n n_deps deps
 remove_unused_dep_args [] arg_n n_deps deps
 	= []
 
-determine_type_of_member_instance_from_symbol_type :: !SymbolType !TypeAttribute !InstanceType !*TypeHeaps !*VarHeap !*ErrorAdmin
+determine_type_of_member_instance_from_symbol_type :: !SymbolType !InstanceType !*TypeHeaps !*VarHeap !*ErrorAdmin
 	-> (!SymbolType, !*TypeHeaps, !*VarHeap, !*ErrorAdmin)
-determine_type_of_member_instance_from_symbol_type me_type=:{st_context=[{tc_types = [TV class_var]}:_]} class_var_attr ins_type hp_type_heaps hp_var_heap error
+determine_type_of_member_instance_from_symbol_type me_type=:{st_context=[{tc_types = [TV class_var]}:_]} ins_type hp_type_heaps hp_var_heap error
 	#! (symbol_type, _, hp_type_heaps, _, error) 
-		= determineTypeOfMemberInstance me_type [{atv_attribute=class_var_attr,atv_variable=class_var}] ins_type SP_None hp_type_heaps No error
+		= determineTypeOfMemberInstance me_type [class_var] ins_type SP_None hp_type_heaps No error
 	#! (st_context, hp_var_heap) = initializeContextVariables symbol_type.st_context hp_var_heap
 	#! hp_type_heaps = clearSymbolType me_type hp_type_heaps
 	#! symbol_type = {symbol_type & st_context = st_context}
@@ -2729,15 +2724,15 @@ where
 	convert_context :: !Ident !Position !TypeContext (!*Modules, !*Heaps, !*ErrorAdmin)
 		-> (!Bool, !TypeContext, (!*Modules, !*Heaps, !*ErrorAdmin))
 	convert_context fun_name fun_pos tc=:{tc_class=TCGeneric gtc=:{gtc_generic, gtc_kind}} (modules, heaps=:{hp_generic_heap}, error)
-		# ({gen_info_ptr,gen_type}, modules) = modules![gtc_generic.glob_module].com_generic_defs.[gtc_generic.glob_object.ds_index]
+		# ({gen_info_ptr}, modules) = modules![gtc_generic.glob_module].com_generic_defs.[gtc_generic.glob_object.ds_index]
 		# ({gen_classes}, hp_generic_heap) = readPtr gen_info_ptr hp_generic_heap		
 		# opt_class_info = lookupGenericClassInfo gtc_kind gen_classes
 		# (tc_class, error) = case opt_class_info of 
 			No
 				# error = reportError fun_name.id_name fun_pos "no generic cases for this kind" error  
 				-> (TCGeneric gtc, error)
-			Yes class_info
-				# clazz =
+			Yes class_info 
+				# clazz = 
 					{ glob_module = class_info.gci_module
 					, glob_object = 
 						{ ds_ident = genericIdentToClassIdent gtc_generic.glob_object.ds_ident.id_name gtc_kind 
@@ -2746,11 +2741,9 @@ where
 						}
 					}
 				// AA HACK: dummy dictionary
-				| gen_type.st_arity==0
-					#! {pds_module,pds_def} = gs_predefs.[PD_TypeGenericDict0]
-					-> (TCGeneric {gtc & gtc_class=clazz, gtc_generic_dict={gi_module=pds_module, gi_index=pds_def}}, error)
-					#! {pds_module,pds_def} = gs_predefs.[PD_TypeGenericDict]
-					-> (TCGeneric {gtc & gtc_class=clazz, gtc_generic_dict={gi_module=pds_module, gi_index=pds_def}}, error)
+				#! {pds_module,pds_def} = gs_predefs.[PD_TypeGenericDict]
+				# generic_dict = {gi_module=pds_module, gi_index=pds_def}
+				-> (TCGeneric {gtc & gtc_class=clazz, gtc_generic_dict=generic_dict}, error)
 		= (True, {tc & tc_class=tc_class}, (modules, {heaps & hp_generic_heap=hp_generic_heap}, error))
 	convert_context fun_name fun_pos tc st 
 		= (False, tc, st)
@@ -3021,7 +3014,7 @@ where
 		| size fun_defs<>fun_index
 			= abort "copy_generic_case_macro: incorrect function index"
 
-		# (reversed_groups,unexpanded_dcl_macros,fun_defs,dcl_macros,var_heap,expression_heap,symbol_table,error)
+		# (unexpanded_dcl_macros,fun_defs,dcl_macros,var_heap,expression_heap,symbol_table,error)
 			= partitionateAndLiftMacro macro_module_index macro_index main_module_index predefs group_index
 												 fun_defs dcl_macros var_heap expression_heap symbol_table error
 
@@ -5491,7 +5484,7 @@ where
 			= indexes
 				//---> ("do not collect call ", symb_ident, glob_module, glob_object)
 	get_call _ indexes = indexes
-
+import StdDebug
 // collects variables and computes the refernce counts
 collectVars :: 
 		!Expression 	// expression to collect variables in

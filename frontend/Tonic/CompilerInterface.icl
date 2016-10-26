@@ -4,7 +4,7 @@ import Tonic.Util
 import Tonic.GraphGen
 import Tonic.Pretty
 import syntax, checksupport, compile, unitype, generics1
-from overloading import :: InstanceTree (..), find_instance, :: Subst
+from overloading import :: InstanceTree (..), find_instance
 import StdFile
 from CoclSystemDependent import DirectorySeparator, ensureCleanSystemFilesExists
 import Text

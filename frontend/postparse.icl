@@ -5,10 +5,10 @@ import syntax, parse, utilities, containers, compare_types
 import genericsupport
 
 :: *CollectAdmin =
-	{	ca_error		:: !*ParseErrorAdmin
-	,	ca_fun_count	:: !Int
-	,	ca_rev_fun_defs	:: ![FunDef]
-	,	ca_hash_table	:: !*HashTable
+	{ ca_error		:: !*ParseErrorAdmin
+	, ca_fun_count	:: !Int
+	, ca_rev_fun_defs	:: ![FunDef]
+	, ca_hash_table	:: !*HashTable
 	, ca_compr		:: ![(String, ParsedExpr)]
 	}
 
@@ -118,9 +118,9 @@ where
 	collectFunctions (PE_Bound bound_expr) icl_module ca
 		# (bound_expr, ca) = collectFunctions bound_expr icl_module ca
 		= (PE_Bound bound_expr, ca)
-	collectFunctions (PE_Lambda lam_ident args rhs pos) icl_module ca
-		# ((args,rhs), ca) = collectFunctions (args,rhs) icl_module ca
-		# (range, ca) = addFunctionsRange [transformLambda lam_ident args rhs pos] ca
+	collectFunctions (PE_Lambda lam_ident args res pos) icl_module ca
+		# ((args,res), ca) = collectFunctions (args,res) icl_module ca
+		# (range, ca) = addFunctionsRange [transformLambda lam_ident args res pos] ca
 		= (PE_Let (CollectedLocalDefs { loc_functions = range, loc_nodes = [], loc_in_icl_module=icl_module })
 				(PE_Ident lam_ident), ca)
 	collectFunctions (PE_Record rec_expr type_ident fields) icl_module ca
@@ -384,9 +384,11 @@ instance collectFunctions ParsedBody where
 
 NoCollectedLocalDefs :== CollectedLocalDefs { loc_functions = { ir_from = 0, ir_to = 0 }, loc_nodes = [], loc_in_icl_module=True }
 
-transformLambda :: Ident [ParsedExpr] Rhs Position -> FunDef
-transformLambda lam_ident args rhs pos
-	# lam_body = [{pb_args = args, pb_rhs = rhs, pb_position = pos }]
+transformLambda :: Ident [ParsedExpr] ParsedExpr Position -> FunDef
+transformLambda lam_ident args result pos
+	# lam_rhs = { rhs_alts = UnGuardedExpr { ewl_nodes = [], ewl_expr = result, ewl_locals = NoCollectedLocalDefs, ewl_position = NoPos },
+	  					rhs_locals = NoCollectedLocalDefs }
+	  lam_body = [{pb_args = args, pb_rhs = lam_rhs, pb_position = pos }]
 	= MakeNewImpOrDefFunction lam_ident (length args) lam_body (FK_Function cNameLocationDependent) NoPrio No pos
 
 makeConsExpressionForGenerator :: GeneratorKind ParsedExpr ParsedExpr -> ParsedExpr
@@ -1072,10 +1074,10 @@ scanModule :: !ParsedModule ![Ident] !Bool !Bool !*HashTable !*File !SearchPaths
 	-> (!Bool, !ScannedModule, !IndexRange, ![FunDef], !Optional ScannedModule, ![ScannedModule],!Int, [(String, ParsedExpr)], !*HashTable, !*File, !*Files)
 scanModule mod=:{mod_ident,mod_type,mod_defs = pdefs} cached_modules support_generics support_dynamics hash_table err_file searchPaths /*predefs*/ modtimefunction files
 	# predefIdents = predefined_idents
-	# ca =	{	ca_error		= {pea_file = err_file, pea_ok = True}
-			,	ca_fun_count	= 0
-			,	ca_rev_fun_defs	= []
-			,	ca_hash_table	= hash_table
+	# ca =	{ ca_error		= {pea_file = err_file, pea_ok = True}
+			, ca_fun_count	= 0
+			, ca_rev_fun_defs	= []
+			, ca_hash_table	= hash_table
 			, ca_compr		= []
 			}
 	  (fun_defs, defs, imports, imported_objects,foreign_exports,ca) = reorganiseDefinitionsAndAddTypes mod_ident support_dynamics True pdefs ca
@@ -1102,12 +1104,14 @@ scanModule mod=:{mod_ident,mod_type,mod_defs = pdefs} cached_modules support_gen
 	  n_global_functions = length fun_defs
 
 	  (fun_defs, ca) = collectFunctions fun_defs True {ca & ca_fun_count=n_global_functions,ca_rev_fun_defs=[]}
+
+//	  (fun_range, ca) = addFunctionsRange fun_defs ca
 	  (macro_defs, ca) = collectFunctions defs.def_macros True ca
+	  (macro_range, ca) = addFunctionsRange macro_defs ca
 	  (def_instances, ca) = collectFunctions defs.def_instances True ca
 	  (def_generic_cases, ca) = collectFunctions defs.def_generic_cases True ca  
-	  (macro_range, ca) = addFunctionsRange macro_defs ca
 
-	  {ca_error = {pea_file = err_file,pea_ok}, ca_rev_fun_defs, ca_hash_table} = ca
+	  {	ca_error = {pea_file = err_file,pea_ok}, ca_rev_fun_defs, ca_hash_table } = ca
 	  mod = { mod & mod_imports = imports, mod_imported_objects = imported_objects, mod_foreign_exports = foreign_exports,
 	  				mod_defs = { defs & def_instances = def_instances,
 	  								def_generic_cases = def_generic_cases,
@@ -1794,3 +1798,4 @@ sameFixity (Prio _ _) is_infix
 	=	is_infix
 sameFixity NoPrio is_infix
 	=	not is_infix
+

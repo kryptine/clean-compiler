@@ -33,7 +33,7 @@ import predef, syntax, compare_types, compare_constructor
 :: BoxedIdent = {boxed_ident::!Ident}
 
 newHashTable :: !*SymbolTable -> *HashTable
-newHashTable symbol_heap = { hte_symbol_heap = symbol_heap, hte_entries = {  HTE_Empty \\ i <- [0 .. dec HashTableArraySize] },hte_mark=0}
+newHashTable symbol_heap = { hte_symbol_heap = symbol_heap, hte_entries = {  HTE_Empty \\ i <- [0 .. dec cHashTableSize] },hte_mark=0}
 
 set_hte_mark :: !Int !*HashTable -> *HashTable
 set_hte_mark hte_mark ht = {ht & hte_mark=hte_mark}
@@ -41,9 +41,7 @@ set_hte_mark hte_mark ht = {ht & hte_mark=hte_mark}
 instance =< IdentClass
 where
 	(=<) (IC_Instance types1) (IC_Instance types2)
-		= IF_ALLOW_NON_LINEAR_AND_OVERLAPPING_INSTANCES
-			(compareInstances types1 types2)
-			(compare_types types1 types2)
+		= compare_types types1 types2
 	(=<) (IC_InstanceMember types1) (IC_InstanceMember types2)
 		= compare_types types1 types2
 	(=<) (IC_GenericCase type1) (IC_GenericCase type2)
@@ -81,10 +79,7 @@ where
 			= y1 =< y2
 			= cmp
 
-cHashTableSize :== 1023
-// the hte_entries array has an additional entry to store the modules with qualified indents
-HashTableArraySize :== 1024
-ModulesWithQualifiedIdentsHashTableIndex :== 1023
+cHashTableSize	:==	1023
 
 hashValue :: !String -> Int
 hashValue name
@@ -129,53 +124,28 @@ putQualifiedIdentInHashTable :: !String !BoxedIdent !IdentClass !*HashTable -> (
 putQualifiedIdentInHashTable module_name ident ident_class {hte_symbol_heap,hte_entries,hte_mark}
 	# hash_val = hashValue module_name
 	  (entries,hte_entries) = hte_entries![hash_val]
-	  (ident, old_qualified_idents, hte_symbol_heap, entries) = insert module_name ident ident_class (IC_Module NoQualifiedIdents) hte_mark hte_symbol_heap entries
+	  (ident, hte_symbol_heap, entries) = insert module_name ident ident_class (IC_Module NoQualifiedIdents) hte_mark hte_symbol_heap entries
 	  hte_entries = {hte_entries & [hash_val]=entries}
-	= case old_qualified_idents of
-		NoQualifiedIdents
-		 	# (entries,hte_entries) = hte_entries![ModulesWithQualifiedIdentsHashTableIndex]
-			  (hte_symbol_heap, entries) = insert_module_with_qualified_idents module_name (IC_Module NoQualifiedIdents) hte_symbol_heap entries
-			  hte_entries & [ModulesWithQualifiedIdentsHashTableIndex] = entries
-			-> (ident, {hte_symbol_heap = hte_symbol_heap, hte_entries = hte_entries,hte_mark=hte_mark})
-		_
-			-> (ident, {hte_symbol_heap = hte_symbol_heap, hte_entries = hte_entries,hte_mark=hte_mark})
+	= (ident, { hte_symbol_heap = hte_symbol_heap, hte_entries = hte_entries,hte_mark=hte_mark })
 where
-	insert :: !String !BoxedIdent !IdentClass !IdentClass !Int !*SymbolTable *HashTableEntry
-		-> (!BoxedIdent, !QualifiedIdents, !*SymbolTable, !*HashTableEntry)
+	insert :: !String !BoxedIdent !IdentClass !IdentClass !Int !*SymbolTable *HashTableEntry -> (!BoxedIdent, !*SymbolTable, !*HashTableEntry)
 	insert module_name ident ident_class module_ident_class hte_mark0 hte_symbol_heap HTE_Empty
 		# (hte_symbol_ptr, hte_symbol_heap) = newPtr EmptySymbolTableEntry hte_symbol_heap
-		  module_ident = { id_name = module_name, id_info = hte_symbol_ptr}
-		  boxed_module_ident={boxed_ident=module_ident}
-		  old_qualified_idents = NoQualifiedIdents
-		  ident_class = IC_Module (QualifiedIdents ident.boxed_ident ident_class old_qualified_idents)
-		= (boxed_module_ident, old_qualified_idents, hte_symbol_heap, HTE_Ident boxed_module_ident ident_class hte_mark0 HTE_Empty HTE_Empty)
+		# module_ident = { id_name = module_name, id_info = hte_symbol_ptr}
+		# boxed_module_ident={boxed_ident=module_ident}
+		# ident_class = IC_Module (QualifiedIdents ident.boxed_ident ident_class NoQualifiedIdents)
+		= (boxed_module_ident, hte_symbol_heap, HTE_Ident boxed_module_ident ident_class hte_mark0 HTE_Empty HTE_Empty)
 	insert module_name ident ident_class module_ident_class hte_mark0 hte_symbol_heap (HTE_Ident hte_ident=:{boxed_ident={id_name}} hte_class hte_mark hte_left hte_right)
 		# cmp = (module_name,module_ident_class) =< (id_name,hte_class)
 		| cmp == Equal
-			# (IC_Module old_qualified_idents) = hte_class
-			  ident_class = IC_Module (QualifiedIdents ident.boxed_ident ident_class old_qualified_idents)
-			= (hte_ident, old_qualified_idents, hte_symbol_heap, HTE_Ident hte_ident ident_class (hte_mark bitand hte_mark0) hte_left hte_right)
+			# (IC_Module qualified_idents) = hte_class
+			  qualified_idents = QualifiedIdents ident.boxed_ident ident_class qualified_idents
+			= (hte_ident, hte_symbol_heap, HTE_Ident hte_ident (IC_Module qualified_idents) (hte_mark bitand hte_mark0) hte_left hte_right)
 		| cmp == Smaller
-			#! (boxed_ident, qualified_idents, hte_symbol_heap, hte_left) = insert module_name ident ident_class module_ident_class hte_mark0 hte_symbol_heap hte_left
-			= (boxed_ident, qualified_idents, hte_symbol_heap, HTE_Ident hte_ident hte_class hte_mark hte_left hte_right)
-			#! (boxed_ident, qualified_idents, hte_symbol_heap, hte_right) = insert module_name ident ident_class module_ident_class hte_mark0 hte_symbol_heap hte_right
-			= (boxed_ident, qualified_idents, hte_symbol_heap, HTE_Ident hte_ident hte_class hte_mark hte_left hte_right)
-
-	insert_module_with_qualified_idents :: !String !IdentClass !*SymbolTable *HashTableEntry -> (!*SymbolTable, !*HashTableEntry)
-	insert_module_with_qualified_idents name ident_class hte_symbol_heap HTE_Empty
-		# (hte_symbol_ptr, hte_symbol_heap) = newPtr EmptySymbolTableEntry hte_symbol_heap
-		  ident = { id_name = name, id_info = hte_symbol_ptr}
-		  boxed_ident={boxed_ident=ident}
-		= (hte_symbol_heap, HTE_Ident boxed_ident ident_class 0 HTE_Empty HTE_Empty)
-	insert_module_with_qualified_idents name ident_class hte_symbol_heap hte=:(HTE_Ident hte_ident=:{boxed_ident={id_name}} hte_class hte_mark hte_left hte_right)
-		# cmp = (name,ident_class) =< (id_name,hte_class)
-		| cmp == Equal
-			= (hte_symbol_heap, hte)
-		| cmp == Smaller
-			#! (hte_symbol_heap, hte_left) = insert_module_with_qualified_idents name ident_class hte_symbol_heap hte_left
-			= (hte_symbol_heap, HTE_Ident hte_ident hte_class hte_mark hte_left hte_right)
-			#! (hte_symbol_heap, hte_right) = insert_module_with_qualified_idents name ident_class hte_symbol_heap hte_right
-			= (hte_symbol_heap, HTE_Ident hte_ident hte_class hte_mark hte_left hte_right)
+			#! (boxed_ident, hte_symbol_heap, hte_left) = insert module_name ident ident_class module_ident_class hte_mark0 hte_symbol_heap hte_left
+			= (boxed_ident, hte_symbol_heap, HTE_Ident hte_ident hte_class hte_mark hte_left hte_right)
+			#! (boxed_ident, hte_symbol_heap, hte_right) = insert module_name ident ident_class module_ident_class hte_mark0 hte_symbol_heap hte_right
+			= (boxed_ident, hte_symbol_heap, HTE_Ident hte_ident hte_class hte_mark hte_left hte_right)
 
 putPredefinedIdentInHashTable :: !Ident !IdentClass !*HashTable -> *HashTable
 putPredefinedIdentInHashTable predefined_ident=:{id_name} ident_class {hte_symbol_heap,hte_entries,hte_mark}
@@ -220,42 +190,13 @@ where
 			#! (qualified_idents, hte_right) = find_qualified_idents module_name module_ident_class hte_right
 			= (qualified_idents, HTE_Ident hte_ident hte_class hte_mark hte_left hte_right)
 
-remove_qualified_idents_from_hash_table :: !*HashTable -> *HashTable
-remove_qualified_idents_from_hash_table hash_table=:{hte_entries}
-	# (modules_with_qualified_idents,hte_entries) = hte_entries![ModulesWithQualifiedIdentsHashTableIndex]
-	  hte_entries & [ModulesWithQualifiedIdentsHashTableIndex] = modules_with_qualified_idents
-	  hte_entries = remove_qualified_idents_from_modules modules_with_qualified_idents hte_entries
-	= {hash_table & hte_entries = hte_entries}
-	where
-		remove_qualified_idents_from_modules (HTE_Ident hte_ident=:{boxed_ident={id_name}} hte_class=:(IC_Module NoQualifiedIdents) hte_mark hte_left hte_right) hte_entries
-			# hash_val = hashValue id_name
-			  (entries,hte_entries) = hte_entries![hash_val]
-	  		  (_, entries) = remove_qualified_idents_from_module id_name hte_class entries
-			  hte_entries & [hash_val] = entries
-			= remove_qualified_idents_from_modules hte_right (remove_qualified_idents_from_modules hte_left hte_entries)
-		remove_qualified_idents_from_modules HTE_Empty hte_entries
-			= hte_entries
-
-		remove_qualified_idents_from_module :: !String !IdentClass *HashTableEntry -> (!Bool, !*HashTableEntry)
-		remove_qualified_idents_from_module module_name module_ident_class (HTE_Ident hte_ident=:{boxed_ident={id_name}} hte_class hte_mark hte_left hte_right)
-			# cmp = (module_name,module_ident_class) =< (id_name,hte_class)
-			| cmp == Equal
-				= (True, HTE_Ident hte_ident (IC_Module NoQualifiedIdents) hte_mark hte_left hte_right)
-			| cmp == Smaller
-				#! (found, hte_left) = remove_qualified_idents_from_module module_name module_ident_class hte_left
-				= (found, HTE_Ident hte_ident hte_class hte_mark hte_left hte_right)
-				#! (found, hte_right) = remove_qualified_idents_from_module module_name module_ident_class hte_right
-				= (found, HTE_Ident hte_ident hte_class hte_mark hte_left hte_right)
-		remove_qualified_idents_from_module module_name module_ident_class HTE_Empty
-			= (False, HTE_Empty)
-
 remove_icl_symbols_from_hash_table :: !*HashTable -> *HashTable
 remove_icl_symbols_from_hash_table hash_table=:{hte_entries}
 	# hte_entries=remove_icl_symbols_from_array 0 hte_entries
 	= {hash_table & hte_entries=hte_entries}
 	where
 		remove_icl_symbols_from_array i hte_entries
-			 | i<cHashTableSize
+			 | i<size hte_entries
 			 	# (entries,hte_entries) = hte_entries![i]
 				# (_,entries) = remove_icl_entries_from_tree entries
 				# hte_entries = {hte_entries & [i] = entries}

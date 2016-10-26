@@ -4,8 +4,6 @@ import syntax
 
 simplifyTypeApplication :: !Type ![AType] -> Type
 
-simplifyAndCheckTypeApplication :: !Type ![AType] -> (!Bool, !Type)
-
 convertSymbolType :: !Bool !{#CommonDefs} !SymbolType !Int !*ImportedTypes !ImportedConstructors !*TypeHeaps !*VarHeap 
 										  -> (!SymbolType, !*ImportedTypes,!ImportedConstructors,!*TypeHeaps,!*VarHeap)
 

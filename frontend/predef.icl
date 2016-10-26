@@ -217,7 +217,6 @@ predefined_idents
 					[PD_bimapId] = i "bimapId",
 				
 					[PD_TypeGenericDict] = i "GenericDict",
-					[PD_TypeGenericDict0] = i "GenericDict0",
 
 					[PD_StdMisc] = i "StdMisc",
 					[PD_abort] = i "abort",
@@ -397,7 +396,7 @@ where
 					<<- (local_predefined_idents,	IC_Module NoQualifiedIdents, PD_StdGeneric)
 		# hash_table = put_predefined_idents_in_hash_table PD_TC_Int PD_TC__Unit IC_Expression local_predefined_idents hash_table
 
-		# hash_table = put_predefined_idents_in_hash_table PD_TypeBimap PD_TypeGenericDict0 IC_Type local_predefined_idents hash_table
+		# hash_table = put_predefined_idents_in_hash_table PD_TypeBimap PD_TypeGenericDict IC_Type local_predefined_idents hash_table
 		# hash_table = put_predefined_idents_in_hash_table PD_ConsBimap PD_bimapId IC_Expression local_predefined_idents hash_table
 					<<- (local_predefined_idents,	IC_Generic,		PD_GenericBimap)	
 		# bimap_type = local_predefined_idents.[PD_TypeBimap]
@@ -569,7 +568,6 @@ where
 			
 			  tc_class_def = { class_ident = tc_class_name, class_arity = 1, class_args = [class_var], class_context = [],
 			  				   class_members = {{ds_ident = tc_member_name, ds_index = cTCMemberSymbIndex, ds_arity = 0 }}, class_cons_vars = 0,
-			  				   class_fun_dep_vars = 0, class_lazy_members = 0,
 			  				   class_macro_members = {},
 							   class_dictionary = { ds_ident = { tc_class_name & id_info = nilPtr }, ds_arity = 0, ds_index = NoIndex }, class_pos = NoPos
 							 }

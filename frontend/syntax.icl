@@ -207,8 +207,6 @@ where
 		= file  <<< "E.#" <<< tv_number <<< ' ' 
 	(<<<) file (TempQDV tv_number)
 		= file  <<< "E.#" <<< tv_number <<< ' ' 
-	(<<<) file (TGenericFunctionInDictionary _ _ {gi_module,gi_index})
-		= file <<< "TGenericFunctionInDictionary " <<< gi_module <<< ' ' <<< gi_index
 	(<<<) file TE
 		= file <<< "### EMPTY ###"
 /*
@@ -318,7 +316,7 @@ where
 	(<<<) file (BasicPatterns type patterns) = file <<< " " <<<patterns
 	(<<<) file (AlgebraicPatterns type patterns) = file <<< patterns
 	(<<<) file (DynamicPatterns patterns) = file <<< patterns
-	(<<<) file (OverloadedListPatterns type decons_expr patterns) = file <<< ' ' <<< decons_expr <<< " " <<< patterns
+	(<<<) file (OverloadedListPatterns type decons_expr patterns) = file <<< decons_expr <<< " " <<< patterns
 	(<<<) file (NewTypePatterns type patterns) = file <<< patterns
 	(<<<) file NoPattern = file 
 
@@ -358,12 +356,12 @@ where
 
 instance <<< Expression
 where
-	(<<<) file (Var ident) = file <<< ident
+	(<<<) file (Var ident) = file <<< "<Var>" <<< ident
 	(<<<) file (App {app_symb, app_args, app_info_ptr})
 		= case app_symb.symb_kind of
 			SK_Generic _ kind 
-				->  file <<< app_symb <<< kind <<< ' ' <<< app_args
-			_ 	-> file <<< app_symb <<< ' ' <<< app_args
+				->  file <<< "<App>" <<< app_symb <<< kind <<< ' ' <<< app_args
+			_ 	-> file <<< "<App>" <<< app_symb <<< ' ' <<< app_args
 	(<<<) file (f_exp @ a_exp) = file <<< '(' <<< f_exp <<< ") @ (" <<< a_exp <<< ')'
 	(<<<) file (Let {let_info_ptr, let_strict_binds, let_lazy_binds, let_expr}) 
 			= write_binds "" (write_binds "!" (file <<< "let" <<< '\n') let_strict_binds) let_lazy_binds <<< "in\n" <<< let_expr
@@ -412,7 +410,7 @@ where
 	(<<<) file (ABCCodeExpr code_sequence do_inline)      = file <<< (if do_inline "code inline\n" "code\n") <<< code_sequence
 	(<<<) file (AnyCodeExpr input output code_sequence)   = file <<< "code\n" <<< input <<< "\n" <<< output <<< "\n" <<< code_sequence
 
-	(<<<) file (FreeVar {fv_ident})         	= file <<< fv_ident
+	(<<<) file (FreeVar {fv_ident})         	= file <<< "<FreeVar>" <<< fv_ident
 	(<<<) file (ClassVariable info_ptr)         	= file <<< "ClassVariable " <<< info_ptr
 
 	(<<<) file (FailExpr _) = file <<< "** FAIL **"
@@ -473,9 +471,9 @@ where
 
 instance <<< Selection
 where
-	(<<<) file (RecordSelection selector _) = file <<< selector
-	(<<<) file (ArraySelection {glob_object={ds_index}} _ index_expr) = file <<< '<' <<< ds_index <<< '>' <<< '[' <<< index_expr <<< ']'
-	(<<<) file (DictionarySelection var selections _ index_expr) = file <<< '(' <<< var <<< '.' <<< selections <<< ')' <<< '[' <<< index_expr <<< ']'
+	(<<<) file (RecordSelection selector _) = file <<< "(RS)" <<< selector
+	(<<<) file (ArraySelection {glob_object={ds_index}} _ index_expr) = file <<< "(AS)" <<< '<' <<< ds_index <<< '>' <<< '[' <<< index_expr <<< ']'
+	(<<<) file (DictionarySelection var selections _ index_expr) = file <<< "(DS)" <<< '(' <<< var <<< '.' <<< selections <<< ')' <<< '[' <<< index_expr <<< ']'
 
 instance <<< LocalDefs
 where

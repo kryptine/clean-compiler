@@ -14,7 +14,7 @@ checkDclMacros :: !Index !Level !Index !Index !*ExpressionInfo !*Heaps !*CheckSt
 checkForeignExportedFunctionTypes :: ![ForeignExport] !*ErrorAdmin !p:PredefinedSymbols !*{#FunDef}
 												  -> (!*ErrorAdmin,!p:PredefinedSymbols,!*{#FunDef})
 
-determineTypeOfMemberInstance :: !SymbolType ![ATypeVar] !InstanceType !Specials !*TypeHeaps !u:(Optional (v:{#DclModule}, w:{#CheckedTypeDef}, Index)) !*ErrorAdmin
+determineTypeOfMemberInstance :: !SymbolType ![TypeVar] !InstanceType !Specials !*TypeHeaps !u:(Optional (v:{#DclModule}, w:{#CheckedTypeDef}, Index)) !*ErrorAdmin
 												 -> (!SymbolType, !FunSpecials, !*TypeHeaps,!u: Optional (v:{#DclModule}, w:{#CheckedTypeDef}), !*ErrorAdmin)
 
 arrayFunOffsetToPD_IndexTable :: !w:{# MemberDef} !v:{# PredefinedSymbol} -> (!{# Index}, !x:{#MemberDef}, !v:{#PredefinedSymbol}) , [w<=x]

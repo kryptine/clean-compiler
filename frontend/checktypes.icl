@@ -11,7 +11,7 @@ from explicitimports import search_qualified_ident,::NameSpaceN,TypeNameSpaceN,C
 	,	ts_selector_defs	:: !.{# SelectorDef}
 	,	ts_modules			:: !.{# DclModule}
 	}
-
+	
 ::	TypeInfo =
 	{	ti_var_heap			:: !.VarHeap
 	,	ti_type_heaps		:: !.TypeHeaps
@@ -47,8 +47,7 @@ bindArgAType cti {at_attribute,at_type} class_defs ts_ti_cs
 	= (attype,combined_attribute,class_defs,ts_ti_cs)
 
 bind_rank2_context_of_cons [context=:{tc_class,tc_types}:contexts] cti class_defs ts ti cs
-	# (ok,tc_class,fun_dep_vars,class_defs,modules,cs=:{cs_error}) = check_context_class tc_class tc_types cti.cti_module_index class_defs ts.ts_modules cs
-	// to do: use ok and fun_dep_vars
+	# (tc_class, class_defs, modules, cs=:{cs_error}) = check_context_class tc_class tc_types cti.cti_module_index class_defs ts.ts_modules cs
 	  ts = {ts & ts_modules=modules}
 	| cs_error.ea_ok
 	 	# (tc_types, _, (ts,ti,cs)) = bindTypes cti tc_types (ts,ti,cs)
@@ -186,7 +185,7 @@ retrieveTypeDefinition type_ptr mod_index symbol_table used_types
 		with
 			retrieve_type_definition (STE_UsedQualifiedType uqt_mod_index uqt_index orig_kind)
 				| uqt_mod_index==mod_index && uqt_index==ste_index
-					= (ste_index, mod_index, symbol_table, used_types)
+					= (ste_index, mod_index, symbol_table, used_types) 
 					= retrieve_type_definition orig_kind
 			retrieve_type_definition (STE_Imported STE_Type ste_mod_index)
 				= (ste_index, ste_mod_index, symbol_table <:= (type_ptr, { entry & ste_kind = STE_UsedType ste_mod_index this_kind }), used_types)
@@ -328,34 +327,34 @@ addToAttributeEnviron _ _ attr_env error
 	= (attr_env, checkError "inconsistent attribution of type definition" "" error)
 
 check_context_class :: TCClass [Type] Int u:{#ClassDef} v:{#DclModule} *CheckState
-			 -> (!Bool,TCClass,!BITVECT,u:{#ClassDef},v:{#DclModule},*CheckState)
+							  -> (TCClass,u:{#ClassDef},v:{#DclModule},*CheckState)
 check_context_class (TCClass cl) tc_types mod_index class_defs modules cs
 	# (entry, cs_symbol_table) = readPtr cl.glob_object.ds_ident.id_info cs.cs_symbol_table
   	# cs = { cs & cs_symbol_table = cs_symbol_table }
 	# (class_index, class_module) = retrieveGlobalDefinition entry STE_Class mod_index
 	| class_index <> NotFound
-		# ({class_arity,class_fun_dep_vars}, class_index, class_defs, modules) = getClassDef class_index class_module mod_index class_defs modules
+		# ({class_arity}, class_index, class_defs, modules) = getClassDef class_index class_module mod_index class_defs modules
 		| class_arity == cl.glob_object.ds_arity
 			# checked_class = {cl & glob_module = class_module, glob_object = {cl.glob_object & ds_index = class_index}}
-			= (True, TCClass checked_class, class_fun_dep_vars, class_defs, modules, cs) 
+			= (TCClass checked_class, class_defs, modules, cs) 
 			# cs_error = checkError cl.glob_object.ds_ident	"class used with wrong arity" cs.cs_error
-			= (False, TCClass cl, class_fun_dep_vars, class_defs, modules, {cs & cs_error = cs_error})
+			= (TCClass cl, class_defs, modules, {cs & cs_error = cs_error})
 		# cs_error = checkError cl.glob_object.ds_ident	"class undefined" cs.cs_error	
-		= (False, TCClass cl, 0, class_defs, modules, {cs & cs_error = cs_error})
+		= (TCClass cl, class_defs, modules, {cs & cs_error = cs_error})
 check_context_class tc_class=:(TCQualifiedIdent module_id class_name) tc_types mod_index class_defs modules cs
 	# (found,{decl_kind,decl_ident=type_ident,decl_index=class_index},cs) = search_qualified_ident module_id class_name ClassNameSpaceN cs
 	| not found
-		= (False, tc_class, 0, class_defs, modules, cs)
+		= (tc_class, class_defs, modules, cs)
 		= case decl_kind of
 			STE_Imported STE_Class class_module
-				# ({class_ident,class_fun_dep_vars,class_arity}, class_index, class_defs, modules) = getClassDef class_index class_module mod_index class_defs modules
+				# ({class_ident,class_arity}, class_index, class_defs, modules) = getClassDef class_index class_module mod_index class_defs modules
 				| class_arity == length tc_types
 					# checked_class = { glob_object = MakeDefinedSymbol class_ident class_index class_arity, glob_module = class_module }
-					-> (True, TCClass checked_class, class_fun_dep_vars, class_defs, modules, cs)
+					-> (TCClass checked_class, class_defs, modules, cs)
 					# cs_error = checkError ("'"+++module_id.id_name+++"'."+++class_name) "class used with wrong arity" cs.cs_error
-					-> (False, tc_class, class_fun_dep_vars, class_defs, modules, {cs & cs_error = cs_error})
+					-> (tc_class, class_defs, modules, {cs & cs_error = cs_error})
 			_
-				-> (False, tc_class, 0, class_defs, modules, {cs & cs_error = checkError ("'"+++module_id.id_name+++"'."+++class_name) "class undefined" cs.cs_error})
+				-> (tc_class, class_defs, modules, {cs & cs_error = checkError ("'"+++module_id.id_name+++"'."+++class_name) "class undefined" cs.cs_error})
 check_context_class (TCGeneric gtc=:{gtc_generic, gtc_kind}) tc_types mod_index class_defs modules cs
   	# gen_ident = gtc_generic.glob_object.ds_ident
 	# (entry, cs_symbol_table) = readPtr gen_ident.id_info cs.cs_symbol_table
@@ -371,21 +370,17 @@ check_context_class (TCGeneric gtc=:{gtc_generic, gtc_kind}) tc_types mod_index 
 				{ glob_module = generic_module
 				, glob_object = {gtc_generic.glob_object & ds_index = generic_index}					
 				}
-			#! generic_dict_index
-				= if (modules.[generic_module].dcl_common.com_generic_defs.[generic_index].gen_type.st_arity==0)
-					PD_TypeGenericDict0
-					PD_TypeGenericDict
-			# ({pds_module,pds_def},cs) = cs!cs_predef_symbols.[generic_dict_index]
+			  ({pds_module,pds_def},cs) = cs!cs_predef_symbols.[PD_TypeGenericDict]
 			  generic_dict = {gi_module=pds_module, gi_index=pds_def}
 			#! tc_class = TCGeneric {gtc & gtc_generic = checked_gen, gtc_class=clazz, gtc_generic_dict=generic_dict}
 			| not cs.cs_x.x_check_dynamic_types
-				= (True, tc_class, 0, class_defs, modules, cs)
+				= (tc_class, class_defs, modules, cs)
 				# cs = {cs & cs_error = checkError gen_ident "a generic context is not allowed in a dynamic type" cs.cs_error}
-				= (True, tc_class, 0, class_defs, modules, cs)
-			# cs_error = checkError gen_ident "generic used with wrong arity: generic always has one class argument" cs.cs_error  
-			= (False, TCGeneric {gtc & gtc_class=clazz}, 0, class_defs, modules, {cs & cs_error = cs_error})
+				= (tc_class, class_defs, modules, cs)
+			# cs_error = checkError gen_ident "generic used with wrong arity: generic has always has one class argument" cs.cs_error  
+			= (TCGeneric {gtc & gtc_class=clazz}, class_defs, modules, {cs & cs_error = cs_error})
 		# cs_error = checkError gen_ident "generic undefined" cs.cs_error
-		= (True, TCGeneric {gtc & gtc_class=clazz}, 0, class_defs, modules, {cs & cs_error = cs_error})
+		= (TCGeneric {gtc & gtc_class=clazz}, class_defs, modules, {cs & cs_error = cs_error})
 
 check_context_types tc_class [] cs=:{cs_error}
 	= {cs & cs_error = checkError tc_class "type context should contain one or more type variables" cs_error}
@@ -396,17 +391,6 @@ check_context_types tc_class [TV _ : types] cs
 	= cs
 check_context_types tc_class [type : types] cs
 	= check_context_types tc_class types cs
-
-check_fun_dep_context_types tc_class [(CV _ :@: _):_] fun_dep_vars cs
-	| fun_dep_vars bitand 1==0
-		= cs
-check_fun_dep_context_types tc_class [TV _ : types] fun_dep_vars cs
-	| fun_dep_vars bitand 1==0
-		= cs
-check_fun_dep_context_types tc_class [type : types] fun_dep_vars cs
-	= check_fun_dep_context_types tc_class types (fun_dep_vars>>1) cs
-check_fun_dep_context_types tc_class [] fun_dep_vars cs=:{cs_error}
-	= {cs & cs_error = checkError tc_class "type context should contain one or more type variables" cs_error}
 
 emptyIdent name :== { id_name = name, id_info = nilPtr }
 
@@ -588,8 +572,7 @@ where
 			= ([type : types], attr_env, class_defs, (ts, ti, {cs & cs_error = cs_error}))
 
 		bind_context_of_cons [context=:{tc_class,tc_types,tc_var}:contexts] cti class_defs ts ti cs
-			# (ok,tc_class,fun_dep_vars,class_defs,modules,cs=:{cs_error}) = check_context_class tc_class tc_types cti.cti_module_index class_defs ts.ts_modules cs
-			// to do: use ok and fun_dep_vars
+			# (tc_class, class_defs, modules, cs=:{cs_error}) = check_context_class tc_class tc_types cti.cti_module_index class_defs ts.ts_modules cs
 			  ts = {ts & ts_modules=modules}
 			| cs_error.ea_ok
 			 	# (tc_types, _, (ts,ti,cs)) = bindTypes cti tc_types (ts,ti,cs)
@@ -640,7 +623,7 @@ CS_Checking	:== 0
 
 checkTypeDefs :: !Index !(Optional (CopiedDefinitions, Int))
 		!*{#CheckedTypeDef} !*{#ConsDef} !*{#SelectorDef} !v:{#ClassDef} !*{#DclModule} !*Heaps !*CheckState
-	-> (!*{#CheckedTypeDef},!*{#ConsDef},!*{#SelectorDef},!v:{#ClassDef},!*{#DclModule},!*Heaps,!*CheckState)
+	-> (!*{#CheckedTypeDef}, *{#ConsDef},!*{#SelectorDef},!v:{#ClassDef},!*{#DclModule},!*Heaps,!*CheckState)
 checkTypeDefs module_index opt_icl_info type_defs cons_defs selector_defs class_defs modules heaps=:{hp_type_heaps,hp_var_heap} cs
 	#! nr_of_types = size type_defs
 	#  ts = { ts_type_defs = type_defs, ts_cons_defs = cons_defs, ts_selector_defs = selector_defs, ts_modules = modules }
@@ -684,11 +667,11 @@ determineAttributeVariable attr_var=:{av_ident=attr_name=:{id_info}} oti=:{oti_h
 		= ({ attr_var & av_info_ptr = attr_ptr}, oti, symbol_table)
 
 ::	DemandedAttributeKind = DAK_Ignore | DAK_Unique | DAK_None
-
 instance toString DemandedAttributeKind where
 	toString DAK_Ignore = "DAK_Ignore"
 	toString DAK_Unique = "DAK_Unique"
 	toString DAK_None = "DAK_None"
+	
 
 newAttribute :: !DemandedAttributeKind {#Char} TypeAttribute !*OpenTypeInfo !*CheckState -> (!TypeAttribute, !*OpenTypeInfo, !*CheckState)
 newAttribute DAK_Ignore var_ident attr oti cs
@@ -720,6 +703,7 @@ newAttribute DAK_None var_ident TA_Unique oti cs
 	= (TA_Unique, oti, cs)
 newAttribute DAK_None var_ident attr oti cs
 	= (TA_Multi, oti, cs)
+			
 
 getTypeDef :: !Index !Index !Index !u:{# CheckedTypeDef} !v:{# DclModule} -> (!CheckedTypeDef, !Index , !u:{# CheckedTypeDef}, !v:{# DclModule})
 getTypeDef type_index type_module module_index type_defs modules
@@ -756,34 +740,25 @@ checkTypeVar scope dem_attr tv=:{tv_ident=var_ident=:{id_name,id_info}} tv_attr 
 		# (new_attr, oti=:{oti_heaps,oti_all_vars}, cs) = newAttribute dem_attr id_name tv_attr oti {cs & cs_symbol_table = cs_symbol_table}
 		  (new_var_ptr, th_vars) = newPtr (TVI_AttrAndRefCount new_attr 1) oti_heaps.th_vars
 		  new_var = { tv & tv_info_ptr = new_var_ptr }
-		  entry = {ste_index = NoIndex, ste_kind = STE_TypeVariable new_var_ptr, ste_def_level = scope, ste_previous = entry}
-		  cs & cs_symbol_table = writePtr id_info entry cs.cs_symbol_table
-		= (new_var, new_attr, ({ oti & oti_heaps = { oti_heaps & th_vars = th_vars }, oti_all_vars = [new_var : oti_all_vars]}, cs))
-		= case ste_kind of
-			STE_TypeVariable tv_info_ptr
-				# {oti_heaps} = oti
-				  (tv_info, th_vars) = readPtr tv_info_ptr oti_heaps.th_vars
-				  th_vars = incr_ref_count tv_info_ptr tv_info th_vars	
-				  (var_attr, oti, cs) = check_attribute id_name dem_attr tv_info tv_attr {oti & oti_heaps = {oti_heaps & th_vars = th_vars}}
-				  								{cs & cs_symbol_table = cs_symbol_table}
-				-> ({tv & tv_info_ptr = tv_info_ptr}, var_attr, (oti, cs))
-			STE_FunDepTypeVariable tv_info_ptr
-				# {oti_heaps,oti_all_vars} = oti
-				  (TVI_AttrAndRefCount attr ref_count, th_vars) = readPtr tv_info_ptr oti_heaps.th_vars
-				  th_vars = writePtr tv_info_ptr (TVI_AttrAndRefCount attr (inc ref_count)) th_vars
-				  entry & ste_kind = STE_TypeVariable tv_info_ptr, ste_def_level = scope
-				  cs & cs_symbol_table = writePtr id_info entry cs_symbol_table
-				  tv & tv_info_ptr=tv_info_ptr
-				-> (tv, attr, ({oti & oti_heaps = {oti_heaps & th_vars = th_vars}, oti_all_vars = [tv : oti_all_vars]}, cs))
+		= (new_var, new_attr, ({ oti & oti_heaps = { oti_heaps & th_vars = th_vars }, oti_all_vars = [new_var : oti_all_vars]},
+				{ cs & cs_symbol_table = cs.cs_symbol_table <:= (id_info, {ste_index = NoIndex, ste_kind = STE_TypeVariable new_var_ptr,
+								ste_def_level = scope, ste_previous = entry })}))
+		# (STE_TypeVariable tv_info_ptr) = ste_kind
+		  {oti_heaps} = oti
+		  (tv_info, th_vars) = readPtr tv_info_ptr oti_heaps.th_vars
+		  th_vars = incr_ref_count tv_info_ptr tv_info th_vars	
+		  (var_attr, oti, cs) = check_attribute id_name dem_attr tv_info tv_attr {oti & oti_heaps = {oti_heaps & th_vars = th_vars}}
+		  								{cs & cs_symbol_table = cs_symbol_table}
+		= ({tv & tv_info_ptr = tv_info_ptr}, var_attr, (oti, cs))
 where
 	incr_ref_count tv_info_ptr (TVI_AttrAndRefCount prev_attr ref_count) th_vars
-		= th_vars <:= (tv_info_ptr, TVI_AttrAndRefCount prev_attr (inc ref_count))
+		= th_vars <:=	(tv_info_ptr, TVI_AttrAndRefCount prev_attr (inc ref_count))			
 	incr_ref_count tv_info_ptr _ th_vars
 		= th_vars
 
 	check_attribute var_ident DAK_Ignore (TVI_AttrAndRefCount prev_attr ref_count) this_attr oti cs=:{cs_error}
 		= (TA_Multi, oti, cs)
-	check_attribute var_ident dem_attr (TVI_AttrAndRefCount prev_attr _) this_attr oti cs=:{cs_error}
+	check_attribute var_ident dem_attr (TVI_AttrAndRefCount prev_attr ref_count) this_attr oti cs=:{cs_error}
 		# (new_attr, cs_error) = determine_attribute var_ident dem_attr this_attr cs_error
 		= check_var_attribute prev_attr new_attr oti { cs & cs_error = cs_error }
 	where					
@@ -1026,22 +1001,17 @@ remove_universal_vars vars symbol_table
 	remove_universal_var {atv_variable = {tv_ident}} cs_symbol_table
 		= removeDefinitionFromSymbolTable cRankTwoScope tv_ident cs_symbol_table
 
-checkInstanceType :: !Index !GlobalIndex !ClassIdent !BITVECT
-		!InstanceType !Specials !u:{# CheckedTypeDef} !v:{# ClassDef} !u:{# DclModule} !*TypeHeaps !*CheckState
-	-> (!InstanceType,!Specials,!u:{# CheckedTypeDef},!v:{# ClassDef},!u:{# DclModule},!*TypeHeaps,!*CheckState)
-checkInstanceType mod_index ins_class_index ins_class_ident class_fun_dep_vars it=:{it_types,it_context} specials type_defs class_defs modules heaps cs
+checkInstanceType :: !Index !GlobalIndex !ClassIdent !InstanceType !Specials !u:{# CheckedTypeDef} !v:{# ClassDef} !u:{# DclModule} !*TypeHeaps !*CheckState
+												 -> (!InstanceType,!Specials,!u:{# CheckedTypeDef},!v:{# ClassDef},!u:{# DclModule},!*TypeHeaps,!*CheckState)
+checkInstanceType mod_index ins_class_index ins_class_ident it=:{it_types,it_context} specials type_defs class_defs modules heaps cs
 	# cs_error = check_fully_polymorphity it_types it_context cs.cs_error
 	  ots = { ots_type_defs = type_defs, ots_modules = modules }
 	  oti = { oti_heaps = heaps, oti_all_vars = [], oti_all_attrs = [], oti_global_vars= [] }
-	  (it_types, undefined_contexts_vars, (ots, oti=:{oti_all_vars = it_vars, oti_all_attrs = it_attr_vars}, cs))
-		= check_instance_type class_fun_dep_vars mod_index it_types (ots, oti, {cs & cs_error = cs_error})
+	  (it_types, (ots, oti=:{oti_all_vars = it_vars, oti_all_attrs = it_attr_vars}, cs))
+	  	= checkOpenTypes mod_index cGlobalScope DAK_None it_types (ots, oti, { cs & cs_error = cs_error })
 	  (heaps, cs) = check_linearity_of_type_vars it_vars oti.oti_heaps cs
 	  oti = { oti &  oti_all_vars = [], oti_all_attrs = [], oti_heaps = heaps }
-	  (it_context, type_context_vars, type_defs, class_defs, modules, heaps, cs)
-		= checkInstanceTypeContexts it_context it_vars it_types undefined_contexts_vars mod_index class_defs ots oti cs
-	  it_vars = case type_context_vars of
-	  				[] -> it_vars
-	  				_ -> it_vars ++ type_context_vars
+	  (it_context, type_defs, class_defs, modules, heaps, cs) = checkTypeContexts it_context mod_index class_defs ots oti cs
 	  cs_error = foldSt (compare_context_and_instance_types ins_class_index ins_class_ident it_types) it_context cs.cs_error
 	  (specials, cs) = checkSpecialTypeVars specials { cs & cs_error = cs_error }
 	  cs_symbol_table = removeVariablesFromSymbolTable cGlobalScope it_vars cs.cs_symbol_table
@@ -1052,29 +1022,12 @@ checkInstanceType mod_index ins_class_index ins_class_ident class_fun_dep_vars i
   where
 	check_fully_polymorphity it_types it_context cs_error
 		| all is_type_var it_types && not (isEmpty it_context)
-			= IF_ALLOW_NON_LINEAR_AND_OVERLAPPING_INSTANCES
-				cs_error
-				(checkError "context restriction not allowed for fully polymorph instance" "" cs_error)
+			= checkError "context restriction not allowed for fully polymorph instance" "" cs_error
 		= cs_error
 	  where
 		is_type_var (TV _) = True
 		is_type_var _ = False
-
-	check_instance_type :: Int Int [Type] *(u:OpenTypeSymbols,*OpenTypeInfo,*CheckState) -> ([Type],[[TypeVar]],(u:OpenTypeSymbols,*OpenTypeInfo,*CheckState))
-	check_instance_type 0 mod_index it_types ots_oti_cs
-		# (it_types, ots_oti_cs) = checkOpenTypes mod_index cGlobalScope DAK_None it_types ots_oti_cs
-		= (it_types, [], ots_oti_cs)
-	check_instance_type fun_dep_vars mod_index it_types ots_oti_cs
-		# (it_types, (ots, oti, cs)) = check_fun_non_dep_types it_types fun_dep_vars DAK_None mod_index ots_oti_cs
-		  (free_non_dep_vars,oti) = oti!oti_all_vars
-		  oti & oti_all_vars = []
-		  (it_types, (ots, oti, cs)) = check_fun_dep_types it_types fun_dep_vars DAK_None mod_index (ots, oti, cs)
-		  (free_dep_vars,oti) = oti!oti_all_vars
-		  cs = mark_free_vars free_dep_vars cs
-		  oti & oti_all_vars = free_non_dep_vars
-		  free_dep_vars = if (isEmpty free_dep_vars) [] [free_dep_vars]
-		= (it_types, free_dep_vars, (ots, oti, cs))
-
+	
 	check_linearity_of_type_vars vars heaps=:{th_vars} cs=:{cs_error}
 		# (th_vars, cs_error) = foldSt check_linearity vars (th_vars, cs_error)
 		= ({heaps & th_vars = th_vars}, {cs & cs_error = cs_error})
@@ -1082,9 +1035,7 @@ checkInstanceType mod_index ins_class_index ins_class_ident class_fun_dep_vars i
 		check_linearity {tv_ident, tv_info_ptr} (th_vars, error)
 			# (TVI_AttrAndRefCount prev_attr ref_count, th_vars) = readPtr tv_info_ptr th_vars
 			| ref_count > 1
-				= IF_ALLOW_NON_LINEAR_AND_OVERLAPPING_INSTANCES
-					(th_vars, error)
-					(th_vars, checkError tv_ident ": this type variable occurs more than once in an instance type" error)
+				= (th_vars, checkError tv_ident ": this type variable occurs more than once in an instance type" error)
 				= (th_vars, error)
 
 	compare_context_and_instance_types ins_class_index ins_class_ident it_types {tc_class=TCGeneric _, tc_types} cs_error
@@ -1126,39 +1077,12 @@ checkFunctionType :: !Index !SymbolType !FunSpecials !u:{#CheckedTypeDef} !v:{#C
 checkFunctionType mod_index st specials type_defs class_defs modules heaps cs
 	= checkSymbolType True mod_index st specials type_defs class_defs modules heaps cs
 
-checkMemberType :: !Index !SymbolType !u:{#CheckedTypeDef} !v:{#ClassDef} !u:{#DclModule} !*TypeHeaps !*CheckState
-		  -> (!SymbolType,![ATypeVar],!u:{#CheckedTypeDef},!v:{#ClassDef},!u:{#DclModule},!*TypeHeaps,!*CheckState)
+checkMemberType :: !Index !SymbolType !u:{#CheckedTypeDef} !v:{#ClassDef} !u:{# DclModule} !*TypeHeaps !*CheckState
+	-> (!SymbolType, !u:{# CheckedTypeDef}, !v:{#ClassDef}, !u:{#DclModule}, !*TypeHeaps, !*CheckState)
 checkMemberType mod_index st type_defs class_defs modules heaps cs
-	# {st_args,st_result,st_context,st_attr_env} = st
-	  ots = {ots_type_defs = type_defs, ots_modules = modules}
-	  oti = {oti_heaps = heaps, oti_all_vars = [], oti_all_attrs = [], oti_global_vars= []}
-	  (st_args, cot_state) = checkOpenArgATypes mod_index cGlobalScope st_args (ots, oti, cs)
-	  (st_result, (ots, oti=:{oti_all_vars = st_vars,oti_all_attrs = st_attr_vars,oti_global_vars}, cs))
-	  	= checkOpenAType mod_index cGlobalScope DAK_None st_result cot_state	  
-	  oti = {oti & oti_all_vars = [], oti_all_attrs = []}
-	  (st_context, type_context_vars, type_defs, class_defs, modules, heaps, cs)
-	  	= check_symbol_type_contexts False st_context mod_index class_defs ots oti cs
-
-	  (atype_class_vars,th_vars) = add_attrs_to_class_vars (hd st_context).tc_types heaps.th_vars
-	  heaps & th_vars = th_vars
-
-	  st_vars = case type_context_vars of
-	  				[] -> st_vars
-	  				_ -> st_vars ++ type_context_vars
-	  (st_attr_env, cs) = check_attr_inequalities st_attr_env cs
-	  cs_symbol_table = removeVariablesFromSymbolTable cGlobalScope st_vars cs.cs_symbol_table
-	  cs_symbol_table = removeAttributesFromSymbolTable st_attr_vars cs_symbol_table
-	  cs & cs_symbol_table = cs_symbol_table
-	  checked_st = {st & st_vars = st_vars, st_args = st_args, st_result = st_result, st_context = st_context,
-	    					st_attr_vars = st_attr_vars, st_attr_env = st_attr_env }
-	= (checked_st, atype_class_vars, type_defs, class_defs, modules, heaps, cs) 
-	where
-		add_attrs_to_class_vars [TV type_var=:{tv_info_ptr}:tv_type_vars] th_vars
-			# (TVI_AttrAndRefCount attr _, th_vars) = readPtr tv_info_ptr th_vars
-			# (atype_class_vars,th_vars) = add_attrs_to_class_vars tv_type_vars th_vars
-			= ([{atv_attribute = attr, atv_variable = type_var}:atype_class_vars],th_vars)
-		add_attrs_to_class_vars [] th_vars
-			= ([],th_vars)
+	# (checked_st, specials, type_defs, class_defs, modules, heaps, cs) 
+			= checkSymbolType False mod_index st FSP_None type_defs class_defs modules heaps cs
+	= (checked_st, type_defs, class_defs, modules, heaps, cs) 
 
 checkSymbolType :: !Bool !Index !SymbolType !FunSpecials !u:{#CheckedTypeDef} !v:{#ClassDef} !u:{#DclModule} !*TypeHeaps !*CheckState
 							-> (!SymbolType,!FunSpecials,!u:{#CheckedTypeDef},!v:{#ClassDef},!u:{#DclModule},!*TypeHeaps,!*CheckState)
@@ -1170,12 +1094,8 @@ checkSymbolType is_function mod_index st=:{st_args,st_result,st_context,st_attr_
 	  (st_result, (ots, oti=:{oti_all_vars = st_vars,oti_all_attrs = st_attr_vars,oti_global_vars}, cs))
 	  	= checkOpenAType mod_index cGlobalScope DAK_None st_result cot_state	  
 	  oti = {oti & oti_all_vars = [], oti_all_attrs = []}
-	  (st_context, type_context_vars, type_defs, class_defs, modules, heaps, cs)
-	  	= check_symbol_type_contexts is_function st_context mod_index class_defs ots oti cs
-	  st_vars = case type_context_vars of
-	  				[] -> st_vars
-	  				_ -> st_vars ++ type_context_vars
-	  (st_attr_env, cs) = check_attr_inequalities st_attr_env cs
+	  (st_context, type_defs, class_defs, modules, heaps, cs) = check_type_contexts is_function st_context mod_index class_defs ots oti cs
+	  (st_attr_env, cs) = mapSt check_attr_inequality st_attr_env cs
 	  (specials, cs) = checkFunSpecialTypeVars specials cs 
 	  cs_symbol_table = removeVariablesFromSymbolTable cGlobalScope st_vars cs.cs_symbol_table
 	  cs_symbol_table = removeAttributesFromSymbolTable st_attr_vars cs_symbol_table
@@ -1186,9 +1106,8 @@ checkSymbolType is_function mod_index st=:{st_args,st_result,st_context,st_attr_
 where
 	check_argument_type_contexts [arg=:{at_type=TFAC vars type contexts}:args] mod_index class_defs ots oti cs
 		# (vars, (oti, cs)) = add_universal_vars vars oti cs
-		  (contexts, type_context_vars, type_defs, class_defs, modules, heaps, cs)
-		  	= checkTypeContexts contexts [] [] mod_index class_defs ots {oti & oti_all_vars=[],oti_all_attrs=[],oti_global_vars=[]} cs
-		  // to do: use type_context_vars
+		  (contexts, type_defs, class_defs, modules, heaps, cs)
+		  	= checkTypeContexts contexts mod_index class_defs ots {oti & oti_all_vars=[],oti_all_attrs=[],oti_global_vars=[]} cs
 		  oti = {oti & oti_heaps=heaps}
 		  ots = {ots_modules = modules, ots_type_defs = type_defs}
 		  cs = {cs & cs_symbol_table = remove_universal_vars vars cs.cs_symbol_table}
@@ -1201,9 +1120,6 @@ where
 	check_argument_type_contexts [] mod_index class_defs ots oti cs
 		= ([],class_defs,ots,oti,cs)
 
-check_attr_inequalities st_attr_env cs
-	= mapSt check_attr_inequality st_attr_env cs
-where
 	check_attr_inequality ineq=:{ai_demanded=ai_demanded=:{av_ident=dem_name},ai_offered=ai_offered=:{av_ident=off_name}} cs=:{cs_symbol_table,cs_error}
 		# (dem_entry, cs_symbol_table) = readPtr dem_name.id_info cs_symbol_table
 		# (found_dem_attr, dem_attr_ptr) = retrieve_attribute dem_entry
@@ -1222,20 +1138,19 @@ where
 		retrieve_attribute entry
 			= (False, abort "no attribute")
 
-check_symbol_type_contexts is_function st_context mod_index class_defs ots oti cs
-	| is_function
-	 	= checkTypeContexts st_context [] [] mod_index class_defs ots oti cs
-		= check_member_contexts st_context mod_index class_defs ots oti cs
-where
-	// AA generic members do not have a context at the moment of checking
-	check_member_contexts [] mod_index class_defs ots oti cs
-		= checkTypeContexts [] [] [] mod_index class_defs ots oti cs
-	check_member_contexts [tc : tcs] mod_index class_defs ots oti cs
-		# (tc, type_context_vars, (class_defs, ots, oti, cs)) = checkTypeContext mod_index tc (class_defs, ots, oti, cs)
-          cs_symbol_table = cs.cs_symbol_table
-		  (tcs, type_context_vars, type_defs, class_defs, modules, heaps, cs) = checkTypeContexts tcs type_context_vars [] mod_index class_defs ots oti {cs & cs_symbol_table = cs_symbol_table}
-          cs & cs_symbol_table = removeVariablesFromSymbolTable cGlobalScope [ tv \\ (TV tv) <- tc.tc_types] cs.cs_symbol_table
-		= ([tc : tcs], type_context_vars, type_defs, class_defs, modules, heaps, cs)
+	check_type_contexts is_function st_context mod_index class_defs ots oti cs
+		| is_function
+		 	= checkTypeContexts st_context mod_index class_defs ots oti cs
+			= check_member_contexts st_context mod_index class_defs ots oti cs
+	where
+		// AA generic members do not have a context at the moment of checking
+		check_member_contexts [] mod_index class_defs ots oti cs
+			= checkTypeContexts [] mod_index class_defs ots oti cs
+		check_member_contexts [tc : tcs] mod_index class_defs ots oti cs
+			# (tc, (class_defs, ots, oti, cs)) = checkTypeContext mod_index tc  (class_defs, ots, oti, cs)
+			  cs_symbol_table = removeVariablesFromSymbolTable cGlobalScope [ tv \\ (TV tv) <- tc.tc_types] cs.cs_symbol_table
+			  (tcs, type_defs, class_defs, modules, heaps, cs) = checkTypeContexts tcs mod_index class_defs ots oti {cs & cs_symbol_table = cs_symbol_table}
+			= ([tc : tcs], type_defs, class_defs, modules, heaps, cs)
 
 NewEntry symbol_table symb_ptr def_kind def_index level previous :==
 	 symbol_table <:= (symb_ptr,{  ste_kind = def_kind, ste_index = def_index, ste_def_level = level, ste_previous = previous })
@@ -1248,8 +1163,8 @@ checkSuperClasses class_args class_contexts mod_index type_defs class_defs modul
 	  cs = {cs & cs_symbol_table = cs_symbol_table, cs_error = cs_error }
 	  ots = { ots_modules = modules, ots_type_defs = type_defs }
 	  oti = { oti_heaps = { heaps & th_vars = th_vars }, oti_all_vars = [], oti_all_attrs = [], oti_global_vars = [] }
-	  (class_contexts, _, type_defs, class_defs, modules, type_heaps, cs)
-		  		= checkTypeContexts class_contexts [] [] mod_index class_defs ots oti cs
+	  (class_contexts, type_defs, class_defs, modules, type_heaps, cs)
+		  		= checkTypeContexts class_contexts mod_index class_defs ots oti cs
 	  (class_args, cs_symbol_table) = retrieve_variables_from_symbol_table rev_class_args [] cs.cs_symbol_table
 	= (class_args, class_contexts, type_defs, class_defs, modules, type_heaps, {cs & cs_symbol_table = cs_symbol_table})
 where
@@ -1270,97 +1185,16 @@ where
 	retrieve_variables_from_symbol_table [] class_args symbol_table
 		= (class_args, symbol_table)
 
-check_type_context ::  !Index !TypeContext ![TypeVar] !(!v:{#ClassDef}, !u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState)
-	-> (!TypeContext,![TypeVar],![TypeVar],![TypeVar],!(!v:{#ClassDef}, !u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState))
-check_type_context mod_index tc=:{tc_class, tc_types} fun_dep_determined_vars (class_defs, ots, oti, cs)
-	# (ok, tc_class, fun_dep_vars, class_defs, modules, cs=:{cs_error}) = check_context_class tc_class tc_types mod_index class_defs ots.ots_modules cs
-	# ots & ots_modules = modules
-	| ok
-		| fun_dep_vars==0
-			# (tc_types, (ots, oti, cs)) = checkOpenTypes mod_index cGlobalScope DAK_Ignore tc_types (ots, oti, cs)
-			  tc & tc_class = tc_class, tc_types = tc_types
-			  cs = check_context_types tc_class tc_types cs
-			  (free_vars,oti) = oti!oti_all_vars
-			  cs = mark_free_vars free_vars cs
-			  oti & oti_all_vars = []
-			= (tc, free_vars, [], fun_dep_determined_vars, (class_defs, ots, oti, cs))
-			# (tc_types, (ots, oti, cs)) = check_fun_non_dep_types tc_types fun_dep_vars DAK_Ignore mod_index (ots, oti, cs)
-			  (free_non_dep_vars,oti) = oti!oti_all_vars
-			| isEmpty free_non_dep_vars
-				# (tc_types, (ots, oti, cs)) = check_fun_dep_types tc_types fun_dep_vars DAK_Ignore mod_index (ots, oti, cs)
-				  tc & tc_class = tc_class, tc_types = tc_types
-				  cs = check_fun_dep_context_types tc_class tc_types fun_dep_vars cs
-				  (new_fun_dep_determined_vars,oti) = oti!oti_all_vars
-				  oti & oti_all_vars = []
-				  fun_dep_determined_vars = fun_dep_determined_vars++new_fun_dep_determined_vars
-				= (tc, [], new_fun_dep_determined_vars, fun_dep_determined_vars, (class_defs, ots, oti, cs))
-				# cs = mark_free_vars free_non_dep_vars cs
-				  oti & oti_all_vars = []
-				  (tc_types, (ots, oti, cs)) = check_fun_dep_types tc_types fun_dep_vars DAK_Ignore mod_index (ots, oti, cs)
-				  tc & tc_class = tc_class, tc_types = tc_types
-				  cs = check_fun_dep_context_types tc_class tc_types fun_dep_vars cs
-				  (free_dep_vars,oti) = oti!oti_all_vars
-				  cs = mark_free_vars free_dep_vars cs
-				  oti & oti_all_vars = []
-				= (tc, free_non_dep_vars, free_dep_vars, fun_dep_determined_vars, (class_defs, ots, oti, cs))
-		= ({tc & tc_types = []}, [], [], fun_dep_determined_vars, (class_defs, ots, oti, cs))
-
-mark_free_vars :: ![TypeVar] !*CheckState -> *CheckState
-mark_free_vars [{tv_ident={id_info}}:free_vars] cs=:{cs_symbol_table}
-	# (entry=:{ste_kind},cs_symbol_table) = readPtr id_info cs_symbol_table
-	= case ste_kind of
-		STE_TypeVariable tv_info_ptr
-			# entry & ste_kind = STE_FunDepTypeVariable tv_info_ptr
-			# cs & cs_symbol_table = writePtr id_info entry cs_symbol_table
-			-> mark_free_vars free_vars cs
-mark_free_vars [] cs
-  	= cs
-
-checkTypeContext ::  !Index !TypeContext !(!v:{#ClassDef}, !u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState)
-			 -> (!TypeContext,![TypeVar],!(!v:{#ClassDef}, !u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState))
+checkTypeContext ::  !Index !TypeContext !(!v:{# ClassDef}, !u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState)
+	-> (!TypeContext,!(!v:{# ClassDef}, !u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState))
 checkTypeContext mod_index tc=:{tc_class, tc_types} (class_defs, ots, oti, cs)
-	# (ok, tc_class, fun_dep_vars, class_defs, modules, cs=:{cs_error}) = check_context_class tc_class tc_types mod_index class_defs ots.ots_modules cs
-	# ots & ots_modules = modules
-	| ok
-		| fun_dep_vars==0
-			# (tc_types, (ots, oti, cs)) = checkOpenTypes mod_index cGlobalScope DAK_Ignore tc_types (ots, oti, cs)
-			  tc & tc_class = tc_class, tc_types = tc_types
-			  cs = check_context_types tc_class tc_types cs
-			= (tc, [], (class_defs, ots, oti, cs))
-			# (tc_types, (ots, oti, cs)) = check_fun_non_dep_types tc_types fun_dep_vars DAK_Ignore mod_index (ots, oti, cs)
-			  (free_non_dep_vars,oti) = oti!oti_all_vars
-			| isEmpty free_non_dep_vars
-				# (tc_types, (ots, oti, cs)) = check_fun_dep_types tc_types fun_dep_vars DAK_Ignore mod_index (ots, oti, cs)
-				  tc & tc_class = tc_class, tc_types = tc_types
-				  cs = check_fun_dep_context_types tc_class tc_types fun_dep_vars cs
-				  (new_fun_dep_determined_vars,oti) = oti!oti_all_vars
-				  oti & oti_all_vars = []
-				= (tc, new_fun_dep_determined_vars, (class_defs, ots, oti, cs))
-				# (tc_types, (ots, oti, cs)) = check_fun_dep_types tc_types fun_dep_vars DAK_Ignore mod_index (ots, oti, cs)
-				  tc & tc_class = tc_class, tc_types = tc_types
-				  cs = check_fun_dep_context_types tc_class tc_types fun_dep_vars cs
-				= (tc, [], (class_defs, ots, oti, cs))
-		= ({tc & tc_types = []}, [], (class_defs, ots, oti, cs))
-
-check_fun_non_dep_types [tc_type:tc_types] fun_dep_vars dem_attr mod_index cot_state
-	| fun_dep_vars bitand 1==0
-		# (tc_type,cot_state) = checkOpenType mod_index cGlobalScope dem_attr tc_type cot_state
-		# (tc_types,cot_state) = check_fun_non_dep_types tc_types (fun_dep_vars>>1) dem_attr mod_index cot_state
-		= ([tc_type:tc_types],cot_state)
-		# (tc_types,cot_state) = check_fun_non_dep_types tc_types (fun_dep_vars>>1) dem_attr mod_index cot_state
-		= ([tc_type:tc_types],cot_state)
-check_fun_non_dep_types [] fun_dep_vars dem_attr mod_index cot_state
-	= ([],cot_state)
-
-check_fun_dep_types [tc_type:tc_types] fun_dep_vars dem_attr mod_index cot_state
-	| fun_dep_vars bitand 1<>0
-		# (tc_type,cot_state) = checkOpenType mod_index cGlobalScope dem_attr tc_type cot_state
-		# (tc_types,cot_state) = check_fun_dep_types tc_types (fun_dep_vars>>1) dem_attr mod_index cot_state
-		= ([tc_type:tc_types],cot_state)
-		# (tc_types,cot_state) = check_fun_dep_types tc_types (fun_dep_vars>>1) dem_attr mod_index cot_state
-		= ([tc_type:tc_types],cot_state)
-check_fun_dep_types [] fun_dep_vars mod_index dem_attr cot_state
-	= ([],cot_state)
+	# (tc_class, class_defs, modules, cs=:{cs_error}) = check_context_class tc_class tc_types mod_index class_defs ots.ots_modules cs
+	# ots = {ots & ots_modules = modules}
+	| cs_error.ea_ok
+		# (tc_types, (ots, oti, cs)) = checkOpenTypes mod_index cGlobalScope DAK_Ignore tc_types (ots, oti, cs)
+		# cs = check_context_types tc_class tc_types cs
+		= ({tc & tc_class = tc_class, tc_types = tc_types}, (class_defs, ots, oti, cs))
+		= ({tc & tc_types = []}, (class_defs, ots, oti, cs))
 
 check_no_global_type_vars [] cs
 	= cs
@@ -1368,213 +1202,28 @@ check_no_global_type_vars [{tv_ident}:global_vars] cs=:{cs_error}
 	# cs = {cs & cs_error = checkError tv_ident ": type variable with ^ only allowed in dynamic types" cs_error }
 	= check_no_global_type_vars global_vars cs
 
-checkInstanceTypeContexts :: ![TypeContext] ![TypeVar] ![Type] ![[TypeVar]] !Index !v:{#ClassDef} !u:OpenTypeSymbols !*OpenTypeInfo !*CheckState
-	-> (![TypeContext], ![TypeVar], !u:{#CheckedTypeDef}, !v:{#ClassDef}, u:{#DclModule}, !*TypeHeaps, !*CheckState)
-checkInstanceTypeContexts tcs instance_type_vars instance_type undefined_contexts_vars mod_index class_defs ots oti cs
-	# (instance_type_ref_counts,instance_type_size,oti,cs)
-		= zero_ref_counts_and_size_of_instance_type tcs instance_type_vars instance_type oti cs
-	  (tcs, fun_dep_determined_vars, undefined_contexts_vars, fun_contexts_vars, (class_defs, {ots_modules,ots_type_defs}, oti, cs))
-		= check_type_contexts tcs [] undefined_contexts_vars [] instance_type_vars instance_type_ref_counts instance_type_size mod_index (class_defs, ots, oti, cs)
-	  (new_fun_dep_determined_vars,cs_symbol_table) = iterate_define_fun_contexts_dep_vars fun_contexts_vars [] cs.cs_symbol_table
-	  cs & cs_symbol_table=cs_symbol_table
-	  fun_dep_determined_vars = if (isEmpty new_fun_dep_determined_vars) fun_dep_determined_vars (fun_dep_determined_vars++reverse new_fun_dep_determined_vars)
-	  (free_vars,cs) = collect_free_contexts_vars_error undefined_contexts_vars oti.oti_all_vars cs
+checkTypeContexts :: ![TypeContext] !Index !v:{# ClassDef} !u:OpenTypeSymbols !*OpenTypeInfo !*CheckState
+	-> (![TypeContext], !u:{# CheckedTypeDef}, !v:{# ClassDef}, u:{# DclModule}, !*TypeHeaps, !*CheckState)
+checkTypeContexts tcs mod_index class_defs ots oti cs
+	# (tcs, (class_defs, { ots_modules, ots_type_defs}, oti, cs)) = mapSt (checkTypeContext mod_index) tcs (class_defs, ots, oti, cs)
+	  cs = check_class_variables oti.oti_all_vars cs
 	  cs = check_class_attributes oti.oti_all_attrs cs
 	  cs = check_no_global_type_vars oti.oti_global_vars cs
-	= (tcs, fun_dep_determined_vars ++ free_vars, ots_type_defs, class_defs, ots_modules, oti.oti_heaps, cs)
+	= (tcs, ots_type_defs, class_defs, ots_modules, oti.oti_heaps, cs)
 where
-	zero_ref_counts_and_size_of_instance_type [] instance_type_vars instance_type oti cs
-		= ([],0,oti,cs)
-	zero_ref_counts_and_size_of_instance_type _ instance_type_vars instance_type oti cs
-		# (instance_type_ref_counts,oti,cs) = zero_ref_counts instance_type_vars oti cs
-		  instance_type_size = size_types instance_type 0
-		= (instance_type_ref_counts,instance_type_size,oti,cs)
+	check_class_variables class_variables cs
+		= foldSt check_class_variable class_variables cs
+	where
+		check_class_variable {tv_ident} cs=:{cs_symbol_table,cs_error}
+			= { cs & cs_symbol_table	= removeDefinitionFromSymbolTable cGlobalScope tv_ident cs_symbol_table,
+					 cs_error			= checkError tv_ident "wrongly used or not used at all" cs_error}
 
-	check_type_contexts [tc:tcs] fun_dep_determined_vars undefined_contexts_vars fun_contexts_vars instance_type_vars instance_type_ref_counts instance_type_size mod_index (class_defs, ots, oti, cs)
-		# (tc,free_vars,free_dep_vars,fun_dep_determined_vars,(class_defs, ots, oti, cs))
-			= check_type_context mod_index tc fun_dep_determined_vars (class_defs, ots, oti, cs)
-		  (undefined_contexts_vars,fun_contexts_vars)
-			= update_undefined_and_fun_contexts_vars free_vars free_dep_vars undefined_contexts_vars fun_contexts_vars
-		  (oti,cs) = check_and_zero_ref_counts instance_type_vars instance_type_ref_counts oti cs
-		  cs = if (size_types tc.tc_types 0 > instance_type_size)
-		  		{cs & cs_error = checkError (name_of_class tc.tc_class) "type constraint is too large" cs.cs_error}
-		  		cs
-		  	with
-		  		name_of_class (TCClass {glob_object={ds_ident}}) = ds_ident.id_name
-				name_of_class (TCGeneric {gtc_class={glob_object={ds_ident}}}) = ds_ident.id_name
-				name_of_class (TCQualifiedIdent _ class_name) = class_name
-		  (tcs,fun_dep_determined_vars,undefined_contexts_vars,fun_contexts_vars,class_defs_ots_oti_cs)
-			= check_type_contexts tcs fun_dep_determined_vars undefined_contexts_vars fun_contexts_vars instance_type_vars instance_type_ref_counts instance_type_size mod_index (class_defs, ots, oti, cs)
-		= ([tc:tcs],fun_dep_determined_vars,undefined_contexts_vars,fun_contexts_vars,class_defs_ots_oti_cs)
-	check_type_contexts [] fun_dep_determined_vars undefined_contexts_vars fun_contexts_vars instance_type_vars instance_type_ref_counts instance_type_size mod_index class_defs_ots_oti_cs
-		= ([],fun_dep_determined_vars,undefined_contexts_vars,fun_contexts_vars,class_defs_ots_oti_cs)
-
-	zero_ref_counts [{tv_ident={id_info}}:free_vars] oti=:{oti_heaps} cs=:{cs_symbol_table}
-		# (entry=:{ste_kind},cs_symbol_table) = readPtr id_info cs_symbol_table
-		  cs & cs_symbol_table=cs_symbol_table
-		  tv_info_ptr 
-			= case ste_kind of
-				STE_TypeVariable tv_info_ptr -> tv_info_ptr
-				STE_FunDepTypeVariable tv_info_ptr -> tv_info_ptr
-		  (TVI_AttrAndRefCount attr ref_count, th_vars) = readPtr tv_info_ptr oti_heaps.th_vars
-		  th_vars = writePtr tv_info_ptr (TVI_AttrAndRefCount attr 0) th_vars
-		  oti & oti_heaps = {oti_heaps & th_vars = th_vars}
-		  (ref_counts,oti,cs) = zero_ref_counts free_vars oti cs
-		= ([ref_count:ref_counts],oti,cs)
-	zero_ref_counts [] oti cs
-	  	= ([],oti,cs)
-
-	check_and_zero_ref_counts [{tv_ident}:free_vars] [instance_type_ref_count:instance_type_ref_counts] oti=:{oti_heaps} cs=:{cs_symbol_table}
-		# (entry=:{ste_kind},cs_symbol_table) = readPtr tv_ident.id_info cs_symbol_table
-		  cs & cs_symbol_table=cs_symbol_table
-		  tv_info_ptr 
-			= case ste_kind of
-				STE_TypeVariable tv_info_ptr -> tv_info_ptr
-				STE_FunDepTypeVariable tv_info_ptr -> tv_info_ptr
-		  (TVI_AttrAndRefCount attr ref_count, th_vars) = readPtr tv_info_ptr oti_heaps.th_vars
-		  th_vars = writePtr tv_info_ptr (TVI_AttrAndRefCount attr 0) th_vars
-		  oti & oti_heaps = {oti_heaps & th_vars = th_vars}
-		| ref_count > instance_type_ref_count
-			# cs & cs_error = checkError tv_ident "used too many times in type constraint" cs.cs_error
-			= check_and_zero_ref_counts free_vars instance_type_ref_counts oti cs
-			= check_and_zero_ref_counts free_vars instance_type_ref_counts oti cs
-	check_and_zero_ref_counts [] [] oti cs
-	  	= (oti,cs)
-
-checkTypeContexts :: ![TypeContext] ![TypeVar] ![[TypeVar]] !Index !v:{# ClassDef} !u:OpenTypeSymbols !*OpenTypeInfo !*CheckState
-	-> (![TypeContext], ![TypeVar], !u:{# CheckedTypeDef}, !v:{# ClassDef}, u:{# DclModule}, !*TypeHeaps, !*CheckState)
-checkTypeContexts tcs fun_dep_determined_vars undefined_contexts_vars mod_index class_defs ots oti cs
-	# (tcs, fun_dep_determined_vars, undefined_contexts_vars, fun_contexts_vars, (class_defs, {ots_modules,ots_type_defs}, oti, cs))
-		= check_type_contexts tcs fun_dep_determined_vars undefined_contexts_vars [] mod_index (class_defs, ots, oti, cs)
-	  (new_fun_dep_determined_vars,cs_symbol_table) = iterate_define_fun_contexts_dep_vars fun_contexts_vars [] cs.cs_symbol_table
-	  cs & cs_symbol_table=cs_symbol_table
-	  fun_dep_determined_vars = if (isEmpty new_fun_dep_determined_vars) fun_dep_determined_vars (fun_dep_determined_vars++reverse new_fun_dep_determined_vars)
-	  (free_vars,cs) = collect_free_contexts_vars undefined_contexts_vars oti.oti_all_vars cs
-	  cs = check_class_variables free_vars cs
-	  cs = check_class_attributes oti.oti_all_attrs cs
-	  cs = check_no_global_type_vars oti.oti_global_vars cs
-	= (tcs, fun_dep_determined_vars, ots_type_defs, class_defs, ots_modules, oti.oti_heaps, cs)
-where
-	check_type_contexts [tc:tcs] fun_dep_determined_vars undefined_contexts_vars fun_contexts_vars mod_index class_defs_ots_oti_cs
-		# (tc,free_vars,free_dep_vars,fun_dep_determined_vars,class_defs_ots_oti_cs)
-			= check_type_context mod_index tc fun_dep_determined_vars class_defs_ots_oti_cs
-		# (undefined_contexts_vars,fun_contexts_vars)
-			= update_undefined_and_fun_contexts_vars free_vars free_dep_vars undefined_contexts_vars fun_contexts_vars
-		# (tcs,fun_dep_determined_vars,undefined_contexts_vars,fun_contexts_vars,class_defs_ots_oti_cs)
-			= check_type_contexts tcs fun_dep_determined_vars undefined_contexts_vars fun_contexts_vars mod_index class_defs_ots_oti_cs
-		= ([tc:tcs],fun_dep_determined_vars,undefined_contexts_vars,fun_contexts_vars,class_defs_ots_oti_cs)
-	check_type_contexts [] fun_dep_determined_vars undefined_contexts_vars fun_contexts_vars mod_index class_defs_ots_oti_cs
-		= ([],fun_dep_determined_vars,undefined_contexts_vars,fun_contexts_vars,class_defs_ots_oti_cs)
-
-update_undefined_and_fun_contexts_vars :: [TypeVar] [TypeVar] [[TypeVar]] [([TypeVar],[TypeVar])] -> (![[TypeVar]],![([TypeVar],[TypeVar])])
-update_undefined_and_fun_contexts_vars [] free_dep_vars undefined_contexts_vars fun_contexts_vars
-	= (undefined_contexts_vars,fun_contexts_vars)
-update_undefined_and_fun_contexts_vars free_vars [] undefined_contexts_vars fun_contexts_vars
-	= ([free_vars:undefined_contexts_vars],fun_contexts_vars)
-update_undefined_and_fun_contexts_vars free_vars free_dep_vars undefined_contexts_vars fun_contexts_vars
-	= ([free_vars:undefined_contexts_vars],[(free_vars,free_dep_vars) : fun_contexts_vars])
-
-iterate_define_fun_contexts_dep_vars :: [([TypeVar],[TypeVar])] [TypeVar] *SymbolTable -> (![TypeVar],!*SymbolTable)
-iterate_define_fun_contexts_dep_vars fun_contexts_vars new_fun_dep_determined_vars symbol_table
-	# (repeat,fun_contexts_vars,new_fun_dep_determined_vars,symbol_table)
-		= define_fun_contexts_dep_vars_pass fun_contexts_vars [] False new_fun_dep_determined_vars symbol_table
-	| repeat
-		= iterate_define_fun_contexts_dep_vars fun_contexts_vars new_fun_dep_determined_vars symbol_table
-		= (new_fun_dep_determined_vars,symbol_table)
-where
-	define_fun_contexts_dep_vars_pass [fun_context_vars=:(non_dep_vars,dep_vars):fun_contexts_vars] new_fun_contexts_vars repeat fun_dep_determined_vars symbol_table
-		# (all_non_dep_vars_defined,symbol_table) = all_vars_defined non_dep_vars symbol_table
-		| all_non_dep_vars_defined
-			# (repeat,fun_dep_determined_vars,symbol_table) = define_dep_vars dep_vars repeat fun_dep_determined_vars symbol_table 
-			= define_fun_contexts_dep_vars_pass fun_contexts_vars new_fun_contexts_vars repeat fun_dep_determined_vars symbol_table
-		# (all_dep_vars_defined,symbol_table) = all_vars_defined dep_vars symbol_table
-		| all_dep_vars_defined
-			= define_fun_contexts_dep_vars_pass fun_contexts_vars new_fun_contexts_vars repeat fun_dep_determined_vars symbol_table
-			= define_fun_contexts_dep_vars_pass fun_contexts_vars [fun_context_vars:new_fun_contexts_vars] repeat fun_dep_determined_vars symbol_table
-	define_fun_contexts_dep_vars_pass [] new_fun_contexts_vars repeat fun_dep_determined_vars symbol_table
-		= (repeat,new_fun_contexts_vars,fun_dep_determined_vars,symbol_table)
-
-	all_vars_defined [{tv_ident={id_info}}:vars] symbol_table
-		# ({ste_kind},symbol_table) = readPtr id_info symbol_table
-		= case ste_kind of
-			STE_TypeVariable tv_info_ptr
-				-> all_vars_defined vars symbol_table
-			_
-				-> (False,symbol_table)
-	all_vars_defined [] symbol_table
-	  	= (True,symbol_table)
-
-	define_dep_vars [tv=:{tv_ident=tv_ident=:{id_info}}:dep_vars] repeat fun_dep_determined_vars symbol_table
-		# (entry=:{ste_kind},symbol_table) = readPtr id_info symbol_table
-		= case ste_kind of
-			STE_TypeVariable tv_info_ptr
-				-> define_dep_vars dep_vars repeat fun_dep_determined_vars symbol_table
-			STE_FunDepTypeVariable tv_info_ptr
-				# entry & ste_kind = STE_TypeVariable tv_info_ptr
-				  symbol_table = writePtr id_info entry symbol_table
-				  fun_dep_determined_vars = [tv : fun_dep_determined_vars]
-				-> define_dep_vars dep_vars True fun_dep_determined_vars symbol_table
-	define_dep_vars [] repeat fun_dep_determined_vars symbol_table
-		= (repeat,fun_dep_determined_vars,symbol_table) 
-
-collect_free_contexts_vars :: [[TypeVar]] [TypeVar] *CheckState -> (![TypeVar],!*CheckState)
-collect_free_contexts_vars [undefined_context_vars:undefined_contexts_vars] free_vars cs
-	# (free_vars,cs) = collect_free_context_vars undefined_context_vars free_vars cs
-	= collect_free_contexts_vars undefined_contexts_vars free_vars cs
-where
-	collect_free_context_vars [tv=:{tv_ident={id_info}}:undefined_context_vars] free_vars cs=:{cs_symbol_table}
-		# (entry=:{ste_kind},cs_symbol_table) = readPtr id_info cs_symbol_table
-		= case ste_kind of
-			STE_FunDepTypeVariable tv_info_ptr
-				# entry & ste_kind = STE_TypeVariable tv_info_ptr
-				# cs & cs_symbol_table = writePtr id_info entry cs_symbol_table
-				-> collect_free_context_vars undefined_context_vars [tv:free_vars] cs
-			STE_TypeVariable tv_info_ptr
-				# cs & cs_symbol_table = cs_symbol_table
-				-> collect_free_context_vars undefined_context_vars free_vars cs
-	collect_free_context_vars [] free_vars cs
-	  	= (free_vars,cs)
-collect_free_contexts_vars [] free_vars cs
-	= (free_vars,cs)
-
-collect_free_contexts_vars_error :: [[TypeVar]] [TypeVar] *CheckState -> (![TypeVar],!*CheckState)
-collect_free_contexts_vars_error [undefined_context_vars:undefined_contexts_vars] free_vars cs
-	# (free_vars,cs) = collect_free_context_vars undefined_context_vars free_vars cs
-	= collect_free_contexts_vars undefined_contexts_vars free_vars cs
-where
-	collect_free_context_vars [tv=:{tv_ident=tv_ident=:{id_info}}:undefined_context_vars] free_vars cs=:{cs_symbol_table}
-		# (entry=:{ste_kind},cs_symbol_table) = readPtr id_info cs_symbol_table
-		= case ste_kind of
-			STE_FunDepTypeVariable tv_info_ptr
-				# entry & ste_kind = STE_TypeVariable tv_info_ptr
-				# cs & cs_symbol_table = writePtr id_info entry cs_symbol_table
-
-				# cs & cs_error = checkWarning tv_ident.id_name ": coverage condition fails" cs.cs_error
-
-				-> collect_free_context_vars undefined_context_vars [tv:free_vars] cs
-			STE_TypeVariable tv_info_ptr
-				# cs & cs_symbol_table = cs_symbol_table
-				-> collect_free_context_vars undefined_context_vars free_vars cs
-	collect_free_context_vars [] free_vars cs
-	  	= (free_vars,cs)
-collect_free_contexts_vars_error [] free_vars cs
-	= (free_vars,cs)
-
-check_class_variables :: ![TypeVar] !*CheckState -> *CheckState
-check_class_variables class_variables cs
-	= foldSt check_class_variable class_variables cs
-where
-	check_class_variable {tv_ident} cs=:{cs_symbol_table,cs_error}
-		= { cs & cs_symbol_table	= removeDefinitionFromSymbolTable cGlobalScope tv_ident cs_symbol_table,
-				 cs_error			= checkError tv_ident "wrongly used or not used at all" cs_error}
-
-check_class_attributes :: ![AttributeVar] !*CheckState -> *CheckState
-check_class_attributes class_attributes cs
-	= foldSt check_class_attribute class_attributes cs
-where
-	check_class_attribute {av_ident} cs=:{cs_symbol_table,cs_error}
-		= { cs & cs_symbol_table	= removeDefinitionFromSymbolTable cGlobalScope av_ident cs_symbol_table,
-				 cs_error			= checkError av_ident "attribute variable in context undefined" cs_error}
+	check_class_attributes class_attributes cs
+		= foldSt check_class_attribute class_attributes cs
+	where
+		check_class_attribute {av_ident} cs=:{cs_symbol_table,cs_error}
+			= { cs & cs_symbol_table	= removeDefinitionFromSymbolTable cGlobalScope av_ident cs_symbol_table,
+					 cs_error			= checkError av_ident "attribute variable in context undefined" cs_error}
 
 checkDynamicTypes :: !Index ![ExprInfoPtr] !(Optional SymbolType)
 		!u:{#CheckedTypeDef} !v:{#ClassDef} !u:{#DclModule} !*TypeHeaps !*ExpressionHeap !*CheckState
@@ -1696,9 +1345,8 @@ where
 		  (dt_type, (ots, oti, cs))
 		  		= checkOpenAType mod_index scope DAK_None dt_type (ots, oti, { cs & cs_x = {cs.cs_x & x_check_dynamic_types = True} })
 
-		  (contexts, type_context_vars, type_defs, class_defs, modules, heaps, cs)
-		  	= checkTypeContexts dt_contexts [] [] mod_index class_defs ots {oti & oti_all_vars=[],oti_all_attrs=[],oti_global_vars=[]} cs
-		  // to do: use type_context_vars
+		  (contexts, type_defs, class_defs, modules, heaps, cs)
+		  	= checkTypeContexts dt_contexts mod_index class_defs ots {oti & oti_all_vars=[],oti_all_attrs=[],oti_global_vars=[]} cs
 		  oti = {oti & oti_heaps=heaps}
 
 		= check_dynamic_type_uniqueness dt_type dt_uni_vars contexts oti type_defs modules class_defs cs
@@ -2075,8 +1723,8 @@ collect_fields field_nr fields (sel_defs, symbol_table)
 create_class_dictionary :: !Index !Index !*{#ClassDef} !w:{#DclModule} !u:Indexes !*TypeVarHeap !*VarHeap !*SymbolTable 
 						-> (!*{#ClassDef}, !w:{#DclModule}, !SymbolPtr,!u:Indexes,!*TypeVarHeap,!*VarHeap,!*SymbolTable)
 create_class_dictionary mod_index class_index class_defs =:{[class_index] = class_def } modules indexes type_var_heap var_heap symbol_table
-	# {class_ident,class_args,class_arity,class_members,class_context,class_dictionary=ds=:{ds_ident={id_name,id_info}},class_lazy_members} = class_def
-	  (type_id_info, symbol_table) = newPtr EmptySymbolTableEntry symbol_table
+	# {class_ident,class_args,class_arity,class_members,class_context,class_dictionary=ds=:{ds_ident={id_name,id_info}}} = class_def
+	# (type_id_info, symbol_table) = newPtr EmptySymbolTableEntry symbol_table
 	  nr_of_members = size class_members
 	  nr_of_fields = nr_of_members + length class_context
 
@@ -2106,10 +1754,8 @@ create_class_dictionary mod_index class_index class_defs =:{[class_index] = clas
 
 	  cons_def = 	
 		{	cons_ident		= rec_cons_id
-		,	cons_type		= { st_vars	= [], st_args = reverse rev_field_types,
-								st_args_strictness = if (class_lazy_members==0) (first_n_strict nr_of_fields) NotStrict,
-								st_result = rec_type, st_arity = nr_of_fields,
-							    st_context = [], st_attr_vars = [], st_attr_env = [] }
+		,	cons_type		= { st_vars	= [], st_args = reverse rev_field_types, st_args_strictness = first_n_strict nr_of_fields, st_result = rec_type,
+							    st_arity = nr_of_fields, st_context = [], st_attr_vars = [], st_attr_env = [] }
 		,	cons_priority	= NoPrio
 		,	cons_number		= 0
 		,	cons_type_index	= index_type
@@ -2195,26 +1841,6 @@ where
 		  field = { fs_ident = field_id, fs_var = field_id, fs_index = selector_index }
 		= (field, var_heap, symbol_table <:= (id_info, { ste_kind = STE_DictField sel_def, ste_index = selector_index,
 				ste_def_level = NotALevel, ste_previous = abort "empty SymbolTableEntry" }))
-
-size_types :: ![Type] !Int -> Int
-size_types [type:types] s = size_types types (size_type type s)
-where
-	size_type :: !Type !Int -> Int
-	size_type (TB _) s = s+1
-	size_type (TV _) s = s+1
-	size_type (TA _ atypes) s = size_atypes atypes (s+1)
-	size_type (TAS _ atypes _) s = size_atypes atypes (s+1)
-	size_type (arg_type --> result_type) s = size_type result_type.at_type (size_type arg_type.at_type (s+1))
-	size_type (CV _ :@: atypes) s = size_atypes atypes (s+1)
-	size_type (TArrow1 {at_type}) s = size_type at_type (s+1)
-	size_type TArrow s = s+1
-	size_type (TFA vars type) s = size_type type s
-	size_type _ s = s
-	
-	size_atypes :: ![AType] !Int -> Int
-	size_atypes [{at_type}:atypes] s = size_atypes atypes (size_type at_type s)
-	size_atypes [] s = s
-size_types [] s = s
 
 class toVariable var :: !STE_Kind !Ident -> var
 

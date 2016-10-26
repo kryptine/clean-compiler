@@ -465,15 +465,8 @@ typeHasClassInstance` ty lookup_symbol inh chn
                     | coer_demanded = {}
                     , coer_offered  = {}
                     }
-  # subst = { Subst
-            |  subst_changed  = False
-            ,  subst_array    = {}
-            ,  subst_next_var_n = 0
-            ,  subst_previous_context_n = -1
-            ,  subst_context_n_at_last_update = -1
-            }
   # heaps = chn.chn_heaps
-  # (inst, ctxs, hp_type_heaps, _) = find_instance [ty] instance_tree inh.inh_common_defs heaps.hp_type_heaps subst
+  # (inst, ctxs, uni_ok, hp_type_heaps, coercions) = find_instance [ty] instance_tree inh.inh_common_defs heaps.hp_type_heaps coercions
   # chn   = {chn & chn_heaps = {heaps & hp_type_heaps = hp_type_heaps}}
   # defs  = inh.inh_common_defs.[lookup_def.pds_module].com_class_defs.[lookup_def.pds_def]
   = (inst.glob_module <> NotFound && inst.glob_object <> NotFound, chn)
@@ -500,14 +493,11 @@ typeHasClassSynonymInstance ty lookup_symbol inh chn
   tyHasClasses` :: {#{!InstanceTree}} (Global DefinedSymbol) Type *TypeHeaps -> *(Bool, *TypeHeaps)
   tyHasClasses` class_instances {glob_module, glob_object} at_type hp_type_heaps
     # instance_tree = class_instances.[glob_module].[glob_object.ds_index]
-    # subst = { Subst
-              |  subst_changed  = False
-              ,  subst_array    = {}
-              ,  subst_next_var_n = 0
-              ,  subst_previous_context_n = -1
-              ,  subst_context_n_at_last_update = -1
-              }
-    # (inst, ctxs, hp_type_heaps, coercions) = find_instance [at_type] instance_tree inh.inh_common_defs hp_type_heaps subst
+    # coercions     = { Coercions
+                      | coer_demanded = {}
+                      , coer_offered  = {}
+                      }
+    # (inst, ctxs, uni_ok, hp_type_heaps, coercions) = find_instance [at_type] instance_tree inh.inh_common_defs hp_type_heaps coercions
     = (inst.glob_module <> NotFound && inst.glob_object <> NotFound, hp_type_heaps)
 
 isInfix :: SymbIdent *ChnExpression -> *(Bool, *ChnExpression)
@@ -936,21 +926,6 @@ refreshVariables fvs e chn
   refreshVariables` (TupleSelect ds n e) (var_heap, expr_heap)
     # (e, (var_heap, expr_heap)) = refreshVariables` e (var_heap, expr_heap)
     = (TupleSelect ds n e, (var_heap, expr_heap))
-  refreshVariables` e=:(BasicExpr _) (var_heap, expr_heap)
-    = (e, (var_heap, expr_heap))
-  refreshVariables` (Conditional {if_cond, if_then, if_else}) (var_heap, expr_heap)
-    # (if_cond, (var_heap, expr_heap)) = refreshVariables` if_cond (var_heap, expr_heap)
-    # (if_then, (var_heap, expr_heap)) = refreshVariables` if_then (var_heap, expr_heap)
-    # (if_else, (var_heap, expr_heap)) = case if_else of
-                                            Yes e
-                                              # (e, (var_heap, expr_heap)) = (refreshVariables` e (var_heap, expr_heap))
-                                              = (Yes e, (var_heap, expr_heap))
-                                            _ = (No, (var_heap, expr_heap))
-    = (Conditional {if_cond = if_cond, if_then = if_then, if_else = if_else}, (var_heap, expr_heap))
-  refreshVariables` e=:(AnyCodeExpr _ _ _) (var_heap, expr_heap)
-    = (e, (var_heap, expr_heap))
-  refreshVariables` e=:(ABCCodeExpr _ _) (var_heap, expr_heap)
-    = (e, (var_heap, expr_heap))
   refreshVariables` (MatchExpr gds e) (var_heap, expr_heap)
     # (e, (var_heap, expr_heap)) = refreshVariables` e (var_heap, expr_heap)
     = (MatchExpr gds e, (var_heap, expr_heap))
@@ -967,25 +942,8 @@ refreshVariables fvs e chn
   refreshVariables` (DictionariesFunction as e aty) (var_heap, expr_heap)
     # (e, (var_heap, expr_heap)) = refreshVariables` e (var_heap, expr_heap)
     = (DictionariesFunction as e aty, (var_heap, expr_heap))
-  refreshVariables` e=:(Constant _ _ _) (var_heap, expr_heap)
-    = (e, (var_heap, expr_heap))
-  refreshVariables` e=:(ClassVariable _) (var_heap, expr_heap)
-    = (e, (var_heap, expr_heap))
-  refreshVariables` (DynamicExpr de) (var_heap, expr_heap)
-    # (dyn_expr, (var_heap, expr_heap)) = refreshVariables` de.dyn_expr (var_heap, expr_heap)
-    = (DynamicExpr {de & dyn_expr = dyn_expr}, (var_heap, expr_heap))
-  refreshVariables` e=:(TypeCodeExpression _) (var_heap, expr_heap)
-    = (e, (var_heap, expr_heap))
-  refreshVariables` (TypeSignature f e) (var_heap, expr_heap)
-    # (e, (var_heap, expr_heap)) = refreshVariables` e (var_heap, expr_heap)
-    = (TypeSignature f e, (var_heap, expr_heap))
-  refreshVariables` e=:EE (var_heap, expr_heap)
-    = (e, (var_heap, expr_heap))
-  refreshVariables` e=:(NoBind _) (var_heap, expr_heap)
-    = (e, (var_heap, expr_heap))
-  refreshVariables` e=:(FailExpr _) (var_heap, expr_heap)
-    = (e, (var_heap, expr_heap))
-  refreshVariables` e (var_heap, expr_heap) = abort "refreshVariables` uncaught e"
+
+  refreshVariables` e (var_heap, expr_heap) = (e, (var_heap, expr_heap))
 
   refreshSelection (ArraySelection gds eip e) (var_heap, expr_heap)
     # (e, (var_heap, expr_heap)) = refreshVariables` e (var_heap, expr_heap)
@@ -1179,14 +1137,11 @@ wrapBody inh syn hasTonic chn
     tyHasITaskClasses` :: {#{!InstanceTree}} (Global DefinedSymbol) Type *TypeHeaps -> *(Bool, *TypeHeaps)
     tyHasITaskClasses` class_instances {glob_module, glob_object} at_type hp_type_heaps
       # instance_tree = class_instances.[glob_module].[glob_object.ds_index]
-      # subst = { Subst
-                |  subst_changed  = False
-                ,  subst_array    = {}
-                ,  subst_next_var_n = 0
-                ,  subst_previous_context_n = -1
-                ,  subst_context_n_at_last_update = -1
-                }
-      # (inst, ctxs, hp_type_heaps, _) = find_instance [at_type] instance_tree common_defs hp_type_heaps subst
+      # coercions     = { Coercions
+                        | coer_demanded = {}
+                        , coer_offered  = {}
+                        }
+      # (inst, ctxs, uni_ok, hp_type_heaps, coercions) = find_instance [at_type] instance_tree common_defs hp_type_heaps coercions
       = (inst.glob_module <> NotFound && inst.glob_object <> NotFound, hp_type_heaps)
 
     varNoITaskCtx :: FreeVar [TypeContext] *PredefinedSymbols -> *(Bool, *PredefinedSymbols)

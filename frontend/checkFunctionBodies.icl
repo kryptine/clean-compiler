@@ -1245,10 +1245,6 @@ cons_optional (Yes var) variables
 cons_optional No variables
 	= variables
 
-no_TFAC_argument [{at_type=TFAC _ _ _}:_] = False
-no_TFAC_argument [_:args] = no_TFAC_argument args
-no_TFAC_argument [] = True
-
 checkIdentExpression :: !Bool ![FreeVar] !Ident !ExpressionInput !*ExpressionState !u:ExpressionInfo !*CheckState
 									-> (!Expression, ![FreeVar], !*ExpressionState,!u:ExpressionInfo,!*CheckState)
 checkIdentExpression is_expr_list free_vars id=:{id_info} e_input e_state e_info cs=:{cs_symbol_table}
@@ -1416,6 +1412,10 @@ where
 			= SK_LocalMacroFunction index.glob_object
 			= SK_Function index
 
+	no_TFAC_argument [{at_type=TFAC _ _ _}:_] = False
+	no_TFAC_argument [_:args] = no_TFAC_argument args
+	no_TFAC_argument [] = True
+
 checkQualifiedIdentExpression free_vars module_id ident_name is_expr_list e_input=:{ei_fun_index,ei_mod_index} e_state e_info cs
 	# (found,{decl_kind,decl_ident,decl_index},cs) = search_qualified_ident module_id ident_name ExpressionNameSpaceN cs
 	| not found
@@ -1431,21 +1431,14 @@ checkQualifiedIdentExpression free_vars module_id ident_name is_expr_list e_inpu
 					# e_state = { e_state & es_calls = [DclFunCall mod_index decl_index : e_state.es_calls ]}
 					-> (app_expr, free_vars, e_state, e_info, cs)
 			STE_Imported STE_Constructor mod_index
-				# ({cons_type={st_arity,st_args,st_context},cons_priority,cons_number}, e_info) = e_info!ef_modules.[mod_index].dcl_common.com_cons_defs.[decl_index]
+				# ({cons_type={st_arity,st_context},cons_priority,cons_number}, e_info) = e_info!ef_modules.[mod_index].dcl_common.com_cons_defs.[decl_index]
 				| cons_number <> -2
+					# kind = SK_Constructor { glob_object = decl_index, glob_module = mod_index }
+					  symbol = { symb_ident = decl_ident, symb_kind = kind }
 					| isEmpty st_context
-						| no_TFAC_argument st_args
-							# kind = SK_Constructor { glob_object = decl_index, glob_module = mod_index }
-							  symbol = { symb_ident = decl_ident, symb_kind = kind }
-							  (app_expr,e_state) = build_application_or_constant_for_function symbol st_arity cons_priority e_state
-							-> (app_expr, free_vars, e_state, e_info, cs)
-							# kind = SK_OverloadedConstructor { glob_object = decl_index, glob_module = mod_index }
-							  symbol = { symb_ident = decl_ident, symb_kind = kind }
-							  (app_expr,e_state) = build_application_or_constant_for_function symbol st_arity cons_priority e_state
-							-> (app_expr, free_vars, e_state, e_info, cs)
-						# kind = SK_OverloadedConstructor { glob_object = decl_index, glob_module = mod_index }
-						  symbol = { symb_ident = decl_ident, symb_kind = kind }
-						  app_expr = build_application_or_constant_for_constructor symbol st_arity cons_priority
+						# (app_expr,e_state) = build_application_or_constant_for_function symbol st_arity cons_priority e_state
+						-> (app_expr, free_vars, e_state, e_info, cs)
+						# app_expr = build_application_or_constant_for_constructor symbol st_arity cons_priority
 						-> (app_expr, free_vars, e_state, e_info, cs)
 					# kind = SK_NewTypeConstructor { gi_index = decl_index, gi_module = mod_index }
 					# symbol = { symb_ident = decl_ident, symb_kind = kind }

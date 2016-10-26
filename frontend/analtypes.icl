@@ -937,12 +937,6 @@ where
 		determine_kinds_of_context_class modules {tc_class=TCGeneric {gtc_kind}} infos_and_as
 			= infos_and_as 
 
-	bind_kind_avars type_vars kind_ptrs type_var_heap
-		= fold2St bind_kind_avar type_vars kind_ptrs type_var_heap
-	where
-		bind_kind_avar {atv_variable={tv_info_ptr}} kind_info_ptr type_var_heap
-			= type_var_heap <:= (tv_info_ptr, TVI_TypeKind kind_info_ptr)
-
 	bind_kind_vars type_vars kind_ptrs type_var_heap
 		= fold2St bind_kind_var type_vars kind_ptrs type_var_heap
 	where
@@ -957,14 +951,14 @@ where
 
 	determine_kinds_of_members modules members member_defs class_kind_vars (class_infos, as)
 		= iFoldSt (determine_kind_of_member modules members member_defs class_kind_vars) 0 (size members) (class_infos, as)
-	
+		
 	determine_kind_of_member modules members member_defs class_kind_vars loc_member_index class_infos_and_as
 		# glob_member_index = members.[loc_member_index].ds_index
 		  {me_class_vars,me_type={st_vars,st_args,st_result,st_context}} = member_defs.[glob_member_index]
 		  other_contexts = tl st_context
 		  (class_infos, as) = determine_kinds_of_context_classes other_contexts class_infos_and_as
 		  as_type_var_heap = clear_variables st_vars as.as_type_var_heap
-		  as_type_var_heap = bind_kind_avars me_class_vars class_kind_vars as_type_var_heap
+		  as_type_var_heap = bind_kind_vars me_class_vars class_kind_vars as_type_var_heap
 		  (as_type_var_heap, as_kind_heap) = fresh_kind_vars_for_unbound_vars st_vars as_type_var_heap as.as_kind_heap
 		  as = determine_kinds_type_list modules [st_result:st_args] { as & as_type_var_heap = as_type_var_heap, as_kind_heap = as_kind_heap}
 		= determine_kinds_of_type_contexts modules other_contexts class_infos as
@@ -1048,7 +1042,7 @@ where
 			= (class_infos, as)
 			# (class_infos, as) = check_kinds_of_class_instance common_defs instance_defs.[instance_index] class_infos as
 			= check_kinds_of_class_instances common_defs (inc instance_index) instance_defs class_infos as
-	where
+	where	
 		check_kinds_of_class_instance :: !{#CommonDefs} !ClassInstance  !*ClassDefInfos !*AnalyseState -> (!*ClassDefInfos, !*AnalyseState)
 		check_kinds_of_class_instance common_defs {ins_class_index,ins_class_ident={ci_ident=Ident class_ident,ci_arity},ins_ident,ins_pos,ins_type={it_vars,it_types,it_context}} class_infos
 					as=:{as_type_var_heap,as_kind_heap,as_error}
