@@ -253,7 +253,7 @@ predefined_idents
 					[PD_FromThenToUTS]= i "_from_then_to_uts",
 					[PD_FromThenToO]= i "_from_then_to_o",
 					[PD_iTasks_Framework_Tonic]   = i "iTasks._Framework.Tonic",
-					[PD_iTasks_Framework_Generic] = i "iTasks._Framework.Generic",
+					//[PD_iTasks_Framework_Generic] = i "iTasks._Framework.Generic",
 					[PD_iTasks_API_Core_Types]    = i "iTasks.API.Core.Types",
 					//[PD_ITaskClass]                  = i "iTask", // TODO Find a more general solution for this
 					[PD_TMonadClass]                 = i "TMonad",
@@ -412,7 +412,7 @@ where
 					<<- (local_predefined_idents,	IC_Expression, PD_Start)
 
 					<<- (local_predefined_idents,	IC_Module NoQualifiedIdents, PD_iTasks_Framework_Tonic)
-					<<- (local_predefined_idents,	IC_Module NoQualifiedIdents, PD_iTasks_Framework_Generic)
+					//<<- (local_predefined_idents,	IC_Module NoQualifiedIdents, PD_iTasks_Framework_Generic)
 					<<- (local_predefined_idents,	IC_Module NoQualifiedIdents, PD_iTasks_API_Core_Types)
 					<<- (local_predefined_idents,	IC_Expression,	PD_tonicExtWrapArg)
 					<<- (local_predefined_idents,	IC_Expression,	PD_tonicExtWrapBody)

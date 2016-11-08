@@ -2539,6 +2539,8 @@ check_module1 cdefs icl_global_function_range fun_defs optional_dcl_mod optional
 					<=< adjust_predefined_module_symbol PD_StdDynamic
 					<=< adjust_predefined_module_symbol PD_StdGeneric
 					<=< adjust_predefined_module_symbol PD_StdMisc										
+					<=< adjust_predefined_module_symbol PD_iTasks_Framework_Tonic
+					<=< adjust_predefined_module_symbol PD_iTasks_API_Core_Types
 					<=< adjust_predefined_module_symbol PD_PredefinedModule
 			= ([], [], { cs & cs_predef_symbols = cs_predef_symbols, cs_symbol_table = cs_symbol_table})
 		where

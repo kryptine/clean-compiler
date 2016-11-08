@@ -304,8 +304,8 @@ PD_TC__UnboxedArray	:== 295
 
 PD_TC__Unit			:== 296
 
-PD_iTasks_Framework_Tonic   :== 296
-PD_iTasks_Framework_Generic :== 297
+PD_iTasks_Framework_Tonic   :== 297
+//PD_iTasks_Framework_Generic :== 297
 PD_iTasks_API_Core_Types    :== 298
 
 //PD_ITaskClass                  :== 299 // TODO Find a more general solution for this
