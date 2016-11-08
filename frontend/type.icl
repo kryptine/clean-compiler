@@ -2555,6 +2555,7 @@ typeProgram comps main_dcl_module_n fun_defs specials list_inferred_types icl_de
 	  ti = { ti_common_defs = ti_common_defs, ti_functions = ti_functions,ti_main_dcl_module_n=main_dcl_module_n, ti_expand_newtypes = False }
 	  special_instances = { si_next_array_member_index = fun_env_size, si_array_instances = [], si_list_instances = [], si_tail_strict_list_instances = [] }
 	# (type_error, predef_symbols, special_instances, out, ts) = type_components list_inferred_types 0 comps class_instances ti (False, predef_symbols, special_instances, out, ts)
+
 	  (fun_defs,ts_fun_env) = update_function_types 0 comps ts.ts_fun_env ts.ts_fun_defs
 	  (type_error, predef_symbols, special_instances,out, {ts_td_infos,ts_fun_env,ts_error,ts_var_heap, ts_expr_heap, ts_type_heaps, ts_generic_heap,ts_fun_defs})
 			= type_instances list_inferred_types specials.ir_from specials.ir_to class_instances ti (type_error, predef_symbols, special_instances, out,
