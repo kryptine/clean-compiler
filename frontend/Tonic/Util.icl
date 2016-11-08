@@ -458,18 +458,15 @@ typeHasClassInstance (TAS tsi args _) lookup_symbol inh chn = typeHasClassInstan
 typeHasClassInstance _             _             _   chn = (False, chn)
 
 typeHasClassInstance` :: Type Int InhExpression *ChnExpression -> *(Bool, *ChnExpression)
-typeHasClassInstance` ty lookup_symbol inh chn = (False, chn) // TODO FIXME
-  //# (lookup_def, predefined_symbols) = (chn.chn_predef_symbols)![lookup_symbol]
-  //# instance_tree = inh.inh_instance_tree.[lookup_def.pds_module].[lookup_def.pds_def]
-  //# coercions     = { Coercions
-                    //| coer_demanded = {}
-                    //, coer_offered  = {}
-                    //}
-  //# heaps = chn.chn_heaps
-  //# (inst, ctxs, hp_type_heaps, coercions) = find_instance [ty] instance_tree inh.inh_common_defs heaps.hp_type_heaps coercions
-  //# chn   = {chn & chn_heaps = {heaps & hp_type_heaps = hp_type_heaps}}
-  //# defs  = inh.inh_common_defs.[lookup_def.pds_module].com_class_defs.[lookup_def.pds_def]
-  //= (inst.glob_module <> NotFound && inst.glob_object <> NotFound, chn)
+typeHasClassInstance` ty lookup_symbol inh chn
+  # (lookup_def, predefined_symbols) = (chn.chn_predef_symbols)![lookup_symbol]
+  # instance_tree = inh.inh_instance_tree.[lookup_def.pds_module].[lookup_def.pds_def]
+  # subst = {subst_changed = False, subst_array = {}, subst_next_var_n = -1, subst_previous_context_n = -1, subst_context_n_at_last_update = -1}
+  # heaps = chn.chn_heaps
+  # (inst, ctxs, hp_type_heaps, _) = find_instance [ty] instance_tree inh.inh_common_defs heaps.hp_type_heaps subst
+  # chn   = {chn & chn_heaps = {heaps & hp_type_heaps = hp_type_heaps}}
+  # defs  = inh.inh_common_defs.[lookup_def.pds_module].com_class_defs.[lookup_def.pds_def]
+  = (inst.glob_module <> NotFound && inst.glob_object <> NotFound, chn)
 
 typeHasClassSynonymInstance :: Type Int InhExpression *ChnExpression -> *(Bool, *ChnExpression)
 typeHasClassSynonymInstance ty lookup_symbol inh chn
@@ -491,14 +488,11 @@ typeHasClassSynonymInstance ty lookup_symbol inh chn
     | otherwise = (False, hp_type_heaps)
 
   tyHasClasses` :: {#{!InstanceTree}} (Global DefinedSymbol) Type *TypeHeaps -> *(Bool, *TypeHeaps)
-  tyHasClasses` class_instances {glob_module, glob_object} at_type hp_type_heaps = (False, hp_type_heaps) // TODO FIXME
-    //# instance_tree = class_instances.[glob_module].[glob_object.ds_index]
-    //# coercions     = { Coercions
-                      //| coer_demanded = {}
-                      //, coer_offered  = {}
-                      //}
-    //# (inst, ctxs, hp_type_heaps, coercions) = find_instance [at_type] instance_tree inh.inh_common_defs hp_type_heaps coercions
-    //= (inst.glob_module <> NotFound && inst.glob_object <> NotFound, hp_type_heaps)
+  tyHasClasses` class_instances {glob_module, glob_object} at_type hp_type_heaps
+    # instance_tree = class_instances.[glob_module].[glob_object.ds_index]
+    # subst = {subst_changed = False, subst_array = {}, subst_next_var_n = -1, subst_previous_context_n = -1, subst_context_n_at_last_update = -1}
+    # (inst, ctxs, hp_type_heaps, _) = find_instance [at_type] instance_tree inh.inh_common_defs hp_type_heaps subst
+    = (inst.glob_module <> NotFound && inst.glob_object <> NotFound, hp_type_heaps)
 
 isInfix :: SymbIdent *ChnExpression -> *(Bool, *ChnExpression)
 isInfix si chn
