@@ -308,26 +308,26 @@ PD_iTasks_Framework_Tonic   :== 296
 PD_iTasks_Framework_Generic :== 297
 PD_iTasks_API_Core_Types    :== 298
 
-PD_ITaskClass                  :== 299
-PD_TMonadClass                 :== 300
-PD_TApplicativeClass           :== 301
-PD_TonicTopLevelBlueprintClass :== 302
-PD_TonicBlueprintPartClass     :== 303
+//PD_ITaskClass                  :== 299 // TODO Find a more general solution for this
+PD_TMonadClass                 :== 299
+PD_TApplicativeClass           :== 300
+PD_TonicTopLevelBlueprintClass :== 301
+PD_TonicBlueprintPartClass     :== 302
 
-PD_tonicExtWrapArg         :== 304
-PD_tonicExtWrapBody        :== 305
-PD_tonicExtWrapBodyLam1    :== 306
-PD_tonicExtWrapBodyLam2    :== 307
-PD_tonicExtWrapBodyLam3    :== 308
-PD_tonicExtWrapApp         :== 309
-PD_tonicExtWrapAppLam1     :== 310
-PD_tonicExtWrapAppLam2     :== 311
-PD_tonicExtWrapAppLam3     :== 312
+PD_tonicExtWrapArg         :== 303
+PD_tonicExtWrapBody        :== 304
+PD_tonicExtWrapBodyLam1    :== 305
+PD_tonicExtWrapBodyLam2    :== 306
+PD_tonicExtWrapBodyLam3    :== 307
+PD_tonicExtWrapApp         :== 308
+PD_tonicExtWrapAppLam1     :== 309
+PD_tonicExtWrapAppLam2     :== 310
+PD_tonicExtWrapAppLam3     :== 311
 
-PD_TMonadBind :== 313
-PD_TMonadBindNoLam :== 314
+PD_TMonadBind :== 312
+PD_TMonadBindNoLam :== 313
 
-PD_NrOfPredefSymbols		:== 297
+PD_NrOfPredefSymbols		:== 314
 
 GetTupleConsIndex tup_arity :== PD_Arity2TupleSymbol + tup_arity - 2
 GetTupleTypeIndex tup_arity :== PD_Arity2TupleType + tup_arity - 2

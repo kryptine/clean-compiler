@@ -255,7 +255,7 @@ predefined_idents
 					[PD_iTasks_Framework_Tonic]   = i "iTasks._Framework.Tonic",
 					[PD_iTasks_Framework_Generic] = i "iTasks._Framework.Generic",
 					[PD_iTasks_API_Core_Types]    = i "iTasks.API.Core.Types",
-					[PD_ITaskClass]                  = i "iTask",
+					//[PD_ITaskClass]                  = i "iTask", // TODO Find a more general solution for this
 					[PD_TMonadClass]                 = i "TMonad",
 					[PD_TApplicativeClass]           = i "TApplicative",
 					[PD_TonicTopLevelBlueprintClass] = i "TonicTopLevelBlueprint",
@@ -423,7 +423,7 @@ where
 					<<- (local_predefined_idents,	IC_Expression,	PD_tonicExtWrapAppLam1)
 					<<- (local_predefined_idents,	IC_Expression,	PD_tonicExtWrapAppLam2)
 					<<- (local_predefined_idents,	IC_Expression,	PD_tonicExtWrapAppLam3)
-					<<- (local_predefined_idents,	IC_Class,	PD_ITaskClass)
+					//<<- (local_predefined_idents,	IC_Class,	PD_ITaskClass) // TODO Find a more general solution for this
 					<<- (local_predefined_idents,	IC_Class,	PD_TMonadClass)
 					<<- (local_predefined_idents,	IC_Class,	PD_TApplicativeClass)
 					<<- (local_predefined_idents,	IC_Class,	PD_TonicTopLevelBlueprintClass)

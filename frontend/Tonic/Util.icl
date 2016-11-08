@@ -1109,14 +1109,16 @@ wrapBody inh syn hasTonic chn
     mkArg symty hasTonic class_instances (arg=:{fv_info_ptr, fv_ident}, {at_type}) (xs, chn)
       # pdss = chn.chn_predef_symbols
       # heaps = chn.chn_heaps
-      # (itask_class_symbol, pdss) = pdss![PD_ITaskClass]
-      # gtcClasses  = [gtc_class \\ {tc_class = TCGeneric {gtc_class}} <- common_defs.[itask_class_symbol.pds_module].com_class_defs.[itask_class_symbol.pds_def].class_context] 
+      //# (itask_class_symbol, pdss) = pdss![PD_ITaskClass]
+      //# gtcClasses  = [gtc_class \\ {tc_class = TCGeneric {gtc_class}} <- common_defs.[itask_class_symbol.pds_module].com_class_defs.[itask_class_symbol.pds_def].class_context] 
       //# (hasITasks, hp_type_heaps) = tyHasITaskClasses class_instances gtcClasses at_type heaps.hp_type_heaps
       //# heaps         = {heaps & hp_type_heaps = hp_type_heaps}
       # hasITasks = False // TODO Find a more general solution to this
-      # (varNoCtx, pdss) = varNoITaskCtx arg symty.st_context pdss
-      # (tvNoITaskCtxs, pdss) = mapSt (tvNoITaskCtx symty.st_context) (getTyVars at_type) pdss
-      # tvNoITaskCtx  = or tvNoITaskCtxs
+      //# (varNoCtx, pdss) = varNoITaskCtx arg symty.st_context pdss
+      # (varNoCtx, pdss) = (True, pdss) // TODO Find a more general solution to this
+      //# (tvNoITaskCtxs, pdss) = mapSt (tvNoITaskCtx symty.st_context) (getTyVars at_type) pdss
+      //# tvNoITaskCtx  = or tvNoITaskCtxs
+      # tvNoITaskCtx  = True // TODO Find a more general solution to this
       # (bv, heaps)   = freeVarToVar arg heaps
       # (viewApp, heaps, pdss) = appPredefinedSymbolWithEI PD_tonicExtWrapArg
                                    [ mkStr fv_ident.id_name
@@ -1145,22 +1147,22 @@ wrapBody inh syn hasTonic chn
       //# (inst, ctxs, hp_type_heaps, coercions) = find_instance [at_type] instance_tree common_defs hp_type_heaps coercions
       //= (inst.glob_module <> NotFound && inst.glob_object <> NotFound, hp_type_heaps)
 
-    varNoITaskCtx :: FreeVar [TypeContext] *PredefinedSymbols -> *(Bool, *PredefinedSymbols)
-    varNoITaskCtx fv tcs pdss
-      # (pds, pdss) = pdss![PD_ITaskClass]
-      = ( isEmpty [0 \\ {tc_var, tc_class = (TCClass {glob_object, glob_module})} <- tcs
-                      |  fv.fv_info_ptr == tc_var
-                      && glob_module == pds.pds_module
-                      && glob_object.ds_index == pds.pds_def]
-        , pdss)
-    tvNoITaskCtx :: [TypeContext] TypeVar *PredefinedSymbols -> *(Bool, *PredefinedSymbols)
-    tvNoITaskCtx tcs tv pdss
-      # (pds, pdss) = pdss![PD_ITaskClass]
-      = ( isEmpty [0 \\ {tc_types = [ty], tc_class = (TCClass {glob_object, glob_module})} <- tcs
-                      |  getTyVars ty == [tv]
-                      && glob_module == pds.pds_module
-                      && glob_object.ds_index == pds.pds_def]
-        , pdss)
+    //varNoITaskCtx :: FreeVar [TypeContext] *PredefinedSymbols -> *(Bool, *PredefinedSymbols)
+    //varNoITaskCtx fv tcs pdss
+      //# (pds, pdss) = pdss![PD_ITaskClass]
+      //= ( isEmpty [0 \\ {tc_var, tc_class = (TCClass {glob_object, glob_module})} <- tcs
+                      //|  fv.fv_info_ptr == tc_var
+                      //&& glob_module == pds.pds_module
+                      //&& glob_object.ds_index == pds.pds_def]
+        //, pdss)
+    //tvNoITaskCtx :: [TypeContext] TypeVar *PredefinedSymbols -> *(Bool, *PredefinedSymbols)
+    //tvNoITaskCtx tcs tv pdss
+      //# (pds, pdss) = pdss![PD_ITaskClass]
+      //= ( isEmpty [0 \\ {tc_types = [ty], tc_class = (TCClass {glob_object, glob_module})} <- tcs
+                      //|  getTyVars ty == [tv]
+                      //&& glob_module == pds.pds_module
+                      //&& glob_object.ds_index == pds.pds_def]
+        //, pdss)
 
     getTyVars :: Type -> [TypeVar]
     getTyVars (TA _ atys) = concatMap getTyVars` atys
