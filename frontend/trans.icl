@@ -981,7 +981,9 @@ generate_case_function fun_index case_info_ptr new_expr outer_fun_def outer_cons
 	  ti_type_heaps & th_vars = remove_TVI_Type_values type_variables ti_type_heaps.th_vars
 
 	  // generated function...
-	  fun_def =	{ fun_ident					= tfi_fun.symb_ident
+	  fun_def =	{ fun_docs = ""
+			, fun_pragmas	= []
+			, fun_ident					= tfi_fun.symb_ident
 				, fun_arity					= fun_arity
 				, fun_priority				= NoPrio
 				, fun_body					= TransformedBody { tb_args = form_vars, tb_rhs = copied_expr}
@@ -1061,7 +1063,9 @@ generate_case_function_with_pattern_argument fun_index case_info_ptr
 	  form_vars = [case_free_var:form_vars]
 	  fun_arity = fun_arity+1
 	  // generated function...
-	  fun_def =	{ fun_ident					= ro_fun.symb_ident
+	  fun_def =	{ fun_docs = ""
+			, fun_pragmas	= []
+			, fun_ident					= ro_fun.symb_ident
 				, fun_arity					= fun_arity
 				, fun_priority				= NoPrio
 				, fun_body					= TransformedBody { tb_args = form_vars, tb_rhs = copied_expr}

@@ -442,7 +442,7 @@ where
 												rhs_locals=empty_CollectedLocalDefs},
 									pb_position = ins_pos
 								}]
-		  new_instance_member =	{	fun_ident = new_instance_ident, fun_arity = arity, fun_priority = me_priority,
+		  new_instance_member =	{ fun_docs = "", fun_pragmas	= [], fun_ident = new_instance_ident, fun_arity = arity, fun_priority = me_priority,
 		  							fun_body = new_instance_body, fun_type = No, fun_pos = ins_pos,
 		  							fun_kind = FK_Function False, fun_lifted = 0, fun_info = EmptyFunInfo }
 
@@ -2236,7 +2236,7 @@ renumber_icl_module_functions mod_type icl_global_function_range icl_instance_ra
 		add_dummy_functions n_functions icl_functions
 			| n_functions==0
 				= icl_functions
-				# dummy_function = {fun_ident={id_name="",id_info=nilPtr},fun_arity= -1,fun_priority=NoPrio,fun_body=NoBody,fun_type=No,fun_pos=NoPos,fun_kind=FK_Unknown,fun_lifted=0,fun_info=EmptyFunInfo}
+				# dummy_function = {fun_docs = "", fun_pragmas	= [], fun_ident={id_name="",id_info=nilPtr},fun_arity= -1,fun_priority=NoPrio,fun_body=NoBody,fun_type=No,fun_pos=NoPos,fun_kind=FK_Unknown,fun_lifted=0,fun_info=EmptyFunInfo}
 				= arrayPlusList icl_functions [dummy_function \\ i<-[0..n_functions-1]]
 
 		add_dcl_instances_generic_cases_and_type_funs_to_conversion_table :: !{#Int} !Int !Int !Index IndexRange /*IndexRange*/ !DclModule
@@ -3674,6 +3674,34 @@ where
 			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols}
 				<=< adjustPredefSymbol PD_abort				mod_index STE_DclFunction
 				<=< adjustPredefSymbol PD_undef				mod_index STE_DclFunction)
+		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_iTasks_Framework_Tonic]	
+		| pre_mod.pds_def == mod_index
+			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols}
+                <=< adjustPredefSymbol PD_TonicTopLevelBlueprintClass	mod_index STE_Class
+                <=< adjustPredefSymbol PD_TonicBlueprintPartClass		mod_index STE_Class
+				<=< adjustPredefSymbol PD_tonicExtWrapArg				mod_index STE_DclFunction
+				<=< adjustPredefSymbol PD_tonicExtWrapBody				mod_index STE_DclFunction
+				<=< adjustPredefSymbol PD_tonicExtWrapBodyLam1			mod_index STE_DclFunction
+				<=< adjustPredefSymbol PD_tonicExtWrapBodyLam2			mod_index STE_DclFunction
+				<=< adjustPredefSymbol PD_tonicExtWrapBodyLam3			mod_index STE_DclFunction
+				<=< adjustPredefSymbol PD_tonicExtWrapApp				mod_index STE_DclFunction
+				<=< adjustPredefSymbol PD_tonicExtWrapAppLam1			mod_index STE_DclFunction
+				<=< adjustPredefSymbol PD_tonicExtWrapAppLam2			mod_index STE_DclFunction
+				<=< adjustPredefSymbol PD_tonicExtWrapAppLam3			mod_index STE_DclFunction
+                )
+		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_iTasks_Framework_Generic]	
+		| pre_mod.pds_def == mod_index
+			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols}
+                <=< adjustPredefSymbol PD_ITaskClass					mod_index STE_Class
+                )
+		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_iTasks_API_Core_Types]	
+		| pre_mod.pds_def == mod_index
+			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols}
+                <=< adjustPredefSymbol PD_TMonadClass					mod_index STE_Class
+                <=< adjustPredefSymbol PD_TMonadBind					mod_index STE_Member
+                <=< adjustPredefSymbol PD_TMonadBindNoLam				mod_index STE_Member
+                <=< adjustPredefSymbol PD_TApplicativeClass				mod_index STE_Class
+                )
 			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols})		
 	where
 		unused

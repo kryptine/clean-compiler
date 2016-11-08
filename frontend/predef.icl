@@ -251,7 +251,26 @@ predefined_idents
 					[PD_FromThenToSTS]= i "_from_then_to_sts",
 					[PD_FromThenToU]= i "_from_then_to_u",
 					[PD_FromThenToUTS]= i "_from_then_to_uts",
-					[PD_FromThenToO]= i "_from_then_to_o"
+					[PD_FromThenToO]= i "_from_then_to_o",
+					[PD_iTasks_Framework_Tonic]   = i "iTasks._Framework.Tonic",
+					[PD_iTasks_Framework_Generic] = i "iTasks._Framework.Generic",
+					[PD_iTasks_API_Core_Types]    = i "iTasks.API.Core.Types",
+					[PD_ITaskClass]                  = i "iTask",
+					[PD_TMonadClass]                 = i "TMonad",
+					[PD_TApplicativeClass]           = i "TApplicative",
+					[PD_TonicTopLevelBlueprintClass] = i "TonicTopLevelBlueprint",
+					[PD_TonicBlueprintPartClass]     = i "TonicBlueprintPart",
+					[PD_tonicExtWrapArg]         = i "tonicExtWrapArg",
+					[PD_tonicExtWrapBody]        = i "tonicExtWrapBody",
+					[PD_tonicExtWrapBodyLam1]    = i "tonicExtWrapBodyLam1",
+					[PD_tonicExtWrapBodyLam2]    = i "tonicExtWrapBodyLam2",
+					[PD_tonicExtWrapBodyLam3]    = i "tonicExtWrapBodyLam3",
+					[PD_tonicExtWrapApp]         = i "tonicExtWrapApp",
+					[PD_tonicExtWrapAppLam1]     = i "tonicExtWrapAppLam1",
+					[PD_tonicExtWrapAppLam2]     = i "tonicExtWrapAppLam2",
+					[PD_tonicExtWrapAppLam3]     = i "tonicExtWrapAppLam3",
+					[PD_TMonadBind]              = i ">>=",
+					[PD_TMonadBindNoLam]         = i ">>|"
 		}
 	=: idents
 	where
@@ -392,6 +411,26 @@ where
 
 					<<- (local_predefined_idents,	IC_Expression, PD_Start)
 
+					<<- (local_predefined_idents,	IC_Module NoQualifiedIdents, PD_iTasks_Framework_Tonic)
+					<<- (local_predefined_idents,	IC_Module NoQualifiedIdents, PD_iTasks_Framework_Generic)
+					<<- (local_predefined_idents,	IC_Module NoQualifiedIdents, PD_iTasks_API_Core_Types)
+					<<- (local_predefined_idents,	IC_Expression,	PD_tonicExtWrapArg)
+					<<- (local_predefined_idents,	IC_Expression,	PD_tonicExtWrapBody)
+					<<- (local_predefined_idents,	IC_Expression,	PD_tonicExtWrapBodyLam1)
+					<<- (local_predefined_idents,	IC_Expression,	PD_tonicExtWrapBodyLam2)
+					<<- (local_predefined_idents,	IC_Expression,	PD_tonicExtWrapBodyLam3)
+					<<- (local_predefined_idents,	IC_Expression,	PD_tonicExtWrapApp)
+					<<- (local_predefined_idents,	IC_Expression,	PD_tonicExtWrapAppLam1)
+					<<- (local_predefined_idents,	IC_Expression,	PD_tonicExtWrapAppLam2)
+					<<- (local_predefined_idents,	IC_Expression,	PD_tonicExtWrapAppLam3)
+					<<- (local_predefined_idents,	IC_Class,	PD_ITaskClass)
+					<<- (local_predefined_idents,	IC_Class,	PD_TMonadClass)
+					<<- (local_predefined_idents,	IC_Class,	PD_TApplicativeClass)
+					<<- (local_predefined_idents,	IC_Class,	PD_TonicTopLevelBlueprintClass)
+					<<- (local_predefined_idents,	IC_Class,	PD_TonicBlueprintPartClass)
+					<<- (local_predefined_idents,	IC_Expression,	PD_TMonadBind)
+					<<- (local_predefined_idents,	IC_Expression,	PD_TMonadBindNoLam)
+
 		# hash_table = put_predefined_idents_in_hash_table PD_FromS PD_FromThenToO IC_Expression local_predefined_idents hash_table
 
 		= hash_table
@@ -422,9 +461,9 @@ make_list_definition list_type_pre_def_symbol_index cons_pre_def_symbol_index ni
 	  (list_def, pre_def_symbols) = make_type_def list_type_pre_def_symbol_index [type_var] (AlgType [cons_ds,nil_symb]) pre_def_symbols	
 	  list_type = MakeAttributedType (TA (MakeNewTypeSymbIdent list_ident 1) [type_var_with_attr])
 	  cons_def = {	pc_cons_ident = cons_ident, pc_cons_arity = 2, pc_arg_types = [type_var_with_attr, list_type], pc_context = [],
-				 	pc_args_strictness=cons_strictness,	pc_cons_prio =  NoPrio, pc_exi_vars = [], pc_cons_pos = PreDefPos pre_mod_id}
+				 	pc_args_strictness=cons_strictness,	pc_cons_prio =  NoPrio, pc_exi_vars = [], pc_cons_pos = PreDefPos pre_mod_id, pc_docblock = No}
 	  nil_def = {	pc_cons_ident = nil_ident, pc_cons_arity = 0, pc_arg_types = [], pc_args_strictness=NotStrict, pc_context = [],
-	  				pc_cons_prio =  NoPrio, pc_exi_vars = [], pc_cons_pos = PreDefPos pre_mod_id}
+	  				pc_cons_prio =  NoPrio, pc_exi_vars = [], pc_cons_pos = PreDefPos pre_mod_id, pc_docblock = No}
 	= (list_def,ParsedConstructorToConsDef cons_def,ParsedConstructorToConsDef nil_def,pre_def_symbols);
 
 make_unit_definition :: Ident *{#PredefinedSymbol} -> (!TypeDef TypeRhs,!ConsDef,!.{#PredefinedSymbol})
@@ -433,7 +472,7 @@ make_unit_definition pre_mod_id pre_def_symbols
 	  unit_cons_symb = {ds_ident = unit_cons_ident, ds_arity=0 ,ds_index = PD_UnitConsSymbol-FirstConstructorPredefinedSymbolIndex}
 	  (unit_type_def, pre_def_symbols) = make_type_def PD_UnitType [] (AlgType [unit_cons_symb]) pre_def_symbols	
 	  unit_cons_def = {pc_cons_ident = unit_cons_ident, pc_cons_arity = 0, pc_arg_types = [], pc_args_strictness=NotStrict, pc_context = [],
-		  			   pc_cons_prio =  NoPrio, pc_exi_vars = [], pc_cons_pos = PreDefPos pre_mod_id}
+		  			   pc_cons_prio =  NoPrio, pc_exi_vars = [], pc_cons_pos = PreDefPos pre_mod_id, pc_docblock = No}
 	= (unit_type_def,ParsedConstructorToConsDef unit_cons_def,pre_def_symbols);
 
 buildPredefinedModule :: !Bool !*PredefinedSymbols -> (!ScannedModule, !.PredefinedSymbols)
@@ -496,7 +535,7 @@ where
 			  tuple_cons_def	= { pc_cons_ident = tuple_ident, pc_cons_arity = tup_arity, pc_cons_pos = PreDefPos pre_mod_id,
 			  						pc_arg_types = [ MakeAttributedType (TV tv) \\ tv <- type_vars],
 			  						pc_args_strictness = NotStrict, pc_context = [],
-			  						pc_cons_prio =  NoPrio, pc_exi_vars = []}
+			  						pc_cons_prio =  NoPrio, pc_exi_vars = [], pc_docblock = No}
 			= add_tuple_defs pre_mod_id (dec tup_arity) [tuple_type_def : type_defs] [ParsedConstructorToConsDef tuple_cons_def : cons_defs] pre_def_symbols
 			= (type_defs, cons_defs, pre_def_symbols)
 	where
@@ -540,7 +579,7 @@ where
 		  id_symbol_type = { st_vars = [], st_args = [a], st_args_strictness = Strict 1, st_arity = 1, st_result = a, st_context = [], 
 							st_attr_vars = [], st_attr_env = [] } // !.a -> .a
 		= { ft_ident = alias_dummy_id, ft_arity = 1, ft_priority = NoPrio, ft_type = id_symbol_type, ft_pos = NoPos,
-			ft_specials = FSP_None, ft_type_ptr = nilPtr }
+			ft_specials = FSP_None, ft_type_ptr = nilPtr, ft_pragmas = [], ft_docs = "" }
 
 DynamicRepresentation_String			:== "DynamicTemp" // "_DynamicTemp"		
 

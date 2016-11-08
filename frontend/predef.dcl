@@ -304,6 +304,29 @@ PD_TC__UnboxedArray	:== 295
 
 PD_TC__Unit			:== 296
 
+PD_iTasks_Framework_Tonic   :== 296
+PD_iTasks_Framework_Generic :== 297
+PD_iTasks_API_Core_Types    :== 298
+
+PD_ITaskClass                  :== 299
+PD_TMonadClass                 :== 300
+PD_TApplicativeClass           :== 301
+PD_TonicTopLevelBlueprintClass :== 302
+PD_TonicBlueprintPartClass     :== 303
+
+PD_tonicExtWrapArg         :== 304
+PD_tonicExtWrapBody        :== 305
+PD_tonicExtWrapBodyLam1    :== 306
+PD_tonicExtWrapBodyLam2    :== 307
+PD_tonicExtWrapBodyLam3    :== 308
+PD_tonicExtWrapApp         :== 309
+PD_tonicExtWrapAppLam1     :== 310
+PD_tonicExtWrapAppLam2     :== 311
+PD_tonicExtWrapAppLam3     :== 312
+
+PD_TMonadBind :== 313
+PD_TMonadBindNoLam :== 314
+
 PD_NrOfPredefSymbols		:== 297
 
 GetTupleConsIndex tup_arity :== PD_Arity2TupleSymbol + tup_arity - 2

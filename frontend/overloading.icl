@@ -1127,6 +1127,32 @@ where
 equal_previous_context tc_class tc_types NoPreviousContext subst
 	= (False,subst)
 
+find_instance ::  [Type] !InstanceTree {#CommonDefs} *TypeHeaps !*Subst -> *(!Global Int, ![TypeContext],!*TypeHeaps, !*Subst)
+find_instance  co_types (IT_Node this_inst_index=:{glob_object,glob_module} left right) defs type_heaps subst
+	# (left_index, inst_contexts, type_heaps, subst) = find_instance co_types left defs type_heaps subst
+	| FoundObject left_index
+		= (left_index, inst_contexts, type_heaps, subst)
+		# {ins_type={it_vars,it_types,it_context}, ins_specials} = defs.[glob_module].com_instance_defs.[glob_object]
+		  th_vars = clear_binding_of_type_vars it_vars type_heaps.th_vars
+		  substc = {substc_changes=[#!], substc_array=subst.subst_array, substc_next_var_n=subst.subst_next_var_n}
+		  (matched, type_heaps, substc) = matchListsOfTypes defs it_types co_types { type_heaps & th_vars = th_vars } substc
+		| matched // && True ---> ("find_instance",it_types,co_types,[t\\t<-:subst.subst_array])
+			# (subst_changed,subst_context_n_at_last_update)
+				= case substc.substc_changes of
+					[#!]	-> (subst.subst_changed,subst.subst_context_n_at_last_update)
+					_		-> (True,subst.subst_previous_context_n) // ---> ("substc_changes",[e\\e<|-substc.substc_changes])
+			# subst & subst_array=substc.substc_array, subst_changed=subst_changed, subst_next_var_n=substc.substc_next_var_n,
+					  subst_context_n_at_last_update=subst_context_n_at_last_update
+			# (subst_context, type_heaps) = freshContexts it_context type_heaps
+			  (spec_inst, type_heaps, subst) = trySpecializedInstances subst_context (get_specials ins_specials) type_heaps subst
+			| FoundObject spec_inst
+				= (spec_inst, [], type_heaps, subst)
+				= (this_inst_index, subst_context, type_heaps, subst)
+			# subst & subst_array=undo_substitutions substc
+			= find_instance co_types right defs type_heaps subst
+find_instance  co_types IT_Empty defs heaps  subst
+	= (ObjectNotFound, [], heaps, subst)
+
 reduceContext :: !ReduceInfo !(Global DefinedSymbol) !TypeContext !ReduceDLA !*PreRedState -> *(!CI, !*PreRedState)
 reduceContext info=:{ri_defs,ri_instance_info} class_symbol tc=:{tc_types} rdla prs_state=:{prs_predef_symbols}
 	# {class_ident,class_members,class_args,class_context,class_fun_dep_vars} = getClassDef class_symbol ri_defs
@@ -1167,32 +1193,6 @@ where
 		# th_vars = fold2St (\ type {tv_info_ptr} -> writePtr tv_info_ptr (TVI_Type type)) types class_args th_vars
 		  (ftcs, prs_type_heaps) = freshContexts tcs { prs_type_heaps & th_vars = th_vars }
 		= mapSt (reduceTCorNormalContext info rdla) ftcs {prs_state & prs_type_heaps = prs_type_heaps}
-
-	find_instance ::  [Type] !InstanceTree {#CommonDefs} *TypeHeaps !*Subst -> *(!Global Int, ![TypeContext], !*TypeHeaps, !*Subst)
-	find_instance  co_types (IT_Node this_inst_index=:{glob_object,glob_module} left right) defs type_heaps subst
-		# (left_index, inst_contexts, type_heaps, subst) = find_instance co_types left defs type_heaps subst
-		| FoundObject left_index
-			= (left_index, inst_contexts, type_heaps, subst)
-			# {ins_type={it_vars,it_types,it_context}, ins_specials} = defs.[glob_module].com_instance_defs.[glob_object]
-			  th_vars = clear_binding_of_type_vars it_vars type_heaps.th_vars
-			  substc = {substc_changes=[#!], substc_array=subst.subst_array, substc_next_var_n=subst.subst_next_var_n}
-			  (matched, type_heaps, substc) = matchListsOfTypes defs it_types co_types { type_heaps & th_vars = th_vars } substc
-			| matched // && True ---> ("find_instance",it_types,co_types,[t\\t<-:subst.subst_array])
-				# (subst_changed,subst_context_n_at_last_update)
-					= case substc.substc_changes of
-						[#!]	-> (subst.subst_changed,subst.subst_context_n_at_last_update)
-						_		-> (True,subst.subst_previous_context_n) // ---> ("substc_changes",[e\\e<|-substc.substc_changes])
-				# subst & subst_array=substc.substc_array, subst_changed=subst_changed, subst_next_var_n=substc.substc_next_var_n,
-						  subst_context_n_at_last_update=subst_context_n_at_last_update
-				# (subst_context, type_heaps) = freshContexts it_context type_heaps
-				  (spec_inst, type_heaps, subst) = trySpecializedInstances subst_context (get_specials ins_specials) type_heaps subst
-				| FoundObject spec_inst
-					= (spec_inst, [], type_heaps, subst)
-					= (this_inst_index, subst_context, type_heaps, subst)
-				# subst & subst_array=undo_substitutions substc
-				= find_instance co_types right defs type_heaps subst
-	find_instance  co_types IT_Empty defs heaps  subst
-		= (ObjectNotFound, [], heaps, subst)
 
 	find_fun_dep_instance :: [Type] !InstanceTree BITVECT {#CommonDefs} *TypeHeaps !*Subst
 			-> *(!Global Int, ![TypeContext], ![(TypeVarInfoPtr,Int)], !*TypeHeaps,!*Subst)

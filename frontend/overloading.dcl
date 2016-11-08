@@ -36,6 +36,16 @@ from unitype import ::BOOLVECT
 :: ReducedOverloadedApplication
 :: ReducedOverloadedContext
 
+::	Subst =
+	{	subst_changed	:: !Bool
+	,	subst_array		:: !.{!Type}
+	,	subst_next_var_n :: !Int
+	,	subst_previous_context_n :: !Int
+	,	subst_context_n_at_last_update :: !Int
+	}
+
+find_instance ::  [Type] !InstanceTree {#CommonDefs} *TypeHeaps !*Subst -> *(!Global Int, ![TypeContext],!*TypeHeaps, !*Subst)
+
 finishContextReduction :: ![ReducedOverloadedContext] ![ExprInfoPtr] !Int !{# CommonDefs } 
 	!*VarHeap !*TypeHeaps !*ExpressionHeap  !*PredefinedSymbols !*SpecialInstances !*Coercions !*{!Type} !*ErrorAdmin
 	-> (![ReducedOverloadedApplication], ![TypeContext], ![LocalTypePatternVariable], !*VarHeap, !*TypeHeaps, !*ExpressionHeap, !*PredefinedSymbols,
@@ -58,6 +68,10 @@ uniqueError :: a b *ErrorAdmin -> *ErrorAdmin | writeType b & <<< a
 	}
 
 removeOverloadedFunctions :: ![Index] ![LocalTypePatternVariable] !Int !*{#FunDef} !*{! FunctionType} !*ExpressionHeap
+	!*TypeCodeInfo !*VarHeap !*ErrorAdmin !*{#PredefinedSymbol} //!*{#PredefinedSymbol}
+		-> (!*{#FunDef}, !*{! FunctionType}, !*ExpressionHeap, !*TypeCodeInfo, !*VarHeap, !*ErrorAdmin, !*{#PredefinedSymbol})
+
+removeOverloadedFunctionsWithoutUpdatingFunctions :: ![Index] ![LocalTypePatternVariable] !Int !*{#FunDef} !*{! FunctionType} !*ExpressionHeap
 	!*TypeCodeInfo !*VarHeap !*ErrorAdmin !*{#PredefinedSymbol} //!*{#PredefinedSymbol}
 		-> (!*{#FunDef}, !*{! FunctionType}, !*ExpressionHeap, !*TypeCodeInfo, !*VarHeap, !*ErrorAdmin, !*{#PredefinedSymbol})
 

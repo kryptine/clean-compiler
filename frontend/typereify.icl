@@ -11,7 +11,9 @@ instance makeTypeFun FunDef where
 		=	(function, var_heap, symbol_table)
 		where
 			function =
-				{	fun_ident = ident
+				{	fun_docs = ""
+				,	fun_pragmas	= []
+				,	fun_ident = ident
 				,	fun_arity = 1
 				,	fun_priority = NoPrio
 				,	fun_body = GeneratedBody
@@ -39,6 +41,8 @@ instance makeTypeFun FunType where
 			,	ft_pos = position
 			,	ft_specials = FSP_None
 			,	ft_type_ptr	= ft_type_ptr
+			,	ft_pragmas = []
+			,	ft_docs = ""
 			}, var_heap, symbol_table)
 
 add_dcl_type_fun_types :: TypeSymbIdent Int *{#DclModule} *VarHeap *SymbolTable

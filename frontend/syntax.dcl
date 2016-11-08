@@ -274,6 +274,8 @@ cIsNotAFunction :== False
 	|	PD_Generic GenericDef
 	| 	PD_GenericCase GenericCaseDef Ident
 	|	PD_Derive [GenericCaseDef]
+	|	PD_Documentation !{#Char}
+	|	PD_Pragma !{#Char} !{#Char}
 	|	PD_Erroneous
 
 ::	FunKind = FK_Function !Bool | FK_Macro | FK_Caf | FK_NodeDefOrFunction | FK_Unknown
@@ -290,6 +292,7 @@ cNameLocationDependent :== True
 	,	ps_field_type		:: !AType
 	,	ps_field_var		:: !Ident
 	,	ps_field_pos		:: !Position
+	,	ps_docblock			:: !OptionalDocBlock
 	}
 
 ::	ParsedConstructor =
@@ -301,6 +304,7 @@ cNameLocationDependent :== True
 	,	pc_context		:: ![TypeContext]
 	,	pc_cons_prio	:: !Priority
 	,	pc_cons_pos		:: !Position
+	,	pc_docblock		:: !OptionalDocBlock
 	}
 
 ::	ParsedInstance =
@@ -664,6 +668,8 @@ NoGlobalIndex :== {gi_module=NoIndex,gi_index=NoIndex}
 	,	ft_pos			:: !Position
 	,	ft_specials		:: !FunSpecials
 	,	ft_type_ptr		:: !VarInfoPtr
+	,	ft_pragmas      :: ![(String, String)]
+	,	ft_docs         :: !String
 	}
 
 ::	FreeVar =
@@ -736,7 +742,9 @@ FI_HasTypeCodes :== 256
 					| NoBody
 
 ::	FunDef =
-	{	fun_ident		:: !Ident
+	{	fun_docs		:: !String
+	,	fun_pragmas	:: ![(String, String)]
+	,	fun_ident		:: !Ident
 	,	fun_arity		:: !Int
 	,	fun_priority	:: !Priority
 	,	fun_body		:: !FunctionBody
@@ -1524,6 +1532,8 @@ instance == OverloadedListType
 	,	dp_rhs					:: !Expression
 	,	dp_position				:: !Position
 	}
+
+::	OptionalDocBlock :== Optional String
 	
 /*
 	error handling
@@ -1650,6 +1660,6 @@ MakeTypeDef name lhs rhs attr pos  :==
 MakeDefinedSymbol ident index arity :== { ds_ident = ident, ds_arity = arity, ds_index = index }
 
 MakeNewFunctionType name arity prio type pos specials var_ptr
-	:== { ft_ident = name, ft_arity = arity, ft_priority = prio, ft_type = type, ft_pos = pos, ft_specials = specials, ft_type_ptr = var_ptr  }
+	:== { ft_ident = name, ft_arity = arity, ft_priority = prio, ft_type = type, ft_pos = pos, ft_specials = specials, ft_type_ptr = var_ptr, ft_pragmas = [], ft_docs = ""}
 
 backslash :== '\\'

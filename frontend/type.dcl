@@ -1,7 +1,14 @@
 definition module type
 
 import StdArray
-import syntax, check
+import syntax, check, overloading
+
+
+typeProgramWithoutUpdatingFunctions :: !{! Group} !Int !*{# FunDef} !IndexRange  !(Optional Bool) !CommonDefs !{!Declaration} ![QualifiedDeclaration] !{# DclModule} !NumberSet
+																					 !*TypeDefInfos !*Heaps !*PredefinedSymbols !*File !*File
+	-> (!Bool, !*{! FunctionType}, !*{# FunDef}, !{# CommonDefs}, !{# {# FunType} }, !{# {! InstanceTree}}, !*TypeDefInfos,!*Heaps,!*PredefinedSymbols,!*File,!*File)
+
+update_function_types :: !Index !{!Group} !*{!FunctionType} !*{#FunDef} -> (!*{#FunDef}, !*{!FunctionType})
 
 typeProgram :: !{! Group} !Int !*{# FunDef} !IndexRange  !(Optional Bool) !CommonDefs !{!Declaration} ![QualifiedDeclaration] !{# DclModule} !NumberSet
   																						 !*TypeDefInfos !*Heaps !*PredefinedSymbols !*File !*File

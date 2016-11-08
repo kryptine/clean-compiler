@@ -5185,7 +5185,9 @@ makeFunction ident group_index arg_vars body_expr opt_sym_type main_dcl_module_n
 	#! (arg_vars, local_vars, free_vars) = collectVars body_expr arg_vars	
 	| not (isEmpty free_vars)
 		= abort "makeFunction: free_vars is not empty\n"
-	=	{ fun_ident = ident
+	=	{ fun_docs = ""
+		, fun_pragmas	= []
+		, fun_ident = ident
 		, fun_arity = length arg_vars
 		, fun_priority = NoPrio
 		, fun_body = TransformedBody {tb_args = arg_vars, tb_rhs = body_expr }

@@ -5,6 +5,8 @@ import scanner, parse, postparse, check, type, trans, partition, convertcases, o
 		typereify, compare_types, ctags
 from CoclSystemDependent import DirectorySeparator
 
+import Tonic.CompilerInterface
+
 instance == FrontEndPhase where
 	(==) a b
 		=	equal_constructor a b
@@ -33,6 +35,7 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 	#! support_dynamics = case tcl_file of Yes _ -> True ; No -> False
 	# (ok, mod, global_fun_range, mod_functions, optional_dcl_mod, modules, dcl_module_n_in_cache,hash_table, error, files)
 		= scanModule mod cached_module_idents options.feo_generics support_dynamics hash_table error search_paths modtimefunction files
+	# list_comprehensions = [] // TODO FIXME Implement this
 
 //	# hash_table = {hash_table & hte_entries={}}
 	# hash_table = remove_icl_symbols_from_hash_table hash_table
@@ -156,6 +159,12 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 	#! ok = error_admin.ea_ok
 	| not ok
 		= (No,{},{},main_dcl_module_n,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
+
+    # (ok, fun_defs, td_infos, main_dcl_module_n, predef_symbols, groups, hash_table, files, error, io, out, tcl_file, heaps)
+        = if options.feo_tonic
+            (execute_tonic mod mod_dir search_paths fun_defs td_infos main_dcl_module_n heaps predef_symbols list_comprehensions hash_table files icl_mod groups icl_used_module_numbers dcl_mods icl_qualified_imports icl_import list_inferred_types icl_common icl_function_indices tcl_file error io out)
+            (True, fun_defs, td_infos, main_dcl_module_n, predef_symbols, groups, hash_table, files, error, io, out, tcl_file, heaps)
+    | not ok = (No,{},{},main_dcl_module_n,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
 
 	# (ok, fun_defs, array_instances, common_defs, imported_funs, type_def_infos, heaps, predef_symbols, error,out)
 		= typeProgram groups main_dcl_module_n fun_defs icl_function_indices.ifi_specials_indices list_inferred_types icl_common icl_import icl_qualified_imports dcl_mods icl_used_module_numbers td_infos heaps predef_symbols error out
@@ -315,6 +324,39 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 	where
 		group_members_to_component_members [e:l] = ComponentMember e (group_members_to_component_members l)
 		group_members_to_component_members [] = NoComponentMembers
+
+execute_tonic mod mod_dir search_paths fun_defs td_infos main_dcl_module_n heaps predef_symbols list_comprehensions hash_table files icl_mod groups icl_used_module_numbers dcl_mods icl_qualified_imports icl_import list_inferred_types icl_common icl_function_indices tcl_file error io out
+  # (fun_defs_cpy, fun_defs) = copyFunDefs fun_defs
+
+  # (_,f,files) = fopen ("Clean System Files/groups_check_" +++ icl_mod.icl_name.id_name) FWriteText files
+    (components, fun_defs, f) = showGroups groups 0 False fun_defs f
+    (ok,files) = fclose f files
+  | ok<>ok
+      = abort "";
+
+  # (ok, fun_tys, fun_defs_cpy, common_defs_cpy, _, class_instances, td_infos, heaps, predef_symbols, error,out)
+      = typeProgramWithoutUpdatingFunctions groups main_dcl_module_n fun_defs_cpy icl_function_indices.ifi_specials_indices list_inferred_types icl_common icl_import icl_qualified_imports dcl_mods icl_used_module_numbers td_infos heaps predef_symbols error out
+
+  | not ok
+      = (False,{},{},main_dcl_module_n,predef_symbols, groups, hash_table, files, error, io, out, tcl_file, heaps)
+
+  # (fun_defs_cpy, _) = update_function_types 0 groups fun_tys fun_defs_cpy
+
+  # (_,f,files) = fopen ("Clean System Files/groups_pretonic_" +++ icl_mod.icl_name.id_name) FWriteText files
+    (components, fun_defs, f) = showGroups groups 0 False fun_defs f
+    (ok,files) = fclose f files
+  | ok<>ok
+      = abort "";
+
+  # (fun_defs, predef_symbols, groups, hash_table, error, files, heaps) = ginTonic mod mod_dir search_paths main_dcl_module_n fun_defs fun_defs_cpy groups icl_mod dcl_mods common_defs_cpy list_comprehensions predef_symbols class_instances hash_table error files heaps
+
+  # (_,f,files) = fopen ("Clean System Files/groups_posttonic_" +++ icl_mod.icl_name.id_name) FWriteText files
+    (components, fun_defs, f) = showGroups groups 0 False fun_defs f
+    (ok,files) = fclose f files
+  | ok<>ok
+      = abort "";
+
+  = (True, fun_defs, td_infos, main_dcl_module_n, predef_symbols, groups, hash_table, files, error, io, out, tcl_file, heaps)
 
 newSymbolTable :: !Int -> *{# SymbolTableEntry}
 newSymbolTable size

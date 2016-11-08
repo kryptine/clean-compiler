@@ -203,6 +203,9 @@ ScanOptionNoNewOffsideForSeqLetBit:==4;
 	|	ExistsToken				//		E.
 	|	ForAllToken				//		A.
 
+	|	DocBlockToken String	//		/*-...*/ or //-...
+	|	PragmaToken String String	//		//-#
+
 ::	ScanContext
 	=	GeneralContext
 	|	TypeContext
@@ -746,6 +749,22 @@ Scan 'A' input TypeContext
 	| eof					= (IdentToken "A", input)
 	| c1 == '.'				= (ForAllToken, input)
 							= ScanIdentFast 1 (charBack input) TypeContext
+Scan c=:'/' input co
+	# (eof,c1,input)		= ReadNormalChar input
+	| eof					= CheckReservedOperator (revCharListToString 0 [c]) input
+	| c1 == '*'
+		# (_,c2,input)		= ReadNormalChar input
+		| c2 == '-'			= ScanDocBlock input
+		= abort "Scanner: Error in Scan" //already caught by TryScanComment
+	| c1 == '/'
+		# (_,c2,input)		= ReadNormalChar input
+		| c2 == '-'
+		  # (_,c3,input)	= ReadNormalChar input
+		  | c3 == '#'		= ScanPragma input
+          | otherwise       = ScanDocLine input
+		= abort "Scanner: Error in Scan" //already caught by TryScanComment
+    | isSpecialChar c1      = ScanOperator 1 input [c1, c] co
+    | otherwise             = CheckReservedOperator (revCharListToString 0 [c]) (charBack input)
 Scan c    input co
 	| IsDigit c				= ScanNumeral 0 input [c]
 	| IsIdentChar c	co	
@@ -946,6 +965,64 @@ stripNewline string
 				-> string%(0,size-3)
 				-> string%(0,size-2)
 			-> string
+
+ScanDocBlock :: !Input -> (!Token, !Input)
+ScanDocBlock input
+	= scan_doc_block [] input
+where
+	scan_doc_block :: ![Char] !Input -> (!Token,!Input)
+	scan_doc_block acc input
+		# (eof, c, input)	= ReadChar input
+		| c == '*'
+			# (eof, c, input) = ReadChar input
+			| c == '/' = (DocBlockToken (toString (reverse acc)), input)
+			= scan_doc_block [c:acc] input
+		| isNewLine c
+			| eof
+				= (ErrorToken "end of file encountered inside documentation block", input)
+			= scan_doc_block [c:acc] input
+		= scan_doc_block [c:acc] input
+
+SkipWhites` :: !Input -> (!Optional String, !Char, !Input)
+SkipWhites` input
+	# (eof, c, input)		= ReadChar input
+	| eof					= (No, NewLineChar, input)
+	| IsWhiteSpace c		= SkipWhites` input
+							= (No, c, input)
+
+ScanDocLine :: !Input -> (!Token, !Input)
+ScanDocLine input
+    # (_, c, input) = SkipWhites` input
+	| isNewLine c = (DocBlockToken "", input)
+	= scan_doc_line [c] input
+where
+	scan_doc_line :: ![Char] !Input -> (!Token,!Input)
+	scan_doc_line acc input
+		# (eof, c, input)	= ReadChar input
+		| isNewLine c
+			= (DocBlockToken (toString (reverse acc)), input)
+		= scan_doc_line [c:acc] input
+
+
+ScanPragma :: !Input -> (!Token, !Input)
+ScanPragma input
+    # (_, c, input) = SkipWhites` input
+	| isNewLine c = (PragmaToken "" "", input)
+	= scan_pragma [c] input
+where
+	scan_pragma :: ![Char] !Input -> (!Token,!Input)
+	scan_pragma acc input
+		# (eof, c, input) = ReadChar input
+		| isNewLine c
+			= (PragmaToken (toString (reverse acc)) "", input)
+	    | IsWhiteSpace c  = scan_pragma_val (toString (reverse acc)) [] input
+		= scan_pragma [c:acc] input
+
+	scan_pragma_val :: !String ![Char] !Input -> (!Token,!Input)
+	scan_pragma_val pragma acc input
+		# (eof, c, input) = ReadChar input
+	    | IsWhiteSpace c || isNewLine c = (PragmaToken pragma (toString (reverse acc)), input)
+		= scan_pragma_val pragma [c:acc] input
 
 ScanNumeral	:: !Int !Input [Char] -> (!Token, !Input)
 ScanNumeral n input chars=:['0':r]
