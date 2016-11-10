@@ -1078,7 +1078,7 @@ wrapBody inh syn hasTonic chn
     | not ok     = (syn, chn)
     # (args, chn) = foldr (mkArg symbty hasTonic inh.inh_instance_tree) ([], chn) (zip2 tb_args symbty.st_args)
     | length args == length tb_args
-        # evalableCases  = [(eid, 'DM'.elems vars, cs) \\ (eid, (True, vars, cs)) <- 'DM'.toList syn.syn_cases | allVarsBound inh vars]
+        # evalableCases = [] // TODO Re-enable. Creation of new function is a bit problematic, however. [(eid, 'DM'.elems vars, cs) \\ (eid, (True, vars, cs)) <- 'DM'.toList syn.syn_cases | allVarsBound inh vars]
         # (evalableCases, chn) = mapSt (\(eid, bvs, cs) chn -> mkCaseDetFun Nothing eid inh.inh_fun_idx bvs cs inh chn) evalableCases chn
 
         # (icl, chn) = chn!chn_icl_module

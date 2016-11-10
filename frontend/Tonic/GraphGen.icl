@@ -300,8 +300,8 @@ mkBlueprint inh expr=:(App app=:{app_symb}) chn
                                      Just dcl -> (dcl.dcl_name.id_name, chn)
                                      _        -> (iclName, chn)
           # evalableCases        = case inh.inh_bind_var of
-                                     Just var
-                                       = [(eid, 'DM'.elems vars, cs) \\ (eid, (True, vars, cs)) <- 'DM'.toList inh.inh_cases | allVarsBound` var inh vars]
+                                     //Just var
+                                       // TODO Re-enable. Creation of new function is a bit problematic, however. = [(eid, 'DM'.elems vars, cs) \\ (eid, (True, vars, cs)) <- 'DM'.toList inh.inh_cases | allVarsBound` var inh vars]
                                      _ = []
           # (evalableCases, chn) = mapSt (\(eid, bvs, cs) chn -> mkCaseDetFun inh.inh_bind_var eid (ptrToInt app.app_info_ptr) bvs cs inh chn) evalableCases chn
           # (ps, chn)            = mapSt (\(x, n) chn -> mkBlueprint (addUnique n {inh & inh_bind_var = Nothing, inh_is_top_bind = isTonicContext, inh_parent_fun_mod = modName}) x chn) (zip2 args [0..]) chn
