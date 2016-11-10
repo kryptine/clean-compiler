@@ -452,9 +452,22 @@ symbIdentIsBPPart si inh chn
        = typeHasClassInstance st.st_result.at_type PD_TonicBlueprintPartClass inh chn
      _ = abort ("symbIdentIsBPPart: failed to reify symbIdent '" +++ si.symb_ident.id_name +++ "'")
 
+// TODO Refactor
 typeHasClassInstance :: Type Int InhExpression *ChnExpression -> *(Bool, *ChnExpression)
-typeHasClassInstance (TA tsi args)    lookup_symbol inh chn = typeHasClassInstance` (TA tsi (init args)) lookup_symbol inh chn
-typeHasClassInstance (TAS tsi args _) lookup_symbol inh chn = typeHasClassInstance` (TA tsi (init args)) lookup_symbol inh chn
+typeHasClassInstance (TA tsi=:{type_index={glob_module,glob_object}} args) lookup_symbol inh chn
+  # {td_rhs} = inh.inh_common_defs.[glob_module].com_type_defs.[glob_object]
+  = case td_rhs of
+      SynType {at_type}
+        //# (ok, ty', heaps) = tryToExpandTypeSyn inh.inh_common_defs at_type tsi [] heaps
+        = (False, chn) // TODO Implement this. See line above for a rough idea how
+      _ = typeHasClassInstance` (TA tsi (init args)) lookup_symbol inh chn
+typeHasClassInstance (TAS tsi=:{type_index={glob_module,glob_object}} args _) lookup_symbol inh chn
+  # {td_rhs} = inh.inh_common_defs.[glob_module].com_type_defs.[glob_object]
+  = case td_rhs of
+      SynType {at_type}
+        //# (ok, ty', heaps) = tryToExpandTypeSyn inh.inh_common_defs at_type tsi [] heaps
+        = (False, chn) // TODO Implement this. See line above for a rough idea how
+      _ = typeHasClassInstance` (TA tsi (init args)) lookup_symbol inh chn
 typeHasClassInstance _             _             _   chn = (False, chn)
 
 typeHasClassInstance` :: Type Int InhExpression *ChnExpression -> *(Bool, *ChnExpression)
@@ -468,31 +481,31 @@ typeHasClassInstance` ty lookup_symbol inh chn
   # defs  = inh.inh_common_defs.[lookup_def.pds_module].com_class_defs.[lookup_def.pds_def]
   = (inst.glob_module <> NotFound && inst.glob_object <> NotFound, chn)
 
-typeHasClassSynonymInstance :: Type Int InhExpression *ChnExpression -> *(Bool, *ChnExpression)
-typeHasClassSynonymInstance ty lookup_symbol inh chn
-  # (lookup_def, predefined_symbols) = (chn.chn_predef_symbols)![lookup_symbol]
-  # chn                  = {chn & chn_predef_symbols = predefined_symbols}
-  # defs                 = inh.inh_common_defs.[lookup_def.pds_module].com_class_defs.[lookup_def.pds_def]
-  # gtcClasses           = [gtc_class \\ {tc_class = TCGeneric {gtc_class}} <- defs.class_context]
-  # contextClasses       = [] // [class_ref \\ {tc_class = TCClass class_ref} <- defs.class_context]
-  # heaps                = chn.chn_heaps
-  # (has, hp_type_heaps) = tyHasClasses inh.inh_instance_tree (gtcClasses ++ contextClasses) ty heaps.hp_type_heaps
-  = (has, {chn & chn_heaps = {heaps & hp_type_heaps = hp_type_heaps}})
-  where
-  tyHasClasses :: {#{!InstanceTree}} [Global DefinedSymbol] Type *TypeHeaps -> *(Bool, *TypeHeaps)
-  tyHasClasses class_instances []     at_type hp_type_heaps = (False, hp_type_heaps)
-  tyHasClasses class_instances [x]    at_type hp_type_heaps = tyHasClasses` class_instances x at_type hp_type_heaps
-  tyHasClasses class_instances [x:xs] at_type hp_type_heaps
-    # (f, hp_type_heaps) = tyHasClasses` class_instances x at_type hp_type_heaps
-    | f         = tyHasClasses class_instances xs at_type hp_type_heaps
-    | otherwise = (False, hp_type_heaps)
+//typeHasClassSynonymInstance :: Type Int InhExpression *ChnExpression -> *(Bool, *ChnExpression)
+//typeHasClassSynonymInstance ty lookup_symbol inh chn
+  //# (lookup_def, predefined_symbols) = (chn.chn_predef_symbols)![lookup_symbol]
+  //# chn                  = {chn & chn_predef_symbols = predefined_symbols}
+  //# defs                 = inh.inh_common_defs.[lookup_def.pds_module].com_class_defs.[lookup_def.pds_def]
+  //# gtcClasses           = [gtc_class \\ {tc_class = TCGeneric {gtc_class}} <- defs.class_context]
+  //# contextClasses       = [] // [class_ref \\ {tc_class = TCClass class_ref} <- defs.class_context]
+  //# heaps                = chn.chn_heaps
+  //# (has, hp_type_heaps) = tyHasClasses inh.inh_instance_tree (gtcClasses ++ contextClasses) ty heaps.hp_type_heaps
+  //= (has, {chn & chn_heaps = {heaps & hp_type_heaps = hp_type_heaps}})
+  //where
+  //tyHasClasses :: {#{!InstanceTree}} [Global DefinedSymbol] Type *TypeHeaps -> *(Bool, *TypeHeaps)
+  //tyHasClasses class_instances []     at_type hp_type_heaps = (False, hp_type_heaps)
+  //tyHasClasses class_instances [x]    at_type hp_type_heaps = tyHasClasses` class_instances x at_type hp_type_heaps
+  //tyHasClasses class_instances [x:xs] at_type hp_type_heaps
+    //# (f, hp_type_heaps) = tyHasClasses` class_instances x at_type hp_type_heaps
+    //| f         = tyHasClasses class_instances xs at_type hp_type_heaps
+    //| otherwise = (False, hp_type_heaps)
 
-  tyHasClasses` :: {#{!InstanceTree}} (Global DefinedSymbol) Type *TypeHeaps -> *(Bool, *TypeHeaps)
-  tyHasClasses` class_instances {glob_module, glob_object} at_type hp_type_heaps
-    # instance_tree = class_instances.[glob_module].[glob_object.ds_index]
-    # subst = {subst_changed = False, subst_array = {}, subst_next_var_n = -1, subst_previous_context_n = -1, subst_context_n_at_last_update = -1}
-    # (inst, ctxs, hp_type_heaps, _) = find_instance [at_type] instance_tree inh.inh_common_defs hp_type_heaps subst
-    = (inst.glob_module <> NotFound && inst.glob_object <> NotFound, hp_type_heaps)
+  //tyHasClasses` :: {#{!InstanceTree}} (Global DefinedSymbol) Type *TypeHeaps -> *(Bool, *TypeHeaps)
+  //tyHasClasses` class_instances {glob_module, glob_object} at_type hp_type_heaps
+    //# instance_tree = class_instances.[glob_module].[glob_object.ds_index]
+    //# subst = {subst_changed = False, subst_array = {}, subst_next_var_n = -1, subst_previous_context_n = -1, subst_context_n_at_last_update = -1}
+    //# (inst, ctxs, hp_type_heaps, _) = find_instance [at_type] instance_tree inh.inh_common_defs hp_type_heaps subst
+    //= (inst.glob_module <> NotFound && inst.glob_object <> NotFound, hp_type_heaps)
 
 isInfix :: SymbIdent *ChnExpression -> *(Bool, *ChnExpression)
 isInfix si chn
