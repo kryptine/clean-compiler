@@ -1238,6 +1238,9 @@ reorder_array array index_array
 	# new_array={e\\e<-:array}
 	= {new_array & [index_array.[i]]=e \\ e<-:array & i<-[0..]}
 
+add_conflicting_definition_error decl_ident decl_pos error_admin
+	= checkError "conflicting definition in implementation module" "" (setErrorAdmin (newPosition decl_ident decl_pos) error_admin)
+
 combineDclAndIclModule ::			    ModuleKind *{#DclModule}  [Declaration] (CollectedDefinitions a)  *{#Int}   *CheckState
 	-> (!CopiedDefinitions,!*Optional *{#*{#Int}},!*{#DclModule},![Declaration],!CollectedDefinitions a, !*{#Int}, !*CheckState);
 combineDclAndIclModule MK_Main modules icl_decl_symbols icl_definitions icl_sizes cs
@@ -1299,6 +1302,23 @@ where
 	add_to_conversion_table dcl_common (Declaration {decl_kind=STE_DclMacroOrLocalMacroFunction _})
 			(moved_dcl_defs, dcl_cons_and_member_defs, conversion_table, icl_sizes, icl_defs, cs)
 		= (moved_dcl_defs, dcl_cons_and_member_defs, conversion_table, icl_sizes, icl_defs, cs)
+	add_to_conversion_table dcl_common decl=:(Declaration dcl=:{decl_kind=decl_kind=:STE_Generic,decl_ident=decl_ident=:{id_info},decl_index,decl_pos})
+			(moved_dcl_defs,dcl_cons_and_member_defs, conversion_table, icl_sizes, icl_defs, cs)
+		# (entry=:{ste_kind,ste_index,ste_def_level}, cs_symbol_table) = readPtr id_info cs.cs_symbol_table
+		| ste_kind == STE_Empty
+			#! icl_index = conversion_table.[cGenericDefs].[decl_index]
+			| icl_index==NoIndex
+				# (conversion_table, icl_sizes, icl_defs, cs_symbol_table)
+					= add_dcl_declaration id_info entry decl cGenericDefs decl_index (conversion_table, icl_sizes, icl_defs, cs_symbol_table)
+				= ([decl : moved_dcl_defs],dcl_cons_and_member_defs,conversion_table, icl_sizes, icl_defs, {cs & cs_symbol_table = cs_symbol_table})
+				# icl_defs = [Declaration {dcl & decl_index = icl_index} : icl_defs]
+				  cs_symbol_table = NewEntry cs_symbol_table id_info decl_kind icl_index cGlobalScope entry
+				= ([decl : moved_dcl_defs],dcl_cons_and_member_defs,conversion_table, icl_sizes, icl_defs, {cs & cs_symbol_table = cs_symbol_table})
+		| ste_def_level == cGlobalScope && ste_kind == decl_kind
+			# conversion_table & [cGenericDefs].[decl_index] = ste_index
+			= (moved_dcl_defs,dcl_cons_and_member_defs, conversion_table, icl_sizes, icl_defs, { cs & cs_symbol_table = cs_symbol_table })
+			# cs_error = add_conflicting_definition_error decl_ident decl_pos cs.cs_error
+			= (moved_dcl_defs,dcl_cons_and_member_defs,conversion_table, icl_sizes, icl_defs, { cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table })
 	add_to_conversion_table dcl_common decl=:(Declaration {decl_ident=decl_ident=:{id_info},decl_kind,decl_index,decl_pos})
 			(moved_dcl_defs,dcl_cons_and_member_defs, conversion_table, icl_sizes, icl_defs, cs)
 		# (entry=:{ste_kind,ste_index,ste_def_level}, cs_symbol_table) = readPtr id_info cs.cs_symbol_table
@@ -1316,7 +1336,7 @@ where
 			# def_index = toInt decl_kind
 			  conversion_table = {conversion_table & [def_index].[decl_index] = ste_index}
 			= (moved_dcl_defs,dcl_cons_and_member_defs, conversion_table, icl_sizes, icl_defs, { cs & cs_symbol_table = cs_symbol_table })
-			# cs_error = checkError "conflicting definition in implementation module" "" (setErrorAdmin (newPosition decl_ident decl_pos) cs.cs_error)
+			# cs_error = add_conflicting_definition_error decl_ident decl_pos cs.cs_error
 			= (moved_dcl_defs,dcl_cons_and_member_defs,conversion_table, icl_sizes, icl_defs, { cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table })
 
 	can_be_only_in_dcl def_kind
@@ -1402,12 +1422,15 @@ where
 						# (members,st) = copy_and_redirect_member_symbols (member_index+1) com_member_defs td_pos (new_member_defs,conversion_table,icl_sizes,icl_decl_symbols,cs)
 						= ([member:members],st)
 						= ([],(new_member_defs,conversion_table,icl_sizes,icl_decl_symbols,cs))
-	add_dcl_definition {com_generic_defs} dcl=:(Declaration {decl_kind = STE_Generic, decl_index, decl_pos}) 
+	add_dcl_definition {com_generic_defs} dcl=:(Declaration {decl_kind=STE_Generic, decl_index, decl_pos, decl_ident={id_info}}) 
 			(new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, new_generic_defs, copied_defs, conversion_table, icl_sizes, icl_decl_symbols, cs)
-		# generic_def = com_generic_defs.[decl_index]
+		# generic_def = com_generic_defs.[decl_index]		
+		| generic_def.gen_member_ident.id_info==id_info
+			// gen_ident and gen_member_ident occur both in the Declaration list, add generic definition once
+			= (new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, new_generic_defs, copied_defs, conversion_table, icl_sizes, icl_decl_symbols, cs)
 		# (cop_td_indexes, cop_cd_indexes, cop_gd_indexes) = copied_defs
 		# copied_defs = (cop_td_indexes, cop_cd_indexes, [decl_index:cop_gd_indexes])
-		= (new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, [generic_def:new_generic_defs], copied_defs, conversion_table, icl_sizes, icl_decl_symbols, cs)	
+		= (new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, [generic_def:new_generic_defs], copied_defs, conversion_table, icl_sizes, icl_decl_symbols, cs)
 	add_dcl_definition {com_type_defs,com_cons_defs} dcl=:(Declaration {decl_kind = STE_TypeExtension, decl_index})
 			(new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, new_generic_defs, (cop_td_indexes, cop_cd_indexes, cop_gd_indexes), conversion_table, icl_sizes, icl_decl_symbols, cs)
 		# type_def = com_type_defs.[decl_index]
@@ -1500,7 +1523,7 @@ where
 											_ -> False
 			# function_conversion_table = {function_conversion_table & [decl_index] = ste_index}
 			= (function_conversion_table,macro_conversion_table,icl_defs,{cs & cs_symbol_table = cs_symbol_table})
-			# cs_error = checkError "conflicting definition in implementation module" "" (setErrorAdmin (newPosition decl_ident decl_pos) cs.cs_error)
+			# cs_error = add_conflicting_definition_error decl_ident decl_pos cs.cs_error
 			= (function_conversion_table,macro_conversion_table,icl_defs,{cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table})
 	add_to_conversion_table first_macro_index decl=:(Declaration {decl_kind=decl_kind=:STE_DclMacroOrLocalMacroFunction _,decl_ident=decl_ident=:{id_info},decl_index,decl_pos})
 			(function_conversion_table,macro_conversion_table,icl_defs,cs)
@@ -1519,7 +1542,7 @@ where
 		| ste_def_level == cGlobalScope && ste_kind == decl_kind
 			# macro_conversion_table = {macro_conversion_table & [decl_index - first_macro_index] = ste_index}
 			= (function_conversion_table,macro_conversion_table,icl_defs,{cs & cs_symbol_table = cs_symbol_table})
-			# cs_error = checkError "conflicting definition in implementation module" "" (setErrorAdmin (newPosition decl_ident decl_pos) cs.cs_error)
+			# cs_error = add_conflicting_definition_error decl_ident decl_pos cs.cs_error
 			= (function_conversion_table,macro_conversion_table,icl_defs,{cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table})
 	add_to_conversion_table first_macro_index decl (function_conversion_table,macro_conversion_table,icl_defs,cs)
 		= (function_conversion_table,macro_conversion_table,icl_defs,cs)
