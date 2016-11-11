@@ -1,7 +1,7 @@
 implementation module explicitimports
 // compile with reuse unique nodes option
 
-import StdEnv, StdOverloadedList
+import StdEnv
 
 import syntax, typesupport, parse, checksupport, utilities, checktypes, transform, predef
 
@@ -86,18 +86,8 @@ foldlBelongingSymbols f bs st
 				-> foldlArraySt (\{fs_ident} st -> f fs_ident st) fields st 
 			BS_Members members
 				-> foldlArraySt (\{ds_ident} st -> f ds_ident st) members st 
-			BS_MembersAndMacros members macro_members _ default_macros
-				# st = foldlArraySt (\{ds_ident} st -> f ds_ident st) members st
-				# st = foldlArraySt (\{mm_ident} st -> f mm_ident st) macro_members st
-				-> foldlArraySt (\{mm_ident} st -> f mm_ident st) default_macros st
 			BS_Nothing
 				-> st
-
-FoldSt op l st :== fold_st l st
-	where
-		fold_st [|] st		= st
-		fold_st [|a:x] st	= fold_st x (op a st)
-
 /*
 imp_decl_to_string (ID_Function {ii_ident={id_name}}) = "ID_Function "+++toString id_name
 imp_decl_to_string (ID_Class {ii_ident={id_name}} _) = "ID_Class "+++toString id_name
@@ -228,8 +218,8 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 		= case found of
 			Yes _
 				# eii_declaring_modules = foldSt (store_belonging belong_nr ini_symbol_nr) path eii_declaring_modules
-				  (decls_accu, dcl_modules) = add_nth_belonging_decls position belong_nr decl decls_accu dcl_modules
-				-> (decls_accu, dcl_modules, eii_declaring_modules, visited_modules, cs_error)
+				  (belong_decl, dcl_modules) = get_nth_belonging_decl position belong_nr decl dcl_modules
+				-> ([belong_decl:decls_accu], dcl_modules, eii_declaring_modules, visited_modules, cs_error)
 			_
 				| need_all
 					# (module_name,dcl_modules)=dcl_modules![imported_mod].dcl_name.id_name
@@ -248,52 +238,27 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 			= abort "sanity check failed in module explicitimports"
 		= eii_declaring_modules
 
-	add_nth_belonging_decls position belong_nr decl=:(Declaration {decl_kind,decl_ident}) decls_accu dcl_modules
+	get_nth_belonging_decl position belong_nr decl=:(Declaration {decl_kind}) dcl_modules
 		# (STE_Imported _ def_mod_index) = decl_kind
 		  (belongin_symbols, dcl_modules) = getBelongingSymbols decl dcl_modules
 		= case belongin_symbols of
 			BS_Constructors constructors
 				# {ds_ident, ds_index} = constructors!!belong_nr
-				-> ([Declaration { decl_ident = ds_ident, decl_pos = position, 
+				-> (Declaration { decl_ident = ds_ident, decl_pos = position, 
 						decl_kind = STE_Imported STE_Constructor def_mod_index,
-						decl_index = ds_index } : decls_accu], dcl_modules)
+						decl_index = ds_index }, dcl_modules)
 			BS_Fields rt_fields
 				# {fs_ident, fs_index} = rt_fields.[belong_nr]
 				  ({sd_ident}, dcl_modules)
 						= dcl_modules![def_mod_index].dcl_common.com_selector_defs.[fs_index]
-				-> ([Declaration { decl_ident = fs_ident, decl_pos = position, 
+				-> (Declaration { decl_ident = fs_ident, decl_pos = position, 
 						decl_kind = STE_Imported (STE_Field sd_ident) def_mod_index,
-						decl_index = fs_index } : decls_accu], dcl_modules)
+						decl_index = fs_index }, dcl_modules)
 			BS_Members class_members
 				# {ds_ident, ds_index} = class_members.[belong_nr]
-				-> ([Declaration { decl_ident = ds_ident, decl_pos = position,
-						decl_kind = STE_Imported STE_Member def_mod_index,
-						decl_index = ds_index } : decls_accu], dcl_modules)
-			BS_MembersAndMacros class_members macro_members default_member_indexes default_macros
-				| belong_nr<size class_members
-					# {ds_ident, ds_index} = class_members.[belong_nr]
-					# decl = Declaration { decl_ident = ds_ident, decl_pos = position,
-										   decl_kind = STE_Imported STE_Member def_mod_index,
-										   decl_index = ds_index }
-					| belong_nr>=size default_member_indexes
-						-> ([decl : decls_accu], dcl_modules)
-					# default_macros_index = default_member_indexes.[belong_nr]
-					| default_macros_index<0
-						-> ([decl : decls_accu], dcl_modules)
-						#! {mm_ident,mm_index} = default_macros.[default_macros_index]
-						# macro_decl = Declaration { decl_ident = mm_ident, decl_pos = position,
-													 decl_kind = STE_Imported (STE_DclMacroOrLocalMacroFunction []) def_mod_index,
-													 decl_index = mm_index }
-						-> ([decl,macro_decl : decls_accu], dcl_modules)
-				| belong_nr<size class_members+size macro_members
-					# {mm_ident,mm_index} = macro_members.[belong_nr-size class_members]
-					-> ([Declaration { decl_ident = mm_ident, decl_pos = position,
-							decl_kind = STE_Imported (STE_DclMacroOrLocalMacroFunction []) def_mod_index,
-							decl_index = mm_index } : decls_accu], dcl_modules)
-					# {mm_ident,mm_index} = default_macros.[belong_nr-(size class_members+size macro_members)]
-					-> ([Declaration { decl_ident = mm_ident, decl_pos = position,
-							decl_kind = STE_Imported (STE_DclMacroOrLocalMacroFunction []) def_mod_index,
-							decl_index = mm_index } : decls_accu], dcl_modules)
+				-> (Declaration { decl_ident = ds_ident, decl_pos = position,
+						 decl_kind = STE_Imported STE_Member def_mod_index,
+						decl_index = ds_index }, dcl_modules)
 
 	get_all_belongs decl=:(Declaration {decl_kind,decl_index}) dcl_modules
 		# (belonging_symbols, dcl_modules) = getBelongingSymbols decl dcl_modules
@@ -304,10 +269,6 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 				-> ([fs_ident \\ {fs_ident}<-:rt_fields], dcl_modules)
 			BS_Members class_members
 				-> ([ds_ident \\ {ds_ident}<-:class_members], dcl_modules)
-			BS_MembersAndMacros class_members macro_members _ default_macros
-				-> ([ds_ident \\ {ds_ident}<-:class_members]
-					++[mm_ident\\{mm_ident}<-:macro_members]
-					++[mm_ident\\{mm_ident}<-:default_macros], dcl_modules)
 			BS_Nothing
 				-> ([], dcl_modules)
 
@@ -769,9 +730,6 @@ instance check_completeness Let where
   		  ) ccs
 
 instance check_completeness MemberDef where
-  	check_completeness {me_type,me_default_implementation=Yes {mm_index},me_class} cci ccs
-		# (macro,ccs) = ccs!box_ccs.ccs_macro_defs.[me_class.glob_module,mm_index];
-		= check_completeness macro cci (check_completeness me_type cci ccs)
   	check_completeness {me_type} cci ccs 
   		= check_completeness me_type cci ccs
 

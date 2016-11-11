@@ -1,6 +1,6 @@
 implementation module checksupport
 
-import StdEnv, StdOverloadedList, compare_constructor
+import StdEnv, compare_constructor
 import syntax, predef, containers
 import utilities
 
@@ -148,46 +148,12 @@ getBelongingSymbols (Declaration {decl_kind=STE_Imported STE_Type def_mod_index,
 			-> (BS_Constructors constructors, dcl_modules)
 		RecordType {rt_fields}
 			-> (BS_Fields rt_fields, dcl_modules)
-		NewType constructor
-			-> (BS_Constructors [constructor], dcl_modules)
 		_
 			-> (BS_Nothing, dcl_modules)
 getBelongingSymbols (Declaration {decl_kind=STE_Imported STE_Class def_mod_index, decl_index}) dcl_modules
-	# ({class_members,class_macro_members},dcl_modules) = dcl_modules![def_mod_index].dcl_common.com_class_defs.[decl_index]
-	# (members,dcl_modules) = add_default_class_member_macros 0 dcl_modules
-	  with
-		add_default_class_member_macros class_member_n dcl_modules
-			| class_member_n<size class_members
-				# member_index=class_members.[class_member_n].ds_index
-				  ({me_default_implementation},dcl_modules)
-					= dcl_modules![def_mod_index].dcl_common.com_member_defs.[member_index]
-				= case me_default_implementation of
-					No
-						-> add_default_class_member_macros (class_member_n+1) dcl_modules
-					Yes default_class_member_macro_ident_and_index
-						#! n_members = size class_members
-						# default_member_indexes = createArray n_members -1
-						  default_member_indexes & [class_member_n] = 0
-						-> add_more_default_class_member_macros (class_member_n+1) [|default_class_member_macro_ident_and_index] 1 default_member_indexes dcl_modules
-				| size class_macro_members==0
-					= (BS_Members class_members,dcl_modules)
-					= (BS_MembersAndMacros class_members class_macro_members {} {},dcl_modules)
-
-		add_more_default_class_member_macros class_member_n default_class_members default_member_n default_member_indexes dcl_modules
-			| class_member_n<size class_members
-				# member_index=class_members.[class_member_n].ds_index
-				  ({me_default_implementation}, dcl_modules)
-					= dcl_modules![def_mod_index].dcl_common.com_member_defs.[member_index]
-				= case me_default_implementation of
-					No
-						-> add_more_default_class_member_macros (class_member_n+1) default_class_members default_member_n default_member_indexes dcl_modules
-					Yes default_class_member_macro_ident_and_index
-						# default_class_members = [|default_class_member_macro_ident_and_index:default_class_members]
-  						  default_member_indexes & [class_member_n] = default_member_n
-						-> add_more_default_class_member_macros (class_member_n+1) default_class_members (default_member_n+1) default_member_indexes dcl_modules
-				# default_class_members = {default_class_member\\default_class_member<-reverse default_class_members}
-				= (BS_MembersAndMacros class_members class_macro_members default_member_indexes default_class_members,dcl_modules)
-	= (members,dcl_modules)
+	# ({class_members}, dcl_modules)
+			= dcl_modules![def_mod_index].dcl_common.com_class_defs.[decl_index]
+	= (BS_Members class_members, dcl_modules)
 getBelongingSymbols _ dcl_modules
 	= (BS_Nothing, dcl_modules)
 
@@ -198,8 +164,6 @@ nrOfBelongingSymbols (BS_Fields fields)
 	= size fields
 nrOfBelongingSymbols (BS_Members members)
 	= size members
-nrOfBelongingSymbols (BS_MembersAndMacros members macro_members _ default_macros)
-	= size members+size macro_members+size default_macros
 nrOfBelongingSymbols BS_Nothing
 	= 0
 

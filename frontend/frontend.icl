@@ -2,7 +2,7 @@ implementation module frontend
 
 import scanner, parse, postparse, check, type, trans, partition, convertcases, overloading, utilities, convertDynamics,
 		convertimportedtypes, compilerSwitches, analtypes, generics1,
-		typereify, compare_types, ctags
+		typereify, compare_types
 from CoclSystemDependent import DirectorySeparator
 
 instance == FrontEndPhase where
@@ -162,9 +162,7 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 
 	| not ok
 		= (No,{},{},main_dcl_module_n,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
-	#! (fun_defs, files) = if options.feo_generate_ctags
-		                       (mkCtags mod_dir icl_mod fun_defs files)
-		                       (fun_defs, files)
+
 	# icl_gencase_indices = icl_function_indices.ifi_gencase_indices
 	# icl_function_indices = {icl_function_indices & ifi_gencase_indices = icl_gencase_indices }
 

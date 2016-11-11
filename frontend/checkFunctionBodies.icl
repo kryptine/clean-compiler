@@ -773,7 +773,7 @@ checkExpression free_vars (PE_Dynamic expr opt_type) e_input e_state=:{es_dynami
 			free_vars, { e_state & es_expr_heap = es_expr_heap, es_dynamics = [dyn_info_ptr : outer_dynamics]},
 			e_info, { cs & cs_x.x_needed_modules = cs.cs_x.x_needed_modules bitor cNeedStdDynamic }) 
 
-checkExpression free_vars (PE_Basic basic_value _) e_input e_state e_info cs
+checkExpression free_vars (PE_Basic basic_value) e_input e_state e_info cs
 	= (BasicExpr basic_value, free_vars, e_state, e_info, cs)
 
 checkExpression free_vars (PE_ABC_Code code_sequence do_inline) e_input e_state e_info cs
@@ -1657,7 +1657,7 @@ checkPattern (PE_DynamicPattern pattern type) opt_var p_input accus ps e_info cs
 	# (dyn_pat, accus, ps, e_info, cs) = checkPattern pattern No p_input accus ps e_info cs
 	= (AP_Dynamic dyn_pat type opt_var, accus, ps, e_info, { cs & cs_x.x_needed_modules = cs.cs_x.x_needed_modules bitor cNeedStdDynamic })
 
-checkPattern (PE_Basic basic_value _) opt_var p_input accus ps e_info cs
+checkPattern (PE_Basic basic_value) opt_var p_input accus ps e_info cs
 	= (AP_Basic basic_value opt_var, accus, ps, e_info, cs)
 
 checkPattern (PE_Tuple tuple_args) opt_var p_input accus ps e_info cs
@@ -1758,9 +1758,9 @@ checkPattern (PE_ArrayPattern selections) opt_var p_input (var_env, array_patter
 		| isLowerCaseName id_name
 			= states
 		// further with next alternative
-	check_index_expr (PE_Basic (BVI _) _) states
+	check_index_expr (PE_Basic (BVI _)) states
 			= states
-	check_index_expr (PE_Basic (BVInt _) _) states
+	check_index_expr (PE_Basic (BVInt _)) states
 			= states
 	check_index_expr _ (var_env, ap_selections, var_heap, cs)
 		= (var_env, ap_selections, var_heap, { cs & cs_error = checkError "variable or integer constant expected as index expression" "" cs.cs_error })

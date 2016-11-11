@@ -21,7 +21,6 @@ instance < MemberDef
 
 smallerOrEqual :: !Type !Type -> CompareValue
 
-IF_ALLOW_NON_LINEAR_INSTANCES yes no :== yes
-IF_ALLOW_NON_TERMINATING_AND_OVERLAPPING_INSTANCES yes no :== no
+IF_ALLOW_NON_LINEAR_AND_OVERLAPPING_INSTANCES yes no :== no
 compareInstances :: ![Type] ![Type] -> CompareValue
 compareFunDepInstances :: ![Type] ![Type] !BITVECT -> CompareValue

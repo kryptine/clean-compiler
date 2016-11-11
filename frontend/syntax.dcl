@@ -207,15 +207,13 @@ instance == FunctionOrMacroIndex
 	, 	def_generic_cases 	:: ![GenericCaseDef]
 	}
 
-::	CommonDefs :== CommonDefsR DclInstanceMemberTypeAndFunction
-
-::	CommonDefsR member_types_and_functions =
+::	CommonDefs =
 	{	com_type_defs 		:: !.{# CheckedTypeDef}
 	,	com_cons_defs		:: !.{# ConsDef}
 	,	com_selector_defs	:: !.{# SelectorDef}
 	,	com_class_defs		:: !.{# ClassDef}
 	,	com_member_defs		:: !.{# MemberDef}
-	,	com_instance_defs	:: !.{# ClassInstanceR member_types_and_functions}
+	,	com_instance_defs	:: !.{# ClassInstance}
 	,	com_generic_defs	:: !.{# GenericDef}
 	,	com_gencase_defs 	:: !.{# GenericCaseDef}
 	}
@@ -323,11 +321,6 @@ cNameLocationDependent :== True
 	,	sim_member_types	:: ![FunType]	// for .dcl
 	}
 
-::	DclInstanceMemberTypeAndFunction = {
-		dim_type			:: !FunType,
-		dim_function_index	:: !MacroIndex // optional, -1 if no function
-	  }
-
 ::	IdentOrQualifiedIdent
 	= Ident !Ident
 	| QualifiedIdent /*module*/!Ident !String
@@ -380,20 +373,12 @@ cNameLocationDependent :== True
 	,	ds_index		:: !Index
 	}
 
-::	MacroIndex :== Int;
-
-::	MacroMember = {
-		mm_ident :: !Ident,
-		mm_index :: !MacroIndex // only valid for class in dcl module
-	}
-
 ::	ClassDef =
  	{	class_ident			:: !Ident
 	,	class_arity			:: !Int
 	,	class_args			:: ![TypeVar]
 	,	class_context		:: ![TypeContext]
 	,	class_members		:: !{# DefinedSymbol}
-	,	class_macro_members	:: {#MacroMember}
 	,	class_dictionary	:: !DefinedSymbol
 	,	class_pos			:: !Position
 	,	class_cons_vars		:: !BITVECT
@@ -410,7 +395,6 @@ cNameLocationDependent :== True
 	,	me_type			:: !SymbolType
 	,	me_type_ptr		:: !VarInfoPtr
 	,	me_class_vars	:: ![ATypeVar]
-	,	me_default_implementation :: !(Optional MacroMember)
 	,	me_pos			:: !Position
 	,	me_priority 	:: !Priority
 	}
@@ -510,14 +494,12 @@ instance == GenericDependency
 	,	it_context		:: ![TypeContext]
 	}
 
-::	ClassInstance :== ClassInstanceR DclInstanceMemberTypeAndFunction
-
-::	ClassInstanceR member_types_and_functions =
+::	ClassInstance =
  	{	ins_class_index	:: !GlobalIndex
 	,	ins_class_ident	:: !ClassIdent
 	,	ins_ident		:: !Ident
 	,	ins_type		:: !InstanceType
-	,	ins_member_types_and_functions	:: ![member_types_and_functions]
+	,	ins_member_types :: ![FunType]	// for .dcl
 	,	ins_members		:: !{#ClassInstanceMember}
 	,	ins_specials	:: !Specials
 	,	ins_pos			:: !Position
@@ -1305,7 +1287,7 @@ instance toString 	KindInfo
 
 ::	ParsedExpr	= PE_List ![ParsedExpr]
 				| PE_Ident !Ident
-				| PE_Basic !BasicValue !Position
+				| PE_Basic !BasicValue
 				| PE_Bound !BoundExpr
 				| PE_Lambda !Ident ![ParsedExpr] !Rhs !Position
 				| PE_Tuple ![ParsedExpr]
@@ -1634,13 +1616,12 @@ ParsedConstructorToConsDef pc :==
 				  st_arity = pc.pc_cons_arity, st_context = pc.pc_context, st_attr_env = [], st_attr_vars = []},
 		cons_exi_vars = pc.pc_exi_vars, cons_type_ptr = nilPtr }
 
-ParsedInstanceToClassInstance pi member_types_and_functions members :==
+ParsedInstanceToClassInstance pi members member_types :==
 	{	ins_class_index = {gi_module=NoIndex, gi_index=NoIndex},
 		ins_class_ident = {ci_ident=pi.pi_class, ci_arity=length pi.pi_types}, ins_ident = pi.pi_ident,
 		ins_type = { it_vars = [], it_types = pi.pi_types, it_attr_vars = [],
 					 it_context = pi.pi_context }, 
-		ins_member_types_and_functions = member_types_and_functions,
-		ins_members = members, ins_specials = pi.pi_specials, ins_pos = pi.pi_pos}
+		ins_members = members, ins_member_types = member_types, ins_specials = pi.pi_specials, ins_pos = pi.pi_pos}
 
 MakeTypeDef name lhs rhs attr pos  :== 
 	{	td_ident = name, td_index = -1, td_arity = length lhs, td_args = lhs, td_attrs = [], td_attribute = attr,

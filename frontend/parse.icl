@@ -267,7 +267,6 @@ isIclContext	parseContext	:== parseContext bitand cICLContext <> 0	// not (isDcl
 isNotClassOrInstanceDefsContext parseContext		:== parseContext bitand ClassOrInstanceDefsContext == 0
 isGlobalOrClassDefsContext parseContext				:== parseContext bitand GlobalOrClassDefsContext <> 0
 isInstanceDefsContext parseContext					:== parseContext bitand InstanceDefsContext <> 0
-isNotClassDefsContext parseContext	:== parseContext bitand ClassDefsContext == 0
 
 cWantIclFile :== True
 cWantDclFile :== False
@@ -564,7 +563,7 @@ where
 		  		= wantRhs localsExpected (ruleDefiningRhsSymbol parseContext has_args) pState
 		  fun_kind = definingSymbolToFunKind defining_symbol
 		= case fun_kind of
-			FK_Function _  | isDclContext parseContext && isNotClassDefsContext parseContext
+			FK_Function _  | isDclContext parseContext
 				->	(PD_Function pos name is_infix args rhs fun_kind, parseError "RHS" No "<type specification>" pState)
 			FK_Caf | isNotEmpty args
 				->	(PD_Function pos name is_infix []   rhs fun_kind, parseError "CAF" No "No arguments for a CAF" pState)
@@ -1516,8 +1515,7 @@ wantClassDefinition parseContext pos pState
   		  	  class_def = { class_ident = class_id, class_arity = class_arity, class_args = class_args,
 	    					class_context = contexts, class_pos = pos, class_members = {}, class_cons_vars = class_cons_vars,
 	    					class_fun_dep_vars = class_fun_dep_vars, class_lazy_members = 0,
-							class_macro_members = {},
-							class_dictionary = { ds_ident = { class_id & id_info = nilPtr }, ds_arity = 0, ds_index = NoIndex}
+	    					class_dictionary = { ds_ident = { class_id & id_info = nilPtr }, ds_arity = 0, ds_index = NoIndex}
 						  }
 	    	  pState = wantEndGroup "class" pState
 			= (PD_Class class_def members, pState)
@@ -1529,7 +1527,6 @@ wantClassDefinition parseContext pos pState
   			  class_def = { class_ident = class_id, class_arity = class_arity, class_args = class_args,
 							class_context = contexts, class_pos = pos, class_members = {}, class_cons_vars = class_cons_vars,
 							class_fun_dep_vars = class_fun_dep_vars, class_lazy_members = 0,
-							class_macro_members = {},
 							class_dictionary = { ds_ident = { class_id & id_info = nilPtr }, ds_arity = 0, ds_index = NoIndex }
 						  }
 	  		  pState = wantEndOfDefinition "class definition" pState
@@ -1578,9 +1575,8 @@ wantClassDefinition parseContext pos pState
 			  (class_id, pState) = stringToIdent member_name IC_Class pState
 			  member = PD_TypeSpec pos member_id prio (Yes tspec) FSP_None
 			  class_def = {	class_ident = class_id, class_arity = class_arity, class_args = class_args,
-							class_context = contexts, class_pos = pos, class_members = {}, class_cons_vars = class_cons_vars,
-				 			class_fun_dep_vars = class_fun_dep_vars, class_lazy_members = 0,
-			  				class_macro_members = {},
+		    				class_context = contexts, class_pos = pos, class_members = {}, class_cons_vars = class_cons_vars,
+		    				class_fun_dep_vars = class_fun_dep_vars, class_lazy_members = 0,
    							class_dictionary = { ds_ident = { class_id & id_info = nilPtr }, ds_arity = 0, ds_index = NoIndex }
    						  }
 	 		  pState = wantEndOfDefinition "overloaded function" pState
@@ -1634,18 +1630,12 @@ wantInstanceDeclaration parseContext pi_pos pState
 		  (pi_ident, pState) = stringToIdent class_name (IC_Instance pi_types) pState
 		# (token, pState) = nextToken TypeContext pState
 		| isIclContext parseContext
-			# (begin_members, pState) = begin_member_group token pState
-			| not begin_members
-				# pState = wantEndOfDefinition "instance declaration" (tokenBack pState)
-				= (PD_Instance {pim_pi = {pi_class = pi_class, pi_ident = pi_ident, pi_types = pi_types, pi_context = pi_context,
-										  pi_specials = SP_None, pi_pos = pi_pos},
-								pim_members = []}, pState)
-				
-				# (pi_members, pState) = wantDefinitions (SetInstanceDefsContext parseContext) pState
-				  pState = wantEndGroup "instance" pState
-				= (PD_Instance {pim_pi = {pi_class = pi_class, pi_ident = pi_ident, pi_types = pi_types, pi_context = pi_context,
-										  pi_specials = SP_None, pi_pos = pi_pos},
-								pim_members = pi_members}, pState)
+			# pState = want_begin_group token pState
+			  (pi_members, pState) = wantDefinitions (SetInstanceDefsContext parseContext) pState
+			  pState = wantEndGroup "instance" pState
+			= (PD_Instance {pim_pi = {pi_class = pi_class, pi_ident = pi_ident, pi_types = pi_types, pi_context = pi_context,
+									  pi_specials = SP_None, pi_pos = pi_pos},
+							pim_members = pi_members}, pState)
 		// otherwise // ~ (isIclContext parseContext)
 			| token == CommaToken
 				# (pi_types_and_contexts, pState)	= want_instance_types pState
@@ -1664,6 +1654,24 @@ wantInstanceDeclaration parseContext pi_pos pState
 				# pim_pi = {pi_class = pi_class, pi_ident = pi_ident, pi_types = pi_types,
 							pi_context = pi_context, pi_specials = specials, pi_pos = pi_pos}
 				= want_optional_member_types pim_pi pState
+
+	want_begin_group token pState  // For JvG layout
+		# // (token, pState) = nextToken TypeContext pState PK
+		  (token, pState)
+			= case token of
+				SemicolonToken	->	nextToken TypeContext pState
+				_				->	(token, pState)
+		= case token of
+			WhereToken	-> wantBeginGroup "instance declaration" pState
+			CurlyOpenToken
+				# (ss_useLayout, pState) = accScanState UseLayout pState
+				| ss_useLayout
+					-> parseError "instance declaration" (Yes token) "where" pState
+					-> pState
+			_	# (ss_useLayout, pState) = accScanState UseLayout pState
+				| ss_useLayout
+					-> parseError "instance declaration" (Yes token) "where" pState
+					-> parseError "instance declaration" (Yes token) "where or {" pState
 
 	want_optional_member_types pim_pi pState
 		# (token, pState) = nextToken TypeContext pState
@@ -3550,16 +3558,16 @@ trySimplePatternT CurlyOpenToken pState
 trySimplePatternT (IntToken int_string) pState
 	# (ok,int) = string_to_int int_string
 	| ok
-		= (True, PE_Basic (BVInt int) NoPos, pState)
-		= (True, PE_Basic (BVI int_string) NoPos, pState)
+		= (True, PE_Basic (BVInt int), pState)
+		= (True, PE_Basic (BVI int_string), pState)
 trySimplePatternT (StringToken string) pState
-	= (True, PE_Basic (BVS string) NoPos, pState)
+	= (True, PE_Basic (BVS string), pState)
 trySimplePatternT (BoolToken bool) pState
-	= (True, PE_Basic (BVB bool) NoPos, pState)
+	= (True, PE_Basic (BVB bool), pState)
 trySimplePatternT (CharToken char) pState
-	= (True, PE_Basic (BVC char) NoPos, pState)
+	= (True, PE_Basic (BVC char), pState)
 trySimplePatternT (RealToken real) pState
-	= (True, PE_Basic (BVR real) NoPos, pState)
+	= (True, PE_Basic (BVR real), pState)
 trySimplePatternT (QualifiedIdentToken module_name ident_name) pState
 	| not (isLowerCaseName ident_name)
 		# (module_id, pState) = stringToQualifiedModuleIdent module_name ident_name IC_Expression pState
@@ -3601,16 +3609,16 @@ trySimplePatternWithoutDefinitionsT CurlyOpenToken pState
 trySimplePatternWithoutDefinitionsT (IntToken int_string) pState
 	# (ok,int) = string_to_int int_string
 	| ok
-		= (True, PE_Basic (BVInt int) NoPos, pState)
-		= (True, PE_Basic (BVI int_string) NoPos, pState)
+		= (True, PE_Basic (BVInt int), pState)
+		= (True, PE_Basic (BVI int_string), pState)
 trySimplePatternWithoutDefinitionsT (StringToken string) pState
-	= (True, PE_Basic (BVS string) NoPos, pState)
+	= (True, PE_Basic (BVS string), pState)
 trySimplePatternWithoutDefinitionsT (BoolToken bool) pState
-	= (True, PE_Basic (BVB bool) NoPos, pState)
+	= (True, PE_Basic (BVB bool), pState)
 trySimplePatternWithoutDefinitionsT (CharToken char) pState
-	= (True, PE_Basic (BVC char) NoPos, pState)
+	= (True, PE_Basic (BVC char), pState)
 trySimplePatternWithoutDefinitionsT (RealToken real) pState
-	= (True, PE_Basic (BVR real) NoPos, pState)
+	= (True, PE_Basic (BVR real), pState)
 trySimplePatternWithoutDefinitionsT (QualifiedIdentToken module_name ident_name) pState
 	| not (isLowerCaseName ident_name)
 		# (module_id, pState) = stringToQualifiedModuleIdent module_name ident_name IC_Expression pState
@@ -3672,33 +3680,18 @@ trySimpleExpressionT CurlyOpenToken pState
 	# (rec_or_aray_exp, pState) = wantRecordOrArrayExp cIsNotAPattern pState 
 	= (True, rec_or_aray_exp, pState)
 trySimpleExpressionT (IntToken int_string) pState
-	# (file_name, line_nr, pState)
-	  						= getFileAndLineNr pState
-	  position				= LinePos file_name line_nr
 	# (ok,int) = string_to_int int_string
 	| ok
-		= (True, PE_Basic (BVInt int) position, pState)
-		= (True, PE_Basic (BVI int_string) position, pState)
+		= (True, PE_Basic (BVInt int), pState)
+		= (True, PE_Basic (BVI int_string), pState)
 trySimpleExpressionT (StringToken string) pState
-	# (file_name, line_nr, pState)
-	  						= getFileAndLineNr pState
-	  position				= LinePos file_name line_nr
-	= (True, PE_Basic (BVS string) position, pState)
+	= (True, PE_Basic (BVS string), pState)
 trySimpleExpressionT (BoolToken bool) pState
-	# (file_name, line_nr, pState)
-	  						= getFileAndLineNr pState
-	  position				= LinePos file_name line_nr
-	= (True, PE_Basic (BVB bool) position, pState)
+	= (True, PE_Basic (BVB bool), pState)
 trySimpleExpressionT (CharToken char) pState
-	# (file_name, line_nr, pState)
-	  						= getFileAndLineNr pState
-	  position				= LinePos file_name line_nr
-	= (True, PE_Basic (BVC char) position, pState)
+	= (True, PE_Basic (BVC char), pState)
 trySimpleExpressionT (RealToken real) pState
-	# (file_name, line_nr, pState)
-	  						= getFileAndLineNr pState
-	  position				= LinePos file_name line_nr
-	= (True, PE_Basic (BVR real) position, pState)
+	= (True, PE_Basic (BVR real), pState)
 trySimpleExpressionT (QualifiedIdentToken module_name ident_name) pState
 	# (module_id, pState) = stringToQualifiedModuleIdent module_name ident_name IC_Expression pState
 	= (True, PE_QualifiedIdent module_id ident_name, pState)
@@ -4074,9 +4067,9 @@ want_head_strictness token pState
 add_chars [] 			acc	= acc
 add_chars ['\\',c1,c2,c3:r] acc
 	| c1>='0' && c1<='7'
-		= add_chars r [PE_Basic (BVC (toString ['\'','\\',c1,c2,c3,'\''])) NoPos : acc]
-add_chars ['\\',c:r] acc = add_chars r [PE_Basic (BVC (toString ['\'','\\',c,'\''])) NoPos : acc]
-add_chars [c:r] 		acc	= add_chars r [PE_Basic (BVC (toString ['\'',c,'\''])) NoPos : acc]
+		= add_chars r [PE_Basic (BVC (toString ['\'','\\',c1,c2,c3,'\''])): acc]
+add_chars ['\\',c:r] acc = add_chars r [PE_Basic (BVC (toString ['\'','\\',c,'\''])): acc]
+add_chars [c:r] 		acc	= add_chars r [PE_Basic (BVC (toString ['\'',c,'\''])): acc]
 
 makeNilExpression :: Int Bool -> ParsedExpr
 makeNilExpression head_strictness is_pattern

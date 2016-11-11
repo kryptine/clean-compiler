@@ -1037,10 +1037,8 @@ checkInstanceType mod_index ins_class_index ins_class_ident class_fun_dep_vars i
 	  oti = { oti_heaps = heaps, oti_all_vars = [], oti_all_attrs = [], oti_global_vars= [] }
 	  (it_types, undefined_contexts_vars, (ots, oti=:{oti_all_vars = it_vars, oti_all_attrs = it_attr_vars}, cs))
 		= check_instance_type class_fun_dep_vars mod_index it_types (ots, oti, {cs & cs_error = cs_error})
-	  (heaps, cs) = IF_ALLOW_NON_LINEAR_INSTANCES
-						(oti.oti_heaps, cs)
-						(check_linearity_of_type_vars it_vars oti.oti_heaps cs)
-	  oti = {oti & oti_all_vars = [], oti_all_attrs = [], oti_heaps = heaps}
+	  (heaps, cs) = check_linearity_of_type_vars it_vars oti.oti_heaps cs
+	  oti = { oti &  oti_all_vars = [], oti_all_attrs = [], oti_heaps = heaps }
 	  (it_context, type_context_vars, type_defs, class_defs, modules, heaps, cs)
 		= checkInstanceTypeContexts it_context it_vars it_types undefined_contexts_vars mod_index class_defs ots oti cs
 	  it_vars = case type_context_vars of
@@ -1056,7 +1054,7 @@ checkInstanceType mod_index ins_class_index ins_class_ident class_fun_dep_vars i
   where
 	check_fully_polymorphity it_types it_context cs_error
 		| all is_type_var it_types && not (isEmpty it_context)
-			= IF_ALLOW_NON_TERMINATING_AND_OVERLAPPING_INSTANCES
+			= IF_ALLOW_NON_LINEAR_AND_OVERLAPPING_INSTANCES
 				cs_error
 				(checkError "context restriction not allowed for fully polymorph instance" "" cs_error)
 		= cs_error
@@ -1064,8 +1062,7 @@ checkInstanceType mod_index ins_class_index ins_class_ident class_fun_dep_vars i
 		is_type_var (TV _) = True
 		is_type_var _ = False
 
-	check_instance_type :: Int Int [Type] *(u:OpenTypeSymbols,*OpenTypeInfo,*CheckState)
-					-> ([Type],[[TypeVar]],(u:OpenTypeSymbols,*OpenTypeInfo,*CheckState))
+	check_instance_type :: Int Int [Type] *(u:OpenTypeSymbols,*OpenTypeInfo,*CheckState) -> ([Type],[[TypeVar]],(u:OpenTypeSymbols,*OpenTypeInfo,*CheckState))
 	check_instance_type 0 mod_index it_types ots_oti_cs
 		# (it_types, ots_oti_cs) = checkOpenTypes mod_index cGlobalScope DAK_None it_types ots_oti_cs
 		= (it_types, [], ots_oti_cs)
@@ -1087,7 +1084,9 @@ checkInstanceType mod_index ins_class_index ins_class_ident class_fun_dep_vars i
 		check_linearity {tv_ident, tv_info_ptr} (th_vars, error)
 			# (TVI_AttrAndRefCount prev_attr ref_count, th_vars) = readPtr tv_info_ptr th_vars
 			| ref_count > 1
-				= (th_vars, checkError tv_ident ": this type variable occurs more than once in an instance type" error)
+				= IF_ALLOW_NON_LINEAR_AND_OVERLAPPING_INSTANCES
+					(th_vars, error)
+					(th_vars, checkError tv_ident ": this type variable occurs more than once in an instance type" error)
 				= (th_vars, error)
 
 	compare_context_and_instance_types ins_class_index ins_class_ident it_types {tc_class=TCGeneric _, tc_types} cs_error
@@ -1319,20 +1318,6 @@ mark_free_vars [{tv_ident={id_info}}:free_vars] cs=:{cs_symbol_table}
 mark_free_vars [] cs
   	= cs
 
-add_errors_for_type_variables_only_in_constraints_and_dependent_part :: ![TypeVar] !*CheckState -> *CheckState
-add_errors_for_type_variables_only_in_constraints_and_dependent_part [{tv_ident={id_info,id_name}}:free_vars] cs=:{cs_error,cs_symbol_table}
-	# (entry=:{ste_kind},cs_symbol_table) = readPtr id_info cs_symbol_table
-	= case ste_kind of
-		STE_TypeVariable _
-			# cs & cs_symbol_table = cs_symbol_table,
-				   cs_error = checkError id_name "type variable not used in the instance type (only in constraints or dependent part)" cs_error
-			-> add_errors_for_type_variables_only_in_constraints_and_dependent_part free_vars cs
-		_
-			# cs & cs_symbol_table = cs_symbol_table
-			-> add_errors_for_type_variables_only_in_constraints_and_dependent_part free_vars cs
-add_errors_for_type_variables_only_in_constraints_and_dependent_part [] cs
-  	= cs
-
 checkTypeContext ::  !Index !TypeContext !(!v:{#ClassDef}, !u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState)
 			 -> (!TypeContext,![TypeVar],!(!v:{#ClassDef}, !u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState))
 checkTypeContext mod_index tc=:{tc_class, tc_types} (class_defs, ots, oti, cs)
@@ -1396,9 +1381,6 @@ checkInstanceTypeContexts tcs instance_type_vars instance_type undefined_context
 	  cs & cs_symbol_table=cs_symbol_table
 	  fun_dep_determined_vars = if (isEmpty new_fun_dep_determined_vars) fun_dep_determined_vars (fun_dep_determined_vars++reverse new_fun_dep_determined_vars)
 	  (free_vars,cs) = collect_free_contexts_vars_error undefined_contexts_vars oti.oti_all_vars cs
-	  cs = IF_ALLOW_NON_TERMINATING_AND_OVERLAPPING_INSTANCES
-			cs
-			(add_errors_for_type_variables_only_in_constraints_and_dependent_part fun_dep_determined_vars cs)
 	  cs = check_class_attributes oti.oti_all_attrs cs
 	  cs = check_no_global_type_vars oti.oti_global_vars cs
 	= (tcs, fun_dep_determined_vars ++ free_vars, ots_type_defs, class_defs, ots_modules, oti.oti_heaps, cs)
@@ -1568,7 +1550,9 @@ where
 			STE_FunDepTypeVariable tv_info_ptr
 				# entry & ste_kind = STE_TypeVariable tv_info_ptr
 				# cs & cs_symbol_table = writePtr id_info entry cs_symbol_table
-				# cs & cs_error = checkError tv_ident.id_name ": coverage condition fails" cs.cs_error
+
+				# cs & cs_error = checkWarning tv_ident.id_name ": coverage condition fails" cs.cs_error
+
 				-> collect_free_context_vars undefined_context_vars [tv:free_vars] cs
 			STE_TypeVariable tv_info_ptr
 				# cs & cs_symbol_table = cs_symbol_table
