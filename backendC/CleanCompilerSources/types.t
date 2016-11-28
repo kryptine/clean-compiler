@@ -35,7 +35,6 @@ typedef enum
 		 otherFile, hsFile
 		} FileKind;
 
-#define EndOfFile		((int) -1)
 #define FileNameMax		256
 #define SeekSet
 #define SeekCur
@@ -53,7 +52,9 @@ typedef unsigned long SysTime;
 #  ifdef __MWERKS__
 # 	include <x86_prefix.h>
 #  else
-# 	define _X86_
+#   ifndef _X86_
+#    define _X86_
+#   endif
 #  endif
 #  include <windef.h>
 #  include <winbase.h>
