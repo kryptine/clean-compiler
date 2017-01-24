@@ -255,9 +255,9 @@ where
 						-> (funs_and_groups, gs)
 					GeneratedBody	
 						// needs a generic representation
-						-> build_generic_type_rep type_def.td_rhs type_def.td_ident glob_module glob_object td_info gc_ident.id_name gc_pos funs_and_groups gs
+						-> build_generic_type_rep type_def.TypeDef.td_rhs type_def.TypeDef.td_ident glob_module glob_object td_info gc_ident.id_name gc_pos funs_and_groups gs
 			GCFS gcfs
-				-> build_generic_type_rep type_def.td_rhs type_def.td_ident glob_module glob_object td_info "derive generic superclass" gc_pos funs_and_groups gs
+				-> build_generic_type_rep type_def.TypeDef.td_rhs type_def.TypeDef.td_ident glob_module glob_object td_info "derive generic superclass" gc_pos funs_and_groups gs
 	build_generic_representation _ st
 		= st
 
@@ -352,7 +352,7 @@ where
 
 	convert_type_app {type_index} attr args (modules, td_infos, heaps, error)	
 		# (type_def, modules) = modules![type_index.glob_module].com_type_defs.[type_index.glob_object]
-		= case type_def.td_rhs of 
+		= case type_def.TypeDef.td_rhs of 
 			SynType atype
 				# (expanded_type, th) = expandSynonymType type_def attr args heaps.hp_type_heaps 
 				-> convert {at_type = expanded_type, at_attribute = attr} 
@@ -395,7 +395,7 @@ where
 
 	convert_type_app {type_index=type_index=:{glob_module,glob_object},type_arity} attr args (modules, td_infos, heaps, error)
 		# (type_def, modules) = modules![glob_module].com_type_defs.[glob_object]
-		= case type_def.td_rhs of 
+		= case type_def.TypeDef.td_rhs of 
 			SynType atype
 				# (expanded_type, th) = expandSynonymType type_def attr args heaps.hp_type_heaps
 				-> convert {at_type = expanded_type, at_attribute = attr} 
@@ -675,14 +675,14 @@ buildTypeDefInfo ::
 		!PredefinedSymbols		
 		!FunsAndGroups !*Modules !*Heaps !*ErrorAdmin
 	-> 	(!TypeInfos, !FunsAndGroups, !*Modules, !*Heaps, !*ErrorAdmin)
-buildTypeDefInfo td=:{td_rhs = AlgType alts} td_module main_module_index predefs funs_and_groups modules heaps error
+buildTypeDefInfo td=:{TypeDef | td_rhs = AlgType alts} td_module main_module_index predefs funs_and_groups modules heaps error
 	= buildAlgebraicTypeDefInfo td alts td_module main_module_index predefs funs_and_groups modules heaps error
-buildTypeDefInfo td=:{td_rhs = RecordType {rt_constructor, rt_fields}} td_module main_module_index predefs funs_and_groups modules heaps error
+buildTypeDefInfo td=:{TypeDef | td_rhs = RecordType {rt_constructor, rt_fields}} td_module main_module_index predefs funs_and_groups modules heaps error
 	= buildRecordTypeDefInfo td rt_constructor [x\\x<-:rt_fields] td_module main_module_index predefs funs_and_groups modules heaps error
-buildTypeDefInfo td=:{td_rhs = SynType type, td_ident, td_pos} td_module main_module_index predefs funs_and_groups modules heaps error
+buildTypeDefInfo td=:{TypeDef | td_rhs = SynType type, td_ident, td_pos} td_module main_module_index predefs funs_and_groups modules heaps error
 	# error = reportError td_ident.id_name td_pos "cannot build constructor information for a synonym type" error
 	= buildAlgebraicTypeDefInfo td [] td_module main_module_index predefs funs_and_groups modules heaps error
-buildTypeDefInfo td=:{td_rhs = AbstractType _, td_ident, td_pos} td_module main_module_index predefs funs_and_groups modules heaps error
+buildTypeDefInfo td=:{TypeDef | td_rhs = AbstractType _, td_ident, td_pos} td_module main_module_index predefs funs_and_groups modules heaps error
 	# error = reportError td_ident.id_name td_pos "cannot build constructor information for an abstract type" error
 	= buildAlgebraicTypeDefInfo td [] td_module main_module_index predefs funs_and_groups modules heaps error
 
@@ -3127,17 +3127,17 @@ add_OBJECT_info_args generic_info type_def cons_desc_list_ds arg_exprs main_modu
 		= (arg_exprs,heaps)
 	| generic_info bitand 1<>0 // gtd_name
 		# generic_info = generic_info bitxor 1
-		#! gtd_name_expr = makeStringExpr type_def.td_ident.id_name
+		#! gtd_name_expr = makeStringExpr type_def.TypeDef.td_ident.id_name
 		# (arg_exprs,heaps) = add_OBJECT_info_args generic_info type_def cons_desc_list_ds arg_exprs main_module_index heaps
 		= ([gtd_name_expr : arg_exprs],heaps)
 	| generic_info bitand 2<>0 // gtd_arity
 		# generic_info = generic_info bitxor 2
-		#! gtd_arity_expr = makeIntExpr type_def.td_arity
+		#! gtd_arity_expr = makeIntExpr type_def.TypeDef.td_arity
 		# (arg_exprs,heaps) = add_OBJECT_info_args generic_info type_def cons_desc_list_ds arg_exprs main_module_index heaps
 		= ([gtd_arity_expr : arg_exprs],heaps)
 	| generic_info bitand 4<>0 // gtd_num_conses
 		# generic_info = generic_info bitxor 4
-		#! gtd_num_conses_expr = makeIntExpr (case type_def.td_rhs of AlgType alts -> length alts; _ -> 0)
+		#! gtd_num_conses_expr = makeIntExpr (case type_def.TypeDef.td_rhs of AlgType alts -> length alts; _ -> 0)
 		# (arg_exprs,heaps) = add_OBJECT_info_args generic_info type_def cons_desc_list_ds arg_exprs main_module_index heaps
 		= ([gtd_num_conses_expr : arg_exprs],heaps)
 	| generic_info bitand 8<>0 // gtd_conses
@@ -3187,19 +3187,19 @@ add_RECORD_info_args generic_info type_def gen_type_ds field_list_ds type_module
 		= (arg_exprs,modules,heaps)
 	| generic_info bitand 1<>0 // grd_name
 		# generic_info = generic_info bitxor 1
-		#! grd_name_expr = makeStringExpr type_def.td_ident.id_name
+		#! grd_name_expr = makeStringExpr type_def.TypeDef.td_ident.id_name
 		# (arg_exprs,modules,heaps) = add_RECORD_info_args generic_info type_def gen_type_ds field_list_ds type_module arg_exprs main_module_index modules heaps
 		= ([grd_name_expr : arg_exprs],modules,heaps)
 	| generic_info bitand 2<>0 // grd_arity
 		# generic_info = generic_info bitxor 2
-		# (RecordType {rt_constructor}) = type_def.td_rhs
+		# (RecordType {rt_constructor}) = type_def.TypeDef.td_rhs
 		# ({cons_type}, modules) = modules![type_module].com_cons_defs.[rt_constructor.ds_index]
 		#! grd_arity_expr = makeIntExpr cons_type.st_arity
 		# (arg_exprs,modules,heaps) = add_RECORD_info_args generic_info type_def gen_type_ds field_list_ds type_module arg_exprs main_module_index modules heaps
 		= ([grd_arity_expr : arg_exprs],modules,heaps)
 	| generic_info bitand 4<>0 // grd_type_arity
 		# generic_info = generic_info bitxor 4
-		#! grd_type_arity_expr = makeIntExpr type_def.td_arity
+		#! grd_type_arity_expr = makeIntExpr type_def.TypeDef.td_arity
 		# (arg_exprs,modules,heaps) = add_RECORD_info_args generic_info type_def gen_type_ds field_list_ds type_module arg_exprs main_module_index modules heaps
 		= ([grd_type_arity_expr : arg_exprs],modules,heaps)
 	| generic_info bitand 8<>0 // grd_type
@@ -5474,8 +5474,8 @@ foldExpr f expr=:(DynamicExpr {dyn_expr}) st
 	= foldExpr f dyn_expr st
 foldExpr f EE st 
 	= st
-foldExpr f expr st 
-	= abort "generic.icl: foldExpr does not match\n"
+foldExpr f _ st 
+	= st
 
 // needed for collectCalls
 instance == FunCall where (==) (FunCall x _) (FunCall y _) = x == y
