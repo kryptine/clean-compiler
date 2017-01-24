@@ -43,3 +43,7 @@ instance arraySubst AType
 instance arraySubst Type
 instance arraySubst TypeContext
 instance arraySubst [a] | arraySubst a special a=TypeContext
+
+
+collect_temp_dynamics :: ![Int] !*{#FunDef} !*ExpressionHeap -> *([(ExprInfoPtr, ExprInfo)], *{#FunDef}, *ExpressionHeap)
+reset_temp_dynamics :: ![(ExprInfoPtr, ExprInfo)] !*ExpressionHeap -> *ExpressionHeap

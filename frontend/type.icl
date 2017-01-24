@@ -2422,12 +2422,24 @@ where
 					-> clear_local_dynamics loc_dynamics (clear_type_vars dt_global_vars var_heap, expr_heap)
 				EI_UnmarkedDynamic _ _
 					-> (var_heap, expr_heap)
+				EI_TempDynamicType _ _ _ _ _ _ _
+					-> (var_heap, trace_n "clear_dynamic EI_TempDynamicType" expr_heap)
+				EI_TempDynamicPattern _ _ _ _ _ _ _ _
+					-> (var_heap, trace_n "clear_dynamic EI_TempDynamicPattern" expr_heap)
+				EI_TypeOfDynamic _
+					-> (var_heap, trace_n "clear_dynamic EI_TypeOfDynamic" expr_heap)
+				EI_TypeOfDynamicPattern _ _ _
+					-> (var_heap, trace_n "clear_dynamic EI_TypeOfDynamicPattern" expr_heap)
+				EI_TypeOfDynamicWithContexts _ _
+					-> (var_heap, trace_n "clear_dynamic EI_TypeOfDynamicWithContexts" expr_heap)
 
 		clear_local_dynamics loc_dynamics state
 			= foldSt clear_dynamic loc_dynamics state
 
 		clear_type_vars type_vars var_heap
 			= foldSt (\{tv_info_ptr} -> writePtr tv_info_ptr TVI_Empty) type_vars var_heap 
+
+import StdDebug
 
 specification_error type type1 err
 	# err = errorHeading "Type error" err
@@ -2572,17 +2584,17 @@ where
 		# (start_index, predef_symbols) = get_index_of_start_rule main_dcl_module_n predef_symbols
 		# (predef_symbols, ts) = CreateInitialSymbolTypes start_index ti_common_defs comp (predef_symbols, ts)
 		| not ts.ts_error.ea_ok
-			= (True, predef_symbols, special_instances, out, create_erroneous_function_types comp
+			= (True, predef_symbols, special_instances, out, create_erroneous_function_types comp (reset_expr_heap comp
 					{ ts & ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [],
-								ts_error = { ts.ts_error & ea_ok = True } })
+								ts_error = { ts.ts_error & ea_ok = True } }))
 		# (fun_reqs, ts) = type_functions comp ti ts
 		#! nr_of_type_variables = ts.ts_var_store 
 		# (subst, ts_type_heaps, ts_error)
 		  		= unify_requirements_of_functions fun_reqs ti (createArray nr_of_type_variables TE) ts.ts_type_heaps ts.ts_error
 		| not ts_error.ea_ok
-			= (True, predef_symbols, special_instances, out, create_erroneous_function_types comp
-				{ ts & ts_type_heaps = ts_type_heaps, ts_error = { ts_error & ea_ok = True },
-					ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = []})
+			= (True, predef_symbols, special_instances, out, create_erroneous_function_types comp (reset_expr_heap comp
+				{ ts & ts_type_heaps = ts_type_heaps, ts_error = { ts_error & ea_ok = True }, ts_expr_heap = ts.ts_expr_heap,
+					ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = []}))
 		# {ts_attr_store,ts_var_heap,ts_var_store,ts_expr_heap,ts_generic_heap,ts_td_infos,ts_cons_variables,ts_exis_variables} = ts
 		  (calls, user_contexts, (subst, ts_expr_heap)) = collect_overloaded_calls_and_user_contexts fun_reqs [] [] (subst, ts_expr_heap)
 
@@ -2601,17 +2613,17 @@ where
 		  		= finishContextReduction red_apps case_with_context_ptrs main_dcl_module_n ti_common_defs ts_var_heap ts_type_heaps ts_expr_heap predef_symbols special_instances
 		  				coercion_env subst ts_error
 		| not ts_error.ea_ok 
-			= (True, predef_symbols, special_instances, out, create_erroneous_function_types comp { ts & ts_type_heaps = ts_type_heaps,
+			= (True, predef_symbols, special_instances, out, create_erroneous_function_types comp (reset_expr_heap comp { ts & ts_type_heaps = ts_type_heaps,
 					ts_error = { ts_error & ea_ok = True }, ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [], 
-					ts_td_infos = ts_td_infos, ts_expr_heap = ts_expr_heap, ts_var_heap = ts_var_heap })
+					ts_td_infos = ts_td_infos, ts_expr_heap = ts_expr_heap, ts_var_heap = ts_var_heap }))
 		# (contexts, dict_types, {hp_var_heap=ts_var_heap, hp_expression_heap=ts_expr_heap, hp_type_heaps=ts_type_heaps, hp_generic_heap}, subst, ts_error)
 		  		= addDictionaries user_contexts contexts fin_red_apps ti_common_defs 
 			  		{hp_var_heap= ts_var_heap, hp_expression_heap = ts_expr_heap, hp_type_heaps = ts_type_heaps, hp_generic_heap = ts_generic_heap}
 			  		 subst ts_error
 		| not ts_error.ea_ok
-			= (True, predef_symbols, special_instances, out, create_erroneous_function_types comp { ts & ts_type_heaps = ts_type_heaps,
-					ts_error = { ts_error & ea_ok = True }, ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [], 
-					ts_td_infos = ts_td_infos, ts_expr_heap = ts_expr_heap, ts_var_heap = ts_var_heap, ts_generic_heap=hp_generic_heap})
+			= (True, predef_symbols, special_instances, out, create_erroneous_function_types comp (reset_expr_heap comp { ts & ts_type_heaps = ts_type_heaps,
+					      ts_error = { ts_error & ea_ok = True }, ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [],
+					      ts_td_infos = ts_td_infos, ts_expr_heap = ts_expr_heap, ts_var_heap = ts_var_heap, ts_generic_heap=hp_generic_heap}))
 
 		# (fun_defs, coercion_env, subst, ts_td_infos, ts_var_heap, ts_expr_heap, ts_error)
 		  		= makeSharedReferencesNonUnique comp ts.ts_fun_defs coercion_env subst ts_td_infos ts_var_heap ts_expr_heap ts_error
@@ -2631,19 +2643,53 @@ where
 				(out,ts)
 		| not ts.ts_error.ea_ok
 			= (True, predef_symbols, special_instances, out, create_erroneous_function_types comp
-					{ ts & ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [], ts_error = { ts.ts_error & ea_ok = True }})
+					(reset_expr_heap comp { ts & ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [], ts_error = { ts.ts_error & ea_ok = True }}))
 		# ts_type_heaps = ts.ts_type_heaps
 		  type_code_info = {	tci_type_var_heap = ts_type_heaps.th_vars, tci_attr_var_heap = ts_type_heaps.th_attrs,
 								tci_dcl_modules = dcl_modules, tci_common_defs = ti_common_defs } 
 		  (fun_defs, ts_fun_env, ts_expr_heap, {tci_type_var_heap,tci_attr_var_heap}, ts_var_heap, ts_error, predef_symbols)
 		  		= removeOverloadedFunctionsWithoutUpdatingFunctions comp local_pattern_variables main_dcl_module_n ts.ts_fun_defs ts.ts_fun_env
 		  								ts.ts_expr_heap type_code_info ts.ts_var_heap ts.ts_error predef_symbols
+		# ts = { ts & ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [],
+					        ts_expr_heap = ts_expr_heap, ts_error = { ts_error & ea_ok = True },
+				          	ts_var_heap = ts_var_heap, ts_type_heaps = { ts_type_heaps & th_vars =  tci_type_var_heap, th_attrs =  tci_attr_var_heap },
+				          	ts_fun_env = ts_fun_env, ts_fun_defs=fun_defs}
 		= (	type_error || not ts_error.ea_ok,
-			predef_symbols, special_instances, out,
-			{ ts & ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [],
-					ts_expr_heap = ts_expr_heap, ts_error = { ts_error & ea_ok = True },
-				  	ts_var_heap = ts_var_heap, ts_type_heaps = { ts_type_heaps & th_vars =  tci_type_var_heap, th_attrs =  tci_attr_var_heap },
-				  	ts_fun_env = ts_fun_env, ts_fun_defs=fun_defs})
+			predef_symbols, special_instances, out, reset_expr_heap comp ts)
+
+reset_expr_heap :: ![Int] !*TypeState -> *TypeState
+reset_expr_heap funs ts
+  # {ts_fun_defs, ts_expr_heap} = ts
+  # (eis, fun_defs, expr_heap)  = collect_temp_dynamics funs ts_fun_defs ts_expr_heap
+  # expr_heap                   = reset_temp_dynamics eis expr_heap
+  = { ts & ts_fun_defs = fun_defs, ts_expr_heap = expr_heap }
+
+collect_temp_dynamics :: ![Int] !*{#FunDef} !*ExpressionHeap -> *([(ExprInfoPtr, ExprInfo)], *{#FunDef}, *ExpressionHeap)
+collect_temp_dynamics funs fun_defs expr_heap = collect_temp_dynamics` funs [] fun_defs expr_heap
+  where
+  collect_temp_dynamics` []           ds fun_defs expr_heap = (ds, fun_defs, expr_heap)
+  collect_temp_dynamics` [fun : funs] ds fun_defs expr_heap
+    # (fd, fun_defs)        = fun_defs![fun]
+    # (dynamics, expr_heap) = foldSt collect_dynamic fd.fun_info.fi_dynamics ([], expr_heap)
+    = collect_temp_dynamics` funs (dynamics ++ ds) fun_defs expr_heap
+    where
+    collect_dynamic :: ExprInfoPtr ([(ExprInfoPtr, ExprInfo)], *ExpressionHeap) -> ([(ExprInfoPtr, ExprInfo)], *ExpressionHeap)
+    collect_dynamic dyn_ptr (dyn_ptrs, expr_heap)
+      # (dyn_info, expr_heap) = readPtr dyn_ptr expr_heap
+      = case dyn_info of
+          EI_TempDynamicType opt_dyn_type loc_dynamics _ _ _ _ _
+            = foldSt collect_dynamic loc_dynamics ([(dyn_ptr, dyn_info):dyn_ptrs], expr_heap)
+          EI_TempDynamicPattern loc_type_vars dt loc_dynamics _ _ _ _ _
+            = foldSt collect_dynamic loc_dynamics ([(dyn_ptr, dyn_info):dyn_ptrs], expr_heap)
+          _ = (dyn_ptrs, expr_heap)
+
+reset_temp_dynamics :: ![(ExprInfoPtr, ExprInfo)] !*ExpressionHeap -> *ExpressionHeap
+reset_temp_dynamics ptrs expr_heap = foldSt reset_dynamic ptrs expr_heap
+  where
+  reset_dynamic :: (ExprInfoPtr, ExprInfo) *ExpressionHeap -> *ExpressionHeap
+  reset_dynamic (dyn_ptr, EI_TempDynamicType    opt_dyn_type     loc_dynamics _ _ _ _ _) expr_heap = expr_heap <:= (dyn_ptr, EI_Dynamic opt_dyn_type loc_dynamics)
+  reset_dynamic (dyn_ptr, EI_TempDynamicPattern loc_type_vars dt loc_dynamics _ _ _ _ _) expr_heap = expr_heap <:= (dyn_ptr, EI_DynamicTypeWithVars loc_type_vars dt loc_dynamics)
+  reset_dynamic _                                                                        expr_heap = expr_heap
 
 update_function_types :: !Index !{!Group} !*{!FunctionType} !*{#FunDef} -> (!*{#FunDef}, !*{!FunctionType})
 update_function_types group_index comps fun_env fun_defs

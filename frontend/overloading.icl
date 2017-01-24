@@ -2683,17 +2683,17 @@ where
 			  
 			  error = setErrorAdmin (newPosition fun_ident fun_pos) error
 			  (rev_variables,var_heap,error) = determine_class_arguments st_context var_heap error
+			# (tmp_expr_infos, fun_defs, symbol_heap) = collect_temp_dynamics group fun_defs symbol_heap
 			  (type_code_info, symbol_heap, type_pattern_vars, var_heap, error)
 			  		= convertDynamicTypes fun_info.fi_dynamics (type_code_info, symbol_heap, type_pattern_vars, var_heap, error)
-			 
 			  (_ /*tb_rhs*/, ui)
 			  		= updateExpression fun_info.fi_group_index tb_rhs {ui_instance_calls = [], ui_local_vars = fun_info.fi_local_vars, ui_symbol_heap = symbol_heap,
 			  				ui_var_heap = var_heap, ui_fun_defs = fun_defs, ui_fun_env = fun_env, ui_error = error,
 							ui_has_type_codes = False,
 						    ui_x = {x_type_code_info=type_code_info, x_predef_symbols=predef_symbols,x_main_dcl_module_n=main_dcl_module_n}}
-
 			#  {ui_instance_calls, ui_local_vars, ui_symbol_heap, ui_var_heap, ui_fun_defs, ui_fun_env, ui_has_type_codes, ui_error, ui_x = {x_type_code_info = type_code_info, x_predef_symbols = predef_symbols}}
 				=	ui
+			# ui_symbol_heap = reset_temp_dynamics tmp_expr_infos ui_symbol_heap
 			# (tb_args, var_heap) = retrieve_class_arguments rev_variables tb_args ui_var_heap
 			  // fun_body and fun_arity not updated
 			  fun_def & fun_info = {fun_info & fi_calls = fun_info.fi_calls ++ ui_instance_calls, fi_local_vars = ui_local_vars,
