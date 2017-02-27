@@ -48,4 +48,6 @@ search_qualified_ident :: !Ident {#Char} !NameSpaceN !*CheckState -> (!Bool,!Dec
 search_qualified_import :: !String !SortedQualifiedImports !NameSpaceN -> (!Bool,!DeclarationRecord)
 search_qualified_imports :: !String !SortedQualifiedImports !NameSpaceN -> [DeclarationRecord]
 
+qualified_import_for_type :: !String !SortedQualifiedImports -> Bool
+
 restore_module_ste_kinds_in_symbol_table :: ![(SymbolPtr,STE_Kind)] !*SymbolTable -> *SymbolTable
