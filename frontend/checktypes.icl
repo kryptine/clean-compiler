@@ -3,7 +3,7 @@ implementation module checktypes
 import StdEnv, compare_types
 import syntax, checksupport, typesupport, utilities
 import genericsupport
-from explicitimports import search_qualified_ident,::NameSpaceN,TypeNameSpaceN,ClassNameSpaceN
+from explicitimports import search_qualified_ident,qualified_import_for_type,::NameSpaceN,TypeNameSpaceN,ClassNameSpaceN
 
 ::	TypeSymbols = 
 	{	ts_type_defs		:: !.{# CheckedTypeDef}
@@ -410,6 +410,59 @@ check_fun_dep_context_types tc_class [type : types] fun_dep_vars cs
 check_fun_dep_context_types tc_class [] fun_dep_vars cs=:{cs_error}
 	= {cs & cs_error = checkError tc_class "type context should contain one or more type variables" cs_error}
 
+cached_used_type_is_imported :: !Ident !Int !SymbolPtr !*SymbolTable -> (!Bool,!*SymbolTable)
+cached_used_type_is_imported {id_info,id_name} module_n module_ptr symbol_table
+	# (entry=:{ste_kind,ste_def_level,ste_index}, symbol_table)	= readPtr id_info symbol_table
+	// both normal and qualified import are allowed, because the required information is no longer available (to do)
+	= case ste_kind of
+		STE_Type
+			| ste_def_level==cGlobalScope
+				-> (True,symbol_table)
+		STE_Imported STE_Type ste_mod_index
+			| ste_mod_index==module_n
+				-> (True,symbol_table)
+		_
+			# ({ste_kind}, symbol_table) = readPtr module_ptr symbol_table
+			-> case ste_kind of
+				STE_ModuleQualifiedImports sorted_qualified_imports
+					| qualified_import_for_type id_name sorted_qualified_imports
+						-> (True,symbol_table)
+				_
+					-> (False,symbol_table)
+
+check_imports_of_cached_used_types :: [GlobalIndex] Int Int *{#CheckedTypeDef} *{#DclModule} *CheckState -> (!*{#CheckedTypeDef},!*{#DclModule},!*CheckState)
+check_imports_of_cached_used_types [{gi_module,gi_index} : used_types] module_index type_index ts_type_defs modules cs
+	| gi_module==cPredefinedModuleIndex
+		= check_imports_of_cached_used_types used_types module_index type_index ts_type_defs modules cs
+	# (module_ptr,modules) = modules![gi_module].dcl_name.id_info
+	| gi_module==module_index
+		# (type_ident,ts_type_defs) = ts_type_defs![gi_index].td_ident
+		  (is_imported,symbol_table) = cached_used_type_is_imported type_ident gi_module module_ptr cs.cs_symbol_table
+		  cs & cs_symbol_table=symbol_table
+		| is_imported
+			= check_imports_of_cached_used_types used_types module_index type_index ts_type_defs modules cs
+			= error_and_check_imports_of_cached_used_types type_ident used_types module_index type_index ts_type_defs modules cs
+		# (type_ident,modules) = modules![gi_module].dcl_common.com_type_defs.[gi_index].td_ident
+		  (is_imported,symbol_table) = cached_used_type_is_imported type_ident gi_module module_ptr cs.cs_symbol_table
+		  cs & cs_symbol_table=symbol_table
+		| is_imported
+			= check_imports_of_cached_used_types used_types module_index type_index ts_type_defs modules cs
+			= error_and_check_imports_of_cached_used_types type_ident used_types module_index type_index ts_type_defs modules cs
+where
+	error_and_check_imports_of_cached_used_types type_ident used_types module_index type_index ts_type_defs modules cs
+		# (module_name,modules) = modules![gi_module].dcl_name.id_name
+		# (td_pos, ts_type_defs) = ts_type_defs![type_index].td_pos
+		# cs & cs_error = checkErrorWithPosition type_ident td_pos ("not imported in implementation module (from "+++module_name+++")") cs.cs_error
+		= check_imports_of_cached_used_types used_types module_index type_index ts_type_defs modules cs
+check_imports_of_cached_used_types [] module_index type_index ts_type_defs modules cs
+	= (ts_type_defs,modules,cs)
+
+check_imports_of_cached_type_def :: Int Int *TypeSymbols *CheckState -> (!*TypeSymbols,!*CheckState)
+check_imports_of_cached_type_def type_index module_index ts=:{ts_type_defs,ts_modules} cs
+	# (td_used_types, ts_type_defs) = ts_type_defs![type_index].td_used_types
+	#! (ts_type_defs,ts_modules,cs) = check_imports_of_cached_used_types td_used_types module_index type_index ts_type_defs ts_modules cs
+	= ({ts & ts_type_defs = ts_type_defs, ts_modules = ts_modules},cs)
+
 emptyIdent name :== { id_name = name, id_info = nilPtr }
 
 checkTypeDef :: !Index !Index !v:{#ClassDef} !*TypeSymbols !*TypeInfo !*CheckState -> (!v:{#ClassDef},!*TypeSymbols,!*TypeInfo,!*CheckState);
@@ -654,6 +707,7 @@ where
 	check_type_def module_index opt_icl_info type_index (class_defs, ts, ti, cs)
 		| has_to_be_checked module_index opt_icl_info type_index
 			= checkTypeDef type_index module_index class_defs ts ti cs
+			# (ts,cs) = check_imports_of_cached_type_def type_index module_index ts cs
 			= (class_defs, ts, ti, cs)
 
 	has_to_be_checked module_index No type_index

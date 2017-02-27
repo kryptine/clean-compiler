@@ -1028,6 +1028,21 @@ search_qualified_imports name (SortedQualifiedImports (Declaration declaration=:
 		= search_qualified_imports name sqi_left  name_space_n
 		= search_qualified_imports name sqi_right name_space_n
 
+qualified_import_for_type :: !String !SortedQualifiedImports -> Bool
+qualified_import_for_type name EmptySortedQualifiedImports
+	= False
+qualified_import_for_type name (SortedQualifiedImports (Declaration declaration=:{decl_ident={id_name},decl_kind}) sqi_left sqi_right)
+	| name==id_name
+		# decl_name_space_n = imported_ste_kind_to_name_space_n decl_kind
+		| TypeNameSpaceN == decl_name_space_n
+			= True
+		| TypeNameSpaceN < decl_name_space_n
+			= qualified_import_for_type name sqi_left
+			= qualified_import_for_type name sqi_right
+	| name<id_name
+		= qualified_import_for_type name sqi_left
+		= qualified_import_for_type name sqi_right
+
 restore_module_ste_kinds_in_symbol_table :: ![(SymbolPtr,STE_Kind)] !*SymbolTable -> *SymbolTable
 restore_module_ste_kinds_in_symbol_table [(ptr,ste_kind):ptrs_and_ste_kinds] symbol_table
 	# (ste,symbol_table) = readPtr ptr symbol_table
