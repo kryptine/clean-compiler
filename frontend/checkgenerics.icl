@@ -312,20 +312,20 @@ where
 	check_generic_superclasses [!!] mod_index cs
 		= ([!!],cs)
 
-	check_instance_type module_index (TA type_cons []) type_defs modules heaps=:{hp_type_heaps} cs
+	check_instance_type module_index (TA type_cons []) type_defs modules heaps cs
 		# (entry, cs_symbol_table) = readPtr type_cons.type_ident.id_info cs.cs_symbol_table
 		# cs = {cs & cs_symbol_table = cs_symbol_table}
 	  	# (type_index, type_module) = retrieveGlobalDefinition entry STE_Type module_index
 		| type_index == NotFound
 			# cs_error = checkError type_cons.type_ident "generic argument type undefined" cs.cs_error
- 			= (TA type_cons [], TypeConsSymb type_cons, type_defs, modules,{heaps&hp_type_heaps = hp_type_heaps}, {cs&cs_error=cs_error})
-		# (type_def, type_defs, modules) 
+ 			= (TA type_cons [], TypeConsSymb type_cons, type_defs, modules, heaps, {cs & cs_error=cs_error})
+		# (type_def, type_defs, modules)
 			= getTypeDef module_index {glob_module=type_module, glob_object=type_index} type_defs modules
 		# type_cons = { type_cons & type_index = { glob_object = type_index, glob_module = type_module }}
 		| type_synonym_with_arguments type_def.td_rhs type_def.td_arity
 			# cs = {cs & cs_error = checkError type_def.td_ident "type synonym not allowed" cs.cs_error}
-			= (TA type_cons [], TypeConsSymb type_cons, type_defs, modules,{heaps&hp_type_heaps = hp_type_heaps}, cs)
-			= (TA type_cons [], TypeConsSymb type_cons, type_defs, modules,{heaps&hp_type_heaps = hp_type_heaps}, cs)
+			= (TA type_cons [], TypeConsSymb type_cons, type_defs, modules, heaps, cs)
+			= (TA type_cons [], TypeConsSymb type_cons, type_defs, modules, heaps, cs)
 		where
 			type_synonym_with_arguments (SynType _) arity
 				= arity>0
@@ -335,13 +335,11 @@ where
 		= (TB b, TypeConsBasic b, type_defs, modules,heaps, cs) 
 	check_instance_type module_index TArrow type_defs modules heaps cs
 		= (TArrow, TypeConsArrow, type_defs, modules, heaps , cs) 		
-// General instance ..
 	check_instance_type module_index (TV tv) type_defs modules heaps=:{hp_type_heaps} cs
 		# (tv_info_ptr, th_vars) = newPtr TVI_Empty hp_type_heaps.th_vars
 		# tv = {tv & tv_info_ptr = tv_info_ptr}		
 		= 	( TV tv, TypeConsVar tv, type_defs, modules
 			, {heaps& hp_type_heaps = {hp_type_heaps & th_vars = th_vars}}, cs)
-// .. General instance
 	check_instance_type module_index ins_type type_defs modules heaps cs=:{cs_error}
 		# cs_error = checkError {id_name="<>",id_info=nilPtr} "invalid generic type argument" cs_error
 		= (ins_type, TypeConsArrow, type_defs, modules, heaps, {cs & cs_error=cs_error})
