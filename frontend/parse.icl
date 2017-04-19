@@ -2023,15 +2023,17 @@ where
 		= (derive_def, pState)
 
 	get_type_cons :: Type !*ParseState -> (TypeCons, !*ParseState)	
-	get_type_cons (TA type_symb []) pState 
+	get_type_cons (TA type_symb []) pState
 		= (TypeConsSymb type_symb, pState)
-	get_type_cons (TB tb) pState 
+	get_type_cons (TB tb) pState
 		= (TypeConsBasic tb, pState)
 	get_type_cons TArrow pState
 		= (TypeConsArrow, pState)
 	get_type_cons (TV tv) pState
 		| isDclContext parseContext
-			= (TypeConsVar tv, pState)			 
+			= (TypeConsVar tv, pState)
+	get_type_cons (TQualifiedIdent module_id ident_name []) pState
+		= (TypeConsQualifiedIdent module_id ident_name, pState)
 	get_type_cons type pState 
 		# pState = parseError "generic type" No " type constructor" pState
 		= (abort "no TypeCons", pState)
