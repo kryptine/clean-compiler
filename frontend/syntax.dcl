@@ -445,7 +445,8 @@ instance == GenericDependency
 	= TypeConsSymb TypeSymbIdent 
 	| TypeConsBasic BasicType 
 	| TypeConsArrow
-	| TypeConsVar TypeVar 
+	| TypeConsVar TypeVar
+	| TypeConsQualifiedIdent !Ident !String 
 
 :: GenericCaseDef =
 	{	gc_pos			:: !Position			// position in the source file

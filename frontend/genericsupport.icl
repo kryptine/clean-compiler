@@ -105,6 +105,7 @@ where
 	type_cons_to_str (TypeConsBasic bt) = toString bt
 	type_cons_to_str TypeConsArrow = "ARROW"
 	type_cons_to_str (TypeConsVar tv) = tv.tv_ident.id_name
+	type_cons_to_str (TypeConsQualifiedIdent _ type_name) = type_name
 
 field_n_of_GenericTypeDefDescriptor :: !String -> Int
 field_n_of_GenericTypeDefDescriptor "gtd_name" = 0
