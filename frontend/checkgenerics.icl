@@ -342,13 +342,7 @@ where
  			= (type, TypeConsQualifiedIdent module_id type_name, type_defs, modules, heaps, {cs & cs_error=cs_error})
 			= case decl_kind of
 				STE_Imported STE_Type type_module
-					# (entry, cs_symbol_table) = readPtr type_ident.id_info cs.cs_symbol_table
-					# cs & cs_symbol_table = cs_symbol_table
-				  	# (type_index, type_module) = retrieveGlobalDefinition entry STE_Type module_index
 					# type_cons = MakeNewTypeSymbIdent type_ident 0
-					| type_index == NotFound
-						# cs_error = checkError type_ident "generic argument type undefined" cs.cs_error
-			 			-> (type, TypeConsQualifiedIdent module_id type_name, type_defs, modules, heaps, {cs & cs_error=cs_error})
 					# (type_def, type_defs, modules)
 						= getTypeDef module_index {glob_module=type_module, glob_object=type_index} type_defs modules
 					# type_cons = { type_cons & type_index = { glob_object = type_index, glob_module = type_module }}
