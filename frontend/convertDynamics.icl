@@ -35,7 +35,7 @@ import type_io;
 
 ::	ConversionInput =
 	{	cinp_dynamic_representation	:: !DynamicRepresentation
-	,	cinp_subst_var		:: !BoundVar
+	,	cinp_subst_var :: BoundVar // lazy, may be on a cycle
 	}
 
 fatal :: {#Char} {#Char} -> .a
@@ -325,13 +325,17 @@ instance convertDynamics Let where
 		= (letje, ci)
 
 instance convertDynamics Case where
-	convertDynamics cinp kees=:{case_expr, case_guards, case_default} ci
+	convertDynamics cinp kees=:{case_expr,case_guards,case_default,case_info_ptr} ci
 		# (case_expr, ci) = convertDynamics cinp case_expr ci
 		# (case_default, ci) = convertDynamics cinp case_default ci
 		# kees = {kees & case_expr=case_expr, case_default=case_default}
 		= case case_guards of
+			AlgebraicPatterns type alts
+				# (alts, ci) = convertDynamicsAlgebraicPatternsWithContexts cinp alts ci
+				# kees & case_guards = AlgebraicPatterns type alts
+				-> (kees, ci)
 			DynamicPatterns alts
-				->	convertDynamicCase cinp kees ci
+				-> convertDynamicCase cinp kees ci
 			_
 				# (case_guards, ci) = convertDynamics cinp case_guards ci
 				# kees & case_guards=case_guards
@@ -356,6 +360,32 @@ convertDynamic cinp=:{cinp_dynamic_representation={dr_type_ident}}
 	=	(App {	app_symb		= dr_type_ident,
 				app_args 		= [dyn_expr, dyn_type_code],
 				app_info_ptr	= nilPtr }, ci)
+
+convertDynamicsAlgebraicPatternsWithContexts cinp [ap=:{ap_vars,ap_expr}:aps] ci=:{ci_type_pattern_var_count,ci_type_var_count}
+	# ap & ap_expr = ap_expr3
+	# (aps, ci) = convertDynamicsAlgebraicPatternsWithContexts cinp aps ci3
+	= ([ap:aps], ci)
+	where
+		// subst_var on a cycle
+		(ap_expr2, ci2) = convertDynamics {cinp & cinp_subst_var=subst_var} ap_expr ci
+ 		(ap_expr3, subst_var, ci3)
+			= if (ci2.ci_type_pattern_var_count==ci_type_pattern_var_count && ci2.ci_type_var_count==ci_type_var_count)
+				// no global_type_pattern_var added by convertDynamics
+				(ap_expr2,cinp.cinp_subst_var,ci2)
+ 				(add_global_type_pattern_vars_and_let ap_vars cinp.cinp_subst_var ap_expr2 ci2)
+
+		add_global_type_pattern_vars_and_let ap_vars subst_var ap_expr ci
+			| not (global_type_pattern_in_free_vars ap_vars ci.ci_var_heap)
+				= (ap_expr,subst_var,ci)
+				# ci & ci_subst_var_used = True
+				  unification_environment_expr = Var subst_var
+				  (new_subst_var, ci) = newVariable "gtpv_subst" VI_Empty ci
+				  (unification_environment_expr, ci)
+					= bind_global_type_pattern_vars ap_vars unification_environment_expr ci
+				  (ap_expr,ci) = share_init_subst new_subst_var ap_expr unification_environment_expr ci
+				= (ap_expr,new_subst_var,ci)
+convertDynamicsAlgebraicPatternsWithContexts cinp [] ci
+	= ([],ci)
 
 convertDynamicCase cinp=:{cinp_dynamic_representation={dr_dynamic_symbol, dr_dynamic_type}}
 			kees=:{case_guards=DynamicPatterns alts, case_info_ptr, case_default} ci
