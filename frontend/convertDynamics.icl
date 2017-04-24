@@ -27,7 +27,6 @@ import type_io;
 
 ::	ConversionInput =
 	{	cinp_dynamic_representation	:: !DynamicRepresentation
-	,	cinp_st_args		:: ![FreeVar]
 	,	cinp_subst_var		:: !BoundVar
 	}
 
@@ -126,8 +125,8 @@ where
 			= (fun_defs, ci)
 			# (unify_subst_var, ci) = newVariable "unify_subst" VI_NotUsed ci
 			# ci = {ci & ci_type_pattern_var_count = 0, ci_type_var_count = 0}
-			# (fun_body, ci) = convertDynamics {cinp_st_args = [], cinp_dynamic_representation = dynamic_representation,
-					cinp_subst_var = unify_subst_var} fun_body ci
+			# (fun_body, ci) = convertDynamics {cinp_dynamic_representation = dynamic_representation,
+												cinp_subst_var = unify_subst_var} fun_body ci
 			= ({fun_defs & [fun] = {fun_def & fun_body = fun_body, fun_info = {fun_info & fi_local_vars = ci.ci_new_variables ++ fun_info.fi_local_vars }}},
 				{ci & ci_new_variables = []})
 
