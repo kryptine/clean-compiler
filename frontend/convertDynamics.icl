@@ -8,12 +8,19 @@ extended_unify_and_coerce no yes :== no;	// change also _unify and _coerce in St
 
 import type_io;
 
+::	*ConvertDynamicsState =
+	{	cds_fun_defs	:: !*{#FunDef}
+	,	cds_predef_symb	:: !*PredefinedSymbols
+	,	cds_var_heap	:: !*VarHeap
+	,	cds_expr_heap	:: !*ExpressionHeap
+	}
+
 ::	*ConversionState =
 	{	ci_predef_symb		:: !*PredefinedSymbols
 	,	ci_var_heap			:: !*VarHeap
 	,	ci_expr_heap		:: !*ExpressionHeap
-	,	ci_new_variables 	:: ![FreeVar]
 
+	,	ci_new_variables 	:: ![FreeVar]
 	,	ci_type_pattern_var_count	:: !Int	
 	,	ci_type_var_count :: !Int
 	}
@@ -81,54 +88,51 @@ convertDynamicPatternsIntoUnifyAppls common_defs main_dcl_module_n dcl_mods icl_
 		=	create_dynamic_and_selector_idents common_defs predefined_symbols
 
 	# imported_types = {com_type_defs \\ {com_type_defs} <-: common_defs }
-	# (groups, (fun_defs, {ci_predef_symb, ci_var_heap, ci_expr_heap}))
-			= convert_groups 0 groups dynamic_representation (fun_defs, {	
-							ci_predef_symb = predefined_symbols, ci_var_heap = var_heap, ci_expr_heap = expr_heap,
-							ci_new_variables = [],
-							ci_type_var_count = 0,
-							ci_type_pattern_var_count = 0
-							})
+	# (groups, {cds_fun_defs, cds_predef_symb, cds_var_heap, cds_expr_heap})
+		= convert_groups 0 groups dynamic_representation
+			{cds_fun_defs = fun_defs, cds_predef_symb = predefined_symbols, cds_var_heap = var_heap, cds_expr_heap = expr_heap}
 			
 	// store type info			
-	# (tcl_file,type_heaps,ci_predef_symb,imported_types,ci_var_heap)
+	# (tcl_file,type_heaps,predef_symb,imported_types,var_heap)
 		= case tcl_file of
 			No
-				-> (No,type_heaps,ci_predef_symb,imported_types,ci_var_heap)
+				-> (No,type_heaps,cds_predef_symb,imported_types,cds_var_heap)
 			Yes tcl_file
-				# (ok,tcl_file,type_heaps,ci_predef_symb,imported_types,ci_var_heap)
+				# (ok,tcl_file,type_heaps,cds_predef_symb,imported_types,cds_var_heap)
 					= write_tcl_file main_dcl_module_n dcl_mods directly_imported_dcl_modules common_defs icl_mod.icl_common
 						n_types_with_type_functions n_constructors_with_type_functions
-							tcl_file type_heaps ci_predef_symb imported_types ci_var_heap
+							tcl_file type_heaps cds_predef_symb imported_types cds_var_heap
 				| not ok
 					-> abort "convertDynamicPatternsIntoUnifyAppls: error writing tcl file"
-					-> (Yes tcl_file,type_heaps,ci_predef_symb,imported_types,ci_var_heap)
+					-> (Yes tcl_file,type_heaps,cds_predef_symb,imported_types,cds_var_heap)
 
-	= (imported_types, groups, fun_defs, ci_predef_symb, ci_var_heap, type_heaps, ci_expr_heap, tcl_file)
+	= (imported_types, groups, cds_fun_defs, predef_symb, var_heap, type_heaps, cds_expr_heap, tcl_file)
 where
-	convert_groups group_nr groups dynamic_representation fun_defs_and_ci
+	convert_groups group_nr groups dynamic_representation cds
 		| group_nr == size groups
-			= (groups, fun_defs_and_ci)
+			= (groups, cds)
 			# (group, groups) = groups![group_nr]
 			= convert_groups (inc group_nr) groups dynamic_representation
-				(convert_functions group.component_members group_nr dynamic_representation fun_defs_and_ci)
+				(convert_functions group.component_members group_nr dynamic_representation cds)
 
-	convert_functions (ComponentMember member members) group_nr dynamic_representation fun_defs_and_ci
-		# fun_defs_and_ci = convert_function group_nr dynamic_representation member fun_defs_and_ci
-		= convert_functions members group_nr dynamic_representation fun_defs_and_ci
-	convert_functions NoComponentMembers group_nr dynamic_representation fun_defs_and_ci
-		= fun_defs_and_ci
+	convert_functions (ComponentMember member members) group_nr dynamic_representation cds
+		# cds = convert_function group_nr dynamic_representation member cds
+		= convert_functions members group_nr dynamic_representation cds
+	convert_functions NoComponentMembers group_nr dynamic_representation cds
+		= cds
 
-	convert_function group_nr dynamic_representation fun (fun_defs, ci)
-		# (fun_def, fun_defs) = fun_defs![fun]
+	convert_function group_nr dynamic_representation fun cds=:{cds_fun_defs}
+		# (fun_def, cds_fun_defs) = cds_fun_defs![fun]
 		  {fun_body, fun_type, fun_info} = fun_def
 		| fun_info.fi_properties bitand FI_HasTypeCodes==0 && isEmpty fun_info.fi_dynamics
-			= (fun_defs, ci)
+			= {cds & cds_fun_defs=cds_fun_defs}
+			# ci = {ci_predef_symb = cds.cds_predef_symb, ci_var_heap=cds.cds_var_heap, ci_expr_heap=cds.cds_expr_heap,
+					ci_new_variables = [], ci_type_pattern_var_count = 0, ci_type_var_count = 0}
 			# (unify_subst_var, ci) = newVariable "unify_subst" VI_NotUsed ci
-			# ci = {ci & ci_type_pattern_var_count = 0, ci_type_var_count = 0}
 			# (fun_body, ci) = convertDynamics {cinp_dynamic_representation = dynamic_representation,
 												cinp_subst_var = unify_subst_var} fun_body ci
-			= ({fun_defs & [fun] = {fun_def & fun_body = fun_body, fun_info = {fun_info & fi_local_vars = ci.ci_new_variables ++ fun_info.fi_local_vars }}},
-				{ci & ci_new_variables = []})
+			# cds_fun_defs & [fun] = {fun_def & fun_body = fun_body, fun_info = {fun_info & fi_local_vars = ci.ci_new_variables ++ fun_info.fi_local_vars }}
+			= {cds_fun_defs=cds_fun_defs,cds_predef_symb=ci.ci_predef_symb,cds_var_heap=ci.ci_var_heap,cds_expr_heap=ci.ci_expr_heap}
 
 mark_cinp_subst_var :: !BoundVar !*VarHeap -> *VarHeap;
 mark_cinp_subst_var {var_info_ptr} var_heap
@@ -392,7 +396,7 @@ convertDynamicAlts cinp=:{cinp_subst_var} kees type_var value_var result_type de
 	# unify_call = App {app_symb = unify_symb, app_args = [Var cinp_subst_var,Var type_var,type_code], app_info_ptr = nilPtr}
 
 	// FIXME, more precise types (not all TEs)
-	# (let_info_ptr, ci) = let_ptr (/* 4 */ 3+length binds) ci
+	# (let_info_ptr, ci) = let_ptr (3+length binds) ci
 
 	  (unify_result_var, ci) = newVariable "result" VI_Empty ci
 	  unify_result_fv = varToFreeVar unify_result_var 1
