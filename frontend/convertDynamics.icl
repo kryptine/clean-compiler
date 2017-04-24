@@ -23,6 +23,7 @@ import type_io;
 	,	ci_new_variables 	:: ![FreeVar]
 	,	ci_type_pattern_var_count	:: !Int	
 	,	ci_type_var_count :: !Int
+	,	ci_subst_var_used :: !Bool
 	}
 
 :: DynamicRepresentation =
@@ -127,20 +128,12 @@ where
 		| fun_info.fi_properties bitand FI_HasTypeCodes==0 && isEmpty fun_info.fi_dynamics
 			= {cds & cds_fun_defs=cds_fun_defs}
 			# ci = {ci_predef_symb = cds.cds_predef_symb, ci_var_heap=cds.cds_var_heap, ci_expr_heap=cds.cds_expr_heap,
-					ci_new_variables = [], ci_type_pattern_var_count = 0, ci_type_var_count = 0}
-			# (unify_subst_var, ci) = newVariable "unify_subst" VI_NotUsed ci
+					ci_new_variables = [], ci_type_pattern_var_count = 0, ci_type_var_count = 0, ci_subst_var_used = False}
+			# (unify_subst_var, ci) = newVariable "unify_subst" VI_Empty ci
 			# (fun_body, ci) = convertDynamics {cinp_dynamic_representation = dynamic_representation,
 												cinp_subst_var = unify_subst_var} fun_body ci
 			# cds_fun_defs & [fun] = {fun_def & fun_body = fun_body, fun_info = {fun_info & fi_local_vars = ci.ci_new_variables ++ fun_info.fi_local_vars }}
 			= {cds_fun_defs=cds_fun_defs,cds_predef_symb=ci.ci_predef_symb,cds_var_heap=ci.ci_var_heap,cds_expr_heap=ci.ci_expr_heap}
-
-mark_cinp_subst_var :: !BoundVar !*VarHeap -> *VarHeap;
-mark_cinp_subst_var {var_info_ptr} var_heap
-	= case sreadPtr var_info_ptr var_heap of
-		VI_NotUsed
-			-> writePtr var_info_ptr VI_Empty var_heap
-		_
-			-> var_heap
 
 class convertDynamics a :: !ConversionInput !a !*ConversionState -> (!a, !*ConversionState)
 
@@ -162,9 +155,6 @@ instance convertDynamics FunctionBody where
 
 instance convertDynamics TransformedBody where
 	convertDynamics cinp=:{cinp_subst_var} body=:{tb_args,tb_rhs} ci=:{ci_var_heap}
-		// this actually marks all arguments as type terms (also the regular arguments and dictionaries)
-//		# ci_var_heap
-//			=	foldSt mark_var tb_args ci_var_heap
 		# (tb_rhs, ci)
 			= convertDynamics cinp tb_rhs {ci & ci_var_heap = ci_var_heap}
 		# (global_tpvs, subst, ci)
@@ -176,10 +166,6 @@ instance convertDynamics TransformedBody where
 				# (tb_rhs, ci) = share_init_subst subst global_tpvs tb_rhs ci
 				-> ({body & tb_rhs = tb_rhs}, ci)
 		where
-//			mark_var :: FreeVar *VarHeap -> *VarHeap
-//			mark_var {fv_info_ptr} var_heap
-//				=	writePtr fv_info_ptr (VI_TypeCodeVariable TCI_TypeTerm) var_heap
-
 			collect_global_type_pattern_var :: FreeVar ([LetBind], BoundVar, *ConversionState) -> ([LetBind], BoundVar, *ConversionState)
 			collect_global_type_pattern_var {fv_info_ptr} (let_binds, subst_var, ci)
 			  #	(var_info, ci_var_heap) = readPtr fv_info_ptr ci.ci_var_heap
@@ -197,7 +183,7 @@ instance convertDynamics TransformedBody where
 				  #	(bind_global_tpv_symb, ci)
 						= getSymbol PD_Dyn_bind_global_type_pattern_var SK_Function 3 ci
 					(unify_subst_var, ci) = newVariable "gtpv_subst" VI_Empty ci
-					ci & ci_var_heap = mark_cinp_subst_var cinp_subst_var ci.ci_var_heap
+					ci & ci_subst_var_used = True
 					let_bind
 						= { lb_src = App {	app_symb		= bind_global_tpv_symb,
 											app_args 		= [tpv, type_code, Var unify_subst_var],
@@ -392,7 +378,7 @@ convertDynamicAlts cinp=:{cinp_subst_var} kees type_var value_var result_type de
 
 	#  (unify_symb, ci) 
 		=	getSymbol PD_Dyn_unify SK_Function (extended_unify_and_coerce 3 4) /*3 was 2 */ ci
-	# ci & ci_var_heap = mark_cinp_subst_var cinp_subst_var ci.ci_var_heap
+	# ci & ci_subst_var_used = True
 	# unify_call = App {app_symb = unify_symb, app_args = [Var cinp_subst_var,Var type_var,type_code], app_info_ptr = nilPtr}
 
 	// FIXME, more precise types (not all TEs)
@@ -477,7 +463,7 @@ convertExprTypeCode cinp=:{cinp_subst_var} tce ci
 	| not (isEmpty binds)
 		=	abort "unexpected binds in expression type code"
 	| has_var
-		# ci & ci_var_heap = mark_cinp_subst_var cinp_subst_var ci.ci_var_heap
+		# ci & ci_subst_var_used = True
 		# (normalise_symb, ci) 
 			=	getSymbol PD_Dyn_normalise SK_Function 2 ci
 		# type_code
