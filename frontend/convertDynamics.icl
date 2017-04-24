@@ -157,76 +157,85 @@ instance convertDynamics TransformedBody where
 	convertDynamics cinp=:{cinp_subst_var} body=:{tb_args,tb_rhs} ci=:{ci_var_heap}
 		# (tb_rhs, ci)
 			= convertDynamics cinp tb_rhs {ci & ci_var_heap = ci_var_heap}
-		# (global_tpvs, subst, ci)
-			= foldSt collect_global_type_pattern_var tb_args ([], cinp_subst_var, ci)
-		= case sreadPtr cinp_subst_var.var_info_ptr ci.ci_var_heap of
-			VI_NotUsed
-				-> ({body & tb_rhs = tb_rhs}, ci)
-			_
-				# (tb_rhs, ci) = share_init_subst subst global_tpvs tb_rhs ci
-				-> ({body & tb_rhs = tb_rhs}, ci)
+		#! has_global_type_pattern_var = global_type_pattern_in_free_vars tb_args ci.ci_var_heap
+		# ci & ci_subst_var_used = ci.ci_subst_var_used || has_global_type_pattern_var
+		| not ci.ci_subst_var_used
+			= ({body & tb_rhs = tb_rhs}, ci)
+			# (initial_unification_environment_expr, ci) = make_initial_unification_environment_expr ci
+			  (unification_environment_expr, ci)
+				= bind_global_type_pattern_vars tb_args initial_unification_environment_expr ci
+			  (tb_rhs, ci) = share_init_subst cinp_subst_var tb_rhs unification_environment_expr ci
+			= ({body & tb_rhs = tb_rhs}, ci)
 		where
-			collect_global_type_pattern_var :: FreeVar ([LetBind], BoundVar, *ConversionState) -> ([LetBind], BoundVar, *ConversionState)
-			collect_global_type_pattern_var {fv_info_ptr} (let_binds, subst_var, ci)
-			  #	(var_info, ci_var_heap) = readPtr fv_info_ptr ci.ci_var_heap
-				ci = {ci & ci_var_heap = ci_var_heap}
-			  =	case var_info of
-					VI_TypeCodeVariable (TCI_TypePatternVar tpv)
-						# type_code = Var {var_ident = a_ij_var_name, var_info_ptr = fv_info_ptr, var_expr_ptr = nilPtr}
-						-> bind_global_type_pattern_var tpv type_code let_binds subst_var ci
-					VI_TypeCodeVariable (TCI_SelectionsTypePatternVar tc_selections)
-						-> collect_global_type_pattern_var_selections tc_selections fv_info_ptr let_binds subst_var ci
-					_
-						-> (let_binds, subst_var, ci)
-			where
-				bind_global_type_pattern_var tpv type_code let_binds subst_var ci
-				  #	(bind_global_tpv_symb, ci)
-						= getSymbol PD_Dyn_bind_global_type_pattern_var SK_Function 3 ci
-					(unify_subst_var, ci) = newVariable "gtpv_subst" VI_Empty ci
-					ci & ci_subst_var_used = True
-					let_bind
-						= { lb_src = App {	app_symb		= bind_global_tpv_symb,
-											app_args 		= [tpv, type_code, Var unify_subst_var],
-											app_info_ptr	= nilPtr }
-						,	lb_dst =  varToFreeVar subst_var 1
-						,	lb_position = NoPos }
-				  =	([let_bind:let_binds], unify_subst_var, ci)
+			make_initial_unification_environment_expr :: !*ConversionState -> (!Expression,!*ConversionState)
+			make_initial_unification_environment_expr ci=:{ci_type_pattern_var_count, ci_type_var_count}
+				# (initial_unifier_symb, ci)
+					= getSymbol PD_Dyn_initial_unification_environment SK_Function 2 ci
+				# initial_unification_environment_expr
+					= App {	app_symb		= initial_unifier_symb,
+							app_args 		= [BasicExpr (BVInt ci_type_pattern_var_count),	BasicExpr (BVInt ci_type_var_count)],
+							app_info_ptr	= nilPtr }
+				= (initial_unification_environment_expr, ci)
 
-				collect_global_type_pattern_var_selections [(tpv,selections):tc_selections] fv_info_ptr let_binds subst_var ci
-				  #	dictionary = Var {var_ident = a_ij_var_name, var_info_ptr = fv_info_ptr, var_expr_ptr = nilPtr}
-					type_code = Selection NormalSelector dictionary selections
-					(let_binds,subst_var,ci) = bind_global_type_pattern_var tpv type_code let_binds subst_var ci
-				  =	collect_global_type_pattern_var_selections tc_selections fv_info_ptr let_binds subst_var ci
-				collect_global_type_pattern_var_selections [] fv_info_ptr let_binds subst_var ci
-				  =	(let_binds,subst_var,ci)
+global_type_pattern_in_free_vars :: [FreeVar] VarHeap -> Bool
+global_type_pattern_in_free_vars [{fv_info_ptr}:free_vars] var_heap
+	= case sreadPtr fv_info_ptr var_heap of
+		VI_TypeCodeVariable (TCI_TypePatternVar _)
+			-> True
+		VI_TypeCodeVariable (TCI_SelectionsTypePatternVar [_:_])
+			-> True
+			-> global_type_pattern_in_free_vars free_vars var_heap
+global_type_pattern_in_free_vars [] var_heap
+	= False
 
-			share_init_subst :: BoundVar [LetBind] Expression *ConversionState
-					-> (Expression, *ConversionState)
-			share_init_subst subst global_tpv_binds rhs ci=:{ci_type_pattern_var_count, ci_type_var_count}
-				#  (initial_unifier_symb, ci)
-					=	getSymbol PD_Dyn_initial_unification_environment SK_Function 2 ci
+bind_global_type_pattern_vars :: [FreeVar] Expression *ConversionState -> (Expression,!*ConversionState)
+bind_global_type_pattern_vars free_vars unification_environment_expr ci
+	= foldSt bind_global_type_pattern_var free_vars (unification_environment_expr, ci)
+where
+	bind_global_type_pattern_var :: FreeVar (Expression,*ConversionState) -> (Expression,!*ConversionState)
+	bind_global_type_pattern_var {fv_info_ptr} (unification_environment_expr, ci)
+	  #	(var_info, ci_var_heap) = readPtr fv_info_ptr ci.ci_var_heap
+		ci & ci_var_heap = ci_var_heap
+	  =	case var_info of
+		  VI_TypeCodeVariable (TCI_TypePatternVar tpv)	
+			# type_code = Var {var_ident = a_ij_var_name, var_info_ptr = fv_info_ptr, var_expr_ptr = nilPtr}
+			-> bind_global_type_pattern_var tpv type_code unification_environment_expr ci
+		  VI_TypeCodeVariable (TCI_SelectionsTypePatternVar tc_selections)
+			-> bind_global_type_pattern_var_selections tc_selections fv_info_ptr unification_environment_expr ci
+		  _
+			-> (unification_environment_expr, ci)
+	where
+		bind_global_type_pattern_var_selections [(tpv,selections):tc_selections] fv_info_ptr unification_environment_expr ci
+		  #	dictionary = Var {var_ident = a_ij_var_name, var_info_ptr = fv_info_ptr, var_expr_ptr = nilPtr}
+			type_code = Selection NormalSelector dictionary selections
+			(unification_environment_expr,ci) = bind_global_type_pattern_var tpv type_code unification_environment_expr ci
+		  =	bind_global_type_pattern_var_selections tc_selections fv_info_ptr unification_environment_expr ci
+		bind_global_type_pattern_var_selections [] fv_info_ptr unification_environment_expr ci
+		  =	(unification_environment_expr,ci)
 
-				# let_bind_initial_subst
-					= { lb_src = App {	app_symb		= initial_unifier_symb,
-										app_args 		=
-												[	BasicExpr (BVInt ci_type_pattern_var_count)
-												,	BasicExpr (BVInt ci_type_var_count)
-												],
-										app_info_ptr	= nilPtr }
-					,	lb_dst =  varToFreeVar subst 1
-					,	lb_position = NoPos
-					}
-				# let_binds = [let_bind_initial_subst : global_tpv_binds]
-				# (let_info_ptr, ci) = let_ptr (length let_binds) ci
-				# ci = { ci & ci_new_variables	= [lb_dst  \\ {lb_dst} <- let_binds] ++ ci.ci_new_variables}
-				# rhs
-					= Let {	let_strict_binds	= [],
-							let_lazy_binds		= let_binds,
-							let_expr			= rhs,
-							let_info_ptr		= let_info_ptr,
-							let_expr_position	= NoPos
-					}
-				=	(rhs, ci)
+		bind_global_type_pattern_var tpv type_code unification_environment_expr ci
+		  #	(bind_global_tpv_symb, ci)
+				= getSymbol PD_Dyn_bind_global_type_pattern_var SK_Function 3 ci
+			unification_environment_expr
+				= App {	app_symb		= bind_global_tpv_symb,
+						app_args 		= [tpv, type_code, unification_environment_expr],
+						app_info_ptr	= nilPtr }
+		  =	(unification_environment_expr, ci)
+
+share_init_subst :: BoundVar Expression Expression *ConversionState -> (!Expression,!*ConversionState)
+share_init_subst subst rhs initial_unification_environment_expr ci
+	# let_bind_initial_subst_var = varToFreeVar subst 1
+	  (let_info_ptr, ci) = let_ptr 1 ci
+	  ci & ci_new_variables = [let_bind_initial_subst_var:ci.ci_new_variables]
+	  rhs
+		= Let {	let_strict_binds	= [],
+				let_lazy_binds		= [{lb_src = initial_unification_environment_expr,
+										lb_dst = let_bind_initial_subst_var, lb_position = NoPos}],
+				let_expr			= rhs,
+				let_info_ptr		= let_info_ptr,
+				let_expr_position	= NoPos
+		}
+	= (rhs, ci)
 
 instance convertDynamics LetBind where
 	convertDynamics cinp binding=:{lb_src} ci
