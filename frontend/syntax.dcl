@@ -1213,12 +1213,18 @@ instance toString 	KindInfo
 	,	pv_arg_nr	:: !Int
 	}
 
+:: ReferenceCountList
+	= ReferenceCounts !ReferenceCount !ReferenceCountList
+	| ReferenceCountsUnused !Int !ReferenceCountList
+	| ReferenceCountsAllUnused
+	| EndReferenceCounts
+
 ::	Occurrence =
 	{	occ_ref_count		:: !ReferenceCount
 	,	occ_bind			:: !OccurrenceBinding
 	,	occ_pattern_vars	:: ![[PatternVar]]
 	,	occ_observing		:: (Bool, Ptr ExprInfo)
-	,	occ_previous 		:: ![ReferenceCount]
+	,	occ_previous 		:: !ReferenceCountList
 	}
 
 ::	ReferenceCount = RC_Used !RC_Used | RC_Unused 
