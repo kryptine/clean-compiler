@@ -98,24 +98,59 @@ saveOccurrences free_vars var_heap
 where
 	save_occurrence {fv_ident,fv_info_ptr} var_heap
 		# (VI_Occurrence old_occ=:{occ_ref_count,occ_previous}, var_heap) = readPtr fv_info_ptr var_heap
-		= var_heap <:= (fv_info_ptr, VI_Occurrence {old_occ & occ_ref_count = RC_Unused, occ_previous = [occ_ref_count : occ_previous] } )
- 			===> ("save_occurrence", fv_ident, fv_info_ptr, occ_ref_count, length occ_previous)
+		= case occ_ref_count of
+			RC_Unused
+				-> case occ_previous of
+					ReferenceCountsUnused n ref_counts
+						#! n=n+1
+						-> var_heap <:= (fv_info_ptr, VI_Occurrence {old_occ & occ_previous = ReferenceCountsUnused n ref_counts})
+					ReferenceCountsAllUnused
+						-> var_heap <:= (fv_info_ptr, VI_Occurrence {old_occ & occ_previous = ReferenceCountsAllUnused})
+					EndReferenceCounts
+						-> var_heap <:= (fv_info_ptr, VI_Occurrence {old_occ & occ_previous = ReferenceCountsAllUnused})
+					_
+						-> var_heap <:= (fv_info_ptr, VI_Occurrence {old_occ & occ_previous = ReferenceCountsUnused 1 occ_previous})
+			_
+				-> var_heap <:= (fv_info_ptr, VI_Occurrence {old_occ & occ_ref_count = RC_Unused, occ_previous = ReferenceCounts occ_ref_count occ_previous } )
+					===> ("save_occurrence", fv_ident, fv_info_ptr, occ_ref_count, length occ_previous)
 
 restoreOccurrences free_vars var_heap
 	= foldSt (foldSt restore_occurrence) (free_vars ===> ("restoreOccurrences", free_vars)) ([], var_heap)
 where
 	restore_occurrence fv=:{fv_ident,fv_info_ptr} (occurrences, var_heap)
 		# (VI_Occurrence old_occ=:{occ_ref_count,occ_previous,occ_bind}, var_heap) = readPtr fv_info_ptr var_heap
-		  (prev_ref_count, occ_previous) = case occ_previous of
-		  										[x : xs]
-		  											-> (x, xs)
-		  										_
-		  											-> abort ("restoreOccurrences" /* ---> (fv_ident, fv_info_ptr) */)
-		  var_heap = var_heap <:= (fv_info_ptr, VI_Occurrence {old_occ & occ_ref_count = prev_ref_count, occ_previous = occ_previous })
-		= case occ_ref_count ===> ("restore_occurrence", fv_ident, fv_info_ptr, (occ_ref_count, prev_ref_count, occ_previous)) of
+		= case occ_ref_count of
 			RC_Unused
+				# var_heap
+					= case occ_previous of
+						ReferenceCounts prev_ref_count occ_previous
+							-> var_heap <:= (fv_info_ptr, VI_Occurrence {old_occ & occ_ref_count = prev_ref_count, occ_previous = occ_previous })
+								===> ("restore_occurrence", fv_ident, fv_info_ptr, (occ_ref_count, prev_ref_count, occ_previous))
+						ReferenceCountsAllUnused
+							-> var_heap
+						ReferenceCountsUnused 1 xs
+							-> var_heap <:= (fv_info_ptr, VI_Occurrence {old_occ & occ_previous = xs})
+						ReferenceCountsUnused n xs
+							#! n=n-1
+							-> var_heap <:= (fv_info_ptr, VI_Occurrence {old_occ & occ_previous = ReferenceCountsUnused n xs})
+						_
+							-> abort ("restoreOccurrences" /* ---> (fv_ident, fv_info_ptr) */)
 				-> (occurrences, var_heap)
 			_
+				# var_heap
+					= case occ_previous of
+						ReferenceCounts prev_ref_count occ_previous
+							-> var_heap <:= (fv_info_ptr, VI_Occurrence {old_occ & occ_ref_count = prev_ref_count, occ_previous = occ_previous })
+								===> ("restore_occurrence", fv_ident, fv_info_ptr, (occ_ref_count, prev_ref_count, occ_previous))
+						ReferenceCountsAllUnused
+							-> var_heap <:= (fv_info_ptr, VI_Occurrence {old_occ & occ_ref_count = RC_Unused})
+						ReferenceCountsUnused 1 xs
+							-> var_heap <:= (fv_info_ptr, VI_Occurrence {old_occ & occ_ref_count = RC_Unused, occ_previous = xs})
+						ReferenceCountsUnused n xs
+							#! n=n-1
+							-> var_heap <:= (fv_info_ptr, VI_Occurrence {old_occ & occ_ref_count = RC_Unused, occ_previous = ReferenceCountsUnused n xs})
+						_
+							-> abort ("restoreOccurrences" /* ---> (fv_ident, fv_info_ptr) */)
 				-> case occ_bind of
 					OB_OpenLet _ _
 						-> ([{cfv_var = fv, cfv_count = occ_ref_count, cfv_is_let = True} : occurrences ], var_heap)
@@ -282,12 +317,33 @@ where
 				= foldSt (foldSt let_combine_ref_count) free_vars var_heap
 			where
 				let_combine_ref_count {fv_ident,fv_info_ptr} var_heap
-					# (VI_Occurrence old_occ=:{occ_ref_count,occ_previous=[prev_ref_count, pre_pref_recount:occ_previouses]}, var_heap)
-							= readPtr fv_info_ptr var_heap
-					  seq_comb_ref_count = seqCombineRefCount occ_ref_count prev_ref_count
-					  comb_ref_count = parCombineRefCount seq_comb_ref_count pre_pref_recount
-					= (var_heap <:= (fv_info_ptr, VI_Occurrence { old_occ & occ_ref_count = comb_ref_count, occ_previous = occ_previouses }))
-						===> ("let_combine_ref_count", fv_ident, (pre_pref_recount, prev_ref_count, occ_ref_count, seq_comb_ref_count, comb_ref_count))
+					# (VI_Occurrence old_occ=:{occ_ref_count,occ_previous}, var_heap) = readPtr fv_info_ptr var_heap
+					= case occ_previous of
+						ReferenceCounts prev_ref_count (ReferenceCounts pre_pref_recount occ_previouses)
+							# seq_comb_ref_count = seqCombineRefCount occ_ref_count prev_ref_count
+							  comb_ref_count = parCombineRefCount seq_comb_ref_count pre_pref_recount
+							-> (var_heap <:= (fv_info_ptr, VI_Occurrence {old_occ & occ_ref_count = comb_ref_count, occ_previous = occ_previouses}))
+								===> ("let_combine_ref_count", fv_ident, (pre_pref_recount, prev_ref_count, occ_ref_count, seq_comb_ref_count, comb_ref_count))
+						ReferenceCounts prev_ref_count (ReferenceCountsUnused 1 occ_previouses)
+							# comb_ref_count = seqCombineRefCount occ_ref_count prev_ref_count
+							-> (var_heap <:= (fv_info_ptr, VI_Occurrence {old_occ & occ_ref_count = comb_ref_count, occ_previous = occ_previouses}))
+						ReferenceCounts prev_ref_count ReferenceCountsAllUnused
+							# comb_ref_count = seqCombineRefCount occ_ref_count prev_ref_count
+							-> (var_heap <:= (fv_info_ptr, VI_Occurrence {old_occ & occ_ref_count = comb_ref_count, occ_previous = ReferenceCountsAllUnused}))
+						ReferenceCounts prev_ref_count (ReferenceCountsUnused n occ_previouses)
+							#! n=n-1
+							# comb_ref_count = seqCombineRefCount occ_ref_count prev_ref_count
+							-> (var_heap <:= (fv_info_ptr, VI_Occurrence {old_occ & occ_ref_count = comb_ref_count, occ_previous = ReferenceCountsUnused n occ_previouses}))
+						ReferenceCountsUnused 1 (ReferenceCounts pre_pref_recount occ_previouses)
+							# comb_ref_count = parCombineRefCount occ_ref_count pre_pref_recount
+							-> (var_heap <:= (fv_info_ptr, VI_Occurrence {old_occ & occ_ref_count = comb_ref_count, occ_previous = occ_previouses}))
+						ReferenceCountsUnused 2 occ_previouses
+							-> (var_heap <:= (fv_info_ptr, VI_Occurrence {old_occ & occ_previous = occ_previouses}))
+						ReferenceCountsUnused n occ_previouses
+							#! n=n-2
+							-> (var_heap <:= (fv_info_ptr, VI_Occurrence {old_occ & occ_previous = ReferenceCountsUnused n occ_previouses}))
+						ReferenceCountsAllUnused
+							-> var_heap
 
 			init_let_binds let_binds var_heap
 				= foldSt bind_variable let_binds var_heap
@@ -592,10 +648,17 @@ where
 	par_combine {fv_ident,fv_info_ptr} var_heap
 		# (VI_Occurrence old_occ, var_heap) = readPtr fv_info_ptr var_heap
 		= case old_occ.occ_previous of
-			[glob_ref_count : occ_previous]
+			ReferenceCounts glob_ref_count occ_previous
 				# comb_ref_count = parCombineRefCount old_occ.occ_ref_count glob_ref_count
 				-> var_heap <:= (fv_info_ptr, VI_Occurrence { old_occ & occ_ref_count = comb_ref_count , occ_previous = occ_previous })
-						===> ("par_combine", fv_ident, old_occ.occ_ref_count, glob_ref_count, comb_ref_count) 
+						===> ("par_combine", fv_ident, old_occ.occ_ref_count, glob_ref_count, comb_ref_count)
+			ReferenceCountsUnused 1 occ_previous
+				-> var_heap <:= (fv_info_ptr, VI_Occurrence {old_occ & occ_previous = occ_previous})
+			ReferenceCountsUnused n occ_previous
+				#! n=n-1
+				-> var_heap <:= (fv_info_ptr, VI_Occurrence {old_occ & occ_previous = ReferenceCountsUnused n occ_previous})
+			ReferenceCountsAllUnused
+				-> var_heap
 			_
 				-> abort ("inconsistent reference count administration" ===> fv_ident)
 
@@ -605,27 +668,44 @@ where
 	seq_combine {fv_ident,fv_info_ptr} var_heap
 		# (VI_Occurrence pattern_occ, var_heap) = readPtr fv_info_ptr var_heap
 		= case pattern_occ.occ_previous of
-			[alt_ref_count : occ_previous]
+			ReferenceCounts alt_ref_count occ_previous
 				# comb_ref_count = seqCombineRefCount alt_ref_count pattern_occ.occ_ref_count
 				-> var_heap <:= (fv_info_ptr, VI_Occurrence { pattern_occ & occ_ref_count = comb_ref_count , occ_previous = occ_previous })
-						===> ("seq_combine", fv_ident, pattern_occ.occ_ref_count, alt_ref_count, comb_ref_count) 
+						===> ("seq_combine", fv_ident, pattern_occ.occ_ref_count, alt_ref_count, comb_ref_count)
+			ReferenceCountsUnused 1 occ_previous
+				-> var_heap <:= (fv_info_ptr, VI_Occurrence {pattern_occ & occ_previous = occ_previous})
+			ReferenceCountsUnused n xs
+				#! n=n-1
+				-> var_heap <:= (fv_info_ptr, VI_Occurrence {pattern_occ & occ_previous = ReferenceCountsUnused n xs})
+			ReferenceCountsAllUnused
+				-> var_heap
 			_
 				-> abort ("inconsistent reference count administration" ===> fv_ident)
 
 altCombine depth free_vars var_heap
-	= foldSt (foldSt (alt_combine depth)) free_vars (var_heap ===> ("altCombine", free_vars))
+	= foldSt (foldSt (alt_combine depth)) free_vars var_heap
 where
 	alt_combine depth {fv_ident,fv_info_ptr} var_heap
 		# (VI_Occurrence old_occ=:{occ_ref_count,occ_previous}, var_heap) = readPtr fv_info_ptr var_heap
-		  (occ_ref_count, occ_previous) = alt_combine_ref_counts occ_ref_count occ_previous ((dec depth) ===> ("alt_combine", fv_ident, occ_ref_count, length occ_previous, depth))
+		  (occ_ref_count, occ_previous) = alt_combine_ref_counts occ_ref_count occ_previous (dec depth)
+											===> ("alt_combine", fv_ident, occ_ref_count, length occ_previous, depth)
 		= var_heap <:= (fv_info_ptr, VI_Occurrence { old_occ & occ_ref_count = occ_ref_count , occ_previous = occ_previous })
 				
 	alt_combine_ref_counts comb_ref_count ref_counts 0
 		= (comb_ref_count, ref_counts)
-	alt_combine_ref_counts comb_ref_count [occ_ref_count:occ_previous] depth
+	alt_combine_ref_counts comb_ref_count (ReferenceCounts occ_ref_count occ_previous) depth
 		# new_comb_ref_count = alt_combine_ref_count comb_ref_count occ_ref_count
 		= alt_combine_ref_counts new_comb_ref_count occ_previous (dec depth)
 				===> ("alt_combine_ref_count", comb_ref_count, occ_ref_count, new_comb_ref_count)
+	alt_combine_ref_counts comb_ref_count (ReferenceCountsUnused n_unused_ref_count occ_previous) depth
+		| n_unused_ref_count<depth
+			= alt_combine_ref_counts comb_ref_count occ_previous (depth-n_unused_ref_count)
+		| n_unused_ref_count==depth
+			= (comb_ref_count, occ_previous)
+			#! n_unused_ref_count=n_unused_ref_count-depth
+			= (comb_ref_count, ReferenceCountsUnused n_unused_ref_count occ_previous)
+	alt_combine_ref_counts comb_ref_count ReferenceCountsAllUnused depth
+		= (comb_ref_count, ReferenceCountsAllUnused)
 
 	alt_combine_ref_count RC_Unused ref_count
 		= ref_count
@@ -704,7 +784,7 @@ seqCombineRefCount (RC_Used sec_ref) (RC_Used prim_ref)
 
 emptyOccurrence type_info =
 		{	occ_ref_count		= RC_Unused
-		,	occ_previous		= []
+		,	occ_previous		= EndReferenceCounts
 		,	occ_observing		= type_info
 		,	occ_bind			= OB_Empty
 		, 	occ_pattern_vars	= []
@@ -728,7 +808,7 @@ where
 	  position = newPosition fun_ident fun_pos
 	  (coercion_env, var_heap, expr_heap, error)
 		= make_shared_vars_non_unique variables fun_body coercion_env rms_var_heap expr_heap (setErrorAdmin position error)
-	  var_heap = empty_occurrences variables var_heap
+	#! var_heap = empty_occurrences variables var_heap
 	= (coercion_env, subst, type_def_infos, var_heap, expr_heap, error)
 	where
 		clear_occurrences vars subst type_def_infos var_heap expr_heap
