@@ -7,7 +7,9 @@ extern int CodeRhsNodeDefs
 	struct node_id_list_element *a_node_ids,struct node_id_list_element *b_node_ids,
 	struct node_id_list_element *free_node_ids,int doesnt_fail);
 
+struct saved_node_id_ref_counts;
 struct saved_node_id_ref_counts* save_lhs_node_id_ref_counts (NodeP node_p,struct saved_node_id_ref_counts *snir_p);
+struct saved_case_node_id_ref_counts;
 struct saved_node_id_ref_counts* save_rhs_node_id_ref_counts (NodeP node_p,NodeDefP node_defs,
 											struct saved_node_id_ref_counts *snir_p,struct saved_case_node_id_ref_counts ***scnirc_h);
 void restore_node_id_ref_counts (struct saved_node_id_ref_counts *snir_p,struct saved_case_node_id_ref_counts *scnirc_p);

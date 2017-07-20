@@ -19,6 +19,7 @@
 
 extern void StaticMessage (Bool error, char *symbol_format, char *message_format, ...);
 
+struct symbol;
 extern void PrintSymbol (struct symbol *symbol,File file);
 
 extern Bool  CompilerError;
