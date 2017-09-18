@@ -256,8 +256,20 @@ where
 			= Smaller
 			= Greater
 	where
-		compare_arguments (TB tb1) (TB tb2)		= tb1 =< tb2 
-		compare_arguments _ _					= Equal
+		compare_arguments (TB tb1) (TB tb2)
+			= tb1 =< tb2
+		compare_arguments (TQualifiedIdent module_id1 name1 _) (TQualifiedIdent module_id2 name2 _)
+			| module_id1.id_name<>module_id2.id_name
+				| module_id1.id_name<module_id2.id_name
+					= Smaller
+					= Greater
+			| name1<>name2
+				| name1<name2
+					= Smaller
+					= Greater
+				= Equal
+		compare_arguments _ _
+			= Equal
 
 smallerOrEqual :: !Type !Type -> CompareValue
 smallerOrEqual (TA tc1 args1) (TA tc2 args2)
@@ -294,8 +306,20 @@ smallerOrEqual t1 t2
 			= cmp_app_symb
 		compare_arguments (_ :@: args1) (_ :@: args2)
 			= args1 =< args2
-		compare_arguments (TB tb1) (TB tb2)		= tb1 =< tb2 
-		compare_arguments _ _					= Equal
+		compare_arguments (TB tb1) (TB tb2)
+			= tb1 =< tb2
+		compare_arguments (TQualifiedIdent module_id1 name1 type1) (TQualifiedIdent module_id2 name2 type2)
+			| module_id1.id_name<>module_id2.id_name
+				| module_id1.id_name<module_id2.id_name
+					= Smaller
+					= Greater
+			| name1<>name2
+				| name1<name2
+					= Smaller
+					= Greater
+				= type1 =< type2
+		compare_arguments _ _
+			= Equal
 
 instance =< AType
 where
