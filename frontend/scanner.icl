@@ -1555,7 +1555,7 @@ where
 	toString EndOfFileToken				= "end of file"
 	toString (ErrorToken id)			= "Scanner error: " + id
 
-	toString (QualifiedIdentToken module_name ident_name) = module_name+++"@"+++ident_name
+	toString (QualifiedIdentToken module_name ident_name) = "'"+++module_name+++"'."+++ident_name
 
 	toString GenericToken				= "generic"	
 	toString DeriveToken				= "derive"	
