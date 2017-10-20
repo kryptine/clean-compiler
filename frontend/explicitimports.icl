@@ -8,6 +8,17 @@ import syntax, typesupport, parse, checksupport, utilities, checktypes, transfor
 cUndef :== (-1)
 implies a b :== not a || b
 
+:: *ExplImpInfos :== *{#*{!*ExplImpInfo}}
+
+:: ExplImpInfo = ExplImpInfo Ident !.DeclaringModulesSet
+
+:: DeclaringModulesSet :== IntKeyHashtable DeclarationInfo
+
+:: DeclarationInfo =
+	{	di_decl			::	!Declaration
+	,	di_belonging	::	!NumberSet
+	}
+
 :: ImportNrAndIdents =
 	{	ini_symbol_nr	:: !Index
 	,	ini_imp_decl	:: !ImportDeclaration
@@ -18,6 +29,18 @@ implies a b :== not a || b
 	,	si_qualified_explicit	:: ![QualifiedDeclaration]
 	,	si_implicit				:: ![(ModuleN, Position)]
 	}
+
+idents_to_empty_ExplImpInfo_array :: ![Ident] -> *{!*ExplImpInfo}
+idents_to_empty_ExplImpInfo_array expl_imp_symbols_in_component
+	= {ExplImpInfo expl_imp_symbol ikhEmpty \\ expl_imp_symbol <- expl_imp_symbols_in_component}
+
+addDeclarationWithAllBelongingsToExplImpInfo :: !Declaration !BelongingSymbols !Index !ComponentNrAndIndex !ExplImpInfos -> ExplImpInfos
+addDeclarationWithAllBelongingsToExplImpInfo decl all_belong_s mod_index {cai_component_nr,cai_index} expl_imp_infos
+	# (ExplImpInfo eii_ident eii_declaring_modules, expl_imp_infos) = expl_imp_infos![cai_component_nr,cai_index]
+	  di_belonging = nsFromTo (nrOfBelongingSymbols all_belong_s)
+	  di = {di_decl=decl, di_belonging=di_belonging}
+	  eii_declaring_modules = ikhInsert` False mod_index di eii_declaring_modules
+	= {expl_imp_infos & [cai_component_nr,cai_index] = ExplImpInfo eii_ident eii_declaring_modules}
 
 markExplImpSymbols :: !Int !*(!*ExplImpInfos,!*SymbolTable) -> (!.[Ident],!(!*ExplImpInfos,!*SymbolTable))
 markExplImpSymbols component_nr (expl_imp_info, cs_symbol_table)

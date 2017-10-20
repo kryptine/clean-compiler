@@ -53,18 +53,6 @@ cMacroDefs				:== 9
 
 cConversionTableSize	:== 10
 
-::	*ExplImpInfos :== *{#*{!*ExplImpInfo}}
-
-::	ExplImpInfo
-		= ExplImpInfo Ident !.DeclaringModulesSet
-
-::	DeclaringModulesSet :== IntKeyHashtable DeclarationInfo
-
-::	DeclarationInfo =
-	{	di_decl			::	!Declaration
-	,	di_belonging	::	!NumberSet
-	}
-
 class Erroradmin state
 where
 	pushErrorAdmin :: !IdentPos *state -> *state
@@ -92,7 +80,7 @@ instance toIdent ConsDef, (TypeDef a), ClassDef, MemberDef, FunDef, SelectorDef 
 instance toIdent SymbIdent, TypeSymbIdent, BoundVar, TypeVar, ATypeVar, Ident
 
 instance toInt STE_Kind
-instance <<< IdentPos, StringPos, ExplImpInfo, DeclarationInfo
+instance <<< IdentPos, StringPos
 
 ::	ExpressionInfo =
 	{	ef_type_defs		:: !.{# CheckedTypeDef}

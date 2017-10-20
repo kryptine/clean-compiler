@@ -2,6 +2,10 @@ definition module explicitimports
 
 import syntax, checksupport
 
+:: *ExplImpInfos :== *{#*{!*ExplImpInfo}}
+
+:: ExplImpInfo
+
 :: ImportNrAndIdents =
 	{	ini_symbol_nr	:: !Index
 	,	ini_imp_decl	:: !ImportDeclaration
@@ -19,6 +23,10 @@ import syntax, checksupport
 	,	si_qualified_explicit	:: ![QualifiedDeclaration]
 	,	si_implicit				:: ![(ModuleN, Position)]
 	}
+
+idents_to_empty_ExplImpInfo_array :: ![Ident] -> *{!*ExplImpInfo}
+
+addDeclarationWithAllBelongingsToExplImpInfo :: !Declaration !BelongingSymbols !Index !ComponentNrAndIndex !ExplImpInfos -> ExplImpInfos
 
 markExplImpSymbols :: !Int !*(!*ExplImpInfos,!*SymbolTable) -> (!.[Ident],!(!*ExplImpInfos,!*SymbolTable))
 

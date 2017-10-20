@@ -444,7 +444,6 @@ newFreeVariable new_var vars=:[free_var=:{fv_def_level,fv_info_ptr}: free_vars]
 newFreeVariable new_var []
 	= (True, [new_var])
 
-
 local_declaration_for_import :: !u:Declaration .Index -> v:Declaration, [u <= v]
 local_declaration_for_import decl=:(Declaration {decl_kind=STE_FunctionOrMacro _}) module_n
 	= decl
@@ -472,7 +471,6 @@ where
 instance toIdent ATypeVar
 where
 	toIdent {atv_variable} = atv_variable.tv_ident
-
 
 instance toIdent Ident
 where
@@ -502,12 +500,6 @@ instance toIdent SelectorDef
 where
 	toIdent sd = sd.sd_ident
 
-/*
-instance toIdent DeltaRule
-where
-	toIdent delta = delta.delta_name
-*/
-
 instance toIdent (a,b) | toIdent a
 where
 	toIdent (x,y) = toIdent x
@@ -532,16 +524,6 @@ instance <<< StringPos where
 	| sp_line == cNotALineNumber
 		= file <<< '[' <<< sp_file <<< ',' <<< sp_name <<< ']'
 		= file <<< '[' <<< sp_file <<< ',' <<< sp_line <<< ',' <<< sp_name <<< ']'
-
-instance <<< ExplImpInfo
-  where
-	(<<<) file (ExplImpInfo eii_ident eii_declaring_modules)
-		= file <<< eii_ident //<<< " is declared in " <<< eii_declaring_modules
-
-instance <<< DeclarationInfo
-  where
-	(<<<) file {di_decl}
-		= file <<< di_decl
 
 import_ident :: Ident
 import_ident =: { id_name = "import", id_info = nilPtr }

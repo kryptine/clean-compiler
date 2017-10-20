@@ -1729,10 +1729,7 @@ checkDclModules imports_of_icl_mod dcl_modules macro_defs heaps cs=:{cs_symbol_t
 	   		= mapY2St (get_expl_imp_symbols_of_component imports_of_icl_mod) components (dcl_modules, cs_symbol_table)
 
 	  expl_imp_infos
-	  		= { { ExplImpInfo expl_imp_symbol ikhEmpty
-	  			  \\ expl_imp_symbol <- expl_imp_symbols_in_component
-	  			}
-	  			\\ expl_imp_symbols_in_component<-expl_imp_symbols_in_components }
+		= {idents_to_empty_ExplImpInfo_array expl_imp_symbols_in_component \\ expl_imp_symbols_in_component<-expl_imp_symbols_in_components}
 	  		// eii_declaring_modules will be updated later
 	  cs = { cs & cs_symbol_table = cs_symbol_table }
 	  nr_of_icl_component = component_numbers.[index_of_icl_module]
@@ -3249,13 +3246,10 @@ where
 		= foldSt (addExplImpInfo mod_index decl) component_numbers (dcl_modules, expl_imp_infos)
 	  where
 		addExplImpInfo :: !Index Declaration !ComponentNrAndIndex !(!u:{#DclModule}, !ExplImpInfos) -> (!u:{#DclModule}, !ExplImpInfos)
-		addExplImpInfo mod_index decl { cai_component_nr, cai_index } (dcl_modules, expl_imp_infos)
-			# (ExplImpInfo eii_ident eii_declaring_modules, expl_imp_infos) = expl_imp_infos![cai_component_nr,cai_index]
-			  (all_belongs, dcl_modules) = getBelongingSymbols decl dcl_modules
-			  di_belonging = nsFromTo (nrOfBelongingSymbols all_belongs)
-			  di = { di_decl = decl, di_belonging = di_belonging }
-			  new_expl_imp_info = ExplImpInfo eii_ident (ikhInsert` False mod_index di eii_declaring_modules)
-			= (dcl_modules, { expl_imp_infos & [cai_component_nr,cai_index] = new_expl_imp_info })
+		addExplImpInfo mod_index decl component_n_and_index (dcl_modules, expl_imp_infos)
+			# (all_belong_s,dcl_modules) = getBelongingSymbols decl dcl_modules
+			  expl_imp_infos = addDeclarationWithAllBelongingsToExplImpInfo decl all_belong_s mod_index component_n_and_index expl_imp_infos
+			= (dcl_modules, expl_imp_infos)
 	updateExplImpForMarkedLocalSymbol _ _ entry dcl_modules expl_imp_infos
 		= (dcl_modules, expl_imp_infos)
 
