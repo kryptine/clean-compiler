@@ -2889,16 +2889,6 @@ check_needed_modules_are_imported mod_ident extension cs=:{cs_x={x_needed_module
 		  cs_error = popErrorAdmin cs_error
 		= { cs & cs_error = cs_error }
 
-// MV ...
-	switched_off_Clean_feature pd mod_ident explanation extension cs=:{cs_symbol_table}
- 		# ident = predefined_idents.[pd]
- 		# error_location = { ip_ident = mod_ident, ip_line = 1, ip_file = mod_ident.id_name+++extension}
-		  cs_error = pushErrorAdmin error_location cs.cs_error
-		  cs_error = checkError ident ("not supported"+++explanation) cs_error
-		  cs_error = popErrorAdmin cs_error
-		= { cs & cs_error = cs_error}
-// ... MV
-
 arrayFunOffsetToPD_IndexTable :: !w:{# MemberDef} !v:{# PredefinedSymbol} -> (!{# Index}, !x:{#MemberDef}, !v:{#PredefinedSymbol}) , [w<=x]
 arrayFunOffsetToPD_IndexTable member_defs predef_symbols
 	#! nr_of_array_functions = size member_defs
@@ -3150,25 +3140,23 @@ where
 
 update_expl_imp_for_marked_local_symbol mod_index decl=:(Declaration {decl_ident}) (dcl_modules, expl_imp_infos, cs_symbol_table)
 	# (ste, cs_symbol_table) = readPtr decl_ident.id_info cs_symbol_table
-	= updateExplImpForMarkedLocalSymbol mod_index decl ste dcl_modules expl_imp_infos cs_symbol_table
+	#! (dcl_modules, expl_imp_infos) = updateExplImpForMarkedLocalSymbol mod_index decl ste dcl_modules expl_imp_infos
+	= (dcl_modules, expl_imp_infos, cs_symbol_table)
 where
-	updateExplImpForMarkedLocalSymbol :: !Index Declaration !SymbolTableEntry !u:{#DclModule} !ExplImpInfos !*SymbolTable
-			-> (!u:{#DclModule}, !ExplImpInfos, !.SymbolTable)
-	updateExplImpForMarkedLocalSymbol mod_index decl {ste_kind=STE_ExplImpComponentNrs component_numbers}
-				dcl_modules expl_imp_infos cs_symbol_table
-		= foldSt (addExplImpInfo mod_index decl) component_numbers (dcl_modules, expl_imp_infos, cs_symbol_table)
+	updateExplImpForMarkedLocalSymbol :: !Index Declaration !SymbolTableEntry !u:{#DclModule} !ExplImpInfos -> (!u:{#DclModule}, !ExplImpInfos)
+	updateExplImpForMarkedLocalSymbol mod_index decl {ste_kind=STE_ExplImpComponentNrs component_numbers} dcl_modules expl_imp_infos
+		= foldSt (addExplImpInfo mod_index decl) component_numbers (dcl_modules, expl_imp_infos)
 	  where
-		addExplImpInfo :: !Index Declaration !ComponentNrAndIndex !(!u:{#DclModule}, !ExplImpInfos, !v:SymbolTable)
-					-> (!u:{#DclModule}, !ExplImpInfos, !v:SymbolTable)
-		addExplImpInfo mod_index decl { cai_component_nr, cai_index } (dcl_modules, expl_imp_infos, cs_symbol_table)
+		addExplImpInfo :: !Index Declaration !ComponentNrAndIndex !(!u:{#DclModule}, !ExplImpInfos) -> (!u:{#DclModule}, !ExplImpInfos)
+		addExplImpInfo mod_index decl { cai_component_nr, cai_index } (dcl_modules, expl_imp_infos)
 			# (ExplImpInfo eii_ident eii_declaring_modules, expl_imp_infos) = expl_imp_infos![cai_component_nr,cai_index]
 			  (all_belongs, dcl_modules) = getBelongingSymbols decl dcl_modules
 			  di_belonging = nsFromTo (nrOfBelongingSymbols all_belongs)
 			  di = { di_decl = decl, di_belonging = di_belonging }
 			  new_expl_imp_info = ExplImpInfo eii_ident (ikhInsert` False mod_index di eii_declaring_modules)
-			= (dcl_modules, { expl_imp_infos & [cai_component_nr,cai_index] = new_expl_imp_info }, cs_symbol_table)
-	updateExplImpForMarkedLocalSymbol _ _ entry dcl_modules expl_imp_infos cs_symbol_table
-		= (dcl_modules, expl_imp_infos, cs_symbol_table)
+			= (dcl_modules, { expl_imp_infos & [cai_component_nr,cai_index] = new_expl_imp_info })
+	updateExplImpForMarkedLocalSymbol _ _ entry dcl_modules expl_imp_infos
+		= (dcl_modules, expl_imp_infos)
 
 checkInstancesOfDclModule :: !.Int !(!.Int,.Int,.[FunType]) !(!*{#DclModule},!*Heaps,!*CheckState)
 														  -> (!.{#DclModule},!.Heaps,!.CheckState);
