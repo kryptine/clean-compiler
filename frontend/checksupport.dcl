@@ -139,4 +139,4 @@ getBelongingSymbols :: !Declaration !v:{#DclModule} -> (!BelongingSymbols, !v:{#
 nrOfBelongingSymbols :: !BelongingSymbols -> Int
 
 import_ident :: Ident
-restoreHeap :: !Ident !*SymbolTable -> .SymbolTable
+restoreIdentsSymbolPtrs :: ![Ident] !*SymbolTable -> *SymbolTable

@@ -194,7 +194,7 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 						  belongs_bitvect = bitvectCreate nr_of_belongs
 						  (belongs_set, (cs_error, cs_symbol_table))
 						  		= mapFilterYesSt (get_opt_nr_and_ident position eii_ident) belongs (cs_error, cs_symbol_table)
-			  			  cs_symbol_table = foldSt restoreHeap all_belongs cs_symbol_table
+			  			  cs_symbol_table = restoreIdentsSymbolPtrs all_belongs cs_symbol_table
 						-> (True, belongs_set, cs_error, cs_symbol_table)
 		  (decls_accu, dcl_modules, eii_declaring_modules, visited_modules, cs_error)
 				= foldSt
