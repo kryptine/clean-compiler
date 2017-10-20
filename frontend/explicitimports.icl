@@ -117,11 +117,6 @@ imp_decl_to_string (ID_Class {ii_ident={id_name}} _) = "ID_Class "+++toString id
 imp_decl_to_string (ID_Type {ii_ident={id_name}} _) = "ID_Type "+++toString id_name
 imp_decl_to_string (ID_Record {ii_ident={id_name}} _) = "ID_Record "+++toString id_name
 imp_decl_to_string (ID_Instance {ii_ident={id_name}} _ _ ) = "ID_Instance "+++toString id_name
-imp_decl_to_string (ID_OldSyntax idents) = "ID_OldSyntax "+++idents_to_string idents
-	where
-		idents_to_string [] = ""
-		idents_to_string [{id_name}] = toString id_name
-		idents_to_string [{id_name}:l] = toString id_name+++","+++idents_to_string l
 */
 
 getBelongingSymbolsFromID :: !ImportDeclaration -> Optional [Ident]
@@ -295,11 +290,13 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 			BS_Nothing
 				-> ([], dcl_modules)
 
+	numerate_belongs :: Ident *(Int,*SymbolTable) -> (!Int,!*SymbolTable)
 	numerate_belongs {id_info} (i, cs_symbol_table)
 		# (ste, cs_symbol_table) = readPtr id_info cs_symbol_table
 		  new_ste = { ste & ste_kind = STE_BelongingSymbol i, ste_previous = ste }
 		= (i+1, writePtr id_info new_ste cs_symbol_table)
 	
+	get_opt_nr_and_ident :: Position Ident Ident !*(*ErrorAdmin,!*SymbolTable) -> (!Optional (Int,Ident),!*(!*ErrorAdmin,!*SymbolTable))
 	get_opt_nr_and_ident position eii_ident ii_ident=:{id_info} (cs_error, cs_symbol_table)
 		# ({ste_kind}, cs_symbol_table) = readPtr id_info cs_symbol_table
 		= case ste_kind of
@@ -355,6 +352,7 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 	is_not_STE_member STE_Member = False
 	is_not_STE_member _ = True
 
+	update_declaring_modules :: Declaration ![Int] !*DeclaringModulesSet -> *DeclaringModulesSet
 	update_declaring_modules di_decl path eii_declaring_modules
 		= foldSt (\mod_index eei_dm->ikhInsert` False mod_index {di_decl = di_decl, di_belonging=EndNumbers} eei_dm) path eii_declaring_modules
 
@@ -365,8 +363,6 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 
 	depth_first_search expl_imp_indices_ikh modules_in_component_set
 			imported_mod imported_symbol belong_nr belong_ident path eii_declaring_modules visited_modules
-//		| False--->("depth_first_search imported_mod", imported_mod, "imported_symbol", imported_symbol)
-//			= undef
 		# (search_result, eii_declaring_modules) = ikhUSearch imported_mod eii_declaring_modules
 		= case search_result of
 			yes_di=:(Yes di)
@@ -447,6 +443,7 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 			= True
 		= is_member belong_ident t
 
+	report_not_exported_symbol_errors :: ![ImportNrAndIdents] Position *{!*ExplImpInfo} Int v:{#DclModule} *ErrorAdmin -> (*{!*ExplImpInfo},v:{#DclModule},*ErrorAdmin)
 	report_not_exported_symbol_errors [{ini_symbol_nr,ini_imp_decl}:not_exported_symbols] position expl_imp_info imported_mod dcl_modules cs_error
 		# (eii, expl_imp_info) = expl_imp_info![ini_symbol_nr]
 		  (eii_ident, eii) = get_eei_ident eii
