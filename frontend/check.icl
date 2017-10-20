@@ -1773,7 +1773,7 @@ checkDclModules imports_of_icl_mod dcl_modules macro_defs heaps cs=:{cs_symbol_t
 	get_expl_imp_symbols_of_component imports_of_icl_mod component (dcl_modules, cs_symbol_table)
 		# (expl_imp_symbols, _, expl_imp_indices, dcl_modules, cs_symbol_table)
 				= foldSt (get_expl_imp_symbols_of_module imports_of_icl_mod) component ([], 0, [], dcl_modules, cs_symbol_table)
-		  cs_symbol_table = foldSt restoreHeap expl_imp_symbols cs_symbol_table
+		  cs_symbol_table = restoreIdentsSymbolPtrs expl_imp_symbols cs_symbol_table
 		= (reverse expl_imp_symbols, reverse expl_imp_indices, (dcl_modules, cs_symbol_table))
 
 	get_expl_imp_symbols_of_module imports_of_icl_mod mod_index (expl_imp_symbols_accu, nr_of_expl_imp_symbols, expl_imp_indices_accu, dcl_modules, cs_symbol_table)
@@ -1929,8 +1929,7 @@ checkDclComponent components_array components_importing_module_a expl_imp_indice
 				= markExplImpSymbols component_nr (expl_imp_infos, cs.cs_symbol_table)
 		  (expl_imp_infos, dcl_modules, cs_symbol_table)
 		  		= foldSt collect_expl_imp_info_per_module mod_indices (expl_imp_infos, dcl_modules, cs_symbol_table)
-		  cs_symbol_table
-		  		= foldSt restoreHeap changed_symbols cs_symbol_table
+		  cs_symbol_table = restoreIdentsSymbolPtrs changed_symbols cs_symbol_table
 		= (expl_imp_infos, dcl_modules, { cs & cs_symbol_table = cs_symbol_table })
 
 	collect_expl_imp_info_per_module mod_index (expl_imp_infos, dcl_modules, cs_symbol_table)
@@ -3141,8 +3140,7 @@ updateExplImpInfo components_importing_module mod_index dcls_import dcls_local_f
 	  		= update_expl_imp_for_marked_symbols mod_index dcls_local_for_import (dcl_modules, expl_imp_infos, cs_symbol_table)
 	  (dcl_modules, expl_imp_infos, cs_symbol_table)
 	  		= update_expl_imp_for_marked_symbols mod_index dcls_import (dcl_modules, expl_imp_infos, cs_symbol_table)
-	  cs_symbol_table
-	  		= foldSt (\l cs_symbol_table->foldSt restoreHeap l cs_symbol_table) changed_symbols cs_symbol_table
+	  cs_symbol_table = foldSt restoreIdentsSymbolPtrs changed_symbols cs_symbol_table
 	= (dcl_modules, expl_imp_infos, cs_symbol_table)
 
 updateExplImpInfoForCachedModule :: [Int] Index {!Declaration} {!Declaration} ExplImpInfos u:{#DclModule} *SymbolTable 
@@ -3167,7 +3165,7 @@ updateExplImpInfoForCachedModule components_importing_module mod_index dcls_impo
 	  (dcl_modules, cs_symbol_table)
 	  		= unmark_belongings_of_expl_imp_symbols dcls_import dcl_modules__cs_symbol_table
 
-	  cs_symbol_table = foldSt (\l cs_symbol_table->foldSt restoreHeap l cs_symbol_table) changed_symbols cs_symbol_table
+	  cs_symbol_table = foldSt restoreIdentsSymbolPtrs changed_symbols cs_symbol_table
 	= (expl_imp_infos, dcl_modules, cs_symbol_table)
 where
 	mark_belongings_of_expl_imp_symbols decls (dcl_modules, cs_symbol_table)

@@ -546,8 +546,10 @@ instance <<< DeclarationInfo
 import_ident :: Ident
 import_ident =: { id_name = "import", id_info = nilPtr }
 
-restoreHeap :: !Ident !*SymbolTable -> .SymbolTable
-restoreHeap {id_info} cs_symbol_table
-		# ({ste_previous}, cs_symbol_table)
-			= readPtr id_info cs_symbol_table
-		= writePtr id_info ste_previous cs_symbol_table
+restoreIdentsSymbolPtrs :: ![Ident] !*SymbolTable -> *SymbolTable
+restoreIdentsSymbolPtrs idents symbol_table = foldSt restoreIdentSymbolPtr idents symbol_table
+
+restoreIdentSymbolPtr :: !Ident !*SymbolTable -> *SymbolTable
+restoreIdentSymbolPtr {id_info} cs_symbol_table
+	# ({ste_previous}, cs_symbol_table) = readPtr id_info cs_symbol_table
+	= writePtr id_info ste_previous cs_symbol_table
