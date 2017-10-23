@@ -1623,7 +1623,6 @@ checkDclModules imports_of_icl_mod dcl_modules macro_defs heaps cs=:{cs_symbol_t
 	  components_array = {! component \\ component <- components }
 	  (expl_imp_symbols_in_components, expl_imp_indices, (dcl_modules, cs_symbol_table))
 	   		= mapY2St (get_expl_imp_symbols_of_component imports_of_icl_mod) components (dcl_modules, cs_symbol_table)
-
 	  expl_imp_infos
 		= {idents_to_empty_ExplImpInfo_array expl_imp_symbols_in_component \\ expl_imp_symbols_in_component<-expl_imp_symbols_in_components}
 	  		// eii_declaring_modules will be updated later
@@ -1674,7 +1673,7 @@ checkDclModules imports_of_icl_mod dcl_modules macro_defs heaps cs=:{cs_symbol_t
 		# (mod_imports, dcl_modules, cs_symbol_table)
 				= get_mod_imports (mod_index==siz) imports_of_icl_mod dcl_modules cs_symbol_table
 		  (expl_imp_symbols_accu, nr_of_expl_imp_symbols, expl_imp_indices, cs_symbol_table)
-				= foldSt get_expl_imp_symbols mod_imports (expl_imp_symbols_accu, nr_of_expl_imp_symbols, [], cs_symbol_table)
+				= foldSt get_expl_imp_symbols_of_import mod_imports (expl_imp_symbols_accu, nr_of_expl_imp_symbols, [], cs_symbol_table)
 		= (expl_imp_symbols_accu, nr_of_expl_imp_symbols, [expl_imp_indices:expl_imp_indices_accu],dcl_modules, cs_symbol_table)
 	  where
 		get_mod_imports is_icl_mod=:False _ dcl_modules cs_symbol_table
@@ -1688,13 +1687,13 @@ checkDclModules imports_of_icl_mod dcl_modules macro_defs heaps cs=:{cs_symbol_t
 		get_mod_imports _ imports_of_icl_mod dcl_modules cs_symbol_table
 		 	= (imports_of_icl_mod, dcl_modules, cs_symbol_table)
 
-	get_expl_imp_symbols :: ParsedImport *([Ident],Int,[ExplicitImport],*SymbolTable) -> ([Ident],Int,[ExplicitImport],*SymbolTable)
-	get_expl_imp_symbols {import_module,import_symbols,import_file_position,import_qualified} (expl_imp_symbols_accu, nr_of_expl_imp_symbols, expl_imp_indices_accu, cs_symbol_table)
+	get_expl_imp_symbols_of_import :: ParsedImport *([Ident],Int,[ExplicitImport],*SymbolTable) -> ([Ident],Int,[ExplicitImport],*SymbolTable)
+	get_expl_imp_symbols_of_import {import_module,import_symbols,import_file_position,import_qualified} (expl_imp_symbols_accu, nr_of_expl_imp_symbols, expl_imp_indices_accu, cs_symbol_table)
 		# (expl_imp_symbols_accu, nr_of_expl_imp_symbols, expl_imp_indices, cs_symbol_table)
 			= case import_symbols of
 				ImportSymbolsOnly import_symbols
 					# (expl_imp_symbols_accu, nr_of_expl_imp_symbols, expl_imp_indices, cs_symbol_table)
-						= foldSt get_expl_imp_symbol import_symbols (expl_imp_symbols_accu, nr_of_expl_imp_symbols, [], cs_symbol_table)
+						= get_expl_imp_symbols import_symbols (expl_imp_symbols_accu, nr_of_expl_imp_symbols, [], cs_symbol_table)
 					-> (expl_imp_symbols_accu, nr_of_expl_imp_symbols, ImportSymbolsOnly expl_imp_indices, cs_symbol_table)
 				ImportSymbolsAll
 					->  (expl_imp_symbols_accu, nr_of_expl_imp_symbols, ImportSymbolsAll, cs_symbol_table)
@@ -1703,21 +1702,24 @@ checkDclModules imports_of_icl_mod dcl_modules macro_defs heaps cs=:{cs_symbol_t
 		  					 ei_symbols=expl_imp_indices, ei_qualified=import_qualified}
 		= (expl_imp_symbols_accu, nr_of_expl_imp_symbols, [explicit_import:expl_imp_indices_accu], cs_symbol_table)
 
-	get_expl_imp_symbol imp_decl=:(ID_Function ident) state
-		= get_symbol imp_decl ident state
-	get_expl_imp_symbol imp_decl=:(ID_Class ident _) state
-		= get_symbol imp_decl ident state
-	get_expl_imp_symbol imp_decl=:(ID_Type ident _) state
-		= get_symbol imp_decl ident state
-	get_expl_imp_symbol imp_decl=:(ID_Record ident _) state
-		= get_symbol imp_decl ident state
-	get_expl_imp_symbol imp_decl=:(ID_Instance class_ident instance_ident _) state
-		= get_symbol imp_decl instance_ident state
-	get_expl_imp_symbol (ID_Generic generic_ident ident) state
-		= get_symbol (ID_Function ident) ident
-		 (get_symbol (ID_Function generic_ident) generic_ident state)
+	get_expl_imp_symbols import_symbols state
+		= foldSt get_expl_imp_symbol import_symbols state
+	where
+		get_expl_imp_symbol imp_decl=:(ID_Function ident) state
+			= get_symbol imp_decl ident state
+		get_expl_imp_symbol imp_decl=:(ID_Class ident _) state
+			= get_symbol imp_decl ident state
+		get_expl_imp_symbol imp_decl=:(ID_Type ident _) state
+			= get_symbol imp_decl ident state
+		get_expl_imp_symbol imp_decl=:(ID_Record ident _) state
+			= get_symbol imp_decl ident state
+		get_expl_imp_symbol imp_decl=:(ID_Instance class_ident instance_ident _) state
+			= get_symbol imp_decl instance_ident state
+		get_expl_imp_symbol (ID_Generic generic_ident ident) state
+			= get_symbol (ID_Function ident) ident
+			 (get_symbol (ID_Function generic_ident) generic_ident state)
 
-	get_symbol :: ImportDeclaration !Ident !*([Ident],Int,[ImportNrAndIdents],*(Heap SymbolTableEntry)) -> ([Ident],Int,[ImportNrAndIdents],.(Heap SymbolTableEntry))
+	get_symbol :: ImportDeclaration !Ident !*([Ident],Int,[ImportNrAndIdents],*SymbolTable) -> ([Ident],Int,[ImportNrAndIdents],*SymbolTable)
 	get_symbol imp_decl ident=:{id_info} (expl_imp_symbols_accu, nr_of_expl_imp_symbols, expl_imp_indices_accu, cs_symbol_table)
 		# (ste, cs_symbol_table) = readPtr id_info cs_symbol_table
 		= case ste.ste_kind of
@@ -2423,13 +2425,13 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 	  (dcls_import_list, dcl_modules, cs)
 	  		= addImportedSymbolsToSymbolTable nr_of_modules (Yes dcl_macros) modules_in_component_set imports_ikh dcl_modules cs
 
-	  qualified_explicit_imports = (ikhSearch` nr_of_modules imports_ikh).si_qualified_explicit
+	  {si_qualified_explicit} = ikhSearch` nr_of_modules imports_ikh
 	  (dcl_modules, macro_defs,hp_expression_heap, cs)
-			= checkExplicitImportCompleteness imports.si_explicit qualified_explicit_imports dcl_modules macro_defs heaps.hp_expression_heap cs
+			= checkExplicitImportCompleteness imports.si_explicit si_qualified_explicit dcl_modules macro_defs heaps.hp_expression_heap cs
 	  heaps	= { heaps & hp_expression_heap=hp_expression_heap }
 
 	  (modified_ste_kinds,symbol_table,dcl_modules)
-		= store_qualified_explicit_imports_in_symbol_table qualified_explicit_imports [] cs.cs_symbol_table dcl_modules
+		= store_qualified_explicit_imports_in_symbol_table si_qualified_explicit [] cs.cs_symbol_table dcl_modules
 
 	#! first_inst_index = size icl_functions
 	   first_gen_inst_index = first_inst_index + length inst_fun_defs
@@ -2540,6 +2542,8 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 	  cs_symbol_table = foldlArraySt removeImportedSymbolsFromSymbolTable icl_imported cs_symbol_table
 
 	  dcl_modules = e_info.ef_modules
+
+	  icl_imported_instances = collect_imported_instances icl_imported si_qualified_explicit
 	  
 	| cs_error.ea_ok
 		# {hp_var_heap,hp_type_heaps=hp_type_heaps=:{th_vars},hp_expression_heap} = heaps
@@ -2564,7 +2568,7 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 		  				  	 		ifi_gencase_indices = icl_generic_ranges, ifi_type_function_indices = icl_type_fun_ranges }
 
 		  icl_mod	= { icl_name = mod_ident, icl_functions = icl_functions, icl_function_indices = icl_function_indices,
-		  				icl_common = icl_common, icl_import = icl_imported, icl_qualified_imports = qualified_explicit_imports,
+		  				icl_common = icl_common, icl_imported_instances = icl_imported_instances,
 		  				icl_imported_objects = mod_imported_objects, icl_foreign_exports = foreign_exports,
 		  				icl_used_module_numbers = imported_module_numbers, icl_modification_time = mod_modification_time }
 
@@ -2594,7 +2598,7 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 		  				  	 		ifi_gencase_indices = icl_generic_ranges, ifi_type_function_indices = icl_type_fun_ranges }
 
 		  icl_mod		= { icl_name = mod_ident, icl_functions = icl_functions, icl_function_indices = icl_function_indices,
-		  					icl_common = icl_common, icl_import = icl_imported, icl_qualified_imports = qualified_explicit_imports,
+		  					icl_common = icl_common, icl_imported_instances = icl_imported_instances,
 		  					icl_imported_objects = mod_imported_objects, icl_foreign_exports = foreign_exports,
 		  					icl_used_module_numbers = imported_module_numbers, icl_modification_time = mod_modification_time }
 		= (False, icl_mod, dcl_modules, {}, {}, cs_x.x_main_dcl_module_n,heaps, cs_predef_symbols, cs_symbol_table, cs_error.ea_file, directly_imported_dcl_modules)
@@ -2991,9 +2995,8 @@ addImportedSymbolsToSymbolTable importing_mod opt_macro_range modules_in_compone
 		# {si_explicit, si_implicit} = ikhSearch` mod_index imports_ikh
 		  (decls_accu,dcl_modules,cs)
 				= foldSt (\(decls, _) state ->
-							foldSt (\decl state -> add_declaration opt_macro_range importing_mod decl state)
-								decls state)
-						si_explicit (decls_accu,dcl_modules,cs)
+							foldSt (add_declaration opt_macro_range importing_mod) decls state
+						  ) si_explicit (decls_accu,dcl_modules,cs)
 		= foldSt (\(mod_index, _) state 
 					-> add_impl_imported_symbols opt_macro_range importing_mod modules_in_component_set
 						 imports_ikh mod_index state)

@@ -39,7 +39,7 @@ instance == FunctionOrMacroIndex
 				| STE_Type
 				| STE_Constructor
 				| STE_Selector ![Global Index]
-				| STE_Field !Ident
+				| STE_Field !Ident // IC_Selector
 				| STE_Class
 				| STE_Member
 				| STE_Generic
@@ -139,8 +139,7 @@ instance == FunctionOrMacroIndex
 	,	icl_functions			:: !.{# FunDef }
 	,	icl_function_indices	:: !IclFunctionIndices
 	,	icl_common				:: !.CommonDefs
-	,	icl_import				:: !{!Declaration}
-	,	icl_qualified_imports	:: ![([Declaration], ModuleN, Position)]
+	,	icl_imported_instances	:: ![!GlobalInstanceIndex!]
 	,	icl_imported_objects	:: ![ImportedObject]
 	,	icl_foreign_exports		:: ![ForeignExport]
 	,	icl_used_module_numbers :: !NumberSet
@@ -551,8 +550,8 @@ cIsImportedObject :== False
 	}
 
 ::	FieldSymbol =
-	{	fs_ident		:: !Ident
-	,	fs_var			:: !Ident
+	{	fs_ident		:: !Ident // IC_Field
+	,	fs_var			:: !Ident // IC_Expression
 	,	fs_index		:: !Index
 	}
 
@@ -580,6 +579,11 @@ cIsAnalysed				:== 4
 	,	gi_index	::!Int
 	}
 NoGlobalIndex :== {gi_module=NoIndex,gi_index=NoIndex}	
+
+::	GlobalInstanceIndex =
+	{	gii_module_n ::!Int
+	,	gii_instance_n ::!Int
+	}
 
 ::	TypeDef type_rhs =
 	{	td_ident		:: !Ident
@@ -1018,8 +1022,8 @@ cNotVarNumber :== -1
 	}
 
 ::	SelectorDef =
-	{	sd_ident		:: !Ident
-	,	sd_field		:: !Ident
+	{	sd_ident		:: !Ident // IC_Selector
+	,	sd_field		:: !Ident // IC_Field
 	,	sd_type			:: !SymbolType
 	,	sd_exi_vars		:: ![ATypeVar]
 	,	sd_field_nr		:: !Int
