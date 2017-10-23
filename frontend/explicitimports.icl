@@ -119,11 +119,11 @@ imp_decl_to_string (ID_Record {ii_ident={id_name}} _) = "ID_Record "+++toString 
 imp_decl_to_string (ID_Instance {ii_ident={id_name}} _ _ ) = "ID_Instance "+++toString id_name
 */
 
-getBelongingSymbolsFromID :: !ImportDeclaration -> Optional [Ident]
-getBelongingSymbolsFromID (ID_Class _ x)					= x
-getBelongingSymbolsFromID (ID_Type _ x)						= x
-getBelongingSymbolsFromID (ID_Record _ x)					= x
-getBelongingSymbolsFromID _									= No
+getBelongingSymbolsFromImportDeclaration :: !ImportDeclaration -> Optional [Ident]
+getBelongingSymbolsFromImportDeclaration (ID_Class _ x) = x
+getBelongingSymbolsFromImportDeclaration (ID_Type _ x) = x
+getBelongingSymbolsFromImportDeclaration (ID_Record _ x) = x
+getBelongingSymbolsFromImportDeclaration _ = No
 
 solveExplicitImports :: !(IntKeyHashtable [ExplicitImport]) !{#Int} !Index
 								!*(!v:{#DclModule},!*{#Int},!{!*ExplImpInfo},!*CheckState)
@@ -201,7 +201,7 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 	solve_belonging position expl_imp_indices_ikh modules_in_component_set path
 			(decl, {ini_symbol_nr, ini_imp_decl}, imported_mod)
 			(decls_accu, dcl_modules, visited_modules, expl_imp_info, cs=:{cs_error, cs_symbol_table})
-		# (Yes belongs) = getBelongingSymbolsFromID ini_imp_decl
+		# (Yes belongs) = getBelongingSymbolsFromImportDeclaration ini_imp_decl
 		  (all_belongs, dcl_modules) = get_all_belongs decl dcl_modules
 		  (ExplImpInfo eii_ident eii_declaring_modules, expl_imp_info) = expl_imp_info![ini_symbol_nr]
 		  (need_all, belongs_set, cs_error, cs_symbol_table)
@@ -256,6 +256,7 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 			= abort "sanity check failed in module explicitimports"
 		= eii_declaring_modules
 
+	get_nth_belonging_decl :: Position Int Declaration v:{#DclModule} -> (Declaration,v:{#DclModule});
 	get_nth_belonging_decl position belong_nr decl=:(Declaration {decl_kind}) dcl_modules
 		# (STE_Imported _ def_mod_index) = decl_kind
 		  (belongin_symbols, dcl_modules) = getBelongingSymbols decl dcl_modules
@@ -278,6 +279,7 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 						 decl_kind = STE_Imported STE_Member def_mod_index,
 						decl_index = ds_index }, dcl_modules)
 
+	get_all_belongs :: Declaration v:{#DclModule} -> (![Ident],!v:{#DclModule})
 	get_all_belongs decl=:(Declaration {decl_kind,decl_index}) dcl_modules
 		# (belonging_symbols, dcl_modules) = getBelongingSymbols decl dcl_modules
 		= case belonging_symbols of
@@ -352,12 +354,12 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 	is_not_STE_member STE_Member = False
 	is_not_STE_member _ = True
 
-	update_declaring_modules :: Declaration ![Int] !*DeclaringModulesSet -> *DeclaringModulesSet
+	update_declaring_modules :: Declaration [Int] *DeclaringModulesSet -> *DeclaringModulesSet
 	update_declaring_modules di_decl path eii_declaring_modules
 		= foldSt (\mod_index eei_dm->ikhInsert` False mod_index {di_decl = di_decl, di_belonging=EndNumbers} eei_dm) path eii_declaring_modules
 
 	update_belonging_accu di_decl ini imported_mod belonging_accu
-		= case getBelongingSymbolsFromID ini.ini_imp_decl of
+		= case getBelongingSymbolsFromImportDeclaration ini.ini_imp_decl of
 			No		-> belonging_accu
 			Yes _	-> [(di_decl, ini, imported_mod):belonging_accu]
 
@@ -421,7 +423,7 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 		= (False, No)
 	search_imported_symbol imported_symbol [{ini_symbol_nr, ini_imp_decl}:t]
 		| imported_symbol==ini_symbol_nr
-			= (True, getBelongingSymbolsFromID ini_imp_decl)
+			= (True, getBelongingSymbolsFromImportDeclaration ini_imp_decl)
 		= search_imported_symbol imported_symbol t
 
 	belong_ident_found :: !Ident !(Optional [Ident]) -> Bool
@@ -456,6 +458,7 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 	report_not_exported_symbol_errors [] position expl_imp_info imported_mod dcl_modules cs_error
 		= (expl_imp_info,dcl_modules,cs_error)
 
+	impDeclToNameSpaceString :: !ImportDeclaration -> {#Char}
 	impDeclToNameSpaceString (ID_Function _)	= "function/macro"
 	impDeclToNameSpaceString (ID_Class _ _)		= "class"
 	impDeclToNameSpaceString (ID_Type _ _)		= "type"
