@@ -59,3 +59,5 @@ search_qualified_imports :: !String !SortedQualifiedImports !NameSpaceN -> [Decl
 qualified_import_for_type :: !String !SortedQualifiedImports -> Bool
 
 restore_module_ste_kinds_in_symbol_table :: ![(SymbolPtr,STE_Kind)] !*SymbolTable -> *SymbolTable
+
+collect_imported_instances :: !{!Declaration} ![QualifiedDeclaration] -> [!GlobalInstanceIndex!]

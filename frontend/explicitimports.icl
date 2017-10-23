@@ -184,7 +184,7 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 		  										-> (module_ident,dcl_modules)
 		  									_
 												-> dcl_modules![imported_mod].dcl_name
-		= ((decl_accu, module_ident, position), (dcl_modules, visited_modules, expl_imp_info, cs))
+		= ((decl_accu, module_ident), (dcl_modules, visited_modules, expl_imp_info, cs))
 
 	search_expl_imp_symbols imported_symbols expl_imp_indices_ikh modules_in_component_set path imported_mod state
 		= foldSt (search_expl_imp_symbol expl_imp_indices_ikh modules_in_component_set path imported_mod)
@@ -900,9 +900,8 @@ stupid_ident =: { id_name = "stupid", id_info = nilPtr }
 
 // XXX from m import :: T(..) works also if T is a record type
 
-
 store_qualified_explicitly_imported_symbols_in_symbol_table :: ![QualifiedDeclaration] ![SymbolPtr] !*SymbolTable -> (![SymbolPtr],!*SymbolTable)
-store_qualified_explicitly_imported_symbols_in_symbol_table [(declarations,module_n,position):qualified_explicit_imports] modified_symbol_ptrs symbol_table
+store_qualified_explicitly_imported_symbols_in_symbol_table [(declarations,module_n):qualified_explicit_imports] modified_symbol_ptrs symbol_table
 	# (modified_symbol_ptrs,symbol_table) = foldSt store_qualified_explicitly_imported_symbol declarations (modified_symbol_ptrs,symbol_table)
 	= store_qualified_explicitly_imported_symbols_in_symbol_table qualified_explicit_imports modified_symbol_ptrs symbol_table
 	where
@@ -935,7 +934,7 @@ restore_symbol_table_after_checking_completeness modified_symbol_ptrs symbol_tab
 			= writePtr symbol_ptr {symbol_ste & ste_kind=ste_kind} symbol_table
 
 store_qualified_explicit_imports_in_symbol_table :: ![QualifiedDeclaration] ![(SymbolPtr,STE_Kind)] !*SymbolTable !*{#DclModule} -> (![(SymbolPtr,STE_Kind)],!*SymbolTable,!*{#DclModule})
-store_qualified_explicit_imports_in_symbol_table [(declarations,module_symbol,position):qualified_explicit_imports] modified_ste_kinds symbol_table modules
+store_qualified_explicit_imports_in_symbol_table [(declarations,module_symbol):qualified_explicit_imports] modified_ste_kinds symbol_table modules
 	# module_symbol_ptr = module_symbol.id_info
 	  (module_ste=:{ste_kind},symbol_table) = readPtr module_symbol_ptr symbol_table
 	  (modified_ste_kinds,sorted_qualified_imports)
@@ -1070,3 +1069,32 @@ restore_module_ste_kinds_in_symbol_table [(ptr,ste_kind):ptrs_and_ste_kinds] sym
 	= restore_module_ste_kinds_in_symbol_table ptrs_and_ste_kinds symbol_table
 restore_module_ste_kinds_in_symbol_table [] symbol_table
 	= symbol_table
+
+collect_imported_instances :: !{!Declaration} ![QualifiedDeclaration] -> [!GlobalInstanceIndex!]
+collect_imported_instances icl_imports icl_qualified_imports
+	# instance_indices = collect_imported_instances_in_array 0 icl_imports
+	= collect_qualified_imported_instances icl_qualified_imports instance_indices
+where
+	collect_imported_instances_in_array :: !Int !{!Declaration} -> [!GlobalInstanceIndex!]
+	collect_imported_instances_in_array i imports
+		| i<size imports
+			= case imports.[i] of
+				Declaration {decl_kind = STE_Imported STE_Instance mod_index, decl_index}
+					-> [! {gii_module_n=mod_index,gii_instance_n=decl_index} : collect_imported_instances_in_array (i+1) imports !]
+				_
+					-> collect_imported_instances_in_array (i+1) imports
+			= [!!]
+
+	collect_qualified_imported_instances :: ![([Declaration],a)] ![!GlobalInstanceIndex!] -> [!GlobalInstanceIndex!]
+	collect_qualified_imported_instances [(declarations,_):qualified_imports] instance_indices
+		= collect_imported_instances_in_list declarations (collect_qualified_imported_instances qualified_imports instance_indices)
+	collect_qualified_imported_instances [] instance_indices
+		= instance_indices
+
+	collect_imported_instances_in_list :: ![Declaration] ![!GlobalInstanceIndex!] -> [!GlobalInstanceIndex!]
+	collect_imported_instances_in_list [Declaration {decl_kind = STE_Imported STE_Instance mod_index, decl_index}:declarations] instance_indices
+		= [! {gii_module_n=mod_index,gii_instance_n=decl_index} : collect_imported_instances_in_list declarations instance_indices!]
+	collect_imported_instances_in_list [_:declarations] instance_indices
+		= collect_imported_instances_in_list declarations instance_indices
+	collect_imported_instances_in_list [] instance_indices
+		= instance_indices

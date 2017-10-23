@@ -2533,10 +2533,10 @@ addLiftedArgumentsToSymbolType st=:{st_arity,st_args,st_args_strictness,st_vars,
 	,	fe_location		:: !IdentPos
 	}
 
-typeProgram :: !{! Group} !Int !*{# FunDef} !IndexRange  !(Optional Bool) !CommonDefs !{!Declaration} ![QualifiedDeclaration] !{# DclModule} !NumberSet
+typeProgram :: !{! Group} !Int !*{# FunDef} !IndexRange  !(Optional Bool) !CommonDefs ![!GlobalInstanceIndex!] !{# DclModule} !NumberSet
 																						 !*TypeDefInfos !*Heaps !*PredefinedSymbols !*File !*File
 	-> (!Bool, !*{# FunDef}, !ArrayAndListInstances, !{# CommonDefs}, !{# {# FunType} }, !*TypeDefInfos,!*Heaps,!*PredefinedSymbols,!*File,!*File)
-typeProgram comps main_dcl_module_n fun_defs specials list_inferred_types icl_defs imports icl_qualified_imports dcl_modules used_module_numbers
+typeProgram comps main_dcl_module_n fun_defs specials list_inferred_types icl_defs icl_imported_instances dcl_modules used_module_numbers
 	td_infos heaps=:{hp_var_heap, hp_expression_heap, hp_type_heaps,hp_generic_heap} predef_symbols file out
 	#! fun_env_size = size fun_defs
 
@@ -2545,8 +2545,7 @@ typeProgram comps main_dcl_module_n fun_defs specials list_inferred_types icl_de
 	  ti_functions	 = {dcl_functions \\ {dcl_functions} <-: dcl_modules }	  
 
 	  class_instances = { {  IT_Empty \\ i <- [0 .. dec (size com_class_defs)] } \\ {com_class_defs} <-: ti_common_defs }
-	  state = collect_imported_instances imports ti_common_defs ts_error class_instances hp_type_heaps.th_vars td_infos
-	  state = collect_qualified_imported_instances icl_qualified_imports ti_common_defs state
+	  state = collect_imported_instances icl_imported_instances ti_common_defs ts_error class_instances hp_type_heaps.th_vars td_infos
 
 	  (ts_error, class_instances, th_vars, td_infos) = collect_and_check_instances (size icl_defs.com_instance_defs) ti_common_defs main_dcl_module_n state
 	  
@@ -2842,17 +2841,12 @@ where
 		# err = errorHeading "Uniqueness error " err
 		= {err & ea_file = err.ea_file <<< "* annotated type " <<< type_name <<< " occurs non unique in inferred function type"<<< '\n'}
 
-collect_imported_instances imports common_defs error class_instances type_var_heap td_infos
-	= foldlArraySt (collect_imported_instance common_defs) imports (error, class_instances, type_var_heap, td_infos)
-
-collect_qualified_imported_instances icl_qualified_imports common_defs state
-	= foldSt (\ (declarations,_,_) state -> foldSt (collect_imported_instance common_defs) declarations state)
-			  icl_qualified_imports state
-
-collect_imported_instance common_defs (Declaration {decl_kind = STE_Imported STE_Instance mod_index, decl_index }) state
-	= update_instances_of_class common_defs mod_index decl_index state
-collect_imported_instance common_defs _ state
-	= state
+collect_imported_instances [!{gii_module_n,gii_instance_n}:imported_instances!] common_defs error class_instances type_var_heap td_infos
+	# (error, class_instances, type_var_heap, td_infos)
+		= update_instances_of_class common_defs gii_module_n gii_instance_n (error, class_instances, type_var_heap, td_infos)
+	= collect_imported_instances imported_instances common_defs error class_instances type_var_heap td_infos
+collect_imported_instances [!!] common_defs error class_instances type_var_heap td_infos
+	= (error, class_instances, type_var_heap, td_infos)
 
 collect_and_check_instances nr_of_instances common_defs main_dcl_module_n state
 	= iFoldSt (update_instances_of_class common_defs main_dcl_module_n) 0 nr_of_instances state
