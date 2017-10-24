@@ -70,6 +70,7 @@ instance == FunctionOrMacroIndex
 				| STE_BelongingSymbol !Int
 				| STE_ExplImpSymbolNotImported !ModuleN !STE_Kind
 				| STE_ImportedQualified !Declaration !STE_Kind
+				| STE_Hidden !Declaration !STE_Kind
 
 				| STE_UsedType !ModuleN !STE_Kind
 					/* used during binding of types to mark types that have been applied. */
@@ -526,6 +527,7 @@ instance == GenericDependency
 ::	ImportSymbols import_declarations
 	= ImportSymbolsAll
 	| ImportSymbolsOnly !import_declarations
+	| ImportSymbolsAllSomeQualified !import_declarations
 
 ::	ImportQualified = NotQualified | Qualified | QualifiedAs !Ident
 

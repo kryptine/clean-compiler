@@ -18,10 +18,16 @@ import syntax, checksupport
 		ei_qualified:: !ImportQualified
 	}
 
+:: QualifiedAndHiddenDeclaration
+	= QualifiedHiddenDeclaration !Declaration // qualified and hidden
+	| QualifiedNotHiddenDeclaration !Declaration // qualified and not hidden, because imported by another import in the same module
+	| QualifiedSomeNotHiddenDeclaration !Declaration ![Int] // qualified and hidden, not hidden in some (other) modules of the component
+
 :: SolvedImports =
-	{	si_explicit				:: ![([Declaration], Position)]
-	,	si_qualified_explicit	:: ![QualifiedDeclaration]
-	,	si_implicit				:: ![(ModuleN, Position)]
+	{	si_explicit :: ![([Declaration], Position)]
+	,	si_qualified_explicit :: ![QualifiedDeclaration]
+	,	si_qualified_hidden_explicit :: ![([QualifiedAndHiddenDeclaration],ModuleN)]
+	,	si_implicit :: ![(ModuleN, Position)]
 	}
 
 idents_to_empty_ExplImpInfo_array :: ![Ident] -> *{!*ExplImpInfo}
@@ -33,15 +39,17 @@ markExplImpSymbols :: !Int !*(!*ExplImpInfos,!*SymbolTable) -> (!.[Ident],!(!*Ex
 updateExplImpForMarkedSymbol :: !Index !Declaration !SymbolTableEntry !u:{#DclModule} !*ExplImpInfos !*SymbolTable
 																  -> (!u:{#DclModule},!*ExplImpInfos,!*SymbolTable)
 
-solveExplicitImports :: !(IntKeyHashtable [ExplicitImport]) !{#Int} !Index 
+solveExplicitImports :: !(IntKeyHashtable [ExplicitImport]) !{#Int} ![Index] !Index
 								!*(!v:{#DclModule},!*{#Int},!{!*ExplImpInfo},!*CheckState)
 			-> (!.SolvedImports,! (!v:{#DclModule},!.{#Int},!{!.ExplImpInfo},!.CheckState))
 
-checkExplicitImportCompleteness :: ![([Declaration], Position)] ![QualifiedDeclaration]
+checkExplicitImportCompleteness :: ![([Declaration], Position)] ![QualifiedDeclaration] ![([QualifiedAndHiddenDeclaration],ModuleN)]
 										!*{#DclModule} !*{#*{#FunDef}} !*ExpressionHeap !*CheckState
 									-> (!.{#DclModule},!*{#*{#FunDef}},!.ExpressionHeap,!.CheckState)
 
-store_qualified_explicit_imports_in_symbol_table :: ![QualifiedDeclaration] ![(SymbolPtr,STE_Kind)] !*SymbolTable !*{#DclModule} -> (![(SymbolPtr,STE_Kind)],!*SymbolTable,!*{#DclModule})
+store_qualified_explicit_imports_in_symbol_table :: ![QualifiedDeclaration] ![([QualifiedAndHiddenDeclaration],ModuleN)]
+														![(SymbolPtr,STE_Kind)] !*SymbolTable !*{#DclModule}
+													-> (![(SymbolPtr,STE_Kind)],!*SymbolTable,!*{#DclModule})
 
 :: NameSpaceN:==Int
 
@@ -60,4 +68,4 @@ qualified_import_for_type :: !String !SortedQualifiedImports -> Bool
 
 restore_module_ste_kinds_in_symbol_table :: ![(SymbolPtr,STE_Kind)] !*SymbolTable -> *SymbolTable
 
-collect_imported_instances :: !{!Declaration} ![QualifiedDeclaration] -> [!GlobalInstanceIndex!]
+collect_imported_instances :: !{!Declaration} ![QualifiedDeclaration] ![([QualifiedAndHiddenDeclaration],ModuleN)] -> [!GlobalInstanceIndex!]

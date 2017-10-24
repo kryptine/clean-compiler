@@ -312,6 +312,47 @@ addSymbol yes_for_icl_module ident pos decl_kind def_kind def_index def_mod impo
 		add_indirectly_imported_symbol _ {ste_kind = STE_Imported kind mod_index, ste_index} _ _ def_kind def_index def_mod _ dcl_modules cs
 			| kind == def_kind && mod_index == def_mod && ste_index == def_index
 				= (False, dcl_modules, cs)
+		add_indirectly_imported_symbol yes_for_icl_module {ste_kind=first_hidden_ste_kind=:STE_Hidden (Declaration {decl_kind=hidden_decl_kind,decl_index}) ste_kind,ste_index,ste_def_level,ste_previous}
+				ident _ def_kind def_index def_mod importing_mod dcl_modules cs
+			# (STE_Imported hidden_kind hidden_mod_index) = hidden_decl_kind
+			| def_kind==hidden_kind && def_mod==hidden_mod_index && def_index==decl_index
+				= (False, dcl_modules, cs)
+			# ste_kind2 = skip_other_hidden_symbols ste_kind def_kind def_index def_mod
+			= case ste_kind2 of
+				STE_Hidden _ _
+					-> (False, dcl_modules, cs) // symbol is hidden
+				STE_Empty
+					# previous_entry = {ste_kind=ste_kind2, ste_index=ste_index, ste_def_level=ste_def_level, ste_previous=ste_previous}
+					# decl_kind = add_hidden_declarations first_hidden_ste_kind decl_kind
+					# entry = {ste_kind=decl_kind, ste_index=def_index, ste_def_level=cModuleScope, ste_previous=previous_entry}					
+					  cs = {cs & cs_symbol_table = writePtr ident.id_info entry cs.cs_symbol_table}
+					-> case def_kind of
+						STE_Field selector_id
+							-> (True, dcl_modules, addFieldToSelectorDefinition selector_id {glob_module=def_mod, glob_object=def_index} cs)
+						_
+							-> (True, dcl_modules, cs)
+				STE_Imported kind mod_index
+					| kind==def_kind && mod_index==def_mod && ste_index==def_index
+						-> (False, dcl_modules, cs)
+				_
+					| def_mod == cs.cs_x.x_main_dcl_module_n && case yes_for_icl_module of Yes _ -> True ; _ -> False
+						-> (False, dcl_modules, cs)
+					| importing_mod==def_mod
+						-> (False, dcl_modules, cs)
+						-> (False, dcl_modules, {cs & cs_error = checkError ident "multiply defined" cs.cs_error})
+		where
+			skip_other_hidden_symbols hidden_ste_kind=:(STE_Hidden (Declaration {decl_kind=hidden_decl_kind,decl_index}) ste_kind) def_kind def_index def_mod
+				# (STE_Imported hidden_kind hidden_mod_index) = hidden_decl_kind
+				| def_kind==hidden_kind && def_mod==hidden_mod_index && def_index==decl_index
+					= hidden_ste_kind
+					= skip_other_hidden_symbols ste_kind def_kind def_index def_mod
+			skip_other_hidden_symbols ste_kind def_kind def_index def_mod
+				= ste_kind
+			
+			add_hidden_declarations (STE_Hidden hidden_declaration ste_kind) decl_kind
+				= STE_Hidden hidden_declaration (add_hidden_declarations ste_kind decl_kind)
+			add_hidden_declarations _ decl_kind
+				= decl_kind
 		add_indirectly_imported_symbol (Yes _) _ _ _ def_kind def_index def_mod _ dcl_modules cs
 			| def_mod == cs.cs_x.x_main_dcl_module_n
 				// an icl module imports one of it's definitions from the dcl module

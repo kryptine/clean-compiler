@@ -317,7 +317,7 @@ where
 		# (token, scanState) = nextToken GeneralContext scanState
 		| is_icl_mod
 			| token == ModuleToken
-				# (token, scanState) = nextToken GeneralContext scanState
+				# (token, scanState) = nextToken ModuleNameContext scanState
 				= try_module_name token MK_Main scanState
 			| token == ImpModuleToken 
 				= try_module_token MK_Module scanState
@@ -424,7 +424,7 @@ where
 			# (importedObjects, pState) = wantCodeImports pState
 			= (True, PD_ImportedObjects importedObjects, pState)
 			# pState = tokenBack pState
-			# (imports, pState) = wantImports pState
+			# (imports, pState) = wantImports parseContext pState
 	   		= (True, PD_Import imports, pState)
 	try_definition _ FromToken pos pState
 		| ~(isGlobalContext parseContext)
@@ -1320,25 +1320,63 @@ wantLocals pState
 	imports and exports
 */
 
-wantImports :: !ParseState -> (![ParsedImport], !ParseState)
-wantImports pState
-	# (imports, pState) = wantModuleImports (IC_Module NoQualifiedIdents) pState
+wantImports :: !ParseContext !ParseState -> (![ParsedImport], !ParseState)
+wantImports parseContext pState
+	# (imports, pState) = wantImportOfModulesOrModuleWithQualifiedAndHidden parseContext pState
 	  pState = wantEndOfDefinition "imports" pState
 	= (imports, pState)
 
+wantImportOfModulesOrModuleWithQualifiedAndHidden :: !ParseContext !ParseState -> (![ParsedImport], !ParseState)
+wantImportOfModulesOrModuleWithQualifiedAndHidden parseContext pState
+	| isIclContext parseContext
+		# (token, pState) = nextToken ModuleNameContext pState
+		= wantImportOfModulesOrModuleWithQualifiedAndHiddenT token pState 
+	= wantModuleImports (IC_Module NoQualifiedIdents) pState
+
+wantImportOfModulesOrModuleWithQualifiedAndHiddenT :: !Token !ParseState -> (![Import], !ParseState)
+wantImportOfModulesOrModuleWithQualifiedAndHiddenT token pState
+	| is_not_qualified_module_name token
+		# first_name = not_qualified_module_nameT token
+		  ident_class = IC_Module NoQualifiedIdents
+		  (first_ident, pState) = stringToIdent first_name ident_class pState
+		  (file_name, line_nr, pState)	= getFileAndLineNr pState
+		  position = LinePos file_name line_nr
+		  (token, pState) = nextToken FunctionContext pState
+		= case token of
+			DoubleArrowToken
+				# pState = wantToken GeneralContext "import" (IdentToken "qualified") pState
+				  (import_symbols, pState) = wantImportDeclarations pState
+				  module_import = {import_module = first_ident, import_symbols = ImportSymbolsAllSomeQualified import_symbols, import_file_position = position, import_qualified = NotQualified}
+				-> ([module_import], pState)
+			_
+				# module_import = {import_module = first_ident, import_symbols = ImportSymbolsAll, import_file_position = position, import_qualified = NotQualified}
+				-> parseOptionalModuleImportsT token module_import ident_class pState
+		= wantModuleImportsT token (IC_Module NoQualifiedIdents) pState
+where
+	is_not_qualified_module_name (IdentToken name) = name<>"qualified"
+	is_not_qualified_module_name (UnderscoreIdentToken name) = True
+	is_not_qualified_module_name (QualifiedIdentToken _ _) = True
+	is_not_qualified_module_name _ = False
+	
+	not_qualified_module_nameT (IdentToken name) = name
+	not_qualified_module_nameT (UnderscoreIdentToken name) = name
+	not_qualified_module_nameT (QualifiedIdentToken module_dname module_fname) = module_dname+++"."+++module_fname
+
 wantModuleImports :: !IdentClass !ParseState -> (![Import], !ParseState)
 wantModuleImports ident_class pState
-	# (import_qualified, first_name, pState) = wantOptionalQualifiedAndModuleName pState
+	# (token, pState) = nextToken ModuleNameContext pState
+	= wantModuleImportsT token ident_class pState
+
+wantModuleImportsT :: !Token !IdentClass !ParseState -> (![Import], !ParseState)
+wantModuleImportsT token ident_class pState
+	# (import_qualified, first_name, pState) = wantOptionalQualifiedAndModuleNameT token pState
 	  (first_ident, pState) = stringToIdent first_name ident_class pState
 	  (file_name, line_nr, pState)	= getFileAndLineNr pState
 	  position = LinePos file_name line_nr
 	  (token, pState) = nextToken FunctionContext pState
-	  (import_qualified,token, pState) = parse_optional_as_module_name import_qualified token pState
+	  (import_qualified,token,pState) = parse_optional_as_module_name import_qualified token pState
 	  module_import = {import_module = first_ident, import_symbols = ImportSymbolsAll, import_file_position = position, import_qualified = import_qualified}
-	| token == CommaToken
-		# (rest, pState) = wantModuleImports ident_class pState
-		= ([module_import : rest], pState)
-	= ([module_import], tokenBack pState)
+	= parseOptionalModuleImportsT token module_import ident_class pState
 where
 	parse_optional_as_module_name import_qualified=:Qualified token=:(IdentToken "as") pState
 		# (mod_name, pState) = wantModuleName pState
@@ -1347,6 +1385,13 @@ where
 		= (QualifiedAs mod_ident,token,pState)
 	parse_optional_as_module_name import_qualified token pState
 		= (import_qualified,token,pState)
+
+parseOptionalModuleImportsT :: !Token !Import !IdentClass !ParseState -> (![Import], !ParseState)
+parseOptionalModuleImportsT CommaToken module_import ident_class pState
+	# (rest, pState) = wantModuleImports ident_class pState
+	= ([module_import : rest], pState)
+parseOptionalModuleImportsT token module_import ident_class pState
+	= ([module_import], tokenBack pState)
 
 wantFromImports :: !ParseState -> (!ParsedImport, !ParseState)
 wantFromImports pState
@@ -1383,17 +1428,17 @@ wantFromImports pState
 		= ( { import_module = mod_ident, import_symbols = ImportSymbolsOnly import_symbols,
 			  import_file_position = LinePos file_name line_nr, import_qualified = NotQualified }, pState)
 
-	wantImportDeclarations pState
-		# (token, pState) = nextToken GeneralContext pState
-		= wantImportDeclarationsT token pState
+wantImportDeclarations pState
+	# (token, pState) = nextToken GeneralContext pState
+	= wantImportDeclarationsT token pState
 
-	wantImportDeclarationsT token pState
-		# (first, pState) = wantImportDeclarationT token pState
-		  (token, pState) = nextToken GeneralContext pState
-		| token == CommaToken
-			# (rest, pState) = wantImportDeclarations pState
-			= ([first : rest], pState)
-			= ([first], tokenBack pState)
+wantImportDeclarationsT token pState
+	# (first, pState) = wantImportDeclarationT token pState
+	  (token, pState) = nextToken GeneralContext pState
+	| token == CommaToken
+		# (rest, pState) = wantImportDeclarations pState
+		= ([first : rest], pState)
+		= ([first], tokenBack pState)
 
 instance want ImportedObject where
 	want pState
@@ -5191,9 +5236,8 @@ wantModuleName pState
 		UnderscoreIdentToken name -> (name, pState)
 		_				-> ("", parseError "String" (Yes token) "module name" pState)
 
-wantOptionalQualifiedAndModuleName :: !*ParseState -> (!ImportQualified,!{#Char},!*ParseState)
-wantOptionalQualifiedAndModuleName pState
-	# (token, pState) = nextToken ModuleNameContext pState
+wantOptionalQualifiedAndModuleNameT :: !Token !*ParseState -> (!ImportQualified,!{#Char},!*ParseState)
+wantOptionalQualifiedAndModuleNameT token pState
 	= case token of
 		IdentToken name1=:"qualified"
 			# (token, pState) = nextToken ModuleNameContext pState

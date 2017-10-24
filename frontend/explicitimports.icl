@@ -4,6 +4,7 @@ implementation module explicitimports
 import StdEnv
 
 import syntax, typesupport, parse, checksupport, utilities, checktypes, transform, predef
+from compare_constructor import equal_constructor
 
 :: *ExplImpInfos :== *{#*{!*ExplImpInfo}}
 
@@ -11,20 +12,25 @@ import syntax, typesupport, parse, checksupport, utilities, checktypes, transfor
 
 :: DeclaringModulesSet :== IntKeyHashtable DeclarationInfo
 
-:: DeclarationInfo =
-	{	di_decl			::	!Declaration
-	,	di_belonging	::	!NumberSet
-	}
+:: DeclarationInfo
+	= DeclarationAndBelongings !Declaration !NumberSet
+	| NoDeclarationAndBelongings !Declaration !NumberSet
 
 :: ImportNrAndIdents =
 	{	ini_symbol_nr	:: !Index
 	,	ini_imp_decl	:: !ImportDeclaration
 	}
 
+:: QualifiedAndHiddenDeclaration
+	= QualifiedHiddenDeclaration !Declaration // qualified and hidden
+	| QualifiedNotHiddenDeclaration !Declaration // qualified and not hidden, because imported by another import in the same module
+	| QualifiedSomeNotHiddenDeclaration !Declaration ![Int] // qualified and hidden, not hidden in some (other) modules of the component
+
 :: SolvedImports =
-	{	si_explicit				:: ![([Declaration], Position)]
-	,	si_qualified_explicit	:: ![QualifiedDeclaration]
-	,	si_implicit				:: ![(ModuleN, Position)]
+	{	si_explicit :: ![([Declaration], Position)]
+	,	si_qualified_explicit :: ![QualifiedDeclaration]
+	,	si_qualified_hidden_explicit :: ![([QualifiedAndHiddenDeclaration], ModuleN)]
+	,	si_implicit :: ![(ModuleN, Position)]
 	}
 
 idents_to_empty_ExplImpInfo_array :: ![Ident] -> *{!*ExplImpInfo}
@@ -35,9 +41,16 @@ addDeclarationWithAllBelongingsToExplImpInfo :: !Declaration !BelongingSymbols !
 addDeclarationWithAllBelongingsToExplImpInfo decl all_belong_s mod_index {cai_component_nr,cai_index} expl_imp_infos
 	# (ExplImpInfo eii_ident eii_declaring_modules, expl_imp_infos) = expl_imp_infos![cai_component_nr,cai_index]
 	  di_belonging = nsFromTo (nrOfBelongingSymbols all_belong_s)
-	  di = {di_decl=decl, di_belonging=di_belonging}
-	  eii_declaring_modules = ikhInsert` False mod_index di eii_declaring_modules
-	= {expl_imp_infos & [cai_component_nr,cai_index] = ExplImpInfo eii_ident eii_declaring_modules}
+	  di = DeclarationAndBelongings decl di_belonging
+	# (new,eii_declaring_modules) = ikhInsert False mod_index di eii_declaring_modules
+	| new
+		= {expl_imp_infos & [cai_component_nr,cai_index] = ExplImpInfo eii_ident eii_declaring_modules}
+		= case ikhSearch` mod_index eii_declaring_modules of
+			NoDeclarationAndBelongings _ _
+				# eii_declaring_modules = ikhInsert` True mod_index di eii_declaring_modules
+				-> {expl_imp_infos & [cai_component_nr,cai_index] = ExplImpInfo eii_ident eii_declaring_modules}
+			_
+				-> {expl_imp_infos & [cai_component_nr,cai_index] = ExplImpInfo eii_ident eii_declaring_modules}
 
 markExplImpSymbols :: !Int !*(!*ExplImpInfos,!*SymbolTable) -> (!.[Ident],!(!*ExplImpInfos,!*SymbolTable))
 markExplImpSymbols component_nr (expl_imp_info, cs_symbol_table)
@@ -75,9 +88,16 @@ addExplImpInfo mod_index decl { cai_component_nr, cai_index } (dcl_modules, expl
 	# (ExplImpInfo eii_ident eii_declaring_modules, expl_imp_infos) = expl_imp_infos![cai_component_nr,cai_index]
 	  (di_belonging, dcl_modules, cs_symbol_table)
 	  		= get_belonging_symbol_nrs decl dcl_modules cs_symbol_table
-	  di = { di_decl = decl, di_belonging = di_belonging }
-	  new_expl_imp_info = ExplImpInfo eii_ident (ikhInsert` False mod_index di eii_declaring_modules)
-	= (dcl_modules, { expl_imp_infos & [cai_component_nr,cai_index] = new_expl_imp_info }, cs_symbol_table)
+	  di = DeclarationAndBelongings decl di_belonging
+	  (new,eii_declaring_modules) = ikhInsert False mod_index di eii_declaring_modules
+	| new
+		= (dcl_modules, { expl_imp_infos & [cai_component_nr,cai_index] = ExplImpInfo eii_ident eii_declaring_modules }, cs_symbol_table)
+		= case ikhSearch` mod_index eii_declaring_modules of
+			NoDeclarationAndBelongings _ _
+				# eii_declaring_modules = ikhInsert` True mod_index di eii_declaring_modules
+				-> (dcl_modules, {expl_imp_infos & [cai_component_nr,cai_index] = ExplImpInfo eii_ident eii_declaring_modules}, cs_symbol_table)
+			_
+				-> (dcl_modules, {expl_imp_infos & [cai_component_nr,cai_index] = ExplImpInfo eii_ident eii_declaring_modules}, cs_symbol_table)
   where
 	get_belonging_symbol_nrs :: !Declaration !v:{#DclModule} !*SymbolTable
 							 -> (!.NumberSet,!v:{#DclModule},!*SymbolTable)
@@ -134,31 +154,37 @@ getBelongingSymbolsFromImportDeclaration _ = No
 	belonging_imported_mod :: !Int
    }
 
-solveExplicitImports :: !(IntKeyHashtable [ExplicitImport]) !{#Int} !Index
+solveExplicitImports :: !(IntKeyHashtable [ExplicitImport]) !{#Int} ![Index] !Index
 								!*(!v:{#DclModule},!*{#Int},!{!*ExplImpInfo},!*CheckState)
 			-> (!.SolvedImports,! (!v:{#DclModule},!.{#Int},!{!.ExplImpInfo},!.CheckState))
-solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod (dcl_modules, visited_modules, expl_imp_info, cs)
+solveExplicitImports expl_imp_indices_ikh modules_in_component_set modules_in_component importing_mod (dcl_modules, visited_modules, expl_imp_info, cs)
 	# import_indices = ikhSearch` importing_mod expl_imp_indices_ikh
-	  (expl_imp_indices,qualified_expl_imp_indices,impl_imports) = split_imports import_indices
+	  (expl_imp_indices,qualified_expl_imp_indices,qualfied_hidden_imports,impl_imports) = split_imports import_indices
 	  state = (dcl_modules, visited_modules, expl_imp_info, cs)
 	  eimi = {eimi_module_path=[importing_mod],eimi_modules_explicit_imports=expl_imp_indices_ikh,eimi_component_mods=modules_in_component_set}
 	  (expl_imports, state) = mapSt (solve_expl_imp_from_module eimi) expl_imp_indices state
 	  eimi = {eimi_module_path=[],eimi_modules_explicit_imports=expl_imp_indices_ikh,eimi_component_mods=modules_in_component_set}
+	  other_modules_in_component = [module_in_component \\ module_in_component<-modules_in_component | module_in_component<>importing_mod]
+	  (qualified_hidden_imports, state) = solve_qualified_hidden_imports qualfied_hidden_imports importing_mod other_modules_in_component eimi state
+	  eimi = {eimi_module_path=[],eimi_modules_explicit_imports=expl_imp_indices_ikh,eimi_component_mods=modules_in_component_set}
 	  (qualified_expl_imports, state) = mapSt (solve_qualified_expl_imp_from_module eimi) qualified_expl_imp_indices state
-	= ({ si_explicit=expl_imports, si_qualified_explicit=qualified_expl_imports, si_implicit=impl_imports }, state)
+	  si = {si_explicit=expl_imports, si_qualified_explicit=qualified_expl_imports, si_qualified_hidden_explicit=qualified_hidden_imports, si_implicit=impl_imports}
+	= (si, state)
   where
-	split_imports :: [ExplicitImport] -> (![ExplicitImport],![ExplicitImport],![(Int,Position)])
+	split_imports :: [ExplicitImport] -> (![ExplicitImport],![ExplicitImport],![ExplicitImport],![(Int,Position)])
 	split_imports [imports:import_indices]
-		# (expl_imp_indices,qualified_expl_imp_indices,impl_imports) = split_imports import_indices
+		# (expl_imp_indices,qualified_expl_imp_indices,qualified_hidden_imports,impl_imports) = split_imports import_indices
 		= case imports of
 			{ei_symbols=ImportSymbolsOnly _,ei_qualified=NotQualified}
-				-> ([imports:expl_imp_indices],qualified_expl_imp_indices,impl_imports)
+				-> ([imports:expl_imp_indices],qualified_expl_imp_indices,qualified_hidden_imports,impl_imports)
 			{ei_symbols=ImportSymbolsOnly _}
-				-> (expl_imp_indices,[imports:qualified_expl_imp_indices],impl_imports)
+				-> (expl_imp_indices,[imports:qualified_expl_imp_indices],qualified_hidden_imports,impl_imports)
 			{ei_symbols=ImportSymbolsAll,ei_module_n,ei_position}
-				-> (expl_imp_indices,qualified_expl_imp_indices,[(ei_module_n,ei_position):impl_imports])
+				-> (expl_imp_indices,qualified_expl_imp_indices,qualified_hidden_imports,[(ei_module_n,ei_position):impl_imports])
+			{ei_symbols=ImportSymbolsAllSomeQualified _,ei_module_n,ei_position}
+				-> (expl_imp_indices,qualified_expl_imp_indices,[imports:qualified_hidden_imports],[(ei_module_n,ei_position):impl_imports])
 	split_imports []
-		= ([],[],[])
+		= ([],[],[],[])
 
 	solve_expl_imp_from_module :: ExplicitImportsModuleInfo ExplicitImport
 															*(v:{#DclModule},*{#Int},*{!*ExplImpInfo},*CheckState)
@@ -172,6 +198,32 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 		  (decl_accu, dcl_modules, visited_modules, expl_imp_info, cs)
 		  		= solve_belongings unsolved_belongings position eimi (decl_accu,dcl_modules,visited_modules,expl_imp_info,{cs & cs_error=cs_error})
 		= ((decl_accu, position), (dcl_modules, visited_modules, expl_imp_info, cs))
+
+	solve_qualified_hidden_imports :: [ExplicitImport] Int [Int] ExplicitImportsModuleInfo
+																				*(v:{#DclModule},*{#Int},*{!*ExplImpInfo},*CheckState)
+									-> ([([QualifiedAndHiddenDeclaration],Int)],*(v:{#DclModule},*{#Int},*{!*ExplImpInfo},*CheckState))
+	solve_qualified_hidden_imports [hidden_imports_from_module:hidden_imports_from_modules] importing_mod other_modules_in_component eimi state
+		# (hidden_module_imports,state) = solve_qualified_hidden_imports_from_module eimi hidden_imports_from_module importing_mod other_modules_in_component state
+		# (hidden_modules_imports,state) = solve_qualified_hidden_imports hidden_imports_from_modules importing_mod other_modules_in_component eimi state
+		= ([hidden_module_imports:hidden_modules_imports],state)
+	solve_qualified_hidden_imports [] importing_mod other_modules_in_component eimi state
+		= ([],state)
+
+	solve_qualified_hidden_imports_from_module :: ExplicitImportsModuleInfo ExplicitImport Int [Int]
+																						 *(v:{#DclModule},*{#Int},*{!*ExplImpInfo},*CheckState)
+												-> (([QualifiedAndHiddenDeclaration],Int),(v:{#DclModule},*{#Int},*{!*ExplImpInfo},*CheckState))
+	solve_qualified_hidden_imports_from_module eimi
+			{ei_symbols=ImportSymbolsAllSomeQualified imported_symbols, ei_module_n=imported_mod, ei_position=position}
+			importing_mod other_modules_in_component (dcl_modules, visited_modules, expl_imp_info, cs)
+		# (not_exported_symbols,decl_accu, unsolved_belonging, dcl_modules, visited_modules, expl_imp_info)
+			= search_qualified_hidden_symbols imported_symbols eimi imported_mod importing_mod other_modules_in_component
+												dcl_modules visited_modules expl_imp_info
+		  (expl_imp_info,dcl_modules,cs_error)
+			= report_not_exported_symbol_errors not_exported_symbols position expl_imp_info imported_mod dcl_modules cs.cs_error
+		  (decl_accu, dcl_modules, visited_modules, expl_imp_info, cs)
+		  	= solve_qualified_hidden_belongings unsolved_belonging position importing_mod other_modules_in_component eimi
+		  		(decl_accu,dcl_modules,visited_modules,expl_imp_info,{cs & cs_error=cs_error})
+		= ((decl_accu,imported_mod), (dcl_modules, visited_modules, expl_imp_info, cs))
 
 	solve_qualified_expl_imp_from_module :: ExplicitImportsModuleInfo ExplicitImport
 																	*(v:{#DclModule},*{#Int},*{!*ExplImpInfo},*CheckState)
@@ -201,67 +253,189 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 	search_qualified_expl_imp_symbols imported_symbols eimi imported_mod visited_modules expl_imp_info
 		= foldSt (search_qualified_expl_imp_symbol eimi imported_mod) imported_symbols ([],[],[],visited_modules,expl_imp_info)
 
+	search_qualified_hidden_symbols :: [ImportNrAndIdents] ExplicitImportsModuleInfo Int Int [Int]		   v:{#DclModule} *{#Int} *{!*ExplImpInfo}
+									   -> ([ImportNrAndIdents],[QualifiedAndHiddenDeclaration],[Belonging],v:{#DclModule},*{#Int},*{!*ExplImpInfo})
+	search_qualified_hidden_symbols imported_symbols eimi imported_mod importing_mod other_modules_in_component dcl_modules visited_modules expl_imp_info
+		= foldSt (search_qualified_hidden_symbol eimi imported_mod importing_mod other_modules_in_component)
+					imported_symbols ([],[],[],dcl_modules,visited_modules,expl_imp_info)
+
+	solve_qualified_hidden_belongings :: [Belonging] Position Int [Int] ExplicitImportsModuleInfo
+										 !*([QualifiedAndHiddenDeclaration],v:{#DclModule},*{#Int},*{!*ExplImpInfo},*CheckState)
+										-> ([QualifiedAndHiddenDeclaration],v:{#DclModule},*{#Int},*{!*ExplImpInfo},*CheckState)
+	solve_qualified_hidden_belongings unsolved_belongings position importing_mod other_modules_in_component eimi state
+  		= foldSt (solve_qualified_hidden_belonging position importing_mod other_modules_in_component eimi) unsolved_belongings state 
+
 	solve_belongings :: [Belonging] Position ExplicitImportsModuleInfo *([Declaration],v:{#DclModule},*{#Int},*{!*ExplImpInfo},*CheckState)
 																	 -> ([Declaration],v:{#DclModule},*{#Int},*{!*ExplImpInfo},*CheckState)
-	solve_belongings unsolved_belonging position eimi state
-		= foldSt (solve_belonging position eimi) unsolved_belonging state
+	solve_belongings unsolved_belongings position eimi state
+  		= foldSt (solve_belonging position eimi) unsolved_belongings state 
 
 	solve_belonging :: Position ExplicitImportsModuleInfo Belonging *([Declaration],v:{#DclModule},*{#Int},*{!*ExplImpInfo},*CheckState)
 																  -> ([Declaration],v:{#DclModule},*{#Int},*{!*ExplImpInfo},*CheckState)
-	solve_belonging position eimi
-			{belonging_declaration,belonging_import_n_and_idents={ini_symbol_nr, ini_imp_decl},belonging_imported_mod}
+	solve_belonging position eimi unsolved_belonging=:{belonging_import_n_and_idents={ini_symbol_nr}} (decls_accu, dcl_modules, visited_modules, expl_imp_info, cs=:{cs_error, cs_symbol_table})
+		# (ExplImpInfo eii_ident eii_declaring_modules, expl_imp_info) = expl_imp_info![ini_symbol_nr]
+		# (need_all,belongs_set,belonging_symbols,dcl_modules,cs_error,cs_symbol_table)
+			= get_numbered_belongings eii_ident unsolved_belonging position dcl_modules cs_error cs_symbol_table
+		# (decls_accu, dcl_modules, eii_declaring_modules, visited_modules, cs_error)
+			= search_belongings need_all belongs_set belonging_symbols eii_ident eii_declaring_modules position eimi unsolved_belonging decls_accu
+								dcl_modules visited_modules cs_error
+		# expl_imp_info = { expl_imp_info & [ini_symbol_nr] = ExplImpInfo eii_ident eii_declaring_modules }
+		= (decls_accu, dcl_modules, visited_modules, expl_imp_info, {cs & cs_error=cs_error, cs_symbol_table=cs_symbol_table})
+	where
+		search_belongings need_all belongs_set belonging_symbols eii_ident eii_declaring_modules position eimi
+				{belonging_declaration,belonging_import_n_and_idents={ini_symbol_nr},belonging_imported_mod}
+				decls_accu dcl_modules visited_modules cs_error
+			= foldSt
+				(search_belonging need_all position eii_ident belonging_declaration belonging_symbols belonging_imported_mod ini_symbol_nr eimi)
+				belongs_set (decls_accu, dcl_modules, eii_declaring_modules, visited_modules, cs_error)
+
+	solve_qualified_hidden_belonging :: Position Int [Int] ExplicitImportsModuleInfo Belonging
+								  *([QualifiedAndHiddenDeclaration],v:{#DclModule},*{#Int},*{!*ExplImpInfo},*CheckState)
+						 		-> ([QualifiedAndHiddenDeclaration],v:{#DclModule},*{#Int},*{!*ExplImpInfo},*CheckState)
+	solve_qualified_hidden_belonging position importing_mod other_modules_in_component eimi unsolved_belonging=:{belonging_import_n_and_idents={ini_symbol_nr}}
 			(decls_accu, dcl_modules, visited_modules, expl_imp_info, cs=:{cs_error, cs_symbol_table})
+		# (ExplImpInfo eii_ident eii_declaring_modules, expl_imp_info) = expl_imp_info![ini_symbol_nr]
+		# (need_all,belongs_set,belonging_symbols,dcl_modules,cs_error,cs_symbol_table)
+			= get_numbered_belongings eii_ident unsolved_belonging position dcl_modules cs_error cs_symbol_table
+		# (decls_accu, eii_declaring_modules, dcl_modules, visited_modules, cs_error)
+			= search_hidden_belongings need_all belongs_set belonging_symbols eii_ident position importing_mod other_modules_in_component eimi unsolved_belonging
+										decls_accu eii_declaring_modules dcl_modules visited_modules cs_error
+		# expl_imp_info = { expl_imp_info & [ini_symbol_nr] = ExplImpInfo eii_ident eii_declaring_modules }
+		= (decls_accu, dcl_modules, visited_modules, expl_imp_info, {cs & cs_error=cs_error, cs_symbol_table=cs_symbol_table})
+	where
+		search_hidden_belongings :: Bool [(Int,Ident)] BelongingSymbols Ident Position Int [Int] ExplicitImportsModuleInfo Belonging
+										[QualifiedAndHiddenDeclaration] *DeclaringModulesSet v:{#DclModule} *{#Int} *ErrorAdmin
+									-> ([QualifiedAndHiddenDeclaration],*DeclaringModulesSet,v:{#DclModule},*{#Int},*ErrorAdmin)
+		search_hidden_belongings need_all belongs_set belonging_symbols eii_ident position importing_mod other_modules_in_component eimi
+				{belonging_declaration,belonging_import_n_and_idents={ini_symbol_nr},belonging_imported_mod}
+				decls_accu eii_declaring_modules dcl_modules visited_modules cs_error
+			= foldSt
+				(search_qualified_hidden_belonging need_all position eii_ident belonging_declaration belonging_symbols belonging_imported_mod ini_symbol_nr importing_mod other_modules_in_component eimi)
+				belongs_set (decls_accu, eii_declaring_modules, dcl_modules, visited_modules, cs_error)
+
+	get_numbered_belongings :: Ident Belonging Position v:{#DclModule}  *ErrorAdmin  *SymbolTable
+			-> (!Bool,![(Int,Ident)],!BelongingSymbols,!v:{#DclModule},!*ErrorAdmin,!*SymbolTable)
+	get_numbered_belongings eii_ident {belonging_declaration,belonging_import_n_and_idents={ini_imp_decl}} position dcl_modules cs_error cs_symbol_table
 		# (Yes belongs) = getBelongingSymbolsFromImportDeclaration ini_imp_decl
 		  (all_belongs,belonging_symbols,dcl_modules) = get_all_belongs belonging_declaration dcl_modules
-		  (ExplImpInfo eii_ident eii_declaring_modules, expl_imp_info) = expl_imp_info![ini_symbol_nr]
-		  (need_all, belongs_set, cs_error, cs_symbol_table)
-		  		= case belongs of
-		  			[]
-		  				// an import like ::A(..) or ::A{..} or class c{..} 
-						# belongs_set = [(belong_nr, belong_ident) \\ belong_nr<-[0..] & belong_ident<-all_belongs]
-						-> (False, belongs_set, cs_error, cs_symbol_table)
-		  			_
-		  				// an import like ::A(C1, C2) or ::A{f1} or class c{m1} 
-		  				# (nr_of_belongs, cs_symbol_table)
-			  					= foldSt numerate_belongs all_belongs (0, cs_symbol_table)
-						  belongs_bitvect = bitvectCreate nr_of_belongs
-						  (belongs_set, (cs_error, cs_symbol_table))
-						  		= mapFilterYesSt (get_opt_nr_and_ident position eii_ident) belongs (cs_error, cs_symbol_table)
-			  			  cs_symbol_table = restoreIdentsSymbolPtrs all_belongs cs_symbol_table
-						-> (True, belongs_set, cs_error, cs_symbol_table)
-		  (decls_accu, dcl_modules, eii_declaring_modules, visited_modules, cs_error)
-				= foldSt
-					(search_belonging need_all position eii_ident belonging_declaration belonging_symbols belonging_imported_mod ini_symbol_nr eimi)
-					belongs_set (decls_accu, dcl_modules, eii_declaring_modules, visited_modules, cs_error)
-		  expl_imp_info = { expl_imp_info & [ini_symbol_nr] = ExplImpInfo eii_ident eii_declaring_modules }
-		= (decls_accu, dcl_modules, visited_modules, expl_imp_info, { cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table })
+  		= case belongs of
+  			[]
+  				// an import like ::A(..) or ::A{..} or class c{..}
+				# belongs_set = [(belong_nr, belong_ident) \\ belong_nr<-[0..] & belong_ident<-all_belongs]
+				-> (False, belongs_set,	belonging_symbols, dcl_modules, cs_error, cs_symbol_table)
+  			_
+  				// an import like ::A(C1, C2) or ::A{f1} or class c{m1} 
+				# (nr_of_belongs, cs_symbol_table) = foldSt numerate_belongs all_belongs (0, cs_symbol_table)
+				  (belongs_set, (cs_error, cs_symbol_table))
+					= mapFilterYesSt (get_opt_nr_and_ident position eii_ident) belongs (cs_error, cs_symbol_table)
+	  			  cs_symbol_table = restoreIdentsSymbolPtrs all_belongs cs_symbol_table
+				-> (True, belongs_set, belonging_symbols, dcl_modules, cs_error, cs_symbol_table)
 
+	search_qualified_hidden_belonging :: Bool Position Ident Declaration BelongingSymbols Int Int Int [Int] ExplicitImportsModuleInfo (Int,Ident)
+											([QualifiedAndHiddenDeclaration],*DeclaringModulesSet,v:{#DclModule},*{#Int},*ErrorAdmin)
+										->	([QualifiedAndHiddenDeclaration],*DeclaringModulesSet,v:{#DclModule},*{#Int},*ErrorAdmin)
+	search_qualified_hidden_belonging need_all position eii_ident belonging_declaration belonging_symbols belonging_imported_mod ini_symbol_nr importing_mod other_modules_in_component eimi
+										(belong_nr,belong_ident) (decls_accu, eii_declaring_modules, dcl_modules, visited_modules, cs_error)
+		# eimi & eimi_module_path=[]
+		  (found, path, eii_declaring_modules, visited_modules)
+			= search_belonging_symbol eii_declaring_modules ini_symbol_nr belong_nr belong_ident belonging_declaration belonging_imported_mod
+										eimi (bitvectResetAll visited_modules)
+		| found
+			# eii_declaring_modules = foldSt (store_qualified_hidden_belonging belong_nr belonging_declaration) path eii_declaring_modules
+			  (belong_decl, dcl_modules) = get_nth_belonging_decl belong_nr belonging_declaration belonging_symbols position dcl_modules
+			  eimi & eimi_module_path=[]
+			// check if belonging of hidden symbol is imported by another import
+			  (declaration_found, path, eii_declaring_modules, visited_modules)
+				= search_belonging_symbol_in_importing_mod eii_declaring_modules ini_symbol_nr belong_nr belong_ident belonging_declaration
+															importing_mod eimi (bitvectResetAll visited_modules)
+			| declaration_found
+				# eii_declaring_modules = foldSt (store_qualified_hidden_belonging belong_nr belonging_declaration) path eii_declaring_modules
+				// forget belonging of hidden symbol because it is imported by another import
+				= ([QualifiedNotHiddenDeclaration belong_decl:decls_accu], eii_declaring_modules, dcl_modules, visited_modules, cs_error)
+
+				# (modules_in_component_with_declaration,eii_declaring_modules,visited_modules)
+					= search_belonging_in_component other_modules_in_component ini_symbol_nr belong_nr belong_ident eimi eii_declaring_modules visited_modules
+				= case modules_in_component_with_declaration of
+					[]
+						-> ([QualifiedHiddenDeclaration belong_decl:decls_accu], eii_declaring_modules, dcl_modules, visited_modules, cs_error)
+					_	-> ([QualifiedSomeNotHiddenDeclaration belong_decl modules_in_component_with_declaration:decls_accu], eii_declaring_modules, dcl_modules, visited_modules, cs_error)
+		| need_all
+			# (dcl_modules,cs_error) = belonging_not_exported_error belong_ident eii_ident import_ident position belonging_imported_mod dcl_modules cs_error
+			= (decls_accu, eii_declaring_modules, dcl_modules, visited_modules, cs_error)
+			= (decls_accu, eii_declaring_modules, dcl_modules, visited_modules, cs_error)
+	where
+		search_belonging_in_component :: [Int] Int Int Ident ExplicitImportsModuleInfo *DeclaringModulesSet *{#Int}
+																			 -> ([Int],*DeclaringModulesSet,*{#Int})
+		search_belonging_in_component [module_in_component:other_modules_in_component] ini_symbol_nr belong_nr belong_ident eimi eii_declaring_modules visited_modules
+			# eimi & eimi_module_path=[]
+			# (declaration_found,path,eii_declaring_modules,visited_modules)
+				= search_belonging_symbol_in_importing_mod eii_declaring_modules ini_symbol_nr belong_nr belong_ident belonging_declaration
+															module_in_component eimi (bitvectResetAll visited_modules)
+			| not declaration_found
+				= search_belonging_in_component other_modules_in_component ini_symbol_nr belong_nr belong_ident eimi eii_declaring_modules visited_modules
+			# eii_declaring_modules = foldSt (store_qualified_hidden_belonging belong_nr belonging_declaration) path eii_declaring_modules
+			# (modules_in_component_with_declaration,eii_declaring_modules,visited_modules)
+				= search_belonging_in_component other_modules_in_component ini_symbol_nr belong_nr belong_ident eimi eii_declaring_modules visited_modules
+			= ([module_in_component:modules_in_component_with_declaration],eii_declaring_modules,visited_modules)
+		search_belonging_in_component [] ini_symbol_nr belong_nr belong_ident eimi eii_declaring_modules visited_modules
+			= ([],eii_declaring_modules,visited_modules)
+
+	search_belonging :: Bool Position Ident Declaration BelongingSymbols Int Int ExplicitImportsModuleInfo (Int,Ident)
+						*([Declaration],v:{#DclModule},*DeclaringModulesSet,*{#Int},*ErrorAdmin)
+					  -> ([Declaration],v:{#DclModule},*DeclaringModulesSet,*{#Int},*ErrorAdmin)
 	search_belonging need_all position eii_ident belonging_declaration belonging_symbols imported_mod ini_symbol_nr eimi
 						(belong_nr, belong_ident) (decls_accu, dcl_modules, eii_declaring_modules, visited_modules, cs_error)
 		# (found, path, eii_declaring_modules, visited_modules)
-			= search_belonging_symbol eii_declaring_modules ini_symbol_nr belong_nr belong_ident imported_mod
+			= search_belonging_symbol eii_declaring_modules ini_symbol_nr belong_nr belong_ident belonging_declaration imported_mod
 										eimi (bitvectResetAll visited_modules)
 		| found
 			# eii_declaring_modules = foldSt (store_belonging belong_nr) path eii_declaring_modules
 			  (belong_decl, dcl_modules) = get_nth_belonging_decl belong_nr belonging_declaration belonging_symbols position dcl_modules
 			= ([belong_decl:decls_accu], dcl_modules, eii_declaring_modules, visited_modules, cs_error)
 		| need_all
-			# (module_name,dcl_modules)=dcl_modules![imported_mod].dcl_name.id_name
-			  cs_error = pushErrorAdmin (newPosition import_ident position) cs_error
-			  cs_error = checkError belong_ident ("of "+++eii_ident.id_name+++" not exported by module "+++module_name) cs_error
-			  cs_error = popErrorAdmin cs_error
+			# (dcl_modules,cs_error) = belonging_not_exported_error belong_ident eii_ident import_ident position imported_mod dcl_modules cs_error
 			= (decls_accu, dcl_modules, eii_declaring_modules, visited_modules, cs_error)
 			= (decls_accu, dcl_modules, eii_declaring_modules, visited_modules, cs_error)
+
+	belonging_not_exported_error :: Ident Ident Ident Position Int v:{#DclModule} *ErrorAdmin -> (v:{#DclModule},*ErrorAdmin)
+	belonging_not_exported_error belong_ident eii_ident import_ident position belonging_imported_mod dcl_modules cs_error
+		# (module_name,dcl_modules)=dcl_modules![belonging_imported_mod].dcl_name.id_name
+		  cs_error = pushErrorAdmin (newPosition import_ident position) cs_error
+		  cs_error = checkError belong_ident ("of "+++eii_ident.id_name+++" not exported by module "+++module_name) cs_error
+		  cs_error = popErrorAdmin cs_error
+		= (dcl_modules,cs_error)
 
 	store_belonging :: Int Int *DeclaringModulesSet -> *DeclaringModulesSet
 	store_belonging belong_nr mod_index eii_declaring_modules
-		# (Yes di=:{di_belonging}, eii_declaring_modules) = ikhUSearch mod_index eii_declaring_modules
-		  (new, eii_declaring_modules) = ikhInsert True mod_index {di & di_belonging = addNr belong_nr di_belonging} eii_declaring_modules
-		| new
-			= abort "sanity check failed in module explicitimports"
-		= eii_declaring_modules
+		# (Yes di, eii_declaring_modules) = ikhUSearch mod_index eii_declaring_modules
+		= case di of
+			DeclarationAndBelongings di_decl di_belonging
+				# di_belonging = addNr belong_nr di_belonging
+				  (new, eii_declaring_modules) = ikhInsert True mod_index (DeclarationAndBelongings di_decl di_belonging) eii_declaring_modules
+				| not new
+					-> eii_declaring_modules
+			NoDeclarationAndBelongings di_decl di_belonging
+				# di_belonging = addNr belong_nr di_belonging
+				  (new, eii_declaring_modules) = ikhInsert True mod_index (NoDeclarationAndBelongings di_decl di_belonging) eii_declaring_modules
+				| not new
+					-> eii_declaring_modules
 
-	get_nth_belonging_decl :: Int Declaration BelongingSymbols Position v:{#DclModule} -> (!Declaration,!v:{#DclModule})
+	store_qualified_hidden_belonging :: Int Declaration Int *DeclaringModulesSet -> *DeclaringModulesSet
+	store_qualified_hidden_belonging belong_nr belonging_declaration mod_index eii_declaring_modules
+		# (yes_di, eii_declaring_modules) = ikhUSearch mod_index eii_declaring_modules
+		= case yes_di of
+			Yes (DeclarationAndBelongings di_decl di_belonging)
+				# (new, eii_declaring_modules) = ikhInsert True mod_index (DeclarationAndBelongings di_decl (addNr belong_nr di_belonging)) eii_declaring_modules
+				| not new
+					-> eii_declaring_modules
+			Yes (NoDeclarationAndBelongings di_decl di_belonging)
+				# (new, eii_declaring_modules) = ikhInsert True mod_index (NoDeclarationAndBelongings di_decl (addNr belong_nr di_belonging)) eii_declaring_modules
+				| not new
+					-> eii_declaring_modules
+			No
+				-> ikhInsert` False mod_index (NoDeclarationAndBelongings belonging_declaration (addNr belong_nr EndNumbers)) eii_declaring_modules
+
+	get_nth_belonging_decl :: Int Declaration BelongingSymbols Position v:{#DclModule} -> (!Declaration,!v:{#DclModule});
 	get_nth_belonging_decl belong_nr (Declaration {decl_kind=STE_Imported _ def_mod_index}) (BS_Constructors constructors) position dcl_modules
 		# {ds_ident, ds_index} = constructors!!belong_nr
 		  decl_kind = STE_Imported STE_Constructor def_mod_index
@@ -315,7 +489,7 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 		  (opt_decl, path, eii_declaring_modules, visited_modules)
 			= search_symbol eii_declaring_modules ini_symbol_nr imported_mod eimi (bitvectResetAll visited_modules)
 		= case opt_decl of
-			Yes di=:{di_decl=di_decl=:Declaration {decl_kind}}
+			Yes di=:(DeclarationAndBelongings di_decl=:(Declaration {decl_kind}) _)
 				| is_not_STE_member decl_kind
 					# new_eii_declaring_modules = update_declaring_modules di_decl path eii_declaring_modules
 					  expl_imp_info = {expl_imp_info & [ini_symbol_nr] = ExplImpInfo eii_ident new_eii_declaring_modules}
@@ -334,7 +508,7 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 		  (opt_decl, path, eii_declaring_modules, visited_modules)
 			= search_symbol eii_declaring_modules ini_symbol_nr imported_mod eimi (bitvectResetAll visited_modules)
 		= case opt_decl of
-			Yes {di_decl}
+			Yes (DeclarationAndBelongings di_decl _)
 				# new_eii_declaring_modules = update_declaring_modules di_decl path eii_declaring_modules
 				  expl_imp_info = {expl_imp_info & [ini_symbol_nr] = ExplImpInfo eii_ident new_eii_declaring_modules}
 				  new_belonging_accu = update_belonging_accu di_decl ini imported_mod belonging_accu
@@ -343,13 +517,101 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 				# expl_imp_info = {expl_imp_info & [ini_symbol_nr] = ExplImpInfo eii_ident eii_declaring_modules}
 				-> ([ini:not_exported_symbols],decls_accu, belonging_accu, visited_modules, expl_imp_info)
 
+	search_qualified_hidden_symbol :: ExplicitImportsModuleInfo Int Int [Int] ImportNrAndIdents
+							  *([ImportNrAndIdents],[QualifiedAndHiddenDeclaration],[Belonging],v:{#DclModule},*{#Int},*{!*ExplImpInfo})
+							-> ([ImportNrAndIdents],[QualifiedAndHiddenDeclaration],[Belonging],v:{#DclModule},*{#Int},*{!*ExplImpInfo})
+	search_qualified_hidden_symbol eimi imported_mod importing_mod other_modules_in_component ini=:{ini_symbol_nr,ini_imp_decl}
+			(not_exported_symbols,decls_accu, belonging_accu,dcl_modules,visited_modules,expl_imp_info)
+		# (ExplImpInfo eii_ident eii_declaring_modules, expl_imp_info) = expl_imp_info![ini_symbol_nr]
+		  (opt_decl, path, eii_declaring_modules, visited_modules)
+			= search_symbol eii_declaring_modules ini_symbol_nr imported_mod eimi (bitvectResetAll visited_modules)
+		= case opt_decl of
+			Yes (DeclarationAndBelongings di_decl=:(Declaration {decl_kind,decl_index}) _ )
+				# eii_declaring_modules = update_declaring_modules di_decl path eii_declaring_modules
+				// check if hidden symbol is imported by another import
+				  eimi & eimi_module_path=[]
+				  (declaration_found, path, eii_declaring_modules, visited_modules)
+					= search_declaration_in_importing_mod eii_declaring_modules di_decl ini_symbol_nr importing_mod eimi (bitvectResetAll visited_modules)
+				| declaration_found
+					# eii_declaring_modules = update_declaring_modules di_decl path eii_declaring_modules
+					  new_belonging_accu = update_belonging_accu di_decl ini imported_mod belonging_accu
+					// forget hidden symbol because it is imported by another import, belongings may still be hidden and qualified
+					  expl_imp_info = {expl_imp_info & [ini_symbol_nr] = ExplImpInfo eii_ident eii_declaring_modules}
+					  decls_accu = [QualifiedNotHiddenDeclaration di_decl:decls_accu]
+					-> (not_exported_symbols,decls_accu,new_belonging_accu,dcl_modules,visited_modules,expl_imp_info)
+					# (modules_in_component_with_declaration,eii_declaring_modules,visited_modules)
+						= search_declaration_in_component eii_declaring_modules di_decl ini_symbol_nr other_modules_in_component eimi visited_modules
+					  new_belonging_accu = update_belonging_accu di_decl ini imported_mod belonging_accu
+					  expl_imp_info = {expl_imp_info & [ini_symbol_nr] = ExplImpInfo eii_ident eii_declaring_modules}
+					-> case di_decl of
+						Declaration {decl_kind=STE_Imported STE_Type def_mod_index, decl_index}
+							| case ini_imp_decl of ID_Record _ _ -> True; ID_Type _ _ -> True; _ -> False // for ::Record(..)
+								/* also hide the constructor declaration of the record */
+								# (td_rhs,dcl_modules) = dcl_modules![def_mod_index].dcl_common.com_type_defs.[decl_index].td_rhs
+								-> case td_rhs of
+									RecordType {rt_constructor={ds_ident,ds_index}}
+										# decl_kind = STE_Imported STE_Constructor def_mod_index
+										  record_cons_decl = Declaration {decl_ident=ds_ident,decl_pos=NoPos,decl_kind=decl_kind,decl_index=ds_index}
+										-> case modules_in_component_with_declaration of
+											[]	# decls_accu = [QualifiedHiddenDeclaration di_decl,
+																QualifiedHiddenDeclaration record_cons_decl:decls_accu]
+												-> (not_exported_symbols,decls_accu,new_belonging_accu,dcl_modules,visited_modules,expl_imp_info)
+											_	# decls_accu = [QualifiedSomeNotHiddenDeclaration di_decl modules_in_component_with_declaration,
+																QualifiedSomeNotHiddenDeclaration record_cons_decl modules_in_component_with_declaration
+																:decls_accu]
+												-> (not_exported_symbols,decls_accu,new_belonging_accu,dcl_modules,visited_modules,expl_imp_info)
+									-> case modules_in_component_with_declaration of
+										[]	# decls_accu = [QualifiedHiddenDeclaration di_decl:decls_accu]
+											-> (not_exported_symbols,decls_accu,new_belonging_accu,dcl_modules,visited_modules,expl_imp_info)
+										_	# decls_accu = [QualifiedSomeNotHiddenDeclaration di_decl modules_in_component_with_declaration:decls_accu]
+											-> (not_exported_symbols,decls_accu,new_belonging_accu,dcl_modules,visited_modules,expl_imp_info)
+						_
+							-> case modules_in_component_with_declaration of
+								[]	# decls_accu = [QualifiedHiddenDeclaration di_decl:decls_accu]
+									-> (not_exported_symbols,decls_accu,new_belonging_accu,dcl_modules,visited_modules,expl_imp_info)
+								_	# decls_accu = [QualifiedSomeNotHiddenDeclaration di_decl modules_in_component_with_declaration:decls_accu]
+									-> (not_exported_symbols,decls_accu,new_belonging_accu,dcl_modules,visited_modules,expl_imp_info)
+			_
+				# expl_imp_info = {expl_imp_info & [ini_symbol_nr] = ExplImpInfo eii_ident eii_declaring_modules}
+				-> ([ini:not_exported_symbols],decls_accu,belonging_accu,dcl_modules,visited_modules,expl_imp_info)
+	where
+		search_declaration_in_component :: *DeclaringModulesSet Declaration Int [Int] ExplicitImportsModuleInfo *{#Int}
+											-> (![Int],!DeclaringModulesSet,!*{#Int})
+		search_declaration_in_component eii_declaring_modules di_decl ini_symbol_nr [module_in_component:other_modules_in_component] eimi visited_modules				
+			# eimi & eimi_module_path=[]
+			# (declaration_found,path,eii_declaring_modules,visited_modules)
+				= search_declaration_in_importing_mod eii_declaring_modules di_decl ini_symbol_nr module_in_component eimi (bitvectResetAll visited_modules)
+			| not declaration_found
+				= search_declaration_in_component eii_declaring_modules di_decl ini_symbol_nr other_modules_in_component eimi visited_modules
+			# eii_declaring_modules = update_declaring_modules di_decl path eii_declaring_modules
+			# (modules_in_component_with_declaration,eii_declaring_modules,visited_modules)
+				= search_declaration_in_component eii_declaring_modules di_decl ini_symbol_nr other_modules_in_component eimi visited_modules
+			= ([module_in_component:modules_in_component_with_declaration],eii_declaring_modules,visited_modules)
+		search_declaration_in_component eii_declaring_modules di_decl ini_symbol_nr [] eimi visited_modules
+			= ([],eii_declaring_modules,visited_modules)
+
+	is_not_STE_member :: STE_Kind -> Bool
 	is_not_STE_member (STE_Imported STE_Member _) = False
 	is_not_STE_member STE_Member = False
 	is_not_STE_member _ = True
 
 	update_declaring_modules :: Declaration [Int] *DeclaringModulesSet -> *DeclaringModulesSet
 	update_declaring_modules di_decl path eii_declaring_modules
-		= foldSt (\mod_index eei_dm->ikhInsert` False mod_index {di_decl = di_decl, di_belonging=EndNumbers} eei_dm) path eii_declaring_modules
+		# di = DeclarationAndBelongings di_decl EndNumbers
+		= foldSt (update_declaring_module di) path eii_declaring_modules
+	where
+		update_declaring_module di mod_index eei_dm
+			# (new,eei_dm) = ikhInsert False mod_index di eei_dm
+			| new
+				= eei_dm
+			# (Yes decl_b,eei_dm) = ikhUSearch mod_index eei_dm
+			= case decl_b of
+				NoDeclarationAndBelongings decl belongings
+					->  ikhInsert` True mod_index (DeclarationAndBelongings decl belongings) eei_dm
+				DeclarationAndBelongings decl belongings
+					# (DeclarationAndBelongings di_decl _) = di
+					| eq_declaration decl di_decl
+						-> eei_dm
 
 	update_belonging_accu :: Declaration ImportNrAndIdents Int [Belonging] -> [Belonging]
 	update_belonging_accu di_decl ini imported_mod belonging_accu
@@ -381,6 +643,9 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 				ImportSymbolsOnly imp_imp_symbols
 					| not (search_imported_symbol imported_symbol_n imp_imp_symbols)
 						-> search_symbol_in_imports imports eii_declaring_modules imported_symbol_n eimi visited_modules
+				ImportSymbolsAllSomeQualified imp_imp_qualified_symbols
+					| search_imported_symbol imported_symbol_n imp_imp_qualified_symbols
+						-> search_symbol_in_imports imports eii_declaring_modules imported_symbol_n eimi visited_modules				
 				_
 					# (opt_decl, path, eii_declaring_modules, visited_modules)
 						= search_symbol eii_declaring_modules imported_symbol_n imp_imp_mod eimi visited_modules
@@ -392,13 +657,34 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 		search_symbol_in_imports [] eii_declaring_modules imported_symbol_n eimi visited_modules
 			= (No, [], eii_declaring_modules, visited_modules)
 
-	search_belonging_symbol :: !*DeclaringModulesSet Int Int Ident !Int !ExplicitImportsModuleInfo !*{#Int} -> *(!Bool,![Int],!*DeclaringModulesSet,!*{#Int})
-	search_belonging_symbol eii_declaring_modules imported_symbol_n belong_nr belong_ident imported_mod
+	search_belonging_symbol_in_importing_mod :: !*DeclaringModulesSet Int Int Ident !Declaration !Int !ExplicitImportsModuleInfo !*{#Int} -> *(!Bool,![Int],!*DeclaringModulesSet,!*{#Int})
+	search_belonging_symbol_in_importing_mod eii_declaring_modules imported_symbol_n belong_nr belong_ident belonging_declaration imported_mod
 			eimi=:{eimi_modules_explicit_imports,eimi_component_mods,eimi_module_path} visited_modules
 		# (opt_declaration_info_of_symbol_in_mod, eii_declaring_modules) = ikhUSearch imported_mod eii_declaring_modules
 		= case opt_declaration_info_of_symbol_in_mod of
-			Yes di=:{di_belonging}
-				| inNumberSet belong_nr di_belonging
+			Yes di=:(DeclarationAndBelongings di_decl di_belonging)
+				| eq_declaration di_decl belonging_declaration && inNumberSet belong_nr di_belonging
+					-> (True, eimi_module_path, eii_declaring_modules, visited_modules)
+			Yes di=:(NoDeclarationAndBelongings di_decl di_belonging)
+				| eq_declaration di_decl belonging_declaration && inNumberSet belong_nr di_belonging
+					-> (True, eimi_module_path, eii_declaring_modules, visited_modules)
+			_
+				# imports_of_imported_mod = ikhSearch` imported_mod eimi_modules_explicit_imports
+				  visited_modules = bitvectSet imported_mod visited_modules
+				  eimi & eimi_module_path = [imported_mod:eimi_module_path]
+				-> search_belonging_symbol_in_imports imports_of_imported_mod eii_declaring_modules imported_symbol_n belong_nr belong_ident belonging_declaration
+														eimi visited_modules
+
+	search_belonging_symbol :: !*DeclaringModulesSet Int Int Ident !Declaration !Int !ExplicitImportsModuleInfo !*{#Int} -> *(!Bool,![Int],!*DeclaringModulesSet,!*{#Int})
+	search_belonging_symbol eii_declaring_modules imported_symbol_n belong_nr belong_ident belonging_declaration imported_mod
+			eimi=:{eimi_modules_explicit_imports,eimi_component_mods,eimi_module_path} visited_modules
+		# (opt_declaration_info_of_symbol_in_mod, eii_declaring_modules) = ikhUSearch imported_mod eii_declaring_modules
+		= case opt_declaration_info_of_symbol_in_mod of
+			Yes di=:(DeclarationAndBelongings di_decl di_belonging)
+				| eq_declaration di_decl belonging_declaration && inNumberSet belong_nr di_belonging
+					-> (True, eimi_module_path, eii_declaring_modules, visited_modules)
+			Yes di=:(NoDeclarationAndBelongings di_decl di_belonging)
+				| eq_declaration di_decl belonging_declaration && inNumberSet belong_nr di_belonging
 					-> (True, eimi_module_path, eii_declaring_modules, visited_modules)
 			_
 				| not (bitvectSelect imported_mod eimi_component_mods)
@@ -408,32 +694,94 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 				# imports_of_imported_mod = ikhSearch` imported_mod eimi_modules_explicit_imports
 				  visited_modules = bitvectSet imported_mod visited_modules
 				  eimi & eimi_module_path = [imported_mod:eimi_module_path]
-				-> search_belonging_symbol_in_imports imports_of_imported_mod eii_declaring_modules imported_symbol_n belong_nr belong_ident
+				-> search_belonging_symbol_in_imports imports_of_imported_mod eii_declaring_modules imported_symbol_n belong_nr belong_ident belonging_declaration
 														eimi visited_modules
-	where
-		search_belonging_symbol_in_imports :: [ExplicitImport] *DeclaringModulesSet Int Int Ident
-												!ExplicitImportsModuleInfo *{#Int} -> *(!Bool,![Int],!*DeclaringModulesSet,!*{#Int})
-		search_belonging_symbol_in_imports [{ei_module_n=imp_imp_mod,ei_symbols}:imports] eii_declaring_modules imported_symbol_n belong_nr belong_ident
-				eimi visited_modules
-			| bitvectSelect imp_imp_mod visited_modules
-				= search_belonging_symbol_in_imports imports eii_declaring_modules imported_symbol_n belong_nr belong_ident
-														eimi visited_modules
-			= case ei_symbols of
-				ImportSymbolsOnly imp_imp_symbols
-					# (found, opt_belongs) = search_imported_symbol_and_belongings imported_symbol_n imp_imp_symbols
-					| not (found && belong_ident_found belong_ident opt_belongs)
-						-> search_belonging_symbol_in_imports imports eii_declaring_modules imported_symbol_n belong_nr belong_ident
-																eimi visited_modules
-				_
-					# (found, path, eii_declaring_modules, visited_modules)
-						= search_belonging_symbol eii_declaring_modules imported_symbol_n belong_nr belong_ident imp_imp_mod
+
+	search_belonging_symbol_in_imports :: [ExplicitImport] *DeclaringModulesSet Int Int Ident !Declaration
+											!ExplicitImportsModuleInfo *{#Int} -> *(!Bool,![Int],!*DeclaringModulesSet,!*{#Int})
+	search_belonging_symbol_in_imports [{ei_module_n=imp_imp_mod,ei_symbols}:imports] eii_declaring_modules imported_symbol_n belong_nr belong_ident belonging_declaration
+			eimi visited_modules
+		| bitvectSelect imp_imp_mod visited_modules
+			= search_belonging_symbol_in_imports imports eii_declaring_modules imported_symbol_n belong_nr belong_ident belonging_declaration
 													eimi visited_modules
-					| found
-						-> (True, path, eii_declaring_modules, visited_modules)
-						-> search_belonging_symbol_in_imports imports eii_declaring_modules imported_symbol_n belong_nr belong_ident
-																eimi visited_modules
-		search_belonging_symbol_in_imports [] eii_declaring_modules imported_symbol_n belong_nr belong_ident eimi visited_modules
-			= (False, [], eii_declaring_modules, visited_modules)
+		= case ei_symbols of
+			ImportSymbolsOnly imp_imp_symbols
+				# (found, opt_belongs) = search_imported_symbol_and_belongings imported_symbol_n imp_imp_symbols
+				| not (found && belong_ident_found belong_ident opt_belongs)
+					-> search_belonging_symbol_in_imports imports eii_declaring_modules imported_symbol_n belong_nr belong_ident belonging_declaration
+															eimi visited_modules
+			ImportSymbolsAllSomeQualified imp_imp_qualified_symbols
+				# (found, opt_belongs) = search_imported_symbol_and_belongings imported_symbol_n imp_imp_qualified_symbols
+				| found && belong_ident_found belong_ident opt_belongs
+					-> search_belonging_symbol_in_imports imports eii_declaring_modules imported_symbol_n belong_nr belong_ident belonging_declaration
+															eimi visited_modules
+			_
+				# (found, path, eii_declaring_modules, visited_modules)
+					= search_belonging_symbol eii_declaring_modules imported_symbol_n belong_nr belong_ident belonging_declaration
+												imp_imp_mod eimi visited_modules
+				| found
+					-> (True, path, eii_declaring_modules, visited_modules)
+					-> search_belonging_symbol_in_imports imports eii_declaring_modules imported_symbol_n belong_nr belong_ident belonging_declaration
+															eimi visited_modules
+	search_belonging_symbol_in_imports [] eii_declaring_modules imported_symbol_n belong_nr belong_ident belonging_declaration
+			eimi visited_modules
+		= (False, [], eii_declaring_modules, visited_modules)
+
+	search_declaration_in_importing_mod :: *DeclaringModulesSet Declaration Int Int ExplicitImportsModuleInfo *LargeBitvect -> *(!Bool,![Int],!*DeclaringModulesSet,!*LargeBitvect)
+	search_declaration_in_importing_mod eii_declaring_modules declaration imported_symbol_n imported_mod
+			eimi=:{eimi_modules_explicit_imports,eimi_component_mods,eimi_module_path} visited_modules
+		# (opt_declaration_info_of_symbol_in_mod, eii_declaring_modules) = ikhUSearch imported_mod eii_declaring_modules
+		= case opt_declaration_info_of_symbol_in_mod of
+			Yes (DeclarationAndBelongings di_decl _)
+				| eq_declaration di_decl declaration
+					-> (True, eimi_module_path, eii_declaring_modules, visited_modules)
+			_
+				# imports_of_imported_mod = ikhSearch` imported_mod eimi_modules_explicit_imports
+				  visited_modules = bitvectSet imported_mod visited_modules
+				  eimi & eimi_module_path = [imported_mod:eimi_module_path]
+				-> search_declaration_in_imports imports_of_imported_mod eii_declaring_modules declaration imported_symbol_n eimi visited_modules
+
+	search_declaration :: *DeclaringModulesSet Declaration Int Int ExplicitImportsModuleInfo *LargeBitvect -> *(!Bool,![Int],!*DeclaringModulesSet,!*LargeBitvect)
+	search_declaration eii_declaring_modules declaration imported_symbol_n imported_mod
+			eimi=:{eimi_modules_explicit_imports,eimi_component_mods,eimi_module_path} visited_modules
+		# (opt_declaration_info_of_symbol_in_mod, eii_declaring_modules) = ikhUSearch imported_mod eii_declaring_modules
+		= case opt_declaration_info_of_symbol_in_mod of
+			Yes (DeclarationAndBelongings di_decl _)
+				| eq_declaration di_decl declaration
+					-> (True, eimi_module_path, eii_declaring_modules, visited_modules)
+			_
+				| not (bitvectSelect imported_mod eimi_component_mods)
+					// the eii_declaring_modules is complete for modules that are outside
+					// (=beneath) the actual component=> no need to search further
+					-> (False, [], eii_declaring_modules, visited_modules)
+				# imports_of_imported_mod = ikhSearch` imported_mod eimi_modules_explicit_imports
+				  visited_modules = bitvectSet imported_mod visited_modules
+				  eimi & eimi_module_path = [imported_mod:eimi_module_path]
+				-> search_declaration_in_imports imports_of_imported_mod eii_declaring_modules declaration imported_symbol_n eimi visited_modules
+
+	eq_declaration :: Declaration Declaration -> Bool 
+	eq_declaration (Declaration declaration1) (Declaration declaration2)
+		= declaration1.decl_index==declaration2.decl_index && eq_STE_Kind declaration1.decl_kind declaration2.decl_kind
+
+	search_declaration_in_imports :: [ExplicitImport] *DeclaringModulesSet Declaration Int ExplicitImportsModuleInfo *{#Int} -> *(!Bool,![Int],!*DeclaringModulesSet,!*{#Int})
+	search_declaration_in_imports [{ei_module_n=imp_imp_mod,ei_symbols}:imports] eii_declaring_modules declaration imported_symbol_n eimi visited_modules
+		| bitvectSelect imp_imp_mod visited_modules
+			= search_declaration_in_imports imports eii_declaring_modules declaration imported_symbol_n eimi visited_modules
+		= case ei_symbols of
+			ImportSymbolsOnly imp_imp_symbols
+				| not (search_imported_symbol imported_symbol_n imp_imp_symbols)
+					-> search_declaration_in_imports imports eii_declaring_modules declaration imported_symbol_n eimi visited_modules
+			ImportSymbolsAllSomeQualified imp_imp_qualified_symbols
+				| search_imported_symbol imported_symbol_n imp_imp_qualified_symbols
+					-> search_declaration_in_imports imports eii_declaring_modules declaration imported_symbol_n eimi visited_modules
+			_
+				# (declaration_found, path, eii_declaring_modules, visited_modules)
+					= search_declaration eii_declaring_modules declaration imported_symbol_n imp_imp_mod eimi visited_modules
+				| declaration_found
+					-> (True, path, eii_declaring_modules, visited_modules)
+					-> search_declaration_in_imports imports eii_declaring_modules declaration imported_symbol_n eimi visited_modules	
+	search_declaration_in_imports [] eii_declaring_modules declaration imported_symbol_n eimi visited_modules
+		= (False, [], eii_declaring_modules, visited_modules)
 
 	search_imported_symbol :: !Int ![ImportNrAndIdents] -> Bool
 	search_imported_symbol imported_symbol_n []
@@ -489,7 +837,21 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 	impDeclToNameSpaceString (ID_Instance _ _ _)= "instance"
 
 get_eei_ident (eii=:ExplImpInfo eii_ident _) = (eii_ident, eii)
-	
+
+// instance == STE_Kind does not compare STE_Imported
+eq_STE_Kind (STE_Imported sk1 mn1) (STE_Imported sk2 mn2)
+	= mn1==mn2 && eq_STE_Kind sk1 sk2
+eq_STE_Kind (STE_FunctionOrMacro _) STE_DclFunction
+	= True
+eq_STE_Kind (STE_FunctionOrMacro _) (STE_DclMacroOrLocalMacroFunction _)
+	= True
+eq_STE_Kind STE_DclFunction (STE_FunctionOrMacro _)
+	= True
+eq_STE_Kind (STE_DclMacroOrLocalMacroFunction _) (STE_FunctionOrMacro _)
+	= True
+eq_STE_Kind sk1 sk2
+	= equal_constructor sk1 sk2
+
 :: CheckCompletenessState =
 	{	ccs_dcl_modules				:: !.{#DclModule}
 	,	ccs_macro_defs :: !.{#.{#FunDef}}
@@ -509,13 +871,14 @@ get_eei_ident (eii=:ExplImpInfo eii_ident _) = (eii_ident, eii)
 
 :: CheckCompletenessInputBox = { box_cci :: !CheckCompletenessInput }
 
-checkExplicitImportCompleteness :: ![([Declaration], Position)] ![QualifiedDeclaration]
+checkExplicitImportCompleteness :: ![([Declaration],Position)] ![QualifiedDeclaration] ![([QualifiedAndHiddenDeclaration],ModuleN)]
 										!*{#DclModule} !*{#*{#FunDef}} !*ExpressionHeap !*CheckState
 									-> (!.{#DclModule},!*{#*{#FunDef}},!.ExpressionHeap,!.CheckState)
-checkExplicitImportCompleteness dcls_explicit explicit_qualified_imports dcl_modules macro_defs expr_heap cs=:{cs_symbol_table, cs_error}
+checkExplicitImportCompleteness dcls_explicit explicit_qualified_imports explicit_qualified_hidden_imports dcl_modules macro_defs expr_heap cs=:{cs_symbol_table, cs_error}
 	#! n_dcl_modules = size dcl_modules
 
-	# (modified_symbol_ptrs,cs_symbol_table) = store_qualified_explicitly_imported_symbols_in_symbol_table explicit_qualified_imports [] cs_symbol_table
+	# (modified_symbol_ptrs,cs_symbol_table)
+		= store_qualified_explicitly_imported_symbols_in_symbol_table explicit_qualified_imports explicit_qualified_hidden_imports cs_symbol_table
 
 	  box_ccs = { ccs_dcl_modules = dcl_modules, ccs_macro_defs=macro_defs,
 	   			ccs_set_of_visited_macros = { {} \\ module_n<-[0..n_dcl_modules-1]},
@@ -923,22 +1286,39 @@ ste_field =: STE_Field { id_name="", id_info=nilPtr }
 
 // XXX from m import :: T(..) works also if T is a record type
 
-store_qualified_explicitly_imported_symbols_in_symbol_table :: ![QualifiedDeclaration] ![SymbolPtr] !*SymbolTable -> (![SymbolPtr],!*SymbolTable)
-store_qualified_explicitly_imported_symbols_in_symbol_table [(declarations,module_n):qualified_explicit_imports] modified_symbol_ptrs symbol_table
-	# (modified_symbol_ptrs,symbol_table) = foldSt store_qualified_explicitly_imported_symbol declarations (modified_symbol_ptrs,symbol_table)
-	= store_qualified_explicitly_imported_symbols_in_symbol_table qualified_explicit_imports modified_symbol_ptrs symbol_table
-	where
-		store_qualified_explicitly_imported_symbol declaration=:(Declaration {decl_ident={id_info},decl_kind=STE_Imported _ module_n}) (modified_symbol_ptrs,symbol_table)
-			# (symbol_ste=:{ste_kind},symbol_table) = readPtr id_info symbol_table
-			# ste_kind = STE_ImportedQualified declaration ste_kind
-			# symbol_table = writePtr id_info {symbol_ste & ste_kind=ste_kind} symbol_table
-			= case ste_kind of
-				STE_ImportedQualified _ _
-					-> ([id_info:modified_symbol_ptrs],symbol_table)					
-				_
-					-> (modified_symbol_ptrs,symbol_table)					
-store_qualified_explicitly_imported_symbols_in_symbol_table [] modified_symbol_ptrs symbol_table
-	= (modified_symbol_ptrs,symbol_table)
+store_qualified_explicitly_imported_symbols_in_symbol_table :: ![QualifiedDeclaration] ![([QualifiedAndHiddenDeclaration],ModuleN)] !*SymbolTable -> (![SymbolPtr],!*SymbolTable)
+store_qualified_explicitly_imported_symbols_in_symbol_table explicit_qualified_imports explicit_qualified_hidden_imports symbol_table
+	# (modified_symbol_ptrs,symbol_table) = store_qualified_explicitly_imported_symbols_in_symbol_table explicit_qualified_imports [] symbol_table
+	= store_qualified_hidden_explicitly_imported_symbols_in_symbol_table explicit_qualified_hidden_imports modified_symbol_ptrs symbol_table
+where
+	store_qualified_explicitly_imported_symbols_in_symbol_table :: ![QualifiedDeclaration] ![SymbolPtr] !*SymbolTable -> (![SymbolPtr],!*SymbolTable)
+	store_qualified_explicitly_imported_symbols_in_symbol_table [(declarations,module_n):explicit_qualified_imports] modified_symbol_ptrs symbol_table
+		# (modified_symbol_ptrs,symbol_table) = foldSt store_qualified_explicitly_imported_symbol declarations (modified_symbol_ptrs,symbol_table)
+		= store_qualified_explicitly_imported_symbols_in_symbol_table explicit_qualified_imports modified_symbol_ptrs symbol_table
+	store_qualified_explicitly_imported_symbols_in_symbol_table [] modified_symbol_ptrs symbol_table
+		= (modified_symbol_ptrs,symbol_table)
+
+	store_qualified_hidden_explicitly_imported_symbols_in_symbol_table :: ![([QualifiedAndHiddenDeclaration],ModuleN)] ![SymbolPtr] !*SymbolTable -> (![SymbolPtr],!*SymbolTable)
+	store_qualified_hidden_explicitly_imported_symbols_in_symbol_table [(declarations,module_n):explicit_qualified_hidden_imports] modified_symbol_ptrs symbol_table
+		# (modified_symbol_ptrs,symbol_table) = foldSt store_qualified_hidden_explicitly_imported_symbol declarations (modified_symbol_ptrs,symbol_table)
+		= store_qualified_hidden_explicitly_imported_symbols_in_symbol_table explicit_qualified_hidden_imports modified_symbol_ptrs symbol_table
+	store_qualified_hidden_explicitly_imported_symbols_in_symbol_table [] modified_symbol_ptrs symbol_table
+		= (modified_symbol_ptrs,symbol_table)
+
+	store_qualified_hidden_explicitly_imported_symbol :: QualifiedAndHiddenDeclaration *([SymbolPtr],*SymbolTable) -> (![SymbolPtr],!*SymbolTable)
+	store_qualified_hidden_explicitly_imported_symbol (QualifiedHiddenDeclaration declaration) modified_symbol_ptrs_and_symbol_table
+		= store_qualified_explicitly_imported_symbol declaration modified_symbol_ptrs_and_symbol_table
+	store_qualified_hidden_explicitly_imported_symbol (QualifiedNotHiddenDeclaration declaration) modified_symbol_ptrs_and_symbol_table
+		= store_qualified_explicitly_imported_symbol declaration modified_symbol_ptrs_and_symbol_table
+	store_qualified_hidden_explicitly_imported_symbol (QualifiedSomeNotHiddenDeclaration declaration _) modified_symbol_ptrs_and_symbol_table
+		= store_qualified_explicitly_imported_symbol declaration modified_symbol_ptrs_and_symbol_table
+
+	store_qualified_explicitly_imported_symbol :: Declaration *([SymbolPtr],*SymbolTable) -> (![SymbolPtr],!*SymbolTable)
+	store_qualified_explicitly_imported_symbol declaration=:(Declaration {decl_ident={id_info},decl_kind=STE_Imported _ module_n}) (modified_symbol_ptrs,symbol_table)
+		# (symbol_ste=:{ste_kind},symbol_table) = readPtr id_info symbol_table
+		# ste_kind = STE_ImportedQualified declaration ste_kind
+		# symbol_table = writePtr id_info {symbol_ste & ste_kind=ste_kind} symbol_table
+		= ([id_info:modified_symbol_ptrs],symbol_table)					
 
 restore_symbol_table_after_checking_completeness :: ![SymbolPtr] !*SymbolTable -> *SymbolTable
 restore_symbol_table_after_checking_completeness modified_symbol_ptrs symbol_table
@@ -956,26 +1336,56 @@ restore_symbol_table_after_checking_completeness modified_symbol_ptrs symbol_tab
 						= ste_kind
 			= writePtr symbol_ptr {symbol_ste & ste_kind=ste_kind} symbol_table
 
-store_qualified_explicit_imports_in_symbol_table :: ![QualifiedDeclaration] ![(SymbolPtr,STE_Kind)] !*SymbolTable !*{#DclModule} -> (![(SymbolPtr,STE_Kind)],!*SymbolTable,!*{#DclModule})
-store_qualified_explicit_imports_in_symbol_table [(declarations,module_symbol):qualified_explicit_imports] modified_ste_kinds symbol_table modules
-	# module_symbol_ptr = module_symbol.id_info
-	  (module_ste=:{ste_kind},symbol_table) = readPtr module_symbol_ptr symbol_table
-	  (modified_ste_kinds,sorted_qualified_imports)
-		= case ste_kind of
-			STE_ModuleQualifiedImports sorted_qualified_imports
-				-> (modified_ste_kinds,sorted_qualified_imports)
-			STE_ClosedModule
-				-> ([(module_symbol_ptr,ste_kind):modified_ste_kinds],EmptySortedQualifiedImports)
-			STE_Module _
-				-> ([(module_symbol_ptr,ste_kind):modified_ste_kinds],EmptySortedQualifiedImports)
-			STE_Empty // for import as
-				-> ([(module_symbol_ptr,ste_kind):modified_ste_kinds],EmptySortedQualifiedImports)
-	  sorted_qualified_imports = foldSt add_qualified_import declarations sorted_qualified_imports
-	  module_ste = {module_ste & ste_kind=STE_ModuleQualifiedImports sorted_qualified_imports}
-	  symbol_table = writePtr module_symbol_ptr module_ste symbol_table
-	= store_qualified_explicit_imports_in_symbol_table qualified_explicit_imports modified_ste_kinds symbol_table modules
-store_qualified_explicit_imports_in_symbol_table [] modified_ste_kinds symbol_table modules
-	= (modified_ste_kinds,symbol_table,modules)
+store_qualified_explicit_imports_in_symbol_table :: ![QualifiedDeclaration] ![([QualifiedAndHiddenDeclaration],ModuleN)]
+														![(SymbolPtr,STE_Kind)] !*SymbolTable !*{#DclModule}
+													-> (![(SymbolPtr,STE_Kind)],!*SymbolTable,!*{#DclModule})
+store_qualified_explicit_imports_in_symbol_table qualified_explicit_imports explicit_qualified_hidden_imports modified_ste_kinds symbol_table modules
+	# (modified_ste_kinds,symbol_table) = store_explicit_qualified_imports_in_symbol_table qualified_explicit_imports modified_ste_kinds symbol_table
+	= store_explicit_qualified_hidden_imports_in_symbol_table explicit_qualified_hidden_imports modified_ste_kinds symbol_table modules
+where
+	store_explicit_qualified_imports_in_symbol_table :: ![QualifiedDeclaration] ![(SymbolPtr,STE_Kind)] !*SymbolTable
+																			-> (![(SymbolPtr,STE_Kind)],!*SymbolTable)
+	store_explicit_qualified_imports_in_symbol_table [(declarations,module_symbol):qualified_explicit_imports] modified_ste_kinds symbol_table
+		# module_symbol_ptr = module_symbol.id_info
+		  (module_ste=:{ste_kind},symbol_table) = readPtr module_symbol_ptr symbol_table
+		  (sorted_qualified_imports,modified_ste_kinds) = get_sorted_qualified_imports_of_module_ste_kind ste_kind module_symbol_ptr modified_ste_kinds
+		  sorted_qualified_imports = foldSt add_qualified_import declarations sorted_qualified_imports
+		  module_ste = {module_ste & ste_kind=STE_ModuleQualifiedImports sorted_qualified_imports}
+		  symbol_table = writePtr module_symbol_ptr module_ste symbol_table
+		= store_explicit_qualified_imports_in_symbol_table qualified_explicit_imports modified_ste_kinds symbol_table
+	store_explicit_qualified_imports_in_symbol_table [] modified_ste_kinds symbol_table
+		= (modified_ste_kinds,symbol_table)
+
+	store_explicit_qualified_hidden_imports_in_symbol_table :: ![([QualifiedAndHiddenDeclaration],ModuleN)] ![(SymbolPtr,STE_Kind)] !*SymbolTable !*{#DclModule}
+																										-> (![(SymbolPtr,STE_Kind)],!*SymbolTable,!*{#DclModule})
+	store_explicit_qualified_hidden_imports_in_symbol_table [(qualified_hidden_declarations,module_n):explicit_qualified_hidden_imports] modified_ste_kinds symbol_table modules
+		# (module_symbol_ptr,modules) = modules![module_n].dcl_name.id_info
+		  (module_ste=:{ste_kind},symbol_table) = readPtr module_symbol_ptr symbol_table
+		  (sorted_qualified_imports,modified_ste_kinds) = get_sorted_qualified_imports_of_module_ste_kind ste_kind module_symbol_ptr modified_ste_kinds
+		  sorted_qualified_imports = foldSt add_qualified_hidden_import qualified_hidden_declarations sorted_qualified_imports
+		  module_ste = {module_ste & ste_kind=STE_ModuleQualifiedImports sorted_qualified_imports}
+		  symbol_table = writePtr module_symbol_ptr module_ste symbol_table
+		= store_explicit_qualified_hidden_imports_in_symbol_table explicit_qualified_hidden_imports modified_ste_kinds symbol_table modules
+	store_explicit_qualified_hidden_imports_in_symbol_table [] modified_ste_kinds symbol_table modules
+		= (modified_ste_kinds,symbol_table,modules)
+
+	get_sorted_qualified_imports_of_module_ste_kind :: STE_Kind SymbolPtr [(SymbolPtr,STE_Kind)] -> (!SortedQualifiedImports,![(SymbolPtr,STE_Kind)])
+	get_sorted_qualified_imports_of_module_ste_kind (STE_ModuleQualifiedImports sorted_qualified_imports) module_symbol_ptr modified_ste_kinds
+		= (sorted_qualified_imports,modified_ste_kinds)
+	get_sorted_qualified_imports_of_module_ste_kind module_ste_kind=:STE_ClosedModule module_symbol_ptr modified_ste_kinds
+		= (EmptySortedQualifiedImports,[(module_symbol_ptr,module_ste_kind):modified_ste_kinds])
+	get_sorted_qualified_imports_of_module_ste_kind module_ste_kind=:(STE_Module _) module_symbol_ptr modified_ste_kinds
+		= (EmptySortedQualifiedImports,[(module_symbol_ptr,module_ste_kind):modified_ste_kinds])
+	get_sorted_qualified_imports_of_module_ste_kind STE_Empty module_symbol_ptr modified_ste_kinds // for import as
+		= (EmptySortedQualifiedImports,[(module_symbol_ptr,STE_Empty):modified_ste_kinds])
+
+	add_qualified_hidden_import :: !QualifiedAndHiddenDeclaration !u:SortedQualifiedImports -> u:SortedQualifiedImports
+	add_qualified_hidden_import (QualifiedHiddenDeclaration declaration) sorted_qualified_imports
+		= add_qualified_import declaration sorted_qualified_imports
+	add_qualified_hidden_import (QualifiedNotHiddenDeclaration declaration) sorted_qualified_imports
+		= add_qualified_import declaration sorted_qualified_imports
+	add_qualified_hidden_import (QualifiedSomeNotHiddenDeclaration declaration _) sorted_qualified_imports
+		= add_qualified_import declaration sorted_qualified_imports
 
 add_qualified_import :: !Declaration !u:SortedQualifiedImports -> u:SortedQualifiedImports
 add_qualified_import new_declaration EmptySortedQualifiedImports
@@ -1093,10 +1503,11 @@ restore_module_ste_kinds_in_symbol_table [(ptr,ste_kind):ptrs_and_ste_kinds] sym
 restore_module_ste_kinds_in_symbol_table [] symbol_table
 	= symbol_table
 
-collect_imported_instances :: !{!Declaration} ![QualifiedDeclaration] -> [!GlobalInstanceIndex!]
-collect_imported_instances icl_imports icl_qualified_imports
+collect_imported_instances :: !{!Declaration} ![QualifiedDeclaration] ![([QualifiedAndHiddenDeclaration],ModuleN)] -> [!GlobalInstanceIndex!]
+collect_imported_instances icl_imports icl_qualified_imports icl_qualified_hidden_explicit_imports
 	# instance_indices = collect_imported_instances_in_array 0 icl_imports
-	= collect_qualified_imported_instances icl_qualified_imports instance_indices
+	# instance_indices = collect_qualified_imported_instances icl_qualified_imports instance_indices
+	= collect_qualified_hidden_explicit_imported_instances icl_qualified_hidden_explicit_imports instance_indices
 where
 	collect_imported_instances_in_array :: !Int !{!Declaration} -> [!GlobalInstanceIndex!]
 	collect_imported_instances_in_array i imports
@@ -1120,4 +1531,25 @@ where
 	collect_imported_instances_in_list [_:declarations] instance_indices
 		= collect_imported_instances_in_list declarations instance_indices
 	collect_imported_instances_in_list [] instance_indices
+		= instance_indices
+
+	collect_qualified_hidden_explicit_imported_instances :: ![([QualifiedAndHiddenDeclaration],a)] ![!GlobalInstanceIndex!] -> [!GlobalInstanceIndex!]
+	collect_qualified_hidden_explicit_imported_instances [(qualified_hidden_explicit_declarations,_):qualified_hidden_explicit_imports] instance_indices
+		# instance_indices = collect_qualified_hidden_explicit_imported_instances qualified_hidden_explicit_imports instance_indices
+		= collect_qualified_and_hidden_imported_instances qualified_hidden_explicit_declarations instance_indices
+	collect_qualified_hidden_explicit_imported_instances [] instance_indices
+		= instance_indices
+
+	collect_qualified_and_hidden_imported_instances
+			[QualifiedHiddenDeclaration (Declaration {decl_kind=STE_Imported STE_Instance mod_index,decl_index}):declarations] instance_indices
+		= [! {gii_module_n=mod_index,gii_instance_n=decl_index} : collect_qualified_and_hidden_imported_instances declarations instance_indices!]
+	collect_qualified_and_hidden_imported_instances
+			[QualifiedNotHiddenDeclaration (Declaration {decl_kind=STE_Imported STE_Instance mod_index,decl_index}):declarations] instance_indices
+		= [! {gii_module_n=mod_index,gii_instance_n=decl_index} : collect_qualified_and_hidden_imported_instances declarations instance_indices!]
+	collect_qualified_and_hidden_imported_instances
+			[QualifiedSomeNotHiddenDeclaration (Declaration {decl_kind=STE_Imported STE_Instance mod_index,decl_index}) _:declarations] instance_indices
+		= [! {gii_module_n=mod_index,gii_instance_n=decl_index} : collect_qualified_and_hidden_imported_instances declarations instance_indices!]
+	collect_qualified_and_hidden_imported_instances [_:declarations] instance_indices
+		= collect_qualified_and_hidden_imported_instances declarations instance_indices
+	collect_qualified_and_hidden_imported_instances [] instance_indices
 		= instance_indices
