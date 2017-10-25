@@ -264,11 +264,17 @@ where
 	build_generic_type_rep td_rhs type_def_ident glob_module glob_object td_info g_ident_name gc_pos funs_and_groups gs
 		= case td_rhs of
 			SynType _
-				#  gs_error = reportError g_ident_name gc_pos ("cannot derive a generic instance for a synonym type " +++ type_def_ident.id_name) gs.gs_error
-				-> (funs_and_groups, {gs & gs_error = gs_error})	
+				#  gs_error = report_derive_error g_ident_name gc_pos "a synonym type " type_def_ident.id_name gs.gs_error
+				-> (funs_and_groups, {gs & gs_error = gs_error})
 			AbstractType _
-				#  gs_error = reportError g_ident_name gc_pos ("cannot derive a generic instance for an abstract type "  +++ type_def_ident.id_name) gs.gs_error
-				-> (funs_and_groups, {gs & gs_error = gs_error})	
+				#  gs_error = report_derive_error g_ident_name gc_pos "an abstract type " type_def_ident.id_name gs.gs_error
+				-> (funs_and_groups, {gs & gs_error = gs_error})
+			ExtensibleAlgType _
+				#  gs_error = report_derive_error g_ident_name gc_pos "an extensible algebraic type " type_def_ident.id_name gs.gs_error
+				-> (funs_and_groups, {gs & gs_error = gs_error})
+			AlgConses _ _
+				#  gs_error = report_derive_error g_ident_name gc_pos "an extensible algebraic type " type_def_ident.id_name gs.gs_error
+				-> (funs_and_groups, {gs & gs_error = gs_error})
 			_
 				-> case td_info.tdi_gen_rep of
 					Yes _
@@ -280,6 +286,9 @@ where
 						# td_info = {td_info & tdi_gen_rep = Yes gen_type_rep}
 						# gs = {gs & gs_td_infos.[glob_module,glob_object] = td_info}
 						-> (funs_and_groups, gs)
+
+	report_derive_error g_ident_name gc_pos kind_of_type_string type_def_ident_name gs_error
+		= reportError g_ident_name gc_pos ("cannot derive a generic instance for "+++kind_of_type_string+++type_def_ident_name) gs_error
 
 :: TypeInfos
 	= AlgebraicInfo !DefinedSymbol !DefinedSymbol ![DefinedSymbol] ![DefinedSymbol]
