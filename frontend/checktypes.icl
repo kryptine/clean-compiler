@@ -545,21 +545,31 @@ where
 									[{at_attribute = atv_attribute,at_type = TV atv_variable} \\ {atv_variable, atv_attribute} <- td_args]}
 		  class_defs_ts_ti_cs = bind_types_of_constructors cti 0 (atype_vars_to_type_vars td_args) attr_vars type_lhs conses class_defs_ts_ti_cs
 		= (td_rhs, class_defs_ts_ti_cs)
-	check_rhs_of_TypeDef {td_ident,td_arity,td_args,td_rhs = td_rhs=:UncheckedAlgConses type_ext_ident conses} attr_vars cti=:{cti_module_index,cti_type_index,cti_lhs_attribute} class_defs_ts_ti_cs
+	check_rhs_of_TypeDef {td_ident,td_arity,td_args,td_attribute,td_rhs = td_rhs=:UncheckedAlgConses type_ext_ident conses} attr_vars cti=:{cti_module_index,cti_type_index,cti_lhs_attribute} class_defs_ts_ti_cs
 		# (class_defs,ts,ti,cs) = class_defs_ts_ti_cs
 		  (type_index, type_module, cs_symbol_table, ti_used_types) = retrieveTypeDefinition td_ident.id_info cti_module_index cs.cs_symbol_table ti.ti_used_types
 		  ti & ti_used_types = ti_used_types
 		  cs & cs_symbol_table = cs_symbol_table
-		| type_index <> NotFound
-		 	# class_defs_ts_ti_cs = (class_defs,ts,ti,cs)
-			// to do check if ExtensibleAlgType
-			# type_lhs = { at_attribute = cti_lhs_attribute,
-					  	   at_type = TA (MakeTypeSymbIdent { glob_object = type_index, glob_module = type_module } td_ident td_arity)
-										[{at_attribute = atv_attribute,at_type = TV atv_variable} \\ {atv_variable, atv_attribute} <- td_args]}
-			  class_defs_ts_ti_cs = bind_types_of_added_constructors cti (atype_vars_to_type_vars td_args) attr_vars type_lhs conses class_defs_ts_ti_cs
-			= (AlgConses conses {gi_module=type_module,gi_index=type_index}, class_defs_ts_ti_cs)
+		| type_index==NotFound
 			# cs & cs_error = checkError td_ident "undefined" cs.cs_error
 			= (td_rhs, (class_defs,ts,ti,cs))
+		# (ext_alg_type_def,type_index,ts_type_defs,ts_modules) = getTypeDef type_index type_module cti_module_index ts.ts_type_defs ts.ts_modules
+		  ts & ts_type_defs = ts_type_defs, ts_modules = ts_modules
+		| not (case ext_alg_type_def.td_rhs of ExtensibleAlgType _ -> True; _ -> False)
+			# cs & cs_error = checkError td_ident "not an extensible algebraic type" cs.cs_error
+			= (td_rhs, (class_defs,ts,ti,cs))
+		| td_attribute<>ext_alg_type_def.td_attribute
+			# cs & cs_error = checkError td_ident "root uniqueness attribute incorrect or missing" cs.cs_error
+			= (td_rhs, (class_defs,ts,ti,cs))
+		| td_arity<>ext_alg_type_def.td_arity
+			# cs & cs_error = checkError td_ident "arity incorrect" cs.cs_error
+			= (td_rhs, (class_defs,ts,ti,cs))
+	 	# class_defs_ts_ti_cs = (class_defs,ts,ti,cs)
+		# type_lhs = { at_attribute = cti_lhs_attribute,
+				  	   at_type = TA (MakeTypeSymbIdent { glob_object = type_index, glob_module = type_module } td_ident td_arity)
+									[{at_attribute = atv_attribute,at_type = TV atv_variable} \\ {atv_variable, atv_attribute} <- td_args]}
+		  class_defs_ts_ti_cs = bind_types_of_added_constructors cti (atype_vars_to_type_vars td_args) attr_vars type_lhs conses class_defs_ts_ti_cs
+		= (AlgConses conses {gi_module=type_module,gi_index=type_index}, class_defs_ts_ti_cs)
 	check_rhs_of_TypeDef {td_rhs} _ _ class_defs_ts_ti_cs
 		= (td_rhs, class_defs_ts_ti_cs)
 
