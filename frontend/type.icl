@@ -778,12 +778,12 @@ fresh_type_variables type_variables state
 	= foldSt (\{atv_variable={tv_info_ptr}} (var_heap, var_store) -> (var_heap <:= (tv_info_ptr, TVI_Type (TempV var_store)), inc var_store))
 				type_variables state
 
-fresh_attributes :: [AttributeVar] *(*Heap AttrVarInfo,Int) -> *(!*Heap AttrVarInfo,!Int);
+fresh_attributes :: [AttributeVar] *(*AttrVarHeap,Int) -> *(!*AttrVarHeap,!Int);
 fresh_attributes attributes state
 	= foldSt (\{av_info_ptr} (attr_heap, attr_store) -> (attr_heap <:= (av_info_ptr, AVI_Attr (TA_TempVar attr_store)), inc attr_store))
 		attributes state
 
-fresh_environment :: [AttrInequality] [AttrCoercion] *(Heap AttrVarInfo) -> *(![AttrCoercion],!*Heap AttrVarInfo);
+fresh_environment :: [AttrInequality] [AttrCoercion] *AttrVarHeap -> *(![AttrCoercion],!*AttrVarHeap);
 fresh_environment inequalities attr_env attr_heap
 	= foldSt fresh_inequality inequalities (attr_env, attr_heap)
 	where
@@ -1101,7 +1101,7 @@ addToExistentialVariables pos [] exis_variables
 addToExistentialVariables pos new_exis_variables exis_variables
 	= [(pos, new_exis_variables) : exis_variables]
 	
-freshInequality :: AttrInequality *(Heap AttrVarInfo) -> (!AttrCoercion,!.Heap AttrVarInfo);
+freshInequality :: AttrInequality *AttrVarHeap -> (!AttrCoercion,!*AttrVarHeap);
 freshInequality {ai_demanded,ai_offered} attr_heap
 	# (av_dem_info, attr_heap) = readPtr ai_demanded.av_info_ptr attr_heap
 	  (av_off_info, attr_heap) = readPtr ai_offered.av_info_ptr attr_heap
@@ -1173,6 +1173,8 @@ attribute_error type_attr (Yes err)
 	# err = errorHeading "Type error" err
 	= Yes { err & ea_file = err.ea_file <<< "* attribute expected instead of " <<< type_attr <<< '\n' }
 
+determine_attribute_of_cons :: !TypeAttribute ![AType] Int !*AttrVarHeap ![AttributeVar] ![AttrInequality] !*(Optional *ErrorAdmin)
+									-> (!TypeAttribute,Int,!*AttrVarHeap,![AttributeVar],![AttrInequality],!* Optional *ErrorAdmin )
 determine_attribute_of_cons TA_Unique cons_args prop_class attr_var_heap attr_vars attr_env ps_error
 	= (TA_Unique, prop_class >> length cons_args, attr_var_heap, attr_vars, attr_env, ps_error)
 determine_attribute_of_cons cons_attr cons_args prop_class attr_var_heap attr_vars attr_env ps_error
@@ -1183,7 +1185,7 @@ determine_attribute_of_cons cons_attr cons_args prop_class attr_var_heap attr_va
 where
 	determine_cummulative_attribute [] cumm_attr attr_vars prop_class
 		= (cumm_attr, attr_vars, prop_class)
-	determine_cummulative_attribute [t=:{at_attribute} : types ] cumm_attr attr_vars prop_class
+	determine_cummulative_attribute [{at_attribute} : types] cumm_attr attr_vars prop_class
 		| prop_class bitand 1 == 0
 			= determine_cummulative_attribute types cumm_attr attr_vars (prop_class >> 1)
 			= case at_attribute of
