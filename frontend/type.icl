@@ -1173,9 +1173,9 @@ attribute_error type_attr (Yes err)
 	# err = errorHeading "Type error" err
 	= Yes { err & ea_file = err.ea_file <<< "* attribute expected instead of " <<< type_attr <<< '\n' }
 
-determine_attribute_of_cons modules TA_Unique cons_args prop_class attr_var_heap attr_vars attr_env ps_error
+determine_attribute_of_cons TA_Unique cons_args prop_class attr_var_heap attr_vars attr_env ps_error
 	= (TA_Unique, prop_class >> length cons_args, attr_var_heap, attr_vars, attr_env, ps_error)
-determine_attribute_of_cons modules cons_attr cons_args prop_class attr_var_heap attr_vars attr_env ps_error
+determine_attribute_of_cons cons_attr cons_args prop_class attr_var_heap attr_vars attr_env ps_error
 	# (cumm_attr, prop_attrs, prop_class) = determine_cummulative_attribute cons_args TA_Multi [] prop_class
 	  (comb_attr, attr_var_heap, attr_vars, attr_env, ps_error)
 	  		= combine_attributes cons_attr cumm_attr prop_attrs attr_var_heap attr_vars attr_env ps_error
@@ -1248,12 +1248,12 @@ add_propagation_attributes_to_AType modules type=:{at_type = TA cons_id=:{type_i
 	  (prop_class, th_vars, prop_td_infos) = propClassification glob_object glob_module props modules prop_type_heaps.th_vars prop_td_infos
 	| cons_args_m
 		# (at_attribute, prop_class, th_attrs, prop_attr_vars, prop_attr_env, prop_error)
-		  		= determine_attribute_of_cons modules at_attribute cons_args_r prop_class prop_type_heaps.th_attrs prop_attr_vars prop_attr_env prop_error
+		  		= determine_attribute_of_cons at_attribute cons_args_r prop_class prop_type_heaps.th_attrs prop_attr_vars prop_attr_env prop_error
 		  prop_type_heaps & th_vars = th_vars, th_attrs = th_attrs
 		  ps & prop_attr_vars = prop_attr_vars, prop_td_infos = prop_td_infos, prop_attr_env = prop_attr_env, prop_type_heaps = prop_type_heaps, prop_error = prop_error
 		= (True, {type & at_type = TA cons_id cons_args_r, at_attribute = at_attribute}, prop_class, ps)
 		# (at_attribute_r, prop_class, th_attrs, prop_attr_vars, prop_attr_env, prop_error)
-		  		= determine_attribute_of_cons modules at_attribute cons_args prop_class prop_type_heaps.th_attrs prop_attr_vars prop_attr_env prop_error
+		  		= determine_attribute_of_cons at_attribute cons_args prop_class prop_type_heaps.th_attrs prop_attr_vars prop_attr_env prop_error
 		  prop_type_heaps & th_vars = th_vars, th_attrs = th_attrs
 		  ps & prop_attr_vars = prop_attr_vars, prop_td_infos = prop_td_infos, prop_attr_env = prop_attr_env, prop_type_heaps = prop_type_heaps, prop_error = prop_error
 		| not (equal_attribute at_attribute at_attribute_r)
@@ -1265,12 +1265,12 @@ add_propagation_attributes_to_AType modules type=:{at_type = TAS cons_id=:{type_
 	  (prop_class, th_vars, prop_td_infos) = propClassification glob_object glob_module props modules prop_type_heaps.th_vars prop_td_infos
 	| cons_args_m
 		# (at_attribute, prop_class, th_attrs, prop_attr_vars, prop_attr_env, prop_error)
-		  		= determine_attribute_of_cons modules at_attribute cons_args_r prop_class prop_type_heaps.th_attrs prop_attr_vars prop_attr_env prop_error
+		  		= determine_attribute_of_cons at_attribute cons_args_r prop_class prop_type_heaps.th_attrs prop_attr_vars prop_attr_env prop_error
 		  prop_type_heaps & th_vars = th_vars, th_attrs = th_attrs
 		  ps & prop_attr_vars = prop_attr_vars, prop_td_infos = prop_td_infos, prop_attr_env = prop_attr_env, prop_type_heaps = prop_type_heaps, prop_error = prop_error
 		= (True, {type & at_type = TAS cons_id cons_args_r strictness, at_attribute = at_attribute}, prop_class, ps)
 		# (at_attribute_r, prop_class, th_attrs, prop_attr_vars, prop_attr_env, prop_error)
-		  		= determine_attribute_of_cons modules at_attribute cons_args prop_class prop_type_heaps.th_attrs prop_attr_vars prop_attr_env prop_error
+		  		= determine_attribute_of_cons at_attribute cons_args prop_class prop_type_heaps.th_attrs prop_attr_vars prop_attr_env prop_error
 		  prop_type_heaps & th_vars = th_vars, th_attrs = th_attrs
 		  ps & prop_attr_vars = prop_attr_vars, prop_td_infos = prop_td_infos, prop_attr_env = prop_attr_env, prop_type_heaps = prop_type_heaps, prop_error = prop_error
 		| not (equal_attribute at_attribute at_attribute_r)
