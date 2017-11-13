@@ -641,24 +641,6 @@ where
 		build_either x y = GTSEither x y
 		build_void = abort "sanity check: no alternatives in a type\n"		
 
-/*
-// build a product of types
-buildProductType :: ![AType] !PredefinedSymbols -> AType
-buildProductType types predefs 
-	= listToBin build_pair build_unit types
-where
-	build_pair x y = buildPredefTypeApp PD_TypePAIR [x, y] predefs	
-	build_unit  = buildPredefTypeApp PD_TypeUNIT [] predefs
-
-// build a sum of types		
-buildSumType :: ![AType] !PredefinedSymbols -> AType
-buildSumType types predefs 
-	= listToBin build_either build_void types
-where
-	build_either x y = buildPredefTypeApp PD_TypeEITHER [x, y] predefs	
-	build_void  = abort "sum of zero types\n"
-*/
-
 // build a binary representation of a list
 listToBin :: (a a -> a) a [a] -> a 
 listToBin bin tip [] = tip
@@ -666,15 +648,6 @@ listToBin bin tip [x] = x
 listToBin bin tip xs
 	# (l,r) = splitAt ((length xs) / 2) xs
 	= bin (listToBin bin tip l) (listToBin bin tip r)
-
-// build application of a predefined type constructor 
-buildPredefTypeApp :: !Int [AType] !PredefinedSymbols -> AType
-buildPredefTypeApp predef_index args predefs
-	# {pds_module, pds_def} = predefs.[predef_index]
-	# pds_ident = predefined_idents.[predef_index]
-	# global_index = {glob_module = pds_module, glob_object = pds_def}
-	# type_symb = MakeTypeSymbIdent global_index pds_ident (length args) 		  
-	= makeAType (TA type_symb args) TA_Multi
 
 //	build type infos
 buildTypeDefInfo :: 
@@ -5438,6 +5411,7 @@ where
 	fold_guards f (AlgebraicPatterns gi aps) st = foldSt (foldExpr f) [ap_expr\\{ap_expr}<-aps] st
 	fold_guards f (BasicPatterns gi bps) st = foldSt (foldExpr f) [bp_expr\\{bp_expr}<-bps] st
 	fold_guards f (DynamicPatterns dps) st = foldSt (foldExpr f) [dp_rhs\\{dp_rhs}<-dps] st
+	fold_guards f (NewTypePatterns gi aps) st = foldSt (foldExpr f) [ap_expr\\{ap_expr}<-aps] st
 	fold_guards f NoPattern st = st
 foldExpr f expr=:(Selection _ expr1 _) st
 	# st = f expr st
@@ -5540,6 +5514,7 @@ where
 		collect (AlgebraicPatterns _ aps) = flatten [ap_vars\\{ap_vars}<-aps]
 		collect (BasicPatterns _ bps) = []
 		collect (DynamicPatterns dps) = [dp_var \\ {dp_var}<-dps]
+		collect (NewTypePatterns _ aps) = flatten [ap_vars\\{ap_vars}<-aps]
 		collect NoPattern = []
 	collect_vars expr st = st		
 
