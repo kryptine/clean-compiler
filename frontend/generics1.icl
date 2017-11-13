@@ -49,7 +49,7 @@ import genericsupport
 		fii_ident :: Ident
 	}
 
-:: PredefinedSymbolsData :== PredefinedSymbols
+:: PredefinedSymbolsData = !{psd_predefs_a :: !{#PredefinedSymbol}}
 
 :: *GenericState = 
 	{ gs_modules :: !*Modules
@@ -116,10 +116,10 @@ convertGenerics main_dcl_module_n used_module_numbers modules groups funs td_inf
 		, gs_varh = hp_var_heap
 		, gs_tvarh = th_vars
 		, gs_avarh = th_attrs
-		, gs_error = error	
+		, gs_error = error
 		, gs_funs = funs
-		, gs_groups = groups	
-		, gs_predefs = predefs
+		, gs_groups = groups
+		, gs_predefs = {psd_predefs_a=predefs}
 		, gs_main_module = main_dcl_module_n
 		, gs_used_modules = used_module_numbers
 		} 
@@ -339,7 +339,7 @@ buildGenericTypeRep type_index funs_and_groups
 
 convertATypeToGenTypeStruct :: !Ident !Position !PredefinedSymbolsData !AType (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin) 
 														   -> (GenTypeStruct, (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin))
-convertATypeToGenTypeStruct ident pos predefs type st
+convertATypeToGenTypeStruct ident pos {psd_predefs_a} type st
 	= convert type st
 where	
 	convert {at_type=TA type_symb args, at_attribute} st
@@ -369,7 +369,7 @@ where
 				-> convert {at_type = expanded_type, at_attribute = attr} 
 					(modules, td_infos, {heaps & hp_type_heaps = th}, error) 
 			_
-				#! {pds_module, pds_def} = predefs.[PD_UnboxedArrayType]
+				#! {pds_module, pds_def} = psd_predefs_a.[PD_UnboxedArrayType]
 				| 	type_index.glob_module == pds_module
 					&& type_index.glob_object == pds_def
 					&& (case args of [{at_type=TB _}] -> True; _ -> False)
@@ -382,7 +382,7 @@ where
 
 convert_bimap_AType_to_GenTypeStruct :: !AType !Position !PredefinedSymbolsData (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin) 
 															 -> (GenTypeStruct, (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin))
-convert_bimap_AType_to_GenTypeStruct type pos predefs st
+convert_bimap_AType_to_GenTypeStruct type pos {psd_predefs_a} st
 	= convert type st
 where
 	convert {at_type=TA type_symb args, at_attribute} st
@@ -412,12 +412,12 @@ where
 				-> convert {at_type = expanded_type, at_attribute = attr} 
 					(modules, td_infos, {heaps & hp_type_heaps = th}, error) 
 			AbstractType _
-				#! {pds_module, pds_def} = predefs.[PD_UnboxedArrayType]
+				#! {pds_module, pds_def} = psd_predefs_a.[PD_UnboxedArrayType]
 				| glob_module == pds_module && glob_object == pds_def
 					&& (case args of [{at_type=TB _}] -> True; _ -> False)
 					-> (GTSAppCons KindConst [], (modules, td_infos, heaps, error))
 			RecordType _
-				# {pds_module, pds_def} = predefs.[PD_TypeBimap]
+				# {pds_module, pds_def} = psd_predefs_a.[PD_TypeBimap]
 				| glob_module == pds_module && glob_object == pds_def
 					&& case args of [_,_] -> True; _ -> False
 					#! (tdi_kinds,td_infos) = td_infos![glob_module,glob_object].tdi_kinds
@@ -1147,7 +1147,7 @@ where
 			, !*Heaps
 			)
 	build_prod is_record expr [] heaps
-		= build_case_unit expr heaps	
+		= build_case_unit expr predefs heaps	
 	build_prod is_record expr [cons_arg_var] heaps
 		| is_record
 			= build_case_field cons_arg_var expr predefs heaps
@@ -1168,9 +1168,9 @@ where
 		#! (expr, heaps) = buildConsApp cons_mod def_symbol var_exprs heaps
 	 	= (expr, vars, heaps)
 
-	build_case_unit body_expr heaps
+	build_case_unit body_expr predefs=:{psd_predefs_a} heaps
 		# unit_pat = buildPredefConsPattern PD_ConsUNIT [] body_expr predefs
-		# {pds_module, pds_def} = predefs.[PD_TypeUNIT]
+		# {pds_module, pds_def} = psd_predefs_a.[PD_TypeUNIT]
 		# case_patterns = AlgebraicPatterns {gi_module = pds_module, gi_index = pds_def} [unit_pat]
 		= build_case_expr case_patterns heaps
 
@@ -1195,40 +1195,40 @@ build_record expr predefs heaps
 build_field var_expr predefs heaps
 	= buildPredefConsApp PD_ConsFIELD [var_expr] predefs heaps 
 
-build_case_pair var1 var2 body_expr predefs heaps
+build_case_pair var1 var2 body_expr predefs=:{psd_predefs_a} heaps
 	# pair_pat = buildPredefConsPattern PD_ConsPAIR [var1, var2] body_expr predefs	
-	# {pds_module, pds_def} = predefs.[PD_TypePAIR]
+	# {pds_module, pds_def} = psd_predefs_a.[PD_TypePAIR]
 	# case_patterns = AlgebraicPatterns {gi_module = pds_module, gi_index = pds_def} [pair_pat]
 	= build_case_expr case_patterns heaps
 
-build_case_either left_var left_expr right_var right_expr predefs heaps
+build_case_either left_var left_expr right_var right_expr predefs=:{psd_predefs_a} heaps
 	# left_pat = buildPredefConsPattern PD_ConsLEFT [left_var] left_expr predefs
 	# right_pat = buildPredefConsPattern PD_ConsRIGHT [right_var] right_expr predefs
-	# {pds_module, pds_def} = predefs.[PD_TypeEITHER]
+	# {pds_module, pds_def} = psd_predefs_a.[PD_TypeEITHER]
 	# case_patterns = AlgebraicPatterns {gi_module = pds_module, gi_index = pds_def} [left_pat, right_pat]
 	= build_case_expr case_patterns heaps
 
-build_case_object var body_expr predefs heaps
+build_case_object var body_expr predefs=:{psd_predefs_a} heaps
 	# pat = buildPredefConsPattern PD_ConsOBJECT [var] body_expr predefs	
-	# {pds_module, pds_def} = predefs.[PD_TypeOBJECT]
+	# {pds_module, pds_def} = psd_predefs_a.[PD_TypeOBJECT]
 	# case_patterns = AlgebraicPatterns {gi_module = pds_module, gi_index = pds_def} [pat]
 	= build_case_expr case_patterns heaps
 
-build_case_cons var body_expr predefs heaps
+build_case_cons var body_expr predefs=:{psd_predefs_a} heaps
 	# pat = buildPredefConsPattern PD_ConsCONS [var] body_expr predefs	
-	# {pds_module, pds_def} = predefs.[PD_TypeCONS]
+	# {pds_module, pds_def} = psd_predefs_a.[PD_TypeCONS]
 	# case_patterns = AlgebraicPatterns {gi_module = pds_module, gi_index = pds_def} [pat]
 	= build_case_expr case_patterns heaps 
 
-build_case_record var body_expr predefs heaps
+build_case_record var body_expr predefs=:{psd_predefs_a} heaps
 	# pat = buildPredefConsPattern PD_ConsRECORD [var] body_expr predefs	
-	# {pds_module, pds_def} = predefs.[PD_TypeRECORD]
+	# {pds_module, pds_def} = psd_predefs_a.[PD_TypeRECORD]
 	# case_patterns = AlgebraicPatterns {gi_module = pds_module, gi_index = pds_def} [pat]
 	= build_case_expr case_patterns heaps 
 
-build_case_field var body_expr predefs heaps
+build_case_field var body_expr predefs=:{psd_predefs_a} heaps
 	# pat = buildPredefConsPattern PD_ConsFIELD [var] body_expr predefs	
-	# {pds_module, pds_def} = predefs.[PD_TypeFIELD]
+	# {pds_module, pds_def} = psd_predefs_a.[PD_TypeFIELD]
 	# case_patterns = AlgebraicPatterns {gi_module = pds_module, gi_index = pds_def} [pat]
 	= build_case_expr case_patterns heaps 
 
@@ -1567,8 +1567,8 @@ where
 
 	build_context tv kind gs_varh
 		#! (var_info_ptr, gs_varh) = newPtr VI_Empty gs_varh
-		#! {pds_module, pds_def} = gs_predefs . [PD_GenericBimap]
-		#! pds_ident = predefined_idents . [PD_GenericBimap]
+		#! {pds_module, pds_def} = gs_predefs.psd_predefs_a.[PD_GenericBimap]
+		#! pds_ident = predefined_idents.[PD_GenericBimap]
 		# glob_def_sym = 
 			{ glob_module = pds_module
 			, glob_object = {ds_ident=pds_ident, ds_index=pds_def, ds_arity = 1}
@@ -2236,35 +2236,35 @@ add_generic_info_to_type st=:{st_arity, st_args, st_args_strictness} generic_inf
 	# (st_args,n_new_args) = add_generic_info_types generic_info_index generic_info st_args predefs
 	= {st & st_args = st_args, st_arity = st_arity + n_new_args, st_args_strictness = insert_n_lazy_values_at_beginning n_new_args st_args_strictness}
 where
-	add_generic_info_types 0 generic_info args predefs
+	add_generic_info_types 0 generic_info args predefs=:{psd_predefs_a}
 		| generic_info== -1
-			# {pds_module, pds_def} = predefs.[PD_TGenericTypeDefDescriptor]
+			# {pds_module, pds_def} = psd_predefs_a.[PD_TGenericTypeDefDescriptor]
 			#! type_symb = MakeTypeSymbIdent {glob_module = pds_module, glob_object = pds_def} predefined_idents.[PD_TGenericTypeDefDescriptor] 0
 			= ([makeAType (TA type_symb []) TA_Multi : args], 1)
 			= add_OBJECT_field_args generic_info args predefs
-	add_generic_info_types 1 generic_info args predefs
+	add_generic_info_types 1 generic_info args predefs=:{psd_predefs_a}
 		| generic_info== -1
-			# {pds_module, pds_def} = predefs.[PD_TGenericConsDescriptor]
+			# {pds_module, pds_def} = psd_predefs_a.[PD_TGenericConsDescriptor]
 			#! type_symb = MakeTypeSymbIdent {glob_module = pds_module, glob_object = pds_def} predefined_idents.[PD_TGenericConsDescriptor] 0
 			= ([makeAType (TA type_symb []) TA_Multi : args], 1)
 			= add_CONS_field_args generic_info args predefs
-	add_generic_info_types 2 generic_info args predefs
+	add_generic_info_types 2 generic_info args predefs=:{psd_predefs_a}
 		| generic_info== -1
-			# {pds_module, pds_def} = predefs.[PD_TGenericRecordDescriptor]
+			# {pds_module, pds_def} = psd_predefs_a.[PD_TGenericRecordDescriptor]
 			#! type_symb = MakeTypeSymbIdent {glob_module = pds_module, glob_object = pds_def} predefined_idents.[PD_TGenericRecordDescriptor] 0
 			= ([makeAType (TA type_symb []) TA_Multi : args], 1)
 			= add_RECORD_field_args generic_info args predefs
-	add_generic_info_types 3 generic_info args predefs
+	add_generic_info_types 3 generic_info args predefs=:{psd_predefs_a}
 		| generic_info== -1
-			# {pds_module, pds_def} = predefs.[PD_TGenericFieldDescriptor]
+			# {pds_module, pds_def} = psd_predefs_a.[PD_TGenericFieldDescriptor]
 			#! type_symb = MakeTypeSymbIdent {glob_module = pds_module, glob_object = pds_def} predefined_idents.[PD_TGenericFieldDescriptor] 0
 			= ([makeAType (TA type_symb []) TA_Multi : args], 1)
 			= add_FIELD_field_args generic_info args predefs
 
-	add_OBJECT_field_args generic_info args predefs
+	add_OBJECT_field_args generic_info args predefs=:{psd_predefs_a}
 		| generic_info bitand 1<>0 // gtd_name
 			# (args,n_args) = add_OBJECT_field_args (generic_info bitxor 1) args predefs
-			= add_String_arg args n_args
+			= add_String_arg args n_args psd_predefs_a
 		| generic_info bitand 2<>0 // gtd_arity
 			# (args,n_args) = add_OBJECT_field_args (generic_info bitxor 2) args predefs
 			= add_Int_arg args n_args
@@ -2273,34 +2273,34 @@ where
 			= add_Int_arg args n_args
 		| generic_info bitand 8<>0 // gtd_conses
 			# (args,n_args) = add_RECORD_field_args (generic_info bitxor 8) args predefs
-			# {pds_module, pds_def} = predefs.[PD_TGenericConsDescriptor]
+			# {pds_module, pds_def} = psd_predefs_a.[PD_TGenericConsDescriptor]
 			#! type_symb = MakeTypeSymbIdent {glob_module = pds_module, glob_object = pds_def} predefined_idents.[PD_TGenericConsDescriptor] 0
 			# type_GenericConsDescriptor = {at_type= TA type_symb [], at_attribute = TA_Multi}
-			# {pds_module,pds_def} = predefs.[PD_ListType]
+			# {pds_module,pds_def} = psd_predefs_a.[PD_ListType]
 			#! string_type_symb = MakeTypeSymbIdent {glob_module = pds_module, glob_object = pds_def} predefined_idents.[PD_ListType] 1
 			= ([{at_type = TA string_type_symb [type_GenericConsDescriptor], at_attribute = TA_Multi} : args],n_args+1)
 			= (args,0)
 
-	add_CONS_field_args generic_info args predefs
+	add_CONS_field_args generic_info args predefs=:{psd_predefs_a}
 		| generic_info bitand 1<>0 // gcd_name
 			# (args,n_args) = add_CONS_field_args (generic_info bitxor 1) args predefs
-			= add_String_arg args n_args
+			= add_String_arg args n_args psd_predefs_a
 		| generic_info bitand 2<>0 // gcd_arity
 			# (args,n_args) = add_CONS_field_args (generic_info bitxor 2) args predefs
 			= add_Int_arg args n_args
 		| generic_info bitand 4<>0 // gcd_prio
 			# (args,n_args) = add_CONS_field_args (generic_info bitxor 4) args predefs
-			# {pds_module, pds_def} = predefs.[PD_TGenConsPrio]
+			# {pds_module, pds_def} = psd_predefs_a.[PD_TGenConsPrio]
 			#! type_symb = MakeTypeSymbIdent {glob_module = pds_module, glob_object = pds_def} predefined_idents.[PD_TGenConsPrio] 0
 			= ([{at_type = TA type_symb [], at_attribute = TA_Multi} : args],n_args+1)
 		| generic_info bitand 8<>0 // gcd_type_def
 			# (args,n_args) = add_CONS_field_args (generic_info bitxor 8) args predefs
-			# {pds_module, pds_def} = predefs.[PD_TGenericTypeDefDescriptor]
+			# {pds_module, pds_def} = psd_predefs_a.[PD_TGenericTypeDefDescriptor]
 			#! type_symb = MakeTypeSymbIdent {glob_module = pds_module, glob_object = pds_def} predefined_idents.[PD_TGenericTypeDefDescriptor] 0
 			= ([{at_type = TA type_symb [], at_attribute = TA_Multi} : args],n_args+1)
 		| generic_info bitand 16<>0 // gcd_type
 			# (args,n_args) = add_CONS_field_args (generic_info bitxor 16) args predefs
-			# {pds_module, pds_def} = predefs.[PD_TGenType]
+			# {pds_module, pds_def} = psd_predefs_a.[PD_TGenType]
 			#! type_symb = MakeTypeSymbIdent {glob_module = pds_module, glob_object = pds_def} predefined_idents.[PD_TGenType] 0
 			= ([{at_type = TA type_symb [], at_attribute = TA_Multi} : args],n_args+1)
 		| generic_info bitand 32<>0 // gcd_index
@@ -2308,10 +2308,10 @@ where
 			= add_Int_arg args n_args
 			= (args,0)
 
-	add_RECORD_field_args generic_info args predefs
+	add_RECORD_field_args generic_info args predefs=:{psd_predefs_a}
 		| generic_info bitand 1<>0 // grd_name
 			# (args,n_args) = add_RECORD_field_args (generic_info bitxor 1) args predefs
-			= add_String_arg args n_args
+			= add_String_arg args n_args psd_predefs_a
 		| generic_info bitand 2<>0 // grd_arity
 			# (args,n_args) = add_RECORD_field_args (generic_info bitxor 2) args predefs
 			= add_Int_arg args n_args
@@ -2320,35 +2320,35 @@ where
 			= add_Int_arg args n_args
 		| generic_info bitand 8<>0 // grd_type
 			# (args,n_args) = add_RECORD_field_args (generic_info bitxor 8) args predefs
-			# {pds_module, pds_def} = predefs.[PD_TGenType]
+			# {pds_module, pds_def} = psd_predefs_a.[PD_TGenType]
 			#! type_symb = MakeTypeSymbIdent {glob_module = pds_module, glob_object = pds_def} predefined_idents.[PD_TGenType] 0
 			= ([{at_type = TA type_symb [], at_attribute = TA_Multi} : args],n_args+1)
 		| generic_info bitand 16<>0 // grd_fields
 			# (args,n_args) = add_RECORD_field_args (generic_info bitxor 16) args predefs
-			# {pds_module,pds_def} = predefs.[PD_StringType]
+			# {pds_module,pds_def} = psd_predefs_a.[PD_StringType]
 			#! string_type_symb = MakeTypeSymbIdent {glob_module = pds_module, glob_object = pds_def} predefined_idents.[PD_StringType] 0
 			# string_type = {at_type = TA string_type_symb [], at_attribute = TA_Multi}
-			# {pds_module,pds_def} = predefs.[PD_ListType]
+			# {pds_module,pds_def} = psd_predefs_a.[PD_ListType]
 			#! string_type_symb = MakeTypeSymbIdent {glob_module = pds_module, glob_object = pds_def} predefined_idents.[PD_ListType] 1
 			= ([{at_type = TA string_type_symb [string_type], at_attribute = TA_Multi} : args],n_args+1)
 			= (args,0)
 
-	add_FIELD_field_args generic_info args predefs
+	add_FIELD_field_args generic_info args predefs=:{psd_predefs_a}
 		| generic_info bitand 1<>0 // gfd_name
 			# (args,n_args) = add_FIELD_field_args (generic_info bitxor 1) args predefs
-			= add_String_arg args n_args
+			= add_String_arg args n_args psd_predefs_a
 		| generic_info bitand 2<>0 // gfd_index
 			# (args,n_args) = add_FIELD_field_args (generic_info bitxor 2) args predefs
 			= add_Int_arg args n_args
 		| generic_info bitand 4<>0 // gfd_cons
 			# (args,n_args) = add_FIELD_field_args (generic_info bitxor 4) args predefs
-			# {pds_module, pds_def} = predefs.[PD_TGenericRecordDescriptor]
+			# {pds_module, pds_def} = psd_predefs_a.[PD_TGenericRecordDescriptor]
 			#! type_symb = MakeTypeSymbIdent {glob_module = pds_module, glob_object = pds_def} predefined_idents.[PD_TGenericRecordDescriptor] 0
 			= ([{at_type = TA type_symb [], at_attribute = TA_Multi} : args],n_args+1)
 			= (args,0)
 
-	add_String_arg args n_args
-		# {pds_module,pds_def} = predefs.[PD_StringType]
+	add_String_arg args n_args psd_predefs_a
+		# {pds_module,pds_def} = psd_predefs_a.[PD_StringType]
 		#! string_type_symb = MakeTypeSymbIdent {glob_module = pds_module, glob_object = pds_def} predefined_idents.[PD_StringType] 0
 		= ([{at_type = TA string_type_symb [], at_attribute = TA_Multi} : args],n_args+1)
 
@@ -2356,21 +2356,21 @@ where
 		= ([{at_type = TB BT_Int, at_attribute = TA_Multi} : args],n_args+1)
 
 index_gen_cons_with_info_type :: !Type !PredefinedSymbolsData -> Int
-index_gen_cons_with_info_type (TA {type_index={glob_module,glob_object}} []) predefs
-	| glob_module==predefs.[PD_StdGeneric].pds_def
-		| glob_object==predefs.[PD_TypeOBJECT].pds_def
+index_gen_cons_with_info_type (TA {type_index={glob_module,glob_object}} []) {psd_predefs_a}
+	| glob_module==psd_predefs_a.[PD_StdGeneric].pds_def
+		| glob_object==psd_predefs_a.[PD_TypeOBJECT].pds_def
 			= 0
-		| glob_object==predefs.[PD_TypeCONS].pds_def
+		| glob_object==psd_predefs_a.[PD_TypeCONS].pds_def
 			= 1
-		| glob_object==predefs.[PD_TypeRECORD].pds_def
+		| glob_object==psd_predefs_a.[PD_TypeRECORD].pds_def
 			= 2
-		| glob_object==predefs.[PD_TypeFIELD].pds_def
+		| glob_object==psd_predefs_a.[PD_TypeFIELD].pds_def
 			= 3
-		| glob_object==predefs.[PD_TypePAIR].pds_def
+		| glob_object==psd_predefs_a.[PD_TypePAIR].pds_def
 			= 4
-		| glob_object==predefs.[PD_TypeEITHER].pds_def
+		| glob_object==psd_predefs_a.[PD_TypeEITHER].pds_def
 			= 5
-		| glob_object==predefs.[PD_TypeUNIT].pds_def
+		| glob_object==psd_predefs_a.[PD_TypeUNIT].pds_def
 			= 6
 			= -1
 		= -1
@@ -2378,15 +2378,15 @@ index_gen_cons_with_info_type _ predefs
 	= -1
 
 is_gen_cons_without_instances :: !Type !PredefinedSymbolsData -> Bool
-is_gen_cons_without_instances (TA {type_index={glob_module,glob_object}} []) predefs
-	| glob_module==predefs.[PD_StdGeneric].pds_def
-		=  glob_object==predefs.[PD_TypeOBJECT].pds_def
-		|| glob_object==predefs.[PD_TypeCONS].pds_def
-		|| glob_object==predefs.[PD_TypeRECORD].pds_def
-		|| glob_object==predefs.[PD_TypeFIELD].pds_def
-		|| glob_object==predefs.[PD_TypePAIR].pds_def
-		|| glob_object==predefs.[PD_TypeEITHER].pds_def
-		|| glob_object==predefs.[PD_TypeUNIT].pds_def
+is_gen_cons_without_instances (TA {type_index={glob_module,glob_object}} []) {psd_predefs_a}
+	| glob_module==psd_predefs_a.[PD_StdGeneric].pds_def
+		=  glob_object==psd_predefs_a.[PD_TypeOBJECT].pds_def
+		|| glob_object==psd_predefs_a.[PD_TypeCONS].pds_def
+		|| glob_object==psd_predefs_a.[PD_TypeRECORD].pds_def
+		|| glob_object==psd_predefs_a.[PD_TypeFIELD].pds_def
+		|| glob_object==psd_predefs_a.[PD_TypePAIR].pds_def
+		|| glob_object==psd_predefs_a.[PD_TypeEITHER].pds_def
+		|| glob_object==psd_predefs_a.[PD_TypeUNIT].pds_def
 		= False
 is_gen_cons_without_instances _ predefs
 	= False
@@ -2398,7 +2398,7 @@ buildGenericCaseBody ::
 		!*SpecializeState
 	-> (!FunctionBody,
 		!*SpecializeState)
-buildGenericCaseBody main_module_index gc_pos (TypeConsSymb {type_ident,type_index}) gc_ident generic_info_index gcf_generic predefs
+buildGenericCaseBody main_module_index gc_pos (TypeConsSymb {type_ident,type_index}) gc_ident generic_info_index gcf_generic predefs=:{psd_predefs_a}
 					st=:{ss_modules=modules,ss_td_infos=td_infos,ss_heaps=heaps}
 	#! (gen_def, modules) = modules![gcf_generic.gi_module].com_generic_defs.[gcf_generic.gi_index]
 	#! (td_info=:{tdi_gen_rep}, td_infos) = td_infos![type_index.glob_module, type_index.glob_object]
@@ -2460,7 +2460,7 @@ where
                 // multiple dependencies on the same generic function but with different generic dependency variables
                 // See functions: specialize_type_var and checkgenerics.check_dependency
 		#! spec_env = [(atv_variable, TVI_Exprs (zip2 [gcf_generic:[gd_index \\ {gd_index} <- gen_deps]] exprs)) \\ {atv_variable} <- td_args & exprs <- generated_arg_exprss]
-		# generic_bimap = predefs.[PD_GenericBimap]
+		# generic_bimap = psd_predefs_a.[PD_GenericBimap]
 		| gcf_generic.gi_module==generic_bimap.pds_module && gcf_generic.gi_index==generic_bimap.pds_def
 
 			// JvG: can probably make special version of simplify_bimap_GenTypeStruct that doesn't simplify if any var occurs, because all vars are passed
@@ -2507,7 +2507,7 @@ where
 
 		= (body_expr, funs_and_groups, modules, td_infos, heaps, error)
 	where
-		{pds_module = bimap_module, pds_def=bimap_index} = predefs.[PD_GenericBimap]
+		{pds_module = bimap_module, pds_def=bimap_index} = psd_predefs_a.[PD_GenericBimap]
 		bimap_ident = predefined_idents.[PD_GenericBimap]
 		
 		get_var_kinds gen_info_ptr heaps=:{hp_generic_heap}
@@ -2714,8 +2714,8 @@ where
 			No
 				# error = reportError fun_name.id_name fun_pos "no generic cases for this kind" error  
 				-> (TCGeneric gtc, error)
-			Yes class_info 
-				# clazz = 
+			Yes class_info
+				# clazz =
 					{ glob_module = class_info.gci_module
 					, glob_object = 
 						{ ds_ident = genericIdentToClassIdent gtc_generic.glob_object.ds_ident.id_name gtc_kind 
@@ -2724,7 +2724,7 @@ where
 						}
 					}
 				// AA HACK: dummy dictionary
-				#! {pds_module,pds_def} = gs_predefs.[PD_TypeGenericDict]
+				#! {pds_module,pds_def} = gs_predefs.psd_predefs_a.[PD_TypeGenericDict]
 				# generic_dict = {gi_module=pds_module, gi_index=pds_def}
 				-> (TCGeneric {gtc & gtc_class=clazz, gtc_generic_dict=generic_dict}, error)
 		= (True, {tc & tc_class=tc_class}, (modules, {heaps & hp_generic_heap=hp_generic_heap}, error))
@@ -2998,7 +2998,7 @@ where
 			= abort "copy_generic_case_macro: incorrect function index"
 
 		# (reversed_groups,unexpanded_dcl_macros,fun_defs,dcl_macros,var_heap,expression_heap,symbol_table,error)
-			= partitionateAndLiftMacro macro_module_index macro_index main_module_index predefs group_index
+			= partitionateAndLiftMacro macro_module_index macro_index main_module_index predefs.psd_predefs_a group_index
 												 fun_defs dcl_macros var_heap expression_heap symbol_table error
 
 		  (fun_index,fun_defs) = usize fun_defs
@@ -5253,8 +5253,8 @@ buildFunApp2 fun_mod ds_index ds_ident arg_exprs heaps=:{hp_expression_heap}
 	= (expr, heaps)	
 
 buildPredefFunApp :: !Int [Expression] !PredefinedSymbolsData !*Heaps -> (!Expression, !*Heaps)
-buildPredefFunApp predef_index args predefs heaps
-	# {pds_module, pds_def} = predefs.[predef_index]
+buildPredefFunApp predef_index args {psd_predefs_a} heaps
+	# {pds_module, pds_def} = psd_predefs_a.[predef_index]
  	= buildFunApp2 pds_module pds_def predefined_idents.[predef_index] args heaps
 
 buildGenericApp :: !Index !Index !Ident !TypeKind ![Expression] !*Heaps -> (!Expression, !*Heaps)
@@ -5269,8 +5269,8 @@ buildGenericApp gen_module gen_index gen_ident kind arg_exprs heaps=:{hp_express
 	= (expr, heaps)	
 
 buildPredefConsApp :: !Int [Expression] !PredefinedSymbolsData !*Heaps -> (!Expression, !*Heaps)
-buildPredefConsApp predef_index args predefs heaps=:{hp_expression_heap}
-	# {pds_module, pds_def} = predefs.[predef_index]
+buildPredefConsApp predef_index args {psd_predefs_a} heaps=:{hp_expression_heap}
+	# {pds_module, pds_def} = psd_predefs_a.[predef_index]
 	# pds_ident = predefined_idents.[predef_index]
 	# global_index = {glob_module = pds_module, glob_object = pds_def}
 	# symb_ident = 
@@ -5282,8 +5282,8 @@ buildPredefConsApp predef_index args predefs heaps=:{hp_expression_heap}
 	= (app, {heaps & hp_expression_heap = hp_expression_heap})
 
 buildPredefConsPattern :: !Int ![FreeVar] !Expression !PredefinedSymbolsData -> AlgebraicPattern
-buildPredefConsPattern predef_index vars expr predefs
-	# {pds_module, pds_def} = predefs.[predef_index]
+buildPredefConsPattern predef_index vars expr {psd_predefs_a}
+	# {pds_module, pds_def} = psd_predefs_a.[predef_index]
 	# pds_ident = predefined_idents.[predef_index]
 	# cons_def_symbol = {
 		ds_ident = pds_ident,
@@ -5331,10 +5331,10 @@ build_map_to_expr bimap_expr predefs
 	= buildRecordSelectionExpr bimap_expr PD_map_to 0 predefs
 
 buildRecordSelectionExpr :: !Expression !Index !Int !PredefinedSymbolsData -> Expression
-buildRecordSelectionExpr record_expr predef_field field_n predefs 
-	# {pds_module, pds_def} = predefs . [predef_field]
-	# pds_ident = predefined_idents . [predef_field]
-	# selector = { 
+buildRecordSelectionExpr record_expr predef_field field_n {psd_predefs_a}
+	# {pds_module, pds_def} = psd_predefs_a.[predef_field]
+	# pds_ident = predefined_idents.[predef_field]
+	# selector = {
 		glob_module = pds_module, 
 		glob_object = {ds_ident = pds_ident, ds_index = pds_def, ds_arity = 1}}
 	= Selection NormalSelector record_expr [RecordSelection selector field_n]
