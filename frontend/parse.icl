@@ -2402,7 +2402,17 @@ where
 	want_newtype_constructor exi_vars token pState
 		# token = basic_type_to_constructor token
 		  (pc_cons_ident,  pc_cons_prio, pc_cons_pos, pState) = want_cons_name_and_prio token pState
-		  (succ, pc_arg_type, pState) = trySimpleType TA_Anonymous pState
+		  (token, pState) = nextToken TypeContext pState
+		  (succ,pc_arg_type,pState)
+			= case token of
+				IdentToken id
+					| isLowerCaseName id
+						// TA_None instead of TA_Anonymous
+						# (typevar, pState)	= nameToTypeVar id pState
+						-> (True, {at_attribute = TA_None, at_type = typevar}, pState)
+				token
+						# (succ,pc_arg_type,pState) = trySimpleTypeT token TA_Anonymous pState
+						-> (succ==ParseOk,pc_arg_type,pState)
 		  cons = {	pc_cons_ident = pc_cons_ident, pc_arg_types = [pc_arg_type], pc_args_strictness = NotStrict,
 		  			pc_context = [], pc_cons_arity = 1, pc_cons_prio = pc_cons_prio, pc_exi_vars = exi_vars, pc_cons_pos = pc_cons_pos}
 		| succ
