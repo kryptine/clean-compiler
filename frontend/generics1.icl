@@ -49,6 +49,8 @@ import genericsupport
 		fii_ident :: Ident
 	}
 
+:: PredefinedSymbolsData :== PredefinedSymbols
+
 :: *GenericState = 
 	{ gs_modules :: !*Modules
 	, gs_exprh :: !*ExpressionHeap
@@ -63,7 +65,7 @@ import genericsupport
 	, gs_funs :: !*{#FunDef}
 	, gs_groups :: {!Group}
 	// non-unique, read only
-	, gs_predefs :: !PredefinedSymbols
+	, gs_predefs :: !PredefinedSymbolsData
 	, gs_main_module :: !Index
 	, gs_used_modules :: !NumberSet
 	}
@@ -335,8 +337,8 @@ buildGenericTypeRep type_index funs_and_groups
 	
 //	the structure type
 
-convertATypeToGenTypeStruct :: !Ident !Position !PredefinedSymbols !AType (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin) 
-													   -> (GenTypeStruct, (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin))
+convertATypeToGenTypeStruct :: !Ident !Position !PredefinedSymbolsData !AType (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin) 
+														   -> (GenTypeStruct, (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin))
 convertATypeToGenTypeStruct ident pos predefs type st
 	= convert type st
 where	
@@ -378,8 +380,8 @@ where
 					#! (args, st) = mapSt  convert args (modules, td_infos, heaps, error)
 					-> (GTSAppCons kind args, st)  
 
-convert_bimap_AType_to_GenTypeStruct :: !AType !Position !PredefinedSymbols (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin) 
-														 -> (GenTypeStruct, (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin))
+convert_bimap_AType_to_GenTypeStruct :: !AType !Position !PredefinedSymbolsData (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin) 
+															 -> (GenTypeStruct, (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin))
 convert_bimap_AType_to_GenTypeStruct type pos predefs st
 	= convert type st
 where
@@ -586,7 +588,7 @@ where
 buildStructType ::
 		!GlobalIndex				// type def global index
 		!TypeInfos					// type, constructor and field info symbols
-		!PredefinedSymbols
+		!PredefinedSymbolsData
 		(!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin)
 	-> 	( !GenTypeStruct			// the structure type
 		, (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin)
@@ -654,7 +656,7 @@ buildTypeDefInfo ::
 		!CheckedTypeDef		// the type definition
 		!Index 				// type def module
 		!Index				// icl module
-		!PredefinedSymbols		
+		!PredefinedSymbolsData
 		!FunsAndGroups !*Modules !*Heaps !*ErrorAdmin
 	-> 	(!TypeInfos, !FunsAndGroups, !*Modules, !*Heaps, !*ErrorAdmin)
 buildTypeDefInfo td=:{td_rhs = AlgType alts} td_module main_module_index predefs funs_and_groups modules heaps error
@@ -920,7 +922,7 @@ buildConversionIso ::
 		!DefinedSymbol		// from fun
 		!DefinedSymbol	 	// to fun
 		!Index				// main module
-		!PredefinedSymbols
+		!PredefinedSymbolsData
 		FunsAndGroups !*Heaps !*ErrorAdmin
 	-> (!DefinedSymbol,
 		FunsAndGroups,!*Heaps,!*ErrorAdmin)
@@ -942,7 +944,7 @@ buildConversionTo ::
 		!Index				// type def module
 		!CheckedTypeDef 	// the type def
 		!Index 				// main module
-		!PredefinedSymbols
+		!PredefinedSymbolsData
 		!FunsAndGroups !*Heaps !*ErrorAdmin
 	-> 	(!DefinedSymbol,
 		 FunsAndGroups,!*Heaps,!*ErrorAdmin)
@@ -1025,7 +1027,7 @@ where
 			}
 		= (alg_pattern, heaps, error)	
 
-	build_sum :: !Int !Int !Expression !PredefinedSymbols !*Heaps -> (!Expression, !*Heaps)
+	build_sum :: !Int !Int !Expression !PredefinedSymbolsData !*Heaps -> (!Expression, !*Heaps)
 	build_sum i n expr predefs heaps
 		| n == 0 	= abort "build sum of zero elements\n"
 		| i >= n	= abort "error building sum"
@@ -1050,7 +1052,7 @@ where
 		# (case_expr, heaps) = buildCaseExpr arg_expr case_patterns heaps
 		= (case_expr, heaps, error)
 
-	build_prod :: ![Expression] !PredefinedSymbols !*Heaps -> (!Expression, !*Heaps)
+	build_prod :: ![Expression] !PredefinedSymbolsData !*Heaps -> (!Expression, !*Heaps)
 	build_prod [] predefs heaps = build_unit heaps
 	where
 		build_unit heaps = buildPredefConsApp PD_ConsUNIT [] predefs heaps 	
@@ -1065,7 +1067,7 @@ buildConversionFrom	::
 		!Index				// type def module
 		!CheckedTypeDef 	// the type def
 		!Index 				// main module
-		!PredefinedSymbols
+		!PredefinedSymbolsData
 		!FunsAndGroups !*Heaps !*ErrorAdmin
 	-> (!DefinedSymbol,
 		 FunsAndGroups,!*Heaps,!*ErrorAdmin)
@@ -2233,7 +2235,7 @@ determine_type_of_member_instance_from_symbol_type me_type=:{st_context=[{tc_typ
 	= (symbol_type, hp_type_heaps, hp_var_heap, error)
 
 // add an argument for generic info at the beginning
-add_generic_info_to_type :: !SymbolType !Int !Int !{#PredefinedSymbol} -> SymbolType
+add_generic_info_to_type :: !SymbolType !Int !Int !PredefinedSymbolsData -> SymbolType
 add_generic_info_to_type st=:{st_arity, st_args, st_args_strictness} generic_info_index generic_info predefs
 	# (st_args,n_new_args) = add_generic_info_types generic_info_index generic_info st_args predefs
 	= {st & st_args = st_args, st_arity = st_arity + n_new_args, st_args_strictness = insert_n_lazy_values_at_beginning n_new_args st_args_strictness}
@@ -2357,7 +2359,7 @@ where
 	add_Int_arg args n_args
 		= ([{at_type = TB BT_Int, at_attribute = TA_Multi} : args],n_args+1)
 
-index_gen_cons_with_info_type :: !Type !{#PredefinedSymbol} -> Int
+index_gen_cons_with_info_type :: !Type !PredefinedSymbolsData -> Int
 index_gen_cons_with_info_type (TA {type_index={glob_module,glob_object}} []) predefs
 	| glob_module==predefs.[PD_StdGeneric].pds_def
 		| glob_object==predefs.[PD_TypeOBJECT].pds_def
@@ -2379,7 +2381,7 @@ index_gen_cons_with_info_type (TA {type_index={glob_module,glob_object}} []) pre
 index_gen_cons_with_info_type _ predefs
 	= -1
 
-is_gen_cons_without_instances :: !Type !{#PredefinedSymbol} -> Bool
+is_gen_cons_without_instances :: !Type !PredefinedSymbolsData -> Bool
 is_gen_cons_without_instances (TA {type_index={glob_module,glob_object}} []) predefs
 	| glob_module==predefs.[PD_StdGeneric].pds_def
 		=  glob_object==predefs.[PD_TypeOBJECT].pds_def
@@ -2396,7 +2398,7 @@ is_gen_cons_without_instances _ predefs
 buildGenericCaseBody :: 
 		!Index					// current icl module
 		!Position !TypeCons !Ident !Int !GlobalIndex
-		!PredefinedSymbols
+		!PredefinedSymbolsData
 		!*SpecializeState
 	-> (!FunctionBody,
 		!*SpecializeState)
@@ -2747,7 +2749,7 @@ specializeGeneric ::
 		!{!GenericRepresentationConstructor}
 		!GenericInfoPtr
 		!Index 					// main_module index
-		!PredefinedSymbols
+		!PredefinedSymbolsData
 		!*SpecializeState
 	-> (!Expression,
 		!*SpecializeState)
@@ -3126,7 +3128,7 @@ add_OBJECT_info_args generic_info type_def cons_desc_list_ds arg_exprs main_modu
 		# (arg_exprs,heaps) = add_OBJECT_info_args generic_info type_def cons_desc_list_ds arg_exprs main_module_index heaps
 		= ([gtd_conses_expr : arg_exprs],heaps)
 
-add_CONS_info_args :: Int ConsDef DefinedSymbol DefinedSymbol [Expression] Int {#PredefinedSymbol} *Heaps -> (![Expression],!*Heaps)
+add_CONS_info_args :: Int ConsDef DefinedSymbol DefinedSymbol [Expression] Int PredefinedSymbolsData *Heaps -> (![Expression],!*Heaps)
 add_CONS_info_args generic_info cons_def type_def_info gen_type_ds arg_exprs main_module_index predefs heaps
 	| generic_info==0
 		= (arg_exprs,heaps)
@@ -3220,7 +3222,7 @@ specialize_generic_bimap ::
 		!Ident					// generic/generic case
 		!Position				// of generic case
 		!Index 					// main_module index
-		!PredefinedSymbols
+		!PredefinedSymbolsData
 		!FunsAndGroups !*Heaps !*ErrorAdmin
 	-> (!Expression,
 		!FunsAndGroups,!*Heaps,!*ErrorAdmin)
@@ -3333,7 +3335,7 @@ adapt_with_specialized_generic_bimap ::
 		![Expression]
 		!Expression
 		!Index 					// main_module index
-		!PredefinedSymbols
+		!PredefinedSymbolsData
 		!FunsAndGroups !*Modules !*Heaps !*ErrorAdmin
 	-> (!Expression,
 		!FunsAndGroups,!*Modules,!*Heaps,!*ErrorAdmin)
@@ -5219,7 +5221,7 @@ where
 	adjust_chars ['\\':cs] 	= ['\\','\\' : adjust_chars cs]
 	adjust_chars [c:cs] 	= [c : adjust_chars cs]
 		
-makeListExpr :: [Expression] !PredefinedSymbols !*Heaps -> (Expression, !*Heaps)
+makeListExpr :: [Expression] !PredefinedSymbolsData !*Heaps -> (Expression, !*Heaps)
 makeListExpr [] predefs heaps
 	= buildPredefConsApp PD_NilSymbol [] predefs heaps
 makeListExpr [expr:exprs] predefs heaps 
@@ -5256,14 +5258,12 @@ buildFunApp2 fun_mod ds_index ds_ident arg_exprs heaps=:{hp_expression_heap}
 	# heaps = {heaps & hp_expression_heap = hp_expression_heap}
 	= (expr, heaps)	
 
-buildPredefFunApp :: !Int [Expression] !PredefinedSymbols !*Heaps
-	-> (!Expression, !*Heaps)
+buildPredefFunApp :: !Int [Expression] !PredefinedSymbolsData !*Heaps -> (!Expression, !*Heaps)
 buildPredefFunApp predef_index args predefs heaps
 	# {pds_module, pds_def} = predefs.[predef_index]
  	= buildFunApp2 pds_module pds_def predefined_idents.[predef_index] args heaps
 
-buildGenericApp :: !Index !Index !Ident !TypeKind ![Expression] !*Heaps
-	-> (!Expression, !*Heaps)
+buildGenericApp :: !Index !Index !Ident !TypeKind ![Expression] !*Heaps -> (!Expression, !*Heaps)
 buildGenericApp gen_module gen_index gen_ident kind arg_exprs heaps=:{hp_expression_heap}
 	# (expr_info_ptr, hp_expression_heap) = newPtr EI_Empty hp_expression_heap
 	# glob_index = {glob_module = gen_module, glob_object = gen_index}
@@ -5274,8 +5274,7 @@ buildGenericApp gen_module gen_index gen_ident kind arg_exprs heaps=:{hp_express
 	# heaps = {heaps & hp_expression_heap = hp_expression_heap}
 	= (expr, heaps)	
 
-buildPredefConsApp :: !Int [Expression] !PredefinedSymbols !*Heaps
-	-> (!Expression, !*Heaps)
+buildPredefConsApp :: !Int [Expression] !PredefinedSymbolsData !*Heaps -> (!Expression, !*Heaps)
 buildPredefConsApp predef_index args predefs heaps=:{hp_expression_heap}
 	# {pds_module, pds_def} = predefs.[predef_index]
 	# pds_ident = predefined_idents.[predef_index]
@@ -5288,8 +5287,7 @@ buildPredefConsApp predef_index args predefs heaps=:{hp_expression_heap}
 	# app = App {app_symb = symb_ident, app_args = args, app_info_ptr = expr_info_ptr} 
 	= (app, {heaps & hp_expression_heap = hp_expression_heap})
 
-buildPredefConsPattern :: !Int ![FreeVar] !Expression !PredefinedSymbols
-	-> AlgebraicPattern
+buildPredefConsPattern :: !Int ![FreeVar] !Expression !PredefinedSymbolsData -> AlgebraicPattern
 buildPredefConsPattern predef_index vars expr predefs
 	# {pds_module, pds_def} = predefs.[predef_index]
 	# pds_ident = predefined_idents.[predef_index]
@@ -5338,7 +5336,7 @@ build_map_to_tvi_expr (TVI_Iso iso_ds to_ds from_ds) main_module_index predefs h
 build_map_to_expr bimap_expr predefs
 	= buildRecordSelectionExpr bimap_expr PD_map_to 0 predefs
 
-buildRecordSelectionExpr :: !Expression !Index !Int !PredefinedSymbols -> Expression
+buildRecordSelectionExpr :: !Expression !Index !Int !PredefinedSymbolsData -> Expression
 buildRecordSelectionExpr record_expr predef_field field_n predefs 
 	# {pds_module, pds_def} = predefs . [predef_field]
 	# pds_ident = predefined_idents . [predef_field]
