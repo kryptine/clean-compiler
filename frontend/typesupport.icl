@@ -1602,6 +1602,11 @@ beautifulizeAttributes symbol_type th_attrs
 				= (accu, visited)
 			= ([candidate:accu], visited)
 
+instance performOnAttrVars AttrInequality
+where
+	performOnAttrVars f {ai_demanded,ai_offered} st
+		= f ai_demanded (f ai_offered st)
+
 assignNumbersToAttrVars :: !SymbolType !*AttrVarHeap -> (!Int, ![AttributeVar], !.AttrVarHeap)
 assignNumbersToAttrVars {st_attr_vars, st_args, st_result, st_attr_env} th_attrs
 	# th_attrs = foldSt initializeToAVI_Empty st_attr_vars th_attrs
@@ -1609,8 +1614,9 @@ assignNumbersToAttrVars {st_attr_vars, st_args, st_result, st_attr_env} th_attrs
 			= performOnAttrVars assign_number_to_unencountered_attr_var (st_args, st_result)
 	  				(0, [], th_attrs)
 	| fst (foldSt hasnt_got_a_number st_attr_env (False, th_attrs))
-		= abort "sanity check nr 834 in module typesupport failed"
- 	= (nr_of_attr_vars, attr_vars, th_attrs)
+		// to do: prevent free attributes in st_attr_env when expanding types
+		= performOnAttrVars assign_number_to_unencountered_attr_var st_attr_env (nr_of_attr_vars, attr_vars, th_attrs)
+	 	= (nr_of_attr_vars, attr_vars, th_attrs)
   where
 	assign_number_to_unencountered_attr_var av=:{av_info_ptr} (next_number, attr_vars_accu, th_attrs)
 		# (avi, th_attrs) = readPtr av_info_ptr th_attrs
