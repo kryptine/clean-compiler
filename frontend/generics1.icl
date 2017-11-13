@@ -49,7 +49,12 @@ import genericsupport
 		fii_ident :: Ident
 	}
 
-:: PredefinedSymbolsData = !{psd_predefs_a :: !{#PredefinedSymbol}}
+OBJECT_NewType_Mask:==1;
+CONS_NewType_Mask:==2;
+RECORD_NewType_Mask:==4;
+FIELD_NewType_Mask:==8;
+
+:: PredefinedSymbolsData = !{psd_predefs_a :: !{#PredefinedSymbol}, psd_generic_newtypes::!Int}
 
 :: *GenericState = 
 	{ gs_modules :: !*Modules
@@ -105,6 +110,8 @@ convertGenerics main_dcl_module_n used_module_numbers modules groups funs td_inf
 	#! td_infos = clearTypeDefInfos td_infos
 	#! (modules, heaps) = clearGenericDefs modules heaps
 
+	#! generic_newtypes = determine_generic_newtypes predefs modules
+
 	# {hp_var_heap, hp_generic_heap, hp_type_heaps={th_vars, th_attrs}, hp_expression_heap} = heaps
 	# gs = 
 		{ gs_modules = modules
@@ -119,7 +126,7 @@ convertGenerics main_dcl_module_n used_module_numbers modules groups funs td_inf
 		, gs_error = error
 		, gs_funs = funs
 		, gs_groups = groups
-		, gs_predefs = {psd_predefs_a=predefs}
+		, gs_predefs = {psd_predefs_a=predefs,psd_generic_newtypes=generic_newtypes}
 		, gs_main_module = main_dcl_module_n
 		, gs_used_modules = used_module_numbers
 		} 
@@ -154,6 +161,24 @@ where
 		#! gs = convertGenericTypeContexts gs
 
 		= (dcl_macros, gs)
+
+determine_generic_newtypes :: !{#PredefinedSymbol} !{#CommonDefs} -> Int
+determine_generic_newtypes predefs_a modules_cd
+	= add_if_generic_newtype PD_TypeOBJECT OBJECT_NewType_Mask
+	 (add_if_generic_newtype PD_TypeCONS CONS_NewType_Mask
+	 (add_if_generic_newtype PD_TypeRECORD RECORD_NewType_Mask
+	 (add_if_generic_newtype PD_TypeFIELD FIELD_NewType_Mask 0)))
+	where
+		add_if_generic_newtype :: !Int !Int !Int -> Int
+		add_if_generic_newtype generic_newtype_predef_index generic_newtype_mask generic_newtypes
+			# {pds_module,pds_def} = predefs_a.[generic_newtype_predef_index]
+			| pds_module>=0 && pds_module<size modules_cd && pds_def>=0 && pds_def<size modules_cd.[pds_module].com_type_defs
+				= case modules_cd.[pds_module].com_type_defs.[pds_def].td_rhs of
+					NewType _
+						-> generic_newtypes bitor generic_newtype_mask
+					_
+						-> generic_newtypes
+			= generic_newtypes
 
 // clear stuff that might have been left over
 // from compilation of other icl modules
@@ -1184,16 +1209,24 @@ build_right x predefs heaps
 	= buildPredefConsApp PD_ConsRIGHT [x] predefs heaps
 
 build_object expr predefs heaps
-	= buildPredefConsApp PD_ConsOBJECT [expr] predefs heaps						
+	| predefs.psd_generic_newtypes bitand OBJECT_NewType_Mask<>0
+		= buildPredefNewTypeConsApp PD_ConsOBJECT [expr] predefs heaps
+		= buildPredefConsApp        PD_ConsOBJECT [expr] predefs heaps
 
 build_cons expr predefs heaps
-	= buildPredefConsApp PD_ConsCONS [expr] predefs heaps
+	| predefs.psd_generic_newtypes bitand CONS_NewType_Mask<>0
+		= buildPredefNewTypeConsApp PD_ConsCONS [expr] predefs heaps
+		= buildPredefConsApp        PD_ConsCONS [expr] predefs heaps
 
 build_record expr predefs heaps
-	= buildPredefConsApp PD_ConsRECORD [expr] predefs heaps
+	| predefs.psd_generic_newtypes bitand RECORD_NewType_Mask<>0
+		= buildPredefNewTypeConsApp PD_ConsRECORD [expr] predefs heaps
+		= buildPredefConsApp        PD_ConsRECORD [expr] predefs heaps
 
 build_field var_expr predefs heaps
-	= buildPredefConsApp PD_ConsFIELD [var_expr] predefs heaps 
+	| predefs.psd_generic_newtypes bitand FIELD_NewType_Mask<>0
+		= buildPredefNewTypeConsApp PD_ConsFIELD [var_expr] predefs heaps 
+		= buildPredefConsApp        PD_ConsFIELD [var_expr] predefs heaps 
 
 build_case_pair var1 var2 body_expr predefs=:{psd_predefs_a} heaps
 	# pair_pat = buildPredefConsPattern PD_ConsPAIR [var1, var2] body_expr predefs	
@@ -1208,29 +1241,41 @@ build_case_either left_var left_expr right_var right_expr predefs=:{psd_predefs_
 	# case_patterns = AlgebraicPatterns {gi_module = pds_module, gi_index = pds_def} [left_pat, right_pat]
 	= build_case_expr case_patterns heaps
 
-build_case_object var body_expr predefs=:{psd_predefs_a} heaps
+build_case_object var body_expr predefs=:{psd_predefs_a,psd_generic_newtypes} heaps
 	# pat = buildPredefConsPattern PD_ConsOBJECT [var] body_expr predefs	
 	# {pds_module, pds_def} = psd_predefs_a.[PD_TypeOBJECT]
-	# case_patterns = AlgebraicPatterns {gi_module = pds_module, gi_index = pds_def} [pat]
-	= build_case_expr case_patterns heaps
+	| psd_generic_newtypes bitand OBJECT_NewType_Mask<>0
+		# case_patterns = NewTypePatterns {gi_module = pds_module, gi_index = pds_def} [pat]
+		= build_case_expr case_patterns heaps
+		# case_patterns = AlgebraicPatterns {gi_module = pds_module, gi_index = pds_def} [pat]
+		= build_case_expr case_patterns heaps
 
-build_case_cons var body_expr predefs=:{psd_predefs_a} heaps
+build_case_cons var body_expr predefs=:{psd_predefs_a,psd_generic_newtypes} heaps
 	# pat = buildPredefConsPattern PD_ConsCONS [var] body_expr predefs	
 	# {pds_module, pds_def} = psd_predefs_a.[PD_TypeCONS]
-	# case_patterns = AlgebraicPatterns {gi_module = pds_module, gi_index = pds_def} [pat]
-	= build_case_expr case_patterns heaps 
+	| psd_generic_newtypes bitand CONS_NewType_Mask<>0
+		# case_patterns = NewTypePatterns {gi_module = pds_module, gi_index = pds_def} [pat]
+		= build_case_expr case_patterns heaps 
+		# case_patterns = AlgebraicPatterns {gi_module = pds_module, gi_index = pds_def} [pat]
+		= build_case_expr case_patterns heaps 
 
-build_case_record var body_expr predefs=:{psd_predefs_a} heaps
-	# pat = buildPredefConsPattern PD_ConsRECORD [var] body_expr predefs	
+build_case_record var body_expr predefs=:{psd_predefs_a,psd_generic_newtypes} heaps
+	# pat = buildPredefConsPattern PD_ConsRECORD [var] body_expr predefs
 	# {pds_module, pds_def} = psd_predefs_a.[PD_TypeRECORD]
-	# case_patterns = AlgebraicPatterns {gi_module = pds_module, gi_index = pds_def} [pat]
-	= build_case_expr case_patterns heaps 
+	| psd_generic_newtypes bitand RECORD_NewType_Mask<>0
+		# case_patterns = NewTypePatterns {gi_module = pds_module, gi_index = pds_def} [pat]
+		= build_case_expr case_patterns heaps 
+		# case_patterns = AlgebraicPatterns {gi_module = pds_module, gi_index = pds_def} [pat]
+		= build_case_expr case_patterns heaps 
 
-build_case_field var body_expr predefs=:{psd_predefs_a} heaps
-	# pat = buildPredefConsPattern PD_ConsFIELD [var] body_expr predefs	
+build_case_field var body_expr predefs=:{psd_predefs_a,psd_generic_newtypes} heaps
+	# pat = buildPredefConsPattern PD_ConsFIELD [var] body_expr predefs
 	# {pds_module, pds_def} = psd_predefs_a.[PD_TypeFIELD]
-	# case_patterns = AlgebraicPatterns {gi_module = pds_module, gi_index = pds_def} [pat]
-	= build_case_expr case_patterns heaps 
+	| psd_generic_newtypes bitand FIELD_NewType_Mask<>0
+		# case_patterns = NewTypePatterns {gi_module = pds_module, gi_index = pds_def} [pat]
+		= build_case_expr case_patterns heaps 
+		# case_patterns = AlgebraicPatterns {gi_module = pds_module, gi_index = pds_def} [pat]
+		= build_case_expr case_patterns heaps 
 
 // case with a variable as the selector expression
 build_case_expr case_patterns heaps
@@ -5276,6 +5321,19 @@ buildPredefConsApp predef_index args {psd_predefs_a} heaps=:{hp_expression_heap}
 	# symb_ident = 
 		{ symb_ident = pds_ident 
 		, symb_kind = SK_Constructor global_index
+		}
+	# (expr_info_ptr, hp_expression_heap) = newPtr EI_Empty hp_expression_heap
+	# app = App {app_symb = symb_ident, app_args = args, app_info_ptr = expr_info_ptr} 
+	= (app, {heaps & hp_expression_heap = hp_expression_heap})
+
+buildPredefNewTypeConsApp :: !Int [Expression] !PredefinedSymbolsData !*Heaps -> (!Expression, !*Heaps)
+buildPredefNewTypeConsApp predef_index args {psd_predefs_a} heaps=:{hp_expression_heap}
+	# {pds_module, pds_def} = psd_predefs_a.[predef_index]
+	# pds_ident = predefined_idents.[predef_index]
+	# global_index = {gi_module = pds_module, gi_index = pds_def}
+	# symb_ident = 
+		{ symb_ident = pds_ident 
+		, symb_kind = SK_NewTypeConstructor global_index
 		}
 	# (expr_info_ptr, hp_expression_heap) = newPtr EI_Empty hp_expression_heap
 	# app = App {app_symb = symb_ident, app_args = args, app_info_ptr = expr_info_ptr} 
