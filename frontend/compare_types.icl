@@ -245,10 +245,26 @@ where
 
 instance =< Type
 where
-	(=<) (TA tc1 _) (TA tc2 _)	= tc1 =< tc2
-	(=<) (TA tc1 _) (TAS tc2 _ _)	= tc1 =< tc2
-	(=<) (TAS tc1 _ _) (TA tc2 _)	= tc1 =< tc2
-	(=<) (TAS tc1 _ _) (TAS tc2 _ _)	= tc1 =< tc2
+	(=<) (TA tc1 args1) (TA tc2 args2)
+		# cmp_app_symb = tc1 =< tc2
+		| cmp_app_symb==Equal
+			= length args1 =< length args2
+		= cmp_app_symb
+	(=<) (TA tc1 args1) (TAS tc2 args2 _)
+		# cmp_app_symb = tc1 =< tc2
+		| cmp_app_symb==Equal
+			= length args1 =< length args2
+		= cmp_app_symb
+	(=<) (TAS tc1 args1 _) (TA tc2 args2)
+		# cmp_app_symb = tc1 =< tc2
+		| cmp_app_symb==Equal
+			= length args1 =< length args2
+		= cmp_app_symb
+	(=<) (TAS tc1 args1 _) (TAS tc2 args2 _)
+		# cmp_app_symb = tc1 =< tc2
+		| cmp_app_symb==Equal
+			= length args1 =< length args2
+		= cmp_app_symb
 	(=<) t1 t2
 		| equal_constructor t1 t2
 			= compare_arguments t1 t2
