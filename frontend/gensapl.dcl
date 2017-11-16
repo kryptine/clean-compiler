@@ -31,14 +31,16 @@ import StdEnv,syntax,transform,backend
 // module name, type name, list of field names and global field indeces
 ::SaplRecordDef = SaplRecordDef !String !String !StrictnessList [(!String, !Int, !Type)] 
 
-instance toString SaplExp
 instance toString SaplConsDef
-instance toString SaplFuncDef
 instance toString SaplRecordDef
 
 renameVars 		:: SaplFuncDef -> SaplFuncDef
 
 CleanFunctoSaplFunc  :: Int CommonDefs Int Int FunDef String {#DclModule} [IndexRange] !*BackEnd !*Heaps -> *(!*BackEnd, !*Heaps, !SaplFuncDef)
 
+class +< v string_or_file where
+	(+<) infixl :: !*string_or_file !v -> *string_or_file;
 
-
+instance +< {#Char} File
+instance +< SaplFuncDef string_or_file | +< {#Char} string_or_file & +< SaplExp string_or_file
+	special string_or_file=File

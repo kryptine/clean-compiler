@@ -34,7 +34,7 @@ where
   group f [] = []
   group f [x:xs] = let (as,bs) = span (f x) xs in [[x:as] : group f bs]  
   writedef2file [] file = file
-  writedef2file [f:fs] file = writedef2file fs (file <<< toString f <<< "\n")
+  writedef2file [f:fs] file = writedef2file fs (file +< f +< "\n")
   writerecs2file [] file = file
   writerecs2file [f:fs] file = writerecs2file fs (file <<< toString f <<< "\n")
   makeString [] = ""

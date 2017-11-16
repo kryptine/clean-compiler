@@ -4,7 +4,7 @@ implementation module gensapl
 // JMJ: May 2007
 // László Domoszlai: 2011 - 
 
-import StdEnv, syntax, transform, backend, backendinterface, containers
+import StdEnv, StdStrictLists, syntax, transform, backend, backendinterface, containers
 
 genTypeInfo :: Type -> String 
 genTypeInfo (TB BT_Int)  = "::I"
@@ -23,10 +23,22 @@ where
 		= makePrintableName (mod +++ "." +++ name) 
 			+++ makeString [(if (arg_is_strict (n-1) strictness) " !a" " a") +++ toString n +++ genTypeInfo argty \\ n <- [1..nrargs] & argty <- argtys]
 
-instance toString SaplFuncDef 
-where 
-	toString (SaplFuncDef name nrargs args body kind mbType) 
-		= makePrintableName name +++ genTypeInfo mbType +++ makeArgs args +++ toString kind +++ toString body
+class +< v string_or_file where
+	(+<) infixl :: !*string_or_file !v -> *string_or_file;
+
+//instance +< {#Char} {#Char} where
+//	(+<) s1 s2 = s1+++.s2;
+
+instance +< {#Char} File where
+	(+<) f s = f<<<s;
+
+(+<@) infixl;
+(+<@) f g :== g f;
+
+instance +< SaplFuncDef string_or_file | +< {#Char} string_or_file & +< SaplExp string_or_file
+where
+	(+<) string_or_file (SaplFuncDef name nrargs args body kind mbType)
+		= string_or_file +< makePrintableName name +< genTypeInfo mbType +< makeArgs args +< toString kind +< body
 
 instance toString SaplRecordDef
 where 
@@ -82,44 +94,58 @@ where
 	toString (PCons name args) = makePrintableName name +++ makeString [" "+++arg\\ SaplVar arg _ _ _<- args]
 	toString (PLit lit) = toString lit
 
-instance toString SaplExp
-where 
-	toString e = exp2string False e
+//instance toString SaplExp where
+//	toString e = "" +< e
+
+instance +< SaplExp string_or_file | +< {#Char} string_or_file
+where
+	(+<) string_or_file e = exp2string False e string_or_file
 	where
-		exp2string b (SaplApp left right)         = bracks b (exp2string False left +++ " " +++ exp2string True right)
-		exp2string b (SaplLit l)                  = toString l
-		exp2string b (SaplFun f)                  = makePrintableName f
-		exp2string b (SaplVar n vi a No)          = makePrintableName n
-		exp2string b (SaplVar n vi a (Yes ty))    = makePrintableName n +++ genTypeInfo ty		
-		exp2string b e=:(SaplCase _ _ _)          = bracks b (caseToString e)
-		exp2string b (SaplSelect expr cons idx)   = bracks b ("select " +++ exp2string True expr +++ "::" +++ cons +++ " " +++ toString idx)		
-		exp2string b (SaplLet ves body)           = bracks b ("let " +++ multiLet ves body)
-		exp2string b (SaplUpdate expr cons binds) = bracks b ("update " +++ exp2string True expr +++ "::" +++ cons +++ " [" +++ multiUpdate binds +++ "]")
-		exp2string b (SaplError m)                = bracks b ("error \"" +++ m +++ "\"")
+		exp2string b (SaplApp left right)
+			s=s +<@ bracks b (\ s->s +<@ exp2string False left +< " " +<@ exp2string True right)
+		exp2string b (SaplLit l)
+			s=s +< toString l
+		exp2string b (SaplFun f)
+			s=s +< makePrintableName f
+		exp2string b (SaplVar n vi a No)
+			s=s +< makePrintableName n
+		exp2string b (SaplVar n vi a (Yes ty))
+			s=s +< makePrintableName n +< genTypeInfo ty
+		exp2string b e=:(SaplCase _ _ _)
+			s=s +<@ bracks b (caseToString e)
+		exp2string b (SaplSelect expr cons idx)
+			s=s +<@ bracks b (\ s->s +< "select " +<@ exp2string True expr +< "::" +< cons +< " " +< toString idx)
+		exp2string b (SaplLet ves body)
+			s=s +<@ bracks b (\ s->s +< "let " +<@ multiLet ves body)
+		exp2string b (SaplUpdate expr cons binds)
+			s=s +<@ bracks b (\ s->s +< "update " +<@ exp2string True expr +< "::" +< cons +< " [" +<@ multiUpdate binds +< "]")
+		exp2string b (SaplError m)
+			s=s +<@ bracks b (\ s->s +< "error \"" +< m +< "\"")
 
-		bracks b e | b = "(" +++ e +++ ")" 
-    		           = e
-      
-        caseToString :: !SaplExp -> String       
-		caseToString (SaplCase e ps def) = "case " +++ exp2string True e +++ " " +++ dopats ps +++ dodef def
-		where dopats [] = ""
-		      dopats [(p,exp):pats] = "(" +++ toString p +++ " -> " +++ toString exp +++ ") " +++ dopats pats
-		                                                 		                                                 
-		      dodef No = ""
-		      dodef (Yes def) = "(_ -> " +++ toString def +++ ")"
-        
-		multiLet :: ![((SaplAnnotation,Type),SaplExp,SaplExp)] !SaplExp -> String
-		multiLet []                                body  =  toString body // empty let
-		multiLet [((annotation, type), arg, e)]      body  =  toString annotation +++ toString arg +++ genTypeInfo type +++ " = " +++ toString e +++ " in " +++ toString body
-		multiLet [((annotation, type), arg, e): ves] body  =  toString annotation +++ toString arg +++ genTypeInfo type +++ " = " +++ toString e +++ ", " +++ multiLet ves body
+		bracks b e string_or_file
+			| b
+				= string_or_file +< "(" +<@ e +< ")"
+				= e string_or_file
 
-		multiUpdate [] = ""
-		multiUpdate [(idx,expr)] = toString idx +++ ":" +++ toString expr 		
-		multiUpdate [(idx,expr):us] = toString idx +++ ":" +++ toString expr +++ "," +++ multiUpdate us
+		caseToString (SaplCase e ps def) s=s +< "case " +<@ exp2string True e +< " " +<@ dopats ps +<@ dodef def
+		where
+			dopats [] s=s
+			dopats [(p,exp):pats] s=s +< "(" +< toString p +< " -> " +<@ exp2string False exp +< ") " +<@ dopats pats
 
-		makeCodeString :: ![String] -> String
-		makeCodeString []     = ""
-		makeCodeString [c:cs] = c +++ ";" +++ makeCodeString cs 
+			dodef No s=s
+			dodef (Yes def) s=s +< "(_ -> " +<@ exp2string False def +< ")"
+ 
+		multiLet :: ![((SaplAnnotation,Type),SaplExp,SaplExp)] !SaplExp *string_or_file -> *string_or_file | +< {#Char} string_or_file
+		multiLet [] body
+			s=s +<@ exp2string False body // empty let
+		multiLet [((annotation, type), arg, e)] body
+			s=s +< toString annotation +<@ exp2string False arg +< genTypeInfo type +< " = " +<@ exp2string False e +< " in " +<@ exp2string False body
+		multiLet [((annotation, type), arg, e): ves] body
+			s=s +< toString annotation +<@ exp2string False arg +< genTypeInfo type +< " = " +<@ exp2string False e +< ", " +<@ multiLet ves body
+
+		multiUpdate [] s=s
+		multiUpdate [(idx,expr)] s=s +< toString idx +< ":" +<@ exp2string False expr
+		multiUpdate [(idx,expr):us] s=s +< toString idx +< ":" +<@ exp2string False expr +< "," +<@ multiUpdate us
 
 makeArgs :: [SaplExp] -> String
 makeArgs []                         = ""
@@ -619,6 +645,3 @@ where
 	scanBSChar [f:s:t:chars] | isOctDigit f && isOctDigit s && isOctDigit t
 			= (toHex (digitToInt f << 6 + digitToInt s << 3 + digitToInt t), chars)
 	scanBSChar [c: chars] = (['\\',c], chars)
-
-                                    
-                     
