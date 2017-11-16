@@ -42,5 +42,4 @@ class +< v string_or_file where
 	(+<) infixl :: !*string_or_file !v -> *string_or_file;
 
 instance +< {#Char} File
-instance +< SaplFuncDef string_or_file | +< {#Char} string_or_file & +< SaplExp string_or_file
-	special string_or_file=File
+instance +< SaplFuncDef File
