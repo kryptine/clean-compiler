@@ -141,13 +141,14 @@ retrieveGlobalGenericDefinition _ mod_index
 
 getBelongingSymbols :: !Declaration !v:{#DclModule} -> (!BelongingSymbols, !v:{#DclModule})
 getBelongingSymbols (Declaration {decl_kind=STE_Imported STE_Type def_mod_index, decl_index}) dcl_modules
-	# ({td_rhs}, dcl_modules)
-			= dcl_modules![def_mod_index].dcl_common.com_type_defs.[decl_index]
+	# (td_rhs,dcl_modules) = dcl_modules![def_mod_index].dcl_common.com_type_defs.[decl_index].td_rhs
 	= case td_rhs of
 		AlgType constructors
 			-> (BS_Constructors constructors, dcl_modules)
 		RecordType {rt_fields}
 			-> (BS_Fields rt_fields, dcl_modules)
+		NewType constructor
+			-> (BS_Constructors [constructor], dcl_modules)
 		_
 			-> (BS_Nothing, dcl_modules)
 getBelongingSymbols (Declaration {decl_kind=STE_Imported STE_Class def_mod_index, decl_index}) dcl_modules
