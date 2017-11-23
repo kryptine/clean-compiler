@@ -190,6 +190,25 @@ store_type_info_of_alg_pattern_in_pattern_variables ct_cons_types patterns var_h
 		store_type_info_of_pattern_var var_type {fv_info_ptr} var_heap
 			= setExtendedVarInfo fv_info_ptr (EVI_VarType var_type) var_heap
 
+store_type_info_of_let_bindings_in_heap :: ![LetBind] ![LetBind] !ExprInfoPtr !*TransformInfo -> *TransformInfo
+store_type_info_of_let_bindings_in_heap let_strict_binds let_lazy_binds let_info_ptr ti=:{ti_symbol_heap,ti_var_heap}
+	# (EI_LetType var_types,symbol_heap) = readExprInfo let_info_ptr ti_symbol_heap
+	  (var_types,var_heap) = store_strict_let_type_info let_strict_binds var_types ti_var_heap
+	  var_heap = store_lazy_let_type_info let_lazy_binds var_types var_heap
+	= {ti & ti_symbol_heap=symbol_heap, ti_var_heap=var_heap}
+where
+	store_strict_let_type_info [{lb_dst={fv_info_ptr}}:let_strict_binds] [var_type:var_types] var_heap
+		# var_heap = setExtendedVarInfo fv_info_ptr (EVI_VarType var_type) var_heap
+		= store_strict_let_type_info let_strict_binds var_types var_heap
+	store_strict_let_type_info [] var_types var_heap
+		= (var_types,var_heap)
+
+	store_lazy_let_type_info [{lb_dst={fv_info_ptr}}:let_lazy_binds] [var_type:var_types] var_heap
+		# var_heap = setExtendedVarInfo fv_info_ptr (EVI_VarType var_type) var_heap
+		= store_lazy_let_type_info let_lazy_binds var_types var_heap
+	store_lazy_let_type_info [] [] var_heap
+		= var_heap
+
 class transform a :: !a !ReadOnlyTI !*TransformInfo -> (!a, !*TransformInfo)
 
 instance transform Expression
@@ -205,22 +224,13 @@ where
 				-> transformApplication app exprs ro ti
 			_
 				-> (expr @ exprs, ti)
-	transform (Let lad=:{let_strict_binds, let_lazy_binds, let_expr}) ro ti
-		# ti = store_type_info_of_bindings_in_heap lad ti
+	transform (Let lad=:{let_strict_binds,let_lazy_binds,let_info_ptr,let_expr}) ro ti	
+		# ti = store_type_info_of_let_bindings_in_heap let_strict_binds let_lazy_binds let_info_ptr ti
 		  (let_strict_binds, ti) = transform let_strict_binds ro ti
 		  (let_lazy_binds, ti) = transform let_lazy_binds ro ti
 		  (let_expr, ti) = transform let_expr ro ti
 		  lad = { lad & let_lazy_binds = let_lazy_binds, let_strict_binds = let_strict_binds, let_expr = let_expr}
 		= (Let lad, ti)
-	  where
-		store_type_info_of_bindings_in_heap {let_strict_binds, let_lazy_binds,let_info_ptr} ti
-			# let_binds = let_strict_binds ++ let_lazy_binds
-			  (EI_LetType var_types, ti_symbol_heap) = readExprInfo let_info_ptr ti.ti_symbol_heap
-			  ti_var_heap = foldSt store_type_info_let_bind (zip2 var_types let_binds) ti.ti_var_heap
-			= {ti & ti_symbol_heap = ti_symbol_heap, ti_var_heap = ti_var_heap}
-		store_type_info_let_bind (var_type, {lb_dst={fv_info_ptr}}) var_heap
-			= setExtendedVarInfo fv_info_ptr (EVI_VarType var_type) var_heap
-
 	transform (Case kees) ro ti
 		# ti = store_type_info_of_patterns_in_heap kees ti
 		= transformCase kees ro ti
@@ -773,8 +783,9 @@ transform_active_root_case aci this_case=:{case_expr=case_expr=:BasicExpr basic_
 		[{bp_expr}:_]
 			-> transform bp_expr {ro & ro_root_case_mode = NotRootCase} ti
 
-transform_active_root_case aci this_case=:{case_expr = (Let lad)} ro ti
+transform_active_root_case aci this_case=:{case_expr = Let lad=:{let_strict_binds,let_lazy_binds,let_info_ptr}} ro ti
 	# ro_not_root = { ro & ro_root_case_mode = NotRootCase }
+	  ti = store_type_info_of_let_bindings_in_heap let_strict_binds let_lazy_binds let_info_ptr ti
 	  (new_let_strict_binds, ti) = transform lad.let_strict_binds ro_not_root ti
 	  (new_let_lazy_binds, ti) = transform lad.let_lazy_binds ro_not_root ti
 	  (new_let_expr, ti) = transform (Case { this_case & case_expr = lad.let_expr }) ro ti
