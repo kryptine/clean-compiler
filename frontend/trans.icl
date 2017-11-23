@@ -5043,7 +5043,7 @@ instance copy FreeVar
 where
 	copy fv=:{fv_info_ptr,fv_ident} ci cs=:{cs_var_heap}
 		# (new_info_ptr, cs_var_heap) = newPtr VI_Empty cs_var_heap
-		= ({ fv & fv_info_ptr = new_info_ptr }, { cs & cs_var_heap = writePtr fv_info_ptr (VI_Variable fv_ident new_info_ptr) cs_var_heap })
+		= ({fv & fv_info_ptr = new_info_ptr}, {cs & cs_var_heap = writeVarInfo fv_info_ptr (VI_Variable fv_ident new_info_ptr) cs_var_heap})
 
 instance copy App
 where
