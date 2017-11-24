@@ -3590,7 +3590,7 @@ where
 
 	is_monomorphic_symbol_type (Yes {st_vars=[],st_attr_vars=[]})
 		= True
-	is_monomorphic_symbol_type No
+	is_monomorphic_symbol_type _
 		= False
 
 	find_same_Var :: ![Expression] !VarInfoPtr !Int -> Int	
