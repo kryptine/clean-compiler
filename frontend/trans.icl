@@ -5434,6 +5434,10 @@ equal_type (TB bt1) (TB bt2)
 	= equal_basic_type bt1 bt2
 equal_type (TV {tv_info_ptr=tv_info_ptr1}) (TV {tv_info_ptr=tv_info_ptr2})
 	= tv_info_ptr1==tv_info_ptr2
+equal_type (CV {tv_info_ptr=tv_info_ptr1} :@: types1) (CV {tv_info_ptr=tv_info_ptr2} :@: types2)
+	= tv_info_ptr1==tv_info_ptr2 && equal_atypes types1 types2
+equal_type (a_atype1 --> r_atype1) (a_atype2 --> r_atype2)
+	= equal_atype a_atype1 a_atype2 && equal_atype r_atype1 r_atype2
 equal_type new_type old_type
 	= False
 
