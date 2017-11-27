@@ -2101,9 +2101,10 @@ determine_arg PR_Empty _ form=:{fv_ident,fv_info_ptr} _ ((linear_bit,cons_arg), 
 			, das_new_cons_args		= [cons_arg : das.das_new_cons_args]
 			, das_var_heap			= das_var_heap }
 
-determine_arg PR_Unused _ form prod_index (_,ro) das
+determine_arg PR_Unused _ {fv_info_ptr} prod_index (_,ro) das=:{das_var_heap}
+	# das_var_heap = writeVarInfo fv_info_ptr VI_NotUsed das_var_heap
 	# no_arg_type = {ats_types = [], ats_strictness = NotStrict}
-	= {das & das_arg_types.[prod_index] = no_arg_type}
+	= {das & das_arg_types.[prod_index] = no_arg_type, das_var_heap=das_var_heap}
 
 determine_arg (PR_Class class_app free_vars_and_types class_type) _ {fv_info_ptr} prod_index (_,ro)
 			  das=:{das_arg_types, das_subst, das_type_heaps, das_predef}
@@ -4520,6 +4521,8 @@ where
 				-> writeVarInfo var_info_ptr VI_Empty var_heap
 			VI_Body _ _ _ _ _
 				-> writeVarInfo var_info_ptr VI_Empty var_heap
+			VI_NotUsed
+				-> var_heap
 
 instance clearVariables Expression
 where
@@ -5078,6 +5081,8 @@ copyVariable var=:{var_info_ptr} ci cs
 			-> copy_dictionary_variable app_symb app_args class_type ci cs
 		VI_ExpressionOrBody expr _ _ _ _ _
 			-> (expr, cs)
+		VI_NotUsed
+			-> (ExprToBeRemoved, cs)
 		_
 			-> (Var var, cs)
 

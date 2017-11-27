@@ -161,6 +161,12 @@ where
 						# (mark, fun_defs, pi) = partitionate_function fc_index max_fun_nr fun_defs pi
 						= visit_functions funs (min min_dep mark) max_fun_nr fun_defs pi
 						= visit_functions funs (min min_dep mark) max_fun_nr fun_defs pi
+				visit_functions [GeneratedFunCall fc_index _:funs] min_dep max_fun_nr fun_defs pi=:{pi_marks`}
+					#! mark = pi_marks`.[fc_index]
+					| mark == NotChecked
+						# (mark, fun_defs, pi) = partitionate_function fc_index max_fun_nr fun_defs pi
+						= visit_functions funs (min min_dep mark) max_fun_nr fun_defs pi
+						= visit_functions funs (min min_dep mark) max_fun_nr fun_defs pi
 				visit_functions [DclFunCall module_index fc_index:funs] min_dep max_fun_nr fun_defs pi
 					= visit_functions funs min_dep max_fun_nr fun_defs pi
 				visit_functions [] min_dep max_fun_nr fun_defs pi
@@ -439,6 +445,8 @@ where
 		= fc_state
 	find_calls fc_info (DictionariesFunction dictionaries expr expr_type) fc_state
 		= find_calls fc_info expr fc_state
+	find_calls fc_info ExprToBeRemoved fc_state
+		= fc_state
 
 instance find_calls App
 where
