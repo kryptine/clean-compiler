@@ -3445,19 +3445,20 @@ determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer c
 		# producers = { producers & [prod_index] = PR_Unused }
 		# (lb,ti) = case isStrictVarOrSimpleExpression arg of
 						True	-> ([],ti)
-						_		# (info_ptr, ti_var_heap)	= newPtr VI_Empty ti.ti_var_heap
-								  ti						= {ti & ti_var_heap = ti_var_heap}
-								  lb =	{lb_dst=
-								  			{ fv_ident = { id_name = "dummy_for_strict_unused", id_info = nilPtr }
-								  			, fv_info_ptr = info_ptr
-								  			, fv_count = 0
-								  			, fv_def_level = NotALevel 
-								  			}
-								  		,lb_src=arg
-								  		,lb_position=NoPos
-								  		}
-								-> ([(lb,getArgType consumer_type prod_index)],ti)
-		  
+						_
+							# arg_type = getArgType consumer_type prod_index
+							  (info_ptr, ti_var_heap) = newPtr (VI_Extended (EVI_VarType arg_type) VI_Empty) ti.ti_var_heap
+							  ti = {ti & ti_var_heap = ti_var_heap}
+							  lb = {lb_dst=
+							  			{ fv_ident = {id_name = "dummy_for_strict_unused", id_info = nilPtr}
+							  			, fv_info_ptr = info_ptr
+							  			, fv_count = 0
+							  			, fv_def_level = NotALevel 
+							  			}
+							  		,lb_src=arg
+							  		,lb_position=NoPos
+							  		}
+							-> ([(lb,arg_type)],ti)
 		= (producers, args, lb, ti)	 // ---> ("UnusedStrict",lb,arg,fun_type)
 	| SwitchUnusedFusion (cons_arg == CUnusedStrict && not (isStrictArg consumer_type prod_index) && isStrictVar arg) False
 		# producers = { producers & [prod_index] = PR_Unused }
