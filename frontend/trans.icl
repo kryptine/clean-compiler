@@ -154,6 +154,7 @@ cleanup_attributes expr_info_ptr symbol_heap
 
 NoFusion:==0
 FullFusion:==4
+NoRecProdFusion:==8	// no recursive producers
 
 ::	TransformFunctionInfo =
 	{	tfi_root				:: !SymbIdent		// original function
@@ -3822,7 +3823,10 @@ determineProducer app=:{app_symb = symb=:{ symb_kind = SK_GeneratedFunction fun_
 				  new_args prod_index producers ro ti
 	# (FI_Function {gf_cons_args={cc_producer},gf_fun_def={fun_body, fun_arity, fun_type, fun_info}}, ti_fun_heap) = readPtr fun_ptr ti.ti_fun_heap
 	  ti & ti_fun_heap=ti_fun_heap
-	  n_app_args = length app_args
+	# rec_producer = fun_info.fi_properties bitand FI_IsNonRecursive == 0
+	| rec_producer && ro.ro_transform_fusion>=NoRecProdFusion
+		= (producers, [App app : new_args], ti)
+	# n_app_args = length app_args
 	| SwitchArityChecks (n_app_args>1 && size producers + n_app_args - 1 > 32) False
 		# ti & ti_error_file = ti.ti_error_file <<< "Possibly missed fusion oppurtunity: Function Arity > 32\n"
 		= (producers, [App app : new_args], ti)
@@ -3875,6 +3879,9 @@ determineProducer app=:{app_symb = symb=:{symb_kind}, app_args} _ consumer_prope
 			= case symb_kind of
 				SK_Function global_index -> global_index
 				SK_LocalMacroFunction index -> { glob_module = ro.ro_main_dcl_module_n, glob_object = index }
+		| glob_module==ro.ro_main_dcl_module_n && glob_object<size ti.ti_cons_args &&
+			ti.ti_fun_defs.[glob_object].fun_info.fi_properties bitand FI_IsNonRecursive == 0 && ro.ro_transform_fusion>=NoRecProdFusion
+			= (producers, [App app : new_args], ti)
 		# (fun_arity, ti) = get_fun_arity glob_module glob_object ro ti
 		  n_app_args = length app_args
 		| n_app_args<>fun_arity
