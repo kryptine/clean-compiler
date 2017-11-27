@@ -153,6 +153,8 @@ cleanup_attributes expr_info_ptr symbol_heap
 	}
 
 NoFusion:==0
+OnlyGenericFusionMask:==1 // transform only generic functions
+GenericFullFusionMask:==2 // full fusion for generic functions
 FullFusion:==4
 NoRecProdFusion:==8	// no recursive producers
 
@@ -4212,13 +4214,20 @@ transformGroups cleanup_info main_dcl_module_n ro_StdStrictLists_module_n def_mi
 					, ti_predef_symbols	= predef_symbols }
 
 	# groups = [group \\ group <-: groups]
-	  transform_fusion1 = if compile_with_fusion FullFusion NoFusion
+	  transform_fusion1 = if generic_fusion (NoRecProdFusion bitor OnlyGenericFusionMask) (if compile_with_fusion FullFusion NoFusion)
 	# (groups, imported_types, collected_imports, fun_indices_with_abs_syn_types, ti)
 		= transform_groups 0 groups [] transform_fusion1 common_defs imported_funs imported_types [] [] initial_ti
+	# (groups,ti)
+		= case generic_fusion of
+			True
+				# groups = reverse groups
+				# transform_fusion2 = if compile_with_fusion FullFusion GenericFullFusionMask
+				-> transform_groups_again 0 groups [] transform_fusion2 common_defs imported_funs ti
+			False
+				-> (groups,ti)
 	# groups = {group \\ group <- reverse groups}
-
 	  {ti_fun_defs,ti_new_functions,ti_var_heap,ti_symbol_heap,ti_fun_heap,ti_next_fun_nr,ti_type_heaps,ti_cleanup_info} = ti
-	# (fun_defs, imported_types, collected_imports, type_heaps, var_heap) 
+	  (fun_defs, imported_types, collected_imports, type_heaps, var_heap)
 			= foldSt (expand_abstract_syn_types_in_function_type common_defs) (reverse fun_indices_with_abs_syn_types)
 					(ti_fun_defs, imported_types, collected_imports, ti_type_heaps, ti_var_heap)
 
@@ -4229,6 +4238,8 @@ transformGroups cleanup_info main_dcl_module_n ro_StdStrictLists_module_n def_mi
 	  fun_defs = { fundef \\ fundef <- [ fundef \\ fundef <-: fun_defs ] ++ new_fun_defs }
 	= (groups, fun_defs, imported_types, collected_imports,	var_heap, type_heaps, symbol_heap, ti.ti_error_file, ti.ti_predef_symbols)
 where
+	generic_fusion = False
+
 	transform_groups :: !Int ![Component] ![Component] !Int !{#CommonDefs} !{#{#FunType}}
 						  !*{#{#CheckedTypeDef}} ![Global Int] ![Int] !*TransformInfo
 		-> *(![Component],!.{#{#CheckedTypeDef}},![Global Int],![Int],!*TransformInfo)
@@ -4248,7 +4259,7 @@ where
 		= convert_function_types members common_defs s
 	convert_function_types NoComponentMembers common_defs s
 		= s
-/*
+
 	transform_groups_again :: !Int ![Component] ![Component] !Int !{#CommonDefs} !{#{#FunType}} !*TransformInfo -> *(![Component],!*TransformInfo)
 	transform_groups_again group_nr [group:groups] acc_groups transform_fusion common_defs imported_funs ti
 		# {component_members} = group
@@ -4256,16 +4267,22 @@ where
 		= transform_groups_again group_nr groups acc_groups transform_fusion common_defs imported_funs ti
 	transform_groups_again group_nr [] acc_groups transform_fusion common_defs imported_funs ti
 		= (acc_groups, ti)
-*/
+
 	transform_group :: !{#CommonDefs} !{#{#FunType}} !Int !ComponentMembers !u:[Component] !Int !*TransformInfo -> *(!Int,!u:[Component],!*TransformInfo)
 	transform_group common_defs imported_funs group_nr component_members acc_groups transform_fusion ti
 		// assign group_nr to component_members
 		# ti = assign_groups component_members group_nr ti
 
+		# (skip_group,ti)
+			= if (transform_fusion bitand OnlyGenericFusionMask<>0)
+					(group_has_no_generic_function component_members ti)
+					(False,ti)
 		# (previous_new_functions,ti) = ti!ti_new_functions
 		# ti & ti_new_functions=[]
 		// transform component_members
-		# ti = transform_functions component_members common_defs imported_funs ti
+		# ti = if skip_group
+					ti
+					(transform_functions component_members common_defs imported_funs ti)
 		// partitionate group: need to know added functions for this...
 		# (new_functions,ti) = ti!ti_new_functions
 
@@ -4273,7 +4290,7 @@ where
 		# ti & ti_fun_heap = ti_fun_heap,
 			   ti_new_functions = new_generated_functions ++ previous_new_functions
 
-		| not (compile_with_fusion || not (isEmpty new_functions))
+		| not (compile_with_fusion || (generic_fusion && not skip_group) || not (isEmpty new_functions))
 			= (inc group_nr,[{component_members=component_members}:acc_groups],ti)
 
 		# (new_functions_in_component,ti_fun_heap)
@@ -4338,25 +4355,46 @@ where
 						, ti_error_file		= error_admin.ea_file }
 			= (groups,ti)
 
+		group_has_no_generic_function :: !ComponentMembers !*TransformInfo -> (!Bool,!*TransformInfo)
+		group_has_no_generic_function (ComponentMember member members) ti
+			| ti.ti_fun_defs.[member].fun_info.fi_properties bitand FI_GenericFun<>0
+				= (False,ti)
+				= group_has_no_generic_function members ti
+		group_has_no_generic_function (GeneratedComponentMember member fun_ptr members) ti
+			# (FI_Function {gf_fun_def},ti_fun_heap) = readPtr fun_ptr ti.ti_fun_heap
+			  ti & ti_fun_heap = ti_fun_heap
+			| gf_fun_def.fun_info.fi_properties bitand FI_GenericFun<>0
+				= (False,ti)
+				= group_has_no_generic_function members ti
+		group_has_no_generic_function NoComponentMembers ti
+			= (True,ti)
+
 		transform_functions :: !ComponentMembers !{#CommonDefs} !{#{#FunType}} !*TransformInfo -> *TransformInfo
 		transform_functions (ComponentMember member members) common_defs imported_funs ti
 			# (fun_def, ti) = ti!ti_fun_defs.[member]
 			  fun_symb = {symb_ident=fun_def.fun_ident, symb_kind=SK_Function {glob_object=member, glob_module=main_dcl_module_n}}
-			  (fun_body,ti)
-				= transform_function fun_def.fun_type fun_def.fun_body fun_symb transform_fusion common_defs imported_funs ti
-			  fun_def = {fun_def & fun_body=fun_body}
-			  ti = {ti & ti_fun_defs.[member] = fun_def}
-			= transform_functions members common_defs imported_funs ti
+			| transform_fusion bitand GenericFullFusionMask<>0 && fun_def.fun_info.fi_properties bitand FI_GenericFun<>0
+				# (fun_body,ti)
+					= transform_function fun_def.fun_type fun_def.fun_body fun_symb FullFusion common_defs imported_funs ti
+				  ti & ti_fun_defs.[member] = {fun_def & fun_body=fun_body}
+				= transform_functions members common_defs imported_funs ti
+				# (fun_body,ti)
+					= transform_function fun_def.fun_type fun_def.fun_body fun_symb transform_fusion common_defs imported_funs ti
+				  ti & ti_fun_defs.[member] = {fun_def & fun_body=fun_body}
+				= transform_functions members common_defs imported_funs ti
 		transform_functions (GeneratedComponentMember member fun_ptr members) common_defs imported_funs ti
 			# (FI_Function gf=:{gf_fun_def},ti_fun_heap) = readPtr fun_ptr ti.ti_fun_heap
-			  fun_symb = {symb_ident=gf_fun_def.fun_ident, symb_kind=SK_GeneratedFunction fun_ptr member }
-			  ti = {ti & ti_fun_heap = ti_fun_heap}
-			  (fun_body,ti)
-				= transform_function gf_fun_def.fun_type gf_fun_def.fun_body fun_symb transform_fusion common_defs imported_funs ti
-			  gf_fun_def = {gf_fun_def & fun_body=fun_body}
-			  ti_fun_heap = writePtr fun_ptr (FI_Function {gf & gf_fun_def=gf_fun_def}) ti.ti_fun_heap
-			  ti = {ti & ti_fun_heap = ti_fun_heap}
-			= transform_functions members common_defs imported_funs ti
+			  fun_symb = {symb_ident=gf_fun_def.fun_ident, symb_kind=SK_GeneratedFunction fun_ptr member}
+			  ti & ti_fun_heap = ti_fun_heap
+			| transform_fusion bitand GenericFullFusionMask<>0 && gf_fun_def.fun_info.fi_properties bitand FI_GenericFun<>0
+				# (fun_body,ti)
+					= transform_function gf_fun_def.fun_type gf_fun_def.fun_body fun_symb FullFusion common_defs imported_funs ti
+				  ti & ti_fun_heap = writePtr fun_ptr (FI_Function {gf & gf_fun_def={gf_fun_def & fun_body=fun_body}}) ti.ti_fun_heap
+				= transform_functions members common_defs imported_funs ti
+				# (fun_body,ti)
+					= transform_function gf_fun_def.fun_type gf_fun_def.fun_body fun_symb transform_fusion common_defs imported_funs ti
+				  ti & ti_fun_heap = writePtr fun_ptr (FI_Function {gf & gf_fun_def={gf_fun_def & fun_body=fun_body}}) ti.ti_fun_heap
+				= transform_functions members common_defs imported_funs ti
 		transform_functions NoComponentMembers common_defs imported_funs ti
 			= ti
 
