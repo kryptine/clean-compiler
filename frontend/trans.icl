@@ -147,10 +147,13 @@ cleanup_attributes expr_info_ptr symbol_heap
 	,	ro_root_case_mode		:: !RootCaseMode
 	,	ro_tfi					:: !TransformFunctionInfo
 	,	ro_main_dcl_module_n 	:: !Int
-	,	ro_transform_fusion		:: !Bool			// fusion switch
+	,	ro_transform_fusion		:: !Int	// fusion switch
 	,	ro_StdStrictLists_module_n :: !Int
 	,	ro_StdGeneric_module_n	:: !Int
 	}
+
+NoFusion:==0
+FullFusion:==4
 
 ::	TransformFunctionInfo =
 	{	tfi_root				:: !SymbIdent		// original function
@@ -308,7 +311,7 @@ instance transform DynamicExpr where
 		= ({dyn & dyn_expr = dyn_expr}, ti)
 
 transformCase this_case=:{case_expr,case_guards,case_default,case_ident,case_info_ptr} ro ti
-	| SwitchCaseFusion (not ro.ro_transform_fusion) True
+	| SwitchCaseFusion (ro.ro_transform_fusion<FullFusion) True
 		= skip_over this_case ro ti
 	| isNilPtr case_info_ptr			// encountered neverMatchingCase?!
 		= skip_over this_case ro ti
@@ -894,7 +897,7 @@ transform_active_non_root_case kees=:{case_info_ptr,case_expr = App {app_symb}} 
 		  all_args = lifted_arguments++arguments_from_outer_fun
 		| SwitchArityChecks (1+length all_args > 32) False
 			# ti = { ti & ti_cons_args = ti_cons_args, ti_fun_defs = ti_fun_defs, ti_fun_heap = ti_fun_heap, ti_recursion_introduced = No }
-			| ro.ro_transform_fusion
+			| ro.ro_transform_fusion>=FullFusion
 				# ti = { ti & ti_error_file = ti.ti_error_file <<< "Possibly missed fusion oppurtunity: Case Arity > 32 " <<< ro.ro_tfi.tfi_root.symb_ident.id_name <<< "\n"}
 				= skip_over kees ro ti
 			= skip_over kees ro ti
@@ -932,7 +935,7 @@ transform_active_non_root_case kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti=
 	  all_args = lifted_arguments++arguments_from_outer_fun
 	| SwitchArityChecks (length all_args > 32) False
 		# ti = { ti & ti_cons_args = ti_cons_args, ti_fun_defs = ti_fun_defs, ti_fun_heap = ti_fun_heap, ti_recursion_introduced = No }
-		| ro.ro_transform_fusion
+		| ro.ro_transform_fusion>=FullFusion
 			#  ti	= { ti & ti_error_file = ti.ti_error_file <<< "Possibly missed fusion oppurtunity: Case Arity > 32 " <<< ro.ro_tfi.tfi_root.symb_ident.id_name <<< "\n"}
 			= skip_over kees ro ti
 		= skip_over kees ro ti
@@ -1580,7 +1583,7 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 		# ti = { ti & ti_type_heaps = ti_type_heaps, ti_symbol_heap = ti_symbol_heap, ti_fun_defs = ti_fun_defs
 				, ti_fun_heap = ti_fun_heap, ti_var_heap = ti_var_heap, ti_cons_args = ti_cons_args, ti_type_def_infos = ti_type_def_infos
 				, ti_predef_symbols = ti_predef_symbols }
-		| ro.ro_transform_fusion
+		| ro.ro_transform_fusion>=FullFusion
 			#  ti = { ti & ti_error_file = ti.ti_error_file <<< "Possibly missed fusion oppurtunity: Function Arity > 32 " <<< ro.ro_tfi.tfi_root.symb_ident.id_name <<< "\n"}
 			= (-1,new_fun_arity,ti)
 		= (-1,new_fun_arity,ti)
@@ -2122,7 +2125,6 @@ determine_arg (PR_Class class_app free_vars_and_types class_type) _ {fv_info_ptr
 	#! (defTypeGenericDict,das_predef) = das_predef![PD_TypeGenericDict]
 	#! (defTypeGenericDict0,das_predef) = das_predef![PD_TypeGenericDict0]
 	# (succ, das_subst, das_type_heaps)
-		//AA: = unify class_atype arg_type type_input das_subst das_type_heaps
 		= unify_dict class_atype arg_type type_input das_subst das_type_heaps
 		with
 			unify_dict class_atype=:{at_type=TA type_symb1 args1} arg_type=:{at_type=TA type_symb2 args2} 
@@ -2730,7 +2732,7 @@ transformFunctionApplication fun_def instances cc=:{cc_size, cc_args, cc_linear_
 	 	= (build_application { app & app_args = app_args } extra_args, ti)
 	# {fun_body=TransformedBody {tb_rhs}, fun_kind} = fun_def
 	| cc_size == 0
-		| SwitchTransformConstants (ro.ro_transform_fusion && is_not_caf fun_kind && is_sexy_body tb_rhs) False
+		| SwitchTransformConstants (ro.ro_transform_fusion>=FullFusion && is_not_caf fun_kind && is_sexy_body tb_rhs) False
 			= transform_trivial_function app app_args extra_args ro ti
 		= (build_application { app & app_args = app_args } extra_args, ti)
 	# (opt_expr,ti) = is_trivial_function app_symb app_args fun_kind tb_rhs ro ti
@@ -2791,7 +2793,7 @@ transformFunctionApplication fun_def instances cc=:{cc_size, cc_args, cc_linear_
 				= possiblyAddStrictLetBinds expr strict_let_binds ti
 				# (expr,ti) = transformApplication {app & app_symb = app_symb`, app_args = app_args} extra_args ro ti
 				= possiblyAddStrictLetBinds expr strict_let_binds ti
-		| SwitchTrivialFusion ro.ro_transform_fusion False
+		| SwitchTrivialFusion (ro.ro_transform_fusion>=FullFusion) False
 			= transform_trivial_function app app_args extra_args ro ti
 		= (build_application { app & app_args = app_args } extra_args, ti)
 	= (build_application { app & app_args = app_args } extra_args, ti)
@@ -2860,7 +2862,7 @@ where
 
 	is_trivial_function :: !SymbIdent ![Expression] !FunKind !Expression !ReadOnlyTI !*TransformInfo -> *(!Optional Expression,!*TransformInfo)
 	is_trivial_function app_symb app_args fun_kind rhs ro ti
-		| SwitchTransformConstants (ro.ro_transform_fusion && is_not_caf fun_kind && is_sexy_body rhs) False
+		| SwitchTransformConstants (ro.ro_transform_fusion>=FullFusion && is_not_caf fun_kind && is_sexy_body rhs) False
 			= is_trivial_function_call app_symb.symb_kind app_args ro ti
 			= (No, ti)
 
@@ -2921,7 +2923,7 @@ determineCurriedProducersInExtraArgs :: ![Expression] ![Expression] !BITVECT !{!
 determineCurriedProducersInExtraArgs new_args [] consumer_properties producers cc_args cc_linear_bits fun_def ro ti
 	= (False,new_args,[],producers,cc_args,cc_linear_bits,fun_def,0,ti)
 determineCurriedProducersInExtraArgs new_args extra_args consumer_properties producers cc_args cc_linear_bits fun_def ro ti
-	| not (SwitchExtraCurriedFusion ro.ro_transform_fusion consumer_properties)
+	| not (SwitchExtraCurriedFusion (ro.ro_transform_fusion>=FullFusion) consumer_properties)
 		= (False,new_args,extra_args,producers,cc_args,cc_linear_bits,fun_def,0,ti)
 	# n_extra_args													= length extra_args
 	# {fun_type = Yes symbol_type=:{st_args,st_result,st_arity}}	= fun_def
@@ -3421,7 +3423,7 @@ determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer c
 		# (producers, new_arg, ti) = determine_producer consumer_properties consumer_is_curried ok_non_rec_consumer linear_bit arg [] prod_index producers ro ti
 		| isProducer producers.[prod_index]
 			= (producers, new_arg++args, [], ti)
-		| not ro.ro_transform_fusion || consumer_properties bitand FI_GenericFun==0
+		| ro.ro_transform_fusion<FullFusion || consumer_properties bitand FI_GenericFun==0
 			#! (producers, new_args, lb, ti)
 				= determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer consumer_type linear_bits cons_args args (inc prod_index) producers ro ti
 			= (producers, new_arg++new_args, lb, ti)
@@ -3435,7 +3437,7 @@ determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer c
 				_
 					#! (producers, new_args, lb, ti) = determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer consumer_type linear_bits cons_args args (inc prod_index) producers ro ti
 					-> (producers, new_arg++new_args, lb, ti)
-	| not ro.ro_transform_fusion
+	| ro.ro_transform_fusion<FullFusion
 		#! (producers, new_args, lb, ti)
 			= determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer consumer_type linear_bits cons_args args (inc prod_index) producers ro ti
 		= (producers, [arg : new_args], lb, ti)
@@ -3753,9 +3755,9 @@ determineProducer app=:{app_symb = symb=:{symb_kind = SK_Constructor cons_index,
 	# {cons_type}								= ro.ro_common_defs.[cons_index.glob_module].com_cons_defs.[cons_index.glob_object]
 	  rnf										= rnf_args app_args 0 cons_type.st_args_strictness ro
 	| SwitchConstructorFusion
-		(ro.ro_transform_fusion && SwitchRnfConstructorFusion (linear_bit || rnf) linear_bit)
-		(ro.ro_transform_fusion && (cons_index.glob_module==ro.ro_StdGeneric_module_n || consumer_properties bitand FI_GenericFun<>0)
-								&& (linear_bit || rnf))
+		(ro.ro_transform_fusion>=FullFusion && SwitchRnfConstructorFusion (linear_bit || rnf) linear_bit)
+		(ro.ro_transform_fusion>=FullFusion && (cons_index.glob_module==ro.ro_StdGeneric_module_n || consumer_properties bitand FI_GenericFun<>0)
+											&& (linear_bit || rnf))
 		False
 		# producers = {producers & [prod_index] = PR_Constructor symb (length app_args) app_args }
 		= (producers, app_args ++ new_args, ti)
@@ -3788,7 +3790,7 @@ determineProducer app=:{app_symb = symb=:{ symb_kind = SK_GeneratedFunction fun_
 		# ti & ti_error_file = ti.ti_error_file <<< "Possibly missed fusion oppurtunity: Function Arity > 32\n"
 		= (producers, [App app : new_args], ti)
 	| n_app_args<>fun_arity
-		| SwitchCurriedFusion ro.ro_transform_fusion cc_producer False
+		| SwitchCurriedFusion (ro.ro_transform_fusion>=FullFusion) cc_producer False
 			# (is_good_producer,ti)
 				= SwitchGeneratedFusion
 					(function_is_good_producer fun_body fun_type linear_bit ro ti)
@@ -3825,7 +3827,7 @@ determineProducer app=:{app_symb = symb=:{ symb_kind = SK_GeneratedFunction fun_
 			Expanding _
 				-> False
 			(TransformedBody {tb_rhs})
-				-> ro.ro_transform_fusion && not_expanding_producer && is_sexy_body tb_rhs && ok_non_rec_consumer && non_rec_producer//is_good_producer
+				-> ro.ro_transform_fusion>=FullFusion && not_expanding_producer && is_sexy_body tb_rhs && ok_non_rec_consumer && non_rec_producer//is_good_producer
 	| SwitchNonRecFusion ok_non_rec False
 		= ({producers & [prod_index] = PR_GeneratedFunction symb n_app_args fun_index}, app_args ++ new_args, ti)
 	= (producers, [App app : new_args ], ti)
@@ -3842,7 +3844,7 @@ determineProducer app=:{app_symb = symb=:{symb_kind}, app_args} _ consumer_prope
 			| consumer_properties bitand FI_IsMacroFun <> 0
 				= ({ producers & [prod_index] = PR_Curried symb n_app_args}, app_args ++ new_args, ti)
 			# ({cc_producer},ti) = ti!ti_cons_args.[glob_object]
-			| SwitchCurriedFusion ro.ro_transform_fusion cc_producer False
+			| SwitchCurriedFusion (ro.ro_transform_fusion>=FullFusion) cc_producer False
 				# ({fun_body,fun_type,fun_info}, ti) = ti!ti_fun_defs.[glob_object]
 				# (is_good_producer,ti)
 					= SwitchFunctionFusion
@@ -3880,7 +3882,7 @@ determineProducer app=:{app_symb = symb=:{symb_kind}, app_args} _ consumer_prope
 				Expanding _
 					-> False
 				(TransformedBody {tb_rhs})
-					-> ro.ro_transform_fusion && not_expanding_producer && is_sexy_body tb_rhs && ok_non_rec_consumer && non_rec_producer//&& is_good_producer
+					-> ro.ro_transform_fusion>=FullFusion && not_expanding_producer && is_sexy_body tb_rhs && ok_non_rec_consumer && non_rec_producer//&& is_good_producer
 		| SwitchNonRecFusion ok_non_rec False
 			= ({producers & [prod_index] = PR_Function symb n_app_args glob_object}, app_args ++ new_args, ti)
 		= (producers, [App app : new_args], ti)
@@ -3901,7 +3903,7 @@ where
 function_is_good_producer (Expanding _) fun_type linear_bit ro ti
 	= (False,ti)
 function_is_good_producer (TransformedBody {tb_rhs}) fun_type linear_bit ro ti
-	| ro.ro_transform_fusion
+	| ro.ro_transform_fusion>=FullFusion
 		| linear_bit && is_sexy_body tb_rhs
 			= (True,ti)
 			= function_may_be_copied fun_type tb_rhs ro ti
@@ -4166,8 +4168,9 @@ transformGroups cleanup_info main_dcl_module_n ro_StdStrictLists_module_n def_mi
 					, ti_predef_symbols	= predef_symbols }
 
 	# groups = [group \\ group <-: groups]
+	  transform_fusion1 = if compile_with_fusion FullFusion NoFusion
 	# (groups, imported_types, collected_imports, fun_indices_with_abs_syn_types, ti)
-		= transform_groups 0 groups [] common_defs imported_funs imported_types [] [] initial_ti
+		= transform_groups 0 groups [] transform_fusion1 common_defs imported_funs imported_types [] [] initial_ti
 	# groups = {group \\ group <- reverse groups}
 	  {ti_fun_defs,ti_new_functions,ti_var_heap,ti_symbol_heap,ti_fun_heap,ti_next_fun_nr,ti_type_heaps,ti_cleanup_info} = ti
 	# (fun_defs, imported_types, collected_imports, type_heaps, var_heap) 
@@ -4181,17 +4184,18 @@ transformGroups cleanup_info main_dcl_module_n ro_StdStrictLists_module_n def_mi
 	  fun_defs = { fundef \\ fundef <- [ fundef \\ fundef <-: fun_defs ] ++ new_fun_defs }
 	= (groups, fun_defs, imported_types, collected_imports,	var_heap, type_heaps, symbol_heap, ti.ti_error_file, ti.ti_predef_symbols)
 where
-	transform_groups :: !Int ![Component] !u:[Component] !{#CommonDefs} !{#{#FunType}} !*{#{#CheckedTypeDef}} ![(Global Int)] !v:[Int] !*TransformInfo
-		-> *(!w:[Component],!.{#{#CheckedTypeDef}},![(Global Int)],!x:[Int],!*TransformInfo), [u <= w,v <= x]
-	transform_groups group_nr [group:groups] acc_groups common_defs imported_funs imported_types collected_imports fun_indices_with_abs_syn_types ti
+	transform_groups :: !Int ![Component] ![Component] !Int !{#CommonDefs} !{#{#FunType}}
+						  !*{#{#CheckedTypeDef}} ![Global Int] ![Int] !*TransformInfo
+		-> *(![Component],!.{#{#CheckedTypeDef}},![Global Int],![Int],!*TransformInfo)
+	transform_groups group_nr [group:groups] acc_groups transform_fusion common_defs imported_funs imported_types collected_imports fun_indices_with_abs_syn_types ti
 		# {component_members} = group
 		# (ti_fun_defs, imported_types, collected_imports, fun_indices_with_abs_syn_types, ti_type_heaps, ti_var_heap) 
 				= convert_function_types component_members common_defs
 						(ti.ti_fun_defs, imported_types, collected_imports, fun_indices_with_abs_syn_types, ti.ti_type_heaps, ti.ti_var_heap)
 		# ti = { ti & ti_fun_defs = ti_fun_defs, ti_type_heaps = ti_type_heaps, ti_var_heap = ti_var_heap }
-		# (group_nr,acc_groups,ti) = transform_group common_defs imported_funs group_nr component_members acc_groups ti
-		= transform_groups group_nr groups acc_groups common_defs imported_funs imported_types collected_imports fun_indices_with_abs_syn_types ti
-	transform_groups group_nr [] acc_groups common_defs imported_funs imported_types collected_imports fun_indices_with_abs_syn_types ti
+		# (group_nr,acc_groups,ti) = transform_group common_defs imported_funs group_nr component_members acc_groups transform_fusion ti
+		= transform_groups group_nr groups acc_groups transform_fusion common_defs imported_funs imported_types collected_imports fun_indices_with_abs_syn_types ti
+	transform_groups group_nr [] acc_groups transform_fusion common_defs imported_funs imported_types collected_imports fun_indices_with_abs_syn_types ti
 		= (acc_groups, imported_types, collected_imports, fun_indices_with_abs_syn_types, ti)
 
 	convert_function_types (ComponentMember member members) common_defs s
@@ -4200,16 +4204,16 @@ where
 	convert_function_types NoComponentMembers common_defs s
 		= s
 /*
-	transform_groups_again :: !Int ![Component] ![Component] !{#CommonDefs} !{#{#FunType}} !*TransformInfo -> *(![Component],!*TransformInfo)
-	transform_groups_again group_nr [group:groups] acc_groups common_defs imported_funs ti
+	transform_groups_again :: !Int ![Component] ![Component] !Int !{#CommonDefs} !{#{#FunType}} !*TransformInfo -> *(![Component],!*TransformInfo)
+	transform_groups_again group_nr [group:groups] acc_groups transform_fusion common_defs imported_funs ti
 		# {component_members} = group
-		# (group_nr,acc_groups,ti) = transform_group common_defs imported_funs group_nr component_members acc_groups ti
-		= transform_groups_again group_nr groups acc_groups common_defs imported_funs ti
-	transform_groups_again group_nr [] acc_groups common_defs imported_funs ti
+		# (group_nr,acc_groups,ti) = transform_group common_defs imported_funs group_nr component_members acc_groups transform_fusion ti
+		= transform_groups_again group_nr groups acc_groups transform_fusion common_defs imported_funs ti
+	transform_groups_again group_nr [] acc_groups transform_fusion common_defs imported_funs ti
 		= (acc_groups, ti)
 */
-	transform_group :: !{#CommonDefs} !{#{#FunType}} !Int !ComponentMembers !u:[Component] !*TransformInfo -> *(!Int,!u:[Component],!*TransformInfo)
-	transform_group common_defs imported_funs group_nr component_members acc_groups ti
+	transform_group :: !{#CommonDefs} !{#{#FunType}} !Int !ComponentMembers !u:[Component] !Int !*TransformInfo -> *(!Int,!u:[Component],!*TransformInfo)
+	transform_group common_defs imported_funs group_nr component_members acc_groups transform_fusion ti
 		// assign group_nr to component_members
 		# ti = assign_groups component_members group_nr ti
 
@@ -4257,7 +4261,7 @@ where
 		transform_groups` common_defs imported_funs group_nr [] acc_groups ti
 			= (group_nr, acc_groups, ti)
 		transform_groups` common_defs imported_funs group_nr [{component_members}:groups] acc_groups ti
-			# (group_nr,acc_groups,ti) = transform_group common_defs imported_funs group_nr component_members acc_groups ti
+			# (group_nr,acc_groups,ti) = transform_group common_defs imported_funs group_nr component_members acc_groups transform_fusion ti
 			= transform_groups` common_defs imported_funs group_nr groups acc_groups ti
 
 		assign_groups :: !ComponentMembers !Int !*TransformInfo -> *TransformInfo
@@ -4294,7 +4298,7 @@ where
 			# (fun_def, ti) = ti!ti_fun_defs.[member]
 			  fun_symb = {symb_ident=fun_def.fun_ident, symb_kind=SK_Function {glob_object=member, glob_module=main_dcl_module_n}}
 			  (fun_body,ti)
-				= transform_function fun_def.fun_type fun_def.fun_body fun_symb common_defs imported_funs ti
+				= transform_function fun_def.fun_type fun_def.fun_body fun_symb transform_fusion common_defs imported_funs ti
 			  fun_def = {fun_def & fun_body=fun_body}
 			  ti = {ti & ti_fun_defs.[member] = fun_def}
 			= transform_functions members common_defs imported_funs ti
@@ -4303,7 +4307,7 @@ where
 			  fun_symb = {symb_ident=gf_fun_def.fun_ident, symb_kind=SK_GeneratedFunction fun_ptr member }
 			  ti = {ti & ti_fun_heap = ti_fun_heap}
 			  (fun_body,ti)
-				= transform_function gf_fun_def.fun_type gf_fun_def.fun_body fun_symb common_defs imported_funs ti
+				= transform_function gf_fun_def.fun_type gf_fun_def.fun_body fun_symb transform_fusion common_defs imported_funs ti
 			  gf_fun_def = {gf_fun_def & fun_body=fun_body}
 			  ti_fun_heap = writePtr fun_ptr (FI_Function {gf & gf_fun_def=gf_fun_def}) ti.ti_fun_heap
 			  ti = {ti & ti_fun_heap = ti_fun_heap}
@@ -4311,8 +4315,9 @@ where
 		transform_functions NoComponentMembers common_defs imported_funs ti
 			= ti
 
-		transform_function :: !(Optional SymbolType) !FunctionBody !SymbIdent !{#CommonDefs} !{#{#FunType}} !*TransformInfo -> (!FunctionBody,!*TransformInfo)
-		transform_function (Yes {st_args,st_args_strictness}) (TransformedBody tb) fun_symb common_defs imported_funs ti
+		transform_function :: !(Optional SymbolType) !FunctionBody !SymbIdent !Int !{#CommonDefs} !{#{#FunType}} !*TransformInfo
+								-> (!FunctionBody,!*TransformInfo)
+		transform_function (Yes {st_args,st_args_strictness}) (TransformedBody tb) fun_symb transform_fusion common_defs imported_funs ti
 			# (ro_StdGeneric_module_n,ti) = ti!ti_predef_symbols.[PD_StdGeneric].pds_def
 			  ti_var_heap					= fold2St store_arg_type_info tb.tb_args st_args ti.ti_var_heap
 			  tfi =	{ tfi_root				= fun_symb
@@ -4328,7 +4333,7 @@ where
 					, ro_root_case_mode				= get_root_case_mode tb
 					, ro_tfi						= tfi
 					, ro_main_dcl_module_n			= main_dcl_module_n
-					, ro_transform_fusion			= compile_with_fusion
+					, ro_transform_fusion			= transform_fusion
 					, ro_StdStrictLists_module_n	= ro_StdStrictLists_module_n
 					, ro_StdGeneric_module_n		= ro_StdGeneric_module_n
 					}
