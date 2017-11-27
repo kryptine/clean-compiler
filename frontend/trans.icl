@@ -3489,6 +3489,22 @@ determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer c
 					# producers & [prod_index] = PR_Curried symb 0
 					-> (producers, args, [], ti)
 					-> determineProducersInNextArgs consumer_properties consumer_is_curried ok_non_rec_consumer consumer_type linear_bits cons_args arg args prod_index producers ro ti
+			App {app_symb=symb1=:{symb_kind=SK_Function {glob_module=module_1,glob_object=object_1}},app_args=
+					[App {app_symb=symb2=:{symb_kind=SK_Function {glob_module=module_2,glob_object=object_2}},app_args=[]}]}
+				| module_1==ro.ro_main_dcl_module_n && module_2==ro.ro_main_dcl_module_n && consumer_properties bitand FI_GenericFun<>0
+					# (fun_def1,ti) = ti!ti_fun_defs.[object_1]
+					| fun_def1.fun_arity>1 && fun_def1.fun_info.fi_properties bitand FI_IsNonRecursive==0
+						# (fun_def2,ti) = ti!ti_fun_defs.[object_2]
+						| fun_def2.fun_arity>0 // && fun_def2.fun_info.fi_properties bitand FI_IsNonRecursive<>0
+							# arg_ns = find_same_SK_Functions_args args ro.ro_main_dcl_module_n object_1 object_2 (prod_index+1)
+							| not (case arg_ns of [#!] -> True; _ -> False)
+							&& is_monomorphic_symbol_type fun_def2.fun_type
+							&& is_monomorphic_symbol_type_for_monomorphic_arg fun_def1.fun_type
+								-> equal_producers arg_ns arg args prod_index producers ti
+								-> determineProducersInNextArgs consumer_properties consumer_is_curried ok_non_rec_consumer consumer_type linear_bits cons_args arg args prod_index producers ro ti
+							-> determineProducersInNextArgs consumer_properties consumer_is_curried ok_non_rec_consumer consumer_type linear_bits cons_args arg args prod_index producers ro ti
+						-> determineProducersInNextArgs consumer_properties consumer_is_curried ok_non_rec_consumer consumer_type linear_bits cons_args arg args prod_index producers ro ti
+					-> determineProducersInNextArgs consumer_properties consumer_is_curried ok_non_rec_consumer consumer_type linear_bits cons_args arg args prod_index producers ro ti
 			App {app_symb=symb=:{symb_kind=SK_LocalMacroFunction fun_index},app_args=[]}
 				# ({fun_arity,fun_info,fun_type},ti) = ti!ti_fun_defs.[fun_index]
 				| fun_arity>0
@@ -3632,6 +3648,22 @@ find_equal_arguments (App {app_symb=symb=:{symb_kind=SK_Function {glob_module,gl
 				= (arg_ns,ti)
 				= ([#!],ti)
 			= ([#!],ti)
+find_equal_arguments (App {app_symb=symb1=:{symb_kind=SK_Function {glob_module=module_1,glob_object=object_1}},app_args=
+					 [App {app_symb=symb2=:{symb_kind=SK_Function {glob_module=module_2,glob_object=object_2}},app_args=[]}]}) args consumer_properties consumer_type cons_arg prod_index ro ti
+	| module_1==ro.ro_main_dcl_module_n && module_2==ro.ro_main_dcl_module_n && consumer_properties bitand FI_GenericFun<>0
+		# (fun_def1,ti) = ti!ti_fun_defs.[object_1]
+		| fun_def1.fun_arity>1 && fun_def1.fun_info.fi_properties bitand FI_IsNonRecursive==0
+			# (fun_def2,ti) = ti!ti_fun_defs.[object_2]
+			| fun_def2.fun_arity>0 // && fun_def2.fun_info.fi_properties bitand FI_IsNonRecursive<>0				
+				# arg_ns = find_same_SK_Functions_args args ro.ro_main_dcl_module_n object_1 object_2 (prod_index+1)
+				| not (case arg_ns of [#!] -> True; _ -> False)
+				&& is_monomorphic_symbol_type fun_def2.fun_type
+				&& is_monomorphic_symbol_type_for_monomorphic_arg fun_def1.fun_type
+					= (arg_ns,ti)
+					= ([#!],ti)
+				= ([#!],ti)
+			= ([#!],ti)
+		= ([#!],ti)
 find_equal_arguments (App {app_symb=symb=:{symb_kind=SK_LocalMacroFunction fun_index},app_args=[]}) args consumer_properties consumer_type cons_arg prod_index ro ti
 	# ({fun_arity,fun_type},ti) = ti!ti_fun_defs.[fun_index]
 	| fun_arity>0
@@ -3690,6 +3722,19 @@ find_same_SK_Function_args [arg:args] fun_module fun_index arg_n
 find_same_SK_Function_args [] fun_module fun_index arg_n
 	= [#!]
 
+find_same_SK_Functions_args :: ![Expression] !Int !Int !Int !Int -> [#Int!]
+find_same_SK_Functions_args [App {app_symb={symb_kind=SK_Function app_fun1},app_args=
+								[App {app_symb={symb_kind=SK_Function app_fun2},app_args=[]}]}:args]
+							main_module_n fun_index1 fun_index2 arg_n
+	| app_fun1.glob_module==main_module_n && app_fun1.glob_object==fun_index1
+	&& app_fun2.glob_module==main_module_n && app_fun2.glob_object==fun_index2
+		= [#arg_n:find_same_SK_Functions_args args main_module_n fun_index1 fun_index2 (arg_n+1)!]
+		= find_same_SK_Functions_args args main_module_n fun_index1 fun_index2 (arg_n+1)
+find_same_SK_Functions_args [arg:args] main_module_n fun_index1 fun_index2 arg_n
+	= find_same_SK_Functions_args args main_module_n fun_index1 fun_index2 (arg_n+1)
+find_same_SK_Functions_args [] main_module_n fun_index1 fun_index2 arg_n
+	= [#!]
+
 find_same_SK_LocalMacroFunction_args :: ![Expression] !Int !Int -> [#Int!]
 find_same_SK_LocalMacroFunction_args [App {app_symb={symb_kind=SK_LocalMacroFunction arg_fun_index},app_args=[]}:args] fun_index arg_n
 	| arg_fun_index==fun_index
@@ -3714,6 +3759,32 @@ is_monomorphic_symbol_type :: !(Optional SymbolType) -> Bool
 is_monomorphic_symbol_type (Yes {st_vars=[],st_attr_vars=[]})
 	= True
 is_monomorphic_symbol_type _
+	= False
+
+is_monomorphic_symbol_type_for_monomorphic_arg :: !(Optional SymbolType) -> Bool
+is_monomorphic_symbol_type_for_monomorphic_arg (Yes {st_vars=vars,st_attr_vars=[],st_args=[arg:_]})
+	= all_vars_occur vars arg
+where
+	all_vars_occur [type_var:type_vars] type = var_occurs_in_atype type_var.tv_info_ptr type && all_vars_occur type_vars type
+	all_vars_occur [] type = True
+
+	var_occurs_in_atype var_info_ptr {at_type}
+		= var_occurs_in_type var_info_ptr at_type
+
+	var_occurs_in_type var_info_ptr (TV {tv_info_ptr})
+		= var_info_ptr==tv_info_ptr
+	var_occurs_in_type var_info_ptr (TA _ atypes)
+		= var_occurs_in_atypes var_info_ptr atypes
+	var_occurs_in_type var_info_ptr (atype1-->atype2)
+		= var_occurs_in_atype var_info_ptr atype1 || var_occurs_in_atype var_info_ptr atype2
+	var_occurs_in_type var_info_ptr _
+		= False
+
+	var_occurs_in_atypes var_info_ptr [{at_type}:atypes]
+		= var_occurs_in_type var_info_ptr at_type || var_occurs_in_atypes var_info_ptr atypes
+	var_occurs_in_atypes _ []
+		= False
+is_monomorphic_symbol_type_for_monomorphic_arg _
 	= False
 
 find_same_Vars :: ![Expression] !VarInfoPtr !Int -> [#Int!]
