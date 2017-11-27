@@ -419,6 +419,7 @@ where
 	(<<<) file (TypeSignature array_kind expr) = file <<< "TypeSignature " <<< '(' <<< expr <<< ')'
 	(<<<) file (DictionariesFunction dictionaries expr expr_type)
 		= file <<< "DictionariesFunction " <<< dictionaries <<< expr <<< expr_type
+	(<<<) file ExprToBeRemoved = file <<< "** ExprToBeRemoved **"
 	(<<<) file expr         				= abort ("<<< (Expression)" )
 	
 instance <<< LetBind

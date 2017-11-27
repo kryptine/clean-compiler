@@ -1421,6 +1421,7 @@ cIsNotStrict	:== False
 				| EE
 				| NoBind ExprInfoPtr /* auxiliary, to store fields that are not specified in a record expression */ 
 				| FailExpr !Ident // only allowed on (case) root positions
+				| ExprToBeRemoved
 
 ::	CodeBinding	variable :== Env String variable
 

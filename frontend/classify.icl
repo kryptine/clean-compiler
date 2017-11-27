@@ -493,6 +493,8 @@ instance consumerRequirements Expression where
 				= init_variables dictionaries (inc ai_next_var) (inc ai_next_var_of_fun) ai_var_heap
 			init_variables [] ai_next_var ai_next_var_of_fun ai_var_heap
 				= (ai_next_var,ai_next_var_of_fun,ai_var_heap)
+	consumerRequirements ExprToBeRemoved _ ai
+		= (CPassive, False, ai)
 	consumerRequirements expr _ ai
 		= abort ("consumerRequirements [Expression]" ---> expr)
 
@@ -1490,6 +1492,8 @@ count_locals (DictionariesFunction dictionaries expr expr_type) n
 			| fv_count > 0
 				= n+1
 				= n
+count_locals ExprToBeRemoved n
+	= n
 
 count_optional_locals (Yes e) n
 	= count_locals e n
