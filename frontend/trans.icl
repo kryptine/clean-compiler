@@ -3443,8 +3443,10 @@ determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer c
 		= (producers, [arg : new_args], lb, ti)
 	| SwitchUnusedFusion (cons_arg == CUnusedStrict && isStrictArg consumer_type prod_index) False
 		# producers = { producers & [prod_index] = PR_Unused }
-		# (lb,ti) = case isStrictVarOrSimpleExpression arg of
-						True	-> ([],ti)
+		# (is_strict_var_or_simple_expression,ti) = isStrictVarOrSimpleExpression arg ti
+		# (lb,ti) = case is_strict_var_or_simple_expression of
+						True
+							-> ([],ti)
 						_
 							# arg_type = getArgType consumer_type prod_index
 							  (info_ptr, ti_var_heap) = newPtr (VI_Extended (EVI_VarType arg_type) VI_Empty) ti.ti_var_heap
@@ -3534,15 +3536,19 @@ where
 	determineUnusedProducersInNextArgs [cons_arg : cons_args] arg_and_args=:[arg : args] prod_index producers ro ti
 		| SwitchUnusedFusion (cons_arg == CUnusedStrict && isStrictArg consumer_type prod_index) False
 			# producers & [prod_index] = PR_Unused
-			# (lb,ti) = case isStrictVarOrSimpleExpression arg of
-							True	-> ([],ti)
-							_		# (info_ptr, ti_var_heap) = newPtr VI_Empty ti.ti_var_heap
-									  ti & ti_var_heap = ti_var_heap
-									  lb =	{lb_dst=
-									  			{ fv_ident = { id_name = "dummy_for_strict_unused", id_info = nilPtr }
-									  			, fv_info_ptr = info_ptr, fv_count = 0, fv_def_level = NotALevel }
-									  		,lb_src=arg, lb_position=NoPos }
-									-> ([(lb,getArgType consumer_type prod_index)],ti)
+			# (is_strict_var_or_simple_expression,ti) = isStrictVarOrSimpleExpression arg ti
+			# (lb,ti) = case is_strict_var_or_simple_expression of
+							True
+								-> ([],ti)
+							_
+								# arg_type = getArgType consumer_type prod_index
+								  (info_ptr, ti_var_heap) = newPtr (VI_Extended (EVI_VarType arg_type) VI_Empty) ti.ti_var_heap
+								  ti & ti_var_heap = ti_var_heap
+								  lb =	{lb_dst=
+								  			{ fv_ident = {id_name = "dummy_for_strict_unused", id_info = nilPtr}
+								  			, fv_info_ptr = info_ptr, fv_count = 0, fv_def_level = NotALevel }
+								  		,lb_src=arg, lb_position=NoPos }
+								-> ([(lb,arg_type)],ti)
 			= (producers, args, lb, ti)	 // ---> ("UnusedStrict",lb,arg,fun_type)
 		| SwitchUnusedFusion (cons_arg == CUnusedStrict && not (isStrictArg consumer_type prod_index) && isStrictVar arg) False
 			# producers & [prod_index] = PR_Unused
@@ -3565,14 +3571,44 @@ where
 	isStrictVar (Var bv) = not (isEmpty [fv \\ fv <- ro.ro_tfi.tfi_vars | fv.fv_info_ptr == bv.var_info_ptr])
 	isStrictVar _ = False
 
-	isStrictVarOrSimpleExpression (Var bv)
-		= not (isEmpty [fv \\ fv <- ro.ro_tfi.tfi_vars | fv.fv_info_ptr == bv.var_info_ptr])
-	isStrictVarOrSimpleExpression (App {app_symb={symb_kind=SK_Constructor _},app_args=[]})
-		= True
-	isStrictVarOrSimpleExpression (BasicExpr _)
-		= True
-	isStrictVarOrSimpleExpression _
-		= False
+	isStrictVarOrSimpleExpression :: !Expression *TransformInfo -> *(!Bool,*TransformInfo)
+	isStrictVarOrSimpleExpression (Var bv) ti
+		= (not (isEmpty [fv \\ fv <- ro.ro_tfi.tfi_vars | fv.fv_info_ptr == bv.var_info_ptr]),ti)
+	isStrictVarOrSimpleExpression (App {app_symb={symb_kind=SK_Constructor _},app_args=[]}) ti
+		= (True,ti)
+	isStrictVarOrSimpleExpression (App {app_symb={symb_kind=SK_Constructor cons_index},app_args}) ti
+		# cons_arity = ro.ro_common_defs.[cons_index.glob_module].com_cons_defs.[cons_index.glob_object].cons_type.st_arity
+		# n_args = length app_args
+		| n_args==cons_arity
+			= all_isStrictVarOrSimpleExpression app_args ti
+			= (n_args<cons_arity,ti)
+		where
+			all_isStrictVarOrSimpleExpression [a:as] ti
+				# (b,ti) = isStrictVarOrSimpleExpression a ti
+				| b
+					= all_isStrictVarOrSimpleExpression as ti
+					= (False,ti)
+			all_isStrictVarOrSimpleExpression [] ti
+				= (True,ti)
+	isStrictVarOrSimpleExpression (App {app_symb={symb_kind=SK_Function {glob_module, glob_object}},app_args}) ti
+		| glob_module == ro.ro_main_dcl_module_n
+			#! fun_arity = ti.ti_fun_defs.[glob_object].fun_arity
+			= (length app_args < fun_arity,ti)
+			#! fun_arity = ro.ro_imported_funs.[glob_module].[glob_object].ft_arity
+			= (length app_args < fun_arity,ti)
+	isStrictVarOrSimpleExpression (App {app_symb={symb_kind=SK_LocalMacroFunction glob_object},app_args}) ti
+		#! fun_arity = ti.ti_fun_defs.[glob_object].fun_arity
+		= (length app_args < fun_arity,ti)
+	isStrictVarOrSimpleExpression (App {app_symb={symb_kind=SK_GeneratedFunction fun_ptr fun_index},app_args}) ti
+		# (FI_Function {gf_fun_def={fun_arity}},fun_heap) = readPtr fun_ptr ti.ti_fun_heap
+		  ti & ti_fun_heap = fun_heap
+		= (length app_args<fun_arity,ti)
+	isStrictVarOrSimpleExpression (BasicExpr _) ti
+		= (True,ti)
+	isStrictVarOrSimpleExpression ExprToBeRemoved ti
+		= (True,ti)
+	isStrictVarOrSimpleExpression _ ti
+		= (False,ti)
 
 	determine_producer consumer_properties consumer_is_curried ok_non_rec_consumer linear_bit arg=:(App app=:{app_info_ptr}) new_args prod_index producers ro ti
 		| isNilPtr app_info_ptr
