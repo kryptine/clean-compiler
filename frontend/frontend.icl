@@ -211,7 +211,7 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 	# exported_functions = exported_global_functions ++  [dcl_instances,dcl_specials,dcl_gencases,dcl_type_funs]
 	# (components, fun_defs, predef_symbols, var_heap, expression_heap, error_admin) 
 		= case options.feo_strip_unused of
-			True -> partitionateFunctions` fun_defs exported_functions
+			True -> partitionateFunctions` fun_defs (exported_functions ++ [icl_function_indices.ifi_type_function_indices!!1])
 						main_dcl_module_n def_min def_max predef_symbols var_heap expression_heap error_admin
 			_ 
 				-> case options.feo_fusion of
