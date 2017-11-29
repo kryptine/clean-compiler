@@ -117,12 +117,14 @@ where
 		push_on_dep_stack attr pi=:{pi_deps,pi_marks,pi_next_num}
 			= { pi & pi_deps = [attr : pi_deps], pi_marks = { pi_marks & [attr] = pi_next_num }, pi_next_num = inc pi_next_num}
 
+		try_to_close_group :: !Int !Int !Int !Int !*PartitioningInfo -> (!Int,!*PartitioningInfo)
 		try_to_close_group attr attr_nr min_dep max_attr_nr pi=:{pi_marks, pi_deps, pi_groups}
 			| attr_nr <= min_dep
 				# (pi_deps, pi_marks, group) = close_group attr pi_deps pi_marks [] max_attr_nr
 				= (max_attr_nr, { pi & pi_deps = pi_deps, pi_marks = pi_marks, pi_groups = [group : pi_groups] })
 				= (min_dep, pi)
 		where
+			close_group :: !Int ![Int] !*{#Int} ![Int] Int -> (![Int],!*{#Int},![Int])
 			close_group attr [d:ds] marks group max_attr_nr
 				# marks = { marks & [d] = max_attr_nr }
 				| d == attr
@@ -576,6 +578,17 @@ where
 	 toInt TA_Multi 				= AttrMulti
 	 toInt TA_None 					= AttrMulti
 
+expand_and_coerce_type :: !{#CommonDefs} !{#Int} !AType !*(!*Coercions,!*{!Type},!*TypeHeaps,!*TypeDefInfos)
+											 -> (!AType,!*(!*Coercions,!*{!Type},!*TypeHeaps,!*TypeDefInfos))
+expand_and_coerce_type common_defs cons_vars atype (coercions, subst, ti_type_heaps, ti_type_def_infos)
+	# es = {es_type_heaps=ti_type_heaps, es_td_infos=ti_type_def_infos}
+	  (_, btype, (subst, {es_type_heaps, es_td_infos}))
+		= expandType common_defs cons_vars atype (subst, es)
+	  cs = {crc_type_heaps=es_type_heaps, crc_coercions=coercions, crc_td_infos=es_td_infos}
+	  (_, {crc_type_heaps,crc_coercions,crc_td_infos})
+		= coerce PositiveSign common_defs cons_vars [] btype btype cs
+	= (btype, (crc_coercions, subst, crc_type_heaps, crc_td_infos))
+
 ::	CoercionState =
 	{	crc_type_heaps	:: !.TypeHeaps
 	,	crc_coercions	:: !.Coercions
@@ -830,7 +843,6 @@ tryToExpandTypeSyn defs cons_vars type cons_id=:{type_index={glob_object,glob_mo
 			  (_, expanded_type, (_, {es_type_heaps, es_td_infos})) = expandType defs cons_vars at_type
 			  		({}, { es_type_heaps = type_heaps, es_td_infos = td_infos })
 			-> (True, expanded_type, clearBindingsOfTypeVarsAndAttributes attribute td_args es_type_heaps, es_td_infos)
-
 		_
 			-> (False, type, type_heaps, td_infos)
 
