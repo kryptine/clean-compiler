@@ -34,14 +34,14 @@ isPositive :: !TempVarId !{# BOOLVECT } -> Bool
 isPositive var_id cons_vars
 	= cons_vars.[BITINDEX var_id] bitand (1 << BITNUMBER var_id) <> 0
 
-:: CoerceInfo = ! { ci_common_defs :: !{#CommonDefs}, ci_cons_vars :: !{#BOOLVECT} }
+:: CoerceInfo = ! { ci_common_defs :: !{#CommonDefs}, ci_cons_vars :: !{#BOOLVECT}, ci_expand_newtypes :: !Bool }
 
-determineAttributeCoercions :: !AType !AType !Bool !u:{!Type} !*Coercions !{#CommonDefs} !{#BOOLVECT} !*TypeDefInfos !*TypeHeaps
-	-> (!Optional (TypePosition, AType), !u:{! Type}, !*Coercions, !*TypeDefInfos, !*TypeHeaps) 
-determineAttributeCoercions off_type dem_type coercible subst coercions defs cons_vars td_infos type_heaps
+determineAttributeCoercions :: !AType !AType !Bool !Bool !u:{!Type} !*Coercions !{#CommonDefs} !{#BOOLVECT} !*TypeDefInfos !*TypeHeaps
+												 -> (!Optional (TypePosition, AType),!u:{!Type},!*Coercions,!*TypeDefInfos,!*TypeHeaps) 
+determineAttributeCoercions off_type dem_type coercible expand_newtypes subst coercions defs cons_vars td_infos type_heaps
 	# (_, exp_off_type, es) = expandType defs cons_vars off_type (subst, { es_type_heaps = type_heaps, es_td_infos = td_infos})
 	  (_, exp_dem_type, (subst, {es_td_infos,es_type_heaps})) = expandType defs cons_vars dem_type es
-	  ci = {ci_common_defs=defs, ci_cons_vars=cons_vars}
+	  ci = {ci_common_defs=defs, ci_cons_vars=cons_vars, ci_expand_newtypes=expand_newtypes}
 	  (result, {crc_type_heaps, crc_coercions, crc_td_infos}) = coerce (if coercible PositiveSign TopSign) ci [] exp_off_type exp_dem_type
 	  		 { crc_type_heaps = es_type_heaps, crc_coercions = coercions, crc_td_infos = es_td_infos}
 	= case result of
@@ -622,7 +622,7 @@ expand_and_coerce_type common_defs cons_vars atype (coercions, subst, ti_type_he
 	  (_, btype, (subst, {es_type_heaps, es_td_infos}))
 		= expandType common_defs cons_vars atype (subst, es)
 	  cs = {crc_type_heaps=es_type_heaps, crc_coercions=coercions, crc_td_infos=es_td_infos}
-	  ci = {ci_common_defs=common_defs, ci_cons_vars=cons_vars}
+	  ci = {ci_common_defs=common_defs, ci_cons_vars=cons_vars, ci_expand_newtypes=True}
 	  (_, {crc_type_heaps,crc_coercions,crc_td_infos})
 		= coerce PositiveSign ci [] btype btype cs
 	= (btype, (crc_coercions, subst, crc_type_heaps, crc_td_infos))
@@ -970,7 +970,7 @@ coercions_of_arg_types sign ci tpos [] [] _ _ cs
 
 tryToExpandTypeSyn :: !CoerceInfo !Type !TypeSymbIdent ![AType] !TypeAttribute !*TypeHeaps !*TypeDefInfos
 	-> (!Bool, !Type, !*TypeHeaps, !*TypeDefInfos)
-tryToExpandTypeSyn {ci_common_defs,ci_cons_vars} type cons_id=:{type_index={glob_object,glob_module}} type_args attribute type_heaps td_infos
+tryToExpandTypeSyn {ci_common_defs,ci_cons_vars,ci_expand_newtypes} type {type_index={glob_object,glob_module}} type_args attribute type_heaps td_infos
 	# {td_rhs,td_args,td_attribute,td_ident} = ci_common_defs.[glob_module].com_type_defs.[glob_object]
 	= case td_rhs of
 		SynType {at_type}
@@ -978,6 +978,13 @@ tryToExpandTypeSyn {ci_common_defs,ci_cons_vars} type cons_id=:{type_index={glob
 			  (_, expanded_type, (_, {es_type_heaps, es_td_infos})) = expandType ci_common_defs ci_cons_vars at_type
 			  		({}, { es_type_heaps = type_heaps, es_td_infos = td_infos })
 			-> (True, expanded_type, clearBindingsOfTypeVarsAndAttributes attribute td_args es_type_heaps, es_td_infos)
+		NewType {ds_index}
+			| ci_expand_newtypes
+				# {cons_type={st_args=[{at_type}:_]}} = ci_common_defs.[glob_module].com_cons_defs.[ds_index];
+				  type_heaps = bindTypeVarsAndAttributes td_attribute attribute td_args type_args type_heaps
+				  (_, expanded_type, (_, {es_type_heaps, es_td_infos})) = expandType ci_common_defs ci_cons_vars at_type
+				  		({}, { es_type_heaps = type_heaps, es_td_infos = td_infos })
+				-> (True, expanded_type, clearBindingsOfTypeVarsAndAttributes attribute td_args es_type_heaps, es_td_infos)
 		_
 			-> (False, type, type_heaps, td_infos)
 

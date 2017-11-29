@@ -3018,7 +3018,7 @@ build_coercion_env_for_alternative fun_ident common_defs cons_var_vects {tcg_pos
 where
 	add_to_coercion_env [{tc_offered,tc_demanded,tc_coercible,tc_position} : attr_coercions] subst coercion_env common_defs cons_var_vects type_signs type_var_heap error
 		# (opt_error_info, subst, coercion_env, type_signs, type_var_heap)
-				= determineAttributeCoercions tc_offered tc_demanded tc_coercible
+				= determineAttributeCoercions tc_offered tc_demanded tc_coercible False
 						subst coercion_env common_defs cons_var_vects type_signs
 						type_var_heap
 		  (coercion_env, error)
