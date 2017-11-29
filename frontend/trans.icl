@@ -1901,7 +1901,7 @@ where
 
 	coerce_types common_defs cons_vars {ur_offered, ur_demanded} (subst, coercions, ti_type_def_infos, ti_type_heaps)
 		# (opt_error_info, subst, coercions, ti_type_def_infos, ti_type_heaps)
-				= determineAttributeCoercions ur_offered ur_demanded True subst coercions common_defs cons_vars ti_type_def_infos ti_type_heaps
+				= determineAttributeCoercions ur_offered ur_demanded True True subst coercions common_defs cons_vars ti_type_def_infos ti_type_heaps
 		= case opt_error_info of
 			Yes _
 				-> abort "Error in compiler: determineAttributeCoercions failed in module trans"
