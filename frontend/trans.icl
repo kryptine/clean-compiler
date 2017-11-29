@@ -1910,22 +1910,13 @@ where
 	lift_offered_substitutions_for_unification common_defs cons_vars {ur_offered, ur_demanded} (next_attr_nr,subst,ti_type_def_infos,ti_type_heaps)
 		= liftOfferedSubstitutions ur_offered ur_demanded common_defs cons_vars next_attr_nr subst ti_type_def_infos ti_type_heaps
 
-	expand_type :: !{#.CommonDefs} !{#.Int} !.AType !*(!*Coercions,!u:{!.Type},!*TypeHeaps,!*{#*{#.TypeDefInfo}}) -> (!AType,!(!.Coercions,!v:{!Type},!.TypeHeaps,!{#.{#TypeDefInfo}})), [u <= v]
+	expand_type :: !{#CommonDefs} !{#Int} !AType !*(!*Coercions,!*{!Type},!*TypeHeaps,!*TypeDefInfos)
+									  -> (!AType,!*(!*Coercions,!*{!Type},!*TypeHeaps,!*TypeDefInfos))
 	expand_type ro_common_defs cons_vars atype (coercions, subst, ti_type_heaps, ti_type_def_infos)
 		| is_dictionary atype ti_type_def_infos
 			# (_, atype, subst) = arraySubst atype subst
 			= (atype, (coercions, subst, ti_type_heaps, ti_type_def_infos))
-		# es = {es_type_heaps = ti_type_heaps, es_td_infos = ti_type_def_infos}
-		  (_, btype, (subst, es))
-		  		= expandType ro_common_defs cons_vars atype (subst, es)
- 		  {es_type_heaps = ti_type_heaps, es_td_infos = ti_type_def_infos}
-				= es
-		# cs = {crc_type_heaps = ti_type_heaps, crc_coercions = coercions, crc_td_infos = ti_type_def_infos}
-		  (_, cs)
-		  		= coerce PositiveSign ro_common_defs cons_vars [] btype btype cs
-		  { crc_type_heaps = ti_type_heaps, crc_coercions = coercions, crc_td_infos = ti_type_def_infos }
-		  		= cs
-		= (btype, (coercions, subst, ti_type_heaps, ti_type_def_infos))
+			= expand_and_coerce_type ro_common_defs cons_vars atype (coercions, subst, ti_type_heaps, ti_type_def_infos)
 
 	n_args_before_producer_and_n_producer_args :: [FreeVar] [FreeVar] *VarHeap -> (!Int,!Int,!*VarHeap)
 	n_args_before_producer_and_n_producer_args tb_args new_fun_args var_heap

@@ -3,14 +3,6 @@ definition module unitype
 import StdEnv
 import syntax, analunitypes
 
-::	CoercionState =
-	{	crc_type_heaps	:: !.TypeHeaps
-	,	crc_coercions	:: !.Coercions
-	,	crc_td_infos	:: !.TypeDefInfos
-	}
-
-coerce :: !Sign !{#CommonDefs} !{#BOOLVECT} !TypePosition !AType !AType !*CoercionState -> (!Optional TypePosition, !*CoercionState)
-
 ::	TypePosition :== [Int]
 
 AttrUni			:== 0
@@ -59,14 +51,8 @@ liftSubstitution :: !*{!Type} !{#CommonDefs}!{#BOOLVECT} !Int !*TypeHeaps !*Type
 
 liftRemainingSubstitutions :: !*{!Type} !{#CommonDefs }!{#BOOLVECT} !Int !*TypeHeaps !*TypeDefInfos -> (*{!Type}, !Int, !*TypeHeaps, !*TypeDefInfos)
 
-::	ExpansionState = 
-	{	es_type_heaps	:: !.TypeHeaps
-	,	es_td_infos		:: !.TypeDefInfos
-	}
-
-class expandType a :: !{# CommonDefs } !{# BOOLVECT } !a !*(!u:{! Type}, !*ExpansionState) -> (!Bool, !a, !*(!u:{! Type}, !*ExpansionState))
-
-instance expandType AType
+expand_and_coerce_type :: !{#CommonDefs} !{#Int} !AType !*(!*Coercions,!*{!Type},!*TypeHeaps,!*TypeDefInfos)
+											 -> (!AType,!*(!*Coercions,!*{!Type},!*TypeHeaps,!*TypeDefInfos))
 
 checkExistentionalAttributeVars :: [TempAttrId] !AttributePartition !*{! CoercionTree} -> (!Bool,!*{! CoercionTree})
 

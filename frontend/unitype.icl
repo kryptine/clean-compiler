@@ -613,6 +613,17 @@ where
 	 toInt TA_Multi 				= AttrMulti
 	 toInt TA_None 					= AttrMulti
 
+expand_and_coerce_type :: !{#CommonDefs} !{#Int} !AType !*(!*Coercions,!*{!Type},!*TypeHeaps,!*TypeDefInfos)
+											 -> (!AType,!*(!*Coercions,!*{!Type},!*TypeHeaps,!*TypeDefInfos))
+expand_and_coerce_type common_defs cons_vars atype (coercions, subst, ti_type_heaps, ti_type_def_infos)
+	# es = {es_type_heaps=ti_type_heaps, es_td_infos=ti_type_def_infos}
+	  (_, btype, (subst, {es_type_heaps, es_td_infos}))
+		= expandType common_defs cons_vars atype (subst, es)
+	  cs = {crc_type_heaps=es_type_heaps, crc_coercions=coercions, crc_td_infos=es_td_infos}
+	  (_, {crc_type_heaps,crc_coercions,crc_td_infos})
+		= coerce PositiveSign common_defs cons_vars [] btype btype cs
+	= (btype, (crc_coercions, subst, crc_type_heaps, crc_td_infos))
+
 ::	CoercionState =
 	{	crc_type_heaps	:: !.TypeHeaps
 	,	crc_coercions	:: !.Coercions
