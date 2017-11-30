@@ -1261,6 +1261,90 @@ convert_condition (Case {case_expr,case_guards=(BasicPatterns BT_Bool [{bp_value
 convert_condition expr ci cs
 	= convertCases ci expr cs
 
+// optimise the following case: an alternative for each constructor, at least 3, one alternative cannot fail and the other
+// alternatives yield the same boolean result. Remove those boolean result alternatives, and add a default with this result.
+optimise_case :: !CasePatterns !(Optional Expression) ExprInfoPtr !{#CommonDefs} !*ExpressionHeap
+	-> (!CasePatterns,!Optional Expression,!*ExpressionHeap)
+optimise_case case_guards=:(AlgebraicPatterns global_type_index algebraic_patterns) case_default=:No case_info_ptr common_defs expr_heap
+	= case common_defs.[global_type_index.gi_module].com_type_defs.[global_type_index.gi_index].td_rhs of
+		AlgType cons_symbols
+			| at_least_three_same_length_lists algebraic_patterns cons_symbols
+				# (new_guard_n,new_algebraic_patterns,new_case_default) = try_replace_case_alts_by_default algebraic_patterns
+				| new_guard_n<0
+					-> (case_guards,case_default,expr_heap)
+					-> case readPtr case_info_ptr expr_heap of
+						(EI_CaseTypeAndSplits case_type=:{ct_cons_types} splits,expr_heap)
+							# case_type & ct_cons_types=[ct_cons_types!!new_guard_n]
+							# expr_heap = writePtr case_info_ptr (EI_CaseTypeAndSplits case_type splits) expr_heap
+							-> (AlgebraicPatterns global_type_index new_algebraic_patterns,new_case_default,expr_heap)
+						(_,expr_heap)
+							-> abort "optimise_case No EI_CaseTypeAndSplits"
+				-> (case_guards,case_default,expr_heap)
+		_
+			-> (case_guards,case_default,expr_heap)
+where
+	at_least_three_same_length_lists :: ![a] ![b] -> Bool
+	at_least_three_same_length_lists [_,_,_:l1] [_,_,_:l2] = same_length_lists l1 l2
+	at_least_three_same_length_lists _ _ = False
+
+	same_length_lists :: ![a] ![b] -> Bool
+	same_length_lists [_:l1] [_:l2] = same_length_lists l1 l2
+	same_length_lists [] [] = True
+	same_length_lists _ _ = False
+
+	try_replace_case_alts_by_default :: ![AlgebraicPattern] -> (!Int,![AlgebraicPattern],!Optional Expression)
+	try_replace_case_alts_by_default [{ap_expr=ap1_expr=:BasicExpr (BVB bool1)},{ap_expr=BasicExpr (BVB bool2)}:algebraic_patterns3]
+		| bool1==bool2
+			# (algebraic_patterns3,guard_n) = skip_case_alt_results_this_bool algebraic_patterns3 bool1 2
+			= case algebraic_patterns3 of
+				[algebraic_pattern:algebraic_patterns2]
+					| all_case_alt_results_this_bool algebraic_patterns2 bool1 && no_partial_match algebraic_pattern.ap_expr
+						-> (guard_n,[algebraic_pattern],Yes ap1_expr)
+				_
+					-> (-1,[],No)
+	try_replace_case_alts_by_default [ap1=:{ap_expr=BasicExpr (BVB bool1)},ap2=:{ap_expr=BasicExpr (BVB bool2)},{ap_expr=BasicExpr (BVB bool3)}:algebraic_patterns4]
+		// bool1<>bool2
+		| all_case_alt_results_this_bool algebraic_patterns4 bool3
+			| bool3<>bool1 // bool3==bool2
+				= (0,[ap1],Yes ap2.ap_expr)
+			// | bool3==bool1
+				= (1,[ap2],Yes ap1.ap_expr)
+			= (-1,[],No)
+	try_replace_case_alts_by_default [ap1=:{ap_expr=BasicExpr (BVB bool1)},ap2,{ap_expr=BasicExpr (BVB bool3)}:algebraic_patterns4]
+		| bool1==bool3 && all_case_alt_results_this_bool algebraic_patterns4 bool1 && no_partial_match ap2.ap_expr
+			= (1,[ap2],Yes ap1.ap_expr)
+			= (-1,[],No)
+	try_replace_case_alts_by_default [ap1,ap2=:{ap_expr=BasicExpr (BVB bool2)},{ap_expr=BasicExpr (BVB bool3)}:algebraic_patterns4]
+		| bool2==bool3 && all_case_alt_results_this_bool algebraic_patterns4 bool2 && no_partial_match ap1.ap_expr
+			= (0,[ap1],Yes ap2.ap_expr)
+			= (-1,[],No)
+	try_replace_case_alts_by_default algebraic_patterns
+		= (-1,[],No)
+	
+	skip_case_alt_results_this_bool :: ![AlgebraicPattern] !Bool !Int -> (![AlgebraicPattern],!Int)
+	skip_case_alt_results_this_bool [{ap_expr=BasicExpr (BVB bool1)}:algebraic_patterns2] bool guard_n
+		| bool1==bool
+			= skip_case_alt_results_this_bool algebraic_patterns2 bool (guard_n+1)
+	skip_case_alt_results_this_bool algebraic_patterns bool guard_n
+		= (algebraic_patterns,guard_n)
+	
+	all_case_alt_results_this_bool :: ![AlgebraicPattern] !Bool -> Bool
+	all_case_alt_results_this_bool [{ap_expr=BasicExpr (BVB bool1)}:algebraic_patterns2] bool
+		= bool1==bool && all_case_alt_results_this_bool algebraic_patterns2 bool
+	all_case_alt_results_this_bool [_:_] bool
+		= False
+	all_case_alt_results_this_bool [] bool
+		= True
+		
+	no_partial_match (Case {case_explicit})
+		= case_explicit
+	no_partial_match (Let {let_expr})
+		= no_partial_match let_expr
+	no_partial_match _
+		= True
+optimise_case case_guards case_default case_info_ptr common_defs expr_heap
+	= (case_guards,case_default,expr_heap)
+
 class convertRootCases a :: !ConvertInfo !a *ConvertState -> (a, *ConvertState)
 
 instance convertRootCases TransformedBody where
@@ -1290,11 +1374,12 @@ instance convertRootCases Expression where
 			CaseKindLeave
 				# (kees=:{case_expr, case_guards, case_default, case_explicit, case_info_ptr}, cs)
 						=	splitCase ci kees cs
-				# (EI_CaseTypeAndSplits case_type _, cs_expr_heap)
-					= readPtr case_info_ptr cs.cs_expr_heap
-		  		# (case_expr, cs)	= convertCases ci case_expr {cs & cs_expr_heap=cs_expr_heap}
-				# (case_guards, cs) = convertRootCasesCasePatterns ci case_guards case_type.ct_cons_types cs
-		  		# (case_default, cs)= convertRootCases ci case_default cs
+				  (EI_CaseTypeAndSplits case_type _, cs_expr_heap) = readPtr case_info_ptr cs.cs_expr_heap
+		  		  (case_expr, cs)	= convertCases ci case_expr {cs & cs_expr_heap=cs_expr_heap}
+				  (case_guards, cs) = convertRootCasesCasePatterns ci case_guards case_type.ct_cons_types cs
+				  (case_default, cs)= convertRootCases ci case_default cs
+				  (case_guards,case_default,expr_heap) = optimise_case case_guards case_default case_info_ptr ci.ci_common_defs cs.cs_expr_heap
+				  cs & cs_expr_heap = expr_heap
 				-> (Case {kees & case_expr=case_expr, case_guards=case_guards, case_default=case_default}, cs)
 			CaseKindTransform
 				->	convertNonRootCase ci kees cs
