@@ -128,7 +128,7 @@ InitialCoclOptions =
 	,	outMode=	FWriteText
 	,	searchPaths=	{sp_locations = [], sp_paths = []}
 	,	listTypes = {lto_showAttributes = True, lto_listTypesKind = ListTypesNone}
-	,	fusion_options = {compile_with_fusion = False, strip_unused = False}
+	,	fusion_options = {compile_with_fusion = False, generic_fusion = False, strip_unused = False}
 	,	compile_for_dynamics	= False
 	,	dump_core				= False
 	,	compile_with_generics 	= True 
@@ -193,6 +193,8 @@ parseCommandLine [arg1=:"-fusion":args] options
 	// switch on fusion transformations
 	# (args,modules,options) = parseCommandLine args {options & fusion_options.compile_with_fusion = True}
 	= ([arg1:args],modules,options)
+parseCommandLine ["-generic_fusion":args] options
+	= parseCommandLine args {options & fusion_options.generic_fusion = True}
 parseCommandLine [arg1=:"-dump":args] options
 	= parseCommandLine args {options & dump_core = True}
 parseCommandLine [arg1=:"-strip":args] options
