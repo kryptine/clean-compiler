@@ -4258,7 +4258,7 @@ transformGroups :: !CleanupInfo !Int !Int !Int !Int !*{!Component} !*{#FunDef} !
 		!*ImportedTypes !*TypeDefInfos !*VarHeap !*TypeHeaps !*ExpressionHeap !FusionOptions !*File !*PredefinedSymbols
 			-> (!*{!Component}, !*{#FunDef}, !*ImportedTypes, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap, !*File, !*PredefinedSymbols)
 transformGroups cleanup_info main_dcl_module_n ro_StdStrictLists_module_n def_min def_max groups fun_defs cons_args common_defs imported_funs
-		imported_types type_def_infos var_heap type_heaps symbol_heap {compile_with_fusion} error predef_symbols
+		imported_types type_def_infos var_heap type_heaps symbol_heap {compile_with_fusion,generic_fusion} error predef_symbols
 	#! nr_of_funs = size fun_defs
 	# initial_ti =	{ ti_fun_defs		= fun_defs
 					, ti_instances		= createArray nr_of_funs II_Empty
@@ -4300,8 +4300,6 @@ transformGroups cleanup_info main_dcl_module_n ro_StdStrictLists_module_n def_mi
 	  fun_defs = { fundef \\ fundef <- [ fundef \\ fundef <-: fun_defs ] ++ new_fun_defs }
 	= (groups, fun_defs, imported_types, collected_imports,	var_heap, type_heaps, symbol_heap, ti.ti_error_file, ti.ti_predef_symbols)
 where
-	generic_fusion = False
-
 	transform_groups :: !Int ![Component] ![Component] !Int !{#CommonDefs} !{#{#FunType}}
 						  !*{#{#CheckedTypeDef}} ![Global Int] ![Int] !*TransformInfo
 		-> *(![Component],!.{#{#CheckedTypeDef}},![Global Int],![Int],!*TransformInfo)
