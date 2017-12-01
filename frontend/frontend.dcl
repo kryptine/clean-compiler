@@ -6,13 +6,13 @@ definition module frontend
 from scanner import ::SearchPaths
 from general import ::Optional (Yes, No)
 import checksupport, overloading
+from trans import ::FusionOptions(..)
 from partition import ::Component(..),::ComponentMembers
 
 :: FrontEndOptions 
 	=	{	feo_up_to_phase			:: !FrontEndPhase
+		,	feo_fusion	 			:: !FusionOptions
 		,	feo_generics 			:: !Bool
-		,	feo_fusion	 			:: !Bool
-		,	feo_strip_unused		:: !Bool
 		,	feo_generate_sapl		:: !Bool
 		}
 

@@ -108,10 +108,9 @@ closeFile _ files
 	,	outMode::	Int
 	,	searchPaths:: SearchPaths
 	,	listTypes :: ListTypesOption
+	,	fusion_options :: !FusionOptions
 	,	compile_for_dynamics	:: !Bool
-	,	compile_with_fusion		:: !Bool
 	,	dump_core				:: !Bool
-	,	strip_unused			:: !Bool
 	,	compile_with_generics   :: !Bool
 	,	generate_sapl           :: !Bool
 	}
@@ -129,10 +128,9 @@ InitialCoclOptions =
 	,	outMode=	FWriteText
 	,	searchPaths=	{sp_locations = [], sp_paths = []}
 	,	listTypes = {lto_showAttributes = True, lto_listTypesKind = ListTypesNone}
+	,	fusion_options = {compile_with_fusion = False, strip_unused = False}
 	,	compile_for_dynamics	= False
-	,	compile_with_fusion		= False
 	,	dump_core				= False
-	,	strip_unused			= False
 	,	compile_with_generics 	= True 
 	,	generate_sapl       	= False
 	}
@@ -193,12 +191,12 @@ parseCommandLine [arg1=:"-dynamics":args] options
 	= ([arg1:args],modules,options)
 parseCommandLine [arg1=:"-fusion":args] options
 	// switch on fusion transformations
-	# (args,modules,options) = parseCommandLine args {options & compile_with_fusion = True}
+	# (args,modules,options) = parseCommandLine args {options & fusion_options.compile_with_fusion = True}
 	= ([arg1:args],modules,options)
 parseCommandLine [arg1=:"-dump":args] options
 	= parseCommandLine args {options & dump_core = True}
 parseCommandLine [arg1=:"-strip":args] options
-	= parseCommandLine args {options & strip_unused = True}
+	= parseCommandLine args {options & fusion_options.strip_unused = True}
 parseCommandLine ["-generics":args] options
 	// enable generics
 	= parseCommandLine args {options & compile_with_generics = True}
@@ -327,8 +325,7 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 		= frontEndInterface opt_file_dir_time
 			{feo_up_to_phase=FrontEndPhaseAll
 			,feo_generics=options.compile_with_generics
-			,feo_fusion=options.compile_with_fusion
-			,feo_strip_unused=options.strip_unused
+			,feo_fusion=options.fusion_options
 			,feo_generate_sapl=options.generate_sapl
 			} moduleIdent options.searchPaths dcl_modules functions_and_macros list_inferred_types predef_symbols hash_table fmodificationtime files error io out tcl_file heaps
 
