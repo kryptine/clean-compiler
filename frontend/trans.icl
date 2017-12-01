@@ -4255,10 +4255,10 @@ mark_unused_functions_in_components [] ti
 	= ti
 
 transformGroups :: !CleanupInfo !Int !Int !Int !Int !*{!Component} !*{#FunDef} !*{!.ConsClasses} !{# CommonDefs}  !{# {# FunType} }
-		!*ImportedTypes !*TypeDefInfos !*VarHeap !*TypeHeaps !*ExpressionHeap !Bool !*File !*PredefinedSymbols
+		!*ImportedTypes !*TypeDefInfos !*VarHeap !*TypeHeaps !*ExpressionHeap !FusionOptions !*File !*PredefinedSymbols
 			-> (!*{!Component}, !*{#FunDef}, !*ImportedTypes, !ImportedConstructors, !*VarHeap, !*TypeHeaps, !*ExpressionHeap, !*File, !*PredefinedSymbols)
 transformGroups cleanup_info main_dcl_module_n ro_StdStrictLists_module_n def_min def_max groups fun_defs cons_args common_defs imported_funs
-		imported_types type_def_infos var_heap type_heaps symbol_heap compile_with_fusion error predef_symbols
+		imported_types type_def_infos var_heap type_heaps symbol_heap {compile_with_fusion} error predef_symbols
 	#! nr_of_funs = size fun_defs
 	# initial_ti =	{ ti_fun_defs		= fun_defs
 					, ti_instances		= createArray nr_of_funs II_Empty
