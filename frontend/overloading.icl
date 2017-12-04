@@ -1453,13 +1453,25 @@ where
 				# (expr_info, expr_heap) = readPtr expr_ptr expr_heap
 				-> case expr_info of
 					EI_TypeCode type_expr
-						# (type_expr, (var_heap, error)) = updateFreeVarsOfTCE symb_ident type_expr (var_heap, error)
-						  expr_heap = expr_heap <:= (dyn_ptr, EI_TypeOfDynamic type_expr)
-						-> convert_local_dynamics loc_dynamics (type_code_info, expr_heap, type_pattern_vars, var_heap, error)
+						# (type_expr, (undefined_tc_class_vars,var_heap)) = try_update_free_vars_of_TCE type_expr ([],var_heap)
+						-> case undefined_tc_class_vars of
+							[]
+								# expr_heap = expr_heap <:= (dyn_ptr, EI_TypeOfDynamic type_expr)
+								-> convert_local_dynamics loc_dynamics (type_code_info, expr_heap, type_pattern_vars, var_heap, error)
+							_
+								# expr_heap = expr_heap <:= (dyn_ptr, EI_TypeOfDynamicAndTCsToFind type_expr symb_ident undefined_tc_class_vars)
+								-> convert_local_dynamics loc_dynamics (type_code_info, expr_heap, type_pattern_vars, var_heap, error)
 					EI_Selection selectors record_var _
-						# (_, var_info_ptr, var_heap, error) = getClassVariable symb_ident record_var var_heap error
-						  expr_heap = expr_heap <:= (dyn_ptr, EI_TypeOfDynamic (convert_selectors selectors var_info_ptr))
-						-> convert_local_dynamics loc_dynamics (type_code_info, expr_heap, type_pattern_vars, var_heap, error)
+						# (var_info,var_heap) = readPtr record_var var_heap
+						-> case var_info of
+							VI_ClassVar var_ident new_info_ptr count
+								# var_heap = writePtr record_var (VI_ClassVar var_ident new_info_ptr (inc count)) var_heap
+								  expr_heap = expr_heap <:= (dyn_ptr, EI_TypeOfDynamic (convert_selectors selectors new_info_ptr))
+								-> convert_local_dynamics loc_dynamics (type_code_info, expr_heap, type_pattern_vars, var_heap, error)
+							_
+								# type_expr = convert_selectors selectors record_var
+								  expr_heap = expr_heap <:= (dyn_ptr, EI_TypeOfDynamicAndTCsToFind type_expr symb_ident [record_var])
+								-> convert_local_dynamics loc_dynamics (type_code_info, expr_heap, type_pattern_vars, var_heap, error)
 			EI_TempDynamicPattern type_vars {dt_global_vars,dt_uni_vars,dt_type,dt_contexts} loc_dynamics temp_local_vars _ _ expr_ptr {symb_ident}
 				#! no_contexts = isEmpty dt_contexts
 				# (expr_info, expr_heap) = readPtr expr_ptr expr_heap
@@ -1539,6 +1551,36 @@ updateFreeVarsOfTCE symb_ident (TCE_TypeTerm var_info_ptr) var_heap_and_error
 updateFreeVarsOfTCE symb_ident tce var_heap_and_error
 	= (tce, var_heap_and_error)
 
+try_update_free_vars_of_TCE :: !TypeCodeExpression !(![VarInfoPtr],!*VarHeap) -> (!TypeCodeExpression, !(![VarInfoPtr],!*VarHeap))
+try_update_free_vars_of_TCE (TCE_Constructor type_cons type_args) var_info_ptrs_and_heap 
+	# (type_args, var_info_ptrs_and_heap) = mapSt try_update_free_vars_of_TCE type_args var_info_ptrs_and_heap 
+	= (TCE_Constructor type_cons type_args, var_info_ptrs_and_heap)
+try_update_free_vars_of_TCE (TCE_Selector selections var_info_ptr) var_info_ptrs_and_heap
+	# (var_info_ptr, var_info_ptrs_and_heap) = try_getTCDictionary var_info_ptr var_info_ptrs_and_heap
+	= (TCE_Selector selections var_info_ptr, var_info_ptrs_and_heap)
+try_update_free_vars_of_TCE (TCE_TypeTerm var_info_ptr) var_info_ptrs_and_heap 
+	# (var_info_ptr, var_info_ptrs_and_heap) = try_getTCDictionary var_info_ptr var_info_ptrs_and_heap
+	= (TCE_TypeTerm var_info_ptr, var_info_ptrs_and_heap)
+try_update_free_vars_of_TCE tce var_info_ptrs_and_heap
+	= (tce, var_info_ptrs_and_heap)
+
+update_undefined_free_vars_of_TCE :: !Ident ![VarInfoPtr] !TypeCodeExpression !(!*VarHeap,!*ErrorAdmin) -> (!TypeCodeExpression,!(!*VarHeap,!*ErrorAdmin))
+update_undefined_free_vars_of_TCE symb_ident undefined_var_info_ptrs (TCE_Constructor type_cons type_args) var_heap_and_error
+	# (type_args, var_heap_and_error) = mapSt (update_undefined_free_vars_of_TCE symb_ident undefined_var_info_ptrs) type_args var_heap_and_error 
+	= (TCE_Constructor type_cons type_args, var_heap_and_error)
+update_undefined_free_vars_of_TCE symb_ident undefined_var_info_ptrs tce=:(TCE_Selector selections var_info_ptr) var_heap_and_error
+	| IsMember var_info_ptr undefined_var_info_ptrs
+		# (var_info_ptr, var_heap_and_error) = getTCDictionary symb_ident var_info_ptr var_heap_and_error
+		= (TCE_Selector selections var_info_ptr, var_heap_and_error)
+		= (tce, var_heap_and_error)
+update_undefined_free_vars_of_TCE symb_ident undefined_var_info_ptrs tce=:(TCE_TypeTerm var_info_ptr) var_heap_and_error 
+	| IsMember var_info_ptr undefined_var_info_ptrs
+		# (var_info_ptr, var_heap_and_error) = getTCDictionary symb_ident var_info_ptr var_heap_and_error
+		= (TCE_TypeTerm var_info_ptr, var_heap_and_error)
+		= (tce, var_heap_and_error)
+update_undefined_free_vars_of_TCE symb_ident undefined_var_info_ptrs tce var_heap_and_error
+	= (tce, var_heap_and_error)
+
 getTCDictionary symb_ident var_info_ptr (var_heap, error)
 	# (var_info, var_heap) = readPtr var_info_ptr var_heap
 	= case var_info of
@@ -1546,6 +1588,15 @@ getTCDictionary symb_ident var_info_ptr (var_heap, error)
 			-> (new_info_ptr, (var_heap <:= (var_info_ptr, VI_ClassVar var_ident new_info_ptr (inc count)), error))
 		_
 			-> (var_info_ptr, (var_heap, overloadingError symb_ident error))
+
+try_getTCDictionary :: !VarInfoPtr !(![VarInfoPtr],!*VarHeap) -> (!VarInfoPtr,!(![VarInfoPtr],!*VarHeap))
+try_getTCDictionary var_info_ptr (var_info_ptrs,var_heap)
+	# (var_info, var_heap) = readPtr var_info_ptr var_heap
+	= case var_info of
+		VI_ClassVar var_ident new_info_ptr count
+			-> (new_info_ptr, (var_info_ptrs,writePtr var_info_ptr (VI_ClassVar var_ident new_info_ptr (inc count)) var_heap))
+		_
+			-> (var_info_ptr, ([var_info_ptr:var_info_ptrs],var_heap))
 
 toTypeCodeConstructor type=:{glob_object=type_index, glob_module=module_index} common_defs
 	| module_index == cPredefinedModuleIndex
@@ -1831,6 +1882,12 @@ where
 				EI_TypeOfDynamic type_code
 					# (dyn_expr, ui) = updateExpression group_index dyn_expr ui
 					-> (dyn_expr,type_code,ui)
+				EI_TypeOfDynamicAndTCsToFind type_expr symb_ident undefined_tc_class_vars
+					# (type_expr, (var_heap, error))
+						= update_undefined_free_vars_of_TCE symb_ident undefined_tc_class_vars type_expr (ui.ui_var_heap, ui.ui_error)
+					  ui & ui_var_heap=var_heap, ui_error=error
+					  (dyn_expr, ui) = updateExpression group_index dyn_expr ui
+					-> (dyn_expr,type_expr,ui)
 				EI_TypeOfDynamicWithContexts type_code (VarContext _ context dynamic_expr_type NoVarContexts)
 					# (old_var_infos,var_heap) = add_class_vars_for_var_context context ui.ui_var_heap
 					  (dyn_expr,ui) = updateExpression group_index dyn_expr {ui & ui_var_heap=var_heap}

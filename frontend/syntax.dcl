@@ -928,6 +928,7 @@ cNotVarNumber :== -1
 					| EI_TempDynamicPattern 	![TypeVar] !DynamicType ![DynamicPtr] ![TempLocalVar] !AType ![TypeContext] !ExprInfoPtr !SymbIdent
 
 					| EI_TypeOfDynamic 			!TypeCodeExpression						/* Final */
+					| EI_TypeOfDynamicAndTCsToFind !TypeCodeExpression !Ident ![VarInfoPtr]
 					| EI_TypeOfDynamicPattern 	![VarInfoPtr] !TypeCodeExpression !Bool	/* Final */
 					| EI_TypeOfDynamicWithContexts !TypeCodeExpression !(VarContexts DictionaryAndClassType)
 
