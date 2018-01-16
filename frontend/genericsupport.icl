@@ -99,13 +99,14 @@ genericIdentToMemberIdent id_name kind
 
 genericIdentToFunIdent :: !String !TypeCons -> Ident
 genericIdentToFunIdent id_name type_cons
-	= postfixIdent id_name ("_" +++ type_cons_to_str type_cons)
-where
-	type_cons_to_str (TypeConsSymb {type_ident}) = toString type_ident
-	type_cons_to_str (TypeConsBasic bt) = toString bt
-	type_cons_to_str TypeConsArrow = "ARROW"
-	type_cons_to_str (TypeConsVar tv) = tv.tv_ident.id_name
-	type_cons_to_str (TypeConsQualifiedIdent _ type_name) = type_name
+	= postfixIdent id_name ("_" +++ type_cons_to_string type_cons)
+
+type_cons_to_string :: !TypeCons -> {#Char}
+type_cons_to_string (TypeConsSymb {type_ident}) = toString type_ident
+type_cons_to_string (TypeConsBasic bt) = toString bt
+type_cons_to_string TypeConsArrow = "ARROW"
+type_cons_to_string (TypeConsVar tv) = tv.tv_ident.id_name
+type_cons_to_string (TypeConsQualifiedIdent _ type_name) = type_name
 
 field_n_of_GenericTypeDefDescriptor :: !String -> Int
 field_n_of_GenericTypeDefDescriptor "gtd_name" = 0
