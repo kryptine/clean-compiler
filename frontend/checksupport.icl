@@ -3,6 +3,7 @@ implementation module checksupport
 import StdEnv, compare_constructor
 import syntax, predef, containers
 import utilities
+from genericsupport import type_cons_to_string
 
 cUndef			:== -1
 
@@ -368,7 +369,29 @@ addSymbol yes_for_icl_module ident pos decl_kind def_kind def_index def_mod impo
 				  cs & cs_error = checkError ident ("multiply defined (in module "+++toString dcl_name1+++" and already in module "+++toString dcl_name2+++")") cs_error
 				= (False, dcl_modules, cs)
 		add_indirectly_imported_symbol _ entry ident pos def_kind def_index def_mod _ dcl_modules cs=:{cs_error}
-			= (False, dcl_modules, { cs & cs_error = checkError ident "multiply defined" cs_error})
+			= case decl_kind of
+				STE_Imported ste_kind mod_index
+					| mod_index>=0 && mod_index<size dcl_modules
+						# ({dcl_name,dcl_common={com_gencase_defs}},dcl_modules) = dcl_modules![mod_index]
+						-> case (ste_kind,entry) of
+							(STE_GenericDeriveClass,{ste_kind=STE_GenericDeriveClass,ste_index})
+								| ste_index>=0 && ste_index<size com_gencase_defs
+									# gc_type_cons = com_gencase_defs.[ste_index].gc_type_cons
+									# ident = "derived generic instances for class "+++ident.id_name+++" for type "+++type_cons_to_string gc_type_cons
+									-> (False, dcl_modules, {cs & cs_error = checkError ident ("multiply defined (also imported from module "+++toString dcl_name+++")") cs_error})
+							(STE_Instance,{ste_kind=STE_Instance,ste_index})
+								-> (False, dcl_modules, {cs & cs_error = checkError ("instance of class "+++toString ident) ("multiply defined (also imported from module "+++toString dcl_name+++")") cs_error})
+							_
+								-> (False, dcl_modules, {cs & cs_error = checkError ident ("multiply defined (also imported from module "+++toString dcl_name+++")") cs_error})
+				_
+					# cs_error = case entry.ste_kind of
+									STE_GenericDeriveClass
+										-> checkError ("derive of class "+++toString ident) "multiply defined" cs_error
+									STE_Instance
+										-> checkError ("instance of class "+++toString ident) "multiply defined" cs_error
+									_
+										-> checkError ident "multiply defined" cs_error
+					-> (False, dcl_modules, {cs & cs_error=cs_error})
 
 addGlobalDefinitionsToSymbolTable :: ![Declaration] !*CheckState -> .CheckState;
 addGlobalDefinitionsToSymbolTable decls cs

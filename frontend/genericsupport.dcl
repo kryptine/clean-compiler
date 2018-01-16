@@ -50,6 +50,7 @@ postfixIdent 				:: !String !String -> Ident
 genericIdentToClassIdent 	:: !String !TypeKind -> Ident
 genericIdentToMemberIdent 	:: !String !TypeKind -> Ident
 genericIdentToFunIdent 		:: !String !TypeCons -> Ident
+type_cons_to_string :: !TypeCons -> {#Char}
 kind_to_short_string :: !TypeKind -> {#Char}
 
 field_n_of_GenericTypeDefDescriptor :: !String -> Int
