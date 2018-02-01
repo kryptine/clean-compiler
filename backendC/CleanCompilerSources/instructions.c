@@ -1583,9 +1583,7 @@ void CallArrayFunction (SymbDef array_def,Bool is_jsr,StateP node_state_p)
 					CallFunction2	(ApplyLabel, ApplyDef, True, ApplyState, NULL, 2);
 				
 				GenPushArray (0);
-				GenUpdateA (0, 1);
-				GenPopA (1);
-				
+				GenUpdatePopA (0, 1);
 				break;
 			case ArraySelectFun:
 				if (elem_state.state_kind==StrictOnA)
@@ -1668,8 +1666,7 @@ void CallArrayFunction (SymbDef array_def,Bool is_jsr,StateP node_state_p)
 				ApplyOperatorToArrayElem (asize, bsize, elem_state.state_object);
 
 				GenPushArray (0);
-				GenUpdateA (0, 1);
-				GenPopA (1);
+				GenUpdatePopA (0, 1);
 				break;
 			case ArrayUpdateFun:
 				DetermineSizeOfState (elem_state,&asize,&bsize);
@@ -1678,8 +1675,7 @@ void CallArrayFunction (SymbDef array_def,Bool is_jsr,StateP node_state_p)
 				ApplyOperatorToArrayElem (asize,bsize,elem_state.state_object);
 
 				GenPushArray (0);
-				GenUpdateA (0, 1);
-				GenPopA (1);
+				GenUpdatePopA (0, 1);
 				break;
 			case ArrayReplaceFun:
 				DetermineSizeOfState (elem_state,&asize,&bsize);
@@ -2336,10 +2332,8 @@ void GenBuildR (Label symblab,int nr_a_args,int nr_b_args,int a_offset,int b_off
 	FPrintF (OutFile, " %d %d %d %d",nr_a_args,nr_b_args,a_offset,b_offset);
 
 	if (pop_args){
-		if (nr_a_args>0){
-			GenUpdateA (0,nr_a_args);
-			GenPopA (nr_a_args);
-		}
+		if (nr_a_args>0)
+			GenUpdatePopA (0,nr_a_args);
 		GenPopB (nr_b_args);
 	}
 }
