@@ -81,6 +81,7 @@ void GenFill2R (Label symblab,int n_a_args,int n_b_args,int rootoffset,char bits
 void GenFill3R (Label symblab,int n_a_args,int n_b_args,int rootoffset,char bits[]);
 void GenBuildR (Label symblab,int nr_a_args,int nr_b_args,int a_offset,int b_offset,Bool pop_args);
 
+void GenFillArrayAndPop (int rootoffset, FillKind fkind);
 void GenFillArray (int argoffset, int rootoffset, FillKind fkind);
 
 void GenPushArray (int offset);
