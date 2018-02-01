@@ -2351,6 +2351,11 @@ void GenFillFromA (int src, int dst, FillKind fkind)
 	TreatWaitListAfterFill (dst, fkind);
 }
 
+void GenFillArrayAndPop (int rootoffset, FillKind fkind)
+{
+	GenFillh (&BasicDescriptors [ArrayObj], 1, rootoffset, fkind);
+}
+
 void GenFillArray (int argoffset, int rootoffset, FillKind fkind)
 {
 	GenPushA (argoffset);
