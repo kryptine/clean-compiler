@@ -255,15 +255,21 @@ void RedirectResultAndReturn (int asp,int bsp,int source_a_index,int source_b_in
 					BuildTuple (source_a_index,source_b_index,asp,bsp,
 						offstate.state_arity, offstate.state_tuple_arguments,
 						offasize, offbsize, 0, ReleaseAndFill,True);
+					GenUpdatePopA (0,asp);
 					break;
 				case RecordState:
 					BuildRecord (offstate.state_record_symbol,source_a_index,source_b_index, asp, bsp,
 						offasize, offbsize, 0, ReleaseAndFill,True);
+					GenUpdatePopA (0,asp);
 					break;
 				case ArrayState:
-					GenBuildArray (asp-source_a_index);
+					if (asp==source_a_index && asp==1)
+						GenBuildArrayPop();
+					else {
+						GenBuildArray (asp-source_a_index);
+						GenUpdatePopA (0,asp);
+					}
 			}
-			GenUpdatePopA (0,asp);
 			GenPopB (bsp);
 		} else {
 			switch (offstate.state_type){

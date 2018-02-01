@@ -2168,10 +2168,15 @@ void GenBuildU (Label symblab,int a_size,int b_size,Label contlab)
 	GenDescriptorOrNodeEntryLabel (contlab);
 }
 
+void GenBuildArrayPop (void)
+{
+	GenBuildh (& BasicDescriptors [ArrayObj], 1);
+}
+
 void GenBuildArray (int argoffset)
 {
 	GenPushA (argoffset);
-	GenBuildh (& BasicDescriptors [ArrayObj], 1);
+	GenBuildArrayPop();
 }
 
 void GenBuildString (SymbValue val)

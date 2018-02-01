@@ -1878,21 +1878,17 @@ void ApplyEntry (StateS *const function_state_p,int arity,Label ea_lab,int ea_la
 			case TupleState:
 				BuildTuple (asize, bsize, asize, bsize, function_state_p[-1].state_arity,
 					function_state_p[-1].state_tuple_arguments,asize,bsize, asize,NormalFill,True);
+				GenUpdatePopA (0, asize);
 				break;
 			case RecordState:
 				BuildRecord (function_state_p[-1].state_record_symbol,asize, bsize, asize, bsize,
 							asize, bsize, asize, NormalFill,True);
+				GenUpdatePopA (0, asize);
 				break;
 			case ArrayState:
-				GenBuildArray (0);
+				GenBuildArrayPop();
 				break;
 		}
-#if UPDATE_POP
-		GenUpdatePopA (0, asize);
-#else
-		GenUpdateA	(0, asize);
-		GenPopA		(asize);
-#endif
 		GenPopB		(bsize);
 		GenRtn		(1,0,OnAState);
 #if SHARE_UPDATE_CODE

@@ -64,6 +64,7 @@ void GenBuild (Label symblab,int arity,Label contlab);
 void GenBuildh (Label symblab,int arity);
 void GenBuildPartialFunctionh (Label symblab,int arity);
 void GenBuildU (Label symblab,int a_size,int b_size,Label contlab);
+void GenBuildArrayPop (void);
 void GenBuildArray (int argoffset);
 void GenBuildString (SymbValue val);
 
