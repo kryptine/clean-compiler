@@ -2832,14 +2832,8 @@ static void fill_strict_if_node (Node node,int *asp_p,int *bsp_p,CodeGenNodeIdsP
 				for (i=a_size-1; i>=0; --i)
 					GenPushA (difference-1);
 				
-				if (a_size>0){
-					GenBuildh (&nil_lab,0);
-
-					for (i=0; i<a_size; ++i)
-						GenUpdateA (0,difference+i);
-
-					GenPopA (1);
-				}
+				for (i=0; i<a_size; ++i)
+					GenUpdateA (difference-1/*offset of _Nil*/,difference+i);
 			} else {
 				for (i=difference-1; i>=0; --i)
 					GenPushA (difference-1);
@@ -2892,14 +2886,8 @@ static void fill_strict_if_node (Node node,int *asp_p,int *bsp_p,CodeGenNodeIdsP
 				for (i=b_size-1; i>=0; --i)
 					GenPushB (difference-1);
 
-				if (b_size>0){
-					PushBasic (IntObj,sv);
-
-					for (i=0; i<b_size; ++i)
-						GenUpdateB (0,difference+i);
-
-					GenPopB (1);
-				}
+				for (i=0; i<b_size; ++i)
+					GenUpdateB (difference-1/*offset of int 0*/,difference+i);
 			} else {
 				for (i=difference-1; i>=0; --i)
 					GenPushB (difference-1);
