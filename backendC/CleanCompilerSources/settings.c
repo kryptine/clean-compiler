@@ -31,6 +31,7 @@ Bool DoTimeProfiling=False;
 
 Bool DoReuseUniqueNodes		= False;
 Bool DoFusion				= False;
+Bool DoGenericFusion		= False;
 
 Bool OptimizeLazyTupleRecursion=False;
 Bool OptimizeTailCallModuloCons=True;

@@ -128,6 +128,7 @@ Bool CallCompiler (int argc, char **argv)
 	DoTimeProfiling=False;
 	DoReuseUniqueNodes=False;
 	DoFusion=False;
+	DoGenericFusion=False;
 	DoDescriptors=False;
 	ExportLocalLabels=False;
 	AddStrictnessToExportedFunctionTypes=False;
@@ -192,6 +193,8 @@ Bool CallCompiler (int argc, char **argv)
 				ExportLocalLabels=True;
 			else if (strcmp (argv_i,"-fusion") == 0)
 				DoFusion=True;
+			else if (strcmp (argv_i,"-generic_fusion") == 0)
+				DoGenericFusion=True;
 			else if (strcmp (argv_i,"-seft") == 0)
 				AddStrictnessToExportedFunctionTypes=True;
 			else if (strcmp (argv_i,"-dynamics") == 0)
