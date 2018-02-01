@@ -687,19 +687,27 @@ void CoerceArgumentOnTopOfStack (int *asp_p,int *bsp_p,StateS argstate,StateS no
 				BuildTuple (*asp_p,*bsp_p,*asp_p,*bsp_p,nodestate.state_arity,nodestate.state_tuple_arguments,
 							asize,bsize,*asp_p,NormalFill,True);
 				*asp_p+=1;
+				GenUpdatePopA (0,asize);
+				*asp_p-=asize;
 				break;
 			case RecordState:
 				BuildRecord (nodestate.state_record_symbol,*asp_p,*bsp_p,*asp_p,*bsp_p,
 							asize,bsize,*asp_p,NormalFill,True);
 				*asp_p+=1;
+				GenUpdatePopA (0,asize);
+				*asp_p-=asize;
 				break;
 			case ArrayState:
-				GenBuildArray (0);
-				++*asp_p;
+				if (asize==1)
+					GenBuildArrayPop();
+				else {
+					GenBuildArray (0);
+					++*asp_p;
+					GenUpdatePopA (0,asize);
+					*asp_p-=asize;
+				}
 				break;
 		}
-		GenUpdatePopA (0,asize);
-		*asp_p-=asize;
 		GenPopB (bsize);
 		*bsp_p-=bsize;
 	} else {
@@ -3845,9 +3853,8 @@ static void FillUpdateNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 		}
 
 		if (update_immediately){
-#if 1
 			BuildArgs (record_arg->arg_next,asp_p,bsp_p,code_gen_node_ids_p);
-#endif
+
 			if (record_node->node_kind==NodeIdNode){
 				NodeIdP record_node_id;
 				
@@ -3860,9 +3867,6 @@ static void FillUpdateNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 
 #if BOXED_RECORDS
 					record_node_id->nid_mark2 |= NID_RECORD_USED_BY_NON_SELECTOR_OR_UPDATES;
-#endif
-#if 0
-					BuildArgs (record_arg->arg_next,asp_p,bsp_p,code_gen_node_ids_p);
 #endif
 					DetermineSizeOfState (*record_state_p,&record_a_size,&record_b_size);
 				
@@ -3896,11 +3900,9 @@ static void FillUpdateNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 #endif
 
 			record_arg->arg_state=*record_state_p;
-#if 1
+
 			BuildArg (node->node_arguments,asp_p,bsp_p,code_gen_node_ids_p);
-#else
-			BuildArgs (node->node_arguments,asp_p,bsp_p,code_gen_node_ids_p);
-#endif
+
 			DetermineSizeOfState (*record_state_p,&record_a_size,&record_b_size);
 
 			{
