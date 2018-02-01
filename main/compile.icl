@@ -193,8 +193,9 @@ parseCommandLine [arg1=:"-fusion":args] options
 	// switch on fusion transformations
 	# (args,modules,options) = parseCommandLine args {options & fusion_options.compile_with_fusion = True}
 	= ([arg1:args],modules,options)
-parseCommandLine ["-generic_fusion":args] options
-	= parseCommandLine args {options & fusion_options.generic_fusion = True}
+parseCommandLine [arg1=:"-generic_fusion":args] options
+	# (args,modules,options) = parseCommandLine args {options & fusion_options.generic_fusion = True}
+	= ([arg1:args],modules,options)
 parseCommandLine [arg1=:"-dump":args] options
 	= parseCommandLine args {options & dump_core = True}
 parseCommandLine [arg1=:"-strip":args] options
