@@ -271,15 +271,21 @@ void RedirectResultAndReturn (int asp,int bsp,int source_a_index,int source_b_in
 					BuildTuple (source_a_index,source_b_index,asp,bsp,
 						offstate.state_arity, offstate.state_tuple_arguments,
 						offasize, offbsize, 0, ReleaseAndFill,False);
+					GenPopA (asp);
 					break;
 				case RecordState:
 					BuildRecord (offstate.state_record_symbol,source_a_index,source_b_index, asp, bsp,
 						offasize, offbsize, 0, ReleaseAndFill,False);
+					GenPopA (asp);
 					break;
-				case ArrayState:			
-					GenFillArray (asp-source_a_index,asp,ReleaseAndFill);
+				case ArrayState:
+					if (asp==source_a_index && asp==1)
+						GenFillArrayAndPop (asp,ReleaseAndFill);
+					else {
+						GenFillArray (asp-source_a_index,asp,ReleaseAndFill);
+						GenPopA (asp);
+					}
 			}
-			GenPopA (asp);
 			GenPopB (bsp);
 		}
 	} else {

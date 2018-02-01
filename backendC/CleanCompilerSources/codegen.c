@@ -914,16 +914,17 @@ static void CodeRule (ImpRuleP rule)
 					case TupleState:
 						BuildTuple (asize,bsize,asize,bsize,function_state_p[-1].state_arity,
 							function_state_p[-1].state_tuple_arguments,asize, bsize, 0, ReleaseAndFill,False);
+						GenPopA (asize);
 						break;
 					case RecordState:
 						BuildRecord (function_state_p[-1].state_record_symbol,asize, bsize, asize, bsize,
 							asize, bsize, 0, ReleaseAndFill, False);
+						GenPopA (asize);
 						break;
 					case ArrayState:
-						GenFillArray (0, 1, ReleaseAndFill);
+						GenFillArrayAndPop (1, ReleaseAndFill);
 						break;
 				}
-				GenPopA (asize);
 			} else {
 				switch (function_state_p[-1].state_type){
 					case TupleState:
@@ -938,12 +939,7 @@ static void CodeRule (ImpRuleP rule)
 						GenBuildArray (0);
 						break;
 				}
-#if UPDATE_POP
 				GenUpdatePopA (0, asize);
-#else
-				GenUpdateA (0, asize);
-				GenPopA (asize);
-#endif
 			}
 	
 			GenPopB		(bsize);

@@ -1103,18 +1103,19 @@ static void GenLazyFieldSelectorEntry (SymbDef field_def,StateS recstate,int tot
 					BuildTuple (asize,bsize,asize,bsize,
 								offfieldstate.state_arity,offfieldstate.state_tuple_arguments,
 								asize,bsize,0,ReleaseAndFill,False);
+					GenPopA (asize);
 					break;
 				case ArrayState:
-					GenFillArray (0,1,ReleaseAndFill);
+					GenFillArrayAndPop (1,ReleaseAndFill);
 					break;
 #ifdef ADD_ARGUMENTS_TO_HIGHER_ORDER_FUNCTIONS
 				case RecordState:
 					BuildRecord (offfieldstate.state_record_symbol,asize,bsize,asize,bsize,
 									asize,bsize,0,ReleaseAndFill,False);
+					GenPopA (asize);
 					break;
 #endif
 			}
-			GenPopA (asize);
 			GenPopB (bsize);
 		 	GenRtn (1,0,OnAState);
 		}
@@ -1520,18 +1521,19 @@ Bool NodeEntry (StateS *const function_state_p,int arity,Label ealab,SymbDef roo
 			case TupleState:
 				BuildTuple (asize,bsize,asize,bsize,function_state_p[-1].state_arity,
 					function_state_p[-1].state_tuple_arguments,asize, bsize, 0, ReleaseAndFill,False);
+				GenPopA (asize);
 				break;
 			case RecordState:
 				BuildRecord (function_state_p[-1].state_record_symbol,asize,bsize,asize,bsize,
 								asize,bsize,0,ReleaseAndFill,False);
+				GenPopA (asize);
 				break;
 			case ArrayState:
-				GenFillArray (0, 1, ReleaseAndFill);
+				GenFillArrayAndPop (1, ReleaseAndFill);
 				break;
 		}
-		GenPopA (asize);
-		GenPopB (bsize);
 
+		GenPopB (bsize);
 		GenRtn (1,0,OnAState);
 #if SHARE_UPDATE_CODE
 		}
@@ -1690,18 +1692,19 @@ Bool NodeEntryUnboxed (StateS *const function_state_p,NodeP call_node_p,int args
 			case TupleState:
 				BuildTuple (asize,bsize,asize,bsize,function_state_p[-1].state_arity,
 					function_state_p[-1].state_tuple_arguments,asize, bsize, 0, ReleaseAndFill,False);
+				GenPopA (asize);
 				break;
 			case RecordState:
 				BuildRecord (function_state_p[-1].state_record_symbol,asize,bsize,asize,bsize,
 								asize,bsize,0,ReleaseAndFill,False);
+				GenPopA (asize);
 				break;
 			case ArrayState:
-				GenFillArray (0, 1, ReleaseAndFill);
+				GenFillArrayAndPop (1, ReleaseAndFill);
 				break;
 		}
-		GenPopA (asize);
-		GenPopB (bsize);
 
+		GenPopB (bsize);
 		GenRtn (1,0,OnAState);
 #	if SHARE_UPDATE_CODE
 		}
