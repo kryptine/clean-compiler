@@ -808,6 +808,8 @@ instance check_completeness SymbIdent where
 				-> check_completeness_for_local_dcl_macro symb_ident global_index cci ccs
 			SK_OverloadedFunction {glob_module,glob_object}
 				-> check_whether_ident_is_imported symb_ident glob_module glob_object STE_Member cci ccs
+			SK_Generic {glob_module,glob_object} _
+				-> check_whether_ident_is_imported symb_ident glob_module glob_object STE_Generic cci ccs
   	  where
 		check_completeness_for_function symb_ident {glob_object,glob_module} cci ccs
 			= check_whether_ident_is_imported symb_ident glob_module glob_object (STE_FunctionOrMacro []) cci ccs
