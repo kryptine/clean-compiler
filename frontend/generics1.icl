@@ -1989,6 +1989,8 @@ where
 			= case gcf_body of
 				GCB_FunIndex fun_index
 					-> fun_index
+				GCB_FunAndMacroIndex fun_index macro_index
+					-> fun_index
 		= foldSt (build_shorthand_instance gc_ident kinds gcf_generic fun_index gc_type gc_type_cons gc_pos module_index) [1 .. length kinds] st
 	where
 		build_shorthand_instance gc_ident kinds gcf_generic fun_index gc_type gc_type_cons gc_pos module_index num_args
