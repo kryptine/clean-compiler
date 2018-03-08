@@ -1325,7 +1325,7 @@ remove_generic_info_and_determine_generic_instance_deps bodies arity type_cons c
 					-> (bodies,arity-1,GenericInstanceUsedArgs n_deps deps,ca)
 					-> (bodies,arity-1,GenericInstanceUsedArgs 0 0,ca)
 		_
-			-> (bodies,arity-1,AllGenericInstanceDependencies,ca)
+			-> (map remove_generic_info_in_body bodies,arity-1,AllGenericInstanceDependencies,ca)
   where
 	remove_generic_info_and_determine_generic_instance_deps_in_bodies [body:bodies] n_deps deps
 		# (body,n_deps,deps) = remove_generic_info_and_determine_generic_instance_deps_in_body body n_deps deps
@@ -1339,6 +1339,11 @@ remove_generic_info_and_determine_generic_instance_deps bodies arity type_cons c
 		= ({body & pb_args=args},n_deps,deps)
 	remove_generic_info_and_determine_generic_instance_deps_in_body body n_deps deps
 		= (body,n_deps,deps)
+
+	remove_generic_info_in_body body=:{pb_args=[_:args]}
+		= {body & pb_args=args}
+	remove_generic_info_in_body body
+		= body
 
 mark_deps_in_args :: [ParsedExpr] Int Int Int -> (!Int,!Int)
 mark_deps_in_args [PE_WildCard:args] arg_n n_deps deps
