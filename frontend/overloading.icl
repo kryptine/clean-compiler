@@ -248,19 +248,19 @@ improveDepTypes info [rc : rcs] dts_state
 	# dts_state = improve_rc info rc dts_state
 	= improve_rcs info rcs dts_state
 where
-	improve_rc info=:{ri_defs} (RC_Context tc=:{tc_class=TCClass class_symb,tc_types}) dts_state=:{dts_contexts,dts_subst}
+	improve_rc info=:{ri_defs} (RC_Context tc=:{tc_class=TCClass class_symb,tc_types}) dts_state=:{dts_contexts,dts_subst,dts_type_heaps}
 		# class_fun_dep_vars = ri_defs.[class_symb.glob_module].com_class_defs.[class_symb.glob_object.ds_index].class_fun_dep_vars
 		| class_fun_dep_vars<>0
 			# (found,prev_tc_types,dts_subst) = tc_with_dep_type_occurs dts_contexts class_symb tc_types class_fun_dep_vars dts_subst
 			| found // && trace_tn "improve_rc" ---> (class_fun_dep_vars,prev_tc_types,tc_types)
-				# (ok,dts_subst) = improve_dep_type_in_context prev_tc_types tc_types class_fun_dep_vars dts_subst				
+				# (ok,dts_subst,dts_type_heaps) = improve_dep_type_in_context ri_defs prev_tc_types tc_types class_fun_dep_vars dts_subst dts_type_heaps
 				| ok
-					= {dts_state & dts_subst = dts_subst}
+					= {dts_state & dts_subst = dts_subst, dts_type_heaps = dts_type_heaps}
 					# (_, tc_types, subst_array) = arraySubst tc_types dts_subst.subst_array
 					  (_, prev_tc_types, subst_array) = arraySubst prev_tc_types subst_array
 					  dts_subst & subst_array = subst_array
 					  dts_error = typeImprovementError class_symb.glob_object.ds_ident prev_tc_types tc_types dts_state.dts_error
-					= {dts_state & dts_subst = dts_subst, dts_error = dts_error}
+					= {dts_state & dts_subst = dts_subst, dts_type_heaps = dts_type_heaps, dts_error = dts_error}
 				= {dts_state & dts_contexts = [tc:dts_contexts], dts_subst=dts_subst}
 			= dts_state
 	improve_rc info (RC_Context tc) dts_state
@@ -401,121 +401,149 @@ equal_type_vars2 tv_n1 tv_n2 subst
 		_
 			-> (False,subst) // ---> ("equal_type_vars2",tv_n1,tv_n2)
 
-improve_dep_type_in_context :: [Type] [Type] Int *Subst -> (!Bool,!*Subst)
-improve_dep_type_in_context [prev_type:prev_types] [type:types] fun_dep_vars subst
+improve_dep_type_in_context :: !{#CommonDefs} [Type] [Type] Int *Subst !*TypeHeaps -> (!Bool,!*Subst,!*TypeHeaps)
+improve_dep_type_in_context defs [prev_type:prev_types] [type:types] fun_dep_vars subst type_heaps
 	| fun_dep_vars bitand 1<>0
-		# (ok,subst) = improve_type prev_type type subst
+		# (ok,subst,type_heaps) = improve_type defs prev_type type subst type_heaps
 		| ok
-			= improve_dep_type_in_context prev_types types (fun_dep_vars>>1) subst
-			= (False,subst)
-		= improve_dep_type_in_context prev_types types (fun_dep_vars>>1) subst
+			= improve_dep_type_in_context defs prev_types types (fun_dep_vars>>1) subst type_heaps
+			= (False,subst,type_heaps)
+		= improve_dep_type_in_context defs prev_types types (fun_dep_vars>>1) subst type_heaps
 where
-	improve_type :: Type Type *Subst -> (!Bool,!*Subst)
-	improve_type (TempV tv_n1) (TempV tv_n2) subst
-		= improve_type_vars tv_n1 tv_n2 subst
-	improve_type (TempV tv_n1) type2 subst
+	improve_type :: !{#CommonDefs} Type Type *Subst !*TypeHeaps -> (!Bool,!*Subst,!*TypeHeaps)
+	improve_type defs (TempV tv_n1) (TempV tv_n2) subst type_heaps
+		= improve_type_vars defs tv_n1 tv_n2 subst type_heaps
+	improve_type defs (TempV tv_n1) type2 subst type_heaps
 		# (stype1,subst) = subst!subst_array.[tv_n1]
 		= case stype1 of
 			TE
 				| containsTypeVariable tv_n1 type2 subst.subst_array
-					-> (False,subst)
+					-> (False,subst,type_heaps)
 					# subst & subst_array.[tv_n1] = type2, subst_changed=True
-					-> (True,subst)
+					-> (True,subst,type_heaps)
 			_
-				-> improve_type stype1 type2 subst
-	improve_type type1 (TempV tv_n2) subst
+				-> improve_type defs stype1 type2 subst type_heaps
+	improve_type defs type1 (TempV tv_n2) subst type_heaps
 		# (stype2,subst) = subst!subst_array.[tv_n2]
 		= case stype2 of
 			TE
 				| containsTypeVariable tv_n2 type1 subst.subst_array
-					-> (False,subst)
+					-> (False,subst,type_heaps)
 					# subst & subst_array.[tv_n2] = type1, subst_changed=True
-					-> (True,subst)	// ---> ("improve_type",type1,tv_n2)
+					-> (True,subst,type_heaps)
 			_
-				-> improve_type type1 stype2 subst
-	improve_type (TA cons_id1 cons_args1) (TA cons_id2 cons_args2) subst
+				-> improve_type defs type1 stype2 subst type_heaps
+	improve_type defs type1=:(TA cons_id1 cons_args1) type2=:(TA cons_id2 cons_args2) subst type_heaps
 		| cons_id1==cons_id2
-			= improve_atypes cons_args1 cons_args2 subst
-			= (False,subst)
-	improve_type (TA cons_id1 cons_args1) (TAS cons_id2 cons_args2 _) subst
+			= improve_atypes defs cons_args1 cons_args2 subst type_heaps
+			= expand_and_improve defs cons_id1 cons_args1 cons_id2 cons_args2 type1 type2 subst type_heaps
+	improve_type defs type1=:(TA cons_id1 cons_args1) type2=:(TAS cons_id2 cons_args2 _) subst type_heaps
 		| cons_id1==cons_id2
-			= improve_atypes cons_args1 cons_args2 subst
-			= (False,subst)
-	improve_type (TAS cons_id1 cons_args1 _) (TAS cons_id2 cons_args2 _) subst
+			= improve_atypes defs cons_args1 cons_args2 subst type_heaps
+			= expand_and_improve defs cons_id1 cons_args1 cons_id2 cons_args2 type1 type2 subst type_heaps
+	improve_type defs type1=:(TAS cons_id1 cons_args1 _) type2=:(TAS cons_id2 cons_args2 _) subst type_heaps
 		| cons_id1==cons_id2
-			= improve_atypes cons_args1 cons_args2 subst
-			= (False,subst)
-	improve_type (TAS cons_id1 cons_args1 _) (TA cons_id2 cons_args2) subst
+			= improve_atypes defs cons_args1 cons_args2 subst type_heaps
+			= expand_and_improve defs cons_id1 cons_args1 cons_id2 cons_args2 type1 type2 subst type_heaps
+	improve_type defs type1=:(TAS cons_id1 cons_args1 _) type2=:(TA cons_id2 cons_args2) subst type_heaps
 		| cons_id1==cons_id2
-			= improve_atypes cons_args1 cons_args2 subst
-			= (False,subst)
-	improve_type (TB tb1) (TB tb2) subst
-		= (tb1==tb2,subst)
-	improve_type (arg_atype1-->res_atype1) (arg_atype2-->res_atype2) subst
-		# (ok,subst) = improve_type arg_atype1.at_type arg_atype2.at_type subst
+			= improve_atypes defs cons_args1 cons_args2 subst type_heaps
+			= expand_and_improve defs cons_id1 cons_args1 cons_id2 cons_args2 type1 type2 subst type_heaps
+	improve_type defs (TB tb1) (TB tb2) subst type_heaps
+		= (tb1==tb2,subst,type_heaps)
+	improve_type defs (arg_atype1-->res_atype1) (arg_atype2-->res_atype2) subst type_heaps
+		# (ok,subst,type_heaps) = improve_type defs arg_atype1.at_type arg_atype2.at_type subst type_heaps
 		| ok
-			= improve_type res_atype1.at_type res_atype2.at_type subst
-			= (False,subst)
-	improve_type (TempCV tv_n1 :@: atypes1) (TempCV tv_n2 :@: atypes2) subst
-		# (ok,subst) = improve_type_vars tv_n1 tv_n2 subst
+			= improve_type defs res_atype1.at_type res_atype2.at_type subst type_heaps
+			= (False,subst,type_heaps)
+	improve_type defs (TempCV tv_n1 :@: atypes1) (TempCV tv_n2 :@: atypes2) subst type_heaps
+		# (ok,subst,type_heaps) = improve_type_vars defs tv_n1 tv_n2 subst type_heaps
 		| ok
-			= improve_atypes atypes1 atypes2 subst
-			= (False,subst)
-	improve_type (TArrow1 atype1) (TArrow1 atype2) subst
-		= improve_type atype1.at_type atype2.at_type subst
-	improve_type TArrow TArrow subst
-		= (True,subst)
-	improve_type type1 type2 subst
-		= (False,subst)	// ---> ("improve_type",type1,type2)
+			= improve_atypes defs atypes1 atypes2 subst type_heaps
+			= (False,subst,type_heaps)
+	improve_type defs (TArrow1 atype1) (TArrow1 atype2) subst type_heaps
+		= improve_type defs atype1.at_type atype2.at_type subst type_heaps
+	improve_type defs TArrow TArrow subst type_heaps
+		= (True,subst,type_heaps)
+	improve_type defs type1=:(TA cons_id1 cons_args1) type2 subst type_heaps
+		# (succ,type1,type_heaps) = tryToExpandTypeSyn defs type1 cons_id1 cons_args1 type_heaps
+		| succ
+			= improve_type defs type1 type2 subst type_heaps
+			= (False,subst,type_heaps)
+	improve_type defs type1=:(TAS cons_id1 cons_args1 _) type2 subst type_heaps
+		# (succ,type1,type_heaps) = tryToExpandTypeSyn defs type1 cons_id1 cons_args1 type_heaps
+		| succ
+			= improve_type defs type1 type2 subst type_heaps
+			= (False,subst,type_heaps)
+	improve_type defs type1 type2=:(TA cons_id2 cons_args2) subst type_heaps
+		# (succ,type2,type_heaps) = tryToExpandTypeSyn defs type2 cons_id2 cons_args2 type_heaps
+		| succ
+			= improve_type defs type1 type2 subst type_heaps
+			= (False,subst,type_heaps)
+	improve_type defs type1 type2=:(TAS cons_id2 cons_args2 _) subst type_heaps
+		# (succ,type2,type_heaps) = tryToExpandTypeSyn defs type2 cons_id2 cons_args2 type_heaps
+		| succ
+			= improve_type defs type1 type2 subst type_heaps
+			= (False,subst,type_heaps)
+	improve_type defs type1 type2 subst type_heaps
+		= (False,subst,type_heaps)
 
-	improve_type_vars :: Int Int *Subst -> (!Bool,!*Subst)
-	improve_type_vars tv_n1 tv_n2 subst
+	improve_type_vars :: !{#CommonDefs} Int Int *Subst !*TypeHeaps -> (!Bool,!*Subst,!*TypeHeaps)
+	improve_type_vars defs tv_n1 tv_n2 subst type_heaps
 		| tv_n1==tv_n2
-			= (True,subst)
+			= (True,subst,type_heaps)
 		# (stype1,subst) = subst!subst_array.[tv_n1]
 		= case stype1 of
 			TempV tv_n1
-				-> improve_type_vars tv_n1 tv_n2 subst
+				-> improve_type_vars defs tv_n1 tv_n2 subst type_heaps
 			_
-				-> improve_type_vars2 tv_n1 tv_n2 stype1 subst
+				-> improve_type_vars2 defs tv_n1 tv_n2 stype1 subst type_heaps
 
-	improve_type_vars2 :: Int Int Type *Subst -> (!Bool,!*Subst)
-	improve_type_vars2 tv_n1 tv_n2 stype1 subst
+	improve_type_vars2 :: !{#CommonDefs} Int Int Type *Subst !*TypeHeaps -> (!Bool,!*Subst,!*TypeHeaps)
+	improve_type_vars2 defs tv_n1 tv_n2 stype1 subst type_heaps
 		# (stype2,subst) = subst!subst_array.[tv_n2]
 		= case stype2 of
 			TempV tv_n2
 				| tv_n1==tv_n2
-					-> (True,subst)
-					-> improve_type_vars2 tv_n1 tv_n2 stype1 subst
+					-> (True,subst,type_heaps)
+					-> improve_type_vars2 defs tv_n1 tv_n2 stype1 subst type_heaps
 			TE
 				-> case stype1 of
 					TE	# subst & subst_array.[tv_n2] = TempV tv_n1, subst_changed=True
-						-> (True,subst)
+						-> (True,subst,type_heaps)
 					_
 						| containsTypeVariable tv_n2 stype1 subst.subst_array
-							-> (False,subst)
+							-> (False,subst,type_heaps)
 							# subst & subst_array.[tv_n2] = stype1, subst_changed=True
-							-> (True,subst)
+							-> (True,subst,type_heaps)
 			_
 				-> case stype1 of
 					TE
 						| containsTypeVariable tv_n1 stype2 subst.subst_array
-							-> (False,subst)
+							-> (False,subst,type_heaps)
 							# subst & subst_array.[tv_n1] = stype2, subst_changed=True
-							-> (True,subst)
+							-> (True,subst,type_heaps)
 					_
-						-> improve_type stype1 stype2 subst
+						-> improve_type defs stype1 stype2 subst type_heaps
 
-	improve_atypes :: [AType] [AType] *Subst -> (!Bool,!*Subst)
-	improve_atypes [arg1:args1] [arg2:args2] subst
-		# (ok,subst) = improve_type arg1.at_type arg2.at_type subst
+	improve_atypes :: !{#CommonDefs} [AType] [AType] *Subst !*TypeHeaps -> (!Bool,!*Subst,!*TypeHeaps)
+	improve_atypes defs [arg1:args1] [arg2:args2] subst type_heaps
+		# (ok,subst,type_heaps) = improve_type defs arg1.at_type arg2.at_type subst type_heaps
 		| ok
-			= improve_atypes args1 args2 subst
-			= (False,subst)
-	improve_atypes [] [] subst
-		= (True,subst)
-improve_dep_type_in_context [] [] fun_dep_vars subst
-	= (True,subst)
+			= improve_atypes defs args1 args2 subst type_heaps
+			= (False,subst,type_heaps)
+	improve_atypes defs [] [] subst type_heaps
+		= (True,subst,type_heaps)
+
+	expand_and_improve :: {#CommonDefs} TypeSymbIdent [AType] TypeSymbIdent [AType] Type Type !*Subst *TypeHeaps -> (!Bool,!*Subst,!*TypeHeaps)
+    expand_and_improve defs cons_id1 cons_args1 cons_id2 cons_args2 type1 type2 subst type_heaps
+		# (succ1,type1,type_heaps) = tryToExpandTypeSyn defs type1 cons_id1 cons_args1 type_heaps
+		# (succ2,type2,type_heaps) = tryToExpandTypeSyn defs type2 cons_id2 cons_args2 type_heaps
+		| succ1 || succ2
+			= improve_type defs type1 type2 subst  type_heaps
+			= (False, subst, type_heaps)
+improve_dep_type_in_context defs [] [] fun_dep_vars subst type_heaps
+	= (True,subst,type_heaps)
 
 :: ReduceTCState =
 	{	rtcs_new_contexts		:: ![TypeContext]
@@ -2243,8 +2271,9 @@ startContextReduction over_exprs specified_contexts_list defs instance_info prs_
 	# (rcss, case_with_context_ptrs, expr_heap, prs_state) = foldSt (try_to_reduce_contexts_in_function ri_info) over_exprs ([], [], expr_heap, prs_state)
 	# (rcss, {prs_var_heap, prs_type_heaps, prs_predef_symbols, prs_error, prs_subst}) = iterate_cr ri_info rcss prs_state
 	# dts_subst = {prs_subst & subst_changed = True}
+	# dts_contexts = flatten specified_contexts_list
 	# dts_state
-		= {dts_contexts=flatten specified_contexts_list, dts_subst=dts_subst, dts_var_heap=prs_var_heap, dts_type_heaps=prs_type_heaps, dts_error=prs_error}
+		= {dts_contexts=dts_contexts, dts_subst=dts_subst, dts_var_heap=prs_var_heap, dts_type_heaps=prs_type_heaps, dts_error=prs_error}
 	# (predef_symbols, {dts_contexts,dts_subst,dts_var_heap,dts_type_heaps,dts_error})
 		= iterate_improve_dep_types_and_reduce rcss ri_info prs_predef_symbols dts_state
 	= (rcss, case_with_context_ptrs, dts_var_heap, dts_type_heaps, expr_heap, predef_symbols, dts_subst.subst_array, dts_error)
