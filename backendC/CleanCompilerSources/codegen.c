@@ -1179,8 +1179,6 @@ void CodeGeneration (ImpMod imod, char *fname)
 		}
 		ExitOnInterrupt();
 
-		ListTypes (imod);	
-		ExitOnInterrupt();
 #if 0
 		PrintRules (imod->im_rules);
 #endif
