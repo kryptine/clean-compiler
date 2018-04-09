@@ -436,43 +436,6 @@ static void PrintTypeContext (TypeContext context)
 	
 } /* PrintTypeContext */
 
-void PrintType (SymbDef tdef, TypeAlts type)
-{
-	TypeNode lhs_root = type -> type_alt_lhs;
-	TypeArgs lhsargs = lhs_root -> type_node_arguments;
-	
-	PrintSymbolOfIdent (tdef -> sdef_ident, tdef -> sdef_line, StdListTypes);
-	FPutS (" :: ", StdListTypes);
-	
-	if (lhsargs)
-	{	PrintArguments (lhsargs,' ', cPrintBrackets, cInAStrictContext, NULL);
-		FPutS (" -> ", StdListTypes);
-	}
-	if (type -> type_alt_rhs -> type_node_is_var)
-	{	if (type -> type_alt_rhs -> type_node_attribute > NoAttr)
-			PrintAttribute (type -> type_alt_rhs -> type_node_attribute, cDoPrintColon);
-		FPutS (type -> type_alt_rhs -> type_node_tv -> tv_ident -> ident_name, StdListTypes);
-	}
-	else
-	{	Bool rhs_brackets = (lhsargs == NULL) && (type -> type_alt_rhs -> type_node_symbol -> symb_kind == fun_type);
-		PrintNode (type -> type_alt_rhs, rhs_brackets, cInAStrictContext, cDontPrintAnnot);
-	}
-	if (type -> type_alt_type_context)
-	{	TypeContext next_context;
-		FPutS (" | ", StdListTypes);
-		PrintTypeContext (type -> type_alt_type_context);
-		for (next_context = type -> type_alt_type_context -> tyco_next; next_context; next_context = next_context -> tyco_next)
-		{	FPutS (" & ", StdListTypes);
-			PrintTypeContext (next_context);
-		}
-	}
-	
-	if (DoShowAttributes && type -> type_alt_attr_equations)
-		PrintAttributeEquations (type -> type_alt_attr_equations);
-
-	FPutS (";\n", StdListTypes);
-} /* PrintType */
-
 void InitARC_Info (void)
 {
 	CurrentARC_Info = CompAllocType (struct attr_ref_count_info);
