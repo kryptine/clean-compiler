@@ -169,14 +169,6 @@ Bool CallCompiler (int argc, char **argv)
 				DoStackLayout = True;
 			else if (strcmp (argv_i, "-sa") == 0)
 				DoStrictnessAnalysis = False;
-			else if (strcmp (argv_i, "-lattr") == 0)
-				DoShowAttributes = False;
-			else if (strcmp (argv_i, "-lt") == 0)
-				DoListTypes = True;
-			else if (strcmp (argv_i, "-lset") == 0)
-				DoListStrictTypes = True;				
-			else if (strcmp (argv_i, "-lat") == 0)
-				DoListAllTypes = True;
 			else if (strcmp (argv_i,"-ou") == 0)
 				DoReuseUniqueNodes=True;
 			else if (strcmp (argv_i,"-pm") == 0)
