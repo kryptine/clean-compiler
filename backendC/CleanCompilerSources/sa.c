@@ -62,6 +62,7 @@ int stack_source = 0;
 #endif
 
 #if MORE_ANNOTS
+/*# define MaxNrAnnots 2000*/
 # define MaxNrAnnots 100
 #else
 # define MaxNrAnnots 10					/* the maximum nr of strict rhs annots	*/
