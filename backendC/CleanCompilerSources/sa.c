@@ -3654,9 +3654,7 @@ static void update_function_strictness (SymbDef sdef)
 
 		if (sdef->sdef_exported){
 			if (strict_added){
-				if (DoListStrictTypes && ! DoListAllTypes)
-					PrintType (sdef, rule);
-				else if (!AddStrictnessToExportedFunctionTypes)
+				if (!AddStrictnessToExportedFunctionTypes)
 					export_warning = True;
 			}
 			
