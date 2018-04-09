@@ -26,7 +26,6 @@ static char
 unsigned RuleCount,TypeSymbolCount;
 SymbDef StackTop;
 
-
 char *ConvertSymbolKindToString (SymbKind skind)
 {
 	switch (skind)
@@ -53,68 +52,6 @@ char *ConvertSymbolKindToString (SymbKind skind)
 	}
 
 } /* ConvertSymbolKindToString */
-
-static void PrintString (char * string, File file, int length, int * const max_length_p)
-{	
-	if (*max_length_p >= length)
-	{	char del = string [length];
-
-		*max_length_p -= length;
-
-		if (del != '\0')
-		{	string [length] = '\0';
-			FPutS (string, file);
-			string [length] = del;
-		}
-		else
-			FPutS (string, file);
-	}
-	else if (*max_length_p >= 0)
-	{	*max_length_p = -1;
-		FPutS ("(...)", file);
- 	}
- 	
- } /* PrintString */
- 
-static void PrintChar (char c, File file, int * const max_length_p)
-{
-	if (*max_length_p > 0)
-	{	--*max_length_p;
-		FPutC (c, file);
-	}
-	else if (*max_length_p == 0)
-	{	*max_length_p = -1;
-		FPutS ("(...)", file);
-	}
-
-} /* PrintChar */
-
-static char *PrintTypesOfSymbol (char *type_repr, File file, ModuleInfo module_info, int * const max_length_p);
-
-static char *FindTypeName (int type_number, TypeConversionTable types)
-{
-	TypeConversionTable next_type;
-	
-	for (next_type = types; next_type; next_type = next_type -> tct_next)
-	{	if (next_type -> tct_number == type_number)
-			return next_type -> tct_type_symbol -> sdef_ident ->ident_name;
-	}
-	Assume (False, "checksupport", "FindTypeName");
-	return "";
-
-} /* FindTypeName */
-
-static char *PrintArgumentsOfType (char *type_repr, File file, ModuleInfo module_info, int * const max_length_p)
-{
-	for (; ; ++type_repr)
-	{	type_repr = PrintTypesOfSymbol (type_repr,file, module_info, max_length_p);
-		if (*type_repr == cTypeLastArg)
-			break;
-		else
-			PrintChar ('(', file, max_length_p);
-	}
-	return ++type_repr;
-}
 
 static int string_and_string_begin_equal (char *s1,char *s2_begin,char *s2_passed_end)
 {
@@ -222,143 +159,11 @@ static char *PrintName (char *name, char *name_end, unsigned line_nr, File file)
 	}
 }
 
-static char *PrintTypesOfSymbol (char *type_repr, File file, ModuleInfo module_info, int * const max_length_p)
-{
-	char first_char = * type_repr;
-	if (islower (first_char))
-	{	if (first_char == 'l')
-		{	PrintChar ('[', file, max_length_p);
-			if (*(++type_repr) == cTypeFirstArg)
-				type_repr = PrintArgumentsOfType (++type_repr, file, module_info, max_length_p);
-			PrintChar (']', file, max_length_p);
-			return type_repr;
-		}
-		else if (first_char == 't')
-		{	int tuparity;
-		
-			++type_repr;
-		
-			Assume (isdigit (*type_repr),"checksupport","PrintTypesOfSymbol");
-			tuparity = strtol (type_repr, & type_repr, 10);
-
-			PrintChar ('(', file, max_length_p);
-
-			if (*type_repr == cTypeFirstArg)
-			{	type_repr = PrintArgumentsOfType (++type_repr, file, module_info, max_length_p);
-				PrintChar (')', file, max_length_p);
-			}
-			else
-			{	for (; tuparity>1; tuparity--)
-					PrintString ("_,", file, 2, max_length_p);
-				PrintString ("_)", file, 2, max_length_p);
-			}
-
-			return type_repr;
-		}
-		else if (first_char == 'a')
-		{	PrintChar ('{', file, max_length_p);
-			if (*(++type_repr) == cTypeFirstArg)
-				type_repr = PrintArgumentsOfType (++type_repr, file, module_info, max_length_p);
-			PrintChar ('}', file, max_length_p);
-			return type_repr;
-		}
-		else if (first_char == 'd')
-		{	PrintString ("<default>", file, 9, max_length_p);
-			return ++type_repr;
-		}
-		else if (first_char == 'h')
-		{	PrintString ("-> (", file, 4, max_length_p);
-			++type_repr;
-			if (*type_repr==cTypeFirstArg)
-				type_repr = PrintArgumentsOfType (type_repr+1, file, module_info, max_length_p);
-
-			PrintChar (')', file, max_length_p);
-			return type_repr;
-		}
-		else if (first_char == 'u')
-		{	int type_number;
-			char *type_name;
-		
-			++type_repr;
-		
-			Assume (isdigit (*type_repr),"checksupport","PrintTypesOfSymbol");
-			type_number = strtol (type_repr, & type_repr, 10);
-
-			type_name = FindTypeName (type_number, module_info -> mi_type_table);
-			
-			PrintString (type_name, file, strlen (type_name), max_length_p);
-			
-			if (*type_repr == cTypeFirstArg)
-			{	PrintChar ('(', file, max_length_p);
-				type_repr = PrintArgumentsOfType (++type_repr, file, module_info, max_length_p);
-				PrintChar (')', file, max_length_p);
-			}
-			
-			return type_repr;
-		}
-		else
-		{	int symbkind;
-			char *symbol_string;
-			for (symbkind = int_type;  symbkind < Nr_Of_Basic_Types; symbkind++)
-			{	if (BasicTypeIds [symbkind] == first_char)
-					break;
-			}
-			
-			Assume (symbkind < Nr_Of_Basic_Types,"checksupport","PrintTypesOfSymbol");
-			symbol_string = ConvertSymbolKindToString ((SymbKind) symbkind);
-			
-			PrintString (symbol_string, file, strlen (symbol_string), max_length_p);
-			return ++type_repr;
-		}
-	}
-	else if (first_char == '!')
-	{	PrintString ("{!", file, 2, max_length_p);
-		if (*(++type_repr) == cTypeFirstArg)
-			type_repr = PrintArgumentsOfType (++type_repr, file, module_info, max_length_p);
-		PrintChar ('}', file, max_length_p);
-		return type_repr;
-	}
-	else if (first_char == '#')
-	{	PrintString ("{#", file, 2, max_length_p);
-		if (*(++type_repr) == cTypeFirstArg)
-			type_repr = PrintArgumentsOfType (++type_repr, file, module_info, max_length_p);
-		PrintChar ('}', file, max_length_p);
-		return type_repr;
-	}
-	else if (first_char == cTypeFirstArg)
-	{	char *type_end;
-		for (type_end = ++type_repr; *type_end != cTypeLastArg; type_end++)
-			;
-
-		PrintString (type_repr, file, type_end - type_repr, max_length_p);
-		
-		return ++type_end;
-	}
-	else
-	{	char *type_end;
-		for (type_end = type_repr; *type_end != cTypeDelimiter && *type_end != '\0' && *type_end != cTypeFirstArg && *type_end != cTypeLastArg; type_end++)
-			if (*type_end == '.')
-				type_end++;
-
-		PrintString (type_repr, file, type_end - type_repr, max_length_p);
-		
-		if (*type_end == cTypeFirstArg)
-		{	PrintChar ('(', file, max_length_p);
-			type_end = PrintArgumentsOfType (++type_end, file, module_info, max_length_p);
-			PrintChar (')', file, max_length_p);
-		}
-		return type_end;
-	}
-
-} /* PrintTypesOfSymbol */
-
 #define _ANALYSE_IDENT_ 		/* also in optimisations.c */
-#define MAX_SYMBOL_EXTENSION_SIZE 40
 
 void PrintSymbolOfIdent (Ident sid, unsigned line_nr, File file)
 {
 	char *next_char,*name;
-	int print_length = MAX_SYMBOL_EXTENSION_SIZE;
 
 	name  = sid -> ident_name;
 
