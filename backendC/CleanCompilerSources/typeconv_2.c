@@ -473,21 +473,6 @@ void PrintType (SymbDef tdef, TypeAlts type)
 	FPutS (";\n", StdListTypes);
 } /* PrintType */
 
-void ListTypes (ImpMod imod)
-{
-	if (DoListAllTypes)
-	{	ImpRules irule;
-		for (irule = imod -> im_rules; irule; irule = irule -> rule_next)
-		{	SymbDef imp_sdef = irule -> rule_root -> node_symbol -> symb_def;
-		
-#ifdef CLEAN2
-			if (strncmp (imp_sdef->sdef_ident->ident_name, "_dictionary", 11) != 0 || imp_sdef->sdef_isused)
-#endif
-			PrintType (imp_sdef, irule -> rule_type);
-		}
-	}
-} /* ListTypes */
-
 void InitARC_Info (void)
 {
 	CurrentARC_Info = CompAllocType (struct attr_ref_count_info);
