@@ -216,16 +216,6 @@ void InitChecker (void)
 	ArrayFunctionIds[_UnqArraySelectLastFun]= PutStringInHashTable ("_uselectl", SymbolIdTable);
 	ArrayFunctionIds[_ArrayUpdateFun]= PutStringInHashTable ("_updatei", SymbolIdTable);
 
-#ifndef CLEAN2
-	FunTypeClass.tac_uniprop = ALLBITSCLEAR;
-	FunTypeClass.tac_possign = BIT(1);
-	FunTypeClass.tac_negsign = BIT(0);
-
-	GeneralTypeClass.tac_uniprop = ALLBITSSET;
-	GeneralTypeClass.tac_possign = ALLBITSSET;
-	GeneralTypeClass.tac_negsign = ALLBITSCLEAR;
-#endif
-
 	OpenDefinitionModules	= NIL;
 }
 
