@@ -56,8 +56,6 @@ extern TypeNode NewTypeNode (Annotation annot, AttributeKind attr, SymbolP symb,
 extern TypeArgs NewTypeArgument (TypeNode pattern);
 extern TypeNode NewTypeVarNode (TypeVar node_id,Annotation annot, AttributeKind attr);
 
-extern RuleTypes NewRuleType (TypeAlts type_alt, unsigned line_nr);
-
 extern NodeP NewSelectNode (SymbolP selectSymbol, NodeIdP selectId, int arity);
 extern NodeIdP BuildSelect (NodeP node, NodeDefs **node_defs_p);
 extern NodeIdP BuildSelectors (NodeP pattern, NodeP node, NodeDefs **node_defs_p);

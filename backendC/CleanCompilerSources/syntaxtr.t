@@ -592,7 +592,6 @@ STRUCT (symbol_def,SymbDef){
 	union
 	{	Types			u_type;
 		RuleTypes		u_rule_type;
-		SynTypes		u_syn_type;
 		AbsTypes		u_abs_type;
 		ImpRules		u_rule;
 	} sdef_u;
@@ -641,7 +640,6 @@ STRUCT (symbol_def,SymbDef){
 
 #define sdef_type			sdef_u.u_type
 #define sdef_rule_type		sdef_u.u_rule_type
-#define sdef_syn_type		sdef_u.u_syn_type
 #define sdef_abs_type		sdef_u.u_abs_type
 #define sdef_rule			sdef_u.u_rule
 
@@ -698,7 +696,6 @@ typedef struct {
 	Symbol				im_name;
 	Symbol				im_symbols;
 	Types				im_types;
-	SynTypes			im_syn_types;
 	ImpRules			im_rules;
 	struct symbol_def *	im_start;
 	Bool				im_main;
@@ -717,7 +714,6 @@ struct def_repr {
 	Symbol		dm_name;
 	Symbol		dm_symbols;
 	Types		dm_types;
-	SynTypes	dm_syn_types;
 	AbsTypes	dm_abs_types;
 	RuleTypes	dm_rules;
 	TableKind	dm_system_module_table_kind;

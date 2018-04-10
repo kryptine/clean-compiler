@@ -28,19 +28,6 @@ SymbolP
 
 IdentP gArrayIdents [NrOfArrayInstances];
 
-RuleTypes
-NewRuleType (TypeAlts type_alt, unsigned line_nr)
-{
-	RuleTypes rule_type = CompAllocType (struct rule_type);
-			
-	rule_type->rule_type_rule 		= type_alt;
-	rule_type->rule_type_line		= line_nr;
-	rule_type->rule_type_root		= type_alt->type_alt_lhs;
-	
-	return rule_type;
-
-} /* NewRuleType */
-
 TypeArgs
 NewTypeArgument (TypeNode pattern)
 {
@@ -138,7 +125,6 @@ NewTypeVar (IdentP nid)
 
 	newnid->tv_ident			= nid;
 	newnid->tv_argument_nr		= 0;
-	newnid->tv_mark				= 0;
 
 	return (newnid);
 }
@@ -153,7 +139,6 @@ NewUniVar (IdentP id)
 	new_uni_var->uv_ident			= id;
 	new_uni_var->uv_number			= 0;
 	new_uni_var->uv_next_uni_var	= NULL;
-	new_uni_var->uv_equations		= NULL;
 
 	return (new_uni_var);
 }

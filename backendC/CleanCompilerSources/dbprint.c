@@ -109,7 +109,6 @@ static void DPrintTypeVar (TypeVar tv, Node follow, File file)
 			FPrintF (file, "%s",tv->tv_ident->ident_name);
 		else
 			FPrintF (file, "i_%lx", (long) tv);
-		FPrintF (file, "<%d>", tv->tv_refcount);
 		if (follow)
 			FPutS (" = ", file);
 	}
@@ -712,30 +711,6 @@ static void	PrintTypeAttrEquations (UniVarEquations equs, File file)
 		}
 	}
 }
-			
-static void PrintTypeContext (TypeContext type_context, File file)
-{
-	SymbolList symbols;
-	
-	for (symbols = type_context -> tyco_symbols; symbols; symbols = symbols -> sl_next)
-	{
-#ifndef CLEAN2
-		PrintSymbol (symbols -> sl_symbol -> sdef_class -> cd_symbol, file);
-#endif
-		FPutC (' ', file);
-		DPrintTypeVar (type_context -> tyco_variable, NULL, file);
-	}
-}
-
-static void PrintTypeContexts (TypeContext type_contexts, File file)
-{
-	PrintTypeContext (type_contexts, file);
-	
-	for (type_contexts = type_contexts -> tyco_next; type_contexts; type_contexts = type_contexts -> tyco_next)
-	{	FPutS (" & ", file);
-		PrintTypeContext (type_contexts, file);
-	}
-}
 
 void PrintTypeAlt (TypeAlts type_alts, File file, Bool with_equats)
 {
@@ -747,10 +722,6 @@ void PrintTypeAlt (TypeAlts type_alts, File file, Bool with_equats)
 
 	FPutS (" -> ", file);
 	PrintTypeNode (type_alts -> type_alt_rhs, file);
-	if (type_alts -> type_alt_type_context)
-	{	FPutS (" | ", file);
-		PrintTypeContexts (type_alts -> type_alt_type_context, file);
-	}
 	FPutC ('\n', file);
 	if (with_equats)
 	{	PrintTypeAttrEquations (type_alts -> type_alt_attr_equations, file);
