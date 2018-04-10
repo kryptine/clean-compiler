@@ -75,9 +75,6 @@ extern TypeArgs ConvertFieldsToTypeArguments (FieldList fields);
 
 extern char *CopyString (char *to, char *from, int *rest_size);
 
-extern	char BasicTypeIds  [];
-#define ConvertBasicTypeToChar(type_symb) BasicTypeIds [(type_symb) -> symb_kind]
-
 extern IdentP DetermineNewSymbolId (char *prefix, TypeNode inst_type, TableKind table);
 
 extern	IdentP	gArrayIdents [];
