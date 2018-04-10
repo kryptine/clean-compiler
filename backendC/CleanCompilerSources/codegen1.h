@@ -45,7 +45,6 @@ extern void ContractumComment (int asp, int bsp);
 extern void RedirectionComment (NodeId nid);
 extern void ArgComment (Args arg);
 extern void NodeIdComment (NodeId node_id);
-extern void TypeArgComment (TypeArgs arg);
 extern void ParComment (Args arg);
 
 extern void InitStackFrame (int offframe[], int defframe [], int max);
