@@ -26,8 +26,6 @@ SymbolP
 	UnboxedTailStrictListSymbol, UnboxedTailStrictConsSymbol, UnboxedTailStrictNilSymbol;
 #endif
 
-char BasicTypeIds [] = BASIC_TYPE_IDS_STRING;
-
 IdentP gArrayIdents [NrOfArrayInstances];
 
 RuleTypes
@@ -139,11 +137,7 @@ NewTypeVar (IdentP nid)
 	newnid	= CompAllocType (struct type_var);
 
 	newnid->tv_ident			= nid;
-	newnid->tv_refcount			= 0;
 	newnid->tv_argument_nr		= 0;
-	newnid->tv_type				= NIL;
-	newnid->tv_imp_tv			= NIL;
-	newnid->tv_overvar_arity	= 0;
 	newnid->tv_mark				= 0;
 
 	return (newnid);
@@ -157,7 +151,6 @@ NewUniVar (IdentP id)
 	new_uni_var	= CompAllocType (struct uni_var);
 
 	new_uni_var->uv_ident			= id;
-	new_uni_var->uv_mark			= 0;
 	new_uni_var->uv_number			= 0;
 	new_uni_var->uv_next_uni_var	= NULL;
 	new_uni_var->uv_equations		= NULL;

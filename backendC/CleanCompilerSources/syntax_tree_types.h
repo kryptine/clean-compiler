@@ -1,10 +1,3 @@
-/*
-	Version 1.2 17 dec1996
-*/
-
-#define BASIC_TYPE_IDS_STRING "ibcrfswpvr" /* indexed by SymbKind */
-
-#define Type_Variable_Mark	(1 << Nr_Of_Basic_Types)
 
 typedef enum
 {	NoUniAttr, NotUniqueAttr, UniqueAttr, ExistsAttr, UniqueVariable, FirstUniVarNumber
@@ -37,16 +30,8 @@ typedef struct flat_type
 	AttributeKind			ft_attribute;
 } * FlatType;
 
-STRUCT (symbol_list, SymbolList)
-{
-	struct symbol_def *		sl_symbol;
-	struct symbol_list *	sl_next;
-};
-
 STRUCT (type_context, TypeContext)
 {
-	SymbolList				tyco_symbols;
-	TypeVar					tyco_variable;
 	struct type_context	*	tyco_next;
 };
 
@@ -151,11 +136,7 @@ struct type_var
 {
 	Ident			tv_ident;
 	unsigned short	tv_mark;
-	int				tv_refcount;
 	int 			tv_argument_nr;
-	int				tv_overvar_arity;
-	TypeVar			tv_imp_tv;
-	struct type_cell *	tv_type;
 };
 
 #define TestMark(n,f,mask) 	(((n)->f & (mask)) != 0)
@@ -163,7 +144,6 @@ struct type_var
 typedef struct uni_var
 {
 	Ident				uv_ident;
-	unsigned short		uv_mark;
 	int					uv_number;
 	struct uni_var *	uv_next_uni_var;
 	UniVarEquations		uv_equations;
