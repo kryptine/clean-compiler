@@ -419,28 +419,6 @@ void NodeIdComment (NodeId node_id)
 	}
 }
 
-void TypeArgComment (TypeArgs arg)
-{
-	if (DoDebug){
-		if (arg->type_arg_node->type_node_is_var){
-			if (arg->type_arg_node->type_node_tv){
-				TypeVar type_var;
-
-				PrintComment();
-				
-				type_var=arg->type_arg_node->type_node_tv;
-				if (type_var && type_var->tv_ident && type_var->tv_ident->ident_name)
-					FPrintF (OutFile, "%s", type_var->tv_ident->ident_name);
-				else
-					FPrintF (OutFile, "_");
-			}
-		} else {
-			PrintComment();
-			PrintSymbol (arg->type_arg_node->type_node_symbol,OutFile);
-		}
-	}
-}
-
 void ParComment (Args arg)
 {
 	if (DoDebug){
