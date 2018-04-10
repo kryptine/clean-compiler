@@ -21,12 +21,6 @@ typedef struct type_arg * TypeArgs, TypeArg;
 typedef struct type_node *	TypeNode;
 typedef struct type_alt *	TypeAlts;
 
-typedef struct
-{	BITVECT	tac_uniprop;
-	BITVECT	tac_possign;
-	BITVECT	tac_negsign;		
-} TypeArgClass;
-
 typedef struct type_var *TypeVar;
 
 typedef struct type_var_list
@@ -166,9 +160,6 @@ struct type_var
 
 #define TestMark(n,f,mask) 	(((n)->f & (mask)) != 0)
 
-#define TV_EXISTENTIAL_ATTRIBUTE_MASK				(1 << 3)	/* checktypedefs, typeconv */
-#define TV_WITH_INST_RESTR							(1 << 14)	/* checktypedefs */
-
 typedef struct uni_var
 {
 	Ident				uv_ident;
@@ -177,16 +168,3 @@ typedef struct uni_var
 	struct uni_var *	uv_next_uni_var;
 	UniVarEquations		uv_equations;
 } * UniVar;
-
-#ifdef SHORT_CLASS_NAMES
-STRUCT (module_info, ModuleInfo)
-{
-	struct type_conversion_table *	mi_type_table;
-};
-
-STRUCT (type_conversion_table, TypeConversionTable) 
-{	int								tct_number;
-	struct symbol_def *				tct_type_symbol;
-	struct type_conversion_table *	tct_next;
-};
-#endif
