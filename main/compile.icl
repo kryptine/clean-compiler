@@ -324,14 +324,16 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 		=	abort ("couldn't close stdio")
 	# var_heap=heaps.hp_var_heap
 	  hp_type_heaps=heaps.hp_type_heaps
+	  type_var_heap=hp_type_heaps.th_vars
 	  attrHeap=hp_type_heaps.th_attrs
-	# (success,functions_and_macros,var_heap,attrHeap,error, out)
+	# (success,functions_and_macros,var_heap,type_var_heap,attrHeap,error,out)
 		= case optionalSyntaxTree of
 			Yes syntaxTree
 				# functions_and_macros = syntaxTree.fe_icl.icl_functions
-				# (success, var_heap, attrHeap, error, out)
-				 	 = backEndInterface outputPath (map appendRedirection backendArgs) options.listTypes options.outPath predef_symbols syntaxTree main_dcl_module_n var_heap attrHeap error out
-				-> (success,functions_and_macros,var_heap,attrHeap, error, out)
+				# (success, var_heap, type_var_heap, attrHeap, error, out)
+				 	 = backEndInterface outputPath (map appendRedirection backendArgs) options.listTypes options.outPath predef_symbols syntaxTree main_dcl_module_n
+				 	 					var_heap type_var_heap attrHeap error out
+				-> (success,functions_and_macros,var_heap,type_var_heap,attrHeap,error,out)
 				with
 					appendRedirection arg
 						= case arg of
@@ -342,7 +344,7 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 							arg
 								->	arg
 			No
-				-> (False,{},var_heap,attrHeap,error, out)
+				-> (False,{},var_heap,type_var_heap,attrHeap,error,out)
 		with
 /*
 			outputPath
@@ -353,7 +355,7 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 			outputPath
 	//				=	/* directoryName options.pathName +++ "Clean System Files" +++ {DirectorySeparator} +++ */ baseName options.pathName
 				=	baseName options.pathName
-	# heaps = {heaps & hp_var_heap=var_heap, hp_type_heaps = {hp_type_heaps  & th_attrs = attrHeap}}
+	# heaps = {heaps & hp_var_heap=var_heap, hp_type_heaps = {th_vars=type_var_heap, th_attrs=attrHeap}}
 	# (closed, files) = fclose out files
 	| not closed
 		=	abort ("couldn't close out file \"" +++ options.outPath +++ "\"\n")

@@ -23,8 +23,11 @@ checkVersion VersionObservedIsTooOld errorFile
 			=	fwrites "Error: the back end library is too old\n" errorFile
 	=	(False, errorFile)
 
-backEndInterface :: !{#Char} [{#Char}] !ListTypesOption !{#Char} !PredefinedSymbols !FrontEndSyntaxTree !Int !*VarHeap !*AttrVarHeap !*File !*File -> (!Bool, !*VarHeap, !*AttrVarHeap, !*File, !*File)
-backEndInterface outputFileName commandLineArgs listTypes typesPath predef_symbols syntaxTree=:{fe_icl,fe_components,fe_dcls} main_dcl_module_n var_heap attrHeap errorFile outFile
+backEndInterface :: !{#Char} [{#Char}] !ListTypesOption !{#Char} !PredefinedSymbols !FrontEndSyntaxTree !Int
+							  !*VarHeap !*TypeVarHeap !*AttrVarHeap !*File !*File
+					-> (!Bool,!*VarHeap,!*TypeVarHeap,!*AttrVarHeap,!*File,!*File)
+backEndInterface outputFileName commandLineArgs listTypes typesPath predef_symbols syntaxTree=:{fe_icl,fe_components,fe_dcls} main_dcl_module_n
+		var_heap type_var_heap attrHeap errorFile outFile
 	# (observedCurrent, observedOldestDefinition, observedOldestImplementation)
 		=	BEGetVersion
 	  observedVersion =
@@ -46,7 +49,7 @@ backEndInterface outputFileName commandLineArgs listTypes typesPath predef_symbo
 	# (compatible, errorFile)
 		=	checkVersion (versionCompare expectedVersion observedVersion) errorFile
 	| not compatible
-		=	(False, var_heap, attrHeap, errorFile, outFile)
+		=	(False, var_heap, type_var_heap, attrHeap, errorFile, outFile)
 	# varHeap
 		=	backEndPreprocess predefined_idents.[PD_DummyForStrictAliasFun] functionIndices fe_icl var_heap
 		with
@@ -79,7 +82,7 @@ backEndInterface outputFileName commandLineArgs listTypes typesPath predef_symbo
 		=	optionallyPrintFunctionTypes listTypes typesPath (DictionaryToClassInfo main_dcl_module_n fe_icl fe_dcls) fe_components fe_icl.icl_functions attrHeap outFile backEnd
 	# backEndFiles
 		=	BEFree backEnd backEndFiles
-	=	(backEndFiles == 0 && success, var_heap, attrHeap, errorFile, outFile)
+	=	(backEndFiles == 0 && success, var_heap, type_var_heap, attrHeap, errorFile, outFile)
 
 :: DictionaryToClassInfo =
 	{	dtci_iclModuleIndex :: Int
