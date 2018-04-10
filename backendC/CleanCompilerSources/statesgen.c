@@ -346,7 +346,7 @@ static void GenRecordState (SymbDef sdef)
 		oldsymbol	= CurrentSymbol;
 		
 		CurrentSymbol	= lhs->ft_symbol;
-		CurrentLine		= rectype->type_line;
+		CurrentLine		= 0 /*rectype->type_line*/;
 
 		sdef->sdef_checkstatus = ConvertingToState; /* to detect cyclic strict field dependencies */
 		SetRecordState (&sdef->sdef_record_state, sdef, sdef->sdef_cons_arity);
@@ -416,7 +416,7 @@ static void GenResultStatesOfLazyFields (SymbDef sdef)
 	rectype = sdef->sdef_type;
 	
 	CurrentSymbol = rectype->type_lhs->ft_symbol;
-	CurrentLine = rectype->type_line;
+	CurrentLine = 0 /*rectype->type_line*/;
 	
 	for (i=0, fields = rectype->type_fields; fields; i++, fields = fields->fl_next){
 		TypeNode field_type_node = fields->fl_type;
@@ -439,7 +439,7 @@ static void ChangeFieldRecordStateForStrictAbsTypeFields (SymbDef icl_sdef,SymbD
 	icl_type = icl_sdef->sdef_type;
 
 	CurrentSymbol = icl_type->type_lhs->ft_symbol;
-	CurrentLine = icl_type->type_line;
+	CurrentLine = 0 /*icl_type->type_line*/;
 
 	icl_fieldstate_p=icl_sdef->sdef_record_state.state_record_arguments;
 	dcl_fieldstate_p=dcl_sdef->sdef_record_state.state_record_arguments;
@@ -464,7 +464,7 @@ static void GenerateStatesForConstructors (SymbDef sdef)
 {
 	ConstructorList constructor;
 
-	CurrentLine	 = sdef->sdef_type->type_line;
+	CurrentLine	 = 0 /*sdef->sdef_type->type_line*/;
 
 	for_l (constructor,sdef->sdef_type->type_constructors,cl_next){
 		int strict_constructor;
@@ -522,7 +522,7 @@ static void ChangeElementStateForStrictAbsTypeFields (SymbDef icl_sdef,SymbDef d
 	Types icl_type = icl_sdef->sdef_type, dcl_type = dcl_sdef->sdef_type;
 	ConstructorList icl_cons, dcl_cons;
 
-	CurrentLine = icl_type->type_line;
+	CurrentLine = 0 /*icl_type->type_line*/;
 
 	for (icl_cons = icl_type->type_constructors, dcl_cons = dcl_type->type_constructors; dcl_cons;
 		 icl_cons = icl_cons->cl_next, dcl_cons = dcl_cons->cl_next)
@@ -647,7 +647,7 @@ static StateS DetermineStatesOfRuleType (TypeAlts ruletype,StateS *const functio
 	lhsroot = ruletype->type_alt_lhs;
 	
 	CurrentSymbol	= lhsroot ->type_node_symbol;
-	CurrentLine = ruletype->type_alt_line;
+	CurrentLine = 0 /*ruletype->type_alt_line*/;
 	
 	if (lhsroot->type_node_annotation!=NoAnnot)
 		StaticMessage (False, "%S", Wrootannot, CurrentSymbol);

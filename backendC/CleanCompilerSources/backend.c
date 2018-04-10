@@ -700,7 +700,6 @@ BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, in
 
 			newTypeAlt	= ConvertAllocType (TypeAlt);
 
-			newTypeAlt->type_alt_type_context	= NULL;	/* used in PrintType */
 			newTypeAlt->type_alt_attr_equations	= NULL; /* used in PrintType */
 
 			Assert (!arrayType->type_node_is_var);
@@ -854,7 +853,6 @@ CreateLocallyDefinedFunction (int index, char ** abcCode, TypeArgs lhsArgs, Type
 
 	typeAlt	= ConvertAllocType (TypeAlt);
 
-	typeAlt->type_alt_type_context	= NULL;	/* used in PrintType */
 	typeAlt->type_alt_attr_equations	= NULL; /* used in PrintType */
 	typeAlt->type_alt_lhs	= BENormalTypeNode (functionSymbol, lhsArgs);
 	typeAlt->type_alt_rhs	= rhsType;
@@ -1554,7 +1552,6 @@ BETypeAlt (BETypeNodeP lhs, BETypeNodeP rhs, BEUniVarEquations attributeEquation
 	alt->type_alt_lhs	= lhs;
 	alt->type_alt_rhs	= rhs;
 
-	alt->type_alt_type_context		= NULL;	/* used in PrintType */
 	alt->type_alt_attr_equations	= attributeEquations; /* used in PrintType */
 	alt->type_alt_strict_positions	= NULL;
 
@@ -2781,7 +2778,6 @@ BETypeVar (CleanString name)
 	ident->ident_name	= ConvertCleanString (name);
 
 	typeVar->tv_ident		= ident;
-	typeVar->tv_mark		= 0;
 	typeVar->tv_argument_nr	= 0; /* ??? */
 
 	return (typeVar);
@@ -2843,7 +2839,6 @@ BEAlgebraicType (BEFlatTypeP lhs, BEConstructorListP constructors)
 	/* endif */
 
 	type->type_lhs	=	lhs;
-	type->type_line	=	0; /* ??? */
 	type->type_constructors	= constructors;
 
 	nConstructors	=	0;
@@ -2878,7 +2873,6 @@ void BEExtendableAlgebraicType (BEFlatTypeP lhs, BEConstructorListP constructors
 	type = ConvertAllocType (struct type);
 	type->type_next = NULL;
 	type->type_lhs = lhs;
-	type->type_line = 0;
 	type->type_constructors	= constructors;
 	type->type_nr_of_constructors = 0;
 
@@ -2907,7 +2901,6 @@ BERecordType (int moduleIndex, BEFlatTypeP lhs, BETypeNodeP constructorType, int
 	constructor->cl_constructor	= constructorType;
 
 	type->type_lhs	=	lhs;
-	type->type_line	=	0; /* ??? */
 	type->type_constructors	= constructor;
 	type->type_fields		= fields;
 
@@ -2961,12 +2954,8 @@ BEAbsType (BEFlatTypeP lhs)
 	SymbDefP	sdef;
 
 	absType	= ConvertAllocType (struct abs_type);
-	/* ifdef DEBUG */
-	absType->abs_next	= NULL;
-	/* endif */
 
 	absType->abs_graph	=	lhs;
-	absType->abs_line	=	0; /* ??? */
 
 	Assert (lhs->ft_symbol->symb_kind == definition);
 	sdef	= lhs->ft_symbol->symb_def;

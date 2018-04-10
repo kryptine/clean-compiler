@@ -30,11 +30,6 @@ typedef struct flat_type
 	AttributeKind			ft_attribute;
 } * FlatType;
 
-STRUCT (type_context, TypeContext)
-{
-	struct type_context	*	tyco_next;
-};
-
 typedef struct field_list
 {
 	Symbol				fl_symbol;
@@ -56,7 +51,6 @@ typedef struct type
 	FlatType			type_lhs;
 	ConstructorList		type_constructors;
 	struct type *		type_next;
-	unsigned			type_line;
 	int					type_nr_of_constructors;	/* 0 for records */
 } * Types;
 
@@ -67,19 +61,10 @@ struct rule_type
 {	TypeAlts			rule_type_rule;
 	StateP              rule_type_state_p;
 	TypeNode			rule_type_root;
-	unsigned			rule_type_line;
-};
-
-typedef struct syn_type SynType,*SynTypes;
-
-struct syn_type
-{	FlatType 			syn_lhs;
 };
 
 typedef struct abs_type
 {	FlatType			abs_graph;
-	struct abs_type *	abs_next;
-	unsigned			abs_line;
 } *AbsTypes;
 
 struct type_node
@@ -127,15 +112,12 @@ typedef struct type_alt
 	TypeNode				type_alt_lhs;
 	TypeNode				type_alt_rhs;
 	UniVarEquations			type_alt_attr_equations;
-	TypeContext				type_alt_type_context;
-	unsigned				type_alt_line;
 	StrictPositionsP		type_alt_strict_positions;
 } TypeAlt;
 
 struct type_var
 {
 	Ident			tv_ident;
-	unsigned short	tv_mark;
 	int 			tv_argument_nr;
 };
 
@@ -146,5 +128,4 @@ typedef struct uni_var
 	Ident				uv_ident;
 	int					uv_number;
 	struct uni_var *	uv_next_uni_var;
-	UniVarEquations		uv_equations;
 } * UniVar;
