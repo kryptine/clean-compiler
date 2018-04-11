@@ -1234,7 +1234,7 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 						
 						sdef=arg_node->node_symbol->symb_def;
 						
-						if (arg_node->node_arity==(sdef->sdef_kind==RECORDTYPE ? sdef->sdef_cons_arity : sdef->sdef_arity)){
+						if (arg_node->node_arity==sdef->sdef_arity){
 							Bool is_rule;
 							StateP function_state_p;
 
@@ -1676,7 +1676,7 @@ static int is_optimisable_argument (NodeP arg_node,StateP function_arg_state_p)
 				sdef=arg_node->node_symbol->symb_def;
 				kind=sdef->sdef_kind;
 				
-				if (arg_node->node_arity==(kind==RECORDTYPE ? sdef->sdef_cons_arity : sdef->sdef_arity)){
+				if (arg_node->node_arity==sdef->sdef_arity){
 					if (kind==IMPRULE || kind==DEFRULE || kind==SYSRULE || (kind==RECORDTYPE && sdef->sdef_strict_constructor))
 						return 1;
 				}
@@ -3550,7 +3550,7 @@ static void ExamineSymbolApplication (struct node *node)
 			}
 		}
 	} else {
-		if ((sdef->sdef_kind==RECORDTYPE ? sdef->sdef_cons_arity : sdef->sdef_arity) != node->node_arity)
+		if (sdef->sdef_arity != node->node_arity)
 			sdef->sdef_mark |= SDEF_USED_CURRIED_MASK;
 		else
 			if (IsLazyState (node->node_state))

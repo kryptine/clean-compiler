@@ -2348,7 +2348,7 @@ static Exp ConvertNode (Node node, NodeId nid)
 					} else {
 						e->e_fun = sdef->sdef_sa_fun;
 										
-						if (sdef->sdef_kind==RECORDTYPE ? arity==sdef->sdef_cons_arity : arity==sdef->sdef_arity)
+						if (arity==sdef->sdef_arity)
 							e->e_kind = Value;
 						else {
 							ConvertToApplyNode (e, node, arity);
@@ -2477,7 +2477,7 @@ static Exp ConvertNode (Node node, NodeId nid)
 			/* build a record expression for the new record node */
 			newrecordexp->e_fun  = node->node_symbol->symb_def->sdef_sa_fun;
 			newrecordexp->e_kind = Value;
-			arity                = node->node_symbol->symb_def->sdef_cons_arity;
+			arity                = node->node_symbol->symb_def->sdef_arity;
 			
 			/* initialise the arguments of the new record exp */
 			newrecordexp->e_args = NewExpArgs (arity);
@@ -2660,7 +2660,7 @@ static Exp convert_pattern (SymbolP symbol_p,int arity,NodeIdListElementP node_i
 			} else {
 				e->e_fun = sdef->sdef_sa_fun;
 								
-				if (sdef->sdef_kind==RECORDTYPE ? arity==sdef->sdef_cons_arity : arity==sdef->sdef_arity)
+				if (arity==sdef->sdef_arity)
 					e->e_kind = Value;
 				else {
 					convert_pattern_to_apply_node (e,symbol_p,node_id_list,arity);
@@ -3602,7 +3602,7 @@ static void ConvertSyntaxTree (Symbol symbols)
 
 				sdef->sdef_sa_fun = f;
 				f->fun_symbol        = sdef;
-				arity = f->fun_arity = sdef->sdef_cons_arity;			
+				arity = f->fun_arity = sdef->sdef_arity;			
 				f->fun_kind          = Constructor;
 				f->fun_single        = True;
 	

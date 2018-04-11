@@ -2279,7 +2279,7 @@ static void FillSymbol (Node node,SymbDef sdef,int *asp_p,int *bsp_p,NodeId upda
 	LabDef name;
 	int symbarity;
 	
-	symbarity = sdef->sdef_kind==RECORDTYPE ? sdef->sdef_cons_arity : sdef->sdef_arity;
+	symbarity = sdef->sdef_arity;
 
 	if (symbarity==node->node_arity){
 		switch (sdef->sdef_kind){

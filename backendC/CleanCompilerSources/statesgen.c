@@ -349,7 +349,7 @@ static void GenRecordState (SymbDef sdef)
 		CurrentLine		= 0 /*rectype->type_line*/;
 
 		sdef->sdef_checkstatus = ConvertingToState; /* to detect cyclic strict field dependencies */
-		SetRecordState (&sdef->sdef_record_state, sdef, sdef->sdef_cons_arity);
+		SetRecordState (&sdef->sdef_record_state, sdef, sdef->sdef_arity);
 		fieldstates=sdef->sdef_record_state.state_record_arguments;
 
 		strict_record=0;
@@ -1695,7 +1695,7 @@ static StateP GetStateOfArguments (SymbDef sdef,int actual_arity)
 			break;
 		case RECORDTYPE:
 			state_p=sdef->sdef_record_state.state_record_arguments;
-			symbol_arity = sdef->sdef_cons_arity;
+			symbol_arity = sdef->sdef_arity;
 			break;
 		default:
 			return NULL;
@@ -3235,9 +3235,8 @@ static int get_symbol_arity_or_zero (SymbolP symbol_p)
 				case SYSRULE:
 				case IMPRULE:
 				case CONSTRUCTOR:
-					return sdef->sdef_arity;
 				case RECORDTYPE:
-					return sdef->sdef_cons_arity;
+					return sdef->sdef_arity;
 			}
 			break;
 		}

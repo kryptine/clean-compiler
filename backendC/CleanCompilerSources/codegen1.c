@@ -890,7 +890,7 @@ static void GenLazyRecordEntry (SymbDef rdef)
 
 	argstates = rdef->sdef_record_state.state_record_arguments;
 
-	asp = rdef->sdef_cons_arity;
+	asp = rdef->sdef_arity;
 	bsp = 0;
 	arity = asp;
 

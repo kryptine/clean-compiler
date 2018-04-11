@@ -3482,7 +3482,7 @@ void GenLazyRecordDescriptorAndExport (SymbDef sdef)
 		return;
 
 	name = sdef->sdef_ident->ident_name;
-	arity = sdef->sdef_cons_arity;
+	arity = sdef->sdef_arity;
 	
 	if (sdef->sdef_exported){
 		put_directive_ (Ddescexp);
