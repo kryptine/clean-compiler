@@ -3883,7 +3883,7 @@ void GenNoMatchError (SymbDef sdef,int asp,int bsp,int string_already_generated)
 	if (!desc_needed && !string_already_generated){
 		put_directive_ (Dstring);
 		FPrintF (OutFile, "x_%u \"",sdef->sdef_number);		
-		PrintSymbolOfIdent (sdef->sdef_ident, sdef->sdef_line,OutFile);
+		PrintSymbolOfIdent (sdef->sdef_ident,0,OutFile);
 		FPutS ("\"", OutFile);
 	}
 }
@@ -3907,7 +3907,7 @@ void GenCaseNoMatchError (SymbDefP case_def,int asp,int bsp)
 	
 	put_directive_ (Dstring);
 	FPrintF (OutFile, "case_fail%u \"",CaseFailNumber);		
-	PrintSymbolOfIdent (case_def->sdef_ident,case_def->sdef_line,OutFile);
+	PrintSymbolOfIdent (case_def->sdef_ident,0,OutFile);
 	FPrintF (OutFile, "\"");		
 
 	CaseFailNumber++;

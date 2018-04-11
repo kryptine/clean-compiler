@@ -126,7 +126,6 @@ SymbDef MakeNewSymbolDefinition (char * module, Ident name, int arity, SDefKind 
 	def->sdef_ident = name;
 	def->sdef_arity = arity;
 	def->sdef_kind = kind;
-	def->sdef_line = 0;
 
 	def->sdef_mark=0;
 
