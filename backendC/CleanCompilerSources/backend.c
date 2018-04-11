@@ -2919,7 +2919,6 @@ BERecordType (int moduleIndex, BEFlatTypeP lhs, BETypeNodeP constructorType, int
 	Assert (type->type_lhs->ft_symbol->symb_kind == definition);
 	sdef	= type->type_lhs->ft_symbol->symb_def;
 	Assert (sdef->sdef_kind == NEWDEFINITION);
-	sdef->sdef_cons_arity	= constructorType->type_node_arity;
 	sdef->sdef_checkstatus	= TypeChecked;
 	sdef->sdef_kind 		= RECORDTYPE;
 	sdef->sdef_type			= type;

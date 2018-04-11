@@ -447,7 +447,7 @@ static void CodeRootSymbolApplication (Node root,NodeId rootid,SymbDef def,int a
 	LabDef name;
 	int symbarity;
 
-	symbarity = def->sdef_kind==RECORDTYPE ? def->sdef_cons_arity : def->sdef_arity;
+	symbarity = def->sdef_arity;
 	
 	if (symbarity==root->node_arity){
 		SDefKind symbkind;

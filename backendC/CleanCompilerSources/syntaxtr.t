@@ -1,6 +1,3 @@
-/*
-	Version 1.1 23-1-1996
-*/
 
 #include "compiledefines.h"
 
@@ -605,7 +602,6 @@ STRUCT (symbol_def,SymbDef){
 	unsigned		sdef_number;
 	unsigned		sdef_ancestor;
 	short			sdef_arity;
-	short			sdef_cons_arity;
 
 	union {
 		struct _fun *	u3_sa_fun;					/* sa.c */
@@ -688,7 +684,6 @@ typedef FileTime ModuleFileTime;
 typedef struct {
 	Symbol				im_name;
 	Symbol				im_symbols;
-	Types				im_types;
 	ImpRules			im_rules;
 	struct symbol_def *	im_start;
 	DefMod				im_def_module;
@@ -705,9 +700,6 @@ typedef struct {
 struct def_repr {
 	Symbol		dm_name;
 	Symbol		dm_symbols;
-	Types		dm_types;
-	AbsTypes	dm_abs_types;
-	RuleTypes	dm_rules;
 	TableKind	dm_system_module_table_kind;
 	Bool		dm_system_module;
 #if WRITE_DCL_MODIFICATION_TIME
