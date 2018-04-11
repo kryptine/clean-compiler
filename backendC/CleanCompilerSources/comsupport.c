@@ -355,7 +355,7 @@ void PrintSymbol (Symbol symbol, File file)
 		break;
 	case definition:
 		symb_id = symbol -> symb_def -> sdef_ident;
-		line_nr = symbol -> symb_def -> sdef_line;
+		line_nr = 0;
 		break;
 	case int_denot:
 		FPutS (symbol->symb_int, file);
@@ -499,7 +499,7 @@ void StaticMessage (Bool error, char *symbol_format, char *message_format, ...)
 				case 'D':
 				{
 					SymbDef def  = va_arg (ap, SymbDef);
-					PrintSymbolOfIdent (def->sdef_ident, def->sdef_line, StdError);
+					PrintSymbolOfIdent (def->sdef_ident, 0, StdError);
 					break;
 				}
 				case 'S':

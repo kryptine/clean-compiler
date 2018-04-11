@@ -2539,8 +2539,6 @@ DeclareFunctionC (char *name, int arity, int functionIndex, unsigned int ancesto
 	newSymbDef->sdef_dcl_icl	= NULL;
 	newSymbDef->sdef_isused		= 0;
 
-	newSymbDef->sdef_line					= 0;	/* used in PrintType */
-
 	*icl->beicl_depsP	= newSymbDef;
 	icl->beicl_depsP	= &newSymbDef->sdef_next_scc;
 	newSymbDef->sdef_arfun		= NoArrayFun;
@@ -2660,7 +2658,6 @@ BEDeclareRuleType (int functionIndex, int moduleIndex, CleanString name)
 	newSymbDef->sdef_ident		= newIdent;
 	newSymbDef->sdef_mark		= 0;
 	newSymbDef->sdef_isused		= 0;
-	newSymbDef->sdef_line		= 0;	/* used in PrintSymbolOfIdent */
 
 	functions [functionIndex].symb_kind	= definition;
 	functions [functionIndex].symb_def	= newSymbDef;

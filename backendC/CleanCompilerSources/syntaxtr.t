@@ -517,7 +517,6 @@ STRUCT (rule_alt,RuleAlt){
 	RuleAlts				alt_next;
 	unsigned				alt_line;
 	unsigned				alt_kind:3;	/* RhsKind */
-	Bool					alt_may_fail:1;
 };
 
 #define alt_rhs_root alt_rhs.rhs_root
@@ -565,7 +564,6 @@ STRUCT (imp_rule,ImpRule){
 #endif
 	unsigned					rule_line;
 	unsigned					rule_mark;
-	unsigned					rule_ref_count;
 };
 
 #define RULE_CAF_MASK					2
@@ -620,11 +618,9 @@ STRUCT (symbol_def,SymbDef){
 	struct symbol_def *	sdef_next_scc;
 
 	union {
-		struct symbol_def *		sdef_u2_parent;
 		struct symbol_def *		sdef_u2_next_version;	/* for IMPRULES */
 	} sdef_u2;
 	
-	unsigned	 	sdef_line;
 	int				sdef_mark;
 
 	unsigned		sdef_kind:SDefKindSize;
@@ -660,9 +656,6 @@ STRUCT (symbol_def,SymbDef){
 /* some macros to reuse bit fields */
 
 #define sdef_group_number		sdef_ancestor
-#define sdef_has_instance_info	sdef_used_as_instance
-
-#define sdef_parent			sdef_u2.sdef_u2_parent
 
 #define sdef_next_version	sdef_u2.sdef_u2_next_version
 
@@ -698,7 +691,6 @@ typedef struct {
 	Types				im_types;
 	ImpRules			im_rules;
 	struct symbol_def *	im_start;
-	Bool				im_main;
 	DefMod				im_def_module;
 #if IMPORT_OBJ_AND_LIB
 	struct string_list *	im_imported_objs;

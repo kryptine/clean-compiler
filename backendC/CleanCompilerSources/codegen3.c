@@ -943,7 +943,6 @@ static void CodeNormalRootNode (Node root,NodeId rootid,int asp,int bsp,CodeGenN
 			Assume (case_ident_s.ident_name != NULL, "codegen3", "CodeNormalRootNode (fail_symb)");
 
 			case_def_s.sdef_ident = &case_ident_s;
-			case_def_s.sdef_line = 0;
 
 			StaticMessage (FunctionMayFailIsError, "%D", "case may fail", &case_def_s);
 

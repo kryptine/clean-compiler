@@ -10,22 +10,6 @@
 #include "checker.h"
 #include <ctype.h>
 
-char
-	*Earity			= "used with wrong arity",
-	*Ecyclicsyn	 	= "cyclic dependencies between synonym types",
-	*EwrongdefS		= "differs from the symbol of the first rule alternative",
-	*Einfix_imp_def	= "infix specification in the impl module conflicts with the def module",
-	*EImplandDef1	= "definition in the impl module conflicts with the def module",
-	*EImplandDef5	= "should have a type specification in the implementation rule",
-	*Enodeid2		= "multiply defined",
-	*Enodeid3		= "not defined";
-
-static char
-	*Etuple			= "tuples without type checking not allowed";
-
-unsigned RuleCount,TypeSymbolCount;
-SymbDef StackTop;
-
 char *ConvertSymbolKindToString (SymbKind skind)
 {
 	switch (skind)
@@ -256,11 +240,3 @@ void CheckSymbolWarningOrError (Bool error,struct symbol *symbol,char *msg)
 {
 	StaticMessage (error,"%S","%S %s",CurrentSymbol,symbol,msg);
 }
-
-extern Ident TupleId;
-
-void TupleError (void)
-{
-	CheckError (TupleId->ident_name,Etuple);
-}
-
