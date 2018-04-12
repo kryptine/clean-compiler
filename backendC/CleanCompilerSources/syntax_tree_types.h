@@ -120,12 +120,3 @@ struct type_var
 	Ident			tv_ident;
 	int 			tv_argument_nr;
 };
-
-#define TestMark(n,f,mask) 	(((n)->f & (mask)) != 0)
-
-typedef struct uni_var
-{
-	Ident				uv_ident;
-	int					uv_number;
-	struct uni_var *	uv_next_uni_var;
-} * UniVar;

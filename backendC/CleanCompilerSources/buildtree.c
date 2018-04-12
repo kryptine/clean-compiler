@@ -129,20 +129,6 @@ NewTypeVar (IdentP nid)
 	return (newnid);
 }
 
-UniVar
-NewUniVar (IdentP id)
-{
-	UniVar	new_uni_var;
-
-	new_uni_var	= CompAllocType (struct uni_var);
-
-	new_uni_var->uv_ident			= id;
-	new_uni_var->uv_number			= 0;
-	new_uni_var->uv_next_uni_var	= NULL;
-
-	return (new_uni_var);
-}
-
 NodeP
 NewNodeIdNode (NodeIdP node_id)
 {

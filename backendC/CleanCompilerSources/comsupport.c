@@ -26,7 +26,6 @@
 #include "buildtree.h"
 #include "comparser.h"
 #include "checker.h"
-#include "tcsupport.h"
 #include "statesgen.h"
 #include "codegen_types.h"
 #include "codegen1.h"
@@ -555,12 +554,6 @@ void StaticMessage (Bool error, char *symbol_format, char *message_format, ...)
 				case 'S':
 					PrintSymbol (va_arg (ap, Symbol), StdError);
 					break;
-				case 'N':
-				{	Node node		= va_arg (ap, Node);
-					int arg_nr	= va_arg (ap, int);
-					PrintNodeSymbol (node, arg_nr, StdError);
-					break;
-				}
 				default:
 					FPutC ('%', StdError);
 					FPutC (format_spec, StdError);
