@@ -49,7 +49,6 @@ extern NodeIdP NewNodeId (IdentP nid);
 extern StrictNodeIdP NewStrictNodeId (NodeIdP node_id, StrictNodeIdP next);
 extern StrictNodeIdP NewStrictIdent (Ident ident, StrictNodeIdP next);
 extern TypeVar NewTypeVar (IdentP nid);
-extern UniVar NewUniVar (IdentP nid);
 extern NodeDefs NewNodeDefinition (NodeIdP nid, NodeP node);
 extern SymbolP NewSymbol (SymbKind symbolKind);
 extern TypeNode NewTypeNode (Annotation annot, AttributeKind attr, SymbolP symb, TypeArgs args, int arity);
