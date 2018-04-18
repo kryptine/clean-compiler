@@ -556,19 +556,35 @@ removeExpandedTypesFromDclModules dcls used_module_numbers
 	=	foldStateWithIndexA removeExpandedTypesFromDclModule dcls
 where
 	removeExpandedTypesFromDclModule :: ModuleIndex DclModule -> BackEnder
-	removeExpandedTypesFromDclModule moduleIndex dclModule=:{dcl_functions}
+	removeExpandedTypesFromDclModule moduleIndex dclModule=:{dcl_functions,dcl_common={com_cons_defs,com_selector_defs}}
 		| moduleIndex == cPredefinedModuleIndex || not (inNumberSet moduleIndex used_module_numbers)
 			= identity
-			= foldStateWithIndexA (removeExpandedTypesFromFunType moduleIndex)  dcl_functions
+			= foldStateA removeExpandedTypesFromFunType dcl_functions
+			o` foldStateA removeExpandedTypesFromConsType com_cons_defs
+			o` foldStateA removeExpandedTypesFromSelectorType com_selector_defs
 			where
-				removeExpandedTypesFromFunType :: ModuleIndex Index FunType -> BackEnder
-				removeExpandedTypesFromFunType moduleIndex functionIndex {ft_ident, ft_type_ptr}
-					= \be0 ->	let (ft_type,be) = read_from_var_heap ft_type_ptr be0 in
+				removeExpandedTypesFromFunType :: FunType -> BackEnder
+				removeExpandedTypesFromFunType {ft_type_ptr}
+					= \be0 -> let (ft_type,be) = read_from_var_heap ft_type_ptr be0 in
 						(case ft_type of
 							VI_ExpandedType expandedType
 								->	write_to_var_heap ft_type_ptr VI_Empty	
 							_
 								->	identity) be
+
+				removeExpandedTypesFromSelectorType :: SelectorDef -> BackEnder
+				removeExpandedTypesFromSelectorType {sd_type_ptr}
+					= \be0
+						| not (isNilPtr sd_type_ptr)
+							-> write_to_var_heap sd_type_ptr VI_Empty be0
+							-> be0
+
+				removeExpandedTypesFromConsType :: ConsDef -> BackEnder
+				removeExpandedTypesFromConsType {cons_type_ptr}
+					= \be0
+						| not (isNilPtr cons_type_ptr)
+							-> write_to_var_heap cons_type_ptr VI_Empty be0
+							-> be0
 
 :: DeclVarsInput :== Ident
 
@@ -2129,8 +2145,6 @@ markExports {dcl_functions,dcl_common={com_type_defs,com_cons_defs,com_selector_
 			where
 				iclTypeIndex
 					=	iclClasses.[classIndex].class_dictionary.ds_index
-				dclTypeIndex
-					=	dclClasses.[classIndex].class_dictionary.ds_index
 				{td_rhs = RecordType {rt_fields}}
 					=	iclTypes.[iclTypeIndex]
 
