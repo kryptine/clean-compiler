@@ -362,7 +362,7 @@ buildGenericTypeRep type_index funs_and_groups
 	
 //	the structure type
 
-convertATypeToGenTypeStruct :: !Ident !Position !PredefinedSymbolsData !AType (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin) 
+convertATypeToGenTypeStruct :: !Ident !Position !PredefinedSymbolsData !AType (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin)
 														   -> (GenTypeStruct, (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin))
 convertATypeToGenTypeStruct ident pos {psd_predefs_a} type st
 	= convert type st
@@ -405,7 +405,7 @@ where
 					#! (args, st) = mapSt  convert args (modules, td_infos, heaps, error)
 					-> (GTSAppCons kind args, st)  
 
-convert_bimap_AType_to_GenTypeStruct :: !AType !Position !PredefinedSymbolsData (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin) 
+convert_bimap_AType_to_GenTypeStruct :: !AType !Position !PredefinedSymbolsData (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin)
 															 -> (GenTypeStruct, (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin))
 convert_bimap_AType_to_GenTypeStruct type pos {psd_predefs_a} st
 	= convert type st
@@ -638,6 +638,9 @@ where
 			= (GTSRecord ci_record_info {gi_module=gi_module,gi_index=gi_index} gen_type_ds field_list_ds prod_type, st)
 			# error = reportError td_ident.id_name td_pos "cannot build a generic representation of an existential type" error
 			= (GTSE, (modules, td_infos, heaps, error))
+	build_type {td_rhs=NewType cons, td_ident, td_pos} (AlgebraicInfo type_info cons_desc_list_ds _ _) st
+		# (type, st) = build_newtype_alt td_ident td_pos cons st
+		= (GTSObject type_info {gi_module=gi_module,gi_index=gi_index} cons_desc_list_ds type, st)
 	build_type {td_rhs=SynType type,td_ident, td_pos} type_infos (modules, td_infos, heaps, error)
 		# error = reportError td_ident.id_name td_pos "cannot build a generic representation of a synonym type" error
 		= (GTSE, (modules, td_infos, heaps, error))
@@ -651,6 +654,14 @@ where
 			# (args, st) = mapSt (convertATypeToGenTypeStruct td_ident td_pos predefs) st_args (modules, td_infos, heaps, error)	
 			# prod_type = build_prod_type args
 			= (GTSCons cons_info {gi_module=gi_module,gi_index=ds_index} type_info gen_type_ds prod_type, st)
+			# error = reportError td_ident.id_name td_pos "cannot build a generic representation of an existential type" error
+			= (GTSE, (modules, td_infos, heaps, error))
+
+	build_newtype_alt td_ident td_pos cons_def_sym=:{ds_index} (modules, td_infos, heaps, error)
+		# ({cons_type={st_args},cons_exi_vars}, modules) = modules![gi_module].com_cons_defs.[ds_index]
+		| isEmpty cons_exi_vars
+			# st_arg = case st_args of [st_arg] -> st_arg;
+			= convertATypeToGenTypeStruct td_ident td_pos predefs st_arg (modules, td_infos, heaps, error)	
 			# error = reportError td_ident.id_name td_pos "cannot build a generic representation of an existential type" error
 			= (GTSE, (modules, td_infos, heaps, error))
 
@@ -688,6 +699,8 @@ buildTypeDefInfo td=:{td_rhs = AlgType alts} td_module main_module_index predefs
 	= buildAlgebraicTypeDefInfo td alts td_module main_module_index predefs funs_and_groups modules heaps error
 buildTypeDefInfo td=:{td_rhs = RecordType {rt_constructor, rt_fields}} td_module main_module_index predefs funs_and_groups modules heaps error
 	= buildRecordTypeDefInfo td rt_constructor [x\\x<-:rt_fields] td_module main_module_index predefs funs_and_groups modules heaps error
+buildTypeDefInfo td=:{td_rhs = NewType cons} td_module main_module_index predefs funs_and_groups modules heaps error
+	= buildAlgebraicTypeDefInfo td [cons] td_module main_module_index predefs funs_and_groups modules heaps error
 buildTypeDefInfo td=:{td_rhs = SynType type, td_ident, td_pos} td_module main_module_index predefs funs_and_groups modules heaps error
 	# error = reportError td_ident.id_name td_pos "cannot build constructor information for a synonym type" error
 	= buildAlgebraicTypeDefInfo td [] td_module main_module_index predefs funs_and_groups modules heaps error
@@ -982,7 +995,7 @@ buildConversionTo
 		build_expr_for_type_rhs type_def_mod td_index td_rhs arg_expr heaps error
 	# fun_name = makeIdent ("toGeneric" +++ td_ident.id_name)
 	| not error.ea_ok
-		# (def_sym, funs_and_groups) 
+		# (def_sym, funs_and_groups)
 			= (buildFunAndGroup fun_name [] EE No main_module_index td_pos funs_and_groups)
 		= (def_sym, funs_and_groups, heaps, error)
 		# (def_sym, funs_and_groups) 
@@ -1004,6 +1017,8 @@ where
 		= build_expr_for_conses type_def_mod type_def_index def_symbols arg_expr heaps error
 	build_expr_for_type_rhs type_def_mod type_def_index (RecordType {rt_constructor}) arg_expr heaps error		
 		= build_expr_for_record type_def_mod type_def_index rt_constructor arg_expr heaps error
+ 	build_expr_for_type_rhs type_def_mod type_def_index (NewType cons) arg_expr heaps error
+		= build_expr_for_newtype type_def_mod type_def_index cons arg_expr heaps error
 	build_expr_for_type_rhs type_def_mod type_def_index (AbstractType _) arg_expr  heaps error
 		#! error = checkErrorWithIdentPos (newPosition td_ident td_pos) "cannot build isomorphisms for an abstract type" error
 		= (EE, heaps, error)
@@ -1063,6 +1078,27 @@ where
 		| otherwise
 			# (expr, heaps) = build_sum (i - (n/2)) (n - (n/2)) expr predefs heaps
 			= build_right expr predefs heaps
+
+	build_expr_for_newtype type_def_mod type_def_index cons_def_sym arg_expr heaps error
+		# (alt, heaps, error) = build_expr_for_newtype_cons type_def_mod cons_def_sym heaps error
+		# case_patterns = NewTypePatterns {gi_module = type_def_mod, gi_index = type_def_index} [alt]
+		# (case_expr, heaps) = buildCaseExpr arg_expr case_patterns heaps
+		= (case_expr, heaps, error)
+
+	build_expr_for_newtype_cons :: !Int !DefinedSymbol !*Heaps !*ErrorAdmin -> (AlgebraicPattern, !*Heaps, !*ErrorAdmin)
+	build_expr_for_newtype_cons type_def_mod cons_def_sym heaps error	
+		# (var_expr, var, heaps) = buildVarExpr "x11" heaps
+
+		#! expr = var_expr
+		#! (expr, heaps) = build_object expr predefs heaps
+						
+		#! alg_pattern = {
+			ap_symbol = {glob_module = type_def_mod, glob_object = cons_def_sym},
+			ap_vars = [var],
+			ap_expr = expr,
+			ap_position = NoPos
+			}
+		= (alg_pattern, heaps, error)	
 
 	// build conversion for a record type def
 	build_expr_for_record type_def_mod type_def_index cons_def_sym=:{ds_ident, ds_arity} arg_expr heaps error
@@ -1126,6 +1162,10 @@ where
 	build_expr_for_type_rhs type_def_mod (RecordType {rt_constructor}) heaps error				
 		# (expr, var, heaps, error) = build_record type_def_mod [rt_constructor] heaps	error
 		= (expr, var, heaps, error)
+	build_expr_for_type_rhs type_def_mod (NewType cons) heaps error
+		#! (expr, var, heaps) = build_newtype_cons_app type_def_mod cons heaps
+		#! (expr, var, heaps) = build_case_object var expr predefs heaps
+		= (expr, var, heaps, error)
 	build_expr_for_type_rhs type_def_mod (AbstractType _) heaps error
 		#! error = reportError td_ident.id_name td_pos "cannot build isomorphisms for an abstract type" error
 		# dummy_fv = {fv_def_level=(-1), fv_count=0, fv_ident=makeIdent "dummy", fv_info_ptr=nilPtr}
@@ -1185,13 +1225,18 @@ where
 		= (case_expr, var, heaps) 
 	
 	// build constructor application expression
-	build_cons_app :: !Index !DefinedSymbol !*Heaps 
-		-> (!Expression, ![FreeVar], !*Heaps)
+	build_cons_app :: !Index !DefinedSymbol !*Heaps -> (!Expression, ![FreeVar], !*Heaps)
 	build_cons_app cons_mod def_symbol=:{ds_arity} heaps
 		#! names = ["x"  +++ toString k \\ k <- [1..ds_arity]]
 		#! (var_exprs, vars, heaps) = buildVarExprs names heaps 
 		#! (expr, heaps) = buildConsApp cons_mod def_symbol var_exprs heaps
 	 	= (expr, vars, heaps)
+
+	build_newtype_cons_app :: !Index !DefinedSymbol !*Heaps -> (!Expression, !FreeVar, !*Heaps)
+	build_newtype_cons_app cons_mod def_symbol heaps
+		#! (var_expr, var, heaps) = buildVarExpr "x11" heaps 
+		#! (expr, heaps) = buildNewTypeConsApp cons_mod def_symbol var_expr heaps
+	 	= (expr, var, heaps)
 
 	build_case_unit body_expr predefs=:{psd_predefs_a} heaps
 		# unit_pat = buildPredefConsPattern PD_ConsUNIT [] body_expr predefs
@@ -1229,7 +1274,7 @@ build_field var_expr predefs heaps
 		= buildPredefConsApp        PD_ConsFIELD [var_expr] predefs heaps 
 
 build_case_pair var1 var2 body_expr predefs=:{psd_predefs_a} heaps
-	# pair_pat = buildPredefConsPattern PD_ConsPAIR [var1, var2] body_expr predefs	
+	# pair_pat = buildPredefConsPattern PD_ConsPAIR [var1, var2] body_expr predefs
 	# {pds_module, pds_def} = psd_predefs_a.[PD_TypePAIR]
 	# case_patterns = AlgebraicPatterns {gi_module = pds_module, gi_index = pds_def} [pair_pat]
 	= build_case_expr case_patterns heaps
@@ -1242,7 +1287,7 @@ build_case_either left_var left_expr right_var right_expr predefs=:{psd_predefs_
 	= build_case_expr case_patterns heaps
 
 build_case_object var body_expr predefs=:{psd_predefs_a,psd_generic_newtypes} heaps
-	# pat = buildPredefConsPattern PD_ConsOBJECT [var] body_expr predefs	
+	# pat = buildPredefConsPattern PD_ConsOBJECT [var] body_expr predefs
 	# {pds_module, pds_def} = psd_predefs_a.[PD_TypeOBJECT]
 	| psd_generic_newtypes bitand OBJECT_NewType_Mask<>0
 		# case_patterns = NewTypePatterns {gi_module = pds_module, gi_index = pds_def} [pat]
@@ -5286,6 +5331,19 @@ buildConsApp cons_mod {ds_ident, ds_index, ds_arity} arg_exprs heaps=:{hp_expres
 			symb_kind = SK_Constructor cons_glob
 			}, 
 		app_args = arg_exprs, 
+		app_info_ptr = expr_info_ptr} 	
+	# heaps = { heaps & hp_expression_heap = hp_expression_heap } 
+	= (expr, heaps)	
+
+buildNewTypeConsApp :: !Index DefinedSymbol !Expression !*Heaps -> (!Expression, !*Heaps) 
+buildNewTypeConsApp cons_mod {ds_ident, ds_index, ds_arity} arg_expr heaps=:{hp_expression_heap}
+	# (expr_info_ptr, hp_expression_heap) = newPtr EI_Empty hp_expression_heap
+	# expr = App {
+		app_symb = {
+			symb_ident = ds_ident, 
+			symb_kind = SK_NewTypeConstructor {gi_module = cons_mod, gi_index = ds_index}
+			},
+		app_args = [arg_expr], 
 		app_info_ptr = expr_info_ptr} 	
 	# heaps = { heaps & hp_expression_heap = hp_expression_heap } 
 	= (expr, heaps)	
