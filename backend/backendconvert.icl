@@ -575,16 +575,16 @@ where
 				removeExpandedTypesFromSelectorType :: SelectorDef -> BackEnder
 				removeExpandedTypesFromSelectorType {sd_type_ptr}
 					= \be0
-						| not (isNilPtr sd_type_ptr)
-							-> write_to_var_heap sd_type_ptr VI_Empty be0
-							-> be0
+						= if (not (isNilPtr sd_type_ptr))
+							(write_to_var_heap sd_type_ptr VI_Empty be0)
+							be0
 
 				removeExpandedTypesFromConsType :: ConsDef -> BackEnder
 				removeExpandedTypesFromConsType {cons_type_ptr}
 					= \be0
-						| not (isNilPtr cons_type_ptr)
-							-> write_to_var_heap cons_type_ptr VI_Empty be0
-							-> be0
+						= if (not (isNilPtr cons_type_ptr))
+							(write_to_var_heap cons_type_ptr VI_Empty be0)
+							be0
 
 :: DeclVarsInput :== Ident
 
