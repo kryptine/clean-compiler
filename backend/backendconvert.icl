@@ -422,18 +422,18 @@ backEndConvertModulesH predefs {fe_icl =
 	#! backEnd
 		=	declareDynamicTemp predefs (backEnd -*-> "declareDynamicTemp")
 
-	#! backEnd
-		=	defineDclModule main_dcl_module_n fe_dcls.[main_dcl_module_n] (backEnd -*-> "defineDclModule(cIclMoIndex)")
-	#! backEnd
-		=	defineOtherDclModules fe_dcls main_dcl_module_n icl_used_module_numbers (backEnd -*-> "defineOtherDclModules")
+	#! (type_var_heap,backEnd)
+		=	defineDclModule main_dcl_module_n fe_dcls.[main_dcl_module_n] type_var_heap backEnd
+	#! (type_var_heap,backEnd)
+		=	defineOtherDclModules fe_dcls main_dcl_module_n icl_used_module_numbers type_var_heap backEnd
 
 	#! backEnd
 		=	appBackEnd (BEDeclareIclModule icl_name.id_name icl_modification_time (size icl_functions) (size icl_common.com_type_defs) (size icl_common.com_cons_defs) (size icl_common.com_selector_defs)) (backEnd -*-> "BEDeclareIclModule")
 	#! backEnd
 		=	declareFunctionSymbols icl_functions functionIndices
 				(ifi_type_function_indices ++ ifi_global_function_indices) (backEnd -*-> "declareFunctionSymbols")
-	#! backEnd
-		=	declare main_dcl_module_n icl_common (backEnd -*-> "declare (main_dcl_module_n)")
+	#! (type_var_heap,backEnd)
+		=	declare_common_defs main_dcl_module_n icl_common type_var_heap backEnd
 	#! backEnd
 		=	declareArrayInstances /*fe_arrayInstances.ali_instances_range*/fe_arrayInstances.ali_array_first_instance_indices predefs main_dcl_module_n icl_functions fe_dcls (backEnd -*-> "declareArrayInstances")
 	#! backEnd
@@ -489,6 +489,14 @@ backEndConvertModulesH predefs {fe_icl =
 		function_indices2 NoComponentMembers i components
 			= function_indices (i+1) components
 
+fold2StatesWithIndexA function array s1 s2 :== fold2StatesWithIndexA 0 s1 s2
+	where
+		fold2StatesWithIndexA index s1 s2
+			| index == size array
+				= (s1,s2)
+				# (s1,s2) = fold2StatesWithIndexA (index+1) s1 s2
+				= function index array.[index] s1 s2
+
 declareOtherDclModules :: {#DclModule} Int NumberSet -> BackEnder
 declareOtherDclModules dcls main_dcl_module_n used_module_numbers
 	=	foldStateWithIndexA declareOtherDclModule dcls
@@ -502,18 +510,17 @@ where
 		// otherwise
 			=	declareDclModule moduleIndex dclModule
 
-defineOtherDclModules :: {#DclModule} Int NumberSet -> BackEnder
-defineOtherDclModules dcls main_dcl_module_n used_module_numbers
-	=	foldStateWithIndexA defineOtherDclModule dcls
+defineOtherDclModules :: {#DclModule} Int NumberSet !*TypeVarHeap !*BackEndState -> (!*TypeVarHeap,!*BackEndState)
+defineOtherDclModules dcls main_dcl_module_n used_module_numbers type_var_heap beState
+	= fold2StatesWithIndexA defineOtherDclModule dcls type_var_heap beState
 where
-	defineOtherDclModule :: ModuleIndex DclModule -> BackEnder
-	defineOtherDclModule moduleIndex dclModule
+	defineOtherDclModule :: ModuleIndex DclModule !*TypeVarHeap !*BackEndState -> (!*TypeVarHeap,!*BackEndState)
+	defineOtherDclModule moduleIndex dclModule type_var_heap beState
 		| moduleIndex == main_dcl_module_n
 		|| moduleIndex == cPredefinedModuleIndex
 		|| not (inNumberSet moduleIndex used_module_numbers)
-			=	identity		
-		// otherwise
-			=	defineDclModule moduleIndex dclModule
+			= (type_var_heap, beState)
+			= defineDclModule moduleIndex dclModule type_var_heap beState
 
 isSystem :: ModuleKind -> Bool
 isSystem MK_System
@@ -533,12 +540,11 @@ declareDclModule :: ModuleIndex DclModule -> BackEnder
 declareDclModule moduleIndex {dcl_name, dcl_modification_time, dcl_common, dcl_functions, dcl_module_kind}
 	=	appBackEnd (BEDeclareDclModule moduleIndex dcl_name.id_name dcl_modification_time (isSystem dcl_module_kind) (size dcl_functions) (size dcl_common.com_type_defs) (size dcl_common.com_cons_defs) (size dcl_common.com_selector_defs))
 
-defineDclModule :: ModuleIndex DclModule -> BackEnder
-defineDclModule moduleIndex
-		{dcl_name, dcl_common, dcl_functions, dcl_type_funs, dcl_instances}
-	=	declare moduleIndex dcl_common
-	o`	declareFunTypes moduleIndex dcl_functions
-			[{ir_from = 0, ir_to = dcl_instances.ir_from}, dcl_type_funs]
+defineDclModule :: ModuleIndex DclModule !*TypeVarHeap !*BackEndState -> (!*TypeVarHeap,!*BackEndState)
+defineDclModule moduleIndex	{dcl_name, dcl_common, dcl_functions, dcl_type_funs, dcl_instances} type_var_heap beState
+	# (type_var_heap,beState) = declare_common_defs moduleIndex dcl_common type_var_heap beState
+	# beState = declareFunTypes moduleIndex dcl_functions [{ir_from = 0, ir_to = dcl_instances.ir_from}, dcl_type_funs] beState
+	= (type_var_heap,beState)
 
 removeExpandedTypesFromDclModules :: {#DclModule} NumberSet -> BackEnder
 removeExpandedTypesFromDclModules dcls used_module_numbers
@@ -766,11 +772,10 @@ declareListInstances array_first_instance_indices predef_list_class_index predef
 			=	beDeclareRuleType index main_dcl_module_n (id_name +++ ";" +++ toString index)
 			o`	beDefineRuleType index main_dcl_module_n (convertTypeAlt index main_dcl_module_n type)
 
-instance declare CommonDefs where
-	declare :: ModuleIndex CommonDefs -> BackEnder
-	declare moduleIndex {com_cons_defs, com_type_defs, com_selector_defs, com_class_defs}
-		=	declare moduleIndex com_type_defs
-		o`	defineTypes moduleIndex com_cons_defs com_selector_defs com_type_defs
+declare_common_defs :: ModuleIndex CommonDefs !*TypeVarHeap !*BackEndState -> (!*TypeVarHeap,!*BackEndState)
+declare_common_defs moduleIndex {com_cons_defs, com_type_defs, com_selector_defs, com_class_defs} type_var_heap bes
+	# bes = declare moduleIndex com_type_defs bes
+	= defineTypes 0 (size com_type_defs) moduleIndex com_cons_defs com_selector_defs com_type_defs type_var_heap bes
 
 instance declareWithIndex (TypeDef a) where
 	declareWithIndex :: Index ModuleIndex (TypeDef a) -> BackEnder
@@ -802,9 +807,12 @@ declareFunType moduleIndex ranges functionIndex {ft_ident, ft_type_ptr}
 					index_in_ranges index []
 						= False
 
-defineTypes :: ModuleIndex {#ConsDef} {#SelectorDef} {#CheckedTypeDef} -> BackEnder
-defineTypes moduleIndex constructors selectors types
-	=	foldStateWithIndexA (defineType moduleIndex constructors selectors) types
+defineTypes :: !Int !Int ModuleIndex {#ConsDef} {#SelectorDef} {#CheckedTypeDef} !*TypeVarHeap !*BackEndState -> (!*TypeVarHeap,!*BackEndState)
+defineTypes type_i type_i_stop moduleIndex constructors selectors types type_var_heap bes
+	| type_i<type_i_stop
+		# (type_var_heap,bes) = defineType moduleIndex constructors selectors type_i types.[type_i] type_var_heap bes
+		= defineTypes (type_i+1) type_i_stop moduleIndex constructors selectors types type_var_heap bes
+		= (type_var_heap,bes)
 
 convertTypeLhs :: ModuleIndex Index TypeAttribute [ATypeVar] -> BEMonad BEFlatTypeP
 convertTypeLhs moduleIndex typeIndex attribute args
@@ -822,12 +830,13 @@ convertTypeVar :: ATypeVar -> BEMonad BETypeVarListP
 convertTypeVar typeVar
 	=	beTypeVarListElem (beTypeVar typeVar.atv_variable.tv_ident.id_name) (convertAttribution typeVar.atv_attribute)
 
-defineType :: ModuleIndex {#ConsDef} {#SelectorDef} Index CheckedTypeDef *BackEndState -> *BackEndState
-defineType moduleIndex constructors _ typeIndex {td_ident, td_attribute, td_args, td_rhs=AlgType constructorSymbols} be
+defineType :: ModuleIndex {#ConsDef} {#SelectorDef} Index CheckedTypeDef !*TypeVarHeap *BackEndState -> (!*TypeVarHeap,!*BackEndState)
+defineType moduleIndex constructors _ typeIndex {td_ident, td_attribute, td_args, td_rhs=AlgType constructorSymbols} type_var_heap be
 	# (flatType, be) = convertTypeLhs moduleIndex typeIndex td_attribute td_args be
-	# (constructors, be) = convertConstructors typeIndex td_ident.id_name moduleIndex constructors constructorSymbols be
-	= appBackEnd (BEAlgebraicType flatType constructors) be
-defineType moduleIndex constructors selectors typeIndex {td_attribute, td_args, td_rhs=RecordType {rt_constructor, rt_fields, rt_is_boxed_record}, td_fun_index} be
+	  (constructors, be) = convertConstructors typeIndex td_ident.id_name moduleIndex constructors constructorSymbols be
+	  be = appBackEnd (BEAlgebraicType flatType constructors) be
+	= (type_var_heap,be)
+defineType moduleIndex constructors selectors typeIndex {td_attribute, td_args, td_rhs=RecordType {rt_constructor, rt_fields, rt_is_boxed_record}, td_fun_index} type_var_heap be
 	# constructorIndex = rt_constructor.ds_index
 	  constructorDef = constructors.[constructorIndex]
 	# (flatType, be)
@@ -844,7 +853,8 @@ defineType moduleIndex constructors selectors typeIndex {td_attribute, td_args, 
 				(beConstructorSymbol moduleIndex constructorIndex)
 				(convertSymbolTypeArgs constructorType)
 				be
-	= appBackEnd (BERecordType moduleIndex flatType constructorTypeNode (if rt_is_boxed_record 1 0) fields) be
+	# be = appBackEnd (BERecordType moduleIndex flatType constructorTypeNode (if rt_is_boxed_record 1 0) fields) be
+	= (type_var_heap,be)
 	where
 		constructorTypeFunction constructorDef be0
 			= let (cons_type,be) = read_from_var_heap constructorDef.cons_type_ptr be0 in
@@ -853,20 +863,24 @@ defineType moduleIndex constructors selectors typeIndex {td_attribute, td_args, 
 							->	(expandedType,be)
 						_
 							->	(constructorDef.cons_type,be))
-defineType moduleIndex _ _ typeIndex {td_attribute, td_args, td_rhs=AbstractType _} be
- 	=	beAbsType (convertTypeLhs moduleIndex typeIndex td_attribute td_args) be
-defineType moduleIndex _ _ typeIndex {td_attribute, td_args, td_rhs=AbstractSynType _ _} be
- 	=	beAbsType (convertTypeLhs moduleIndex typeIndex td_attribute td_args) be
-defineType moduleIndex constructors _ typeIndex {td_ident, td_attribute, td_args, td_rhs=ExtensibleAlgType constructorSymbols} be
+defineType moduleIndex _ _ typeIndex {td_attribute, td_args, td_rhs=AbstractType _} type_var_heap be
+ 	# be = beAbsType (convertTypeLhs moduleIndex typeIndex td_attribute td_args) be
+ 	= (type_var_heap,be)
+defineType moduleIndex _ _ typeIndex {td_attribute, td_args, td_rhs=AbstractSynType _ _} type_var_heap be
+ 	# be = beAbsType (convertTypeLhs moduleIndex typeIndex td_attribute td_args) be
+ 	= (type_var_heap,be)
+defineType moduleIndex constructors _ typeIndex {td_ident, td_attribute, td_args, td_rhs=ExtensibleAlgType constructorSymbols} type_var_heap be
 	# (flatType, be) = convertTypeLhs moduleIndex typeIndex td_attribute td_args be
-	# (constructors, be) = convertConstructors typeIndex td_ident.id_name moduleIndex constructors constructorSymbols be
-	= appBackEnd (BEExtendableAlgebraicType flatType constructors) be
-defineType moduleIndex constructors _ typeIndex {td_ident, td_attribute, td_args, td_rhs=AlgConses constructorSymbols _} be
+	  (constructors, be) = convertConstructors typeIndex td_ident.id_name moduleIndex constructors constructorSymbols be
+	  be = appBackEnd (BEExtendableAlgebraicType flatType constructors) be
+	= (type_var_heap,be)
+defineType moduleIndex constructors _ typeIndex {td_ident, td_attribute, td_args, td_rhs=AlgConses constructorSymbols _} type_var_heap be
 	# (flatType, be) = convertTypeLhs moduleIndex typeIndex td_attribute td_args be
-	# (constructors, be) = convertConstructors typeIndex td_ident.id_name moduleIndex constructors constructorSymbols be
-	= appBackEnd (BEExtendableAlgebraicType flatType constructors) be
-defineType _ _ _ _ _ be
-	=	be
+	  (constructors, be) = convertConstructors typeIndex td_ident.id_name moduleIndex constructors constructorSymbols be
+	  be = appBackEnd (BEExtendableAlgebraicType flatType constructors) be
+	= (type_var_heap,be)
+defineType _ _ _ _ _ type_var_heap be
+	= (type_var_heap,be)
 
 convertConstructors :: Int {#Char} ModuleIndex {#ConsDef} [DefinedSymbol] -> BEMonad BEConstructorListP
 convertConstructors typeIndex typeName moduleIndex constructors symbols
