@@ -71,19 +71,19 @@ backEndInterface outputFileName commandLineArgs listTypes typesPath predef_symbo
 		
 	# var_heap=heaps.hp_var_heap
 	  hp_type_heaps=heaps.hp_type_heaps
-	  attrHeap=hp_type_heaps.th_attrs		
-						
+	  {th_attrs=attrHeap,th_vars=type_var_heap}=hp_type_heaps
+
 	# backEndFiles
 		=	0
 	# (backEnd, backEndFiles)
 		=	BEInit (length commandLineArgs) backEndFiles
 	# backEnd
 		=	foldState BEArg commandLineArgs backEnd
-	# (var_heap, attrHeap, backEnd)
-		=	backEndConvertModules predef_symbols syntaxTree main_dcl_module_n var_heap attrHeap backEnd
+	# (type_var_heap,var_heap,attrHeap,backEnd)
+		=	backEndConvertModules predef_symbols syntaxTree main_dcl_module_n type_var_heap var_heap attrHeap backEnd
 		
-	# heaps = {heaps & hp_var_heap = var_heap, hp_type_heaps = {hp_type_heaps  & th_attrs = attrHeap}}		
-		
+	# heaps = {heaps & hp_var_heap = var_heap, hp_type_heaps = {th_attrs=attrHeap,th_vars=type_var_heap}}
+
 	# (success, backEnd)
 		=	BEGenerateCode outputFileName backEnd
 		

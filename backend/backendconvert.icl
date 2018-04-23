@@ -368,36 +368,25 @@ notYetImplementedExpr :: Expression
 notYetImplementedExpr
 	=	(BasicExpr (BVS "\"error in compiler (something was not implemented by lazy Ronny)\""))
 
-backEndConvertModules :: PredefinedSymbols FrontEndSyntaxTree !Int *VarHeap *AttrVarHeap *BackEnd -> (!*VarHeap, *AttrVarHeap, !*BackEnd)
-/*
-backEndConvertModules p s main_dcl_module_n v be
-	= (newHeap,backEndConvertModulesH p s v be)
-*/
-backEndConvertModules p s main_dcl_module_n var_heap attr_var_heap be
-	# {bes_varHeap,bes_attrHeap,bes_backEnd} = backEndConvertModulesH p s main_dcl_module_n {bes_varHeap=var_heap,bes_attrHeap=attr_var_heap,bes_backEnd=be, bes_attr_number = 0}
-	= (bes_varHeap,bes_attrHeap,bes_backEnd)
+backEndConvertModules :: PredefinedSymbols FrontEndSyntaxTree !Int !*TypeVarHeap !*VarHeap !*AttrVarHeap !*BackEnd
+															   -> (!*TypeVarHeap,!*VarHeap,!*AttrVarHeap,!*BackEnd)
+backEndConvertModules p s main_dcl_module_n type_var_heap var_heap attr_var_heap be
+	# (type_var_heap,{bes_varHeap,bes_attrHeap,bes_backEnd})
+		= backEndConvertModulesH p s main_dcl_module_n type_var_heap {bes_varHeap=var_heap,bes_attrHeap=attr_var_heap,bes_backEnd=be, bes_attr_number=0}
+	= (type_var_heap,bes_varHeap,bes_attrHeap,bes_backEnd)
 
-backEndConvertModulesH :: PredefinedSymbols FrontEndSyntaxTree !Int *BackEndState -> *BackEndState
+backEndConvertModulesH :: PredefinedSymbols FrontEndSyntaxTree !Int !*TypeVarHeap !*BackEndState -> (!*TypeVarHeap,!*BackEndState)
 backEndConvertModulesH predefs {fe_icl = 
 	fe_icl =: {	icl_name, icl_functions, icl_common,
 				icl_function_indices = {ifi_type_function_indices,ifi_global_function_indices},
 				icl_imported_objects, icl_foreign_exports, icl_used_module_numbers, icl_modification_time},
 	fe_components, fe_dcls, fe_arrayInstances}
-	main_dcl_module_n backEnd
+	main_dcl_module_n type_var_heap backEnd
 
 	// sanity check ...
 //	| cIclModIndex <> kIclModuleIndex || cPredefinedModuleIndex <> kPredefinedModuleIndex
 //		=	undef <<- "backendconvert, backEndConvertModules: module index mismatch"
 	// ... sanity check
-/*
-	#  backEnd
-		=	ruleDoesNotMatch 1 backEnd
-			with
-				ruleDoesNotMatch 0 backEnd
-					=	backEnd
-	#  backEnd
-		=	abort "front end abort" backEnd
-*/
 	#! backEnd = appBackEnd (BESetMainDclModuleN main_dcl_module_n) backEnd
 	#! backEnd
 		=	appBackEnd (BEDeclareModules (size fe_dcls)) backEnd
@@ -482,7 +471,7 @@ backEndConvertModulesH predefs {fe_icl =
 									\\ r <- [ifi_type_function_indices!!1]]
 	# backEnd = bindSpecialIdents predefs icl_used_module_numbers backEnd
 	#! backEnd = removeExpandedTypesFromDclModules fe_dcls icl_used_module_numbers backEnd
-	=	(backEnd -*-> "backend done")
+	= (type_var_heap,backEnd)
 	where
 		functionIndices
 			= function_indices 0 fe_components
