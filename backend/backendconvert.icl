@@ -871,11 +871,11 @@ defineType moduleIndex constructors selectors typeIndex {td_attribute, td_args, 
 defineType moduleIndex _ _ typeIndex {td_attribute, td_args, td_rhs=AbstractType _} type_var_heap be
  	# (flatType,type_var_heap,be) = convertTypeLhs moduleIndex typeIndex td_attribute td_args type_var_heap be
 	  be = appBackEnd (BEAbsType flatType) be
- 	= (type_var_heap,be)
+	= (type_var_heap,be)
 defineType moduleIndex _ _ typeIndex {td_attribute, td_args, td_rhs=AbstractSynType _ _} type_var_heap be
  	# (flatType,type_var_heap,be) = convertTypeLhs moduleIndex typeIndex td_attribute td_args type_var_heap be
 	  be = appBackEnd (BEAbsType flatType) be
- 	= (type_var_heap,be)
+	= (type_var_heap,be)
 defineType moduleIndex constructors _ typeIndex {td_ident, td_attribute, td_args, td_rhs=ExtensibleAlgType constructorSymbols} type_var_heap be
 	# (flatType,type_var_heap,be) = convertTypeLhs moduleIndex typeIndex td_attribute td_args type_var_heap be
 	  (constructors, be) = convertConstructors typeIndex td_ident.id_name moduleIndex constructors constructorSymbols be
