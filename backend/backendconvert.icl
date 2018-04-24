@@ -838,7 +838,8 @@ convertTypeVar typeVar
 defineType :: ModuleIndex {#ConsDef} {#SelectorDef} Index CheckedTypeDef !*TypeVarHeap !*BackEndState -> (!*TypeVarHeap,!*BackEndState)
 defineType moduleIndex constructors _ typeIndex {td_ident, td_attribute, td_args, td_rhs=AlgType constructorSymbols} type_var_heap be
 	# (flatType,type_var_heap,be) = convertTypeLhs moduleIndex typeIndex td_attribute td_args type_var_heap be
-	  (constructors, be) = convertConstructors typeIndex td_ident.id_name moduleIndex constructors constructorSymbols be
+	  (constructors,type_var_heap,be)
+		= convertConstructors typeIndex td_ident.id_name moduleIndex constructors constructorSymbols type_var_heap be
 	  be = appBackEnd (BEAlgebraicType flatType constructors) be
 	= (type_var_heap,be)
 defineType moduleIndex constructors selectors typeIndex {td_attribute, td_args, td_rhs=RecordType {rt_constructor, rt_fields, rt_is_boxed_record}, td_fun_index} type_var_heap be
@@ -849,15 +850,12 @@ defineType moduleIndex constructors selectors typeIndex {td_attribute, td_args, 
 			(convertTypeLhs moduleIndex typeIndex td_attribute td_args type_var_heap be)
 			// define the record without marking, to prevent code generation for many unused generic dictionaries
 			(convertTypeDefToFlatType (beTypeSymbolNoMark typeIndex moduleIndex) td_attribute td_args type_var_heap be)
-	  (fields, be)
-		= convertSelectors moduleIndex selectors rt_fields constructorDef.cons_type.st_args_strictness be
-	  (constructorType,be)
-		= constructorTypeFunction constructorDef be
-	  (constructorTypeNode, be)
-		= beNormalTypeNode
-				(beConstructorSymbol moduleIndex constructorIndex)
-				(convertSymbolTypeArgs constructorType)
-				be
+	  (fields,type_var_heap,be)
+		= convertSelectors moduleIndex selectors rt_fields constructorDef.cons_type.st_args_strictness type_var_heap be
+	  (constructorType,be) = constructorTypeFunction constructorDef be
+	  (type_arg_p,be) = convertAnnotatedTypeArgs constructorType.st_args constructorType.st_args_strictness be
+	  (symbol_p,be) = beConstructorSymbol moduleIndex constructorIndex be
+	  (constructorTypeNode,be) = accBackEnd (BENormalTypeNode symbol_p type_arg_p) be
 	  be = appBackEnd (BERecordType moduleIndex flatType constructorTypeNode (if rt_is_boxed_record 1 0) fields) be
 	= (type_var_heap,be)
 	where
@@ -878,66 +876,87 @@ defineType moduleIndex _ _ typeIndex {td_attribute, td_args, td_rhs=AbstractSynT
 	= (type_var_heap,be)
 defineType moduleIndex constructors _ typeIndex {td_ident, td_attribute, td_args, td_rhs=ExtensibleAlgType constructorSymbols} type_var_heap be
 	# (flatType,type_var_heap,be) = convertTypeLhs moduleIndex typeIndex td_attribute td_args type_var_heap be
-	  (constructors, be) = convertConstructors typeIndex td_ident.id_name moduleIndex constructors constructorSymbols be
+	  (constructors,type_var_heap,be)
+		= convertConstructors typeIndex td_ident.id_name moduleIndex constructors constructorSymbols type_var_heap be
 	  be = appBackEnd (BEExtendableAlgebraicType flatType constructors) be
 	= (type_var_heap,be)
 defineType moduleIndex constructors _ typeIndex {td_ident, td_attribute, td_args, td_rhs=AlgConses constructorSymbols _} type_var_heap be
 	# (flatType,type_var_heap,be) = convertTypeLhs moduleIndex typeIndex td_attribute td_args type_var_heap be
-	  (constructors, be) = convertConstructors typeIndex td_ident.id_name moduleIndex constructors constructorSymbols be
+	  (constructors,type_var_heap,be)
+		= convertConstructors typeIndex td_ident.id_name moduleIndex constructors constructorSymbols type_var_heap be
 	  be = appBackEnd (BEExtendableAlgebraicType flatType constructors) be
 	= (type_var_heap,be)
 defineType _ _ _ _ _ type_var_heap be
 	= (type_var_heap,be)
 
-convertConstructors :: Int {#Char} ModuleIndex {#ConsDef} [DefinedSymbol] -> BEMonad BEConstructorListP
-convertConstructors typeIndex typeName moduleIndex constructors symbols
-	=	sfoldr (beConstructors o convertConstructor typeIndex typeName moduleIndex constructors) beNoConstructors symbols
+convertConstructors :: Int {#Char} ModuleIndex {#ConsDef} [DefinedSymbol] !*TypeVarHeap !*BackEndState
+												  -> (!BEConstructorListP,!*TypeVarHeap,!*BackEndState)
+convertConstructors typeIndex typeName moduleIndex cons_defs symbols type_var_heap beState
+	= convert_constructors symbols type_var_heap beState
+where
+	convert_constructors [a:x] type_var_heap beState
+		# (constructors,type_var_heap,beState) = convert_constructors x type_var_heap beState
+		  (constructor,type_var_heap,beState) = convertConstructor typeIndex typeName moduleIndex cons_defs a type_var_heap beState
+		  (constructors,beState) = accBackEnd (BEConstructors constructor constructors) beState
+		= (constructors,type_var_heap,beState)
+	convert_constructors [] type_var_heap beState
+		# (constructors,beState) = beNoConstructors beState
+		= (constructors,type_var_heap,beState)
 
-convertConstructor :: Int {#Char} ModuleIndex {#ConsDef} DefinedSymbol -> BEMonad BEConstructorListP
-convertConstructor typeIndex typeName moduleIndex constructorDefs {ds_index}
-	= \be0 -> let (constructorType,be) = constructorTypeFunction be0 in
-		(appBackEnd (BEDeclareConstructor ds_index moduleIndex constructorDef.cons_ident.id_name) // +++ remove declare
-		o`	beConstructor
-			(beNormalTypeNode
-				(beConstructorSymbol moduleIndex ds_index)
-				(convertSymbolTypeArgs constructorType))) be
+convertConstructor :: Int {#Char} ModuleIndex {#ConsDef} DefinedSymbol !*TypeVarHeap !*BackEndState
+											   -> (!BEConstructorListP,!*TypeVarHeap,!*BackEndState)
+convertConstructor typeIndex typeName moduleIndex constructorDefs {ds_index} type_var_heap bes
+	# (constructorType,bes) = constructorTypeFunction bes
+	  bes = appBackEnd (BEDeclareConstructor ds_index moduleIndex constructorDef.cons_ident.id_name) bes // +++ remove declare
+	  (atype_args,bes) = convertAnnotatedTypeArgs constructorType.st_args constructorType.st_args_strictness bes
+	  (constructor,bes)
+		= beConstructor
+			(beConstructorSymbol moduleIndex ds_index ==> \ constructor_symbol ->
+			 accBackEnd (BENormalTypeNode constructor_symbol atype_args)) bes
+	= (constructor,type_var_heap,bes)
 	where
 		constructorDef
 			=	constructorDefs.[ds_index]
-		constructorTypeFunction be0
-			= let (cons_type,be) = read_from_var_heap constructorDef.cons_type_ptr be0 in
-					(case cons_type of
-						VI_ExpandedType expandedType
-							->	(expandedType,be)
-						_
-							->	(constructorDef.cons_type,be))
+		constructorTypeFunction bes
+			# (cons_type,bes) = read_from_var_heap constructorDef.cons_type_ptr bes
+			= case cons_type of
+				VI_ExpandedType expandedType
+					->	(expandedType,bes)
+				_
+					->	(constructorDef.cons_type,bes)
 
-foldrAi function result array :== foldrA 0
-	where
-		foldrA index
-			| index == size array
-				= result
-				= function index array.[index] (foldrA (index+1))
-
-convertSelectors :: ModuleIndex {#SelectorDef} {#FieldSymbol} StrictnessList -> BEMonad BEFieldListP
-convertSelectors moduleIndex selectors symbols strictness
-	= foldrAi (\i -> beFields o convertSelector moduleIndex selectors (arg_is_strict i strictness)) beNoFields symbols
+convertSelectors :: ModuleIndex {#SelectorDef} {#FieldSymbol} StrictnessList !*TypeVarHeap !*BackEndState
+														   -> (!BEFieldListP,!*TypeVarHeap,!*BackEndState)
+convertSelectors moduleIndex selectors symbols strictness type_var_heap bes
+	= convert_selectors 0 type_var_heap bes
 where
-	convertSelector :: ModuleIndex {#SelectorDef} Bool FieldSymbol -> BEMonad BEFieldListP
-	convertSelector moduleIndex selectorDefs is_strict {fs_index}
-		= \be0 -> let	selectorDef = selectorDefs.[fs_index]
-						(field_type,be) = selectorTypeFunction selectorDef be0 in
-				(	appBackEnd (BEDeclareField fs_index moduleIndex selectorDef.sd_ident.id_name)
-				o`	beField fs_index moduleIndex (convertAnnotAndTypeNode (if is_strict AN_Strict AN_None) field_type)) be
-		where
-			selectorTypeFunction :: !SelectorDef !*BackEndState -> *(!AType,!*BackEndState)
-			selectorTypeFunction {sd_type_ptr,sd_type} be
-				# (sd_type_in_ptr,be) = read_from_var_heap sd_type_ptr be
-				= case sd_type_in_ptr of
-					VI_ExpandedType {st_result}
-						->	(st_result,be)
-					_
-						->	(sd_type.st_result,be)
+	convert_selectors index type_var_heap bes
+		| index == size symbols
+			# (field_list_p,bes) = accBackEnd BENoFields bes
+			= (field_list_p,type_var_heap,bes)
+			# (field_list_p,type_var_heap,bes) = convert_selectors (index+1) type_var_heap bes
+			  (single_field_list_p,type_var_heap,bes)
+				= convertSelector moduleIndex selectors (arg_is_strict index strictness) symbols.[index] type_var_heap bes
+			  (field_list_p,bes) = accBackEnd (BEFields single_field_list_p field_list_p) bes
+			= (field_list_p,type_var_heap,bes)
+
+convertSelector :: ModuleIndex {#SelectorDef} Bool FieldSymbol !*TypeVarHeap !*BackEndState -> (!BEFieldListP,!*TypeVarHeap,!*BackEndState)
+convertSelector moduleIndex selectorDefs is_strict {fs_index} type_var_heap bes
+	# selectorDef = selectorDefs.[fs_index]
+	  (field_type,bes) = selectorTypeFunction selectorDef bes
+	  (type_node_p,bes) = convertAnnotAndTypeNode (if is_strict AN_Strict AN_None) field_type bes
+	  bes = appBackEnd (BEDeclareField fs_index moduleIndex selectorDef.sd_ident.id_name) bes
+	  (field_list_p,bes) = accBackEnd (BEField fs_index moduleIndex type_node_p) bes
+	= (field_list_p,type_var_heap,bes)
+	where
+		selectorTypeFunction :: !SelectorDef !*BackEndState -> *(!AType,!*BackEndState)
+		selectorTypeFunction {sd_type_ptr,sd_type} bes
+			# (sd_type_in_ptr,bes) = read_from_var_heap sd_type_ptr bes
+			= case sd_type_in_ptr of
+				VI_ExpandedType {st_result}
+					->	(st_result,bes)
+				_
+					->	(sd_type.st_result,bes)
 
 declareDynamicTemp :: PredefinedSymbols -> BackEnder
 declareDynamicTemp predefs
