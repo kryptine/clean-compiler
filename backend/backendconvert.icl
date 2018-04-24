@@ -814,13 +814,17 @@ defineTypes type_i type_i_stop moduleIndex constructors selectors types type_var
 		= defineTypes (type_i+1) type_i_stop moduleIndex constructors selectors types type_var_heap bes
 		= (type_var_heap,bes)
 
-convertTypeLhs :: ModuleIndex Index TypeAttribute [ATypeVar] -> BEMonad BEFlatTypeP
-convertTypeLhs moduleIndex typeIndex attribute args
-	= be_flat_type (beTypeSymbol typeIndex moduleIndex) attribute args
+convertTypeLhs :: ModuleIndex Index TypeAttribute [ATypeVar] !*TypeVarHeap !*BackEndState -> (!BEFlatTypeP, !*TypeVarHeap,!*BackEndState)
+convertTypeLhs moduleIndex typeIndex attribute args type_var_heap bes
+	= convertTypeDefToFlatType (beTypeSymbol typeIndex moduleIndex) attribute args type_var_heap bes
 
-be_flat_type :: (BEMonad BESymbolP) TypeAttribute [ATypeVar] -> BEMonad BEFlatTypeP
-be_flat_type type_symbol attribute args
-	= beFlatType type_symbol (convertAttribution attribute) (convertTypeVars args)
+convertTypeDefToFlatType :: (BEMonad BESymbolP) TypeAttribute [ATypeVar] !*TypeVarHeap !*BackEndState -> (!BEFlatTypeP, !*TypeVarHeap,!*BackEndState)
+convertTypeDefToFlatType type_symbol_m attribute args type_var_heap bes
+	# (a1,bes) = type_symbol_m bes
+	  (a2,bes) = convertAttribution attribute bes
+	  (a3,bes) = convertTypeVars args bes
+	  (flat_type_p,bes) = accBackEnd (BEFlatType a1 a2 a3) bes
+	= (flat_type_p,type_var_heap,bes)
 
 convertTypeVars :: [ATypeVar] -> BEMonad BETypeVarListP
 convertTypeVars typeVars
@@ -830,20 +834,20 @@ convertTypeVar :: ATypeVar -> BEMonad BETypeVarListP
 convertTypeVar typeVar
 	=	beTypeVarListElem (beTypeVar typeVar.atv_variable.tv_ident.id_name) (convertAttribution typeVar.atv_attribute)
 
-defineType :: ModuleIndex {#ConsDef} {#SelectorDef} Index CheckedTypeDef !*TypeVarHeap *BackEndState -> (!*TypeVarHeap,!*BackEndState)
+defineType :: ModuleIndex {#ConsDef} {#SelectorDef} Index CheckedTypeDef !*TypeVarHeap !*BackEndState -> (!*TypeVarHeap,!*BackEndState)
 defineType moduleIndex constructors _ typeIndex {td_ident, td_attribute, td_args, td_rhs=AlgType constructorSymbols} type_var_heap be
-	# (flatType, be) = convertTypeLhs moduleIndex typeIndex td_attribute td_args be
+	# (flatType,type_var_heap,be) = convertTypeLhs moduleIndex typeIndex td_attribute td_args type_var_heap be
 	  (constructors, be) = convertConstructors typeIndex td_ident.id_name moduleIndex constructors constructorSymbols be
 	  be = appBackEnd (BEAlgebraicType flatType constructors) be
 	= (type_var_heap,be)
 defineType moduleIndex constructors selectors typeIndex {td_attribute, td_args, td_rhs=RecordType {rt_constructor, rt_fields, rt_is_boxed_record}, td_fun_index} type_var_heap be
 	# constructorIndex = rt_constructor.ds_index
 	  constructorDef = constructors.[constructorIndex]
-	# (flatType, be)
+	  (flatType,type_var_heap,be)
 		= if (td_fun_index<>NoIndex)
-			(convertTypeLhs moduleIndex typeIndex td_attribute td_args be)
+			(convertTypeLhs moduleIndex typeIndex td_attribute td_args type_var_heap be)
 			// define the record without marking, to prevent code generation for many unused generic dictionaries
-			(be_flat_type (beTypeSymbolNoMark typeIndex moduleIndex) td_attribute td_args be)
+			(convertTypeDefToFlatType (beTypeSymbolNoMark typeIndex moduleIndex) td_attribute td_args type_var_heap be)
 	  (fields, be)
 		= convertSelectors moduleIndex selectors rt_fields constructorDef.cons_type.st_args_strictness be
 	  (constructorType,be)
@@ -853,29 +857,31 @@ defineType moduleIndex constructors selectors typeIndex {td_attribute, td_args, 
 				(beConstructorSymbol moduleIndex constructorIndex)
 				(convertSymbolTypeArgs constructorType)
 				be
-	# be = appBackEnd (BERecordType moduleIndex flatType constructorTypeNode (if rt_is_boxed_record 1 0) fields) be
+	  be = appBackEnd (BERecordType moduleIndex flatType constructorTypeNode (if rt_is_boxed_record 1 0) fields) be
 	= (type_var_heap,be)
 	where
-		constructorTypeFunction constructorDef be0
-			= let (cons_type,be) = read_from_var_heap constructorDef.cons_type_ptr be0 in
-					(case cons_type of
-						VI_ExpandedType expandedType
-							->	(expandedType,be)
-						_
-							->	(constructorDef.cons_type,be))
+		constructorTypeFunction constructorDef bes
+			# (cons_type,bes) = read_from_var_heap constructorDef.cons_type_ptr bes
+			= case cons_type of
+					VI_ExpandedType expandedType
+						->	(expandedType,bes)
+					_
+						->	(constructorDef.cons_type,bes)
 defineType moduleIndex _ _ typeIndex {td_attribute, td_args, td_rhs=AbstractType _} type_var_heap be
- 	# be = beAbsType (convertTypeLhs moduleIndex typeIndex td_attribute td_args) be
+ 	# (flatType,type_var_heap,be) = convertTypeLhs moduleIndex typeIndex td_attribute td_args type_var_heap be
+	  be = appBackEnd (BEAbsType flatType) be
  	= (type_var_heap,be)
 defineType moduleIndex _ _ typeIndex {td_attribute, td_args, td_rhs=AbstractSynType _ _} type_var_heap be
- 	# be = beAbsType (convertTypeLhs moduleIndex typeIndex td_attribute td_args) be
+ 	# (flatType,type_var_heap,be) = convertTypeLhs moduleIndex typeIndex td_attribute td_args type_var_heap be
+	  be = appBackEnd (BEAbsType flatType) be
  	= (type_var_heap,be)
 defineType moduleIndex constructors _ typeIndex {td_ident, td_attribute, td_args, td_rhs=ExtensibleAlgType constructorSymbols} type_var_heap be
-	# (flatType, be) = convertTypeLhs moduleIndex typeIndex td_attribute td_args be
+	# (flatType,type_var_heap,be) = convertTypeLhs moduleIndex typeIndex td_attribute td_args type_var_heap be
 	  (constructors, be) = convertConstructors typeIndex td_ident.id_name moduleIndex constructors constructorSymbols be
 	  be = appBackEnd (BEExtendableAlgebraicType flatType constructors) be
 	= (type_var_heap,be)
 defineType moduleIndex constructors _ typeIndex {td_ident, td_attribute, td_args, td_rhs=AlgConses constructorSymbols _} type_var_heap be
-	# (flatType, be) = convertTypeLhs moduleIndex typeIndex td_attribute td_args be
+	# (flatType,type_var_heap,be) = convertTypeLhs moduleIndex typeIndex td_attribute td_args type_var_heap be
 	  (constructors, be) = convertConstructors typeIndex td_ident.id_name moduleIndex constructors constructorSymbols be
 	  be = appBackEnd (BEExtendableAlgebraicType flatType constructors) be
 	= (type_var_heap,be)
