@@ -231,18 +231,10 @@ beVarTypeNode name
 	:==	beFunction0 (BEVarTypeNode name)
 beRuleAlt lineNumber
 	:==	beFunction5 (BERuleAlt lineNumber)
-beNoRuleAlts
-	:==	beFunction0 BENoRuleAlts
-beRuleAlts
-	:==	beFunction2 BERuleAlts
 beTypeAlt
 	:==	beFunction3 BETypeAlt
 beRule index isCaf
 	:==	beFunction2 (BERule index isCaf)
-beNoRules
-	:==	beFunction0 BENoRules
-beRules
-	:==	beFunction2 BERules
 beNodeDef sequenceNumber
 	:==	beFunction1 (BENodeDef sequenceNumber)
 beNoNodeDefs
@@ -259,20 +251,10 @@ beNodeIdNode
 	:==	beFunction2 BENodeIdNode
 beNodeId sequenceNumber
 	:==	beFunction0 (BENodeId sequenceNumber)
-beWildCardNodeId
-	:==	beFunction0 BEWildCardNodeId
 beConstructor
 	:==	beFunction1 BEConstructor
 beNoConstructors
 	:==	beFunction0 BENoConstructors
-beConstructors
-	:==	beFunction2 BEConstructors
-beNoFields
-	:==	beFunction0 BENoFields
-beFields
-	:==	beFunction2 BEFields
-beField fieldIndex moduleIndex 
-	:==	beFunction1 (BEField fieldIndex moduleIndex)
 beAnnotateTypeNode annotation
 	:==	beFunction1 (BEAnnotateTypeNode annotation)
 beAttributeTypeNode
@@ -303,8 +285,6 @@ beDeclareNodeId number lhsOrRhs name
 	:==	beApFunction0 (BEDeclareNodeId number lhsOrRhs name)
 beAdjustArrayFunction backendId functionIndex moduleIndex
 	:==	beApFunction0 (BEAdjustArrayFunction backendId functionIndex moduleIndex)
-beFlatType
-	:==	beFunction3 BEFlatType
 beNoTypeVars
 	:==	beFunction0 BENoTypeVars
 beTypeVars
@@ -327,14 +307,8 @@ beMatchNode arity
 	:==	beFunction2 (BEMatchNode arity)
 beDefineImportedObjsAndLibs
 	:== beApFunction2 BEDefineImportedObjsAndLibs
-beAbsType
-	:== beApFunction1 BEAbsType
 beSwitchNode
 	:==	beFunction2 BESwitchNode
-beCaseNode symbolArity
-	:== beFunction4 (BECaseNode symbolArity)
-bePushNode symbolArity
-	:== beFunction3 (BEPushNode symbolArity)
 beDefaultNode
 	:==	beFunction3 BEDefaultNode
 beNoNodeIds
@@ -363,10 +337,6 @@ beBindSpecialFunction specialIdentIndex functionIndex moduleIndex
 // temporary hack
 beDynamicTempTypeSymbol
 	:== beFunction0 BEDynamicTempTypeSymbol
-
-notYetImplementedExpr :: Expression
-notYetImplementedExpr
-	=	(BasicExpr (BVS "\"error in compiler (something was not implemented by lazy Ronny)\""))
 
 backEndConvertModules :: PredefinedSymbols FrontEndSyntaxTree !Int !*TypeVarHeap !*VarHeap !*AttrVarHeap !*BackEnd
 															   -> (!*TypeVarHeap,!*VarHeap,!*AttrVarHeap,!*BackEnd)
