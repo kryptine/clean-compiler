@@ -542,7 +542,7 @@ declareDclModule moduleIndex {dcl_name, dcl_modification_time, dcl_common, dcl_f
 	=	appBackEnd (BEDeclareDclModule moduleIndex dcl_name.id_name dcl_modification_time (isSystem dcl_module_kind) (size dcl_functions) (size dcl_common.com_type_defs) (size dcl_common.com_cons_defs) (size dcl_common.com_selector_defs))
 
 defineDclModule :: ModuleIndex DclModule !*TypeVarHeap !*BackEndState -> (!*TypeVarHeap,!*BackEndState)
-defineDclModule moduleIndex	{dcl_name, dcl_common, dcl_functions, dcl_type_funs, dcl_instances} type_var_heap beState
+defineDclModule moduleIndex {dcl_name, dcl_common, dcl_functions, dcl_type_funs, dcl_instances} type_var_heap beState
 	# (type_var_heap,beState) = declare_common_defs moduleIndex dcl_common type_var_heap beState
 	# beState = declareFunTypes moduleIndex dcl_functions [{ir_from = 0, ir_to = dcl_instances.ir_from}, dcl_type_funs] beState
 	= (type_var_heap,beState)
@@ -853,7 +853,7 @@ defineType moduleIndex constructors selectors typeIndex {td_attribute, td_args, 
 	  (fields,type_var_heap,be)
 		= convertSelectors moduleIndex selectors rt_fields constructorDef.cons_type.st_args_strictness type_var_heap be
 	  (constructorType,be) = constructorTypeFunction constructorDef be
-	  (type_arg_p,be) = convertAnnotatedTypeArgs constructorType.st_args constructorType.st_args_strictness be
+	  (type_arg_p,type_var_heap,be) = convertTypeDefAnnotatedTypeArgs constructorType.st_args constructorType.st_args_strictness type_var_heap be
 	  (symbol_p,be) = beConstructorSymbol moduleIndex constructorIndex be
 	  (constructorTypeNode,be) = accBackEnd (BENormalTypeNode symbol_p type_arg_p) be
 	  be = appBackEnd (BERecordType moduleIndex flatType constructorTypeNode (if rt_is_boxed_record 1 0) fields) be
@@ -908,7 +908,7 @@ convertConstructor :: Int {#Char} ModuleIndex {#ConsDef} DefinedSymbol !*TypeVar
 convertConstructor typeIndex typeName moduleIndex constructorDefs {ds_index} type_var_heap bes
 	# (constructorType,bes) = constructorTypeFunction bes
 	  bes = appBackEnd (BEDeclareConstructor ds_index moduleIndex constructorDef.cons_ident.id_name) bes // +++ remove declare
-	  (atype_args,bes) = convertAnnotatedTypeArgs constructorType.st_args constructorType.st_args_strictness bes
+	  (atype_args,type_var_heap,bes) = convertTypeDefAnnotatedTypeArgs constructorType.st_args constructorType.st_args_strictness type_var_heap bes
 	  (constructor,bes)
 		= beConstructor
 			(beConstructorSymbol moduleIndex ds_index ==> \ constructor_symbol ->
@@ -944,7 +944,7 @@ convertSelector :: ModuleIndex {#SelectorDef} Bool FieldSymbol !*TypeVarHeap !*B
 convertSelector moduleIndex selectorDefs is_strict {fs_index} type_var_heap bes
 	# selectorDef = selectorDefs.[fs_index]
 	  (field_type,bes) = selectorTypeFunction selectorDef bes
-	  (type_node_p,bes) = convertAnnotAndTypeNode (if is_strict AN_Strict AN_None) field_type bes
+	  (type_node_p,type_var_heap,bes) = convertTypeDefAnnotAndTypeNode (if is_strict AN_Strict AN_None) field_type type_var_heap bes
 	  bes = appBackEnd (BEDeclareField fs_index moduleIndex selectorDef.sd_ident.id_name) bes
 	  (field_list_p,bes) = accBackEnd (BEField fs_index moduleIndex type_node_p) bes
 	= (field_list_p,type_var_heap,bes)
@@ -1491,6 +1491,88 @@ convertTypeNode (TGenericFunctionInDictionary gds type_kind generic_dict=:{gi_mo
 convertTypeNode typeNode
 	=	abort "convertTypeNode"  // <<- ("backendconvert, convertTypeNode: unknown type node", typeNode)
 
+convertTypeDefAnnotTypeNode :: AType !*TypeVarHeap !*BackEndState -> (!BETypeNodeP,!*TypeVarHeap,!*BackEndState)
+convertTypeDefAnnotTypeNode {at_type, at_attribute} type_var_heap bes
+	# (type_node,type_var_heap,bes) = convertTypeDefTypeNode at_type type_var_heap bes
+	  (type_node,bes) = accBackEnd (BEAnnotateTypeNode (convertAnnotation AN_None) type_node) bes
+	  (attribution,bes) = convertAttribution at_attribute bes
+	  (type_node_p,bes) = accBackEnd (BEAttributeTypeNode attribution type_node) bes
+	= (type_node_p,type_var_heap,bes)
+
+convertTypeDefAnnotAndTypeNode :: Annotation AType !*TypeVarHeap !*BackEndState-> (!BETypeNodeP,!*TypeVarHeap,!*BackEndState)
+convertTypeDefAnnotAndTypeNode at_annotation {at_type, at_attribute} type_var_heap bes
+	# (type_node,type_var_heap,bes) = convertTypeDefTypeNode at_type type_var_heap bes
+	  (type_node,bes) = accBackEnd (BEAnnotateTypeNode (convertAnnotation at_annotation) type_node) bes
+	  (attribution,bes) = convertAttribution at_attribute bes
+	  (type_node_p,bes) = accBackEnd (BEAttributeTypeNode attribution type_node) bes
+	= (type_node_p,type_var_heap,bes)
+
+convertTypeDefTypeNode :: Type !*TypeVarHeap !*BackEndState -> (!BETypeNodeP,!*TypeVarHeap,!*BackEndState)
+convertTypeDefTypeNode (TB (BT_String type)) type_var_heap bes
+	= convertTypeDefTypeNode type type_var_heap bes
+convertTypeDefTypeNode (TB BT_Dynamic) type_var_heap bes
+	# (type_node_p,bes) = beNormalTypeNode beDynamicTempTypeSymbol beNoTypeArgs bes
+	= (type_node_p,type_var_heap,bes)
+convertTypeDefTypeNode (TB basicType) type_var_heap bes
+	# (type_node_p,bes) = beNormalTypeNode (beBasicSymbol (convertBasicTypeKind basicType)) beNoTypeArgs bes
+	= (type_node_p,type_var_heap,bes)
+convertTypeDefTypeNode (TA typeSymbolIdent typeArgs) type_var_heap bes
+	# (symbol_p,bes) = convertTypeSymbolIdent typeSymbolIdent bes
+	  (type_arg_p,type_var_heap,bes) = convertTypeDefTypeArgs typeArgs type_var_heap bes
+	  (type_node_p,bes) = accBackEnd (BENormalTypeNode symbol_p type_arg_p) bes
+	= (type_node_p,type_var_heap,bes)
+convertTypeDefTypeNode (TAS typeSymbolIdent typeArgs strictness) type_var_heap bes
+	# (symbol_p,bes) = convertTypeSymbolIdent typeSymbolIdent bes
+	  (type_arg_p,type_var_heap,bes) = convertTypeDefAnnotatedTypeArgs typeArgs strictness type_var_heap bes
+	  (type_node_p,bes) = accBackEnd (BENormalTypeNode symbol_p type_arg_p) bes
+	= (type_node_p,type_var_heap,bes)
+convertTypeDefTypeNode (TV {tv_ident}) type_var_heap bes
+	# (type_node_p,bes) = beVarTypeNode tv_ident.id_name bes
+	= (type_node_p,type_var_heap,bes)
+convertTypeDefTypeNode (TempV n) type_var_heap bes
+	# (type_node_p,bes) = beVarTypeNode ("_tv" +++ toString n) bes
+	= (type_node_p,type_var_heap,bes)
+convertTypeDefTypeNode (TempQV n) type_var_heap bes
+	# (type_node_p,bes) = beVarTypeNode ("_tqv" +++ toString n) bes
+	= (type_node_p,type_var_heap,bes)
+convertTypeDefTypeNode (TempQDV n) type_var_heap bes
+	# (type_node_p,bes) = beVarTypeNode ("_tqv" +++ toString n) bes
+	= (type_node_p,type_var_heap,bes)
+convertTypeDefTypeNode (a --> b) type_var_heap bes
+	# (symbol_p,bes) = accBackEnd (BEBasicSymbol BEFunType) bes
+	  (type_arg_p,type_var_heap,bes) = convertTypeDefTypeArgs [a, b] type_var_heap bes
+	  (type_node_p,bes) = accBackEnd (BENormalTypeNode symbol_p type_arg_p) bes
+	= (type_node_p,type_var_heap,bes)
+convertTypeDefTypeNode (TArrow1 a) type_var_heap bes
+	# (symbol_p,bes) = accBackEnd (BEBasicSymbol BEFunType) bes
+	  (type_arg_p,type_var_heap,bes) = convertTypeDefTypeArgs [a] type_var_heap bes
+	  (type_node_p,bes) = accBackEnd (BENormalTypeNode symbol_p type_arg_p) bes
+	= (type_node_p,type_var_heap,bes)
+convertTypeDefTypeNode TArrow type_var_heap bes
+	# (type_node_p,bes) = beNormalTypeNode (beBasicSymbol BEFunType) beNoTypeArgs bes
+	= (type_node_p,type_var_heap,bes)
+convertTypeDefTypeNode (a :@: b) type_var_heap bes
+	# (symbol_p,bes) = accBackEnd (BEBasicSymbol BEApplySymb) bes
+	  (type_arg_p,type_var_heap,bes) = convertTypeDefTypeArgs [{at_attribute=TA_Multi, at_type=consVariableToType a} : b] type_var_heap bes
+	  (type_node_p,bes) = accBackEnd (BENormalTypeNode symbol_p type_arg_p) bes
+	= (type_node_p,type_var_heap,bes)
+convertTypeDefTypeNode TE type_var_heap bes
+	# (type_node_p,bes) = beNormalTypeNode beDontCareDefinitionSymbol beNoTypeArgs bes
+	= (type_node_p,type_var_heap,bes)
+convertTypeDefTypeNode (TFA vars type) type_var_heap bes
+	# (type_var_list_p,bes) = convertTypeVars vars bes
+	  (type_node_p,type_var_heap,bes) = convertTypeDefTypeNode type type_var_heap bes
+	  (type_node_p,bes) = accBackEnd (BEAddForAllTypeVariables type_var_list_p type_node_p) bes
+	= (type_node_p,type_var_heap,bes)
+convertTypeDefTypeNode (TFAC vars type contexts) type_var_heap bes
+	# (type_var_list_p,bes) = convertTypeVars vars bes
+	  (type_node_p,type_var_heap,bes) = convertTypeDefTypeNode type type_var_heap bes
+	  (type_node_p,bes) = accBackEnd (BEAddForAllTypeVariables type_var_list_p type_node_p) bes
+	= (type_node_p,type_var_heap,bes)
+convertTypeDefTypeNode (TGenericFunctionInDictionary gds type_kind generic_dict=:{gi_module,gi_index}) type_var_heap bes
+	# (type_node_p,bes) = beNormalTypeNode (beTypeSymbol gi_index gi_module) beNoTypeArgs bes
+	= (type_node_p,type_var_heap,bes)
+
 consVariableToType :: ConsVariable -> Type
 consVariableToType (CV typeVar)
 	=	TV typeVar
@@ -1505,6 +1587,20 @@ convertTypeArgs :: [AType] -> BEMonad BETypeArgP
 convertTypeArgs args
 	=	sfoldr (beTypeArgs o convertAnnotTypeNode) beNoTypeArgs args
 
+convertTypeDefTypeArgs :: [AType] !*TypeVarHeap !*BackEndState -> (!BETypeArgP,!*TypeVarHeap,!*BackEndState)
+convertTypeDefTypeArgs args type_var_heap bes
+	= convert_type_def_type_args args type_var_heap bes
+where
+	convert_type_def_type_args [] type_var_heap bes
+		# (type_arg_p,bes) = beNoTypeArgs bes
+		= (type_arg_p,type_var_heap,bes)
+	convert_type_def_type_args [a:x] type_var_heap bes
+		# (atype_arg,type_var_heap,bes)
+			= convertTypeDefAnnotTypeNode a type_var_heap bes
+		  (atype_args,type_var_heap,bes) = convert_type_def_type_args x type_var_heap bes
+		  (type_arg_p,bes) = accBackEnd (BETypeArgs atype_arg atype_args) bes
+		= (type_arg_p,type_var_heap,bes)
+
 convertAnnotatedTypeArgs :: [AType] StrictnessList -> BEMonad BETypeArgP
 convertAnnotatedTypeArgs args strictness
 	= foldr args 0
@@ -1513,6 +1609,21 @@ convertAnnotatedTypeArgs args strictness
 			= beNoTypeArgs
 		foldr [a:x] i
 			= (beTypeArgs o (convertAnnotAndTypeNode (arg_strictness_annotation i strictness))) a (foldr x (i+1))
+
+convertTypeDefAnnotatedTypeArgs :: [AType] StrictnessList !*TypeVarHeap !*BackEndState
+										  -> (!BETypeArgP,!*TypeVarHeap,!*BackEndState)
+convertTypeDefAnnotatedTypeArgs args strictness type_var_heap bes
+	= convert_type_def_annotated_type_args args 0 type_var_heap bes
+where
+	convert_type_def_annotated_type_args [a:x] i type_var_heap bes
+		# (atype_arg,type_var_heap,bes)
+			= convertTypeDefAnnotAndTypeNode (arg_strictness_annotation i strictness) a type_var_heap bes
+		  (atype_args,type_var_heap,bes) = convert_type_def_annotated_type_args x (i+1) type_var_heap bes
+		  (type_arg_p,bes) = accBackEnd (BETypeArgs atype_arg atype_args) bes
+		= (type_arg_p,type_var_heap,bes)
+	convert_type_def_annotated_type_args [] i type_var_heap bes
+		# (type_arg_p,bes) = beNoTypeArgs bes
+		= (type_arg_p,type_var_heap,bes)
 
 convertTransformedBody :: Int Int Ident TransformedBody Int -> BEMonad BERuleAltP
 convertTransformedBody functionIndex lineNumber aliasDummyId body main_dcl_module_n
