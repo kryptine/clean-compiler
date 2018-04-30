@@ -29,6 +29,7 @@ BEPredefineConstructorSymbol
 BEPredefineTypeSymbol
 BEBasicSymbol
 BEVarTypeNode
+BENumberedVarTypeNode
 BETypeVarListElem
 BETypeVars
 BENoTypeVars
@@ -93,10 +94,12 @@ BENoConstructors
 BEConstructor
 BEDeclareField
 BEField
+BESetMemberTypeOfField
 BEFields
 BENoFields
 BEDeclareConstructor
 BETypeVar
+BENumberedTypeVar
 BEDeclareType
 BEDeclareFunction
 BECodeAlt
