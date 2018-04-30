@@ -1148,6 +1148,7 @@ cNotVarNumber :== -1
 					| TVI_Exprs ![(GlobalIndex, Expression)] /* List of expressions corresponding to the type var during generic specialization */
 					| TVI_Iso !DefinedSymbol !DefinedSymbol !DefinedSymbol
 					| TVI_GenTypeVarNumber !Int
+					| TVI_TypeVarArgN !Int // type argument number in module backendconvert
 					| TVI_CPSTypeVar !CheatCompiler /* MdM: a pointer to a variable in CleanProverSystem is stored here, using a cast */
 					| TVI_Attr !TypeAttribute
 					| TVI_TypeAttribute !TypeAttribute

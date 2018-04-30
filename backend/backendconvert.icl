@@ -478,7 +478,6 @@ where
 		|| moduleIndex == cPredefinedModuleIndex
 		|| not (inNumberSet moduleIndex used_module_numbers)
 			=	identity
-		// otherwise
 			=	declareDclModule moduleIndex dclModule
 
 defineOtherDclModules :: {#DclModule} Int NumberSet !*TypeVarHeap !*BackEndState -> (!*TypeVarHeap,!*BackEndState)
@@ -793,13 +792,35 @@ convertTypeDefToFlatType :: (BEMonad BESymbolP) TypeAttribute [ATypeVar] !*TypeV
 convertTypeDefToFlatType type_symbol_m attribute args type_var_heap bes
 	# (a1,bes) = type_symbol_m bes
 	  (a2,bes) = convertAttribution attribute bes
-	  (a3,bes) = convertTypeVars args bes
+	  (a3,type_var_heap,bes) = convertAndNumberLhsTypeVars args 0 type_var_heap bes
 	  (flat_type_p,bes) = accBackEnd (BEFlatType a1 a2 a3) bes
 	= (flat_type_p,type_var_heap,bes)
 
 convertTypeVars :: [ATypeVar] -> BEMonad BETypeVarListP
 convertTypeVars typeVars
 	=	sfoldr (beTypeVars o convertTypeVar) beNoTypeVars typeVars
+
+convertAndNumberLhsTypeVars :: [ATypeVar] Int !*TypeVarHeap !*BackEndState -> (!BETypeVarListP,!*TypeVarHeap,!*BackEndState)
+convertAndNumberLhsTypeVars [a=:{atv_variable={tv_info_ptr}}:x] arg_n type_var_heap beState
+	# type_var_heap = writePtr tv_info_ptr (TVI_TypeVarArgN arg_n) type_var_heap
+	  (a1,beState) = convertNumberedTypeVar a arg_n beState
+	  (a2,type_var_heap,beState) = convertAndNumberLhsTypeVars x (arg_n+1) type_var_heap beState
+	  (type_vars,beState) = accBackEnd (BETypeVars a1 a2) beState
+	= (type_vars,type_var_heap,beState)
+convertAndNumberLhsTypeVars [] arg_n type_var_heap beState
+	# (type_vars,beState) = accBackEnd BENoTypeVars beState
+	= (type_vars,type_var_heap,beState)
+
+remove_TVI_TypeVarArgN_in_args :: [ATypeVar] !*TypeVarHeap -> *TypeVarHeap
+remove_TVI_TypeVarArgN_in_args [{atv_variable={tv_info_ptr}}:args] type_var_heap
+	# type_var_heap = writePtr tv_info_ptr TVI_Empty type_var_heap
+	= remove_TVI_TypeVarArgN_in_args args type_var_heap
+remove_TVI_TypeVarArgN_in_args [] type_var_heap
+	= type_var_heap
+
+convertNumberedTypeVar :: ATypeVar Int -> BEMonad BETypeVarListP
+convertNumberedTypeVar typeVar arg_n
+	= beTypeVarListElem (accBackEnd (BENumberedTypeVar typeVar.atv_variable.tv_ident.id_name arg_n)) (convertAttribution typeVar.atv_attribute)
 
 convertTypeVar :: ATypeVar -> BEMonad BETypeVarListP
 convertTypeVar typeVar
@@ -811,6 +832,7 @@ defineType moduleIndex constructors _ typeIndex {td_ident, td_attribute, td_args
 	  (constructors,type_var_heap,be)
 		= convertConstructors typeIndex td_ident.id_name moduleIndex constructors constructorSymbols type_var_heap be
 	  be = appBackEnd (BEAlgebraicType flatType constructors) be
+	  type_var_heap = remove_TVI_TypeVarArgN_in_args td_args type_var_heap
 	= (type_var_heap,be)
 defineType moduleIndex constructors selectors typeIndex {td_attribute, td_args, td_rhs=RecordType {rt_constructor, rt_fields, rt_is_boxed_record}, td_fun_index} type_var_heap be
 	# constructorIndex = rt_constructor.ds_index
@@ -827,6 +849,7 @@ defineType moduleIndex constructors selectors typeIndex {td_attribute, td_args, 
 	  (symbol_p,be) = beConstructorSymbol moduleIndex constructorIndex be
 	  (constructorTypeNode,be) = accBackEnd (BENormalTypeNode symbol_p type_arg_p) be
 	  be = appBackEnd (BERecordType moduleIndex flatType constructorTypeNode (if rt_is_boxed_record 1 0) fields) be
+	  type_var_heap = remove_TVI_TypeVarArgN_in_args td_args type_var_heap
 	= (type_var_heap,be)
 	where
 		constructorTypeFunction constructorDef bes
@@ -839,22 +862,26 @@ defineType moduleIndex constructors selectors typeIndex {td_attribute, td_args, 
 defineType moduleIndex _ _ typeIndex {td_attribute, td_args, td_rhs=AbstractType _} type_var_heap be
  	# (flatType,type_var_heap,be) = convertTypeLhs moduleIndex typeIndex td_attribute td_args type_var_heap be
 	  be = appBackEnd (BEAbsType flatType) be
+	  type_var_heap = remove_TVI_TypeVarArgN_in_args td_args type_var_heap
 	= (type_var_heap,be)
 defineType moduleIndex _ _ typeIndex {td_attribute, td_args, td_rhs=AbstractSynType _ _} type_var_heap be
  	# (flatType,type_var_heap,be) = convertTypeLhs moduleIndex typeIndex td_attribute td_args type_var_heap be
 	  be = appBackEnd (BEAbsType flatType) be
+	  type_var_heap = remove_TVI_TypeVarArgN_in_args td_args type_var_heap
 	= (type_var_heap,be)
 defineType moduleIndex constructors _ typeIndex {td_ident, td_attribute, td_args, td_rhs=ExtensibleAlgType constructorSymbols} type_var_heap be
 	# (flatType,type_var_heap,be) = convertTypeLhs moduleIndex typeIndex td_attribute td_args type_var_heap be
 	  (constructors,type_var_heap,be)
 		= convertConstructors typeIndex td_ident.id_name moduleIndex constructors constructorSymbols type_var_heap be
 	  be = appBackEnd (BEExtendableAlgebraicType flatType constructors) be
+	  type_var_heap = remove_TVI_TypeVarArgN_in_args td_args type_var_heap
 	= (type_var_heap,be)
 defineType moduleIndex constructors _ typeIndex {td_ident, td_attribute, td_args, td_rhs=AlgConses constructorSymbols _} type_var_heap be
 	# (flatType,type_var_heap,be) = convertTypeLhs moduleIndex typeIndex td_attribute td_args type_var_heap be
 	  (constructors,type_var_heap,be)
 		= convertConstructors typeIndex td_ident.id_name moduleIndex constructors constructorSymbols type_var_heap be
 	  be = appBackEnd (BEExtendableAlgebraicType flatType constructors) be
+	  type_var_heap = remove_TVI_TypeVarArgN_in_args td_args type_var_heap
 	= (type_var_heap,be)
 defineType _ _ _ _ _ type_var_heap be
 	= (type_var_heap,be)
@@ -1496,17 +1523,23 @@ convertTypeDefTypeNode (TAS typeSymbolIdent typeArgs strictness) type_var_heap b
 	  (type_arg_p,type_var_heap,bes) = convertTypeDefAnnotatedTypeArgs typeArgs strictness type_var_heap bes
 	  (type_node_p,bes) = accBackEnd (BENormalTypeNode symbol_p type_arg_p) bes
 	= (type_node_p,type_var_heap,bes)
-convertTypeDefTypeNode (TV {tv_ident}) type_var_heap bes
-	# (type_node_p,bes) = beVarTypeNode tv_ident.id_name bes
+convertTypeDefTypeNode (TV {tv_ident,tv_info_ptr}) type_var_heap bes
+	#! argument_n
+		= case sreadPtr tv_info_ptr type_var_heap of
+				TVI_TypeVarArgN type_var_arg_n
+					-> type_var_arg_n
+				_
+					-> -1
+	# (type_node_p,bes) = accBackEnd (BENumberedVarTypeNode tv_ident.id_name argument_n) bes
 	= (type_node_p,type_var_heap,bes)
 convertTypeDefTypeNode (TempV n) type_var_heap bes
-	# (type_node_p,bes) = beVarTypeNode ("_tv" +++ toString n) bes
+	# (type_node_p,bes) = accBackEnd (BENumberedVarTypeNode ("_tv" +++ toString n) -1) bes
 	= (type_node_p,type_var_heap,bes)
 convertTypeDefTypeNode (TempQV n) type_var_heap bes
-	# (type_node_p,bes) = beVarTypeNode ("_tqv" +++ toString n) bes
+	# (type_node_p,bes) = accBackEnd (BENumberedVarTypeNode ("_tqv" +++ toString n) -1) bes
 	= (type_node_p,type_var_heap,bes)
 convertTypeDefTypeNode (TempQDV n) type_var_heap bes
-	# (type_node_p,bes) = beVarTypeNode ("_tqv" +++ toString n) bes
+	# (type_node_p,bes) = accBackEnd (BENumberedVarTypeNode ("_tqv" +++ toString n) -1) bes
 	= (type_node_p,type_var_heap,bes)
 convertTypeDefTypeNode (a --> b) type_var_heap bes
 	# (symbol_p,bes) = accBackEnd (BEBasicSymbol BEFunType) bes
