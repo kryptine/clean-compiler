@@ -82,6 +82,12 @@ BEBindSpecialFunction a0 a1 a2 a3 = code {
 }
 // void BEBindSpecialFunction (BESpecialIdentIndex index,int functionIndex,int moduleIndex);
 
+BEBindSpecialType :: !Int !Int !Int !BackEnd -> BackEnd;
+BEBindSpecialType a0 a1 a2 a3 = code {
+	ccall BEBindSpecialType "III:V:p"
+}
+// void BEBindSpecialType (int special_type_n,int type_index,int module_index);
+
 BESpecialArrayFunctionSymbol :: !BEArrayFunKind !Int !Int !BackEnd -> (!BESymbolP,!BackEnd);
 BESpecialArrayFunctionSymbol a0 a1 a2 a3 = code {
 	ccall BESpecialArrayFunctionSymbol "III:p:p"
@@ -213,6 +219,12 @@ BEVarTypeNode a0 a1 = code {
 	ccall BEVarTypeNode "S:p:p"
 }
 // BETypeNodeP BEVarTypeNode (CleanString name);
+
+BENumberedVarTypeNode :: !String !Int !BackEnd -> (!BETypeNodeP,!BackEnd);
+BENumberedVarTypeNode a0 a1 a2 = code {
+	ccall BENumberedVarTypeNode "SI:p:p"
+}
+// BETypeNodeP BENumberedVarTypeNode (CleanString name,int argument_n);
 
 BETypeVarListElem :: !BETypeVarP !BEAttribution !BackEnd -> (!BETypeVarListP,!BackEnd);
 BETypeVarListElem a0 a1 a2 = code {
@@ -363,6 +375,12 @@ BECaseNode a0 a1 a2 a3 a4 a5 = code {
 	ccall BECaseNode "Ipppp:p:p"
 }
 // BENodeP BECaseNode (int symbolArity,BESymbolP symbol,BENodeDefP nodeDefs,BEStrictNodeIdP strictNodeIds,BENodeP node);
+
+BEOverloadedCaseNode :: !BENodeP !BENodeP !BENodeP !BackEnd -> (!BENodeP,!BackEnd);
+BEOverloadedCaseNode a0 a1 a2 a3 = code {
+	ccall BEOverloadedCaseNode "ppp:p:p"
+}
+// BENodeP BEOverloadedCaseNode (BENodeP case_node,BENodeP equal_node,BENodeP from_integer_node);
 
 BEEnterLocalScope :: !BackEnd -> BackEnd;
 BEEnterLocalScope a0 = code {
@@ -598,6 +616,12 @@ BEField a0 a1 a2 a3 = code {
 }
 // BEFieldListP BEField (int fieldIndex,int moduleIndex,BETypeNodeP type);
 
+BESetMemberTypeOfField :: !Int !Int !BETypeAltP !BackEnd -> BackEnd;
+BESetMemberTypeOfField a0 a1 a2 a3 = code {
+	ccall BESetMemberTypeOfField "IIp:V:p"
+}
+// void BESetMemberTypeOfField (int fieldIndex,int moduleIndex,BETypeAltP typeAlt);
+
 BEFields :: !BEFieldListP !BEFieldListP !BackEnd -> (!BEFieldListP,!BackEnd);
 BEFields a0 a1 a2 = code {
 	ccall BEFields "pp:p:p"
@@ -622,6 +646,12 @@ BETypeVar a0 a1 = code {
 }
 // BETypeVarP BETypeVar (CleanString name);
 
+BENumberedTypeVar :: !String !Int !BackEnd -> (!BETypeVarP,!BackEnd);
+BENumberedTypeVar a0 a1 a2 = code {
+	ccall BENumberedTypeVar "SI:p:p"
+}
+// BETypeVarP BENumberedTypeVar (CleanString name,int argument_n);
+
 BEDeclareType :: !Int !Int !String !BackEnd -> BackEnd;
 BEDeclareType a0 a1 a2 a3 = code {
 	ccall BEDeclareType "IIS:V:p"
@@ -633,6 +663,12 @@ BEDeclareFunction a0 a1 a2 a3 a4 = code {
 	ccall BEDeclareFunction "SIII:V:p"
 }
 // void BEDeclareFunction (CleanString name,int arity,int functionIndex,int ancestor);
+
+BEStartFunction :: !Int !BackEnd -> BackEnd;
+BEStartFunction a0 a1 = code {
+	ccall BEStartFunction "I:V:p"
+}
+// void BEStartFunction (int functionIndex);
 
 BECodeAlt :: !Int !BENodeDefP !BENodeP !BECodeBlockP !BackEnd -> (!BERuleAltP,!BackEnd);
 BECodeAlt a0 a1 a2 a3 a4 = code {
@@ -698,7 +734,7 @@ BEAbcCodeBlock :: !Bool !BEStringListP !BackEnd -> (!BECodeBlockP,!BackEnd);
 BEAbcCodeBlock a0 a1 a2 = code {
 	ccall BEAbcCodeBlock "Ip:p:p"
 }
-// BECodeBlockP BEAbcCodeBlock (int inline,BEStringListP instructions);
+// BECodeBlockP BEAbcCodeBlock (int inlineFlag,BEStringListP instructions);
 
 BEAnyCodeBlock :: !BECodeParameterP !BECodeParameterP !BEStringListP !BackEnd -> (!BECodeBlockP,!BackEnd);
 BEAnyCodeBlock a0 a1 a2 a3 = code {
@@ -735,6 +771,12 @@ BEGenerateCode a0 a1 = code {
 	ccall BEGenerateCode "S:I:p"
 }
 // int BEGenerateCode (CleanString outputFile);
+
+BEGetError :: {#Char};
+BEGetError  = code {
+	ccall BEGetError ":S"
+}
+// CleanString BEGetError ();
 
 BEExportType :: !Bool !Int !BackEnd -> BackEnd;
 BEExportType a0 a1 a2 = code {
@@ -783,12 +825,11 @@ BEStrictPositions a0 a1 = code {
 	ccall BEStrictPositions "I:VIp:p"
 }
 // void BEStrictPositions (int functionIndex,int* bits,int** positions);
-/*
+
 BECopyInts :: !Int !Int !Int -> Int;
 BECopyInts a0 a1 a2 = code {
 	ccall BECopyInts "Ipp:I"
 }
-*/
 // int BECopyInts (int cLength,int* ints,int* cleanArray);
 
 BEGetIntFromArray :: !Int !Int -> Int;
