@@ -30,6 +30,7 @@ EXPORTS
  BEPredefineTypeSymbol
  BEBasicSymbol
  BEVarTypeNode
+ BENumberedVarTypeNode
  BETypeVarListElem
  BETypeVars
  BENoTypeVars
@@ -95,10 +96,12 @@ EXPORTS
  BEConstructor
  BEDeclareField
  BEField
+ BESetMemberTypeOfField
  BEFields
  BENoFields
  BEDeclareConstructor
  BETypeVar
+ BENumberedTypeVar
  BEDeclareType
  BEDeclareFunction
  BEStartFunction
