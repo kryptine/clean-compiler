@@ -1421,6 +1421,23 @@ BEVarTypeNode (CleanString name)
 } /* BEVarTypeNode */
 
 BETypeNodeP
+BENumberedVarTypeNode (CleanString name,int argument_n)
+{
+	TypeNode	node;
+
+	node	= ConvertAllocType (struct type_node);
+
+	node->type_node_is_var		= True;
+	node->type_node_tv			= BENumberedTypeVar (name,argument_n);
+	node->type_node_arity		= 0;
+	node->type_node_annotation	= NoAnnot;
+	node->type_node_attribute	= NoUniAttr;
+	node->type_for_all_vars		= NULL;
+
+	return node;
+}
+
+BETypeNodeP
 BENormalTypeNode (BESymbolP symbol, BETypeArgP args)
 {
 	TypeNode	node;
@@ -2780,6 +2797,23 @@ BETypeVar (CleanString name)
 	return (typeVar);
 } /* BETypeVar */
 
+BETypeVarP
+BENumberedTypeVar (CleanString name,int argument_n)
+{
+	IdentP	ident;
+	TypeVar	typeVar;
+
+	ident	= ConvertAllocType (IdentS);
+	typeVar	= ConvertAllocType (struct type_var);
+
+	ident->ident_name	= ConvertCleanString (name);
+
+	typeVar->tv_ident		= ident;
+	typeVar->tv_argument_nr	= argument_n;
+
+	return typeVar;
+}
+
 BETypeVarListP
 BETypeVarListElem (BETypeVarP typeVar, BEAttribution attribute)
 {
@@ -3072,6 +3106,16 @@ BEField (int fieldIndex, int moduleIndex, BETypeNodeP type)
 
 	return (field);
 } /* BEField */
+
+void
+BESetMemberTypeOfField (int fieldIndex, int moduleIndex, BETypeAltP typeAlt)
+{
+	SymbDef sdef;
+
+	sdef = gBEState.be_modules [moduleIndex].bem_fields [fieldIndex].symb_def;
+	sdef->sdef_mark |= SDEF_FIELD_HAS_MEMBER_TYPE;
+	sdef->sdef_member_type_of_field = typeAlt;
+}
 
 BEFieldListP
 BEFields (BEFieldListP field, BEFieldListP fields)

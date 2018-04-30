@@ -615,6 +615,7 @@ STRUCT (symbol_def,SymbDef){
 
 	union {
 		struct symbol_def *		sdef_u2_next_version;	/* for IMPRULES */
+		struct type_alt *		sdef_u2_member_type_of_field; /* for FIELDSELECTOR if SDEF_FIELD_HAS_MEMBER_TYPE */
 	} sdef_u2;
 	
 	int				sdef_mark;
@@ -648,12 +649,14 @@ STRUCT (symbol_def,SymbDef){
 #define	SDEF_HAS_IMP_RULE_VERSIONS_MASK 64
 #define	SDEF_OPTIMISED_FUNCTION_MASK 128
 #define SDEF_INLINE_IS_CONSTRUCTOR 4096
+#define SDEF_FIELD_HAS_MEMBER_TYPE 16384
 
 /* some macros to reuse bit fields */
 
 #define sdef_group_number		sdef_ancestor
 
 #define sdef_next_version	sdef_u2.sdef_u2_next_version
+#define sdef_member_type_of_field	sdef_u2.sdef_u2_member_type_of_field
 
 #define sdef_constructor sdef_typeinfo.typeinfo_constructor
 

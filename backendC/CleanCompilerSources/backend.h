@@ -217,11 +217,11 @@ Clean (BEConstructorSymbol :: Int Int BackEnd -> (BESymbolP, BackEnd))
 BESymbolP BEFieldSymbol (int fieldIndex, int moduleIndex);
 Clean (BEFieldSymbol :: Int Int BackEnd -> (BESymbolP, BackEnd))
 
-BESymbolP BETypeSymbolNoMark (int typeIndex, int moduleIndex);
-Clean (BETypeSymbolNoMark :: Int Int BackEnd -> (BESymbolP, BackEnd))
-
 BESymbolP BETypeSymbol (int typeIndex, int moduleIndex);
 Clean (BETypeSymbol :: Int Int BackEnd -> (BESymbolP, BackEnd))
+
+BESymbolP BETypeSymbolNoMark (int typeIndex, int moduleIndex);
+Clean (BETypeSymbolNoMark :: Int Int BackEnd -> (BESymbolP, BackEnd))
 
 BESymbolP BEDontCareDefinitionSymbol (void);
 Clean (BEDontCareDefinitionSymbol :: BackEnd -> (BESymbolP, BackEnd))
@@ -266,6 +266,9 @@ Clean (BEBasicSymbol :: Int BackEnd -> (BESymbolP, BackEnd))
 
 BETypeNodeP BEVarTypeNode (CleanString name);
 Clean (BEVarTypeNode :: String BackEnd -> (BETypeNodeP, BackEnd))
+
+BETypeNodeP BENumberedVarTypeNode (CleanString name,int argument_n);
+Clean (BENumberedVarTypeNode :: String Int BackEnd -> (BETypeNodeP, BackEnd))
 
 BETypeVarListP BETypeVarListElem (BETypeVarP typeVar, BEAttribution attribute);
 Clean (BETypeVarListElem :: BETypeVarP BEAttribution BackEnd -> (BETypeVarListP, BackEnd))
@@ -466,6 +469,9 @@ Clean (BEDeclareField :: Int Int String BackEnd -> BackEnd)
 BEFieldListP BEField (int fieldIndex, int moduleIndex, BETypeNodeP type);
 Clean (BEField :: Int Int BETypeNodeP BackEnd -> (BEFieldListP, BackEnd))
 
+void BESetMemberTypeOfField (int fieldIndex, int moduleIndex, BETypeAltP typeAlt);
+Clean (BESetMemberTypeOfField :: Int Int BETypeAltP BackEnd -> BackEnd)
+
 BEFieldListP BEFields (BEFieldListP field, BEFieldListP fields);
 Clean (BEFields:: BEFieldListP BEFieldListP BackEnd -> (BEFieldListP, BackEnd))
 
@@ -477,6 +483,9 @@ Clean (BEDeclareConstructor:: Int Int String BackEnd -> BackEnd)
 
 BETypeVarP BETypeVar (CleanString name);
 Clean (BETypeVar:: String BackEnd -> (BETypeVarP, BackEnd))
+
+BETypeVarP BENumberedTypeVar (CleanString name,int argument_n);
+Clean (BENumberedTypeVar :: String Int BackEnd -> (BETypeVarP,BackEnd))
 
 void BEDeclareType (int typeIndex, int moduleIndex, CleanString name);
 Clean (BEDeclareType:: Int Int String BackEnd -> BackEnd)
