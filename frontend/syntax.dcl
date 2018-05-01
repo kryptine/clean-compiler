@@ -799,6 +799,7 @@ pIsSafe			:== True
 				VI_Used | /* for indicating that an imported function has been used */
 				VI_PropagationType !SymbolType | /* for storing the type with propagation environment of an imported function */
 				VI_ExpandedType !SymbolType | /* for storing the (expanded) type of an imported function */
+				VI_ExpandedMemberType !SymbolType !VarInfo /* VI_Empty or VI_ExpandedType */ | // only in sd_type_ptr
 				VI_Record ![AuxiliaryPattern] |
 				VI_Pattern !AuxiliaryPattern |
 				VI_TypeCodeVariable !TypeCodeVariableInfo |

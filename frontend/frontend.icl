@@ -158,7 +158,8 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 		= (No,{},{},main_dcl_module_n,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
 
 	# (ok, fun_defs, array_instances, common_defs, imported_funs, type_def_infos, heaps, predef_symbols, error,out)
-		= typeProgram groups main_dcl_module_n fun_defs icl_function_indices.ifi_specials_indices list_inferred_types icl_common icl_imported_instances dcl_mods icl_used_module_numbers td_infos heaps predef_symbols error out
+		= typeProgram groups main_dcl_module_n fun_defs icl_function_indices.ifi_specials_indices list_inferred_types icl_common icl_imported_instances dcl_mods icl_used_module_numbers
+			td_infos heaps predef_symbols error out
 
 	| not ok
 		= (No,{},{},main_dcl_module_n,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
@@ -231,8 +232,8 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 		=	frontSyntaxTree cached_dcl_macros cached_dcl_mods main_dcl_module_n
 							predef_symbols hash_table files error io out tcl_file icl_mod dcl_mods fun_defs components array_instances heaps
 
-	# (dcl_types, used_conses, var_heap, type_heaps) = convertIclModule main_dcl_module_n common_defs dcl_types used_conses var_heap type_heaps
-	# (dcl_types, used_conses, var_heap, type_heaps) = convertDclModule main_dcl_module_n dcl_mods common_defs dcl_types used_conses var_heap type_heaps
+	# (dcl_types,used_conses,var_heap,type_heaps) = convertIclModule main_dcl_module_n common_defs dcl_types used_conses var_heap type_heaps
+	# (dcl_types,used_conses,var_heap,type_heaps) = convertDclModule main_dcl_module_n dcl_mods common_defs dcl_types used_conses var_heap type_heaps
 
 //	  (components, fun_defs, out) = showComponents components 0 False fun_defs out
 
@@ -245,6 +246,10 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 	# (used_funs, components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap)
 	  		= convertCasesOfFunctions components main_dcl_module_n imported_funs common_defs fun_defs dcl_types used_conses
 					var_heap type_heaps expression_heap
+
+	# (dcl_types,used_conses,var_heap,type_heaps)
+		= convertMemberTypes main_dcl_module_n dcl_mods common_defs icl_used_module_numbers dcl_types used_conses var_heap type_heaps
+
 	#!  (dcl_types, type_heaps, var_heap)
 			= convertImportedTypeSpecifications main_dcl_module_n dcl_mods imported_funs common_defs used_conses used_funs dcl_types type_heaps var_heap		
 //	# (components, fun_defs, error)	= showTypes components 0 fun_defs error
@@ -423,7 +428,7 @@ where
 		| mod_index == size_dcl_mods
 			= (dcl_mods, file)
 			# (dcl_mod, dcl_mods) = dcl_mods![mod_index]
-			# file =  show_dcl_mod dcl_mod file
+			# file = show_dcl_mod dcl_mod file
 			= show_dcl_mods (mod_index+1) dcl_mods file
 
 	show_dcl_mod {dcl_name, dcl_functions, dcl_common} file
