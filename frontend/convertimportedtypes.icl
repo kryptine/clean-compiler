@@ -1,11 +1,22 @@
 implementation module convertimportedtypes
 
 import syntax, expand_types, utilities
+from containers import inNumberSet
 
 cDontRemoveAnnotations :== False
 
+convertIclModule :: !Int !{# CommonDefs} !*{#{# CheckedTypeDef}} !ImportedConstructors !*VarHeap !*TypeHeaps
+									 -> (!*{#{# CheckedTypeDef}},!ImportedConstructors,!*VarHeap,!*TypeHeaps)
+convertIclModule main_dcl_module_n common_defs imported_types imported_conses var_heap type_heaps
+	#! types_and_heaps = convertConstructorTypes common_defs.[main_dcl_module_n].com_cons_defs main_dcl_module_n common_defs (imported_types, imported_conses, var_heap, type_heaps)
+	# (imported_types,imported_conses,var_heap,type_heaps)
+		= convertSelectorTypes common_defs.[main_dcl_module_n].com_selector_defs main_dcl_module_n common_defs types_and_heaps
+	# {com_class_defs,com_type_defs,com_cons_defs,com_selector_defs,com_member_defs} = common_defs.[main_dcl_module_n]
+	= convert_member_types_of_module 0 com_class_defs com_type_defs com_cons_defs com_selector_defs com_member_defs main_dcl_module_n common_defs
+											imported_types imported_conses var_heap type_heaps
+
 convertDclModule :: !Int !{# DclModule} !{# CommonDefs} !*{#{# CheckedTypeDef}} !ImportedConstructors !*VarHeap !*TypeHeaps
-	-> (!*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps)
+													-> (!*{#{# CheckedTypeDef}},!ImportedConstructors,!*VarHeap,!*TypeHeaps)
 convertDclModule main_dcl_module_n dcl_mods common_defs imported_types imported_conses var_heap type_heaps
 	# {dcl_functions,dcl_common=dcl_common=:{com_type_defs,com_cons_defs,com_selector_defs},dcl_has_macro_conversions} = dcl_mods.[main_dcl_module_n]
 	| dcl_has_macro_conversions
@@ -43,13 +54,80 @@ where
 		#!{sd_type_ptr, sd_type, sd_ident} = selector_defs.[sel_index]
 		  (sd_type, imported_types, imported_conses, type_heaps, var_heap)
 				= convertSymbolType cDontRemoveAnnotations common_defs sd_type main_dcl_module_n imported_types imported_conses type_heaps var_heap
-		= (imported_types, imported_conses, var_heap <:= (sd_type_ptr, VI_ExpandedType sd_type), type_heaps)
+		  (sd_type_ptr_v,var_heap) = readPtr sd_type_ptr var_heap
+		= case sd_type_ptr_v of
+			VI_ExpandedMemberType expanded_member_type _
+				# var_heap = writePtr sd_type_ptr (VI_ExpandedMemberType expanded_member_type (VI_ExpandedType sd_type)) var_heap
+				-> (imported_types, imported_conses, var_heap, type_heaps)
+			_
+				# var_heap = writePtr sd_type_ptr (VI_ExpandedType sd_type) var_heap
+				-> (imported_types, imported_conses, var_heap, type_heaps)
 
-convertIclModule :: !Int !{# CommonDefs} !*{#{# CheckedTypeDef}} !ImportedConstructors !*VarHeap !*TypeHeaps
-	-> (!*{#{# CheckedTypeDef}}, !ImportedConstructors, !*VarHeap, !*TypeHeaps)
-convertIclModule main_dcl_module_n common_defs imported_types imported_conses var_heap type_heaps
-	#! types_and_heaps = convertConstructorTypes common_defs.[main_dcl_module_n].com_cons_defs main_dcl_module_n common_defs (imported_types, imported_conses, var_heap, type_heaps)
-	= convertSelectorTypes common_defs.[main_dcl_module_n].com_selector_defs main_dcl_module_n common_defs types_and_heaps
+convertMemberTypes :: !Int !{#DclModule} !{#CommonDefs} !NumberSet !*{#{#CheckedTypeDef}} !ImportedConstructors !*VarHeap !*TypeHeaps
+															   -> (!*{#{#CheckedTypeDef}},!ImportedConstructors,!*VarHeap,!*TypeHeaps)
+convertMemberTypes main_dcl_module_n dcl_mods common_defs used_module_numbers imported_types imported_conses var_heap type_heaps
+	= convert_member_types 0 main_dcl_module_n dcl_mods common_defs used_module_numbers imported_types imported_conses var_heap type_heaps
+
+convert_member_types module_i main_dcl_module_n dcl_mods common_defs used_module_numbers imported_types imported_conses var_heap type_heaps
+	| module_i==size dcl_mods
+		= (imported_types,imported_conses,var_heap,type_heaps)
+	| inNumberSet module_i used_module_numbers
+		# {dcl_common={com_class_defs,com_type_defs,com_cons_defs,com_selector_defs,com_member_defs}} = dcl_mods.[module_i]
+		# (imported_types,imported_conses,var_heap,type_heaps)
+			= convert_member_types_of_module 0 com_class_defs com_type_defs com_cons_defs com_selector_defs com_member_defs main_dcl_module_n common_defs
+												imported_types imported_conses var_heap type_heaps
+		= convert_member_types (module_i+1) main_dcl_module_n dcl_mods common_defs used_module_numbers imported_types imported_conses var_heap type_heaps
+		= convert_member_types (module_i+1) main_dcl_module_n dcl_mods common_defs used_module_numbers imported_types imported_conses var_heap type_heaps
+
+convert_member_types_of_module :: !Int !{#ClassDef} !{#CheckedTypeDef} !{#ConsDef} !{#SelectorDef} !{#MemberDef} !Int !{#CommonDefs}
+										!*{#{#CheckedTypeDef}} ![Global Int] !*VarHeap !*TypeHeaps
+									-> (!*{#{#CheckedTypeDef}},![Global Int],!*VarHeap,!*TypeHeaps)
+convert_member_types_of_module class_i class_defs type_defs cons_defs selector_defs member_defs main_dcl_module_n common_defs
+								imported_types imported_conses var_heap type_heaps
+	| class_i==size class_defs
+		= (imported_types,imported_conses,var_heap,type_heaps)
+		# {class_dictionary,class_members} = class_defs.[class_i]
+		  {td_rhs=RecordType {rt_constructor,rt_fields}} = type_defs.[class_dictionary.ds_index]
+		  {cons_ident,cons_type_ptr} = cons_defs.[rt_constructor.ds_index]
+		  (cons_type_ptr_v,var_heap) = readPtr cons_type_ptr var_heap
+		| case cons_type_ptr_v of VI_Used -> True; VI_ExpandedType _  -> True; _ -> False;
+			# (imported_types,imported_conses,var_heap,type_heaps)
+				= convert_member_types_of_class 0 class_members rt_fields selector_defs member_defs main_dcl_module_n common_defs
+												imported_types imported_conses var_heap type_heaps
+			= convert_member_types_of_module (class_i+1) class_defs type_defs cons_defs selector_defs member_defs main_dcl_module_n common_defs
+												imported_types imported_conses var_heap type_heaps
+			= convert_member_types_of_module (class_i+1) class_defs type_defs cons_defs selector_defs member_defs main_dcl_module_n common_defs
+												imported_types imported_conses var_heap type_heaps
+
+convert_member_types_of_class :: !Int !{#DefinedSymbol} !{#FieldSymbol} !{#SelectorDef} !{#MemberDef} !Int !{#CommonDefs}
+										!*{#{#CheckedTypeDef}} ![Global Int] !*VarHeap !*TypeHeaps
+									-> (!*{#{#CheckedTypeDef}},![Global Int],!*VarHeap,!*TypeHeaps)
+convert_member_types_of_class i class_members rt_fields selector_defs member_defs main_dcl_module_n common_defs
+								imported_types imported_conses var_heap type_heaps
+	| i<size class_members
+		# class_member_index = class_members.[i].ds_index
+		  {fs_ident,fs_index} = rt_fields.[i]
+		  {me_ident,me_type} = member_defs.[class_member_index]
+		  {sd_ident,sd_type_ptr} = selector_defs.[fs_index]
+		  (sd_type_ptr_v,var_heap) = readPtr sd_type_ptr var_heap
+		= case sd_type_ptr_v of
+			VI_ExpandedMemberType _ _
+				-> convert_member_types_of_class (i+1) class_members rt_fields selector_defs member_defs main_dcl_module_n common_defs
+														imported_types imported_conses var_heap type_heaps
+			VI_ExpandedType _
+				# (converted_me_type, imported_types,imported_conses,type_heaps,var_heap)
+					= convertSymbolType cDontRemoveAnnotations common_defs me_type main_dcl_module_n
+										imported_types imported_conses type_heaps var_heap
+				  var_heap = writePtr sd_type_ptr (VI_ExpandedMemberType converted_me_type sd_type_ptr_v) var_heap
+				-> convert_member_types_of_class (i+1) class_members rt_fields selector_defs member_defs main_dcl_module_n common_defs
+														imported_types imported_conses var_heap type_heaps
+			_
+				# (converted_me_type, imported_types,imported_conses,type_heaps,var_heap)
+					= convertSymbolType cDontRemoveAnnotations common_defs me_type main_dcl_module_n imported_types imported_conses type_heaps var_heap
+				  var_heap = writePtr sd_type_ptr (VI_ExpandedMemberType converted_me_type VI_Empty) var_heap
+				-> convert_member_types_of_class (i+1) class_members rt_fields selector_defs member_defs main_dcl_module_n common_defs
+														imported_types imported_conses var_heap type_heaps
+		= (imported_types,imported_conses,var_heap,type_heaps)
 
 convertImportedTypeSpecifications :: !Int !{# DclModule}  !{# {# FunType} } !{# CommonDefs} !ImportedConstructors !ImportedFunctions
 	!*{# {#CheckedTypeDef}} !*TypeHeaps !*VarHeap -> (!*{#{#CheckedTypeDef}}, !*TypeHeaps, !*VarHeap)
@@ -115,4 +193,11 @@ where
 				  {sd_type_ptr,sd_type,sd_ident} = selector_defs.[field_index]
 				  (sd_type, imported_types, conses, type_heaps, var_heap)
 				  		= convertSymbolType cDontRemoveAnnotations common_defs sd_type main_dcl_module_n imported_types conses type_heaps var_heap
-				= (imported_types, conses, type_heaps, var_heap <:= (sd_type_ptr, VI_ExpandedType sd_type))
+				  (sd_type_ptr_v,var_heap) = readPtr sd_type_ptr var_heap
+				= case sd_type_ptr_v of
+					VI_ExpandedMemberType expanded_member_type _
+						# var_heap = writePtr sd_type_ptr (VI_ExpandedMemberType expanded_member_type (VI_ExpandedType sd_type)) var_heap
+						-> (imported_types, conses, type_heaps, var_heap)
+					_
+						# var_heap = writePtr sd_type_ptr (VI_ExpandedType sd_type) var_heap
+						-> (imported_types, conses, type_heaps, var_heap)
