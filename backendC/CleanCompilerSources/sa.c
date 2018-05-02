@@ -115,7 +115,8 @@ static Fun
 	* strict_sym[MaxNrAnnots],	/* the strict ids						*/
 	* fail_sym,					/* the fail id							*/
 	* inffunct_sym,				/* the E2 id							*/
-	* botmemfunct_sym;			/* the E3 id							*/
+	* botmemfunct_sym,			/* the E3 id							*/
+	* strictapsym;				/* the strict apply id					*/
 
 #if STRICT_LISTS
 # ifndef _DB_
@@ -2276,6 +2277,71 @@ static Exp ConvertNode (Node node, NodeId nid)
 					break;
 				case apply_symb:
 					e->e_fun = apsym;
+
+					/* for member calls: use strictapsym for strict arguments */
+					if (arity==2){
+						int n_apply_args;
+						struct arg *arg_p;
+
+						n_apply_args=1;
+						arg_p = node->node_arguments;
+						while (arg_p!=NULL && arg_p->arg_node->node_arity==2 && arg_p->arg_node->node_kind==NormalNode &&
+							   arg_p->arg_node->node_symbol->symb_kind==apply_symb)
+						{
+							++n_apply_args;
+							arg_p=arg_p->arg_node->node_arguments;
+						}
+
+						if (arg_p!=NULL && arg_p->arg_node->node_kind==SelectorNode && arg_p->arg_node->node_arity==1 &&
+							(arg_p->arg_node->node_symbol->symb_def->sdef_mark & SDEF_FIELD_HAS_MEMBER_TYPE)!=0)
+						{
+							struct type_alt *member_type_alt;
+							struct type_arg *type_arg_p;
+							
+							member_type_alt=arg_p->arg_node->node_symbol->symb_def->sdef_member_type_of_field;
+							if (member_type_alt->type_alt_lhs->type_node_arity==n_apply_args+1){
+								int arg_n;
+								unsigned int arg_strictness;
+								NodeP first_arg_of_apply_node_p;
+								Exp e2;
+								
+								arg_strictness=0;
+								arg_n=0;
+								for_l (type_arg_p,member_type_alt->type_alt_lhs->type_node_arguments->type_arg_next,type_arg_next){
+									if (type_arg_p->type_arg_node->type_node_annotation==StrictAnnot)
+										arg_strictness |= 1<<arg_n;
+									++arg_n;
+								}
+								
+								--arg_n;
+								if (arg_strictness & (1<<arg_n))
+									e->e_fun = strictapsym;
+
+								e->e_args = NewExpArgs (2);
+								arg_p = node->node_arguments;
+								e->e_args[1] = ConvertNode (arg_p->arg_next->arg_node, NULL);
+								e2=e;
+								first_arg_of_apply_node_p=arg_p->arg_node;
+								while (first_arg_of_apply_node_p->node_arity==2){ /* node_arity of SelectorNode == 1 */
+									Exp e3;
+
+									--arg_n;
+									e3 = NewValueExp (arg_strictness & (1<<arg_n) ? strictapsym : apsym,False,0);
+									e2->e_args[0]=e3;
+									e2=e3;
+									e2->e_args = NewExpArgs (2);
+									arg_p=first_arg_of_apply_node_p->node_arguments;
+									e2->e_args[1] = ConvertNode (arg_p->arg_next->arg_node, NULL);
+									
+									first_arg_of_apply_node_p=arg_p->arg_node;
+								}
+								e2->e_args[0] = ConvertNode (first_arg_of_apply_node_p, NULL);
+								
+								return e;								
+							}
+						}
+					}
+
 					break;
 				case select_symb:
 					e->e_fun = selectsym[arity - 1];
@@ -3323,7 +3389,7 @@ static void init_predefined_symbols (void)
 	   strict functions (for strict annots), lists (2), conditional (4)
 	   and the apply. Also for the two list functions if necessary.
 	 */
-	nr_funs = MaxNodeArity + MaxNodeArity + MaxNrAnnots + 2 + 4 + 1
+	nr_funs = MaxNodeArity + MaxNodeArity + MaxNrAnnots + 2 + 4 + 2
 #if STRICT_LISTS
 				/* +3 */
 				+11
@@ -3501,6 +3567,17 @@ static void init_predefined_symbols (void)
 	f->fun_strictargs = InitNewStrictInfos (2, NotStrict);
 	f->fun_single     = False;
 	InitStrictInfo (f->fun_strictargs, HnfStrict);
+	InitStrictResult (& f->fun_strictresult);
+	f++;
+
+	strictapsym = f;
+	f->fun_symbol     = Null;
+	f->fun_arity      = 2;
+	f->fun_kind       = ApFunction;
+	f->fun_strictargs = InitNewStrictInfos (2, NotStrict);
+	f->fun_single     = False;
+	InitStrictInfo (f->fun_strictargs, HnfStrict);
+	InitStrictInfo (&f->fun_strictargs[1], HnfStrict);
 	InitStrictResult (& f->fun_strictresult);
 	f++;
 	
