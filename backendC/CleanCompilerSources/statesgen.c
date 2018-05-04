@@ -737,12 +737,13 @@ static void determine_unique_state_of_constructor_argument (StateP result_state_
 	}
 }
 # else
-static StateP determine_unique_state_of_constructor_argument (StateP type_state_p,TypeNodeP type_arg_node,int lhs_type_attribute)
-{	
+static StateP determine_unique_state_of_constructor_argument
+				(StateP type_state_p,TypeNodeP type_arg_node,int lhs_type_attribute,StateP constructor_state_p)
+{
 	if (type_arg_node->type_node_is_var){
-		if ((type_state_p->state_mark & STATE_UNIQUE_TYPE_ARGUMENTS_MASK) &&
+		if ((constructor_state_p->state_mark & STATE_UNIQUE_TYPE_ARGUMENTS_MASK) &&
 			type_arg_node->type_node_tv->tv_argument_nr>=0 &&
-			(type_state_p->state_unq_type_args & (1<<(type_arg_node->type_node_tv->tv_argument_nr))) &&
+			(constructor_state_p->state_unq_type_args & (1<<(type_arg_node->type_node_tv->tv_argument_nr))) &&
 			(type_state_p->state_mark & STATE_UNIQUE_MASK)==0)
 		{
 			StateP result_state_p;
@@ -787,9 +788,9 @@ static StateP determine_unique_state_of_constructor_argument (StateP type_state_
 					
 					type_arg_node_p=type_arg->type_arg_node;
 					if (type_arg_node_p->type_node_is_var){
-						if ((type_state_p->state_mark & STATE_UNIQUE_TYPE_ARGUMENTS_MASK) &&
+						if ((constructor_state_p->state_mark & STATE_UNIQUE_TYPE_ARGUMENTS_MASK) &&
 							type_arg_node_p->type_node_tv->tv_argument_nr>=0 &&
-							(type_state_p->state_unq_type_args & (1<<(type_arg_node_p->type_node_tv->tv_argument_nr))))
+							(constructor_state_p->state_unq_type_args & (1<<(type_arg_node_p->type_node_tv->tv_argument_nr))))
 						{
 							unq_type_args |= 1<<i;
 						}
@@ -928,7 +929,8 @@ static void GenStatesInLhsNode (Node node,StateP arg_state_p)
 						
 						arg->arg_state = *arg_state_p;
 
-						determine_unique_state_of_constructor_argument (&arg->arg_state,arg_state_p,field->fl_type,lhs_type_attribute);
+						determine_unique_state_of_constructor_argument
+							(&arg->arg_state,arg_state_p,field->fl_type,lhs_type_attribute,node_id_state_p);
 						
 						arg_node=arg->arg_node;
 
@@ -2692,8 +2694,9 @@ static void DetermineStatesOfNodeAndDefs (Node root_node,NodeDefs node_defs,Stat
 												node_id_p=node_ids_elem->nidl_node_id;
 												node_id_p->nid_ref_count_copy=node_id_p->nid_refcount;
 												
-												node_id_p->nid_lhs_state_p_=determine_unique_state_of_constructor_argument (constructor_arg_state_p,type_arg_p->type_arg_node,lhs_type_attribute);
-											}							
+												node_id_p->nid_lhs_state_p_ = determine_unique_state_of_constructor_argument
+																				(constructor_arg_state_p,type_arg_p->type_arg_node,lhs_type_attribute,node_id_state_p);
+											}
 										} else {
 											struct type_arg *type_arg_p;
 											
@@ -2703,7 +2706,8 @@ static void DetermineStatesOfNodeAndDefs (Node root_node,NodeDefs node_defs,Stat
 												node_id_p=node_ids_elem->nidl_node_id;
 												node_id_p->nid_ref_count_copy=node_id_p->nid_refcount;
 												
-												node_id_p->nid_lhs_state_p_=determine_unique_state_of_constructor_argument (&LazyState,type_arg_p->type_arg_node,lhs_type_attribute);
+												node_id_p->nid_lhs_state_p_ = determine_unique_state_of_constructor_argument
+																				(&LazyState,type_arg_p->type_arg_node,lhs_type_attribute,node_id_state_p);
 											}						
 										}
 									} else
@@ -2742,7 +2746,8 @@ static void DetermineStatesOfNodeAndDefs (Node root_node,NodeDefs node_defs,Stat
 											node_id_p=node_ids_elem->nidl_node_id;
 											node_id_p->nid_ref_count_copy=node_id_p->nid_refcount;
 											
-											node_id_p->nid_lhs_state_p_=determine_unique_state_of_constructor_argument (arg_state_p,field->fl_type,lhs_type_attribute);
+											node_id_p->nid_lhs_state_p_ = determine_unique_state_of_constructor_argument
+																			(arg_state_p,field->fl_type,lhs_type_attribute,node_id_state_p);
 										}
 									} else				
 # endif
