@@ -2904,7 +2904,8 @@ checkForeignExports [{pfe_ident=pfe_ident=:{id_name,id_info},pfe_line,pfe_file,p
 			check_foreign_export (STE_FunctionOrMacro _) [_,{ir_from, ir_to}:_] fun_defs cs
 				| ste_index>=ir_from && ste_index<ir_to
 					# ident_pos = { ip_ident=pfe_ident,ip_line=pfe_line,ip_file=pfe_file }
-					= ([],fun_defs,{cs & cs_error = checkErrorWithIdentPos ident_pos "has not been exported" cs.cs_error})
+					  cs & cs_error = checkErrorWithIdentPos ident_pos "function has not been exported (not defined in definition module)" cs.cs_error
+					= ([],fun_defs,cs)
 			check_foreign_export _ _ fun_defs cs
 				# ident_pos = { ip_ident=pfe_ident,ip_line=pfe_line,ip_file=pfe_file }
 				= ([],fun_defs,{cs & cs_error = checkErrorWithIdentPos ident_pos "has not been declared" cs.cs_error})
@@ -3073,7 +3074,7 @@ addImportedSymbolsToSymbolTable importing_mod opt_macro_range modules_in_compone
 	  (decls_accu, visited_modules, hidden_symbols, dcl_modules, cs)
 	  		= foldSt (add_impl_imported_symbols_with_new_error_pos opt_macro_range importing_mod modules_in_component_set imports_ikh)
 					si_implicit ([], bitvectCreate (nr_of_dcl_modules+1), [], dcl_modules, cs)
-	# (decls_accu, dcl_modules, cs)
+	  (decls_accu, dcl_modules, cs)
 		= foldSt (add_expl_imported_symbols_with_new_error_pos opt_macro_range importing_mod) si_explicit (decls_accu, dcl_modules, cs)
 	  cs & cs_symbol_table = remove_hidden_symbols si_qualified_hidden_explicit (remove_hidden_symbols_of_component_modules hidden_symbols cs.cs_symbol_table)
 	= (decls_accu, dcl_modules, cs)
