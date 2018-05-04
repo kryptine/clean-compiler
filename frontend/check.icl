@@ -2797,7 +2797,8 @@ checkForeignExports [{pfe_ident=pfe_ident=:{id_name,id_info},pfe_line,pfe_file,p
 			check_foreign_export (STE_FunctionOrMacro _) [_,{ir_from, ir_to}:_] fun_defs cs
 				| ste_index>=ir_from && ste_index<ir_to
 					# ident_pos = { ip_ident=pfe_ident,ip_line=pfe_line,ip_file=pfe_file }
-					= ([],fun_defs,{cs & cs_error = checkErrorWithIdentPos ident_pos "has not been exported" cs.cs_error})
+					  cs & cs_error = checkErrorWithIdentPos ident_pos "function has not been exported (not defined in definition module)" cs.cs_error
+					= ([],fun_defs,cs)
 			check_foreign_export _ _ fun_defs cs
 				# ident_pos = { ip_ident=pfe_ident,ip_line=pfe_line,ip_file=pfe_file }
 				= ([],fun_defs,{cs & cs_error = checkErrorWithIdentPos ident_pos "has not been declared" cs.cs_error})
