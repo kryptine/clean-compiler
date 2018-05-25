@@ -114,7 +114,6 @@ Symbol StartSymbol;
 SymbDef ArrayFunctionDefs [NoArrayFun],StdArrayAbortDef;
 
 SymbDef scc_dependency_list;
-SymbDef *scc_dependency_list_p;
 
 SymbDef MakeNewSymbolDefinition (char * module, Ident name, int arity, SDefKind kind)
 {
