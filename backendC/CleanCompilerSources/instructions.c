@@ -1455,8 +1455,6 @@ static void GenArrayReplace (Label elemdesc, int asize, int bsize)
 	GenLabel (elemdesc);
 	FPrintF (OutFile, " %d %d", asize, bsize);
 }
-	
-extern Symbol UnboxedArrayFunctionSymbols [];
 
 static 	Label	ApplyLabel;
 static 	StateS  	ApplyState;
