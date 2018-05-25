@@ -3362,7 +3362,7 @@ static Bool IsObservedDef (NodeDefP def_p)
 	NodeP node_p;
 
 	node_p=def_p->def_node;
-	if (node_p==NULL || (node_p->node_annotation==StrictAnnot && (def_p->def_mark & NODE_DEF_OBSERVE_MASK)))
+	if (node_p==NULL)
 		return True;
 	else
 		return False;
