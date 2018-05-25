@@ -3214,9 +3214,6 @@ static void AddStrictLhsNodeIdsToNodeDefs (StrictNodeIdP strict_node_id,NodeDefs
 			new_def->def_next=*defs_p;
 			*defs_p=new_def;
 			defs_p=&new_def->def_next;
-		} else if ((strict_node_id->snid_mark & STRICT_NODE_ID_OBSERVE_MASK) && node_id->nid_refcount>0 && node_id->nid_node!=NULL){
-			if (node_id->nid_node_def!=NULL)
-				node_id->nid_node_def->def_mark |= NODE_DEF_OBSERVE_MASK;
 		}
 
 		strict_node_id=strict_node_id->snid_next;

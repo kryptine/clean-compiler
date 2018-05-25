@@ -1,10 +1,3 @@
-/*
-
-Version 1.0 25/04/1994
-
-Author: Sjaak Smetsers 
-
-*/
 
 #undef _TYPESBUG_
 
@@ -94,18 +87,8 @@ extern TypeCell NewConstructorTypeCell (SymbDef type_cons, int act_arity, Attrib
 #define cDontAddExtraArgument	False
 
 extern TypeCell NewTemporaryConstructorTypeCell (TypeConsRepr type_cons, int act_arity, AttributeCellKind attrkind, Bool extra_argument);
-	
-extern BITVECT DetermineUniPropOfTypeCell (SymbDef cons_def, TypeCell cons_cell);
-
-extern BITVECT DetermineConsVarsOfTypeCons (SymbDef typecons, ConsVarList * cons_vars);
-
-extern BITVECT DetermineUniPropOfTypeCons (SymbDef typecons);
-
-extern BITVECT DetermineUniPropOfTypeConsVar (TypeArgClass arg_class [], int arity);
 
 extern void CreateAttributeEquationsForConstructorVariables (SymbDef cons_def, TypeCell arg_cells []);
-
-extern BITVECT DetermineUniVarsOfTypeCons (SymbDef typecons);
 
 extern AttributeCellKind DetermineAttrkindOfTemporaryTypeCell (TypeCell type);
 

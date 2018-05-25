@@ -9,12 +9,6 @@
 	typedef struct struct_name *type_name##P; \
 	struct struct_name
 
-typedef unsigned long BITVECT;
-
-typedef	enum
-{	NoAttr, DeferAttr, CopyAttr
-} GraphAttributeKind;
-
 typedef enum {
 	TupleState,  ArrayState, RecordState, SimpleState
 } StateType;
@@ -315,7 +309,6 @@ STRUCT (strict_node_id,StrictNodeId){
 };
 
 #define STRICT_NODE_ID_IDENT_MASK 1
-#define STRICT_NODE_ID_OBSERVE_MASK 2
 
 #define snid_node_id snid_val.val_node_id
 #define snid_ident snid_val.val_ident
@@ -459,7 +452,6 @@ STRUCT (node_def,NodeDef){
 };
 
 #define NODE_DEF_MARKED 8
-#define NODE_DEF_OBSERVE_MASK 16
 #define NODE_DEF_SELECT_AND_REMOVE_MASK 32
 
 /*	for implementing calls to C or the OS */
