@@ -297,21 +297,12 @@ typedef struct imp_rule *ImpRules;
 typedef struct rule_type *RuleTypes;
 
 STRUCT (strict_node_id,StrictNodeId){
-	union {
-		NodeId			val_node_id;	/* if snid_kind==0 */
-		Ident			val_ident;	/* if snid_kind==1 */
-	} snid_val;
+	NodeId					snid_node_id;
 	struct strict_node_id *	snid_next;
-	unsigned				snid_mark:8;
 #ifdef OBSERVE_ARRAY_SELECTS_IN_PATTERN
 	unsigned				snid_array_select_in_pattern:1;
 #endif
 };
-
-#define STRICT_NODE_ID_IDENT_MASK 1
-
-#define snid_node_id snid_val.val_node_id
-#define snid_ident snid_val.val_ident
 
 STRUCT (if_node_contents,IfNodeContents){
 	NodeDefs		if_then_node_defs;

@@ -378,7 +378,6 @@ static StrictNodeIdP copy_strict_node_ids (StrictNodeIdP old_strict_node_ids)
 		
 		new = CompAllocType (StrictNodeIdS);
 
-		new->snid_mark = old_p->snid_mark;
 #ifdef OBSERVE_ARRAY_SELECTS_IN_PATTERN
 		new->snid_array_select_in_pattern=old_p->snid_array_select_in_pattern;
 #endif
@@ -639,7 +638,6 @@ static Node copy_root_node (Node old)
 
 				for_l (strict_node_id_p,case_node_p->node_strict_node_ids,snid_next){
 					new_strict_node_id=CompAllocType (StrictNodeIdS);
-					new_strict_node_id->snid_mark=0;
 					
 					*strict_node_id_h=new_strict_node_id;
 					new_strict_node_id->snid_node_id = strict_node_id_p->snid_node_id->nid_forward_node_id;
@@ -686,7 +684,6 @@ static Node copy_root_node (Node old)
 
 			for_l (strict_node_id_p,old->node_guard_strict_node_ids,snid_next){
 				new_strict_node_id=CompAllocType (StrictNodeIdS);
-				new_strict_node_id->snid_mark=0;
 				
 				*strict_node_id_h=new_strict_node_id;
 				new_strict_node_id->snid_node_id = strict_node_id_p->snid_node_id->nid_forward_node_id;

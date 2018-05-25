@@ -2341,7 +2341,6 @@ BEStrictNodeId (BENodeIdP nodeId)
 	StrictNodeId	strictNodeId;
 
 	strictNodeId	=	ConvertAllocType (struct strict_node_id);
-	strictNodeId->snid_mark		= 0;
 	strictNodeId->snid_node_id	= nodeId;
 
 	/* +++ remove this hack */

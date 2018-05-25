@@ -393,12 +393,8 @@ void PrintRuleNode (Node node,Bool brackets,int n_leading_spaces,File file)
 			FPutS ("let! ", file);
 			
 			for_l (strict_node_id,node->node_strict_node_ids,snid_next){
-				if (strict_node_id->snid_mark & STRICT_NODE_ID_IDENT_MASK){
-					FPrintF (file, " %s",strict_node_id->snid_ident->ident_name);
-				} else {
-					DPrintNodeId (strict_node_id->snid_node_id,file);
-					FPutS ("; ",file);
-				}
+				DPrintNodeId (strict_node_id->snid_node_id,file);
+				FPutS ("; ",file);
 			}
 			FPutC ('\n',file);
 			print_spaces (n_leading_spaces+4,file);
@@ -439,12 +435,8 @@ void PrintRuleNode (Node node,Bool brackets,int n_leading_spaces,File file)
 			FPutS ("let! ", file);
 			
 			for_l (strict_node_id,node->node_strict_node_ids,snid_next){
-				if (strict_node_id->snid_mark & STRICT_NODE_ID_IDENT_MASK){
-					FPrintF (file, " %s",strict_node_id->snid_ident->ident_name);
-				} else {
-					DPrintNodeId (strict_node_id->snid_node_id,file);
-					FPutS ("; ",file);
-				}
+				DPrintNodeId (strict_node_id->snid_node_id,file);
+				FPutS ("; ",file);
 			}
 			FPutC ('\n',file);
 			print_spaces (n_leading_spaces+4,file);
@@ -583,12 +575,8 @@ void PrintRuleAlt (RuleAlts rulealt,int n_leading_spaces,File file)
 			FPutS ("let! ", file);
 			
 			for_l (strict_node_id,rulealt->alt_strict_node_ids,snid_next){
-				if (strict_node_id->snid_mark & STRICT_NODE_ID_IDENT_MASK){
-					FPrintF (file, " %s",strict_node_id->snid_ident->ident_name);
-				} else {
-					DPrintNodeId (strict_node_id->snid_node_id,file);
-					FPutS ("; ",file);
-				}
+				DPrintNodeId (strict_node_id->snid_node_id,file);
+				FPutS ("; ",file);
 			}
 			FPutC ('\n',file);
 			print_spaces (n_leading_spaces,file);

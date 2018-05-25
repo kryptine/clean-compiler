@@ -97,24 +97,10 @@ NewStrictNodeId (NodeId nodeId, StrictNodeIdP next)
 
 	strictNodeId	=	NewStrict (next);
 
-	strictNodeId->snid_mark		= 0;
 	strictNodeId->snid_node_id	= nodeId;
 
 	return (strictNodeId);
 } /* NewStrictNodeId */
-
-StrictNodeIdP
-NewStrictIdent (Ident ident, StrictNodeIdP next)
-{
-	StrictNodeIdP	strictNodeId;
-
-	strictNodeId	=	NewStrict (next);
-
-	strictNodeId->snid_mark		= STRICT_NODE_ID_IDENT_MASK;
-	strictNodeId->snid_ident	= ident;
-
-	return (strictNodeId);
-} /* NewStrictIdent */
 
 TypeVar
 NewTypeVar (IdentP nid)
