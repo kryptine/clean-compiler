@@ -513,7 +513,7 @@ where
 			= ({ at & at_type = TFAC avars type contexts, at_attribute = at_attribute}, (all_exi_vars, cus))
 			= ({ at & at_type = TFAC avars type contexts, at_attribute = at_attribute},
 					(all_exi_vars, {cus & cus_error = existentialError cus.cus_error, cus_exis_vars = []}))
-	clean_up_arg_type cui at (all_exi_vars, cus)
+	clean_up_arg_type cui=:{cui_top_level} at (all_exi_vars, cus)
 		# (at, cus) = clean_up cui at cus
 		  (cus_exis_vars, cus) = cus!cus_exis_vars
 		| isEmpty cus_exis_vars
@@ -522,8 +522,8 @@ where
 			= ({ at & at_type = TFA new_exi_vars at.at_type }, (all_exi_vars, {cus & cus_exis_vars = []}))
 	where
 		check_existential_var (var_number,var_attr) (exi_vars, all_vars, cus)
+			# (type, cus) = cus!cus_var_env.[var_number]
 			| isMember var_number all_vars
-				# (type, cus) = cus!cus_var_env.[var_number]
 				= case type of
 					TE
 						-> (exi_vars, all_vars, cus)
@@ -531,9 +531,15 @@ where
 						# (TV var, cus) = cus!cus_var_env.[var_number]
 						-> ([{atv_attribute = var_attr, atv_variable = var } : exi_vars ], all_vars,
 							{cus & cus_var_env = {cus.cus_var_env & [var_number] = TE }, cus_error = existentialError cus.cus_error })
-				# (TV var, cus) = cus!cus_var_env.[var_number]
-				= ([{atv_attribute = var_attr, atv_variable = var } : exi_vars ],
-						[var_number : all_vars], {cus & cus_var_env = {cus.cus_var_env & [var_number] = TE}})
+				# all_vars = [var_number : all_vars]
+				= case type of
+					TV var
+						-> ([{atv_attribute=var_attr, atv_variable=var} : exi_vars], all_vars, {cus & cus_var_env.[var_number] = TE})
+					TLifted var
+						| cui_top_level
+							# cus = {cus & cus_error = liftedError var cus.cus_error, cus_var_env.[var_number] = TE}
+							-> ([{atv_attribute=var_attr, atv_variable=var} : exi_vars], all_vars, cus)
+							-> ([{atv_attribute=var_attr, atv_variable=var} : exi_vars], all_vars, {cus & cus_var_env.[var_number] = TE})
 
 	clean_up_result_type cui at cus
 		# (at, cus=:{cus_exis_vars}) = clean_up cui at cus
@@ -1983,7 +1989,7 @@ optBeautifulizeIdent id_name
 			= "comprehension"
 		| prefix.[0] == 'g'
 			= "generator"
-	prefix_to_readable_name _		= abort "fatal error 21 in typesupport.icl"
+	prefix_to_readable_name _		= abort "fatal error in optBeautifulizeIdent in typesupport"
 
 // search for an element in an array
 searchlArrElt p s i
