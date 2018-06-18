@@ -818,8 +818,6 @@ filterWith _ _
 possibly_add_let [] ap_expr _ _ _ ti_symbol_heap cons_type_args_strictness
 	= (ap_expr, ti_symbol_heap)
 possibly_add_let zipped_ap_vars_and_args ap_expr not_unfoldable cons_type_args ro ti_symbol_heap cons_type_args_strictness
-	# let_type = filterWith not_unfoldable cons_type_args
-	  (new_info_ptr, ti_symbol_heap) = newPtr (EI_LetType let_type) ti_symbol_heap
 	= SwitchStrictPossiblyAddLet
 		(let
 			strict_binds	= [ {lb_src=lb_src, lb_dst=lb_dst, lb_position = NoPos}
@@ -837,17 +835,18 @@ possibly_add_let zipped_ap_vars_and_args ap_expr not_unfoldable cons_type_args r
 		 in
 		 	case (strict_binds,lazy_binds) of
 		 		([],[])
-		 			->	ap_expr
-		 		_
-		 			->	Let
+					-> (ap_expr, ti_symbol_heap)
+				_
+					# let_type = filterWith not_unfoldable cons_type_args
+					  (new_info_ptr, ti_symbol_heap) = newPtr (EI_LetType let_type) ti_symbol_heap
+		 			-> (Let
 						{	let_strict_binds	= strict_binds
 						,	let_lazy_binds		= lazy_binds
 						,	let_expr			= ap_expr
 						,	let_info_ptr		= new_info_ptr
 						,	let_expr_position	= NoPos
-						}
-	  , ti_symbol_heap
-	  ) 
+						}, ti_symbol_heap)
+	  )
 	  (let
 			lazy_binds		= [ {lb_src=lb_src, lb_dst=lb_dst, lb_position = NoPos}
 									\\ (lb_dst,lb_src)<-zipped_ap_vars_and_args
@@ -857,16 +856,17 @@ possibly_add_let zipped_ap_vars_and_args ap_expr not_unfoldable cons_type_args r
 	   in
 			case lazy_binds of
 				[]
-					-> ap_expr
+					-> (ap_expr, ti_symbol_heap)
 				_
-					-> Let
+					# let_type = filterWith not_unfoldable cons_type_args
+					  (new_info_ptr, ti_symbol_heap) = newPtr (EI_LetType let_type) ti_symbol_heap
+					-> (Let
 		  			 	{	let_strict_binds	= []
 						,	let_lazy_binds		= lazy_binds
 						,	let_expr			= ap_expr
 						,	let_info_ptr		= new_info_ptr
 						,	let_expr_position	= NoPos
-						}
-	  , ti_symbol_heap
+						}, ti_symbol_heap)
 	  )
 
 free_variables_of_expression expr ti
