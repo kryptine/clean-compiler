@@ -512,25 +512,25 @@ where
 		  new_case								= { outer_case & case_expr = guard_expr, case_guards=outer_guards, case_info_ptr=new_info_ptr }
 		= transformCase new_case ro ti // ---> ("possiblyFoldOuterCase`",Case new_case)
 
-transform_active_root_case aci this_case=:{case_expr = case_expr=:(App app=:{app_symb,app_args}),case_guards,case_default,case_explicit,case_ident} ro ti
+transform_active_root_case aci this_case=:{case_expr = case_expr=:(App app=:{app_symb,app_args}),case_guards,case_default,case_explicit,case_ident,case_info_ptr} ro ti
 	= case app_symb.symb_kind of
 		SK_Constructor cons_index
 			// currently only active cases are matched at runtime (multimatch problem)
 			# aci_linearity_of_patterns = aci.aci_linearity_of_patterns
-			  (may_be_match_expr, ti) = match_and_instantiate aci_linearity_of_patterns cons_index app_args case_guards case_default ro ti
+			  (may_be_match_expr, ti) = match_and_instantiate aci_linearity_of_patterns cons_index app_args case_guards case_info_ptr case_default ro ti
 			-> expr_or_never_matching_case may_be_match_expr case_ident ti
 		SK_Function {glob_module,glob_object}
 			| glob_module==ro.ro_StdStrictLists_module_n &&
 				(let type = ro.ro_imported_funs.[glob_module].[glob_object].ft_type
 				 in (type.st_arity==0 || (type.st_arity==2 && case app_args of [_:_] -> True; _ -> False)))
 				# type = ro.ro_imported_funs.[glob_module].[glob_object].ft_type
-				-> trans_case_of_overloaded_nil_or_cons type ti
+				-> trans_case_of_overloaded_nil_or_cons type case_info_ptr ti
 			| glob_module==ro.ro_main_dcl_module_n && glob_object>=size ti.ti_cons_args &&
 				(ti.ti_fun_defs.[glob_object].fun_info.fi_properties bitand FI_IsUnboxedListOfRecordsConsOrNil)<>0 &&
 				(case ti.ti_fun_defs.[glob_object].fun_type of
 					Yes type ->(type.st_arity==0 || (type.st_arity==2 && case app_args of [_:_] -> True; _ -> False)))
 				# (Yes type,ti) = ti!ti_fun_defs.[glob_object].fun_type
-				-> trans_case_of_overloaded_nil_or_cons type ti
+				-> trans_case_of_overloaded_nil_or_cons type case_info_ptr ti
 		// otherwise it's a function application
 		_
 			# {aci_params,aci_opt_unfolder} = aci
@@ -598,27 +598,32 @@ where
 				= [h_act_pars:replacement producer_vars t_act_pars form_pars]
 			= replacement producer_vars t_act_pars form_pars
 
-	match_and_instantiate linearities cons_index app_args (AlgebraicPatterns _ algebraicPatterns) case_default ro ti
-		= match_and_instantiate_algebraic_type linearities cons_index app_args algebraicPatterns case_default ro ti
+	match_and_instantiate linearities cons_index app_args (AlgebraicPatterns _ algebraicPatterns) case_info_ptr case_default ro ti
+		# (EI_CaseType {ct_cons_types}, ti_symbol_heap) = readExprInfo case_info_ptr ti.ti_symbol_heap
+		  ti & ti_symbol_heap=ti_symbol_heap
+		= match_and_instantiate_algebraic_type linearities cons_index app_args algebraicPatterns ct_cons_types case_default ro ti
 		where
 			match_and_instantiate_algebraic_type [!linearity:linearities!] cons_index app_args
-												 [{ap_symbol={glob_module,glob_object={ds_index}}, ap_vars, ap_expr} : guards] case_default ro ti
+												 [{ap_symbol={glob_module,glob_object={ds_index}}, ap_vars, ap_expr} : guards]
+												 [cons_type:cons_types] case_default ro ti
 				| cons_index.glob_module == glob_module && cons_index.glob_object == ds_index
-					# {cons_type} = ro.ro_common_defs.[glob_module].com_cons_defs.[ds_index]
-					= instantiate linearity app_args ap_vars ap_expr cons_type.st_args_strictness cons_type.st_args ti
-				= match_and_instantiate_algebraic_type linearities cons_index app_args guards case_default ro ti
-			match_and_instantiate_algebraic_type _ cons_index app_args [] case_default ro ti
+					# args_strictness = ro.ro_common_defs.[glob_module].com_cons_defs.[ds_index].cons_type.st_args_strictness
+					= instantiate linearity app_args ap_vars ap_expr args_strictness cons_type ti
+				= match_and_instantiate_algebraic_type linearities cons_index app_args guards cons_types case_default ro ti
+			match_and_instantiate_algebraic_type _ cons_index app_args [] cons_types case_default ro ti
 				= transform case_default { ro & ro_root_case_mode = NotRootCase } ti
-	match_and_instantiate linearities cons_index app_args (OverloadedListPatterns (OverloadedList _ _ _ _) _ algebraicPatterns) case_default ro ti
-		= match_and_instantiate_overloaded_list linearities cons_index app_args algebraicPatterns case_default ro ti
+	match_and_instantiate linearities cons_index app_args (OverloadedListPatterns (OverloadedList _ _ _ _) _ algebraicPatterns) case_info_ptr case_default ro ti
+		# (EI_CaseType {ct_cons_types}, ti_symbol_heap) = readExprInfo case_info_ptr ti.ti_symbol_heap
+		  ti & ti_symbol_heap=ti_symbol_heap
+		= match_and_instantiate_overloaded_list linearities cons_index app_args algebraicPatterns ct_cons_types case_default ro ti
 		where
 			match_and_instantiate_overloaded_list [!linearity:linearities!] cons_index=:{glob_module=cons_glob_module,glob_object=cons_ds_index} app_args 
-									[{ap_symbol={glob_module,glob_object={ds_index}}, ap_vars, ap_expr} : guards] 
-									case_default ro ti
+									[{ap_symbol={glob_module,glob_object={ds_index}}, ap_vars, ap_expr} : guards]
+									[cons_type:cons_types] case_default ro ti
 				| equal_list_contructor glob_module ds_index cons_glob_module cons_ds_index
-					# {cons_type} = ro.ro_common_defs.[cons_glob_module].com_cons_defs.[cons_ds_index]
-					= instantiate linearity app_args ap_vars ap_expr cons_type.st_args_strictness cons_type.st_args ti
-					= match_and_instantiate_overloaded_list linearities cons_index app_args guards case_default ro ti
+					# args_strictness = ro.ro_common_defs.[cons_glob_module].com_cons_defs.[cons_ds_index].cons_type.st_args_strictness
+					= instantiate linearity app_args ap_vars ap_expr args_strictness cons_type ti
+					= match_and_instantiate_overloaded_list linearities cons_index app_args guards cons_types case_default ro ti
 					where
 						equal_list_contructor glob_module ds_index cons_glob_module cons_ds_index
 							| glob_module==cPredefinedModuleIndex && cons_glob_module==cPredefinedModuleIndex
@@ -629,15 +634,17 @@ where
 								| index==PD_OverloadedNilSymbol
 									= cons_index==PD_NilSymbol || cons_index==PD_StrictNilSymbol || cons_index==PD_TailStrictNilSymbol || cons_index==PD_StrictTailStrictNilSymbol
 									= abort "equal_list_contructor"
-			match_and_instantiate_overloaded_list _ cons_index app_args [] case_default ro ti
+			match_and_instantiate_overloaded_list _ cons_index app_args [] cons_types case_default ro ti
 				= transform case_default { ro & ro_root_case_mode = NotRootCase } ti
 
-	trans_case_of_overloaded_nil_or_cons type ti
+	trans_case_of_overloaded_nil_or_cons type case_info_ptr ti
 		| type.st_arity==0
 			# (may_be_match_expr, ti) = match_and_instantiate_overloaded_nil case_guards case_default ro ti
 			= expr_or_never_matching_case may_be_match_expr case_ident ti
 			# aci_linearity_of_patterns = aci.aci_linearity_of_patterns
-			  (may_be_match_expr, ti) = match_and_instantiate_overloaded_cons type aci_linearity_of_patterns app_args case_guards case_default ro ti
+			  (EI_CaseType {ct_cons_types}, ti_symbol_heap) = readExprInfo case_info_ptr ti.ti_symbol_heap
+			  ti & ti_symbol_heap=ti_symbol_heap
+			  (may_be_match_expr, ti) = match_and_instantiate_overloaded_cons type aci_linearity_of_patterns app_args case_guards ct_cons_types case_default ro ti
 			= expr_or_never_matching_case may_be_match_expr case_ident ti
 	where
 		match_and_instantiate_overloaded_nil (OverloadedListPatterns _ _ algebraicPatterns) case_default ro ti
@@ -655,7 +662,7 @@ where
 		match_and_instantiate_nil [] case_default ro ti
 			= transform case_default { ro & ro_root_case_mode = NotRootCase } ti
 	
-		match_and_instantiate_overloaded_cons cons_function_type linearities app_args (AlgebraicPatterns _ algebraicPatterns) case_default ro ti
+		match_and_instantiate_overloaded_cons cons_function_type linearities app_args (AlgebraicPatterns _ algebraicPatterns) [cons_type:_] case_default ro ti
 			= match_and_instantiate_overloaded_cons_boxed_match linearities app_args algebraicPatterns case_default ro ti
 			where
 				match_and_instantiate_overloaded_cons_boxed_match [!linearity:linearities!] app_args
@@ -664,14 +671,14 @@ where
 					| glob_module==cPredefinedModuleIndex
 						# index=ds_index+FirstConstructorPredefinedSymbolIndex
 						| index==PD_ConsSymbol || index==PD_StrictConsSymbol || index==PD_TailStrictConsSymbol || index==PD_StrictTailStrictConsSymbol
-							# {cons_type} = ro.ro_common_defs.[glob_module].com_cons_defs.[ds_index]
-							= instantiate linearity app_args ap_vars ap_expr cons_type.st_args_strictness cons_type.st_args ti
+							# args_strictness = ro.ro_common_defs.[glob_module].com_cons_defs.[ds_index].cons_type.st_args_strictness
+							= instantiate linearity app_args ap_vars ap_expr args_strictness cons_type ti
 		//				| index==PD_NilSymbol || index==PD_StrictNilSymbol || index==PD_TailStrictNilSymbol || index==PD_StrictTailStrictNilSymbol
 							= match_and_instantiate_overloaded_cons_boxed_match linearities app_args guards case_default ro ti
 		//					= abort "match_and_instantiate_overloaded_cons_boxed_match"
 				match_and_instantiate_overloaded_cons_boxed_match _ app_args [] case_default ro ti
 					= transform case_default { ro & ro_root_case_mode = NotRootCase } ti
-		match_and_instantiate_overloaded_cons cons_function_type linearities app_args (OverloadedListPatterns _ _ algebraicPatterns) case_default ro ti
+		match_and_instantiate_overloaded_cons cons_function_type linearities app_args (OverloadedListPatterns _ _ algebraicPatterns) cons_types case_default ro ti
 			= match_and_instantiate_overloaded_cons_overloaded_match linearities app_args algebraicPatterns case_default ro ti
 			where
 				match_and_instantiate_overloaded_cons_overloaded_match [!linearity:linearities!] app_args
