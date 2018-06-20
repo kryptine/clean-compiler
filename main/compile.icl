@@ -194,7 +194,10 @@ parseCommandLine [arg1=:"-fusion":args] options
 	# (args,modules,options) = parseCommandLine args {options & fusion_options.compile_with_fusion = True}
 	= ([arg1:args],modules,options)
 parseCommandLine [arg1=:"-generic_fusion":args] options
-	# (args,modules,options) = parseCommandLine args {options & fusion_options.generic_fusion = True}
+	# options = if options.generate_sapl
+					{options & fusion_options.generic_fusion = True, fusion_options.strip_unused = True}
+					{options & fusion_options.generic_fusion = True}
+	# (args,modules,options) = parseCommandLine args options;
 	= ([arg1:args],modules,options)
 parseCommandLine [arg1=:"-dump":args] options
 	= parseCommandLine args {options & dump_core = True}
@@ -211,9 +214,12 @@ parseCommandLine ["-lset":args] options
 	= parseCommandLine args {options & listTypes.lto_listTypesKind = ListTypesStrictExports}
 parseCommandLine ["-lat":args] options
 	= parseCommandLine args {options & listTypes.lto_listTypesKind = ListTypesAll}
-	// enable sapl	
+	// enable sapl
 parseCommandLine ["-sapl":args] options
-	= parseCommandLine args {options & generate_sapl = True}
+	# options = if options.fusion_options.generic_fusion
+					{options & generate_sapl = True, fusion_options.strip_unused = True}
+					{options & generate_sapl = True}
+	= parseCommandLine args options
 parseCommandLine [arg : args] options
 	| arg.[0] == '-'
 		# (args,modules,options)=	parseCommandLine args options
