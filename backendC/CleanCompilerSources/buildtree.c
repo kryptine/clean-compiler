@@ -249,10 +249,8 @@ NewIfNode (void)
 	node->node_contents.contents_if=then_else_info;
 
 	then_else_info->if_then_node_defs		= NIL;
-	then_else_info->if_then_rules			= NIL;
 	then_else_info->if_then_strict_node_ids	= NIL;
 	then_else_info->if_else_node_defs		= NIL;
-	then_else_info->if_else_rules			= NIL;
 	then_else_info->if_else_strict_node_ids = NIL;
 
 	node->node_line=-1;

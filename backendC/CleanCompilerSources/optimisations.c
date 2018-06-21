@@ -410,9 +410,6 @@ static Node copy_root_node (Node old)
 		old_then_else_info = old->node_contents.contents_if;
 		new->node_contents.contents_if = new_then_else_info;
 
-		new_then_else_info->if_then_rules = NULL;
-		new_then_else_info->if_else_rules = NULL;
-
 		old_arg=old->node_arguments;
 
 		new_arg = CompAllocType (ArgS);
@@ -736,9 +733,6 @@ static Node copy_node (Node old,Bool lhs)
 
 		old_then_else_info = old->node_contents.contents_if;
 		new->node_contents.contents_if = new_then_else_info;
-
-		new_then_else_info->if_then_rules = NULL;
-		new_then_else_info->if_else_rules = NULL;
 
 		old_arg=old->node_arguments;
 

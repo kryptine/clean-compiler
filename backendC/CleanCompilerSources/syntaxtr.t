@@ -306,13 +306,11 @@ STRUCT (strict_node_id,StrictNodeId){
 
 STRUCT (if_node_contents,IfNodeContents){
 	NodeDefs		if_then_node_defs;
-	ImpRules		if_then_rules;
 	union {
 		StrictNodeIdP					u_strict_node_ids;
 		struct node_id_ref_count_list *	u_node_id_ref_counts;
 	} if_then_u;
 	NodeDefs		if_else_node_defs;
-	ImpRules		if_else_rules;
 	union {
 		StrictNodeIdP					u_strict_node_ids;
 		struct node_id_ref_count_list *	u_node_id_ref_counts;
@@ -409,10 +407,8 @@ STRUCT (node,Node){
 #endif
 
 #define node_then_node_defs			node_contents.contents_if->if_then_node_defs
-#define node_then_rules				node_contents.contents_if->if_then_rules
 #define node_then_strict_node_ids	node_contents.contents_if->if_then_strict_node_ids
 #define node_else_node_defs			node_contents.contents_if->if_else_node_defs
-#define node_else_rules				node_contents.contents_if->if_else_rules
 #define node_else_strict_node_ids	node_contents.contents_if->if_else_strict_node_ids
 #define node_if_scope				node_contents.contents_if->if_local_scope
 
