@@ -1709,10 +1709,8 @@ BEGuardNode (BENodeP cond, BENodeDefP thenNodeDefs, BEStrictNodeIdP thenStricts,
 	thenElseInfo = ConvertAllocType (struct if_node_contents);
 
 	thenElseInfo->if_then_node_defs			= thenNodeDefs;
-	thenElseInfo->if_then_rules				= NIL;
 	thenElseInfo->if_then_strict_node_ids	= thenStricts;
 	thenElseInfo->if_else_node_defs			= elseNodeDefs;
-	thenElseInfo->if_else_rules				= NIL;
 	thenElseInfo->if_else_strict_node_ids	= elseStricts;
 
 	node	= ConvertAllocType (NodeS);
