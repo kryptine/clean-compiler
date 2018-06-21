@@ -194,11 +194,6 @@ void PrintRuleNode (Node node,Bool brackets,int n_leading_spaces,File file)
 #ifdef PRINT_NODE_LINE_NUMBERS
 			FPrintF (file,"#%d",node->node_line);
 #endif
-			if (node_symb->symb_kind==definition && node_symb->symb_def->sdef_kind==IMPRULE &&
-				(node_symb->symb_def->sdef_rule->rule_mark & RULE_INTERNAL_FUNCTION_MASK))
-			{
-				FPrintF (file,"_%d",node_symb->symb_def->sdef_number);
-			}
 
 			if (node -> node_arguments)
 			{	FPutC (' ', file);

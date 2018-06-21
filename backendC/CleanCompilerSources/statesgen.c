@@ -3479,7 +3479,7 @@ static SymbolP copy_imp_rule_and_add_arguments (SymbDef rule_sdef,int n_extra_ar
 	return new_symbol_p;
 }
 
-static int create_new_function_with_more_arguments (NodeP node_p,int determine_node_state)
+static void create_new_function_with_more_arguments (NodeP node_p)
 {
 	NodeP function_node_p;
 	int n_extra_arguments;
@@ -3547,17 +3547,16 @@ static int create_new_function_with_more_arguments (NodeP node_p,int determine_n
 						} else
 							node_p->node_symbol=function_node_p->node_symbol;
 					} else
-						return 0;
+						return;
 				} else
-					return 0;
-			/* 26-6-2000: added DEFRULE and SYSRULE case */
+					return;
 			} else if (function_symbol_p->symb_def->sdef_kind==DEFRULE || function_symbol_p->symb_def->sdef_kind==SYSRULE){
 				if (function_node_p->node_arity + n_extra_arguments <= function_symbol_p->symb_def->sdef_arity){
 					node_p->node_symbol=function_node_p->node_symbol;
 				} else
-					return 0;
+					return;
 			} else
-				return 0;
+				return;
 
 			{
 				NodeP function_node_p2;
@@ -3586,7 +3585,7 @@ static int create_new_function_with_more_arguments (NodeP node_p,int determine_n
 				
 				node_p->node_arity=function_node_p->node_arity+n_extra_arguments;
 				
-				return 1;
+				return;
 			}
 		} else if (function_symbol_p->symb_kind==if_symb && function_node_p->node_arity==3){
 			NodeP apply_node_p;
@@ -3623,13 +3622,10 @@ static int create_new_function_with_more_arguments (NodeP node_p,int determine_n
 				}
 				
 				*node_p=*function_node_p;
-				if (determine_node_state)
-					DetermineNodeState (node_p);
+				DetermineNodeState (node_p);
 			}
 		}
 	}
-	
-	return 0;
 }
 #endif
 
@@ -3787,7 +3783,7 @@ static NodeDefs *CollectSharedNodeIdsInNode (Node* node_p,NodeId parent_node_id,
 
 #ifdef ADD_ARGUMENTS_TO_HIGHER_ORDER_FUNCTIONS
 			if (node->node_kind==NormalNode && node->node_symbol->symb_kind==apply_symb)
-				(void) create_new_function_with_more_arguments (node,1);
+				create_new_function_with_more_arguments (node);
 #endif
 			
 			for_l (arg,node->node_arguments,arg_next){
@@ -3897,95 +3893,6 @@ static void CollectSharedAndAnnotatedNodesInRhs (NodeS **root_p,NodeDefS **defs_
 	if (root_node->node_kind==NodeIdNode && root_node->node_node_id->nid_refcount==1)
 		root_node->node_node_id->nid_node->node_annotation=NoAnnot;
 	*/
-
-#ifdef ADD_ARGUMENTS_TO_HIGHER_ORDER_FUNCTIONS
-	while (root_node->node_kind==NormalNode && 
-		((root_node->node_symbol->symb_kind==apply_symb && create_new_function_with_more_arguments (root_node,0)) || 
-		 (root_node->node_symbol->symb_kind==definition && root_node->node_symbol->symb_def->sdef_kind==IMPRULE)))
-	{		
-		if (root_node->node_symbol->symb_def->sdef_kind==IMPRULE){
-			ImpRuleP imp_rule_p;
-			
-			imp_rule_p=root_node->node_symbol->symb_def->sdef_rule;
-			
-			if ((imp_rule_p->rule_mark & RULE_LAMBDA_FUNCTION_MASK) && 
-				root_node->node_symbol->symb_def->sdef_arity==root_node->node_arity &&
-				imp_rule_p->rule_alts->alt_next==NULL
-# ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
-				&& ! (imp_rule_p->rule_alts->alt_rhs_root->node_kind==SwitchNode ||
-					  imp_rule_p->rule_alts->alt_rhs_root->node_kind==GuardNode ||
-					  imp_rule_p->rule_alts->alt_rhs_root->node_kind==IfNode)
-# endif
-				)
-			{
-				ArgP call_arg_p,lhs_arg_p;
-				
-				for_l (lhs_arg_p,imp_rule_p->rule_alts->alt_lhs_root->node_arguments,arg_next)
-					if (lhs_arg_p->arg_node->node_kind!=NodeIdNode ||
-						lhs_arg_p->arg_node->node_node_id->nid_refcount==-1 ||
-						lhs_arg_p->arg_node->node_node_id->nid_node!=NULL)
-					{
-						break;
-					}
-				
-				if (lhs_arg_p==NULL){
-					NodeP new_root_node;
-	/*
-					PrintRuleNode (root_node,False,StdOut);
-					FPrintF (StdOut,"\n");
-					PrintRuleAlt (imp_rule_p->rule_alts,StdOut);
-	*/
-					for_ll (call_arg_p,lhs_arg_p,root_node->node_arguments,imp_rule_p->rule_alts->alt_lhs_root->node_arguments,arg_next,arg_next){
-						NodeP call_node_p;
-						NodeIdP lhs_node_id_p,call_node_id_p;
-						
-						lhs_node_id_p=lhs_arg_p->arg_node->node_node_id;
-					
-						call_node_p=call_arg_p->arg_node;
-						if (call_node_p->node_kind==NodeIdNode)
-							call_node_id_p=call_node_p->node_node_id;
-						else {
-							NodeDefP new_node_def_p;
-							
-							call_node_id_p=NewNodeId (NULL);
-							call_node_id_p->nid_refcount=1;
-							call_node_id_p->nid_ref_count_copy_=1;
-							call_node_id_p->nid_exp_=NULL;
-		
-							call_node_id_p->nid_node=call_node_p;
-							
-							new_node_def_p = NewNodeDef (call_node_id_p,call_node_p);
-							new_node_def_p->def_next=*defs_p;
-							*defs_p=new_node_def_p;
-						}
-						
-						call_node_id_p->nid_mark &= ~SHARED_NODES_COLLECTED_MASK;
-						if (call_node_id_p->nid_refcount<0)
-							call_node_id_p->nid_refcount -= -2-lhs_node_id_p->nid_refcount;
-						else
-							call_node_id_p->nid_refcount += -2-lhs_node_id_p->nid_refcount;
-					
-						lhs_node_id_p->nid_forward_node_id=call_node_id_p;
-					}
-					
-					copy_rhs_node_defs_and_root (imp_rule_p->rule_alts,&new_root_node,defs_p);
-/*				
-					PrintRuleNode (new_root_node,False,StdOut);
-					FPrintF (StdOut,"\n");
-					PrintNodeDefs (*defs_p,False,StdOut);
-					FPrintF (StdOut,"\n");
-					FPrintF (StdOut,"\n");
-*/
-					root_node=new_root_node;
-					*root_p=new_root_node;
-					
-					continue;
-				}
-			}
-		}
-		break;
-	}
-#endif
 
 	last=defs_p;
 	

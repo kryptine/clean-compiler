@@ -319,7 +319,7 @@ static NodeDefP copy_lhs_node_ids_of_node_defs (NodeDefs old_node_defs)
 	return first_p;
 }
 
-static NodeDefP copy_rhs_node_ids_of_node_defs (NodeDefs old_node_defs,NodeDefP **end_node_defs_h)
+static NodeDefP copy_rhs_node_ids_of_node_defs (NodeDefs old_node_defs)
 {
 	NodeDefP old_def_p,first_p,*next_h;
 	
@@ -346,12 +346,6 @@ static NodeDefP copy_rhs_node_ids_of_node_defs (NodeDefs old_node_defs,NodeDefP 
 	}
 
 	*next_h=NULL;
-	
-	if (end_node_defs_h!=NULL)
-		if (first_p==NULL)
-			*end_node_defs_h=NULL;
-		else
-			*end_node_defs_h=next_h;
 	
 	return first_p;
 }
@@ -420,7 +414,7 @@ static Node copy_root_node (Node old)
 
 		old_arg=old_arg->arg_next;
 
-		new_then_else_info->if_then_node_defs=copy_rhs_node_ids_of_node_defs (old_then_else_info->if_then_node_defs,NULL);
+		new_then_else_info->if_then_node_defs=copy_rhs_node_ids_of_node_defs (old_then_else_info->if_then_node_defs);
 			
 		new_arg = CompAllocType (ArgS);
 		new_arg->arg_state = LazyState;
@@ -431,7 +425,7 @@ static Node copy_root_node (Node old)
 		copy_nodes_of_node_defs (new_then_else_info->if_then_node_defs,False);
 		new_then_else_info->if_then_strict_node_ids=copy_strict_node_ids (old_then_else_info->if_then_strict_node_ids);
 
-		new_then_else_info->if_else_node_defs=copy_rhs_node_ids_of_node_defs (old_then_else_info->if_else_node_defs,NULL);
+		new_then_else_info->if_else_node_defs=copy_rhs_node_ids_of_node_defs (old_then_else_info->if_else_node_defs);
 
 		old_arg=old_arg->arg_next;
 			
@@ -496,7 +490,7 @@ static Node copy_root_node (Node old)
 			if (case_node_p->node_kind==CaseNode){
 				new_case_node_p->node_su.su_u.u_case=CompAllocType (CaseNodeContentsS);
 
-				new_case_node_p->node_node_defs = copy_rhs_node_ids_of_node_defs (case_node_p->node_node_defs,NULL);
+				new_case_node_p->node_node_defs = copy_rhs_node_ids_of_node_defs (case_node_p->node_node_defs);
 				
 				if (case_node_arg_p->arg_node->node_kind==PushNode){
 					ArgP push_node_arg_1,new_push_node_arg_1,new_push_node_arg_2;
@@ -568,7 +562,7 @@ static Node copy_root_node (Node old)
 			} else if (case_node_p->node_kind==DefaultNode){
 				new_case_node_p->node_su.su_u.u_case=CompAllocType (CaseNodeContentsS);
 
-				new_case_node_p->node_node_defs = copy_rhs_node_ids_of_node_defs (case_node_p->node_node_defs,NULL);
+				new_case_node_p->node_node_defs = copy_rhs_node_ids_of_node_defs (case_node_p->node_node_defs);
 				copy_nodes_of_node_defs (new_case_node_p->node_node_defs,False);
 				new_case_node_arg_p->arg_node = copy_root_node (case_node_arg_p->arg_node);
 
@@ -603,7 +597,7 @@ static Node copy_root_node (Node old)
 
 				new_case_node_p->node_su.su_u.u_case=CompAllocType (CaseNodeContentsS);
 
-				new_case_node_p->node_node_defs = copy_rhs_node_ids_of_node_defs (case_node_p->node_node_defs,NULL);
+				new_case_node_p->node_node_defs = copy_rhs_node_ids_of_node_defs (case_node_p->node_node_defs);
 
 				copy_nodes_of_node_defs (new_case_node_p->node_node_defs,False);
 				new_case_node_arg_p->arg_node = copy_root_node (case_node_arg_p->arg_node);
@@ -668,7 +662,7 @@ static Node copy_root_node (Node old)
 		
 		arg_1->arg_node = copy_root_node (old->node_arguments->arg_node);
 
-		new->node_node_defs = copy_rhs_node_ids_of_node_defs (old->node_node_defs,NULL);
+		new->node_node_defs = copy_rhs_node_ids_of_node_defs (old->node_node_defs);
 
 		arg_2->arg_node = copy_root_node (old->node_arguments->arg_next->arg_node);
 
@@ -744,7 +738,7 @@ static Node copy_node (Node old,Bool lhs)
 
 		old_arg=old_arg->arg_next;
 
-		new_then_else_info->if_then_node_defs=copy_rhs_node_ids_of_node_defs (old_then_else_info->if_then_node_defs,NULL);
+		new_then_else_info->if_then_node_defs=copy_rhs_node_ids_of_node_defs (old_then_else_info->if_then_node_defs);
 		
 		new_arg = CompAllocType (ArgS);
 		new_arg->arg_state = LazyState;
@@ -755,7 +749,7 @@ static Node copy_node (Node old,Bool lhs)
 		copy_nodes_of_node_defs (new_then_else_info->if_then_node_defs,False);
 		new_then_else_info->if_then_strict_node_ids=copy_strict_node_ids (old_then_else_info->if_then_strict_node_ids);
 
-		new_then_else_info->if_else_node_defs=copy_rhs_node_ids_of_node_defs (old_then_else_info->if_else_node_defs,NULL);
+		new_then_else_info->if_else_node_defs=copy_rhs_node_ids_of_node_defs (old_then_else_info->if_else_node_defs);
 
 		old_arg=old_arg->arg_next;
 			
@@ -810,7 +804,7 @@ static void copy_alts (RuleAltP old_alts,RuleAlts *next_p,Symbol new_symbol)
 		new->alt_lhs_root->node_symbol=new_symbol;
 		copy_nodes_of_node_defs (new->alt_lhs_defs,True);
 		
-	 	new->alt_rhs_defs=copy_rhs_node_ids_of_node_defs (old->alt_rhs_defs,NULL);
+	 	new->alt_rhs_defs=copy_rhs_node_ids_of_node_defs (old->alt_rhs_defs);
 #ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
 		new->alt_rhs_root = copy_root_node (old->alt_rhs_root);
 #else
@@ -828,26 +822,12 @@ static void copy_alts (RuleAltP old_alts,RuleAlts *next_p,Symbol new_symbol)
 	*next_p = NULL;
 }
 
-void copy_rhs_node_defs_and_root (RuleAltP old_alt_p,NodeP *new_root_node_h,NodeDefP *node_defs_p)
-{
-	NodeDefP new_node_defs,*end_node_defs_h;
-	
- 	new_node_defs=copy_rhs_node_ids_of_node_defs (old_alt_p->alt_rhs_defs,&end_node_defs_h);
-	*new_root_node_h = copy_node (old_alt_p->alt_rhs_root,False);
-	copy_nodes_of_node_defs (new_node_defs,False);
-
-	if (end_node_defs_h!=NULL){
-		*end_node_defs_h=*node_defs_p;
-		*node_defs_p=new_node_defs;
-	}
-}
-
 void copy_imp_rule_nodes (ImpRuleP old_rule_p,ImpRuleP new_rule_p)
 {
 	copy_alts (old_rule_p->rule_alts,&new_rule_p->rule_alts,new_rule_p->rule_type->type_alt_lhs->type_node_symbol);
 	new_rule_p->rule_line = old_rule_p->rule_line;
 	new_rule_p->rule_root = new_rule_p->rule_alts->alt_lhs_root;
-	new_rule_p->rule_mark = old_rule_p->rule_mark & (RULE_CAF_MASK | RULE_INTERNAL_FUNCTION_MASK | RULE_LAMBDA_FUNCTION_MASK);
+	new_rule_p->rule_mark = old_rule_p->rule_mark & RULE_CAF_MASK;
 }
 
 static ImpRules new_strict_result_rules;
