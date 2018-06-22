@@ -99,8 +99,8 @@ where
 
 instance <<< AttributeVar
 where
-	(<<<) file {av_ident,av_info_ptr} = file <<< av_ident <<< "[" <<< av_info_ptr <<< "]"
-//	(<<<) file {av_ident,av_info_ptr} = file <<< av_ident
+//	(<<<) file {av_ident,av_info_ptr} = file <<< av_ident <<< "[" <<< av_info_ptr <<< "]"
+	(<<<) file {av_ident,av_info_ptr} = file <<< av_ident
 
 instance toString AttributeVar
 where
