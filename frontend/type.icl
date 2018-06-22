@@ -1167,11 +1167,11 @@ freshAttribute ts=:{ts_attr_store}
 	,	prop_error		:: !.Optional .ErrorAdmin
 	}
 
-attribute_error type_attr No
-	= No // XXX abort ("sanity check nr 723 failed in module type"--->("type_attr", type_attr))
-attribute_error type_attr (Yes err)
+attribute_error attr_var No
+	= No
+attribute_error attr_var (Yes err)
 	# err = errorHeading "Type error" err
-	= Yes { err & ea_file = err.ea_file <<< "* attribute expected instead of " <<< type_attr <<< '\n' }
+	= Yes { err & ea_file = err.ea_file <<< "* attribute expected instead of attribute variable:" <<< attr_var <<< '\n' }
 
 determine_attribute_of_cons :: !TypeAttribute ![AType] Int !*AttrVarHeap ![AttributeVar] ![AttrInequality] !*(Optional *ErrorAdmin)
 									-> (!TypeAttribute,Int,!*AttrVarHeap,![AttributeVar],![AttrInequality],!* Optional *ErrorAdmin )
