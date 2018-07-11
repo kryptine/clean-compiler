@@ -1,6 +1,3 @@
-/*
-	module owner: Ronny Wichers Schreur
-*/
 definition module frontend
 
 from scanner import ::SearchPaths
@@ -13,7 +10,6 @@ from partition import ::Component(..),::ComponentMembers
 	=	{	feo_up_to_phase			:: !FrontEndPhase
 		,	feo_fusion	 			:: !FusionOptions
 		,	feo_generics 			:: !Bool
-		,	feo_dump_core			:: !Bool
 		}
 
 :: FrontEndSyntaxTree
