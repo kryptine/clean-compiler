@@ -18,6 +18,11 @@ frontSyntaxTree cached_dcl_macros cached_dcl_mods main_dcl_module_n predef_symbo
 			},cached_dcl_macros,cached_dcl_mods,main_dcl_module_n,predef_symbols,hash_table,files,error,io,out,tcl_file,heaps
 		)
 
+defaultFrontEndOptions :: FrontEndOptions
+defaultFrontEndOptions
+	= { feo_up_to_phase = FrontEndPhaseAll, feo_generics = False, feo_generate_sapl = False,
+		feo_fusion = { compile_with_fusion = False, generic_fusion = False, strip_unused = False } }
+
 frontEndInterface :: !(Optional (*File,{#Char},{#Char})) !FrontEndOptions !Ident !SearchPaths !{#DclModule} !*{#*{#FunDef}} !(Optional Bool) !*PredefinedSymbols !*HashTable (ModTimeFunction *Files) !*Files !*File !*File !*File !(Optional *File) !*Heaps
   	-> ( !Optional *FrontEndSyntaxTree,!*{#*{#FunDef}},!{#DclModule},!Int,!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional *File, !*Heaps)
 frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_modules cached_dcl_macros list_inferred_types predef_symbols hash_table modtimefunction files error io out tcl_file heaps
