@@ -28,6 +28,8 @@ simplifyAndCheckTypeApplication (TV tv) type_args
 	= (True, CV tv :@: type_args)
 simplifyAndCheckTypeApplication (TempV i) type_args
 	= (True, TempCV i :@: type_args)
+simplifyAndCheckTypeApplication (TempQV i) type_args
+	= (True, TempQCV i :@: type_args)
 simplifyAndCheckTypeApplication type type_args
 	= (False, type)
 
