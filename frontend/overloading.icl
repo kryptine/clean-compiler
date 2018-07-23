@@ -21,6 +21,7 @@ import genericsupport, type_io_common
 :: 	ReducedContext  = RC_Class		!ClassInstanceDescr [ReducedContext]
 					| RC_TC_Global	!GlobalTCType ![ClassApplication]
 					| RC_TC_Local	!VarInfoPtr
+					| RC_TC_Context	!TypeContext // used if contextIsReducible yields True for a non reducible TC context
 
 ::	ClassApplication	= CA_Instance	!ReducedContext
 						| CA_Context 	!TypeContext
@@ -827,6 +828,17 @@ where
 			= addLocalTCInstance var_number (rtcs_type_pattern_vars, rtcs_var_heap)
 		# rtcs_state = {rtcs_state & rtcs_type_pattern_vars=rtcs_type_pattern_vars, rtcs_var_heap=rtcs_var_heap}
 		= (RC_TC_Local inst_var, rtcs_state)
+	reduce_tc_context defs type_code_class type rtcs_state=:{rtcs_var_heap, rtcs_new_contexts}
+		/*	workaround for the following problem: a type synonym may yield a (TempCV _ :@: _),
+			contextIsReducible then yields True for the unexpanded type synonym application,
+			but after expanding the type synonym the resulting type may not be reducible
+		*/
+		| case type of TempCV _ :@: _ -> True; TempV _ -> True; TempQV _ -> True; _ -> False
+			# (tc_var, rtcs_var_heap) = newPtr VI_Empty rtcs_var_heap
+			  tc = {tc_class=type_code_class, tc_types=[type], tc_var=tc_var}
+			  rtcs_new_contexts = if (containsContext tc rtcs_new_contexts) rtcs_new_contexts [tc : rtcs_new_contexts]
+			  rtcs_state & rtcs_var_heap=rtcs_var_heap, rtcs_new_contexts=rtcs_new_contexts
+			= (RC_TC_Context tc, rtcs_state)
 
 	try_to_reduce_tc_contexts :: {#CommonDefs} TCClass [AType] *ReduceTCState -> (![ClassApplication], !*ReduceTCState)
 	try_to_reduce_tc_contexts defs type_code_class cons_args rtcs_state
@@ -1016,6 +1028,8 @@ where
 		= collect_variable_and_contexts_of_cas cas variables_and_contexts class_context
 	collect_variable_and_contexts_of_rc (RC_TC_Local _) variables_and_contexts class_context
 		= variables_and_contexts
+	collect_variable_and_contexts_of_rc (RC_TC_Context tc) variables_and_contexts class_context
+		= collect_variable_and_contexts_of_cas [CA_Context tc] variables_and_contexts class_context
 
 	collect_variable_and_contexts_of_context :: GlobalIndex [Type] [(Int,Int)] [TypeContext] -> [(Int,Int)]
 	collect_variable_and_contexts_of_context cid_class_index [TempV type_var_n] variables_and_contexts class_context
@@ -2445,6 +2459,13 @@ where
 				-> (EI_TypeCode (TCE_Constructor tci_constructor typeCodeExpressions), heaps_and_ptrs)
 	adjust_member_instance defs contexts {me_ident,me_offset,me_class={glob_module,glob_object}} (RC_TC_Local new_var_ptr) _ heaps_and_ptrs
 		= (EI_TypeCode (TCE_Var new_var_ptr), heaps_and_ptrs)
+	adjust_member_instance defs contexts {me_ident,me_offset,me_class={glob_module,glob_object}} (RC_TC_Context tc) class_exprs (heaps=:{hp_type_heaps}, ptrs)
+		// same as adjust_member_application for CA_Context
+		# (class_context, address, hp_type_heaps) = determineContextAddress contexts defs tc hp_type_heaps
+		# {class_dictionary={ds_index,ds_ident}} = defs.[glob_module].com_class_defs.[glob_object]
+		  selector = selectFromDictionary glob_module ds_index me_offset defs
+		= (EI_Selection (generateClassSelection address [RecordSelection selector me_offset]) class_context.tc_var class_exprs,
+				({heaps & hp_type_heaps = hp_type_heaps}, ptrs))
 
 	find_instance_of_member :: (Global Int) Int ClassInstanceDescr [ReducedContext] -> (!Int,!Int,Ident,[ClassApplication])
 	find_instance_of_member me_class me_offset {cid_class_index, cid_inst_module, cid_inst_members, cid_red_contexts} constraint_contexts
@@ -2636,6 +2657,12 @@ where
 			= ([{lb_src = dict, lb_dst = fv, lb_position = NoPos} : binds ], [ AttributedType class_type : types ], [Var var : rev_dicts], var_heap, expr_heap)
 		bind_shared_dictionary nr_of_members dict (binds, types, rev_dicts, var_heap, expr_heap)
 			= (binds, types, [dict : rev_dicts], var_heap, expr_heap)
+	convert_reduced_contexts_to_expression defs contexts (RC_TC_Context tc) (heaps=:{hp_type_heaps}, ptrs)
+		// same as convert_class_appl_to_expression for CA_Context
+		# (class_context, context_address, hp_type_heaps) = determineContextAddress contexts defs tc hp_type_heaps
+		| isEmpty context_address
+			= (ClassVariable class_context.tc_var, ({heaps & hp_type_heaps=hp_type_heaps}, ptrs))
+			= (Selection NormalSelector (ClassVariable class_context.tc_var) (generateClassSelection context_address []), ({heaps & hp_type_heaps = hp_type_heaps}, ptrs))
 
 determineContextAddress :: ![TypeContext] !{#CommonDefs} !TypeContext !*TypeHeaps
 	-> (!TypeContext, ![(Int, Global DefinedSymbol)], !*TypeHeaps)
