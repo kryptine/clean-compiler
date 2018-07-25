@@ -520,7 +520,7 @@ ScanComment2 c1 input
 								'/'	->	ScanComment (SkipToEndOfLine input)
 								'*'	->	case ScanComment input of
 											(No, input) -> ScanComment input
-											error		-> error
+											error -> error
 								_	->	ScanComment input
 	| c1 == '*'
 		# (eol2, c2, input)	= ReadNormalChar input
@@ -966,9 +966,9 @@ ScanNumeral n input chars=:['0':r]
 		| c == 'x'
 			# (eof, c1, input)	= ReadNormalChar input
 			| eof				= (IntToken "0", charBack input)
-			| isHexDigit c1		= ScanHexNumeral (~ (hexDigitToInt c1)) input
+			| isHexDigit c1		= ScanNegativeHexNumeral (hexDigitToInt c1) input
 								= (IntToken "0", charBack (charBack input))
-		| isOctDigit c			= ScanOctNumeral (~ (digitToInt c)) input
+		| isOctDigit c			= ScanNegativeOctNumeral (digitToInt c) input
 		| c == '.'				= TestFraction n input chars
 								= (IntToken "0", charBack input)
 ScanNumeral n input chars
@@ -1016,19 +1016,39 @@ ScanExponent n input chars
 								[c:_] | IsDigit c	-> (RealToken (revCharListToString n chars), charBack input)
 								_					-> (ErrorToken ("Digit expected after "+revCharListToString n chars), charBack input)
 
-ScanHexNumeral	:: !Int !Input -> (!Token, !Input)
+ScanHexNumeral :: !Int !Input -> (!Token, !Input)
 ScanHexNumeral n input
-	# (eof, c, input)		= ReadNormalChar input
-	| eof					= (IntToken (toString n), input)
-	| isHexDigit c			= ScanHexNumeral (n*16+hexDigitToInt c) input
-							= (IntToken (toString n), charBack input)
+	# (n, input) = ReadHexNumeral n input
+	= (IntToken (toString n), input)
 
-ScanOctNumeral	:: !Int !Input -> (!Token, !Input)
-ScanOctNumeral n input
+ScanNegativeHexNumeral :: !Int !Input -> (!Token, !Input)
+ScanNegativeHexNumeral n input
+	# (n, input) = ReadHexNumeral n input
+	= (IntToken (toString (~n)), input)
+
+ReadHexNumeral	:: !Int !Input -> (!Int, !Input)
+ReadHexNumeral n input
 	# (eof, c, input)		= ReadNormalChar input
-	| eof					= (IntToken (toString n), input)
-	| isOctDigit c			= ScanOctNumeral (n*8+digitToInt c) input
-							= (IntToken (toString n), charBack input)
+	| eof					= (n, input)
+	| isHexDigit c			= ReadHexNumeral (n*16+hexDigitToInt c) input
+							= (n, charBack input)
+
+ScanOctNumeral :: !Int !Input -> (!Token, !Input)
+ScanOctNumeral n input
+	# (n, input) = ReadOctNumeral n input
+	= (IntToken (toString n), input)
+
+ScanNegativeOctNumeral :: !Int !Input -> (!Token, !Input)
+ScanNegativeOctNumeral n input
+	# (n, input) = ReadOctNumeral n input
+	= (IntToken (toString (~n)), input)
+
+ReadOctNumeral :: !Int !Input -> (!Int, !Input)
+ReadOctNumeral n input
+	# (eof, c, input)		= ReadNormalChar input
+	| eof					= (n, input)
+	| isOctDigit c			= ReadOctNumeral (n*8+digitToInt c) input
+							= (n, charBack input)
 
 ScanChar :: !Input -> (!Token, !Input)
 ScanChar input
