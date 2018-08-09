@@ -714,18 +714,17 @@ static void UpdateEntry (int srcoffset, int dstoffset, int sp, int offframe [])
 
 static void FillHole (int sp,int offframe[],int demframe [],int defframe [],int offsize,int demsize)
 {
+	if (sp > demsize)
+		return;
+
 	do {
-		if (sp > demsize)
-			return;
-		else {
 			int newdef;
 			
 			newdef = defframe [demframe[sp]];
 			UpdateEntry (newdef, sp, offsize, offframe);
 			UpdateFrame (defframe, demframe[sp], sp, offframe);
 			sp = newdef;
-		}
-	} while (offframe[sp] != demframe[sp]);
+	} while (sp <= demsize && offframe[sp] != demframe[sp]);
 }
 
 static void GenStackConversions (int *sp,int demsize,int offframe[],int demframe[],int defframe[],int hole)
