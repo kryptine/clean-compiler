@@ -1933,7 +1933,7 @@ static void generate_code_for_tail_call_modulo_cons (NodeP node_p,NodeId node_de
 	}
 }
 
-static int is_tail_call_module_cons_node (NodeP node_p)
+static int is_tail_call_modulo_cons_node (NodeP node_p)
 {
 	if (node_p->node_kind==NormalNode && node_p->node_symbol->symb_kind==definition){
 		SymbDef sdef;
@@ -2456,7 +2456,7 @@ int CodeRhsNodeDefs
 					if (arg_node_p->node_kind==FillUniqueNode)
 						arg_node_p=arg_node_p->node_arguments->arg_node;
 
-					if (is_tail_call_module_cons_node (arg_node_p) && (arg_node_p->node_symbol->symb_def->sdef_rule->rule_mark & RULE_TAIL_MODULO_CONS_ENTRY_MASK)){
+					if (is_tail_call_modulo_cons_node (arg_node_p) && (arg_node_p->node_symbol->symb_def->sdef_rule->rule_mark & RULE_TAIL_MODULO_CONS_ENTRY_MASK)){
 						arg_p2=arg_p;
 						break;
 					}
@@ -2486,7 +2486,7 @@ int CodeRhsNodeDefs
 								node_p=node_p->node_arguments->arg_node;
 							}
 							
-							if (!(node_def_id->nid_mark & ON_A_CYCLE_MASK) && is_tail_call_module_cons_node (node_p)
+							if (!(node_def_id->nid_mark & ON_A_CYCLE_MASK) && is_tail_call_modulo_cons_node (node_p)
 								&& (node_p->node_symbol->symb_def->sdef_rule->rule_mark & RULE_TAIL_MODULO_CONS_ENTRY_MASK))
 							{
 								n_node_id_refs=node_def_id->nid_refcount;
@@ -2843,7 +2843,7 @@ static int tail_call_modulo_cons_call (NodeP node_p,NodeDefP node_defs)
 				if (arg_node_p->node_kind==FillUniqueNode)
 					arg_node_p=arg_node_p->node_arguments->arg_node;
 
-				if (is_tail_call_module_cons_node (arg_node_p))
+				if (is_tail_call_modulo_cons_node (arg_node_p))
 					return 1;
 			}
 
@@ -2865,7 +2865,7 @@ static int tail_call_modulo_cons_call (NodeP node_p,NodeDefP node_defs)
 					if (node_def_node_p->node_kind==FillUniqueNode)
 						node_def_node_p=node_def_node_p->node_arguments->arg_node;
 					
-					if (!(node_def_id->nid_mark & ON_A_CYCLE_MASK) && is_tail_call_module_cons_node (node_def_node_p)){
+					if (!(node_def_id->nid_mark & ON_A_CYCLE_MASK) && is_tail_call_modulo_cons_node (node_def_node_p)){
 						int n_node_id_refs;
 						
 						n_node_id_refs=node_def_id->nid_refcount;
