@@ -1013,6 +1013,7 @@ static Symbol new_rule_symbol (char *function_name)
 	function_ident=PutStringInHashTable (function_name,SymbolIdTable);
 	function_sdef=MakeNewSymbolDefinition (CurrentModule,function_ident,0,IMPRULE);
 
+	function_sdef->sdef_ancestor = ~next_def_number;
 	function_sdef->sdef_number=next_def_number++;
 	function_sdef->sdef_isused=True;
 
