@@ -744,7 +744,7 @@ where
 		body_strict (App app) ap_vars ro fun_defs fun_heap
 			# (is,fun_defs,fun_heap) = app_indices app ro fun_defs fun_heap
 			# lazy_args = insert_n_lazy_values_at_beginning (length app_args) NotStrict
-			= (seq (map add_strictness is) lazy_args, fun_defs,fun_heap)
+			= (foldSt add_strictness is lazy_args, fun_defs,fun_heap)
 		body_strict _ _ ro fun_defs fun_heap
 			# lazy_args = insert_n_lazy_values_at_beginning (length app_args) NotStrict
 			= (lazy_args,fun_defs,fun_heap)
