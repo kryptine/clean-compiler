@@ -1684,7 +1684,7 @@ wantInstanceDeclaration parseContext pi_pos pState
 		// otherwise // ~ (isIclContext parseContext)
 			| token == CommaToken
 				# (pi_types_and_contexts, pState)	= want_instance_types pState
-				  (idents, pState)		= seqList [stringToIdent class_name (IC_Instance type) \\ (type,context) <- pi_types_and_contexts] pState
+				  (idents, pState)		= mapSt (\ (type,_) -> stringToIdent class_name (IC_Instance type)) pi_types_and_contexts pState
 				= (PD_Instances
 					[ {	pim_pi = { pi_class = pi_class, pi_ident = ident, pi_types = type, pi_context = context
 								 , pi_specials = SP_None, pi_pos = pi_pos},
