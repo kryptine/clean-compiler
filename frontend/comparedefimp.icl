@@ -1,5 +1,6 @@
 implementation module comparedefimp
 
+from StdFunc import return
 import syntax, checksupport, compare_constructor, utilities, compare_types
 
 ::	CompareState =
