@@ -529,7 +529,7 @@ where
 			
 			  tc_class_def = { class_ident = tc_class_name, class_arity = 1, class_args = [class_var], class_context = [],
 			  				   class_members = {{ds_ident = tc_member_name, ds_index = cTCMemberSymbIndex, ds_arity = 0 }}, class_cons_vars = 0,
-			  				   class_fun_dep_vars = 0,
+			  				   class_fun_dep_vars = 0, class_lazy_members = 0,
 							   class_dictionary = { ds_ident = { tc_class_name & id_info = nilPtr }, ds_arity = 0, ds_index = NoIndex }, class_pos = NoPos
 							 }
 	
