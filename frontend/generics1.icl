@@ -708,7 +708,7 @@ buildTypeDefInfo td=:{td_rhs = AbstractType _, td_ident, td_pos} td_module main_
 	# error = reportError td_ident.id_name td_pos "cannot build constructor information for an abstract type" error
 	= buildAlgebraicTypeDefInfo td [] td_module main_module_index predefs funs_and_groups modules heaps error
 
-buildAlgebraicTypeDefInfo {td_ident, td_pos, td_arity} alts td_module main_module_index predefs
+buildAlgebraicTypeDefInfo {td_ident,td_pos,td_arity,td_rhs} alts td_module main_module_index predefs
 				funs_and_groups=:{fg_fun_index=fun_index,fg_group_index=group_index,fg_funs=funs,fg_groups=groups} modules heaps error
 
 	# num_conses = length alts
@@ -756,7 +756,7 @@ where
 	build_type_def_dsc group_index /*cons_info_dss*/ {ds_ident} cons_desc_list_ds heaps
 		# td_name_expr = makeStringExpr td_ident.id_name // gtd_name
 		# td_arity_expr = makeIntExpr td_arity // gtd_arity
-		# num_conses_expr = makeIntExpr (length alts) // gtd_num_conses
+		# num_conses_expr = makeIntExpr (case td_rhs of AlgType alts -> length alts; _ -> 0) // gtd_num_conses
 		# (gtd_conses_expr, heaps) = buildFunApp main_module_index cons_desc_list_ds [] heaps // gtd_conses
 		# (body_expr, heaps) = buildPredefConsApp PD_CGenericTypeDefDescriptor
 			[td_name_expr, td_arity_expr, num_conses_expr, gtd_conses_expr] // TODO: module_name_expr
