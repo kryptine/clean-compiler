@@ -406,6 +406,7 @@ cNameLocationDependent :== True
 	,	gen_type		:: !SymbolType	// Generic type (st_vars include generic type vars)
 	,	gen_vars		:: ![TypeVar]	// Generic type variables
 	,	gen_deps		:: ![GenericDependency]	   // Generic function dependencies
+	,	gen_use_binumap	:: !Bool
 	,	gen_info_ptr	:: !GenericInfoPtr
 	}
 

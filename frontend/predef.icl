@@ -213,9 +213,10 @@ predefined_idents
 					[PD_CGenTypeArrow] = i "GenTypeArrow",
 					[PD_CGenTypeApp] = i "GenTypeApp",
 				
-					[PD_GenericBimap] = i "bimap",
 					[PD_bimapId] = i "bimapId",
-				
+					[PD_GenericBimap] = i "bimap",
+					[PD_GenericBinumap] = i "binumap",
+
 					[PD_TypeGenericDict] = i "GenericDict",
 					[PD_TypeGenericDict0] = i "GenericDict0",
 
@@ -379,7 +380,8 @@ where
 
 		# hash_table = put_predefined_idents_in_hash_table PD_TypeBimap PD_TypeGenericDict0 IC_Type local_predefined_idents hash_table
 		# hash_table = put_predefined_idents_in_hash_table PD_ConsBimap PD_bimapId IC_Expression local_predefined_idents hash_table
-					<<- (local_predefined_idents,	IC_Generic,		PD_GenericBimap)	
+					<<- (local_predefined_idents,	IC_Generic,		PD_GenericBimap)
+					<<- (local_predefined_idents,	IC_Generic,		PD_GenericBinumap)
 		# bimap_type = local_predefined_idents.[PD_TypeBimap]
 		# hash_table = hash_table 
 					<<- (local_predefined_idents, IC_Field bimap_type, PD_map_to)
@@ -527,7 +529,7 @@ where
 			
 			  tc_class_def = { class_ident = tc_class_name, class_arity = 1, class_args = [class_var], class_context = [],
 			  				   class_members = {{ds_ident = tc_member_name, ds_index = cTCMemberSymbIndex, ds_arity = 0 }}, class_cons_vars = 0,
-			  				   class_fun_dep_vars = 0, class_lazy_members = 0,
+			  				   class_fun_dep_vars = 0,
 							   class_dictionary = { ds_ident = { tc_class_name & id_info = nilPtr }, ds_arity = 0, ds_index = NoIndex }, class_pos = NoPos
 							 }
 	

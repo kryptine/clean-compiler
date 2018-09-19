@@ -405,9 +405,9 @@ where
 					#! (args, st) = mapSt  convert args (modules, td_infos, heaps, error)
 					-> (GTSAppCons kind args, st)  
 
-convert_bimap_AType_to_GenTypeStruct :: !AType !Position !PredefinedSymbolsData (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin)
-															 -> (GenTypeStruct, (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin))
-convert_bimap_AType_to_GenTypeStruct type pos {psd_predefs_a} st
+convert_bimap_AType_to_GenTypeStruct :: !AType !Position !Ident !PredefinedSymbolsData (!*Modules,!*TypeDefInfos,!*Heaps,!*ErrorAdmin)
+																	-> (GenTypeStruct, (!*Modules,!*TypeDefInfos,!*Heaps,!*ErrorAdmin))
+convert_bimap_AType_to_GenTypeStruct type pos bimap_ident {psd_predefs_a} st
 	= convert type st
 where
 	convert {at_type=TA type_symb args, at_attribute} st
@@ -426,7 +426,7 @@ where
 	convert {at_type=TB _} st
 		= (GTSAppCons KindConst [], st)  
 	convert {at_type=type} (modules, td_infos, heaps, error)
-		# error = reportError predefined_idents.[PD_GenericBimap].id_name pos ("can not build generic representation for this type", type) error
+		# error = reportError bimap_ident.id_name pos ("can not build generic representation for this type", type) error
 		= (GTSE, (modules, td_infos, heaps, error))
 
 	convert_type_app {type_index=type_index=:{glob_module,glob_object},type_arity} attr args (modules, td_infos, heaps, error)
@@ -1636,7 +1636,7 @@ buildMemberTypeWithPartialDependencies gen_def=:{gen_ident,gen_pos,gen_type,gen_
 
 add_bimap_contexts :: GenericDef *GenericState -> (!SymbolType,!*GenericState)
 add_bimap_contexts 
-		{gen_type=gen_type=:{st_vars, st_context}, gen_vars, gen_info_ptr} 
+		{gen_type=gen_type=:{st_vars, st_context}, gen_vars, gen_use_binumap, gen_info_ptr}
 		gs=:{gs_predefs, gs_varh, gs_genh}
 	#! ({gen_var_kinds}, gs_genh) = readPtr gen_info_ptr gs_genh	
 	#! num_gen_vars = length gen_vars
@@ -1657,9 +1657,10 @@ where
 		= ([z:zs], st) 
 
 	build_context tv kind gs_varh
+		# pd_generic_bi_map = if gen_use_binumap PD_GenericBinumap PD_GenericBimap
 		#! (var_info_ptr, gs_varh) = newPtr VI_Empty gs_varh
-		#! {pds_module, pds_def} = gs_predefs.psd_predefs_a.[PD_GenericBimap]
-		#! pds_ident = predefined_idents.[PD_GenericBimap]
+		#! {pds_module, pds_def} = gs_predefs.psd_predefs_a.[pd_generic_bi_map]
+		#! pds_ident = predefined_idents.[pd_generic_bi_map]
 		# glob_def_sym = 
 			{ glob_module = pds_module
 			, glob_object = {ds_ident=pds_ident, ds_index=pds_def, ds_arity = 1}
@@ -2557,7 +2558,9 @@ where
                 // See functions: specialize_type_var and checkgenerics.check_dependency
 		#! spec_env = [(atv_variable, TVI_Exprs (zip2 [gcf_generic:[gd_index \\ {gd_index} <- gen_deps]] exprs)) \\ {atv_variable} <- td_args & exprs <- generated_arg_exprss]
 		# generic_bimap = psd_predefs_a.[PD_GenericBimap]
-		| gcf_generic.gi_module==generic_bimap.pds_module && gcf_generic.gi_index==generic_bimap.pds_def
+		  generic_binumap = psd_predefs_a.[PD_GenericBinumap]
+		| (gcf_generic.gi_module==generic_bimap.pds_module && gcf_generic.gi_index==generic_bimap.pds_def) ||
+		  (gcf_generic.gi_module==generic_binumap.pds_module && gcf_generic.gi_index==generic_binumap.pds_def)
 
 			// JvG: can probably make special version of simplify_bimap_GenTypeStruct that doesn't simplify if any var occurs, because all vars are passed
 			# (gtr_type, heaps) = simplify_bimap_GenTypeStruct [atv_variable \\ {atv_variable} <- td_args] gtr_type st.ss_heaps
@@ -2578,8 +2581,15 @@ where
 	adapt_specialized_expr :: Position GenericDef GenericTypeRep [Expression] Expression
 						!FunsAndGroups !*Modules !*TypeDefInfos !*Heaps !*ErrorAdmin
 		-> (!Expression,!FunsAndGroups,!*Modules,!*TypeDefInfos,!*Heaps,!*ErrorAdmin)
-	adapt_specialized_expr gc_pos {gen_type, gen_vars, gen_info_ptr} {gtr_iso,gtr_to,gtr_from} original_arg_exprs specialized_expr
+	adapt_specialized_expr gc_pos {gen_type,gen_vars,gen_use_binumap,gen_info_ptr} {gtr_iso,gtr_to,gtr_from} original_arg_exprs specialized_expr
 			funs_and_groups modules td_infos heaps error
+
+		| bimap_module<0 || bimap_index<0
+			# error = reportError gc_ident.id_name gc_pos
+						("cannot specialize because generic function "+++
+						 (if gen_use_binumap "binumap" "bimap")+++" is not imported") error
+			= (EE, funs_and_groups, modules, td_infos, heaps, error)
+
 		#! (var_kinds, heaps) = get_var_kinds gen_info_ptr heaps		
 		#! non_gen_var_kinds = drop (length gen_vars) var_kinds  
 		
@@ -2592,7 +2602,7 @@ where
 		#! curried_gen_type = curry_symbol_type gen_type
 
 		#! (struct_gen_type, (modules, td_infos, heaps, error))
-			= convert_bimap_AType_to_GenTypeStruct curried_gen_type gc_pos predefs (modules, td_infos, heaps, error)  
+			= convert_bimap_AType_to_GenTypeStruct curried_gen_type gc_pos bimap_ident predefs (modules, td_infos, heaps, error)  
 
 		#! (struct_gen_type, heaps) = simplify_bimap_GenTypeStruct gen_vars struct_gen_type heaps
 
@@ -2600,11 +2610,11 @@ where
 		#! (body_expr, funs_and_groups, modules, heaps, error)
 			= adapt_with_specialized_generic_bimap bimap_gi struct_gen_type spec_env bimap_ident gc_pos original_arg_exprs specialized_expr main_module_index predefs 
 						funs_and_groups modules heaps error
-
 		= (body_expr, funs_and_groups, modules, td_infos, heaps, error)
 	where
-		{pds_module = bimap_module, pds_def=bimap_index} = psd_predefs_a.[PD_GenericBimap]
-		bimap_ident = predefined_idents.[PD_GenericBimap]
+		pd_generic_bi_map = if gen_use_binumap PD_GenericBinumap PD_GenericBimap
+		{pds_module = bimap_module, pds_def=bimap_index} = psd_predefs_a.[pd_generic_bi_map]
+		bimap_ident = predefined_idents.[pd_generic_bi_map]
 		
 		get_var_kinds gen_info_ptr heaps=:{hp_generic_heap}
 			#! ({gen_var_kinds}, hp_generic_heap) = readPtr gen_info_ptr hp_generic_heap

@@ -597,7 +597,7 @@ where
 						   )
 					_
 						-> (False, th_vars, modules, type_defs, error)
-		
+
 getTypeDef :: !Index !(Global Index) !v:{#CheckedTypeDef} !w:{#DclModule}
 		-> (!CheckedTypeDef, !v:{#CheckedTypeDef}, !w:{#DclModule})
 getTypeDef x_main_dcl_module_n {glob_module,glob_object} type_defs modules
@@ -3568,8 +3568,9 @@ where
 				<=< adjustPredefSymbol PD_map_to				mod_index (STE_Field type_bimap)
 				<=< adjustPredefSymbol PD_map_from				mod_index (STE_Field type_bimap)
 				<=< adjust_predef_symbols PD_ConsBimap PD_CGenTypeApp mod_index STE_Constructor
+				<=< adjustPredefSymbol PD_bimapId				mod_index STE_DclFunction
 				<=< adjustPredefSymbol PD_GenericBimap			mod_index (STE_Generic -1)
-				<=< adjustPredefSymbol PD_bimapId				mod_index STE_DclFunction				
+				<=< adjustPredefSymbolNoNotDefinedError PD_GenericBinumap mod_index (STE_Generic -1)
 				)
 		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_StdMisc]	
 		| pre_mod.pds_def == mod_index
@@ -3610,13 +3611,19 @@ adjustPredefSymbol predef_index mod_index symb_kind cs=:{cs_symbol_table,cs_erro
 	#! pre_index = determine_index_of_symbol (sreadPtr pre_id.id_info cs_symbol_table) symb_kind
 	| pre_index <> NoIndex
 		= { cs & cs_predef_symbols.[predef_index] = { pds_def = pre_index, pds_module = mod_index }}
-			//---> ("predef_index", predef_index, size predefined_idents)
 		= { cs & cs_error = checkError pre_id " function not defined" cs_error }
-where
-	determine_index_of_symbol {ste_kind, ste_index} symb_kind
-		| ste_kind == symb_kind
-			= ste_index
-			= NoIndex
+
+adjustPredefSymbolNoNotDefinedError predef_index mod_index symb_kind cs=:{cs_symbol_table,cs_error}
+	# pre_id = predefined_idents.[predef_index]
+	#! pre_index = determine_index_of_symbol (sreadPtr pre_id.id_info cs_symbol_table) symb_kind
+	| pre_index <> NoIndex
+		= {cs & cs_predef_symbols.[predef_index] = {pds_def = pre_index, pds_module = mod_index}}
+		= cs
+
+determine_index_of_symbol {ste_kind, ste_index} symb_kind
+	| ste_kind == symb_kind
+		= ste_index
+		= NoIndex
 
 adjustPredefSymbolAndCheckIndex predef_index mod_index symbol_index symb_kind cs=:{cs_symbol_table,cs_error}
 	# pre_id = predefined_idents.[predef_index]

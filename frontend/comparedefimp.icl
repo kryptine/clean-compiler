@@ -240,16 +240,22 @@ where
 		| not copied_from_dcl.[generic_index]
 			# dcl_generic_def = dcl_generic_defs.[generic_index]
 			  (icl_generic_def, icl_generic_defs) = icl_generic_defs![generic_index]
-			  
 			# (ok1, comp_st) = compare dcl_generic_def.gen_type icl_generic_def.gen_type comp_st
+			| not ok1
+				= generic_defs_differ icl_generic_def icl_generic_defs comp_st
 			# (ok2, comp_st) = compare dcl_generic_def.gen_vars icl_generic_def.gen_vars comp_st
-			# (ok3, comp_st) = compare dcl_generic_def.gen_deps icl_generic_def.gen_deps comp_st			
-			| ok1 && ok2 && ok3
+			| not ok2
+				= generic_defs_differ icl_generic_def icl_generic_defs comp_st
+			# (ok3, comp_st) = compare dcl_generic_def.gen_deps icl_generic_def.gen_deps comp_st
+			| not ok3 || dcl_generic_def.gen_use_binumap <> icl_generic_def.gen_use_binumap
+ 				= generic_defs_differ icl_generic_def icl_generic_defs comp_st
 				= (icl_generic_defs, comp_st)
-				# comp_error = compareError generic_def_error (newPosition icl_generic_def.gen_ident icl_generic_def.gen_pos) comp_st.comp_error
-				= (icl_generic_defs, { comp_st & comp_error = comp_error })
 		| otherwise
 			= (icl_generic_defs, comp_st)
+
+	generic_defs_differ icl_generic_def icl_generic_defs comp_st
+		# comp_error = compareError generic_def_error (newPosition icl_generic_def.gen_ident icl_generic_def.gen_pos) comp_st.comp_error
+		= (icl_generic_defs, { comp_st & comp_error = comp_error })
 
 collectGenericCaseDefMacros :: !{#GenericCaseDef} -> [(GenericCaseBody,Int)]
 collectGenericCaseDefMacros dcl_generic_case_defs

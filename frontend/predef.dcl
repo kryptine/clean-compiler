@@ -217,94 +217,95 @@ PD_CGenTypeApp				:== 219
 
 PD_bimapId					:== 220
 PD_GenericBimap				:== 221
+PD_GenericBinumap			:== 222
 
-PD_FromS					:== 222
-PD_FromTS					:== 223
-PD_FromSTS					:== 224
-PD_FromU					:== 225
-PD_FromUTS					:== 226
-PD_FromO					:== 227
+PD_FromS					:== 223
+PD_FromTS					:== 224
+PD_FromSTS					:== 225
+PD_FromU					:== 226
+PD_FromUTS					:== 227
+PD_FromO					:== 228
 
-PD_FromThenS				:== 228
-PD_FromThenTS				:== 229
-PD_FromThenSTS				:== 230
-PD_FromThenU				:== 231
-PD_FromThenUTS				:== 232
-PD_FromThenO				:== 233
+PD_FromThenS				:== 229
+PD_FromThenTS				:== 230
+PD_FromThenSTS				:== 231
+PD_FromThenU				:== 232
+PD_FromThenUTS				:== 233
+PD_FromThenO				:== 234
 
-PD_FromToS					:== 234
-PD_FromToTS					:== 235
-PD_FromToSTS				:== 236
-PD_FromToU					:== 237
-PD_FromToUTS				:== 238
-PD_FromToO					:== 239
+PD_FromToS					:== 235
+PD_FromToTS					:== 236
+PD_FromToSTS				:== 237
+PD_FromToU					:== 238
+PD_FromToUTS				:== 239
+PD_FromToO					:== 240
 
-PD_FromThenToS				:== 240
-PD_FromThenToTS				:== 241
-PD_FromThenToSTS			:== 242
-PD_FromThenToU				:== 243
-PD_FromThenToUTS			:== 244
-PD_FromThenToO				:== 245
+PD_FromThenToS				:== 241
+PD_FromThenToTS				:== 242
+PD_FromThenToSTS			:== 243
+PD_FromThenToU				:== 244
+PD_FromThenToUTS			:== 245
+PD_FromThenToO				:== 246
 
-PD_Dyn__to_TypeCodeConstructor	:== 246
-PD_TypeCodeConstructor :== 247
+PD_Dyn__to_TypeCodeConstructor	:== 247
+PD_TypeCodeConstructor :== 248
 
-PD_TC_Int			:== 248
-PD_TC_Char			:== 249
-PD_TC_Real			:== 250
-PD_TC_Bool			:== 251
-PD_TC_Dynamic		:== 252
-PD_TC_File			:== 253
-PD_TC_World			:== 254
+PD_TC_Int			:== 249
+PD_TC_Char			:== 250
+PD_TC_Real			:== 251
+PD_TC_Bool			:== 252
+PD_TC_Dynamic		:== 253
+PD_TC_File			:== 254
+PD_TC_World			:== 255
 
-PD_TC__Arrow		:== 255
+PD_TC__Arrow		:== 256
 
-PD_TC__List			:== 256
-PD_TC__StrictList	:== 257
-PD_TC__UnboxedList	:== 258
-PD_TC__TailStrictList	:== 259
-PD_TC__StrictTailStrictList	:== 260
-PD_TC__UnboxedTailStrictList	:== 261
+PD_TC__List			:== 257
+PD_TC__StrictList	:== 258
+PD_TC__UnboxedList	:== 259
+PD_TC__TailStrictList	:== 260
+PD_TC__StrictTailStrictList	:== 261
+PD_TC__UnboxedTailStrictList	:== 262
 
-PD_TC__Tuple2		:== 262
-PD_TC__Tuple3		:== 263
-PD_TC__Tuple4		:== 264
-PD_TC__Tuple5		:== 265
-PD_TC__Tuple6		:== 266
-PD_TC__Tuple7		:== 267
-PD_TC__Tuple8		:== 268
-PD_TC__Tuple9		:== 269
-PD_TC__Tuple10		:== 270
-PD_TC__Tuple11		:== 271
-PD_TC__Tuple12		:== 272
-PD_TC__Tuple13		:== 273
-PD_TC__Tuple14		:== 274
-PD_TC__Tuple15		:== 275
-PD_TC__Tuple16		:== 276
-PD_TC__Tuple17		:== 277
-PD_TC__Tuple18		:== 278
-PD_TC__Tuple19		:== 279
-PD_TC__Tuple20		:== 280
-PD_TC__Tuple21		:== 281
-PD_TC__Tuple22		:== 282
-PD_TC__Tuple23		:== 283
-PD_TC__Tuple24		:== 284
-PD_TC__Tuple25		:== 285
-PD_TC__Tuple26		:== 286
-PD_TC__Tuple27		:== 287
-PD_TC__Tuple28		:== 288
-PD_TC__Tuple29		:== 289
-PD_TC__Tuple30		:== 290
-PD_TC__Tuple31		:== 291
-PD_TC__Tuple32		:== 292
+PD_TC__Tuple2		:== 263
+PD_TC__Tuple3		:== 264
+PD_TC__Tuple4		:== 265
+PD_TC__Tuple5		:== 266
+PD_TC__Tuple6		:== 267
+PD_TC__Tuple7		:== 268
+PD_TC__Tuple8		:== 269
+PD_TC__Tuple9		:== 270
+PD_TC__Tuple10		:== 271
+PD_TC__Tuple11		:== 272
+PD_TC__Tuple12		:== 273
+PD_TC__Tuple13		:== 274
+PD_TC__Tuple14		:== 275
+PD_TC__Tuple15		:== 276
+PD_TC__Tuple16		:== 277
+PD_TC__Tuple17		:== 278
+PD_TC__Tuple18		:== 279
+PD_TC__Tuple19		:== 280
+PD_TC__Tuple20		:== 281
+PD_TC__Tuple21		:== 282
+PD_TC__Tuple22		:== 283
+PD_TC__Tuple23		:== 284
+PD_TC__Tuple24		:== 285
+PD_TC__Tuple25		:== 286
+PD_TC__Tuple26		:== 287
+PD_TC__Tuple27		:== 288
+PD_TC__Tuple28		:== 289
+PD_TC__Tuple29		:== 290
+PD_TC__Tuple30		:== 291
+PD_TC__Tuple31		:== 292
+PD_TC__Tuple32		:== 293
 
-PD_TC__LazyArray	:== 293
-PD_TC__StrictArray	:== 294
-PD_TC__UnboxedArray	:== 295
+PD_TC__LazyArray	:== 294
+PD_TC__StrictArray	:== 295
+PD_TC__UnboxedArray	:== 296
 
-PD_TC__Unit			:== 296
+PD_TC__Unit			:== 297
 
-PD_NrOfPredefSymbols		:== 297
+PD_NrOfPredefSymbols		:== 298
 
 GetTupleConsIndex tup_arity :== PD_Arity2TupleSymbol + tup_arity - 2
 GetTupleTypeIndex tup_arity :== PD_Arity2TupleType + tup_arity - 2

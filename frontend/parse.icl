@@ -1910,7 +1910,8 @@ wantGenericDefinition parseContext pos pState
 	# (ident, pState) = stringToIdent name IC_Generic/*IC_Class*/ pState
 	# (member_ident, pState) = stringToIdent name IC_Expression pState
 	# (arg_vars, pState) = wantList "generic variable(s)" try_variable pState
-	# (gen_deps, pState) = optionalDependencies pState
+	  (gen_deps, token, pState) = optionalDependencies pState
+	  (gen_use_binumap, pState) = optionalAsteriskExclamation token pState
 	# pState = wantToken TypeContext "generic definition" DoubleColonToken pState
 	# (type, pState) = wantSymbolType pState
 	# pState = wantEndOfDefinition "generic definition" pState
@@ -1921,13 +1922,14 @@ wantGenericDefinition parseContext pos pState
 		,	gen_vars = arg_vars
 		,	gen_deps = gen_deps                 
 		,	gen_pos = pos
+		,	gen_use_binumap = gen_use_binumap
 		,	gen_info_ptr = nilPtr
 		}
 	= (PD_Generic gen_def, pState)	
 	where
 		want_name pState 
 			# (token, pState) = nextToken TypeContext pState
-			= 	case token of
+			= case token of
 				IdentToken name -> (name, pState)
 				_ -> ("", parseError "generic definition" (Yes token) "<identifier>" pState)
 
@@ -1935,12 +1937,21 @@ wantGenericDefinition parseContext pos pState
 			# (token, pState) = nextToken TypeContext pState
 			= tryTypeVarT token pState
 
-		optionalDependencies :: !ParseState -> (![GenericDependency], !ParseState)
+		optionalDependencies :: !ParseState -> (![GenericDependency], !Token, !ParseState)
 		optionalDependencies pState
 			# (token, pState) = nextToken TypeContext pState
 			= case token of 
-				BarToken -> wantSepList "generic dependencies" CommaToken TypeContext wantDependency pState
-				_ -> ([], tokenBack pState)
+				BarToken
+					# (gen_deps, pState) = wantSepList "generic dependencies" CommaToken TypeContext wantDependency pState
+					  (token, pState) = nextToken TypeContext pState
+					-> (gen_deps, token, pState)
+				_ -> ([], token, pState)
+
+		optionalAsteriskExclamation :: !Token !ParseState -> (!Bool, !ParseState)
+		optionalAsteriskExclamation AsteriskToken pState
+			= (True, wantToken TypeContext "generic definition" ExclamationToken pState)
+		optionalAsteriskExclamation token pState
+			= (False, tokenBack pState)
 
 		wantDependency :: !ParseState -> (Bool, GenericDependency, ParseState)
 		wantDependency pState 
