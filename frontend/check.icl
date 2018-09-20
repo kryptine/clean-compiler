@@ -173,7 +173,8 @@ checkMemberTypes module_index opt_icl_info member_defs type_defs class_defs modu
 where
 	check_class_member module_index opt_icl_info member_index (member_defs, type_defs, class_defs, modules, type_heaps, var_heap, cs)
 		# (member_def=:{me_ident,me_type,me_pos,me_class}, member_defs) = member_defs![member_index]
-		| has_to_be_checked opt_icl_info me_class
+		// prevent crash if dcl module contains more members than icl module
+		| me_class.glob_module<>NoIndex && has_to_be_checked opt_icl_info me_class
 			# position = newPosition me_ident me_pos
 			  cs = { cs & cs_error = setErrorAdmin position cs.cs_error }
 			  (me_type, me_class_vars, type_defs, class_defs, modules, type_heaps, cs)
