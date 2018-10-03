@@ -1271,7 +1271,6 @@ void CodeGeneration (ImpMod imod, char *fname)
 				*update_function_p=NULL;
 				if (first_update_function){
 					while (first_update_function){
-						transform_patterns_to_case_and_guard_nodes (first_update_function->rule_alts);
 #ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
 						determine_failing_cases_and_adjust_ref_counts_of_rule (first_update_function->rule_alts);
 #endif
