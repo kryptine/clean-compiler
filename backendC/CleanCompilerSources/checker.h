@@ -17,7 +17,6 @@ extern SymbDef scc_dependency_list;
 
 SymbDef MakeNewSymbolDefinition (char * module, Ident name, int arity, SDefKind kind);
 char *ConvertSymbolToString (Symbol symb);
-ImpMod ParseAndCheckImplementationModule (char *name);
 void ReadInlineCode (void);
 void InitChecker (void);
 void GenDependencyList (void);
