@@ -115,8 +115,8 @@ extern SymbDef CreateUpdateFunction (ArgS *record_arg,ArgS *first_field_arg,Node
 );
 
 extern SymbDef create_select_function (Symbol selector_symbol,int selector_kind);
-extern SymbDef create_match_function (struct symbol *constructor_symbol,int constructor_arity,int strict_constructor);
-extern SymbDef create_select_and_match_function (struct symbol *constructor_symbol,int strict_constructor);
+extern SymbDef create_match_function (struct symbol *constructor_symbol,int result_arity,int n_dictionaries,int strict_constructor);
+extern SymbDef create_select_and_match_function (struct symbol *constructor_symbol,int n_dictionaries,int strict_constructor);
 
 extern void ReduceArgumentToHnf (NodeId node_id,StateS state,int offset,struct saved_nid_state **save_states_p);
 extern void BindArgs (Args args,int ara,int arb);

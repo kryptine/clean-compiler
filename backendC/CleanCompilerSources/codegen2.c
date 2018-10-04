@@ -6,9 +6,6 @@
 	Version:	1.2
 */
 
-#pragma segment codegen2
-#pragma options (!macsbug_names)
-
 #define FASTER_STRICT_IF /* also in statesgen.c */
 #define DO_LAZY_SELECTORS_FROM_BOXED_STRICT_RECORDS
 #define FREE_STRICT_LHS_TUPLE_ELEMENTS 1 /* also in codegen1.c */
@@ -54,7 +51,7 @@ char notused_string[] = "notused";
 SymbDef ApplyDef,IfDef,SeqDef;
 
 unsigned NewLabelNr,new_not_eq_z_label_n;
-		
+
 StateS StrictOnAState;
 static StateS UnderEvalState,ProcIdState;
 
@@ -4155,19 +4152,25 @@ LabDef selector_m_error_lab = {NULL,"",False,"selector_m_error",0};
 
 void FillMatchNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_id,CodeGenNodeIdsP code_gen_node_ids_p)
 {
-	int symbol_arity_eq_one;
+	int node_arity_eq_one,n_dictionaries;
 	Symbol symbol;
 
 	BuildArgs (node->node_arguments,asp_p,bsp_p,code_gen_node_ids_p);
 
 	symbol=node->node_symbol;
 
-	if (symbol->symb_kind==definition && symbol->symb_def->sdef_kind==CONSTRUCTOR && symbol->symb_def->sdef_arity==1)
-		symbol_arity_eq_one=1;
-	else
-		symbol_arity_eq_one=0;
+	if (symbol->symb_kind==definition && symbol->symb_def->sdef_kind==CONSTRUCTOR){
+		n_dictionaries = symbol->symb_def->sdef_arity - node->node_arity;
+		if (node->node_arity==1)
+			node_arity_eq_one=1;
+		else
+			node_arity_eq_one=0;
+	} else {
+		n_dictionaries=0;
+		node_arity_eq_one=0;
+	}
 
-	if (IsSimpleState (node->node_state) && !(symbol_arity_eq_one && !IsLazyState (node->node_state))){
+	if (IsSimpleState (node->node_state) && !(node_arity_eq_one && !IsLazyState (node->node_state))){
 		int n_arguments,strict_constructor;
 		LabDef name,codelab;
 		SymbDef new_match_sdef;
@@ -4178,8 +4181,8 @@ void FillMatchNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_id,CodeGe
 			if (symbol->symb_def->sdef_strict_constructor)
 				strict_constructor=1;
 			else
-				if (symbol->symb_def->sdef_type->type_nr_of_constructors==1){
-					if (symbol_arity_eq_one){
+				if (symbol->symb_def->sdef_type->type_nr_of_constructors==1 && n_dictionaries==0){
+					if (node_arity_eq_one){
 						LabDef sellab, nsellab;
 
 						BuildLazyTupleSelectorLabel (&nsellab,1,1);
@@ -4204,14 +4207,14 @@ void FillMatchNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_id,CodeGe
 				}
 		}
 
-		if (!symbol_arity_eq_one){
+		if (!node_arity_eq_one){
 #if STRICT_LISTS
 			if (symbol->symb_kind==cons_symb && (symbol->symb_head_strictness>1 || symbol->symb_tail_strictness))
 				strict_constructor=1;
 #endif
-			new_match_sdef=create_match_function (symbol,node->node_arity,strict_constructor);
+			new_match_sdef=create_match_function (symbol,node->node_arity,n_dictionaries,strict_constructor);
 		} else
-			new_match_sdef=create_select_and_match_function (symbol,strict_constructor);
+			new_match_sdef=create_select_and_match_function (symbol,n_dictionaries,strict_constructor);
 	
 		ConvertSymbolToDandNLabel (&name,&codelab,new_match_sdef);
 		
@@ -4295,7 +4298,7 @@ void FillMatchNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_id,CodeGe
 #endif
 		}
 
-		if (symbol_arity_eq_one){
+		if (node_arity_eq_one){
 			demanded_state_array=&node->node_state;
 			demanded_state_arity=1;
 		} else {
@@ -4315,6 +4318,22 @@ void FillMatchNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_id,CodeGe
 			GenReplRArgs (a_size,b_size);
 			*asp_p -= 1-a_size;
 			*bsp_p += b_size;
+
+			if (n_dictionaries!=0){
+				int dictionaries_asize,dictionaries_bsize;
+
+				DetermineSizeOfStates (n_dictionaries,constructor_args_state_p,&dictionaries_asize,&dictionaries_bsize);
+				GenPopA (dictionaries_asize);
+				GenPopB (dictionaries_bsize);
+				*asp_p -= dictionaries_asize;
+				*bsp_p -= dictionaries_bsize;
+
+				a_size-=dictionaries_asize;
+				b_size-=dictionaries_bsize;
+				constructor_args_state_p=&constructor_args_state_p[n_dictionaries];
+
+				arity-=n_dictionaries;
+			}
 
 			AdjustTuple (a_size,b_size,asp_p,bsp_p,arity,demanded_state_array,constructor_args_state_p,a_size,b_size);
 		} else
@@ -4354,7 +4373,38 @@ void FillMatchNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_id,CodeGe
 #endif
 		{
 			*asp_p-=1;
-			UnpackTuple (*asp_p,asp_p,bsp_p,True,demanded_state_arity,demanded_state_array);
+
+			if (n_dictionaries==0)
+				UnpackTuple (*asp_p,asp_p,bsp_p,True,demanded_state_arity,demanded_state_array);
+			else {
+				int arity,aselmts,oldaframesize,locasp,asize,maxasize;
+				StateP argstates;
+
+				/* untested code, probably not used because dictionaries are strict */
+
+				GenReplArgs (symbol->symb_def->sdef_arity,symbol->symb_def->sdef_arity);
+
+				GenPopA (n_dictionaries);
+
+				arity=demanded_state_arity;
+				argstates=demanded_state_array;
+
+				aselmts = 0;
+				locasp = arity;
+				asize = 0;
+				maxasize = arity;
+
+				AddStateSizesAndMaxFrameSizes (arity, argstates, &maxasize, &asize,bsp_p);
+
+				InitAStackConversions (maxasize+1, &oldaframesize);
+
+				EvaluateAndMoveArguments (arity,argstates,&locasp,&aselmts);
+
+				GenAStackConversions (locasp,aselmts);
+
+				FreeAFrameSpace	(oldaframesize);
+				*asp_p += aselmts;
+			}
 		}
 	}	
 }
