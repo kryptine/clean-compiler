@@ -126,15 +126,17 @@ foldlBelongingSymbols f bs st
 				-> foldlArraySt (\{fs_ident} st -> f fs_ident st) fields st 
 			BS_Members members
 				-> foldlArraySt (\{ds_ident} st -> f ds_ident st) members st 
+			BS_MembersAndMacros members macro_members _ default_macros
+				# st = foldlArraySt (\{ds_ident} st -> f ds_ident st) members st
+				# st = foldlArraySt (\{mm_ident} st -> f mm_ident st) macro_members st
+				-> foldlArraySt (\{mm_ident} st -> f mm_ident st) default_macros st
 			BS_Nothing
 				-> st
-/*
-imp_decl_to_string (ID_Function {ii_ident={id_name}}) = "ID_Function "+++toString id_name
-imp_decl_to_string (ID_Class {ii_ident={id_name}} _) = "ID_Class "+++toString id_name
-imp_decl_to_string (ID_Type {ii_ident={id_name}} _) = "ID_Type "+++toString id_name
-imp_decl_to_string (ID_Record {ii_ident={id_name}} _) = "ID_Record "+++toString id_name
-imp_decl_to_string (ID_Instance {ii_ident={id_name}} _ _ ) = "ID_Instance "+++toString id_name
-*/
+
+FoldSt op l st :== fold_st l st
+	where
+		fold_st [|] st		= st
+		fold_st [|a:x] st	= fold_st x (op a st)
 
 getBelongingSymbolsFromImportDeclaration :: !ImportDeclaration -> Optional [Ident]
 getBelongingSymbolsFromImportDeclaration (ID_Class _ x) = x
@@ -342,7 +344,6 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set modules_in_co
 										eimi (bitvectResetAll visited_modules)
 		| found
 			# eii_declaring_modules = foldSt (store_qualified_hidden_belonging belong_nr belonging_declaration) path eii_declaring_modules
-			  (belong_decl, dcl_modules) = get_nth_belonging_decl belong_nr belonging_declaration belonging_symbols position dcl_modules
 			  eimi & eimi_module_path=[]
 			// check if belonging of hidden symbol is imported by another import
 			  (declaration_found, path, eii_declaring_modules, visited_modules)
@@ -351,14 +352,22 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set modules_in_co
 			| declaration_found
 				# eii_declaring_modules = foldSt (store_qualified_hidden_belonging belong_nr belonging_declaration) path eii_declaring_modules
 				// forget belonging of hidden symbol because it is imported by another import
-				= ([QualifiedNotHiddenDeclaration belong_decl:decls_accu], eii_declaring_modules, dcl_modules, visited_modules, cs_error)
+				  (decls_accu,dcl_modules) = add_nth_belonging_hidden_decls belong_nr QualifiedNotHiddenDeclaration
+				  									belonging_symbols belonging_declaration position decls_accu dcl_modules
+				= (decls_accu, eii_declaring_modules, dcl_modules, visited_modules, cs_error)
 
 				# (modules_in_component_with_declaration,eii_declaring_modules,visited_modules)
 					= search_belonging_in_component other_modules_in_component ini_symbol_nr belong_nr belong_ident eimi eii_declaring_modules visited_modules
 				= case modules_in_component_with_declaration of
 					[]
-						-> ([QualifiedHiddenDeclaration belong_decl:decls_accu], eii_declaring_modules, dcl_modules, visited_modules, cs_error)
-					_	-> ([QualifiedSomeNotHiddenDeclaration belong_decl modules_in_component_with_declaration:decls_accu], eii_declaring_modules, dcl_modules, visited_modules, cs_error)
+						# (decls_accu,dcl_modules) = add_nth_belonging_hidden_decls belong_nr QualifiedHiddenDeclaration
+															belonging_symbols belonging_declaration position decls_accu dcl_modules
+						-> (decls_accu, eii_declaring_modules, dcl_modules, visited_modules, cs_error)
+					_
+						# (decls_accu,dcl_modules) = add_nth_belonging_hidden_decls belong_nr
+							(\ belong_decl -> QualifiedSomeNotHiddenDeclaration belong_decl modules_in_component_with_declaration)
+															belonging_symbols belonging_declaration position decls_accu dcl_modules
+						-> (decls_accu, eii_declaring_modules, dcl_modules, visited_modules, cs_error)
 		| need_all
 			# (dcl_modules,cs_error) = belonging_not_exported_error belong_ident eii_ident import_ident position belonging_imported_mod dcl_modules cs_error
 			= (decls_accu, eii_declaring_modules, dcl_modules, visited_modules, cs_error)
@@ -390,8 +399,8 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set modules_in_co
 										eimi (bitvectResetAll visited_modules)
 		| found
 			# eii_declaring_modules = foldSt (store_belonging belong_nr) path eii_declaring_modules
-			  (belong_decl, dcl_modules) = get_nth_belonging_decl belong_nr belonging_declaration belonging_symbols position dcl_modules
-			= ([belong_decl:decls_accu], dcl_modules, eii_declaring_modules, visited_modules, cs_error)
+			  (decls_accu, dcl_modules) = add_nth_belonging_decls position belong_nr belonging_declaration decls_accu dcl_modules
+			= (decls_accu, dcl_modules, eii_declaring_modules, visited_modules, cs_error)
 		| need_all
 			# (dcl_modules,cs_error) = belonging_not_exported_error belong_ident eii_ident import_ident position imported_mod dcl_modules cs_error
 			= (decls_accu, dcl_modules, eii_declaring_modules, visited_modules, cs_error)
@@ -435,20 +444,95 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set modules_in_co
 			No
 				-> ikhInsert` False mod_index (NoDeclarationAndBelongings belonging_declaration (addNr belong_nr EndNumbers)) eii_declaring_modules
 
-	get_nth_belonging_decl :: Int Declaration BelongingSymbols Position v:{#DclModule} -> (!Declaration,!v:{#DclModule});
-	get_nth_belonging_decl belong_nr (Declaration {decl_kind=STE_Imported _ def_mod_index}) (BS_Constructors constructors) position dcl_modules
+	add_nth_belonging_decls :: Position Int !Declaration [Declaration] v:{#DclModule} -> (![Declaration],!v:{#DclModule})
+	add_nth_belonging_decls position belong_nr decl=:(Declaration {decl_kind,decl_ident}) decls_accu dcl_modules
+		# (STE_Imported _ def_mod_index) = decl_kind
+		  (belongin_symbols, dcl_modules) = getBelongingSymbols decl dcl_modules
+		= case belongin_symbols of
+			BS_Constructors constructors
+				# {ds_ident, ds_index} = constructors!!belong_nr
+				-> ([Declaration { decl_ident = ds_ident, decl_pos = position, 
+						decl_kind = STE_Imported STE_Constructor def_mod_index,
+						decl_index = ds_index } : decls_accu], dcl_modules)
+			BS_Fields rt_fields
+				# {fs_ident, fs_index} = rt_fields.[belong_nr]
+				  ({sd_ident}, dcl_modules)
+						= dcl_modules![def_mod_index].dcl_common.com_selector_defs.[fs_index]
+				-> ([Declaration { decl_ident = fs_ident, decl_pos = position, 
+						decl_kind = STE_Imported (STE_Field sd_ident) def_mod_index,
+						decl_index = fs_index } : decls_accu], dcl_modules)
+			BS_Members class_members
+				# {ds_ident, ds_index} = class_members.[belong_nr]
+				-> ([Declaration { decl_ident = ds_ident, decl_pos = position,
+						decl_kind = STE_Imported STE_Member def_mod_index,
+						decl_index = ds_index } : decls_accu], dcl_modules)
+			BS_MembersAndMacros class_members macro_members default_member_indexes default_macros
+				| belong_nr<size class_members
+					# {ds_ident, ds_index} = class_members.[belong_nr]
+					# decl = Declaration { decl_ident = ds_ident, decl_pos = position,
+										   decl_kind = STE_Imported STE_Member def_mod_index,
+										   decl_index = ds_index }
+					| belong_nr>=size default_member_indexes
+						-> ([decl : decls_accu], dcl_modules)
+					# default_macros_index = default_member_indexes.[belong_nr]
+					| default_macros_index<0
+						-> ([decl : decls_accu], dcl_modules)
+						#! {mm_ident,mm_index} = default_macros.[default_macros_index]
+						# macro_decl = Declaration { decl_ident = mm_ident, decl_pos = position,
+													 decl_kind = STE_Imported (STE_DclMacroOrLocalMacroFunction []) def_mod_index,
+													 decl_index = mm_index }
+						-> ([decl,macro_decl : decls_accu], dcl_modules)
+				| belong_nr<size class_members+size macro_members
+					# {mm_ident,mm_index} = macro_members.[belong_nr-size class_members]
+					-> ([Declaration { decl_ident = mm_ident, decl_pos = position,
+							decl_kind = STE_Imported (STE_DclMacroOrLocalMacroFunction []) def_mod_index,
+							decl_index = mm_index } : decls_accu], dcl_modules)
+					# {mm_ident,mm_index} = default_macros.[belong_nr-(size class_members+size macro_members)]
+					-> ([Declaration { decl_ident = mm_ident, decl_pos = position,
+							decl_kind = STE_Imported (STE_DclMacroOrLocalMacroFunction []) def_mod_index,
+							decl_index = mm_index } : decls_accu], dcl_modules)
+
+	add_nth_belonging_hidden_decls :: Int (Declaration->QualifiedAndHiddenDeclaration) !BelongingSymbols !Declaration Position [QualifiedAndHiddenDeclaration] v:{#DclModule} -> (![QualifiedAndHiddenDeclaration],!v:{#DclModule})
+	add_nth_belonging_hidden_decls belong_nr make_qualified_hidden_declaration (BS_Constructors constructors) (Declaration {decl_kind=STE_Imported _ def_mod_index}) position decls_accu dcl_modules
 		# {ds_ident, ds_index} = constructors!!belong_nr
 		  decl_kind = STE_Imported STE_Constructor def_mod_index
-		= (Declaration {decl_ident=ds_ident, decl_pos=position, decl_kind=decl_kind, decl_index=ds_index}, dcl_modules)
-	get_nth_belonging_decl belong_nr (Declaration {decl_kind=STE_Imported _ def_mod_index}) (BS_Fields rt_fields) position dcl_modules
+		#! decl = Declaration {decl_ident=ds_ident, decl_pos=position, decl_kind=decl_kind, decl_index=ds_index}
+		= ([make_qualified_hidden_declaration decl:decls_accu], dcl_modules)
+	add_nth_belonging_hidden_decls belong_nr make_qualified_hidden_declaration (BS_Fields rt_fields) (Declaration {decl_kind=STE_Imported _ def_mod_index}) position decls_accu dcl_modules
 		# {fs_ident, fs_index} = rt_fields.[belong_nr]
 		  ({sd_ident}, dcl_modules) = dcl_modules![def_mod_index].dcl_common.com_selector_defs.[fs_index]
 		  decl_kind = STE_Imported (STE_Field sd_ident) def_mod_index
-		= (Declaration {decl_ident = fs_ident, decl_pos=position, decl_kind=decl_kind, decl_index=fs_index}, dcl_modules)
-	get_nth_belonging_decl belong_nr (Declaration {decl_kind=STE_Imported _ def_mod_index}) (BS_Members class_members) position dcl_modules
+		#! decl = Declaration {decl_ident = fs_ident, decl_pos=position, decl_kind=decl_kind, decl_index=fs_index}
+		= ([make_qualified_hidden_declaration decl:decls_accu], dcl_modules)
+	add_nth_belonging_hidden_decls belong_nr make_qualified_hidden_declaration (BS_Members class_members) (Declaration {decl_kind=STE_Imported _ def_mod_index}) position decls_accu dcl_modules
 		# {ds_ident, ds_index} = class_members.[belong_nr]
 		  decl_kind = STE_Imported STE_Member def_mod_index
-		= (Declaration {decl_ident=ds_ident, decl_pos=position, decl_kind=decl_kind, decl_index=ds_index}, dcl_modules)
+		#! decl = Declaration {decl_ident=ds_ident, decl_pos=position, decl_kind=decl_kind, decl_index=ds_index}
+		= ([make_qualified_hidden_declaration decl:decls_accu], dcl_modules)
+	add_nth_belonging_hidden_decls belong_nr make_qualified_hidden_declaration (BS_MembersAndMacros class_members macro_members default_member_indexes default_macros) (Declaration {decl_kind=STE_Imported _ def_mod_index}) position decls_accu dcl_modules
+		| belong_nr<size class_members
+			# {ds_ident, ds_index} = class_members.[belong_nr]
+			#! decl = Declaration {decl_ident = ds_ident, decl_pos = position,
+								   decl_kind = STE_Imported STE_Member def_mod_index, decl_index = ds_index}
+			| belong_nr>=size default_member_indexes
+				= ([make_qualified_hidden_declaration decl : decls_accu], dcl_modules)
+			# default_macros_index = default_member_indexes.[belong_nr]
+			| default_macros_index<0
+				= ([make_qualified_hidden_declaration decl : decls_accu], dcl_modules)
+				#! {mm_ident,mm_index} = default_macros.[default_macros_index]
+				#! macro_decl = Declaration {decl_ident = mm_ident, decl_pos = position,
+											 decl_kind = STE_Imported (STE_DclMacroOrLocalMacroFunction []) def_mod_index,
+											 decl_index = mm_index}
+				= ([make_qualified_hidden_declaration decl,make_qualified_hidden_declaration macro_decl : decls_accu], dcl_modules)
+		| belong_nr<size class_members+size macro_members
+			# {mm_ident,mm_index} = macro_members.[belong_nr-size class_members]
+			#! decl = Declaration {decl_ident = mm_ident, decl_pos = position,
+								   decl_kind = STE_Imported (STE_DclMacroOrLocalMacroFunction []) def_mod_index, decl_index = mm_index}
+			= ([make_qualified_hidden_declaration decl : decls_accu], dcl_modules)
+			# {mm_ident,mm_index} = default_macros.[belong_nr-(size class_members+size macro_members)]
+			#! decl = Declaration {decl_ident = mm_ident, decl_pos = position,
+								   decl_kind = STE_Imported (STE_DclMacroOrLocalMacroFunction []) def_mod_index, decl_index = mm_index}
+			= ([make_qualified_hidden_declaration decl : decls_accu], dcl_modules)
 
 	get_all_belongs :: Declaration v:{#DclModule} -> (![Ident],!BelongingSymbols,!v:{#DclModule})
 	get_all_belongs decl=:(Declaration {decl_kind,decl_index}) dcl_modules
@@ -460,6 +544,10 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set modules_in_co
 				-> ([fs_ident \\ {fs_ident}<-:rt_fields], belonging_symbols, dcl_modules)
 			BS_Members class_members
 				-> ([ds_ident \\ {ds_ident}<-:class_members], belonging_symbols, dcl_modules)
+			BS_MembersAndMacros class_members macro_members _ default_macros
+				-> ([ds_ident \\ {ds_ident}<-:class_members]
+					++[mm_ident\\{mm_ident}<-:macro_members]
+					++[mm_ident\\{mm_ident}<-:default_macros], belonging_symbols, dcl_modules)
 			BS_Nothing
 				-> ([], belonging_symbols, dcl_modules)
 
@@ -1139,6 +1227,9 @@ instance check_completeness Let where
   		  ) ccs
 
 instance check_completeness MemberDef where
+  	check_completeness {me_type,me_default_implementation=Yes {mm_index},me_class} cci ccs
+		# (macro,ccs) = ccs!box_ccs.ccs_macro_defs.[me_class.glob_module,mm_index];
+		= check_completeness macro cci (check_completeness me_type cci ccs)
   	check_completeness {me_type} cci ccs 
   		= check_completeness me_type cci ccs
 
