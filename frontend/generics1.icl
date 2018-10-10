@@ -1723,7 +1723,8 @@ where
 			me_type_ptr = type_ptr,				// empty
 			me_class_vars = [class_var], 		// the same variable as in the class
 			me_pos = gen_pos,
-			me_priority = NoPrio
+			me_priority = NoPrio,
+			me_default_implementation = No
 			}
 		= (member_def, gs)
 
@@ -1745,6 +1746,7 @@ where
 		    class_context = [], 
 		    class_pos = gen_pos, 
 		    class_members = createArray 1 class_member, 
+		    class_macro_members = {},
 		    class_cons_vars = 0, // dotted class variables
 		    class_dictionary = class_dictionary
 		    }
@@ -2156,7 +2158,7 @@ where
 			 	,	ins_class_ident = {ci_ident=Ident class_ident, ci_arity=1}
 				,	ins_ident 	= class_ident
 				,	ins_type 	= ins_type
-				,	ins_member_types = []
+				,	ins_member_types_and_functions = []
 				,	ins_members	= {{cim_ident=ds_ident,cim_arity=ds_arity,cim_index=ds_index}}
 				,	ins_specials = SP_None
 				,	ins_pos		= gc_pos
@@ -2289,7 +2291,7 @@ where
 		 	,	ins_class_ident = {ci_ident=Ident class_ident, ci_arity=1}
 			,	ins_ident 	= class_ident
 			,	ins_type 	= ins_type
-			,	ins_member_types = []
+			,	ins_member_types_and_functions = []
 			,	ins_members	= {class_instance_member}
 			,	ins_specials = SP_None
 			,	ins_pos		= gc_pos

@@ -2,6 +2,8 @@ definition module comparedefimp
 
 import syntax, checksupport
 
+compare_members_of_exported_classes :: !(Optional {#{#Int}}) !Int !Int !*(CommonDefsR b) !*{#DclModule} !*CheckState -> (!*(CommonDefsR b),!*{#DclModule},!*CheckState)
+
 // compare definition and implementation module
 
 compareDefImp :: !Int !DclModule !(Optional {#Index}) !CopiedDefinitions !Int !*IclModule !*{#*{#FunDef}} !*Heaps !*ErrorAdmin 

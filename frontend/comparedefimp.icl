@@ -3,6 +3,55 @@ implementation module comparedefimp
 from StdFunc import return
 import syntax, checksupport, compare_constructor, utilities, compare_types
 
+compare_members_of_exported_classes :: !(Optional {#{#Int}}) !Int !Int !*(CommonDefsR b) !*{#DclModule} !*CheckState -> (!*(CommonDefsR b),!*{#DclModule},!*CheckState)
+compare_members_of_exported_classes (Yes conversion_table) n_specified_icl_classes n_specified_icl_members icl_common=:{com_class_defs} dcl_modules cs
+	| n_specified_icl_classes==0
+		= (icl_common,dcl_modules,cs)
+	#! main_dcl_module_n=cs.cs_x.x_main_dcl_module_n
+	# class_conversion_table = conversion_table.[cClassDefs]
+	  member_conversion_table = conversion_table.[cMemberDefs]
+	  ({com_class_defs=dcl_class_defs},dcl_modules) = dcl_modules![main_dcl_module_n].dcl_common
+	  (com_class_defs,cs) = check_members_of_exported_classes 0 class_conversion_table member_conversion_table n_specified_icl_classes n_specified_icl_members com_class_defs dcl_class_defs cs
+	= (icl_common,dcl_modules,cs)
+where
+	check_members_of_exported_classes :: !Int !{#Int} !{#Int} !Int !Int !{#ClassDef} !{#ClassDef} !*CheckState -> (!{#ClassDef},!*CheckState)
+	check_members_of_exported_classes dcl_class_index class_conversion_table member_conversion_table n_specified_icl_classes n_specified_icl_members com_class_defs dcl_class_defs cs
+		| dcl_class_index<size class_conversion_table
+			# icl_class_index = class_conversion_table.[dcl_class_index]
+			| icl_class_index>=0 && icl_class_index<n_specified_icl_classes
+				# cs = check_members_of_exported_class icl_class_index dcl_class_index com_class_defs dcl_class_defs n_specified_icl_members member_conversion_table cs
+				= check_members_of_exported_classes (dcl_class_index+1) class_conversion_table member_conversion_table n_specified_icl_classes n_specified_icl_members com_class_defs dcl_class_defs cs
+				= check_members_of_exported_classes (dcl_class_index+1) class_conversion_table member_conversion_table n_specified_icl_classes n_specified_icl_members com_class_defs dcl_class_defs cs
+		= (com_class_defs,cs)
+
+	check_members_of_exported_class :: !Int !Int !{#ClassDef} !{#ClassDef} !Int !{#Int} !*CheckState -> *CheckState
+	check_members_of_exported_class icl_class_index dcl_class_index com_class_defs dcl_class_defs n_specified_icl_members member_conversion_table cs
+		# dcl_class = dcl_class_defs.[dcl_class_index]
+		# icl_class = com_class_defs.[icl_class_index]
+		| size icl_class.class_members<>size dcl_class.class_members
+			# cs_error = checkError "different number of members in class definitions in implementation and definition module" "" (setErrorAdmin (newPosition icl_class.class_ident icl_class.class_pos) cs.cs_error)
+			= {cs & cs_error=cs_error}
+		| size icl_class.class_macro_members<>size dcl_class.class_macro_members
+			# cs_error = checkError "different number of macro members in class definitions in implementation and definition module" "" (setErrorAdmin (newPosition icl_class.class_ident icl_class.class_pos) cs.cs_error)
+			= {cs & cs_error=cs_error}
+			= check_member_names_of_exported_class 0 icl_class.class_members dcl_class.class_members icl_class.class_pos n_specified_icl_members member_conversion_table cs
+
+	check_member_names_of_exported_class :: !Int !{#DefinedSymbol} !{#DefinedSymbol} Position !Int !{#Int} !*CheckState -> *CheckState
+	check_member_names_of_exported_class member_n icl_class_members dcl_class_members icl_class_pos n_specified_icl_members member_conversion_table cs
+		| member_n<size icl_class_members
+			# dcl_index = dcl_class_members.[member_n].ds_index
+			| dcl_index<0 || dcl_index>=size member_conversion_table
+				= check_member_names_of_exported_class (member_n+1) icl_class_members dcl_class_members icl_class_pos n_specified_icl_members member_conversion_table cs
+			# converted_dcl_index = member_conversion_table.[dcl_index];
+			| converted_dcl_index<0 || converted_dcl_index>=n_specified_icl_members
+				# dcl_ident = dcl_class_members.[member_n].ds_ident
+				# cs & cs_error = checkError "member of exported class missing in implementation module" "" (setErrorAdmin (newPosition dcl_ident icl_class_pos) cs.cs_error)
+				= check_member_names_of_exported_class (member_n+1) icl_class_members dcl_class_members icl_class_pos n_specified_icl_members member_conversion_table cs
+			= check_member_names_of_exported_class (member_n+1) icl_class_members dcl_class_members icl_class_pos n_specified_icl_members member_conversion_table cs
+			= cs
+compare_members_of_exported_classes No n_specified_icl_classes n_specified_icl_members icl_common dcl_modules cs
+	= (icl_common,dcl_modules,cs)
+
 ::	CompareState =
 	{	comp_type_var_heap	:: !.TypeVarHeap
 	,	comp_attr_var_heap	:: !.AttrVarHeap
@@ -143,12 +192,20 @@ where
 		# comp_type_var_heap = initialyseTypeVars dcl_class_def.class_args icl_class_def.class_args comp_type_var_heap
 		  comp_st = { comp_st & comp_type_var_heap = comp_type_var_heap }
 		# (ok, comp_st) = compare dcl_class_def.class_context icl_class_def.class_context comp_st
-		| ok
-			# nr_of_dcl_members = size dcl_class_def.class_members
-			| nr_of_dcl_members == size icl_class_def.class_members
-				= compare_array_of_class_members nr_of_dcl_members dcl_class_def.class_members icl_class_def.class_members dcl_member_defs icl_member_defs comp_st
-				= (False, icl_member_defs, comp_st)
+		| not ok
 			= (False, icl_member_defs, comp_st)
+		# nr_of_dcl_members = size dcl_class_def.class_members
+		| nr_of_dcl_members <> size icl_class_def.class_members
+			= (False, icl_member_defs, comp_st)
+		# (ok, icl_member_defs, comp_st) = compare_array_of_class_members nr_of_dcl_members dcl_class_def.class_members icl_class_def.class_members dcl_member_defs icl_member_defs comp_st
+		| not ok
+			= (False, icl_member_defs, comp_st)
+		# n_dcl_class_macro_members = size dcl_class_def.class_macro_members
+		| n_dcl_class_macro_members <> size icl_class_def.class_macro_members
+			= (False, icl_member_defs, comp_st)
+		| sort_clas_macro_members dcl_class_def.class_macro_members <> sort_clas_macro_members icl_class_def.class_macro_members
+			= (False, icl_member_defs, comp_st)
+			= (True, icl_member_defs, comp_st)
 
 	compare_array_of_class_members loc_member_index dcl_members icl_members dcl_member_defs icl_member_defs comp_st
 		| loc_member_index == 0
@@ -162,9 +219,17 @@ where
 			  (icl_member_def, icl_member_defs) = icl_member_defs![glob_member_index]
 			  (ok, comp_st) = compare dcl_member_def.me_type icl_member_def.me_type comp_st
 			| ok && dcl_member_def.me_priority == icl_member_def.me_priority
+				&& compare_default_implementations dcl_member_def.me_default_implementation icl_member_def.me_default_implementation
 				= compare_array_of_class_members loc_member_index dcl_members icl_members dcl_member_defs icl_member_defs comp_st
 				= (False, icl_member_defs, comp_st)
 			= (False, icl_member_defs, comp_st)
+
+	compare_default_implementations No No = True
+	compare_default_implementations (Yes _) (Yes _) = True
+	compare_default_implementations _ _ = False
+
+	sort_clas_macro_members class_macro_members
+		= sort [id_name \\ {mm_ident={id_name}}<-:class_macro_members]
 
 compareInstanceDefs :: !{# Int} !{# ClassInstance} !u:{# ClassInstance} !*{#FunDef} !*CompareState
 											   -> (!u:{# ClassInstance},!*{#FunDef},!*CompareState)
@@ -182,10 +247,10 @@ where
 			# comp_st = instance_def_conflicts_error icl_instance_def.ins_ident icl_instance_def.ins_pos comp_st
 			= (icl_instance_defs,icl_functions, comp_st)
 		# (icl_functions,comp_st)
-			= member_types_equal dcl_instance_def.ins_member_types icl_instance_def.ins_members 0 icl_functions comp_st
+			= member_types_equal dcl_instance_def.ins_member_types_and_functions icl_instance_def.ins_members 0 icl_functions comp_st
 		= (icl_instance_defs,icl_functions,comp_st)
 
-	member_types_equal :: [FunType] {#ClassInstanceMember} Int *{#FunDef} *CompareState -> (!*{#FunDef},!*CompareState)
+	member_types_equal :: [DclInstanceMemberTypeAndFunction] {#ClassInstanceMember} Int *{#FunDef} *CompareState -> (!*{#FunDef},!*CompareState)
 	member_types_equal [] icl_instance_members icl_member_n icl_functions comp_st
 		| icl_member_n<size icl_instance_members
 			# function_index = icl_instance_members.[icl_member_n].cim_index
@@ -195,7 +260,7 @@ where
 				= member_types_equal [] icl_instance_members (icl_member_n+1) icl_functions comp_st
 				= member_types_equal [] icl_instance_members (icl_member_n+1) icl_functions comp_st
 			= (icl_functions,comp_st)
-	member_types_equal [instance_member_type:instance_member_types] icl_instance_members icl_member_n icl_functions comp_st
+	member_types_equal [{dim_type=instance_member_type,dim_function_index}:instance_member_types] icl_instance_members icl_member_n icl_functions comp_st
 		= member_type_and_types_equal instance_member_type instance_member_types icl_instance_members icl_member_n icl_functions comp_st
 	where
 		member_type_and_types_equal instance_member_type=:{ft_ident,ft_type,ft_pos} instance_member_types icl_instance_members icl_member_n icl_functions comp_st

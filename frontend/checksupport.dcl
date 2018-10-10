@@ -121,6 +121,7 @@ local_declaration_for_import :: !u:Declaration .Index -> v:Declaration, [u <= v]
 	=	BS_Constructors ![DefinedSymbol]
 	|	BS_Fields !{#FieldSymbol}
 	|	BS_Members !{#DefinedSymbol}
+	|	BS_MembersAndMacros !{#DefinedSymbol} !{#MacroMember} !{#Int} !{!MacroMember}
 	|	BS_Nothing
 
 getBelongingSymbols :: !Declaration !v:{#DclModule} -> (!BelongingSymbols, !v:{#DclModule})
