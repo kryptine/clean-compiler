@@ -700,6 +700,9 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set modules_in_co
 					# (DeclarationAndBelongings di_decl _) = di
 					| eq_declaration decl di_decl
 						-> eei_dm
+						// there are multiple definitions for this symbol in this module
+						// ignore it, because the compiler already reports this error
+						-> eei_dm
 
 	update_belonging_accu :: Declaration ImportNrAndIdents Int [Belonging] -> [Belonging]
 	update_belonging_accu di_decl ini imported_mod belonging_accu
