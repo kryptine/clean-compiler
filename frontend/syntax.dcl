@@ -944,6 +944,7 @@ cNotVarNumber :== -1
 					| EI_UnmarkedDynamic 		!(Optional DynamicType) ![DynamicPtr]	// in expression
 					| EI_Dynamic 				!(Optional DynamicType) ![DynamicPtr]	// in expression
 					| EI_DynamicType			!DynamicType ![DynamicPtr]				// in pattern
+					| EI_DynamicCopy !ExprInfoPtr !ExprInfo // used in module transform to copy dynamics in macros
 
 		/* Auxiliary, was EI_DynamicType before checking */
 

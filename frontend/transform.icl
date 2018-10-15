@@ -418,9 +418,14 @@ instance unfold DynamicExpr
 where
 	unfold expr=:{dyn_expr, dyn_info_ptr} us=:{us_symbol_heap}
 		# (dyn_info, us_symbol_heap) = readPtr dyn_info_ptr us_symbol_heap
-		# (new_dyn_info_ptr, us_symbol_heap) = newPtr dyn_info us_symbol_heap
-		# (dyn_expr, us) = unfold dyn_expr {us & us_symbol_heap=us_symbol_heap}
-		= ({ expr & dyn_expr = dyn_expr, dyn_info_ptr = new_dyn_info_ptr }, us)
+		= case dyn_info of
+			EI_DynamicCopy new_dyn_ptr dyn_info
+				# (dyn_expr, us) = unfold dyn_expr {us & us_symbol_heap=us_symbol_heap}
+				= ({expr & dyn_expr = dyn_expr, dyn_info_ptr = new_dyn_ptr}, us)
+			_
+				# (new_dyn_info_ptr, us_symbol_heap) = newPtr dyn_info us_symbol_heap
+				# (dyn_expr, us) = unfold dyn_expr {us & us_symbol_heap=us_symbol_heap}
+				= ({expr & dyn_expr = dyn_expr, dyn_info_ptr = new_dyn_info_ptr}, us)
 
 instance unfold Selection
 where
@@ -608,10 +613,18 @@ where
 
 instance unfold DynamicPattern
 where
-	unfold guard=:{dp_var,dp_rhs} us
-		# (dp_var, us) = unfold dp_var us
-		  (dp_rhs, us) = unfold dp_rhs us
-		= ({ guard & dp_var = dp_var, dp_rhs = dp_rhs }, us)
+	unfold guard=:{dp_var,dp_rhs,dp_type} us
+		# (dyn_info, us_symbol_heap) = readPtr dp_type us.us_symbol_heap
+		  us & us_symbol_heap=us_symbol_heap
+		= case dyn_info of
+			EI_DynamicCopy new_dp_type _
+				# (dp_var, us) = unfold dp_var us
+				  (dp_rhs, us) = unfold dp_rhs us
+				= ({guard & dp_var = dp_var, dp_rhs = dp_rhs, dp_type=new_dp_type}, us)
+			_
+				# (dp_var, us) = unfold dp_var us
+				  (dp_rhs, us) = unfold dp_rhs us
+				= ({guard & dp_var = dp_var, dp_rhs = dp_rhs}, us)
 
 instance unfold [a] | unfold a
 where
@@ -789,7 +802,8 @@ where
 		= calls
 
 copy_macro_or_local_macro_function :: !FunDef !(Optional CopiedLocalFunctions) !*VarHeap !*ExpressionHeap -> (!FunDef,!Optional CopiedLocalFunctions,!*VarHeap,!*ExpressionHeap);
-copy_macro_or_local_macro_function macro=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_kind,fun_info={fi_local_vars,fi_calls}} local_macro_functions var_heap expr_heap
+copy_macro_or_local_macro_function macro=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_kind,fun_info={fi_local_vars,fi_calls,fi_dynamics}} local_macro_functions var_heap expr_heap
+	# (new_dynamics,expr_heap) = copy_dynamic_expr_info_ptrs fi_dynamics expr_heap
 	# (tb_args,var_heap) = create_new_arguments tb_args var_heap
 		with
 			create_new_arguments [var=:{fv_ident,fv_info_ptr} : vars] var_heap
@@ -814,8 +828,27 @@ copy_macro_or_local_macro_function macro=:{fun_body = TransformedBody {tb_args,t
 			update_local_vars [] var_heap
 				= ([],var_heap)
 	# fi_calls = update_calls fi_calls us_local_macro_functions
-	= ({macro & fun_body = TransformedBody {tb_args=tb_args,tb_rhs=result_expr},fun_info.fi_local_vars=fi_local_vars,fun_info.fi_calls=fi_calls},us_local_macro_functions,
+	# us_symbol_heap = remove_dynamic_expr_info_ptr_copies fi_dynamics us_symbol_heap
+	= ({macro & fun_body = TransformedBody {tb_args=tb_args,tb_rhs=result_expr},fun_info.fi_local_vars=fi_local_vars,fun_info.fi_calls=fi_calls,fun_info.fi_dynamics=new_dynamics},us_local_macro_functions,
 	   us_var_heap, us_symbol_heap)
+
+copy_dynamic_expr_info_ptrs :: ![ExprInfoPtr] !*ExpressionHeap -> (![ExprInfoPtr],!*ExpressionHeap)
+copy_dynamic_expr_info_ptrs [dyn_ptr:dyn_ptrs] expr_heap
+	# (dyn_info, expr_heap) = readPtr dyn_ptr expr_heap
+	  (new_dyn_ptr,expr_heap) = newPtr dyn_info expr_heap
+	  expr_heap = writePtr dyn_ptr (EI_DynamicCopy new_dyn_ptr dyn_info) expr_heap
+	  (new_dyn_ptrs, expr_heap) = copy_dynamic_expr_info_ptrs dyn_ptrs expr_heap
+	= ([new_dyn_ptr:new_dyn_ptrs],expr_heap)
+copy_dynamic_expr_info_ptrs [] expr_heap
+	= ([],expr_heap)
+
+remove_dynamic_expr_info_ptr_copies :: ![ExprInfoPtr] !*ExpressionHeap -> *ExpressionHeap
+remove_dynamic_expr_info_ptr_copies [dyn_ptr:dyn_ptrs] expr_heap
+	# (EI_DynamicCopy _ dyn_info, expr_heap) = readPtr dyn_ptr expr_heap
+	  expr_heap = writePtr dyn_ptr dyn_info expr_heap
+	= remove_dynamic_expr_info_ptr_copies dyn_ptrs expr_heap
+remove_dynamic_expr_info_ptr_copies [] expr_heap
+	= expr_heap
 
 unfoldMacro :: !FunDef ![Expression] !*ExpandInfo -> (!Expression, !*ExpandInfo)
 unfoldMacro {fun_body =fun_body=: TransformedBody {tb_args,tb_rhs}, fun_info = {fi_calls},fun_kind,fun_ident} args (calls, es=:{es_var_heap,es_expression_heap,es_fun_defs})
