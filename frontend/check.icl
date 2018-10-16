@@ -2242,8 +2242,8 @@ renumber_icl_module_functions mod_type icl_global_function_range icl_instance_ra
 	# n_not_exported_type_funs
 		=	(icl_type_fun_range.ir_to - icl_type_fun_range.ir_from) - n_dcl_type_funs
 	# not_exported_type_fun_range =
-	  	{ ir_from=not_exported_generic_range.ir_to + n_default_exported_class_instances
-		, ir_to = not_exported_generic_range.ir_to + n_default_exported_class_instances + n_not_exported_type_funs
+	  	{ ir_from=not_exported_generic_range.ir_to
+		, ir_to = not_exported_generic_range.ir_to + n_not_exported_type_funs
 		}
 	# icl_generic_ranges = [dcl_gencases, not_exported_generic_range]
 
