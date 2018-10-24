@@ -46,7 +46,7 @@ BEGetVersion (int *current, int *oldestDefinition, int *oldestImplementation)
 #endif
 
 extern PolyList UserDefinedArrayFunctions;	/* typechecker.c */
-extern StdOutReopened, StdErrorReopened;	/* cocl.c */
+extern int StdOutReopened, StdErrorReopened; /* cocl.c */
 
 /*
 	Strings

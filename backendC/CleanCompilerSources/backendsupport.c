@@ -206,7 +206,7 @@ ConvertAlloc (SizeT size)
 		if (size>gBytesLeft){
 			static char s[100];
 			
-			sprintf (s,"ConvertAlloc: size = %d, gBytesLeft = %d",size,gBytesLeft);
+			sprintf (s,"ConvertAlloc: size = %ld, gBytesLeft = %ld",(long)size,gBytesLeft);
 			fatal_backend_error (s);
 		}
 	}
