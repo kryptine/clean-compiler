@@ -954,10 +954,8 @@ static void CodeRule (ImpRuleP rule)
 		++CurrentAltLabel.lab_post;
 
 		CurrentLine=rule->rule_alts->alt_line;
-#if CLEAN2
-		if (FunctionMayFailIsError)
-#endif
-			StaticMessage (FunctionMayFailIsError, "%S", "function may fail", CurrentSymbol);
+		if (FunctionMayFailWarningOrError!=0)
+			StaticMessage (FunctionMayFailWarningOrError==2, "%S", "function may fail", CurrentSymbol);
 
 		MatchError (asize,bsize,rule_sdef,root_node_needed,0);
 	}

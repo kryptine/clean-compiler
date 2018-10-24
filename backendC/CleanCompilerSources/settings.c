@@ -48,4 +48,5 @@ Bool StrictDoEager			= True;
 Bool StrictDoVerbose		= False;
 Bool StrictDoAnnots			= True;
 
-Bool FunctionMayFailIsError	= False;
+int FunctionMayFailWarningOrError = 0; /* 0: ignore, 1: warning, 2: error */
+

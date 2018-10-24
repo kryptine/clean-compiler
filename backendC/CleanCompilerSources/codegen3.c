@@ -944,7 +944,8 @@ static void CodeNormalRootNode (Node root,NodeId rootid,int asp,int bsp,CodeGenN
 
 			case_def_s.sdef_ident = &case_ident_s;
 
-			StaticMessage (FunctionMayFailIsError, "%D", "case may fail", &case_def_s);
+			if (FunctionMayFailWarningOrError!=0)
+				StaticMessage (FunctionMayFailWarningOrError==2, "%D", "case may fail", &case_def_s);
 
 			if (! (IsOnBStack (resultstate) || 
 						(IsSimpleState (resultstate) && resultstate.state_kind==StrictRedirection)))

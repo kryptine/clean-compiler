@@ -137,7 +137,7 @@ Bool CallCompiler (int argc, char **argv)
 	StrictDoAnnots			= False;
 	StrictDepth				= 10;/* 8; */
 
-	FunctionMayFailIsError	= False;
+	FunctionMayFailWarningOrError = 0;
 
 #ifdef CLEAN2
 	StdErrorReopened	= False;
@@ -177,8 +177,10 @@ Bool CallCompiler (int argc, char **argv)
 				DoTimeProfiling=True;
 			else if (strcmp (argv_i,"-wmt") == 0)
 				WriteModificationTimes=True;
+			else if (strcmp (argv_i,"-wmf") == 0)
+				FunctionMayFailWarningOrError=1;
 			else if (strcmp (argv_i,"-emf") == 0)
-				FunctionMayFailIsError=True;
+				FunctionMayFailWarningOrError=2;
 			else if (strcmp (argv_i,"-desc") ==0)
 				DoDescriptors=True;
 			else if (strcmp (argv_i,"-exl") ==0)
