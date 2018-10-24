@@ -46,4 +46,4 @@ extern Bool StrictDoEager;
 extern Bool StrictDoVerbose;
 extern Bool StrictDoAnnots;
 
-extern Bool FunctionMayFailIsError;
+extern int FunctionMayFailWarningOrError;
