@@ -281,7 +281,7 @@ void ConvertTypeToState (TypeNode type,StateS *state_p,StateKind kind)
 		
 		obj_kind=state_p->state_object;
 		if (obj_kind==TupleObj){
-			int i; 
+			int i;
 			TypeArgs arg;
 			
 			SetTupleState (state_p, NewArrayOfStates (type->type_node_arity), type->type_node_arity);
@@ -1816,6 +1816,48 @@ static Bool ArgsInAStrictContext (StateP arg_state_p,Args argn, int local_scope)
 
 int optimise_strict_tuple_result_functions;
 
+static Bool MemberCallInAStrictContext (Node node,int arg_n,unsigned int arg_strictness,int local_scope)
+{
+	struct arg *arg1_p,*arg2_p;
+	struct node *arg1_of_apply_node_p;
+	Bool parallel;
+	
+	parallel=False;
+	
+	node->node_state = StrictState;
+	node->node_state.state_kind = StrictRedirection;
+
+	arg1_p = node->node_arguments;
+	arg1_of_apply_node_p=arg1_p->arg_node;
+	--arg_n;
+	arg2_p = arg1_p->arg_next;
+
+	if (arg1_of_apply_node_p->node_arity==2){ /* node_arity of SelectorNode == 1 */
+		/* arg 1 is apply node */
+
+		AdjustState (&arg1_p->arg_state, StrictState);
+		parallel = MemberCallInAStrictContext (arg1_of_apply_node_p,arg_n,arg_strictness,local_scope);
+	} else {
+		/* arg 1 is SelectorNode */
+		parallel = DetermineStrictArgContext (arg1_p, StrictState, local_scope);
+	}
+
+	if ((arg_strictness & (1<<arg_n)) &&
+		(arg2_p->arg_node->node_kind!=NodeIdNode ||
+		 (arg2_p->arg_node->node_node_id->nid_ref_count_copy>=0 && arg2_p->arg_node->node_node_id->nid_node_def)))
+	{
+		if (DetermineStrictArgContext (arg2_p, StrictState, local_scope))
+			parallel = True;
+	} else
+		if (ShouldDecrRefCount)
+			DecrRefCountCopiesOfArg (arg2_p IF_OPTIMIZE_LAZY_TUPLE_RECURSION(local_scope));
+	
+	if (parallel)
+		node->node_state.state_mark |= STATE_PARALLEL_MASK;
+
+	return parallel;	
+}
+
 static Bool NodeInAStrictContext (Node node,StateS demanded_state,int local_scope)
 {
 	Bool parallel;
@@ -1850,6 +1892,43 @@ static Bool NodeInAStrictContext (Node node,StateS demanded_state,int local_scop
 				SetUnaryState (&node->node_state, StrictOnA, ListObj);
 				break;
 			case apply_symb:
+				if (node->node_arity==2){
+					int n_apply_args;
+					struct arg *arg_p;
+					
+					n_apply_args=1;
+					arg_p = node->node_arguments;
+					while (arg_p!=NULL && arg_p->arg_node->node_arity==2 && arg_p->arg_node->node_kind==NormalNode &&
+						   arg_p->arg_node->node_symbol->symb_kind==apply_symb)
+					{
+						++n_apply_args;
+						arg_p=arg_p->arg_node->node_arguments;
+					}
+					if (arg_p!=NULL && arg_p->arg_node->node_kind==SelectorNode && arg_p->arg_node->node_arity==1 &&
+						(arg_p->arg_node->node_symbol->symb_def->sdef_mark & SDEF_FIELD_HAS_MEMBER_TYPE)!=0)
+					{
+						struct type_alt *member_type_alt;
+						
+						member_type_alt=arg_p->arg_node->node_symbol->symb_def->sdef_member_type_of_field;
+						if (member_type_alt->type_alt_lhs->type_node_arity==n_apply_args+1){
+							int arg_n;
+							unsigned int arg_strictness;
+							struct type_arg *type_arg_p;
+
+							arg_strictness=0;
+							arg_n=0;
+							for_l (type_arg_p,member_type_alt->type_alt_lhs->type_node_arguments->type_arg_next,type_arg_next){
+								if (type_arg_p->type_arg_node->type_node_annotation==StrictAnnot){
+									arg_strictness |= 1<<arg_n;
+								}
+								++arg_n;
+							}
+	
+							return MemberCallInAStrictContext (node,arg_n,arg_strictness,local_scope);
+						}
+					}
+				}
+
 				node->node_state = StrictState;
 				node->node_state.state_kind = StrictRedirection;
 				parallel = DetermineStrictArgContext (node->node_arguments, StrictState, local_scope);
@@ -2708,7 +2787,7 @@ static void DetermineStatesOfNodeAndDefs (Node root_node,NodeDefs node_defs,Stat
 												
 												node_id_p->nid_lhs_state_p_ = determine_unique_state_of_constructor_argument
 																				(&LazyState,type_arg_p->type_arg_node,lhs_type_attribute,node_id_state_p);
-											}						
+											}
 										}
 									} else
 # endif				
