@@ -87,6 +87,11 @@ checkErrorWithPosition ident pos mess error=:{ea_file}
 	# ident_pos = newPosition ident pos
 	= { error & ea_file = ea_file <<< "Error " <<< ident_pos <<< ": " <<< mess <<< '\n', ea_ok = False }
 
+checkStringErrorWithPosition :: !{#Char} !Position !a !*ErrorAdmin -> *ErrorAdmin | <<< a;
+checkStringErrorWithPosition string pos mess error=:{ea_file}
+	# string_pos = stringPosition string pos
+	= { error & ea_file = ea_file <<< "Error " <<< string_pos <<< ": " <<< mess <<< '\n', ea_ok = False }
+
 checkWarningWithPosition :: !Ident !Position !a !*ErrorAdmin -> .ErrorAdmin | <<< a;
 checkWarningWithPosition ident pos mess error=:{ea_file}
 	# ident_pos = newPosition ident pos
