@@ -886,7 +886,7 @@ checkExpression free_vars (PE_Matches case_ident expr pattern position) e_input=
 	# (expr, free_vars, e_state, e_info, cs) = checkExpression free_vars expr e_input e_state e_info cs
 	  {es_fun_defs,es_var_heap,es_expr_heap} = e_state
 	  ps = {ps_var_heap = es_var_heap,ps_fun_defs = es_fun_defs}
-	  cs = pushErrorAdmin (newPosition {id_name="<irrefutable pattern>", id_info=nilPtr} position) cs
+	  cs = pushErrorAdmin (newPosition {id_name="<pattern>", id_info=nilPtr} position) cs
 	  (pattern, (_/*var_env*/, _/*array_patterns*/), {ps_fun_defs,ps_var_heap}, e_info, cs)
 		= checkPattern pattern No { pi_def_level = ei_expr_level, pi_mod_index = ei_mod_index, pi_is_node_pattern = False } ([], []) ps e_info cs
 	  cs = popErrorAdmin cs
