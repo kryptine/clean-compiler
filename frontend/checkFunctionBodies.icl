@@ -134,9 +134,11 @@ checkFunctionBodies :: !FunctionBody !Ident !.ExpressionInput !*ExpressionState 
 checkFunctionBodies (ParsedBody [{pb_args,pb_rhs={rhs_alts,rhs_locals}, pb_position} : bodies]) function_ident_for_errors e_input=:{ei_expr_level,ei_mod_index}
 		e_state=:{es_var_heap, es_fun_defs} e_info cs
 
-	# (aux_patterns, (var_env, array_patterns), {ps_var_heap,ps_fun_defs}, e_info, cs)
+	# cs = pushErrorAdmin (newPosition function_ident_for_errors pb_position) cs
+	  (aux_patterns, (var_env, array_patterns), {ps_var_heap,ps_fun_defs}, e_info, cs)
 			= check_patterns pb_args {pi_def_level = ei_expr_level, pi_mod_index = ei_mod_index, pi_is_node_pattern = False} ([], [])
-							{ps_var_heap = es_var_heap, ps_fun_defs = es_fun_defs} e_info cs
+				{ps_var_heap = es_var_heap, ps_fun_defs = es_fun_defs} e_info cs
+	  cs = popErrorAdmin cs
 	  (rhs_expr, free_vars, e_state, e_info, cs)
 	  		= checkRhs [] rhs_alts rhs_locals e_input { e_state & es_var_heap = ps_var_heap, es_fun_defs = ps_fun_defs } e_info cs
 	  (expr_with_array_selections, free_vars, e_state=:{es_var_heap,es_dynamics=dynamics_in_rhs}, e_info, cs)
@@ -473,7 +475,7 @@ where
 
 	check_sequential_let :: [FreeVar] NodeDefWithLocals ExpressionInput *ExpressionState *ExpressionInfo *CheckState -> *(!Expression,!AuxiliaryPattern,!(![Ident],![ArrayPattern]),![FreeVar],!*ExpressionState,!*ExpressionInfo,!*CheckState);
 	check_sequential_let free_vars {ndwl_def={bind_src,bind_dst},ndwl_locals, ndwl_position} e_input=:{ei_expr_level,ei_mod_index,ei_local_functions_index_offset} e_state e_info cs
-		# cs = pushErrorAdmin (newPosition {id_name="node definition", id_info=nilPtr} ndwl_position) cs
+		# cs = pushErrorAdmin (newPosition {id_name="<node definition>", id_info=nilPtr} ndwl_position) cs
 		  (loc_defs, (loc_env, loc_array_patterns), e_state, e_info, cs) = checkLhssOfLocalDefs ei_expr_level ei_mod_index ndwl_locals ei_local_functions_index_offset e_state e_info cs
 		  (src_expr, free_vars, e_state, e_info, cs) = checkExpression free_vars bind_src e_input e_state e_info cs
 		  (src_expr, free_vars, e_state, e_info, cs)
@@ -660,9 +662,11 @@ where
 												 -> *(CasePatterns,CasePatterns,[(Bind Ident (Ptr VarInfo))],(Optional ((Optional FreeVar),Expression)),[FreeVar],*ExpressionState,*ExpressionInfo,*CheckState)
 	check_case_alt free_vars {calt_pattern,calt_rhs={rhs_alts,rhs_locals},calt_position} patterns pattern_scheme pattern_variables defaul case_name 
 				e_input=:{ei_expr_level,ei_mod_index} e_state=:{es_fun_defs,es_var_heap,es_dynamics=outer_dynamics} e_info cs
-		# (pattern, (var_env, array_patterns), {ps_fun_defs,ps_var_heap}, e_info, cs)
+		# cs = pushErrorAdmin (newPosition {id_name="<case pattern>", id_info=nilPtr} calt_position) cs
+		  (pattern, (var_env, array_patterns), {ps_fun_defs,ps_var_heap}, e_info, cs)
 				= checkPattern calt_pattern No { pi_def_level = ei_expr_level, pi_mod_index = ei_mod_index, pi_is_node_pattern = False } ([], [])
 					{ps_var_heap = es_var_heap,ps_fun_defs = es_fun_defs} e_info cs
+		  cs = popErrorAdmin cs
 		  e_state = { e_state & es_var_heap = ps_var_heap, es_fun_defs = ps_fun_defs, es_dynamics = [] }
 		  (rhs_expr, free_vars, e_state, e_info, cs)
 		  		= checkRhs free_vars rhs_alts rhs_locals e_input e_state e_info cs
@@ -752,7 +756,7 @@ where
 		= ([expr : exprs], free_vars, e_state, e_info, cs)
 
 	check_field_expr :: [FreeVar] (Bind ParsedExpr (Global FieldSymbol)) Int RecordKind ExpressionInput *ExpressionState *ExpressionInfo *CheckState -> *(!.Bind Expression (Global FieldSymbol),![FreeVar],!*ExpressionState,!*ExpressionInfo,!*CheckState);
-	check_field_expr free_vars field=:{bind_src = PE_Empty, bind_dst={glob_object={fs_var,fs_ident,fs_index},glob_module}} field_nr record_kind e_input e_state e_info cs
+	check_field_expr free_vars field=:{bind_src = PE_Empty, bind_dst={glob_object={fs_var,fs_index},glob_module}} field_nr record_kind e_input e_state e_info cs
 		# (expr, free_vars, e_state, e_info, cs)
 			= checkIdentExpression cIsNotInExpressionList free_vars fs_var e_input e_state e_info cs
 		= ({ field & bind_src = expr }, free_vars, e_state, e_info, cs)
@@ -882,8 +886,10 @@ checkExpression free_vars (PE_Matches case_ident expr pattern position) e_input=
 	# (expr, free_vars, e_state, e_info, cs) = checkExpression free_vars expr e_input e_state e_info cs
 	  {es_fun_defs,es_var_heap,es_expr_heap} = e_state
 	  ps = {ps_var_heap = es_var_heap,ps_fun_defs = es_fun_defs}
+	  cs = pushErrorAdmin (newPosition {id_name="<irrefutable pattern>", id_info=nilPtr} position) cs
 	  (pattern, (_/*var_env*/, _/*array_patterns*/), {ps_fun_defs,ps_var_heap}, e_info, cs)
 		= checkPattern pattern No { pi_def_level = ei_expr_level, pi_mod_index = ei_mod_index, pi_is_node_pattern = False } ([], []) ps e_info cs
+	  cs = popErrorAdmin cs
 	| is_single_constructor_pattern pattern
 		= case pattern of
 			AP_Algebraic cons_symbol global_type_index args _
@@ -1006,8 +1012,8 @@ transform_pattern (AP_Algebraic cons_symbol global_type_index args opt_var) patt
 					| global_type_index == alg_type
 						# alg_patterns = alg_patterns_of_AlgebraicPatterns_or_NoPattern patterns
 						-> (AlgebraicPatterns global_type_index [pattern : alg_patterns], pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
-						-> (patterns, pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics,
-									{ cs & cs_error = checkError cons_symbol.glob_object.ds_ident "incompatible types of patterns" cs.cs_error })
+						# cs & cs_error = checkErrorWithOptionalPosition cons_symbol.glob_object.ds_ident pos "incompatible types of patterns" cs.cs_error
+						-> (patterns, pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
 				OverloadedListPatterns (OverloadedList _ _ _ _) _ _
 					| global_type_index.gi_module==cPredefinedModuleIndex
 						# index=global_type_index.gi_index+FirstTypePredefinedSymbolIndex
@@ -1532,6 +1538,16 @@ dcl_fun_is_called_before ste_index mod_index [DclFunCall dcl_fun_mod_index dcl_f
 dcl_fun_is_called_before ste_index mod_index [_:calls]
 	= dcl_fun_is_called_before ste_index mod_index calls
 
+checkErrorWithOptionalPosition ident NoPos error_message cs_error
+	= checkError ident error_message cs_error
+checkErrorWithOptionalPosition ident position error_message cs_error
+	= checkErrorWithPosition ident position error_message cs_error
+
+checkStringErrorWithOptionalPosition string NoPos error_message cs_error
+	= checkError string error_message cs_error
+checkStringErrorWithOptionalPosition string position error_message cs_error
+	= checkStringErrorWithPosition string position error_message cs_error
+
 checkPattern :: !ParsedExpr !(Optional (Bind Ident VarInfoPtr)) !PatternInput !(![Ident], ![ArrayPattern]) !*PatternState !*ExpressionInfo !*CheckState
 									-> (!AuxiliaryPattern, !(![Ident], ![ArrayPattern]), !*PatternState, !*ExpressionInfo, !*CheckState)
 checkPattern (PE_List [exp]) opt_var p_input accus ps e_info cs=:{cs_symbol_table}
@@ -1580,7 +1596,7 @@ checkPattern (PE_List [exp1, exp2 : exps]) opt_var p_input accus ps e_info cs
 			  (pattern, ps, e_info, cs) = buildPattern pi_mod_index kind cons [left,middle_pat] opt_var ps e_info cs
 			  (pattern, ps, e_info, cs) = build_final_pattern pi_mod_index left_args pattern ps e_info cs
 			= (pattern, accus, ps, e_info, cs)
-	 	check_infix_pattern left_args left kind cons prio middle [right] opt_var  p_input=:{pi_mod_index} accus ps e_info cs
+	 	check_infix_pattern left_args left kind cons prio middle [right] opt_var p_input=:{pi_mod_index} accus ps e_info cs
 			# (right_pat, accus, ps, e_info, cs) = checkPattern right No p_input accus ps e_info cs
 			  (right_arg, ps, e_info, cs) = combine_patterns pi_mod_index No [right_pat : middle] [] 0 ps e_info cs
 			  (pattern, ps, e_info, cs) = buildPattern pi_mod_index kind cons [left,right_arg] opt_var ps e_info cs
@@ -1643,9 +1659,9 @@ checkPattern (PE_List [exp1, exp2 : exps]) opt_var p_input accus ps e_info cs
 					| ds_arity == nr_of_args || (case kind of
 												  APK_Macro _ -> True
 												  _ -> False)
-						# (pattern, ps, e_info, cs) = buildPattern mod_index kind constant args opt_var ps e_info cs
-						-> (pattern, ps, e_info, cs)
-						-> (AP_Empty, ps, e_info, { cs & cs_error = checkError ds_ident "used with wrong arity" cs.cs_error})
+						-> buildPattern mod_index kind constant args opt_var ps e_info cs
+						# error_message = "used with wrong arity ("+++toString nr_of_args+++", expected: "+++toString ds_arity+++")"
+						-> (AP_Empty, ps, e_info, { cs & cs_error = checkError ds_ident error_message cs.cs_error})
 				_
 					| nr_of_args == 0
 						-> (first_expr, ps, e_info, cs)
@@ -1831,7 +1847,10 @@ checkPatternConstructor mod_index is_expr_list {ste_index, ste_kind} cons_ident 
 			= (AP_Constant (APK_Constructor global_type_index) cons_symbol cons_priority, ps, e_info, {cs & cs_error = cs_error})
 			| cons_arity == 0
 				= (AP_Algebraic cons_symbol global_type_index [] opt_var, ps, e_info, {cs & cs_error = cs_error})
-				# cs & cs_error = checkError cons_ident "constructor arguments are missing" cs_error
+				# error_message = if (cons_arity==1)
+									"constructor argument is missing"
+									(toString cons_arity+++" constructor arguments are missing")
+				  cs & cs_error = checkError cons_ident error_message cs_error
 				= (AP_Algebraic cons_symbol global_type_index [] opt_var, ps, e_info, cs)
 	| cons_number == -2
 		| is_expr_list
@@ -2054,8 +2073,8 @@ convertSubPattern AP_Empty result_expr pattern_position var_store expr_heap opt_
 	= convertSubPattern (AP_WildCard No) EE pattern_position var_store expr_heap opt_dynamics cs
 
 checkAndTransformPatternIntoBind free_vars [{nd_dst,nd_alts,nd_locals,nd_position} : local_defs] e_input=:{ei_expr_level,ei_mod_index} e_state e_info cs
-	# cs = pushErrorAdmin (newPosition {id_name="node definition", id_info=nilPtr} nd_position) cs
-	# (bind_src, free_vars, e_state, e_info, cs) = checkRhs free_vars nd_alts nd_locals
+	# cs = pushErrorAdmin (newPosition {id_name="<node definition>", id_info=nilPtr} nd_position) cs
+	  (bind_src, free_vars, e_state, e_info, cs) = checkRhs free_vars nd_alts nd_locals
 			{e_input & ei_expr_level = ei_expr_level + 1} e_state e_info cs	
 	  (binds_of_bind, es_var_heap, es_expr_heap, e_info, cs)
 			= transfromPatternIntoBind ei_mod_index ei_expr_level nd_dst bind_src nd_position
@@ -2082,7 +2101,8 @@ transfromPatternIntoBind mod_index def_level (AP_Algebraic cons_symbol=:{glob_mo
 		src_expr position var_store expr_heap e_info=:{ef_type_defs,ef_modules} cs
 	# (src_expr, opt_var_bind, var_store, expr_heap) = bind_opt_var opt_var src_expr position var_store expr_heap
 	| ds_arity == 0
-		= ([], var_store, expr_heap, e_info, { cs & cs_error = checkError ds_ident "constant not allowed in a node pattern" cs.cs_error})
+		# cs & cs_error = checkErrorWithOptionalPosition ds_ident position "constant not allowed in a node pattern" cs.cs_error
+		= ([], var_store, expr_heap, e_info, cs)
 	# (is_tuple, cs) = is_tuple_symbol glob_module ds_index cs
 	| is_tuple
 		# (tuple_var, tuple_bind, var_store, expr_heap) = bind_match_expr src_expr opt_var_bind position def_level var_store expr_heap
@@ -2117,8 +2137,9 @@ transfromPatternIntoBind mod_index def_level (AP_NewType cons_symbol type_index 
 	= (opt_var_bind ++ binds, var_store, expr_heap, e_info, cs)
 transfromPatternIntoBind mod_index def_level (AP_WildCard _) src_expr _ var_store expr_heap e_info cs
 	= ([], var_store, expr_heap, e_info, cs)
-transfromPatternIntoBind _ _ pattern src_expr _ var_store expr_heap e_info cs
-	= ([], var_store, expr_heap, e_info, { cs & cs_error = checkError "<pattern>" "illegal node pattern" cs.cs_error})
+transfromPatternIntoBind _ _ pattern src_expr position var_store expr_heap e_info cs
+	# cs & cs_error = checkStringErrorWithOptionalPosition "<pattern>" position "illegal node pattern" cs.cs_error
+	= ([], var_store, expr_heap, e_info, cs)
 
 transfromPatternIntoStrictBind :: !Index !Level !AuxiliaryPattern !Expression !Position !*VarHeap !*ExpressionHeap !*ExpressionInfo !*CheckState
 	-> *(![LetBind],![LetBind],!*VarHeap, !*ExpressionHeap,  !*ExpressionInfo, !*CheckState)
@@ -2129,7 +2150,8 @@ transfromPatternIntoStrictBind mod_index def_level (AP_Algebraic cons_symbol=:{g
 		src_expr position var_store expr_heap e_info=:{ef_type_defs,ef_modules} cs
 	# (src_expr, src_bind, var_store, expr_heap) = bind_opt_var_or_create_new_var opt_var src_expr position def_level var_store expr_heap
 	| ds_arity == 0
-		= ([],[],var_store, expr_heap, e_info, { cs & cs_error = checkError ds_ident "constant not allowed in a node pattern" cs.cs_error})
+		# cs & cs_error = checkErrorWithOptionalPosition ds_ident position "constant not allowed in a node pattern" cs.cs_error
+		= ([],[],var_store, expr_heap, e_info, cs)
 	# (is_tuple, cs) = is_tuple_symbol glob_module ds_index cs
 	| is_tuple
 		# (lazy_binds,var_store,expr_heap,e_info,cs) = transform_sub_patterns mod_index def_level args ds_cons 0 src_expr [] position var_store expr_heap e_info cs
@@ -2161,8 +2183,9 @@ transfromPatternIntoStrictBind mod_index def_level (AP_NewType cons_symbol type_
 	= (binds,src_bind, var_store, expr_heap, e_info, cs)
 transfromPatternIntoStrictBind mod_index def_level (AP_WildCard _) src_expr _ var_store expr_heap e_info cs
 	= ([],[],var_store, expr_heap, e_info, cs)
-transfromPatternIntoStrictBind _ _ pattern src_expr _ var_store expr_heap e_info cs
-	= ([],[],var_store, expr_heap, e_info, { cs & cs_error = checkError "<pattern>" "illegal node pattern" cs.cs_error})
+transfromPatternIntoStrictBind _ _ pattern src_expr position var_store expr_heap e_info cs
+	# cs & cs_error = checkStringErrorWithOptionalPosition "<pattern>" position "illegal node pattern" cs.cs_error
+	= ([],[],var_store, expr_heap, e_info, cs)
 
 get_type_def mod_index global_type_index=:{gi_module,gi_index} ef_type_defs ef_modules
 	| mod_index == gi_module
