@@ -1137,17 +1137,6 @@ void CodeGeneration (ImpMod imod, char *fname)
 
 		GenerateStatesForRecords (imod->im_symbols);
 
-#if defined (TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS) && !CLEAN2
-		{
-			ImpRuleP rule_p;
-
-			for_l (rule_p,imod->im_rules,rule_next)
-				transform_patterns_to_case_and_guard_nodes (rule_p->rule_alts);
-		}
-#endif
-#if 0
-		PrintRules (imod->im_rules);
-#endif
 		DoStrictnessAnalysis_and_init_ok = DoStrictnessAnalysis && init_strictness_analysis (imod);
 		
 		if (DoStrictnessAnalysis_and_init_ok){

@@ -4130,10 +4130,6 @@ static ImpRuleS **OptimiseRule (ImpRuleS *rule)
 	
 	rule_sdef= CurrentSymbol->symb_def;
 
-#ifndef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
-	transform_patterns_to_case_and_guard_nodes (rule->rule_alts);
-#endif
-
 	alt=rule->rule_alts;
 	CurrentLine = alt->alt_line;
 
