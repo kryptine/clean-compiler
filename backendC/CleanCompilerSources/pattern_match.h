@@ -1,4 +1,3 @@
-extern void transform_patterns_to_case_and_guard_nodes (RuleAltS *alt);
 extern void set_local_reference_counts (struct node *case_node);
 extern void set_global_reference_counts (struct node *case_node);
 extern struct node_id_ref_count_list *new_node_id_ref_count (struct node_id_ref_count_list *node_id_ref_count_list,struct node_id *node_id,int ref_count);
