@@ -3255,7 +3255,7 @@ transformApplication app=:{app_symb=symb=:{symb_kind}, app_args} extra_args
 						readAppInfo _ heap = (EI_Empty,heap)
 				# ti							= {ti & ti_symbol_heap = ti_symbol_heap}
 				# context						= ro.ro_imported_funs.[glob_module].[glob_object].ft_type.st_context
-				# insts							= resolveContext context ei
+				# insts							= resolveContext context ei ro.ro_common_defs
 				# (num_special_args,special_gi)	= findInstInSpecials insts specials
 				| foundSpecial special_gi
 					= build_application {app & app_symb.symb_kind = SK_Function special_gi} (drop num_special_args app_args) extra_args special_gi ti
@@ -5083,17 +5083,21 @@ instance <<< TypeContext
 where
 	(<<<) file co = file <<< co.tc_class <<< " " <<< co.tc_types <<< " <" <<< co.tc_var <<< '>'
 
-resolveContext :: ![TypeContext] ![ExprInfo] -> [[Type]]
-resolveContext [tc:tcs] [EI_DictionaryType t:eis]
-	= minimiseContext tc t ++ resolveContext tcs eis
-resolveContext _ _ = []
+resolveContext :: ![TypeContext] ![ExprInfo] !{#CommonDefs} -> [[Type]]
+resolveContext [tc:tcs] [EI_DictionaryType t:eis] common_defs
+	= minimiseContext tc t common_defs ++ resolveContext tcs eis common_defs
+resolveContext _ _ common_defs
+	= []
 
-minimiseContext {tc_class = TCClass gds} (TA ti ts)
-	# tc_index = {glob_module = gds.glob_module, glob_object = gds.glob_object.ds_index}
-	| tc_index == ti.type_index
+minimiseContext :: !TypeContext !Type !{#CommonDefs} -> [[Type]]
+minimiseContext {tc_class = TCClass gds} (TA ti=:{type_index} ts) common_defs
+	# class_module_index = gds.glob_module
+	# dictionary_index = common_defs.[class_module_index].com_class_defs.[gds.glob_object.ds_index].class_dictionary.ds_index
+	| type_index.glob_module==class_module_index && type_index.glob_object==dictionary_index
 		= [[at_type \\ {at_type} <- ts]]
 		= []
-minimiseContext _ _ = []
+minimiseContext _ _ common_defs
+	= []
 
 findInstInSpecials :: ![[Type]] ![Special] -> (!Int,!Global Int)
 findInstInSpecials insts []
