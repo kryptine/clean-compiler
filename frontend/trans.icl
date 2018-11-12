@@ -5095,7 +5095,7 @@ minimiseContext {tc_class = TCClass gds} (TA ti ts)
 		= []
 minimiseContext _ _ = []
 
-findInstInSpecials :: ![[.Type]] ![.Special] -> .(!Int,!(Global Int))
+findInstInSpecials :: ![[Type]] ![Special] -> (!Int,!Global Int)
 findInstInSpecials insts []
 	= (0,{glob_object= -1,glob_module = -1})
 findInstInSpecials insts [{spec_types,spec_index}:specials]
@@ -5103,9 +5103,13 @@ findInstInSpecials insts [{spec_types,spec_index}:specials]
 		= (length spec_types, spec_index)
 	= findInstInSpecials insts specials
 
+matchTypes :: ![[Type]] ![[Type]] -> Bool
 matchTypes [] [] = True
+matchTypes [[TA ltsi [],_]:ls] [[TA rtsi [],TV _]:rs]
+	// second arg is contexts of special, a TV can only occur as lazy or boxed element of an array or list
+	= rtsi==ltsi && matchTypes ls rs
 matchTypes [l:ls] [r:rs]
-	= l == r && matchTypes ls rs
+	= l==r && matchTypes ls rs
 matchTypes _ _ = False
 
 foundSpecial {glob_object= -1,glob_module = -1}	= False
