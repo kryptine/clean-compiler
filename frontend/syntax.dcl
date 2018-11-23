@@ -1159,8 +1159,8 @@ cNotVarNumber :== -1
 					| TVI_Iso !DefinedSymbol !DefinedSymbol !DefinedSymbol
 					| TVI_GenTypeVarNumber !Int
 					| TVI_TypeVarArgN !Int // type argument number in module backendconvert
-					| TVI_CPSTypeVar !CheatCompiler /* MdM: a pointer to a variable in CleanProverSystem is stored here, using a cast */
 					| TVI_Attr !TypeAttribute
+					| ..
 
 ::	TypeVarInfoPtr	:== Ptr TypeVarInfo
 ::	TypeVarHeap 	:== Heap TypeVarInfo
