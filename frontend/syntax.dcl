@@ -785,7 +785,6 @@ pIsSafe			:== True
 				| VITI_Coercion		CoercionPosition
 				| VITI_PatternType	[AType] /*module*/!Index /*constructor*/!Index VI_TypeInfo
 
-//::	VarInfo  =	VI_Empty | VI_Type !AType !(Optional CoercionPosition) | VI_FAType ![ATypeVar] !AType !(Optional CoercionPosition) |
 ::	VarInfo  =	VI_Empty | VI_Type !AType !VI_TypeInfo |
 				VI_FAType ![ATypeVar] !AType !VI_TypeInfo |
 				VI_FATypeC ![ATypeVar] !AType ![TypeContext] !VI_TypeInfo | VI_FPC |
@@ -820,11 +819,9 @@ pIsSafe			:== True
 				VI_Dictionary !SymbIdent ![Expression] !Type | /* used during fusion */
 				VI_Extended !ExtendedVarInfo !VarInfo |
 				VI_NotUsed |
-// MdM
-				VI_CPSExprVar !CheatCompiler /* a pointer to a variable in CleanProverSystem is stored here, using a cast */
-// ... MdM
-				| VI_Labelled_Empty !{#Char} // RWS debugging
-				| VI_LocalLetVar // RWS, mark Let vars during case transformation
+				VI_Labelled_Empty !{#Char} | // RWS debugging
+				VI_LocalLetVar | // RWS, mark Let vars during case transformation
+				..
 
 ::	TypeCodeVariableInfo
 	= TCI_TypeVar !Expression
