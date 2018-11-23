@@ -3,13 +3,13 @@
 
 	Authors:	Sjaak Smetsers & John van Groningen
 	At:			University of Nijmegen, department of computing science
-	Version:	1.2
 */
 
 #define FASTER_STRICT_IF /* also in statesgen.c */
 #define DO_LAZY_SELECTORS_FROM_BOXED_STRICT_RECORDS
 #define FREE_STRICT_LHS_TUPLE_ELEMENTS 1 /* also in codegen1.c */
 #define SELECTORS_FIRST 1 /* also in codegen.c */
+#define OPTIMIZE_SELECTION_OF_SELECTION_OF_UNBOXED_RECORD_FIELD
 
 #include "compiledefines.h"
 #include "types.t"
@@ -1217,6 +1217,223 @@ void ReplaceRecordByField (StateS recstate,int fieldnr,int *asp_p,int *bsp_p,int
 	*asp_p += *a_size_p - 1;
 }
 
+#ifdef OPTIMIZE_SELECTION_OF_SELECTION_OF_UNBOXED_RECORD_FIELD
+/* yields NULL if coerced to node_state */
+static struct state *FillOrReduceFieldSelection_of_selection_in_single_field_unboxable_record (Node node,SymbDef seldef,int *asp_p,int *bsp_p,CodeGenNodeIdsP code_gen_node_ids_p)
+{
+	Node arg_node;
+	Args arg;
+	int	fieldnr;
+
+	arg=node->node_arguments;
+	fieldnr=seldef->sdef_sel_field_number;
+	arg_node=arg->arg_node;
+	if (arg_node->node_kind!=NodeIdNode){
+		if (IsLazyState (node->node_state)){
+			if (arg_node->node_kind==SelectorNode && arg_node->node_arity==1){
+				SymbDef record_sdef;
+				StateP record_state_p;
+				
+				record_sdef=seldef->sdef_type->type_lhs->ft_symbol->symb_def;
+				record_state_p=&record_sdef->sdef_record_state;
+				if (record_state_p->state_type==RecordState && record_state_p->state_arity==1 && !record_sdef->sdef_boxed_record){
+					int asize,bsize;
+					struct state *record_field_state_p;
+
+					/* record with one field may be unboxed in another record */
+					ArgComment (arg);
+
+					record_field_state_p = FillOrReduceFieldSelection_of_selection_in_single_field_unboxable_record (arg_node,arg_node->node_symbol->symb_def,asp_p,bsp_p,code_gen_node_ids_p);
+					if (record_field_state_p!=NULL){
+						DetermineSizeOfState (*record_field_state_p, &asize, &bsize);
+						if (record_field_state_p->state_type==RecordState){
+							CoerceArgumentOnTopOfStack (asp_p,bsp_p,*record_state_p,*record_field_state_p,asize,bsize);
+							return &record_state_p->state_record_arguments[fieldnr];
+						}
+
+						CoerceArgumentOnTopOfStack (asp_p,bsp_p,arg->arg_state,*record_field_state_p,asize,bsize);
+					} else {
+						DetermineSizeOfState (arg_node->node_state, &asize, &bsize);
+						CoerceArgumentOnTopOfStack (asp_p,bsp_p,arg->arg_state,arg_node->node_state,asize,bsize);
+					}
+				} else
+					BuildArg (arg,asp_p,bsp_p,code_gen_node_ids_p);
+			} else
+				BuildArg (arg,asp_p,bsp_p,code_gen_node_ids_p);
+
+#ifdef DO_LAZY_SELECTORS_FROM_BOXED_STRICT_RECORDS
+			if (!ResultIsNotInRootNormalForm (arg_node->node_state)){
+				int asize,bsize,apos,bpos,tot_asize,tot_bsize;
+				StateP record_state_p;
+			
+				record_state_p=&seldef->sdef_type->type_lhs->ft_symbol->symb_def->sdef_record_state;
+				if (record_state_p->state_type!=RecordState)
+					error_in_function ("FillOrReduceFieldSelection_of_selection_in_single_field_unboxable_record");
+
+				DetermineFieldSizeAndPositionAndRecordSize (fieldnr,&asize,&bsize,&apos,&bpos,&tot_asize,&tot_bsize,record_state_p);
+				
+				GenPushRArgB (0,tot_asize,tot_bsize,bpos+1,bsize);
+				GenReplRArgA (tot_asize,tot_bsize,apos+1,asize);
+				
+				*asp_p -= 1-asize;
+				*bsp_p += bsize;
+				
+				return &record_state_p->state_record_arguments[fieldnr];
+			} else
+#endif
+			BuildOrFillLazyFieldSelector (seldef,node->node_state.state_kind,asp_p,NULL);
+		} else {
+			int asize,bsize,apos,bpos,tot_asize,tot_bsize;
+			StateP record_state_p;
+
+			record_state_p=&seldef->sdef_type->type_lhs->ft_symbol->symb_def->sdef_record_state;
+
+			Build (arg_node,asp_p,bsp_p,code_gen_node_ids_p);
+
+			DetermineFieldSizeAndPositionAndRecordSize (fieldnr,&asize,&bsize,&apos,&bpos,&tot_asize,&tot_bsize,record_state_p);
+			CoerceArgumentOnTopOfStack (asp_p,bsp_p,*record_state_p,arg_node->node_state,tot_asize,tot_bsize);
+
+			ReplaceRecordOnTopOfStackByField (asp_p,bsp_p,apos,bpos,asize,bsize,tot_asize,tot_bsize);
+			
+			return &record_state_p->state_record_arguments[fieldnr];
+		}
+	} else {
+		StateS recstate;
+		NodeId arg_node_id;
+		
+		arg_node_id=arg_node->node_node_id;
+		recstate=arg_node_id->nid_state;
+		if (recstate.state_type==RecordState){
+			int a_size,b_size,apos,bpos,record_a_index,record_b_index;
+			StateP field_state_p;
+
+			DetermineFieldSizeAndPosition (fieldnr,&a_size,&b_size,&apos,&bpos,recstate.state_record_arguments);
+			
+			if (arg_node_id->nid_refcount<0 && arg_node_id->nid_node!=NULL){
+				ArgS *args;
+				
+				args=arg_node_id->nid_node->node_arguments;
+				record_a_index=get_a_index_of_unpacked_lhs_node (args);				
+				record_b_index=get_b_index_of_unpacked_lhs_node (args);
+			} else {
+				record_a_index=arg_node_id->nid_a_index;
+				record_b_index=arg_node_id->nid_b_index;
+			}
+
+			field_state_p=&recstate.state_record_arguments[fieldnr];
+
+			/* maybe better way than calling CopyArgument with identical demanded and offered state ? */
+			CopyArgument (*field_state_p,*field_state_p,record_a_index-apos,record_b_index-bpos,asp_p,bsp_p,a_size,b_size,True);
+
+			decrement_reference_count_of_node_id (arg_node_id,&code_gen_node_ids_p->free_node_ids);
+			
+			return field_state_p;
+		} else if (IsLazyState (node->node_state)){
+#ifdef DO_LAZY_SELECTORS_FROM_BOXED_STRICT_RECORDS
+			if ((recstate.state_kind==StrictOnA || recstate.state_kind==StrictRedirection)){
+				int asize,bsize,apos,bpos,tot_asize,tot_bsize,recindex;
+				SymbDef record_sdef;
+				StateP record_state_p;
+			
+				recindex = arg_node_id->nid_a_index;
+				record_sdef=seldef->sdef_type->type_lhs->ft_symbol->symb_def;
+				record_state_p=&record_sdef->sdef_record_state;
+
+				if (record_state_p->state_type!=RecordState)
+					error_in_function ("FillOrReduceFieldSelection_of_selection_in_single_field_unboxable_record");
+
+				DetermineFieldSizeAndPositionAndRecordSize (fieldnr,&asize,&bsize,&apos,&bpos,&tot_asize,&tot_bsize,record_state_p);
+# if BOXED_RECORDS
+ 				if (record_sdef->sdef_boxed_record && (arg_node_id->nid_mark2 & (NID_RECORD_USED_BY_UPDATE | NID_RECORD_USED_BY_NON_SELECTOR_OR_UPDATES))==NID_RECORD_USED_BY_UPDATE
+					&&
+					(((arg_node_id->nid_state.state_mark & STATE_UNIQUE_MASK)!=0
+/*
+					&&
+					(arg_node_id->nid_refcount==-2 || ((arg_node_id->nid_mark2 & NID_HAS_REFCOUNT_WITHOUT_UPDATES)!=0 && arg_node_id->nid_number== -1))
+*/
+					)
+					||
+					((arg_node_id->nid_mark2 & NID_SELECTION_NODE_ID)==0
+					  ?	(arg_node_id->nid_refcount>=0 && arg_node_id->nid_node->node_kind==NodeIdNode && 
+						 (arg_node_id->nid_node->node_node_id->nid_mark2 & (NID_SELECTION_NODE_ID | NID_RECORD_USED_BY_NON_SELECTOR_OR_UPDATES))==NID_SELECTION_NODE_ID)
+					  :	(arg_node_id->nid_mark2 & (NID_SELECTION_NODE_ID | NID_RECORD_USED_BY_NON_SELECTOR_OR_UPDATES))==NID_SELECTION_NODE_ID
+					  )
+					)
+				){
+					GenPushRArgU (*asp_p-recindex,tot_asize,tot_bsize,apos+1,asize,bpos+1,bsize);
+				} else
+# endif
+				{
+					GenPushRArgB (*asp_p-recindex,tot_asize,tot_bsize,bpos+1,bsize);
+					GenPushRArgA (*asp_p-recindex,tot_asize,tot_bsize,apos+1,asize);
+				}
+				
+				*asp_p+=asize;
+				*bsp_p+=bsize;
+				
+				decrement_reference_count_of_node_id (arg_node_id,&code_gen_node_ids_p->free_node_ids);
+				
+				return &record_state_p->state_record_arguments [fieldnr];
+			} else
+#endif
+			{
+				BuildArg (arg,asp_p,bsp_p,code_gen_node_ids_p);
+				
+				BuildOrFillLazyFieldSelector (seldef,node->node_state.state_kind,asp_p,NULL);
+			}
+		} else {
+			int a_size,b_size,apos, bpos, tot_asize, tot_bsize,recindex;
+			SymbDef record_sdef;
+
+			/* the selector is strict but the record is not */
+			recindex = arg_node_id->nid_a_index;
+
+			if (ResultIsNotInRootNormalForm (recstate)){
+				GenJsrEval (*asp_p-recindex);
+				ChangeEvalStatusKindToStrictOnA (arg_node_id,code_gen_node_ids_p->saved_nid_state_l);
+				
+				recstate.state_kind = StrictOnA;
+			}
+
+			record_sdef=seldef->sdef_type->type_lhs->ft_symbol->symb_def;
+			DetermineFieldSizeAndPositionAndRecordSize (fieldnr,&a_size,&b_size,&apos, &bpos,&tot_asize,&tot_bsize,&record_sdef->sdef_record_state);
+# if BOXED_RECORDS
+			if (record_sdef->sdef_boxed_record && (arg_node_id->nid_mark2 & (NID_RECORD_USED_BY_UPDATE | NID_RECORD_USED_BY_NON_SELECTOR_OR_UPDATES))==NID_RECORD_USED_BY_UPDATE
+				&&
+				((	(arg_node_id->nid_state.state_mark & STATE_UNIQUE_MASK)!=0
+/*					&&
+					(arg_node_id->nid_refcount==-2 || ((arg_node_id->nid_mark2 & NID_HAS_REFCOUNT_WITHOUT_UPDATES)!=0 && arg_node_id->nid_number== -1))
+*/
+				)
+				||
+				((arg_node_id->nid_mark2 & NID_SELECTION_NODE_ID)==0
+				  ?	(arg_node_id->nid_refcount>=0 && arg_node_id->nid_node->node_kind==NodeIdNode && 
+						 (arg_node_id->nid_node->node_node_id->nid_mark2 & (NID_SELECTION_NODE_ID | NID_RECORD_USED_BY_NON_SELECTOR_OR_UPDATES))==NID_SELECTION_NODE_ID)
+					  :	(arg_node_id->nid_mark2 & (NID_SELECTION_NODE_ID | NID_RECORD_USED_BY_NON_SELECTOR_OR_UPDATES))==NID_SELECTION_NODE_ID
+					  )
+				)
+			){
+				GenPushRArgU (*asp_p-recindex,tot_asize,tot_bsize,apos+1,a_size,bpos+1,b_size);
+			} else
+# endif
+			{
+				GenPushRArgB (*asp_p-recindex, tot_asize, tot_bsize, bpos+1,b_size);
+				GenPushRArgA (*asp_p-recindex, tot_asize, tot_bsize, apos+1,a_size);
+			}
+			
+			*asp_p+=a_size;
+			*bsp_p+=b_size;
+
+			decrement_reference_count_of_node_id (arg_node_id,&code_gen_node_ids_p->free_node_ids);
+			
+			return &record_sdef->sdef_record_state.state_record_arguments[fieldnr];
+		}
+	}
+
+	return NULL;
+}
+#endif
+
 static void FillOrReduceFieldSelection (Node node,SymbDef seldef,int *asp_p,int *bsp_p,NodeId update_node_id,CodeGenNodeIdsP code_gen_node_ids_p)
 {
 	Node arg_node;
@@ -1335,6 +1552,43 @@ static void FillOrReduceFieldSelection (Node node,SymbDef seldef,int *asp_p,int 
 
 	if (arg_node->node_kind!=NodeIdNode){
 		if (IsLazyState (node->node_state)){
+
+#ifdef OPTIMIZE_SELECTION_OF_SELECTION_OF_UNBOXED_RECORD_FIELD
+			if (arg_node->node_kind==SelectorNode && arg_node->node_arity==1 && update_node_id==NULL){
+				SymbDef record_sdef;
+				StateP record_state_p;
+				
+				record_sdef=seldef->sdef_type->type_lhs->ft_symbol->symb_def;
+				record_state_p=&record_sdef->sdef_record_state;
+				if (record_state_p->state_type==RecordState && record_state_p->state_arity==1 && !record_sdef->sdef_boxed_record){
+					int asize,bsize;
+					struct state *record_field_state_p;
+
+					/* record with one field may be unboxed in another record */
+					ArgComment (arg);
+
+					record_field_state_p = FillOrReduceFieldSelection_of_selection_in_single_field_unboxable_record (arg_node,arg_node->node_symbol->symb_def,asp_p,bsp_p,code_gen_node_ids_p);
+					if (record_field_state_p!=NULL){
+						DetermineSizeOfState (*record_field_state_p, &asize, &bsize);						
+						if (record_field_state_p->state_type==RecordState){
+							CoerceArgumentOnTopOfStack (asp_p,bsp_p,*record_state_p,*record_field_state_p,asize,bsize);
+							DetermineSizeOfState (record_state_p->state_record_arguments[fieldnr], &asize, &bsize);
+							CoerceArgumentOnTopOfStack (asp_p,bsp_p,node->node_state,record_state_p->state_record_arguments[fieldnr],asize,bsize);
+							
+							if (node->node_state.state_kind==OnA)
+								node->node_state.state_kind=StrictOnA;
+
+							return;
+						}
+						CoerceArgumentOnTopOfStack (asp_p,bsp_p,arg->arg_state,*record_field_state_p,asize,bsize);
+					} else {
+						DetermineSizeOfState (arg_node->node_state, &asize, &bsize);
+						CoerceArgumentOnTopOfStack (asp_p,bsp_p,arg->arg_state,arg_node->node_state,asize,bsize);
+					}
+				} else
+					BuildArg (arg,asp_p,bsp_p,code_gen_node_ids_p);
+			} else
+#endif
 			BuildArg (arg,asp_p,bsp_p,code_gen_node_ids_p);
 
 #ifdef DO_LAZY_SELECTORS_FROM_BOXED_STRICT_RECORDS
@@ -1343,7 +1597,6 @@ static void FillOrReduceFieldSelection (Node node,SymbDef seldef,int *asp_p,int 
 				StateP record_state_p,field_state_p;
 			
 				record_state_p=&seldef->sdef_type->type_lhs->ft_symbol->symb_def->sdef_record_state;
-
 				if (record_state_p->state_type!=RecordState)
 					error_in_function ("FillOrReduceFieldSelection");
 
@@ -1446,9 +1699,7 @@ static void FillOrReduceFieldSelection (Node node,SymbDef seldef,int *asp_p,int 
 # if BOXED_RECORDS
  				if (record_sdef->sdef_boxed_record && (arg_node_id->nid_mark2 & (NID_RECORD_USED_BY_UPDATE | NID_RECORD_USED_BY_NON_SELECTOR_OR_UPDATES))==NID_RECORD_USED_BY_UPDATE
 					&&
-#  if 1
-					((
-					(arg_node_id->nid_state.state_mark & STATE_UNIQUE_MASK)!=0
+					(((arg_node_id->nid_state.state_mark & STATE_UNIQUE_MASK)!=0
 /*
 					&&
 					(arg_node_id->nid_refcount==-2 || ((arg_node_id->nid_mark2 & NID_HAS_REFCOUNT_WITHOUT_UPDATES)!=0 && arg_node_id->nid_number== -1))
@@ -1461,12 +1712,6 @@ static void FillOrReduceFieldSelection (Node node,SymbDef seldef,int *asp_p,int 
 					  :	(arg_node_id->nid_mark2 & (NID_SELECTION_NODE_ID | NID_RECORD_USED_BY_NON_SELECTOR_OR_UPDATES))==NID_SELECTION_NODE_ID
 					  )
 					)
-#  else
-					 ((arg_node_id->nid_mark2 & NID_SELECTION_NODE_ID)==0
-					  ?	(arg_node_id->nid_refcount>=0 && arg_node_id->nid_node->node_kind==NodeIdNode && 
-						 (arg_node_id->nid_node->node_node_id->nid_mark & NID_SHARED_SELECTION_NODE_ID)==0)
-					  :	(arg_node_id->nid_mark & NID_SHARED_SELECTION_NODE_ID)==0)
-#  endif
 				){
 					GenPushRArgU (*asp_p-recindex,tot_asize,tot_bsize,apos+1,asize,bpos+1,bsize);
 				} else
@@ -1509,18 +1754,11 @@ static void FillOrReduceFieldSelection (Node node,SymbDef seldef,int *asp_p,int 
 			}
 
 			record_sdef=seldef->sdef_type->type_lhs->ft_symbol->symb_def;
-			DetermineFieldSizeAndPositionAndRecordSize (fieldnr,&a_size,&b_size,&apos, &bpos,&tot_asize,&tot_bsize,
-#if 1
-				&record_sdef->sdef_record_state);
-#else
-				&arg->arg_state);
-#endif
+			DetermineFieldSizeAndPositionAndRecordSize (fieldnr,&a_size,&b_size,&apos, &bpos,&tot_asize,&tot_bsize,&record_sdef->sdef_record_state);
 # if BOXED_RECORDS
 			if (record_sdef->sdef_boxed_record && (arg_node_id->nid_mark2 & (NID_RECORD_USED_BY_UPDATE | NID_RECORD_USED_BY_NON_SELECTOR_OR_UPDATES))==NID_RECORD_USED_BY_UPDATE
 				&&
-#  if 1
-				((
-					(arg_node_id->nid_state.state_mark & STATE_UNIQUE_MASK)!=0
+				((	(arg_node_id->nid_state.state_mark & STATE_UNIQUE_MASK)!=0
 /*					&&
 					(arg_node_id->nid_refcount==-2 || ((arg_node_id->nid_mark2 & NID_HAS_REFCOUNT_WITHOUT_UPDATES)!=0 && arg_node_id->nid_number== -1))
 */
@@ -1532,12 +1770,6 @@ static void FillOrReduceFieldSelection (Node node,SymbDef seldef,int *asp_p,int 
 					  :	(arg_node_id->nid_mark2 & (NID_SELECTION_NODE_ID | NID_RECORD_USED_BY_NON_SELECTOR_OR_UPDATES))==NID_SELECTION_NODE_ID
 					  )
 				)
-#  else
-				((arg_node_id->nid_mark2 & NID_SELECTION_NODE_ID)==0
-				  ?	(arg_node_id->nid_refcount>=0 && arg_node_id->nid_node->node_kind==NodeIdNode && 
-					 (arg_node_id->nid_node->node_node_id->nid_mark & NID_SHARED_SELECTION_NODE_ID)==0)
-				  :	(arg_node_id->nid_mark & NID_SHARED_SELECTION_NODE_ID)==0)
-#  endif
 			){
 				GenPushRArgU (*asp_p-recindex,tot_asize,tot_bsize,apos+1,a_size,bpos+1,b_size);
 			} else
@@ -1550,12 +1782,7 @@ static void FillOrReduceFieldSelection (Node node,SymbDef seldef,int *asp_p,int 
 			*asp_p+=a_size;
 			*bsp_p+=b_size;
 			
-			CoerceArgumentOnTopOfStack (asp_p,bsp_p, node->node_state, 
-#if 1
-				record_sdef->sdef_record_state.state_record_arguments [fieldnr],a_size,b_size);			
-#else
-				arg->arg_state.state_record_arguments [fieldnr],a_size,b_size);			
-#endif
+			CoerceArgumentOnTopOfStack (asp_p,bsp_p, node->node_state,record_sdef->sdef_record_state.state_record_arguments [fieldnr],a_size,b_size);
 			decrement_reference_count_of_node_id (arg_node_id,&code_gen_node_ids_p->free_node_ids);
 		}
 	}
