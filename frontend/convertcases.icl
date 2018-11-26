@@ -1752,12 +1752,12 @@ where
 		store_VI_FreeVar_in_dictionary_vars_and_save_old_values [] old_fv_info_ptr_values var_heap
 			= (old_fv_info_ptr_values,var_heap)
 
-		retrieve_dictionary_variables cp_free_vars cp_var_heap
-			= foldSt retrieve_dictionary_variable cp_free_vars ([], cp_var_heap)
-		where
-			retrieve_dictionary_variable ({fv_info_ptr}, type) (free_typed_vars, var_heap)
-				# (VI_FreeVar name new_ptr count type, var_heap) = readPtr fv_info_ptr var_heap
-				= ([({fv_def_level = NotALevel, fv_ident = name, fv_info_ptr = new_ptr, fv_count = count}, type) : free_typed_vars], var_heap)
+		retrieve_dictionary_variables [({fv_info_ptr}, type):cp_free_vars] var_heap
+			# (free_typed_vars, var_heap) = retrieve_dictionary_variables cp_free_vars var_heap
+			  (VI_FreeVar name new_ptr count type, var_heap) = readPtr fv_info_ptr var_heap
+			= ([({fv_def_level=NotALevel, fv_ident=name, fv_info_ptr=new_ptr, fv_count=count}, type) : free_typed_vars], var_heap)
+		retrieve_dictionary_variables [] cp_var_heap
+			= ([],cp_var_heap)
 	convertCases ci expr cs
 		= (expr, cs)
 
