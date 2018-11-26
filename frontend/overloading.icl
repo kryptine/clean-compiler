@@ -1719,27 +1719,7 @@ where
 	matchExpandedFunDepTypes (TV tv) type defs type_heaps substc
 		= matchExpandedFunDepTVandType tv type defs type_heaps substc
 	matchExpandedFunDepTypes instance_type (TempV tv_number) defs type_heaps substc
-		# (ok, instance_type, type_heaps, substc) = addNewTypeVarsInSubstFunDepType instance_type defs type_heaps substc
-		| ok // && True ---> ("matchExpandedFunDepTypes",tv_number,instance_type)
-			| isIndirection substc.substc_array.[tv_number]
-				= abort "matchExpandedFunDepTypes TempV" // impossible because expandOneStepC expands the TempV
-			| is_var tv_number instance_type substc.substc_array
-				= (True,type_heaps,substc)
-			// could also do this contains check in addNewTypeVarsInSubstFunDepType
-			| containsTypeVariable tv_number instance_type substc.substc_array
-				= (False,type_heaps,substc)
-				# substc & substc_changes = [#tv_number:substc.substc_changes!], substc_array.[tv_number] = instance_type
-				= (True,type_heaps,substc)
-			= (False,type_heaps,substc)
-		where
-			is_var tv_number (TempV tv_number2) subst_array
-				= case subst_array.[tv_number2] of
-					TE
-						-> tv_number2==tv_number
-					instance_type
-						-> is_var tv_number instance_type subst_array
-			is_var tv_number instance_type subst_array
-				= False
+		= matchExpandedFunDepTypeAndTV instance_type tv_number defs type_heaps substc
 	matchExpandedFunDepTypes (TempV tv_number) type defs type_heaps substc
 		# (instance_type,substc) = substc!substc_array.[tv_number]
 		= case instance_type of
@@ -1806,8 +1786,52 @@ where
 		# (succ, type2, type_heaps) = tryToExpandTypeSyn defs type2 cons_id cons_args type_heaps
 		| succ
 			= matchFunDepTypes type1 type2 defs type_heaps substc
+	matchExpandedFunDepTypes type1=:(TA type_cons types1) type2=:(TempCV tv_n :@: types2) defs type_heaps substc
+		# (succ, type1e, type_heaps) = tryToExpandTypeSyn defs type1 type_cons types1 type_heaps
+		| succ
+			= matchExpandedFunDepTypes type1e type2 defs type_heaps substc
+			# diff = type_cons.type_arity - length types2
+			| diff>=0
+				# (matched, type_heaps, substc)
+					= matchExpandedFunDepTypeAndTV (TA {type_cons & type_arity=diff} (take diff types1)) tv_n defs type_heaps substc
+				| matched
+					= matchExpandedFunDepListOfATypes (drop diff types1) types2 defs type_heaps substc
+				= (False,type_heaps,substc)
+	matchExpandedFunDepTypes (TAS type_cons types1 sl) (TempCV tv_n :@: types2) defs type_heaps substc
+		// no tryToExpandTypeSyn necessary for TAS
+		# diff = type_cons.type_arity - length types2
+		| diff>=0
+			# (matched, type_heaps, substc)
+				= matchExpandedFunDepTypeAndTV (TAS {type_cons & type_arity=diff} (take diff types1) sl) tv_n defs type_heaps substc
+			| matched
+				= matchExpandedFunDepListOfATypes (drop diff types1) types2 defs type_heaps substc
+			= (False,type_heaps,substc)
 	matchExpandedFunDepTypes instance_type type defs type_heaps substc
 		= (False,type_heaps,substc) ---> ("matchExpandedFunDepTypes False",instance_type,type)
+
+	matchExpandedFunDepTypeAndTV :: Type Int {#CommonDefs} *TypeHeaps *SubstC -> (!Bool,!*TypeHeaps,!*SubstC)
+	matchExpandedFunDepTypeAndTV instance_type tv_number defs type_heaps substc
+		# (ok, instance_type, type_heaps, substc) = addNewTypeVarsInSubstFunDepType instance_type defs type_heaps substc
+		| ok // && True ---> ("matchExpandedFunDepTypes",tv_number,instance_type)
+			| isIndirection substc.substc_array.[tv_number]
+				= abort "matchExpandedFunDepTypes TempV" // impossible because expandOneStepC expands the TempV
+			| is_var tv_number instance_type substc.substc_array
+				= (True,type_heaps,substc)
+			// could also do this contains check in addNewTypeVarsInSubstFunDepType
+			| containsTypeVariable tv_number instance_type substc.substc_array
+				= (False,type_heaps,substc)
+				# substc & substc_changes = [#tv_number:substc.substc_changes!], substc_array.[tv_number] = instance_type
+				= (True,type_heaps,substc)
+			= (False,type_heaps,substc)
+		where
+			is_var tv_number (TempV tv_number2) subst_array
+				= case subst_array.[tv_number2] of
+					TE
+						-> tv_number2==tv_number
+					instance_type
+						-> is_var tv_number instance_type subst_array
+			is_var tv_number instance_type subst_array
+				= False
 	
 	matchExpandedFunDepTVandType :: TypeVar Type {#CommonDefs} *TypeHeaps *SubstC -> *(!Bool,!*TypeHeaps,!*SubstC)
 	matchExpandedFunDepTVandType {tv_info_ptr,tv_ident} type defs type_heaps=:{th_vars} substc
