@@ -282,15 +282,23 @@ where
 					GeneratedBody	
 						// needs a generic representation
 						# generic_bimap = gs.gs_predefs.psd_predefs_a.[PD_GenericBimap]
-						#! is_generic_bimap = gcf_generic.gi_module==generic_bimap.pds_module && gcf_generic.gi_index==generic_bimap.pds_def
+						  generic_binumap = gs.gs_predefs.psd_predefs_a.[PD_GenericBinumap]
+						#! is_generic_bimap = (gcf_generic.gi_module==generic_bimap.pds_module && gcf_generic.gi_index==generic_bimap.pds_def)
+												|| (gcf_generic.gi_module==generic_binumap.pds_module && gcf_generic.gi_index==generic_binumap.pds_def)
 						-> build_generic_type_rep type_def.td_rhs type_def.td_ident glob_module glob_object (not is_generic_bimap) is_generic_bimap td_info gc_ident.id_name gc_pos funs_and_groups gs
 			GCFS gcfs
-				# ({pds_module=generic_bimap_module,pds_def=generic_bimap_index},gs) = gs!gs_predefs.psd_predefs_a.[PD_GenericBimap]
-				#! build_type_rep = Any (\ {gcf_generic={gi_module,gi_index}} -> not (gi_module==generic_bimap_module && gi_index==generic_bimap_index)) gcfs
-				#! build_bimap_type_rep = Any (\ {gcf_generic={gi_module,gi_index}} -> gi_module==generic_bimap_module && gi_index==generic_bimap_index) gcfs
+				#! generic_bimap = gs.gs_predefs.psd_predefs_a.[PD_GenericBimap]
+				#! generic_binumap = gs.gs_predefs.psd_predefs_a.[PD_GenericBinumap]
+				#! build_type_rep = Any (\ {gcf_generic} = not (is_generic_bimap_or_binumap gcf_generic generic_bimap generic_binumap)) gcfs
+				#! build_bimap_type_rep = Any (\ {gcf_generic} = is_generic_bimap_or_binumap gcf_generic generic_bimap generic_binumap) gcfs
 				-> build_generic_type_rep type_def.td_rhs type_def.td_ident glob_module glob_object build_type_rep build_bimap_type_rep td_info "derive generic superclass" gc_pos funs_and_groups gs
 	build_generic_representation _ st
 		= st
+
+	is_generic_bimap_or_binumap :: !GlobalIndex !PredefinedSymbol !PredefinedSymbol -> Bool
+	is_generic_bimap_or_binumap {gi_module,gi_index} generic_bimap generic_binumap
+		= (gi_module==generic_bimap.pds_module && gi_index==generic_bimap.pds_def)
+			|| (gi_module==generic_binumap.pds_module && gi_index==generic_binumap.pds_def)
 
 	build_generic_type_rep td_rhs type_def_ident glob_module glob_object build_type_rep build_bimap_type_rep td_info g_ident_name gc_pos funs_and_groups gs
 		= case td_rhs of
@@ -2751,7 +2759,9 @@ buildGenericCaseBody ::
 buildGenericCaseBody main_module_index gc_pos (TypeConsSymb {type_ident,type_index}) gc_ident generic_info_index gcf_generic predefs=:{psd_predefs_a}
 					st=:{ss_modules=modules,ss_td_infos=td_infos,ss_heaps=heaps}
 	# generic_bimap = psd_predefs_a.[PD_GenericBimap]
-	# is_generic_bimap = gcf_generic.gi_module==generic_bimap.pds_module && gcf_generic.gi_index==generic_bimap.pds_def
+	  generic_binumap = psd_predefs_a.[PD_GenericBinumap]
+	# is_generic_bimap = (gcf_generic.gi_module==generic_bimap.pds_module && gcf_generic.gi_index==generic_bimap.pds_def)
+						|| (gcf_generic.gi_module==generic_binumap.pds_module && gcf_generic.gi_index==generic_binumap.pds_def)
 	#! (gen_def, modules) = modules![gcf_generic.gi_module].com_generic_defs.[gcf_generic.gi_index]
 	#! (td_info=:{tdi_gen_rep}, td_infos) = td_infos![type_index.glob_module, type_index.glob_object]
 	# (gen_type_rep=:{gtr_type}) = case tdi_gen_rep of
