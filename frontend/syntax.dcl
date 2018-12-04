@@ -625,7 +625,7 @@ NoGlobalIndex :== {gi_module=NoIndex,gi_index=NoIndex}
 	,	tdi_cons_vars		:: ![Int]
 	,	tdi_index_in_group	:: !Index
 	,	tdi_classification	:: !TypeClassification
-	,	tdi_gen_rep 		:: !Optional GenericTypeRep
+	,	tdi_gen_rep 		:: !GenericTypeReps
 	}
 
 // type structure is used to specialize a generic to a type
@@ -638,14 +638,22 @@ NoGlobalIndex :== {gi_module=NoIndex,gi_index=NoIndex}
  	| GTSField !DefinedSymbol !GlobalIndex !DefinedSymbol !GenTypeStruct
  	| GTSObject !DefinedSymbol !GlobalIndex !DefinedSymbol !GenTypeStruct
 	| GTSE
-	// the following constructors are used for optimizing bimaps
 	| GTSPair !GenTypeStruct !GenTypeStruct
 	| GTSEither !GenTypeStruct !GenTypeStruct
 	| GTSUnit
 	| GTSArrow GenTypeStruct GenTypeStruct
+	// the following constructors are used for optimizing bimaps
  	| GTSAppConsBimapKindConst
 	| GTSAppBimap TypeKind [GenTypeStruct]
 	| GTSAppConsSimpleType !GlobalIndex !TypeKind ![GenTypeStruct]
+ 	| GTSCons1Bimap !GenTypeStruct
+ 	| GTSRecord1Bimap !GenTypeStruct
+
+:: GenericTypeReps
+	= NoGenericTypeReps
+	| GenericTypeRep !GenericTypeRep
+	| GenericBimapTypeRep !GenericTypeRep
+	| GenericTypeRepAndBimapTypeRep !GenericTypeRep !GenericTypeRep
 
 :: GenericTypeRep = 
 	{ gtr_type :: GenTypeStruct		// generic structure type
@@ -967,7 +975,6 @@ cNotVarNumber :== -1
 					| EI_LetTypeAndRefCounts ![AType] ![Int]
 
 		/* for converting case into function patterns the following auxiliary constuctors are used */
-
 
 					| EI_Default !Expression !AType !ExprInfoPtr
 					| EI_DefaultFunction !SymbIdent ![Expression]
@@ -1604,7 +1611,7 @@ EmptySymbolTableEntryCAF :: BoxedSymbolTableEntry
 cNotAGroupNumber :== -1
 
 EmptyTypeDefInfo :== { tdi_kinds = [], tdi_properties = cAllBitsClear, tdi_group = [], tdi_group_vars = [], tdi_cons_vars = [],
-					   tdi_classification = EmptyTypeClassification, tdi_group_nr = cNotAGroupNumber, tdi_index_in_group = NoIndex, tdi_gen_rep = No }
+					   tdi_classification = EmptyTypeClassification, tdi_group_nr = cNotAGroupNumber, tdi_index_in_group = NoIndex, tdi_gen_rep = NoGenericTypeReps }
 
 MakeTypeVar name	:== { tv_ident = name, tv_info_ptr = nilPtr }
 MakeVar name		:== { var_ident = name, var_info_ptr = nilPtr, var_expr_ptr = nilPtr }
