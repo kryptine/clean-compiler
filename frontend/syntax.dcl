@@ -665,7 +665,6 @@ NoGlobalIndex :== {gi_module=NoIndex,gi_index=NoIndex}
 
 :: GenericTypeRep = 
 	{ gtr_type :: GenTypeStruct		// generic structure type
-	, gtr_iso  :: !DefinedSymbol	// the conversion isomorphism
 	, gtr_to   :: !DefinedSymbol
 	, gtr_from :: !DefinedSymbol
 	}
@@ -1169,8 +1168,6 @@ cNotVarNumber :== -1
 					| TVI_Kind !TypeKind
 					| TVI_ConsInstance !DefinedSymbol //AA: generic cons instance function 
 					| TVI_Normalized !Int /* MV - position of type variable in its definition */
-					| TVI_Expr !Bool !Expression	/* AA: Expression corresponding to the type var during generic specialization */
-					| TVI_Iso !DefinedSymbol !DefinedSymbol !DefinedSymbol
 					| TVI_GenTypeVarNumber !Int
 					| TVI_TypeVarArgN !Int // type argument number in module backendconvert
 					| TVI_Attr !TypeAttribute
