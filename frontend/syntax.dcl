@@ -1170,7 +1170,6 @@ cNotVarNumber :== -1
 					| TVI_ConsInstance !DefinedSymbol //AA: generic cons instance function 
 					| TVI_Normalized !Int /* MV - position of type variable in its definition */
 					| TVI_Expr !Bool !Expression	/* AA: Expression corresponding to the type var during generic specialization */
-					| TVI_Exprs ![(GlobalIndex, Expression)] /* List of expressions corresponding to the type var during generic specialization */
 					| TVI_Iso !DefinedSymbol !DefinedSymbol !DefinedSymbol
 					| TVI_GenTypeVarNumber !Int
 					| TVI_TypeVarArgN !Int // type argument number in module backendconvert
