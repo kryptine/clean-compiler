@@ -32,10 +32,6 @@ import genericsupport
 		bimap_tofrom_function :: !FunctionIndexAndIdent,
 		bimap_to_function :: !FunctionIndexAndIdent,
 		bimap_from_function :: !FunctionIndexAndIdent,
-		bimap_arrow_function :: !FunctionIndexAndIdent,
-		bimap_arrow_arg_id_function :: !FunctionIndexAndIdent,
-		bimap_arrow_res_id_function :: !FunctionIndexAndIdent,
-		bimap_from_Bimap_function :: !FunctionIndexAndIdent,
 		bimap_PAIR_function :: !FunctionIndexAndIdent,
 		bimap_EITHER_function :: !FunctionIndexAndIdent,
 		bimap_OBJECT_function :: !FunctionIndexAndIdent,
@@ -57,7 +53,10 @@ FIELD_NewType_Mask:==8;
 :: PredefinedSymbolsData = !{psd_predefs_a :: !{#PredefinedSymbol}, psd_generic_newtypes::!Int}
 
 :: TypeVarInfo
+	| TVI_Iso !DefinedSymbol !DefinedSymbol
+	| TVI_BimapExpr !Bool !Expression !Expression // Expression corresponding to the type var during generic specialization
 	| TVI_Exprs ![((GlobalIndex,[Int]), Expression)] // List of expressions corresponding to the type var during generic specialization
+	| TVI_SimpleBimapArgExpr !Expression
 
 :: *GenericState = 
 	{ gs_modules :: !*Modules
@@ -249,10 +248,6 @@ buildGenericRepresentations gs=:{gs_main_module, gs_modules, gs_funs, gs_groups}
 				bimap_tofrom_function = undefined_function_and_ident,
 				bimap_to_function = undefined_function_and_ident,
 				bimap_from_function = undefined_function_and_ident,
-		  		bimap_arrow_function = undefined_function_and_ident,
-		  		bimap_arrow_arg_id_function = undefined_function_and_ident,
-		  		bimap_arrow_res_id_function = undefined_function_and_ident,
-		  		bimap_from_Bimap_function = undefined_function_and_ident,
 		  		bimap_PAIR_function = undefined_function_and_ident,
 		  		bimap_EITHER_function = undefined_function_and_ident,
 		  		bimap_OBJECT_function = undefined_function_and_ident,
@@ -371,9 +366,6 @@ buildGenericTypeRep type_index funs_and_groups
 	# (to_fun_ds, funs_and_groups, heaps, gs_error)
 		= buildConversionTo type_index.gi_module type_def gs_main_module gs_predefs funs_and_groups heaps gs_error
 
-	# (iso_fun_ds, funs_and_groups, heaps, gs_error)
-		= buildConversionIso type_def from_fun_ds to_fun_ds "iso" gs_main_module gs_predefs funs_and_groups heaps gs_error
-
 	# {hp_expression_heap, hp_var_heap, hp_generic_heap, hp_type_heaps={th_vars, th_attrs}} = heaps
 	# gs = {gs	& gs_modules = gs_modules
 				, gs_td_infos = gs_td_infos
@@ -384,7 +376,7 @@ buildGenericTypeRep type_index funs_and_groups
 				, gs_genh = hp_generic_heap
 				, gs_exprh = hp_expression_heap
 		   }
-	= ({gtr_type=atype,gtr_iso=iso_fun_ds,gtr_to=to_fun_ds,gtr_from=from_fun_ds}, funs_and_groups, gs)
+	= ({gtr_type=atype,gtr_to=to_fun_ds,gtr_from=from_fun_ds}, funs_and_groups, gs)
 
 buildBimapGenericTypeRep :: !GlobalIndex /*type def index*/ !FunsAndGroups !*GenericState ->	(!GenericTypeRep,!FunsAndGroups,!*GenericState)
 buildBimapGenericTypeRep type_index funs_and_groups
@@ -399,12 +391,10 @@ buildBimapGenericTypeRep type_index funs_and_groups
 		= buildBimapConversionFrom type_index.gi_module type_def gs_main_module gs_predefs funs_and_groups heaps gs_error
 	  (to_fun_ds, funs_and_groups, heaps, gs_error)
 		= buildBimapConversionTo type_index.gi_module type_def gs_main_module gs_predefs funs_and_groups heaps gs_error
-	  (iso_fun_ds, funs_and_groups, heaps, gs_error)
-		= buildConversionIso type_def from_fun_ds to_fun_ds "iso-" gs_main_module gs_predefs funs_and_groups heaps gs_error
 	  {hp_expression_heap, hp_var_heap, hp_generic_heap, hp_type_heaps={th_vars, th_attrs}} = heaps
 	  gs & gs_modules = gs_modules, gs_td_infos = gs_td_infos, gs_error = gs_error, gs_avarh = th_attrs,
 		   gs_tvarh = th_vars, gs_varh = hp_var_heap, gs_genh = hp_generic_heap, gs_exprh = hp_expression_heap
-	= ({gtr_type=atype,gtr_iso=iso_fun_ds,gtr_to=to_fun_ds,gtr_from=from_fun_ds}, funs_and_groups, gs)
+	= ({gtr_type=atype,gtr_to=to_fun_ds,gtr_from=from_fun_ds}, funs_and_groups, gs)
 	
 //	the structure type
 
@@ -487,19 +477,11 @@ where
 				| glob_module == pds_module && glob_object == pds_def
 					&& (case args of [{at_type=TB _}] -> True; _ -> False)
 					-> (GTSAppCons KindConst [], (modules, td_infos, heaps, error))
-			RecordType _
-				# {pds_module, pds_def} = psd_predefs_a.[PD_TypeBimap]
-				| glob_module == pds_module && glob_object == pds_def
-					&& case args of [_,_] -> True; _ -> False
-					#! (tdi_kinds,td_infos) = td_infos![glob_module,glob_object].tdi_kinds
-					#! kind = if (isEmpty tdi_kinds) KindConst (KindArrow tdi_kinds)
-					#! (args, st) = convert_args args (modules, td_infos, heaps, error)
-					-> (GTSAppBimap kind args, st)
 			AlgType alts
 				# n_args = length args
 				| n_args>0 && type_arity==n_args
 					# (can_generate_bimap_to_or_from,modules,heaps)
-						= can_generate_bimap_to_or_from_for_this_type type_def glob_module alts modules heaps
+						= can_generate_bimap_to_or_from_for_this_type type_def.td_args glob_module alts modules heaps
 					| can_generate_bimap_to_or_from
 						#! (tdi_kinds,td_infos) = td_infos![glob_module,glob_object].tdi_kinds			
 						#! (args, st) = convert_args args (modules, td_infos, heaps, error)
@@ -514,40 +496,40 @@ where
 			#! (args, st) = convert_args args (modules, td_infos, heaps, error)
 			= (GTSAppCons kind args, st)
 
-	can_generate_bimap_to_or_from_for_this_type :: !CheckedTypeDef !Index ![DefinedSymbol] !*Modules !*Heaps -> (!Bool,!*Modules,!*Heaps)
-	can_generate_bimap_to_or_from_for_this_type type_def=:{td_args} type_def_module_n alts modules heaps=:{hp_type_heaps}
-		# th_vars = number_type_arguments td_args 0 hp_type_heaps.th_vars
-		#! ok = check_constructors alts type_def_module_n modules th_vars
-		# th_vars = remove_type_argument_numbers td_args th_vars
-		# heaps = {heaps & hp_type_heaps={hp_type_heaps & th_vars=th_vars}}
-		= (ok,modules,heaps)
-	where
-		check_constructors :: ![DefinedSymbol] !Index !Modules !TypeVarHeap -> Bool
-		check_constructors [{ds_index}:constructors] type_def_module_n modules th_vars
-			# {cons_type,cons_exi_vars} = modules.[type_def_module_n].com_cons_defs.[ds_index]
-			= isEmpty cons_exi_vars &&
-			  isEmpty cons_type.st_context &&
-			  check_constructor cons_type.st_args 0 th_vars &&
-			  check_constructors constructors type_def_module_n modules th_vars
-		check_constructors [] type_def_module_n modules th_vars
-			= True
-
-		check_constructor :: ![AType] !Int !TypeVarHeap -> Bool
-		check_constructor [{at_type=TV {tv_info_ptr}}:atypes] used_type_vars th_vars
-			= case sreadPtr tv_info_ptr th_vars of
-				TVI_GenTypeVarNumber arg_n
-					# arg_mask = 1<<arg_n
-					| used_type_vars bitand arg_mask<>0
-						-> False
-						# used_type_vars = used_type_vars bitor arg_mask
-						-> check_constructor atypes used_type_vars th_vars
-		check_constructor [_:_] used_type_vars th_vars
-			= False
-		check_constructor [] used_type_vars th_vars
-			= True
-
 	convert_args args st
 		= mapSt convert args st
+
+can_generate_bimap_to_or_from_for_this_type :: ![ATypeVar] !Index ![DefinedSymbol] !*Modules !*Heaps -> (!Bool,!*Modules,!*Heaps)
+can_generate_bimap_to_or_from_for_this_type td_args type_def_module_n alts modules heaps=:{hp_type_heaps}
+	# th_vars = number_type_arguments td_args 0 hp_type_heaps.th_vars
+	#! ok = check_constructors alts type_def_module_n modules th_vars
+	# th_vars = remove_type_argument_numbers td_args th_vars
+	# heaps = {heaps & hp_type_heaps={hp_type_heaps & th_vars=th_vars}}
+	= (ok,modules,heaps)
+where
+	check_constructors :: ![DefinedSymbol] !Index !Modules !TypeVarHeap -> Bool
+	check_constructors [{ds_index}:constructors] type_def_module_n modules th_vars
+		# {cons_type,cons_exi_vars} = modules.[type_def_module_n].com_cons_defs.[ds_index]
+		= isEmpty cons_exi_vars &&
+		  isEmpty cons_type.st_context &&
+		  check_constructor cons_type.st_args 0 th_vars &&
+		  check_constructors constructors type_def_module_n modules th_vars
+	check_constructors [] type_def_module_n modules th_vars
+		= True
+
+	check_constructor :: ![AType] !Int !TypeVarHeap -> Bool
+	check_constructor [{at_type=TV {tv_info_ptr}}:atypes] used_type_vars th_vars
+		= case sreadPtr tv_info_ptr th_vars of
+			TVI_GenTypeVarNumber arg_n
+				# arg_mask = 1<<arg_n
+				| used_type_vars bitand arg_mask<>0
+					-> False
+					# used_type_vars = used_type_vars bitor arg_mask
+					-> check_constructor atypes used_type_vars th_vars
+	check_constructor [_:_] used_type_vars th_vars
+		= False
+	check_constructor [] used_type_vars th_vars
+		= True
 
 // the structure type of a generic type can often be simplified
 // because bimaps for types not containing generic variables are indentity bimaps
@@ -574,16 +556,6 @@ where
 			= (GTSAppConsBimapKindConst, st)
 			# (args, st) = mapSt simplify args st
 			= (GTSAppConsSimpleType type_symbol_n kind args, st)
-	simplify t=:(GTSAppBimap KindConst [])  st
-		= (t, st)
-	simplify (GTSAppBimap kind=:(KindArrow kinds) args) st
-		# formal_arity = length kinds
-		# actual_arity = length args
-		# contains_gen_vars = occurs_list args st
-		| formal_arity == actual_arity && not contains_gen_vars
-			= (GTSAppConsBimapKindConst, st)
-			# (args, st) = mapSt simplify args st
-			= (GTSAppBimap kind args, st)
 	simplify (GTSArrow x y) st
 		# contains_gen_vars = occurs2 x y st
 		| not contains_gen_vars
@@ -627,7 +599,6 @@ where
 
 	occurs (GTSAppCons _ args) st 	= occurs_list args st
 	occurs (GTSAppConsSimpleType _ _ args) st 	= occurs_list args st
-	occurs (GTSAppBimap _ args) st 	= occurs_list args st
 	occurs (GTSAppVar tv args) st 	= type_var_occurs tv st || occurs_list args st		
 	occurs (GTSVar tv) st			= type_var_occurs tv st
 	occurs (GTSArrow x y) st 		= occurs2 x y st
@@ -1054,30 +1025,6 @@ where
 		= buildPredefConsApp PD_CGenTypeCons [name_expr] predefs heaps
 
 //	conversions functions
-
-// buildConversionIso
-buildConversionIso :: 
-		!CheckedTypeDef		// the type definition
-		!DefinedSymbol		// from fun
-		!DefinedSymbol	 	// to fun
-		!{#Char}			// iso ident prefix
-		!Index				// main module
-		!PredefinedSymbolsData
-		FunsAndGroups !*Heaps !*ErrorAdmin
-	-> (!DefinedSymbol,
-		FunsAndGroups,!*Heaps,!*ErrorAdmin)
-buildConversionIso type_def=:{td_ident, td_pos} from_fun to_fun iso_ident_prefix
-		main_dcl_module_n predefs funs_and_groups heaps error
-	#! (from_expr, heaps) 	= buildFunApp main_dcl_module_n from_fun [] heaps
-	#! (to_expr, heaps) 	= buildFunApp main_dcl_module_n to_fun [] heaps	
-	#! (iso_expr, heaps) 	= build_bimap_record to_expr from_expr predefs heaps
-	
-	#! ident = makeIdent (iso_ident_prefix +++ td_ident.id_name)
-	#! (def_sym, funs_and_groups) = buildFunAndGroup ident [] iso_expr No main_dcl_module_n td_pos funs_and_groups
-	= (def_sym, funs_and_groups, heaps, error)
-
-build_bimap_record to_expr from_expr predefs heaps 
-	= buildPredefConsApp PD_ConsBimap [to_expr, from_expr] predefs heaps	
 
 // conversion from type to generic
 buildConversionTo ::
@@ -2765,7 +2712,7 @@ buildGenericCaseBody main_module_index gc_pos (TypeConsSymb {type_ident,type_ind
 				-> bimap_gen_type_rep
 		_ -> abort "sanity check: no generic representation\n"
 
-	#! (type_def=:{td_args, td_arity}, modules) = modules![type_index.glob_module].com_type_defs.[type_index.glob_object]
+	#! (type_def=:{td_args,td_arity,td_rhs}, modules) = modules![type_index.glob_module].com_type_defs.[type_index.glob_object]
 	#! (generated_arg_exprss, original_arg_exprs, arg_vars, heaps)
 		= build_arg_vars gen_def gcf_generic td_args heaps
 
@@ -2776,6 +2723,13 @@ buildGenericCaseBody main_module_index gc_pos (TypeConsSymb {type_ident,type_ind
 				arg_vars = [generic_info_var:arg_vars]
 			 in (arg_vars,heaps_))
 			(arg_vars,heaps)
+
+	# (is_simple_bimap,modules,heaps)
+		= test_if_simple_bimap gcf_generic td_args td_rhs type_index.glob_module psd_predefs_a modules heaps
+	| is_simple_bimap
+		# (body_expr,modules,heaps) = build_simple_bimap td_args td_rhs type_index generated_arg_exprss original_arg_exprs modules heaps
+		# st & ss_modules=modules,ss_td_infos=td_infos,ss_heaps=heaps
+		= (TransformedBody {tb_args=arg_vars, tb_rhs=body_expr}, st)	
 
 	# st & ss_modules=modules,ss_td_infos=td_infos,ss_heaps=heaps
 	#! (specialized_expr, st)
@@ -2818,7 +2772,7 @@ where
 		# generic_bimap = psd_predefs_a.[PD_GenericBimap]
 		| gcf_generic.gi_module==generic_bimap.pds_module && gcf_generic.gi_index==generic_bimap.pds_def
 
-			#! bimap_spec_env = [(atv_variable, TVI_Expr False (hd exprs)) \\ {atv_variable} <- td_args & exprs <- generated_arg_exprss]
+			#! bimap_spec_env = [(atv_variable, TVI_BimapExpr False bimap_a_b_expr bimap_b_a_expr) \\ {atv_variable} <- td_args & [bimap_a_b_expr,bimap_b_a_expr] <- generated_arg_exprss]
 			// JvG: can probably make special version of simplify_bimap_GenTypeStruct that doesn't simplify if any var occurs, because all vars are passed
 			# (gtr_type, heaps) = simplify_bimap_GenTypeStruct [atv_variable \\ {atv_variable} <- td_args] gtr_type st.ss_heaps
 
@@ -2842,14 +2796,14 @@ where
 	adapt_specialized_expr :: Position GenericDef GenericTypeRep [Expression] Expression
 						!FunsAndGroups !*Modules !*TypeDefInfos !*Heaps !*ErrorAdmin
 		-> (!Expression,!FunsAndGroups,!*Modules,!*TypeDefInfos,!*Heaps,!*ErrorAdmin)
-	adapt_specialized_expr gc_pos {gen_type, gen_vars, gen_info_ptr} {gtr_iso,gtr_to,gtr_from} original_arg_exprs specialized_expr
+	adapt_specialized_expr gc_pos {gen_type, gen_vars, gen_info_ptr} {gtr_to,gtr_from} original_arg_exprs specialized_expr
 			funs_and_groups modules td_infos heaps error
 		#! (var_kinds, heaps) = get_var_kinds gen_info_ptr heaps		
 		#! non_gen_var_kinds = drop (length gen_vars) var_kinds  
 		
 		#! non_gen_vars = gen_type.st_vars -- gen_vars	
 		#! (gen_env, heaps) 
-			= build_gen_env gtr_iso gtr_to gtr_from gen_vars heaps
+			= build_gen_env gtr_to gtr_from gen_vars heaps
 		#! (non_gen_env, funs_and_groups, heaps)
 			= build_non_gen_env non_gen_vars non_gen_var_kinds funs_and_groups heaps
 		#! spec_env = gen_env ++ non_gen_env	
@@ -2877,12 +2831,12 @@ where
 		curry_symbol_type {st_args, st_result}
 			= foldr (\x y -> makeAType (x --> y) TA_Multi) st_result st_args 	
 	
-		build_gen_env :: !DefinedSymbol !DefinedSymbol !DefinedSymbol ![TypeVar] !*Heaps -> (![(!TypeVar, !TypeVarInfo)], !*Heaps)
-		build_gen_env gtr_iso gtr_to gtr_from gen_vars heaps 
+		build_gen_env :: !DefinedSymbol !DefinedSymbol ![TypeVar] !*Heaps -> (![(!TypeVar, !TypeVarInfo)], !*Heaps)
+		build_gen_env gtr_to gtr_from gen_vars heaps 
 			= mapSt build_iso_expr gen_vars heaps
 		where
 			build_iso_expr gen_var heaps 
-				= ((gen_var, TVI_Iso gtr_iso gtr_to gtr_from), heaps)
+				= ((gen_var, TVI_Iso gtr_to gtr_from), heaps)
 
 		build_non_gen_env :: ![TypeVar] ![TypeKind] FunsAndGroups !*Heaps -> (![(!TypeVar, !TypeVarInfo)], !FunsAndGroups, !*Heaps)
 		build_non_gen_env non_gen_vars kinds funs_and_groups heaps
@@ -2892,14 +2846,67 @@ where
 			build_bimap_expr non_gen_var KindConst funs_and_groups heaps
 				# (expr, funs_and_groups, heaps)
 					= bimap_id_expression main_module_index predefs funs_and_groups heaps
-				= ((non_gen_var, TVI_Expr True expr), funs_and_groups, heaps)
+				= ((non_gen_var, TVI_BimapExpr True expr expr), funs_and_groups, heaps)
 			build_bimap_expr non_gen_var kind funs_and_groups heaps
 				#! (expr, heaps)
 					= buildGenericApp bimap_module bimap_index bimap_ident kind [] heaps		
-				= ((non_gen_var, TVI_Expr False expr), funs_and_groups, heaps)
+				= ((non_gen_var, TVI_BimapExpr False expr expr), funs_and_groups, heaps)
 buildGenericCaseBody main_module_index gc_pos gc_type_cons gc_ident generic_info_index gcf_generic predefs st
 	# error = reportError gc_ident.id_name gc_pos "cannot specialize to this type" st.ss_error
 	= (TransformedBody {tb_args=[], tb_rhs=EE}, {st & ss_error=error})
+
+
+test_if_simple_bimap :: GlobalIndex [ATypeVar] TypeRhs Int PredefinedSymbols !*Modules !*Heaps -> (!Bool,!*Modules,!*Heaps)
+test_if_simple_bimap gcf_generic td_args (AlgType alts) type_module psd_predefs_a modules heaps
+	# generic_bimap = psd_predefs_a.[PD_GenericBimap]
+	| gcf_generic.gi_module==generic_bimap.pds_module && gcf_generic.gi_index==generic_bimap.pds_def
+		= can_generate_bimap_to_or_from_for_this_type td_args type_module alts modules heaps
+		= (False,modules,heaps)
+test_if_simple_bimap gcf_generic td_args td_rhs type_module psd_predefs_a modules heaps
+	= (False,modules,heaps)
+
+build_simple_bimap :: [ATypeVar] !TypeRhs (Global Index) [[Expression]] [Expression] *Modules *Heaps -> (!Expression,!*Modules,!*Heaps)
+build_simple_bimap td_args (AlgType alts) type_index generated_arg_exprss [original_arg_expr] modules heaps
+	# {hp_type_heaps} = heaps
+	  th_vars = set_arg_exprs td_args generated_arg_exprss hp_type_heaps.th_vars
+	  heaps & hp_type_heaps={hp_type_heaps & th_vars=th_vars}
+	  (alg_patterns,modules,heaps) = build_bimap_alg_patterns alts type_index.glob_module modules heaps
+	  (case_expr,heaps) = build_bimap_case {gi_module=type_index.glob_module,gi_index=type_index.glob_object} original_arg_expr alg_patterns heaps
+	  {hp_type_heaps} = heaps
+	  th_vars = remove_type_argument_numbers td_args hp_type_heaps.th_vars
+	  heaps & hp_type_heaps={hp_type_heaps & th_vars=th_vars}
+	= (case_expr,modules,heaps)
+where	
+	set_arg_exprs :: ![ATypeVar] ![[Expression]] !*TypeVarHeap -> *TypeVarHeap
+	set_arg_exprs [{atv_variable={tv_info_ptr}}:atype_vars] [[arg_expr:_]:arg_exprs] th_vars
+		# th_vars = writePtr tv_info_ptr (TVI_SimpleBimapArgExpr arg_expr) th_vars
+		= set_arg_exprs atype_vars arg_exprs th_vars
+	set_arg_exprs [] [] th_vars
+		= th_vars
+	
+	build_bimap_alg_patterns :: [DefinedSymbol] Int !*Modules *Heaps -> (![AlgebraicPattern],!*Modules,!*Heaps)
+	build_bimap_alg_patterns [cons_ds=:{ds_ident,ds_index,ds_arity}:alts] type_module_n modules heaps
+		# (cons_args,modules) = modules![type_module_n].com_cons_defs.[ds_index].cons_type.st_args
+		  arg_names = ["x" +++ toString k \\ k <- [1..ds_arity]]
+		  (var_exprs, vars, heaps) = buildVarExprs arg_names heaps
+		  {hp_type_heaps} = heaps
+		  (args,th_vars) = bimaps_with_arg cons_args var_exprs hp_type_heaps.th_vars
+		  heaps & hp_type_heaps={hp_type_heaps & th_vars=th_vars}	  
+		  (alg_pattern,heaps) = build_alg_pattern cons_ds vars args type_module_n heaps
+		  (alg_patterns,modules,heaps) = build_bimap_alg_patterns alts type_module_n modules heaps
+		= ([alg_pattern:alg_patterns],modules,heaps)
+	build_bimap_alg_patterns [] type_module_n modules heaps
+		= ([],modules,heaps)
+	
+	bimaps_with_arg :: [AType] [Expression] !*TypeVarHeap -> (![Expression],!*TypeVarHeap)
+	bimaps_with_arg [{at_type=TV {tv_info_ptr}}:type_args] [var_expr:var_exprs] th_vars
+		# (tv_info, th_vars) = readPtr tv_info_ptr th_vars
+		= case tv_info of
+			TVI_SimpleBimapArgExpr bimap_expr
+				# (args,th_vars) = bimaps_with_arg type_args var_exprs th_vars
+				= ([bimap_expr @ [var_expr]:args],th_vars)
+	bimaps_with_arg [] [] th_vars
+		= ([],th_vars)
 
 //  convert generic type contexts into normal type contexts
 
@@ -3267,9 +3274,6 @@ where
 			TVI_Exprs exprs
 				# (argExpr, error) = lookupArgExpr gen_index g_nums exprs st.ss_error
 				-> (argExpr, {st & ss_heaps=heaps,ss_error=error})
-			TVI_Iso iso_ds to_ds from_ds
-				# (expr,heaps) = buildFunApp main_module_index iso_ds [] heaps
-				-> (expr, {st & ss_heaps=heaps})
 	where
 		lookupArgExpr x g_nums [((k,gen_var_nums),v):kvs] error
 			| k==x && g_nums==gen_var_nums
@@ -3581,106 +3585,214 @@ specialize_generic_bimap ::
 specialize_generic_bimap gen_index type spec_env gen_ident gen_pos main_module_index predefs funs_and_groups heaps error
 	#! heaps = set_tvs spec_env heaps
 	#! (expr, (funs_and_groups, heaps, error)) 
-		= specialize type (funs_and_groups, heaps, error)
+		= specialize_f type (funs_and_groups, heaps, error)
 	#! heaps = clear_tvs spec_env heaps
 	= (expr, funs_and_groups, heaps, error)
 where
-	specialize (GTSAppCons KindConst []) (funs_and_groups, heaps, error)
-		# (expr, funs_and_groups, heaps)
-			= bimap_id_expression main_module_index predefs funs_and_groups heaps
+	specialize_f (GTSAppCons KindConst []) (funs_and_groups, heaps, error)
+		# (expr, funs_and_groups, heaps) = bimap_id_expression main_module_index predefs funs_and_groups heaps
 		= (expr, (funs_and_groups, heaps, error))
-	specialize (GTSAppCons kind arg_types) st
-		#! (arg_exprs, st) = mapSt specialize arg_types st
+	specialize_f (GTSAppCons kind arg_types) st
+		#! (arg_exprs, st) = specialize_f_args arg_types st
 		= build_generic_app kind arg_exprs gen_index gen_ident st
-	specialize (GTSAppVar tv arg_types) st
-		#! (arg_exprs, st) = mapSt specialize arg_types st
-		#! (expr, st) = specialize_type_var tv st 
+	specialize_f (GTSAppVar tv arg_types) st
+		#! (arg_exprs, st) = specialize_f_args arg_types st
+		#! (expr, st) = specialize_f_type_var tv st 
 		= (expr @ arg_exprs, st)
-	specialize (GTSVar tv) st
-		= specialize_type_var tv st
-	specialize (GTSArrow x y) st=:(_,heaps,_)
+	specialize_f (GTSVar tv) st
+		= specialize_f_type_var tv st
+	specialize_f (GTSArrow x y) st=:(_,heaps,_)
 		| is_bimap_id x heaps
-			#! (y, st) = specialize y st
+			#! (y, st) = specialize_f y st
 			# (funs_and_groups, heaps, error) = st
 			  (expr, funs_and_groups, heaps)
-				= bimap_arrow_arg_id_expression [y] main_module_index predefs funs_and_groups heaps
+				= bimap_from_expression [y] main_module_index predefs funs_and_groups heaps
 			= (expr, (funs_and_groups, heaps, error))
 		| is_bimap_id y heaps
-			#! (x, st) = specialize x st
+			#! (x, st) = specialize_b x st
 			# (funs_and_groups, heaps, error) = st
 			  (expr, funs_and_groups, heaps)
-				= bimap_arrow_res_id_expression [x] main_module_index predefs funs_and_groups heaps
+				= bimap_to_expression [x] main_module_index predefs funs_and_groups heaps
 			= (expr, (funs_and_groups, heaps, error))
-			#! (x, st) = specialize x st 
-			#! (y, st) = specialize y st 
+			#! (x, st) = specialize_b x st 
+			#! (y, st) = specialize_f y st 
 			# (funs_and_groups, heaps, error) = st
 			  (expr, funs_and_groups, heaps)
-				= bimap_arrow_expression [x,y] main_module_index predefs funs_and_groups heaps
+				= bimap_tofrom_expression [x,y] main_module_index predefs funs_and_groups heaps
 			= (expr, (funs_and_groups, heaps, error))
-	specialize (GTSPair x y) st
-		#! (x, st) = specialize x st 
-		#! (y, st) = specialize y st 
+	specialize_f (GTSPair x y) st
+		#! (x, st) = specialize_f x st 
+		#! (y, st) = specialize_f y st 
 		# (funs_and_groups, heaps, error) = st
 		  (expr, funs_and_groups, heaps)
 			= bimap_PAIR_expression [x,y] main_module_index predefs funs_and_groups heaps
 		= (expr, (funs_and_groups, heaps, error))
-	specialize (GTSEither x y) st
-		#! (x, st) = specialize x st 
-		#! (y, st) = specialize y st 
+	specialize_f (GTSEither x y) st
+		#! (x, st) = specialize_f x st 
+		#! (y, st) = specialize_f y st 
 		# (funs_and_groups, heaps, error) = st
 		  (expr, funs_and_groups, heaps)
 			= bimap_EITHER_expression [x,y] main_module_index predefs funs_and_groups heaps
 		= (expr, (funs_and_groups, heaps, error))
-	specialize GTSAppConsBimapKindConst (funs_and_groups, heaps, error)
-		# (expr, funs_and_groups, heaps)
-			= bimap_id_expression main_module_index predefs funs_and_groups heaps
+	specialize_f GTSAppConsBimapKindConst (funs_and_groups, heaps, error)
+		# (expr, funs_and_groups, heaps) = bimap_id_expression main_module_index predefs funs_and_groups heaps
 		= (expr ,(funs_and_groups, heaps, error))
-	specialize GTSUnit (funs_and_groups, heaps, error)
-		# (expr, funs_and_groups, heaps)
-			= bimap_id_expression main_module_index predefs funs_and_groups heaps
+	specialize_f GTSUnit (funs_and_groups, heaps, error)
+		# (expr, funs_and_groups, heaps) = bimap_id_expression main_module_index predefs funs_and_groups heaps
 		= (expr, (funs_and_groups, heaps, error))
-	specialize (GTSCons1Bimap arg_type) st
-		# (arg_expr, (funs_and_groups, heaps, error)) = specialize arg_type st
+	specialize_f (GTSCons1Bimap arg_type) st
+		# (arg_expr, (funs_and_groups, heaps, error)) = specialize_f arg_type st
 		  (expr, funs_and_groups, heaps)
 			= bimap_CONS_expression [arg_expr] main_module_index predefs funs_and_groups heaps
 		= (expr, (funs_and_groups, heaps, error))
-	specialize (GTSRecord1Bimap arg_type) st
-		# (arg_expr, (funs_and_groups, heaps, error)) = specialize arg_type st
+	specialize_f (GTSRecord1Bimap arg_type) st
+		# (arg_expr, (funs_and_groups, heaps, error)) = specialize_f arg_type st
 		  (expr, funs_and_groups, heaps)
 			= bimap_RECORD_expression [arg_expr] main_module_index predefs funs_and_groups heaps
 		= (expr, (funs_and_groups, heaps, error))
-	specialize (GTSCons _ _ _ _ arg_type) st
-		# (arg_expr, (funs_and_groups, heaps, error)) = specialize arg_type st
+	specialize_f (GTSCons _ _ _ _ arg_type) st
+		# (arg_expr, (funs_and_groups, heaps, error)) = specialize_f arg_type st
 		  (expr, funs_and_groups, heaps)
 			= bimap_CONS_expression [arg_expr] main_module_index predefs funs_and_groups heaps
 		= (expr, (funs_and_groups, heaps, error))
-	specialize (GTSRecord _ _ _ _ arg_type) st
-		# (arg_expr, (funs_and_groups, heaps, error)) = specialize arg_type st
+	specialize_f (GTSRecord _ _ _ _ arg_type) st
+		# (arg_expr, (funs_and_groups, heaps, error)) = specialize_f arg_type st
 		  (expr, funs_and_groups, heaps)
 			= bimap_RECORD_expression [arg_expr] main_module_index predefs funs_and_groups heaps
 		= (expr, (funs_and_groups, heaps, error))
-	specialize (GTSField _ _ _ arg_type) st
-		# (arg_expr, (funs_and_groups, heaps, error)) = specialize arg_type st
+	specialize_f (GTSField _ _ _ arg_type) st
+		# (arg_expr, (funs_and_groups, heaps, error)) = specialize_f arg_type st
 		  (expr, funs_and_groups, heaps)
 			= bimap_FIELD_expression [arg_expr] main_module_index predefs funs_and_groups heaps
 		= (expr, (funs_and_groups, heaps, error))
-	specialize (GTSObject _ _ _ arg_type) st
-		# (arg_expr, (funs_and_groups, heaps, error)) = specialize arg_type st
+	specialize_f (GTSObject _ _ _ arg_type) st
+		# (arg_expr, (funs_and_groups, heaps, error)) = specialize_f arg_type st
 		  (expr, funs_and_groups, heaps)
 			= bimap_OBJECT_expression [arg_expr] main_module_index predefs funs_and_groups heaps
 		= (expr, (funs_and_groups, heaps, error))
-	specialize type (funs_and_groups, heaps, error)
+	specialize_f type (funs_and_groups, heaps, error)
 		#! error = reportError gen_ident.id_name gen_pos "cannot specialize " error 
 		= (EE, (funs_and_groups, heaps, error))
 
-	specialize_type_var tv=:{tv_info_ptr} (funs_and_groups, heaps=:{hp_type_heaps=th=:{th_vars}}, error)		
+	specialize_f_args [arg_type:arg_types] st
+		# (f_arg_expr,st) = specialize_f arg_type st
+		  (b_arg_expr,st) = specialize_b arg_type st
+		  (arg_exprs,st) = specialize_f_args arg_types st
+		= ([f_arg_expr,b_arg_expr:arg_exprs],st)
+	specialize_f_args [] st
+		= ([],st)
+
+	specialize_b (GTSAppCons KindConst []) (funs_and_groups, heaps, error)
+		# (expr, funs_and_groups, heaps) = bimap_id_expression main_module_index predefs funs_and_groups heaps
+		= (expr, (funs_and_groups, heaps, error))
+	specialize_b (GTSAppCons kind arg_types) st
+		#! (arg_exprs, st) = specialize_b_args arg_types st
+		= build_generic_app kind arg_exprs gen_index gen_ident st
+	specialize_b (GTSAppVar tv arg_types) st
+		#! (arg_exprs, st) = specialize_b_args arg_types st
+		#! (expr, st) = specialize_b_type_var tv st 
+		= (expr @ arg_exprs, st)
+	specialize_b (GTSVar tv) st
+		= specialize_b_type_var tv st
+	specialize_b (GTSArrow x y) st=:(_,heaps,_)
+		| is_bimap_id x heaps
+			#! (y, st) = specialize_b y st
+			# (funs_and_groups, heaps, error) = st
+			  (expr, funs_and_groups, heaps)
+				= bimap_from_expression [y] main_module_index predefs funs_and_groups heaps
+			= (expr, (funs_and_groups, heaps, error))
+		| is_bimap_id y heaps
+			#! (x, st) = specialize_f x st
+			# (funs_and_groups, heaps, error) = st
+			  (expr, funs_and_groups, heaps)
+				= bimap_to_expression [x] main_module_index predefs funs_and_groups heaps
+			= (expr, (funs_and_groups, heaps, error))
+			#! (x, st) = specialize_f x st 
+			#! (y, st) = specialize_b y st 
+			# (funs_and_groups, heaps, error) = st
+			  (expr, funs_and_groups, heaps)
+				= bimap_tofrom_expression [x,y] main_module_index predefs funs_and_groups heaps
+			= (expr, (funs_and_groups, heaps, error))
+	specialize_b (GTSPair x y) st
+		#! (x, st) = specialize_b x st 
+		#! (y, st) = specialize_b y st 
+		# (funs_and_groups, heaps, error) = st
+		  (expr, funs_and_groups, heaps)
+			= bimap_PAIR_expression [x,y] main_module_index predefs funs_and_groups heaps
+		= (expr, (funs_and_groups, heaps, error))
+	specialize_b (GTSEither x y) st
+		#! (x, st) = specialize_b x st 
+		#! (y, st) = specialize_b y st 
+		# (funs_and_groups, heaps, error) = st
+		  (expr, funs_and_groups, heaps)
+			= bimap_EITHER_expression [x,y] main_module_index predefs funs_and_groups heaps
+		= (expr, (funs_and_groups, heaps, error))
+	specialize_b GTSAppConsBimapKindConst (funs_and_groups, heaps, error)
+		# (expr, funs_and_groups, heaps) = bimap_id_expression main_module_index predefs funs_and_groups heaps
+		= (expr ,(funs_and_groups, heaps, error))
+	specialize_b GTSUnit (funs_and_groups, heaps, error)
+		# (expr, funs_and_groups, heaps) = bimap_id_expression main_module_index predefs funs_and_groups heaps
+		= (expr, (funs_and_groups, heaps, error))
+	specialize_b (GTSCons1Bimap arg_type) st
+		# (arg_expr, (funs_and_groups, heaps, error)) = specialize_b arg_type st
+		  (expr, funs_and_groups, heaps)
+			= bimap_CONS_expression [arg_expr] main_module_index predefs funs_and_groups heaps
+		= (expr, (funs_and_groups, heaps, error))
+	specialize_b (GTSRecord1Bimap arg_type) st
+		# (arg_expr, (funs_and_groups, heaps, error)) = specialize_b arg_type st
+		  (expr, funs_and_groups, heaps)
+			= bimap_RECORD_expression [arg_expr] main_module_index predefs funs_and_groups heaps
+		= (expr, (funs_and_groups, heaps, error))
+	specialize_b (GTSCons _ _ _ _ arg_type) st
+		# (arg_expr, (funs_and_groups, heaps, error)) = specialize_b arg_type st
+		  (expr, funs_and_groups, heaps)
+			= bimap_CONS_expression [arg_expr] main_module_index predefs funs_and_groups heaps
+		= (expr, (funs_and_groups, heaps, error))
+	specialize_b (GTSRecord _ _ _ _ arg_type) st
+		# (arg_expr, (funs_and_groups, heaps, error)) = specialize_b arg_type st
+		  (expr, funs_and_groups, heaps)
+			= bimap_RECORD_expression [arg_expr] main_module_index predefs funs_and_groups heaps
+		= (expr, (funs_and_groups, heaps, error))
+	specialize_b (GTSField _ _ _ arg_type) st
+		# (arg_expr, (funs_and_groups, heaps, error)) = specialize_b arg_type st
+		  (expr, funs_and_groups, heaps)
+			= bimap_FIELD_expression [arg_expr] main_module_index predefs funs_and_groups heaps
+		= (expr, (funs_and_groups, heaps, error))
+	specialize_b (GTSObject _ _ _ arg_type) st
+		# (arg_expr, (funs_and_groups, heaps, error)) = specialize_b arg_type st
+		  (expr, funs_and_groups, heaps)
+			= bimap_OBJECT_expression [arg_expr] main_module_index predefs funs_and_groups heaps
+		= (expr, (funs_and_groups, heaps, error))
+	specialize_b type (funs_and_groups, heaps, error)
+		#! error = reportError gen_ident.id_name gen_pos "cannot specialize " error 
+		= (EE, (funs_and_groups, heaps, error))
+
+	specialize_b_args [arg_type:arg_types] st
+		# (b_arg_expr,st) = specialize_b arg_type st
+		  (f_arg_expr,st) = specialize_f arg_type st
+		  (arg_exprs,st) = specialize_b_args arg_types st
+		= ([b_arg_expr,f_arg_expr:arg_exprs],st)
+	specialize_b_args [] st
+		= ([],st)
+
+ 	specialize_f_type_var tv=:{tv_info_ptr} (funs_and_groups, heaps=:{hp_type_heaps=th=:{th_vars}}, error)
 		# (expr, th_vars) = readPtr tv_info_ptr th_vars
 		# heaps = {heaps & hp_type_heaps = {th & th_vars = th_vars}}
 		= case expr of
-			TVI_Expr is_bimap_id expr
+			TVI_BimapExpr _ expr _
 				-> (expr, (funs_and_groups, heaps, error))
-			TVI_Iso iso_ds to_ds from_ds
-				# (expr,heaps) = buildFunApp main_module_index iso_ds [] heaps
+			TVI_Iso to_ds _
+				# (expr,heaps) = buildFunApp main_module_index to_ds [] heaps
+				-> (expr, (funs_and_groups, heaps, error))
+
+ 	specialize_b_type_var tv=:{tv_info_ptr} (funs_and_groups, heaps=:{hp_type_heaps=th=:{th_vars}}, error)
+		# (expr, th_vars) = readPtr tv_info_ptr th_vars
+		# heaps = {heaps & hp_type_heaps = {th & th_vars = th_vars}}
+		= case expr of
+			TVI_BimapExpr _ _ expr
+				-> (expr, (funs_and_groups, heaps, error))
+			TVI_Iso _ from_ds
+				# (expr,heaps) = buildFunApp main_module_index from_ds [] heaps
 				-> (expr, (funs_and_groups, heaps, error))
 
 	build_generic_app kind arg_exprs gen_index gen_ident (funs_and_groups, heaps, error)
@@ -3754,10 +3866,10 @@ where
 		# (expr, th_vars) = readPtr tv_info_ptr th_vars
 		# heaps = {heaps & hp_type_heaps = {th & th_vars = th_vars}}
 		= case expr of
-			TVI_Expr is_bimap_id expr
-				# expr = build_map_to_expr expr predefs @ [arg]
+			TVI_BimapExpr _ expr _
+				# expr = expr @ [arg]
 				-> (expr, (funs_and_groups, modules, heaps, error))
-			TVI_Iso iso_ds to_ds from_ds
+			TVI_Iso to_ds _
 				# (expr,heaps) = buildFunApp main_module_index to_ds [arg] heaps
 				-> (expr, (funs_and_groups, modules, heaps, error))
 	specialize_to_with_arg (GTSAppConsSimpleType type_symbol_n kind arg_types) arg st
@@ -3771,10 +3883,10 @@ where
 		# (expr, th_vars) = readPtr tv_info_ptr th_vars
 		# heaps = {heaps & hp_type_heaps = {th & th_vars = th_vars}}
 		= case expr of
-			TVI_Expr is_bimap_id expr
-				# expr = build_map_from_expr expr predefs @ [arg]
+			TVI_BimapExpr _ _ expr
+				# expr = expr @ [arg]
 				-> (expr, (funs_and_groups, modules, heaps, error))
-			TVI_Iso iso_ds to_ds from_ds
+			TVI_Iso _ from_ds
 				# (expr,heaps) = buildFunApp main_module_index from_ds [arg] heaps
 				-> (expr, (funs_and_groups, modules, heaps, error))
 	specialize_from_with_arg (GTSAppConsSimpleType type_symbol_n kind arg_types) arg st
@@ -3799,17 +3911,17 @@ where
 		| is_bimap_id_expression x_expr
 			# (y,heaps) = build_map_from_tvi_expr y_expr main_module_index predefs heaps
 			  (expr, funs_and_groups, heaps)
-				= bimap_from_arrow_arg_id_expression [y] main_module_index predefs funs_and_groups heaps
+				= bimap_from_expression [y] main_module_index predefs funs_and_groups heaps
 			= (expr, (funs_and_groups, modules, heaps, error))
 		| is_bimap_id_expression y_expr
 			# (x,heaps) = build_map_to_tvi_expr x_expr main_module_index predefs heaps
 			  (expr, funs_and_groups, heaps)
-				= bimap_from_arrow_res_id_expression [x] main_module_index predefs funs_and_groups heaps
+				= bimap_to_expression [x] main_module_index predefs funs_and_groups heaps
 			= (expr, (funs_and_groups, modules, heaps, error))
 			# (x,heaps) = build_map_to_tvi_expr x_expr main_module_index predefs heaps
 			  (y,heaps) = build_map_from_tvi_expr y_expr main_module_index predefs heaps
 			  (expr, funs_and_groups, heaps)
-				= bimap_from_arrow_expression [x,y] main_module_index predefs funs_and_groups heaps
+				= bimap_tofrom_expression [x,y] main_module_index predefs funs_and_groups heaps
 			= (expr, (funs_and_groups, modules, heaps, error))
 	specialize_from (GTSArrow (GTSVar {tv_info_ptr}) y) (funs_and_groups, modules, heaps=:{hp_type_heaps=th=:{th_vars}}, error)
 		#! (expr, th_vars) = readPtr tv_info_ptr th_vars
@@ -3821,7 +3933,7 @@ where
 			  (y, (funs_and_groups, modules, heaps, error))
 			  	= specialize_from y (funs_and_groups, modules, heaps, error)
 			  (expr, funs_and_groups, heaps)
-				= bimap_from_arrow_expression [x,y] main_module_index predefs funs_and_groups heaps
+				= bimap_tofrom_expression [x,y] main_module_index predefs funs_and_groups heaps
 			= (expr, (funs_and_groups, modules, heaps, error))
 	specialize_from (GTSArrow x (GTSVar {tv_info_ptr})) (funs_and_groups, modules, heaps=:{hp_type_heaps=th=:{th_vars}}, error)
 		#! (expr, th_vars) = readPtr tv_info_ptr th_vars
@@ -3833,131 +3945,181 @@ where
 			  (x, (funs_and_groups, modules, heaps, error))
 			  	= specialize_to x (funs_and_groups, modules, heaps, error)
 			  (expr, funs_and_groups, heaps)
-				= bimap_from_arrow_expression [x,y] main_module_index predefs funs_and_groups heaps
+				= bimap_tofrom_expression [x,y] main_module_index predefs funs_and_groups heaps
 			= (expr, (funs_and_groups, modules, heaps, error))
 	specialize_from (GTSArrow x y) st
 		#! (x, st) = specialize_to x st
 		#! (y, st) = specialize_from y st
 		# (funs_and_groups, modules, heaps, error) = st
 		  (expr, funs_and_groups, heaps)
-			= bimap_from_arrow_expression [x,y] main_module_index predefs funs_and_groups heaps
+			= bimap_tofrom_expression [x,y] main_module_index predefs funs_and_groups heaps
 		= (expr, (funs_and_groups, modules, heaps, error))
 	specialize_from (GTSVar tv=:{tv_info_ptr}) (funs_and_groups, modules, heaps=:{hp_type_heaps=th=:{th_vars}}, error)
 		# (expr, th_vars) = readPtr tv_info_ptr th_vars
 		# heaps = {heaps & hp_type_heaps = {th & th_vars = th_vars}}
 		= case expr of
-			TVI_Expr is_bimap_id expr
-				# from_expr = build_map_from_expr expr predefs
-				-> (from_expr, (funs_and_groups, modules, heaps, error))
-			TVI_Iso iso_ds to_ds from_ds
+			TVI_BimapExpr _ _ expr
+				-> (expr, (funs_and_groups, modules, heaps, error))
+			TVI_Iso _ from_ds
 				# (expr,heaps) = buildFunApp main_module_index from_ds [] heaps
 				-> (expr, (funs_and_groups, modules, heaps, error))
-	specialize_from type=:(GTSAppBimap (KindArrow [KindConst,KindConst]) [arg1,arg2]) st
-		# (arg1,st) = specialize arg1 st
-		  (arg2,st) = specialize arg2 st
-		  (funs_and_groups, modules, heaps, error) = st
-		  (expr, funs_and_groups, heaps)
-			= bimap_from_Bimap_expression [arg1,arg2] main_module_index predefs funs_and_groups heaps
-		= (expr, (funs_and_groups, modules, heaps, error))
 	specialize_from type (funs_and_groups, modules, heaps, error)
-		#! (bimap_expr, st)
-			= specialize type (funs_and_groups, modules, heaps, error)
-		# adaptor_expr = build_map_from_expr bimap_expr predefs
-		= (adaptor_expr, st)
+		= specialize_a_b type (funs_and_groups, modules, heaps, error)
 
 	specialize_from_arrow_arg_id y st
 		#! (y, st) = specialize_from y st
 		# (funs_and_groups, modules, heaps, error) = st
 		  (expr, funs_and_groups, heaps)
-			= bimap_from_arrow_arg_id_expression [y] main_module_index predefs funs_and_groups heaps
+			= bimap_from_expression [y] main_module_index predefs funs_and_groups heaps
 		= (expr, (funs_and_groups, modules, heaps, error))
 
 	specialize_from_arrow_res_id x st
 		#! (x, st) = specialize_to x st
 		# (funs_and_groups, modules, heaps, error) = st
 		  (expr, funs_and_groups, heaps)
-			= bimap_from_arrow_res_id_expression [x] main_module_index predefs funs_and_groups heaps
+			= bimap_to_expression [x] main_module_index predefs funs_and_groups heaps
 		= (expr, (funs_and_groups, modules, heaps, error))
 
 	specialize_to (GTSVar tv=:{tv_info_ptr}) (funs_and_groups, modules, heaps=:{hp_type_heaps=th=:{th_vars}}, error)
 		# (expr, th_vars) = readPtr tv_info_ptr th_vars
 		# heaps = {heaps & hp_type_heaps = {th & th_vars = th_vars}}
 		= case expr of
-			TVI_Expr is_bimap_id expr
-				# from_expr = build_map_to_expr expr predefs
-				-> (from_expr, (funs_and_groups, modules, heaps, error))
-			TVI_Iso iso_ds to_ds from_ds
+			TVI_BimapExpr _ expr _
+				-> (expr, (funs_and_groups, modules, heaps, error))
+			TVI_Iso to_ds _
 				# (expr,heaps) = buildFunApp main_module_index to_ds [] heaps
 				-> (expr, (funs_and_groups, modules, heaps, error))
 	specialize_to type (funs_and_groups, modules, heaps, error)
-		#! (bimap_expr, st) 
-			= specialize type (funs_and_groups, modules, heaps, error)
-		# adaptor_expr = build_map_to_expr bimap_expr predefs
-		= (adaptor_expr, st)
+		= specialize_a_f type (funs_and_groups, modules, heaps, error)
 
-	specialize (GTSAppCons KindConst []) (funs_and_groups, modules, heaps, error)
-		# (expr, funs_and_groups, heaps)
-			= bimap_id_expression main_module_index predefs funs_and_groups heaps
+	specialize_a_f (GTSAppCons KindConst []) (funs_and_groups, modules, heaps, error)
+		# (expr, funs_and_groups, heaps) = bimap_id_expression main_module_index predefs funs_and_groups heaps
 		= (expr ,(funs_and_groups, modules, heaps, error))
-	specialize (GTSAppCons kind arg_types) st
-		#! (arg_exprs, st) = mapSt specialize arg_types st
+	specialize_a_f (GTSAppCons kind arg_types) st
+		#! (arg_exprs, st) = specialize_a_f_args arg_types st
 		# (funs_and_groups, modules, heaps, error) = st
 		  (expr, heaps)
 		  	= build_generic_app kind arg_exprs gen_index gen_ident heaps
 		= (expr, (funs_and_groups, modules, heaps, error))
-	specialize (GTSAppConsSimpleType _ kind arg_types) st
-		#! (arg_exprs, st) = mapSt specialize arg_types st
+	specialize_a_f (GTSAppConsSimpleType _ kind arg_types) st
+		#! (arg_exprs, st) = specialize_a_f_args arg_types st
 		# (funs_and_groups, modules, heaps, error) = st
 		  (expr, heaps)
 		  	= build_generic_app kind arg_exprs gen_index gen_ident heaps
 		= (expr, (funs_and_groups, modules, heaps, error))
-	specialize (GTSAppBimap kind arg_types) st
-		#! (arg_exprs, st) = mapSt specialize arg_types st
-		# (funs_and_groups, modules, heaps, error) = st
-		  (expr, heaps)
-		  	= build_generic_app kind arg_exprs gen_index gen_ident heaps
-		= (expr, (funs_and_groups, modules, heaps, error))
-	specialize (GTSAppVar tv arg_types) st
-		#! (arg_exprs, st) = mapSt specialize arg_types st
-		#! (expr, st) = specialize_type_var tv st 
+	specialize_a_f (GTSAppVar tv arg_types) st
+		#! (arg_exprs, st) = specialize_a_f_args arg_types st
+		#! (expr, st) = specialize_a_f_type_var tv st 
 		= (expr @ arg_exprs, st)
-	specialize (GTSVar tv) st
-		= specialize_type_var tv st
-	specialize (GTSArrow x y) st=:(_,_,heaps,_)
+	specialize_a_f (GTSVar tv) st
+		= specialize_a_f_type_var tv st
+	specialize_a_f (GTSArrow x y) st=:(_,_,heaps,_)
 		| is_bimap_id x heaps
-			#! (y, st) = specialize y st
+			#! (y, st) = specialize_a_f y st
 			# (funs_and_groups, modules, heaps, error) = st
 			  (expr, funs_and_groups, heaps)
-				= bimap_arrow_arg_id_expression [y] main_module_index predefs funs_and_groups heaps
+				= bimap_from_expression [y] main_module_index predefs funs_and_groups heaps
 			= (expr, (funs_and_groups, modules, heaps, error))
 		| is_bimap_id y heaps
-			#! (x, st) = specialize x st
+			#! (x, st) = specialize_a_b x st
 			# (funs_and_groups, modules, heaps, error) = st
 			  (expr, funs_and_groups, heaps)
-				= bimap_arrow_res_id_expression [x] main_module_index predefs funs_and_groups heaps
+				= bimap_to_expression [x] main_module_index predefs funs_and_groups heaps
 			= (expr, (funs_and_groups, modules, heaps, error))
-			#! (x, st) = specialize x st
-			#! (y, st) = specialize y st
+			#! (x, st) = specialize_a_b x st
+			#! (y, st) = specialize_a_f y st
 			# (funs_and_groups, modules, heaps, error) = st
 			  (expr, funs_and_groups, heaps)
-				= bimap_arrow_expression [x,y] main_module_index predefs funs_and_groups heaps
+				= bimap_tofrom_expression [x,y] main_module_index predefs funs_and_groups heaps
 			= (expr, (funs_and_groups, modules, heaps, error))
-	specialize GTSAppConsBimapKindConst (funs_and_groups, modules, heaps, error)
-		# (expr, funs_and_groups, heaps)
-			= bimap_id_expression main_module_index predefs funs_and_groups heaps
+	specialize_a_f GTSAppConsBimapKindConst (funs_and_groups, modules, heaps, error)
+		# (expr, funs_and_groups, heaps) = bimap_id_expression main_module_index predefs funs_and_groups heaps
 		= (expr ,(funs_and_groups, modules, heaps, error))
-	specialize type (funs_and_groups, modules, heaps, error)
+	specialize_a_f type (funs_and_groups, modules, heaps, error)
 		#! error = reportError gen_ident.id_name gen_pos "cannot specialize " error 
 		= (EE, (funs_and_groups, modules, heaps, error))
 
-	specialize_type_var tv=:{tv_info_ptr} (funs_and_groups, modules, heaps=:{hp_type_heaps=th=:{th_vars}}, error)		
+	specialize_a_f_args [arg_type:arg_types] st
+		# (f_expr_arg,st) = specialize_a_f arg_type st
+		  (b_expr_arg,st) = specialize_a_b arg_type st
+		  (expr_args,st) = specialize_a_f_args arg_types st
+		= ([f_expr_arg,b_expr_arg:expr_args],st)
+	specialize_a_f_args [] st
+		= ([],st)
+
+	specialize_a_b (GTSAppCons KindConst []) (funs_and_groups, modules, heaps, error)
+		# (expr, funs_and_groups, heaps) = bimap_id_expression main_module_index predefs funs_and_groups heaps
+		= (expr ,(funs_and_groups, modules, heaps, error))
+	specialize_a_b (GTSAppCons kind arg_types) st
+		#! (arg_exprs, st) = specialize_a_b_args arg_types st
+		# (funs_and_groups, modules, heaps, error) = st
+		  (expr, heaps)
+		  	= build_generic_app kind arg_exprs gen_index gen_ident heaps
+		= (expr, (funs_and_groups, modules, heaps, error))
+	specialize_a_b (GTSAppConsSimpleType _ kind arg_types) st
+		#! (arg_exprs, st) = specialize_a_b_args arg_types st
+		# (funs_and_groups, modules, heaps, error) = st
+		  (expr, heaps)
+		  	= build_generic_app kind arg_exprs gen_index gen_ident heaps
+		= (expr, (funs_and_groups, modules, heaps, error))
+	specialize_a_b (GTSAppVar tv arg_types) st
+		#! (arg_exprs, st) = specialize_a_b_args arg_types st
+		#! (expr, st) = specialize_a_b_type_var tv st 
+		= (expr @ arg_exprs, st)
+	specialize_a_b (GTSVar tv) st
+		= specialize_a_b_type_var tv st
+	specialize_a_b (GTSArrow x y) st=:(_,_,heaps,_)
+		| is_bimap_id x heaps
+			#! (y, st) = specialize_a_b y st
+			# (funs_and_groups, modules, heaps, error) = st
+			  (expr, funs_and_groups, heaps)
+				= bimap_from_expression [y] main_module_index predefs funs_and_groups heaps
+			= (expr, (funs_and_groups, modules, heaps, error))
+		| is_bimap_id y heaps
+			#! (x, st) = specialize_a_f x st
+			# (funs_and_groups, modules, heaps, error) = st
+			  (expr, funs_and_groups, heaps)
+				= bimap_to_expression [x] main_module_index predefs funs_and_groups heaps
+			= (expr, (funs_and_groups, modules, heaps, error))
+			#! (x, st) = specialize_a_f x st
+			#! (y, st) = specialize_a_b y st
+			# (funs_and_groups, modules, heaps, error) = st
+			  (expr, funs_and_groups, heaps)
+				= bimap_tofrom_expression [x,y] main_module_index predefs funs_and_groups heaps
+			= (expr, (funs_and_groups, modules, heaps, error))
+	specialize_a_b GTSAppConsBimapKindConst (funs_and_groups, modules, heaps, error)
+		# (expr, funs_and_groups, heaps) = bimap_id_expression main_module_index predefs funs_and_groups heaps
+		= (expr ,(funs_and_groups, modules, heaps, error))
+	specialize_a_b type (funs_and_groups, modules, heaps, error)
+		#! error = reportError gen_ident.id_name gen_pos "cannot specialize " error 
+		= (EE, (funs_and_groups, modules, heaps, error))
+
+	specialize_a_b_args [arg_type:arg_types] st
+		# (b_expr_arg,st) = specialize_a_b arg_type st
+		  (f_expr_arg,st) = specialize_a_f arg_type st
+		  (expr_args,st) = specialize_a_b_args arg_types st
+		= ([b_expr_arg,f_expr_arg:expr_args],st)
+	specialize_a_b_args [] st
+		= ([],st)
+
+	specialize_a_f_type_var tv=:{tv_info_ptr} (funs_and_groups, modules, heaps=:{hp_type_heaps=th=:{th_vars}}, error)		
 		# (expr, th_vars) = readPtr tv_info_ptr th_vars
 		# heaps = {heaps & hp_type_heaps = {th & th_vars = th_vars}}
 		= case expr of
-			TVI_Expr is_bimap_id expr
+			TVI_BimapExpr _ expr _
 				-> (expr, (funs_and_groups, modules, heaps, error))
-			TVI_Iso iso_ds to_ds from_ds
-				# (expr,heaps) = buildFunApp main_module_index iso_ds [] heaps
+			TVI_Iso to_ds _
+				# (expr,heaps) = buildFunApp main_module_index to_ds [] heaps
+				-> (expr, (funs_and_groups, modules, heaps, error))
+
+	specialize_a_b_type_var tv=:{tv_info_ptr} (funs_and_groups, modules, heaps=:{hp_type_heaps=th=:{th_vars}}, error)		
+		# (expr, th_vars) = readPtr tv_info_ptr th_vars
+		# heaps = {heaps & hp_type_heaps = {th & th_vars = th_vars}}
+		= case expr of
+			TVI_BimapExpr _ _ expr
+				-> (expr, (funs_and_groups, modules, heaps, error))
+			TVI_Iso _ from_ds
+				# (expr,heaps) = buildFunApp main_module_index from_ds [] heaps
 				-> (expr, (funs_and_groups, modules, heaps, error))
 
 	build_generic_app kind arg_exprs gen_index gen_ident heaps
@@ -3966,22 +4128,17 @@ where
 	bimap_to_simple_type :: !GlobalIndex !TypeKind ![GenTypeStruct] !Expression !*(!FunsAndGroups,!*{#CommonDefs},!*Heaps,!*ErrorAdmin)
 															   -> *(!Expression,!*(!FunsAndGroups,!*{#CommonDefs},!*Heaps,!*ErrorAdmin))
 	bimap_to_simple_type global_type_def_index=:{gi_module} (KindArrow kinds) arg_types arg (funs_and_groups,modules,heaps,error)
-/*
 		# (alts,constructors_arg_types,modules,heaps)
 			= determine_constructors_arg_types global_type_def_index arg_types modules heaps
 		# (alg_patterns,funs_and_groups,modules,heaps,error)
 			= build_to_alg_patterns alts constructors_arg_types gi_module funs_and_groups modules heaps error
+/*
 		= build_bimap_case global_type_def_index arg alg_patterns funs_and_groups modules heaps error
 */
-		# (alts,constructors_arg_types,modules,heaps)
-			= determine_constructors_arg_types global_type_def_index arg_types modules heaps
-		# (alg_patterns,funs_and_groups,modules,heaps,error)
-			= build_to_alg_patterns alts constructors_arg_types gi_module funs_and_groups modules heaps error
-
 		# (arg_expr, arg_var, heaps) = buildVarExpr "x" heaps 
 
-		# (case_expr,(funs_and_groups,modules,heaps,error))
-			= build_bimap_case global_type_def_index arg_expr alg_patterns funs_and_groups modules heaps error
+		# (case_expr,heaps)
+			= build_bimap_case global_type_def_index arg_expr alg_patterns heaps
 
 		# (def_sym, funs_and_groups)
 			= buildFunAndGroup (makeIdent "bimapToGeneric") [arg_var] case_expr No main_module_index NoPos funs_and_groups
@@ -4017,22 +4174,17 @@ where
 	bimap_from_simple_type :: !GlobalIndex !TypeKind ![GenTypeStruct] !Expression !*(!FunsAndGroups,!*{#CommonDefs},!*Heaps,!*ErrorAdmin)
 																 -> *(!Expression,!*(!FunsAndGroups,!*{#CommonDefs},!*Heaps,!*ErrorAdmin))
 	bimap_from_simple_type global_type_def_index=:{gi_module} (KindArrow kinds) arg_types arg (funs_and_groups,modules,heaps,error)
-/*
 		# (alts,constructors_arg_types,modules,heaps)
 			= determine_constructors_arg_types global_type_def_index arg_types modules heaps
 		# (alg_patterns,funs_and_groups,modules,heaps,error)
 			= build_from_alg_patterns alts constructors_arg_types gi_module funs_and_groups modules heaps error
+/*
 		= build_bimap_case global_type_def_index arg alg_patterns funs_and_groups modules heaps error
 */
-		# (alts,constructors_arg_types,modules,heaps)
-			= determine_constructors_arg_types global_type_def_index arg_types modules heaps
-		# (alg_patterns,funs_and_groups,modules,heaps,error)
-			= build_from_alg_patterns alts constructors_arg_types gi_module funs_and_groups modules heaps error
-
 		# (arg_expr, arg_var, heaps) = buildVarExpr "x" heaps 
 
-		# (case_expr,(funs_and_groups,modules,heaps,error))
-			= build_bimap_case global_type_def_index arg_expr alg_patterns funs_and_groups modules heaps error
+		# (case_expr,heaps)
+			= build_bimap_case global_type_def_index arg_expr alg_patterns heaps
 
 		# (def_sym, funs_and_groups)
 			= buildFunAndGroup (makeIdent "bimapFromGeneric") [arg_var] case_expr No main_module_index NoPos funs_and_groups
@@ -4102,27 +4254,26 @@ where
 		compute_constructor_arg_types [] arg_types_a th_vars
 			= ([],th_vars)
 
-	build_bimap_case :: !GlobalIndex !.Expression ![AlgebraicPattern] !FunsAndGroups !*Modules !*Heaps !*ErrorAdmin
-													-> (!Expression,!(!FunsAndGroups,!*Modules,!*Heaps,!*ErrorAdmin))
-	build_bimap_case global_type_def_index arg alg_patterns funs_and_groups modules heaps error
-		# case_patterns = AlgebraicPatterns global_type_def_index alg_patterns
-		# (expr_info_ptr, hp_expression_heap) = newPtr EI_Empty heaps.hp_expression_heap
-		# case_expr = Case {case_expr = arg, case_guards = case_patterns, case_default = No, case_ident = No,
-							case_info_ptr = expr_info_ptr, case_explicit = True, case_default_pos = NoPos}
-		# heaps = {heaps & hp_expression_heap = hp_expression_heap}
-		= (case_expr, (funs_and_groups,modules,heaps,error))
+build_bimap_case :: !GlobalIndex !.Expression ![AlgebraicPattern] !*Heaps -> (!Expression,!*Heaps)
+build_bimap_case global_type_def_index arg alg_patterns heaps
+	# case_patterns = AlgebraicPatterns global_type_def_index alg_patterns
+	# (expr_info_ptr, hp_expression_heap) = newPtr EI_Empty heaps.hp_expression_heap
+	# case_expr = Case {case_expr = arg, case_guards = case_patterns, case_default = No, case_ident = No,
+						case_info_ptr = expr_info_ptr, case_explicit = True, case_default_pos = NoPos}
+	# heaps = {heaps & hp_expression_heap = hp_expression_heap}
+	= (case_expr, heaps)
 
-	build_alg_pattern :: !DefinedSymbol ![FreeVar] ![Expression] !Int !*Heaps -> (!AlgebraicPattern,!*Heaps)
-	build_alg_pattern cons_ds=:{ds_ident,ds_index} vars args type_module_n heaps
-		# cons_symbol = {glob_module = type_module_n, glob_object = cons_ds}
-		# cons_symb_ident = {symb_ident = ds_ident, symb_kind = SK_Constructor {glob_module = type_module_n,glob_object = ds_index}}
+build_alg_pattern :: !DefinedSymbol ![FreeVar] ![Expression] !Int !*Heaps -> (!AlgebraicPattern,!*Heaps)
+build_alg_pattern cons_ds=:{ds_ident,ds_index} vars args type_module_n heaps
+	# cons_symbol = {glob_module = type_module_n, glob_object = cons_ds}
+	# cons_symb_ident = {symb_ident = ds_ident, symb_kind = SK_Constructor {glob_module = type_module_n,glob_object = ds_index}}
 
-		# (expr_info_ptr, hp_expression_heap) = newPtr EI_Empty heaps.hp_expression_heap
-		# expr = App {app_symb = cons_symb_ident, app_args = args, app_info_ptr = expr_info_ptr} 
+	# (expr_info_ptr, hp_expression_heap) = newPtr EI_Empty heaps.hp_expression_heap
+	# expr = App {app_symb = cons_symb_ident, app_args = args, app_info_ptr = expr_info_ptr} 
 
-		#! alg_pattern = { ap_symbol = cons_symbol, ap_vars = vars, ap_expr = expr, ap_position = NoPos }
-		# heaps = {heaps & hp_expression_heap = hp_expression_heap}
-		= (alg_pattern,heaps)
+	#! alg_pattern = { ap_symbol = cons_symbol, ap_vars = vars, ap_expr = expr, ap_position = NoPos }
+	# heaps = {heaps & hp_expression_heap = hp_expression_heap}
+	= (alg_pattern,heaps)
 
 is_bimap_id :: !GenTypeStruct !Heaps -> Bool
 is_bimap_id (GTSAppCons KindConst []) heaps
@@ -4131,14 +4282,14 @@ is_bimap_id GTSAppConsBimapKindConst heaps
 	= True
 is_bimap_id (GTSVar {tv_info_ptr}) heaps
 	= case sreadPtr tv_info_ptr heaps.hp_type_heaps.th_vars of
-		TVI_Expr is_bimap_id expr
+		TVI_BimapExpr is_bimap_id _ _
 			-> is_bimap_id
 		_
 			-> False
 is_bimap_id _ heaps
 	= False
 
-is_bimap_id_expression (TVI_Expr is_bimap_id _)
+is_bimap_id_expression (TVI_BimapExpr is_bimap_id _ _)
 	= is_bimap_id
 is_bimap_id_expression _
 	= False
@@ -4168,17 +4319,6 @@ remove_type_argument_numbers [{atv_variable={tv_info_ptr}}:atype_vars] th_vars
 	= remove_type_argument_numbers atype_vars th_vars
 remove_type_argument_numbers [] th_vars
 	= th_vars
-
-build_bimap_with_calls map_id_index map_id_ident to_args from_args main_module_index predefs heaps
-	# (map_to_expr,heaps) = buildFunApp2 main_module_index map_id_index map_id_ident to_args heaps
-	  (map_from_expr,heaps) = buildFunApp2 main_module_index map_id_index map_id_ident from_args heaps
-	= build_bimap_record map_to_expr map_from_expr predefs heaps	
-
-build_var_with_bimap_selectors var_name predefs heaps
-	# (bimap_var_expr,arg_var,heaps) = buildVarExpr var_name heaps 
-	  to_arg_expr = build_map_to_expr bimap_var_expr predefs
-	  from_arg_expr = build_map_from_expr bimap_var_expr predefs
-	= (to_arg_expr,from_arg_expr,arg_var,heaps)
 
 bimap_fromto_function main_module_index funs_and_groups=:{fg_bimap_functions={bimap_fromto_function={fii_index,fii_ident}}} heaps
 	| fii_index>=0
@@ -4251,113 +4391,17 @@ bimap_id_expression main_module_index predefs funs_and_groups=:{fg_bimap_functio
 		  (arg_expr, arg_var, heaps) = buildVarExpr "x" heaps 
 		  (bimap_id_index,funs_and_groups) = buildFunAndGroup2 bimap_id_ident [arg_var] arg_expr main_module_index funs_and_groups
 
-		// bimap/c = {map_to = bimap/id, map_from = bimap/id}
-		  bimap_c_ident = makeIdent "bimap/c"
-		  (bimap_expr,heaps) = build_bimap_with_calls bimap_id_index bimap_id_ident [] [] main_module_index predefs heaps
+		  funs_and_groups = {funs_and_groups & fg_bimap_functions.bimap_id_function={fii_index=bimap_id_index,fii_ident=bimap_id_ident}}
 
-		  (bimap_c_index,funs_and_groups) = buildFunAndGroup2 bimap_c_ident [] bimap_expr main_module_index funs_and_groups
-
-		  funs_and_groups = {funs_and_groups & fg_bimap_functions.bimap_id_function={fii_index=bimap_c_index,fii_ident=bimap_c_ident}}
-
-		  (bimap_c_expr,heaps) = buildFunApp2 main_module_index bimap_c_index bimap_c_ident [] heaps
+		  (bimap_c_expr,heaps) = buildFunApp2 main_module_index bimap_id_index bimap_id_ident [] heaps
 		= (bimap_c_expr,funs_and_groups,heaps)
-
-bimap_arrow_expression arg_exprs main_module_index predefs funs_and_groups=:{fg_bimap_functions={bimap_arrow_function={fii_index,fii_ident}}} heaps
-	| fii_index>=0
-		# (expr,heaps) = buildFunApp2 main_module_index fii_index fii_ident arg_exprs heaps
-		= (expr,funs_and_groups,heaps)
-		# (bimap_tofrom_index,bimap_tofrom_ident,funs_and_groups,heaps)
-			= bimap_tofrom_function main_module_index funs_and_groups heaps
-		// bimap/arrow args res
-		//	= {map_to = bimap/tofrom arg.map_from res.map_to, map_from = bimap/tofrom arg.map_to res.map_to}
-		  bimap_arrow_ident = makeIdent "bimap/arrow"
-		  (to_arg_expr,from_arg_expr,arg_var,heaps) = build_var_with_bimap_selectors "arg" predefs heaps
-		  (to_res_expr,from_res_expr,res_var,heaps) = build_var_with_bimap_selectors "res" predefs heaps
-		  (bimap_expr,heaps) = build_bimap_with_calls bimap_tofrom_index bimap_tofrom_ident [from_arg_expr,to_res_expr] [to_arg_expr,from_res_expr] main_module_index predefs heaps
-
-		  args = [arg_var,res_var]
-		  (bimap_arrow_index,funs_and_groups) = buildFunAndGroup2 bimap_arrow_ident args bimap_expr main_module_index funs_and_groups
-
-		  funs_and_groups = {funs_and_groups & fg_bimap_functions.bimap_arrow_function={fii_index=bimap_arrow_index,fii_ident=bimap_arrow_ident}}
-
-		  (bimap_arrow_expr,heaps) = buildFunApp2 main_module_index bimap_arrow_index bimap_arrow_ident arg_exprs heaps
-		= (bimap_arrow_expr,funs_and_groups,heaps)
-
-bimap_arrow_arg_id_expression arg_exprs main_module_index predefs funs_and_groups=:{fg_bimap_functions={bimap_arrow_arg_id_function={fii_index,fii_ident}}} heaps
-	| fii_index>=0
-		# (expr,heaps) = buildFunApp2 main_module_index fii_index fii_ident arg_exprs heaps
-		= (expr,funs_and_groups,heaps)
-		# (bimap_from_index,bimap_from_ident,funs_and_groups,heaps)
-			= bimap_from_function main_module_index funs_and_groups heaps
-		// bimap/arrow_arg_id res
-		//	= {map_to = bimap/from res.map_to, map_from = bimap/from res.map_from }
-		  bimap_arrow_arg_id_ident = makeIdent "bimap/arrow_arg_id"
-		  (to_res_expr,from_res_expr,res_var,heaps) = build_var_with_bimap_selectors "res" predefs heaps
-		  (bimap_expr,heaps) = build_bimap_with_calls bimap_from_index bimap_from_ident [to_res_expr] [from_res_expr] main_module_index predefs heaps
-
-		  args = [res_var]
-		  (bimap_arrow_arg_id_index,funs_and_groups) = buildFunAndGroup2 bimap_arrow_arg_id_ident args bimap_expr main_module_index funs_and_groups
-
-		  funs_and_groups = {funs_and_groups & fg_bimap_functions.bimap_arrow_arg_id_function={fii_index=bimap_arrow_arg_id_index,fii_ident=bimap_arrow_arg_id_ident}}
-
-		  (bimap_arrow_expr,heaps) = buildFunApp2 main_module_index bimap_arrow_arg_id_index bimap_arrow_arg_id_ident arg_exprs heaps
-		= (bimap_arrow_expr,funs_and_groups,heaps)
-
-bimap_arrow_res_id_expression arg_exprs main_module_index predefs funs_and_groups=:{fg_bimap_functions={bimap_arrow_res_id_function={fii_index,fii_ident}}} heaps
-	| fii_index>=0
-		# (expr,heaps) = buildFunApp2 main_module_index fii_index fii_ident arg_exprs heaps
-		= (expr,funs_and_groups,heaps)
-		# (bimap_to_index,bimap_to_ident,funs_and_groups,heaps)
-			= bimap_to_function main_module_index funs_and_groups heaps
-		// bimap/arrow_res_id arg
-		//	= {map_to = bimap/to arg.map_from, map_from = bimap/to arg.map_to }
-		  bimap_arrow_res_id_ident = makeIdent "bimap/arrow_res_id"
-		  (to_arg_expr,from_arg_expr,arg_var,heaps) = build_var_with_bimap_selectors "arg" predefs heaps
-		  (bimap_expr,heaps) = build_bimap_with_calls bimap_to_index bimap_to_ident [from_arg_expr] [to_arg_expr] main_module_index predefs heaps
-
-		  args = [arg_var]
-		  (bimap_arrow_res_id_index,funs_and_groups) = buildFunAndGroup2 bimap_arrow_res_id_ident args bimap_expr main_module_index funs_and_groups
-
-		  funs_and_groups = {funs_and_groups & fg_bimap_functions.bimap_arrow_res_id_function={fii_index=bimap_arrow_res_id_index,fii_ident=bimap_arrow_res_id_ident}}
-
-		  (bimap_arrow_expr,heaps) = buildFunApp2 main_module_index bimap_arrow_res_id_index bimap_arrow_res_id_ident arg_exprs heaps
-		= (bimap_arrow_expr,funs_and_groups,heaps)
-
-bimap_from_Bimap_expression arg_exprs main_module_index predefs funs_and_groups=:{fg_bimap_functions={bimap_from_Bimap_function={fii_index,fii_ident}}} heaps
-	| fii_index>=0
-		# (expr,heaps) = buildFunApp2 main_module_index fii_index fii_ident arg_exprs heaps
-		= (expr,funs_and_groups,heaps)
-		# (bimap_fromto_index,bimap_fromto_ident,funs_and_groups,heaps)
-			= bimap_fromto_function main_module_index funs_and_groups heaps
-
-		// bimap/from_Bimap arg res f
-		//	= {map_to = bimap/fromto res.map_from arg.map_to f.map_to, map_from = bimap/fromto arg.map_from res.map_to f.map_from}
-		  bimap_from_Bimap_ident = makeIdent "bimap/from_Bimap"
-		  (to_arg_expr,from_arg_expr,arg_var,heaps) = build_var_with_bimap_selectors "arg" predefs heaps
-		  (to_res_expr,from_res_expr,res_var,heaps) = build_var_with_bimap_selectors "res" predefs heaps
-		  (to_f_expr,from_f_expr,f_var,heaps) = build_var_with_bimap_selectors "f" predefs heaps
-		  (bimap_expr,heaps) = build_bimap_with_calls bimap_fromto_index bimap_fromto_ident
-		  							[from_res_expr,to_arg_expr,to_f_expr] [from_arg_expr,to_res_expr,from_f_expr] main_module_index predefs heaps
-
-		  args = [arg_var,res_var,f_var]
-		  (bimap_from_Bimap_index,funs_and_groups) = buildFunAndGroup2 bimap_from_Bimap_ident args bimap_expr main_module_index funs_and_groups
-
-		  funs_and_groups = {funs_and_groups & fg_bimap_functions.bimap_from_Bimap_function={fii_index=bimap_from_Bimap_index,fii_ident=bimap_from_Bimap_ident}}
-
-		  (bimap_arrow_expr,heaps) = buildFunApp2 main_module_index bimap_from_Bimap_index bimap_from_Bimap_ident arg_exprs heaps
-		= (bimap_arrow_expr,funs_and_groups,heaps)
 
 bimap_PAIR_expression arg_exprs main_module_index predefs funs_and_groups=:{fg_bimap_functions={bimap_PAIR_function={fii_index,fii_ident}}} heaps
 	| fii_index>=0
 		# (expr,heaps) = buildFunApp2 main_module_index fii_index fii_ident arg_exprs heaps
 		= (expr,funs_and_groups,heaps)
-		/*
-		bimap/PAIR x y
-			= {map_to = map/PAIR x.map_to y.map_to, map_from = map/PAIR x.map_from y.map_from}
-		where
-			map/PAIR fx fy (PAIR x y) = PAIR (fx x) (fy y)
-		*/
-		# map_PAIR_ident = makeIdent "map/PAIR"
+		// bimap/PAIR fx fy (PAIR x y) = PAIR (fx x) (fy y)
+		# map_PAIR_ident = makeIdent "bimap/PAIR"
 		  (fx_expr,fx_var,heaps) = buildVarExpr "fx" heaps 
 		  (fy_expr,fy_var,heaps) = buildVarExpr "fy" heaps 
 		  (x_expr,x_var,heaps) = buildVarExpr "x" heaps
@@ -4368,31 +4412,18 @@ bimap_PAIR_expression arg_exprs main_module_index predefs funs_and_groups=:{fg_b
 		  args = [fx_var,fy_var,c_var]
 		  (map_PAIR_index,funs_and_groups) = buildFunAndGroup2 map_PAIR_ident args case_expr main_module_index funs_and_groups
 
-		  bimap_PAIR_ident = makeIdent "bimap/PAIR"
-		  (to_x_expr,from_x_expr,x_var,heaps) = build_var_with_bimap_selectors "x" predefs heaps
-		  (to_y_expr,from_y_expr,y_var,heaps) = build_var_with_bimap_selectors "y" predefs heaps
-		  (bimap_expr,heaps) = build_bimap_with_calls map_PAIR_index map_PAIR_ident [to_x_expr,to_y_expr] [from_x_expr,from_y_expr] main_module_index predefs heaps
+		  funs_and_groups = {funs_and_groups & fg_bimap_functions.bimap_PAIR_function={fii_index=map_PAIR_index,fii_ident=map_PAIR_ident}}
 
-		  args = [x_var,y_var]
-		  (bimap_PAIR_index,funs_and_groups) = buildFunAndGroup2 bimap_PAIR_ident args bimap_expr main_module_index funs_and_groups
-
-		  funs_and_groups = {funs_and_groups & fg_bimap_functions.bimap_PAIR_function={fii_index=bimap_PAIR_index,fii_ident=bimap_PAIR_ident}}
-
-		  (bimap_PAIR_expr,heaps) = buildFunApp2 main_module_index bimap_PAIR_index bimap_PAIR_ident arg_exprs heaps
+		  (bimap_PAIR_expr,heaps) = buildFunApp2 main_module_index map_PAIR_index map_PAIR_ident arg_exprs heaps
 		= (bimap_PAIR_expr,funs_and_groups,heaps)
 
 bimap_EITHER_expression arg_exprs main_module_index predefs funs_and_groups=:{fg_bimap_functions={bimap_EITHER_function={fii_index,fii_ident}}} heaps
 	| fii_index>=0
 		# (expr,heaps) = buildFunApp2 main_module_index fii_index fii_ident arg_exprs heaps
 		= (expr,funs_and_groups,heaps)
-		/*
-		bimap/EITHER l r
-			= {map_to = map/EITHER l.map_to r.map_to, map_from = map/EITHER l.map_from r.map_from}
-		where
-			map/EITHER lf rf (LEFT l)  = LEFT  (lf l)
-			map/EITHER lf rf (RIGHT r) = RIGHT (rf r)
-		*/
-		# map_EITHER_ident = makeIdent "map/EITHER"
+		// bimap/EITHER lf rf (LEFT l)  = LEFT  (lf l)
+		// bimap/EITHER lf rf (RIGHT r) = RIGHT (rf r)
+		# map_EITHER_ident = makeIdent "bimap/EITHER"
 		  (lf_expr,lf_var,heaps) = buildVarExpr "lf" heaps 
 		  (rf_expr,rf_var,heaps) = buildVarExpr "rf" heaps 
 		  (l_expr,l_var,heaps) = buildVarExpr "l" heaps
@@ -4405,30 +4436,17 @@ bimap_EITHER_expression arg_exprs main_module_index predefs funs_and_groups=:{fg
 		  args = [lf_var,rf_var,c_var]
 		  (map_EITHER_index,funs_and_groups) = buildFunAndGroup2 map_EITHER_ident args case_expr main_module_index funs_and_groups
 
-		  bimap_EITHER_ident = makeIdent "bimap/EITHER"
-		  (to_l_expr,from_l_expr,l_var,heaps) = build_var_with_bimap_selectors "l" predefs heaps
-		  (to_r_expr,from_r_expr,r_var,heaps) = build_var_with_bimap_selectors "r" predefs heaps
-		  (bimap_expr,heaps) = build_bimap_with_calls map_EITHER_index map_EITHER_ident [to_l_expr,to_r_expr] [from_l_expr,from_r_expr] main_module_index predefs heaps
+		  funs_and_groups = {funs_and_groups & fg_bimap_functions.bimap_EITHER_function={fii_index=map_EITHER_index,fii_ident=map_EITHER_ident}}
 
-		  args = [l_var,r_var]
-		  (bimap_EITHER_index,funs_and_groups) = buildFunAndGroup2 bimap_EITHER_ident args bimap_expr main_module_index funs_and_groups
-
-		  funs_and_groups = {funs_and_groups & fg_bimap_functions.bimap_EITHER_function={fii_index=bimap_EITHER_index,fii_ident=bimap_EITHER_ident}}
-
-		  (bimap_EITHER_expr,heaps) = buildFunApp2 main_module_index bimap_EITHER_index bimap_EITHER_ident arg_exprs heaps
+		  (bimap_EITHER_expr,heaps) = buildFunApp2 main_module_index map_EITHER_index map_EITHER_ident arg_exprs heaps
 		= (bimap_EITHER_expr,funs_and_groups,heaps)
 
 bimap_OBJECT_expression arg_exprs main_module_index predefs funs_and_groups=:{fg_bimap_functions={bimap_OBJECT_function={fii_index,fii_ident}}} heaps
 	| fii_index>=0
 		# (expr,heaps) = buildFunApp2 main_module_index fii_index fii_ident arg_exprs heaps
 		= (expr,funs_and_groups,heaps)
-		/*
-		bimap/OBJECT arg
-			= {map_to = map/OBJECT arg.map_to, map_from = map/OBJECT arg.map_from}
-		where
-			map/OBJECT f (OBJECT x) = OBJECT (f x)
-		*/
-		# map_OBJECT_ident = makeIdent "map/OBJECT"
+		// bimap/OBJECT f (OBJECT x) = OBJECT (f x)
+		# map_OBJECT_ident = makeIdent "bimap/OBJECT"
 		  (f_expr,f_var,heaps) = buildVarExpr "f" heaps 
 		  (x_expr,x_var,heaps) = buildVarExpr "x" heaps
 
@@ -4437,29 +4455,17 @@ bimap_OBJECT_expression arg_exprs main_module_index predefs funs_and_groups=:{fg
 		  args = [f_var,c_var]
 		  (map_OBJECT_index,funs_and_groups) = buildFunAndGroup2 map_OBJECT_ident args case_expr main_module_index funs_and_groups
 
-		  bimap_OBJECT_ident = makeIdent "bimap/OBJECT"
-		  (to_arg_expr,from_arg_expr,arg_var,heaps) = build_var_with_bimap_selectors "arg" predefs heaps
-		  (bimap_expr,heaps) = build_bimap_with_calls map_OBJECT_index map_OBJECT_ident [to_arg_expr] [from_arg_expr] main_module_index predefs heaps
+		  funs_and_groups = {funs_and_groups & fg_bimap_functions.bimap_OBJECT_function={fii_index=map_OBJECT_index,fii_ident=map_OBJECT_ident}}
 
-		  args = [arg_var]
-		  (bimap_OBJECT_index,funs_and_groups) = buildFunAndGroup2 bimap_OBJECT_ident args bimap_expr main_module_index funs_and_groups
-
-		  funs_and_groups = {funs_and_groups & fg_bimap_functions.bimap_OBJECT_function={fii_index=bimap_OBJECT_index,fii_ident=bimap_OBJECT_ident}}
-
-		  (bimap_arrow_expr,heaps) = buildFunApp2 main_module_index bimap_OBJECT_index bimap_OBJECT_ident arg_exprs heaps
-		= (bimap_arrow_expr,funs_and_groups,heaps)
+		  (bimap_OBJECT_expr,heaps) = buildFunApp2 main_module_index map_OBJECT_index map_OBJECT_ident arg_exprs heaps
+		= (bimap_OBJECT_expr,funs_and_groups,heaps)
 
 bimap_CONS_expression arg_exprs main_module_index predefs funs_and_groups=:{fg_bimap_functions={bimap_CONS_function={fii_index,fii_ident}}} heaps
 	| fii_index>=0
 		# (expr,heaps) = buildFunApp2 main_module_index fii_index fii_ident arg_exprs heaps
 		= (expr,funs_and_groups,heaps)
-		/*
-		bimap/CONS arg
-			= {map_to = map/CONS arg.map_to, map_from = map/CONS arg.map_from}
-		where
-			map/CONS f (CONS x) = CONS (f x)
-		*/
-		# map_CONS_ident = makeIdent "map/CONS"
+		// bimap/CONS f (CONS x) = CONS (f x)
+		# map_CONS_ident = makeIdent "bimap/CONS"
 		  (f_expr,f_var,heaps) = buildVarExpr "f" heaps 
 		  (x_expr,x_var,heaps) = buildVarExpr "x" heaps
 
@@ -4468,29 +4474,17 @@ bimap_CONS_expression arg_exprs main_module_index predefs funs_and_groups=:{fg_b
 		  args = [f_var,c_var]
 		  (map_CONS_index,funs_and_groups) = buildFunAndGroup2 map_CONS_ident args case_expr main_module_index funs_and_groups
 
-		  bimap_CONS_ident = makeIdent "bimap/CONS"
-		  (to_arg_expr,from_arg_expr,arg_var,heaps) = build_var_with_bimap_selectors "arg" predefs heaps
-		  (bimap_expr,heaps) = build_bimap_with_calls map_CONS_index map_CONS_ident [to_arg_expr] [from_arg_expr] main_module_index predefs heaps
+		  funs_and_groups = {funs_and_groups & fg_bimap_functions.bimap_CONS_function={fii_index=map_CONS_index,fii_ident=map_CONS_ident}}
 
-		  args = [arg_var]
-		  (bimap_CONS_index,funs_and_groups) = buildFunAndGroup2 bimap_CONS_ident args bimap_expr main_module_index funs_and_groups
-
-		  funs_and_groups = {funs_and_groups & fg_bimap_functions.bimap_CONS_function={fii_index=bimap_CONS_index,fii_ident=bimap_CONS_ident}}
-
-		  (bimap_arrow_expr,heaps) = buildFunApp2 main_module_index bimap_CONS_index bimap_CONS_ident arg_exprs heaps
-		= (bimap_arrow_expr,funs_and_groups,heaps)
+		  (bimap_CONS_expr,heaps) = buildFunApp2 main_module_index map_CONS_index map_CONS_ident arg_exprs heaps
+		= (bimap_CONS_expr,funs_and_groups,heaps)
 
 bimap_RECORD_expression arg_exprs main_module_index predefs funs_and_groups=:{fg_bimap_functions={bimap_RECORD_function={fii_index,fii_ident}}} heaps
 	| fii_index>=0
 		# (expr,heaps) = buildFunApp2 main_module_index fii_index fii_ident arg_exprs heaps
 		= (expr,funs_and_groups,heaps)
-		/*
-		bimap/RECORD arg
-			= {map_to = map/RECORD arg.map_to, map_from = map/RECORD arg.map_from}
-		where
-			map/RECORD f (RECORD x) = RECORD (f x)
-		*/
-		# map_RECORD_ident = makeIdent "map/RECORD"
+		// bimap/RECORD f (RECORD x) = RECORD (f x)
+		# map_RECORD_ident = makeIdent "bimap/RECORD"
 		  (f_expr,f_var,heaps) = buildVarExpr "f" heaps 
 		  (x_expr,x_var,heaps) = buildVarExpr "x" heaps
 
@@ -4499,29 +4493,17 @@ bimap_RECORD_expression arg_exprs main_module_index predefs funs_and_groups=:{fg
 		  args = [f_var,c_var]
 		  (map_RECORD_index,funs_and_groups) = buildFunAndGroup2 map_RECORD_ident args case_expr main_module_index funs_and_groups
 
-		  bimap_RECORD_ident = makeIdent "bimap/RECORD"
-		  (to_arg_expr,from_arg_expr,arg_var,heaps) = build_var_with_bimap_selectors "arg" predefs heaps
-		  (bimap_expr,heaps) = build_bimap_with_calls map_RECORD_index map_RECORD_ident [to_arg_expr] [from_arg_expr] main_module_index predefs heaps
+		  funs_and_groups = {funs_and_groups & fg_bimap_functions.bimap_RECORD_function={fii_index=map_RECORD_index,fii_ident=map_RECORD_ident}}
 
-		  args = [arg_var]
-		  (bimap_RECORD_index,funs_and_groups) = buildFunAndGroup2 bimap_RECORD_ident args bimap_expr main_module_index funs_and_groups
-
-		  funs_and_groups = {funs_and_groups & fg_bimap_functions.bimap_RECORD_function={fii_index=bimap_RECORD_index,fii_ident=bimap_RECORD_ident}}
-
-		  (bimap_arrow_expr,heaps) = buildFunApp2 main_module_index bimap_RECORD_index bimap_RECORD_ident arg_exprs heaps
-		= (bimap_arrow_expr,funs_and_groups,heaps)
+		  (bimap_RECORD_expr,heaps) = buildFunApp2 main_module_index map_RECORD_index map_RECORD_ident arg_exprs heaps
+		= (bimap_RECORD_expr,funs_and_groups,heaps)
 
 bimap_FIELD_expression arg_exprs main_module_index predefs funs_and_groups=:{fg_bimap_functions={bimap_FIELD_function={fii_index,fii_ident}}} heaps
 	| fii_index>=0
 		# (expr,heaps) = buildFunApp2 main_module_index fii_index fii_ident arg_exprs heaps
 		= (expr,funs_and_groups,heaps)
-		/*
-		bimap/FIELD arg
-			= {map_to = map/FIELD arg.map_to, map_from = map/FIELD arg.map_from}
-		where
-			map/FIELD f (FIELD x) = FIELD (f x)
-		*/
-		# map_FIELD_ident = makeIdent "map/FIELD"
+		// bimap/FIELD f (FIELD x) = FIELD (f x)
+		# map_FIELD_ident = makeIdent "bimap/FIELD"
 		  (f_expr,f_var,heaps) = buildVarExpr "f" heaps 
 		  (x_expr,x_var,heaps) = buildVarExpr "x" heaps
 
@@ -4530,31 +4512,24 @@ bimap_FIELD_expression arg_exprs main_module_index predefs funs_and_groups=:{fg_
 		  args = [f_var,c_var]
 		  (map_FIELD_index,funs_and_groups) = buildFunAndGroup2 map_FIELD_ident args case_expr main_module_index funs_and_groups
 
-		  bimap_FIELD_ident = makeIdent "bimap/FIELD"
-		  (to_arg_expr,from_arg_expr,arg_var,heaps) = build_var_with_bimap_selectors "arg" predefs heaps
-		  (bimap_expr,heaps) = build_bimap_with_calls map_FIELD_index map_FIELD_ident [to_arg_expr] [from_arg_expr] main_module_index predefs heaps
+		  funs_and_groups = {funs_and_groups & fg_bimap_functions.bimap_FIELD_function={fii_index=map_FIELD_index,fii_ident=map_FIELD_ident}}
 
-		  args = [arg_var]
-		  (bimap_FIELD_index,funs_and_groups) = buildFunAndGroup2 bimap_FIELD_ident args bimap_expr main_module_index funs_and_groups
+		  (bimap_FIELD_expr,heaps) = buildFunApp2 main_module_index map_FIELD_index map_FIELD_ident arg_exprs heaps
+		= (bimap_FIELD_expr,funs_and_groups,heaps)
 
-		  funs_and_groups = {funs_and_groups & fg_bimap_functions.bimap_FIELD_function={fii_index=bimap_FIELD_index,fii_ident=bimap_FIELD_ident}}
-
-		  (bimap_arrow_expr,heaps) = buildFunApp2 main_module_index bimap_FIELD_index bimap_FIELD_ident arg_exprs heaps
-		= (bimap_arrow_expr,funs_and_groups,heaps)
-
-bimap_from_arrow_expression arg_exprs main_module_index predefs funs_and_groups heaps
+bimap_tofrom_expression arg_exprs main_module_index predefs funs_and_groups heaps
 	# (bimap_fromto_index,bimap_fromto_ident,funs_and_groups,heaps)
 		= bimap_tofrom_function main_module_index funs_and_groups heaps
 	# (bimap_from_arrow_expr,heaps) = buildFunApp2 main_module_index bimap_fromto_index bimap_fromto_ident arg_exprs heaps
 	= (bimap_from_arrow_expr,funs_and_groups,heaps)
 
-bimap_from_arrow_res_id_expression arg_exprs main_module_index predefs funs_and_groups heaps
+bimap_to_expression arg_exprs main_module_index predefs funs_and_groups heaps
 	# (bimap_to_index,bimap_to_ident,funs_and_groups,heaps)
 		= bimap_to_function main_module_index funs_and_groups heaps
 	# (bimap_from_arrow_expr,heaps) = buildFunApp2 main_module_index bimap_to_index bimap_to_ident arg_exprs heaps
 	= (bimap_from_arrow_expr,funs_and_groups,heaps)
 
-bimap_from_arrow_arg_id_expression arg_exprs main_module_index predefs funs_and_groups heaps
+bimap_from_expression arg_exprs main_module_index predefs funs_and_groups heaps
 	# (bimap_from_index,bimap_from_ident,funs_and_groups,heaps)
 		= bimap_from_function main_module_index funs_and_groups heaps
 	# (bimap_from_arrow_expr,heaps) = buildFunApp2 main_module_index bimap_from_index bimap_from_ident arg_exprs heaps
@@ -5708,30 +5683,15 @@ buildCaseExpr case_arg case_alts heaps=:{hp_expression_heap}
 	# heaps = { heaps & hp_expression_heap = hp_expression_heap}	
 	= (expr, heaps)
 
-build_map_from_tvi_expr (TVI_Expr is_bimap_id bimap_expr) main_module_index predefs heaps
-	= (buildRecordSelectionExpr bimap_expr PD_map_from 1 predefs, heaps)
-build_map_from_tvi_expr (TVI_Iso iso_ds to_ds from_ds) main_module_index predefs heaps
+build_map_from_tvi_expr (TVI_BimapExpr _ _ bimap_expr) main_module_index predefs heaps
+	= (bimap_expr, heaps)
+build_map_from_tvi_expr (TVI_Iso _ from_ds) main_module_index predefs heaps
 	= buildFunApp main_module_index from_ds [] heaps
 
-build_map_from_expr bimap_expr predefs
-	= buildRecordSelectionExpr bimap_expr PD_map_from 1 predefs
-
-build_map_to_tvi_expr (TVI_Expr is_bimap_id bimap_expr) main_module_index predefs heaps
-	= (buildRecordSelectionExpr bimap_expr PD_map_to 0 predefs, heaps)
-build_map_to_tvi_expr (TVI_Iso iso_ds to_ds from_ds) main_module_index predefs heaps
+build_map_to_tvi_expr (TVI_BimapExpr _ bimap_expr _) main_module_index predefs heaps
+	= (bimap_expr, heaps)
+build_map_to_tvi_expr (TVI_Iso to_ds _) main_module_index predefs heaps
 	= buildFunApp main_module_index to_ds [] heaps
-
-build_map_to_expr bimap_expr predefs
-	= buildRecordSelectionExpr bimap_expr PD_map_to 0 predefs
-
-buildRecordSelectionExpr :: !Expression !Index !Int !PredefinedSymbolsData -> Expression
-buildRecordSelectionExpr record_expr predef_field field_n {psd_predefs_a}
-	# {pds_module, pds_def} = psd_predefs_a.[predef_field]
-	# pds_ident = predefined_idents.[predef_field]
-	# selector = {
-		glob_module = pds_module, 
-		glob_object = {ds_ident = pds_ident, ds_index = pds_def, ds_arity = 1}}
-	= Selection NormalSelector record_expr [RecordSelection selector field_n]
 
 // variables
 
