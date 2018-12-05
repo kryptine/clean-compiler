@@ -162,10 +162,6 @@ where
 				= (acc, (gen_defs, modules, check_generic_dep_error gd_ident "already implicitly depends on itself" cs))
 			| isMember gen_dep acc
 				= (acc, (gen_defs, modules, check_generic_dep_error gd_ident "duplicate generic dependency" cs))
-                        // TODO: TvN: This check is to prevent duplicate dependencies with different generic dependency variables
-                        // See functions: generics1.build_specialized_expr and generics1.specialize_type_var
-			| isMember gen_dep.gd_index [gd_index \\ {gd_index} <- acc]
-				= (acc, (gen_defs, modules, check_generic_dep_error gd_ident "dependency occurs multiple times with different generic dependency variables, but only one occurrence of the same generic function as a dependency is currently allowed" cs))
 			= ([gen_dep:acc], (gen_defs, modules, cs))
 
 		resolve_dependency_index gen_dep=:{gd_ident} cs 
