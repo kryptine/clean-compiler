@@ -2132,7 +2132,7 @@ where
 		# ({ ste_kind = STE_DictType type_def,ste_index}, symbol_table) = readPtr type_ptr symbol_table
 		  (RecordType {rt_constructor, rt_fields}) = type_def.td_rhs
 		  ({ ste_kind = STE_DictCons cons_def }, symbol_table) = readPtr rt_constructor.ds_ident.id_info symbol_table
-	 	| ste_index < size_type_defs	 		
+	 	| ste_index < size_type_defs
 			# cons_defs = {cons_defs & [rt_constructor.ds_index] = cons_def}
 			# (selector_defs, symbol_table) = store_fields_in_selector_array 0 rt_fields (selector_defs, symbol_table)
 			= (type_defs , sel_def_list, cons_def_list, selector_defs, cons_defs, symbol_table)
@@ -2178,7 +2178,7 @@ create_class_dictionary mod_index class_index class_defs =:{[class_index] = clas
 
 	  (index_selector, rev_fields, rev_field_types, class_defs, modules, var_heap, symbol_table)
   			= build_context_fields mod_index nr_of_members class_context rec_type index_type (index_selector + nr_of_members) rev_fields
-  					[ field_type \\ i <- [1..nr_of_members] ] class_defs modules var_heap symbol_table
+  					[field_type \\ i <- [1..nr_of_members]] class_args class_defs modules var_heap symbol_table
 
 	  (cons_id_info, symbol_table) = newPtr EmptySymbolTableEntry symbol_table
 	  rec_cons_id = { id_name = dictionary_record_name, id_info = cons_id_info }
@@ -2237,17 +2237,20 @@ where
 				 [field : rev_fields] var_heap symbol_table
 			= (rev_fields, var_heap, symbol_table)			
 
-	build_context_fields mod_index field_nr [{tc_class = TCClass {glob_module, glob_object={ds_index}}}:tcs] rec_type rec_type_index
-			next_selector_index rev_fields rev_field_types class_defs modules var_heap symbol_table
-		# ({class_ident, class_arity, class_dictionary = {ds_ident, ds_index}}, _, class_defs, modules) = getClassDef ds_index glob_module mod_index class_defs modules
+	build_context_fields mod_index field_nr [{tc_class = TCClass {glob_module, glob_object={ds_index}},tc_types}:tcs] rec_type rec_type_index
+			next_selector_index rev_fields rev_field_types root_class_args class_defs modules var_heap symbol_table
+		# ({class_ident,class_arity,class_dictionary={ds_ident, ds_index},class_args}, _, class_defs, modules) = getClassDef ds_index glob_module mod_index class_defs modules
 		  type_symb = MakeTypeSymbIdent { glob_object = ds_index, glob_module = glob_module } ds_ident class_arity
 		  field_type = makeAttributedType TA_Multi (TA type_symb [makeAttributedType TA_Multi TE \\ i <- [1..class_arity]])
+		  field_name = if (same_args_as_root_class tc_types root_class_args)
+		  				class_ident.id_name
+		  				(class_ident.id_name+++";"+++toString field_nr)
 		  (field, var_heap, symbol_table)
-			= build_field field_nr class_ident.id_name rec_type_index rec_type field_type next_selector_index var_heap symbol_table
+			= build_field field_nr field_name rec_type_index rec_type field_type next_selector_index var_heap symbol_table
 		= build_context_fields mod_index (inc field_nr) tcs rec_type rec_type_index (inc next_selector_index) [field : rev_fields]
-				 [field_type : rev_field_types] class_defs modules var_heap symbol_table
+				 [field_type : rev_field_types] root_class_args class_defs modules var_heap symbol_table
 	build_context_fields mod_index field_nr [{tc_class = TCGeneric {gtc_generic,gtc_kind,gtc_generic_dict}} :tcs] rec_type rec_type_index
-			next_selector_index rev_fields rev_field_types class_defs modules var_heap symbol_table
+			next_selector_index rev_fields rev_field_types root_class_args class_defs modules var_heap symbol_table
 		// FIXME: We do not know the type before the generic phase.
 		// The generic phase currently does not update the type.
 		# field_type = {at_attribute = TA_Multi, at_type = TGenericFunctionInDictionary gtc_generic gtc_kind gtc_generic_dict}
@@ -2255,8 +2258,9 @@ where
 		# (field, var_heap, symbol_table)
 			= build_field field_nr class_ident.id_name rec_type_index rec_type field_type next_selector_index var_heap symbol_table
 		= build_context_fields mod_index (inc field_nr) tcs rec_type rec_type_index (inc next_selector_index) [field : rev_fields]
-				 [field_type : rev_field_types] class_defs modules var_heap symbol_table
-	build_context_fields mod_index field_nr [] rec_type rec_type_index next_selector_index rev_fields rev_field_types class_defs modules var_heap symbol_table
+				 [field_type : rev_field_types] root_class_args class_defs modules var_heap symbol_table
+	build_context_fields mod_index field_nr [] rec_type rec_type_index
+			next_selector_index rev_fields rev_field_types root_class_args class_defs modules var_heap symbol_table
 		= (next_selector_index, rev_fields, rev_field_types , class_defs, modules, var_heap, symbol_table)			
 
 	build_field field_nr field_name rec_type_index rec_type field_type selector_index var_heap symbol_table
@@ -2277,6 +2281,10 @@ where
 		  field = { fs_ident = field_id, fs_var = field_id, fs_index = selector_index }
 		= (field, var_heap, symbol_table <:= (id_info, { ste_kind = STE_DictField sel_def, ste_index = selector_index,
 				ste_def_level = NotALevel, ste_previous = abort "empty SymbolTableEntry" }))
+
+	same_args_as_root_class [TV tv1:tvs1] [tv2:tvs2] = tv1.tv_ident.id_name==tv2.tv_ident.id_name && same_args_as_root_class tvs1 tvs2
+	same_args_as_root_class [] [] = True
+	same_args_as_root_class _ _ = False
 
 size_types :: ![Type] !Int -> Int
 size_types [type:types] s = size_types types (size_type type s)
