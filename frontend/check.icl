@@ -3391,16 +3391,10 @@ checkInstancesOfDclModule mod_index	(nr_of_dcl_functions_and_instances, nr_of_dc
 	  			 ++ reverse rev_special_defs
 	  			 ++ gen_funs
 	  			)
-  	  			
-	#  cs = { cs & cs_predef_symbols=cs_predef_symbols,cs_error = cs_error}
-	#! mod_index_of_std_array = cs.cs_predef_symbols.[PD_StdArray].pds_def
+
+	# cs & cs_predef_symbols=cs_predef_symbols, cs_error=cs_error
 	# (com_member_defs, com_instance_defs, dcl_functions, cs)
-	  		= case mod_index_of_std_array==mod_index of
-				False
-					-> (com_member_defs, com_instance_defs, dcl_functions, cs)
-				True
-					-> adjust_instance_types_of_array_functions_in_std_array_dcl mod_index
-							com_member_defs com_instance_defs dcl_functions cs
+		= adjust_instance_types_of_std_array_and_std_list_functions mod_index com_member_defs com_instance_defs dcl_functions cs
 	#! dcl_mod = {dcl_mod & dcl_functions = dcl_functions,
 			  				dcl_specials = { ir_from = nr_of_dcl_functions_and_instances,
 			  								ir_to = nr_of_dcl_funs_insts_and_specs },
@@ -3414,22 +3408,32 @@ checkInstancesOfDclModule mod_index	(nr_of_dcl_functions_and_instances, nr_of_dc
 	   dcl_modules = { dcl_modules & [mod_index] = dcl_mod }
 	= (dcl_modules, heaps, cs)
   where
-	adjust_instance_types_of_array_functions_in_std_array_dcl array_mod_index class_members class_instances fun_types cs=:{cs_predef_symbols}
-		#! nr_of_instances = size class_instances
-		# ({pds_def}, cs_predef_symbols) = cs_predef_symbols![PD_ArrayClass]
-		  (offset_table, class_members, cs_predef_symbols) = arrayFunOffsetToPD_IndexTable class_members cs_predef_symbols
-		  (class_instances, fun_types, cs_predef_symbols) 
-				= iFoldSt (adjust_instance_types_of_array_functions array_mod_index pds_def offset_table) 0 nr_of_instances
-						(class_instances, fun_types, cs_predef_symbols)
-		= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols })
+	adjust_instance_types_of_std_array_and_std_list_functions mod_index class_members class_instances fun_types cs=:{cs_predef_symbols}
+		| mod_index == cs_predef_symbols.[PD_StdArray].pds_def
+			#! nr_of_instances = size class_instances
+			# ({pds_def}, cs_predef_symbols) = cs_predef_symbols![PD_ArrayClass]
+			  (offset_table, class_members, cs_predef_symbols) = arrayFunOffsetToPD_IndexTable class_members cs_predef_symbols
+			  (class_instances, fun_types, cs_predef_symbols) 
+					= iFoldSt (adjust_instance_types_of_array_functions mod_index pds_def offset_table) 0 nr_of_instances
+							(class_instances, fun_types, cs_predef_symbols)
+			= (class_members, class_instances, fun_types, {cs & cs_predef_symbols = cs_predef_symbols})
+		| mod_index == cs_predef_symbols.[PD_StdStrictLists].pds_def
+			#! n_of_instances = size class_instances
+			# (class_instances, cs_predef_symbols)
+				= iFoldSt (adjust_instances_of__SystemStrictLists_module mod_index) 0 n_of_instances (class_instances, cs_predef_symbols)
+			= (class_members, class_instances, fun_types, {cs & cs_predef_symbols = cs_predef_symbols})
+			= (class_members, class_instances, fun_types, cs)
 	where
-		adjust_instance_types_of_array_functions :: .Index !Index !{#.Index} !Int !*(!u:{# ClassInstance},!*{# FunType},!v:{#PredefinedSymbol})
-			 -> (!u:{# ClassInstance},!*{# FunType},!v:{#PredefinedSymbol})
+		adjust_instance_types_of_array_functions :: Index !Index !{#Index} !Int !*(!*{#ClassInstance},!*{#FunType},!v:{#PredefinedSymbol})
+																			   -> (!*{#ClassInstance},!*{#FunType},!v:{#PredefinedSymbol})
 		adjust_instance_types_of_array_functions array_mod_index array_class_index offset_table inst_index (class_instances, fun_types, predef_symbols)
 			# ({ins_class_index={gi_module,gi_index},ins_type,ins_members}, class_instances) = class_instances![inst_index]
 			| gi_module == array_mod_index && gi_index == array_class_index && elemTypeIsStrict ins_type.it_types predef_symbols
 				# fun_types = iFoldSt (make_instance_strict ins_members offset_table) 0 (size ins_members) fun_types
-				= (class_instances, fun_types, predef_symbols)
+				| is_polymorphic_unboxed_array_instance_type ins_type.it_types predef_symbols
+					# class_instances & [inst_index].ins_specials = SP_GenerateRecordInstances
+					= (class_instances, fun_types, predef_symbols)
+					= (class_instances, fun_types, predef_symbols)
 				= (class_instances, fun_types, predef_symbols)
 
 		make_instance_strict :: !{#ClassInstanceMember} !{#Index} !Int !*{# FunType} -> *{# FunType}
@@ -3438,6 +3442,25 @@ checkInstancesOfDclModule mod_index	(nr_of_dcl_functions_and_instances, nr_of_dc
 			  (inst_def, instance_defs) = instance_defs![cim_index]
 			  (Yes symbol_type) = inst_def.ft_type
 			= {instance_defs & [cim_index] = {inst_def & ft_type = makeElemTypeOfArrayFunctionStrict inst_def.ft_type ins_offset offset_table}}
+
+		is_polymorphic_unboxed_array_instance_type [TA {type_index={glob_object,glob_module}} _, TV _ : _] predef_symbols
+			= glob_module == predef_symbols.[PD_PredefinedModule].pds_def && glob_object == predef_symbols.[PD_UnboxedArrayType].pds_def
+		is_polymorphic_unboxed_array_instance_type _ _
+			= False
+
+		adjust_instances_of__SystemStrictLists_module :: !Index !Int !*(!*{#ClassInstance},!v:{#PredefinedSymbol})
+																	-> (!*{#ClassInstance},!v:{#PredefinedSymbol})
+		adjust_instances_of__SystemStrictLists_module strict_lists_mod_index inst_index (class_instances, predef_symbols)
+			# ({ins_class_index={gi_module,gi_index},ins_type={it_types}}, class_instances) = class_instances![inst_index]
+			| gi_module==strict_lists_mod_index
+				&& (gi_index==predef_symbols.[PD_UListClass].pds_def || gi_index==predef_symbols.[PD_UTSListClass].pds_def)
+				= case it_types of
+					[TV _]
+						# class_instances & [inst_index].ins_specials = SP_GenerateRecordInstances
+						-> (class_instances, predef_symbols)
+					_
+						-> (class_instances, predef_symbols)
+				= (class_instances, predef_symbols)
 
 checkPredefinedDclModule :: !NumberSet ![Int] !(IntKeyHashtable SolvedImports) !Int !Bool !LargeBitvect !Bool
 							!(Module (CollectedDefinitions ClassInstance)) !Index !*ExplImpInfos !*{#DclModule} !*{#*{#FunDef}} !*Heaps !*CheckState

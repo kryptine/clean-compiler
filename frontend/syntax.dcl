@@ -342,6 +342,7 @@ cNameLocationDependent :== True
 	| SP_Substitutions 		 	![SpecialSubstitution]
 	| SP_ContextTypes			![Special]
 	| SP_TypeOffset				!Int					// index in SP_Substitutions for specialized instance
+	| SP_GenerateRecordInstances	// for unboxed arrays and lists
 	| SP_None
 
 ::	FunSpecials

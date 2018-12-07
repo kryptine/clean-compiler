@@ -304,7 +304,8 @@ where
 
 	get_specials :: Specials -> [Special]
 	get_specials (SP_ContextTypes specials) = specials
-	get_specials SP_None 					= []
+	get_specials SP_None = []
+	get_specials SP_GenerateRecordInstances = []
 
 	adjust_type_attributes :: !{#CommonDefs} ![Type] ![Type] !*Coercions !*TypeHeaps -> (Bool, !*Coercions, !*TypeHeaps)
 	adjust_type_attributes defs act_types form_types coercion_env type_heaps
@@ -795,6 +796,8 @@ where
 		= match defs (t1,ts1) (t2,ts2) type_heaps
 	match defs [] [] type_heaps
 		= (True, type_heaps)
+	match defs _ _ type_heaps // in case of a kind error
+		= (False, type_heaps)
 
 instance match ConsVariable
 where
@@ -1029,7 +1032,7 @@ where
 			= [(index, new_ptrs ++ ptrs) : dict_types]
 			= [(new_index, new_ptrs) : dt]
 	
-selectFromDictionary  dict_mod dict_index member_index defs
+selectFromDictionary dict_mod dict_index member_index defs
 	# (RecordType {rt_fields}) = defs.[dict_mod].com_type_defs.[dict_index].td_rhs
 	  { fs_ident, fs_index } = rt_fields.[member_index]
 	= { glob_module = dict_mod, glob_object = { ds_ident = fs_ident, ds_index = fs_index, ds_arity = 1 }}
@@ -1060,7 +1063,7 @@ where
             # index = -1 - cim_index
             = (EI_Instance {glob_module=glob_module, glob_object={ds_ident=cim_ident, ds_arity=n_class_exprs, ds_index=index}} class_exprs,
                                 heaps_and_ptrs)
-	adjust_member_application defs contexts  {me_ident,me_offset,me_class={glob_module,glob_object}} (CA_Context tc) class_exprs (heaps=:{hp_type_heaps}, ptrs)
+	adjust_member_application defs contexts {me_offset,me_class={glob_module,glob_object}} (CA_Context tc) class_exprs (heaps=:{hp_type_heaps}, ptrs)
 		# (class_context, address, hp_type_heaps) = determineContextAddress contexts defs tc hp_type_heaps
 		# {class_dictionary={ds_index,ds_ident}} = defs.[glob_module].com_class_defs.[glob_object]
 		  selector = selectFromDictionary glob_module ds_index me_offset defs

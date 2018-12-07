@@ -1464,6 +1464,8 @@ checkSpecialTypeVars (SP_ParsedSubstitutions env) cs
 	= (SP_ParsedSubstitutions env, cs)
 checkSpecialTypeVars SP_None cs
 	= (SP_None, cs)
+checkSpecialTypeVars SP_GenerateRecordInstances cs
+	= (SP_GenerateRecordInstances, cs)
 
 checkFunSpecialTypeVars :: !FunSpecials !*CheckState -> (!FunSpecials, !*CheckState)
 checkFunSpecialTypeVars (FSP_ParsedSubstitutions env) cs
@@ -1501,6 +1503,8 @@ checkSpecialTypes mod_index (SP_ParsedSubstitutions envs) type_defs modules heap
 	= (SP_Substitutions specials, ots.ots_type_defs, ots.ots_modules, heaps, cs)
 checkSpecialTypes mod_index SP_None type_defs modules heaps cs
 	= (SP_None, type_defs, modules, heaps, cs)
+checkSpecialTypes mod_index SP_GenerateRecordInstances type_defs modules heaps cs
+	= (SP_GenerateRecordInstances, type_defs, modules, heaps, cs)
 
 checkFunSpecialTypes :: !Index !FunSpecials !v:{#CheckedTypeDef} !u:{#DclModule} !*TypeHeaps !*CheckState
 						   -> (!FunSpecials,!x:{#CheckedTypeDef},!w:{#DclModule},!.TypeHeaps,!.CheckState), [u v <= w, v u <= x];
