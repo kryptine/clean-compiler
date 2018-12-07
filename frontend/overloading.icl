@@ -149,8 +149,10 @@ ObjectNotFound 	:== { glob_module = NotFound, glob_object = NotFound }
 
 :: FinReduceInfo =
 	{	fri_defs 				:: !{# CommonDefs}
-	,	fri_main_dcl_module_n 	:: !Int
+	,	fri_unboxed_array_and_list_info	:: !UnboxedArrayAndListInfo
 	}
+
+:: UnboxedArrayAndListInfo = {uaali_main_dcl_module_n :: !Int, uaali_instance_info :: !ClassInstanceInfo}
 
 ::	Subst =
 	{	subst_changed	:: !Bool
@@ -566,22 +568,27 @@ improve_dep_type_in_context defs [] [] fun_dep_vars subst type_heaps
 	,	frs_error				:: !.ErrorAdmin
 	}
 
-finishContextReduction :: ![ReducedOverloadedContext] ![ExprInfoPtr] !Int !{# CommonDefs } 
+finishContextReduction :: ![ReducedOverloadedContext] ![ExprInfoPtr] !Int !{#CommonDefs} !ClassInstanceInfo
 	!*VarHeap !*TypeHeaps !*ExpressionHeap !*PredefinedSymbols !*SpecialInstances !*Coercions !*{!Type} !*ErrorAdmin
 	-> (![ReducedOverloadedApplication], ![TypeContext], ![LocalTypePatternVariable], !*VarHeap, !*TypeHeaps, !*ExpressionHeap, !*PredefinedSymbols,
 		!*SpecialInstances , !*Coercions, !*{!Type}, !*ErrorAdmin)
-finishContextReduction roaps case_with_context_ptrs module_id com_defs var_heap type_heaps expr_heap predef_symbols special_instances coercion_env subst error
-	= finishContextReduction_ roaps case_with_context_ptrs module_id com_defs var_heap type_heaps expr_heap predef_symbols special_instances coercion_env subst error
+finishContextReduction roaps case_with_context_ptrs module_id com_defs instance_info
+		var_heap type_heaps expr_heap predef_symbols special_instances coercion_env subst error
+	= finishContextReduction_ roaps case_with_context_ptrs module_id com_defs instance_info
+		var_heap type_heaps expr_heap predef_symbols special_instances coercion_env subst error
 
-finishContextReduction_ :: ![ReducedOverloadedContext] ![ExprInfoPtr] !Int !{# CommonDefs } 
+finishContextReduction_ :: ![ReducedOverloadedContext] ![ExprInfoPtr] !Int !{#CommonDefs} !ClassInstanceInfo
 	!*VarHeap !*TypeHeaps !*ExpressionHeap !*PredefinedSymbols !*SpecialInstances !*Coercions !*{!Type} !*ErrorAdmin
 	-> (![ReducedOverloadedApplication], ![TypeContext], ![LocalTypePatternVariable], !*VarHeap, !*TypeHeaps, !*ExpressionHeap, !*PredefinedSymbols,
 		!*SpecialInstances , !*Coercions, !*{!Type}, !*ErrorAdmin)
-finishContextReduction_ roaps case_with_context_ptrs module_id com_defs var_heap type_heaps expr_heap predef_symbols special_instances coercion_env subst error
+finishContextReduction_ roaps case_with_context_ptrs module_id com_defs instance_info
+		var_heap type_heaps expr_heap predef_symbols special_instances coercion_env subst error
 	# fr_state = { frs_all_contexts = [], frs_special_instances = special_instances, frs_type_pattern_vars = [], frs_var_heap = var_heap,
 				   frs_subst = subst,
 				   frs_type_heaps = type_heaps, frs_predef_symbols = predef_symbols, frs_coercions = coercion_env, frs_error = error }
-	  (roaps, (expr_heap, fr_state)) = mapSt (get_tc_and_finish_rc {fri_defs = com_defs, fri_main_dcl_module_n = module_id }) roaps (expr_heap, fr_state)
+	  (roaps, (expr_heap, fr_state))
+		= mapSt (get_tc_and_finish_rc {fri_defs=com_defs, fri_unboxed_array_and_list_info={uaali_main_dcl_module_n=module_id,uaali_instance_info=instance_info}})
+					roaps (expr_heap, fr_state)
 	  (expr_heap,all_contexts,subst,var_heap,predef_symbols)
 	  	= foldSt (add_case_constructor_contexts com_defs) case_with_context_ptrs
 	  		(expr_heap,fr_state.frs_all_contexts,fr_state.frs_subst,fr_state.frs_var_heap,fr_state.frs_predef_symbols)
@@ -765,7 +772,7 @@ where
 				# {class_ident} = fri_defs.[ins_class_index.gi_module].com_class_defs.[ins_class_index.gi_index]
 				= ({ cid_class_index = ins_class_index, cid_inst_module = glob_module, cid_inst_members = ins_members, cid_types = tc_types, cid_red_contexts = [] },
 						{ frs_state & frs_type_heaps = frs_type_heaps, frs_coercions = frs_coercions, frs_error = uniqueError class_ident tc_types frs_error})
-			= check_unboxed_array_or_list_type info glob_module ins_class_index ins_members tc_types fri_defs frs_state
+			= check_unboxed_array_or_list_type info.fri_unboxed_array_and_list_info glob_module ins_class_index ins_members tc_types fri_defs frs_state
 
 	finish_cr_of_cis :: FinReduceInfo [CI] TypeContext *FinalRedState -> *(*[ReducedContext],*FinalRedState)
 	finish_cr_of_cis info [] act_tc frs_state
@@ -867,28 +874,28 @@ where
 	bind_new_vars [] subst type_heaps
 		= (subst,type_heaps)
 
-check_unboxed_array_or_list_type :: FinReduceInfo Int GlobalIndex {#ClassInstanceMember} ![Type] {#CommonDefs} *FinalRedState
+check_unboxed_array_or_list_type :: UnboxedArrayAndListInfo Int GlobalIndex {#ClassInstanceMember} ![Type] {#CommonDefs} *FinalRedState
 	-> (ClassInstanceDescr,*FinalRedState)
-check_unboxed_array_or_list_type info glob_module ins_class_index ins_members tc_types fri_defs
+check_unboxed_array_or_list_type fri_unboxed_array_and_list_info glob_module ins_class_index ins_members tc_types fri_defs
 		 	frs_state=:{frs_type_heaps,frs_coercions,frs_predef_symbols,frs_special_instances,frs_error}
 	| is_predefined_global_symbol ins_class_index PD_ArrayClass frs_predef_symbols && is_unboxed_array tc_types frs_predef_symbols
 		# {class_members} = fri_defs.[ins_class_index.gi_module].com_class_defs.[ins_class_index.gi_index]
 		  (rcs_class_context, frs_special_instances, (frs_predef_symbols, frs_type_heaps), frs_error)
-			= check_unboxed_array_type info.fri_main_dcl_module_n glob_module ins_class_index ins_members tc_types class_members fri_defs
+			= check_unboxed_array_type fri_unboxed_array_and_list_info glob_module ins_class_index ins_members tc_types class_members fri_defs
 			 	frs_special_instances (frs_predef_symbols, frs_type_heaps) frs_error
 		= (rcs_class_context,
 				{ frs_state & frs_predef_symbols = frs_predef_symbols, frs_type_heaps = frs_type_heaps, frs_error = frs_error, frs_special_instances = frs_special_instances})
 	| is_predefined_global_symbol ins_class_index PD_UListClass frs_predef_symbols
 		# {class_members} = fri_defs.[ins_class_index.gi_module].com_class_defs.[ins_class_index.gi_index]
 		  (rcs_class_context, frs_special_instances, (frs_predef_symbols, frs_type_heaps), frs_error)
-				= check_unboxed_list_type info.fri_main_dcl_module_n glob_module ins_class_index ins_members tc_types class_members fri_defs 
+				= check_unboxed_list_type fri_unboxed_array_and_list_info glob_module ins_class_index ins_members tc_types class_members fri_defs 
 				 	frs_special_instances (frs_predef_symbols, frs_type_heaps) frs_error
 		= (rcs_class_context,
 				{ frs_state & frs_predef_symbols = frs_predef_symbols, frs_type_heaps = frs_type_heaps, frs_error = frs_error, frs_special_instances = frs_special_instances})
 	| is_predefined_global_symbol ins_class_index PD_UTSListClass frs_predef_symbols
 		# {class_members} = fri_defs.[ins_class_index.gi_module].com_class_defs.[ins_class_index.gi_index]
 		  (rcs_class_context, frs_special_instances, (frs_predef_symbols, frs_type_heaps), frs_error)
-				= check_unboxed_tail_strict_list_type info.fri_main_dcl_module_n glob_module ins_class_index ins_members tc_types class_members fri_defs 
+				= check_unboxed_tail_strict_list_type fri_unboxed_array_and_list_info glob_module ins_class_index ins_members tc_types class_members fri_defs 
 				 	frs_special_instances (frs_predef_symbols, frs_type_heaps) frs_error
 		= (rcs_class_context,
 				{ frs_state & frs_predef_symbols = frs_predef_symbols, frs_type_heaps = frs_type_heaps, frs_error = frs_error, frs_special_instances = frs_special_instances})
@@ -904,21 +911,29 @@ where
 	is_unboxed_array _ predef_symbols
 		= False
 
-	check_unboxed_array_type :: Int Int GlobalIndex {#ClassInstanceMember} ![Type] {#DefinedSymbol} {#CommonDefs} *SpecialInstances *(*PredefinedSymbols,*TypeHeaps) *ErrorAdmin
+	check_unboxed_array_type :: UnboxedArrayAndListInfo Int GlobalIndex {#ClassInstanceMember} ![Type] {#DefinedSymbol} {#CommonDefs} *SpecialInstances *(*PredefinedSymbols,*TypeHeaps) *ErrorAdmin
 		-> (ClassInstanceDescr,*SpecialInstances,(*PredefinedSymbols,*TypeHeaps), *ErrorAdmin)
-	check_unboxed_array_type main_dcl_module_n ins_module ins_class_index ins_members types=:[ _, elem_type :_] class_members defs special_instances predef_symbols_type_heaps error
-		# (unboxable, opt_record, predef_symbols_type_heaps) = try_to_unbox elem_type defs predef_symbols_type_heaps
-		| unboxable
-			= case opt_record of
-				Yes record
-					# (ins_members, special_instances) = add_record_to_array_instances record class_members special_instances
-					-> ({ cid_class_index = ins_class_index, cid_inst_module = main_dcl_module_n, cid_inst_members = ins_members, cid_red_contexts = [], cid_types = types },
-							special_instances, predef_symbols_type_heaps, error)
-				No
-					-> ({ cid_class_index = ins_class_index, cid_inst_module = ins_module, cid_inst_members = ins_members, cid_red_contexts = [], cid_types = types },
-							special_instances, predef_symbols_type_heaps, error)
-			= ({ cid_class_index = ins_class_index, cid_inst_module = ins_module, cid_inst_members = ins_members, cid_red_contexts = [], cid_types = types },
-					special_instances, predef_symbols_type_heaps, unboxError "Array" elem_type error)
+	check_unboxed_array_type {uaali_main_dcl_module_n,uaali_instance_info} ins_module ins_class_index ins_members types=:[ _, elem_type :_] class_members defs special_instances predef_symbols_type_heaps error
+		# (unboxed_type, opt_record, predef_symbols_type_heaps) = try_to_unbox elem_type defs predef_symbols_type_heaps
+		= case opt_record of
+			Yes record
+				# (ins_members, special_instances) = add_record_to_array_instances record class_members special_instances
+				-> ({cid_class_index = ins_class_index, cid_inst_module = uaali_main_dcl_module_n, cid_inst_members = ins_members, cid_red_contexts = [], cid_types = types},
+						special_instances, predef_symbols_type_heaps, error)
+			No
+				| not unboxed_type=:TE
+					# (predef_symbols,type_heaps) = predef_symbols_type_heaps
+					  array_instances = uaali_instance_info.[ins_class_index.gi_module].[ins_class_index.gi_index]
+					  ({glob_module,glob_object},predef_symbols) = find_unboxed_array_instance unboxed_type array_instances defs predef_symbols
+					  predef_symbols_type_heaps = (predef_symbols,type_heaps)
+					| glob_module <> NotFound
+						# {ins_members,ins_class_index} = defs.[glob_module].com_instance_defs.[glob_object]
+						-> ({cid_class_index = ins_class_index, cid_inst_module = ins_module, cid_inst_members = ins_members, cid_red_contexts = [], cid_types = types},
+								special_instances, predef_symbols_type_heaps, error)
+						-> ({cid_class_index = ins_class_index, cid_inst_module = ins_module, cid_inst_members = ins_members, cid_red_contexts = [], cid_types = types},
+								special_instances, predef_symbols_type_heaps, unboxError "Array" elem_type error)
+					-> ({cid_class_index = ins_class_index, cid_inst_module = ins_module, cid_inst_members = ins_members, cid_red_contexts = [], cid_types = types},
+							special_instances, predef_symbols_type_heaps, unboxError "Array" elem_type error)
 	where
 		add_record_to_array_instances :: !TypeSymbIdent !{#DefinedSymbol} !*SpecialInstances -> (!{#ClassInstanceMember},!*SpecialInstances)
 		add_record_to_array_instances record members special_instances=:{si_next_array_member_index,si_array_instances}
@@ -931,21 +946,27 @@ where
 					-> (inst.ai_members, { special_instances &  si_next_array_member_index = si_next_array_member_index + size members,
 																si_array_instances = [ inst : si_array_instances ] })
 
-	check_unboxed_list_type :: Int Int GlobalIndex {#ClassInstanceMember} ![Type] {#DefinedSymbol} {#CommonDefs} *SpecialInstances *(*PredefinedSymbols,*TypeHeaps) *ErrorAdmin
+	check_unboxed_list_type :: UnboxedArrayAndListInfo Int GlobalIndex {#ClassInstanceMember} ![Type] {#DefinedSymbol} {#CommonDefs} *SpecialInstances *(*PredefinedSymbols,*TypeHeaps) *ErrorAdmin
 		-> (ClassInstanceDescr,*SpecialInstances,(*PredefinedSymbols,*TypeHeaps), *ErrorAdmin)
-	check_unboxed_list_type main_dcl_module_n ins_module ins_class_index ins_members types=:[elem_type:_] class_members defs special_instances predef_symbols_type_heaps error
-		# (unboxable, opt_record, predef_symbols_type_heaps) = try_to_unbox elem_type defs predef_symbols_type_heaps
-		| unboxable
-			= case opt_record of
-				Yes record
-					# (ins_members, special_instances) = add_record_to_list_instances record class_members special_instances
-					-> ({ cid_class_index = ins_class_index, cid_inst_module = main_dcl_module_n, cid_inst_members = ins_members, cid_red_contexts = [], cid_types = types },
-							special_instances, predef_symbols_type_heaps, error)
-				No
-					-> ({ cid_class_index = ins_class_index, cid_inst_module = ins_module, cid_inst_members = ins_members, cid_red_contexts = [], cid_types = types },
-							special_instances, predef_symbols_type_heaps, error)
-			= ({ cid_class_index = ins_class_index, cid_inst_module = ins_module, cid_inst_members = ins_members, cid_red_contexts = [], cid_types = types },
-					special_instances, predef_symbols_type_heaps, unboxError "UList" elem_type error)
+	check_unboxed_list_type {uaali_main_dcl_module_n,uaali_instance_info} ins_module ins_class_index ins_members types=:[elem_type:_] class_members defs special_instances predef_symbols_type_heaps error
+		# (unboxed_type, opt_record, predef_symbols_type_heaps) = try_to_unbox elem_type defs predef_symbols_type_heaps
+		= case opt_record of
+			Yes record
+				# (ins_members, special_instances) = add_record_to_list_instances record class_members special_instances
+				-> ({cid_class_index = ins_class_index, cid_inst_module = uaali_main_dcl_module_n, cid_inst_members = ins_members, cid_red_contexts = [], cid_types = types},
+						special_instances, predef_symbols_type_heaps, error)
+			No
+				| not unboxed_type=:TE
+					# ulist_instances = uaali_instance_info.[ins_class_index.gi_module].[ins_class_index.gi_index]
+					  {glob_module,glob_object} = find_unboxed_list_instance unboxed_type ulist_instances defs
+					| glob_module <> NotFound
+						# {ins_members,ins_class_index} = defs.[glob_module].com_instance_defs.[glob_object]
+						-> ({cid_class_index = ins_class_index, cid_inst_module = ins_module, cid_inst_members = ins_members, cid_red_contexts = [], cid_types = types},
+								special_instances, predef_symbols_type_heaps, error)
+						-> ({cid_class_index = ins_class_index, cid_inst_module = ins_module, cid_inst_members = ins_members, cid_red_contexts = [], cid_types = types},
+								special_instances, predef_symbols_type_heaps, unboxError "UList" elem_type error)
+					-> ({cid_class_index = ins_class_index, cid_inst_module = ins_module, cid_inst_members = ins_members, cid_red_contexts = [], cid_types = types},
+							special_instances, predef_symbols_type_heaps, unboxError "UList" elem_type error)
 	where
 		add_record_to_list_instances :: !TypeSymbIdent !{# DefinedSymbol} !*SpecialInstances -> (!{#ClassInstanceMember},!*SpecialInstances)
 		add_record_to_list_instances record members special_instances=:{si_next_array_member_index,si_list_instances}
@@ -958,21 +979,27 @@ where
 					-> (inst.ai_members, { special_instances &  si_next_array_member_index = si_next_array_member_index + size members,
 																si_list_instances = [ inst : si_list_instances ] })
 
-	check_unboxed_tail_strict_list_type :: Int Int GlobalIndex {#ClassInstanceMember} ![Type] {#DefinedSymbol} {#CommonDefs} *SpecialInstances *(*PredefinedSymbols,*TypeHeaps) *ErrorAdmin
+	check_unboxed_tail_strict_list_type :: UnboxedArrayAndListInfo Int GlobalIndex {#ClassInstanceMember} ![Type] {#DefinedSymbol} {#CommonDefs} *SpecialInstances *(*PredefinedSymbols,*TypeHeaps) *ErrorAdmin
 		-> (ClassInstanceDescr,*SpecialInstances,(*PredefinedSymbols,*TypeHeaps), *ErrorAdmin)
-	check_unboxed_tail_strict_list_type main_dcl_module_n ins_module ins_class_index ins_members types=:[elem_type:_] class_members defs special_instances predef_symbols_type_heaps error
-		# (unboxable, opt_record, predef_symbols_type_heaps) = try_to_unbox elem_type defs predef_symbols_type_heaps
-		| unboxable
-			= case opt_record of
-				Yes record
-					# (ins_members, special_instances) = add_record_to_tail_strict_list_instances record class_members special_instances
-					-> ({ cid_class_index = ins_class_index, cid_inst_module = main_dcl_module_n, cid_inst_members = ins_members, cid_red_contexts = [], cid_types = types },
-							special_instances, predef_symbols_type_heaps, error)
-				No
-					-> ({ cid_class_index = ins_class_index, cid_inst_module = ins_module, cid_inst_members = ins_members, cid_red_contexts = [], cid_types = types },
-							special_instances, predef_symbols_type_heaps, error)
-			= ({ cid_class_index = ins_class_index, cid_inst_module = ins_module, cid_inst_members = ins_members, cid_red_contexts = [], cid_types = types },
-					special_instances, predef_symbols_type_heaps, unboxError "UTSList" elem_type error)
+	check_unboxed_tail_strict_list_type {uaali_main_dcl_module_n,uaali_instance_info} ins_module ins_class_index ins_members types=:[elem_type:_] class_members defs special_instances predef_symbols_type_heaps error
+		# (unboxed_type, opt_record, predef_symbols_type_heaps) = try_to_unbox elem_type defs predef_symbols_type_heaps
+		= case opt_record of
+			Yes record
+				# (ins_members, special_instances) = add_record_to_tail_strict_list_instances record class_members special_instances
+				-> ({cid_class_index = ins_class_index, cid_inst_module = uaali_main_dcl_module_n, cid_inst_members = ins_members, cid_red_contexts = [], cid_types = types},
+						special_instances, predef_symbols_type_heaps, error)
+			No
+				| not unboxed_type=:TE
+					# utslist_instances = uaali_instance_info.[ins_class_index.gi_module].[ins_class_index.gi_index]
+					  {glob_module,glob_object} = find_unboxed_list_instance unboxed_type utslist_instances defs
+					| glob_module <> NotFound
+						# {ins_members,ins_class_index} = defs.[glob_module].com_instance_defs.[glob_object]
+						-> ({cid_class_index = ins_class_index, cid_inst_module = ins_module, cid_inst_members = ins_members, cid_red_contexts = [], cid_types = types},
+								special_instances, predef_symbols_type_heaps, error)
+						-> ({cid_class_index = ins_class_index, cid_inst_module = ins_module, cid_inst_members = ins_members, cid_red_contexts = [], cid_types = types},
+								special_instances, predef_symbols_type_heaps, unboxError "UTSList" elem_type error)
+					-> ({cid_class_index = ins_class_index, cid_inst_module = ins_module, cid_inst_members = ins_members, cid_red_contexts = [], cid_types = types},
+							special_instances, predef_symbols_type_heaps, unboxError "UTSList" elem_type error)
 	where
 		add_record_to_tail_strict_list_instances :: !TypeSymbIdent !{#DefinedSymbol} !*SpecialInstances -> (!{#ClassInstanceMember},!*SpecialInstances)
 		add_record_to_tail_strict_list_instances record members special_instances=:{si_next_array_member_index,si_tail_strict_list_instances}
@@ -985,27 +1012,74 @@ where
 					-> (inst.ai_members, { special_instances &  si_next_array_member_index = si_next_array_member_index + size members,
 																si_tail_strict_list_instances = [ inst : si_tail_strict_list_instances ] })
 
-	try_to_unbox ::  Type !{#CommonDefs} (!*PredefinedSymbols, !*TypeHeaps) -> (!Bool, !Optional TypeSymbIdent, !(!*PredefinedSymbols, !*TypeHeaps))
-	try_to_unbox (TB _) _ predef_symbols_type_heaps
-		= (True, No, predef_symbols_type_heaps)
-	try_to_unbox (TA type_symb=:{type_index={glob_module,glob_object},type_arity} type_args) defs (predef_symbols, type_heaps)
+	try_to_unbox :: Type !{#CommonDefs} (!*PredefinedSymbols, !*TypeHeaps) -> (!Type, !Optional TypeSymbIdent, !(!*PredefinedSymbols, !*TypeHeaps))
+	try_to_unbox type=:(TB _) _ predef_symbols_type_heaps
+		= (type, No, predef_symbols_type_heaps)
+	try_to_unbox type=:(TA type_symb=:{type_index={glob_module,glob_object},type_arity} type_args) defs (predef_symbols, type_heaps)
 		# {td_arity,td_rhs,td_args,td_attribute} = defs.[glob_module].com_type_defs.[glob_object]
 		= case td_rhs of
 			RecordType _
-				-> (True, (Yes type_symb), (predef_symbols, type_heaps))
+				-> (TE, Yes type_symb, (predef_symbols, type_heaps))
 			AbstractType _
-				#! unboxable =
-					   is_predefined_symbol glob_module glob_object PD_LazyArrayType predef_symbols ||
-					   is_predefined_symbol glob_module glob_object PD_StrictArrayType predef_symbols ||
-					   is_predefined_symbol glob_module glob_object PD_UnboxedArrayType predef_symbols
-				-> (unboxable, No, (predef_symbols, type_heaps))
+				| is_predefined_symbol glob_module glob_object PD_LazyArrayType predef_symbols ||
+				  is_predefined_symbol glob_module glob_object PD_StrictArrayType predef_symbols ||
+				  is_predefined_symbol glob_module glob_object PD_UnboxedArrayType predef_symbols
+					-> (type, No, (predef_symbols, type_heaps))
+					-> (TE, No, (predef_symbols, type_heaps))
 			SynType {at_type}
 				# (expanded_type, type_heaps) = substituteType td_attribute TA_Multi td_args type_args at_type type_heaps
 				-> try_to_unbox expanded_type defs (predef_symbols, type_heaps)
+			NewType {ds_index}
+				# {cons_type={st_args=[arg_type:_]}} = defs.[glob_module].com_cons_defs.[ds_index];
+				# (expanded_type, type_heaps) = substituteType td_attribute TA_Multi td_args type_args arg_type.at_type type_heaps
+				-> try_to_unbox expanded_type defs (predef_symbols, type_heaps)
 			_
-				-> (False, No, (predef_symbols, type_heaps))				
+				-> (TE, No, (predef_symbols, type_heaps))				
 	try_to_unbox type _ predef_symbols_type_heaps
-		= (False, No, predef_symbols_type_heaps)
+		= (TE, No, predef_symbols_type_heaps)
+
+	find_unboxed_array_instance :: Type !InstanceTree {#CommonDefs} *PredefinedSymbols -> *(!Global Int,!*PredefinedSymbols)
+	find_unboxed_array_instance element_type (IT_Node this_inst_index=:{glob_object,glob_module} left right) defs predef_symbols
+		# (left_index,predef_symbols) = find_unboxed_array_instance element_type left defs predef_symbols
+		| FoundObject left_index
+			= (left_index,predef_symbols)
+			= case defs.[glob_module].com_instance_defs.[glob_object].ins_type.it_types of
+				[TA {type_index={glob_module,glob_object}} _,instance_element_type:_]
+					| is_predefined_symbol glob_module glob_object PD_UnboxedArrayType predef_symbols
+						-> case (element_type,instance_element_type) of
+							(TB bt1,TB bt2)
+								| bt1==bt2
+									-> (this_inst_index,predef_symbols)
+							(TA {type_index=ti1} [_],TA {type_index=ti2} [_]) // for array elements
+								| ti1==ti2
+									-> (this_inst_index,predef_symbols)
+							_
+								-> find_unboxed_array_instance element_type right defs predef_symbols
+				_
+					-> find_unboxed_array_instance element_type right defs predef_symbols
+	find_unboxed_array_instance co_types IT_Empty defs predef_symbols
+		= (ObjectNotFound,predef_symbols)
+
+	find_unboxed_list_instance :: Type !InstanceTree {#CommonDefs} -> Global Int
+	find_unboxed_list_instance element_type (IT_Node this_inst_index=:{glob_object,glob_module} left right) defs
+		# left_index = find_unboxed_list_instance element_type left defs
+		| FoundObject left_index
+			= left_index
+			= case defs.[glob_module].com_instance_defs.[glob_object].ins_type.it_types of
+				[instance_element_type]
+					-> case (element_type,instance_element_type) of
+						(TB bt1,TB bt2)
+							| bt1==bt2
+								-> this_inst_index
+						(TA {type_index=ti1} [_],TA {type_index=ti2} [_]) // for array elements
+							| ti1==ti2
+								-> this_inst_index
+						_
+							-> find_unboxed_list_instance element_type right defs
+				_
+					-> find_unboxed_list_instance element_type right defs
+	find_unboxed_list_instance co_types IT_Empty defs
+		= ObjectNotFound
 
 	look_up_array_or_list_instance :: !TypeSymbIdent ![ArrayInstance] -> Optional ArrayInstance
 	look_up_array_or_list_instance record []

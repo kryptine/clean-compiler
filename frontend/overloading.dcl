@@ -36,7 +36,7 @@ from unitype import ::BOOLVECT
 :: ReducedOverloadedApplication
 :: ReducedOverloadedContext
 
-finishContextReduction :: ![ReducedOverloadedContext] ![ExprInfoPtr] !Int !{# CommonDefs } 
+finishContextReduction :: ![ReducedOverloadedContext] ![ExprInfoPtr] !Int !{#CommonDefs} !ClassInstanceInfo
 	!*VarHeap !*TypeHeaps !*ExpressionHeap  !*PredefinedSymbols !*SpecialInstances !*Coercions !*{!Type} !*ErrorAdmin
 	-> (![ReducedOverloadedApplication], ![TypeContext], ![LocalTypePatternVariable], !*VarHeap, !*TypeHeaps, !*ExpressionHeap, !*PredefinedSymbols,
 		!*SpecialInstances , !*Coercions, !*{!Type}, !*ErrorAdmin)
