@@ -746,29 +746,8 @@ where
 
 	finish_cr_of_cd info=:{fri_defs} {cd_inst_symbol={glob_module,glob_object},cd_inst_contexts,cd_new_vars} act_tc=:{tc_class,tc_types}
 			frs_state=:{frs_type_heaps,frs_coercions,frs_predef_symbols,frs_special_instances,frs_error}
-		# {ins_type={it_vars,it_attr_vars,it_types,it_context}, ins_members, ins_class_index} = fri_defs.[glob_module].com_instance_defs.[glob_object]
-		| is_predefined_global_symbol ins_class_index PD_ArrayClass frs_predef_symbols && is_unboxed_array tc_types frs_predef_symbols
-			# {class_members} = fri_defs.[ins_class_index.gi_module].com_class_defs.[ins_class_index.gi_index]
-			  (rcs_class_context, frs_special_instances, (frs_predef_symbols, frs_type_heaps), frs_error)
-				= check_unboxed_array_type info.fri_main_dcl_module_n glob_module ins_class_index ins_members tc_types class_members fri_defs
-				 	frs_special_instances (frs_predef_symbols, frs_type_heaps) frs_error
-			= (rcs_class_context,
-					{ frs_state & frs_predef_symbols = frs_predef_symbols, frs_type_heaps = frs_type_heaps, frs_error = frs_error, frs_special_instances = frs_special_instances})
-		| is_predefined_global_symbol ins_class_index PD_UListClass frs_predef_symbols
-			# {class_members} = fri_defs.[ins_class_index.gi_module].com_class_defs.[ins_class_index.gi_index]
-			  (rcs_class_context, frs_special_instances, (frs_predef_symbols, frs_type_heaps), frs_error)
-					= check_unboxed_list_type info.fri_main_dcl_module_n glob_module ins_class_index ins_members tc_types class_members fri_defs 
-					 	frs_special_instances (frs_predef_symbols, frs_type_heaps) frs_error
-			= (rcs_class_context,
-					{ frs_state & frs_predef_symbols = frs_predef_symbols, frs_type_heaps = frs_type_heaps, frs_error = frs_error, frs_special_instances = frs_special_instances})
-		| is_predefined_global_symbol ins_class_index PD_UTSListClass frs_predef_symbols
-			# {class_members} = fri_defs.[ins_class_index.gi_module].com_class_defs.[ins_class_index.gi_index]
-			  (rcs_class_context, frs_special_instances, (frs_predef_symbols, frs_type_heaps), frs_error)
-					= check_unboxed_tail_strict_list_type info.fri_main_dcl_module_n glob_module ins_class_index ins_members tc_types class_members fri_defs 
-					 	frs_special_instances (frs_predef_symbols, frs_type_heaps) frs_error
-			= (rcs_class_context,
-					{ frs_state & frs_predef_symbols = frs_predef_symbols, frs_type_heaps = frs_type_heaps, frs_error = frs_error, frs_special_instances = frs_special_instances})
-		| otherwise
+		# {ins_type={it_vars,it_attr_vars,it_types,it_context},ins_members,ins_class_index,ins_specials} = fri_defs.[glob_module].com_instance_defs.[glob_object]
+		| not ins_specials=:SP_GenerateRecordInstances
 			# frs_type_heaps & th_vars = clear_binding_of_type_vars it_vars frs_type_heaps.th_vars,
 							   th_attrs = clear_attr_vars it_attr_vars frs_type_heaps.th_attrs
 				with
@@ -786,6 +765,7 @@ where
 				# {class_ident} = fri_defs.[ins_class_index.gi_module].com_class_defs.[ins_class_index.gi_index]
 				= ({ cid_class_index = ins_class_index, cid_inst_module = glob_module, cid_inst_members = ins_members, cid_types = tc_types, cid_red_contexts = [] },
 						{ frs_state & frs_type_heaps = frs_type_heaps, frs_coercions = frs_coercions, frs_error = uniqueError class_ident tc_types frs_error})
+			= check_unboxed_array_or_list_type info glob_module ins_class_index ins_members tc_types fri_defs frs_state
 
 	finish_cr_of_cis :: FinReduceInfo [CI] TypeContext *FinalRedState -> *(*[ReducedContext],*FinalRedState)
 	finish_cr_of_cis info [] act_tc frs_state
@@ -799,11 +779,6 @@ where
 
 	getClassSymbol (TCClass class_symbol)	= class_symbol
 	getClassSymbol (TCGeneric {gtc_class})	= gtc_class
-
-	is_predefined_global_symbol :: !GlobalIndex !Int !PredefinedSymbols -> Bool
-	is_predefined_global_symbol {gi_module,gi_index} predef_index predef_symbols
-		# {pds_def,pds_module} = predef_symbols.[predef_index]
-		= gi_module == pds_module && gi_index == pds_def
 
 	reduce_tc_context :: {#CommonDefs} TCClass Type *ReduceTCState -> (ReducedContext, !*ReduceTCState)
 	reduce_tc_context defs type_code_class type=:(TA cons_id=:{type_index} cons_args) rtcs_state=:{rtcs_error,rtcs_type_heaps}
@@ -879,6 +854,49 @@ where
 				AbstractType _			-> abstractTypeInDynamicError td_ident error
 				AbstractSynType _ _		-> abstractTypeInDynamicError td_ident error
 				_						-> error
+
+	bind_new_vars [(tv_info_ptr,tv_n):new_vars] subst type_heaps
+		# (tv_info, th_vars) = readPtr tv_info_ptr type_heaps.th_vars
+		= case tv_info of
+			TVI_Empty
+				# (_,type2,subst) = arraySubst (TempV tv_n) subst
+			 	  type_heaps & th_vars = writePtr tv_info_ptr (TVI_Type type2) th_vars
+				-> bind_new_vars new_vars subst type_heaps
+			TVI_Type _
+			 	-> bind_new_vars new_vars subst {type_heaps & th_vars = th_vars}
+	bind_new_vars [] subst type_heaps
+		= (subst,type_heaps)
+
+check_unboxed_array_or_list_type :: FinReduceInfo Int GlobalIndex {#ClassInstanceMember} ![Type] {#CommonDefs} *FinalRedState
+	-> (ClassInstanceDescr,*FinalRedState)
+check_unboxed_array_or_list_type info glob_module ins_class_index ins_members tc_types fri_defs
+		 	frs_state=:{frs_type_heaps,frs_coercions,frs_predef_symbols,frs_special_instances,frs_error}
+	| is_predefined_global_symbol ins_class_index PD_ArrayClass frs_predef_symbols && is_unboxed_array tc_types frs_predef_symbols
+		# {class_members} = fri_defs.[ins_class_index.gi_module].com_class_defs.[ins_class_index.gi_index]
+		  (rcs_class_context, frs_special_instances, (frs_predef_symbols, frs_type_heaps), frs_error)
+			= check_unboxed_array_type info.fri_main_dcl_module_n glob_module ins_class_index ins_members tc_types class_members fri_defs
+			 	frs_special_instances (frs_predef_symbols, frs_type_heaps) frs_error
+		= (rcs_class_context,
+				{ frs_state & frs_predef_symbols = frs_predef_symbols, frs_type_heaps = frs_type_heaps, frs_error = frs_error, frs_special_instances = frs_special_instances})
+	| is_predefined_global_symbol ins_class_index PD_UListClass frs_predef_symbols
+		# {class_members} = fri_defs.[ins_class_index.gi_module].com_class_defs.[ins_class_index.gi_index]
+		  (rcs_class_context, frs_special_instances, (frs_predef_symbols, frs_type_heaps), frs_error)
+				= check_unboxed_list_type info.fri_main_dcl_module_n glob_module ins_class_index ins_members tc_types class_members fri_defs 
+				 	frs_special_instances (frs_predef_symbols, frs_type_heaps) frs_error
+		= (rcs_class_context,
+				{ frs_state & frs_predef_symbols = frs_predef_symbols, frs_type_heaps = frs_type_heaps, frs_error = frs_error, frs_special_instances = frs_special_instances})
+	| is_predefined_global_symbol ins_class_index PD_UTSListClass frs_predef_symbols
+		# {class_members} = fri_defs.[ins_class_index.gi_module].com_class_defs.[ins_class_index.gi_index]
+		  (rcs_class_context, frs_special_instances, (frs_predef_symbols, frs_type_heaps), frs_error)
+				= check_unboxed_tail_strict_list_type info.fri_main_dcl_module_n glob_module ins_class_index ins_members tc_types class_members fri_defs 
+				 	frs_special_instances (frs_predef_symbols, frs_type_heaps) frs_error
+		= (rcs_class_context,
+				{ frs_state & frs_predef_symbols = frs_predef_symbols, frs_type_heaps = frs_type_heaps, frs_error = frs_error, frs_special_instances = frs_special_instances})
+where
+	is_predefined_global_symbol :: !GlobalIndex !Int !PredefinedSymbols -> Bool
+	is_predefined_global_symbol {gi_module,gi_index} predef_index predef_symbols
+		# {pds_def,pds_module} = predef_symbols.[predef_index]
+		= gi_module == pds_module && gi_index == pds_def
 
 	is_unboxed_array:: [Type] PredefinedSymbols -> Bool
 	is_unboxed_array [TA {type_index={glob_module,glob_object},type_arity} _ : _] predef_symbols
@@ -1001,18 +1019,6 @@ where
 	new_array_instance record members next_member_index
 		= {	ai_members = { {cim_ident=ds_ident,cim_arity=ds_arity,cim_index=next_inst_index} \\ {ds_ident,ds_arity} <-: members & next_inst_index <- [next_member_index .. ]},
 			ai_record = record }
-
-	bind_new_vars [(tv_info_ptr,tv_n):new_vars] subst type_heaps
-		# (tv_info, th_vars) = readPtr tv_info_ptr type_heaps.th_vars
-		= case tv_info of
-			TVI_Empty
-				# (_,type2,subst) = arraySubst (TempV tv_n) subst
-			 	  type_heaps & th_vars = writePtr tv_info_ptr (TVI_Type type2) th_vars
-				-> bind_new_vars new_vars subst type_heaps
-			TVI_Type _
-			 	-> bind_new_vars new_vars subst {type_heaps & th_vars = th_vars}
-	bind_new_vars [] subst type_heaps
-		= (subst,type_heaps)
 
 collect_variable_and_contexts_of_rcs :: [ReducedContext] [(Int,Int)] [TypeContext] -> [(Int,Int)]
 collect_variable_and_contexts_of_rcs [rc:rcs] variables_and_contexts class_context
