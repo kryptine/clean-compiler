@@ -318,7 +318,7 @@ where
 	(<<<) file (BasicPatterns type patterns) = file <<< " " <<<patterns
 	(<<<) file (AlgebraicPatterns type patterns) = file <<< patterns
 	(<<<) file (DynamicPatterns patterns) = file <<< patterns
-	(<<<) file (OverloadedListPatterns type decons_expr patterns) = file <<< ' ' <<< decons_expr <<< " " <<< patterns
+	(<<<) file (OverloadedListPatterns type decons_expr patterns) = file <<< ' ' <<< decons_expr <<< ' ' <<< patterns
 	(<<<) file (NewTypePatterns type patterns) = file <<< patterns
 	(<<<) file NoPattern = file 
 
@@ -421,7 +421,7 @@ where
 		= file <<< "DictionariesFunction " <<< dictionaries <<< expr <<< expr_type
 	(<<<) file ExprToBeRemoved = file <<< "** ExprToBeRemoved **"
 	(<<<) file expr         				= abort ("<<< (Expression)" )
-	
+
 instance <<< LetBind
 where
 	(<<<) file {lb_dst, lb_src}
@@ -683,6 +683,10 @@ where
 		= file <<< " = " <<< data 
 	(<<<) file (RecordType record)
 		= file <<< " = " <<< '{' <<< record <<< '}'
+	(<<<) file (ExtensibleAlgType data)
+		= file <<< " = " <<< data <<< " | .."
+	(<<<) file (AlgConses data _)
+		= file <<< " | " <<< data
 	(<<<) file _
 		= file 
 

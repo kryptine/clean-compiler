@@ -1484,7 +1484,8 @@ is_predefined_symbol mod_index symb_index predef_index predef_symbols
 
 get_specials :: Specials -> [Special]
 get_specials (SP_ContextTypes specials) = specials
-get_specials SP_None 					= []
+get_specials SP_None = []
+get_specials SP_GenerateRecordInstances = []
 
 freshContexts :: ![TypeContext] !*TypeHeaps -> (![TypeContext],*TypeHeaps)
 freshContexts tcs type_heaps
@@ -2434,7 +2435,7 @@ where
 			= [(index, new_ptrs ++ ptrs) : dict_types]
 			= [(new_index, new_ptrs) : dt]
 
-selectFromDictionary  dict_mod dict_index member_index defs
+selectFromDictionary dict_mod dict_index member_index defs
 	# (RecordType {rt_fields}) = defs.[dict_mod].com_type_defs.[dict_index].td_rhs
 	  { fs_ident, fs_index } = rt_fields.[member_index]
 	= { glob_module = dict_mod, glob_object = { ds_ident = fs_ident, ds_index = fs_index, ds_arity = 1 }}
@@ -2457,7 +2458,7 @@ convertOverloadedCall defs contexts {symb_ident,symb_kind = SK_OverloadedFunctio
 where
 	adjust_member_application defs contexts mem_def (CA_Instance rc) class_exprs heaps_and_ptrs
 		= adjust_member_instance  defs contexts mem_def rc class_exprs heaps_and_ptrs
-	adjust_member_application defs contexts  {me_ident,me_offset,me_class={glob_module,glob_object}} (CA_Context tc) class_exprs (heaps=:{hp_type_heaps}, ptrs)
+	adjust_member_application defs contexts {me_offset,me_class={glob_module,glob_object}} (CA_Context tc) class_exprs (heaps=:{hp_type_heaps}, ptrs)
 		# (class_context, address, hp_type_heaps) = determineContextAddress contexts defs tc hp_type_heaps
 		# {class_dictionary={ds_index,ds_ident}} = defs.[glob_module].com_class_defs.[glob_object]
 		  selector = selectFromDictionary glob_module ds_index me_offset defs

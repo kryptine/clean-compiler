@@ -5059,11 +5059,12 @@ where
 instance <<< Specials
 where
 	(<<<) file spec = case spec of
+		SP_None							-> file <<< "SP_None"
 		(SP_ParsedSubstitutions 	_)	-> file <<< "SP_ParsedSubstitutions"
 		(SP_Substitutions 		 	_)	-> file <<< "SP_Substitutions"
 		(SP_ContextTypes			l)	-> file <<< "(SP_ContextTypes: " <<< l <<< ")"
 		(SP_TypeOffset				_)	-> file <<< "SP_TypeOffset"
-		SP_None							-> file <<< "SP_None"
+		SP_GenerateRecordInstances		-> file <<< "SP_GenerateRecordInstances"
 
 instance <<< Special
 where
