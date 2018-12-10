@@ -6,6 +6,55 @@ import syntax, Heap, typesupport, overloading, unitype, utilities
 (===>) infix 1
 (===>) a b :== a // --->  b
 
+:: VarInfo
+	| VI_Occurrence !Occurrence
+
+::	PatternVar =
+	{	pv_var		:: !FreeVar
+	,	pv_arg_nr	:: !Int
+	}
+
+:: ReferenceCountList
+	= ReferenceCounts !ReferenceCount !ReferenceCountList
+	| ReferenceCountsUnused !Int !ReferenceCountList
+	| ReferenceCountsAllUnused
+	| EndReferenceCounts
+
+::	Occurrence =
+	{	occ_ref_count		:: !ReferenceCount
+	,	occ_bind			:: !OccurrenceBinding
+	,	occ_pattern_vars	:: ![[PatternVar]]
+	,	occ_observing		:: (Bool, Ptr ExprInfo)
+	,	occ_previous 		:: !ReferenceCountList
+	}
+
+::	ReferenceCount = RC_Used !RC_Used | RC_Unused 
+
+::	SelectiveUse =
+	{	su_field	:: !Int
+	,	su_multiply :: ![ExprInfoPtr]
+	,	su_uniquely :: ![ExprInfoPtr]
+	}
+
+::	RC_Used =
+	{ 	rcu_multiply	:: ![ExprInfoPtr]
+	,	rcu_selectively :: ![SelectiveUse]
+	,	rcu_uniquely	:: ![ExprInfoPtr]
+	}
+
+::	CountedFreeVar =
+	{	cfv_var		:: !FreeVar
+	,	cfv_is_let	:: !Bool
+	,	cfv_count	:: !ReferenceCount
+	}
+
+::	OccurrenceBinding	= OB_Empty 
+						| OB_OpenLet	!FreeVar !(Optional RefMarkResult)
+						| OB_LockedLet	!OccurrenceBinding
+						| OB_MarkedLet	!OccurrenceBinding
+
+::	RefMarkResult :== ([CountedFreeVar], [FreeVar])
+
 NotASelector :== -1
 
 ::	RMState =
