@@ -1,15 +1,7 @@
-/*
-	module owner: Ronny Wichers Schreur
-*/
 definition module convertcases
 
 import syntax
 from checksupport import ::Component
-
-:: LetVarInfo
-:: LetExpressionInfo
-:: RefCountsInCase
-:: SplitsInCase
 
 convertCasesOfFunctions :: !*{!Component} !Int !{# {# FunType} } !{# CommonDefs} !*{#FunDef} !*{#{# CheckedTypeDef}}
 		!ImportedConstructors !*VarHeap !*TypeHeaps !*ExpressionHeap

@@ -5,7 +5,6 @@ import StdEnv
 import scanner, general, typeproperties, Heap
 import IndexType
 from containers import ::NumberSet
-from convertcases import :: LetVarInfo, :: LetExpressionInfo, :: RefCountsInCase, :: SplitsInCase
 
 ::	Ident =
 	{ 	id_name		:: !String
@@ -818,7 +817,7 @@ pIsSafe			:== True
 				VI_ClassVar !Ident !VarInfoPtr !Int | /* to hold dictionary variables during overloading */
 				VI_EmptyConstructorClassVar |
 				VI_ForwardClassVar !VarInfoPtr | /* to hold the dictionary variable generated during overloading */
-				VI_Forward !BoundVar | VI_LetVar !LetVarInfo | VI_LetExpression !LetExpressionInfo |
+				VI_Forward !BoundVar |
 				VI_CaseOrStrictLetVar !VarInfoPtr | VI_StrictLetVar |
 				VI_CorrespondenceNumber !Int | /* it is assumed that this alternative is _only_ used in module comparedefimp */
 				VI_SequenceNumber !Int | VI_AliasSequenceNumber !BoundVar |
@@ -978,8 +977,6 @@ cNotVarNumber :== -1
 					| EI_CaseType !CaseType
 					| EI_LetType ![AType]
 					| EI_CaseTypeWithContexts !CaseType ![(DefinedSymbol,[TypeContext])]
-					| EI_CaseTypeAndRefCounts !CaseType !RefCountsInCase
-					| EI_CaseTypeAndSplits !CaseType !SplitsInCase
 					| EI_LetTypeAndRefCounts ![AType] ![Int]
 
 		/* for converting case into function patterns the following auxiliary constuctors are used */
@@ -987,6 +984,7 @@ cNotVarNumber :== -1
 					| EI_Default !Expression !AType !ExprInfoPtr
 					| EI_DefaultFunction !SymbIdent ![Expression]
 					| EI_Extended !ExtendedExprInfo !ExprInfo
+					| ..
 
 ::	ExtendedExprInfo
 					= EEI_ActiveCase !ActiveCaseInfo

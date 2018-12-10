@@ -4,6 +4,14 @@ import StdStrictLists
 import syntax, compare_types, utilities, expand_types, general
 from checksupport import ::Component(..),::ComponentMembers(..)
 
+:: VarInfo
+	| VI_LetVar !LetVarInfo
+	| VI_LetExpression !LetExpressionInfo
+
+:: ExprInfo
+	| EI_CaseTypeAndRefCounts !CaseType !RefCountsInCase
+	| EI_CaseTypeAndSplits !CaseType !SplitsInCase
+
 // exactZip fails when its arguments are of unequal length
 exactZip :: ![.a] ![.b] -> [(.a,.b)]
 exactZip [x:xs][y:ys]
