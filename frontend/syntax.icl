@@ -835,7 +835,6 @@ where
 	(<<<) file (TVI_AType at) 			= file <<< "TVI_AType " <<< at
 	(<<<) file TVI_Used					= file <<< "TVI_Used"
 	(<<<) file (TVI_TypeCode	_)		= file <<< "TVI_TypeCode"
-	(<<<) file (TVI_CPSLocalTypeVar	_)	= file <<< "TVI_CPSLocalTypeVar"		
 	(<<<) file (TVI_Kinds _)		= file <<< "TVI_Kinds"
 	(<<<) file (TVI_PropClass _ _ _) 	= file <<< "TVI_PropClass"
 	(<<<) file (TVI_TypeKind kind_info_ptr) = file <<< "TVI_TypeKind " <<< (ptrToInt kind_info_ptr)
