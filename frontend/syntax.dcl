@@ -804,7 +804,7 @@ pIsSafe			:== True
 ::	VarInfo  =	VI_Empty | VI_Type !AType !VI_TypeInfo |
 				VI_FAType ![ATypeVar] !AType !VI_TypeInfo |
 				VI_FATypeC ![ATypeVar] !AType ![TypeContext] !VI_TypeInfo | VI_FPC |
-				VI_Occurrence !Occurrence | VI_UsedVar !Ident |
+				VI_UsedVar !Ident |
 				VI_Expression !Expression | VI_Variable !Ident !VarInfoPtr | VI_LiftedVariable !VarInfoPtr |
 				VI_Count !Int /* the reference count of a variable */ !Bool /* true if the variable is global, false otherwise */ |
 				VI_AccVar !ConsClass !ArgumentPosition /* used during fusion to determine accumulating parameters of functions */ |
@@ -1235,54 +1235,6 @@ instance toString 	TypeKind
 instance <<< 		TypeKind
 instance == 		TypeKind
 instance toString 	KindInfo
-
-/* A few obscure type definitions */
-
-::	PatternVar =
-	{	pv_var		:: !FreeVar
-	,	pv_arg_nr	:: !Int
-	}
-
-:: ReferenceCountList
-	= ReferenceCounts !ReferenceCount !ReferenceCountList
-	| ReferenceCountsUnused !Int !ReferenceCountList
-	| ReferenceCountsAllUnused
-	| EndReferenceCounts
-
-::	Occurrence =
-	{	occ_ref_count		:: !ReferenceCount
-	,	occ_bind			:: !OccurrenceBinding
-	,	occ_pattern_vars	:: ![[PatternVar]]
-	,	occ_observing		:: (Bool, Ptr ExprInfo)
-	,	occ_previous 		:: !ReferenceCountList
-	}
-
-::	ReferenceCount = RC_Used !RC_Used | RC_Unused 
-
-::	SelectiveUse =
-	{	su_field	:: !Int
-	,	su_multiply :: ![ExprInfoPtr]
-	,	su_uniquely :: ![ExprInfoPtr]
-	}
-
-::	RC_Used =
-	{ 	rcu_multiply	:: ![ExprInfoPtr]
-	,	rcu_selectively :: ![SelectiveUse]
-	,	rcu_uniquely	:: ![ExprInfoPtr]
-	}
-
-::	CountedFreeVar =
-	{	cfv_var		:: !FreeVar
-	,	cfv_is_let	:: !Bool
-	,	cfv_count	:: !ReferenceCount
-	}
-
-::	OccurrenceBinding	= OB_Empty 
-						| OB_OpenLet	!FreeVar !(Optional RefMarkResult)
-						| OB_LockedLet	!OccurrenceBinding
-						| OB_MarkedLet	!OccurrenceBinding
-
-::	RefMarkResult :== ([CountedFreeVar], [FreeVar])
 
 ::	OptGuardedAlts	= GuardedAlts ![GuardedExpr] !(Optional ExprWithLocalDefs)
 				 	| UnGuardedExpr !ExprWithLocalDefs
