@@ -1156,13 +1156,8 @@ cNotVarNumber :== -1
 					| TVI_SignClass !Index !SignClassification !TypeVarInfo | TVI_PropClass !Index !PropClassification !TypeVarInfo
 					| TVI_AttrAndRefCount !TypeAttribute !Int
 					| TVI_CorrespondenceNumber !Int /* auxiliary used in module comparedefimp */
-					| TVI_AType !AType /* auxiliary used in module comparedefimp */
-					| TVI_Reify !Int
 					| TVI_Used /* to administer that this variable is encountered (in checkOpenTypes) */
 					| TVI_TypeCode !TypeCodeExpression
-					| TVI_Kinds ![TypeKind] // AA: used to collect kinds during checking 
-					| TVI_Kind !TypeKind
-					| TVI_ConsInstance !DefinedSymbol //AA: generic cons instance function 
 					| TVI_Normalized !Int /* MV - position of type variable in its definition */
 					| TVI_GenTypeVarNumber !Int
 					| TVI_TypeVarArgN !Int // type argument number in module backendconvert
