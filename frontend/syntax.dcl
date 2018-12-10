@@ -973,8 +973,6 @@ cNotVarNumber :== -1
 
 		/* for converting case into function patterns the following auxiliary constuctors are used */
 
-					| EI_Default !Expression !AType !ExprInfoPtr
-					| EI_DefaultFunction !SymbIdent ![Expression]
 					| EI_Extended !ExtendedExprInfo !ExprInfo
 					| ..
 
