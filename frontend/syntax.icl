@@ -822,13 +822,10 @@ where
 	(<<<) file (TVI_SignClass _ _ _) 	= file <<< "TVI_SignClass"
 	(<<<) file (TVI_AttrAndRefCount ta rc) 	= file <<< "TVI_AttrAndRefCount " <<< ta <<< " " <<< rc
 	(<<<) file (TVI_CorrespondenceNumber n) = file <<< "TVI_CorrespondenceNumber " <<< n
-	(<<<) file (TVI_AType at) 			= file <<< "TVI_AType " <<< at
 	(<<<) file TVI_Used					= file <<< "TVI_Used"
 	(<<<) file (TVI_TypeCode	_)		= file <<< "TVI_TypeCode"
-	(<<<) file (TVI_Kinds _)		= file <<< "TVI_Kinds"
 	(<<<) file (TVI_PropClass _ _ _) 	= file <<< "TVI_PropClass"
 	(<<<) file (TVI_TypeKind kind_info_ptr) = file <<< "TVI_TypeKind " <<< (ptrToInt kind_info_ptr)
-	(<<<) file (TVI_Kind kind) 			= file <<< "TVI_Kind" <<< kind
 
 instance <<< AttrVarInfo
 where
