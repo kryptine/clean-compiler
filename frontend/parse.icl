@@ -573,28 +573,13 @@ where
 		//# (type, pState) = wantType pState
 		# (ok, {at_type=type}, pState) = trySimpleType TA_None pState
 		# (ident, pState) = stringToIdent name (IC_GenericCase type) pState
-		# (generic_ident, pState) = stringToIdent name IC_Generic pState	
-		# (type_cons, generic_fun_ident, pState) = get_type_cons type pState
+		# (generic_ident, pState) = stringToIdent name IC_Generic pState
+		# (type_cons, pState) = get_type_cons type pState
+		# (generic_fun_ident, pState) = make_generic_fun_ident type_cons pState
 			with
-				get_type_cons (TA type_symb []) pState
-					= make_generic_fun_ident (TypeConsSymb type_symb) pState
-				get_type_cons (TA type_symb _) pState
-					# pState = parseError "generic type, no constructor arguments allowed" No " |}" pState
-					= (abort_no_TypeCons, abort_no_TypeCons, pState)
-				get_type_cons (TB tb) pState
-					= make_generic_fun_ident (TypeConsBasic tb) pState
-				get_type_cons TArrow pState
-					= make_generic_fun_ident TypeConsArrow pState
-				get_type_cons (TV tv) pState
-					= make_generic_fun_ident (TypeConsVar tv) pState
-				get_type_cons _ pState 
-					# pState = parseError "generic type" No " |}" pState
-					= (abort_no_TypeCons, abort_no_TypeCons, pState)
-				
 				make_generic_fun_ident type_cons pState
 					# generic_fun_ident = genericIdentToFunIdent name type_cons
-					  (generic_fun_ident,pState) = stringToIdent generic_fun_ident.id_name IC_Expression pState
-					= (type_cons, generic_fun_ident, pState)
+					= stringToIdent generic_fun_ident.id_name IC_Expression pState
 
 		# (token, pState) = nextToken GenericContext pState
 		# (geninfo_arg, gcf_generic_info, pState) = case token of
@@ -659,8 +644,6 @@ where
 						gcf_generic_instance_deps = AllGenericInstanceDependencies }
 			}
 		= (True, PD_GenericCase generic_case generic_fun_ident, pState)
-
-	abort_no_TypeCons => abort "no TypeCons"
 
 	wantForeignExportDefinition pState
 		# (token, pState) = nextToken GeneralContext pState
@@ -2000,22 +1983,6 @@ where
 						 gc_gcf = GCFC ident class_ident}
 		= (derive_def, pState)
 
-	get_type_cons :: Type !*ParseState -> (TypeCons, !*ParseState)	
-	get_type_cons (TA type_symb []) pState
-		= (TypeConsSymb type_symb, pState)
-	get_type_cons (TB tb) pState
-		= (TypeConsBasic tb, pState)
-	get_type_cons TArrow pState
-		= (TypeConsArrow, pState)
-	get_type_cons (TV tv) pState
-		| isDclContext parseContext
-			= (TypeConsVar tv, pState)
-	get_type_cons (TQualifiedIdent module_id ident_name []) pState
-		= (TypeConsQualifiedIdent module_id ident_name, pState)
-	get_type_cons type pState 
-		# pState = parseError "generic type" No " type constructor" pState
-		= (abort "no TypeCons", pState)
-
 	parse_info_fields "OBJECT" token pState
 		= parse_OBJECT_info_fields token 0 pState
 	parse_info_fields "CONS" token pState
@@ -2124,6 +2091,24 @@ where
 				-> parse_generic_instance_deps (n_deps+1) (deps bitor (1<<n_deps)) pState
 			_
 				-> (GenericInstanceDependencies n_deps deps, token, pState)
+
+get_type_cons :: !Type !*ParseState -> (TypeCons, !*ParseState)
+get_type_cons (TA type_symb []) pState
+	= (TypeConsSymb type_symb, pState)
+get_type_cons (TA {type_ident={id_name=PD_UnboxedArray_String}} [{at_type}]) pState
+	# (element_type_cons, pState) = get_type_cons at_type pState
+	= (TypeConsUnboxedArray element_type_cons, pState)
+get_type_cons (TB tb) pState
+	= (TypeConsBasic tb, pState)
+get_type_cons TArrow pState
+	= (TypeConsArrow, pState)
+get_type_cons (TV tv) pState
+	= (TypeConsVar tv, pState)
+get_type_cons (TQualifiedIdent module_id ident_name []) pState
+	= (TypeConsQualifiedIdent module_id ident_name, pState)
+get_type_cons type pState
+	# pState = parseError "generic type" No "type constructor" pState
+	= (abort "no TypeCons", pState)
 
 /*
 	Type definitions

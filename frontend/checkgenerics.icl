@@ -322,6 +322,14 @@ where
 			# cs = {cs & cs_error = checkError type_def.td_ident "type synonym not allowed" cs.cs_error}
 			= (TA type_cons [], TypeConsSymb type_cons, type_defs, modules, heaps, cs)
 			= (TA type_cons [], TypeConsSymb type_cons, type_defs, modules, heaps, cs)
+	check_instance_type module_index (TA type_cons=:{type_ident={id_name=PD_UnboxedArray_String,id_info}} [element_type]) type_defs modules heaps cs
+		# (entry, cs_symbol_table) = readPtr id_info cs.cs_symbol_table
+		# cs & cs_symbol_table = cs_symbol_table
+		# (type_index, type_module) = retrieveGlobalDefinition entry STE_Type module_index
+		# type_cons & type_index = { glob_object = type_index, glob_module = type_module }
+		# (at_type, element_type_cons, type_defs, modules, heaps, cs) = check_instance_type module_index element_type.at_type type_defs modules heaps cs
+		# element_type & at_type = at_type
+		= (TA type_cons [element_type], TypeConsUnboxedArray element_type_cons, type_defs, modules, heaps, cs)
 	check_instance_type module_index (TB b) type_defs modules heaps cs
 		= (TB b, TypeConsBasic b, type_defs, modules,heaps, cs) 
 	check_instance_type module_index TArrow type_defs modules heaps cs
