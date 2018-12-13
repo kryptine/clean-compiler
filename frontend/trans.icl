@@ -288,8 +288,12 @@ where
 		# (dynamic_expr, ti) = transform dynamic_expr ro ti
 		= (DynamicExpr dynamic_expr, ti)
 	transform (DictionariesFunction dictionaries expr expr_type) ro ti
+		# ti & ti_var_heap = foldSt store_dictionary_type_info dictionaries ti.ti_var_heap
 		# (expr,ti) = transform expr ro ti
 		= (DictionariesFunction dictionaries expr expr_type,ti)
+	where
+		store_dictionary_type_info ({fv_info_ptr},a_type) ti_var_heap
+			= setExtendedVarInfo fv_info_ptr (EVI_VarType a_type) ti_var_heap
 	transform expr ro ti
 		= (expr, ti)
 
