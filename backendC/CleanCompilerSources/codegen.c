@@ -786,7 +786,7 @@ static void CodeRule (ImpRuleP rule)
 		GenOStackLayoutOfStates (a_stack_size_of_strict_entry,init_b_stack_top,rule_sdef->sdef_arity,rule->rule_state_p);
 		GenLabelDefinition (&CurrentAltLabel);
 	
-		MakeSymbolLabel (&caf_label,NULL,caf_pref,rule_sdef,0);
+		MakeLabel (&caf_label,rule_sdef->sdef_ident->ident_name,0,caf_pref);
 		MakeLabel (&local_label,m_symb,NewLabelNr++,no_pref);
 
 		DetermineSizeOfState (resultstate,&a_size,&b_size);

@@ -55,7 +55,7 @@ char eu_pref[]	= "eu";
 char l_pref[] 	= "l";
 char s_pref[] 	= "s";
 
-char caf_pref[]	= "c";
+char caf_pref[]	= "v";
 
 char glob_sel[]	= "_S";
 char m_symb[]	= "m";
