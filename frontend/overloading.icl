@@ -811,11 +811,11 @@ where
 		# rtcs_state = {rtcs_state & rtcs_type_pattern_vars=rtcs_type_pattern_vars, rtcs_var_heap=rtcs_var_heap}
 		= (RC_TC_Local inst_var, rtcs_state)
 	reduce_tc_context defs type_code_class type rtcs_state=:{rtcs_var_heap, rtcs_new_contexts}
-		/*	workaround for the following problem: a type synonym may yield a (TempCV _ :@: _),
+		/*	workaround for the following problem: a type synonym may yield a (TempCV (or TempQCV) _ :@: _),
 			contextIsReducible then yields True for the unexpanded type synonym application,
 			but after expanding the type synonym the resulting type may not be reducible
 		*/
-		| case type of TempCV _ :@: _ -> True; TempV _ -> True; TempQV _ -> True; _ -> False
+		| case type of TempCV _ :@: _ -> True; TempV _ -> True; TempQCV _ :@: _ -> True; TempQV _ -> True; _ -> False
 			# (tc_var, rtcs_var_heap) = newPtr VI_Empty rtcs_var_heap
 			  tc = {tc_class=type_code_class, tc_types=[type], tc_var=tc_var}
 			  rtcs_new_contexts = if (containsContext tc rtcs_new_contexts) rtcs_new_contexts [tc : rtcs_new_contexts]
