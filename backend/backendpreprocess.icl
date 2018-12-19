@@ -15,24 +15,22 @@ backEndPreprocess aliasDummyId functionIndices iclModule varHeap
 	=	preprocess aliasDummyId
 					[iclModule.icl_functions.[i] \\ i <- functionIndices] varHeap
 
-class preprocess a :: !Ident a -> Preprocessor
-:: Preprocessor
-	:==	*PreprocessState -> *PreprocessState
+class preprocess a :: !Ident a !*PreprocessState -> *PreprocessState
 :: PreprocessState
 	:==	VarHeap
 
 instance preprocess {#a} | preprocess a & Array {#} a where
-	preprocess aliasDummyId array
-		=	foldStateA (preprocess aliasDummyId) array
+	preprocess aliasDummyId array pst
+		=	foldStateA (preprocess aliasDummyId) array pst
 
 instance preprocess [a] | preprocess a where
-	preprocess aliasDummyId list
-		=	foldState (preprocess aliasDummyId) list
+	preprocess aliasDummyId list pst
+		=	foldState (preprocess aliasDummyId) list pst
 
 // +++ this assigns sequence numbers per function, should be per alternative and move to backendconvert
 instance preprocess FunDef where
-	preprocess aliasDummyId funDef
-		=	fromSequencerToPreprocessor aliasDummyId (sequence funDef.fun_body)
+	preprocess aliasDummyId funDef pst
+		=	fromSequencerToPreprocessor aliasDummyId (sequence funDef.fun_body) pst
 
 class sequence a :: a -> Sequencer
 :: Sequencer

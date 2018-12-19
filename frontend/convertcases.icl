@@ -63,6 +63,9 @@ where
 	convert_functions NoComponentMembers group_nr dcl_functions common_defs main_dcl_module_n fun_defs_and_ci
 		= fun_defs_and_ci
 
+	convert_function :: !Index !{#{#FunType}} !{#CommonDefs} !Int !Int
+				!*(!*{#FunDef}, ![SymbKind], !*ConvertState)
+			->   *(!*{#FunDef}, ![SymbKind], !*ConvertState)
 	convert_function group_index dcl_functions common_defs main_dcl_module_n fun (fun_defs, collected_imports, cs)
 		# ({fun_body,fun_type}, fun_defs) = fun_defs![fun]
 		  (fun_body, (collected_imports, cs))
