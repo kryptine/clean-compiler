@@ -1364,7 +1364,6 @@ adjustArrayFunctions array_first_instance_indices predefs main_dcl_module_n func
 
 		adjustIclArrayInstances :: [Int] {#BEArrayFunKind} Int -> BackEnder
 		adjustIclArrayInstances array_first_instance_indices mapping n_array_members
-
 			= adjustIclArrayInstances array_first_instance_indices
 			where
 				adjustIclArrayInstances [array_first_instance_index:array_first_instance_indices]
@@ -2147,12 +2146,29 @@ where
 									(beArgs dictionary
 										(beArgs expression beNoArgs)))
 								(convertArgs [index]))
+				BESelector_F
+					# uselect_selection = replace_select_by_uselect dictionarySelections
+					# uselect_member = convertExpr (Selection NormalSelector (Var dictionaryVar) uselect_selection)
+					->	beNormalNode (beBasicSymbol BEApplySymb)
+								(beArgs
+									(beNormalNode (beBasicSymbol BEApplySymb)
+									(beArgs uselect_member
+										(beArgs expression beNoArgs)))
+								(convertArgs [index]))
 				_
 					->	beNormalNode beDictionarySelectFunSymbol
 								(beArgs dictionary (beArgs expression (convertArgs [index])))
 			where
 				dictionary
 					=	convertExpr (Selection NormalSelector (Var dictionaryVar) dictionarySelections)
+
+				replace_select_by_uselect :: ![Selection] -> [Selection]
+				replace_select_by_uselect [RecordSelection rs=:{glob_object={ds_index}} field_number]
+					// Array member field indices: 0 _createArray, 1 createArray, 2 replace, 3 select, 4 size, 5 update 6 uselect, 7 usize
+					| ds_index==3 && field_number==3
+						= [RecordSelection {rs & glob_object.ds_index=6} 6]	// ds_ident not updated, but is not used
+				replace_select_by_uselect [selection:selections]
+					= [selection:replace_select_by_uselect selections]
 
 caseVar :: Expression -> BoundVar
 caseVar (Var var)
