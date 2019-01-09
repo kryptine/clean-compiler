@@ -247,7 +247,6 @@ InitPredefinedSymbols (void)
 
 	gBasicSymbols [fun_type]	= PredefinedSymbol (fun_type, 2);
 
-
 	ApplySymbol	= PredefinedSymbol (apply_symb, 2);
 	gBasicSymbols [apply_symb]	= ApplySymbol;
 
@@ -526,34 +525,6 @@ BEFunctionSymbol (int functionIndex, int moduleIndex)
 
 	return (functionSymbol);
 } /* BEFunctionSymbol */
-
-static void
-GetArrayFunctionType (SymbDefP sdef, TypeNode *elementTypeP, TypeNode *arrayTypeP)
-{
-	TypeAlt		*typeAlt;
-
-	typeAlt	= sdef->sdef_rule_type->rule_type_rule;
-
-	switch (sdef->sdef_arfun)
-	{
-		case BEArraySelectFun:
-		case BEUnqArraySelectFun:
-		case BE_UnqArraySelectFun:
-		case BE_UnqArraySelectNextFun:
-		case BE_UnqArraySelectLastFun:
-			break;
-		case BEArrayUpdateFun:
-		case BE_ArrayUpdateFun:
-			Assert (typeAlt->type_alt_lhs->type_node_arity == 3);
-			*elementTypeP	= typeAlt->type_alt_lhs->type_node_arguments->type_arg_next->type_arg_next->type_arg_node;
-			*arrayTypeP	= typeAlt->type_alt_lhs->type_node_arguments->type_arg_node;
-			break;
-		default:
-			*elementTypeP	= NULL;
-			*arrayTypeP		= NULL;
-			break;
-	}
-} /* GetArrayFunctionType */
 
 void
 BEBindSpecialModule (BESpecialIdentIndex index, int moduleIndex)
@@ -923,36 +894,18 @@ CreateDictionaryUpdateFunSymbol (void)
 	/* updatei :: !(*(a .e) -> *(!Int -> *(.e -> .(a .e)))) !(!*(a .e), !*r) !Int .e -> *r // !(!.(a .e), !*r) */
 	/* updatei _ _ _ _ = code */
 	static char *abcCode[] = {
-		"	push_a 1",
-		"	push_a 1",
-		"	build _Nil 0 _hnf",
-		"	update_a 0 4",
-		"	pop_a 1",
-		".d 2 0",
-		"	jsr e_system_sAP",
-		".o 1 0",
-		"	buildI_b 0",
-		"	push_a 1",
-		"	update_a 1 2",
-		"	update_a 0 1",
-		"	pop_a 1",
-		"	pop_b 1",
-		".d 2 0",
-		"	jsr e_system_sAP",
-		".o 1 0",
-		"	push_a 4",
-		"	push_a 1",
-		"	update_a 1 2",
-		"	update_a 0 1",
-		"	pop_a 1",
-		"	build _Nil 0 _hnf",
-		"	update_a 0 6",
-		"	pop_a 1",
-		".d 2 0",
-		"	jsr e_system_sAP",
-		".o 1 0",
-		"	update_a 3 4",
-		"	pop_a 4",
+		"push_a 3",
+		"buildI_b 0",
+		"push_a 3",
+		"push_a 3",
+		"pop_b 1",
+		"update_a 6 7",
+		"update_a 3 6",
+		"update_a 2 5",
+		"update_a 1 4",
+		"updatepop_a 0 3",
+		"jsr_ap 3",
+		"pop_a 1",
 		NULL
 	};
 
