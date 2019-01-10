@@ -371,7 +371,6 @@ NewImpRule (unsigned line_number,TypeAlts typeAlternative,NodeP rule_root)
 
 	impRule->rule_alts = NIL;
 	impRule->rule_root = rule_root;
-	impRule->rule_line = line_number;
 	impRule->rule_type = typeAlternative;
 	impRule->rule_next_changed_function = NULL;
 

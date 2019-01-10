@@ -825,7 +825,6 @@ static void copy_alts (RuleAltP old_alts,RuleAlts *next_p,Symbol new_symbol)
 void copy_imp_rule_nodes (ImpRuleP old_rule_p,ImpRuleP new_rule_p)
 {
 	copy_alts (old_rule_p->rule_alts,&new_rule_p->rule_alts,new_rule_p->rule_type->type_alt_lhs->type_node_symbol);
-	new_rule_p->rule_line = old_rule_p->rule_line;
 	new_rule_p->rule_root = new_rule_p->rule_alts->alt_lhs_root;
 	new_rule_p->rule_mark = old_rule_p->rule_mark & RULE_CAF_MASK;
 }

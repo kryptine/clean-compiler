@@ -2133,7 +2133,6 @@ ImpRuleP create_simple_imp_rule (NodeP lhs_root,NodeP rhs_root,SymbDefP function
 	imp_rule->rule_alts = rule_alt;
 	imp_rule->rule_root = lhs_root;
 	imp_rule->rule_mark = 0;
-	imp_rule->rule_line = 0;
 	imp_rule->rule_type = NULL;
 
 	function_sdef->sdef_rule=imp_rule;
