@@ -1462,55 +1462,6 @@ static 	StateS  	ApplyState;
 static int CaseFailNumber;
 #endif
 
-extern SymbDef ApplyDef; /* from codegen2.c */
-
-static void ApplyOperatorToArrayAndIndex (Bool is_jsr)
-{
-	GenPushA (0);
-	GenCreate (-1);
-	GenFillArray (3, 0, NormalFill);
-
-	GenUpdateA (0, 2);
-
-	BuildBasicFromB (IntObj,0);
-
-	GenPopB (SizeOfInt);
-
-	GenUpdateA (0, 4);
-
-	GenPopA (2);
-
-	CallFunction2	(ApplyLabel, ApplyDef, True, ApplyState, NULL, 2);
-	CallFunction2	(ApplyLabel, ApplyDef, is_jsr, ApplyState, NULL, 2);
-}
-
-static void ApplyOperatorToArrayElem (int asize, int bsize, ObjectKind kind)
-{
-	if (asize==0){
-		GenPushA (0);
-
-		BuildBasicFromB (kind,0);
-
-		GenUpdateA (0, 2);
-		GenPopB (bsize);
-		GenPopA (1);
-	}
-
-	CallFunction2	(ApplyLabel, ApplyDef, True, ApplyState, NULL, 2);
-}
-
-static void UnpackResultTuple (int asize,int bsize,ObjectKind kind)
-{
-	GenReplArgs (2, 2);
-	if (asize==0){
-		PushBasicFromAOnB (kind, 0);
-		GenPopA (1);
-	}
-	GenPushArray (asize);
-	GenUpdateA (0,1+asize);
-	GenPopA (1);
-}
-
 void CallArrayFunction (SymbDef array_def,Bool is_jsr,StateP node_state_p)
 {
 	LabDef elem_desc;
@@ -1521,9 +1472,7 @@ void CallArrayFunction (SymbDef array_def,Bool is_jsr,StateP node_state_p)
 	StateP function_state_p;
 	
 	fkind = (ArrayFunKind)array_def->sdef_arfun;
-/* RWS ...
-	function_state_p = array_def->sdef_rule_type->rule_type_state_p;
-*/
+
 	switch (array_def->sdef_kind)
 	{
 		case DEFRULE:
@@ -1537,218 +1486,31 @@ void CallArrayFunction (SymbDef array_def,Bool is_jsr,StateP node_state_p)
 			error_in_function ("CallArrayFunction");
 			break;
 	}
-/* RWS */
-		
-	if (function_state_p[0].state_type==SimpleState && function_state_p[0].state_object==UnknownObj){
-		StateS	elem_state;
 
-		switch (fkind){
-			case CreateArrayFun:
-			case _CreateArrayFun:
-				array_state=function_state_p[-1];
-				break;
-		 	case _UnqArraySelectNextFun:
-			case _UnqArraySelectLastFun:
-			case _ArrayUpdateFun:
-				if (function_state_p[1].state_type==TupleState)
-					array_state=function_state_p[1].state_tuple_arguments[0];
-				else
-					error_in_function ("CallArrayFunction");
-				break;
-			default:
-				array_state=function_state_p[1];
-		}
-
-		elem_state = array_state.state_array_arguments [0];
-
-		if (array_state.state_type==ArrayState && (array_state.state_mark & STATE_UNBOXED_ARRAY_MASK)){
-			if (ApplyLabel == NULL){
-				ApplyLabel = CompAllocType (LabDef);
-				ConvertSymbolToLabel (ApplyLabel, ApplyDef);
-			}
-
-			switch (fkind){
-			case CreateArrayFun:
-			case _CreateArrayFun:
-				GenPushA (0);
-				BuildBasicFromB (IntObj,0);
-				GenPopB (SizeOfInt);
-	
-				GenUpdateA (0, 2);
-				GenPopA (1);
-	
-				CallFunction2	(ApplyLabel, ApplyDef, True, ApplyState, NULL, 2);
-
-				if (fkind!=_CreateArrayFun)
-					CallFunction2	(ApplyLabel, ApplyDef, True, ApplyState, NULL, 2);
-				
-				GenPushArray (0);
-				GenUpdatePopA (0, 1);
-				break;
-			case ArraySelectFun:
-				if (elem_state.state_kind==StrictOnA)
-					ApplyOperatorToArrayAndIndex (is_jsr);
-				else {
-					ApplyOperatorToArrayAndIndex (True);
-					PushBasicFromAOnB	(elem_state.state_object, 0);
-					GenPopA				(1);
-				}
-				break;
-			case UnqArraySelectFun:
-#ifdef OBSERVE_ARRAY_SELECTS_IN_PATTERN
-				DetermineSizeOfState (elem_state,&asize,&bsize);
-				ApplyOperatorToArrayAndIndex (True);
-				if (node_state_p->state_type==TupleState
-					&& node_state_p->state_tuple_arguments[1].state_type==SimpleState
-					&& node_state_p->state_tuple_arguments[1].state_kind==Undefined)
-				{
-					GenReplArg (2,1);
-					if (asize==0){
-						PushBasicFromAOnB (elem_state.state_object,0);
-						GenPopA (1);
-					}
-				} else
-					UnpackResultTuple (asize,bsize,elem_state.state_object);
-				break;
-#endif
-			case _UnqArraySelectFun:
-				DetermineSizeOfState (elem_state,&asize,&bsize);
-				ApplyOperatorToArrayAndIndex (True);
-				UnpackResultTuple (asize, bsize, elem_state.state_object);
-				break;
-			case _UnqArraySelectNextFun:
-			case _UnqArraySelectLastFun:
-				DetermineSizeOfState (elem_state,&asize,&bsize);
-				
-				GenCreate (-1);
-				GenFillArray (3, 0, NormalFill);
-				GenCreate (-1);
-				GenFillArray (3, 0, NormalFill);
-				GenBuildh (&tuple_lab,2);
-
-				GenUpdateA (0, 2);
-
-				BuildBasicFromB (IntObj,0);
-
-				GenPopB (SizeOfInt);
-
-				GenUpdateA (0, 4);
-
-				GenPopA (2);
-
-				CallFunction2	(ApplyLabel, ApplyDef, True, ApplyState, NULL, 2);
-				CallFunction2	(ApplyLabel, ApplyDef, True, ApplyState, NULL, 2);
-
-				UnpackResultTuple (asize, bsize, elem_state.state_object);
-				break;
-
-			case _ArrayUpdateFun:
-				DetermineSizeOfState (elem_state,&asize,&bsize);
-
-				GenCreate (-1);
-				GenFillArray (3, 0, NormalFill);
-				GenCreate (-1);
-				GenFillArray (3, 0, NormalFill);
-				GenBuildh (&tuple_lab,2);
-
-				GenUpdateA (0, 2);
-
-				BuildBasicFromB (IntObj,0);
-				GenPopB (SizeOfInt);
-
-				GenUpdateA (0, 4);
-
-				GenPopA (2);
-
-				CallFunction2	(ApplyLabel, ApplyDef, True, ApplyState, NULL, 2);
-				CallFunction2	(ApplyLabel, ApplyDef, True, ApplyState, NULL, 2);
-
-				ApplyOperatorToArrayElem (asize, bsize, elem_state.state_object);
-
-				GenPushArray (0);
-				GenUpdatePopA (0, 1);
-				break;
-			case ArrayUpdateFun:
-				DetermineSizeOfState (elem_state,&asize,&bsize);
-
-				ApplyOperatorToArrayAndIndex (True);
-				ApplyOperatorToArrayElem (asize,bsize,elem_state.state_object);
-
-				GenPushArray (0);
-				GenUpdatePopA (0, 1);
-				break;
-			case ArrayReplaceFun:
-				DetermineSizeOfState (elem_state,&asize,&bsize);
-
-				ApplyOperatorToArrayAndIndex (True);
-				ApplyOperatorToArrayElem (asize,bsize,elem_state.state_object);
-				UnpackResultTuple (asize,bsize,elem_state.state_object);
-				break;
-			case ArraySizeFun:
-				GenCreate (-1);
-				GenFillArray (2, 0, NormalFill);
-				GenUpdateA (0, 2);
-
-				GenPopA (1);
-
-				CallFunction2	(ApplyLabel, ApplyDef, True, ApplyState, NULL, 2);
-
-				PushBasicFromAOnB (IntObj, 0);
-				GenPopA (1);
-				break;
-			case UnqArraySizeFun:
-				GenCreate (-1);
-				GenFillArray (2, 0, NormalFill);
-				GenUpdateA (0, 2);
-
-				GenPopA (1);
-
-				CallFunction2	(ApplyLabel, ApplyDef, True, ApplyState, NULL, 2);
-
-				UnpackResultTuple (0, SizeOfInt, IntObj);
-
-				break;
-		
-			}
-			if (! is_jsr){
-				DetermineSizeOfState (function_state_p[-1], & asize, & bsize);
-				GenRtn (asize,bsize,function_state_p[-1]);
-			}
-			return;
-		}	
-		else
-		{	GenPopA (1);
-			elem_desc = BasicDescriptors [UnknownObj];
-			asize = 1;
-			bsize = 0;
-			elem_is_lazy = elem_state.state_type==SimpleState && elem_state.state_kind==OnA;
-		}
-	} else {
-		switch (fkind){
-			case CreateArrayFun:
-			case _CreateArrayFun:
-				array_state = function_state_p[-1];
-				break;
-		 	case _UnqArraySelectNextFun:
-			case _UnqArraySelectLastFun:
-			case _ArrayUpdateFun:
-				if (function_state_p[0].state_type==TupleState)
-					array_state=function_state_p[0].state_tuple_arguments[0];
-				else
-					error_in_function ("CallArrayFunction");
-				break;
-			default:
-				array_state = function_state_p[0];
-		}
-
-		if (array_state.state_type == ArrayState){
-			StateS elem_state = array_state.state_array_arguments [0];
-			DetermineArrayElemDescr (elem_state, & elem_desc);
-			DetermineSizeOfState	(elem_state, & asize, & bsize);
-			elem_is_lazy = elem_state.state_type==SimpleState && elem_state.state_kind==OnA;
-		} else
-			error_in_function ("CallArrayFunction");
+	switch (fkind){
+		case CreateArrayFun:
+		case _CreateArrayFun:
+			array_state = function_state_p[-1];
+			break;
+	 	case _UnqArraySelectNextFun:
+		case _UnqArraySelectLastFun:
+		case _ArrayUpdateFun:
+			if (function_state_p[0].state_type==TupleState)
+				array_state=function_state_p[0].state_tuple_arguments[0];
+			else
+				error_in_function ("CallArrayFunction");
+			break;
+		default:
+			array_state = function_state_p[0];
 	}
+
+	if (array_state.state_type == ArrayState){
+		StateS elem_state = array_state.state_array_arguments [0];
+		DetermineArrayElemDescr (elem_state, & elem_desc);
+		DetermineSizeOfState	(elem_state, & asize, & bsize);
+		elem_is_lazy = elem_state.state_type==SimpleState && elem_state.state_kind==OnA;
+	} else
+		error_in_function ("CallArrayFunction");
 
 	switch (fkind){
 		case CreateArrayFun:
