@@ -538,7 +538,6 @@ STRUCT (imp_rule,ImpRule){
 	struct node *				rule_strict_call_node;
 	struct node *				rule_strict_call_node2;
 #endif
-	unsigned					rule_line;
 	unsigned					rule_mark;
 };
 
