@@ -2499,6 +2499,7 @@ SymbDef create_match_function (SymbolP constructor_symbol,int result_arity,int n
 		}
 
 		rhs_root=NewNode (TupleSymbol,NULL,result_arity);
+		rhs_root->node_state=StrictState;
 		rhs_arg_p=&rhs_root->node_arguments;
 
 		arg2=NewArgument (rhs_root);
