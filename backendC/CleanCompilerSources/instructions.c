@@ -1456,8 +1456,6 @@ static void GenArrayReplace (Label elemdesc, int asize, int bsize)
 	FPrintF (OutFile, " %d %d", asize, bsize);
 }
 
-static 	Label	ApplyLabel;
-static 	StateS  	ApplyState;
 #if CLEAN2
 static int CaseFailNumber;
 #endif
@@ -4046,6 +4044,4 @@ void InitInstructions (void)
 #endif
 
     ABCFileName	= NULL;
-	SetUnaryState (& ApplyState, StrictRedirection, UnknownObj);
-	ApplyLabel = NULL;
 }
