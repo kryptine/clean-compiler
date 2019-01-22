@@ -214,8 +214,6 @@ where
 :: Mark		= { m_fun :: !Int, m_mark :: !Int}
 
 create_marks max_fun_nr functions
-//	# marks				= createArray max_fun_nr max_fun_nr
-//	= {marks & [i] = NotChecked \\ i <- functions}
 	= {{m_fun = fun, m_mark = NotChecked} \\ fun <- component_members_to_list functions}
 
 component_members_to_list (ComponentMember member members)
@@ -226,7 +224,6 @@ component_members_to_list NoComponentMembers
 	= []
 
 get_mark max_fun_nr marks fun
-//	:== marks.[fun]
 	:== get_mark 0 marks fun max_fun_nr
 where
 	get_mark :: !Int !{#Mark} !Int !Int -> Int
@@ -238,9 +235,14 @@ where
 			= max_fun_nr
 
 set_mark marks fun val
-//	:== { marks & [fun] = val}
-//	:== { if (m_fun==fun) {m & m_mark = val} m \\ m=:{m_fun=m_fun} <-: marks}
-	:== { if (m.m_fun==fun) {m & m_mark = val} m \\ m <-: marks}
+	:== set_mark 0 marks fun val
+where
+	set_mark :: !Int !*{#Mark} !Int !Int -> *{#Mark}
+	set_mark i marks fun val
+//		| i<size marks
+		| marks.[i].m_fun<>fun
+			= set_mark (i+1) marks fun val
+			= {marks & [i].m_mark=val}
 
 partitionateFunctions`` :: !Int !Int !*{#FunDef} !ComponentMembers !Index !Int !Int !*FunctionHeap !*PredefinedSymbols !*VarHeap !*ExpressionHeap !*ErrorAdmin
 	-> (!Int, ![Component], !*{#FunDef}, !*FunctionHeap, !*PredefinedSymbols, !*VarHeap, !*ExpressionHeap, !*ErrorAdmin)
