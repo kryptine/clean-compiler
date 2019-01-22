@@ -1401,14 +1401,14 @@ assoc_list_lookup equal t1 [hd=:(t2, _):tl]
 		= Yes hd
 	= assoc_list_lookup equal t1 tl
 
-
 cNoPosition :== -1
-	 
+
 instance writeType [a] | writeType a
 where
 	writeType file opt_beautifulizer (form, types)
 		= show_list 0 form types (file, opt_beautifulizer)
 	where
+		show_list :: !Int Format [a] !*(!*File,!Optional TypeVarBeautifulizer) -> (!*File,!Optional TypeVarBeautifulizer) | writeType a
 		show_list elem_number form [type] file_opt_beautifulizer
 			| checkProperty form cCommaSeparator
 				= show_elem elem_number (clearProperty form cCommaSeparator) type file_opt_beautifulizer
@@ -1424,11 +1424,12 @@ where
 							(if (checkProperty form cAndSeparator) (clearProperty form cAndSeparator, " & ")
 								(setProperty form cBrackets, " ")))
 			  (file, opt_beautifulizer)
-			  		= show_elem elem_number elem_format type file_opt_beautifulizer
+					= show_elem elem_number elem_format type file_opt_beautifulizer
 			= show_list (inc elem_number) form types (file <<< seperator, opt_beautifulizer)
 		show_list elem_number form [] file
 			= file
 
+		show_elem :: !Int Format a !*(!*File,!Optional TypeVarBeautifulizer) -> (!*File,!Optional TypeVarBeautifulizer) | writeType a
 		show_elem elem_nr form=:{form_attr_position = No} type (file, opt_beautifulizer)
 			= writeType file opt_beautifulizer (form, type)
 		show_elem elem_nr form=:{form_attr_position = Yes ([#pos : positions!], coercions)} type (file, opt_beautifulizer)
@@ -1681,6 +1682,7 @@ anonymizeAttrVars st=:{st_attr_vars, st_args, st_result, st_attr_env} implicit_i
 	  (st_result, th_attrs) = anonymize_atype st_result th_attrs
 	= ({ st & st_args = st_args, st_result = st_result }, th_attrs)
   where
+	anonymize_atype :: !AType !*AttrVarHeap -> (!AType,!*AttrVarHeap)
 	anonymize_atype atype=:{at_attribute=TA_Var {av_info_ptr}, at_type} th_attrs
 		# (at_type, th_attrs)	= anonymize_type at_type th_attrs
 		  (avi, th_attrs)		= readPtr av_info_ptr th_attrs
@@ -1701,6 +1703,7 @@ anonymizeAttrVars st=:{st_attr_vars, st_args, st_result, st_attr_env} implicit_i
 		# (at_type, th_attrs) = anonymize_type at_type th_attrs
 		= ({ atype & at_type = at_type }, th_attrs)
 
+	anonymize_type :: !Type !*AttrVarHeap -> (!Type,!*AttrVarHeap)
 	anonymize_type (TA tsi args) th_attrs
 		# (args, th_attrs) = mapSt anonymize_atype args th_attrs
 		= (TA tsi args, th_attrs)
