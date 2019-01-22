@@ -12,7 +12,7 @@ class writeType a :: !*File !(Optional TypeVarBeautifulizer) !(!Format, !a) -> (
 
 :: Format =
 	{	form_properties 	:: !BITVECT
-	,	form_attr_position	:: Optional ([Int], Coercions)
+	,	form_attr_position	:: Optional ([#Int!], Coercions)
 	}
 
 cNoProperties		:== 0

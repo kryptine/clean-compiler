@@ -3032,7 +3032,7 @@ where
 					  		= copyCoercions coercion_env
 					  format
 					  		= { form_properties = cMarkAttribute,
-					  			form_attr_position = Yes (reverse positions, copy_coercion_env) }			
+					  			form_attr_position = Yes (Reverse positions, copy_coercion_env) }			
 					  ea_file = 
 					  	case tc_position of
 					  		CP_FunArg _ _
