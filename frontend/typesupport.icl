@@ -1045,7 +1045,7 @@ where
 	
 :: Format =
 	{	form_properties 	:: !BITVECT
-	,	form_attr_position	:: Optional ([Int], Coercions)
+	,	form_attr_position	:: Optional ([#Int!], Coercions)
 	}
 
 cNoProperties		:== 0
@@ -1198,7 +1198,7 @@ where
 				= writeType file opt_beautifulizer (form, type)
 
 		show_marked_attribute file opt_beautifulizer (form=:{form_attr_position = Yes (positions, coercions)}, attr)
-			| isEmpty positions
+			| positions=:[#!]
 				= show_attribute coercions (file <<< "^ ") opt_beautifulizer (form, attr)
 				= show_attribute coercions file opt_beautifulizer (form, attr)
 
@@ -1431,14 +1431,14 @@ where
 
 		show_elem elem_nr form=:{form_attr_position = No} type (file, opt_beautifulizer)
 			= writeType file opt_beautifulizer (form, type)
-		show_elem elem_nr form=:{form_attr_position = Yes ([pos : positions], coercions)} type (file, opt_beautifulizer)
+		show_elem elem_nr form=:{form_attr_position = Yes ([#pos : positions!], coercions)} type (file, opt_beautifulizer)
 			| elem_nr == pos
 				= writeType file opt_beautifulizer ({form & form_attr_position = Yes (positions, coercions)}, type)
 			| pos == cNoPosition
 				= writeType file opt_beautifulizer (form, type)
-				= writeType file opt_beautifulizer ({form & form_attr_position = Yes ([cNoPosition], coercions)}, type)
-		show_elem elem_nr form=:{form_attr_position = Yes ([], coercions)} type (file, opt_beautifulizer)
-			= writeType file opt_beautifulizer ({form & form_attr_position = Yes ([cNoPosition], coercions)}, type)
+				= writeType file opt_beautifulizer ({form & form_attr_position = Yes ([#cNoPosition!], coercions)}, type)
+		show_elem elem_nr form=:{form_attr_position = Yes ([#!], coercions)} type (file, opt_beautifulizer)
+			= writeType file opt_beautifulizer ({form & form_attr_position = Yes ([#cNoPosition!], coercions)}, type)
 
 from compare_constructor import equal_constructor	
 
@@ -1896,7 +1896,7 @@ removeUnusedAttrVars demanded unused_attr_vars
 		= foldSt (\(offered, demanded) coercions -> newInequality offered demanded coercions)
 				[(offered, demanded) \\ offered<-offered_attr_vars, demanded<-demanded_attr_vars]
 				{ coercions & coer_offered = coer_offered, coer_demanded = coer_demanded }
-	
+
 getTypeVars :: !a !*TypeVarHeap -> (!.[TypeVar],!.TypeVarHeap) | performOnTypeVars a
 getTypeVars type th_vars
 	# th_vars = performOnTypeVars initializeToTVI_Empty type th_vars

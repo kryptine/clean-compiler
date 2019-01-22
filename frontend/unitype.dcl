@@ -3,7 +3,7 @@ definition module unitype
 import StdEnv
 import syntax, analunitypes
 
-::	TypePosition :== [Int]
+::	TypePosition :== [#Int!]
 
 AttrUni			:== 0
 AttrMulti		:== 1

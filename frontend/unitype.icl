@@ -42,7 +42,7 @@ determineAttributeCoercions off_type dem_type coercible expand_newtypes subst co
 	# (_, exp_off_type, es) = expandType defs cons_vars off_type (subst, { es_type_heaps = type_heaps, es_td_infos = td_infos})
 	  (_, exp_dem_type, (subst, {es_td_infos,es_type_heaps})) = expandType defs cons_vars dem_type es
 	  ci = {ci_common_defs=defs, ci_cons_vars=cons_vars, ci_expand_newtypes=expand_newtypes}
-	  (result, {crc_type_heaps, crc_coercions, crc_td_infos}) = coerce (if coercible PositiveSign TopSign) ci [] exp_off_type exp_dem_type
+	  (result, {crc_type_heaps, crc_coercions, crc_td_infos}) = coerce (if coercible PositiveSign TopSign) ci [#!] exp_off_type exp_dem_type
 	  		 { crc_type_heaps = es_type_heaps, crc_coercions = coercions, crc_td_infos = es_td_infos}
 	= case result of
 		No
@@ -572,7 +572,7 @@ where
 			| changed
 				= (True, [type0:types], es)
 				= (False, types0, es)
-	
+
 instance toInt TypeAttribute
 where
 	 toInt TA_Unique 				= AttrUni
@@ -589,7 +589,7 @@ expand_and_coerce_type common_defs cons_vars atype (coercions, subst, ti_type_he
 	  cs = {crc_type_heaps=es_type_heaps, crc_coercions=coercions, crc_td_infos=es_td_infos}
 	  ci = {ci_common_defs=common_defs, ci_cons_vars=cons_vars, ci_expand_newtypes=True}
 	  (_, {crc_type_heaps,crc_coercions,crc_td_infos})
-		= coerce PositiveSign ci [] btype btype cs
+		= coerce PositiveSign ci [#!] btype btype cs
 	= (btype, (crc_coercions, subst, crc_type_heaps, crc_td_infos))
 
 ::	CoercionState =
@@ -598,7 +598,7 @@ expand_and_coerce_type common_defs cons_vars atype (coercions, subst, ti_type_he
 	,	crc_td_infos	:: !.TypeDefInfos
 	}
 
-::	TypePosition :== [Int]
+::	TypePosition :== [#Int!]
 
 /*
 'coerceAttributes offered_attribute offered_attribute sign coercions' coerce offered_attribute to
@@ -760,8 +760,7 @@ tryToMakeNonUnique attr coercions=:{coer_demanded}
 		= (True, makeNonUnique attr coercions)
 //				---> ("tryToMakeNonUnique", attr)
 
-Success No		=  True
-Success (Yes _)	=  False
+Success suc :== suc=:No
 
 coerce :: !Sign !CoerceInfo !TypePosition !AType !AType !*CoercionState -> (!Optional TypePosition, !*CoercionState)
 coerce sign ci=:{ci_cons_vars} tpos at1=:{at_attribute=attr1, at_type = type1} at2=:{at_attribute=attr2} cs=:{crc_coercions}
@@ -775,7 +774,7 @@ coerce sign ci=:{ci_cons_vars} tpos at1=:{at_attribute=attr1, at_type = type1} a
 			= (if (succ1 && succ2) No (Yes tpos), { cs & crc_coercions = crc_coercions })
 			= (succ, cs)
 		= (Yes tpos, { cs & crc_coercions = crc_coercions })
-where		
+where
 	adjust_sign :: !Sign !Type {# BOOLVECT} -> Sign
 	adjust_sign sign (TempV _) cons_vars
 		= TopSign
@@ -890,15 +889,15 @@ coerceTypes sign ci tpos dem_type off_type=:{at_type=type=:TA off_cons off_args}
 		= (No, { cs & crc_type_heaps = crc_type_heaps, crc_td_infos = crc_td_infos })
 coerceTypes sign ci tpos {at_type = arg_type1 --> res_type1} {at_type = arg_type2 --> res_type2} cs
 	# arg_sign = NegativeSign * sign
-	# (succ, cs) = coerce arg_sign ci [0 : tpos] arg_type1 arg_type2  cs
+	# (succ, cs) = coerce arg_sign ci [#0 : tpos!] arg_type1 arg_type2  cs
 	| Success succ
-		= coerce sign ci [1 : tpos] res_type1 res_type2 cs
+		= coerce sign ci [#1 : tpos!] res_type1 res_type2 cs
 		= (succ, cs)
 coerceTypes sign ci tpos {at_type = TArrow} {at_type = TArrow} cs
 	= (No, cs) // ???
 coerceTypes sign ci tpos {at_type = TArrow1 arg_type1} {at_type = TArrow1 arg_type2} cs
 	# arg_sign = NegativeSign * sign
-	= coerce arg_sign ci [0 : tpos] arg_type1 arg_type2  cs
+	= coerce arg_sign ci [#0 : tpos!] arg_type1 arg_type2 cs
 coerceTypes sign ci tpos {at_type = cons_var :@: types1} {at_type = _ :@: types2}  cs
 	# sign = determine_sign_of_arg_types sign cons_var ci
 	= coercions_of_type_list sign ci tpos 0 types1 types2 cs
@@ -911,7 +910,7 @@ where
 			= TopSign
 		
 	coercions_of_type_list sign ci tpos arg_number [t1 : ts1] [t2 : ts2] cs
-		# (succ, cs) = coerce sign ci [arg_number : tpos] t1 t2 cs
+		# (succ, cs) = coerce sign ci [#arg_number : tpos!] t1 t2 cs
 		| Success succ
 			= coercions_of_type_list sign ci tpos (inc arg_number) ts1 ts2 cs
 			= (succ, cs)
@@ -920,9 +919,10 @@ where
 coerceTypes sign ci tpos _ _  cs
 	= (No, cs)
 
+coercions_of_arg_types :: Sign CoerceInfo !TypePosition [AType] [AType] SignClassification !Int *CoercionState -> (Optional TypePosition,*CoercionState)
 coercions_of_arg_types sign ci tpos [t1 : ts1] [t2 : ts2] sign_class arg_number cs
 	# arg_sign = sign * signClassToSign sign_class arg_number
-	  (succ, cs) = coerce arg_sign ci [arg_number : tpos] t1 t2 cs
+	  (succ, cs) = coerce arg_sign ci [#arg_number : tpos!] t1 t2 cs
 	| Success succ
 		= coercions_of_arg_types sign ci tpos ts1 ts2 sign_class (inc arg_number) cs
 		= (succ, cs)
