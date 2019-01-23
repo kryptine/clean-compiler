@@ -1775,11 +1775,7 @@ static void generate_code_for_tail_call_modulo_cons (NodeP node_p,NodeId node_de
 
 		DetermineSizeOfArguments (root_node->node_arguments,&asize,&bsize);
 	
-#if STRICT_LISTS
 		if (asize+bsize>2 && push_node!=NULL && push_node->node_push_size>=asize+bsize){
-#else
-		if (asize+bsize>2 && push_node!=NULL && push_node->node_line>=asize+bsize){
-#endif
 			NodeIdListElementP node_id_list;
 			char bits[MaxNodeArity+2];
 			unsigned int a_bits,b_bits,a_size,b_size,a_size2,b_size2,arg_n;
