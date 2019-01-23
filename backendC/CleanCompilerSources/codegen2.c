@@ -4840,7 +4840,7 @@ static void FillUniqueNodeWithNode (NodeP update_node,int *asp_p,int *bsp_p,Code
 			
 			switch (sdef->sdef_kind){
 				case CONSTRUCTOR:					
-					if (push_node->node_record_symbol==node->node_symbol && push_node->node_arity==node_arity)
+					if (push_node->node_push_symbol==node->node_symbol && push_node->node_arity==node_arity)
 						bits[0]='0';
 					else
 						bits[0]='1';
@@ -4857,7 +4857,7 @@ static void FillUniqueNodeWithNode (NodeP update_node,int *asp_p,int *bsp_p,Code
 					}
 					break;
 				case RECORDTYPE:
-					if (push_node->node_record_symbol==node->node_symbol && push_node->node_arity==node_arity)
+					if (push_node->node_push_symbol==node->node_symbol && push_node->node_arity==node_arity)
 						bits[0]='0';
 					else
 						bits[0]='1';
@@ -4990,7 +4990,7 @@ static void FillUniqueNodeWithNode (NodeP update_node,int *asp_p,int *bsp_p,Code
 			}
 #endif
 
-			if (push_node->node_record_symbol->symb_kind==cons_symb && push_node->node_arity==node_arity)
+			if (push_node->node_push_symbol->symb_kind==cons_symb && push_node->node_arity==node_arity)
 				bits[0]='0';
 			else
 				bits[0]='1';
@@ -5000,7 +5000,7 @@ static void FillUniqueNodeWithNode (NodeP update_node,int *asp_p,int *bsp_p,Code
 		case tuple_symb:
 			node_arity=node->node_arity;
 
-			if (push_node->node_record_symbol->symb_kind==tuple_symb && push_node->node_arity==node_arity)
+			if (push_node->node_push_symbol->symb_kind==tuple_symb && push_node->node_arity==node_arity)
 				bits[0]='0';
 			else
 				bits[0]='1';

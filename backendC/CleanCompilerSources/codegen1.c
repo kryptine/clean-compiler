@@ -2511,7 +2511,7 @@ SymbDef create_match_function (SymbolP constructor_symbol,int result_arity,int n
 		push_node->node_kind=PushNode;
 		push_node->node_arity=result_arity+n_dictionaries;
 		push_node->node_arguments=arg1;
-		push_node->node_record_symbol=constructor_symbol;
+		push_node->node_push_symbol=constructor_symbol;
 		push_node->node_number=0;	/* if !=0 then unique */
 
 		last_node_id_p=&push_node->node_node_ids;
@@ -2681,7 +2681,7 @@ SymbDef create_select_and_match_function (SymbolP constructor_symbol,int n_dicti
 	push_node->node_kind=PushNode;
 	push_node->node_arity=1+n_dictionaries;
 	push_node->node_arguments=arg1;
-	push_node->node_record_symbol=constructor_symbol;
+	push_node->node_push_symbol=constructor_symbol;
 	push_node->node_number=0;	/* if !=0 then unique */
 
 	if (n_dictionaries==0){
@@ -4279,8 +4279,8 @@ static int generate_code_for_push_node (NodeP node,int asp,int bsp,struct esc *e
 				GenPushRArgsU (asp-node_id_p->nid_a_index,a_size,b_size);				
 		}
 # ifdef DESTRUCTIVE_RECORD_UPDATES
-		else if (node->node_record_symbol->symb_kind==definition &&
-				node->node_record_symbol->symb_def->sdef_kind==RECORDTYPE &&
+		else if (node->node_push_symbol->symb_kind==definition &&
+				node->node_push_symbol->symb_def->sdef_kind==RECORDTYPE &&
 				(((node_id_p->nid_mark2 & NID_HAS_REFCOUNT_WITHOUT_UPDATES)!=0 &&
 				node_id_p->nid_number==-2)
 #  if BOXED_RECORDS

@@ -728,6 +728,9 @@ static Node copy_node (Node old,Bool lhs)
 		old_then_else_info = old->node_contents.contents_if;
 		new->node_contents.contents_if = new_then_else_info;
 
+		new_then_else_info->if_then_rules = NULL;
+		new_then_else_info->if_else_rules = NULL;
+
 		old_arg=old->node_arguments;
 
 		new_arg = CompAllocType (ArgS);
@@ -1932,11 +1935,7 @@ static NodeP replace_node_by_unique_fill_node (NodeP node,NodeP push_node,int no
 	node->node_arguments=arg_p;
 	node->node_arity=1;
 
-#if STRICT_LISTS
 	push_node->node_push_size=node_size;
-#else
-	push_node->node_line=node_size;
-#endif
 	
 	--push_node->node_arguments->arg_node->node_node_id->nid_refcount;
 	push_node->node_number=1;

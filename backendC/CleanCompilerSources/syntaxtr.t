@@ -356,11 +356,7 @@ STRUCT (node,Node){
 	struct arg *					node_arguments;
 
 	union {
-		StateS						 su_state;
-		struct {
-			Symbol							s_record_symbol;			/* comparser,checker */
-			int								s_line;						/* size for PushNode if not STRICT_LISTS) */
-		} su_s;
+		StateS						su_state;
 		struct {
 			struct node_def *			 	u_node_defs;		/* for CaseNode,DefaultNode and GuardNode */
 #ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
@@ -369,15 +365,17 @@ STRUCT (node,Node){
 			struct node_id_ref_count_list *	u_node_id_ref_counts;
 #endif
 		} su_u;
-#if STRICT_LISTS
 		struct {
 			SymbolP						push_symbol;
+#if STRICT_LISTS
 			union {
 				NodeP					pu_decons_node;			/* if overloaded push */
 				int						pu_size;				/* if unique non overloaded push */
 			} push_pu;
-		} su_push;												/* for PushNode */
+#else
+			int push_size;
 #endif
+		} su_push;												/* for PushNode */
 	} node_su;
 
 	short			node_arity;
@@ -394,8 +392,6 @@ STRUCT (node,Node){
 #endif
 
 #define node_state					node_su.su_state
-#define node_record_symbol			node_su.su_s.s_record_symbol
-#define node_line					node_su.su_s.s_line
 #define node_node_defs				node_su.su_u.u_node_defs
 #define node_symbol					node_contents.contents_symbol
 #define node_node_id				node_contents.contents_node_id
@@ -412,10 +408,12 @@ STRUCT (node,Node){
 #define node_else_strict_node_ids	node_contents.contents_if->if_else_strict_node_ids
 #define node_if_scope				node_contents.contents_if->if_local_scope
 
+#define node_push_symbol			node_su.su_push.push_symbol
 #if STRICT_LISTS
-# define node_push_symbol			node_su.su_push.push_symbol
 # define node_decons_node			node_su.su_push.push_pu.pu_decons_node
 # define node_push_size				node_su.su_push.push_pu.pu_size
+#else
+# define node_push_size				node_su.su_push.push_size
 #endif
 
 STRUCT (arg,Arg){

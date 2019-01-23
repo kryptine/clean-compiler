@@ -6,7 +6,6 @@
 
 	Authors: Sjaak Smetsers & John van Groningen
 	At:		 University of Nijmegen, department of computing science
-	Version: 1.1
 */
 
 #pragma segment statesgen
@@ -2724,7 +2723,7 @@ static void DetermineStatesOfNodeAndDefs (Node root_node,NodeDefs node_defs,Stat
 					
 					switch (node_id_state_p->state_type){
 						case RecordState:
-							set_push_node_id_states (node_ids,case_alt_node_p->node_record_symbol->symb_def->sdef_record_state.state_record_arguments);
+							set_push_node_id_states (node_ids,case_alt_node_p->node_push_symbol->symb_def->sdef_record_state.state_record_arguments);
 							break;
 						case TupleState:
 							set_push_node_id_states (node_ids,node_id_state_p->state_tuple_arguments);
@@ -2733,7 +2732,7 @@ static void DetermineStatesOfNodeAndDefs (Node root_node,NodeDefs node_defs,Stat
 						{
 							Symbol symbol;
 							
-							symbol=case_alt_node_p->node_record_symbol;
+							symbol=case_alt_node_p->node_push_symbol;
 							
 							if (symbol->symb_kind==definition){
 								SymbDef sdef;

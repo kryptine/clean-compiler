@@ -110,7 +110,7 @@ static NodeP new_push_node (Symbol symbol,int arity,ArgP arguments)
 	push_node->node_kind=PushNode;
 	push_node->node_arity=arity;
 	push_node->node_arguments=arguments;
-	push_node->node_record_symbol=symbol;
+	push_node->node_push_symbol=symbol;
 	push_node->node_number=0;	/* if !=0 then unique */
 	
 	return push_node;

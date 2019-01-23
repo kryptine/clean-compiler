@@ -127,8 +127,6 @@ NewNodeIdNode (NodeIdP node_id)
 	node->node_arguments	= NIL;
 	node->node_arity		= 0;
 	
-	node->node_line=-1;
-
 	return (node);
 } /* NewNodeIdNode */
 
@@ -194,8 +192,6 @@ NewSelectorNode (SymbolP symb, Args args, int arity)
 	node->node_symbol		= symb;
 	node->node_arity		= arity;
 
-	node->node_line=-1;
-
 	return (node);
 } /* NewSelectorNode */
 
@@ -215,8 +211,6 @@ NewNodeByKind (NodeKind nodeKind, SymbolP symb, Args args, int arity)
 
 	if (arity > MaxNodeArity)
 		StaticMessage (True, "<node>", "\"%S\" %s", symb, "Too many arguments (> 32)"); 
-
-	node->node_line=-1;
 
 	return (node);
 } /* NewNodeByKind */
@@ -252,8 +246,6 @@ NewIfNode (void)
 	then_else_info->if_then_strict_node_ids	= NIL;
 	then_else_info->if_else_node_defs		= NIL;
 	then_else_info->if_else_strict_node_ids = NIL;
-
-	node->node_line=-1;
 
 	return (node);
 } /* NewIfNode */
