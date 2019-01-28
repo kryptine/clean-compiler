@@ -317,7 +317,7 @@ where
 		# (token, scanState) = nextToken GeneralContext scanState
 		| is_icl_mod
 			| token == ModuleToken
-				# (token, scanState) = nextToken GeneralContext scanState
+				# (token, scanState) = nextToken ModuleNameContext scanState
 				= try_module_name token MK_Main scanState
 			| token == ImpModuleToken 
 				= try_module_token MK_Module scanState
