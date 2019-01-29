@@ -46,6 +46,8 @@ extern void BuildTuple (int aindex, int bindex, int asp, int bsp, int arity,
 
 extern void BuildRecord (SymbDef seldef, int aindex, int bindex, int asp, int bsp,
 						int asize, int bsize, int rootindex,FillKind fkind, Bool popargs);
+extern void BuildNewRecord (SymbDef seldef, int aindex, int bindex, int asp, int bsp, int asize, int bsize);
+extern void BuildNewRecordPop (SymbDef seldef, int asize, int bsize);
 extern void CoerceArgumentUsingStackFrames (StateS demstate, StateS offstate,
 											int aindex,int bindex,int *asp,int *bsp,int *anext,int *bnext,int asize,int bsize);
 extern void DetermineArrayElemDescr (StateS elemstate, Label lab);

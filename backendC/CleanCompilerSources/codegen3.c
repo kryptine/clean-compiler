@@ -256,11 +256,16 @@ void RedirectResultAndReturn (int asp,int bsp,int source_a_index,int source_b_in
 						offstate.state_arity, offstate.state_tuple_arguments,
 						offasize, offbsize, 0, ReleaseAndFill,True);
 					GenUpdatePopA (0,asp);
+					GenPopB (bsp);
 					break;
 				case RecordState:
-					BuildRecord (offstate.state_record_symbol,source_a_index,source_b_index, asp, bsp,
-						offasize, offbsize, 0, ReleaseAndFill,True);
+					if (source_a_index==asp && (source_b_index==bsp || offbsize==0))
+						BuildNewRecordPop (offstate.state_record_symbol,offasize,offbsize);						
+					else {
+						BuildNewRecord (offstate.state_record_symbol,source_a_index,source_b_index,asp,bsp,offasize,offbsize);
 					GenUpdatePopA (0,asp);
+						GenPopB (bsp);
+					}
 					break;
 				case ArrayState:
 					if (asp==source_a_index && asp==1)
@@ -268,9 +273,9 @@ void RedirectResultAndReturn (int asp,int bsp,int source_a_index,int source_b_in
 					else {
 						GenBuildArray (asp-source_a_index);
 						GenUpdatePopA (0,asp);
-					}
 			}
 			GenPopB (bsp);
+			}
 		} else {
 			switch (offstate.state_type){
 				case TupleState:
@@ -977,7 +982,7 @@ static void CodeNormalRootNode (Node root,NodeId rootid,int asp,int bsp,CodeGenN
 				LabDef record_lab;
 				
 				ConvertSymbolToRLabel (&record_lab,BasicSymbolStates [integer_denot].state_record_symbol);
-				GenBuildR (&record_lab,1,1,0,0,True);
+				GenBuildhr (&record_lab,1,1);
 				GenRtn (1,0,OnAState);
 			} else
 				GenRtn (1,1,resultstate);
@@ -1434,12 +1439,12 @@ static void CodeRootUpdateNode (Node root,NodeId rootid,int asp,int bsp,CodeGenN
 					BuildRecord (record_state_p->state_record_symbol,asp,bsp,asp,bsp,record_a_size,record_b_size,
 									0,ReleaseAndFill,False);
 					GenPopA (asp);
+					GenPopB (bsp);
 				} else {
-					BuildRecord (record_state_p->state_record_symbol,asp,bsp,asp,bsp,record_a_size,record_b_size,
-									asp,NormalFill,True);
-					GenUpdatePopA (0,asp);
+					BuildNewRecordPop (record_state_p->state_record_symbol,record_a_size,record_b_size);
+					GenUpdatePopA (0,asp-record_a_size);
+					GenPopB (bsp-record_b_size);
 				}
-				GenPopB (bsp);
 				GenRtn (1,0,OnAState);
 
 				function_called_only_curried_or_lazy_with_one_return = 0;

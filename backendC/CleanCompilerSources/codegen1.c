@@ -1856,18 +1856,16 @@ void ApplyEntry (StateS *const function_state_p,int arity,Label ea_lab,int ea_la
 				BuildTuple (asize, bsize, asize, bsize, function_state_p[-1].state_arity,
 					function_state_p[-1].state_tuple_arguments,asize,bsize, asize,NormalFill,True);
 				GenUpdatePopA (0, asize);
+				GenPopB (bsize);
 				break;
 			case RecordState:
-				BuildRecord (function_state_p[-1].state_record_symbol,asize, bsize, asize, bsize,
-							asize, bsize, asize, NormalFill,True);
-				GenUpdatePopA (0, asize);
+				BuildNewRecordPop (function_state_p[-1].state_record_symbol,asize,bsize);
 				break;
 			case ArrayState:
 				GenBuildArrayPop();
 				break;
 		}
-		GenPopB		(bsize);
-		GenRtn		(1,0,OnAState);
+		GenRtn (1,0,OnAState);
 #if SHARE_UPDATE_CODE
 		}
 #endif
@@ -3870,7 +3868,7 @@ static int generate_code_for_switch_node (NodeP node,int asp,int bsp,struct esc 
 									LabDef record_lab;
 
 									ConvertSymbolToRLabel (&record_lab,BasicSymbolStates [integer_denot].state_record_symbol);
-									GenBuildR (&record_lab,1,1,0,0,True);
+									GenBuildhr (&record_lab,1,1);
 								}
 							} else if (symbol->symb_kind==rational_denot){
 								push_rational (symbol);
@@ -3878,7 +3876,7 @@ static int generate_code_for_switch_node (NodeP node,int asp,int bsp,struct esc 
 									LabDef ratio_record_lab;
 
 									ConvertSymbolToKLabel (&ratio_record_lab,special_types[1]->sdef_type->type_constructors->cl_constructor->type_node_symbol->symb_def);
-									GenBuildR (&ratio_record_lab,2,0,0,0,True);
+									GenBuildhr (&ratio_record_lab,2,0);
 								}
 							} else
 								BuildBasic (BasicSymbolStates [symbol->symb_kind].state_object,symbol->symb_val);
@@ -3902,7 +3900,7 @@ static int generate_code_for_switch_node (NodeP node,int asp,int bsp,struct esc 
 
 							GenPushZ (symbol->symb_val);
 							ConvertSymbolToRLabel (&record_lab,BasicSymbolStates [integer_denot].state_record_symbol);
-							GenBuildR (&record_lab,1,1,0,0,True);
+							GenBuildhr (&record_lab,1,1);
 						} else if (symbol->symb_kind==rational_denot){
 							LabDef ratio_record_lab;
 
@@ -3910,7 +3908,7 @@ static int generate_code_for_switch_node (NodeP node,int asp,int bsp,struct esc 
 
 							ConvertSymbolToKLabel (&ratio_record_lab,special_types[1]->sdef_type->type_constructors->cl_constructor->type_node_symbol->symb_def);
 
-							GenBuildR (&ratio_record_lab,2,0,0,0,True);
+							GenBuildhr (&ratio_record_lab,2,0);
 						} else
 							BuildBasic (BasicSymbolStates [symbol->symb_kind].state_object,symbol->symb_val);
 
