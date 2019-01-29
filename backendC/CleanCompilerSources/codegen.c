@@ -925,17 +925,17 @@ static void CodeRule (ImpRuleP rule)
 						GenFillArrayAndPop (1, ReleaseAndFill);
 						break;
 				}
+				GenPopB (bsize);
 			} else {
 				switch (function_state_p[-1].state_type){
 					case TupleState:
 						BuildTuple (asize, bsize, asize, bsize, function_state_p[-1].state_arity,
 							function_state_p[-1].state_tuple_arguments,asize,bsize, asize,NormalFill,True);
 						GenUpdatePopA (0, asize);
+						GenPopB (bsize);
 						break;
 					case RecordState:
-						BuildRecord (function_state_p[-1].state_record_symbol,asize, bsize, asize, bsize,
-								asize, bsize, asize, NormalFill,True);
-						GenUpdatePopA (0, asize);
+						BuildNewRecordPop (function_state_p[-1].state_record_symbol,asize,bsize);
 						break;
 					case ArrayState:
 						GenBuildArrayPop();
@@ -943,7 +943,6 @@ static void CodeRule (ImpRuleP rule)
 				}
 			}
 	
-			GenPopB		(bsize);
 			GenRtn		(1,0,OnAState);
 		}
 		

@@ -454,8 +454,7 @@ void CoerceArgumentUsingStackFrames (StateS demstate, StateS offstate,int aindex
 				*asp_p += SizeOfAStackElem;
 				break;
 			case RecordState:
-				BuildRecord (offstate.state_record_symbol,aindex, bindex, *asp_p, *bsp,
-							asize,bsize,*asp_p,NormalFill,True);
+				BuildNewRecord (offstate.state_record_symbol,aindex,bindex,*asp_p,*bsp,asize,bsize);
 				*asp_p += SizeOfAStackElem;
 				break;
 			case ArrayState:
@@ -591,9 +590,27 @@ void BuildRecord (SymbDef record_sdef,int aindex,int bindex,int asp,int bsp,int 
 	ConvertSymbolToRLabel (&record_lab,record_sdef);
 
 	if (newnode)
-		GenBuildR (&record_lab,asize,bsize,asp-aindex,bsp-bindex,False);
+		GenBuildR (&record_lab,asize,bsize,asp-aindex,bsp-bindex);
 	else
 		GenFillR (&record_lab,asize,bsize,asp-rootindex,asp-aindex,bsp-bindex,fkind,False);
+}
+
+void BuildNewRecord (SymbDef record_sdef,int aindex,int bindex,int asp,int bsp,int asize,int bsize)
+{
+	LabDef record_lab;
+	
+	ConvertSymbolToRLabel (&record_lab,record_sdef);
+
+	GenBuildR (&record_lab,asize,bsize,asp-aindex,bsp-bindex);
+}
+
+void BuildNewRecordPop (SymbDef record_sdef,int asize,int bsize)
+{
+	LabDef record_lab;
+	
+	ConvertSymbolToRLabel (&record_lab,record_sdef);
+
+	GenBuildhr (&record_lab,asize,bsize);
 }
 
 void PackArgument (StateS argstate,int aindex,int bindex,int asp,int bsp,int offasize,int offbsize)
@@ -610,8 +627,7 @@ void PackArgument (StateS argstate,int aindex,int bindex,int asp,int bsp,int off
 							offasize,offbsize,asp,NormalFill,True);
 				return;
 			case RecordState:
-				BuildRecord (argstate.state_record_symbol,aindex, bindex, asp, bsp,
-							offasize,offbsize,asp,NormalFill,True);
+				BuildNewRecord (argstate.state_record_symbol,aindex,bindex,asp,bsp,offasize,offbsize);
 				return;
 			case ArrayState:
 				GenBuildArray (asp - aindex);
@@ -686,13 +702,14 @@ void CoerceArgumentOnTopOfStack (int *asp_p,int *bsp_p,StateS argstate,StateS no
 				*asp_p+=1;
 				GenUpdatePopA (0,asize);
 				*asp_p-=asize;
+				GenPopB (bsize);
+				*bsp_p-=bsize;
 				break;
 			case RecordState:
-				BuildRecord (nodestate.state_record_symbol,*asp_p,*bsp_p,*asp_p,*bsp_p,
-							asize,bsize,*asp_p,NormalFill,True);
+				BuildNewRecordPop (nodestate.state_record_symbol,asize,bsize);
 				*asp_p+=1;
-				GenUpdatePopA (0,asize);
 				*asp_p-=asize;
+				*bsp_p-=bsize;
 				break;
 			case ArrayState:
 				if (asize==1)
@@ -703,10 +720,10 @@ void CoerceArgumentOnTopOfStack (int *asp_p,int *bsp_p,StateS argstate,StateS no
 					GenUpdatePopA (0,asize);
 					*asp_p-=asize;
 				}
+				GenPopB (bsize);
+				*bsp_p-=bsize;
 				break;
 		}
-		GenPopB (bsize);
-		*bsp_p-=bsize;
 	} else {
 		if (argstate.state_type==TupleState)
 			AdjustTuple (asize,bsize,asp_p,bsp_p,argstate.state_arity,
@@ -1782,7 +1799,7 @@ static void FillOrReduceFieldSelection (Node node,SymbDef seldef,int *asp_p,int 
 			*asp_p+=a_size;
 			*bsp_p+=b_size;
 			
-			CoerceArgumentOnTopOfStack (asp_p,bsp_p, node->node_state,record_sdef->sdef_record_state.state_record_arguments [fieldnr],a_size,b_size);
+			CoerceArgumentOnTopOfStack (asp_p,bsp_p,node->node_state,record_sdef->sdef_record_state.state_record_arguments[fieldnr],a_size,b_size);
 			decrement_reference_count_of_node_id (arg_node_id,&code_gen_node_ids_p->free_node_ids);
 		}
 	}
@@ -2716,7 +2733,7 @@ static void FillSymbol (Node node,SymbDef sdef,int *asp_p,int *bsp_p,NodeId upda
 						*bsp_p-=bsize;
 						
 						if (update_node_id==NULL){
-							GenBuildR (&record_label,asize,bsize,0,0,True);
+							GenBuildhr (&record_label,asize,bsize);
 							*asp_p+=1;
 						} else {
 							GenFillR (&record_label,asize,bsize,*asp_p+asize-update_node_id->nid_a_index,0,0,node->node_state.state_kind==SemiStrict ? ReleaseAndFill : NormalFill,True);
@@ -2788,7 +2805,7 @@ static void FillSymbol (Node node,SymbDef sdef,int *asp_p,int *bsp_p,NodeId upda
 
 						if (update_node_id==NULL){
 							*asp_p+=1;
-							GenBuildR (&record_label,asize,bsize,0,0,True);
+							GenBuildhr (&record_label,asize,bsize);
 						} else {
 							GenFillR (&record_label,asize,bsize,*asp_p+asize-update_node_id->nid_a_index,0,0,node->node_state.state_kind==SemiStrict ? ReleaseAndFill : NormalFill,True);
 						}
@@ -3249,8 +3266,8 @@ void push_rational (SymbolP symb)
 	ConvertSymbolToRLabel (&integer_record_lab,BasicSymbolStates [integer_denot].state_record_symbol);
 
 	GenPushZR (symb->symb_val);
-	GenBuildR (&integer_record_lab,1,1,1,1,False);
-	GenBuildR (&integer_record_lab,1,1,0+1,0,False);
+	GenBuildR (&integer_record_lab,1,1,1,1);
+	GenBuildR (&integer_record_lab,1,1,0+1,0);
 	GenPopB (2);
 	GenUpdateA (1,3);
 	GenUpdateA (0,2);
@@ -3416,7 +3433,7 @@ static void FillNormalNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 							if (update_node_id==NULL){
 								*asp_p+=1-a_size;
 								if (symb->symb_head_strictness==4)
-									GenBuildR (strict_cons_lab_p,a_size,b_size,0,0,True);
+									GenBuildhr (strict_cons_lab_p,a_size,b_size);
 								else
 									GenBuildh (node->node_arity==2 ? &cons_lab : strict_cons_lab_p,a_size);									
 							} else {
@@ -3478,7 +3495,7 @@ static void FillNormalNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 				ConvertSymbolToRLabel (&record_lab,BasicSymbolStates [integer_denot].state_record_symbol);
 
 				if (update_node_id==NULL)
-					GenBuildR (&record_lab,1,1,0,0,True);
+					GenBuildhr (&record_lab,1,1);
 				else {
 					GenFillR (&record_lab,1,1,*asp_p-update_node_id->nid_a_index,0,0,node->node_state.state_kind==SemiStrict ? ReleaseAndFill : NormalFill,True);
 					*asp_p-=1;
@@ -3495,7 +3512,7 @@ static void FillNormalNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 			ConvertSymbolToKLabel (&ratio_record_lab,special_types[1]->sdef_type->type_constructors->cl_constructor->type_node_symbol->symb_def);
 
 			if (update_node_id==NULL){
-				GenBuildR (&ratio_record_lab,2,0,0,0,True);
+				GenBuildhr (&ratio_record_lab,2,0);
 				*asp_p+=1;
 			} else {
 				GenFillR (&ratio_record_lab,2,0,*asp_p+2-update_node_id->nid_a_index,0,0,node->node_state.state_kind==SemiStrict ? ReleaseAndFill : NormalFill,True);
@@ -4136,18 +4153,19 @@ static void FillUpdateNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 				record_state_p->state_record_arguments,record_a_size,record_b_size,&end_args_a_offset,&end_args_b_offset);
 
 			if (update_node_id==NULL){
-				BuildRecord (record_state_p->state_record_symbol,*asp_p,*bsp_p,*asp_p,*bsp_p,record_a_size,record_b_size,
-						0,node->node_state.state_kind==SemiStrict ? PartialFill : NormalFill,True);
-				GenUpdatePopA (0,end_args_a_offset);
+				BuildNewRecordPop (record_state_p->state_record_symbol,record_a_size,record_b_size);
+				GenUpdatePopA (0,end_args_a_offset-record_a_size);
+				GenPopB (end_args_b_offset-record_b_size);
 				*asp_p+=1-end_args_a_offset;
+				*bsp_p-=end_args_b_offset;
 			} else {
 				BuildRecord (record_state_p->state_record_symbol,*asp_p,*bsp_p,*asp_p,*bsp_p,record_a_size,record_b_size,
 						*asp_p-update_node_id->nid_a_index,node->node_state.state_kind==SemiStrict ? PartialFill : NormalFill,False);
 				GenPopA (end_args_a_offset);
 				*asp_p-=end_args_a_offset;
-			}
 			GenPopB (end_args_b_offset);
 			*bsp_p-=end_args_b_offset;
+			}
 			}
 
 			return;

@@ -610,6 +610,7 @@ enum {
 #define Ifill2_r "fill2_r"
 #define Ifill3_r "fill3_r"
 
+#define Ibuildhr "buildhr"
 #define Ibuild_r "build_r"
 
 #define Ifill_a "fill_a"
@@ -2080,7 +2081,19 @@ void GenFill3R (Label symblab,int n_a_args,int n_b_args,int rootoffset,char bits
 	FPrintF (OutFile, " %d %d %d %s",n_a_args,n_b_args,rootoffset,bits);
 }
 
-void GenBuildR (Label symblab,int nr_a_args,int nr_b_args,int a_offset,int b_offset,Bool pop_args)
+void GenBuildhr (Label symblab,int nr_a_args,int nr_b_args)
+{
+	put_instruction_ (Ibuildhr);
+	
+	if (!symblab->lab_issymbol || DescriptorNeeded (symblab->lab_symbol))
+		GenLabel (symblab);
+	else
+		FPutS (empty_lab.lab_name, OutFile);
+
+	FPrintF (OutFile, " %d %d",nr_a_args,nr_b_args);
+}
+
+void GenBuildR (Label symblab,int nr_a_args,int nr_b_args,int a_offset,int b_offset)
 {
 	put_instruction_ (Ibuild_r);
 	
@@ -2095,12 +2108,6 @@ void GenBuildR (Label symblab,int nr_a_args,int nr_b_args,int a_offset,int b_off
 		b_offset=0;
 
 	FPrintF (OutFile, " %d %d %d %d",nr_a_args,nr_b_args,a_offset,b_offset);
-
-	if (pop_args){
-		if (nr_a_args>0)
-			GenUpdatePopA (0,nr_a_args);
-		GenPopB (nr_b_args);
-	}
 }
 
 void GenFillFromA (int src, int dst, FillKind fkind)
