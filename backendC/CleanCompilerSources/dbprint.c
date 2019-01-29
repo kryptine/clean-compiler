@@ -18,7 +18,6 @@
 #undef PRINT_alt_lifted_node_ids
 #undef PRINT_NODE_ID_REF_COUNTS
 #define PRINT_ALL_NODE_ID_ADDRESSES
-#undef PRINT_NODE_LINE_NUMBERS
 #define PRINT_NODE_ID_REF_COUNT		
 
 static void PrintUnaryState (StateKind kind, ObjectKind obj, File file)
@@ -190,10 +189,6 @@ void PrintRuleNode (Node node,Bool brackets,int n_leading_spaces,File file)
 				FPutC ('(', file);
 			
 			PrintSymbol (node_symb, file);
-
-#ifdef PRINT_NODE_LINE_NUMBERS
-			FPrintF (file,"#%d",node->node_line);
-#endif
 
 			if (node -> node_arguments)
 			{	FPutC (' ', file);
