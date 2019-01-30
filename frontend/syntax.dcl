@@ -705,11 +705,12 @@ FI_GenericFun :== 32
 FI_Unused :== 64				// used in module trans
 FI_UnusedUsed :== 128			// used in module trans
 FI_HasTypeCodes :== 256
+FI_FusedMember :== 512			// used in module trans to mark fused versions of instance members
 
 ::	FunInfo =
 	{	fi_calls			:: ![FunCall]
 	,	fi_group_index		:: !Index
-	,	fi_def_level		:: !Level
+	,	fi_def_level		:: !Level			// instance function index if FI_FusedMember set
 	,	fi_free_vars		:: ![FreeVar]
 	,	fi_local_vars		:: ![FreeVar]
 	,	fi_dynamics			:: ![ExprInfoPtr]

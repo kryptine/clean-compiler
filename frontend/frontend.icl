@@ -200,8 +200,10 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 	# (def_max, acc_args)		= usize acc_args
 	# (def_min, fun_defs)		= usize fun_defs
 
-	  (components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap, error, predef_symbols)
-	  	= transformGroups cleanup_info main_dcl_module_n stdStrictLists_module_n def_min def_max components fun_defs acc_args common_defs imported_funs dcl_types type_def_infos var_heap type_heaps expression_heap options.feo_fusion error predef_symbols
+	  (components, used_conses, fun_defs, dcl_types, var_heap, type_heaps, expression_heap, error, predef_symbols)
+	  	= transformGroups cleanup_info main_dcl_module_n stdStrictLists_module_n def_min def_max components acc_args
+	  						common_defs imported_funs type_def_infos dcl_mods options.feo_fusion
+							fun_defs dcl_types var_heap type_heaps expression_heap error predef_symbols
 
 	# error_admin = {ea_file = error, ea_loc = [], ea_ok = True }
 	# {dcl_instances,dcl_specials,dcl_gencases,dcl_type_funs} = dcl_mods.[main_dcl_module_n]
