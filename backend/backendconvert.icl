@@ -1031,7 +1031,7 @@ where
 			# (field_list_p,type_var_heap,bes) = convert_dictionary_selectors (index+1) type_var_heap bes
 			| index<size class_members
 				# (single_field_list_p,type_var_heap,bes)
-					= convertMemberSelector moduleIndex selectors class_members.[index] (arg_is_strict index strictness) symbols.[index] type_var_heap bes
+					= convertMemberSelector moduleIndex selectors (arg_is_strict index strictness) symbols.[index] type_var_heap bes
 				  (field_list_p,bes) = accBackEnd (BEFields single_field_list_p field_list_p) bes
 				= (field_list_p,type_var_heap,bes)
 				# (single_field_list_p,type_var_heap,bes)
@@ -1039,9 +1039,8 @@ where
 				  (field_list_p,bes) = accBackEnd (BEFields single_field_list_p field_list_p) bes
 				= (field_list_p,type_var_heap,bes)
 
-convertMemberSelector :: ModuleIndex {#SelectorDef} DefinedSymbol Bool FieldSymbol
-							!*TypeVarHeap !*BackEndState -> (!BEFieldListP,!*TypeVarHeap,!*BackEndState)
-convertMemberSelector moduleIndex selectorDefs class_member is_strict {fs_index} type_var_heap bes
+convertMemberSelector :: ModuleIndex {#SelectorDef} Bool FieldSymbol !*TypeVarHeap !*BackEndState -> (!BEFieldListP,!*TypeVarHeap,!*BackEndState)
+convertMemberSelector moduleIndex selectorDefs is_strict {fs_index} type_var_heap bes
 	# selectorDef = selectorDefs.[fs_index]
 	  (field_type,optional_type_alt_p,bes) = selectorTypeFunction selectorDef bes
 	  (field_type,type_var_heap,bes) = convertTypeDefAnnotAndTypeNode (if is_strict AN_Strict AN_None) field_type type_var_heap bes
