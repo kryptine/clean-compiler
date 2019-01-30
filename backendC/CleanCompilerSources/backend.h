@@ -472,6 +472,12 @@ Clean (BEField :: Int Int BETypeNodeP BackEnd -> (BEFieldListP, BackEnd))
 void BESetMemberTypeOfField (int fieldIndex, int moduleIndex, BETypeAltP typeAlt);
 Clean (BESetMemberTypeOfField :: Int Int BETypeAltP BackEnd -> BackEnd)
 
+int BESetDictionaryFieldOfMember (int function_index, int field_index, int field_module_index);
+Clean (BESetDictionaryFieldOfMember :: Int Int Int BackEnd -> (Int,BackEnd))
+
+void BESetInstanceFunctionOfFunction (int function_index,int instance_function_index);
+Clean (BESetInstanceFunctionOfFunction :: Int Int BackEnd -> BackEnd)
+
 BEFieldListP BEFields (BEFieldListP field, BEFieldListP fields);
 Clean (BEFields:: BEFieldListP BEFieldListP BackEnd -> (BEFieldListP, BackEnd))
 

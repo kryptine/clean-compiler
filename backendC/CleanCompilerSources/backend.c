@@ -3065,6 +3065,62 @@ BESetMemberTypeOfField (int fieldIndex, int moduleIndex, BETypeAltP typeAlt)
 	sdef = gBEState.be_modules [moduleIndex].bem_fields [fieldIndex].symb_def;
 	sdef->sdef_mark |= SDEF_FIELD_HAS_MEMBER_TYPE;
 	sdef->sdef_member_type_of_field = typeAlt;
+	sdef->sdef_member_states_of_field = NULL;
+}
+
+int
+BESetDictionaryFieldOfMember (int function_index,int field_index, int field_module_index)
+{
+	SymbolP function_symbol_p;
+	SymbDefP field_sdef,function_sdef;
+	
+	function_symbol_p = &gBEState.be_modules[main_dcl_module_n].bem_functions[function_index];
+	if (function_symbol_p->symb_kind==erroneous_symb)
+		return 1;
+
+	field_sdef = gBEState.be_modules [field_module_index].bem_fields[field_index].symb_def;
+
+	/* in BEAdjustStrictListConsInstance symb_kind=cons_symb */	
+	if (function_symbol_p->symb_kind==cons_symb)
+		function_sdef = function_symbol_p->symb_unboxed_cons_p->unboxed_cons_sdef_p;
+	else
+		function_sdef = function_symbol_p->symb_def;
+
+	if (! (function_sdef->sdef_kind==IMPRULE || function_sdef->sdef_kind==DEFRULE || function_sdef->sdef_kind==SYSRULE))
+		return 2;
+
+	function_sdef->sdef_mark |= SDEF_INSTANCE_RULE_WITH_FIELD_P;
+	function_sdef->sdef_dictionary_field = field_sdef;
+	
+	return 0;
+}
+
+void
+BESetInstanceFunctionOfFunction (int function_index,int instance_function_index)
+{
+	SymbolP instance_function_symbol_p;
+	SymbDefP function_sdef,instance_function_sdef;
+
+	function_sdef = gBEState.be_modules[main_dcl_module_n].bem_functions[function_index].symb_def;
+	instance_function_symbol_p = &gBEState.be_modules[main_dcl_module_n].bem_functions[instance_function_index];
+	
+	if (instance_function_symbol_p->symb_kind==erroneous_symb){
+		/*	the instance function is not used any more, only specialized versions of it,
+			allocate empty SymbDef for BESetDictionaryFieldOfMember */
+
+		instance_function_sdef = ConvertAllocType (SymbDefS);
+		instance_function_sdef->sdef_kind = IMPRULE;
+		instance_function_sdef->sdef_mark = 0;
+		instance_function_sdef->sdef_isused = 0;
+
+		instance_function_symbol_p->symb_def=instance_function_sdef;
+		instance_function_symbol_p->symb_kind=instance_symb;
+	}
+
+	instance_function_sdef = instance_function_symbol_p->symb_def;
+
+	function_sdef->sdef_mark |= SDEF_RULE_INSTANCE_RULE_P;
+	function_sdef->sdef_instance_rule = instance_function_sdef;
 }
 
 BEFieldListP
