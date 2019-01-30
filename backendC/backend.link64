@@ -94,6 +94,8 @@
 /EXPORT:BEDeclareField
 /EXPORT:BEField
 /EXPORT:BESetMemberTypeOfField
+/EXPORT:BESetDictionaryFieldOfMember
+/EXPORT:BESetInstanceFunctionOfFunction
 /EXPORT:BEFields
 /EXPORT:BENoFields
 /EXPORT:BEDeclareConstructor

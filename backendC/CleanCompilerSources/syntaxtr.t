@@ -565,12 +565,14 @@ STRUCT (symbol_def,SymbDef){
 		ImpRules		u_rule;
 	} sdef_u;
 	union
-	{	StateS			typeinfo_record_state;
+	{	StateS			typeinfo_record_state; /* for RECORDTYPE */
 		struct
 		{	FieldList	fieldinfo_sel_field;
 			int			fieldinfo_sel_field_number;
-		} sdef_fieldinfo;
+		} sdef_fieldinfo; /* for FIELDSELECTOR */
 		struct constructor_list * typeinfo_constructor;	/* for CONSTRUCTOR */
+		struct symbol_def *typeinfo_dictionary_field; /* for IMPRULE if SDEF_INSTANCE_RULE_WITH_FIELD_P */
+		struct symbol_def *typeinfo_instance_rule; /* for IMPRULE if SDEF_RULE_INSTANCE_RULE_P */
 	} sdef_typeinfo;
 
 	unsigned		sdef_number;
@@ -582,6 +584,7 @@ STRUCT (symbol_def,SymbDef){
 #ifdef CLEAN2
 		SymbolP			u3_unboxed_cons_symbol;		/* backend.c */
 #endif
+		struct state *	u3_member_states_of_field; /* for FIELDSELECTOR if SDEF_FIELD_HAS_MEMBER_TYPE */
 	} sdef_u3;
 
 	struct symbol_def *	sdef_dcl_icl;					/* to dcl if sdef_exported, to icl if sdef_main_dcl */
@@ -614,6 +617,7 @@ STRUCT (symbol_def,SymbDef){
 #ifdef CLEAN2
  #define sdef_unboxed_cons_symbol sdef_u3.u3_unboxed_cons_symbol
 #endif
+#define sdef_member_states_of_field sdef_u3.u3_member_states_of_field
 
 #define	SDEF_USED_LAZILY_MASK 1
 #define SDEF_USED_STRICTLY_MASK 2
@@ -623,7 +627,9 @@ STRUCT (symbol_def,SymbDef){
 #define	SDEF_HAS_IMP_RULE_VERSIONS_MASK 64
 #define	SDEF_OPTIMISED_FUNCTION_MASK 128
 #define SDEF_INLINE_IS_CONSTRUCTOR 4096
-#define SDEF_FIELD_HAS_MEMBER_TYPE 16384
+#define SDEF_FIELD_HAS_MEMBER_TYPE 1024
+#define SDEF_INSTANCE_RULE_WITH_FIELD_P 16384
+#define SDEF_RULE_INSTANCE_RULE_P 32768
 
 /* some macros to reuse bit fields */
 
@@ -635,9 +641,12 @@ STRUCT (symbol_def,SymbDef){
 #define sdef_constructor sdef_typeinfo.typeinfo_constructor
 
 #define sdef_record_state	sdef_typeinfo.typeinfo_record_state
-#define sdef_sel_field	sdef_typeinfo.sdef_fieldinfo.fieldinfo_sel_field
 
+#define sdef_sel_field	sdef_typeinfo.sdef_fieldinfo.fieldinfo_sel_field
 #define sdef_sel_field_number	sdef_typeinfo.sdef_fieldinfo.fieldinfo_sel_field_number
+
+#define sdef_dictionary_field	sdef_typeinfo.typeinfo_dictionary_field
+#define sdef_instance_rule	sdef_typeinfo.typeinfo_instance_rule
 
 #if IMPORT_OBJ_AND_LIB
 struct string_list {
