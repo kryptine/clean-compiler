@@ -933,7 +933,7 @@ define_dictionary_type moduleIndex constructors selectors typeIndex
 			// define the record without marking, to prevent code generation for many unused generic dictionaries
 			(convertTypeDefToFlatType (beTypeSymbolNoMark typeIndex moduleIndex) td_attribute td_args type_var_heap bes)
 	  (fields,type_var_heap,bes)
-		= convert_dictionary_selectors moduleIndex selectors rt_fields class_members constructorDef.cons_type.st_args_strictness member_defs type_var_heap bes
+		= convert_dictionary_selectors moduleIndex selectors rt_fields (size class_members) constructorDef.cons_type.st_args_strictness member_defs type_var_heap bes
 	  (constructorType,bes) = constructorTypeFunction constructorDef bes
 	  (type_arg_p,type_var_heap,bes) = convertTypeDefAnnotatedTypeArgs constructorType.st_args constructorType.st_args_strictness type_var_heap bes
 	  (symbol_p,bes) = beConstructorSymbol moduleIndex constructorIndex bes
@@ -1019,10 +1019,9 @@ convertSelector moduleIndex selectorDefs is_strict {fs_index} type_var_heap bes
 				_
 					->	(sd_type.st_result,bes)
 
-convert_dictionary_selectors :: ModuleIndex {#SelectorDef} {#FieldSymbol} {#DefinedSymbol} StrictnessList {#MemberDef}
+convert_dictionary_selectors :: ModuleIndex {#SelectorDef} {#FieldSymbol} !Int StrictnessList {#MemberDef}
 								!*TypeVarHeap !*BackEndState -> (!BEFieldListP,!*TypeVarHeap,!*BackEndState)
-convert_dictionary_selectors moduleIndex selectors symbols class_members strictness member_defs type_var_heap bes
-	# n_field_symbols = size symbols
+convert_dictionary_selectors moduleIndex selectors symbols size_class_members strictness member_defs type_var_heap bes
 	= convert_dictionary_selectors 0 type_var_heap bes
 where
 	convert_dictionary_selectors index type_var_heap bes
@@ -1030,7 +1029,7 @@ where
 			# (field_list_p,bes) = accBackEnd BENoFields bes
 			= (field_list_p,type_var_heap,bes)
 			# (field_list_p,type_var_heap,bes) = convert_dictionary_selectors (index+1) type_var_heap bes
-			| index<size class_members
+			| index<size_class_members
 				# (single_field_list_p,type_var_heap,bes)
 					= convertMemberSelector moduleIndex selectors (arg_is_strict index strictness) symbols.[index] type_var_heap bes
 				  (field_list_p,bes) = accBackEnd (BEFields single_field_list_p field_list_p) bes
