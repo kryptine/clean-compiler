@@ -13,7 +13,7 @@ convertIclModule main_dcl_module_n common_defs imported_types imported_conses va
 		= convertSelectorTypes common_defs.[main_dcl_module_n].com_selector_defs main_dcl_module_n common_defs types_and_heaps
 	  {com_class_defs,com_type_defs,com_cons_defs,com_selector_defs,com_member_defs,com_instance_defs} = common_defs.[main_dcl_module_n]
 	  (imported_types,imported_conses,var_heap,type_heaps)
-	= convert_member_types_of_module 0 com_class_defs com_type_defs com_cons_defs com_selector_defs com_member_defs main_dcl_module_n common_defs
+		= convert_member_types_of_module 0 com_class_defs com_type_defs com_cons_defs com_selector_defs com_member_defs main_dcl_module_n common_defs
 											imported_types imported_conses var_heap type_heaps
 	  (imported_conses,var_heap) = mark_imported_classes_in_instances 0 main_dcl_module_n com_instance_defs common_defs imported_conses var_heap
 	= (imported_types,imported_conses,var_heap,type_heaps)
