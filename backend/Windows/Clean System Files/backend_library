@@ -95,6 +95,8 @@ BEConstructor
 BEDeclareField
 BEField
 BESetMemberTypeOfField
+BESetDictionaryFieldOfMember
+BESetInstanceFunctionOfFunction
 BEFields
 BENoFields
 BEDeclareConstructor
