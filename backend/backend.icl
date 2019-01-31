@@ -622,6 +622,18 @@ BESetMemberTypeOfField a0 a1 a2 a3 = code {
 }
 // void BESetMemberTypeOfField (int fieldIndex,int moduleIndex,BETypeAltP typeAlt);
 
+BESetDictionaryFieldOfMember :: !Int !Int !Int !BackEnd -> (!Int,!BackEnd);
+BESetDictionaryFieldOfMember a0 a1 a2 a3 = code {
+	ccall BESetDictionaryFieldOfMember "III:I:p"
+}
+// int BESetDictionaryFieldOfMember (int function_index, int field_index, int field_module_index);
+
+BESetInstanceFunctionOfFunction :: !Int !Int !BackEnd -> BackEnd;
+BESetInstanceFunctionOfFunction a0 a1 a2 = code {
+	ccall BESetInstanceFunctionOfFunction "II:V:p"
+}
+// void BESetInstanceFunctionOfFunction (int function_index, int instance_function_index);
+
 BEFields :: !BEFieldListP !BEFieldListP !BackEnd -> (!BEFieldListP,!BackEnd);
 BEFields a0 a1 a2 = code {
 	ccall BEFields "pp:p:p"

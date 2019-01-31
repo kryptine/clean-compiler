@@ -407,17 +407,21 @@ backEndConvertModulesH predefs {fe_icl =
 	#! (type_var_heap,backEnd)
 		=	declare_icl_common_defs main_dcl_module_n icl_common currentDcl.dcl_common type_var_heap backEnd
 	#! backEnd
-		=	declareArrayInstances /*fe_arrayInstances.ali_instances_range*/fe_arrayInstances.ali_array_first_instance_indices predefs main_dcl_module_n icl_functions fe_dcls (backEnd -*-> "declareArrayInstances")
+		=	declareArrayInstances fe_arrayInstances.ali_array_first_instance_indices predefs main_dcl_module_n icl_functions fe_dcls backEnd
 	#! backEnd
 		=	declareListInstances fe_arrayInstances.ali_list_first_instance_indices PD_UListClass predefs main_dcl_module_n icl_functions fe_dcls backEnd
 	#! backEnd
 		=	declareListInstances fe_arrayInstances.ali_tail_strict_list_first_instance_indices PD_UTSListClass predefs main_dcl_module_n icl_functions fe_dcls backEnd
 	#! backEnd
-		=	adjustArrayFunctions /*fe_arrayInstances.ali_instances_range*/fe_arrayInstances.ali_array_first_instance_indices predefs main_dcl_module_n icl_functions fe_dcls icl_common.com_instance_defs icl_used_module_numbers (backEnd -*-> "adjustArrayFunctions")
+		=	adjustArrayFunctions fe_arrayInstances.ali_array_first_instance_indices predefs main_dcl_module_n icl_functions fe_dcls icl_common.com_instance_defs icl_used_module_numbers backEnd
 	#! backEnd
 		=	adjustStrictListFunctions fe_arrayInstances.ali_list_first_instance_indices fe_arrayInstances.ali_tail_strict_list_first_instance_indices predefs fe_dcls icl_used_module_numbers main_dcl_module_n backEnd;
 	#! (rules, backEnd)
 		=	convertRules [(index, icl_functions.[index]) \\ (_, index) <- functionIndices] main_dcl_module_n predefined_idents.[PD_DummyForStrictAliasFun] (backEnd -*-> "convertRules")
+	# backEnd
+		= set_dictionary_field_for_instance_member_functions_for_implementation_module icl_common icl_functions main_dcl_module_n fe_dcls backEnd
+	# backEnd
+		= set_dictionary_field_for_special_instance_member_functions currentDcl icl_common icl_functions main_dcl_module_n fe_dcls backEnd
 	#! backEnd
 		=	appBackEnd (BEDefineRules rules) (backEnd -*-> "BEDefineRules")
 	#! backEnd
@@ -1062,6 +1066,10 @@ convertMemberSelector moduleIndex selectorDefs is_strict {fs_index} type_var_hea
 					# (dont_care_symbol_p,bes) = accBackEnd BEDontCareDefinitionSymbol bes
 					  (type_alt_p,bes) = convertTypeAltForSymbolP dont_care_symbol_p expanded_member_type bes
 					->	(st_result,Yes type_alt_p,bes)
+				VI_ExpandedMemberType expanded_member_type VI_Empty
+					# (dont_care_symbol_p,bes) = accBackEnd BEDontCareDefinitionSymbol bes
+					  (type_alt_p,bes) = convertTypeAltForSymbolP dont_care_symbol_p expanded_member_type bes
+					->	(sd_type.st_result,Yes type_alt_p,bes)
 				_
 					->	(sd_type.st_result,No,bes)
 
@@ -1229,8 +1237,19 @@ adjustStrictListFunctions list_first_instance_indices tail_strict_list_first_ins
 		# std_strict_lists_nil_functions=std_strict_lists.dcl_functions
 		# first_instance_index=std_strict_lists.dcl_instances.ir_from;
 		# backEnd=adjust_overloaded_nil_functions 0 first_instance_index std_strict_lists_nil_functions backEnd
-		# backEnd=adjustRecordListInstances list_first_instance_indices backEnd
-		= adjustRecordListInstances tail_strict_list_first_instance_indices backEnd
+
+		# std_list_common_defs = std_strict_lists.dcl_common
+		  indexUListClass = predefs.[PD_UListClass].pds_def
+		  dictionaryIndexUListClass = std_list_common_defs.com_class_defs.[indexUListClass].class_dictionary.ds_index
+		  (RecordType {rt_fields}) = std_list_common_defs.com_type_defs.[dictionaryIndexUListClass].td_rhs
+
+		  backEnd=appBackEnd (adjustRecordListInstances list_first_instance_indices rt_fields) backEnd
+
+		  indexUTSListClass = predefs.[PD_UTSListClass].pds_def
+		  dictionaryIndexUTSListClass = std_list_common_defs.com_class_defs.[indexUTSListClass].class_dictionary.ds_index
+		  (RecordType {rt_fields}) = std_list_common_defs.com_type_defs.[dictionaryIndexUTSListClass].td_rhs
+
+		= appBackEnd (adjustRecordListInstances tail_strict_list_first_instance_indices rt_fields) backEnd
 where
 	std_strict_lists=dcls.[std_strict_list_module_index]
 	std_strict_list_module_index=predefs.[PD_StdStrictLists].pds_def
@@ -1265,13 +1284,14 @@ where
 			= adjust_overloaded_nil_functions (function_index+1) first_instance_index std_strict_lists_nil_functions backEnd
 			= backEnd
 
-	adjustRecordListInstances [] back_end
-		= back_end
-	adjustRecordListInstances [index:indices] backend
-//		| trace_tn ("adjustRecordListInstances "+++toString index+++" "+++toString main_dcl_module_n)
-		# backend = appBackEnd (BEAdjustStrictListConsInstance index main_dcl_module_n) backend
-		# backend = appBackEnd (BEAdjustUnboxedListDeconsInstance (index+1) main_dcl_module_n) backend
-		= adjustRecordListInstances indices backend
+	adjustRecordListInstances [] rt_fields backend
+		= backend
+	adjustRecordListInstances [index:indices] rt_fields backend
+		# backend = BEAdjustStrictListConsInstance index main_dcl_module_n backend
+		  (r0,backend) = BESetDictionaryFieldOfMember index rt_fields.[0].fs_index std_strict_list_module_index backend
+		  backend = BEAdjustUnboxedListDeconsInstance (index+1) main_dcl_module_n backend
+		  (r1,backend) = BESetDictionaryFieldOfMember (index+1) rt_fields.[1].fs_index std_strict_list_module_index backend
+		= adjustRecordListInstances indices rt_fields backend
 
 :: AdjustStdArrayInfo =
 	{	asai_moduleIndex	:: !Int
@@ -1360,22 +1380,25 @@ adjustArrayFunctions array_first_instance_indices predefs main_dcl_module_n func
 											_
 												->	identity) be
 
+		array_class_dictionary_index = arrayClass.class_dictionary.ds_index
+		(RecordType {rt_fields}) = stdArray.dcl_common.com_type_defs.[array_class_dictionary_index].td_rhs
+
 		adjustIclArrayInstances :: [Int] {#BEArrayFunKind} Int -> BackEnder
 		adjustIclArrayInstances array_first_instance_indices mapping n_array_members
 			= adjustIclArrayInstances array_first_instance_indices
 			where
 				adjustIclArrayInstances [array_first_instance_index:array_first_instance_indices]
-					=	adjustIclArrayInstanceMembers array_first_instance_index 0
+					=	appBackEnd (adjustIclArrayInstanceMembers array_first_instance_index 0)
 					o`	adjustIclArrayInstances array_first_instance_indices
 				adjustIclArrayInstances []
 					= identity
 
-				adjustIclArrayInstanceMembers index member_index
+				adjustIclArrayInstanceMembers index member_index backend
 					| member_index==n_array_members
-						= identity
-						# next_member_index=member_index+1
-						=	beAdjustArrayFunction mapping.[member_index] index main_dcl_module_n
-						o`	adjustIclArrayInstanceMembers (index+1) next_member_index
+						= backend
+						# backend = BEAdjustArrayFunction mapping.[member_index] index main_dcl_module_n backend
+						# (r0,backend) = BESetDictionaryFieldOfMember index rt_fields.[member_index].fs_index arrayModuleIndex backend
+						= adjustIclArrayInstanceMembers (index+1) (member_index+1) backend
 
 convertRules :: [(Int, FunDef)] Int Ident *BackEndState -> (BEImpRuleP, *BackEndState)
 convertRules rules main_dcl_module_n aliasDummyId be
@@ -1394,10 +1417,19 @@ convertRules rules main_dcl_module_n aliasDummyId be
 			=	convert t rulesP be
 
 convertRule :: Ident (Int,FunDef) Int -> BEMonad BEImpRuleP
-convertRule aliasDummyId (index, {fun_type=Yes type, fun_body=body, fun_pos, fun_kind, fun_ident, fun_info}) main_dcl_module_n
-//	| trace_tn fun_ident.id_name
-	=	beRule index (cafness fun_kind)
-			(convertTypeAlt index main_dcl_module_n (type -*-> ("convertRule", fun_ident.id_name, index, type, (fun_info.fi_group_index, body))))
+convertRule aliasDummyId (index, {fun_type=Yes type, fun_body=body, fun_pos, fun_kind, fun_info}) main_dcl_module_n
+	| fun_info.fi_properties bitand FI_FusedMember<>0
+		#! instance_function_index = fun_info.fi_def_level;
+		= convert_fused_instance_member_function instance_function_index
+		with
+		  convert_fused_instance_member_function instance_function_index bes
+			# bes & bes_backEnd = BESetInstanceFunctionOfFunction index instance_function_index bes.bes_backEnd
+			= beRule index (cafness fun_kind)
+					(convertTypeAlt index main_dcl_module_n type)
+					(convertFunctionBody index (positionToLineNumber fun_pos) aliasDummyId body main_dcl_module_n)
+					bes
+		= beRule index (cafness fun_kind)
+			(convertTypeAlt index main_dcl_module_n type)
 			(convertFunctionBody index (positionToLineNumber fun_pos) aliasDummyId body main_dcl_module_n)
 	where
 		cafness :: FunKind -> Int
@@ -2386,6 +2418,57 @@ getVariableSequenceNumber varInfoPtr be
 			-> (sequenceNumber,be)
 		VI_AliasSequenceNumber {var_info_ptr}
 			-> getVariableSequenceNumber var_info_ptr be
+
+set_dictionary_field_for_instance_member_functions :: !Int !{#ClassInstance} !{#ClassDef} !{#CheckedTypeDef} !{#SelectorDef} !{#FunDef} !Int !{#DclModule} !*BackEndState -> *BackEndState
+set_dictionary_field_for_instance_member_functions i instance_defs class_defs type_defs selector_defs icl_functions main_dcl_module_n dcls bes
+	| i<size instance_defs
+		# bes = set_dictionary_field_for_instance_member_functions_for_instance instance_defs.[i] class_defs type_defs selector_defs icl_functions main_dcl_module_n dcls bes
+		= set_dictionary_field_for_instance_member_functions (i+1) instance_defs class_defs type_defs selector_defs icl_functions main_dcl_module_n dcls bes
+		= bes
+where
+	set_dictionary_field_for_instance_member_functions_for_instance :: !ClassInstance !{#ClassDef} !{#CheckedTypeDef} !{#SelectorDef} !{#FunDef} !Int !{#DclModule} !*BackEndState -> *BackEndState
+	set_dictionary_field_for_instance_member_functions_for_instance {ins_class_index={gi_module=class_module,gi_index},ins_members} class_defs com_type_defs com_selector_defs icl_functions main_dcl_module_n dcls bes
+		| class_module==main_dcl_module_n
+			# {class_dictionary={ds_index}} = class_defs.[gi_index]
+			  selector_defs = com_selector_defs
+			  {td_rhs=RecordType {rt_fields}} = com_type_defs.[ds_index]
+			= set_dictionary_field_for_instance_member_functions_for_instance_members 0 ins_members rt_fields selector_defs class_module bes
+			# {class_dictionary={ds_index}} = dcls.[class_module].dcl_common.com_class_defs.[gi_index]
+			  selector_defs = dcls.[class_module].dcl_common.com_selector_defs
+			  {td_rhs=RecordType {rt_fields}} = dcls.[class_module].dcl_common.com_type_defs.[ds_index]
+			= set_dictionary_field_for_instance_member_functions_for_instance_members 0 ins_members rt_fields selector_defs class_module bes
+
+	set_dictionary_field_for_instance_member_functions_for_instance_members :: !Int !{#ClassInstanceMember} !{#FieldSymbol} !{#SelectorDef} !Int !*BackEndState -> *BackEndState
+	set_dictionary_field_for_instance_member_functions_for_instance_members i ins_members fields selector_defs class_module bes
+		| i<size ins_members
+			# {cim_arity,cim_index} = ins_members.[i]
+			  {fs_index} = fields.[i]
+			  {sd_type_ptr} = selector_defs.[fs_index]
+			  (sd_type_in_ptr,bes) = read_from_var_heap sd_type_ptr bes
+			| cim_index<0
+				| cim_arity==main_dcl_module_n
+					# cim_index = -1-cim_index
+					| sd_type_in_ptr=:VI_ExpandedMemberType _ _
+						# (r0,bes) = accBackEnd (BESetDictionaryFieldOfMember cim_index fs_index class_module) bes
+						= set_dictionary_field_for_instance_member_functions_for_instance_members (i+1) ins_members fields selector_defs class_module bes
+						= abort "No VI_ExpandedMemberType in set_dictionary_field_for_instance_member_functions_for_instance_members"
+					= set_dictionary_field_for_instance_member_functions_for_instance_members (i+1) ins_members fields selector_defs class_module bes
+			| sd_type_in_ptr=:VI_ExpandedMemberType _ _
+				# (r0,bes) = accBackEnd (BESetDictionaryFieldOfMember cim_index fs_index class_module) bes
+				= set_dictionary_field_for_instance_member_functions_for_instance_members (i+1) ins_members fields selector_defs class_module bes
+				= abort "No VI_ExpandedMemberType in set_dictionary_field_for_instance_member_functions_for_instance_members"
+		= bes
+
+set_dictionary_field_for_instance_member_functions_for_implementation_module :: !CommonDefs !{#FunDef} !ModuleIndex !{#DclModule} !*BackEndState -> *BackEndState
+set_dictionary_field_for_instance_member_functions_for_implementation_module {com_instance_defs,com_class_defs,com_type_defs,com_selector_defs}
+		icl_functions main_dcl_module_n dcls bes
+	= set_dictionary_field_for_instance_member_functions 0 com_instance_defs com_class_defs com_type_defs com_selector_defs icl_functions main_dcl_module_n dcls bes
+
+set_dictionary_field_for_special_instance_member_functions :: !DclModule !CommonDefs !{#FunDef} !ModuleIndex !{#DclModule} !*BackEndState -> *BackEndState
+set_dictionary_field_for_special_instance_member_functions {dcl_module_kind=MK_None} icl_common icl_functions main_dcl_module_n dcls bes
+	= bes
+set_dictionary_field_for_special_instance_member_functions {dcl_common={com_instance_defs},dcl_sizes} {com_class_defs,com_type_defs,com_selector_defs} icl_functions main_dcl_module_n dcls bes
+	= set_dictionary_field_for_instance_member_functions dcl_sizes.[cInstanceDefs] com_instance_defs com_class_defs com_type_defs com_selector_defs icl_functions main_dcl_module_n dcls bes
 
 convertForeignExports :: [ForeignExport] Int BackEnd -> BackEnd
 convertForeignExports [{fe_fd_index,fe_stdcall}:icl_foreign_exports] main_dcl_module_n backEnd
