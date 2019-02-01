@@ -1176,6 +1176,11 @@ void ExamineTypesAndLhsOfSymbolDefinition (SymbDef def)
 			break;
 		}
 		case FIELDSELECTOR:
+			if (def->sdef_mark & SDEF_FIELD_HAS_MEMBER_TYPE){
+				def->sdef_member_states_of_field = allocate_function_state (def->sdef_member_type_of_field->type_alt_lhs->type_node_arity);
+				(void) DetermineStatesOfRuleType (def->sdef_member_type_of_field,def->sdef_member_states_of_field);
+			}
+
 			rootstate = def->sdef_sel_field->fl_state;
 
 			if (def->sdef_module==CurrentModule)
@@ -1877,11 +1882,22 @@ static Bool NodeInAStrictContext (Node node,StateS demanded_state,int local_scop
 						else
 							parallel = DetermineStrictArgContext (node->node_arguments,StrictState,local_scope);
 					if (rootsymb->symb_tail_strictness)
-						parallel = DetermineStrictArgContext (node->node_arguments->arg_next,StrictState,local_scope);
-				}
+						if (DetermineStrictArgContext (node->node_arguments->arg_next,StrictState,local_scope))
+							parallel = True;
+
+					if (ShouldDecrRefCount){
+						if (!(rootsymb->symb_head_strictness>1))
+							DecrRefCountCopiesOfArg (node->node_arguments IF_OPTIMIZE_LAZY_TUPLE_RECURSION(local_scope));
+						if (!rootsymb->symb_tail_strictness)
+							DecrRefCountCopiesOfArg (node->node_arguments->arg_next IF_OPTIMIZE_LAZY_TUPLE_RECURSION(local_scope));
+					}
+				} else
 #endif
 				if (ShouldDecrRefCount)
 					DecrRefCountCopiesOfArgs (node->node_arguments IF_OPTIMIZE_LAZY_TUPLE_RECURSION(local_scope));
+
+				SetUnaryState (&node->node_state, StrictOnA, ListObj);
+				break;
 			case nil_symb:
 #if STRICT_LISTS
 				if (rootsymb->symb_head_strictness & 1)
