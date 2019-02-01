@@ -482,6 +482,16 @@ void AddStateSizesAndMaxFrameSizes (int arity,States states,int *maxasize,int *a
 		AddStateSizeAndMaxFrameSize (states [arity], maxasize, asize, bsize);
 }
 
+static void DetermineStateSizesAndMaxFrameSizes (int arity,States states,int *maxasize,int *asize,int *bsize)
+{
+	*asize=0;
+	*bsize=0;
+	*maxasize=0;
+
+	for (arity--; arity>=0; arity--)
+		AddStateSizeAndMaxFrameSize (states [arity], maxasize, asize, bsize);
+}
+
 void AddStateSizeAndMaxFrameSize (StateS state,int *maxasize,int *asize,int *bsize)
 {
 	if (IsSimpleState (state)){
@@ -1147,14 +1157,10 @@ static void GenUnboxedRecordApplyAndNodeEntries (SymbDef fun_def,int n_result_no
 {
 	LabDef ealab;
 	int asize,bsize,maxasize;
-	RuleTypes rule_type;
+	struct state *rule_type_state_p;
 	int arity;
 
-	asize = 0;
-	bsize = 0;
-	maxasize = 0;
-
-	rule_type	= fun_def->sdef_rule_type;
+	rule_type_state_p = fun_def->sdef_rule_type->rule_type_state_p;
 	arity = fun_def->sdef_arity;
 
 	MakeSymbolLabel (&CurrentAltLabel,NULL,no_pref,fun_def,0);
@@ -1162,7 +1168,7 @@ static void GenUnboxedRecordApplyAndNodeEntries (SymbDef fun_def,int n_result_no
 	ealab			= CurrentAltLabel;
 	ealab.lab_pref	= ea_pref;
 	
-	AddStateSizesAndMaxFrameSizes (arity,rule_type->rule_type_state_p,&maxasize,&asize,&bsize);
+	DetermineStateSizesAndMaxFrameSizes (arity,rule_type_state_p,&maxasize,&asize,&bsize);
 
 	if ((fun_def->sdef_mark & SDEF_USED_CURRIED_MASK) || DoDescriptors || DoParallel)
 		GenArrayFunctionDescriptor (fun_def,&CurrentAltLabel,arity);
@@ -1171,12 +1177,12 @@ static void GenUnboxedRecordApplyAndNodeEntries (SymbDef fun_def,int n_result_no
 		GenPB (fun_def->sdef_ident->ident_name);
 
 	if (fun_def->sdef_mark & SDEF_USED_CURRIED_MASK)
-		ApplyEntry (rule_type->rule_type_state_p,arity,&ealab,!(fun_def->sdef_mark & SDEF_USED_LAZILY_MASK));
+		ApplyEntry (rule_type_state_p,arity,&ealab,!(fun_def->sdef_mark & SDEF_USED_LAZILY_MASK));
 
 	if (fun_def->sdef_mark & SDEF_USED_LAZILY_MASK)
-		NodeEntry (rule_type->rule_type_state_p,arity,&ealab,fun_def);
+		NodeEntry (rule_type_state_p,arity,&ealab,fun_def);
 
-	EvalArgsEntry (rule_type->rule_type_state_p,fun_def,maxasize,&ealab,n_result_nodes_on_a_stack);
+	EvalArgsEntry (rule_type_state_p,fun_def,maxasize,&ealab,n_result_nodes_on_a_stack);
 	
 	*a_size_p=asize;
 	*b_size_p=bsize;
@@ -1198,8 +1204,6 @@ void GenerateCodeForLazyUnboxedRecordListFunctions (void)
 			TypeArgs type_node_arguments_p;
 			LabDef unboxed_record_cons_lab;
 			int tail_strict;
-
-			GenUnboxedRecordApplyAndNodeEntries (fun_def,1,&a_size,&b_size);
 					
 			type_node_arguments_p=fun_def->sdef_rule_type->rule_type_rule->type_alt_lhs->type_node_arguments;
 			tail_strict=type_node_arguments_p->type_arg_next->type_arg_node->type_node_symbol->symb_tail_strictness;
@@ -1215,6 +1219,8 @@ void GenerateCodeForLazyUnboxedRecordListFunctions (void)
 			unboxed_record_cons_lab.lab_pref=tail_strict ? "r_Cons#!" : "r_Cons#";
 			unboxed_record_cons_lab.lab_post='\0';
 			
+			GenUnboxedRecordApplyAndNodeEntries (fun_def,1,&a_size,&b_size);
+
 			GenFillR (&unboxed_record_cons_lab,a_size,b_size,a_size,0,0,ReleaseAndFill,True);
 
 			GenRtn (1,0,OnAState);
