@@ -1349,31 +1349,19 @@ static int generate_unboxed_record_instance_entry (struct symbol_def *rule_sdef,
 	if (dictionary_sdef_mark & SDEF_FIELD_HAS_MEMBER_TYPE){
 		struct state *member_state_p;
 		int asize,bsize,function_updates_node;
-		LabDef current_alt_label;
-
 		function_updates_node = generate_instance_entry_arguments (dictionary_field,rule_sdef->sdef_arity,function_state_p,i_label_p,&asize,&bsize);
 
 		member_state_p=dictionary_field->sdef_member_states_of_field;
 		
 		++member_state_p;
 
-		GenDStackLayoutOfStates (asize+function_updates_node,bsize,rule_sdef->sdef_arity,function_state_p);
-
-		current_alt_label = CurrentAltLabel;
-		current_alt_label.lab_pref = s_pref;
-		current_alt_label.lab_post = 0;
-		if (rule_sdef->sdef_exported)
-			current_alt_label.lab_mod = NULL;
-
 		if (function_updates_node || EqualState (function_state_p[-1],member_state_p[-2]))
-			GenJmp (&current_alt_label);
+			CallArrayFunction (rule_sdef,False,&rule_sdef->sdef_rule_type->rule_type_state_p[-1]);
 		else {
 			int result_asize,result_bsize;
-			
-			GenJsr (&current_alt_label);
 
+			CallArrayFunction (rule_sdef,True,&rule_sdef->sdef_rule_type->rule_type_state_p[-1]);
 			DetermineSizeOfState (function_state_p[-1],&result_asize,&result_bsize);
-			GenOStackLayoutOfState (result_asize,result_bsize,function_state_p[-1]);
 			RedirectResultAndReturn (result_asize,result_bsize,result_asize,result_bsize,function_state_p[-1],member_state_p[-2],result_asize,result_bsize);
 		}
 
