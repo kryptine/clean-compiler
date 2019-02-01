@@ -686,6 +686,7 @@ static void put_instruction_code (int instruction_code)
 }
 
 #define Da "a"
+#define Dai "ai"
 #define Dkeep "keep"
 #define Dd "d"
 #define Do "o"
@@ -2673,14 +2674,24 @@ void GenNodeEntryDirective (int arity,Label label,Label label2)
 	}
 }
 
-#ifdef NEW_APPLY
 void GenApplyEntryDirective (int arity,Label label)
 {
 	put_directive_b (a);
 	put_arguments_n__b (arity);
 	GenLabel (label);
 }
-#endif
+
+void GenApplyInstanceEntryDirective (int arity,Label label,Label label2)
+{
+	put_directive_b (ai);
+	put_arguments_n__b (arity);
+	if (label==NULL)
+		FPutS (empty_lab.lab_name, OutFile);
+	else
+		GenLabel (label);
+	FPutC (' ', OutFile);
+	GenLabel (label2);
+}
 
 void GenLazyRecordNodeEntryDirective (int arity,Label label,Label label2)
 {
