@@ -717,8 +717,17 @@ static void CodeRule (ImpRuleP rule)
 		}
 	}
 
-	if (rule_sdef->sdef_mark & SDEF_USED_CURRIED_MASK)
-		ApplyEntry (rule->rule_state_p,rule_sdef->sdef_arity,&ea_lab,!(rule_sdef->sdef_mark & SDEF_USED_LAZILY_MASK));
+	if (rule_sdef->sdef_mark & SDEF_USED_CURRIED_MASK){
+		struct label i_label;
+		
+		if (rule_sdef->sdef_mark & (SDEF_INSTANCE_RULE_WITH_FIELD_P | SDEF_RULE_INSTANCE_RULE_P) &&
+			generate_instance_entry (rule_sdef,rule->rule_state_p,&i_label))
+		{
+			function_called_only_curried_or_lazy_with_one_return=0;
+			ApplyInstanceEntry (rule->rule_state_p,rule_sdef->sdef_arity,&ea_lab,&i_label,!(rule_sdef->sdef_mark & SDEF_USED_LAZILY_MASK));
+		} else
+			ApplyEntry (rule->rule_state_p,rule_sdef->sdef_arity,&ea_lab,!(rule_sdef->sdef_mark & SDEF_USED_LAZILY_MASK));
+	}
 
 	if (rule_sdef->sdef_mark & SDEF_USED_LAZILY_MASK)
 		if (rule->rule_mark & RULE_UNBOXED_LAZY_CALL){

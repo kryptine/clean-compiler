@@ -96,6 +96,9 @@ extern void GenerateStatesForRecords (Symbol symbs);
 
 extern Bool NodeEntry (StateS *const function_state_p,int arity,Label ealab,SymbDef rootsymb);
 extern Bool NodeEntryUnboxed (StateS *const function_state_p,NodeP call_node_p,int args_a_size,int args_b_size,Label ealab,SymbDef rootsymb);
+
+extern int generate_instance_entry (struct symbol_def *rule_sdef,struct state *function_state_p,struct label *i_label_p);
+extern void ApplyInstanceEntry (StateS *const function_state_p,int arity,Label ea_lab,struct label *i_label_p,int ea_label_follows);
 extern void ApplyEntry (StateS *const function_state_p,int arity,Label ealab,int ea_label_follows);
 
 extern Bool ConvertExternalToInternalCall (int arity,StateS *const ext_function_state_p,StateS *const int_function_state_p,

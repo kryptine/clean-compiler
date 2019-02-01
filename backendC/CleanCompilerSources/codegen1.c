@@ -1153,12 +1153,243 @@ static void GenLazyFieldSelectorEntry (SymbDef field_def,StateS recstate,int tot
 	 }
 }
 
-static void GenUnboxedRecordApplyAndNodeEntries (SymbDef fun_def,int n_result_nodes_on_a_stack,int *a_size_p,int *b_size_p)
+static void coerce_args_from_class_to_instance_member
+	(int create_new_node,int n_dictionary_args,int n_args,StateP ext_arg_state_p,StateP int_arg_state_p,int aindex,int bindex,int *asp_p,int *bsp_p,int *a_ind_p,int *b_ind_p)
 {
-	LabDef ealab;
-	int asize,bsize,maxasize;
+	if (create_new_node){
+		PutInAFrames (aindex,a_ind_p);
+		coerce_args_from_class_to_instance_member (0,n_dictionary_args,n_args,ext_arg_state_p,int_arg_state_p,aindex-1,bindex,asp_p,bsp_p,a_ind_p,b_ind_p);
+	} else if (n_dictionary_args>0){
+		coerce_args_from_class_to_instance_member (0,n_dictionary_args-1,n_args,ext_arg_state_p,int_arg_state_p+1,aindex-1,bindex,asp_p,bsp_p,a_ind_p,b_ind_p);
+		CoerceArgumentUsingStackFrames (*int_arg_state_p,OnAState,aindex,bindex,asp_p,bsp_p,a_ind_p,b_ind_p,1,0);	
+	} else if (n_args>0){
+		int asize, bsize;
+	
+		DetermineSizeOfState (*ext_arg_state_p,&asize,&bsize);		
+		coerce_args_from_class_to_instance_member (0,n_dictionary_args,n_args-1,ext_arg_state_p+1,int_arg_state_p+1,aindex-asize,bindex-bsize,asp_p,bsp_p,a_ind_p,b_ind_p);
+		CoerceArgumentUsingStackFrames (*int_arg_state_p,*ext_arg_state_p,aindex,bindex,asp_p,bsp_p,a_ind_p,b_ind_p,asize,bsize);
+	}
+}
+
+static int generate_instance_entry_arguments
+	(struct symbol_def *dictionary_field,int function_arity,struct state *function_state_p,struct label *i_label_p,int *asize_p,int *bsize_p)
+{
+	struct type_alt *field_type_alt;
+	struct state *member_state_p;
+	int member_arity,n_dictionary_args;
+	int arg_n,asp,bsp,asize,bsize,oldamax,oldbmax,a_ind,b_ind,maxasize;
+	int member_called_with_root_node,function_updates_node,create_new_node;
+	
+	field_type_alt=dictionary_field->sdef_member_type_of_field; 
+	member_arity=field_type_alt->type_alt_lhs->type_node_arity-1;
+	member_state_p=dictionary_field->sdef_member_states_of_field;
+	FPrintF (OutFile, "\n||\tmember type %s %d %d",
+			 dictionary_field->sdef_ident->ident_name,member_arity,function_arity);
+	
+	n_dictionary_args = function_arity-member_arity;
+
+	++member_state_p;
+
+	DetermineSizeOfStates (member_arity,member_state_p,&asp,&bsp);
+
+	asize=0;
+	bsize=0;
+	maxasize=0;
+	for (arg_n=0; arg_n<function_arity; ++arg_n)
+		AddStateSizeAndMaxFrameSize (function_state_p[arg_n],&maxasize,&asize,&bsize);
+
+	member_called_with_root_node = member_state_p[-2].state_type==SimpleState
+									&& !(member_state_p[-2].state_kind==StrictRedirection || member_state_p[-2].state_kind==OnB);
+	function_updates_node = function_state_p[-1].state_type==SimpleState
+							&& !(function_state_p[-1].state_kind==StrictRedirection || function_state_p[-1].state_kind==OnB);
+
+	*i_label_p = CurrentAltLabel;
+	i_label_p->lab_pref = "i";
+	i_label_p->lab_post = 0;
+	GenOStackLayoutOfStates (asp+1+member_called_with_root_node,bsp,member_arity,member_state_p);
+	GenLabelDefinition (i_label_p);
+
+	if (n_dictionary_args==0)
+		GenPopA (1);
+	else
+		GenReplArgs (n_dictionary_args,n_dictionary_args);
+
+	create_new_node = function_updates_node && !member_called_with_root_node;
+	if (create_new_node)
+		GenCreate (-1);
+
+	asp+=create_new_node+n_dictionary_args;
+	InitStackConversions (asp+maxasize+1, bsp+bsize+1, &oldamax, &oldbmax);
+	a_ind=0;
+	b_ind=0;
+	coerce_args_from_class_to_instance_member (create_new_node,n_dictionary_args,member_arity,member_state_p,function_state_p,asp,bsp,&asp,&bsp,&a_ind,&b_ind);
+	GenAStackConversions (asp,a_ind);
+	GenBStackConversions (bsp,b_ind);
+	ExitStackConversions (oldamax, oldbmax);
+	
+	*asize_p=asize;
+	*bsize_p=bsize;
+	return function_updates_node;
+}
+
+static int generate_unboxed_record_cons_instance_entry
+	(struct symbol_def *rule_sdef,struct label *unboxed_record_cons_lab_p,struct state *function_state_p,int a_size,int b_size,struct label *i_label_p)
+{
+	struct symbol_def *dictionary_field;
+	int dictionary_sdef_mark;
+	
+	if (rule_sdef->sdef_mark & SDEF_RULE_INSTANCE_RULE_P){
+		FPrintF (OutFile, "\n||\tinstance fused");
+		if (rule_sdef->sdef_instance_rule->sdef_mark & SDEF_INSTANCE_RULE_WITH_FIELD_P){
+			dictionary_field=rule_sdef->sdef_instance_rule->sdef_dictionary_field;
+			dictionary_sdef_mark=dictionary_field->sdef_mark;
+		} else {
+			dictionary_sdef_mark=0;
+		}
+	} else {
+		/* SDEF_INSTANCE_RULE_WITH_FIELD_P */
+		FPrintF (OutFile, "\n||\tinstance");
+		dictionary_field=rule_sdef->sdef_dictionary_field;
+		dictionary_sdef_mark=dictionary_field->sdef_mark;
+	}
+	
+	if (dictionary_sdef_mark & SDEF_FIELD_HAS_MEMBER_TYPE){
+		struct state *member_state_p;
+		int asize,bsize,function_updates_node;
+
+		function_updates_node = generate_instance_entry_arguments (dictionary_field,rule_sdef->sdef_arity,function_state_p,i_label_p,&asize,&bsize);
+
+		member_state_p=dictionary_field->sdef_member_states_of_field;
+		
+		++member_state_p;
+
+		GenFillR (unboxed_record_cons_lab_p,a_size,b_size,a_size,0,0,ReleaseAndFill,True);
+
+		if (function_updates_node || EqualState (function_state_p[-1],member_state_p[-2])){
+			GenRtn (1,0,OnAState);
+		} else {
+			int result_asize,result_bsize;
+			
+			DetermineSizeOfState (function_state_p[-1],&result_asize,&result_bsize);
+			RedirectResultAndReturn (result_asize,result_bsize,result_asize,result_bsize,function_state_p[-1],member_state_p[-2],result_asize,result_bsize);
+		}
+
+		return 1;
+	}
+	return 0;
+}
+
+static int generate_unboxed_record_decons_instance_entry (struct symbol_def *rule_sdef,struct state *function_state_p,struct label *i_label_p)
+{
+	struct symbol_def *dictionary_field;
+	int dictionary_sdef_mark;
+	
+	if (rule_sdef->sdef_mark & SDEF_RULE_INSTANCE_RULE_P){
+		FPrintF (OutFile, "\n||\tinstance fused");
+		if (rule_sdef->sdef_instance_rule->sdef_mark & SDEF_INSTANCE_RULE_WITH_FIELD_P){
+			dictionary_field=rule_sdef->sdef_instance_rule->sdef_dictionary_field;
+			dictionary_sdef_mark=dictionary_field->sdef_mark;
+		} else {
+			dictionary_sdef_mark=0;
+		}
+	} else {
+		/* SDEF_INSTANCE_RULE_WITH_FIELD_P */
+		FPrintF (OutFile, "\n||\tinstance");
+		dictionary_field=rule_sdef->sdef_dictionary_field;
+		dictionary_sdef_mark=dictionary_field->sdef_mark;
+	}
+	
+	if (dictionary_sdef_mark & SDEF_FIELD_HAS_MEMBER_TYPE){
+		struct state *member_state_p;
+		int asize,bsize,function_updates_node,result_asize,result_bsize;
+
+		function_updates_node = generate_instance_entry_arguments (dictionary_field,rule_sdef->sdef_arity,function_state_p,i_label_p,&asize,&bsize);
+
+		member_state_p=dictionary_field->sdef_member_states_of_field;
+		
+		++member_state_p;
+
+		DetermineSizeOfState (function_state_p[-1],&result_asize,&result_bsize);
+
+		if (result_bsize==0)
+			GenReplArgs (result_asize,result_asize);
+		else
+			GenReplRArgs (result_asize,result_bsize);
+
+		if (function_updates_node || EqualState (function_state_p[-1],member_state_p[-2]))
+			GenRtn (result_asize,result_bsize,function_state_p[-1]);
+		else 
+			RedirectResultAndReturn (result_asize,result_bsize,result_asize,result_bsize,function_state_p[-1],member_state_p[-2],result_asize,result_bsize);
+
+		return 1;
+	}
+	return 0;
+}
+
+static int generate_unboxed_record_instance_entry (struct symbol_def *rule_sdef,struct state *function_state_p,struct label *i_label_p)
+{
+	struct symbol_def *dictionary_field;
+	int dictionary_sdef_mark;
+	
+	if (rule_sdef->sdef_mark & SDEF_RULE_INSTANCE_RULE_P){
+		FPrintF (OutFile, "\n||\tinstance fused");
+		if (rule_sdef->sdef_instance_rule->sdef_mark & SDEF_INSTANCE_RULE_WITH_FIELD_P){
+			dictionary_field=rule_sdef->sdef_instance_rule->sdef_dictionary_field;
+			dictionary_sdef_mark=dictionary_field->sdef_mark;
+		} else {
+			dictionary_sdef_mark=0;
+		}
+	} else {
+		/* SDEF_INSTANCE_RULE_WITH_FIELD_P */
+		FPrintF (OutFile, "\n||\tinstance");
+		dictionary_field=rule_sdef->sdef_dictionary_field;
+		dictionary_sdef_mark=dictionary_field->sdef_mark;
+	}
+	
+	if (dictionary_sdef_mark & SDEF_FIELD_HAS_MEMBER_TYPE){
+		struct state *member_state_p;
+		int asize,bsize,function_updates_node;
+		LabDef current_alt_label;
+
+		function_updates_node = generate_instance_entry_arguments (dictionary_field,rule_sdef->sdef_arity,function_state_p,i_label_p,&asize,&bsize);
+
+		member_state_p=dictionary_field->sdef_member_states_of_field;
+		
+		++member_state_p;
+
+		GenDStackLayoutOfStates (asize+function_updates_node,bsize,rule_sdef->sdef_arity,function_state_p);
+
+		current_alt_label = CurrentAltLabel;
+		current_alt_label.lab_pref = s_pref;
+		current_alt_label.lab_post = 0;
+		if (rule_sdef->sdef_exported)
+			current_alt_label.lab_mod = NULL;
+
+		if (function_updates_node || EqualState (function_state_p[-1],member_state_p[-2]))
+			GenJmp (&current_alt_label);
+		else {
+			int result_asize,result_bsize;
+			
+			GenJsr (&current_alt_label);
+
+			DetermineSizeOfState (function_state_p[-1],&result_asize,&result_bsize);
+			GenOStackLayoutOfState (result_asize,result_bsize,function_state_p[-1]);
+			RedirectResultAndReturn (result_asize,result_bsize,result_asize,result_bsize,function_state_p[-1],member_state_p[-2],result_asize,result_bsize);
+		}
+
+		return 1;
+	}
+	return 0;
+}
+
+static void GenUnboxedRecordConsApplyAndNodeEntries
+	(SymbDef fun_def,struct label *unboxed_record_cons_lab_p,int *a_size_p,int *b_size_p)
+{
+	int asize,bsize,maxasize,arity,n_result_nodes_on_a_stack;
 	struct state *rule_type_state_p;
-	int arity;
+	LabDef ealab;
+
+	n_result_nodes_on_a_stack=1;
 
 	rule_type_state_p = fun_def->sdef_rule_type->rule_type_state_p;
 	arity = fun_def->sdef_arity;
@@ -1176,8 +1407,105 @@ static void GenUnboxedRecordApplyAndNodeEntries (SymbDef fun_def,int n_result_no
 	if (DoTimeProfiling)
 		GenPB (fun_def->sdef_ident->ident_name);
 
-	if (fun_def->sdef_mark & SDEF_USED_CURRIED_MASK)
-		ApplyEntry (rule_type_state_p,arity,&ealab,!(fun_def->sdef_mark & SDEF_USED_LAZILY_MASK));
+	if (fun_def->sdef_mark & SDEF_USED_CURRIED_MASK){
+		struct label i_label;
+
+		if (fun_def->sdef_mark & (SDEF_INSTANCE_RULE_WITH_FIELD_P | SDEF_RULE_INSTANCE_RULE_P) &&
+			generate_unboxed_record_cons_instance_entry (fun_def,unboxed_record_cons_lab_p,rule_type_state_p,asize,bsize,&i_label))
+		{
+			ApplyInstanceEntry (rule_type_state_p,arity,&ealab,&i_label,!(fun_def->sdef_mark & SDEF_USED_LAZILY_MASK));
+		} else
+			ApplyEntry (rule_type_state_p,arity,&ealab,!(fun_def->sdef_mark & SDEF_USED_LAZILY_MASK));
+	}
+
+	if (fun_def->sdef_mark & SDEF_USED_LAZILY_MASK)
+		NodeEntry (rule_type_state_p,arity,&ealab,fun_def);
+
+	EvalArgsEntry (rule_type_state_p,fun_def,maxasize,&ealab,n_result_nodes_on_a_stack);
+	
+	*a_size_p=asize;
+	*b_size_p=bsize;
+}
+
+static void GenUnboxedRecordDeconsApplyAndNodeEntries (SymbDef fun_def,int *a_size_p,int *b_size_p)
+{
+	LabDef ealab;
+	int asize,bsize,maxasize,arity,n_result_nodes_on_a_stack;
+	struct state *rule_type_state_p;
+	
+	n_result_nodes_on_a_stack=0;
+
+	rule_type_state_p = fun_def->sdef_rule_type->rule_type_state_p;
+	arity = fun_def->sdef_arity;
+
+	MakeSymbolLabel (&CurrentAltLabel,NULL,no_pref,fun_def,0);
+
+	ealab			= CurrentAltLabel;
+	ealab.lab_pref	= ea_pref;
+	
+	DetermineStateSizesAndMaxFrameSizes (arity,rule_type_state_p,&maxasize,&asize,&bsize);
+
+	if ((fun_def->sdef_mark & SDEF_USED_CURRIED_MASK) || DoDescriptors || DoParallel)
+		GenArrayFunctionDescriptor (fun_def,&CurrentAltLabel,arity);
+
+	if (DoTimeProfiling)
+		GenPB (fun_def->sdef_ident->ident_name);
+
+	if (fun_def->sdef_mark & SDEF_USED_CURRIED_MASK){
+		struct label i_label;
+
+		if (fun_def->sdef_mark & (SDEF_INSTANCE_RULE_WITH_FIELD_P | SDEF_RULE_INSTANCE_RULE_P) &&
+			generate_unboxed_record_decons_instance_entry (fun_def,rule_type_state_p,&i_label))
+		{
+			ApplyInstanceEntry (rule_type_state_p,arity,&ealab,&i_label,!(fun_def->sdef_mark & SDEF_USED_LAZILY_MASK));
+		} else
+			ApplyEntry (rule_type_state_p,arity,&ealab,!(fun_def->sdef_mark & SDEF_USED_LAZILY_MASK));
+	}
+
+	if (fun_def->sdef_mark & SDEF_USED_LAZILY_MASK)
+		NodeEntry (rule_type_state_p,arity,&ealab,fun_def);
+
+	EvalArgsEntry (rule_type_state_p,fun_def,maxasize,&ealab,n_result_nodes_on_a_stack);
+	
+	*a_size_p=asize;
+	*b_size_p=bsize;
+}
+
+static void GenUnboxedRecordApplyAndNodeEntries (SymbDef fun_def,int *a_size_p,int *b_size_p)
+{
+	LabDef ealab;
+	int asize,bsize,maxasize,n_result_nodes_on_a_stack;
+	struct state *rule_type_state_p;
+	int arity;
+
+	n_result_nodes_on_a_stack=0;
+
+	rule_type_state_p = fun_def->sdef_rule_type->rule_type_state_p;
+	arity = fun_def->sdef_arity;
+
+	MakeSymbolLabel (&CurrentAltLabel,NULL,no_pref,fun_def,0);
+
+	ealab			= CurrentAltLabel;
+	ealab.lab_pref	= ea_pref;
+	
+	DetermineStateSizesAndMaxFrameSizes (arity,rule_type_state_p,&maxasize,&asize,&bsize);
+
+	if ((fun_def->sdef_mark & SDEF_USED_CURRIED_MASK) || DoDescriptors || DoParallel)
+		GenArrayFunctionDescriptor (fun_def,&CurrentAltLabel,arity);
+
+	if (DoTimeProfiling)
+		GenPB (fun_def->sdef_ident->ident_name);
+
+	if (fun_def->sdef_mark & SDEF_USED_CURRIED_MASK){
+		struct label i_label;
+
+		if (fun_def->sdef_mark & (SDEF_INSTANCE_RULE_WITH_FIELD_P | SDEF_RULE_INSTANCE_RULE_P) &&
+			generate_unboxed_record_instance_entry (fun_def,rule_type_state_p,&i_label))
+		{
+			ApplyInstanceEntry (rule_type_state_p,arity,&ealab,&i_label,!(fun_def->sdef_mark & SDEF_USED_LAZILY_MASK));
+		} else
+			ApplyEntry (rule_type_state_p,arity,&ealab,!(fun_def->sdef_mark & SDEF_USED_LAZILY_MASK));
+	}
 
 	if (fun_def->sdef_mark & SDEF_USED_LAZILY_MASK)
 		NodeEntry (rule_type_state_p,arity,&ealab,fun_def);
@@ -1219,7 +1547,7 @@ void GenerateCodeForLazyUnboxedRecordListFunctions (void)
 			unboxed_record_cons_lab.lab_pref=tail_strict ? "r_Cons#!" : "r_Cons#";
 			unboxed_record_cons_lab.lab_post='\0';
 			
-			GenUnboxedRecordApplyAndNodeEntries (fun_def,1,&a_size,&b_size);
+			GenUnboxedRecordConsApplyAndNodeEntries (fun_def,&unboxed_record_cons_lab,&a_size,&b_size);
 
 			GenFillR (&unboxed_record_cons_lab,a_size,b_size,a_size,0,0,ReleaseAndFill,True);
 
@@ -1238,7 +1566,7 @@ void GenerateCodeForLazyUnboxedRecordListFunctions (void)
 			int a_size,b_size;
 			StateP result_state_p;
 
-			GenUnboxedRecordApplyAndNodeEntries (fun_def,0,&a_size,&b_size);
+			GenUnboxedRecordDeconsApplyAndNodeEntries (fun_def,&a_size,&b_size);
 			
 			result_state_p=&fun_def->sdef_rule_type->rule_type_state_p[-1];
 
@@ -1272,7 +1600,7 @@ void GenerateCodeForLazyArrayFunctionEntries (void)
 		if (arr_fun_def ->sdef_mark & (SDEF_USED_LAZILY_MASK | SDEF_USED_CURRIED_MASK)){
 			int a_size,b_size;
 			
-			GenUnboxedRecordApplyAndNodeEntries (arr_fun_def,0,&a_size,&b_size);
+			GenUnboxedRecordApplyAndNodeEntries (arr_fun_def,&a_size,&b_size);
 
 			CallArrayFunction (arr_fun_def,False,&arr_fun_def->sdef_rule_type->rule_type_state_p[-1]);
 
@@ -1706,6 +2034,64 @@ Bool NodeEntryUnboxed (StateS *const function_state_p,NodeP call_node_p,int args
 	return False;
 }
 
+int generate_instance_entry (struct symbol_def *rule_sdef,struct state *function_state_p,struct label *i_label_p)
+{
+	struct symbol_def *dictionary_field;
+	int dictionary_sdef_mark;
+	
+	if (rule_sdef->sdef_mark & SDEF_RULE_INSTANCE_RULE_P){
+		FPrintF (OutFile, "\n||\tinstance fused");
+		if (rule_sdef->sdef_instance_rule->sdef_mark & SDEF_INSTANCE_RULE_WITH_FIELD_P){
+			dictionary_field=rule_sdef->sdef_instance_rule->sdef_dictionary_field;
+			dictionary_sdef_mark=dictionary_field->sdef_mark;
+		} else {
+			dictionary_sdef_mark=0;
+		}
+	} else {
+		/* SDEF_INSTANCE_RULE_WITH_FIELD_P */
+		FPrintF (OutFile, "\n||\tinstance");
+		dictionary_field=rule_sdef->sdef_dictionary_field;
+		dictionary_sdef_mark=dictionary_field->sdef_mark;
+	}
+	
+	if (dictionary_sdef_mark & SDEF_FIELD_HAS_MEMBER_TYPE){
+		struct state *member_state_p;
+		int asize,bsize,function_updates_node;
+		LabDef current_alt_label;
+
+		function_updates_node = generate_instance_entry_arguments (dictionary_field,rule_sdef->sdef_arity,function_state_p,i_label_p,&asize,&bsize);
+
+		member_state_p=dictionary_field->sdef_member_states_of_field;
+		
+		++member_state_p;
+
+		GenDStackLayoutOfStates (asize+function_updates_node,bsize,rule_sdef->sdef_arity,function_state_p);
+
+		current_alt_label = CurrentAltLabel;
+		current_alt_label.lab_pref = s_pref;
+		current_alt_label.lab_post = 0;
+		if (rule_sdef->sdef_exported)
+			current_alt_label.lab_mod = NULL;
+
+		if (function_updates_node || EqualState (function_state_p[-1],member_state_p[-2]))
+			GenJmp (&current_alt_label);
+		else {
+			int result_asize,result_bsize;
+			
+			GenJsr (&current_alt_label);
+
+			DetermineSizeOfState (function_state_p[-1],&result_asize,&result_bsize);
+			GenOStackLayoutOfState (result_asize,result_bsize,function_state_p[-1]);
+			RedirectResultAndReturn (result_asize,result_bsize,result_asize,result_bsize,function_state_p[-1],member_state_p[-2],result_asize,result_bsize);
+		}
+
+		return 1;
+	}
+	return 0;
+}
+
+static void ApplyEntry2 (StateS *const function_state_p,int arity,Label ea_lab,int ea_label_follows);
+
 void ApplyEntry (StateS *const function_state_p,int arity,Label ea_lab,int ea_label_follows)
 {
 	CurrentAltLabel.lab_pref = l_pref;
@@ -1724,7 +2110,6 @@ void ApplyEntry (StateS *const function_state_p,int arity,Label ea_lab,int ea_la
 			GenPL();
 	}
 
-#ifdef NEW_APPLY
 	if (arity>=2){
 		if (IsSimpleState (function_state_p[-1])){
 			if (function_state_p[-1].state_kind==OnB){
@@ -1746,8 +2131,49 @@ void ApplyEntry (StateS *const function_state_p,int arity,Label ea_lab,int ea_la
 			GenApplyEntryDirective (0,&a_lab);		
 		}
 	}
-#endif
 
+	ApplyEntry2 (function_state_p,arity,ea_lab,ea_label_follows);
+}
+
+void ApplyInstanceEntry (StateS *const function_state_p,int arity,Label ea_lab,struct label *i_label_p,int ea_label_follows)
+{
+	CurrentAltLabel.lab_pref = l_pref;
+
+	if (arity==0){
+		GenOAStackLayout (1);
+		GenLabelDefinition (&CurrentAltLabel);
+		GenHalt();
+		return;
+	}
+
+	if (DoTimeProfiling){
+		if ((!IsSimpleState (function_state_p[-1]) || function_state_p[-1].state_kind==OnB) && !function_called_only_curried_or_lazy_with_one_return)
+			GenPLD();
+		else
+			GenPL();
+	}
+
+	if (arity>=2){
+		if (!IsSimpleState (function_state_p[-1]) || function_state_p[-1].state_kind==OnB){
+			LabDef a_lab;	
+			
+			a_lab=*ea_lab;
+			a_lab.lab_pref="a";
+			GenApplyInstanceEntryDirective (0,&a_lab,i_label_p);
+		} else if (function_state_p[-1].state_kind==StrictRedirection || function_state_p[-1].state_kind==LazyRedirection){
+			GenApplyInstanceEntryDirective (0,ea_lab,i_label_p);
+		} else {
+			GenApplyInstanceEntryDirective (arity,ea_lab,i_label_p);
+		}
+	} else {
+		GenApplyInstanceEntryDirective (arity,NULL,i_label_p);	
+	}
+
+	ApplyEntry2 (function_state_p,arity,ea_lab,ea_label_follows);
+}
+
+static void ApplyEntry2 (StateS *const function_state_p,int arity,Label ea_lab,int ea_label_follows)
+{
 	GenOAStackLayout (2);
 	GenLabelDefinition (&CurrentAltLabel);
 	
@@ -2471,7 +2897,7 @@ SymbDef create_match_function (SymbolP constructor_symbol,int result_arity,int n
 	constructor_node_node_id->nid_node=NULL;
 
 	if (strict_constructor || n_dictionaries!=0){
-		struct arg **rhs_arg_p,*lhs_arg;
+		struct arg **rhs_arg_p;
 		StateP constructor_arg_state_p;
 #if STRICT_LISTS
 		StateS head_and_tail_states[2];
@@ -2522,7 +2948,6 @@ SymbDef create_match_function (SymbolP constructor_symbol,int result_arity,int n
 
 		if (strict_constructor){
 			for (n=0; n<n_dictionaries; ++n){
-				struct arg *lhs_arg,*rhs_arg;
 				struct node_id *arg_node_id;
 
 				arg_node_id=NewNodeId (NULL);
@@ -2537,7 +2962,7 @@ SymbDef create_match_function (SymbolP constructor_symbol,int result_arity,int n
 			}
 
 			for (n=0; n<result_arity; ++n){
-				struct arg *lhs_arg,*rhs_arg;
+				struct arg *rhs_arg;
 				struct node_id *arg_node_id;
 
 				arg_node_id=NewNodeId (NULL);
@@ -2558,7 +2983,6 @@ SymbDef create_match_function (SymbolP constructor_symbol,int result_arity,int n
 			}
 		} else {
 			for (n=0; n<n_dictionaries; ++n){
-				struct arg *lhs_arg,*rhs_arg;
 				struct node_id *arg_node_id;
 
 				arg_node_id=NewNodeId (NULL);
@@ -2571,7 +2995,7 @@ SymbDef create_match_function (SymbolP constructor_symbol,int result_arity,int n
 			}
 
 			for (n=0; n<result_arity; ++n){
-				struct arg *lhs_arg,*rhs_arg;
+				struct arg *rhs_arg;
 				struct node_id *arg_node_id;
 
 				arg_node_id=NewNodeId (NULL);
@@ -2652,7 +3076,7 @@ SymbDef create_select_and_match_function (SymbolP constructor_symbol,int n_dicti
 {
 	SymbDef match_function_sdef;
 	Symbol match_function_symbol;
-	ArgP lhs_function_arg,lhs_arg;
+	ArgP lhs_function_arg;
 	NodeP lhs_root,rhs_root,constructor_node;
 	NodeIdP node_id;
 	ImpRuleS *match_imp_rule;
@@ -2699,7 +3123,6 @@ SymbDef create_select_and_match_function (SymbolP constructor_symbol,int n_dicti
 		last_node_id_p=&push_node->node_node_ids;
 
 		for (n=0; n<n_dictionaries; ++n){
-			struct arg *lhs_arg,*rhs_arg;
 			struct node_id *arg_node_id;
 
 			arg_node_id=NewNodeId (NULL);
@@ -4137,7 +4560,6 @@ int unused_node_id_ (NodeId node_id)
 static void repl_overloaded_cons_arguments (NodeP node_p,int *asp_p,int *bsp_p,SavedNidStateS **save_states_p,AbNodeIdsP ab_node_ids_p)
 {
 	CodeGenNodeIdsS code_gen_node_ids;
-	LabDef apply_label;
 	
 	code_gen_node_ids.saved_nid_state_l=save_states_p;
 	code_gen_node_ids.free_node_ids=ab_node_ids_p->free_node_ids;
