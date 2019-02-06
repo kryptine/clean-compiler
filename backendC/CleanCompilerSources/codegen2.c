@@ -1121,7 +1121,7 @@ void DetermineFieldSizeAndPositionAndRecordSize
 	*rec_bsize_p = *bsize_p + *bpos_p;
 
 	for (i=fieldnr+1; i<record_state_p->state_arity; ++i)
-		AddSizeOfState (record_state_p->state_record_arguments[i],rec_asize_p,rec_bsize_p);	
+		AddSizeOfState (record_state_p->state_record_arguments[i],rec_asize_p,rec_bsize_p);
 }
 
 int get_a_index_of_unpacked_lhs_node (ArgS *arg)
@@ -2654,7 +2654,7 @@ static void FillSymbol (Node node,SymbDef sdef,int *asp_p,int *bsp_p,NodeId upda
 
 						CallFunction (&name,sdef,True,node);
 											
-						AddSizeOfState (node->node_state,asp_p,bsp_p);						
+						AddSizeOfState (node->node_state,asp_p,bsp_p);
 						
 						GenPopA (1);
 						*asp_p-=1;
@@ -2679,7 +2679,7 @@ static void FillSymbol (Node node,SymbDef sdef,int *asp_p,int *bsp_p,NodeId upda
 
 						CallFunction (&name,sdef,True,node);
 
-						AddSizeOfState (node->node_state,asp_p,bsp_p);						
+						AddSizeOfState (node->node_state,asp_p,bsp_p);
 					}
 				}
 				return;
@@ -2860,9 +2860,16 @@ static void generate_code_for_apply_in_strict_context (NodeP node,int *asp_p,int
 	int a_size,b_size,n_apply_args;
 	ArgP node_args;
 
-	node_args=node->node_arguments;
 	a_size=0;
+
+	if (OptimizeInstanceCalls && node->node_symbol->symb_instance_apply==1 && ExpectsResultNode (node->node_state)){
+		NewEmptyNode (asp_p,-1);
+		a_size=1;
+	}
+
+	node_args=node->node_arguments;
 	b_size=0;
+
 	n_apply_args=build_apply_arguments (node_args,&a_size,&b_size,asp_p,bsp_p,code_gen_node_ids_p);
 	
 	*asp_p-=a_size;
@@ -2871,9 +2878,61 @@ static void generate_code_for_apply_in_strict_context (NodeP node,int *asp_p,int
 					&code_gen_node_ids_p->free_node_ids,code_gen_node_ids_p->moved_node_ids_l,
 					code_gen_node_ids_p->doesnt_fail);
 
+	if (node->node_symbol->symb_instance_apply==1){
+		struct arg *arg_p;
+		struct symbol_def *field_sdef;
+
+		field_sdef = (struct symbol_def *)node->node_symbol->symb_next;
+
+		arg_p=node_args;
+		while (arg_p!=NULL && arg_p->arg_node->node_kind==NormalNode && arg_p->arg_node->node_symbol->symb_kind==apply_symb)
+			arg_p=arg_p->arg_node->node_arguments;
+		if (arg_p!=NULL && arg_p->arg_node->node_kind==SelectorNode && arg_p->arg_node->node_arity==1){
+			struct node *selector_node_p;
+			
+			selector_node_p=arg_p->arg_node;
+			if ((selector_node_p->node_symbol->symb_def->sdef_mark & SDEF_FIELD_HAS_MEMBER_TYPE)!=0){
+				struct type_alt *member_type_alt;
+				
+				field_sdef=selector_node_p->node_symbol->symb_def;
+				member_type_alt=field_sdef->sdef_member_type_of_field;
+				if (DoDebug)
+					if (member_type_alt->type_alt_lhs->type_node_arity==n_apply_args+1){
+						FPrintF (OutFile, "\n||\t%s",selector_node_p->node_symbol->symb_def->sdef_ident->ident_name);
+					} else
+						FPrintF (OutFile, "\n||\t(no dictionary) %s",field_sdef->sdef_ident->ident_name);
+			} else if (DoDebug)
+				FPrintF (OutFile, "\n||\t(no dictionary) %s",field_sdef->sdef_ident->ident_name);
+		} else if (DoDebug)
+			FPrintF (OutFile, "\n||\t(no dictionary) %s",field_sdef->sdef_ident->ident_name);
+
+		if (field_sdef!=NULL && OptimizeInstanceCalls){
+			struct state *member_states_of_field;
+			int member_arity,member_called_with_root_node,a_size,b_size;
+
+			member_states_of_field=field_sdef->sdef_member_states_of_field;
+			member_arity=field_sdef->sdef_member_type_of_field->type_alt_lhs->type_node_arity;
+
+			member_called_with_root_node = member_states_of_field[-1].state_type==SimpleState
+											&& !(member_states_of_field[-1].state_kind==StrictRedirection || member_states_of_field[-1].state_kind==OnB);
+
+			DetermineSizeOfStates (member_arity-1,&member_states_of_field[1],&a_size,&b_size);
+			GenDStackLayoutOfStates (a_size+1+member_called_with_root_node,b_size,member_arity-1,&member_states_of_field[1]);
+
+			GenJsrI (n_apply_args);
+
+			AddSizeOfState (node->node_state,asp_p,bsp_p);
+
+			DetermineSizeOfState (member_states_of_field[-1],&a_size,&b_size);
+			GenOStackLayoutOfState (a_size,b_size,member_states_of_field[-1]);
+
+			return;
+		}
+	}
+
 	GenJsrAp (n_apply_args);
 
-	AddSizeOfState (node->node_state,asp_p,bsp_p);						
+	AddSizeOfState (node->node_state,asp_p,bsp_p);
 }
 
 static void FillApply (Node node,int *asp_p,int *bsp_p,NodeId update_node_id,CodeGenNodeIdsP code_gen_node_ids_p)
@@ -2914,7 +2973,7 @@ static void FillApply (Node node,int *asp_p,int *bsp_p,NodeId update_node_id,Cod
 
 			GenJsrAp (1);
 			
-			AddSizeOfState (node->node_state,asp_p,bsp_p);						
+			AddSizeOfState (node->node_state,asp_p,bsp_p);
 			
 			GenPopA (1);
 			*asp_p-=1;
@@ -4163,8 +4222,8 @@ static void FillUpdateNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 						*asp_p-update_node_id->nid_a_index,node->node_state.state_kind==SemiStrict ? PartialFill : NormalFill,False);
 				GenPopA (end_args_a_offset);
 				*asp_p-=end_args_a_offset;
-			GenPopB (end_args_b_offset);
-			*bsp_p-=end_args_b_offset;
+				GenPopB (end_args_b_offset);
+				*bsp_p-=end_args_b_offset;
 			}
 			}
 
@@ -5508,7 +5567,7 @@ static void ReorderParallelAndNonParallelArgs (Args args)
 		if (arg->arg_state.state_mark & STATE_PARALLEL_MASK)
 			AddSizeOfState (arg->arg_state,&par_a_size,&par_b_size);
 		else
-			AddSizeOfState (arg->arg_state,&npar_a_size,&npar_b_size);		
+			AddSizeOfState (arg->arg_state,&npar_a_size,&npar_b_size);
 
 	if ((par_a_size==0 || npar_a_size==0) && (par_b_size==0 || npar_b_size==0))
 		return;

@@ -86,7 +86,7 @@ static int tuple_state_has_more_strictness (StateS *state_p,TypeNode type_node,S
 		++function_arg_state_p;
 	}
 	
-	return 0;	
+	return 0;
 }
 
 static int equal_strictness_in_types (TypeNode lazy_type_node,TypeNode strict_type_node)
@@ -1148,6 +1148,66 @@ static int add_n_new_arguments_for_local_function (ArgP arg_p,int n_arguments)
 	return n_arguments;
 }
 
+static struct arg *remove_apply_nodes (struct node *node,int n_apply_args)
+{
+	struct arg *old_arg_p,*new_arg_list,*arg_p;
+	int arg_n;
+
+	new_arg_list=NULL;
+	arg_p=node->node_arguments;
+	old_arg_p=arg_p;
+
+	for (arg_n=n_apply_args; arg_n>1; --arg_n){
+		struct arg *arg_next_p;
+
+		arg_next_p=arg_p->arg_next;
+		arg_next_p->arg_next=new_arg_list;
+		new_arg_list=arg_next_p;
+		arg_p=arg_p->arg_node->node_arguments;
+	}
+
+	arg_p->arg_next->arg_next=new_arg_list;
+	node->node_arguments=arg_p;
+
+	return old_arg_p;
+}
+
+static void restore_removed_apply_nodes (struct node *node,struct arg *old_arg_p,int n_apply_args)
+{
+	struct arg *arg_p;
+	int arg_n;
+	
+	node->node_arguments=old_arg_p;
+	arg_p=old_arg_p;
+
+	for (arg_n=n_apply_args; arg_n>1; --arg_n){
+		arg_p->arg_next->arg_next=NULL;
+		arg_p=arg_p->arg_node->node_arguments;
+	}
+
+	arg_p->arg_next->arg_next=NULL;
+}
+
+static struct arg *store_args_in_apply_nodes (int n_apply_args,struct arg *arg_p,struct node *apply_node)
+{
+	struct arg *remaining_args;
+
+	if (n_apply_args==1){
+		apply_node->node_arguments=arg_p;
+		remaining_args=arg_p->arg_next->arg_next;
+		arg_p->arg_next->arg_next=NULL;
+		return remaining_args;
+	} else {
+		struct arg *first_arg_p,*next_arg_p;
+		first_arg_p=apply_node->node_arguments;
+		next_arg_p=store_args_in_apply_nodes (n_apply_args-1,arg_p,first_arg_p->arg_node);
+		remaining_args=next_arg_p->arg_next;
+		next_arg_p->arg_next=NULL;
+		first_arg_p->arg_next=next_arg_p;
+		return remaining_args;
+	}
+}
+
 static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,ArgS ***lhs_arg_h,ArgS **rhs_arg_p,StateP arg_state_p,int *arity_p,char *function_name_p,char *end_function_name,int *n_arguments_p)
 {
 	NodeIdP arg_node_id;
@@ -1321,6 +1381,84 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 #endif
 #ifdef MOVE_APPLY_NODES_IN_LAZY_CONTEXT_TO_NEW_FUNCTION
 				case apply_symb:
+					if (arg_node->node_arity==2){
+						struct arg *arg_p;
+						int n_apply_args;
+				
+						n_apply_args=1;
+						arg_p=arg_node->node_arguments;
+						while (arg_p!=NULL && arg_p->arg_node->node_arity==2 && arg_p->arg_node->node_kind==NormalNode &&
+							   arg_p->arg_node->node_symbol->symb_kind==apply_symb)
+						{
+							++n_apply_args;
+							arg_p=arg_p->arg_node->node_arguments;
+						}
+						if (arg_p!=NULL && arg_p->arg_node->node_kind==SelectorNode && arg_p->arg_node->node_arity==1){
+							struct node *selector_node_p;
+
+							selector_node_p=arg_p->arg_node;
+							if ((selector_node_p->node_symbol->symb_def->sdef_mark & SDEF_FIELD_HAS_MEMBER_TYPE)!=0){
+								struct symbol_def *field_sdef;
+								struct type_alt *member_type_alt;
+									
+								field_sdef=selector_node_p->node_symbol->symb_def;
+								member_type_alt=field_sdef->sdef_member_type_of_field;
+								if (member_type_alt->type_alt_lhs->type_node_arity==n_apply_args+1){
+									struct symbol *new_symbol_p;
+
+									new_symbol_p = CompAlloc (sizeof (struct symbol));
+									*new_symbol_p = *arg_node->node_symbol;
+									new_symbol_p->symb_instance_apply = 1;
+									new_symbol_p->symb_next = (struct symbol*)selector_node_p->node_symbol->symb_def;
+									arg_node->node_symbol = new_symbol_p;
+
+									if (arg_state_p->state_type==SimpleState && (arg_state_p->state_kind==StrictOnA || arg_state_p->state_kind==StrictRedirection)
+										&& OptimizeInstanceCalls)
+									{
+										struct state *member_states_of_field;
+										struct arg *old_arg_p;
+										Node function_node;
+										ArgP new_arg;
+										int new_n_arguments;
+										
+										member_states_of_field=field_sdef->sdef_member_states_of_field;
+
+										old_arg_p = remove_apply_nodes (arg_node,n_apply_args);
+
+										new_n_arguments=add_n_new_arguments_for_local_function (arg_node->node_arguments,*n_arguments_p-1);
+										
+										if (new_n_arguments>MAX_N_FUNCTION_ARGUMENTS){
+											restore_removed_apply_nodes (arg_node,old_arg_p,n_apply_args);
+											break;
+										}
+										
+										*n_arguments_p=new_n_arguments;
+
+										function_node=NewNode (arg_node->node_symbol,NULL,arg_node->node_arity);
+										function_node->node_state=LazyState;
+										function_node->node_number=0;
+										
+										new_arg=NewArgument (function_node);
+										new_arg->arg_state=LazyState;
+										*rhs_arg_p=new_arg;
+										rhs_arg_p=&new_arg->arg_next;
+										
+										function_name_p = create_arguments_for_local_function (arg_node,arg_h,lhs_arg_h,&function_node->node_arguments,
+																								 member_states_of_field,arity_p,function_name_p,end_function_name,n_arguments_p);
+										
+										++arg_state_p;
+
+										arg_p=function_node->node_arguments;
+										function_node->node_arguments=old_arg_p;
+										store_args_in_apply_nodes (n_apply_args,arg_p,function_node);
+
+										continue;
+									}
+								}
+							}
+						}
+					}
+
 					if (arg_state_p->state_type==SimpleState && (arg_state_p->state_kind==StrictOnA || arg_state_p->state_kind==StrictRedirection)){
 						Node function_node;
 						ArgP new_arg;
@@ -1503,7 +1641,7 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 
 			**lhs_arg_h=lhs_arg;
 			*lhs_arg_h=&lhs_arg->arg_next;
-									
+			
 			**arg_h=arg;
 			*arg_h=&arg->arg_next;
 		}
@@ -1521,7 +1659,7 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 	return function_name_p;
 }
 
-static void create_new_local_function (Node node,StateP function_state_p)
+static struct node *create_new_local_function (Node node,StateP function_state_p)
 {
 	static char function_name[64];
 	Symbol function_symbol;
@@ -1534,7 +1672,7 @@ static void create_new_local_function (Node node,StateP function_state_p)
 	n_arguments = add_n_new_arguments_for_local_function (node->node_arguments,0);
 	
 	if (n_arguments>MAX_N_FUNCTION_ARGUMENTS)
-		return;
+		return NULL;
 
 	sprintf (function_name,"_f%d",next_function_n);
 	++next_function_n;
@@ -1629,6 +1767,8 @@ static void create_new_local_function (Node node,StateP function_state_p)
 
 	imp_rule->rule_next=new_rules;
 	new_rules=imp_rule;
+	
+	return rhs_root;
 }
 
 static int is_optimisable_argument (NodeP arg_node,StateP function_arg_state_p)
@@ -1771,6 +1911,32 @@ static int can_build_strict_constructor_or_record_in_lazy_context (NodeP node_p,
 	return 1;
 }
 
+#ifdef MOVE_APPLY_NODES_IN_LAZY_CONTEXT_TO_NEW_FUNCTION
+static void optimise_instance_call (NodeP node,int n_apply_args,struct state *member_states_of_field)
+{
+	int arg_n;
+	
+	arg_n=n_apply_args;
+	if (arg_n>1 || is_optimisable_argument (node->node_arguments->arg_next->arg_node,&member_states_of_field[1])){
+		struct arg *old_arg_p;
+		struct node *rhs_root_of_function;
+		
+		old_arg_p = remove_apply_nodes (node,n_apply_args);
+		
+		rhs_root_of_function = create_new_local_function (node,member_states_of_field);
+		
+		if (rhs_root_of_function!=NULL){
+			struct arg *arg_p;
+			
+			arg_p=rhs_root_of_function->node_arguments;
+			rhs_root_of_function->node_arguments=old_arg_p;
+			store_args_in_apply_nodes (n_apply_args,arg_p,rhs_root_of_function);
+		} else
+			restore_removed_apply_nodes (node,old_arg_p,n_apply_args);
+	}
+}
+#endif
+
 static void optimise_normal_node (Node node)
 {	
 	Symbol symbol;
@@ -1799,6 +1965,46 @@ static void optimise_normal_node (Node node)
 		}
 #ifdef MOVE_APPLY_NODES_IN_LAZY_CONTEXT_TO_NEW_FUNCTION
 		else if (symbol->symb_kind==apply_symb){
+			if (node->node_arity==2 && node->node_symbol->symb_instance_apply==0){
+				struct arg *arg_p;
+				int n_apply_args;
+				
+				n_apply_args=1;
+				arg_p=node->node_arguments;
+				while (arg_p!=NULL && arg_p->arg_node->node_arity==2 && arg_p->arg_node->node_kind==NormalNode &&
+					   arg_p->arg_node->node_symbol->symb_kind==apply_symb)
+				{
+					++n_apply_args;
+					arg_p=arg_p->arg_node->node_arguments;
+				}
+				if (arg_p!=NULL && arg_p->arg_node->node_kind==SelectorNode && arg_p->arg_node->node_arity==1){
+					struct node *selector_node_p;
+					
+					selector_node_p=arg_p->arg_node;
+					if ((selector_node_p->node_symbol->symb_def->sdef_mark & SDEF_FIELD_HAS_MEMBER_TYPE)!=0){
+						struct symbol_def *field_sdef;
+						struct type_alt *member_type_alt;
+							
+						field_sdef=selector_node_p->node_symbol->symb_def;
+						member_type_alt=field_sdef->sdef_member_type_of_field;
+						if (member_type_alt->type_alt_lhs->type_node_arity==n_apply_args+1){
+							struct symbol *new_symbol_p;
+
+							new_symbol_p = CompAlloc (sizeof (struct symbol));
+							*new_symbol_p = *node->node_symbol;
+							new_symbol_p->symb_instance_apply = 1;
+							new_symbol_p->symb_next = (struct symbol*)selector_node_p->node_symbol->symb_def;
+							node->node_symbol = new_symbol_p;
+
+							if (OptimizeInstanceCalls){
+								optimise_instance_call (node,n_apply_args,field_sdef->sdef_member_states_of_field);
+								return;
+							}
+						}
+					}
+				}
+			}
+
 			if (apply_symb_function_state_p==NULL)
 				init_apply_symb_function_state_p();
 			function_state_p=apply_symb_function_state_p;

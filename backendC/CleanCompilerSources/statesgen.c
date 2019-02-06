@@ -8,8 +8,6 @@
 	At:		 University of Nijmegen, department of computing science
 */
 
-#pragma segment statesgen
-
 #include "compiledefines.h"
 #include "types.t"
 #include "system.h"
@@ -1862,6 +1860,46 @@ static Bool MemberCallInAStrictContext (Node node,int arg_n,unsigned int arg_str
 	return parallel;	
 }
 
+static Bool OptimizedMemberCallInAStrictContext (Node node,int arg_n,struct state *member_states_of_field,int local_scope)
+{
+	struct arg *arg1_p,*arg2_p;
+	struct node *arg1_of_apply_node_p;
+	Bool parallel;
+	
+	parallel=False;
+	
+	arg1_p = node->node_arguments;
+	arg1_of_apply_node_p=arg1_p->arg_node;
+	--arg_n;
+	arg2_p = arg1_p->arg_next;
+
+	if (arg1_of_apply_node_p->node_arity==2){ /* node_arity of SelectorNode == 1 */
+		/* arg 1 is apply node */
+
+		AdjustState (&arg1_p->arg_state, StrictState);
+
+		arg1_of_apply_node_p->node_state = StrictState;
+		arg1_of_apply_node_p->node_state.state_kind = StrictRedirection;
+
+		parallel = OptimizedMemberCallInAStrictContext (arg1_of_apply_node_p,arg_n,member_states_of_field,local_scope);
+	} else {
+		/* arg 1 is SelectorNode */
+		parallel = DetermineStrictArgContext (arg1_p, StrictState, local_scope);
+	}
+
+	if (! IsLazyState (member_states_of_field[arg_n+1])){
+		if (DetermineStrictArgContext (arg2_p, member_states_of_field[arg_n+1], local_scope))
+			parallel = True;
+	} else
+		if (ShouldDecrRefCount)
+			DecrRefCountCopiesOfArg (arg2_p IF_OPTIMIZE_LAZY_TUPLE_RECURSION(local_scope));
+	
+	if (parallel)
+		node->node_state.state_mark |= STATE_PARALLEL_MASK;
+
+	return parallel;
+}
+
 static Bool NodeInAStrictContext (Node node,StateS demanded_state,int local_scope)
 {
 	Bool parallel;
@@ -1907,6 +1945,34 @@ static Bool NodeInAStrictContext (Node node,StateS demanded_state,int local_scop
 				SetUnaryState (&node->node_state, StrictOnA, ListObj);
 				break;
 			case apply_symb:
+				if (node->node_symbol->symb_instance_apply){ /* if set by optimisations.c */
+					struct symbol_def *field_sdef;
+					struct type_alt *member_type_alt;
+					int arg_n;
+					unsigned int arg_strictness;
+					struct type_arg *type_arg_p;
+					
+					field_sdef = (struct symbol_def *)node->node_symbol->symb_next;
+					member_type_alt=field_sdef->sdef_member_type_of_field;
+
+					if (OptimizeInstanceCalls){
+						arg_n=member_type_alt->type_alt_lhs->type_node_arity-1;
+						node->node_state = field_sdef->sdef_member_states_of_field[-1];
+						return OptimizedMemberCallInAStrictContext (node,arg_n,field_sdef->sdef_member_states_of_field,local_scope);
+					}
+
+					arg_strictness=0;
+					arg_n=0;
+					for_l (type_arg_p,member_type_alt->type_alt_lhs->type_node_arguments->type_arg_next,type_arg_next){
+						if (type_arg_p->type_arg_node->type_node_annotation==StrictAnnot){
+							arg_strictness |= 1<<arg_n;
+						}
+						++arg_n;
+					}
+
+					return MemberCallInAStrictContext (node,arg_n,arg_strictness,local_scope);
+				}
+
 				if (node->node_arity==2){
 					int n_apply_args;
 					struct arg *arg_p;
@@ -1919,27 +1985,49 @@ static Bool NodeInAStrictContext (Node node,StateS demanded_state,int local_scop
 						++n_apply_args;
 						arg_p=arg_p->arg_node->node_arguments;
 					}
-					if (arg_p!=NULL && arg_p->arg_node->node_kind==SelectorNode && arg_p->arg_node->node_arity==1 &&
-						(arg_p->arg_node->node_symbol->symb_def->sdef_mark & SDEF_FIELD_HAS_MEMBER_TYPE)!=0)
-					{
-						struct type_alt *member_type_alt;
+					
+					if (arg_p!=NULL && arg_p->arg_node->node_kind==SelectorNode && arg_p->arg_node->node_arity==1){
+						struct node *selector_node_p;
 						
-						member_type_alt=arg_p->arg_node->node_symbol->symb_def->sdef_member_type_of_field;
-						if (member_type_alt->type_alt_lhs->type_node_arity==n_apply_args+1){
-							int arg_n;
-							unsigned int arg_strictness;
-							struct type_arg *type_arg_p;
+						selector_node_p=arg_p->arg_node;
+						if ((selector_node_p->node_symbol->symb_def->sdef_mark & SDEF_FIELD_HAS_MEMBER_TYPE)!=0){
+							struct symbol_def *field_sdef;
+							struct type_alt *member_type_alt;
+							
+							field_sdef=selector_node_p->node_symbol->symb_def;
+							member_type_alt=field_sdef->sdef_member_type_of_field;
+							if (member_type_alt->type_alt_lhs->type_node_arity==n_apply_args+1){
+								int arg_n;
+								unsigned int arg_strictness;
+								struct type_arg *type_arg_p;
 
-							arg_strictness=0;
-							arg_n=0;
-							for_l (type_arg_p,member_type_alt->type_alt_lhs->type_node_arguments->type_arg_next,type_arg_next){
-								if (type_arg_p->type_arg_node->type_node_annotation==StrictAnnot){
-									arg_strictness |= 1<<arg_n;
+								{
+									struct symbol *new_symbol_p;
+
+									new_symbol_p = CompAlloc (sizeof (struct symbol));
+									*new_symbol_p = *node->node_symbol;
+									new_symbol_p->symb_instance_apply = 1;
+									new_symbol_p->symb_next = (struct symbol*)field_sdef;
+									node->node_symbol = new_symbol_p;
 								}
-								++arg_n;
+
+								if (OptimizeInstanceCalls){
+									arg_n=member_type_alt->type_alt_lhs->type_node_arity-1;
+									node->node_state = field_sdef->sdef_member_states_of_field[-1];
+									return OptimizedMemberCallInAStrictContext (node,arg_n,field_sdef->sdef_member_states_of_field,local_scope);
+								}
+
+								arg_strictness=0;
+								arg_n=0;
+								for_l (type_arg_p,member_type_alt->type_alt_lhs->type_node_arguments->type_arg_next,type_arg_next){
+									if (type_arg_p->type_arg_node->type_node_annotation==StrictAnnot){
+										arg_strictness |= 1<<arg_n;
+									}
+									++arg_n;
+								}
+		
+								return MemberCallInAStrictContext (node,arg_n,arg_strictness,local_scope);
 							}
-	
-							return MemberCallInAStrictContext (node,arg_n,arg_strictness,local_scope);
 						}
 					}
 				}

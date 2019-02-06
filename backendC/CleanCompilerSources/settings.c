@@ -35,6 +35,7 @@ Bool DoGenericFusion		= False;
 
 Bool OptimizeLazyTupleRecursion=False;
 Bool OptimizeTailCallModuloCons=True;
+Bool OptimizeInstanceCalls = False;
 Bool WriteModificationTimes	= False;
 
 unsigned StrictDepth		= 10; /* 8; */

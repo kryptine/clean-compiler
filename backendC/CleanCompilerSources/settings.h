@@ -32,6 +32,7 @@ extern Bool DoFusion;
 extern Bool DoGenericFusion;
 extern Bool OptimizeLazyTupleRecursion;
 extern Bool OptimizeTailCallModuloCons;
+extern Bool OptimizeInstanceCalls;
 extern Bool WriteModificationTimes;
 
 #define	StrictDoRelated	False

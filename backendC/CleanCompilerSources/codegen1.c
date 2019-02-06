@@ -3,8 +3,6 @@
 	Authors:Sjaak Smetsers & John van Groningen
 */
 
-#pragma segment codegen1
-
 #define SHARE_UPDATE_CODE 0 /* also in codegen.c */
 #define FREE_STRICT_LHS_TUPLE_ELEMENTS 1 /* also in codegen2.c */
 #define BIND_UNBOXED_LHS_TUPLE_AND_RECORD_ARGUMENTS_IN_BIND_ARGUMENTS 1
@@ -1183,8 +1181,9 @@ static int generate_instance_entry_arguments
 	field_type_alt=dictionary_field->sdef_member_type_of_field; 
 	member_arity=field_type_alt->type_alt_lhs->type_node_arity-1;
 	member_state_p=dictionary_field->sdef_member_states_of_field;
-	FPrintF (OutFile, "\n||\tmember type %s %d %d",
-			 dictionary_field->sdef_ident->ident_name,member_arity,function_arity);
+	
+	if (DoDebug)
+		FPrintF (OutFile, "\n||\tmember type %s %d %d",dictionary_field->sdef_ident->ident_name,member_arity,function_arity);
 	
 	n_dictionary_args = function_arity-member_arity;
 
@@ -1239,7 +1238,8 @@ static int generate_unboxed_record_cons_instance_entry
 	int dictionary_sdef_mark;
 	
 	if (rule_sdef->sdef_mark & SDEF_RULE_INSTANCE_RULE_P){
-		FPrintF (OutFile, "\n||\tinstance fused");
+		if (DoDebug)
+			FPrintF (OutFile, "\n||\tinstance fused");
 		if (rule_sdef->sdef_instance_rule->sdef_mark & SDEF_INSTANCE_RULE_WITH_FIELD_P){
 			dictionary_field=rule_sdef->sdef_instance_rule->sdef_dictionary_field;
 			dictionary_sdef_mark=dictionary_field->sdef_mark;
@@ -1248,7 +1248,8 @@ static int generate_unboxed_record_cons_instance_entry
 		}
 	} else {
 		/* SDEF_INSTANCE_RULE_WITH_FIELD_P */
-		FPrintF (OutFile, "\n||\tinstance");
+		if (DoDebug)
+			FPrintF (OutFile, "\n||\tinstance");
 		dictionary_field=rule_sdef->sdef_dictionary_field;
 		dictionary_sdef_mark=dictionary_field->sdef_mark;
 	}
@@ -1285,7 +1286,8 @@ static int generate_unboxed_record_decons_instance_entry (struct symbol_def *rul
 	int dictionary_sdef_mark;
 	
 	if (rule_sdef->sdef_mark & SDEF_RULE_INSTANCE_RULE_P){
-		FPrintF (OutFile, "\n||\tinstance fused");
+		if (DoDebug)
+			FPrintF (OutFile, "\n||\tinstance fused");
 		if (rule_sdef->sdef_instance_rule->sdef_mark & SDEF_INSTANCE_RULE_WITH_FIELD_P){
 			dictionary_field=rule_sdef->sdef_instance_rule->sdef_dictionary_field;
 			dictionary_sdef_mark=dictionary_field->sdef_mark;
@@ -1294,7 +1296,8 @@ static int generate_unboxed_record_decons_instance_entry (struct symbol_def *rul
 		}
 	} else {
 		/* SDEF_INSTANCE_RULE_WITH_FIELD_P */
-		FPrintF (OutFile, "\n||\tinstance");
+		if (DoDebug)
+			FPrintF (OutFile, "\n||\tinstance");
 		dictionary_field=rule_sdef->sdef_dictionary_field;
 		dictionary_sdef_mark=dictionary_field->sdef_mark;
 	}
@@ -1332,7 +1335,8 @@ static int generate_unboxed_record_instance_entry (struct symbol_def *rule_sdef,
 	int dictionary_sdef_mark;
 	
 	if (rule_sdef->sdef_mark & SDEF_RULE_INSTANCE_RULE_P){
-		FPrintF (OutFile, "\n||\tinstance fused");
+		if (DoDebug)
+			FPrintF (OutFile, "\n||\tinstance fused");
 		if (rule_sdef->sdef_instance_rule->sdef_mark & SDEF_INSTANCE_RULE_WITH_FIELD_P){
 			dictionary_field=rule_sdef->sdef_instance_rule->sdef_dictionary_field;
 			dictionary_sdef_mark=dictionary_field->sdef_mark;
@@ -1341,7 +1345,8 @@ static int generate_unboxed_record_instance_entry (struct symbol_def *rule_sdef,
 		}
 	} else {
 		/* SDEF_INSTANCE_RULE_WITH_FIELD_P */
-		FPrintF (OutFile, "\n||\tinstance");
+		if (DoDebug)
+			FPrintF (OutFile, "\n||\tinstance");
 		dictionary_field=rule_sdef->sdef_dictionary_field;
 		dictionary_sdef_mark=dictionary_field->sdef_mark;
 	}
@@ -2028,7 +2033,8 @@ int generate_instance_entry (struct symbol_def *rule_sdef,struct state *function
 	int dictionary_sdef_mark;
 	
 	if (rule_sdef->sdef_mark & SDEF_RULE_INSTANCE_RULE_P){
-		FPrintF (OutFile, "\n||\tinstance fused");
+		if (DoDebug)
+			FPrintF (OutFile, "\n||\tinstance fused");
 		if (rule_sdef->sdef_instance_rule->sdef_mark & SDEF_INSTANCE_RULE_WITH_FIELD_P){
 			dictionary_field=rule_sdef->sdef_instance_rule->sdef_dictionary_field;
 			dictionary_sdef_mark=dictionary_field->sdef_mark;
@@ -2037,7 +2043,8 @@ int generate_instance_entry (struct symbol_def *rule_sdef,struct state *function
 		}
 	} else {
 		/* SDEF_INSTANCE_RULE_WITH_FIELD_P */
-		FPrintF (OutFile, "\n||\tinstance");
+		if (DoDebug)
+			FPrintF (OutFile, "\n||\tinstance");
 		dictionary_field=rule_sdef->sdef_dictionary_field;
 		dictionary_sdef_mark=dictionary_field->sdef_mark;
 	}
@@ -4563,6 +4570,45 @@ static void repl_overloaded_cons_arguments (NodeP node_p,int *asp_p,int *bsp_p,S
 	ab_node_ids_p->free_node_ids=code_gen_node_ids.free_node_ids;
 	ab_node_ids_p->a_node_ids=code_gen_node_ids.a_node_ids;
 	ab_node_ids_p->b_node_ids=code_gen_node_ids.b_node_ids;
+
+	if (DoDebug)
+		FPrintF (OutFile, "\n||\tinstance %d %d",node_p->node_push_symbol->symb_head_strictness,node_p->node_push_symbol->symb_instance_apply);
+
+	if (node_p->node_decons_node->node_kind==SelectorNode &&
+		(node_p->node_decons_node->node_symbol->symb_def->sdef_mark & SDEF_FIELD_HAS_MEMBER_TYPE)!=0)
+	{
+		struct symbol_def *field_sdef;
+
+		field_sdef=node_p->node_decons_node->node_symbol->symb_def;
+
+		if (DoDebug)
+			FPrintF (OutFile, "\n||\t%s",field_sdef->sdef_ident->ident_name);
+
+		if (OptimizeInstanceCalls){
+			struct state *member_states_of_field;
+			int member_arity,member_called_with_root_node;
+
+			member_states_of_field=field_sdef->sdef_member_states_of_field;
+
+			member_arity=field_sdef->sdef_member_type_of_field->type_alt_lhs->type_node_arity;
+
+			member_called_with_root_node = member_states_of_field[-1].state_type==SimpleState
+											&& !(member_states_of_field[-1].state_kind==StrictRedirection || member_states_of_field[-1].state_kind==OnB);
+
+			if (member_states_of_field[-1].state_type==TupleState){
+				int a_size,b_size;
+
+				DetermineSizeOfStates (member_arity-1,&member_states_of_field[1],&a_size,&b_size);
+				GenDStackLayoutOfStates (a_size+1+member_called_with_root_node,b_size,member_arity-1,&member_states_of_field[1]);
+
+				GenJsrI (1);
+
+				DetermineSizeOfState (member_states_of_field[-1],&a_size,&b_size);
+				GenOStackLayoutOfState (a_size,b_size,member_states_of_field[-1]);
+				return;
+			}
+		}
+	}
 
 	GenJsrAp (1);
 
