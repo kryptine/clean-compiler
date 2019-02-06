@@ -248,6 +248,7 @@ InitPredefinedSymbols (void)
 	gBasicSymbols [fun_type]	= PredefinedSymbol (fun_type, 2);
 
 	ApplySymbol	= PredefinedSymbol (apply_symb, 2);
+	ApplySymbol->symb_instance_apply = 0;
 	gBasicSymbols [apply_symb]	= ApplySymbol;
 
 	TupleSymbol	= PredefinedSymbol (tuple_symb, 2); /* arity doesn't matter */

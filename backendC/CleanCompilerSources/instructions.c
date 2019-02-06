@@ -620,6 +620,7 @@ enum {
 
 #define Ijsr_eval "jsr_eval"
 #define Ijsr_ap "jsr_ap"
+#define Ijsr_i "jsr_i"
 
 #define Ipop_a "pop_a"
 #define Ipop_b "pop_b"
@@ -652,8 +653,9 @@ enum {
 #define Ijmp_eval "jmp_eval"
 #define Ijmp_eval_upd "jmp_eval_upd"
 #define Ijmp_ap "jmp_ap"
-#define Ijmp_not_eqZ "jmp_not_eqZ"
 #define Ijmp_ap_upd "jmp_ap_upd"
+#define Ijmp_i "jmp_i"
+#define Ijmp_not_eqZ "jmp_not_eqZ"
 #define Ijmp_upd "jmp_upd"
 
 #define Ihalt "halt"
@@ -2175,6 +2177,12 @@ void GenJsrAp (int n_args)
 	put_arguments_n_b (n_args);
 }
 
+void GenJsrI (int n_args)
+{
+	put_instruction_b (jsr_i);
+	put_arguments_n_b (n_args);
+}
+
 void GenJmpEval (void)
 {
 	put_instruction (Ijmp_eval);
@@ -2189,6 +2197,12 @@ void GenJmpAp (int n_args)
 void GenJmpApUpd (int n_args)
 {
 	put_instruction_b (jmp_ap_upd);
+	put_arguments_n_b (n_args);
+}
+
+void GenJmpI (int n_args)
+{
+	put_instruction_b (jmp_i);
 	put_arguments_n_b (n_args);
 }
 
