@@ -138,6 +138,8 @@ STRUCT (symbol,Symbol) {
 	unsigned			symb_tail_strictness:2;	/* 0=lazy,1=strict */
 };
 
+#define symb_instance_apply symb_tail_strictness
+
 #if STRICT_LISTS
 # define symb_state_p symb_val.val_state_p
 # define symb_unboxed_cons_p symb_val.val_unboxed_cons_p

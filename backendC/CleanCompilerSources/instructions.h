@@ -95,9 +95,11 @@ void GenPushB (int offset);
 
 void GenJsrEval (int offset);
 void GenJsrAp (int n_args);
+void GenJsrI (int n_args);
 void GenJmpEval (void);
 void GenJmpAp (int n_args);
 void GenJmpApUpd (int n_args);
+void GenJmpI (int n_args);
 void GenJmpNotEqZ (SymbValue val,Label tolab);
 void GenJmpUpd (Label tolab);
 void GenPopA (int nr);

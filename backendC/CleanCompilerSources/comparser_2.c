@@ -192,6 +192,8 @@ InitParser (void)
 #endif
 
 	ApplySymbol		= NewSymbol (apply_symb);
+	ApplySymbol->symb_instance_apply = 0;
+
 	FailSymbol		= NewSymbol (fail_symb);
 
 	clear_p_at_node_tree();
