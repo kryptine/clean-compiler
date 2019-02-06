@@ -132,6 +132,7 @@ Bool CallCompiler (int argc, char **argv)
 	DoDescriptors=False;
 	ExportLocalLabels=False;
 	AddStrictnessToExportedFunctionTypes=False;
+	OptimizeInstanceCalls=False;
 	Dynamics=False;
 
 	StrictDoAnnots			= False;
@@ -193,6 +194,8 @@ Bool CallCompiler (int argc, char **argv)
 				AddStrictnessToExportedFunctionTypes=True;
 			else if (strcmp (argv_i,"-dynamics") == 0)
 				Dynamics=True;
+			else if (strcmp (argv_i,"-oic") == 0)
+				OptimizeInstanceCalls=True;
 			else if (strncmp (argv_i, "-sa", 3) == 0){
 				if (!SetStrictOption (argv[i]+3)){
 					CmdError ("unknown flag %s", argv[i]);

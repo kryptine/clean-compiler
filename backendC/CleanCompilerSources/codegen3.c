@@ -260,10 +260,10 @@ void RedirectResultAndReturn (int asp,int bsp,int source_a_index,int source_b_in
 					break;
 				case RecordState:
 					if (source_a_index==asp && (source_b_index==bsp || offbsize==0))
-						BuildNewRecordPop (offstate.state_record_symbol,offasize,offbsize);						
+						BuildNewRecordPop (offstate.state_record_symbol,offasize,offbsize);
 					else {
 						BuildNewRecord (offstate.state_record_symbol,source_a_index,source_b_index,asp,bsp,offasize,offbsize);
-					GenUpdatePopA (0,asp);
+						GenUpdatePopA (0,asp);
 						GenPopB (bsp);
 					}
 					break;
@@ -273,8 +273,8 @@ void RedirectResultAndReturn (int asp,int bsp,int source_a_index,int source_b_in
 					else {
 						GenBuildArray (asp-source_a_index);
 						GenUpdatePopA (0,asp);
-			}
-			GenPopB (bsp);
+					}
+					GenPopB (bsp);
 			}
 		} else {
 			switch (offstate.state_type){
@@ -621,15 +621,95 @@ static void CodeRootApply (Node root,NodeId rootid,int asp,int bsp,CodeGenNodeId
 
 		CreateSemiStrictRootNode (&name,&codelab,root,rootid,asp,bsp,code_gen_node_ids_p,resultstate);
 	} else {
-		int a_size,b_size,n_apply_args;
+		int a_size,b_size,n_apply_args,no_tail_call;
 
 		a_size=0;
+
+		if (OptimizeInstanceCalls && root->node_symbol->symb_instance_apply==1){
+			Coercions moveact;
+
+			moveact = DetermineResultAdjustment (resultstate, root->node_state);
+			if (moveact==AToB || moveact==BToA || moveact==AToRoot){
+				no_tail_call=1;
+				
+				if (ResultNodeNecessary (moveact,root->node_state)){
+					NewEmptyNode (&asp,-1);
+					a_size=1;
+				}
+			} else
+				no_tail_call=0;
+		} else
+			no_tail_call = !IsSimpleState (resultstate) || resultstate.state_kind!=StrictRedirection;
+
 		b_size=0;
 		n_apply_args=build_apply_arguments (root->node_arguments,&a_size,&b_size,&asp,&bsp,code_gen_node_ids_p);
 
 		UpdateAAndBStack (asp,bsp,a_size,b_size,&asp,&bsp);
 
-		if (!IsSimpleState (resultstate) || resultstate.state_kind!=StrictRedirection){
+		if (root->node_symbol->symb_instance_apply==1){
+			struct arg *arg_p;
+			struct symbol_def *field_sdef;
+
+			field_sdef = (struct symbol_def *)root->node_symbol->symb_next;
+
+			arg_p=root->node_arguments;
+			while (arg_p!=NULL && arg_p->arg_node->node_kind==NormalNode && arg_p->arg_node->node_symbol->symb_kind==apply_symb)
+				arg_p=arg_p->arg_node->node_arguments;
+			if (arg_p!=NULL && arg_p->arg_node->node_kind==SelectorNode && arg_p->arg_node->node_arity==1){
+				struct node *selector_node_p;
+				
+				selector_node_p=arg_p->arg_node;
+				if ((selector_node_p->node_symbol->symb_def->sdef_mark & SDEF_FIELD_HAS_MEMBER_TYPE)!=0){
+					struct type_alt *member_type_alt;
+					
+					field_sdef=selector_node_p->node_symbol->symb_def;
+					member_type_alt=field_sdef->sdef_member_type_of_field;
+					if (DoDebug)
+						if (member_type_alt->type_alt_lhs->type_node_arity==n_apply_args+1){
+							FPrintF (OutFile, "\n||\t%d %s",root->node_symbol->symb_instance_apply,selector_node_p->node_symbol->symb_def->sdef_ident->ident_name);
+						} else
+							FPrintF (OutFile, "\n||\t(no dictionary) %s",field_sdef->sdef_ident->ident_name);
+				} else if (DoDebug)
+					FPrintF (OutFile, "\n||\t(no dictionary) %s",field_sdef->sdef_ident->ident_name);
+			} else if (DoDebug)
+				FPrintF (OutFile, "\n||\t(no dictionary) %s",field_sdef->sdef_ident->ident_name);
+
+			if (field_sdef!=NULL && OptimizeInstanceCalls){
+				struct state *member_states_of_field;
+				int member_arity,member_called_with_root_node;
+				int a_size,b_size;
+
+				member_states_of_field=field_sdef->sdef_member_states_of_field;
+				member_arity=field_sdef->sdef_member_type_of_field->type_alt_lhs->type_node_arity;
+
+				member_called_with_root_node = member_states_of_field[-1].state_type==SimpleState
+												&& !(member_states_of_field[-1].state_kind==StrictRedirection || member_states_of_field[-1].state_kind==OnB);
+
+				DetermineSizeOfStates (member_arity-1,&member_states_of_field[1],&a_size,&b_size);
+				GenDStackLayoutOfStates (a_size+1+member_called_with_root_node,b_size,member_arity-1,&member_states_of_field[1]);
+
+				if (no_tail_call){
+					int result_a_size,result_b_size,jsr_i_result_a_size,jsr_i_result_b_size;
+
+					GenJsrI (n_apply_args);
+
+					DetermineSizeOfState (member_states_of_field[-1],&jsr_i_result_a_size,&jsr_i_result_b_size);
+					GenOStackLayoutOfState (jsr_i_result_a_size,jsr_i_result_b_size,member_states_of_field[-1]);				
+
+					DetermineSizeOfState (root->node_state,&result_a_size,&result_b_size);
+
+					asp+=result_a_size-(a_size+1+member_called_with_root_node);
+					bsp+=result_b_size-b_size;
+
+					RedirectResultAndReturn (asp,bsp,asp,bsp,root->node_state,resultstate,result_a_size,result_b_size);
+				} else
+					GenJmpI (n_apply_args);
+
+				return;
+			}
+		}
+
+		if (no_tail_call){
 			int result_a_size,result_b_size;
 
 			GenJsrAp (n_apply_args);
