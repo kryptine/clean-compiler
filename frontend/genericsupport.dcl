@@ -64,3 +64,4 @@ field_2_name_of_generic_info :: !Int -> String
 field_3_name_of_generic_info :: !Int -> String
 field_4_name_of_generic_info :: !Int -> String
 field_5_name_of_generic_info :: !Int -> String
+field_6_name_of_generic_info :: !Int -> String
