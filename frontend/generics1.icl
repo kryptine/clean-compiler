@@ -767,6 +767,11 @@ listToBin bin tip xs
 	# (l,r) = splitAt ((length xs) / 2) xs
 	= bin (listToBin bin tip l) (listToBin bin tip r)
 
+strictness_of_args_or_fields :: !StrictnessList !Int -> Int;
+strictness_of_args_or_fields NotStrict arity = 0;
+strictness_of_args_or_fields (Strict s) arity = s bitand ((1<<arity)-1);
+strictness_of_args_or_fields (StrictList s _) arity = s bitand ((1<<arity)-1);
+
 //	build type infos
 buildTypeDefInfo :: 
 		!CheckedTypeDef		// the type definition
@@ -853,9 +858,11 @@ where
 		# (type_def_expr, heaps) = buildFunApp main_module_index type_def_info_ds [] heaps // gcd_type_def
 		# (type_expr, heaps)	 = buildFunApp main_module_index gen_type_ds [] heaps // gcd_type
 		# cons_index_expr		 = makeIntExpr cons_number // gcd_index
+		# {st_arity,st_args_strictness} = cons_type
+		#! strict_arguments_expr = makeIntExpr (strictness_of_args_or_fields st_args_strictness st_arity) // gcd_strict_arguments
 		# (body_expr, heaps)
-			= buildPredefConsApp PD_CGenericConsDescriptor 
-				[name_expr, arity_expr, prio_expr, type_def_expr, type_expr, cons_index_expr]
+			= buildPredefConsApp PD_CGenericConsDescriptor
+				[name_expr, arity_expr, prio_expr, type_def_expr, type_expr, cons_index_expr, strict_arguments_expr]
 				predefs heaps
 		# fun = makeFunction ds_ident group_index [] body_expr No main_module_index td_pos		
 		= (fun, (modules, heaps))
@@ -871,7 +878,7 @@ make_prio_expr (Prio assoc prio) predefs heaps
 	# prio_expr = makeIntExpr prio
 	= buildPredefConsApp PD_CGenConsPrio [assoc_expr, prio_expr] predefs heaps 
 
-buildRecordTypeDefInfo {td_ident, td_pos, td_arity} alt fields td_module main_module_index predefs
+buildRecordTypeDefInfo {td_ident,td_pos,td_arity,td_rhs} alt fields td_module main_module_index predefs
 				funs_and_groups=:{fg_fun_index=fun_index,fg_group_index=group_index,fg_funs=funs,fg_groups=groups} modules heaps error
 
 	# num_fields = length fields
@@ -923,9 +930,11 @@ where
 		# td_arity_expr 		 = makeIntExpr td_arity // grd_type_arity
 		# (type_expr, heaps)	 = buildFunApp main_module_index gen_type_ds [] heaps // grd_type
 		# (fields_expr, heaps)	 = buildFunApp main_module_index field_list_ds [] heaps // grd_fields
+		# {st_arity,st_args_strictness} = cons_type
+		# strict_fields_expr = makeIntExpr (strictness_of_args_or_fields st_args_strictness st_arity) // grd_strict_fields
 		# (body_expr, heaps)
 			= buildPredefConsApp PD_CGenericRecordDescriptor
-				[name_expr, arity_expr, td_arity_expr, type_expr, fields_expr]
+				[name_expr, arity_expr, td_arity_expr, type_expr, fields_expr, strict_fields_expr]
 				predefs heaps
 		# fun = makeFunction cons_info_ds.ds_ident group_index [] body_expr No main_module_index td_pos		
 		= (fun, (modules, heaps))
@@ -2614,6 +2623,9 @@ where
 		| generic_info bitand 32<>0 // gcd_index
 			# (args,n_args) = add_CONS_field_args (generic_info bitxor 32) args predefs
 			= add_Int_arg args n_args
+		| generic_info bitand 64<>0 // gcd_strict_arguments
+			# (args,n_args) = add_CONS_field_args (generic_info bitxor 64) args predefs
+			= add_Int_arg args n_args
 			= (args,0)
 
 	add_RECORD_field_args generic_info args predefs=:{psd_predefs_a}
@@ -2639,6 +2651,9 @@ where
 			# {pds_module,pds_def} = psd_predefs_a.[PD_ListType]
 			#! string_type_symb = MakeTypeSymbIdent {glob_module = pds_module, glob_object = pds_def} predefined_idents.[PD_ListType] 1
 			= ([{at_type = TA string_type_symb [string_type], at_attribute = TA_Multi} : args],n_args+1)
+		| generic_info bitand 32<>0 // grd_strict_fields
+			# (args,n_args) = add_RECORD_field_args (generic_info bitxor 32) args predefs
+			= add_Int_arg args n_args
 			= (args,0)
 
 	add_FIELD_field_args generic_info args predefs=:{psd_predefs_a}
@@ -3544,6 +3559,12 @@ add_CONS_info_args generic_info cons_def type_def_info gen_type_ds arg_exprs mai
 		#! gcd_index_expr = makeIntExpr cons_def.cons_number
 		# (arg_exprs,heaps) = add_CONS_info_args generic_info cons_def type_def_info gen_type_ds arg_exprs main_module_index predefs heaps
 		= ([gcd_index_expr : arg_exprs],heaps)
+	| generic_info bitand 64<>0 // gcd_strict_arguments
+		# generic_info = generic_info bitxor 64
+		# {st_arity,st_args_strictness} = cons_def.cons_type
+		#! gcd_strict_arguments_expr = makeIntExpr (strictness_of_args_or_fields st_args_strictness st_arity)
+		# (arg_exprs,heaps) = add_CONS_info_args generic_info cons_def type_def_info gen_type_ds arg_exprs main_module_index predefs heaps
+		= ([gcd_strict_arguments_expr : arg_exprs],heaps)
 
 add_RECORD_info_args :: Int CheckedTypeDef DefinedSymbol DefinedSymbol Int [Expression] Int *{#CommonDefs} *Heaps -> (![Expression],!*{#CommonDefs},!*Heaps)
 add_RECORD_info_args generic_info type_def gen_type_ds field_list_ds type_module arg_exprs main_module_index modules heaps
@@ -3576,6 +3597,13 @@ add_RECORD_info_args generic_info type_def gen_type_ds field_list_ds type_module
 		# (gen_type_expr, heaps) = buildFunApp main_module_index field_list_ds [] heaps
 		# (arg_exprs,modules,heaps) = add_RECORD_info_args generic_info type_def gen_type_ds field_list_ds type_module arg_exprs main_module_index modules heaps
 		= ([gen_type_expr : arg_exprs],modules,heaps)
+	| generic_info bitand 32<>0 // grd_strict_fields
+		# generic_info = generic_info bitxor 32
+		# (RecordType {rt_constructor}) = type_def.td_rhs
+		# ({st_arity,st_args_strictness}, modules) = modules![type_module].com_cons_defs.[rt_constructor.ds_index].cons_type
+		#! grd_strict_fields_expr = makeIntExpr (strictness_of_args_or_fields st_args_strictness st_arity)
+		# (arg_exprs,modules,heaps) = add_RECORD_info_args generic_info type_def gen_type_ds field_list_ds type_module arg_exprs main_module_index modules heaps
+		= ([grd_strict_fields_expr : arg_exprs],modules,heaps)
 
 add_FIELD_info_args :: Int SelectorDef DefinedSymbol [Expression] Int *Heaps -> (![Expression],!*Heaps)
 add_FIELD_info_args generic_info field_def record_info_ds arg_exprs main_module_index heaps
@@ -3583,14 +3611,14 @@ add_FIELD_info_args generic_info field_def record_info_ds arg_exprs main_module_
 		= (arg_exprs,heaps)
 	| generic_info bitand 1<>0 // gfd_name
 		# generic_info = generic_info bitxor 1
-		#! gcd_name_expr = makeStringExpr field_def.sd_ident.id_name
+		#! gfd_name_expr = makeStringExpr field_def.sd_ident.id_name
 		# (arg_exprs,heaps) = add_FIELD_info_args generic_info field_def record_info_ds arg_exprs main_module_index heaps
-		= ([gcd_name_expr : arg_exprs],heaps)
+		= ([gfd_name_expr : arg_exprs],heaps)
 	| generic_info bitand 2<>0 // gfd_index
 		# generic_info = generic_info bitxor 2
-		#! gcd_arity_expr = makeIntExpr field_def.sd_field_nr
+		#! gfd_index_expr = makeIntExpr field_def.sd_field_nr
 		# (arg_exprs,heaps) = add_FIELD_info_args generic_info field_def record_info_ds arg_exprs main_module_index heaps
-		= ([gcd_arity_expr : arg_exprs],heaps)
+		= ([gfd_index_expr : arg_exprs],heaps)
 	| generic_info bitand 4<>0 // gfd_cons
 		# generic_info = generic_info bitxor 4
 		# (record_info_expr, heaps) = buildFunApp main_module_index record_info_ds [] heaps
