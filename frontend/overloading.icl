@@ -2251,9 +2251,8 @@ where
 				# type_heaps & th_vars = writePtr tv_info_ptr (TVI_Type type2) th_vars
 				-> (True, type_heaps, coercion_env)
 			TVI_Type type1
-				# (ok, coercion_env) = equalize_type_attributes type1 type2 coercion_env
 				# type_heaps & th_vars = th_vars
-				-> (ok, type_heaps, coercion_env)
+				-> equalize_type_attributes type1 type2 defs type_heaps coercion_env
 	bindAndAdjustAttrs defs type1=:(TA cons_id1 cons_args1) type2=:(TA cons_id2 cons_args2) type_heaps coercion_env
 		| cons_id1 == cons_id2
 			= bindListsOfTypes defs cons_args1 cons_args2 type_heaps coercion_env
@@ -3952,11 +3951,11 @@ where
 	(<<<) file (CA_Instance rc) = file <<< "CA_Instance"
 	(<<<) file (CA_Context tc) = file <<< "CA_Context " <<< tc
 
-equalize_atype_attributes :: !AType !AType !*Coercions -> *(!Bool,!*Coercions)
-equalize_atype_attributes {at_attribute=at_attribute1,at_type=at_type1} {at_attribute=at_attribute2,at_type=at_type2} coercions
+equalize_atype_attributes :: !AType !AType !{#CommonDefs} !*TypeHeaps !*Coercions -> *(!Bool,!*TypeHeaps,!*Coercions)
+equalize_atype_attributes {at_attribute=at_attribute1,at_type=at_type1} {at_attribute=at_attribute2,at_type=at_type2} defs type_heaps coercions
 	# (ok1,coercions) = equalize_attributes at_attribute1 at_attribute2 coercions
-	# (ok2,coercions) = equalize_type_attributes at_type1 at_type2 coercions
-	= (ok1 && ok2,coercions)
+	# (ok2,type_heaps,coercions) = equalize_type_attributes at_type1 at_type2 defs type_heaps coercions
+	= (ok1 && ok2,type_heaps,coercions)
 
 equalize_attributes :: !TypeAttribute !TypeAttribute !*Coercions -> (!Bool,!*Coercions)
 equalize_attributes TA_Multi TA_Multi coercions
@@ -3980,39 +3979,53 @@ equalize_attributes (TA_TempVar av1_n) (TA_TempVar av2_n) coercions
 equalize_attributes attribute1 attribute2 coercions
 	= abort "equalize_attributes" ---> (attribute1,attribute2)
 
-equalize_type_attributes :: !Type !Type !*Coercions -> (!Bool,!*Coercions)
-equalize_type_attributes (arg_atype1-->res_atype1) (arg_atype2-->res_atype2) coercions
-	# (ok1,coercions) = equalize_atype_attributes arg_atype1 arg_atype2 coercions
-	# (ok2,coercions) = equalize_atype_attributes res_atype1 res_atype2 coercions
-	= (ok1 && ok2,coercions)
-equalize_type_attributes (TA _ cons_args1) (TA _ cons_args2) coercions
-	= equalize_atypes_attributes cons_args1 cons_args2 coercions
-equalize_type_attributes (TA _ cons_args1) (TAS _ cons_args2 _) coercions
-	= equalize_atypes_attributes cons_args1 cons_args2 coercions
-equalize_type_attributes (TAS _ cons_args1 _) (TAS _ cons_args2 _) coercions
-	= equalize_atypes_attributes cons_args1 cons_args2 coercions
-equalize_type_attributes (TAS _ cons_args1 _) (TA _ cons_args2) coercions
-	= equalize_atypes_attributes cons_args1 cons_args2 coercions
-equalize_type_attributes (_ :@: atypes1) (_ :@: atypes2) coercions
-	= equalize_atypes_attributes atypes1 atypes2 coercions
-equalize_type_attributes (TArrow1 atype1) (TArrow1 atype2) coercions
-	= equalize_atype_attributes atype1 atype2 coercions
-equalize_type_attributes (TB _) (TB _) coercions
-	= (True,coercions)
-equalize_type_attributes (TempV _) (TempV _) coercions
-	= (True,coercions)
-equalize_type_attributes TArrow TArrow coercions
-	= (True,coercions)
-equalize_type_attributes type1 type2 coercions
+equalize_type_attributes :: !Type !Type !{#CommonDefs} !*TypeHeaps !*Coercions -> (!Bool,!*TypeHeaps,!*Coercions)
+equalize_type_attributes (arg_atype1-->res_atype1) (arg_atype2-->res_atype2) defs type_heaps coercions
+	# (ok1,type_heaps,coercions) = equalize_atype_attributes arg_atype1 arg_atype2 defs type_heaps coercions
+	# (ok2,type_heaps,coercions) = equalize_atype_attributes res_atype1 res_atype2 defs type_heaps coercions
+	= (ok1 && ok2,type_heaps,coercions)
+equalize_type_attributes type1=:(TA cons_id1 cons_args1) type2=:(TA cons_id2 cons_args2) defs type_heaps coercions
+	| cons_id1==cons_id2
+		= equalize_atypes_attributes cons_args1 cons_args2 defs type_heaps coercions
+		= expand_and_equalize_type_attributes cons_id1 cons_args1 cons_id2 cons_args2 type1 type2 defs type_heaps coercions
+equalize_type_attributes type1=:(TA cons_id1 cons_args1) type2=:(TAS cons_id2 cons_args2 _) defs type_heaps coercions
+	| cons_id1==cons_id2
+		= equalize_atypes_attributes cons_args1 cons_args2 defs type_heaps coercions
+		= expand_and_equalize_type_attributes cons_id1 cons_args1 cons_id2 cons_args2 type1 type2 defs type_heaps coercions
+equalize_type_attributes type1=:(TAS cons_id1 cons_args1 _) type2=:(TAS cons_id2 cons_args2 _) defs type_heaps coercions
+	| cons_id1==cons_id2
+		= equalize_atypes_attributes cons_args1 cons_args2 defs type_heaps coercions
+		= expand_and_equalize_type_attributes cons_id1 cons_args1 cons_id2 cons_args2 type1 type2 defs type_heaps coercions
+equalize_type_attributes type1=:(TAS cons_id1 cons_args1 _) type2=:(TA cons_id2 cons_args2) defs type_heaps coercions
+	| cons_id1==cons_id2
+		= equalize_atypes_attributes cons_args1 cons_args2 defs type_heaps coercions
+		= expand_and_equalize_type_attributes cons_id1 cons_args1 cons_id2 cons_args2 type1 type2 defs type_heaps coercions
+equalize_type_attributes (_ :@: atypes1) (_ :@: atypes2) defs type_heaps coercions
+	= equalize_atypes_attributes atypes1 atypes2 defs type_heaps coercions
+equalize_type_attributes (TArrow1 atype1) (TArrow1 atype2) defs type_heaps coercions
+	= equalize_atype_attributes atype1 atype2 defs type_heaps coercions
+equalize_type_attributes (TB _) (TB _) defs type_heaps coercions
+	= (True,type_heaps,coercions)
+equalize_type_attributes (TempV _) (TempV _) defs type_heaps coercions
+	= (True,type_heaps,coercions)
+equalize_type_attributes TArrow TArrow defs type_heaps coercions
+	= (True,type_heaps,coercions)
+equalize_type_attributes type1 type2 defs type_heaps coercions
 	= abort "equalize_type_attributes" ---> (type1,type2)
 
-equalize_atypes_attributes :: ![AType] ![AType] !*Coercions -> *(!Bool,!*Coercions)
-equalize_atypes_attributes [atype1:atypes1] [atype2:atypes2] coercions
-	# (ok1,coercions) = equalize_atype_attributes atype1 atype2 coercions
-	# (ok2,coercions) = equalize_atypes_attributes atypes1 atypes2 coercions
-	= (ok1 && ok2,coercions)
-equalize_atypes_attributes [] [] coercions
-	= (True,coercions)
+expand_and_equalize_type_attributes cons_id1 cons_args1 cons_id2 cons_args2 type1 type2 defs type_heaps coercions
+	# (succ1, type1, type_heaps) = tryToExpandTypeSyn defs type1 cons_id1 cons_args1 type_heaps
+	# (succ2, type2, type_heaps) = tryToExpandTypeSyn defs type2 cons_id2 cons_args2 type_heaps
+	| succ1 || succ2
+		= equalize_type_attributes type1 type2 defs type_heaps coercions
+
+equalize_atypes_attributes :: ![AType] ![AType] !{#CommonDefs} !*TypeHeaps !*Coercions -> *(!Bool,!*TypeHeaps,!*Coercions)
+equalize_atypes_attributes [atype1:atypes1] [atype2:atypes2] defs type_heaps coercions
+	# (ok1,type_heaps,coercions) = equalize_atype_attributes atype1 atype2 defs type_heaps coercions
+	# (ok2,type_heaps,coercions) = equalize_atypes_attributes atypes1 atypes2 defs type_heaps coercions
+	= (ok1 && ok2,type_heaps,coercions)
+equalize_atypes_attributes [] [] defs type_heaps coercions
+	= (True,type_heaps,coercions)
 
 // containsTypeVariable copied from module type and extended
 class containsTypeVariable a :: !Int !a !{!Type} -> Bool
