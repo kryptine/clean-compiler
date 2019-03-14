@@ -1741,9 +1741,9 @@ qualified_idents_to_import_declarations NoQualifiedIdents
 qualified_ident_to_import_declaration IC_Expression ident
 	= ID_Function ident
 qualified_ident_to_import_declaration IC_Type ident
-	= ID_Type ident No
+	= ID_Type ident IB_None
 qualified_ident_to_import_declaration IC_Class ident
-	= ID_Class ident No
+	= ID_Class ident IB_None
 qualified_ident_to_import_declaration IC_Selector ident
 	= abort "qualified_ident_to_import_declaration IC_Selector not yet implemented"
 
