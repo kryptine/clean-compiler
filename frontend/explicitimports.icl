@@ -144,6 +144,13 @@ getBelongingSymbolsFromImportDeclaration (ID_Type _ x) = x
 getBelongingSymbolsFromImportDeclaration (ID_Record _ x) = x
 getBelongingSymbolsFromImportDeclaration _ = IB_None
 
+importDeclarationImportsBelongingSymbols :: !ImportDeclaration -> Bool
+importDeclarationImportsBelongingSymbols (ID_Class _ (IB_Idents _)) = True
+importDeclarationImportsBelongingSymbols (ID_Class _ (IB_IdentsAndOptIdents _ _)) = True
+importDeclarationImportsBelongingSymbols (ID_Type _ (IB_Idents _)) = True
+importDeclarationImportsBelongingSymbols (ID_Record _ (IB_Idents _)) = True
+importDeclarationImportsBelongingSymbols _ = False
+
 :: ExplicitImportsModuleInfo = {
 	eimi_module_path :: ![Int],
 	eimi_modules_explicit_imports :: !IntKeyHashtable [ExplicitImport],
@@ -706,9 +713,9 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set modules_in_co
 
 	update_belonging_accu :: Declaration ImportNrAndIdents Int [Belonging] -> [Belonging]
 	update_belonging_accu di_decl ini imported_mod belonging_accu
-		= case getBelongingSymbolsFromImportDeclaration ini.ini_imp_decl of
-			IB_None		-> belonging_accu
-			IB_Idents _	-> [{belonging_declaration=di_decl, belonging_import_n_and_idents=ini, belonging_imported_mod=imported_mod}:belonging_accu]
+		| importDeclarationImportsBelongingSymbols ini.ini_imp_decl
+			= [{belonging_declaration=di_decl, belonging_import_n_and_idents=ini, belonging_imported_mod=imported_mod}:belonging_accu]
+			= belonging_accu
 
 	search_symbol :: *DeclaringModulesSet Int Int ExplicitImportsModuleInfo *{#Int} -> *(!Optional DeclarationInfo,![Int],!*DeclaringModulesSet,!*{#Int})
 	search_symbol eii_declaring_modules imported_symbol_n imported_mod eimi=:{eimi_modules_explicit_imports,eimi_component_mods,eimi_module_path} visited_modules
