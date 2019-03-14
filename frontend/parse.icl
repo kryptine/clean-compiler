@@ -1412,9 +1412,11 @@ wantImportDeclarationT token pState
 			  (class_id, pState)			= stringToIdent name IC_Class pState
 			  (token, pState) = nextToken FunctionContext pState
 			| token == OpenToken
-			  	#	(members, pState)			= want_names want IC_Expression CloseToken pState
-			  	->	(ID_Class class_id (IB_Idents members), pState)
-			  	->	(ID_Class class_id IB_None, tokenBack pState)
+				# (members,default_members,pState) = want_class_members want name pState
+				| members=:[] || default_members=:[]
+					->	(ID_Class class_id (IB_Idents members), pState)
+					->	(ID_Class class_id (IB_IdentsAndOptIdents members default_members), pState)
+				->	(ID_Class class_id IB_None, tokenBack pState)
 		InstanceToken
 			#	(class_name, pState)	= want pState
 				(types, pState)			= wantList "instance types" tryBrackType pState
@@ -1453,6 +1455,34 @@ where
 		| token == close_token
 			= ([name_id], pState)
 			= ([name_id], parseError "ImportDeclaration" (Yes token) ")" pState)
+
+	want_class_members want_fun class_name pState
+		# (token, pState) = nextToken FunctionContext pState
+		| token=:DotDotToken
+			= ([], [], wantToken FunctionContext "import declaration" CloseToken pState)
+			= want_list_of_class_members want_fun class_name (tokenBack pState)
+	where
+		want_list_of_class_members want_fun class_name pState
+			# (name, pState) = want_fun pState
+			  (name_id, pState)	= stringToIdent name IC_Expression pState
+			  (token, pState) = nextToken FunctionContext pState
+			| token=:OpenToken
+				# pState = wantToken FunctionContext "import declaration" CloseToken pState
+				  (token, pState) = nextToken FunctionContext pState
+				| token=:CommaToken
+					# (names, default_members, pState) = want_list_of_class_members want_fun class_name pState
+					= ([name_id:names], default_members, pState)
+				| token=:CloseToken
+					= ([name_id], [], pState)
+					= ([name_id], [], parseError "ImportDeclaration" (Yes token) ")" pState)
+				# macro_name = class_name+++"_"+++name
+				  (default_member_ident, pState) = stringToIdent macro_name IC_Expression pState
+				| token=:CommaToken
+					# (names, default_members, pState) = want_list_of_class_members want_fun class_name pState
+					= ([name_id:names], [default_member_ident:default_members], pState)
+				| token=:CloseToken
+					= ([name_id], [default_member_ident], pState)
+					= ([name_id], [default_member_ident], parseError "ImportDeclaration" (Yes token) ")" pState)
 		
 	optional_extension pState
 		# (token, pState) = nextToken FunctionContext pState

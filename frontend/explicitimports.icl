@@ -220,11 +220,11 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 		  (ExplImpInfo eii_ident eii_declaring_modules, expl_imp_info) = expl_imp_info![ini_symbol_nr]
 		  (need_all, belongs_set, cs_error, cs_symbol_table)
 		  		= case belongs of
-		  			IB_Idents []
+					IB_Idents []
 		  				// an import like ::A(..) or ::A{..} or class c{..} 
 						# belongs_set = [(belong_nr, belong_ident) \\ belong_nr<-[0..] & belong_ident<-all_belongs]
 						-> (False, belongs_set, cs_error, cs_symbol_table)
-		  			IB_Idents belongs
+					IB_Idents belongs
 		  				// an import like ::A(C1, C2) or ::A{f1} or class c{m1} 
 		  				# (nr_of_belongs, cs_symbol_table)
 			  					= foldSt numerate_belongs all_belongs (0, cs_symbol_table)
@@ -232,14 +232,14 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 						  		= get_opt_nr_and_idents belongs position eii_ident [] cs_error cs_symbol_table
 			  			  cs_symbol_table = restoreIdentsSymbolPtrs all_belongs cs_symbol_table
 						-> (True, belongs_set, cs_error, cs_symbol_table)
-		  			IB_IdentsAndOptIdents belongs optional_belongs
-		  				# (nr_of_belongs, cs_symbol_table)
-			  					= foldSt numerate_belongs all_belongs (0, cs_symbol_table)
+					IB_IdentsAndOptIdents belongs optional_belongs
+						# (nr_of_belongs, cs_symbol_table)
+								= foldSt numerate_belongs all_belongs (0, cs_symbol_table)
 						  (opt_belongs_set, cs_symbol_table)
-						  		= try_get_opt_nr_and_idents optional_belongs [] cs_symbol_table
+								= try_get_opt_nr_and_idents optional_belongs [] cs_symbol_table
 						  (belongs_set, cs_error, cs_symbol_table)
-						  		= get_opt_nr_and_idents belongs position eii_ident opt_belongs_set cs_error cs_symbol_table
-			  			  cs_symbol_table = restoreIdentsSymbolPtrs all_belongs cs_symbol_table
+								= get_opt_nr_and_idents belongs position eii_ident opt_belongs_set cs_error cs_symbol_table
+						  cs_symbol_table = restoreIdentsSymbolPtrs all_belongs cs_symbol_table
 						-> (True, belongs_set, cs_error, cs_symbol_table)
 		  (decls_accu, dcl_modules, eii_declaring_modules, visited_modules, cs_error)
 				= foldSt
@@ -300,16 +300,7 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 					# decl = Declaration { decl_ident = ds_ident, decl_pos = position,
 										   decl_kind = STE_Imported STE_Member def_mod_index,
 										   decl_index = ds_index }
-					| belong_nr>=size default_member_indexes
-						-> ([decl : decls_accu], dcl_modules)
-					# default_macros_index = default_member_indexes.[belong_nr]
-					| default_macros_index<0
-						-> ([decl : decls_accu], dcl_modules)
-						#! {mm_ident,mm_index} = default_macros.[default_macros_index]
-						# macro_decl = Declaration { decl_ident = mm_ident, decl_pos = position,
-													 decl_kind = STE_Imported (STE_DclMacroOrLocalMacroFunction []) def_mod_index,
-													 decl_index = mm_index }
-						-> ([decl,macro_decl : decls_accu], dcl_modules)
+					-> ([decl : decls_accu], dcl_modules)
 				| belong_nr<size class_members+size macro_members
 					# {mm_ident,mm_index} = macro_members.[belong_nr-size class_members]
 					-> ([Declaration { decl_ident = mm_ident, decl_pos = position,
