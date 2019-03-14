@@ -1475,19 +1475,19 @@ wantImportDeclarationT token pState
 			  (token, pState) = nextToken FunctionContext pState
 			| token == OpenToken
 			  	#	(conses, pState)			= want_names (wantConstructorName "import type (..)") IC_Expression CloseToken pState
-			  	->	(ID_Type type_id (Yes conses), pState)
+			  	->	(ID_Type type_id (IB_Idents conses), pState)
 			| token == CurlyOpenToken
 			  	#	(fields, pState) = want_names (wantLowerCaseName "import record fields") (IC_Field type_id) CurlyCloseToken pState
-			  	->	(ID_Record type_id (Yes fields), pState)
-			  	->	(ID_Type type_id No, tokenBack pState)
+			  	->	(ID_Record type_id (IB_Idents fields), pState)
+			  	->	(ID_Type type_id IB_None, tokenBack pState)
 		ClassToken
 			# (name, pState)				= want pState
 			  (class_id, pState)			= stringToIdent name IC_Class pState
 			  (token, pState) = nextToken FunctionContext pState
 			| token == OpenToken
 			  	#	(members, pState)			= want_names want IC_Expression CloseToken pState
-			  	->	(ID_Class class_id (Yes members), pState)
-			  	->	(ID_Class class_id No, tokenBack pState)
+			  	->	(ID_Class class_id (IB_Idents members), pState)
+			  	->	(ID_Class class_id IB_None, tokenBack pState)
 		InstanceToken
 			#	(class_name, pState)	= want pState
 				(types, pState)			= wantList "instance types" tryBrackType pState
@@ -1509,7 +1509,7 @@ wantImportDeclarationT token pState
 			->	( ID_Function fun_id
 				, parseError "from import" (Yes token) "imported item" pState
 				)
-where				
+where
 	want_names want_fun ident_kind close_token pState
 		# (token, pState) = nextToken FunctionContext pState
 		| token == DotDotToken

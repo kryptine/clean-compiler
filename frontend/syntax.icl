@@ -867,6 +867,12 @@ where
 	(<<<) file (ID_Record ident optIdents)	= file <<< ident <<< " { " <<< optIdents <<< " } "
 	(<<<) file (ID_Instance i1 i2 tup)		= file <<< "instance " <<< i1 <<< i2 <<< tup // !ImportedIdent !Ident !(![Type],![TypeContext])
 
+instance <<< ImportBelongings
+where
+	(<<<) file IB_None = file
+	(<<<) file (IB_Idents idents) = file <<< idents
+	(<<<) file (IB_IdentsAndOptIdents idents opt_idents) = file <<< idents <<< ' ' <<< opt_idents
+
 instance <<< CoercionPosition
 where
 	(<<<) file (CP_FunArg fun_name arg_nr)

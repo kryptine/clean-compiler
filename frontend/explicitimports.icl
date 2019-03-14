@@ -138,11 +138,11 @@ FoldSt op l st :== fold_st l st
 		fold_st [|] st		= st
 		fold_st [|a:x] st	= fold_st x (op a st)
 
-getBelongingSymbolsFromImportDeclaration :: !ImportDeclaration -> Optional [Ident]
+getBelongingSymbolsFromImportDeclaration :: !ImportDeclaration -> ImportBelongings
 getBelongingSymbolsFromImportDeclaration (ID_Class _ x) = x
 getBelongingSymbolsFromImportDeclaration (ID_Type _ x) = x
 getBelongingSymbolsFromImportDeclaration (ID_Record _ x) = x
-getBelongingSymbolsFromImportDeclaration _ = No
+getBelongingSymbolsFromImportDeclaration _ = IB_None
 
 :: ExplicitImportsModuleInfo = {
 	eimi_module_path :: ![Int],
@@ -318,7 +318,7 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set modules_in_co
 	get_numbered_belongings :: Ident Belonging Position v:{#DclModule}  *ErrorAdmin  *SymbolTable
 			-> (!Bool,![(Int,Ident)],!BelongingSymbols,!v:{#DclModule},!*ErrorAdmin,!*SymbolTable)
 	get_numbered_belongings eii_ident {belonging_declaration,belonging_import_n_and_idents={ini_imp_decl}} position dcl_modules cs_error cs_symbol_table
-		# (Yes belongs) = getBelongingSymbolsFromImportDeclaration ini_imp_decl
+		# (IB_Idents belongs) = getBelongingSymbolsFromImportDeclaration ini_imp_decl
 		  (all_belongs,belonging_symbols,dcl_modules) = get_all_belongs belonging_declaration dcl_modules
   		= case belongs of
   			[]
@@ -707,8 +707,8 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set modules_in_co
 	update_belonging_accu :: Declaration ImportNrAndIdents Int [Belonging] -> [Belonging]
 	update_belonging_accu di_decl ini imported_mod belonging_accu
 		= case getBelongingSymbolsFromImportDeclaration ini.ini_imp_decl of
-			No		-> belonging_accu
-			Yes _	-> [{belonging_declaration=di_decl, belonging_import_n_and_idents=ini, belonging_imported_mod=imported_mod}:belonging_accu]
+			IB_None		-> belonging_accu
+			IB_Idents _	-> [{belonging_declaration=di_decl, belonging_import_n_and_idents=ini, belonging_imported_mod=imported_mod}:belonging_accu]
 
 	search_symbol :: *DeclaringModulesSet Int Int ExplicitImportsModuleInfo *{#Int} -> *(!Optional DeclarationInfo,![Int],!*DeclaringModulesSet,!*{#Int})
 	search_symbol eii_declaring_modules imported_symbol_n imported_mod eimi=:{eimi_modules_explicit_imports,eimi_component_mods,eimi_module_path} visited_modules
@@ -880,22 +880,22 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set modules_in_co
 	search_imported_symbol imported_symbol_n [{ini_symbol_nr, ini_imp_decl}:t]
 		= imported_symbol_n==ini_symbol_nr || search_imported_symbol imported_symbol_n t
 
-	search_imported_symbol_and_belongings :: !Int ![ImportNrAndIdents] -> (!Bool, !Optional [Ident])
+	search_imported_symbol_and_belongings :: !Int ![ImportNrAndIdents] -> (!Bool, !ImportBelongings)
 	search_imported_symbol_and_belongings imported_symbol_n []
-		= (False, No)
+		= (False, IB_None)
 	search_imported_symbol_and_belongings imported_symbol_n [{ini_symbol_nr, ini_imp_decl}:t]
 		| imported_symbol_n==ini_symbol_nr
 			= (True, getBelongingSymbolsFromImportDeclaration ini_imp_decl)
 		= search_imported_symbol_and_belongings imported_symbol_n t
 
-	belong_ident_found :: !Ident !(Optional [Ident]) -> Bool
-	belong_ident_found belong_ident No
+	belong_ident_found :: !Ident !ImportBelongings -> Bool
+	belong_ident_found belong_ident IB_None
 		// like from m import ::T
 		= False
-	belong_ident_found belong_ident (Yes [])
+	belong_ident_found belong_ident (IB_Idents [])
 		// like from m import ::T(..)
 		= True 
-	belong_ident_found belong_ident (Yes import_list)
+	belong_ident_found belong_ident (IB_Idents import_list)
 		// like from m import ::T(C1,C2)
 		= is_member belong_ident import_list
 

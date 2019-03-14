@@ -555,11 +555,13 @@ instance toString Import, AttributeVar, TypeAttribute, Annotation
 ::	ParsedImport		:== Import
 
 ::	ImportDeclaration	= ID_Function !Ident
-						| ID_Class !Ident !(Optional [Ident])
-						| ID_Type !Ident !(Optional [Ident])
-						| ID_Record !Ident !(Optional [Ident])
+						| ID_Class !Ident !ImportBelongings
+						| ID_Type !Ident !ImportBelongings
+						| ID_Record !Ident !ImportBelongings
 						| ID_Instance !Ident !Ident !(![Type],![TypeContext])
 						| ID_Generic !Ident !Ident
+
+::	ImportBelongings = IB_None | IB_Idents ![Ident] | IB_IdentsAndOptIdents ![Ident] ![Ident]
 
 cIsImportedLibrary :== True
 cIsImportedObject :== False
