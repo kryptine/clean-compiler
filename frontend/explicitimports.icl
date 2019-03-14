@@ -228,8 +228,8 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 		  				// an import like ::A(C1, C2) or ::A{f1} or class c{m1} 
 		  				# (nr_of_belongs, cs_symbol_table)
 			  					= foldSt numerate_belongs all_belongs (0, cs_symbol_table)
-						  (belongs_set, (cs_error, cs_symbol_table))
-						  		= mapFilterYesSt (get_opt_nr_and_ident position eii_ident) belongs (cs_error, cs_symbol_table)
+						  (belongs_set, cs_error, cs_symbol_table)
+						  		= get_opt_nr_and_idents belongs position eii_ident [] cs_error cs_symbol_table
 			  			  cs_symbol_table = restoreIdentsSymbolPtrs all_belongs cs_symbol_table
 						-> (True, belongs_set, cs_error, cs_symbol_table)
 		  (decls_accu, dcl_modules, eii_declaring_modules, visited_modules, cs_error)
@@ -334,16 +334,22 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 		  new_ste = { ste & ste_kind = STE_BelongingSymbol i, ste_previous = ste }
 		= (i+1, writePtr id_info new_ste cs_symbol_table)
 	
-	get_opt_nr_and_ident :: Position Ident Ident !*(*ErrorAdmin,!*SymbolTable) -> (!Optional (Int,Ident),!*(!*ErrorAdmin,!*SymbolTable))
-	get_opt_nr_and_ident position eii_ident ii_ident=:{id_info} (cs_error, cs_symbol_table)
+	get_opt_nr_and_idents :: ![Ident] Position Ident ![(Int,Ident)] !*ErrorAdmin !*SymbolTable -> (![(Int,Ident)],!*ErrorAdmin,!*SymbolTable)
+	get_opt_nr_and_idents [ii_ident=:{id_info}:idents] position eii_ident opt_nr_and_idents cs_error cs_symbol_table
 		# ({ste_kind}, cs_symbol_table) = readPtr id_info cs_symbol_table
 		= case ste_kind of
 			STE_BelongingSymbol i
-				-> (Yes (i, ii_ident), (cs_error, cs_symbol_table))
+				# (opt_nr_and_idents,cs_error,cs_symbol_table)
+					= get_opt_nr_and_idents idents position eii_ident opt_nr_and_idents cs_error cs_symbol_table
+				# opt_nr_and_idents = [(i, ii_ident):opt_nr_and_idents]
+				-> (opt_nr_and_idents,cs_error,cs_symbol_table)
 			_
 				# cs_error = pushErrorAdmin (newPosition import_ident position) cs_error
-				  cs_error = checkError ii_ident ("does not belong to "+++eii_ident.id_name) cs_error 
-				-> (No, (popErrorAdmin cs_error, cs_symbol_table))
+				  cs_error = checkError ii_ident ("does not belong to "+++eii_ident.id_name) cs_error
+				  cs_error = popErrorAdmin cs_error
+				-> get_opt_nr_and_idents idents position eii_ident opt_nr_and_idents cs_error cs_symbol_table
+	get_opt_nr_and_idents [] position eii_ident opt_nr_and_idents cs_error cs_symbol_table
+		= (opt_nr_and_idents,cs_error,cs_symbol_table)
 
 	search_expl_imp_symbol :: ExplicitImportsModuleInfo Int ImportNrAndIdents
 							  *([ImportNrAndIdents],[Declaration],[Belonging],*{#Int},*{!*ExplImpInfo})
@@ -498,6 +504,9 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 	belong_ident_found belong_ident (IB_Idents import_list)
 		// like from m import ::T(C1,C2)
 		= is_member belong_ident import_list
+	belong_ident_found belong_ident (IB_IdentsAndOptIdents import_list macro_member_list)
+		// like from m import class T(m1,m2)
+		= is_member belong_ident import_list || is_member belong_ident macro_member_list
 
 	is_member :: !Ident ![Ident] -> Bool
 	is_member belong_ident []
