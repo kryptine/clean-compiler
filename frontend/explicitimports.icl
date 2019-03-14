@@ -124,6 +124,13 @@ getBelongingSymbolsFromImportDeclaration (ID_Type _ x) = x
 getBelongingSymbolsFromImportDeclaration (ID_Record _ x) = x
 getBelongingSymbolsFromImportDeclaration _ = IB_None
 
+importDeclarationImportsBelongingSymbols :: !ImportDeclaration -> Bool
+importDeclarationImportsBelongingSymbols (ID_Class _ (IB_Idents _)) = True
+importDeclarationImportsBelongingSymbols (ID_Class _ (IB_IdentsAndOptIdents _ _)) = True
+importDeclarationImportsBelongingSymbols (ID_Type _ (IB_Idents _)) = True
+importDeclarationImportsBelongingSymbols (ID_Record _ (IB_Idents _)) = True
+importDeclarationImportsBelongingSymbols _ = False
+
 :: ExplicitImportsModuleInfo = {
 	eimi_module_path :: ![Int],
 	eimi_modules_explicit_imports :: !IntKeyHashtable [ExplicitImport],
@@ -221,7 +228,6 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 		  				// an import like ::A(C1, C2) or ::A{f1} or class c{m1} 
 		  				# (nr_of_belongs, cs_symbol_table)
 			  					= foldSt numerate_belongs all_belongs (0, cs_symbol_table)
-						  belongs_bitvect = bitvectCreate nr_of_belongs
 						  (belongs_set, (cs_error, cs_symbol_table))
 						  		= mapFilterYesSt (get_opt_nr_and_ident position eii_ident) belongs (cs_error, cs_symbol_table)
 			  			  cs_symbol_table = restoreIdentsSymbolPtrs all_belongs cs_symbol_table
@@ -386,9 +392,9 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 
 	update_belonging_accu :: Declaration ImportNrAndIdents Int [Belonging] -> [Belonging]
 	update_belonging_accu di_decl ini imported_mod belonging_accu
-		= case getBelongingSymbolsFromImportDeclaration ini.ini_imp_decl of
-			IB_None		-> belonging_accu
-			IB_Idents _	-> [{belonging_declaration=di_decl, belonging_import_n_and_idents=ini, belonging_imported_mod=imported_mod}:belonging_accu]
+		| importDeclarationImportsBelongingSymbols ini.ini_imp_decl
+			= [{belonging_declaration=di_decl, belonging_import_n_and_idents=ini, belonging_imported_mod=imported_mod}:belonging_accu]
+			= belonging_accu
 
 	search_symbol :: *DeclaringModulesSet Int Int ExplicitImportsModuleInfo *{#Int} -> *(!Optional DeclarationInfo,![Int],!*DeclaringModulesSet,!*{#Int})
 	search_symbol eii_declaring_modules imported_symbol_n imported_mod eimi=:{eimi_modules_explicit_imports,eimi_component_mods,eimi_module_path} visited_modules
