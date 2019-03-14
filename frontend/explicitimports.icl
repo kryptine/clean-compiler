@@ -487,16 +487,7 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set modules_in_co
 					# decl = Declaration { decl_ident = ds_ident, decl_pos = position,
 										   decl_kind = STE_Imported STE_Member def_mod_index,
 										   decl_index = ds_index }
-					| belong_nr>=size default_member_indexes
-						-> ([decl : decls_accu], dcl_modules)
-					# default_macros_index = default_member_indexes.[belong_nr]
-					| default_macros_index<0
-						-> ([decl : decls_accu], dcl_modules)
-						#! {mm_ident,mm_index} = default_macros.[default_macros_index]
-						# macro_decl = Declaration { decl_ident = mm_ident, decl_pos = position,
-													 decl_kind = STE_Imported (STE_DclMacroOrLocalMacroFunction []) def_mod_index,
-													 decl_index = mm_index }
-						-> ([decl,macro_decl : decls_accu], dcl_modules)
+					-> ([decl : decls_accu], dcl_modules)
 				| belong_nr<size class_members+size macro_members
 					# {mm_ident,mm_index} = macro_members.[belong_nr-size class_members]
 					-> ([Declaration { decl_ident = mm_ident, decl_pos = position,
