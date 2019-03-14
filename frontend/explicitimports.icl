@@ -325,19 +325,27 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set modules_in_co
 	get_numbered_belongings :: Ident Belonging Position v:{#DclModule}  *ErrorAdmin  *SymbolTable
 			-> (!Bool,![(Int,Ident)],!BelongingSymbols,!v:{#DclModule},!*ErrorAdmin,!*SymbolTable)
 	get_numbered_belongings eii_ident {belonging_declaration,belonging_import_n_and_idents={ini_imp_decl}} position dcl_modules cs_error cs_symbol_table
-		# (IB_Idents belongs) = getBelongingSymbolsFromImportDeclaration ini_imp_decl
+		# belongs = getBelongingSymbolsFromImportDeclaration ini_imp_decl
 		  (all_belongs,belonging_symbols,dcl_modules) = get_all_belongs belonging_declaration dcl_modules
   		= case belongs of
-  			[]
+			IB_Idents []
   				// an import like ::A(..) or ::A{..} or class c{..}
 				# belongs_set = [(belong_nr, belong_ident) \\ belong_nr<-[0..] & belong_ident<-all_belongs]
 				-> (False, belongs_set,	belonging_symbols, dcl_modules, cs_error, cs_symbol_table)
-  			_
+			IB_Idents belongs
   				// an import like ::A(C1, C2) or ::A{f1} or class c{m1} 
 				# (nr_of_belongs, cs_symbol_table) = foldSt numerate_belongs all_belongs (0, cs_symbol_table)
 				  (belongs_set, cs_error, cs_symbol_table)
 					= get_opt_nr_and_idents belongs position eii_ident [] cs_error cs_symbol_table
 	  			  cs_symbol_table = restoreIdentsSymbolPtrs all_belongs cs_symbol_table
+				-> (True, belongs_set, belonging_symbols, dcl_modules, cs_error, cs_symbol_table)
+			IB_IdentsAndOptIdents belongs optional_belongs
+				# (nr_of_belongs, cs_symbol_table) = foldSt numerate_belongs all_belongs (0, cs_symbol_table)
+				  (opt_belongs_set, cs_symbol_table)
+					= try_get_opt_nr_and_idents optional_belongs [] cs_symbol_table
+				  (belongs_set, cs_error, cs_symbol_table)
+					= get_opt_nr_and_idents belongs position eii_ident opt_belongs_set cs_error cs_symbol_table
+				  cs_symbol_table = restoreIdentsSymbolPtrs all_belongs cs_symbol_table
 				-> (True, belongs_set, belonging_symbols, dcl_modules, cs_error, cs_symbol_table)
 
 	search_qualified_hidden_belonging :: Bool Position Ident Declaration BelongingSymbols Int Int Int [Int] ExplicitImportsModuleInfo (Int,Ident)
@@ -580,6 +588,20 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set modules_in_co
 				-> get_opt_nr_and_idents idents position eii_ident opt_nr_and_idents cs_error cs_symbol_table
 	get_opt_nr_and_idents [] position eii_ident opt_nr_and_idents cs_error cs_symbol_table
 		= (opt_nr_and_idents,cs_error,cs_symbol_table)
+
+	try_get_opt_nr_and_idents :: ![Ident] ![(Int,Ident)] !*SymbolTable -> (![(Int,Ident)],!*SymbolTable)
+	try_get_opt_nr_and_idents [ii_ident=:{id_info}:idents] opt_nr_and_idents cs_symbol_table
+		# ({ste_kind}, cs_symbol_table) = readPtr id_info cs_symbol_table
+		= case ste_kind of
+			STE_BelongingSymbol i
+				# (opt_nr_and_idents,cs_symbol_table)
+					= try_get_opt_nr_and_idents idents opt_nr_and_idents cs_symbol_table
+				# opt_nr_and_idents = [(i, ii_ident):opt_nr_and_idents]
+				-> (opt_nr_and_idents,cs_symbol_table)
+			_
+				-> try_get_opt_nr_and_idents idents opt_nr_and_idents cs_symbol_table
+	try_get_opt_nr_and_idents [] opt_nr_and_idents cs_symbol_table
+		= (opt_nr_and_idents,cs_symbol_table)
 
 	search_expl_imp_symbol :: ExplicitImportsModuleInfo Int ImportNrAndIdents
 							  *([ImportNrAndIdents],[Declaration],[Belonging],*{#Int},*{!*ExplImpInfo})
