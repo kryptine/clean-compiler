@@ -1259,9 +1259,6 @@ instance check_completeness Let where
   		  ) ccs
 
 instance check_completeness MemberDef where
-  	check_completeness {me_type,me_default_implementation=Yes {mm_index},me_class} cci ccs
-		# (macro,ccs) = ccs!box_ccs.ccs_macro_defs.[me_class.glob_module,mm_index];
-		= check_completeness macro cci (check_completeness me_type cci ccs)
   	check_completeness {me_type} cci ccs 
   		= check_completeness me_type cci ccs
 
