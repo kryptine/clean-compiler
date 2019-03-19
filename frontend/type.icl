@@ -2965,16 +2965,16 @@ get_index_of_start_rule main_dcl_module_n predef_symbols
 
 unify_requirements_of_functions :: ![FunctionRequirements] !TypeInput !*{!Type} !*TypeHeaps !*ErrorAdmin -> (!*{!Type},!*TypeHeaps,!*ErrorAdmin)
 unify_requirements_of_functions [{fe_requirements={req_type_coercion_groups},fe_location={ip_ident}} : reqs_list] ti subst heaps ts_error
-	# (subst, heaps, ts_error) = foldSt (unify_requirements_within_one_position ip_ident ti) req_type_coercion_groups (subst, heaps, ts_error)
+	# (subst, heaps, ts_error) = foldSt (unify_requirements_within_one_position ip_ident ti) (reverse req_type_coercion_groups) (subst, heaps, ts_error)
 	= unify_requirements_of_functions reqs_list ti subst heaps ts_error
 where
 	unify_requirements_within_one_position :: !Ident !TypeInput !TypeCoercionGroup !(*{!Type}, !*TypeHeaps, !*ErrorAdmin)
 						-> (*{!Type}, !*TypeHeaps, !*ErrorAdmin)
 	unify_requirements_within_one_position _ ti {tcg_type_coercions, tcg_position=NoPos} (subst, heaps, ts_error)
-		= unify_coercions tcg_type_coercions ti subst heaps ts_error
+		= unify_coercions (reverse tcg_type_coercions) ti subst heaps ts_error
 	unify_requirements_within_one_position fun_ident ti {tcg_type_coercions, tcg_position} (subst, heaps, ts_error)
 		# ts_error = setErrorAdmin (newPosition fun_ident tcg_position) ts_error
-		= unify_coercions tcg_type_coercions ti subst heaps ts_error
+		= unify_coercions (reverse tcg_type_coercions) ti subst heaps ts_error
 unify_requirements_of_functions [] ti subst heaps ts_error
 	= (subst, heaps, ts_error)
 
