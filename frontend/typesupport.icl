@@ -44,6 +44,8 @@ import syntax, expand_types, unitype, utilities, checktypes
 	,	cui_is_lifted_part	:: !Bool
 	}
 
+::	VarInfo | VI_ContextSpecified
+
 class clean_up a ::  !CleanUpInput !a !*CleanUpState -> (!a, !*CleanUpState)
 
 instance clean_up AType
@@ -258,10 +260,8 @@ where
 	cleanUpClosed (TempCV tv_number :@: types) env
 		# (type, env) = env![tv_number]
 		# (cur1, type, env) = cleanUpClosedVariable type env
-		| checkCleanUpResult cur1 cUndefinedVar
-			= (cur1, TempCV tv_number :@: types, env)
-			# (cur2, types, env) = cleanUpClosed types env
-            = (combineCleanUpResults cur1 cur2, simplifyTypeApplication type types, env)
+		# (cur2, types, env) = cleanUpClosed types env
+		= (combineCleanUpResults cur1 cur2, simplifyTypeApplication type types, env)
 	cleanUpClosed t=:(TempQV _) env
 		= (cQVar, t, env)
 	cleanUpClosed t=:(TempQDV _) env
@@ -273,10 +273,8 @@ instance cleanUpClosed (a,b) | cleanUpClosed a & cleanUpClosed b
 where
 	cleanUpClosed (x,y) env
 		# (cur1, x, env) = cleanUpClosed x env
-		| checkCleanUpResult cur1 cUndefinedVar
-			= (cur1, (x,y), env)
-			# (cur2, y, env) = cleanUpClosed y env
-			= (combineCleanUpResults cur1 cur2, (x,y), env)
+		# (cur2, y, env) = cleanUpClosed y env
+		= (combineCleanUpResults cur1 cur2, (x,y), env)
 
 instance cleanUpClosed [a] | cleanUpClosed a
 where
@@ -343,9 +341,11 @@ newAttributedVariable var_number (variables, attributes, type_heaps=:{th_vars,th
 cSpecifiedType	:== True
 cDerivedType	:== False
 
+:: ErrorContexts = AmbiguousContext !TypeContext !ErrorContexts | MissingContext !TypeContext !ErrorContexts | NoErrorContexts
+
 cleanUpSymbolType :: !Bool !Bool !TempSymbolType ![TypeContext] ![ExprInfoPtr] !{! CoercionTree} !AttributePartition
-						!*VarEnv !*AttributeEnv !*TypeHeaps !*VarHeap !*ExpressionHeap !*ErrorAdmin
-							-> (!SymbolType, !*VarEnv, !*AttributeEnv, !*TypeHeaps, !*VarHeap, !*ExpressionHeap, !*ErrorAdmin)
+												   !*VarEnv !*AttributeEnv !*TypeHeaps !*VarHeap !*ExpressionHeap !*ErrorAdmin
+					-> (!SymbolType,!ErrorContexts,!*VarEnv,!*AttributeEnv,!*TypeHeaps,!*VarHeap,!*ExpressionHeap,!*ErrorAdmin)
 cleanUpSymbolType is_start_rule spec_type {tst_arity,tst_args,tst_result,tst_context,tst_lifted} derived_context case_and_let_exprs
 		coercions attr_part var_env attr_var_env heaps var_heap expr_heap error
 	#! nr_of_temp_vars = size var_env
@@ -358,7 +358,8 @@ cleanUpSymbolType is_start_rule spec_type {tst_arity,tst_args,tst_result,tst_con
 	  (lifted_vars, cus_var_env) = determine_type_vars nr_of_temp_vars [] cus_var_env
 	  (st_args, (_, cus))	= mapSt (clean_up_arg_type cui) (drop tst_lifted tst_args) ([], { cus & cus_var_env = cus_var_env })
 	  (st_result, cus) = clean_up_result_type cui tst_result cus
-	  (st_context, cus_var_env, var_heap, cus_error) = clean_up_type_contexts spec_type tst_context derived_context cus.cus_var_env var_heap cus.cus_error
+	  (st_context, ambiguous_or_missing_contexts, cus_var_env, var_heap, cus_error)
+		= clean_up_type_contexts spec_type tst_context derived_context cus.cus_var_env var_heap cus.cus_error
 	  (st_vars, cus_var_env) = determine_type_vars nr_of_temp_vars lifted_vars cus_var_env
 	  (cus_attr_env, st_attr_vars, st_attr_env, cus_error)
 	  		= build_attribute_environment cus.cus_appears_in_lifted_part 0 max_attr_nr coercions (bitvectCreate max_attr_nr) cus.cus_attr_env [] [] cus_error
@@ -370,8 +371,9 @@ cleanUpSymbolType is_start_rule spec_type {tst_arity,tst_args,tst_result,tst_con
 	  st = {st_arity = tst_arity, st_vars = st_vars , st_args = lifted_args ++ st_args, st_args_strictness=NotStrict, st_result = st_result, st_context = st_context,
 			st_attr_env = st_attr_env, st_attr_vars = st_attr_vars }
 	  cus_error = check_type_of_start_rule is_start_rule st cus_error
-	= (st,			{ cus_var_env & [i] = TE \\ i <- [0..nr_of_temp_vars - 1]},
-					{ cus_attr_env & [i] = TA_None \\ i <- [0..max_attr_nr - 1]}, cus_heaps, var_heap, expr_heap, cus_error)
+	  cus_var_env = {cus_var_env & [i] = TE \\ i <- [0..nr_of_temp_vars-1]}
+	  cus_attr_env = {cus_attr_env & [i] = TA_None \\ i <- [0..max_attr_nr-1]}
+	= (st, ambiguous_or_missing_contexts, cus_var_env, cus_attr_env, cus_heaps, var_heap, expr_heap, cus_error)
 where
 	determine_type_vars to_index all_vars var_env
 		= iFoldSt determine_type_var 0 to_index (all_vars, var_env)
@@ -433,42 +435,57 @@ where
 			= (at, { cus & cus_error = existentialError cus.cus_error })
 
 	clean_up_type_contexts spec_type spec_context derived_context env var_heap error
-		|  spec_type
+		| spec_type
 			# var_heap = foldSt (mark_specified_context derived_context) spec_context var_heap
-			  (rev_contexts, env, error) = foldSt clean_up_lifted_type_context derived_context ([], env, error)
-			  (rev_contexts, env, var_heap, error) = foldSt clean_up_type_context spec_context (rev_contexts, env, var_heap, error)
-			= (reverse rev_contexts, env, var_heap, error)
-			# (rev_contexts, env, var_heap, error) = foldSt clean_up_type_context derived_context ([], env, var_heap, error)
-			= (reverse rev_contexts, env, var_heap, error)
+			  (rev_contexts, ambiguous_or_missing_contexts, env, var_heap, error)
+				= foldSt clean_up_lifted_type_context derived_context ([], NoErrorContexts, env, var_heap, error)
+			  (rev_contexts, ambiguous_or_missing_contexts, env, var_heap, error)
+				= foldSt clean_up_type_context spec_context (rev_contexts, ambiguous_or_missing_contexts, env, var_heap, error)
+			= (reverse rev_contexts, ambiguous_or_missing_contexts, env, var_heap, error)
+			# (rev_contexts, ambiguous_or_missing_contexts, env, var_heap, error)
+				= foldSt clean_up_type_context derived_context ([], NoErrorContexts, env, var_heap, error)
+			= (reverse rev_contexts, ambiguous_or_missing_contexts, env, var_heap, error)
 
 	mark_specified_context [] spec_tc var_heap
 		= var_heap
 	mark_specified_context [tc=:{tc_var} : tcs] spec_tc var_heap
 		| spec_tc == tc
+			# (tc_var_info,var_heap) = readPtr tc_var var_heap
+			# var_heap = if (tc_var_info=:VI_Empty) (writePtr tc_var VI_ContextSpecified var_heap) var_heap
 			| spec_tc.tc_var == tc_var
 				= var_heap
-				= var_heap <:= (spec_tc.tc_var, VI_ForwardClassVar tc_var)
+				= writePtr spec_tc.tc_var (VI_ForwardClassVar tc_var) var_heap
 			= mark_specified_context tcs spec_tc var_heap
 
-	clean_up_type_context tc=:{tc_types,tc_class,tc_var} (collected_contexts, env, var_heap, error)
-		| case sreadPtr tc_var var_heap of VI_EmptyConstructorClassVar-> True; _ -> False
-			= (collected_contexts, env, var_heap, error)
-		# (cur, tc_types, env) = cleanUpClosed tc_types env
-		| checkCleanUpResult cur cUndefinedVar
-			= (collected_contexts, env, var_heap, error)
-		| checkCleanUpResult cur cLiftedVar
-			= ([{ tc & tc_types = tc_types } : collected_contexts ], env, var_heap, liftedContextError (toString tc_class) error)
-		| checkCleanUpResult cur cQVar
-			= (collected_contexts, env, var_heap, error)
-			= ([{ tc & tc_types = tc_types } : collected_contexts ], env, var_heap, error)
-
-	clean_up_lifted_type_context tc=:{tc_types} (collected_contexts, env, error)
+	clean_up_lifted_type_context tc=:{tc_var,tc_types} (collected_contexts,ambiguous_or_missing_contexts,env,var_heap,error)
+		| (sreadPtr tc_var var_heap)=:VI_ContextSpecified
+			# var_heap = writePtr tc_var VI_Empty var_heap
+			= (collected_contexts,ambiguous_or_missing_contexts,env,var_heap,error)
 		# (cur, tc_types, env) = cleanUpClosed tc.tc_types env
 		| checkCleanUpResult cur cLiftedVar
 			| checkCleanUpResult cur cDefinedVar
-				= (collected_contexts, env, liftedContextError (toString tc.tc_class) error)
-				= ([{ tc & tc_types = tc_types } : collected_contexts], env, error)
-			= (collected_contexts, env, error)
+				# error = liftedContextError (toString tc.tc_class) error
+				= (collected_contexts,ambiguous_or_missing_contexts,env,var_heap,error)
+				# collected_contexts = [{tc & tc_types = tc_types}:collected_contexts]
+				= (collected_contexts,ambiguous_or_missing_contexts,env,var_heap,error)
+		| checkCleanUpResult cur cUndefinedVar
+			# ambiguous_or_missing_contexts = AmbiguousContext {tc & tc_types=tc_types} ambiguous_or_missing_contexts
+			= (collected_contexts,ambiguous_or_missing_contexts,env,var_heap,error)
+			# ambiguous_or_missing_contexts = MissingContext {tc & tc_types=tc_types} ambiguous_or_missing_contexts
+			= (collected_contexts,ambiguous_or_missing_contexts,env,var_heap,error)
+
+	clean_up_type_context tc=:{tc_types,tc_class,tc_var} (collected_contexts, ambiguous_or_missing_contexts, env, var_heap, error)
+		| case sreadPtr tc_var var_heap of VI_EmptyConstructorClassVar-> True; _ -> False
+			= (collected_contexts, ambiguous_or_missing_contexts, env, var_heap, error)
+		# (cur, tc_types, env) = cleanUpClosed tc_types env
+		| checkCleanUpResult cur cUndefinedVar
+			# ambiguous_or_missing_contexts = AmbiguousContext {tc & tc_types = tc_types} ambiguous_or_missing_contexts
+			= (collected_contexts, ambiguous_or_missing_contexts, env, var_heap, error)
+		| checkCleanUpResult cur cLiftedVar
+			= ([{tc & tc_types = tc_types} : collected_contexts], ambiguous_or_missing_contexts, env, var_heap, liftedContextError (toString tc_class) error)
+		| checkCleanUpResult cur cQVar
+			= (collected_contexts, ambiguous_or_missing_contexts, env, var_heap, error)
+			= ([{tc & tc_types = tc_types} : collected_contexts], ambiguous_or_missing_contexts, env, var_heap, error)
 
 	build_attribute_environment :: !LargeBitvect !Index !Index !{! CoercionTree} !*LargeBitvect !*AttributeEnv ![AttributeVar] ![AttrInequality] !*ErrorAdmin
 																							-> (!*AttributeEnv,![AttributeVar],![AttrInequality],!*ErrorAdmin)
@@ -1052,6 +1069,7 @@ cNoProperties		:== 0
 cAttributed			:== 1
 cAnnotated			:== 2
 cMarkAttribute		:== 4
+cWriteUnderscoreforTE :== 128
 
 cBrackets			:== 8
 cCommaSeparator		:== 16
@@ -1286,8 +1304,10 @@ where
 		= (file  <<< "E." <<< tv_number <<< ' ', opt_beautifulizer)
 	writeType file opt_beautifulizer (form, TempQDV tv_number)
 		= (file  <<< "E." <<< tv_number <<< ' ', opt_beautifulizer)
-	writeType file opt_beautifulizer (form, TE)
-		= (file <<< "__", opt_beautifulizer)
+	writeType file opt_beautifulizer (form=:{form_properties}, TE)
+		| form_properties bitand cWriteUnderscoreforTE<>0
+			= (file <<< "_", opt_beautifulizer)
+			= (file <<< "__", opt_beautifulizer)
 	writeType file _ (form, type)
 		= abort ("<:: (Type) (typesupport.icl)" ---> type)
 

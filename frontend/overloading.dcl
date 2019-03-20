@@ -47,6 +47,6 @@ tryToSolveOverloading :: ![(Optional [TypeContext], [ExprInfoPtr], IdentPos, Ind
 	,	tci_common_defs						:: !{# CommonDefs }
 	}
 
-removeOverloadedFunctions :: ![Index] ![LocalTypePatternVariable] !Int !*{#FunDef} !*{! FunctionType} !*ExpressionHeap
-	!*TypeCodeInfo !*VarHeap !*ErrorAdmin !*{#PredefinedSymbol} //!*{#PredefinedSymbol}
-		-> (!*{#FunDef}, !*{! FunctionType}, !*ExpressionHeap, !*TypeCodeInfo, !*VarHeap, !*ErrorAdmin, !*{#PredefinedSymbol})
+removeOverloadedFunctions :: ![Index] ![LocalTypePatternVariable] ![ErrorContexts] !Int !*{#FunDef} !*{! FunctionType} !*ExpressionHeap
+														   !*TypeCodeInfo !*VarHeap !*ErrorAdmin !*{#PredefinedSymbol}
+		-> (!*{#FunDef},!*{!FunctionType},!*ExpressionHeap,!*TypeCodeInfo,!*VarHeap,!*ErrorAdmin,!*{#PredefinedSymbol})

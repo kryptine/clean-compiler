@@ -33,6 +33,8 @@ import genericsupport, type_io_common
 						| CA_LocalTypeCode !VarInfoPtr			/* for (local) type pattern variables */
 						| CA_GlobalTypeCode !TypeCodeInstance	/* for (global) type constructors */
 
+::	VarInfo | VI_ContextContainsFreeTypeVar !TypeContext | VI_MissingContext !TypeContext
+
 instanceError symbol types err
 	# err = errorHeading "Overloading error" err
 	  format = { form_properties = cNoProperties, form_attr_position = No }
@@ -59,6 +61,50 @@ overloadingError op_symb err
 	  			Yes (str, line_nr)
 	  				-> str+++" [line "+++toString line_nr+++"]"
 	= { err & ea_file = err.ea_file <<< " internal overloading of \"" <<< str <<< "\" could not be solved\n" }
+
+class_name :: !TCClass -> {#Char}
+class_name (TCClass {glob_object={ds_ident={id_name}}})
+	= id_name
+class_name (TCGeneric {gtc_class={glob_object={ds_ident={id_name}}},gtc_kind})
+	# i=find_last_underscore (size id_name-1) id_name
+	| i>=0
+		= id_name % (0,i-1)+++"{|" +++ toString gtc_kind +++ "|}"
+		= id_name+++"{|" +++ toString gtc_kind +++ "|}"
+where
+	find_last_underscore i s
+  		| i>=0 && s.[i]<>'_'
+  			= find_last_underscore (i-1) s
+  			= i
+
+overloadingErrorWithContext :: !Ident !TCClass ![Type] !*ErrorAdmin -> *ErrorAdmin
+overloadingErrorWithContext op_symb tc_class tc_types err
+	# err=:{ea_file} = errorHeading "Overloading error" err
+	  str = case optBeautifulizeIdent op_symb.id_name of
+	  			No
+	  				-> op_symb.id_name
+	  			Yes (str, line_nr)
+	  				-> str+++" [line "+++toString line_nr+++"]"
+	  format = { form_properties = cWriteUnderscoreforTE, form_attr_position = No }
+	# ea_file = ea_file <<< " internal overloading of \"" <<< str <<< "\" "
+						<<< "could not be solved for: "
+						<<< class_name tc_class <<< ' ' <:: (format, tc_types, Yes initialTypeVarBeautifulizer)
+						<<< " (contains type variable not in function type at _ )\n"
+	= {err & ea_file = ea_file}
+
+missingContextError :: !Ident !TCClass ![Type] !*ErrorAdmin -> *ErrorAdmin
+missingContextError op_symb tc_class tc_types err
+	# err=:{ea_file} = errorHeading "Overloading error" err
+	  str = case optBeautifulizeIdent op_symb.id_name of
+	  			No
+	  				-> op_symb.id_name
+	  			Yes (str, line_nr)
+	  				-> str+++" [line "+++toString line_nr+++"]"
+	  format = { form_properties = cWriteUnderscoreforTE, form_attr_position = No }
+	# ea_file = ea_file <<< " internal overloading of \"" <<< str <<< "\" "
+						<<< "could not be solved for: "
+						<<< class_name tc_class <<< ' ' <:: (format, tc_types, Yes initialTypeVarBeautifulizer)
+						<<< " (context does not occur in function type)\n"
+	= {err & ea_file = ea_file}
 
 sub_class_error op_symb err
 	# err = errorHeading "Overloading error" err
@@ -1389,28 +1435,37 @@ getClassVariable symb var_info_ptr var_heap error
 	= case (readPtr var_info_ptr var_heap) of
 		(VI_ClassVar var_ident new_info_ptr count, var_heap)
 			-> (var_ident, new_info_ptr, var_heap <:= (var_info_ptr, VI_ClassVar var_ident new_info_ptr (inc count)), error)
+		(VI_ContextContainsFreeTypeVar {tc_class,tc_types},var_heap)
+			# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
+			# error = overloadingErrorWithContext symb tc_class tc_types error
+			-> (symb, new_info_ptr, var_heap <:= (var_info_ptr, VI_ClassVar symb new_info_ptr 1), error)
+		(VI_MissingContext {tc_class,tc_types},var_heap)
+			# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
+			# error = missingContextError symb tc_class tc_types error
+			-> (symb, new_info_ptr, var_heap <:= (var_info_ptr, VI_ClassVar symb new_info_ptr 1), error)
 		(_,var_heap)
 			# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
 			# error = overloadingError symb error
 			-> (symb, new_info_ptr, var_heap <:= (var_info_ptr, VI_ClassVar symb new_info_ptr 1), error)
 
-removeOverloadedFunctions :: ![Index] ![LocalTypePatternVariable] !Int !*{#FunDef} !*{! FunctionType} !*ExpressionHeap
-	!*TypeCodeInfo !*VarHeap !*ErrorAdmin !*{#PredefinedSymbol}
-		-> (!*{#FunDef}, !*{! FunctionType}, !*ExpressionHeap, !*TypeCodeInfo, !*VarHeap, !*ErrorAdmin, !*{#PredefinedSymbol})
-removeOverloadedFunctions group type_pattern_vars main_dcl_module_n fun_defs fun_env symbol_heap type_code_info var_heap error predef_symbols
-	#! ok = error.ea_ok
+removeOverloadedFunctions :: ![Index] ![LocalTypePatternVariable] ![ErrorContexts] !Int !*{#FunDef} !*{! FunctionType} !*ExpressionHeap
+														   !*TypeCodeInfo !*VarHeap !*ErrorAdmin !*{#PredefinedSymbol}
+		-> (!*{#FunDef},!*{!FunctionType},!*ExpressionHeap,!*TypeCodeInfo,!*VarHeap,!*ErrorAdmin,!*{#PredefinedSymbol})
+removeOverloadedFunctions group type_pattern_vars comp_error_contexts main_dcl_module_n fun_defs fun_env symbol_heap type_code_info var_heap error predef_symbols
 	# (_, fun_defs, fun_env, symbol_heap, type_code_info, var_heap, error, predef_symbols)
-		= foldSt (remove_overloaded_function type_pattern_vars) group (ok, fun_defs, fun_env, symbol_heap, type_code_info, var_heap, error, predef_symbols)
+		= foldSt (remove_overloaded_function type_pattern_vars) group (comp_error_contexts, fun_defs, fun_env, symbol_heap, type_code_info, var_heap, error, predef_symbols)
 	= (fun_defs, fun_env, symbol_heap, type_code_info, var_heap, error, predef_symbols)
 where
-	remove_overloaded_function type_pattern_vars fun_index (ok, fun_defs, fun_env, symbol_heap, type_code_info, var_heap, error, predef_symbols)
-		| ok
+	remove_overloaded_function type_pattern_vars fun_index ([error_contexts:comp_error_contexts], fun_defs, fun_env, symbol_heap, type_code_info, var_heap, error, predef_symbols)
+		| error.ea_ok
 			# (fun_def, fun_defs) = fun_defs![fun_index]  
 			  (CheckedType st=:{st_context,st_args}, fun_env) = fun_env![fun_index]
 			  {fun_body = TransformedBody {tb_args,tb_rhs},fun_info,fun_arity,fun_ident,fun_pos} = fun_def
 			  var_heap = mark_FPC_arguments st_args tb_args var_heap
 			  
 			  error = setErrorAdmin (newPosition fun_ident fun_pos) error
+			  var_heap = store_ambiguous_and_missing_contexts_for_errors error_contexts var_heap
+
 			  (rev_variables,var_heap,error) = foldSt determine_class_argument st_context ([],var_heap,error)
 			  (type_code_info, symbol_heap, type_pattern_vars, var_heap, error)
 			  		= convertDynamicTypes fun_info.fi_dynamics (type_code_info, symbol_heap, type_pattern_vars, var_heap, error)
@@ -1429,15 +1484,29 @@ where
 											   fi_properties = if ui_has_type_codes
 																	(fun_info.fi_properties bitor FI_HasTypeCodes)
 																	fun_info.fi_properties}
-			#! ok = ui_error.ea_ok
-			= (ok, { ui_fun_defs & [fun_index] = fun_def }, ui_fun_env, ui_symbol_heap, type_code_info, var_heap, ui_error, predef_symbols)
-			= (False, fun_defs, fun_env, symbol_heap, type_code_info, var_heap, error, predef_symbols)
+			# var_heap = remove_error_contexts error_contexts var_heap
+			# ui_fun_defs & [fun_index] = fun_def
+			= (comp_error_contexts, ui_fun_defs, ui_fun_env, ui_symbol_heap, type_code_info, var_heap, ui_error, predef_symbols)
+			= (comp_error_contexts, fun_defs, fun_env, symbol_heap, type_code_info, var_heap, error, predef_symbols)
 
 	mark_FPC_arguments :: ![AType] ![FreeVar] !*VarHeap -> *VarHeap
 	mark_FPC_arguments st_args tb_args var_heap
 		| has_TFAC st_args
 			= mark_FPC_vars st_args tb_args var_heap
 			= var_heap
+
+	store_ambiguous_and_missing_contexts_for_errors (AmbiguousContext tc=:{tc_var} error_contexts) var_heap
+		| (sreadPtr tc_var var_heap)=:VI_Empty
+			# var_heap = writePtr tc_var (VI_ContextContainsFreeTypeVar tc) var_heap
+			= store_ambiguous_and_missing_contexts_for_errors error_contexts var_heap
+			= store_ambiguous_and_missing_contexts_for_errors error_contexts var_heap
+	store_ambiguous_and_missing_contexts_for_errors (MissingContext tc=:{tc_var} error_contexts) var_heap
+		| (sreadPtr tc_var var_heap)=:VI_Empty
+			# var_heap = writePtr tc_var (VI_MissingContext tc) var_heap
+			= store_ambiguous_and_missing_contexts_for_errors error_contexts var_heap
+			= store_ambiguous_and_missing_contexts_for_errors error_contexts var_heap
+	store_ambiguous_and_missing_contexts_for_errors NoErrorContexts var_heap
+		= var_heap;
 
 	determine_class_argument {tc_class, tc_var} (variables,var_heap,error)
 		# (var_info, var_heap) = readPtr tc_var var_heap
@@ -1469,6 +1538,15 @@ where
 	retrieve_class_argument var_info_ptr (args, var_heap)
 		# (VI_ClassVar var_ident new_info_ptr count, var_heap) = readPtr var_info_ptr var_heap
 		= ([{fv_ident = var_ident, fv_info_ptr = new_info_ptr, fv_def_level = NotALevel, fv_count = count } : args], var_heap <:= (var_info_ptr, VI_Empty))
+
+	remove_error_contexts (AmbiguousContext {tc_var} error_contexts) var_heap
+		# var_heap = writePtr tc_var VI_Empty var_heap
+		= remove_error_contexts error_contexts var_heap
+	remove_error_contexts (MissingContext {tc_var} error_contexts) var_heap
+		# var_heap = writePtr tc_var VI_Empty var_heap
+		= remove_error_contexts error_contexts var_heap
+	remove_error_contexts NoErrorContexts var_heap
+		= var_heap;
 
 has_TFAC [{at_type=TFAC _ _ _}:_] = True
 has_TFAC [_:atypes] = has_TFAC atypes
@@ -1834,6 +1912,16 @@ where
 				VI_ClassVar var_ident new_info_ptr count
 					-> (Var { var_ident = var_ident, var_info_ptr = new_info_ptr, var_expr_ptr = nilPtr },
 								(var_heap <:= (tc_var, VI_ClassVar var_ident new_info_ptr (inc count)), error))
+				VI_ContextContainsFreeTypeVar {tc_class,tc_types}
+					# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
+					# error = overloadingErrorWithContext symb tc_class tc_types error
+					-> (Var { var_ident = symb, var_info_ptr = new_info_ptr, var_expr_ptr = nilPtr },
+								(var_heap <:= (tc_var, VI_ClassVar symb new_info_ptr 1), error))
+				VI_MissingContext {tc_class,tc_types}
+					# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
+					# error = missingContextError symb tc_class tc_types error
+					-> (Var { var_ident = symb, var_info_ptr = new_info_ptr, var_expr_ptr = nilPtr },
+								(var_heap <:= (tc_var, VI_ClassVar symb new_info_ptr 1), error))
 				_
 					# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
 					-> (Var { var_ident = symb, var_info_ptr = new_info_ptr, var_expr_ptr = nilPtr },

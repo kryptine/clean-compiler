@@ -2444,18 +2444,21 @@ specification_error type type1 err
 	# err = { err & ea_file = err.ea_file <<< " " <:: (format, type1, Yes initialTypeVarBeautifulizer) <<< '\n' }
 	= err
 
+cleanUpAndCheckFunctionTypes :: ![Int] ![FunctionRequirements] ![(Int,[Ptr ExprInfo])] !Int !(Optional Bool) !{#CommonDefs} ![TypeContext] !{!CoercionTree}
+								!{#Int} !*{!Type} !*{!TypeAttribute} !*(![ErrorContexts],!*File,!*TypeState) -> (![ErrorContexts],!*File,!*TypeState)
 cleanUpAndCheckFunctionTypes [] _ _ start_index _
-								defs type_contexts coercion_env attr_partition type_var_env attr_var_env (out, ts)
-	= (out, ts)
+								defs type_contexts coercion_env attr_partition type_var_env attr_var_env (rev_comp_error_contexts,out,ts)
+	= (rev_comp_error_contexts,out,ts)
 cleanUpAndCheckFunctionTypes [fun:funs] [{fe_requirements={req_case_and_let_exprs}}:reqs] dict_types start_index list_inferred_types
-								defs type_contexts coercion_env attr_partition type_var_env attr_var_env (out, ts)
+								defs type_contexts coercion_env attr_partition type_var_env attr_var_env (rev_comp_error_contexts,out,ts)
 	# (fd, ts) = ts!ts_fun_defs.[fun]
 	  dict_ptrs = get_dict_ptrs fun dict_types
-	  (type_var_env, attr_var_env, out, ts)
+	  (type_var_env, error_contexts, attr_var_env, out, ts)
 		= clean_up_and_check_function_type fd fun (start_index == fun) list_inferred_types defs type_contexts
 										(dict_ptrs ++ req_case_and_let_exprs) coercion_env attr_partition type_var_env attr_var_env out ts
+	  rev_comp_error_contexts = [error_contexts:rev_comp_error_contexts]
 	= cleanUpAndCheckFunctionTypes funs reqs dict_types start_index list_inferred_types
-									defs type_contexts coercion_env attr_partition type_var_env attr_var_env (out, ts)
+									defs type_contexts coercion_env attr_partition type_var_env attr_var_env (rev_comp_error_contexts,out,ts)
 where
 	get_dict_ptrs fun_index []
 		= []
@@ -2464,23 +2467,28 @@ where
 			= ptrs
 			= get_dict_ptrs fun_index dict_types
 
+	clean_up_and_check_function_type :: !FunDef !Int !Bool (Optional Bool) !{#CommonDefs} ![TypeContext] ![ExprInfoPtr] !{!CoercionTree} !{#Int}
+													   *{!Type} !*{!TypeAttribute} !*File !*TypeState
+									-> (*{!Type},!ErrorContexts,!*{!TypeAttribute},!*File,!*TypeState)
 	clean_up_and_check_function_type {fun_ident,fun_kind,fun_pos,fun_type = opt_fun_type} fun is_start_rule list_inferred_types defs type_contexts type_ptrs
 					coercion_env attr_partition type_var_env attr_var_env out ts
 		# (env_type, ts) = ts!ts_fun_env.[fun]
 		# ts = { ts & ts_error = setErrorAdmin (newPosition fun_ident fun_pos) ts.ts_error}
 		= case env_type of
 			ExpandedType fun_type tmp_fun_type exp_fun_type
-				# (clean_fun_type, type_var_env, attr_var_env, ts_type_heaps, ts_var_heap, ts_expr_heap, ts_error)
+				# (clean_fun_type, ambiguous_or_missing_contexts, type_var_env, attr_var_env, ts_type_heaps, ts_var_heap, ts_expr_heap, ts_error)
 					= cleanUpSymbolType is_start_rule cSpecifiedType exp_fun_type type_contexts type_ptrs coercion_env 
 										attr_partition type_var_env attr_var_env ts.ts_type_heaps ts.ts_var_heap ts.ts_expr_heap ts.ts_error
 				  ts_error = check_caf_context (newPosition fun_ident fun_pos) fun_kind clean_fun_type ts_error
 				| ts_error.ea_ok
 					# (ts_fun_env, attr_var_env, ts_type_heaps, ts_expr_heap, ts_error)
 			  			= check_function_type fun_type tmp_fun_type clean_fun_type type_ptrs defs ts.ts_fun_env attr_var_env ts_type_heaps ts_expr_heap ts_error
-					-> (type_var_env, attr_var_env, out, {ts & ts_type_heaps = ts_type_heaps, ts_var_heap = ts_var_heap, ts_expr_heap = ts_expr_heap, ts_fun_env = ts_fun_env, ts_error = ts_error})
-					-> (type_var_env, attr_var_env, out, {ts & ts_type_heaps = ts_type_heaps, ts_var_heap = ts_var_heap, ts_expr_heap = ts_expr_heap, ts_error = ts_error})
+					  ts & ts_type_heaps=ts_type_heaps, ts_var_heap=ts_var_heap, ts_expr_heap=ts_expr_heap, ts_fun_env=ts_fun_env, ts_error=ts_error
+					-> (type_var_env, ambiguous_or_missing_contexts, attr_var_env, out, ts)
+					# ts & ts_type_heaps=ts_type_heaps, ts_var_heap=ts_var_heap, ts_expr_heap=ts_expr_heap, ts_error=ts_error
+					-> (type_var_env, NoErrorContexts, attr_var_env, out, ts)
 		  	UncheckedType exp_fun_type
-				# (clean_fun_type, type_var_env, attr_var_env, ts_type_heaps, ts_var_heap, ts_expr_heap, ts_error)
+				# (clean_fun_type, ambiguous_or_missing_contexts, type_var_env, attr_var_env, ts_type_heaps, ts_var_heap, ts_expr_heap, ts_error)
 					= cleanUpSymbolType is_start_rule cDerivedType exp_fun_type type_contexts type_ptrs coercion_env
 										attr_partition type_var_env attr_var_env ts.ts_type_heaps ts.ts_var_heap ts.ts_expr_heap ts.ts_error
 				  ts_error = check_caf_context (newPosition fun_ident fun_pos) fun_kind clean_fun_type ts_error
@@ -2501,7 +2509,8 @@ where
 				  				-> (out <<< fun_ident <<< " :: " 
 				  						<:: (form, printable_type, Yes initialTypeVarBeautifulizer) <<< '\n', th_attrs)
 				  ts_fun_env = { ts.ts_fun_env & [fun] = CheckedType clean_fun_type }
-				-> (type_var_env, attr_var_env, out, { ts & ts_type_heaps = { ts_type_heaps & th_attrs = th_attrs }, ts_var_heap = ts_var_heap, ts_expr_heap = ts_expr_heap, ts_fun_env = ts_fun_env, ts_error = ts_error })
+				  ts & ts_type_heaps={ts_type_heaps & th_attrs=th_attrs}, ts_var_heap=ts_var_heap, ts_expr_heap=ts_expr_heap, ts_fun_env=ts_fun_env, ts_error=ts_error
+				-> (type_var_env, ambiguous_or_missing_contexts, attr_var_env, out, ts)
 
 	check_function_type fun_type tmp_fun_type=:{tst_lifted} clean_fun_type=:{st_arity, st_args, st_vars, st_attr_vars, st_context} type_ptrs
 						defs fun_env attr_var_env type_heaps expr_heap error
@@ -2735,9 +2744,9 @@ where
 		  var_env = { subst & [i] = TE \\ i <- [0..dec ts_var_store]}
 		  ts = {ts & ts_error = ts_error, ts_fun_env = ts_fun_env, ts_type_heaps = ts_type_heaps, ts_td_infos = ts_td_infos,
 					 ts_var_heap = os_var_heap, ts_expr_heap = os_symbol_heap,ts_generic_heap=os_generic_heap,ts_fun_defs=fun_defs}
-		  (out, ts)
+		  (rev_error_contexts,out,ts)
 			= cleanUpAndCheckFunctionTypes comp fun_reqs dict_types start_index list_inferred_types ti_common_defs contexts coer_demanded attr_partition var_env attr_var_env
-				(out,ts)
+				([],out,ts)
 		| not ts.ts_error.ea_ok
 			= (True, os_predef_symbols, os_special_instances, out, create_erroneous_function_types comp
 					{ ts & ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [], ts_error = { ts.ts_error & ea_ok = True }})
@@ -2745,7 +2754,7 @@ where
 		  type_code_info = {	tci_type_var_heap = ts_type_heaps.th_vars, tci_attr_var_heap = ts_type_heaps.th_attrs,
 								tci_dcl_modules = dcl_modules, tci_common_defs = ti_common_defs } 
 		  (fun_defs, ts_fun_env, ts_expr_heap, {tci_type_var_heap,tci_attr_var_heap}, ts_var_heap, ts_error, os_predef_symbols)
-		  		= removeOverloadedFunctions comp local_pattern_variables main_dcl_module_n ts.ts_fun_defs ts.ts_fun_env
+		  		= removeOverloadedFunctions comp local_pattern_variables (reverse rev_error_contexts) main_dcl_module_n ts.ts_fun_defs ts.ts_fun_env
 		  								ts.ts_expr_heap type_code_info ts.ts_var_heap ts.ts_error os_predef_symbols
 		= (	type_error || not ts_error.ea_ok,
 			os_predef_symbols, os_special_instances, out,
