@@ -1132,6 +1132,7 @@ cNotVarNumber :== -1
 				 | TempCV 	!TempVarId
 				 | TempQCV 	!TempVarId
 				 | TempQCDV !TempVarId	// existential type variable in dynamic pattern
+				 | CVE	// only in erroneous contexts for error messages
 
 ::	DynamicType =
 	{	dt_uni_vars 	:: ![ATypeVar]
