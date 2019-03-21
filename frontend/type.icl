@@ -452,26 +452,6 @@ tryToExpandInUnify type=:(TAS {type_index={glob_object,glob_module}} type_args _
 tryToExpandInUnify type type_attr modules type_heaps
 	= (False, type, type_heaps)
 
-tryToExpand :: !Type !TypeAttribute !{# CommonDefs} !*TypeHeaps -> (!Bool, !Type, !*TypeHeaps)
-tryToExpand type=:(TA {type_index={glob_object,glob_module}} type_args) type_attr ti_common_defs type_heaps
-	#! type_def = ti_common_defs.[glob_module].com_type_defs.[glob_object]
-	= case type_def.td_rhs of
-		SynType {at_type}
-			# (expanded_type, type_heaps) = substituteType type_def.td_attribute type_attr type_def.td_args type_args at_type type_heaps
-			-> (True, expanded_type, type_heaps)
-		_
-			-> (False, type, type_heaps)
-tryToExpand type=:(TAS {type_index={glob_object,glob_module}} type_args _) type_attr ti_common_defs type_heaps
-	#! type_def = ti_common_defs.[glob_module].com_type_defs.[glob_object]
-	= case type_def.td_rhs of
-		SynType {at_type}
-			# (expanded_type, type_heaps) = substituteType type_def.td_attribute type_attr type_def.td_args type_args at_type type_heaps
-			-> (True, expanded_type, type_heaps)
-		_
-			-> (False, type, type_heaps)
-tryToExpand type type_attr modules type_heaps
-	= (False, type, type_heaps)
-
 simplifyTypeApplication :: !Type ![AType] -> (!Bool, !Type)
 simplifyTypeApplication (TA type_cons=:{type_arity} cons_args) type_args
 	= (True, TA { type_cons & type_arity = type_arity + length type_args } (cons_args ++ type_args))
