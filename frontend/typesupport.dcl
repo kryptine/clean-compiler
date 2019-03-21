@@ -38,7 +38,7 @@ cDerivedType	:== False
 
 :: ErrorContexts = AmbiguousContext !TypeContext !ErrorContexts | MissingContext !TypeContext !ErrorContexts | NoErrorContexts
 
-cleanUpSymbolType :: !Bool !Bool !TempSymbolType ![TypeContext] ![ExprInfoPtr] !{! CoercionTree} !AttributePartition
+cleanUpSymbolType :: !Bool !Bool !TempSymbolType ![TypeContext] ![ExprInfoPtr] !{!CoercionTree} !AttributePartition !{#CommonDefs}
 												   !*VarEnv !*AttributeEnv !*TypeHeaps !*VarHeap !*ExpressionHeap !*ErrorAdmin
 					-> (!SymbolType,!ErrorContexts,!*VarEnv,!*AttributeEnv,!*TypeHeaps,!*VarHeap,!*ExpressionHeap,!*ErrorAdmin)
 

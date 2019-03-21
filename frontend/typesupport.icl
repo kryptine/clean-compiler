@@ -340,16 +340,101 @@ newAttributedVariable var_number (variables, attributes, type_heaps=:{th_vars,th
 	= ({ at_attribute = TA_Var new_attr_var, at_type = TV new_var},
 		([ new_var : variables ], [ new_attr_var : attributes ], { type_heaps & th_vars = th_vars, th_attrs = th_attrs }))
 
+equal_expanded_context :: !Type !Type !{#CommonDefs} !*TypeHeaps -> (!Bool,!*TypeHeaps)
+equal_expanded_context type1 type2 common_defs_a type_heaps
+	# (expanded1,expanded_type1,type_heaps) = tryToExpand type1 TA_Multi common_defs_a type_heaps
+	# (expanded2,expanded_type2,type_heaps) = tryToExpand type2 TA_Multi common_defs_a type_heaps
+	| expanded1 || expanded2
+		= equal_context expanded_type1 type2 common_defs_a type_heaps
+		= (False,type_heaps)
+
+// extended version of instance == in module compare_types that expands synonym types
+
+class equal_context t :: !t !t !{#CommonDefs} !*TypeHeaps -> (!Bool,!*TypeHeaps)
+
+instance equal_context TypeContext where
+	equal_context tc1 tc2 common_defs_a type_heaps
+		| tc1.tc_class == tc2.tc_class
+			= equal_context tc1.tc_types tc2.tc_types common_defs_a type_heaps;
+			= (False,type_heaps)
+
+instance equal_context AType where
+	equal_context atype1 atype2 common_defs_a type_heaps
+		= equal_context atype1.at_type atype2.at_type common_defs_a type_heaps
+
+instance equal_context Type where
+	equal_context type1=:(TA tc1 types1) type2=:(TA tc2 types2) common_defs_a type_heaps
+		| tc1 == tc2
+			= equal_context types1 types2 common_defs_a type_heaps
+			= equal_expanded_context type1 type2 common_defs_a type_heaps
+	equal_context type1=:(TA tc1 types1) type2=:(TAS tc2 types2 _) common_defs_a type_heaps
+		| tc1 == tc2
+			= equal_context types1 types2 common_defs_a type_heaps
+			= equal_expanded_context type1 type2 common_defs_a type_heaps
+	equal_context (TA tc1 types1) _ common_defs_a type_heaps
+		= (False,type_heaps)
+	equal_context type1=:(TAS tc1 types1 _) type2=:(TA tc2 types2) common_defs_a type_heaps
+		| tc1 == tc2
+			= equal_context types1 types2 common_defs_a type_heaps
+			= equal_expanded_context type1 type2 common_defs_a type_heaps
+	equal_context type1=:(TAS tc1 types1 _) type2=:(TAS tc2 types2 _) common_defs_a type_heaps
+		| tc1 == tc2
+			= equal_context types1 types2 common_defs_a type_heaps
+			= equal_expanded_context type1 type2 common_defs_a type_heaps
+	equal_context (TAS tc1 types1 _) _ common_defs_a type_heaps
+		= (False,type_heaps)
+	equal_context t1 t2 common_defs_a type_heaps
+		| equal_constructor t1 t2
+			= equal_constructor_args t1 t2 common_defs_a type_heaps
+			= (False,type_heaps) 
+	where
+		equal_constructor_args (TV varid1) (TV varid2) common_defs_a type_heaps
+			= (varid1 == varid2,type_heaps)
+		equal_constructor_args (TempV varid1) (TempV varid2) common_defs_a type_heaps
+			= (varid1 == varid2,type_heaps)
+		equal_constructor_args (arg_type1-->restype1) (arg_type2-->restype2) common_defs_a type_heaps
+			# (equal,type_heaps) = equal_context arg_type1 arg_type2 common_defs_a type_heaps
+			| equal
+				= equal_context restype1 restype2 common_defs_a type_heaps
+				= (False,type_heaps)
+		equal_constructor_args (TB tb1) (TB tb2) common_defs_a type_heaps
+			= (tb1 == tb2,type_heaps)
+		equal_constructor_args (type1 :@: types1) (type2 :@: types2) common_defs_a type_heaps
+			| type1==type2
+				= equal_context types1 types2 common_defs_a type_heaps
+				= (False,type_heaps)
+		equal_constructor_args (GTV varid1) (GTV varid2) common_defs_a type_heaps
+			= (varid1==varid2,type_heaps)
+		equal_constructor_args (TempQV varid1) (TempQV varid2) common_defs_a type_heaps
+			= (varid1==varid2,type_heaps)
+		equal_constructor_args (TempQDV varid1) (TempQDV varid2) common_defs_a type_heaps
+			= (varid1==varid2,type_heaps)
+		equal_constructor_args (TLifted varid1) (TLifted varid2) common_defs_a type_heaps
+			= (varid1==varid2,type_heaps)
+		equal_constructor_args type1 type2 common_defs_a type_heaps
+			= (True,type_heaps)
+
+instance equal_context [t] | equal_context t where
+	equal_context [e1:l1] [e2:l2] common_defs_a type_heaps
+		# (equal,type_heaps) = equal_context e1 e2 common_defs_a type_heaps
+		| equal
+			= equal_context l1 l2 common_defs_a type_heaps
+			= (False,type_heaps)
+	equal_context [] [] common_defs_a type_heaps
+		= (True,type_heaps)
+	equal_context _ _ common_defs_a type_heaps
+		= (False,type_heaps)
+
 cSpecifiedType	:== True
 cDerivedType	:== False
 
 :: ErrorContexts = AmbiguousContext !TypeContext !ErrorContexts | MissingContext !TypeContext !ErrorContexts | NoErrorContexts
 
-cleanUpSymbolType :: !Bool !Bool !TempSymbolType ![TypeContext] ![ExprInfoPtr] !{! CoercionTree} !AttributePartition
+cleanUpSymbolType :: !Bool !Bool !TempSymbolType ![TypeContext] ![ExprInfoPtr] !{!CoercionTree} !AttributePartition !{#CommonDefs}
 												   !*VarEnv !*AttributeEnv !*TypeHeaps !*VarHeap !*ExpressionHeap !*ErrorAdmin
 					-> (!SymbolType,!ErrorContexts,!*VarEnv,!*AttributeEnv,!*TypeHeaps,!*VarHeap,!*ExpressionHeap,!*ErrorAdmin)
 cleanUpSymbolType is_start_rule spec_type {tst_arity,tst_args,tst_result,tst_context,tst_lifted} derived_context case_and_let_exprs
-		coercions attr_part var_env attr_var_env heaps var_heap expr_heap error
+		coercions attr_part common_defs var_env attr_var_env heaps var_heap expr_heap error
 	#! nr_of_temp_vars = size var_env
 	#! max_attr_nr = size attr_var_env
 	# cus = { cus_var_env = var_env, cus_attr_env = attr_var_env, cus_appears_in_lifted_part = bitvectCreate max_attr_nr,
@@ -360,8 +445,8 @@ cleanUpSymbolType is_start_rule spec_type {tst_arity,tst_args,tst_result,tst_con
 	  (lifted_vars, cus_var_env) = determine_type_vars nr_of_temp_vars [] cus_var_env
 	  (st_args, (_, cus))	= mapSt (clean_up_arg_type cui) (drop tst_lifted tst_args) ([], { cus & cus_var_env = cus_var_env })
 	  (st_result, cus) = clean_up_result_type cui tst_result cus
-	  (st_context, ambiguous_or_missing_contexts, cus_var_env, var_heap, cus_error)
-		= clean_up_type_contexts spec_type tst_context derived_context cus.cus_var_env var_heap cus.cus_error
+	  (st_context, ambiguous_or_missing_contexts, cus_var_env, type_heaps, var_heap, cus_error)
+		= clean_up_type_contexts spec_type tst_context derived_context cus.cus_var_env cus.cus_heaps var_heap cus.cus_error
 	  (st_vars, cus_var_env) = determine_type_vars nr_of_temp_vars lifted_vars cus_var_env
 	  (cus_attr_env, st_attr_vars, st_attr_env, cus_error)
 	  		= build_attribute_environment cus.cus_appears_in_lifted_part 0 max_attr_nr coercions (bitvectCreate max_attr_nr) cus.cus_attr_env [] [] cus_error
@@ -369,7 +454,7 @@ cleanUpSymbolType is_start_rule spec_type {tst_arity,tst_args,tst_result,tst_con
 			= clean_up_expression_types {cui & cui_top_level = False} case_and_let_exprs expr_heap
 					 {cus & cus_var_env = cus_var_env, cus_attr_env = cus_attr_env,
 							cus_appears_in_lifted_part = {el\\el<-:cus.cus_appears_in_lifted_part},
-							cus_error = cus_error }
+							cus_heaps = type_heaps, cus_error = cus_error}
 	  st = {st_arity = tst_arity, st_vars = st_vars , st_args = lifted_args ++ st_args, st_args_strictness=NotStrict, st_result = st_result, st_context = st_context,
 			st_attr_env = st_attr_env, st_attr_vars = st_attr_vars }
 	  cus_error = check_type_of_start_rule is_start_rule st cus_error
@@ -436,28 +521,31 @@ where
 			= (at, cus)
 			= (at, { cus & cus_error = existentialError cus.cus_error })
 
-	clean_up_type_contexts spec_type spec_context derived_context env var_heap error
+	clean_up_type_contexts spec_type spec_context derived_context env type_heaps var_heap error
 		| spec_type
-			# var_heap = foldSt (mark_specified_context derived_context) spec_context var_heap
+			# (type_heaps,var_heap) = foldSt (mark_specified_context derived_context) spec_context (type_heaps,var_heap)
 			  (rev_contexts, ambiguous_or_missing_contexts, env, var_heap, error)
 				= foldSt clean_up_lifted_type_context derived_context ([], NoErrorContexts, env, var_heap, error)
 			  (rev_contexts, ambiguous_or_missing_contexts, env, var_heap, error)
 				= foldSt clean_up_type_context spec_context (rev_contexts, ambiguous_or_missing_contexts, env, var_heap, error)
-			= (reverse rev_contexts, ambiguous_or_missing_contexts, env, var_heap, error)
+			= (reverse rev_contexts, ambiguous_or_missing_contexts, env, type_heaps, var_heap, error)
 			# (rev_contexts, ambiguous_or_missing_contexts, env, var_heap, error)
 				= foldSt clean_up_type_context derived_context ([], NoErrorContexts, env, var_heap, error)
-			= (reverse rev_contexts, ambiguous_or_missing_contexts, env, var_heap, error)
+			= (reverse rev_contexts, ambiguous_or_missing_contexts, env, type_heaps, var_heap, error)
 
-	mark_specified_context [] spec_tc var_heap
-		= var_heap
-	mark_specified_context [tc=:{tc_var} : tcs] spec_tc var_heap
-		| spec_tc == tc
+	mark_specified_context :: ![TypeContext] !TypeContext !*(*TypeHeaps,!*VarHeap) -> (!*TypeHeaps,!*VarHeap)
+	mark_specified_context [] spec_tc (type_heaps,var_heap)
+		= (type_heaps,var_heap)
+	mark_specified_context [tc=:{tc_var} : tcs] spec_tc (type_heaps,var_heap)
+		# (contexts_equal,type_heaps) = equal_context spec_tc tc common_defs type_heaps
+		| contexts_equal
 			# (tc_var_info,var_heap) = readPtr tc_var var_heap
 			# var_heap = if (tc_var_info=:VI_Empty) (writePtr tc_var VI_ContextSpecified var_heap) var_heap
 			| spec_tc.tc_var == tc_var
-				= var_heap
-				= writePtr spec_tc.tc_var (VI_ForwardClassVar tc_var) var_heap
-			= mark_specified_context tcs spec_tc var_heap
+				= (type_heaps,var_heap)
+				# var_heap = writePtr spec_tc.tc_var (VI_ForwardClassVar tc_var) var_heap
+				= (type_heaps,var_heap)
+			= mark_specified_context tcs spec_tc (type_heaps,var_heap)
 
 	clean_up_lifted_type_context tc=:{tc_var,tc_types} (collected_contexts,ambiguous_or_missing_contexts,env,var_heap,error)
 		| (sreadPtr tc_var var_heap)=:VI_ContextSpecified
