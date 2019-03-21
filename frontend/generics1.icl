@@ -8,7 +8,7 @@ import StdEnv,StdOverloadedList,compare_types
 import check
 from checktypes import createMoreClassDictionaries
 from transform import ::Group
-import genericsupport
+import genericsupport,transform
 
 // Data types
 
