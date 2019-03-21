@@ -1,7 +1,7 @@
 definition module type
 
 import StdArray
-import syntax, check
+import syntax, check, typesupport
 
 typeProgram :: !{! Group} !Int !*{# FunDef} !IndexRange  !(Optional Bool) !CommonDefs ![!GlobalInstanceIndex!] !{# DclModule} !NumberSet
   																						 !*TypeDefInfos !*Heaps !*PredefinedSymbols !*File !*File
