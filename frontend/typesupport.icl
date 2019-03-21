@@ -261,7 +261,9 @@ where
 		# (type, env) = env![tv_number]
 		# (cur1, type, env) = cleanUpClosedVariable type env
 		# (cur2, types, env) = cleanUpClosed types env
-		= (combineCleanUpResults cur1 cur2, simplifyTypeApplication type types, env)
+		| type=:TE
+			= (combineCleanUpResults cur1 cur2, CVE :@: types, env)
+			= (combineCleanUpResults cur1 cur2, simplifyTypeApplication type types, env)
 	cleanUpClosed t=:(TempQV _) env
 		= (cQVar, t, env)
 	cleanUpClosed t=:(TempQDV _) env
@@ -1414,6 +1416,8 @@ instance writeType ConsVariable where
 		= writeBeautifulTypeVar file beautifulizer (TV tv)
 	writeType file (Yes beautifulizer) (_, TempCV i)
 		= writeBeautifulTypeVar file beautifulizer (TempV i)
+	writeType file yes_beautifulizer (_, CVE)
+		= (file <<< '_', yes_beautifulizer)
 
 assoc_list_lookup _ _ [] = No
 assoc_list_lookup equal t1 [hd=:(t2, _):tl]
