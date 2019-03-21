@@ -9,8 +9,6 @@ typeProgram :: !{! Group} !Int !*{# FunDef} !IndexRange  !(Optional Bool) !Commo
 
 addPropagationAttributesToAType :: {#CommonDefs} !AType !*PropState -> *(!AType,!*PropState);
 
-tryToExpand :: !Type !TypeAttribute !{# CommonDefs} !*TypeHeaps -> (!Bool, !Type, !*TypeHeaps)
-
 ::	PropState =
 	{	prop_type_heaps	:: !.TypeHeaps
 	,	prop_td_infos	:: !.TypeDefInfos

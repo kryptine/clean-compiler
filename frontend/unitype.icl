@@ -2,7 +2,7 @@ implementation module unitype
 
 import StdEnv, StdStrictLists, compare_types
 from StdOverloadedList import Any
-import syntax, analunitypes, type, utilities, checktypes
+import syntax, analunitypes, typesupport, utilities, checktypes
 
 AttrUni			:== 0
 AttrMulti		:== 1

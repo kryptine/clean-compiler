@@ -751,6 +751,26 @@ instance bindInstances AType
 	bindInstances {at_type=t1} {at_type=t2} type_var_heap
 			= bindInstances t1 t2 type_var_heap
 
+tryToExpand :: !Type !TypeAttribute !{# CommonDefs} !*TypeHeaps -> (!Bool, !Type, !*TypeHeaps)
+tryToExpand type=:(TA {type_index={glob_object,glob_module}} type_args) type_attr ti_common_defs type_heaps
+	#! type_def = ti_common_defs.[glob_module].com_type_defs.[glob_object]
+	= case type_def.td_rhs of
+		SynType {at_type}
+			# (expanded_type, type_heaps) = substituteType type_def.td_attribute type_attr type_def.td_args type_args at_type type_heaps
+			-> (True, expanded_type, type_heaps)
+		_
+			-> (False, type, type_heaps)
+tryToExpand type=:(TAS {type_index={glob_object,glob_module}} type_args _) type_attr ti_common_defs type_heaps
+	#! type_def = ti_common_defs.[glob_module].com_type_defs.[glob_object]
+	= case type_def.td_rhs of
+		SynType {at_type}
+			# (expanded_type, type_heaps) = substituteType type_def.td_attribute type_attr type_def.td_args type_args at_type type_heaps
+			-> (True, expanded_type, type_heaps)
+		_
+			-> (False, type, type_heaps)
+tryToExpand type type_attr modules type_heaps
+	= (False, type, type_heaps)
+
 substituteType :: !TypeAttribute !TypeAttribute ![ATypeVar] ![AType] !Type !*TypeHeaps -> (!Type, !*TypeHeaps)
 substituteType form_root_attribute act_root_attribute form_type_args act_type_args orig_type type_heaps
 	# type_heaps = bindTypeVarsAndAttributes form_root_attribute act_root_attribute form_type_args act_type_args type_heaps
