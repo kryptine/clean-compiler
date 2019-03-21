@@ -2454,8 +2454,8 @@ where
 		= case env_type of
 			ExpandedType fun_type tmp_fun_type exp_fun_type
 				# (clean_fun_type, ambiguous_or_missing_contexts, type_var_env, attr_var_env, ts_type_heaps, ts_var_heap, ts_expr_heap, ts_error)
-					= cleanUpSymbolType is_start_rule cSpecifiedType exp_fun_type type_contexts type_ptrs coercion_env 
-										attr_partition defs type_var_env attr_var_env ts.ts_type_heaps ts.ts_var_heap ts.ts_expr_heap ts.ts_error
+					= cleanUpSymbolType is_start_rule cSpecifiedType exp_fun_type type_contexts type_ptrs coercion_env attr_partition
+										defs type_var_env attr_var_env ts.ts_type_heaps ts.ts_var_heap ts.ts_expr_heap ts.ts_error
 				  ts_error = check_caf_context (newPosition fun_ident fun_pos) fun_kind clean_fun_type ts_error
 				| ts_error.ea_ok
 					# (ts_fun_env, attr_var_env, ts_type_heaps, ts_expr_heap, ts_error)
@@ -2466,8 +2466,8 @@ where
 					-> (type_var_env, NoErrorContexts, attr_var_env, out, ts)
 		  	UncheckedType exp_fun_type
 				# (clean_fun_type, ambiguous_or_missing_contexts, type_var_env, attr_var_env, ts_type_heaps, ts_var_heap, ts_expr_heap, ts_error)
-					= cleanUpSymbolType is_start_rule cDerivedType exp_fun_type type_contexts type_ptrs coercion_env
-										attr_partition defs type_var_env attr_var_env ts.ts_type_heaps ts.ts_var_heap ts.ts_expr_heap ts.ts_error
+					= cleanUpSymbolType is_start_rule cDerivedType exp_fun_type type_contexts type_ptrs coercion_env attr_partition
+										defs type_var_env attr_var_env ts.ts_type_heaps ts.ts_var_heap ts.ts_expr_heap ts.ts_error
 				  ts_error = check_caf_context (newPosition fun_ident fun_pos) fun_kind clean_fun_type ts_error
 				  th_attrs = ts_type_heaps.th_attrs
 				  (out, th_attrs)
