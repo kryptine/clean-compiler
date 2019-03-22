@@ -3325,24 +3325,6 @@ BENoCodeParameters (void)
 	return (NULL);
 } /* BENoCodeParameters */
 
-static void
-RemoveSpecialArrayFunctionsFromSymbolList (SymbolP *symbolH)
-{
-	SymbolP	symbolP;
-
-	while ((symbolP = *symbolH) != NULL)
-	{
-		SymbDefP	sdef;
-
-		sdef	= symbolP->symb_def;
-
-		if (symbolP->symb_kind == definition && sdef->sdef_kind == IMPRULE && sdef->sdef_arfun != NoArrayFun)
-			*symbolH	= symbolP->symb_next;
-		else
-			symbolH	= &symbolP->symb_next;
-	}
-} /* RemoveSpecialArrayFunctionsFromSymbolList */
-
 #if 0
 File rules_file;
 #endif
@@ -3366,8 +3348,6 @@ BEGenerateCode (CleanString outputFile)
 	}
 
 	ExitEnv_valid=1;	
-
-	// RemoveSpecialArrayFunctionsFromSymbolList (&gBEState.be_icl.beicl_module->im_symbols);
 
 	/* +++ hack */
 	rule	= gBEState.be_dictionarySelectFunSymbol->symb_def->sdef_rule;
