@@ -2105,11 +2105,9 @@ where
 				RecordSelection _ _
 					->	beUpdateNode (convertArgs [expr1, Selection NormalSelector expr2 [singleSelection]])
 				ArraySelection {glob_object={ds_index}, glob_module} _ index
-	// RWS not used?, eleminate beSpecialArrayFunctionSymbol?
 					->	beNormalNode
-							(beSpecialArrayFunctionSymbol BEArrayUpdateFun ds_index glob_module)
+							(beFunctionSymbol ds_index glob_module)
 							(convertArgs [expr1, index, expr2])
-	//
 				DictionarySelection dictionaryVar dictionarySelections _ index
 					->	convertExpr (Selection NormalSelector (Var dictionaryVar) dictionarySelections @ [expr1, index, expr2])
 	convertExpr (Update expr1 selections expr2)
@@ -2165,7 +2163,18 @@ where
 	convertSelection expression (kind, RecordSelection {glob_object={ds_index}, glob_module} _)
 		=	beSelectorNode kind (beFieldSymbol ds_index glob_module) (beArgs expression beNoArgs)
 	convertSelection expression (kind, ArraySelection {glob_object={ds_index}, glob_module} _ index)
-		=	beNormalNode (beSpecialArrayFunctionSymbol (selectionKindToArrayFunKind kind) ds_index glob_module) (beArgs expression (convertArgs [index]))
+		=	beNormalNode (beArraySelectionSymbol kind ds_index glob_module) (beArgs expression (convertArgs [index]))
+	where
+		beArraySelectionSymbol BESelector ds_index glob_module
+			= beFunctionSymbol ds_index glob_module
+		beArraySelectionSymbol BESelector_U ds_index glob_module
+			= beSpecialArrayFunctionSymbol BE_UnqArraySelectFun ds_index glob_module
+		beArraySelectionSymbol BESelector_F ds_index glob_module
+			= beSpecialArrayFunctionSymbol BE_UnqArraySelectFun ds_index glob_module
+		beArraySelectionSymbol BESelector_L ds_index glob_module
+			= beSpecialArrayFunctionSymbol BE_UnqArraySelectLastFun ds_index glob_module
+		beArraySelectionSymbol BESelector_N ds_index glob_module
+			= beSpecialArrayFunctionSymbol BE_UnqArraySelectLastFun ds_index glob_module
 	convertSelection expression (kind, DictionarySelection dictionaryVar dictionarySelections _ index)
 		=	case kind of
 				BESelector
@@ -2392,17 +2401,6 @@ convertDefaultCase (DefaultCase expr) aliasDummyId main_dcl_module_n
 				(convertRhsStrictNodeIds expr)
 				(convertRootExpr aliasDummyId expr main_dcl_module_n))
 			beNoArgs
-
-selectionKindToArrayFunKind BESelector
-	=	BEArraySelectFun
-selectionKindToArrayFunKind BESelector_U
-	=	BE_UnqArraySelectFun
-selectionKindToArrayFunKind BESelector_F
-	=	BE_UnqArraySelectFun
-selectionKindToArrayFunKind BESelector_L
-	=	BE_UnqArraySelectLastFun
-selectionKindToArrayFunKind BESelector_N
-	=	BE_UnqArraySelectLastFun
 
 convertVar :: VarInfoPtr -> BEMonad BENodeIdP
 convertVar varInfo
