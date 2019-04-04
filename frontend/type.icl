@@ -322,9 +322,9 @@ class unify a :: !a !a !TypeInput !*{! Type} !*TypeHeaps -> (!Bool, !*{! Type}, 
 instance unify (a, b) | unify a & unify b
 where
 	unify (t1x, t1y) (t2x, t2y) modules subst heaps
-		# (succ, subst, heaps) =  unify t1y t2y modules subst heaps
+		# (succ, subst, heaps) =  unify t1x t2x modules subst heaps
 		| succ
-	      = unify t1x t2x modules subst heaps
+	      = unify t1y t2y modules subst heaps
 	      = (False, subst, heaps)
 
 instance unify [a] | unify a
@@ -503,36 +503,36 @@ unifyCVwithType cv1 type_args1 type=:(cv2 :@: type_args2) modules subst heaps
 			-> unifyCVApplicationwithCVApplication cv1 type_args1 cv2 type_args2 modules subst heaps
 unifyCVwithType cv type_args type=:(TA type_cons cons_args) modules subst heaps
 	# diff = type_cons.type_arity - length type_args
-	| diff >= 0 
-		# (succ, subst, heaps) = unify type_args (drop diff cons_args) modules subst heaps
+	| diff >= 0
+		# (succ, subst, heaps) = unifyTypes (toTV cv) TA_Multi (TA { type_cons & type_arity = diff } (take diff cons_args)) TA_Multi modules subst heaps
 		| succ
-			= unifyTypes (toTV cv) TA_Multi (TA { type_cons & type_arity = diff } (take diff cons_args)) TA_Multi modules subst heaps
+			= unify type_args (drop diff cons_args) modules subst heaps
 		    = (False, subst, heaps)
 		= (False, subst, heaps)
 unifyCVwithType cv type_args type=:(TAS type_cons cons_args strictness) modules subst heaps
 	# diff = type_cons.type_arity - length type_args
-	| diff >= 0 
-		# (succ, subst, heaps) = unify type_args (drop diff cons_args) modules subst heaps
+	| diff >= 0
+		# (succ, subst, heaps) = unifyTypes (toTV cv) TA_Multi (TAS { type_cons & type_arity = diff } (take diff cons_args) strictness) TA_Multi modules subst heaps
 		| succ
-			= unifyTypes (toTV cv) TA_Multi (TAS { type_cons & type_arity = diff } (take diff cons_args) strictness) TA_Multi modules subst heaps
+			= unify type_args (drop diff cons_args) modules subst heaps
 		    = (False, subst, heaps)
 		= (False, subst, heaps)
 unifyCVwithType cv [type_arg1, type_arg2] type=:(atype1 --> atype2) modules subst heaps
-	# (succ, subst, heaps) = unify (type_arg1, type_arg2) (atype1, atype2) modules subst heaps
+	# (succ, subst, heaps) = unifyTypes (toTV cv) TA_Multi TArrow TA_Multi modules subst heaps
 	| succ
-		= unifyTypes (toTV cv) TA_Multi TArrow TA_Multi modules subst heaps
+		= unify (type_arg1, type_arg2) (atype1, atype2) modules subst heaps
 		= (False, subst, heaps)		
 unifyCVwithType cv [type_arg] type=:(atype1 --> atype2) modules subst heaps
-	# (succ, subst, heaps) = unify type_arg atype2 modules subst heaps
+	# (succ, subst, heaps) = unifyTypes (toTV cv) TA_Multi (TArrow1 atype1) TA_Multi modules subst heaps
 	| succ
-		= unifyTypes (toTV cv) TA_Multi (TArrow1 atype1) TA_Multi modules subst heaps
+		= unify type_arg atype2 modules subst heaps
 		= (False, subst, heaps)
 unifyCVwithType cv [] type=:(atype1 --> atype2) modules subst heaps
 	= unifyTypes (toTV cv) TA_Multi type TA_Multi modules subst heaps
 unifyCVwithType cv [type_arg] type=:(TArrow1 atype) modules subst heaps
-	# (succ, subst, heaps) = unify type_arg atype modules subst heaps
+	# (succ, subst, heaps) = unifyTypes (toTV cv) TA_Multi TArrow TA_Multi modules subst heaps
 	| succ
-		= unifyTypes (toTV cv) TA_Multi TArrow TA_Multi modules subst heaps
+		= unify type_arg atype modules subst heaps
 		= (False, subst, heaps)
 unifyCVwithType cv [] type=:(TArrow1 atype) modules subst heaps
 	= unifyTypes (toTV cv) TA_Multi type TA_Multi modules subst heaps
