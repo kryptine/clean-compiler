@@ -488,9 +488,11 @@ instance consumerRequirements Expression where
 		# ai = {ai & ai_next_var=new_next_var,ai_next_var_of_fun=new_next_var_of_fun,ai_var_heap=ai_var_heap}
 		= consumerRequirements expr common_defs ai
 		where
-			init_variables [({fv_info_ptr},_):dictionaries] ai_next_var ai_next_var_of_fun ai_var_heap
-				# ai_var_heap = writePtr fv_info_ptr (VI_AccVar ai_next_var ai_next_var_of_fun) ai_var_heap
-				= init_variables dictionaries (inc ai_next_var) (inc ai_next_var_of_fun) ai_var_heap
+			init_variables [({fv_info_ptr,fv_count},_):dictionaries] ai_next_var ai_next_var_of_fun ai_var_heap
+				| fv_count>0
+					# ai_var_heap = writePtr fv_info_ptr (VI_AccVar ai_next_var ai_next_var_of_fun) ai_var_heap
+					= init_variables dictionaries (inc ai_next_var) (inc ai_next_var_of_fun) ai_var_heap
+					= init_variables dictionaries ai_next_var ai_next_var_of_fun ai_var_heap
 			init_variables [] ai_next_var ai_next_var_of_fun ai_var_heap
 				= (ai_next_var,ai_next_var_of_fun,ai_var_heap)
 	consumerRequirements ExprToBeRemoved _ ai
