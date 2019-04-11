@@ -580,41 +580,27 @@ ScanInitIdentStringTable (void)
 	ReservedWords [(int) openbracesym]		= "{";
 	ReservedWords [(int) closebracesym]		= "}";
 	ReservedWords [(int) arrowsym]			= "->";
-	ReservedWords [(int) abstypesym]		= "AbsType";
 
 	ReservedWords [(int) arraysym]			= "{ }";
 	ReservedWords [(int) strictarraysym]	= "{ ! }";
 	ReservedWords [(int) unboxedarraysym]	= "{ # }";
 
-	ReservedWords [(int) atsym]				= "at";
 	ReservedWords [(int) boolsym]			= "Bool";
 	ReservedWords [(int) charsym]			= "Char";
 	ReservedWords [(int) codesym]			= "code";
-	ReservedWords [(int) defsym]			= "definition";
 	ReservedWords [(int) falsesym]			= "False";
 	ReservedWords [(int) filesym]			= "File";
-	ReservedWords [(int) allsym]			= "All";
 	ReservedWords [(int) fromsym]			= "from";
-/* RWS ... hack */
 	ReservedWords [(int) ifsym]				= "if ";
-/* ... RWS */
-	ReservedWords [(int) impsym]			= "implementation";
-	ReservedWords [(int) importsym]			= "import";
 	ReservedWords [(int) intsym]			= "Int";
-	ReservedWords [(int) macrosym]			= "macro";
-	ReservedWords [(int) modulesym]			= "module";
 	ReservedWords [(int) procidsym]			= "ProcId";
 	ReservedWords [(int) redidsym]			= "RedId";
 	ReservedWords [(int) realsym]			= "Real";
-	ReservedWords [(int) rulesym]			= "rule";
 /* */
 	ReservedWords [(int) stringsym]			= "_STRING";
 /* */
-	ReservedWords [(int) systemsym]			= "system";
 	ReservedWords [(int) truesym]			= "True";
-	ReservedWords [(int) typedefsym]		= "type";
 	ReservedWords [(int) applysym]			= "=>";
-	ReservedWords [(int) uniquesym]			= "*";
 	ReservedWords [(int) worldsym]			= "World";
 
 	gIdentStringTable	= (struct ident_string**)CompAlloc (kIdentStringTableSize * sizeof (struct ident_string));
