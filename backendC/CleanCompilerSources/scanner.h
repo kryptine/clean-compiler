@@ -8,17 +8,15 @@ typedef
 		errorsym, barsym, strictsym, opensym,
 		closesym, opensquaresym, closesquaresym, colonsym,
  		typesym, semicolonsym, commasym, dotsym, openbracesym,
-		closebracesym, arrowsym, abstypesym,
+		closebracesym, arrowsym,
 		arraysym, strictarraysym, unboxedarraysym,
 
-		atsym,boolsym, codesym, charsym,defsym,
-		falsesym, filesym, fromsym, ifsym, impsym,
-
-		allsym,
-		importsym, intsym, macrosym, modulesym, procidsym, redidsym,
-		realsym, rulesym, stringsym,
-		systemsym, truesym, typedefsym, applysym,
-		uniquesym, worldsym,
+		boolsym, codesym, charsym,
+		falsesym, filesym, fromsym, ifsym,
+		intsym, procidsym, redidsym,
+		realsym, stringsym,
+		truesym, applysym,
+		worldsym,
 		NumberOfKeywords /* make sure that this constant is the last one */
 		
 	} KeywordKind;  
