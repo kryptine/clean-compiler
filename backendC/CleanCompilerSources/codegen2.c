@@ -6788,7 +6788,6 @@ void InitCoding (void)
 	InitBasicDescriptor (IntObj, "INT", SizeOfInt);
 	InitBasicDescriptor (BoolObj, "BOOL", SizeOfBool);
 	InitBasicDescriptor (CharObj, "CHAR", SizeOfChar);
-	InitBasicDescriptor (StringObj, "STRING", SizeOfAStackElem);
 #ifdef G_A64
 	InitBasicDescriptor (RealObj, "REAL", 1);
 #else
