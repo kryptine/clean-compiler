@@ -596,9 +596,6 @@ ScanInitIdentStringTable (void)
 	ReservedWords [(int) procidsym]			= "ProcId";
 	ReservedWords [(int) redidsym]			= "RedId";
 	ReservedWords [(int) realsym]			= "Real";
-/* */
-	ReservedWords [(int) stringsym]			= "_STRING";
-/* */
 	ReservedWords [(int) truesym]			= "True";
 	ReservedWords [(int) applysym]			= "=>";
 	ReservedWords [(int) worldsym]			= "World";

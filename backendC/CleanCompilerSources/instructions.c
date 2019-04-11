@@ -517,7 +517,6 @@ enum {
 #define IbuildC "buildC"
 #define IbuildI "buildI"
 #define IbuildR "buildR"
-#define IbuildS "buildS"
 
 #define IbuildB_b "buildB_b"
 #define IbuildC_b "buildC_b"
@@ -529,7 +528,6 @@ enum {
 #define IfillC "fillC"
 #define IfillI "fillI"
 #define IfillR "fillR"
-#define IfillS "fillS"
 
 #define IfillB_b "fillB_b"
 #define IfillC_b "fillC_b"
@@ -541,7 +539,6 @@ enum {
 #define IeqC_a "eqC_a"
 #define IeqI_a "eqI_a"
 #define IeqR_a "eqR_a"
-#define IeqS_a "eqS_a"
 
 #define IeqAC_a "eqAC_a"
 
@@ -812,10 +809,6 @@ void BuildBasic (ObjectKind obj,SymbValue val)
 			put_instruction_ (IbuildR);
 			FPrintF (OutFile, "%s", val.val_real);
 			break;
-		case StringObj:
-			put_instruction_ (IbuildS);
-			FPrintF (OutFile, "%s", val.val_string);
-			break;
 		default:
 			error_in_function ("BuildBasic");
 			return;
@@ -845,10 +838,6 @@ void FillBasic (ObjectKind obj, SymbValue val, int offset, FillKind fkind)
 			put_instruction_ (IfillR);
 			FPrintF (OutFile, "%s %d", val.val_real, offset);
 			break;
-		case StringObj:
-			put_instruction_ (IfillS);
-			FPrintF (OutFile, "%s %d", val.val_string, offset);
-			break;
 		default:
 			error_in_function ("FillBasic");
 			return;
@@ -876,9 +865,6 @@ void IsBasic (ObjectKind obj, SymbValue val, int offset)
 		case RealObj:
 			put_instruction_ (IeqR_a);
 			FPrintF (OutFile, "%s %d", val.val_real, offset); break;
-		case StringObj:
-			put_instruction_ (IeqS_a);
-			FPrintF (OutFile, "%s %d", val.val_string, offset); break;
 		default:
 			error_in_function ("IsBasic");
 			return;

@@ -37,7 +37,6 @@ static void PrintUnaryState (StateKind kind, ObjectKind obj, File file)
 		case IntObj: FPutS ("Int ", file); break;
 		case BoolObj: FPutS ("Bool ", file); break;
 		case CharObj: FPutS ("Char ", file); break;
-		case StringObj: FPutS ("String ", file); break;
 		case RealObj: FPutS ("Real ", file); break;
 		case FileObj: FPutS ("File ", file); break;
 		case TupleObj: FPutS ("Tuple ", file); break;

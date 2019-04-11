@@ -17,7 +17,6 @@ char *ConvertSymbolKindToString (SymbKind skind)
 		case int_type: 		return ReservedWords [(int) intsym];
 		case bool_type:		return ReservedWords [(int) boolsym];
 		case char_type:		return ReservedWords [(int) charsym];
-		case string_type:	return ReservedWords [(int) stringsym];
 		case real_type:		return ReservedWords [(int) realsym];
 		case file_type:		return ReservedWords [(int) filesym];
 		case array_type:		return ReservedWords [(int) arraysym];

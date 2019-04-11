@@ -25,7 +25,7 @@ typedef enum {
 #if ABSTRACT_OBJECT
 	AbstractObj,
 #endif
-	IntObj, BoolObj, CharObj, RealObj, FileObj, StringObj,
+	IntObj, BoolObj, CharObj, RealObj, FileObj, unusedObjectKind0/*StringObj*/,
 	TupleObj, ListObj, RecordObj, ArrayObj, StrictArrayObj, UnboxedArrayObj,
 	WorldObj, ProcIdObj, RedIdObj
 #ifdef CLEAN2
@@ -42,7 +42,7 @@ typedef enum {
 
 typedef enum {
 	int_type, bool_type, char_type, real_type,
-	file_type, string_type, world_type, procid_type,
+	file_type, unusedSymbKind0/*string_type*/, world_type, procid_type,
 	redid_type,
 #ifdef CLEAN2
 	rational_denot,

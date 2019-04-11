@@ -95,7 +95,6 @@ InitParser (void)
 	BasicTypeSymbols [int_type]		= NewPredefinedTypeSymbol (int_type, intsym, & gBasicTypeIdents [int_type]);
 	BasicTypeSymbols [bool_type]	= NewPredefinedTypeSymbol (bool_type, boolsym, & gBasicTypeIdents [bool_type]);
 	BasicTypeSymbols [char_type]	= NewPredefinedTypeSymbol (char_type, charsym, & gBasicTypeIdents [char_type]);
-	BasicTypeSymbols [string_type]	= NewPredefinedTypeSymbol (string_type, stringsym, & gBasicTypeIdents [string_type]);
 	BasicTypeSymbols [real_type]	= NewPredefinedTypeSymbol (real_type, realsym, & gBasicTypeIdents [real_type]);
 	BasicTypeSymbols [file_type]	= NewPredefinedTypeSymbol (file_type, filesym, & gBasicTypeIdents [file_type]);
 	BasicTypeSymbols [world_type]	= NewPredefinedTypeSymbol (world_type, worldsym, & gBasicTypeIdents [world_type]);
