@@ -14,7 +14,7 @@ typedef
 		boolsym, codesym, charsym,
 		falsesym, filesym, fromsym, ifsym,
 		intsym, procidsym, redidsym,
-		realsym, stringsym,
+		realsym,
 		truesym, applysym,
 		worldsym,
 		NumberOfKeywords /* make sure that this constant is the last one */

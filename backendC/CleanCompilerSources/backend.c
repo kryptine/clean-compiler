@@ -3617,7 +3617,6 @@ CheckBEEnumTypes (void)
 	Assert (char_type					== BECharType);
 	Assert (real_type					== BERealType);
 	Assert (file_type					== BEFileType);
-	Assert (string_type					== BEStringType);
 	Assert (world_type					== BEWorldType);
 	Assert (procid_type					== BEProcIdType);
 	Assert (redid_type					== BERedIdType);

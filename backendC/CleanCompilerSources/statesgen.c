@@ -4424,7 +4424,6 @@ void InitStatesGen (void)
 	SetUnaryState (& BasicSymbolStates[int_type], OnB, IntObj);
 	SetUnaryState (& BasicSymbolStates[bool_type], OnB, BoolObj);
 	SetUnaryState (& BasicSymbolStates[char_type], OnB, CharObj);
-	SetUnaryState (& BasicSymbolStates[string_type], StrictOnA, StringObj);
 	SetUnaryState (& BasicSymbolStates[real_type], OnB, RealObj);
 	SetUnaryState (& BasicSymbolStates[file_type], OnB, FileObj);
 	SetUnaryState (& BasicSymbolStates[world_type], StrictOnA, WorldObj);
