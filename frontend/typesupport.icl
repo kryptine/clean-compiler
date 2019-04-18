@@ -345,7 +345,7 @@ equal_expanded_context type1 type2 common_defs_a type_heaps
 	# (expanded1,expanded_type1,type_heaps) = tryToExpand type1 TA_Multi common_defs_a type_heaps
 	# (expanded2,expanded_type2,type_heaps) = tryToExpand type2 TA_Multi common_defs_a type_heaps
 	| expanded1 || expanded2
-		= equal_context expanded_type1 type2 common_defs_a type_heaps
+		= equal_context expanded_type1 expanded_type2 common_defs_a type_heaps
 		= (False,type_heaps)
 
 // extended version of instance == in module compare_types that expands synonym types
