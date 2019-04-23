@@ -54,7 +54,7 @@ checkSpecial mod_index fun_type=:{ft_type} fun_index subst (next_inst_index, spe
 where	
 	substitute_type st=:{st_vars,st_attr_vars,st_args,st_result,st_context,st_attr_env} environment type_heaps error
 		# (st_vars, st_attr_vars, [st_result : st_args], st_context, st_attr_env, _, type_heaps, error)
-			= instantiateTypes st_vars st_attr_vars [ st_result : st_args ] st_context st_attr_env environment [] type_heaps error
+			= instantiateTypes environment st_vars st_attr_vars [st_result : st_args] st_context st_attr_env [] type_heaps error
 		= ({st & st_vars = st_vars, st_args = st_args, st_result = st_result, st_attr_vars = st_attr_vars,
 			st_context = st_context, st_attr_env = st_attr_env }, type_heaps, error)
 
@@ -460,25 +460,29 @@ getMemberDef mem_mod mem_index mod_index member_defs modules
 		# (dcl_mod,modules) = modules![mem_mod]
 		= (dcl_mod.dcl_common.com_member_defs.[mem_index], member_defs, modules)
 
-instantiateTypes :: ![TypeVar] ![AttributeVar] ![AType] ![TypeContext] ![AttrInequality] !SpecialSubstitution ![SpecialSubstitution] !*TypeHeaps !*ErrorAdmin
-	-> (![TypeVar], ![AttributeVar], ![AType], ![TypeContext], ![AttrInequality], ![SpecialSubstitution], !*TypeHeaps, !*ErrorAdmin)
-instantiateTypes old_type_vars old_attr_vars types type_contexts attr_env {ss_environ, ss_vars, ss_attrs, ss_context} special_subst_list type_heaps=:{th_vars, th_attrs} error
+instantiateTypes :: !SpecialSubstitution
+					![TypeVar] ![AttributeVar] ![AType] ![TypeContext] ![AttrInequality] ![SpecialSubstitution] !*TypeHeaps !*ErrorAdmin
+				-> (![TypeVar],![AttributeVar],![AType],![TypeContext],![AttrInequality],![SpecialSubstitution],!*TypeHeaps,!*ErrorAdmin)
+instantiateTypes {ss_environ, ss_vars, ss_attrs, ss_context}
+		old_type_vars old_attr_vars types type_contexts attr_env special_subst_list type_heaps=:{th_vars, th_attrs} error
 	# th_vars = clear_vars old_type_vars th_vars
 
 	  (new_type_vars, th_vars) = foldSt build_var_subst ss_vars ([], th_vars)
 	  (new_attr_vars, th_attrs) = foldSt build_attr_var_subst ss_attrs ([], th_attrs)
 
-	  type_heaps = foldSt build_type_subst ss_environ { type_heaps & th_vars = th_vars, th_attrs = th_attrs }
-	  (_, new_ss_context, type_heaps) = substitute ss_context type_heaps
+	  (erroneous_types,type_heaps) = foldSt build_type_subst ss_environ ([],{type_heaps & th_vars = th_vars, th_attrs = th_attrs})
+	  (_, new_ss_context, erroneous_types, type_heaps) = substitute_special ss_context erroneous_types type_heaps
 
 	  (inst_vars, th_vars)			= foldSt determine_free_var old_type_vars (new_type_vars, type_heaps.th_vars) 
 	  (inst_attr_vars, th_attrs)	= foldSt build_attr_var_subst old_attr_vars (new_attr_vars, type_heaps.th_attrs)
 
-	  (inst_types, (ok2, type_heaps))	= mapSt substitue_arg_type types (True, { type_heaps & th_vars = th_vars, th_attrs = th_attrs })
-	  (_, inst_contexts, type_heaps)	= substitute type_contexts type_heaps
+	  (inst_types, (erroneous_types, type_heaps)) = mapSt substitue_arg_type types (erroneous_types, {type_heaps & th_vars = th_vars, th_attrs = th_attrs})
+	  (_, inst_contexts, erroneous_types, type_heaps) = substitute_special type_contexts erroneous_types type_heaps
 	  (_, inst_attr_env, type_heaps)	= substitute attr_env type_heaps
 	  (special_subst_list, th_vars) 	= mapSt adjust_special_subst special_subst_list type_heaps.th_vars
-	= (inst_vars, inst_attr_vars, inst_types, new_ss_context ++ inst_contexts, inst_attr_env, special_subst_list, { type_heaps & th_vars = th_vars }, error)
+	  type_heaps & th_vars = th_vars
+	  error = report_erroneous_types erroneous_types error
+	= (inst_vars, inst_attr_vars, inst_types, new_ss_context ++ inst_contexts, inst_attr_env, special_subst_list, type_heaps, error)
 where
 	clear_vars type_vars type_var_heap = foldSt (\tv -> writePtr tv.tv_info_ptr TVI_Empty) type_vars type_var_heap
 	
@@ -490,37 +494,34 @@ where
 			_
 				-> (free_vars, type_var_heap)
 
-	build_type_subst {bind_src,bind_dst} type_heaps
-		# (_, bind_src, type_heaps) = substitute bind_src type_heaps
-// RWS ...
-/*
-	FIXME: this is a patch for the following incorrect function type (in a dcl module)
-
-
-    f :: a | c a b special
-        a=[], b = Int
-        a=T, b = Char
-
-   The type variable b doesn't occur in f's type, but this is checked in a later
-   phase. Probably it's a better solution to change the order of checking.
-
-*/
+	build_type_subst {bind_src,bind_dst} (erroneous_types,type_heaps)
+		# (_, bind_src, erroneous_types, type_heaps) = substitute_special bind_src erroneous_types type_heaps
+		/*
+			FIXME: this is a patch for the following incorrect function type (in a dcl module)
+			
+			f :: a | c a b special
+				a=[], b = Int
+				a=T, b = Char
+			
+			The type variable b doesn't occur in f's type, but this is checked in a later
+			phase. Probably it's a better solution to change the order of checking.
+		*/
 		| isNilPtr bind_dst.tv_info_ptr
-			= type_heaps
-// ... RWS
-		= { type_heaps & th_vars = writePtr bind_dst.tv_info_ptr (TVI_Type bind_src) type_heaps.th_vars}
+			= (erroneous_types, type_heaps)
+			# type_heaps & th_vars = writePtr bind_dst.tv_info_ptr (TVI_Type bind_src) type_heaps.th_vars
+			= (erroneous_types, type_heaps)
 
-	substitue_arg_type at=:{at_type = TFA type_vars type} (was_ok, type_heaps)
+	substitue_arg_type at=:{at_type = TFA type_vars type} (erroneous_types, type_heaps)
 		# (fresh_type_vars, type_heaps) = foldSt build_avar_subst type_vars ([], type_heaps)
-		  (_, new_at, type_heaps) = substitute {at & at_type = type} type_heaps
-		= ({ new_at & at_type = TFA fresh_type_vars new_at.at_type}, (was_ok, type_heaps))
-	substitue_arg_type at=:{at_type = TFAC type_vars type type_contexts} (was_ok, type_heaps)
+		  (_, new_at, erroneous_types, type_heaps) = substitute_special {at & at_type = type} erroneous_types type_heaps
+		= ({ new_at & at_type = TFA fresh_type_vars new_at.at_type}, (erroneous_types, type_heaps))
+	substitue_arg_type at=:{at_type = TFAC type_vars type type_contexts} (erroneous_types, type_heaps)
 		# (fresh_type_vars, type_heaps) = foldSt build_avar_subst type_vars ([], type_heaps)
-		  (_, new_at, type_heaps) = substitute {at & at_type = type} type_heaps
-		= ({ new_at & at_type = TFAC fresh_type_vars new_at.at_type type_contexts}, (was_ok, type_heaps))
-	substitue_arg_type type (was_ok, type_heaps)
-		# (_, type, type_heaps) = substitute type type_heaps
-		= (type, (was_ok, type_heaps))
+		  (_, new_at, erroneous_types, type_heaps) = substitute_special {at & at_type = type} erroneous_types type_heaps
+		= ({ new_at & at_type = TFAC fresh_type_vars new_at.at_type type_contexts}, (erroneous_types, type_heaps))
+	substitue_arg_type type (erroneous_types, type_heaps)
+		# (_, type, erroneous_types, type_heaps) = substitute_special type erroneous_types type_heaps
+		= (type, (erroneous_types, type_heaps))
 		
 	build_var_subst var (free_vars, type_var_heap)
 		# (new_info_ptr, type_var_heap) = newPtr TVI_Empty type_var_heap
@@ -553,6 +554,15 @@ where
 		# (TVI_Type (TV new_tv), type_var_heap) = readPtr tv_info_ptr type_var_heap
 		= ({ bind & bind_dst = new_tv }, type_var_heap)
 
+	report_erroneous_types [(type,a_types):erroneous_types] error
+		# error = errorHeading "Error" error
+		  format = {form_properties = cNoProperties, form_attr_position = No}
+		  error & ea_file = error.ea_file
+			<<< "Specialized type contains incorrect type (" <:: (format, [type:[at_type\\{at_type}<-a_types]], No) <<< ")\n"
+		= report_erroneous_types erroneous_types error
+	report_erroneous_types [] error
+		= error
+
 determineTypeOfMemberInstance :: !SymbolType ![TypeVar] !InstanceType !Specials !*TypeHeaps !u:(Optional (v:{#DclModule}, w:{#CheckedTypeDef}, Index)) !*ErrorAdmin
 												 -> (!SymbolType, !FunSpecials, !*TypeHeaps,!u: Optional (v:{#DclModule}, w:{#CheckedTypeDef}), !*ErrorAdmin)
 determineTypeOfMemberInstance mem_st class_vars {it_types,it_vars,it_attr_vars,it_context} specials type_heaps opt_modules error
@@ -575,7 +585,7 @@ where
 
 	substitute_symbol_type st=:{st_vars,st_attr_vars,st_args,st_result,st_context,st_attr_env} environment specials type_heaps error
 		# (st_vars, st_attr_vars, [st_result : st_args], st_context, st_attr_env, specials, type_heaps, error)
-			= instantiateTypes st_vars st_attr_vars [ st_result : st_args ] st_context st_attr_env environment specials type_heaps error
+			= instantiateTypes environment st_vars st_attr_vars [st_result : st_args] st_context st_attr_env specials type_heaps error
 		= ({st & st_vars = st_vars, st_args = st_args, st_result = st_result, st_attr_vars = st_attr_vars,
 			st_context = st_context, st_attr_env = st_attr_env }, specials, type_heaps, error)
 
@@ -731,8 +741,8 @@ where
 		where
 			substitute_instance_type :: !InstanceType !SpecialSubstitution !*TypeHeaps !*ErrorAdmin -> (!InstanceType,!*TypeHeaps,!.ErrorAdmin)
 			substitute_instance_type it=:{it_vars,it_attr_vars,it_types,it_context} environment type_heaps cs_error
-				# (it_vars, it_attr_vars, it_atypes, it_context, _, _, type_heaps, cs_error)	
-					= instantiateTypes it_vars it_attr_vars [MakeAttributedType type \\ type <- it_types] it_context [] environment [] type_heaps cs_error
+				# (it_vars, it_attr_vars, it_atypes, it_context, _, _, type_heaps, cs_error)
+					= instantiateTypes environment it_vars it_attr_vars [MakeAttributedType type \\ type <- it_types] it_context [] [] type_heaps cs_error
 				= ({it & it_vars = it_vars, it_types = [ at_type \\ {at_type} <- it_atypes ], it_attr_vars = it_attr_vars, it_context = it_context }, type_heaps, cs_error)			
 		check_specials mod_index inst=:{ins_type} type_offset [] list_of_specials next_inst_index all_instances type_heaps predef_symbols error
 			= (list_of_specials,  next_inst_index, all_instances, type_heaps, predef_symbols, error)

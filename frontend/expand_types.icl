@@ -484,6 +484,105 @@ where
 					= (True, {ct_pattern_type=ct_pattern_type, ct_result_type=ct_result_type, ct_cons_types=cons_types_r}, heaps)
 					= (False, {ct_pattern_type=ct_pattern_type, ct_result_type=ct_result_type, ct_cons_types=ct_cons_types}, heaps)
 
+class substitute_special a :: !a ![(Type,[AType])] !*TypeHeaps -> (!Bool, !a, ![(Type,[AType])], !*TypeHeaps)
+
+instance substitute_special AType
+where
+	substitute_special atype=:{at_attribute,at_type} erroneous_types heaps
+		# (changed_attribute, at_attribute_r, heaps) = substitute at_attribute heaps
+		# (changed_type, at_type_r, erroneous_types, heaps) = substitute_special at_type erroneous_types heaps
+		| changed_attribute
+			| changed_type
+				= (True, {at_attribute = at_attribute_r, at_type = at_type_r}, erroneous_types, heaps)
+				= (True, {atype & at_attribute = at_attribute_r}, erroneous_types, heaps)
+			| changed_type
+				= (True, {atype & at_type = at_type_r}, erroneous_types, heaps)
+				= (False, atype, erroneous_types, heaps)
+
+instance substitute_special Type
+where
+	substitute_special tv=:(TV {tv_info_ptr}) erroneous_types heaps=:{th_vars}
+		# (tv_info, th_vars) = readPtr tv_info_ptr th_vars
+		  heaps & th_vars = th_vars
+		= case tv_info of
+			TVI_Type type
+				-> (True, type, erroneous_types, heaps)
+			_
+				-> (False, tv, erroneous_types, heaps)
+	substitute_special type=:(arg_type --> res_type) erroneous_types heaps
+		# (changed_arg_type, arg_type_r, erroneous_types, heaps) = substitute_special arg_type erroneous_types heaps
+		# (changed_res_type, res_type_r, erroneous_types, heaps) = substitute_special res_type erroneous_types heaps
+		| changed_arg_type
+			| changed_res_type
+				= (True, arg_type_r --> res_type_r, erroneous_types, heaps)
+				= (True, arg_type_r --> res_type, erroneous_types, heaps)
+			| changed_res_type
+				= (True, arg_type --> res_type_r, erroneous_types, heaps)
+				= (False, type, erroneous_types, heaps)
+	substitute_special type=:(TA cons_id cons_args) erroneous_types heaps
+		# (changed, cons_args_r, erroneous_types, heaps) = substitute_special cons_args erroneous_types heaps
+		| changed
+			= (True, TA cons_id cons_args_r, erroneous_types, heaps)
+			= (False, type, erroneous_types, heaps)
+	substitute_special type=:(TAS cons_id cons_args strictness) erroneous_types heaps
+		# (changed, cons_args_r, erroneous_types, heaps) = substitute_special cons_args erroneous_types heaps
+		| changed
+			= (True, TAS cons_id cons_args_r strictness, erroneous_types, heaps)
+			= (False, type, erroneous_types, heaps)
+	substitute_special type=:(CV type_var :@: types) erroneous_types heaps=:{th_vars}
+		# (tv_info, th_vars) = readPtr type_var.tv_info_ptr th_vars
+		  heaps & th_vars = th_vars
+		  (changed, types_r, erroneous_types, heaps) = substitute_special types erroneous_types heaps
+		| changed
+			= case tv_info of
+				TVI_Type s_type
+					# (ok, simplified_type) = simplifyAndCheckTypeApplication s_type types_r
+					| ok
+						-> (True, simplified_type, erroneous_types, heaps)
+						# erroneous_types = [(s_type,types_r):erroneous_types]
+						-> 	(True, CV type_var :@: types_r, erroneous_types, heaps)
+				_
+					-> 	(True, CV type_var :@: types_r, erroneous_types, heaps)
+			= case tv_info of
+				TVI_Type s_type
+					# (ok, simplified_type) = simplifyAndCheckTypeApplication s_type types
+					| ok
+						-> (True, simplified_type, erroneous_types, heaps)
+						# erroneous_types = [(s_type,types_r):erroneous_types]
+						-> 	(False, type, erroneous_types, heaps)
+				_
+					-> 	(False, type, erroneous_types, heaps)
+	substitute_special type=:(TArrow1 arg_type) erroneous_types heaps
+		# (changed, arg_type_r, erroneous_types, heaps) = substitute_special arg_type erroneous_types heaps
+		| changed
+			= (True, TArrow1 arg_type_r, erroneous_types, heaps)
+			= (False, type, erroneous_types, heaps)
+	substitute_special type erroneous_types heaps
+		= (False, type, erroneous_types, heaps)
+
+instance substitute_special [a] | substitute_special a
+where
+	substitute_special lt=:[t:ts] erroneous_types heaps
+		# (changed_t, t_r, erroneous_types, heaps) = substitute_special t erroneous_types heaps
+		  (changed_ts, ts_r, erroneous_types, heaps) = substitute_special ts erroneous_types heaps
+		| changed_t
+			| changed_ts
+				= (True, [t_r:ts_r], erroneous_types, heaps)
+				= (True, [t_r:ts], erroneous_types, heaps)
+			| changed_ts
+				= (True, [t:ts_r], erroneous_types, heaps)
+				= (False, lt, erroneous_types, heaps)
+	substitute_special [] erroneous_types heaps
+		= (False, [], erroneous_types, heaps)
+
+instance substitute_special TypeContext
+where
+	substitute_special tc=:{tc_types} erroneous_types heaps
+		# (changed_tc_types, tc_types_r, erroneous_types, heaps) = substitute_special tc_types erroneous_types heaps
+		| changed_tc_types
+			= (True, {tc & tc_types = tc_types_r}, erroneous_types, heaps)
+			= (False, tc, erroneous_types, heaps)
+
 class removeAnnotations a :: !a  -> (!Bool, !a)
 
 instance removeAnnotations (a,b) | removeAnnotations a & removeAnnotations b
