@@ -310,7 +310,7 @@ where
 				| ins_member.cim_ident == class_member.ds_ident
 					#! instance_member_arity=icl_functions.[ins_member.cim_index].fun_arity
 					| instance_member_arity <> class_member.ds_arity
-						# cs & cs_error = checkError class_member.ds_ident "used with wrong arity" cs.cs_error
+						# cs & cs_error = checkError class_member.ds_ident ("defined with wrong arity ("+++toString instance_member_arity+++" instead of "+++toString class_member.ds_arity+++")") cs.cs_error
 						= check_icl_instance_members (class_member_n+1) (instance_member_n+1) member_mod_index ins_members class_members class_ident ins_pos ins_type
 								instance_types n_icl_functions new_instance_members member_defs type_defs icl_functions modules var_heap type_heaps cs
 						# ({me_ident, me_type,me_class_vars,me_pos}, member_defs, modules)
