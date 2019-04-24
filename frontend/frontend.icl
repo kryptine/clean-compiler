@@ -115,7 +115,7 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 
 	# (fun_defs, dcl_mods, td_infos, th_vars, hp_expression_heap, gen_heap, error_admin)
 		= checkKindsOfCommonDefsAndFunctions n_cached_dcl_modules main_dcl_module_n icl_used_module_numbers
-				(icl_global_functions++[icl_function_indices.ifi_local_function_indices])
+				(icl_global_functions++[icl_function_indices.ifi_local_function_indices,icl_function_indices.ifi_specials_indices])
 				ti_common_defs fun_defs dcl_mods td_infos class_infos th_vars heaps.hp_expression_heap heaps.hp_generic_heap error_admin
 
       type_heaps = { type_heaps & th_vars = th_vars }
