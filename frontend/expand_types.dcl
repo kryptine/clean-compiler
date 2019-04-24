@@ -40,6 +40,10 @@ class substitute a :: !a !*TypeHeaps -> (!Bool, !a, !*TypeHeaps)
 instance substitute Type,AType,TypeContext,AttrInequality,CaseType
 instance substitute [a] | substitute a special a=AType; a=TypeContext; a=AttrInequality
 
+class substitute_special a :: !a ![(Type,[AType])] !*TypeHeaps -> (!Bool, !a, ![(Type,[AType])], !*TypeHeaps)
+instance substitute_special Type,AType
+instance substitute_special [a] | substitute_special a special a=AType; a=TypeContext
+
 class removeAnnotations a :: !a  -> (!Bool, !a)
 
 instance removeAnnotations Type,SymbolType
