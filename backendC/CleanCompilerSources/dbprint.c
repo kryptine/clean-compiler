@@ -700,10 +700,6 @@ void PrintTypeAlt (TypeAlts type_alts, File file, Bool with_equats)
 	FPutS (" -> ", file);
 	PrintTypeNode (type_alts -> type_alt_rhs, file);
 	FPutC ('\n', file);
-	if (with_equats)
-	{	PrintTypeAttrEquations (type_alts -> type_alt_attr_equations, file);
-		FPutC ('\n', file);
-	}	
 }
 
 void PrintImpRule (ImpRules rule,int n_leading_spaces,File file)

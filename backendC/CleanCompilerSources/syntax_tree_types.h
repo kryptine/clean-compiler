@@ -111,7 +111,6 @@ typedef struct type_alt
 {
 	TypeNode				type_alt_lhs;
 	TypeNode				type_alt_rhs;
-	UniVarEquations			type_alt_attr_equations;
 	StrictPositionsP		type_alt_strict_positions;
 } TypeAlt;
 

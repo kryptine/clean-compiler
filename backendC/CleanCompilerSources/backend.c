@@ -672,8 +672,6 @@ BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, in
 
 			newTypeAlt	= ConvertAllocType (TypeAlt);
 
-			newTypeAlt->type_alt_attr_equations	= NULL; /* used in PrintType */
-
 			Assert (!arrayType->type_node_is_var);
 			switch (arrayType->type_node_symbol->symb_kind)
 			{
@@ -825,7 +823,6 @@ CreateLocallyDefinedFunction (int index, char ** abcCode, TypeArgs lhsArgs, Type
 
 	typeAlt	= ConvertAllocType (TypeAlt);
 
-	typeAlt->type_alt_attr_equations	= NULL; /* used in PrintType */
 	typeAlt->type_alt_lhs	= BENormalTypeNode (functionSymbol, lhsArgs);
 	typeAlt->type_alt_rhs	= rhsType;
 	typeAlt->type_alt_strict_positions	= NULL;
@@ -1523,7 +1520,6 @@ BETypeAlt (BETypeNodeP lhs, BETypeNodeP rhs, BEUniVarEquations attributeEquation
 	alt->type_alt_lhs	= lhs;
 	alt->type_alt_rhs	= rhs;
 
-	alt->type_alt_attr_equations	= attributeEquations; /* used in PrintType */
 	alt->type_alt_strict_positions	= NULL;
 
 	return (alt);
