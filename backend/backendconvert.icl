@@ -817,24 +817,17 @@ convertTypeDefToFlatType :: (BEMonad BESymbolP) TypeAttribute [ATypeVar] !*TypeV
 convertTypeDefToFlatType type_symbol_m attribute args type_var_heap bes
 	# (a1,bes) = type_symbol_m bes
 	  (a2,bes) = convertAttribution attribute bes
-	  (a3,type_var_heap,bes) = convertAndNumberLhsTypeVars args 0 type_var_heap bes
+	  type_var_heap = numberLhsTypeVars args 0 type_var_heap
+	  (a3,bes) = accBackEnd BENoTypeVars bes
 	  (flat_type_p,bes) = accBackEnd (BEFlatType a1 a2 a3) bes
 	= (flat_type_p,type_var_heap,bes)
 
-convertTypeVars :: [ATypeVar] -> BEMonad BETypeVarListP
-convertTypeVars typeVars
-	=	sfoldr (beTypeVars o convertTypeVar) beNoTypeVars typeVars
-
-convertAndNumberLhsTypeVars :: [ATypeVar] Int !*TypeVarHeap !*BackEndState -> (!BETypeVarListP,!*TypeVarHeap,!*BackEndState)
-convertAndNumberLhsTypeVars [a=:{atv_variable={tv_info_ptr}}:x] arg_n type_var_heap beState
+numberLhsTypeVars :: [ATypeVar] Int !*TypeVarHeap -> *TypeVarHeap
+numberLhsTypeVars [{atv_variable={tv_info_ptr}}:x] arg_n type_var_heap
 	# type_var_heap = writePtr tv_info_ptr (TVI_TypeVarArgN arg_n) type_var_heap
-	  (a1,beState) = convertNumberedTypeVar a arg_n beState
-	  (a2,type_var_heap,beState) = convertAndNumberLhsTypeVars x (arg_n+1) type_var_heap beState
-	  (type_vars,beState) = accBackEnd (BETypeVars a1 a2) beState
-	= (type_vars,type_var_heap,beState)
-convertAndNumberLhsTypeVars [] arg_n type_var_heap beState
-	# (type_vars,beState) = accBackEnd BENoTypeVars beState
-	= (type_vars,type_var_heap,beState)
+	= numberLhsTypeVars x (arg_n+1) type_var_heap
+numberLhsTypeVars [] arg_n type_var_heap
+	= type_var_heap
 
 remove_TVI_TypeVarArgN_in_args :: [ATypeVar] !*TypeVarHeap -> *TypeVarHeap
 remove_TVI_TypeVarArgN_in_args [{atv_variable={tv_info_ptr}}:args] type_var_heap
@@ -842,10 +835,6 @@ remove_TVI_TypeVarArgN_in_args [{atv_variable={tv_info_ptr}}:args] type_var_heap
 	= remove_TVI_TypeVarArgN_in_args args type_var_heap
 remove_TVI_TypeVarArgN_in_args [] type_var_heap
 	= type_var_heap
-
-convertNumberedTypeVar :: ATypeVar Int -> BEMonad BETypeVarListP
-convertNumberedTypeVar typeVar arg_n
-	= beTypeVarListElem (accBackEnd (BENumberedTypeVar typeVar.atv_variable.tv_ident.id_name arg_n)) (convertAttribution typeVar.atv_attribute)
 
 convertTypeVar :: ATypeVar -> BEMonad BETypeVarListP
 convertTypeVar typeVar
@@ -1659,15 +1648,9 @@ convertTypeDefTypeNode TE type_var_heap bes
 	# (type_node_p,bes) = beNormalTypeNode beDontCareDefinitionSymbol beNoTypeArgs bes
 	= (type_node_p,type_var_heap,bes)
 convertTypeDefTypeNode (TFA vars type) type_var_heap bes
-	# (type_var_list_p,bes) = convertTypeVars vars bes
-	  (type_node_p,type_var_heap,bes) = convertTypeDefTypeNode type type_var_heap bes
-	  (type_node_p,bes) = accBackEnd (BEAddForAllTypeVariables type_var_list_p type_node_p) bes
-	= (type_node_p,type_var_heap,bes)
+	= convertTypeDefTypeNode type type_var_heap bes
 convertTypeDefTypeNode (TFAC vars type contexts) type_var_heap bes
-	# (type_var_list_p,bes) = convertTypeVars vars bes
-	  (type_node_p,type_var_heap,bes) = convertTypeDefTypeNode type type_var_heap bes
-	  (type_node_p,bes) = accBackEnd (BEAddForAllTypeVariables type_var_list_p type_node_p) bes
-	= (type_node_p,type_var_heap,bes)
+	= convertTypeDefTypeNode type type_var_heap bes
 convertTypeDefTypeNode (TGenericFunctionInDictionary gds type_kind generic_dict=:{gi_module,gi_index}) type_var_heap bes
 	# (type_node_p,bes) = beNormalTypeNode (beTypeSymbol gi_index gi_module) beNoTypeArgs bes
 	= (type_node_p,type_var_heap,bes)
