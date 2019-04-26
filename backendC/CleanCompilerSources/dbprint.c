@@ -679,13 +679,7 @@ static void PrintAttribute (AttributeKind attr, File file)
 static void	PrintTypeAttrEquations (UniVarEquations equs, File file)
 {
 	for (; equs; equs = equs -> uve_next)
-	{	AttributeKindList next;
-		PrintAttribute (equs -> uve_demanded, file);
-		FPutC (':', file);
-		for (next = equs -> uve_offered; next; next = next -> akl_next)
-		{	FPutC (' ', file);
-			PrintAttribute (next -> akl_elem, file);
-		}
+	{	FPutC (':', file);
 	}
 }
 

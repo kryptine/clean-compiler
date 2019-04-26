@@ -1423,7 +1423,6 @@ BEAttributeKind (BEAttribution attributeKind)
 
 	new	= ConvertAllocType (struct attr_kind_list);
 
-	new->akl_elem	= attributeKind;
 	new->akl_next	= NULL;
 
 	return (new);
@@ -1451,8 +1450,6 @@ BEUniVarEquation (BEAttribution demanded, BEAttributeKindList offered)
 
 	new	= ConvertAllocType (struct uni_var_equats);
 
-	new->uve_demanded	= demanded;
-	new->uve_offered	= offered;
 	new->uve_next		= NULL;
 
 	return (new);

@@ -91,14 +91,11 @@ struct type_arg
 };
 
 typedef struct attr_kind_list
-{	AttributeKind			akl_elem;
-	struct attr_kind_list *	akl_next;
+{	struct attr_kind_list *	akl_next;
 } * AttributeKindList;
 	
 typedef struct uni_var_equats
-{	AttributeKind			uve_demanded;
-	AttributeKindList		uve_offered;
-	struct uni_var_equats *	uve_next;
+{	struct uni_var_equats *	uve_next;
 } * UniVarEquations;
 
 STRUCT (strict_positions, StrictPositions)
