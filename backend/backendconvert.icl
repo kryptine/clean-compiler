@@ -318,18 +318,8 @@ beNodeIds
 	:==	beFunction2 BENodeIds
 beNodeIdListElem
 	:==	beFunction1 BENodeIdListElem
-beAttributeKind
-	:== beFunction1 BEAttributeKind
-beNoAttributeKinds
-	:== beFunction0 BENoAttributeKinds
-beAttributeKinds
-	:== beFunction2 BEAttributeKinds
-beUniVarEquation
-	:== beFunction2 BEUniVarEquation
 beNoUniVarEquations
 	:== beFunction0 BENoUniVarEquations
-beUniVarEquationsList
-	:== beFunction2 BEUniVarEquationsList
 beBindSpecialModule specialIdentIndex moduleIndex
 	:== beApFunction0 (BEBindSpecialModule specialIdentIndex moduleIndex)
 beBindSpecialFunction specialIdentIndex functionIndex moduleIndex
@@ -1468,24 +1458,7 @@ convertTypeAltForSymbolP symbol_p symbolType
 			(convertSymbolTypeArgs symbolType ==> \a2 ->
 			 accBackEnd (BENormalTypeNode symbol_p a2))
 			(convertAnnotTypeNode st_result)
-			(convertAttributeInequalities (group st_attr_env)))
-	where
-		group :: [AttrInequality] -> [InequalityGroup]
-		group []
-			=	[]
-		group [{ai_demanded, ai_offered} : t]
-			=	grouped ai_demanded [ai_offered] t
-
-		// copied grouped from typesupport.icl, apparently inequalities are already sorted by
-		// offered attributes
-		// grouped takes care that inequalities like [a<=c, b<=c] are printed like [a b <= c]
-		grouped :: AttributeVar [AttributeVar] [AttrInequality] -> [InequalityGroup]
-		grouped group_var accu []
-			= [{ ig_offered = accu, ig_demanded = group_var}]
-		grouped group_var accu [{ai_offered, ai_demanded}:ineqs]
-			| group_var==ai_demanded
-				= grouped group_var [ai_offered:accu] ineqs
-			=[{ ig_offered = accu, ig_demanded = group_var}: grouped ai_demanded [ai_offered] ineqs]
+			beNoUniVarEquations)
 		
 :: InequalityGroup =
 	{	ig_offered	:: ![AttributeVar] 
@@ -1502,22 +1475,6 @@ resetAttrNumbers attrVars state=:{bes_attrHeap}
 		resetAttrVar :: AttributeVar *AttrVarHeap -> *AttrVarHeap
 		resetAttrVar {av_info_ptr} attrHeap
 			=	writePtr av_info_ptr AVI_Empty attrHeap
-		
-convertAttributeInequalities :: [InequalityGroup] -> BEMonad BEUniVarEquations
-convertAttributeInequalities inequalities
-	=	sfoldr (beUniVarEquationsList o convertAttributeInequality) beNoUniVarEquations inequalities
-
-convertAttributeInequality :: InequalityGroup -> BEMonad BEUniVarEquations
-convertAttributeInequality {ig_demanded, ig_offered}
-	=	beUniVarEquation (convertAttributeVar ig_demanded) (convertAttributeKinds ig_offered)
-
-convertAttributeKinds :: [AttributeVar] -> BEMonad BEAttributeKindList
-convertAttributeKinds vars
-	=	sfoldr (beAttributeKinds o convertAttributeKind) beNoAttributeKinds vars
-
-convertAttributeKind :: AttributeVar -> BEMonad BEAttributeKindList
-convertAttributeKind attributeVar
-	=	beAttributeKind (convertAttributeVar attributeVar)
 
 convertSymbolTypeArgs :: SymbolType -> BEMonad BETypeArgP
 convertSymbolTypeArgs {st_args,st_args_strictness}
