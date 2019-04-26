@@ -26,7 +26,6 @@ typedef struct type_var_list
 typedef struct flat_type 
 {
 	Symbol					ft_symbol;
-	TypeVarList				ft_arguments;
 	AttributeKind			ft_attribute;
 } * FlatType;
 

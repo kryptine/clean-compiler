@@ -2789,7 +2789,6 @@ BEFlatType (BESymbolP symbol, BEAttribution attribution, BETypeVarListP argument
 	flatType	= ConvertAllocType (struct flat_type);
 
 	flatType->ft_symbol		= symbol;
-	flatType->ft_arguments	= arguments;
 	flatType->ft_attribute = (AttributeKind) attribution;;
 
 	return (flatType);
