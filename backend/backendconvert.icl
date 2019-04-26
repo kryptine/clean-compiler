@@ -1458,11 +1458,6 @@ convertTypeAltForSymbolP symbol_p symbolType
 			 accBackEnd (BENormalTypeNode symbol_p a2))
 			(convertAnnotTypeNode st_result)
 			beNoUniVarEquations)
-		
-:: InequalityGroup =
-	{	ig_offered	:: ![AttributeVar] 
-	,	ig_demanded:: !AttributeVar
-	}
 
 resetAttrNumbers :: [AttributeVar] *BackEndState -> *BackEndState
 resetAttrNumbers attrVars state=:{bes_attrHeap}
