@@ -79,7 +79,6 @@ struct type_node
 	short					type_node_arity;
 	Annotation				type_node_annotation;
 	unsigned char			type_node_is_var:1;
-	TypeVarList				type_for_all_vars;
 };
 
 #define type_node_symbol type_node_contents.contents_symbol
