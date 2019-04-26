@@ -1366,7 +1366,6 @@ BEVarTypeNode (CleanString name)
 	node->type_node_arity		= 0;
 	node->type_node_annotation	= NoAnnot;
 	node->type_node_attribute	= NoUniAttr;
-	node->type_for_all_vars		= NULL;
 
 	return (node);
 } /* BEVarTypeNode */
@@ -1383,7 +1382,6 @@ BENumberedVarTypeNode (CleanString name,int argument_n)
 	node->type_node_arity		= 0;
 	node->type_node_annotation	= NoAnnot;
 	node->type_node_attribute	= NoUniAttr;
-	node->type_for_all_vars		= NULL;
 
 	return node;
 }
@@ -1401,7 +1399,6 @@ BENormalTypeNode (BESymbolP symbol, BETypeArgP args)
 	node->type_node_attribute	= NoUniAttr;
 	node->type_node_symbol		= symbol;
 	node->type_node_arguments	= args;
-	node->type_for_all_vars		= NULL;
 
 	return (node);
 } /* BENormalTypeNode */
@@ -1482,9 +1479,6 @@ BEAnnotateTypeNode (BEAnnotation annotation, BETypeNodeP typeNode)
 BETypeNodeP
 BEAddForAllTypeVariables (BETypeVarListP vars, BETypeNodeP type)
 {
-	Assert (type->type_for_all_vars == NULL);
-	type->type_for_all_vars		= vars;
-
 	return (type);
 } /* BEAddForAllTypeVariables */
 
