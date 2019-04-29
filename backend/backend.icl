@@ -544,18 +544,6 @@ BERules a0 a1 a2 = code {
 }
 // BEImpRuleP BERules (BEImpRuleP rule,BEImpRuleP rules);
 
-BETypes :: !BETypeP !BETypeP !BackEnd -> (!BETypeP,!BackEnd);
-BETypes a0 a1 a2 = code {
-	ccall BETypes "pp:p:p"
-}
-// BETypeP BETypes (BETypeP type,BETypeP types);
-
-BENoTypes :: !BackEnd -> (!BETypeP,!BackEnd);
-BENoTypes a0 = code {
-	ccall BENoTypes ":p:p"
-}
-// BETypeP BENoTypes ();
-
 BEFlatType :: !BESymbolP !BEAttribution !BETypeVarListP !BackEnd -> (!BEFlatTypeP,!BackEnd);
 BEFlatType a0 a1 a2 a3 = code {
 	ccall BEFlatType "pIp:p:p"

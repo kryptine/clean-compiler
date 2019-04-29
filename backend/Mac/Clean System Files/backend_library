@@ -81,8 +81,6 @@ BEDefineRuleType
 BEAdjustArrayFunction
 BENoRules
 BERules
-BETypes
-BENoTypes
 BEFlatType
 BEAlgebraicType
 BERecordType
