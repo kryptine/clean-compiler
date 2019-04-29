@@ -32,12 +32,8 @@ BENoTypeVars
 BENormalTypeNode
 BEAnnotateTypeNode
 BEAttributeTypeNode
-BEAttributeKind
 BENoAttributeKinds
-BEAttributeKinds
-BEUniVarEquation
 BENoUniVarEquations
-BEUniVarEquationsList
 BENoTypeArgs
 BETypeArgs
 BETypeAlt
