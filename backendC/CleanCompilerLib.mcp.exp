@@ -33,7 +33,6 @@ BENormalTypeNode
 BEAnnotateTypeNode
 BEAttributeTypeNode
 BENoAttributeKinds
-BENoUniVarEquations
 BENoTypeArgs
 BETypeArgs
 BETypeAlt

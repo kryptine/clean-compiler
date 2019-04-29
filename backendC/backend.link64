@@ -34,7 +34,6 @@
 /EXPORT:BEAnnotateTypeNode
 /EXPORT:BEAttributeTypeNode
 /EXPORT:BENoAttributeKinds
-/EXPORT:BENoUniVarEquations
 /EXPORT:BENoTypeArgs
 /EXPORT:BETypeArgs
 /EXPORT:BETypeAlt

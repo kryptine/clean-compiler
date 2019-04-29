@@ -255,12 +255,6 @@ BENoAttributeKinds a0 = code {
 }
 // BEAttributeKindList BENoAttributeKinds ();
 
-BENoUniVarEquations :: !BackEnd -> (!BEUniVarEquations,!BackEnd);
-BENoUniVarEquations a0 = code {
-	ccall BENoUniVarEquations ":p:p"
-}
-// BEUniVarEquations BENoUniVarEquations ();
-
 BENoTypeArgs :: !BackEnd -> (!BETypeArgP,!BackEnd);
 BENoTypeArgs a0 = code {
 	ccall BENoTypeArgs ":p:p"
@@ -273,11 +267,11 @@ BETypeArgs a0 a1 a2 = code {
 }
 // BETypeArgP BETypeArgs (BETypeNodeP node,BETypeArgP nextArgs);
 
-BETypeAlt :: !BETypeNodeP !BETypeNodeP !BEUniVarEquations !BackEnd -> (!BETypeAltP,!BackEnd);
-BETypeAlt a0 a1 a2 a3 = code {
-	ccall BETypeAlt "ppp:p:p"
+BETypeAlt :: !BETypeNodeP !BETypeNodeP !BackEnd -> (!BETypeAltP,!BackEnd);
+BETypeAlt a0 a1 a2 = code {
+	ccall BETypeAlt "pp:p:p"
 }
-// BETypeAltP BETypeAlt (BETypeNodeP lhs,BETypeNodeP rhs,BEUniVarEquations attributeEquations);
+// BETypeAltP BETypeAlt (BETypeNodeP lhs,BETypeNodeP rhs);
 
 BENormalNode :: !BESymbolP !BEArgP !BackEnd -> (!BENodeP,!BackEnd);
 BENormalNode a0 a1 a2 = code {

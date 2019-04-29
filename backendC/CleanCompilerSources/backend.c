@@ -1419,12 +1419,6 @@ BENoAttributeKinds (void)
 	return (NULL);
 } /* BENoAttributeKinds */
 
-BEUniVarEquations
-BENoUniVarEquations (void)
-{
-	return (NULL);
-} /* BENoUniVarEquations */
-
 BETypeNodeP
 BEAnnotateTypeNode (BEAnnotation annotation, BETypeNodeP typeNode)
 {
@@ -1454,7 +1448,7 @@ BETypeArgs (BETypeNodeP node, BETypeArgP nextArgs)
 } /* BETypeArgs */
 
 BETypeAltP
-BETypeAlt (BETypeNodeP lhs, BETypeNodeP rhs, BEUniVarEquations attributeEquations)
+BETypeAlt (BETypeNodeP lhs, BETypeNodeP rhs)
 {
 	TypeAlt	*alt;
 
