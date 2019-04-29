@@ -52,7 +52,6 @@ extern NodeDefs NewNodeDefinition (NodeIdP nid, NodeP node);
 extern SymbolP NewSymbol (SymbKind symbolKind);
 extern TypeNode NewTypeNode (Annotation annot, AttributeKind attr, SymbolP symb, TypeArgs args, int arity);
 extern TypeArgs NewTypeArgument (TypeNode pattern);
-extern TypeNode NewTypeVarNode (TypeVar node_id,Annotation annot, AttributeKind attr);
 
 extern NodeP NewSelectNode (SymbolP selectSymbol, NodeIdP selectId, int arity);
 extern NodeIdP BuildSelect (NodeP node, NodeDefs **node_defs_p);

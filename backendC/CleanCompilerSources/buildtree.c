@@ -155,28 +155,6 @@ NewTypeNode (Annotation annot, AttributeKind attr, SymbolP symb, TypeArgs args, 
 	return (node);
 } /* NewTypeNode */
 
-TypeNode
-NewTypeVarNode (TypeVar type_var, Annotation annot, AttributeKind attrib)
-{
-	TypeNode node;
-	
-	node = CompAllocType (struct type_node);
-
-	node->type_node_is_var		= True;
-	node->type_node_tv			= type_var;
-	node->type_node_arguments	= NIL;
-	node->type_node_annotation	= annot;
-	node->type_node_attribute	= attrib;
-#if 0
-	node->type_node_state.state_arity		= 1;
-	node->type_node_state.state_kind		= OnA;
-	node->type_node_state.state_object		= UnknownObj;
-	node->type_node_state.state_type		= SimpleState;
-	node->type_node_state.state_mark		= 0;
-#endif
-	return (node);
-} /* NewTypeVarNode */
-
 NodeP
 NewSelectorNode (SymbolP symb, Args args, int arity)
 {
