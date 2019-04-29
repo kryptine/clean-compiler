@@ -54,9 +54,6 @@ Clean (:: BERuleAltP (:== CPtr))
 typedef struct imp_rule *BEImpRuleP;
 Clean (:: BEImpRuleP (:== CPtr))
 
-typedef struct type *BETypeP;
-Clean (:: BETypeP (:== CPtr))
-
 typedef struct flat_type *BEFlatTypeP;
 Clean (:: BEFlatTypeP (:== CPtr))
 
