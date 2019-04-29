@@ -11,7 +11,6 @@ implementation module backend;
 :: BEArgP :== CPtr;
 :: BERuleAltP :== CPtr;
 :: BEImpRuleP :== CPtr;
-:: BETypeP :== CPtr;
 :: BEFlatTypeP :== CPtr;
 :: BETypeVarP :== CPtr;
 :: BETypeVarListP :== CPtr;

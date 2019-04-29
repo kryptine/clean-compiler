@@ -33,7 +33,6 @@ BETypeVars
 BENoTypeVars
 BENormalTypeNode
 BEAnnotateTypeNode
-BEAddForAllTypeVariables
 BEAttributeTypeNode
 BEAttributeKind
 BENoAttributeKinds

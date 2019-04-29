@@ -1476,12 +1476,6 @@ BEAnnotateTypeNode (BEAnnotation annotation, BETypeNodeP typeNode)
 	return (typeNode);
 } /* BEAnnotateTypeNode */
 
-BETypeNodeP
-BEAddForAllTypeVariables (BETypeVarListP vars, BETypeNodeP type)
-{
-	return (type);
-} /* BEAddForAllTypeVariables */
-
 BETypeArgP
 BENoTypeArgs (void)
 {
