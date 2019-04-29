@@ -231,7 +231,7 @@ beVarTypeNode name
 beRuleAlt lineNumber
 	:==	beFunction5 (BERuleAlt lineNumber)
 beTypeAlt
-	:==	beFunction3 BETypeAlt
+	:==	beFunction2 BETypeAlt
 beRule index isCaf
 	:==	beFunction2 (BERule index isCaf)
 beNodeDef sequenceNumber
@@ -312,8 +312,6 @@ beNodeIds
 	:==	beFunction2 BENodeIds
 beNodeIdListElem
 	:==	beFunction1 BENodeIdListElem
-beNoUniVarEquations
-	:== beFunction0 BENoUniVarEquations
 beBindSpecialModule specialIdentIndex moduleIndex
 	:== beApFunction0 (BEBindSpecialModule specialIdentIndex moduleIndex)
 beBindSpecialFunction specialIdentIndex functionIndex moduleIndex
@@ -1435,8 +1433,7 @@ convertTypeAltForSymbolP symbol_p symbolType
 	o`	(beTypeAlt
 			(convertSymbolTypeArgs symbolType ==> \a2 ->
 			 accBackEnd (BENormalTypeNode symbol_p a2))
-			(convertAnnotTypeNode st_result)
-			beNoUniVarEquations)
+			(convertAnnotTypeNode st_result))
 
 resetAttrNumbers :: [AttributeVar] *BackEndState -> *BackEndState
 resetAttrNumbers attrVars state=:{bes_attrHeap}

@@ -93,9 +93,6 @@ Clean (:: BENodeIdListP (:== CPtr))
 typedef struct node_id_ref_count_list *BENodeIdRefCountListP;
 Clean (:: BENodeIdRefCountListP (:== CPtr))
 
-typedef struct uni_var_equats *BEUniVarEquations;
-Clean (:: BEUniVarEquations (:== CPtr))
-
 typedef struct attr_kind_list *BEAttributeKindList;
 Clean (:: BEAttributeKindList (:== CPtr))
 
@@ -282,17 +279,14 @@ Clean (BEAttributeTypeNode :: BEAttribution BETypeNodeP BackEnd -> (BETypeNodeP,
 BEAttributeKindList BENoAttributeKinds (void);
 Clean (BENoAttributeKinds :: BackEnd -> (BEAttributeKindList, BackEnd))
 
-BEUniVarEquations BENoUniVarEquations (void);
-Clean (BENoUniVarEquations :: BackEnd -> (BEUniVarEquations, BackEnd))
-
 BETypeArgP BENoTypeArgs (void);
 Clean (BENoTypeArgs :: BackEnd -> (BETypeArgP, BackEnd))
 
 BETypeArgP BETypeArgs (BETypeNodeP node, BETypeArgP nextArgs);
 Clean (BETypeArgs :: BETypeNodeP BETypeArgP BackEnd -> (BETypeArgP, BackEnd))
 
-BETypeAltP BETypeAlt (BETypeNodeP lhs, BETypeNodeP rhs, BEUniVarEquations attributeEquations);
-Clean (BETypeAlt :: BETypeNodeP BETypeNodeP BEUniVarEquations BackEnd -> (BETypeAltP, BackEnd))
+BETypeAltP BETypeAlt (BETypeNodeP lhs, BETypeNodeP rhs);
+Clean (BETypeAlt :: BETypeNodeP BETypeNodeP BackEnd -> (BETypeAltP, BackEnd))
 
 BENodeP BENormalNode (BESymbolP symbol, BEArgP args);
 Clean (BENormalNode :: BESymbolP BEArgP BackEnd -> (BENodeP, BackEnd))
