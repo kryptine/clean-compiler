@@ -2665,22 +2665,6 @@ BEAdjustArrayFunction (BEArrayFunKind arrayFunKind, int functionIndex, int modul
 	}
 } /* BEAdjustArrayFunction */
 
-BETypeP
-BETypes (BETypeP type, BETypeP types)
-{
-	Assert (type->type_next == NULL);
-
-	type->type_next	= types;
-
-	return (type);
-} /* BETypes */
-
-BETypeP
-BENoTypes (void)
-{
-	return (NULL);
-} /* BENoTypes */
-
 void
 BEDeclareType (int typeIndex, int moduleIndex, CleanString name)
 {

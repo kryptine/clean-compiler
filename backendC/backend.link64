@@ -81,8 +81,6 @@
 /EXPORT:BEAdjustArrayFunction
 /EXPORT:BENoRules
 /EXPORT:BERules
-/EXPORT:BETypes
-/EXPORT:BENoTypes
 /EXPORT:BEFlatType
 /EXPORT:BEAlgebraicType
 /EXPORT:BEExtendableAlgebraicType

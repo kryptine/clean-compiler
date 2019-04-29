@@ -433,12 +433,6 @@ Clean (BENoRules :: BackEnd -> (BEImpRuleP, BackEnd))
 BEImpRuleP BERules (BEImpRuleP rule, BEImpRuleP rules);
 Clean (BERules :: BEImpRuleP BEImpRuleP BackEnd -> (BEImpRuleP, BackEnd))
 
-BETypeP BETypes (BETypeP type, BETypeP types);
-Clean (BETypes :: BETypeP BETypeP BackEnd -> (BETypeP, BackEnd))
-
-BETypeP BENoTypes (void);
-Clean (BENoTypes :: BackEnd -> (BETypeP, BackEnd))
-
 BEFlatTypeP BEFlatType (BESymbolP symbol, BEAttribution attribution, BETypeVarListP arguments);
 Clean (BEFlatType :: BESymbolP BEAttribution BETypeVarListP BackEnd -> (BEFlatTypeP, BackEnd))
 

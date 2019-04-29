@@ -84,8 +84,6 @@ EXPORTS
  BEAdjustArrayFunction
  BENoRules
  BERules
- BETypes
- BENoTypes
  BEFlatType
  BEAlgebraicType
  BEExtendableAlgebraicType
