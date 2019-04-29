@@ -282,9 +282,6 @@ Clean (BENormalTypeNode :: BESymbolP BETypeArgP BackEnd -> (BETypeNodeP, BackEnd
 BETypeNodeP BEAnnotateTypeNode (BEAnnotation annotation, BETypeNodeP typeNode);
 Clean (BEAnnotateTypeNode :: BEAnnotation BETypeNodeP BackEnd -> (BETypeNodeP, BackEnd))
 
-BETypeNodeP BEAddForAllTypeVariables (BETypeVarListP vars, BETypeNodeP type);
-Clean (BEAddForAllTypeVariables :: BETypeVarListP BETypeNodeP BackEnd -> (BETypeNodeP, BackEnd))
-
 BETypeNodeP BEAttributeTypeNode (BEAttribution attribution, BETypeNodeP typeNode);
 Clean (BEAttributeTypeNode :: BEAttribution BETypeNodeP BackEnd -> (BETypeNodeP, BackEnd))
 

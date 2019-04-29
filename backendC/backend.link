@@ -35,7 +35,6 @@
 /EXPORT: BENoTypeVars
 /EXPORT: BENormalTypeNode
 /EXPORT: BEAnnotateTypeNode
-/EXPORT: BEAddForAllTypeVariables
 /EXPORT: BEAttributeTypeNode
 /EXPORT: BEAttributeKind
 /EXPORT: BENoAttributeKinds
