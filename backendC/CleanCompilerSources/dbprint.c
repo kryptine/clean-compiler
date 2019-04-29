@@ -103,10 +103,7 @@ void DPrintNodeIdS (char *s,NodeId node_id,File file)
 static void DPrintTypeVar (TypeVar tv, Node follow, File file)
 {
 	if (tv){
-		if (tv->tv_ident)
-			FPrintF (file, "%s",tv->tv_ident->ident_name);
-		else
-			FPrintF (file, "i_%lx", (long) tv);
+		FPrintF (file, "i_%lx", (long) tv);
 		if (follow)
 			FPutS (" = ", file);
 	}
@@ -624,7 +621,7 @@ void PrintTypeNode (TypeNode node, File file)
 	}
 
 	if (node->type_node_is_var)
-		FPutS (node->type_node_tv->tv_ident->ident_name, file);
+		FPrintF (file, "%d:", node->type_node_tv->tv_argument_nr);
 	else if (node->type_node_symbol->symb_kind == tuple_type)
 	{	FPutC ('(', file);
 		PrintTypeArguments (node->type_node_arguments, ',', file);
@@ -674,13 +671,6 @@ static void PrintAttribute (AttributeKind attr, File file)
 	else
 		FPrintF (file, "%d", attr - UniqueAttr, file);
 
-}
-
-static void	PrintTypeAttrEquations (UniVarEquations equs, File file)
-{
-	for (; equs; equs = equs -> uve_next)
-	{	FPutC (':', file);
-	}
 }
 
 void PrintTypeAlt (TypeAlts type_alts, File file, Bool with_equats)
