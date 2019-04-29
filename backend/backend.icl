@@ -225,18 +225,6 @@ BENumberedVarTypeNode a0 a1 a2 = code {
 }
 // BETypeNodeP BENumberedVarTypeNode (CleanString name,int argument_n);
 
-BETypeVarListElem :: !BETypeVarP !BEAttribution !BackEnd -> (!BETypeVarListP,!BackEnd);
-BETypeVarListElem a0 a1 a2 = code {
-	ccall BETypeVarListElem "pI:p:p"
-}
-// BETypeVarListP BETypeVarListElem (BETypeVarP typeVar,BEAttribution attribute);
-
-BETypeVars :: !BETypeVarListP !BETypeVarListP !BackEnd -> (!BETypeVarListP,!BackEnd);
-BETypeVars a0 a1 a2 = code {
-	ccall BETypeVars "pp:p:p"
-}
-// BETypeVarListP BETypeVars (BETypeVarListP typeVarListElem,BETypeVarListP typeVarList);
-
 BENoTypeVars :: !BackEnd -> (!BETypeVarListP,!BackEnd);
 BENoTypeVars a0 = code {
 	ccall BENoTypeVars ":p:p"
@@ -254,12 +242,6 @@ BEAnnotateTypeNode a0 a1 a2 = code {
 	ccall BEAnnotateTypeNode "Ip:p:p"
 }
 // BETypeNodeP BEAnnotateTypeNode (BEAnnotation annotation,BETypeNodeP typeNode);
-
-BEAddForAllTypeVariables :: !BETypeVarListP !BETypeNodeP !BackEnd -> (!BETypeNodeP,!BackEnd);
-BEAddForAllTypeVariables a0 a1 a2 = code {
-	ccall BEAddForAllTypeVariables "pp:p:p"
-}
-// BETypeNodeP BEAddForAllTypeVariables (BETypeVarListP vars,BETypeNodeP type);
 
 BEAttributeTypeNode :: !BEAttribution !BETypeNodeP !BackEnd -> (!BETypeNodeP,!BackEnd);
 BEAttributeTypeNode a0 a1 a2 = code {

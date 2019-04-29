@@ -2731,29 +2731,6 @@ BENumberedTypeVar (CleanString name,int argument_n)
 }
 
 BETypeVarListP
-BETypeVarListElem (BETypeVarP typeVar, BEAttribution attribute)
-{
-	TypeVarList	typeVarListElement;
-
-	typeVarListElement	= ConvertAllocType (struct type_var_list);
-	typeVarListElement->tvl_elem		= typeVar;
-	typeVarListElement->tvl_attribute	= attribute;
-	typeVarListElement->tvl_next		= NULL;
-
-	return (typeVarListElement);
-} /* BETypeVarListElem */
-
-BETypeVarListP
-BETypeVars (BETypeVarListP typeVarListElement, BETypeVarListP typeVarList)
-{
-	Assert (typeVarListElement->tvl_next == NULL);
-
-	typeVarListElement->tvl_next	= typeVarList;
-
-	return (typeVarListElement);
-} /* BETypeVars */
-
-BETypeVarListP
 BENoTypeVars (void)
 {
 	return (NULL);
