@@ -279,23 +279,11 @@ Clean (BEAnnotateTypeNode :: BEAnnotation BETypeNodeP BackEnd -> (BETypeNodeP, B
 BETypeNodeP BEAttributeTypeNode (BEAttribution attribution, BETypeNodeP typeNode);
 Clean (BEAttributeTypeNode :: BEAttribution BETypeNodeP BackEnd -> (BETypeNodeP, BackEnd))
 
-BEAttributeKindList BEAttributeKind (BEAttribution attributeKind);
-Clean (BEAttributeKind :: BEAttribution BackEnd -> (BEAttributeKindList, BackEnd))
-
 BEAttributeKindList BENoAttributeKinds (void);
 Clean (BENoAttributeKinds :: BackEnd -> (BEAttributeKindList, BackEnd))
 
-BEAttributeKindList BEAttributeKinds (BEAttributeKindList elem, BEAttributeKindList list);
-Clean (BEAttributeKinds :: BEAttributeKindList BEAttributeKindList BackEnd -> (BEAttributeKindList, BackEnd))
-
-BEUniVarEquations BEUniVarEquation (BEAttribution demanded, BEAttributeKindList offered);
-Clean (BEUniVarEquation ::BEAttribution BEAttributeKindList BackEnd -> (BEUniVarEquations, BackEnd))
-
 BEUniVarEquations BENoUniVarEquations (void);
 Clean (BENoUniVarEquations :: BackEnd -> (BEUniVarEquations, BackEnd))
-
-BEUniVarEquations BEUniVarEquationsList (BEUniVarEquations elem, BEUniVarEquations list);
-Clean (BEUniVarEquationsList ::BEUniVarEquations BEUniVarEquations BackEnd -> (BEUniVarEquations, BackEnd))
 
 BETypeArgP BENoTypeArgs (void);
 Clean (BENoTypeArgs :: BackEnd -> (BETypeArgP, BackEnd))

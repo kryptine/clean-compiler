@@ -249,41 +249,17 @@ BEAttributeTypeNode a0 a1 a2 = code {
 }
 // BETypeNodeP BEAttributeTypeNode (BEAttribution attribution,BETypeNodeP typeNode);
 
-BEAttributeKind :: !BEAttribution !BackEnd -> (!BEAttributeKindList,!BackEnd);
-BEAttributeKind a0 a1 = code {
-	ccall BEAttributeKind "I:p:p"
-}
-// BEAttributeKindList BEAttributeKind (BEAttribution attributeKind);
-
 BENoAttributeKinds :: !BackEnd -> (!BEAttributeKindList,!BackEnd);
 BENoAttributeKinds a0 = code {
 	ccall BENoAttributeKinds ":p:p"
 }
 // BEAttributeKindList BENoAttributeKinds ();
 
-BEAttributeKinds :: !BEAttributeKindList !BEAttributeKindList !BackEnd -> (!BEAttributeKindList,!BackEnd);
-BEAttributeKinds a0 a1 a2 = code {
-	ccall BEAttributeKinds "pp:p:p"
-}
-// BEAttributeKindList BEAttributeKinds (BEAttributeKindList elem,BEAttributeKindList list);
-
-BEUniVarEquation :: !BEAttribution !BEAttributeKindList !BackEnd -> (!BEUniVarEquations,!BackEnd);
-BEUniVarEquation a0 a1 a2 = code {
-	ccall BEUniVarEquation "Ip:p:p"
-}
-// BEUniVarEquations BEUniVarEquation (BEAttribution demanded,BEAttributeKindList offered);
-
 BENoUniVarEquations :: !BackEnd -> (!BEUniVarEquations,!BackEnd);
 BENoUniVarEquations a0 = code {
 	ccall BENoUniVarEquations ":p:p"
 }
 // BEUniVarEquations BENoUniVarEquations ();
-
-BEUniVarEquationsList :: !BEUniVarEquations !BEUniVarEquations !BackEnd -> (!BEUniVarEquations,!BackEnd);
-BEUniVarEquationsList a0 a1 a2 = code {
-	ccall BEUniVarEquationsList "pp:p:p"
-}
-// BEUniVarEquations BEUniVarEquationsList (BEUniVarEquations elem,BEUniVarEquations list);
 
 BENoTypeArgs :: !BackEnd -> (!BETypeArgP,!BackEnd);
 BENoTypeArgs a0 = code {

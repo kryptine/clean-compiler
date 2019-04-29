@@ -1414,58 +1414,16 @@ BEAttributeTypeNode (BEAttribution attribution, BETypeNodeP typeNode)
 } /* BEAttributeTypeNode */
 
 BEAttributeKindList
-BEAttributeKind (BEAttribution attributeKind)
-{
-	AttributeKindList	new;
-
-	new	= ConvertAllocType (struct attr_kind_list);
-
-	new->akl_next	= NULL;
-
-	return (new);
-} /* BEAttributeKind */
-
-BEAttributeKindList
 BENoAttributeKinds (void)
 {
 	return (NULL);
 } /* BENoAttributeKinds */
-
-BEAttributeKindList
-BEAttributeKinds (BEAttributeKindList elem, BEAttributeKindList list)
-{
-	Assert (elem->akl_next == NULL);
-	elem->akl_next	= list;
-
-	return (elem);
-} /* BEAttributeKindList */
-
-BEUniVarEquations
-BEUniVarEquation (BEAttribution demanded, BEAttributeKindList offered)
-{
-	UniVarEquations	new;
-
-	new	= ConvertAllocType (struct uni_var_equats);
-
-	new->uve_next		= NULL;
-
-	return (new);
-} /* BEUniVarEquation */
 
 BEUniVarEquations
 BENoUniVarEquations (void)
 {
 	return (NULL);
 } /* BENoUniVarEquations */
-
-BEUniVarEquations
-BEUniVarEquationsList (BEUniVarEquations elem, BEUniVarEquations list)
-{
-	Assert (elem->uve_next == NULL);
-	elem->uve_next	= list;
-
-	return (elem);
-} /* BEUniVarEquations */
 
 BETypeNodeP
 BEAnnotateTypeNode (BEAnnotation annotation, BETypeNodeP typeNode)

@@ -104,18 +104,10 @@ BEAnnotateTypeNode :: !BEAnnotation !BETypeNodeP !BackEnd -> (!BETypeNodeP,!Back
 // BETypeNodeP BEAnnotateTypeNode (BEAnnotation annotation,BETypeNodeP typeNode);
 BEAttributeTypeNode :: !BEAttribution !BETypeNodeP !BackEnd -> (!BETypeNodeP,!BackEnd);
 // BETypeNodeP BEAttributeTypeNode (BEAttribution attribution,BETypeNodeP typeNode);
-BEAttributeKind :: !BEAttribution !BackEnd -> (!BEAttributeKindList,!BackEnd);
-// BEAttributeKindList BEAttributeKind (BEAttribution attributeKind);
 BENoAttributeKinds :: !BackEnd -> (!BEAttributeKindList,!BackEnd);
 // BEAttributeKindList BENoAttributeKinds ();
-BEAttributeKinds :: !BEAttributeKindList !BEAttributeKindList !BackEnd -> (!BEAttributeKindList,!BackEnd);
-// BEAttributeKindList BEAttributeKinds (BEAttributeKindList elem,BEAttributeKindList list);
-BEUniVarEquation :: !BEAttribution !BEAttributeKindList !BackEnd -> (!BEUniVarEquations,!BackEnd);
-// BEUniVarEquations BEUniVarEquation (BEAttribution demanded,BEAttributeKindList offered);
 BENoUniVarEquations :: !BackEnd -> (!BEUniVarEquations,!BackEnd);
 // BEUniVarEquations BENoUniVarEquations ();
-BEUniVarEquationsList :: !BEUniVarEquations !BEUniVarEquations !BackEnd -> (!BEUniVarEquations,!BackEnd);
-// BEUniVarEquations BEUniVarEquationsList (BEUniVarEquations elem,BEUniVarEquations list);
 BENoTypeArgs :: !BackEnd -> (!BETypeArgP,!BackEnd);
 // BETypeArgP BENoTypeArgs ();
 BETypeArgs :: !BETypeNodeP !BETypeArgP !BackEnd -> (!BETypeArgP,!BackEnd);

@@ -16,13 +16,6 @@ typedef struct type_alt *	TypeAlts;
 
 typedef struct type_var *TypeVar;
 
-typedef struct type_var_list
-{
-	TypeVar					tvl_elem;
-	struct type_var_list *	tvl_next;
-	AttributeKind			tvl_attribute;
-} * TypeVarList;
-
 typedef struct flat_type 
 {
 	Symbol					ft_symbol;
