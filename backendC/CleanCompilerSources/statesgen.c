@@ -3583,19 +3583,9 @@ static SymbolP copy_imp_rule_and_add_arguments (SymbDef rule_sdef,int n_extra_ar
 			last_lhs_type_arg_p=&(*last_lhs_type_arg_p)->type_arg_next;
 		
 		for (n=0; n<n_extra_arguments; ++n){
-#if 0
-			if (rhs_type_node_p->type_node_is_var){
-				struct type_arg *new_type_arg_p;
-				
-				new_type_arg_p=NewTypeArgument (NewTypeVarNode (NewTypeVar (NULL),NoAnnot,NoAttr));
-
-				*last_lhs_type_arg_p=new_type_arg_p;
-				last_lhs_type_arg_p=&new_type_arg_p->type_arg_next;
-			} else
-#else				
 			if (rhs_type_node_p->type_node_is_var || rhs_type_node_p->type_node_symbol->symb_kind!=fun_type)
 				error_in_function ("copy_imp_rule_and_add_arguments");
-#endif
+
 			{
 				struct type_arg *first_arg_p;
 				
