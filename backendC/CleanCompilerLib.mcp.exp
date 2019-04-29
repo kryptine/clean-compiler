@@ -28,8 +28,6 @@ BEPredefineConstructorSymbol
 BEPredefineTypeSymbol
 BEBasicSymbol
 BEVarTypeNode
-BETypeVarListElem
-BETypeVars
 BENoTypeVars
 BENormalTypeNode
 BEAnnotateTypeNode

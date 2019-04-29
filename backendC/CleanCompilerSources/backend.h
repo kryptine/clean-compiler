@@ -267,12 +267,6 @@ Clean (BEVarTypeNode :: String BackEnd -> (BETypeNodeP, BackEnd))
 BETypeNodeP BENumberedVarTypeNode (CleanString name,int argument_n);
 Clean (BENumberedVarTypeNode :: String Int BackEnd -> (BETypeNodeP, BackEnd))
 
-BETypeVarListP BETypeVarListElem (BETypeVarP typeVar, BEAttribution attribute);
-Clean (BETypeVarListElem :: BETypeVarP BEAttribution BackEnd -> (BETypeVarListP, BackEnd))
-
-BETypeVarListP BETypeVars (BETypeVarListP typeVarListElem, BETypeVarListP typeVarList);
-Clean (BETypeVars :: BETypeVarListP BETypeVarListP BackEnd -> (BETypeVarListP, BackEnd))
-
 BETypeVarListP BENoTypeVars (void);
 Clean (BENoTypeVars :: BackEnd -> (BETypeVarListP, BackEnd))
 

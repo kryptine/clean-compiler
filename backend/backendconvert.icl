@@ -286,12 +286,8 @@ beAdjustArrayFunction backendId functionIndex moduleIndex
 	:==	beApFunction0 (BEAdjustArrayFunction backendId functionIndex moduleIndex)
 beNoTypeVars
 	:==	beFunction0 BENoTypeVars
-beTypeVars
-	:==	beFunction2 BETypeVars
 beTypeVar name
 	:==	beFunction0 (BETypeVar name)
-beTypeVarListElem
-	:==	beFunction2 BETypeVarListElem
 beExportType isDictionary typeIndex
 	:==	beApFunction0 (BEExportType isDictionary typeIndex)
 beExportConstructor constructorIndex
@@ -836,10 +832,6 @@ remove_TVI_TypeVarArgN_in_args [{atv_variable={tv_info_ptr}}:args] type_var_heap
 	= remove_TVI_TypeVarArgN_in_args args type_var_heap
 remove_TVI_TypeVarArgN_in_args [] type_var_heap
 	= type_var_heap
-
-convertTypeVar :: ATypeVar -> BEMonad BETypeVarListP
-convertTypeVar typeVar
-	=	beTypeVarListElem (beTypeVar typeVar.atv_variable.tv_ident.id_name) (convertAttribution typeVar.atv_attribute)
 
 defineType :: ModuleIndex {#ConsDef} {#SelectorDef} Index CheckedTypeDef !*TypeVarHeap !*BackEndState -> (!*TypeVarHeap,!*BackEndState)
 defineType moduleIndex constructors _ typeIndex {td_ident, td_attribute, td_args, td_rhs=AlgType constructorSymbols} type_var_heap be
