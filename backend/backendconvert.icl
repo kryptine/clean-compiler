@@ -284,8 +284,6 @@ beDeclareNodeId number lhsOrRhs name
 	:==	beApFunction0 (BEDeclareNodeId number lhsOrRhs name)
 beAdjustArrayFunction backendId functionIndex moduleIndex
 	:==	beApFunction0 (BEAdjustArrayFunction backendId functionIndex moduleIndex)
-beNoTypeVars
-	:==	beFunction0 BENoTypeVars
 beTypeVar name
 	:==	beFunction0 (BETypeVar name)
 beExportType isDictionary typeIndex
@@ -813,8 +811,7 @@ convertTypeDefToFlatType type_symbol_m attribute args type_var_heap bes
 	# (a1,bes) = type_symbol_m bes
 	  (a2,bes) = convertAttribution attribute bes
 	  type_var_heap = numberLhsTypeVars args 0 type_var_heap
-	  (a3,bes) = accBackEnd BENoTypeVars bes
-	  (flat_type_p,bes) = accBackEnd (BEFlatType a1 a2 a3) bes
+	  (flat_type_p,bes) = accBackEnd (BEFlatType a1 a2) bes
 	= (flat_type_p,type_var_heap,bes)
 
 numberLhsTypeVars :: [ATypeVar] Int !*TypeVarHeap -> *TypeVarHeap
@@ -1056,12 +1053,6 @@ declareDynamicTemp predefs
 	  (v2,be) = f2 be
 	:== f v1 v2 be
 
-@^^^ f f1 f2 f3 be
-	# (v1,be) = f1 be
-	  (v2,be) = f2 be
-	  (v3,be) = f3 be
-	:== f v1 v2 v3 be
-
 predefineSymbols :: DclModule PredefinedSymbols -> BackEnder
 predefineSymbols {dcl_common} predefs
 	=	appBackEnd (BEDeclarePredefinedModule (size dcl_common.com_type_defs) (size dcl_common.com_cons_defs))
@@ -1148,7 +1139,7 @@ predefineSymbols {dcl_common} predefs
 			  type_be_f = @^^ BENormalTypeNode constructor_symbol_be_f BENoTypeArgs
 			  constructors_be_f = @^^ BEConstructors (@^ BEConstructor type_be_f) BENoConstructors
 			  type_symbol_be_f = BETypeSymbol predefs.[PD_UnitType].pds_def cPredefinedModuleIndex
-			  flat_type_be_f = @^^^ BEFlatType type_symbol_be_f (^= BENoUniAttr) BENoTypeVars
+			  flat_type_be_f = @^^ BEFlatType type_symbol_be_f (^= BENoUniAttr)
 			= appBackEnd
 				(  BEDeclareConstructor predefs.[PD_UnitConsSymbol].pds_def cPredefinedModuleIndex "_Unit"
 			  	o` BEDeclareType predefs.[PD_UnitType].pds_def cPredefinedModuleIndex "_Unit"

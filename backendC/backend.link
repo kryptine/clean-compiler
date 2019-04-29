@@ -30,11 +30,9 @@
 /EXPORT: BEBasicSymbol
 /EXPORT: BEVarTypeNode
 /EXPORT: BENumberedVarTypeNode
-/EXPORT: BENoTypeVars
 /EXPORT: BENormalTypeNode
 /EXPORT: BEAnnotateTypeNode
 /EXPORT: BEAttributeTypeNode
-/EXPORT: BENoAttributeKinds
 /EXPORT: BENoTypeArgs
 /EXPORT: BETypeArgs
 /EXPORT: BETypeAlt

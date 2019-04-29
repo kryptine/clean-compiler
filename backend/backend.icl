@@ -225,12 +225,6 @@ BENumberedVarTypeNode a0 a1 a2 = code {
 }
 // BETypeNodeP BENumberedVarTypeNode (CleanString name,int argument_n);
 
-BENoTypeVars :: !BackEnd -> (!BETypeVarListP,!BackEnd);
-BENoTypeVars a0 = code {
-	ccall BENoTypeVars ":p:p"
-}
-// BETypeVarListP BENoTypeVars ();
-
 BENormalTypeNode :: !BESymbolP !BETypeArgP !BackEnd -> (!BETypeNodeP,!BackEnd);
 BENormalTypeNode a0 a1 a2 = code {
 	ccall BENormalTypeNode "pp:p:p"
@@ -248,12 +242,6 @@ BEAttributeTypeNode a0 a1 a2 = code {
 	ccall BEAttributeTypeNode "Ip:p:p"
 }
 // BETypeNodeP BEAttributeTypeNode (BEAttribution attribution,BETypeNodeP typeNode);
-
-BENoAttributeKinds :: !BackEnd -> (!BEAttributeKindList,!BackEnd);
-BENoAttributeKinds a0 = code {
-	ccall BENoAttributeKinds ":p:p"
-}
-// BEAttributeKindList BENoAttributeKinds ();
 
 BENoTypeArgs :: !BackEnd -> (!BETypeArgP,!BackEnd);
 BENoTypeArgs a0 = code {
@@ -495,11 +483,11 @@ BERules a0 a1 a2 = code {
 }
 // BEImpRuleP BERules (BEImpRuleP rule,BEImpRuleP rules);
 
-BEFlatType :: !BESymbolP !BEAttribution !BETypeVarListP !BackEnd -> (!BEFlatTypeP,!BackEnd);
-BEFlatType a0 a1 a2 a3 = code {
-	ccall BEFlatType "pIp:p:p"
+BEFlatType :: !BESymbolP !BEAttribution !BackEnd -> (!BEFlatTypeP,!BackEnd);
+BEFlatType a0 a1 a2 = code {
+	ccall BEFlatType "pI:p:p"
 }
-// BEFlatTypeP BEFlatType (BESymbolP symbol,BEAttribution attribution,BETypeVarListP arguments);
+// BEFlatTypeP BEFlatType (BESymbolP symbol,BEAttribution attribution);
 
 BEAlgebraicType :: !BEFlatTypeP !BEConstructorListP !BackEnd -> BackEnd;
 BEAlgebraicType a0 a1 a2 = code {

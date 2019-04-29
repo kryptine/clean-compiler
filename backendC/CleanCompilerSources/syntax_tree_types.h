@@ -79,10 +79,6 @@ struct type_arg
 	TypeArgs	type_arg_next;
 };
 
-typedef struct attr_kind_list
-{	struct attr_kind_list *	akl_next;
-} * AttributeKindList;
-
 STRUCT (strict_positions, StrictPositions)
 {
 	int sp_size;		/* size in bits */
