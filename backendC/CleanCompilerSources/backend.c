@@ -2665,7 +2665,6 @@ BETypeVar (CleanString name)
 
 	ident->ident_name	= ConvertCleanString (name);
 
-	typeVar->tv_ident		= ident;
 	typeVar->tv_argument_nr	= 0; /* ??? */
 
 	return (typeVar);
@@ -2682,7 +2681,6 @@ BENumberedTypeVar (CleanString name,int argument_n)
 
 	ident->ident_name	= ConvertCleanString (name);
 
-	typeVar->tv_ident		= ident;
 	typeVar->tv_argument_nr	= argument_n;
 
 	return typeVar;

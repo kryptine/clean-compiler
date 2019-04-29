@@ -109,7 +109,6 @@ NewTypeVar (IdentP nid)
 
 	newnid	= CompAllocType (struct type_var);
 
-	newnid->tv_ident			= nid;
 	newnid->tv_argument_nr		= 0;
 
 	return (newnid);

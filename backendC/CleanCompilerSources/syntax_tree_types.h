@@ -102,6 +102,5 @@ typedef struct type_alt
 
 struct type_var
 {
-	Ident			tv_ident;
 	int 			tv_argument_nr;
 };
