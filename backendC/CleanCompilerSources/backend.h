@@ -60,9 +60,6 @@ Clean (:: BEFlatTypeP (:== CPtr))
 typedef struct type_var *BETypeVarP;
 Clean (:: BETypeVarP (:== CPtr))
 
-typedef struct type_var_list *BETypeVarListP;
-Clean (:: BETypeVarListP (:== CPtr))
-
 typedef struct constructor_list *BEConstructorListP;
 Clean (:: BEConstructorListP (:== CPtr))
 
@@ -92,9 +89,6 @@ Clean (:: BENodeIdListP (:== CPtr))
 
 typedef struct node_id_ref_count_list *BENodeIdRefCountListP;
 Clean (:: BENodeIdRefCountListP (:== CPtr))
-
-typedef struct attr_kind_list *BEAttributeKindList;
-Clean (:: BEAttributeKindList (:== CPtr))
 
 /* constants */
 /*
@@ -264,9 +258,6 @@ Clean (BEVarTypeNode :: String BackEnd -> (BETypeNodeP, BackEnd))
 BETypeNodeP BENumberedVarTypeNode (CleanString name,int argument_n);
 Clean (BENumberedVarTypeNode :: String Int BackEnd -> (BETypeNodeP, BackEnd))
 
-BETypeVarListP BENoTypeVars (void);
-Clean (BENoTypeVars :: BackEnd -> (BETypeVarListP, BackEnd))
-
 BETypeNodeP BENormalTypeNode (BESymbolP symbol, BETypeArgP args);
 Clean (BENormalTypeNode :: BESymbolP BETypeArgP BackEnd -> (BETypeNodeP, BackEnd))
 
@@ -275,9 +266,6 @@ Clean (BEAnnotateTypeNode :: BEAnnotation BETypeNodeP BackEnd -> (BETypeNodeP, B
 
 BETypeNodeP BEAttributeTypeNode (BEAttribution attribution, BETypeNodeP typeNode);
 Clean (BEAttributeTypeNode :: BEAttribution BETypeNodeP BackEnd -> (BETypeNodeP, BackEnd))
-
-BEAttributeKindList BENoAttributeKinds (void);
-Clean (BENoAttributeKinds :: BackEnd -> (BEAttributeKindList, BackEnd))
 
 BETypeArgP BENoTypeArgs (void);
 Clean (BENoTypeArgs :: BackEnd -> (BETypeArgP, BackEnd))
@@ -403,8 +391,8 @@ Clean (BENoRules :: BackEnd -> (BEImpRuleP, BackEnd))
 BEImpRuleP BERules (BEImpRuleP rule, BEImpRuleP rules);
 Clean (BERules :: BEImpRuleP BEImpRuleP BackEnd -> (BEImpRuleP, BackEnd))
 
-BEFlatTypeP BEFlatType (BESymbolP symbol, BEAttribution attribution, BETypeVarListP arguments);
-Clean (BEFlatType :: BESymbolP BEAttribution BETypeVarListP BackEnd -> (BEFlatTypeP, BackEnd))
+BEFlatTypeP BEFlatType (BESymbolP symbol, BEAttribution attribution);
+Clean (BEFlatType :: BESymbolP BEAttribution BackEnd -> (BEFlatTypeP, BackEnd))
 
 void BEAlgebraicType (BEFlatTypeP lhs, BEConstructorListP constructors);
 Clean (BEAlgebraicType:: BEFlatTypeP BEConstructorListP BackEnd -> BackEnd)

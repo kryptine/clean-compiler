@@ -31,11 +31,9 @@ EXPORTS
  BEBasicSymbol
  BEVarTypeNode
  BENumberedVarTypeNode
- BENoTypeVars
  BENormalTypeNode
  BEAnnotateTypeNode
  BEAttributeTypeNode
- BENoAttributeKinds
  BENoTypeArgs
  BETypeArgs
  BETypeAlt

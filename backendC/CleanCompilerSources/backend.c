@@ -1413,12 +1413,6 @@ BEAttributeTypeNode (BEAttribution attribution, BETypeNodeP typeNode)
 	return (typeNode);
 } /* BEAttributeTypeNode */
 
-BEAttributeKindList
-BENoAttributeKinds (void)
-{
-	return (NULL);
-} /* BENoAttributeKinds */
-
 BETypeNodeP
 BEAnnotateTypeNode (BEAnnotation annotation, BETypeNodeP typeNode)
 {
@@ -2680,14 +2674,8 @@ BENumberedTypeVar (CleanString name,int argument_n)
 	return typeVar;
 }
 
-BETypeVarListP
-BENoTypeVars (void)
-{
-	return (NULL);
-} /* BENoTypeVars */
-
 BEFlatTypeP
-BEFlatType (BESymbolP symbol, BEAttribution attribution, BETypeVarListP arguments)
+BEFlatType (BESymbolP symbol, BEAttribution attribution)
 {
 	FlatType	flatType;
 
