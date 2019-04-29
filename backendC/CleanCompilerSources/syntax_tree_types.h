@@ -49,7 +49,6 @@ typedef struct type
 {
 	FlatType			type_lhs;
 	ConstructorList		type_constructors;
-	struct type *		type_next;
 	int					type_nr_of_constructors;	/* 0 for records */
 } * Types;
 
@@ -59,7 +58,6 @@ typedef struct type
 struct rule_type
 {	TypeAlts			rule_type_rule;
 	StateP              rule_type_state_p;
-	TypeNode			rule_type_root;
 };
 
 typedef struct abs_type

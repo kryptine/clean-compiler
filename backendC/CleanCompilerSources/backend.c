@@ -2786,9 +2786,6 @@ BEAlgebraicType (BEFlatTypeP lhs, BEConstructorListP constructors)
 	int			nConstructors;
 
 	type	= ConvertAllocType (struct type);
-	/* ifdef DEBUG */
-	type->type_next	= NULL;
-	/* endif */
 
 	type->type_lhs	=	lhs;
 	type->type_constructors	= constructors;
@@ -2823,7 +2820,6 @@ void BEExtendableAlgebraicType (BEFlatTypeP lhs, BEConstructorListP constructors
 	SymbDefP sdef;
 
 	type = ConvertAllocType (struct type);
-	type->type_next = NULL;
 	type->type_lhs = lhs;
 	type->type_constructors	= constructors;
 	type->type_nr_of_constructors = 0;
@@ -2845,7 +2841,6 @@ BERecordType (int moduleIndex, BEFlatTypeP lhs, BETypeNodeP constructorType, int
 	BEConstructorListP	constructor;
 
 	type	= ConvertAllocType (struct type);
-	type->type_next	= NULL;
 
 	constructor	= ConvertAllocType (struct constructor_list);
 
