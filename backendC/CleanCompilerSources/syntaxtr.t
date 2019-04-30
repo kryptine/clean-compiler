@@ -688,6 +688,7 @@ typedef struct {
 struct def_repr {
 	char *		dm_name;
 	Symbol		dm_symbols;
+	Symbol		dm_symbols_end;
 	TableKind	dm_system_module_table_kind;
 	Bool		dm_system_module;
 #if WRITE_DCL_MODIFICATION_TIME
