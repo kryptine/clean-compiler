@@ -62,7 +62,7 @@ void GenDependencyList (void)
 	DefModList def_mod;
 
 	for_l (def_mod,OpenDefinitionModules,mod_next)
-		GenDepend (def_mod->mod_body->dm_name->symb_ident->ident_name
+		GenDepend (def_mod->mod_body->dm_name
 #if WRITE_DCL_MODIFICATION_TIME
 					,def_mod->mod_body->dm_modification_time
 #endif

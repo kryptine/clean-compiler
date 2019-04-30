@@ -462,7 +462,7 @@ BEDeclareDclModule (int moduleIndex, CleanString name, CleanString modificationT
 	DeclareModule (moduleIndex, cName, isSystemModule, nFunctions, nTypes, nConstructors, nFields);
 
 	dclModule	= ConvertAllocType (DefRepr);
-	dclModule->dm_name			= moduleNameSymbol;
+	dclModule->dm_name			= cName;
 	dclModule->dm_modification_time	= ConvertCleanString (modificationTime);
 	dclModule->dm_system_module	= isSystemModule;
 	dclModule->dm_symbols		= gBEState.be_allSymbols; /* ??? too many symbols? */
