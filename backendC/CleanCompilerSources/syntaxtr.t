@@ -563,7 +563,6 @@ STRUCT (symbol_def,SymbDef){
 	union
 	{	Types			u_type;
 		RuleTypes		u_rule_type;
-		AbsTypes		u_abs_type;
 		ImpRules		u_rule;
 	} sdef_u;
 	union
@@ -612,7 +611,6 @@ STRUCT (symbol_def,SymbDef){
 
 #define sdef_type			sdef_u.u_type
 #define sdef_rule_type		sdef_u.u_rule_type
-#define sdef_abs_type		sdef_u.u_abs_type
 #define sdef_rule			sdef_u.u_rule
 
 #define sdef_sa_fun					sdef_u3.u3_sa_fun
