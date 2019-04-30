@@ -686,7 +686,7 @@ typedef struct {
 } *ImpMod, ImpRepr;
 
 struct def_repr {
-	Symbol		dm_name;
+	char *		dm_name;
 	Symbol		dm_symbols;
 	TableKind	dm_system_module_table_kind;
 	Bool		dm_system_module;
