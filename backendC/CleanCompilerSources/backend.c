@@ -122,7 +122,6 @@ STRUCT (be_icl_module, BEIcl)
 
 	// +++ remove this (build deps list separately)
 	SymbDefP		*beicl_depsP;
-	unsigned int	beicl_previousAncestor;
 };
 
 STRUCT (be_state, BEState)
@@ -402,7 +401,6 @@ BEDeclareIclModule (CleanString name, CleanString modificationTime, int nFunctio
 
 	icl->beicl_module		= ConvertAllocType (ImpRepr);
 	icl->beicl_dcl_module	= gBEState.be_modules [main_dcl_module_n];
-	icl->beicl_previousAncestor	= 0;
 	scc_dependency_list	= NULL;
 	icl->beicl_depsP	= &scc_dependency_list;
 
@@ -2411,9 +2409,6 @@ DeclareFunctionC (char *name, int arity, int functionIndex, unsigned int ancesto
 	module	= &gBEState.be_modules [main_dcl_module_n];
 	functions	=	module->bem_functions;
 	Assert (functions != NULL);
-
-	Assert (icl->beicl_previousAncestor <= ancestor);
-	icl->beicl_previousAncestor	= ancestor;
 
 	Assert (functionIndex < module->bem_nFunctions);
 	newSymbDef	= ConvertAllocType (SymbDefS);
