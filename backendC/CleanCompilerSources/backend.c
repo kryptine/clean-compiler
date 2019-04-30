@@ -446,7 +446,7 @@ BEDeclareDclModule (int moduleIndex, CleanString name, CleanString modificationT
 	char	*cName;
 	SymbolP	moduleNameSymbol;
 	DefMod	dclModule;
-	SymbolP	saveSymbols;
+	SymbolP	saveSymbols,previous_all_symbols;
 
 	cName	= ConvertCleanString (name);
 
@@ -459,13 +459,16 @@ BEDeclareDclModule (int moduleIndex, CleanString name, CleanString modificationT
 		gBEState.be_allSymbols	= NULL;
 	}
 
+	previous_all_symbols = gBEState.be_allSymbols;
+
 	DeclareModule (moduleIndex, cName, isSystemModule, nFunctions, nTypes, nConstructors, nFields);
 
 	dclModule	= ConvertAllocType (DefRepr);
 	dclModule->dm_name			= cName;
 	dclModule->dm_modification_time	= ConvertCleanString (modificationTime);
 	dclModule->dm_system_module	= isSystemModule;
-	dclModule->dm_symbols		= gBEState.be_allSymbols; /* ??? too many symbols? */
+	dclModule->dm_symbols		= gBEState.be_allSymbols;
+	dclModule->dm_symbols_end = previous_all_symbols;
 	dclModule->dm_system_module_table_kind = FirstSystemModuleTable + moduleIndex;
 
 	AddOpenDefinitionModule (moduleNameSymbol, dclModule);

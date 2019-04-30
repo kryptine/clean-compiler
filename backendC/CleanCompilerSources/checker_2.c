@@ -78,9 +78,11 @@ void ReadInlineCode (void)
 		
 		def_mod=d_mod->mod_body;
 		if (def_mod->dm_system_module){
-			Symbol symbol;
+			Symbol symbol,symbols_end;
 			
-			for_l (symbol,def_mod->dm_symbols,symb_next)
+			symbols_end=def_mod->dm_symbols_end;
+			
+			for (symbol=def_mod->dm_symbols; symbol!=NULL && symbol!=symbols_end; symbol=symbol->symb_next)
 				if (symbol->symb_kind==definition){
 					SymbDef sdef;
 
@@ -89,7 +91,7 @@ void ReadInlineCode (void)
 						break;
 				}
 			
-			if (symbol!=NULL && d_mod->mod_name->symb_ident->ident_name!=CurrentModule)
+			if (symbol!=NULL && symbol!=symbols_end && d_mod->mod_name->symb_ident->ident_name!=CurrentModule)
 				/* Get the inline instructions of all the rules that are defined in this module */
 				ScanInlineFile (d_mod->mod_name->symb_ident->ident_name,def_mod->dm_system_module_table_kind);
 		}
