@@ -2763,19 +2763,13 @@ BERecordType (int moduleIndex, BEFlatTypeP lhs, BETypeNodeP constructorType, int
 void
 BEAbsType (BEFlatTypeP lhs)
 {
-	AbsTypes	absType;
 	SymbDefP	sdef;
-
-	absType	= ConvertAllocType (struct abs_type);
-
-	absType->abs_graph	=	lhs;
 
 	Assert (lhs->ft_symbol->symb_kind == definition);
 	sdef	= lhs->ft_symbol->symb_def;
 	Assert (sdef->sdef_kind == NEWDEFINITION);
 	sdef->sdef_checkstatus	= TypeChecked;
 	sdef->sdef_kind 		= ABSTYPE;
-	sdef->sdef_abs_type		= absType;
 
 } /* BEAbsType */
 

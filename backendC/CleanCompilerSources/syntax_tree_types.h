@@ -53,10 +53,6 @@ struct rule_type
 	StateP              rule_type_state_p;
 };
 
-typedef struct abs_type
-{	FlatType			abs_graph;
-} *AbsTypes;
-
 struct type_node
 {
 	union {
