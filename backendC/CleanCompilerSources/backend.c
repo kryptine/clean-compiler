@@ -744,7 +744,7 @@ BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, in
 			newRuleType->rule_type_rule	= newTypeAlt;
 
 			newsdef->sdef_ident			= newIdent;
-			newsdef->sdef_module		= gBEState.be_icl.beicl_module->im_name->symb_def->sdef_module; /* phew! */
+			newsdef->sdef_module		= gBEState.be_icl.beicl_module->im_name->symb_ident->ident_name;
 			newsdef->sdef_mark		= 0;
 			newsdef->sdef_isused		= True;
 			newsdef->sdef_exported		= False;
