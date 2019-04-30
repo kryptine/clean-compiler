@@ -670,7 +670,7 @@ typedef FileTime ModuleFileTime;
 #endif
 
 typedef struct {
-	Symbol				im_name;
+	char *				im_name;
 	Symbol				im_symbols;
 	ImpRules			im_rules;
 	struct symbol_def *	im_start;
