@@ -59,8 +59,8 @@ typedef struct abs_type
 
 struct type_node
 {
-	union
-	{	TypeVar				contents_tv;
+	union {
+		int					contents_tv_argument_n;
 		Symbol				contents_symbol;
 	} type_node_contents;
 
@@ -72,7 +72,7 @@ struct type_node
 };
 
 #define type_node_symbol type_node_contents.contents_symbol
-#define type_node_tv type_node_contents.contents_tv
+#define type_node_tv_argument_n type_node_contents.contents_tv_argument_n
 
 struct type_arg
 {	TypeNode	type_arg_node;
@@ -91,8 +91,3 @@ typedef struct type_alt
 	TypeNode				type_alt_rhs;
 	StrictPositionsP		type_alt_strict_positions;
 } TypeAlt;
-
-struct type_var
-{
-	int 			tv_argument_nr;
-};

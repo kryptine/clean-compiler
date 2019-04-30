@@ -82,7 +82,8 @@ BEField
 BEFields
 BENoFields
 BEDeclareConstructor
-BETypeVar
+BETypeVar0TypeNode
+BETypeVarNTypeNode
 BEDeclareType
 BEDeclareFunction
 BECodeAlt

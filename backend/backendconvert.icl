@@ -226,8 +226,8 @@ beUpdateNode
 	:==	beFunction1 BEUpdateNode
 beNormalTypeNode
 	:==	beFunction2 BENormalTypeNode
-beVarTypeNode name
-	:==	beFunction0 (BEVarTypeNode name)
+beTypeVar0TypeNode
+	:==	beFunction0 BETypeVar0TypeNode
 beRuleAlt lineNumber
 	:==	beFunction5 (BERuleAlt lineNumber)
 beTypeAlt
@@ -284,8 +284,6 @@ beDeclareNodeId number lhsOrRhs name
 	:==	beApFunction0 (BEDeclareNodeId number lhsOrRhs name)
 beAdjustArrayFunction backendId functionIndex moduleIndex
 	:==	beApFunction0 (BEAdjustArrayFunction backendId functionIndex moduleIndex)
-beTypeVar name
-	:==	beFunction0 (BETypeVar name)
 beExportType isDictionary typeIndex
 	:==	beApFunction0 (BEExportType isDictionary typeIndex)
 beExportConstructor constructorIndex
@@ -1527,14 +1525,14 @@ convertTypeNode (TA typeSymbolIdent typeArgs)
 	=	beNormalTypeNode (convertTypeSymbolIdent typeSymbolIdent) (convertTypeArgs typeArgs )
 convertTypeNode (TAS typeSymbolIdent typeArgs strictness)
 	=	beNormalTypeNode (convertTypeSymbolIdent typeSymbolIdent) (convertAnnotatedTypeArgs typeArgs strictness)
-convertTypeNode (TV {tv_ident})
-	=	beVarTypeNode tv_ident.id_name
-convertTypeNode (TempV n)
-	=	beVarTypeNode ("_tv" +++ toString n)
-convertTypeNode (TempQV n)
-	=	beVarTypeNode ("_tqv" +++ toString n)
-convertTypeNode (TempQDV n)
-	=	beVarTypeNode ("_tqv" +++ toString n)
+convertTypeNode (TV _)
+	=	beTypeVar0TypeNode
+convertTypeNode (TempV _)
+	=	beTypeVar0TypeNode
+convertTypeNode (TempQV _)
+	=	beTypeVar0TypeNode
+convertTypeNode (TempQDV _)
+	=	beTypeVar0TypeNode
 convertTypeNode (a --> b) 
 	=	beNormalTypeNode (beBasicSymbol BEFunType) (convertTypeArgs [a, b])
 convertTypeNode (TArrow1 a) 
@@ -1589,23 +1587,23 @@ convertTypeDefTypeNode (TAS typeSymbolIdent typeArgs strictness) type_var_heap b
 	  (type_arg_p,type_var_heap,bes) = convertTypeDefAnnotatedTypeArgs typeArgs strictness type_var_heap bes
 	  (type_node_p,bes) = accBackEnd (BENormalTypeNode symbol_p type_arg_p) bes
 	= (type_node_p,type_var_heap,bes)
-convertTypeDefTypeNode (TV {tv_ident,tv_info_ptr}) type_var_heap bes
+convertTypeDefTypeNode (TV {tv_info_ptr}) type_var_heap bes
 	#! argument_n
 		= case sreadPtr tv_info_ptr type_var_heap of
 				TVI_TypeVarArgN type_var_arg_n
 					-> type_var_arg_n
 				_
 					-> -1
-	# (type_node_p,bes) = accBackEnd (BENumberedVarTypeNode tv_ident.id_name argument_n) bes
+	# (type_node_p,bes) = accBackEnd (BETypeVarNTypeNode argument_n) bes
 	= (type_node_p,type_var_heap,bes)
-convertTypeDefTypeNode (TempV n) type_var_heap bes
-	# (type_node_p,bes) = accBackEnd (BENumberedVarTypeNode ("_tv" +++ toString n) -1) bes
+convertTypeDefTypeNode (TempV _) type_var_heap bes
+	# (type_node_p,bes) = accBackEnd (BETypeVarNTypeNode -1) bes
 	= (type_node_p,type_var_heap,bes)
-convertTypeDefTypeNode (TempQV n) type_var_heap bes
-	# (type_node_p,bes) = accBackEnd (BENumberedVarTypeNode ("_tqv" +++ toString n) -1) bes
+convertTypeDefTypeNode (TempQV _) type_var_heap bes
+	# (type_node_p,bes) = accBackEnd (BETypeVarNTypeNode -1) bes
 	= (type_node_p,type_var_heap,bes)
-convertTypeDefTypeNode (TempQDV n) type_var_heap bes
-	# (type_node_p,bes) = accBackEnd (BENumberedVarTypeNode ("_tqv" +++ toString n) -1) bes
+convertTypeDefTypeNode (TempQDV _) type_var_heap bes
+	# (type_node_p,bes) = accBackEnd (BETypeVarNTypeNode -1) bes
 	= (type_node_p,type_var_heap,bes)
 convertTypeDefTypeNode (a --> b) type_var_heap bes
 	# (symbol_p,bes) = accBackEnd (BEBasicSymbol BEFunType) bes

@@ -29,8 +29,8 @@ EXPORTS
  BEPredefineConstructorSymbol
  BEPredefineTypeSymbol
  BEBasicSymbol
- BEVarTypeNode
- BENumberedVarTypeNode
+ BETypeVar0TypeNode
+ BETypeVarNTypeNode
  BENormalTypeNode
  BEAnnotateTypeNode
  BEAttributeTypeNode
@@ -90,8 +90,6 @@ EXPORTS
  BEFields
  BENoFields
  BEDeclareConstructor
- BETypeVar
- BENumberedTypeVar
  BEDeclareType
  BEDeclareFunction
  BEStartFunction
