@@ -12,8 +12,6 @@ implementation module backend;
 :: BERuleAltP :== CPtr;
 :: BEImpRuleP :== CPtr;
 :: BEFlatTypeP :== CPtr;
-:: BETypeVarP :== CPtr;
-:: BETypeVarListP :== CPtr;
 :: BEConstructorListP :== CPtr;
 :: BEFieldListP :== CPtr;
 :: BENodeIdP :== CPtr;
@@ -213,17 +211,17 @@ BEBasicSymbol a0 a1 = code {
 }
 // BESymbolP BEBasicSymbol (BESymbKind kind);
 
-BEVarTypeNode :: !String !BackEnd -> (!BETypeNodeP,!BackEnd);
-BEVarTypeNode a0 a1 = code {
-	ccall BEVarTypeNode "S:p:p"
+BETypeVar0TypeNode :: !BackEnd -> (!BETypeNodeP,!BackEnd);
+BETypeVar0TypeNode a0 = code {
+	ccall BETypeVar0TypeNode ":p:p"
 }
-// BETypeNodeP BEVarTypeNode (CleanString name);
+// BETypeNodeP BETypeVar0TypeNode ();
 
-BENumberedVarTypeNode :: !String !Int !BackEnd -> (!BETypeNodeP,!BackEnd);
-BENumberedVarTypeNode a0 a1 a2 = code {
-	ccall BENumberedVarTypeNode "SI:p:p"
+BETypeVarNTypeNode :: !Int !BackEnd -> (!BETypeNodeP,!BackEnd);
+BETypeVarNTypeNode a0 a1 = code {
+	ccall BETypeVarNTypeNode "I:p:p"
 }
-// BETypeNodeP BENumberedVarTypeNode (CleanString name,int argument_n);
+// BETypeNodeP BETypeVarNTypeNode (int argument_n);
 
 BENormalTypeNode :: !BESymbolP !BETypeArgP !BackEnd -> (!BETypeNodeP,!BackEnd);
 BENormalTypeNode a0 a1 a2 = code {
@@ -578,18 +576,6 @@ BEDeclareConstructor a0 a1 a2 a3 = code {
 	ccall BEDeclareConstructor "IIS:V:p"
 }
 // void BEDeclareConstructor (int constructorIndex,int moduleIndex,CleanString name);
-
-BETypeVar :: !String !BackEnd -> (!BETypeVarP,!BackEnd);
-BETypeVar a0 a1 = code {
-	ccall BETypeVar "S:p:p"
-}
-// BETypeVarP BETypeVar (CleanString name);
-
-BENumberedTypeVar :: !String !Int !BackEnd -> (!BETypeVarP,!BackEnd);
-BENumberedTypeVar a0 a1 a2 = code {
-	ccall BENumberedTypeVar "SI:p:p"
-}
-// BETypeVarP BENumberedTypeVar (CleanString name,int argument_n);
 
 BEDeclareType :: !Int !Int !String !BackEnd -> BackEnd;
 BEDeclareType a0 a1 a2 a3 = code {

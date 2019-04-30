@@ -621,7 +621,7 @@ void PrintTypeNode (TypeNode node, File file)
 	}
 
 	if (node->type_node_is_var)
-		FPrintF (file, "%d:", node->type_node_tv->tv_argument_nr);
+		FPrintF (file, "%d:", node->type_node_tv_argument_n);
 	else if (node->type_node_symbol->symb_kind == tuple_type)
 	{	FPutC ('(', file);
 		PrintTypeArguments (node->type_node_arguments, ',', file);

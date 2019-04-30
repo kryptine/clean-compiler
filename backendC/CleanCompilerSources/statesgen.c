@@ -679,8 +679,8 @@ static void determine_unique_state_of_constructor_argument (StateP result_state_
 {
 	if (type_arg_node->type_node_is_var){
 		if ((type_state_p->state_mark & STATE_UNIQUE_TYPE_ARGUMENTS_MASK) &&
-			type_arg_node->type_node_tv->tv_argument_nr>=0 &&
-			(type_state_p->state_unq_type_args & (1<<(type_arg_node->type_node_tv->tv_argument_nr))))
+			type_arg_node->type_node_tv_argument_n>=0 &&
+			(type_state_p->state_unq_type_args & (1<<(type_arg_node->type_node_tv_argument_n))))
 		{
 			result_state_p->state_mark |= STATE_UNIQUE_MASK;
 		}
@@ -711,8 +711,8 @@ static void determine_unique_state_of_constructor_argument (StateP result_state_
 					type_arg_node_p=type_arg->type_arg_node;
 					if (type_arg_node_p->type_node_is_var){
 						if ((type_state_p->state_mark & STATE_UNIQUE_TYPE_ARGUMENTS_MASK) &&
-							type_arg_node_p->type_node_tv->tv_argument_nr>=0 &&
-							(type_state_p->state_unq_type_args & (1<<(type_arg_node_p->type_node_tv->tv_argument_nr))))
+							type_arg_node_p->type_node_tv_argument_n>=0 &&
+							(type_state_p->state_unq_type_args & (1<<(type_arg_node_p->type_node_tv_argument_n))))
 						{
 							unq_type_args |= 1<<i;
 						}
@@ -739,8 +739,8 @@ static StateP determine_unique_state_of_constructor_argument
 {
 	if (type_arg_node->type_node_is_var){
 		if ((constructor_state_p->state_mark & STATE_UNIQUE_TYPE_ARGUMENTS_MASK) &&
-			type_arg_node->type_node_tv->tv_argument_nr>=0 &&
-			(constructor_state_p->state_unq_type_args & (1<<(type_arg_node->type_node_tv->tv_argument_nr))) &&
+			type_arg_node->type_node_tv_argument_n>=0 &&
+			(constructor_state_p->state_unq_type_args & (1<<(type_arg_node->type_node_tv_argument_n))) &&
 			(type_state_p->state_mark & STATE_UNIQUE_MASK)==0)
 		{
 			StateP result_state_p;
@@ -786,8 +786,8 @@ static StateP determine_unique_state_of_constructor_argument
 					type_arg_node_p=type_arg->type_arg_node;
 					if (type_arg_node_p->type_node_is_var){
 						if ((constructor_state_p->state_mark & STATE_UNIQUE_TYPE_ARGUMENTS_MASK) &&
-							type_arg_node_p->type_node_tv->tv_argument_nr>=0 &&
-							(constructor_state_p->state_unq_type_args & (1<<(type_arg_node_p->type_node_tv->tv_argument_nr))))
+							type_arg_node_p->type_node_tv_argument_n>=0 &&
+							(constructor_state_p->state_unq_type_args & (1<<(type_arg_node_p->type_node_tv_argument_n))))
 						{
 							unq_type_args |= 1<<i;
 						}

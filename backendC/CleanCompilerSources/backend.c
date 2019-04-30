@@ -696,10 +696,9 @@ BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, in
 					break;
 				case BE_UnqArraySelectLastFun:
 				{
-					struct clean_string	rName = {1, 'r'};
 					TypeNode			rType;
 
-					rType	= BEAnnotateTypeNode (StrictAnnot, BEVarTypeNode (&rName));
+					rType	= BEAnnotateTypeNode (StrictAnnot, BETypeVar0TypeNode());
 					rhs	= BENormalTypeNode (gBasicSymbols [tuple_type],
 												BETypeArgs (elementType, BETypeArgs (rType, NULL)));
 					lhsArgs	= BETypeArgs (
@@ -711,10 +710,9 @@ BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, in
 				}
 				case BE_ArrayUpdateFun:
 				{
-					struct clean_string	rName = {1, 'r'};
 					TypeNode			rType;
 
-					rType	= BEAnnotateTypeNode (StrictAnnot, BEVarTypeNode (&rName));
+					rType	= BEAnnotateTypeNode (StrictAnnot, BETypeVar0TypeNode());
 					rhs	= rType;
 					lhsArgs	= BETypeArgs (
 								BEAnnotateTypeNode (StrictAnnot, BENormalTypeNode (gBasicSymbols [tuple_type],
@@ -837,7 +835,6 @@ CreateDictionarySelectFunSymbol (void)
 {
 	TypeNode		rhsType;
 	TypeArgs		lhsArgs;
-	struct clean_string	aName = {1, 'a'};
 
 	/* selectl :: !((a e) Int -> e) !(!a e, !r) !Int -> (e, !r) */
 	/* select _ _ _ = code */
@@ -865,19 +862,19 @@ CreateDictionarySelectFunSymbol (void)
 
 	/*	actual type simplified to !a !(!a,!a) !Int -> (a,!a) */
 	lhsArgs	=	BETypeArgs (
-					BEAnnotateTypeNode (StrictAnnot, BEVarTypeNode (&aName)),
+					BEAnnotateTypeNode (StrictAnnot, BETypeVar0TypeNode()),
 				BETypeArgs (
 					BEAnnotateTypeNode (StrictAnnot, BENormalTypeNode (gBasicSymbols [tuple_type],
 								BETypeArgs (
-									BEAnnotateTypeNode (StrictAnnot, BEVarTypeNode (&aName)),
+									BEAnnotateTypeNode (StrictAnnot, BETypeVar0TypeNode()),
 								BETypeArgs (
-									BEAnnotateTypeNode (StrictAnnot, BEVarTypeNode (&aName)),
+									BEAnnotateTypeNode (StrictAnnot, BETypeVar0TypeNode()),
 								NULL)))),
 				BETypeArgs (
 					BEAnnotateTypeNode (StrictAnnot, BENormalTypeNode (gBasicSymbols [int_type], NULL)),
 				NULL)));
 	rhsType	= BENormalTypeNode (gBasicSymbols [tuple_type],
-								BETypeArgs (BEVarTypeNode (&aName), BETypeArgs (BEAnnotateTypeNode (StrictAnnot, BEVarTypeNode (&aName)), NULL)));
+								BETypeArgs (BETypeVar0TypeNode(), BETypeArgs (BEAnnotateTypeNode (StrictAnnot, BETypeVar0TypeNode()), NULL)));
 
 	return (CreateLocallyDefinedFunction (kDictionarySelect, abcCode, lhsArgs, rhsType));
 } /* CreateDictionarySelectFunSymbol */
@@ -887,7 +884,6 @@ CreateDictionaryUpdateFunSymbol (void)
 {
 	TypeNode		rhsType;
 	TypeArgs		lhsArgs;
-	struct clean_string	aName = {1, 'a'};
 
 	/* updatei :: !(*(a .e) -> *(!Int -> *(.e -> .(a .e)))) !(!*(a .e), !*r) !Int .e -> *r // !(!.(a .e), !*r) */
 	/* updatei _ _ _ _ = code */
@@ -909,21 +905,21 @@ CreateDictionaryUpdateFunSymbol (void)
 
 	/*	actual type simplified to !a !(!a,!a) !Int a -> a */
 	lhsArgs	=	BETypeArgs (
-					BEAnnotateTypeNode (StrictAnnot, BEVarTypeNode (&aName)),
+					BEAnnotateTypeNode (StrictAnnot, BETypeVar0TypeNode()),
 				BETypeArgs (
 					BEAnnotateTypeNode (StrictAnnot, BENormalTypeNode (gBasicSymbols [tuple_type],
 								BETypeArgs (
-									BEAnnotateTypeNode (StrictAnnot, BEVarTypeNode (&aName)),
+									BEAnnotateTypeNode (StrictAnnot, BETypeVar0TypeNode()),
 								BETypeArgs (
-									BEAnnotateTypeNode (StrictAnnot, BEVarTypeNode (&aName)),
+									BEAnnotateTypeNode (StrictAnnot, BETypeVar0TypeNode()),
 								NULL)))),
 				BETypeArgs (
 					BEAnnotateTypeNode (StrictAnnot, BENormalTypeNode (gBasicSymbols [int_type], NULL)),
 				BETypeArgs (
-					BEVarTypeNode (&aName),
+					BETypeVar0TypeNode(),
 				NULL))));
 
-	rhsType	= BEVarTypeNode (&aName);
+	rhsType	= BETypeVar0TypeNode();
 
 	return (CreateLocallyDefinedFunction (kDictionaryUpdate, abcCode, lhsArgs, rhsType));
 } /* CreateDictionaryUpdateFunSymbol */
@@ -1355,30 +1351,30 @@ BEBasicSymbol (BESymbKind kind)
 } /* BEBasicSymbol */
 
 BETypeNodeP
-BEVarTypeNode (CleanString name)
+BETypeVar0TypeNode (void)
 {
-	TypeNode	node;
+	TypeNode node;
 
-	node	= ConvertAllocType (struct type_node);
+	node = ConvertAllocType (struct type_node);
 
 	node->type_node_is_var		= True;
-	node->type_node_tv			= BETypeVar (name);
+	node->type_node_tv_argument_n = 0;
 	node->type_node_arity		= 0;
 	node->type_node_annotation	= NoAnnot;
 	node->type_node_attribute	= NoUniAttr;
 
-	return (node);
-} /* BEVarTypeNode */
+	return node;
+}
 
 BETypeNodeP
-BENumberedVarTypeNode (CleanString name,int argument_n)
+BETypeVarNTypeNode (int argument_n)
 {
-	TypeNode	node;
+	TypeNode node;
 
-	node	= ConvertAllocType (struct type_node);
+	node = ConvertAllocType (struct type_node);
 
 	node->type_node_is_var		= True;
-	node->type_node_tv			= BENumberedTypeVar (name,argument_n);
+	node->type_node_tv_argument_n = argument_n;
 	node->type_node_arity		= 0;
 	node->type_node_annotation	= NoAnnot;
 	node->type_node_attribute	= NoUniAttr;
@@ -2641,38 +2637,6 @@ BEDeclareType (int typeIndex, int moduleIndex, CleanString name)
 	types [typeIndex]->symb_kind	= definition;
 	types [typeIndex]->symb_def		= newSymbDef;
 } /* BEDeclareType */
- 
-BETypeVarP
-BETypeVar (CleanString name)
-{
-	IdentP	ident;
-	TypeVar	typeVar;
-
-	ident	= ConvertAllocType (IdentS);
-	typeVar	= ConvertAllocType (struct type_var);
-
-	ident->ident_name	= ConvertCleanString (name);
-
-	typeVar->tv_argument_nr	= 0; /* ??? */
-
-	return (typeVar);
-} /* BETypeVar */
-
-BETypeVarP
-BENumberedTypeVar (CleanString name,int argument_n)
-{
-	IdentP	ident;
-	TypeVar	typeVar;
-
-	ident	= ConvertAllocType (IdentS);
-	typeVar	= ConvertAllocType (struct type_var);
-
-	ident->ident_name	= ConvertCleanString (name);
-
-	typeVar->tv_argument_nr	= argument_n;
-
-	return typeVar;
-}
 
 BEFlatTypeP
 BEFlatType (BESymbolP symbol, BEAttribution attribution)

@@ -102,18 +102,6 @@ NewStrictNodeId (NodeId nodeId, StrictNodeIdP next)
 	return (strictNodeId);
 } /* NewStrictNodeId */
 
-TypeVar
-NewTypeVar (IdentP nid)
-{
-	TypeVar	newnid;
-
-	newnid	= CompAllocType (struct type_var);
-
-	newnid->tv_argument_nr		= 0;
-
-	return (newnid);
-}
-
 NodeP
 NewNodeIdNode (NodeIdP node_id)
 {

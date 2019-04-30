@@ -28,8 +28,8 @@ BEOverloadedPushNode
 BEPredefineConstructorSymbol
 BEPredefineTypeSymbol
 BEBasicSymbol
-BEVarTypeNode
-BENumberedVarTypeNode
+BETypeVar0TypeNode
+BETypeVarNTypeNode
 BENormalTypeNode
 BEAnnotateTypeNode
 BEAttributeTypeNode
@@ -88,8 +88,6 @@ BESetInstanceFunctionOfFunction
 BEFields
 BENoFields
 BEDeclareConstructor
-BETypeVar
-BENumberedTypeVar
 BEDeclareType
 BEDeclareFunction
 BECodeAlt

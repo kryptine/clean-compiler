@@ -57,9 +57,6 @@ Clean (:: BEImpRuleP (:== CPtr))
 typedef struct flat_type *BEFlatTypeP;
 Clean (:: BEFlatTypeP (:== CPtr))
 
-typedef struct type_var *BETypeVarP;
-Clean (:: BETypeVarP (:== CPtr))
-
 typedef struct constructor_list *BEConstructorListP;
 Clean (:: BEConstructorListP (:== CPtr))
 
@@ -252,11 +249,11 @@ Clean (BEPredefineTypeSymbol :: Int Int Int BESymbKind BackEnd -> BackEnd)
 BESymbolP BEBasicSymbol (BESymbKind kind);
 Clean (BEBasicSymbol :: Int BackEnd -> (BESymbolP, BackEnd))
 
-BETypeNodeP BEVarTypeNode (CleanString name);
-Clean (BEVarTypeNode :: String BackEnd -> (BETypeNodeP, BackEnd))
+BETypeNodeP BETypeVar0TypeNode ();
+Clean (BETypeVar0TypeNode :: BackEnd -> (BETypeNodeP, BackEnd))
 
-BETypeNodeP BENumberedVarTypeNode (CleanString name,int argument_n);
-Clean (BENumberedVarTypeNode :: String Int BackEnd -> (BETypeNodeP, BackEnd))
+BETypeNodeP BETypeVarNTypeNode (int argument_n);
+Clean (BETypeVarNTypeNode :: Int BackEnd -> (BETypeNodeP, BackEnd))
 
 BETypeNodeP BENormalTypeNode (BESymbolP symbol, BETypeArgP args);
 Clean (BENormalTypeNode :: BESymbolP BETypeArgP BackEnd -> (BETypeNodeP, BackEnd))
@@ -438,12 +435,6 @@ Clean (BENoFields:: BackEnd -> (BEFieldListP, BackEnd))
 
 void BEDeclareConstructor (int constructorIndex, int moduleIndex, CleanString name);
 Clean (BEDeclareConstructor:: Int Int String BackEnd -> BackEnd)
-
-BETypeVarP BETypeVar (CleanString name);
-Clean (BETypeVar:: String BackEnd -> (BETypeVarP, BackEnd))
-
-BETypeVarP BENumberedTypeVar (CleanString name,int argument_n);
-Clean (BENumberedTypeVar :: String Int BackEnd -> (BETypeVarP,BackEnd))
 
 void BEDeclareType (int typeIndex, int moduleIndex, CleanString name);
 Clean (BEDeclareType:: Int Int String BackEnd -> BackEnd)
