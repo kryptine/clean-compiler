@@ -387,7 +387,6 @@ BEDeclareIclModule (CleanString name, CleanString modificationTime, int nFunctio
 {
 	int		i;
 	char	*cName;
-	SymbolP	moduleNameSymbol;
 	ImpMod	iclModule;
 	BEIclP	icl;
 
@@ -395,9 +394,6 @@ BEDeclareIclModule (CleanString name, CleanString modificationTime, int nFunctio
 
 	if (cName == NULL)
 		cName	= ConvertCleanString (name);
-
-	moduleNameSymbol	= ConvertAllocType (SymbolS);
-	moduleNameSymbol->symb_ident	= Identifier (cName);
 
 /*	Assert (strcmp (gBEState.be_modules [main_dcl_module_n].bem_name, cName) == 0); */
 	Assert (strncmp (cName, name->chars, name->length) == 0);
@@ -414,7 +410,7 @@ BEDeclareIclModule (CleanString name, CleanString modificationTime, int nFunctio
 	DeclareModule (main_dcl_module_n, cName, False, nFunctions, nTypes, nConstructors, nFields);
 
 	iclModule	= icl->beicl_module;
-	iclModule->im_name			= moduleNameSymbol;
+	iclModule->im_name			= cName;
 	iclModule->im_modification_time	= ConvertCleanString (modificationTime);
 	iclModule->im_def_module	= im_def_module;
 	iclModule->im_rules			= NULL;
@@ -744,7 +740,7 @@ BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, in
 			newRuleType->rule_type_rule	= newTypeAlt;
 
 			newsdef->sdef_ident			= newIdent;
-			newsdef->sdef_module		= gBEState.be_icl.beicl_module->im_name->symb_def->sdef_module; /* phew! */
+			newsdef->sdef_module		= gBEState.be_icl.beicl_module->im_name;
 			newsdef->sdef_mark		= 0;
 			newsdef->sdef_isused		= True;
 			newsdef->sdef_exported		= False;
