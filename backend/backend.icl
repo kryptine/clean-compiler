@@ -379,18 +379,6 @@ BERuleAlt a0 a1 a2 a3 a4 a5 a6 = code {
 }
 // BERuleAltP BERuleAlt (int line,BENodeDefP lhsDefs,BENodeP lhs,BENodeDefP rhsDefs,BEStrictNodeIdP lhsStrictNodeIds,BENodeP rhs);
 
-BERuleAlts :: !BERuleAltP !BERuleAltP !BackEnd -> (!BERuleAltP,!BackEnd);
-BERuleAlts a0 a1 a2 = code {
-	ccall BERuleAlts "pp:p:p"
-}
-// BERuleAltP BERuleAlts (BERuleAltP alt,BERuleAltP alts);
-
-BENoRuleAlts :: !BackEnd -> (!BERuleAltP,!BackEnd);
-BENoRuleAlts a0 = code {
-	ccall BENoRuleAlts ":p:p"
-}
-// BERuleAltP BENoRuleAlts ();
-
 BEDeclareNodeId :: !Int !Int !String !BackEnd -> BackEnd;
 BEDeclareNodeId a0 a1 a2 a3 = code {
 	ccall BEDeclareNodeId "IIS:V:p"

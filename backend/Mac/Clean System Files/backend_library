@@ -55,8 +55,6 @@ BENodeIdNode
 BENoArgs
 BEArgs
 BERuleAlt
-BERuleAlts
-BENoRuleAlts
 BEDeclareNodeId
 BENodeId
 BEWildCardNodeId

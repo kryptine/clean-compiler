@@ -56,8 +56,6 @@
 /EXPORT: BENoArgs
 /EXPORT: BEArgs
 /EXPORT: BERuleAlt
-/EXPORT: BERuleAlts
-/EXPORT: BENoRuleAlts
 /EXPORT: BEDeclareNodeId
 /EXPORT: BENodeId
 /EXPORT: BEWildCardNodeId
