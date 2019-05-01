@@ -3174,7 +3174,7 @@ static void mark_is_constructor_function (ImpRuleP rule)
 	RuleAltP alt;
 
 	alt=rule->rule_alts;
-	if (alt->alt_kind==Contractum && alt->alt_next==NULL && alt->alt_rhs_defs==NULL && alt->alt_lhs_defs==NULL){
+	if (alt->alt_kind==Contractum && alt->alt_rhs_defs==NULL && alt->alt_lhs_defs==NULL){
 		NodeP node_p;
 		ArgP arg_p;
 		
@@ -3240,25 +3240,24 @@ void GenerateStatesForRule (ImpRuleS *rule)
 	function_state_p=rule->rule_state_p;
 #endif
 
-	for_l (alt,rule->rule_alts,alt_next){
-		CurrentLine = alt->alt_line;
-	
+	alt=rule->rule_alts;
+	CurrentLine = alt->alt_line;
+
 #ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
-		set_states_in_lhs (alt->alt_lhs_root->node_arguments,function_state_p);
-		alt->alt_lhs_root->node_state = function_state_p[-1]; /* i.e. the result state */
+	set_states_in_lhs (alt->alt_lhs_root->node_arguments,function_state_p);
+	alt->alt_lhs_root->node_state = function_state_p[-1]; /* i.e. the result state */
 #endif
 
-		scope=1;
+	scope=1;
 
-		if (alt->alt_kind==Contractum){
-			DetermineStatesOfRootNodeAndDefs (alt->alt_rhs_root,&alt->alt_rhs_defs,alt->alt_lhs_root->node_state,0);
+	if (alt->alt_kind==Contractum){
+		DetermineStatesOfRootNodeAndDefs (alt->alt_rhs_root,&alt->alt_rhs_defs,alt->alt_lhs_root->node_state,0);
 
 #ifdef OBSERVE_ARRAY_SELECTS_IN_PATTERN
-			set_states_of_array_selects_in_pattern (alt);
+		set_states_of_array_selects_in_pattern (alt);
 #endif
-		} else if (rule->rule_type==NULL)
-			StaticMessage (True, "%S", ECodeBlock, CurrentSymbol);
-	}
+	} else if (rule->rule_type==NULL)
+		StaticMessage (True, "%S", ECodeBlock, CurrentSymbol);
 
 	if (rule_sdef->sdef_arity==1 &&
 			function_state_p[-1].state_type==SimpleState && function_state_p[-1].state_kind==OnB && function_state_p[-1].state_object==BoolObj &&
@@ -3611,34 +3610,33 @@ static SymbolP copy_imp_rule_and_add_arguments (SymbDef rule_sdef,int n_extra_ar
 	
 	{
 		RuleAltP alt_p;
+		int n;
+		ArgP *last_lhs_arg_h;
 		
-		for_l (alt_p,new_rule_p->rule_alts,alt_next){
-			int n;
-			ArgP *last_lhs_arg_h;
+		alt_p=new_rule_p->rule_alts;
 			
-			last_lhs_arg_h=&alt_p->alt_lhs_root->node_arguments;
-			while (*last_lhs_arg_h)
-				last_lhs_arg_h=&(*last_lhs_arg_h)->arg_next;
+		last_lhs_arg_h=&alt_p->alt_lhs_root->node_arguments;
+		while (*last_lhs_arg_h)
+			last_lhs_arg_h=&(*last_lhs_arg_h)->arg_next;
+		
+		for (n=0; n<n_extra_arguments; ++n){
+			NodeIdP new_node_id_p;
+			ArgP new_arg;
 			
-			for (n=0; n<n_extra_arguments; ++n){
-				NodeIdP new_node_id_p;
-				ArgP new_arg;
-				
-				new_node_id_p=NewNodeId (NULL);
-				new_node_id_p->nid_refcount=-2;
-				
-				new_arg=NewArgument (NewNodeIdNode (new_node_id_p));
-				
-				*last_lhs_arg_h=new_arg;
-				last_lhs_arg_h=&new_arg->arg_next;
-								
-				alt_p->alt_rhs_root=add_argument_to_node (alt_p->alt_rhs_root,new_node_id_p);
-			}
+			new_node_id_p=NewNodeId (NULL);
+			new_node_id_p->nid_refcount=-2;
 			
-			*last_lhs_arg_h=NULL;
+			new_arg=NewArgument (NewNodeIdNode (new_node_id_p));
 			
-			alt_p->alt_lhs_root->node_arity += n_extra_arguments;
+			*last_lhs_arg_h=new_arg;
+			last_lhs_arg_h=&new_arg->arg_next;
+							
+			alt_p->alt_rhs_root=add_argument_to_node (alt_p->alt_rhs_root,new_node_id_p);
 		}
+		
+		*last_lhs_arg_h=NULL;
+		
+		alt_p->alt_lhs_root->node_arity += n_extra_arguments;
 		
 		new_sdef_p->sdef_arity += n_extra_arguments;
 	}
@@ -4193,14 +4191,14 @@ static void DetermineSharedAndAnnotatedNodesOfRule (ImpRuleP rule)
 	
 	rule_sdef=CurrentSymbol->symb_def;
 
-	for_l (alt,rule->rule_alts,alt_next)
-		if (alt->alt_kind==Contractum){
-			CurrentLine = alt->alt_line;
+	alt=rule->rule_alts;
+	if (alt->alt_kind==Contractum){
+		CurrentLine = alt->alt_line;
 
-			AnnotateStrictNodeIds (alt->alt_rhs_root,alt->alt_strict_node_ids,&alt->alt_rhs_defs);
+		AnnotateStrictNodeIds (alt->alt_rhs_root,alt->alt_strict_node_ids,&alt->alt_rhs_defs);
 
-			CollectSharedAndAnnotatedNodesInRhs (&alt->alt_rhs_root,&alt->alt_rhs_defs,alt->alt_strict_node_ids);
-		}
+		CollectSharedAndAnnotatedNodesInRhs (&alt->alt_rhs_root,&alt->alt_rhs_defs,alt->alt_strict_node_ids);
+	}
 }
 
 static void reset_states_and_ref_count_copies_of_node_defs (NodeDefS *node_def);
@@ -4348,17 +4346,17 @@ void reset_states_and_ref_count_copies (ImpRuleS *rule)
 	
 	rule_sdef=CurrentSymbol->symb_def;
 
-	for_l (alt,rule->rule_alts,alt_next)
-		if (alt->alt_kind==Contractum){
-			CurrentLine = alt->alt_line;
+	alt=rule->rule_alts;
+	if (alt->alt_kind==Contractum){
+		CurrentLine = alt->alt_line;
 
 #ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
-			reset_states_and_ref_count_copies_of_root_node (alt->alt_rhs_root);
+		reset_states_and_ref_count_copies_of_root_node (alt->alt_rhs_root);
 #else
-			reset_states_and_ref_count_copies_of_node (alt->alt_rhs_root);
+		reset_states_and_ref_count_copies_of_node (alt->alt_rhs_root);
 #endif
-			reset_states_and_ref_count_copies_of_node_defs (alt->alt_rhs_defs);
-		}
+		reset_states_and_ref_count_copies_of_node_defs (alt->alt_rhs_defs);
+	}
 }
 
 void DetermineSharedAndAnnotatedNodes (ImpRules rules,SymbolP *im_symbols_h)

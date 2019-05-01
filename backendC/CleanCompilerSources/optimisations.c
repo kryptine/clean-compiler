@@ -793,41 +793,37 @@ static Node copy_node (Node old,Bool lhs)
 	return new;
 }
 
-static void copy_alts (RuleAltP old_alts,RuleAlts *next_p,Symbol new_symbol)
+static RuleAltP copy_alt (RuleAltP old_alts,Symbol new_symbol)
 {
-	RuleAltP old;
+	RuleAltP old,new;
 	
-	for_l (old,old_alts,alt_next){
-		RuleAltP new;
-		
-		new = CompAllocType (RuleAltS);
-		
-		new->alt_lhs_defs=copy_lhs_node_ids_of_node_defs (old->alt_lhs_defs);
-		new->alt_lhs_root = copy_node (old->alt_lhs_root, True);
-		new->alt_lhs_root->node_symbol=new_symbol;
-		copy_nodes_of_node_defs (new->alt_lhs_defs,True);
-		
-	 	new->alt_rhs_defs=copy_rhs_node_ids_of_node_defs (old->alt_rhs_defs);
+	old=old_alts;
+	
+	new = CompAllocType (RuleAltS);
+	
+	new->alt_lhs_defs=copy_lhs_node_ids_of_node_defs (old->alt_lhs_defs);
+	new->alt_lhs_root = copy_node (old->alt_lhs_root, True);
+	new->alt_lhs_root->node_symbol=new_symbol;
+	copy_nodes_of_node_defs (new->alt_lhs_defs,True);
+	
+ 	new->alt_rhs_defs=copy_rhs_node_ids_of_node_defs (old->alt_rhs_defs);
 #ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
-		new->alt_rhs_root = copy_root_node (old->alt_rhs_root);
+	new->alt_rhs_root = copy_root_node (old->alt_rhs_root);
 #else
-		new->alt_rhs_root = copy_node (old->alt_rhs_root, False);
+	new->alt_rhs_root = copy_node (old->alt_rhs_root, False);
 #endif
-		copy_nodes_of_node_defs (new->alt_rhs_defs,False);
-		new->alt_strict_node_ids=copy_strict_node_ids (old->alt_strict_node_ids);
-		
-		new->alt_line = old->alt_line;
-		new->alt_kind = old->alt_kind;
+	copy_nodes_of_node_defs (new->alt_rhs_defs,False);
+	new->alt_strict_node_ids=copy_strict_node_ids (old->alt_strict_node_ids);
+	
+	new->alt_line = old->alt_line;
+	new->alt_kind = old->alt_kind;
 
-		*next_p = new;
-		next_p = &new->alt_next;			
-	}
-	*next_p = NULL;
+	return new;
 }
 
 void copy_imp_rule_nodes (ImpRuleP old_rule_p,ImpRuleP new_rule_p)
 {
-	copy_alts (old_rule_p->rule_alts,&new_rule_p->rule_alts,new_rule_p->rule_type->type_alt_lhs->type_node_symbol);
+	new_rule_p->rule_alts = copy_alt (old_rule_p->rule_alts,new_rule_p->rule_type->type_alt_lhs->type_node_symbol);
 	new_rule_p->rule_root = new_rule_p->rule_alts->alt_lhs_root;
 	new_rule_p->rule_mark = old_rule_p->rule_mark & RULE_CAF_MASK;
 }

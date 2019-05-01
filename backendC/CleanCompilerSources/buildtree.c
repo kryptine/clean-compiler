@@ -349,7 +349,6 @@ NewRuleAlt (void)
 	alt->alt_lhs_defs			= NIL;
 	alt->alt_rhs_defs			= NIL;
 	alt->alt_strict_node_ids	= NIL;
-	alt->alt_next 				= NIL;
 	alt->alt_line				= 0;
 
 	return (alt);

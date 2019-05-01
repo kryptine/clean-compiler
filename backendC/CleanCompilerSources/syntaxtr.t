@@ -490,7 +490,6 @@ STRUCT (rule_alt,RuleAlt){
 	} alt_rhs;
 	NodeDefs				alt_rhs_defs;
 	StrictNodeIdP			alt_strict_node_ids;
-	RuleAlts				alt_next;
 	unsigned				alt_line;
 	unsigned				alt_kind:3;	/* RhsKind */
 };

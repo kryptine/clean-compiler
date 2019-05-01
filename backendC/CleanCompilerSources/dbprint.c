@@ -581,12 +581,6 @@ void PrintRuleAlt (RuleAlts rulealt,int n_leading_spaces,File file)
 	}
 }
 
-static void PrintRuleAlts (RuleAlts rulealt,int n_leading_spaces,File file)
-{
-	for (; rulealt; rulealt = rulealt -> alt_next)
-		PrintRuleAlt (rulealt,n_leading_spaces,file);
-}
-
 static void PrintTypeArguments (TypeArgs args, char separator, File file)
 {
 	if (args){
@@ -693,7 +687,7 @@ void PrintImpRule (ImpRules rule,int n_leading_spaces,File file)
 		PrintTypeAlt (rule -> rule_type, file);
 	*/
 	
-	PrintRuleAlts (rule->rule_alts,n_leading_spaces,file);
+	PrintRuleAlt (rule->rule_alts,n_leading_spaces,file);
 }
 
 void PrintRules (ImpRules rules,File file)
