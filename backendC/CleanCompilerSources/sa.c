@@ -2879,9 +2879,7 @@ static void ConvertAlternatives (Alts *funalts,RuleAlts rulealts)
 	}
 	
 	fun_alt_p->fun_has_fail = has_fail;
-	
-	/* convert the following alternatives */
-	ConvertAlternatives (&fun_alt_p->fun_next, rulealts->alt_next);
+	fun_alt_p->fun_next = NULL;
 }
 
 static StrictInfo *InitNewStrictInfos (unsigned arity, StrictKind s)
@@ -3177,7 +3175,7 @@ static void UpdateStateInfoWithStrictInfo (TypeNode node, StrictInfo *s,Bool *st
 }
 
 static void UpdateStateInfosWithStrictInfos (TypeAlts rule, unsigned arity, StrictInfo *strict_args,
-											 StrictInfo *result, Bool *strict_added, Bool *warning)
+											 Bool *strict_added, Bool *warning)
 {	unsigned	i;
 	TypeArgs	args;
 
@@ -3207,8 +3205,6 @@ static void UpdateStateInfosWithStrictInfos (TypeAlts rule, unsigned arity, Stri
 
 	rule->type_alt_strict_positions = StrictPositionsCopy ();
 #endif
-
-	/* the result has no sense at the moment */	
 }
 
 static void update_exported_function_state_info_with_strict_info (TypeNode node, StrictInfo *s)
@@ -3248,7 +3244,7 @@ static void update_exported_function_type_state_infos_with_strict_infos (TypeAlt
 		update_exported_function_state_info_with_strict_info (args->type_arg_node,&strict_args[i]);
 }
 
-Bool IsListArg (Fun *f, unsigned n)
+static Bool IsListArg (Fun *f, unsigned n)
 {
 	TypeArgs	args;
 	TypeAlts	typerule;
@@ -3727,7 +3723,7 @@ static void update_function_strictness (SymbDef sdef)
 		
 		strict_added = False;
 		warning      = False;
-		UpdateStateInfosWithStrictInfos (rule, arity, f->fun_strictargs, &f->fun_strictresult,&strict_added, &warning);
+		UpdateStateInfosWithStrictInfos (rule, arity, f->fun_strictargs, &strict_added, &warning);
 
 		if (sdef->sdef_exported){
 			if (strict_added){

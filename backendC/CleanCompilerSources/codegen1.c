@@ -2550,7 +2550,6 @@ ImpRuleP create_simple_imp_rule (NodeP lhs_root,NodeP rhs_root,SymbDefP function
 	rule_alt->alt_rhs_root=rhs_root;
 	rule_alt->alt_rhs_defs=NULL;
 	rule_alt->alt_strict_node_ids=NULL;
-	rule_alt->alt_next=NULL;
 	rule_alt->alt_line=0;
 	rule_alt->alt_kind=Contractum;
 

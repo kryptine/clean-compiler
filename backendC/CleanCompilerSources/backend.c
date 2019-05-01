@@ -2295,7 +2295,6 @@ BERuleAlt (int line, BENodeDefP lhsDefs, BENodeP lhs, BENodeDefP rhsDefs, BEStri
 	alt->alt_strict_node_ids	= rhsStrictNodeIds;
 
 	/* +++ ifdef DEBUG */
-	alt->alt_next				= NULL;
 	number_of_node_ids=0;
 	/* endif DEBUG */
 
@@ -2320,7 +2319,6 @@ BECodeAlt (int line, BENodeDefP lhsDefs, BENodeP lhs, BECodeBlockP codeBlock)
 	alt->alt_strict_node_ids	= NULL;
 
 	/* +++ ifdef DEBUG */
-	alt->alt_next				= NULL;
 	number_of_node_ids=0;
 	/* endif DEBUG */
 
