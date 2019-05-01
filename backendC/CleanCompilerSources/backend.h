@@ -333,12 +333,6 @@ Clean (BEArgs :: BENodeP BEArgP BackEnd -> (BEArgP, BackEnd))
 BERuleAltP BERuleAlt (int line, BENodeDefP lhsDefs, BENodeP lhs, BENodeDefP rhsDefs, BEStrictNodeIdP lhsStrictNodeIds, BENodeP rhs);
 Clean (BERuleAlt :: Int BENodeDefP BENodeP BENodeDefP BEStrictNodeIdP BENodeP BackEnd -> (BERuleAltP, BackEnd))
 
-BERuleAltP BERuleAlts (BERuleAltP alt, BERuleAltP alts);
-Clean (BERuleAlts :: BERuleAltP BERuleAltP BackEnd -> (BERuleAltP, BackEnd))
-
-BERuleAltP BENoRuleAlts (void);
-Clean (BENoRuleAlts :: BackEnd -> (BERuleAltP, BackEnd))
-
 # define	BELhsNodeId	0
 # define	BERhsNodeId	1
 void BEDeclareNodeId (int sequenceNumber, int lhsOrRhs, CleanString name);

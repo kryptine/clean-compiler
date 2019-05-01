@@ -18,8 +18,6 @@
 # include "comsupport.h" 	/* CurrentModule */
 # include "buildtree.h"		/* TupleSymbol, ApplySymbol */
 
-extern void InitARC_Info (void); /* from typeconv.h */
-
 # include "backendsupport.h"
 # define Clean(ignore)
 
@@ -48,10 +46,6 @@ BEGetVersion (int *current, int *oldestDefinition, int *oldestImplementation)
 extern PolyList UserDefinedArrayFunctions;	/* typechecker.c */
 extern int StdOutReopened, StdErrorReopened; /* cocl.c */
 
-/*
-	Strings
-	=======
-*/
 static char *
 ConvertCleanString (CleanString string)
 {
@@ -65,10 +59,6 @@ ConvertCleanString (CleanString string)
 
 	return (copy);
 } /* ConvertCleanString */
-
-/*
-	Counting routines
-*/
 
 static short
 CountTypeArgs (BETypeArgP args)
@@ -1937,18 +1927,7 @@ BEPushNode (int arity, BESymbolP symbol, BEArgP arguments, BENodeIdListP nodeIds
 #endif
 	pushNode->node_node_ids		= nodeIds;
 	pushNode->node_number		= 0;
-/*
-	for (; nodeIds; nodeIds=nodeIds->nidl_next)
-	{
-		NodeIdP	nodeId;
-		
-		nodeId	= nodeIds->nidl_node_id;
 
-		Assert (nodeId->nid_ref_count_sign == -1);
-
-		nodeId->nid_refcount++;
-	}
-*/
 	Assert (arguments->arg_node->node_kind == NodeIdNode);
 	Assert (arguments->arg_node->node_node_id->nid_ref_count_sign == -1);
 
@@ -2377,23 +2356,6 @@ BECodeAlt (int line, BENodeDefP lhsDefs, BENodeP lhs, BECodeBlockP codeBlock)
 
 	return (alt);
 } /* BECodeAlt */
-
-
-BERuleAltP
-BERuleAlts (BERuleAltP alt, BERuleAltP alts)
-{
-	Assert (alt->alt_next == NULL);
-
-	alt->alt_next	= alts;
-
-	return (alt);
-} /* BERuleAlts*/
-
-BERuleAltP
-BENoRuleAlts (void)
-{
-	return (NULL);
-} /* BENoRuleAlts */
 
 static void
 DeclareFunctionC (char *name, int arity, int functionIndex, unsigned int ancestor)
@@ -3517,12 +3479,6 @@ BEArg (CleanString arg)
 
 		if (!ParseCommandArgs (gBEState.be_argc, gBEState.be_argv, &dummy, &dummy))
 			FatalCompError ("backend", "BEInit", "compilation aborted");
-
-	/*	FatalCompError ("backend", "BEInit", "FatalCompError in backend"); */
-	/*	ErrorInCompiler ("backend", "BEInit", "ErrorInCompiler in backend"); */
-	/*	StaticMessage (True, "<backend>", "StaticMessage (True) in backend"); */
-	/*	StaticMessage (False, "<backend>", "StaticMessage (False) in backend"); */
-	/*	*(int*)0L= 17; */
 	}
 } /* BEArg */
 
@@ -3641,7 +3597,6 @@ BEInit (int argc)
 
 	ClearOpenDefinitionModules ();
 
-	InitARC_Info ();
 	InitStatesGen ();
 	InitCoding ();
 	InitInstructions ();
