@@ -308,7 +308,6 @@ DeclareModule (int moduleIndex, char *name, Bool isSystemModule, int nFunctions,
 	symbols	+=	nFunctions;
 
 	module->bem_nTypes	= (unsigned int) nTypes;
-//	module->bem_types	= symbols;
 	{
 		/* +++ do this lazily */
 		int	i;
@@ -316,9 +315,7 @@ DeclareModule (int moduleIndex, char *name, Bool isSystemModule, int nFunctions,
 		module->bem_types	= (SymbolP *) ConvertAlloc (nTypes * sizeof (SymbolP));
 
 		for (i = 0; i < nTypes; i++)
-		{
 			module->bem_types [i]	= &symbols [i];
-		}
 	}
 	{
 		/* +++ change this */
@@ -336,7 +333,6 @@ DeclareModule (int moduleIndex, char *name, Bool isSystemModule, int nFunctions,
 	symbols	+=	nTypes;
 
 	module->bem_nConstructors	= (unsigned int) nConstructors;
-//	module->bem_constructors	= symbols;
 	{
 		/* +++ do this lazily */
 		int	i;
@@ -344,9 +340,7 @@ DeclareModule (int moduleIndex, char *name, Bool isSystemModule, int nFunctions,
 		module->bem_constructors	= (SymbolP *) ConvertAlloc (nConstructors * sizeof (SymbolP));
 
 		for (i = 0; i < nConstructors; i++)
-		{
 			module->bem_constructors [i]	= &symbols [i];
-		}
 	}
 	symbols	+=	nConstructors;
 
@@ -1027,20 +1021,10 @@ BEFieldSymbol (int fieldIndex, int moduleIndex)
 BESymbolP
 BEBoolSymbol (int value)
 {
-/* JVG: */
 	if (value)
 		return TrueSymbol;
 	else
 		return FalseSymbol;
-/*
-	SymbolP	symbol;
-	
-	symbol	= ConvertAllocType (SymbolS);
-	symbol->symb_kind	= bool_denot;
-	symbol->symb_bool	= value;
-
-	return (symbol);
-*/
 } /* BEBoolSymbol */
 
 BESymbolP
@@ -2136,7 +2120,7 @@ BEWildCardNodeId (void)
 } /* BEWildCardNodeId */
 
 BENodeDefP
-BENodeDef (int sequenceNumber, BENodeP node)
+BENodeDefList (int sequenceNumber, BENodeP node, BENodeDefP nodeDefs)
 {
 	NodeIdP		nodeId;
 	NodeDefP	nodeDef;
@@ -2163,22 +2147,10 @@ BENodeDef (int sequenceNumber, BENodeP node)
 
 	nodeDef->def_id		= nodeId;
 	nodeDef->def_node	= node;
-	/* ifdef DEBUG */
-	nodeDef->def_next	= NULL;
-	/* endif DEBUG */
-
-	return (nodeDef);
-} /* BENodeDef */
-
-BENodeDefP
-BENodeDefs (BENodeDefP nodeDef, BENodeDefP nodeDefs)
-{
-	Assert (nodeDef->def_next == NULL);
-
 	nodeDef->def_next	= nodeDefs;
 
-	return (nodeDef);
-} /* BENodeDefs */
+	return nodeDef;
+}
 
 BENodeDefP
 BENoNodeDefs (void)
@@ -2187,32 +2159,20 @@ BENoNodeDefs (void)
 } /* BENoNodeDefs */
 
 BEStrictNodeIdP
-BEStrictNodeId (BENodeIdP nodeId)
+BEStrictNodeIdList (BENodeIdP nodeId, BEStrictNodeIdP strictNodeIds)
 {
-	StrictNodeId	strictNodeId;
+	StrictNodeId strictNodeId;
 
-	strictNodeId	=	ConvertAllocType (struct strict_node_id);
-	strictNodeId->snid_node_id	= nodeId;
+	strictNodeId = ConvertAllocType (struct strict_node_id);
+	strictNodeId->snid_node_id = nodeId;
 
 	/* +++ remove this hack */
 	nodeId->nid_refcount--;
 
-	/* ifdef DEBUG */
-	strictNodeId->snid_next	= NULL;
-	/* endif */
-
-	return (strictNodeId);
-} /* BEStrictNodeId */
-
-BEStrictNodeIdP
-BEStrictNodeIds (BEStrictNodeIdP strictNodeId, BEStrictNodeIdP strictNodeIds)
-{
-	Assert (strictNodeId->snid_next == NULL);
-
 	strictNodeId->snid_next	= strictNodeIds;
 
-	return (strictNodeId);
-} /* BEStrictNodeIds */
+	return strictNodeId;
+}
 
 BEStrictNodeIdP
 BENoStrictNodeIds (void)
@@ -2734,23 +2694,13 @@ BEAbsType (BEFlatTypeP lhs)
 } /* BEAbsType */
 
 BEConstructorListP
-BEConstructors (BEConstructorListP constructor, BEConstructorListP constructors)
-{
-	Assert (constructor->cl_next == NULL);
-
-	constructor->cl_next	= constructors;
-
-	return (constructor);
-} /* BEConstructors */
-
-BEConstructorListP
 BENoConstructors (void)
 {
 	return (NULL);
 } /* BENoConstructors */
 
 BEConstructorListP
-BEConstructor (BETypeNodeP type)
+BEConstructorList (BETypeNodeP type, BEConstructorListP constructors)
 {
 	ConstructorList	constructor;
 	SymbDef			sdef;
@@ -2761,10 +2711,7 @@ BEConstructor (BETypeNodeP type)
 	sdef	= type->type_node_symbol->symb_def;
 
 	constructor	= ConvertAllocType (struct constructor_list);
-
-	/* ifdef DEBUG */
-	constructor->cl_next	= NULL;
-	/* endif */
+	constructor->cl_next = constructors;
 	constructor->cl_constructor	= type;
 
 	sdef->sdef_kind = CONSTRUCTOR;
@@ -2774,8 +2721,8 @@ BEConstructor (BETypeNodeP type)
 	sdef->sdef_type			= NULL;
 	/* endif */
 
-	return (constructor);
-} /* BEConstructor */
+	return constructor;
+}
 
 void
 BEDeclareField (int fieldIndex, int moduleIndex, CleanString name)
@@ -2809,7 +2756,7 @@ BEDeclareField (int fieldIndex, int moduleIndex, CleanString name)
 } /* BEDeclareField */
 
 BEFieldListP
-BEField (int fieldIndex, int moduleIndex, BETypeNodeP type)
+BEFieldList (int fieldIndex, int moduleIndex, BETypeNodeP type, BEFieldListP next_fields)
 {
 	SymbDef		sdef;
 	SymbolP		fields;
@@ -2825,9 +2772,7 @@ BEField (int fieldIndex, int moduleIndex, BETypeNodeP type)
 
 	field	= ConvertAllocType (struct field_list);
 
-	/* ifdef DEBUG */
-	field->fl_next	= NULL;
-	/* endif */
+	field->fl_next	= next_fields;
 	field->fl_symbol	= &fields [fieldIndex];
 	field->fl_type		= type;
 
@@ -2841,8 +2786,8 @@ BEField (int fieldIndex, int moduleIndex, BETypeNodeP type)
 	sdef->sdef_type			= NULL;
 	/* endif */
 
-	return (field);
-} /* BEField */
+	return field;
+}
 
 void
 BESetMemberTypeOfField (int fieldIndex, int moduleIndex, BETypeAltP typeAlt)
@@ -2911,16 +2856,6 @@ BESetInstanceFunctionOfFunction (int function_index,int instance_function_index)
 }
 
 BEFieldListP
-BEFields (BEFieldListP field, BEFieldListP fields)
-{
-	Assert (field->fl_next == NULL);
-
-	field->fl_next	= fields;
-
-	return (field);
-} /* BEFields */
-
-BEFieldListP
 BENoFields (void)
 {
 	return (NULL);
@@ -2986,29 +2921,17 @@ void BEInsertForeignExport (BESymbolP symbol_p,int stdcall)
 }
 
 BEStringListP
-BEString (CleanString cleanString)
+BEStringList (CleanString cleanString,BEStringListP strings)
 {
-	struct string_list	*string;
+	struct string_list *string;
 
-	string	= ConvertAllocType (struct string_list);
+	string = ConvertAllocType (struct string_list);
 
-	string->sl_string	= ConvertCleanString (cleanString);
-	/* ifdef DEBUG */
-	string->sl_next	= NULL;
-	/* endif */
-
-	return (string);
-} /* BEString */
-
-BEStringListP
-BEStrings (BEStringListP string, BEStringListP strings)
-{
-	Assert (string->sl_next == NULL);
-
+	string->sl_string = ConvertCleanString (cleanString);
 	string->sl_next	= strings;
 
-	return (string);
-} /* BEStringList*/
+	return string;
+}
 
 BEStringListP
 BENoStrings (void)
@@ -3016,31 +2939,18 @@ BENoStrings (void)
 	return (NULL);
 } /* BENoStrings */
 
-
 BENodeIdListP
-BENodeIdListElem (BENodeIdP nodeId)
+BENodeIdList (BENodeIdP nodeId, BENodeIdListP nids)
 {
 	struct node_id_list_element	*elem;
 
-	elem	= ConvertAllocType (struct node_id_list_element);
+	elem = ConvertAllocType (struct node_id_list_element);
 
 	elem->nidl_node_id	= nodeId;
-	/* ifdef DEBUG */
-	elem->nidl_next	= NULL;
-	/* endif */
+	elem->nidl_next	= nids;
 
-	return (elem);
-} /* BENodeIdListElem */
-
-BENodeIdListP
-BENodeIds (BENodeIdListP nid, BENodeIdListP nids)
-{
-	Assert (nid->nidl_next == NULL);
-
-	nid->nidl_next	= nids;
-
-	return (nid);
-} /* BENodeIds*/
+	return elem;
+}
 
 BENodeIdListP
 BENoNodeIds (void)
@@ -3078,7 +2988,7 @@ BEAnyCodeBlock (BECodeParameterP inParams, BECodeParameterP outParams, BEStringL
 } /* BEAnyCodeBlock */
 
 BECodeParameterP
-BECodeParameter (CleanString location, BENodeIdP nodeId)
+BECodeParameterList (CleanString location, BENodeIdP nodeId, BECodeParameterP parameters)
 {
 	Parameters	parameter;
 
@@ -3087,23 +2997,10 @@ BECodeParameter (CleanString location, BENodeIdP nodeId)
 	parameter->par_kind		= 0;
 	parameter->par_node_id	= nodeId;
 	parameter->par_loc		= Identifier (ConvertCleanString (location));
-
-	/* ifdef DEBUG */
-	parameter->par_next	= NULL;
-	/* endif */
-
-	return (parameter);
-} /* BECodeParameter */
-
-BECodeParameterP
-BECodeParameters (BECodeParameterP parameter, BECodeParameterP parameters)
-{
-	Assert (parameter->par_next == NULL);
-
 	parameter->par_next	= parameters;
 
-	return (parameter);
-} /* BECodeParameters */
+	return parameter;
+}
 
 BECodeParameterP
 BENoCodeParameters (void)
@@ -3357,24 +3254,6 @@ BEStrictPositions (int functionIndex, int *bits, int **positions)
 		*positions	= strict_positions->sp_bits;
 	}
 } /* BEStrictPositions */
-
-int
-BECopyInts  (int cLength, int *ints, int *cleanArray)
-{
-    int	cleanLength, truncate;
-
-	cleanLength	= cleanArray [-2];
-
-	truncate	= cleanLength < cLength;
-	if (truncate)
-		cLength	= cleanLength;
-
-	memcpy (cleanArray, ints, cLength * sizeof (int));
-
-	Assert (!truncate);
-
-	return (!truncate);
-} /* BECopyInts */
 
 int
 BEGetIntFromArray  (int index, int *ints)

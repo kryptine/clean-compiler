@@ -344,23 +344,17 @@ Clean (BENodeId :: Int BackEnd -> (BENodeIdP, BackEnd))
 BENodeIdP BEWildCardNodeId (void);
 Clean (BEWildCardNodeId :: BackEnd -> (BENodeIdP, BackEnd))
 
-BENodeDefP BENodeDef (int sequenceNumber, BENodeP node);
-Clean (BENodeDef :: Int BENodeP BackEnd -> (BENodeDefP, BackEnd))
+BENodeDefP BENodeDefList (int sequenceNumber, BENodeP node, BENodeDefP nodeDefs);
+Clean (BENodeDefList :: Int BENodeP BENodeDefP BackEnd -> (BENodeDefP, BackEnd))
 
 BENodeDefP BENoNodeDefs (void);
 Clean (BENoNodeDefs :: BackEnd -> (BENodeDefP, BackEnd))
 
-BENodeDefP BENodeDefs (BENodeDefP nodeDef, BENodeDefP nodeDefs);
-Clean (BENodeDefs :: BENodeDefP BENodeDefP BackEnd -> (BENodeDefP, BackEnd))
-
-BEStrictNodeIdP BEStrictNodeId (BENodeIdP nodeId);
-Clean (BEStrictNodeId :: BENodeIdP BackEnd -> (BEStrictNodeIdP, BackEnd))
+BEStrictNodeIdP BEStrictNodeIdList (BENodeIdP nodeId, BEStrictNodeIdP strictNodeIds);
+Clean (BEStrictNodeIdList :: BENodeIdP BEStrictNodeIdP BackEnd -> (BEStrictNodeIdP, BackEnd))
 
 BEStrictNodeIdP BENoStrictNodeIds (void);
 Clean (BENoStrictNodeIds :: BackEnd -> (BEStrictNodeIdP, BackEnd))
-
-BEStrictNodeIdP BEStrictNodeIds (BEStrictNodeIdP strictNodeId, BEStrictNodeIdP strictNodeIds);
-Clean (BEStrictNodeIds :: BEStrictNodeIdP BEStrictNodeIdP BackEnd -> (BEStrictNodeIdP, BackEnd))
 
 # define	BEIsNotACaf	0
 # define	BEIsACaf	1
@@ -397,20 +391,17 @@ Clean (BERecordType :: Int BEFlatTypeP BETypeNodeP Int BEFieldListP BackEnd -> B
 void BEAbsType (BEFlatTypeP lhs);
 Clean (BEAbsType :: BEFlatTypeP BackEnd -> BackEnd)
 
-BEConstructorListP BEConstructors (BEConstructorListP constructor, BEConstructorListP constructors);
-Clean (BEConstructors:: BEConstructorListP BEConstructorListP BackEnd -> (BEConstructorListP, BackEnd))
-
 BEConstructorListP BENoConstructors (void);
 Clean (BENoConstructors:: BackEnd -> (BEConstructorListP, BackEnd))
 
-BEConstructorListP BEConstructor (BETypeNodeP type);
-Clean (BEConstructor:: BETypeNodeP BackEnd -> (BEConstructorListP, BackEnd))
+BEConstructorListP BEConstructorList (BETypeNodeP type, BEConstructorListP constructors);
+Clean (BEConstructorList:: BETypeNodeP BEConstructorListP BackEnd -> (BEConstructorListP, BackEnd))
 
 void BEDeclareField (int fieldIndex, int moduleIndex, CleanString name);
 Clean (BEDeclareField :: Int Int String BackEnd -> BackEnd)
 
-BEFieldListP BEField (int fieldIndex, int moduleIndex, BETypeNodeP type);
-Clean (BEField :: Int Int BETypeNodeP BackEnd -> (BEFieldListP, BackEnd))
+BEFieldListP BEFieldList (int fieldIndex, int moduleIndex, BETypeNodeP type, BEFieldListP next_fields);
+Clean (BEFieldList :: Int Int BETypeNodeP BEFieldListP BackEnd -> (BEFieldListP, BackEnd))
 
 void BESetMemberTypeOfField (int fieldIndex, int moduleIndex, BETypeAltP typeAlt);
 Clean (BESetMemberTypeOfField :: Int Int BETypeAltP BackEnd -> BackEnd)
@@ -420,9 +411,6 @@ Clean (BESetDictionaryFieldOfMember :: Int Int Int BackEnd -> (Int,BackEnd))
 
 void BESetInstanceFunctionOfFunction (int function_index,int instance_function_index);
 Clean (BESetInstanceFunctionOfFunction :: Int Int BackEnd -> BackEnd)
-
-BEFieldListP BEFields (BEFieldListP field, BEFieldListP fields);
-Clean (BEFields:: BEFieldListP BEFieldListP BackEnd -> (BEFieldListP, BackEnd))
 
 BEFieldListP BENoFields (void);
 Clean (BENoFields:: BackEnd -> (BEFieldListP, BackEnd))
@@ -442,29 +430,20 @@ Clean (BEStartFunction :: Int BackEnd -> BackEnd)
 BERuleAltP BECodeAlt (int line, BENodeDefP lhsDefs, BENodeP lhs, BECodeBlockP codeBlock);
 Clean (BECodeAlt:: Int BENodeDefP BENodeP BECodeBlockP BackEnd -> (BERuleAltP, BackEnd))
 
-BEStringListP BEString (CleanString cleanString);
-Clean (BEString:: String BackEnd -> (BEStringListP, BackEnd))
-
-BEStringListP BEStrings (BEStringListP string, BEStringListP strings);
-Clean (BEStrings:: BEStringListP BEStringListP BackEnd -> (BEStringListP, BackEnd))
+BEStringListP BEStringList (CleanString cleanString, BEStringListP strings);
+Clean (BEStringList:: String BEStringListP BackEnd -> (BEStringListP, BackEnd))
 
 BEStringListP BENoStrings (void);
 Clean (BENoStrings:: BackEnd -> (BEStringListP, BackEnd))
 
-BECodeParameterP BECodeParameter (CleanString location, BENodeIdP nodeId);
-Clean (BECodeParameter:: String BENodeIdP BackEnd -> (BECodeParameterP, BackEnd))
-
-BECodeParameterP BECodeParameters (BECodeParameterP parameter, BECodeParameterP parameters);
-Clean (BECodeParameters:: BECodeParameterP BECodeParameterP BackEnd -> (BECodeParameterP, BackEnd))
+BECodeParameterP BECodeParameterList (CleanString location, BENodeIdP nodeId, BECodeParameterP parameters);
+Clean (BECodeParameterList:: String BENodeIdP BECodeParameterP BackEnd -> (BECodeParameterP, BackEnd))
 
 BECodeParameterP BENoCodeParameters (void);
 Clean (BENoCodeParameters:: BackEnd -> (BECodeParameterP, BackEnd))
 
-BENodeIdListP BENodeIdListElem (BENodeIdP nodeId);
-Clean (BENodeIdListElem:: BENodeIdP BackEnd -> (BENodeIdListP, BackEnd))
-
-BENodeIdListP BENodeIds (BENodeIdListP nid, BENodeIdListP nids);
-Clean (BENodeIds:: BENodeIdListP BENodeIdListP BackEnd -> (BENodeIdListP, BackEnd))
+BENodeIdListP BENodeIdList (BENodeIdP nodeId, BENodeIdListP nids);
+Clean (BENodeIdList:: BENodeIdP BENodeIdListP BackEnd -> (BENodeIdListP, BackEnd))
 
 BENodeIdListP BENoNodeIds (void);
 Clean (BENoNodeIds:: BackEnd -> (BENodeIdListP, BackEnd))
@@ -516,8 +495,6 @@ Clean (BESetMainDclModuleN :: Int BackEnd -> BackEnd)
 
 void BEStrictPositions (int functionIndex, int *bits, int **positions);
 Clean (BEStrictPositions :: Int BackEnd -> (Int, Int, BackEnd))
-
-int BECopyInts  (int cLength, int *ints, int *cleanArray);
 
 int BEGetIntFromArray  (int index, int *ints);
 

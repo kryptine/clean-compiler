@@ -467,19 +467,6 @@ typeToClass {dtci_iclModuleIndex, dtci_iclModule, dtci_dclModules} {type_ident, 
 		nIclClasses
 			=	size dtci_iclModule.icl_common.com_class_defs
 
-/*
-copyInts :: !Int !Int -> {#Int}
-copyInts length cArray
-    = code {
-    		push_b 0
-            create_array_ INT 0 1
-  
-            push_a  0
-            ccall   BECopyInts "IIA-I"
-            pop_b   1
-	}
-*/
-
 copyInts :: !Int !Int -> {#Int}
 copyInts length cArray
     = {BEGetIntFromArray i cArray \\ i<-[0..length-1]}
