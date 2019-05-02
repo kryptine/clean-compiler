@@ -345,7 +345,7 @@ BENodeIdP BEWildCardNodeId (void);
 Clean (BEWildCardNodeId :: BackEnd -> (BENodeIdP, BackEnd))
 
 BENodeDefP BENodeDefList (int sequenceNumber, BENodeP node, BENodeDefP nodeDefs);
-Clean (BENodeDef :: Int BENodeP BENodeDefP BackEnd -> (BENodeDefP, BackEnd))
+Clean (BENodeDefList :: Int BENodeP BENodeDefP BackEnd -> (BENodeDefP, BackEnd))
 
 BENodeDefP BENoNodeDefs (void);
 Clean (BENoNodeDefs :: BackEnd -> (BENodeDefP, BackEnd))
