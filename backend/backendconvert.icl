@@ -94,41 +94,6 @@ beApFunction2 f m1 m2
 	:== m1 ==> \a1
 	->	m2 ==> \a2
 	->	appBackEnd (f a1 a2)
-beApFunction3 f m1 m2 m3
-	:== m1 ==> \a1
-	->	m2 ==> \a2
-	->	m3 ==> \a3
-	->	appBackEnd (f a1 a2 a3)
-beApFunction4 f m1 m2 m3 m4
-	:== m1 ==> \a1
-	->	m2 ==> \a2
-	->	m3 ==> \a3
-	->	m4 ==> \a4
-	->	appBackEnd (f a1 a2 a3 a4)
-beApFunction5 f m1 m2 m3 m4 m5
-	:== m1 ==> \a1
-	->	m2 ==> \a2
-	->	m3 ==> \a3
-	->	m4 ==> \a4
-	->	m5 ==> \a5
-	->	appBackEnd (f a1 a2 a3 a4 a5)
-beApFunction6 f m1 m2 m3 m4 m5 m6
-	:== m1 ==> \a1
-	->	m2 ==> \a2
-	->	m3 ==> \a3
-	->	m4 ==> \a4
-	->	m5 ==> \a5
-	->	m6 ==> \a6
-	->	appBackEnd (f a1 a2 a3 a4 a5 a6)
-beApFunction7 f m1 m2 m3 m4 m5 m6 m7
-	:== m1 ==> \a1
-	->	m2 ==> \a2
-	->	m3 ==> \a3
-	->	m4 ==> \a4
-	->	m5 ==> \a5
-	->	m6 ==> \a6
-	->	m7 ==> \a7
-	->	appBackEnd (f a1 a2 a3 a4 a5 a6 a7)
 
 beFunction0 f
 	:== accBackEnd f
@@ -234,24 +199,14 @@ beTypeAlt
 	:==	beFunction2 BETypeAlt
 beRule index isCaf
 	:==	beFunction2 (BERule index isCaf)
-beNodeDef sequenceNumber
-	:==	beFunction1 (BENodeDef sequenceNumber)
 beNoNodeDefs
 	:==	beFunction0 BENoNodeDefs
-beNodeDefs
-	:==	beFunction2 BENodeDefs
-beStrictNodeId
-	:==	beFunction1 BEStrictNodeId
 beNoStrictNodeIds
 	:==	beFunction0 BENoStrictNodeIds
-beStrictNodeIds
-	:==	beFunction2 BEStrictNodeIds
 beNodeIdNode
 	:==	beFunction2 BENodeIdNode
 beNodeId sequenceNumber
 	:==	beFunction0 (BENodeId sequenceNumber)
-beConstructor
-	:==	beFunction1 BEConstructor
 beNoConstructors
 	:==	beFunction0 BENoConstructors
 beAnnotateTypeNode annotation
@@ -264,16 +219,10 @@ beDefineRuleType functionIndex moduleIndex
 	:==	beApFunction1 (BEDefineRuleType functionIndex moduleIndex)
 beCodeAlt lineNumber
 	:==	beFunction3 (BECodeAlt lineNumber)
-beString string
-	:==	beFunction0 (BEString string)
-beStrings
-	:==	beFunction2 BEStrings
+beStringList string strings
+	:==	beFunction0 (BEStringList string strings)
 beNoStrings
 	:==	beFunction0 BENoStrings
-beCodeParameter location
-	:==	beFunction1 (BECodeParameter location)
-beCodeParameters
-	:==	beFunction2 BECodeParameters
 beNoCodeParameters
 	:==	beFunction0 BENoCodeParameters
 beAbcCodeBlock inline
@@ -304,10 +253,6 @@ beDefaultNode
 	:==	beFunction3 BEDefaultNode
 beNoNodeIds
 	:==	beFunction0 BENoNodeIds
-beNodeIds
-	:==	beFunction2 BENodeIds
-beNodeIdListElem
-	:==	beFunction1 BENodeIdListElem
 beBindSpecialModule specialIdentIndex moduleIndex
 	:== beApFunction0 (BEBindSpecialModule specialIdentIndex moduleIndex)
 beBindSpecialFunction specialIdentIndex functionIndex moduleIndex
@@ -343,25 +288,6 @@ backEndConvertModulesH predefs {fe_icl =
 
 	#  currentDcl
 	   	=	fe_dcls.[main_dcl_module_n]
-/*
-	#  backEnd
-		=	backEnd ->>
-				(	"dcl conversions"
-				,	currentDcl.dcl_conversions
-				,	"dcl constructors"
-				,	[constructor.cons_ident.id_name \\ constructor <-: currentDcl.dcl_common.com_cons_defs]
-				,	"dcl selectors"
-				,	[selector.sd_ident.id_name \\ selector <-: currentDcl.dcl_common.com_selector_defs]
-				,	"dcl types"
-				,	[type.td_ident.id_name \\ type <-: currentDcl.dcl_common.com_type_defs]
-				,	"icl constructors"
-				,	[constructor.cons_ident.id_name \\ constructor <-: icl_common.com_cons_defs]
-				,	"icl selectors"
-				,	[selector.sd_ident.id_name \\ selector <-: icl_common.com_selector_defs]
-				,	"icl types"
-				,	[type.td_ident.id_name \\ type <-: icl_common.com_type_defs]
-				)
-*/
 	#! backEnd
 		=	declareCurrentDclModule fe_icl fe_dcls.[main_dcl_module_n] main_dcl_module_n (backEnd -*-> "declareCurrentDclModule")
 	#! backEnd
@@ -777,7 +703,7 @@ declareFunType moduleIndex ranges functionIndex {ft_ident, ft_type_ptr}
 			functionName name functionIndex ranges 
 				| index_in_ranges functionIndex ranges
 					=	name
-					=	(name +++ ";" +++ toString functionIndex)
+					=	name +++ ";" +++ toString functionIndex
 				where
 					index_in_ranges index [{ir_from, ir_to}:ranges]
 						= (index>=ir_from && index < ir_to) || index_in_ranges index ranges;
@@ -922,24 +848,21 @@ convertConstructors typeIndex typeName moduleIndex cons_defs symbols type_var_he
 where
 	convert_constructors [a:x] type_var_heap beState
 		# (constructors,type_var_heap,beState) = convert_constructors x type_var_heap beState
-		  (constructor,type_var_heap,beState) = convertConstructor typeIndex typeName moduleIndex cons_defs a type_var_heap beState
-		  (constructors,beState) = accBackEnd (BEConstructors constructor constructors) beState
-		= (constructors,type_var_heap,beState)
+		= convertConstructor typeIndex typeName moduleIndex cons_defs a constructors type_var_heap beState
 	convert_constructors [] type_var_heap beState
 		# (constructors,beState) = beNoConstructors beState
 		= (constructors,type_var_heap,beState)
 
-convertConstructor :: Int {#Char} ModuleIndex {#ConsDef} DefinedSymbol !*TypeVarHeap !*BackEndState
-											   -> (!BEConstructorListP,!*TypeVarHeap,!*BackEndState)
-convertConstructor typeIndex typeName moduleIndex constructorDefs {ds_index} type_var_heap bes
+convertConstructor :: Int {#Char} ModuleIndex {#ConsDef} DefinedSymbol !BEConstructorListP !*TypeVarHeap !*BackEndState
+																   -> (!BEConstructorListP,!*TypeVarHeap,!*BackEndState)
+convertConstructor typeIndex typeName moduleIndex constructorDefs {ds_index} constructors type_var_heap bes
 	# (constructorType,bes) = constructorTypeFunction bes
 	  bes = appBackEnd (BEDeclareConstructor ds_index moduleIndex constructorDef.cons_ident.id_name) bes // +++ remove declare
 	  (atype_args,type_var_heap,bes) = convertTypeDefAnnotatedTypeArgs constructorType.st_args constructorType.st_args_strictness type_var_heap bes
-	  (constructor,bes)
-		= beConstructor
-			(beConstructorSymbol moduleIndex ds_index ==> \ constructor_symbol ->
-			 accBackEnd (BENormalTypeNode constructor_symbol atype_args)) bes
-	= (constructor,type_var_heap,bes)
+	  (constructor_symbol,bes) = beConstructorSymbol moduleIndex ds_index bes
+	  (type_node,bes) = accBackEnd (BENormalTypeNode constructor_symbol atype_args) bes
+	  (constructors,bes) = accBackEnd (BEConstructorList type_node constructors) bes
+	= (constructors,type_var_heap,bes)
 	where
 		constructorDef
 			=	constructorDefs.[ds_index]
@@ -961,18 +884,15 @@ where
 			# (field_list_p,bes) = accBackEnd BENoFields bes
 			= (field_list_p,type_var_heap,bes)
 			# (field_list_p,type_var_heap,bes) = convert_selectors (index+1) type_var_heap bes
-			  (single_field_list_p,type_var_heap,bes)
-				= convertSelector moduleIndex selectors (arg_is_strict index strictness) symbols.[index] type_var_heap bes
-			  (field_list_p,bes) = accBackEnd (BEFields single_field_list_p field_list_p) bes
-			= (field_list_p,type_var_heap,bes)
+			= convertSelector moduleIndex selectors (arg_is_strict index strictness) symbols.[index] field_list_p type_var_heap bes
 
-convertSelector :: ModuleIndex {#SelectorDef} Bool FieldSymbol !*TypeVarHeap !*BackEndState -> (!BEFieldListP,!*TypeVarHeap,!*BackEndState)
-convertSelector moduleIndex selectorDefs is_strict {fs_index} type_var_heap bes
+convertSelector :: ModuleIndex {#SelectorDef} Bool FieldSymbol !BEFieldListP !*TypeVarHeap !*BackEndState -> (!BEFieldListP,!*TypeVarHeap,!*BackEndState)
+convertSelector moduleIndex selectorDefs is_strict {fs_index} field_list_p type_var_heap bes
 	# selectorDef = selectorDefs.[fs_index]
 	  (field_type,bes) = selectorTypeFunction selectorDef bes
 	  (type_node_p,type_var_heap,bes) = convertTypeDefAnnotAndTypeNode (if is_strict AN_Strict AN_None) field_type type_var_heap bes
 	  bes = appBackEnd (BEDeclareField fs_index moduleIndex selectorDef.sd_ident.id_name) bes
-	  (field_list_p,bes) = accBackEnd (BEField fs_index moduleIndex type_node_p) bes
+	  (field_list_p,bes) = accBackEnd (BEFieldList fs_index moduleIndex type_node_p field_list_p) bes
 	= (field_list_p,type_var_heap,bes)
 	where
 		selectorTypeFunction :: !SelectorDef !*BackEndState -> *(!AType,!*BackEndState)
@@ -995,22 +915,17 @@ where
 			= (field_list_p,type_var_heap,bes)
 			# (field_list_p,type_var_heap,bes) = convert_dictionary_selectors (index+1) type_var_heap bes
 			| index<size_class_members
-				# (single_field_list_p,type_var_heap,bes)
-					= convertMemberSelector moduleIndex selectors (arg_is_strict index strictness) symbols.[index] type_var_heap bes
-				  (field_list_p,bes) = accBackEnd (BEFields single_field_list_p field_list_p) bes
-				= (field_list_p,type_var_heap,bes)
-				# (single_field_list_p,type_var_heap,bes)
-					= convertSelector moduleIndex selectors (arg_is_strict index strictness) symbols.[index] type_var_heap bes
-				  (field_list_p,bes) = accBackEnd (BEFields single_field_list_p field_list_p) bes
-				= (field_list_p,type_var_heap,bes)
+				= convertMemberSelector moduleIndex selectors (arg_is_strict index strictness) symbols.[index] field_list_p type_var_heap bes
+				= convertSelector moduleIndex selectors (arg_is_strict index strictness) symbols.[index] field_list_p type_var_heap bes
 
-convertMemberSelector :: ModuleIndex {#SelectorDef} Bool FieldSymbol !*TypeVarHeap !*BackEndState -> (!BEFieldListP,!*TypeVarHeap,!*BackEndState)
-convertMemberSelector moduleIndex selectorDefs is_strict {fs_index} type_var_heap bes
+convertMemberSelector :: ModuleIndex {#SelectorDef} Bool FieldSymbol !BEFieldListP !*TypeVarHeap !*BackEndState -> (!BEFieldListP,!*TypeVarHeap,!*BackEndState)
+convertMemberSelector moduleIndex selectorDefs is_strict {fs_index} field_list_p type_var_heap bes
+//convertMemberSelector moduleIndex selectorDefs is_strict {fs_index,fs_ident} type_var_heap bes
 	# selectorDef = selectorDefs.[fs_index]
 	  (field_type,optional_type_alt_p,bes) = selectorTypeFunction selectorDef bes
 	  (field_type,type_var_heap,bes) = convertTypeDefAnnotAndTypeNode (if is_strict AN_Strict AN_None) field_type type_var_heap bes
 	  bes = appBackEnd (BEDeclareField fs_index moduleIndex selectorDef.sd_ident.id_name) bes
-	  (field_list_p,bes) = accBackEnd (BEField fs_index moduleIndex field_type) bes
+	  (field_list_p,bes) = accBackEnd (BEFieldList fs_index moduleIndex field_type field_list_p) bes
 	= case optional_type_alt_p of
 		No
 			-> (field_list_p,type_var_heap,bes)
@@ -1134,7 +1049,7 @@ predefineSymbols {dcl_common} predefs
 		define_unit_type
 			# constructor_symbol_be_f = BEConstructorSymbol predefs.[PD_UnitConsSymbol].pds_def cPredefinedModuleIndex
 			  type_be_f = @^^ BENormalTypeNode constructor_symbol_be_f BENoTypeArgs
-			  constructors_be_f = @^^ BEConstructors (@^ BEConstructor type_be_f) BENoConstructors
+			  constructors_be_f = @^^ BEConstructorList type_be_f BENoConstructors
 			  type_symbol_be_f = BETypeSymbol predefs.[PD_UnitType].pds_def cPredefinedModuleIndex
 			  flat_type_be_f = @^^ BEFlatType type_symbol_be_f (^= BENoUniAttr)
 			= appBackEnd
@@ -1778,11 +1693,12 @@ convertBackEndLhs functionIndex patterns main_dcl_module_n
 
 convertStrings :: [{#Char}] -> BEMonad BEStringListP
 convertStrings strings
-	=	sfoldr (beStrings o beString) beNoStrings strings
- 
+	=	sfoldr (\s -> beFunction1 (BEStringList s)) beNoStrings strings
+
 convertCodeParameters :: (CodeBinding a) -> BEMonad BECodeParameterP | varInfoPtr a
 convertCodeParameters codeParameters
-	=	sfoldr (beCodeParameters o convertCodeParameter) beNoCodeParameters codeParameters
+	=	sfoldr (\ {bind_src,bind_dst} -> beFunction2 (BECodeParameterList bind_src) (convertVar (varInfoPtr bind_dst)))
+				beNoCodeParameters codeParameters
 
 class varInfoPtr a :: a -> VarInfoPtr
 
@@ -1793,10 +1709,6 @@ instance varInfoPtr BoundVar where
 instance varInfoPtr FreeVar where
 	varInfoPtr freeVar
 		=	freeVar.fv_info_ptr
-
-convertCodeParameter :: (Bind String a) -> BEMonad BECodeParameterP | varInfoPtr a
-convertCodeParameter {bind_src, bind_dst}
-		=	beCodeParameter bind_src (convertVar (varInfoPtr bind_dst))
 
 convertPatterns :: [FunctionPattern] -> BEMonad BEArgP
 convertPatterns patterns
@@ -1845,11 +1757,9 @@ convertRootExpr aliasDummyId (Conditional {if_cond=cond, if_then=then, if_else=N
 				beNoNodeDefs
 				beNoStrictNodeIds
 				(beNormalNode (beBasicSymbol BEFailSymb) beNoArgs)
-convertRootExpr aliasDummyId (Case kees=:{case_expr, case_guards}) main_dcl_module_n
+convertRootExpr aliasDummyId (Case kees=:{case_expr=Var var, case_guards}) main_dcl_module_n
 	=	beSwitchNode (convertVar var.var_info_ptr) (convertCases case_guards aliasDummyId var (defaultCase kees) main_dcl_module_n)
 	where
-		var = caseVar case_expr
-
 		defaultCase {case_default=Yes defaul} 
 			=	DefaultCase defaul
 		defaultCase {case_explicit, case_default=No, case_ident}
@@ -1906,12 +1816,9 @@ convertRhsNodeDefs aliasDummyId expr main_dcl_module_n
 where
 	convertNodeDefs :: [LetBind] -> BEMonad BENodeDefP
 	convertNodeDefs binds
-		=	sfoldr (beNodeDefs o convertNodeDef) beNoNodeDefs binds
-		where
-			convertNodeDef :: !LetBind -> BEMonad BENodeDefP
-			convertNodeDef {lb_src=expr, lb_dst=freeVar}
-				= \be0 -> let (variable_sequence_number,be) = getVariableSequenceNumber freeVar.fv_info_ptr be0 in
-					beNodeDef variable_sequence_number (convertExpr expr main_dcl_module_n) be
+		= sfoldr (\ {lb_src=expr,lb_dst=freeVar}
+					-> beFunction3 BENodeDefList (getVariableSequenceNumber freeVar.fv_info_ptr) (convertExpr expr main_dcl_module_n))
+				 beNoNodeDefs binds
 
 collectStrictNodeIds :: Expression -> [FreeVar]
 collectStrictNodeIds (Let {let_strict_binds, let_expr})
@@ -1919,13 +1826,9 @@ collectStrictNodeIds (Let {let_strict_binds, let_expr})
 collectStrictNodeIds _
 	=	[]
 
-convertStrictNodeId :: FreeVar -> BEMonad BEStrictNodeIdP
-convertStrictNodeId freeVar
-	=	beStrictNodeId (convertVar freeVar.fv_info_ptr)
-
 convertStrictNodeIds :: [FreeVar] -> BEMonad BEStrictNodeIdP
 convertStrictNodeIds freeVars
-	=	sfoldr (beStrictNodeIds o convertStrictNodeId) beNoStrictNodeIds freeVars
+	=	sfoldr (\ {fv_info_ptr} -> beFunction2 BEStrictNodeIdList (convertVar fv_info_ptr)) beNoStrictNodeIds freeVars
 
 convertRhsStrictNodeIds :: Expression -> BEMonad BEStrictNodeIdP
 convertRhsStrictNodeIds expression
@@ -2119,12 +2022,6 @@ where
 				replace_select_by_uselect [selection:selections]
 					= [selection:replace_select_by_uselect selections]
 
-caseVar :: Expression -> BoundVar
-caseVar (Var var)
-	=	var
-caseVar expr
-	=	undef // <<- ("backendconvert, caseVar: unknown expression", expr)
-
 :: DefaultCase
 	=	DefaultCase Expression
 	|	DefaultCaseFail !Ident
@@ -2290,11 +2187,7 @@ where
 
 convertPatternVars :: [FreeVar] -> BEMonad BENodeIdListP
 convertPatternVars vars
-	=	sfoldr (beNodeIds o convertPatternVar) beNoNodeIds vars
-
-convertPatternVar :: FreeVar -> BEMonad BENodeIdListP
-convertPatternVar freeVar
-	=	beNodeIdListElem (convertVar freeVar.fv_info_ptr)
+	=	sfoldr (\ {fv_info_ptr} -> beFunction2 BENodeIdList (convertVar fv_info_ptr)) beNoNodeIds vars
 
 convertDefaultCase DefaultCaseNone _ _
 	=	beNoArgs

@@ -22,8 +22,6 @@ implementation module backend;
 :: BEStringListP :== CPtr;
 :: BENodeIdListP :== CPtr;
 :: BENodeIdRefCountListP :== CPtr;
-:: BEUniVarEquations :== CPtr;
-:: BEAttributeKindList :== CPtr;
 :: BEAnnotation :== Int;
 :: BEAttribution :== Int;
 :: BESymbKind :== Int;
@@ -397,11 +395,11 @@ BEWildCardNodeId a0 = code {
 }
 // BENodeIdP BEWildCardNodeId ();
 
-BENodeDef :: !Int !BENodeP !BackEnd -> (!BENodeDefP,!BackEnd);
-BENodeDef a0 a1 a2 = code {
-	ccall BENodeDef "Ip:p:p"
+BENodeDefList :: !Int !BENodeP !BENodeDefP !BackEnd -> (!BENodeDefP,!BackEnd);
+BENodeDefList a0 a1 a2 a3 = code {
+	ccall BENodeDefList "Ipp:p:p"
 }
-// BENodeDefP BENodeDef (int sequenceNumber,BENodeP node);
+// BENodeDefP BENodeDefList (int sequenceNumber,BENodeP node,BENodeDefP nodeDefs);
 
 BENoNodeDefs :: !BackEnd -> (!BENodeDefP,!BackEnd);
 BENoNodeDefs a0 = code {
@@ -409,29 +407,17 @@ BENoNodeDefs a0 = code {
 }
 // BENodeDefP BENoNodeDefs ();
 
-BENodeDefs :: !BENodeDefP !BENodeDefP !BackEnd -> (!BENodeDefP,!BackEnd);
-BENodeDefs a0 a1 a2 = code {
-	ccall BENodeDefs "pp:p:p"
+BEStrictNodeIdList :: !BENodeIdP !BEStrictNodeIdP !BackEnd -> (!BEStrictNodeIdP,!BackEnd);
+BEStrictNodeIdList a0 a1 a2 = code {
+	ccall BEStrictNodeIdList "pp:p:p"
 }
-// BENodeDefP BENodeDefs (BENodeDefP nodeDef,BENodeDefP nodeDefs);
-
-BEStrictNodeId :: !BENodeIdP !BackEnd -> (!BEStrictNodeIdP,!BackEnd);
-BEStrictNodeId a0 a1 = code {
-	ccall BEStrictNodeId "p:p:p"
-}
-// BEStrictNodeIdP BEStrictNodeId (BENodeIdP nodeId);
+// BEStrictNodeIdP BEStrictNodeIdList (BENodeIdP nodeId,BEStrictNodeIdP strictNodeIds);
 
 BENoStrictNodeIds :: !BackEnd -> (!BEStrictNodeIdP,!BackEnd);
 BENoStrictNodeIds a0 = code {
 	ccall BENoStrictNodeIds ":p:p"
 }
 // BEStrictNodeIdP BENoStrictNodeIds ();
-
-BEStrictNodeIds :: !BEStrictNodeIdP !BEStrictNodeIdP !BackEnd -> (!BEStrictNodeIdP,!BackEnd);
-BEStrictNodeIds a0 a1 a2 = code {
-	ccall BEStrictNodeIds "pp:p:p"
-}
-// BEStrictNodeIdP BEStrictNodeIds (BEStrictNodeIdP strictNodeId,BEStrictNodeIdP strictNodeIds);
 
 BERule :: !Int !Int !BETypeAltP !BERuleAltP !BackEnd -> (!BEImpRuleP,!BackEnd);
 BERule a0 a1 a2 a3 a4 = code {
@@ -499,11 +485,11 @@ BEAbsType a0 a1 = code {
 }
 // void BEAbsType (BEFlatTypeP lhs);
 
-BEConstructors :: !BEConstructorListP !BEConstructorListP !BackEnd -> (!BEConstructorListP,!BackEnd);
-BEConstructors a0 a1 a2 = code {
-	ccall BEConstructors "pp:p:p"
+BEConstructorList :: !BETypeNodeP !BEConstructorListP !BackEnd -> (!BEConstructorListP,!BackEnd);
+BEConstructorList a0 a1 a2 = code {
+	ccall BEConstructorList "pp:p:p"
 }
-// BEConstructorListP BEConstructors (BEConstructorListP constructor,BEConstructorListP constructors);
+// BEConstructorListP BEConstructorList (BETypeNodeP type,BEConstructorListP constructors);
 
 BENoConstructors :: !BackEnd -> (!BEConstructorListP,!BackEnd);
 BENoConstructors a0 = code {
@@ -511,23 +497,17 @@ BENoConstructors a0 = code {
 }
 // BEConstructorListP BENoConstructors ();
 
-BEConstructor :: !BETypeNodeP !BackEnd -> (!BEConstructorListP,!BackEnd);
-BEConstructor a0 a1 = code {
-	ccall BEConstructor "p:p:p"
-}
-// BEConstructorListP BEConstructor (BETypeNodeP type);
-
 BEDeclareField :: !Int !Int !String !BackEnd -> BackEnd;
 BEDeclareField a0 a1 a2 a3 = code {
 	ccall BEDeclareField "IIS:V:p"
 }
 // void BEDeclareField (int fieldIndex,int moduleIndex,CleanString name);
 
-BEField :: !Int !Int !BETypeNodeP !BackEnd -> (!BEFieldListP,!BackEnd);
-BEField a0 a1 a2 a3 = code {
-	ccall BEField "IIp:p:p"
+BEFieldList :: !Int !Int !BETypeNodeP !BEFieldListP !BackEnd -> (!BEFieldListP,!BackEnd);
+BEFieldList a0 a1 a2 a3 a4 = code {
+	ccall BEFieldList "IIpp:p:p"
 }
-// BEFieldListP BEField (int fieldIndex,int moduleIndex,BETypeNodeP type);
+// BEFieldListP BEField (int fieldIndex,int moduleIndex,BETypeNodeP type,BEFieldListP fields);
 
 BESetMemberTypeOfField :: !Int !Int !BETypeAltP !BackEnd -> BackEnd;
 BESetMemberTypeOfField a0 a1 a2 a3 = code {
@@ -546,12 +526,6 @@ BESetInstanceFunctionOfFunction a0 a1 a2 = code {
 	ccall BESetInstanceFunctionOfFunction "II:V:p"
 }
 // void BESetInstanceFunctionOfFunction (int function_index, int instance_function_index);
-
-BEFields :: !BEFieldListP !BEFieldListP !BackEnd -> (!BEFieldListP,!BackEnd);
-BEFields a0 a1 a2 = code {
-	ccall BEFields "pp:p:p"
-}
-// BEFieldListP BEFields (BEFieldListP field,BEFieldListP fields);
 
 BENoFields :: !BackEnd -> (!BEFieldListP,!BackEnd);
 BENoFields a0 = code {
@@ -589,17 +563,11 @@ BECodeAlt a0 a1 a2 a3 a4 = code {
 }
 // BERuleAltP BECodeAlt (int line,BENodeDefP lhsDefs,BENodeP lhs,BECodeBlockP codeBlock);
 
-BEString :: !String !BackEnd -> (!BEStringListP,!BackEnd);
-BEString a0 a1 = code {
-	ccall BEString "S:p:p"
+BEStringList :: !String !BEStringListP !BackEnd -> (!BEStringListP,!BackEnd);
+BEStringList a0 a1 a2 = code {
+	ccall BEStringList "Sp:p:p"
 }
-// BEStringListP BEString (CleanString cleanString);
-
-BEStrings :: !BEStringListP !BEStringListP !BackEnd -> (!BEStringListP,!BackEnd);
-BEStrings a0 a1 a2 = code {
-	ccall BEStrings "pp:p:p"
-}
-// BEStringListP BEStrings (BEStringListP string,BEStringListP strings);
+// BEStringListP BEStringList (CleanString cleanString,BEStringListP strings);
 
 BENoStrings :: !BackEnd -> (!BEStringListP,!BackEnd);
 BENoStrings a0 = code {
@@ -607,17 +575,11 @@ BENoStrings a0 = code {
 }
 // BEStringListP BENoStrings ();
 
-BECodeParameter :: !String !BENodeIdP !BackEnd -> (!BECodeParameterP,!BackEnd);
-BECodeParameter a0 a1 a2 = code {
-	ccall BECodeParameter "Sp:p:p"
+BECodeParameterList :: !String !BENodeIdP !BECodeParameterP !BackEnd -> (!BECodeParameterP,!BackEnd);
+BECodeParameterList a0 a1 a2 a3 = code {
+	ccall BECodeParameterList "Spp:p:p"
 }
-// BECodeParameterP BECodeParameter (CleanString location,BENodeIdP nodeId);
-
-BECodeParameters :: !BECodeParameterP !BECodeParameterP !BackEnd -> (!BECodeParameterP,!BackEnd);
-BECodeParameters a0 a1 a2 = code {
-	ccall BECodeParameters "pp:p:p"
-}
-// BECodeParameterP BECodeParameters (BECodeParameterP parameter,BECodeParameterP parameters);
+// BECodeParameterP BECodeParameterList (CleanString location,BENodeIdP nodeId,BECodeParameterP parameters);
 
 BENoCodeParameters :: !BackEnd -> (!BECodeParameterP,!BackEnd);
 BENoCodeParameters a0 = code {
@@ -625,17 +587,11 @@ BENoCodeParameters a0 = code {
 }
 // BECodeParameterP BENoCodeParameters ();
 
-BENodeIdListElem :: !BENodeIdP !BackEnd -> (!BENodeIdListP,!BackEnd);
-BENodeIdListElem a0 a1 = code {
-	ccall BENodeIdListElem "p:p:p"
+BENodeIdList :: !BENodeIdP !BENodeIdListP !BackEnd -> (!BENodeIdListP,!BackEnd);
+BENodeIdList a0 a1 a2 = code {
+	ccall BENodeIdList "pp:p:p"
 }
-// BENodeIdListP BENodeIdListElem (BENodeIdP nodeId);
-
-BENodeIds :: !BENodeIdListP !BENodeIdListP !BackEnd -> (!BENodeIdListP,!BackEnd);
-BENodeIds a0 a1 a2 = code {
-	ccall BENodeIds "pp:p:p"
-}
-// BENodeIdListP BENodeIds (BENodeIdListP nid,BENodeIdListP nids);
+// BENodeIdListP BENodeIdList (BENodeIdP nodeId,BENodeIdListP nids);
 
 BENoNodeIds :: !BackEnd -> (!BENodeIdListP,!BackEnd);
 BENoNodeIds a0 = code {
@@ -738,12 +694,6 @@ BEStrictPositions a0 a1 = code {
 	ccall BEStrictPositions "I:VIp:p"
 }
 // void BEStrictPositions (int functionIndex,int* bits,int** positions);
-
-BECopyInts :: !Int !Int !Int -> Int;
-BECopyInts a0 a1 a2 = code {
-	ccall BECopyInts "Ipp:I"
-}
-// int BECopyInts (int cLength,int* ints,int* cleanArray);
 
 BEGetIntFromArray :: !Int !Int -> Int;
 BEGetIntFromArray a0 a1 = code {

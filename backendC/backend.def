@@ -60,12 +60,10 @@ EXPORTS
  BEDeclareNodeId
  BENodeId
  BEWildCardNodeId
- BENodeDef
+ BENodeDefList
  BENoNodeDefs
- BENodeDefs
- BEStrictNodeId
+ BEStrictNodeIdList
  BENoStrictNodeIds
- BEStrictNodeIds
  BERule
  BEDeclareRuleType
  BEDefineRuleType
@@ -77,29 +75,24 @@ EXPORTS
  BEExtendableAlgebraicType
  BERecordType
  BEAbsType
- BEConstructors
+ BEConstructorList
  BENoConstructors
- BEConstructor
  BEDeclareField
- BEField
+ BEFieldList
  BESetMemberTypeOfField
  BESetDictionaryFieldOfMember
  BESetInstanceFunctionOfFunction
- BEFields
  BENoFields
  BEDeclareConstructor
  BEDeclareType
  BEDeclareFunction
  BEStartFunction
  BECodeAlt
- BEString
- BEStrings
+ BEStringList
  BENoStrings
- BECodeParameter
- BECodeParameters
+ BECodeParameterList
  BENoCodeParameters
- BENodeIdListElem
- BENodeIds
+ BENodeIdList
  BENoNodeIds
  BEAbcCodeBlock
  BEAnyCodeBlock
@@ -116,7 +109,6 @@ EXPORTS
  BEDefineImportedObjsAndLibs
  BESetMainDclModuleN
  BEStrictPositions
- BECopyInts
  BEGetIntFromArray
  BEDeclareDynamicTypeSymbol
  BEDynamicTempTypeSymbol
