@@ -67,11 +67,10 @@
 /EXPORT:BEAdjustArrayFunction
 /EXPORT:BENoRules
 /EXPORT:BERules
-/EXPORT:BEFlatType
-/EXPORT:BEAlgebraicType
-/EXPORT:BEExtendableAlgebraicType
-/EXPORT:BERecordType
-/EXPORT:BEAbsType
+/EXPORT:BEDefineAlgebraicType
+/EXPORT:BEDefineExtensibleAlgebraicType
+/EXPORT:BEDefineRecordType
+/EXPORT:BEAbstractType
 /EXPORT:BEConstructorList
 /EXPORT:BENoConstructors
 /EXPORT:BEDeclareField

@@ -1559,7 +1559,7 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 				*rhs_arg_p=new_arg;
 				rhs_arg_p=&new_arg->arg_next;
 
-				selector_arg_state_p=&arg_node->node_symbol->symb_def->sdef_type->type_lhs->ft_symbol->symb_def->sdef_record_state;
+				selector_arg_state_p=&arg_node->node_symbol->symb_def->sdef_type->type_symbol->symb_def->sdef_record_state;
 
 				if (arg_node->node_arity>=SELECTOR_L)
 					selector_arg_state_p=selector_l_or_n_state_p (&tuple_state,tuple_arg_states,selector_arg_state_p);
@@ -2919,7 +2919,7 @@ static void optimise_node_in_then_or_else (NodeP node,FreeUniqueNodeIdsS **f_nod
 				StateP selector_arg_state_p;
 				StateS tuple_state,tuple_arg_states[2];
 
-				selector_arg_state_p=&node->node_symbol->symb_def->sdef_type->type_lhs->ft_symbol->symb_def->sdef_record_state;
+				selector_arg_state_p=&node->node_symbol->symb_def->sdef_type->type_symbol->symb_def->sdef_record_state;
 
 				if (node->node_arity>=SELECTOR_L)
 					selector_arg_state_p=selector_l_or_n_state_p (&tuple_state,tuple_arg_states,selector_arg_state_p);
@@ -3194,7 +3194,7 @@ static void optimise_node (NodeP node,FreeUniqueNodeIdsS **f_node_ids_l)
 				StateP selector_arg_state_p;
 				StateS tuple_state,tuple_arg_states[2];
 
-				selector_arg_state_p=&node->node_symbol->symb_def->sdef_type->type_lhs->ft_symbol->symb_def->sdef_record_state;
+				selector_arg_state_p=&node->node_symbol->symb_def->sdef_type->type_symbol->symb_def->sdef_record_state;
 				
 				if (node->node_arity>=SELECTOR_L)
 					selector_arg_state_p=selector_l_or_n_state_p (&tuple_state,tuple_arg_states,selector_arg_state_p);

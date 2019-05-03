@@ -11,7 +11,6 @@ implementation module backend;
 :: BEArgP :== CPtr;
 :: BERuleAltP :== CPtr;
 :: BEImpRuleP :== CPtr;
-:: BEFlatTypeP :== CPtr;
 :: BEConstructorListP :== CPtr;
 :: BEFieldListP :== CPtr;
 :: BENodeIdP :== CPtr;
@@ -455,35 +454,29 @@ BERules a0 a1 a2 = code {
 }
 // BEImpRuleP BERules (BEImpRuleP rule,BEImpRuleP rules);
 
-BEFlatType :: !BESymbolP !BEAttribution !BackEnd -> (!BEFlatTypeP,!BackEnd);
-BEFlatType a0 a1 a2 = code {
-	ccall BEFlatType "pI:p:p"
+BEDefineAlgebraicType :: !BESymbolP !BEAttribution !BEConstructorListP !BackEnd -> BackEnd;
+BEDefineAlgebraicType a0 a1 a2 a3 = code {
+	ccall BEDefineAlgebraicType "pIp:V:p"
 }
-// BEFlatTypeP BEFlatType (BESymbolP symbol,BEAttribution attribution);
+// void BEDefineAlgebraicType (BESymbolP symbol,BEAttribution attribution,BEConstructorListP constructors);
 
-BEAlgebraicType :: !BEFlatTypeP !BEConstructorListP !BackEnd -> BackEnd;
-BEAlgebraicType a0 a1 a2 = code {
-	ccall BEAlgebraicType "pp:V:p"
+BEDefineExtensibleAlgebraicType :: !BESymbolP !BEAttribution !BEConstructorListP !BackEnd -> BackEnd;
+BEDefineExtensibleAlgebraicType a0 a1 a2 a3 = code {
+	ccall BEDefineExtensibleAlgebraicType "pIp:V:p"
 }
-// void BEAlgebraicType (BEFlatTypeP lhs,BEConstructorListP constructors);
+// void BEDefineExtensibleAlgebraicType (BESymbolP symbol,BEAttribution attribution,BEConstructorListP constructors);
 
-BEExtendableAlgebraicType :: !BEFlatTypeP !BEConstructorListP !BackEnd -> BackEnd;
-BEExtendableAlgebraicType a0 a1 a2 = code {
-	ccall BEExtendableAlgebraicType "pp:V:p"
+BEDefineRecordType :: !BESymbolP !BEAttribution !Int !Int !BETypeArgP !Int !BEFieldListP !BackEnd -> BackEnd;
+BEDefineRecordType a0 a1 a2 a3 a4 a5 a6 a7 = code {
+	ccall BEDefineRecordType "pIIIpIp:V:p"
 }
-// void BEExtendableAlgebraicType (BEFlatTypeP lhs,BEConstructorListP constructors);
+// void BEDefineRecordType (BESymbolP symbol,BEAttribution attribution,int moduleIndex,int constructorIndex,BETypeArgP constructor_args,int is_boxed_record,BEFieldListP fields);
 
-BERecordType :: !Int !BEFlatTypeP !BETypeNodeP !Int !BEFieldListP !BackEnd -> BackEnd;
-BERecordType a0 a1 a2 a3 a4 a5 = code {
-	ccall BERecordType "IppIp:V:p"
+BEAbstractType :: !BESymbolP !BackEnd -> BackEnd;
+BEAbstractType a0 a1 = code {
+	ccall BEAbstractType "p:V:p"
 }
-// void BERecordType (int moduleIndex,BEFlatTypeP lhs,BETypeNodeP constructorType,int is_boxed_record,BEFieldListP fields);
-
-BEAbsType :: !BEFlatTypeP !BackEnd -> BackEnd;
-BEAbsType a0 a1 = code {
-	ccall BEAbsType "p:V:p"
-}
-// void BEAbsType (BEFlatTypeP lhs);
+// void BEAbstractType (BESymbolP symbol);
 
 BEConstructorList :: !BETypeNodeP !BEConstructorListP !BackEnd -> (!BEConstructorListP,!BackEnd);
 BEConstructorList a0 a1 a2 = code {

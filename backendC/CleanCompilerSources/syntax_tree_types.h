@@ -16,12 +16,6 @@ typedef struct type_alt *	TypeAlts;
 
 typedef struct type_var *TypeVar;
 
-typedef struct flat_type 
-{
-	Symbol					ft_symbol;
-	AttributeKind			ft_attribute;
-} * FlatType;
-
 typedef struct field_list
 {
 	Symbol				fl_symbol;
@@ -40,13 +34,13 @@ typedef struct constructor_list
 
 typedef struct type
 {
-	FlatType			type_lhs;
+	Symbol				type_symbol;
+	AttributeKind		type_attribute;
 	ConstructorList		type_constructors;
 	int					type_nr_of_constructors;	/* 0 for records */
 } * Types;
 
 #define type_fields 	type_constructors -> cl_fields
-#define type_symbol		type_lhs -> ft_symbol
 
 struct rule_type
 {	TypeAlts			rule_type_rule;

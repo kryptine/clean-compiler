@@ -54,9 +54,6 @@ Clean (:: BERuleAltP (:== CPtr))
 typedef struct imp_rule *BEImpRuleP;
 Clean (:: BEImpRuleP (:== CPtr))
 
-typedef struct flat_type *BEFlatTypeP;
-Clean (:: BEFlatTypeP (:== CPtr))
-
 typedef struct constructor_list *BEConstructorListP;
 Clean (:: BEConstructorListP (:== CPtr))
 
@@ -376,20 +373,17 @@ Clean (BENoRules :: BackEnd -> (BEImpRuleP, BackEnd))
 BEImpRuleP BERules (BEImpRuleP rule, BEImpRuleP rules);
 Clean (BERules :: BEImpRuleP BEImpRuleP BackEnd -> (BEImpRuleP, BackEnd))
 
-BEFlatTypeP BEFlatType (BESymbolP symbol, BEAttribution attribution);
-Clean (BEFlatType :: BESymbolP BEAttribution BackEnd -> (BEFlatTypeP, BackEnd))
+void BEDefineAlgebraicType (BESymbolP symbol, BEAttribution attribution, BEConstructorListP constructors);
+Clean (BEDefineAlgebraicType:: BESymbolP BEAttribution BEConstructorListP BackEnd -> BackEnd)
 
-void BEAlgebraicType (BEFlatTypeP lhs, BEConstructorListP constructors);
-Clean (BEAlgebraicType:: BEFlatTypeP BEConstructorListP BackEnd -> BackEnd)
+void BEDefineExtensibleAlgebraicType (BESymbolP symbol, BEAttribution attribution, BEConstructorListP constructors);
+Clean (BEDefineExtensibleAlgebraicType:: BESymbolP BEAttribution BEConstructorListP BackEnd -> BackEnd)
 
-void BEExtendableAlgebraicType (BEFlatTypeP lhs, BEConstructorListP constructors);
-Clean (BEExtendableAlgebraicType:: BEFlatTypeP BEConstructorListP BackEnd -> BackEnd)
+void BEDefineRecordType (BESymbolP symbol, BEAttribution attribution, int moduleIndex, int constructorIndex, BETypeArgP constructor_args, int is_boxed_record, BEFieldListP fields);
+Clean (BEDefineRecordType :: BESymbolP BEAttribution Int Int BETypeArgP Int BEFieldListP BackEnd -> BackEnd)
 
-void BERecordType (int moduleIndex, BEFlatTypeP lhs, BETypeNodeP constructorType, int is_boxed_record, BEFieldListP fields);
-Clean (BERecordType :: Int BEFlatTypeP BETypeNodeP Int BEFieldListP BackEnd -> BackEnd)
-
-void BEAbsType (BEFlatTypeP lhs);
-Clean (BEAbsType :: BEFlatTypeP BackEnd -> BackEnd)
+void BEAbstractType (BESymbolP symbol);
+Clean (BEAbstractType :: BESymbolP BackEnd -> BackEnd)
 
 BEConstructorListP BENoConstructors (void);
 Clean (BENoConstructors:: BackEnd -> (BEConstructorListP, BackEnd))

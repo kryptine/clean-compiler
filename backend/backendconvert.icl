@@ -726,17 +726,18 @@ define_dictionary_types type_i class_i type_i_stop moduleIndex constructors sele
 		= define_dictionary_types (type_i+1) (class_i+1) type_i_stop moduleIndex constructors selectors types class_defs member_defs type_var_heap bes
 		= (type_var_heap,bes)
 
-convertTypeLhs :: ModuleIndex Index TypeAttribute [ATypeVar] !*TypeVarHeap !*BackEndState -> (!BEFlatTypeP, !*TypeVarHeap,!*BackEndState)
+convertTypeLhs :: ModuleIndex Index TypeAttribute [ATypeVar] !*TypeVarHeap !*BackEndState
+							  -> (!BESymbolP,!BEAttribution, !*TypeVarHeap,!*BackEndState)
 convertTypeLhs moduleIndex typeIndex attribute args type_var_heap bes
 	= convertTypeDefToFlatType (beTypeSymbol typeIndex moduleIndex) attribute args type_var_heap bes
 
-convertTypeDefToFlatType :: (BEMonad BESymbolP) TypeAttribute [ATypeVar] !*TypeVarHeap !*BackEndState -> (!BEFlatTypeP, !*TypeVarHeap,!*BackEndState)
+convertTypeDefToFlatType :: (BEMonad BESymbolP) TypeAttribute [ATypeVar] !*TypeVarHeap !*BackEndState
+										   -> (!BESymbolP,!BEAttribution,!*TypeVarHeap,!*BackEndState)
 convertTypeDefToFlatType type_symbol_m attribute args type_var_heap bes
 	# (a1,bes) = type_symbol_m bes
 	  (a2,bes) = convertAttribution attribute bes
 	  type_var_heap = numberLhsTypeVars args 0 type_var_heap
-	  (flat_type_p,bes) = accBackEnd (BEFlatType a1 a2) bes
-	= (flat_type_p,type_var_heap,bes)
+	= (a1,a2,type_var_heap,bes)
 
 numberLhsTypeVars :: [ATypeVar] Int !*TypeVarHeap -> *TypeVarHeap
 numberLhsTypeVars [{atv_variable={tv_info_ptr}}:x] arg_n type_var_heap
@@ -754,16 +755,16 @@ remove_TVI_TypeVarArgN_in_args [] type_var_heap
 
 defineType :: ModuleIndex {#ConsDef} {#SelectorDef} Index CheckedTypeDef !*TypeVarHeap !*BackEndState -> (!*TypeVarHeap,!*BackEndState)
 defineType moduleIndex constructors _ typeIndex {td_ident, td_attribute, td_args, td_rhs=AlgType constructorSymbols} type_var_heap be
-	# (flatType,type_var_heap,be) = convertTypeLhs moduleIndex typeIndex td_attribute td_args type_var_heap be
+	# (symbol_p,type_attribute,type_var_heap,be) = convertTypeLhs moduleIndex typeIndex td_attribute td_args type_var_heap be
 	  (constructors,type_var_heap,be)
 		= convertConstructors typeIndex td_ident.id_name moduleIndex constructors constructorSymbols type_var_heap be
-	  be = appBackEnd (BEAlgebraicType flatType constructors) be
+	  be = appBackEnd (BEDefineAlgebraicType symbol_p type_attribute constructors) be
 	  type_var_heap = remove_TVI_TypeVarArgN_in_args td_args type_var_heap
 	= (type_var_heap,be)
 defineType moduleIndex constructors selectors typeIndex {td_attribute, td_args, td_rhs=RecordType {rt_constructor, rt_fields, rt_is_boxed_record}, td_fun_index} type_var_heap be
 	# constructorIndex = rt_constructor.ds_index
 	  constructorDef = constructors.[constructorIndex]
-	  (flatType,type_var_heap,be)
+	  (symbol_p,type_attribute,type_var_heap,be)
 		= if (td_fun_index<>NoIndex)
 			(convertTypeLhs moduleIndex typeIndex td_attribute td_args type_var_heap be)
 			// define the record without marking, to prevent code generation for many unused generic dictionaries
@@ -772,9 +773,7 @@ defineType moduleIndex constructors selectors typeIndex {td_attribute, td_args, 
 		= convertSelectors moduleIndex selectors rt_fields constructorDef.cons_type.st_args_strictness type_var_heap be
 	  (constructorType,be) = constructorTypeFunction constructorDef be
 	  (type_arg_p,type_var_heap,be) = convertTypeDefAnnotatedTypeArgs constructorType.st_args constructorType.st_args_strictness type_var_heap be
-	  (symbol_p,be) = beConstructorSymbol moduleIndex constructorIndex be
-	  (constructorTypeNode,be) = accBackEnd (BENormalTypeNode symbol_p type_arg_p) be
-	  be = appBackEnd (BERecordType moduleIndex flatType constructorTypeNode (if rt_is_boxed_record 1 0) fields) be
+	  be = appBackEnd (BEDefineRecordType symbol_p type_attribute moduleIndex constructorIndex type_arg_p (if rt_is_boxed_record 1 0) fields) be
 	  type_var_heap = remove_TVI_TypeVarArgN_in_args td_args type_var_heap
 	= (type_var_heap,be)
 	where
@@ -785,28 +784,26 @@ defineType moduleIndex constructors selectors typeIndex {td_attribute, td_args, 
 						->	(expandedType,bes)
 					_
 						->	(constructorDef.cons_type,bes)
-defineType moduleIndex _ _ typeIndex {td_attribute, td_args, td_rhs=AbstractType _} type_var_heap be
- 	# (flatType,type_var_heap,be) = convertTypeLhs moduleIndex typeIndex td_attribute td_args type_var_heap be
-	  be = appBackEnd (BEAbsType flatType) be
-	  type_var_heap = remove_TVI_TypeVarArgN_in_args td_args type_var_heap
-	= (type_var_heap,be)
-defineType moduleIndex _ _ typeIndex {td_attribute, td_args, td_rhs=AbstractSynType _ _} type_var_heap be
- 	# (flatType,type_var_heap,be) = convertTypeLhs moduleIndex typeIndex td_attribute td_args type_var_heap be
-	  be = appBackEnd (BEAbsType flatType) be
-	  type_var_heap = remove_TVI_TypeVarArgN_in_args td_args type_var_heap
-	= (type_var_heap,be)
+defineType moduleIndex _ _ typeIndex {td_rhs=AbstractType _} type_var_heap be
+ 	# (symbol,be) = beTypeSymbol typeIndex moduleIndex be
+	  be = appBackEnd (BEAbstractType symbol) be
+ 	= (type_var_heap,be)
+defineType moduleIndex _ _ typeIndex {td_rhs=AbstractSynType _ _} type_var_heap be
+ 	# (symbol,be) = beTypeSymbol typeIndex moduleIndex be
+	  be = appBackEnd (BEAbstractType symbol) be
+ 	= (type_var_heap,be)
 defineType moduleIndex constructors _ typeIndex {td_ident, td_attribute, td_args, td_rhs=ExtensibleAlgType constructorSymbols} type_var_heap be
-	# (flatType,type_var_heap,be) = convertTypeLhs moduleIndex typeIndex td_attribute td_args type_var_heap be
+	# (symbol_p,type_attribute,type_var_heap,be) = convertTypeLhs moduleIndex typeIndex td_attribute td_args type_var_heap be
 	  (constructors,type_var_heap,be)
 		= convertConstructors typeIndex td_ident.id_name moduleIndex constructors constructorSymbols type_var_heap be
-	  be = appBackEnd (BEExtendableAlgebraicType flatType constructors) be
+	  be = appBackEnd (BEDefineExtensibleAlgebraicType symbol_p type_attribute constructors) be
 	  type_var_heap = remove_TVI_TypeVarArgN_in_args td_args type_var_heap
 	= (type_var_heap,be)
 defineType moduleIndex constructors _ typeIndex {td_ident, td_attribute, td_args, td_rhs=AlgConses constructorSymbols _} type_var_heap be
-	# (flatType,type_var_heap,be) = convertTypeLhs moduleIndex typeIndex td_attribute td_args type_var_heap be
+	# (symbol_p,type_attribute,type_var_heap,be) = convertTypeLhs moduleIndex typeIndex td_attribute td_args type_var_heap be
 	  (constructors,type_var_heap,be)
 		= convertConstructors typeIndex td_ident.id_name moduleIndex constructors constructorSymbols type_var_heap be
-	  be = appBackEnd (BEExtendableAlgebraicType flatType constructors) be
+	  be = appBackEnd (BEDefineExtensibleAlgebraicType symbol_p type_attribute constructors) be
 	  type_var_heap = remove_TVI_TypeVarArgN_in_args td_args type_var_heap
 	= (type_var_heap,be)
 defineType _ _ _ _ _ type_var_heap be
@@ -819,7 +816,7 @@ define_dictionary_type moduleIndex constructors selectors typeIndex
 						{class_members} member_defs type_var_heap bes
 	# constructorIndex = rt_constructor.ds_index
 	  constructorDef = constructors.[constructorIndex]
-	  (flatType,type_var_heap,bes)
+	  (symbol_p,type_attribute,type_var_heap,bes)
 		= if (td_fun_index<>NoIndex)
 			(convertTypeLhs moduleIndex typeIndex td_attribute td_args type_var_heap bes)
 			// define the record without marking, to prevent code generation for many unused generic dictionaries
@@ -828,9 +825,7 @@ define_dictionary_type moduleIndex constructors selectors typeIndex
 		= convert_dictionary_selectors moduleIndex selectors rt_fields (size class_members) constructorDef.cons_type.st_args_strictness member_defs type_var_heap bes
 	  (constructorType,bes) = constructorTypeFunction constructorDef bes
 	  (type_arg_p,type_var_heap,bes) = convertTypeDefAnnotatedTypeArgs constructorType.st_args constructorType.st_args_strictness type_var_heap bes
-	  (symbol_p,bes) = beConstructorSymbol moduleIndex constructorIndex bes
-	  (constructorTypeNode,bes) = accBackEnd (BENormalTypeNode symbol_p type_arg_p) bes
-	  bes = appBackEnd (BERecordType moduleIndex flatType constructorTypeNode (if rt_is_boxed_record 1 0) fields) bes
+	  bes = appBackEnd (BEDefineRecordType symbol_p type_attribute moduleIndex constructorIndex type_arg_p (if rt_is_boxed_record 1 0) fields) bes
 	  type_var_heap = remove_TVI_TypeVarArgN_in_args td_args type_var_heap
 	= (type_var_heap,bes)
 	where
@@ -966,6 +961,11 @@ declareDynamicTemp predefs
 	  (v2,be) = f2 be
 	:== f v1 v2 be
 
+@^&^ f f1 v2 f3 be
+	# (v1,be) = f1 be
+	  (v3,be) = f3 be
+	:== f v1 v2 v3 be
+
 predefineSymbols :: DclModule PredefinedSymbols -> BackEnder
 predefineSymbols {dcl_common} predefs
 	=	appBackEnd (BEDeclarePredefinedModule (size dcl_common.com_type_defs) (size dcl_common.com_cons_defs))
@@ -1038,7 +1038,6 @@ predefineSymbols {dcl_common} predefs
 		constructors :: [(Int, Int, BESymbKind)]
 		constructors
 			=	[(index, index-PD_Arity2TupleSymbol+2, BETupleSymb) \\ index <- [PD_Arity2TupleSymbol..PD_Arity32TupleSymbol]]
-
  
 		predefineConstructor (index, arity, symbolKind)
 			// sanity check ...
@@ -1052,11 +1051,10 @@ predefineSymbols {dcl_common} predefs
 			  type_be_f = @^^ BENormalTypeNode constructor_symbol_be_f BENoTypeArgs
 			  constructors_be_f = @^^ BEConstructorList type_be_f BENoConstructors
 			  type_symbol_be_f = BETypeSymbol predefs.[PD_UnitType].pds_def cPredefinedModuleIndex
-			  flat_type_be_f = @^^ BEFlatType type_symbol_be_f (^= BENoUniAttr)
 			= appBackEnd
 				(  BEDeclareConstructor predefs.[PD_UnitConsSymbol].pds_def cPredefinedModuleIndex "_Unit"
 			  	o` BEDeclareType predefs.[PD_UnitType].pds_def cPredefinedModuleIndex "_Unit"
-				o` @^^ BEAlgebraicType flat_type_be_f constructors_be_f)
+				o` @^&^ BEDefineAlgebraicType type_symbol_be_f BENoUniAttr constructors_be_f)
 
 bindSpecialIdents :: PredefinedSymbols NumberSet -> BackEnder
 bindSpecialIdents predefs usedModules

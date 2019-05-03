@@ -996,7 +996,7 @@ static void GenLazyFieldSelectorEntry (SymbDef field_def,StateS recstate,int tot
 
 		update_root_node = ! ExpectsResultNode (offfieldstate);
 
-		record_name=field_def->sdef_type->type_lhs->ft_symbol->symb_def->sdef_ident->ident_name;
+		record_name=field_def->sdef_type->type_symbol->symb_def->sdef_ident->ident_name;
 		
 		if (field_def->sdef_calledwithrootnode){
 			ealab = CurrentAltLabel;
@@ -2782,7 +2782,7 @@ SymbDef create_select_function (Symbol selector_symbol,int selector_kind)
 	select_function_symbol=NewSymbol (definition);
 	select_function_symbol->symb_def=select_function_sdef;
 
-	record_state_p=&selector_sdef->sdef_type->type_lhs->ft_symbol->symb_def->sdef_record_state;
+	record_state_p=&selector_sdef->sdef_type->type_symbol->symb_def->sdef_record_state;
 	fieldnr = selector_sdef->sdef_sel_field_number;
 	
 	record_node_id=NewNodeId (NULL);
