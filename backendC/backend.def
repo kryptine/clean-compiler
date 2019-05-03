@@ -70,11 +70,10 @@ EXPORTS
  BEAdjustArrayFunction
  BENoRules
  BERules
- BEFlatType
- BEAlgebraicType
- BEExtendableAlgebraicType
- BERecordType
- BEAbsType
+ BEDefineAlgebraicType
+ BEDefineExtensibleAlgebraicType
+ BEDefineRecordType
+ BEAbstractType
  BEConstructorList
  BENoConstructors
  BEDeclareField

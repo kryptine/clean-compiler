@@ -68,10 +68,9 @@ BEDefineRuleType
 BEAdjustArrayFunction
 BENoRules
 BERules
-BEFlatType
-BEAlgebraicType
-BERecordType
-BEAbsType
+BEDefineAlgebraicType
+BEDefineRecordType
+BEAbstractType
 BEConstructorList
 BENoConstructors
 BEDeclareField

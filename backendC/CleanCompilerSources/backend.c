@@ -984,13 +984,6 @@ BEConstructorSymbol (int constructorIndex, int moduleIndex)
 	Assert ((unsigned int) constructorIndex < module->bem_nConstructors);
 	constructorSymbol	= module->bem_constructors [constructorIndex];
 
-	/* RWS +++ hack for record constructors, remove this */
-	if (constructorSymbol->symb_kind == erroneous_symb){
-		/* store index in symb_arity until BERecordType is called, should be passed directly to BERecordType */
-		constructorSymbol->symb_arity = constructorIndex;
-		return constructorSymbol;
-	}
-
 	Assert (constructorSymbol->symb_kind == definition || constructorSymbol->symb_kind == cons_symb
 				|| (moduleIndex == kPredefinedModuleIndex && constructorSymbol->symb_kind != erroneous_symb));
 
@@ -1952,7 +1945,7 @@ BEUpdateNode (BEArgP args)
 	Assert (args->arg_next->arg_node->node_kind == SelectorNode);
 	Assert (args->arg_next->arg_node->node_arity == BESelector);
 
-	recordSymbol	= args->arg_next->arg_node->node_symbol->symb_def->sdef_type->type_lhs->ft_symbol;
+	recordSymbol	= args->arg_next->arg_node->node_symbol->symb_def->sdef_type->type_symbol;
 
 	node	= ConvertAllocType (NodeS);
 
@@ -2552,21 +2545,8 @@ BEDeclareType (int typeIndex, int moduleIndex, CleanString name)
 	types [typeIndex]->symb_def		= newSymbDef;
 } /* BEDeclareType */
 
-BEFlatTypeP
-BEFlatType (BESymbolP symbol, BEAttribution attribution)
-{
-	FlatType	flatType;
-
-	flatType	= ConvertAllocType (struct flat_type);
-
-	flatType->ft_symbol		= symbol;
-	flatType->ft_attribute = (AttributeKind) attribution;;
-
-	return (flatType);
-} /* BEFlatType */
-
 void
-BEAlgebraicType (BEFlatTypeP lhs, BEConstructorListP constructors)
+BEDefineAlgebraicType (BESymbolP symbol, BEAttribution attribution, BEConstructorListP constructors)
 {
 	Types		type;
 	SymbDefP	sdef;
@@ -2574,7 +2554,8 @@ BEAlgebraicType (BEFlatTypeP lhs, BEConstructorListP constructors)
 
 	type	= ConvertAllocType (struct type);
 
-	type->type_lhs	=	lhs;
+	type->type_symbol =	symbol;
+	type->type_attribute = attribution;
 	type->type_constructors	= constructors;
 
 	nConstructors	=	0;
@@ -2594,47 +2575,53 @@ BEAlgebraicType (BEFlatTypeP lhs, BEConstructorListP constructors)
 
 	type->type_nr_of_constructors	= nConstructors;
 
-	Assert (type->type_lhs->ft_symbol->symb_kind == definition);
-	sdef	= type->type_lhs->ft_symbol->symb_def;
+	Assert (symbol->symb_kind == definition);
+	sdef = symbol->symb_def;
 	Assert (sdef->sdef_kind == NEWDEFINITION);
 	sdef->sdef_kind 		= TYPE;
 	sdef->sdef_type			= type;
-} /* BEAlgebraicType */
+}
 
-void BEExtendableAlgebraicType (BEFlatTypeP lhs, BEConstructorListP constructors)
+void BEDefineExtensibleAlgebraicType (BESymbolP symbol, BEAttribution attribution, BEConstructorListP constructors)
 {
 	Types type;
 	SymbDefP sdef;
 
 	type = ConvertAllocType (struct type);
-	type->type_lhs = lhs;
+	type->type_symbol =	symbol;
+	type->type_attribute = attribution;
 	type->type_constructors	= constructors;
 	type->type_nr_of_constructors = 0;
 
 	for (; constructors!=NULL; constructors=constructors->cl_next)
 		constructors->cl_constructor->type_node_symbol->symb_def->sdef_type = type;
 
-	sdef = type->type_lhs->ft_symbol->symb_def;
+	sdef = symbol->symb_def;
 	sdef->sdef_kind = TYPE;
 	sdef->sdef_type = type;
 }
 
-void
-BERecordType (int moduleIndex, BEFlatTypeP lhs, BETypeNodeP constructorType, int is_boxed_record, BEFieldListP fields)
+void BEDefineRecordType
+	(BESymbolP symbol, BEAttribution attribution, int moduleIndex, int constructorIndex, BETypeArgP constructor_args, int is_boxed_record, BEFieldListP fields)
 {
+	struct symbol *constructor_symbol_p;
+	BETypeNodeP constructorType;
 	int					nFields;
 	Types				type;
 	SymbDefP			sdef;
 	BEConstructorListP	constructor;
 
-	type	= ConvertAllocType (struct type);
+	constructor_symbol_p = gBEState.be_modules [moduleIndex].bem_constructors [constructorIndex];
+
+	constructorType = BENormalTypeNode (constructor_symbol_p,constructor_args);
 
 	constructor	= ConvertAllocType (struct constructor_list);
-
 	constructor->cl_next		= NULL;
 	constructor->cl_constructor	= constructorType;
 
-	type->type_lhs	=	lhs;
+	type = ConvertAllocType (struct type);
+	type->type_symbol =	symbol;
+	type->type_attribute = attribution;
 	type->type_constructors	= constructor;
 	type->type_fields		= fields;
 
@@ -2653,8 +2640,8 @@ BERecordType (int moduleIndex, BEFlatTypeP lhs, BETypeNodeP constructorType, int
 
 	type->type_nr_of_constructors	= 0;
 
-	Assert (type->type_lhs->ft_symbol->symb_kind == definition);
-	sdef	= type->type_lhs->ft_symbol->symb_def;
+	Assert (symbol->symb_kind == definition);
+	sdef = symbol->symb_def;
 	Assert (sdef->sdef_kind == NEWDEFINITION);
 	sdef->sdef_checkstatus	= TypeChecked;
 	sdef->sdef_kind 		= RECORDTYPE;
@@ -2663,35 +2650,22 @@ BERecordType (int moduleIndex, BEFlatTypeP lhs, BETypeNodeP constructorType, int
 
 	sdef->sdef_boxed_record	= is_boxed_record;
 
-	{
-		int constructor_index;
-		struct symbol *constructor_symbol_p;
-		BEModuleP module;
-		
-		constructor_symbol_p = constructorType->type_node_symbol;
-		/* BEConstructorSymbol has stored the index in symb_arity, should be passed directly to BERecordType */
-		constructor_index = constructor_symbol_p->symb_arity;
-		constructor_symbol_p->symb_arity = 0;
+	constructor_symbol_p->symb_arity = 0;
 
-		module = &gBEState.be_modules [moduleIndex];
-		
-		Assert (module->bem_constructors[constructor_index]==constructor_symbol_p);
-		module->bem_constructors[constructor_index] = type->type_lhs->ft_symbol;
-	}
-} /* BERecordType */
+	gBEState.be_modules [moduleIndex].bem_constructors [constructorIndex] = symbol;
+}
 
 void
-BEAbsType (BEFlatTypeP lhs)
+BEAbstractType (BESymbolP symbol_p)
 {
-	SymbDefP	sdef;
+	SymbDefP sdef;
 
-	Assert (lhs->ft_symbol->symb_kind == definition);
-	sdef	= lhs->ft_symbol->symb_def;
+	Assert (symbol_p->symb_kind == definition);
+	sdef	= symbol_p->symb_def;
 	Assert (sdef->sdef_kind == NEWDEFINITION);
 	sdef->sdef_checkstatus	= TypeChecked;
 	sdef->sdef_kind 		= ABSTYPE;
-
-} /* BEAbsType */
+}
 
 BEConstructorListP
 BENoConstructors (void)

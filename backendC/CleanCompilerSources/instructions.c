@@ -2451,7 +2451,7 @@ void GenImport (SymbDef sdef)
 				if (sdef->sdef_mark & SDEF_USED_LAZILY_MASK){
 					char *record_name;
 	
-					record_name	= sdef->sdef_type->type_lhs->ft_symbol->symb_def->sdef_ident->ident_name;
+					record_name	= sdef->sdef_type->type_symbol->symb_def->sdef_ident->ident_name;
 	
 					put_directive_b (impdesc);
 					FPrintF (OutFile, "e_%s_" D_PREFIX "%s.%s",sdef->sdef_module,record_name,name);	
@@ -2544,7 +2544,7 @@ void GenExportFieldSelector (SymbDef sdef)
 	
 	name = sdef->sdef_ident->ident_name;
 	
-	record_name=sdef->sdef_type->type_lhs->ft_symbol->symb_def->sdef_ident->ident_name;
+	record_name=sdef->sdef_type->type_symbol->symb_def->sdef_ident->ident_name;
 
 	put_directive_ (Dexport);
 	FPrintF (OutFile,"e_%s_" D_PREFIX "%s.%s",CurrentModule,record_name,name);
@@ -3335,7 +3335,7 @@ void GenFieldSelectorDescriptor (SymbDef sdef,StateS field_state,int a_pos,int b
 	gc_updates_selector=IsSimpleState (field_state);
 
 	name = sdef->sdef_ident->ident_name;
-	record_name=sdef->sdef_type->type_lhs->ft_symbol->symb_def->sdef_ident->ident_name;
+	record_name=sdef->sdef_type->type_symbol->symb_def->sdef_ident->ident_name;
 
 	put_directive_ (gc_updates_selector ? Ddescs : Ddesc);
 	if (sdef->sdef_exported){
@@ -3387,7 +3387,7 @@ void GenFieldSelectorDescriptor (SymbDef sdef,int has_gc_apply_entry)
 	name = sdef->sdef_ident->ident_name;
 	arity = (sdef->sdef_kind == RECORDTYPE) ? sdef->sdef_cons_arity : sdef->sdef_arity;
 
-	record_name=sdef->sdef_type->type_lhs->ft_symbol->symb_def->sdef_ident->ident_name;
+	record_name=sdef->sdef_type->type_symbol->symb_def->sdef_ident->ident_name;
 	
 	put_directive_ (Ddesc);
 	if (sdef->sdef_exported){

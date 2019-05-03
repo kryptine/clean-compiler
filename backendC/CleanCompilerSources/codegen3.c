@@ -1167,7 +1167,7 @@ static void CodeRootFieldSelector (Node root,NodeId rootid,int asp,int bsp,CodeG
 			offstate = arg_node->node_state;
 			Build (arg_node,&asp,&bsp,code_gen_node_ids_p);
 
-			record_state_p=&seldef->sdef_type->type_lhs->ft_symbol->symb_def->sdef_record_state;
+			record_state_p=&seldef->sdef_type->type_symbol->symb_def->sdef_record_state;
 
 			if (root->node_arity>=SELECTOR_U){
 				int record_a_size,record_b_size,asize,bsize,aindex,bindex,offstate_a_size,offstate_b_size;
@@ -1288,7 +1288,7 @@ static void CodeRootFieldSelector (Node root,NodeId rootid,int asp,int bsp,CodeG
 				int a_size,b_size;
 				StateP record_state_p;
 
-				record_state_p=&seldef->sdef_type->type_lhs->ft_symbol->symb_def->sdef_record_state;
+				record_state_p=&seldef->sdef_type->type_symbol->symb_def->sdef_record_state;
 				if (root->node_arity>=SELECTOR_U){
 					int	asize,bsize,aindex,bindex,offered_a_size,offered_b_size;
 					

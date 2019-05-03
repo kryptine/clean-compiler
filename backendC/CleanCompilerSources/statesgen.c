@@ -247,7 +247,7 @@ void ConvertTypeToState (TypeNode type,StateS *state_p,StateKind kind)
 #ifdef REUSE_UNIQUE_NODES
 	if (type->type_node_attribute==UniqueAttr || (symbol->symb_kind==definition && 
 			(symbol->symb_def->sdef_kind==TYPE || symbol->symb_def->sdef_kind==RECORDTYPE) &&
-			symbol->symb_def->sdef_type->type_lhs->ft_attribute==UniqueAttr))
+			symbol->symb_def->sdef_type->type_attribute==UniqueAttr))
 	{
 		state_p->state_mark |= STATE_UNIQUE_MASK;
 	}
@@ -333,16 +333,14 @@ static void GenRecordState (SymbDef sdef)
 		States fieldstates;
 		int i,oldline;
 		Symbol oldsymbol;
-		FlatType lhs;
 		int strict_record;
 
 		rectype = sdef->sdef_type;
-		lhs = rectype->type_lhs;
 		
 		oldline		= CurrentLine;
 		oldsymbol	= CurrentSymbol;
 		
-		CurrentSymbol	= lhs->ft_symbol;
+		CurrentSymbol	= rectype->type_symbol;
 		CurrentLine		= 0 /*rectype->type_line*/;
 
 		sdef->sdef_checkstatus = ConvertingToState; /* to detect cyclic strict field dependencies */
@@ -412,7 +410,7 @@ static void GenResultStatesOfLazyFields (SymbDef sdef)
 
 	rectype = sdef->sdef_type;
 	
-	CurrentSymbol = rectype->type_lhs->ft_symbol;
+	CurrentSymbol = rectype->type_symbol;
 	CurrentLine = 0 /*rectype->type_line*/;
 	
 	for (i=0, fields = rectype->type_fields; fields; i++, fields = fields->fl_next){
@@ -435,7 +433,7 @@ static void ChangeFieldRecordStateForStrictAbsTypeFields (SymbDef icl_sdef,SymbD
 
 	icl_type = icl_sdef->sdef_type;
 
-	CurrentSymbol = icl_type->type_lhs->ft_symbol;
+	CurrentSymbol = icl_type->type_symbol;
 	CurrentLine = 0 /*icl_type->type_line*/;
 
 	icl_fieldstate_p=icl_sdef->sdef_record_state.state_record_arguments;
@@ -843,7 +841,7 @@ static void GenStatesInLhsNode (Node node,StateP arg_state_p)
 # ifdef REUSE_UNIQUE_NODES
 				AttributeKind lhs_type_attribute;
 				
-				lhs_type_attribute=sdef->sdef_type->type_lhs->ft_attribute;
+				lhs_type_attribute=sdef->sdef_type->type_attribute;
 
 				if (lhs_type_attribute==UniqueAttr)
 					arg_state_p->state_mark |= STATE_UNIQUE_MASK;
@@ -909,7 +907,7 @@ static void GenStatesInLhsNode (Node node,StateP arg_state_p)
 # ifdef REUSE_UNIQUE_NODES
 				AttributeKind lhs_type_attribute;
 				
-				lhs_type_attribute=sdef->sdef_type->type_lhs->ft_attribute;
+				lhs_type_attribute=sdef->sdef_type->type_attribute;
 
 				if (lhs_type_attribute==UniqueAttr)
 					arg_state_p->state_mark |= STATE_UNIQUE_MASK;
@@ -2368,9 +2366,9 @@ static Bool NodeInAStrictContext (Node node,StateS demanded_state,int local_scop
 #endif		
 		ssymb = node->node_symbol->symb_def;
 
-		unboxed_record_state_p=&ssymb->sdef_type->type_lhs->ft_symbol->symb_def->sdef_record_state;
+		unboxed_record_state_p=&ssymb->sdef_type->type_symbol->symb_def->sdef_record_state;
 #if BOXED_RECORDS		
-		if (ssymb->sdef_type->type_lhs->ft_symbol->symb_def->sdef_boxed_record){
+		if (ssymb->sdef_type->type_symbol->symb_def->sdef_boxed_record){
 			SetUnaryState (&boxed_record_state,StrictOnA,RecordObj);
 			record_state_p = &boxed_record_state;
 		} else
@@ -2847,7 +2845,7 @@ static void DetermineStatesOfNodeAndDefs (Node root_node,NodeDefs node_defs,Stat
 # ifdef REUSE_UNIQUE_NODES
 									AttributeKind lhs_type_attribute;
 									
-									lhs_type_attribute=sdef->sdef_type->type_lhs->ft_attribute;
+									lhs_type_attribute=sdef->sdef_type->type_attribute;
 
 									if (lhs_type_attribute==UniqueAttr && (node_id_state_p->state_mark & STATE_UNIQUE_MASK)==0){
 										StateP unique_state_p;
@@ -2902,7 +2900,7 @@ static void DetermineStatesOfNodeAndDefs (Node root_node,NodeDefs node_defs,Stat
 # ifdef REUSE_UNIQUE_NODES
 									AttributeKind lhs_type_attribute;
 									
-									lhs_type_attribute=sdef->sdef_type->type_lhs->ft_attribute;
+									lhs_type_attribute=sdef->sdef_type->type_attribute;
 
 									if (lhs_type_attribute==UniqueAttr && (node_id_state_p->state_mark & STATE_UNIQUE_MASK)==0){
 										StateP unique_state_p;
