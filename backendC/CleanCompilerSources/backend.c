@@ -670,22 +670,22 @@ BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, in
 			switch (arrayFunKind)
 			{
 				case BE_UnqArraySelectFun:
-					rhs	= BENormalTypeNode (gBasicSymbols [tuple_type],
+					rhs	= BESymbolTypeNode (NoAnnot,NoUniAttr,gBasicSymbols [tuple_type],
 												BETypeArgs (elementType, BETypeArgs (arrayType, NULL)));
-					lhsArgs	= BETypeArgs (arrayType, BETypeArgs (BEAnnotateTypeNode (StrictAnnot, BENormalTypeNode (gBasicSymbols [int_type], NULL)), NULL));
+					lhsArgs	= BETypeArgs (arrayType, BETypeArgs (BESymbolTypeNode (StrictAnnot,NoUniAttr,gBasicSymbols [int_type], NULL), NULL));
 					functionPrefix	= "_uselectf";
 					break;
 				case BE_UnqArraySelectLastFun:
 				{
 					TypeNode			rType;
 
-					rType	= BEAnnotateTypeNode (StrictAnnot, BETypeVar0TypeNode());
-					rhs	= BENormalTypeNode (gBasicSymbols [tuple_type],
+					rType	= BEVar0TypeNode (StrictAnnot,NoUniAttr);
+					rhs	= BESymbolTypeNode (NoAnnot,NoUniAttr,gBasicSymbols [tuple_type],
 												BETypeArgs (elementType, BETypeArgs (rType, NULL)));
 					lhsArgs	= BETypeArgs (
-								BEAnnotateTypeNode (StrictAnnot, BENormalTypeNode (gBasicSymbols [tuple_type],
-										BETypeArgs (arrayType, BETypeArgs (rType, NULL)))),
-								BETypeArgs (BEAnnotateTypeNode (StrictAnnot, BENormalTypeNode (gBasicSymbols [int_type], NULL)), NULL));
+								BESymbolTypeNode (StrictAnnot,NoUniAttr,gBasicSymbols [tuple_type],
+										BETypeArgs (arrayType, BETypeArgs (rType, NULL))),
+								BETypeArgs (BESymbolTypeNode (StrictAnnot,NoUniAttr,gBasicSymbols [int_type], NULL), NULL));
 					functionPrefix	= "_uselectl";
 					break;
 				}
@@ -693,12 +693,12 @@ BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, in
 				{
 					TypeNode			rType;
 
-					rType	= BEAnnotateTypeNode (StrictAnnot, BETypeVar0TypeNode());
+					rType	= BEVar0TypeNode (StrictAnnot,NoUniAttr);
 					rhs	= rType;
 					lhsArgs	= BETypeArgs (
-								BEAnnotateTypeNode (StrictAnnot, BENormalTypeNode (gBasicSymbols [tuple_type],
-										BETypeArgs (arrayType, BETypeArgs (rType, NULL)))),
-								BETypeArgs (BEAnnotateTypeNode (StrictAnnot, BENormalTypeNode (gBasicSymbols [int_type], NULL)),
+								BESymbolTypeNode (StrictAnnot,NoUniAttr,gBasicSymbols [tuple_type],
+										BETypeArgs (arrayType, BETypeArgs (rType, NULL))),
+								BETypeArgs (BESymbolTypeNode (StrictAnnot,NoUniAttr,gBasicSymbols [int_type], NULL),
 								BETypeArgs (elementType,
 								NULL)));
 					functionPrefix	= "_updatei";
@@ -714,7 +714,7 @@ BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, in
 			strcat (functionName, ";");
 			strcat (functionName, originalsdef->sdef_ident->ident_name);
 
-			newTypeAlt->type_alt_lhs	= BENormalTypeNode (newFunctionSymbol, lhsArgs);
+			newTypeAlt->type_alt_lhs	= BESymbolTypeNode (NoAnnot,NoUniAttr,newFunctionSymbol, lhsArgs);
 			newTypeAlt->type_alt_rhs	= rhs;
 			newTypeAlt->type_alt_strict_positions	= NULL;
 
@@ -802,7 +802,7 @@ CreateLocallyDefinedFunction (int index, char ** abcCode, TypeArgs lhsArgs, Type
 
 	typeAlt	= ConvertAllocType (TypeAlt);
 
-	typeAlt->type_alt_lhs	= BENormalTypeNode (functionSymbol, lhsArgs);
+	typeAlt->type_alt_lhs	= BESymbolTypeNode (NoAnnot,NoUniAttr,functionSymbol, lhsArgs);
 	typeAlt->type_alt_rhs	= rhsType;
 	typeAlt->type_alt_strict_positions	= NULL;
 
@@ -843,19 +843,19 @@ CreateDictionarySelectFunSymbol (void)
 
 	/*	actual type simplified to !a !(!a,!a) !Int -> (a,!a) */
 	lhsArgs	=	BETypeArgs (
-					BEAnnotateTypeNode (StrictAnnot, BETypeVar0TypeNode()),
+					BEVar0TypeNode (StrictAnnot,NoUniAttr),
 				BETypeArgs (
-					BEAnnotateTypeNode (StrictAnnot, BENormalTypeNode (gBasicSymbols [tuple_type],
+					BESymbolTypeNode (StrictAnnot,NoUniAttr,gBasicSymbols [tuple_type],
 								BETypeArgs (
-									BEAnnotateTypeNode (StrictAnnot, BETypeVar0TypeNode()),
+									BEVar0TypeNode (StrictAnnot,NoUniAttr),
 								BETypeArgs (
-									BEAnnotateTypeNode (StrictAnnot, BETypeVar0TypeNode()),
-								NULL)))),
+									BEVar0TypeNode (StrictAnnot,NoUniAttr),
+								NULL))),
 				BETypeArgs (
-					BEAnnotateTypeNode (StrictAnnot, BENormalTypeNode (gBasicSymbols [int_type], NULL)),
+					BESymbolTypeNode (StrictAnnot,NoUniAttr,gBasicSymbols [int_type], NULL),
 				NULL)));
-	rhsType	= BENormalTypeNode (gBasicSymbols [tuple_type],
-								BETypeArgs (BETypeVar0TypeNode(), BETypeArgs (BEAnnotateTypeNode (StrictAnnot, BETypeVar0TypeNode()), NULL)));
+	rhsType	= BESymbolTypeNode (NoAnnot,NoUniAttr,gBasicSymbols [tuple_type],
+								BETypeArgs (BEVar0TypeNode (NoAnnot,NoUniAttr), BETypeArgs (BEVar0TypeNode (StrictAnnot,NoUniAttr), NULL)));
 
 	return (CreateLocallyDefinedFunction (kDictionarySelect, abcCode, lhsArgs, rhsType));
 } /* CreateDictionarySelectFunSymbol */
@@ -886,21 +886,21 @@ CreateDictionaryUpdateFunSymbol (void)
 
 	/*	actual type simplified to !a !(!a,!a) !Int a -> a */
 	lhsArgs	=	BETypeArgs (
-					BEAnnotateTypeNode (StrictAnnot, BETypeVar0TypeNode()),
+					BEVar0TypeNode (StrictAnnot,NoUniAttr),
 				BETypeArgs (
-					BEAnnotateTypeNode (StrictAnnot, BENormalTypeNode (gBasicSymbols [tuple_type],
+					BESymbolTypeNode (StrictAnnot,NoUniAttr,gBasicSymbols [tuple_type],
 								BETypeArgs (
-									BEAnnotateTypeNode (StrictAnnot, BETypeVar0TypeNode()),
+									BEVar0TypeNode (StrictAnnot,NoUniAttr),
 								BETypeArgs (
-									BEAnnotateTypeNode (StrictAnnot, BETypeVar0TypeNode()),
-								NULL)))),
+									BEVar0TypeNode (StrictAnnot,NoUniAttr),
+								NULL))),
 				BETypeArgs (
-					BEAnnotateTypeNode (StrictAnnot, BENormalTypeNode (gBasicSymbols [int_type], NULL)),
+					BESymbolTypeNode (StrictAnnot,NoUniAttr,gBasicSymbols [int_type], NULL),
 				BETypeArgs (
-					BETypeVar0TypeNode(),
+					BEVar0TypeNode (NoAnnot,NoUniAttr),
 				NULL))));
 
-	rhsType	= BETypeVar0TypeNode();
+	rhsType	= BEVar0TypeNode (NoAnnot,NoUniAttr);
 
 	return (CreateLocallyDefinedFunction (kDictionaryUpdate, abcCode, lhsArgs, rhsType));
 } /* CreateDictionaryUpdateFunSymbol */
@@ -1315,7 +1315,7 @@ BEBasicSymbol (BESymbKind kind)
 } /* BEBasicSymbol */
 
 BETypeNodeP
-BETypeVar0TypeNode (void)
+BEVar0TypeNode (BEAnnotation annotation, BEAttribution attribution)
 {
 	TypeNode node;
 
@@ -1324,14 +1324,14 @@ BETypeVar0TypeNode (void)
 	node->type_node_is_var		= True;
 	node->type_node_tv_argument_n = 0;
 	node->type_node_arity		= 0;
-	node->type_node_annotation	= NoAnnot;
-	node->type_node_attribute	= NoUniAttr;
+	node->type_node_annotation	= annotation;
+	node->type_node_attribute	= attribution;
 
 	return node;
 }
 
 BETypeNodeP
-BETypeVarNTypeNode (int argument_n)
+BEVarNTypeNode (BEAnnotation annotation, BEAttribution attribution, int argument_n)
 {
 	TypeNode node;
 
@@ -1340,14 +1340,14 @@ BETypeVarNTypeNode (int argument_n)
 	node->type_node_is_var		= True;
 	node->type_node_tv_argument_n = argument_n;
 	node->type_node_arity		= 0;
-	node->type_node_annotation	= NoAnnot;
-	node->type_node_attribute	= NoUniAttr;
+	node->type_node_annotation	= annotation;
+	node->type_node_attribute	= attribution;
 
 	return node;
 }
 
 BETypeNodeP
-BENormalTypeNode (BESymbolP symbol, BETypeArgP args)
+BESymbolTypeNode (BEAnnotation annotation, BEAttribution attribution, BESymbolP symbol, BETypeArgP args)
 {
 	TypeNode	node;
 
@@ -1355,32 +1355,13 @@ BENormalTypeNode (BESymbolP symbol, BETypeArgP args)
 
 	node->type_node_is_var		= False;
 	node->type_node_arity		= CountTypeArgs (args);
-	node->type_node_annotation	= NoAnnot;
-	node->type_node_attribute	= NoUniAttr;
+	node->type_node_annotation	= annotation;
+	node->type_node_attribute	= attribution;
 	node->type_node_symbol		= symbol;
 	node->type_node_arguments	= args;
 
-	return (node);
-} /* BENormalTypeNode */
-
-
-BETypeNodeP
-BEAttributeTypeNode (BEAttribution attribution, BETypeNodeP typeNode)
-{
-	Assert (typeNode->type_node_attribute == NoUniAttr);
-	typeNode->type_node_attribute	= (AttributeKind) attribution;
-
-	return (typeNode);
-} /* BEAttributeTypeNode */
-
-BETypeNodeP
-BEAnnotateTypeNode (BEAnnotation annotation, BETypeNodeP typeNode)
-{
-	Assert (typeNode->type_node_annotation == NoAnnot);
-	typeNode->type_node_annotation	= (Annotation) annotation;
-
-	return (typeNode);
-} /* BEAnnotateTypeNode */
+	return node;
+}
 
 BETypeArgP
 BENoTypeArgs (void)
@@ -2613,7 +2594,7 @@ void BEDefineRecordType
 
 	constructor_symbol_p = gBEState.be_modules [moduleIndex].bem_constructors [constructorIndex];
 
-	constructorType = BENormalTypeNode (constructor_symbol_p,constructor_args);
+	constructorType = BESymbolTypeNode (NoAnnot,NoUniAttr,constructor_symbol_p,constructor_args);
 
 	constructor	= ConvertAllocType (struct constructor_list);
 	constructor->cl_next		= NULL;

@@ -208,35 +208,23 @@ BEBasicSymbol a0 a1 = code {
 }
 // BESymbolP BEBasicSymbol (BESymbKind kind);
 
-BETypeVar0TypeNode :: !BackEnd -> (!BETypeNodeP,!BackEnd);
-BETypeVar0TypeNode a0 = code {
-	ccall BETypeVar0TypeNode ":p:p"
+BEVar0TypeNode :: !BEAnnotation !BEAttribution !BackEnd -> (!BETypeNodeP,!BackEnd);
+BEVar0TypeNode a0 a1 a2 = code {
+	ccall BEVar0TypeNode "II:p:p"
 }
-// BETypeNodeP BETypeVar0TypeNode ();
+// BETypeNodeP BEVar0TypeNode (BEAnnotation annotation,BEAttribution attribution);
 
-BETypeVarNTypeNode :: !Int !BackEnd -> (!BETypeNodeP,!BackEnd);
-BETypeVarNTypeNode a0 a1 = code {
-	ccall BETypeVarNTypeNode "I:p:p"
+BEVarNTypeNode :: !BEAnnotation !BEAttribution !Int !BackEnd -> (!BETypeNodeP,!BackEnd);
+BEVarNTypeNode a0 a1 a2 a3 = code {
+	ccall BEVarNTypeNode "III:p:p"
 }
-// BETypeNodeP BETypeVarNTypeNode (int argument_n);
+// BETypeNodeP BEVarNTypeNode (BEAnnotation annotation,BEAttribution attribution,int argument_n);
 
-BENormalTypeNode :: !BESymbolP !BETypeArgP !BackEnd -> (!BETypeNodeP,!BackEnd);
-BENormalTypeNode a0 a1 a2 = code {
-	ccall BENormalTypeNode "pp:p:p"
+BESymbolTypeNode :: !BEAnnotation !BEAttribution !BESymbolP !BETypeArgP !BackEnd -> (!BETypeNodeP,!BackEnd);
+BESymbolTypeNode a0 a1 a2 a3 a4 = code {
+	ccall BESymbolTypeNode "IIpp:p:p"
 }
-// BETypeNodeP BENormalTypeNode (BESymbolP symbol,BETypeArgP args);
-
-BEAnnotateTypeNode :: !BEAnnotation !BETypeNodeP !BackEnd -> (!BETypeNodeP,!BackEnd);
-BEAnnotateTypeNode a0 a1 a2 = code {
-	ccall BEAnnotateTypeNode "Ip:p:p"
-}
-// BETypeNodeP BEAnnotateTypeNode (BEAnnotation annotation,BETypeNodeP typeNode);
-
-BEAttributeTypeNode :: !BEAttribution !BETypeNodeP !BackEnd -> (!BETypeNodeP,!BackEnd);
-BEAttributeTypeNode a0 a1 a2 = code {
-	ccall BEAttributeTypeNode "Ip:p:p"
-}
-// BETypeNodeP BEAttributeTypeNode (BEAttribution attribution,BETypeNodeP typeNode);
+// BETypeNodeP BESymbolTypeNode (BEAnnotation annotation,BEAttribution attribution,BESymbolP symbol,BETypeArgP args);
 
 BENoTypeArgs :: !BackEnd -> (!BETypeArgP,!BackEnd);
 BENoTypeArgs a0 = code {

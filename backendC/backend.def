@@ -29,11 +29,9 @@ EXPORTS
  BEPredefineConstructorSymbol
  BEPredefineTypeSymbol
  BEBasicSymbol
- BETypeVar0TypeNode
- BETypeVarNTypeNode
- BENormalTypeNode
- BEAnnotateTypeNode
- BEAttributeTypeNode
+ BEVar0TypeNode
+ BEVarNTypeNode
+ BESymbolTypeNode
  BENoTypeArgs
  BETypeArgs
  BETypeAlt
