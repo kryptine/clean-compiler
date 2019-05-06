@@ -236,7 +236,6 @@ Clean (BEOverloadedConsSymbol :: Int Int Int Int BackEnd -> (BESymbolP,BackEnd))
 BENodeP BEOverloadedPushNode (int arity,BESymbolP symbol,BEArgP arguments,BENodeIdListP nodeIds,BENodeP decons_node);
 Clean (BEOverloadedPushNode :: Int BESymbolP BEArgP BENodeIdListP BENodeP BackEnd -> (BENodeP, BackEnd))
 
-
 void BEPredefineConstructorSymbol (int arity, int constructorIndex, int moduleIndex, BESymbKind symbolKind);
 Clean (BEPredefineConstructorSymbol :: Int Int Int BESymbKind BackEnd -> BackEnd)
 
@@ -246,20 +245,14 @@ Clean (BEPredefineTypeSymbol :: Int Int Int BESymbKind BackEnd -> BackEnd)
 BESymbolP BEBasicSymbol (BESymbKind kind);
 Clean (BEBasicSymbol :: Int BackEnd -> (BESymbolP, BackEnd))
 
-BETypeNodeP BETypeVar0TypeNode ();
-Clean (BETypeVar0TypeNode :: BackEnd -> (BETypeNodeP, BackEnd))
+BETypeNodeP BEVar0TypeNode (BEAnnotation annotation, BEAttribution attribution);
+Clean (BEVar0TypeNode :: BEAnnotation BEAttribution BackEnd -> (BETypeNodeP, BackEnd))
 
-BETypeNodeP BETypeVarNTypeNode (int argument_n);
-Clean (BETypeVarNTypeNode :: Int BackEnd -> (BETypeNodeP, BackEnd))
+BETypeNodeP BEVarNTypeNode (BEAnnotation annotation, BEAttribution attribution, int argument_n);
+Clean (BEVarNTypeNode :: BEAnnotation BEAttribution Int BackEnd -> (BETypeNodeP, BackEnd))
 
-BETypeNodeP BENormalTypeNode (BESymbolP symbol, BETypeArgP args);
-Clean (BENormalTypeNode :: BESymbolP BETypeArgP BackEnd -> (BETypeNodeP, BackEnd))
-
-BETypeNodeP BEAnnotateTypeNode (BEAnnotation annotation, BETypeNodeP typeNode);
-Clean (BEAnnotateTypeNode :: BEAnnotation BETypeNodeP BackEnd -> (BETypeNodeP, BackEnd))
-
-BETypeNodeP BEAttributeTypeNode (BEAttribution attribution, BETypeNodeP typeNode);
-Clean (BEAttributeTypeNode :: BEAttribution BETypeNodeP BackEnd -> (BETypeNodeP, BackEnd))
+BETypeNodeP BESymbolTypeNode (BEAnnotation annotation, BEAttribution attribution, BESymbolP symbol, BETypeArgP args);
+Clean (BESymbolTypeNode :: BEAnnotation BEAttribution BESymbolP BETypeArgP BackEnd -> (BETypeNodeP, BackEnd))
 
 BETypeArgP BENoTypeArgs (void);
 Clean (BENoTypeArgs :: BackEnd -> (BETypeArgP, BackEnd))

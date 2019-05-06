@@ -28,11 +28,9 @@
 /EXPORT: BEPredefineConstructorSymbol
 /EXPORT: BEPredefineTypeSymbol
 /EXPORT: BEBasicSymbol
-/EXPORT: BETypeVar0TypeNode
-/EXPORT: BETypeVarNTypeNode
-/EXPORT: BENormalTypeNode
-/EXPORT: BEAnnotateTypeNode
-/EXPORT: BEAttributeTypeNode
+/EXPORT: BEVar0TypeNode
+/EXPORT: BEVarNTypeNode
+/EXPORT: BESymbolTypeNode
 /EXPORT: BENoTypeArgs
 /EXPORT: BETypeArgs
 /EXPORT: BETypeAlt

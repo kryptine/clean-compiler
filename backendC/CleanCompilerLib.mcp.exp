@@ -28,9 +28,7 @@ BEPredefineConstructorSymbol
 BEPredefineTypeSymbol
 BEBasicSymbol
 BEVarTypeNode
-BENormalTypeNode
-BEAnnotateTypeNode
-BEAttributeTypeNode
+BESymbolTypeNode
 BENoTypeArgs
 BETypeArgs
 BETypeAlt
@@ -76,8 +74,8 @@ BEDeclareField
 BEFieldList
 BENoFields
 BEDeclareConstructor
-BETypeVar0TypeNode
-BETypeVarNTypeNode
+BEVar0TypeNode
+BEVarNTypeNode
 BEDeclareType
 BEDeclareFunction
 BECodeAlt
