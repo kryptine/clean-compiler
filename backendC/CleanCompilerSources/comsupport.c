@@ -46,9 +46,6 @@ Bool CompilerError;
 int ExitEnv_valid=0;
 jmp_buf ExitEnv;
 
-char	*OutName = (char *) NIL;
-char *InName;
-
 /*	The storage administration. */
 
 unsigned long NrOfBytes;
@@ -169,123 +166,6 @@ void *CompAlloc (SizeT size)
 #endif
 
 	return (void *) new_block;
-}
-
-static HeapDescr FreeHeapDescrList;
-
-HeapDescr TH_New (void)
-{
-	HeapDescr new_hd;
-	if (FreeHeapDescrList)
-	{	new_hd  = FreeHeapDescrList;
-		FreeHeapDescrList = FreeHeapDescrList -> hd_next;
-	}
-	else
-		new_hd = CompAllocType (struct heap_descr);
-	new_hd -> hd_start = NULL;
-	return new_hd;
-
-} /* TH_New */
-
-void TH_Free (HeapDescr hd)
-{
-	char *next_block;
-	char *currentblock = hd -> hd_start;
-
-	while (currentblock != NULL)
-	{	next_block = *(char**) currentblock;
-
-		Free (currentblock);
-		currentblock = next_block;
-	}
-	hd -> hd_next = FreeHeapDescrList;
-	FreeHeapDescrList = hd;
-	
-} /* TH_Free */
-
-void TH_Reset (HeapDescr hd)
-{
-	if (hd -> hd_start)
-		hd -> hd_end = hd -> hd_start;
-	else
-	{	char **newblock = (char **) Alloc (TH_BlockSize + SizeOf (char *), SizeOf(char));
-		
-		if (newblock == NULL){
-/*			FPrintF (StdError,"Allocated %ld bytes\n",(long)NrOfBytes); */
-			FatalCompError ("comsupport","TH_Reset","Insufficient Memory");
-		}
-		*newblock = (char *) NIL;
-		hd -> hd_end = hd -> hd_start = (char *) newblock;
-	}
-	hd -> hd_free = hd -> hd_start + SizeOf (char *);
-	
-} /* TH_Reset */
-
-void *TH_Alloc (HeapDescr hd, SizeT size)
-{
-	if (size > 0){
-		char *memory_block;
-		
-		size = ReSize (size); /* word allignment */
-		
-		if (size > TH_BlockSize) /* too large to be handled by the temporary administration */
-			return CompAlloc (size);
-		else if (hd -> hd_free + size > hd -> hd_end + (TH_BlockSize + SizeOf (char *)))
-		{
-			/* the current block if full so a new one has to be allocated */
-		
-			if (*((char**) hd -> hd_end) == NULL)
-			{
-				char *new_block;
-				
-				/*	the reference to the next heap block is NIL which implies that
-					a new block has to be allocated in the Memory of the compiler */
-				
-				new_block = (char*)Alloc (TH_BlockSize + SizeOf (char *), SizeOf (char));
-				if (new_block == NULL)
-				{
-/*					FPrintF (StdError,"Allocated %ld bytes\n",(long)NrOfBytes);
-					{
-						int n_blocks;
-						char *currentblock;
-						
-						n_blocks=0;
-					
-						for (currentblock=hd->hd_start; currentblock!=NULL; currentblock = *(char**) currentblock)
-							++n_blocks;
-							
-						FPrintF (StdError,"Allocated %d blocks,%ld bytes\n",n_blocks,(long)n_blocks*(TH_BlockSize+SizeOf (char*)));
-					}
-*/
-					TH_Free (hd);
-					FatalCompError ("comsupport","TH_Alloc","Insufficient Memory");
-				}
-	
-				*((char**)  hd -> hd_end) = new_block;
-				hd -> hd_end = *((char **)  hd -> hd_end);
-				*((char**)  hd -> hd_end) = NULL;
-			}
-			else
-				 hd -> hd_end = *((char **)  hd -> hd_end);
-					
-			memory_block = hd -> hd_end + SizeOf(char*);
-		}
-		else
-			memory_block = hd -> hd_free;
-		
-		hd -> hd_free = memory_block + size;
-		
-		return memory_block;
-	}
-	else
-		return NULL;
-}
-
-extern Bool CS_MemoryCheck (void * ptr);
-
-Bool CS_MemoryCheck (void * ptr)
-{
-	return (char *) ptr > StartStorage && (char *) ptr <= LastBlock + MemBlockSize;
 }
 
 extern void finish_strictness_analysis (void);
@@ -618,14 +498,11 @@ void InitCompiler (void)
 	InterruptFlag  = False;
 	OpenedFile     = (File) NIL;
 	CompilerError	= False;
-	InName		= (char *) NIL;
 	/* Call all the initialization functions */
 	/* InitStorage has to be called first */
 	CurrentModule = Init;
 	CurrentExt    = "";
 
-	FreeHeapDescrList = NULL;
-	
 	InitStorage		();
 	InitScanner		();
 	InitParser		();
@@ -641,7 +518,6 @@ void ExitCompiler (void)
 {
 	CompFree();
 	SetSignal (oldhandler);
-	OutName	 = (char *) NIL;
 }
 
 #ifdef CLEAN2
