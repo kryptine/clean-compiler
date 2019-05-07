@@ -177,10 +177,8 @@ BEConstructorList :: !BETypeNodeP !BEConstructorListP !BackEnd -> (!BEConstructo
 // BEConstructorListP BEConstructorList (BETypeNodeP type,BEConstructorListP constructors);
 BENoConstructors :: !BackEnd -> (!BEConstructorListP,!BackEnd);
 // BEConstructorListP BENoConstructors ();
-BEDeclareField :: !Int !Int !String !BackEnd -> BackEnd;
-// void BEDeclareField (int fieldIndex,int moduleIndex,CleanString name);
-BEFieldList :: !Int !Int !BETypeNodeP !BEFieldListP !BackEnd -> (!BEFieldListP,!BackEnd);
-// BEFieldListP BEField (int fieldIndex,int moduleIndex,BETypeNodeP type,BEFieldListP fields);
+BEFieldList :: !Int !Int !String !BETypeNodeP !BEFieldListP !BackEnd -> (!BEFieldListP,!BackEnd);
+// BEFieldListP BEField (int fieldIndex,int moduleIndex,CleanString name,BETypeNodeP type,BEFieldListP fields);
 BESetMemberTypeOfField :: !Int !Int !BETypeAltP !BackEnd -> BackEnd;
 // void BESetMemberTypeOfField (int fieldIndex,int moduleIndex,BETypeAltP typeAlt);
 BESetDictionaryFieldOfMember :: !Int !Int !Int !BackEnd -> (!Int,!BackEnd);

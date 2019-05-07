@@ -73,7 +73,6 @@
 /EXPORT: BEAbstractType
 /EXPORT: BEConstructorList
 /EXPORT: BENoConstructors
-/EXPORT: BEDeclareField
 /EXPORT: BEFieldList
 /EXPORT: BESetMemberTypeOfField
 /EXPORT: BESetDictionaryFieldOfMember

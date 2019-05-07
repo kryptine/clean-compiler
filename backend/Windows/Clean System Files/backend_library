@@ -72,7 +72,6 @@ BEDefineRecordType
 BEAbstractType
 BEConstructorList
 BENoConstructors
-BEDeclareField
 BEFieldList
 BESetMemberTypeOfField
 BESetDictionaryFieldOfMember

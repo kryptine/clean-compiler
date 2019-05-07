@@ -384,11 +384,8 @@ Clean (BENoConstructors:: BackEnd -> (BEConstructorListP, BackEnd))
 BEConstructorListP BEConstructorList (BETypeNodeP type, BEConstructorListP constructors);
 Clean (BEConstructorList:: BETypeNodeP BEConstructorListP BackEnd -> (BEConstructorListP, BackEnd))
 
-void BEDeclareField (int fieldIndex, int moduleIndex, CleanString name);
-Clean (BEDeclareField :: Int Int String BackEnd -> BackEnd)
-
-BEFieldListP BEFieldList (int fieldIndex, int moduleIndex, BETypeNodeP type, BEFieldListP next_fields);
-Clean (BEFieldList :: Int Int BETypeNodeP BEFieldListP BackEnd -> (BEFieldListP, BackEnd))
+BEFieldListP BEFieldList (int fieldIndex, int moduleIndex, CleanString name, BETypeNodeP type, BEFieldListP next_fields);
+Clean (BEFieldList :: Int Int String BETypeNodeP BEFieldListP BackEnd -> (BEFieldListP, BackEnd))
 
 void BESetMemberTypeOfField (int fieldIndex, int moduleIndex, BETypeAltP typeAlt);
 Clean (BESetMemberTypeOfField :: Int Int BETypeAltP BackEnd -> BackEnd)

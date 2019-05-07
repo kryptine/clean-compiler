@@ -2677,67 +2677,45 @@ BEConstructorList (BETypeNodeP type, BEConstructorListP constructors)
 	return constructor;
 }
 
-void
-BEDeclareField (int fieldIndex, int moduleIndex, CleanString name)
+BEFieldListP
+BEFieldList (int fieldIndex, int moduleIndex, CleanString name, BETypeNodeP type, BEFieldListP next_fields)
 {
 	SymbDefP	newSymbDef;
 	Ident		newIdent;
-	SymbolP	 	fields;
-	BEModuleP	module;
-
-	module	= &gBEState.be_modules [moduleIndex];
-	Assert ((unsigned) fieldIndex < module->bem_nFields);
-	Assert (module->bem_fields [fieldIndex].symb_kind == erroneous_symb);
-
-	fields	=	module->bem_fields;
-	Assert (fields != NULL);
-
-	newIdent	= ConvertAllocType (IdentS);
-	newIdent->ident_name	= ConvertCleanString (name);
-	newIdent->ident_symbol	= &fields [fieldIndex];
-
-	newSymbDef	= ConvertAllocType (SymbDefS);
-	newSymbDef->sdef_kind		= NEWDEFINITION;
-	newSymbDef->sdef_exported	= False;
-	newSymbDef->sdef_module		= module->bem_name;
-	newSymbDef->sdef_ident		= newIdent;
-	newSymbDef->sdef_mark		= 0;
-	newSymbDef->sdef_isused		= 0;
-
-	fields [fieldIndex].symb_kind	= definition;
-	fields [fieldIndex].symb_def	= newSymbDef;
-} /* BEDeclareField */
-
-BEFieldListP
-BEFieldList (int fieldIndex, int moduleIndex, BETypeNodeP type, BEFieldListP next_fields)
-{
-	SymbDef		sdef;
-	SymbolP		fields;
+	SymbolP	 	field_symbol_p;
 	BEModuleP	module;
 	FieldList	field;
 
 	module	= &gBEState.be_modules [moduleIndex];
 	Assert ((unsigned) fieldIndex < module->bem_nFields);
-	Assert (module->bem_fields [fieldIndex].symb_kind == definition);
 
-	fields	=	module->bem_fields;
-	Assert (fields != NULL);
+	field_symbol_p = &module->bem_fields[fieldIndex];
+	Assert (field_symbol_p->symb_kind == erroneous_symb);
+
+	newIdent	= ConvertAllocType (IdentS);
+	newIdent->ident_name	= ConvertCleanString (name);
+	newIdent->ident_symbol	= field_symbol_p;
 
 	field	= ConvertAllocType (struct field_list);
-
 	field->fl_next	= next_fields;
-	field->fl_symbol	= &fields [fieldIndex];
-	field->fl_type		= type;
+	field->fl_symbol= field_symbol_p;
+	field->fl_type	= type;
 
-	sdef	=	fields [fieldIndex].symb_def;
-
-	sdef->sdef_kind = FIELDSELECTOR;
-	sdef->sdef_sel_field	= field;
-	sdef->sdef_arity		= 1;
-	sdef->sdef_mark			= 0;
+	newSymbDef	= ConvertAllocType (SymbDefS);
+	newSymbDef->sdef_kind		= FIELDSELECTOR;
+	newSymbDef->sdef_exported	= False;
+	newSymbDef->sdef_module		= module->bem_name;
+	newSymbDef->sdef_ident		= newIdent;
+	newSymbDef->sdef_isused		= 0;
+	newSymbDef->sdef_sel_field	= field;
+	newSymbDef->sdef_arity		= 1;
+	newSymbDef->sdef_mark		= 0;
 	/* ifdef DEBUG */
-	sdef->sdef_type			= NULL;
+	newSymbDef->sdef_type		= NULL;
 	/* endif */
+
+	field_symbol_p->symb_kind	= definition;
+	field_symbol_p->symb_def	= newSymbDef;
 
 	return field;
 }
