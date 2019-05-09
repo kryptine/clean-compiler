@@ -1118,6 +1118,37 @@ void ExamineTypesAndLhsOfImpRuleSymbolDefinitionAgain (SymbDef def)
 
 #define allocate_function_state(arity) (((StateP)(CompAlloc (sizeof(StateS)*((arity)+1))))+1)
 
+static void ExamineTypesAndLhsOfConstructorDefinition (SymbDef def)
+{
+	StateS rootstate;
+
+	if (def->sdef_module==CurrentModule)
+		def->sdef_number = next_def_number++;
+	else
+		def->sdef_number = 0;
+
+	if (def->sdef_exported && def->sdef_dcl_icl!=def)
+		def->sdef_mark |= SDEF_USED_LAZILY_MASK | SDEF_USED_CURRIED_MASK;
+
+	rootstate = OnAState;
+
+	if (IsSimpleState (rootstate)){
+		if (rootstate.state_kind == OnA || rootstate.state_kind == StrictOnA){
+			def->sdef_calledwithrootnode = True;
+			def->sdef_returnsnode = True;
+		} else if (rootstate.state_kind == StrictRedirection){
+			def->sdef_calledwithrootnode = False;
+			def->sdef_returnsnode = True;
+		} else {
+			def->sdef_calledwithrootnode = False;
+			def->sdef_returnsnode = False;
+		}
+	} else {
+		def->sdef_calledwithrootnode = False;
+		def->sdef_returnsnode = False;
+	}
+}
+
 void ExamineTypesAndLhsOfSymbolDefinition (SymbDef def)
 {
 	StateS rootstate;
@@ -1185,15 +1216,18 @@ void ExamineTypesAndLhsOfSymbolDefinition (SymbDef def)
 				rootstate = def->sdef_dcl_icl->sdef_sel_field->fl_state;
 			break;
 		case TYPE:
+		{
+			ConstructorList constructor;
+
 			if (def->sdef_module==CurrentModule)
 				def->sdef_number = next_def_number++;
+
+			for_l (constructor,def->sdef_type->type_constructors,cl_next)
+				ExamineTypesAndLhsOfConstructorDefinition (constructor->cl_constructor->type_node_symbol->symb_def);
+
 			rootstate = LazyState;
 			break;
-		case CONSTRUCTOR:
-			if (def->sdef_module==CurrentModule)
-				def->sdef_number = next_def_number++;
-			rootstate = OnAState;
-			break;
+		}
 		default:
 			rootstate = OnAState;
 			break;
@@ -1280,7 +1314,24 @@ void ImportSymbols (Symbol symbols)
 				GenImport (sdef);
 			}
 
-			if (sdef->sdef_kind==RECORDTYPE){
+			if (sdef->sdef_kind==TYPE){
+				ConstructorList constructor;
+
+				for_l (constructor,sdef->sdef_type->type_constructors,cl_next){
+					SymbDef constructor_sdef;
+					
+					constructor_sdef = constructor->cl_constructor->type_node_symbol->symb_def;
+					if (constructor_sdef->sdef_isused
+						&& constructor_sdef->sdef_mark & (SDEF_USED_STRICTLY_MASK | SDEF_USED_LAZILY_MASK | SDEF_USED_CURRIED_MASK)
+					){
+						if (constructor_sdef->sdef_module!=current_imported_module){
+							current_imported_module=constructor_sdef->sdef_module;
+							GenImpMod (current_imported_module);
+						}
+						GenImport (constructor_sdef);
+					}
+				}				
+			} else if (sdef->sdef_kind==RECORDTYPE){
 				FieldList fields;
 	
 				for_l (fields,sdef->sdef_type->type_fields,fl_next){

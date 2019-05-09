@@ -70,7 +70,6 @@ BEDefineRecordType
 BEAbstractType
 BEConstructorList
 BENoConstructors
-BEDeclareField
 BEFieldList
 BENoFields
 BEDeclareConstructor

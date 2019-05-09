@@ -879,8 +879,7 @@ convertSelector moduleIndex selectorDefs is_strict {fs_index} field_list_p type_
 	# selectorDef = selectorDefs.[fs_index]
 	  (field_type,bes) = selectorTypeFunction selectorDef bes
 	  (type_node_p,type_var_heap,bes) = convertTypeDefAnnotAndTypeNode (if is_strict AN_Strict AN_None) field_type type_var_heap bes
-	  bes = appBackEnd (BEDeclareField fs_index moduleIndex selectorDef.sd_ident.id_name) bes
-	  (field_list_p,bes) = accBackEnd (BEFieldList fs_index moduleIndex type_node_p field_list_p) bes
+	  (field_list_p,bes) = accBackEnd (BEFieldList fs_index moduleIndex selectorDef.sd_ident.id_name type_node_p field_list_p) bes
 	= (field_list_p,type_var_heap,bes)
 	where
 		selectorTypeFunction :: !SelectorDef !*BackEndState -> *(!AType,!*BackEndState)
@@ -912,8 +911,7 @@ convertMemberSelector moduleIndex selectorDefs is_strict {fs_index} field_list_p
 	# selectorDef = selectorDefs.[fs_index]
 	  (field_type,optional_type_alt_p,bes) = selectorTypeFunction selectorDef bes
 	  (field_type,type_var_heap,bes) = convertTypeDefAnnotAndTypeNode (if is_strict AN_Strict AN_None) field_type type_var_heap bes
-	  bes = appBackEnd (BEDeclareField fs_index moduleIndex selectorDef.sd_ident.id_name) bes
-	  (field_list_p,bes) = accBackEnd (BEFieldList fs_index moduleIndex field_type field_list_p) bes
+	  (field_list_p,bes) = accBackEnd (BEFieldList fs_index moduleIndex selectorDef.sd_ident.id_name field_type field_list_p) bes
 	= case optional_type_alt_p of
 		No
 			-> (field_list_p,type_var_heap,bes)

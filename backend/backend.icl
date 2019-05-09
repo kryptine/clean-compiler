@@ -478,17 +478,11 @@ BENoConstructors a0 = code {
 }
 // BEConstructorListP BENoConstructors ();
 
-BEDeclareField :: !Int !Int !String !BackEnd -> BackEnd;
-BEDeclareField a0 a1 a2 a3 = code {
-	ccall BEDeclareField "IIS:V:p"
+BEFieldList :: !Int !Int !String !BETypeNodeP !BEFieldListP !BackEnd -> (!BEFieldListP,!BackEnd);
+BEFieldList a0 a1 a2 a3 a4 a5 = code {
+	ccall BEFieldList "IISpp:p:p"
 }
-// void BEDeclareField (int fieldIndex,int moduleIndex,CleanString name);
-
-BEFieldList :: !Int !Int !BETypeNodeP !BEFieldListP !BackEnd -> (!BEFieldListP,!BackEnd);
-BEFieldList a0 a1 a2 a3 a4 = code {
-	ccall BEFieldList "IIpp:p:p"
-}
-// BEFieldListP BEField (int fieldIndex,int moduleIndex,BETypeNodeP type,BEFieldListP fields);
+// BEFieldListP BEField (int fieldIndex,int moduleIndex,CleanString name,BETypeNodeP type,BEFieldListP fields);
 
 BESetMemberTypeOfField :: !Int !Int !BETypeAltP !BackEnd -> BackEnd;
 BESetMemberTypeOfField a0 a1 a2 a3 = code {

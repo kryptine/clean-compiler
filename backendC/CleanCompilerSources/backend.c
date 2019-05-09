@@ -92,13 +92,10 @@ STRUCT (be_module, BEModule)
 
 	unsigned int	bem_nFunctions;
 	SymbolP			bem_functions;
-	unsigned int	bem_nConstructors;
-
 	unsigned int	bem_nTypes;
-	SymbolP			*bem_types;
-
-	SymbolP			*bem_constructors;
-
+	SymbolP			bem_types;
+	unsigned int	bem_nConstructors;
+	SymbolP			bem_constructors;
 	unsigned int	bem_nFields;
 	SymbolP			bem_fields;
 };
@@ -183,29 +180,30 @@ PredefinedSymbol (SymbKind symbolKind, int arity)
 } /* PredefinedSymbol */
 
 static SymbolP
-AllocateSymbols (int nTypeRecordAndConstructorSymbols,int nFieldSymbols, SymbolP allSymbols)
+AllocateSymbols (int nFunctionsAndTypes, int nConstructorsAndFields, SymbolP allSymbols)
 {
 	int	nSymbols;
 
-	nSymbols=nTypeRecordAndConstructorSymbols+nFieldSymbols;
+	nSymbols=nFunctionsAndTypes+nConstructorsAndFields;
 	
 	if (nSymbols > 0){
 		int i;
 		SymbolP	symbols;
 
 		symbols	= (SymbolP) ConvertAlloc (nSymbols * sizeof (SymbolS));
+		i = 0;
 
-		for (i = 0; i < nTypeRecordAndConstructorSymbols; i++){
-			symbols [i].symb_kind	= erroneous_symb;
-			symbols [i].symb_next	= &symbols [i+1];
-		}
+		if (nFunctionsAndTypes>0){
+			for (; i < nFunctionsAndTypes; ++i){
+				symbols [i].symb_kind	= erroneous_symb;
+				symbols [i].symb_next	= &symbols [i+1];
+			}
 		
-		if (nTypeRecordAndConstructorSymbols>0){
-			symbols [nTypeRecordAndConstructorSymbols-1].symb_next	= allSymbols;
+			symbols [nFunctionsAndTypes-1].symb_next = allSymbols;
 			allSymbols=symbols;
 		}
 		
-		for (i = nTypeRecordAndConstructorSymbols; i < nSymbols; i++){
+		for (; i < nSymbols; i++){
 			symbols [i].symb_kind	= erroneous_symb;
 			symbols [i].symb_next	= NULL;
 		}
@@ -291,7 +289,7 @@ DeclareModule (int moduleIndex, char *name, Bool isSystemModule, int nFunctions,
 
 	allSymbols	= gBEState.be_allSymbols;
 
-	allSymbols	= AllocateSymbols (nFunctions + nTypes + nConstructors, nFields, allSymbols);
+	allSymbols	= AllocateSymbols (nFunctions + nTypes, nConstructors + nFields, allSymbols);
 
 	Assert ((unsigned int) moduleIndex < gBEState.be_nModules);
 	module	= &gBEState.be_modules [moduleIndex];
@@ -306,15 +304,7 @@ DeclareModule (int moduleIndex, char *name, Bool isSystemModule, int nFunctions,
 	symbols	+=	nFunctions;
 
 	module->bem_nTypes	= (unsigned int) nTypes;
-	{
-		/* +++ do this lazily */
-		int	i;
-		
-		module->bem_types	= (SymbolP *) ConvertAlloc (nTypes * sizeof (SymbolP));
-
-		for (i = 0; i < nTypes; i++)
-			module->bem_types [i]	= &symbols [i];
-	}
+	module->bem_types = symbols;
 	{
 		/* +++ change this */
 		int		i;
@@ -331,15 +321,7 @@ DeclareModule (int moduleIndex, char *name, Bool isSystemModule, int nFunctions,
 	symbols	+=	nTypes;
 
 	module->bem_nConstructors	= (unsigned int) nConstructors;
-	{
-		/* +++ do this lazily */
-		int	i;
-		
-		module->bem_constructors	= (SymbolP *) ConvertAlloc (nConstructors * sizeof (SymbolP));
-
-		for (i = 0; i < nConstructors; i++)
-			module->bem_constructors [i]	= &symbols [i];
-	}
+	module->bem_constructors = symbols;
 	symbols	+=	nConstructors;
 
 	module->bem_nFields	= (unsigned int) nFields;
@@ -550,8 +532,7 @@ void BEBindSpecialType (int special_type_n,int type_index,int module_index)
 	BEModuleP	module;
 
 	module	= &gBEState.be_modules [module_index];
-	type_symbol_p = module->bem_types [type_index];
-
+	type_symbol_p = &module->bem_types [type_index];
 	if (type_symbol_p->symb_kind==definition)
 		special_types[special_type_n] = type_symbol_p->symb_def;
 	else
@@ -930,7 +911,7 @@ BETypeSymbol (int typeIndex, int moduleIndex)
 	module	= &gBEState.be_modules [moduleIndex];
 
 	Assert ((unsigned int) typeIndex < module->bem_nTypes);
-	typeSymbol	= module->bem_types [typeIndex];
+	typeSymbol	= &module->bem_types [typeIndex];
 /*	Assert (typeSymbol->symb_kind == definition
 				|| (moduleIndex == kPredefinedModuleIndex && typeSymbol->symb_kind != erroneous_symb));
 */
@@ -942,7 +923,7 @@ BETypeSymbol (int typeIndex, int moduleIndex)
 
 BESymbolP BETypeSymbolNoMark (int typeIndex, int moduleIndex)
 {
-	return gBEState.be_modules [moduleIndex].bem_types [typeIndex];
+	return &gBEState.be_modules [moduleIndex].bem_types [typeIndex];
 }
 
 BESymbolP
@@ -980,7 +961,7 @@ BEConstructorSymbol (int constructorIndex, int moduleIndex)
 	module	= &gBEState.be_modules [moduleIndex];
 
 	Assert ((unsigned int) constructorIndex < module->bem_nConstructors);
-	constructorSymbol	= module->bem_constructors [constructorIndex];
+	constructorSymbol = &module->bem_constructors [constructorIndex];
 
 	Assert (constructorSymbol->symb_kind == definition || constructorSymbol->symb_kind == cons_symb
 				|| (moduleIndex == kPredefinedModuleIndex && constructorSymbol->symb_kind != erroneous_symb));
@@ -1048,9 +1029,7 @@ void BEPredefineListConstructorSymbol (int constructorIndex,int moduleIndex,BESy
 	module = &gBEState.be_modules [moduleIndex];
 
 	Assert ((unsigned int) constructorIndex < module->bem_nConstructors);
-	
-	symbol_p=module->bem_constructors [constructorIndex];
-
+	symbol_p=&module->bem_constructors [constructorIndex];
 	symbol_p->symb_kind	= symbolKind;
 	symbol_p->symb_head_strictness=head_strictness;
 	symbol_p->symb_tail_strictness=tail_strictness;
@@ -1070,9 +1049,7 @@ void BEPredefineListTypeSymbol (int typeIndex,int moduleIndex,BESymbKind symbolK
 	module = &gBEState.be_modules [moduleIndex];
 
 	Assert ((unsigned int) typeIndex < module->bem_nTypes);
-
-	symbol_p=module->bem_types [typeIndex];
-
+	symbol_p=&module->bem_types [typeIndex];
 	symbol_p->symb_kind = symbolKind;
 	symbol_p->symb_arity = 1;
 	symbol_p->symb_head_strictness=head_strictness;
@@ -1218,7 +1195,7 @@ BESymbolP BEOverloadedConsSymbol (int constructorIndex,int moduleIndex,int decon
 	module = &gBEState.be_modules [moduleIndex];
 
 	Assert ((unsigned int) constructorIndex < module->bem_nConstructors);
-	constructor_symbol = module->bem_constructors [constructorIndex];
+	constructor_symbol = &module->bem_constructors [constructorIndex];
 
 	Assert (constructor_symbol->symb_kind==definition
 				|| (moduleIndex==kPredefinedModuleIndex && constructor_symbol->symb_kind!=erroneous_symb));
@@ -1281,10 +1258,10 @@ BEPredefineConstructorSymbol (int arity, int constructorIndex, int moduleIndex, 
 	module	= &gBEState.be_modules [moduleIndex];
 
 	Assert ((unsigned int) constructorIndex < module->bem_nConstructors);
-	Assert (module->bem_constructors [constructorIndex]->symb_kind == erroneous_symb);
+	Assert (module->bem_constructors [constructorIndex].symb_kind == erroneous_symb);
 
-	module->bem_constructors [constructorIndex]->symb_kind	= symbolKind;
-	module->bem_constructors [constructorIndex]->symb_arity	= arity;
+	module->bem_constructors [constructorIndex].symb_kind	= symbolKind;
+	module->bem_constructors [constructorIndex].symb_arity	= arity;
 } /* BEPredefineConstructorSymbol */
 
 void
@@ -1298,10 +1275,10 @@ BEPredefineTypeSymbol (int arity, int typeIndex, int moduleIndex, BESymbKind sym
 	module	= &gBEState.be_modules [moduleIndex];
 
 	Assert ((unsigned int) typeIndex < module->bem_nTypes);
-	Assert (module->bem_types [typeIndex]->symb_kind == erroneous_symb);
+	Assert (module->bem_types [typeIndex].symb_kind == erroneous_symb);
 
-	module->bem_types [typeIndex]->symb_kind		= symbolKind;
-	module->bem_types [typeIndex]->symb_arity	= arity;
+	module->bem_types [typeIndex].symb_kind		= symbolKind;
+	module->bem_types [typeIndex].symb_arity	= arity;
 } /* BEPredefineTypeSymbol */
 
 BESymbolP
@@ -2492,23 +2469,24 @@ BEDeclareType (int typeIndex, int moduleIndex, CleanString name)
 {
 	SymbDefP	newSymbDef;
 	Ident		newIdent;
-	SymbolP	 	*types;
+	SymbolP	 	type_p;
 	BEModuleP	module;
+
 	module	= &gBEState.be_modules [moduleIndex];
 
 	Assert ((unsigned int) typeIndex < module->bem_nTypes);
-	Assert (module->bem_types [typeIndex]->symb_kind == erroneous_symb);
+	Assert (module->bem_types [typeIndex].symb_kind == erroneous_symb);
+	Assert (module->bem_types != NULL);
 
-	types	=	module->bem_types;
-	Assert (types != NULL);
+	type_p = &module->bem_types[typeIndex];
 
 	newIdent	= ConvertAllocType (IdentS);
 	newIdent->ident_name	= ConvertCleanString (name);
-	newIdent->ident_symbol	= types [typeIndex];
+	newIdent->ident_symbol	= type_p;
 /* RWS change this
 	newSymbDef	= ConvertAllocType (SymbDefS);
 */
-	newSymbDef	= types [typeIndex]->symb_def;
+	newSymbDef	= type_p->symb_def;
 	Assert (newSymbDef != NULL);
 
 	newSymbDef->sdef_kind		= NEWDEFINITION;
@@ -2520,8 +2498,8 @@ BEDeclareType (int typeIndex, int moduleIndex, CleanString name)
 	newSymbDef->sdef_module		= module->bem_name;
 	newSymbDef->sdef_ident		= newIdent;
 
-	types [typeIndex]->symb_kind	= definition;
-	types [typeIndex]->symb_def		= newSymbDef;
+	type_p->symb_kind	= definition;
+	type_p->symb_def	= newSymbDef;
 } /* BEDeclareType */
 
 void
@@ -2590,7 +2568,7 @@ void BEDefineRecordType
 	SymbDefP			sdef;
 	BEConstructorListP	constructor;
 
-	constructor_symbol_p = gBEState.be_modules [moduleIndex].bem_constructors [constructorIndex];
+	constructor_symbol_p = &gBEState.be_modules [moduleIndex].bem_constructors [constructorIndex];
 
 	constructorType = BESymbolTypeNode (NoAnnot,NoUniAttr,constructor_symbol_p,constructor_args);
 
@@ -2631,7 +2609,8 @@ void BEDefineRecordType
 
 	constructor_symbol_p->symb_arity = 0;
 
-	gBEState.be_modules [moduleIndex].bem_constructors [constructorIndex] = symbol;
+	gBEState.be_modules [moduleIndex].bem_constructors [constructorIndex].symb_val = symbol->symb_val;
+	gBEState.be_modules [moduleIndex].bem_constructors [constructorIndex].symb_kind = symbol->symb_kind;
 }
 
 void
@@ -2677,67 +2656,45 @@ BEConstructorList (BETypeNodeP type, BEConstructorListP constructors)
 	return constructor;
 }
 
-void
-BEDeclareField (int fieldIndex, int moduleIndex, CleanString name)
+BEFieldListP
+BEFieldList (int fieldIndex, int moduleIndex, CleanString name, BETypeNodeP type, BEFieldListP next_fields)
 {
 	SymbDefP	newSymbDef;
 	Ident		newIdent;
-	SymbolP	 	fields;
-	BEModuleP	module;
-
-	module	= &gBEState.be_modules [moduleIndex];
-	Assert ((unsigned) fieldIndex < module->bem_nFields);
-	Assert (module->bem_fields [fieldIndex].symb_kind == erroneous_symb);
-
-	fields	=	module->bem_fields;
-	Assert (fields != NULL);
-
-	newIdent	= ConvertAllocType (IdentS);
-	newIdent->ident_name	= ConvertCleanString (name);
-	newIdent->ident_symbol	= &fields [fieldIndex];
-
-	newSymbDef	= ConvertAllocType (SymbDefS);
-	newSymbDef->sdef_kind		= NEWDEFINITION;
-	newSymbDef->sdef_exported	= False;
-	newSymbDef->sdef_module		= module->bem_name;
-	newSymbDef->sdef_ident		= newIdent;
-	newSymbDef->sdef_mark		= 0;
-	newSymbDef->sdef_isused		= 0;
-
-	fields [fieldIndex].symb_kind	= definition;
-	fields [fieldIndex].symb_def	= newSymbDef;
-} /* BEDeclareField */
-
-BEFieldListP
-BEFieldList (int fieldIndex, int moduleIndex, BETypeNodeP type, BEFieldListP next_fields)
-{
-	SymbDef		sdef;
-	SymbolP		fields;
+	SymbolP	 	field_symbol_p;
 	BEModuleP	module;
 	FieldList	field;
 
 	module	= &gBEState.be_modules [moduleIndex];
 	Assert ((unsigned) fieldIndex < module->bem_nFields);
-	Assert (module->bem_fields [fieldIndex].symb_kind == definition);
 
-	fields	=	module->bem_fields;
-	Assert (fields != NULL);
+	field_symbol_p = &module->bem_fields[fieldIndex];
+	Assert (field_symbol_p->symb_kind == erroneous_symb);
+
+	newIdent	= ConvertAllocType (IdentS);
+	newIdent->ident_name	= ConvertCleanString (name);
+	newIdent->ident_symbol	= field_symbol_p;
 
 	field	= ConvertAllocType (struct field_list);
-
 	field->fl_next	= next_fields;
-	field->fl_symbol	= &fields [fieldIndex];
-	field->fl_type		= type;
+	field->fl_symbol= field_symbol_p;
+	field->fl_type	= type;
 
-	sdef	=	fields [fieldIndex].symb_def;
-
-	sdef->sdef_kind = FIELDSELECTOR;
-	sdef->sdef_sel_field	= field;
-	sdef->sdef_arity		= 1;
-	sdef->sdef_mark			= 0;
+	newSymbDef	= ConvertAllocType (SymbDefS);
+	newSymbDef->sdef_kind		= FIELDSELECTOR;
+	newSymbDef->sdef_exported	= False;
+	newSymbDef->sdef_module		= module->bem_name;
+	newSymbDef->sdef_ident		= newIdent;
+	newSymbDef->sdef_isused		= 0;
+	newSymbDef->sdef_sel_field	= field;
+	newSymbDef->sdef_arity		= 1;
+	newSymbDef->sdef_mark		= 0;
 	/* ifdef DEBUG */
-	sdef->sdef_type			= NULL;
+	newSymbDef->sdef_type		= NULL;
 	/* endif */
+
+	field_symbol_p->symb_kind	= definition;
+	field_symbol_p->symb_def	= newSymbDef;
 
 	return field;
 }
@@ -2819,19 +2776,17 @@ BEDeclareConstructor (int constructorIndex, int moduleIndex, CleanString name)
 {
 	SymbDefP	newSymbDef;
 	Ident		newIdent;
-	SymbolP	 	*constructors;
+	SymbolP	 	constructor_p;
 	BEModuleP	module;
 
 	module	= &gBEState.be_modules [moduleIndex];
 	Assert ((unsigned) constructorIndex < module->bem_nConstructors);
-	Assert (module->bem_constructors [constructorIndex]->symb_kind == erroneous_symb);
-
-	constructors	=	module->bem_constructors;
-	Assert (constructors != NULL);
+	Assert (module->bem_constructors [constructorIndex].symb_kind == erroneous_symb);
+	constructor_p = &module->bem_constructors[constructorIndex];
 
 	newIdent	= ConvertAllocType (IdentS);
 	newIdent->ident_name	= ConvertCleanString (name);
-	newIdent->ident_symbol	= constructors [constructorIndex];
+	newIdent->ident_symbol	= constructor_p;
 
 	newSymbDef	= ConvertAllocType (SymbDefS);
 	newSymbDef->sdef_kind		= NEWDEFINITION;
@@ -2841,8 +2796,8 @@ BEDeclareConstructor (int constructorIndex, int moduleIndex, CleanString name)
 	newSymbDef->sdef_mark		= 0;
 	newSymbDef->sdef_isused		= 0;
 
-	constructors [constructorIndex]->symb_kind	= definition;
-	constructors [constructorIndex]->symb_def	= newSymbDef;
+	constructor_p->symb_kind = definition;
+	constructor_p->symb_def	= newSymbDef;
 } /* BEDeclareConstructor */
 
 void
@@ -3045,7 +3000,7 @@ BEExportType (int isDictionary, int typeIndex)
 	iclModule	= &gBEState.be_modules [main_dcl_module_n];
 
 	Assert ((unsigned int) typeIndex < iclModule->bem_nTypes);
-	typeSymbol	= iclModule->bem_types [typeIndex];
+	typeSymbol = &iclModule->bem_types [typeIndex];
 	Assert (typeSymbol->symb_kind == definition);
 
 	iclDef	= typeSymbol->symb_def;
@@ -3058,7 +3013,7 @@ BEExportType (int isDictionary, int typeIndex)
 	else
 	{
 		Assert ((unsigned int) typeIndex < dclModule->bem_nTypes);
-		typeSymbol	= dclModule->bem_types [typeIndex];
+		typeSymbol = &dclModule->bem_types [typeIndex];
 		Assert (typeSymbol->symb_kind == definition);
 		dclDef	= typeSymbol->symb_def;
 	}
@@ -3080,7 +3035,7 @@ BEExportConstructor (int constructorIndex)
 	iclModule	= &gBEState.be_modules [main_dcl_module_n];
 
 	Assert ((unsigned int) constructorIndex < iclModule->bem_nConstructors);
-	constructorSymbol	= iclModule->bem_constructors [constructorIndex];
+	constructorSymbol = &iclModule->bem_constructors [constructorIndex];
 	Assert (constructorSymbol->symb_kind == definition);
 
 	iclDef	= constructorSymbol->symb_def;
