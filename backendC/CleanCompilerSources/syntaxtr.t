@@ -668,7 +668,8 @@ typedef FileTime ModuleFileTime;
 
 typedef struct {
 	char *				im_name;
-	Symbol				im_symbols;
+	SymbolP				im_function_symbols;
+	SymbolP				im_type_symbols;
 	ImpRules			im_rules;
 	struct symbol_def *	im_start;
 	DefMod				im_def_module;
@@ -684,7 +685,8 @@ typedef struct {
 
 struct def_repr {
 	char *		dm_name;
-	Symbol		dm_symbols;
+	SymbolP		dm_function_symbols;
+	SymbolP		dm_type_symbols;
 	Symbol		dm_symbols_end;
 	TableKind	dm_system_module_table_kind;
 	Bool		dm_system_module;

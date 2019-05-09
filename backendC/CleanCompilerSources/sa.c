@@ -5724,7 +5724,7 @@ int init_strictness_analysis (ImpMod imod)
 
 	if (setjmp (SAEnv) == 0){
 		
-		ConvertSyntaxTree (imod->im_symbols);
+		ConvertSyntaxTree (imod->im_type_symbols);
 
 		/* other values are converted after syntaxconversion (because of cons symbol) */
 		InitValues ();

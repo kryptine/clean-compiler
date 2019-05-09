@@ -82,7 +82,7 @@ void ReadInlineCode (void)
 			
 			symbols_end=def_mod->dm_symbols_end;
 			
-			for (symbol=def_mod->dm_symbols; symbol!=NULL && symbol!=symbols_end; symbol=symbol->symb_next)
+			for (symbol=def_mod->dm_function_symbols; symbol!=NULL && symbol!=symbols_end; symbol=symbol->symb_next)
 				if (symbol->symb_kind==definition){
 					SymbDef sdef;
 

@@ -16,8 +16,8 @@ extern void InitStatesGen (void);
 extern void GenerateStates (ImpRules rules);
 extern void DetermineSharedAndAnnotatedNodes (ImpRules rules,SymbolP *im_symbols_h);
 extern void DetermineStateOfArrayElem (Symbol elemtype, States state);
-extern void ExamineTypesAndLhsOfSymbols (Symbol symbs);
-extern void ImportSymbols (Symbol symbols);
+extern void ExamineTypesAndLhsOfSymbols (SymbolP function_symbols,SymbolP type_symbols);
+extern void ImportSymbols (SymbolP function_symbols,Symbol type_symbols);
 extern void import_not_yet_imported_record_r_labels (Symbol symbols);
 extern void DetermineStatesOfRootNodeAndDefs (Node root_node,NodeDefs *rootdef,StateS demstate,int local_scope);
 
