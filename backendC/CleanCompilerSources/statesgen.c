@@ -1254,16 +1254,19 @@ void ExamineTypesAndLhsOfSymbolDefinition (SymbDef def)
 extern PolyList unboxed_record_cons_list,unboxed_record_decons_list;
 #endif
 
-void ExamineTypesAndLhsOfSymbols (Symbol symbs)
+void ExamineTypesAndLhsOfSymbols (SymbolP function_symbols,SymbolP type_symbols)
 {
+	SymbolP symbs;
+
 	next_def_number = 1;
 
-	while (symbs!=NULL){
+	for_l (symbs,function_symbols,symb_next)
 		if (symbs->symb_kind==definition)
 			ExamineTypesAndLhsOfSymbolDefinition (symbs->symb_def);
 
-		symbs=symbs->symb_next;
-	}
+	for_l (symbs,type_symbols,symb_next)
+		if (symbs->symb_kind==definition)
+			ExamineTypesAndLhsOfSymbolDefinition (symbs->symb_def);
 #if STRICT_LISTS
 	{
 		PolyList unboxed_record_cons_elem,unboxed_record_decons_elem;
@@ -1280,7 +1283,7 @@ PolyList UserDefinedArrayFunctions;
 
 char *current_imported_module; /* also used by instructions.c */
 
-void ImportSymbols (Symbol symbols)
+void ImportSymbols (SymbolP function_symbols,Symbol type_symbols)
 {
 	Symbol symbol;	
 	PolyList array_fun;
@@ -1296,7 +1299,27 @@ void ImportSymbols (Symbol symbols)
 			fun_def -> sdef_module = CurrentModule;
 	}
 
-	for_l (symbol,symbols,symb_next){
+	for_l (symbol,function_symbols,symb_next){
+		SymbDef sdef;
+
+		if (symbol->symb_kind!=definition)
+			continue;
+
+		sdef=symbol->symb_def;
+		if (sdef->sdef_module!=CurrentModule){
+			if (sdef->sdef_isused
+				&& sdef->sdef_mark & (SDEF_USED_STRICTLY_MASK | SDEF_USED_LAZILY_MASK | SDEF_USED_CURRIED_MASK)
+			){
+				if (sdef->sdef_module!=current_imported_module){
+					current_imported_module=sdef->sdef_module;
+					GenImpMod (current_imported_module);
+				}
+				GenImport (sdef);
+			}
+		}
+	}
+
+	for_l (symbol,type_symbols,symb_next){
 		SymbDef sdef;
 
 		if (symbol->symb_kind!=definition)
@@ -1330,7 +1353,7 @@ void ImportSymbols (Symbol symbols)
 						}
 						GenImport (constructor_sdef);
 					}
-				}				
+				}
 			} else if (sdef->sdef_kind==RECORDTYPE){
 				FieldList fields;
 	

@@ -1136,14 +1136,14 @@ void CodeGeneration (ImpMod imod, char *fname)
 #if 0
 		PrintRules (imod->im_rules);
 #endif
-		DetermineSharedAndAnnotatedNodes (imod->im_rules,&imod->im_symbols);
+		DetermineSharedAndAnnotatedNodes (imod->im_rules,&imod->im_function_symbols);
 		ExitOnInterrupt();
 
 #if 0
 		PrintRules (imod->im_rules,rules_file);
 #endif
 
-		GenerateStatesForRecords (imod->im_symbols);
+		GenerateStatesForRecords (imod->im_type_symbols);
 
 		DoStrictnessAnalysis_and_init_ok = DoStrictnessAnalysis && init_strictness_analysis (imod);
 		
@@ -1152,7 +1152,7 @@ void CodeGeneration (ImpMod imod, char *fname)
 			ExitOnInterrupt();
 		}
 
-		ExamineTypesAndLhsOfSymbols	(imod->im_symbols);
+		ExamineTypesAndLhsOfSymbols	(imod->im_function_symbols,imod->im_type_symbols);
 
 #ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
 		{
@@ -1234,9 +1234,9 @@ void CodeGeneration (ImpMod imod, char *fname)
 
 			CreateStackFrames();
 
-			ImportSymbols (imod->im_symbols);
+			ImportSymbols (imod->im_function_symbols,imod->im_type_symbols);
 
-			GenerateCodeForConstructorsAndRecords (imod->im_symbols);
+			GenerateCodeForConstructorsAndRecords (imod->im_type_symbols);
 
 			GenerateForeignExports (imod->im_foreign_exports);
 
@@ -1285,7 +1285,7 @@ void CodeGeneration (ImpMod imod, char *fname)
 			GenerateCodeForLazyUnboxedRecordListFunctions();
 #endif
 
-			import_not_yet_imported_record_r_labels (imod->im_symbols);
+			import_not_yet_imported_record_r_labels (imod->im_type_symbols);
 			import_not_yet_imported_system_labels();
 
 			WriteLastNewlineToABCFile();
