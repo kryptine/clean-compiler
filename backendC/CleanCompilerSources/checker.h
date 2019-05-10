@@ -22,7 +22,14 @@ void InitChecker (void);
 void GenDependencyList (void);
 NodeDefs NewNodeDef (NodeId nid, Node node);
 
-#ifdef CLEAN2
+struct def_list {
+	Symbol				mod_name;
+	Bool				mod_undereval;
+	DefMod				mod_body;
+	struct def_list *	mod_next;
+};
+
+extern struct def_list *OpenDefinitionModules;
+
 void ClearOpenDefinitionModules (void);
 void AddOpenDefinitionModule (SymbolP moduleNameSymbol, DefMod definitionModule);
-#endif

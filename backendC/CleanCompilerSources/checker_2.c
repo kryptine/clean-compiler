@@ -3,13 +3,6 @@
 	Version:	1.2
 */
 
-#define COMPLEX_ABSTYPES
-#define MOVE_LIFTED_CONSTANTS
-#define OPTIMIZE_APPLIES
-#define MOVE_MORE_LIFTED_CONSTANTS
-#define MOVE_CURRIED_APPLICATIONS
-#define MOVE_FUNCTIONS_IN_LAMBDAS
-
 #include "compiledefines.h"
 #include "types.t"
 #include "system.h"
@@ -24,38 +17,18 @@
 #include "codegen1.h"
 #include "codegen2.h"
 #include "instructions.h"
-#include "transform.h"
 #include "checksupport.h"
 #include "settings.h"
 #include "checker.h"
-#ifdef MOVE_FUNCTIONS_IN_LAMBDAS
-# include "optimise_lambda.h"
-#endif
 #ifdef applec
 #	include <types.h>
 #endif
 
-#undef DEBUG_REF_COUNT
-
-#ifdef DEBUG_REF_COUNT
-# define IF_DEBUG_REF_COUNT(a) a
-# include "dbprint.h"
-#else
-# define IF_DEBUG_REF_COUNT(a)
-#endif
-
 #define for_l(v,l,n) for(v=(l);v!=NULL;v=v->n)
-
-struct def_list {
-	Symbol				mod_name;
-	Bool				mod_undereval;
-	DefMod				mod_body;
-	struct def_list *	mod_next;
-};
 
 typedef struct def_list *DefModList,DefModElem;
 
-static DefModList OpenDefinitionModules;
+struct def_list *OpenDefinitionModules;
 
 void GenDependencyList (void)
 {

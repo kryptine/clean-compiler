@@ -569,15 +569,18 @@ static void ChangeElementStateForStrictAbsTypeFields (SymbDef icl_sdef,SymbDef d
 SymbDefP special_types[2];
 #endif
 
-void GenerateStatesForRecords (Symbol symbols)
+void GenerateStatesForRecords (struct module_type_symbols mts,int size_dcl_type_symbols_a,struct module_type_symbols dcl_type_symbols_a[])
 {
-	Symbol symb;
-	
-	for_l (symb,symbols,symb_next)
-		if (symb->symb_kind==definition){
+	int n_types,i,dcl_type_symbols_n;
+	SymbolP type_symbol_a;
+
+	n_types = mts.mts_n_types;
+	type_symbol_a = mts.mts_type_symbol_a;	
+	for (i=0; i<n_types; ++i)
+		if (type_symbol_a[i].symb_kind==definition){
 			SymbDef def;
 
-			def=symb->symb_def;
+			def=type_symbol_a[i].symb_def;
 			if (def->sdef_kind==RECORDTYPE){
 				GenRecordState (def);
 				GenResultStatesOfLazyFields (def);
@@ -586,7 +589,6 @@ void GenerateStatesForRecords (Symbol symbols)
 					SymbDef dcl_sdef;
 					
 					dcl_sdef=def->sdef_dcl_icl;
-
 					if (dcl_sdef!=NULL && dcl_sdef->sdef_kind==RECORDTYPE){
 						GenRecordState (dcl_sdef);
 						GenResultStatesOfLazyFields (dcl_sdef);
@@ -600,7 +602,6 @@ void GenerateStatesForRecords (Symbol symbols)
 					SymbDef dcl_sdef;
 					
 					dcl_sdef=def->sdef_dcl_icl;
-					
 					if (dcl_sdef->sdef_kind==TYPE){
 						GenerateStatesForConstructors (dcl_sdef);
 						ChangeElementStateForStrictAbsTypeFields (def,dcl_sdef);
@@ -608,6 +609,22 @@ void GenerateStatesForRecords (Symbol symbols)
 				}
 			}
 		}
+
+	for (dcl_type_symbols_n=0; dcl_type_symbols_n<size_dcl_type_symbols_a; ++dcl_type_symbols_n){		
+		n_types = dcl_type_symbols_a[dcl_type_symbols_n].mts_n_types;
+		type_symbol_a = dcl_type_symbols_a[dcl_type_symbols_n].mts_type_symbol_a;	
+		for (i=0; i<n_types; ++i)
+			if (type_symbol_a[i].symb_kind==definition){
+				SymbDef def;
+
+				def=type_symbol_a[i].symb_def;
+				if (def->sdef_kind==RECORDTYPE){
+					GenRecordState (def);
+					GenResultStatesOfLazyFields (def);
+				} else if (def->sdef_kind==TYPE)
+					GenerateStatesForConstructors (def);
+			}
+	}
 
 #ifdef CLEAN2
 	if (special_types[0]!=NULL)
@@ -1254,9 +1271,11 @@ void ExamineTypesAndLhsOfSymbolDefinition (SymbDef def)
 extern PolyList unboxed_record_cons_list,unboxed_record_decons_list;
 #endif
 
-void ExamineTypesAndLhsOfSymbols (SymbolP function_symbols,SymbolP type_symbols)
+void ExamineTypesAndLhsOfSymbols
+	(SymbolP function_symbols,struct module_type_symbols mts,int size_dcl_type_symbols_a,struct module_type_symbols dcl_type_symbols_a[])
 {
-	SymbolP symbs;
+	int n_types,i,dcl_type_symbols_n;
+	SymbolP symbs,type_symbol_a;
 
 	next_def_number = 1;
 
@@ -1264,9 +1283,20 @@ void ExamineTypesAndLhsOfSymbols (SymbolP function_symbols,SymbolP type_symbols)
 		if (symbs->symb_kind==definition)
 			ExamineTypesAndLhsOfSymbolDefinition (symbs->symb_def);
 
-	for_l (symbs,type_symbols,symb_next)
-		if (symbs->symb_kind==definition)
-			ExamineTypesAndLhsOfSymbolDefinition (symbs->symb_def);
+	n_types = mts.mts_n_types;
+	type_symbol_a = mts.mts_type_symbol_a;
+	for (i=0; i<n_types; ++i)
+		if (type_symbol_a[i].symb_kind==definition)
+			ExamineTypesAndLhsOfSymbolDefinition (type_symbol_a[i].symb_def);
+
+	for (dcl_type_symbols_n=0; dcl_type_symbols_n<size_dcl_type_symbols_a; ++dcl_type_symbols_n){		
+		n_types = dcl_type_symbols_a[dcl_type_symbols_n].mts_n_types;
+		type_symbol_a = dcl_type_symbols_a[dcl_type_symbols_n].mts_type_symbol_a;	
+		for (i=0; i<n_types; ++i)
+			if (type_symbol_a[i].symb_kind==definition)
+				ExamineTypesAndLhsOfSymbolDefinition (type_symbol_a[i].symb_def);
+	}
+
 #if STRICT_LISTS
 	{
 		PolyList unboxed_record_cons_elem,unboxed_record_decons_elem;
@@ -1283,10 +1313,11 @@ PolyList UserDefinedArrayFunctions;
 
 char *current_imported_module; /* also used by instructions.c */
 
-void ImportSymbols (SymbolP function_symbols,Symbol type_symbols)
+void ImportSymbols (SymbolP function_symbols,int size_dcl_type_symbols_a,struct module_type_symbols dcl_type_symbols_a[])
 {
-	Symbol symbol;	
+	Symbol symbol;
 	PolyList array_fun;
+	int dcl_type_symbols_n;
 
 	current_imported_module = NULL;
 	
@@ -1319,55 +1350,62 @@ void ImportSymbols (SymbolP function_symbols,Symbol type_symbols)
 		}
 	}
 
-	for_l (symbol,type_symbols,symb_next){
+	for (dcl_type_symbols_n=0; dcl_type_symbols_n<size_dcl_type_symbols_a; ++dcl_type_symbols_n){
+		int n_types;
+		SymbolP type_symbol_a;
 		SymbDef sdef;
+		int i;
 
-		if (symbol->symb_kind!=definition)
-			continue;
+		n_types = dcl_type_symbols_a[dcl_type_symbols_n].mts_n_types;
+		type_symbol_a = dcl_type_symbols_a[dcl_type_symbols_n].mts_type_symbol_a;	
+		for (i=0; i<n_types; ++i){
+			if (type_symbol_a[i].symb_kind!=definition)
+				continue;
 
-		sdef=symbol->symb_def;
-		if (sdef->sdef_module!=CurrentModule){
-			if (sdef->sdef_isused
-				&& sdef->sdef_mark & (SDEF_USED_STRICTLY_MASK | SDEF_USED_LAZILY_MASK | SDEF_USED_CURRIED_MASK)
-			){
-				if (sdef->sdef_module!=current_imported_module){
-					current_imported_module=sdef->sdef_module;
-					GenImpMod (current_imported_module);
-				}
-				GenImport (sdef);
-			}
-
-			if (sdef->sdef_kind==TYPE){
-				ConstructorList constructor;
-
-				for_l (constructor,sdef->sdef_type->type_constructors,cl_next){
-					SymbDef constructor_sdef;
-					
-					constructor_sdef = constructor->cl_constructor->type_node_symbol->symb_def;
-					if (constructor_sdef->sdef_isused
-						&& constructor_sdef->sdef_mark & (SDEF_USED_STRICTLY_MASK | SDEF_USED_LAZILY_MASK | SDEF_USED_CURRIED_MASK)
-					){
-						if (constructor_sdef->sdef_module!=current_imported_module){
-							current_imported_module=constructor_sdef->sdef_module;
-							GenImpMod (current_imported_module);
-						}
-						GenImport (constructor_sdef);
+			sdef=type_symbol_a[i].symb_def;
+			if (sdef->sdef_module!=CurrentModule){
+				if (sdef->sdef_isused
+					&& sdef->sdef_mark & (SDEF_USED_STRICTLY_MASK | SDEF_USED_LAZILY_MASK | SDEF_USED_CURRIED_MASK)
+				){
+					if (sdef->sdef_module!=current_imported_module){
+						current_imported_module=sdef->sdef_module;
+						GenImpMod (current_imported_module);
 					}
+					GenImport (sdef);
 				}
-			} else if (sdef->sdef_kind==RECORDTYPE){
-				FieldList fields;
-	
-				for_l (fields,sdef->sdef_type->type_fields,fl_next){
-					SymbDef field_sdef;
 
-					field_sdef=fields->fl_symbol->symb_def;
+				if (sdef->sdef_kind==TYPE){
+					ConstructorList constructor;
 
-					if (field_sdef->sdef_isused && field_sdef->sdef_mark & SDEF_USED_LAZILY_MASK){
-						if (sdef->sdef_module!=current_imported_module){
-							current_imported_module=sdef->sdef_module;
-							GenImpMod (current_imported_module);
+					for_l (constructor,sdef->sdef_type->type_constructors,cl_next){
+						SymbDef constructor_sdef;
+						
+						constructor_sdef = constructor->cl_constructor->type_node_symbol->symb_def;
+						if (constructor_sdef->sdef_isused
+							&& constructor_sdef->sdef_mark & (SDEF_USED_STRICTLY_MASK | SDEF_USED_LAZILY_MASK | SDEF_USED_CURRIED_MASK)
+						){
+							if (constructor_sdef->sdef_module!=current_imported_module){
+								current_imported_module=constructor_sdef->sdef_module;
+								GenImpMod (current_imported_module);
+							}
+							GenImport (constructor_sdef);
 						}
-						GenImport (field_sdef);
+					}
+				} else if (sdef->sdef_kind==RECORDTYPE){
+					FieldList fields;
+		
+					for_l (fields,sdef->sdef_type->type_fields,fl_next){
+						SymbDef field_sdef;
+
+						field_sdef=fields->fl_symbol->symb_def;
+
+						if (field_sdef->sdef_isused && field_sdef->sdef_mark & SDEF_USED_LAZILY_MASK){
+							if (sdef->sdef_module!=current_imported_module){
+								current_imported_module=sdef->sdef_module;
+								GenImpMod (current_imported_module);
+							}
+							GenImport (field_sdef);
+						}
 					}
 				}
 			}
@@ -1375,24 +1413,31 @@ void ImportSymbols (SymbolP function_symbols,Symbol type_symbols)
 	}
 }
 
-void import_not_yet_imported_record_r_labels (Symbol symbols)
+void import_not_yet_imported_record_r_labels (int size_dcl_type_symbols_a,struct module_type_symbols dcl_type_symbols_a[])
 {
-	Symbol symbol;	
+	int dcl_type_symbols_n;
 	
-	for_l (symbol,symbols,symb_next){
-		if (symbol->symb_kind==definition){
-			SymbDef sdef;
+	for (dcl_type_symbols_n=0; dcl_type_symbols_n<size_dcl_type_symbols_a; ++dcl_type_symbols_n){
+		int n_types;
+		SymbolP type_symbol_a;
+		int i;
 
-			sdef=symbol->symb_def;
-			if ((sdef->sdef_mark & (SDEF_USED_STRICTLY_MASK | SDEF_RECORD_R_LABEL_IMPORTED_MASK))==SDEF_USED_STRICTLY_MASK
-				&& sdef->sdef_kind==RECORDTYPE && sdef->sdef_module!=CurrentModule)
-			{
-				if (sdef->sdef_module!=current_imported_module){
-					current_imported_module=sdef->sdef_module;
-					GenImpMod (current_imported_module);
+		n_types = dcl_type_symbols_a[dcl_type_symbols_n].mts_n_types;
+		type_symbol_a = dcl_type_symbols_a[dcl_type_symbols_n].mts_type_symbol_a;	
+		for (i=0; i<n_types; ++i)
+			if (type_symbol_a[i].symb_kind==definition){
+				SymbDef sdef;
+
+				sdef=type_symbol_a[i].symb_def;
+				if ((sdef->sdef_mark & (SDEF_USED_STRICTLY_MASK | SDEF_RECORD_R_LABEL_IMPORTED_MASK))==SDEF_USED_STRICTLY_MASK
+					&& sdef->sdef_kind==RECORDTYPE && sdef->sdef_module!=CurrentModule)
+				{
+					if (sdef->sdef_module!=current_imported_module){
+						current_imported_module=sdef->sdef_module;
+						GenImpMod (current_imported_module);
+					}
+					GenImport (sdef);
 				}
-				GenImport (sdef);
-			}
 		}
 	}
 }

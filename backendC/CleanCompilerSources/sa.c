@@ -3626,66 +3626,81 @@ static void convert_imp_rule_alts (SymbDef sdef)
 		f->fun_alts = NULL;
 }
 
-static void ConvertSyntaxTree (Symbol symbols)
+static void convert_type (SymbDef sdef)
 {
-	unsigned arity;
-	Symbol		sym;
+	Fun *f;
+	unsigned int arity;
+
+	if (sdef->sdef_kind==TYPE){
+		ConstructorList talts;
+
+		for_l (talts,sdef->sdef_type->type_constructors,cl_next){
+			SymbDef cdef;
+			
+			f=SAllocType (Fun);
+			
+			cdef = talts->cl_constructor->type_node_symbol->symb_def;
+
+			cdef->sdef_sa_fun = f;
+			f->fun_symbol        = cdef;
+			arity = f->fun_arity = cdef->sdef_arity;
+			f->fun_single        = False;
+			f->fun_kind          = Constructor;
+			f->fun_single        = cdef->sdef_type->type_nr_of_constructors == 1;
+
+			cdef->sdef_constructor=talts;
+
+			if (cdef->sdef_strict_constructor)
+				ConvertTypeArgsToStrictInfos (talts->cl_constructor->type_node_arguments,arity,&f->fun_strictargs, True);
+			else
+				f->fun_strictargs = NULL;
+
+			InitStrictResult (& f->fun_strictresult);
+		}
+	} else if (sdef->sdef_kind==RECORDTYPE){
+		f=SAllocType (Fun);
+
+		sdef->sdef_sa_fun = f;
+		f->fun_symbol        = sdef;
+		arity = f->fun_arity = sdef->sdef_arity;
+		f->fun_kind          = Constructor;
+		f->fun_single        = True;
+
+		if (sdef->sdef_strict_constructor)
+			ConvertTypeArgsToStrictInfos (TypeArgsOfRecord (sdef), arity,&f->fun_strictargs, True);
+		else
+			f->fun_strictargs = Null;
+		
+		InitStrictResult (& f->fun_strictresult);
+	}
+}
+
+static void ConvertSyntaxTree
+	(struct module_type_symbols mts,int size_dcl_type_symbols_a,struct module_type_symbols dcl_type_symbols_a[])
+{
+	SymbolP type_symbol_a;
 	Bool		annot_warning;
 	SymbDef 	sdef;
-	Fun	*f;
+	int i,n_types,dcl_type_symbols_n;
 
 	annot_warning = False;
 
 	init_predefined_symbols();
 	
 	/* initialise the function table with constructors */
-	for_l (sym,symbols,symb_next)
-		if (sym->symb_kind==definition){
-			sdef = sym->symb_def;
+	n_types = mts.mts_n_types;
+	type_symbol_a = mts.mts_type_symbol_a;
+	for (i=0; i<n_types; ++i)
+		if (type_symbol_a[i].symb_kind==definition)
+			convert_type (type_symbol_a[i].symb_def);
 
-			if (sdef->sdef_kind==TYPE){
-				ConstructorList talts;
-	
-				for_l (talts,sdef->sdef_type->type_constructors,cl_next){
-					SymbDef cdef;
-					
-					f=SAllocType (Fun);
-					
-					cdef = talts->cl_constructor->type_node_symbol->symb_def;
-	
-					cdef->sdef_sa_fun = f;
-					f->fun_symbol        = cdef;
-					arity = f->fun_arity = cdef->sdef_arity;			
-					f->fun_single        = False;
-					f->fun_kind          = Constructor;
-					f->fun_single        = cdef->sdef_type->type_nr_of_constructors == 1;
-
-					cdef->sdef_constructor=talts;
-
-					if (cdef->sdef_strict_constructor)
-						ConvertTypeArgsToStrictInfos (talts->cl_constructor->type_node_arguments,arity,&f->fun_strictargs, True);
-					else
-						f->fun_strictargs = NULL;
-	
-					InitStrictResult (& f->fun_strictresult);
-				}
-			} else if (sdef->sdef_kind==RECORDTYPE){
-				f=SAllocType (Fun);
-
-				sdef->sdef_sa_fun = f;
-				f->fun_symbol        = sdef;
-				arity = f->fun_arity = sdef->sdef_arity;			
-				f->fun_kind          = Constructor;
-				f->fun_single        = True;
-	
-				if (sdef->sdef_strict_constructor)
-					ConvertTypeArgsToStrictInfos (TypeArgsOfRecord (sdef), arity,&f->fun_strictargs, True);
-				else
-					f->fun_strictargs = Null;
-				
-				InitStrictResult (& f->fun_strictresult);
-			}
-		}
+	for (dcl_type_symbols_n=0; dcl_type_symbols_n<size_dcl_type_symbols_a; ++dcl_type_symbols_n){		
+		n_types = dcl_type_symbols_a[dcl_type_symbols_n].mts_n_types;
+		type_symbol_a = dcl_type_symbols_a[dcl_type_symbols_n].mts_type_symbol_a;	
+		for (i=0; i<n_types; ++i)
+			if (type_symbol_a[i].symb_kind==definition)
+				convert_type (type_symbol_a[i].symb_def);
+	}
 	
 	/* initialise the function table with symbols with a definition */
 	for_l (sdef,scc_dependency_list,sdef_next_scc)

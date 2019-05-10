@@ -660,16 +660,19 @@ struct foreign_export_list {
 	struct foreign_export_list *fe_next;
 };
 
-#if CLEAN2
-typedef char * ModuleFileTime;
-#else
-typedef FileTime ModuleFileTime;
-#endif
+typedef char *ModuleFileTime;
+
+struct module_type_symbols {
+	int		mts_n_types;
+	SymbolP	mts_type_symbol_a;
+};
 
 typedef struct {
 	char *				im_name;
 	SymbolP				im_function_symbols;
-	SymbolP				im_type_symbols;
+	struct module_type_symbols im_type_symbols;
+	int					im_size_dcl_type_symbols_a;
+	struct module_type_symbols *im_dcl_type_symbols_a;
 	ImpRules			im_rules;
 	struct symbol_def *	im_start;
 	DefMod				im_def_module;
@@ -678,19 +681,15 @@ typedef struct {
 	struct string_list *	im_imported_libs;
 #endif
 	struct foreign_export_list *	im_foreign_exports;
-#if WRITE_DCL_MODIFICATION_TIME
 	ModuleFileTime		im_modification_time;
-#endif
 } *ImpMod, ImpRepr;
 
 struct def_repr {
 	char *		dm_name;
+	int			dm_module_n;
 	SymbolP		dm_function_symbols;
-	SymbolP		dm_type_symbols;
 	Symbol		dm_symbols_end;
 	TableKind	dm_system_module_table_kind;
 	Bool		dm_system_module;
-#if WRITE_DCL_MODIFICATION_TIME
 	ModuleFileTime	dm_modification_time;
-#endif
 };
