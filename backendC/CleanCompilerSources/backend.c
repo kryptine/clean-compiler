@@ -553,10 +553,8 @@ void BEBindSpecialType (int special_type_n,int type_index,int module_index)
 BESymbolP
 BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, int moduleIndex)
 {
-	Bool		isSpecialArrayFunction;
 	BEModuleP	module;
-	SymbolP		functionSymbol;
-	SymbDefP	sdef;
+	SymbolP		functionSymbol,previousFunctionSymbol;
 	SymbDefP	originalsdef;
 	TypeAlt		*typeAlt;
 	TypeNode	elementType, arrayType;
@@ -572,172 +570,153 @@ BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, in
 	originalsdef	= functionSymbol->symb_def;
 
 	typeAlt	= originalsdef->sdef_rule_type->rule_type_rule;
-	isSpecialArrayFunction	= False;
 	switch (arrayFunKind)
 	{
-		case BEArraySelectFun:
-			Assert (originalsdef->sdef_arfun == BEArraySelectFun || originalsdef->sdef_arfun == BEUnqArraySelectFun);
-			break;
 		case BE_UnqArraySelectFun:
 		case BE_UnqArraySelectLastFun:
 			Assert (typeAlt->type_alt_lhs->type_node_arity == 2);
 			elementType	= typeAlt->type_alt_rhs;
 			arrayType	= typeAlt->type_alt_lhs->type_node_arguments->type_arg_node;
-
-			isSpecialArrayFunction	= True;
 			Assert (originalsdef->sdef_arfun == BEArraySelectFun);
 			break;
 		case BE_ArrayUpdateFun:
-			isSpecialArrayFunction	= True;
 			elementType	= typeAlt->type_alt_lhs->type_node_arguments->type_arg_next->type_arg_next->type_arg_node;
 			arrayType	= typeAlt->type_alt_lhs->type_node_arguments->type_arg_node;
-			/* fall through! */
-		case BEArrayUpdateFun:
 			Assert (originalsdef->sdef_arfun == BEArrayUpdateFun);
 			break;
 		default:
 			Assert (False);
-			break;
+			return (functionSymbol);
 	}
 
-	if (isSpecialArrayFunction)
+	previousFunctionSymbol	= functionSymbol;
+	functionSymbol	= functionSymbol->symb_next;
+
+	if (functionSymbol != NULL && functionSymbol->symb_kind == definition){
+		if (functionSymbol->symb_def->sdef_arfun == (ArrayFunKind) arrayFunKind)
+			return functionSymbol;
+
+		if (arrayFunKind == BE_UnqArraySelectLastFun && functionSymbol->symb_def->sdef_arfun == BE_UnqArraySelectFun){
+			previousFunctionSymbol	= functionSymbol;
+			functionSymbol	= functionSymbol->symb_next;
+
+			if (functionSymbol != NULL && functionSymbol->symb_kind == definition &&
+				functionSymbol->symb_def->sdef_arfun == (ArrayFunKind) arrayFunKind)
+			{
+				return functionSymbol;
+			}
+		}
+	}
+
 	{
-		SymbolP	previousFunctionSymbol;
-		Bool	allreadyCreated;
+		char		*functionName, *functionPrefix;
+		TypeAlt		*newTypeAlt;
+		IdentP		newIdent;
+		SymbDefP	newsdef;
+		SymbolP		newFunctionSymbol;
+		RuleTypes	newRuleType;
+		TypeArgs	lhsArgs;
+		TypeNode	rhs;
 
-		previousFunctionSymbol	= functionSymbol;
-		functionSymbol	= functionSymbol->symb_next;
+		newFunctionSymbol	= ConvertAllocType (SymbolS);
+		newsdef				= ConvertAllocType (SymbDefS);
+		newIdent			= ConvertAllocType (IdentS);
 
-		allreadyCreated	= False;
-		if (functionSymbol != NULL && functionSymbol->symb_kind == definition)
+		newTypeAlt	= ConvertAllocType (TypeAlt);
+
+		Assert (!arrayType->type_node_is_var);
+		switch (arrayType->type_node_symbol->symb_kind)
 		{
-			sdef			= functionSymbol->symb_def;
-			allreadyCreated	= sdef->sdef_arfun == (ArrayFunKind) arrayFunKind;
-			if (!allreadyCreated && arrayFunKind == BE_UnqArraySelectLastFun && sdef->sdef_arfun == BE_UnqArraySelectFun)
-			{
-				previousFunctionSymbol	= functionSymbol;
-				functionSymbol	= functionSymbol->symb_next;
-	
-				if (functionSymbol != NULL && functionSymbol->symb_kind == definition)
-				{
-					sdef			= functionSymbol->symb_def;
-					allreadyCreated	= sdef->sdef_arfun == (ArrayFunKind) arrayFunKind;
-				}
-			}
+			case strict_array_type:
+			case unboxed_array_type:
+				elementType->type_node_annotation	= StrictAnnot;
+				break;
+			case array_type:
+				break;
+			default:
+				Assert (False);
+				break;
 		}
 
-		if (!allreadyCreated)
+		switch (arrayFunKind)
 		{
-			char		*functionName, *functionPrefix;
-			TypeAlt		*newTypeAlt;
-			IdentP		newIdent;
-			SymbDefP	newsdef;
-			SymbolP		newFunctionSymbol;
-			RuleTypes	newRuleType;
-			TypeArgs	lhsArgs;
-			TypeNode	rhs;
-
-			newFunctionSymbol	= ConvertAllocType (SymbolS);
-			newsdef				= ConvertAllocType (SymbDefS);
-			newIdent			= ConvertAllocType (IdentS);
-
-			newTypeAlt	= ConvertAllocType (TypeAlt);
-
-			Assert (!arrayType->type_node_is_var);
-			switch (arrayType->type_node_symbol->symb_kind)
+			case BE_UnqArraySelectFun:
+				rhs	= BESymbolTypeNode (NoAnnot,NoUniAttr,gBasicSymbols [tuple_type],
+											BETypeArgs (elementType, BETypeArgs (arrayType, NULL)));
+				lhsArgs	= BETypeArgs (arrayType, BETypeArgs (BESymbolTypeNode (StrictAnnot,NoUniAttr,gBasicSymbols [int_type], NULL), NULL));
+				functionPrefix	= "_uselectf";
+				break;
+			case BE_UnqArraySelectLastFun:
 			{
-				case strict_array_type:
-				case unboxed_array_type:
-					elementType->type_node_annotation	= StrictAnnot;
-					break;
-				case array_type:
-					break;
-				default:
-					Assert (False);
-					break;
-			}
+				TypeNode			rType;
 
-			switch (arrayFunKind)
+				rType	= BEVar0TypeNode (StrictAnnot,NoUniAttr);
+				rhs	= BESymbolTypeNode (NoAnnot,NoUniAttr,gBasicSymbols [tuple_type],
+											BETypeArgs (elementType, BETypeArgs (rType, NULL)));
+				lhsArgs	= BETypeArgs (
+							BESymbolTypeNode (StrictAnnot,NoUniAttr,gBasicSymbols [tuple_type],
+									BETypeArgs (arrayType, BETypeArgs (rType, NULL))),
+							BETypeArgs (BESymbolTypeNode (StrictAnnot,NoUniAttr,gBasicSymbols [int_type], NULL), NULL));
+				functionPrefix	= "_uselectl";
+				break;
+			}
+			case BE_ArrayUpdateFun:
 			{
-				case BE_UnqArraySelectFun:
-					rhs	= BESymbolTypeNode (NoAnnot,NoUniAttr,gBasicSymbols [tuple_type],
-												BETypeArgs (elementType, BETypeArgs (arrayType, NULL)));
-					lhsArgs	= BETypeArgs (arrayType, BETypeArgs (BESymbolTypeNode (StrictAnnot,NoUniAttr,gBasicSymbols [int_type], NULL), NULL));
-					functionPrefix	= "_uselectf";
-					break;
-				case BE_UnqArraySelectLastFun:
-				{
-					TypeNode			rType;
+				TypeNode			rType;
 
-					rType	= BEVar0TypeNode (StrictAnnot,NoUniAttr);
-					rhs	= BESymbolTypeNode (NoAnnot,NoUniAttr,gBasicSymbols [tuple_type],
-												BETypeArgs (elementType, BETypeArgs (rType, NULL)));
-					lhsArgs	= BETypeArgs (
-								BESymbolTypeNode (StrictAnnot,NoUniAttr,gBasicSymbols [tuple_type],
-										BETypeArgs (arrayType, BETypeArgs (rType, NULL))),
-								BETypeArgs (BESymbolTypeNode (StrictAnnot,NoUniAttr,gBasicSymbols [int_type], NULL), NULL));
-					functionPrefix	= "_uselectl";
-					break;
-				}
-				case BE_ArrayUpdateFun:
-				{
-					TypeNode			rType;
-
-					rType	= BEVar0TypeNode (StrictAnnot,NoUniAttr);
-					rhs	= rType;
-					lhsArgs	= BETypeArgs (
-								BESymbolTypeNode (StrictAnnot,NoUniAttr,gBasicSymbols [tuple_type],
-										BETypeArgs (arrayType, BETypeArgs (rType, NULL))),
-								BETypeArgs (BESymbolTypeNode (StrictAnnot,NoUniAttr,gBasicSymbols [int_type], NULL),
-								BETypeArgs (elementType,
-								NULL)));
-					functionPrefix	= "_updatei";
-					break;
-				}
-				default:
-					Assert (False);
-					break;
+				rType	= BEVar0TypeNode (StrictAnnot,NoUniAttr);
+				rhs	= rType;
+				lhsArgs	= BETypeArgs (
+							BESymbolTypeNode (StrictAnnot,NoUniAttr,gBasicSymbols [tuple_type],
+									BETypeArgs (arrayType, BETypeArgs (rType, NULL))),
+							BETypeArgs (BESymbolTypeNode (StrictAnnot,NoUniAttr,gBasicSymbols [int_type], NULL),
+							BETypeArgs (elementType,
+							NULL)));
+				functionPrefix	= "_updatei";
+				break;
 			}
-
-			functionName	= ConvertAlloc (strlen (functionPrefix) + 1 + strlen (originalsdef->sdef_ident->ident_name) + 1);
-			strcpy (functionName, functionPrefix);
-			strcat (functionName, ";");
-			strcat (functionName, originalsdef->sdef_ident->ident_name);
-
-			newTypeAlt->type_alt_lhs	= BESymbolTypeNode (NoAnnot,NoUniAttr,newFunctionSymbol, lhsArgs);
-			newTypeAlt->type_alt_rhs	= rhs;
-			newTypeAlt->type_alt_strict_positions	= NULL;
-
-			newIdent->ident_symbol	= newFunctionSymbol;
-			newIdent->ident_name	= functionName;
-
-			newRuleType	= ConvertAllocType (struct rule_type);
-			newRuleType->rule_type_rule	= newTypeAlt;
-
-			newsdef->sdef_ident			= newIdent;
-			newsdef->sdef_module		= gBEState.be_icl.beicl_module->im_name;
-			newsdef->sdef_mark		= 0;
-			newsdef->sdef_isused		= True;
-			newsdef->sdef_exported		= False;
-			newsdef->sdef_arity			= newTypeAlt->type_alt_lhs->type_node_arity;
-			newsdef->sdef_arfun			= arrayFunKind;
-			newsdef->sdef_kind 			= SYSRULE;
-			newsdef->sdef_rule_type		= newRuleType;
-			newsdef->sdef_ident			= newIdent;
-			newsdef->sdef_mark			= 0;
-
-			newFunctionSymbol->symb_kind	= definition;
-			newFunctionSymbol->symb_def		= newsdef;
-
-			functionSymbol						= previousFunctionSymbol->symb_next;
-			previousFunctionSymbol->symb_next	= newFunctionSymbol;
-			newFunctionSymbol->symb_next		= functionSymbol;
-
-			AddUserDefinedArrayFunction (newFunctionSymbol);
-
-			functionSymbol	= newFunctionSymbol;
+			default:
+				Assert (False);
+				break;
 		}
 
+		functionName	= ConvertAlloc (strlen (functionPrefix) + 1 + strlen (originalsdef->sdef_ident->ident_name) + 1);
+		strcpy (functionName, functionPrefix);
+		strcat (functionName, ";");
+		strcat (functionName, originalsdef->sdef_ident->ident_name);
+
+		newTypeAlt->type_alt_lhs	= BESymbolTypeNode (NoAnnot,NoUniAttr,newFunctionSymbol, lhsArgs);
+		newTypeAlt->type_alt_rhs	= rhs;
+		newTypeAlt->type_alt_strict_positions	= NULL;
+
+		newIdent->ident_symbol	= newFunctionSymbol;
+		newIdent->ident_name	= functionName;
+
+		newRuleType	= ConvertAllocType (struct rule_type);
+		newRuleType->rule_type_rule	= newTypeAlt;
+
+		newsdef->sdef_ident			= newIdent;
+		newsdef->sdef_module		= gBEState.be_icl.beicl_module->im_name;
+		newsdef->sdef_mark		= 0;
+		newsdef->sdef_isused		= True;
+		newsdef->sdef_exported		= False;
+		newsdef->sdef_arity			= newTypeAlt->type_alt_lhs->type_node_arity;
+		newsdef->sdef_arfun			= arrayFunKind;
+		newsdef->sdef_kind 			= SYSRULE;
+		newsdef->sdef_rule_type		= newRuleType;
+		newsdef->sdef_ident			= newIdent;
+		newsdef->sdef_mark			= 0;
+
+		newFunctionSymbol->symb_kind	= definition;
+		newFunctionSymbol->symb_def		= newsdef;
+
+		functionSymbol						= previousFunctionSymbol->symb_next;
+		previousFunctionSymbol->symb_next	= newFunctionSymbol;
+		newFunctionSymbol->symb_next		= functionSymbol;
+
+		AddUserDefinedArrayFunction (newFunctionSymbol);
+
+		functionSymbol	= newFunctionSymbol;
 	}
 
 	return (functionSymbol);
