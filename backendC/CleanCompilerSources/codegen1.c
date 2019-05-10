@@ -1603,18 +1603,21 @@ void GenerateCodeForLazyArrayFunctionEntries (void)
 	}
 }
 
-void GenerateCodeForConstructorsAndRecords (Symbol symbols)
+void GenerateCodeForConstructorsAndRecords (struct module_type_symbols mts)
 {
-	Symbol symbol_p;
+	int n_types,i;
+	SymbolP type_symbol_a;
 #if STRICT_LISTS
 	PolyList unboxed_record_cons_element;
 #endif
 	
-	for_l (symbol_p,symbols,symb_next){
-		if (symbol_p->symb_kind==definition){
+	n_types = mts.mts_n_types;
+	type_symbol_a = mts.mts_type_symbol_a;
+	for (i=0; i<n_types; ++i){
+		if (type_symbol_a[i].symb_kind==definition){
 			SymbDef def;
 		
-			def = symbol_p->symb_def;
+			def = type_symbol_a[i].symb_def;
 
 			if (def->sdef_module==CurrentModule){
 				if (def->sdef_kind==TYPE){
@@ -3071,7 +3074,7 @@ SymbDef create_select_and_match_function (SymbolP constructor_symbol,int n_dicti
 	SymbDef match_function_sdef;
 	Symbol match_function_symbol;
 	ArgP lhs_function_arg;
-	NodeP lhs_root,rhs_root,constructor_node;
+	NodeP lhs_root,rhs_root;
 	NodeIdP node_id;
 	ImpRuleS *match_imp_rule;
 	struct node *push_node,*case_node,*switch_node;
@@ -3237,8 +3240,8 @@ struct update {
 };
 
 #if BIND_UNBOXED_LHS_TUPLE_AND_RECORD_ARGUMENTS_IN_BIND_ARGUMENTS /* added 9-4-1999 */
-void bind_tuple_and_record_arguments (ArgP arguments,NodeId tuple_node_id,int a_offset,int b_offset,
-									  NodeIdListElementS ***a_node_ids_h,NodeIdListElementS ***b_node_ids_h)
+static void bind_tuple_and_record_arguments (ArgP arguments,NodeId tuple_node_id,int a_offset,int b_offset,
+											 NodeIdListElementS ***a_node_ids_h,NodeIdListElementS ***b_node_ids_h)
 {
 	NodeIdListElementS **a_node_ids_p,**b_node_ids_p;
 	ArgP arg_p;
@@ -3836,7 +3839,7 @@ static void add_node_id_or_tuple_node_ids_to_list (NodeIdP node_id,NodeIdP push_
 #endif
 
 #if BUILD_FREE_NODE_ID_LIST_DURING_PATTER_MATCH
-void set_local_reference_counts_and_add_free_node_ids (NodeP case_node,NodeIdListElementS **free_node_ids_l)
+static void set_local_reference_counts_and_add_free_node_ids (NodeP case_node,NodeIdListElementS **free_node_ids_l)
 {
 	NodeIdRefCountListP node_id_ref_count_elem;
 	NodeIdP push_node_id_p;

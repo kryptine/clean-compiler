@@ -123,7 +123,6 @@ STRUCT (be_state, BEState)
 	unsigned int	be_nModules;
 
 	SymbolP			be_function_symbols;
-	SymbolP			be_type_symbols;
 	SymbolP			be_dontCareSymbol;
 	SymbolP			be_dictionarySelectFunSymbol;
 	SymbolP			be_dictionaryUpdateFunSymbol;
@@ -181,13 +180,11 @@ PredefinedSymbol (SymbKind symbolKind, int arity)
 } /* PredefinedSymbol */
 
 static SymbolP
-AllocateSymbols (int nFunctions, int nTypes, int nConstructorsAndFields, SymbolP *function_symbols_h, SymbolP *type_symbols_h)
+AllocateSymbols (int nFunctions, int nTypesConstructorsAndFields, SymbolP *function_symbols_h)
 {
-	int	nFunctionsAndTypes,nSymbols;
+	int	nSymbols;
 	
-	nFunctionsAndTypes = nFunctions+nTypes;
-	nSymbols = nFunctionsAndTypes+nConstructorsAndFields;
-
+	nSymbols = nFunctions+nTypesConstructorsAndFields;
 	if (nSymbols!=0){
 		SymbolP	symbols;
 		int i;
@@ -203,16 +200,6 @@ AllocateSymbols (int nFunctions, int nTypes, int nConstructorsAndFields, SymbolP
 		
 			symbols [nFunctions-1].symb_next = *function_symbols_h;
 			*function_symbols_h = symbols;
-		}
-
-		if (nTypes>0){
-			for (; i < nFunctionsAndTypes; ++i){
-				symbols [i].symb_kind	= erroneous_symb;
-				symbols [i].symb_next	= &symbols [i+1];
-			}
-		
-			symbols [nFunctionsAndTypes-1].symb_next = *type_symbols_h;
-			*type_symbols_h = &symbols[nFunctions];
 		}
 		
 		for (; i < nSymbols; i++){
@@ -300,7 +287,7 @@ DeclareModule (int moduleIndex, char *name, Bool isSystemModule, int nFunctions,
 	BEModuleP	module;
 	SymbolP		symbols;
 
-	symbols = AllocateSymbols (nFunctions, nTypes, nConstructors + nFields, &gBEState.be_function_symbols, &gBEState.be_type_symbols);
+	symbols = AllocateSymbols (nFunctions, nTypes + nConstructors + nFields, &gBEState.be_function_symbols);
 
 	Assert ((unsigned int) moduleIndex < gBEState.be_nModules);
 	module	= &gBEState.be_modules [moduleIndex];
@@ -375,6 +362,35 @@ BEDeclareIclModule (CleanString name, CleanString modificationTime, int nFunctio
 	scc_dependency_list	= NULL;
 	icl->beicl_depsP	= &scc_dependency_list;
 
+	{
+		struct module_type_symbols *dcl_type_symbols_a;
+		int n_dcl_type_symbols;
+		struct def_list *def_mod;
+		
+		dcl_type_symbols_a = (struct module_type_symbols*) ConvertAlloc (gBEState.be_nModules * sizeof (struct module_type_symbols));
+		n_dcl_type_symbols=0;
+
+		for (def_mod=OpenDefinitionModules; def_mod!=NULL; def_mod=def_mod->mod_next){
+			int module_n;
+			
+			module_n = def_mod->mod_body->dm_module_n;
+			if (module_n!=main_dcl_module_n){
+				dcl_type_symbols_a[n_dcl_type_symbols].mts_n_types       = gBEState.be_modules [module_n].bem_nTypes;
+				dcl_type_symbols_a[n_dcl_type_symbols].mts_type_symbol_a = gBEState.be_modules [module_n].bem_types;
+				++n_dcl_type_symbols;
+			}
+		}
+		
+		dcl_type_symbols_a[n_dcl_type_symbols].mts_n_types       = gBEState.be_modules [kPredefinedModuleIndex].bem_nTypes;
+		dcl_type_symbols_a[n_dcl_type_symbols].mts_type_symbol_a = gBEState.be_modules [kPredefinedModuleIndex].bem_types;
+		++n_dcl_type_symbols;
+
+		Assert (n_dcl_type_symbols<=gBEState.be_nModules);
+
+		icl->beicl_module->im_dcl_type_symbols_a = dcl_type_symbols_a;
+		icl->beicl_module->im_size_dcl_type_symbols_a = n_dcl_type_symbols;
+	}
+
 	nFunctions	+= ArraySize (gLocallyGeneratedFunctions);
 	DeclareModule (main_dcl_module_n, cName, False, nFunctions, nTypes, nConstructors, nFields);
 
@@ -384,8 +400,9 @@ BEDeclareIclModule (CleanString name, CleanString modificationTime, int nFunctio
 	iclModule->im_def_module	= im_def_module;
 	iclModule->im_rules			= NULL;
 	iclModule->im_start			= NULL;
+	iclModule->im_type_symbols.mts_n_types = nTypes;
+	iclModule->im_type_symbols.mts_type_symbol_a = gBEState.be_modules [main_dcl_module_n].bem_types;
 	iclModule->im_function_symbols = gBEState.be_function_symbols;
-	iclModule->im_type_symbols = gBEState.be_type_symbols;
 # if IMPORT_OBJ_AND_LIB
 	iclModule->im_imported_objs	= NULL;
 	iclModule->im_imported_libs	= NULL;
@@ -416,7 +433,7 @@ BEDeclareDclModule (int moduleIndex, CleanString name, CleanString modificationT
 	char	*cName;
 	SymbolP	moduleNameSymbol;
 	DefMod	dclModule;
-	SymbolP	saved_function_symbols,saved_type_symbols,previous_all_symbols;
+	SymbolP	saved_function_symbols,previous_all_symbols;
 
 	cName	= ConvertCleanString (name);
 
@@ -425,9 +442,7 @@ BEDeclareDclModule (int moduleIndex, CleanString name, CleanString modificationT
 
 	if (moduleIndex == main_dcl_module_n){
 		saved_function_symbols = gBEState.be_function_symbols;
-		saved_type_symbols = gBEState.be_type_symbols;
 		gBEState.be_function_symbols = NULL;
-		gBEState.be_type_symbols = NULL;
 	}
 
 	previous_all_symbols = gBEState.be_function_symbols;
@@ -436,10 +451,10 @@ BEDeclareDclModule (int moduleIndex, CleanString name, CleanString modificationT
 
 	dclModule	= ConvertAllocType (DefRepr);
 	dclModule->dm_name			= cName;
+	dclModule->dm_module_n = moduleIndex;
 	dclModule->dm_modification_time	= ConvertCleanString (modificationTime);
 	dclModule->dm_system_module	= isSystemModule;
 	dclModule->dm_function_symbols = gBEState.be_function_symbols;
-	dclModule->dm_type_symbols = gBEState.be_type_symbols;
 	dclModule->dm_symbols_end = previous_all_symbols;
 	dclModule->dm_system_module_table_kind = FirstSystemModuleTable + moduleIndex;
 
@@ -447,7 +462,6 @@ BEDeclareDclModule (int moduleIndex, CleanString name, CleanString modificationT
 
 	if (moduleIndex == main_dcl_module_n){
 		gBEState.be_function_symbols = saved_function_symbols;
-		gBEState.be_type_symbols = saved_type_symbols;
 		im_def_module=dclModule;
 	}
 } /* BEDeclareDclModule */
@@ -3389,7 +3403,6 @@ BEInit (int argc)
 
 	gBEState.be_modules						= NULL;
 	gBEState.be_function_symbols			= NULL;
-	gBEState.be_type_symbols				= NULL;
 	gBEState.be_dontCareSymbol				= NULL;
 	gBEState.be_dictionarySelectFunSymbol	= NULL;
 	gBEState.be_dictionaryUpdateFunSymbol	= NULL;
