@@ -1405,7 +1405,8 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 									new_symbol_p = CompAlloc (sizeof (struct symbol));
 									*new_symbol_p = *arg_node->node_symbol;
 									new_symbol_p->symb_instance_apply = 1;
-									new_symbol_p->symb_next = (struct symbol*)selector_node_p->node_symbol->symb_def;
+									new_symbol_p->symb_apply_instance_field_def = selector_node_p->node_symbol->symb_def;
+
 									arg_node->node_symbol = new_symbol_p;
 
 									if (arg_state_p->state_type==SimpleState && (arg_state_p->state_kind==StrictOnA || arg_state_p->state_kind==StrictRedirection)
@@ -1989,7 +1990,7 @@ static void optimise_normal_node (Node node)
 							new_symbol_p = CompAlloc (sizeof (struct symbol));
 							*new_symbol_p = *node->node_symbol;
 							new_symbol_p->symb_instance_apply = 1;
-							new_symbol_p->symb_next = (struct symbol*)selector_node_p->node_symbol->symb_def;
+							new_symbol_p->symb_apply_instance_field_def = selector_node_p->node_symbol->symb_def;
 							node->node_symbol = new_symbol_p;
 
 							if (OptimizeInstanceCalls){

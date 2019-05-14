@@ -24,7 +24,6 @@ NodeDefs NewNodeDef (NodeId nid, Node node);
 
 struct def_list {
 	Symbol				mod_name;
-	Bool				mod_undereval;
 	DefMod				mod_body;
 	struct def_list *	mod_next;
 };

@@ -2882,7 +2882,7 @@ static void generate_code_for_apply_in_strict_context (NodeP node,int *asp_p,int
 		struct arg *arg_p;
 		struct symbol_def *field_sdef;
 
-		field_sdef = (struct symbol_def *)node->node_symbol->symb_next;
+		field_sdef = node->node_symbol->symb_apply_instance_field_def;
 
 		arg_p=node_args;
 		while (arg_p!=NULL && arg_p->arg_node->node_kind==NormalNode && arg_p->arg_node->node_symbol->symb_kind==apply_symb)
