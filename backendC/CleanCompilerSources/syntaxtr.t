@@ -591,8 +591,9 @@ STRUCT (symbol_def,SymbDef){
 	struct symbol_def *	sdef_next_scc;
 
 	union {
-		struct symbol_def *		sdef_u2_next_version;	/* for IMPRULES */
-		struct type_alt *		sdef_u2_member_type_of_field; /* for FIELDSELECTOR if SDEF_FIELD_HAS_MEMBER_TYPE */
+		struct symbol_def *	sdef_u2_next_version;	/* for IMPRULES */
+		struct type_alt *	sdef_u2_member_type_of_field; /* for FIELDSELECTOR if SDEF_FIELD_HAS_MEMBER_TYPE */
+		struct symbol *		sdef_u2_special_array_function_symbol; /* if SDEF_HAS_SPECIAL_ARRAY_FUNCTION */
 	} sdef_u2;
 	
 	int				sdef_mark;
@@ -629,12 +630,14 @@ STRUCT (symbol_def,SymbDef){
 #define SDEF_FIELD_HAS_MEMBER_TYPE 1024
 #define SDEF_INSTANCE_RULE_WITH_FIELD_P 16384
 #define SDEF_RULE_INSTANCE_RULE_P 32768
+#define SDEF_HAS_SPECIAL_ARRAY_FUNCTION 512
 
 /* some macros to reuse bit fields */
 
 #define sdef_group_number		sdef_ancestor
 
 #define sdef_next_version	sdef_u2.sdef_u2_next_version
+#define sdef_special_array_function_symbol	sdef_u2.sdef_u2_special_array_function_symbol
 #define sdef_member_type_of_field	sdef_u2.sdef_u2_member_type_of_field
 
 #define sdef_constructor sdef_typeinfo.typeinfo_constructor

@@ -568,10 +568,11 @@ BESymbolP
 BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, int moduleIndex)
 {
 	BEModuleP	module;
-	SymbolP		functionSymbol,previousFunctionSymbol;
+	SymbolP functionSymbol;
 	SymbDefP	originalsdef;
 	TypeAlt		*typeAlt;
 	TypeNode	elementType, arrayType;
+	SymbDef previousFunctionSymbDef;
 
 	Assert ((unsigned int) moduleIndex < gBEState.be_nModules);
 	module	= &gBEState.be_modules [moduleIndex];
@@ -603,21 +604,18 @@ BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, in
 			return (functionSymbol);
 	}
 
-	previousFunctionSymbol	= functionSymbol;
-	functionSymbol	= functionSymbol->symb_next;
-
-	if (functionSymbol != NULL && functionSymbol->symb_kind == definition){
+	previousFunctionSymbDef = originalsdef;
+	if (previousFunctionSymbDef->sdef_mark & SDEF_HAS_SPECIAL_ARRAY_FUNCTION){
+		functionSymbol = previousFunctionSymbDef->sdef_special_array_function_symbol;
 		if (functionSymbol->symb_def->sdef_arfun == (ArrayFunKind) arrayFunKind)
 			return functionSymbol;
 
 		if (arrayFunKind == BE_UnqArraySelectLastFun && functionSymbol->symb_def->sdef_arfun == BE_UnqArraySelectFun){
-			previousFunctionSymbol	= functionSymbol;
-			functionSymbol	= functionSymbol->symb_next;
-
-			if (functionSymbol != NULL && functionSymbol->symb_kind == definition &&
-				functionSymbol->symb_def->sdef_arfun == (ArrayFunKind) arrayFunKind)
-			{
-				return functionSymbol;
+			previousFunctionSymbDef = functionSymbol->symb_def;
+			if (previousFunctionSymbDef->sdef_mark & SDEF_HAS_SPECIAL_ARRAY_FUNCTION){
+				functionSymbol = previousFunctionSymbDef->sdef_special_array_function_symbol;
+				if (functionSymbol->symb_def->sdef_arfun == (ArrayFunKind) arrayFunKind)
+					return functionSymbol;
 			}
 		}
 	}
@@ -724,9 +722,14 @@ BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, in
 		newFunctionSymbol->symb_kind	= definition;
 		newFunctionSymbol->symb_def		= newsdef;
 
-		functionSymbol						= previousFunctionSymbol->symb_next;
-		previousFunctionSymbol->symb_next	= newFunctionSymbol;
-		newFunctionSymbol->symb_next		= functionSymbol;
+		if ((previousFunctionSymbDef->sdef_mark & SDEF_HAS_SPECIAL_ARRAY_FUNCTION)==0){
+			previousFunctionSymbDef->sdef_special_array_function_symbol = newFunctionSymbol;
+			previousFunctionSymbDef->sdef_mark |= SDEF_HAS_SPECIAL_ARRAY_FUNCTION;
+		} else {
+			newsdef->sdef_special_array_function_symbol = previousFunctionSymbDef->sdef_special_array_function_symbol;
+			newsdef->sdef_mark |= SDEF_HAS_SPECIAL_ARRAY_FUNCTION;			
+			previousFunctionSymbDef->sdef_special_array_function_symbol = newFunctionSymbol;
+		}
 
 		AddUserDefinedArrayFunction (newFunctionSymbol);
 
