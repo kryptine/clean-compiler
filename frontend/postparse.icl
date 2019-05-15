@@ -107,6 +107,10 @@ MakeNewImpOrDefFunction name arity body kind prio opt_type pos
 	:== { fun_ident = name, fun_arity = arity, fun_priority = prio, fun_type = opt_type, fun_kind = kind,
 		  fun_body = ParsedBody body, fun_pos = pos, fun_lifted = 0, fun_info = EmptyFunInfo }
 
+MakeNewGenericImpOrDefFunction name arity body kind prio opt_type pos
+	:== { fun_ident = name, fun_arity = arity, fun_priority = prio, fun_type = opt_type, fun_kind = kind,
+		  fun_body = ParsedBody body, fun_pos = pos, fun_lifted = 0, fun_info = {EmptyFunInfo & fi_properties = FI_GenericFun} }
+
 class collectFunctions a :: a Bool !*CollectAdmin -> (a, !*CollectAdmin)
 
 instance collectFunctions ParsedExpr
@@ -1671,7 +1675,7 @@ reorganiseDefinitions icl_module [PD_GenericCase gc=:{gc_type_cons} generic_fun_
 				(determine_generic_instance_deps bodies gcf_arity gc_type_cons ca)
 		#! (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) 
 			= reorganiseDefinitions icl_module defs def_counts ca
-		#! fun = MakeNewImpOrDefFunction fun_name gcf_arity bodies (FK_Function cNameNotLocationDependent) NoPrio No gc.gc_pos
+		#! fun = MakeNewGenericImpOrDefFunction fun_name gcf_arity bodies (FK_Function cNameNotLocationDependent) NoPrio No gc.gc_pos
 		# gcf & gcf_body=GCB_FunDef fun, gcf_arity=gcf_arity, gcf_generic_info=generic_info, gcf_generic_instance_deps=generic_instance_deps
 		#! inst = {gc & gc_gcf = GCF gc_ident gcf}
 		#! c_defs & def_generic_cases = [inst : c_defs.def_generic_cases]

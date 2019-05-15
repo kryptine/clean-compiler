@@ -922,7 +922,7 @@ checkFunctionBodyIfMacro _ def ea
 
 checkFunction :: !FunDef !Index !FunctionOrMacroIndex !Level !Int !*{#FunDef} !*ExpressionInfo !*Heaps !*CheckState
 													  -> (!FunDef,!*{#FunDef},!*ExpressionInfo,!*Heaps,!*CheckState);
-checkFunction fun_def=:{fun_ident,fun_pos,fun_body,fun_type,fun_kind} mod_index fun_index def_level local_functions_index_offset
+checkFunction fun_def=:{fun_ident,fun_pos,fun_body,fun_type,fun_kind,fun_info={fi_properties}} mod_index fun_index def_level local_functions_index_offset
 			fun_defs e_info=:{ef_type_defs,ef_modules,ef_class_defs,ef_is_macro_fun} heaps=:{hp_var_heap,hp_expression_heap,hp_type_heaps,hp_generic_heap} cs=:{cs_error}			
 	# function_ident_for_errors = ident_for_errors_from_fun_symb_and_fun_kind fun_ident fun_kind
 	# cs = {cs & cs_error = pushErrorAdmin (newPosition function_ident_for_errors fun_pos) cs_error}
@@ -940,7 +940,7 @@ checkFunction fun_def=:{fun_ident,fun_pos,fun_body,fun_type,fun_kind} mod_index 
 	  	checkDynamicTypes mod_index es_dynamics fun_type e_info.ef_type_defs e_info.ef_class_defs e_info.ef_modules es_type_heaps es_expr_heap cs
 	  (fun_body, cs_error) = checkFunctionBodyIfMacro fun_kind fun_body cs.cs_error
 	  cs = { cs & cs_error = popErrorAdmin cs_error }
-	  fi_properties = (if ef_is_macro_fun FI_IsMacroFun 0) bitor (has_type fun_type)
+	  fi_properties = (if ef_is_macro_fun (fi_properties bitor FI_IsMacroFun) fi_properties) bitor (has_type fun_type)
 	  fun_info = { fun_def.fun_info & fi_calls = es_calls, fi_def_level = def_level, fi_free_vars = free_vars, fi_dynamics = es_dynamics,
 	  								  fi_properties = fi_properties }
   
