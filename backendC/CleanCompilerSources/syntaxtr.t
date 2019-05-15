@@ -121,6 +121,7 @@ typedef union symb_value {
 	struct state *					val_state_p;		/* element state for unboxed list cons in lhs */
 	struct unboxed_cons *			val_unboxed_cons_p;	/* state and symbol definition for unboxed list cons in rhs */
 #endif
+	struct symbol_def *				val_apply_instance_field_def;
 } SymbValue;
 
 #if STRICT_LISTS
@@ -155,6 +156,7 @@ STRUCT (symbol,Symbol) {
 #define symb_string symb_val.val_string
 #define symb_real symb_val.val_real
 #define symb_arity symb_val.val_arity
+#define symb_apply_instance_field_def symb_val.val_apply_instance_field_def
 
 STRUCT(ident,Ident){
 	char *				ident_name;

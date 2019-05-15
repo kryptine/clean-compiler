@@ -650,7 +650,7 @@ static void CodeRootApply (Node root,NodeId rootid,int asp,int bsp,CodeGenNodeId
 			struct arg *arg_p;
 			struct symbol_def *field_sdef;
 
-			field_sdef = (struct symbol_def *)root->node_symbol->symb_next;
+			field_sdef = root->node_symbol->symb_apply_instance_field_def;
 
 			arg_p=root->node_arguments;
 			while (arg_p!=NULL && arg_p->arg_node->node_kind==NormalNode && arg_p->arg_node->node_symbol->symb_kind==apply_symb)

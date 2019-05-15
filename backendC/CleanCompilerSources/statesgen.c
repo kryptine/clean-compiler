@@ -2069,7 +2069,7 @@ static Bool NodeInAStrictContext (Node node,StateS demanded_state,int local_scop
 					unsigned int arg_strictness;
 					struct type_arg *type_arg_p;
 					
-					field_sdef = (struct symbol_def *)node->node_symbol->symb_next;
+					field_sdef = node->node_symbol->symb_apply_instance_field_def;
 					member_type_alt=field_sdef->sdef_member_type_of_field;
 
 					if (OptimizeInstanceCalls){
@@ -2124,7 +2124,7 @@ static Bool NodeInAStrictContext (Node node,StateS demanded_state,int local_scop
 									new_symbol_p = CompAlloc (sizeof (struct symbol));
 									*new_symbol_p = *node->node_symbol;
 									new_symbol_p->symb_instance_apply = 1;
-									new_symbol_p->symb_next = (struct symbol*)field_sdef;
+									new_symbol_p->symb_apply_instance_field_def = field_sdef;
 									node->node_symbol = new_symbol_p;
 								}
 
