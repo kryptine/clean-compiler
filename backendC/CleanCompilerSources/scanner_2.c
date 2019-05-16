@@ -3,9 +3,6 @@
 		University of Nijmegen
 */
 
-
-#pragma segment scanner
-
 # include	<stdio.h>
 # include	<string.h>
 # include	<ctype.h>
@@ -25,14 +22,6 @@
 # include	"comsupport.h"
 # include	"scanner.h"
 # include	"sizes.h"
-
-# if (defined (__MWERKS__) || defined (__MRC__) || (defined (GNU_C) && defined (_MAC_))) && !defined _WINDOWS_ /* && !defined (MAKE_MPW_TOOL) */
-# define CACHE_DCL_FILES
-# define CACHE_INLINE_FILES
-# else
-# undef CACHE_DCL_FILES
-# undef CACHE_INLINE_FILES
-# endif
 
 char **ReservedWords;
 
@@ -236,7 +225,7 @@ static IdentP RetrieveFromSymbolTable (char *string,TableKind table_kind)
 	| the encountered inline instructions in the symbol table.				|
 	+-----------------------------------------------------------------------+
 */
-	
+
 char NextLine[LineLength];
 
 /* has a command been read? */
@@ -254,217 +243,35 @@ static char *IsCommand (char *com, char *p)
 char    *InlineCodeBuffer;
 unsigned InlineBufferIndex, InlineBufferStart;
 
-#ifdef CACHE_INLINE_FILES
-
-struct inline_cache_list {
-	struct inline_cache_list *	icache_next;
-	struct file_block *			icache_file_blocks;
-#if defined (__MWERKS__) || defined (__MRC__)
-	char						icache_file_name[];
-#else
-	char						icache_file_name[0];
-#endif
-};
-
-#define BUFFER_SIZE 1024
-
-struct file_block {
-	int					file_block_size;
-	struct file_block *	file_block_next;
-	char				file_block_data[BUFFER_SIZE];
-};
-
-struct file_block **next_file_block_l;
-
-static int reading_from_cache=0;
-
-static struct inline_cache_list * inline_cache=NULL;
-
-static File inline_file;
-
-static int chars_left_in_buffer;
-static int end_of_file;
-static char *buffer_p;
-
-static int open_inline_file_for_block_reading (char *file_name)
-{
-	struct inline_cache_list **icache_elem_p,*new_icache_elem;
-	int file_name_length;
-
-	chars_left_in_buffer=0;
-	end_of_file=0;
-	reading_from_cache=0;
-
-	for (icache_elem_p=&inline_cache; *icache_elem_p;
-		icache_elem_p=&(*icache_elem_p)->icache_next)
-	{
-		if (!strcmp ((*icache_elem_p)->icache_file_name,file_name)){
-			reading_from_cache=1;
-
-			next_file_block_l=&(*icache_elem_p)->icache_file_blocks;
-			return 1;
-		}
-	}
-		
-	inline_file = FOpen (file_name, abcFile, "r");
-	if (inline_file==NULL)
-		return 0;
-	
-#if defined (POWER)
-	setvbuf (inline_file,NULL,_IOFBF,8192);
-#endif	
-
-	file_name_length=strlen (file_name);
-
-	new_icache_elem=(struct inline_cache_list*)Alloc (1,sizeof (struct inline_cache_list)+file_name_length+1);
-
-	strcpy (new_icache_elem->icache_file_name,file_name);
-	new_icache_elem->icache_next=NULL;
-	new_icache_elem->icache_file_blocks=NULL;
-	*icache_elem_p=new_icache_elem;
-
-	next_file_block_l=&new_icache_elem->icache_file_blocks;
-	
-	return 1;
-}
-
-static int get_line_from_inline_file (char *line_buffer,int line_length)
-{
-	char *line_buffer_p;
-	
-	line_buffer_p=line_buffer;
-	
-	for (;;){		
-		while (chars_left_in_buffer>0){
-			char c;
-			
-			c=*buffer_p++;
-			--chars_left_in_buffer;
-
-			if (c=='\r')
-				c='\n';
-			
-			if (line_length>1){
-				--line_length;
-				*line_buffer_p++=c;
-			}
-			
-			if (c=='\n'){
-				*line_buffer_p=0;
-				return 1;
-			}
-		}
-		
-		if (!reading_from_cache){
-			struct file_block *file_block;
-
-			if (end_of_file){
-				*line_buffer_p=0;
-				return line_buffer!=line_buffer_p;
-			}
-			
-			file_block=(struct file_block*)Alloc (1,sizeof (struct file_block));
-			
-			chars_left_in_buffer=FRead (file_block->file_block_data,1,BUFFER_SIZE,inline_file);
-			buffer_p=file_block->file_block_data;
-			
-			file_block->file_block_size=chars_left_in_buffer;
-			file_block->file_block_next=NULL;
-			
-			end_of_file = chars_left_in_buffer!=BUFFER_SIZE;
-			
-			*next_file_block_l=file_block;
-			next_file_block_l=&file_block->file_block_next;
-		} else {
-			struct file_block *file_block;
-			
-			file_block=*next_file_block_l;
-		
-			if (file_block==NULL){
-				*line_buffer_p=0;
-				return line_buffer!=line_buffer_p;
-			}
-			
-			chars_left_in_buffer=file_block->file_block_size;
-			buffer_p=file_block->file_block_data;
-			
-			if (chars_left_in_buffer==0){
-				*line_buffer_p=0;
-				return line_buffer!=line_buffer_p;
-			}
-			
-			next_file_block_l=&file_block->file_block_next;
-		}
-	};
-}
-
-extern void clear_inline_cache (void);
-void clear_inline_cache (void)
-{
-	struct inline_cache_list *icache_elem,*next_icache_elem;
-
-	icache_elem=inline_cache;
-	inline_cache=NULL;
-
-	while (icache_elem!=NULL){
-		struct file_block *icache_file_blocks,*next_icache_file_block;
-
-		next_icache_elem=icache_elem->icache_next;
-		icache_file_blocks=icache_elem->icache_file_blocks;
-		icache_elem->icache_file_blocks=NULL;
-		Free (icache_elem);
-
-		while (icache_file_blocks!=NULL){
-			next_icache_file_block=icache_file_blocks->file_block_next;
-			Free (icache_file_blocks);
-			icache_file_blocks=next_icache_file_block;
-		}
-
-		icache_elem=next_icache_elem;
-	}
-}
-#endif
-
 void ScanInlineFile (char *fname,TableKind system_module_table_kind)
 {
 	register char *tail, *instr, *importingModule, *importingExtension;
 	IdentP instrid;
 	int nrinstr;
-#ifndef CACHE_INLINE_FILES
 	File f;
-#endif
 
 	importingModule		= CurrentModule;
 	importingExtension	= CurrentExt;
     
 	CurrentModule = fname;
 	CurrentExt    = GetFileExtension (abcFile);
-          
-#ifdef CACHE_INLINE_FILES
-	if (!open_inline_file_for_block_reading (fname))
-#else
+
 	if (! (f = FOpen (fname, abcFile, "r")))
-#endif
 	{	CurrentModule = importingModule;
 		CurrentExt    = importingExtension;
 
 		return;
 	}
-#ifndef CACHE_INLINE_FILES	
+
 #	if defined (POWER)
 		setvbuf ((void*) f, NULL, _IOFBF, 8192);
 #	endif
-#endif
 		
 	CurrentLine		= 0;
 	CurrentPhase	= NULL;
 		
 	for (;;){
-#ifdef CACHE_INLINE_FILES
-		if (!get_line_from_inline_file (NextLine,LineLength))
-#else
 		if (! FGetS (NextLine, LineLength, f))
-#endif
 			break;
 
 		for (tail = NextLine; isspace (*tail); tail++)
@@ -500,13 +307,8 @@ void ScanInlineFile (char *fname,TableKind system_module_table_kind)
 		InlineBufferIndex = InlineBufferStart;
 
 		for (nrinstr = 0; nrinstr <= MaxInlineInstr;){
-#ifdef CACHE_INLINE_FILES
-			if (!get_line_from_inline_file (NextLine,LineLength)){
-#else
 			if (! FGetS (NextLine, LineLength, f)){
-#endif
 				StaticMessage (False, "%s", "%s no .end found in this file", instrid->ident_name,fname);
-
 				break;
 			}
 			for (tail = NextLine; *tail == ' ' || *tail == '\t'; tail++)
@@ -545,12 +347,7 @@ void ScanInlineFile (char *fname,TableKind system_module_table_kind)
 /*		} */
 	}
 
-#ifdef CACHE_INLINE_FILES
-	if (!reading_from_cache)
-		FClose (inline_file);
-#else
 	FClose (f);
-#endif
 
 	CurrentModule = importingModule;
 	CurrentExt    = importingExtension;
