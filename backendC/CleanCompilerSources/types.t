@@ -34,4 +34,22 @@ typedef enum
 #define SeekCur
 #define SeekEnd
 
+#ifdef _WINDOWS_
+# include <stdarg.h>
+# ifdef _WIN64
+#  undef _WINDOWS_
+#  include <windows.h>
+# else
+#  ifdef __MWERKS__
+#      include <x86_prefix.h>
+#  else
+#   ifndef _X86_
+#    define _X86_
+#   endif
+#  endif
+#  include <windef.h>
+#  include <winbase.h>
+# endif
+#endif
+
 #endif
