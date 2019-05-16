@@ -1603,7 +1603,7 @@ void GenerateCodeForLazyArrayFunctionEntries (void)
 	}
 }
 
-void GenerateCodeForConstructorsAndRecords (struct module_type_symbols mts)
+void GenerateCodeForConstructorsAndRecords (struct module_function_and_type_symbols mfts)
 {
 	int n_types,i;
 	SymbolP type_symbol_a;
@@ -1611,8 +1611,8 @@ void GenerateCodeForConstructorsAndRecords (struct module_type_symbols mts)
 	PolyList unboxed_record_cons_element;
 #endif
 	
-	n_types = mts.mts_n_types;
-	type_symbol_a = mts.mts_type_symbol_a;
+	n_types = mfts.mfts_n_types;
+	type_symbol_a = mfts.mfts_type_symbol_a;
 	for (i=0; i<n_types; ++i){
 		if (type_symbol_a[i].symb_kind==definition){
 			SymbDef def;

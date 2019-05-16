@@ -902,12 +902,6 @@ void CmdError (char *errormsg,...)
 	va_end (args);
 }
 
-extern long GetMainModuleVolume (void);
-long GetMainModuleVolume (void)
-{
-	return 0;
-}
-
 void Free (void *p)
 {		
 #if USE_SYSTEM_ALLOC

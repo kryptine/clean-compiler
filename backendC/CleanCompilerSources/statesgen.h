@@ -11,14 +11,15 @@ extern int FieldArgumentNodeStatesAreStricter (ArgS *offered_args,ArgS *field_ar
 extern void ConvertAnnotationToState (Annotation annot, States state);
 extern void SetUnaryState (States state, StateKind kind, ObjectKind object);
 extern Bool HasExternalAnnot (Node node);
-extern void GenerateStatesForRecords (struct module_type_symbols mts,int size_dcl_type_symbols_a,struct module_type_symbols dcl_type_symbols_a[]);
+extern void GenerateStatesForRecords (struct module_function_and_type_symbols mts,int size_dcl_mfts_a,struct module_function_and_type_symbols dcl_mfts_a[]);
 extern void InitStatesGen (void);
 extern void GenerateStates (ImpRules rules);
-extern void DetermineSharedAndAnnotatedNodes (ImpRules rules,SymbolP *im_symbols_h);
+extern ImpRuleP DetermineSharedAndAnnotatedNodes (ImpRules rules);
 extern void DetermineStateOfArrayElem (Symbol elemtype, States state);
-extern void ExamineTypesAndLhsOfSymbols (SymbolP function_symbols,struct module_type_symbols mts,int size_dcl_type_symbols_a,struct module_type_symbols dcl_type_symbols_a[]);
-extern void ImportSymbols (SymbolP function_symbols,int size_dcl_type_symbols_a,struct module_type_symbols dcl_type_symbols_a[]);
-extern void import_not_yet_imported_record_r_labels (int size_dcl_type_symbols_a,struct module_type_symbols dcl_type_symbols_a[]);
+extern void ExamineTypesAndLhsOfSymbols
+	(struct module_function_and_type_symbols mfts,int size_dcl_mfts_a,struct module_function_and_type_symbols dcl_mfts_a[],ImpRuleP new_imp_rules);
+extern void ImportSymbols (int size_dcl_mfts_a,struct module_function_and_type_symbols dcl_mfts_a[]);
+extern void import_not_yet_imported_record_r_labels (int size_dcl_mfts_a,struct module_function_and_type_symbols dcl_mfts_a[]);
 extern void DetermineStatesOfRootNodeAndDefs (Node root_node,NodeDefs *rootdef,StateS demstate,int local_scope);
 
 extern unsigned next_def_number;

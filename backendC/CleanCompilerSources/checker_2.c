@@ -51,20 +51,21 @@ void ReadInlineCode (void)
 		
 		def_mod=d_mod->mod_body;
 		if (def_mod->dm_system_module){
-			Symbol symbol,symbols_end;
+			int i,n_function_symbols;
+			Symbol function_symbol_a;
 			
-			symbols_end=def_mod->dm_symbols_end;
-			
-			for (symbol=def_mod->dm_function_symbols; symbol!=NULL && symbol!=symbols_end; symbol=symbol->symb_next)
-				if (symbol->symb_kind==definition){
+			n_function_symbols=def_mod->dm_n_function_symbols;
+			function_symbol_a=def_mod->dm_function_symbol_a;
+			for (i=0; i<n_function_symbols; ++i)
+				if (function_symbol_a[i].symb_kind==definition){
 					SymbDef sdef;
 
-					sdef=symbol->symb_def;
+					sdef=function_symbol_a[i].symb_def;
 					if (sdef->sdef_kind==SYSRULE && sdef->sdef_mark & SDEF_USED_STRICTLY_MASK)
 						break;
 				}
-			
-			if (symbol!=NULL && symbol!=symbols_end && d_mod->mod_name->symb_ident->ident_name!=CurrentModule)
+
+			if (i<n_function_symbols && d_mod->mod_name->symb_ident->ident_name!=CurrentModule)
 				/* Get the inline instructions of all the rules that are defined in this module */
 				ScanInlineFile (d_mod->mod_name->symb_ident->ident_name,def_mod->dm_system_module_table_kind);
 		}

@@ -91,7 +91,7 @@ extern void AddStateSizesAndMaxFrameSizes (int arity, States states,int *maxasiz
 extern void AddStateSizesAndMaxFrameSizesOfArguments (Args args,int *maxasize, int *asize, int *bsize);
 extern void DetermineFieldSizeAndPosition (int fieldnr, int *asize, int *bsize,int *apos, int *bpos, States argstates);
 	
-extern void GenerateCodeForConstructorsAndRecords (struct module_type_symbols mts);
+extern void GenerateCodeForConstructorsAndRecords (struct module_function_and_type_symbols mfts);
 
 extern Bool NodeEntry (StateS *const function_state_p,int arity,Label ealab,SymbDef rootsymb);
 extern Bool NodeEntryUnboxed (StateS *const function_state_p,NodeP call_node_p,int args_a_size,int args_b_size,Label ealab,SymbDef rootsymb);
