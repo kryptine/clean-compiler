@@ -3,11 +3,6 @@
 		University of Nijmegen
 */
 
-# pragma segment comparser
-# ifdef THINK_C
-# pragma options (!macsbug_names)
-# endif
-
 # undef	PRINT_RULES_AFTER_PARSING
 # undef	STOP_AFTER_PARSING
 

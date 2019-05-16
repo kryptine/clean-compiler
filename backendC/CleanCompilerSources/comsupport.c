@@ -477,7 +477,6 @@ static void SetInterruptFlag (void)
 
 void ExitOnInterrupt (void)
 {
-	CheckInterrupt ();
 	if (InterruptFlag){
 		if (OpenedFile){
 			if (ABCFileName){
@@ -490,8 +489,6 @@ void ExitOnInterrupt (void)
 		longjmp (ExitEnv, 1);
 	}
 }
-
-static void (*oldhandler) ();
 
 void InitCompiler (void)
 {
@@ -510,14 +507,11 @@ void InitCompiler (void)
 	InitStatesGen		();
 	InitCoding		();
 	InitInstructions	();
-	oldhandler = SetSignal (SetInterruptFlag);
-
 } /* InitCompiler */
 
 void ExitCompiler (void)
 {
 	CompFree();
-	SetSignal (oldhandler);
 }
 
 #ifdef CLEAN2

@@ -422,93 +422,6 @@ long FTell (File f)
 	return ftell ((FILE *) f);
 } /* FTell */
 
-
-/*******************************************************************************
- * Cursor movement                                                             *
- ******************************************************************************/
-
-void FGotoXY (File f, int x, int y)
-{
-	return;
-}
-
-void FGetXY (int *x, int *y, File f)
-{
-	*x = *y = 0;
-}
-
-/*******************************************************************************
- *     Time Handling                                                           *
- ******************************************************************************/
-
-
-
-#ifdef HP
-#	include <unistd.h>
-#	include <sys/times.h>
-#endif
-
-SysTime GetSysTime (unsigned scale)
-{
-/*
-#ifndef HP
-# ifdef OS2
-	unsigned long time;
-	SysTime t;
-
-# define INCL_DOS
-# include <os2emx.h>
-
-	DosQuerySysInfo (QSV_MS_COUNT,QSV_MS_COUNT,&time,sizeof (time));
-	if (scale>=1000)
-		t=(SysTime)(time * (unsigned long) (scale/1000));
-	else
-		t=(SysTime)((time * (unsigned long) scale)/1000);
-	
-	return t;
-# else
-    struct rusage usage;
-	SysTime t;
-
-    (void) getrusage (RUSAGE_SELF, &usage);
-    t = (SysTime) (usage.ru_utime.tv_sec * (unsigned long) scale +
-    	usage.ru_utime.tv_usec / (unsigned long) (1000000L / scale));
-
-    return t;
-# endif
-#else
-	double clock_ticks_per_second;
-	struct tms time_buffer;
-	
-	clock_ticks_per_second=sysconf (_SC_CLK_TCK);
-	times (&time_buffer);
-	
-	return (SysTime) (((double)time_buffer.tms_utime * scale) / clock_ticks_per_second);
-#endif
-*/
-	return 0;
-} /* GetSysTime */
-
-void StopTimer (void)
-{
-} /* StopTimer */
-
-void ResetTimer (void)
-{
-} /* ResetTimer */
-
-FileTime FGetFileTime (char *fname, FileKind kind)
-{	struct stat buf;
-	char path[MAXPATHLEN];
-	
-	if (! findfilepath (fname, kind, "", path))
-		return NoFile;
-		
-	stat (path, &buf);
-
-	return (FileTime) buf.st_mtime;
-} /* FGetFileTime */
-
 /* Error Handling */
 	
 void DoError (char *fmt, ...)
@@ -544,34 +457,6 @@ void CmdError (char *errormsg,...)
 		
 	va_end (args);
 }
-
-/*******************************************************************************
- *     Interrupt Handling                                                      *
- ******************************************************************************/
-
-#include <signal.h>
-
-/* Special for the stand alone version of the Clean compiler:
-   No interrupthandler should be installed
-*/
-
-
-static void DoNothing (void)
-{
-} /* DoNothing */
-
-
-void (*SetSignal (void (*f) (void))) (void)
-{	
-	return DoNothing;
-} /* SetSignal */
-
-
-int CheckInterrupt (void)
-{	
-	return 0;
-} /* CheckInterrupt */
-
 
 /*******************************************************************************
  *     Storage                                                                 *

@@ -46,9 +46,6 @@ extern char *PATHLIST;
 
 extern char *GetFileExtension (FileKind kind);
 extern File FOpen (char *wname, FileKind kind, char *mode);
-#if defined(WRITE_DCL_MODIFICATION_TIME) && WRITE_DCL_MODIFICATION_TIME
-extern File FOpenWithFileTime (char *file_name,FileKind kind, char *mode,FileTime *file_time_p);
-#endif
 extern int FDelete (char *fname, FileKind kind);
 extern int FClose (File f);
 
@@ -66,10 +63,6 @@ extern char *FGetS (char *s, int n, File f);
 extern size_t FRead (void *ptr, size_t size, size_t count, File f);
 extern int FSeek (File f, long offset, int origin);
 extern long FTell (File f);
-extern FileTime FGetFileTime (char *fname, FileKind kind);
-#if defined(WRITE_DCL_MODIFICATION_TIME) && WRITE_DCL_MODIFICATION_TIME
-extern void FWriteFileTime (FileTime file_time,File f);
-#endif
 
 #ifdef _VARARGS_
 	extern void DoError (char *fmt,...);
@@ -81,20 +74,10 @@ extern void FWriteFileTime (FileTime file_time,File f);
 	extern void CmdError ();
 #endif
 
-extern void (*SetSignal (void (*f) (void))) (void);
-	
-extern int CheckInterrupt (void);
-
 extern void *Alloc (unsigned long count, SizeT size);
 
 extern void Free (void *p);
 
-#ifdef THINK_C
-#define ReSize(A) (((A)+1) & ~1)
-#else
 #define ReSize(A) (((A)+3) & ~3)
-#endif
-
-extern int System (char *s);
 
 #endif
