@@ -467,32 +467,10 @@ void PrintVersion (void)
 
 static char Init[] = "Compiler initialization";
 
-Bool InterruptFlag;
 File OpenedFile;
-
-static void SetInterruptFlag (void)
-{
-	InterruptFlag = True;
-}
-
-void ExitOnInterrupt (void)
-{
-	if (InterruptFlag){
-		if (OpenedFile){
-			if (ABCFileName){
-				CompilerError = True;
-				CloseABCFile (ABCFileName);
-			} else
-				FClose (OpenedFile);
-			OpenedFile = (File) NIL;
-		}
-		longjmp (ExitEnv, 1);
-	}
-}
 
 void InitCompiler (void)
 {
-	InterruptFlag  = False;
 	OpenedFile     = (File) NIL;
 	CompilerError	= False;
 	/* Call all the initialization functions */

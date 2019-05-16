@@ -113,7 +113,7 @@ Bool OpenABCFile (char *fname)
 	OutFile = FOpen (fname, abcFile, "w");
 
 	if (OutFile!=NULL){
-#if defined (THINK_C) || defined (POWER)
+#if defined (POWER)
 		setvbuf ((FILE*) OutFile, NULL, _IOFBF, 8192);
 #endif
 		OpenedFile = OutFile;
@@ -131,16 +131,7 @@ void WriteLastNewlineToABCFile (void)
 void CloseABCFile (char *fname)
 {
 	if (OutFile){
-#ifdef THINK_C
-		int file_io_error;
-		
-		file_io_error=ferror (OutFile);
-#endif
-		if (FClose (OutFile) != 0
-#ifdef THINK_C
-		||	file_io_error
-#endif
-		){
+		if (FClose (OutFile) != 0){
 			CompilerError = True;
 			CurrentLine = 0;
 			
@@ -3455,11 +3446,7 @@ void GenModuleDescriptor (
 	if (WriteModificationTimes){
 		FPutC (' ',OutFile);
 		FPutC ('\"',OutFile);
-# if CLEAN2
 		FPutS (file_time,OutFile);
-# else
-		FWriteFileTime (file_time,OutFile);
-# endif
 		FPutC ('\"',OutFile);
 	}
 #endif
@@ -3478,11 +3465,7 @@ void GenDepend (char *modname
 	if (WriteModificationTimes){
 		FPutC (' ',OutFile);
 		FPutC ('\"',OutFile);
-# if CLEAN2
 		FPutS (file_time,OutFile);
-# else
-		FWriteFileTime (file_time,OutFile);
-# endif
 		FPutC ('\"',OutFile);
 	}
 #endif

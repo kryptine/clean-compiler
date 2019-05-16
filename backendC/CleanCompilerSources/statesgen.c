@@ -569,13 +569,13 @@ static void ChangeElementStateForStrictAbsTypeFields (SymbDef icl_sdef,SymbDef d
 SymbDefP special_types[2];
 #endif
 
-void GenerateStatesForRecords (struct module_type_symbols mts,int size_dcl_type_symbols_a,struct module_type_symbols dcl_type_symbols_a[])
+void GenerateStatesForRecords (struct module_function_and_type_symbols mfts,int size_dcl_mfts_a,struct module_function_and_type_symbols dcl_mfts_a[])
 {
 	int n_types,i,dcl_type_symbols_n;
 	SymbolP type_symbol_a;
 
-	n_types = mts.mts_n_types;
-	type_symbol_a = mts.mts_type_symbol_a;	
+	n_types = mfts.mfts_n_types;
+	type_symbol_a = mfts.mfts_type_symbol_a;	
 	for (i=0; i<n_types; ++i)
 		if (type_symbol_a[i].symb_kind==definition){
 			SymbDef def;
@@ -610,9 +610,9 @@ void GenerateStatesForRecords (struct module_type_symbols mts,int size_dcl_type_
 			}
 		}
 
-	for (dcl_type_symbols_n=0; dcl_type_symbols_n<size_dcl_type_symbols_a; ++dcl_type_symbols_n){		
-		n_types = dcl_type_symbols_a[dcl_type_symbols_n].mts_n_types;
-		type_symbol_a = dcl_type_symbols_a[dcl_type_symbols_n].mts_type_symbol_a;	
+	for (dcl_type_symbols_n=0; dcl_type_symbols_n<size_dcl_mfts_a; ++dcl_type_symbols_n){		
+		n_types = dcl_mfts_a[dcl_type_symbols_n].mfts_n_types;
+		type_symbol_a = dcl_mfts_a[dcl_type_symbols_n].mfts_type_symbol_a;	
 		for (i=0; i<n_types; ++i)
 			if (type_symbol_a[i].symb_kind==definition){
 				SymbDef def;
@@ -1272,26 +1272,54 @@ extern PolyList unboxed_record_cons_list,unboxed_record_decons_list;
 #endif
 
 void ExamineTypesAndLhsOfSymbols
-	(SymbolP function_symbols,struct module_type_symbols mts,int size_dcl_type_symbols_a,struct module_type_symbols dcl_type_symbols_a[])
+	(struct module_function_and_type_symbols mfts,int size_dcl_mfts_a,struct module_function_and_type_symbols dcl_mfts_a[],ImpRuleP new_imp_rules)
 {
-	int n_types,i,dcl_type_symbols_n;
-	SymbolP symbs,type_symbol_a;
+	int dcl_mfts_i,n_types,i,dcl_type_symbols_n;
+	SymbolP type_symbol_a;
+	PolyList array_fun;
+	int n_functions;
+	SymbolP function_symbol_a;
 
 	next_def_number = 1;
 
-	for_l (symbs,function_symbols,symb_next)
-		if (symbs->symb_kind==definition)
-			ExamineTypesAndLhsOfSymbolDefinition (symbs->symb_def);
+	n_functions = mfts.mfts_n_functions;
+	function_symbol_a = mfts.mfts_function_symbol_a;
+	for (i=0; i<n_functions; ++i)
+		if (function_symbol_a[i].symb_kind==definition)
+			ExamineTypesAndLhsOfSymbolDefinition (function_symbol_a[i].symb_def);
+	
+	while (new_imp_rules!=NULL){
+		ExamineTypesAndLhsOfSymbolDefinition (new_imp_rules->rule_root->node_symbol->symb_def);
+		new_imp_rules=new_imp_rules->rule_next;
+	}	
 
-	n_types = mts.mts_n_types;
-	type_symbol_a = mts.mts_type_symbol_a;
+	for (dcl_mfts_i=0; dcl_mfts_i<size_dcl_mfts_a; ++dcl_mfts_i){
+		int n_functions;
+		SymbolP function_symbol_a;
+		
+		n_functions = dcl_mfts_a[dcl_mfts_i].mfts_n_functions;
+		function_symbol_a = dcl_mfts_a[dcl_mfts_i].mfts_function_symbol_a;	
+		for (i=0; i<n_functions; ++i)
+			if (function_symbol_a[i].symb_kind==definition)
+				ExamineTypesAndLhsOfSymbolDefinition (function_symbol_a[i].symb_def);
+	}
+
+	for_l (array_fun,UserDefinedArrayFunctions,pl_next){
+		SymbDef fun_def;
+		
+		fun_def = ((Symbol) array_fun->pl_elem)->symb_def;
+		ExamineTypesAndLhsOfSymbolDefinition (fun_def);
+	}
+
+	n_types = mfts.mfts_n_types;
+	type_symbol_a = mfts.mfts_type_symbol_a;
 	for (i=0; i<n_types; ++i)
 		if (type_symbol_a[i].symb_kind==definition)
 			ExamineTypesAndLhsOfSymbolDefinition (type_symbol_a[i].symb_def);
 
-	for (dcl_type_symbols_n=0; dcl_type_symbols_n<size_dcl_type_symbols_a; ++dcl_type_symbols_n){		
-		n_types = dcl_type_symbols_a[dcl_type_symbols_n].mts_n_types;
-		type_symbol_a = dcl_type_symbols_a[dcl_type_symbols_n].mts_type_symbol_a;	
+	for (dcl_type_symbols_n=0; dcl_type_symbols_n<size_dcl_mfts_a; ++dcl_type_symbols_n){
+		n_types = dcl_mfts_a[dcl_type_symbols_n].mfts_n_types;
+		type_symbol_a = dcl_mfts_a[dcl_type_symbols_n].mfts_type_symbol_a;	
 		for (i=0; i<n_types; ++i)
 			if (type_symbol_a[i].symb_kind==definition)
 				ExamineTypesAndLhsOfSymbolDefinition (type_symbol_a[i].symb_def);
@@ -1313,11 +1341,10 @@ PolyList UserDefinedArrayFunctions;
 
 char *current_imported_module; /* also used by instructions.c */
 
-void ImportSymbols (SymbolP function_symbols,int size_dcl_type_symbols_a,struct module_type_symbols dcl_type_symbols_a[])
+void ImportSymbols (int size_dcl_mfts_a,struct module_function_and_type_symbols dcl_mfts_a[])
 {
-	Symbol symbol;
 	PolyList array_fun;
-	int dcl_type_symbols_n;
+	int dcl_mfts_i,dcl_type_symbols_n;
 
 	current_imported_module = NULL;
 	
@@ -1325,39 +1352,45 @@ void ImportSymbols (SymbolP function_symbols,int size_dcl_type_symbols_a,struct 
 		SymbDef fun_def;
 		
 		fun_def = ((Symbol) array_fun->pl_elem)->symb_def;
-		
 		if (fun_def ->sdef_mark & (SDEF_USED_LAZILY_MASK | SDEF_USED_CURRIED_MASK))
 			fun_def -> sdef_module = CurrentModule;
 	}
 
-	for_l (symbol,function_symbols,symb_next){
+	for (dcl_mfts_i=0; dcl_mfts_i<size_dcl_mfts_a; ++dcl_mfts_i){
+		int n_functions;
+		SymbolP function_symbol_a;
 		SymbDef sdef;
+		int i;
 
-		if (symbol->symb_kind!=definition)
-			continue;
+		n_functions = dcl_mfts_a[dcl_mfts_i].mfts_n_functions;
+		function_symbol_a = dcl_mfts_a[dcl_mfts_i].mfts_function_symbol_a;	
+		for (i=0; i<n_functions; ++i){
+			if (function_symbol_a[i].symb_kind!=definition)
+				continue;
 
-		sdef=symbol->symb_def;
-		if (sdef->sdef_module!=CurrentModule){
-			if (sdef->sdef_isused
-				&& sdef->sdef_mark & (SDEF_USED_STRICTLY_MASK | SDEF_USED_LAZILY_MASK | SDEF_USED_CURRIED_MASK)
-			){
-				if (sdef->sdef_module!=current_imported_module){
-					current_imported_module=sdef->sdef_module;
-					GenImpMod (current_imported_module);
+			sdef=function_symbol_a[i].symb_def;
+			if (sdef->sdef_module!=CurrentModule){
+				if (sdef->sdef_isused
+					&& sdef->sdef_mark & (SDEF_USED_STRICTLY_MASK | SDEF_USED_LAZILY_MASK | SDEF_USED_CURRIED_MASK)
+				){
+					if (sdef->sdef_module!=current_imported_module){
+						current_imported_module=sdef->sdef_module;
+						GenImpMod (current_imported_module);
+					}
+					GenImport (sdef);
 				}
-				GenImport (sdef);
 			}
 		}
 	}
 
-	for (dcl_type_symbols_n=0; dcl_type_symbols_n<size_dcl_type_symbols_a; ++dcl_type_symbols_n){
+	for (dcl_type_symbols_n=0; dcl_type_symbols_n<size_dcl_mfts_a; ++dcl_type_symbols_n){
 		int n_types;
 		SymbolP type_symbol_a;
 		SymbDef sdef;
 		int i;
 
-		n_types = dcl_type_symbols_a[dcl_type_symbols_n].mts_n_types;
-		type_symbol_a = dcl_type_symbols_a[dcl_type_symbols_n].mts_type_symbol_a;	
+		n_types = dcl_mfts_a[dcl_type_symbols_n].mfts_n_types;
+		type_symbol_a = dcl_mfts_a[dcl_type_symbols_n].mfts_type_symbol_a;	
 		for (i=0; i<n_types; ++i){
 			if (type_symbol_a[i].symb_kind!=definition)
 				continue;
@@ -1413,17 +1446,17 @@ void ImportSymbols (SymbolP function_symbols,int size_dcl_type_symbols_a,struct 
 	}
 }
 
-void import_not_yet_imported_record_r_labels (int size_dcl_type_symbols_a,struct module_type_symbols dcl_type_symbols_a[])
+void import_not_yet_imported_record_r_labels (int size_dcl_mfts_a,struct module_function_and_type_symbols dcl_mfts_a[])
 {
 	int dcl_type_symbols_n;
 	
-	for (dcl_type_symbols_n=0; dcl_type_symbols_n<size_dcl_type_symbols_a; ++dcl_type_symbols_n){
+	for (dcl_type_symbols_n=0; dcl_type_symbols_n<size_dcl_mfts_a; ++dcl_type_symbols_n){
 		int n_types;
 		SymbolP type_symbol_a;
 		int i;
 
-		n_types = dcl_type_symbols_a[dcl_type_symbols_n].mts_n_types;
-		type_symbol_a = dcl_type_symbols_a[dcl_type_symbols_n].mts_type_symbol_a;	
+		n_types = dcl_mfts_a[dcl_type_symbols_n].mfts_n_types;
+		type_symbol_a = dcl_mfts_a[dcl_type_symbols_n].mfts_type_symbol_a;	
 		for (i=0; i<n_types; ++i)
 			if (type_symbol_a[i].symb_kind==definition){
 				SymbDef sdef;
@@ -4476,14 +4509,16 @@ void reset_states_and_ref_count_copies (ImpRuleS *rule)
 	}
 }
 
-void DetermineSharedAndAnnotatedNodes (ImpRules rules,SymbolP *im_symbols_h)
+ImpRuleP DetermineSharedAndAnnotatedNodes (ImpRules rules)
 {
-	ImpRuleP rule;
+	ImpRuleP rule,*new_rules_h;
 
 #ifdef ADD_ARGUMENTS_TO_HIGHER_ORDER_FUNCTIONS
 	last_new_rule_with_more_arguments_h=&new_rules_with_more_arguments;
 #endif
 	
+	new_rules_h=NULL;
+
 	for_l (rule,rules,rule_next)
 		DetermineSharedAndAnnotatedNodesOfRule (rule);
 
@@ -4494,10 +4529,9 @@ void DetermineSharedAndAnnotatedNodes (ImpRules rules,SymbolP *im_symbols_h)
 		rule_h=&rules;
 		while (*rule_h!=NULL)
 			rule_h=&(*rule_h)->rule_next;
-			
-		while (*im_symbols_h)
-			im_symbols_h=&(*im_symbols_h)->symb_next;
-		
+
+		new_rules_h=rule_h;
+
 		while (new_rules_with_more_arguments!=NULL){
 			SymbolP new_symbol_p;
 			
@@ -4511,14 +4545,13 @@ void DetermineSharedAndAnnotatedNodes (ImpRules rules,SymbolP *im_symbols_h)
 			rule_h=&new_rule_p->rule_next;
 			
 			new_symbol_p=new_rule_p->rule_root->node_symbol;
-			*im_symbols_h=new_symbol_p;
-			im_symbols_h=&new_symbol_p->symb_next;
 		}
 		
 		*rule_h=NULL;
-		*im_symbols_h=NULL;
 	}
 #endif
+
+	return new_rules_h==NULL ? NULL : *new_rules_h;	
 }
 
 void InitStatesGen (void)

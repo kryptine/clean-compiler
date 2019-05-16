@@ -118,7 +118,6 @@ STRUCT (be_state, BEState)
 	BEIclS			be_icl;
 	unsigned int	be_nModules;
 
-	SymbolP			be_function_symbols;
 	SymbolP			be_dontCareSymbol;
 	SymbolP			be_dictionarySelectFunSymbol;
 	SymbolP			be_dictionaryUpdateFunSymbol;
@@ -176,32 +175,15 @@ PredefinedSymbol (SymbKind symbolKind, int arity)
 } /* PredefinedSymbol */
 
 static SymbolP
-AllocateSymbols (int nFunctions, int nTypesConstructorsAndFields, SymbolP *function_symbols_h)
-{
-	int	nSymbols;
-	
-	nSymbols = nFunctions+nTypesConstructorsAndFields;
-	if (nSymbols!=0){
+AllocateSymbols (int n_symbols)
+{	
+	if (n_symbols!=0){
 		SymbolP	symbols;
 		int i;
 
-		symbols	= (SymbolP) ConvertAlloc (nSymbols * sizeof (SymbolS));
-		i = 0;
-
-		if (nFunctions>0){
-			for (; i < nFunctions; ++i){
-				symbols [i].symb_kind	= erroneous_symb;
-				symbols [i].symb_next	= &symbols [i+1];
-			}
-		
-			symbols [nFunctions-1].symb_next = *function_symbols_h;
-			*function_symbols_h = symbols;
-		}
-		
-		for (; i < nSymbols; i++){
+		symbols	= (SymbolP) ConvertAlloc (n_symbols * sizeof (SymbolS));
+		for (i = 0; i < n_symbols; i++)
 			symbols [i].symb_kind	= erroneous_symb;
-			symbols [i].symb_next	= NULL;
-		}
 		
 		return symbols;
 	} else
@@ -277,13 +259,12 @@ NewGuardNode (NodeP ifNode, NodeP node, NodeDefP nodeDefs, StrictNodeIdP stricts
 } /* NewGuardNode */
 
 static void
-DeclareModule (int moduleIndex, char *name, Bool isSystemModule, int nFunctions,
-											int nTypes, int nConstructors, int nFields)
+DeclareModule (int moduleIndex, char *name, Bool isSystemModule, int nFunctions,int nTypes, int nConstructors, int nFields)
 {
+	SymbolP symbols;
 	BEModuleP	module;
-	SymbolP		symbols;
 
-	symbols = AllocateSymbols (nFunctions, nTypes + nConstructors + nFields, &gBEState.be_function_symbols);
+	symbols = AllocateSymbols (nFunctions + nTypes + nConstructors + nFields);
 
 	Assert ((unsigned int) moduleIndex < gBEState.be_nModules);
 	module	= &gBEState.be_modules [moduleIndex];
@@ -359,11 +340,11 @@ BEDeclareIclModule (CleanString name, CleanString modificationTime, int nFunctio
 	icl->beicl_depsP	= &scc_dependency_list;
 
 	{
-		struct module_type_symbols *dcl_type_symbols_a;
+		struct module_function_and_type_symbols *dcl_type_symbols_a;
 		int n_dcl_type_symbols;
 		struct def_list *def_mod;
 		
-		dcl_type_symbols_a = (struct module_type_symbols*) ConvertAlloc (gBEState.be_nModules * sizeof (struct module_type_symbols));
+		dcl_type_symbols_a = (struct module_function_and_type_symbols*) ConvertAlloc (gBEState.be_nModules * sizeof (struct module_function_and_type_symbols));
 		n_dcl_type_symbols=0;
 
 		for (def_mod=OpenDefinitionModules; def_mod!=NULL; def_mod=def_mod->mod_next){
@@ -371,23 +352,28 @@ BEDeclareIclModule (CleanString name, CleanString modificationTime, int nFunctio
 			
 			module_n = def_mod->mod_body->dm_module_n;
 			if (module_n!=main_dcl_module_n){
-				dcl_type_symbols_a[n_dcl_type_symbols].mts_n_types       = gBEState.be_modules [module_n].bem_nTypes;
-				dcl_type_symbols_a[n_dcl_type_symbols].mts_type_symbol_a = gBEState.be_modules [module_n].bem_types;
+				dcl_type_symbols_a[n_dcl_type_symbols].mfts_n_types = gBEState.be_modules[module_n].bem_nTypes;
+				dcl_type_symbols_a[n_dcl_type_symbols].mfts_type_symbol_a = gBEState.be_modules[module_n].bem_types;
+				dcl_type_symbols_a[n_dcl_type_symbols].mfts_n_functions = gBEState.be_modules[module_n].bem_nFunctions;
+				dcl_type_symbols_a[n_dcl_type_symbols].mfts_function_symbol_a = gBEState.be_modules[module_n].bem_functions;				
 				++n_dcl_type_symbols;
 			}
 		}
 		
-		dcl_type_symbols_a[n_dcl_type_symbols].mts_n_types       = gBEState.be_modules [kPredefinedModuleIndex].bem_nTypes;
-		dcl_type_symbols_a[n_dcl_type_symbols].mts_type_symbol_a = gBEState.be_modules [kPredefinedModuleIndex].bem_types;
+		dcl_type_symbols_a[n_dcl_type_symbols].mfts_n_types = gBEState.be_modules[kPredefinedModuleIndex].bem_nTypes;
+		dcl_type_symbols_a[n_dcl_type_symbols].mfts_type_symbol_a = gBEState.be_modules[kPredefinedModuleIndex].bem_types;
+		dcl_type_symbols_a[n_dcl_type_symbols].mfts_n_functions = gBEState.be_modules[kPredefinedModuleIndex].bem_nFunctions;
+		dcl_type_symbols_a[n_dcl_type_symbols].mfts_function_symbol_a = gBEState.be_modules[kPredefinedModuleIndex].bem_functions;
 		++n_dcl_type_symbols;
 
 		Assert (n_dcl_type_symbols<=gBEState.be_nModules);
 
-		icl->beicl_module->im_dcl_type_symbols_a = dcl_type_symbols_a;
-		icl->beicl_module->im_size_dcl_type_symbols_a = n_dcl_type_symbols;
+		icl->beicl_module->im_dcl_mfts_a = dcl_type_symbols_a;
+		icl->beicl_module->im_size_dcl_mfts_a = n_dcl_type_symbols;
 	}
 
 	nFunctions	+= ArraySize (gLocallyGeneratedFunctions);
+
 	DeclareModule (main_dcl_module_n, cName, False, nFunctions, nTypes, nConstructors, nFields);
 
 	iclModule	= icl->beicl_module;
@@ -396,9 +382,10 @@ BEDeclareIclModule (CleanString name, CleanString modificationTime, int nFunctio
 	iclModule->im_def_module	= im_def_module;
 	iclModule->im_rules			= NULL;
 	iclModule->im_start			= NULL;
-	iclModule->im_type_symbols.mts_n_types = nTypes;
-	iclModule->im_type_symbols.mts_type_symbol_a = gBEState.be_modules [main_dcl_module_n].bem_types;
-	iclModule->im_function_symbols = gBEState.be_function_symbols;
+	iclModule->im_mfts_a.mfts_n_types = nTypes;
+	iclModule->im_mfts_a.mfts_type_symbol_a = gBEState.be_modules [main_dcl_module_n].bem_types;
+	iclModule->im_mfts_a.mfts_n_functions = nFunctions;
+	iclModule->im_mfts_a.mfts_function_symbol_a = gBEState.be_modules[main_dcl_module_n].bem_functions;
 # if IMPORT_OBJ_AND_LIB
 	iclModule->im_imported_objs	= NULL;
 	iclModule->im_imported_libs	= NULL;
@@ -429,19 +416,11 @@ BEDeclareDclModule (int moduleIndex, CleanString name, CleanString modificationT
 	char	*cName;
 	SymbolP	moduleNameSymbol;
 	DefMod	dclModule;
-	SymbolP	saved_function_symbols,previous_all_symbols;
 
 	cName	= ConvertCleanString (name);
 
 	moduleNameSymbol	= ConvertAllocType (SymbolS);
 	moduleNameSymbol->symb_ident	= Identifier (cName);
-
-	if (moduleIndex == main_dcl_module_n){
-		saved_function_symbols = gBEState.be_function_symbols;
-		gBEState.be_function_symbols = NULL;
-	}
-
-	previous_all_symbols = gBEState.be_function_symbols;
 
 	DeclareModule (moduleIndex, cName, isSystemModule, nFunctions, nTypes, nConstructors, nFields);
 
@@ -450,16 +429,11 @@ BEDeclareDclModule (int moduleIndex, CleanString name, CleanString modificationT
 	dclModule->dm_module_n = moduleIndex;
 	dclModule->dm_modification_time	= ConvertCleanString (modificationTime);
 	dclModule->dm_system_module	= isSystemModule;
-	dclModule->dm_function_symbols = gBEState.be_function_symbols;
-	dclModule->dm_symbols_end = previous_all_symbols;
+	dclModule->dm_function_symbol_a = gBEState.be_modules[moduleIndex].bem_functions;
+	dclModule->dm_n_function_symbols = gBEState.be_modules[moduleIndex].bem_nFunctions;
 	dclModule->dm_system_module_table_kind = FirstSystemModuleTable + moduleIndex;
 
 	AddOpenDefinitionModule (moduleNameSymbol, dclModule);
-
-	if (moduleIndex == main_dcl_module_n){
-		gBEState.be_function_symbols = saved_function_symbols;
-		im_def_module=dclModule;
-	}
 } /* BEDeclareDclModule */
 
 void
@@ -564,10 +538,11 @@ BESymbolP
 BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, int moduleIndex)
 {
 	BEModuleP	module;
-	SymbolP		functionSymbol,previousFunctionSymbol;
+	SymbolP functionSymbol;
 	SymbDefP	originalsdef;
 	TypeAlt		*typeAlt;
 	TypeNode	elementType, arrayType;
+	SymbDef previousFunctionSymbDef;
 
 	Assert ((unsigned int) moduleIndex < gBEState.be_nModules);
 	module	= &gBEState.be_modules [moduleIndex];
@@ -599,21 +574,18 @@ BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, in
 			return (functionSymbol);
 	}
 
-	previousFunctionSymbol	= functionSymbol;
-	functionSymbol	= functionSymbol->symb_next;
-
-	if (functionSymbol != NULL && functionSymbol->symb_kind == definition){
+	previousFunctionSymbDef = originalsdef;
+	if (previousFunctionSymbDef->sdef_mark & SDEF_HAS_SPECIAL_ARRAY_FUNCTION){
+		functionSymbol = previousFunctionSymbDef->sdef_special_array_function_symbol;
 		if (functionSymbol->symb_def->sdef_arfun == (ArrayFunKind) arrayFunKind)
 			return functionSymbol;
 
 		if (arrayFunKind == BE_UnqArraySelectLastFun && functionSymbol->symb_def->sdef_arfun == BE_UnqArraySelectFun){
-			previousFunctionSymbol	= functionSymbol;
-			functionSymbol	= functionSymbol->symb_next;
-
-			if (functionSymbol != NULL && functionSymbol->symb_kind == definition &&
-				functionSymbol->symb_def->sdef_arfun == (ArrayFunKind) arrayFunKind)
-			{
-				return functionSymbol;
+			previousFunctionSymbDef = functionSymbol->symb_def;
+			if (previousFunctionSymbDef->sdef_mark & SDEF_HAS_SPECIAL_ARRAY_FUNCTION){
+				functionSymbol = previousFunctionSymbDef->sdef_special_array_function_symbol;
+				if (functionSymbol->symb_def->sdef_arfun == (ArrayFunKind) arrayFunKind)
+					return functionSymbol;
 			}
 		}
 	}
@@ -720,9 +692,14 @@ BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, in
 		newFunctionSymbol->symb_kind	= definition;
 		newFunctionSymbol->symb_def		= newsdef;
 
-		functionSymbol						= previousFunctionSymbol->symb_next;
-		previousFunctionSymbol->symb_next	= newFunctionSymbol;
-		newFunctionSymbol->symb_next		= functionSymbol;
+		if ((previousFunctionSymbDef->sdef_mark & SDEF_HAS_SPECIAL_ARRAY_FUNCTION)==0){
+			previousFunctionSymbDef->sdef_special_array_function_symbol = newFunctionSymbol;
+			previousFunctionSymbDef->sdef_mark |= SDEF_HAS_SPECIAL_ARRAY_FUNCTION;
+		} else {
+			newsdef->sdef_special_array_function_symbol = previousFunctionSymbDef->sdef_special_array_function_symbol;
+			newsdef->sdef_mark |= SDEF_HAS_SPECIAL_ARRAY_FUNCTION;			
+			previousFunctionSymbDef->sdef_special_array_function_symbol = newFunctionSymbol;
+		}
 
 		AddUserDefinedArrayFunction (newFunctionSymbol);
 
@@ -3281,14 +3258,12 @@ static void init_unboxed_list_symbols (void)
 		symbol_p->symb_head_strictness=4;
 		symbol_p->symb_tail_strictness=0;
 		symbol_p->symb_state_p=&BasicSymbolStates[i];
-		symbol_p->symb_next=NULL;
-		
+
 		symbol_p=&unboxed_list_symbols[i][1];
 		symbol_p->symb_kind=cons_symb;
 		symbol_p->symb_head_strictness=4;
 		symbol_p->symb_tail_strictness=1;
 		symbol_p->symb_state_p=&BasicSymbolStates[i];
-		symbol_p->symb_next=NULL;
 	}
 
 	array_state_p=ConvertAllocType (StateS);
@@ -3398,7 +3373,6 @@ BEInit (int argc)
 	gBEState.be_argi		= 0;
 
 	gBEState.be_modules						= NULL;
-	gBEState.be_function_symbols			= NULL;
 	gBEState.be_dontCareSymbol				= NULL;
 	gBEState.be_dictionarySelectFunSymbol	= NULL;
 	gBEState.be_dictionaryUpdateFunSymbol	= NULL;

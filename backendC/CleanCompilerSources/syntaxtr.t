@@ -133,7 +133,6 @@ struct unboxed_cons {
 
 STRUCT (symbol,Symbol) {
 	SymbValue			symb_val;
-	Symbol				symb_next;
 	unsigned			symb_kind:8;			/* SymbKind */
 	unsigned			symb_head_strictness:4; /* 0=lazy,1=overloaded,2=strict,3=unboxed overloaded,4=unboxed*/
 	unsigned			symb_tail_strictness:2;	/* 0=lazy,1=strict */
@@ -593,8 +592,9 @@ STRUCT (symbol_def,SymbDef){
 	struct symbol_def *	sdef_next_scc;
 
 	union {
-		struct symbol_def *		sdef_u2_next_version;	/* for IMPRULES */
-		struct type_alt *		sdef_u2_member_type_of_field; /* for FIELDSELECTOR if SDEF_FIELD_HAS_MEMBER_TYPE */
+		struct symbol_def *	sdef_u2_next_version;	/* for IMPRULES */
+		struct type_alt *	sdef_u2_member_type_of_field; /* for FIELDSELECTOR if SDEF_FIELD_HAS_MEMBER_TYPE */
+		struct symbol *		sdef_u2_special_array_function_symbol; /* if SDEF_HAS_SPECIAL_ARRAY_FUNCTION */
 	} sdef_u2;
 	
 	int				sdef_mark;
@@ -631,12 +631,14 @@ STRUCT (symbol_def,SymbDef){
 #define SDEF_FIELD_HAS_MEMBER_TYPE 1024
 #define SDEF_INSTANCE_RULE_WITH_FIELD_P 16384
 #define SDEF_RULE_INSTANCE_RULE_P 32768
+#define SDEF_HAS_SPECIAL_ARRAY_FUNCTION 512
 
 /* some macros to reuse bit fields */
 
 #define sdef_group_number		sdef_ancestor
 
 #define sdef_next_version	sdef_u2.sdef_u2_next_version
+#define sdef_special_array_function_symbol	sdef_u2.sdef_u2_special_array_function_symbol
 #define sdef_member_type_of_field	sdef_u2.sdef_u2_member_type_of_field
 
 #define sdef_constructor sdef_typeinfo.typeinfo_constructor
@@ -664,17 +666,18 @@ struct foreign_export_list {
 
 typedef char *ModuleFileTime;
 
-struct module_type_symbols {
-	int		mts_n_types;
-	SymbolP	mts_type_symbol_a;
+struct module_function_and_type_symbols {
+	int		mfts_n_functions;
+	SymbolP	mfts_function_symbol_a;
+	int		mfts_n_types;
+	SymbolP	mfts_type_symbol_a;
 };
 
 typedef struct {
 	char *				im_name;
-	SymbolP				im_function_symbols;
-	struct module_type_symbols im_type_symbols;
-	int					im_size_dcl_type_symbols_a;
-	struct module_type_symbols *im_dcl_type_symbols_a;
+	struct module_function_and_type_symbols im_mfts_a;
+	int					im_size_dcl_mfts_a;
+	struct module_function_and_type_symbols *im_dcl_mfts_a;
 	ImpRules			im_rules;
 	struct symbol_def *	im_start;
 	DefMod				im_def_module;
@@ -689,8 +692,8 @@ typedef struct {
 struct def_repr {
 	char *		dm_name;
 	int			dm_module_n;
-	SymbolP		dm_function_symbols;
-	Symbol		dm_symbols_end;
+	int			dm_n_function_symbols;
+	SymbolP		dm_function_symbol_a;
 	TableKind	dm_system_module_table_kind;
 	Bool		dm_system_module;
 	ModuleFileTime	dm_modification_time;

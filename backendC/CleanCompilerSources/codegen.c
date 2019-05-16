@@ -951,7 +951,7 @@ static void CodeRule (ImpRuleP rule)
 						break;
 				}
 			}
-	
+
 			GenRtn		(1,0,OnAState);
 		}
 		
@@ -1130,29 +1130,29 @@ void CodeGeneration (ImpMod imod, char *fname)
 {
 	if (! CompilerError){
 		int DoStrictnessAnalysis_and_init_ok;
+		ImpRuleP new_rules;
 
 		CurrentPhase = NULL;
 
 #if 0
 		PrintRules (imod->im_rules);
 #endif
-		DetermineSharedAndAnnotatedNodes (imod->im_rules,&imod->im_function_symbols);
-		ExitOnInterrupt();
+
+		new_rules=DetermineSharedAndAnnotatedNodes (imod->im_rules);
 
 #if 0
 		PrintRules (imod->im_rules,rules_file);
 #endif
 
-		GenerateStatesForRecords (imod->im_type_symbols,imod->im_size_dcl_type_symbols_a,imod->im_dcl_type_symbols_a);
+		GenerateStatesForRecords (imod->im_mfts_a,imod->im_size_dcl_mfts_a,imod->im_dcl_mfts_a);
 
 		DoStrictnessAnalysis_and_init_ok = DoStrictnessAnalysis && init_strictness_analysis (imod);
 		
 		if (DoStrictnessAnalysis_and_init_ok){
 			do_strictness_analysis();
-			ExitOnInterrupt();
 		}
 
-		ExamineTypesAndLhsOfSymbols (imod->im_function_symbols,imod->im_type_symbols,imod->im_size_dcl_type_symbols_a,imod->im_dcl_type_symbols_a);
+		ExamineTypesAndLhsOfSymbols (imod->im_mfts_a,imod->im_size_dcl_mfts_a,imod->im_dcl_mfts_a,new_rules);
 
 #ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
 		{
@@ -1168,11 +1168,8 @@ void CodeGeneration (ImpMod imod, char *fname)
 		generate_states (imod->im_rules,True);
 
 		if (DoStrictnessAnalysis_and_init_ok){
-			ExitOnInterrupt();
-		
 			finish_strictness_analysis();		
 		}
-		ExitOnInterrupt();
 
 #if 0
 		PrintRules (imod->im_rules);
@@ -1181,7 +1178,6 @@ void CodeGeneration (ImpMod imod, char *fname)
 		optimise_strict_tuple_result_functions=0;
 
 		OptimiseRules (imod->im_rules,imod->im_start);
-		ExitOnInterrupt();
 #if 0
 		PrintRules (imod->im_rules,rules_file);
 #endif
@@ -1228,21 +1224,19 @@ void CodeGeneration (ImpMod imod, char *fname)
 #endif
 			GenSystemImports();
 			FileComment();
-			ExitOnInterrupt();
 
-			ReadInlineCode ();
+			ReadInlineCode();
 
 			CreateStackFrames();
 
-			ImportSymbols (imod->im_function_symbols,imod->im_size_dcl_type_symbols_a,imod->im_dcl_type_symbols_a);
+			ImportSymbols (imod->im_size_dcl_mfts_a,imod->im_dcl_mfts_a);
 
-			GenerateCodeForConstructorsAndRecords (imod->im_type_symbols);
+			GenerateCodeForConstructorsAndRecords (imod->im_mfts_a);
 
 			GenerateForeignExports (imod->im_foreign_exports);
 
 			if (imod->im_start)
 				GenStart (imod->im_start);
-			ExitOnInterrupt ();
 
 #if SHARE_UPDATE_CODE
 			create_result_state_database (imod->im_rules);
@@ -1275,8 +1269,6 @@ void CodeGeneration (ImpMod imod, char *fname)
 					}
 					update_function_p=&first_update_function;						
 				}
-
-				ExitOnInterrupt ();
 			}
 
 			GenerateCodeForLazyTupleSelectorEntries (LazyTupleSelectors);
@@ -1285,7 +1277,7 @@ void CodeGeneration (ImpMod imod, char *fname)
 			GenerateCodeForLazyUnboxedRecordListFunctions();
 #endif
 
-			import_not_yet_imported_record_r_labels (imod->im_size_dcl_type_symbols_a,imod->im_dcl_type_symbols_a);
+			import_not_yet_imported_record_r_labels (imod->im_size_dcl_mfts_a,imod->im_dcl_mfts_a);
 			import_not_yet_imported_system_labels();
 
 			WriteLastNewlineToABCFile();

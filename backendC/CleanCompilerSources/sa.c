@@ -2185,20 +2185,7 @@ static void InitNode (Node node)
 
 static void InitAlternative (RuleAltS *alt)
 {
-#ifndef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
-	NodeDefs nds;
-#endif
-
 	InitNode (alt->alt_lhs_root);
-
-#ifndef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
-	for_l (nds,alt->alt_lhs_defs,def_next){
-		if (nds->def_id)
-			nds->def_id->nid_exp_ = NULL;
-	
-		InitNode (nds->def_node);
-	}
-#endif
 
 	if (alt->alt_kind==Contractum){
 		InitNode (alt->alt_rhs_root);
@@ -2412,7 +2399,7 @@ static Exp ConvertNode (Node node, NodeId nid)
 						return e;
 					} else {
 						e->e_fun = sdef->sdef_sa_fun;
-										
+
 						if (arity==sdef->sdef_arity)
 							e->e_kind = Value;
 						else {
@@ -2520,7 +2507,7 @@ static Exp ConvertNode (Node node, NodeId nid)
 
 			e->e_fun  = selectsym [field_nr];
 			e->e_args = NewExpArgs (1);
-					
+
 			e->e_args[0] = ConvertNode (arg->arg_node, Null);
 			break;
 		}
@@ -2856,11 +2843,7 @@ static void ConvertAlternatives (Alts *funalts,RuleAlts rulealts)
 	
 	InitAlternative (rulealts);
 	
-#ifndef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
-	fun_alt_p->fun_lhs = ConvertNodeDefs (rulealts->alt_lhs_root,rulealts->alt_lhs_defs,NULL);
-#else
 	fun_alt_p->fun_lhs = ConvertNodeDefs (rulealts->alt_lhs_root,NULL,NULL);
-#endif
 	
 	has_fail = False;
 	
@@ -3676,7 +3659,7 @@ static void convert_type (SymbDef sdef)
 }
 
 static void ConvertSyntaxTree
-	(struct module_type_symbols mts,int size_dcl_type_symbols_a,struct module_type_symbols dcl_type_symbols_a[])
+	(struct module_function_and_type_symbols mfts,int size_dcl_type_symbols_a,struct module_function_and_type_symbols dcl_type_symbols_a[])
 {
 	SymbolP type_symbol_a;
 	Bool		annot_warning;
@@ -3688,15 +3671,15 @@ static void ConvertSyntaxTree
 	init_predefined_symbols();
 	
 	/* initialise the function table with constructors */
-	n_types = mts.mts_n_types;
-	type_symbol_a = mts.mts_type_symbol_a;
+	n_types = mfts.mfts_n_types;
+	type_symbol_a = mfts.mfts_type_symbol_a;
 	for (i=0; i<n_types; ++i)
 		if (type_symbol_a[i].symb_kind==definition)
 			convert_type (type_symbol_a[i].symb_def);
 
 	for (dcl_type_symbols_n=0; dcl_type_symbols_n<size_dcl_type_symbols_a; ++dcl_type_symbols_n){		
-		n_types = dcl_type_symbols_a[dcl_type_symbols_n].mts_n_types;
-		type_symbol_a = dcl_type_symbols_a[dcl_type_symbols_n].mts_type_symbol_a;	
+		n_types = dcl_type_symbols_a[dcl_type_symbols_n].mfts_n_types;
+		type_symbol_a = dcl_type_symbols_a[dcl_type_symbols_n].mfts_type_symbol_a;	
 		for (i=0; i<n_types; ++i)
 			if (type_symbol_a[i].symb_kind==definition)
 				convert_type (type_symbol_a[i].symb_def);
@@ -5738,7 +5721,7 @@ int init_strictness_analysis (ImpMod imod)
 	InitExp (&bottom, Bottom, 0,       True);
 
 	if (setjmp (SAEnv) == 0){
-		ConvertSyntaxTree (imod->im_type_symbols,imod->im_size_dcl_type_symbols_a,imod->im_dcl_type_symbols_a);
+		ConvertSyntaxTree (imod->im_mfts_a,imod->im_size_dcl_mfts_a,imod->im_dcl_mfts_a);
 
 		/* other values are converted after syntaxconversion (because of cons symbol) */
 		InitValues ();
