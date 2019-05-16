@@ -4415,9 +4415,6 @@ void OptimiseRules (ImpRules rules,SymbDef start_sdef)
 		OptimiseRule (rule);
 	}
 
-# ifdef THINK_C
-	if (!DoParallel)
-# endif
 	{
 		ImpRuleP rule_p;
 		

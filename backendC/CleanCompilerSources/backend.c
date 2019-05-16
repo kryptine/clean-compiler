@@ -25,10 +25,6 @@
 
 # include <limits.h>
 
-# if 0
-# include "dbprint.h"
-# endif
-
 void
 BEGetVersion (int *current, int *oldestDefinition, int *oldestImplementation)
 {
@@ -2331,7 +2327,7 @@ void
 BEDeclareFunction (CleanString name, int arity, int functionIndex, int ancestor)
 {
 	/* +++ ugly */
-	if (strncmp (name->chars, "Start;", 6) == 0 && isdigit (name->chars[6]))
+	if (strncmp (name->chars, "Start;", 6) == 0 && (name->chars[6]>='0' && name->chars[6]<='9'))
 		name->length	= 5;
 
 	DeclareFunctionC (ConvertCleanString (name), arity, functionIndex, ancestor);

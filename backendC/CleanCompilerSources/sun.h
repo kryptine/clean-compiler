@@ -36,6 +36,5 @@ extern FILE *std_out_file_p,*std_error_file_p;
 #define FGetS(s,n,f) fgets(s,n,f)
 #define FPutC(c,f) fputc(c,f)
 
-int System (char *s);
 int abs (int n);
 

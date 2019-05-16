@@ -259,7 +259,7 @@ unsigned InlineBufferIndex, InlineBufferStart;
 struct inline_cache_list {
 	struct inline_cache_list *	icache_next;
 	struct file_block *			icache_file_blocks;
-#if defined (__MWERKS__) || defined (THINK_C) || defined (__MRC__)
+#if defined (__MWERKS__) || defined (__MRC__)
 	char						icache_file_name[];
 #else
 	char						icache_file_name[0];
@@ -310,7 +310,7 @@ static int open_inline_file_for_block_reading (char *file_name)
 	if (inline_file==NULL)
 		return 0;
 	
-#if defined (THINK_C) || defined (POWER)
+#if defined (POWER)
 	setvbuf (inline_file,NULL,_IOFBF,8192);
 #endif	
 
@@ -451,7 +451,7 @@ void ScanInlineFile (char *fname,TableKind system_module_table_kind)
 		return;
 	}
 #ifndef CACHE_INLINE_FILES	
-#	if defined (THINK_C) || defined (POWER)
+#	if defined (POWER)
 		setvbuf ((void*) f, NULL, _IOFBF, 8192);
 #	endif
 #endif

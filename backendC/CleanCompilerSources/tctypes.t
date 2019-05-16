@@ -83,15 +83,6 @@ typedef unsigned int  AttributeCellKind;
 	};
 
 #define AttributeCellKindSize 2
-
-#ifdef THINK_C
-#define DAttributeCellKind(v) (\
-	v == AC_Indirection ? "AC_Indirection" 	:\
-	v == AC_Unique 	? "AC_Unique"		:\
-	v == AC_Variable  	? "AC_Variable"	:\
-	v == AC_NotUnique 	? "AC_NotUnique"	:\
-	"Unknown")
-#endif
 	
 typedef struct plain_attr_var
 {	Bool					pav_mark:1;
@@ -239,21 +230,6 @@ typedef  unsigned int CellKind;
 
 #define CellKindSize 4
 
-#ifdef THINK_C
-#define DCellKind(v) (\
-	v == BasicType 			? "BasicType" 				:\
-	v == ConstructorType 		? "ConstructorType"			:\
-	v == FunctionType  			? "FunctionType"			:\
-	v == TypeVariable 			? "TypeVariable"			:\
-	v == VoidType 				? "VoidType"				:\
-	v == StrictnessCell 		? "StrictnessCell"			:\
-	v == Indirection 			? "Indirection"			:\
-	v == ExistentialVariable 	? "ExistentialVariable"		:\
-	v == ClassVariable 			? "ClassVariable"			:\
-	v == ConstructorVariable  	? "ConstructorVariable"		:\
-	"Unknown")
-#endif
-
 #ifndef _NEW_ARRAY_
 
 typedef unsigned int StrictCellKind;
@@ -265,31 +241,12 @@ typedef unsigned int StrictCellKind;
 
 #endif
 
-#ifdef THINK_C
-#define DStrictCellKind(v) (\
-	v == SC_Lazy 		? "SC_Lazy" 		:\
-	v == SC_Strict 	? "SC_Strict"		:\
-	v == SC_Var  		? "SC_Var"		:\
-	v == SC_Indirection ? "SC_Indirection"	:\
-	"Unknown")
-#endif
-
-
 typedef unsigned int AttrVarKind;
 	enum
 	{	AVK_None, AVK_Plain, AVK_Equation, AVK_Temporarily
 	};
 
 #define AttrVarKindSize 2
-
-#ifdef THINK_C
-#define DAttrVarKind(v) (\
-	v == AVK_None 			? "AVK_None" 		:\
-	v == AVK_Plain 		? "AVK_Plain"		:\
-	v == AVK_Equation  		? "AVK_Equation"	:\
-	v == AVK_Temporarily 	? "AVK_Temporarily":\
-	"Unknown")
-#endif
 
 #define MaxInstanciationDepth 8	
 

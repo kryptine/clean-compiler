@@ -48,24 +48,6 @@ char *GetFileExtension (FileKind kind)
 
 char clean_lib_directory[129] = ".";
 
-#if WRITE_DCL_MODIFICATION_TIME
-static int file_exists_with_time (char *file_name,FileTime *file_time_p)
-{
-	HANDLE h;
-	WIN32_FIND_DATA find_data;
-	
-	h=FindFirstFile (file_name,&find_data);
-
-	if (h!=INVALID_HANDLE_VALUE){
-		FindClose (h);
-		
-		*file_time_p=find_data.ftLastWriteTime;
-		return True;
-	} else
-		return False;
-}
-#endif
-
 static int file_exists (char *file_name)
 {
 	HANDLE h;
@@ -83,59 +65,6 @@ static int file_exists (char *file_name)
 static int use_clean_system_files_folder=1;
 
 extern char *path_parameter;
-
-#if WRITE_DCL_MODIFICATION_TIME
-static Bool find_filepath_and_time (char *fname,FileKind kind,char *path,FileTime *file_time_p)
-{
-    char *s,*path_elem,c,*pathlist,*ext;
-
-	if (path_parameter==NULL)
-	    pathlist=getenv ("CLEANPATH");
-	else
-		pathlist=path_parameter;
-
-    if (pathlist==NULL)
-		pathlist=".";
-
-	ext = GetFileExtension (kind);
-
-	if (! (fname[0]=='\\' || (fname[0]!=0 && fname[1]==':'))){
-		path_elem = pathlist;
-
-		s=path_elem;		
-		for (;;){
-			c = *s;
-			if (c == ';' || c == '\0'){
-				char *from_p,*dest_p;
-			
-				from_p=path_elem;
-				dest_p=path;
-				while (from_p<s)
-					*dest_p++ = *from_p++;
-				*dest_p = '\0';
-
-			    strcat (path,"\\");
-			    strcat (path,fname);
-			    strcat (path,ext);
-				if (file_exists_with_time (path,file_time_p))
-					return True;
-		    
-			    if (c == '\0')
-			    	break;
-	
-				path_elem = ++s;
-			} else
-			    ++s;
-		}
-	}
-
-	strcpy (path,fname);
-	strcat (path,ext);
-
- 	return file_exists_with_time (path,file_time_p);
-}
-#endif
-
 
 static void append_file_name_and_ext (char *path_p,char *fname_p,char *ext,int in_clean_system_files_folder)
 {
@@ -256,27 +185,6 @@ static Bool findfilepath (char *fname,FileKind kind,char *path)
 
  	return file_exists (path);
 }
-
-/*
-#include <share.h>
-
-		file=(File) _fsopen (path,mode,_SH_DENYNO);
-*/
-
-#if WRITE_DCL_MODIFICATION_TIME
-File FOpenWithFileTime (char *file_name,FileKind kind, char *mode,FileTime *file_time_p)
-{
-	char path[MAXPATHLEN];
-	Bool res;
-
-	res=find_filepath_and_time (file_name, kind, path,file_time_p);
-
-	if (res || mode[0] != 'r')
-		return fopen (path, mode);
-	else
-		return NULL;
-}
-#endif
 
 static char *skip_after_last_dot (char *s)
 {
@@ -415,19 +323,6 @@ long FTell (File f)
 	return ftell ((FILE *) f);
 }
 
-SysTime GetSysTime (unsigned scale)
-{
-	return 0;
-}
-
-void StopTimer (void)
-{
-}
-
-void ResetTimer (void)
-{
-}
-
 void DoError (char *fmt, ...)
 {
 	va_list args;
@@ -465,20 +360,6 @@ void CmdError (char *errormsg,...)
 	va_end (args);
 }
 
-static void DoNothing (void)
-{
-}
-
-void (*SetSignal (void (*f) (void))) (void)
-{	
-	return DoNothing;
-}
-
-int CheckInterrupt (void)
-{	
-	return 0;
-}
-
 void *Alloc (long unsigned count, SizeT size)
 {	
 	if (size == 1){
@@ -495,19 +376,3 @@ void Free (void *p)
 {
 	(void) free (p);
 }
-
-#ifdef WRITE_DCL_MODIFICATION_TIME
-void FWriteFileTime (FileTime file_time,File f)
-{
-	SYSTEMTIME date_and_time;
-	FILETIME local_file_time;
-	
-	FileTimeToLocalFileTime (&file_time,&local_file_time);
-	
-	FileTimeToSystemTime (&local_file_time,&date_and_time);
-	
-	fprintf (f,"%04d%02d%02d%02d%02d%02d",
-				date_and_time.wYear,date_and_time.wMonth,date_and_time.wDay,
-				date_and_time.wHour,date_and_time.wMinute,date_and_time.wSecond);
-}
-#endif
