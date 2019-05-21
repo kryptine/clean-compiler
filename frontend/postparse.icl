@@ -1263,8 +1263,6 @@ replace_generic_info_record_by_arguments generic_info bodies arity (TypeConsSymb
 			= add_field (field_4_name_of_generic_info generic_cons_index) (generic_info bitxor 16) field_assignments args ca
 		| generic_info bitand 32<>0
 			= add_field (field_5_name_of_generic_info generic_cons_index) (generic_info bitxor 32) field_assignments args ca
-		| generic_info bitand 64<>0
-			= add_field (field_6_name_of_generic_info generic_cons_index) (generic_info bitxor 64) field_assignments args ca
 
 	add_field :: !{#Char} !Int [FieldAssignment] [ParsedExpr] *CollectAdmin -> (![ParsedExpr],!*CollectAdmin)
 	add_field field_name generic_info field_assignments args ca
