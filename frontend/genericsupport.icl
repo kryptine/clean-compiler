@@ -122,7 +122,6 @@ field_n_of_GenericConsDescriptor "gcd_prio" = 2
 field_n_of_GenericConsDescriptor "gcd_type_def" = 3
 field_n_of_GenericConsDescriptor "gcd_type" = 4
 field_n_of_GenericConsDescriptor "gcd_index" = 5
-field_n_of_GenericConsDescriptor "gcd_strict_arguments" = 6
 field_n_of_GenericConsDescriptor  _ = -1
 
 field_n_of_GenericFieldDescriptor :: !String -> Int
@@ -137,7 +136,6 @@ field_n_of_GenericRecordDescriptor "grd_arity" = 1
 field_n_of_GenericRecordDescriptor "grd_type_arity" = 2
 field_n_of_GenericRecordDescriptor "grd_type" = 3
 field_n_of_GenericRecordDescriptor "grd_fields" = 4
-field_n_of_GenericRecordDescriptor "grd_strict_fields" = 5
 field_n_of_GenericRecordDescriptor _ = -1
 
 field_0_name_of_generic_info :: !Int -> String
@@ -169,7 +167,3 @@ field_4_name_of_generic_info 2 = "grd_fields"
 
 field_5_name_of_generic_info :: !Int -> String
 field_5_name_of_generic_info 1 = "gcd_index"
-field_5_name_of_generic_info 2 = "grd_strict_fields"
-
-field_6_name_of_generic_info :: !Int -> String
-field_6_name_of_generic_info 1 = "gcd_strict_arguments"
