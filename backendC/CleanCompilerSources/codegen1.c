@@ -2599,7 +2599,7 @@ SymbDef CreateUpdateFunction (ArgS *record_arg,ArgS *first_field_arg,Node node
 	} else
 		strict_record_state_p = &record_state;
 
-	update_function_ident=PutStringInHashTable (update_function_name,SymbolIdTable);
+	update_function_ident=NewIdent (update_function_name);
 	update_function_sdef=MakeNewSymbolDefinition (CurrentModule,update_function_ident,n_arguments,IMPRULE);
 
 	update_function_sdef->sdef_number=next_def_number++;
@@ -2773,7 +2773,7 @@ SymbDef create_select_function (Symbol selector_symbol,int selector_kind)
 	sprintf (select_function_name,"_sel%d",next_update_function_n);
 	++next_update_function_n;
 
-	select_function_ident=PutStringInHashTable (select_function_name,SymbolIdTable);
+	select_function_ident=NewIdent (select_function_name);
 	select_function_sdef=MakeNewSymbolDefinition (CurrentModule,select_function_ident,1,IMPRULE);
 
 	U5 (select_function_sdef,	sdef_number=next_def_number++,
@@ -2862,7 +2862,7 @@ static SymbDef create_match_function_sdef (void)
 	sprintf (match_function_name,"_match%d",next_match_function_n);
 	++next_match_function_n;
 
-	match_function_ident=PutStringInHashTable (match_function_name,SymbolIdTable);
+	match_function_ident=NewIdent (match_function_name);
 	match_function_sdef=MakeNewSymbolDefinition (CurrentModule,match_function_ident,1,IMPRULE);
 
 	U5 (match_function_sdef,	sdef_number=next_def_number++,

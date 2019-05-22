@@ -1008,7 +1008,7 @@ static Symbol new_rule_symbol (char *function_name)
 	Symbol function_symbol;
 	Ident function_ident;
 
-	function_ident=PutStringInHashTable (function_name,SymbolIdTable);
+	function_ident=NewIdent (function_name);
 	function_sdef=MakeNewSymbolDefinition (CurrentModule,function_ident,0,IMPRULE);
 
 	function_sdef->sdef_ancestor = ~next_def_number;

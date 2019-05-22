@@ -105,7 +105,7 @@ typedef struct record_state_descr {
 } *RecordStateDescr;
 
 typedef enum {
-	SymbolIdTable, TypeSymbolIdTable, FirstSystemModuleTable, LastSystemModuleTable=0x7fff
+	FirstSystemModuleTable, LastSystemModuleTable=0x7fff
 } TableKind;
 
 typedef union symb_value {

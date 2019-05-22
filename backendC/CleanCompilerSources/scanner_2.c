@@ -24,7 +24,7 @@
 # include	"sizes.h"
 
 static IdentP
-NewIdent (TableKind tableKind, char *name)
+NewIdentInTable (TableKind tableKind, char *name)
 {
 	IdentP	ident;
 
@@ -39,7 +39,7 @@ NewIdent (TableKind tableKind, char *name)
 	ident->ident_mark 		= 0;
 
 	return (ident);
-} /* NewIdent */
+}
 
 #define CompAllocString(size) ((char*)CompAlloc(size))
 
@@ -57,6 +57,24 @@ AllocString (char *string, short length)
 	
 	return (newString);
 } /* AllocString */
+
+IdentP
+NewIdent (char *name)
+{
+	IdentP	ident;
+
+	ident	= CompAllocType (struct ident);
+
+	ident->ident_name	= AllocString (name,strlen (name));
+
+	ident->ident_table	= LastSystemModuleTable;
+	ident->ident_next		= NULL;
+	ident->ident_environ	= NULL;
+	ident->ident_symbol		= NULL;
+	ident->ident_mark 		= 0;
+
+	return ident;
+}
 
 # define	kIdentStringTableSizeBits	10
 # define	kIdentStringTableSize		((1 << kIdentStringTableSizeBits) - 1)
@@ -129,7 +147,7 @@ PutIdentStringInTable (IdentStringP identString, TableKind tableKind)
 
 	if (ident == NIL)
 	{
-		ident	= NewIdent (tableKind, identString->string);
+		ident	= NewIdentInTable (tableKind, identString->string);
 		
 		ident->ident_next	= identString->ident;
 

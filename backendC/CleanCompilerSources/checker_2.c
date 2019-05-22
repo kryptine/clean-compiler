@@ -122,9 +122,9 @@ NodeDefs NewNodeDef (NodeId nid,Node node)
 void InitChecker (void)
 {
 	StartSymbol = NewSymbol (newsymbol);
-	StartSymbol -> symb_ident = PutStringInHashTable ("Start", SymbolIdTable);
+	StartSymbol -> symb_ident = NewIdent ("Start");
 
-	system_seq_id = PutStringInHashTable ("seq", SymbolIdTable);
+	system_seq_id = NewIdent ("seq");
 
 	OpenDefinitionModules	= NIL;
 }

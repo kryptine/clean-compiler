@@ -1,4 +1,6 @@
 
+extern IdentP NewIdent (char *name);
+
 extern	IdentP	PutStringInHashTable (char *string, TableKind tabkind);
 
 extern	void	InitScanner (void);

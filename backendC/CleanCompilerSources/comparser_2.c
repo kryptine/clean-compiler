@@ -26,8 +26,6 @@
 # include "dbprint.h"
 # endif
 
-static void	*gSymbIdEnv;
-
 static IdentP	gBasicTypeIdents [Nr_Of_Basic_Types], gIfIdent;
 
 static SymbolP
@@ -38,13 +36,13 @@ NewPredefinedTypeSymbol (SymbKind symbolKind, char *symbolName, IdentP *identPtr
 
 	symbol		= NewSymbol (symbolKind);
 
-	ident				= PutStringInHashTable (symbolName, TypeSymbolIdTable);
+	ident				= NewIdent (symbolName);
 	ident->ident_symbol	= symbol;
-	ident->ident_environ= (char*)gSymbIdEnv;
+	ident->ident_environ= NULL;
 	*identPtr			= ident;
 
 	return (symbol);
-} /* NewPredefinedSymbol */
+}
 
 static SymbolP
 NewPredefinedSymbol (SymbKind symbolKind, char *symbolName, IdentP *identPtr)
@@ -54,9 +52,9 @@ NewPredefinedSymbol (SymbKind symbolKind, char *symbolName, IdentP *identPtr)
 
 	symbol		= NewSymbol (symbolKind);
 
-	ident				= PutStringInHashTable (symbolName, SymbolIdTable);
+	ident				= NewIdent (symbolName);
 	ident->ident_symbol	= symbol;
-	ident->ident_environ= (char*)gSymbIdEnv;
+	ident->ident_environ= NULL;
 	*identPtr			= ident;
 
 	return (symbol);
