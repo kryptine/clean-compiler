@@ -240,7 +240,7 @@ void PrintSymbol (Symbol symbol, File file)
 		FPutS (symbol->symb_int, file);
 		return;
 	case bool_denot:
-		FPutS (symbol->symb_bool ? ReservedWords [truesym] : ReservedWords [falsesym], file);
+		FPutS (symbol->symb_bool ? "True" : "False", file);
 		return;
 	case char_denot:
 		FPutS (symbol->symb_char, file);
