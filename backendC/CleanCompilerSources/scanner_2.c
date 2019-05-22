@@ -23,8 +23,6 @@
 # include	"scanner.h"
 # include	"sizes.h"
 
-char **ReservedWords;
-
 static IdentP
 NewIdent (TableKind tableKind, char *name)
 {
@@ -334,24 +332,6 @@ void
 ScanInitIdentStringTable (void)
 {
 	int		i;
-
-	ReservedWords = (char **) CompAlloc ((unsigned long) NumberOfKeywords * SizeOf (char *));
-	ReservedWords [(int) errorsym]			= "Erroneous";
-	ReservedWords [(int) arraysym]			= "{ }";
-	ReservedWords [(int) strictarraysym]	= "{ ! }";
-	ReservedWords [(int) unboxedarraysym]	= "{ # }";
-	ReservedWords [(int) boolsym]			= "Bool";
-	ReservedWords [(int) charsym]			= "Char";
-	ReservedWords [(int) falsesym]			= "False";
-	ReservedWords [(int) filesym]			= "File";
-	ReservedWords [(int) ifsym]				= "if ";
-	ReservedWords [(int) intsym]			= "Int";
-	ReservedWords [(int) procidsym]			= "ProcId";
-	ReservedWords [(int) redidsym]			= "RedId";
-	ReservedWords [(int) realsym]			= "Real";
-	ReservedWords [(int) truesym]			= "True";
-	ReservedWords [(int) applysym]			= "=>";
-	ReservedWords [(int) worldsym]			= "World";
 
 	gIdentStringTable	= (struct ident_string**)CompAlloc (kIdentStringTableSize * sizeof (struct ident_string));
 	for (i = 0; i < kIdentStringTableSize; i++)

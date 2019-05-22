@@ -31,13 +31,11 @@ static void	*gSymbIdEnv;
 static IdentP	gBasicTypeIdents [Nr_Of_Basic_Types], gIfIdent;
 
 static SymbolP
-NewPredefinedTypeSymbol (SymbKind symbolKind, KeywordKind keyWordKind, IdentP *identPtr)
+NewPredefinedTypeSymbol (SymbKind symbolKind, char *symbolName, IdentP *identPtr)
 {
-	char		*symbolName;
 	SymbolP		symbol;
 	IdentP		ident;
 
-	symbolName	= ReservedWords [keyWordKind];
 	symbol		= NewSymbol (symbolKind);
 
 	ident				= PutStringInHashTable (symbolName, TypeSymbolIdTable);
@@ -49,13 +47,11 @@ NewPredefinedTypeSymbol (SymbKind symbolKind, KeywordKind keyWordKind, IdentP *i
 } /* NewPredefinedSymbol */
 
 static SymbolP
-NewPredefinedSymbol (SymbKind symbolKind, KeywordKind keyWordKind, IdentP *identPtr)
+NewPredefinedSymbol (SymbKind symbolKind, char *symbolName, IdentP *identPtr)
 {
-	char		*symbolName;
 	SymbolP		symbol;
 	IdentP		ident;
 
-	symbolName	= ReservedWords [keyWordKind];
 	symbol		= NewSymbol (symbolKind);
 
 	ident				= PutStringInHashTable (symbolName, SymbolIdTable);
@@ -87,21 +83,21 @@ InitParser (void)
 		TupleTypeSymbols [i] = NULL;
 	}
 
-	BasicTypeSymbols [int_type]		= NewPredefinedTypeSymbol (int_type, intsym, & gBasicTypeIdents [int_type]);
-	BasicTypeSymbols [bool_type]	= NewPredefinedTypeSymbol (bool_type, boolsym, & gBasicTypeIdents [bool_type]);
-	BasicTypeSymbols [char_type]	= NewPredefinedTypeSymbol (char_type, charsym, & gBasicTypeIdents [char_type]);
-	BasicTypeSymbols [real_type]	= NewPredefinedTypeSymbol (real_type, realsym, & gBasicTypeIdents [real_type]);
-	BasicTypeSymbols [file_type]	= NewPredefinedTypeSymbol (file_type, filesym, & gBasicTypeIdents [file_type]);
-	BasicTypeSymbols [world_type]	= NewPredefinedTypeSymbol (world_type, worldsym, & gBasicTypeIdents [world_type]);
+	BasicTypeSymbols [int_type]		= NewPredefinedTypeSymbol (int_type, "Int", & gBasicTypeIdents [int_type]);
+	BasicTypeSymbols [bool_type]	= NewPredefinedTypeSymbol (bool_type, "Bool", & gBasicTypeIdents [bool_type]);
+	BasicTypeSymbols [char_type]	= NewPredefinedTypeSymbol (char_type, "Char", & gBasicTypeIdents [char_type]);
+	BasicTypeSymbols [real_type]	= NewPredefinedTypeSymbol (real_type, "Real", & gBasicTypeIdents [real_type]);
+	BasicTypeSymbols [file_type]	= NewPredefinedTypeSymbol (file_type, "File", & gBasicTypeIdents [file_type]);
+	BasicTypeSymbols [world_type]	= NewPredefinedTypeSymbol (world_type, "World", & gBasicTypeIdents [world_type]);
 
-	ArraySymbols [LazyArrayInstance]	= NewPredefinedTypeSymbol (array_type, arraysym, &gArrayIdents [LazyArrayInstance]);
-	ArraySymbols [StrictArrayInstance]	= NewPredefinedTypeSymbol (strict_array_type, strictarraysym, &gArrayIdents [StrictArrayInstance]);
-	ArraySymbols [UnboxedArrayInstance] = NewPredefinedTypeSymbol (unboxed_array_type, unboxedarraysym, &gArrayIdents [UnboxedArrayInstance]);
+	ArraySymbols [LazyArrayInstance]	= NewPredefinedTypeSymbol (array_type, "{ }", &gArrayIdents [LazyArrayInstance]);
+	ArraySymbols [StrictArrayInstance]	= NewPredefinedTypeSymbol (strict_array_type, "{ ! }", &gArrayIdents [StrictArrayInstance]);
+	ArraySymbols [UnboxedArrayInstance] = NewPredefinedTypeSymbol (unboxed_array_type, "{ # }", &gArrayIdents [UnboxedArrayInstance]);
 	
-	BasicTypeSymbols [procid_type]	= NewPredefinedTypeSymbol (procid_type, procidsym, & gBasicTypeIdents [procid_type]);
+	BasicTypeSymbols [procid_type]	= NewPredefinedTypeSymbol (procid_type, "ProcId", & gBasicTypeIdents [procid_type]);
 
-	IfSymbol		= NewPredefinedSymbol (if_symb, ifsym, &gIfIdent);
-	BasicTypeSymbols [redid_type]	= NewPredefinedTypeSymbol (procid_type, procidsym, & gBasicTypeIdents [redid_type]);
+	IfSymbol		= NewPredefinedSymbol (if_symb, "if ", &gIfIdent);
+	BasicTypeSymbols [redid_type]	= NewPredefinedTypeSymbol (procid_type, "ProcId", & gBasicTypeIdents [redid_type]);
 	ApplyTypeSymbol	= NewSymbol (fun_type);
 
 	TrueSymbol		= NewSymbol (bool_denot);

@@ -14,24 +14,22 @@ char *ConvertSymbolKindToString (SymbKind skind)
 {
 	switch (skind)
 	{
-		case int_type: 		return ReservedWords [(int) intsym];
-		case bool_type:		return ReservedWords [(int) boolsym];
-		case char_type:		return ReservedWords [(int) charsym];
-		case real_type:		return ReservedWords [(int) realsym];
-		case file_type:		return ReservedWords [(int) filesym];
-		case array_type:		return ReservedWords [(int) arraysym];
-		case strict_array_type:	return ReservedWords [(int) strictarraysym];
-		case unboxed_array_type:return ReservedWords [(int) unboxedarraysym];
-		case world_type:	return ReservedWords [(int) worldsym];
-		case procid_type:	return ReservedWords [(int) procidsym];
-		case redid_type:	return ReservedWords [(int) redidsym];
-		case fun_type:		return ReservedWords [(int) applysym];
+		case int_type: 		return "Int";
+		case bool_type:		return "Bool";
+		case char_type:		return "Char";
+		case real_type:		return "Real";
+		case file_type:		return "File";
+		case array_type:		return "{ }";
+		case strict_array_type:	return "{ ! }";
+		case unboxed_array_type:return "{ # }";
+		case world_type:	return "World";
+		case procid_type:	return "ProcId";
+		case redid_type:	return "RedId";
+		case fun_type:		return "=>";
 		case list_type:		return ListId	-> ident_name;
 		case tuple_type:	return TupleId	-> ident_name;
-#ifdef CLEAN2
 		case dynamic_type:	return DynamicId -> ident_name;
-#endif
-		default:			return ReservedWords [errorsym];
+		default:			return "Erroneous";
 	}
 
 } /* ConvertSymbolKindToString */
