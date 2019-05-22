@@ -121,25 +121,8 @@ NodeDefs NewNodeDef (NodeId nid,Node node)
 
 void InitChecker (void)
 {
-	ApplyId		= PutStringInHashTable ("AP", SymbolIdTable);
-	DynamicId	= PutStringInHashTable ("Dynamic", SymbolIdTable);
-	
-	/* hack RWS */
-	IfId		= PutStringInHashTable ("if ", SymbolIdTable);
-	IfId->ident_name	= "if";
-
-	FailId		= PutStringInHashTable ("_Fail", SymbolIdTable);
-
 	StartSymbol = NewSymbol (newsymbol);
 	StartSymbol -> symb_ident = PutStringInHashTable ("Start", SymbolIdTable);
-
-	AndId		= PutStringInHashTable ("&&", SymbolIdTable);
-	OrId		= PutStringInHashTable ("||", SymbolIdTable);
-
-#if SA_RECOGNIZES_ABORT_AND_UNDEF
-	abort_id = PutStringInHashTable ("abort",SymbolIdTable);
-	undef_id = PutStringInHashTable ("undef",SymbolIdTable);
-#endif
 
 	system_seq_id = PutStringInHashTable ("seq", SymbolIdTable);
 
