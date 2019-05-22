@@ -120,7 +120,7 @@ StringInTable (char *string, short length)
 	return (identString);
 } /* StringInTable */
 
-IdentP
+static IdentP
 PutIdentStringInTable (IdentStringP identString, TableKind tableKind)
 {
 	IdentP		ident;
@@ -150,29 +150,6 @@ PutStringInHashTable (char *string, TableKind tableKind)
 
 	return (PutIdentStringInTable (identString, tableKind));
 } /* PutStringInHashTable */
-
-STRUCT (keyWordInfo, KeyWordInfo)
-{
-	char	*name;
-	Token	token;
-};
-
-static	void
-PutKeyWordInTable (KeyWordInfoP keyWord)
-{
-	IdentStringP identString;
-	IdentP ident;
-
-	identString	= StringInTable (keyWord->name, strlen (keyWord->name));
-
-	ident	= NewIdent (KeyWordTable, identString->string);
-	
-	ident->ident_next		= identString->ident;
-	ident->ident_environ	= NIL;
-	ident->ident_symbol		= (struct symbol *) keyWord->token;
-
-	identString->ident		= ident;
-} /* PutKeyWordInTable */
 
 static IdentP RetrieveFromSymbolTable (char *string,TableKind table_kind)
 {
@@ -402,72 +379,10 @@ ScanInitIdentStringTable (void)
 		gIdentStringTable [i]	= NIL;
 }
 
-static KeyWordInfoS gKeyWords [] =
-{
-	{ "export",			kTokenExport				},
-	{ "import",			kTokenImport				},
-	{ "from",			kTokenFrom					},
-	{ "definition",		kTokenDefinition			},
-	{ "implementation",	kTokenImplementation		},
-	{ "system",			kTokenSystem				},
-	{ "module",			kTokenModule				},
-	{ "let",			kTokenLet					},
-	{ "in",				kTokenIn					},
-	{ "case",			kTokenCase					},
-	{ "of",				kTokenOf					},
-	{ "if",				kTokenIf					},
-	{ "with",			kTokenWith					},
-	{ "where",			kTokenWhere					},
-	{ "code",			kTokenCode					},
-	{ "True",			kTokenTrue					},
-	{ "False",			kTokenFalse					},	
-/*	{ "overload",		kTokenOverload				}, */
-	{ "instance",		kTokenInstance				},
-	{ "default",		kTokenDefault				},
-	{ "class",			kTokenClass					},
-	{ "infix",			kTokenInfix					},
-	{ "infixl",			kTokenInfixL				},
-	{ "infixr",			kTokenInfixR				},
-	{ "\\",				'\\'						},
-	{ "\\\\",			kTokenDoubleBackSlash		},
-	{ "#",				'#'							},
-	{ "#!",				kTokenHashExclamationMark	},
-	{ "=",				'='							},
-	{ "|",				'|'							},
-	{ ".",				'.'							},
-	{ "!",				'!'							},
-	{ "&",				'&'							},
-	{ "..",				kTokenDotDot				},
-	{ "=:",				kTokenEqualColon			},
-#ifndef H
-	{ ":",				':'							},
-#endif
-	{ ":==",			kTokenColonDoubleEqual		},
-	{ "=>",				kTokenDoubleRightArrow		},
-	{ "<-",				kTokenLeftArrow				},
-	{ "<-:",			kTokenLeftArrowColon		},
-	{ "->",				kTokenRightArrow			}
-#ifdef H
-	,{ "data",			kTokenData					}
-	,{ "type",			kTokenType					}
-	,{ "@",				kTokenAtSign				}
-	,{ "then",			kTokenThen					}
-	,{ "else",			kTokenElse					}
-	,{ "interface",		kTokenInterface				}
-#endif
-};
-
-# define	ArraySize(array)	((unsigned) (sizeof (array) / sizeof (array[0])))
-
 void
 ScanInitialise (void)
 {
-	int i;
-
 	ScanInitIdentStringTable();
-
-	for (i = 0; i < ArraySize (gKeyWords); i++)
-		PutKeyWordInTable (&gKeyWords [i]);
 } /* ScanInitialise */
 
 void
