@@ -449,15 +449,3 @@ NodeP get_p_at_node (NodeP annoted_node)
 		return NULL;
 }
 
-unsigned import_system_functions, import_system_array_functions;
-
-#ifndef CLEAN2
-IdentP
-UseArrayFunctionId (ArrayFunKind kind)
-{
-	if (import_system_array_functions == 0)
-		import_system_array_functions	= gCurrentToken.lineNumber;
-
-	return (ArrayFunctionIds [kind]);
-} /* UseArrayFunctionId */
-#endif

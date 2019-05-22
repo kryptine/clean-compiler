@@ -252,16 +252,16 @@ void PrintSymbol (Symbol symbol, File file)
 		FPutS (symbol->symb_real, file);
 		return;
 	case tuple_symb:
-		FPutS (TupleId -> ident_name, file);
+		FPutS ("Tuple", file);
 		return;
 	case cons_symb:
-		FPutS (ConsId -> ident_name, file);
+		FPutS ("[:]", file);
 		return;
 	case nil_symb:
-		FPutS (NilId -> ident_name, file);
+		FPutS ("[]", file);
 		return;
 	case select_symb:
-		FPutS (SelectId -> ident_name, file);
+		FPutS ("_Select", file);
 		return;
 	case apply_symb:
 		FPutS (ApplyId -> ident_name, file);
