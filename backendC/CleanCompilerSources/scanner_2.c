@@ -335,36 +335,15 @@ ScanInitIdentStringTable (void)
 {
 	int		i;
 
-	/*
-		RWS +++ clean up symbols
-	*/
 	ReservedWords = (char **) CompAlloc ((unsigned long) NumberOfKeywords * SizeOf (char *));
 	ReservedWords [(int) errorsym]			= "Erroneous";
-	ReservedWords [(int) barsym]			= "|";
-	ReservedWords [(int) strictsym]			= "!";
-	ReservedWords [(int) opensym]			= "(";
-	ReservedWords [(int) closesym]			= ")";
-	ReservedWords [(int) opensquaresym]		= "[";
-	ReservedWords [(int) closesquaresym]	= "]";
-	ReservedWords [(int) colonsym]			= ":";
-	ReservedWords [(int) typesym]			= "::";
-	ReservedWords [(int) semicolonsym]		= ";";
-	ReservedWords [(int) commasym]			= ",";
-	ReservedWords [(int) dotsym]			= ".";
-	ReservedWords [(int) openbracesym]		= "{";
-	ReservedWords [(int) closebracesym]		= "}";
-	ReservedWords [(int) arrowsym]			= "->";
-
 	ReservedWords [(int) arraysym]			= "{ }";
 	ReservedWords [(int) strictarraysym]	= "{ ! }";
 	ReservedWords [(int) unboxedarraysym]	= "{ # }";
-
 	ReservedWords [(int) boolsym]			= "Bool";
 	ReservedWords [(int) charsym]			= "Char";
-	ReservedWords [(int) codesym]			= "code";
 	ReservedWords [(int) falsesym]			= "False";
 	ReservedWords [(int) filesym]			= "File";
-	ReservedWords [(int) fromsym]			= "from";
 	ReservedWords [(int) ifsym]				= "if ";
 	ReservedWords [(int) intsym]			= "Int";
 	ReservedWords [(int) procidsym]			= "ProcId";
