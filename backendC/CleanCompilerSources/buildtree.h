@@ -91,8 +91,6 @@ extern	SymbolP	TupleTypeSymbols [];
 IdentP UseArrayFunctionId (ArrayFunKind kind);
 void InitialiseEnumFunctionIds (void);
 
-extern unsigned import_system_functions, import_system_array_functions;
-
 void clear_p_at_node_tree (void);
 void store_p_at_node (NodeP annoted_node,NodeP at_node);
 NodeP *get_p_at_node_p (NodeP annoted_node);

@@ -72,11 +72,7 @@ void ReadInlineCode (void)
 	}
 }
 
-Ident AnnotatedId, ListId, TupleId, ConsId, NilId, ApplyId, SelectId,
-#ifdef CLEAN2
-	DynamicId,
-#endif
-	StdBoolId, IfId, FailId, AndId, OrId, ArrayFunctionIds [NoArrayFun];
+Ident ApplyId, DynamicId, StdBoolId, IfId, FailId, AndId, OrId;
 
 #if SA_RECOGNIZES_ABORT_AND_UNDEF
 Ident StdMiscId,abort_id,undef_id;	
@@ -110,17 +106,11 @@ SymbDef MakeNewSymbolDefinition (char * module, Ident name, int arity, SDefKind 
 	return def;
 }
 
-static NodeDefs FreeDefs;
-
 NodeDefs NewNodeDef (NodeId nid,Node node)
 {
 	NodeDefs new;
 
-	if (FreeDefs){
-		new = FreeDefs;
-		FreeDefs = FreeDefs->def_next;
-	} else
-		new = CompAllocType (NodeDefS);
+	new = CompAllocType (NodeDefS);
 
 	new->def_id		= nid;
 	new->def_node	= node;
@@ -131,56 +121,10 @@ NodeDefs NewNodeDef (NodeId nid,Node node)
 
 void InitChecker (void)
 {
-	FreeDefs=NIL;
-#ifndef CLEAN2
-	free_ldefs=NULL;
-	free_depend_macros=NULL;
-#endif
-	AnnotatedId	= PutStringInHashTable ("_annotated", SymbolIdTable);
-	ListId		= PutStringInHashTable ("[...]", SymbolIdTable);
-	TupleId		= PutStringInHashTable ("(...)", SymbolIdTable);
-	ConsId		= PutStringInHashTable ("[...|...]", SymbolIdTable);
-	NilId		= PutStringInHashTable ("[]", SymbolIdTable);
-	ApplyId		= PutStringInHashTable ("AP", SymbolIdTable);
-	SelectId	= PutStringInHashTable ("_Select", SymbolIdTable);
-
-#ifdef CLEAN2
-	DynamicId	= PutStringInHashTable ("Dynamic", SymbolIdTable);
-#endif
-	
-	/* hack RWS */
-	IfId		= PutStringInHashTable ("if ", SymbolIdTable);
-	IfId->ident_name	= "if";
-
-	FailId		= PutStringInHashTable ("_Fail", SymbolIdTable);
-
 	StartSymbol = NewSymbol (newsymbol);
 	StartSymbol -> symb_ident = PutStringInHashTable ("Start", SymbolIdTable);
 
-	AndId		= PutStringInHashTable ("&&", SymbolIdTable);
-	OrId		= PutStringInHashTable ("||", SymbolIdTable);
-
-#if SA_RECOGNIZES_ABORT_AND_UNDEF
-	abort_id = PutStringInHashTable ("abort",SymbolIdTable);
-	undef_id = PutStringInHashTable ("undef",SymbolIdTable);
-#endif
-
 	system_seq_id = PutStringInHashTable ("seq", SymbolIdTable);
-
- 	/* Predefined Array functions */
-
- 	ArrayFunctionIds[CreateArrayFun]	= PutStringInHashTable ("createArray", SymbolIdTable);
-	ArrayFunctionIds[UnqArraySelectFun]	= PutStringInHashTable ("uselect", SymbolIdTable);
-	ArrayFunctionIds[ArrayReplaceFun]	= PutStringInHashTable ("replace", SymbolIdTable);
-	ArrayFunctionIds[UnqArraySizeFun]	= PutStringInHashTable ("usize", SymbolIdTable);
-	ArrayFunctionIds[ArrayUpdateFun]	= PutStringInHashTable ("update", SymbolIdTable);
-	ArrayFunctionIds[ArraySelectFun]	= PutStringInHashTable ("select", SymbolIdTable);
-	ArrayFunctionIds[ArraySizeFun]		= PutStringInHashTable ("size", SymbolIdTable);
-	ArrayFunctionIds[_CreateArrayFun]	= PutStringInHashTable ("_createArrayc", SymbolIdTable);
-	ArrayFunctionIds[_UnqArraySelectFun]= PutStringInHashTable ("_uselectf", SymbolIdTable);
-	ArrayFunctionIds[_UnqArraySelectNextFun]= PutStringInHashTable ("_uselectn", SymbolIdTable);
-	ArrayFunctionIds[_UnqArraySelectLastFun]= PutStringInHashTable ("_uselectl", SymbolIdTable);
-	ArrayFunctionIds[_ArrayUpdateFun]= PutStringInHashTable ("_updatei", SymbolIdTable);
 
 	OpenDefinitionModules	= NIL;
 }

@@ -26,8 +26,8 @@ char *ConvertSymbolKindToString (SymbKind skind)
 		case procid_type:	return "ProcId";
 		case redid_type:	return "RedId";
 		case fun_type:		return "=>";
-		case list_type:		return ListId	-> ident_name;
-		case tuple_type:	return TupleId	-> ident_name;
+		case list_type:		return "List";
+		case tuple_type:	return "Tuple";
 		case dynamic_type:	return DynamicId -> ident_name;
 		default:			return "Erroneous";
 	}

@@ -3314,11 +3314,6 @@ BEInit (int argc)
 	ScanInitIdentStringTable ();
 	InitScanner (); /* for inlining */
 	ApplyId		= Identifier ("AP");
-	ListId		= Identifier ("List");
-	TupleId		= Identifier ("Tuple");
-	ConsId		= Identifier ("[:]");
-	NilId		= Identifier ("[]");
-	SelectId	= Identifier ("_Select");
 	IfId		= Identifier ("if");
 	FailId		= Identifier ("_Fail");
 #if DYNAMIC_TYPE
