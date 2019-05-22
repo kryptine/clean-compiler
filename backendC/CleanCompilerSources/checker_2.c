@@ -76,8 +76,7 @@ Ident AnnotatedId, ListId, TupleId, ConsId, NilId, ApplyId, SelectId,
 #ifdef CLEAN2
 	DynamicId,
 #endif
-	StdBoolId, IfId, FailId, AndId, OrId,
-	StdArrayId, ArrayFunctionIds [NoArrayFun];
+	StdBoolId, IfId, FailId, AndId, OrId, ArrayFunctionIds [NoArrayFun];
 
 #if SA_RECOGNIZES_ABORT_AND_UNDEF
 Ident StdMiscId,abort_id,undef_id;	
@@ -164,13 +163,6 @@ void InitChecker (void)
 #if SA_RECOGNIZES_ABORT_AND_UNDEF
 	abort_id = PutStringInHashTable ("abort",SymbolIdTable);
 	undef_id = PutStringInHashTable ("undef",SymbolIdTable);
-#endif
-
-	StdBoolId 			= PutStringInHashTable ("StdBool", ModuleIdTable);
-	StdArrayId			= PutStringInHashTable ("_SystemArray", ModuleIdTable);
-
-#if SA_RECOGNIZES_ABORT_AND_UNDEF
-	StdMiscId = PutStringInHashTable ("StdMisc",ModuleIdTable);
 #endif
 
 	system_seq_id = PutStringInHashTable ("seq", SymbolIdTable);
