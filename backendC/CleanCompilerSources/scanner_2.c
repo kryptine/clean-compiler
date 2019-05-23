@@ -34,8 +34,7 @@ NewIdentInTable (TableKind tableKind, char *name)
 	ident->ident_name	= name;
 
 	ident->ident_next		= NULL;
-	ident->ident_environ	= NULL;
-	ident->ident_symbol		= NULL;
+	ident->ident_instructions = NULL;
 	ident->ident_mark 		= 0;
 
 	return (ident);
@@ -69,8 +68,7 @@ NewIdent (char *name)
 
 	ident->ident_table	= LastSystemModuleTable;
 	ident->ident_next		= NULL;
-	ident->ident_environ	= NULL;
-	ident->ident_symbol		= NULL;
+	ident->ident_instructions = NULL;
 	ident->ident_mark 		= 0;
 
 	return ident;
@@ -286,8 +284,6 @@ void ScanInlineFile (char *fname,TableKind system_module_table_kind)
 
 		*tail = '\0';
 		if (! (instrid = RetrieveFromSymbolTable (instr,system_module_table_kind)))
-			continue;
-		if (instrid->ident_environ!=importingModule)
 			continue;
 		if ((instrid->ident_mark & INLINE_MASK) != 0)
 		{

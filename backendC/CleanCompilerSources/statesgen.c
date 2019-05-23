@@ -1177,8 +1177,7 @@ void ExamineTypesAndLhsOfSymbolDefinition (SymbDef def)
 
 	switch (def->sdef_kind){
 		case SYSRULE:
-			def->sdef_ident->ident_symbol = NULL;
-			def->sdef_ident->ident_environ = CurrentModule;
+			def->sdef_ident->ident_instructions = NULL;
 		case DEFRULE:
 			if (def->sdef_isused){
 				def->sdef_rule_type->rule_type_state_p = allocate_function_state (def->sdef_arity);

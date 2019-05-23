@@ -37,8 +37,6 @@ NewPredefinedTypeSymbol (SymbKind symbolKind, char *symbolName, IdentP *identPtr
 	symbol		= NewSymbol (symbolKind);
 
 	ident				= NewIdent (symbolName);
-	ident->ident_symbol	= symbol;
-	ident->ident_environ= NULL;
 	*identPtr			= ident;
 
 	return (symbol);
@@ -53,8 +51,6 @@ NewPredefinedSymbol (SymbKind symbolKind, char *symbolName, IdentP *identPtr)
 	symbol		= NewSymbol (symbolKind);
 
 	ident				= NewIdent (symbolName);
-	ident->ident_symbol	= symbol;
-	ident->ident_environ= NULL;
 	*identPtr			= ident;
 
 	return (symbol);
