@@ -1338,8 +1338,8 @@ static void CallFunction2 (Label label, SymbDef def, Bool isjsr, StateS root_sta
 			if (!isjsr)
 				GenRtn (aout, bout, root_state);
 		} else {
-			if (def->sdef_ident->ident_environ && instr==NULL)
-			{	char *previous_module = CurrentModule;
+			if ((def->sdef_ident->ident_mark & WARNED_NO_INLINE_CODE)==0 && instr==NULL){
+				char *previous_module = CurrentModule;
 				char *previous_ext = CurrentExt;
 			
 				CurrentModule = def->sdef_module;
@@ -1350,7 +1350,7 @@ static void CallFunction2 (Label label, SymbDef def, Bool isjsr, StateS root_sta
 				CurrentModule = previous_module;
 				CurrentExt = previous_ext;
 
-               	def->sdef_ident->ident_environ = (char *) NIL;	
+				def->sdef_ident->ident_mark |= WARNED_NO_INLINE_CODE;
 			}
 			GenDStackLayout (ain, bin, fun_args);
 			if (isjsr){

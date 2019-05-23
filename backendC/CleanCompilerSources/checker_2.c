@@ -67,7 +67,7 @@ void ReadInlineCode (void)
 
 			if (i<n_function_symbols && d_mod->mod_name->symb_ident->ident_name!=CurrentModule)
 				/* Get the inline instructions of all the rules that are defined in this module */
-				ScanInlineFile (d_mod->mod_name->symb_ident->ident_name,def_mod->dm_system_module_table_kind);
+				ScanInlineFile (d_mod->mod_name->symb_ident->ident_name,FirstSystemModuleTable+def_mod->dm_module_n);
 		}
 	}
 }
@@ -122,9 +122,9 @@ NodeDefs NewNodeDef (NodeId nid,Node node)
 void InitChecker (void)
 {
 	StartSymbol = NewSymbol (newsymbol);
-	StartSymbol -> symb_ident = PutStringInHashTable ("Start", SymbolIdTable);
+	StartSymbol -> symb_ident = NewIdent ("Start");
 
-	system_seq_id = PutStringInHashTable ("seq", SymbolIdTable);
+	system_seq_id = NewIdent ("seq");
 
 	OpenDefinitionModules	= NIL;
 }

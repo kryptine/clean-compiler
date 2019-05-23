@@ -431,7 +431,6 @@ BEDeclareDclModule (int moduleIndex, CleanString name, CleanString modificationT
 	dclModule->dm_system_module	= isSystemModule;
 	dclModule->dm_function_symbol_a = gBEState.be_modules[moduleIndex].bem_functions;
 	dclModule->dm_n_function_symbols = gBEState.be_modules[moduleIndex].bem_nFunctions;
-	dclModule->dm_system_module_table_kind = FirstSystemModuleTable + moduleIndex;
 
 	AddOpenDefinitionModule (moduleNameSymbol, dclModule);
 } /* BEDeclareDclModule */
@@ -671,7 +670,6 @@ BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, in
 		newTypeAlt->type_alt_rhs	= rhs;
 		newTypeAlt->type_alt_strict_positions	= NULL;
 
-		newIdent->ident_symbol	= newFunctionSymbol;
 		newIdent->ident_name	= functionName;
 
 		newRuleType	= ConvertAllocType (struct rule_type);
@@ -2277,7 +2275,6 @@ DeclareFunctionC (char *name, int arity, int functionIndex, unsigned int ancesto
 	newIdent	= ConvertAllocType (IdentS);
 
 	newIdent->ident_name	= name;
-	newIdent->ident_symbol	= &functions [functionIndex];
 
 	newSymbDef->sdef_ident	= newIdent;
 
@@ -2380,8 +2377,6 @@ BEDeclareRuleType (int functionIndex, int moduleIndex, CleanString name)
 		newIdent->ident_name	= ConvertCleanString (name);
 	}
 
-	newIdent->ident_symbol	= &functions [functionIndex];
-
 	newSymbDef	= ConvertAllocType (SymbDefS);
 	newSymbDef->sdef_kind		= NEWDEFINITION;
 	newSymbDef->sdef_exported	= False;
@@ -2459,7 +2454,6 @@ BEDeclareType (int typeIndex, int moduleIndex, CleanString name)
 
 	newIdent	= ConvertAllocType (IdentS);
 	newIdent->ident_name	= ConvertCleanString (name);
-	newIdent->ident_symbol	= type_p;
 /* RWS change this
 	newSymbDef	= ConvertAllocType (SymbDefS);
 */
@@ -2650,7 +2644,6 @@ BEFieldList (int fieldIndex, int moduleIndex, CleanString name, BETypeNodeP type
 
 	newIdent	= ConvertAllocType (IdentS);
 	newIdent->ident_name	= ConvertCleanString (name);
-	newIdent->ident_symbol	= field_symbol_p;
 
 	field	= ConvertAllocType (struct field_list);
 	field->fl_next	= next_fields;
@@ -2763,7 +2756,6 @@ BEDeclareConstructor (int constructorIndex, int moduleIndex, CleanString name)
 
 	newIdent	= ConvertAllocType (IdentS);
 	newIdent->ident_name	= ConvertCleanString (name);
-	newIdent->ident_symbol	= constructor_p;
 
 	newSymbDef	= ConvertAllocType (SymbDefS);
 	newSymbDef->sdef_kind		= NEWDEFINITION;

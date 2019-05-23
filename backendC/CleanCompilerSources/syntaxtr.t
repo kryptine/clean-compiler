@@ -105,7 +105,7 @@ typedef struct record_state_descr {
 } *RecordStateDescr;
 
 typedef enum {
-	SymbolIdTable, TypeSymbolIdTable, FirstSystemModuleTable, LastSystemModuleTable=0x7fff
+	FirstSystemModuleTable, LastSystemModuleTable=0x7fff
 } TableKind;
 
 typedef union symb_value {
@@ -159,21 +159,14 @@ STRUCT (symbol,Symbol) {
 
 STRUCT(ident,Ident){
 	char *				ident_name;
-	char *				ident_environ;
-	union{
-		Symbol 				ident_u1_symbol;
-		char *				ident_u1_instructions;
-	} ident_union1;
-
+	char *				ident_instructions;
 	struct ident *		ident_next;
 	unsigned char		ident_table; /* TableKind */
 	unsigned char		ident_mark;
 };
-
-#define ident_symbol		ident_union1.ident_u1_symbol
-#define ident_instructions	ident_union1.ident_u1_instructions
  
 #define INLINE_MASK					8
+#define WARNED_NO_INLINE_CODE		16
 
 /*
 	The order in which the annotationkinds appear in the enum type
@@ -694,7 +687,6 @@ struct def_repr {
 	int			dm_module_n;
 	int			dm_n_function_symbols;
 	SymbolP		dm_function_symbol_a;
-	TableKind	dm_system_module_table_kind;
 	Bool		dm_system_module;
 	ModuleFileTime	dm_modification_time;
 };
