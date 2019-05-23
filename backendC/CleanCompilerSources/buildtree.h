@@ -1,25 +1,4 @@
 
-typedef enum
-{
-	LazyArrayInstance, StrictArrayInstance, UnboxedArrayInstance, NrOfArrayInstances
-} ArrayInstance;
-
-typedef enum
-{
-	NoQuantifier, AllQuantifier, ExistQuantifier, ExistAttributeQuantifier
-} Quantifier;
-
-typedef enum
-{
-										/* defining symbol */
-	kUnknownRuleAlternativeKind,		/* ':==', '=:', '=>' or '=' */
-	kUnknownFunctionAlternativeKind,	/* '=>' or '=' */
-	kFunctionAlternativeKind,			/* '=' */
-	kExplicitFunctionAlternativeKind,	/* '=>' */
-	kCAFAlternativeKind,				/* '=:' */
-	kArrowAlternativeKind				/* '->' */
-} RuleAltKind;
-
 extern Args NewArgument (NodeP pattern);
 extern NodeP NewNode (SymbolP symb, Args args, int arity);
 extern NodeP NewIfNode (void);
@@ -30,18 +9,8 @@ extern NodeP NewNodeByKind (NodeKind nodeKind, SymbolP symb, Args args, int arit
 # define	NewNormalNode(symb, args, arity)	NewNodeByKind (NormalNode, (symb), (args), (arity))
 # define	NewRecordNode(symb, args, arity)	NewNodeByKind (RecordNode, (symb), (args), (arity))
 # define	NewMatchNode(symb, args, arity)		NewNodeByKind (MatchNode, (symb), (args), (arity))
-# define	NewCons(element)	NewNormalNode (ConsSymbol, element, 2)
-# define	NewNil()			NewNormalNode (NilSymbol, NIL, 0)
 # define	NewFalse()			NewNormalNode (FalseSymbol, NIL, 0)
 # define	NewTrue()			NewNormalNode (TrueSymbol, NIL, 0)
-
-#if STRICT_LISTS
-# define	NewStrictNil() NewNormalNode (StrictNilSymbol, NIL, 0)
-# define	NewUnboxedNil() NewNormalNode (UnboxedNilSymbol, NIL, 0)
-# define	NewTailStrictNil() NewNormalNode (TailStrictNilSymbol, NIL, 0)
-# define	NewStrictTailStrictNil() NewNormalNode (StrictTailStrictNilSymbol, NIL, 0)
-# define	NewUnboxedTailStrictNil() NewNormalNode (UnboxedTailStrictNilSymbol, NIL, 0)
-#endif
 
 extern	NodeP NewIntNode (int value);
 
@@ -65,31 +34,15 @@ extern RuleAltP	NewRuleAlt (void);
 
 extern NodeIdP FreshNodeId (NodeP node, NodeDefs **node_defs_h);
 
-extern TypeArgs ConvertFieldsToTypeArguments (FieldList fields);
-
 extern char *CopyString (char *to, char *from, int *rest_size);
 
 extern IdentP DetermineNewSymbolId (char *prefix, TypeNode inst_type, TableKind table);
 
-extern	IdentP	gArrayIdents [];
-
-extern SymbolP	BasicTypeSymbols [],
-				ArraySymbols [],
-				TrueSymbol, FalseSymbol, TupleSymbol, ListSymbol, ConsSymbol, NilSymbol,
+extern SymbolP	TrueSymbol, FalseSymbol, TupleSymbol,
 				ApplySymbol, ApplyTypeSymbol, SelectSymbols[],
 				FailSymbol, IfSymbol;
-#if STRICT_LISTS
-extern SymbolP
-	StrictListSymbol, StrictConsSymbol, StrictNilSymbol,
-	UnboxedListSymbol, UnboxedConsSymbol, UnboxedNilSymbol,
-	TailStrictListSymbol, TailStrictConsSymbol, TailStrictNilSymbol,
-	StrictTailStrictListSymbol, StrictTailStrictConsSymbol, StrictTailStrictNilSymbol,
-	UnboxedTailStrictListSymbol, UnboxedTailStrictConsSymbol, UnboxedTailStrictNilSymbol;
-#endif
 
 extern	SymbolP	TupleTypeSymbols [];
-IdentP UseArrayFunctionId (ArrayFunKind kind);
-void InitialiseEnumFunctionIds (void);
 
 void clear_p_at_node_tree (void);
 void store_p_at_node (NodeP annoted_node,NodeP at_node);

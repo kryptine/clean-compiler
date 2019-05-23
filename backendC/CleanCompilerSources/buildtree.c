@@ -8,25 +8,9 @@
 # include "checker.h"
 # include "scanner.h"
 
-SymbolP	BasicTypeSymbols [Nr_Of_Basic_Types],
-		ArraySymbols [NrOfArrayInstances],
-
-		ApplyTypeSymbol, TrueSymbol, FalseSymbol,
-		TupleSymbol, ListSymbol, ConsSymbol, NilSymbol,
-		SelectSymbols [MaxNodeArity], ApplySymbol, IfSymbol, FailSymbol,
-		EmptyTypeSymbol,
+SymbolP	TrueSymbol, FalseSymbol, TupleSymbol,
+		SelectSymbols [MaxNodeArity], ApplySymbol, IfSymbol,
 		TupleTypeSymbols [MaxNodeArity];
-
-#if STRICT_LISTS
-SymbolP
-	StrictListSymbol, StrictConsSymbol, StrictNilSymbol,
-	UnboxedListSymbol, UnboxedConsSymbol, UnboxedNilSymbol,
-	TailStrictListSymbol, TailStrictConsSymbol, TailStrictNilSymbol,
-	StrictTailStrictListSymbol, StrictTailStrictConsSymbol, StrictTailStrictNilSymbol,
-	UnboxedTailStrictListSymbol, UnboxedTailStrictConsSymbol, UnboxedTailStrictNilSymbol;
-#endif
-
-IdentP gArrayIdents [NrOfArrayInstances];
 
 TypeArgs
 NewTypeArgument (TypeNode pattern)
