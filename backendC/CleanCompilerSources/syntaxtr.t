@@ -194,7 +194,7 @@ typedef struct {
 struct _exp;
 
 STRUCT (node_id,NodeId){
-	Ident			nid_ident;
+	char *			nid_name;
 	unsigned short	nid_mark;
 	unsigned short	nid_mark2;
 	int				nid_refcount;

@@ -684,8 +684,6 @@ BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, in
 		newsdef->sdef_arfun			= arrayFunKind;
 		newsdef->sdef_kind 			= SYSRULE;
 		newsdef->sdef_rule_type		= newRuleType;
-		newsdef->sdef_ident			= newIdent;
-		newsdef->sdef_mark			= 0;
 
 		newFunctionSymbol->symb_kind	= definition;
 		newFunctionSymbol->symb_def		= newsdef;
@@ -1949,7 +1947,6 @@ static void increase_number_of_node_ids (int sequenceNumber)
 void
 BEDeclareNodeId (int sequenceNumber, int lhsOrRhs, CleanString name)
 {
-	IdentP	newIdent;
 	NodeIdP	newNodeId;
 
 	if (sequenceNumber>=n_gCurrentNodeIds)
@@ -1968,13 +1965,8 @@ BEDeclareNodeId (int sequenceNumber, int lhsOrRhs, CleanString name)
 
 	Assert (gCurrentNodeIds [sequenceNumber] == NULL);
 
-	/* +++ share idents ??? */
-	newIdent	= ConvertAllocType (IdentS);
-	newIdent->ident_name	= ConvertCleanString (name);
-
 	newNodeId	= ConvertAllocType (NodeIdS);
-	newNodeId->nid_ident	= newIdent;
-
+	newNodeId->nid_name = ConvertCleanString (name);
 	newNodeId->nid_node_def			= NULL;
 	newNodeId->nid_forward_node_id	= NULL;
 	newNodeId->nid_node				= NULL;
@@ -2030,7 +2022,7 @@ BEWildCardNodeId (void)
 
 	newNodeId	= ConvertAllocType (NodeIdS);
 
-	newNodeId->nid_ident			= NULL;
+	newNodeId->nid_name				= NULL;
 	newNodeId->nid_node_def			= NULL;
 	newNodeId->nid_forward_node_id	= NULL;
 	newNodeId->nid_node				= NULL;

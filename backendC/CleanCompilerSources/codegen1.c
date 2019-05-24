@@ -306,8 +306,8 @@ void FileComment (void)
 
 void PrintNodeId (NodeId nid)
 {
-	if (nid && nid->nid_ident && nid->nid_ident->ident_name)
-		FPrintF (OutFile, "%s", nid->nid_ident->ident_name);
+	if (nid && nid->nid_name)
+		FPrintF (OutFile, "%s", nid->nid_name);
 	else
 		FPrintF (OutFile, "_");
 }
@@ -2640,7 +2640,7 @@ SymbDef CreateUpdateFunction (ArgS *record_arg,ArgS *first_field_arg,Node node
 
 			state_p=&record_state.state_record_arguments [field_number];
 
-			arg_node_id=NewNodeId (NULL);
+			arg_node_id=NewNodeId();
 			arg_node_id->nid_refcount=-2;
 			
 			lhs_arg=NewArgument (NewNodeIdNode (arg_node_id));
@@ -2675,7 +2675,7 @@ SymbDef CreateUpdateFunction (ArgS *record_arg,ArgS *first_field_arg,Node node
 		NodeId record_node_id;
 		ArgS *lhs_record_arg,*rhs_record_arg,**lhs_arg_p,**rhs_arg_p;
 		
-		record_node_id=NewNodeId (NULL);
+		record_node_id=NewNodeId();
 		record_node_id->nid_refcount=-1;
 		
 		lhs_record_arg=NewArgument (NewNodeIdNode (record_node_id));
@@ -2707,7 +2707,7 @@ SymbDef CreateUpdateFunction (ArgS *record_arg,ArgS *first_field_arg,Node node
 			field_node=arg->arg_node;
 			field_number=field_node->node_symbol->symb_def->sdef_sel_field_number;
 
-			arg_node_id=NewNodeId (NULL);
+			arg_node_id=NewNodeId();
 			arg_node_id->nid_refcount=-2;
 			
 			lhs_arg=NewArgument (NewNodeIdNode (arg_node_id));
@@ -2788,7 +2788,7 @@ SymbDef create_select_function (Symbol selector_symbol,int selector_kind)
 	record_state_p=&selector_sdef->sdef_type->type_symbol->symb_def->sdef_record_state;
 	fieldnr = selector_sdef->sdef_sel_field_number;
 	
-	record_node_id=NewNodeId (NULL);
+	record_node_id=NewNodeId();
 	record_node_id->nid_refcount=-2;
 
 	tuple_state_arguments=CompAllocArray (2,StateS);
@@ -2889,7 +2889,7 @@ SymbDef create_match_function (SymbolP constructor_symbol,int result_arity,int n
 	match_function_symbol=NewSymbol (definition);
 	match_function_symbol->symb_def=match_function_sdef;
 
-	constructor_node_node_id=NewNodeId (NULL);
+	constructor_node_node_id=NewNodeId();
 	constructor_node_node_id->nid_refcount=-2;
 	constructor_node_node_id->nid_node=NULL;
 
@@ -2947,7 +2947,7 @@ SymbDef create_match_function (SymbolP constructor_symbol,int result_arity,int n
 			for (n=0; n<n_dictionaries; ++n){
 				struct node_id *arg_node_id;
 
-				arg_node_id=NewNodeId (NULL);
+				arg_node_id=NewNodeId();
 				arg_node_id->nid_refcount=-1;
 				arg_node_id->nid_lhs_state_p_=constructor_arg_state_p;
 
@@ -2962,7 +2962,7 @@ SymbDef create_match_function (SymbolP constructor_symbol,int result_arity,int n
 				struct arg *rhs_arg;
 				struct node_id *arg_node_id;
 
-				arg_node_id=NewNodeId (NULL);
+				arg_node_id=NewNodeId();
 				arg_node_id->nid_refcount=-2;
 				arg_node_id->nid_lhs_state_p_=constructor_arg_state_p;
 
@@ -2982,7 +2982,7 @@ SymbDef create_match_function (SymbolP constructor_symbol,int result_arity,int n
 			for (n=0; n<n_dictionaries; ++n){
 				struct node_id *arg_node_id;
 
-				arg_node_id=NewNodeId (NULL);
+				arg_node_id=NewNodeId();
 				arg_node_id->nid_refcount=-1;
 				arg_node_id->nid_lhs_state_p_=&LazyState;
 
@@ -2995,7 +2995,7 @@ SymbDef create_match_function (SymbolP constructor_symbol,int result_arity,int n
 				struct arg *rhs_arg;
 				struct node_id *arg_node_id;
 
-				arg_node_id=NewNodeId (NULL);
+				arg_node_id=NewNodeId();
 				arg_node_id->nid_refcount=-2;
 				arg_node_id->nid_lhs_state_p_=&LazyState;
 
@@ -3086,10 +3086,10 @@ SymbDef create_select_and_match_function (SymbolP constructor_symbol,int n_dicti
 	match_function_symbol=NewSymbol (definition);
 	match_function_symbol->symb_def=match_function_sdef;
 
-	node_id=NewNodeId (NULL);
+	node_id=NewNodeId();
 	node_id->nid_refcount=-2;
 
-	constructor_node_node_id=NewNodeId (NULL);
+	constructor_node_node_id=NewNodeId();
 	constructor_node_node_id->nid_refcount=-2;
 	constructor_node_node_id->nid_node=NULL;
 
@@ -3122,7 +3122,7 @@ SymbDef create_select_and_match_function (SymbolP constructor_symbol,int n_dicti
 		for (n=0; n<n_dictionaries; ++n){
 			struct node_id *arg_node_id;
 
-			arg_node_id=NewNodeId (NULL);
+			arg_node_id=NewNodeId();
 			arg_node_id->nid_refcount=-1;
 			if (strict_constructor)
 				arg_node_id->nid_lhs_state_p_=&constructor_symbol->symb_def->sdef_constructor->cl_state_p[n];

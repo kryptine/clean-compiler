@@ -40,13 +40,13 @@ NewArgument (NodeP node)
 } /* NewArgument */
 
 NodeIdP
-NewNodeId (IdentP nid)
+NewNodeId (void)
 {
 	NodeIdP	newnid;
 
 	newnid	= CompAllocType (struct node_id);
 
-	newnid->nid_ident		= nid;
+	newnid->nid_name		= NULL;
 	newnid->nid_refcount	= 0;
 	newnid->nid_ref_count_copy	= 0;
 	newnid->nid_forward_node_id		= NIL;
@@ -229,7 +229,7 @@ FreshNodeId (NodeP node, NodeDefs **node_defs_h)
 	NodeIdP		nodeId;
 	NodeDefs	def;
 
-	nodeId	= NewNodeId (NIL);
+	nodeId = NewNodeId();
 
 	def	= NewNodeDefinition (nodeId, node);
 

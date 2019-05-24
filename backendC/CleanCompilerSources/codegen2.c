@@ -6009,7 +6009,7 @@ static int FillNodeDefs (NodeDefs nds,int node_id_number,int *asp_p,int *bsp_p,N
 								if (a_size==0 && b_size==0)
 									continue;
 
-								node_id=NewNodeId (NULL);								
+								node_id=NewNodeId();
 								add_node_id_to_list (node_id,&code_gen_node_ids_p->free_node_ids);
 							}
 														

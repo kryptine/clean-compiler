@@ -3772,7 +3772,7 @@ static SymbolP copy_imp_rule_and_add_arguments (SymbDef rule_sdef,int n_extra_ar
 			NodeIdP new_node_id_p;
 			ArgP new_arg;
 			
-			new_node_id_p=NewNodeId (NULL);
+			new_node_id_p=NewNodeId();
 			new_node_id_p->nid_refcount=-2;
 			
 			new_arg=NewArgument (NewNodeIdNode (new_node_id_p));
@@ -4257,7 +4257,7 @@ static void AnnotateStrictNodeIds (Node node,StrictNodeIdP strict_node_ids,NodeD
 				NodeIdP uselect_node_id_p;
 				NodeDefP new_def;
 
-				uselect_node_id_p=NewNodeId (NULL);
+				uselect_node_id_p=NewNodeId();
 				uselect_node_id_p->nid_refcount=1;
 
 				node_id->nid_node->node_arguments->arg_node=NewNodeIdNode (uselect_node_id_p);

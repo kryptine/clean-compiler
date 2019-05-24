@@ -2454,7 +2454,7 @@ int CodeRhsNodeDefs
 										if (a_size==0 && b_size==0)
 											continue;
 
-										node_id=NewNodeId (NULL);								
+										node_id=NewNodeId();
 										add_node_id_to_list (node_id,&code_gen_node_ids.free_node_ids);
 									}
 																
@@ -2604,7 +2604,7 @@ int CodeRhsNodeDefs
 						node_p=node_p->node_arguments->arg_node;
 					}
 
-					node_id_p=NewNodeId (NULL);
+					node_id_p=NewNodeId();
 					node_id_p->nid_refcount=1;
 					
 					old_arg_node_p=arg_p2->arg_node;
