@@ -159,14 +159,13 @@ STRUCT (symbol,Symbol) {
 
 STRUCT(ident,Ident){
 	char *				ident_name;
-	char *				ident_instructions;
+	struct symbol_def *	ident_sys_rule_def;
 	struct ident *		ident_next;
 	unsigned char		ident_table; /* TableKind */
 	unsigned char		ident_mark;
 };
 
 #define INLINE_MASK					8
-#define WARNED_NO_INLINE_CODE		16
 
 /*
 	The order in which the annotationkinds appear in the enum type
@@ -551,6 +550,7 @@ STRUCT (symbol_def,SymbDef){
 		struct constructor_list * typeinfo_constructor;	/* for CONSTRUCTOR */
 		struct symbol_def *typeinfo_dictionary_field; /* for IMPRULE if SDEF_INSTANCE_RULE_WITH_FIELD_P */
 		struct symbol_def *typeinfo_instance_rule; /* for IMPRULE if SDEF_RULE_INSTANCE_RULE_P */
+		char * typeinfo_instructions; /* for DEFRULE or SYSRULE if SDEF_DEFRULE_INSTRUCTIONS */
 	} sdef_typeinfo;
 
 	unsigned		sdef_number;
@@ -609,6 +609,8 @@ STRUCT (symbol_def,SymbDef){
 #define SDEF_INSTANCE_RULE_WITH_FIELD_P 16384
 #define SDEF_RULE_INSTANCE_RULE_P 32768
 #define SDEF_HAS_SPECIAL_ARRAY_FUNCTION 512
+#define SDEF_DEFRULE_INSTRUCTIONS 16
+#define SDEF_WARNED_NO_INLINE_CODE 65536
 
 /* some macros to reuse bit fields */
 
@@ -627,6 +629,7 @@ STRUCT (symbol_def,SymbDef){
 
 #define sdef_dictionary_field	sdef_typeinfo.typeinfo_dictionary_field
 #define sdef_instance_rule	sdef_typeinfo.typeinfo_instance_rule
+#define sdef_instructions	sdef_typeinfo.typeinfo_instructions
 
 #if IMPORT_OBJ_AND_LIB
 struct string_list {

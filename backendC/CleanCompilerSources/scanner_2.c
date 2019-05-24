@@ -43,7 +43,7 @@ NewIdentInTable (TableKind tableKind, char *name)
 	ident->ident_name	= name;
 
 	ident->ident_next		= NULL;
-	ident->ident_instructions = NULL;
+	ident->ident_sys_rule_def = NULL;
 	ident->ident_mark 		= 0;
 
 	return (ident);
@@ -77,7 +77,7 @@ NewIdent (char *name)
 
 	ident->ident_table	= LastSystemModuleTable;
 	ident->ident_next		= NULL;
-	ident->ident_instructions = NULL;
+	ident->ident_sys_rule_def = NULL;
 	ident->ident_mark 		= 0;
 
 	return ident;
@@ -294,6 +294,8 @@ void ScanInlineFile (char *fname,TableKind system_module_table_kind)
 		*tail = '\0';
 		if (! (instrid = RetrieveFromSymbolTable (instr,system_module_table_kind)))
 			continue;
+		if (instrid->ident_sys_rule_def==NULL)
+			continue;
 		if ((instrid->ident_mark & INLINE_MASK) != 0)
 		{
 			StaticMessage (True, "%s", "multiple .inline directives", instr);
@@ -336,13 +338,12 @@ void ScanInlineFile (char *fname,TableKind system_module_table_kind)
 		}
 		
 		/* save the list of inline instructions */
-/*		if (InlineBufferIndex != InlineBufferStart){ */
-			instrid->ident_instructions = &InlineCodeBuffer [InlineBufferStart];
-			InlineBufferStart     = InlineBufferIndex+1;
+		instrid->ident_sys_rule_def->sdef_mark |= SDEF_DEFRULE_INSTRUCTIONS;
+		instrid->ident_sys_rule_def->sdef_instructions = &InlineCodeBuffer [InlineBufferStart];
+		InlineBufferStart     = InlineBufferIndex+1;
 
-			/* close the list with the NULL character */
-			InlineCodeBuffer [InlineBufferIndex] = '\0';
-/*		} */
+		/* close the list with the NULL character */
+		InlineCodeBuffer [InlineBufferIndex] = '\0';
 	}
 
 	FClose (f);
