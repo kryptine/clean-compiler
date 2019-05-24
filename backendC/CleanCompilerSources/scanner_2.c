@@ -23,6 +23,15 @@
 # include	"scanner.h"
 # include	"sizes.h"
 
+typedef struct ident_string *IdentStringP;
+
+struct ident_string {
+	IdentStringP	left;
+	IdentStringP	right;
+	Ident			ident;
+	char			*string;
+};
+
 static IdentP
 NewIdentInTable (TableKind tableKind, char *name)
 {

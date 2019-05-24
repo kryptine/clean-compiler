@@ -3914,9 +3914,9 @@ void GenParameters (Bool input, Parameters params, int asp, int bsp)
 		if (!is_first_parameter)
 			FPutC (' ',OutFile);
 		if (IsSimpleState (node_id->nid_state) && node_id->nid_state.state_kind==OnB)
-			FPrintF (OutFile, "b%d:%s",bsp-node_id->nid_b_index,params->par_loc->ident_name);
+			FPrintF (OutFile, "b%d:%s",bsp-node_id->nid_b_index,params->par_loc_name);
 		else
-			FPrintF (OutFile, "a%d:%s",asp-node_id->nid_a_index,params->par_loc->ident_name);
+			FPrintF (OutFile, "a%d:%s",asp-node_id->nid_a_index,params->par_loc_name);
 		is_first_parameter=0;
 	}
 }
