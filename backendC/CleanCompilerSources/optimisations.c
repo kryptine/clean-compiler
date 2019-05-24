@@ -1579,7 +1579,7 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 			--arg_node_id->nid_refcount;
 			--arg_node_id->nid_ref_count_copy__;
 		} else {
-			arg_node_id=NewNodeId (NULL);
+			arg_node_id=NewNodeId();
 			arg_node_id->nid_refcount=-2;
 			arg_node_id->nid_ref_count_copy__=-2;
 			
@@ -3786,7 +3786,7 @@ static void MarkTupleSelectorsNode (NodeIdP node_id,NodeP tuple_node)
 				element_node_id=select_nodes[element_n]->node_node_id;
 				element_node_id->nid_mark |= NID_SHARED_SELECTION_NODE_ID;
 			} else {
-				element_node_id=NewNodeId (NULL);
+				element_node_id=NewNodeId();
 				element_node_id->nid_number=element_n;
 				element_node_id->nid_node=select_node;
 				element_node_id->nid_scope = node_id->nid_scope;

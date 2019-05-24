@@ -14,7 +14,7 @@ extern NodeP NewNodeByKind (NodeKind nodeKind, SymbolP symb, Args args, int arit
 
 extern	NodeP NewIntNode (int value);
 
-extern NodeIdP NewNodeId (IdentP nid);
+extern NodeIdP NewNodeId (void);
 extern StrictNodeIdP NewStrictNodeId (NodeIdP node_id, StrictNodeIdP next);
 extern NodeDefs NewNodeDefinition (NodeIdP nid, NodeP node);
 extern SymbolP NewSymbol (SymbKind symbolKind);

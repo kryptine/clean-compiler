@@ -78,8 +78,8 @@ void PrintState (StateS state, File file)
 void DPrintNodeId (NodeId nid, File file)
 {
 	if (nid){
-		if (nid->nid_ident){
-			FPrintF (file, "%s",nid->nid_ident->ident_name);
+		if (nid->nid_name){
+			FPrintF (file, "%s",nid->nid_name);
 #ifdef PRINT_ALL_NODE_ID_ADDRESSES
 			FPrintF (file, "@i_%lx", (long) nid);
 #endif
@@ -313,8 +313,8 @@ void PrintRuleNode (Node node,Bool brackets,int n_leading_spaces,File file)
 		
 		node_id=node->node_node_id;
 		
-		if (node_id->nid_ident){
-			FPrintF (file, " %s<%d>",node_id->nid_ident->ident_name,node_id->nid_refcount);
+		if (node_id->nid_name){
+			FPrintF (file, " %s<%d>",node_id->nid_name,node_id->nid_refcount);
 #ifdef PRINT_ALL_NODE_ID_ADDRESSES
 			FPrintF (file, " i_%lx",(long) node_id);
 #endif
@@ -576,7 +576,7 @@ void PrintRuleAlt (RuleAlts rulealt,int n_leading_spaces,File file)
 		PrintNodeDefs (rulealt->alt_rhs_defs,4,file);
 	} else {
 /*
-		FPutS (rulealt->alt_rhs_root->node_node_id->nid_ident->ident_name,file);
+		FPutS (rulealt->alt_rhs_root->node_node_id->nid_name,file);
 */
 	}
 }
