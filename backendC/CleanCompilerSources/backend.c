@@ -148,7 +148,8 @@ static SymbolP	gTupleSelectSymbols [MaxNodeArity];
 static int number_of_node_ids=0;
 
 typedef IdentP *IdentH;
-static IdentH gSpecialIdents[BESpecialIdentCount];
+static char **gSpecialModules[BESpecialIdentCount];
+static struct symbol_def **gSpecialFunctions[BESpecialIdentCount];
 
 static IdentP
 Identifier (char *name)
@@ -492,7 +493,7 @@ BEBindSpecialModule (BESpecialIdentIndex index, int moduleIndex)
 	Assert ((unsigned int) moduleIndex < gBEState.be_nModules);
 	module	= &gBEState.be_modules [moduleIndex];
 
-	(*gSpecialIdents [index])->ident_name	= module->bem_name;
+	(*gSpecialModules[index]) = module->bem_name;
 } /* BEBindSpecialModule */
 
 void
@@ -510,7 +511,7 @@ BEBindSpecialFunction (BESpecialIdentIndex index, int functionIndex, int moduleI
 	functionSymbol	= &module->bem_functions [functionIndex];
 
 	if (functionSymbol->symb_kind == definition){
-		*gSpecialIdents [index]	= functionSymbol->symb_def->sdef_ident;
+		*gSpecialFunctions[index] = functionSymbol->symb_def;
 		
 		if (index==BESpecialIdentSeq && moduleIndex!=main_dcl_module_n){
 			functionSymbol->symb_kind=seq_symb;
@@ -592,7 +593,6 @@ BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, in
 	{
 		char		*functionName, *functionPrefix;
 		TypeAlt		*newTypeAlt;
-		IdentP		newIdent;
 		SymbDefP	newsdef;
 		SymbolP		newFunctionSymbol;
 		RuleTypes	newRuleType;
@@ -601,7 +601,6 @@ BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, in
 
 		newFunctionSymbol	= ConvertAllocType (SymbolS);
 		newsdef				= ConvertAllocType (SymbDefS);
-		newIdent			= ConvertAllocType (IdentS);
 
 		newTypeAlt	= ConvertAllocType (TypeAlt);
 
@@ -661,21 +660,19 @@ BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, in
 				break;
 		}
 
-		functionName	= ConvertAlloc (strlen (functionPrefix) + 1 + strlen (originalsdef->sdef_ident->ident_name) + 1);
+		functionName	= ConvertAlloc (strlen (functionPrefix) + 1 + strlen (originalsdef->sdef_name) + 1);
 		strcpy (functionName, functionPrefix);
 		strcat (functionName, ";");
-		strcat (functionName, originalsdef->sdef_ident->ident_name);
+		strcat (functionName, originalsdef->sdef_name);
 
 		newTypeAlt->type_alt_lhs	= BESymbolTypeNode (NoAnnot,NoUniAttr,newFunctionSymbol, lhsArgs);
 		newTypeAlt->type_alt_rhs	= rhs;
 		newTypeAlt->type_alt_strict_positions	= NULL;
 
-		newIdent->ident_name	= functionName;
-
 		newRuleType	= ConvertAllocType (struct rule_type);
 		newRuleType->rule_type_rule	= newTypeAlt;
 
-		newsdef->sdef_ident			= newIdent;
+		newsdef->sdef_name			= functionName;
 		newsdef->sdef_module		= gBEState.be_icl.beicl_module->im_name;
 		newsdef->sdef_mark		= 0;
 		newsdef->sdef_isused		= True;
@@ -912,7 +909,7 @@ BEDontCareDefinitionSymbol (void)
 		symbDef	= ConvertAllocType (SymbDefS);
 		symbDef->sdef_kind	= ABSTYPE;
 
-		symbDef->sdef_ident	= Identifier ("_Don'tCare"); /* +++ name */
+		symbDef->sdef_name	= "_Don'tCare"; /* +++ name */
 
 		symbol	= ConvertAllocType (SymbolS);
 		symbol->symb_kind	= definition;
@@ -2207,7 +2204,7 @@ BECodeAlt (int line, BENodeDefP lhsDefs, BENodeP lhs, BECodeBlockP codeBlock)
 
 		Assert (lhs->node_kind == NormalNode);
 		Assert (lhs->node_symbol->symb_kind == definition);
-		functionName	= lhs->node_symbol->symb_def->sdef_ident->ident_name;
+		functionName	= lhs->node_symbol->symb_def->sdef_name;
 
 		/* .inline <name> */
 		instructionLine	= ConvertAlloc (sizeof (".inline ") + strlen (functionName));
@@ -2235,7 +2232,6 @@ static void
 DeclareFunctionC (char *name, int arity, int functionIndex, unsigned int ancestor)
 {
 	SymbDefP	newSymbDef;
-	Ident		newIdent;
 	SymbolP	 	functions;
 	BEIcl		icl;
 	BEModule	module;
@@ -2263,20 +2259,14 @@ DeclareFunctionC (char *name, int arity, int functionIndex, unsigned int ancesto
 	*icl->beicl_depsP	= newSymbDef;
 	icl->beicl_depsP	= &newSymbDef->sdef_next_scc;
 	newSymbDef->sdef_arfun		= NoArrayFun;
-
-	newIdent	= ConvertAllocType (IdentS);
-
-	newIdent->ident_name	= name;
-
-	newSymbDef->sdef_ident	= newIdent;
+	newSymbDef->sdef_name = name;
 
 	Assert (functions [functionIndex].symb_kind == erroneous_symb);
 	functions [functionIndex].symb_kind	= definition;
 	functions [functionIndex].symb_def	= newSymbDef;
 
-
 	/* +++ ugly */
-	if (strcmp (newIdent->ident_name, "Start") == 0)
+	if (strcmp (name, "Start") == 0)
 	{
 		Assert (icl->beicl_module->im_start == NULL);
 		icl->beicl_module->im_start	= newSymbDef;
@@ -2346,7 +2336,6 @@ BERule (int functionIndex, int isCaf, BETypeAltP type, BERuleAltP alts)
 void
 BEDeclareRuleType (int functionIndex, int moduleIndex, CleanString name)
 {
-	IdentP		newIdent;
 	SymbDefP	newSymbDef;
 	SymbolP		functions;
 	BEModuleP	module;
@@ -2361,20 +2350,20 @@ BEDeclareRuleType (int functionIndex, int moduleIndex, CleanString name)
 	Assert (functions [functionIndex].symb_kind == erroneous_symb);
 
 	if (module->bem_isSystemModule){
+		IdentP		newIdent;
+
 		/* for inline code */
 		newIdent	= PutStringInHashTable (ConvertCleanString (name), FirstSystemModuleTable + moduleIndex);
 		newSymbDef	= ConvertAllocType (SymbDefS);
 		newIdent->ident_sys_rule_def = newSymbDef;
 	} else {
-		newIdent	= ConvertAllocType (IdentS);
-		newIdent->ident_name	= ConvertCleanString (name);
 		newSymbDef	= ConvertAllocType (SymbDefS);
 	}
 
 	newSymbDef->sdef_kind		= NEWDEFINITION;
 	newSymbDef->sdef_exported	= False;
 	newSymbDef->sdef_module		= module->bem_name;
-	newSymbDef->sdef_ident		= newIdent;
+	newSymbDef->sdef_name = ConvertCleanString (name);
 	newSymbDef->sdef_mark		= 0;
 	newSymbDef->sdef_isused		= 0;
 
@@ -2433,7 +2422,6 @@ void
 BEDeclareType (int typeIndex, int moduleIndex, CleanString name)
 {
 	SymbDefP	newSymbDef;
-	Ident		newIdent;
 	SymbolP	 	type_p;
 	BEModuleP	module;
 
@@ -2445,8 +2433,6 @@ BEDeclareType (int typeIndex, int moduleIndex, CleanString name)
 
 	type_p = &module->bem_types[typeIndex];
 
-	newIdent	= ConvertAllocType (IdentS);
-	newIdent->ident_name	= ConvertCleanString (name);
 /* RWS change this
 	newSymbDef	= ConvertAllocType (SymbDefS);
 */
@@ -2460,7 +2446,7 @@ BEDeclareType (int typeIndex, int moduleIndex, CleanString name)
 	newSymbDef->sdef_isused		= 0;
 
 	newSymbDef->sdef_module		= module->bem_name;
-	newSymbDef->sdef_ident		= newIdent;
+	newSymbDef->sdef_name = ConvertCleanString (name);
 
 	type_p->symb_kind	= definition;
 	type_p->symb_def	= newSymbDef;
@@ -2624,7 +2610,6 @@ BEFieldListP
 BEFieldList (int fieldIndex, int moduleIndex, CleanString name, BETypeNodeP type, BEFieldListP next_fields)
 {
 	SymbDefP	newSymbDef;
-	Ident		newIdent;
 	SymbolP	 	field_symbol_p;
 	BEModuleP	module;
 	FieldList	field;
@@ -2635,9 +2620,6 @@ BEFieldList (int fieldIndex, int moduleIndex, CleanString name, BETypeNodeP type
 	field_symbol_p = &module->bem_fields[fieldIndex];
 	Assert (field_symbol_p->symb_kind == erroneous_symb);
 
-	newIdent	= ConvertAllocType (IdentS);
-	newIdent->ident_name	= ConvertCleanString (name);
-
 	field	= ConvertAllocType (struct field_list);
 	field->fl_next	= next_fields;
 	field->fl_symbol= field_symbol_p;
@@ -2647,7 +2629,7 @@ BEFieldList (int fieldIndex, int moduleIndex, CleanString name, BETypeNodeP type
 	newSymbDef->sdef_kind		= FIELDSELECTOR;
 	newSymbDef->sdef_exported	= False;
 	newSymbDef->sdef_module		= module->bem_name;
-	newSymbDef->sdef_ident		= newIdent;
+	newSymbDef->sdef_name = ConvertCleanString (name);
 	newSymbDef->sdef_isused		= 0;
 	newSymbDef->sdef_sel_field	= field;
 	newSymbDef->sdef_arity		= 1;
@@ -2738,7 +2720,6 @@ void
 BEDeclareConstructor (int constructorIndex, int moduleIndex, CleanString name)
 {
 	SymbDefP	newSymbDef;
-	Ident		newIdent;
 	SymbolP	 	constructor_p;
 	BEModuleP	module;
 
@@ -2747,14 +2728,11 @@ BEDeclareConstructor (int constructorIndex, int moduleIndex, CleanString name)
 	Assert (module->bem_constructors [constructorIndex].symb_kind == erroneous_symb);
 	constructor_p = &module->bem_constructors[constructorIndex];
 
-	newIdent	= ConvertAllocType (IdentS);
-	newIdent->ident_name	= ConvertCleanString (name);
-
 	newSymbDef	= ConvertAllocType (SymbDefS);
 	newSymbDef->sdef_kind		= NEWDEFINITION;
 	newSymbDef->sdef_exported	= False;
 	newSymbDef->sdef_module		= module->bem_name;
-	newSymbDef->sdef_ident		= newIdent;
+	newSymbDef->sdef_name = ConvertCleanString (name);
 	newSymbDef->sdef_mark		= 0;
 	newSymbDef->sdef_isused		= 0;
 
@@ -2865,7 +2843,7 @@ BECodeParameterList (CleanString location, BENodeIdP nodeId, BECodeParameterP pa
 	parameter	= ConvertAllocType (struct parameter);
 
 	parameter->par_node_id	= nodeId;
-	parameter->par_loc_name	= ConvertCleanString (location);
+	parameter->par_loc_name = ConvertCleanString (location);
 	parameter->par_next	= parameters;
 
 	return parameter;
@@ -2978,7 +2956,7 @@ BEExportType (int isDictionary, int typeIndex)
 		Assert (typeSymbol->symb_kind == definition);
 		dclDef	= typeSymbol->symb_def;
 	}
-	Assert (strcmp (iclDef->sdef_ident->ident_name, dclDef->sdef_ident->ident_name) == 0);
+	Assert (strcmp (iclDef->sdef_name, dclDef->sdef_name) == 0);
 
 	iclDef->sdef_dcl_icl	= dclDef;
 	dclDef->sdef_dcl_icl	= iclDef;
@@ -3038,7 +3016,7 @@ BEExportField (int isDictionaryField, int fieldIndex)
 		dclDef	= fieldSymbol->symb_def;
 	}
 
-	Assert (strcmp (iclDef->sdef_ident->ident_name, dclDef->sdef_ident->ident_name) == 0);
+	Assert (strcmp (iclDef->sdef_name, dclDef->sdef_name) == 0);
 
 	iclDef->sdef_dcl_icl	= dclDef;
 	dclDef->sdef_dcl_icl	= iclDef;
@@ -3072,7 +3050,7 @@ BEExportFunction (int functionIndex)
 	
 		dclDef->sdef_dcl_icl	= iclDef;
 
-		Assert (strcmp (iclDef->sdef_ident->ident_name, dclDef->sdef_ident->ident_name) == 0);
+		Assert (strcmp (iclDef->sdef_name, dclDef->sdef_name) == 0);
 	}
 	else
 		dclDef	= NULL;
@@ -3300,31 +3278,27 @@ BEInit (int argc)
 	ApplyId		= Identifier ("AP");
 	IfId		= Identifier ("if");
 	FailId		= Identifier ("_Fail");
-#if DYNAMIC_TYPE
-	DynamicId	= Identifier ("Dynamic");
-#endif
 
 #if SA_RECOGNIZES_ABORT_AND_UNDEF
-	StdMiscId	= Identifier ("StdMisc");
-
-	abort_id	= NULL;
-	undef_id	= NULL;
-	gSpecialIdents [BESpecialIdentStdMisc]	= &StdMiscId;
-	gSpecialIdents [BESpecialIdentAbort]	= &abort_id;
-	gSpecialIdents [BESpecialIdentUndef]	= &undef_id;
+	StdMiscId = NULL;
+	abort_symb_def = NULL;
+	undef_symb_def = NULL;
+	gSpecialModules[BESpecialIdentStdMisc]	= &StdMiscId;
+	gSpecialFunctions[BESpecialIdentAbort]	= &abort_symb_def;
+	gSpecialFunctions[BESpecialIdentUndef]	= &undef_symb_def;
 #endif
 
-	StdBoolId	= Identifier ("StdBool");
-	AndId	= NULL;
-	OrId	= NULL;
-	gSpecialIdents [BESpecialIdentStdBool]	= &StdBoolId;
-	gSpecialIdents [BESpecialIdentAnd]		= &AndId;
-	gSpecialIdents [BESpecialIdentOr]		= &OrId;
+	StdBoolId	= "StdBool";
+	AndSymbDef = NULL;
+	OrSymbDef = NULL;
+	gSpecialModules[BESpecialIdentStdBool]	= &StdBoolId;
+	gSpecialFunctions[BESpecialIdentAnd]	= &AndSymbDef;
+	gSpecialFunctions[BESpecialIdentOr]	= &OrSymbDef;
 
-	PreludeId = Identifier ("Prelude");
-	seq_id = NULL;
-	gSpecialIdents[BESpecialIdentPrelude] = &PreludeId;
-	gSpecialIdents[BESpecialIdentSeq] = &seq_id;
+	PreludeId = "Prelude";
+	seq_symb_def = NULL;
+	gSpecialModules[BESpecialIdentPrelude] = &PreludeId;
+	gSpecialFunctions[BESpecialIdentSeq] = &seq_symb_def;
 
 	UserDefinedArrayFunctions	= NULL;
 #if STRICT_LISTS

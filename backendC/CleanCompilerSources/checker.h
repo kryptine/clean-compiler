@@ -1,21 +1,17 @@
 
-extern Ident ApplyId, IfId, FailId, StdBoolId,
-			 AndId, OrId, ArrayId, StrictArrayId, UnboxedArrayId, ArrayClassId;
-#if STRICT_LISTS
-extern Ident StrictListId,UnboxedListId,TailStrictListId,StrictTailStrictListId,UnboxedTailStrictListId;
-#endif
-#ifdef CLEAN2
-extern Ident DynamicId;
-#endif
-#if SA_RECOGNIZES_ABORT_AND_UNDEF
-extern Ident StdMiscId,abort_id,undef_id;
-#endif
-extern Ident PreludeId,seq_id,system_seq_id;
+extern Ident ApplyId, IfId, FailId;
+extern char *StdBoolId;
 
-extern Symbol StartSymbol;
+extern SymbDef AndSymbDef,OrSymbDef,abort_symb_def,undef_symb_def;
+#if SA_RECOGNIZES_ABORT_AND_UNDEF
+extern char *StdMiscId;
+#endif
+extern char *PreludeId;
+extern SymbDef seq_symb_def;
+
 extern SymbDef scc_dependency_list;
 
-SymbDef MakeNewSymbolDefinition (char * module, Ident name, int arity, SDefKind kind);
+SymbDef MakeNewSymbolDefinition (char *module, char *name, int arity, SDefKind kind);
 char *ConvertSymbolToString (Symbol symb);
 void ReadInlineCode (void);
 void InitChecker (void);

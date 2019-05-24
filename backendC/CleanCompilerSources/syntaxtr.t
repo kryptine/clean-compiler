@@ -535,7 +535,7 @@ STRUCT (imp_rule,ImpRule){
 
 STRUCT (symbol_def,SymbDef){
 	char    	*sdef_module;
-	Ident    	 sdef_ident;
+	char		*sdef_name;
 	union
 	{	Types			u_type;
 		RuleTypes		u_rule_type;

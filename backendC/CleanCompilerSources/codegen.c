@@ -72,7 +72,7 @@ static Parameters CalculateOffsetsOfParameters (Parameters params,States results
 		if (params)
 			params = CalculateOffsetsOfParameter (params,resultstates[arity],asp_p,bsp_p);
 		else {
-			StaticMessage (True,CurrentAltLabel.lab_symbol->sdef_ident->ident_name,ECodeBlock);
+			StaticMessage (True,CurrentAltLabel.lab_symbol->sdef_name,ECodeBlock);
 			break;
 		}
 	}
@@ -118,7 +118,7 @@ static void GenCodeBlock (CodeBlock code, int asp, int bsp, StateS resultstate)
 		}
 		
 		if (nextparam)
-			StaticMessage (True,CurrentAltLabel.lab_symbol->sdef_ident->ident_name, ECodeBlock);
+			StaticMessage (True,CurrentAltLabel.lab_symbol->sdef_name, ECodeBlock);
 
 		GenParameters (True, code->co_parin, asp, bsp);
 		GenInstructions (code->co_instr);
@@ -673,7 +673,7 @@ static void CodeRule (ImpRuleP rule)
 	GenFunctionDescriptorAndExportNodeAndDescriptor (rule_sdef);
 
 	if (DoTimeProfiling)
-		GenPB_ident (rule_sdef->sdef_ident,0 /*rule_sdef->sdef_line*/);
+		GenPB_ident (rule_sdef->sdef_name,0 /*rule_sdef->sdef_line*/);
 
 	if (rule_sdef->sdef_exported && rule_sdef->sdef_calledwithrootnode && ExpectsResultNode (resultstate))
 		MakeSymbolLabel (&ea_lab,CurrentModule,ea_pref,rule_sdef,0);
@@ -795,7 +795,7 @@ static void CodeRule (ImpRuleP rule)
 		GenOStackLayoutOfStates (a_stack_size_of_strict_entry,init_b_stack_top,rule_sdef->sdef_arity,rule->rule_state_p);
 		GenLabelDefinition (&CurrentAltLabel);
 	
-		MakeLabel (&caf_label,rule_sdef->sdef_ident->ident_name,0,caf_pref);
+		MakeLabel (&caf_label,rule_sdef->sdef_name,0,caf_pref);
 		MakeLabel (&local_label,m_symb,NewLabelNr++,no_pref);
 
 		DetermineSizeOfState (resultstate,&a_size,&b_size);
@@ -850,7 +850,7 @@ static void CodeRule (ImpRuleP rule)
 		tail_call_modulo_cons=1;
 
 		if (ListOptimizations)
-			printf ("Optimize tail call modulo cons of %s\n",rule_sdef->sdef_ident->ident_name);				
+			printf ("Optimize tail call modulo cons of %s\n",rule_sdef->sdef_name);				
 		call_code_generator_again=1;
 	} else
 		tail_call_modulo_cons=0;

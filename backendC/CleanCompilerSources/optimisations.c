@@ -1006,10 +1006,8 @@ static Symbol new_rule_symbol (char *function_name)
 {
 	SymbDef function_sdef;
 	Symbol function_symbol;
-	Ident function_ident;
 
-	function_ident=NewIdent (function_name);
-	function_sdef=MakeNewSymbolDefinition (CurrentModule,function_ident,0,IMPRULE);
+	function_sdef=MakeNewSymbolDefinition (CurrentModule,function_name,0,IMPRULE);
 
 	function_sdef->sdef_ancestor = ~next_def_number;
 	function_sdef->sdef_number=next_def_number++;
@@ -1214,7 +1212,7 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 		int length_before_type_delimiter;
 		char *f_name;
 		
-		f_name=node_p->node_symbol->symb_def->sdef_ident->ident_name;
+		f_name=node_p->node_symbol->symb_def->sdef_name;
 		length_before_type_delimiter=compute_length_before_type_delimiter (f_name);
 		
 		if (function_name_p+2+length_before_type_delimiter < end_function_name){
@@ -1681,7 +1679,7 @@ static struct node *create_new_local_function (Node node,StateP function_state_p
 		end_function_name=function_name+sizeof (function_name);
 		function_name_p=&function_name[strlen (function_name)];
 		
-		f_name=CurrentSymbol->symb_def->sdef_ident->ident_name;
+		f_name=CurrentSymbol->symb_def->sdef_name;
 		length_before_type_delimiter=compute_length_before_type_delimiter (f_name);
 		
 		if (function_name_p+2+length_before_type_delimiter < end_function_name){

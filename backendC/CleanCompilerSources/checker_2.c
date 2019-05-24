@@ -72,28 +72,38 @@ void ReadInlineCode (void)
 	}
 }
 
-Ident ApplyId, DynamicId, StdBoolId, IfId, FailId, AndId, OrId;
+Ident ApplyId, IfId, FailId;
+
+char *StdBoolId;
+SymbDef AndSymbDef,OrSymbDef;
 
 #if SA_RECOGNIZES_ABORT_AND_UNDEF
-Ident StdMiscId,abort_id,undef_id;	
+char *StdMiscId;
+SymbDef abort_symb_def,undef_symb_def;
 #endif
 
-Ident PreludeId,seq_id,system_seq_id;
-
-Symbol StartSymbol;
-
-SymbDef ArrayFunctionDefs [NoArrayFun],StdArrayAbortDef;
+char *PreludeId;
+SymbDef seq_symb_def;
 
 SymbDef scc_dependency_list;
 
-SymbDef MakeNewSymbolDefinition (char * module, Ident name, int arity, SDefKind kind)
+SymbDef MakeNewSymbolDefinition (char *module, char *name, int arity, SDefKind kind)
 {
 	SymbDef def;
+	int i,string_length;
+	char *s,*new_string;
+	
+	string_length = strlen (name);
+	new_string = CompAlloc (string_length+1);
+
+	for (i=0; i<string_length; ++i)
+		new_string[i] = name[i];
+	new_string [string_length] = '\0';
 	
 	def = CompAllocType (SymbDefS);
 	
 	def->sdef_module = module;
-	def->sdef_ident = name;
+	def->sdef_name = new_string;
 	def->sdef_arity = arity;
 	def->sdef_kind = kind;
 
@@ -101,7 +111,7 @@ SymbDef MakeNewSymbolDefinition (char * module, Ident name, int arity, SDefKind 
 
 	def->sdef_exported=False;
 
-	def->sdef_arfun				= NoArrayFun;
+	def->sdef_arfun = NoArrayFun;
 	
 	return def;
 }
@@ -121,11 +131,6 @@ NodeDefs NewNodeDef (NodeId nid,Node node)
 
 void InitChecker (void)
 {
-	StartSymbol = NewSymbol (newsymbol);
-	StartSymbol -> symb_ident = NewIdent ("Start");
-
-	system_seq_id = NewIdent ("seq");
-
 	OpenDefinitionModules	= NIL;
 }
 

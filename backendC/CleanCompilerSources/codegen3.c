@@ -214,7 +214,7 @@ void RedirectResultAndReturn (int asp,int bsp,int source_a_index,int source_b_in
 					break;
 				case CyclicSpine:
 					GenReduceError ();
-					StaticMessage (False,CurrentAltLabel.lab_symbol->sdef_ident->ident_name,Co_Wspine);
+					StaticMessage (False,CurrentAltLabel.lab_symbol->sdef_name,Co_Wspine);
 					break;
 				default:
 					error_in_function ("RedirectResultAndReturn");
@@ -666,13 +666,13 @@ static void CodeRootApply (Node root,NodeId rootid,int asp,int bsp,CodeGenNodeId
 					member_type_alt=field_sdef->sdef_member_type_of_field;
 					if (DoDebug)
 						if (member_type_alt->type_alt_lhs->type_node_arity==n_apply_args+1){
-							FPrintF (OutFile, "\n||\t%d %s",root->node_symbol->symb_instance_apply,selector_node_p->node_symbol->symb_def->sdef_ident->ident_name);
+							FPrintF (OutFile, "\n||\t%d %s",root->node_symbol->symb_instance_apply,selector_node_p->node_symbol->symb_def->sdef_name);
 						} else
-							FPrintF (OutFile, "\n||\t(no dictionary) %s",field_sdef->sdef_ident->ident_name);
+							FPrintF (OutFile, "\n||\t(no dictionary) %s",field_sdef->sdef_name);
 				} else if (DoDebug)
-					FPrintF (OutFile, "\n||\t(no dictionary) %s",field_sdef->sdef_ident->ident_name);
+					FPrintF (OutFile, "\n||\t(no dictionary) %s",field_sdef->sdef_name);
 			} else if (DoDebug)
-				FPrintF (OutFile, "\n||\t(no dictionary) %s",field_sdef->sdef_ident->ident_name);
+				FPrintF (OutFile, "\n||\t(no dictionary) %s",field_sdef->sdef_name);
 
 			if (field_sdef!=NULL && OptimizeInstanceCalls){
 				struct state *member_states_of_field;
@@ -1019,7 +1019,6 @@ static void CodeNormalRootNode (Node root,NodeId rootid,int asp,int bsp,CodeGenN
 			CodeRootSelection (root, rootid, asp, bsp,code_gen_node_ids_p,resultstate);
 			return;
 		case fail_symb:
-#ifdef CLEAN2
 		{
 			IdentS case_ident_s;
 			SymbDefS case_def_s;
@@ -1027,7 +1026,7 @@ static void CodeNormalRootNode (Node root,NodeId rootid,int asp,int bsp,CodeGenN
 			case_ident_s.ident_name=rootsymb->symb_string;
 			Assume (case_ident_s.ident_name != NULL, "codegen3", "CodeNormalRootNode (fail_symb)");
 
-			case_def_s.sdef_ident = &case_ident_s;
+			case_def_s.sdef_name = case_ident_s.ident_name;
 
 			if (FunctionMayFailWarningOrError!=0)
 				StaticMessage (FunctionMayFailWarningOrError==2, "%D", "case may fail", &case_def_s);
@@ -1041,11 +1040,6 @@ static void CodeNormalRootNode (Node root,NodeId rootid,int asp,int bsp,CodeGenN
 
 			return;
 		}
-#else /* ifndef CLEAN2 */
-			error_in_function ("CodeNormalRootNode");
-/*			JumpToNextAlternative (asp, bsp); */
-			return;
-#endif
 		case string_denot:
 			GenPopA (asp);
 			GenPopB (bsp);
@@ -1118,7 +1112,7 @@ static void CodeNormalRootNode (Node root,NodeId rootid,int asp,int bsp,CodeGenN
 							GenRtn (1, 0, OnAState);
 					}
 				} else {
-					StaticMessage (False,CurrentAltLabel.lab_symbol->sdef_ident->ident_name,Co_Wtype);
+					StaticMessage (False,CurrentAltLabel.lab_symbol->sdef_name,Co_Wtype);
 					GenTypeError();
 					GenRtn (0, 0, OnAState);
 				}
@@ -2308,7 +2302,7 @@ int CodeRhsNodeDefs
 					NodeP node,tuple_node;
 					ArgP function_result_tuple_elements_a[MaxNodeArity],*function_result_tuple_elements,*function_result_tuple_elements_p;
 					
-					printf ("Tuple tail call modulo cons %s\n",tuple_call_node_id_p->nid_node->node_symbol->symb_def->sdef_ident->ident_name);
+					printf ("Tuple tail call modulo cons %s\n",tuple_call_node_id_p->nid_node->node_symbol->symb_def->sdef_name);
 
 					function_result_tuple_elements_p=&function_result_tuple_elements_a[0];
 					for_l (function_result_tuple_element_p,last_node_def_p->def_node->node_arguments,arg_next)

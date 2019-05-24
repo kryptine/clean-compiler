@@ -333,7 +333,7 @@ Coercions CoerceSimpleStateArgument (StateS demstate,StateKind offkind,int ainde
 			break;
 		case CyclicSpine:
 			GenReduceError ();
-			StaticMessage (False,CurrentAltLabel.lab_symbol->sdef_ident->ident_name,Co_Wspine);
+			StaticMessage (False,CurrentAltLabel.lab_symbol->sdef_name,Co_Wspine);
 			*ontop = False;
 			break;
 		default:
@@ -978,7 +978,7 @@ void BuildOrFillLazyFieldSelector (SymbDef selector_sdef,StateKind result_state_
 	ConvertSymbolToDandNLabel (&dsellab,&nsellab,selector_sdef);
 
 	record_sdef=selector_sdef->sdef_type->type_symbol->symb_def;
-	record_name=record_sdef->sdef_ident->ident_name;
+	record_name=record_sdef->sdef_name;
 
 	field_result_state_p=&record_sdef->sdef_record_state.state_record_arguments [selector_sdef->sdef_sel_field_number];
 	fill_arity= IsSimpleState (*field_result_state_p) ? (field_result_state_p->state_kind!=OnB ? -4 : -3) : 1;
@@ -2081,7 +2081,7 @@ void cleanup_stack
 	while (p_node_ids!=NULL && p_node_ids->nidl_node_id->nid_a_index==UNUSED_NODE_ID_INDEX){
 #if 0
 		printf ("cleanup_stack00 ");
-		printf ("%s ",CurrentAltLabel.lab_symbol->sdef_ident->ident_name);
+		printf ("%s ",CurrentAltLabel.lab_symbol->sdef_name);
 		DPrintNodeId (p_node_ids->nidl_node_id,StdOut);
 		printf ("\n");
 #endif
@@ -2097,7 +2097,7 @@ void cleanup_stack
 		do {
 #if 0
 			printf ("cleanup_stack01 ");
-			printf ("%s ",CurrentAltLabel.lab_symbol->sdef_ident->ident_name);
+			printf ("%s ",CurrentAltLabel.lab_symbol->sdef_name);
 			DPrintNodeId (p_node_ids->nidl_node_id,StdOut);
 			printf ("\n");
 #endif
@@ -2109,7 +2109,7 @@ void cleanup_stack
 			while (p_node_ids!=NULL && p_node_ids->nidl_node_id->nid_a_index==UNUSED_NODE_ID_INDEX){
 #if 0
 				printf ("cleanup_stack02 ");
-				printf ("%s ",CurrentAltLabel.lab_symbol->sdef_ident->ident_name);
+				printf ("%s ",CurrentAltLabel.lab_symbol->sdef_name);
 				DPrintNodeId (p_node_ids->nidl_node_id,StdOut);
 				printf ("\n");
 #endif
@@ -2190,7 +2190,7 @@ void cleanup_stack
 		while (p_node_ids!=NULL && p_node_ids->nidl_node_id->nid_a_index==UNUSED_NODE_ID_INDEX){
 #if 0
 			printf ("cleanup_stack03 ");
-			printf ("%s ",CurrentAltLabel.lab_symbol->sdef_ident->ident_name);
+			printf ("%s ",CurrentAltLabel.lab_symbol->sdef_name);
 			DPrintNodeId (p_node_ids->nidl_node_id,StdOut);
 			printf ("\n");
 #endif
@@ -2199,7 +2199,7 @@ void cleanup_stack
 
 #if 0
 		printf ("cleanup_stack1 ");
-		printf ("%s\n",CurrentAltLabel.lab_symbol->sdef_ident->ident_name);
+		printf ("%s\n",CurrentAltLabel.lab_symbol->sdef_name);
 
 		if (p_node_ids!=NULL && p_node_ids->nidl_node_id->nid_a_index!=asp){
 			printf ("asp=%d nid_a_index=%d ",asp,p_node_ids->nidl_node_id->nid_a_index);
@@ -2235,7 +2235,7 @@ void cleanup_stack
 			while (p_node_ids!=NULL && p_node_ids->nidl_node_id->nid_a_index==UNUSED_NODE_ID_INDEX){
 #if 0
 				printf ("cleanup_stack11 ");
-				printf ("%s ",CurrentAltLabel.lab_symbol->sdef_ident->ident_name);
+				printf ("%s ",CurrentAltLabel.lab_symbol->sdef_name);
 				DPrintNodeId (p_node_ids->nidl_node_id,StdOut);
 				printf ("\n");
 #endif
@@ -2892,13 +2892,13 @@ static void generate_code_for_apply_in_strict_context (NodeP node,int *asp_p,int
 				member_type_alt=field_sdef->sdef_member_type_of_field;
 				if (DoDebug)
 					if (member_type_alt->type_alt_lhs->type_node_arity==n_apply_args+1){
-						FPrintF (OutFile, "\n||\t%s",selector_node_p->node_symbol->symb_def->sdef_ident->ident_name);
+						FPrintF (OutFile, "\n||\t%s",selector_node_p->node_symbol->symb_def->sdef_name);
 					} else
-						FPrintF (OutFile, "\n||\t(no dictionary) %s",field_sdef->sdef_ident->ident_name);
+						FPrintF (OutFile, "\n||\t(no dictionary) %s",field_sdef->sdef_name);
 			} else if (DoDebug)
-				FPrintF (OutFile, "\n||\t(no dictionary) %s",field_sdef->sdef_ident->ident_name);
+				FPrintF (OutFile, "\n||\t(no dictionary) %s",field_sdef->sdef_name);
 		} else if (DoDebug)
-			FPrintF (OutFile, "\n||\t(no dictionary) %s",field_sdef->sdef_ident->ident_name);
+			FPrintF (OutFile, "\n||\t(no dictionary) %s",field_sdef->sdef_name);
 
 		if (field_sdef!=NULL && OptimizeInstanceCalls){
 			struct state *member_states_of_field;
@@ -3282,7 +3282,7 @@ LabDef *unboxed_cons_label (SymbolP cons_symbol_p)
 			unboxed_record_cons_lab.lab_symbol=cons_symbol_p->symb_unboxed_cons_state_p->state_record_symbol;			
 			unboxed_record_cons_lab.lab_issymbol=True;
 		} else {
-			unboxed_record_cons_lab.lab_name=cons_symbol_p->symb_unboxed_cons_state_p->state_record_symbol->sdef_ident->ident_name;
+			unboxed_record_cons_lab.lab_name=cons_symbol_p->symb_unboxed_cons_state_p->state_record_symbol->sdef_name;
 			unboxed_record_cons_lab.lab_issymbol=False;
 		}
 		unboxed_record_cons_lab.lab_pref=cons_symbol_p->symb_tail_strictness ? "r_Cons#!" : "r_Cons#";
@@ -3663,7 +3663,7 @@ static void FillNormalNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 						}
 					}
 				} else {
-					StaticMessage (False,CurrentAltLabel.lab_symbol->sdef_ident->ident_name,Co_Wtype);
+					StaticMessage (False,CurrentAltLabel.lab_symbol->sdef_name,Co_Wtype);
 					GenTypeError();
 				}
 			}
@@ -6764,13 +6764,13 @@ void InitCoding (void)
 	SetUnaryState (& UnderEvalState, UnderEval, UnknownObj);
 	SetUnaryState (& ProcIdState, OnB, ProcIdObj);
 
-	ApplyDef=MakeNewSymbolDefinition ("system", ApplyId, 2, DEFRULE);
+	ApplyDef=MakeNewSymbolDefinition ("system", "AP", 2, DEFRULE);
 	ApplyDef->sdef_number=0;
 
-	IfDef=MakeNewSymbolDefinition ("system", IfId, 3, DEFRULE);
+	IfDef=MakeNewSymbolDefinition ("system", "if", 3, DEFRULE);
 	IfDef->sdef_number=0;
 
-	SeqDef=MakeNewSymbolDefinition ("system", system_seq_id, 2, DEFRULE);
+	SeqDef=MakeNewSymbolDefinition ("system", "seq", 2, DEFRULE);
 	SeqDef->sdef_number=0;
 
 	InitBasicDescriptor (UnknownObj, "_", SizeOfAStackElem);
