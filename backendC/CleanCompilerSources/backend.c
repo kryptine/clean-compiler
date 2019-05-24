@@ -2360,16 +2360,17 @@ BEDeclareRuleType (int functionIndex, int moduleIndex, CleanString name)
 	Assert (functions != NULL);
 	Assert (functions [functionIndex].symb_kind == erroneous_symb);
 
-	if (module->bem_isSystemModule)
+	if (module->bem_isSystemModule){
 		/* for inline code */
 		newIdent	= PutStringInHashTable (ConvertCleanString (name), FirstSystemModuleTable + moduleIndex);
-	else
-	{
+		newSymbDef	= ConvertAllocType (SymbDefS);
+		newIdent->ident_sys_rule_def = newSymbDef;
+	} else {
 		newIdent	= ConvertAllocType (IdentS);
 		newIdent->ident_name	= ConvertCleanString (name);
+		newSymbDef	= ConvertAllocType (SymbDefS);
 	}
 
-	newSymbDef	= ConvertAllocType (SymbDefS);
 	newSymbDef->sdef_kind		= NEWDEFINITION;
 	newSymbDef->sdef_exported	= False;
 	newSymbDef->sdef_module		= module->bem_name;
