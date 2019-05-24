@@ -90,11 +90,20 @@ SymbDef scc_dependency_list;
 SymbDef MakeNewSymbolDefinition (char *module, char *name, int arity, SDefKind kind)
 {
 	SymbDef def;
+	int i,string_length;
+	char *s,*new_string;
+	
+	string_length = strlen (name);
+	new_string = CompAlloc (string_length+1);
+
+	for (i=0; i<string_length; ++i)
+		new_string[i] = name[i];
+	new_string [string_length] = '\0';
 	
 	def = CompAllocType (SymbDefS);
 	
 	def->sdef_module = module;
-	def->sdef_name = name;
+	def->sdef_name = new_string;
 	def->sdef_arity = arity;
 	def->sdef_kind = kind;
 
@@ -102,7 +111,7 @@ SymbDef MakeNewSymbolDefinition (char *module, char *name, int arity, SDefKind k
 
 	def->sdef_exported=False;
 
-	def->sdef_arfun				= NoArrayFun;
+	def->sdef_arfun = NoArrayFun;
 	
 	return def;
 }
