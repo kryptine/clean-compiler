@@ -399,7 +399,7 @@ static void GenRecordState (SymbDef sdef)
 	} else if (sdef->sdef_checkstatus == ConvertedToState)
 		return;
 	else
-		StaticMessage (True, "%S", "%s cyclic strict field dependencies are not allowed", CurrentSymbol, sdef->sdef_ident->ident_name);
+		StaticMessage (True, "%S", "%s cyclic strict field dependencies are not allowed", CurrentSymbol, sdef->sdef_name);
 }
 
 static void GenResultStatesOfLazyFields (SymbDef sdef)
@@ -1583,7 +1583,7 @@ static void DecrRefCountCopiesOfArg (Args arg IF_OPTIMIZE_LAZY_TUPLE_RECURSION(i
 							node_id->nid_node_def->def_id->nid_mark2 |= NID_CALL_VIA_LAZY_SELECTIONS_ONLY;
 							node_id_def_node->node_symbol->symb_def->sdef_rule->rule_mark |= RULE_CALL_VIA_LAZY_SELECTIONS_ONLY;
 							if (ListOptimizations)
-								printf ("Optimize lazy tuple recursion of %s\n",node_id_def_node->node_symbol->symb_def->sdef_ident->ident_name);
+								printf ("Optimize lazy tuple recursion of %s\n",node_id_def_node->node_symbol->symb_def->sdef_name);
 						}
 					}
 				}
@@ -2412,8 +2412,8 @@ static Bool NodeInAStrictContext (Node node,StateS demanded_state,int local_scop
 
 				if (definition_state_p!=NULL){
 #ifdef FASTER_STRICT_AND_OR
-					if (sdef->sdef_module==StdBoolId->ident_name && node->node_arity==2){
-						if (sdef->sdef_ident==AndId){
+					if (sdef->sdef_module==StdBoolId && node->node_arity==2){
+						if (sdef==AndSymbDef){
 							ArgP arg1,arg2,false_arg;
 							NodeP false_node;
 							
@@ -2436,7 +2436,7 @@ static Bool NodeInAStrictContext (Node node,StateS demanded_state,int local_scop
 
 								return NodeInAStrictContext (node,demanded_state,local_scope);
 							}
-						} else if (sdef->sdef_ident==OrId){
+						} else if (sdef==OrSymbDef){
 							ArgP arg1,arg2,true_arg;
 							NodeP true_node;
 							
@@ -2901,13 +2901,13 @@ static void DetermineStatesOfNodeDefs (NodeDefs firstdef, int local_scope)
 			if (! (next->def_id->nid_ref_count_copy<0 ||
 					(next->def_id->nid_ref_count_copy==0 && (next->def_id->nid_mark & ON_A_CYCLE_MASK))))
 #if 1
-				error_in_function_s ("DetermineStatesOfNodeDefs",CurrentSymbol->symb_def->sdef_ident->ident_name);
+				error_in_function_s ("DetermineStatesOfNodeDefs",CurrentSymbol->symb_def->sdef_name);
 #else
 			{
 				char s[20];
 				
 				sprintf (s,"%x %d %d",(int)next->def_id,next->def_id->nid_ref_count_copy,next->def_id->nid_refcount);
-				error_in_function_s ("DetermineStatesOfNodeDefs",/*CurrentSymbol->symb_def->sdef_ident->ident_name*/s/*next->def_id->nid_ident->ident_name*/);
+				error_in_function_s ("DetermineStatesOfNodeDefs",/*CurrentSymbol->symb_def->sdef_name*/s/*next->def_id->nid_ident->ident_name*/);
 			}
 #endif
 }

@@ -233,9 +233,9 @@ void PrintSymbol (Symbol symbol, File file)
 		line_nr = 0;
 		break;
 	case definition:
-		symb_id = symbol -> symb_def -> sdef_ident;
 		line_nr = 0;
-		break;
+		PrintSymbolOfIdent (symbol->symb_def->sdef_name, line_nr, file);
+		return;
 	case int_denot:
 		FPutS (symbol->symb_int, file);
 		return;
@@ -277,7 +277,7 @@ void PrintSymbol (Symbol symbol, File file)
 		return;
 	}
 
-	PrintSymbolOfIdent (symb_id, line_nr, file);
+	PrintSymbolOfIdent (symb_id->ident_name, line_nr, file);
 
 } /* PrintSymbol */
 
@@ -378,7 +378,7 @@ void StaticMessage (Bool error, char *symbol_format, char *message_format, ...)
 				case 'D':
 				{
 					SymbDef def  = va_arg (ap, SymbDef);
-					PrintSymbolOfIdent (def->sdef_ident, 0, StdError);
+					PrintSymbolOfIdent (def->sdef_name, 0, StdError);
 					break;
 				}
 				case 'S':

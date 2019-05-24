@@ -13,7 +13,7 @@ extern void CheckWarningOrError (Bool error,char *msg1,char *msg2);
 extern void CheckWarningOrError2 (Bool error,char *msg1,char *msg2,char *msg3);
 extern void CheckSymbolWarningOrError (Bool error,struct symbol *symbol,char *msg);
 
-#define NameOfSymbol(symb)	((symb)->symb_def ->sdef_ident->ident_name)
+#define NameOfSymbol(symb)	((symb)->symb_def ->sdef_name)
 
-extern void PrintSymbolOfIdent (Ident sid,unsigned line_nr,File file);
+extern void PrintSymbolOfIdent (char *name,unsigned line_nr,File file);
 

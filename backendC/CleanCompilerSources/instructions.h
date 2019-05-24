@@ -241,7 +241,7 @@ void GenFillCaf (Label label,int a_stack_size,int b_stack_size);
 void GenCaf (Label label,int a_stack_size,int b_stack_size);
 
 void GenPB (char *function_name);
-void GenPB_ident (IdentP ident,unsigned int line_n);
+void GenPB_ident (char *ident_name,unsigned int line_n);
 void GenPB_with_line_number (char *function_name,int line_number);
 void GenPD (void);
 void GenPN (void);

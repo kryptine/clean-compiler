@@ -2357,8 +2357,8 @@ static Exp ConvertNode (Node node, NodeId nid)
 						Exp exp;
 
 #if SA_RECOGNIZES_ABORT_AND_UNDEF
-						if (sdef->sdef_module==StdMiscId->ident_name){
-							if ((sdef->sdef_ident==abort_id && node->node_arity==1) || sdef->sdef_ident==undef_id){
+						if (sdef->sdef_module==StdMiscId){
+							if ((sdef==abort_symb_def && node->node_arity==1) || sdef==undef_symb_def){
 								e->e_kind = Bottom;
 								e->e_sym = 0;
 								e->e_hnf = True;
@@ -2894,7 +2894,7 @@ static void ConvertStateToStrictInfo (TypeNode node, StrictInfo *s, Bool adopt_a
 				printf ("ConvertStateToStrictInfo Var\n");
 			else {
 				if (node->type_node_symbol->symb_kind==definition)
-					printf ("ConvertStateToStrictInfo Definition %s\n",node->type_node_symbol->symb_def->sdef_ident->ident_name);
+					printf ("ConvertStateToStrictInfo Definition %s\n",node->type_node_symbol->symb_def->sdef_name);
 				else
 					printf ("ConvertStateToStrictInfo NoTuple %d\n",node->type_node_symbol->symb_kind);
 			}
@@ -3589,7 +3589,7 @@ static void convert_imp_rule_type (SymbDef sdef)
 	rule_type = sdef->sdef_rule->rule_type;
 /*
 	#ifdef _DB_
-		printf ("ConvertStateInfoToStrictInfos %s\n",sdef->sdef_ident->ident_name);
+		printf ("ConvertStateInfoToStrictInfos %s\n",sdef->sdef_name);
 	#endif
 */
 	ConvertStateInfoToStrictInfos (rule_type,arity, &f->fun_strictargs, &f->fun_strictresult, !StrictChecks);
@@ -3716,7 +3716,7 @@ static void update_function_strictness (SymbDef sdef)
 		rule = sdef->sdef_rule->rule_type;
 
 #if 0
-		printf ("%s\n",sdef->sdef_ident->ident_name);
+		printf ("%s\n",sdef->sdef_name);
 #endif
 		
 		strict_added = False;
@@ -3734,10 +3734,10 @@ static void update_function_strictness (SymbDef sdef)
 		}
 	
 		if (warning && (StrictAllWarning || StrictChecks))
-			GiveStrictWarning (sdef->sdef_ident->ident_name, "not all user annotations could be derived");
+			GiveStrictWarning (sdef->sdef_name, "not all user annotations could be derived");
 
 		if (export_warning && (StrictAllWarning || StrictExportChecks))
-			GiveStrictWarning (sdef->sdef_ident->ident_name, "function not annotated as being strict in definition module");
+			GiveStrictWarning (sdef->sdef_name, "function not annotated as being strict in definition module");
 	}
 }
 
@@ -4775,7 +4775,7 @@ static Exp GetResultOfFunctionApplication (Exp e, Path p, Context context)
 #ifdef _DB_RED_
 		if (DBPrinting){
 			DumpMatch (outfile, m);
-			FPrintF (outfile, " (%s, %d)\n", f->fun_symbol ? f->fun_symbol->sdef_ident->ident_name : "??", i);
+			FPrintF (outfile, " (%s, %d)\n", f->fun_symbol ? f->fun_symbol->sdef_name : "??", i);
 		}
 #endif
 
@@ -5601,7 +5601,7 @@ static void FindStrictPropertiesOfFunction (Fun *f)
 		
 	max_depth_reached = False;
 	max_time_reached  = False;
-	CurrentName       = f->fun_symbol->sdef_ident->ident_name;
+	CurrentName       = f->fun_symbol->sdef_name;
 
 #if 0
 	printf ("%s\n",CurrentName);
@@ -5653,7 +5653,7 @@ static void FindStrictPropertiesOfFunction (Fun *f)
 
 #ifdef _DB_TEST_
 	if (StrictDoVerbose)
-	{	FPrintF (StdOut, "(%4d)%15s   ", (int) start_fuel, f->fun_symbol->sdef_ident->ident_name);
+	{	FPrintF (StdOut, "(%4d)%15s   ", (int) start_fuel, f->fun_symbol->sdef_name);
 		DumpStrictInfoOfFunction (StdOut, f);
 		FPutC ('\n', StdOut);
 	}
@@ -5675,7 +5675,7 @@ static void PrintFoundStrictArgs (File w)
 			f=sdef->sdef_sa_fun;
 					
 			if (! StrictDoVerbose)
-			{	FPrintF (StdOut, "%15s   ", f->fun_symbol->sdef_ident->ident_name);
+			{	FPrintF (StdOut, "%15s   ", f->fun_symbol->sdef_name);
 				DumpStrictInfoOfFunction (StdOut, f);
 				FPutC ('\n', StdOut);
 			}

@@ -28,7 +28,7 @@ char *ConvertSymbolKindToString (SymbKind skind)
 		case fun_type:		return "=>";
 		case list_type:		return "List";
 		case tuple_type:	return "Tuple";
-		case dynamic_type:	return DynamicId -> ident_name;
+		case dynamic_type:	return "Dynamic";
 		default:			return "Erroneous";
 	}
 
@@ -142,11 +142,9 @@ static char *PrintName (char *name, char *name_end, unsigned line_nr, File file)
 
 #define _ANALYSE_IDENT_ 		/* also in optimisations.c */
 
-void PrintSymbolOfIdent (Ident sid, unsigned line_nr, File file)
+void PrintSymbolOfIdent (char *name, unsigned line_nr, File file)
 {
-	char *next_char,*name;
-
-	name  = sid -> ident_name;
+	char *next_char;
 
 #ifdef _ANALYSE_IDENT_
 	if (*name == cTypeDelimiter)

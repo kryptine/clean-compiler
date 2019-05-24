@@ -259,14 +259,13 @@ void ConvertSymbolToRLabel (LabDef *slab,SymbDef sdef)
 		} else {
 			sdef->sdef_mark |= SDEF_USED_STRICTLY_MASK | SDEF_RECORD_R_LABEL_IMPORTED_MASK;
 
-			GenImpRecordDesc (modname,sdef->sdef_ident->ident_name);
+			GenImpRecordDesc (modname,sdef->sdef_name);
 		}
 	}
 	MakeSymbolLabel (slab,modname,r_pref,sdef,0);
 }
 
 static SymbDefS lazy_tuple_selector_sdef;
-static IdentS lazy_tuple_selector_ident;
 
 void BuildLazyTupleSelectorLabel (Label slab, int arity, int argnr)
 {
@@ -274,8 +273,7 @@ void BuildLazyTupleSelectorLabel (Label slab, int arity, int argnr)
 		LazyTupleSelectors [argnr - NrOfGlobalSelectors- 1] = True;
 		if (ExportLocalLabels){
 			lazy_tuple_selector_sdef.sdef_exported=True;
-			lazy_tuple_selector_sdef.sdef_ident=&lazy_tuple_selector_ident;
-			lazy_tuple_selector_ident.ident_name=loc_sel;
+			lazy_tuple_selector_sdef.sdef_name=loc_sel;
 			MakeSymbolLabel (slab,CurrentModule,n_pref,&lazy_tuple_selector_sdef,argnr);
 		} else {
 			LazyTupleSelectors [argnr - NrOfGlobalSelectors- 1] = True;
@@ -831,7 +829,7 @@ static void GenerateLazyConstructorDescriptorAndFunctionForStrictConstructor (Co
 		GenConstructorFunctionDescriptorAndExportNodeAndDescriptor (constructor_def);
 
 		if (DoTimeProfiling)
-			GenPB (constructor_def->sdef_ident->ident_name);
+			GenPB (constructor_def->sdef_name);
 
 		MakeSymbolLabel (&ealab,constructor_def->sdef_exported ? CurrentModule : NULL,ea_pref,constructor_def,0);
 		
@@ -915,7 +913,7 @@ static void GenLazyRecordEntry (SymbDef rdef)
 		eu_label_p=NULL;
 	
 	if (DoTimeProfiling)
-		GenPB (rdef->sdef_ident->ident_name);
+		GenPB (rdef->sdef_name);
 
 	GenLazyRecordDescriptorAndExport (rdef);
 
@@ -992,11 +990,11 @@ static void GenLazyFieldSelectorEntry (SymbDef field_def,StateS recstate,int tot
 #endif
 
 		if (DoTimeProfiling)
-			GenPB (field_def->sdef_ident->ident_name);
+			GenPB (field_def->sdef_name);
 
 		update_root_node = ! ExpectsResultNode (offfieldstate);
 
-		record_name=field_def->sdef_type->type_symbol->symb_def->sdef_ident->ident_name;
+		record_name=field_def->sdef_type->type_symbol->symb_def->sdef_name;
 		
 		if (field_def->sdef_calledwithrootnode){
 			ealab = CurrentAltLabel;
@@ -1183,7 +1181,7 @@ static int generate_instance_entry_arguments
 	member_state_p=dictionary_field->sdef_member_states_of_field;
 	
 	if (DoDebug)
-		FPrintF (OutFile, "\n||\tmember type %s %d %d",dictionary_field->sdef_ident->ident_name,member_arity,function_arity);
+		FPrintF (OutFile, "\n||\tmember type %s %d %d",dictionary_field->sdef_name,member_arity,function_arity);
 	
 	n_dictionary_args = function_arity-member_arity;
 
@@ -1398,7 +1396,7 @@ static void GenUnboxedRecordConsApplyAndNodeEntries
 		GenArrayFunctionDescriptor (fun_def,&CurrentAltLabel,arity);
 
 	if (DoTimeProfiling)
-		GenPB (fun_def->sdef_ident->ident_name);
+		GenPB (fun_def->sdef_name);
 
 	if (fun_def->sdef_mark & SDEF_USED_CURRIED_MASK){
 		struct label i_label;
@@ -1442,7 +1440,7 @@ static void GenUnboxedRecordDeconsApplyAndNodeEntries (SymbDef fun_def,int *a_si
 		GenArrayFunctionDescriptor (fun_def,&CurrentAltLabel,arity);
 
 	if (DoTimeProfiling)
-		GenPB (fun_def->sdef_ident->ident_name);
+		GenPB (fun_def->sdef_name);
 
 	if (fun_def->sdef_mark & SDEF_USED_CURRIED_MASK){
 		struct label i_label;
@@ -1487,7 +1485,7 @@ static void GenUnboxedRecordApplyAndNodeEntries (SymbDef fun_def,int *a_size_p,i
 		GenArrayFunctionDescriptor (fun_def,&CurrentAltLabel,arity);
 
 	if (DoTimeProfiling)
-		GenPB (fun_def->sdef_ident->ident_name);
+		GenPB (fun_def->sdef_name);
 
 	if (fun_def->sdef_mark & SDEF_USED_CURRIED_MASK){
 		struct label i_label;
@@ -1534,7 +1532,7 @@ void GenerateCodeForLazyUnboxedRecordListFunctions (void)
 				unboxed_record_cons_lab.lab_symbol=type_node_arguments_p->type_arg_node->type_node_symbol->symb_def;
 				unboxed_record_cons_lab.lab_issymbol=True;
 			} else {
-				unboxed_record_cons_lab.lab_name=type_node_arguments_p->type_arg_node->type_node_symbol->symb_def->sdef_ident->ident_name;
+				unboxed_record_cons_lab.lab_name=type_node_arguments_p->type_arg_node->type_node_symbol->symb_def->sdef_name;
 				unboxed_record_cons_lab.lab_issymbol=False;			
 			}
 			unboxed_record_cons_lab.lab_pref=tail_strict ? "r_Cons#!" : "r_Cons#";
@@ -2575,7 +2573,6 @@ SymbDef CreateUpdateFunction (ArgS *record_arg,ArgS *first_field_arg,Node node
 {
 	static char update_function_name[16];
 	SymbDef update_function_sdef;
-	Ident update_function_ident;
 	Symbol update_function_symbol;
 	ArgS *previous_arg,*arg;
 	Node lhs_root,rhs_root;
@@ -2599,8 +2596,7 @@ SymbDef CreateUpdateFunction (ArgS *record_arg,ArgS *first_field_arg,Node node
 	} else
 		strict_record_state_p = &record_state;
 
-	update_function_ident=NewIdent (update_function_name);
-	update_function_sdef=MakeNewSymbolDefinition (CurrentModule,update_function_ident,n_arguments,IMPRULE);
+	update_function_sdef=MakeNewSymbolDefinition (CurrentModule,update_function_name,n_arguments,IMPRULE);
 
 	update_function_sdef->sdef_number=next_def_number++;
 	update_function_sdef->sdef_isused=True;
@@ -2757,7 +2753,6 @@ SymbDef create_select_function (Symbol selector_symbol,int selector_kind)
 {
 	static char select_function_name[16];
 	SymbDef select_function_sdef;
-	Ident select_function_ident;
 	Symbol select_function_symbol;
 	NodeP lhs_root,rhs_root;
 	ImpRuleS *update_imp_rule;
@@ -2773,8 +2768,7 @@ SymbDef create_select_function (Symbol selector_symbol,int selector_kind)
 	sprintf (select_function_name,"_sel%d",next_update_function_n);
 	++next_update_function_n;
 
-	select_function_ident=NewIdent (select_function_name);
-	select_function_sdef=MakeNewSymbolDefinition (CurrentModule,select_function_ident,1,IMPRULE);
+	select_function_sdef=MakeNewSymbolDefinition (CurrentModule,select_function_name,1,IMPRULE);
 
 	U5 (select_function_sdef,	sdef_number=next_def_number++,
 								sdef_isused=True,
@@ -2856,14 +2850,12 @@ SymbDef create_select_function (Symbol selector_symbol,int selector_kind)
 static SymbDef create_match_function_sdef (void)
 {
 	char match_function_name[16];
-	Ident match_function_ident;
 	SymbDef match_function_sdef;
 
 	sprintf (match_function_name,"_match%d",next_match_function_n);
 	++next_match_function_n;
 
-	match_function_ident=NewIdent (match_function_name);
-	match_function_sdef=MakeNewSymbolDefinition (CurrentModule,match_function_ident,1,IMPRULE);
+	match_function_sdef=MakeNewSymbolDefinition (CurrentModule,match_function_name,1,IMPRULE);
 
 	U5 (match_function_sdef,	sdef_number=next_def_number++,
 								sdef_isused=True,
@@ -4584,7 +4576,7 @@ static void repl_overloaded_cons_arguments (NodeP node_p,int *asp_p,int *bsp_p,S
 		field_sdef=node_p->node_decons_node->node_symbol->symb_def;
 
 		if (DoDebug)
-			FPrintF (OutFile, "\n||\t%s",field_sdef->sdef_ident->ident_name);
+			FPrintF (OutFile, "\n||\t%s",field_sdef->sdef_name);
 
 		if (OptimizeInstanceCalls){
 			struct state *member_states_of_field;
