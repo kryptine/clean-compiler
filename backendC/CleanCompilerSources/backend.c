@@ -2871,9 +2871,8 @@ BECodeParameterList (CleanString location, BENodeIdP nodeId, BECodeParameterP pa
 
 	parameter	= ConvertAllocType (struct parameter);
 
-	parameter->par_kind		= 0;
 	parameter->par_node_id	= nodeId;
-	parameter->par_loc		= Identifier (ConvertCleanString (location));
+	parameter->par_loc_name	= ConvertCleanString (location);
 	parameter->par_next	= parameters;
 
 	return parameter;

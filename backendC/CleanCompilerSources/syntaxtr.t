@@ -164,7 +164,7 @@ STRUCT(ident,Ident){
 	unsigned char		ident_table; /* TableKind */
 	unsigned char		ident_mark;
 };
- 
+
 #define INLINE_MASK					8
 #define WARNED_NO_INLINE_CODE		16
 
@@ -181,15 +181,6 @@ typedef enum {
 	ProcessAnnot,ParallelAtAnnot, DeferAnnot, ContInterleavedAnnot, WaitAnnot,
 	ParallelNFAnnot, InterleavedNFAnnot
 } Annotation;
-
-typedef struct ident_string *IdentStringP;
-
-struct ident_string {
-	IdentStringP	left;
-	IdentStringP	right;
-	Ident			ident;
-	char			*string;
-};
 
 typedef struct def_repr DefRepr,*DefMod;
 
@@ -440,17 +431,10 @@ STRUCT (node_def,NodeDef){
 typedef struct parameter Parameter,*Parameters;
 
 struct parameter {
-	union {
-		NodeId	val_node_id;	/* if par_kind == 0 */
-		Ident	val_ident;	/* if par_kind == 1 */
-	} par_val;
-	Ident		par_loc;
+	NodeId		par_node_id;
+	char *		par_loc_name;
 	Parameters	par_next;
-	int			par_kind;
 };
-
-#define par_node_id par_val.val_node_id
-#define par_ident par_val.val_ident
 
 typedef struct instruction Instruction,*Instructions;
 
