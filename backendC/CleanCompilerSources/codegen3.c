@@ -1020,13 +1020,11 @@ static void CodeNormalRootNode (Node root,NodeId rootid,int asp,int bsp,CodeGenN
 			return;
 		case fail_symb:
 		{
-			IdentS case_ident_s;
 			SymbDefS case_def_s;
 
-			case_ident_s.ident_name=rootsymb->symb_string;
-			Assume (case_ident_s.ident_name != NULL, "codegen3", "CodeNormalRootNode (fail_symb)");
+			Assume (rootsymb->symb_string != NULL, "codegen3", "CodeNormalRootNode (fail_symb)");
 
-			case_def_s.sdef_name = case_ident_s.ident_name;
+			case_def_s.sdef_name = rootsymb->symb_string;
 
 			if (FunctionMayFailWarningOrError!=0)
 				StaticMessage (FunctionMayFailWarningOrError==2, "%D", "case may fail", &case_def_s);

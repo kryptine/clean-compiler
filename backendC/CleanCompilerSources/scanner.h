@@ -1,7 +1,5 @@
 
-extern IdentP NewIdent (char *name);
-
-extern	IdentP	PutStringInHashTable (char *string, TableKind tabkind);
+extern	void PutStringInHashTable (char *string, TableKind tabkind, SymbDefP sys_rule_def);
 
 extern	void	InitScanner (void);
 

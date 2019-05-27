@@ -36,8 +36,6 @@ extern NodeIdP FreshNodeId (NodeP node, NodeDefs **node_defs_h);
 
 extern char *CopyString (char *to, char *from, int *rest_size);
 
-extern IdentP DetermineNewSymbolId (char *prefix, TypeNode inst_type, TableKind table);
-
 extern SymbolP	TrueSymbol, FalseSymbol, TupleSymbol,
 				ApplySymbol, ApplyTypeSymbol, SelectSymbols[],
 				FailSymbol, IfSymbol;
