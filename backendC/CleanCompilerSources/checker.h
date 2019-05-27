@@ -1,5 +1,4 @@
 
-extern Ident ApplyId, IfId, FailId;
 extern char *StdBoolId;
 
 extern SymbDef AndSymbDef,OrSymbDef,abort_symb_def,undef_symb_def;

@@ -259,13 +259,13 @@ void PrintSymbol (Symbol symbol, File file)
 		FPutS ("_Select", file);
 		return;
 	case apply_symb:
-		FPutS (ApplyId -> ident_name, file);
+		FPutS ("AP", file);
 		return;
 	case if_symb:
-		FPutS (IfId -> ident_name, file);
+		FPutS ("if", file);
 		return;
 	case fail_symb:
-		FPutS (FailId -> ident_name, file);
+		FPutS ("_Fail", file);
 		return;
 	default:
 		FPutS (ConvertSymbolKindToString ((SymbKind)symbol -> symb_kind), file);
