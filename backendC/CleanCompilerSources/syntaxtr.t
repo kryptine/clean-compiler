@@ -109,7 +109,6 @@ typedef enum {
 } TableKind;
 
 typedef union symb_value {
-	struct ident *					val_ident;
 	struct symbol_def *				val_def;
 	char *							val_int;
 	Bool 							val_bool;
@@ -147,7 +146,6 @@ STRUCT (symbol,Symbol) {
 # define symb_unboxed_cons_sdef_p symb_val.val_unboxed_cons_p->unboxed_cons_sdef_p
 #endif
 
-#define symb_ident symb_val.val_ident
 #define symb_def symb_val.val_def
 #define symb_int symb_val.val_int
 #define symb_bool symb_val.val_bool
