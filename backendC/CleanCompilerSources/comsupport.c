@@ -222,14 +222,10 @@ void FatalCompError (char *mod, char *proc, char *mess)
 
 void PrintSymbol (Symbol symbol, File file)
 {
-	Ident symb_id;
-	unsigned line_nr;
-	
 	switch (symbol -> symb_kind)
 	{
 	case definition:
-		line_nr = 0;
-		PrintSymbolOfIdent (symbol->symb_def->sdef_name, line_nr, file);
+		PrintSymbolOfIdent (symbol->symb_def->sdef_name, 0, file);
 		return;
 	case int_denot:
 		FPutS (symbol->symb_int, file);
@@ -271,9 +267,6 @@ void PrintSymbol (Symbol symbol, File file)
 		FPutS (ConvertSymbolKindToString ((SymbKind)symbol -> symb_kind), file);
 		return;
 	}
-
-	PrintSymbolOfIdent (symb_id->ident_name, line_nr, file);
-
 } /* PrintSymbol */
 
 #include <stdarg.h>

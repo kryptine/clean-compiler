@@ -23,6 +23,16 @@
 # include	"scanner.h"
 # include	"sizes.h"
 
+STRUCT(ident,Ident){
+	char *				ident_name;
+	struct symbol_def *	ident_sys_rule_def;
+	struct ident *		ident_next;
+	unsigned char		ident_table; /* TableKind */
+	unsigned char		ident_mark;
+};
+
+#define INLINE_MASK					8
+
 typedef struct ident_string *IdentStringP;
 
 struct ident_string {
@@ -65,23 +75,6 @@ AllocString (char *string, short length)
 	
 	return (newString);
 } /* AllocString */
-
-IdentP
-NewIdent (char *name)
-{
-	IdentP	ident;
-
-	ident	= CompAllocType (struct ident);
-
-	ident->ident_name	= AllocString (name,strlen (name));
-
-	ident->ident_table	= LastSystemModuleTable;
-	ident->ident_next		= NULL;
-	ident->ident_sys_rule_def = NULL;
-	ident->ident_mark 		= 0;
-
-	return ident;
-}
 
 # define	kIdentStringTableSizeBits	10
 # define	kIdentStringTableSize		((1 << kIdentStringTableSizeBits) - 1)
@@ -164,14 +157,15 @@ PutIdentStringInTable (IdentStringP identString, TableKind tableKind)
 	return (ident);
 } /* PutIdentStringInTable */
 
-IdentP
-PutStringInHashTable (char *string, TableKind tableKind)
+void PutStringInHashTable (char *string, TableKind tableKind, SymbDefP sys_rule_def)
 {
 	IdentStringP	identString;
+	IdentP newIdent;
 
 	identString	= StringInTable (string, strlen (string));
 
-	return (PutIdentStringInTable (identString, tableKind));
+	newIdent = PutIdentStringInTable (identString, tableKind);
+	newIdent->ident_sys_rule_def = sys_rule_def;
 } /* PutStringInHashTable */
 
 static IdentP RetrieveFromSymbolTable (char *string,TableKind table_kind)

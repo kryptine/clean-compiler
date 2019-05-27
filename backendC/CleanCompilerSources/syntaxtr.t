@@ -155,16 +155,6 @@ STRUCT (symbol,Symbol) {
 #define symb_arity symb_val.val_arity
 #define symb_apply_instance_field_def symb_val.val_apply_instance_field_def
 
-STRUCT(ident,Ident){
-	char *				ident_name;
-	struct symbol_def *	ident_sys_rule_def;
-	struct ident *		ident_next;
-	unsigned char		ident_table; /* TableKind */
-	unsigned char		ident_mark;
-};
-
-#define INLINE_MASK					8
-
 /*
 	The order in which the annotationkinds appear in the enum type
 	determines their priority
