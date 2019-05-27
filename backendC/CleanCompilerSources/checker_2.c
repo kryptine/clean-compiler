@@ -65,9 +65,9 @@ void ReadInlineCode (void)
 						break;
 				}
 
-			if (i<n_function_symbols && d_mod->mod_name->symb_ident->ident_name!=CurrentModule)
+			if (i<n_function_symbols && d_mod->mod_body->dm_name!=CurrentModule)
 				/* Get the inline instructions of all the rules that are defined in this module */
-				ScanInlineFile (d_mod->mod_name->symb_ident->ident_name,FirstSystemModuleTable+def_mod->dm_module_n);
+				ScanInlineFile (d_mod->mod_body->dm_name,FirstSystemModuleTable+def_mod->dm_module_n);
 		}
 	}
 }
@@ -139,12 +139,11 @@ void ClearOpenDefinitionModules (void)
 	OpenDefinitionModules	= NULL;
 }
 
-void AddOpenDefinitionModule (SymbolP moduleNameSymbol, DefMod definitionModule)
+void AddOpenDefinitionModule (DefMod definitionModule)
 {
 	DefModList	openModule;
 
 	openModule = CompAllocType (DefModElem);
-	openModule->mod_name	= moduleNameSymbol;
 	openModule->mod_body	= definitionModule;
 	openModule->mod_next	= OpenDefinitionModules;
 
