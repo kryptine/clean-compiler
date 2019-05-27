@@ -72,8 +72,6 @@ void ReadInlineCode (void)
 	}
 }
 
-Ident ApplyId, IfId, FailId;
-
 char *StdBoolId;
 SymbDef AndSymbDef,OrSymbDef;
 

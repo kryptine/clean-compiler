@@ -147,20 +147,8 @@ static SymbolP	gTupleSelectSymbols [MaxNodeArity];
 
 static int number_of_node_ids=0;
 
-typedef IdentP *IdentH;
 static char **gSpecialModules[BESpecialIdentCount];
 static struct symbol_def **gSpecialFunctions[BESpecialIdentCount];
-
-static IdentP
-Identifier (char *name)
-{
-	IdentP	ident;
-
-	ident	= ConvertAllocType (IdentS);
-	ident->ident_name	= name;
-
-	return (ident);
-} /* Identifier */
 
 static SymbolP
 PredefinedSymbol (SymbKind symbolKind, int arity)
@@ -3271,9 +3259,6 @@ BEInit (int argc)
 	/* +++ remove symbol table from backend */
 	ScanInitIdentStringTable ();
 	InitScanner (); /* for inlining */
-	ApplyId		= Identifier ("AP");
-	IfId		= Identifier ("if");
-	FailId		= Identifier ("_Fail");
 
 #if SA_RECOGNIZES_ABORT_AND_UNDEF
 	StdMiscId = NULL;
