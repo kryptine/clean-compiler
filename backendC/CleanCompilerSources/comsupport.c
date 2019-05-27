@@ -227,11 +227,6 @@ void PrintSymbol (Symbol symbol, File file)
 	
 	switch (symbol -> symb_kind)
 	{
-	case newsymbol:
-	case instance_symb:
-		symb_id = symbol -> symb_ident;
-		line_nr = 0;
-		break;
 	case definition:
 		line_nr = 0;
 		PrintSymbolOfIdent (symbol->symb_def->sdef_name, line_nr, file);
