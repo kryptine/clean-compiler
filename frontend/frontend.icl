@@ -20,7 +20,7 @@ frontSyntaxTree cached_dcl_macros cached_dcl_mods main_dcl_module_n predef_symbo
 
 defaultFrontEndOptions :: FrontEndOptions
 defaultFrontEndOptions
-	= { feo_up_to_phase = FrontEndPhaseAll, feo_generics = False, feo_generate_sapl = False,
+	= { feo_up_to_phase = FrontEndPhaseAll, feo_generics = False,
 		feo_fusion = { compile_with_fusion = False, generic_fusion = False, strip_unused = False } }
 
 frontEndInterface :: !(Optional (*File,{#Char},{#Char})) !FrontEndOptions !Ident !SearchPaths !{#DclModule} !*{#*{#FunDef}} !(Optional Bool) !*PredefinedSymbols !*HashTable (ModTimeFunction *Files) !*Files !*File !*File !*File !(Optional *File) !*Heaps

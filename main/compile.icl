@@ -66,10 +66,6 @@ openTclFile :: !String !String !*File !*Files -> (!Bool, !Optional .File, !*File
 openTclFile mod_dir mod_name error files
 	= open_file_in_clean_system_files_folder mod_dir mod_name ".tcl" FWriteData error files
 
-openSaplFile :: !String !String !*File !*Files -> (!Bool, !Optional .File, !*File, !*Files)
-openSaplFile mod_dir mod_name error files
-	= open_file_in_clean_system_files_folder mod_dir mod_name ".sapl" FWriteData error files
-
 open_file_in_clean_system_files_folder :: !String !String !String !Int !*File !*Files -> (!Bool, !Optional .File, !*File, !*Files)
 open_file_in_clean_system_files_folder mod_dir mod_name file_extension file_mode error files
 	# icl_mod_pathname = mod_dir +++ {DirectorySeparator} +++ mod_name;
@@ -112,7 +108,6 @@ closeFile _ files
 	,	compile_for_dynamics	:: !Bool
 	,	dump_core				:: !Bool
 	,	compile_with_generics   :: !Bool
-	,	generate_sapl           :: !Bool
 	}
 
 StdErrPathName :== "_stderr_"
@@ -132,7 +127,6 @@ InitialCoclOptions =
 	,	compile_for_dynamics	= False
 	,	dump_core				= False
 	,	compile_with_generics 	= True 
-	,	generate_sapl       	= False
 	}
 
 :: DclCache = {
@@ -194,9 +188,7 @@ parseCommandLine [arg1=:"-fusion":args] options
 	# (args,modules,options) = parseCommandLine args {options & fusion_options.compile_with_fusion = True}
 	= ([arg1:args],modules,options)
 parseCommandLine [arg1=:"-generic_fusion":args] options
-	# options = if options.generate_sapl
-					{options & fusion_options.generic_fusion = True, fusion_options.strip_unused = True}
-					{options & fusion_options.generic_fusion = True}
+	# options & fusion_options.generic_fusion = True
 	# (args,modules,options) = parseCommandLine args options;
 	= ([arg1:args],modules,options)
 parseCommandLine [arg1=:"-dump":args] options
@@ -214,12 +206,6 @@ parseCommandLine ["-lset":args] options
 	= parseCommandLine args {options & listTypes.lto_listTypesKind = ListTypesStrictExports}
 parseCommandLine ["-lat":args] options
 	= parseCommandLine args {options & listTypes.lto_listTypesKind = ListTypesAll}
-	// enable sapl
-parseCommandLine ["-sapl":args] options
-	# options = if options.fusion_options.generic_fusion
-					{options & generate_sapl = True, fusion_options.strip_unused = True}
-					{options & generate_sapl = True}
-	= parseCommandLine args options
 parseCommandLine [arg : args] options
 	| arg.[0] == '-'
 		# (args,modules,options)=	parseCommandLine args options
@@ -308,15 +294,8 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 					-> openTclFile mod_path options.moduleName error files
 			_
 				-> 	(True,No,error,files)
-				
-	# (optional_sapl_opened, sapl_file, error, files)
-		= case (options.generate_sapl, mbModPath) of
-			(True, Yes mod_path)
-				-> openSaplFile mod_path options.moduleName error files
-			_
-				-> 	(True,No,error,files)
-								
- 	| not (optional_tcl_opened && optional_sapl_opened)
+												
+ 	| not optional_tcl_opened
 		# (closed, files) = fclose out files
 		| not closed
 			=	abort ("couldn't close stdio")
@@ -335,7 +314,6 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 			{feo_up_to_phase=FrontEndPhaseAll
 			,feo_generics=options.compile_with_generics
 			,feo_fusion=options.fusion_options
-			,feo_generate_sapl=options.generate_sapl
 			} moduleIdent options.searchPaths dcl_modules functions_and_macros list_inferred_types predef_symbols hash_table fmodificationtime files error io out tcl_file heaps
 
 	# unique_copy_of_predef_symbols={predef_symbol\\predef_symbol<-:predef_symbols}
@@ -348,13 +326,13 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 	| not closed
 		=	abort ("couldn't close stdio")
 
-	# (success,functions_and_macros,heaps,sapl_file,error,out)
+	# (success,functions_and_macros,heaps,error,out)
 		= case optionalSyntaxTree of
 			Yes syntaxTree
 				# functions_and_macros = syntaxTree.fe_icl.icl_functions
-				# (success, heaps, sapl_file, error, out)
-				 	 = backEndInterface outputPath (map appendRedirection backendArgs) options.listTypes options.outPath predef_symbols syntaxTree main_dcl_module_n heaps sapl_file error out
-				-> (success,functions_and_macros,heaps,sapl_file,error,out)
+				# (success, heaps, error, out)
+				 	 = backEndInterface outputPath (map appendRedirection backendArgs) options.listTypes options.outPath predef_symbols syntaxTree main_dcl_module_n heaps error out
+				-> (success,functions_and_macros,heaps,error,out)
 				with
 					appendRedirection arg
 						= case arg of
@@ -365,7 +343,7 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 							arg
 								->	arg
 			No
-				-> (False,{},heaps,sapl_file,error,out)
+				-> (False,{},heaps,error,out)
 		with
 /*
 			outputPath
@@ -376,11 +354,6 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 			outputPath
 	//				=	/* directoryName options.pathName +++ "Clean System Files" +++ {DirectorySeparator} +++ */ baseName options.pathName
 				=	baseName options.pathName
-				
-	# (closed, files)
-		= closeFile sapl_file files
-	| not closed
-		=   abort ("couldn't close sapl file \"" +++ options.pathName +++ "sapl\"\n")
 	
 	# (closed, files) = fclose out files
 	| not closed

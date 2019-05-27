@@ -13,7 +13,6 @@ from partition import ::Component(..),::ComponentMembers
 	=	{	feo_up_to_phase			:: !FrontEndPhase
 		,	feo_fusion	 			:: !FusionOptions
 		,	feo_generics 			:: !Bool
-		,	feo_generate_sapl		:: !Bool
 		}
 
 :: FrontEndSyntaxTree
