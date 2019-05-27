@@ -415,13 +415,9 @@ void
 BEDeclareDclModule (int moduleIndex, CleanString name, CleanString modificationTime, int isSystemModule, int nFunctions, int nTypes, int nConstructors, int nFields)
 {
 	char	*cName;
-	SymbolP	moduleNameSymbol;
 	DefMod	dclModule;
 
 	cName	= ConvertCleanString (name);
-
-	moduleNameSymbol	= ConvertAllocType (SymbolS);
-	moduleNameSymbol->symb_ident	= Identifier (cName);
 
 	DeclareModule (moduleIndex, cName, isSystemModule, nFunctions, nTypes, nConstructors, nFields);
 
@@ -433,7 +429,7 @@ BEDeclareDclModule (int moduleIndex, CleanString name, CleanString modificationT
 	dclModule->dm_function_symbol_a = gBEState.be_modules[moduleIndex].bem_functions;
 	dclModule->dm_n_function_symbols = gBEState.be_modules[moduleIndex].bem_nFunctions;
 
-	AddOpenDefinitionModule (moduleNameSymbol, dclModule);
+	AddOpenDefinitionModule (dclModule);
 } /* BEDeclareDclModule */
 
 void

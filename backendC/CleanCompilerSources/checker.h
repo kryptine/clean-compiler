@@ -19,7 +19,6 @@ void GenDependencyList (void);
 NodeDefs NewNodeDef (NodeId nid, Node node);
 
 struct def_list {
-	Symbol				mod_name;
 	DefMod				mod_body;
 	struct def_list *	mod_next;
 };
@@ -27,4 +26,4 @@ struct def_list {
 extern struct def_list *OpenDefinitionModules;
 
 void ClearOpenDefinitionModules (void);
-void AddOpenDefinitionModule (SymbolP moduleNameSymbol, DefMod definitionModule);
+void AddOpenDefinitionModule (DefMod definitionModule);
