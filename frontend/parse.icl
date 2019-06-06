@@ -1658,6 +1658,14 @@ wantInstanceDeclaration parseContext pi_pos pState
 			# (instance_member_types, pState) = want_instance_type_definitions pim_pi.pi_types pState
     	  	  pState = wantEndGroup "instance" pState
 			= (PD_Instance {pim_pi = pim_pi, pim_members = instance_member_types}, pState)
+		| token=:DoubleColonToken
+			# (fname, linenr, pState) = getFileAndLineNr pState
+			  pos = LinePos fname linenr
+			  (tspec, pState) = wantSymbolType pState
+			  (instance_member_ident, pState) = stringToIdent pim_pi.pi_ident.id_name (IC_InstanceMember pim_pi.pi_types) pState
+			  instance_member_type = PD_TypeSpec pos instance_member_ident NoPrio (Yes tspec) FSP_None
+			#! def = PD_Instance {pim_pi = pim_pi, pim_members = [instance_member_type]}
+			= (def, wantEndOfDefinition "instance declaration" pState)
 			# pState = wantEndOfDefinition "instance declaration" (tokenBack pState)
 			= (PD_Instance {pim_pi = pim_pi, pim_members = []}, pState)
 
