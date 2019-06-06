@@ -2399,6 +2399,18 @@ optionalAnnot pState
 	| otherwise // token <> ExclamationToken
 		= (False, AN_None, tokenBack pState)
 
+warnOptionalAnnot :: !ParseState -> (!Annotation, !ParseState)
+warnOptionalAnnot pState
+	# (token, pState) = nextToken TypeContext pState
+	| token=:ExclamationToken
+		# (token, pState) = nextToken TypeContext pState
+		// JVG added for strict lists:
+		| token=:SquareCloseToken
+			= (AN_None,tokenBack (tokenBack pState))
+		# pState = parseWarning "" "! ignored" pState
+		= (AN_Strict, tokenBack pState)
+		= (AN_None, tokenBack pState)
+
 optionalAnnotWithPosition :: !ParseState -> (!Bool,!AnnotationWithPosition, !ParseState)
 optionalAnnotWithPosition pState
    	# (token, pState) = nextToken TypeContext pState
@@ -2411,6 +2423,19 @@ optionalAnnotWithPosition pState
 		= (True, StrictAnnotWithPosition position, tokenBack pState)
 	| otherwise // token <> ExclamationToken
 		= (False, NoAnnot, tokenBack pState)
+
+warnOptionalAnnotWithPosition :: !ParseState -> (!AnnotationWithPosition, !ParseState)
+warnOptionalAnnotWithPosition pState
+	# (token, pState) = nextToken TypeContext pState
+	| token=:ExclamationToken
+		# (token, pState) = nextToken TypeContext pState
+		// JVG added for strict lists:
+		| token=:SquareCloseToken
+			= (NoAnnot,tokenBack (tokenBack pState))
+		# (position,pState) = getPosition pState
+		# pState = parseWarning "" "! ignored" pState
+		= (StrictAnnotWithPosition position, tokenBack pState)
+		= (NoAnnot, tokenBack pState)
 
 warnAnnotAndOptionalAttr :: !ParseState -> (!Bool, !TypeAttribute, !ParseState)
 warnAnnotAndOptionalAttr pState
@@ -2678,6 +2703,21 @@ where
 		# (annotation,a_type,pState) = wantAnnotatedAType pState
 		= ({s_annotation=annotation,s_type=a_type},pState)
 
+want_SAType_warn_strictness :: !*ParseState -> (!SAType, !*ParseState)
+want_SAType_warn_strictness pState
+	# (annotation,a_type,pState) = wantAnnotatedAType_warn_strictness pState
+	= ({s_annotation=annotation,s_type=a_type},pState)
+
+wantSequence_SAType_warn_strictness :: !Token !ScanContext !*ParseState -> (!.[SAType],!*ParseState)
+wantSequence_SAType_warn_strictness separator scanContext pState
+	# (first, pState) = want_SAType_warn_strictness pState
+	  (token, pState) = nextToken scanContext pState
+	| separator == token
+		# (rest, pState) = wantSequence_SAType_warn_strictness separator scanContext pState
+		= ([first : rest], pState)
+	// otherwise // separator <> token
+	= ([first], tokenBack pState)
+
 :: AnnotationWithPosition = NoAnnot | StrictAnnotWithPosition !FilePosition;
 
 wantAnnotatedATypeWithPositionT :: !Token !ParseState -> (!AnnotationWithPosition,!AType,!ParseState)
@@ -2699,10 +2739,38 @@ wantAnnotatedATypeWithPosition_noUniversalQuantifiedVariables pState
 		= (annotation, atype, pState)
 		= (annotation, atype, attributed_and_annotated_type_error pState)
 
+wantAnnotatedATypeWithPositionT_warn_strictness :: !Token !ParseState -> (!AnnotationWithPosition,!AType,!ParseState)
+wantAnnotatedATypeWithPositionT_warn_strictness token=:ForAllToken pState
+	= wantAnnotatedATypeWithPositionT token pState
+wantAnnotatedATypeWithPositionT_warn_strictness noForAllToken pState
+	= wantAnnotatedATypeWithPosition_noUniversalQuantifiedVariables_warn_strictness (tokenBack pState)
+
+wantAnnotatedATypeWithPosition_noUniversalQuantifiedVariables_warn_strictness pState
+	# (annotation,pState) = warnOptionalAnnotWithPosition pState
+	# (succ, atype, pState)	= tryAnnotatedAType TA_None pState
+	| succ
+		= (annotation, atype, pState)
+		= (annotation, atype, attributed_and_annotated_type_error pState)
+
 wantAnnotatedAType :: !ParseState -> (!Annotation,!AType,!ParseState)
 wantAnnotatedAType pState
 	# (vars , pState)		= optionalUniversalQuantifiedVariables pState	
 	# (_,annotation,pState) = optionalAnnot pState
+	| isEmpty vars
+		# (succ, atype, pState)	= tryAnnotatedAType TA_None pState
+		| succ
+			= (annotation, atype, pState)
+			= (annotation, atype, attributed_and_annotated_type_error pState)
+		# (succ, atype, pState)	= tryAnnotatedAType TA_None pState
+		# atype = {atype & at_type = TFA vars atype.at_type}
+		| succ
+			= (annotation, atype, pState)
+			= (annotation, atype, attributed_and_annotated_type_error pState)
+
+wantAnnotatedAType_warn_strictness :: !ParseState -> (!Annotation,!AType,!ParseState)
+wantAnnotatedAType_warn_strictness pState
+	# (vars , pState)		= optionalUniversalQuantifiedVariables pState	
+	# (annotation,pState) = warnOptionalAnnot pState
 	| isEmpty vars
 		# (succ, atype, pState)	= tryAnnotatedAType TA_None pState
 		| succ
@@ -2721,7 +2789,7 @@ tryAnnotatedAType attr pState
 		= (False, {at_attribute = attr, at_type = TE}, pState)
 	# (token, pState)		= nextToken TypeContext pState
 	| token == ArrowToken
-		# (rtype, pState)	= wantAType pState
+		# (rtype, pState)	= wantAType_strictness_ignored pState
 		  atype = make_curry_type attr types rtype
 		= ( True, atype, pState)
 	// otherwise (note that types is non-empty)
@@ -2839,6 +2907,13 @@ wantAType pState
 		= (atype, pState)
 		= (atype, attributed_and_annotated_type_error pState)
 
+wantAType_strictness_ignored :: !ParseState -> (!AType,!ParseState)
+wantAType_strictness_ignored pState
+	# (succ, atype, pState)	= tryAType_strictness_ignored TA_None pState
+	| succ
+		= (atype, pState)
+		= (atype, attributed_and_annotated_type_error pState)
+
 attributed_and_annotated_type_error pState
 	# (token, pState) = nextToken TypeContext pState
 	= parseError "atype" (Yes token) "attributed and annotated type" pState
@@ -2862,7 +2937,7 @@ tryAType tryAA attr pState
 			  , parseError "annotated type" (Yes token) "type" (tokenBack pState))
 	# (token, pState)		= nextToken TypeContext pState
 	| token == ArrowToken
-		# (rtype, pState)	= wantAType pState
+		# (rtype, pState)	= wantAType_strictness_ignored pState
 		  atype = make_curry_type attr types rtype
 		| isEmpty vars
 			= ( True, atype, pState)
@@ -2873,21 +2948,35 @@ tryAType tryAA attr pState
 	| isEmpty vars
 		= (True, atype, pState)
 		= (True, { atype & at_type = TFA vars atype.at_type }, pState)
-/* PK
-tryFunctionType :: ![AType] !Annotation !TypeAttribute !ParseState -> (!Bool,!AType,!ParseState)
-tryFunctionType types annot attr pState
-	# (rtype, pState)		= wantAType pState
-	= ( True
-	  , make_curry_type annot attr types rtype
-	  , pState
-	  )
-*/
-where
-	make_curry_type attr [t1] res_type
-		= {at_attribute = attr, at_type = t1 --> res_type}
-	make_curry_type attr [t1:tr] res_type
-		= {at_attribute = attr, at_type = t1 --> make_curry_type TA_None tr res_type}
-	make_curry_type _ _ _ = abort "make_curry_type: wrong assumption"
+
+tryAType_strictness_ignored :: !TypeAttribute !ParseState -> (!Bool,!AType,!ParseState)
+tryAType_strictness_ignored attr pState
+	# (vars , pState)		= optionalUniversalQuantifiedVariables pState
+	# (types, pState)		= parseList tryBrackAType_strictness_ignored pState
+	| isEmpty types
+		| isEmpty vars
+			= (False, {at_attribute = attr, at_type = TE}, pState)
+			# (token, pState) = nextToken TypeContext pState
+			= (False, {at_attribute = attr, at_type = TFA vars TE}
+			  , parseError "annotated type" (Yes token) "type" (tokenBack pState))
+	# (token, pState)		= nextToken TypeContext pState
+	| token == ArrowToken
+		# (rtype, pState)	= wantAType_strictness_ignored pState
+		  atype = make_curry_type attr types rtype
+		| isEmpty vars
+			= ( True, atype, pState)
+			= ( True, { atype & at_type = TFA vars atype.at_type }, pState)
+	// otherwise (note that types is non-empty)
+	# (atype, pState) = convertAAType types attr (tokenBack pState)
+	| isEmpty vars
+		= (True, atype, pState)
+		= (True, { atype & at_type = TFA vars atype.at_type }, pState)
+
+make_curry_type attr [t1] res_type
+	= {at_attribute = attr, at_type = t1 --> res_type}
+make_curry_type attr [t1:tr] res_type
+	= {at_attribute = attr, at_type = t1 --> make_curry_type TA_None tr res_type}
+make_curry_type _ _ _ = abort "make_curry_type: wrong assumption"
 
 // Sjaak ...
 convertAAType :: ![AType] !TypeAttribute !ParseState -> (!AType,!ParseState)
@@ -2938,10 +3027,21 @@ tryBrackAType pState
 	# (_, attr, pState)	= warnAnnotAndOptionalAttr pState
 	= trySimpleType attr pState
 
+tryBrackAType_strictness_ignored :: !ParseState -> (!Bool, AType, !ParseState)
+tryBrackAType_strictness_ignored pState
+	# (_, attr, pState)	= warnAnnotAndOptionalAttr pState
+	= trySimpleType_strictness_ignored attr pState
+
 trySimpleType :: !TypeAttribute !ParseState -> (!Bool, !AType, !ParseState)
 trySimpleType attr pState
 	# (token, pState)		= nextToken TypeContext pState
 	# (result,atype,pState) = trySimpleTypeT token attr pState
+	= (result==ParseOk,atype,pState)
+
+trySimpleType_strictness_ignored :: !TypeAttribute !ParseState -> (!Bool, !AType, !ParseState)
+trySimpleType_strictness_ignored attr pState
+	# (token, pState)		= nextToken TypeContext pState
+	# (result,atype,pState) = trySimpleTypeT_strictness_ignored token attr pState
 	= (result==ParseOk,atype,pState)
 
 is_tail_strict_list_or_nil pState
@@ -2997,7 +3097,7 @@ trySimpleTypeT SquareOpenToken attr pState
   			= (ParseOk, {at_attribute = attr, at_type = TA list_symbol []}, pState)
 			= (ParseFailWithError, {at_attribute = attr, at_type = TE}, parseError "List type" (Yes token) "]" pState)
 
-	# (type, pState)	= wantAType (tokenBack pState)
+	# (type, pState)	= wantAType_strictness_ignored (tokenBack pState)
 	  (token, pState)	= nextToken TypeContext pState
 	| token == SquareCloseToken
 		# list_symbol = makeListTypeSymbol head_strictness 1
@@ -3026,7 +3126,7 @@ trySimpleTypeT CurlyOpenToken attr pState
 			# array_symbol = makeUnboxedArraySymbol 0
 			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol []}, pState)
 		// otherwise // token <> CurlyCloseToken
-	  		# (atype, pState)			= wantAType (tokenBack pState)
+			# (atype, pState)			= wantAType_strictness_ignored (tokenBack pState)
   			  pState					= wantToken TypeContext "unboxed array type" CurlyCloseToken pState
   			  array_symbol = makeUnboxedArraySymbol 1
   			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
@@ -3036,13 +3136,13 @@ trySimpleTypeT CurlyOpenToken attr pState
 			# array_symbol = makeStrictArraySymbol 0
 			= (ParseOk,  {at_attribute = attr, at_type = TA array_symbol []}, pState)
 		// otherwise // token <> CurlyCloseToken
-	  		# (atype,pState)			= wantAType (tokenBack pState)
+			# (atype,pState)			= wantAType_strictness_ignored (tokenBack pState)
   			  pState					= wantToken TypeContext "strict array type" CurlyCloseToken pState
   			  array_symbol = makeStrictArraySymbol 1
   			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
   	// otherwise
-  		# (atype,pState)			= wantAType (tokenBack pState)
-  		  pState					= wantToken TypeContext "lazy array type" CurlyCloseToken pState
+		# (atype,pState)			= wantAType_strictness_ignored (tokenBack pState)
+		  pState					= wantToken TypeContext "lazy array type" CurlyCloseToken pState
 		  array_symbol = makeLazyArraySymbol 1
 		= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
 trySimpleTypeT StringTypeToken attr pState
@@ -3058,6 +3158,13 @@ trySimpleTypeT token attr pState
 	= case bt of
 		Yes bt	-> (ParseOk , {at_attribute = attr, at_type = TB bt}, pState)
 		no		-> (ParseFailWithoutError, {at_attribute = attr, at_type = TE}   , pState)
+
+trySimpleTypeT_strictness_ignored :: !Token !TypeAttribute !ParseState -> (!ParseResult, !AType, !ParseState)
+trySimpleTypeT_strictness_ignored OpenToken attr pState
+	# (token, pState) = nextToken TypeContext pState
+	= trySimpleTypeT_after_OpenToken_strictness_ignored token attr pState
+trySimpleTypeT_strictness_ignored token attr pState
+	= trySimpleTypeT token attr pState
 
 trySimpleTypeT_after_OpenToken :: !Token !TypeAttribute !ParseState -> (!ParseResult, !AType, !ParseState)
 trySimpleTypeT_after_OpenToken CommaToken attr pState
@@ -3101,6 +3208,34 @@ trySimpleTypeT_after_OpenToken_and_type CommaToken annot_with_pos atype attr pSt
  	  tuple_symbol = makeTupleTypeSymbol arity arity
 	= (ParseOk, {at_attribute = attr, at_type = TAS tuple_symbol (atypes_from_satypes satypes) (strictness_from_satypes satypes)}, pState)
 trySimpleTypeT_after_OpenToken_and_type token annot_with_pos atype attr pState
+	= (ParseFailWithError, atype, parseError "Simple type" (Yes token) "')' or ','" pState)
+
+trySimpleTypeT_after_OpenToken_strictness_ignored :: !Token !TypeAttribute !ParseState -> (!ParseResult, !AType, !ParseState)
+trySimpleTypeT_after_OpenToken_strictness_ignored token=:CommaToken attr pState
+	= trySimpleTypeT_after_OpenToken token attr pState
+trySimpleTypeT_after_OpenToken_strictness_ignored token=:ArrowToken attr pState
+	= trySimpleTypeT_after_OpenToken token attr pState
+trySimpleTypeT_after_OpenToken_strictness_ignored token=:CloseToken attr pState
+	= trySimpleTypeT_after_OpenToken token attr pState
+trySimpleTypeT_after_OpenToken_strictness_ignored token attr pState
+	# (annot_with_pos,atype, pState) = wantAnnotatedATypeWithPositionT_warn_strictness token pState
+	  (token, pState)	= nextToken TypeContext pState
+	= trySimpleTypeT_after_OpenToken_and_type_strictness_ignored token annot_with_pos atype attr pState
+
+trySimpleTypeT_after_OpenToken_and_type_strictness_ignored CloseToken annot_with_pos atype attr pState
+	# type				= atype.at_type
+	  (attr, pState)	= determAttr  attr  atype.at_attribute type pState
+	  pState = warnIfStrictAnnot annot_with_pos pState
+	= (ParseOk, {at_attribute = attr, at_type = type}, pState)
+trySimpleTypeT_after_OpenToken_and_type_strictness_ignored CommaToken annot_with_pos atype attr pState
+	// TupleType
+	# (satypes, pState)	= wantSequence_SAType_warn_strictness CommaToken TypeContext pState
+	  pState			= wantToken TypeContext "tuple type" CloseToken pState
+	  satypes			= [{s_annotation=(case annot_with_pos of NoAnnot -> AN_None; StrictAnnotWithPosition _ -> AN_Strict),s_type=atype}:satypes]
+	  arity				= length satypes
+	  tuple_symbol = makeTupleTypeSymbol arity arity
+	= (ParseOk, {at_attribute = attr, at_type = TAS tuple_symbol (atypes_from_satypes satypes) (strictness_from_satypes satypes)}, pState)
+trySimpleTypeT_after_OpenToken_and_type_strictness_ignored token annot_with_pos atype attr pState
 	= (ParseFailWithError, atype, parseError "Simple type" (Yes token) "')' or ','" pState)
 
 instance try BasicType
