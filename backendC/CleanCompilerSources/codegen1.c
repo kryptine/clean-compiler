@@ -2078,6 +2078,7 @@ int generate_instance_entry (struct symbol_def *rule_sdef,struct state *function
 
 			DetermineSizeOfState (function_state_p[-1],&result_asize,&result_bsize);
 			GenOStackLayoutOfState (result_asize,result_bsize,function_state_p[-1]);
+			function_called_only_curried_or_lazy_with_one_return = 0;
 			RedirectResultAndReturn (result_asize,result_bsize,result_asize,result_bsize,function_state_p[-1],member_state_p[-2],result_asize,result_bsize);
 		}
 
