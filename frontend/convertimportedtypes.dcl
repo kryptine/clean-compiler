@@ -1,6 +1,6 @@
 definition module convertimportedtypes
 
-import syntax, transform, trans
+import syntax
 
 convertIclModule :: !Int !{# CommonDefs} !*{#{# CheckedTypeDef}} !ImportedConstructors !*VarHeap !*TypeHeaps
 									 -> (!*{#{# CheckedTypeDef}},!ImportedConstructors,!*VarHeap,!*TypeHeaps)
