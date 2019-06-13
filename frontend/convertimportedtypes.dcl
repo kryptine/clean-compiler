@@ -8,8 +8,6 @@ convertIclModule :: !Int !{# CommonDefs} !*{#{# CheckedTypeDef}} !ImportedConstr
 convertDclModule :: !Int !{# DclModule} !{# CommonDefs} !*{#{# CheckedTypeDef}} !ImportedConstructors !*VarHeap !*TypeHeaps
 													-> (!*{#{# CheckedTypeDef}},!ImportedConstructors,!*VarHeap,!*TypeHeaps)
 
-convertMemberTypes :: !Int !{#DclModule} !{#CommonDefs} !NumberSet !*{#{#CheckedTypeDef}} !ImportedConstructors !*VarHeap !*TypeHeaps
-															   -> (!*{#{#CheckedTypeDef}},!ImportedConstructors,!*VarHeap,!*TypeHeaps)
-
-convertImportedTypeSpecifications :: !Int !{# DclModule}  !{# {# FunType} } !{# CommonDefs} !ImportedConstructors !ImportedFunctions
-	!*{# {#CheckedTypeDef}} !*TypeHeaps !*VarHeap -> (!*{#{#CheckedTypeDef}}, !*TypeHeaps, !*VarHeap)
+convertMemberTypesAndImportedTypeSpecifications
+	:: !Int !NumberSet !{#DclModule} !{#{#FunType}} !{#CommonDefs} !ImportedConstructors !ImportedFunctions !*{#{#CheckedTypeDef}}
+		!*TypeHeaps !*VarHeap -> (!*TypeHeaps, !*VarHeap)

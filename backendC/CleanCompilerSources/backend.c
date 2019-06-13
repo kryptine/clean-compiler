@@ -2981,24 +2981,28 @@ BEExportField (int isDictionaryField, int fieldIndex)
 	iclDef	= fieldSymbol->symb_def;
 	iclDef->sdef_exported	= True;
 
-	if (isDictionaryField)
-		dclDef	= iclDef;
-	else
-	{
+	if (isDictionaryField){
+		dclDef = gBEState.be_icl.beicl_dcl_module.bem_fields[fieldIndex].symb_def;
+		if (dclDef->sdef_mark & SDEF_FIELD_HAS_MEMBER_TYPE){
+			iclDef->sdef_mark |= SDEF_FIELD_HAS_MEMBER_TYPE;
+			iclDef->sdef_member_type_of_field = dclDef->sdef_member_type_of_field;
+			iclDef->sdef_member_states_of_field = NULL;
+		}
+
+		dclDef = iclDef;
+	} else {
 		dclModule	= &gBEState.be_icl.beicl_dcl_module;
 	
 		Assert ((unsigned int) fieldIndex < dclModule->bem_nFields);
 		fieldSymbol	= &dclModule->bem_fields [fieldIndex];
 		Assert (fieldSymbol->symb_kind == definition);
 		dclDef	= fieldSymbol->symb_def;
-	}
 
-	Assert (strcmp (iclDef->sdef_name, dclDef->sdef_name) == 0);
+		Assert (strcmp (iclDef->sdef_name, dclDef->sdef_name) == 0);
+	}
 
 	iclDef->sdef_dcl_icl	= dclDef;
 	dclDef->sdef_dcl_icl	= iclDef;
-
-	iclDef->sdef_exported = True;
 } /* BEExportField */
 
 void

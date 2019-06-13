@@ -155,21 +155,17 @@ convert_member_types_of_class i class_members rt_fields selector_defs member_def
 														imported_types imported_conses var_heap type_heaps
 		= (imported_types,imported_conses,var_heap,type_heaps)
 
-convertImportedTypeSpecifications :: !Int !{# DclModule}  !{# {# FunType} } !{# CommonDefs} !ImportedConstructors !ImportedFunctions
-	!*{# {#CheckedTypeDef}} !*TypeHeaps !*VarHeap -> (!*{#{#CheckedTypeDef}}, !*TypeHeaps, !*VarHeap)
-convertImportedTypeSpecifications main_dcl_module_n dcl_mods dcl_functions common_defs imported_conses imported_functions imported_types type_heaps var_heap
+make_abstract_types_in_implementation_module_abstract :: !Int !{#DclModule} !*{#{#CheckedTypeDef}} -> *{#{#CheckedTypeDef}}
+make_abstract_types_in_implementation_module_abstract main_dcl_module_n dcl_mods imported_types
 	# {dcl_common={com_type_defs},dcl_has_macro_conversions} = dcl_mods.[main_dcl_module_n]
 	| dcl_has_macro_conversions
 		# abstract_type_indexes = iFoldSt (determine_abstract_type com_type_defs) 0 (size com_type_defs) []
 		| isEmpty abstract_type_indexes
-			= convert_imported_type_specs dcl_functions common_defs imported_conses imported_functions imported_types type_heaps var_heap
+			= imported_types
 			#!(icl_type_defs, imported_types) = imported_types![main_dcl_module_n]
 			  type_defs = foldSt insert_abstract_type abstract_type_indexes { icl_type_def \\ icl_type_def <-: icl_type_defs }
-			  (imported_types, type_heaps, var_heap)
-			  		= convert_imported_type_specs dcl_functions common_defs imported_conses imported_functions
-						{ imported_types & [main_dcl_module_n] = type_defs } type_heaps var_heap
-			= ({ imported_types & [main_dcl_module_n] = icl_type_defs }, type_heaps, var_heap)
-		= convert_imported_type_specs dcl_functions common_defs imported_conses imported_functions imported_types type_heaps var_heap
+			= {imported_types & [main_dcl_module_n] = type_defs}
+		= imported_types
 where
 	determine_abstract_type dcl_type_defs type_index abstract_type_indexes
 		# {td_rhs} = dcl_type_defs.[type_index]
@@ -178,12 +174,22 @@ where
 				-> [type_index : abstract_type_indexes]
 			_
 				-> abstract_type_indexes
-					
+
 	insert_abstract_type type_index type_defs
 		# icl_index=type_index
 		# (type_def, type_defs) = type_defs![icl_index]
 		= { type_defs & [icl_index] = { type_def & td_rhs = AbstractType cAllBitsClear }}
 
+convertMemberTypesAndImportedTypeSpecifications
+	:: !Int !NumberSet !{#DclModule} !{#{#FunType}} !{#CommonDefs} !ImportedConstructors !ImportedFunctions !*{#{#CheckedTypeDef}}
+		!*TypeHeaps !*VarHeap -> (!*TypeHeaps, !*VarHeap)
+convertMemberTypesAndImportedTypeSpecifications main_dcl_module_n used_module_numbers dcl_mods dcl_functions common_defs imported_conses imported_functions imported_types
+		type_heaps var_heap
+	# imported_types = make_abstract_types_in_implementation_module_abstract main_dcl_module_n dcl_mods imported_types;
+	# (imported_types,imported_conses,var_heap,type_heaps)
+		= convertMemberTypes main_dcl_module_n dcl_mods common_defs used_module_numbers imported_types imported_conses var_heap type_heaps
+	= convert_imported_type_specs dcl_functions common_defs imported_conses imported_functions imported_types type_heaps var_heap
+where
 	convert_imported_type_specs dcl_functions common_defs imported_conses imported_functions imported_types type_heaps var_heap
 		# (imported_types, imported_conses, type_heaps, var_heap)
 				= foldSt (convert_imported_function dcl_functions common_defs) imported_functions (imported_types, imported_conses, type_heaps, var_heap)
@@ -194,9 +200,9 @@ where
 		  (ft_type, imported_types, imported_conses, type_heaps, var_heap)
 				= convertSymbolType cDontRemoveAnnotations common_defs ft_type main_dcl_module_n imported_types imported_conses type_heaps var_heap
 		= (imported_types, imported_conses, type_heaps, var_heap <:= (ft_type_ptr, VI_ExpandedType ft_type))
-			
+
 	convert_imported_constructors common_defs [] imported_types type_heaps var_heap
-		= (imported_types, type_heaps, var_heap)
+		= (type_heaps, var_heap)
 	convert_imported_constructors common_defs [ {glob_module, glob_object} : conses ] imported_types type_heaps var_heap 
 		#!{com_cons_defs,com_selector_defs} = common_defs.[glob_module]
 		  {cons_type_ptr,cons_type,cons_type_index,cons_ident} = common_defs.[glob_module].com_cons_defs.[glob_object]
