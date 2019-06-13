@@ -246,11 +246,9 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 	  		= convertCasesOfFunctions components main_dcl_module_n imported_funs common_defs fun_defs dcl_types used_conses
 					var_heap type_heaps expression_heap
 
-	# (dcl_types,used_conses,var_heap,type_heaps)
-		= convertMemberTypes main_dcl_module_n dcl_mods common_defs icl_used_module_numbers dcl_types used_conses var_heap type_heaps
-
-	#!  (dcl_types, type_heaps, var_heap)
-			= convertImportedTypeSpecifications main_dcl_module_n dcl_mods imported_funs common_defs used_conses used_funs dcl_types type_heaps var_heap		
+	#! (type_heaps, var_heap)
+		= convertMemberTypesAndImportedTypeSpecifications main_dcl_module_n icl_used_module_numbers dcl_mods imported_funs common_defs used_conses used_funs dcl_types
+															type_heaps var_heap
 //	# (components, fun_defs, error)	= showTypes components 0 fun_defs error
 //	# (dcl_mods, out) = showDclModules dcl_mods out
 //	# (components, fun_defs, out) = showComponents components 0 False fun_defs out
