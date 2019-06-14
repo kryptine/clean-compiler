@@ -126,6 +126,8 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 	| not error_admin.ea_ok
 		= (No,{},dcl_mods,main_dcl_module_n,predef_symbols, hash_table, files, error_admin.ea_file, io, out, tcl_file, heaps)
 
+	#! start_index_generic_classes = size icl_common.com_class_defs;
+
 	# (saved_main_dcl_common, ti_common_defs) = replace {#dcl_common \\ {dcl_common}<-:dcl_mods} main_dcl_module_n icl_common
 
 	#! (ti_common_defs, groups, fun_defs, td_infos, heaps, hash_table, predef_symbols, dcl_mods, cached_dcl_macros, error_admin)
@@ -239,13 +241,17 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 		=	frontSyntaxTree cached_dcl_macros cached_dcl_mods main_dcl_module_n
 							predef_symbols hash_table files error io out tcl_file icl_mod dcl_mods fun_defs components array_instances heaps
 
-	# (dcl_types,used_conses,var_heap,type_heaps) = convertIclModule main_dcl_module_n common_defs dcl_types used_conses var_heap type_heaps
+	# generic_heap = heaps.hp_generic_heap
+	#! first_not_exported_generic_def_index = size dcl_mods.[main_dcl_module_n].dcl_common.com_generic_defs;
+	# (dcl_types,used_conses,var_heap,type_heaps,generic_heap)
+		= convertIclModule main_dcl_module_n start_index_generic_classes first_not_exported_generic_def_index common_defs dcl_types used_conses
+			var_heap type_heaps generic_heap
 	# (dcl_types,used_conses,var_heap,type_heaps) = convertDclModule main_dcl_module_n dcl_mods common_defs dcl_types used_conses var_heap type_heaps
 
 //	  (components, fun_defs, out) = showComponents components 0 False fun_defs out
 
 	| options.feo_up_to_phase == FrontEndPhaseConvertModules
-		# heaps = {hp_var_heap=var_heap, hp_type_heaps=type_heaps, hp_expression_heap=expression_heap,hp_generic_heap=heaps.hp_generic_heap}
+		# heaps = {hp_var_heap=var_heap, hp_type_heaps=type_heaps, hp_expression_heap=expression_heap,hp_generic_heap=generic_heap}
 		=	frontSyntaxTree cached_dcl_macros cached_dcl_mods main_dcl_module_n
 							predef_symbols hash_table files error io out tcl_file icl_mod dcl_mods fun_defs components array_instances heaps
 
@@ -255,8 +261,8 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 					var_heap type_heaps expression_heap
 
 	#! (type_heaps, var_heap)
-		= convertMemberTypesAndImportedTypeSpecifications main_dcl_module_n icl_used_module_numbers dcl_mods imported_funs common_defs used_conses used_funs dcl_types
-															type_heaps var_heap
+		= convertMemberTypesAndImportedTypeSpecifications main_dcl_module_n start_index_generic_classes icl_used_module_numbers
+			dcl_mods imported_funs common_defs used_conses used_funs dcl_types type_heaps var_heap
 //	# (components, fun_defs, error)	= showTypes components 0 fun_defs error
 //	# (dcl_mods, out) = showDclModules dcl_mods out
 //	# (components, fun_defs, out) = showComponents components 0 False fun_defs out
@@ -269,7 +275,7 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 		= abort "";
 */
 
-	# heaps = {hp_var_heap = var_heap, hp_expression_heap=expression_heap, hp_type_heaps=type_heaps,hp_generic_heap=heaps.hp_generic_heap}
+	# heaps = {hp_var_heap = var_heap, hp_expression_heap=expression_heap, hp_type_heaps=type_heaps,hp_generic_heap=generic_heap}
 	# 	fe ={	fe_icl = {icl_functions=fun_defs, icl_function_indices=icl_function_indices, icl_common=icl_common,
 						 icl_imported_instances=icl_imported_instances, icl_imported_objects=icl_imported_objects,
 						 icl_foreign_exports=icl_foreign_exports,icl_name=icl_name,icl_used_module_numbers=icl_used_module_numbers,
