@@ -12,11 +12,17 @@ from partition import ::Component(..),::ComponentMembers
 		,	feo_generics 			:: !Bool
 		}
 
+:: InstanceAndClassInfo
+	=	{	iaci_array_and_list_instances :: !ArrayAndListInstances
+		,	iaci_start_index_generic_classes :: !Int
+		,	iaci_not_exported_generic_classes :: !{#Bool}
+		}
+
 :: FrontEndSyntaxTree
 	=	{	fe_icl					:: !IclModule
 		,	fe_dcls					:: !{#DclModule}
 		,	fe_components			:: !{!Component}
-		,	fe_arrayInstances		:: !ArrayAndListInstances
+		,	fe_iaci					:: !InstanceAndClassInfo
 		}
 
 :: FrontEndPhase

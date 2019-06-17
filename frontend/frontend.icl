@@ -13,7 +13,10 @@ frontSyntaxTree cached_dcl_macros cached_dcl_mods main_dcl_module_n predef_symbo
 				fe_icl = {icl_mod & icl_functions=fun_defs }
 			,	fe_dcls = dcl_mods
 			,	fe_components = components
-			,	fe_arrayInstances = array_instances
+			,	fe_iaci = {	iaci_array_and_list_instances = array_instances,
+							iaci_start_index_generic_classes = 0,
+							iaci_not_exported_generic_classes = {}
+						  }
 			},cached_dcl_macros,cached_dcl_mods,main_dcl_module_n,predef_symbols,hash_table,files,error,io,out,tcl_file,heaps
 		)
 
@@ -235,7 +238,7 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 
 	# generic_heap = heaps.hp_generic_heap
 	#! first_not_exported_generic_def_index = size dcl_mods.[main_dcl_module_n].dcl_common.com_generic_defs;
-	# (dcl_types,used_conses,var_heap,type_heaps,generic_heap)
+	# (not_exported_generic_classes,dcl_types,used_conses,var_heap,type_heaps,generic_heap)
 		= convertIclModule main_dcl_module_n start_index_generic_classes first_not_exported_generic_def_index common_defs dcl_types used_conses
 			var_heap type_heaps generic_heap
 	# (dcl_types,used_conses,var_heap,type_heaps) = convertDclModule main_dcl_module_n dcl_mods common_defs dcl_types used_conses var_heap type_heaps
@@ -276,7 +279,10 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 						 icl_modification_time=icl_mod.icl_modification_time }
 			,	fe_dcls = dcl_mods
 			,	fe_components = components
-			,	fe_arrayInstances = array_instances
+			,	fe_iaci = {	iaci_array_and_list_instances = array_instances,
+							iaci_start_index_generic_classes = start_index_generic_classes,
+							iaci_not_exported_generic_classes = not_exported_generic_classes
+						  }
 			}
 
 	# cached_dcl_macros = clear_group_indices_of_macros cached_dcl_macros

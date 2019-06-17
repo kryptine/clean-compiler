@@ -266,7 +266,11 @@ backEndConvertModulesH predefs {fe_icl =
 	fe_icl =: {	icl_name, icl_functions, icl_common,
 				icl_function_indices = {ifi_type_function_indices,ifi_global_function_indices},
 				icl_imported_objects, icl_foreign_exports, icl_used_module_numbers, icl_modification_time},
-	fe_components, fe_dcls, fe_arrayInstances}
+	fe_components, fe_dcls,
+	fe_iaci = { iaci_array_and_list_instances
+				= {ali_array_first_instance_indices,ali_list_first_instance_indices,ali_tail_strict_list_first_instance_indices},
+				iaci_start_index_generic_classes, iaci_not_exported_generic_classes }
+	}
 	main_dcl_module_n type_var_heap backEnd
 	// sanity check ...
 //	| cIclModIndex <> kIclModuleIndex || cPredefinedModuleIndex <> kPredefinedModuleIndex
@@ -281,13 +285,13 @@ backEndConvertModulesH predefs {fe_icl =
 	#  currentDcl
 	   	=	fe_dcls.[main_dcl_module_n]
 	#! backEnd
-		=	declareCurrentDclModule fe_icl fe_dcls.[main_dcl_module_n] main_dcl_module_n (backEnd -*-> "declareCurrentDclModule")
+		=	declareCurrentDclModule fe_icl fe_dcls.[main_dcl_module_n] main_dcl_module_n backEnd
 	#! backEnd
-		=	declareOtherDclModules fe_dcls main_dcl_module_n icl_used_module_numbers (backEnd -*-> "declareOtherDclModules")
+		=	declareOtherDclModules fe_dcls main_dcl_module_n icl_used_module_numbers backEnd
 
 // tempory hack
 	#! backEnd
-		=	declareDynamicTemp predefs (backEnd -*-> "declareDynamicTemp")
+		=	declareDynamicTemp predefs backEnd
 
 	#! (type_var_heap,backEnd)
 		=	defineDclModule main_dcl_module_n fe_dcls.[main_dcl_module_n] type_var_heap backEnd
@@ -302,15 +306,15 @@ backEndConvertModulesH predefs {fe_icl =
 	#! (type_var_heap,backEnd)
 		=	declare_icl_common_defs main_dcl_module_n icl_common currentDcl.dcl_common type_var_heap backEnd
 	#! backEnd
-		=	declareArrayInstances fe_arrayInstances.ali_array_first_instance_indices predefs main_dcl_module_n icl_functions fe_dcls backEnd
+		=	declareArrayInstances ali_array_first_instance_indices predefs main_dcl_module_n icl_functions fe_dcls backEnd
 	#! backEnd
-		=	declareListInstances fe_arrayInstances.ali_list_first_instance_indices PD_UListClass predefs main_dcl_module_n icl_functions fe_dcls backEnd
+		=	declareListInstances ali_list_first_instance_indices PD_UListClass predefs main_dcl_module_n icl_functions fe_dcls backEnd
 	#! backEnd
-		=	declareListInstances fe_arrayInstances.ali_tail_strict_list_first_instance_indices PD_UTSListClass predefs main_dcl_module_n icl_functions fe_dcls backEnd
+		=	declareListInstances ali_tail_strict_list_first_instance_indices PD_UTSListClass predefs main_dcl_module_n icl_functions fe_dcls backEnd
 	#! backEnd
-		=	adjustArrayFunctions fe_arrayInstances.ali_array_first_instance_indices predefs main_dcl_module_n icl_functions fe_dcls icl_common.com_instance_defs icl_used_module_numbers backEnd
+		=	adjustArrayFunctions ali_array_first_instance_indices predefs main_dcl_module_n icl_functions fe_dcls icl_common.com_instance_defs icl_used_module_numbers backEnd
 	#! backEnd
-		=	adjustStrictListFunctions fe_arrayInstances.ali_list_first_instance_indices fe_arrayInstances.ali_tail_strict_list_first_instance_indices predefs fe_dcls icl_used_module_numbers main_dcl_module_n backEnd;
+		=	adjustStrictListFunctions ali_list_first_instance_indices ali_tail_strict_list_first_instance_indices predefs fe_dcls icl_used_module_numbers main_dcl_module_n backEnd
 	#! (rules, backEnd)
 		=	convertRules [(index, icl_functions.[index]) \\ (_, index) <- functionIndices] main_dcl_module_n predefined_idents.[PD_DummyForStrictAliasFun] (backEnd -*-> "convertRules")
 	# backEnd
@@ -1447,7 +1451,7 @@ convertTypeNode (TFA vars type) annotation attribution
 	=	convertTypeNode type annotation attribution
 convertTypeNode (TFAC vars type contexts) annotation attribution
 	=	convertTypeNode type annotation attribution
-convertTypeNode (TGenericFunctionInDictionary gds type_kind generic_dict=:{gi_module,gi_index}) annotation attribution
+convertTypeNode (TGenericFunctionInDictionary gds type_kind {gi_module,gi_index}) annotation attribution
 	=	beFunction2 (BESymbolTypeNode annotation attribution) (beTypeSymbol gi_index gi_module) beNoTypeArgs
 convertTypeNode typeNode annotation attribution
 	=	abort "convertTypeNode"  // <<- ("backendconvert, convertTypeNode: unknown type node", typeNode)
