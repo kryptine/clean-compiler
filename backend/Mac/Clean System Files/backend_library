@@ -15,6 +15,7 @@ BEFunctionSymbol
 BEConstructorSymbol
 BEFieldSymbol
 BETypeSymbol
+BEExternalTypeSymbol
 BEDontCareDefinitionSymbol
 BEBoolSymbol
 BELiteralSymbol
