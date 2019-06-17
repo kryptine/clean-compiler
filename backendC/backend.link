@@ -15,6 +15,7 @@
 /EXPORT: BEFieldSymbol
 /EXPORT: BETypeSymbol
 /EXPORT: BETypeSymbolNoMark
+/EXPORT: BEExternalTypeSymbol
 /EXPORT: BEDontCareDefinitionSymbol
 /EXPORT: BEBoolSymbol
 /EXPORT: BELiteralSymbol

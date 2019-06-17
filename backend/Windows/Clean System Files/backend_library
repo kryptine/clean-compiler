@@ -15,6 +15,7 @@ BEConstructorSymbol
 BEFieldSymbol
 BETypeSymbol
 BETypeSymbolNoMark
+BEExternalTypeSymbol
 BEDontCareDefinitionSymbol
 BEBoolSymbol
 BELiteralSymbol

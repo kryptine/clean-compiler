@@ -205,6 +205,9 @@ Clean (BETypeSymbol :: Int Int BackEnd -> (BESymbolP, BackEnd))
 BESymbolP BETypeSymbolNoMark (int typeIndex, int moduleIndex);
 Clean (BETypeSymbolNoMark :: Int Int BackEnd -> (BESymbolP, BackEnd))
 
+BESymbolP BEExternalTypeSymbol (int typeIndex, int moduleIndex);
+Clean (BEExternalTypeSymbol :: Int Int BackEnd -> (BESymbolP, BackEnd))
+
 BESymbolP BEDontCareDefinitionSymbol (void);
 Clean (BEDontCareDefinitionSymbol :: BackEnd -> (BESymbolP, BackEnd))
 

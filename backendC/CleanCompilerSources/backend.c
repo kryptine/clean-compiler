@@ -881,6 +881,25 @@ BESymbolP BETypeSymbolNoMark (int typeIndex, int moduleIndex)
 }
 
 BESymbolP
+BEExternalTypeSymbol (int typeIndex, int moduleIndex)
+{
+	SymbolP	typeSymbol;
+
+	if (moduleIndex==main_dcl_module_n){
+		typeSymbol = &gBEState.be_modules[moduleIndex].bem_types[typeIndex];
+		typeSymbol->symb_def->sdef_isused = True;
+
+		if (typeIndex < gBEState.be_icl.beicl_dcl_module.bem_nTypes){
+			typeSymbol = &gBEState.be_icl.beicl_dcl_module.bem_types[typeIndex];
+			typeSymbol->symb_def->sdef_isused = True;
+		}
+	} else
+		typeSymbol = &gBEState.be_modules[moduleIndex].bem_types[typeIndex];
+
+	return typeSymbol;
+}
+
+BESymbolP
 BEDontCareDefinitionSymbol (void)
 {
 	SymbolP	symbol;
