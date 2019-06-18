@@ -307,7 +307,7 @@ backEndConvertModulesH predefs {fe_icl =
 		=	declareFunctionSymbols icl_functions functionIndices
 				(ifi_type_function_indices ++ ifi_global_function_indices) (backEnd -*-> "declareFunctionSymbols")
 	#! (type_var_heap,backEnd)
-		=	declare_icl_common_defs main_dcl_module_n iaci_start_index_generic_classes iaci_not_exported_generic_classes icl_common currentDcl.dcl_common type_var_heap backEnd
+		=	declare_icl_common_defs main_dcl_module_n iaci_start_index_generic_classes iaci_not_exported_generic_classes icl_common currentDcl.dcl_common currentDcl.dcl_module_kind type_var_heap backEnd
 	#! backEnd
 		=	declareArrayInstances ali_array_first_instance_indices predefs main_dcl_module_n icl_functions fe_dcls backEnd
 	#! backEnd
@@ -649,12 +649,11 @@ declareListInstances array_first_instance_indices predef_list_class_index predef
 			=	beDeclareRuleType index main_dcl_module_n (id_name +++ ";" +++ toString index)
 			o`	beDefineRuleType index main_dcl_module_n (convertTypeAlt index main_dcl_module_n type)
 
-declare_icl_common_defs :: ModuleIndex !Int !{#Bool} CommonDefs CommonDefs !*TypeVarHeap !*BackEndState -> (!*TypeVarHeap,!*BackEndState)
+declare_icl_common_defs :: ModuleIndex !Int !{#Bool} CommonDefs CommonDefs !ModuleKind !*TypeVarHeap !*BackEndState -> (!*TypeVarHeap,!*BackEndState)
 declare_icl_common_defs moduleIndex start_index_generic_classes not_exported_generic_classes
-		{com_cons_defs,com_type_defs,com_selector_defs,com_class_defs,com_member_defs} dcl_common_defs type_var_heap bes
+		{com_cons_defs,com_type_defs,com_selector_defs,com_class_defs,com_member_defs} dcl_common_defs dcl_module_kind type_var_heap bes
 	# n_dcl_type_defs = size dcl_common_defs.com_type_defs
 	  n_dcl_class_defs = size dcl_common_defs.com_class_defs
-	  n_generic_classes = size not_exported_generic_classes
 	  n_type_defs = size com_type_defs
 	  n_class_defs = size com_class_defs
 	  first_exported_dictionary_i = n_dcl_type_defs-n_dcl_class_defs
@@ -667,12 +666,16 @@ declare_icl_common_defs moduleIndex start_index_generic_classes not_exported_gen
 									com_cons_defs com_selector_defs com_type_defs com_class_defs com_member_defs type_var_heap bes
 	  (type_var_heap,bes)
 		= defineTypes n_dcl_type_defs first_local_dictionary_i moduleIndex com_cons_defs com_selector_defs com_type_defs type_var_heap bes
-	  start_index_generic_class_types = n_type_defs-n_generic_classes
-	  (type_var_heap,bes)
-		= define_dictionary_types first_local_dictionary_i n_dcl_class_defs start_index_generic_class_types moduleIndex
-									com_cons_defs com_selector_defs com_type_defs com_class_defs com_member_defs type_var_heap bes
-	= define_generic_dictionary_types 0 start_index_generic_classes start_index_generic_class_types not_exported_generic_classes moduleIndex
-									com_cons_defs com_selector_defs com_type_defs com_class_defs com_member_defs type_var_heap bes
+	| dcl_module_kind=:MK_None
+		= define_dictionary_types first_local_dictionary_i n_dcl_class_defs n_type_defs moduleIndex
+										com_cons_defs com_selector_defs com_type_defs com_class_defs com_member_defs type_var_heap bes
+		# n_generic_classes = size not_exported_generic_classes
+		  start_index_generic_class_types = n_type_defs-n_generic_classes
+		  (type_var_heap,bes)
+			= define_dictionary_types first_local_dictionary_i n_dcl_class_defs start_index_generic_class_types moduleIndex
+										com_cons_defs com_selector_defs com_type_defs com_class_defs com_member_defs type_var_heap bes
+		= define_generic_dictionary_types 0 start_index_generic_classes start_index_generic_class_types not_exported_generic_classes moduleIndex
+										com_cons_defs com_selector_defs com_type_defs com_class_defs com_member_defs type_var_heap bes
 
 declare_dcl_common_defs :: ModuleIndex CommonDefs !*TypeVarHeap !*BackEndState -> (!*TypeVarHeap,!*BackEndState)
 declare_dcl_common_defs moduleIndex {com_cons_defs,com_type_defs,com_selector_defs,com_class_defs,com_member_defs} type_var_heap bes
