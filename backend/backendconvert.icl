@@ -28,7 +28,7 @@ sfoldr op r l s
 ::	FunctionPattern	= FP_Algebraic !(Global DefinedSymbol) ![FunctionPattern]
 					| FP_Variable !FreeVar
 
-:: BEMonad a :== *BackEndState -> *(!a,!*BackEndState)
+:: BEMonad a :== *BackEndState -> *(a,*BackEndState)
 :: BackEnder :== *BackEndState -> *BackEndState
 
 //
@@ -167,6 +167,8 @@ beTypeSymbol typeIndex moduleIndex
 	:==	beFunction0 (BETypeSymbol typeIndex moduleIndex)
 beTypeSymbolNoMark typeIndex moduleIndex
 	:==	beFunction0 (BETypeSymbolNoMark typeIndex moduleIndex)
+beExternalTypeSymbol typeIndex moduleIndex
+	:==	beFunction0 (BEExternalTypeSymbol typeIndex moduleIndex)
 beBasicSymbol symbolIndex
 	:==	beFunction0 (BEBasicSymbol symbolIndex)
 beDontCareDefinitionSymbol
@@ -300,12 +302,12 @@ backEndConvertModulesH predefs {fe_icl =
 		=	defineOtherDclModules fe_dcls main_dcl_module_n icl_used_module_numbers type_var_heap backEnd
 
 	#! backEnd
-		=	appBackEnd (BEDeclareIclModule icl_name.id_name icl_modification_time (size icl_functions) (size icl_common.com_type_defs) (size icl_common.com_cons_defs) (size icl_common.com_selector_defs)) (backEnd -*-> "BEDeclareIclModule")
+		=	appBackEnd (BEDeclareIclModule icl_name.id_name icl_modification_time (size icl_functions) (size icl_common.com_type_defs) (size icl_common.com_cons_defs) (size icl_common.com_selector_defs)) backEnd
 	#! backEnd
 		=	declareFunctionSymbols icl_functions functionIndices
 				(ifi_type_function_indices ++ ifi_global_function_indices) (backEnd -*-> "declareFunctionSymbols")
 	#! (type_var_heap,backEnd)
-		=	declare_icl_common_defs main_dcl_module_n icl_common currentDcl.dcl_common type_var_heap backEnd
+		=	declare_icl_common_defs main_dcl_module_n iaci_start_index_generic_classes iaci_not_exported_generic_classes icl_common currentDcl.dcl_common type_var_heap backEnd
 	#! backEnd
 		=	declareArrayInstances ali_array_first_instance_indices predefs main_dcl_module_n icl_functions fe_dcls backEnd
 	#! backEnd
@@ -647,10 +649,12 @@ declareListInstances array_first_instance_indices predef_list_class_index predef
 			=	beDeclareRuleType index main_dcl_module_n (id_name +++ ";" +++ toString index)
 			o`	beDefineRuleType index main_dcl_module_n (convertTypeAlt index main_dcl_module_n type)
 
-declare_icl_common_defs :: ModuleIndex CommonDefs CommonDefs !*TypeVarHeap !*BackEndState -> (!*TypeVarHeap,!*BackEndState)
-declare_icl_common_defs moduleIndex {com_cons_defs,com_type_defs,com_selector_defs,com_class_defs,com_member_defs} dcl_common_defs type_var_heap bes
+declare_icl_common_defs :: ModuleIndex !Int !{#Bool} CommonDefs CommonDefs !*TypeVarHeap !*BackEndState -> (!*TypeVarHeap,!*BackEndState)
+declare_icl_common_defs moduleIndex start_index_generic_classes not_exported_generic_classes
+		{com_cons_defs,com_type_defs,com_selector_defs,com_class_defs,com_member_defs} dcl_common_defs type_var_heap bes
 	# n_dcl_type_defs = size dcl_common_defs.com_type_defs
 	  n_dcl_class_defs = size dcl_common_defs.com_class_defs
+	  n_generic_classes = size not_exported_generic_classes
 	  n_type_defs = size com_type_defs
 	  n_class_defs = size com_class_defs
 	  first_exported_dictionary_i = n_dcl_type_defs-n_dcl_class_defs
@@ -663,8 +667,12 @@ declare_icl_common_defs moduleIndex {com_cons_defs,com_type_defs,com_selector_de
 									com_cons_defs com_selector_defs com_type_defs com_class_defs com_member_defs type_var_heap bes
 	  (type_var_heap,bes)
 		= defineTypes n_dcl_type_defs first_local_dictionary_i moduleIndex com_cons_defs com_selector_defs com_type_defs type_var_heap bes
-	= define_dictionary_types first_local_dictionary_i n_dcl_class_defs n_type_defs moduleIndex
-								com_cons_defs com_selector_defs com_type_defs com_class_defs com_member_defs type_var_heap bes
+	  start_index_generic_class_types = n_type_defs-n_generic_classes
+	  (type_var_heap,bes)
+		= define_dictionary_types first_local_dictionary_i n_dcl_class_defs start_index_generic_class_types moduleIndex
+									com_cons_defs com_selector_defs com_type_defs com_class_defs com_member_defs type_var_heap bes
+	= define_generic_dictionary_types 0 start_index_generic_classes start_index_generic_class_types not_exported_generic_classes moduleIndex
+									com_cons_defs com_selector_defs com_type_defs com_class_defs com_member_defs type_var_heap bes
 
 declare_dcl_common_defs :: ModuleIndex CommonDefs !*TypeVarHeap !*BackEndState -> (!*TypeVarHeap,!*BackEndState)
 declare_dcl_common_defs moduleIndex {com_cons_defs,com_type_defs,com_selector_defs,com_class_defs,com_member_defs} type_var_heap bes
@@ -720,6 +728,20 @@ define_dictionary_types type_i class_i type_i_stop moduleIndex constructors sele
 		# (type_var_heap,bes)
 			= define_dictionary_type moduleIndex constructors selectors type_i types.[type_i] class_defs.[class_i] member_defs type_var_heap bes
 		= define_dictionary_types (type_i+1) (class_i+1) type_i_stop moduleIndex constructors selectors types class_defs member_defs type_var_heap bes
+		= (type_var_heap,bes)
+
+define_generic_dictionary_types :: !Int !Int !Int !{#Bool} ModuleIndex {#ConsDef} {#SelectorDef} {#CheckedTypeDef} {#ClassDef} {#MemberDef} !*TypeVarHeap !*BackEndState -> (!*TypeVarHeap,!*BackEndState)
+define_generic_dictionary_types generic_class_i start_index_generic_classes start_index_generic_class_types not_exported_generic_classes moduleIndex constructors selectors types class_defs member_defs type_var_heap bes
+	| generic_class_i<size not_exported_generic_classes
+		# class_i = start_index_generic_classes+generic_class_i
+		# type_i = start_index_generic_class_types+generic_class_i
+		| not_exported_generic_classes.[generic_class_i]
+			# (type_var_heap,bes)
+				= define_dictionary_type moduleIndex constructors selectors type_i types.[type_i] class_defs.[class_i] member_defs type_var_heap bes
+			= define_generic_dictionary_types (generic_class_i+1) start_index_generic_classes start_index_generic_class_types not_exported_generic_classes moduleIndex constructors selectors types class_defs member_defs type_var_heap bes
+			# (type_var_heap,bes)
+				= define_exported_generic_dictionary_type moduleIndex constructors selectors type_i types.[type_i] class_defs.[class_i] member_defs type_var_heap bes
+			= define_generic_dictionary_types (generic_class_i+1) start_index_generic_classes start_index_generic_class_types not_exported_generic_classes moduleIndex constructors selectors types class_defs member_defs type_var_heap bes
 		= (type_var_heap,bes)
 
 convertTypeLhs :: ModuleIndex Index TypeAttribute [ATypeVar] !*TypeVarHeap !*BackEndState
@@ -824,14 +846,34 @@ define_dictionary_type moduleIndex constructors selectors typeIndex
 	  bes = appBackEnd (BEDefineRecordType symbol_p type_attribute moduleIndex constructorIndex type_arg_p (if rt_is_boxed_record 1 0) fields) bes
 	  type_var_heap = remove_TVI_TypeVarArgN_in_args td_args type_var_heap
 	= (type_var_heap,bes)
-	where
-		constructorTypeFunction constructorDef bes
-			# (cons_type,bes) = read_from_var_heap constructorDef.cons_type_ptr bes
-			= case cons_type of
-					VI_ExpandedType expandedType
-						->	(expandedType,bes)
-					_
-						->	(constructorDef.cons_type,bes)
+
+define_exported_generic_dictionary_type :: ModuleIndex {#ConsDef} {#SelectorDef} Index CheckedTypeDef ClassDef {#MemberDef}
+						!*TypeVarHeap !*BackEndState -> (!*TypeVarHeap,!*BackEndState)
+define_exported_generic_dictionary_type moduleIndex constructors selectors typeIndex
+						{td_attribute,td_args,td_rhs=RecordType {rt_constructor,rt_fields,rt_is_boxed_record},td_fun_index}
+						{class_members} member_defs type_var_heap bes
+	# constructorIndex = rt_constructor.ds_index
+	  constructorDef = constructors.[constructorIndex]
+	  (symbol_p,type_attribute,type_var_heap,bes)
+		= if (td_fun_index<>NoIndex)
+			(convertTypeLhs moduleIndex typeIndex td_attribute td_args type_var_heap bes)
+			// define the record without marking, to prevent code generation for many unused generic dictionaries
+			(convertTypeDefToFlatType (beTypeSymbolNoMark typeIndex moduleIndex) td_attribute td_args type_var_heap bes)
+	  (fields,type_var_heap,bes)
+		= convert_exported_generic_dictionary_selectors moduleIndex selectors rt_fields (size class_members) constructorDef.cons_type.st_args_strictness member_defs type_var_heap bes
+	  (constructorType,bes) = constructorTypeFunction constructorDef bes
+	  (type_arg_p,type_var_heap,bes) = convertTypeDefAnnotatedTypeArgs constructorType.st_args constructorType.st_args_strictness type_var_heap bes
+	  bes = appBackEnd (BEDefineRecordType symbol_p type_attribute moduleIndex constructorIndex type_arg_p (if rt_is_boxed_record 1 0) fields) bes
+	  type_var_heap = remove_TVI_TypeVarArgN_in_args td_args type_var_heap
+	= (type_var_heap,bes)
+
+constructorTypeFunction constructorDef bes
+	# (cons_type,bes) = read_from_var_heap constructorDef.cons_type_ptr bes
+	= case cons_type of
+			VI_ExpandedType expandedType
+				->	(expandedType,bes)
+			_
+				->	(constructorDef.cons_type,bes)
 
 convertConstructors :: Int {#Char} ModuleIndex {#ConsDef} [DefinedSymbol] !*TypeVarHeap !*BackEndState
 												  -> (!BEConstructorListP,!*TypeVarHeap,!*BackEndState)
@@ -895,8 +937,7 @@ convertSelector moduleIndex selectorDefs is_strict {fs_index} field_list_p type_
 				_
 					->	(sd_type.st_result,bes)
 
-convert_dictionary_selectors :: ModuleIndex {#SelectorDef} {#FieldSymbol} !Int StrictnessList {#MemberDef}
-								!*TypeVarHeap !*BackEndState -> (!BEFieldListP,!*TypeVarHeap,!*BackEndState)
+convert_dictionary_selectors :: ModuleIndex {#SelectorDef} {#FieldSymbol} !Int StrictnessList {#MemberDef} !*TypeVarHeap !*BackEndState -> (!BEFieldListP,!*TypeVarHeap,!*BackEndState)
 convert_dictionary_selectors moduleIndex selectors symbols size_class_members strictness member_defs type_var_heap bes
 	= convert_dictionary_selectors 0 type_var_heap bes
 where
@@ -909,9 +950,21 @@ where
 				= convertMemberSelector moduleIndex selectors (arg_is_strict index strictness) symbols.[index] field_list_p type_var_heap bes
 				= convertSelector moduleIndex selectors (arg_is_strict index strictness) symbols.[index] field_list_p type_var_heap bes
 
+convert_exported_generic_dictionary_selectors :: ModuleIndex {#SelectorDef} {#FieldSymbol} !Int StrictnessList {#MemberDef} !*TypeVarHeap !*BackEndState -> (!BEFieldListP,!*TypeVarHeap,!*BackEndState)
+convert_exported_generic_dictionary_selectors moduleIndex selectors symbols size_class_members strictness member_defs type_var_heap bes
+	= convert_dictionary_selectors 0 type_var_heap bes
+where
+	convert_dictionary_selectors index type_var_heap bes
+		| index == size symbols
+			# (field_list_p,bes) = accBackEnd BENoFields bes
+			= (field_list_p,type_var_heap,bes)
+			# (field_list_p,type_var_heap,bes) = convert_dictionary_selectors (index+1) type_var_heap bes
+			| index<size_class_members
+				= convert_exported_generic_member_selector moduleIndex selectors (arg_is_strict index strictness) symbols.[index] field_list_p type_var_heap bes
+				= convertSelector moduleIndex selectors (arg_is_strict index strictness) symbols.[index] field_list_p type_var_heap bes
+
 convertMemberSelector :: ModuleIndex {#SelectorDef} Bool FieldSymbol !BEFieldListP !*TypeVarHeap !*BackEndState -> (!BEFieldListP,!*TypeVarHeap,!*BackEndState)
 convertMemberSelector moduleIndex selectorDefs is_strict {fs_index} field_list_p type_var_heap bes
-//convertMemberSelector moduleIndex selectorDefs is_strict {fs_index,fs_ident} type_var_heap bes
 	# selectorDef = selectorDefs.[fs_index]
 	  (field_type,optional_type_alt_p,bes) = selectorTypeFunction selectorDef bes
 	  (field_type,type_var_heap,bes) = convertTypeDefAnnotAndTypeNode (if is_strict AN_Strict AN_None) field_type type_var_heap bes
@@ -935,6 +988,35 @@ convertMemberSelector moduleIndex selectorDefs is_strict {fs_index} field_list_p
 				VI_ExpandedMemberType expanded_member_type VI_Empty
 					# (dont_care_symbol_p,bes) = accBackEnd BEDontCareDefinitionSymbol bes
 					  (type_alt_p,bes) = convertTypeAltForSymbolP dont_care_symbol_p expanded_member_type bes
+					->	(sd_type.st_result,Yes type_alt_p,bes)
+				_
+					->	(sd_type.st_result,No,bes)
+
+convert_exported_generic_member_selector :: ModuleIndex {#SelectorDef} Bool FieldSymbol !BEFieldListP !*TypeVarHeap !*BackEndState -> (!BEFieldListP,!*TypeVarHeap,!*BackEndState)
+convert_exported_generic_member_selector moduleIndex selectorDefs is_strict {fs_index} field_list_p type_var_heap bes
+	# selectorDef = selectorDefs.[fs_index]
+	  (field_type,optional_type_alt_p,bes) = selectorTypeFunction selectorDef bes
+	  (field_type,type_var_heap,bes) = convertTypeDefAnnotAndTypeNode (if is_strict AN_Strict AN_None) field_type type_var_heap bes
+	  (field_list_p,bes) = accBackEnd (BEFieldList fs_index moduleIndex selectorDef.sd_ident.id_name field_type field_list_p) bes
+	= case optional_type_alt_p of
+		No
+			-> (field_list_p,type_var_heap,bes)
+		Yes type_alt_p
+			-> (field_list_p,type_var_heap,appBackEnd (BESetMemberTypeOfField fs_index moduleIndex type_alt_p) bes)
+	where
+		selectorTypeFunction :: !SelectorDef !*BackEndState -> *(!AType,!Optional BETypeAltP,!*BackEndState)
+		selectorTypeFunction {sd_type_ptr,sd_type} bes
+			# (sd_type_in_ptr,bes) = read_from_var_heap sd_type_ptr bes
+			= case sd_type_in_ptr of
+				VI_ExpandedType {st_result}
+					->	(st_result,No,bes)
+				VI_ExpandedMemberType expanded_member_type (VI_ExpandedType {st_result})
+					# (dont_care_symbol_p,bes) = accBackEnd BEDontCareDefinitionSymbol bes
+					  (type_alt_p,bes) = convertExportedTypeAltForSymbolP dont_care_symbol_p expanded_member_type bes
+					->	(st_result,Yes type_alt_p,bes)
+				VI_ExpandedMemberType expanded_member_type VI_Empty
+					# (dont_care_symbol_p,bes) = accBackEnd BEDontCareDefinitionSymbol bes
+					  (type_alt_p,bes) = convertExportedTypeAltForSymbolP dont_care_symbol_p expanded_member_type bes
 					->	(sd_type.st_result,Yes type_alt_p,bes)
 				_
 					->	(sd_type.st_result,No,bes)
@@ -1194,7 +1276,7 @@ adjustArrayFunctions array_first_instance_indices predefs main_dcl_module_n func
 				&	[i] = backEndFunKind member.ds_index (memberIndexMapping predefs) \\ member <-: members & i <- [0..]
 				}				
 			where
-				memberIndexMapping :: PredefinedSymbols -> [(!Index, !BEArrayFunKind)]
+				memberIndexMapping :: PredefinedSymbols -> [(Index,BEArrayFunKind)]
 				memberIndexMapping predefs
 					=	[(predefs.[predefIndex].pds_def, backEndArrayFunKind) \\ (predefIndex, backEndArrayFunKind) <- predefMapping]
 					where
@@ -1209,7 +1291,7 @@ adjustArrayFunctions array_first_instance_indices predefs main_dcl_module_n func
 								,	(PD__CreateArrayFun,	BE_CreateArrayFun)
 								]
 
-				backEndFunKind :: Index [(!Index, !BEArrayFunKind)] -> BEArrayFunKind
+				backEndFunKind :: Index [(Index,BEArrayFunKind)] -> BEArrayFunKind
 				backEndFunKind memberIndex predefMapping
 					=	hd [back \\ (predefMemberIndex, back) <- predefMapping | predefMemberIndex == memberIndex]
 
@@ -1332,6 +1414,15 @@ convertTypeAltForSymbolP symbol_p symbolType
 			 accBackEnd (BESymbolTypeNode BENoAnnot BENoUniAttr symbol_p a2))
 			(convertAnnotTypeNode st_result))
 
+convertExportedTypeAltForSymbolP :: BESymbolP SymbolType -> BEMonad BETypeAltP
+convertExportedTypeAltForSymbolP symbol_p symbolType
+	=	beautifyAttributes symbolType ==> \ {st_args,st_args_strictness,st_result, st_attr_env, st_attr_vars} 
+	->	resetAttrNumbers st_attr_vars
+	o`	(beTypeAlt
+			(convertAnnotatedExternalTypeArgs st_args st_args_strictness ==> \a2 ->
+			 accBackEnd (BESymbolTypeNode BENoAnnot BENoUniAttr symbol_p a2))
+			(convertAnnotExternalTypeNode st_result))
+
 resetAttrNumbers :: [AttributeVar] *BackEndState -> *BackEndState
 resetAttrNumbers attrVars state=:{bes_attrHeap}
 	=	{	state
@@ -1414,10 +1505,20 @@ convertAnnotTypeNode {at_type, at_attribute}
 	= convertAttribution at_attribute ==> \ attribution
 	-> convertTypeNode at_type (convertAnnotation AN_None) attribution
 
+convertAnnotExternalTypeNode :: AType -> BEMonad BETypeNodeP
+convertAnnotExternalTypeNode {at_type, at_attribute}
+	= convertAttribution at_attribute ==> \ attribution
+	-> convertExternalTypeNode at_type (convertAnnotation AN_None) attribution
+
 convertAnnotAndTypeNode :: Annotation AType -> BEMonad BETypeNodeP
 convertAnnotAndTypeNode at_annotation {at_type, at_attribute}
 	= convertAttribution at_attribute ==> \ attribution
 	-> convertTypeNode at_type (convertAnnotation at_annotation) attribution
+
+convertAnnotAndExternalTypeNode :: Annotation AType -> BEMonad BETypeNodeP
+convertAnnotAndExternalTypeNode at_annotation {at_type, at_attribute}
+	= convertAttribution at_attribute ==> \ attribution
+	-> convertExternalTypeNode at_type (convertAnnotation at_annotation) attribution
 
 convertTypeNode :: Type BEAnnotation BEAttribution -> BEMonad BETypeNodeP
 convertTypeNode (TB (BT_String type)) annotation attribution
@@ -1456,6 +1557,24 @@ convertTypeNode (TGenericFunctionInDictionary gds type_kind {gi_module,gi_index}
 	=	beFunction2 (BESymbolTypeNode annotation attribution) (beTypeSymbol gi_index gi_module) beNoTypeArgs
 convertTypeNode typeNode annotation attribution
 	=	abort "convertTypeNode"  // <<- ("backendconvert, convertTypeNode: unknown type node", typeNode)
+
+convertExternalTypeNode :: Type BEAnnotation BEAttribution -> BEMonad BETypeNodeP
+convertExternalTypeNode (TA typeSymbolIdent typeArgs) annotation attribution
+	=	beFunction2 (BESymbolTypeNode annotation attribution) (convertExternalTypeSymbolIdent typeSymbolIdent) (convertExternalTypeArgs typeArgs )
+convertExternalTypeNode (TAS typeSymbolIdent typeArgs strictness) annotation attribution
+	=	beFunction2 (BESymbolTypeNode annotation attribution) (convertTypeSymbolIdent typeSymbolIdent) (convertAnnotatedExternalTypeArgs typeArgs strictness)
+convertExternalTypeNode (a --> b) annotation attribution
+	=	beFunction2 (BESymbolTypeNode annotation attribution) (beBasicSymbol BEFunType) (convertExternalTypeArgs [a, b])
+convertExternalTypeNode (TArrow1 a) annotation attribution
+	=	beFunction2 (BESymbolTypeNode annotation attribution) (beBasicSymbol BEFunType) (convertExternalTypeArgs [a])
+convertExternalTypeNode (a :@: b) annotation attribution
+	=	beFunction2 (BESymbolTypeNode annotation attribution) (beBasicSymbol BEApplySymb) (convertExternalTypeArgs [{at_attribute=TA_Multi, at_type = consVariableToType a} : b])
+convertExternalTypeNode (TFA vars type) annotation attribution
+	=	convertExternalTypeNode type annotation attribution
+convertExternalTypeNode (TFAC vars type contexts) annotation attribution
+	=	convertExternalTypeNode type annotation attribution
+convertExternalTypeNode typeNode annotation attribution
+	=	convertTypeNode typeNode annotation attribution
 
 convertTypeDefAnnotTypeNode :: AType !*TypeVarHeap !*BackEndState -> (!BETypeNodeP,!*TypeVarHeap,!*BackEndState)
 convertTypeDefAnnotTypeNode {at_type, at_attribute} type_var_heap bes
@@ -1529,7 +1648,7 @@ convertTypeDefTypeNode (TFA vars type) annotation attribution type_var_heap bes
 	= convertTypeDefTypeNode type annotation attribution type_var_heap bes
 convertTypeDefTypeNode (TFAC vars type contexts) annotation attribution type_var_heap bes
 	= convertTypeDefTypeNode type annotation attribution type_var_heap bes
-convertTypeDefTypeNode (TGenericFunctionInDictionary gds type_kind generic_dict=:{gi_module,gi_index}) annotation attribution type_var_heap bes
+convertTypeDefTypeNode (TGenericFunctionInDictionary gds type_kind {gi_module,gi_index}) annotation attribution type_var_heap bes
 	# (type_node_p,bes) = beFunction2 (BESymbolTypeNode annotation attribution) (beTypeSymbol gi_index gi_module) beNoTypeArgs bes
 	= (type_node_p,type_var_heap,bes)
 
@@ -1546,6 +1665,10 @@ consVariableToType (TempQCDV varId)
 convertTypeArgs :: [AType] -> BEMonad BETypeArgP
 convertTypeArgs args
 	=	sfoldr (beTypeArgs o convertAnnotTypeNode) beNoTypeArgs args
+
+convertExternalTypeArgs :: [AType] -> BEMonad BETypeArgP
+convertExternalTypeArgs args
+	=	sfoldr (beTypeArgs o convertAnnotExternalTypeNode) beNoTypeArgs args
 
 convertTypeDefTypeArgs :: [AType] !*TypeVarHeap !*BackEndState -> (!BETypeArgP,!*TypeVarHeap,!*BackEndState)
 convertTypeDefTypeArgs args type_var_heap bes
@@ -1569,6 +1692,15 @@ convertAnnotatedTypeArgs args strictness
 			= beNoTypeArgs
 		foldr [a:x] i
 			= (beTypeArgs o (convertAnnotAndTypeNode (arg_strictness_annotation i strictness))) a (foldr x (i+1))
+
+convertAnnotatedExternalTypeArgs :: [AType] StrictnessList -> BEMonad BETypeArgP
+convertAnnotatedExternalTypeArgs args strictness
+	= foldr args 0
+	where
+		foldr [] i
+			= beNoTypeArgs
+		foldr [a:x] i
+			= (beTypeArgs o (convertAnnotAndExternalTypeNode (arg_strictness_annotation i strictness))) a (foldr x (i+1))
 
 convertTypeDefAnnotatedTypeArgs :: [AType] StrictnessList !*TypeVarHeap !*BackEndState
 										  -> (!BETypeArgP,!*TypeVarHeap,!*BackEndState)
@@ -1836,6 +1968,10 @@ convertLiteralSymbol (BVS string)
 convertTypeSymbolIdent :: TypeSymbIdent -> BEMonad BESymbolP
 convertTypeSymbolIdent {type_index={glob_module, glob_object}}
 	=	beTypeSymbol glob_object glob_module // ->> ("convertTypeSymbolIdent", (glob_module, glob_object))
+
+convertExternalTypeSymbolIdent :: TypeSymbIdent -> BEMonad BESymbolP
+convertExternalTypeSymbolIdent {type_index={glob_module, glob_object}}
+	= beExternalTypeSymbol glob_object glob_module
 
 convertExpr :: Expression Int -> BEMonad BENodeP
 convertExpr  expr main_dcl_module_n
