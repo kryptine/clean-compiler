@@ -58,9 +58,5 @@ typedef	FILE	*File;
 # define	FPrintF		fprintf
 # define	FPutC		fputc
 # define	FPutS		fputs
-# define	FWrite		fwrite
-# define	FSeek		fseek
-# define	FTell		ftell
 # define	FGetC		fgetc
 # define	FGetS		fgets
-# define	FRead		fread

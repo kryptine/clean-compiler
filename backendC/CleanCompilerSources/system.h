@@ -50,7 +50,6 @@ extern int FDelete (char *fname, FileKind kind);
 extern int FClose (File f);
 
 extern int FPutS (char *s, File f);
-extern size_t FWrite (void *ptr, size_t size, size_t count, File f);
 #ifdef _VARARGS_
 extern int FPrintF (File f, char *fmt,...);
 #else
@@ -60,9 +59,6 @@ extern int FPrintF (); /* (File w, char *fmt,...) */
 #ifndef __ppc__
 extern char *FGetS (char *s, int n, File f);
 #endif
-extern size_t FRead (void *ptr, size_t size, size_t count, File f);
-extern int FSeek (File f, long offset, int origin);
-extern long FTell (File f);
 
 #ifdef _VARARGS_
 	extern void DoError (char *fmt,...);
