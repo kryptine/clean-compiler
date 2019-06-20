@@ -293,16 +293,6 @@ int FPrintF (File f, char *fmt, ...)
 	return n;
 }
 
-size_t FWrite (void *ptr, size_t size, size_t count, File f)
-{
-	return fwrite (ptr, size, count, (FILE *) f);
-}
-
-size_t FRead  (void *ptr, size_t size, size_t count, File f)
-{
-	return fread (ptr, size, count, (FILE *) f);
-}
-
 char *FGetS (char *s, int n, File f)
 {
 	return fgets (s, n, (FILE *) f);
@@ -311,16 +301,6 @@ char *FGetS (char *s, int n, File f)
 int FPutS (char *s, File f)
 {
 	return fputs (s, (FILE *) f);
-}
-
-int FSeek (File f, long offset, int origin)
-{
-	return fseek ((FILE *) f, offset, origin);
-}
-
-long FTell (File f)
-{
-	return ftell ((FILE *) f);
 }
 
 void DoError (char *fmt, ...)

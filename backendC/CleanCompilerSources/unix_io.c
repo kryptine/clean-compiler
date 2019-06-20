@@ -384,16 +384,6 @@ int FPrintF (File f, char *fmt, ...)
 	return n;
 }
 
-size_t FWrite (void *ptr, size_t size, size_t count, File f)
-{
-	return fwrite (ptr, size, count, (FILE *) f);
-}
-
-size_t FRead  (void *ptr, size_t size, size_t count, File f)
-{
-	return fread (ptr, size, count, (FILE *) f);
-}
-
 #ifndef FGetS
 char *FGetS (char *s, int n, File f)
 {
@@ -405,22 +395,6 @@ int FPutS (char *s, File f)
 {
 	return fputs (s, (FILE *) f);
 } /* FPutS */
-
-
-/*******************************************************************************
- *     Special for files                                                       *
- ******************************************************************************/
-
-int FSeek (File f, long offset, int origin)
-{
-	return fseek ((FILE *) f, offset, origin);
-} /* FSeek */
-
-
-long FTell (File f)
-{
-	return ftell ((FILE *) f);
-} /* FTell */
 
 /* Error Handling */
 	

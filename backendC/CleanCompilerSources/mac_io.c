@@ -843,30 +843,10 @@ int FPrintF (File f, char *fmt, ...)
 	return fputs (outbuffer, (FILE *) f);
 } /* FPrintF */
 
-size_t FWrite (void *ptr, size_t size, size_t count, File f)
-{
-	return fwrite (ptr, size, count, (FILE *) f);
-} /* FWrite */
-
-size_t FRead  (void *ptr, size_t size, size_t count, File f)
-{
-	return fread (ptr, size, count, (FILE *) f);
-} /* FRead */
-
 int FPutS (char *s, File f)
 {
 	return fputs (s, (FILE *) f);
 } /* FPutS */
-
-int FSeek (File f, long offset, int origin)
-{
-	return fseek ((FILE *) f, offset, origin);
-} /* FSeek */
-
-long FTell (File f)
-{
-	return ftell ((FILE *) f);
-} /* FTell */
 	
 void DoError (char *fmt, ...)
 {	va_list args;
