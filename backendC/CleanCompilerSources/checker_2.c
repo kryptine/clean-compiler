@@ -61,7 +61,8 @@ void ReadInlineCode (void)
 					SymbDef sdef;
 
 					sdef=function_symbol_a[i].symb_def;
-					if (sdef->sdef_kind==SYSRULE && sdef->sdef_mark & SDEF_USED_STRICTLY_MASK)
+					if (sdef->sdef_kind==SYSRULE &&
+						(sdef->sdef_mark & (SDEF_USED_STRICTLY_MASK | SDEF_DEFRULE_ABC_CODE))==SDEF_USED_STRICTLY_MASK)
 						break;
 				}
 

@@ -2391,6 +2391,30 @@ BEDefineRuleType (int functionIndex, int moduleIndex, BETypeAltP typeAlt)
 } /* BEDefineRuleType */
 
 void
+BEDefineRuleTypeWithCode (int functionIndex, int moduleIndex, BETypeAltP typeAlt, BECodeBlockP codeBlock)
+{
+	SymbolP		functionSymbol;
+	SymbDef		sdef;
+	RuleTypes	ruleType;
+	BEModule	module;
+
+	ruleType	= ConvertAllocType (struct rule_type);
+	ruleType->rule_type_rule	= typeAlt;
+
+	module	= &gBEState.be_modules [moduleIndex];
+	functionSymbol	= &module->bem_functions [functionIndex];
+
+	sdef	= functionSymbol->symb_def;
+	Assert (sdef->sdef_kind == NEWDEFINITION);
+	sdef->sdef_arity		= typeAlt->type_alt_lhs->type_node_arity;
+	sdef->sdef_arfun		= NoArrayFun;
+	sdef->sdef_kind 		= module->bem_isSystemModule ? SYSRULE : DEFRULE;
+	sdef->sdef_rule_type	= ruleType;
+	sdef->sdef_abc_code = codeBlock->co_instr;
+	sdef->sdef_mark |= SDEF_DEFRULE_ABC_CODE;
+}
+
+void
 BEAdjustArrayFunction (BEArrayFunKind arrayFunKind, int functionIndex, int moduleIndex)
 {
 	SymbolP		functionSymbol;

@@ -360,6 +360,9 @@ Clean (BEDeclareRuleType :: Int Int String BackEnd -> BackEnd)
 void BEDefineRuleType (int functionIndex, int moduleIndex, BETypeAltP typeAlt);
 Clean (BEDefineRuleType :: Int Int BETypeAltP BackEnd -> BackEnd)
 
+void BEDefineRuleTypeWithCode (int functionIndex, int moduleIndex, BETypeAltP typeAlt, BECodeBlockP codeBlock);
+Clean (BEDefineRuleTypeWithCode :: Int Int BETypeAltP BECodeBlockP BackEnd -> BackEnd)
+
 void BEAdjustArrayFunction (BEArrayFunKind arrayFunKind, int functionIndex, int moduleIndex);
 Clean (BEAdjustArrayFunction :: BEArrayFunKind Int Int BackEnd -> BackEnd)
 

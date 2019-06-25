@@ -288,7 +288,7 @@ void ScanInlineFile (char *fname,TableKind system_module_table_kind)
 		*tail = '\0';
 		if (! (instrid = RetrieveFromSymbolTable (instr,system_module_table_kind)))
 			continue;
-		if (instrid->ident_sys_rule_def==NULL)
+		if (instrid->ident_sys_rule_def==NULL || (instrid->ident_sys_rule_def->sdef_mark & SDEF_DEFRULE_ABC_CODE)!=0)
 			continue;
 		if ((instrid->ident_mark & INLINE_MASK) != 0)
 		{

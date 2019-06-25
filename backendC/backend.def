@@ -66,6 +66,7 @@ EXPORTS
  BERule
  BEDeclareRuleType
  BEDefineRuleType
+ BEDefineRuleTypeWithCode
  BEAdjustArrayFunction
  BENoRules
  BERules
