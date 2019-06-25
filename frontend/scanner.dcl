@@ -8,7 +8,7 @@ import StdEnv, general
 	}
 
 :: ModTimeFunction f
-	:== ({#Char} f -> *(!{#Char}, !f))
+	:== ({#Char} f -> *({#Char}, f))
 
 ::	* ScanState
 
