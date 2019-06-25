@@ -130,11 +130,7 @@ static Bool findfilepath (char *fname,FileKind kind,char *path)
     char *s,*path_elem,c,*pathlist,*ext;
 	int in_clean_system_files_folder;
 
-	if (path_parameter==NULL)
-	    pathlist=getenv ("CLEANPATH");
-	else
-		pathlist=path_parameter;
-
+	pathlist=path_parameter;
     if (pathlist==NULL)
 		pathlist=".";
 
