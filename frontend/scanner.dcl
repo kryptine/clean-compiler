@@ -2,8 +2,6 @@ definition module scanner
 
 import StdEnv, general
 
-// RWS Proof ... ::	SearchPaths	:== [String]
-
 :: SearchPaths = 
 	{ sp_locations   :: [(String, String)]       // (module, path)
 	, sp_paths       :: [String]
@@ -11,8 +9,6 @@ import StdEnv, general
 
 :: ModTimeFunction f
 	:== ({#Char} f -> *(!{#Char}, !f))
-
-// ... RWS
 
 ::	* ScanState
 
@@ -170,15 +166,7 @@ instance <<< Token
 
 instance toString Token, Priority
 
-
-/* Sjaak ... */
-
-// instance < Priority
-
 determinePriority :: !Priority !Priority -> Optional Bool
-
-/* ... Sjaak */
-
 
 setNoNewOffsideForSeqLetBit :: !ScanState -> ScanState
 

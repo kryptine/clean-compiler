@@ -5,16 +5,13 @@ import	StdEnv, compare_constructor, general
 from utilities import revCharListToString, isSpecialChar
 from CoclSystemDependent import DirectorySeparator
 
-// RWS Proof ... ::	SearchPaths	:== [String]
 :: SearchPaths = 
 	{ sp_locations   :: [(String, String)]       // (module, path)
 	, sp_paths       :: [String]
 	}
 
 :: ModTimeFunction f
-	:== ({#Char} f -> *(!{#Char}, !f))
-
-// ... RWS
+	:== ({#Char} f -> *({#Char}, f))
 
 ::	*ScanState = ScanState !RScanState
 
@@ -917,8 +914,63 @@ determineStrictness input
 
 ScanCodeBlock :: !Input -> (!Token, !Input)
 ScanCodeBlock input
-	= scan_code_block [] input
+	= scan_begin_code_block input
 where
+	scan_begin_code_block :: !Input -> (!Token,!Input)
+	scan_begin_code_block input
+		# (eof, c, input) = ReadChar input
+		| c == '}'
+			= (CodeBlockToken [], input)
+		| isNewLine c
+			| eof
+				= (ErrorToken "eof in code block", input)
+				= scan_begin_code_block input
+		| IsWhiteSpace c
+			= scan_begin_code_block input
+		# (line, input) = ReadLine input
+		# line = toString c+++stripNewline line;
+		| line.[size line-1]=='}'
+			#! line = line % (0,skip_white_space_left (size line-2) line);
+			# lines = split_line_at_semicolon 0 line
+			= (CodeBlockToken lines, input)
+			= scan_code_block [line] input
+
+	skip_white_space_left :: !Int !{#Char} -> Int
+	skip_white_space_left i s
+		| i>=0 && (s.[i]==' ' || s.[i]=='\t')
+			= skip_white_space_left (i-1) s
+			= i
+
+	split_line_at_semicolon i line
+		# sc_i = skip_to_semicolon i line
+		| sc_i<0
+			| i==0
+				= [line]
+				= [line % (i,size line-1)]
+		#! s = line % (i,skip_white_space_left (sc_i-1) i line)
+		# i = skip_white_space_right (sc_i+1) line
+		# sl = split_line_at_semicolon i line
+		= [s:sl];
+	where
+		skip_to_semicolon i line
+			| i<size line
+				| line.[i]<>';'
+					= skip_to_semicolon (i+1) line;
+					= i;
+				= -1;
+
+		skip_white_space_left :: !Int !Int !{#Char} -> Int
+		skip_white_space_left i b_i s
+			| i>=b_i && (s.[i]==' ' || s.[i]=='\t')
+				= skip_white_space_left (i-1) b_i s
+				= i
+
+		skip_white_space_right :: !Int !{#Char} -> Int
+		skip_white_space_right i s
+			| i<size line && (s.[i]==' ' || s.[i]=='\t')
+				= skip_white_space_right (i+1) s
+				= i
+
 	scan_code_block :: ![String] !Input -> (!Token,!Input)
 	scan_code_block acc input
 		# (eof, c, input)	= ReadChar input
@@ -1058,7 +1110,7 @@ ScanChar input
 	| c=='\\'				= ScanBSChar 0 ['\''] input ScanEndOfChar
 							= ScanEndOfNoBSChar c input
 
-ScanBSChar :: !Int ![Char] !Input (Int [Char] Input -> (!Token, !Input)) -> (!Token, !Input)
+ScanBSChar :: !Int ![Char] !Input (Int [Char] Input -> (Token, Input)) -> (!Token, !Input)
 ScanBSChar n chars input cont
 	# (eof, c, input)		= ReadNormalChar input
 	| eof					= cont n chars input
@@ -1608,22 +1660,6 @@ where
 			= ident_name1==ident_name2 && module_name1==module_name2
 		equal_args_of_tokens _						_						= True
 
-/* Sjaak ... */
-
-/*
-instance < Priority
-where
-	(<) (Prio assoc1 prio1) (Prio assoc2 prio2)
-		= prio1 < prio2 || prio1 == prio2 && assoc1 < assoc2
-	(<) _ _ = abort "< of these Priorities (NoPrio) is undefined"
-			
-instance < Assoc
-where
-	(<) _ LeftAssoc = True
-	(<) LeftAssoc _ = False
-	(<) _ _ = True
-
-*/
 DefaultPriority :: Priority
 DefaultPriority
 	=	Prio LeftAssoc 9
@@ -1637,9 +1673,6 @@ where
 	has_priority_over LeftAssoc 	LeftAssoc 	= Yes True
 	has_priority_over RightAssoc	RightAssoc 	= Yes False
 	has_priority_over _				_			= No
-
-/* Sjaak ... */
-
 			
 instance toString Priority
 where
