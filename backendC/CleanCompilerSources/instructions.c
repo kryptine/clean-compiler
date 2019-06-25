@@ -1297,6 +1297,24 @@ void GenOStackLayout (int asize,int bsize,Args fun_args)
 	}
 }
 
+static void GenABCInstructions (Instructions ilist)
+{
+	for (; ilist; ilist = ilist->instr_next){
+		char *instruction_name;
+		
+		instruction_name=ilist->instr_this;
+		
+		FPutC ('\n',OutFile);
+		if (instruction_name[0]==':')
+			FPutS (&instruction_name[1],OutFile);
+		else {
+			if (instruction_name[0]!='.')
+				FPutC ('\t',OutFile);
+			FPutS (instruction_name,OutFile);
+		}
+	}
+}
+
 static void CallFunction2 (Label label, SymbDef def, Bool isjsr, StateS root_state, Args fun_args, int arity)
 {
 	int ain,aout,bin,bout;
@@ -1322,7 +1340,14 @@ static void CallFunction2 (Label label, SymbDef def, Bool isjsr, StateS root_sta
 
 	if (def->sdef_kind==SYSRULE){
 		char  *instr;
-	
+
+		if (def->sdef_mark & SDEF_DEFRULE_ABC_CODE){
+			GenABCInstructions (def->sdef_abc_code);
+			if (!isjsr)
+				GenRtn (aout, bout, root_state);
+			return;
+		}
+
 		if (def->sdef_mark & SDEF_DEFRULE_INSTRUCTIONS)
 			instr = def->sdef_instructions;
 		else
@@ -3934,8 +3959,6 @@ void GenInstructions (Instructions ilist)
 			FPutS (instruction_name,OutFile);
 		}
 	}
-	if (!DoDebug)
-		FPutC ('\n',OutFile);
 }
 
 void GenTestCaf (Label label)

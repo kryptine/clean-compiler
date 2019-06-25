@@ -63,6 +63,7 @@
 /EXPORT:BERule
 /EXPORT:BEDeclareRuleType
 /EXPORT:BEDefineRuleType
+/EXPORT:BEDefineRuleTypeWithCode
 /EXPORT:BEAdjustArrayFunction
 /EXPORT:BENoRules
 /EXPORT:BERules

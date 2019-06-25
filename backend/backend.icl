@@ -430,6 +430,12 @@ BEDefineRuleType a0 a1 a2 a3 = code {
 }
 // void BEDefineRuleType (int functionIndex,int moduleIndex,BETypeAltP typeAlt);
 
+BEDefineRuleTypeWithCode :: !Int !Int !BETypeAltP !BECodeBlockP !BackEnd -> BackEnd;
+BEDefineRuleTypeWithCode a0 a1 a2 a3 a4 = code {
+	ccall BEDefineRuleTypeWithCode "IIpp:V:p"
+}
+// void BEDefineRuleTypeWithCode (int functionIndex,int moduleIndex,BETypeAltP typeAlt,BECodeBlockP codeBlock);
+
 BEAdjustArrayFunction :: !BEArrayFunKind !Int !Int !BackEnd -> BackEnd;
 BEAdjustArrayFunction a0 a1 a2 a3 = code {
 	ccall BEAdjustArrayFunction "III:V:p"

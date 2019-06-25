@@ -2615,8 +2615,10 @@ static void FillSymbol (Node node,SymbDef sdef,int *asp_p,int *bsp_p,NodeId upda
 						*asp_p-=a_size;
 						*bsp_p-=b_size;
 
-						if (! (sdef->sdef_kind==SYSRULE && (sdef->sdef_mark & SDEF_DEFRULE_INSTRUCTIONS)!=0
-								&& sdef->sdef_instructions!=NULL && *sdef->sdef_instructions!='\0' && *sdef->sdef_instructions!='.'))
+						if (! (sdef->sdef_kind==SYSRULE &&
+								(  (sdef->sdef_mark & SDEF_DEFRULE_INSTRUCTIONS)!=0 && sdef->sdef_instructions!=NULL && *sdef->sdef_instructions!='\0' && *sdef->sdef_instructions!='.')
+								|| (sdef->sdef_mark & SDEF_DEFRULE_ABC_CODE)!=0 && sdef->sdef_abc_code!=NULL && sdef->sdef_abc_code->instr_this[0]!='.')
+							  )
 						{
 							cleanup_stack (asp_p,bsp_p,a_size,b_size,&code_gen_node_ids_p->a_node_ids,&code_gen_node_ids_p->b_node_ids,
 											&code_gen_node_ids_p->free_node_ids,code_gen_node_ids_p->moved_node_ids_l,
@@ -2640,8 +2642,10 @@ static void FillSymbol (Node node,SymbDef sdef,int *asp_p,int *bsp_p,NodeId upda
 						*asp_p-=a_size+1;
 						*bsp_p-=b_size;
 
-						if (! (sdef->sdef_kind==SYSRULE && (sdef->sdef_mark & SDEF_DEFRULE_INSTRUCTIONS)!=0
-								&& sdef->sdef_instructions!=NULL && *sdef->sdef_instructions!='\0' && *sdef->sdef_instructions!='.'))
+						if (! (sdef->sdef_kind==SYSRULE &&
+								(  (sdef->sdef_mark & SDEF_DEFRULE_INSTRUCTIONS)!=0 && sdef->sdef_instructions!=NULL && *sdef->sdef_instructions!='\0' && *sdef->sdef_instructions!='.')
+								|| (sdef->sdef_mark & SDEF_DEFRULE_ABC_CODE)!=0 && sdef->sdef_abc_code!=NULL && sdef->sdef_abc_code->instr_this[0]!='.')
+							  )
 						{
 							cleanup_stack (asp_p,bsp_p,a_size+1,b_size,&code_gen_node_ids_p->a_node_ids,&code_gen_node_ids_p->b_node_ids,
 											&code_gen_node_ids_p->free_node_ids,code_gen_node_ids_p->moved_node_ids_l,
@@ -2663,8 +2667,10 @@ static void FillSymbol (Node node,SymbDef sdef,int *asp_p,int *bsp_p,NodeId upda
 						*asp_p-=a_size;
 						*bsp_p-=b_size;
 
-						if (! (sdef->sdef_kind==SYSRULE && (sdef->sdef_mark & SDEF_DEFRULE_INSTRUCTIONS)!=0
-								&& sdef->sdef_instructions!=NULL && *sdef->sdef_instructions!='\0' && *sdef->sdef_instructions!='.'))
+						if (! (sdef->sdef_kind==SYSRULE &&
+								(  (sdef->sdef_mark & SDEF_DEFRULE_INSTRUCTIONS)!=0 && sdef->sdef_instructions!=NULL && *sdef->sdef_instructions!='\0' && *sdef->sdef_instructions!='.')
+								|| (sdef->sdef_mark & SDEF_DEFRULE_ABC_CODE)!=0 && sdef->sdef_abc_code!=NULL && sdef->sdef_abc_code->instr_this[0]!='.')
+							  )
 						{
 							cleanup_stack (asp_p,bsp_p,a_size,b_size,&code_gen_node_ids_p->a_node_ids,&code_gen_node_ids_p->b_node_ids,
 											&code_gen_node_ids_p->free_node_ids,code_gen_node_ids_p->moved_node_ids_l,
@@ -4991,8 +4997,10 @@ static void FillUniqueNodeWithNode (NodeP update_node,int *asp_p,int *bsp_p,Code
 						*asp_p-=a_size;
 						*bsp_p-=b_size;
 
-						if (! (sdef->sdef_kind==SYSRULE && (sdef->sdef_mark & SDEF_DEFRULE_INSTRUCTIONS)!=0
-								&& sdef->sdef_instructions!=NULL && *sdef->sdef_instructions!='\0' && *sdef->sdef_instructions!='.'))
+						if (! (sdef->sdef_kind==SYSRULE &&
+								(  (sdef->sdef_mark & SDEF_DEFRULE_INSTRUCTIONS)!=0 && sdef->sdef_instructions!=NULL && *sdef->sdef_instructions!='\0' && *sdef->sdef_instructions!='.')
+								|| (sdef->sdef_mark & SDEF_DEFRULE_ABC_CODE)!=0 && sdef->sdef_abc_code!=NULL && sdef->sdef_abc_code->instr_this[0]!='.')
+							  )
 						{
 							cleanup_stack (asp_p,bsp_p,a_size,b_size,&code_gen_node_ids_p->a_node_ids,&code_gen_node_ids_p->b_node_ids,
 											&code_gen_node_ids_p->free_node_ids,code_gen_node_ids_p->moved_node_ids_l,

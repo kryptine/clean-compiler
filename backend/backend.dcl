@@ -161,6 +161,8 @@ BEDeclareRuleType :: !Int !Int !String !BackEnd -> BackEnd;
 // void BEDeclareRuleType (int functionIndex,int moduleIndex,CleanString name);
 BEDefineRuleType :: !Int !Int !BETypeAltP !BackEnd -> BackEnd;
 // void BEDefineRuleType (int functionIndex,int moduleIndex,BETypeAltP typeAlt);
+BEDefineRuleTypeWithCode :: !Int !Int !BETypeAltP !BECodeBlockP !BackEnd -> BackEnd;
+// void BEDefineRuleTypeWithCode (int functionIndex,int moduleIndex,BETypeAltP typeAlt,BECodeBlockP codeBlock);
 BEAdjustArrayFunction :: !BEArrayFunKind !Int !Int !BackEnd -> BackEnd;
 // void BEAdjustArrayFunction (BEArrayFunKind arrayFunKind,int functionIndex,int moduleIndex);
 BENoRules :: !BackEnd -> (!BEImpRuleP,!BackEnd);

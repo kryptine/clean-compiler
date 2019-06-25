@@ -539,6 +539,7 @@ STRUCT (symbol_def,SymbDef){
 		struct symbol_def *typeinfo_dictionary_field; /* for IMPRULE if SDEF_INSTANCE_RULE_WITH_FIELD_P */
 		struct symbol_def *typeinfo_instance_rule; /* for IMPRULE if SDEF_RULE_INSTANCE_RULE_P */
 		char * typeinfo_instructions; /* for DEFRULE or SYSRULE if SDEF_DEFRULE_INSTRUCTIONS */
+		Instructions typeinfo_abc_code; /* for DEFRULE or SYSRULE if SDEF_DEFRULE_ABC_CODE */
 	} sdef_typeinfo;
 
 	unsigned		sdef_number;
@@ -597,6 +598,7 @@ STRUCT (symbol_def,SymbDef){
 #define SDEF_INSTANCE_RULE_WITH_FIELD_P 16384
 #define SDEF_RULE_INSTANCE_RULE_P 32768
 #define SDEF_HAS_SPECIAL_ARRAY_FUNCTION 512
+#define SDEF_DEFRULE_ABC_CODE 2048
 #define SDEF_DEFRULE_INSTRUCTIONS 16
 #define SDEF_WARNED_NO_INLINE_CODE 65536
 
@@ -618,6 +620,7 @@ STRUCT (symbol_def,SymbDef){
 #define sdef_dictionary_field	sdef_typeinfo.typeinfo_dictionary_field
 #define sdef_instance_rule	sdef_typeinfo.typeinfo_instance_rule
 #define sdef_instructions	sdef_typeinfo.typeinfo_instructions
+#define sdef_abc_code	sdef_typeinfo.typeinfo_abc_code
 
 #if IMPORT_OBJ_AND_LIB
 struct string_list {
