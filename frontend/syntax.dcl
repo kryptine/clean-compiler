@@ -349,6 +349,7 @@ cNameLocationDependent :== True
 	| FSP_Substitutions			![SpecialSubstitution]
 	| FSP_ContextTypes			![Special]
 	| FSP_FunIndex				!Index
+	| FSP_ABCCode ![{#Char}]
 	| FSP_None
 
 ::	SpecialSubstitution =
@@ -1351,7 +1352,7 @@ cIsNotStrict	:== False
 		|	UniqueSingleArraySelector
 		|	UniqueSingleArraySelectorUniqueElementResult
 
-::	Expression	= Var !BoundVar 
+::	Expression	= Var !BoundVar
 				| App !App
 				| (@) infixl 9  !Expression ![Expression]
 				| Let !Let

@@ -501,7 +501,14 @@ where
 		  (tspec, pState) = wantSymbolType pState
 		| isDclContext parseContext
 			# (specials, pState) = optionalFunSpecials pState
-			= (PD_TypeSpec pos name (if is_infix DefaultPriority NoPrio) (Yes tspec) specials, wantEndOfDefinition "type definition" pState)
+			#! def = PD_TypeSpec pos name (if is_infix DefaultPriority NoPrio) (Yes tspec) specials;
+			| not specials=:FSP_ABCCode _
+				= (def, wantEndOfDefinition "type definition" pState)
+			# (ss_useLayout, pState) = accScanState UseLayout pState
+			| ss_useLayout
+				= (def, wantEndOfDefinition "type definition" pState)
+				// } must be at end of line, make ; optional
+				= (def, optional_semicolon_without_layout_rule pState)
 			= (PD_TypeSpec pos name (if is_infix DefaultPriority NoPrio) (Yes tspec) FSP_None, wantEndOfDefinition "type definition" pState)
 	want_rhs_of_def parseContext (opt_name, args) (PriorityToken prio) pos pState
 		# (name, _, pState) = check_name_and_fixity opt_name cHasPriority pState
@@ -510,7 +517,14 @@ where
 		  	# (tspec, pState) = wantSymbolType pState
 			| isDclContext parseContext
 				# (specials, pState) = optionalFunSpecials pState
-				= (PD_TypeSpec pos name prio (Yes tspec) specials, wantEndOfDefinition "type definition" pState)
+				#! def = PD_TypeSpec pos name prio (Yes tspec) specials
+				| not specials=:FSP_ABCCode _
+					= (def, wantEndOfDefinition "type definition" pState)
+				# (ss_useLayout, pState) = accScanState UseLayout pState
+				| ss_useLayout
+					= (def, wantEndOfDefinition "type definition" pState)
+					// } must be at end of line, make ; optional
+					= (def, optional_semicolon_without_layout_rule pState)
 				= (PD_TypeSpec pos name prio (Yes tspec) FSP_None, wantEndOfDefinition "type definition" pState)
 			= (PD_TypeSpec pos name prio No FSP_None, wantEndOfDefinition "type definition" (tokenBack pState))
 	want_rhs_of_def parseContext (No, args) token pos pState
@@ -766,6 +780,17 @@ generic_info_of_FIELD_geninfo_arg (PE_Record PE_Empty NoRecordName field_assignm
 generic_info_of_FIELD_geninfo_arg _
 	= -1
 
+optional_semicolon_without_layout_rule pState
+	# (token, pState) = nextToken FunctionContext pState
+	= case token of
+		NewDefinitionToken	->	pState
+		SemicolonToken
+			# (token, pState) = nextToken FunctionContext pState
+			| token=:NewDefinitionToken
+				->	pState
+				->	tokenBack pState
+		_ -> tokenBack pState
+
 want_instance_type_definitions :: ![Type] !ParseState -> (![ParsedDefinition], !ParseState)
 want_instance_type_definitions instance_type pState
 	= parseList want_instance_type_definition pState
@@ -821,13 +846,31 @@ where
 	want_rhs_of_instance_member_def opt_name DoubleColonToken pos pState
 		# (name, priority, pState) = check_name opt_name pState
 		  (tspec, pState) = wantSymbolType pState
-		= (PD_TypeSpec pos name priority (Yes tspec) FSP_None, wantEndOfDefinition "type definition" pState)
+		  (token, pState) = nextToken TypeContext pState
+		  (fun_specials,pState) = optionalCode token pState
+		#! def = PD_TypeSpec pos name priority (Yes tspec) fun_specials
+		| not fun_specials=:FSP_ABCCode _
+			= (def, wantEndOfDefinition "type definition" pState)
+		# (ss_useLayout, pState) = accScanState UseLayout pState
+		| ss_useLayout
+			= (def, wantEndOfDefinition "type definition" pState)
+			// } must be at end of line, make ; optional
+			= (def, optional_semicolon_without_layout_rule pState)
 	want_rhs_of_instance_member_def opt_name (PriorityToken prio) pos pState
 		# (name,_,pState) = check_name_and_fixity opt_name cHasPriority pState
 		  (token, pState) = nextToken TypeContext pState
 		| token == DoubleColonToken
 		  	# (tspec, pState) = wantSymbolType pState
-			= (PD_TypeSpec pos name prio (Yes tspec) FSP_None, wantEndOfDefinition "type definition" pState)
+			  (token, pState) = nextToken TypeContext pState
+			  (fun_specials,pState) = optionalCode token pState
+			#! def = PD_TypeSpec pos name prio (Yes tspec) fun_specials
+			| not fun_specials=:FSP_ABCCode _
+				= (def, wantEndOfDefinition "type definition" pState)
+			# (ss_useLayout, pState) = accScanState UseLayout pState
+			| ss_useLayout
+				= (def, wantEndOfDefinition "type definition" pState)
+				// } must be at end of line, make ; optional
+				= (def, optional_semicolon_without_layout_rule pState)
 			# pState = parseError "type definition" (Yes token) "::" pState
 			= (PD_TypeSpec pos name prio No FSP_None, wantEndOfDefinition "type defenition" pState)
 	want_rhs_of_instance_member_def opt_name token pos pState
@@ -852,10 +895,24 @@ optionalSpecials pState
 optionalFunSpecials :: !ParseState -> (!FunSpecials, !ParseState)
 optionalFunSpecials pState
 	# (token, pState) = nextToken TypeContext pState
-	| token == SpecialToken
+	| token=:SpecialToken
 		# (specials, pState) = wantSpecials pState
 		= (FSP_ParsedSubstitutions specials, pState)
-		= (FSP_None, tokenBack pState)
+		= optionalCode token pState
+
+optionalCode :: !Token !ParseState -> (!FunSpecials, !ParseState)
+optionalCode ColonDefinesToken pState
+	# (token, pState) = nextToken FunctionContext pState
+	| token=:CodeToken
+		# (token, pState) = nextToken CodeContext pState
+		= case token of
+			CodeBlockToken the_code
+				-> (FSP_ABCCode the_code, pState)
+			token
+				-> (FSP_None, parseError "code rhs" (Yes token) "<code rhs>" pState)
+		= (FSP_None, parseError "code rhs" (Yes token) "code" pState)
+optionalCode token pState
+	= (FSP_None, tokenBack pState)
 
 wantSpecials :: !ParseState -> (![Env Type TypeVar], !ParseState)
 wantSpecials pState
@@ -1662,10 +1719,18 @@ wantInstanceDeclaration parseContext pi_pos pState
 			# (fname, linenr, pState) = getFileAndLineNr pState
 			  pos = LinePos fname linenr
 			  (tspec, pState) = wantSymbolType pState
+			  (token, pState) = nextToken TypeContext pState
+			  (fun_specials,pState) = optionalCode token pState
 			  (instance_member_ident, pState) = stringToIdent pim_pi.pi_ident.id_name (IC_InstanceMember pim_pi.pi_types) pState
-			  instance_member_type = PD_TypeSpec pos instance_member_ident NoPrio (Yes tspec) FSP_None
+			  instance_member_type = PD_TypeSpec pos instance_member_ident NoPrio (Yes tspec) fun_specials
 			#! def = PD_Instance {pim_pi = pim_pi, pim_members = [instance_member_type]}
-			= (def, wantEndOfDefinition "instance declaration" pState)
+			| not fun_specials=:FSP_ABCCode _
+				= (def, wantEndOfDefinition "instance declaration" pState)
+			# (ss_useLayout, pState) = accScanState UseLayout pState
+			| ss_useLayout
+				= (def, wantEndOfDefinition "instance declaration" pState)
+				// } must be at end of line, make ; optional
+				= (def, optional_semicolon_without_layout_rule pState)
 			# pState = wantEndOfDefinition "instance declaration" (tokenBack pState)
 			= (PD_Instance {pim_pi = pim_pi, pim_members = []}, pState)
 
