@@ -62,15 +62,12 @@ where
 		
 		#! (checked_gen_vars, cs) = check_generic_vars gen_vars checked_gen_type.st_vars cs		
 		#! checked_gen_type = { checked_gen_type & st_vars = move_gen_vars checked_gen_vars checked_gen_type.st_vars}
-				
-		#! (hp_type_heaps, cs) = check_no_generic_vars_in_contexts checked_gen_type checked_gen_vars hp_type_heaps cs
-		= 	( {gen_def & gen_type = checked_gen_type, gen_vars = checked_gen_vars}
-			, type_defs
-			, class_defs
-			, modules
-			, {heaps & hp_type_heaps = hp_type_heaps}
-			, cs
-			)
+		# gen_def & gen_type = checked_gen_type, gen_vars = checked_gen_vars
+		| not cs.cs_error.ea_ok
+			// do not call check_no_generic_vars_in_contexts if a contraint contains an unused type variable (not added to st_vars)
+			= (gen_def, type_defs, class_defs, modules, {heaps & hp_type_heaps=hp_type_heaps}, cs)
+			#! (hp_type_heaps, cs) = check_no_generic_vars_in_contexts checked_gen_type checked_gen_vars hp_type_heaps cs
+			= (gen_def, type_defs, class_defs, modules, {heaps & hp_type_heaps=hp_type_heaps}, cs)
 	where
 		check_generic_vars gen_vars st_vars cs=:{cs_error}
 			# (gen_vars, _, cs_error) = foldSt check_generic_var gen_vars ([], st_vars, cs_error)
