@@ -1512,6 +1512,8 @@ checkFunSpecialTypes :: !Index !FunSpecials !v:{#CheckedTypeDef} !u:{#DclModule}
 						   -> (!FunSpecials,!x:{#CheckedTypeDef},!w:{#DclModule},!.TypeHeaps,!.CheckState), [u v <= w, v u <= x];
 checkFunSpecialTypes mod_index FSP_None type_defs modules heaps cs
 	= (FSP_None, type_defs, modules, heaps, cs)
+checkFunSpecialTypes mod_index fsp=:(FSP_ABCCode _) type_defs modules heaps cs
+	= (fsp, type_defs, modules, heaps, cs)
 checkFunSpecialTypes mod_index (FSP_ParsedSubstitutions envs) type_defs modules heaps cs
 	# ots = { ots_type_defs = type_defs, ots_modules = modules }
 	  (specials, (heaps, ots, cs)) = mapSt (check_environment mod_index) envs (heaps, ots, cs)
