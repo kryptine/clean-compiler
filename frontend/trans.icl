@@ -912,7 +912,7 @@ transform_active_non_root_case kees=:{case_info_ptr,case_expr = App {app_symb}} 
 		| SwitchArityChecks (1+length all_args > 32) False
 			# ti = { ti & ti_cons_args = ti_cons_args, ti_fun_defs = ti_fun_defs, ti_fun_heap = ti_fun_heap, ti_recursion_introduced = No }
 			| ro.ro_transform_fusion>=FullFusion
-				# ti = { ti & ti_error_file = ti.ti_error_file <<< "Possibly missed fusion oppurtunity: Case Arity > 32 " <<< ro.ro_tfi.tfi_root.symb_ident.id_name <<< "\n"}
+				# ti & ti_error_file = ti.ti_error_file <<< "Possibly missed fusion opportunity: Case Arity > 32 " <<< ro.ro_tfi.tfi_root.symb_ident.id_name <<< "\n"
 				= skip_over kees ro ti
 			= skip_over kees ro ti
 		# (fun_info_ptr, ti_fun_heap) = newPtr FI_Empty ti_fun_heap
@@ -950,7 +950,7 @@ transform_active_non_root_case kees=:{case_info_ptr} aci=:{aci_free_vars} ro ti=
 	| SwitchArityChecks (length all_args > 32) False
 		# ti = { ti & ti_cons_args = ti_cons_args, ti_fun_defs = ti_fun_defs, ti_fun_heap = ti_fun_heap, ti_recursion_introduced = No }
 		| ro.ro_transform_fusion>=FullFusion
-			#  ti	= { ti & ti_error_file = ti.ti_error_file <<< "Possibly missed fusion oppurtunity: Case Arity > 32 " <<< ro.ro_tfi.tfi_root.symb_ident.id_name <<< "\n"}
+			# ti & ti_error_file = ti.ti_error_file <<< "Possibly missed fusion opportunity: Case Arity > 32 " <<< ro.ro_tfi.tfi_root.symb_ident.id_name <<< "\n"
 			= skip_over kees ro ti
 		= skip_over kees ro ti
 	# (fun_info_ptr, ti_fun_heap) = newPtr FI_Empty ti_fun_heap
@@ -1599,7 +1599,7 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 				, ti_fun_heap = ti_fun_heap, ti_var_heap = ti_var_heap, ti_cons_args = ti_cons_args, ti_type_def_infos = ti_type_def_infos
 				, ti_predef_symbols = ti_predef_symbols }
 		| ro.ro_transform_fusion>=FullFusion
-			#  ti = { ti & ti_error_file = ti.ti_error_file <<< "Possibly missed fusion oppurtunity: Function Arity > 32 " <<< ro.ro_tfi.tfi_root.symb_ident.id_name <<< "\n"}
+			# ti & ti_error_file = ti.ti_error_file <<< "Possibly missed fusion opportunity: Function Arity > 32 " <<< ro.ro_tfi.tfi_root.symb_ident.id_name <<< "\n"
 			= (-1,new_fun_arity,ti)
 		= (-1,new_fun_arity,ti)
 	# new_arg_types = flatten [ ats_types \\ {ats_types}<-:new_arg_types_array ]
@@ -3903,7 +3903,7 @@ determineProducer app=:{app_symb = symb=:{ symb_kind = SK_GeneratedFunction fun_
 		= (producers, [App app : new_args], ti)
 	# n_app_args = length app_args
 	| SwitchArityChecks (n_app_args>1 && size producers + n_app_args - 1 > 32) False
-		# ti & ti_error_file = ti.ti_error_file <<< "Possibly missed fusion oppurtunity: Function Arity > 32\n"
+		# ti & ti_error_file = ti.ti_error_file <<< "Possibly missed fusion opportunity: Function Arity > 32\n"
 		= (producers, [App app : new_args], ti)
 	| n_app_args<>fun_arity
 		| SwitchCurriedFusion (ro.ro_transform_fusion>=FullFusion) cc_producer False
