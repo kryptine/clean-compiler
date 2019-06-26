@@ -211,6 +211,8 @@ beDeclareRuleType functionIndex moduleIndex name
 	:==	beApFunction0 (BEDeclareRuleType functionIndex moduleIndex name)
 beDefineRuleType functionIndex moduleIndex
 	:==	beApFunction1 (BEDefineRuleType functionIndex moduleIndex)
+beDefineRuleTypeWithCode functionIndex moduleIndex
+	:==	beApFunction2 (BEDefineRuleTypeWithCode functionIndex moduleIndex)
 beCodeAlt lineNumber
 	:==	beFunction3 (BECodeAlt lineNumber)
 beStringList string strings
@@ -698,12 +700,19 @@ declareFunTypes moduleIndex funTypes ranges
 		=	foldStateWithIndexA (declareFunType moduleIndex ranges) funTypes
 
 declareFunType :: ModuleIndex [IndexRange] Int FunType -> BackEnder
-declareFunType moduleIndex ranges functionIndex {ft_ident, ft_type_ptr}
+declareFunType moduleIndex ranges functionIndex {ft_ident,ft_type_ptr,ft_specials}
 	= \be0 -> let (vi,be) = read_from_var_heap ft_type_ptr be0 in
 					(case vi of
 						VI_ExpandedType expandedType
-							->	beDeclareRuleType functionIndex moduleIndex (functionName ft_ident.id_name functionIndex ranges)
-							o`	beDefineRuleType functionIndex moduleIndex (convertTypeAlt functionIndex moduleIndex expandedType)
+							| not ft_specials=:FSP_ABCCode _
+								->	beDeclareRuleType functionIndex moduleIndex (functionName ft_ident.id_name functionIndex ranges)
+								o`	beDefineRuleType functionIndex moduleIndex (convertTypeAlt functionIndex moduleIndex expandedType)
+								->	be_f ft_specials with
+									be_f (FSP_ABCCode abc_code) be
+										# be = beDeclareRuleType functionIndex moduleIndex (functionName ft_ident.id_name functionIndex ranges) be
+										= beDefineRuleTypeWithCode functionIndex moduleIndex
+											(convertTypeAlt functionIndex moduleIndex expandedType)
+											(beAbcCodeBlock False (convertStrings abc_code)) be
 						_
 							->	identity) be
 		where

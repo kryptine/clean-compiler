@@ -85,12 +85,14 @@ where
 
 	check_specials :: !Index !FunType !Index !FunSpecials !Index ![FunType] !*Heaps !*PredefinedSymbols !*ErrorAdmin
 										 -> (!FunSpecials,!Index,![FunType],!*Heaps,!*PredefinedSymbols,!*ErrorAdmin)
+	check_specials mod_index fun_type fun_index FSP_None next_inst_index all_instances heaps predef_symbols error
+		= (FSP_None, next_inst_index, all_instances, heaps, predef_symbols,error)
+	check_specials mod_index fun_type fun_index fsp=:(FSP_ABCCode _) next_inst_index all_instances heaps predef_symbols error
+		= (fsp, next_inst_index, all_instances, heaps, predef_symbols,error)
 	check_specials mod_index fun_type fun_index (FSP_Substitutions substs) next_inst_index all_instances heaps predef_symbols error
 		# (list_of_specials, (next_inst_index, all_instances, heaps, cs_predef_symbols,cs_error))
 				= mapSt (checkSpecial mod_index fun_type fun_index) substs (next_inst_index, all_instances, heaps, predef_symbols,error)
 		= (FSP_ContextTypes list_of_specials, next_inst_index, all_instances, heaps, cs_predef_symbols,cs_error)
-	check_specials mod_index fun_type fun_index FSP_None next_inst_index all_instances heaps predef_symbols error
-		= (FSP_None, next_inst_index, all_instances, heaps, predef_symbols,error)
 
 checkDclInstanceMemberTypes :: !*{#ClassInstance} !ModuleIndex !v:{#CheckedTypeDef} !w:{#ClassDef} !v:{#DclModule} !*Heaps !*CheckState
 						  				-> (!*{#ClassInstance},!v:{#CheckedTypeDef},!w:{#ClassDef},!v:{#DclModule},!*Heaps,!*CheckState)
@@ -820,6 +822,7 @@ where
 				= if_instance_member_type_specified_compare_and_use tl_member_types instance_type specials me_ident modules type_heaps cs_error
 			| ft_ident.id_name<>me_ident.id_name
 				= (instance_type, specials, member_types, modules, type_heaps, cs_error)
+			# specials = if (ft_specials=:FSP_ABCCode _) ft_specials specials
 			| ft_arity<>instance_type.st_arity
 				# cs_error = specified_member_type_incorrect_error CEC_NrArgsNotOk cs_error
 				= (instance_type, specials, member_types, modules, type_heaps, cs_error)
@@ -3543,13 +3546,14 @@ checkInstancesOfDclModule mod_index	(nr_of_dcl_functions_and_instances, nr_of_dc
 	  		= create_gencase_funtypes nr_of_dcl_funs_insts_and_specs {d \\ d<-:dcl_common.com_gencase_defs} heaps	
 	  
 	#  dcl_functions
-	  		= arrayPlusList dcl_functions
-	  			(   [ { mem_inst & ft_specials = if (isEmpty spec_types) FSP_None (FSP_ContextTypes spec_types) } 
-				  	  \\ mem_inst <- memb_inst_defs & spec_types <-: all_spec_types
+			= arrayPlusList dcl_functions
+				(	[ { mem_inst & ft_specials
+						= if (isEmpty spec_types) ft_specials (FSP_ContextTypes spec_types) }
+					  \\ mem_inst=:{ft_specials} <- memb_inst_defs & spec_types <-: all_spec_types
 				  	]
 	  			 ++ reverse rev_special_defs
 	  			 ++ gen_funs
-	  			)
+				)
 
 	# cs & cs_predef_symbols=cs_predef_symbols, cs_error=cs_error
 	# (com_instance_defs, cs)

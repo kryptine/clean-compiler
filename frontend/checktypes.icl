@@ -1838,11 +1838,13 @@ checkSpecialTypeVars SP_GenerateRecordInstances cs
 	= (SP_GenerateRecordInstances, cs)
 
 checkFunSpecialTypeVars :: !FunSpecials !*CheckState -> (!FunSpecials, !*CheckState)
+checkFunSpecialTypeVars FSP_None cs
+	= (FSP_None, cs)
+checkFunSpecialTypeVars fsp=:(FSP_ABCCode _) cs
+	= (fsp, cs)
 checkFunSpecialTypeVars (FSP_ParsedSubstitutions env) cs
 	# (env, cs) = mapSt check_type_vars env cs
 	= (FSP_ParsedSubstitutions env, cs)
-checkFunSpecialTypeVars FSP_None cs
-	= (FSP_None, cs)
 
 check_type_vars [] cs
 	= ([],cs)
@@ -1878,12 +1880,14 @@ checkSpecialTypes mod_index SP_GenerateRecordInstances type_defs modules heaps c
 
 checkFunSpecialTypes :: !Index !FunSpecials !v:{#CheckedTypeDef} !u:{#DclModule} !*TypeHeaps !*CheckState
 						   -> (!FunSpecials,!x:{#CheckedTypeDef},!w:{#DclModule},!.TypeHeaps,!.CheckState), [u v <= w, v u <= x];
+checkFunSpecialTypes mod_index FSP_None type_defs modules heaps cs
+	= (FSP_None, type_defs, modules, heaps, cs)
+checkFunSpecialTypes mod_index fsp=:(FSP_ABCCode _) type_defs modules heaps cs
+	= (fsp, type_defs, modules, heaps, cs)
 checkFunSpecialTypes mod_index (FSP_ParsedSubstitutions envs) type_defs modules heaps cs
 	# ots = { ots_type_defs = type_defs, ots_modules = modules }
 	  (specials, (heaps, ots, cs)) = mapSt (check_environment mod_index) envs (heaps, ots, cs)
 	= (FSP_Substitutions specials, ots.ots_type_defs, ots.ots_modules, heaps, cs)
-checkFunSpecialTypes mod_index FSP_None type_defs modules heaps cs
-	= (FSP_None, type_defs, modules, heaps, cs)
 
 check_environment :: Int (Env Type TypeVar) *(*TypeHeaps,u:OpenTypeSymbols,*CheckState) -> *(SpecialSubstitution,(*TypeHeaps,u:OpenTypeSymbols,*CheckState))
 check_environment mod_index env (heaps, ots, cs)
