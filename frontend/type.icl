@@ -1459,8 +1459,9 @@ getSymbolType pos ti=:{ti_functions,ti_common_defs,ti_main_dcl_module_n} {symb_k
 		# (fun_type_copy, ts) = determineSymbolTypeOfFunction pos symb_ident n_app_args ft_type ft_type_ptr ti_common_defs ts
 		= (fun_type_copy, get_specials ft_specials, ts)
 	where
+		get_specials FSP_None = []
+		get_specials (FSP_ABCCode _) = []
 		get_specials (FSP_ContextTypes specials) = specials
-		get_specials FSP_None					 = []
 getSymbolType pos ti {symb_kind = SK_Constructor {glob_module,glob_object}} n_app_args ts
 	# (fresh_cons_type, ts) = standardRhsConstructorType pos glob_object glob_module n_app_args ti ts
 	= (fresh_cons_type, [], ts)
