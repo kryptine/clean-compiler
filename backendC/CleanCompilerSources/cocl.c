@@ -12,16 +12,6 @@
 FILE *std_out_file_p,*std_error_file_p;
 #endif
 
-static char usage[]=
-	"Usage: \'cocl [options] [-o file] file\'\n"
-	"Options: [-v] [-w] [-tc] [-d] [-sl] [-p] [-sa] [-lt] [-lset] [-lat] [-lattr]";
-
-static void Usage (void)
-{
-	FPutS (usage, StdError);
-	FPutC ('\n', StdError);
-}
-
 static Bool GetInt (char *s, int *i)
 {
 	int j;
@@ -203,7 +193,6 @@ Bool CallCompiler (int argc, char **argv)
 			else if (strncmp (argv_i, "-sa", 3) == 0){
 				if (!SetStrictOption (argv[i]+3)){
 					CmdError ("unknown flag %s", argv[i]);
-					Usage ();
 					return False;
 				}
 			} else if (strcmp (argv_i, "-o") == 0){
@@ -294,7 +283,6 @@ Bool CallCompiler (int argc, char **argv)
 				}
 			} else {
 				CmdError ("unknown flag %s", argv_i);
-				Usage ();
 				return False;
 			}
 		} else {
@@ -336,7 +324,6 @@ Bool CallCompiler (int argc, char **argv)
 		return True;
 	} else {
 		CmdError ("no input file given");
-		Usage ();
 		return False;
 	}
 }
