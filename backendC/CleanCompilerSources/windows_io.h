@@ -32,27 +32,13 @@ typedef float         FourBytesReal;
 
 typedef FILE *File;
 
-/* special for MacIntosh command line support */
-extern void InitIO (void);
-extern void GetPreferences (char *fname);
-
 #ifdef _MSC_VER
 extern FILE *std_out_file_p,*std_error_file_p;
 # define StdOut std_out_file_p 
 # define StdError std_error_file_p
-# define StdVerboseH std_out_file_p
-# define StdVerboseL std_out_file_p
-# define StdTrace std_out_file_p
-# define StdDebug std_out_file_p
-# define StdListTypes std_out_file_p
 #else
 # define StdOut stdout
 # define StdError stderr
-# define StdVerboseH stdout
-# define StdVerboseL stdout
-# define StdTrace stdout
-# define StdDebug stdout;
-# define StdListTypes stdout
 #endif
 
 #define FGetC(f) fgetc(f)

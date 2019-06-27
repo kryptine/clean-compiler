@@ -1184,8 +1184,6 @@ void CodeGeneration (ImpMod imod, char *fname)
 		if (DoCode && !CompilerError){
 			ImpRuleS *rule;
 
-			Verbose ("Code generation");
-
 			if (!OpenABCFile (fname)){
 				StaticMessage (True, "<open file>","Can't create abc file '%s'",fname);
 				return;

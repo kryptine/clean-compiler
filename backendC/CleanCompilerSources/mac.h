@@ -35,11 +35,7 @@ void FreePathList (void);
 #else
 #define StdError stdout
 #endif
-#define StdVerboseH stdout
-#define StdVerboseL stdout
-#define StdListTypes stdout
 
 #define FGetC(f) fgetc(f)
 #define FGetS(s,n,f) fgets(s,n,f)
 #define FPutC(c,f) fputc(c,f)
-

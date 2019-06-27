@@ -45,8 +45,6 @@ extern void CompFree (void);
 extern Bool ArgParser (int argc, char *argv[]);
 extern void FatalCompError (char *mod, char *proc, char *mess);
 
-extern void Verbose (char *msg);
-extern void PrintVersion (void);
 extern void InitSettings (void);
 extern void ExitOnInterrupt (void);
 extern void InitCompiler (void);

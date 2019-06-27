@@ -45,11 +45,7 @@ static void error_in_function (char *m)
 */
 #define N_DoStrictnessAnalysis	4
 #define N_NoTimeProfiling		5
-
 #define N_ExportLocalLabels 6
-/*
-#define N_DoVerbose				6
-*/
 #define N_DoWarning				7
 #define N_System				8
 #define N_DoFusion				9
@@ -74,9 +70,6 @@ static void ConvertOptionsToString (char *optstring)
 
 	optstring[N_NoTimeProfiling]      = !DoTimeProfiling ? '1' : '0';
 	optstring[N_ExportLocalLabels] = ExportLocalLabels ? '1' : '0';
-/*
-	optstring[N_DoVerbose]            = DoVerbose ? '1' : '0';
-*/
 	optstring[N_DoWarning]            = DoWarning ? '1' : '0';
 	optstring[N_System]               = '0';
 

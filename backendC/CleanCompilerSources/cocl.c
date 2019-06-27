@@ -99,7 +99,6 @@ Bool CallCompiler (int argc, char **argv)
 #endif
 	
 	DoWarning 				= True;
-	DoVerbose 				= False;
 	DoCode					= True;
 	DoDebug 				= False;
 	DoStrictnessAnalysis	= True;
@@ -144,7 +143,7 @@ Bool CallCompiler (int argc, char **argv)
 			argv_i=argv[i];
 			
 			if (strcmp (argv_i, "-v") == 0)
-				DoVerbose = True;
+				;
 			else if (strcmp (argv_i, "-w") == 0){
 				DoWarning = False;
 				DoStrictWarning	= False;
@@ -319,10 +318,7 @@ Bool CallCompiler (int argc, char **argv)
 
 	if (fname)
 		return Compile (fname,output_file_name);
-	else if (DoVerbose){
-		FPrintF (StdOut, "\nConcurrent Clean Compiler (Version %d.%d)\n\n", VERSION / 1000, VERSION % 1000);
-		return True;
-	} else {
+	else {
 		CmdError ("no input file given");
 		return False;
 	}
