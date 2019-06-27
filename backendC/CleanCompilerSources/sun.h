@@ -26,11 +26,6 @@ typedef FILE *File;
 extern FILE *std_out_file_p,*std_error_file_p;
 #define StdOut std_out_file_p 
 #define StdError std_error_file_p
-#define StdVerboseH std_out_file_p
-#define StdVerboseL std_out_file_p
-#define StdTrace std_out_file_p
-#define StdDebug std_out_file_p
-#define StdListTypes std_out_file_p
 
 #define FGetC(f) fgetc(f)
 #define FGetS(s,n,f) fgets(s,n,f)

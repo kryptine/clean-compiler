@@ -5696,8 +5696,6 @@ int init_strictness_analysis (ImpMod imod)
 	StrictAllWarning   = DoStrictAllWarning;
 	StrictChecks       = DoStrictCheck;
 	StrictExportChecks = DoStrictExportChecks;
-	
-	Verbose ("Strictness analysis");
 
 	/* Initialise all */
 #ifdef _DB_

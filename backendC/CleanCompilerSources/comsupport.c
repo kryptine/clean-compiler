@@ -440,19 +440,6 @@ void StaticMessage (Bool error, char *symbol_format, char *message_format, ...)
 		CompilerError = True;
 }
 
-void Verbose (char *msg)
-{
-	if (DoVerbose)
-		FPrintF (StdVerboseL, "%s \"%s%s\"\n", msg, CurrentModule, CurrentExt);
-}
-
-void PrintVersion (void)
-{
-	if (DoVerbose)
-		FPrintF (StdVerboseL, "Concurrent Clean Compiler (Version %d.%d)\n",
-			   VERSION / 1000, VERSION % 1000);
-}
-
 static char Init[] = "Compiler initialization";
 
 File OpenedFile;

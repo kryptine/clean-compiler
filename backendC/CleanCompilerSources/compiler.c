@@ -1,6 +1,4 @@
 
-#undef PROFILE
-
 #include "compiledefines.h"
 #include "types.t"
 #include "system.h"
@@ -12,11 +10,6 @@
 #include "codegen_types.h"
 #include "codegen.h"
 #include "statesgen.h"
-
-#ifdef _PROFILE_
-/* FROM profile IMPORT */
-	extern DumpProfile ();
-#endif
 
 char *CurrentFilePath;
 
@@ -41,8 +34,6 @@ static void AddExtension (char *name)
 static void ExecCompiler (char *fname,char *output_file_name)
 {
 	ImpMod imod;
-	
-/*	PrintVersion (); */
 
  	if (fname){	
 		Bool hadext;
@@ -97,21 +88,12 @@ static void ExecCompiler (char *fname,char *output_file_name)
 		CmdError ("No source file specified");
 }
 
-#ifdef PROFILE
-#include "profile.h"
-#endif
-
 #ifdef _MAC_
 	extern void GetInitialPathList (void);
 #endif
 
 Bool Compile (char *fname,char *output_file_name)
 {
-#ifdef PROFILE
-	InitProfile (900,300);
-	freopen ("Profile","w",stdout);
-#endif
-
 #ifdef _MAC_
 	GetInitialPathList();
 #endif
@@ -123,10 +105,6 @@ Bool Compile (char *fname,char *output_file_name)
 		CompilerError = True;
 
 	ExitCompiler ();
-
-#ifdef PROFILE
-	DumpProfile();
-#endif
 
 	return ! CompilerError;
 }
