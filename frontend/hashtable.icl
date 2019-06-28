@@ -47,9 +47,15 @@ where
 	(=<) (IC_InstanceMember types1) (IC_InstanceMember types2)
 		= compare_types types1 types2
 	(=<) (IC_GenericCase type1) (IC_GenericCase type2)
-		= type1 =< type2
+		# cmp = type1 =< type2
+		| cmp == Equal
+			= compare_unboxed_array_element_type type1 type2
+			= cmp
 	(=<) (IC_GenericDeriveClass type1) (IC_GenericDeriveClass type2)
-		= type1 =< type2
+		# cmp = type1 =< type2
+		| cmp == Equal
+			= compare_unboxed_array_element_type type1 type2
+			= cmp
 	(=<) (IC_Field typ_id1) (IC_Field typ_id2)
 		= typ_id1 =< typ_id2
 	(=<) (IC_TypeExtension module_name1) (IC_TypeExtension module_name2)
@@ -72,6 +78,16 @@ compare_types [] _
 	= Smaller
 compare_types _ []
 	= Greater
+
+compare_unboxed_array_element_type (TA {type_ident={id_name=PD_UnboxedArray_String}} [{at_type=element_type1}]) (TA {type_ident={id_name=PD_UnboxedArray_String}} [{at_type=element_type2}])
+	= compare_unboxed_array_element_type` element_type1 element_type2
+where
+	compare_unboxed_array_element_type` (TA {type_ident={id_name=PD_UnboxedArray_String}} [{at_type=element_type1}]) (TA {type_ident={id_name=PD_UnboxedArray_String}} [{at_type=element_type2}])
+		= compare_unboxed_array_element_type` element_type1 element_type2
+	compare_unboxed_array_element_type` t1 t2
+		= t1 =< t2
+compare_unboxed_array_element_type t1 t2
+	= Equal
 
 instance =< (!a,!b) |  =< a &  =< b
 where

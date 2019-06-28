@@ -2873,8 +2873,25 @@ where
 			= (error, IT_Node ins it_less it_greater)
 		| ins.glob_object==new_ins_index && ins.glob_module==new_ins_module
 			= (error, IT_Node ins it_less it_greater)
+		# cmp = check_unboxed_arrays ins_types it_types
+		| cmp == Smaller
+			# (error, it_less) = insert ins_types new_ins_index new_ins_module modules error it_less
+			= (error, IT_Node ins it_less it_greater)
+		| cmp == Greater
+			# (error, it_greater) = insert ins_types new_ins_index new_ins_module modules error it_greater
+			= (error, IT_Node ins it_less it_greater)
 			# error = overlapping_instance_error new_ins_module new_ins_index glob_module glob_object modules error
 			= (error, IT_Node ins it_less it_greater)
+	where
+		check_unboxed_arrays [TA {type_ident={id_name=PD_UnboxedArray_String}} [{at_type=elem_type1}]] [TA {type_ident={id_name=PD_UnboxedArray_String}} [{at_type=elem_type2}]]
+			| elem_type1=:(TV _) || elem_type2=:(TV _)
+				= Equal
+			# cmp = elem_type1 =< elem_type2
+			| cmp <> Equal
+				= cmp
+				= check_unboxed_arrays [elem_type1] [elem_type2]
+		check_unboxed_arrays _ _
+			= Equal
 
 	insert_fun_dep_instance ::  ![Type] !BITVECT !Index !Index !{# CommonDefs } !*ErrorAdmin !*InstanceTree -> (!*ErrorAdmin, !*InstanceTree)
 	insert_fun_dep_instance ins_types class_fun_dep_vars new_ins_index new_ins_module modules error IT_Empty

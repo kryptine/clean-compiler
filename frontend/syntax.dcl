@@ -467,6 +467,7 @@ instance == GenericDependency
 :: TypeCons 
 	= TypeConsSymb TypeSymbIdent 
 	| TypeConsBasic BasicType 
+	| TypeConsUnboxedArray TypeCons
 	| TypeConsArrow
 	| TypeConsVar TypeVar
 	| TypeConsQualifiedIdent !Ident !String 

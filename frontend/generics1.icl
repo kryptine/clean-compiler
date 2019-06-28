@@ -441,7 +441,6 @@ where
 				#! {pds_module, pds_def} = psd_predefs_a.[PD_UnboxedArrayType]
 				| 	type_index.glob_module == pds_module
 					&& type_index.glob_object == pds_def
-					&& (case args of [{at_type=TB _}] -> True; _ -> False)
 					-> (GTSAppCons KindConst [], (modules, td_infos, heaps, error))
 				| otherwise
 					#! ({tdi_kinds}, td_infos) = td_infos ! [type_index.glob_module,type_index.glob_object]
@@ -1740,6 +1739,8 @@ where
 	get_kind_of_type_cons :: !TypeCons !*TypeDefInfos -> (!TypeKind, !*TypeDefInfos)
 	get_kind_of_type_cons (TypeConsBasic _) td_infos 
 		= (KindConst, td_infos)
+	get_kind_of_type_cons (TypeConsUnboxedArray _) td_infos
+		= (KindConst, td_infos)
 	get_kind_of_type_cons TypeConsArrow td_infos
 		= (KindArrow [KindConst,KindConst], td_infos)
 	get_kind_of_type_cons (TypeConsSymb {type_ident, type_index}) td_infos
@@ -1789,6 +1790,8 @@ where
 
 instance_vars_from_type_cons (TypeConsVar tv)
 	= [tv]
+instance_vars_from_type_cons (TypeConsUnboxedArray element_type_cons)
+	= instance_vars_from_type_cons element_type_cons
 instance_vars_from_type_cons _
 	= []
 
