@@ -104,6 +104,7 @@ genericIdentToFunIdent id_name type_cons
 type_cons_to_string :: !TypeCons -> {#Char}
 type_cons_to_string (TypeConsSymb {type_ident}) = toString type_ident
 type_cons_to_string (TypeConsBasic bt) = toString bt
+type_cons_to_string (TypeConsUnboxedArray tc) = "#ARRAY;" +++ type_cons_to_string tc
 type_cons_to_string TypeConsArrow = "ARROW"
 type_cons_to_string (TypeConsVar tv) = tv.tv_ident.id_name
 type_cons_to_string (TypeConsQualifiedIdent _ type_name) = type_name
