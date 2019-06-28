@@ -2597,7 +2597,24 @@ where
 				= (error, IT_Node ins it_less it_greater)
 			| ins.glob_object==new_ins_index && ins.glob_module==new_ins_module
 				= (error, IT_Node ins it_less it_greater)
+			# cmp = check_unboxed_arrays ins_types it_types
+			| cmp == Smaller
+				# (error, it_less) = insert ins_types new_ins_index new_ins_module modules error it_less
+				= (error, IT_Node ins it_less it_greater)
+			| cmp == Greater
+				# (error, it_greater) = insert ins_types new_ins_index new_ins_module modules error it_greater
+				= (error, IT_Node ins it_less it_greater)
 				= (checkError ins_types " instance is overlapping" error, IT_Node ins it_less it_greater)
+		where
+			check_unboxed_arrays [TA {type_ident={id_name=PD_UnboxedArray_String}} [{at_type=elem_type1}]] [TA {type_ident={id_name=PD_UnboxedArray_String}} [{at_type=elem_type2}]]
+				| elem_type1=:(TV _) || elem_type2=:(TV _)
+					= Equal
+				# cmp = elem_type1 =< elem_type2
+				| cmp <> Equal
+					= cmp
+					= check_unboxed_arrays [elem_type1] [elem_type2]
+			check_unboxed_arrays _ _
+				= Equal
 
 	check_types_of_instances ins_pos common_defs class_module class_index types state
 		# {class_cons_vars} = common_defs.[class_module].com_class_defs.[class_index]
