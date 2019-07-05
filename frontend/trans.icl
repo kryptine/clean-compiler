@@ -4275,7 +4275,8 @@ where
 	mark_fused_members_of_instance_members ins_i ins_members instances class_members class_module_member_defs fun_defs
 		| ins_i<size ins_members
 			# member_i = class_members.[ins_i].ds_index
-			  member_arity = class_module_member_defs.[member_i].me_type.st_arity
+			  {st_arity=member_arity,st_context=[_:member_context]} = class_module_member_defs.[member_i].me_type
+			  member_arity = member_arity + length member_context
 			  {cim_arity,cim_index} = ins_members.[ins_i]
 			| cim_index<0
 				| cim_arity==main_dcl_module_n
