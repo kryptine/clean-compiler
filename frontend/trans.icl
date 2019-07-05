@@ -4268,25 +4268,25 @@ mark_unused_functions_in_components [] ti
 mark_fused_members_of_instance :: !ClassInstance !Int !{!InstanceInfo} !{#CommonDefs} !FunctionHeap !*{#FunDef} -> *{#FunDef}
 mark_fused_members_of_instance instance_def=:{ins_members,ins_class_index} main_dcl_module_n instances common_defs fun_heap fun_defs
 	# {class_ident,class_members} = common_defs.[ins_class_index.gi_module].com_class_defs.[ins_class_index.gi_index]
-	# clas_module_member_defs = common_defs.[ins_class_index.gi_module].com_member_defs
-	= mark_fused_members_of_instance_members 0 ins_members instances class_members clas_module_member_defs fun_defs
+	# class_module_member_defs = common_defs.[ins_class_index.gi_module].com_member_defs
+	= mark_fused_members_of_instance_members 0 ins_members instances class_members class_module_member_defs fun_defs
 where
 	mark_fused_members_of_instance_members :: !Int !{#ClassInstanceMember} !{!InstanceInfo} !{#DefinedSymbol} !{#MemberDef} !*{#FunDef} -> *{#FunDef}
-	mark_fused_members_of_instance_members ins_i ins_members instances class_members clas_module_member_defs fun_defs
+	mark_fused_members_of_instance_members ins_i ins_members instances class_members class_module_member_defs fun_defs
 		| ins_i<size ins_members
 			# member_i = class_members.[ins_i].ds_index
-			  member_arity = clas_module_member_defs.[member_i].me_type.st_arity
+			  member_arity = class_module_member_defs.[member_i].me_type.st_arity
 			  {cim_arity,cim_index} = ins_members.[ins_i]
 			| cim_index<0
 				| cim_arity==main_dcl_module_n
 					# cim_index = -1-cim_index
 					| cim_index<size instances
 						#! fun_defs = mark_fused_members_of_function cim_index instances.[cim_index] cim_index member_arity fun_defs
-						= mark_fused_members_of_instance_members (ins_i+1) ins_members instances class_members clas_module_member_defs fun_defs
-						= mark_fused_members_of_instance_members (ins_i+1) ins_members instances class_members clas_module_member_defs fun_defs
-					= mark_fused_members_of_instance_members (ins_i+1) ins_members instances class_members clas_module_member_defs fun_defs
+						= mark_fused_members_of_instance_members (ins_i+1) ins_members instances class_members class_module_member_defs fun_defs
+						= mark_fused_members_of_instance_members (ins_i+1) ins_members instances class_members class_module_member_defs fun_defs
+					= mark_fused_members_of_instance_members (ins_i+1) ins_members instances class_members class_module_member_defs fun_defs
 			#! fun_defs = mark_fused_members_of_function cim_index instances.[cim_index] cim_index member_arity fun_defs
-			= mark_fused_members_of_instance_members (ins_i+1) ins_members instances class_members clas_module_member_defs fun_defs
+			= mark_fused_members_of_instance_members (ins_i+1) ins_members instances class_members class_module_member_defs fun_defs
 			= fun_defs
 
 	mark_fused_members_of_function :: !Int !InstanceInfo !Int !Int !*{#FunDef} -> *{#FunDef}
