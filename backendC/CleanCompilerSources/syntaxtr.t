@@ -599,8 +599,6 @@ STRUCT (symbol_def,SymbDef){
 #define SDEF_RULE_INSTANCE_RULE_P 32768
 #define SDEF_HAS_SPECIAL_ARRAY_FUNCTION 512
 #define SDEF_DEFRULE_ABC_CODE 2048
-#define SDEF_DEFRULE_INSTRUCTIONS 16
-#define SDEF_WARNED_NO_INLINE_CODE 65536
 
 /* some macros to reuse bit fields */
 

@@ -22,7 +22,6 @@
 #include "settings.h"
 #include "syntaxtr.t"
 #include "comsupport.h"
-#include "scanner.h"
 #include "buildtree.h"
 #include "comparser.h"
 #include "checker.h"
@@ -454,7 +453,6 @@ void InitCompiler (void)
 	CurrentExt    = "";
 
 	InitStorage		();
-	InitScanner		();
 	InitParser		();
 	InitChecker		();
 	InitStatesGen		();

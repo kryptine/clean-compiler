@@ -6,7 +6,6 @@
 # include	"syntaxtr.t"
 
 # include	"comsupport.h"
-# include	"scanner.h"
 # include	"sizes.h"
 # include	"checker.h"
 # include	"statesgen.h"
@@ -19,8 +18,6 @@ void
 InitParser (void)
 {
 	int		i;
-
-	ScanInitialise ();
 
 	for (i = 0; i < MaxNodeArity; i++)
 	{	SelectSymbols	 [i] = NULL;

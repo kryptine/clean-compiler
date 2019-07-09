@@ -9,7 +9,6 @@
 #include "syntaxtr.t"
 #include "comsupport.h"
 #include "sizes.h"
-#include "scanner.h"
 #include "buildtree.h"
 #include "comparser.h"
 #include "statesgen.h"
@@ -40,37 +39,6 @@ void GenDependencyList (void)
 					,def_mod->mod_body->dm_modification_time
 #endif
 					);
-}
-
-void ReadInlineCode (void)
-{
-	DefModList d_mod;
-
-	for_l (d_mod,OpenDefinitionModules,mod_next){
-		DefMod def_mod;
-		
-		def_mod=d_mod->mod_body;
-		if (def_mod->dm_system_module){
-			int i,n_function_symbols;
-			Symbol function_symbol_a;
-			
-			n_function_symbols=def_mod->dm_n_function_symbols;
-			function_symbol_a=def_mod->dm_function_symbol_a;
-			for (i=0; i<n_function_symbols; ++i)
-				if (function_symbol_a[i].symb_kind==definition){
-					SymbDef sdef;
-
-					sdef=function_symbol_a[i].symb_def;
-					if (sdef->sdef_kind==SYSRULE &&
-						(sdef->sdef_mark & (SDEF_USED_STRICTLY_MASK | SDEF_DEFRULE_ABC_CODE))==SDEF_USED_STRICTLY_MASK)
-						break;
-				}
-
-			if (i<n_function_symbols && d_mod->mod_body->dm_name!=CurrentModule)
-				/* Get the inline instructions of all the rules that are defined in this module */
-				ScanInlineFile (d_mod->mod_body->dm_name,FirstSystemModuleTable+def_mod->dm_module_n);
-		}
-	}
 }
 
 char *StdBoolId;

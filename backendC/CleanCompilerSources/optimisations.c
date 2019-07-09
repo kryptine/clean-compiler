@@ -10,7 +10,6 @@
 #include "comsupport.h"
 #include "statesgen.h"
 #include "checker.h"
-#include "scanner.h"
 #include "buildtree.h"
 #include "codegen_types.h"
 #include "optimisations.h"

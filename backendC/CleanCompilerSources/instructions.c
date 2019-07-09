@@ -1332,55 +1332,12 @@ static void CallFunction2 (Label label, SymbDef def, Bool isjsr, StateS root_sta
 	label->lab_pref = s_pref;
 
 	if (def->sdef_kind==SYSRULE){
-		char  *instr;
-
 		if (def->sdef_mark & SDEF_DEFRULE_ABC_CODE){
 			GenABCInstructions (def->sdef_abc_code);
 			if (!isjsr)
 				GenRtn (aout, bout, root_state);
 			return;
 		}
-
-		if (def->sdef_mark & SDEF_DEFRULE_INSTRUCTIONS)
-			instr = def->sdef_instructions;
-		else
-			instr = NULL;
-
-		if (instr && *instr!='\0'){
-			char *tail;
-
-			for (; *instr != '\0'; instr = tail){
-				for (tail = instr; *tail != '\n'; tail++)
-					;
-				*tail = '\0';
-				FPrintF (OutFile, "\n%s", instr);
-				*tail++ = '\n';
-			}
-			if (!isjsr)
-				GenRtn (aout, bout, root_state);
-		} else {
-			if ((def->sdef_mark & SDEF_WARNED_NO_INLINE_CODE)==0 && instr==NULL){
-				char *previous_module = CurrentModule;
-				char *previous_ext = CurrentExt;
-			
-				CurrentModule = def->sdef_module;
-				CurrentExt    = GetFileExtension (abcFile);
-				
-				StaticMessage (False, "%D", "no inline code for this function", def);
-
-				CurrentModule = previous_module;
-				CurrentExt = previous_ext;
-
-				def->sdef_mark |= SDEF_WARNED_NO_INLINE_CODE;
-			}
-			GenDStackLayout (ain, bin, fun_args);
-			if (isjsr){
-				GenJsr (label);
-				GenOStackLayoutOfState (aout, bout, root_state);
-			} else
-				GenJmp (label);
-		}
-		return;
 	}
 	if (def->sdef_kind==IMPRULE){
 		if ((def->sdef_mark & SDEF_INLINE_IS_CONSTRUCTOR)!=0){

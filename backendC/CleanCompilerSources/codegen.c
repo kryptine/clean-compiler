@@ -1223,8 +1223,6 @@ void CodeGeneration (ImpMod imod, char *fname)
 			GenSystemImports();
 			FileComment();
 
-			ReadInlineCode();
-
 			CreateStackFrames();
 
 			ImportSymbols (imod->im_size_dcl_mfts_a,imod->im_dcl_mfts_a);

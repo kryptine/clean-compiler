@@ -13,7 +13,6 @@
 # include "sizes.h"
 # include "set_scope_numbers.h"
 
-# include "scanner.h"		/* InitScanner, ScanInitIdentStringTable */
 # include "checker.h"		/* scc_dependency_list, ClearOpenDefinitionModules, AddOpenDefinitionModule */
 # include "comsupport.h" 	/* CurrentModule */
 # include "buildtree.h"		/* TupleSymbol, ApplySymbol */
@@ -2353,9 +2352,6 @@ BEDeclareRuleType (int functionIndex, int moduleIndex, CleanString name)
 	Assert (functions [functionIndex].symb_kind == erroneous_symb);
 
 	newSymbDef	= ConvertAllocType (SymbDefS);
-	if (module->bem_isSystemModule) /* for inline code */
-		PutStringInHashTable (ConvertCleanString (name), FirstSystemModuleTable + moduleIndex, newSymbDef);
-
 	newSymbDef->sdef_kind		= NEWDEFINITION;
 	newSymbDef->sdef_exported	= False;
 	newSymbDef->sdef_module		= module->bem_name;
@@ -3296,9 +3292,6 @@ BEInit (int argc)
 	CurrentExt		= "";
 
 	InitStorage ();
-	/* +++ remove symbol table from backend */
-	ScanInitIdentStringTable ();
-	InitScanner (); /* for inlining */
 
 #if SA_RECOGNIZES_ABORT_AND_UNDEF
 	StdMiscId = NULL;

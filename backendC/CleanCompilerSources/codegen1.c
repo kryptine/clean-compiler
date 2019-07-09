@@ -24,7 +24,6 @@
 #include "codegen2.h"
 #include "codegen3.h"
 #include "instructions.h"
-#include "scanner.h"
 #include "buildtree.h"
 #include "pattern_match.h"
 #if SHARE_UPDATE_CODE
