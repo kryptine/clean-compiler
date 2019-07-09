@@ -6,7 +6,6 @@
 # include "sizes.h"
 # include "buildtree.h"
 # include "checker.h"
-# include "scanner.h"
 
 SymbolP	TrueSymbol, FalseSymbol, TupleSymbol,
 		SelectSymbols [MaxNodeArity], ApplySymbol, IfSymbol,

@@ -3,7 +3,6 @@
 #include "types.t"
 #include "syntaxtr.t"
 #include "comsupport.h"
-#include "scanner.h"
 #include "checksupport.h"
 #include "settings.h"
 #include "buildtree.h"
