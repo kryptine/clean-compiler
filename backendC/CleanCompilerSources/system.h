@@ -44,9 +44,8 @@
 
 extern char *PATHLIST;
 
-extern char *GetFileExtension (FileKind kind);
-extern File FOpen (char *wname, FileKind kind, char *mode);
-extern int FDelete (char *fname, FileKind kind);
+extern File FOpen (char *fname, char *mode);
+extern int FDelete (char *fname);
 extern int FClose (File f);
 
 extern int FPutS (char *s, File f);
@@ -54,10 +53,6 @@ extern int FPutS (char *s, File f);
 extern int FPrintF (File f, char *fmt,...);
 #else
 extern int FPrintF (); /* (File w, char *fmt,...) */
-#endif
-
-#ifndef __ppc__
-extern char *FGetS (char *s, int n, File f);
 #endif
 
 #ifdef _VARARGS_

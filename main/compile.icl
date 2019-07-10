@@ -94,6 +94,17 @@ closeTclFile (Yes tcl_file) files
 closeTclFile _ files
 	= (True,files);
 
+abc_file_name_in_clean_system_files_folder :: !String !String !*File !*Files -> (!Bool, !String, !*File, !*Files)
+abc_file_name_in_clean_system_files_folder mod_dir mod_name error files
+	// mod_dir ends with DirectorySeparator
+	# (csf_directory_path,file_name) = make_clean_system_files_dir_and_file_name (mod_dir +++ mod_name)
+	# file_path = csf_directory_path +++ {DirectorySeparator} +++ file_name +++ ".abc"
+	# (ok, files) = ensureCleanSystemFilesExists csf_directory_path files
+	| not ok
+		# error = fwrites ("can't create folder \"" +++ csf_directory_path +++"\"\n") error
+		= (False, file_path, error, files)
+	= (True, file_path, error, files)
+
 ::	CoclOptions =
 	{	moduleName:: {#Char}
 	,	pathName ::{#Char}
@@ -325,14 +336,16 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 	  hp_type_heaps=heaps.hp_type_heaps
 	  type_var_heap=hp_type_heaps.th_vars
 	  attrHeap=hp_type_heaps.th_attrs
-	# (success,functions_and_macros,var_heap,type_var_heap,attrHeap,error,out)
+	# (success,functions_and_macros,var_heap,type_var_heap,attrHeap,error,out,files)
 		= case optionalSyntaxTree of
 			Yes syntaxTree
 				# functions_and_macros = syntaxTree.fe_icl.icl_functions
+				# (Yes path) = mbModPath
+				# (csf_dir_exists,abc_file_path,error,files) = abc_file_name_in_clean_system_files_folder path options.moduleName error files
 				# (success, var_heap, type_var_heap, attrHeap, error, out)
-				 	 = backEndInterface outputPath (map appendRedirection backendArgs) options.listTypes options.outPath predef_symbols syntaxTree main_dcl_module_n
+				 	 = backEndInterface abc_file_path (map appendRedirection backendArgs) options.listTypes options.outPath predef_symbols syntaxTree main_dcl_module_n
 				 	 					var_heap type_var_heap attrHeap error out
-				-> (success,functions_and_macros,var_heap,type_var_heap,attrHeap,error,out)
+				-> (success,functions_and_macros,var_heap,type_var_heap,attrHeap,error,out,files)
 				with
 					appendRedirection arg
 						= case arg of
@@ -343,17 +356,7 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 							arg
 								->	arg
 			No
-				-> (False,{},var_heap,type_var_heap,attrHeap,error,out)
-		with
-/*
-			outputPath
-				=	if (options.outputPathName == "")
-						(directoryName options.pathName +++ "Clean System Files" +++ {DirectorySeparator} +++ baseName options.pathName)
-						options.outputPathName
-*/
-			outputPath
-	//				=	/* directoryName options.pathName +++ "Clean System Files" +++ {DirectorySeparator} +++ */ baseName options.pathName
-				=	baseName options.pathName
+				-> (False,{},var_heap,type_var_heap,attrHeap,error,out,files)
 	# heaps = {heaps & hp_var_heap=var_heap, hp_type_heaps = {th_vars=type_var_heap, th_attrs=attrHeap}}
 	# (closed, files) = fclose out files
 	| not closed

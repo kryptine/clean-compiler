@@ -103,7 +103,7 @@ char *ABCFileName;
 
 Bool OpenABCFile (char *fname)
 {
-	OutFile = FOpen (fname, abcFile, "w");
+	OutFile = FOpen (fname, "w");
 
 	if (OutFile!=NULL){
 #if defined (POWER)
@@ -131,7 +131,7 @@ void CloseABCFile (char *fname)
 			StaticMessage (True, "<open file>", "Write error (disk full?)");
 		}
 		if (CompilerError)
-			FDelete (fname, abcFile); 
+			FDelete (fname);
 		OpenedFile = (File) NIL;
 	}
 }
