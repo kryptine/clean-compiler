@@ -200,37 +200,3 @@ void PrintSymbolOfIdent (char *name, unsigned line_nr, File file)
 #endif	
 }
 
-void CheckWarningOrError2 (Bool error,char *msg1,char *msg2,char *msg3)
-{
-	StaticMessage (error,"%S","%s,%s %s",CurrentSymbol,msg1,msg2,msg3);
-}
-
-void CheckError (char *msg1,char *msg2)
-{
-	StaticMessage (True,"%S","%s %s",CurrentSymbol,msg1,msg2);
-}
-
-void CheckSymbolError (struct symbol *symbol,char *msg)
-{
-	StaticMessage (True,"%S","%S %s",CurrentSymbol,symbol,msg);
-}
-
-void CheckWarning (char *msg1,char *msg2)
-{
-	StaticMessage (False,"%S","%s %s",CurrentSymbol,msg1,msg2);
-}
-
-void CheckWarningOrError (Bool error,char *msg1,char *msg2)
-{
-	StaticMessage (error,"%S","%s %s",CurrentSymbol,msg1,msg2);
-}
-
-void CheckSymbolWarning (struct symbol *symbol,char *msg)
-{
-	StaticMessage (False,"%S","%S %s",CurrentSymbol,symbol,msg);
-}
-
-void CheckSymbolWarningOrError (Bool error,struct symbol *symbol,char *msg)
-{
-	StaticMessage (error,"%S","%S %s",CurrentSymbol,symbol,msg);
-}
