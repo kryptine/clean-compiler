@@ -19,7 +19,7 @@ struct symbol;
 extern void PrintSymbol (struct symbol *symbol,File file);
 
 extern Bool  CompilerError;
-extern char *CurrentModule, *CurrentExt, *CurrentPhase, *CompilerVersion;
+extern char *CurrentModule, *CompilerVersion;
 
 extern struct symbol *CurrentSymbol;
 

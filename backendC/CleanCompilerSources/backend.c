@@ -3287,9 +3287,7 @@ BEInit (int argc)
 
 	ExitEnv_valid=0;
 
-	CurrentPhase	= "Back End";
 	CurrentModule	= "<unknown module>";
-	CurrentExt		= "";
 
 	InitStorage ();
 

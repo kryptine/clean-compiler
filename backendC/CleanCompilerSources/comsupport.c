@@ -37,7 +37,7 @@ extern int VERSION;
 
 /* 'CurrentModule' contains the name of the module that is currently under examination. */
 
-char *CurrentPhase, *CurrentModule, *CurrentExt;
+char *CurrentModule;
 unsigned CurrentLine;
 Symbol CurrentSymbol;
 Bool CompilerError;
@@ -309,18 +309,13 @@ void StaticMessage (Bool error, char *symbol_format, char *message_format, ...)
 	FPutS ("### ",StdError);
 #endif
 
-	if (CurrentPhase){
-		FPutS (CurrentPhase, StdError);
-		FPutS (error ? " error [" : " warning [", StdError);
-	} else
-		FPutS (error ? "Error [" : "Warning [", StdError);
+	FPutS (error ? "Error [" : "Warning [", StdError);
 
 #ifdef MAKE_MPW_TOOL
 	FPutS ("File ",StdError);
 #endif
 
 	FPutS (CurrentModule, StdError);
-	FPutS (CurrentExt, StdError);
 	
 	if (CurrentLine > 0){
 #ifdef MAKE_MPW_TOOL
@@ -450,7 +445,6 @@ void InitCompiler (void)
 	/* Call all the initialization functions */
 	/* InitStorage has to be called first */
 	CurrentModule = Init;
-	CurrentExt    = "";
 
 	InitStorage		();
 	InitParser		();
