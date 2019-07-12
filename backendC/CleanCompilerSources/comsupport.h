@@ -10,10 +10,6 @@
 #include "system.h"
 #endif
 
-#define   NoError 	0
-#define   ErrKind1 	1
-#define   ErrKind2	2
-
 #define MINIMUM(a,b)	(((a)<(b)) ? (a) : (b))
 #define MAXIMUM(a,b)	(((a)>(b)) ? (a) : (b))
 
@@ -42,11 +38,9 @@ extern void *CompAlloc (SizeT size);
 extern void InitStorage (void);
 extern void CompFree (void);
 
-extern Bool ArgParser (int argc, char *argv[]);
 extern void FatalCompError (char *mod, char *proc, char *mess);
 
 extern void InitSettings (void);
-extern void ExitOnInterrupt (void);
 extern void InitCompiler (void);
 extern void ExitCompiler (void);
 
