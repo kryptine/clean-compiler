@@ -36,14 +36,6 @@
 
 #include "types.t"
 
-#ifdef GEN_SUPPORT_H
-# include "gensupport.h"
-#else
-
-#define MAXPATHLEN 1024
-
-extern char *PATHLIST;
-
 extern File FOpen (char *fname, char *mode);
 extern int FDelete (char *fname);
 extern int FClose (File f);
@@ -70,5 +62,3 @@ extern void *Alloc (unsigned long count, SizeT size);
 extern void Free (void *p);
 
 #define ReSize(A) (((A)+3) & ~3)
-
-#endif

@@ -538,7 +538,6 @@ STRUCT (symbol_def,SymbDef){
 		struct constructor_list * typeinfo_constructor;	/* for CONSTRUCTOR */
 		struct symbol_def *typeinfo_dictionary_field; /* for IMPRULE if SDEF_INSTANCE_RULE_WITH_FIELD_P */
 		struct symbol_def *typeinfo_instance_rule; /* for IMPRULE if SDEF_RULE_INSTANCE_RULE_P */
-		char * typeinfo_instructions; /* for DEFRULE or SYSRULE if SDEF_DEFRULE_INSTRUCTIONS */
 		Instructions typeinfo_abc_code; /* for DEFRULE or SYSRULE if SDEF_DEFRULE_ABC_CODE */
 	} sdef_typeinfo;
 
@@ -617,7 +616,6 @@ STRUCT (symbol_def,SymbDef){
 
 #define sdef_dictionary_field	sdef_typeinfo.typeinfo_dictionary_field
 #define sdef_instance_rule	sdef_typeinfo.typeinfo_instance_rule
-#define sdef_instructions	sdef_typeinfo.typeinfo_instructions
 #define sdef_abc_code	sdef_typeinfo.typeinfo_abc_code
 
 #if IMPORT_OBJ_AND_LIB

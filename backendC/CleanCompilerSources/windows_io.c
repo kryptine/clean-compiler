@@ -23,7 +23,7 @@
 File FOpen (char *fname,char *mode)
 {
 	return fopen (fname,mode);
-	}
+}
 
 int FClose (File f)
 {

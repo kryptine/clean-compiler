@@ -23,16 +23,7 @@ typedef unsigned Bool;
 		False = 0, True, MightBeTrue
 	};
 
-typedef enum
-		{abcFile = 1, iclFile, dclFile, applFile, assFile, sunAssFile,
-		 obj00File, obj20File, obj81File,
-		 otherFile, hsFile
-		} FileKind;
-
 #define FileNameMax		256
-#define SeekSet
-#define SeekCur
-#define SeekEnd
 
 #ifdef _WINDOWS_
 # include <stdarg.h>

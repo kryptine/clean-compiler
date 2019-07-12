@@ -1132,8 +1132,6 @@ void CodeGeneration (ImpMod imod, char *fname)
 		int DoStrictnessAnalysis_and_init_ok;
 		ImpRuleP new_rules;
 
-		CurrentPhase = NULL;
-
 #if 0
 		PrintRules (imod->im_rules);
 #endif

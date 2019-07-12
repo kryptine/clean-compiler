@@ -2,14 +2,6 @@
 extern int MACVAR;
 #define CheckVersion if (MACVAR != VERSION) DoFatalError ("Wrong version number")
 
-typedef short          TwoBytesInt;
-typedef int            FourBytesInt;
-typedef unsigned short TwoBytesUnsigned;
-typedef unsigned int   FourBytesUnsigned;
-
-typedef double  EightBytesReal;
-typedef float         FourBytesReal;
-
 #define SizeT		unsigned long
 #define SizeOf(A)	((SizeT) sizeof (A))
 
@@ -41,5 +33,4 @@ extern FILE *std_out_file_p,*std_error_file_p;
 # define StdError stderr
 #endif
 
-#define FGetC(f) fgetc(f)
 #define FPutC(c,f) fputc(c,f)
