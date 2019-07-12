@@ -118,7 +118,7 @@ Bool OpenABCFile (char *fname)
 
 void WriteLastNewlineToABCFile (void)
 {
-	FPutC ('\n',OutFile);
+	PutCOutFile ('\n');
 }
 
 void CloseABCFile (char *fname)
@@ -275,11 +275,11 @@ static void TreatWaitListAfterFill (int offset, FillKind fkind)
 static void put_n (long n)
 {
 	while (!(n>=-64 && n<=63)){
-		FPutC (128+(n & 127),OutFile);
+		PutCOutFile (128+(n & 127));
 		n=n>>7;
 	}
 
-	FPutC (n+64,OutFile);
+	PutCOutFile (n+64);
 }
 
 static long integer_string_to_integer (char *s_p)
@@ -395,7 +395,7 @@ static void put_arguments__n_b (long n1)
 	if (DoDebug)
 		FPrintF (OutFile," %d",(n1));
 	else {
-		FPutC (' ',OutFile);
+		PutCOutFile (' ',OutFile);
 		put_n (n1);
 	}
 }
@@ -405,7 +405,7 @@ static void put_arguments__n__b (long n1)
 	if (DoDebug)
 		FPrintF (OutFile," %d ",(n1));
 	else {
-		FPutC (' ',OutFile);
+		PutCOutFile (' ',OutFile);
 		put_n (n1);
 	}
 }
@@ -425,7 +425,7 @@ static void put_arguments__nn_b (long n1,long n2)
 	if (DoDebug)
 		FPrintF (OutFile," %d %d",(n1),(n2));
 	else {
-		FPutC (' ',OutFile);
+		PutCOutFile (' ',OutFile);
 		put_n (n1);
 		put_n (n2);
 	}
@@ -650,22 +650,22 @@ enum {
 
 static void put_instruction (char *instruction)
 {
-	FPutC ('\n',OutFile);
-	FPutC ('\t',OutFile);
+	PutCOutFile ('\n');
+	PutCOutFile ('\t');
 	FPutS (instruction,OutFile);
 }
 
 static void put_instruction_ (char *instruction)
 {
-	FPutC ('\n',OutFile);
-	FPutC ('\t',OutFile);
+	PutCOutFile ('\n');
+	PutCOutFile ('\t');
 	FPutS (instruction,OutFile);
-	FPutC (' ',OutFile);
+	PutCOutFile (' ');
 }
 
 static void put_instruction_code (int instruction_code)
 {
-	FPutC (instruction_code,OutFile);
+	PutCOutFile (instruction_code);
 }
 
 #define Da "a"
@@ -704,24 +704,24 @@ static void put_instruction_code (int instruction_code)
 
 static void put_directive (char *directive)
 {
-	FPutC ('\n',OutFile);
-	FPutC ('.',OutFile);
+	PutCOutFile ('\n');
+	PutCOutFile ('.');
 	FPutS (directive,OutFile);
 }
 
 static void put_directive_ (char *directive)
 {
-	FPutC ('\n',OutFile);
-	FPutC ('.',OutFile);
+	PutCOutFile ('\n');
+	PutCOutFile ('.');
 	FPutS (directive,OutFile);
-	FPutC (' ',OutFile);
+	PutCOutFile (' ');
 }
 
 static void put_first_directive_ (char *directive)
 {
-	FPutC ('.',OutFile);
+	PutCOutFile ('.');
 	FPutS (directive,OutFile);
-	FPutC (' ',OutFile);
+	PutCOutFile (' ');
 }
 
 void BuildBasicFromB (ObjectKind kind,int b_offset)
@@ -1039,7 +1039,7 @@ static void GenBStackElems (StateS state)
 {
 	if (IsSimpleState (state)){
 		if (state.state_kind == OnB)
-			FPutC (BElems [(int) state.state_object], OutFile);			
+			PutCOutFile (BElems [(int) state.state_object]);			
 	} else {
 		int arity;
 		States argstates;
@@ -1066,9 +1066,9 @@ static void GenABStackElems (StateS state)
 {
 	if (IsSimpleState (state)){
 		if (state.state_kind == OnB)
-			FPutC (BElems [(int) state.state_object], OutFile);
+			PutCOutFile (BElems [(int) state.state_object]);
 		else
-			FPutC ('a', OutFile);
+			PutCOutFile ('a');
 	} else {
 		int arity;
 		States argstates;
@@ -1076,25 +1076,25 @@ static void GenABStackElems (StateS state)
 		switch (state.state_type){
 			case TupleState:
 				argstates = state.state_tuple_arguments;			
-				FPutC ('(', OutFile);
+				PutCOutFile ('(');
 				if (state.state_arity>0){
 					GenABStackElems (argstates[0]);
 					for (arity=1; arity < state.state_arity; arity++){
-						FPutC (',', OutFile);
+						PutCOutFile (',');
 						GenABStackElems (argstates[arity]);
 					}
 				}
-				FPutC (')', OutFile);
+				PutCOutFile (')');
 				break;
 			case RecordState:
 				argstates = state.state_record_arguments;
-				FPutC ('(', OutFile);
+				PutCOutFile ('(');
 				for (arity=0; arity < state.state_arity; arity++)
 					GenABStackElems (argstates[arity]);
-				FPutC (')', OutFile);
+				PutCOutFile (')');
 				return;
 			case ArrayState:
-				FPutC ('a', OutFile);
+				PutCOutFile ('a');
 				return;
 			default:
 				error_in_function ("GenABStackElems");
@@ -1107,9 +1107,9 @@ static void GenABStackElemsForRecordDesc (StateS state)
 {
 	if (IsSimpleState (state)){
 		if (state.state_kind == OnB)
-			FPutC (BElems [(int) state.state_object], OutFile);
+			PutCOutFile (BElems [(int) state.state_object]);
 		else
-			FPutC ('a', OutFile);
+			PutCOutFile ('a');
 	} else {
 		int arity;
 		States argstates;
@@ -1117,25 +1117,25 @@ static void GenABStackElemsForRecordDesc (StateS state)
 		switch (state.state_type){
 			case TupleState:
 				argstates = state.state_tuple_arguments;			
-				FPutC ('(', OutFile);
+				PutCOutFile ('(');
 				if (state.state_arity>0){
 					GenABStackElemsForRecordDesc (argstates[0]);
 					for (arity=1; arity < state.state_arity; ++arity){
-						FPutC (',', OutFile);
+						PutCOutFile (',');
 						GenABStackElemsForRecordDesc (argstates[arity]);
 					}
 				}
-				FPutC (')', OutFile);
+				PutCOutFile (')');
 				return;
 			case RecordState:
 				argstates = state.state_record_arguments;
-				FPutC ('{', OutFile);
+				PutCOutFile ('{');
 				for (arity=0; arity < state.state_arity; ++arity)
 					GenABStackElemsForRecordDesc (argstates[arity]);
-				FPutC ('}', OutFile);
+				PutCOutFile ('}');
 				return;
 			case ArrayState:
-				FPutC ('a', OutFile);
+				PutCOutFile ('a');
 				return;
 			default:
 				error_in_function ("GenABStackElemsForRecordDesc");
@@ -1297,12 +1297,12 @@ static void GenABCInstructions (Instructions ilist)
 		
 		instruction_name=ilist->instr_this;
 		
-		FPutC ('\n',OutFile);
+		PutCOutFile ('\n');
 		if (instruction_name[0]==':')
 			FPutS (&instruction_name[1],OutFile);
 		else {
 			if (instruction_name[0]!='.')
-				FPutC ('\t',OutFile);
+				PutCOutFile ('\t');
 			FPutS (instruction_name,OutFile);
 		}
 	}
@@ -2254,14 +2254,14 @@ void GenDumpString (char *str)
 void GenLabelDefinition (Label lab)
 {
 	if (lab){
-		FPutC ('\n', OutFile);
+		PutCOutFile ('\n');
 		GenLabel (lab);
 	}
 }
 
 void GenNodeEntryLabelDefinition (Label lab)
 {
-	FPutC ('\n', OutFile);
+	PutCOutFile ('\n');
 	GenDescriptorOrNodeEntryLabel (lab);
 }
 
@@ -2631,7 +2631,7 @@ void GenNodeEntryDirective (int arity,Label label,Label label2)
 			FPutS (empty_lab.lab_name, OutFile);
 
 		if (label2){
-			FPutC (' ', OutFile);
+			PutCOutFile (' ');
 			GenLabel (label2);
 		}
 #ifdef MEMORY_PROFILING_WITH_N_STRING
@@ -2658,7 +2658,7 @@ void GenApplyInstanceEntryDirective (int arity,Label label,Label label2)
 		FPutS (empty_lab.lab_name, OutFile);
 	else
 		GenLabel (label);
-	FPutC (' ', OutFile);
+	PutCOutFile (' ');
 	GenLabel (label2);
 }
 
@@ -2674,7 +2674,7 @@ void GenLazyRecordNodeEntryDirective (int arity,Label label,Label label2)
 			FPutS (empty_lab.lab_name, OutFile);
 
 		if (label2){
-			FPutC (' ', OutFile);
+			PutCOutFile (' ');
 			GenLabel (label2);
 		}
 
@@ -2696,7 +2696,7 @@ void GenNodeEntryDirectiveForLabelWithoutSymbol (int arity,Label label,Label lab
 		GenLabel (label);
 
 		if (label2){
-			FPutC (' ', OutFile);
+			PutCOutFile (' ');
 			GenLabel (label2);
 		}
 
@@ -2721,7 +2721,7 @@ void GenNodeEntryDirectiveUnboxed (int a_size,int b_size,Label label,Label label
 			FPutS (empty_lab.lab_name, OutFile);
 
 		if (label2){
-			FPutC (' ', OutFile);
+			PutCOutFile (' ');
 			GenLabel (label2);
 		}
 
@@ -2746,7 +2746,7 @@ void GenFieldNodeEntryDirective (int arity,Label label,Label label2,char *record
 			FPutS (empty_lab.lab_name, OutFile);
 		
 		if (label2!=NULL){
-			FPutC (' ', OutFile);
+			PutCOutFile (' ');
 			if (label2==&empty_lab)
 				FPutS (empty_lab.lab_name, OutFile);				
 			else
@@ -2877,8 +2877,8 @@ void GenUnboxedConsRecordDescriptor (SymbDef sdef,int tail_strict)
 		FPrintF (OutFile, "%s%s ",unboxed_record_cons_prefix,name);
 	}
 
-	FPutC ('l', OutFile);
-	FPutC ('R', OutFile);
+	PutCOutFile ('l');
+	PutCOutFile ('R');
 
 	GenABStackElemsOfRecord (tuple_arguments_state[0]);
 	GenABStackElems (tuple_arguments_state[1]);
@@ -2931,7 +2931,7 @@ void GenStrictConstructorDescriptor (SymbDef sdef,StateP constructor_arg_states)
 		FPrintF (OutFile, CONSTRUCTOR_R_PREFIX "%u ",sdef->sdef_number);
 	}
 
-	FPutC ('d', OutFile);
+	PutCOutFile ('d');
 
 	for (arg_n=0,constructor_arg_state_p=constructor_arg_states; arg_n<state_arity; ++arg_n,++constructor_arg_state_p)
 		 GenABStackElemsForRecordDesc (*constructor_arg_state_p);
@@ -2975,9 +2975,9 @@ void GenArrayFunctionDescriptor (SymbDef arr_fun_def, Label desclab, int arity)
 	else
 		GenLabel (&descriptor_label);
 
-	FPutC (' ', OutFile);
+	PutCOutFile (' ');
 	GenLabel (&empty_lab);
-	FPutC (' ', OutFile);
+	PutCOutFile (' ');
 
 	if (arr_fun_def->sdef_mark & SDEF_USED_CURRIED_MASK){
 		LabDef lazylab;
@@ -3086,7 +3086,7 @@ void GenFunctionDescriptorAndExportNodeAndDescriptor (SymbDef sdef)
 			FPrintF (OutFile,"%s.%u",name,sdef->sdef_number);
 	} else
 		PrintSymbolOfIdent (name, 0, OutFile);
-	FPutC ('\"',OutFile);
+	PutCOutFile ('\"');
 }
 
 void GenConstructorFunctionDescriptorAndExportNodeAndDescriptor (SymbDef sdef)
@@ -3164,7 +3164,7 @@ void GenConstructorFunctionDescriptorAndExportNodeAndDescriptor (SymbDef sdef)
 	
 	FPrintF (OutFile, "%d 0 \"", sdef->sdef_arity);
 	PrintSymbolOfIdent (name, 0, OutFile);
-	FPutC ('\"',OutFile);
+	PutCOutFile ('\"');
 }
 
 #if OPTIMIZE_LAZY_TUPLE_RECURSION
@@ -3189,7 +3189,7 @@ void GenFunctionDescriptorForLazyTupleRecursion (SymbDef sdef,int tuple_result_a
 	
 	FPrintF (OutFile, "%d 0 \"",sdef->sdef_arity+tuple_result_arity);
 	PrintSymbolOfIdent (name,0,OutFile);
-	FPutC ('\"',OutFile);
+	PutCOutFile ('\"');
 
 # if 1
 	put_directive_ (Ddescn);
@@ -3207,7 +3207,7 @@ void GenFunctionDescriptorForLazyTupleRecursion (SymbDef sdef,int tuple_result_a
 	
 	FPrintF (OutFile, "%d 0 \"",sdef->sdef_arity+tuple_result_arity);
 	PrintSymbolOfIdent (name,0,OutFile);
-	FPutC ('\"',OutFile);
+	PutCOutFile ('\"');
 # endif
 }
 #endif
@@ -3416,10 +3416,10 @@ void GenModuleDescriptor (
 
 #if WRITE_DCL_MODIFICATION_TIME
 	if (WriteModificationTimes){
-		FPutC (' ',OutFile);
-		FPutC ('\"',OutFile);
+		PutCOutFile (' ');
+		PutCOutFile ('\"');
 		FPutS (file_time,OutFile);
-		FPutC ('\"',OutFile);
+		PutCOutFile ('\"');
 	}
 #endif
 }
@@ -3435,10 +3435,10 @@ void GenDepend (char *modname
 
 #if WRITE_DCL_MODIFICATION_TIME
 	if (WriteModificationTimes){
-		FPutC (' ',OutFile);
-		FPutC ('\"',OutFile);
+		PutCOutFile (' ');
+		PutCOutFile ('\"');
 		FPutS (file_time,OutFile);
-		FPutC ('\"',OutFile);
+		PutCOutFile ('\"');
 	}
 #endif
 }
@@ -3854,7 +3854,7 @@ void GenerateForeignExports (struct foreign_export_list *foreign_export_list)
 		FPrintF (OutFile,"\n\tcentry %s e_%s_s%s \"",function_sdef->sdef_name,CurrentModule,function_sdef->sdef_name);
 		
 		if (foreign_export_list->fe_stdcall)
-			FPutC ('P',OutFile);
+			PutCOutFile ('P');
 		
 		rule_type_p=function_sdef->sdef_rule->rule_type;
 		
@@ -3884,7 +3884,7 @@ void GenParameters (Bool input, Parameters params, int asp, int bsp)
 		
 		node_id=params->par_node_id;
 		if (!is_first_parameter)
-			FPutC (' ',OutFile);
+			PutCOutFile (' ');
 		if (IsSimpleState (node_id->nid_state) && node_id->nid_state.state_kind==OnB)
 			FPrintF (OutFile, "b%d:%s",bsp-node_id->nid_b_index,params->par_loc_name);
 		else
@@ -3900,12 +3900,12 @@ void GenInstructions (Instructions ilist)
 		
 		instruction_name=ilist->instr_this;
 		
-		FPutC ('\n',OutFile);
+		PutCOutFile ('\n');
 		if (instruction_name[0]==':')
 			FPutS (&instruction_name[1],OutFile);
 		else {
 			if (instruction_name[0]!='.')
-				FPutC ('\t',OutFile);
+				PutCOutFile ('\t');
 			FPutS (instruction_name,OutFile);
 		}
 	}
