@@ -1653,6 +1653,272 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 	return function_name_p;
 }
 
+#ifdef LIFT_PARTIAL_APPLICATIONS_WITH_ZERO_ARITY_ARGS
+static char *create_arguments_for_partially_applied_local_function (NodeP node_p,ArgS ***lhs_arg_h,ArgS **rhs_arg_p,StateP arg_state_p,int old_function_arity,char *function_name_p,char *end_function_name)
+{
+	ArgP arg;
+	int arg_n;
+	
+	if (function_name_p!=NULL && node_p->node_symbol->symb_kind==definition){
+		int length_before_type_delimiter;
+		char *f_name;
+		
+		f_name=node_p->node_symbol->symb_def->sdef_name;
+		length_before_type_delimiter=compute_length_before_type_delimiter (f_name);
+		
+		if (function_name_p+2+length_before_type_delimiter < end_function_name){
+			*function_name_p++='.';
+			function_name_p=append_n_chars (function_name_p,f_name,length_before_type_delimiter);
+		} else
+			end_function_name=function_name_p;
+	}
+	
+	arg_n=0;
+	for_l (arg,node_p->node_arguments,arg_next){
+		NodeP arg_node;
+		NodeP function_node;
+		ArgP rhs_arg;
+
+		arg_node=arg->arg_node;
+		
+		function_node=NewNode (arg_node->node_symbol,NULL,0);
+		function_node->node_number=0;
+		if (arg_node->node_symbol->symb_kind==definition)
+			function_node->node_state=StrictState;
+		else
+			function_node->node_state=arg_state_p[arg_n];
+	
+		rhs_arg=NewArgument (function_node);
+		rhs_arg->arg_state=arg_state_p[arg_n];
+		*rhs_arg_p=rhs_arg;
+		rhs_arg_p=&rhs_arg->arg_next;
+		
+		++arg_n;
+	}
+
+	while (arg_n<old_function_arity){
+		NodeIdP arg_node_id;
+		ArgP lhs_arg,rhs_arg;
+
+		arg_node_id=NewNodeId();
+		arg_node_id->nid_refcount=-2;
+		arg_node_id->nid_ref_count_copy__=-2;
+
+		lhs_arg=NewArgument (NewNodeIdNode (arg_node_id));
+		lhs_arg->arg_state=LazyState;
+		
+		arg_node_id->nid_lhs_state_p_=&lhs_arg->arg_state;
+
+		**lhs_arg_h=lhs_arg;
+		*lhs_arg_h=&lhs_arg->arg_next;
+
+		rhs_arg=NewArgument (NewNodeIdNode (arg_node_id));
+		rhs_arg->arg_state=arg_state_p[arg_n];
+		*rhs_arg_p=rhs_arg;
+		rhs_arg_p=&rhs_arg->arg_next;
+
+		++arg_n;
+	}
+	
+	*rhs_arg_p=NULL;
+		
+	return function_name_p;
+}
+
+static ImpRuleP create_new_partially_applied_local_function (Node node,int old_function_arity,StateP function_state_p)
+{
+	static char function_name[64];
+	Symbol function_symbol;
+	int function_arity;
+	ImpRuleS *imp_rule;
+	ArgS **lhs_arg_p;
+	Node lhs_root,rhs_root;
+	char *function_name_p,*end_function_name;
+
+	sprintf (function_name,"_f%d",next_function_n);
+	++next_function_n;
+
+	if (DoTimeProfiling || DoProfiling){
+		char *f_name;
+		int length_before_type_delimiter;
+	
+		end_function_name=function_name+sizeof (function_name);
+		function_name_p=&function_name[strlen (function_name)];
+		
+		f_name=CurrentSymbol->symb_def->sdef_name;
+		length_before_type_delimiter=compute_length_before_type_delimiter (f_name);
+		
+		if (function_name_p+2+length_before_type_delimiter < end_function_name){
+			*function_name_p++='.';
+			function_name_p=append_n_chars (function_name_p,f_name,length_before_type_delimiter);
+		} else
+			end_function_name=function_name_p;
+	} else {
+		function_name_p=NULL;
+		end_function_name=NULL;
+	}
+
+	lhs_root=NewNode (NULL,NULL,0);
+	lhs_root->node_state=StrictState;
+
+# ifdef THUNK_LIFT_U_RECORD_SELECTORS
+	rhs_root=NewNodeByKind (node->node_kind,node->node_symbol,NULL,old_function_arity);
+# else
+	rhs_root=NewNode (node->node_symbol,NULL,old_function_arity);
+# endif
+	rhs_root->node_state=LazyState;
+	rhs_root->node_number=0;
+	
+	function_arity=0;
+
+	lhs_arg_p=&lhs_root->node_arguments;
+
+	function_name_p = create_arguments_for_partially_applied_local_function (node,&lhs_arg_p,&rhs_root->node_arguments,function_state_p,
+																			 old_function_arity,function_name_p,end_function_name);
+	if (function_name_p!=NULL)
+		*function_name_p='\0';
+
+	function_arity=old_function_arity-node->node_arity;
+
+	function_symbol=new_rule_symbol (function_name);
+	lhs_root->node_symbol=function_symbol;
+	
+	*lhs_arg_p=NULL;
+	node->node_arguments=NULL;
+
+	lhs_root->node_arity=function_arity;
+	function_symbol->symb_def->sdef_arity=function_arity;
+	
+# ifdef THUNK_LIFT_U_RECORD_SELECTORS
+	node->node_kind=NormalNode;
+# endif
+	node->node_symbol=function_symbol;
+	node->node_arity=0;
+
+	imp_rule=create_simple_imp_rule (lhs_root,rhs_root,function_symbol->symb_def);
+	
+	{
+		StateP arg_state_p;
+		ArgP arg_p;
+		
+		arg_state_p=allocate_function_state (function_arity);
+
+		imp_rule->rule_state_p=arg_state_p;
+
+		arg_state_p[-1]=StrictState;
+		
+		for_l (arg_p,lhs_root->node_arguments,arg_next)
+			*arg_state_p++ = arg_p->arg_state;
+	}
+
+	imp_rule->rule_next=new_rules;
+	new_rules=imp_rule;
+	
+	return imp_rule;
+}
+
+static int optimise_partial_function_application (NodeP node,SymbDef sdef,StateP function_state_p)
+{
+	ArgP arg_p;
+	int arg_n;
+
+	for (arg_p=node->node_arguments,arg_n=0; arg_p!=NULL; arg_p=arg_p->arg_next,++arg_n){
+		NodeP arg_node_p;
+
+		arg_node_p=arg_p->arg_node;
+		
+		if (arg_node_p->node_symbol->symb_kind==definition){
+			SymbDef arg_sdef;
+
+			arg_sdef=arg_node_p->node_symbol->symb_def;
+			if (arg_node_p->node_arity!=0){
+				if (arg_sdef->sdef_kind==IMPRULE){
+					if (arg_node_p->node_arity<arg_sdef->sdef_arity){
+						if (!optimise_partial_function_application (arg_node_p,arg_sdef,arg_sdef->sdef_rule->rule_state_p))
+							return 0;
+						continue;
+					}
+				} else if (arg_sdef->sdef_kind==DEFRULE || arg_sdef->sdef_kind==SYSRULE){
+					if (arg_node_p->node_arity<arg_sdef->sdef_arity){
+						if (!optimise_partial_function_application (arg_node_p,arg_sdef,arg_sdef->sdef_rule_type->rule_type_state_p))
+							return 0;
+						continue;
+					}
+				}
+				return 0;
+			}
+
+			if (arg_sdef->sdef_kind==CONSTRUCTOR)
+				continue;
+			else if (arg_sdef->sdef_kind==IMPRULE || arg_sdef->sdef_kind==DEFRULE || arg_sdef->sdef_kind==SYSRULE)
+				if (arg_sdef->sdef_arity>0)
+					continue;
+		} else if (arg_node_p->node_symbol->symb_kind==int_denot){
+			if (function_state_p[arg_n].state_type==SimpleState && function_state_p[arg_n].state_kind==OnB)
+				continue;
+		} else if (arg_node_p->node_symbol->symb_kind==string_denot){
+			if (function_state_p[arg_n].state_type==ArrayState)
+				continue;
+		}
+
+		return 0;
+	}
+
+	if (arg_p==NULL){
+		ImpRuleP rule_p;
+
+		if (sdef->sdef_mark & SDEF_DEF_OR_SYS_RULE_HAS_VERSION_WITH_ZERO_ARITY_ARGS_MASK){
+			ImpRuleP rule_with_zero_arity_args_p;
+
+			rule_with_zero_arity_args_p = sdef->sdef_functions_with_zero_arity_args;
+			for (;; rule_with_zero_arity_args_p=rule_with_zero_arity_args_p->rule_next_function_with_zero_arity_args){
+				RuleAltP rule_alt_p;
+				ArgP arg_p2;
+				
+				rule_alt_p=rule_with_zero_arity_args_p->rule_alts;
+				if (node->node_arity==rule_alt_p->alt_rhs_root->node_arity-rule_alt_p->alt_lhs_root->node_arity){
+					arg_p=node->node_arguments;
+					arg_p2=rule_alt_p->alt_rhs_root->node_arguments;
+					while (arg_p!=NULL && arg_p->arg_node->node_symbol->symb_kind==arg_p2->arg_node->node_symbol->symb_kind &&
+						(arg_p->arg_node->node_symbol->symb_kind==definition ?
+						 arg_p->arg_node->node_symbol->symb_def==arg_p2->arg_node->node_symbol->symb_def :
+						 arg_p->arg_node->node_symbol->symb_kind==int_denot ?
+						 strcmp (arg_p->arg_node->node_symbol->symb_val.val_int,arg_p2->arg_node->node_symbol->symb_val.val_int)==0 :
+						 strcmp (arg_p->arg_node->node_symbol->symb_val.val_string,arg_p2->arg_node->node_symbol->symb_val.val_string)==0)
+					){
+						arg_p=arg_p->arg_next;
+						arg_p2=arg_p2->arg_next;
+					}
+					if (arg_p==NULL){
+						node->node_symbol=rule_with_zero_arity_args_p->rule_alts->alt_lhs_root->node_symbol;
+
+						node->node_arguments=NULL;
+						node->node_arity=0;
+						return 1;
+					}
+				}
+
+				if (!(rule_with_zero_arity_args_p->rule_mark & RULE_HAS_NEXT_VERSION_WITH_ZERO_ARITY_ARGS))
+					break;
+			}
+
+			rule_p = create_new_partially_applied_local_function (node,sdef->sdef_arity,function_state_p);
+
+			rule_with_zero_arity_args_p->rule_next_function_with_zero_arity_args = rule_p;
+			rule_with_zero_arity_args_p->rule_mark |= RULE_HAS_NEXT_VERSION_WITH_ZERO_ARITY_ARGS;
+		} else {
+			rule_p = create_new_partially_applied_local_function (node,sdef->sdef_arity,function_state_p);
+
+			sdef->sdef_functions_with_zero_arity_args = rule_p;
+			sdef->sdef_mark |= SDEF_DEF_OR_SYS_RULE_HAS_VERSION_WITH_ZERO_ARITY_ARGS_MASK;
+		}
+		return 1;
+	}
+	
+	return 0;
+}
+#endif
+
 static struct node *create_new_local_function (Node node,StateP function_state_p)
 {
 	static char function_name[64];
@@ -1938,8 +2204,29 @@ static void optimise_normal_node (Node node)
 
 	symbol=node->node_symbol;
 
-	if (node->node_state.state_type!=SimpleState || node->node_state.state_kind!=OnA)
+	if (node->node_state.state_type!=SimpleState || node->node_state.state_kind!=OnA){
+#if defined (LIFT_PARTIAL_APPLICATIONS_WITH_ZERO_ARITY_ARGS)
+		if (node->node_state.state_type==SimpleState && node->node_state.state_kind==StrictOnA && symbol->symb_kind==definition){
+			SymbDef sdef;
+
+			sdef=symbol->symb_def;
+			if (node->node_arity!=sdef->sdef_arity){
+				if (sdef->sdef_kind==RECORDTYPE)
+					return;
+
+				if (node->node_arity<sdef->sdef_arity){
+					if (node->node_arity!=0){
+						if (sdef->sdef_kind==IMPRULE)
+							optimise_partial_function_application (node,sdef,sdef->sdef_rule->rule_state_p);
+						else if (sdef->sdef_kind==DEFRULE || sdef->sdef_kind==SYSRULE)
+							optimise_partial_function_application (node,sdef,sdef->sdef_rule_type->rule_type_state_p);
+					}
+				}
+			}
+		}
+#endif
 		return;
+	}
 
 	if (symbol->symb_kind!=definition){
 #ifndef STRICT_STATE_FOR_LAZY_TUPLE_CONSTRUCTORS
@@ -2015,8 +2302,24 @@ static void optimise_normal_node (Node node)
 		sdef=symbol->symb_def;
 
 		if (node->node_arity!=sdef->sdef_arity){
+#if defined (LIFT_PARTIAL_APPLICATIONS_WITH_ZERO_ARITY_ARGS)
+			if (sdef->sdef_kind==RECORDTYPE)
+				return;
+
+			if (node->node_arity<sdef->sdef_arity){
+				node->node_state.state_kind=StrictOnA;
+
+				if (node->node_arity!=0){
+					if (sdef->sdef_kind==IMPRULE)
+						optimise_partial_function_application (node,sdef,sdef->sdef_rule->rule_state_p);
+					else if (sdef->sdef_kind==DEFRULE || sdef->sdef_kind==SYSRULE)
+						optimise_partial_function_application (node,sdef,sdef->sdef_rule_type->rule_type_state_p);
+				}
+			}
+#else
 			if (sdef->sdef_kind!=RECORDTYPE && node->node_arity<sdef->sdef_arity)
 				node->node_state.state_kind=StrictOnA;
+#endif
 			return;
 		}
 
@@ -2735,6 +3038,17 @@ static void optimise_strict_constructor_in_lazy_context (NodeP node,FreeUniqueNo
 				}
 			}
 		}
+#ifdef LIFT_PARTIAL_APPLICATIONS_WITH_ZERO_ARITY_ARGS
+		else if (node->node_state.state_type==SimpleState && node->node_state.state_kind==StrictOnA){
+			if (node->node_arity<sdef->sdef_arity && node->node_arity!=0){
+				if (sdef->sdef_kind==IMPRULE)
+					optimise_partial_function_application (node,sdef,sdef->sdef_rule->rule_state_p);
+				else if (sdef->sdef_kind==DEFRULE || sdef->sdef_kind==SYSRULE)
+					optimise_partial_function_application (node,sdef,sdef->sdef_rule_type->rule_type_state_p);
+			}
+		}
+#endif
+
 	}
 	else if (symbol->symb_kind==select_symb && node->node_arguments->arg_node->node_kind==NodeIdNode){
 		NodeIdP node_id;
@@ -3699,6 +4013,9 @@ static void ExamineSymbolApplication (struct node *node)
 				
 					rule_p=sdef->sdef_rule;
 					if (sdef->sdef_mark & (SDEF_USED_CURRIED_MASK | SDEF_USED_LAZILY_MASK) ||
+# ifdef LIFT_PARTIAL_APPLICATIONS_WITH_ZERO_ARITY_ARGS
+						(rule_p->rule_mark & RULE_HAS_NEXT_VERSION_WITH_ZERO_ARITY_ARGS) ||
+# endif
 						((sdef->sdef_mark & SDEF_USED_STRICTLY_MASK) && !(rule_p->rule_mark & RULE_STRICT_CALL_NODE_MASK)))
 					{
 						rule_p->rule_mark &= ~(RULE_STRICT_CALL_NODE_MASK | RULE_STRICT_CALL_NODE2_MASK);

@@ -18,7 +18,7 @@
 File FOpen (char *fname, char *mode)
 {
 	return (File) fopen (fname, mode);
-				}
+}
 
 int FClose (File f)
 {

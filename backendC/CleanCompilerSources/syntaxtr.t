@@ -499,7 +499,14 @@ STRUCT (imp_rule,ImpRule){
 	} rule_u;
 	struct node *				rule_lazy_call_node;
 #if STORE_STRICT_CALL_NODES
+# ifdef LIFT_PARTIAL_APPLICATIONS_WITH_ZERO_ARITY_ARGS
+	union {
+		struct node *			u2_strict_call_node;					/* if RULE_STRICT_CALL_NODE_MASK */
+		ImpRuleP				u2_next_function_with_zero_arity_args;	/* if RULE_HAS_NEXT_VERSION_WITH_ZERO_ARITY_ARGS */
+	} rule_u2;
+# else
 	struct node *				rule_strict_call_node;
+# endif
 	struct node *				rule_strict_call_node2;
 #endif
 	unsigned					rule_mark;
@@ -516,10 +523,18 @@ STRUCT (imp_rule,ImpRule){
 
 #define RULE_CALL_VIA_LAZY_SELECTIONS_ONLY	1024
 #define RULE_TAIL_MODULO_CONS_ENTRY_MASK	2048
+#ifdef LIFT_PARTIAL_APPLICATIONS_WITH_ZERO_ARITY_ARGS
+# define RULE_HAS_NEXT_VERSION_WITH_ZERO_ARITY_ARGS	4096
+#endif
 
 #define rule_next_changed_function				rule_u.u_next_changed_function				/* optimisations */
 #define rule_next_used_function					rule_u.u_next_used_function					/* optimisations */
 #define rule_next_function_with_more_arguments	rule_u.u_next_function_with_more_arguments	/* statesgen */
+
+#ifdef LIFT_PARTIAL_APPLICATIONS_WITH_ZERO_ARITY_ARGS
+# define rule_strict_call_node						rule_u2.u2_strict_call_node
+# define rule_next_function_with_zero_arity_args	rule_u2.u2_next_function_with_zero_arity_args	/* optimisations */
+#endif
 
 STRUCT (symbol_def,SymbDef){
 	char    	*sdef_module;
@@ -554,7 +569,14 @@ STRUCT (symbol_def,SymbDef){
 	} sdef_u3;
 
 	struct symbol_def *	sdef_dcl_icl;					/* to dcl if sdef_exported, to icl if sdef_main_dcl */
+#ifdef LIFT_PARTIAL_APPLICATIONS_WITH_ZERO_ARITY_ARGS
+	union {
+		struct symbol_def *	sdef_u4_next_scc;	/* sa.c */
+		ImpRuleP			sdef_u4_functions_with_zero_arity_args; /* if SDEF_DEF_OR_SYS_RULE_HAS_VERSION_WITH_ZERO_ARITY_ARGS_MASK */
+	} sdef_u4;
+#else
 	struct symbol_def *	sdef_next_scc;
+#endif
 
 	union {
 		struct symbol_def *	sdef_u2_next_version;	/* for IMPRULES */
@@ -593,6 +615,9 @@ STRUCT (symbol_def,SymbDef){
 #define	SDEF_HAS_IMP_RULE_VERSIONS_MASK 64
 #define	SDEF_OPTIMISED_FUNCTION_MASK 128
 #define SDEF_INLINE_IS_CONSTRUCTOR 4096
+#ifdef LIFT_PARTIAL_APPLICATIONS_WITH_ZERO_ARITY_ARGS
+# define SDEF_DEF_OR_SYS_RULE_HAS_VERSION_WITH_ZERO_ARITY_ARGS_MASK 8192
+#endif
 #define SDEF_FIELD_HAS_MEMBER_TYPE 1024
 #define SDEF_INSTANCE_RULE_WITH_FIELD_P 16384
 #define SDEF_RULE_INSTANCE_RULE_P 32768
@@ -606,6 +631,11 @@ STRUCT (symbol_def,SymbDef){
 #define sdef_next_version	sdef_u2.sdef_u2_next_version
 #define sdef_special_array_function_symbol	sdef_u2.sdef_u2_special_array_function_symbol
 #define sdef_member_type_of_field	sdef_u2.sdef_u2_member_type_of_field
+
+#ifdef LIFT_PARTIAL_APPLICATIONS_WITH_ZERO_ARITY_ARGS
+# define sdef_functions_with_zero_arity_args sdef_u4.sdef_u4_functions_with_zero_arity_args
+# define sdef_next_scc sdef_u4.sdef_u4_next_scc
+#endif
 
 #define sdef_constructor sdef_typeinfo.typeinfo_constructor
 
