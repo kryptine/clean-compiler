@@ -56,16 +56,6 @@ int FPutS (char *s, File f)
 } /* FPutS */
 
 /* Error Handling */
-	
-void DoError (char *fmt, ...)
-{	va_list args;
-	
-	va_start (args, fmt);
-
-	(void) vfprintf (StdError, fmt, args);
-	
-	va_end (args);
-}
 
 void DoFatalError (char *fmt, ...)
 {	va_list args;

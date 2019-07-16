@@ -48,11 +48,9 @@ extern int FPrintF (); /* (File w, char *fmt,...) */
 #endif
 
 #ifdef _VARARGS_
-	extern void DoError (char *fmt,...);
 	extern void DoFatalError (char *fmt,...);
 	extern void CmdError (char *errormsg,...);
 #else
-	extern void DoError ();
 	extern void DoFatalError ();
 	extern void CmdError ();
 #endif

@@ -52,17 +52,6 @@ int FPutS (char *s, File f)
 	return fputs (s, (FILE *) f);
 }
 
-void DoError (char *fmt, ...)
-{
-	va_list args;
-	
-	va_start (args, fmt);
-
-	(void) vfprintf (stderr, fmt, args);
-	
-	va_end (args);
-}
-
 void DoFatalError (char *fmt, ...)
 {
 	va_list args;
