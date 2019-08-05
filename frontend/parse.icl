@@ -587,6 +587,9 @@ where
 	wantGenericFunctionDefinition name pos pState
 		//# (type, pState) = wantType pState
 		# (ok, {at_type=type}, pState) = trySimpleType TA_None pState
+		| not ok
+			# pState = parseError "type argument" No "type constructor" pState
+			= (False, abort "no TypeCons", pState)
 		# (ident, pState) = stringToIdent name (IC_GenericCase type) pState
 		# (generic_ident, pState) = stringToIdent name IC_Generic pState
 		# (type_cons, pState) = get_type_cons type pState
