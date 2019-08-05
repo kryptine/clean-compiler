@@ -148,11 +148,13 @@ where
 				
 instance bindTypes TypeVar
 where
-	bindTypes cti tv=:{tv_ident=var_id=:{id_info}} (ts, ti, cs=:{cs_symbol_table})
+	bindTypes cti tv=:{tv_ident=var_id=:{id_info}} (ts, ti=:{ti_type_heaps=type_heaps=:{th_vars}}, cs=:{cs_symbol_table})
 		# (var_def, cs_symbol_table) = readPtr id_info cs_symbol_table
 		  cs = { cs & cs_symbol_table = cs_symbol_table }
 		= case var_def.ste_kind of
 			STE_BoundTypeVariable {stv_info_ptr,stv_attribute}
+				# th_vars = writePtr stv_info_ptr TVI_Used th_vars
+				  ti & ti_type_heaps = { type_heaps & th_vars = th_vars }
 				-> ({ tv & tv_info_ptr = stv_info_ptr}, stv_attribute, (ts, ti, cs))
 			_
 				-> (tv, TA_Multi, (ts, ti, {cs & cs_error = checkError var_id "type variable undefined" cs.cs_error}))
@@ -611,17 +613,22 @@ where
 		# (cons_def, ts) = ts!ts_cons_defs.[cons_index]
 		# (exi_vars, (ti_type_heaps, cs))
 		  		= addExistentionalTypeVariablesToSymbolTable cti_lhs_attribute cons_def.cons_exi_vars ti_type_heaps cs
-		  (st_args, st_attr_env,class_defs,(ts, ti, cs))
+		  (st_args, st_attr_env,class_defs,(ts, ti=:{ti_type_heaps}, cs))
 		  		= bind_types_of_cons cons_def.cons_type.st_args cti free_vars [] class_defs (ts, {ti & ti_type_heaps = ti_type_heaps}, cs)
-		  (st_context,class_defs,ts,ti,cs)
-		  		= bind_context_of_cons cons_def.cons_type.st_context cti class_defs ts ti cs
+		  (unused_exi_vars,th_vars,cs)
+		  		= find_unused_existential_type_vars exi_vars [] ti_type_heaps.th_vars cs
+		  (st_context,class_defs,ts,ti=:{ti_type_heaps},cs)
+		  		= bind_context_of_cons cons_def.cons_type.st_context cti class_defs ts { ti & ti_type_heaps = { ti_type_heaps & th_vars = th_vars } } cs
+		  (th_vars,cs)
+		  		= check_unused_existential_type_vars unused_exi_vars ti_type_heaps.th_vars cs
 		  symbol_table = removeAttributedTypeVarsFromSymbolTable cGlobalScope /* cOuterMostLevel */ exi_vars cs.cs_symbol_table
 		  attr_vars = add_universal_attr_vars st_args free_attrs
 		  cons_type = {cons_def.cons_type & st_vars = free_vars, st_args = st_args, st_result = type_lhs, st_context = st_context, st_attr_vars = attr_vars, st_attr_env = st_attr_env}
 		  (new_type_ptr, ti_var_heap) = newPtr VI_Empty ti.ti_var_heap
 		  cons_def = { cons_def & cons_type = cons_type, cons_number = cons_number, cons_type_index = cti.cti_type_index, cons_exi_vars = exi_vars,
 		  						  cons_type_ptr = new_type_ptr }
-		= (class_defs, {ts & ts_cons_defs.[cons_index] = cons_def}, {ti & ti_var_heap = ti_var_heap}, {cs & cs_symbol_table=symbol_table})
+		  ti & ti_type_heaps = { ti_type_heaps & th_vars = th_vars }, ti_var_heap = ti_var_heap
+		= (class_defs, {ts & ts_cons_defs.[cons_index] = cons_def}, ti, {cs & cs_symbol_table=symbol_table})
 	where
 		bind_types_of_cons :: ![AType] !CurrentTypeInfo ![TypeVar] ![AttrInequality] !v:{#ClassDef} !(!*TypeSymbols, !*TypeInfo, !*CheckState)
 													 -> (![AType], ![AttrInequality],!v:{#ClassDef},!(!*TypeSymbols, !*TypeInfo, !*CheckState))
@@ -646,6 +653,24 @@ where
 				= ([{context & tc_types = []}:contexts],class_defs,ts,ti,cs)
 		bind_context_of_cons [] cti class_defs ts ti cs
 			= ([],class_defs,ts,ti,cs)
+
+		find_unused_existential_type_vars [] unused th_vars cs
+			= (unused,th_vars,cs)
+		find_unused_existential_type_vars [{atv_variable} : exi_vars] unused th_vars cs
+			# (tv_info,th_vars) = readPtr atv_variable.tv_info_ptr th_vars
+			= find_unused_existential_type_vars exi_vars (if (tv_info=:TVI_Used) unused [atv_variable : unused]) th_vars cs
+
+		check_unused_existential_type_vars [] th_vars cs
+			= (th_vars,cs)
+		check_unused_existential_type_vars [atv_variable=:{tv_info_ptr} : exi_vars] th_vars cs
+			# (tv_info,th_vars) = readPtr tv_info_ptr th_vars
+			# cs & cs_error = case tv_info of
+				TVI_Used
+					-> checkError   message atv_variable cs.cs_error
+					-> checkWarning message atv_variable cs.cs_error
+			= check_unused_existential_type_vars exi_vars th_vars cs
+		where
+			message = "unused existentially quantified type variable"
 
 		add_universal_attr_vars [] attr_vars
 			= attr_vars
