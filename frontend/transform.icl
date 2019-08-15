@@ -992,20 +992,20 @@ is_a_pattern_macro FK_Macro (TransformedBody {tb_args})
 is_a_pattern_macro _ _
 	= False
 
-visit_macro mod_index max_fun_nr predef_symbols_for_transform (FunCall fc_index _) ps
-	= partitionate_icl_macro mod_index max_fun_nr predef_symbols_for_transform fc_index ps
-visit_macro mod_index max_fun_nr predef_symbols_for_transform (MacroCall macro_module_index fc_index _) ps
-	= partitionate_dcl_macro macro_module_index max_fun_nr predef_symbols_for_transform fc_index ps
-visit_macro mod_index max_fun_nr predef_symbols_for_transform (DclFunCall _ _) ps
+visit_macro mod_index predef_symbols_for_transform (FunCall fc_index _) ps
+	= partitionate_icl_macro mod_index predef_symbols_for_transform fc_index ps
+visit_macro mod_index predef_symbols_for_transform (MacroCall macro_module_index fc_index _) ps
+	= partitionate_dcl_macro macro_module_index predef_symbols_for_transform fc_index ps
+visit_macro mod_index predef_symbols_for_transform (DclFunCall _ _) ps
 	= ps
 
-partitionate_dcl_macro mod_index max_fun_nr predef_symbols_for_transform macro_index ps
+partitionate_dcl_macro mod_index predef_symbols_for_transform macro_index ps
 	# (macro_def, ps) = ps!ps_macro_defs.[mod_index,macro_index]
 	| case macro_def.fun_kind of FK_Macro->True ; _ -> False
 	 	= case macro_def.fun_body of
 			CheckedBody body
 	 			# ps={ ps & ps_macro_defs.[mod_index,macro_index] = { macro_def & fun_body = PartitioningMacro }}
-		  		# macros_pi = foldSt (visit_macro mod_index max_fun_nr predef_symbols_for_transform) macro_def.fun_info.fi_calls ps
+				# macros_pi = foldSt (visit_macro mod_index predef_symbols_for_transform) macro_def.fun_info.fi_calls ps
 				-> expand_dcl_macro_if_simple mod_index macro_index macro_def predef_symbols_for_transform macros_pi
 			PartitioningMacro
 	  			# identPos = newPosition macro_def.fun_ident macro_def.fun_pos
@@ -1014,13 +1014,13 @@ partitionate_dcl_macro mod_index max_fun_nr predef_symbols_for_transform macro_i
 	 			-> ps
 		= ps
 
-partitionate_icl_macro mod_index max_fun_nr predef_symbols_for_transform macro_index ps
+partitionate_icl_macro mod_index predef_symbols_for_transform macro_index ps
 	# (macro_def, ps) = ps!ps_fun_defs.[macro_index]
 	| case macro_def.fun_kind of FK_Macro->True; _ -> False
 	 	= case macro_def.fun_body of
 	 		CheckedBody body
 	 			# ps={ ps & ps_fun_defs.[macro_index] = { macro_def & fun_body = PartitioningMacro }}
-		  		# macros_pi = foldSt (visit_macro mod_index max_fun_nr predef_symbols_for_transform) macro_def.fun_info.fi_calls ps
+				# macros_pi = foldSt (visit_macro mod_index predef_symbols_for_transform) macro_def.fun_info.fi_calls ps
 				-> expand_icl_macro_if_simple mod_index macro_index macro_def predef_symbols_for_transform macros_pi
 	 		PartitioningMacro
 	  			# identPos = newPosition macro_def.fun_ident macro_def.fun_pos
@@ -1032,26 +1032,24 @@ partitionate_icl_macro mod_index max_fun_nr predef_symbols_for_transform macro_i
 partitionateDclMacros :: !IndexRange !Index !PredefSymbolsForTransform !*{#*{#FunDef}} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
 																   -> (!*{#*{#FunDef}},!*VarHeap,!*ExpressionHeap,!*SymbolTable,!*ErrorAdmin )
 partitionateDclMacros {ir_from,ir_to} mod_index predef_symbols_for_transform macro_defs var_heap symbol_heap symbol_table error
-	#! max_fun_nr = cMAXINT
 	# partitioning_info = { ps_var_heap = var_heap, ps_symbol_heap = symbol_heap,
 							ps_symbol_table = symbol_table, ps_fun_defs={}, ps_macro_defs=macro_defs,
 							ps_error = error, ps_deps = [], ps_next_num = 0, ps_next_group = 0, ps_groups = [],
 							ps_unexpanded_dcl_macros=[] }
 	  {ps_symbol_table, ps_var_heap, ps_symbol_heap, ps_fun_defs, ps_macro_defs, ps_error, ps_next_group, ps_groups, ps_deps}
-	  		= iFoldSt (partitionate_dcl_macro mod_index max_fun_nr predef_symbols_for_transform) ir_from ir_to partitioning_info
+			= iFoldSt (partitionate_dcl_macro mod_index predef_symbols_for_transform) ir_from ir_to partitioning_info
 	  (_,macro_defs) = reset_body_of_rhs_macros ps_deps ps_fun_defs ps_macro_defs
 	= (macro_defs, ps_var_heap, ps_symbol_heap, ps_symbol_table, ps_error)
 
 partitionateIclMacros :: !IndexRange !Index !PredefSymbolsForTransform !*{#FunDef} !*{#*{#FunDef}} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
 																   -> (!*{#FunDef},!*{#*{#FunDef}},!*VarHeap,!*ExpressionHeap,!*SymbolTable,!*ErrorAdmin )
 partitionateIclMacros {ir_from,ir_to} mod_index predef_symbols_for_transform fun_defs macro_defs var_heap symbol_heap symbol_table error
-	#! max_fun_nr = cMAXINT
 	# partitioning_info = { ps_var_heap = var_heap, ps_symbol_heap = symbol_heap,
 							ps_symbol_table = symbol_table, ps_fun_defs=fun_defs, ps_macro_defs=macro_defs,
 							ps_error = error, ps_deps = [], ps_next_num = 0, ps_next_group = 0, ps_groups = [],
 							ps_unexpanded_dcl_macros=[] }
 	  {ps_symbol_table, ps_var_heap, ps_symbol_heap, ps_fun_defs, ps_macro_defs, ps_error, ps_next_group, ps_groups, ps_deps}
-	  		= iFoldSt (partitionate_icl_macro mod_index max_fun_nr predef_symbols_for_transform) ir_from ir_to partitioning_info
+			= iFoldSt (partitionate_icl_macro mod_index predef_symbols_for_transform) ir_from ir_to partitioning_info
 	  (fun_defs,macro_defs) = reset_body_of_rhs_macros ps_deps ps_fun_defs ps_macro_defs
 	= (fun_defs,macro_defs, ps_var_heap, ps_symbol_heap, ps_symbol_table, ps_error)
 
