@@ -1331,14 +1331,6 @@ static void CallFunction2 (Label label, SymbDef def, Bool isjsr, StateS root_sta
 
 	label->lab_pref = s_pref;
 
-	if (def->sdef_kind==SYSRULE){
-		if (def->sdef_mark & SDEF_DEFRULE_ABC_CODE){
-			GenABCInstructions (def->sdef_abc_code);
-			if (!isjsr)
-				GenRtn (aout, bout, root_state);
-			return;
-		}
-	}
 	if (def->sdef_kind==IMPRULE){
 		if ((def->sdef_mark & SDEF_INLINE_IS_CONSTRUCTOR)!=0){
 			generate_is_constructor (def->sdef_rule);
@@ -1364,6 +1356,11 @@ static void CallFunction2 (Label label, SymbDef def, Bool isjsr, StateS root_sta
 				GenRtn (aout, bout, root_state);
 			return;
 		}
+	} else if ((def->sdef_mark & SDEF_DEFRULE_ABC_CODE)!=0 && (def->sdef_kind==SYSRULE || def->sdef_kind==DEFRULE)){
+		GenABCInstructions (def->sdef_abc_code);
+		if (!isjsr)
+			GenRtn (aout, bout, root_state);
+		return;
 	}
 
 	GenDStackLayout (ain, bin, fun_args);
