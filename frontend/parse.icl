@@ -3048,7 +3048,7 @@ wantType :: !ParseState -> (!Type,!ParseState)
 wantType pState
 	# (vars, pState)	= optionalUniversalQuantifiedVariables pState
 	| isEmpty vars
-		# (succ, atype, pState)	= tryAType False TA_None pState
+		# (succ, atype, pState)	= tryAType pState
 		  (succ2, type, pState)	= tryATypeToType atype pState
 		| succ&&succ2
 			= (type, pState)
@@ -3061,7 +3061,7 @@ wantType pState
 
 wantAType :: !ParseState -> (!AType,!ParseState)
 wantAType pState
-	# (succ, atype, pState)	= tryAType True TA_None pState
+	# (succ, atype, pState)	= tryAType pState
 	| succ
 		= (atype, pState)
 		= (atype, attributed_and_annotated_type_error pState)
@@ -3079,31 +3079,30 @@ attributed_and_annotated_type_error pState
 
 tryType :: !ParseState -> (!Bool,!Type,!ParseState)
 tryType pState
-	# (succ, atype, pState)	= tryAType False TA_None pState
+	# (succ, atype, pState)	= tryAType pState
 	  (succ2, type, pState)	= tryATypeToType atype pState
 	= (succ&&succ2, type, pState)
 
-tryAType :: !Bool !TypeAttribute !ParseState -> (!Bool,!AType,!ParseState)
-tryAType tryAA attr pState
+tryAType :: !ParseState -> (!Bool,!AType,!ParseState)
+tryAType pState
 	# (vars , pState)		= optionalUniversalQuantifiedVariables pState
 	# (types, pState)		= parseList tryBrackAType pState
 	| isEmpty types
 		| isEmpty vars
-			= (False, {at_attribute = attr, at_type = TE}, pState)
+			= (False, {at_attribute = TA_None, at_type = TE}, pState)
 		// otherwise // PK
 			# (token, pState) = nextToken TypeContext pState
-			= (False, {at_attribute = attr, at_type = TFA vars TE}
+			= (False, {at_attribute = TA_None, at_type = TFA vars TE}
 			  , parseError "annotated type" (Yes token) "type" (tokenBack pState))
 	# (token, pState)		= nextToken TypeContext pState
 	| token == ArrowToken
 		# (rtype, pState)	= wantAType_strictness_ignored pState
-		  atype = make_curry_type attr types rtype
+		  atype = make_curry_type TA_None types rtype
 		| isEmpty vars
 			= ( True, atype, pState)
 			= ( True, { atype & at_type = TFA vars atype.at_type }, pState)
-	// otherwise (not that types is non-empty)
-// Sjaak	
-	# (atype, pState) = convertAAType types attr (tokenBack pState)
+	// otherwise (note that types is non-empty)
+	# (atype, pState) = convertAAType types TA_None (tokenBack pState)
 	| isEmpty vars
 		= (True, atype, pState)
 		= (True, { atype & at_type = TFA vars atype.at_type }, pState)
