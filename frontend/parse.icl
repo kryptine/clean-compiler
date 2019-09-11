@@ -1538,8 +1538,7 @@ wantImportDeclarationT token pState
 				(types, pState)			= wantList "instance types" tryBrackType pState
 				(class_id, pState)		= stringToIdent class_name IC_Class pState
 				(inst_id, pState)		= stringToIdent class_name (IC_Instance types) pState
-				(context, pState)		= optionalContext pState
-			->	(ID_Instance class_id inst_id (types,context), pState)
+			->	(ID_Instance class_id inst_id types, pState)
 		IdentToken fun_name
 			#	(fun_id, pState)		= stringToIdent fun_name IC_Expression pState
 				(ii_extended, pState)	= optional_extension pState

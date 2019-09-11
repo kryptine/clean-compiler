@@ -560,7 +560,7 @@ instance toString Import, AttributeVar, TypeAttribute, Annotation
 						| ID_Class !Ident !ImportBelongings
 						| ID_Type !Ident !ImportBelongings
 						| ID_Record !Ident !ImportBelongings
-						| ID_Instance !Ident !Ident !(![Type],![TypeContext])
+						| ID_Instance !Ident !Ident ![Type]
 						| ID_Generic !Ident !Ident
 
 ::	ImportBelongings = IB_None | IB_Idents ![Ident] | IB_IdentsAndOptIdents ![Ident] ![Ident]
