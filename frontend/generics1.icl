@@ -472,7 +472,7 @@ where
 		# error = reportError bimap_ident.id_name pos ("can not build generic representation for this type", type) error
 		= (GTSE, (modules, td_infos, heaps, error))
 
-	convert_type_app {type_index=type_index=:{glob_module,glob_object},type_arity} attr args (modules, td_infos, heaps, error)
+	convert_type_app {type_index=type_index=:{glob_module,glob_object}} attr args (modules, td_infos, heaps, error)
 		# (type_def, modules) = modules![glob_module].com_type_defs.[glob_object]
 		= case type_def.td_rhs of 
 			SynType atype
@@ -486,11 +486,11 @@ where
 					-> (GTSAppCons KindConst [], (modules, td_infos, heaps, error))
 			AlgType alts
 				# n_args = length args
-				| n_args>0 && type_arity==n_args
+				| n_args>0 && type_def.td_arity==n_args
 					# (can_generate_bimap_to_or_from,modules,heaps)
 						= can_generate_bimap_to_or_from_for_this_type type_def.td_args glob_module alts modules heaps
 					| can_generate_bimap_to_or_from
-						#! (tdi_kinds,td_infos) = td_infos![glob_module,glob_object].tdi_kinds			
+						#! (tdi_kinds,td_infos) = td_infos![glob_module,glob_object].tdi_kinds
 						#! (args, st) = convert_args args (modules, td_infos, heaps, error)
 						-> (GTSAppConsSimpleType {gi_module=type_index.glob_module,gi_index=type_index.glob_object} (KindArrow tdi_kinds) args, st)
 						-> 	convert_type_app_to_GTSAppCons glob_module glob_object args modules td_infos heaps error
