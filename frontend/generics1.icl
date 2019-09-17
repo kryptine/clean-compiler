@@ -480,7 +480,7 @@ where
 				# n_args = length args
 				| n_args>0 && type_def.td_arity==n_args
 					# (can_generate_bimap_to_or_from,modules,heaps)
-						= can_generate_bimap_to_or_from_for_this_type type_def.td_args glob_module alts modules heaps
+						= can_generate_bimap_to_or_from_for_this_algebraic_type type_def.td_args glob_module alts modules heaps
 					| can_generate_bimap_to_or_from
 						#! (tdi_kinds,td_infos) = td_infos![glob_module,glob_object].tdi_kinds
 						#! (args, st) = convert_args args (modules, td_infos, heaps, error)
@@ -498,8 +498,8 @@ where
 	convert_args args st
 		= mapSt convert args st
 
-can_generate_bimap_to_or_from_for_this_type :: ![ATypeVar] !Index ![DefinedSymbol] !*Modules !*Heaps -> (!Bool,!*Modules,!*Heaps)
-can_generate_bimap_to_or_from_for_this_type td_args type_def_module_n alts modules heaps=:{hp_type_heaps}
+can_generate_bimap_to_or_from_for_this_algebraic_type :: ![ATypeVar] !Index ![DefinedSymbol] !*Modules !*Heaps -> (!Bool,!*Modules,!*Heaps)
+can_generate_bimap_to_or_from_for_this_algebraic_type td_args type_def_module_n alts modules heaps=:{hp_type_heaps}
 	# th_vars = number_type_arguments td_args 0 hp_type_heaps.th_vars
 	#! ok = check_constructors alts type_def_module_n modules th_vars
 	# th_vars = remove_type_argument_numbers td_args th_vars
@@ -525,10 +525,19 @@ where
 					-> False
 					# used_type_vars = used_type_vars bitor arg_mask
 					-> check_constructor atypes used_type_vars th_vars
-	check_constructor [_:_] used_type_vars th_vars
-		= False
+	check_constructor [atype:atypes] used_type_vars th_vars
+		= contains_no_type_var atype && check_constructor atypes used_type_vars th_vars
 	check_constructor [] used_type_vars th_vars
 		= True
+
+contains_no_type_var :: !AType -> Bool
+contains_no_type_var {at_type=TB _} = True
+contains_no_type_var {at_type=TA _ atypes} = args_contain_no_type_var atypes
+contains_no_type_var {at_type=TAS _ atypes _} = args_contain_no_type_var atypes
+contains_no_type_var {at_type=type1-->type2} = contains_no_type_var type1 && contains_no_type_var type2
+contains_no_type_var _ = False
+
+args_contain_no_type_var atypes = All contains_no_type_var atypes
 
 // the structure type of a generic type can often be simplified
 // because bimaps for types not containing generic variables are indentity bimaps
@@ -2863,7 +2872,7 @@ test_if_simple_bimap :: GlobalIndex [ATypeVar] TypeRhs Int PredefinedSymbols !*M
 test_if_simple_bimap gcf_generic td_args (AlgType alts) type_module psd_predefs_a modules heaps
 	# generic_bimap = psd_predefs_a.[PD_GenericBimap]
 	| gcf_generic.gi_module==generic_bimap.pds_module && gcf_generic.gi_index==generic_bimap.pds_def
-		= can_generate_bimap_to_or_from_for_this_type td_args type_module alts modules heaps
+		= can_generate_bimap_to_or_from_for_this_algebraic_type td_args type_module alts modules heaps
 		= (False,modules,heaps)
 test_if_simple_bimap gcf_generic td_args td_rhs type_module psd_predefs_a modules heaps
 	= (False,modules,heaps)
@@ -4247,15 +4256,23 @@ where
 			= ([],modules,th_vars)
 
 		compute_constructor_arg_types :: ![AType] !{!GenTypeStruct} !*TypeVarHeap -> (![GenTypeStruct],!*TypeVarHeap)
-		compute_constructor_arg_types [{at_type=TV {tv_info_ptr}}:atypes] arg_types_a th_vars
-			# (TVI_GenTypeVarNumber constructor_arg_number,th_vars)
-				= readPtr tv_info_ptr th_vars
-			#! constructor_arg_types = arg_types_a.[constructor_arg_number]
+		compute_constructor_arg_types [atype:atypes] arg_types_a th_vars
+			# (constructor_arg_type,th_vars)
+				= compute_constructor_arg_type atype arg_types_a th_vars
 			# (constructors_arg_types,th_vars)
 				= compute_constructor_arg_types atypes arg_types_a th_vars
-			= ([constructor_arg_types:constructors_arg_types],th_vars);
+			= ([constructor_arg_type:constructors_arg_types],th_vars)
 		compute_constructor_arg_types [] arg_types_a th_vars
 			= ([],th_vars)
+
+		compute_constructor_arg_type :: !AType !{!GenTypeStruct} !*TypeVarHeap -> (!GenTypeStruct,!*TypeVarHeap)
+		compute_constructor_arg_type {at_type=TV {tv_info_ptr}} arg_types_a th_vars
+			# (TVI_GenTypeVarNumber constructor_arg_number,th_vars) = readPtr tv_info_ptr th_vars
+			#! constructor_arg_type = arg_types_a.[constructor_arg_number]
+			= (constructor_arg_type,th_vars)
+		compute_constructor_arg_type atype arg_types_a th_vars
+			| contains_no_type_var atype
+				= (GTSAppConsBimapKindConst,th_vars)
 
 build_bimap_case :: !GlobalIndex !.Expression ![AlgebraicPattern] !*Heaps -> (!Expression,!*Heaps)
 build_bimap_case global_type_def_index arg alg_patterns heaps
