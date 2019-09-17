@@ -494,6 +494,17 @@ where
 						#! (args, st) = convert_args args (modules, td_infos, heaps, error)
 						-> (GTSAppConsSimpleType {gi_module=type_index.glob_module,gi_index=type_index.glob_object} (KindArrow tdi_kinds) args, st)
 						-> 	convert_type_app_to_GTSAppCons glob_module glob_object args modules td_infos heaps error
+			RecordType {rt_constructor}
+				# n_args = length args
+				| n_args>0 && type_def.td_arity==n_args
+					#! (ok,modules,td_infos,heaps)
+						= can_generate_bimap_to_or_from_for_this_record type_def.td_args rt_constructor glob_module modules td_infos heaps
+					| ok
+						#! (tdi_kinds,td_infos) = td_infos![glob_module,glob_object].tdi_kinds
+						#! (args, st) = convert_args args (modules, td_infos, heaps, error)
+						-> (GTSAppConsSimpleType {gi_module=type_index.glob_module,gi_index=type_index.glob_object} (KindArrow tdi_kinds) args, st)
+						-> convert_type_app_to_GTSAppCons glob_module glob_object args modules td_infos heaps error
+				-> convert_type_app_to_GTSAppCons glob_module glob_object args modules td_infos heaps error
 			_
 				-> 	convert_type_app_to_GTSAppCons glob_module glob_object args modules td_infos heaps error
 	where
@@ -537,6 +548,54 @@ where
 		= contains_no_type_var atype && check_constructor atypes used_type_vars th_vars
 	check_constructor [] used_type_vars th_vars
 		= True
+
+can_generate_bimap_to_or_from_for_this_record :: ![ATypeVar] !DefinedSymbol !Index !*Modules !*TypeDefInfos !*Heaps -> (!Bool,!*Modules,!*TypeDefInfos,!*Heaps)
+can_generate_bimap_to_or_from_for_this_record td_args {ds_index} type_def_module_n modules td_infos heaps
+	# ({cons_type,cons_exi_vars},modules) = modules![type_def_module_n].com_cons_defs.[ds_index]
+	| cons_exi_vars=:[] && cons_type.st_context=:[]
+		= check_record_fields cons_type.st_args modules td_infos heaps
+		= (False,modules,td_infos,heaps)
+where
+	check_record_fields :: ![AType] !*Modules !*TypeDefInfos !*Heaps -> (!Bool,!*Modules,!*TypeDefInfos,!*Heaps)
+	check_record_fields [atype:atypes] modules td_infos heaps
+		# (ok,modules,td_infos,heaps) = check_record_field atype modules td_infos heaps
+		| ok
+			= check_record_fields atypes modules td_infos heaps
+			= (False,modules,td_infos,heaps)
+	check_record_fields [] modules td_infos heaps
+		= (True,modules,td_infos,heaps)
+
+	check_record_field :: !AType !*Modules !*TypeDefInfos !*Heaps -> (!Bool,!*Modules,!*TypeDefInfos,!*Heaps)
+	check_record_field {at_type=TV _} modules td_infos heaps
+		= (True,modules,td_infos,heaps)
+	check_record_field {at_type=TA {type_index={glob_module,glob_object}} [arg_atype]} modules td_infos heaps
+		| contains_no_type_var arg_atype
+			= (True,modules,td_infos,heaps)
+		#! (tdi_kinds,td_infos) = td_infos![glob_module,glob_object].tdi_kinds
+		| All (\k->k=:KindConst) tdi_kinds
+			# (type_def, modules) = modules![glob_module].com_type_defs.[glob_object]
+			| type_def.td_arity==1
+				= case type_def.td_rhs of
+					AlgType alts
+						# (can_generate_bimap_to_or_from,modules,heaps)
+							= can_generate_bimap_to_or_from_for_this_algebraic_type type_def.td_args glob_module alts modules heaps
+						| can_generate_bimap_to_or_from
+							-> check_record_field arg_atype modules td_infos heaps
+							-> (False,modules,td_infos,heaps)
+					_
+						-> (False,modules,td_infos,heaps)
+				= (False,modules,td_infos,heaps)
+			= (False,modules,td_infos,heaps)
+	check_record_field {at_type=atype1-->atype2} modules td_infos heaps
+		| contains_no_type_var atype2
+			= check_record_field atype1 modules td_infos heaps
+		| contains_no_type_var atype1
+			= (True,modules,td_infos,heaps)
+			= (False,modules,td_infos,heaps)
+	check_record_field atype modules td_infos heaps
+		| contains_no_type_var atype
+			= (True,modules,td_infos,heaps)
+			= (False,modules,td_infos,heaps)
 
 contains_no_type_var :: !AType -> Bool
 contains_no_type_var {at_type=TB _} = True
@@ -4262,16 +4321,24 @@ where
 	determine_constructors_arg_types :: !GlobalIndex ![GenTypeStruct] !*Modules !*Heaps
 							  -> (![DefinedSymbol],![[GenTypeStruct]],!*Modules,!*Heaps)
 	determine_constructors_arg_types {gi_module,gi_index} arg_types modules heaps
-		# ({td_args,td_rhs=AlgType alts},modules) = modules![gi_module].com_type_defs.[gi_index]
-
+		# ({td_args,td_rhs},modules) = modules![gi_module].com_type_defs.[gi_index]
 		# {hp_type_heaps} = heaps
 		# th_vars = number_type_arguments td_args 0 hp_type_heaps.th_vars
 		# arg_types_a = {!arg_type\\arg_type<-arg_types}
-		# (constructors_arg_types,modules,th_vars)
-			= compute_constructors_arg_types alts gi_module arg_types_a modules th_vars
-		# th_vars = remove_type_argument_numbers td_args th_vars
-		# heaps = {heaps & hp_type_heaps={hp_type_heaps & th_vars=th_vars}}
-		= (alts,constructors_arg_types,modules,heaps)
+		= case td_rhs of
+			AlgType alts
+				# (constructors_arg_types,modules,th_vars)
+					= compute_constructors_arg_types alts gi_module arg_types_a modules th_vars
+				# th_vars = remove_type_argument_numbers td_args th_vars
+				# heaps & hp_type_heaps={hp_type_heaps & th_vars=th_vars}
+				-> (alts,constructors_arg_types,modules,heaps)
+			RecordType {rt_constructor}
+				# ({cons_type={st_args}},modules) = modules![gi_module].com_cons_defs.[rt_constructor.ds_index]
+				# (constructor_arg_numbers,th_vars)
+					= compute_constructor_arg_types st_args arg_types_a th_vars
+				# th_vars = remove_type_argument_numbers td_args th_vars
+				# heaps & hp_type_heaps={hp_type_heaps & th_vars=th_vars}
+				-> ([rt_constructor],[constructor_arg_numbers],modules,heaps)
 	where
 		compute_constructors_arg_types :: ![DefinedSymbol] !Int !{!GenTypeStruct} !*Modules !*TypeVarHeap
 														   -> (![[GenTypeStruct]],!*Modules,!*TypeVarHeap)
@@ -4300,6 +4367,26 @@ where
 			# (TVI_GenTypeVarNumber constructor_arg_number,th_vars) = readPtr tv_info_ptr th_vars
 			#! constructor_arg_type = arg_types_a.[constructor_arg_number]
 			= (constructor_arg_type,th_vars)
+		compute_constructor_arg_type {at_type=TA {type_index={glob_module,glob_object},type_arity} [arg_atype]} arg_types_a th_vars
+			| contains_no_type_var arg_atype
+				= (GTSAppConsBimapKindConst,th_vars)
+			# (constructor_arg_type,th_vars)
+				= compute_constructor_arg_type arg_atype arg_types_a th_vars
+			# constructor_arg_type = GTSAppConsSimpleType {gi_module=glob_module,gi_index=glob_object} (KindArrow [KindConst]) [constructor_arg_type]
+			= (constructor_arg_type,th_vars)
+		compute_constructor_arg_type {at_type=atype1-->atype2} arg_types_a th_vars
+			| contains_no_type_var atype2
+				| contains_no_type_var atype1
+					= (GTSAppConsBimapKindConst,th_vars)
+				# (constructor_arg_type,th_vars)
+					= compute_constructor_arg_type atype1 arg_types_a th_vars
+				# constructor_arg_type = GTSArrow constructor_arg_type GTSAppConsBimapKindConst
+				= (constructor_arg_type,th_vars)
+			| contains_no_type_var atype1
+				# (constructor_arg_type,th_vars)
+					= compute_constructor_arg_type atype2 arg_types_a th_vars
+				# constructor_arg_type = GTSArrow GTSAppConsBimapKindConst constructor_arg_type
+				= (constructor_arg_type,th_vars)
 		compute_constructor_arg_type atype arg_types_a th_vars
 			| contains_no_type_var atype
 				= (GTSAppConsBimapKindConst,th_vars)
