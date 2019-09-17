@@ -3911,7 +3911,7 @@ where
 				# (expr,heaps) = buildFunApp main_module_index to_ds [arg] heaps
 				-> (expr, (funs_and_groups, modules, heaps, error))
 	specialize_to_with_arg (GTSAppConsSimpleType type_symbol_n kind arg_types) arg st
-		= bimap_to_simple_type type_symbol_n kind arg_types arg st
+		= bimap_to_simple_type type_symbol_n kind arg_types [arg] st
 	specialize_to_with_arg type arg st
 		# (adaptor_expr,st)
 			= specialize_to type st
@@ -3928,7 +3928,7 @@ where
 				# (expr,heaps) = buildFunApp main_module_index from_ds [arg] heaps
 				-> (expr, (funs_and_groups, modules, heaps, error))
 	specialize_from_with_arg (GTSAppConsSimpleType type_symbol_n kind arg_types) arg st
-		= bimap_from_simple_type type_symbol_n kind arg_types arg st
+		= bimap_from_simple_type type_symbol_n kind arg_types [arg] st
 	specialize_from_with_arg type arg st
 		# (adaptor_expr,st)
 			= specialize_from type st
@@ -4001,6 +4001,8 @@ where
 			TVI_Iso _ from_ds
 				# (expr,heaps) = buildFunApp main_module_index from_ds [] heaps
 				-> (expr, (funs_and_groups, modules, heaps, error))
+	specialize_from (GTSAppConsSimpleType type_symbol_n kind arg_types) st
+		= bimap_from_simple_type type_symbol_n kind arg_types [] st
 	specialize_from type (funs_and_groups, modules, heaps, error)
 		= specialize_a_b type (funs_and_groups, modules, heaps, error)
 
@@ -4027,6 +4029,8 @@ where
 			TVI_Iso to_ds _
 				# (expr,heaps) = buildFunApp main_module_index to_ds [] heaps
 				-> (expr, (funs_and_groups, modules, heaps, error))
+	specialize_to (GTSAppConsSimpleType type_symbol_n kind arg_types) st
+		= bimap_to_simple_type type_symbol_n kind arg_types [] st
 	specialize_to type (funs_and_groups, modules, heaps, error)
 		= specialize_a_f type (funs_and_groups, modules, heaps, error)
 
@@ -4163,9 +4167,9 @@ where
 	build_generic_app kind arg_exprs gen_index gen_ident heaps
 		= buildGenericApp gen_index.gi_module gen_index.gi_index gen_ident kind arg_exprs heaps 
 
-	bimap_to_simple_type :: !GlobalIndex !TypeKind ![GenTypeStruct] !Expression !*(!FunsAndGroups,!*{#CommonDefs},!*Heaps,!*ErrorAdmin)
-															   -> *(!Expression,!*(!FunsAndGroups,!*{#CommonDefs},!*Heaps,!*ErrorAdmin))
-	bimap_to_simple_type global_type_def_index=:{gi_module} (KindArrow kinds) arg_types arg (funs_and_groups,modules,heaps,error)
+	bimap_to_simple_type :: !GlobalIndex !TypeKind ![GenTypeStruct] ![Expression] !*(!FunsAndGroups,!*{#CommonDefs},!*Heaps,!*ErrorAdmin)
+																 -> *(!Expression,!*(!FunsAndGroups,!*{#CommonDefs},!*Heaps,!*ErrorAdmin))
+	bimap_to_simple_type global_type_def_index=:{gi_module} (KindArrow kinds) arg_types args (funs_and_groups,modules,heaps,error)
 		# (alts,constructors_arg_types,modules,heaps)
 			= determine_constructors_arg_types global_type_def_index arg_types modules heaps
 		# (alg_patterns,funs_and_groups,modules,heaps,error)
@@ -4180,7 +4184,7 @@ where
 
 		# (def_sym, funs_and_groups)
 			= buildFunAndGroup (makeIdent "bimapToGeneric") [arg_var] case_expr No main_module_index NoPos funs_and_groups
-		# (app_expr, heaps) = buildFunApp main_module_index def_sym [arg] heaps
+		# (app_expr, heaps) = buildFunApp main_module_index def_sym args heaps
 		= (app_expr,(funs_and_groups,modules,heaps,error))
 	where
 		build_to_alg_patterns [cons_ds=:{ds_ident,ds_index,ds_arity}:alts] [constructor_arg_types:constructors_arg_types] type_module_n funs_and_groups modules heaps error
@@ -4209,9 +4213,9 @@ where
 		specialize_to_with_args [] [] st
 			= ([],st)
 
-	bimap_from_simple_type :: !GlobalIndex !TypeKind ![GenTypeStruct] !Expression !*(!FunsAndGroups,!*{#CommonDefs},!*Heaps,!*ErrorAdmin)
-																 -> *(!Expression,!*(!FunsAndGroups,!*{#CommonDefs},!*Heaps,!*ErrorAdmin))
-	bimap_from_simple_type global_type_def_index=:{gi_module} (KindArrow kinds) arg_types arg (funs_and_groups,modules,heaps,error)
+	bimap_from_simple_type :: !GlobalIndex !TypeKind ![GenTypeStruct] ![Expression] !*(!FunsAndGroups,!*{#CommonDefs},!*Heaps,!*ErrorAdmin)
+																   -> *(!Expression,!*(!FunsAndGroups,!*{#CommonDefs},!*Heaps,!*ErrorAdmin))
+	bimap_from_simple_type global_type_def_index=:{gi_module} (KindArrow kinds) arg_types args (funs_and_groups,modules,heaps,error)
 		# (alts,constructors_arg_types,modules,heaps)
 			= determine_constructors_arg_types global_type_def_index arg_types modules heaps
 		# (alg_patterns,funs_and_groups,modules,heaps,error)
@@ -4226,7 +4230,7 @@ where
 
 		# (def_sym, funs_and_groups)
 			= buildFunAndGroup (makeIdent "bimapFromGeneric") [arg_var] case_expr No main_module_index NoPos funs_and_groups
-		# (app_expr, heaps) = buildFunApp main_module_index def_sym [arg] heaps
+		# (app_expr, heaps) = buildFunApp main_module_index def_sym args heaps
 		= (app_expr,(funs_and_groups,modules,heaps,error))
 	where
 		build_from_alg_patterns [cons_ds=:{ds_ident,ds_index,ds_arity}:alts] [constructor_arg_types:constructors_arg_types] type_module_n funs_and_groups modules heaps error
