@@ -2976,6 +2976,10 @@ where
 			TVI_SimpleBimapArgExpr bimap_expr
 				# (args,th_vars) = bimaps_with_arg type_args var_exprs th_vars
 				= ([bimap_expr @ [var_expr]:args],th_vars)
+	bimaps_with_arg [type_arg:type_args] [var_expr:var_exprs] th_vars
+		| contains_no_type_var type_arg // always
+			# (args,th_vars) = bimaps_with_arg type_args var_exprs th_vars
+			= ([var_expr:args],th_vars)
 	bimaps_with_arg [] [] th_vars
 		= ([],th_vars)
 
