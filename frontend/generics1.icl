@@ -590,7 +590,7 @@ where
 		| contains_no_type_var atype2
 			= check_record_field atype1 modules td_infos heaps
 		| contains_no_type_var atype1
-			= (True,modules,td_infos,heaps)
+			= check_record_field atype2 modules td_infos heaps
 			= (False,modules,td_infos,heaps)
 	check_record_field atype modules td_infos heaps
 		| contains_no_type_var atype
