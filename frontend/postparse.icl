@@ -426,6 +426,7 @@ get_predef_id predef_index :== predefined_idents.[predef_index]
 	,	tg_rhs_continuation :: [ParsedExpr]
 	,	tg_case1 :: Ident
 	,	tg_case2 :: Ident
+	,	tg_pos :: Position
 	}
 
 :: IndexGenerator :== Optional (ParsedExpr,[([ParsedDefinition],ParsedExpr,ParsedExpr)])
@@ -465,6 +466,7 @@ transformGenerator {gen_kind=IsArrayGenerator, gen_expr, gen_pattern, gen_positi
 					,	tg_pattern = pattern
 					,	tg_rhs_continuation = [PE_List [PE_Ident inc, i], n, array]
 					,	tg_case1 = gen_var_case1, tg_case2 = gen_var_case2
+					,	tg_pos = LinePos qual_filename gen_position.lc_line
 					}
 			-> (transformed_generator,Yes (i,[([],dec_n,n2)]),2,ca)
 		Yes (i,[])
@@ -481,6 +483,7 @@ transformGenerator {gen_kind=IsArrayGenerator, gen_expr, gen_pattern, gen_positi
 					,	tg_pattern = pattern
 					,	tg_rhs_continuation = [n,array]
 					,	tg_case1 = gen_var_case1, tg_case2 = gen_var_case2
+					,	tg_pos = LinePos qual_filename gen_position.lc_line
 					}
 			-> (transformed_generator,Yes (i,[([],dec_n,n2)]),1,ca)
 		Yes (i,size_expressions)
@@ -494,6 +497,7 @@ transformGenerator {gen_kind=IsArrayGenerator, gen_expr, gen_pattern, gen_positi
 					,	tg_pattern = pattern
 					,	tg_rhs_continuation = [array]
 					,	tg_case1 = gen_var_case1, tg_case2 = gen_var_case2
+					,	tg_pos = LinePos qual_filename gen_position.lc_line
 					}
 			# size_expression
 				=([PD_NodeDef (LinePos qual_filename gen_position.lc_line) (PE_Tuple [n,a2]) (exprToRhs (PE_List [PE_Ident usize, gen_expr]))],
@@ -520,6 +524,7 @@ transformGenerator {gen_kind, gen_expr=PE_Sequ (SQ_FromTo pd_from_to_index from_
 							,	tg_pattern = gen_pattern
 							,	tg_rhs_continuation = [PE_List [PE_Ident inc, i], n]
 							,	tg_case1 = gen_var_case1, tg_case2 = gen_var_case2
+							,	tg_pos = LinePos qual_filename gen_position.lc_line
 							}
 					-> (transformed_generator,Yes (i,[([],to_exp,n)]),2,ca)
 				Yes (i,[])
@@ -535,6 +540,7 @@ transformGenerator {gen_kind, gen_expr=PE_Sequ (SQ_FromTo pd_from_to_index from_
 							,	tg_pattern = gen_pattern
 							,	tg_rhs_continuation = [n]
 							,	tg_case1 = gen_var_case1, tg_case2 = gen_var_case2
+							,	tg_pos = LinePos qual_filename gen_position.lc_line
 							}
 					-> (transformed_generator,Yes (i,[([],to_exp,n)]),1,ca)
 				Yes (i,size_expressions)
@@ -548,6 +554,7 @@ transformGenerator {gen_kind, gen_expr=PE_Sequ (SQ_FromTo pd_from_to_index from_
 							,	tg_pattern = gen_pattern
 							,	tg_rhs_continuation = []
 							,	tg_case1 = gen_var_case1, tg_case2 = gen_var_case2
+							,	tg_pos = LinePos qual_filename gen_position.lc_line
 							}
 					-> (transformed_generator,Yes (i,[([],to_exp,n):size_expressions]),0,ca)
 			# (i, ca) = patternPrefixAndPositionToIdentExp gen_pattern "g_i" gen_position ca
@@ -563,6 +570,7 @@ transformGenerator {gen_kind, gen_expr=PE_Sequ (SQ_FromTo pd_from_to_index from_
 					,	tg_pattern = gen_pattern
 					,	tg_rhs_continuation = [PE_List [PE_Ident inc, i], n]
 					,	tg_case1 = gen_var_case1, tg_case2 = gen_var_case2
+					,	tg_pos = LinePos qual_filename gen_position.lc_line
 					}
 			= (transformed_generator,index_generator,0,ca)
 transformGenerator {gen_kind, gen_expr=PE_Sequ (SQ_From pd_from_index from_exp), gen_pattern, gen_position} qual_filename index_generator ca
@@ -584,6 +592,7 @@ transformGenerator {gen_kind, gen_expr=PE_Sequ (SQ_From pd_from_index from_exp),
 							,	tg_pattern = gen_pattern
 							,	tg_rhs_continuation = [PE_List [PE_Ident inc, i]]
 							,	tg_case1 = gen_var_case1, tg_case2 = gen_var_case2
+							,	tg_pos = LinePos qual_filename gen_position.lc_line
 							}
 					-> (transformed_generator,Yes (i,[]),0,ca)
 				Yes (i,size_expressions)
@@ -597,6 +606,7 @@ transformGenerator {gen_kind, gen_expr=PE_Sequ (SQ_From pd_from_index from_exp),
 							,	tg_pattern = gen_pattern
 							,	tg_rhs_continuation = []
 							,	tg_case1 = gen_var_case1, tg_case2 = gen_var_case2
+							,	tg_pos = LinePos qual_filename gen_position.lc_line
 							}
 					-> (transformed_generator,index_generator,0,ca)
 			# (i, ca) = patternPrefixAndPositionToIdentExp gen_pattern "g_i" gen_position ca
@@ -611,6 +621,7 @@ transformGenerator {gen_kind, gen_expr=PE_Sequ (SQ_From pd_from_index from_exp),
 					,	tg_pattern = gen_pattern
 					,	tg_rhs_continuation = [PE_List [PE_Ident inc, i]]
 					,	tg_case1 = gen_var_case1, tg_case2 = gen_var_case2
+					,	tg_pos = LinePos qual_filename gen_position.lc_line
 					}
 			= (transformed_generator,index_generator,0,ca)
 transformGenerator {gen_kind, gen_expr, gen_pattern, gen_position} qual_filename index_generator ca
@@ -630,6 +641,7 @@ transformGenerator {gen_kind, gen_expr, gen_pattern, gen_position} qual_filename
 			,	tg_pattern = gen_pattern
 			,	tg_rhs_continuation = [tl]
 			,	tg_case1 = gen_var_case1, tg_case2 = gen_var_case2
+			,	tg_pos = LinePos qual_filename gen_position.lc_line
 			}
 	= (transformed_generator,index_generator,0,ca)
 
@@ -928,11 +940,11 @@ makeComprehensions [{tq_generators,tq_let_defs,tq_filter, tq_end, tq_call, tq_lh
 		build_rhs :: [TransformedGenerator] ParsedExpr LocalDefs (Optional ParsedExpr) ParsedExpr ParsedExpr Position -> Rhs
 		build_rhs [generator : generators] success let_defs optional_filter failure end fun_pos
 			#	rhs2 = foldr (case_end end)
-						(case_with_default generator.tg_case2 generator.tg_element generator.tg_element_is_uselect generator.tg_pattern
+						(case_with_default generator.tg_pos generator.tg_case2 generator.tg_element generator.tg_element_is_uselect generator.tg_pattern
 							(foldr (case_pattern failure) rhs generators)
 							failure)
 						generators
-			=	case_with_default generator.tg_case1 generator.tg_case_end_expr False generator.tg_case_end_pattern rhs2 end
+			=	case_with_default generator.tg_pos generator.tg_case1 generator.tg_case_end_expr False generator.tg_case_end_pattern rhs2 end
 			where
 				rhs
 					=	case optional_filter of
@@ -948,27 +960,27 @@ makeComprehensions [{tq_generators,tq_let_defs,tq_filter, tq_end, tq_call, tq_lh
 				(LinePos _ line_nr) = fun_pos
 
 		case_end :: ParsedExpr TransformedGenerator Rhs -> Rhs
-		case_end end {tg_case1, tg_case_end_expr, tg_case_end_pattern} rhs
-			=	case_with_default tg_case1 tg_case_end_expr False tg_case_end_pattern rhs end
+		case_end end {tg_pos, tg_case1, tg_case_end_expr, tg_case_end_pattern} rhs
+			=	case_with_default tg_pos tg_case1 tg_case_end_expr False tg_case_end_pattern rhs end
 	
 		case_pattern :: ParsedExpr TransformedGenerator Rhs -> Rhs
-		case_pattern failure {tg_case2, tg_element,tg_element_is_uselect, tg_pattern} rhs
-			=	case_with_default tg_case2 tg_element tg_element_is_uselect tg_pattern rhs failure
+		case_pattern failure {tg_pos, tg_case2, tg_element,tg_element_is_uselect, tg_pattern} rhs
+			=	case_with_default tg_pos tg_case2 tg_element tg_element_is_uselect tg_pattern rhs failure
 
-		case_with_default :: Ident ParsedExpr Bool ParsedExpr Rhs ParsedExpr -> Rhs
-		case_with_default case_ident expr expr_is_uselect pattern=:(PE_Ident ident) rhs=:{rhs_alts=UnGuardedExpr ung_exp=:{ewl_nodes,ewl_expr,ewl_locals=LocalParsedDefs [],ewl_position},rhs_locals=LocalParsedDefs []} default_rhs
+		case_with_default :: Position Ident ParsedExpr Bool ParsedExpr Rhs ParsedExpr -> Rhs
+		case_with_default pos case_ident expr expr_is_uselect pattern=:(PE_Ident ident) rhs=:{rhs_alts=UnGuardedExpr ung_exp=:{ewl_nodes,ewl_expr,ewl_locals=LocalParsedDefs [],ewl_position},rhs_locals=LocalParsedDefs []} default_rhs
 			| isLowerCaseName ident.id_name
 				# new_node={ndwl_strict=False,ndwl_def={bind_src=expr,bind_dst=pattern},ndwl_locals=LocalParsedDefs [],ndwl_position=ewl_position}
 				= {rhs & rhs_alts=UnGuardedExpr {ung_exp & ewl_nodes=[new_node:ewl_nodes]}}
-		case_with_default case_ident expr True pattern=:(PE_Tuple [PE_Ident ident1,ident2_exp=:PE_Ident ident2]) rhs=:{rhs_alts=UnGuardedExpr ung_exp=:{ewl_nodes,ewl_expr,ewl_locals=LocalParsedDefs [],ewl_position},rhs_locals=LocalParsedDefs []} default_rhs
+		case_with_default pos case_ident expr True pattern=:(PE_Tuple [PE_Ident ident1,ident2_exp=:PE_Ident ident2]) rhs=:{rhs_alts=UnGuardedExpr ung_exp=:{ewl_nodes,ewl_expr,ewl_locals=LocalParsedDefs [],ewl_position},rhs_locals=LocalParsedDefs []} default_rhs
 			# new_node1={ndwl_strict=False,ndwl_def={bind_src=expr,bind_dst=pattern},ndwl_locals=LocalParsedDefs [],ndwl_position=ewl_position}
 			# new_node2={ndwl_strict=True,ndwl_def={bind_src=ident2_exp,bind_dst=ident2_exp},ndwl_locals=LocalParsedDefs [],ndwl_position=ewl_position}
 			= {rhs & rhs_alts=UnGuardedExpr {ung_exp & ewl_nodes=[new_node1,new_node2:ewl_nodes]}}
-		case_with_default case_ident expr expr_is_uselect PE_Empty rhs default_rhs
+		case_with_default pos case_ident expr expr_is_uselect PE_Empty rhs default_rhs
 			= rhs
-		case_with_default case_ident expr expr_is_uselect pattern rhs default_rhs
+		case_with_default pos case_ident expr expr_is_uselect pattern rhs default_rhs
 			=	exprToRhs (PE_Case case_ident expr
-					[	{calt_pattern = pattern, calt_rhs = rhs, calt_position=NoPos}
+					[	{calt_pattern = pattern, calt_rhs = rhs, calt_position=pos}
 					,	{calt_pattern = PE_WildCard, calt_rhs = exprToRhs default_rhs, calt_position=NoPos}
 					])
 
