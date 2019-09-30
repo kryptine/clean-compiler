@@ -903,7 +903,9 @@ GetPrio input
 	# (error, c, input) = SkipWhites input
 	| IsDigit c
 		= (error, digitToInt c, input)
+	| c<>NewLineChar // not eof ?
 		= (error, defaultPrio , charBack input)
+		= (error, defaultPrio , input)
 where defaultPrio = 9
 
 determineStrictness :: !Input -> (!Bool, !Input)
