@@ -632,38 +632,9 @@ NoGlobalIndex :== {gi_module=NoIndex,gi_index=NoIndex}
 	,	tdi_gen_rep 		:: !GenericTypeReps
 	}
 
-// type structure is used to specialize a generic to a type
-:: GenTypeStruct 
-	= GTSAppCons TypeKind [GenTypeStruct]
-	| GTSAppVar TypeVar [GenTypeStruct] 
-	| GTSVar TypeVar
- 	| GTSCons !DefinedSymbol !GlobalIndex !DefinedSymbol !DefinedSymbol !GenTypeStruct
- 	| GTSRecord !DefinedSymbol !GlobalIndex !DefinedSymbol !DefinedSymbol !GenTypeStruct
- 	| GTSField !DefinedSymbol !GlobalIndex !DefinedSymbol !GenTypeStruct
- 	| GTSObject !DefinedSymbol !GlobalIndex !DefinedSymbol !GenTypeStruct
-	| GTSE
-	| GTSPair !GenTypeStruct !GenTypeStruct
-	| GTSEither !GenTypeStruct !GenTypeStruct
-	| GTSUnit
-	| GTSArrow GenTypeStruct GenTypeStruct
-	// the following constructors are used for optimizing bimaps
- 	| GTSAppConsBimapKindConst
-	| GTSAppBimap TypeKind [GenTypeStruct]
-	| GTSAppConsSimpleType !GlobalIndex !TypeKind ![GenTypeStruct]
- 	| GTSCons1Bimap !GenTypeStruct
- 	| GTSRecord1Bimap !GenTypeStruct
-
 :: GenericTypeReps
 	= NoGenericTypeReps
-	| GenericTypeRep !GenericTypeRep
-	| GenericBimapTypeRep !GenericTypeRep
-	| GenericTypeRepAndBimapTypeRep !GenericTypeRep !GenericTypeRep
-
-:: GenericTypeRep = 
-	{ gtr_type :: GenTypeStruct		// generic structure type
-	, gtr_to   :: !DefinedSymbol
-	, gtr_from :: !DefinedSymbol
-	}
+	| ..
 
 ::	TypeDefInfos :== {# .{# TypeDefInfo}}
 
