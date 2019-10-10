@@ -32,7 +32,6 @@ import genericsupport,transform,utilities
 	| BGTSAppVar TypeVar [BimapGenTypeStruct]
 	| BGTSVar TypeVar
 	| BGTSE
-	| BGTSUnit
 	| BGTSArrow BimapGenTypeStruct BimapGenTypeStruct
 	| BGTSAlgebraic ![[BimapGenTypeStruct]]
 	| BGTSRecord ![BimapGenTypeStruct]
@@ -66,7 +65,6 @@ import genericsupport,transform,utilities
 
 :: BimapFunctions = {
 		bimap_id_function :: !FunctionIndexAndIdent,
-		bimap_fromto_function :: !FunctionIndexAndIdent,
 		bimap_tofrom_function :: !FunctionIndexAndIdent,
 		bimap_to_function :: !FunctionIndexAndIdent,
 		bimap_from_function :: !FunctionIndexAndIdent
@@ -276,7 +274,6 @@ buildGenericRepresentations gs=:{gs_main_module, gs_modules, gs_funs, gs_groups}
 	# undefined_function_and_ident = {fii_index = -1,fii_ident = undef}
 	  bimap_functions = {
 				bimap_id_function = undefined_function_and_ident,
-				bimap_fromto_function = undefined_function_and_ident,
 				bimap_tofrom_function = undefined_function_and_ident,
 				bimap_to_function = undefined_function_and_ident,
 				bimap_from_function = undefined_function_and_ident
@@ -758,8 +755,6 @@ where
 		= (BGTSAppVar tv args, st)	
 	simplify t=:(BGTSVar tv) st
 		= (t, st)
-	simplify BGTSUnit st
-		= (BGTSUnit, st)
 	simplify (BGTSAlgebraic algebraic_gen_type) st
 		# (algebraic_gen_type, st) = mapSt (mapSt simplify) algebraic_gen_type st
 		= (BGTSAlgebraic algebraic_gen_type, st)
@@ -772,7 +767,6 @@ where
 	occurs (BGTSAppVar tv args) st 	= type_var_occurs tv st || occurs_list args st		
 	occurs (BGTSVar tv) st			= type_var_occurs tv st
 	occurs (BGTSArrow x y) st 		= occurs2 x y st
-	occurs BGTSUnit st				= False
 	occurs BGTSE st 				= False
 
 	occurs2 x y st
@@ -3728,9 +3722,6 @@ where
 	specialize_f BGTSAppConsBimapKindConst (funs_and_groups, heaps, error)
 		# (expr, funs_and_groups, heaps) = bimap_id_expression main_module_index predefs funs_and_groups heaps
 		= (expr ,(funs_and_groups, heaps, error))
-	specialize_f BGTSUnit (funs_and_groups, heaps, error)
-		# (expr, funs_and_groups, heaps) = bimap_id_expression main_module_index predefs funs_and_groups heaps
-		= (expr, (funs_and_groups, heaps, error))
 	specialize_f type (funs_and_groups, heaps, error)
 		#! error = reportError gen_ident.id_name gen_pos "cannot specialize " error 
 		= (EE, (funs_and_groups, heaps, error))
@@ -3777,9 +3768,6 @@ where
 	specialize_b BGTSAppConsBimapKindConst (funs_and_groups, heaps, error)
 		# (expr, funs_and_groups, heaps) = bimap_id_expression main_module_index predefs funs_and_groups heaps
 		= (expr ,(funs_and_groups, heaps, error))
-	specialize_b BGTSUnit (funs_and_groups, heaps, error)
-		# (expr, funs_and_groups, heaps) = bimap_id_expression main_module_index predefs funs_and_groups heaps
-		= (expr, (funs_and_groups, heaps, error))
 	specialize_b type (funs_and_groups, heaps, error)
 		#! error = reportError gen_ident.id_name gen_pos "cannot specialize " error 
 		= (EE, (funs_and_groups, heaps, error))
@@ -4406,22 +4394,6 @@ remove_type_argument_numbers [{atv_variable={tv_info_ptr}}:atype_vars] th_vars
 	= remove_type_argument_numbers atype_vars th_vars
 remove_type_argument_numbers [] th_vars
 	= th_vars
-
-bimap_fromto_function main_module_index funs_and_groups=:{fg_bimap_functions={bimap_fromto_function={fii_index,fii_ident}}} heaps
-	| fii_index>=0
-		= (fii_index,fii_ident,funs_and_groups,heaps)
-		// bimap/fromto from to f x = from (f (to x))
-		# bimap_fromto_ident = makeIdent "bimap/fromto"
-		  (from_expr,from_var,heaps) = buildVarExpr "from" heaps 
-		  (to_expr,to_var,heaps) = buildVarExpr "to" heaps 
-		  (f_expr,f_var,heaps) = buildVarExpr "f" heaps 
-		  (x_expr,x_var,heaps) = buildVarExpr "x" heaps 
-
-		  args = [from_var,to_var,f_var,x_var]
-		  rhs_expr = from_expr @ [f_expr @ [to_expr @ [x_expr]]]
-		  (bimap_fromto_index,funs_and_groups) = buildFunAndGroup2 bimap_fromto_ident args rhs_expr main_module_index funs_and_groups
-		  funs_and_groups = {funs_and_groups & fg_bimap_functions.bimap_fromto_function={fii_index=bimap_fromto_index,fii_ident=bimap_fromto_ident}}
-		= (bimap_fromto_index,bimap_fromto_ident,funs_and_groups,heaps)
 
 bimap_tofrom_function main_module_index funs_and_groups=:{fg_bimap_functions={bimap_tofrom_function={fii_index,fii_ident}}} heaps
 	| fii_index>=0
