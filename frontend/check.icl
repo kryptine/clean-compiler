@@ -3557,15 +3557,11 @@ where
 				<=< adjust_predef_symbols PD_TC_Int PD_TC__Unit mod_index STE_Constructor
 				)
 		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_StdGeneric]
-		# type_bimap = predefined_idents.[PD_TypeBimap]	
 		| pre_mod.pds_def == mod_index
 			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols}
-				<=< adjust_predef_symbols PD_TypeBimap PD_TypeGenericDict mod_index STE_Type
-				<=< adjustPredefSymbol PD_map_to				mod_index (STE_Field type_bimap)
-				<=< adjustPredefSymbol PD_map_from				mod_index (STE_Field type_bimap)
-				<=< adjust_predef_symbols PD_ConsBimap PD_CGenTypeApp mod_index STE_Constructor
+				<=< adjust_predef_symbols PD_TypeUNIT PD_TypeGenericDict mod_index STE_Type
+				<=< adjust_predef_symbols PD_ConsUNIT PD_CGenTypeApp mod_index STE_Constructor
 				<=< adjustPredefSymbol PD_GenericBimap			mod_index STE_Generic
-				<=< adjustPredefSymbol PD_bimapId				mod_index STE_DclFunction				
 				)
 		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_StdMisc]	
 		| pre_mod.pds_def == mod_index
