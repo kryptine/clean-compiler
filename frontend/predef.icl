@@ -173,10 +173,6 @@ predefined_idents
 					[PD_TC__Unit] = i "TC__Unit",
 
 					[PD_StdGeneric] = i "StdGeneric",
-					[PD_TypeBimap] = i "Bimap",
-					[PD_ConsBimap] = i "_Bimap",
-					[PD_map_to] = i "map_to",
-					[PD_map_from] = i "map_from",
 					[PD_TypeUNIT] = i "UNIT",
 					[PD_ConsUNIT] = i "UNIT",
 					[PD_TypeEITHER] = i "EITHER",
@@ -213,7 +209,6 @@ predefined_idents
 					[PD_CGenTypeArrow] = i "GenTypeArrow",
 					[PD_CGenTypeApp] = i "GenTypeApp",
 				
-					[PD_bimapId] = i "bimapId",
 					[PD_GenericBimap] = i "bimap",
 					[PD_GenericBinumap] = i "binumap",
 
@@ -378,15 +373,11 @@ where
 					<<- (local_predefined_idents,	IC_Module NoQualifiedIdents, PD_StdGeneric)
 		# hash_table = put_predefined_idents_in_hash_table PD_TC_Int PD_TC__Unit IC_Expression local_predefined_idents hash_table
 
-		# hash_table = put_predefined_idents_in_hash_table PD_TypeBimap PD_TypeGenericDict0 IC_Type local_predefined_idents hash_table
-		# hash_table = put_predefined_idents_in_hash_table PD_ConsBimap PD_bimapId IC_Expression local_predefined_idents hash_table
+		# hash_table = put_predefined_idents_in_hash_table PD_TypeUNIT PD_TypeGenericDict0 IC_Type local_predefined_idents hash_table
+		# hash_table = put_predefined_idents_in_hash_table PD_ConsUNIT PD_CGenTypeApp IC_Expression local_predefined_idents hash_table
 					<<- (local_predefined_idents,	IC_Generic,		PD_GenericBimap)
 					<<- (local_predefined_idents,	IC_Generic,		PD_GenericBinumap)
-		# bimap_type = local_predefined_idents.[PD_TypeBimap]
-		# hash_table = hash_table 
-					<<- (local_predefined_idents, IC_Field bimap_type, PD_map_to)
-					<<- (local_predefined_idents, IC_Field bimap_type, PD_map_from)
-									
+		# hash_table = hash_table
 					<<- (local_predefined_idents,	IC_Module NoQualifiedIdents, PD_StdMisc)
 
 					<<- (local_predefined_idents,	IC_Expression, 	PD_abort)
