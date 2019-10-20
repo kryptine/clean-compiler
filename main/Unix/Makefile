@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-fno-pie -pedantic -Wall -W -O
+CFLAGS=-fno-pie -pedantic -Wall -W -O -m32
 CPPFLAGS=
 
 all: cDirectory.o ipc.o set_return_code_c.o \

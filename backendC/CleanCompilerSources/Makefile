@@ -1,6 +1,6 @@
 # This is for Unix
 CC = gcc
-CFLAGS = -D_SUN_ -DGNU_C -O -fomit-frame-pointer
+CFLAGS = -D_SUN_ -DGNU_C -O -fomit-frame-pointer -m32
 AR = ar
 RANLIB = ranlib
 
