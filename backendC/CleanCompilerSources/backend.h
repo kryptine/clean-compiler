@@ -114,7 +114,8 @@ enum {
 	BEIntDenot, BEBoolDenot, BECharDenot, BERealDenot, BEIntegerDenot,
 
 	BEStringDenot,
-	BEFunType, BEArrayType, BEStrictArrayType, BEUnboxedArrayType, BEListType, BETupleType, BEEmptyType,
+	BEFunType, BEArrayType, BEStrictArrayType, BEUnboxedArrayType, BEClippedArrayType,
+	BEListType, BETupleType, BEEmptyType,
  	BEDynamicType, 
  	BENrOfPredefTypes,
 	

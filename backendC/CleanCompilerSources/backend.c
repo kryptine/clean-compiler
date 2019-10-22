@@ -195,6 +195,7 @@ InitPredefinedSymbols (void)
 	gBasicSymbols [array_type]			= PredefinedSymbol (array_type, 1);
 	gBasicSymbols [strict_array_type]	= PredefinedSymbol (strict_array_type, 1);
 	gBasicSymbols [unboxed_array_type]	= PredefinedSymbol (unboxed_array_type, 1);
+	gBasicSymbols [clipped_array_type]	= PredefinedSymbol (clipped_array_type, 1);
 
 	gBasicSymbols [fun_type]	= PredefinedSymbol (fun_type, 2);
 
@@ -603,6 +604,7 @@ BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, in
 		{
 			case strict_array_type:
 			case unboxed_array_type:
+			case clipped_array_type:
 				elementType->type_node_annotation	= StrictAnnot;
 				break;
 			case array_type:
@@ -3176,6 +3178,7 @@ CheckBEEnumTypes (void)
 	Assert (array_type					== BEArrayType);
 	Assert (strict_array_type			== BEStrictArrayType);
 	Assert (unboxed_array_type			== BEUnboxedArrayType);
+	Assert (clipped_array_type			== BEClippedArrayType);
 	Assert (list_type					== BEListType);
 	Assert (tuple_type					== BETupleType);
 	Assert (empty_type					== BEEmptyType);
