@@ -2,7 +2,7 @@ implementation module type
 
 import StdEnv,StdOverloadedList,compare_types
 import syntax, typesupport, check, analtypes, overloading, unitype, refmark, predef, utilities, compare_constructor
-import genericsupport
+import check_instances, genericsupport
 
 ::	TypeInput =
 	! {	ti_common_defs	:: !{# CommonDefs }
@@ -2536,11 +2536,10 @@ typeProgram comps main_dcl_module_n fun_defs specials list_inferred_types icl_de
 
 	  class_instances = { {  IT_Empty \\ i <- [0 .. dec (size com_class_defs)] } \\ {com_class_defs} <-: ti_common_defs }
 	  state = collect_imported_instances icl_imported_instances ti_common_defs ts_error class_instances hp_type_heaps.th_vars td_infos
-
 	  (ts_error, class_instances, th_vars, td_infos) = collect_and_check_instances (size icl_defs.com_instance_defs) ti_common_defs main_dcl_module_n state
-	  
+	  (class_instances,th_vars,ts_error) = check_if_class_instances_overlap class_instances ti_common_defs th_vars ts_error
 	  ts = { ts_fun_env = InitFunEnv fun_env_size, ts_var_heap = hp_var_heap, ts_expr_heap = hp_expression_heap, ts_generic_heap = hp_generic_heap, ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [],
-	  		 ts_type_heaps = { hp_type_heaps & th_vars = th_vars }, ts_td_infos = td_infos, ts_error = ts_error, ts_fun_defs=fun_defs }
+			 ts_type_heaps = { hp_type_heaps & th_vars = th_vars }, ts_td_infos = td_infos, ts_error = ts_error, ts_fun_defs=fun_defs }
 	  ti = { ti_common_defs = ti_common_defs, ti_functions = ti_functions,ti_main_dcl_module_n=main_dcl_module_n, ti_expand_newtypes = False }
 	  special_instances = { si_next_array_member_index = fun_env_size, si_array_instances = [], si_list_instances = [], si_tail_strict_list_instances = [] }
 	# (type_error, predef_symbols, special_instances, out, ts) = type_components list_inferred_types 0 comps class_instances ti (False, predef_symbols, special_instances, out, ts)
