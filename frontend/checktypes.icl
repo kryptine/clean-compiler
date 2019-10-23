@@ -633,7 +633,9 @@ where
 		  		= addExistentionalTypeVariablesToSymbolTable cti_lhs_attribute cons_def.cons_exi_vars ti_type_heaps cs
 		  (st_args, st_attr_env,class_defs,(ts, ti=:{ti_type_heaps}, cs))
 		  		= bind_types_of_cons cons_def.cons_type.st_args cti free_vars [] class_defs (ts, {ti & ti_type_heaps = ti_type_heaps}, cs)
-		  (unused_exi_vars,th_vars,cs)
+		| not cs.cs_error.ea_ok
+			= (class_defs, ts, ti, cs)
+		# (unused_exi_vars,th_vars,cs)
 		  		= find_unused_existential_type_vars exi_vars [] ti_type_heaps.th_vars cs
 		  (st_context,class_defs,ts,ti=:{ti_type_heaps},cs)
 		  		= bind_context_of_cons cons_def.cons_type.st_context cti class_defs ts { ti & ti_type_heaps = { ti_type_heaps & th_vars = th_vars } } cs
