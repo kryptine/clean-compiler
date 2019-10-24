@@ -2444,6 +2444,6 @@ markExports {dcl_functions,dcl_common={com_type_defs,com_cons_defs,com_selector_
 					=	beExportField True fs_index
 
 		export_constructor constructor_index
-			| com_cons_defs.[constructor_index].cons_number <> -2
+			| com_cons_defs.[constructor_index].cons_number <> ConsNumberNewType
 				= beExportConstructor constructor_index
 				= \ bs=:{bes_backEnd} -> bs

@@ -801,7 +801,7 @@ freshAlgebraicType {gi_module,gi_index} patterns common_defs ts=:{ts_var_store,t
 where
 	fresh_symbol_types [{ap_symbol={glob_object,glob_module},ap_expr}] common_defs td_attrs td_args var_store attr_store type_heaps all_exis_variables
 		# {cons_type = {st_args,st_attr_env,st_result,st_context}, cons_exi_vars, cons_number, cons_type_index} = common_defs.[glob_module].com_cons_defs.[glob_object.ds_index]
-		| cons_number <> -3
+		| cons_number <> ConsNumberAddedConstructor
 			# (exis_variables, var_store, attr_store, type_heaps) = freshExistentialVariables cons_exi_vars var_store attr_store type_heaps
 		  	  (attr_env, th_attrs) 		= fresh_environment st_attr_env [] type_heaps.th_attrs
 		  	  (result_type, type_heaps)	= freshCopy st_result { type_heaps & th_attrs = th_attrs }
@@ -828,7 +828,7 @@ where
 		# (cons_types, result_type, attr_env, constructor_contexts, var_store, attr_store, type_heaps, all_exis_variables)
 				= fresh_symbol_types patterns common_defs td_attrs td_args var_store attr_store type_heaps all_exis_variables
 		# {cons_type = {st_args,st_attr_env,st_context}, cons_exi_vars,cons_number, cons_type_index} = common_defs.[glob_module].com_cons_defs.[glob_object.ds_index]
-		| cons_number <> -3
+		| cons_number <> ConsNumberAddedConstructor
 			# (exis_variables, var_store, attr_store, type_heaps) = freshExistentialVariables cons_exi_vars var_store attr_store type_heaps
 			  (attr_env, th_attrs) 		= fresh_environment st_attr_env attr_env type_heaps.th_attrs
 		  	  (fresh_args, type_heaps) 	= freshCopy st_args { type_heaps & th_attrs = th_attrs }

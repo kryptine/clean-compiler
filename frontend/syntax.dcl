@@ -1011,12 +1011,16 @@ cNotVarNumber :== -1
 	{	cons_ident			:: !Ident
 	,	cons_type			:: !SymbolType
 	,	cons_priority		:: !Priority
-	,	cons_number			:: !Index // -2 for newtype constructor, -3 for added constructor
+	,	cons_number			:: !Index
 	,	cons_type_index		:: !Index
 	,	cons_exi_vars		:: ![ATypeVar]
 	,	cons_type_ptr		:: !VarInfoPtr
 	,	cons_pos			:: !Position
 	}
+
+// Possible values for cons_number (-1 is reserved for NoIndex):
+ConsNumberNewType :== -2
+ConsNumberAddedConstructor :== -3
 
 ::	SelectorDef =
 	{	sd_ident		:: !Ident // IC_Selector
