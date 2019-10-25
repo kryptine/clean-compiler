@@ -20,3 +20,5 @@ instance == BasicType, TypeVar, AttributeVar, AttrInequality, TypeSymbIdent, Def
 instance < MemberDef
 
 smallerOrEqual :: !Type !Type -> CompareValue
+
+compareInstances :: ![Type] ![Type] -> CompareValue

@@ -169,7 +169,6 @@ where
 instance =< SymbIdent
 where
 	(=<) {symb_kind=symb_kind1} {symb_kind=symb_kind2} = symb_kind1 =< symb_kind2
-			
 
 instance =< App
 where
@@ -202,7 +201,7 @@ where
 		| s1 < s2
 			= Smaller
 			= Greater
-	
+
 instance =< Expression
 where
 	(=<) expr1 expr2
@@ -354,3 +353,77 @@ where
 instance < MemberDef
 where
 	(<) md1 md2 = md1.me_ident.id_name < md2.me_ident.id_name
+
+(CAND) infix 3 :: !(!CompareValue, ![(Ident,Ident)]) (CompareValue, [(Ident,Ident)]) -> (CompareValue,  [(Ident,Ident)])
+(CAND) (cv1,vlist1) cl2
+	| cv1 == Equal
+		= case cl2 of
+			(cv2,vlist2)
+				| cv2 == Equal
+					-> compare_and_add_variables vlist1 vlist2
+					-> (cv2,[])
+		= (cv1,[])
+
+compare_and_add_variables :: ![(Ident,Ident)] ![(Ident,Ident)] -> (!CompareValue,![(Ident,Ident)])
+compare_and_add_variables vlist1 []
+	= (Equal, vlist1)
+compare_and_add_variables vlist1 [v2=:(v2a,v2b):vlist2]
+	# (cv,not_found) = compare_variable vlist1 v2a v2b
+	| cv==Equal
+		| not_found
+			= compare_and_add_variables (vlist1++[v2]) vlist2
+			= compare_and_add_variables vlist1 vlist2
+		= (cv, [])
+
+compare_variable :: ![(Ident,Ident)] !Ident !Ident -> (!CompareValue,!Bool)
+compare_variable [(v1a,v1b):vlist1] v2a v2b
+	| v1a==v2a
+		| v1b==v2b
+			= (Equal,False)
+			= (Smaller,False)
+		| v1b==v2b
+			= (Greater,False)
+			= compare_variable vlist1 v2a v2b
+compare_variable [] v2a v2b
+	= (Equal,True)
+
+compareInstances :: ![Type] ![Type] -> CompareValue
+compareInstances types1 types2
+	# (cv, vlist) = compare_lists types1 types2
+	 = cv
+where
+	compare_lists [type1:types1] [type2:types2]
+		= compareInstanceTypes type1 type2 CAND compare_lists types1 types2
+	compare_lists [] []
+		= (Equal, [])
+	compare_lists [] types
+		= (Smaller, [])
+	compare_lists types []
+		= (Greater, [])
+
+compareInstanceTypes (TA tc1 a1)    (TA tc2 a2)		= (tc1 =< tc2,[]) CAND compareArguments a1 a2
+compareInstanceTypes (TA tc1 a1)    (TAS tc2 a2 _)	= (tc1 =< tc2,[]) CAND compareArguments a1 a2
+compareInstanceTypes (TAS tc1 a1 _) (TA tc2 a2)		= (tc1 =< tc2,[]) CAND compareArguments a1 a2
+compareInstanceTypes (TAS tc1 a1 _) (TAS tc2 a2 _)	= (tc1 =< tc2,[]) CAND compareArguments a1 a2
+compareInstanceTypes t1 t2
+	| equal_constructor t1 t2
+		= compare_arguments t1 t2
+	| less_constructor t1 t2
+		= (Smaller, [])
+		= (Greater, [])
+where
+		compare_arguments (TB tb1) (TB tb2)				= (tb1 =< tb2, [])
+		compare_arguments (t1a --> t1r) (t2a --> t2r)	= compareInstanceTypes t1a.at_type t2a.at_type CAND compareInstanceTypes t1r.at_type t2r.at_type
+		compare_arguments (TArrow1 t1) (TArrow1 t2)		= compareInstanceTypes t1.at_type t2.at_type
+		compare_arguments (TV tv1) (TV tv2)				= (Equal, [(tv1.tv_ident,tv2.tv_ident)])
+		compare_arguments type1 type2 				    = (Equal, [])
+			
+compareArguments [{at_type=type1}:types1] [{at_type=type2}:types2]
+	= compareInstanceTypes type1 type2 CAND compareArguments types1 types2
+compareArguments [] []
+	= (Equal, [])
+compareArguments [] types
+	= (Smaller, [])
+compareArguments types []
+	= (Greater, [])
+

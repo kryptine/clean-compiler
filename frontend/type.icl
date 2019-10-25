@@ -2576,44 +2576,25 @@ where
 	update_instances_of_class common_defs mod_index ins_index (error, class_instances, type_var_heap, td_infos)
 		#!{ins_class_index={gi_module,gi_index},ins_type={it_types},ins_pos} = common_defs.[mod_index].com_instance_defs.[ins_index]
 		  (instances, class_instances) = class_instances![gi_module,gi_index]
-		  (error, instances) = insert it_types ins_index mod_index common_defs error instances
+		  instances = insert ins_index mod_index instances
 		  class_instances = {class_instances & [gi_module,gi_index]=instances}
 		  (error, type_var_heap, td_infos)
 					= check_types_of_instances ins_pos common_defs gi_module gi_index it_types (error, type_var_heap, td_infos)
 		= (error, class_instances, type_var_heap, td_infos)
 	where
-		insert ::  ![Type] !Index !Index !{# CommonDefs } !*ErrorAdmin !*InstanceTree -> (!*ErrorAdmin, !*InstanceTree)
-		insert ins_types new_ins_index new_ins_module modules error IT_Empty
-			=  (error, IT_Node {glob_object = new_ins_index,glob_module = new_ins_module}  IT_Empty IT_Empty)
-		insert ins_types new_ins_index new_ins_module modules error (IT_Node ins=:{glob_object,glob_module} it_less it_greater)
-			#! {ins_type={it_types}} = modules.[glob_module].com_instance_defs.[glob_object]
-			# cmp = ins_types =< it_types
-			| cmp == Smaller
-				# (error, it_less) = insert ins_types new_ins_index new_ins_module modules error it_less
-				= (error, IT_Node ins it_less it_greater)
-			| cmp == Greater
-				# (error, it_greater) = insert ins_types new_ins_index new_ins_module modules error it_greater
-				= (error, IT_Node ins it_less it_greater)
-			| ins.glob_object==new_ins_index && ins.glob_module==new_ins_module
-				= (error, IT_Node ins it_less it_greater)
-			# cmp = check_unboxed_arrays ins_types it_types
-			| cmp == Smaller
-				# (error, it_less) = insert ins_types new_ins_index new_ins_module modules error it_less
-				= (error, IT_Node ins it_less it_greater)
-			| cmp == Greater
-				# (error, it_greater) = insert ins_types new_ins_index new_ins_module modules error it_greater
-				= (error, IT_Node ins it_less it_greater)
-				= (checkError ins_types " instance is overlapping" error, IT_Node ins it_less it_greater)
-		where
-			check_unboxed_arrays [TA {type_ident={id_name=PD_UnboxedArray_String}} [{at_type=elem_type1}]] [TA {type_ident={id_name=PD_UnboxedArray_String}} [{at_type=elem_type2}]]
-				| elem_type1=:(TV _) || elem_type2=:(TV _)
-					= Equal
-				# cmp = elem_type1 =< elem_type2
-				| cmp <> Equal
-					= cmp
-					= check_unboxed_arrays [elem_type1] [elem_type2]
-			check_unboxed_arrays _ _
-				= Equal
+		insert :: !Index !Index !*InstanceTree -> *InstanceTree
+		insert new_ins_index new_ins_module IT_Empty
+			= IT_Node {glob_object = new_ins_index,glob_module = new_ins_module} IT_Empty IT_Empty
+		insert new_ins_index new_ins_module (IT_Node ins=:{glob_module,glob_object} it_less it_greater)
+			| new_ins_module==glob_module
+				| new_ins_index<glob_object
+					= IT_Node ins (insert new_ins_index new_ins_module it_less) it_greater
+				| new_ins_index>glob_object
+					= IT_Node ins it_less (insert new_ins_index new_ins_module it_greater)
+					= IT_Node ins it_less it_greater
+			| new_ins_module<glob_module
+				= IT_Node ins (insert new_ins_index new_ins_module it_less) it_greater
+				= IT_Node ins it_less (insert new_ins_index new_ins_module it_greater)
 
 	check_types_of_instances ins_pos common_defs class_module class_index types state
 		# {class_cons_vars} = common_defs.[class_module].com_class_defs.[class_index]

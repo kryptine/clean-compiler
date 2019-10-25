@@ -5,6 +5,8 @@ import syntax,compare_types,utilities,checksupport
 from expand_types import simplifyAndCheckTypeApplication
 from overloading import ::ClassInstanceInfo,::InstanceTree(..)
 
+:: SortedInstances = SI_Node ![Global Index] !SortedInstances !SortedInstances | SI_Empty
+
 check_if_class_instances_overlap :: !*ClassInstanceInfo !{#CommonDefs} !*TypeVarHeap !*ErrorAdmin -> (!*ClassInstanceInfo,!*TypeVarHeap,!*ErrorAdmin)
 check_if_class_instances_overlap class_instances common_defs tvh error_admin
 	= check_class_instances_of_modules 0 class_instances common_defs tvh error_admin
@@ -15,8 +17,6 @@ check_class_instances_of_modules module_n class_instances common_defs tvh error_
 		# (class_instances,tvh,error_admin) = check_class_instances_of_module 0 module_n class_instances common_defs tvh error_admin
 		= check_class_instances_of_modules (module_n+1) class_instances common_defs tvh error_admin
 		= (class_instances,tvh,error_admin)
-
-:: SortedInstances = SI_Node ![Global Index] !SortedInstances !SortedInstances | SI_Empty
 
 check_class_instances_of_module :: !Int !Int !*ClassInstanceInfo !{#CommonDefs} !*TypeVarHeap !*ErrorAdmin -> (!*ClassInstanceInfo,!*TypeVarHeap,!*ErrorAdmin)
 check_class_instances_of_module class_n module_n class_instances common_defs tvh error_admin
@@ -29,6 +29,11 @@ check_class_instances_of_module class_n module_n class_instances common_defs tvh
 			  (tvh,error_admin) = check_if_sorted_instances_overlap normal_instances common_defs tvh error_admin
 			  (tvh,error_admin) = check_if_sorted_instances_overlap default_instances common_defs tvh error_admin
 			  (tvh,error_admin) = check_if_other_instances_overlap normal_instances default_instances other_instances common_defs tvh error_admin
+
+			  (instance_tree,error_admin) = add_sorted_instances_to_instance_tree default_instances common_defs IT_Empty error_admin
+			  (instance_tree,error_admin) = add_instances_to_instance_tree other_instances common_defs instance_tree error_admin
+			  class_instances & [module_n].[class_n] = IT_Trees normal_instances instance_tree
+
 			= check_class_instances_of_module (class_n+1) module_n class_instances common_defs tvh error_admin
 		= (class_instances,tvh,error_admin)
 
@@ -37,6 +42,7 @@ classify_and_sort_instances :: !InstanceTree !SortedInstances !SortedInstances !
 classify_and_sort_instances (IT_Node instance_index=:{glob_module,glob_object} left right) normal_instances default_instances other_instances common_defs tvh
 	#! {ins_type={it_types},ins_specials} = common_defs.[glob_module].com_instance_defs.[glob_object]
 	| ins_specials=:SP_GenerateRecordInstances
+		# (default_instances,tvh) = add_to_sorted_instances instance_index it_types default_instances common_defs tvh
 		= classify_and_sort_left_and_right_instances left right normal_instances default_instances other_instances common_defs tvh
 	# (is_normal_instance,tvh) = instance_root_types_specified it_types common_defs tvh
 	| is_normal_instance
@@ -107,6 +113,39 @@ check_if_sorted_instances_overlap (SI_Node [instance_index=:{glob_module,glob_ob
 	= check_if_sorted_instances_overlap right common_defs tvh error_admin
 check_if_sorted_instances_overlap SI_Empty common_defs tvh error_admin
 	= (tvh,error_admin)
+
+add_sorted_instances_to_instance_tree :: !SortedInstances !{#CommonDefs} !*InstanceTree !*ErrorAdmin -> (!*InstanceTree,!*ErrorAdmin)
+add_sorted_instances_to_instance_tree (SI_Node instances left right) common_defs instance_tree error_admin
+	# (instance_tree,error_admin) = add_instances_to_instance_tree instances common_defs instance_tree error_admin
+	# (instance_tree,error_admin) = add_sorted_instances_to_instance_tree left common_defs instance_tree error_admin
+	= add_sorted_instances_to_instance_tree right common_defs instance_tree error_admin
+add_sorted_instances_to_instance_tree SI_Empty common_defs instance_tree error_admin
+	= (instance_tree,error_admin)
+
+add_instances_to_instance_tree :: ![Global Int] !{#CommonDefs} !*InstanceTree !*ErrorAdmin -> (!*InstanceTree,!*ErrorAdmin)
+add_instances_to_instance_tree [instance_index=:{glob_module,glob_object}:instances] common_defs instance_tree error_admin
+	#! it_types = common_defs.[glob_module].com_instance_defs.[glob_object].ins_type.it_types
+	# (instance_tree,error_admin) = insert_instance_in_tree it_types glob_module glob_object common_defs instance_tree error_admin
+	= add_instances_to_instance_tree instances common_defs instance_tree error_admin
+add_instances_to_instance_tree [] common_defs instance_tree error_admin
+	= (instance_tree,error_admin)
+
+insert_instance_in_tree ::  ![Type] !Index !Index !{#CommonDefs} !*InstanceTree !*ErrorAdmin -> (!*InstanceTree,!*ErrorAdmin)
+insert_instance_in_tree ins_types new_ins_module new_ins_index common_defs (IT_Node ins=:{glob_object,glob_module} it_less it_greater) error_admin
+	#! {ins_type={it_types}} = common_defs.[glob_module].com_instance_defs.[glob_object]
+	# cmp = compareInstances ins_types it_types // to do: use compare that expands synonym types
+	| cmp == Smaller
+		# (it_less,error_admin) = insert_instance_in_tree ins_types new_ins_module new_ins_index common_defs it_less error_admin
+		= (IT_Node ins it_less it_greater, error_admin)
+	| cmp == Greater
+		# (it_greater,error_admin) = insert_instance_in_tree ins_types new_ins_module new_ins_index common_defs it_greater error_admin
+		= (IT_Node ins it_less it_greater, error_admin)
+	| ins.glob_object==new_ins_index && ins.glob_module==new_ins_module
+		= (IT_Node ins it_less it_greater, error_admin)
+		# error_admin = overlapping_instance_error new_ins_module new_ins_index ins common_defs error_admin
+		= (IT_Node ins it_less it_greater, error_admin)
+insert_instance_in_tree ins_types new_ins_module new_ins_index common_defs IT_Empty error_admin
+	= (IT_Node {glob_object = new_ins_index,glob_module = new_ins_module} IT_Empty IT_Empty, error_admin)
 
 check_if_instances_overlap :: ![Global Index] ![([Type],Global Index)] !{#CommonDefs} !*TypeVarHeap !*ErrorAdmin
 							-> (![([Type],Global Index)],!*TypeVarHeap,!*ErrorAdmin)
