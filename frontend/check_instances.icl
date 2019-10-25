@@ -144,10 +144,10 @@ restore_type_var_infos [] tvh
 
 overlapping_instance_error :: !Int !Int !(Global Int) !{#CommonDefs} !*ErrorAdmin -> *ErrorAdmin
 // almost same function as in module type
-overlapping_instance_error new_ins_module new_ins_index instance_index modules error
-	# {ins_ident,ins_pos} = modules.[new_ins_module].com_instance_defs.[new_ins_index]
+overlapping_instance_error new_ins_module new_ins_index instance_index common_defs error
+	# {ins_ident,ins_pos} = common_defs.[new_ins_module].com_instance_defs.[new_ins_index]
 	  error = checkErrorWithIdentPos (newPosition ins_ident ins_pos) " instance is overlapping with the instance in the next error" error
-	  {ins_ident,ins_pos} = modules.[instance_index.glob_module].com_instance_defs.[instance_index.glob_object]
+	  {ins_ident,ins_pos} = common_defs.[instance_index.glob_module].com_instance_defs.[instance_index.glob_object]
 	= checkErrorWithIdentPos (newPosition ins_ident ins_pos) " instance is overlapping with the instance in the previous error" error
 
 unify_instances :: ![Type] ![Type] !{#CommonDefs} [(TypeVarInfoPtr,TypeVarInfo)] !*TypeVarHeap -> (!Bool,[(TypeVarInfoPtr,TypeVarInfo)],!*TypeVarHeap)
@@ -337,26 +337,26 @@ unify_instances_CV_with_type cv type_args type common_defs subst tvh
 	= (False, subst, tvh)
 
 unify_instances_CV_application_with_CV_application :: !TypeVar ![AType] !TypeVar ![AType] !{#CommonDefs} [(TypeVarInfoPtr,TypeVarInfo)] !*TypeVarHeap -> (!Bool,[(TypeVarInfoPtr,TypeVarInfo)],!*TypeVarHeap)
-unify_instances_CV_application_with_CV_application cv1 type_args1 cv2 type_args2 modules subst tvh
+unify_instances_CV_application_with_CV_application cv1 type_args1 cv2 type_args2 common_defs subst tvh
 	# arity1 = length type_args1
 	  arity2 = length type_args2
 	  diff = arity1 - arity2
 	| diff == 0
 		| cv1.tv_info_ptr == cv2.tv_info_ptr
-		    = unify_instances_arg_types type_args1 type_args2 modules subst tvh
+		    = unify_instances_arg_types type_args1 type_args2 common_defs subst tvh
 			# (old_tv_info1,tvh) = readPtr cv1.tv_info_ptr tvh
 			# tvh = writePtr cv1.tv_info_ptr (TVI_Type (TV cv2)) tvh
 			# subst = [(cv1.tv_info_ptr,old_tv_info1) : subst]
-		    = unify_instances_arg_types type_args1 type_args2 modules subst tvh
+		    = unify_instances_arg_types type_args1 type_args2 common_defs subst tvh
 	| diff < 0
 		# diff = ~diff
-		  (succ, subst, tvh) = unify_instances_types (TV cv1) (CV cv2 :@: take diff type_args2) modules subst tvh
+		  (succ, subst, tvh) = unify_instances_types (TV cv1) (CV cv2 :@: take diff type_args2) common_defs subst tvh
 		| succ
-		    = unify_instances_arg_types type_args1 (drop diff type_args2) modules subst tvh
+		    = unify_instances_arg_types type_args1 (drop diff type_args2) common_defs subst tvh
 			= (False, subst, tvh)
-		# (succ, subst, tvh) = unify_instances_types (CV cv1 :@: take diff type_args1) (TV cv2) modules subst tvh
+		# (succ, subst, tvh) = unify_instances_types (CV cv1 :@: take diff type_args1) (TV cv2) common_defs subst tvh
 		| succ
-		    = unify_instances_arg_types (drop diff type_args1) type_args2 modules subst tvh
+		    = unify_instances_arg_types (drop diff type_args1) type_args2 common_defs subst tvh
 			= (False, subst, tvh)
 
 expand_and_unify_instance_types :: !Type !Type !{#CommonDefs} [(TypeVarInfoPtr,TypeVarInfo)] !*TypeVarHeap -> *(!Bool,[(TypeVarInfoPtr,TypeVarInfo)],!*TypeVarHeap)
@@ -503,11 +503,11 @@ compare_root_types_syn_type1 (SynType {at_type=type1}) td_args args1 type2 commo
 	= compare_root_types type1 type2 common_defs tvh
 
 compare_root_types_syn_type2 type1 (SynType {at_type=type2=:TV _}) td_args args2 common_defs tvh
-	# (expanded_type, tvh) = substitute_instance_type td_args args2 type1 tvh
-	= compare_root_types expanded_type type2 common_defs tvh
+	# (expanded_type, tvh) = substitute_instance_type td_args args2 type2 tvh
+	= compare_root_types type1 expanded_type common_defs tvh
 compare_root_types_syn_type2 type1 (SynType {at_type=type2=:(CV _ :@: _)}) td_args args2 common_defs tvh
-	# (expanded_type, tvh) = substitute_instance_type td_args args2 type1 tvh
-	= compare_root_types expanded_type type2 common_defs tvh
+	# (expanded_type, tvh) = substitute_instance_type td_args args2 type2 tvh
+	= compare_root_types type1 expanded_type common_defs tvh
 compare_root_types_syn_type2 type1 (SynType {at_type=type2}) td_args args2 common_defs tvh
 	= compare_root_types type1 type2 common_defs tvh
 
