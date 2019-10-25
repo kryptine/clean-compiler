@@ -3,10 +3,14 @@ definition module overloading
 import StdEnv
 import syntax, typesupport
 from unitype import ::BOOLVECT
+from check_instances import ::SortedInstances
 
-::	InstanceTree = IT_Node !(Global Index) !InstanceTree !InstanceTree | IT_Empty 
+::	InstanceTree
+	= IT_Node !(Global Index) !InstanceTree !InstanceTree
+	| IT_Empty
+	| IT_Trees !SortedInstances !InstanceTree
 
-::	ClassInstanceInfo :== {# {! .InstanceTree}}
+::	ClassInstanceInfo :== {# .{! .InstanceTree}}
 
 ::	ArrayInstance =
 	{	ai_record		:: !TypeSymbIdent

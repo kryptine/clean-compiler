@@ -4,6 +4,7 @@ import StdEnv,StdOverloadedList,compare_types
 
 import syntax, type, expand_types, utilities, unitype, predef, checktypes
 import genericsupport, type_io_common
+from check_instances import ::SortedInstances(..)
 
 ::	LocalTypePatternVariable =
 	{	ltpv_var			:: !Int
@@ -48,7 +49,7 @@ import genericsupport, type_io_common
 ::  CD  = { cd_inst_symbol		:: ! Global Int
 		  , cd_inst_contexts	:: ![RC]
 		  , cd_new_vars :: ![(TypeVarInfoPtr,Int)]
-		  }						
+		  }
 
 ::	VarInfo | VI_ContextContainsFreeTypeVar !TypeContext | VI_MissingContext !TypeContext
 
@@ -1080,7 +1081,7 @@ where
 				# (expanded_type, type_heaps) = substituteType td_attribute TA_Multi td_args type_args arg_type.at_type type_heaps
 				-> try_to_unbox expanded_type defs (predef_symbols, type_heaps)
 			_
-				-> (TE, No, (predef_symbols, type_heaps))				
+				-> (TE, No, (predef_symbols, type_heaps))
 	try_to_unbox type _ predef_symbols_type_heaps
 		= (TE, No, predef_symbols_type_heaps)
 
@@ -1089,43 +1090,80 @@ where
 		# (left_index,predef_symbols) = find_unboxed_array_instance element_type left defs predef_symbols
 		| FoundObject left_index
 			= (left_index,predef_symbols)
-			= case defs.[glob_module].com_instance_defs.[glob_object].ins_type.it_types of
-				[TA {type_index={glob_module,glob_object}} _,instance_element_type:_]
-					| is_predefined_symbol glob_module glob_object PD_UnboxedArrayType predef_symbols
-						-> case (element_type,instance_element_type) of
-							(TB bt1,TB bt2)
-								| bt1==bt2
-									-> (this_inst_index,predef_symbols)
-							(TA {type_index=ti1} [_],TA {type_index=ti2} [_]) // for array elements
-								| ti1==ti2
-									-> (this_inst_index,predef_symbols)
-							_
-								-> find_unboxed_array_instance element_type right defs predef_symbols
-				_
-					-> find_unboxed_array_instance element_type right defs predef_symbols
-	find_unboxed_array_instance co_types IT_Empty defs predef_symbols
+		| unboxed_array_instance_type_matches defs.[glob_module].com_instance_defs.[glob_object].ins_type.it_types element_type predef_symbols
+			= (this_inst_index,predef_symbols)
+			= find_unboxed_array_instance element_type right defs predef_symbols
+	find_unboxed_array_instance element_type IT_Empty defs predef_symbols
 		= (ObjectNotFound,predef_symbols)
+	find_unboxed_array_instance element_type (IT_Trees sorted_instances instances) defs predef_symbols
+		# (index,predef_symbols) = find_sorted_unboxed_array_instance element_type sorted_instances defs predef_symbols
+		| FoundObject index
+			= (index,predef_symbols)
+			= find_unboxed_array_instance element_type instances defs predef_symbols
+	where
+		find_sorted_unboxed_array_instance element_type (SI_Node instances left right) defs predef_symbols
+			# (left_index,predef_symbols) = find_sorted_unboxed_array_instance element_type left defs predef_symbols
+			| FoundObject left_index
+				= (left_index,predef_symbols)
+			# (inst_index,predef_symbols) = find_unboxed_array_instance_in_list element_type instances defs predef_symbols
+			| FoundObject left_index
+				= (inst_index,predef_symbols)
+				= find_sorted_unboxed_array_instance element_type right defs predef_symbols
+		find_sorted_unboxed_array_instance element_type SI_Empty defs predef_symbols
+			= (ObjectNotFound,predef_symbols)
+	
+		find_unboxed_array_instance_in_list element_type [this_inst_index=:{glob_object,glob_module}:instances] defs predef_symbols
+			| unboxed_array_instance_type_matches defs.[glob_module].com_instance_defs.[glob_object].ins_type.it_types element_type predef_symbols
+				= (this_inst_index,predef_symbols)
+				= find_unboxed_array_instance_in_list element_type instances defs predef_symbols
+		find_unboxed_array_instance_in_list element_type [] defs predef_symbols
+			= (ObjectNotFound,predef_symbols)
+
+	unboxed_array_instance_type_matches [TA {type_index={glob_module,glob_object}} _,TB bt1:_] (TB bt2) predef_symbols
+		= is_predefined_symbol glob_module glob_object PD_UnboxedArrayType predef_symbols && bt1==bt2
+	unboxed_array_instance_type_matches [TA {type_index={glob_module,glob_object}} _,TA {type_index=ti1} [_]:_] (TA {type_index=ti2} [_]) predef_symbols
+		// for array elements
+		= is_predefined_symbol glob_module glob_object PD_UnboxedArrayType predef_symbols && ti1==ti2
+	unboxed_array_instance_type_matches _ _ _
+		= False
 
 	find_unboxed_list_instance :: Type !InstanceTree {#CommonDefs} -> Global Int
 	find_unboxed_list_instance element_type (IT_Node this_inst_index=:{glob_object,glob_module} left right) defs
 		# left_index = find_unboxed_list_instance element_type left defs
 		| FoundObject left_index
 			= left_index
-			= case defs.[glob_module].com_instance_defs.[glob_object].ins_type.it_types of
-				[instance_element_type]
-					-> case (element_type,instance_element_type) of
-						(TB bt1,TB bt2)
-							| bt1==bt2
-								-> this_inst_index
-						(TA {type_index=ti1} [_],TA {type_index=ti2} [_]) // for array elements
-							| ti1==ti2
-								-> this_inst_index
-						_
-							-> find_unboxed_list_instance element_type right defs
-				_
-					-> find_unboxed_list_instance element_type right defs
-	find_unboxed_list_instance co_types IT_Empty defs
+		| unboxed_list_instance_type_matches defs.[glob_module].com_instance_defs.[glob_object].ins_type.it_types element_type
+			= this_inst_index
+			= find_unboxed_list_instance element_type right defs
+	find_unboxed_list_instance element_type IT_Empty defs
 		= ObjectNotFound
+	find_unboxed_list_instance element_type (IT_Trees sorted_instances instances) defs
+		# index = find_sorted_unboxed_list_instance element_type sorted_instances defs
+		| FoundObject index
+			= index
+			= find_unboxed_list_instance element_type instances defs
+	where
+		find_sorted_unboxed_list_instance element_type (SI_Node instances left right) defs
+			# left_index = find_sorted_unboxed_list_instance element_type left defs
+			| FoundObject left_index
+				= left_index
+			# inst_index = find_unboxed_list_instance_in_list element_type instances defs
+			| FoundObject left_index
+				= inst_index
+				= find_sorted_unboxed_list_instance element_type right defs
+		find_sorted_unboxed_list_instance element_type SI_Empty defs
+			= ObjectNotFound
+	
+		find_unboxed_list_instance_in_list element_type [this_inst_index=:{glob_object,glob_module}:instances] defs
+			| unboxed_list_instance_type_matches defs.[glob_module].com_instance_defs.[glob_object].ins_type.it_types element_type
+				= this_inst_index
+				= find_unboxed_list_instance_in_list element_type instances defs
+		find_unboxed_list_instance_in_list element_type [] defs
+			= ObjectNotFound
+
+	unboxed_list_instance_type_matches [TB bt1] (TB bt2) = bt1==bt2
+	unboxed_list_instance_type_matches [TA {type_index=ti1} [_]] (TA {type_index=ti2} [_]) = ti1==ti2	// for array elements
+	unboxed_list_instance_type_matches _ _ = False
 
 	look_up_array_or_list_instance :: !TypeSymbIdent ![ArrayInstance] -> Optional ArrayInstance
 	look_up_array_or_list_instance record []
@@ -1337,85 +1375,190 @@ where
 		= mapSt (reduceTCorNormalContext info rdla) ftcs {prs_state & prs_type_heaps = prs_type_heaps}
 
 	find_instance ::  [Type] !InstanceTree {#CommonDefs} *TypeHeaps !*Subst -> *(!Global Int, ![TypeContext], !*TypeHeaps, !*Subst)
-	find_instance  co_types (IT_Node this_inst_index=:{glob_object,glob_module} left right) defs type_heaps subst
-		# (left_index, inst_contexts, type_heaps, subst) = find_instance co_types left defs type_heaps subst
+	find_instance co_types (IT_Trees sorted_instances instance_tree) defs type_heaps subst
+		# (found, instances, type_heaps, subst) = find_instance_group co_types sorted_instances defs type_heaps subst
+		| found
+			= find_root_monomorphic_instance_in_group co_types instances defs type_heaps subst
+			= find_root_polymorphic_instance co_types instance_tree defs type_heaps subst
+
+	find_instance_group :: [Type] !SortedInstances !{#CommonDefs} !*TypeHeaps !*Subst -> *(!Bool, ![Global Int], !*TypeHeaps, !*Subst)
+	find_instance_group co_types (SI_Node instances=:[this_inst_index=:{glob_object,glob_module}:_] left right) defs type_heaps subst
+		#! {it_vars,it_types} = defs.[glob_module].com_instance_defs.[glob_object].ins_type
+		# th_vars = clear_binding_of_type_vars it_vars type_heaps.th_vars
+		  substc = {substc_changes=[#!], substc_array=subst.subst_array, substc_next_var_n=subst.subst_next_var_n}
+		  (compare_value, type_heaps, substc) = compare_instance_root_types it_types co_types defs {type_heaps & th_vars=th_vars} substc
+		  subst & subst_array=undo_substitutions substc
+		| compare_value==Equal
+			= (True, instances, type_heaps, subst)
+		| compare_value==Greater
+			= find_instance_group co_types left defs type_heaps subst
+		| compare_value==Smaller
+			= find_instance_group co_types right defs type_heaps subst
+			= (False, [], type_heaps, subst)
+	find_instance_group co_types SI_Empty defs type_heaps subst
+		= (False, [], type_heaps, subst)
+
+	find_root_monomorphic_instance_in_group :: [Type] ![Global Index] {#CommonDefs} *TypeHeaps !*Subst -> *(!Global Int, ![TypeContext], !*TypeHeaps, !*Subst)
+	find_root_monomorphic_instance_in_group co_types [this_inst_index=:{glob_object,glob_module}:instances] defs type_heaps subst
+		# {ins_type={it_vars,it_types,it_context}, ins_specials} = defs.[glob_module].com_instance_defs.[glob_object]
+		  th_vars = clear_binding_of_type_vars it_vars type_heaps.th_vars
+		  substc = {substc_changes=[#!], substc_array=subst.subst_array, substc_next_var_n=subst.subst_next_var_n}
+		  (matched, type_heaps, substc) = matchListsOfTypes defs it_types co_types { type_heaps & th_vars = th_vars } substc
+		| matched
+			# (subst_changed,subst_context_n_at_last_update)
+				= case substc.substc_changes of
+					[#!]	-> (subst.subst_changed,subst.subst_context_n_at_last_update)
+					_		-> (True,subst.subst_previous_context_n) // ---> ("substc_changes",[e\\e<|-substc.substc_changes])
+			# subst & subst_array=substc.substc_array, subst_changed=subst_changed, subst_next_var_n=substc.substc_next_var_n,
+					  subst_context_n_at_last_update=subst_context_n_at_last_update
+			# (subst_context, type_heaps) = freshContexts it_context type_heaps
+			  (spec_inst, type_heaps, subst) = trySpecializedInstances subst_context (get_specials ins_specials) type_heaps subst
+			| FoundObject spec_inst
+				= (spec_inst, [], type_heaps, subst)
+				= (this_inst_index, subst_context, type_heaps, subst)
+			# subst & subst_array=undo_substitutions substc
+			= find_root_monomorphic_instance_in_group co_types instances defs type_heaps subst
+	find_root_monomorphic_instance_in_group co_types [] defs heaps  subst
+		= (ObjectNotFound, [], heaps, subst)
+
+	find_root_polymorphic_instance :: [Type] !InstanceTree {#CommonDefs} *TypeHeaps !*Subst -> *(!Global Int, ![TypeContext], !*TypeHeaps, !*Subst)
+	find_root_polymorphic_instance co_types (IT_Node this_inst_index=:{glob_object,glob_module} left right) defs type_heaps subst
+		# (left_index, inst_contexts, type_heaps, subst) = find_root_polymorphic_instance co_types left defs type_heaps subst
 		| FoundObject left_index
 			= (left_index, inst_contexts, type_heaps, subst)
 			# {ins_type={it_vars,it_types,it_context}, ins_specials} = defs.[glob_module].com_instance_defs.[glob_object]
 			  th_vars = clear_binding_of_type_vars it_vars type_heaps.th_vars
 			  substc = {substc_changes=[#!], substc_array=subst.subst_array, substc_next_var_n=subst.subst_next_var_n}
 			  (matched, type_heaps, substc) = matchListsOfTypes defs it_types co_types { type_heaps & th_vars = th_vars } substc
-			| matched // && True ---> ("find_instance",it_types,co_types,[t\\t<-:subst.subst_array])
-				# (subst_changed,subst_context_n_at_last_update)
-					= case substc.substc_changes of
-						[#!]	-> (subst.subst_changed,subst.subst_context_n_at_last_update)
-						_		-> (True,subst.subst_previous_context_n) // ---> ("substc_changes",[e\\e<|-substc.substc_changes])
-				# subst & subst_array=substc.substc_array, subst_changed=subst_changed, subst_next_var_n=substc.substc_next_var_n,
-						  subst_context_n_at_last_update=subst_context_n_at_last_update
-				# (subst_context, type_heaps) = freshContexts it_context type_heaps
-				  (spec_inst, type_heaps, subst) = trySpecializedInstances subst_context (get_specials ins_specials) type_heaps subst
-				| FoundObject spec_inst
-					= (spec_inst, [], type_heaps, subst)
-					= (this_inst_index, subst_context, type_heaps, subst)
+			| matched
+				# subst & subst_array=substc.substc_array, subst_next_var_n=substc.substc_next_var_n
+				= found_instance substc.substc_changes it_context ins_specials this_inst_index type_heaps subst
 				# subst & subst_array=undo_substitutions substc
-				= find_instance co_types right defs type_heaps subst
-	find_instance  co_types IT_Empty defs heaps  subst
+				= find_root_polymorphic_instance co_types right defs type_heaps subst
+	find_root_polymorphic_instance co_types IT_Empty defs heaps  subst
 		= (ObjectNotFound, [], heaps, subst)
+
+	found_instance :: ![#Int!] ![TypeContext] !Specials !(Global Index) !*TypeHeaps !*Subst -> *(!Global Int, ![TypeContext], !*TypeHeaps, !*Subst)
+	found_instance [#!] it_context ins_specials this_inst_index type_heaps subst
+		# (subst_context, type_heaps) = freshContexts it_context type_heaps
+		  (spec_inst, type_heaps, subst) = trySpecializedInstances subst_context (get_specials ins_specials) type_heaps subst
+		| FoundObject spec_inst
+			= (spec_inst, [], type_heaps, subst)
+			= (this_inst_index, subst_context, type_heaps, subst)
+	found_instance substc_changes it_context ins_specials this_inst_index type_heaps subst
+		# subst & subst_changed=True, subst_context_n_at_last_update=subst.subst_previous_context_n
+		# (subst_context, type_heaps) = freshContexts it_context type_heaps
+		  (spec_inst, type_heaps, subst) = trySpecializedInstances subst_context (get_specials ins_specials) type_heaps subst
+		| FoundObject spec_inst
+			= (spec_inst, [], type_heaps, subst)
+			= (this_inst_index, subst_context, type_heaps, subst)
 
 	find_fun_dep_instance :: [Type] !InstanceTree BITVECT {#CommonDefs} *TypeHeaps !*Subst
 			-> *(!Global Int, ![TypeContext], ![(TypeVarInfoPtr,Int)], !*TypeHeaps,!*Subst)
-	find_fun_dep_instance co_types (IT_Node this_inst_index=:{glob_object,glob_module} left right) class_fun_dep_vars defs type_heaps subst
-		# (left_index, inst_contexts, new_vars, type_heaps, subst) = find_fun_dep_instance co_types left class_fun_dep_vars defs type_heaps subst
+	find_fun_dep_instance co_types (IT_Trees sorted_instances instance_tree) class_fun_dep_vars defs type_heaps subst
+		# (found, instances, type_heaps, subst) = find_fun_dep_instance_group co_types sorted_instances class_fun_dep_vars defs type_heaps subst
+		| found
+			= find_root_monomorphic_fun_dep_instance_in_group co_types instances class_fun_dep_vars defs type_heaps subst
+			= find_root_polymorphic_fun_dep_instance co_types instance_tree class_fun_dep_vars defs type_heaps subst
+
+	find_fun_dep_instance_group :: [Type] !SortedInstances !BITVECT !{#CommonDefs} !*TypeHeaps !*Subst -> *(!Bool, ![Global Int], !*TypeHeaps, !*Subst)
+	find_fun_dep_instance_group co_types (SI_Node instances=:[this_inst_index=:{glob_object,glob_module}:_] left right) class_fun_dep_vars defs type_heaps subst
+		#! {it_vars,it_types} = defs.[glob_module].com_instance_defs.[glob_object].ins_type
+		# th_vars = clear_binding_of_type_vars it_vars type_heaps.th_vars
+		  substc = {substc_changes=[#!], substc_array=subst.subst_array, substc_next_var_n=subst.subst_next_var_n}
+		  (compare_value, type_heaps, substc) = compare_fun_dep_instance_root_types it_types co_types class_fun_dep_vars defs {type_heaps & th_vars=th_vars} substc
+		  subst & subst_array=undo_substitutions substc
+		| compare_value==Equal
+			= (True, instances, type_heaps, subst)
+		| compare_value==Greater
+			= find_fun_dep_instance_group co_types left class_fun_dep_vars defs type_heaps subst
+		| compare_value==Smaller
+			= find_fun_dep_instance_group co_types right class_fun_dep_vars defs type_heaps subst
+			= (False, [], type_heaps, subst)
+	find_fun_dep_instance_group co_types SI_Empty class_fun_dep_vars defs type_heaps subst
+		= (False, [], type_heaps, subst)
+
+	find_root_monomorphic_fun_dep_instance_in_group :: [Type] ![Global Index] BITVECT {#CommonDefs} *TypeHeaps !*Subst
+									  -> *(!Global Int, ![TypeContext], ![(TypeVarInfoPtr,Int)], !*TypeHeaps,!*Subst)
+	find_root_monomorphic_fun_dep_instance_in_group co_types [this_inst_index=:{glob_object,glob_module}:instances] class_fun_dep_vars defs type_heaps subst
+		# {ins_type={it_vars,it_types,it_context}, ins_specials} = defs.[glob_module].com_instance_defs.[glob_object]
+		  th_vars = clear_binding_of_type_vars it_vars type_heaps.th_vars
+		  substc = {substc_changes=[#!], substc_array=subst.subst_array, substc_next_var_n=subst.subst_next_var_n}
+		  (matched, type_heaps, substc) = matchListsOfNonFunDepTypes defs it_types co_types class_fun_dep_vars {type_heaps & th_vars = th_vars} substc
+		| matched
+			#! all_vars_defined = check_if_all_vars_defined it_vars type_heaps.th_vars
+			# (maybe_non_termination, substc)
+				= if (not all_vars_defined)
+					(checkFunDepTypesForPossibleNonTermination it_types co_types class_fun_dep_vars co_types class_fun_dep_vars substc)
+					(False, substc)
+			| maybe_non_termination
+				# subst & subst_array=undo_substitutions substc
+				= find_root_monomorphic_fun_dep_instance_in_group co_types instances class_fun_dep_vars defs type_heaps subst
+
+			# (matched, type_heaps, substc) = matchListsOfFunDepTypes defs it_types co_types class_fun_dep_vars type_heaps substc
+			| not matched
+				# subst & subst_array=undo_substitutions substc
+				= find_root_monomorphic_fun_dep_instance_in_group co_types instances class_fun_dep_vars defs type_heaps subst
+			# subst & subst_array=substc.substc_array, subst_next_var_n=substc.substc_next_var_n
+			= found_fun_dep_instance substc.substc_changes all_vars_defined it_vars it_context ins_specials this_inst_index type_heaps subst
+			# subst & subst_array=undo_substitutions substc
+			= find_root_monomorphic_fun_dep_instance_in_group co_types instances class_fun_dep_vars defs type_heaps subst
+	find_root_monomorphic_fun_dep_instance_in_group co_types [] class_fun_dep_vars defs heaps subst
+		= (ObjectNotFound, [], [], heaps, subst)
+
+	find_root_polymorphic_fun_dep_instance :: [Type] !InstanceTree BITVECT {#CommonDefs} *TypeHeaps !*Subst
+							 -> *(!Global Int, ![TypeContext], ![(TypeVarInfoPtr,Int)], !*TypeHeaps,!*Subst)
+	find_root_polymorphic_fun_dep_instance co_types (IT_Node this_inst_index=:{glob_object,glob_module} left right) class_fun_dep_vars defs type_heaps subst
+		# (left_index, inst_contexts, new_vars, type_heaps, subst) = find_root_polymorphic_fun_dep_instance co_types left class_fun_dep_vars defs type_heaps subst
 		| FoundObject left_index
 			= (left_index, inst_contexts, new_vars, type_heaps, subst)
 			# {ins_type={it_vars,it_types,it_context}, ins_specials} = defs.[glob_module].com_instance_defs.[glob_object]
 			  th_vars = clear_binding_of_type_vars it_vars type_heaps.th_vars
 			  substc = {substc_changes=[#!], substc_array=subst.subst_array, substc_next_var_n=subst.subst_next_var_n}
 			  (matched, type_heaps, substc) = matchListsOfNonFunDepTypes defs it_types co_types class_fun_dep_vars {type_heaps & th_vars = th_vars} substc
-			| matched // && True ---> ("find_fun_dep_instance",it_types,expanded_co_types)		
-				# (all_vars_defined,type_var_heap) = check_if_all_vars_defined it_vars type_heaps.th_vars
-				# type_heaps & th_vars = type_var_heap
-			 	# (maybe_non_termination, substc)
-			 		= if (not all_vars_defined)
+			| matched
+				#! all_vars_defined = check_if_all_vars_defined it_vars type_heaps.th_vars
+				# (maybe_non_termination, substc)
+					= if (not all_vars_defined)
 						(checkFunDepTypesForPossibleNonTermination it_types co_types class_fun_dep_vars co_types class_fun_dep_vars substc)
 						(False, substc)
 				| maybe_non_termination
 					# subst & subst_array=undo_substitutions substc
-					= find_fun_dep_instance co_types right class_fun_dep_vars defs type_heaps subst
+					= find_root_polymorphic_fun_dep_instance co_types right class_fun_dep_vars defs type_heaps subst
 
-			 	# (matched, type_heaps, substc) = matchListsOfFunDepTypes defs it_types co_types class_fun_dep_vars type_heaps substc
+				# (matched, type_heaps, substc) = matchListsOfFunDepTypes defs it_types co_types class_fun_dep_vars type_heaps substc
 				| not matched
 					# subst & subst_array=undo_substitutions substc
-					= find_fun_dep_instance co_types right class_fun_dep_vars defs type_heaps subst
-				# (subst_changed,subst_context_n_at_last_update)
-					= case substc.substc_changes of
-						[#!]	-> (subst.subst_changed,subst.subst_context_n_at_last_update)
-						_		-> (True,subst.subst_previous_context_n) // ---> ("substc_changes",[e\\e<|-substc.substc_changes])
-				# subst & subst_array=substc.substc_array, subst_changed=subst_changed, subst_next_var_n=substc.substc_next_var_n,
-						  subst_context_n_at_last_update=subst_context_n_at_last_update
-				# (new_vars,type_heaps,subst)
-					= if (not all_vars_defined)
-						(foldSt fresh_type_var_only_in_context it_vars ([],type_heaps,subst))
-						([],type_heaps,subst)
-				# (subst_context, type_heaps) = freshContexts it_context type_heaps
-				  (spec_inst, type_heaps, subst) = trySpecializedInstances subst_context (get_specials ins_specials) type_heaps subst
-				| FoundObject spec_inst
-					= (spec_inst, [], new_vars, type_heaps, subst)
-					= (this_inst_index, subst_context, new_vars, type_heaps, subst) // ---> ("subst_context",subst_context)
+					= find_root_polymorphic_fun_dep_instance co_types right class_fun_dep_vars defs type_heaps subst
+				# subst & subst_array=substc.substc_array, subst_next_var_n=substc.substc_next_var_n
+				= found_fun_dep_instance substc.substc_changes all_vars_defined it_vars it_context ins_specials this_inst_index type_heaps subst
 				# subst & subst_array=undo_substitutions substc
-				= find_fun_dep_instance co_types right class_fun_dep_vars defs type_heaps subst
-	find_fun_dep_instance co_types IT_Empty class_fun_dep_vars defs heaps subst
+				= find_root_polymorphic_fun_dep_instance co_types right class_fun_dep_vars defs type_heaps subst
+	find_root_polymorphic_fun_dep_instance co_types IT_Empty class_fun_dep_vars defs heaps subst
 		= (ObjectNotFound, [], [], heaps, subst)
 
+	found_fun_dep_instance :: ![#Int!] !Bool ![TypeVar] ![TypeContext] !Specials !(Global Index) !*TypeHeaps !*Subst
+							 -> *(!Global Int, ![TypeContext], ![(TypeVarInfoPtr,Int)], !*TypeHeaps,!*Subst)
+	found_fun_dep_instance substc_changes all_vars_defined it_vars it_context ins_specials this_inst_index type_heaps subst
+		# (subst_changed,subst_context_n_at_last_update)
+			= case substc_changes of
+				[#!]	-> (subst.subst_changed,subst.subst_context_n_at_last_update)
+				_		-> (True,subst.subst_previous_context_n) // ---> ("substc_changes",[e\\e<|-substc.substc_changes])
+		# subst & subst_changed=subst_changed, subst_context_n_at_last_update=subst_context_n_at_last_update
+		# (new_vars,type_heaps,subst)
+			= if (not all_vars_defined)
+				(foldSt fresh_type_var_only_in_context it_vars ([],type_heaps,subst))
+				([],type_heaps,subst)
+		# (subst_context, type_heaps) = freshContexts it_context type_heaps
+		  (spec_inst, type_heaps, subst) = trySpecializedInstances subst_context (get_specials ins_specials) type_heaps subst
+		| FoundObject spec_inst
+			= (spec_inst, [], new_vars, type_heaps, subst)
+			= (this_inst_index, subst_context, new_vars, type_heaps, subst) // ---> ("subst_context",subst_context)
+
 	check_if_all_vars_defined [{tv_info_ptr}:vars] type_var_heap
-		# (tv_info,type_var_heap) = readPtr tv_info_ptr type_var_heap
-		= case tv_info of
-			TVI_Type _
-				-> check_if_all_vars_defined vars type_var_heap
-			_
-				-> (False,type_var_heap)
+		= (sreadPtr tv_info_ptr type_var_heap)=:TVI_Type _ && check_if_all_vars_defined vars type_var_heap
 	check_if_all_vars_defined [] type_var_heap
-		= (True,type_var_heap)
+		= True
 
 	fresh_type_var_only_in_context {tv_info_ptr,tv_ident} (new_vars,type_heaps,subst)
 		# (tv_info, th_vars) = readPtr tv_info_ptr type_heaps.th_vars
@@ -1503,7 +1646,7 @@ expandOneStepC type=:(TempV tv_number) subst=:{substc_array}
 	| isIndirection stype
 		= expandOneStepC stype { subst & substc_array = substc_array }
 		= (type, {subst & substc_array = substc_array})
-expandOneStepC type=:(TempCV tv_number :@: types)  subst=:{substc_array}
+expandOneStepC type=:(TempCV tv_number :@: types) subst=:{substc_array}
 	# (stype, substc_array) = substc_array![tv_number]
 	| isIndirection stype
 		# (etype, subst) = expandOneStepC stype {subst & substc_array = substc_array}
@@ -1622,7 +1765,7 @@ fresh_context tc=:{tc_types} type_heaps
 	# (_, tc_types, type_heaps) = substitute tc_types type_heaps
 	= ({ tc & tc_types = tc_types }, type_heaps)
 
-addLocalTCInstance :: Int (([LocalTypePatternVariable], *VarHeap)) -> (VarInfoPtr, ([LocalTypePatternVariable], *VarHeap))
+addLocalTCInstance :: Int ([LocalTypePatternVariable], *VarHeap) -> (VarInfoPtr, ([LocalTypePatternVariable], *VarHeap))
 addLocalTCInstance var_number (instances=:[inst : insts], ltp_var_heap)
 	# cmp = var_number =< inst.ltpv_var
 	| cmp == Equal
@@ -2379,6 +2522,120 @@ bindListsOfTypes defs [t1 : ts1] [t2 : ts2] type_heaps coercion_env
 		= (False, type_heaps, coercion_env)
 bindListsOfTypes defs [] [] type_heaps coercion_env
 		= (True, type_heaps, coercion_env)
+
+// compare_instance_root_types and compare_fun_dep_instance_root_types are not symmetric:
+// the first type is the (formal) instance type, the second type is the (actual) expression type.
+
+compare_instance_root_types :: ![Type] ![Type] !{#CommonDefs} !*TypeHeaps !*SubstC -> (!CompareValue,!*TypeHeaps,!*SubstC)
+compare_instance_root_types [t1 : ts1] [t2 : ts2] defs type_heaps subst
+	# (compare_value, type_heaps, subst) = compare_root_types t1 t2 defs type_heaps subst
+	| compare_value==Equal
+		= compare_instance_root_types ts1 ts2 defs type_heaps subst
+		= (compare_value, type_heaps, subst)
+compare_instance_root_types [] [] defs type_heaps subst
+	= (Equal, type_heaps, subst)
+
+compare_fun_dep_instance_root_types :: ![Type] ![Type] !BITVECT !{#CommonDefs} !*TypeHeaps !*SubstC -> (!CompareValue,!*TypeHeaps,!*SubstC)
+compare_fun_dep_instance_root_types [t1 : ts1] [t2 : ts2] class_fun_dep_vars defs type_heaps subst
+	| class_fun_dep_vars bitand 1==0
+		# (compare_value, type_heaps, subst) = compare_root_types t1 t2 defs type_heaps subst
+		| compare_value==Equal
+			= compare_fun_dep_instance_root_types ts1 ts2 class_fun_dep_vars defs type_heaps subst
+			= (compare_value, type_heaps, subst)
+		= compare_fun_dep_instance_root_types ts1 ts2 (class_fun_dep_vars>>1) defs type_heaps subst
+compare_fun_dep_instance_root_types [] [] class_fun_dep_vars defs type_heaps subst
+	= (Equal, type_heaps, subst)
+
+compare_root_types :: !Type !Type !{#CommonDefs} !*TypeHeaps !*SubstC -> (!Int,!*TypeHeaps,!*SubstC)
+compare_root_types type1 type2 defs type_heaps subst
+	# (type2, subst) = expandOneStepC type2 subst
+	= compare_root_types_after_expand type1 type2 defs type_heaps subst
+
+compare_root_types_after_expand :: !Type !Type !{#CommonDefs} !*TypeHeaps !*SubstC -> (!Int,!*TypeHeaps,!*SubstC)
+compare_root_types_after_expand type1=:(TA {type_index=type_index1} cons_args1) type2=:(TA {type_index=type_index2} cons_args2) defs type_heaps subst
+	#! {td_rhs,td_args,td_attribute} = defs.[type_index1.glob_module].com_type_defs.[type_index1.glob_object]
+	| td_rhs=:SynType _
+		= compare_root_types_syn_type1 td_rhs td_args td_attribute cons_args1 type2 defs type_heaps subst
+	#! {td_rhs,td_args} = defs.[type_index2.glob_module].com_type_defs.[type_index2.glob_object]
+	| td_rhs=:SynType _
+		= compare_root_types_syn_type2 type1 td_rhs td_args td_attribute cons_args2 defs type_heaps subst
+		#! compare_value = compare_root_types_TAs type_index1 cons_args1 type_index2 cons_args2
+		= (compare_value,type_heaps,subst)
+compare_root_types_after_expand (TA {type_index=type_index1} cons_args1) type2=:(TAS {type_index=type_index2} cons_args2 _) defs type_heaps subst
+	#! {td_rhs,td_args,td_attribute} = defs.[type_index1.glob_module].com_type_defs.[type_index1.glob_object]
+	| td_rhs=:SynType _
+		= compare_root_types_syn_type1 td_rhs td_args td_attribute cons_args1 type2 defs type_heaps subst
+		#! compare_value = compare_root_types_TAs type_index1 cons_args1 type_index2 cons_args2
+		= (compare_value,type_heaps,subst)
+compare_root_types_after_expand (TA {type_index=type_index1} cons_args1) type2 defs type_heaps subst
+	#! {td_rhs,td_args,td_attribute} = defs.[type_index1.glob_module].com_type_defs.[type_index1.glob_object]
+	| td_rhs=:SynType _
+		= compare_root_types_syn_type1 td_rhs td_args td_attribute cons_args1 type2 defs type_heaps subst
+		= (Smaller,type_heaps,subst)
+compare_root_types_after_expand (TAS {type_index=type_index1} cons_args1 _) (TAS {type_index=type_index2} cons_args2 _) defs type_heaps subst
+	#! compare_value = compare_root_types_TAs type_index1 cons_args1 type_index2 cons_args2
+	= (compare_value,type_heaps,subst)
+compare_root_types_after_expand type1=:(TAS {type_index=type_index1} cons_args1 _) (TA {type_index=type_index2} cons_args2) defs type_heaps subst
+	#! {td_rhs,td_args,td_attribute} = defs.[type_index2.glob_module].com_type_defs.[type_index2.glob_object]
+	| td_rhs=:SynType _
+		= compare_root_types_syn_type2 type1 td_rhs td_args td_attribute cons_args2 defs type_heaps subst
+		#! compare_value = compare_root_types_TAs type_index1 cons_args1 type_index2 cons_args2
+		= (compare_value,type_heaps,subst)
+compare_root_types_after_expand type1 (TA {type_index=type_index2} cons_args2) defs type_heaps subst
+	#! {td_rhs,td_args,td_attribute} = defs.[type_index2.glob_module].com_type_defs.[type_index2.glob_object]
+	| td_rhs=:SynType _
+		= compare_root_types_syn_type2 type1 td_rhs td_args td_attribute cons_args2 defs type_heaps subst
+		= (Greater,type_heaps,subst)
+compare_root_types_after_expand (TB type1) (TB type2) defs type_heaps subst
+	| equal_constructor type1 type2
+		= (Equal,type_heaps,subst)
+	| less_constructor type1 type2
+		= (Smaller,type_heaps,subst)
+		= (Greater,type_heaps,subst)
+compare_root_types_after_expand type1 type2 defs type_heaps subst
+	| equal_constructor type1 type2
+		= (Equal,type_heaps,subst)
+	| less_constructor type1 type2
+		= (Smaller,type_heaps,subst)
+		= (Greater,type_heaps,subst)
+
+compare_root_types_syn_type1 (SynType {at_type=type1=:TV _}) td_args td_attribute args1 type2 defs type_heaps subst
+	# (expanded_type, type_heaps) = substituteType td_attribute TA_Multi td_args args1 type1 type_heaps
+	= compare_root_types expanded_type type2 defs type_heaps subst
+compare_root_types_syn_type1 (SynType {at_type=type1=:(CV _ :@: _)}) td_args td_attribute args1 type2 defs type_heaps subst
+	# (expanded_type, type_heaps) = substituteType td_attribute TA_Multi td_args args1 type1 type_heaps
+	= compare_root_types expanded_type type2 defs type_heaps subst
+compare_root_types_syn_type1 (SynType {at_type=type1}) td_args td_attribute args1 type2 defs type_heaps subst
+	= compare_root_types type1 type2 defs type_heaps subst
+
+compare_root_types_syn_type2 type1 (SynType {at_type=type2=:TV _}) td_args td_attribute args2 defs type_heaps subst
+	# (expanded_type, type_heaps) = substituteType td_attribute TA_Multi td_args args2 type2 type_heaps
+	# (expanded_type, subst) = expandOneStepC expanded_type subst
+	= compare_root_types type1 expanded_type defs type_heaps subst
+compare_root_types_syn_type2 type1 (SynType {at_type=type2=:(CV _ :@: _)}) td_args td_attribute args2 defs type_heaps subst
+	# (expanded_type, type_heaps) = substituteType td_attribute TA_Multi td_args args2 type2 type_heaps
+	# (expanded_type, subst) = expandOneStepC expanded_type subst
+	= compare_root_types type1 expanded_type defs type_heaps subst
+compare_root_types_syn_type2 type1 (SynType {at_type=type2}) td_args td_attribute args2 defs type_heaps subst
+	= compare_root_types type1 type2 defs type_heaps subst
+
+compare_root_types_TAs :: !(Global Int) ![AType] !(Global Int) ![AType] -> CompareValue
+compare_root_types_TAs type_index1 args1 type_index2 args2
+	| type_index1.glob_module==type_index2.glob_module
+		| type_index1.glob_object==type_index2.glob_object
+			# n_args1 = length args1
+			# n_args2 = length args1
+			| n_args1==n_args2
+				= Equal
+			| n_args1<n_args2
+				= Smaller
+				= Greater
+		| type_index1.glob_object<type_index2.glob_object
+			= Smaller
+			= Greater
+	| type_index1.glob_module<type_index2.glob_module
+		= Smaller
+		= Greater
 
 trySpecializedInstances :: [TypeContext] [Special] *TypeHeaps !*Subst -> (!Global Index, !*TypeHeaps, !*Subst)
 trySpecializedInstances type_contexts [] type_heaps subst

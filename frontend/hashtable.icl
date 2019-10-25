@@ -41,9 +41,7 @@ set_hte_mark hte_mark ht = {ht & hte_mark=hte_mark}
 instance =< IdentClass
 where
 	(=<) (IC_Instance types1) (IC_Instance types2)
-		= IF_ALLOW_NON_TERMINATING_AND_OVERLAPPING_INSTANCES
-			(compareInstances types1 types2)
-			(compare_types types1 types2)
+		= compareInstances types1 types2
 	(=<) (IC_InstanceMember types1) (IC_InstanceMember types2)
 		= compare_types types1 types2
 	(=<) (IC_GenericCase type1) (IC_GenericCase type2)

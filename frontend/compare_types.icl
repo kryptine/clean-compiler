@@ -354,7 +354,7 @@ instance < MemberDef
 where
 	(<) md1 md2 = md1.me_ident.id_name < md2.me_ident.id_name
 
-(CAND) infix 3 :: !(!CompareValue, ![(Ident,Ident)]) (CompareValue, ![(Ident,Ident)]) -> (CompareValue,  ![(Ident,Ident)])
+(CAND) infix 3 :: !(!CompareValue, ![(Ident,Ident)]) (CompareValue, ![(Ident,Ident)]) -> (CompareValue, ![(Ident,Ident)])
 (CAND) (cv1,vlist1) cl2
 	| cv1 == Equal
 		= case cl2 of

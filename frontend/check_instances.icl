@@ -5,6 +5,8 @@ import syntax,compare_types,utilities,checksupport
 from expand_types import simplifyAndCheckTypeApplication
 from overloading import ::ClassInstanceInfo,::InstanceTree(..)
 
+:: SortedInstances = SI_Node ![Global Index] !SortedInstances !SortedInstances | SI_Empty
+
 check_if_class_instances_overlap :: !*ClassInstanceInfo !{#CommonDefs} !*TypeVarHeap !*ErrorAdmin -> (!*ClassInstanceInfo,!*TypeVarHeap,!*ErrorAdmin)
 check_if_class_instances_overlap class_instances common_defs tvh error_admin
 	= check_class_instances_of_modules 0 class_instances common_defs tvh error_admin
@@ -16,29 +18,42 @@ check_class_instances_of_modules module_n class_instances common_defs tvh error_
 		= check_class_instances_of_modules (module_n+1) class_instances common_defs tvh error_admin
 		= (class_instances,tvh,error_admin)
 
-:: SortedInstances = SI_Node ![Global Index] !SortedInstances !SortedInstances | SI_Empty
-
 check_class_instances_of_module :: !Int !Int !*ClassInstanceInfo !{#CommonDefs} !*TypeVarHeap !*ErrorAdmin -> (!*ClassInstanceInfo,!*TypeVarHeap,!*ErrorAdmin)
 check_class_instances_of_module class_n module_n class_instances common_defs tvh error_admin
 	| class_n<size class_instances.[module_n]
-		# (instances,class_instances) = class_instances![module_n].[class_n]
-		| instances=:IT_Empty
-			= check_class_instances_of_module (class_n+1) module_n class_instances common_defs tvh error_admin
-		# class_fun_dep_vars = common_defs.[module_n].com_class_defs.[class_n].class_fun_dep_vars
-		| class_fun_dep_vars==0
-			# (normal_instances,default_instances,other_instances,tvh)
-				= classify_and_sort_instances instances SI_Empty SI_Empty [] common_defs tvh
-			  (tvh,error_admin) = check_if_sorted_instances_overlap normal_instances common_defs tvh error_admin
-			  (tvh,error_admin) = check_if_sorted_instances_overlap default_instances common_defs tvh error_admin
-			  (tvh,error_admin) = check_if_other_instances_overlap normal_instances default_instances other_instances common_defs tvh error_admin
-			= check_class_instances_of_module (class_n+1) module_n class_instances common_defs tvh error_admin
-			# (normal_instances,default_instances,other_instances,tvh)
-				= classify_and_sort_instances_with_fundeps instances class_fun_dep_vars SI_Empty SI_Empty [] common_defs tvh
-			  (tvh,error_admin) = check_if_sorted_instances_with_fundeps_overlap normal_instances class_fun_dep_vars common_defs tvh error_admin
-			  (tvh,error_admin) = check_if_sorted_instances_with_fundeps_overlap default_instances class_fun_dep_vars common_defs tvh error_admin
-			  (tvh,error_admin)
-				= check_if_other_instances_with_fundeps_overlap normal_instances default_instances other_instances class_fun_dep_vars common_defs tvh error_admin
-			= check_class_instances_of_module (class_n+1) module_n class_instances common_defs tvh error_admin
+		# (class_instances,tvh,error_admin) = check_class_instances class_n module_n class_instances common_defs tvh error_admin;
+		= check_class_instances_of_module (class_n+1) module_n class_instances common_defs tvh error_admin
+		= (class_instances,tvh,error_admin)
+
+check_class_instances :: !Int !Int !*ClassInstanceInfo !{#CommonDefs} !*TypeVarHeap !*ErrorAdmin -> (!*ClassInstanceInfo,!*TypeVarHeap,!*ErrorAdmin)
+check_class_instances class_n module_n class_instances common_defs tvh error_admin
+	# (instances,class_instances) = class_instances![module_n].[class_n]
+	| instances=:IT_Empty
+		= (class_instances,tvh,error_admin)
+	# class_fun_dep_vars = common_defs.[module_n].com_class_defs.[class_n].class_fun_dep_vars
+	| class_fun_dep_vars==0
+		# (normal_instances,default_instances,other_instances,tvh)
+			= classify_and_sort_instances instances SI_Empty SI_Empty [] common_defs tvh
+		  (tvh,error_admin) = check_if_sorted_instances_overlap normal_instances common_defs tvh error_admin
+		  (tvh,error_admin) = check_if_sorted_instances_overlap default_instances common_defs tvh error_admin
+		  (tvh,error_admin) = check_if_other_instances_overlap normal_instances default_instances other_instances common_defs tvh error_admin
+
+		  (instance_tree,error_admin) = add_sorted_instances_to_instance_tree default_instances common_defs IT_Empty error_admin
+		  (instance_tree,error_admin) = add_instances_to_instance_tree other_instances common_defs instance_tree error_admin
+		  class_instances & [module_n].[class_n] = IT_Trees normal_instances instance_tree
+
+		= (class_instances,tvh,error_admin)
+		# (normal_instances,default_instances,other_instances,tvh)
+			= classify_and_sort_instances_with_fundeps instances class_fun_dep_vars SI_Empty SI_Empty [] common_defs tvh
+		  (tvh,error_admin) = check_if_sorted_instances_with_fundeps_overlap normal_instances class_fun_dep_vars common_defs tvh error_admin
+		  (tvh,error_admin) = check_if_sorted_instances_with_fundeps_overlap default_instances class_fun_dep_vars common_defs tvh error_admin
+		  (tvh,error_admin)
+			= check_if_other_instances_with_fundeps_overlap normal_instances default_instances other_instances class_fun_dep_vars common_defs tvh error_admin
+
+		  (instance_tree,error_admin) = add_sorted_fun_dep_instances_to_instance_tree default_instances class_fun_dep_vars common_defs IT_Empty error_admin
+		  (instance_tree,error_admin) = add_fun_dep_instances_to_instance_tree other_instances class_fun_dep_vars common_defs instance_tree error_admin
+		  class_instances & [module_n].[class_n] = IT_Trees normal_instances instance_tree
+
 		= (class_instances,tvh,error_admin)
 
 classify_and_sort_instances :: !InstanceTree !SortedInstances !SortedInstances ![Global Index] !{#CommonDefs} !*TypeVarHeap
@@ -46,6 +61,7 @@ classify_and_sort_instances :: !InstanceTree !SortedInstances !SortedInstances !
 classify_and_sort_instances (IT_Node instance_index=:{glob_module,glob_object} left right) normal_instances default_instances other_instances common_defs tvh
 	#! {ins_type={it_types},ins_specials} = common_defs.[glob_module].com_instance_defs.[glob_object]
 	| ins_specials=:SP_GenerateRecordInstances
+		# (default_instances,tvh) = add_to_sorted_instances instance_index it_types default_instances common_defs tvh
 		= classify_and_sort_left_and_right_instances left right normal_instances default_instances other_instances common_defs tvh
 	# (is_normal_instance,tvh) = instance_root_types_specified it_types common_defs tvh
 	| is_normal_instance
@@ -124,8 +140,8 @@ check_if_other_instances_overlap :: SortedInstances SortedInstances ![Global Ind
 check_if_other_instances_overlap normal_instances default_instances [] common_defs tvh error_admin
 	= (tvh,error_admin)
 check_if_other_instances_overlap normal_instances default_instances other_instances common_defs tvh error_admin
-	# instances = add_instances_from_tree normal_instances [] common_defs
-	# instances = add_instances_from_tree default_instances instances common_defs
+	# instances = add_instances_from_tree_to_list normal_instances [] common_defs
+	# instances = add_instances_from_tree_to_list default_instances instances common_defs
 	# (_,tvh,error_admin) = check_if_instances_overlap other_instances instances common_defs tvh error_admin
 	= (tvh,error_admin)
 
@@ -134,23 +150,23 @@ check_if_other_instances_with_fundeps_overlap :: SortedInstances SortedInstances
 check_if_other_instances_with_fundeps_overlap normal_instances default_instances [] class_fun_dep_vars common_defs tvh error_admin
 	= (tvh,error_admin)
 check_if_other_instances_with_fundeps_overlap normal_instances default_instances other_instances class_fun_dep_vars common_defs tvh error_admin
-	# instances = add_instances_from_tree normal_instances [] common_defs
-	# instances = add_instances_from_tree default_instances instances common_defs
+	# instances = add_instances_from_tree_to_list normal_instances [] common_defs
+	# instances = add_instances_from_tree_to_list default_instances instances common_defs
 	# (_,tvh,error_admin) = check_if_instances_with_fundeps_overlap other_instances instances class_fun_dep_vars common_defs tvh error_admin
 	= (tvh,error_admin)
 
-add_instances_from_tree :: !SortedInstances ![([Type],Global Int)] !{#CommonDefs} -> [([Type],Global Int)]
-add_instances_from_tree (SI_Node instances left right) l common_defs
-	# l = add_instances_from_tree left l common_defs
+add_instances_from_tree_to_list :: !SortedInstances ![([Type],Global Int)] !{#CommonDefs} -> [([Type],Global Int)]
+add_instances_from_tree_to_list (SI_Node instances left right) l common_defs
+	# l = add_instances_from_tree_to_list left l common_defs
 	# l = add_instances_from_list instances l common_defs
-	= add_instances_from_tree right l common_defs
+	= add_instances_from_tree_to_list right l common_defs
 where
 	add_instances_from_list [instance_index=:{glob_module,glob_object}:instances] l common_defs
 		#! it_types = common_defs.[glob_module].com_instance_defs.[glob_object].ins_type.it_types
 		= [(it_types,instance_index):add_instances_from_list instances l common_defs]
 	add_instances_from_list [] l common_defs
 		= l
-add_instances_from_tree SI_Empty l common_defs
+add_instances_from_tree_to_list SI_Empty l common_defs
 	= l
 
 check_if_sorted_instances_overlap :: !SortedInstances !{#CommonDefs} !*TypeVarHeap !*ErrorAdmin -> (!*TypeVarHeap,!*ErrorAdmin)
@@ -177,6 +193,72 @@ check_if_sorted_instances_with_fundeps_overlap (SI_Node [instance_index=:{glob_m
 check_if_sorted_instances_with_fundeps_overlap SI_Empty class_fun_dep_vars common_defs tvh error_admin
 	= (tvh,error_admin)
 
+add_sorted_instances_to_instance_tree :: !SortedInstances !{#CommonDefs} !*InstanceTree !*ErrorAdmin -> (!*InstanceTree,!*ErrorAdmin)
+add_sorted_instances_to_instance_tree (SI_Node instances left right) common_defs instance_tree error_admin
+	# (instance_tree,error_admin) = add_instances_to_instance_tree instances common_defs instance_tree error_admin
+	# (instance_tree,error_admin) = add_sorted_instances_to_instance_tree left common_defs instance_tree error_admin
+	= add_sorted_instances_to_instance_tree right common_defs instance_tree error_admin
+add_sorted_instances_to_instance_tree SI_Empty common_defs instance_tree error_admin
+	= (instance_tree,error_admin)
+
+add_sorted_fun_dep_instances_to_instance_tree :: !SortedInstances !BITVECT !{#CommonDefs} !*InstanceTree !*ErrorAdmin -> (!*InstanceTree,!*ErrorAdmin)
+add_sorted_fun_dep_instances_to_instance_tree (SI_Node instances left right) class_fun_dep_vars common_defs instance_tree error_admin
+	# (instance_tree,error_admin) = add_fun_dep_instances_to_instance_tree instances class_fun_dep_vars common_defs instance_tree error_admin
+	# (instance_tree,error_admin) = add_sorted_fun_dep_instances_to_instance_tree left class_fun_dep_vars common_defs instance_tree error_admin
+	= add_sorted_fun_dep_instances_to_instance_tree right class_fun_dep_vars common_defs instance_tree error_admin
+add_sorted_fun_dep_instances_to_instance_tree SI_Empty class_fun_dep_vars common_defs instance_tree error_admin
+	= (instance_tree,error_admin)
+
+add_instances_to_instance_tree :: ![Global Int] !{#CommonDefs} !*InstanceTree !*ErrorAdmin -> (!*InstanceTree,!*ErrorAdmin)
+add_instances_to_instance_tree [instance_index=:{glob_module,glob_object}:instances] common_defs instance_tree error_admin
+	#! it_types = common_defs.[glob_module].com_instance_defs.[glob_object].ins_type.it_types
+	# (instance_tree,error_admin) = insert_instance_in_tree it_types glob_module glob_object common_defs instance_tree error_admin
+	= add_instances_to_instance_tree instances common_defs instance_tree error_admin
+add_instances_to_instance_tree [] common_defs instance_tree error_admin
+	= (instance_tree,error_admin)
+
+add_fun_dep_instances_to_instance_tree :: ![Global Int] !BITVECT !{#CommonDefs} !*InstanceTree !*ErrorAdmin -> (!*InstanceTree,!*ErrorAdmin)
+add_fun_dep_instances_to_instance_tree [instance_index=:{glob_module,glob_object}:instances] class_fun_dep_vars common_defs instance_tree error_admin
+	#! it_types = common_defs.[glob_module].com_instance_defs.[glob_object].ins_type.it_types
+	# (instance_tree,error_admin) = insert_fun_dep_instance_in_tree it_types glob_module glob_object class_fun_dep_vars common_defs instance_tree error_admin
+	= add_fun_dep_instances_to_instance_tree instances class_fun_dep_vars common_defs instance_tree error_admin
+add_fun_dep_instances_to_instance_tree [] class_fun_dep_vars common_defs instance_tree error_admin
+	= (instance_tree,error_admin)
+
+insert_instance_in_tree ::  ![Type] !Index !Index !{#CommonDefs} !*InstanceTree !*ErrorAdmin -> (!*InstanceTree,!*ErrorAdmin)
+insert_instance_in_tree ins_types new_ins_module new_ins_index common_defs (IT_Node ins=:{glob_object,glob_module} it_less it_greater) error_admin
+	#! {ins_type={it_types}} = common_defs.[glob_module].com_instance_defs.[glob_object]
+	# cmp = compareInstances ins_types it_types // to do: use compare that expands synonym types
+	| cmp == Smaller
+		# (it_less,error_admin) = insert_instance_in_tree ins_types new_ins_module new_ins_index common_defs it_less error_admin
+		= (IT_Node ins it_less it_greater, error_admin)
+	| cmp == Greater
+		# (it_greater,error_admin) = insert_instance_in_tree ins_types new_ins_module new_ins_index common_defs it_greater error_admin
+		= (IT_Node ins it_less it_greater, error_admin)
+	| ins.glob_object==new_ins_index && ins.glob_module==new_ins_module
+		= (IT_Node ins it_less it_greater, error_admin)
+		# error_admin = overlapping_instance_error new_ins_module new_ins_index ins common_defs error_admin
+		= (IT_Node ins it_less it_greater, error_admin)
+insert_instance_in_tree ins_types new_ins_module new_ins_index common_defs IT_Empty error_admin
+	= (IT_Node {glob_object = new_ins_index,glob_module = new_ins_module} IT_Empty IT_Empty, error_admin)
+
+insert_fun_dep_instance_in_tree ::  ![Type] !Index !Index !BITVECT !{#CommonDefs} !*InstanceTree !*ErrorAdmin -> (!*InstanceTree,!*ErrorAdmin)
+insert_fun_dep_instance_in_tree ins_types new_ins_module new_ins_index class_fun_dep_vars common_defs (IT_Node ins=:{glob_object,glob_module} it_less it_greater) error_admin
+	#! {ins_type={it_types}} = common_defs.[glob_module].com_instance_defs.[glob_object]
+	# cmp = compareFunDepInstances ins_types it_types class_fun_dep_vars // to do: use compare that expands synonym types
+	| cmp == Smaller
+		# (it_less,error_admin) = insert_fun_dep_instance_in_tree ins_types new_ins_module new_ins_index class_fun_dep_vars common_defs it_less error_admin
+		= (IT_Node ins it_less it_greater, error_admin)
+	| cmp == Greater
+		# (it_greater,error_admin) = insert_fun_dep_instance_in_tree ins_types new_ins_module new_ins_index class_fun_dep_vars common_defs it_greater error_admin
+		= (IT_Node ins it_less it_greater, error_admin)
+	| ins.glob_object==new_ins_index && ins.glob_module==new_ins_module
+		= (IT_Node ins it_less it_greater, error_admin)
+		# error_admin = overlapping_instance_error new_ins_module new_ins_index ins common_defs error_admin
+		= (IT_Node ins it_less it_greater, error_admin)
+insert_fun_dep_instance_in_tree ins_types new_ins_module new_ins_index class_fun_dep_vars common_defs IT_Empty error_admin
+	= (IT_Node {glob_object = new_ins_index,glob_module = new_ins_module} IT_Empty IT_Empty, error_admin)
+
 check_if_instances_overlap :: ![Global Index] ![([Type],Global Index)] !{#CommonDefs} !*TypeVarHeap !*ErrorAdmin
 							-> (![([Type],Global Index)],!*TypeVarHeap,!*ErrorAdmin)
 check_if_instances_overlap [instance_index=:{glob_module,glob_object}:instances] previous_instances common_defs tvh error_admin
@@ -190,7 +272,7 @@ check_if_instances_overlap [instance_index=:{glob_module,glob_object}:instances]
 check_if_instances_overlap [] previous_instances common_defs tvh error_admin
 	= (previous_instances,tvh,error_admin)
 
-check_if_instances_with_fundeps_overlap :: ![Global Index] ![([Type],Global Index)] !Int !{#CommonDefs} !*TypeVarHeap !*ErrorAdmin
+check_if_instances_with_fundeps_overlap :: ![Global Index] ![([Type],Global Index)] !BITVECT !{#CommonDefs} !*TypeVarHeap !*ErrorAdmin
 										-> (![([Type],Global Index)],!*TypeVarHeap,!*ErrorAdmin)
 check_if_instances_with_fundeps_overlap [instance_index=:{glob_module,glob_object}:instances] previous_instances class_fun_dep_vars common_defs tvh error_admin
 	#! {ins_type={it_types},ins_specials} = common_defs.[glob_module].com_instance_defs.[glob_object]
@@ -218,9 +300,10 @@ check_instance instance_types instance_index [previous_instance=:(previous_insta
 check_instance instance_types instance_index [] common_defs tvh
 	= ({glob_module = -1,glob_object = -1},[(instance_types,instance_index)],tvh)
 
-check_instance_with_fundeps :: ![Type] !(Global Index) ![([Type],Global Index)] !Int !{#CommonDefs} !*TypeVarHeap
+check_instance_with_fundeps :: ![Type] !(Global Index) ![([Type],Global Index)] !BITVECT !{#CommonDefs} !*TypeVarHeap
 										-> (!Global Index,![([Type],Global Index)],!*TypeVarHeap)
-check_instance_with_fundeps instance_types instance_index [previous_instance=:(previous_instance_type,previous_instance_index):previous_instances] class_fun_dep_vars common_defs tvh
+check_instance_with_fundeps instance_types instance_index
+		[previous_instance=:(previous_instance_type,previous_instance_index):previous_instances] class_fun_dep_vars common_defs tvh
 	# ins_ident = common_defs.[instance_index.glob_module].com_instance_defs.[instance_index.glob_object].ins_ident
 	# (overlaps,subst,tvh) = unify_instances_with_fundeps instance_types previous_instance_type class_fun_dep_vars common_defs [] tvh
 	# tvh = restore_type_var_infos subst tvh
@@ -258,7 +341,7 @@ unify_instances [] [] common_defs subst tvh
 unify_instances _ _ common_defs subst tvh
 	= (False, subst, tvh)
 
-unify_instances_with_fundeps :: ![Type] ![Type] !Int !{#CommonDefs} [(TypeVarInfoPtr,TypeVarInfo)] !*TypeVarHeap -> (!Bool,[(TypeVarInfoPtr,TypeVarInfo)],!*TypeVarHeap)
+unify_instances_with_fundeps :: ![Type] ![Type] !BITVECT !{#CommonDefs} [(TypeVarInfoPtr,TypeVarInfo)] !*TypeVarHeap -> (!Bool,[(TypeVarInfoPtr,TypeVarInfo)],!*TypeVarHeap)
 unify_instances_with_fundeps [t1 : ts1] [t2 : ts2] class_fun_dep_vars common_defs subst tvh
 	| class_fun_dep_vars bitand 1==0
 		# (succ, subst, tvh) = unify_instances_types t1 t2 common_defs subst tvh
@@ -561,7 +644,7 @@ compare_instance_root_types [type1:types1] [type2:types2] common_defs tvh
 compare_instance_root_types [] [] common_defs tvh
 	= (Equal,tvh)
 
-compare_instance_with_fundeps_root_types :: ![Type] ![Type] !Int !{#CommonDefs} !*TypeVarHeap -> (!Int,!*TypeVarHeap)
+compare_instance_with_fundeps_root_types :: ![Type] ![Type] !BITVECT !{#CommonDefs} !*TypeVarHeap -> (!Int,!*TypeVarHeap)
 compare_instance_with_fundeps_root_types [type1:types1] [type2:types2] class_fun_dep_vars common_defs tvh
 	| class_fun_dep_vars bitand 1==0
 		# (compare_value,tvh) = compare_root_types type1 type2 common_defs tvh
@@ -661,7 +744,7 @@ instance_root_types_specified [type:types] common_defs tvh
 instance_root_types_specified [] common_defs tvh
 	= (True,tvh)
 
-instance_with_fundeps_root_types_specified :: ![Type] !Int !{#CommonDefs} !*TypeVarHeap -> (!Bool,!*TypeVarHeap)
+instance_with_fundeps_root_types_specified :: ![Type] !BITVECT !{#CommonDefs} !*TypeVarHeap -> (!Bool,!*TypeVarHeap)
 instance_with_fundeps_root_types_specified [type:types] class_fun_dep_vars common_defs tvh
 	| class_fun_dep_vars bitand 1==0
 		# (can_be_compared,tvh) = root_type_can_be_compared type common_defs tvh

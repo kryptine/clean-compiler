@@ -387,7 +387,7 @@ unifyTypes t1=:(TAS cons_id1 cons_args1 _) attr1 t2=:(TAS cons_id2 cons_args2 _)
 unifyTypes (arg_type1 --> res_type1) attr1 (arg_type2 --> res_type2) attr2 modules subst heaps
 	= unify (arg_type1,res_type1) (arg_type2,res_type2) modules subst heaps
 unifyTypes TArrow attr1 TArrow attr2 modules subst heaps
-	= (True, subst, heaps)	
+	= (True, subst, heaps)
 unifyTypes (TArrow1 t1) attr1 (TArrow1 t2) attr2 modules subst heaps
 	= unify t1 t2 modules subst heaps	
 unifyTypes (cons_var :@: types) attr1 type2 attr2 modules subst heaps
@@ -2532,7 +2532,7 @@ typeProgram comps main_dcl_module_n fun_defs specials list_inferred_types icl_de
 
 	# ts_error = {ea_file = file, ea_loc = [], ea_ok = True }
 	  ti_common_defs = {{dcl_common \\ {dcl_common} <-: dcl_modules } & [main_dcl_module_n] = icl_defs }
-	  ti_functions	 = {dcl_functions \\ {dcl_functions} <-: dcl_modules }	  
+	  ti_functions	 = {dcl_functions \\ {dcl_functions} <-: dcl_modules }
 
 	  class_instances = { {  IT_Empty \\ i <- [0 .. dec (size com_class_defs)] } \\ {com_class_defs} <-: ti_common_defs }
 	  state = collect_imported_instances icl_imported_instances ti_common_defs ts_error class_instances hp_type_heaps.th_vars td_infos
@@ -2843,81 +2843,27 @@ collect_and_check_instances nr_of_instances common_defs main_dcl_module_n state
 update_instances_of_class common_defs mod_index ins_index (error, class_instances, type_var_heap, td_infos)
 	#!{ins_class_index={gi_module,gi_index},ins_type={it_types},ins_pos} = common_defs.[mod_index].com_instance_defs.[ins_index]
 	  (instances, class_instances) = class_instances![gi_module,gi_index]
-	# class_fun_dep_vars = common_defs.[gi_module].com_class_defs.[gi_index].class_fun_dep_vars
-	| class_fun_dep_vars==0
-		# (error, instances) = insert it_types ins_index mod_index common_defs error instances
-		  class_instances = {class_instances & [gi_module,gi_index]=instances}
-		  (error, type_var_heap, td_infos)
-					= check_types_of_instances ins_pos common_defs gi_module gi_index it_types (error, type_var_heap, td_infos)
-		= (error, class_instances, type_var_heap, td_infos)
-		# (error, instances) = insert_fun_dep_instance it_types class_fun_dep_vars ins_index mod_index common_defs error instances
-		  class_instances & [gi_module,gi_index]=instances
-		  (error, type_var_heap, td_infos)
-					= check_types_of_instances ins_pos common_defs gi_module gi_index it_types (error, type_var_heap, td_infos)
-		= (error, class_instances, type_var_heap, td_infos)
+	# instances = insert ins_index mod_index instances
+	  class_instances & [gi_module,gi_index]=instances
+	  (error, type_var_heap, td_infos)
+				= check_types_of_instance ins_pos common_defs gi_module gi_index it_types (error, type_var_heap, td_infos)
+	= (error, class_instances, type_var_heap, td_infos)
 where
-	insert ::  ![Type] !Index !Index !{# CommonDefs } !*ErrorAdmin !*InstanceTree -> (!*ErrorAdmin, !*InstanceTree)
-	insert ins_types new_ins_index new_ins_module modules error IT_Empty
-		=  (error, IT_Node {glob_object = new_ins_index,glob_module = new_ins_module}  IT_Empty IT_Empty)
-	insert ins_types new_ins_index new_ins_module modules error (IT_Node ins=:{glob_object,glob_module} it_less it_greater)
-		#! {ins_type={it_types}} = modules.[glob_module].com_instance_defs.[glob_object]
-		# cmp = IF_ALLOW_NON_TERMINATING_AND_OVERLAPPING_INSTANCES
-					(compareInstances ins_types it_types)
-					(ins_types =< it_types)
-		| cmp == Smaller
-			# (error, it_less) = insert ins_types new_ins_index new_ins_module modules error it_less
-			= (error, IT_Node ins it_less it_greater)
-		| cmp == Greater
-			# (error, it_greater) = insert ins_types new_ins_index new_ins_module modules error it_greater
-			= (error, IT_Node ins it_less it_greater)
-		| ins.glob_object==new_ins_index && ins.glob_module==new_ins_module
-			= (error, IT_Node ins it_less it_greater)
-		# cmp = check_unboxed_arrays ins_types it_types
-		| cmp == Smaller
-			# (error, it_less) = insert ins_types new_ins_index new_ins_module modules error it_less
-			= (error, IT_Node ins it_less it_greater)
-		| cmp == Greater
-			# (error, it_greater) = insert ins_types new_ins_index new_ins_module modules error it_greater
-			= (error, IT_Node ins it_less it_greater)
-			# error = overlapping_instance_error new_ins_module new_ins_index glob_module glob_object modules error
-			= (error, IT_Node ins it_less it_greater)
-	where
-		check_unboxed_arrays [TA {type_ident={id_name=PD_UnboxedArray_String}} [{at_type=elem_type1}]] [TA {type_ident={id_name=PD_UnboxedArray_String}} [{at_type=elem_type2}]]
-			| elem_type1=:(TV _) || elem_type2=:(TV _)
-				= Equal
-			# cmp = elem_type1 =< elem_type2
-			| cmp <> Equal
-				= cmp
-				= check_unboxed_arrays [elem_type1] [elem_type2]
-		check_unboxed_arrays _ _
-			= Equal
+	insert :: !Index !Index !*InstanceTree -> *InstanceTree
+	insert new_ins_index new_ins_module IT_Empty
+		= IT_Node {glob_object = new_ins_index,glob_module = new_ins_module} IT_Empty IT_Empty
+	insert new_ins_index new_ins_module (IT_Node ins=:{glob_module,glob_object} it_less it_greater)
+		| new_ins_module==glob_module
+			| new_ins_index<glob_object
+				= IT_Node ins (insert new_ins_index new_ins_module it_less) it_greater
+			| new_ins_index>glob_object
+				= IT_Node ins it_less (insert new_ins_index new_ins_module it_greater)
+				= IT_Node ins it_less it_greater
+		| new_ins_module<glob_module
+			= IT_Node ins (insert new_ins_index new_ins_module it_less) it_greater
+			= IT_Node ins it_less (insert new_ins_index new_ins_module it_greater)
 
-	insert_fun_dep_instance ::  ![Type] !BITVECT !Index !Index !{# CommonDefs } !*ErrorAdmin !*InstanceTree -> (!*ErrorAdmin, !*InstanceTree)
-	insert_fun_dep_instance ins_types class_fun_dep_vars new_ins_index new_ins_module modules error IT_Empty
-		=  (error, IT_Node {glob_object = new_ins_index,glob_module = new_ins_module}  IT_Empty IT_Empty)
-	insert_fun_dep_instance ins_types class_fun_dep_vars new_ins_index new_ins_module modules error (IT_Node ins=:{glob_object,glob_module} it_less it_greater)
-		#! {ins_type={it_types}} = modules.[glob_module].com_instance_defs.[glob_object]
-		# cmp = IF_ALLOW_NON_TERMINATING_AND_OVERLAPPING_INSTANCES
-					(compareFunDepInstances ins_types it_types class_fun_dep_vars)
-					(ins_types =< it_types)
-		| cmp == Smaller
-			# (error, it_less) = insert_fun_dep_instance ins_types class_fun_dep_vars new_ins_index new_ins_module modules error it_less
-			= (error, IT_Node ins it_less it_greater)
-		| cmp == Greater
-			# (error, it_greater) = insert_fun_dep_instance ins_types class_fun_dep_vars new_ins_index new_ins_module modules error it_greater
-			= (error, IT_Node ins it_less it_greater)
-		| ins.glob_object==new_ins_index && ins.glob_module==new_ins_module
-			= (error, IT_Node ins it_less it_greater)
-			# error = overlapping_instance_error new_ins_module new_ins_index glob_module glob_object modules error
-			= (error, IT_Node ins it_less it_greater)
-
-	overlapping_instance_error new_ins_module new_ins_index glob_module glob_object modules error
-		# {ins_ident,ins_pos} = modules.[new_ins_module].com_instance_defs.[new_ins_index]
-		  error = checkErrorWithIdentPos (newPosition ins_ident ins_pos) " instance is overlapping with the instance in the next error" error
-		  {ins_ident,ins_pos} = modules.[glob_module].com_instance_defs.[glob_object]
-		= checkErrorWithIdentPos (newPosition ins_ident ins_pos) " instance is overlapping with the instance in the previous" error
-
-	check_types_of_instances ins_pos common_defs class_module class_index types state
+	check_types_of_instance ins_pos common_defs class_module class_index types state
 		# {class_cons_vars} = common_defs.[class_module].com_class_defs.[class_index]
 		| class_cons_vars==0
 			= state
