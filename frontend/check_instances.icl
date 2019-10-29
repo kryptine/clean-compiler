@@ -38,9 +38,9 @@ check_class_instances class_n module_n class_instances common_defs tvh error_adm
 		  (tvh,error_admin) = check_if_sorted_instances_overlap default_instances common_defs tvh error_admin
 		  (tvh,error_admin) = check_if_other_instances_overlap normal_instances default_instances other_instances common_defs tvh error_admin
 
-		  (instance_tree,error_admin) = add_sorted_instances_to_instance_tree default_instances common_defs IT_Empty error_admin
-		  (instance_tree,error_admin) = add_instances_to_instance_tree other_instances common_defs instance_tree error_admin
-		  class_instances & [module_n].[class_n] = IT_Trees normal_instances instance_tree
+		  (other_instance_tree,error_admin) = add_instances_to_instance_tree other_instances common_defs IT_Empty error_admin
+		  (default_instance_tree,error_admin) = add_sorted_instances_to_instance_tree default_instances common_defs IT_Empty error_admin
+		  class_instances & [module_n].[class_n] = IT_Trees normal_instances other_instance_tree default_instance_tree
 
 		= (class_instances,tvh,error_admin)
 		# (normal_instances,default_instances,other_instances,tvh)
@@ -50,9 +50,9 @@ check_class_instances class_n module_n class_instances common_defs tvh error_adm
 		  (tvh,error_admin)
 			= check_if_other_instances_with_fundeps_overlap normal_instances default_instances other_instances class_fun_dep_vars common_defs tvh error_admin
 
-		  (instance_tree,error_admin) = add_sorted_fun_dep_instances_to_instance_tree default_instances class_fun_dep_vars common_defs IT_Empty error_admin
-		  (instance_tree,error_admin) = add_fun_dep_instances_to_instance_tree other_instances class_fun_dep_vars common_defs instance_tree error_admin
-		  class_instances & [module_n].[class_n] = IT_Trees normal_instances instance_tree
+		  (other_instance_tree,error_admin) = add_fun_dep_instances_to_instance_tree other_instances class_fun_dep_vars common_defs IT_Empty error_admin
+		  (default_instance_tree,error_admin) = add_sorted_fun_dep_instances_to_instance_tree default_instances class_fun_dep_vars common_defs IT_Empty error_admin
+		  class_instances & [module_n].[class_n] = IT_Trees normal_instances other_instance_tree default_instance_tree
 
 		= (class_instances,tvh,error_admin)
 
@@ -67,7 +67,7 @@ classify_and_sort_instances (IT_Node instance_index=:{glob_module,glob_object} l
 	| is_normal_instance
 		# (normal_instances,tvh) = add_to_sorted_instances instance_index it_types normal_instances common_defs tvh
 		= classify_and_sort_left_and_right_instances left right normal_instances default_instances other_instances common_defs tvh
-	# (is_default_instance,tvh) = instance_root_types_specified_or_polymorphic it_types [] common_defs tvh
+	# (is_default_instance,tvh) = check_if_default_instance_types it_types [] common_defs False tvh
 	| is_default_instance
 		# (default_instances,tvh) = add_to_sorted_instances instance_index it_types default_instances common_defs tvh
 		= classify_and_sort_left_and_right_instances left right normal_instances default_instances other_instances common_defs tvh
@@ -91,7 +91,7 @@ classify_and_sort_instances_with_fundeps (IT_Node instance_index=:{glob_module,g
 	| is_normal_instance
 		# (normal_instances,tvh) = add_to_sorted_instances_with_fundeps instance_index it_types normal_instances class_fun_dep_vars common_defs tvh
 		= classify_and_sort_left_and_right_instances_with_fundeps left right class_fun_dep_vars normal_instances default_instances other_instances common_defs tvh
-	# (is_default_instance,tvh) = instance_root_types_specified_or_polymorphic it_types [] common_defs tvh
+	# (is_default_instance,tvh) = check_if_default_instance_with_fun_deps_types it_types [] class_fun_dep_vars common_defs False tvh
 	| is_default_instance
 		# (default_instances,tvh) = add_to_sorted_instances_with_fundeps instance_index it_types default_instances class_fun_dep_vars common_defs tvh
 		= classify_and_sort_left_and_right_instances_with_fundeps left right class_fun_dep_vars normal_instances default_instances other_instances common_defs tvh
@@ -755,18 +755,6 @@ instance_with_fundeps_root_types_specified [type:types] class_fun_dep_vars commo
 instance_with_fundeps_root_types_specified [] class_fun_dep_vars common_defs tvh
 	= (True,tvh)
 
-instance_root_types_specified_or_polymorphic :: ![Type] ![TypeVarInfoPtr] !{#CommonDefs} !*TypeVarHeap -> (!Bool,!*TypeVarHeap)
-instance_root_types_specified_or_polymorphic [type:types] previous_type_vars common_defs tvh
-	# (can_be_compared,tvh) = root_type_can_be_compared type common_defs tvh
-	| can_be_compared
-		= instance_root_types_specified_or_polymorphic types previous_type_vars common_defs tvh
-	# (is_polymorphic,previous_type_vars,tvh) = root_type_polymorphic type previous_type_vars common_defs tvh
-	| is_polymorphic
-		= instance_root_types_specified_or_polymorphic types previous_type_vars common_defs tvh
-		= (False,tvh)
-instance_root_types_specified_or_polymorphic [] previous_type_vars common_defs tvh
-	= (True,tvh)
-
 root_type_can_be_compared :: !Type !{#CommonDefs} !*TypeVarHeap -> (!Bool,!*TypeVarHeap)
 root_type_can_be_compared (TA {type_index={glob_object,glob_module}} type_args) common_defs tvh
 	#! {td_rhs,td_args} = common_defs.[glob_module].com_type_defs.[glob_object]
@@ -801,21 +789,68 @@ type_is_basic_or_function_type TArrow = True
 type_is_basic_or_function_type (TArrow1 _) = True
 type_is_basic_or_function_type _ = False
 
-root_type_polymorphic :: !Type ![TypeVarInfoPtr] !{#CommonDefs} !*TypeVarHeap -> (!Bool,![TypeVarInfoPtr],!*TypeVarHeap)
-root_type_polymorphic (TA {type_index={glob_object,glob_module}} type_args) previous_type_vars common_defs tvh
+check_if_default_instance_types :: ![Type] ![TypeVarInfoPtr] !{#CommonDefs} !Bool !*TypeVarHeap -> (!Bool,!*TypeVarHeap)
+check_if_default_instance_types [type:types] previous_type_vars common_defs has_root_type_var tvh
+	# (is_polymorphic,previous_type_vars,has_root_type_var,tvh) = check_if_default_instance_type_arg type previous_type_vars common_defs has_root_type_var tvh
+	| is_polymorphic
+		= check_if_default_instance_types types previous_type_vars common_defs has_root_type_var tvh
+		= (False,tvh)
+check_if_default_instance_types [] previous_type_vars common_defs has_root_type_var tvh
+	= (has_root_type_var,tvh)
+
+check_if_default_instance_with_fun_deps_types :: ![Type] ![TypeVarInfoPtr] !BITVECT !{#CommonDefs} !Bool !*TypeVarHeap -> (!Bool,!*TypeVarHeap)
+check_if_default_instance_with_fun_deps_types [type:types] previous_type_vars class_fun_dep_vars common_defs has_root_type_var tvh
+	| class_fun_dep_vars bitand 1==0
+		# (is_polymorphic,previous_type_vars,has_root_type_var,tvh) = check_if_default_instance_type_arg type previous_type_vars common_defs has_root_type_var tvh
+		| is_polymorphic
+			= check_if_default_instance_with_fun_deps_types types previous_type_vars (class_fun_dep_vars>>1) common_defs has_root_type_var tvh
+			= (False,tvh)
+		= check_if_default_instance_with_fun_deps_types types previous_type_vars (class_fun_dep_vars>>1) common_defs has_root_type_var tvh
+check_if_default_instance_with_fun_deps_types [] previous_type_vars class_fun_dep_vars common_defs has_root_type_var tvh
+	= (has_root_type_var,tvh)
+
+check_if_default_instance_type_arg :: !Type ![TypeVarInfoPtr] !{#CommonDefs} !Bool !*TypeVarHeap -> (!Bool,[TypeVarInfoPtr],!Bool,!*TypeVarHeap)
+check_if_default_instance_type_arg (TV {tv_info_ptr}) previous_type_vars common_defs has_root_type_var tvh
+	| IsMember tv_info_ptr previous_type_vars
+		= (False,previous_type_vars,has_root_type_var,tvh)
+		# has_root_type_var = True
+		= (True,[tv_info_ptr:previous_type_vars],has_root_type_var,tvh)
+check_if_default_instance_type_arg (TA {type_index={glob_object,glob_module}} type_args) previous_type_vars common_defs has_root_type_var tvh
 	#! {td_rhs,td_args} = common_defs.[glob_module].com_type_defs.[glob_object]
 	= case td_rhs of
-		SynType {at_type=syn_type_rhs=:TV _}
+		SynType {at_type=syn_type_rhs}
 			# (expanded_type, tvh) = substitute_instance_type td_args type_args syn_type_rhs tvh
-			-> root_type_polymorphic expanded_type previous_type_vars common_defs tvh
-		SynType {at_type=syn_type_rhs=:(CV _ :@: _)}
-			# (expanded_type, tvh) = substitute_instance_type td_args type_args syn_type_rhs tvh
-			-> root_type_polymorphic expanded_type previous_type_vars common_defs tvh
+			-> check_if_default_instance_type_arg expanded_type previous_type_vars common_defs has_root_type_var tvh
 		_
-			-> (False,previous_type_vars,tvh)
-root_type_polymorphic (TV {tv_info_ptr}) previous_type_vars common_defs tvh
+			-> only_used_once_type_variables type_args previous_type_vars common_defs has_root_type_var tvh
+check_if_default_instance_type_arg (TAS _ type_args _) previous_type_vars common_defs has_root_type_var tvh
+	= only_used_once_type_variables type_args previous_type_vars common_defs has_root_type_var tvh
+check_if_default_instance_type_arg (TB _) previous_type_vars common_defs has_root_type_var tvh
+	= (True,previous_type_vars,has_root_type_var,tvh)
+check_if_default_instance_type_arg (type1 --> type2) previous_type_vars common_defs has_root_type_var tvh
+	= only_used_once_type_variables [type1,type2] previous_type_vars common_defs has_root_type_var tvh
+check_if_default_instance_type_arg TArrow previous_type_vars common_defs has_root_type_var tvh
+	= (True,previous_type_vars,has_root_type_var,tvh)
+check_if_default_instance_type_arg (TArrow1 type) previous_type_vars common_defs has_root_type_var tvh
+	= only_used_once_type_variables [type] previous_type_vars common_defs has_root_type_var tvh
+check_if_default_instance_type_arg type previous_type_vars common_defs has_root_type_var tvh
+	= (False,previous_type_vars,has_root_type_var,tvh)
+
+only_used_once_type_variables :: ![AType] ![TypeVarInfoPtr] !{#CommonDefs} !Bool !*TypeVarHeap -> (!Bool,[TypeVarInfoPtr],!Bool,!*TypeVarHeap)
+only_used_once_type_variables [{at_type=TV {tv_info_ptr}}:type_args] previous_type_vars common_defs has_root_type_var tvh
 	| IsMember tv_info_ptr previous_type_vars
-		= (False,previous_type_vars,tvh);
-		= (True,[tv_info_ptr:previous_type_vars],tvh)
-root_type_polymorphic type previous_type_vars common_defs tvh
-	= (False,previous_type_vars,tvh)
+		= (False,previous_type_vars,has_root_type_var,tvh)
+		# previous_type_vars = [tv_info_ptr:previous_type_vars]
+		= only_used_once_type_variables type_args previous_type_vars common_defs has_root_type_var tvh
+only_used_once_type_variables [type_arg1=:{at_type=TA {type_index={glob_object,glob_module}} type_args_TA}:type_args] previous_type_vars common_defs has_root_type_var tvh
+	#! {td_rhs,td_args} = common_defs.[glob_module].com_type_defs.[glob_object]
+	= case td_rhs of
+		SynType {at_type=syn_type_rhs}
+			# (expanded_type, tvh) = substitute_instance_type td_args type_args_TA syn_type_rhs tvh
+			-> only_used_once_type_variables [{type_arg1 & at_type=expanded_type}:type_args] previous_type_vars common_defs has_root_type_var tvh
+		_
+			-> (False,previous_type_vars,has_root_type_var,tvh)
+only_used_once_type_variables [_:_] previous_type_vars common_defs has_root_type_var tvh
+	= (False,previous_type_vars,has_root_type_var,tvh)
+only_used_once_type_variables [] previous_type_vars common_defs has_root_type_var tvh
+	= (True,previous_type_vars,has_root_type_var,tvh)

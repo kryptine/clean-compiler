@@ -1095,11 +1095,15 @@ where
 			= find_unboxed_array_instance element_type right defs predef_symbols
 	find_unboxed_array_instance element_type IT_Empty defs predef_symbols
 		= (ObjectNotFound,predef_symbols)
-	find_unboxed_array_instance element_type (IT_Trees sorted_instances instances) defs predef_symbols
+	find_unboxed_array_instance element_type (IT_Trees sorted_instances other_instances default_instances) defs predef_symbols
 		# (index,predef_symbols) = find_sorted_unboxed_array_instance element_type sorted_instances defs predef_symbols
 		| FoundObject index
 			= (index,predef_symbols)
-			= find_unboxed_array_instance element_type instances defs predef_symbols
+		# (index,predef_symbols)
+			= find_unboxed_array_instance element_type other_instances defs predef_symbols
+		| FoundObject index
+			= (index,predef_symbols)
+			= find_unboxed_array_instance element_type default_instances defs predef_symbols
 	where
 		find_sorted_unboxed_array_instance element_type (SI_Node instances left right) defs predef_symbols
 			# (left_index,predef_symbols) = find_sorted_unboxed_array_instance element_type left defs predef_symbols
@@ -1137,11 +1141,14 @@ where
 			= find_unboxed_list_instance element_type right defs
 	find_unboxed_list_instance element_type IT_Empty defs
 		= ObjectNotFound
-	find_unboxed_list_instance element_type (IT_Trees sorted_instances instances) defs
+	find_unboxed_list_instance element_type (IT_Trees sorted_instances other_instances default_instances) defs
 		# index = find_sorted_unboxed_list_instance element_type sorted_instances defs
 		| FoundObject index
 			= index
-			= find_unboxed_list_instance element_type instances defs
+		# index = find_unboxed_list_instance element_type other_instances defs
+		| FoundObject index
+			= index
+			= find_unboxed_list_instance element_type default_instances defs
 	where
 		find_sorted_unboxed_list_instance element_type (SI_Node instances left right) defs
 			# left_index = find_sorted_unboxed_list_instance element_type left defs
@@ -1375,11 +1382,17 @@ where
 		= mapSt (reduceTCorNormalContext info rdla) ftcs {prs_state & prs_type_heaps = prs_type_heaps}
 
 	find_instance ::  [Type] !InstanceTree {#CommonDefs} *TypeHeaps !*Subst -> *(!Global Int, ![TypeContext], !*TypeHeaps, !*Subst)
-	find_instance co_types (IT_Trees sorted_instances instance_tree) defs type_heaps subst
-		# (found, instances, type_heaps, subst) = find_instance_group co_types sorted_instances defs type_heaps subst
+	find_instance co_types (IT_Trees sorted_instances other_instance_tree default_instance_tree) defs type_heaps subst
+		# (found,instances,type_heaps,subst) = find_instance_group co_types sorted_instances defs type_heaps subst
 		| found
-			= find_root_monomorphic_instance_in_group co_types instances defs type_heaps subst
-			= find_root_polymorphic_instance co_types instance_tree defs type_heaps subst
+			# (instance_index,context,type_heaps,subst) = find_instance_in_group co_types instances defs type_heaps subst
+			| FoundObject instance_index
+				= (instance_index,context,type_heaps,subst)
+			= find_instance_in_tree co_types other_instance_tree defs type_heaps subst
+			# (instance_index,context,type_heaps,subst) = find_instance_in_tree co_types other_instance_tree defs type_heaps subst
+			| FoundObject instance_index
+				= (instance_index,context,type_heaps,subst)
+			= find_instance_in_tree co_types default_instance_tree defs type_heaps subst
 
 	find_instance_group :: [Type] !SortedInstances !{#CommonDefs} !*TypeHeaps !*Subst -> *(!Bool, ![Global Int], !*TypeHeaps, !*Subst)
 	find_instance_group co_types (SI_Node instances=:[this_inst_index=:{glob_object,glob_module}:_] left right) defs type_heaps subst
@@ -1398,8 +1411,8 @@ where
 	find_instance_group co_types SI_Empty defs type_heaps subst
 		= (False, [], type_heaps, subst)
 
-	find_root_monomorphic_instance_in_group :: [Type] ![Global Index] {#CommonDefs} *TypeHeaps !*Subst -> *(!Global Int, ![TypeContext], !*TypeHeaps, !*Subst)
-	find_root_monomorphic_instance_in_group co_types [this_inst_index=:{glob_object,glob_module}:instances] defs type_heaps subst
+	find_instance_in_group :: [Type] ![Global Index] {#CommonDefs} *TypeHeaps !*Subst -> *(!Global Int, ![TypeContext], !*TypeHeaps, !*Subst)
+	find_instance_in_group co_types [this_inst_index=:{glob_object,glob_module}:instances] defs type_heaps subst
 		# {ins_type={it_vars,it_types,it_context}, ins_specials} = defs.[glob_module].com_instance_defs.[glob_object]
 		  th_vars = clear_binding_of_type_vars it_vars type_heaps.th_vars
 		  substc = {substc_changes=[#!], substc_array=subst.subst_array, substc_next_var_n=subst.subst_next_var_n}
@@ -1417,13 +1430,13 @@ where
 				= (spec_inst, [], type_heaps, subst)
 				= (this_inst_index, subst_context, type_heaps, subst)
 			# subst & subst_array=undo_substitutions substc
-			= find_root_monomorphic_instance_in_group co_types instances defs type_heaps subst
-	find_root_monomorphic_instance_in_group co_types [] defs heaps  subst
+			= find_instance_in_group co_types instances defs type_heaps subst
+	find_instance_in_group co_types [] defs heaps  subst
 		= (ObjectNotFound, [], heaps, subst)
 
-	find_root_polymorphic_instance :: [Type] !InstanceTree {#CommonDefs} *TypeHeaps !*Subst -> *(!Global Int, ![TypeContext], !*TypeHeaps, !*Subst)
-	find_root_polymorphic_instance co_types (IT_Node this_inst_index=:{glob_object,glob_module} left right) defs type_heaps subst
-		# (left_index, inst_contexts, type_heaps, subst) = find_root_polymorphic_instance co_types left defs type_heaps subst
+	find_instance_in_tree :: [Type] !InstanceTree {#CommonDefs} *TypeHeaps !*Subst -> *(!Global Int, ![TypeContext], !*TypeHeaps, !*Subst)
+	find_instance_in_tree co_types (IT_Node this_inst_index=:{glob_object,glob_module} left right) defs type_heaps subst
+		# (left_index, inst_contexts, type_heaps, subst) = find_instance_in_tree co_types left defs type_heaps subst
 		| FoundObject left_index
 			= (left_index, inst_contexts, type_heaps, subst)
 			# {ins_type={it_vars,it_types,it_context}, ins_specials} = defs.[glob_module].com_instance_defs.[glob_object]
@@ -1434,8 +1447,8 @@ where
 				# subst & subst_array=substc.substc_array, subst_next_var_n=substc.substc_next_var_n
 				= found_instance substc.substc_changes it_context ins_specials this_inst_index type_heaps subst
 				# subst & subst_array=undo_substitutions substc
-				= find_root_polymorphic_instance co_types right defs type_heaps subst
-	find_root_polymorphic_instance co_types IT_Empty defs heaps  subst
+				= find_instance_in_tree co_types right defs type_heaps subst
+	find_instance_in_tree co_types IT_Empty defs heaps  subst
 		= (ObjectNotFound, [], heaps, subst)
 
 	found_instance :: ![#Int!] ![TypeContext] !Specials !(Global Index) !*TypeHeaps !*Subst -> *(!Global Int, ![TypeContext], !*TypeHeaps, !*Subst)
@@ -1455,11 +1468,17 @@ where
 
 	find_fun_dep_instance :: [Type] !InstanceTree BITVECT {#CommonDefs} *TypeHeaps !*Subst
 			-> *(!Global Int, ![TypeContext], ![(TypeVarInfoPtr,Int)], !*TypeHeaps,!*Subst)
-	find_fun_dep_instance co_types (IT_Trees sorted_instances instance_tree) class_fun_dep_vars defs type_heaps subst
-		# (found, instances, type_heaps, subst) = find_fun_dep_instance_group co_types sorted_instances class_fun_dep_vars defs type_heaps subst
+	find_fun_dep_instance co_types (IT_Trees sorted_instances other_instance_tree default_instance_tree) class_fun_dep_vars defs type_heaps subst
+		# (found,instances,type_heaps,subst) = find_fun_dep_instance_group co_types sorted_instances class_fun_dep_vars defs type_heaps subst
 		| found
-			= find_root_monomorphic_fun_dep_instance_in_group co_types instances class_fun_dep_vars defs type_heaps subst
-			= find_root_polymorphic_fun_dep_instance co_types instance_tree class_fun_dep_vars defs type_heaps subst
+			# (instance_index,context,new_vars,type_heaps,subst) = find_fun_dep_instance_in_group co_types instances class_fun_dep_vars defs type_heaps subst
+			| FoundObject instance_index
+				= (instance_index,context,new_vars,type_heaps,subst)
+			= find_fun_dep_instance_in_tree co_types other_instance_tree class_fun_dep_vars defs type_heaps subst
+			# (instance_index,context,new_vars,type_heaps,subst)= find_fun_dep_instance_in_tree co_types other_instance_tree class_fun_dep_vars defs type_heaps subst
+			| FoundObject instance_index
+				= (instance_index,context,new_vars,type_heaps,subst)
+			= find_fun_dep_instance_in_tree co_types default_instance_tree class_fun_dep_vars defs type_heaps subst
 
 	find_fun_dep_instance_group :: [Type] !SortedInstances !BITVECT !{#CommonDefs} !*TypeHeaps !*Subst -> *(!Bool, ![Global Int], !*TypeHeaps, !*Subst)
 	find_fun_dep_instance_group co_types (SI_Node instances=:[this_inst_index=:{glob_object,glob_module}:_] left right) class_fun_dep_vars defs type_heaps subst
@@ -1478,9 +1497,9 @@ where
 	find_fun_dep_instance_group co_types SI_Empty class_fun_dep_vars defs type_heaps subst
 		= (False, [], type_heaps, subst)
 
-	find_root_monomorphic_fun_dep_instance_in_group :: [Type] ![Global Index] BITVECT {#CommonDefs} *TypeHeaps !*Subst
-									  -> *(!Global Int, ![TypeContext], ![(TypeVarInfoPtr,Int)], !*TypeHeaps,!*Subst)
-	find_root_monomorphic_fun_dep_instance_in_group co_types [this_inst_index=:{glob_object,glob_module}:instances] class_fun_dep_vars defs type_heaps subst
+	find_fun_dep_instance_in_group :: [Type] ![Global Index] BITVECT {#CommonDefs} *TypeHeaps !*Subst
+					   -> *(!Global Int, ![TypeContext], ![(TypeVarInfoPtr,Int)], !*TypeHeaps,!*Subst)
+	find_fun_dep_instance_in_group co_types [this_inst_index=:{glob_object,glob_module}:instances] class_fun_dep_vars defs type_heaps subst
 		# {ins_type={it_vars,it_types,it_context}, ins_specials} = defs.[glob_module].com_instance_defs.[glob_object]
 		  th_vars = clear_binding_of_type_vars it_vars type_heaps.th_vars
 		  substc = {substc_changes=[#!], substc_array=subst.subst_array, substc_next_var_n=subst.subst_next_var_n}
@@ -1493,23 +1512,23 @@ where
 					(False, substc)
 			| maybe_non_termination
 				# subst & subst_array=undo_substitutions substc
-				= find_root_monomorphic_fun_dep_instance_in_group co_types instances class_fun_dep_vars defs type_heaps subst
+				= find_fun_dep_instance_in_group co_types instances class_fun_dep_vars defs type_heaps subst
 
 			# (matched, type_heaps, substc) = matchListsOfFunDepTypes defs it_types co_types class_fun_dep_vars type_heaps substc
 			| not matched
 				# subst & subst_array=undo_substitutions substc
-				= find_root_monomorphic_fun_dep_instance_in_group co_types instances class_fun_dep_vars defs type_heaps subst
+				= find_fun_dep_instance_in_group co_types instances class_fun_dep_vars defs type_heaps subst
 			# subst & subst_array=substc.substc_array, subst_next_var_n=substc.substc_next_var_n
 			= found_fun_dep_instance substc.substc_changes all_vars_defined it_vars it_context ins_specials this_inst_index type_heaps subst
 			# subst & subst_array=undo_substitutions substc
-			= find_root_monomorphic_fun_dep_instance_in_group co_types instances class_fun_dep_vars defs type_heaps subst
-	find_root_monomorphic_fun_dep_instance_in_group co_types [] class_fun_dep_vars defs heaps subst
+			= find_fun_dep_instance_in_group co_types instances class_fun_dep_vars defs type_heaps subst
+	find_fun_dep_instance_in_group co_types [] class_fun_dep_vars defs heaps subst
 		= (ObjectNotFound, [], [], heaps, subst)
 
-	find_root_polymorphic_fun_dep_instance :: [Type] !InstanceTree BITVECT {#CommonDefs} *TypeHeaps !*Subst
-							 -> *(!Global Int, ![TypeContext], ![(TypeVarInfoPtr,Int)], !*TypeHeaps,!*Subst)
-	find_root_polymorphic_fun_dep_instance co_types (IT_Node this_inst_index=:{glob_object,glob_module} left right) class_fun_dep_vars defs type_heaps subst
-		# (left_index, inst_contexts, new_vars, type_heaps, subst) = find_root_polymorphic_fun_dep_instance co_types left class_fun_dep_vars defs type_heaps subst
+	find_fun_dep_instance_in_tree :: [Type] !InstanceTree BITVECT {#CommonDefs} *TypeHeaps !*Subst
+					-> *(!Global Int, ![TypeContext], ![(TypeVarInfoPtr,Int)], !*TypeHeaps,!*Subst)
+	find_fun_dep_instance_in_tree co_types (IT_Node this_inst_index=:{glob_object,glob_module} left right) class_fun_dep_vars defs type_heaps subst
+		# (left_index, inst_contexts, new_vars, type_heaps, subst) = find_fun_dep_instance_in_tree co_types left class_fun_dep_vars defs type_heaps subst
 		| FoundObject left_index
 			= (left_index, inst_contexts, new_vars, type_heaps, subst)
 			# {ins_type={it_vars,it_types,it_context}, ins_specials} = defs.[glob_module].com_instance_defs.[glob_object]
@@ -1524,17 +1543,17 @@ where
 						(False, substc)
 				| maybe_non_termination
 					# subst & subst_array=undo_substitutions substc
-					= find_root_polymorphic_fun_dep_instance co_types right class_fun_dep_vars defs type_heaps subst
+					= find_fun_dep_instance_in_tree co_types right class_fun_dep_vars defs type_heaps subst
 
 				# (matched, type_heaps, substc) = matchListsOfFunDepTypes defs it_types co_types class_fun_dep_vars type_heaps substc
 				| not matched
 					# subst & subst_array=undo_substitutions substc
-					= find_root_polymorphic_fun_dep_instance co_types right class_fun_dep_vars defs type_heaps subst
+					= find_fun_dep_instance_in_tree co_types right class_fun_dep_vars defs type_heaps subst
 				# subst & subst_array=substc.substc_array, subst_next_var_n=substc.substc_next_var_n
 				= found_fun_dep_instance substc.substc_changes all_vars_defined it_vars it_context ins_specials this_inst_index type_heaps subst
 				# subst & subst_array=undo_substitutions substc
-				= find_root_polymorphic_fun_dep_instance co_types right class_fun_dep_vars defs type_heaps subst
-	find_root_polymorphic_fun_dep_instance co_types IT_Empty class_fun_dep_vars defs heaps subst
+				= find_fun_dep_instance_in_tree co_types right class_fun_dep_vars defs type_heaps subst
+	find_fun_dep_instance_in_tree co_types IT_Empty class_fun_dep_vars defs heaps subst
 		= (ObjectNotFound, [], [], heaps, subst)
 
 	found_fun_dep_instance :: ![#Int!] !Bool ![TypeVar] ![TypeContext] !Specials !(Global Index) !*TypeHeaps !*Subst
