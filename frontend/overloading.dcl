@@ -7,7 +7,7 @@ from check_instances import ::SortedInstances
 ::	InstanceTree
 	= IT_Node !(Global Index) !InstanceTree !InstanceTree
 	| IT_Empty
-	| IT_Trees !SortedInstances !InstanceTree
+	| IT_Trees !SortedInstances !InstanceTree !InstanceTree
 
 ::	ClassInstanceInfo :== {# .{! .InstanceTree}}
 

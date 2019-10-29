@@ -313,11 +313,17 @@ where
 		= mapSt (reduce_any_context info) instantiated_context rs_state
 
 	find_instance ::  [Type] !InstanceTree {#CommonDefs} *TypeHeaps !*Coercions -> *(!Global Int,![TypeContext],!Bool,!*TypeHeaps,!*Coercions)
-	find_instance co_types (IT_Trees sorted_instances instance_tree) defs type_heaps coercion_env
+	find_instance co_types (IT_Trees sorted_instances other_instance_tree default_instance_tree) defs type_heaps coercion_env
 		# (found, instances, type_heaps) = find_instance_group co_types sorted_instances defs type_heaps
 		| found
-			= find_root_monomorphic_instance_in_group co_types instances defs type_heaps coercion_env
-			= find_root_polymorphic_instance co_types instance_tree defs type_heaps coercion_env
+			# (instance_index,context,uni_ok,type_heaps,coercion_env) = find_instance_in_group co_types instances defs type_heaps coercion_env
+			| FoundObject instance_index
+				= (instance_index,context,uni_ok,type_heaps,coercion_env)
+			= find_instance_in_tree co_types other_instance_tree defs type_heaps coercion_env
+			# (instance_index,context,uni_ok,type_heaps,coercion_env) = find_instance_in_tree co_types other_instance_tree defs type_heaps coercion_env
+			| FoundObject instance_index
+				= (instance_index,context,uni_ok,type_heaps,coercion_env)
+			= find_instance_in_tree co_types default_instance_tree defs type_heaps coercion_env
 
 	find_instance_group :: [Type] !SortedInstances !{#CommonDefs} !*TypeHeaps -> *(!Bool,![Global Int],!*TypeHeaps)
 	find_instance_group co_types (SI_Node instances=:[this_inst_index=:{glob_object,glob_module}:_] left right) defs type_heaps
@@ -333,8 +339,8 @@ where
 	find_instance_group co_types SI_Empty defs type_heaps
 		= (False, [], type_heaps)
 
-	find_root_monomorphic_instance_in_group :: [Type] ![Global Index] {#CommonDefs} *TypeHeaps *Coercions -> *(Global Int,[TypeContext],Bool,*TypeHeaps,*Coercions)
-	find_root_monomorphic_instance_in_group co_types [this_inst_index=:{glob_object,glob_module}:instances] defs type_heaps coercion_env
+	find_instance_in_group :: [Type] ![Global Index] {#CommonDefs} *TypeHeaps *Coercions -> *(Global Int,[TypeContext],Bool,*TypeHeaps,*Coercions)
+	find_instance_in_group co_types [this_inst_index=:{glob_object,glob_module}:instances] defs type_heaps coercion_env
 		# {ins_type={it_types,it_context}, ins_specials} = defs.[glob_module].com_instance_defs.[glob_object]
 		  (matched, type_heaps) = match defs it_types co_types type_heaps
 		| matched
@@ -344,13 +350,13 @@ where
 			| FoundObject spec_inst
 				= (spec_inst, [], uni_ok, type_heaps, coercion_env)
 				= (this_inst_index, subst_context, uni_ok, type_heaps, coercion_env)
-			= find_root_monomorphic_instance_in_group co_types instances defs type_heaps coercion_env
-	find_root_monomorphic_instance_in_group co_types [] defs heaps coercion_env
+			= find_instance_in_group co_types instances defs type_heaps coercion_env
+	find_instance_in_group co_types [] defs heaps coercion_env
 		= (ObjectNotFound, [], True, heaps, coercion_env)
 
-	find_root_polymorphic_instance :: [Type] !InstanceTree {#CommonDefs} *TypeHeaps *Coercions -> *(Global Int,[TypeContext],Bool,*TypeHeaps,*Coercions)
-	find_root_polymorphic_instance co_types (IT_Node this_inst_index=:{glob_object,glob_module} left right) defs type_heaps coercion_env
-		# (left_index, types, uni_ok, type_heaps, coercion_env) = find_root_polymorphic_instance co_types left defs type_heaps coercion_env
+	find_instance_in_tree :: [Type] !InstanceTree {#CommonDefs} *TypeHeaps *Coercions -> *(Global Int,[TypeContext],Bool,*TypeHeaps,*Coercions)
+	find_instance_in_tree co_types (IT_Node this_inst_index=:{glob_object,glob_module} left right) defs type_heaps coercion_env
+		# (left_index, types, uni_ok, type_heaps, coercion_env) = find_instance_in_tree co_types left defs type_heaps coercion_env
 		| FoundObject left_index
 			= (left_index, types, uni_ok, type_heaps, coercion_env)
 			# {ins_type={it_types,it_context}, ins_specials} = defs.[glob_module].com_instance_defs.[glob_object]
@@ -362,8 +368,8 @@ where
 				| FoundObject spec_inst
 					= (spec_inst, [], uni_ok, type_heaps, coercion_env)
 					= (this_inst_index, subst_context, uni_ok, type_heaps, coercion_env)
-				= find_root_polymorphic_instance co_types right defs type_heaps coercion_env
-	find_root_polymorphic_instance co_types IT_Empty defs heaps coercion_env
+				= find_instance_in_tree co_types right defs type_heaps coercion_env
+	find_instance_in_tree co_types IT_Empty defs heaps coercion_env
 		= (ObjectNotFound, [], True, heaps, coercion_env)
 
 	get_specials :: Specials -> [Special]
@@ -701,11 +707,15 @@ where
 			= find_unboxed_array_instance element_type right defs predef_symbols
 	find_unboxed_array_instance element_type IT_Empty defs predef_symbols
 		= (ObjectNotFound,predef_symbols)
-	find_unboxed_array_instance element_type (IT_Trees sorted_instances instances) defs predef_symbols
+	find_unboxed_array_instance element_type (IT_Trees sorted_instances other_instances default_instances) defs predef_symbols
 		# (index,predef_symbols) = find_sorted_unboxed_array_instance element_type sorted_instances defs predef_symbols
 		| FoundObject index
 			= (index,predef_symbols)
-			= find_unboxed_array_instance element_type instances defs predef_symbols
+		# (index,predef_symbols)
+			= find_unboxed_array_instance element_type other_instances defs predef_symbols
+		| FoundObject index
+			= (index,predef_symbols)
+			= find_unboxed_array_instance element_type default_instances defs predef_symbols
 	where
 		find_sorted_unboxed_array_instance element_type (SI_Node instances left right) defs predef_symbols
 			# (left_index,predef_symbols) = find_sorted_unboxed_array_instance element_type left defs predef_symbols
@@ -743,11 +753,14 @@ where
 			= find_unboxed_list_instance element_type right defs
 	find_unboxed_list_instance element_type IT_Empty defs
 		= ObjectNotFound
-	find_unboxed_list_instance element_type (IT_Trees sorted_instances instances) defs
+	find_unboxed_list_instance element_type (IT_Trees sorted_instances other_instances default_instances) defs
 		# index = find_sorted_unboxed_list_instance element_type sorted_instances defs
 		| FoundObject index
 			= index
-			= find_unboxed_list_instance element_type instances defs
+		# index = find_unboxed_list_instance element_type other_instances defs
+		| FoundObject index
+			= index
+			= find_unboxed_list_instance element_type default_instances defs
 	where
 		find_sorted_unboxed_list_instance element_type (SI_Node instances left right) defs
 			# left_index = find_sorted_unboxed_list_instance element_type left defs
