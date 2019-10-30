@@ -129,8 +129,10 @@ instance == SignClassification where
 instance == TypeCons where
 	(==) (TypeConsSymb x) (TypeConsSymb y) = x == y 
 	(==) (TypeConsBasic x) (TypeConsBasic y) = x == y 
+	(==) (TypeConsUnboxedArray x) (TypeConsUnboxedArray y) = x == y
 	(==) TypeConsArrow TypeConsArrow = True
 	(==) (TypeConsVar x) (TypeConsVar y) = x == y
+	(==) (TypeConsQualifiedIdent xmod xname) (TypeConsQualifiedIdent ymod yname) = xmod == ymod && xname == yname
 	(==) _ _ = False
 
 ::	CompareValue :== Int
