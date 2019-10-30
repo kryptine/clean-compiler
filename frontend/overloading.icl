@@ -1393,6 +1393,8 @@ where
 			| FoundObject instance_index
 				= (instance_index,context,type_heaps,subst)
 			= find_instance_in_tree co_types default_instance_tree defs type_heaps subst
+	find_instance co_types IT_Empty defs type_heaps subst
+		= (ObjectNotFound, [], type_heaps, subst)
 
 	find_instance_group :: [Type] !SortedInstances !{#CommonDefs} !*TypeHeaps !*Subst -> *(!Bool, ![Global Int], !*TypeHeaps, !*Subst)
 	find_instance_group co_types (SI_Node instances=:[this_inst_index=:{glob_object,glob_module}:_] left right) defs type_heaps subst
@@ -1479,6 +1481,8 @@ where
 			| FoundObject instance_index
 				= (instance_index,context,new_vars,type_heaps,subst)
 			= find_fun_dep_instance_in_tree co_types default_instance_tree class_fun_dep_vars defs type_heaps subst
+	find_fun_dep_instance co_types IT_Empty class_fun_dep_vars defs type_heaps subst
+		= (ObjectNotFound, [], [], type_heaps, subst)
 
 	find_fun_dep_instance_group :: [Type] !SortedInstances !BITVECT !{#CommonDefs} !*TypeHeaps !*Subst -> *(!Bool, ![Global Int], !*TypeHeaps, !*Subst)
 	find_fun_dep_instance_group co_types (SI_Node instances=:[this_inst_index=:{glob_object,glob_module}:_] left right) class_fun_dep_vars defs type_heaps subst
