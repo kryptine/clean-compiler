@@ -324,6 +324,8 @@ where
 			| FoundObject instance_index
 				= (instance_index,context,uni_ok,type_heaps,coercion_env)
 			= find_instance_in_tree co_types default_instance_tree defs type_heaps coercion_env
+	find_instance co_types IT_Empty defs type_heaps coercion_env
+		= (ObjectNotFound, [], True, type_heaps, coercion_env)
 
 	find_instance_group :: [Type] !SortedInstances !{#CommonDefs} !*TypeHeaps -> *(!Bool,![Global Int],!*TypeHeaps)
 	find_instance_group co_types (SI_Node instances=:[this_inst_index=:{glob_object,glob_module}:_] left right) defs type_heaps
