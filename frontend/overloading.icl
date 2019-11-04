@@ -724,7 +724,7 @@ where
 			| FoundObject left_index
 				= (left_index,predef_symbols)
 			# (inst_index,predef_symbols) = find_unboxed_array_instance_in_list element_type instances defs predef_symbols
-			| FoundObject left_index
+			| FoundObject inst_index
 				= (inst_index,predef_symbols)
 				= find_sorted_unboxed_array_instance element_type right defs predef_symbols
 		find_sorted_unboxed_array_instance element_type SI_Empty defs predef_symbols
@@ -769,7 +769,7 @@ where
 			| FoundObject left_index
 				= left_index
 			# inst_index = find_unboxed_list_instance_in_list element_type instances defs
-			| FoundObject left_index
+			| FoundObject inst_index
 				= inst_index
 				= find_sorted_unboxed_list_instance element_type right defs
 		find_sorted_unboxed_list_instance element_type SI_Empty defs
