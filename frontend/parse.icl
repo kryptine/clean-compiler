@@ -340,11 +340,18 @@ where
 			= (False, mod_type, "", tokenBack scanState)
 
 	try_module_name (IdentToken name) mod_type scanState
-		= (True, mod_type, name, scanState)
+		# allow_underscores = file_name_starts_with_underscore (size name-1) name
+		= (True, mod_type, name, setUseUnderscoreIdents allow_underscores scanState)
 	try_module_name (UnderscoreIdentToken name) mod_type scanState
-		= (True, mod_type, name, setUseUnderscoreIdents True scanState)
+		# allow_underscores = file_name_starts_with_underscore (size name-1) name
+		= (True, mod_type, name, setUseUnderscoreIdents allow_underscores scanState)
 	try_module_name token mod_type scanState
 		= (False, mod_type, "", tokenBack scanState)
+
+	file_name_starts_with_underscore i s
+		| i>=0 && s.[i]<>'.'
+			= file_name_starts_with_underscore (i-1) s
+			= i+1<size s && s.[i+1]=='_'
 	
 	verify_name name id_name file_name pState
 		| name == id_name
