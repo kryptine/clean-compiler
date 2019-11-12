@@ -2509,8 +2509,8 @@ where
 				token
 						# (succ,pc_arg_type,pState) = trySimpleTypeT token TA_Anonymous pState
 						-> (succ==ParseOk,pc_arg_type,pState)
-		  cons = {	pc_cons_ident = pc_cons_ident, pc_arg_types = [pc_arg_type], pc_args_strictness = NotStrict,
-		  			pc_context = [], pc_cons_arity = 1, pc_cons_prio = pc_cons_prio, pc_exi_vars = exi_vars, pc_cons_pos = pc_cons_pos}
+		  cons = {	pc_cons_ident = pc_cons_ident, pc_arg_types = [pc_arg_type], pc_args_strictness = Strict 1,
+					pc_context = [], pc_cons_arity = 1, pc_cons_prio = pc_cons_prio, pc_exi_vars = exi_vars, pc_cons_pos = pc_cons_pos}
 		| succ
 			= (cons,pState)
 			= (cons,parseError "newtype definition" No "type" pState)
