@@ -1035,45 +1035,6 @@ static void init_apply_symb_function_state_p()
 }
 #endif
 
-#define cTypeDelimiter	';'		/* also in checksupport.h */
-#ifndef CLEAN2
-#define _ANALYSE_IDENT_			/* also in checksupport.c */
-#endif
-
-static int compute_length_before_type_delimiter (char *fname)
-{
-	char *p;
-	unsigned int c;	
-
-	p=fname;
-	
-#ifdef _ANALYSE_IDENT_
-	--p;
-	do {
-		c=*++p;
-	} while (c!=cTypeDelimiter && c!='\0');
-
-	if (c == cTypeDelimiter && *(p+1) != '\0')
-	{
-		p++;
-
-		if (isdigit (*p))
-		{	
-			for (p = p+1; *p != cTypeDelimiter && *p != '\0'; p++)
-				 ;
-		}
-	}
-#else /* ifndef _ANALYSE_IDENT_ */
-	--p;
-	do {
-		c=*++p;
-	} while (c!='\0');
-
-#endif /* _ANALYSE_IDENT_ */
-
-	return 	p-fname;
-}
-
 static char *append_n_chars (char *dest,const char *src,int length)
 {
 	while (length>0){
@@ -1208,15 +1169,15 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 	ArgP arg;
 	
 	if (function_name_p!=NULL && node_p->node_symbol->symb_kind==definition){
-		int length_before_type_delimiter;
+		int length;
 		char *f_name;
 		
 		f_name=node_p->node_symbol->symb_def->sdef_name;
-		length_before_type_delimiter=compute_length_before_type_delimiter (f_name);
+		length=strlen (f_name);
 		
-		if (function_name_p+2+length_before_type_delimiter < end_function_name){
+		if (function_name_p+2+length < end_function_name){
 			*function_name_p++='.';
-			function_name_p=append_n_chars (function_name_p,f_name,length_before_type_delimiter);
+			function_name_p=append_n_chars (function_name_p,f_name,length);
 		} else
 			end_function_name=function_name_p;
 	}
@@ -1660,15 +1621,15 @@ static char *create_arguments_for_partially_applied_local_function (NodeP node_p
 	int arg_n;
 	
 	if (function_name_p!=NULL && node_p->node_symbol->symb_kind==definition){
-		int length_before_type_delimiter;
+		int length;
 		char *f_name;
 		
 		f_name=node_p->node_symbol->symb_def->sdef_name;
-		length_before_type_delimiter=compute_length_before_type_delimiter (f_name);
+		length=strlen (f_name);
 		
-		if (function_name_p+2+length_before_type_delimiter < end_function_name){
+		if (function_name_p+2+length < end_function_name){
 			*function_name_p++='.';
-			function_name_p=append_n_chars (function_name_p,f_name,length_before_type_delimiter);
+			function_name_p=append_n_chars (function_name_p,f_name,length);
 		} else
 			end_function_name=function_name_p;
 	}
@@ -1740,17 +1701,17 @@ static ImpRuleP create_new_partially_applied_local_function (Node node,int old_f
 
 	if (DoTimeProfiling || DoProfiling){
 		char *f_name;
-		int length_before_type_delimiter;
+		int length;
 	
 		end_function_name=function_name+sizeof (function_name);
 		function_name_p=&function_name[strlen (function_name)];
 		
 		f_name=CurrentSymbol->symb_def->sdef_name;
-		length_before_type_delimiter=compute_length_before_type_delimiter (f_name);
+		length=strlen (f_name);
 		
-		if (function_name_p+2+length_before_type_delimiter < end_function_name){
+		if (function_name_p+2+length < end_function_name){
 			*function_name_p++='.';
-			function_name_p=append_n_chars (function_name_p,f_name,length_before_type_delimiter);
+			function_name_p=append_n_chars (function_name_p,f_name,length);
 		} else
 			end_function_name=function_name_p;
 	} else {
@@ -1939,17 +1900,17 @@ static struct node *create_new_local_function (Node node,StateP function_state_p
 
 	if (DoTimeProfiling || DoProfiling){
 		char *f_name;
-		int length_before_type_delimiter;
+		int length;
 	
 		end_function_name=function_name+sizeof (function_name);
 		function_name_p=&function_name[strlen (function_name)];
 		
 		f_name=CurrentSymbol->symb_def->sdef_name;
-		length_before_type_delimiter=compute_length_before_type_delimiter (f_name);
+		length=strlen (f_name);
 		
-		if (function_name_p+2+length_before_type_delimiter < end_function_name){
+		if (function_name_p+2+length < end_function_name){
 			*function_name_p++='.';
-			function_name_p=append_n_chars (function_name_p,f_name,length_before_type_delimiter);
+			function_name_p=append_n_chars (function_name_p,f_name,length);
 		} else
 			end_function_name=function_name_p;
 	} else {
