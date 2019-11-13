@@ -219,9 +219,9 @@ static void GiveStrictWarning (char *f, char *msg)
 #if 1
 	CurrentLine=0;
 	if (f)
-		StaticMessage (False,"%s","%s",f,msg);
+		StaticMessage_s_s (False,f,msg);
 	else
-		StaticMessage (False,"","%s",msg);
+		StaticMessage_s_s (False,"",msg);
 #else
 	if (f)
 		FPrintF (StdError, "Warning [%s%s,%s]: %s\n", CurrentModule, CurrentExt, f, msg);

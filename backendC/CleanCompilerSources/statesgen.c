@@ -399,7 +399,7 @@ static void GenRecordState (SymbDef sdef)
 	} else if (sdef->sdef_checkstatus == ConvertedToState)
 		return;
 	else
-		StaticMessage (True, "%S", "%s cyclic strict field dependencies are not allowed", CurrentSymbol, sdef->sdef_name);
+		StaticErrorMessage_S_ss (CurrentSymbol, sdef->sdef_name, " cyclic strict field dependencies are not allowed");
 }
 
 static void GenResultStatesOfLazyFields (SymbDef sdef)
@@ -444,8 +444,8 @@ static void ChangeFieldRecordStateForStrictAbsTypeFields (SymbDef icl_sdef,SymbD
 			(icl_fieldstate_p->state_type!=SimpleState ||
 			icl_fieldstate_p->state_kind!=dcl_fieldstate_p->state_kind))
 		{
-			StaticMessage (False, "%S", "%S strict field is boxed because the field type is an abstract type",
-				CurrentSymbol, icl_field->fl_symbol);
+			StaticMessage_S_Ss (False, CurrentSymbol, icl_field->fl_symbol,
+								" strict field is boxed because the field type is an abstract type");
 			
 			*icl_fieldstate_p=*dcl_fieldstate_p;
 		}
@@ -550,8 +550,8 @@ static void ChangeElementStateForStrictAbsTypeFields (SymbDef icl_sdef,SymbDef d
 				if (dcl_arg_state_p->state_type==SimpleState &&
 					(icl_arg_state_p->state_type!=SimpleState || icl_arg_state_p->state_kind!=dcl_arg_state_p->state_kind))
 				{
-					StaticMessage (False, "%S", "%S element is boxed because its type is an abstract type",
-						CurrentSymbol, icl_element_node->type_node_symbol);
+					StaticMessage_S_Ss (False, CurrentSymbol, icl_element_node->type_node_symbol,
+										" element is boxed because its type is an abstract type");
 					
 					*icl_arg_state_p=*dcl_arg_state_p;
 				}
@@ -662,12 +662,12 @@ static StateS DetermineStatesOfRuleType (TypeAlts ruletype,StateS *const functio
 	CurrentLine = 0 /*ruletype->type_alt_line*/;
 	
 	if (lhsroot->type_node_annotation!=NoAnnot)
-		StaticMessage (False, "%S", Wrootannot, CurrentSymbol);
+		StaticMessage_S_s (False, CurrentSymbol, Wrootannot);
 
 	arg_state_p=function_state_p;
 	for_l (type_arg,lhsroot->type_node_arguments,type_arg_next){
 		if (!(type_arg->type_arg_node->type_node_annotation==NoAnnot || type_arg->type_arg_node->type_node_annotation==StrictAnnot))
-			StaticMessage (False, "%S", Wtypeannot, CurrentSymbol);
+			StaticMessage_S_s (False, CurrentSymbol, Wtypeannot);
 	
 		if (!type_arg->type_arg_node->type_node_is_var)
 			ConvertTypeToState (type_arg->type_arg_node,arg_state_p,type_arg->type_arg_node->type_node_annotation==NoAnnot ? OnA : StrictOnA);
@@ -1044,7 +1044,7 @@ static void GenStatesInLhsNode (Node node,StateP arg_state_p)
 static void GenStatesInLhsSubArg (Node arg_node,StateP arg_state_p)
 {
 	if (arg_node->node_annotation!=NoAnnot)
-		StaticMessage (True, "%S", Elhsannots, CurrentSymbol);
+		StaticMessage_S_s (True, CurrentSymbol, Elhsannots);
 
 	switch (arg_state_p->state_type){
 		case RecordState:
@@ -2706,7 +2706,7 @@ static Bool NodeInASemiStrictContext (Node node,int local_scope)
 static void DetermineStatesOfNonIfRootNode (Node root,NodeId root_id,StateS demstate,int local_scope)
 {	
 	if (root->node_state.state_kind != OnA){
-		StaticMessage (False, "%S", Wrootannot, CurrentSymbol);
+		StaticMessage_S_s (False, CurrentSymbol, Wrootannot);
 		root->node_state.state_kind = OnA;
 	}
 	
@@ -3405,7 +3405,7 @@ void GenerateStatesForRule (ImpRuleS *rule)
 		set_states_of_array_selects_in_pattern (alt);
 #endif
 	} else if (rule->rule_type==NULL)
-		StaticMessage (True, "%S", ECodeBlock, CurrentSymbol);
+		StaticMessage_S_s (True, CurrentSymbol, ECodeBlock);
 
 	if (rule_sdef->sdef_arity==1 &&
 			function_state_p[-1].state_type==SimpleState && function_state_p[-1].state_kind==OnB && function_state_p[-1].state_object==BoolObj &&
@@ -3469,7 +3469,7 @@ void DetermineNodeState (Node node)
 			if (DoParallel)
 				/* node->node_attribute = AnnotHasDeferAttr (node->node_annotation->annot_kind) */;
 			else {
-				StaticMessage (False, "%S", Wparannot, CurrentSymbol);
+				StaticMessage_S_s (False, CurrentSymbol, Wparannot);
 				node->node_state.state_kind = OnA;
 			}
 		}

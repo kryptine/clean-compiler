@@ -279,7 +279,7 @@ Coercions CoerceStateKind (StateKind dem_state_kind, StateKind off_state_kind)
 			if (dem_state_kind == OnA)
 				return AToA;
 			else
-				StaticMessage (False, "","parallel annotation in strict context ignored");
+				StaticMessage_s_s (False, "","parallel annotation in strict context ignored");
 				return Reduce;
 		case UnderEval:
 			if (dem_state_kind == OnA)
@@ -333,7 +333,7 @@ Coercions CoerceSimpleStateArgument (StateS demstate,StateKind offkind,int ainde
 			break;
 		case CyclicSpine:
 			GenReduceError ();
-			StaticMessage (False,CurrentAltLabel.lab_symbol->sdef_name,Co_Wspine);
+			StaticMessage_s_s (False,CurrentAltLabel.lab_symbol->sdef_name,Co_Wspine);
 			*ontop = False;
 			break;
 		default:
@@ -949,7 +949,7 @@ static void ReduceSemiStrictNodes (const NodeDefs nds,int asp)
 					GenJsrEval (asp - nd->def_id->nid_a_index);
 					break;
 				case Parallel:
-					StaticMessage (False, "","parallel annotation ignored(?)");
+					StaticMessage_s_s (False, "","parallel annotation ignored(?)");
 					break;
 			}
 		}
@@ -3663,7 +3663,7 @@ static void FillNormalNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 						}
 					}
 				} else {
-					StaticMessage (False,CurrentAltLabel.lab_symbol->sdef_name,Co_Wtype);
+					StaticMessage_s_s (False,CurrentAltLabel.lab_symbol->sdef_name,Co_Wtype);
 					GenTypeError();
 				}
 			}
