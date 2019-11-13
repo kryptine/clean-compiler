@@ -49,8 +49,6 @@ static int string_and_string_begin_equal (char *s1,char *s2_begin,char *s2_passe
 	return 0;
 }
 
-
-#ifdef CLEAN2
 static char *print_compiler_generated_function_name (char *name, char *name_end, unsigned line_nr, File file)
 {
 	char *parsed_digits;
@@ -87,24 +85,19 @@ static char *print_compiler_generated_function_name (char *name, char *name_end,
 
 	return name_end+strlen (name_end);
 }
-#endif
 
 static char *PrintName (char *name, char *name_end, unsigned line_nr, File file)
 {
-#ifdef CLEAN2
 	if (*name=='\\' && name+1==name_end)
 		return print_compiler_generated_function_name ("<lambda>",name_end,line_nr,file);
-#endif
 
 	if (*name == '_'){
 		char *name_tail;
 
-#ifdef CLEAN2
 		if (string_and_string_begin_equal ("c",name+1,name_end))
 			return print_compiler_generated_function_name ("<case>",name_end,line_nr,file);
 		else if (string_and_string_begin_equal ("if",name+1,name_end))
 			return print_compiler_generated_function_name ("<if>",name_end,line_nr,file);
-#endif
 	
 		for (name_tail = name + 1; name_tail != name_end; name_tail++)
 			if (isdigit (*name_tail))
@@ -127,76 +120,44 @@ static char *PrintName (char *name, char *name_end, unsigned line_nr, File file)
 		FPrintF (file, " [line: %u]", line_nr);
 		return name_end;
 	} else {
-		for (; name != name_end; name++){
-			if (*name != '.'){
-/*				if (*name == ':')
-					FPutC (' ', file);
-				else
-*/					FPutC (*name, file);
-			}
-		}
+		for (; name!=name_end; name++)
+			FPutC (*name, file);
+
 		return name_end;
 	}
 }
-
-#define _ANALYSE_IDENT_ 		/* also in optimisations.c */
 
 void PrintSymbolOfIdent (char *name, unsigned line_nr, File file)
 {
 	char *next_char;
 
-#ifdef _ANALYSE_IDENT_
-	if (*name == cTypeDelimiter)
-	{	for (next_char = name + 1; *next_char == cTypeDelimiter; next_char++)
-			;
-		if (*next_char == '\0')
-		{	FPutS (name, file);
-			return;
-		}
-		else
-			next_char--;
-	}
-	else
-	{	for (next_char = name; *next_char != cTypeDelimiter && *next_char != '\0';  next_char++)
-			if (*next_char == '.')
-			{	next_char++;
-				if (*next_char == '\0')
-					break;
-			}
-	}	
-	
+	for (next_char=name; *next_char!=';' && *next_char!='\0'; ++next_char)
+		;
+
 	next_char = PrintName (name, next_char, line_nr, file);
 
-	if ((*next_char) == cTypeDelimiter)
-	{	next_char++;
+	if (*next_char == ';'){
+		++next_char;
 	
-		if (isdigit (* next_char))
-		{	char *end_name;
+		if (isdigit (*next_char)){
+			char *end_name;
 		
-			for (end_name = next_char + 1; *end_name != cTypeDelimiter && *end_name != '\0'; end_name++)
+			for (end_name = next_char + 1; *end_name!=';' && *end_name!='\0'; end_name++)
 				 ;
 			
 			if (line_nr > 0){
 				FPrintF (file, " [line: %u]", line_nr);
 			} else {
-				FPutC (cTypeDelimiter, file);
+				FPutC (';', file);
 				PrintName (next_char, end_name, line_nr, file);
 			}
 			
 			if (*end_name == '\0')
 				return;
-# ifdef CLEAN2
 			next_char = end_name;
-# else
-			next_char = end_name + 1;
-# endif
 		} else
-			FPutC (cTypeDelimiter, file);
+			FPutC (';', file);
 
 		FPutS (next_char, file);
 	}
-#else
-	FPutS (name, file);
-#endif	
 }
-
