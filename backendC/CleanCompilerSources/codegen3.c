@@ -214,7 +214,7 @@ void RedirectResultAndReturn (int asp,int bsp,int source_a_index,int source_b_in
 					break;
 				case CyclicSpine:
 					GenReduceError ();
-					StaticMessage (False,CurrentAltLabel.lab_symbol->sdef_name,Co_Wspine);
+					StaticMessage_s_s (False,CurrentAltLabel.lab_symbol->sdef_name,Co_Wspine);
 					break;
 				default:
 					error_in_function ("RedirectResultAndReturn");
@@ -1027,7 +1027,7 @@ static void CodeNormalRootNode (Node root,NodeId rootid,int asp,int bsp,CodeGenN
 			case_def_s.sdef_name = rootsymb->symb_string;
 
 			if (FunctionMayFailWarningOrError!=0)
-				StaticMessage (FunctionMayFailWarningOrError==2, "%D", "case may fail", &case_def_s);
+				StaticMessage_D_s (FunctionMayFailWarningOrError==2, &case_def_s, "case may fail");
 
 			if (! (IsOnBStack (resultstate) || 
 						(IsSimpleState (resultstate) && resultstate.state_kind==StrictRedirection)))
@@ -1110,7 +1110,7 @@ static void CodeNormalRootNode (Node root,NodeId rootid,int asp,int bsp,CodeGenN
 							GenRtn (1, 0, OnAState);
 					}
 				} else {
-					StaticMessage (False,CurrentAltLabel.lab_symbol->sdef_name,Co_Wtype);
+					StaticMessage_s_s (False,CurrentAltLabel.lab_symbol->sdef_name,Co_Wtype);
 					GenTypeError();
 					GenRtn (0, 0, OnAState);
 				}

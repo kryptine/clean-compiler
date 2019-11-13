@@ -128,7 +128,7 @@ void CloseABCFile (char *fname)
 			CompilerError = True;
 			CurrentLine = 0;
 			
-			StaticMessage (True, "<open file>", "Write error (disk full?)");
+			StaticMessage_s_s (True, "<open file>", "Write error (disk full?)");
 		}
 		if (CompilerError)
 			FDelete (fname);

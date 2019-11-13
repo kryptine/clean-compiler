@@ -115,7 +115,7 @@ NewTypeNode (Annotation annot, AttributeKind attr, SymbolP symb, TypeArgs args, 
 	node->type_node_arity		= arity;
 
 	if (arity > MaxNodeArity)
-		StaticMessage (True, "<type node>", "\"%S\" %s", symb, "Too many arguments (> 32)"); 
+		StaticErrorMessage_s_Ss ("<type node>", symb, " Too many arguments (> 32)");
 #if 0
 	node->type_node_state.state_arity		= 1;
 	node->type_node_state.state_kind		= OnA;
@@ -158,7 +158,7 @@ NewNodeByKind (NodeKind nodeKind, SymbolP symb, Args args, int arity)
 	node->node_arity		= arity;
 
 	if (arity > MaxNodeArity)
-		StaticMessage (True, "<node>", "\"%S\" %s", symb, "Too many arguments (> 32)"); 
+		StaticErrorMessage_s_Ss ("<node>", symb, " Too many arguments (> 32)");
 
 	return (node);
 } /* NewNodeByKind */

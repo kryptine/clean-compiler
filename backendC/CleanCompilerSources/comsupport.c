@@ -275,163 +275,145 @@ static char *FindFormatSpecifier (char * format_string)
 	for (; *format_string != '\0' && *format_string != '%'; format_string++)
 		;
 	return format_string;
-
 }
 
-#ifdef GNU_C
-void StaticMessage (Bool error, char *symbol_format1, char *message_format1, ...)
+void StaticMessage_D_s (Bool error,struct symbol_def *symb_def_p,char *message)
 {
-	char *format, format_spec;
-	char symbol_format [256], message_format [256];
-
-	va_list ap;
-	
-	strcpy (symbol_format, symbol_format1);
-	strcpy (message_format, message_format1);
-
-	va_start (ap, message_format1);
-
-#else
-
-void StaticMessage (Bool error, char *symbol_format, char *message_format, ...)
-{
-	char *format, format_spec;
-
-	va_list ap;
-	va_start (ap, message_format);
-
-#endif
-	
 	if (! (error || DoWarning))
 		return;
 
-#ifdef MAKE_MPW_TOOL
-	FPutS ("### ",StdError);
-#endif
-
 	FPutS (error ? "Error [" : "Warning [", StdError);
-
-#ifdef MAKE_MPW_TOOL
-	FPutS ("File ",StdError);
-#endif
-
 	FPutS (CurrentModule, StdError);
-	
-	if (CurrentLine > 0){
-#ifdef MAKE_MPW_TOOL
-		FPrintF (StdError, "; Line %u", CurrentLine);
-#else
+	if (CurrentLine > 0)
 		FPrintF (StdError, ",%u", CurrentLine);
-#endif
-	}
-
-#ifdef MAKE_MPW_TOOL
-	FPutS ("] ", StdError);
-#else
 	FPutC (',', StdError);
-#endif
-
-	for (format = symbol_format; ;)
-	{	char *tail_format = FindFormatSpecifier (format);
-		
-		if (*tail_format == '\0')
-		{	FPutS (format, StdError);
-			break;
-		}
-		else
-		{	*tail_format = '\0';
-			FPutS (format, StdError);
-			*tail_format = '%';
-			format_spec = * (++tail_format);
-			
-			if (format_spec == '\0')
-			{	FPutC ('%', StdError);
-				break;
-			}
-			else			
-			{	switch (format_spec)
-				{
-				case 's':
-				{	char * message = va_arg (ap, char *);
-					if (message != NULL)
-						FPutS (message, StdError);
-					break;
-				}
-				case 'D':
-				{
-					SymbDef def  = va_arg (ap, SymbDef);
-					PrintSymbolOfIdent (def->sdef_name, 0, StdError);
-					break;
-				}
-				case 'S':
-					PrintSymbol (va_arg (ap, Symbol), StdError);
-					break;
-				default:
-					FPutC ('%', StdError);
-					FPutC (format_spec, StdError);
-					break;
-				}
-				format = ++tail_format;
-			}
-		}
-	}
-
-#ifdef MAKE_MPW_TOOL
-	FPutS (": ", StdError);
-#else
+	PrintSymbolOfIdent (symb_def_p->sdef_name, 0, StdError);
 	FPutS ("]: ", StdError);
-#endif
 
-	for (format = message_format; ;)
-	{	char *tail_format = FindFormatSpecifier (format);
-		
-		if (*tail_format == '\0')
-		{	FPutS (format, StdError);
-			break;
-		}
-		else
-		{	*tail_format = '\0';
-			FPutS (format, StdError);
-			*tail_format = '%';
-			format_spec = * (++tail_format);
-			
-			if (format_spec == '\0')
-			{	FPutC ('%', StdError);
-				break;
-			}
-			else			
-			{	switch (format_spec)
-				{
-				case 's':
-				{	char * message = va_arg (ap, char *);
-					if (message != NULL)
-						FPutS (message, StdError);
-					break;
-				}
-				case 'd':
-				{	int nr	= va_arg (ap, int);
-					FPrintF (StdError, "%d", nr);
-					break;
-				}
-				case 'S':
-					PrintSymbol (va_arg (ap, Symbol), StdError);
-					break;
-				default:
-					FPutC ('%', StdError);
-					FPutC (format_spec, StdError);
-					break;
-				}
-				format = ++tail_format;
-			}
-		}
-	}
+	FPutS (message, StdError);
 
 	FPutC ('\n', StdError);
 
-	va_end (ap);
-	
 	if (error)
 		CompilerError = True;
+}
+
+void StaticMessage_S_s (Bool error,struct symbol *symbol_p,char *message)
+{
+	if (! (error || DoWarning))
+		return;
+
+	FPutS (error ? "Error [" : "Warning [", StdError);
+	FPutS (CurrentModule, StdError);
+	if (CurrentLine > 0)
+		FPrintF (StdError, ",%u", CurrentLine);
+	FPutC (',', StdError);
+	PrintSymbol (symbol_p, StdError);
+	FPutS ("]: ", StdError);
+
+	FPutS (message, StdError);
+
+	FPutC ('\n', StdError);
+
+	if (error)
+		CompilerError = True;
+}
+
+void StaticMessage_S_Ss (Bool error,struct symbol *symbol_p1,struct symbol *symbol_p2,char *message)
+{
+	if (! (error || DoWarning))
+		return;
+
+	FPutS (error ? "Error [" : "Warning [", StdError);
+	FPutS (CurrentModule, StdError);
+	if (CurrentLine > 0)
+		FPrintF (StdError, ",%u", CurrentLine);
+	FPutC (',', StdError);
+	PrintSymbol (symbol_p1, StdError);
+	FPutS ("]: ", StdError);
+
+	PrintSymbol (symbol_p2, StdError);
+	FPutS (message, StdError);
+
+	FPutC ('\n', StdError);
+
+	if (error)
+		CompilerError = True;
+}
+
+void StaticMessage_s_s (Bool error,char *symbol_s,char *message)
+{
+	if (! (error || DoWarning))
+		return;
+
+	FPutS (error ? "Error [" : "Warning [", StdError);
+	FPutS (CurrentModule, StdError);
+	if (CurrentLine > 0)
+		FPrintF (StdError, ",%u", CurrentLine);
+	FPutC (',', StdError);
+	FPutS (symbol_s, StdError);
+	FPutS ("]: ", StdError);
+
+	FPutS (message, StdError);
+
+	FPutC ('\n', StdError);
+
+	if (error)
+		CompilerError = True;
+}
+
+void StaticErrorMessage_S_ss (struct symbol *symbol_p,char *message1,char *message2)
+{
+	FPutS ("Error [", StdError);
+	FPutS (CurrentModule, StdError);
+	if (CurrentLine > 0)
+		FPrintF (StdError, ",%u", CurrentLine);
+	FPutC (',', StdError);
+	PrintSymbol (symbol_p, StdError);
+	FPutS ("]: ", StdError);
+
+	FPutS (message1, StdError);
+	FPutS (message2, StdError);
+
+	FPutC ('\n', StdError);
+
+	CompilerError = True;
+}
+
+void StaticErrorMessage_s_Ss (char *symbol_s,struct symbol *symbol_p,char *message)
+{
+	FPutS ("Error [", StdError);
+	FPutS (CurrentModule, StdError);
+	if (CurrentLine > 0)
+		FPrintF (StdError, ",%u", CurrentLine);
+	FPutC (',', StdError);
+	FPutS (symbol_s, StdError);
+	FPutS ("]: ", StdError);
+
+	PrintSymbol (symbol_p, StdError);
+	FPutS (message, StdError);
+
+	FPutC ('\n', StdError);
+
+	CompilerError = True;
+}
+
+void StaticErrorMessage_s_ss (char *symbol_s,char *message1,char *message2)
+{
+	FPutS ("Error [", StdError);
+	FPutS (CurrentModule, StdError);
+	if (CurrentLine > 0)
+		FPrintF (StdError, ",%u", CurrentLine);
+	FPutC (',', StdError);
+	FPutS (symbol_s, StdError);
+	FPutS ("]: ", StdError);
+
+	FPutS (message1, StdError);
+	FPutS (message2, StdError);
+
+	FPutC ('\n', StdError);
+
+	CompilerError = True;
 }
 
 static char Init[] = "Compiler initialization";

@@ -72,7 +72,7 @@ static Parameters CalculateOffsetsOfParameters (Parameters params,States results
 		if (params)
 			params = CalculateOffsetsOfParameter (params,resultstates[arity],asp_p,bsp_p);
 		else {
-			StaticMessage (True,CurrentAltLabel.lab_symbol->sdef_name,ECodeBlock);
+			StaticMessage_s_s (True,CurrentAltLabel.lab_symbol->sdef_name,ECodeBlock);
 			break;
 		}
 	}
@@ -118,7 +118,7 @@ static void GenCodeBlock (CodeBlock code, int asp, int bsp, StateS resultstate)
 		}
 		
 		if (nextparam)
-			StaticMessage (True,CurrentAltLabel.lab_symbol->sdef_name, ECodeBlock);
+			StaticMessage_s_s (True,CurrentAltLabel.lab_symbol->sdef_name, ECodeBlock);
 
 		GenParameters (True, code->co_parin, asp, bsp);
 		GenInstructions (code->co_instr);
@@ -963,7 +963,7 @@ static void CodeRule (ImpRuleP rule)
 
 		CurrentLine=rule->rule_alts->alt_line;
 		if (FunctionMayFailWarningOrError!=0)
-			StaticMessage (FunctionMayFailWarningOrError==2, "%S", "function may fail", CurrentSymbol);
+			StaticMessage_S_s (FunctionMayFailWarningOrError==2, CurrentSymbol, "function may fail");
 
 		MatchError (asize,bsize,rule_sdef,root_node_needed,0);
 	}
@@ -1183,7 +1183,7 @@ void CodeGeneration (ImpMod imod, char *fname)
 			ImpRuleS *rule;
 
 			if (!OpenABCFile (fname)){
-				StaticMessage (True, "<open file>","Can't create abc file '%s'",fname);
+				StaticErrorMessage_s_ss ("<open file>","Can't create abc file: ",fname);
 				return;
 			}
 			
