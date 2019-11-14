@@ -1089,8 +1089,6 @@ void BEAdjustStrictListConsInstance (int functionIndex,int moduleIndex)
 	} else {
 		Assert (symbol_p->symb_kind==definition);
 		
-		debug_message ("BEAdjustStrictListInstance: !(symbol_p->symb_kind==definition) %d %d %d\n",functionIndex,moduleIndex,symbol_p->symb_kind);
-
 		symbol_p->symb_head_strictness=0;
 		symbol_p->symb_tail_strictness=0;
 	}

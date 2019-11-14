@@ -67,29 +67,6 @@ fatal_backend_error (char *s)
 	Debugger ();
 }
 
-void debug_message (const char *format,...)
-{
-	va_list ap;
-	
-	va_start (ap,format);
-	vfprintf (StdError,format,ap);
-	va_end (ap);
-
-#ifdef _MAC_
-	{
-		FILE *f;
-	
-		f=fopen ("DebugMessages","a");
-		if (f!=NULL){
-			va_start (ap,format);
-			vfprintf (f,format,ap);
-			va_end (ap);
-			fclose (f);
-		}
-	}
-#endif	
-}
-
 #if 1
 /*
 	Memory management
