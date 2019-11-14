@@ -434,6 +434,16 @@ where
 		compare_arguments (t1a --> t1r) (t2a --> t2r)	= compareInstanceTypes t1a.at_type t2a.at_type CAND compareInstanceTypes t1r.at_type t2r.at_type
 		compare_arguments (TArrow1 t1) (TArrow1 t2)		= compareInstanceTypes t1.at_type t2.at_type
 		compare_arguments (TV tv1) (TV tv2)				= (Equal, [(tv1.tv_ident,tv2.tv_ident)])
+		compare_arguments (TQualifiedIdent module_id1 name1 _) (TQualifiedIdent module_id2 name2 _)
+			| module_id1.id_name<>module_id2.id_name
+				| module_id1.id_name<module_id2.id_name
+					= (Smaller,[])
+					= (Greater,[])
+			| name1<>name2
+				| name1<name2
+					= (Smaller,[])
+					= (Greater,[])
+				= (Equal,[])
 		compare_arguments type1 type2 				    = (Equal, [])
 			
 compareArguments [{at_type=type1}:types1] [{at_type=type2}:types2]
