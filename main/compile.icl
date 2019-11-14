@@ -166,11 +166,9 @@ parseCommandLine :: [{#Char}] CoclOptions -> ([{#Char}],[{#Char}],CoclOptions)
 parseCommandLine [] options
 	=	([],[],options)
 parseCommandLine [arg1=:"-o", outputPathName : args] options=:{searchPaths}
-        =       parseCommandLine args {options & outputPathName = outputPathName}
+	= parseCommandLine args {options & outputPathName = outputPathName}
 parseCommandLine [arg1=:"-P", searchPathsString : args] options=:{searchPaths}
-// RWS, voor Maarten +++	=	parseCommandLine args {options & searchPaths = {searchPaths & sp_paths = splitPaths searchPathsString}}
-	# (args,modules,options) =	parseCommandLine args {options & searchPaths.sp_paths = splitPaths searchPathsString}
-	= ([arg1,searchPathsString:args],modules,options)
+	= parseCommandLine args {options & searchPaths.sp_paths = splitPaths searchPathsString}
 parseCommandLine [arg1=:"-RO", outPath : args] options
 	# (args,modules,options)=	parseCommandLine args {options & outPath = stripQuotes outPath, outMode = FWriteText}
 	= ([arg1,outPath:args],modules,options)
@@ -252,20 +250,12 @@ splitPaths paths
 	=	[path +++ {DirectorySeparator} \\ path <- splitBy PathSeparator paths]
 
 compile_modules [module_:modules] n_compiles cocl_options args_without_modules cache files
-	# cocl_options = prependModulePath {cocl_options & pathName=stripExtension ".icl" (stripQuotes module_)}
-		with
-		// RWS +++ hack, both module name and file path should be passed to frontEndInterface
-		prependModulePath options=:{pathName, searchPaths}
-			=	{	options
-				&	moduleName = baseName pathName
-					// RWS, voor Maarten +++				,	searchPaths = {searchPaths & sp_paths = [directoryName pathName : searchPaths.sp_paths]}
-//				,	searchPaths = [directoryName pathName : searchPaths]
-				}
+	# pathName = stripExtension ".icl" (stripQuotes module_)
+	# cocl_options & pathName=pathName, moduleName = baseName pathName
 	# (ok,cache,files)
-		= compileModule cocl_options (args_without_modules++[module_]) cache files;
+		= compileModule cocl_options args_without_modules cache files;
 	| ok
 		= compile_modules modules (n_compiles+1) cocl_options args_without_modules cache files;
-	// otherwise
 		= (ok,cache,files);
 compile_modules [] n_compiles cocl_options args_without_modules cache files
 	= (True,cache,files);
@@ -305,8 +295,7 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 					-> openTclFile mod_path options.moduleName error files
 			_
 				-> 	(True,No,error,files)
-												
- 	| not optional_tcl_opened
+	| not optional_tcl_opened
 		# (closed, files) = fclose out files
 		| not closed
 			=	abort ("couldn't close stdio")
