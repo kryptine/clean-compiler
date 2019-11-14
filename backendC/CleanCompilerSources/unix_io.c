@@ -57,28 +57,19 @@ int FPutS (char *s, File f)
 
 /* Error Handling */
 
-void DoFatalError (char *fmt, ...)
-{	va_list args;
-	
-	va_start (args, fmt);
-
-	(void) vfprintf (StdError, fmt, args);
-	
-	va_end (args);
-
+void DoFatalError (char *s)
+{
+	fputs (s,stderr);
 	exit (0);
 }
 
-void CmdError (char *errormsg,...)
-{	va_list args;
-	
-	va_start (args, errormsg);
-
+void CmdError (char *errormsg1,char *errormsg2)
+{
 	fputs ("Command line error: ", stdout);
-	vfprintf (stdout, errormsg, args);
+	fputs (errormsg1, stdout);
+	if (errormsg2!=NULL)
+		fputs (errormsg2, stdout);
 	fputc ('\n', stdout); 
-		
-	va_end (args);
 }
 
 /*******************************************************************************

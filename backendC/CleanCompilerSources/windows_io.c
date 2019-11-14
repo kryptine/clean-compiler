@@ -52,30 +52,19 @@ int FPutS (char *s, File f)
 	return fputs (s, (FILE *) f);
 }
 
-void DoFatalError (char *fmt, ...)
+void DoFatalError (char *s)
 {
-	va_list args;
-	
-	va_start (args, fmt);
-
-	(void) vfprintf (stderr, fmt, args);
-	
-	va_end (args);
-
+	fputs (s,stderr);
 	exit (0);
 }
 
-void CmdError (char *errormsg,...)
+void CmdError (char *errormsg1,char *errormsg2)
 {
-	va_list args;
-	
-	va_start (args, errormsg);
-
 	fputs ("Command line error: ", stdout);
-	vfprintf (stdout, errormsg, args);
+	fputs (errormsg1, stdout);
+	if (errormsg2!=NULL)
+		fputs (errormsg2, stdout);
 	fputc ('\n', stdout); 
-		
-	va_end (args);
 }
 
 void *Alloc (long unsigned count, SizeT size)

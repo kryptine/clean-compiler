@@ -1,9 +1,3 @@
-/*
-       system.h
-       Author: Eric Nocker
-       At: Department of Computer Science
-           University of Nijmegen
-*/
 
 #define _SYSTEM_
 
@@ -47,13 +41,8 @@ extern int FPrintF (File f, char *fmt,...);
 extern int FPrintF (); /* (File w, char *fmt,...) */
 #endif
 
-#ifdef _VARARGS_
-	extern void DoFatalError (char *fmt,...);
-	extern void CmdError (char *errormsg,...);
-#else
-	extern void DoFatalError ();
-	extern void CmdError ();
-#endif
+extern void DoFatalError (char *s);
+extern void CmdError (char *errormsg1,char *errormsg2);
 
 extern void *Alloc (unsigned long count, SizeT size);
 

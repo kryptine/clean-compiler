@@ -33,8 +33,6 @@
 #include "checksupport.h"
 #include "dbprint.h"
 
-extern int VERSION;
-
 /* 'CurrentModule' contains the name of the module that is currently under examination. */
 
 char *CurrentModule;
@@ -267,15 +265,6 @@ void PrintSymbol (Symbol symbol, File file)
 		return;
 	}
 } /* PrintSymbol */
-
-#include <stdarg.h>
-
-static char *FindFormatSpecifier (char * format_string)
-{
-	for (; *format_string != '\0' && *format_string != '%'; format_string++)
-		;
-	return format_string;
-}
 
 void StaticMessage_D_s (Bool error,struct symbol_def *symb_def_p,char *message)
 {

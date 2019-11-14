@@ -85,7 +85,7 @@ static void ExecCompiler (char *fname,char *output_file_name)
 		if (hadext)
 			AddExtension (CurrentFilePath);
 	} else
-		CmdError ("No source file specified");
+		CmdError ("No source file specified",NULL);
 }
 
 #ifdef _MAC_
