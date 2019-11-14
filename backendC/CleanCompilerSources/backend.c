@@ -3216,10 +3216,9 @@ BEArg (CleanString arg)
 	// +++ ugly
 	if (gBEState.be_argi == gBEState.be_argc)
 	{
-		char	*dummy;
-		extern	Bool ParseCommandArgs (int argc, char **argv, char **file_name_p, char **output_file_name_p);
+		extern	Bool ParseCommandArgs (int argc, char **argv);
 
-		if (!ParseCommandArgs (gBEState.be_argc, gBEState.be_argv, &dummy, &dummy))
+		if (!ParseCommandArgs (gBEState.be_argc, gBEState.be_argv))
 			FatalCompError ("backend", "BEInit", "compilation aborted");
 	}
 } /* BEArg */
