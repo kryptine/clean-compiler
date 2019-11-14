@@ -105,6 +105,7 @@ Bool ParseCommandArgs (int argc, char **argv)
 
 	DoProfiling=False;
 	DoTimeProfiling=False;
+	DoCallGraphProfiling=False;
 	DoReuseUniqueNodes=False;
 	DoFusion=False;
 	DoGenericFusion=False;
@@ -157,7 +158,10 @@ Bool ParseCommandArgs (int argc, char **argv)
 				DoProfiling=True;
 			else if (strcmp (argv_i,"-pt") == 0)
 				DoTimeProfiling=True;
-			else if (strcmp (argv_i,"-wmt") == 0)
+			else if (strcmp (argv_i,"-pg") == 0){
+				DoTimeProfiling=True;
+				DoCallGraphProfiling=True;
+			} else if (strcmp (argv_i,"-wmt") == 0)
 				WriteModificationTimes=True;
 			else if (strcmp (argv_i,"-wmf") == 0)
 				FunctionMayFailWarningOrError=1;
