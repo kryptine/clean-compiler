@@ -50,7 +50,6 @@ static Bool SetStrictOption (char *opt)
 	return True;
 }
 
-char *path_parameter;
 #ifdef _SUN_
 int use_clean_system_files;
 #endif
@@ -76,13 +75,8 @@ static FILE *freopen_with_file_name_conversion (char *file_name,char *mode,FILE 
 # define freopen freopen_with_file_name_conversion
 #endif
 
-#ifdef CLEAN2
-Bool ParseCommandArgs (int argc, char **argv, char **file_name_p, char **output_file_name_p)
-#else
-Bool CallCompiler (int argc, char **argv)
-#endif
+Bool ParseCommandArgs (int argc, char **argv)
 {
-	char *fname,*output_file_name;
 	int i;
 
 # if defined (_MSC_VER) || defined (_SUN_)
@@ -90,10 +84,6 @@ Bool CallCompiler (int argc, char **argv)
 	std_error_file_p = stderr;
 # endif
 
-	fname = NULL;
-	output_file_name=NULL;
-
-	path_parameter=NULL;
 #ifdef _SUN_
 	use_clean_system_files=0;
 #endif
@@ -195,16 +185,14 @@ Bool CallCompiler (int argc, char **argv)
 					return False;
 				}
 			} else if (strcmp (argv_i, "-o") == 0){
-				if (++i < argc)
-					output_file_name = argv[i];
-				else {
+				/* not used anymore */
+				if (++i >= argc){
 					CmdError ("no output file given to option -o",NULL);
 					return False;
 				}
 			} else if (strcmp (argv_i, "-P") == 0){
-				if (++i < argc)
-					path_parameter = argv[i];
-				else {
+				/* not used anymore */
+				if (++i >= argc){
 					CmdError ("no path list given to option -P",NULL);
 					return False;
 				}
@@ -285,58 +273,15 @@ Bool CallCompiler (int argc, char **argv)
 				return False;
 			}
 		} else {
-			/* process (non-flag) argument */
-			if (fname){
-				CmdError ("only one input file allowed",NULL);
-				return False;
-			}
-			fname = argv[i];
+			/* process (non-flag) argument, not used anymore */
 		}
 	}
 
-#ifdef CLEAN2
-		*file_name_p=fname;
-		*output_file_name_p=output_file_name;
-	
-	#ifdef _MAC_
-		GetInitialPathList();
-	#endif
-	
-		InitCompiler();
-	
-		return True;
-	}
-	/*
-	Bool CallCompiler (int argc, char **argv)
-	{
-		char *fname, *output_file_name;
-	
-		if (!ParseCommandArgs (argc,argv,&fname,&output_file_name))
-			return False;
-	*/
-#else
-
-	if (fname)
-		return Compile (fname,output_file_name);
-	else {
-		CmdError ("no input file given",NULL);
-		return False;
-	}
-}
-
-#if ! defined (MAIN_CLM)
-int main (int argc, char *argv[])
-{
-# if defined (_MSC_VER) || defined (_SUN_)
-	std_out_file_p = stdout;
-	std_error_file_p = stderr;
-# endif
-
-	if (CallCompiler (argc-1, & argv[1]))
-		return 0;
-	else
-		return 1;
-}
+#ifdef _MAC_
+	GetInitialPathList();
 #endif
 
-#endif
+	InitCompiler();
+
+	return True;
+}
