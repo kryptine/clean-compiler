@@ -159,14 +159,8 @@ Containing:
 # define Assume2 ProcAssume
 	static void ProcAssume (Bool cond, char *err, char *proc)
 	{
-		Bool stop = False;
-		
 		if (! cond)
-		{	if (! stop)
-				FPrintF (StdError, "FATAL ERROR: %s in %s\n", err, proc);
-			else
-				DoFatalError ("%s in %s\n", err, proc);
-		}
+			FPrintF (StdError, "FATAL ERROR: %s in %s\n", err, proc);
 	}
 #else
 # ifdef _DB_TEST_
@@ -174,14 +168,8 @@ Containing:
 #  define Assume2 ProcAssume
 	static void ProcAssume (Bool cond, char *err, char *proc)
 	{
-		Bool stop = False;
-		
 		if (! cond)
-		{	if (! stop)
-				FPrintF (StdError, "FATAL ERROR: %s in %s\n", err, proc);
-			else
-				DoFatalError ("%s in %s\n", err, proc);
-		}
+			FPrintF (StdError, "FATAL ERROR: %s in %s\n", err, proc);
 	}
 # else
 #  define Assume2(A,B,C)
@@ -216,18 +204,11 @@ static Bool instantiating = False;	/* set True when copying an expression		*/
 
 static void GiveStrictWarning (char *f, char *msg)
 {
-#if 1
 	CurrentLine=0;
 	if (f)
 		StaticMessage_s_s (False,f,msg);
 	else
 		StaticMessage_s_s (False,"",msg);
-#else
-	if (f)
-		FPrintF (StdError, "Warning [%s%s,%s]: %s\n", CurrentModule, CurrentExt, f, msg);
-	else
-		FPrintF (StdError, "Warning [%s%s]: %s\n", CurrentModule, CurrentExt, msg);
-#endif
 }
 
 /*******************************************************************************

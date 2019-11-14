@@ -13,7 +13,6 @@ extern void AssertionFailed (char *conditionString, char *file, int line);
 # define	Assert(condition)	{if (!(condition)) AssertionFailed ("!(" #condition ")", __FILE__, __LINE__);}
 
 extern void fatal_backend_error (char *s);
-extern void debug_message (const char *format,...);
 
 /*
 	Memory management
