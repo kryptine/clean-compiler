@@ -191,21 +191,21 @@ Bool CallCompiler (int argc, char **argv)
 #endif
 			else if (strncmp (argv_i, "-sa", 3) == 0){
 				if (!SetStrictOption (argv[i]+3)){
-					CmdError ("unknown flag %s", argv[i]);
+					CmdError ("unknown flag ", argv[i]);
 					return False;
 				}
 			} else if (strcmp (argv_i, "-o") == 0){
 				if (++i < argc)
 					output_file_name = argv[i];
 				else {
-					CmdError ("no output file given to option -o");
+					CmdError ("no output file given to option -o",NULL);
 					return False;
 				}
 			} else if (strcmp (argv_i, "-P") == 0){
 				if (++i < argc)
 					path_parameter = argv[i];
 				else {
-					CmdError ("no path list given to option -P");
+					CmdError ("no path list given to option -P",NULL);
 					return False;
 				}
 			} else if (strcmp (argv_i, "-RE") == 0){
@@ -223,7 +223,7 @@ Bool CallCompiler (int argc, char **argv)
 # endif
 #endif
 				} else {
-					CmdError ("file name expected after -RE");
+					CmdError ("file name expected after -RE",NULL);
 					return False;
 				}
 			} else if (strcmp (argv_i, "-RAE") == 0){
@@ -241,7 +241,7 @@ Bool CallCompiler (int argc, char **argv)
 # endif
 #endif
 				} else {
-					CmdError ("file name expected after -RAE");
+					CmdError ("file name expected after -RAE",NULL);
 					return False;
 				}
 			} else if (strcmp (argv_i, "-RO") == 0){
@@ -259,7 +259,7 @@ Bool CallCompiler (int argc, char **argv)
 # endif
 #endif
 				} else {
-					CmdError ("file name expected after -RO");
+					CmdError ("file name expected after -RO",NULL);
 					return False;
 				}
 			} else if (strcmp (argv_i, "-RAO") == 0){
@@ -277,7 +277,7 @@ Bool CallCompiler (int argc, char **argv)
 # endif
 #endif
 				} else {
-					CmdError ("file name expected after -RAO");
+					CmdError ("file name expected after -RAO",NULL);
 					return False;
 				}
 			} else {
@@ -287,7 +287,7 @@ Bool CallCompiler (int argc, char **argv)
 		} else {
 			/* process (non-flag) argument */
 			if (fname){
-				CmdError ("only one input file allowed");
+				CmdError ("only one input file allowed",NULL);
 				return False;
 			}
 			fname = argv[i];
@@ -319,7 +319,7 @@ Bool CallCompiler (int argc, char **argv)
 	if (fname)
 		return Compile (fname,output_file_name);
 	else {
-		CmdError ("no input file given");
+		CmdError ("no input file given",NULL);
 		return False;
 	}
 }
