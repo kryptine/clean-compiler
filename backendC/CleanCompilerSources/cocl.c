@@ -184,18 +184,6 @@ Bool ParseCommandArgs (int argc, char **argv)
 					CmdError ("unknown flag ", argv[i]);
 					return False;
 				}
-			} else if (strcmp (argv_i, "-o") == 0){
-				/* not used anymore */
-				if (++i >= argc){
-					CmdError ("no output file given to option -o",NULL);
-					return False;
-				}
-			} else if (strcmp (argv_i, "-P") == 0){
-				/* not used anymore */
-				if (++i >= argc){
-					CmdError ("no path list given to option -P",NULL);
-					return False;
-				}
 			} else if (strcmp (argv_i, "-RE") == 0){
 				if (++i < argc){
 # if defined (_MSC_VER) || defined (_SUN_)
