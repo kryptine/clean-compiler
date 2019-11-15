@@ -49,7 +49,7 @@ static int string_and_string_begin_equal (char *s1,char *s2_begin,char *s2_passe
 	return 0;
 }
 
-static char *print_compiler_generated_function_name (char *name, char *name_end, unsigned line_nr, File file)
+static void print_compiler_generated_function_name (char *name, char *name_end, unsigned line_nr, File file)
 {
 	char *parsed_digits;
 
@@ -82,64 +82,46 @@ static char *print_compiler_generated_function_name (char *name, char *name_end,
 			name_end=parsed_digits;
 		}
 	FPutS (name_end,file);
-
-	return name_end+strlen (name_end);
-}
-
-static char *PrintName (char *name, char *name_end, unsigned line_nr, File file)
-{
-	if (*name=='\\' && name+1==name_end)
-		return print_compiler_generated_function_name ("<lambda>",name_end,line_nr,file);
-
-	if (*name == '_'){
-		if (string_and_string_begin_equal ("c",name+1,name_end))
-			return print_compiler_generated_function_name ("<case>",name_end,line_nr,file);
-		else if (string_and_string_begin_equal ("if",name+1,name_end))
-			return print_compiler_generated_function_name ("<if>",name_end,line_nr,file);
-	
-		FPutS (name, file);
-		while (*name_end!='\0')
-			++name_end;
-		return name_end;
-	} else {
-		for (; name!=name_end; name++)
-			FPutC (*name, file);
-
-		return name_end;
-	}
 }
 
 void PrintSymbolOfIdent (char *name, unsigned line_nr, File file)
 {
-	char *next_char;
+	char *name_end;
 
-	for (next_char=name; *next_char!=';' && *next_char!='\0'; ++next_char)
+	for (name_end=name; *name_end!=';' && *name_end!='\0'; ++name_end)
 		;
 
-	next_char = PrintName (name, next_char, line_nr, file);
-
-	if (*next_char == ';'){
-		++next_char;
-	
-		if (isdigit (*next_char)){
-			char *end_name;
-		
-			for (end_name = next_char + 1; *end_name!=';' && *end_name!='\0'; end_name++)
-				 ;
-			
-			if (line_nr > 0){
-				FPrintF (file, " [line: %u]", line_nr);
-			} else {
-				FPutC (';', file);
-				PrintName (next_char, end_name, line_nr, file);
-			}
-			
-			if (*end_name == '\0')
-				return;
-			next_char = end_name;
-		} else
-			FPutC (';', file);
-
-		FPutS (next_char, file);
+	if (*name=='\\' && name+1==name_end){
+		print_compiler_generated_function_name ("<lambda>",name_end,line_nr,file);
+		return;
 	}
+
+	if (*name == '_'){
+		if (string_and_string_begin_equal ("c",name+1,name_end))
+			print_compiler_generated_function_name ("<case>",name_end,line_nr,file);
+		else if (string_and_string_begin_equal ("if",name+1,name_end))
+			print_compiler_generated_function_name ("<if>",name_end,line_nr,file);	
+		else
+			FPutS (name, file);
+		return;
+	}
+	
+	if (line_nr > 0 && *name_end == ';' && isdigit (name_end[1])){
+		char *end_name;
+
+		for (; name!=name_end; name++)
+			FPutC (*name, file);
+
+		for (end_name = name_end + 2; *end_name!=';' && *end_name!='\0'; end_name++)
+			 ;
+		
+		FPrintF (file, " [line: %u]", line_nr);
+		
+		if (*end_name == '\0')
+			return;
+
+		name = end_name;
+	}
+
+	FPutS (name, file);
 }
