@@ -47,12 +47,3 @@ void store_p_at_node (NodeP annoted_node,NodeP at_node);
 NodeP *get_p_at_node_p (NodeP annoted_node);
 NodeP get_p_at_node (NodeP annoted_node);
 
-# define	kCasePrefix				"_case"
-# define	kLambdaPrefix			"_lambda"
-# define	kArrayGeneratorPrefix	"_array"
-# define	kListGeneratorPrefix	"_list"
-# define	kFromPrefix				"_from"
-# define	kFromThenPrefix			"_from_then"
-# define	kFromToPrefix			"_from_to"
-# define	kFromThenToPrefix		"_from_then_to"
-
