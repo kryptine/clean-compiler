@@ -313,7 +313,7 @@ static long integer_string_to_integer (char *s_p)
 static void put_arguments_i_b (char *i1)
 {
 	if (DoDebug)
-		FPrintF (OutFile,"%s",(i1));
+		PutSOutFile (i1);
 	else
 		put_n (integer_string_to_integer (i1));
 }
@@ -780,18 +780,15 @@ void BuildBasic (ObjectKind obj,SymbValue val)
 			break;
 		case BoolObj:
 			put_instruction_ (IbuildB);
-			if (val.val_bool)
-				FPrintF (OutFile, "TRUE");
-			else
-				FPrintF (OutFile, "FALSE");
+			PutSOutFile (val.val_bool ? "TRUE" : "FALSE");
 			break;
 		case CharObj:
 			put_instruction_ (IbuildC);
-			FPrintF (OutFile, "%s", val.val_char);
+			PutSOutFile (val.val_char);
 			break;
 		case RealObj:
 			put_instruction_ (IbuildR);
-			FPrintF (OutFile, "%s", val.val_real);
+			PutSOutFile (val.val_real);
 			break;
 		default:
 			error_in_function ("BuildBasic");
@@ -809,10 +806,8 @@ void FillBasic (ObjectKind obj, SymbValue val, int offset, FillKind fkind)
 			break;
 		case BoolObj:
 			put_instruction_ (IfillB);
-			if (val.val_bool)
-				FPrintF (OutFile, "TRUE %d", offset);
-			else
-				FPrintF (OutFile, "FALSE %d", offset);
+			PutSOutFile (val.val_bool ? "TRUE" : "FALSE");
+			FPrintF (OutFile, " %d", offset);
 			break;
 		case CharObj:
 			put_instruction_ (IfillC);
@@ -838,10 +833,8 @@ void IsBasic (ObjectKind obj, SymbValue val, int offset)
 			break;
 		case BoolObj:
 			put_instruction_ (IeqB_a);
-			if (val.val_bool)
-				FPrintF (OutFile, "TRUE %d", offset);
-			else
-				FPrintF (OutFile, "FALSE %d", offset);
+			PutSOutFile (val.val_bool ? "TRUE" : "FALSE");
+			FPrintF (OutFile, " %d", offset);
 			break;
 		case CharObj:
 			put_instruction_ (IeqC_a);
@@ -858,7 +851,7 @@ void IsBasic (ObjectKind obj, SymbValue val, int offset)
 void IsString (SymbValue val)
 {
 	put_instruction_ (IeqAC_a);
-	FPrintF (OutFile, "%s",val.val_string);
+	PutSOutFile (val.val_string);
 }
 
 void PushBasic (ObjectKind obj, SymbValue val)
@@ -870,17 +863,14 @@ void PushBasic (ObjectKind obj, SymbValue val)
 			break;
 		case BoolObj:
 			put_instruction_ (IpushB);
-			if (val.val_bool)
-				PutSOutFile ("TRUE");
-			else
-				PutSOutFile ("FALSE");
+			PutSOutFile (val.val_bool ? "TRUE" : "FALSE");
 			break;
 		case CharObj:
 			put_instruction_ (IpushC);
-			FPrintF (OutFile, "%s", val.val_char); break;
+			PutSOutFile (val.val_char); break;
 		case RealObj:
 			put_instruction_ (IpushR);
-			FPrintF (OutFile, "%s", val.val_real); break;
+			PutSOutFile (val.val_real); break;
 		default:
 			error_in_function ("PushBasic");
 			return;
@@ -908,10 +898,8 @@ void EqBasic (ObjectKind obj, SymbValue val, int offset)
 			break;
 		case BoolObj:
 			put_instruction_ (IeqB_b);
-			if (val.val_bool)
-				FPrintF (OutFile, "TRUE %d", offset);
-			else
-				FPrintF (OutFile, "FALSE %d", offset);
+			PutSOutFile (val.val_bool ? "TRUE" : "FALSE");
+			FPrintF (OutFile, " %d", offset);
 			break;
 		case CharObj:
 			put_instruction_ (IeqC_b);
@@ -1896,19 +1884,19 @@ void GenBuildArray (int argoffset)
 void GenBuildString (SymbValue val)
 {
 	put_instruction_ (IbuildAC);
-	FPrintF (OutFile, "%s", val.val_string);
+	PutSOutFile (val.val_string);
 }
 
 void GenPushZ (SymbValue val)
 {
 	put_instruction_ (IpushZ);
-	FPrintF (OutFile, "%s", val.val_string);
+	PutSOutFile (val.val_string);
 }
 
 void GenPushZR (SymbValue val)
 {
 	put_instruction_ (IpushZR);
-	FPrintF (OutFile, "%s", val.val_string);
+	PutSOutFile (val.val_string);
 }
 
 static void GenFieldLabel (Label label,char *record_name)
@@ -3078,7 +3066,7 @@ void GenFunctionDescriptorAndExportNodeAndDescriptor (SymbDef sdef)
 	FPrintF (OutFile, "%d 0 \"", sdef->sdef_arity);
 	if (ExportLocalLabels){
 		if (sdef->sdef_exported)
-			FPrintF (OutFile,"%s",name);
+			PutSOutFile (name);
 		else
 			FPrintF (OutFile,"%s.%u",name,sdef->sdef_number);
 	} else
@@ -3995,13 +3983,13 @@ void GenKeep (int a_offset1,int a_offset2)
 void GenImpObj (char *obj_name)
 {
 	put_directive_ ("impobj");
-	FPrintF (OutFile,"%s",obj_name);
+	PutSOutFile (obj_name);
 }
 
 void GenImpLib (char *lib_name)
 {
 	put_directive_ ("implib");
-	FPrintF (OutFile,"%s",lib_name);
+	PutSOutFile (lib_name);
 }
 #endif
 
