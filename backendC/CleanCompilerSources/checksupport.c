@@ -92,32 +92,14 @@ static char *PrintName (char *name, char *name_end, unsigned line_nr, File file)
 		return print_compiler_generated_function_name ("<lambda>",name_end,line_nr,file);
 
 	if (*name == '_'){
-		char *name_tail;
-
 		if (string_and_string_begin_equal ("c",name+1,name_end))
 			return print_compiler_generated_function_name ("<case>",name_end,line_nr,file);
 		else if (string_and_string_begin_equal ("if",name+1,name_end))
 			return print_compiler_generated_function_name ("<if>",name_end,line_nr,file);
 	
-		for (name_tail = name + 1; name_tail != name_end; name_tail++)
-			if (isdigit (*name_tail))
-				break;
-
-		if (string_and_string_begin_equal (kCasePrefix,name,name_tail))
-			FPutS ("<case expression>", file);
-		else if (string_and_string_begin_equal (kLambdaPrefix,name,name_tail))
-			FPutS ("<lambda expression>", file);
-		else if (string_and_string_begin_equal (kListGeneratorPrefix,name,name_tail))
-			FPutS ("<list comprehension>", file);
-		else if (string_and_string_begin_equal (kArrayGeneratorPrefix,name,name_tail))
-			FPutS ("<array comprehension>", file);
-		else {
-			FPutS (name, file);
-			while (*name_end!='\0')
-				++name_end;
-			return name_end;
-		}
-		FPrintF (file, " [line: %u]", line_nr);
+		FPutS (name, file);
+		while (*name_end!='\0')
+			++name_end;
 		return name_end;
 	} else {
 		for (; name!=name_end; name++)
