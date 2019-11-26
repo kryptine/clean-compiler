@@ -2480,6 +2480,10 @@ where
 			GeneratedBody		// derived case
 				#! (TransformedBody {tb_args, tb_rhs}, st)
 					= buildGenericCaseBody gs_main_module gc_pos gc_type_cons gc_ident generic_info_index gcf_generic gs_predefs st
+				| length tb_args>32
+					# error_s = "cannot specialize to this type because the derived function has too many arguments ("
+									+++toString (length tb_args)+++",>32)"
+					-> {st & ss_error = reportError gc_ident.id_name gc_pos error_s st.ss_error}
 				# funs_and_groups=:{fg_group_index,fg_groups} = st.ss_funs_and_groups
 				#! fun = makeFunction fun_ident fg_group_index tb_args tb_rhs (Yes symbol_type) gs_main_module gc_pos
 				# group = {group_members=[fun_index]}
