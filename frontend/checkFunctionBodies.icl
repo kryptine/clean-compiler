@@ -1389,7 +1389,7 @@ where
 			= (SK_OverloadedFunction { glob_object = def_index, glob_module = mod_index }, st_arity, me_priority)
 		ste_kind_to_symbol_kind STE_Constructor def_index mod_index {dcl_common={com_cons_defs}}
 			# {cons_type={st_arity,st_args,st_context},cons_priority,cons_number} = com_cons_defs.[def_index]
-			| cons_number <> -2
+			| cons_number <> ConsNumberNewType
 				| isEmpty st_context && no_TFAC_argument st_args
 					= (SK_Constructor {glob_object = def_index, glob_module = mod_index}, st_arity, cons_priority)
 					= (SK_OverloadedConstructor {glob_object = def_index, glob_module = mod_index}, st_arity, cons_priority)
@@ -1400,7 +1400,7 @@ where
 				e_state, { e_info & ef_member_defs = ef_member_defs }, cs)
 	determine_info_of_symbol {ste_kind=STE_Constructor, ste_index} _ e_input=:{ei_mod_index} e_state e_info cs
 		# ({cons_type={st_arity,st_args,st_context},cons_priority,cons_number}, e_info) = e_info!ef_cons_defs.[ste_index]
-		| cons_number <> -2
+		| cons_number <> ConsNumberNewType
 			| isEmpty st_context && no_TFAC_argument st_args
 				= (SK_Constructor {glob_object = ste_index, glob_module = ei_mod_index}, st_arity, cons_priority, e_state, e_info, cs)
 				= (SK_OverloadedConstructor {glob_object = ste_index, glob_module = ei_mod_index}, st_arity, cons_priority, e_state, e_info, cs)
@@ -1438,7 +1438,7 @@ checkQualifiedIdentExpression free_vars module_id ident_name is_expr_list e_inpu
 					-> (app_expr, free_vars, e_state, e_info, cs)
 			STE_Imported STE_Constructor mod_index
 				# ({cons_type={st_arity,st_args,st_context},cons_priority,cons_number}, e_info) = e_info!ef_modules.[mod_index].dcl_common.com_cons_defs.[decl_index]
-				| cons_number <> -2
+				| cons_number <> ConsNumberNewType
 					| isEmpty st_context
 						| no_TFAC_argument st_args
 							# kind = SK_Constructor { glob_object = decl_index, glob_module = mod_index }
@@ -1841,7 +1841,7 @@ checkPatternConstructor mod_index is_expr_list {ste_index, ste_kind} cons_ident 
 			= determine_pattern_symbol mod_index ste_index ste_kind cons_ident.id_name ef_cons_defs ef_modules cs_error
 	  e_info = { e_info & ef_cons_defs = ef_cons_defs, ef_modules = ef_modules }
 	  cons_symbol = { glob_object = MakeDefinedSymbol cons_ident cons_index cons_arity, glob_module = cons_module }
-	| cons_number > -2
+	| cons_number >= NoIndex
 		# global_type_index = {gi_module = cons_module, gi_index = cons_type_index}
 		| is_expr_list
 			= (AP_Constant (APK_Constructor global_type_index) cons_symbol cons_priority, ps, e_info, {cs & cs_error = cs_error})
@@ -1852,12 +1852,12 @@ checkPatternConstructor mod_index is_expr_list {ste_index, ste_kind} cons_ident 
 									(toString cons_arity+++" constructor arguments are missing")
 				  cs & cs_error = checkError cons_ident error_message cs_error
 				= (AP_Algebraic cons_symbol global_type_index [] opt_var, ps, e_info, cs)
-	| cons_number == -2
+	| cons_number == ConsNumberNewType
 		| is_expr_list
 			= (AP_Constant (APK_NewTypeConstructor cons_type_index) cons_symbol cons_priority, ps, e_info, {cs & cs_error = cs_error})
 			# cs & cs_error = checkError cons_ident "constructor argument is missing" cs_error
 			= (AP_NewType cons_symbol cons_type_index AP_Empty opt_var, ps, e_info, cs)
-	// cons_number == -3
+	| cons_number == ConsNumberAddedConstructor
 		# (type_rhs,e_info)
 			= case ste_kind of
 				STE_Constructor
@@ -1902,7 +1902,7 @@ checkQualifiedPatternConstructor ste_kind ste_index decl_ident module_name ident
 			= determine_pattern_symbol mod_index ste_index ste_kind module_name ident_name ef_cons_defs ef_modules cs_error
 	  e_info = { e_info & ef_cons_defs = ef_cons_defs, ef_modules = ef_modules }
 	  cons_symbol = { glob_object = MakeDefinedSymbol decl_ident cons_index cons_arity, glob_module = cons_module }
-	| cons_number > -2
+	| cons_number >= NoIndex
 		# global_type_index = {gi_module = cons_module, gi_index = cons_type_index}
 	   	| is_expr_list
 			= (AP_Constant (APK_Constructor global_type_index) cons_symbol cons_priority, ps, e_info, {cs & cs_error = cs_error})
@@ -1910,12 +1910,12 @@ checkQualifiedPatternConstructor ste_kind ste_index decl_ident module_name ident
 				= (AP_Algebraic cons_symbol global_type_index [] opt_var, ps, e_info, {cs & cs_error = cs_error})
 				# cs & cs_error = checkError ident_name "constructor arguments are missing" cs_error
 				= (AP_Algebraic cons_symbol global_type_index [] opt_var, ps, e_info, cs)
-	| cons_number == -2
+	| cons_number == ConsNumberNewType
 	   	| is_expr_list
 			= (AP_Constant (APK_NewTypeConstructor cons_type_index) cons_symbol cons_priority, ps, e_info, {cs & cs_error = cs_error})
 			# cs & cs_error = checkError ident_name "constructor argument is missing" cs_error
 			= (AP_NewType cons_symbol cons_type_index AP_Empty opt_var, ps, e_info, cs)
-	// cons_number == -3
+	| cons_number == ConsNumberAddedConstructor
 		# (type_rhs,e_info)
 			= case ste_kind of
 				STE_Constructor

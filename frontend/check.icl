@@ -1452,7 +1452,7 @@ renumber_icl_definitions_without_functions_as_dcl_definitions (Yes icl_to_dcl_in
 				# com_selector_defs=reorder_and_enlarge_array com_selector_defs n_dictionary_selectors icl_to_dcl_index_table.[cSelectorDefs]
 					 				{sd_ident=dummy_ident,sd_field=dummy_ident,sd_type=dummy_symbol_type,sd_exi_vars=[],sd_field_nr=0,sd_type_index=0,sd_type_ptr=nilPtr,sd_pos=NoPos}
 				# com_cons_defs=reorder_and_enlarge_array com_cons_defs n_dictionary_constructors icl_to_dcl_index_table.[cConstructorDefs]
-									{cons_ident=dummy_ident,cons_type=dummy_symbol_type,cons_priority=NoPrio,cons_number= -1,cons_type_index= -1,cons_exi_vars=[],cons_type_ptr=nilPtr,cons_pos=NoPos}					
+									{cons_ident=dummy_ident,cons_type=dummy_symbol_type,cons_priority=NoPrio,cons_number=NoIndex,cons_type_index= -1,cons_exi_vars=[],cons_type_ptr=nilPtr,cons_pos=NoPos}
 				# com_class_defs=reorder_array com_class_defs icl_to_dcl_index_table.[cClassDefs]
 				# com_member_defs=reorder_array com_member_defs icl_to_dcl_index_table.[cMemberDefs]
 				# com_instance_defs=reorder_array com_instance_defs icl_to_dcl_index_table.[cInstanceDefs]

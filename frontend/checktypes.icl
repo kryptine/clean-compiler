@@ -554,7 +554,7 @@ where
 		# type_lhs = { at_attribute = cti_lhs_attribute,
 				  	   at_type = TA (MakeTypeSymbIdent { glob_object = cti_type_index, glob_module = cti_module_index } td_ident td_arity)
 									[{at_attribute = atv_attribute,at_type = TV atv_variable} \\ {atv_variable, atv_attribute} <- td_args]}
-		  class_defs_ts_ti_cs = bind_types_of_constructor cti -2 (atype_vars_to_type_vars td_args) attr_vars type_lhs ds_index class_defs_ts_ti_cs
+		  class_defs_ts_ti_cs = bind_types_of_constructor cti ConsNumberNewType (atype_vars_to_type_vars td_args) attr_vars type_lhs ds_index class_defs_ts_ti_cs
 		= (td_rhs, class_defs_ts_ti_cs)
 	check_rhs_of_TypeDef {td_rhs = AbstractSynType properties type} _ cti (class_defs,ts,ti,cs)
 		# (type, type_attr, (ts,ti,cs)) = bindTypes cti type (ts,ti,cs)
@@ -615,7 +615,7 @@ where
 		# (ts,cs) = if (ds_arity>32)
 						(constructor_has_too_many_arguments ds_index ds_ident ds_arity ts cs)
 						(ts,cs);
-		# class_defs_ts_ti_cs = bind_types_of_constructor cti -3 free_vars free_attrs type_lhs ds_index (class_defs,ts,ti,cs)
+		# class_defs_ts_ti_cs = bind_types_of_constructor cti ConsNumberAddedConstructor free_vars free_attrs type_lhs ds_index (class_defs,ts,ti,cs)
 		= bind_types_of_added_constructors cti free_vars free_attrs type_lhs conses class_defs_ts_ti_cs
 	bind_types_of_added_constructors _ _ _ _ [] class_defs_ts_ti_cs
 		= class_defs_ts_ti_cs
