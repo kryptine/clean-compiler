@@ -634,6 +634,9 @@ where
 			AbstractSynType properties _
 				# type_def_infos = init_abstract_type_def properties td_args gi_module gi_index type_def_infos
 				-> (True, type_def_infos, as_type_var_heap, kind_heap)
+			AbstractNewType properties _
+				# type_def_infos = init_abstract_type_def properties td_args gi_module gi_index type_def_infos
+				-> (True, type_def_infos, as_type_var_heap, kind_heap)
 			ExtensibleAlgType _
 				# (tdi_kinds, (as_type_var_heap, kind_heap)) = newKindConstVariables td_args (as_type_var_heap, kind_heap)
 				-> (is_abstract_type, {type_def_infos & [gi_module].[gi_index].tdi_kinds = tdi_kinds}, as_type_var_heap, kind_heap)				
@@ -791,6 +794,8 @@ where
 				AbstractType spec_properties
 					= check_abstract_type spec_properties td_ident td_args td_pos as
 				AbstractSynType spec_properties _
+					= check_abstract_type spec_properties td_ident td_args td_pos as
+				AbstractNewType spec_properties _
 					= check_abstract_type spec_properties td_ident td_args td_pos as
 				_
 					= as

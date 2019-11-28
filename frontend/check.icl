@@ -1347,7 +1347,7 @@ renumber_icl_definitions_without_functions_as_dcl_definitions (Yes icl_to_dcl_in
 				# com_selector_defs=reorder_and_enlarge_array com_selector_defs n_dictionary_selectors icl_to_dcl_index_table.[cSelectorDefs]
 					 				{sd_ident=dummy_ident,sd_field=dummy_ident,sd_type=dummy_symbol_type,sd_exi_vars=[],sd_field_nr=0,sd_type_index=0,sd_type_ptr=nilPtr,sd_pos=NoPos}
 				# com_cons_defs=reorder_and_enlarge_array com_cons_defs n_dictionary_constructors icl_to_dcl_index_table.[cConstructorDefs]
-									{cons_ident=dummy_ident,cons_type=dummy_symbol_type,cons_priority=NoPrio,cons_number=NoIndex,cons_type_index= -1,cons_exi_vars=[],cons_type_ptr=nilPtr,cons_pos=NoPos}
+									{cons_ident=dummy_ident,cons_type=dummy_symbol_type,cons_priority=NoPrio,cons_number=NoIndex,cons_type_index= -1,cons_exi_vars=[],cons_type_ptr=nilPtr,cons_pos=NoPos}					
 				# com_class_defs=reorder_array com_class_defs icl_to_dcl_index_table.[cClassDefs]
 				# com_member_defs=reorder_array com_member_defs icl_to_dcl_index_table.[cMemberDefs]
 				# com_instance_defs=reorder_array com_instance_defs icl_to_dcl_index_table.[cInstanceDefs]
@@ -1492,9 +1492,13 @@ where
 	can_be_only_in_dcl def_kind
 		= def_kind == cTypeDefs || def_kind == cSelectorDefs || def_kind == cClassDefs || def_kind == cGenericDefs 
 
- 	is_abstract_type com_type_defs decl_index
- 		= case com_type_defs.[decl_index].td_rhs of (AbstractType _) -> True ; (AbstractSynType _ _) -> True ; _ -> False
- 
+	is_abstract_type com_type_defs decl_index
+		= case com_type_defs.[decl_index].td_rhs of
+			AbstractType _ -> True
+			AbstractSynType _ _ -> True
+			AbstractNewType _ _ -> True
+			_ -> False
+
 	add_dcl_declaration info_ptr entry (Declaration dcl) def_index decl_index (conversion_table, icl_sizes, icl_defs, symbol_table)
 		# (icl_index, icl_sizes) = icl_sizes![def_index]
 		=	(	{ conversion_table & [def_index].[decl_index] = icl_index }
@@ -1523,16 +1527,17 @@ where
 			# new_cons_defs = if (dcl_cons_index==(-1)) new_cons_defs [ com_cons_defs.[dcl_cons_index] : new_cons_defs ]
 			= ([ { td & td_rhs = NewType cons} : new_type_defs ],new_cons_defs,new_selector_defs,conversion_table,icl_sizes,icl_decl_symbols,cs)
 		add_type_def td=:{td_ident, td_pos, td_rhs = AbstractType _} new_type_defs new_cons_defs new_selector_defs conversion_table icl_sizes icl_decl_symbols cs
-			# cs_error = checkError "abstract type not defined in implementation module" ""
-					(setErrorAdmin (newPosition td_ident td_pos) cs.cs_error)
-			= (new_type_defs,new_cons_defs,new_selector_defs,conversion_table,icl_sizes,icl_decl_symbols,{ cs & cs_error = cs_error })
+			# cs & cs_error = abstract_type_error td_ident td_pos cs.cs_error
+			= (new_type_defs,new_cons_defs,new_selector_defs,conversion_table,icl_sizes,icl_decl_symbols,cs)
 		add_type_def td=:{td_ident, td_pos, td_rhs = AbstractSynType _ _} new_type_defs new_cons_defs new_selector_defs conversion_table icl_sizes icl_decl_symbols cs
-			# cs_error = checkError "abstract type not defined in implementation module" ""
-					(setErrorAdmin (newPosition td_ident td_pos) cs.cs_error)
-			= (new_type_defs,new_cons_defs,new_selector_defs,conversion_table,icl_sizes,icl_decl_symbols,{ cs & cs_error = cs_error })
+			# cs & cs_error = abstract_type_error td_ident td_pos cs.cs_error
+			= (new_type_defs,new_cons_defs,new_selector_defs,conversion_table,icl_sizes,icl_decl_symbols,cs)
 		add_type_def td=:{td_pos, td_rhs = ExtensibleAlgType conses} new_type_defs new_cons_defs new_selector_defs conversion_table icl_sizes icl_decl_symbols cs		
 			# (conses,(new_cons_defs,conversion_table,icl_sizes,icl_decl_symbols,cs)) = copy_and_redirect_cons_symbols com_cons_defs td_pos conses (new_cons_defs,conversion_table,icl_sizes,icl_decl_symbols,cs)
 			= ([{td & td_rhs = ExtensibleAlgType conses} : new_type_defs],new_cons_defs,new_selector_defs,conversion_table,icl_sizes,icl_decl_symbols,cs)
+		add_type_def td=:{td_ident, td_pos, td_rhs = AbstractNewType _ _} new_type_defs new_cons_defs new_selector_defs conversion_table icl_sizes icl_decl_symbols cs
+			# cs & cs_error = abstract_type_error td_ident td_pos cs.cs_error
+			= (new_type_defs,new_cons_defs,new_selector_defs,conversion_table,icl_sizes,icl_decl_symbols,cs)
 		add_type_def td new_type_defs new_cons_defs new_selector_defs conversion_table icl_sizes icl_decl_symbols cs
 			= ([td : new_type_defs],new_cons_defs,new_selector_defs,conversion_table,icl_sizes,icl_decl_symbols,cs) 
 
@@ -1550,6 +1555,9 @@ where
 
 			is_field (STE_Field _)	= True
 			is_field _				= False
+
+		abstract_type_error td_ident td_pos error
+			= checkError "abstract type not defined in implementation module" "" (setErrorAdmin (newPosition td_ident td_pos) error)
 	add_dcl_definition {com_selector_defs} dcl=:(Declaration {decl_kind = STE_Field _, decl_index})
 			(new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, new_generic_defs, copied_defs, conversion_table, icl_sizes, icl_decl_symbols, cs)
 		= (new_type_defs, new_class_defs, new_cons_defs, [ com_selector_defs.[decl_index] : new_selector_defs ], new_member_defs, new_generic_defs, copied_defs, conversion_table, icl_sizes, icl_decl_symbols, cs)

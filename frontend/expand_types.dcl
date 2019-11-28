@@ -27,7 +27,7 @@ DontCollectImportedConstructors:==4
 	,	ets_type_heaps			:: !.TypeHeaps
 	,	ets_var_heap			:: !.VarHeap
 	,	ets_main_dcl_module_n :: !Int
-	,	ets_contains_unexpanded_abs_syn_type :: !Bool
+	,	ets_contains_unexpanded_abs_syn_or_new_type :: !Bool
 	}
 
 class expandSynTypes a :: !Int !{#CommonDefs} !a !*ExpandTypeState -> (!Bool,!a, !*ExpandTypeState)

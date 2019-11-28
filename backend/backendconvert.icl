@@ -835,6 +835,10 @@ defineType moduleIndex constructors _ typeIndex {td_ident, td_attribute, td_args
 	  be = appBackEnd (BEDefineExtensibleAlgebraicType symbol_p type_attribute constructors) be
 	  type_var_heap = remove_TVI_TypeVarArgN_in_args td_args type_var_heap
 	= (type_var_heap,be)
+defineType moduleIndex _ _ typeIndex {td_rhs=AbstractNewType _ _} type_var_heap be
+	# (symbol,be) = beTypeSymbol typeIndex moduleIndex be
+	  be = appBackEnd (BEAbstractType symbol) be
+	= (type_var_heap,be)
 defineType _ _ _ _ _ type_var_heap be
 	= (type_var_heap,be)
 
@@ -2444,6 +2448,6 @@ markExports {dcl_functions,dcl_common={com_type_defs,com_cons_defs,com_selector_
 					=	beExportField True fs_index
 
 		export_constructor constructor_index
-			| com_cons_defs.[constructor_index].cons_number <> ConsNumberNewType
+			| not (IsNewTypeOrAbstractNewTypeCons com_cons_defs.[constructor_index].cons_number)
 				= beExportConstructor constructor_index
 				= \ bs=:{bes_backEnd} -> bs

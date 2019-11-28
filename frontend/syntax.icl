@@ -676,6 +676,10 @@ where
 		= file <<< " = " <<< data <<< " | .."
 	(<<<) file (AlgConses data _)
 		= file <<< " | " <<< data
+	(<<<) file (NewType symbol)
+		= file <<< " =: " <<< symbol
+	(<<<) file (AbstractSynType _ type)
+		= file <<< " (:== " <<< type <<< ')'
 	(<<<) file _
 		= file 
 

@@ -135,8 +135,12 @@ where
  		// unimplemented
 		= (tcl_file,wtis)
 	write_type_info (NewType _) tcl_file wtis
- 		#! tcl_file = fwritec AbstractTypeCode tcl_file;
- 		// unimplemented
+		#! tcl_file = fwritec AbstractTypeCode tcl_file;
+		// unimplemented
+		= (tcl_file,wtis)
+	write_type_info (AbstractNewType _ _) tcl_file wtis
+		#! tcl_file = fwritec AbstractTypeCode tcl_file;
+		// unimplemented
 		= (tcl_file,wtis)
 
 instance WriteTypeInfo DefinedSymbol 
