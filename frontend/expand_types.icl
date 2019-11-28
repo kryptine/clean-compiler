@@ -240,11 +240,6 @@ expand_syn_types_in_TA rem_annots common_defs ta_type attribute ets=:{ets_type_d
 				-> update_TA_types_if_changed changed ta_type types ets
 		_
 			#! (changed,types, ets) = expandSynTypes rem_annots common_defs types ets
-			# ta_type = if changed
-							( case ta_type of
-								TA  type_symb _				-> TA  type_symb types
-								TAS type_symb _ strictness	-> TAS type_symb types strictness
-							) ta_type
 			| glob_module == ets.ets_main_dcl_module_n || (rem_annots bitand DontCollectImportedConstructorsAndRestorePointers)<>0
 				-> update_TA_types_if_changed changed ta_type types ets
 				# ets = collect_imported_constructors common_defs glob_module td_rhs ets
