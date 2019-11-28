@@ -1380,30 +1380,36 @@ where
 			= (kind, st_arity, ft_priority, e_state, e_info, cs)
 	determine_info_of_symbol entry=:{ste_kind=STE_Imported kind mod_index,ste_index} symb_index e_input e_state e_info=:{ef_modules} cs
 		# (mod_def, ef_modules) = ef_modules![mod_index]
-		# (kind, arity, priority) = ste_kind_to_symbol_kind kind ste_index mod_index mod_def
+		# (kind, arity, priority, cs) = ste_kind_to_symbol_kind kind ste_index mod_index mod_def cs
 		= (kind, arity, priority, e_state, { e_info & ef_modules = ef_modules }, cs)
 	where
-		ste_kind_to_symbol_kind :: !STE_Kind !Index !Index !DclModule -> (!SymbKind, !Int, !Priority);
-		ste_kind_to_symbol_kind STE_Member def_index mod_index {dcl_common={com_member_defs}}
+		ste_kind_to_symbol_kind :: !STE_Kind !Index !Index !DclModule !*CheckState -> (!SymbKind, !Int, !Priority, !*CheckState)
+		ste_kind_to_symbol_kind STE_Member def_index mod_index {dcl_common={com_member_defs}} cs
 			# {me_type={st_arity},me_priority} = com_member_defs.[def_index]
-			= (SK_OverloadedFunction { glob_object = def_index, glob_module = mod_index }, st_arity, me_priority)
-		ste_kind_to_symbol_kind STE_Constructor def_index mod_index {dcl_common={com_cons_defs}}
-			# {cons_type={st_arity,st_args,st_context},cons_priority,cons_number} = com_cons_defs.[def_index]
-			| cons_number <> ConsNumberNewType
+			= (SK_OverloadedFunction { glob_object = def_index, glob_module = mod_index }, st_arity, me_priority, cs)
+		ste_kind_to_symbol_kind STE_Constructor def_index mod_index {dcl_common={com_cons_defs}} cs
+			# {cons_ident,cons_type={st_arity,st_args,st_context},cons_priority,cons_number} = com_cons_defs.[def_index]
+			| not (IsNewTypeOrAbstractNewTypeCons cons_number)
 				| isEmpty st_context && no_TFAC_argument st_args
-					= (SK_Constructor {glob_object = def_index, glob_module = mod_index}, st_arity, cons_priority)
-					= (SK_OverloadedConstructor {glob_object = def_index, glob_module = mod_index}, st_arity, cons_priority)
-				= (SK_NewTypeConstructor {gi_index = def_index, gi_module = mod_index}, st_arity, cons_priority)
+					= (SK_Constructor {glob_object = def_index, glob_module = mod_index}, st_arity, cons_priority, cs)
+					= (SK_OverloadedConstructor {glob_object = def_index, glob_module = mod_index}, st_arity, cons_priority, cs)
+				| cons_number == ConsNumberNewType
+					= (SK_NewTypeConstructor {gi_index = def_index, gi_module = mod_index}, st_arity, cons_priority, cs)
+					# cs & cs_error = checkError cons_ident.id_name "abstract new type constructor may not be used" cs.cs_error
+					= (SK_NewTypeConstructor {gi_index = def_index, gi_module = mod_index}, st_arity, cons_priority, cs)
 	determine_info_of_symbol {ste_kind=STE_Member, ste_index} _ e_input=:{ei_mod_index} e_state e_info=:{ef_member_defs} cs
 		# ({me_type={st_arity},me_priority}, ef_member_defs) = ef_member_defs![ste_index]
 		= (SK_OverloadedFunction { glob_object = ste_index, glob_module = ei_mod_index}, st_arity, me_priority,
 				e_state, { e_info & ef_member_defs = ef_member_defs }, cs)
 	determine_info_of_symbol {ste_kind=STE_Constructor, ste_index} _ e_input=:{ei_mod_index} e_state e_info cs
-		# ({cons_type={st_arity,st_args,st_context},cons_priority,cons_number}, e_info) = e_info!ef_cons_defs.[ste_index]
-		| cons_number <> ConsNumberNewType
+		# ({cons_type={st_arity,st_args,st_context},cons_priority,cons_number,cons_ident}, e_info) = e_info!ef_cons_defs.[ste_index]
+		| not (IsNewTypeOrAbstractNewTypeCons cons_number)
 			| isEmpty st_context && no_TFAC_argument st_args
 				= (SK_Constructor {glob_object = ste_index, glob_module = ei_mod_index}, st_arity, cons_priority, e_state, e_info, cs)
 				= (SK_OverloadedConstructor {glob_object = ste_index, glob_module = ei_mod_index}, st_arity, cons_priority, e_state, e_info, cs)
+		| cons_number == ConsNumberNewType
+			= (SK_NewTypeConstructor {gi_index = ste_index, gi_module = ei_mod_index}, st_arity, cons_priority, e_state, e_info, cs)
+			# cs & cs_error = checkError cons_ident "abstract new type constructor may not be used" cs.cs_error
 			= (SK_NewTypeConstructor {gi_index = ste_index, gi_module = ei_mod_index}, st_arity, cons_priority, e_state, e_info, cs)
 	determine_info_of_symbol {ste_kind=STE_DclFunction, ste_index} _ e_input=:{ei_mod_index} e_state=:{es_calls} e_info=:{ef_is_macro_fun} cs
 		# ({ft_type={st_arity},ft_priority}, e_info) = e_info!ef_modules.[ei_mod_index].dcl_functions.[ste_index]
@@ -1438,7 +1444,7 @@ checkQualifiedIdentExpression free_vars module_id ident_name is_expr_list e_inpu
 					-> (app_expr, free_vars, e_state, e_info, cs)
 			STE_Imported STE_Constructor mod_index
 				# ({cons_type={st_arity,st_args,st_context},cons_priority,cons_number}, e_info) = e_info!ef_modules.[mod_index].dcl_common.com_cons_defs.[decl_index]
-				| cons_number <> ConsNumberNewType
+				| not (IsNewTypeOrAbstractNewTypeCons cons_number)
 					| isEmpty st_context
 						| no_TFAC_argument st_args
 							# kind = SK_Constructor { glob_object = decl_index, glob_module = mod_index }
@@ -1857,6 +1863,12 @@ checkPatternConstructor mod_index is_expr_list {ste_index, ste_kind} cons_ident 
 			= (AP_Constant (APK_NewTypeConstructor cons_type_index) cons_symbol cons_priority, ps, e_info, {cs & cs_error = cs_error})
 			# cs & cs_error = checkError cons_ident "constructor argument is missing" cs_error
 			= (AP_NewType cons_symbol cons_type_index AP_Empty opt_var, ps, e_info, cs)
+	| cons_number == ConsNumberAbstractNewType
+		# cs_error = checkError cons_ident "abstract new type constructor may not be used" cs_error
+		| is_expr_list
+			= (AP_Constant (APK_NewTypeConstructor cons_type_index) cons_symbol cons_priority, ps, e_info, {cs & cs_error = cs_error})
+			# cs & cs_error = checkError cons_ident "constructor argument is missing" cs_error
+			= (AP_NewType cons_symbol cons_type_index AP_Empty opt_var, ps, e_info, cs)
 	| cons_number == ConsNumberAddedConstructor
 		# (type_rhs,e_info)
 			= case ste_kind of
@@ -1912,6 +1924,12 @@ checkQualifiedPatternConstructor ste_kind ste_index decl_ident module_name ident
 				= (AP_Algebraic cons_symbol global_type_index [] opt_var, ps, e_info, cs)
 	| cons_number == ConsNumberNewType
 	   	| is_expr_list
+			= (AP_Constant (APK_NewTypeConstructor cons_type_index) cons_symbol cons_priority, ps, e_info, {cs & cs_error = cs_error})
+			# cs & cs_error = checkError ident_name "constructor argument is missing" cs_error
+			= (AP_NewType cons_symbol cons_type_index AP_Empty opt_var, ps, e_info, cs)
+	| cons_number == ConsNumberAbstractNewType
+		# cs_error = checkError ident_name "abstract new type constructor may not be used" cs_error
+		| is_expr_list
 			= (AP_Constant (APK_NewTypeConstructor cons_type_index) cons_symbol cons_priority, ps, e_info, {cs & cs_error = cs_error})
 			# cs & cs_error = checkError ident_name "constructor argument is missing" cs_error
 			= (AP_NewType cons_symbol cons_type_index AP_Empty opt_var, ps, e_info, cs)

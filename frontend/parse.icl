@@ -2399,14 +2399,24 @@ where
 	want_type_rhs token=:OpenToken parseContext td=:{td_attribute} annot pState
 		| isIclContext parseContext
 			= (PD_Erroneous, parseError "type RHS" (Yes token) "type definition" pState)
-		# pState = wantToken TypeContext "Abstract type synonym" ColonDefinesToken pState			
-		# name				= td.td_ident.id_name
-		  (atype, pState)	= want pState // Atype
-		# (td_attribute, properties) = determine_properties annot td_attribute
-		  td				= {td & td_rhs = AbstractTypeSpec properties atype, td_attribute=td_attribute}
-		# pState = wantToken TypeContext "Abstract type synonym" CloseToken pState
-		| td_attribute == TA_Anonymous || td_attribute == TA_Unique || td_attribute == TA_None
-			= (PD_Type td, pState)
+		# name					= td.td_ident.id_name
+		  (td_attribute, properties) = determine_properties annot td_attribute
+		| td_attribute =: TA_Anonymous || td_attribute =: TA_Unique || td_attribute =: TA_None
+			# (token, pState)	= nextToken TypeContext pState
+			# td & td_attribute	= td_attribute
+			| token=:ColonDefinesToken
+				# (atype, pState)	= want pState // Atype
+				  td & td_rhs 		= AbstractTypeSpec properties atype
+				  pState			= wantToken TypeContext "Abstract type synonym" CloseToken pState
+				= (PD_Type td, pState)
+			| token=:DefinesColonToken
+				# (exi_vars, pState) = optionalExistentialQuantifiedVariables pState
+				  (token, pState)	= nextToken GeneralContext pState
+				  (condef, pState)	= want_newtype_constructor exi_vars token pState
+				  td & td_rhs 		= AbstractNewTypeCons properties condef
+				  pState			= wantToken TypeContext "Abstract new type" CloseToken pState
+				= (PD_Type td, pState)
+				= (PD_Type td, parseErrorSimple name "only synonym types and new types can be hidden" pState)
 			= (PD_Type td, parseError "abstract type" No ("type attribute "+toString td_attribute+" for abstract type "+name+" is not") (tokenBack pState))
 
 	want_type_rhs BarToken parseContext td=:{td_ident,td_attribute} annot pState

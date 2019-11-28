@@ -1465,7 +1465,14 @@ reorganiseDefinitions icl_module [PD_Type type_def=:{td_rhs = NewTypeCons cons_d
 	  (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs def_counts ca
 	  type_def = { type_def & td_rhs = NewType cons_symb }
 	  c_defs = { c_defs & def_types = [type_def : c_defs.def_types], def_constructors = [ParsedConstructorToConsDef cons_def : c_defs.def_constructors] }
-	= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)  
+	= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)
+reorganiseDefinitions icl_module [PD_Type type_def=:{td_rhs = AbstractNewTypeCons properties cons_def=:{pc_cons_ident,pc_cons_arity}} : defs] def_counts=:{cons_count,type_count} ca
+	# cons_symb = { ds_ident = pc_cons_ident, ds_arity = pc_cons_arity, ds_index = cons_count }
+	  def_counts & cons_count=cons_count+1, type_count=type_count+1
+	  (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs def_counts ca
+	  type_def & td_rhs = AbstractNewType properties cons_symb
+	  c_defs & def_types = [type_def : c_defs.def_types], def_constructors = [ParsedConstructorToConsDef cons_def : c_defs.def_constructors]
+	= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)
 reorganiseDefinitions icl_module [PD_Type type_def=:{td_ident, td_rhs = SelectorList rec_cons_id exivars is_boxed_record sel_defs, td_pos } : defs] def_counts=:{cons_count,sel_count,type_count} ca
 	# (sel_syms, new_count) = determine_symbols_of_selectors sel_defs sel_count
 	  def_counts & cons_count=cons_count+1, sel_count=new_count, type_count=type_count+1

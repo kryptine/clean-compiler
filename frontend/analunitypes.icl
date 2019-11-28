@@ -200,6 +200,10 @@ where
 		= (TopSignClass, scs)
 	sign_class_of_type_def module_index (AlgConses conses _) group_nr ci scs
 		= (TopSignClass, scs)
+	sign_class_of_type_def _ (AbstractNewType properties _) _ _ scs
+		| properties bitand cIsNonCoercible == 0
+			= (PostiveSignClass, scs)
+			= (TopSignClass, scs)
 
 	sign_class_of_type_conses module_index [{ds_index}:conses] group_nr ci cumm_sign_class scs
 		#! cons_def = ci.[module_index].com_cons_defs.[ds_index]
@@ -482,6 +486,8 @@ where
 	prop_class_of_type_def module_index (ExtensibleAlgType conses) group_nr ci pcs
 		= (PropClass, pcs)
 	prop_class_of_type_def module_index (AlgConses conses _) group_nr ci pcs
+		= (PropClass, pcs)
+	prop_class_of_type_def _ (AbstractNewType properties _) _ _ pcs
 		= (PropClass, pcs)
 
 	prop_class_of_type_conses module_index [{ds_index}:conses] group_nr ci cumm_prop_class pcs

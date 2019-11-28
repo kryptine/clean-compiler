@@ -4652,13 +4652,13 @@ where
 		# (FI_Function {gf_fun_def,gf_fun_index}) = sreadPtr fun_ptr fun_heap
 		  {fun_type = Yes ft=:{st_args,st_result}, fun_info = {fi_group_index,fi_properties}} = gf_fun_def
 		  ets =
-		  	{ ets_type_defs							= imported_types
-		  	, ets_collected_conses					= collected_imports
-		  	, ets_type_heaps						= type_heaps
-		  	, ets_var_heap							= var_heap
-		  	, ets_main_dcl_module_n					= main_dcl_module_n
-		  	, ets_contains_unexpanded_abs_syn_type	= False
-		  	}
+			{ ets_type_defs							= imported_types
+			, ets_collected_conses					= collected_imports
+			, ets_type_heaps						= type_heaps
+			, ets_var_heap							= var_heap
+			, ets_main_dcl_module_n					= main_dcl_module_n
+			, ets_contains_unexpanded_abs_syn_or_new_type = False
+			}
 		#! (_,(st_args,st_result), {ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap})
 				= expandSynTypes (if (fi_properties bitand FI_HasTypeSpec == 0) (RemoveAnnotationsMask bitor ExpandAbstractSynTypesMask) ExpandAbstractSynTypesMask) common_defs (st_args,st_result) ets
 		# ft = { ft &  st_result = st_result, st_args = st_args }

@@ -54,7 +54,7 @@ DontCollectImportedConstructorsAndRestorePointers:==4
 convertSymbolType :: !Bool !{#CommonDefs} !SymbolType !Int !*ImportedTypes !ImportedConstructors !*TypeHeaps !*VarHeap
 										  -> (!SymbolType, !*ImportedTypes,!ImportedConstructors,!*TypeHeaps,!*VarHeap)
 convertSymbolType rem_annots common_defs st main_dcl_module_n imported_types collected_imports type_heaps var_heap
-	# (st, ets_contains_unexpanded_abs_syn_type,ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap)
+	# (st, _, ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap)
 		= convertSymbolType_  (if rem_annots (RemoveAnnotationsMask bitor ExpandAbstractSynTypesMask) ExpandAbstractSynTypesMask) common_defs st main_dcl_module_n imported_types collected_imports type_heaps var_heap
 	= (st, ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap)
 
@@ -71,7 +71,7 @@ convertSymbolTypeWithoutCollectingImportedConstructors rem_annots common_defs st
 		= if rem_annots
 			(RemoveAnnotationsMask bitor ExpandAbstractSynTypesMask bitor DontCollectImportedConstructorsAndRestorePointers)
 			(ExpandAbstractSynTypesMask bitor DontCollectImportedConstructorsAndRestorePointers)
-	# (st, ets_contains_unexpanded_abs_syn_type,ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap)
+	# (st, _, ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap)
 		= convertSymbolType_  rem_annots common_defs st main_dcl_module_n imported_types [] type_heaps var_heap
 	= (st, ets_type_defs, ets_type_heaps, ets_var_heap)
 
@@ -83,7 +83,7 @@ convertSymbolType_  rem_annots common_defs st main_dcl_module_n imported_types c
 				, ets_type_heaps		= type_heaps
 				, ets_var_heap			= var_heap
 				, ets_main_dcl_module_n	= main_dcl_module_n 
-				, ets_contains_unexpanded_abs_syn_type = False
+				, ets_contains_unexpanded_abs_syn_or_new_type = False
 				}
 	# {st_args,st_result,st_context,st_args_strictness} = st
 	#! (_,(st_args,st_result), ets)		= expandSynTypes rem_annots common_defs (st_args,st_result) ets
@@ -96,8 +96,8 @@ convertSymbolType_  rem_annots common_defs st main_dcl_module_n imported_types c
 	  			, st_args_strictness	= insert_n_strictness_values_at_beginning (new_st_arity-length st_args) st_args_strictness
 	  			, st_context			= []
 	  			}
-	# {ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap,ets_contains_unexpanded_abs_syn_type} = ets
-	= (st, ets_contains_unexpanded_abs_syn_type, ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap)
+	# {ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap,ets_contains_unexpanded_abs_syn_or_new_type} = ets
+	= (st, ets_contains_unexpanded_abs_syn_or_new_type, ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap)
 
 addTypesOfDictionaries :: !{#CommonDefs} ![TypeContext] ![AType] -> [AType]
 addTypesOfDictionaries common_defs type_contexts type_args
@@ -136,7 +136,7 @@ where
 	,	ets_type_heaps			:: !.TypeHeaps
 	,	ets_var_heap			:: !.VarHeap
 	,	ets_main_dcl_module_n :: !Int
-	,	ets_contains_unexpanded_abs_syn_type :: !Bool
+	,	ets_contains_unexpanded_abs_syn_or_new_type :: !Bool
 	}
 
 class expandSynTypes a :: !Int !{#CommonDefs} !a !*ExpandTypeState -> (!Bool,!a, !*ExpandTypeState)
@@ -223,21 +223,21 @@ expand_syn_types_in_TA rem_annots common_defs ta_type attribute ets=:{ets_type_d
 		SynType rhs_type
 			-> expand_type types td_args td_attribute rhs_type rem_annots attribute ets
 		AbstractSynType _ rhs_type
-			| (rem_annots bitand ExpandAbstractSynTypesMask)<>0
+			| rem_annots bitand ExpandAbstractSynTypesMask<>0
 				-> expand_type types td_args td_attribute rhs_type rem_annots attribute ets
-				# ets = {ets & ets_contains_unexpanded_abs_syn_type=True }
+				# ets & ets_contains_unexpanded_abs_syn_or_new_type=True
 				#! (changed,types, ets) = expandSynTypes rem_annots common_defs types ets
-				# ta_type = if changed
-								( case ta_type of
-									TA  type_symb _				-> TA  type_symb types
-									TAS type_symb _ strictness	-> TAS type_symb types strictness
-								) ta_type
-				| glob_module == ets.ets_main_dcl_module_n
-					-> (changed,ta_type, ets)
-					-> (changed,ta_type, collect_imported_constructors common_defs glob_module td_rhs ets)
+				-> update_TA_types_if_changed changed ta_type types ets
 		NewType {ds_index}
 			# {cons_type={st_args=[arg_type:_]}} = common_defs.[glob_module].com_cons_defs.[ds_index];
 			-> expand_type types td_args td_attribute arg_type rem_annots attribute ets
+		AbstractNewType _ {ds_index}
+			| rem_annots bitand ExpandAbstractSynTypesMask<>0
+				# {cons_type={st_args=[arg_type:_]}} = common_defs.[glob_module].com_cons_defs.[ds_index];
+				-> expand_type types td_args td_attribute arg_type rem_annots attribute ets
+				# ets & ets_contains_unexpanded_abs_syn_or_new_type=True
+				#! (changed,types, ets) = expandSynTypes rem_annots common_defs types ets
+				-> update_TA_types_if_changed changed ta_type types ets
 		_
 			#! (changed,types, ets) = expandSynTypes rem_annots common_defs types ets
 			# ta_type = if changed
@@ -246,8 +246,9 @@ expand_syn_types_in_TA rem_annots common_defs ta_type attribute ets=:{ets_type_d
 								TAS type_symb _ strictness	-> TAS type_symb types strictness
 							) ta_type
 			| glob_module == ets.ets_main_dcl_module_n || (rem_annots bitand DontCollectImportedConstructorsAndRestorePointers)<>0
-				-> (changed,ta_type, ets)
-				-> (changed,ta_type, collect_imported_constructors common_defs glob_module td_rhs ets)
+				-> update_TA_types_if_changed changed ta_type types ets
+				# ets = collect_imported_constructors common_defs glob_module td_rhs ets
+				-> update_TA_types_if_changed changed ta_type types ets
 where
 	expand_type types td_args td_attribute rhs_type rem_annots attribute ets
 		| (rem_annots bitand DontCollectImportedConstructorsAndRestorePointers)==0
@@ -293,10 +294,17 @@ where
 		substitute_rhs rem_annots rhs_type type_heaps
 			| rem_annots bitand RemoveAnnotationsMask<>0
 				# (_, rhs_type) = removeAnnotations rhs_type
-			  	# (_,type,heaps) = substitute rhs_type type_heaps
-			  	= (type,heaps)
-			  	# (_,type,heaps) = substitute rhs_type type_heaps
-			  	= (type,heaps)
+				# (_,type,heaps) = substitute rhs_type type_heaps
+				= (type,heaps)
+				# (_,type,heaps) = substitute rhs_type type_heaps
+				= (type,heaps)
+
+	update_TA_types_if_changed changed=:False ta_type types ets
+		= (changed, ta_type, ets)
+	update_TA_types_if_changed changed=:True (TA  type_symb _) types ets
+		= (changed, TA type_symb types, ets)
+	update_TA_types_if_changed changed=:True (TAS type_symb _ strictness) types ets
+		= (changed, TAS type_symb types strictness, ets)
 
 	collect_imported_constructors :: !{#.CommonDefs} !.Int !.TypeRhs !*ExpandTypeState -> .ExpandTypeState
 	collect_imported_constructors common_defs mod_index (RecordType {rt_constructor}) ets=:{ets_collected_conses,ets_var_heap}

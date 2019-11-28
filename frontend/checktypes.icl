@@ -500,7 +500,7 @@ where
 	check_rhs_of_TypeDef {td_ident,td_arity,td_args,td_rhs = td_rhs=:AlgType conses} attr_vars cti=:{cti_module_index,cti_type_index,cti_lhs_attribute} class_defs_ts_ti_cs
 		# type_lhs = { at_attribute = cti_lhs_attribute,
 				  	   at_type = TA (MakeTypeSymbIdent { glob_object = cti_type_index, glob_module = cti_module_index } td_ident td_arity)
-									[{at_attribute = atv_attribute,at_type = TV atv_variable} \\ {atv_variable, atv_attribute} <- td_args]}
+									(type_def_args_to_TA_args td_args)}
 		  class_defs_ts_ti_cs = bind_types_of_constructors cti 0 (atype_vars_to_type_vars td_args) attr_vars type_lhs conses class_defs_ts_ti_cs
 		= (td_rhs, class_defs_ts_ti_cs)
 	check_rhs_of_TypeDef {td_ident,td_arity,td_args,td_rhs = td_rhs=:RecordType {rt_constructor={ds_index,ds_arity}, rt_fields}}
@@ -553,7 +553,7 @@ where
 	check_rhs_of_TypeDef {td_ident,td_arity,td_args,td_rhs = td_rhs=:NewType {ds_index}} attr_vars cti=:{cti_module_index,cti_type_index,cti_lhs_attribute} class_defs_ts_ti_cs
 		# type_lhs = { at_attribute = cti_lhs_attribute,
 				  	   at_type = TA (MakeTypeSymbIdent { glob_object = cti_type_index, glob_module = cti_module_index } td_ident td_arity)
-									[{at_attribute = atv_attribute,at_type = TV atv_variable} \\ {atv_variable, atv_attribute} <- td_args]}
+									(type_def_args_to_TA_args td_args)}
 		  class_defs_ts_ti_cs = bind_types_of_constructor cti ConsNumberNewType (atype_vars_to_type_vars td_args) attr_vars type_lhs ds_index class_defs_ts_ti_cs
 		= (td_rhs, class_defs_ts_ti_cs)
 	check_rhs_of_TypeDef {td_rhs = AbstractSynType properties type} _ cti (class_defs,ts,ti,cs)
@@ -562,7 +562,7 @@ where
 	check_rhs_of_TypeDef {td_ident,td_arity,td_args,td_rhs = td_rhs=:ExtensibleAlgType conses} attr_vars cti=:{cti_module_index,cti_type_index,cti_lhs_attribute} class_defs_ts_ti_cs
 		# type_lhs = { at_attribute = cti_lhs_attribute,
 				  	   at_type = TA (MakeTypeSymbIdent {glob_object = cti_type_index, glob_module = cti_module_index} td_ident td_arity)
-									[{at_attribute = atv_attribute,at_type = TV atv_variable} \\ {atv_variable, atv_attribute} <- td_args]}
+									(type_def_args_to_TA_args td_args)}
 		  class_defs_ts_ti_cs = bind_types_of_constructors cti 0 (atype_vars_to_type_vars td_args) attr_vars type_lhs conses class_defs_ts_ti_cs
 		= (td_rhs, class_defs_ts_ti_cs)
 	check_rhs_of_TypeDef {td_ident,td_arity,td_args,td_attribute,td_rhs = td_rhs=:UncheckedAlgConses type_ext_ident conses} attr_vars cti=:{cti_module_index,cti_type_index,cti_lhs_attribute} class_defs_ts_ti_cs
@@ -587,11 +587,20 @@ where
 	 	# class_defs_ts_ti_cs = (class_defs,ts,ti,cs)
 		# type_lhs = { at_attribute = cti_lhs_attribute,
 				  	   at_type = TA (MakeTypeSymbIdent { glob_object = type_index, glob_module = type_module } td_ident td_arity)
-									[{at_attribute = atv_attribute,at_type = TV atv_variable} \\ {atv_variable, atv_attribute} <- td_args]}
+									(type_def_args_to_TA_args td_args)}
 		  class_defs_ts_ti_cs = bind_types_of_added_constructors cti (atype_vars_to_type_vars td_args) attr_vars type_lhs conses class_defs_ts_ti_cs
 		= (AlgConses conses {gi_module=type_module,gi_index=type_index}, class_defs_ts_ti_cs)
+	check_rhs_of_TypeDef {td_ident,td_arity,td_args,td_rhs = td_rhs=:AbstractNewType _ {ds_index}} attr_vars cti=:{cti_module_index,cti_type_index,cti_lhs_attribute} class_defs_ts_ti_cs
+		# type_lhs = { at_attribute = cti_lhs_attribute,
+					   at_type = TA (MakeTypeSymbIdent { glob_object = cti_type_index, glob_module = cti_module_index } td_ident td_arity)
+									(type_def_args_to_TA_args td_args)}
+		  class_defs_ts_ti_cs = bind_types_of_constructor cti ConsNumberAbstractNewType (atype_vars_to_type_vars td_args) attr_vars type_lhs ds_index class_defs_ts_ti_cs
+		= (td_rhs, class_defs_ts_ti_cs)
 	check_rhs_of_TypeDef {td_rhs} _ _ class_defs_ts_ti_cs
 		= (td_rhs, class_defs_ts_ti_cs)
+
+	type_def_args_to_TA_args td_args
+		= [{at_attribute = atv_attribute,at_type = TV atv_variable} \\ {atv_variable, atv_attribute} <- td_args]
 
 	atype_vars_to_type_vars atype_vars
 		= [atv_variable \\ {atv_variable} <- atype_vars]

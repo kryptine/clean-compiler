@@ -189,6 +189,7 @@ instance == FunctionOrMacroIndex
 					| NewTypeCons !ParsedConstructor
 					| EmptyRhs !BITVECT
 					| AbstractTypeSpec !BITVECT !AType
+					| AbstractNewTypeCons !BITVECT !ParsedConstructor
 					| ExtensibleConses ![ParsedConstructor]
 					| MoreConses !Ident ![ParsedConstructor]
 
@@ -591,6 +592,7 @@ cIsImportedObject :== False
 			| NewType !DefinedSymbol
 			| AbstractType !BITVECT
 			| AbstractSynType !BITVECT !AType
+			| AbstractNewType !BITVECT !DefinedSymbol
 			| ExtensibleAlgType ![DefinedSymbol]
 			| AlgConses ![DefinedSymbol] !GlobalIndex
 			| UncheckedAlgConses !Ident ![DefinedSymbol]
@@ -1027,8 +1029,10 @@ cNotVarNumber :== -1
 	}
 
 // Possible values for cons_number (-1 is reserved for NoIndex):
-ConsNumberNewType :== -2
-ConsNumberAddedConstructor :== -3
+ConsNumberAddedConstructor :== -2
+ConsNumberNewType :== -3
+ConsNumberAbstractNewType :== -4
+IsNewTypeOrAbstractNewTypeCons cons_number :== cons_number <= ConsNumberNewType
 
 ::	SelectorDef =
 	{	sd_ident		:: !Ident // IC_Selector
