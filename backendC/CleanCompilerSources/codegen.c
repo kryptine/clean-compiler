@@ -15,7 +15,6 @@
 #include "settings.h"
 #include "sa.h"
 #include "statesgen.h"
-#include "typeconv.h"
 #include "codegen_types.h"
 #include "codegen1.h"
 #include "codegen2.h"
