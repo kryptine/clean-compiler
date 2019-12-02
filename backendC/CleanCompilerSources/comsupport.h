@@ -44,6 +44,8 @@ extern void *CompAlloc (SizeT size);
 extern void InitStorage (void);
 extern void CompFree (void);
 
+extern void int_to_string (char *s,long i);
+
 extern void FatalCompError (char *mod, char *proc, char *mess);
 
 extern void InitSettings (void);

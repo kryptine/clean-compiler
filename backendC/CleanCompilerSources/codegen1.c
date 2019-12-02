@@ -2581,7 +2581,8 @@ SymbDef CreateUpdateFunction (ArgS *record_arg,ArgS *first_field_arg,Node node
 	StateS record_state,boxed_record_state;
 	StateP strict_record_state_p;
 
-	sprintf (update_function_name,"_upd%d",next_update_function_n);
+	strcpy (update_function_name,"_upd");
+	int_to_string (&update_function_name[4],next_update_function_n);
 	++next_update_function_n;
 	
 	n_arguments=node->node_arity;
@@ -2764,8 +2765,9 @@ SymbDef create_select_function (Symbol selector_symbol,int selector_kind)
 	int fieldnr;
 
 	selector_sdef=selector_symbol->symb_def;
-	
-	sprintf (select_function_name,"_sel%d",next_update_function_n);
+
+	strcpy (select_function_name,"_sel");
+	int_to_string (&select_function_name[4],next_update_function_n);
 	++next_update_function_n;
 
 	select_function_sdef=MakeNewSymbolDefinition (CurrentModule,select_function_name,1,IMPRULE);
@@ -2852,7 +2854,8 @@ static SymbDef create_match_function_sdef (void)
 	char match_function_name[16];
 	SymbDef match_function_sdef;
 
-	sprintf (match_function_name,"_match%d",next_match_function_n);
+	strcpy (match_function_name,"_match");
+	int_to_string (&match_function_name[6],next_match_function_n);
 	++next_match_function_n;
 
 	match_function_sdef=MakeNewSymbolDefinition (CurrentModule,match_function_name,1,IMPRULE);
