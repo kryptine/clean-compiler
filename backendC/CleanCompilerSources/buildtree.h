@@ -14,13 +14,10 @@ extern NodeP NewNodeByKind (NodeKind nodeKind, SymbolP symb, Args args, int arit
 # define	NewFalse()			NewNormalNode (FalseSymbol, NIL, 0)
 # define	NewTrue()			NewNormalNode (TrueSymbol, NIL, 0)
 
-extern	NodeP NewIntNode (int value);
-
 extern NodeIdP NewNodeId (void);
 extern StrictNodeIdP NewStrictNodeId (NodeIdP node_id, StrictNodeIdP next);
 extern NodeDefs NewNodeDefinition (NodeIdP nid, NodeP node);
 extern SymbolP NewSymbol (SymbKind symbolKind);
-extern TypeNode NewTypeNode (Annotation annot, AttributeKind attr, SymbolP symb, TypeArgs args, int arity);
 extern TypeArgs NewTypeArgument (TypeNode pattern);
 
 extern NodeP NewSelectNode (SymbolP selectSymbol, NodeIdP selectId, int arity);

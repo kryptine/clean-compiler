@@ -1,7 +1,3 @@
-/*
-	Authors:	Sjaak Smetsers & John van Groningen
-	Version:	1.2
-*/
 
 #include "compiledefines.h"
 #include "types.t"
@@ -10,7 +6,6 @@
 #include "comsupport.h"
 #include "sizes.h"
 #include "buildtree.h"
-#include "comparser.h"
 #include "statesgen.h"
 #include "codegen_types.h"
 #include "codegen1.h"

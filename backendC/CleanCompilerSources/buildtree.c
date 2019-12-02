@@ -124,32 +124,6 @@ NewNodeIdNode (NodeIdP node_id)
 	return (node);
 } /* NewNodeIdNode */
 
-TypeNode
-NewTypeNode (Annotation annot, AttributeKind attr, SymbolP symb, TypeArgs args, int arity)
-{
-	TypeNode node;
-	
-	node = CompAllocType (struct type_node);
-
-	node->type_node_annotation	= annot;
-	node->type_node_attribute	= attr;
-	node->type_node_is_var		= False;
-	node->type_node_arguments	= args;
-	node->type_node_symbol		= symb;
-	node->type_node_arity		= arity;
-
-	if (arity > MaxNodeArity)
-		StaticErrorMessage_s_Ss ("<type node>", symb, " Too many arguments (> 32)");
-#if 0
-	node->type_node_state.state_arity		= 1;
-	node->type_node_state.state_kind		= OnA;
-	node->type_node_state.state_object		= UnknownObj;
-	node->type_node_state.state_type		= SimpleState;
-	node->type_node_state.state_mark		= 0;
-#endif
-	return (node);
-} /* NewTypeNode */
-
 NodeP
 NewSelectorNode (SymbolP symb, Args args, int arity)
 {
@@ -273,28 +247,6 @@ NewSymbol (SymbKind symbolKind)
 
 	return (symbol);
 } /* NewSymbol */	
-
-NodeP
-NewIntNode (int value)
-{
-	char	buffer [10], *valueString;
-	SymbolP	symbol;
-	NodeP	node;
-	int		length;
-
-	sprintf (buffer, "%d", value);
-	length	= strlen (buffer);
-
-	valueString	= (char *) CompAlloc (length+1);
-	strcpy (valueString, buffer);
-
-	symbol	= NewSymbol (int_denot);
-	symbol->symb_int = valueString;	
-
-	node	= NewNormalNode (symbol, NIL, 0);
-
-	return (node);
-} /* NewIntNode */
 
 SymbolP
 NewTupleTypeSymbol (int arity)

@@ -23,7 +23,6 @@
 #include "syntaxtr.t"
 #include "comsupport.h"
 #include "buildtree.h"
-#include "comparser.h"
 #include "checker.h"
 #include "statesgen.h"
 #include "codegen_types.h"

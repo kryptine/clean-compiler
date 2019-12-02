@@ -44,7 +44,6 @@
 #ifdef _DB_TEST_
 # include "saprint.h"
 #endif
-#include "typeconv.h"
 #include "statesgen.h"
 #ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
 #include "codegen_types.h"
