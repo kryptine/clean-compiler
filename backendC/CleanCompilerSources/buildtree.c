@@ -11,6 +11,30 @@ SymbolP	TrueSymbol, FalseSymbol, TupleSymbol,
 		SelectSymbols [MaxNodeArity], ApplySymbol, IfSymbol,
 		TupleTypeSymbols [MaxNodeArity];
 
+void InitGlobalSymbols (void)
+{
+	int		i;
+
+	for (i = 0; i < MaxNodeArity; i++)
+	{	SelectSymbols	 [i] = NULL;
+		TupleTypeSymbols [i] = NULL;
+	}
+
+	IfSymbol		= NewSymbol (if_symb);
+
+	TrueSymbol		= NewSymbol (bool_denot);
+	TrueSymbol->symb_bool = True;
+	FalseSymbol		= NewSymbol (bool_denot);
+	FalseSymbol->symb_bool = False;
+
+	TupleSymbol		= NewSymbol (tuple_symb);
+
+	ApplySymbol		= NewSymbol (apply_symb);
+	ApplySymbol->symb_instance_apply = 0;
+
+	clear_p_at_node_tree();
+}
+
 TypeArgs
 NewTypeArgument (TypeNode pattern)
 {
