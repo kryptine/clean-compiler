@@ -418,7 +418,7 @@ void InitCompiler (void)
 	CurrentModule = Init;
 
 	InitStorage		();
-	InitParser		();
+	InitGlobalSymbols();
 	InitChecker		();
 	InitStatesGen		();
 	InitCoding		();

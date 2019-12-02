@@ -1,4 +1,6 @@
 
+extern void InitGlobalSymbols (void);
+
 extern Args NewArgument (NodeP pattern);
 extern NodeP NewNode (SymbolP symb, Args args, int arity);
 extern NodeP NewIfNode (void);
