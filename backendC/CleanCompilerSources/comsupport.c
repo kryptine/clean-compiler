@@ -185,6 +185,69 @@ void CompFree (void)
 	}
 }
 
+void int_to_string (char *s,long i)
+{
+	unsigned long u;
+	unsigned int p,ua[8];
+	int ua_i;
+	
+	if (i<0){
+		*s++ = '-';
+		u = -i;
+	} else
+		u = i;
+	
+	ua_i = 0;
+	while (u>=10000){
+		unsigned long d;
+		
+		d = u/10000;
+		ua[ua_i++] = u-d*10000;
+		u = d;
+	}
+
+	if (u<10){
+		*s++ = '0'+u;	
+	} else if (u<100){
+		unsigned int i;
+		
+		p = u*103;
+		i=p>>10;
+		*s++ = '0'+i;
+		*s++ = '0'+(u-10*i);
+	} else if (u<1000){
+		p = u*41;
+		*s++ = '0'+(p>>12);
+		p = 10 * (p & 0xfff);
+		*s++ = '0'+(p>>12);
+		p = 10 * (p & 0xfff);
+		*s++ = '0'+(p>>12);
+	} else {
+		p = u*8389;
+		*s++ = '0'+(p>>23);
+		p = 10 * (p & 0x7fffff);
+		*s++ = '0'+(p>>23);
+		p = 10 * (p & 0x7fffff);
+		*s++ = '0'+(p>>23);
+		p = 10 * (p & 0x7fffff);
+		*s++ = '0'+(p>>23);	
+	}
+
+	while (ua_i>0){
+		u = ua[--ua_i];
+		p = u*8389;
+		*s++ = '0'+(p>>23);
+		p = 10 * (p & 0x7fffff);
+		*s++ = '0'+(p>>23);
+		p = 10 * (p & 0x7fffff);
+		*s++ = '0'+(p>>23);
+		p = 10 * (p & 0x7fffff);
+		*s++ = '0'+(p>>23);
+	}
+	
+	*s='\0';
+}
+
 /* The environment to leave the compiler if a fatal error occurs */
 
 void FatalCompError (char *mod, char *proc, char *mess)

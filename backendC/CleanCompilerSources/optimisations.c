@@ -1696,7 +1696,9 @@ static ImpRuleP create_new_partially_applied_local_function (Node node,int old_f
 	Node lhs_root,rhs_root;
 	char *function_name_p,*end_function_name;
 
-	sprintf (function_name,"_f%d",next_function_n);
+	function_name[0] = '_';
+	function_name[1] = 'f';
+	int_to_string (&function_name[2],next_function_n);
 	++next_function_n;
 
 	if (DoTimeProfiling || DoProfiling){
@@ -1895,7 +1897,9 @@ static struct node *create_new_local_function (Node node,StateP function_state_p
 	if (n_arguments>MAX_N_FUNCTION_ARGUMENTS)
 		return NULL;
 
-	sprintf (function_name,"_f%d",next_function_n);
+	function_name[0] = '_';
+	function_name[1] = 'f';
+	int_to_string (&function_name[2],next_function_n);
 	++next_function_n;
 
 	if (DoTimeProfiling || DoProfiling){
