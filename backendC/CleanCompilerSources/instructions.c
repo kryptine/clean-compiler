@@ -246,19 +246,19 @@ static void TreatWaitListAfterFill (int offset, FillKind fkind)
 #define put_instructionb(a) put_instruction(I##a)
 #define put_instruction_b(a) put_instruction_(I##a)
 #define put_directive_b(a) put_directive_(D##a)
-#define put_arguments_i_b(i1) FPrintF (OutFile,"%s",(i1))
-#define put_arguments_in_b(i1,n1) FPrintF (OutFile,"%s %d",(i1),(n1))
-#define put_arguments_n_b(n1) FPrintF (OutFile,"%d",(n1))
-#define put_arguments_nn_b(n1,n2) FPrintF (OutFile,"%d %d",(n1),(n2))
-#define put_arguments_nnn_b(n1,n2,n3) FPrintF (OutFile,"%d %d %d",(n1),(n2),(n3))
-#define put_arguments_nnnn_b(n1,n2,n3,n4) FPrintF (OutFile,"%d %d %d %d",(n1),(n2),(n3),(n4))
-#define put_arguments_nnnnn_b(n1,n2,n3,n4,n5) FPrintF (OutFile,"%d %d %d %d %d",(n1),(n2),(n3),(n4),(n5))
-#define put_arguments_nnnnnnn_b(n1,n2,n3,n4,n5,n6,n7) FPrintF (OutFile,"%d %d %d %d %d %d %d",(n1),(n2),(n3),(n4),(n5),(n6),(n7))
-#define put_arguments_n__b(n1) FPrintF (OutFile,"%d ",(n1))
-#define put_arguments_nn__b(n1,n2) FPrintF (OutFile,"%d %d ",(n1),(n2))
-#define put_arguments__n_b(n1) FPrintF (OutFile," %d",(n1))
-#define put_arguments__nn_b(n1,n2) FPrintF (OutFile," %d %d",(n1),(n2))
-#define put_arguments__n__b(n1) FPrintF (OutFile," %d ",(n1))
+#define put_argumentsi_b(i1) FPrintF (OutFile,"%s",(i1))
+#define put_argumentsin_b(i1,n1) FPrintF (OutFile,"%s %d",(i1),(n1))
+#define put_argumentsn_b(n1) FPrintF (OutFile,"%d",(n1))
+#define put_argumentsnn_b(n1,n2) FPrintF (OutFile,"%d %d",(n1),(n2))
+#define put_argumentsnnn_b(n1,n2,n3) FPrintF (OutFile,"%d %d %d",(n1),(n2),(n3))
+#define put_argumentsnnnn_b(n1,n2,n3,n4) FPrintF (OutFile,"%d %d %d %d",(n1),(n2),(n3),(n4))
+#define put_argumentsnnnnn_b(n1,n2,n3,n4,n5) FPrintF (OutFile,"%d %d %d %d %d",(n1),(n2),(n3),(n4),(n5))
+#define put_argumentsnnnnnnn_b(n1,n2,n3,n4,n5,n6,n7) FPrintF (OutFile,"%d %d %d %d %d %d %d",(n1),(n2),(n3),(n4),(n5),(n6),(n7))
+#define put_argumentsn__b(n1) FPrintF (OutFile,"%d ",(n1))
+#define put_argumentsnn__b(n1,n2) FPrintF (OutFile,"%d %d ",(n1),(n2))
+#define put_arguments_n_b(n1) FPrintF (OutFile," %d",(n1))
+#define put_arguments_nn_b(n1,n2) FPrintF (OutFile," %d %d",(n1),(n2))
+#define put_arguments_n__b(n1) FPrintF (OutFile," %d ",(n1))
 
 #else
 
@@ -310,7 +310,7 @@ static long integer_string_to_integer (char *s_p)
 	return integer;
 }
 
-static void put_arguments_i_b (char *i1)
+static void put_argumentsi_b (char *i1)
 {
 	if (DoDebug)
 		PutSOutFile (i1);
@@ -318,7 +318,7 @@ static void put_arguments_i_b (char *i1)
 		put_n (integer_string_to_integer (i1));
 }
 
-static void put_arguments_in_b (char *i1,long n1)
+static void put_argumentsin_b (char *i1,long n1)
 {
 	if (DoDebug)
 		FPrintF (OutFile,"%s %d",(i1),(n1));
@@ -328,7 +328,7 @@ static void put_arguments_in_b (char *i1,long n1)
 	}
 }
 
-static void put_arguments_n_b (long n1)
+static void put_argumentsn_b (long n1)
 {
 	if (DoDebug)
 		FPrintF (OutFile,"%d",(n1));
@@ -336,7 +336,7 @@ static void put_arguments_n_b (long n1)
 		put_n (n1);
 }
 
-static void put_arguments_nn_b (long n1,long n2)
+static void put_argumentsnn_b (long n1,long n2)
 {
 	if (DoDebug)
 		FPrintF (OutFile,"%d %d",(n1),(n2));
@@ -346,7 +346,7 @@ static void put_arguments_nn_b (long n1,long n2)
 	}
 }
 
-static void put_arguments_nnn_b (long n1,long n2,long n3)
+static void put_argumentsnnn_b (long n1,long n2,long n3)
 {
 	if (DoDebug)
 		FPrintF (OutFile,"%d %d %d",(n1),(n2),(n3));
@@ -357,7 +357,7 @@ static void put_arguments_nnn_b (long n1,long n2,long n3)
 	}
 }
 
-static void put_arguments_nnnn_b (long n1,long n2,long n3,long n4)
+static void put_argumentsnnnn_b (long n1,long n2,long n3,long n4)
 {
 	if (DoDebug)	
 		FPrintF (OutFile,"%d %d %d %d",(n1),(n2),(n3),(n4));
@@ -369,7 +369,7 @@ static void put_arguments_nnnn_b (long n1,long n2,long n3,long n4)
 	}
 }
 
-static void put_arguments_nnnnn_b (long n1,long n2,long n3,long n4,long n5)
+static void put_argumentsnnnnn_b (long n1,long n2,long n3,long n4,long n5)
 {
 	if (DoDebug)
 		FPrintF (OutFile,"%d %d %d %d %d",(n1),(n2),(n3),(n4),(n5));
@@ -382,7 +382,7 @@ static void put_arguments_nnnnn_b (long n1,long n2,long n3,long n4,long n5)
 	}
 }
 
-static void put_arguments_n__b (long n1)
+static void put_argumentsn__b (long n1)
 {
 	if (DoDebug)
 		FPrintF (OutFile,"%d ",(n1));
@@ -390,7 +390,7 @@ static void put_arguments_n__b (long n1)
 		put_n (n1);
 }
 
-static void put_arguments__n_b (long n1)
+static void put_arguments_n_b (long n1)
 {
 	if (DoDebug)
 		FPrintF (OutFile," %d",(n1));
@@ -400,7 +400,7 @@ static void put_arguments__n_b (long n1)
 	}
 }
 
-static void put_arguments__n__b (long n1)
+static void put_arguments_n__b (long n1)
 {
 	if (DoDebug)
 		FPrintF (OutFile," %d ",(n1));
@@ -410,7 +410,7 @@ static void put_arguments__n__b (long n1)
 	}
 }
 
-static void put_arguments_nn__b (long n1,long n2)
+static void put_argumentsnn__b (long n1,long n2)
 {
 	if (DoDebug)
 		FPrintF (OutFile,"%d %d ",(n1),(n2));
@@ -420,7 +420,7 @@ static void put_arguments_nn__b (long n1,long n2)
 	}
 }
 
-static void put_arguments__nn_b (long n1,long n2)
+static void put_arguments_nn_b (long n1,long n2)
 {
 	if (DoDebug)
 		FPrintF (OutFile," %d %d",(n1),(n2));
@@ -744,7 +744,7 @@ void BuildBasicFromB (ObjectKind kind,int b_offset)
 			return;
 	}
 
-	put_arguments_n_b (b_offset);
+	put_argumentsn_b (b_offset);
 }
 
 void FillBasicFromB (ObjectKind kind, int boffs, int aoffs, FillKind fkind)
@@ -767,7 +767,7 @@ void FillBasicFromB (ObjectKind kind, int boffs, int aoffs, FillKind fkind)
 			error_in_function ("FillBasicFromB");
 			return;
 	}
-	put_arguments_nn_b (boffs,aoffs);
+	put_argumentsnn_b (boffs,aoffs);
 	TreatWaitListAfterFill (aoffs, fkind);
 }
 
@@ -776,7 +776,7 @@ void BuildBasic (ObjectKind obj,SymbValue val)
 	switch (obj){
 		case IntObj:
 			put_instruction_b (buildI);
-			put_arguments_i_b (val.val_int);
+			put_argumentsi_b (val.val_int);
 			break;
 		case BoolObj:
 			put_instruction_ (IbuildB);
@@ -802,7 +802,7 @@ void FillBasic (ObjectKind obj, SymbValue val, int offset, FillKind fkind)
 	switch (obj){
 		case IntObj:
 			put_instruction_b (fillI);
-			put_arguments_in_b (val.val_int,offset);
+			put_argumentsin_b (val.val_int,offset);
 			break;
 		case BoolObj:
 			put_instruction_ (IfillB);
@@ -829,7 +829,7 @@ void IsBasic (ObjectKind obj, SymbValue val, int offset)
 	switch (obj){
 		case IntObj:
 			put_instruction_b (eqI_a);
-			put_arguments_in_b (val.val_int,offset);
+			put_argumentsin_b (val.val_int,offset);
 			break;
 		case BoolObj:
 			put_instruction_ (IeqB_a);
@@ -859,7 +859,7 @@ void PushBasic (ObjectKind obj, SymbValue val)
 	switch (obj){
 		case IntObj:
 			put_instruction_b (pushI);
-			put_arguments_i_b (val.val_int);
+			put_argumentsi_b (val.val_int);
 			break;
 		case BoolObj:
 			put_instruction_ (IpushB);
@@ -880,13 +880,13 @@ void PushBasic (ObjectKind obj, SymbValue val)
 void GenPushReducerId (int i)
 {
 	put_instruction_b (pushI);
-	put_arguments_n_b (i);
+	put_argumentsn_b (i);
 }
 
 void GenPushArgNr (int argnr)
 {
 	put_instruction_b (pushI);
-	put_arguments_n_b (argnr);
+	put_argumentsn_b (argnr);
 }
 
 void EqBasic (ObjectKind obj, SymbValue val, int offset)
@@ -894,7 +894,7 @@ void EqBasic (ObjectKind obj, SymbValue val, int offset)
 	switch (obj){
 		case IntObj:
 			put_instruction_b (eqI_b);
-			put_arguments_in_b (val.val_int,offset);
+			put_argumentsin_b (val.val_int,offset);
 			break;
 		case BoolObj:
 			put_instruction_ (IeqB_b);
@@ -942,7 +942,7 @@ void PushBasicFromAOnB (ObjectKind kind,int offset)
 			error_in_function ("PushBasicFromAOnB");
 			return;
 	}
-	put_arguments_n_b (offset);
+	put_argumentsn_b (offset);
 }
 
 void GenPushD_a (int a_offset)
@@ -1251,14 +1251,14 @@ void GenDStackLayout (int asize,int bsize,Args fun_args)
 	if (DoStackLayout){
 		put_directive_b (d);
 		if (bsize > 0){
-			put_arguments_nn__b (asize,bsize);
+			put_argumentsnn__b (asize,bsize);
 
 			while (fun_args!=NULL){
 				GenBStackElems (fun_args->arg_state);
 				fun_args=fun_args->arg_next;
 			}
 		} else
-			put_arguments_nn_b (asize,0);
+			put_argumentsnn_b (asize,0);
 	}
 }
 
@@ -1267,14 +1267,14 @@ void GenOStackLayout (int asize,int bsize,Args fun_args)
 	if (DoStackLayout){
 		put_directive_b (o);
 		if (bsize > 0){
-			put_arguments_nn__b (asize,bsize);
+			put_argumentsnn__b (asize,bsize);
 
 			while (fun_args!=NULL){
 				GenBStackElems (fun_args->arg_state);
 				fun_args=fun_args->arg_next;
 			}
 		} else
-			put_arguments_nn_b (asize,0);
+			put_argumentsnn_b (asize,0);
 	}
 }
 
@@ -1597,7 +1597,7 @@ void GenReplArgs (int arity, int nrargs)
 {
 	if (nrargs > 0){
 		put_instruction_b (repl_args);
-		put_arguments_nn_b (arity,nrargs);
+		put_argumentsnn_b (arity,nrargs);
 	} else
 		GenPopA (1);
 }
@@ -1605,14 +1605,14 @@ void GenReplArgs (int arity, int nrargs)
 void GenReplArg (int arity, int argnr)
 {
 	put_instruction_b (repl_arg);
-	put_arguments_nn_b (arity,argnr);
+	put_argumentsnn_b (arity,argnr);
 }
 
 void GenPushArgs (int offset, int arity, int nrargs)
 {
 	if (nrargs > 0){
 		put_instruction_b (push_args);
-		put_arguments_nnn_b (offset,arity,nrargs);
+		put_argumentsnnn_b (offset,arity,nrargs);
 	}
 }
 
@@ -1620,21 +1620,21 @@ void GenPushArgsU (int offset, int arity, int nrargs)
 {
 	if (nrargs > 0){
 		put_instruction_b (push_args_u);
-		put_arguments_nnn_b (offset,arity,nrargs);
+		put_argumentsnnn_b (offset,arity,nrargs);
 	}
 }
 
 void GenPushArg (int offset, int arity, int argnr)
 {
 	put_instruction_b (push_arg);
-	put_arguments_nnn_b (offset,arity,argnr);
+	put_argumentsnnn_b (offset,arity,argnr);
 }
 
 void GenPushRArgs (int offset, int nr_a_args, int nr_b_args)
 {
 	if (nr_a_args + nr_b_args > 0){
 		put_instruction_b (push_r_args);
-		put_arguments_nnn_b (offset,nr_a_args,nr_b_args);
+		put_argumentsnnn_b (offset,nr_a_args,nr_b_args);
 	}
 }
 
@@ -1642,7 +1642,7 @@ void GenPushRArgsU (int offset,int n_a_args,int n_b_args)
 {
 	if (n_a_args + n_b_args > 0){
 		put_instruction_b (push_r_args_u);
-		put_arguments_nnn_b (offset,n_a_args,n_b_args);
+		put_argumentsnnn_b (offset,n_a_args,n_b_args);
 	}
 }
 
@@ -1650,7 +1650,7 @@ void GenPushRArgA (int offset,int tot_nr_a_args,int tot_nr_b_args,int args_nr,in
 {
 	if (nr_a_args > 0){
 		put_instruction_b (push_r_args_a);
-		put_arguments_nnnnn_b (offset,tot_nr_a_args,tot_nr_b_args,args_nr,nr_a_args);
+		put_argumentsnnnnn_b (offset,tot_nr_a_args,tot_nr_b_args,args_nr,nr_a_args);
 	}
 }
 
@@ -1658,21 +1658,21 @@ void GenPushRArgB (int offset,int tot_nr_a_args,int tot_nr_b_args,int args_nr,in
 {
 	if (nr_b_args > 0){
 		put_instruction_b (push_r_args_b);
-		put_arguments_nnnnn_b (offset,tot_nr_a_args,tot_nr_b_args,args_nr,nr_b_args);
+		put_argumentsnnnnn_b (offset,tot_nr_a_args,tot_nr_b_args,args_nr,nr_b_args);
 	}
 }
 
 void GenPushRArgU (int offset,int tot_nr_a_args,int tot_nr_b_args,int args_a_nr,int nr_a_args,int args_b_nr,int nr_b_args)
 {
 	put_instruction_b (push_r_arg_u);
-	put_arguments_nnnnnnn_b (offset,tot_nr_a_args,tot_nr_b_args,args_a_nr,nr_a_args,args_b_nr,nr_b_args);
+	put_argumentsnnnnnnn_b (offset,tot_nr_a_args,tot_nr_b_args,args_a_nr,nr_a_args,args_b_nr,nr_b_args);
 }
 
 void GenReplRArgs (int nr_a_args, int nr_b_args)
 {
 	if (nr_a_args +  nr_b_args > 0){
 		put_instruction_b (repl_r_args);
-		put_arguments_nn_b (nr_a_args,nr_b_args);
+		put_argumentsnn_b (nr_a_args,nr_b_args);
 	} else
 		GenPopA (1);
 }
@@ -1681,7 +1681,7 @@ void GenReplRArgA (int tot_nr_a_args, int tot_nr_b_args, int args_nr, int nr_a_a
 {
 	if (nr_a_args > 0){
 		put_instruction_b (repl_r_args_a);
-		put_arguments_nnnn_b (tot_nr_a_args,tot_nr_b_args,args_nr,nr_a_args);
+		put_argumentsnnnn_b (tot_nr_a_args,tot_nr_b_args,args_nr,nr_a_args);
 	} else
 		GenPopA (1);
 }
@@ -1690,14 +1690,14 @@ void GenPushNode (Label contlab, int arity)
 {
 	put_instruction_b (push_node);
 	GenLabel (contlab);
-	put_arguments__n_b (arity);
+	put_arguments_n_b (arity);
 }
 
 void GenPushNodeU (Label contlab,int a_size,int b_size)
 {
 	put_instruction_b (push_node_u);
 	GenLabel (contlab);
-	put_arguments__nn_b (a_size,b_size);
+	put_arguments_nn_b (a_size,b_size);
 }
 
 void GenFill (Label symblab,int arity,Label contlab,int offset,FillKind fkind)
@@ -1711,11 +1711,11 @@ void GenFill (Label symblab,int arity,Label contlab,int offset,FillKind fkind)
 	else
 		PutSOutFile (empty_lab.lab_name);
 	
-	put_arguments__n__b (arity);
+	put_arguments_n__b (arity);
 	
 	GenDescriptorOrNodeEntryLabel (contlab);
 	
-	put_arguments__n_b (offset);
+	put_arguments_n_b (offset);
 
 	if (arity < 0)
 		arity = 1;
@@ -1735,7 +1735,7 @@ void GenFillU (Label symblab,int a_size,int b_size,Label contlab,int offset)
 		
 	GenDescriptorOrNodeEntryLabel (contlab);
 	
-	put_arguments__n_b (offset);
+	put_arguments_n_b (offset);
 }
 
 void GenFillcp (Label symblab,int arity,Label contlab,int offset,char bits[])
@@ -1747,11 +1747,11 @@ void GenFillcp (Label symblab,int arity,Label contlab,int offset,char bits[])
 	else
 		PutSOutFile (empty_lab.lab_name);
 	
-	put_arguments__n__b (arity);
+	put_arguments_n__b (arity);
 	
 	GenDescriptorOrNodeEntryLabel (contlab);
 	
-	put_arguments__n_b (offset);
+	put_arguments_n_b (offset);
 
 	FPrintF (OutFile," %s",bits);
 }
@@ -1769,7 +1769,7 @@ void GenFillcpU (Label symblab,int a_size,int b_size,Label contlab,int offset,ch
 
 	GenDescriptorOrNodeEntryLabel (contlab);
 	
-	put_arguments__n_b (offset);
+	put_arguments_n_b (offset);
 
 	FPrintF (OutFile," %s",bits);
 }
@@ -1785,7 +1785,7 @@ void GenFillh (Label symblab, int arity, int offset, FillKind fkind)
 	else
 		PutSOutFile (empty_lab.lab_name);
 	
-	put_arguments__nn_b (arity,offset);
+	put_arguments_nn_b (arity,offset);
 
 	if (arity < 0)
 		arity = 1;
@@ -1827,7 +1827,7 @@ void GenBuild (Label symblab,int arity,Label contlab)
 	else
 		PutSOutFile (empty_lab.lab_name);
 	
-	put_arguments__n__b (arity);
+	put_arguments_n__b (arity);
 	
 	GenDescriptorOrNodeEntryLabel (contlab);
 }
@@ -1841,7 +1841,7 @@ void GenBuildh (Label symblab,int arity)
 	else
 		PutSOutFile (empty_lab.lab_name);
 	
-	put_arguments__n_b (arity);
+	put_arguments_n_b (arity);
 }
 
 void GenBuildPartialFunctionh (Label symblab,int arity)
@@ -1853,7 +1853,7 @@ void GenBuildPartialFunctionh (Label symblab,int arity)
 	else
 		PutSOutFile (empty_lab.lab_name);
 	
-	put_arguments__n_b (arity);
+	put_arguments_n_b (arity);
 }
 
 void GenBuildU (Label symblab,int a_size,int b_size,Label contlab)
@@ -1931,7 +1931,7 @@ void GenBuildFieldSelector (Label symblab,Label contlab,char *record_name,int ar
 	else
 		PutSOutFile (empty_lab.lab_name);
 
-	put_arguments__n__b (arity);
+	put_arguments_n__b (arity);
 
 	GenFieldLabel (contlab,record_name);
 }
@@ -1953,11 +1953,11 @@ void GenFillFieldSelector (Label symblab,Label contlab,char *record_name,int ari
 	else
 		PutSOutFile (empty_lab.lab_name);
 
-	put_arguments__n__b (arity);
+	put_arguments_n__b (arity);
 
 	GenFieldLabel (contlab,record_name);
 
-	put_arguments__n_b (offset);
+	put_arguments_n_b (offset);
 
 	TreatWaitListAfterFill (offset-1,fkind);
 }
@@ -2060,7 +2060,7 @@ void GenFillFromA (int src, int dst, FillKind fkind)
 	
 	TreatWaitListBeforeFill (dst, fkind);
 	put_instruction_b (fill_a);
-	put_arguments_nn_b (src,dst);
+	put_argumentsnn_b (src,dst);
 	TreatWaitListAfterFill (dst, fkind);
 }
 
@@ -2093,7 +2093,7 @@ void GenPushA (int offset)
 		error_in_function ("GenPushA");
 
 	put_instruction_b (push_a);
-	put_arguments_n_b (offset);
+	put_argumentsn_b (offset);
 }
 
 void GenPushB (int offset)
@@ -2102,25 +2102,25 @@ void GenPushB (int offset)
 		error_in_function ("GenPushB");
 
 	put_instruction_b (push_b);
-	put_arguments_n_b (offset);
+	put_argumentsn_b (offset);
 }
 
 void GenJsrEval (int offset)
 {
 	put_instruction_b (jsr_eval);
-	put_arguments_n_b (offset);
+	put_argumentsn_b (offset);
 }
 
 void GenJsrAp (int n_args)
 {
 	put_instruction_b (jsr_ap);
-	put_arguments_n_b (n_args);
+	put_argumentsn_b (n_args);
 }
 
 void GenJsrI (int n_args)
 {
 	put_instruction_b (jsr_i);
-	put_arguments_n_b (n_args);
+	put_argumentsn_b (n_args);
 }
 
 void GenJmpEval (void)
@@ -2131,19 +2131,19 @@ void GenJmpEval (void)
 void GenJmpAp (int n_args)
 {
 	put_instruction_b (jmp_ap);
-	put_arguments_n_b (n_args);
+	put_argumentsn_b (n_args);
 }
 
 void GenJmpApUpd (int n_args)
 {
 	put_instruction_b (jmp_ap_upd);
-	put_arguments_n_b (n_args);
+	put_argumentsn_b (n_args);
 }
 
 void GenJmpI (int n_args)
 {
 	put_instruction_b (jmp_i);
-	put_arguments_n_b (n_args);
+	put_argumentsn_b (n_args);
 }
 
 void GenJmpNotEqZ (SymbValue val,Label tolab)
@@ -2163,7 +2163,7 @@ void GenPopA (int nr)
 {
 	if (nr > 0){
 		put_instruction_b (pop_a);
-		put_arguments_n_b (nr);
+		put_argumentsn_b (nr);
 	}
 }
 
@@ -2171,7 +2171,7 @@ void GenPopB (int nr)
 {
 	if (nr > 0){
 		put_instruction_b (pop_b);
-		put_arguments_n_b (nr);
+		put_argumentsn_b (nr);
 	}
 }
 
@@ -2179,14 +2179,14 @@ void GenEqDesc (Label symblab,int arity,int offset)
 {
 	put_instruction_b (eq_desc);
 	GenLabel (symblab);
-	put_arguments__nn_b (arity,offset);
+	put_arguments_nn_b (arity,offset);
 }
 
 void GenEqD_b (Label symblab,int arity)
 {
 	put_instruction_b (eqD_b);
 	GenLabel (symblab);
-	put_arguments__n_b (arity);
+	put_arguments_n_b (arity);
 }
 
 void GenExitFalse (Label to)
@@ -2254,7 +2254,7 @@ void GenUpdateA (int src, int dst)
 {
 	if (src != dst){
 		put_instruction_b (update_a);
-		put_arguments_nn_b (src,dst);
+		put_argumentsnn_b (src,dst);
 	}
 }
 
@@ -2263,15 +2263,15 @@ void GenUpdatePopA (int src, int dst)
 	if (src!=dst){
 		if (dst!=0){
 			put_instruction_b (updatepop_a);
-			put_arguments_nn_b (src,dst);
+			put_argumentsnn_b (src,dst);
 		} else {
 			put_instruction_b (update_a);
-			put_arguments_nn_b (src,dst);
+			put_argumentsnn_b (src,dst);
 		}
 	} else
 		if (dst > 0){
 			put_instruction_b (pop_a);
-			put_arguments_n_b (dst);
+			put_argumentsn_b (dst);
 		}
 }
 
@@ -2279,7 +2279,7 @@ void GenUpdateB (int src, int dst)
 {
 	if (src != dst){
 		put_instruction_b (update_b);
-		put_arguments_nn_b (src,dst);
+		put_argumentsnn_b (src,dst);
 	}
 }
 
@@ -2288,15 +2288,15 @@ void GenUpdatePopB (int src, int dst)
 	if (src!=dst){
 		if (dst!=0){
 			put_instruction_b (updatepop_b);
-			put_arguments_nn_b (src,dst);
+			put_argumentsnn_b (src,dst);
 		} else {
 			put_instruction_b (update_b);
-			put_arguments_nn_b (src,dst);
+			put_argumentsnn_b (src,dst);
 		}
 	} else
 		if (dst > 0) {
 			put_instruction_b (pop_b);
-			put_arguments_n_b (dst);
+			put_argumentsn_b (dst);
 		}
 }
 
@@ -2531,7 +2531,7 @@ void GenDAStackLayout (int asize)
 {
 	if (DoStackLayout){
 		put_directive_b (d);
-		put_arguments_nn_b (asize,0);
+		put_argumentsnn_b (asize,0);
 	}
 }
 
@@ -2539,7 +2539,7 @@ void GenOAStackLayout (int asize)
 {
 	if (DoStackLayout){
 		put_directive_b (o);
-		put_arguments_nn_b (asize,0);
+		put_argumentsnn_b (asize,0);
 	}
 }
 
@@ -2550,12 +2550,12 @@ void GenDStackLayoutOfStates (int asize,int bsize,int n_states,StateP state_p)
 		if (bsize > 0){
 			int i;
 	
-			put_arguments_nn__b (asize,bsize);
+			put_argumentsnn__b (asize,bsize);
 
 			for (i=0; i<n_states; ++i)
 				GenBStackElems (state_p[i]);
 		} else
-			put_arguments_nn_b (asize,0);
+			put_argumentsnn_b (asize,0);
 	}
 }
 
@@ -2566,12 +2566,12 @@ void GenOStackLayoutOfStates (int asize,int bsize,int n_states,StateP state_p)
 		if (bsize > 0){
 			int i;
 			
-			put_arguments_nn__b (asize,bsize);
+			put_argumentsnn__b (asize,bsize);
 
 			for (i=0; i<n_states; ++i)
 				GenBStackElems (state_p[i]);
 		} else
-			put_arguments_nn_b (asize,0);
+			put_argumentsnn_b (asize,0);
 	}
 }
 
@@ -2580,10 +2580,10 @@ void GenDStackLayoutOfState (int asize, int bsize, StateS resultstate)
 	if (DoStackLayout){
 		put_directive_b (d);
 		if (bsize > 0){
-			put_arguments_nn__b (asize,bsize);
+			put_argumentsnn__b (asize,bsize);
 			GenBStackElems (resultstate);
 		} else
-			put_arguments_nn_b (asize,0);
+			put_argumentsnn_b (asize,0);
 	}		
 }
 
@@ -2592,10 +2592,10 @@ void GenOStackLayoutOfState (int asize, int bsize, StateS resultstate)
 	if (DoStackLayout){
 		put_directive_b (o);
 		if (bsize > 0){
-			put_arguments_nn__b (asize,bsize);
+			put_argumentsnn__b (asize,bsize);
 			GenBStackElems (resultstate);
 		} else
-			put_arguments_nn_b (asize,0);
+			put_argumentsnn_b (asize,0);
 	}		
 }
 
@@ -2608,7 +2608,7 @@ void GenNodeEntryDirective (int arity,Label label,Label label2)
 {
 	if (DoStackLayout){
 		put_directive_b (n);
-		put_arguments_n__b (arity);
+		put_argumentsn__b (arity);
 
 		if (DescriptorNeeded (label->lab_symbol))
 			GenDescriptorOrNodeEntryLabel (label);
@@ -2631,14 +2631,14 @@ void GenNodeEntryDirective (int arity,Label label,Label label2)
 void GenApplyEntryDirective (int arity,Label label)
 {
 	put_directive_b (a);
-	put_arguments_n__b (arity);
+	put_argumentsn__b (arity);
 	GenLabel (label);
 }
 
 void GenApplyInstanceEntryDirective (int arity,Label label,Label label2)
 {
 	put_directive_b (ai);
-	put_arguments_n__b (arity);
+	put_argumentsn__b (arity);
 	if (label==NULL)
 		PutSOutFile (empty_lab.lab_name);
 	else
@@ -2651,7 +2651,7 @@ void GenLazyRecordNodeEntryDirective (int arity,Label label,Label label2)
 {
 	if (DoStackLayout){
 		put_directive_b (n);
-		put_arguments_n__b (arity);
+		put_argumentsn__b (arity);
 
 		if (DescriptorNeeded (label->lab_symbol))
 			GenLabel (label);
@@ -2676,7 +2676,7 @@ void GenNodeEntryDirectiveForLabelWithoutSymbol (int arity,Label label,Label lab
 {
 	if (DoStackLayout){
 		put_directive_b (n);
-		put_arguments_n__b (arity);
+		put_argumentsn__b (arity);
 
 		GenLabel (label);
 
@@ -2723,7 +2723,7 @@ void GenFieldNodeEntryDirective (int arity,Label label,Label label2,char *record
 {
 	if (DoStackLayout){
 		put_directive_b (n);
-		put_arguments_n__b (arity);
+		put_argumentsn__b (arity);
 		
 		if (DescriptorNeeded (label->lab_symbol))
 			GenFieldLabel (label,record_name);
@@ -3381,7 +3381,7 @@ void GenStart (SymbDef startsymb)
 
 		if (arity!=0 || strcmp (start_function_name,"main")==0){
 			put_instruction_b (buildI);
-			put_arguments_n_b (65536l);
+			put_argumentsn_b (65536l);
 		}
 		
 		put_instruction_b (build);
@@ -3405,7 +3405,7 @@ void GenStart (SymbDef startsymb)
 				PutSOutFile (empty_lab.lab_name);
 		}
 
-		put_arguments__n__b (arity);
+		put_arguments_n__b (arity);
 
 		if (startsymb->sdef_exported)
 			FPrintF (OutFile, "e_%s_" N_PREFIX "%s",CurrentModule,start_function_name);
@@ -3511,7 +3511,7 @@ void GenNoMatchError (SymbDef sdef,int asp,int bsp,int string_already_generated)
 	
 	if (DoStackLayout){
 		put_directive_b (d);
-		put_arguments_nn__b (0,2);
+		put_argumentsnn__b (0,2);
 		PutSOutFile ("ii");
 	}
 	
