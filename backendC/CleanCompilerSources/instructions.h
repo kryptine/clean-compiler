@@ -184,11 +184,7 @@ void GenConstructorFunctionDescriptorAndExportNodeAndDescriptor (SymbDef sdef);
 void GenFunctionDescriptorForLazyTupleRecursion (SymbDef sdef,int tuple_result_arity);
 #endif
 void GenLazyRecordDescriptorAndExport (SymbDef sdef);
-#ifdef NEW_SELECTOR_DESCRIPTORS
 void GenFieldSelectorDescriptor (SymbDef sdef,StateS field_state,int a_pos,int b_pos,int record_a_size,int record_b_size);
-#else
-void GenFieldSelectorDescriptor (SymbDef sdef,int has_gc_apply_entry);
-#endif
 void GenRecordDescriptor (SymbDef sdef);
 #ifdef STRICT_LISTS
 void GenUnboxedConsRecordDescriptor (SymbDef sdef,int tail_strict);
@@ -226,11 +222,7 @@ void GenInstructions (Instructions ilist);
 
 void GenJmpEvalUpdate (void);
 
-#ifdef NEW_SELECTOR_DESCRIPTORS
 void GenSelectorDescriptor (Label sellab,int element_n);
-#else
-void GenSelectorDescriptor (Label sellab,char *g_pref);
-#endif
 void GenGetNodeArity (int offset);
 void GenPushArgNr (int argnr);
 void GenPushArgB (int offset);

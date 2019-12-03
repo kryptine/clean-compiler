@@ -3239,8 +3239,6 @@ void GenLazyRecordDescriptorAndExport (SymbDef sdef)
 	}
 }
 
-#ifdef NEW_SELECTOR_DESCRIPTORS
-
 static void print_result_descriptor_and_offsets (StateS field_state,int a_pos,int b_pos,int record_a_size,int record_b_size)
 {
 	if (field_state.state_kind!=OnB)
@@ -3323,70 +3321,6 @@ void GenFieldSelectorDescriptor (SymbDef sdef,StateS field_state,int a_pos,int b
 
 	FPrintF (OutFile, "\"%s.%s\"",record_name,name);
 }
-#else
-void GenFieldSelectorDescriptor (SymbDef sdef,int has_gc_apply_entry)
-{
-	char *name,*record_name;
-	int arity;
-
-	if (!DescriptorNeeded (sdef))
-		return;
-
-	name = sdef->sdef_name;
-	arity = (sdef->sdef_kind == RECORDTYPE) ? sdef->sdef_cons_arity : sdef->sdef_arity;
-
-	record_name=sdef->sdef_type->type_symbol->symb_def->sdef_name;
-	
-	put_directive_ (Ddesc);
-	if (sdef->sdef_exported){
-		if (has_gc_apply_entry)
-			FPrintF (OutFile, "e_%s_" D_PREFIX "%s.%s e_%s_" N_PREFIX "%s.%s e_%s_" L_PREFIX "%s.%s %d 0 \"%s.%s\"",
-				CurrentModule,record_name,name,
-				CurrentModule,record_name,name,
-				CurrentModule,record_name,name,
-				arity,record_name,name);	
-		else
-			FPrintF (OutFile, "e_%s_" D_PREFIX "%s.%s e_%s_" N_PREFIX "%s.%s _hnf %d 0 \"%s.%s\"",
-				CurrentModule,record_name,name,
-				CurrentModule,record_name,name,
-				arity,record_name,name);
-	} else if ((sdef->sdef_mark & SDEF_USED_LAZILY_MASK) || has_gc_apply_entry){
-		if (ExportLocalLabels)
-			FPrintF (OutFile, "e_%s_" D_PREFIX "%s.%s ",CurrentModule,record_name,name);		
-		else if (DoDebug)
-			FPrintF (OutFile, D_PREFIX "%s.%s ",record_name,name);				
-		else
-			FPrintF (OutFile, LOCAL_D_PREFIX "%u ", sdef->sdef_number);
-
-		if (sdef->sdef_mark & SDEF_USED_LAZILY_MASK){
-			if (ExportLocalLabels)
-				FPrintF (OutFile, "e_%s_" N_PREFIX "%s.%s ",CurrentModule,record_name,name);
-			else if (DoDebug)
-				FPrintF (OutFile, N_PREFIX "%s.%s ",record_name,name);
-			else
-				FPrintF (OutFile, N_PREFIX "%u ",sdef->sdef_number);
-		} else
-			FPrintF (OutFile, "%s ",hnf_lab.lab_name);
-		
-		if (has_gc_apply_entry){
-			if (ExportLocalLabels)
-				FPrintF (OutFile, "e_%s_" L_PREFIX "%s.%s ",CurrentModule,record_name,name);
-			else if (DoDebug)
-				FPrintF (OutFile, L_PREFIX "%s.%s ",record_name,name);
-			else
-				FPrintF (OutFile, L_PREFIX "%u ",sdef->sdef_number);
-		} else
-			FPrintF (OutFile, "%s ",hnf_lab.lab_name);
-
-		FPrintF (OutFile, "%d 0 \"%s.%s\"",arity,record_name,name);
-	} else if (DoDebug){
-		FPrintF (OutFile, D_PREFIX "%s %s %s %d 0 \"%s.%s\"", name, hnf_lab.lab_name,
-			hnf_lab.lab_name,arity,record_name,name);
-	} else
-		FPrintF (OutFile, LOCAL_D_PREFIX "%u %s %s %d 0 \"%s.%s\"", sdef->sdef_number,
-			hnf_lab.lab_name, hnf_lab.lab_name, arity,record_name,name);
-}
-#endif
 
 void GenModuleDescriptor (
 #if WRITE_DCL_MODIFICATION_TIME
@@ -3493,7 +3427,6 @@ void GenStart (SymbDef startsymb)
 	}
 }
 
-#ifdef NEW_SELECTOR_DESCRIPTORS
 void GenSelectorDescriptor (Label sellab,int element_n)
 {
 	if (sellab->lab_issymbol){
@@ -3521,17 +3454,6 @@ void GenSelectorDescriptor (Label sellab,int element_n)
 				sellab->lab_name, sellab->lab_post);
 	}
 }
-#else
-void GenSelectorDescriptor (Label sellab,char *g_pref)
-{
-	put_directive_ (Ddesc);
-	FPrintF (OutFile, D_PREFIX "%s.%d %s%s.%d %s%s.%d 1 0 \"%s.%d\"",
-			sellab->lab_name, sellab->lab_post,
-			sellab->lab_pref, sellab->lab_name, sellab->lab_post,
-			g_pref, sellab->lab_name, sellab->lab_post,
-			sellab->lab_name, sellab->lab_post);
-}
-#endif
 
 void InitFileInfo (ImpMod imod)
 {

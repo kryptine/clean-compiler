@@ -982,11 +982,7 @@ static void GenLazyFieldSelectorEntry (SymbDef field_def,StateS recstate,int tot
 		if (field_def->sdef_exported || ExportLocalLabels)
 			GenExportFieldSelector (field_def);
 
-#ifdef NEW_SELECTOR_DESCRIPTORS
 		GenFieldSelectorDescriptor (field_def,offfieldstate,apos,bpos,tot_a_size,tot_b_size);
-#else
-		GenFieldSelectorDescriptor (field_def,IsSimpleState (offfieldstate));
-#endif
 
 		if (DoTimeProfiling)
 			GenPB (field_def->sdef_name);
@@ -1038,18 +1034,6 @@ static void GenLazyFieldSelectorEntry (SymbDef field_def,StateS recstate,int tot
 		}
 		
 		GenJsrEval (0);
-
-#ifndef NEW_SELECTOR_DESCRIPTORS
-		if (IsSimpleState (offfieldstate) && offfieldstate.state_kind==OnB && !DoTimeProfiling){
-			LabDef gc_apply_label;
-
-			gc_apply_label=CurrentAltLabel;
-			gc_apply_label.lab_pref = l_pref;
-
-			GenOAStackLayout (2);
-			GenFieldLabelDefinition (&gc_apply_label,record_name);
-		}
-#endif
 
 		GenPushRArgB (0, tot_a_size, tot_b_size, bpos + 1, bsize); 
 		GenReplRArgA (tot_a_size, tot_b_size, apos + 1, asize);
@@ -1115,36 +1099,6 @@ static void GenLazyFieldSelectorEntry (SymbDef field_def,StateS recstate,int tot
 
 		if (DoTimeProfiling)
 			GenPE();
-
-#ifndef NEW_SELECTOR_DESCRIPTORS
-		/* generate apply entry for the garbage collector: */
-		if (IsSimpleState (offfieldstate)){
-			LabDef gc_apply_label;
-
-			gc_apply_label=CurrentAltLabel;
-			gc_apply_label.lab_pref = l_pref;
-
-			if (offfieldstate.state_kind==OnB){
-				if (DoTimeProfiling){
-					GenOAStackLayout (2);
-					GenFieldLabelDefinition (&gc_apply_label,record_name);
-					
-					GenPushRArgB (0,tot_a_size,tot_b_size,bpos+1,bsize);
-					GenReplRArgA (tot_a_size,tot_b_size,apos+1, asize);
-
-					FillBasicFromB (offfieldstate.state_object,0,0,ReleaseAndFill);
-					GenPopB (ObjectSizes [offfieldstate.state_object]);
-		 			GenRtn (1,0, OnAState);
-	 			}
-			} else {
-				GenOAStackLayout (1);
-				GenFieldLabelDefinition (&gc_apply_label,record_name);
-				
-				GenReplRArgA (tot_a_size, tot_b_size, apos + 1, asize);
-	 			GenRtn (1,0, OnAState);
-			}
-		}
-#endif
 	 }
 }
 
@@ -2439,18 +2393,13 @@ Bool ConvertExternalToInternalCall (int arity,StateS *const ext_function_state_p
 	}
 }
 
-static char g_pref[] = "g";
-
 static void GenerateCodeForLazyTupleSelectorEntry (int argnr)
 {
 	LabDef sellab,easellab,descriptor_label;
 
 	BuildLazyTupleSelectorLabel	(&sellab, MaxNodeArity, argnr);
-#ifdef NEW_SELECTOR_DESCRIPTORS
+
 	GenSelectorDescriptor (&sellab,argnr);
-#else
-	GenSelectorDescriptor (&sellab,g_pref);
-#endif
 
 	easellab = sellab;
 	easellab.lab_pref = ea_pref;
@@ -2470,17 +2419,6 @@ static void GenerateCodeForLazyTupleSelectorEntry (int argnr)
 	GenFillFromA		(0, 2, ReleaseAndFill);
 	GenPopA				(2);
 	GenRtn 				(1,0,OnAState);
-
-#ifndef NEW_SELECTOR_DESCRIPTORS
-	GenOAStackLayout (1);
-	sellab.lab_pref = g_pref;
-	GenLabelDefinition	(&sellab);
-	GenGetNodeArity		(0);
-	GenPushArgNr		(argnr);
-	GenPushArgB			(0);
-	GenUpdatePopA		(0, 1);
-	GenRtn 				(1,0,OnAState);
-#endif
 
 	GenOAStackLayout (2);
 	GenLabelDefinition	(&easellab);
