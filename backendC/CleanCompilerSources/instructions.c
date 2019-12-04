@@ -209,38 +209,6 @@ static void GenDescriptorOrNodeEntryLabel (Label label)
 		FPrintF (OutFile,".%u",label->lab_post);
 }
 
-static void GenGetWL (int offset)
-{
-	FPrintF (OutFile, "\n\tgetWL %d", offset);
-}
-
-static void GenPutWL (int offset)
-{
-	FPrintF (OutFile, "\n\tputWL %d", offset);
-}
-
-static void GenRelease (void)
-{
-	PutSOutFile ("\n\trelease");
-}
-
-static void TreatWaitListBeforeFill (int offset, FillKind fkind)
-{
-	if (DoParallel && fkind != NormalFill)
-		GenGetWL (offset);	
-}
-
-static void TreatWaitListAfterFill (int offset, FillKind fkind)
-{
-	if (DoParallel){
-		switch (fkind){
-			case ReleaseAndFill:GenRelease ();		break;
-			case PartialFill:	GenPutWL (offset);	break;
-			default:							break;
-		}
-	}
-}
-
 #if !BINARY_ABC
 
 #define put_instructionb(a) put_instruction(I##a)
@@ -669,6 +637,40 @@ static void put_instruction_code (int instruction_code)
 	PutCOutFile (instruction_code);
 }
 
+static void GenGetWL (int offset)
+{
+	put_instruction ("getWL");
+	put_arguments_n_b (offset);
+}
+
+static void GenPutWL (int offset)
+{
+	put_instruction ("putWL");
+	put_arguments_n_b (offset);
+}
+
+static void GenRelease (void)
+{
+	put_instruction ("release");
+}
+
+static void TreatWaitListBeforeFill (int offset, FillKind fkind)
+{
+	if (DoParallel && fkind != NormalFill)
+		GenGetWL (offset);	
+}
+
+static void TreatWaitListAfterFill (int offset, FillKind fkind)
+{
+	if (DoParallel){
+		switch (fkind){
+			case ReleaseAndFill:GenRelease ();		break;
+			case PartialFill:	GenPutWL (offset);	break;
+			default:							break;
+		}
+	}
+}
+
 #define Da "a"
 #define Dai "ai"
 #define Dkeep "keep"
@@ -718,11 +720,10 @@ static void put_directive_ (char *directive)
 	PutCOutFile (' ');
 }
 
-static void put_first_directive_ (char *directive)
+static void put_first_directive (char *directive)
 {
 	PutCOutFile ('.');
 	PutSOutFile (directive);
-	PutCOutFile (' ');
 }
 
 void BuildBasicFromB (ObjectKind kind,int b_offset)
@@ -806,9 +807,9 @@ void FillBasic (ObjectKind obj, SymbValue val, int offset, FillKind fkind)
 			put_argumentsin_b (val.val_int,offset);
 			break;
 		case BoolObj:
-			put_instruction_ (IfillB);
-			PutSOutFile (val.val_bool ? "TRUE" : "FALSE");
-			FPrintF (OutFile, " %d", offset);
+			put_instruction (IfillB);
+			PutSOutFile (val.val_bool ? " TRUE" : " FALSE");
+			put_arguments_n_b (offset);
 			break;
 		case CharObj:
 			put_instruction_ (IfillC);
@@ -833,9 +834,9 @@ void IsBasic (ObjectKind obj, SymbValue val, int offset)
 			put_argumentsin_b (val.val_int,offset);
 			break;
 		case BoolObj:
-			put_instruction_ (IeqB_a);
-			PutSOutFile (val.val_bool ? "TRUE" : "FALSE");
-			FPrintF (OutFile, " %d", offset);
+			put_instruction (IeqB_a);
+			PutSOutFile (val.val_bool ? " TRUE" : " FALSE");
+			put_arguments_n_b (offset);
 			break;
 		case CharObj:
 			put_instruction_ (IeqC_a);
@@ -868,10 +869,12 @@ void PushBasic (ObjectKind obj, SymbValue val)
 			break;
 		case CharObj:
 			put_instruction_ (IpushC);
-			PutSOutFile (val.val_char); break;
+			PutSOutFile (val.val_char);
+			break;
 		case RealObj:
 			put_instruction_ (IpushR);
-			PutSOutFile (val.val_real); break;
+			PutSOutFile (val.val_real);
+			break;
 		default:
 			error_in_function ("PushBasic");
 			return;
@@ -898,16 +901,18 @@ void EqBasic (ObjectKind obj, SymbValue val, int offset)
 			put_argumentsin_b (val.val_int,offset);
 			break;
 		case BoolObj:
-			put_instruction_ (IeqB_b);
-			PutSOutFile (val.val_bool ? "TRUE" : "FALSE");
-			FPrintF (OutFile, " %d", offset);
+			put_instruction (IeqB_b);
+			PutSOutFile (val.val_bool ? " TRUE" : " FALSE");
+			put_arguments_n_b (offset);
 			break;
 		case CharObj:
 			put_instruction_ (IeqC_b);
-			FPrintF (OutFile, "%s %d", val.val_char, offset); break;
+			FPrintF (OutFile, "%s %d", val.val_char, offset);
+			break;
 		case RealObj:
 			put_instruction_ (IeqR_b);
-			FPrintF (OutFile, "%s %d", val.val_real, offset); break;
+			FPrintF (OutFile, "%s %d", val.val_real, offset);
+			break;
 		default:
 			error_in_function ("EqBasic");
 			return;
@@ -948,8 +953,8 @@ void PushBasicFromAOnB (ObjectKind kind,int offset)
 
 void GenPushD_a (int a_offset)
 {
-	put_instruction_ (IpushD_a);
-	FPrintF (OutFile,"%d",a_offset);
+	put_instruction (IpushD_a);
+	put_arguments_n_b (a_offset);
 }
 	
 void PushBasicOnB (ObjectKind obj, int offset)
@@ -1252,7 +1257,8 @@ void GenDStackLayout (int asize,int bsize,Args fun_args)
 	if (DoStackLayout){
 		put_directiveb (d);
 		if (bsize > 0){
-			put_arguments_nn__b (asize,bsize);
+			put_arguments_nn_b (asize,bsize);
+			PutCOutFile (' ');
 
 			while (fun_args!=NULL){
 				GenBStackElems (fun_args->arg_state);
@@ -1268,7 +1274,8 @@ void GenOStackLayout (int asize,int bsize,Args fun_args)
 	if (DoStackLayout){
 		put_directiveb (o);
 		if (bsize > 0){
-			put_arguments_nn__b (asize,bsize);
+			put_arguments_nn_b (asize,bsize);
+			PutCOutFile (' ');
 
 			while (fun_args!=NULL){
 				GenBStackElems (fun_args->arg_state);
@@ -1377,28 +1384,28 @@ static void GenArraySize (Label elemdesc, int asize, int bsize)
 {
 	put_instruction_ (Ipush_arraysize);
 	GenLabel (elemdesc);
-	FPrintF (OutFile, " %d %d", asize, bsize);
+	put_arguments_nn_b (asize, bsize);
 }
 
 static void GenArraySelect (Label elemdesc, int asize, int bsize)
 {
 	put_instruction_ (Iselect);
 	GenLabel (elemdesc);
-	FPrintF (OutFile, " %d %d", asize, bsize);
+	put_arguments_nn_b (asize, bsize);
 }
 
 static void GenArrayUpdate (Label elemdesc, int asize, int bsize)
 {
 	put_instruction_ (Iupdate);
 	GenLabel (elemdesc);
-	FPrintF (OutFile, " %d %d", asize, bsize);	
+	put_arguments_nn_b (asize, bsize);	
 }
 
 static void GenArrayReplace (Label elemdesc, int asize, int bsize)
 {
 	put_instruction_ (Ireplace);
 	GenLabel (elemdesc);
-	FPrintF (OutFile, " %d %d", asize, bsize);
+	put_arguments_nn_b (asize, bsize);
 }
 
 #if CLEAN2
@@ -1459,12 +1466,12 @@ void CallArrayFunction (SymbDef array_def,Bool is_jsr,StateP node_state_p)
 		case CreateArrayFun:
 			put_instruction_ ("create_array");
 			GenLabel (&elem_desc);
-			FPrintF (OutFile," %d %d",asize,bsize);
+			put_arguments_nn_b (asize,bsize);
 			break;
 		case _CreateArrayFun:
 			put_instruction_ ("create_array_");
 			GenLabel (&elem_desc);
-			FPrintF (OutFile," %d %d",asize,bsize);
+			put_arguments_nn_b (asize,bsize);
 			break;
 		case ArraySelectFun:
 			GenArraySelect (&elem_desc,asize,bsize);
@@ -1584,14 +1591,15 @@ void CallArrayFunction (SymbDef array_def,Bool is_jsr,StateP node_state_p)
 
 void GenNewContext (Label contlab, int offset)
 {
-	FPrintF (OutFile, "\n\tset_entry ");
+	put_instruction_ ("set_entry");
 	GenLabel (contlab);
-	FPrintF (OutFile, " %d", offset);
+	put_arguments_n_b (offset);
 }
 
 void GenSetDefer (int offset)
 {
-	FPrintF (OutFile, "\n\tset_defer %d", offset);
+	put_instruction ("set_defer");
+	put_arguments_n_b (offset);
 }
 
 void GenReplArgs (int arity, int nrargs)
@@ -1713,8 +1721,9 @@ void GenFill (Label symblab,int arity,Label contlab,int offset,FillKind fkind)
 	else
 		PutSOutFile (empty_lab.lab_name);
 	
-	put_arguments_n__b (arity);
+	put_arguments_n_b (arity);
 	
+	PutCOutFile (' ');
 	GenDescriptorOrNodeEntryLabel (contlab);
 	
 	put_arguments_n_b (offset);
@@ -1733,8 +1742,9 @@ void GenFillU (Label symblab,int a_size,int b_size,Label contlab,int offset)
 	else
 		PutSOutFile (empty_lab.lab_name);
 	
-	FPrintF (OutFile," %d %d ",a_size,b_size);
-		
+	put_arguments_nn_b (a_size,b_size);
+	
+	PutCOutFile (' ');
 	GenDescriptorOrNodeEntryLabel (contlab);
 	
 	put_arguments_n_b (offset);
@@ -1749,8 +1759,9 @@ void GenFillcp (Label symblab,int arity,Label contlab,int offset,char bits[])
 	else
 		PutSOutFile (empty_lab.lab_name);
 	
-	put_arguments_n__b (arity);
+	put_arguments_n_b (arity);
 	
+	PutCOutFile (' ');
 	GenDescriptorOrNodeEntryLabel (contlab);
 	
 	put_arguments_n_b (offset);
@@ -1767,8 +1778,9 @@ void GenFillcpU (Label symblab,int a_size,int b_size,Label contlab,int offset,ch
 	else
 		PutSOutFile (empty_lab.lab_name);
 		
-	FPrintF (OutFile," %d %d ",a_size,b_size);
+	put_arguments_nn_b (a_size,b_size);
 
+	PutCOutFile (' ');
 	GenDescriptorOrNodeEntryLabel (contlab);
 	
 	put_arguments_n_b (offset);
@@ -1822,22 +1834,25 @@ void GenFill3 (Label symblab,int arity,int offset,char bits[])
 
 void GenBuild (Label symblab,int arity,Label contlab)
 {
-	put_instruction_b (build);
-	
+	put_instructionb (build);
+
+	PutCOutFile (' ');
 	if (!symblab->lab_issymbol || DescriptorNeeded (symblab->lab_symbol))
 		GenDescriptorOrNodeEntryLabel (symblab);
 	else
 		PutSOutFile (empty_lab.lab_name);
 	
-	put_arguments_n__b (arity);
+	put_arguments_n_b (arity);
 	
+	PutCOutFile (' ');
 	GenDescriptorOrNodeEntryLabel (contlab);
 }
 
 void GenBuildh (Label symblab,int arity)
 {
-	put_instruction_b (buildh);
+	put_instructionb (buildh);
 	
+	PutCOutFile (' ');
 	if (!symblab->lab_issymbol || DescriptorNeeded (symblab->lab_symbol))
 		GenLabel (symblab);
 	else
@@ -1848,8 +1863,9 @@ void GenBuildh (Label symblab,int arity)
 
 void GenBuildPartialFunctionh (Label symblab,int arity)
 {
-	put_instruction_b (buildh);
+	put_instructionb (buildh);
 	
+	PutCOutFile (' ');
 	if (!symblab->lab_issymbol || DescriptorNeeded (symblab->lab_symbol))
 		GenDescriptorOrNodeEntryLabel (symblab);
 	else
@@ -1860,15 +1876,17 @@ void GenBuildPartialFunctionh (Label symblab,int arity)
 
 void GenBuildU (Label symblab,int a_size,int b_size,Label contlab)
 {
-	put_instruction_ (Ibuild_u);
+	put_instruction (Ibuild_u);
 	
+	PutCOutFile (' ');
 	if (!symblab->lab_issymbol || DescriptorNeeded (symblab->lab_symbol))
 		GenDescriptorOrNodeEntryLabel (symblab);
 	else
 		PutSOutFile (empty_lab.lab_name);
 	
-	FPrintF (OutFile," %d %d ",a_size,b_size);
+	put_arguments_nn_b (a_size,b_size);
 	
+	PutCOutFile (' ');
 	GenDescriptorOrNodeEntryLabel (contlab);
 }
 
@@ -1933,8 +1951,9 @@ void GenBuildFieldSelector (Label symblab,Label contlab,char *record_name,int ar
 	else
 		PutSOutFile (empty_lab.lab_name);
 
-	put_arguments_n__b (arity);
+	put_arguments_n_b (arity);
 
+	PutCOutFile (' ');
 	GenFieldLabel (contlab,record_name);
 }
 
@@ -1955,8 +1974,9 @@ void GenFillFieldSelector (Label symblab,Label contlab,char *record_name,int ari
 	else
 		PutSOutFile (empty_lab.lab_name);
 
-	put_arguments_n__b (arity);
+	put_arguments_n_b (arity);
 
+	PutCOutFile (' ');
 	GenFieldLabel (contlab,record_name);
 
 	put_arguments_n_b (offset);
@@ -1980,7 +2000,7 @@ void GenFillR (Label symblab,int nr_a_args,int nr_b_args,int rootoffset,int a_of
 	if (nr_b_args==0)
 		b_offset=0;
 	
-	FPrintF (OutFile, " %d %d %d %d %d",nr_a_args,nr_b_args,rootoffset,a_offset,b_offset);
+	put_arguments_nnnnn_b (nr_a_args,nr_b_args,rootoffset,a_offset,b_offset);
 	
 	if (pop_args){
 		GenPopA (nr_a_args);
@@ -2035,7 +2055,7 @@ void GenBuildhr (Label symblab,int nr_a_args,int nr_b_args)
 	else
 		PutSOutFile (empty_lab.lab_name);
 
-	FPrintF (OutFile, " %d %d",nr_a_args,nr_b_args);
+	put_arguments_nn_b (nr_a_args,nr_b_args);
 }
 
 void GenBuildR (Label symblab,int nr_a_args,int nr_b_args,int a_offset,int b_offset)
@@ -2052,7 +2072,7 @@ void GenBuildR (Label symblab,int nr_a_args,int nr_b_args,int a_offset,int b_off
 	if (nr_b_args==0)
 		b_offset=0;
 
-	FPrintF (OutFile, " %d %d %d %d",nr_a_args,nr_b_args,a_offset,b_offset);
+	put_arguments_nnnn_b (nr_a_args,nr_b_args,a_offset,b_offset);
 }
 
 void GenFillFromA (int src, int dst, FillKind fkind)
@@ -2079,8 +2099,8 @@ void GenFillArray (int argoffset, int rootoffset, FillKind fkind)
 
 void GenPushArray (int rootoffset)
 {
-	put_instruction_ (Ipush_array);
-	FPrintF (OutFile, "%d", rootoffset);
+	put_instruction (Ipush_array);
+	put_arguments_n_b (rootoffset);
 }
 
 void GenRtn (int asize, int bsize, StateS resultstate)
@@ -2223,12 +2243,9 @@ void GenJsr (Label tolab)
 
 void GenCreate (int arity)
 {
-	if (arity == -1)
-		put_instruction (Icreate);
-	else {
-		put_instruction_ (Icreate);
-		FPrintF (OutFile, "%d", arity);
-	}
+	put_instruction (Icreate);
+	if (arity != -1)
+		put_arguments_n_b (arity);
 }
 
 void GenDumpString (char *str)
@@ -2309,7 +2326,8 @@ void GenHalt (void)
 
 void GenSetRedId (int offset)
 {
-	FPrintF (OutFile, "\n\tset_red_id %d", offset);
+	put_instruction ("set_red_id");
+	put_arguments_n_b (offset);
 }
 
 void GenNewParallelReducer (int offset, char *reducer_code)
@@ -2319,8 +2337,10 @@ void GenNewParallelReducer (int offset, char *reducer_code)
 
 void GenNewContInterleavedReducer (int offset)
 {
-	FPrintF (OutFile, "\n\tnew_int_reducer _cont_reducer %d", offset);
-	FPrintF (OutFile, "\n\tforce_cswitch", offset);
+	put_instruction ("new_int_reducer");
+	PutSOutFile (" _cont_reducer");
+	put_arguments_n_b (offset);
+	put_instruction ("force_cswitch");
 }
 
 void GenNewInterleavedReducer (int offset, char *reducer_code)
@@ -2335,40 +2355,43 @@ void GenSendGraph (char *code, int graphoffs, int chanoffs)
 
 void GenCreateChannel (char *code)
 {
-	FPrintF (OutFile, "\n\tcreate_channel %s", code);
+	put_instruction_ ("create_channel");
+	PutSOutFile (code);
 }
 
 void GenNewP (void)
 {
-	PutSOutFile ("\n\tnewP");
+	put_instruction ("newP");
 }
 
 void SetContinue (int offset)
 {
-	FPrintF (OutFile, "\n\tset_continue %d", offset);
+	put_instruction ("set_continue");
+	put_arguments_n_b (offset);
 }
 
 void SetContinueOnReducer (int offset)
 {
-	FPrintF (OutFile, "\n\tset_continue2 %d", offset);
+	put_instruction ("set_continue2");
+	put_arguments_n_b (offset);
 }
 
 void GenGetNodeArity (int offset)
 {
-	put_instruction_ (Iget_node_arity);
-	FPrintF (OutFile, "%d", offset);
+	put_instruction (Iget_node_arity);
+	put_arguments_n_b (offset);
 }
 
 static void GenGetDescArity (int offset)
 {
-	put_instruction_ (Iget_desc_arity);
-	FPrintF (OutFile, "%d", offset);
+	put_instruction (Iget_desc_arity);
+	put_arguments_n_b (offset);
 }
 
 void GenPushArgB (int offset)
 {
-	put_instruction_ (Ipush_arg_b);
-	FPrintF (OutFile, "%d", offset);
+	put_instruction (Ipush_arg_b);
+	put_arguments_n_b (offset);
 }
 
 extern char *current_imported_module; /* from statesgen.c */
@@ -2532,16 +2555,16 @@ void GenExportEuEntry (SymbDef sdef)
 void GenDAStackLayout (int asize)
 {
 	if (DoStackLayout){
-		put_directive_b (d);
-		put_argumentsnn_b (asize,0);
+		put_directiveb (d);
+		put_arguments_nn_b (asize,0);
 	}
 }
 
 void GenOAStackLayout (int asize)
 {
 	if (DoStackLayout){
-		put_directive_b (o);
-		put_argumentsnn_b (asize,0);
+		put_directiveb (o);
+		put_arguments_nn_b (asize,0);
 	}
 }
 
@@ -2552,7 +2575,8 @@ void GenDStackLayoutOfStates (int asize,int bsize,int n_states,StateP state_p)
 		if (bsize > 0){
 			int i;
 	
-			put_arguments_nn__b (asize,bsize);
+			put_arguments_nn_b (asize,bsize);
+			PutCOutFile (' ');
 
 			for (i=0; i<n_states; ++i)
 				GenBStackElems (state_p[i]);
@@ -2568,7 +2592,8 @@ void GenOStackLayoutOfStates (int asize,int bsize,int n_states,StateP state_p)
 		if (bsize > 0){
 			int i;
 			
-			put_arguments_nn__b (asize,bsize);
+			put_arguments_nn_b (asize,bsize);
+			PutCOutFile (' ');
 
 			for (i=0; i<n_states; ++i)
 				GenBStackElems (state_p[i]);
@@ -2582,7 +2607,8 @@ void GenDStackLayoutOfState (int asize, int bsize, StateS resultstate)
 	if (DoStackLayout){
 		put_directiveb (d);
 		if (bsize > 0){
-			put_arguments_nn__b (asize,bsize);
+			put_arguments_nn_b (asize,bsize);
+			PutCOutFile (' ');
 			GenBStackElems (resultstate);
 		} else
 			put_arguments_nn_b (asize,0);
@@ -2594,7 +2620,8 @@ void GenOStackLayoutOfState (int asize, int bsize, StateS resultstate)
 	if (DoStackLayout){
 		put_directiveb (o);
 		if (bsize > 0){
-			put_arguments_nn__b (asize,bsize);
+			put_arguments_nn_b (asize,bsize);
+			PutCOutFile (' ');
 			GenBStackElems (resultstate);
 		} else
 			put_arguments_nn_b (asize,0);
@@ -2610,8 +2637,9 @@ void GenNodeEntryDirective (int arity,Label label,Label label2)
 {
 	if (DoStackLayout){
 		put_directiveb (n);
-		put_arguments_n__b (arity);
+		put_arguments_n_b (arity);
 
+		PutCOutFile (' ');
 		if (DescriptorNeeded (label->lab_symbol))
 			GenDescriptorOrNodeEntryLabel (label);
 		else
@@ -2633,14 +2661,16 @@ void GenNodeEntryDirective (int arity,Label label,Label label2)
 void GenApplyEntryDirective (int arity,Label label)
 {
 	put_directiveb (a);
-	put_arguments_n__b (arity);
+	put_arguments_n_b (arity);
+	PutCOutFile (' ');
 	GenLabel (label);
 }
 
 void GenApplyInstanceEntryDirective (int arity,Label label,Label label2)
 {
 	put_directiveb (ai);
-	put_arguments_n__b (arity);
+	put_arguments_n_b (arity);
+	PutCOutFile (' ');
 	if (label==NULL)
 		PutSOutFile (empty_lab.lab_name);
 	else
@@ -2653,8 +2683,9 @@ void GenLazyRecordNodeEntryDirective (int arity,Label label,Label label2)
 {
 	if (DoStackLayout){
 		put_directiveb (n);
-		put_arguments_n__b (arity);
+		put_arguments_n_b (arity);
 
+		PutCOutFile (' ');
 		if (DescriptorNeeded (label->lab_symbol))
 			GenLabel (label);
 		else
@@ -2678,8 +2709,9 @@ void GenNodeEntryDirectiveForLabelWithoutSymbol (int arity,Label label,Label lab
 {
 	if (DoStackLayout){
 		put_directiveb (n);
-		put_arguments_n__b (arity);
+		put_arguments_n_b (arity);
 
+		PutCOutFile (' ');
 		GenLabel (label);
 
 		if (label2){
@@ -2699,9 +2731,10 @@ void GenNodeEntryDirectiveForLabelWithoutSymbol (int arity,Label label,Label lab
 void GenNodeEntryDirectiveUnboxed (int a_size,int b_size,Label label,Label label2)
 {
 	if (DoStackLayout){
-		put_directive_ (Dnu);
-		FPrintF (OutFile,"%d %d ",a_size,b_size);
+		put_directive (Dnu);
+		put_arguments_nn_b (a_size,b_size);
 
+		PutCOutFile (' ');
 		if (DescriptorNeeded (label->lab_symbol))
 			GenDescriptorOrNodeEntryLabel (label);
 		else
@@ -2725,8 +2758,9 @@ void GenFieldNodeEntryDirective (int arity,Label label,Label label2,char *record
 {
 	if (DoStackLayout){
 		put_directiveb (n);
-		put_arguments_n__b (arity);
+		put_arguments_n_b (arity);
 		
+		PutCOutFile (' ');
 		if (DescriptorNeeded (label->lab_symbol))
 			GenFieldLabel (label,record_name);
 		else
@@ -3268,7 +3302,7 @@ static void print_result_descriptor_and_offsets (StateS field_state,int a_pos,in
 			old_offset1=offset1;
 			offset1=offset2;
 			offset2=old_offset1;
-		}		
+		}
 		FPrintF (OutFile, "%s %d %d ",result_descriptor_name,offset1,offset2);
 	}
 }
@@ -3470,14 +3504,14 @@ void InitFileInfo (ImpMod imod)
 	if (imod->im_def_module!=NULL && imod->im_def_module->dm_system_module)
 		option_string[N_System]='1';
 
-	put_first_directive_ (Dcomp);
-	FPrintF (OutFile, "%d %s", VERSION,option_string);
+	put_first_directive (Dcomp);
+	FPrintF (OutFile, " %d %s", VERSION,option_string);
 	
-	put_directive_ (Dstart);
+	put_directive (Dstart);
 	if (start_sdef!=NULL){
-		FPrintF (OutFile, "__%s_%s",start_sdef->sdef_module,start_sdef->sdef_name);
+		FPrintF (OutFile, " __%s_%s",start_sdef->sdef_module,start_sdef->sdef_name);
 	} else
-		PutSOutFile ("_nostart_");
+		PutSOutFile (" _nostart_");
 }
 
 static int match_error_lab_used = 0;
@@ -3514,7 +3548,8 @@ void GenNoMatchError (SymbDef sdef,int asp,int bsp,int string_already_generated)
 	
 	if (DoStackLayout){
 		put_directiveb (d);
-		put_arguments_nn__b (0,2);
+		put_arguments_nn_b (0,2);
+		PutCOutFile (' ');
 		PutSOutFile ("ii");
 	}
 	
@@ -3707,10 +3742,10 @@ static void print_foreign_export_type (TypeNode type)
 		symbol_p=type->type_node_symbol;
 
 		if (symbol_p->symb_kind==int_type){
-			FPrintF (OutFile,"I");
+			PutSOutFile ("I");
 			return;
 		} else if (symbol_p->symb_kind==real_type){
-			FPrintF (OutFile,"R");
+			PutSOutFile ("R");
 			return;
 		} else if (symbol_p->symb_kind==unboxed_array_type){
 			TypeNode type_node_p;
@@ -3719,13 +3754,13 @@ static void print_foreign_export_type (TypeNode type)
 			if (!type_node_p->type_node_is_var){
 				switch (type_node_p->type_node_symbol->symb_kind){
 					case char_type:
-						FPrintF (OutFile,"S");
+						PutSOutFile ("S");
 						return;
 					case int_type:
-						FPrintF (OutFile,"Ai");
+						PutSOutFile ("Ai");
 						return;
 					case real_type:
-						FPrintF (OutFile,"Ar");
+						PutSOutFile ("Ar");
 						return;
 				}
 			}
@@ -3745,7 +3780,7 @@ static void print_foreign_export_type (TypeNode type)
 static void print_foreign_export_result_type (TypeNode type)
 {
 	if (!type->type_node_is_var && type->type_node_symbol->symb_kind==tuple_type)
-		FPrintF (OutFile,"V");
+		PutSOutFile ("V");
 
 	print_foreign_export_type (type);
 }
@@ -3771,11 +3806,11 @@ void GenerateForeignExports (struct foreign_export_list *foreign_export_list)
 		for_l (type_arg_p,rule_type_p->type_alt_lhs->type_node_arguments,type_arg_next)
 			print_foreign_export_type (type_arg_p->type_arg_node);
 		
-		FPrintF (OutFile,":");
+		PutSOutFile (":");
 		
 		print_foreign_export_result_type (rule_type_p->type_alt_rhs);
 				
-		FPrintF (OutFile,"\"");
+		PutSOutFile ("\"");
 	}
 }
 
@@ -3831,21 +3866,21 @@ void GenPushCaf (Label label,int a_stack_size,int b_stack_size)
 {
 	put_instruction_ (Ipushcaf);
 	GenLabel (label);
-	FPrintF (OutFile," %d %d",a_stack_size,b_stack_size);
+	put_arguments_nn_b (a_stack_size,b_stack_size);
 }
 
 void GenFillCaf (Label label,int a_stack_size,int b_stack_size)
 {
 	put_instruction_ (Ifillcaf);
 	GenLabel (label);
-	FPrintF (OutFile," %d %d",a_stack_size,b_stack_size);
+	put_arguments_nn_b (a_stack_size,b_stack_size);
 }
 
 void GenCaf (Label label,int a_stack_size,int b_stack_size)
 {
 	put_directive_ (Dcaf);
 	GenLabel (label);
-	FPrintF (OutFile," %d %d",a_stack_size,b_stack_size);
+	put_arguments_nn_b (a_stack_size,b_stack_size);
 }
 
 void GenPB (char *function_name)
@@ -3900,8 +3935,8 @@ void GenPE (void)
 
 void GenKeep (int a_offset1,int a_offset2)
 {
-	put_directive_ (Dkeep);
-	FPrintF (OutFile,"%d %d",a_offset1,a_offset2);
+	put_directive (Dkeep);
+	put_arguments_nn_b (a_offset1,a_offset2);
 }
 
 #if IMPORT_OBJ_AND_LIB
