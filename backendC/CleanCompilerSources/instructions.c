@@ -28,12 +28,15 @@
 #define PutSOutFile(s) FPutS ((s),OutFile)
 #define PutCOutFile(s) FPutC ((s),OutFile)
 
+void PutIOutFile (long i)
+{
+	FPrintF (OutFile,"%ld",i);
+}
+
 static void error_in_function (char *m)
 {
 	ErrorInCompiler ("instructions.c",m,"");
 }
-
-/* also defined in project.c, only needed for stand alone compiler */
 
 #define N_DoDebug				0
 #define N_DoReuseUniqueNodes	1
@@ -144,6 +147,20 @@ static Bool DescriptorNeeded (SymbDef sdef)
 			((DoParallel || DoDescriptors) && (sdef->sdef_mark & (SDEF_USED_CURRIED_MASK | SDEF_USED_LAZILY_MASK)));
 }
 
+static void put_label_module_prefix (char *module_name)
+{
+	PutSOutFile ("e_");
+	PutSOutFile (module_name);
+	PutCOutFile ('_');
+}
+
+static void put_space_label_module_prefix (char *module_name)
+{
+	PutSOutFile (" e_");
+	PutSOutFile (module_name);
+	PutCOutFile ('_');
+}
+
 static void Put_SOutFile (char *s)
 {
 	PutCOutFile (' ');
@@ -156,6 +173,43 @@ static void PutSSOutFile (char *s1,char *s2)
 	PutSOutFile (s2);
 }
 
+static void PutSdotUOutFile (char *s1,unsigned int u)
+{
+	PutSOutFile (s1);
+	PutCOutFile ('.');
+	PutIOutFile ((int)u);
+}
+
+static void PutSSdotDOutFile (char *s1,char *s2,int i)
+{
+	PutSOutFile (s1);
+	PutSOutFile (s2);
+	PutCOutFile ('.');
+	PutIOutFile (i);
+}
+
+static void PutSUOutFile (char *s1,unsigned int u)
+{
+	PutSOutFile (s1);
+	PutIOutFile ((int)u);
+}
+
+static void PutSSdotSOutFile (char *s1,char *s2,char *s3)
+{
+	PutSOutFile (s1);
+	PutSOutFile (s2);
+	PutCOutFile ('.');
+	PutSOutFile (s3);
+}
+
+static void PutSSdotUOutFile (char *s1,char *s2,unsigned int u)
+{
+	PutSOutFile (s1);
+	PutSOutFile (s2);
+	PutCOutFile ('.');
+	PutIOutFile ((int)u);
+}
+
 static void GenLabel (Label label)
 {
 	if (label->lab_issymbol){
@@ -165,25 +219,26 @@ static void GenLabel (Label label)
 		def=label->lab_symbol;
 		module_name = label->lab_mod;
 		
-		if (module_name!=NULL)
-			FPrintF (OutFile,"e_%s_%s%s",module_name,label->lab_pref,def->sdef_name);
-		else if (DoDebug){
+		if (module_name!=NULL){
+			put_label_module_prefix (module_name);
+			PutSSOutFile (label->lab_pref,def->sdef_name);
+		} else if (DoDebug){
 			if (def->sdef_kind==IMPRULE)
-				FPrintF (OutFile, "%s%s.%u",label->lab_pref,def->sdef_name,def->sdef_number);
+				PutSSdotUOutFile (label->lab_pref,def->sdef_name,def->sdef_number);
 			else
-				FPrintF (OutFile, "%s%s",label->lab_pref,def->sdef_name);
+				PutSSOutFile (label->lab_pref,def->sdef_name);
 		} else if (def->sdef_number==0)
 			PutSSOutFile (label->lab_pref,def->sdef_name);
 		else if (label->lab_pref[0] == '\0')
-			FPrintF (OutFile,LOCAL_D_PREFIX "%u",def->sdef_number);
+			PutSUOutFile (LOCAL_D_PREFIX,def->sdef_number);
 		else
-			FPrintF (OutFile,"%s%u",label->lab_pref,def->sdef_number);
+			PutSUOutFile (label->lab_pref,def->sdef_number);
 	} else {
 		PutSOutFile (label->lab_pref);
 		PutSOutFile (label->lab_name);
 	}
 	if (label->lab_post!=0)
-		FPrintF (OutFile,".%u",label->lab_post);
+		PutSUOutFile (".",label->lab_post);
 }
 
 static void GenDescriptorOrNodeEntryLabel (Label label)
@@ -195,30 +250,32 @@ static void GenDescriptorOrNodeEntryLabel (Label label)
 		def=label->lab_symbol;
 		module_name = label->lab_mod;
 		
-		if (module_name!=NULL)
-			FPrintF (OutFile,"e_%s_%s%s",module_name,label->lab_pref,def->sdef_name);
-		else if (ExportLocalLabels){
+		if (module_name!=NULL){
+			put_label_module_prefix (module_name);
+			PutSSOutFile (label->lab_pref,def->sdef_name);
+		} else if (ExportLocalLabels){
+			put_label_module_prefix (CurrentModule);
 			if (def->sdef_kind==IMPRULE)
-				FPrintF (OutFile,"e_%s_%s%s.%u",CurrentModule,label->lab_pref,def->sdef_name,def->sdef_number);
+				PutSSdotUOutFile (label->lab_pref,def->sdef_name,def->sdef_number);
 			else
-				FPrintF (OutFile,"e_%s_%s%s",CurrentModule,label->lab_pref,def->sdef_name);
+				PutSSOutFile (label->lab_pref,def->sdef_name);
 		} else if (DoDebug){
 			if (def->sdef_kind==IMPRULE)
-				FPrintF (OutFile, "%s%s.%u",label->lab_pref,def->sdef_name,def->sdef_number);
+				PutSSdotUOutFile (label->lab_pref,def->sdef_name,def->sdef_number);
 			else
 				PutSSOutFile (label->lab_pref,def->sdef_name);
 		} else if (def->sdef_number==0)
 			PutSSOutFile (label->lab_pref,def->sdef_name);
 		else if (label->lab_pref[0] == '\0')
-			FPrintF (OutFile,LOCAL_D_PREFIX "%u",def->sdef_number);
+			PutSUOutFile (LOCAL_D_PREFIX,def->sdef_number);
 		else
-			FPrintF (OutFile,"%s%u",label->lab_pref,def->sdef_number);
+			PutSUOutFile (label->lab_pref,def->sdef_number);
 	} else {
 		PutSOutFile (label->lab_pref);
 		PutSOutFile (label->lab_name);
 	}
 	if (label->lab_post!=0)
-		FPrintF (OutFile,".%u",label->lab_post);
+		PutSUOutFile (".",label->lab_post);
 }
 
 #if !BINARY_ABC
@@ -1240,11 +1297,11 @@ static void GenUnboxedRecordLabelsReversed (StateS state)
 				record_sdef = state.state_record_symbol;
 				if (!record_sdef->sdef_exported && record_sdef->sdef_module==CurrentModule && !ExportLocalLabels){
 					if (DoDebug)
-						FPrintF (OutFile, R_PREFIX "%s ",record_sdef->sdef_name);
+						PutSSOutFile (" " R_PREFIX,record_sdef->sdef_name);
 					else
-						FPrintF (OutFile, R_PREFIX "%u ",record_sdef->sdef_number);
+						PutSUOutFile (" " R_PREFIX,record_sdef->sdef_number);
 				} else
-					FPrintF (OutFile, "e_%s_" R_PREFIX "%s ",record_sdef->sdef_module,record_sdef->sdef_name);
+					FPrintF (OutFile, " e_%s_" R_PREFIX "%s",record_sdef->sdef_module,record_sdef->sdef_name);
 				return;
 			}
 			case ArrayState:
@@ -1847,7 +1904,7 @@ void GenFill2 (Label symblab,int arity,int offset,char bits[])
 void GenFill3 (Label symblab,int arity,int offset,char bits[])
 {	
 	put_instruction_ (Ifill3);
-	GenLabel (symblab);	
+	GenLabel (symblab);
 	put_arguments_nn_b (arity,offset);
 	Put_SOutFile (bits);
 }
@@ -1945,21 +2002,22 @@ static void GenFieldLabel (Label label,char *record_name)
 	
 	def = (SymbDef) label->lab_name;
 		
-	if (label->lab_mod)
-		FPrintF (OutFile,"e_%s_%s%s.%s",label->lab_mod,label->lab_pref,record_name,def->sdef_name);
-	else if (ExportLocalLabels)
-		FPrintF (OutFile,"e_%s_%s%s.%s",CurrentModule,label->lab_pref,record_name,def->sdef_name);
-	else if (DoDebug){
+	if (label->lab_mod){
+		put_label_module_prefix (label->lab_mod);
+		PutSSdotSOutFile (label->lab_pref,record_name,def->sdef_name);
+	} else if (ExportLocalLabels){
+		put_label_module_prefix (CurrentModule);
+		PutSSdotSOutFile (label->lab_pref,record_name,def->sdef_name);
+	} else if (DoDebug){
+		PutSSdotSOutFile (label->lab_pref,record_name,def->sdef_name);
 		if (def->sdef_kind==IMPRULE)
-			FPrintF (OutFile, "%s%s.%s.%u",label->lab_pref,record_name,def->sdef_name,def->sdef_number);
-		else
-			FPrintF (OutFile, "%s%s.%s",label->lab_pref,record_name,def->sdef_name);
+			PutSUOutFile (".",def->sdef_number);
 	} else if (def->sdef_number==0)
 		PutSSOutFile (label->lab_pref,def->sdef_name);
 	else if (label->lab_pref[0] == '\0')
-		FPrintF (OutFile,LOCAL_D_PREFIX "%u",def->sdef_number);
+		PutSUOutFile (LOCAL_D_PREFIX,def->sdef_number);
 	else
-		FPrintF (OutFile,"%s%u",label->lab_pref,def->sdef_number);
+		PutSUOutFile (label->lab_pref,def->sdef_number);
 }
 
 void GenBuildFieldSelector (Label symblab,Label contlab,char *record_name,int arity)
@@ -2889,13 +2947,10 @@ void GenRecordDescriptor (SymbDef sdef)
 
 	GenABStackElemsOfRecord (recstate);
 	
-	if (!has_unboxed_record)
-		FPrintF (OutFile, " %d %d \"%s\"",asize,bsize,name);
-	else {
-		FPrintF (OutFile, " %d %d ",asize,bsize);
+	put_arguments_nn_b (asize,bsize);
+	if (has_unboxed_record)
 		GenUnboxedRecordLabelsReversedForRecord (recstate); 
-		FPrintF (OutFile, "\"%s\"",name);	
-	}
+	FPrintF (OutFile, " \"%s\"",name);
 }
 
 #ifdef STRICT_LISTS
@@ -2919,32 +2974,33 @@ void GenUnboxedConsRecordDescriptor (SymbDef sdef,int tail_strict)
 	unboxed_record_cons_prefix=tail_strict ? "r_Cons#!" : "r_Cons#";
 	
 	if (ExportLocalLabels){
-		put_directive_ (Dexport);
-		FPrintF (OutFile, "e_%s_%s%s",CurrentModule,unboxed_record_cons_prefix,name);
-		put_directive_ (Drecord);
-		FPrintF (OutFile, "e_%s_%s%s ",CurrentModule,unboxed_record_cons_prefix,name);
+		put_directive (Dexport);
+		put_space_label_module_prefix (CurrentModule);
+		PutSSOutFile (unboxed_record_cons_prefix,name);
+		put_directive (Drecord);
+		put_space_label_module_prefix (CurrentModule);
+		PutSSOutFile (unboxed_record_cons_prefix,name);
 	} else {
 		put_directive_ (Drecord);
-		FPrintF (OutFile, "%s%s ",unboxed_record_cons_prefix,name);
+		PutSSOutFile (unboxed_record_cons_prefix,name);
 	}
 
-	PutCOutFile ('l');
-	PutCOutFile ('R');
+	PutSOutFile (" lR");
 
 	GenABStackElemsOfRecord (tuple_arguments_state[0]);
 	GenABStackElems (tuple_arguments_state[1]);
 	
-	FPrintF (OutFile," %d %d ",asize,bsize);
+	put_arguments_nn_b (asize,bsize);
 	if (has_unboxed_record)
 		GenUnboxedRecordLabelsReversedForRecord (tuple_arguments_state[0]);
 	
 	if (!sdef->sdef_exported && sdef->sdef_module==CurrentModule && !ExportLocalLabels){
 		if (DoDebug)
-			FPrintF (OutFile, R_PREFIX "%s ",name);
+			FPrintF (OutFile, " " R_PREFIX "%s ",name);
 		else
-			FPrintF (OutFile, R_PREFIX "%u ",sdef->sdef_number);
+			FPrintF (OutFile, " " R_PREFIX "%u ",sdef->sdef_number);
 	} else
-		FPrintF (OutFile, "e_%s_" R_PREFIX "%s ",sdef->sdef_module,name);
+		FPrintF (OutFile, " e_%s_" R_PREFIX "%s ",sdef->sdef_module,name);
 
 	if (ExportLocalLabels)
 		FPrintF (OutFile,tail_strict ? "\"_Cons#!%s\"" : "\"_Cons#%s\"",name);
@@ -2987,14 +3043,11 @@ void GenStrictConstructorDescriptor (SymbDef sdef,StateP constructor_arg_states)
 	for (arg_n=0,constructor_arg_state_p=constructor_arg_states; arg_n<state_arity; ++arg_n,++constructor_arg_state_p)
 		 GenABStackElemsForRecordDesc (*constructor_arg_state_p);
 	
-	if (!has_unboxed_record)
-		FPrintF (OutFile, " %d %d \"%s\"", asize, bsize, name);
-	else {
-		FPrintF (OutFile, " %d %d ", asize, bsize);
+	put_arguments_nn_b (asize, bsize);
+	if (has_unboxed_record)
 		for (arg_n=state_arity-1; arg_n>=0; --arg_n)
 			GenUnboxedRecordLabelsReversed (constructor_arg_states[arg_n]);
-		FPrintF (OutFile, "\"%s\"", name);	
-	}
+	FPrintF (OutFile, " \"%s\"", name);
 }
 
 void GenArrayFunctionDescriptor (SymbDef arr_fun_def, Label desclab, int arity)
@@ -3136,7 +3189,7 @@ void GenFunctionDescriptorAndExportNodeAndDescriptor (SymbDef sdef)
 		if (sdef->sdef_exported)
 			PutSOutFile (name);
 		else
-			FPrintF (OutFile,"%s.%u",name,sdef->sdef_number);
+			PutSdotUOutFile (name,sdef->sdef_number);
 	} else
 		PrintSymbolOfIdent (name, 0, OutFile);
 	PutCOutFile ('\"');
@@ -3165,25 +3218,25 @@ void GenConstructorFunctionDescriptorAndExportNodeAndDescriptor (SymbDef sdef)
 						CurrentModule,name,CurrentModule,name,sdef->sdef_number);
 	} else {
 		if (sdef->sdef_mark & SDEF_USED_CURRIED_MASK){
-			put_directive_ (Ddesc);
+			put_directive (Ddesc);
 			
 			if (DoDebug)
-				FPrintF (OutFile, D_PREFIX "%s ",name);
+				PutSSOutFile (" " D_PREFIX,name);
 			else
-				FPrintF (OutFile, LOCAL_D_PREFIX "%u ", sdef->sdef_number);
+				PutSUOutFile (" " LOCAL_D_PREFIX,sdef->sdef_number);
 			
 			if (sdef->sdef_mark & SDEF_USED_LAZILY_MASK){
 				if (DoDebug)
-					FPrintF (OutFile,N_PREFIX "%s ",name);
+					PutSSOutFile (" " N_PREFIX,name);
 				else
-					FPrintF (OutFile,N_PREFIX "%u ",sdef->sdef_number);
+					PutSUOutFile (" " N_PREFIX,sdef->sdef_number);
 			} else
-				FPrintF (OutFile, "%s ", hnf_lab.lab_name);
+				Put_SOutFile (hnf_lab.lab_name);
 			
 			if (DoDebug)
-				FPrintF (OutFile,L_PREFIX "%s ",name);
+				PutSSOutFile (" " L_PREFIX,name);
 			else
-				FPrintF (OutFile,L_PREFIX "%u ",sdef->sdef_number);
+				PutSUOutFile (" " L_PREFIX,sdef->sdef_number);
 		} else {
 			if (ExportLocalLabels){
 				put_directive_ (Dexport);
@@ -3463,20 +3516,14 @@ void GenStart (SymbDef startsymb)
 		
 		if (startsymb->sdef_exported)
 			FPrintF (OutFile, "e_%s_" D_PREFIX "%s",CurrentModule,start_function_name);
-		else if (ExportLocalLabels)
-			if (DoParallel)
+		else if (DoParallel){
+			if (ExportLocalLabels)
 				FPrintF (OutFile,"e_%s_" D_PREFIX "%s.%u",CurrentModule,start_function_name,startsymb->sdef_number);
-			else
-				PutSOutFile (empty_lab.lab_name);
-		else if (DoDebug){
-			if (DoParallel)
+			else if (DoDebug)
 				FPrintF (OutFile, D_PREFIX "%s.%u",start_function_name,startsymb->sdef_number);
 			else
-				PutSOutFile (empty_lab.lab_name);
-		} else {
-			if (DoParallel)
 				FPrintF (OutFile, LOCAL_D_PREFIX "%u",startsymb->sdef_number);
-			else
+		} else {
 				PutSOutFile (empty_lab.lab_name);
 		}
 
@@ -3597,8 +3644,9 @@ void GenNoMatchError (SymbDef sdef,int asp,int bsp,int string_already_generated)
 	match_error_lab_used = 1;
 	
 	if (!desc_needed && !string_already_generated){
-		put_directive_ (Dstring);
-		FPrintF (OutFile, "x_%u \"",sdef->sdef_number);
+		put_directive (Dstring);
+		PutSUOutFile (" x_",sdef->sdef_number);
+		PutSOutFile (" \"");
 		PrintSymbolOfIdent (sdef->sdef_name,0,OutFile);
 		PutSOutFile ("\"");
 	}
@@ -3615,16 +3663,17 @@ void GenCaseNoMatchError (SymbDefP case_def,int asp,int bsp)
 	put_instructionb (pushD);
 	PutSSOutFile (" m_",CurrentModule);
 
-	put_instruction_b (pushD);
-	FPrintF (OutFile, "case_fail%u",CaseFailNumber);
+	put_instructionb (pushD);
+	PutSUOutFile (" case_fail",CaseFailNumber);
 
 	GenJmp (&match_error_lab);
 	match_error_lab_used = 1;
 	
-	put_directive_ (Dstring);
-	FPrintF (OutFile, "case_fail%u \"",CaseFailNumber);
+	put_directive (Dstring);
+	PutSUOutFile (" case_fail",CaseFailNumber);
+	PutSOutFile (" \"");
 	PrintSymbolOfIdent (case_def->sdef_name,0,OutFile);
-	FPrintF (OutFile, "\"");		
+	PutSOutFile ("\"");		
 
 	CaseFailNumber++;
 }
@@ -3742,17 +3791,19 @@ void GenSystemImports (void)
 
 		GenImpDesc (tuple_lab.lab_name);
 		for (selnum=1; selnum<=NrOfGlobalSelectors; ++selnum){
-			put_directive_b (impdesc);
-			FPrintF (OutFile,D_PREFIX "%s.%d",glob_sel,selnum);
-			put_directive_b (implab);
-			FPrintF (OutFile,N_PREFIX "%s.%d " EA_PREFIX "%s.%d",glob_sel,selnum,glob_sel,selnum);
+			put_directiveb (impdesc);
+			PutSSdotDOutFile (" " D_PREFIX,glob_sel,selnum);
+			put_directiveb (implab);
+			PutSSdotDOutFile (" " N_PREFIX,glob_sel,selnum);
+			PutSSdotDOutFile (" " EA_PREFIX,glob_sel,selnum);
 		}
 #ifdef THUNK_LIFT_SELECTORS
 		for (selnum=1; selnum<=NrOfGlobalSelectors; ++selnum){
-			put_directive_b (impdesc);
-			FPrintF (OutFile,D_PREFIX "%s.%d",glob_selr,selnum);
-			put_directive_b (implab);
-			FPrintF (OutFile,N_PREFIX "%s.%d " EA_PREFIX "%s.%d",glob_selr,selnum,glob_selr,selnum);
+			put_directiveb (impdesc);
+			PutSSdotDOutFile (" " D_PREFIX,glob_selr,selnum);
+			put_directiveb (implab);
+			PutSSdotDOutFile (" " N_PREFIX,glob_selr,selnum);
+			PutSSdotDOutFile (" " EA_PREFIX,glob_selr,selnum);
 		}
 #endif
 
@@ -3838,7 +3889,12 @@ void GenerateForeignExports (struct foreign_export_list *foreign_export_list)
 
 		function_sdef=foreign_export_p->fe_symbol_p->symb_def;
 
-		FPrintF (OutFile,"\n\tcentry %s e_%s_s%s \"",function_sdef->sdef_name,CurrentModule,function_sdef->sdef_name);
+		put_instruction_ ("centry");
+		PutSOutFile (function_sdef->sdef_name);
+		put_space_label_module_prefix (CurrentModule);
+		PutCOutFile ('s');
+		PutSOutFile (function_sdef->sdef_name);
+		PutSOutFile (" \"");
 		
 		if (foreign_export_list->fe_stdcall)
 			PutCOutFile ('P');
@@ -3872,10 +3928,15 @@ void GenParameters (Bool input, Parameters params, int asp, int bsp)
 		node_id=params->par_node_id;
 		if (!is_first_parameter)
 			PutCOutFile (' ');
-		if (IsSimpleState (node_id->nid_state) && node_id->nid_state.state_kind==OnB)
-			FPrintF (OutFile, "b%d:%s",bsp-node_id->nid_b_index,params->par_loc_name);
-		else
-			FPrintF (OutFile, "a%d:%s",asp-node_id->nid_a_index,params->par_loc_name);
+		if (IsSimpleState (node_id->nid_state) && node_id->nid_state.state_kind==OnB){
+			PutCOutFile ('b');
+			PutIOutFile (bsp-node_id->nid_b_index);
+		} else {
+			PutCOutFile ('a');
+			PutIOutFile (asp-node_id->nid_a_index);
+		}
+		PutCOutFile (':');
+		PutSOutFile (params->par_loc_name);
 		is_first_parameter=0;
 	}
 }
@@ -3941,8 +4002,12 @@ void GenPB_ident (char *ident_name,unsigned int line_n)
 
 void GenPB_with_line_number (char *function_name,int line_number)
 {
-	put_directive_ (Dpb);
-	FPrintF (OutFile,"\"%s[line:%d]\"",function_name,line_number);
+	put_directive (Dpb);
+	PutSOutFile (" \"");
+	PutSOutFile (function_name);
+	PutSOutFile ("[line:");
+	PutIOutFile (line_number);
+	PutSOutFile ("]\"");
 }
 
 void GenPD (void)
