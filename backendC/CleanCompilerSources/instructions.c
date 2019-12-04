@@ -144,6 +144,18 @@ static Bool DescriptorNeeded (SymbDef sdef)
 			((DoParallel || DoDescriptors) && (sdef->sdef_mark & (SDEF_USED_CURRIED_MASK | SDEF_USED_LAZILY_MASK)));
 }
 
+static void Put_SOutFile (char *s)
+{
+	PutCOutFile (' ');
+	PutSOutFile (s);
+}
+
+static void PutSSOutFile (char *s1,char *s2)
+{
+	PutSOutFile (s1);
+	PutSOutFile (s2);
+}
+
 static void GenLabel (Label label)
 {
 	if (label->lab_issymbol){
@@ -161,7 +173,7 @@ static void GenLabel (Label label)
 			else
 				FPrintF (OutFile, "%s%s",label->lab_pref,def->sdef_name);
 		} else if (def->sdef_number==0)
-			FPrintF (OutFile, "%s%s",label->lab_pref,def->sdef_name);
+			PutSSOutFile (label->lab_pref,def->sdef_name);
 		else if (label->lab_pref[0] == '\0')
 			FPrintF (OutFile,LOCAL_D_PREFIX "%u",def->sdef_number);
 		else
@@ -194,9 +206,9 @@ static void GenDescriptorOrNodeEntryLabel (Label label)
 			if (def->sdef_kind==IMPRULE)
 				FPrintF (OutFile, "%s%s.%u",label->lab_pref,def->sdef_name,def->sdef_number);
 			else
-				FPrintF (OutFile, "%s%s",label->lab_pref,def->sdef_name);
+				PutSSOutFile (label->lab_pref,def->sdef_name);
 		} else if (def->sdef_number==0)
-			FPrintF (OutFile, "%s%s",label->lab_pref,def->sdef_name);
+			PutSSOutFile (label->lab_pref,def->sdef_name);
 		else if (label->lab_pref[0] == '\0')
 			FPrintF (OutFile,LOCAL_D_PREFIX "%u",def->sdef_number);
 		else
@@ -215,8 +227,8 @@ static void GenDescriptorOrNodeEntryLabel (Label label)
 #define put_instruction_b(a) put_instruction_(I##a)
 #define put_directiveb(a) put_directive(D##a)
 #define put_directive_b(a) put_directive_(D##a)
-#define put_argumentsi_b(i1) FPrintF (OutFile,"%s",(i1))
-#define put_argumentsin_b(i1,n1) FPrintF (OutFile,"%s %d",(i1),(n1))
+#define put_arguments_i_b(i1) FPrintF (OutFile," %s",(i1))
+#define put_arguments_in_b(i1,n1) FPrintF (OutFile," %s %d",(i1),(n1))
 #define put_argumentsn_b(n1) FPrintF (OutFile,"%d",(n1))
 #define put_argumentsnn_b(n1,n2) FPrintF (OutFile,"%d %d",(n1),(n2))
 #define put_arguments_nnn_b(n1,n2,n3) FPrintF (OutFile," %d %d %d",(n1),(n2),(n3))
@@ -279,18 +291,19 @@ static long integer_string_to_integer (char *s_p)
 	return integer;
 }
 
-static void put_argumentsi_b (char *i1)
+static void put_arguments_i_b (char *i1)
 {
-	if (DoDebug)
+	if (DoDebug){
+		PutCOutFile (' ');
 		PutSOutFile (i1);
-	else
+	} else
 		put_n (integer_string_to_integer (i1));
 }
 
-static void put_argumentsin_b (char *i1,long n1)
+static void put_arguments_in_b (char *i1,long n1)
 {
 	if (DoDebug)
-		FPrintF (OutFile,"%s %d",(i1),(n1));
+		FPrintF (OutFile," %s %d",(i1),(n1));
 	else {
 		put_n (integer_string_to_integer (i1));
 		put_n (n1);
@@ -777,20 +790,20 @@ void BuildBasic (ObjectKind obj,SymbValue val)
 {
 	switch (obj){
 		case IntObj:
-			put_instruction_b (buildI);
-			put_argumentsi_b (val.val_int);
+			put_instructionb (buildI);
+			put_arguments_i_b (val.val_int);
 			break;
 		case BoolObj:
 			put_instruction_ (IbuildB);
 			PutSOutFile (val.val_bool ? "TRUE" : "FALSE");
 			break;
 		case CharObj:
-			put_instruction_ (IbuildC);
-			PutSOutFile (val.val_char);
+			put_instruction (IbuildC);
+			Put_SOutFile (val.val_char);
 			break;
 		case RealObj:
-			put_instruction_ (IbuildR);
-			PutSOutFile (val.val_real);
+			put_instruction (IbuildR);
+			Put_SOutFile (val.val_real);
 			break;
 		default:
 			error_in_function ("BuildBasic");
@@ -803,8 +816,8 @@ void FillBasic (ObjectKind obj, SymbValue val, int offset, FillKind fkind)
 	TreatWaitListBeforeFill (offset, fkind);
 	switch (obj){
 		case IntObj:
-			put_instruction_b (fillI);
-			put_argumentsin_b (val.val_int,offset);
+			put_instructionb (fillI);
+			put_arguments_in_b (val.val_int,offset);
 			break;
 		case BoolObj:
 			put_instruction (IfillB);
@@ -812,12 +825,14 @@ void FillBasic (ObjectKind obj, SymbValue val, int offset, FillKind fkind)
 			put_arguments_n_b (offset);
 			break;
 		case CharObj:
-			put_instruction_ (IfillC);
-			FPrintF (OutFile, "%s %d", val.val_char, offset);
+			put_instruction (IfillC);
+			Put_SOutFile (val.val_char);
+			put_arguments_n_b (offset);
 			break;
 		case RealObj:
-			put_instruction_ (IfillR);
-			FPrintF (OutFile, "%s %d", val.val_real, offset);
+			put_instruction (IfillR);
+			Put_SOutFile (val.val_real);
+			put_arguments_n_b (offset);
 			break;
 		default:
 			error_in_function ("FillBasic");
@@ -830,24 +845,26 @@ void IsBasic (ObjectKind obj, SymbValue val, int offset)
 {
 	switch (obj){
 		case IntObj:
-			put_instruction_b (eqI_a);
-			put_argumentsin_b (val.val_int,offset);
-			break;
+			put_instructionb (eqI_a);
+			put_arguments_in_b (val.val_int,offset);
+			return;
 		case BoolObj:
 			put_instruction (IeqB_a);
 			PutSOutFile (val.val_bool ? " TRUE" : " FALSE");
-			put_arguments_n_b (offset);
 			break;
 		case CharObj:
-			put_instruction_ (IeqC_a);
-			FPrintF (OutFile, "%s %d", val.val_char, offset); break;
+			put_instruction (IeqC_a);
+			Put_SOutFile (val.val_char);
+			break;
 		case RealObj:
-			put_instruction_ (IeqR_a);
-			FPrintF (OutFile, "%s %d", val.val_real, offset); break;
+			put_instruction (IeqR_a);
+			Put_SOutFile (val.val_real);
+			break;
 		default:
 			error_in_function ("IsBasic");
 			return;
 	}
+	put_arguments_n_b (offset);
 }
 
 void IsString (SymbValue val)
@@ -860,16 +877,16 @@ void PushBasic (ObjectKind obj, SymbValue val)
 {
 	switch (obj){
 		case IntObj:
-			put_instruction_b (pushI);
-			put_argumentsi_b (val.val_int);
+			put_instructionb (pushI);
+			put_arguments_i_b (val.val_int);
 			break;
 		case BoolObj:
 			put_instruction_ (IpushB);
 			PutSOutFile (val.val_bool ? "TRUE" : "FALSE");
 			break;
 		case CharObj:
-			put_instruction_ (IpushC);
-			PutSOutFile (val.val_char);
+			put_instruction (IpushC);
+			Put_SOutFile (val.val_char);
 			break;
 		case RealObj:
 			put_instruction_ (IpushR);
@@ -897,26 +914,26 @@ void EqBasic (ObjectKind obj, SymbValue val, int offset)
 {
 	switch (obj){
 		case IntObj:
-			put_instruction_b (eqI_b);
-			put_argumentsin_b (val.val_int,offset);
-			break;
+			put_instructionb (eqI_b);
+			put_arguments_in_b (val.val_int,offset);
+			return;
 		case BoolObj:
 			put_instruction (IeqB_b);
 			PutSOutFile (val.val_bool ? " TRUE" : " FALSE");
-			put_arguments_n_b (offset);
 			break;
 		case CharObj:
-			put_instruction_ (IeqC_b);
-			FPrintF (OutFile, "%s %d", val.val_char, offset);
+			put_instruction (IeqC_b);
+			Put_SOutFile (val.val_char);
 			break;
 		case RealObj:
-			put_instruction_ (IeqR_b);
-			FPrintF (OutFile, "%s %d", val.val_real, offset);
+			put_instruction (IeqR_b);
+			Put_SOutFile (val.val_real);
 			break;
 		default:
 			error_in_function ("EqBasic");
 			return;
 	}
+	put_arguments_n_b (offset);
 }
 
 void GenNotB (void)
@@ -1766,7 +1783,7 @@ void GenFillcp (Label symblab,int arity,Label contlab,int offset,char bits[])
 	
 	put_arguments_n_b (offset);
 
-	FPrintF (OutFile," %s",bits);
+	Put_SOutFile (bits);
 }
 
 void GenFillcpU (Label symblab,int a_size,int b_size,Label contlab,int offset,char bits[])
@@ -1785,7 +1802,7 @@ void GenFillcpU (Label symblab,int a_size,int b_size,Label contlab,int offset,ch
 	
 	put_arguments_n_b (offset);
 
-	FPrintF (OutFile," %s",bits);
+	Put_SOutFile (bits);
 }
 
 void GenFillh (Label symblab, int arity, int offset, FillKind fkind)
@@ -1815,21 +1832,24 @@ void GenFill1 (Label symblab,int arity,int offset,char bits[])
 	else
 		PutSOutFile (empty_lab.lab_name);
 	
-	FPrintF (OutFile," %d %d %s",arity,offset,bits);
+	put_arguments_nn_b (arity,offset);
+	Put_SOutFile (bits);
 }
 
 void GenFill2 (Label symblab,int arity,int offset,char bits[])
 {	
 	put_instruction_ (Ifill2);
 	GenLabel (symblab);
-	FPrintF (OutFile," %d %d %s",arity,offset,bits);
+	put_arguments_nn_b (arity,offset);
+	Put_SOutFile (bits);
 }
 
 void GenFill3 (Label symblab,int arity,int offset,char bits[])
 {	
 	put_instruction_ (Ifill3);
 	GenLabel (symblab);	
-	FPrintF (OutFile, " %d %d %s",arity,offset,bits);
+	put_arguments_nn_b (arity,offset);
+	Put_SOutFile (bits);
 }
 
 void GenBuild (Label symblab,int arity,Label contlab)
@@ -1935,7 +1955,7 @@ static void GenFieldLabel (Label label,char *record_name)
 		else
 			FPrintF (OutFile, "%s%s.%s",label->lab_pref,record_name,def->sdef_name);
 	} else if (def->sdef_number==0)
-		FPrintF (OutFile, "%s%s",label->lab_pref,def->sdef_name);
+		PutSSOutFile (label->lab_pref,def->sdef_name);
 	else if (label->lab_pref[0] == '\0')
 		FPrintF (OutFile,LOCAL_D_PREFIX "%u",def->sdef_number);
 	else
@@ -2019,7 +2039,8 @@ void GenFill1R (Label symblab,int n_a_args,int n_b_args,int rootoffset,char bits
 	else
 		PutSOutFile (empty_lab.lab_name);
 	
-	FPrintF (OutFile, " %d %d %d %s",n_a_args,n_b_args,rootoffset,bits);	
+	put_arguments_nnn_b (n_a_args,n_b_args,rootoffset);
+	Put_SOutFile (bits);
 }
 
 void GenFill2R (Label symblab,int n_a_args,int n_b_args,int rootoffset,char bits[])
@@ -2031,7 +2052,8 @@ void GenFill2R (Label symblab,int n_a_args,int n_b_args,int rootoffset,char bits
 	else
 		PutSOutFile (empty_lab.lab_name);
 	
-	FPrintF (OutFile, " %d %d %d %s",n_a_args,n_b_args,rootoffset,bits);
+	put_arguments_nnn_b (n_a_args,n_b_args,rootoffset);
+	Put_SOutFile (bits);
 }
 
 void GenFill3R (Label symblab,int n_a_args,int n_b_args,int rootoffset,char bits[])
@@ -2043,7 +2065,8 @@ void GenFill3R (Label symblab,int n_a_args,int n_b_args,int rootoffset,char bits
 	else
 		PutSOutFile (empty_lab.lab_name);
 	
-	FPrintF (OutFile, " %d %d %d %s",n_a_args,n_b_args,rootoffset,bits);
+	put_arguments_nnn_b (n_a_args,n_b_args,rootoffset);
+	Put_SOutFile (bits);
 }
 
 void GenBuildhr (Label symblab,int nr_a_args,int nr_b_args)
@@ -2170,8 +2193,9 @@ void GenJmpI (int n_args)
 
 void GenJmpNotEqZ (SymbValue val,Label tolab)
 {
-	put_instruction_ (Ijmp_not_eqZ);
-	FPrintF (OutFile, "%s ", val.val_string);
+	put_instruction (Ijmp_not_eqZ);
+	Put_SOutFile (val.val_string);
+	PutCOutFile (' ');
 	GenLabel (tolab);
 }
 
@@ -2332,7 +2356,9 @@ void GenSetRedId (int offset)
 
 void GenNewParallelReducer (int offset, char *reducer_code)
 {
-	FPrintF (OutFile, "\n\tnew_ext_reducer %s %d", reducer_code, offset);
+	put_instruction ("new_ext_reducer");
+	Put_SOutFile (reducer_code);
+	put_arguments_n_b (offset);
 }
 
 void GenNewContInterleavedReducer (int offset)
@@ -2345,12 +2371,16 @@ void GenNewContInterleavedReducer (int offset)
 
 void GenNewInterleavedReducer (int offset, char *reducer_code)
 {
-	FPrintF (OutFile, "\n\tnew_int_reducer %s %d", reducer_code, offset);
+	put_instruction ("new_int_reducer");
+	Put_SOutFile (reducer_code);
+	put_arguments_n_b (offset);
 }
 
 void GenSendGraph (char *code, int graphoffs, int chanoffs)
 {
-	FPrintF (OutFile, "\n\tsend_graph %s %d %d", code, graphoffs, chanoffs);
+	put_instruction ("send_graph");
+	Put_SOutFile (code);
+	put_arguments_nn_b (graphoffs, chanoffs);
 }
 
 void GenCreateChannel (char *code)
@@ -3100,7 +3130,8 @@ void GenFunctionDescriptorAndExportNodeAndDescriptor (SymbDef sdef)
 		}
 	}
 	
-	FPrintF (OutFile, "%d 0 \"", sdef->sdef_arity);
+	put_arguments_n_b (sdef->sdef_arity);
+	PutSOutFile (" 0 \"");
 	if (ExportLocalLabels){
 		if (sdef->sdef_exported)
 			PutSOutFile (name);
@@ -3184,7 +3215,8 @@ void GenConstructorFunctionDescriptorAndExportNodeAndDescriptor (SymbDef sdef)
 		}
 	}
 	
-	FPrintF (OutFile, "%d 0 \"", sdef->sdef_arity);
+	put_arguments_n_b (sdef->sdef_arity);
+	PutSOutFile (" 0 \"");
 	PrintSymbolOfIdent (name, 0, OutFile);
 	PutCOutFile ('\"');
 }
@@ -3209,7 +3241,8 @@ void GenFunctionDescriptorForLazyTupleRecursion (SymbDef sdef,int tuple_result_a
 		FPrintF (OutFile,N_PREFIX "%u.2 ",sdef->sdef_number);
 	}
 	
-	FPrintF (OutFile, "%d 0 \"",sdef->sdef_arity+tuple_result_arity);
+	put_arguments_n_b (sdef->sdef_arity+tuple_result_arity);
+	PutSOutFile (" 0 \"");
 	PrintSymbolOfIdent (name,0,OutFile);
 	PutCOutFile ('\"');
 
@@ -3227,7 +3260,8 @@ void GenFunctionDescriptorForLazyTupleRecursion (SymbDef sdef,int tuple_result_a
 		FPrintF (OutFile,N_PREFIX "%u.3 ",sdef->sdef_number);
 	}
 	
-	FPrintF (OutFile, "%d 0 \"",sdef->sdef_arity+tuple_result_arity);
+	put_arguments_n_b (sdef->sdef_arity+tuple_result_arity);
+	PutSOutFile (" 0 \"");
 	PrintSymbolOfIdent (name,0,OutFile);
 	PutCOutFile ('\"');
 # endif
@@ -3410,15 +3444,19 @@ void GenStart (SymbDef startsymb)
 
 		start_function_name=startsymb->sdef_name;
 		
-		put_directive_ (Dexport);
-		FPrintF (OutFile, "__%s_%s",CurrentModule,start_function_name);
+		put_directive (Dexport);
+		PutSSOutFile (" __",CurrentModule);
+		PutSSOutFile ("_",start_function_name);
+
 		GenOAStackLayout (0);
 
-		FPrintF (OutFile, "\n__%s_%s", CurrentModule,start_function_name);
+		PutCOutFile ('\n');
+		PutSSOutFile ("__",CurrentModule);
+		PutSSOutFile ("_",start_function_name);
 
 		if (arity!=0 || strcmp (start_function_name,"main")==0){
-			put_instruction_b (buildI);
-			put_argumentsn_b (65536l);
+			put_instructionb (buildI);
+			put_arguments_n_b (65536l);
 		}
 		
 		put_instruction_b (build);
@@ -3505,11 +3543,13 @@ void InitFileInfo (ImpMod imod)
 		option_string[N_System]='1';
 
 	put_first_directive (Dcomp);
-	FPrintF (OutFile, " %d %s", VERSION,option_string);
+	put_arguments_n_b (VERSION);
+	Put_SOutFile (option_string);
 	
 	put_directive (Dstart);
 	if (start_sdef!=NULL){
-		FPrintF (OutFile, " __%s_%s",start_sdef->sdef_module,start_sdef->sdef_name);
+		PutSSOutFile (" __",start_sdef->sdef_module);
+		PutSSOutFile ("_",start_sdef->sdef_name);
 	} else
 		PutSOutFile (" _nostart_");
 }
@@ -3525,8 +3565,8 @@ void GenNoMatchError (SymbDef sdef,int asp,int bsp,int string_already_generated)
 	GenPopA (asp);
 	GenPopB (bsp);
 	
-	put_instruction_b (pushD);
-	FPrintF (OutFile, "m_%s", CurrentModule);
+	put_instructionb (pushD);
+	PutSSOutFile (" m_",CurrentModule);
 
 	put_instruction_b (pushD);	
 	if (!desc_needed)
@@ -3572,8 +3612,8 @@ void GenCaseNoMatchError (SymbDefP case_def,int asp,int bsp)
 	GenPopA (asp);
 	GenPopB (bsp);
 
-	put_instruction_b (pushD);
-	FPrintF (OutFile, "m_%s", CurrentModule);
+	put_instructionb (pushD);
+	PutSSOutFile (" m_",CurrentModule);
 
 	put_instruction_b (pushD);
 	FPrintF (OutFile, "case_fail%u",CaseFailNumber);
@@ -3598,14 +3638,16 @@ static void GenImpLab (char *label_name)
 
 static void GenImpLab_node_entry (char *label_name,char *ea_label_name)
 {
-	put_directive_b (implab);
-	FPrintF (OutFile,"%s %s",label_name,ea_label_name);
+	put_directiveb (implab);
+	Put_SOutFile (label_name);
+	Put_SOutFile (ea_label_name);
 }
 
 static void GenImpLab_n_and_ea_label (char *label_name)
 {
-	put_directive_b (implab);
-	FPrintF (OutFile,"n%s ea%s",label_name,label_name);
+	put_directiveb (implab);
+	PutSSOutFile (" n",label_name);
+	PutSSOutFile (" ea",label_name);
 }
 
 static void GenImpDesc (char *descriptor_name)
