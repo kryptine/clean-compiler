@@ -245,6 +245,7 @@ static void TreatWaitListAfterFill (int offset, FillKind fkind)
 
 #define put_instructionb(a) put_instruction(I##a)
 #define put_instruction_b(a) put_instruction_(I##a)
+#define put_directiveb(a) put_directive(D##a)
 #define put_directive_b(a) put_directive_(D##a)
 #define put_argumentsi_b(i1) FPrintF (OutFile,"%s",(i1))
 #define put_argumentsin_b(i1,n1) FPrintF (OutFile,"%s %d",(i1),(n1))
@@ -254,7 +255,7 @@ static void TreatWaitListAfterFill (int offset, FillKind fkind)
 #define put_arguments_nnnn_b(n1,n2,n3,n4) FPrintF (OutFile," %d %d %d %d",(n1),(n2),(n3),(n4))
 #define put_arguments_nnnnn_b(n1,n2,n3,n4,n5) FPrintF (OutFile," %d %d %d %d %d",(n1),(n2),(n3),(n4),(n5))
 #define put_argumentsn__b(n1) FPrintF (OutFile,"%d ",(n1))
-#define put_argumentsnn__b(n1,n2) FPrintF (OutFile,"%d %d ",(n1),(n2))
+#define put_arguments_nn__b(n1,n2) FPrintF (OutFile," %d %d ",(n1),(n2))
 #define put_arguments_n_b(n1) FPrintF (OutFile," %d",(n1))
 #define put_arguments_nn_b(n1,n2) FPrintF (OutFile," %d %d",(n1),(n2))
 #define put_arguments_n__b(n1) FPrintF (OutFile," %d ",(n1))
@@ -269,6 +270,7 @@ static void TreatWaitListAfterFill (int offset, FillKind fkind)
 
 #define put_instructionb(a) if (DoDebug) put_instruction(I##a); else put_instruction_code(C##a)
 #define put_instruction_b(a) if (DoDebug) put_instruction_(I##a); else put_instruction_code(C##a)
+#define put_directiveb(a) if (DoDebug) put_directive(D##a); else put_instruction_code(C##a)
 #define put_directive_b(a) if (DoDebug) put_directive_(D##a); else put_instruction_code(C##a)
 
 static void put_n (long n)
@@ -409,10 +411,10 @@ static void put_arguments_n__b (long n1)
 	}
 }
 
-static void put_argumentsnn__b (long n1,long n2)
+static void put_arguments_nn__b (long n1,long n2)
 {
 	if (DoDebug)
-		FPrintF (OutFile,"%d %d ",(n1),(n2));
+		FPrintF (OutFile," %d %d ",(n1),(n2));
 	else {
 		put_n (n1);
 		put_n (n2);
@@ -1248,32 +1250,32 @@ static void GenUnboxedRecordLabelsReversedForRecord (StateS state)
 void GenDStackLayout (int asize,int bsize,Args fun_args)
 {
 	if (DoStackLayout){
-		put_directive_b (d);
+		put_directiveb (d);
 		if (bsize > 0){
-			put_argumentsnn__b (asize,bsize);
+			put_arguments_nn__b (asize,bsize);
 
 			while (fun_args!=NULL){
 				GenBStackElems (fun_args->arg_state);
 				fun_args=fun_args->arg_next;
 			}
 		} else
-			put_argumentsnn_b (asize,0);
+			put_arguments_nn_b (asize,0);
 	}
 }
 
 void GenOStackLayout (int asize,int bsize,Args fun_args)
 {
 	if (DoStackLayout){
-		put_directive_b (o);
+		put_directiveb (o);
 		if (bsize > 0){
-			put_argumentsnn__b (asize,bsize);
+			put_arguments_nn__b (asize,bsize);
 
 			while (fun_args!=NULL){
 				GenBStackElems (fun_args->arg_state);
 				fun_args=fun_args->arg_next;
 			}
 		} else
-			put_argumentsnn_b (asize,0);
+			put_arguments_nn_b (asize,0);
 	}
 }
 
@@ -2059,8 +2061,8 @@ void GenFillFromA (int src, int dst, FillKind fkind)
 		return;
 	
 	TreatWaitListBeforeFill (dst, fkind);
-	put_instruction_b (fill_a);
-	put_argumentsnn_b (src,dst);
+	put_instructionb (fill_a);
+	put_arguments_nn_b (src,dst);
 	TreatWaitListAfterFill (dst, fkind);
 }
 
@@ -2546,56 +2548,56 @@ void GenOAStackLayout (int asize)
 void GenDStackLayoutOfStates (int asize,int bsize,int n_states,StateP state_p)
 {
 	if (DoStackLayout){
-		put_directive_b (d);
+		put_directiveb (d);
 		if (bsize > 0){
 			int i;
 	
-			put_argumentsnn__b (asize,bsize);
+			put_arguments_nn__b (asize,bsize);
 
 			for (i=0; i<n_states; ++i)
 				GenBStackElems (state_p[i]);
 		} else
-			put_argumentsnn_b (asize,0);
+			put_arguments_nn_b (asize,0);
 	}
 }
 
 void GenOStackLayoutOfStates (int asize,int bsize,int n_states,StateP state_p)
 {
 	if (DoStackLayout){
-		put_directive_b (o);
+		put_directiveb (o);
 		if (bsize > 0){
 			int i;
 			
-			put_argumentsnn__b (asize,bsize);
+			put_arguments_nn__b (asize,bsize);
 
 			for (i=0; i<n_states; ++i)
 				GenBStackElems (state_p[i]);
 		} else
-			put_argumentsnn_b (asize,0);
+			put_arguments_nn_b (asize,0);
 	}
 }
 
 void GenDStackLayoutOfState (int asize, int bsize, StateS resultstate)
 {
 	if (DoStackLayout){
-		put_directive_b (d);
+		put_directiveb (d);
 		if (bsize > 0){
-			put_argumentsnn__b (asize,bsize);
+			put_arguments_nn__b (asize,bsize);
 			GenBStackElems (resultstate);
 		} else
-			put_argumentsnn_b (asize,0);
+			put_arguments_nn_b (asize,0);
 	}		
 }
 
 void GenOStackLayoutOfState (int asize, int bsize, StateS resultstate)
 {
 	if (DoStackLayout){
-		put_directive_b (o);
+		put_directiveb (o);
 		if (bsize > 0){
-			put_argumentsnn__b (asize,bsize);
+			put_arguments_nn__b (asize,bsize);
 			GenBStackElems (resultstate);
 		} else
-			put_argumentsnn_b (asize,0);
+			put_arguments_nn_b (asize,0);
 	}		
 }
 
@@ -2607,8 +2609,8 @@ void GenJmpEvalUpdate (void)
 void GenNodeEntryDirective (int arity,Label label,Label label2)
 {
 	if (DoStackLayout){
-		put_directive_b (n);
-		put_argumentsn__b (arity);
+		put_directiveb (n);
+		put_arguments_n__b (arity);
 
 		if (DescriptorNeeded (label->lab_symbol))
 			GenDescriptorOrNodeEntryLabel (label);
@@ -2630,15 +2632,15 @@ void GenNodeEntryDirective (int arity,Label label,Label label2)
 
 void GenApplyEntryDirective (int arity,Label label)
 {
-	put_directive_b (a);
-	put_argumentsn__b (arity);
+	put_directiveb (a);
+	put_arguments_n__b (arity);
 	GenLabel (label);
 }
 
 void GenApplyInstanceEntryDirective (int arity,Label label,Label label2)
 {
-	put_directive_b (ai);
-	put_argumentsn__b (arity);
+	put_directiveb (ai);
+	put_arguments_n__b (arity);
 	if (label==NULL)
 		PutSOutFile (empty_lab.lab_name);
 	else
@@ -2650,8 +2652,8 @@ void GenApplyInstanceEntryDirective (int arity,Label label,Label label2)
 void GenLazyRecordNodeEntryDirective (int arity,Label label,Label label2)
 {
 	if (DoStackLayout){
-		put_directive_b (n);
-		put_argumentsn__b (arity);
+		put_directiveb (n);
+		put_arguments_n__b (arity);
 
 		if (DescriptorNeeded (label->lab_symbol))
 			GenLabel (label);
@@ -2675,8 +2677,8 @@ void GenLazyRecordNodeEntryDirective (int arity,Label label,Label label2)
 void GenNodeEntryDirectiveForLabelWithoutSymbol (int arity,Label label,Label label2)
 {
 	if (DoStackLayout){
-		put_directive_b (n);
-		put_argumentsn__b (arity);
+		put_directiveb (n);
+		put_arguments_n__b (arity);
 
 		GenLabel (label);
 
@@ -2722,8 +2724,8 @@ void GenNodeEntryDirectiveUnboxed (int a_size,int b_size,Label label,Label label
 void GenFieldNodeEntryDirective (int arity,Label label,Label label2,char *record_name)
 {
 	if (DoStackLayout){
-		put_directive_b (n);
-		put_argumentsn__b (arity);
+		put_directiveb (n);
+		put_arguments_n__b (arity);
 		
 		if (DescriptorNeeded (label->lab_symbol))
 			GenFieldLabel (label,record_name);
@@ -2962,11 +2964,12 @@ void GenArrayFunctionDescriptor (SymbDef arr_fun_def, Label desclab, int arity)
 
 	PutCOutFile (' ');
 	GenLabel (&empty_lab);
-	PutCOutFile (' ');
 
 	if (arr_fun_def->sdef_mark & SDEF_USED_CURRIED_MASK){
 		LabDef lazylab;
 		
+		PutCOutFile (' ');
+
 		lazylab = *desclab;
 		lazylab.lab_pref = l_pref;
 		GenLabel (&lazylab);
@@ -3510,8 +3513,8 @@ void GenNoMatchError (SymbDef sdef,int asp,int bsp,int string_already_generated)
 		FPrintF (OutFile, LOCAL_D_PREFIX "%u", sdef->sdef_number);
 	
 	if (DoStackLayout){
-		put_directive_b (d);
-		put_argumentsnn__b (0,2);
+		put_directiveb (d);
+		put_arguments_nn__b (0,2);
 		PutSOutFile ("ii");
 	}
 	
