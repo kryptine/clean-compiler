@@ -19,7 +19,6 @@
 
 #include "settings.h"
 #include "sizes.h"
-#include "checker.h"
 #include "codegen_types.h"
 #include "statesgen.h"
 #include "codegen.h"
@@ -61,6 +60,8 @@ Bool LazyTupleSelectors [MaxNodeArity-NrOfGlobalSelectors];
 
 LabDef BasicDescriptors [NrOfObjects];
 int ObjectSizes [NrOfObjects];
+
+struct def_list *OpenDefinitionModules;
 
 static void InitBasicDescriptor (ObjectKind kind,char *name,int size)
 {
@@ -6804,4 +6805,6 @@ void InitCoding (void)
 
 	next_update_function_n=0;
 	next_match_function_n=0;
+
+	OpenDefinitionModules = NULL;
 }

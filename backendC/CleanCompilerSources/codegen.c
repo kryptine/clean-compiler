@@ -11,7 +11,6 @@
 #include "system.h"
 #include "syntaxtr.t"
 #include "comsupport.h"
-#include "checker.h"
 #include "settings.h"
 #include "sa.h"
 #include "statesgen.h"
@@ -1193,7 +1192,17 @@ void CodeGeneration (ImpMod imod, char *fname)
 			else
 				ReduceError = &cycle_lab; /* in sequential case we have no reservation mechanism */
 
-			GenDependencyList();
+			{
+				DefModList def_mod;
+
+				for_l (def_mod,OpenDefinitionModules,mod_next)
+#if WRITE_DCL_MODIFICATION_TIME
+					GenDepend (def_mod->mod_body->dm_name,def_mod->mod_body->dm_modification_time);
+#else
+					GenDepend (def_mod->mod_body->dm_name);
+#endif
+			}
+
 #if IMPORT_OBJ_AND_LIB
 			{
 				struct string_list *sl;

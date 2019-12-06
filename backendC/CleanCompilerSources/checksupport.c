@@ -6,7 +6,6 @@
 #include "checksupport.h"
 #include "settings.h"
 #include "buildtree.h"
-#include "checker.h"
 #include <ctype.h>
 
 static int string_and_string_begin_equal (char *s1,char *s2_begin,char *s2_passed_end)
