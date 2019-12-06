@@ -60,3 +60,10 @@ typedef struct label {
 
 #define lab_name	lab_u.u_name
 #define lab_symbol	lab_u.u_symbol
+
+struct def_list {
+	DefMod				mod_body;
+	struct def_list *	mod_next;
+};
+
+typedef struct def_list *DefModList,DefModElem;

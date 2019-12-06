@@ -13,7 +13,6 @@
 # include "sizes.h"
 # include "set_scope_numbers.h"
 
-# include "checker.h"		/* ClearOpenDefinitionModules, AddOpenDefinitionModule */
 # include "comsupport.h" 	/* CurrentModule */
 # include "buildtree.h"		/* TupleSymbol, ApplySymbol */
 # include "sa.h"			/* StdMiscId,abort_symb_def,undef_symb_def,scc_dependency_list */
@@ -398,6 +397,17 @@ BEDeclareIclModule (CleanString name, CleanString modificationTime, int nFunctio
 		gBEState.be_dictionaryUpdateFunSymbol	= CreateDictionaryUpdateFunSymbol ();
 	}
 } /* BEDeclareIclModule */
+
+static void AddOpenDefinitionModule (DefMod definitionModule)
+{
+	DefModList	openModule;
+
+	openModule = CompAllocType (DefModElem);
+	openModule->mod_body	= definitionModule;
+	openModule->mod_next	= OpenDefinitionModules;
+
+	OpenDefinitionModules  = openModule;
+}
 
 void
 BEDeclareDclModule (int moduleIndex, CleanString name, CleanString modificationTime, int isSystemModule, int nFunctions, int nTypes, int nConstructors, int nFields)
@@ -3320,8 +3330,6 @@ BEInit (int argc)
 #endif
 
 	InitPredefinedSymbols ();
-
-	ClearOpenDefinitionModules ();
 
 	InitStatesGen ();
 	InitCoding ();

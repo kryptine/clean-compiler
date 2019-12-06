@@ -19,7 +19,6 @@
 #include "codegen1.h"
 #include "codegen2.h"
 #include "statesgen.h"
-#include "checker.h"
 #include "instructions.h"
 #include "optimisations.h"
 #include "sa.h"

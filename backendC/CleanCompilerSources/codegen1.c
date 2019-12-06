@@ -14,7 +14,6 @@
 #include "syntaxtr.t"
 #include "comsupport.h"
 #include "sizes.h"
-#include "checker.h"
 #include "codegen_types.h"
 #include "codegen1.h"
 #include "sa.h"

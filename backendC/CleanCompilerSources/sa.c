@@ -38,7 +38,6 @@
 #include "sizes.h"
 #include "syntaxtr.t"
 #include "comsupport.h"
-#include "checker.h"
 #include "sa.t"
 #include "sa.h"
 #ifdef _DB_TEST_

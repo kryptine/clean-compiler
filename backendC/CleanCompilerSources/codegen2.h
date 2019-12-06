@@ -107,6 +107,8 @@ extern char *Co_Wtype,*Co_Wspine,else_symb[],then_symb[],notused_string[];
 extern SymbDef ApplyDef,IfDef,SeqDef;
 extern StateS StrictOnAState;
 
+extern struct def_list *OpenDefinitionModules;
+
 void FillSelectSymbol (StateKind result_state_kind,int arity,int argnr,Args arg,int *asp_p,int *bsp_p,
 								NodeId update_node_id,CodeGenNodeIdsP code_gen_node_ids_p);
 void Build (Node node,int *asp_p,int *bsp_p,CodeGenNodeIdsP code_gen_node_ids_p);

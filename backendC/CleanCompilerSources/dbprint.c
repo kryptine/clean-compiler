@@ -6,7 +6,6 @@
 #include "comsupport.h"
 #include "settings.h"
 #include "sizes.h"
-#include "checker.h"
 #include "checksupport.h"
 #include "dbprint.h"
 #include "codegen_types.h"
