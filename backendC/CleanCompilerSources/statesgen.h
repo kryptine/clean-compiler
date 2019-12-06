@@ -36,3 +36,5 @@ extern int optimise_strict_tuple_result_functions;
 extern PolyList UserDefinedArrayFunctions;
 
 extern SymbDefP special_types[];
+extern char *StdBoolId;
+extern SymbDef AndSymbDef,OrSymbDef;

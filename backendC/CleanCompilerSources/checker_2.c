@@ -36,24 +36,13 @@ void GenDependencyList (void)
 					);
 }
 
-char *StdBoolId;
-SymbDef AndSymbDef,OrSymbDef;
-
-#if SA_RECOGNIZES_ABORT_AND_UNDEF
-char *StdMiscId;
-SymbDef abort_symb_def,undef_symb_def;
-#endif
-
-char *PreludeId;
-SymbDef seq_symb_def;
-
 SymbDef scc_dependency_list;
 
 SymbDef MakeNewSymbolDefinition (char *module, char *name, int arity, SDefKind kind)
 {
 	SymbDef def;
 	int i,string_length;
-	char *s,*new_string;
+	char *new_string;
 	
 	string_length = strlen (name);
 	new_string = CompAlloc (string_length+1);

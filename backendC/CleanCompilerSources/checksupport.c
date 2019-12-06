@@ -9,30 +9,6 @@
 #include "checker.h"
 #include <ctype.h>
 
-char *ConvertSymbolKindToString (SymbKind skind)
-{
-	switch (skind)
-	{
-		case int_type: 		return "Int";
-		case bool_type:		return "Bool";
-		case char_type:		return "Char";
-		case real_type:		return "Real";
-		case file_type:		return "File";
-		case array_type:		return "{ }";
-		case strict_array_type:	return "{ ! }";
-		case unboxed_array_type:return "{ # }";
-		case world_type:	return "World";
-		case procid_type:	return "ProcId";
-		case redid_type:	return "RedId";
-		case fun_type:		return "=>";
-		case list_type:		return "List";
-		case tuple_type:	return "Tuple";
-		case dynamic_type:	return "Dynamic";
-		default:			return "Erroneous";
-	}
-
-} /* ConvertSymbolKindToString */
-
 static int string_and_string_begin_equal (char *s1,char *s2_begin,char *s2_passed_end)
 {
 	char c,*s2;

@@ -16,6 +16,7 @@
 # include "checker.h"		/* scc_dependency_list, ClearOpenDefinitionModules, AddOpenDefinitionModule */
 # include "comsupport.h" 	/* CurrentModule */
 # include "buildtree.h"		/* TupleSymbol, ApplySymbol */
+# include "sa.h"			/* StdMiscId,abort_symb_def,undef_symb_def */
 
 # include "backendsupport.h"
 # define Clean(ignore)
@@ -3276,6 +3277,9 @@ static void init_unboxed_list_symbols (void)
 	unboxed_list_symbols[unboxed_array_type][1].symb_state_p=unboxed_array_state_p;
 }
 #endif
+
+char *PreludeId;
+SymbDef seq_symb_def;
 
 BackEnd
 BEInit (int argc)

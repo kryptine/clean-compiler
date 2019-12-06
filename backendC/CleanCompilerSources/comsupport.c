@@ -279,54 +279,70 @@ void FatalCompError (char *mod, char *proc, char *mess)
 	longjmp (ExitEnv, 1);
 }
 
+static char *ConvertSymbolKindToString (SymbKind skind)
+{
+	switch (skind){
+		case int_type: 		return "Int";
+		case bool_type:		return "Bool";
+		case char_type:		return "Char";
+		case real_type:		return "Real";
+		case file_type:		return "File";
+		case array_type:		return "{ }";
+		case strict_array_type:	return "{ ! }";
+		case unboxed_array_type:return "{ # }";
+		case world_type:	return "World";
+		case procid_type:	return "ProcId";
+		case redid_type:	return "RedId";
+		case fun_type:		return "=>";
+		case list_type:		return "List";
+		case tuple_type:	return "Tuple";
+		case dynamic_type:	return "Dynamic";
+		default:			return "Erroneous";
+	}
+}
+
+/* do not use if symb_kind==definition */
+static char *symbol_to_string (Symbol symbol)
+{
+	switch (symbol->symb_kind){
+	case int_denot:
+		return symbol->symb_int;
+	case bool_denot:
+		return symbol->symb_bool ? "True" : "False";
+	case char_denot:
+		return symbol->symb_char;
+	case string_denot:
+		return symbol->symb_string;
+	case real_denot:
+		return symbol->symb_real;
+	case tuple_symb:
+		return "Tuple";
+	case cons_symb:
+		return "[:]";
+	case nil_symb:
+		return "[]";
+	case select_symb:
+		return "_Select";
+	case apply_symb:
+		return "AP";
+	case if_symb:
+		return "if";
+	case fail_symb:
+		return "_Fail";
+	case definition:
+		return NULL;
+	default:
+		return ConvertSymbolKindToString ((SymbKind)symbol -> symb_kind);
+	}
+}
+
 void PrintSymbol (Symbol symbol, File file)
 {
-	switch (symbol -> symb_kind)
-	{
-	case definition:
+	if (symbol->symb_kind==definition)
 		PrintSymbolOfIdent (symbol->symb_def->sdef_name, 0, file);
-		return;
-	case int_denot:
-		FPutS (symbol->symb_int, file);
-		return;
-	case bool_denot:
-		FPutS (symbol->symb_bool ? "True" : "False", file);
-		return;
-	case char_denot:
-		FPutS (symbol->symb_char, file);
-		return;
-	case string_denot:
-		FPutS (symbol->symb_string, file);
-		return;
-	case real_denot:
-		FPutS (symbol->symb_real, file);
-		return;
-	case tuple_symb:
-		FPutS ("Tuple", file);
-		return;
-	case cons_symb:
-		FPutS ("[:]", file);
-		return;
-	case nil_symb:
-		FPutS ("[]", file);
-		return;
-	case select_symb:
-		FPutS ("_Select", file);
-		return;
-	case apply_symb:
-		FPutS ("AP", file);
-		return;
-	case if_symb:
-		FPutS ("if", file);
-		return;
-	case fail_symb:
-		FPutS ("_Fail", file);
-		return;
-	default:
-		FPutS (ConvertSymbolKindToString ((SymbKind)symbol -> symb_kind), file);
-		return;
-	}
-} /* PrintSymbol */
+	else
+		FPutS (symbol_to_string (symbol), file);
+}
 
 void StaticMessage_D_s (Bool error,struct symbol_def *symb_def_p,char *message)
 {

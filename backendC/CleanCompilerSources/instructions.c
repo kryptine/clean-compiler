@@ -384,38 +384,7 @@ static void GenDescriptorOrNodeEntryLabel (Label label)
 		PutdotUOutFile (label->lab_post);
 }
 
-#if !BINARY_ABC
-
-#define put_instructionb(a) put_instruction(I##a)
-#define put_instruction_b(a) put_instruction_(I##a)
-#define put_directiveb(a) put_directive(D##a)
-#define put_directive_b(a) put_directive_(D##a)
-#define put_arguments_i_b(i1) FPrintF (OutFile," %s",(i1))
-#define put_arguments_in_b(i1,n1) FPrintF (OutFile," %s %d",(i1),(n1))
-#define put_argumentsn_b(n1) FPrintF (OutFile,"%d",(n1))
-#define put_argumentsnn_b(n1,n2) FPrintF (OutFile,"%d %d",(n1),(n2))
-#define put_arguments_nnn_b(n1,n2,n3) FPrintF (OutFile," %d %d %d",(n1),(n2),(n3))
-#define put_arguments_nnnn_b(n1,n2,n3,n4) FPrintF (OutFile," %d %d %d %d",(n1),(n2),(n3),(n4))
-#define put_arguments_nnnnn_b(n1,n2,n3,n4,n5) FPrintF (OutFile," %d %d %d %d %d",(n1),(n2),(n3),(n4),(n5))
-#define put_argumentsn__b(n1) FPrintF (OutFile,"%d ",(n1))
-#define put_arguments_nn__b(n1,n2) FPrintF (OutFile," %d %d ",(n1),(n2))
-#define put_arguments_n_b(n1) FPrintF (OutFile," %d",(n1))
-#define put_arguments_nn_b(n1,n2) FPrintF (OutFile," %d %d",(n1),(n2))
-#define put_arguments_n__b(n1) FPrintF (OutFile," %d ",(n1))
-
-#else
-
-/*
-#define put_instructionb(a) put_instruction_code(C##a)
-#define put_instruction_b(a) put_instruction_code(C##a)
-#define put_directive_b(a) put_instruction_code(C##a)
-*/
-
-#define put_instructionb(a) if (DoDebug) put_instruction(I##a); else put_instruction_code(C##a)
-#define put_instruction_b(a) if (DoDebug) put_instruction_(I##a); else put_instruction_code(C##a)
-#define put_directiveb(a) if (DoDebug) put_directive(D##a); else put_instruction_code(C##a)
-#define put_directive_b(a) if (DoDebug) put_directive_(D##a); else put_instruction_code(C##a)
-
+#if BINARY_ABC
 static void put_n (long n)
 {
 	while (!(n>=-64 && n<=63)){
@@ -453,128 +422,138 @@ static long integer_string_to_integer (char *s_p)
 	
 	return integer;
 }
+#endif
 
 static void put_arguments_i_b (char *i1)
 {
-	if (DoDebug){
-		PutCOutFile (' ');
-		PutSOutFile (i1);
-	} else
+#if BINARY_ABC
+	if (!DoDebug){
 		put_n (integer_string_to_integer (i1));
+		return;
+	}
+#endif
+	PutCOutFile (' ');
+	PutSOutFile (i1);
 }
 
 static void put_arguments_in_b (char *i1,long n1)
 {
-	if (DoDebug)
-		FPrintF (OutFile," %s %d",(i1),(n1));
-	else {
+#if BINARY_ABC
+	if (!DoDebug){
 		put_n (integer_string_to_integer (i1));
 		put_n (n1);
+		return;
 	}
+#endif
+	PutCOutFile (' ');
+	PutSOutFile (i1);
+	PutCOutFile (' ');
+	PutIOutFile (n1);
 }
 
-static void put_argumentsn_b (long n1)
+static void put_arguments_n_b (long n1)
 {
-	if (DoDebug)
-		FPrintF (OutFile,"%d",(n1));
-	else
+#if BINARY_ABC
+	if (!DoDebug){
 		put_n (n1);
+		return;
+	}
+#endif
+	PutCOutFile (' ');
+	PutIOutFile (n1);
 }
 
-static void put_argumentsnn_b (long n1,long n2)
+static void put_arguments_nn_b (long n1,long n2)
 {
-	if (DoDebug)
-		FPrintF (OutFile,"%d %d",(n1),(n2));
-	else {
+#if BINARY_ABC
+	if (!DoDebug){
 		put_n (n1);
 		put_n (n2);
+		return;
 	}
+#endif
+	PutCOutFile (' ');
+	PutIOutFile (n1);
+	PutCOutFile (' ');
+	PutIOutFile (n2);
 }
 
 static void put_arguments_nnn_b (long n1,long n2,long n3)
 {
-	if (DoDebug)
-		FPrintF (OutFile," %d %d %d",(n1),(n2),(n3));
-	else {
+#if BINARY_ABC
+	if (!DoDebug){
 		put_n (n1);
 		put_n (n2);
 		put_n (n3);
+		return;
 	}
+#endif
+	PutCOutFile (' ');
+	PutIOutFile (n1);
+	PutCOutFile (' ');
+	PutIOutFile (n2);
+	PutCOutFile (' ');
+	PutIOutFile (n3);
 }
 
 static void put_arguments_nnnn_b (long n1,long n2,long n3,long n4)
 {
-	if (DoDebug)	
-		FPrintF (OutFile," %d %d %d %d",(n1),(n2),(n3),(n4));
-	else {
+#if BINARY_ABC
+	if (!DoDebug){
 		put_n (n1);
 		put_n (n2);
 		put_n (n3);
 		put_n (n4);
+		return;
 	}
+#endif
+	PutCOutFile (' ');
+	PutIOutFile (n1);
+	PutCOutFile (' ');
+	PutIOutFile (n2);
+	PutCOutFile (' ');
+	PutIOutFile (n3);
+	PutCOutFile (' ');
+	PutIOutFile (n4);
 }
 
 static void put_arguments_nnnnn_b (long n1,long n2,long n3,long n4,long n5)
 {
-	if (DoDebug)
-		FPrintF (OutFile," %d %d %d %d %d",(n1),(n2),(n3),(n4),(n5));
-	else {
+#if BINARY_ABC
+	if (!DoDebug){
 		put_n (n1);
 		put_n (n2);
 		put_n (n3);
 		put_n (n4);
 		put_n (n5);
+		return;
 	}
+#endif
+	PutCOutFile (' ');
+	PutIOutFile (n1);
+	PutCOutFile (' ');
+	PutIOutFile (n2);
+	PutCOutFile (' ');
+	PutIOutFile (n3);
+	PutCOutFile (' ');
+	PutIOutFile (n4);
+	PutCOutFile (' ');
+	PutIOutFile (n5);
 }
 
-static void put_argumentsn__b (long n1)
-{
-	if (DoDebug)
-		FPrintF (OutFile,"%d ",(n1));
-	else
-		put_n (n1);
-}
+#if !BINARY_ABC
 
-static void put_arguments_n_b (long n1)
-{
-	if (DoDebug)
-		FPrintF (OutFile," %d",(n1));
-	else {
-		PutCOutFile (' ',OutFile);
-		put_n (n1);
-	}
-}
+#define put_instructionb(a) put_instruction(I##a)
+#define put_instruction_b(a) put_instruction_(I##a)
+#define put_directiveb(a) put_directive(D##a)
+#define put_directive_b(a) put_directive_(D##a)
 
-static void put_arguments_n__b (long n1)
-{
-	if (DoDebug)
-		FPrintF (OutFile," %d ",(n1));
-	else {
-		PutCOutFile (' ',OutFile);
-		put_n (n1);
-	}
-}
+#else
 
-static void put_arguments_nn__b (long n1,long n2)
-{
-	if (DoDebug)
-		FPrintF (OutFile," %d %d ",(n1),(n2));
-	else {
-		put_n (n1);
-		put_n (n2);
-	}
-}
-
-static void put_arguments_nn_b (long n1,long n2)
-{
-	if (DoDebug)
-		FPrintF (OutFile," %d %d",(n1),(n2));
-	else {
-		PutCOutFile (' ',OutFile);
-		put_n (n1);
-		put_n (n2);
-	}
-}
+#define put_instructionb(a) if (DoDebug) put_instruction(I##a); else put_instruction_code(C##a)
+#define put_instruction_b(a) if (DoDebug) put_instruction_(I##a); else put_instruction_code(C##a)
+#define put_directiveb(a) if (DoDebug) put_directive(D##a); else put_instruction_code(C##a)
+#define put_directive_b(a) if (DoDebug) put_directive_(D##a); else put_instruction_code(C##a)
 
 enum {
 	Cbuild=136,

@@ -2173,6 +2173,11 @@ static void InitAlternative (RuleAltS *alt)
 	}
 }
 
+#if SA_RECOGNIZES_ABORT_AND_UNDEF
+char *StdMiscId;
+SymbDef abort_symb_def,undef_symb_def;
+#endif
+
 /* 'StrictUpdates' defines whether a record update is strict */
 
 #define StrictUpdates
