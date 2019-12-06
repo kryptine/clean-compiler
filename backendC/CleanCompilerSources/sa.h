@@ -14,3 +14,5 @@ extern void free_unused_sa_blocks (void);
 extern char *StdMiscId;
 extern SymbDef abort_symb_def,undef_symb_def;
 #endif
+
+extern SymbDef scc_dependency_list;
