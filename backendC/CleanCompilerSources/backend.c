@@ -13,10 +13,10 @@
 # include "sizes.h"
 # include "set_scope_numbers.h"
 
-# include "checker.h"		/* scc_dependency_list, ClearOpenDefinitionModules, AddOpenDefinitionModule */
+# include "checker.h"		/* ClearOpenDefinitionModules, AddOpenDefinitionModule */
 # include "comsupport.h" 	/* CurrentModule */
 # include "buildtree.h"		/* TupleSymbol, ApplySymbol */
-# include "sa.h"			/* StdMiscId,abort_symb_def,undef_symb_def */
+# include "sa.h"			/* StdMiscId,abort_symb_def,undef_symb_def,scc_dependency_list */
 
 # include "backendsupport.h"
 # define Clean(ignore)

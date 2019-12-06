@@ -3643,6 +3643,8 @@ static void convert_type (SymbDef sdef)
 	}
 }
 
+SymbDef scc_dependency_list;
+
 static void ConvertSyntaxTree
 	(struct module_function_and_type_symbols mfts,int size_dcl_type_symbols_a,struct module_function_and_type_symbols dcl_type_symbols_a[])
 {

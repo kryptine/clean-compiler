@@ -35,19 +35,6 @@ void InitGlobalSymbols (void)
 	clear_p_at_node_tree();
 }
 
-TypeArgs
-NewTypeArgument (TypeNode pattern)
-{
-	TypeArgs newarg;
-
-	newarg = CompAllocType (TypeArg);
-
-	newarg->type_arg_node	= pattern;
-	newarg->type_arg_next	= NIL;
-
-	return (newarg);
-} /* NewTypeArgument */
-
 Args
 NewArgument (NodeP node)
 {
@@ -96,18 +83,6 @@ NewStrict (StrictNodeIdP next)
 	
 	return (strictNodeId);
 } /* NewStrict */
-
-StrictNodeIdP
-NewStrictNodeId (NodeId nodeId, StrictNodeIdP next)
-{
-	StrictNodeIdP	strictNodeId;
-
-	strictNodeId	=	NewStrict (next);
-
-	strictNodeId->snid_node_id	= nodeId;
-
-	return (strictNodeId);
-} /* NewStrictNodeId */
 
 NodeP
 NewNodeIdNode (NodeIdP node_id)
@@ -173,69 +148,6 @@ NewUpdateNode (SymbolP symb, Args args, int arity)
 	return (NewNodeByKind (UpdateNode, symb, args, arity));
 } /* NewUpdateNode */
 
-NodeP
-NewIfNode (void)
-{
-	NodeP node;
-	struct if_node_contents *then_else_info;
-
-	node = CompAllocType (struct node);
-	then_else_info = CompAllocType (struct if_node_contents);
-
-	node->node_annotation	= NoAnnot;
-	node->node_number		= 0;
-	node->node_kind			= IfNode;
-
-	node->node_contents.contents_if=then_else_info;
-
-	then_else_info->if_then_node_defs		= NIL;
-	then_else_info->if_then_strict_node_ids	= NIL;
-	then_else_info->if_else_node_defs		= NIL;
-	then_else_info->if_else_strict_node_ids = NIL;
-
-	return (node);
-} /* NewIfNode */
-
-NodeP
-NewSelectNode (SymbolP selectSymbol, NodeIdP selectId, int arity)
-{
-	Args selectArg;
-
-	selectArg	= NewArgument (NewNodeIdNode (selectId));
-
-	return (NewNode (selectSymbol, selectArg, arity));
-} /* NewSelectNode */
-
-NodeDefs
-NewNodeDefinition (NodeIdP nid, NodeP node)
-{
-	NodeDefs def;
-	
-	def	= CompAllocType (NodeDefS);
-
-	def->def_mark	= 0;
-	def->def_id		= nid;
-	def->def_node	= node;
-
-	return (def);
-} /* NewNodeDefinition */
-
-NodeIdP
-FreshNodeId (NodeP node, NodeDefs **node_defs_h)
-{
-	NodeIdP		nodeId;
-	NodeDefs	def;
-
-	nodeId = NewNodeId();
-
-	def	= NewNodeDefinition (nodeId, node);
-
-	**node_defs_h	= def;
-	*node_defs_h	= &def->def_next;
-
-	return (nodeId);
-} /* FreshNodeId */
-
 SymbolP
 NewSymbol (SymbKind symbolKind)
 {
@@ -248,70 +160,47 @@ NewSymbol (SymbKind symbolKind)
 	return (symbol);
 } /* NewSymbol */	
 
-SymbolP
-NewTupleTypeSymbol (int arity)
+NodeDefs NewNodeDef (NodeId nid,Node node)
 {
-	SymbolP tuple;
+	NodeDefs new;
 
-	if ((tuple =TupleTypeSymbols [arity-1]) == NIL)
-	{
-		TupleTypeSymbols [arity-1] = tuple = NewSymbol (tuple_type);
-		tuple -> symb_arity = arity;
-	}
+	new = CompAllocType (NodeDefS);
 
-	return tuple;
+	new->def_id		= nid;
+	new->def_node	= node;
+	new->def_mark	= 0;
 
-} /* NewTupleTypeSymbol */
+	return new;
+}
 
-SymbolP
-NewSelectSymbol (int arity)
+SymbDef MakeNewSymbolDefinition (char *module, char *name, int arity, SDefKind kind)
 {
-	SymbolP select;
-
-	if ((select = SelectSymbols [arity-1]) == NIL)
-	{
-		select	= NewSymbol (select_symb);
-		select->symb_arity = arity;
-		SelectSymbols [arity-1]		= select;
-	}
-
-	return (select);
-} /* NewSelectSymbol */
-
-ImpRules
-NewImpRule (unsigned line_number,TypeAlts typeAlternative,NodeP rule_root)
-{
-	ImpRules	impRule;
-
-	impRule	= CompAllocType (ImpRuleS);
-
-	impRule->rule_alts = NIL;
-	impRule->rule_root = rule_root;
-	impRule->rule_type = typeAlternative;
-	impRule->rule_next_changed_function = NULL;
-
-	impRule->rule_mark = 0;
-	impRule->rule_next = NIL;
-
-	return impRule;
-} /* NewImpRule */
-
-RuleAltP
-NewRuleAlt (void)
-{
-	RuleAltP alt;
-
-	alt = CompAllocType (RuleAltS);
+	SymbDef def;
+	int i,string_length;
+	char *new_string;
 	
-	alt->alt_kind 				= Contractum;
-	alt->alt_lhs_root			= NIL;
-	alt->alt_lhs_defs			= NIL;
-	alt->alt_rhs_defs			= NIL;
-	alt->alt_strict_node_ids	= NIL;
-	alt->alt_line				= 0;
+	string_length = strlen (name);
+	new_string = CompAlloc (string_length+1);
 
-	return (alt);
-} /* NewRuleAlt */
+	for (i=0; i<string_length; ++i)
+		new_string[i] = name[i];
+	new_string [string_length] = '\0';
+	
+	def = CompAllocType (SymbDefS);
+	
+	def->sdef_module = module;
+	def->sdef_name = new_string;
+	def->sdef_arity = arity;
+	def->sdef_kind = kind;
+
+	def->sdef_mark=0;
+
+	def->sdef_exported=False;
+
+	def->sdef_arfun = NoArrayFun;
+	
+	return def;
+}
 
 struct p_at_node_tree {
 	NodeP					annoted_node;

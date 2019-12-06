@@ -36,50 +36,6 @@ void GenDependencyList (void)
 					);
 }
 
-SymbDef scc_dependency_list;
-
-SymbDef MakeNewSymbolDefinition (char *module, char *name, int arity, SDefKind kind)
-{
-	SymbDef def;
-	int i,string_length;
-	char *new_string;
-	
-	string_length = strlen (name);
-	new_string = CompAlloc (string_length+1);
-
-	for (i=0; i<string_length; ++i)
-		new_string[i] = name[i];
-	new_string [string_length] = '\0';
-	
-	def = CompAllocType (SymbDefS);
-	
-	def->sdef_module = module;
-	def->sdef_name = new_string;
-	def->sdef_arity = arity;
-	def->sdef_kind = kind;
-
-	def->sdef_mark=0;
-
-	def->sdef_exported=False;
-
-	def->sdef_arfun = NoArrayFun;
-	
-	return def;
-}
-
-NodeDefs NewNodeDef (NodeId nid,Node node)
-{
-	NodeDefs new;
-
-	new = CompAllocType (NodeDefS);
-
-	new->def_id		= nid;
-	new->def_node	= node;
-	new->def_mark	= 0;
-
-	return new;
-}
-
 void InitChecker (void)
 {
 	OpenDefinitionModules	= NIL;
