@@ -2048,6 +2048,9 @@ static Bool OptimizedMemberCallInAStrictContext (Node node,int arg_n,struct stat
 	return parallel;
 }
 
+char *StdBoolId;
+SymbDef AndSymbDef,OrSymbDef;
+
 static Bool NodeInAStrictContext (Node node,StateS demanded_state,int local_scope)
 {
 	Bool parallel;

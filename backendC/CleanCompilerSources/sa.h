@@ -10,3 +10,7 @@ extern int StrictnessAnalysisConvertRules (ImpRuleS *rules);
 extern void StrictnessAnalysisForRule (SymbDef sdef);
 extern void free_unused_sa_blocks (void);
 
+#if SA_RECOGNIZES_ABORT_AND_UNDEF
+extern char *StdMiscId;
+extern SymbDef abort_symb_def,undef_symb_def;
+#endif
