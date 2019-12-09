@@ -2052,7 +2052,7 @@ void cleanup_stack
 
 	if (DoDebug){
 		PrintComment ();
-		FPrintF (OutFile,compact_stack_ok ? "Remove unused stack elements" : "Remove unused stack elements without moving");
+		PutSOutFile (compact_stack_ok ? "Remove unused stack elements" : "Remove unused stack elements without moving");
 	}
 	
 	asp=*asp_p;
@@ -2893,13 +2893,20 @@ static void generate_code_for_apply_in_strict_context (NodeP node,int *asp_p,int
 				member_type_alt=field_sdef->sdef_member_type_of_field;
 				if (DoDebug)
 					if (member_type_alt->type_alt_lhs->type_node_arity==n_apply_args+1){
-						FPrintF (OutFile, "\n||\t%s",selector_node_p->node_symbol->symb_def->sdef_name);
-					} else
-						FPrintF (OutFile, "\n||\t(no dictionary) %s",field_sdef->sdef_name);
-			} else if (DoDebug)
-				FPrintF (OutFile, "\n||\t(no dictionary) %s",field_sdef->sdef_name);
-		} else if (DoDebug)
-			FPrintF (OutFile, "\n||\t(no dictionary) %s",field_sdef->sdef_name);
+						PutSOutFile ("\n||\t");
+						PutSOutFile (selector_node_p->node_symbol->symb_def->sdef_name);
+					} else {
+						PutSOutFile ("\n||\t(no dictionary) ");
+						PutSOutFile (field_sdef->sdef_name);
+					}
+			} else if (DoDebug){
+				PutSOutFile ("\n||\t(no dictionary) ");
+				PutSOutFile (field_sdef->sdef_name);
+			}
+		} else if (DoDebug){
+			PutSOutFile ("\n||\t(no dictionary) ");
+			PutSOutFile (field_sdef->sdef_name);
+		}
 
 		if (field_sdef!=NULL && OptimizeInstanceCalls){
 			struct state *member_states_of_field;

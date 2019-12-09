@@ -666,13 +666,22 @@ static void CodeRootApply (Node root,NodeId rootid,int asp,int bsp,CodeGenNodeId
 					member_type_alt=field_sdef->sdef_member_type_of_field;
 					if (DoDebug)
 						if (member_type_alt->type_alt_lhs->type_node_arity==n_apply_args+1){
-							FPrintF (OutFile, "\n||\t%d %s",root->node_symbol->symb_instance_apply,selector_node_p->node_symbol->symb_def->sdef_name);
-						} else
-							FPrintF (OutFile, "\n||\t(no dictionary) %s",field_sdef->sdef_name);
-				} else if (DoDebug)
-					FPrintF (OutFile, "\n||\t(no dictionary) %s",field_sdef->sdef_name);
-			} else if (DoDebug)
-				FPrintF (OutFile, "\n||\t(no dictionary) %s",field_sdef->sdef_name);
+							PutSOutFile ("\n||\t");
+							PutIOutFile (root->node_symbol->symb_instance_apply);
+							PutCOutFile (' ');
+							PutSOutFile (selector_node_p->node_symbol->symb_def->sdef_name);
+						} else {
+							PutSOutFile ("\n||\t(no dictionary) ");
+							PutSOutFile (field_sdef->sdef_name);
+						}
+				} else if (DoDebug){
+					PutSOutFile ("\n||\t(no dictionary) ");
+					PutSOutFile (field_sdef->sdef_name);
+				}
+			} else if (DoDebug){
+				PutSOutFile ("\n||\t(no dictionary) ");
+				PutSOutFile (field_sdef->sdef_name);
+			}
 
 			if (field_sdef!=NULL && OptimizeInstanceCalls){
 				struct state *member_states_of_field;
