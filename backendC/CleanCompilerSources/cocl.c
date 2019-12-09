@@ -4,7 +4,6 @@
 #include "settings.h"
 #include <ctype.h>
 #include "compiler.h"
-#include "version.h"
 
 #include "MAIN_CLM.d"
 

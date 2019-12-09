@@ -18,7 +18,6 @@
 #include "codegen2.h"
 #include "instructions.h"
 #include "statesgen.h"
-#include "version.h"
 
 #define for_l(v,l,n) for(v=(l);v!=NULL;v=v->n)
 

@@ -4,6 +4,8 @@
 #include "system.h"
 #include "settings.h"
 
+int	VERSION=920;
+
 Bool
 	DoCode					= True,
 	DoDebug 				= False,
