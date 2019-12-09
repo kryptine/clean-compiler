@@ -29,8 +29,6 @@
 #	include "result_state_database.h"
 #endif
 
-extern int VERSION;
-
 #define for_l(v,l,n) for(v=(l);v!=NULL;v=v->n)
 
 #define RECORD_N_PREFIX c_pref

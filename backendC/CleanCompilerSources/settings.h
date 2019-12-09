@@ -1,7 +1,7 @@
 
-/*
-	Compiler setttings
-*/
+extern int VERSION;
+
+/* Compiler setttings */
 
 extern Bool DoCode;					/* not generated in abc file */
 extern Bool DoDebug;
