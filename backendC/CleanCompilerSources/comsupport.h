@@ -22,7 +22,11 @@ extern void StaticErrorMessage_s_Ss (char *symbol_s,struct symbol *symbol_p,char
 extern void StaticErrorMessage_s_ss (char *symbol_s,char *message1,char *message2);
 
 struct symbol;
-extern void PrintSymbol (struct symbol *symbol,File file);
+
+/* do not use if symb_kind==definition */
+extern char *symbol_to_string (struct symbol *symbol);
+
+extern void WriteSymbolToStdError (struct symbol *symbol);
 
 extern Bool  CompilerError;
 extern char *CurrentModule, *CompilerVersion;
@@ -48,7 +52,6 @@ extern void int_to_string (char *s,long i);
 
 extern void FatalCompError (char *mod, char *proc, char *mess);
 
-extern void InitSettings (void);
 extern void InitCompiler (void);
 extern void ExitCompiler (void);
 

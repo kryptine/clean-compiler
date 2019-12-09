@@ -7,7 +7,7 @@ extern void PrintImpRule (ImpRules rule,int n_leading_spaces,File file);
 extern void PrintTypeNode (TypeNode node, File file);
 extern void DPrintNodeId (NodeId nid, File file);
 extern void DPrintNodeIdS (char *s,NodeId nid, File file);
-extern void PrintTypeAlt (TypeAlts type_alts, File file, Bool with_equats);
+extern void PrintTypeAlt (TypeAlts type_alts, File file);
 extern void PrintState (StateS state, File file);
 
 extern void PrintRules (ImpRules rules,File file);
