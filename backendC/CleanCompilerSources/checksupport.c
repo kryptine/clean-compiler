@@ -8,22 +8,6 @@
 #include "buildtree.h"
 #include <ctype.h>
 
-static int string_and_string_begin_equal (char *s1,char *s2_begin,char *s2_passed_end)
-{
-	char c,*s2;
-	
-	s2=s2_begin;
-	do {
-		c=*s1++;
-		if (c=='\0')
-			return s2==s2_passed_end;
-		if (s2>=s2_passed_end)
-			return 0;
-	} while (*s2++ == c);
-
-	return 0;
-}
-
 static void print_compiler_generated_function_name (char *name, char *name_end, unsigned line_nr, File file)
 {
 	char *parsed_digits;
@@ -72,9 +56,9 @@ void PrintSymbolOfIdent (char *name, unsigned line_nr, File file)
 	}
 
 	if (*name == '_'){
-		if (string_and_string_begin_equal ("c",name+1,name_end))
+		if (name+2==name_end && name[1]=='c')
 			print_compiler_generated_function_name ("<case>",name_end,line_nr,file);
-		else if (string_and_string_begin_equal ("if",name+1,name_end))
+		else if (name+3==name_end && name[1]=='i' && name[2]=='f')
 			print_compiler_generated_function_name ("<if>",name_end,line_nr,file);	
 		else
 			FPutS (name, file);
