@@ -296,21 +296,26 @@ void BuildLazyTupleSelectorAndRemoveLabel (Label slab,int arity,int argnr)
 
 void FileComment (void)
 {
-	if (DoDebug)
-		FPrintF (OutFile, "\n||\tConcurrent Clean Code Generator (Version %d.%d)",VERSION / 1000, VERSION % 1000);
+	if (DoDebug){
+		PutSOutFile ("\n||\tConcurrent Clean Code Generator (Version ");
+		PutIOutFile (VERSION / 1000);
+		PutCOutFile ('.');
+		PutIOutFile (VERSION % 1000);
+		PutCOutFile (')');
+	}
 }
 
 void PrintNodeId (NodeId nid)
 {
 	if (nid && nid->nid_name)
-		FPrintF (OutFile, "%s", nid->nid_name);
+		PutSOutFile (nid->nid_name);
 	else
-		FPrintF (OutFile, "_");
+		PutCOutFile ('_');
 }
 
 void PrintComment (void)
 {
-	FPrintF (OutFile, "\n\t\t\t||\t");
+	PutSOutFile ("\n\t\t\t||\t");
 }
 
 void LhsComment (unsigned int altnr, int asp, int bsp)
@@ -318,10 +323,15 @@ void LhsComment (unsigned int altnr, int asp, int bsp)
 	if (DoDebug){
 		PrintComment ();
 #if 1
-		FPrintF (OutFile,"Match code, stacksizes A: %d B: %d",asp,bsp);
+		PutSOutFile ("Match code, stacksizes A: ");
 #else
-		FPrintF (OutFile,"Match code for alternative %d, stacksizes A: %d B: %d",altnr, asp, bsp);
+		PutSOutFile ("Match code for alternative ");
+		PutIOutFile (altnr);
+		PutSOutFile (", stacksizes A: ");
 #endif
+		PutIOutFile (asp);
+		PutSOutFile (" B: ");
+		PutIOutFile (bsp);
 	}
 }
 
@@ -330,7 +340,7 @@ void StrictIdComment (NodeId id)
 	if (DoDebug){
 		PrintComment ();
 		PrintNodeId  (id);
-		FPrintF (OutFile, ": strict annotated");
+		PutSOutFile (": strict annotated");
 	}
 }
 
@@ -338,14 +348,16 @@ void NodeDefComment (NodeDefs nd, char *msg)
 {
 	if (DoDebug){
 		PrintComment ();
-		FPrintF (OutFile, "Node definition ");
+		PutSOutFile ("Node definition ");
 		PrintNodeId  (nd->def_id);
 
 		if (nd->def_node && (nd->def_node->node_kind==NormalNode || nd->def_node->node_kind==SelectorNode)){
-			FPrintF (OutFile, ": ");
+			PutSOutFile (": ");
 			PrintSymbol  (nd->def_node->node_symbol, OutFile);
 		}
-		FPrintF (OutFile, " (%s)", msg);
+		PutSOutFile (" (");
+		PutSOutFile (msg);
+		PutCOutFile (')');
 	}
 }
 
@@ -353,7 +365,10 @@ void ContractumComment (int asp, int bsp)
 {
 	if (DoDebug){
 		PrintComment ();
-		FPrintF (OutFile,"Building the contractum, Stacksizes A: %d B: %d",asp, bsp);
+		PutSOutFile ("Building the contractum, Stacksizes A: ");
+		PutIOutFile (asp);
+		PutSOutFile (" B: ");
+		PutIOutFile (bsp);
 	}
 }
 
@@ -361,7 +376,7 @@ void RedirectionComment (NodeId nid)
 {
 	if (DoDebug){
 		PrintComment();
-		FPrintF	   (OutFile, "Redirecting the root to: ");
+		PutSOutFile ("Redirecting the root to: ");
 		PrintNodeId  (nid);
 	}
 }
@@ -384,7 +399,7 @@ void ArgComment (Args arg)
 				node=arg_node->node_node_id->nid_node;
 				
 				if (node->node_kind==NormalNode || node->node_kind==SelectorNode){
-					FPrintF (OutFile, ": ");
+					PutSOutFile (": ");
 					PrintSymbol (node->node_symbol, OutFile);
 				}
 			}
@@ -406,7 +421,7 @@ void NodeIdComment (NodeId node_id)
 			node=node_id->nid_node;
 				
 			if (node->node_kind==NormalNode || node->node_kind==SelectorNode){
-				FPrintF (OutFile, ": ");
+				PutSOutFile (": ");
 				PrintSymbol (node->node_symbol, OutFile);
 			}
 		}
@@ -422,7 +437,7 @@ void ParComment (Args arg)
 		else
 			PrintSymbol (arg->arg_pattern->node_symbol,OutFile);
 */
-		FPrintF	   (OutFile, ": parallel subgraph");
+		PutSOutFile (": parallel subgraph");
 	}
 }
 
@@ -1132,8 +1147,14 @@ static int generate_instance_entry_arguments
 	member_arity=field_type_alt->type_alt_lhs->type_node_arity-1;
 	member_state_p=dictionary_field->sdef_member_states_of_field;
 	
-	if (DoDebug)
-		FPrintF (OutFile, "\n||\tmember type %s %d %d",dictionary_field->sdef_name,member_arity,function_arity);
+	if (DoDebug){
+		PutSOutFile ("\n||\tmember type ");
+		PutSOutFile (dictionary_field->sdef_name);
+		PutCOutFile (' ');
+		PutIOutFile (member_arity);
+		PutCOutFile (' ');
+		PutIOutFile (function_arity);
+	}
 	
 	n_dictionary_args = function_arity-member_arity;
 
@@ -1189,7 +1210,7 @@ static int generate_unboxed_record_cons_instance_entry
 	
 	if (rule_sdef->sdef_mark & SDEF_RULE_INSTANCE_RULE_P){
 		if (DoDebug)
-			FPrintF (OutFile, "\n||\tinstance fused");
+			PutSOutFile ("\n||\tinstance fused");
 		if (rule_sdef->sdef_instance_rule->sdef_mark & SDEF_INSTANCE_RULE_WITH_FIELD_P){
 			dictionary_field=rule_sdef->sdef_instance_rule->sdef_dictionary_field;
 			dictionary_sdef_mark=dictionary_field->sdef_mark;
@@ -1199,7 +1220,7 @@ static int generate_unboxed_record_cons_instance_entry
 	} else {
 		/* SDEF_INSTANCE_RULE_WITH_FIELD_P */
 		if (DoDebug)
-			FPrintF (OutFile, "\n||\tinstance");
+			PutSOutFile ("\n||\tinstance");
 		dictionary_field=rule_sdef->sdef_dictionary_field;
 		dictionary_sdef_mark=dictionary_field->sdef_mark;
 	}
@@ -1237,7 +1258,7 @@ static int generate_unboxed_record_decons_instance_entry (struct symbol_def *rul
 	
 	if (rule_sdef->sdef_mark & SDEF_RULE_INSTANCE_RULE_P){
 		if (DoDebug)
-			FPrintF (OutFile, "\n||\tinstance fused");
+			PutSOutFile ("\n||\tinstance fused");
 		if (rule_sdef->sdef_instance_rule->sdef_mark & SDEF_INSTANCE_RULE_WITH_FIELD_P){
 			dictionary_field=rule_sdef->sdef_instance_rule->sdef_dictionary_field;
 			dictionary_sdef_mark=dictionary_field->sdef_mark;
@@ -1247,7 +1268,7 @@ static int generate_unboxed_record_decons_instance_entry (struct symbol_def *rul
 	} else {
 		/* SDEF_INSTANCE_RULE_WITH_FIELD_P */
 		if (DoDebug)
-			FPrintF (OutFile, "\n||\tinstance");
+			PutSOutFile ("\n||\tinstance");
 		dictionary_field=rule_sdef->sdef_dictionary_field;
 		dictionary_sdef_mark=dictionary_field->sdef_mark;
 	}
@@ -1286,7 +1307,7 @@ static int generate_unboxed_record_instance_entry (struct symbol_def *rule_sdef,
 	
 	if (rule_sdef->sdef_mark & SDEF_RULE_INSTANCE_RULE_P){
 		if (DoDebug)
-			FPrintF (OutFile, "\n||\tinstance fused");
+			PutSOutFile ("\n||\tinstance fused");
 		if (rule_sdef->sdef_instance_rule->sdef_mark & SDEF_INSTANCE_RULE_WITH_FIELD_P){
 			dictionary_field=rule_sdef->sdef_instance_rule->sdef_dictionary_field;
 			dictionary_sdef_mark=dictionary_field->sdef_mark;
@@ -1296,7 +1317,7 @@ static int generate_unboxed_record_instance_entry (struct symbol_def *rule_sdef,
 	} else {
 		/* SDEF_INSTANCE_RULE_WITH_FIELD_P */
 		if (DoDebug)
-			FPrintF (OutFile, "\n||\tinstance");
+			PutSOutFile ("\n||\tinstance");
 		dictionary_field=rule_sdef->sdef_dictionary_field;
 		dictionary_sdef_mark=dictionary_field->sdef_mark;
 	}
@@ -1987,7 +2008,7 @@ int generate_instance_entry (struct symbol_def *rule_sdef,struct state *function
 	
 	if (rule_sdef->sdef_mark & SDEF_RULE_INSTANCE_RULE_P){
 		if (DoDebug)
-			FPrintF (OutFile, "\n||\tinstance fused");
+			PutSOutFile ("\n||\tinstance fused");
 		if (rule_sdef->sdef_instance_rule->sdef_mark & SDEF_INSTANCE_RULE_WITH_FIELD_P){
 			dictionary_field=rule_sdef->sdef_instance_rule->sdef_dictionary_field;
 			dictionary_sdef_mark=dictionary_field->sdef_mark;
@@ -1997,7 +2018,7 @@ int generate_instance_entry (struct symbol_def *rule_sdef,struct state *function
 	} else {
 		/* SDEF_INSTANCE_RULE_WITH_FIELD_P */
 		if (DoDebug)
-			FPrintF (OutFile, "\n||\tinstance");
+			PutSOutFile ("\n||\tinstance");
 		dictionary_field=rule_sdef->sdef_dictionary_field;
 		dictionary_sdef_mark=dictionary_field->sdef_mark;
 	}
@@ -4505,8 +4526,12 @@ static void repl_overloaded_cons_arguments (NodeP node_p,int *asp_p,int *bsp_p,S
 	ab_node_ids_p->a_node_ids=code_gen_node_ids.a_node_ids;
 	ab_node_ids_p->b_node_ids=code_gen_node_ids.b_node_ids;
 
-	if (DoDebug)
-		FPrintF (OutFile, "\n||\tinstance %d %d",node_p->node_push_symbol->symb_head_strictness,node_p->node_push_symbol->symb_instance_apply);
+	if (DoDebug){
+		PutSOutFile ("\n||\tinstance ");
+		PutIOutFile (node_p->node_push_symbol->symb_head_strictness);
+		PutCOutFile (' ');
+		PutIOutFile (node_p->node_push_symbol->symb_instance_apply);
+	}
 
 	if (node_p->node_decons_node->node_kind==SelectorNode &&
 		(node_p->node_decons_node->node_symbol->symb_def->sdef_mark & SDEF_FIELD_HAS_MEMBER_TYPE)!=0)
@@ -4515,8 +4540,10 @@ static void repl_overloaded_cons_arguments (NodeP node_p,int *asp_p,int *bsp_p,S
 
 		field_sdef=node_p->node_decons_node->node_symbol->symb_def;
 
-		if (DoDebug)
-			FPrintF (OutFile, "\n||\t%s",field_sdef->sdef_name);
+		if (DoDebug){
+			PutSOutFile ("\n||\t");
+			PutSOutFile (field_sdef->sdef_name);
+		}
 
 		if (OptimizeInstanceCalls){
 			struct state *member_states_of_field;
