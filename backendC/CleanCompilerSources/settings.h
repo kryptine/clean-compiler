@@ -26,6 +26,7 @@ extern Bool Dynamics;
 
 extern Bool DoProfiling;
 extern Bool DoTimeProfiling;
+extern Bool DoCallGraphProfiling;
 
 extern Bool DoReuseUniqueNodes;
 extern Bool DoFusion;

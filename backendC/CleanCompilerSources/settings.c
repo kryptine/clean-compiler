@@ -28,6 +28,7 @@ Bool Dynamics = False;
 
 Bool DoProfiling=False; /* no longer used by memory profiler */
 Bool DoTimeProfiling=False;
+Bool DoCallGraphProfiling=False;
 
 Bool DoReuseUniqueNodes		= False;
 Bool DoFusion				= False;

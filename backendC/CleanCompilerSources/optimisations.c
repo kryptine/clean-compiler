@@ -2918,7 +2918,9 @@ static Bool try_insert_root_constructor_update_node (NodeP node,FreeUniqueNodeId
 static NodeP try_insert_function_update_node (NodeP node,FreeUniqueNodeIdsS **f_node_ids_l)
 {
 	if (!(node->node_state.state_type==SimpleState && node->node_state.state_kind==SemiStrict) &&
-		(IsLazyState (node->node_state) ? node->node_arity<=2 : ExpectsResultNode (node->node_state)) && 
+		(IsLazyState (node->node_state)
+			? (DoCallGraphProfiling ? node->node_arity<=1 : node->node_arity<=2)
+			: ExpectsResultNode (node->node_state)) &&
 		node->node_symbol->symb_kind==definition)
 	{
 		SymbDef sdef;
