@@ -793,11 +793,11 @@ static void put_instruction_code (int instruction_code)
 	PutCOutFile (instruction_code);
 }
 
-static void print_compiler_generated_function_name (char *name, char *name_end, unsigned line_nr, File file)
+static void write_compiler_generated_function_name_to_out_file (char *name, char *name_end, unsigned line_nr)
 {
 	char *parsed_digits;
 
-	FPutS (name,file);
+	FPutS (name,OutFile);
 	
 	parsed_digits=NULL;
 	if (name_end[0]==';' && isdigit (name_end[1])){
@@ -811,24 +811,26 @@ static void print_compiler_generated_function_name (char *name, char *name_end, 
 	}
 	
 	if (line_nr>0){
-		FPrintF (file,"[line: %u]", line_nr);
+		PutSOutFile ("[line: ");
+		PutIOutFile ((int)line_nr);
+		PutCOutFile (']');
 		if (parsed_digits)
 			name_end=parsed_digits;
 	} else
 		if (parsed_digits){
 			char *d_p;
 
-			FPutS ("[line:",file);
+			PutSOutFile ("[line:");
 			for (d_p=name_end+1; d_p<parsed_digits; ++d_p)
-				FPutC (*d_p,file);
-			FPutC (']',file);
+				PutCOutFile (*d_p);
+			PutCOutFile (']');
 
 			name_end=parsed_digits;
 		}
-	FPutS (name_end,file);
+	PutSOutFile (name_end);
 }
 
-static void PrintSymbolOfIdent (char *name, unsigned line_nr, File file)
+static void WriteSymbolOfIdentToOutFile (char *name, unsigned line_nr)
 {
 	char *name_end;
 
@@ -836,16 +838,16 @@ static void PrintSymbolOfIdent (char *name, unsigned line_nr, File file)
 		;
 
 	if (*name=='\\' && name+1==name_end){
-		print_compiler_generated_function_name ("<lambda>",name_end,line_nr,file);
+		write_compiler_generated_function_name_to_out_file ("<lambda>",name_end,line_nr);
 		return;
 	}
 
 	if (*name == '_'){
 		if (name+2==name_end && name[1]=='c'){
-			print_compiler_generated_function_name ("<case>",name_end,line_nr,file);
+			write_compiler_generated_function_name_to_out_file ("<case>",name_end,line_nr);
 			return;
 		} else if (name+3==name_end && name[1]=='i' && name[2]=='f'){
-			print_compiler_generated_function_name ("<if>",name_end,line_nr,file);
+			write_compiler_generated_function_name_to_out_file ("<if>",name_end,line_nr);
 			return;
 		}
 	} else
@@ -853,20 +855,30 @@ static void PrintSymbolOfIdent (char *name, unsigned line_nr, File file)
 			char *end_name;
 
 			for (; name!=name_end; name++)
-				FPutC (*name, file);
+				PutCOutFile (*name);
 
 			for (end_name = name_end + 2; *end_name!=';' && *end_name!='\0'; end_name++)
 				 ;
 			
-			FPrintF (file, " [line: %u]", line_nr);
-			
+			PutSOutFile (" [line: ");
+			PutIOutFile ((int)line_nr);
+			PutCOutFile (']');
+
 			if (*end_name == '\0')
 				return;
 
 			name = end_name;
 		}
 
-	FPutS (name, file);
+	FPutS (name, OutFile);
+}
+
+void WriteSymbolToOutFile (Symbol symbol)
+{
+	if (symbol->symb_kind==definition)
+		WriteSymbolOfIdentToOutFile (symbol->symb_def->sdef_name, 0);
+	else
+		PutSOutFile (symbol_to_string (symbol));
 }
 
 static void GenGetWL (int offset)
@@ -3221,7 +3233,7 @@ void GenStrictConstructorDescriptor (SymbDef sdef,StateP constructor_arg_states)
 	if (has_unboxed_record)
 		for (arg_n=state_arity-1; arg_n>=0; --arg_n)
 			GenUnboxedRecordLabelsReversed (constructor_arg_states[arg_n]);
-	put_space_quoted_string (name);
+	put_space_quoted_string (name);	
 }
 
 void GenArrayFunctionDescriptor (SymbDef arr_fun_def, Label desclab, int arity)
@@ -3374,7 +3386,7 @@ void GenFunctionDescriptorAndExportNodeAndDescriptor (SymbDef sdef)
 		else
 			PutSdotUOutFile (name,sdef->sdef_number);
 	} else
-		PrintSymbolOfIdent (name, 0, OutFile);
+		WriteSymbolOfIdentToOutFile (name, 0);
 	PutCOutFile ('\"');
 }
 
@@ -3454,7 +3466,7 @@ void GenConstructorFunctionDescriptorAndExportNodeAndDescriptor (SymbDef sdef)
 	
 	put_arguments_n_b (sdef->sdef_arity);
 	PutSOutFile (" 0 \"");
-	PrintSymbolOfIdent (name, 0, OutFile);
+	WriteSymbolOfIdentToOutFile (name, 0);
 	PutCOutFile ('\"');
 }
 
@@ -3486,7 +3498,7 @@ void GenFunctionDescriptorForLazyTupleRecursion (SymbDef sdef,int tuple_result_a
 	
 	put_arguments_n_b (sdef->sdef_arity+tuple_result_arity);
 	PutSOutFile (" 0 \"");
-	PrintSymbolOfIdent (name,0,OutFile);
+	WriteSymbolOfIdentToOutFile (name,0);
 	PutCOutFile ('\"');
 
 # if 1
@@ -3511,7 +3523,7 @@ void GenFunctionDescriptorForLazyTupleRecursion (SymbDef sdef,int tuple_result_a
 	
 	put_arguments_n_b (sdef->sdef_arity+tuple_result_arity);
 	PutSOutFile (" 0 \"");
-	PrintSymbolOfIdent (name,0,OutFile);
+	WriteSymbolOfIdentToOutFile (name,0);
 	PutCOutFile ('\"');
 # endif
 }
@@ -3868,7 +3880,7 @@ void GenNoMatchError (SymbDef sdef,int asp,int bsp,int string_already_generated)
 		put_directive (Dstring);
 		PutSUOutFile (" x_",sdef->sdef_number);
 		PutSOutFile (" \"");
-		PrintSymbolOfIdent (sdef->sdef_name,0,OutFile);
+		WriteSymbolOfIdentToOutFile (sdef->sdef_name,0);
 		PutSOutFile ("\"");
 	}
 }
@@ -3893,7 +3905,7 @@ void GenCaseNoMatchError (SymbDefP case_def,int asp,int bsp)
 	put_directive (Dstring);
 	PutSUOutFile (" case_fail",CaseFailNumber);
 	PutSOutFile (" \"");
-	PrintSymbolOfIdent (case_def->sdef_name,0,OutFile);
+	WriteSymbolOfIdentToOutFile (case_def->sdef_name,0);
 	PutSOutFile ("\"");		
 
 	CaseFailNumber++;
@@ -4215,7 +4227,7 @@ void GenPB_ident (char *ident_name,unsigned int line_n)
 {
 	put_directive_ (Dpb);
 	PutCOutFile ('\"');
-	PrintSymbolOfIdent (ident_name,line_n,OutFile);
+	WriteSymbolOfIdentToOutFile (ident_name,line_n);
 	PutCOutFile ('\"');
 }
 

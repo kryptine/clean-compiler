@@ -300,7 +300,7 @@ static char *ConvertSymbolKindToString (SymbKind skind)
 }
 
 /* do not use if symb_kind==definition */
-static char *symbol_to_string (Symbol symbol)
+char *symbol_to_string (Symbol symbol)
 {
 	switch (symbol->symb_kind){
 	case int_denot:
@@ -334,11 +334,11 @@ static char *symbol_to_string (Symbol symbol)
 	}
 }
 
-static void print_compiler_generated_function_name (char *name, char *name_end, unsigned line_nr, File file)
+static void write_compiler_generated_function_name_to_std_error (char *name, char *name_end, unsigned line_nr)
 {
 	char *parsed_digits;
 
-	FPutS (name,file);
+	FPutS (name,StdError);
 	
 	parsed_digits=NULL;
 	if (name_end[0]==';' && isdigit (name_end[1])){
@@ -352,24 +352,24 @@ static void print_compiler_generated_function_name (char *name, char *name_end, 
 	}
 	
 	if (line_nr>0){
-		FPrintF (file,"[line: %u]", line_nr);
+		FPrintF (StdError,"[line: %u]", line_nr);
 		if (parsed_digits)
 			name_end=parsed_digits;
 	} else
 		if (parsed_digits){
 			char *d_p;
 
-			FPutS ("[line:",file);
+			FPutS ("[line:",StdError);
 			for (d_p=name_end+1; d_p<parsed_digits; ++d_p)
-				FPutC (*d_p,file);
-			FPutC (']',file);
+				FPutC (*d_p,StdError);
+			FPutC (']',StdError);
 
 			name_end=parsed_digits;
 		}
-	FPutS (name_end,file);
+	FPutS (name_end,StdError);
 }
 
-static void PrintSymbolOfIdent (char *name, unsigned line_nr, File file)
+static void WriteSymbolOfIdentToStdError (char *name, unsigned line_nr)
 {
 	char *name_end;
 
@@ -377,16 +377,16 @@ static void PrintSymbolOfIdent (char *name, unsigned line_nr, File file)
 		;
 
 	if (*name=='\\' && name+1==name_end){
-		print_compiler_generated_function_name ("<lambda>",name_end,line_nr,file);
+		write_compiler_generated_function_name_to_std_error ("<lambda>",name_end,line_nr);
 		return;
 	}
 
 	if (*name == '_'){
 		if (name+2==name_end && name[1]=='c'){
-			print_compiler_generated_function_name ("<case>",name_end,line_nr,file);
+			write_compiler_generated_function_name_to_std_error ("<case>",name_end,line_nr);
 			return;
 		} else if (name+3==name_end && name[1]=='i' && name[2]=='f'){
-			print_compiler_generated_function_name ("<if>",name_end,line_nr,file);
+			write_compiler_generated_function_name_to_std_error ("<if>",name_end,line_nr);
 			return;
 		}
 	} else
@@ -394,12 +394,12 @@ static void PrintSymbolOfIdent (char *name, unsigned line_nr, File file)
 			char *end_name;
 
 			for (; name!=name_end; name++)
-				FPutC (*name, file);
+				FPutC (*name, StdError);
 
 			for (end_name = name_end + 2; *end_name!=';' && *end_name!='\0'; end_name++)
 				 ;
 			
-			FPrintF (file, " [line: %u]", line_nr);
+			FPrintF (StdError, " [line: %u]", line_nr);
 			
 			if (*end_name == '\0')
 				return;
@@ -407,15 +407,15 @@ static void PrintSymbolOfIdent (char *name, unsigned line_nr, File file)
 			name = end_name;
 		}
 
-	FPutS (name, file);
+	FPutS (name, StdError);
 }
 
-void PrintSymbol (Symbol symbol, File file)
+void WriteSymbolToStdError (Symbol symbol)
 {
 	if (symbol->symb_kind==definition)
-		PrintSymbolOfIdent (symbol->symb_def->sdef_name, 0, file);
+		WriteSymbolOfIdentToStdError (symbol->symb_def->sdef_name, 0);
 	else
-		FPutS (symbol_to_string (symbol), file);
+		FPutS (symbol_to_string (symbol), StdError);
 }
 
 void StaticMessage_D_s (Bool error,struct symbol_def *symb_def_p,char *message)
@@ -428,7 +428,7 @@ void StaticMessage_D_s (Bool error,struct symbol_def *symb_def_p,char *message)
 	if (CurrentLine > 0)
 		FPrintF (StdError, ",%u", CurrentLine);
 	FPutC (',', StdError);
-	PrintSymbolOfIdent (symb_def_p->sdef_name, 0, StdError);
+	WriteSymbolOfIdentToStdError (symb_def_p->sdef_name, 0);
 	FPutS ("]: ", StdError);
 
 	FPutS (message, StdError);
@@ -449,7 +449,7 @@ void StaticMessage_S_s (Bool error,struct symbol *symbol_p,char *message)
 	if (CurrentLine > 0)
 		FPrintF (StdError, ",%u", CurrentLine);
 	FPutC (',', StdError);
-	PrintSymbol (symbol_p, StdError);
+	WriteSymbolToStdError (symbol_p);
 	FPutS ("]: ", StdError);
 
 	FPutS (message, StdError);
@@ -470,10 +470,10 @@ void StaticMessage_S_Ss (Bool error,struct symbol *symbol_p1,struct symbol *symb
 	if (CurrentLine > 0)
 		FPrintF (StdError, ",%u", CurrentLine);
 	FPutC (',', StdError);
-	PrintSymbol (symbol_p1, StdError);
+	WriteSymbolToStdError (symbol_p1);
 	FPutS ("]: ", StdError);
 
-	PrintSymbol (symbol_p2, StdError);
+	WriteSymbolToStdError (symbol_p2);
 	FPutS (message, StdError);
 
 	FPutC ('\n', StdError);
@@ -510,7 +510,7 @@ void StaticErrorMessage_S_ss (struct symbol *symbol_p,char *message1,char *messa
 	if (CurrentLine > 0)
 		FPrintF (StdError, ",%u", CurrentLine);
 	FPutC (',', StdError);
-	PrintSymbol (symbol_p, StdError);
+	WriteSymbolToStdError (symbol_p);
 	FPutS ("]: ", StdError);
 
 	FPutS (message1, StdError);
@@ -531,7 +531,7 @@ void StaticErrorMessage_s_Ss (char *symbol_s,struct symbol *symbol_p,char *messa
 	FPutS (symbol_s, StdError);
 	FPutS ("]: ", StdError);
 
-	PrintSymbol (symbol_p, StdError);
+	WriteSymbolToStdError (symbol_p);
 	FPutS (message, StdError);
 
 	FPutC ('\n', StdError);

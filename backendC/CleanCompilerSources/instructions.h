@@ -11,6 +11,8 @@ extern File OutFile;
 #define PutCOutFile(s) FPutC ((s),OutFile)
 extern void PutIOutFile (long i);
 
+extern void WriteSymbolToOutFile (Symbol symbol);
+
 void BuildBasicFromB (ObjectKind kind,int b_offset);
 void FillBasicFromB (ObjectKind kind, int boffs, int aoffs, FillKind fkind);
 void BuildBasic (ObjectKind obj,SymbValue val);

@@ -351,7 +351,7 @@ void NodeDefComment (NodeDefs nd, char *msg)
 
 		if (nd->def_node && (nd->def_node->node_kind==NormalNode || nd->def_node->node_kind==SelectorNode)){
 			PutSOutFile (": ");
-			PrintSymbol  (nd->def_node->node_symbol, OutFile);
+			WriteSymbolToOutFile (nd->def_node->node_symbol);
 		}
 		PutSOutFile (" (");
 		PutSOutFile (msg);
@@ -398,11 +398,11 @@ void ArgComment (Args arg)
 				
 				if (node->node_kind==NormalNode || node->node_kind==SelectorNode){
 					PutSOutFile (": ");
-					PrintSymbol (node->node_symbol, OutFile);
+					WriteSymbolToOutFile (node->node_symbol);
 				}
 			}
 		} else if (arg_node->node_kind==NormalNode || arg_node->node_kind==SelectorNode)
-			PrintSymbol (arg->arg_node->node_symbol, OutFile);
+			WriteSymbolToOutFile (arg->arg_node->node_symbol);
 	}
 }
 
@@ -420,7 +420,7 @@ void NodeIdComment (NodeId node_id)
 				
 			if (node->node_kind==NormalNode || node->node_kind==SelectorNode){
 				PutSOutFile (": ");
-				PrintSymbol (node->node_symbol, OutFile);
+				WriteSymbolToOutFile (node->node_symbol);
 			}
 		}
 	}
