@@ -20,30 +20,31 @@
 
 void
 AssertionFailed (char *conditionString, char *file, int line)
-{	
-	FPrintF (StdError, "Error in backend: File %s, Line %d (%s)\n", file, line, conditionString);
+{
+	PutSStdError ("Error in backend: File ");
+	PutSStdError (file);
+	PutSStdError (", Line ");
+	PutIStdError (line);
+	PutSStdError (" (");
+	PutSStdError (conditionString);
+	PutSStdError (")\n");
 
 # ifdef _WINDOWS_
 	{
 		static char error[200];
 
-		sprintf (error, "Error in backend: File %s, Line %d (%s)\nDebug ?", file, line, conditionString);
+		strcpy (error,"Error in backend: File ");
+		strcat (error,file);
+		strcat (error,", Line ");
+		int_to_string (&error[strlen (error)],line);
+		strcat (error," (");
+		strcat (error,conditionString);
+		strcat (error,")\nDebug ?");
 	
 		if (MessageBox (NULL,error,"AssertionFailed",MB_YESNO)==IDYES)
 			Debugger ();
 	}
 #else
-# ifdef _MAC_
-	{
-		FILE *f;
-	
-		f=fopen ("AssertionFailedError","w");
-		if (f!=NULL){
-			FPrintF (f, "Error in backend: File %s, Line %d (%s)\n", file, line, conditionString);
-			fclose (f);
-		}
-	}
-# endif
 	Debugger ();
 #endif
 } /* AssertionFailed */
@@ -51,19 +52,10 @@ AssertionFailed (char *conditionString, char *file, int line)
 void
 fatal_backend_error (char *s)
 {
-	FPrintF (StdError, "Error in backend: %s\n", s);
+	PutSStdError ("Error in backend: ");
+	PutSStdError (s);
+	PutCStdError ('\n');
 
-#ifdef _MAC_
-	{
-		FILE *f;
-	
-		f=fopen ("AssertionFailedError","w");
-		if (f!=NULL){
-			FPrintF (f, "Error in backend: %s\n", s);
-			fclose (f);
-		}
-	}
-#endif	
 	Debugger ();
 }
 
@@ -183,7 +175,10 @@ ConvertAlloc (SizeT size)
 		if (size>gBytesLeft){
 			static char s[100];
 			
-			sprintf (s,"ConvertAlloc: size = %ld, gBytesLeft = %ld",(long)size,gBytesLeft);
+			strcpy (s,"ConvertAlloc: size = ");
+			int_to_string (&s[strlen (s)],size);
+			strcat (s,", gBytesLeft = ");
+			int_to_string (&s[strlen (s)],gBytesLeft);
 			fatal_backend_error (s);
 		}
 	}

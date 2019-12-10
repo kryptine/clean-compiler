@@ -26,10 +26,8 @@ struct symbol;
 /* do not use if symb_kind==definition */
 extern char *symbol_to_string (struct symbol *symbol);
 
-extern void WriteSymbolToStdError (struct symbol *symbol);
-
 extern Bool  CompilerError;
-extern char *CurrentModule, *CompilerVersion;
+extern char *CurrentModule;
 
 extern struct symbol *CurrentSymbol;
 
@@ -47,6 +45,10 @@ extern jmp_buf ExitEnv;
 extern void *CompAlloc (SizeT size);
 extern void InitStorage (void);
 extern void CompFree (void);
+
+#define PutSStdError(s) FPutS ((s),StdError)
+#define PutCStdError(s) FPutC ((s),StdError)
+extern void PutIStdError (long i);
 
 extern void int_to_string (char *s,long i);
 

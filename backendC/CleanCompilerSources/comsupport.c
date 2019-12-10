@@ -246,11 +246,26 @@ void int_to_string (char *s,long i)
 	*s='\0';
 }
 
+#define PutSStdError(s) FPutS ((s),StdError)
+#define PutCStdError(s) FPutC ((s),StdError)
+
+void PutIStdError (long i)
+{
+	FPrintF (StdError,"%ld",i);
+}
+
 /* The environment to leave the compiler if a fatal error occurs */
 
 void FatalCompError (char *mod, char *proc, char *mess)
 {
-	FPrintF (StdError,"Fatal Error in %s:%s \"%s\"\n", mod, proc, mess);
+	PutSStdError ("Fatal Error in ");
+	PutSStdError (mod);
+	PutCStdError (':');
+	PutSStdError (proc);
+	PutSStdError (" \"");
+	PutSStdError (mess);
+	PutSStdError ("\"\n");
+
 	if (OpenedFile){
 		if (ABCFileName){
 			CompilerError = True;
@@ -259,21 +274,9 @@ void FatalCompError (char *mod, char *proc, char *mess)
 			FClose (OpenedFile);
 		OpenedFile = (File) NIL;
 	}
-#ifdef CLEAN2
-# ifdef _MAC_
-	{
-		FILE *f;
-	
-		f=fopen ("FatalCompError","w");
-		if (f!=NULL){
-			FPrintF (f,"Fatal Error in %s:%s \"%s\"\n", mod, proc, mess);
-			fclose (f);
-		}
-	}
-# endif
+
 	if (!ExitEnv_valid)
 		exit (1);
-#endif
 	longjmp (ExitEnv, 1);
 }
 
@@ -352,21 +355,23 @@ static void write_compiler_generated_function_name_to_std_error (char *name, cha
 	}
 	
 	if (line_nr>0){
-		FPrintF (StdError,"[line: %u]", line_nr);
+		PutSStdError ("[line: ");
+		PutIStdError (line_nr);
+		PutCStdError (']');
 		if (parsed_digits)
 			name_end=parsed_digits;
 	} else
 		if (parsed_digits){
 			char *d_p;
 
-			FPutS ("[line:",StdError);
+			PutSStdError ("[line:");
 			for (d_p=name_end+1; d_p<parsed_digits; ++d_p)
-				FPutC (*d_p,StdError);
-			FPutC (']',StdError);
+				PutCStdError (*d_p);
+			PutCStdError (']');
 
 			name_end=parsed_digits;
 		}
-	FPutS (name_end,StdError);
+	PutSStdError (name_end);
 }
 
 static void WriteSymbolOfIdentToStdError (char *name, unsigned line_nr)
@@ -394,12 +399,14 @@ static void WriteSymbolOfIdentToStdError (char *name, unsigned line_nr)
 			char *end_name;
 
 			for (; name!=name_end; name++)
-				FPutC (*name, StdError);
+				PutCStdError (*name);
 
 			for (end_name = name_end + 2; *end_name!=';' && *end_name!='\0'; end_name++)
 				 ;
 			
-			FPrintF (StdError, " [line: %u]", line_nr);
+			PutSStdError (" [line: ");
+			PutIStdError (line_nr);
+			PutCStdError (']');
 			
 			if (*end_name == '\0')
 				return;
@@ -407,15 +414,15 @@ static void WriteSymbolOfIdentToStdError (char *name, unsigned line_nr)
 			name = end_name;
 		}
 
-	FPutS (name, StdError);
+	PutSStdError (name);
 }
 
-void WriteSymbolToStdError (Symbol symbol)
+static void WriteSymbolToStdError (Symbol symbol)
 {
 	if (symbol->symb_kind==definition)
 		WriteSymbolOfIdentToStdError (symbol->symb_def->sdef_name, 0);
 	else
-		FPutS (symbol_to_string (symbol), StdError);
+		PutSStdError (symbol_to_string (symbol));
 }
 
 void StaticMessage_D_s (Bool error,struct symbol_def *symb_def_p,char *message)
@@ -423,17 +430,19 @@ void StaticMessage_D_s (Bool error,struct symbol_def *symb_def_p,char *message)
 	if (! (error || DoWarning))
 		return;
 
-	FPutS (error ? "Error [" : "Warning [", StdError);
-	FPutS (CurrentModule, StdError);
-	if (CurrentLine > 0)
-		FPrintF (StdError, ",%u", CurrentLine);
-	FPutC (',', StdError);
+	PutSStdError (error ? "Error [" : "Warning [");
+	PutSStdError (CurrentModule);
+	if (CurrentLine > 0){
+		PutCStdError (','); 
+		PutIStdError (CurrentLine);
+	}
+	PutCStdError (',');
 	WriteSymbolOfIdentToStdError (symb_def_p->sdef_name, 0);
-	FPutS ("]: ", StdError);
+	PutSStdError ("]: ");
 
-	FPutS (message, StdError);
+	PutSStdError (message);
 
-	FPutC ('\n', StdError);
+	PutCStdError ('\n');
 
 	if (error)
 		CompilerError = True;
@@ -444,17 +453,19 @@ void StaticMessage_S_s (Bool error,struct symbol *symbol_p,char *message)
 	if (! (error || DoWarning))
 		return;
 
-	FPutS (error ? "Error [" : "Warning [", StdError);
-	FPutS (CurrentModule, StdError);
-	if (CurrentLine > 0)
-		FPrintF (StdError, ",%u", CurrentLine);
-	FPutC (',', StdError);
+	PutSStdError (error ? "Error [" : "Warning [");
+	PutSStdError (CurrentModule);
+	if (CurrentLine > 0){
+		PutCStdError (',');
+		PutIStdError (CurrentLine);
+	}
+	PutCStdError (',');
 	WriteSymbolToStdError (symbol_p);
-	FPutS ("]: ", StdError);
+	PutSStdError ("]: ");
 
-	FPutS (message, StdError);
+	PutSStdError (message);
 
-	FPutC ('\n', StdError);
+	PutCStdError ('\n');
 
 	if (error)
 		CompilerError = True;
@@ -465,18 +476,20 @@ void StaticMessage_S_Ss (Bool error,struct symbol *symbol_p1,struct symbol *symb
 	if (! (error || DoWarning))
 		return;
 
-	FPutS (error ? "Error [" : "Warning [", StdError);
-	FPutS (CurrentModule, StdError);
-	if (CurrentLine > 0)
-		FPrintF (StdError, ",%u", CurrentLine);
-	FPutC (',', StdError);
+	PutSStdError (error ? "Error [" : "Warning [");
+	PutSStdError (CurrentModule);
+	if (CurrentLine > 0){
+		PutCStdError (',');
+		PutIStdError (CurrentLine);
+	}
+	PutCStdError (',');
 	WriteSymbolToStdError (symbol_p1);
-	FPutS ("]: ", StdError);
+	PutSStdError ("]: ");
 
 	WriteSymbolToStdError (symbol_p2);
-	FPutS (message, StdError);
+	PutSStdError (message);
 
-	FPutC ('\n', StdError);
+	PutCStdError ('\n');
 
 	if (error)
 		CompilerError = True;
@@ -487,17 +500,19 @@ void StaticMessage_s_s (Bool error,char *symbol_s,char *message)
 	if (! (error || DoWarning))
 		return;
 
-	FPutS (error ? "Error [" : "Warning [", StdError);
-	FPutS (CurrentModule, StdError);
-	if (CurrentLine > 0)
-		FPrintF (StdError, ",%u", CurrentLine);
-	FPutC (',', StdError);
-	FPutS (symbol_s, StdError);
-	FPutS ("]: ", StdError);
+	PutSStdError (error ? "Error [" : "Warning [");
+	PutSStdError (CurrentModule);
+	if (CurrentLine > 0){
+		PutCStdError (',');
+		PutIStdError (CurrentLine);
+	}
+	PutCStdError (',');
+	PutSStdError (symbol_s);
+	PutSStdError ("]: ");
 
-	FPutS (message, StdError);
+	PutSStdError (message);
 
-	FPutC ('\n', StdError);
+	PutCStdError ('\n');
 
 	if (error)
 		CompilerError = True;
@@ -505,54 +520,60 @@ void StaticMessage_s_s (Bool error,char *symbol_s,char *message)
 
 void StaticErrorMessage_S_ss (struct symbol *symbol_p,char *message1,char *message2)
 {
-	FPutS ("Error [", StdError);
-	FPutS (CurrentModule, StdError);
-	if (CurrentLine > 0)
-		FPrintF (StdError, ",%u", CurrentLine);
-	FPutC (',', StdError);
+	PutSStdError ("Error [");
+	PutSStdError (CurrentModule);
+	if (CurrentLine > 0){
+		PutCStdError (',');
+		PutIStdError (CurrentLine);
+	}
+	PutCStdError (',');
 	WriteSymbolToStdError (symbol_p);
-	FPutS ("]: ", StdError);
+	PutSStdError ("]: ");
 
-	FPutS (message1, StdError);
-	FPutS (message2, StdError);
+	PutSStdError (message1);
+	PutSStdError (message2);
 
-	FPutC ('\n', StdError);
+	PutCStdError ('\n');
 
 	CompilerError = True;
 }
 
 void StaticErrorMessage_s_Ss (char *symbol_s,struct symbol *symbol_p,char *message)
 {
-	FPutS ("Error [", StdError);
-	FPutS (CurrentModule, StdError);
-	if (CurrentLine > 0)
-		FPrintF (StdError, ",%u", CurrentLine);
-	FPutC (',', StdError);
-	FPutS (symbol_s, StdError);
-	FPutS ("]: ", StdError);
+	PutSStdError ("Error [");
+	PutSStdError (CurrentModule);
+	if (CurrentLine > 0){
+		PutCStdError (',');
+		PutIStdError (CurrentLine);
+	}
+	PutCStdError (',');
+	PutSStdError (symbol_s);
+	PutSStdError ("]: ");
 
 	WriteSymbolToStdError (symbol_p);
-	FPutS (message, StdError);
+	PutSStdError (message);
 
-	FPutC ('\n', StdError);
+	PutCStdError ('\n');
 
 	CompilerError = True;
 }
 
 void StaticErrorMessage_s_ss (char *symbol_s,char *message1,char *message2)
 {
-	FPutS ("Error [", StdError);
-	FPutS (CurrentModule, StdError);
-	if (CurrentLine > 0)
-		FPrintF (StdError, ",%u", CurrentLine);
-	FPutC (',', StdError);
-	FPutS (symbol_s, StdError);
-	FPutS ("]: ", StdError);
+	PutSStdError ("Error [");
+	PutSStdError (CurrentModule);
+	if (CurrentLine > 0){
+		PutCStdError (',');
+		PutIStdError (CurrentLine);
+	}
+	PutCStdError (',');
+	PutSStdError (symbol_s);
+	PutSStdError ("]: ");
 
-	FPutS (message1, StdError);
-	FPutS (message2, StdError);
+	PutSStdError (message1);
+	PutSStdError (message2);
 
-	FPutC ('\n', StdError);
+	PutCStdError ('\n');
 
 	CompilerError = True;
 }
@@ -589,36 +610,38 @@ extern struct clean_string_128 { size_t length; char chars[128]; } clean_error_s
 
 void ErrorInCompiler (char *mod, char *proc, char *msg)
 {
-	if (CurrentModule!=NULL)
-		FPrintF (StdError,"Error in compiler while compiling %s.icl: Module %s, Function %s, \"%s\"\n",CurrentModule,mod,proc,msg);
-	else
-		FPrintF (StdError,"Error in compiler: Module %s, Function %s, \"%s\"\n",mod,proc,msg);
+	PutSStdError ("Error in compiler");;
+	if (CurrentModule!=NULL){
+		PutSStdError (" while compiling ");
+		PutSStdError (CurrentModule);
+		PutSStdError (".icl");
+	}
+	PutSStdError (": Module ");
+	PutSStdError (mod);
+	PutSStdError (", Function ");
+	PutSStdError (proc);
+	PutSStdError (", \"");
+	PutSStdError (msg);
+	PutSStdError ("\"\n");
 
-#ifdef CLEAN2
-	if (CurrentModule!=NULL)
-		sprintf (clean_error_string.chars,"Error in compiler while compiling %s.icl: Module %s, Function %s, \"%s\"\n",CurrentModule,mod,proc,msg);
-	else
-		sprintf (clean_error_string.chars,"Error in compiler: Module %s, Function %s, \"%s\"\n",mod,proc,msg);	
+	strcpy (clean_error_string.chars,"Error in compiler");
+	if (CurrentModule!=NULL){
+		strcat (clean_error_string.chars," while compiling ");
+		strcat (clean_error_string.chars,CurrentModule);
+		strcat (clean_error_string.chars,".icl");
+	}
+	strcat (clean_error_string.chars,": Module ");
+	strcat (clean_error_string.chars,mod);
+	strcat (clean_error_string.chars,", Function ");
+	strcat (clean_error_string.chars,proc);
+	strcat (clean_error_string.chars,", \"");
+	strcat (clean_error_string.chars,msg);
+	strcat (clean_error_string.chars,"\"\n");
+
 	clean_error_string.length = strlen (clean_error_string.chars);
 
-# ifdef _MAC_
-	{
-		FILE *f;
-	
-		f=fopen ("ErrorInCompiler","w");
-		if (f!=NULL){
-			if (CurrentModule!=NULL)
-				FPrintF (f,"Error in compiler while compiling %s.icl: Module %s, Function %s, \"%s\"\n",CurrentModule,mod,proc,msg);
-			else
-				FPrintF (f,"Error in compiler: Module %s, Function %s, \"%s\"\n",mod,proc,msg);
-			fclose (f);
-		}
-	}
-	exit (1);
-# endif
 	if (ExitEnv_valid)
 		longjmp (ExitEnv, 1);
-#endif
 }
 
 void Assume (Bool cond, char *mod, char *proc)
