@@ -250,7 +250,7 @@ void int_to_string (char *s,long i)
 
 void PutIStdError (long i)
 {
-	FPrintF (StdError,"%ld",i);
+	fprintf (StdError,"%ld",i);
 }
 
 /* The environment to leave the compiler if a fatal error occurs */

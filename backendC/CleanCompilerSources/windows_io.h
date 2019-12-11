@@ -20,7 +20,6 @@ extern int MACVAR;
 #endif
 
 #include <setjmp.h>
-#include <stdarg.h>
 
 typedef FILE *File;
 

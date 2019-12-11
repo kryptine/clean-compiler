@@ -35,11 +35,6 @@ extern int FDelete (char *fname);
 extern int FClose (File f);
 
 extern int FPutS (char *s, File f);
-#ifdef _VARARGS_
-extern int FPrintF (File f, char *fmt,...);
-#else
-extern int FPrintF (); /* (File w, char *fmt,...) */
-#endif
 
 extern void DoFatalError (char *s);
 extern void CmdError (char *errormsg1,char *errormsg2);

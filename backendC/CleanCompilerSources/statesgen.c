@@ -1581,8 +1581,11 @@ static void DecrRefCountCopiesOfArg (Args arg IF_OPTIMIZE_LAZY_TUPLE_RECURSION(i
 						if (roots_are_tuples_or_calls_to_this_function (rule_alt_p->alt_rhs_root,rule_alt_p->alt_rhs_defs,function_sdef_p)){
 							node_id->nid_node_def->def_id->nid_mark2 |= NID_CALL_VIA_LAZY_SELECTIONS_ONLY;
 							node_id_def_node->node_symbol->symb_def->sdef_rule->rule_mark |= RULE_CALL_VIA_LAZY_SELECTIONS_ONLY;
-							if (ListOptimizations)
-								printf ("Optimize lazy tuple recursion of %s\n",node_id_def_node->node_symbol->symb_def->sdef_name);
+							if (ListOptimizations){
+								PutSStdError ("Optimize lazy tuple recursion of ");
+								PutSStdError (node_id_def_node->node_symbol->symb_def->sdef_name);
+								PutCStdError ('\n');
+							}
 						}
 					}
 				}

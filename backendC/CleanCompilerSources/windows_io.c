@@ -35,18 +35,6 @@ int FDelete (char *fname)
 	return remove (fname);
 }
 
-int FPrintF (File f, char *fmt, ...)
-{	int n;
-	va_list args;
-	
-	va_start (args, fmt);
-
-	n = vfprintf ((FILE*)f, fmt, args);
-
-	va_end (args);
-	return n;
-}
-
 int FPutS (char *s, File f)
 {
 	return fputs (s, (FILE *) f);

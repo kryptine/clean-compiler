@@ -847,8 +847,11 @@ static void CodeRule (ImpRuleP rule)
 	if (OptimizeTailCallModuloCons && rule->rule_alts->alt_kind==Contractum && (rule->rule_mark & RULE_TAIL_MODULO_CONS_ENTRY_MASK)){
 		tail_call_modulo_cons=1;
 
-		if (ListOptimizations)
-			printf ("Optimize tail call modulo cons of %s\n",rule_sdef->sdef_name);				
+		if (ListOptimizations){
+			PutSStdError ("Optimize tail call modulo cons of ");
+			PutSStdError (rule_sdef->sdef_name);
+			PutCStdError ('\n');
+		}
 		call_code_generator_again=1;
 	} else
 		tail_call_modulo_cons=0;

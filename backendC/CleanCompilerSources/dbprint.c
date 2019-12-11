@@ -52,10 +52,10 @@ void PrintState (StateS state, File file)
 			int i,arity;
 			
 			arity=state.state_arity;
-			FPrintF (file,"t%d",arity);
+			fprintf (file,"t%d",arity);
 			
 			for (i=0; i<arity; ++i){
-				FPrintF (file," ");
+				fprintf (file," ");
 				PrintState (state.state_tuple_arguments[i],file);
 			}
 			
@@ -77,31 +77,31 @@ void DPrintNodeId (NodeId nid, File file)
 {
 	if (nid){
 		if (nid->nid_name){
-			FPrintF (file, "%s",nid->nid_name);
+			fprintf (file, "%s",nid->nid_name);
 #ifdef PRINT_ALL_NODE_ID_ADDRESSES
-			FPrintF (file, "@i_%lx", (long) nid);
+			fprintf (file, "@i_%lx", (long) nid);
 #endif
 		} else
-			FPrintF (file, "i_%lx", (long) nid);
+			fprintf (file, "i_%lx", (long) nid);
 
 #ifdef PRINT_NODE_ID_REF_COUNT		
-		FPrintF (file, "<%d>", nid->nid_refcount);
+		fprintf (file, "<%d>", nid->nid_refcount);
 #endif
 	} else
-		FPrintF (file," 00000000");
+		fprintf (file," 00000000");
 }
 
 void DPrintNodeIdS (char *s,NodeId node_id,File file)
 {
-	FPrintF (file,"%s",s);
+	fprintf (file,"%s",s);
 	DPrintNodeId (node_id,file);
-	FPrintF (file,"\n");	
+	fprintf (file,"\n");
 }
 
 static void DPrintTypeVar (TypeVar tv, Node follow, File file)
 {
 	if (tv){
-		FPrintF (file, "i_%lx", (long) tv);
+		fprintf (file, "i_%lx", (long) tv);
 		if (follow)
 			FPutS (" = ", file);
 	}
@@ -113,7 +113,7 @@ static void PrintArgument (Args arg,Bool brackets,int n_leading_spaces,File file
 	PrintState (arg->arg_state, file);
 	
 	if ((arg->arg_state.state_mark & STATE_UNIQUE_MASK)!=0)
-		FPrintF (file,"*");
+		fprintf (file,"*");
 	*/
 	
 	if (arg->arg_node->node_kind==NodeIdNode)
@@ -161,7 +161,7 @@ static void print_compiler_generated_function_name (char *name, char *name_end, 
 	}
 	
 	if (line_nr>0){
-		FPrintF (file,"[line: %u]", line_nr);
+		fprintf (file,"[line: %u]", line_nr);
 		if (parsed_digits)
 			name_end=parsed_digits;
 	} else
@@ -208,7 +208,7 @@ static void PrintSymbolOfIdent (char *name, unsigned line_nr, File file)
 			for (end_name = name_end + 2; *end_name!=';' && *end_name!='\0'; end_name++)
 				 ;
 			
-			FPrintF (file, " [line: %u]", line_nr);
+			fprintf (file, " [line: %u]", line_nr);
 			
 			if (*end_name == '\0')
 				return;
@@ -396,12 +396,12 @@ void PrintRuleNode (Node node,Bool brackets,int n_leading_spaces,File file)
 		node_id=node->node_node_id;
 		
 		if (node_id->nid_name){
-			FPrintF (file, " %s<%d>",node_id->nid_name,node_id->nid_refcount);
+			fprintf (file, " %s<%d>",node_id->nid_name,node_id->nid_refcount);
 #ifdef PRINT_ALL_NODE_ID_ADDRESSES
-			FPrintF (file, " i_%lx",(long) node_id);
+			fprintf (file, " i_%lx",(long) node_id);
 #endif
 		} else
-			FPrintF (file, " i_%lx<%d>",(long) node_id,node_id->nid_refcount);
+			fprintf (file, " i_%lx<%d>",(long) node_id,node_id->nid_refcount);
 		break;
 	}
 	case UpdateNode:
@@ -573,7 +573,7 @@ void PrintRuleNode (Node node,Bool brackets,int n_leading_spaces,File file)
 		break;
 	default:
 		FPutC ('?',file);
-		FPrintF (file,"%d",(int)node->node_kind);
+		fprintf (file,"%d",(int)node->node_kind);
 	}
 }
 
@@ -581,7 +581,7 @@ void PrintNodeDef (NodeDefP def_p,int n_leading_spaces,File file)
 {
 	int n;
 	
-	/* FPrintF (file, "%d: ", (int) def_p->def_number); */
+	/* fprintf (file, "%d: ", (int) def_p->def_number); */
 	
 	for (n=n_leading_spaces; n>0; --n)
 		FPutC (' ',file);
@@ -693,11 +693,11 @@ void PrintTypeNode (TypeNode node, File file)
 			FPutC (':', file);
 		}
 		else
-			FPrintF (file, "%u:", node_attr);
+			fprintf (file, "%u:", node_attr);
 	}
 
 	if (node->type_node_is_var)
-		FPrintF (file, "%d:", node->type_node_tv_argument_n);
+		fprintf (file, "%d:", node->type_node_tv_argument_n);
 	else if (node->type_node_symbol->symb_kind == tuple_type)
 	{	FPutC ('(', file);
 		PrintTypeArguments (node->type_node_arguments, ',', file);
@@ -745,7 +745,7 @@ static void PrintAttribute (AttributeKind attr, File file)
 	else if (attr == UniqueAttr)
 		FPutC ('*', file);
 	else
-		FPrintF (file, "%d", attr - UniqueAttr, file);
+		fprintf (file, "%d", attr - UniqueAttr, file);
 
 }
 
