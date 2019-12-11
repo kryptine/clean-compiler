@@ -249,7 +249,7 @@ static void NewBlock (void)
 			}
 		}
 
-		if (! (free_pos = (char *) Alloc (BLOCK_SIZE, SizeOf (char))))
+		if (! (free_pos = (char *) malloc (BLOCK_SIZE)))
 			return;
 		
 		SA_store[n_allocated_blocks] = free_pos;
@@ -326,7 +326,7 @@ void free_unused_sa_blocks (void)
 	
 	for (i=usedblocks; i<n_allocated_blocks; ++i){
 		if (SA_store[i]!=NULL){
-			Free ((void *) SA_store[i]);
+			free ((void *) SA_store[i]);
 			SA_store[i]=NULL;
 		}
 	}
@@ -355,7 +355,7 @@ static void FreeBlocks (void)
 
 	for (i = 0; i < n_allocated_blocks; i++){
 		if (SA_store[i]!=NULL){
-			Free ((void *) SA_store[i]);
+			free ((void *) SA_store[i]);
 			SA_store[i]=NULL;
 		}
 	}

@@ -51,12 +51,12 @@ static void *AllocLarge (SizeT size)
 	char **newblock;
 
 	size = ReSize (size);
-	if ((newblock = (char **) Alloc ((unsigned long) size + SizeOf (char *), SizeOf (char)))!=NULL){
+	if ((newblock = (char **) malloc ((unsigned long) size + SizeOf (char *)))!=NULL){
 		*newblock  = FirstBlock;
 		FirstBlock = (char *) newblock++;
 		NrOfBytes += size;
 		return (char *) newblock;
-	} else {	
+	} else {
 		FatalCompError ("comsupport", "AllocLarge", "Insufficient Memory");
 		
 		return (void *) Null;
@@ -70,7 +70,7 @@ void InitStorage (void)
 	if (InitStorageFlag){
 		char **newblock;
 		
-		if ((newblock = (char **) Alloc ((unsigned long) (MemBlockSize + (SizeT) (SizeOf (char *))), SizeOf (char)))!=NULL){
+		if ((newblock = (char **) malloc ((unsigned long) (MemBlockSize + (SizeT) (SizeOf (char *)))))!=NULL){
 			*newblock = (char *) NIL;
 			StartStorage = LastBlock = FirstBlock = (char *) newblock;
 			NextFreeMem = SizeOf(char*)+(char*)newblock;
@@ -124,9 +124,7 @@ void *CompAlloc (SizeT size)
 	if (new_block-LastBlock+size > MemBlockSize+SizeOf(char*)){
 		char **newblock;
 
-		newblock = (char **) Alloc ((unsigned long)
-				(MemBlockSize + (SizeT) (sizeof (char *))), SizeOf (char));
-
+		newblock = (char **) malloc ((unsigned long)(MemBlockSize + (SizeT) (sizeof (char *))));
 		if (newblock!=NULL){
 			*((char **) LastBlock) = (char *) newblock;
 			LastBlock = (char *) newblock;
@@ -172,7 +170,7 @@ void CompFree (void)
 			char *next_block;
 
 			next_block=*((char **) block);
-			Free (block);
+			free (block);
 			block=next_block;
 		}
 

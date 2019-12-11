@@ -39,8 +39,4 @@ extern int FPutS (char *s, File f);
 extern void DoFatalError (char *s);
 extern void CmdError (char *errormsg1,char *errormsg2);
 
-extern void *Alloc (unsigned long count, SizeT size);
-
-extern void Free (void *p);
-
 #define ReSize(A) (((A)+3) & ~3)
