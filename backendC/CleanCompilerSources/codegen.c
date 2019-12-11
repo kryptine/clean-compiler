@@ -1124,7 +1124,7 @@ static void CodeRule (ImpRuleP rule)
 		GenPE();
 }
 
-void CodeGeneration (ImpMod imod, char *fname)
+static void GenerateStatesAndOptimise (ImpMod imod)
 {
 	if (! CompilerError){
 		int DoStrictnessAnalysis_and_init_ok;
@@ -1177,114 +1177,120 @@ void CodeGeneration (ImpMod imod, char *fname)
 #if 0
 		PrintRules (imod->im_rules,rules_file);
 #endif
-		if (DoCode && !CompilerError){
-			ImpRuleS *rule;
+	}
+}
 
-			if (!OpenABCFile (fname)){
-				StaticErrorMessage_s_ss ("<open file>","Can't create abc file: ",fname);
-				return;
-			}
-			
-			InitFileInfo (imod);
+void CodeGeneration (ImpMod imod, char *fname)
+{
+	GenerateStatesAndOptimise (imod);
 
-			if (DoParallel)
-				ReduceError = &reserve_lab;
-			else
-				ReduceError = &cycle_lab; /* in sequential case we have no reservation mechanism */
+	if (DoCode && !CompilerError){
+		ImpRuleS *rule;
 
-			{
-				DefModList def_mod;
+		if (!OpenABCFile (fname)){
+			StaticErrorMessage_s_ss ("<open file>","Can't create abc file: ",fname);
+			return;
+		}
+		
+		InitFileInfo (imod);
 
-				for_l (def_mod,OpenDefinitionModules,mod_next)
+		if (DoParallel)
+			ReduceError = &reserve_lab;
+		else
+			ReduceError = &cycle_lab; /* in sequential case we have no reservation mechanism */
+
+		{
+			DefModList def_mod;
+
+			for_l (def_mod,OpenDefinitionModules,mod_next)
 #if WRITE_DCL_MODIFICATION_TIME
-					GenDepend (def_mod->mod_body->dm_name,def_mod->mod_body->dm_modification_time);
+				GenDepend (def_mod->mod_body->dm_name,def_mod->mod_body->dm_modification_time);
 #else
-					GenDepend (def_mod->mod_body->dm_name);
+				GenDepend (def_mod->mod_body->dm_name);
 #endif
-			}
+		}
 
 #if IMPORT_OBJ_AND_LIB
-			{
-				struct string_list *sl;
-				
-				for_l (sl,imod->im_imported_objs,sl_next)
-					GenImpObj (sl->sl_string);
-				for_l (sl,imod->im_imported_libs,sl_next)
-					GenImpLib (sl->sl_string);
-			}
+		{
+			struct string_list *sl;
+			
+			for_l (sl,imod->im_imported_objs,sl_next)
+				GenImpObj (sl->sl_string);
+			for_l (sl,imod->im_imported_libs,sl_next)
+				GenImpLib (sl->sl_string);
+		}
 #endif
 
 #if WRITE_DCL_MODIFICATION_TIME
-			if (WriteModificationTimes){
-				GenModuleDescriptor (imod->im_modification_time);
-				GenEndInfo();
-			} else {
-				GenEndInfo();
-				GenModuleDescriptor (imod->im_modification_time);
-			}
-#else
+		if (WriteModificationTimes){
+			GenModuleDescriptor (imod->im_modification_time);
 			GenEndInfo();
-			GenModuleDescriptor();
+		} else {
+			GenEndInfo();
+			GenModuleDescriptor (imod->im_modification_time);
+		}
+#else
+		GenEndInfo();
+		GenModuleDescriptor();
 #endif
-			GenSystemImports();
-			FileComment();
+		GenSystemImports();
+		FileComment();
 
-			CreateStackFrames();
+		CreateStackFrames();
 
-			ImportSymbols (imod->im_size_dcl_mfts_a,imod->im_dcl_mfts_a);
+		ImportSymbols (imod->im_size_dcl_mfts_a,imod->im_dcl_mfts_a);
 
-			GenerateCodeForConstructorsAndRecords (imod->im_mfts_a);
+		GenerateCodeForConstructorsAndRecords (imod->im_mfts_a);
 
-			GenerateForeignExports (imod->im_foreign_exports);
+		GenerateForeignExports (imod->im_foreign_exports);
 
-			if (imod->im_start)
-				GenStart (imod->im_start);
+		if (imod->im_start)
+			GenStart (imod->im_start);
 
 #if SHARE_UPDATE_CODE
-			create_result_state_database (imod->im_rules);
+		create_result_state_database (imod->im_rules);
 #endif
 
 #if TAIL_CALL_MODULO_CONS_OPTIMIZATION
-			if (OptimizeTailCallModuloCons)
-				for_l (rule,imod->im_rules,rule_next)
-					if (rule->rule_alts->alt_kind==Contractum){
-						CurrentSymbol=rule->rule_root->node_symbol;
-						
-						if (does_tail_call_modulo_cons (rule->rule_alts->alt_rhs_root,rule->rule_alts->alt_rhs_defs))
-							rule->rule_mark |= RULE_TAIL_MODULO_CONS_ENTRY_MASK;
-					}
-#endif
-
-			update_function_p=&first_update_function;
-			for_l (rule,imod->im_rules,rule_next){
-				CodeRule (rule);
-
-				*update_function_p=NULL;
-				if (first_update_function){
-					while (first_update_function){
-#ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
-						determine_failing_cases_and_adjust_ref_counts_of_rule (first_update_function->rule_alts);
-#endif
-						CodeRule (first_update_function);
-						
-						first_update_function=first_update_function->rule_next;
-					}
-					update_function_p=&first_update_function;						
+		if (OptimizeTailCallModuloCons)
+			for_l (rule,imod->im_rules,rule_next)
+				if (rule->rule_alts->alt_kind==Contractum){
+					CurrentSymbol=rule->rule_root->node_symbol;
+					
+					if (does_tail_call_modulo_cons (rule->rule_alts->alt_rhs_root,rule->rule_alts->alt_rhs_defs))
+						rule->rule_mark |= RULE_TAIL_MODULO_CONS_ENTRY_MASK;
 				}
-			}
-
-			GenerateCodeForLazyTupleSelectorEntries (LazyTupleSelectors);
-			GenerateCodeForLazyArrayFunctionEntries();
-#if STRICT_LISTS
-			GenerateCodeForLazyUnboxedRecordListFunctions();
 #endif
 
-			import_not_yet_imported_record_r_labels (imod->im_size_dcl_mfts_a,imod->im_dcl_mfts_a);
-			import_not_yet_imported_system_labels();
+		update_function_p=&first_update_function;
+		for_l (rule,imod->im_rules,rule_next){
+			CodeRule (rule);
 
-			WriteLastNewlineToABCFile();
-
-			CloseABCFile (fname);
+			*update_function_p=NULL;
+			if (first_update_function){
+				while (first_update_function){
+#ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
+					determine_failing_cases_and_adjust_ref_counts_of_rule (first_update_function->rule_alts);
+#endif
+					CodeRule (first_update_function);
+					
+					first_update_function=first_update_function->rule_next;
+				}
+				update_function_p=&first_update_function;						
+			}
 		}
+
+		GenerateCodeForLazyTupleSelectorEntries (LazyTupleSelectors);
+		GenerateCodeForLazyArrayFunctionEntries();
+#if STRICT_LISTS
+		GenerateCodeForLazyUnboxedRecordListFunctions();
+#endif
+
+		import_not_yet_imported_record_r_labels (imod->im_size_dcl_mfts_a,imod->im_dcl_mfts_a);
+		import_not_yet_imported_system_labels();
+
+		WriteLastNewlineToABCFile();
+
+		CloseABCFile (fname);
 	}
 }
