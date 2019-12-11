@@ -30,7 +30,7 @@ File OutFile;
 
 void PutIOutFile (long i)
 {
-	FPrintF (OutFile,"%ld",i);
+	fprintf (OutFile,"%ld",i);
 }
 
 static void error_in_function (char *m)
@@ -797,7 +797,7 @@ static void write_compiler_generated_function_name_to_out_file (char *name, char
 {
 	char *parsed_digits;
 
-	FPutS (name,OutFile);
+	PutSOutFile (name);
 	
 	parsed_digits=NULL;
 	if (name_end[0]==';' && isdigit (name_end[1])){
@@ -870,7 +870,7 @@ static void WriteSymbolOfIdentToOutFile (char *name, unsigned line_nr)
 			name = end_name;
 		}
 
-	FPutS (name, OutFile);
+	PutSOutFile (name);
 }
 
 void WriteSymbolToOutFile (Symbol symbol)

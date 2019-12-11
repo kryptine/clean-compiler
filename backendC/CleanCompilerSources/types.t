@@ -26,7 +26,6 @@ typedef unsigned Bool;
 #define FileNameMax		256
 
 #ifdef _WINDOWS_
-# include <stdarg.h>
 # ifdef _WIN64
 #  undef _WINDOWS_
 #  include <windows.h>
