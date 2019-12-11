@@ -54,20 +54,3 @@ void CmdError (char *errormsg1,char *errormsg2)
 		fputs (errormsg2, stdout);
 	fputc ('\n', stdout); 
 }
-
-void *Alloc (long unsigned count, SizeT size)
-{	
-	if (size == 1){
-		if (count >= MAXUNSIGNED)
-			DoFatalError ("Allocate: severe memory allocation problem");
-		return (void *) malloc ((size_t) count);
-	}
-	else if (count >= (MAXUNSIGNED / size))
-		DoFatalError ("Allocate: severe memory allocation problem");
-	return (void *) malloc ((size_t) (count * size));
-}
-
-void Free (void *p)
-{
-	(void) free (p);
-}
