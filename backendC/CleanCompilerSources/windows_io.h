@@ -1,7 +1,4 @@
 
-extern int MACVAR;
-#define CheckVersion if (MACVAR != VERSION) DoFatalError ("Wrong version number")
-
 #define SizeT		unsigned long
 #define SizeOf(A)	((SizeT) sizeof (A))
 
