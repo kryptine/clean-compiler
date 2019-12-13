@@ -1986,7 +1986,7 @@ static Exp ConvertNodeId (NodeId nid)
 		if (nid->nid_node_def)
 			return ConvertNode (nid->nid_node_def->def_node, nid);
 		else {
-			DoFatalError ("ConvertNode (SA): no node or nid");
+			error_in_function ("ConvertNodeId");
 			return & top;
 		}
 	} else {
@@ -2574,7 +2574,7 @@ static Exp ConvertNode (Node node, NodeId nid)
 			}
 		}
 		default:
-			DoFatalError ("ConvertNode (SA): unknown node kind");
+			error_in_function ("ConvertNode");
 			return & top;
 	}
 	return e;

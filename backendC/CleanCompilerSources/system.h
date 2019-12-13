@@ -36,7 +36,6 @@ extern int FClose (File f);
 
 extern int FPutS (char *s, File f);
 
-extern void DoFatalError (char *s);
 extern void CmdError (char *errormsg1,char *errormsg2);
 
 #define ReSize(A) (((A)+3) & ~3)

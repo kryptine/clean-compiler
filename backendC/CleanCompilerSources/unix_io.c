@@ -44,12 +44,6 @@ int FPutS (char *s, File f)
 
 /* Error Handling */
 
-void DoFatalError (char *s)
-{
-	fputs (s,stderr);
-	exit (0);
-}
-
 void CmdError (char *errormsg1,char *errormsg2)
 {
 	fputs ("Command line error: ", stdout);
