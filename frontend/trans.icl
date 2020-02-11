@@ -3453,6 +3453,7 @@ determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer c
 						True
 							-> ([],ti)
 						_
+							/* adding the following let binding is useless, it will be removed in module transform
 							# arg_type = getArgType consumer_type prod_index
 							  (info_ptr, ti_var_heap) = newPtr (VI_Extended (EVI_VarType arg_type) VI_Empty) ti.ti_var_heap
 							  ti = {ti & ti_var_heap = ti_var_heap}
@@ -3466,6 +3467,16 @@ determineProducers consumer_properties consumer_is_curried ok_non_rec_consumer c
 							  		,lb_position=NoPos
 							  		}
 							-> ([(lb,arg_type)],ti)
+							*/
+							# id_name = case arg of
+											Var {var_ident={id_name}}
+												-> " "+++id_name;
+											_
+												-> "";
+							# ti & ti_error_file = ti.ti_error_file
+								<<< "Warning: unused strict argument " <<< (prod_index+1) <<< id_name
+								<<< " removed in function " <<< ro.ro_tfi.tfi_root.symb_ident.id_name <<< "\n"
+							-> ([],ti)
 		= (producers, args, lb, ti)	 // ---> ("UnusedStrict",lb,arg,fun_type)
 	| SwitchUnusedFusion (cons_arg == CUnusedStrict && not (isStrictArg consumer_type prod_index) && isStrictVar arg) False
 		# producers = { producers & [prod_index] = PR_Unused }
@@ -3562,6 +3573,7 @@ where
 							True
 								-> ([],ti)
 							_
+								/* adding the following let binding is useless, it will be removed in module transform
 								# arg_type = getArgType consumer_type prod_index
 								  (info_ptr, ti_var_heap) = newPtr (VI_Extended (EVI_VarType arg_type) VI_Empty) ti.ti_var_heap
 								  ti & ti_var_heap = ti_var_heap
@@ -3570,6 +3582,16 @@ where
 								  			, fv_info_ptr = info_ptr, fv_count = 0, fv_def_level = NotALevel }
 								  		,lb_src=arg, lb_position=NoPos }
 								-> ([(lb,arg_type)],ti)
+								*/
+								# id_name = case arg of
+												Var {var_ident={id_name}}
+													-> " "+++id_name;
+												_
+													-> "";
+								# ti & ti_error_file = ti.ti_error_file
+									<<< "Warning: unused strict argument " <<< (prod_index+1) <<< id_name
+									<<< " removed in function " <<< ro.ro_tfi.tfi_root.symb_ident.id_name <<< "\n"
+								-> ([],ti)
 			= (producers, args, lb, ti)	 // ---> ("UnusedStrict",lb,arg,fun_type)
 		| SwitchUnusedFusion (cons_arg == CUnusedStrict && not (isStrictArg consumer_type prod_index) && isStrictVar arg) False
 			# producers & [prod_index] = PR_Unused
