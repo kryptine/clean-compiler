@@ -2138,18 +2138,20 @@ createCommonDefinitionsWithinComponent is_on_cycle mod_index (dcl_modules, cs=:{
 	# (dcl_mod=:{dcl_name}, dcl_modules) = dcl_modules![mod_index]
 	  (mod_entry, cs_symbol_table) = readPtr dcl_name.id_info cs_symbol_table
 	  ({ste_kind = STE_Module mod, ste_index}) = mod_entry
-	  cs = {cs & cs_symbol_table = cs_symbol_table}
+	  cs & cs_symbol_table = cs_symbol_table
 	# dcl_common = createCommonDefinitions mod.mod_defs
 	#! first_type_index = size dcl_common.com_type_defs		
-	# dcl_common = {dcl_common & com_class_defs = number_class_dictionaries 0 first_type_index dcl_common.com_class_defs}
+	# dcl_common & com_class_defs = number_class_dictionaries 0 first_type_index dcl_common.com_class_defs
 	| not is_on_cycle
 		= (dcl_common, (dcl_modules, cs))
 		# (dcl_common,dcl_common2) = copy_common_defs dcl_common
-		# dcl_modules = {dcl_modules & [mod_index].dcl_common=dcl_common2}
+		# dcl_modules & [mod_index].dcl_common=dcl_common2
 		= (dcl_common, (dcl_modules, cs))
 		with
 			copy_common_defs :: !*CommonDefs -> (!*CommonDefs,!*CommonDefs)
 			copy_common_defs {com_type_defs,com_cons_defs,com_selector_defs,com_class_defs,com_member_defs,com_instance_defs,com_generic_defs,com_gencase_defs}
+				# (com_cons_defs,com_type_defs) = set_cons_type_index_and_number_for_special_constructors 0 com_cons_defs com_type_defs
+
 				# (type_defs1,type_defs2) = arrayCopy com_type_defs
 				# (cons_defs1,cons_defs2) = arrayCopy com_cons_defs
 				# (selector_defs1,selector_defs2) = arrayCopy com_selector_defs
@@ -2162,6 +2164,54 @@ createCommonDefinitionsWithinComponent is_on_cycle mod_index (dcl_modules, cs=:{
 					com_member_defs=member_defs1,com_instance_defs=instance_defs1,com_generic_defs=generic_defs1,com_gencase_defs=gencase_defs1},
 				   {com_type_defs=type_defs2,com_cons_defs=cons_defs2,com_selector_defs=selector_defs2,com_class_defs=class_defs2,
 					com_member_defs=member_defs2,com_instance_defs=instance_defs2,com_generic_defs=generic_defs2,com_gencase_defs=gencase_defs2})
+
+			// cons_type_index and cons_number are set in module checkTypeDefs, but checkPatternConstructor may use it too soon
+			// if a macro uses a constructor of a type definition defined in another definition module on the same cycle
+			set_cons_type_index_and_number_for_special_constructors :: !Int !*{#ConsDef} !*{#CheckedTypeDef} -> (!*{#ConsDef},!*{#CheckedTypeDef})
+			set_cons_type_index_and_number_for_special_constructors type_def_i cons_defs type_defs
+				| type_def_i<size type_defs
+					# ({td_rhs},type_defs) = type_defs![type_def_i]
+					= case td_rhs of
+						AlgType conses
+							# cons_defs = set_cons_type_index_for_constructors conses type_def_i cons_defs
+							-> set_cons_type_index_and_number_for_special_constructors (type_def_i+1) cons_defs type_defs
+						ExtensibleAlgType conses
+							# cons_defs = set_cons_type_index_for_constructors conses type_def_i cons_defs
+							-> set_cons_type_index_and_number_for_special_constructors (type_def_i+1) cons_defs type_defs
+						NewType {ds_index}
+							# cons_defs = set_cons_type_index_and_number ds_index ConsNumberNewType type_def_i cons_defs
+							-> set_cons_type_index_and_number_for_special_constructors (type_def_i+1) cons_defs type_defs
+						AbstractNewType _ {ds_index}
+							# cons_defs = set_cons_type_index_and_number ds_index ConsNumberAbstractNewType type_def_i cons_defs
+							-> set_cons_type_index_and_number_for_special_constructors (type_def_i+1) cons_defs type_defs
+						UncheckedAlgConses _ conses
+							# cons_defs = set_cons_type_index_and_number_for_added_constructors conses type_def_i cons_defs
+							-> set_cons_type_index_and_number_for_special_constructors (type_def_i+1) cons_defs type_defs
+						_
+							-> set_cons_type_index_and_number_for_special_constructors (type_def_i+1) cons_defs type_defs
+					= (cons_defs,type_defs)
+
+			set_cons_type_index_for_constructors :: ![DefinedSymbol] !Int !*{#ConsDef} -> *{#ConsDef}
+			set_cons_type_index_for_constructors [{ds_index}:conses] type_def_i cons_defs
+				| ds_index>=0 && ds_index<size cons_defs
+					# cons_defs & [ds_index].cons_type_index=type_def_i
+					= set_cons_type_index_for_constructors conses type_def_i cons_defs
+					= set_cons_type_index_for_constructors conses type_def_i cons_defs
+			set_cons_type_index_for_constructors [] type_def_i cons_defs
+				= cons_defs
+
+			set_cons_type_index_and_number_for_added_constructors :: ![DefinedSymbol] !Int !*{#ConsDef} -> *{#ConsDef}
+			set_cons_type_index_and_number_for_added_constructors [{ds_index}:conses] type_def_i cons_defs
+				# cons_defs = set_cons_type_index_and_number ds_index ConsNumberAddedConstructor type_def_i cons_defs
+				= set_cons_type_index_and_number_for_added_constructors conses type_def_i cons_defs
+			set_cons_type_index_and_number_for_added_constructors [] type_def_i cons_defs
+				= cons_defs
+
+			set_cons_type_index_and_number :: !Int !Int !Int !*{#ConsDef} -> *{#ConsDef}
+			set_cons_type_index_and_number ds_index cons_number type_def_i cons_defs
+				| ds_index>=0 && ds_index<size cons_defs
+					= {cons_defs & [ds_index].cons_type_index=type_def_i, [ds_index].cons_number=cons_number}
+					= cons_defs
 
 checkDclModuleWithinComponent :: .NumberSet Int Bool {#.Int} {![.Int]} (IntKeyHashtable SolvedImports) Int *CommonDefs
 						   *(*ExplImpInfos,*{#.DclModule},*{#*{#.FunDef}},*Heaps,*CheckState)
