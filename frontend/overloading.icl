@@ -4128,7 +4128,8 @@ set_aliases_for_binds_that_will_become_aliases [{lb_dst={fv_info_ptr},lb_src}:le
 	= set_aliases_for_binds_that_will_become_aliases let_binds ui
 where
 	make_alias_if_expression_will_become_var (Var var) fv_info_ptr ui
-		= set_alias_and_detect_cycle fv_info_ptr var ui
+		| not ((sreadPtr var.var_info_ptr ui.ui_var_heap)=:VI_FPC && (sreadPtr var.var_expr_ptr ui.ui_symbol_heap)=:EI_FPContext _ _)
+			= set_alias_and_detect_cycle fv_info_ptr var ui
 	make_alias_if_expression_will_become_var (App {app_symb={symb_kind=SK_NewTypeConstructor _},app_args=[arg]}) fv_info_ptr ui
 		= skip_newtypes_and_make_alias_if_var arg fv_info_ptr ui
 	make_alias_if_expression_will_become_var (MatchExpr {glob_object={ds_arity = -2}} expr) fv_info_ptr ui
@@ -4139,30 +4140,36 @@ where
 		= ui
 
 	skip_newtypes_and_make_alias_if_var expr fv_info_ptr ui
-		= case skip_newtypes expr of
+		# (expr,ui) = skip_newtypes expr ui
+		= case expr of
 			Var var
-				-> set_alias_and_detect_cycle fv_info_ptr var ui
+				| not ((sreadPtr var.var_info_ptr ui.ui_var_heap)=:VI_FPC && (sreadPtr var.var_expr_ptr ui.ui_symbol_heap)=:EI_FPContext _ _)
+					-> set_alias_and_detect_cycle fv_info_ptr var ui
 			_
 				-> ui
 	where
-		skip_newtypes (App {app_symb={symb_kind=SK_NewTypeConstructor _},app_args=[arg]})
-			= skip_newtypes arg 
-		skip_newtypes (MatchExpr {glob_object={ds_arity = -2}} expr)
-			= skip_newtypes expr
-		skip_newtypes expr=:(Case {case_guards=NewTypePatterns type [{ap_symbol,ap_vars=[ap_var=:{fv_info_ptr}],ap_expr}],case_expr})
-			= case skip_newtypes case_expr of
+		skip_newtypes :: !Expression !*UpdateInfo -> (!Expression,!*UpdateInfo)
+		skip_newtypes (App {app_symb={symb_kind=SK_NewTypeConstructor _},app_args=[arg]}) ui
+			= skip_newtypes arg ui
+		skip_newtypes (MatchExpr {glob_object={ds_arity = -2}} expr) ui
+			= skip_newtypes expr ui
+		skip_newtypes expr=:(Case {case_guards=NewTypePatterns type [{ap_symbol,ap_vars=[ap_var=:{fv_info_ptr}],ap_expr}],case_expr}) ui
+			# (case_expr,ui) = skip_newtypes case_expr ui
+			= case case_expr of
 				Var case_var
-					-> case skip_newtypes ap_expr of
-						Var rhs_var
-							| rhs_var.var_info_ptr==fv_info_ptr
-								-> case_expr
-								-> ap_expr
-						_
-							-> expr 
+					| not ((sreadPtr case_var.var_info_ptr ui.ui_var_heap)=:VI_FPC && (sreadPtr case_var.var_expr_ptr ui.ui_symbol_heap)=:EI_FPContext _ _)
+						# (ap_expr,ui) = skip_newtypes ap_expr ui
+						-> case ap_expr of
+							Var rhs_var
+								| rhs_var.var_info_ptr==fv_info_ptr
+									-> (case_expr,ui)
+									-> (ap_expr,ui)
+							_
+								-> (expr,ui)
 				_
-					-> expr
-		skip_newtypes expr
-			= expr
+					-> (expr,ui)
+		skip_newtypes expr ui
+			= (expr,ui)
 
 adjustClassExpressions symb_ident exprs tail_exprs ui
 	= mapAppendSt (adjustClassExpression symb_ident) exprs tail_exprs ui
