@@ -776,7 +776,7 @@ pIsSafe			:== True
 
 ::	VI_TypeInfo	= VITI_Empty
 				| VITI_Coercion		CoercionPosition
-				| VITI_PatternType	[AType] /*module*/!Index /*constructor*/!Index VI_TypeInfo
+				| ..
 
 ::	VarInfo  =	VI_Empty | VI_Type !AType !VI_TypeInfo |
 				VI_FAType ![ATypeVar] !AType !VI_TypeInfo |
