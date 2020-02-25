@@ -869,6 +869,9 @@ where
 	copy_attributes [] [] th_attrs
 		= th_attrs
 
+:: VI_TypeInfo
+	| VITI_PatternType [AType] /*module*/!Index /*constructor*/!Index !VI_TypeInfo
+
 create_fresh_context_vars [(cons_symbol,contexts):constructor_contexts] var_heap
 	# (constructor_contexts,var_heap) = create_fresh_context_vars constructor_contexts var_heap
 	# (contexts,var_heap) = mapSt fresh_type_context_var contexts var_heap
@@ -1669,8 +1672,7 @@ where
 
 		requirements_of_guarded_expressions (NewTypePatterns alg_type patterns) match_expr case_info_ptr ti=:{ti_common_defs} pattern_type opt_pattern_ptr goal_type reqs ts
 			# (cons_types, result_type, new_attr_env,constructor_contexts,td_rhs,ts) = freshAlgebraicType alg_type patterns ti_common_defs ts
-			  ts_var_heap = update_case_variable match_expr td_rhs cons_types alg_type ts.ts_var_heap
-			  (used_cons_types, (reqs, ts)) = requirements_of_algebraic_patterns ti patterns cons_types goal_type [] (reqs, { ts & ts_var_heap = ts_var_heap } )
+			  (used_cons_types, (reqs, ts)) = requirements_of_algebraic_patterns ti patterns cons_types goal_type [] (reqs,ts)
 			  ts_expr_heap = storeAttribute opt_pattern_ptr result_type.at_attribute ts.ts_expr_heap
 			  (position, ts_var_heap) = getPositionOfExpr match_expr ts.ts_var_heap
 			  reqs = {reqs & req_type_coercions = [{tc_demanded = result_type,tc_offered = pattern_type, tc_position = position, tc_coercible = True} : reqs.req_type_coercions],
@@ -1726,7 +1728,7 @@ where
 		requirements_of_dynamic_patterns ti goal_type [dp=:{dp_position, dp_type} : dps] used_dyn_types (reqs, ts=:{ts_expr_heap})
 			# (EI_TempDynamicPattern _ _ _ _ dyn_type dyn_context dyn_expr_ptr type_code_symbol, ts_expr_heap)
 					= readPtr dp_type ts_expr_heap
-			  (reqs_ts)
+			  reqs_ts
 					= possibly_accumulate_reqs_in_new_group dp_position
 							(requirements_of_dynamic_pattern dyn_type dyn_context dyn_expr_ptr type_code_symbol ti goal_type dp)
 							(reqs, { ts & ts_expr_heap = ts_expr_heap})
