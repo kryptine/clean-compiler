@@ -156,9 +156,9 @@ where
 			= (True,cons_var :@: types, ets)
 			= (False,type, ets)
 	expandSynTypes rem_annots common_defs type=:(TA type_symb types) ets
-		= expand_syn_types_in_TA rem_annots common_defs type TA_Multi ets
+		= expand_syn_types_in_TA type_symb types rem_annots common_defs type TA_Multi ets
 	expandSynTypes rem_annots common_defs type=:(TAS type_symb types _) ets
-		= expand_syn_types_in_TA rem_annots common_defs type TA_Multi ets
+		= expand_syn_types_in_TA type_symb types rem_annots common_defs type TA_Multi ets
 	expandSynTypes rem_annots common_defs tfa_type=:(TFA vars type) ets
 		# (changed,type, ets) = expandSynTypes rem_annots common_defs type ets
 		| changed
@@ -197,12 +197,12 @@ where
 	where
 		expand_syn_types_in_a_type :: !.Int !{#.CommonDefs} !.AType !*ExpandTypeState -> (!.Bool,!AType,!.ExpandTypeState)
 		expand_syn_types_in_a_type rem_annots common_defs atype=:{at_type = at_type=: TA type_symb types,at_attribute} ets
-			# (changed,at_type, ets) = expand_syn_types_in_TA rem_annots common_defs at_type at_attribute ets
+			# (changed,at_type, ets) = expand_syn_types_in_TA type_symb types rem_annots common_defs at_type at_attribute ets
 			| changed
 				= (True,{ atype & at_type = at_type }, ets)
 				= (False,atype,ets)
 		expand_syn_types_in_a_type rem_annots common_defs atype=:{at_type = at_type=: TAS type_symb types _,at_attribute} ets
-			# (changed,at_type, ets) = expand_syn_types_in_TA rem_annots common_defs at_type at_attribute ets
+			# (changed,at_type, ets) = expand_syn_types_in_TA type_symb types rem_annots common_defs at_type at_attribute ets
 			| changed
 				= (True,{ atype & at_type = at_type }, ets)
 				= (False,atype,ets)
@@ -212,13 +212,9 @@ where
 				= (True,{ atype & at_type = at_type }, ets)
 				= (False,atype,ets)
 
-expand_syn_types_in_TA :: !.Int !{#.CommonDefs} !.Type !.TypeAttribute !*ExpandTypeState -> (!Bool,!Type,!.ExpandTypeState)
-expand_syn_types_in_TA rem_annots common_defs ta_type attribute ets=:{ets_type_defs}
-	# (glob_object,glob_module,types)	= case ta_type of
-		(TA type_symb=:{type_index={glob_object,glob_module},type_ident} types)				-> (glob_object,glob_module,types)
-		(TAS type_symb=:{type_index={glob_object,glob_module},type_ident} types strictness)	-> (glob_object,glob_module,types)
-	# ({td_rhs,td_ident,td_args,td_attribute},ets_type_defs) = ets_type_defs![glob_module].[glob_object]
-	  ets = { ets & ets_type_defs = ets_type_defs }
+expand_syn_types_in_TA :: !TypeSymbIdent ![AType] !Int !{#CommonDefs} !Type !TypeAttribute !*ExpandTypeState -> (!Bool,!Type,!*ExpandTypeState)
+expand_syn_types_in_TA {type_index={glob_object,glob_module},type_arity} types rem_annots common_defs ta_type attribute ets
+	# ({td_rhs,td_args,td_attribute,td_arity},ets) = ets!ets_type_defs.[glob_module].[glob_object]
 	= case td_rhs of
 		SynType rhs_type
 			-> expand_type types td_args td_attribute rhs_type rem_annots attribute ets
@@ -229,8 +225,9 @@ expand_syn_types_in_TA rem_annots common_defs ta_type attribute ets=:{ets_type_d
 				#! (changed,types, ets) = expandSynTypes rem_annots common_defs types ets
 				-> update_TA_types_if_changed changed ta_type types ets
 		NewType {ds_index}
-			# {cons_type={st_args=[arg_type:_]}} = common_defs.[glob_module].com_cons_defs.[ds_index];
-			-> expand_type types td_args td_attribute arg_type rem_annots attribute ets
+			| type_arity==td_arity
+				# {cons_type={st_args=[arg_type:_]}} = common_defs.[glob_module].com_cons_defs.[ds_index];
+				-> expand_type types td_args td_attribute arg_type rem_annots attribute ets
 		AbstractNewType _ {ds_index}
 			| rem_annots bitand ExpandAbstractSynTypesMask<>0
 				# {cons_type={st_args=[arg_type:_]}} = common_defs.[glob_module].com_cons_defs.[ds_index];
