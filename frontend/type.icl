@@ -4,6 +4,8 @@ import StdEnv,StdOverloadedList,compare_types
 import syntax, typesupport, check, analtypes, overloading, unitype, refmark, predef, utilities, compare_constructor
 import check_instances, genericsupport
 
+::	FunctionType | TypeWithPropagationAttributes !SymbolType
+
 ::	TypeInput =
 	! {	ti_common_defs	:: !{# CommonDefs }
 	,	ti_functions	:: !{# {# FunType }}
@@ -64,7 +66,7 @@ where
 		| changed
 			= (True, { atype & at_type = at_type }, subst)
 			= (False, atype, subst)
-		
+
 instance arraySubst Type
 where
 	arraySubst tv=:(TempV tv_number) subst
@@ -1485,6 +1487,16 @@ determineSymbolTypeOfFunction pos ident act_arity st=:{st_args,st_result,st_attr
 											ts_var_heap = ts.ts_var_heap <:= (type_ptr, VI_PropagationType st) }
 			-> currySymbolType copy_symb_type act_arity ts
 
+addPropagationAttributesToATypesOfFunctionType :: SymbolType {#CommonDefs} *TypeState -> *(!SymbolType,!*TypeState);
+addPropagationAttributesToATypesOfFunctionType st=:{st_args,st_result,st_attr_vars,st_attr_env} common_defs ts=:{ts_var_heap}
+	# (st_args, ps) = addPropagationAttributesToATypes common_defs st_args
+			{ prop_type_heaps = ts.ts_type_heaps, prop_td_infos = ts.ts_td_infos,
+			  prop_attr_vars = st_attr_vars, prop_attr_env = st_attr_env, prop_error = Yes ts.ts_error}
+	  (st_result, {prop_type_heaps,prop_td_infos,prop_attr_vars,prop_error = Yes ts_error,prop_attr_env})
+				= addPropagationAttributesToAType common_defs st_result ps
+	  st & st_args = st_args, st_result = st_result, st_attr_vars = prop_attr_vars, st_attr_env = prop_attr_env
+	= (st, {ts & ts_type_heaps = prop_type_heaps, ts_td_infos = prop_td_infos, ts_error = ts_error})
+
 standardFieldSelectorType {glob_object={ds_ident,ds_index},glob_module} sel_expr {ti_common_defs}
 		ts=:{ts_var_store,ts_attr_store,ts_type_heaps,ts_exis_variables,ts_var_heap}
 	# ({sd_type,sd_exi_vars}) = ti_common_defs.[glob_module].com_selector_defs.[ds_index]
@@ -1565,11 +1577,17 @@ getSymbolType pos ti=:{ti_functions,ti_common_defs,ti_main_dcl_module_n} {symb_k
 				# (fun_type_copy, ts) = freshSymbolType (Yes pos) cWithFreshContextVars fun_type ti_common_defs ts
 				  (fun_type_copy,ts) = currySymbolType fun_type_copy n_app_args ts
 				-> (fun_type_copy, [], ts)
-		# {ft_type,ft_type_ptr,ft_specials} = ti_functions.[glob_module].[glob_object]
-		| glob_module>=size ti_functions || glob_object>=size ti_functions.[glob_module]
-			= abort (toString glob_module+++" "+++toString glob_object+++" "+++toString ti_main_dcl_module_n+++" "+++symb_ident.id_name);
-		# (fun_type_copy, ts) = determineSymbolTypeOfFunction pos symb_ident n_app_args ft_type ft_type_ptr ti_common_defs ts
-		= (fun_type_copy, get_specials ft_specials, ts)
+			TypeWithPropagationAttributes st
+				# (copy_symb_type, ts) = freshSymbolType (Yes pos) cWithFreshContextVars st ti_common_defs ts
+				  (fun_type_copy,ts) = currySymbolType copy_symb_type n_app_args ts
+				-> (fun_type_copy, [], ts)
+			_
+				# ({fun_type=Yes fun_type}, ts) = ts!ts_fun_defs.[glob_object]
+				  (st, ts) = addPropagationAttributesToATypesOfFunctionType fun_type ti_common_defs ts
+				  ts & ts_fun_env.[glob_object] = TypeWithPropagationAttributes st
+				  (copy_symb_type,ts) = freshSymbolType (Yes pos) cWithFreshContextVars st ti_common_defs ts
+				  (fun_type_copy,ts) = currySymbolType copy_symb_type n_app_args ts
+				-> (fun_type_copy, [], ts)
 	where
 		get_specials FSP_None = []
 		get_specials (FSP_ABCCode _) = []
