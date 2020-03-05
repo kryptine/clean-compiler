@@ -1588,6 +1588,11 @@ getSymbolType pos ti=:{ti_functions,ti_common_defs,ti_main_dcl_module_n} {symb_k
 				  (copy_symb_type,ts) = freshSymbolType (Yes pos) cWithFreshContextVars st ti_common_defs ts
 				  (fun_type_copy,ts) = currySymbolType copy_symb_type n_app_args ts
 				-> (fun_type_copy, [], ts)
+		# {ft_type,ft_type_ptr,ft_specials} = ti_functions.[glob_module].[glob_object]
+		| glob_module>=size ti_functions || glob_object>=size ti_functions.[glob_module]
+			= abort (toString glob_module+++" "+++toString glob_object+++" "+++toString ti_main_dcl_module_n+++" "+++symb_ident.id_name);
+		# (fun_type_copy, ts) = determineSymbolTypeOfFunction pos symb_ident n_app_args ft_type ft_type_ptr ti_common_defs ts
+		= (fun_type_copy, get_specials ft_specials, ts)
 	where
 		get_specials FSP_None = []
 		get_specials (FSP_ABCCode _) = []
