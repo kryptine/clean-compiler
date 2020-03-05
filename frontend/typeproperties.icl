@@ -80,7 +80,7 @@ treeInsert new_key new_el tree=:(BT_Node el left right)
 	| cmp == Smaller
 		= BT_Node el (treeInsert new_key new_el left) right
 		= BT_Node el left (treeInsert new_key new_el right)
-	
+
 treeRetrieve :: !k !(BinTree (m k)) -> Optional (m k) | =< k & key m
 treeRetrieve search_key BT_Empty
 	= No
@@ -109,7 +109,7 @@ where
 		
 instance =< SignClassification
 where
-	=< sc1 sc2
+	(=<) sc1 sc2
 		| sc1.sc_pos_vect == sc2.sc_pos_vect
 			| sc1.sc_neg_vect == sc2.sc_neg_vect
 				= Equal
