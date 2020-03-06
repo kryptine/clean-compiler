@@ -12,85 +12,85 @@ backend.dll: $(OBJECTS)
 	link /dll /release /out:..\backend.dll $(OBJECTS) @..\backend.link64
 
 backend.obj:
-	cl /nologo /c /D_WINDOWS_ /O /Wp64 backend.c
+	cl /nologo /c /D_WINDOWS_ /O backend.c
 
 backendsupport.obj:
-	cl /nologo /c /D_WINDOWS_ /O /Wp64 backendsupport.c
+	cl /nologo /c /D_WINDOWS_ /O backendsupport.c
 
 buildtree.obj:
-	cl /nologo /c /D_WINDOWS_ /O /Wp64 buildtree.c
+	cl /nologo /c /D_WINDOWS_ /O buildtree.c
 
 checker_2.obj:
-	cl /nologo /c /D_WINDOWS_ /O /Wp64 checker_2.c
+	cl /nologo /c /D_WINDOWS_ /O checker_2.c
 
 checksupport.obj:
-	cl /nologo /c /D_WINDOWS_ /O /Wp64 checksupport.c
+	cl /nologo /c /D_WINDOWS_ /O checksupport.c
 
 cocl.obj:
-	cl /nologo /c /D_WINDOWS_ /O /Wp64 cocl.c
+	cl /nologo /c /D_WINDOWS_ /O cocl.c
 
 codegen1.obj:
-	cl /nologo /c /D_WINDOWS_ /O /Wp64 codegen1.c
+	cl /nologo /c /D_WINDOWS_ /O codegen1.c
 
 codegen2.obj:
-	cl /nologo /c /D_WINDOWS_ /DG_A64 /O /Wp64 codegen2.c
+	cl /nologo /c /D_WINDOWS_ /DG_A64 /O codegen2.c
 
 codegen3.obj:
-	cl /nologo /c /D_WINDOWS_ /O /Wp64 codegen3.c
+	cl /nologo /c /D_WINDOWS_ /O codegen3.c
 
 codegen.obj:
-	cl /nologo /c /D_WINDOWS_ /O /Wp64 codegen.c
+	cl /nologo /c /D_WINDOWS_ /O codegen.c
 
 comparser_2.obj:
-	cl /nologo /c /D_WINDOWS_ /O /Wp64 comparser_2.c
+	cl /nologo /c /D_WINDOWS_ /O comparser_2.c
 
 comsupport.obj:
-	cl /nologo /c /D_WINDOWS_ /O /Wp64 comsupport.c
+	cl /nologo /c /D_WINDOWS_ /O comsupport.c
 
 dbprint.obj:
-	cl /nologo /c /D_WINDOWS_ /O /Wp64 dbprint.c
+	cl /nologo /c /D_WINDOWS_ /O dbprint.c
 
 instructions.obj:
-	cl /nologo /c /D_WINDOWS_ /O /Wp64 instructions.c
+	cl /nologo /c /D_WINDOWS_ /O instructions.c
 
 optimisations.obj:
-	cl /nologo /c /D_WINDOWS_ /O /Wp64 optimisations.c
+	cl /nologo /c /D_WINDOWS_ /O optimisations.c
 
 overloading_2.obj:
-	cl /nologo /c /D_WINDOWS_ /O /Wp64 overloading_2.c
+	cl /nologo /c /D_WINDOWS_ /O overloading_2.c
 
 pattern_match_2.obj:
-	cl /nologo /c /D_WINDOWS_ /O /Wp64 pattern_match_2.c
+	cl /nologo /c /D_WINDOWS_ /O pattern_match_2.c
 
 result_state_database.obj:
-	cl /nologo /c /D_WINDOWS_ /O /Wp64 result_state_database.c
+	cl /nologo /c /D_WINDOWS_ /O result_state_database.c
 
 sa.obj:
-	cl /nologo /c /D_WINDOWS_ /O /Wp64 sa.c
+	cl /nologo /c /D_WINDOWS_ /O sa.c
 
 scanner_2.obj:
-	cl /nologo /c /D_WINDOWS_ /O /Wp64 scanner_2.c
+	cl /nologo /c /D_WINDOWS_ /O scanner_2.c
 
 set_scope_numbers.obj:
-	cl /nologo /c /D_WINDOWS_ /O /Wp64 set_scope_numbers.c
+	cl /nologo /c /D_WINDOWS_ /O set_scope_numbers.c
 
 settings.obj:
-	cl /nologo /c /D_WINDOWS_ /O /Wp64 settings.c
+	cl /nologo /c /D_WINDOWS_ /O settings.c
 
 statesgen.obj:
-	cl /nologo /c /D_WINDOWS_ /O /Wp64 statesgen.c
+	cl /nologo /c /D_WINDOWS_ /O statesgen.c
 
 tcsupport_2.obj:
-	cl /nologo /c /D_WINDOWS_ /O /Wp64 tcsupport_2.c
+	cl /nologo /c /D_WINDOWS_ /O tcsupport_2.c
 
 typeconv_2.obj:
-	cl /nologo /c /D_WINDOWS_ /O /Wp64 typeconv_2.c
+	cl /nologo /c /D_WINDOWS_ /O typeconv_2.c
 
 version.obj:
-	cl /nologo /c /D_WINDOWS_ /O /Wp64 version.c
+	cl /nologo /c /D_WINDOWS_ /O version.c
 
 windows_io.obj:
-	cl /nologo /c /D_WINDOWS_ /O /Wp64 windows_io.c
+	cl /nologo /c /D_WINDOWS_ /O windows_io.c
 
 cleanup:
 	del $(OBJECTS)
