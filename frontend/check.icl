@@ -315,9 +315,14 @@ where
 						# cs & cs_error = checkError class_member.ds_ident ("defined with wrong arity ("+++toString instance_member_arity+++" instead of "+++toString class_member.ds_arity+++")") cs.cs_error
 						= check_icl_instance_members (class_member_n+1) (instance_member_n+1) member_mod_index ins_members class_members class_ident ins_pos ins_type
 								instance_types n_icl_functions new_instance_members member_defs type_defs icl_functions modules var_heap type_heaps cs
-						# ({me_ident, me_type,me_class_vars,me_pos}, member_defs, modules)
-							= getMemberDef member_mod_index class_member.ds_index x_main_dcl_module_n member_defs modules
-						  (instance_type,type_defs,modules,var_heap,type_heaps,cs)
+					# ({me_type,me_class_vars,me_priority}, member_defs, modules)
+						= getMemberDef member_mod_index class_member.ds_index x_main_dcl_module_n member_defs modules
+					| icl_functions.[ins_member.cim_index].fun_priority=:NoPrio <> me_priority=:NoPrio
+						# cs & cs_error = checkError class_member.ds_ident
+							(if me_priority=:NoPrio "not an infix operator " "infix operator should be inside parentheses ") cs.cs_error
+						= check_icl_instance_members (class_member_n+1) (instance_member_n+1) member_mod_index ins_members class_members class_ident ins_pos ins_type
+								instance_types n_icl_functions new_instance_members member_defs type_defs icl_functions modules var_heap type_heaps cs
+						# (instance_type,type_defs,modules,var_heap,type_heaps,cs)
 							= make_class_member_instance_type ins_type me_type me_class_vars type_defs modules var_heap type_heaps cs
 						  instance_types = [ (ins_member.cim_index, instance_type) : instance_types ]
 						= check_icl_instance_members (class_member_n+1) (instance_member_n+1) member_mod_index ins_members class_members class_ident ins_pos ins_type
