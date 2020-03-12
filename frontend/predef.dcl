@@ -262,35 +262,6 @@ PD_TC__StrictTailStrictList	:== 256
 PD_TC__UnboxedTailStrictList	:== 257
 
 PD_TC__Tuple2		:== 258
-PD_TC__Tuple3		:== 259
-PD_TC__Tuple4		:== 260
-PD_TC__Tuple5		:== 261
-PD_TC__Tuple6		:== 262
-PD_TC__Tuple7		:== 263
-PD_TC__Tuple8		:== 264
-PD_TC__Tuple9		:== 265
-PD_TC__Tuple10		:== 266
-PD_TC__Tuple11		:== 267
-PD_TC__Tuple12		:== 268
-PD_TC__Tuple13		:== 269
-PD_TC__Tuple14		:== 270
-PD_TC__Tuple15		:== 271
-PD_TC__Tuple16		:== 272
-PD_TC__Tuple17		:== 273
-PD_TC__Tuple18		:== 274
-PD_TC__Tuple19		:== 275
-PD_TC__Tuple20		:== 276
-PD_TC__Tuple21		:== 277
-PD_TC__Tuple22		:== 278
-PD_TC__Tuple23		:== 279
-PD_TC__Tuple24		:== 280
-PD_TC__Tuple25		:== 281
-PD_TC__Tuple26		:== 282
-PD_TC__Tuple27		:== 283
-PD_TC__Tuple28		:== 284
-PD_TC__Tuple29		:== 285
-PD_TC__Tuple30		:== 286
-PD_TC__Tuple31		:== 287
 PD_TC__Tuple32		:== 288
 
 PD_TC__LazyArray	:== 289
