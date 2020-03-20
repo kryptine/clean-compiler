@@ -3217,6 +3217,8 @@ CheckBEEnumTypes (void)
 	Assert (SELECTOR_N	== BESelector_N);
 } /* CheckBEEnumTypes */
 
+extern Bool ParseCommandArgs (int argc, char **argv);
+
 void
 BEArg (CleanString arg)
 {
@@ -3225,10 +3227,7 @@ BEArg (CleanString arg)
 	gBEState.be_argv [gBEState.be_argi++]	= ConvertCleanString (arg);
 
 	// +++ ugly
-	if (gBEState.be_argi == gBEState.be_argc)
-	{
-		extern	Bool ParseCommandArgs (int argc, char **argv);
-
+	if (gBEState.be_argi == gBEState.be_argc){
 		if (!ParseCommandArgs (gBEState.be_argc, gBEState.be_argv))
 			FatalCompError ("backend", "BEInit", "compilation aborted");
 	}
@@ -3357,6 +3356,12 @@ BEInit (int argc)
 
 	special_types[0]=NULL;
 	special_types[1]=NULL;
+
+	if (argc==0){
+		/* ParseCommandArgs is called in BEArg if argc>0 */
+		if (!ParseCommandArgs (gBEState.be_argc, gBEState.be_argv))
+			FatalCompError ("backend", "BEInit", "compilation aborted");
+	}
 
 	return ((BackEnd) &gBEState);
 } /* BEInit */
