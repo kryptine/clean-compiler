@@ -642,9 +642,7 @@ where
 		  		= addExistentionalTypeVariablesToSymbolTable cti_lhs_attribute cons_def.cons_exi_vars ti_type_heaps cs
 		  (st_args, st_attr_env,class_defs,(ts, ti=:{ti_type_heaps}, cs))
 		  		= bind_types_of_cons cons_def.cons_type.st_args cti free_vars [] class_defs (ts, {ti & ti_type_heaps = ti_type_heaps}, cs)
-		| not cs.cs_error.ea_ok
-			= (class_defs, ts, ti, cs)
-		# (unused_exi_vars,th_vars,cs)
+		  (unused_exi_vars,th_vars,cs)
 		  		= find_unused_existential_type_vars exi_vars [] ti_type_heaps.th_vars cs
 		  (st_context,class_defs,ts,ti=:{ti_type_heaps},cs)
 		  		= bind_context_of_cons cons_def.cons_type.st_context cti class_defs ts { ti & ti_type_heaps = { ti_type_heaps & th_vars = th_vars } } cs
@@ -776,7 +774,7 @@ where
 
 determineAttributeVariable attr_var=:{av_ident=attr_name=:{id_info}} oti=:{oti_heaps,oti_all_attrs} symbol_table
 	# (entry=:{ste_kind,ste_def_level}, symbol_table) = readPtr id_info symbol_table
-	| ste_kind == STE_Empty || ste_def_level == cModuleScope
+	| ste_kind =: STE_Empty || ste_def_level == cModuleScope
 		#! (new_attr_ptr, th_attrs) = newPtr AVI_Empty oti_heaps.th_attrs
 		# symbol_table = symbol_table <:= (id_info,{	ste_index = NoIndex, ste_kind = STE_TypeAttribute new_attr_ptr,
 														ste_def_level = cGlobalScope, ste_previous = entry })
@@ -854,7 +852,7 @@ checkTypeVar :: !Level !DemandedAttributeKind !TypeVar !TypeAttribute !(!*OpenTy
 					-> (! TypeVar, !TypeAttribute, !(!*OpenTypeInfo, !*CheckState))
 checkTypeVar scope dem_attr tv=:{tv_ident=var_ident=:{id_name,id_info}} tv_attr (oti, cs=:{cs_symbol_table})
 	# (entry=:{ste_kind,ste_def_level},cs_symbol_table) = readPtr id_info cs_symbol_table
-	| ste_kind == STE_Empty || ste_def_level == cModuleScope
+	| ste_kind =: STE_Empty || ste_def_level == cModuleScope
 		# (new_attr, oti=:{oti_heaps,oti_all_vars}, cs) = newAttribute dem_attr id_name tv_attr oti {cs & cs_symbol_table = cs_symbol_table}
 		  (new_var_ptr, th_vars) = newPtr (TVI_AttrAndRefCount new_attr 1) oti_heaps.th_vars
 		  new_var = { tv & tv_info_ptr = new_var_ptr }
@@ -1090,7 +1088,7 @@ add_universal_vars vars oti cs
   where
 	add_universal_var atv=:{atv_variable = tv=:{tv_ident={id_name,id_info}}, atv_attribute} (oti, cs=:{cs_symbol_table,cs_error})
 		# (entry=:{ste_kind,ste_def_level},cs_symbol_table) = readPtr id_info cs_symbol_table
-		| ste_kind == STE_Empty || ste_def_level < cRankTwoScope
+		| ste_kind =: STE_Empty || ste_def_level < cRankTwoScope
 			# (new_attr, oti=:{oti_heaps}, cs) = newAttribute DAK_None id_name atv_attribute oti {cs & cs_symbol_table = cs_symbol_table}
 			  (new_var_ptr, th_vars) = newPtr (TVI_AttrAndRefCount new_attr 1) oti_heaps.th_vars
 			  cs = {cs & cs_symbol_table = cs.cs_symbol_table <:= (id_info, {ste_index = NoIndex, ste_kind = STE_TypeVariable new_var_ptr,
@@ -1104,7 +1102,7 @@ add_universal_vars_again vars cs
   where
 	add_universal_var_and_attribute_again {atv_variable,atv_attribute=TA_Var {av_ident=attr_name=:{id_info},av_info_ptr}} cs=:{cs_symbol_table}
 		# (entry=:{ste_kind,ste_def_level},cs_symbol_table) = readPtr id_info cs_symbol_table
-		| ste_kind == STE_Empty || ste_def_level == cModuleScope
+		| ste_kind =: STE_Empty || ste_def_level == cModuleScope
 			# cs_symbol_table = cs_symbol_table <:= (id_info,
 				{ste_index = NoIndex, ste_kind = STE_TypeAttribute av_info_ptr, ste_def_level = cGlobalScope, ste_previous = entry})
 			= add_universal_var_again atv_variable {cs & cs_symbol_table=cs_symbol_table}
@@ -1114,7 +1112,7 @@ add_universal_vars_again vars cs
 
 	add_universal_var_again {tv_ident={id_name,id_info},tv_info_ptr} cs=:{cs_symbol_table}
 		# (entry=:{ste_kind,ste_def_level},cs_symbol_table) = readPtr id_info cs_symbol_table
-		| ste_kind == STE_Empty || ste_def_level < cRankTwoScope
+		| ste_kind =: STE_Empty || ste_def_level < cRankTwoScope
 			= {cs & cs_symbol_table = cs_symbol_table <:= (id_info,
 						{ste_index = NoIndex, ste_kind = STE_TypeVariable tv_info_ptr, ste_def_level = cRankTwoScope, ste_previous = entry})}
 			# cs_error = checkError id_name "type variable already defined" cs.cs_error
@@ -1360,7 +1358,7 @@ where
 		-> (![TypeVar],!*SymbolTable,!*TypeVarHeap,!*ErrorAdmin)
 	add_variable_to_symbol_table tv=:{tv_ident={id_name,id_info}} (rev_class_args, symbol_table, th_vars, error)
 	  	# (entry, symbol_table) = readPtr id_info symbol_table
-		| entry.ste_kind == STE_Empty || entry.ste_def_level < cGlobalScope
+		| entry.ste_kind =: STE_Empty || entry.ste_def_level < cGlobalScope
 			# (new_var_ptr, th_vars) = newPtr TVI_Empty th_vars
 			# symbol_table = NewEntry symbol_table id_info (STE_TypeVariable new_var_ptr) NoIndex cGlobalScope entry
 			= ([{ tv & tv_info_ptr = new_var_ptr} : rev_class_args], symbol_table, th_vars, error)
@@ -1720,7 +1718,7 @@ where
 		where		
 			remove_global_type_variable {tv_ident=tv_ident=:{id_info}} symbol_table
 				# (entry, symbol_table) = readPtr id_info symbol_table
-				| entry.ste_kind == STE_Empty
+				| entry.ste_kind =: STE_Empty
 					= symbol_table
 					= symbol_table <:= (id_info, entry.ste_previous)
 checkDynamicTypes mod_index dyn_type_ptrs (Yes {st_vars}) type_defs class_defs modules type_heaps expr_heap cs=:{cs_symbol_table}
@@ -1756,7 +1754,7 @@ where
 		where		
 			check_global_type_variable {tv_ident=tv_ident=:{id_info}} cs=:{cs_symbol_table, cs_error}
 				# (entry, cs_symbol_table) = readPtr id_info cs_symbol_table
-				| entry.ste_kind == STE_Empty
+				| entry.ste_kind =: STE_Empty
 					= { cs & cs_symbol_table = cs_symbol_table }
 					= { cs & cs_symbol_table = cs_symbol_table <:= (id_info, entry.ste_previous),
 							 cs_error = checkError tv_ident.id_name "global type variable not used in type of the function" cs_error }
@@ -1847,7 +1845,7 @@ where
 		add_type_variable_to_symbol_table scope atv=:{atv_variable=atv_variable=:{tv_ident}, atv_attribute} (type_var_heap, cs=:{cs_symbol_table,cs_error})
 			#  var_info = tv_ident.id_info
 			   (var_entry, cs_symbol_table) = readPtr var_info cs_symbol_table
-			| var_entry.ste_kind == STE_Empty || scope < var_entry.ste_def_level
+			| var_entry.ste_kind =: STE_Empty || scope < var_entry.ste_def_level
 				#! (new_var_ptr, type_var_heap) = newPtr TVI_Empty type_var_heap
 				# cs_symbol_table = cs_symbol_table <:=
 					(var_info, {ste_index = NoIndex, ste_kind = STE_TypeVariable new_var_ptr, ste_def_level = scope, ste_previous = var_entry })
@@ -1998,25 +1996,26 @@ where
 addExistentionalTypeVariablesToSymbolTable :: !TypeAttribute ![ATypeVar] !*TypeHeaps !*CheckState
 	-> (![ATypeVar], !(!*TypeHeaps, !*CheckState))
 addExistentionalTypeVariablesToSymbolTable root_attr type_vars heaps cs
-	= mapSt (add_exi_variable_to_symbol_table root_attr) type_vars (heaps, cs)
+	= mapFilterSt (add_exi_variable_to_symbol_table root_attr) type_vars (heaps, cs)
 where
 	add_exi_variable_to_symbol_table :: !TypeAttribute !ATypeVar !(!*TypeHeaps, !*CheckState)
-		-> (!ATypeVar, !(!*TypeHeaps, !*CheckState))
+		-> (!Bool, !ATypeVar, !(!*TypeHeaps, !*CheckState))
 	add_exi_variable_to_symbol_table root_attr atv=:{atv_variable=atv_variable=:{tv_ident}, atv_attribute}
 		(heaps=:{th_vars,th_attrs}, cs=:{ cs_symbol_table, cs_error})
 		# tv_info = tv_ident.id_info
 		  (entry, cs_symbol_table) = readPtr tv_info cs_symbol_table
 		| entry.ste_def_level < cGlobalScope // cOuterMostLevel
 			# (tv_info_ptr, th_vars) = newPtr TVI_Empty th_vars
-		      atv_variable = { atv_variable & tv_info_ptr = tv_info_ptr }
-		      (atv_attribute, th_attrs, cs_error) = check_attribute atv_attribute root_attr tv_ident.id_name th_attrs cs_error
-			  cs_symbol_table = cs_symbol_table <:= (tv_info, {ste_index = NoIndex, ste_kind = STE_BoundTypeVariable {stv_attribute = atv_attribute,
-			  						stv_info_ptr = tv_info_ptr }, ste_def_level = cGlobalScope /* cOuterMostLevel */, ste_previous = entry })
-			  heaps = { heaps & th_vars = th_vars, th_attrs = th_attrs }
-			= ({atv & atv_variable = atv_variable, atv_attribute = atv_attribute},
-					(heaps, { cs & cs_symbol_table = cs_symbol_table, cs_error = cs_error}))
-			= (atv, ({ heaps & th_vars = th_vars },
-					 { cs & cs_symbol_table = cs_symbol_table, cs_error = checkError tv_ident.id_name "type variable already defined" cs_error}))
+			  atv_variable & tv_info_ptr = tv_info_ptr
+			  (atv_attribute, th_attrs, cs_error) = check_attribute atv_attribute root_attr tv_ident.id_name th_attrs cs_error
+			  cs_symbol_table = cs_symbol_table <:= (tv_info,
+					{ste_index = NoIndex, ste_kind = STE_BoundTypeVariable {stv_attribute = atv_attribute, stv_info_ptr = tv_info_ptr },
+					 ste_def_level = cGlobalScope /* cOuterMostLevel */, ste_previous = entry})
+			  heaps & th_vars = th_vars, th_attrs = th_attrs
+			  cs & cs_symbol_table = cs_symbol_table, cs_error = cs_error
+			= (True, {atv & atv_variable = atv_variable, atv_attribute = atv_attribute}, (heaps, cs))
+			# cs & cs_symbol_table = cs_symbol_table, cs_error = checkError tv_ident.id_name "type variable already defined" cs_error
+			= (False, atv, ({ heaps & th_vars = th_vars }, cs))
 
 	check_attribute :: !TypeAttribute !TypeAttribute !String !*AttrVarHeap !*ErrorAdmin
 		-> (!TypeAttribute, !*AttrVarHeap, !*ErrorAdmin)
