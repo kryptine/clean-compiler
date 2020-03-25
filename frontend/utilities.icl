@@ -248,6 +248,19 @@ iterateSt op st :== iterate_st op st
 				= iterate_st op st
 				= st
 
+mapFilterSt f l st
+	:== map_filter_st l st
+  where
+	map_filter_st [h:t] st
+		# (keep, f_h , st) = f h st
+		| keep
+			# (t2, st) = map_filter_st t st
+			= ([f_h:t2], st)
+			= map_filter_st t st
+	map_filter_st [] st
+		#! st = st
+		= ([], st)
+
 mapFilterYesSt f l st
 	:== map_filter_yes_st l st
   where
@@ -260,7 +273,6 @@ mapFilterYesSt f l st
 		   (f_h_t2, _) = optCons opt_f_h t2
 		   st = st
 		= (f_h_t2, st)
-				
 				
 iMapFilterYesSt f fr to st 
 	:== i_map_filter_yes_st fr to st

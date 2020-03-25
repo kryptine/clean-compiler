@@ -153,6 +153,19 @@ iterateSt op st :== iterate_st op st
 				= iterate_st op st
 				= st
 
+mapFilterSt f l st
+	:== map_filter_st l st
+  where
+	map_filter_st [h:t] st
+		# (keep, f_h , st) = f h st
+		| keep
+			# (t2, st) = map_filter_st t st
+			= ([f_h:t2], st)
+			= map_filter_st t st
+	map_filter_st [] st
+		#! st = st
+		= ([], st)
+
 mapFilterYesSt f l st
 	:== map_filter_yes_st l st
   where
