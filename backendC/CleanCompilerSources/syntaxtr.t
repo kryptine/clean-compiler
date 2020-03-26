@@ -95,7 +95,6 @@ STRUCT (state,State){
 typedef struct state		*States;
 
 #define STATE_PARALLEL_MASK 1
-#define STATE_UNBOXED_ARRAY_MASK 2				/* for ArrayState */
 #define STATE_ELEMENTS_UPDATEABLE_MASK 2		/* for TupleState */
 #define STATE_UNIQUE_MASK 4
 

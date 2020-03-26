@@ -317,7 +317,6 @@ void ConvertTypeToState (TypeNode type,StateS *state_p,StateKind kind)
 						state_p->state_array_arguments [0] = StrictState;
 					else
 						ConvertTypeToState (element_node,&state_p->state_array_arguments [0],StrictOnA);
-					state_p->state_mark |= STATE_UNBOXED_ARRAY_MASK;
 					break;
 			}			
 		}
