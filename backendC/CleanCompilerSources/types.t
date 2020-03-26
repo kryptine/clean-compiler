@@ -11,7 +11,6 @@
 #endif
 
 #define NIL			0L
-#define Null		0L
 
 #define REALSIZE	2 /*1*/
 #define FILESIZE	2
