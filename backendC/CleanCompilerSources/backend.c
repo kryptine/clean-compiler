@@ -3279,7 +3279,6 @@ static void init_unboxed_list_symbols (void)
 	unboxed_array_state_p->state_type = ArrayState;
 	unboxed_array_state_p->state_arity = 1;
 	unboxed_array_state_p->state_array_arguments = ConvertAllocType (StateS);
-	unboxed_array_state_p->state_mark = STATE_UNBOXED_ARRAY_MASK;
 	unboxed_array_state_p->state_array_arguments [0] = StrictState;
 
 	unboxed_list_symbols[unboxed_array_type][0].symb_state_p=unboxed_array_state_p;
