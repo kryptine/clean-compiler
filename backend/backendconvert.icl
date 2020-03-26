@@ -1091,6 +1091,7 @@ predefineSymbols {dcl_common} predefs
 					(PD_LazyArrayType, 1, BEArrayType)
 				,	(PD_StrictArrayType, 1, BEStrictArrayType)
 				,	(PD_UnboxedArrayType, 1, BEUnboxedArrayType)
+				,	(PD_ClippedArrayType, 1, BEClippedArrayType)
 				:	[(index, index-PD_Arity2TupleType+2, BETupleType) \\ index <- [PD_Arity2TupleType..PD_Arity32TupleType]]
 				]
 

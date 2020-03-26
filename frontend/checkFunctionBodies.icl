@@ -842,6 +842,7 @@ checkExpression free_vars (PE_TypeSignature array_kind expr) e_input e_state e_i
 	  predef_array_index = case array_kind of
 								UnboxedArray -> PD_UnboxedArrayType
 								StrictArray -> PD_StrictArrayType
+								ClippedArray -> PD_ClippedArrayType
 	  ({pds_module,pds_def},cs) = cs!cs_predef_symbols.[predef_array_index]
 	#! strict_array_ident = predefined_idents.[predef_array_index]
 	# type_prop = { tsp_sign = BottomSignClass, tsp_propagation = NoPropClass, tsp_coercible = True }

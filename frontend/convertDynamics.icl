@@ -592,6 +592,8 @@ where
 					-> type_code_constructor_expression PD_TC__StrictArray ci
 				PD_UnboxedArrayType
 					-> type_code_constructor_expression PD_TC__UnboxedArray ci
+				PD_ClippedArrayType
+					-> type_code_constructor_expression PD_TC__ClippedArray ci
 				PD_UnitType
 					-> type_code_constructor_expression PD_TC__Unit ci
 	typeConstructor (GTT_Constructor fun_ident _) ci

@@ -932,6 +932,13 @@ check_unboxed_array_or_list_type fri_unboxed_array_and_list_info glob_module ins
 			 	frs_special_instances (frs_predef_symbols, frs_type_heaps) frs_error
 		= (rcs_class_context,
 				{ frs_state & frs_predef_symbols = frs_predef_symbols, frs_type_heaps = frs_type_heaps, frs_error = frs_error, frs_special_instances = frs_special_instances})
+	| is_predefined_global_symbol ins_class_index PD_ArrayClass frs_predef_symbols && is_clipped_array tc_types frs_predef_symbols
+		# {class_members} = fri_defs.[ins_class_index.gi_module].com_class_defs.[ins_class_index.gi_index]
+		  (rcs_class_context, frs_special_instances, (frs_predef_symbols, frs_type_heaps), frs_error)
+			= check_unboxed_array_type fri_unboxed_array_and_list_info glob_module ins_class_index ins_members tc_types class_members fri_defs
+			 	frs_special_instances (frs_predef_symbols, frs_type_heaps) frs_error
+		= (rcs_class_context,
+				{ frs_state & frs_predef_symbols = frs_predef_symbols, frs_type_heaps = frs_type_heaps, frs_error = frs_error, frs_special_instances = frs_special_instances})
 	| is_predefined_global_symbol ins_class_index PD_UListClass frs_predef_symbols
 		# {class_members} = fri_defs.[ins_class_index.gi_module].com_class_defs.[ins_class_index.gi_index]
 		  (rcs_class_context, frs_special_instances, (frs_predef_symbols, frs_type_heaps), frs_error)
@@ -992,6 +999,29 @@ where
 					# inst = new_array_instance record members si_next_array_member_index
 					-> (inst.ai_members, { special_instances &  si_next_array_member_index = si_next_array_member_index + size members,
 																si_array_instances = [ inst : si_array_instances ] })
+
+	is_clipped_array:: [Type] PredefinedSymbols -> Bool
+	is_clipped_array [TA {type_index={glob_module,glob_object},type_arity} _ : _] predef_symbols
+		= is_predefined_symbol glob_module glob_object PD_ClippedArrayType predef_symbols
+	is_clipped_array _ predef_symbols
+		= False
+
+	check_clipped_array_type :: Int GlobalIndex {#ClassInstanceMember} ![Type]
+		                   *SpecialInstances (*PredefinedSymbols,*TypeHeaps) *ErrorAdmin
+		-> (ReducedContext,*SpecialInstances,(*PredefinedSymbols,*TypeHeaps),*ErrorAdmin)
+	check_clipped_array_type main_dcl_module_n ins_class_index ins_members types=:[_,elem_type:_]
+			special_instances predef_symbols_type_heaps error
+		# error = if (elem_type=:(TB BT_Int) || elem_type=:(TB BT_Real))
+			error
+			(clipError error)
+		= ({cid_class_index = ins_class_index, cid_inst_module = main_dcl_module_n, cid_inst_members = ins_members, cid_red_contexts = [], cid_types = types},
+			special_instances, predef_symbols_type_heaps, error)
+	where
+		clipError error
+			# error = errorHeading "Overloading error of Array class" error
+			  format = { form_properties = cNoProperties, form_attr_position = No }
+			  error & ea_file = error.ea_file <<< ' ' <:: (format, elem_type, Yes initialTypeVarBeautifulizer) <<< " cannot be clipped\n"
+			= error
 
 	check_unboxed_list_type :: UnboxedArrayAndListInfo Int GlobalIndex {#ClassInstanceMember} ![Type] {#DefinedSymbol} {#CommonDefs} *SpecialInstances *(*PredefinedSymbols,*TypeHeaps) *ErrorAdmin
 		-> (ClassInstanceDescr,*SpecialInstances,(*PredefinedSymbols,*TypeHeaps), *ErrorAdmin)
