@@ -59,7 +59,7 @@ static void *AllocLarge (SizeT size)
 	} else {
 		FatalCompError ("comsupport", "AllocLarge", "Insufficient Memory");
 		
-		return (void *) Null;
+		return (void *) NULL;
 	}
 }
 

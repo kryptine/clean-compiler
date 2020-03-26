@@ -217,10 +217,10 @@ static char		**SA_store;					/* the memory blocks				*/
 static int		SA_store_size = 0;
 static unsigned n_allocated_blocks = 0;		/* the nr of allocated blocks		*/
 static unsigned usedblocks   = 0;			/* the nr of blocks in use			*/
-static char		*high        = Null;		/* current end position in block	*/
-static char		*free_pos    = Null;		/* current free position in block	*/
+static char		*high        = NULL;		/* current end position in block	*/
+static char		*free_pos    = NULL;		/* current free position in block	*/
 static unsigned fblocks      = 0;			/* the freezed nr of blocks			*/
-static char		*ffree       = Null;		/* the freezed free position		*/
+static char		*ffree       = NULL;		/* the freezed free position		*/
 
 static void NewBlock (void)
 {
@@ -361,7 +361,7 @@ static void FreeBlocks (void)
 	}
 	
 	n_allocated_blocks = usedblocks = fblocks = 0;
-	free_pos   = ffree   = Null;
+	free_pos   = ffree   = NULL;
 }
 
 #define NewExpArgs(n) SAllocArrayType(n,Exp)
@@ -381,8 +381,8 @@ static Exp NewExp (ExpKind kind, unsigned sym, Bool hnf, unsigned arity)
 	e->e_mark   = False;
 	e->e_mark2  = False;
 	e->e_imark  = False;
-	e->e_fwd    = Null;
-	e->e_deps   = Null;
+	e->e_fwd    = NULL;
+	e->e_deps   = NULL;
 	
 	if (arity == 0)
 		e->e_args = NULL;
@@ -414,8 +414,8 @@ static Exp NewValueExp (Fun *fun, Bool hnf, unsigned arity)
 	e->e_mark   = False;
 	e->e_mark2  = False;
 	e->e_imark  = False;
-	e->e_fwd    = Null;
-	e->e_deps   = Null;
+	e->e_fwd    = NULL;
+	e->e_deps   = NULL;
 	
 	if (arity == 0)
 		e->e_args = NULL;
@@ -445,8 +445,8 @@ static void InitExp (Exp e, ExpKind kind, unsigned sym, Bool hnf)
 	e->e_mark   = False;
 	e->e_mark2  = False;
 	e->e_imark  = False;
-	e->e_fwd    = Null;
-	e->e_deps   = Null;
+	e->e_fwd    = NULL;
+	e->e_deps   = NULL;
 	
 #ifdef _DB_
 	e->e_mmark  = False;
@@ -467,8 +467,8 @@ static void InitValueExp (Exp e,Fun *fun,Bool hnf)
 	e->e_mark   = False;
 	e->e_mark2  = False;
 	e->e_imark  = False;
-	e->e_fwd    = Null;
-	e->e_deps   = Null;
+	e->e_fwd    = NULL;
+	e->e_deps   = NULL;
 	
 #ifdef _DB_
 	e->e_mmark  = False;
@@ -549,7 +549,7 @@ static Context StrictInfoToContext (StrictInfo *s, Context curcontext, Bool resu
 			context->context_arity       = 1;
 			context->context_speculative = curcontext->context_speculative;
 			context->context_kind        = NotStrict;
-			context->context_args        = (Context *) Null;
+			context->context_args        = (Context *) NULL;
 		}
 		else {
 			unsigned i, n;
@@ -787,7 +787,7 @@ static Exp InstantiateExp2 (Exp e)
 			break;
 		case Argument:
 #ifndef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
-			Assume2 (e->e_args[0] != Null, "argument not bound", "InstantiateExp");
+			Assume2 (e->e_args[0] != NULL, "argument not bound", "InstantiateExp");
 #endif
 			e->e_fwd     = new_e = e->e_args[0];
 #ifndef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
@@ -1216,7 +1216,7 @@ static Bool EqExp (Exp e1, Exp e2)
 	b = EqExp2 (e1, e2);
 	
 	if (b == MightBeTrue && StrictDoExtEq){
-		b = ExtEqExp2 (e1, e2, (APath) Null);
+		b = ExtEqExp2 (e1, e2, (APath) NULL);
 		Assume (! ContainsMark (e1), "e1 is marked", "EqExp (Ext)");
 		Assume (! ContainsMark (e2), "e2 is marked", "EqExp (Ext)");
 	}
@@ -1375,7 +1375,7 @@ static Bool LtExp (Exp e1, Exp e2)
 #endif
 
 	if (b == MightBeTrue && StrictDoExtEq){
-		b = ExtLtExp2 (e1, e2, (APath) Null);
+		b = ExtLtExp2 (e1, e2, (APath) NULL);
 
 #ifdef _DB_EQ_
 		if (DBPrinting){
@@ -1514,7 +1514,7 @@ static Bool ContainsExpOfKind (Exp e, ExpKind kind)
 		else if (kind == Dep && e->e_args[i]->e_kind == Bottom)
 		{	e->e_kind = Bottom;
 			e->e_hnf  = True;
-			e->e_deps = Null;
+			e->e_deps = NULL;
 			return False;
 		}
 		else if (kind == Lub && e->e_args[i]->e_kind == Top)
@@ -1862,8 +1862,8 @@ static void UpdateExp (Exp src, Exp dst)
 		break;
 	case Bottom:
 		dst->e_sym = src->e_sym;
-		dst->e_args = Null;
-		dst->e_deps = Null;
+		dst->e_args = NULL;
+		dst->e_deps = NULL;
 		return;
 	case Ind:
 #ifdef _DB_
@@ -2428,7 +2428,7 @@ static Exp ConvertNode (Node node, NodeId nid)
 			
 			/* conditional part */
 			arg          = node->node_arguments;
-			e->e_args[0] = ConvertNode (arg->arg_node, Null);
+			e->e_args[0] = ConvertNode (arg->arg_node, NULL);
 
 			/* then and else part */
 			arg = arg->arg_next;
@@ -2492,7 +2492,7 @@ static Exp ConvertNode (Node node, NodeId nid)
 			e->e_fun  = selectsym [field_nr];
 			e->e_args = NewExpArgs (1);
 
-			e->e_args[0] = ConvertNode (arg->arg_node, Null);
+			e->e_args[0] = ConvertNode (arg->arg_node, NULL);
 			break;
 		}
 		case UpdateNode:
@@ -2508,7 +2508,7 @@ static Exp ConvertNode (Node node, NodeId nid)
 		
 			/* convert the old record */
 			arg          = node->node_arguments;
-			oldrecordexp = ConvertNode (arg->arg_node, Null);
+			oldrecordexp = ConvertNode (arg->arg_node, NULL);
 
 			/* build a record expression for the new record node */
 			newrecordexp->e_fun  = node->node_symbol->symb_def->sdef_sa_fun;
@@ -2523,7 +2523,7 @@ static Exp ConvertNode (Node node, NodeId nid)
 			/* now fill in the updates of the new record */
 			for_l (arg,node->node_arguments->arg_next,arg_next){
 				field_nr = arg->arg_node->node_symbol->symb_def->sdef_sel_field_number;
-				newrecordexp->e_args[field_nr] = ConvertNode (arg->arg_node->node_arguments->arg_node, Null);
+				newrecordexp->e_args[field_nr] = ConvertNode (arg->arg_node->node_arguments->arg_node, NULL);
 			}
 			
 			/* finally, create selections for the parts which are not updated */
@@ -3255,7 +3255,7 @@ static void BuildInfFunction (Fun *f)
 	
 	*/
 
-	f->fun_symbol      = Null;
+	f->fun_symbol      = NULL;
 	f->fun_arity       = 1;
 	f->fun_kind        = Function;
 	f->fun_strictargs  = InitNewStrictInfos (1, HnfStrict);
@@ -3267,7 +3267,7 @@ static void BuildInfFunction (Fun *f)
 	alt->fun_has_fail   = False;
 	alt->fun_next      = alt2;
 	alt2->fun_has_fail  = False;
-	alt2->fun_next     = Null;
+	alt2->fun_next     = NULL;
 	
 	nil_exp             = NewValueExp (nilsym, True, 0);
 	arg_x               = NewExp (Argument, 0, False, 1);
@@ -3302,7 +3302,7 @@ static void BuildBotmemFunction (Fun *f)
 	   	   
 	*/
 
-	f->fun_symbol      = Null;
+	f->fun_symbol      = NULL;
 	f->fun_arity       = 1;
 	f->fun_kind        = Function;
 	f->fun_strictargs  = InitNewStrictInfos (1, HnfStrict);
@@ -3314,7 +3314,7 @@ static void BuildBotmemFunction (Fun *f)
 	alt->fun_has_fail   = False;
 	alt->fun_next      = alt2;
 	alt2->fun_has_fail  = False;
-	alt2->fun_next     = Null;
+	alt2->fun_next     = NULL;
 	
 	nil_exp             = NewValueExp (nilsym, True, 0);
 	arg_x               = NewExp (Argument, 0, False, 1);
@@ -3366,10 +3366,10 @@ static void init_predefined_symbols (void)
 	/* initialise the function table with tuples */
 	for (i = 0, f = funs; i < MaxNodeArity; i++, f++){
 		tuplesym[i] = f;
-		f->fun_symbol     = Null; /* TupleDefs[i]; */
+		f->fun_symbol     = NULL; /* TupleDefs[i]; */
 		f->fun_arity      = i;
 		f->fun_kind       = Constructor;
-		f->fun_strictargs = Null;
+		f->fun_strictargs = NULL;
 		f->fun_single     = True;
 		InitStrictResult (& f->fun_strictresult);
 	}
@@ -3377,7 +3377,7 @@ static void init_predefined_symbols (void)
 	/* initialise the function table with selectors and update functions */
 	for (i = 0; i < MaxNodeArity; i++,f++){
 		selectsym[i] = f;
-		f->fun_symbol     = Null;
+		f->fun_symbol     = NULL;
 		f->fun_arity      = 1;
 		f->fun_kind       = SelFunction;
 		f->fun_strictargs = InitNewStrictInfos (1, HnfStrict);
@@ -3395,7 +3395,7 @@ static void init_predefined_symbols (void)
 	/* initialise the function table with strict functions */
 	for (i = 0; i < MaxNrAnnots; i++,f++){
 		strict_sym[i] = f;
-		f->fun_symbol     = Null;
+		f->fun_symbol     = NULL;
 		f->fun_arity      = i+2;
 		f->fun_kind       = StrictFunction;
 #if MORE_ANNOTS
@@ -3413,20 +3413,20 @@ static void init_predefined_symbols (void)
 	
 	/* initialise the function table with lists, conditional and apply */
 	nilsym = f;
-	f->fun_symbol     = Null;
+	f->fun_symbol     = NULL;
 	f->fun_arity      = 0;
 	f->fun_kind       = Constructor;
-	f->fun_strictargs = Null;
+	f->fun_strictargs = NULL;
 	f->fun_single     = False;
 	InitStrictResult (& f->fun_strictresult);
 	f++;
 
 #if !STRICT_LISTS
 	conssym = f;
-	f->fun_symbol     = Null;
+	f->fun_symbol     = NULL;
 	f->fun_arity      = 2;
 	f->fun_kind       = Constructor;
-	f->fun_strictargs = Null;
+	f->fun_strictargs = NULL;
 	f->fun_single     = False;
 	InitStrictResult (& f->fun_strictresult);
 	f++;
@@ -3434,10 +3434,10 @@ static void init_predefined_symbols (void)
 	lazy_cons_sym0 = f;
 
 	for (i=0; i<=2; ++i){
-		f->fun_symbol     = Null;
+		f->fun_symbol     = NULL;
 		f->fun_arity      = i;
 		f->fun_kind       = Constructor;
-		f->fun_strictargs = Null;
+		f->fun_strictargs = NULL;
 		f->fun_single     = False;
 		InitStrictResult (& f->fun_strictresult);
 		f++;
@@ -3486,7 +3486,7 @@ static void init_predefined_symbols (void)
 #endif
 
 	if_sym = f;
-	f->fun_symbol     = Null;
+	f->fun_symbol     = NULL;
 	f->fun_arity      = 3;
 	f->fun_kind       = IfFunction;
 	f->fun_strictargs = InitNewStrictInfos (3, NotStrict);
@@ -3496,34 +3496,34 @@ static void init_predefined_symbols (void)
 	f++;
 
 	true_sym = f;
-	f->fun_symbol     = Null;
+	f->fun_symbol     = NULL;
 	f->fun_arity      = 0;
 	f->fun_kind       = Constructor;
-	f->fun_strictargs = Null;
+	f->fun_strictargs = NULL;
 	f->fun_single     = False;
 	InitStrictResult (& f->fun_strictresult);
 	f++;
 
 	false_sym = f;
-	f->fun_symbol     = Null;
+	f->fun_symbol     = NULL;
 	f->fun_arity      = 0;
 	f->fun_kind       = Constructor;
-	f->fun_strictargs = Null;
+	f->fun_strictargs = NULL;
 	f->fun_single     = False;
 	InitStrictResult (& f->fun_strictresult);
 	f++;
 
 	fail_sym = f;
-	f->fun_symbol     = Null;
+	f->fun_symbol     = NULL;
 	f->fun_arity      = 0;
 	f->fun_kind       = FailFunction;
-	f->fun_strictargs = Null;
+	f->fun_strictargs = NULL;
 	f->fun_single     = False;
 	InitStrictResult (& f->fun_strictresult);
 	f++;
 
 	apsym = f;
-	f->fun_symbol     = Null;
+	f->fun_symbol     = NULL;
 	f->fun_arity      = 2;
 	f->fun_kind       = ApFunction;
 	f->fun_strictargs = InitNewStrictInfos (2, NotStrict);
@@ -3533,7 +3533,7 @@ static void init_predefined_symbols (void)
 	f++;
 
 	strictapsym = f;
-	f->fun_symbol     = Null;
+	f->fun_symbol     = NULL;
 	f->fun_arity      = 2;
 	f->fun_kind       = ApFunction;
 	f->fun_strictargs = InitNewStrictInfos (2, NotStrict);
@@ -3636,7 +3636,7 @@ static void convert_type (SymbDef sdef)
 		if (sdef->sdef_strict_constructor)
 			ConvertTypeArgsToStrictInfos (TypeArgsOfRecord (sdef), arity,&f->fun_strictargs, True);
 		else
-			f->fun_strictargs = Null;
+			f->fun_strictargs = NULL;
 		
 		InitStrictResult (& f->fun_strictresult);
 	}
@@ -3683,7 +3683,7 @@ static void ConvertSyntaxTree
 
 	/* give a warning for annotated functions */
 	if (annot_warning && StrictAllWarning)
-		GiveStrictWarning ((char *) Null, "no strictness analysis for functions with code blocks");
+		GiveStrictWarning ((char *) NULL, "no strictness analysis for functions with code blocks");
 }
 
 static void update_function_strictness (SymbDef sdef)
@@ -3832,7 +3832,7 @@ static Bool CheckRelation (Exp e, Path p, Context context)
 #endif
 	
 	old_fuel   = start_fuel;
-	result     = ReduceInContext (&exp_new, (Path) Null, copy_context (context));
+	result     = ReduceInContext (&exp_new, (Path) NULL, copy_context (context));
 	start_fuel = old_fuel;
 	
 #ifdef _DB_RED_
@@ -3908,7 +3908,7 @@ static Path AddToPath (Exp e, Path p)
 		
 	new->p_exp  = InstantiateExp (e);
 	new->p_root = e;
-	new->p_next = Null;
+	new->p_next = NULL;
 	
 	if (! p)
 		return new;
@@ -4583,7 +4583,7 @@ static void ReplaceIndByBottom (Exp e, Exp root)
 			if (deps->dep_exp == root){
 				e->e_kind = Bottom;
 				e->e_hnf  = True;
-				e->e_deps = Null;
+				e->e_deps = NULL;
 				return;
 			}
 		}
@@ -4597,7 +4597,7 @@ static void ReplaceIndByBottom (Exp e, Exp root)
 		case Ind:
 			e->e_kind = Bottom;
 			e->e_hnf  = True;
-			e->e_deps = Null;
+			e->e_deps = NULL;
 			return;
 		case Value:
 			e->e_imark = True;
@@ -4874,7 +4874,7 @@ static Exp ReduceAp (Exp e, Path p, Context context)
 			else
 				return NewTop();
 		case Lub:
-			{	Exp new_e = Null, next_e;
+			{	Exp new_e = NULL, next_e;
 				unsigned arity;
 				
 				/* if there is a lub, it should be the first element of the spine */
@@ -4991,7 +4991,7 @@ static void ReduceArguments (Exp e)
 		printf ("Reduce argument %d\n",i);
 #endif
 
-		(void) ReduceInContext (& e->e_args[i], (Path) Null, NewSimpleContext (HnfStrict, True));
+		(void) ReduceInContext (& e->e_args[i], (Path) NULL, NewSimpleContext (HnfStrict, True));
 
 #if 0 && defined (_DB_)
 		printf ("End reduce argument %d\n",i);
@@ -5006,7 +5006,7 @@ static Exp MakeIndirection (Exp e)
 	new                      = NewExp (Ind, 0, True, 1);
 	new->e_deps              = SAllocType (DependencyRepr);
 	new->e_deps->dep_exp     = e;
-	new->e_deps->dep_next    = Null;
+	new->e_deps->dep_next    = NULL;
 	new->e_args[0] = e;
 	return new;
 }
@@ -5510,7 +5510,7 @@ static Bool CheckIfStrict (StrictKind arg_kind, StrictKind context)
 		
 	if (setjmp (SAEnv2) == 0){
 		e      = BuildApplicationWithBottom (arg_kind, context);
-		result = ReduceInContext (& e, (Path) Null, NewSimpleContext (context, False));
+		result = ReduceInContext (& e, (Path) NULL, NewSimpleContext (context, False));
 	} else
 		result = False;
 		
@@ -5781,7 +5781,7 @@ void do_strictness_analysis (void)
 	}
 	
 	if (StrictWarning && export_warning)
-		GiveStrictWarning ((char *) Null, "not all derived strictness information is exported");
+		GiveStrictWarning ((char *) NULL, "not all derived strictness information is exported");
 	
 	free_unused_sa_blocks();
 }
