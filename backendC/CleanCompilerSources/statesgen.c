@@ -320,6 +320,7 @@ void ConvertTypeToState (TypeNode type,StateS *state_p,StateKind kind)
 					break;
 				case PackedArrayObj:
 					state_p->state_array_arguments [0] = StrictState;
+					state_p->state_mark |= STATE_PACKED_ARRAY_MASK;
 					break;
 			}			
 		}

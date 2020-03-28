@@ -6786,6 +6786,7 @@ void InitCoding (void)
 	InitBasicDescriptor (AbstractObj, "_", SizeOfAStackElem);
 #endif
 	InitBasicDescriptor (IntObj, "INT", SizeOfInt);
+	InitBasicDescriptor (Int32Obj, "INT32", SizeOfInt32);
 	InitBasicDescriptor (BoolObj, "BOOL", SizeOfBool);
 	InitBasicDescriptor (CharObj, "CHAR", SizeOfChar);
 #ifdef G_A64
@@ -6793,6 +6794,7 @@ void InitCoding (void)
 #else
 	InitBasicDescriptor (RealObj, "REAL", SizeOfReal);
 #endif
+	InitBasicDescriptor (Real32Obj, "REAL32", SizeOfReal32);
 	InitBasicDescriptor (FileObj, "FILE", SizeOfFile);
 	InitBasicDescriptor (ArrayObj, "ARRAY", SizeOfAStackElem);
 	InitBasicDescriptor (UnboxedArrayObj, "ARRAY", SizeOfAStackElem);

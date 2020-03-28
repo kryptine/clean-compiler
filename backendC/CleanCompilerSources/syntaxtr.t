@@ -25,7 +25,7 @@ typedef enum {
 #if ABSTRACT_OBJECT
 	AbstractObj,
 #endif
-	IntObj, BoolObj, CharObj, RealObj, FileObj, unusedObjectKind0/*StringObj*/,
+	IntObj, Int32Obj, BoolObj, CharObj, RealObj, Real32Obj, FileObj, unusedObjectKind0/*StringObj*/,
 	TupleObj, ListObj, RecordObj, ArrayObj, StrictArrayObj, UnboxedArrayObj,
 	PackedArrayObj, WorldObj, ProcIdObj, RedIdObj
 #ifdef CLEAN2
@@ -35,9 +35,9 @@ typedef enum {
 } ObjectKind;
 
 #if ABSTRACT_OBJECT
-# define BASIC_ELEMS_STRING "uuibcrfsaaaaaaippa" /* index by ObjectKind */
+# define BASIC_ELEMS_STRING "uuiibcrrfsaaaaaaippa" /* index by ObjectKind */
 #else
-# define BASIC_ELEMS_STRING "uibcrfsaaaaaaippa" /* index by ObjectKind */
+# define BASIC_ELEMS_STRING "uiibcrrfsaaaaaaippa" /* index by ObjectKind */
 #endif
 
 typedef enum {
@@ -96,6 +96,7 @@ typedef struct state		*States;
 
 #define STATE_PARALLEL_MASK 1
 #define STATE_ELEMENTS_UPDATEABLE_MASK 2		/* for TupleState */
+#define STATE_PACKED_ARRAY_MASK 2				/* for ArrayState */
 #define STATE_UNIQUE_MASK 4
 
 typedef struct record_state_descr {

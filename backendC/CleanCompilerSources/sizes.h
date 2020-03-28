@@ -69,9 +69,11 @@
 /* The size of objects expressed in amounts of stack entries are given below */
 
 #define SizeOfInt			1
+#define SizeOfInt32			1
 #define SizeOfBool			1
 #define SizeOfChar			1
 #define SizeOfReal			REALSIZE
+#define SizeOfReal32		1
 #define SizeOfFile			FILESIZE
 #define SizeOfVoid			1
 #define SizeOfProcId		1
