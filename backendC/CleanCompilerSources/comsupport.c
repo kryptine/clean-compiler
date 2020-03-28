@@ -288,7 +288,7 @@ static char *ConvertSymbolKindToString (SymbKind skind)
 		case array_type:		return "{ }";
 		case strict_array_type:	return "{ ! }";
 		case unboxed_array_type:return "{ # }";
-		case clipped_array_type:return "{ #32 }";
+		case packed_array_type: return "{ #32 }";
 		case world_type:	return "World";
 		case procid_type:	return "ProcId";
 		case redid_type:	return "RedId";

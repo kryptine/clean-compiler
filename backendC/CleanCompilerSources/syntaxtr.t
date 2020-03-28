@@ -27,7 +27,7 @@ typedef enum {
 #endif
 	IntObj, BoolObj, CharObj, RealObj, FileObj, unusedObjectKind0/*StringObj*/,
 	TupleObj, ListObj, RecordObj, ArrayObj, StrictArrayObj, UnboxedArrayObj,
-	ClippedArrayObj, WorldObj, ProcIdObj, RedIdObj
+	PackedArrayObj, WorldObj, ProcIdObj, RedIdObj
 #ifdef CLEAN2
 	,DynamicObj
 #endif
@@ -52,7 +52,7 @@ typedef enum {
 	int_denot, bool_denot, char_denot, real_denot,
 /*	Nr_Of_Basic_Denots, */ integer_denot,
 	string_denot,
-	fun_type, array_type, strict_array_type, unboxed_array_type, clipped_array_type, list_type, tuple_type, empty_type,
+	fun_type, array_type, strict_array_type, unboxed_array_type, packed_array_type, list_type, tuple_type, empty_type,
 #ifdef CLEAN2
 	dynamic_type,
 #endif

@@ -109,9 +109,9 @@ makeUnboxedArraySymbol arity
 	#! unboxed_array_ident = predefined_idents.[PD_UnboxedArrayType]
 	= MakeNewTypeSymbIdent unboxed_array_ident arity
 
-makeClippedArraySymbol arity
-	#! clipped_array_ident = predefined_idents.[PD_ClippedArrayType]
-	= MakeNewTypeSymbIdent clipped_array_ident arity
+makePackedArraySymbol arity
+	#! packed_array_ident = predefined_idents.[PD_PackedArrayType]
+	= MakeNewTypeSymbIdent packed_array_ident arity
 
 makeTupleTypeSymbol form_arity act_arity
 	#! tuple_ident = predefined_idents.[GetTupleTypeIndex form_arity]
@@ -3200,12 +3200,12 @@ trySimpleTypeT CurlyOpenToken attr pState
 		| token == IntToken "32"
 			# (token, pState) = nextToken TypeContext pState
 			| token == CurlyCloseToken
-				# array_symbol =  makeClippedArraySymbol 0
+				# array_symbol =  makePackedArraySymbol 0
 				= (ParseOk, {at_attribute = attr, at_type = TA array_symbol []}, pState)
 				// otherwise // token <> CurlyCloseToken
 				# (atype, pState) = wantAType_strictness_ignored (tokenBack pState)
-				  pState          = wantToken TypeContext "clipped array type" CurlyCloseToken pState
-				  array_symbol    = makeClippedArraySymbol 1
+				  pState          = wantToken TypeContext "packed array type" CurlyCloseToken pState
+				  array_symbol    = makePackedArraySymbol 1
 				= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
 		// otherwise // token <> CurlyCloseToken and token <> IntToken "32"
 			# (atype, pState)			= wantAType_strictness_ignored (tokenBack pState)
@@ -4529,7 +4529,7 @@ wantRecordOrArrayExp is_pattern pState
 		SeqLetToken False
 			# (token, pState) = nextToken FunctionContext pState
 			| token == IntToken "32"
-				-> want_array_elems ClippedArray pState
+				-> want_array_elems PackedArray pState
 				-> want_array_elems UnboxedArray (tokenBack pState)
 		CurlyCloseToken
 			-> (PE_ArrayDenot OverloadedArray [], pState)

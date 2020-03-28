@@ -47,7 +47,7 @@ predefined_idents
 					[PD_LazyArrayType] = i "_Array",
 					[PD_StrictArrayType] = i "_!Array",
 					[PD_UnboxedArrayType] = i PD_UnboxedArray_String,
-					[PD_ClippedArrayType] = i "_#32Array",
+					[PD_PackedArrayType] = i "_#32Array",
 					[PD_UnitType] = i "_Unit",
 					[PD_TypeCodeMember] = i "_type_code",
 					[PD_DummyForStrictAliasFun] = i "_dummyForStrictAlias"
@@ -170,7 +170,7 @@ predefined_idents
 					[PD_TC__LazyArray] = i "TC__LazyArray",
 					[PD_TC__StrictArray] = i "TC__StrictArray",
 					[PD_TC__UnboxedArray] = i "TC__UnboxedArray",
-					[PD_TC__ClippedArray] = i "TC__ClippedArray",
+					[PD_TC__PackedArray] = i "TC__PackedArray",
 
 					[PD_TC__Unit] = i "TC__Unit",
 
@@ -310,7 +310,7 @@ where
 			<<= (local_predefined_idents, PD_LazyArrayType)
 			<<= (local_predefined_idents, PD_StrictArrayType)
 			<<= (local_predefined_idents, PD_UnboxedArrayType)
-			<<= (local_predefined_idents, PD_ClippedArrayType)
+			<<= (local_predefined_idents, PD_PackedArrayType)
 			<<= (local_predefined_idents, PD_UnitType) <<= (local_predefined_idents, PD_UnitConsSymbol)
 			<<= (local_predefined_idents, PD_TypeCodeMember)
 			<<= (local_predefined_idents, PD_DummyForStrictAliasFun) // MW++
@@ -461,11 +461,11 @@ buildPredefinedModule support_dynamics pre_def_symbols
 	  (array_def, pre_def_symbols)		= make_type_def PD_LazyArrayType [type_var] (AbstractType cAllBitsClear) pre_def_symbols
 	  (strict_def, pre_def_symbols)		= make_type_def PD_StrictArrayType [type_var] (AbstractType cAllBitsClear) pre_def_symbols
 	  (unboxed_def, pre_def_symbols)	= make_type_def PD_UnboxedArrayType [type_var] (AbstractType cAllBitsClear) pre_def_symbols
-	  (clipped_def, pre_def_symbols)	= make_type_def PD_ClippedArrayType [type_var] (AbstractType cAllBitsClear) pre_def_symbols
+	  (packed_def, pre_def_symbols)	= make_type_def PD_PackedArrayType [type_var] (AbstractType cAllBitsClear) pre_def_symbols
 
 	  (unit_type_def,unit_cons_def,pre_def_symbols) = make_unit_definition pre_mod_ident pre_def_symbols
 
-	  array_and_unit_type_defs = [array_def,strict_def,unboxed_def,clipped_def,unit_type_def]
+	  array_and_unit_type_defs = [array_def,strict_def,unboxed_def,packed_def,unit_type_def]
 	  (type_defs, cons_defs, pre_def_symbols)	= add_tuple_defs pre_mod_ident MaxTupleArity array_and_unit_type_defs [unit_cons_def] pre_def_symbols
 
 	  alias_dummy_type = make_identity_fun_type alias_dummy_ident type_var

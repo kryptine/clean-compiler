@@ -1450,7 +1450,7 @@ writeTypeTA	file opt_beautifulizer form {type_ident,type_index,type_arity} types
 			= writeWithinBrackets "{!" "}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
 		| predef_index==PD_UnboxedArrayType
 			= writeWithinBrackets "{#" "}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-		| predef_index==PD_ClippedArrayType
+		| predef_index==PD_PackedArrayType
 			= writeWithinBrackets "{#32" "}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
 		| predef_index>=PD_Arity2TupleType && predef_index<=PD_Arity32TupleType
 			= writeWithinBrackets "(" ")" file opt_beautifulizer (setProperty form cCommaSeparator, types)

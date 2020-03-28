@@ -284,7 +284,7 @@ BEFunType:==16;
 BEArrayType:==17;
 BEStrictArrayType:==18;
 BEUnboxedArrayType:==19;
-BEClippedArrayType:==20;
+BEPackedArrayType:==20;
 BEListType:==21;
 BETupleType:==22;
 BEEmptyType:==23;

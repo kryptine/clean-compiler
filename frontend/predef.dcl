@@ -45,7 +45,7 @@ PD_Arity32TupleType			:== 39
 PD_LazyArrayType			:== 40
 PD_StrictArrayType			:== 41
 PD_UnboxedArrayType			:== 42
-PD_ClippedArrayType			:== 43
+PD_PackedArrayType			:== 43
 
 PD_UnitType :== 44
 
@@ -266,7 +266,7 @@ PD_TC__Tuple32		:== 287
 PD_TC__LazyArray	:== 288
 PD_TC__StrictArray	:== 289
 PD_TC__UnboxedArray	:== 290
-PD_TC__ClippedArray	:== 291
+PD_TC__PackedArray	:== 291
 
 PD_TC__Unit			:== 292
 
