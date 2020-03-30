@@ -3197,17 +3197,7 @@ trySimpleTypeT CurlyOpenToken attr pState
 		| token == CurlyCloseToken
 			# array_symbol = makeUnboxedArraySymbol 0
 			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol []}, pState)
-		| token == IntToken "32"
-			# (token, pState) = nextToken TypeContext pState
-			| token == CurlyCloseToken
-				# array_symbol =  makePackedArraySymbol 0
-				= (ParseOk, {at_attribute = attr, at_type = TA array_symbol []}, pState)
-				// otherwise // token <> CurlyCloseToken
-				# (atype, pState) = wantAType_strictness_ignored (tokenBack pState)
-				  pState          = wantToken TypeContext "packed array type" CurlyCloseToken pState
-				  array_symbol    = makePackedArraySymbol 1
-				= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
-		// otherwise // token <> CurlyCloseToken and token <> IntToken "32"
+		// otherwise // token <> CurlyCloseToken
 			# (atype, pState)			= wantAType_strictness_ignored (tokenBack pState)
   			  pState					= wantToken TypeContext "unboxed array type" CurlyCloseToken pState
   			  array_symbol = makeUnboxedArraySymbol 1
@@ -3222,6 +3212,17 @@ trySimpleTypeT CurlyOpenToken attr pState
   			  pState					= wantToken TypeContext "strict array type" CurlyCloseToken pState
   			  array_symbol = makeStrictArraySymbol 1
   			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
+	| token == IntToken "32"
+		# pState = wantToken TypeContext "packed array type" HashToken pState
+		# (token, pState) = nextToken TypeContext pState
+		| token == CurlyCloseToken
+			# array_symbol =  makePackedArraySymbol 0
+			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol []}, pState)
+		// otherwise // token <> CurlyCloseToken
+			# (atype, pState) = wantAType_strictness_ignored (tokenBack pState)
+			  pState          = wantToken TypeContext "packed array type" CurlyCloseToken pState
+			  array_symbol    = makePackedArraySymbol 1
+			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
   	// otherwise
 		# (atype,pState)			= wantAType_strictness_ignored (tokenBack pState)
 		  pState					= wantToken TypeContext "lazy array type" CurlyCloseToken pState
@@ -4527,10 +4528,7 @@ wantRecordOrArrayExp is_pattern pState
 		ExclamationToken
 			-> want_array_elems StrictArray pState
 		SeqLetToken False
-			# (token, pState) = nextToken FunctionContext pState
-			| token == IntToken "32"
-				-> want_array_elems PackedArray pState
-				-> want_array_elems UnboxedArray (tokenBack pState)
+			-> want_array_elems UnboxedArray pState
 		CurlyCloseToken
 			-> (PE_ArrayDenot OverloadedArray [], pState)
 		_
@@ -4547,13 +4545,17 @@ wantRecordOrArrayExp is_pattern pState
 						| token == CurlyCloseToken
 							-> (PE_Record PE_Empty NoRecordName [ field ], pState)
 							-> (PE_Record PE_Empty NoRecordName [ field ], parseError "record or array" (Yes token) "}" pState)
-					# (expr, pState) = wantExpressionT token pState
+					# pState=appScanState setNoNewOffsideForSeqLetBit pState
+					  (expr, pState) = wantExpressionT token pState
 					  (token, pState) = nextToken FunctionContext pState
+					  pState=appScanState clearNoNewOffsideForSeqLetBit pState
 					| token == AndToken
 						# (token, pState) = nextToken FunctionContext pState
 						-> want_record_or_array_update token expr pState
 					| token == DoubleBackSlashToken
 						-> wantArrayComprehension OverloadedArray expr pState
+					| expr=:(PE_Basic (BVInt 32)) && token=:(SeqLetToken False)
+						-> want_array_elems PackedArray pState
 					# (elems, pState) = want_more_array_elems token pState
 					-> (PE_ArrayDenot OverloadedArray [expr : elems], pState)
 				opt_type
