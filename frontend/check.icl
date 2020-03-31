@@ -3735,8 +3735,7 @@ checkDclModule2 dcl_imported_module_numbers components_importing_module imports_
 	  
 	  cs = check_needed_modules_are_imported mod_ident ".dcl" cs
 
-	  (ef_member_defs, com_instance_defs, dcl_functions, cs)
-	  		= adjust_predefined_symbols mod_index e_info.ef_member_defs com_instance_defs dcl_functions cs
+	  cs = adjust_predefined_symbols mod_index cs
 
 	  (modules, macro_defs, hp_expression_heap, cs)
 			= case is_on_cycle of
@@ -3768,16 +3767,13 @@ checkDclModule2 dcl_imported_module_numbers components_importing_module imports_
 	= ((nr_of_dcl_functions_and_instances, nr_of_dcl_funs_insts_and_specs, rev_special_defs),
 		(expl_imp_info, { modules & [ mod_index ] = dcl_mod }, macro_defs, heaps, { cs & cs_symbol_table = cs_symbol_table }))
 where
-	adjust_predefined_symbols mod_index class_members class_instances fun_types cs=:{cs_predef_symbols}
-		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_StdArray]
-		| pre_mod.pds_def == mod_index
-			# cs = { cs & cs_predef_symbols = cs_predef_symbols}
+	adjust_predefined_symbols mod_index cs=:{cs_predef_symbols}
+		| mod_index==cs_predef_symbols.[PD_StdArray].pds_def
+			= cs
 				<=< adjust_predef_symbols PD_CreateArrayFun PD_UnqArraySizeFun mod_index STE_Member
 				<=< adjustPredefSymbol PD_ArrayClass mod_index STE_Class
-			= (class_members, class_instances, fun_types, cs)
-		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_PredefinedModule]
-		| pre_mod.pds_def == mod_index
-			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols}
+		| mod_index==cs_predef_symbols.[PD_PredefinedModule].pds_def
+			= cs
 				<=< adjustPredefSymbolAndCheckIndex PD_StringType mod_index PD_StringTypeIndex STE_Type
 				<=< adjust_predef_symbols PD_ListType PD_OverloadedListType mod_index STE_Type
 				<=< adjust_predef_symbols_and_check_indices PD_Arity2TupleType PD_Arity32TupleType PD_Arity2TupleTypeIndex mod_index STE_Type
@@ -3785,21 +3781,18 @@ where
 				<=< adjust_predef_symbols PD_ConsSymbol PD_UnitConsSymbol mod_index STE_Constructor
 				<=< (if tc_class_defined (adjustPredefSymbol PD_TypeCodeClass mod_index STE_Class) (\x->x))
 				<=< (if tc_class_defined (adjustPredefSymbol PD_TypeCodeMember mod_index STE_Member) (\x->x))
-				<=< adjustPredefSymbol PD_DummyForStrictAliasFun mod_index STE_DclFunction)
-		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_StdBool]
-		| pre_mod.pds_def == mod_index
-			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols}
+				<=< adjustPredefSymbol PD_DummyForStrictAliasFun mod_index STE_DclFunction
+		| mod_index==cs_predef_symbols.[PD_StdBool].pds_def
+			= cs
 				<=< adjustPredefSymbol PD_AndOp mod_index STE_DclFunction
-				<=< adjustPredefSymbol PD_OrOp mod_index STE_DclFunction)
-		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_StdStrictLists]
-		| pre_mod.pds_def == mod_index
-			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols}
+				<=< adjustPredefSymbol PD_OrOp mod_index STE_DclFunction
+		| mod_index==cs_predef_symbols.[PD_StdStrictLists].pds_def
+			= cs
 				<=< adjust_predef_symbols PD_cons PD_decons_uts mod_index STE_Member
 				<=< adjust_predef_symbols PD_nil PD_nil_uts mod_index STE_DclFunction
-				<=< adjust_predef_symbols PD_ListClass PD_UTSListClass mod_index STE_Class)
-		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_StdDynamic]	
-		| pre_mod.pds_def == mod_index
-			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols}
+				<=< adjust_predef_symbols PD_ListClass PD_UTSListClass mod_index STE_Class
+		| mod_index==cs_predef_symbols.[PD_StdDynamic].pds_def
+			= cs
 				<=< adjustPredefSymbol PD_Dyn_DynamicTemp			mod_index STE_Type
 				<=< adjustPredefSymbol PD_Dyn_TypeCode				mod_index STE_Type
 				<=< adjustPredefSymbol PD_Dyn_UnificationEnvironment	mod_index STE_Type
@@ -3808,21 +3801,17 @@ where
 				<=< adjustPredefSymbol PD_Dyn__to_TypeCodeConstructor	mod_index STE_DclFunction
 				<=< adjustPredefSymbol PD_TypeCodeConstructor mod_index STE_Type
 				<=< adjust_predef_symbols PD_TC_Int PD_TC__Unit mod_index STE_Constructor
-				)
-		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_StdGeneric]
-		| pre_mod.pds_def == mod_index
-			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols}
+		| mod_index==cs_predef_symbols.[PD_StdGeneric].pds_def
+			= cs
 				<=< adjust_predef_symbols PD_TypeUNIT PD_TypeGenericDict0 mod_index STE_Type
 				<=< adjust_predef_symbols PD_ConsUNIT PD_CGenTypeApp mod_index STE_Constructor
 				<=< adjustPredefSymbol PD_GenericBimap			mod_index (STE_Generic -1)
 				<=< adjustPredefSymbolNoNotDefinedError PD_GenericBinumap mod_index (STE_Generic -1)
-				)
-		# (pre_mod, cs_predef_symbols) = cs_predef_symbols![PD_StdMisc]	
-		| pre_mod.pds_def == mod_index
-			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols}
+		| mod_index==cs_predef_symbols.[PD_StdMisc].pds_def
+			= cs
 				<=< adjustPredefSymbol PD_abort				mod_index STE_DclFunction
-				<=< adjustPredefSymbol PD_undef				mod_index STE_DclFunction)
-			= (class_members, class_instances, fun_types, { cs & cs_predef_symbols = cs_predef_symbols})		
+				<=< adjustPredefSymbol PD_undef				mod_index STE_DclFunction
+			= cs
 	where
 		unused
 			= { id_name = "unused", id_info = nilPtr }
