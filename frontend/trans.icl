@@ -1246,10 +1246,6 @@ where
 	transform (BasicPatterns type patterns) ro ti
 		# (patterns, ti) = transform patterns ro ti
 		= (BasicPatterns type patterns, ti)
-	transform (OverloadedListPatterns type=:(OverloadedList _ _ _ _) decons_expr patterns) ro ti
-		# (patterns, ti) = transform patterns ro ti
-		# (decons_expr, ti) = transform decons_expr ro ti
-		= (OverloadedListPatterns type decons_expr patterns, ti)
 	transform (OverloadedListPatterns type decons_expr patterns) ro ti
 		# (patterns, ti) = transform patterns ro ti
 		# (decons_expr, ti) = transform decons_expr ro ti
