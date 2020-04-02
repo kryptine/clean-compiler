@@ -1535,6 +1535,18 @@ convertAnnotAndExternalTypeNode at_annotation {at_type, at_attribute}
 	= convertAttribution at_attribute ==> \ attribution
 	-> convertExternalTypeNode at_type (convertAnnotation at_annotation) attribution
 
+convert_contexts :: [.a] BETypeNodeP BEAnnotation BEAttribution *BackEndState -> *(BETypeNodeP,*BackEndState)
+convert_contexts [context:contexts] type_node_p annotation attribution bes
+	# (no_type_args,    bes) = accBackEnd BENoTypeArgs bes
+	  (type_node_p,     bes) = convert_contexts contexts type_node_p BENoAnnot BENoUniAttr bes
+	  (type_args,       bes) = accBackEnd (BETypeArgs type_node_p no_type_args) bes
+	  (var_type_node,   bes) = accBackEnd (BEVar0TypeNode BENoAnnot BENoUniAttr) bes
+	  (type_args,       bes) = accBackEnd (BETypeArgs var_type_node type_args) bes
+	  (fun_type_symbol, bes) = accBackEnd (BEBasicSymbol BEFunType) bes
+	= accBackEnd (BESymbolTypeNode annotation attribution fun_type_symbol type_args) bes
+convert_contexts [] type_node_p annotation attribution bes
+	= (type_node_p,bes)
+
 convertTypeNode :: Type BEAnnotation BEAttribution -> BEMonad BETypeNodeP
 convertTypeNode (TB (BT_String type)) annotation attribution
 	=	convertTypeNode type annotation attribution
@@ -1567,7 +1579,11 @@ convertTypeNode TE annotation attribution
 convertTypeNode (TFA vars type) annotation attribution
 	=	convertTypeNode type annotation attribution
 convertTypeNode (TFAC vars type contexts) annotation attribution
-	=	convertTypeNode type annotation attribution
+	= convertTFAC contexts type annotation attribution
+	where
+		convertTFAC contexts type annotation attribution bes
+			# (type_node_p,bes) = convertTypeNode type BENoAnnot BENoUniAttr bes
+			= convert_contexts contexts type_node_p annotation attribution bes
 convertTypeNode (TGenericFunctionInDictionary gds type_kind {gi_module,gi_index}) annotation attribution
 	=	beFunction2 (BESymbolTypeNode annotation attribution) (beTypeSymbol gi_index gi_module) beNoTypeArgs
 convertTypeNode typeNode annotation attribution
@@ -1587,7 +1603,11 @@ convertExternalTypeNode (a :@: b) annotation attribution
 convertExternalTypeNode (TFA vars type) annotation attribution
 	=	convertExternalTypeNode type annotation attribution
 convertExternalTypeNode (TFAC vars type contexts) annotation attribution
-	=	convertExternalTypeNode type annotation attribution
+	= convertTFAC contexts type annotation attribution
+	where
+		convertTFAC contexts type annotation attribution bes
+			# (type_node_p,bes) = convertExternalTypeNode type BENoAnnot BENoUniAttr bes
+			= convert_contexts contexts type_node_p annotation attribution bes
 convertExternalTypeNode typeNode annotation attribution
 	=	convertTypeNode typeNode annotation attribution
 
@@ -1662,7 +1682,9 @@ convertTypeDefTypeNode TE annotation attribution type_var_heap bes
 convertTypeDefTypeNode (TFA vars type) annotation attribution type_var_heap bes
 	= convertTypeDefTypeNode type annotation attribution type_var_heap bes
 convertTypeDefTypeNode (TFAC vars type contexts) annotation attribution type_var_heap bes
-	= convertTypeDefTypeNode type annotation attribution type_var_heap bes
+	# (type_node_p,type_var_heap,bes) = convertTypeDefTypeNode type BENoAnnot BENoUniAttr type_var_heap bes
+	  (type_node_p,bes) = convert_contexts contexts type_node_p annotation attribution bes
+	= (type_node_p,type_var_heap,bes)
 convertTypeDefTypeNode (TGenericFunctionInDictionary gds type_kind {gi_module,gi_index}) annotation attribution type_var_heap bes
 	# (type_node_p,bes) = beFunction2 (BESymbolTypeNode annotation attribution) (beTypeSymbol gi_index gi_module) beNoTypeArgs bes
 	= (type_node_p,type_var_heap,bes)
