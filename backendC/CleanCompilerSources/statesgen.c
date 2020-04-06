@@ -650,20 +650,14 @@ static Bool AnnotHasDeferAttr (Annotation annotkind)
 
 static StateS DetermineStatesOfRuleType (TypeAlts ruletype,StateS *const function_state_p)
 {
-	TypeNode lhsroot;
 	TypeArgs type_arg;
 	StateP arg_state_p;
-
-	lhsroot = ruletype->type_alt_lhs;
 	
-	CurrentSymbol	= lhsroot ->type_node_symbol;
+	CurrentSymbol = ruletype->type_alt_lhs_symbol;
 	CurrentLine = 0 /*ruletype->type_alt_line*/;
 	
-	if (lhsroot->type_node_annotation!=NoAnnot)
-		StaticMessage_S_s (False, CurrentSymbol, Wrootannot);
-
 	arg_state_p=function_state_p;
-	for_l (type_arg,lhsroot->type_node_arguments,type_arg_next){
+	for_l (type_arg,ruletype->type_alt_lhs_arguments,type_arg_next){
 		if (!(type_arg->type_arg_node->type_node_annotation==NoAnnot || type_arg->type_arg_node->type_node_annotation==StrictAnnot))
 			StaticMessage_S_s (False, CurrentSymbol, Wtypeannot);
 	
@@ -1217,7 +1211,7 @@ void ExamineTypesAndLhsOfSymbolDefinition (SymbDef def)
 		}
 		case FIELDSELECTOR:
 			if (def->sdef_mark & SDEF_FIELD_HAS_MEMBER_TYPE){
-				def->sdef_member_states_of_field = allocate_function_state (def->sdef_member_type_of_field->type_alt_lhs->type_node_arity);
+				def->sdef_member_states_of_field = allocate_function_state (def->sdef_member_type_of_field->type_alt_lhs_arity);
 				(void) DetermineStatesOfRuleType (def->sdef_member_type_of_field,def->sdef_member_states_of_field);
 			}
 
@@ -2108,14 +2102,14 @@ static Bool NodeInAStrictContext (Node node,StateS demanded_state,int local_scop
 					member_type_alt=field_sdef->sdef_member_type_of_field;
 
 					if (OptimizeInstanceCalls){
-						arg_n=member_type_alt->type_alt_lhs->type_node_arity-1;
+						arg_n=member_type_alt->type_alt_lhs_arity-1;
 						node->node_state = field_sdef->sdef_member_states_of_field[-1];
 						return OptimizedMemberCallInAStrictContext (node,arg_n,field_sdef->sdef_member_states_of_field,local_scope);
 					}
 
 					arg_strictness=0;
 					arg_n=0;
-					for_l (type_arg_p,member_type_alt->type_alt_lhs->type_node_arguments->type_arg_next,type_arg_next){
+					for_l (type_arg_p,member_type_alt->type_alt_lhs_arguments->type_arg_next,type_arg_next){
 						if (type_arg_p->type_arg_node->type_node_annotation==StrictAnnot){
 							arg_strictness |= 1<<arg_n;
 						}
@@ -2148,7 +2142,7 @@ static Bool NodeInAStrictContext (Node node,StateS demanded_state,int local_scop
 							
 							field_sdef=selector_node_p->node_symbol->symb_def;
 							member_type_alt=field_sdef->sdef_member_type_of_field;
-							if (member_type_alt->type_alt_lhs->type_node_arity==n_apply_args+1){
+							if (member_type_alt->type_alt_lhs_arity==n_apply_args+1){
 								int arg_n;
 								unsigned int arg_strictness;
 								struct type_arg *type_arg_p;
@@ -2164,14 +2158,14 @@ static Bool NodeInAStrictContext (Node node,StateS demanded_state,int local_scop
 								}
 
 								if (OptimizeInstanceCalls){
-									arg_n=member_type_alt->type_alt_lhs->type_node_arity-1;
+									arg_n=member_type_alt->type_alt_lhs_arity-1;
 									node->node_state = field_sdef->sdef_member_states_of_field[-1];
 									return OptimizedMemberCallInAStrictContext (node,arg_n,field_sdef->sdef_member_states_of_field,local_scope);
 								}
 
 								arg_strictness=0;
 								arg_n=0;
-								for_l (type_arg_p,member_type_alt->type_alt_lhs->type_node_arguments->type_arg_next,type_arg_next){
+								for_l (type_arg_p,member_type_alt->type_alt_lhs_arguments->type_arg_next,type_arg_next){
 									if (type_arg_p->type_arg_node->type_node_annotation==StrictAnnot){
 										arg_strictness |= 1<<arg_n;
 									}
@@ -3729,7 +3723,7 @@ static SymbolP copy_imp_rule_and_add_arguments (SymbDef rule_sdef,int n_extra_ar
 		
 		rule_type=new_rule_p->rule_type;
 		rhs_type_node_p=rule_type->type_alt_rhs;
-		last_lhs_type_arg_p=&rule_type->type_alt_lhs->type_node_arguments;
+		last_lhs_type_arg_p=&rule_type->type_alt_lhs_arguments;
 		while (*last_lhs_type_arg_p)
 			last_lhs_type_arg_p=&(*last_lhs_type_arg_p)->type_arg_next;
 		
@@ -3757,7 +3751,7 @@ static SymbolP copy_imp_rule_and_add_arguments (SymbDef rule_sdef,int n_extra_ar
 		*last_lhs_type_arg_p=NULL;
 		rule_type->type_alt_rhs=rhs_type_node_p;
 		
-		rule_type->type_alt_lhs->type_node_arity += n_extra_arguments;
+		rule_type->type_alt_lhs_arity += n_extra_arguments;
 	}
 	
 	{
@@ -4247,9 +4241,9 @@ static void AnnotateStrictNodeIds (Node node,StrictNodeIdP strict_node_ids,NodeD
 			uselect_sdef=array_uselect_node->node_symbol->symb_def;
 			
 			if (uselect_sdef->sdef_kind==IMPRULE)
-				type_arg=uselect_sdef->sdef_rule->rule_type->type_alt_lhs->type_node_arguments;
+				type_arg=uselect_sdef->sdef_rule->rule_type->type_alt_lhs_arguments;
 			else
-				type_arg=uselect_sdef->sdef_rule_type->rule_type_rule->type_alt_lhs->type_node_arguments;
+				type_arg=uselect_sdef->sdef_rule_type->rule_type_rule->type_alt_lhs_arguments;
 
 			if (!type_arg->type_arg_node->type_node_is_var &&
 				(type_arg->type_arg_node->type_node_symbol->symb_kind==strict_array_type ||

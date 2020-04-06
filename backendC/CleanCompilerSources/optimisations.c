@@ -236,7 +236,24 @@ static TypeAlts copy_rule_type (TypeAlts old_rule_alt)
 	new_rule_alt=CompAllocType (TypeAlt);
 	*new_rule_alt=*old_rule_alt;
 	
-	new_rule_alt->type_alt_lhs = copy_type (old_rule_alt->type_alt_lhs);
+	new_rule_alt->type_alt_lhs_arity = old_rule_alt->type_alt_lhs_arity;
+	new_rule_alt->type_alt_lhs_symbol = old_rule_alt->type_alt_lhs_symbol;
+	{
+		TypeArgs old_arg,*next_p;
+		
+		next_p=&new_rule_alt->type_alt_lhs_arguments;
+		for_l (old_arg,old_rule_alt->type_alt_lhs_arguments,type_arg_next){
+			TypeArgs new_arg;
+			
+			new_arg=CompAllocType (TypeArg);
+			new_arg->type_arg_node=copy_type (old_arg->type_arg_node);
+			*next_p=new_arg;
+			next_p=&new_arg->type_arg_next;
+		}
+		
+		*next_p=NULL;
+	}
+
 	new_rule_alt->type_alt_rhs = copy_type (old_rule_alt->type_alt_rhs);
 	
 	return new_rule_alt;
@@ -265,8 +282,8 @@ SymbolP copy_imp_rule_and_type (SymbDef old_sdef)
 	old_rule=old_sdef->sdef_rule;
 
 	new_rule->rule_type=copy_rule_type (old_rule->rule_type);
-	new_rule->rule_type->type_alt_lhs->type_node_symbol=new_symbol;
-			
+	new_rule->rule_type->type_alt_lhs_symbol=new_symbol;
+	
 	return new_symbol;	
 }
 
@@ -821,7 +838,7 @@ static RuleAltP copy_alt (RuleAltP old_alts,Symbol new_symbol)
 
 void copy_imp_rule_nodes (ImpRuleP old_rule_p,ImpRuleP new_rule_p)
 {
-	new_rule_p->rule_alts = copy_alt (old_rule_p->rule_alts,new_rule_p->rule_type->type_alt_lhs->type_node_symbol);
+	new_rule_p->rule_alts = copy_alt (old_rule_p->rule_alts,new_rule_p->rule_type->type_alt_lhs_symbol);
 	new_rule_p->rule_root = new_rule_p->rule_alts->alt_lhs_root;
 	new_rule_p->rule_mark = old_rule_p->rule_mark & RULE_CAF_MASK;
 }
@@ -866,8 +883,8 @@ int optimise_tuple_result_function (Node node,StateS demanded_state)
 			++n_versions;
 
 			if (type_and_strictness_in_state_equals_type (result_type,&demanded_state,version->sdef_rule->rule_type->type_alt_rhs)){
-				if (symbol!=version->sdef_rule->rule_type->type_alt_lhs->type_node_symbol){
-					node->node_symbol=version->sdef_rule->rule_type->type_alt_lhs->type_node_symbol;
+				if (symbol!=version->sdef_rule->rule_type->type_alt_lhs_symbol){
+					node->node_symbol=version->sdef_rule->rule_type->type_alt_lhs_symbol;
 					function_changed=1;
 
 					return 1;
@@ -1356,7 +1373,7 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 									
 								field_sdef=selector_node_p->node_symbol->symb_def;
 								member_type_alt=field_sdef->sdef_member_type_of_field;
-								if (member_type_alt->type_alt_lhs->type_node_arity==n_apply_args+1){
+								if (member_type_alt->type_alt_lhs_arity==n_apply_args+1){
 									struct symbol *new_symbol_p;
 
 									new_symbol_p = CompAlloc (sizeof (struct symbol));
@@ -2232,7 +2249,7 @@ static void optimise_normal_node (Node node)
 							
 						field_sdef=selector_node_p->node_symbol->symb_def;
 						member_type_alt=field_sdef->sdef_member_type_of_field;
-						if (member_type_alt->type_alt_lhs->type_node_arity==n_apply_args+1){
+						if (member_type_alt->type_alt_lhs_arity==n_apply_args+1){
 							struct symbol *new_symbol_p;
 
 							new_symbol_p = CompAlloc (sizeof (struct symbol));

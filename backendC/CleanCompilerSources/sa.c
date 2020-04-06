@@ -2269,7 +2269,7 @@ static Exp ConvertNode (Node node, NodeId nid)
 							struct type_arg *type_arg_p;
 							
 							member_type_alt=arg_p->arg_node->node_symbol->symb_def->sdef_member_type_of_field;
-							if (member_type_alt->type_alt_lhs->type_node_arity==n_apply_args+1){
+							if (member_type_alt->type_alt_lhs_arity==n_apply_args+1){
 								int arg_n;
 								unsigned int arg_strictness;
 								NodeP first_arg_of_apply_node_p;
@@ -2277,7 +2277,7 @@ static Exp ConvertNode (Node node, NodeId nid)
 								
 								arg_strictness=0;
 								arg_n=0;
-								for_l (type_arg_p,member_type_alt->type_alt_lhs->type_node_arguments->type_arg_next,type_arg_next){
+								for_l (type_arg_p,member_type_alt->type_alt_lhs_arguments->type_arg_next,type_arg_next){
 									if (type_arg_p->type_arg_node->type_node_annotation==StrictAnnot)
 										arg_strictness |= 1<<arg_n;
 									++arg_n;
@@ -2354,7 +2354,7 @@ static Exp ConvertNode (Node node, NodeId nid)
 #endif
 
 						rule = sdef->sdef_rule_type->rule_type_rule;
-						typeargs = rule->type_alt_lhs->type_node_arguments;
+						typeargs = rule->type_alt_lhs_arguments;
 
 						/* count the number of strict args in the type */
 						arity    = CountStrictArgs (typeargs);
@@ -2665,7 +2665,7 @@ static Exp convert_pattern (SymbolP symbol_p,int arity,NodeIdListElementP node_i
 				Exp exp;
 				
 				rule = sdef->sdef_rule_type->rule_type_rule;
-				typeargs = rule->type_alt_lhs->type_node_arguments;
+				typeargs = rule->type_alt_lhs_arguments;
 
 				/* count the number of strict args in the type */
 				arity = CountStrictArgs (typeargs);
@@ -2942,7 +2942,7 @@ static void ConvertStateInfoToStrictInfos (TypeAlts rule_type_alts, unsigned ari
 	}
 	
 	/* do the arguments */
-	args = rule_type_alts->type_alt_lhs->type_node_arguments;
+	args = rule_type_alts->type_alt_lhs_arguments;
 	ConvertTypeArgsToStrictInfos (args, arity, strict_args, adopt_annots);
 	
 	/* do the result */
@@ -3150,7 +3150,7 @@ static void UpdateStateInfosWithStrictInfos (TypeAlts rule, unsigned arity, Stri
 		return;
 
 	/* do the arguments */
-	args = rule->type_alt_lhs->type_node_arguments;
+	args = rule->type_alt_lhs_arguments;
 
 #if CLEAN2
 	StrictPositionsClear ();
@@ -3205,7 +3205,7 @@ static void update_exported_function_type_state_infos_with_strict_infos (TypeAlt
 	if (! rule)
 		return;
 
-	args = rule->type_alt_lhs->type_node_arguments;
+	args = rule->type_alt_lhs_arguments;
 
 	for (i = 0; i < arity; i++, args = args->type_arg_next)
 		update_exported_function_state_info_with_strict_info (args->type_arg_node,&strict_args[i]);
@@ -3223,7 +3223,7 @@ static Bool IsListArg (Fun *f, unsigned n)
 		/* ?? */
 		return False;
 		
-	args = typerule->type_alt_lhs->type_node_arguments;
+	args = typerule->type_alt_lhs_arguments;
 	
 	for (i = 0; i < n; i++)
 		args = args->type_arg_next;

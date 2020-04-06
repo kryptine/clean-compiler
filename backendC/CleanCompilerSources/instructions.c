@@ -4132,7 +4132,7 @@ void GenerateForeignExports (struct foreign_export_list *foreign_export_list)
 		
 		rule_type_p=function_sdef->sdef_rule->rule_type;
 		
-		for_l (type_arg_p,rule_type_p->type_alt_lhs->type_node_arguments,type_arg_next)
+		for_l (type_arg_p,rule_type_p->type_alt_lhs_arguments,type_arg_next)
 			print_foreign_export_type (type_arg_p->type_arg_node);
 		
 		PutSOutFile (":");
