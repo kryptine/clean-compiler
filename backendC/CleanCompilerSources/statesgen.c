@@ -462,12 +462,10 @@ static void GenerateStatesForConstructors (SymbDef sdef)
 	for_l (constructor,sdef->sdef_type->type_constructors,cl_next){
 		int strict_constructor;
 		SymbDef constructor_sdef;
-		TypeNode type_node;
 		TypeArgs arg;
 		StateP state_p;
 
-		type_node=constructor->cl_constructor;
-		CurrentSymbol=type_node->type_node_symbol;
+		CurrentSymbol=constructor->cl_constructor_symbol;
 
 		constructor_sdef=CurrentSymbol->symb_def;
 
@@ -478,7 +476,7 @@ static void GenerateStatesForConstructors (SymbDef sdef)
 
 		strict_constructor=0;
 	
-		for_l (arg,type_node->type_node_arguments,type_arg_next){
+		for_l (arg,constructor->cl_constructor_arguments,type_arg_next){
 			TypeNode type_arg_node;
 			
 			type_arg_node=arg->type_arg_node;
@@ -491,7 +489,7 @@ static void GenerateStatesForConstructors (SymbDef sdef)
 					
 					if (state_p->state_type==RecordState)
 #ifdef UNBOX_STRICT_CONSTRUCTOR_RECORD
-					if (type_node->type_node_arguments->type_arg_next!=NULL)
+					if (constructor->cl_constructor_arguments->type_arg_next!=NULL)
 #endif
 #ifdef UNBOX_STRICT_RECORD_WITH_ONE_FIELD
 					if (!(state_p->state_arity==1))
@@ -520,22 +518,19 @@ static void ChangeElementStateForStrictAbsTypeFields (SymbDef icl_sdef,SymbDef d
 	for (icl_cons = icl_type->type_constructors, dcl_cons = dcl_type->type_constructors; dcl_cons;
 		 icl_cons = icl_cons->cl_next, dcl_cons = dcl_cons->cl_next)
 	{
-		TypeNode icl_node,dcl_node;
 		SymbDef icl_constructor,dcl_constructor;
 		
-		icl_node=icl_cons->cl_constructor;
-		icl_constructor=icl_node->type_node_symbol->symb_def;
+		icl_constructor=icl_cons->cl_constructor_symbol->symb_def;
 		
 		if (icl_constructor->sdef_strict_constructor){
 			TypeArgs icl_arg,dcl_arg;
 			StateP icl_arg_state_p,dcl_arg_state_p;
 			
-			dcl_node=dcl_cons->cl_constructor;
-			CurrentSymbol=dcl_node->type_node_symbol;
+			CurrentSymbol=dcl_cons->cl_constructor_symbol;
 			dcl_constructor=CurrentSymbol->symb_def;
 					
-			icl_arg=icl_node->type_node_arguments;
-			dcl_arg=dcl_node->type_node_arguments;
+			icl_arg=icl_cons->cl_constructor_arguments;
+			dcl_arg=dcl_cons->cl_constructor_arguments;
 			icl_arg_state_p=icl_cons->cl_state_p;
 			dcl_arg_state_p=dcl_cons->cl_state_p;
 			
@@ -862,7 +857,7 @@ static void GenStatesInLhsNode (Node node,StateP arg_state_p)
 						ArgS *arg;
 						
 						for_lla (arg,type_arg_p,constructor_arg_state_p,
-								node->node_arguments,sdef->sdef_constructor->cl_constructor->type_node_arguments,symbol->symb_def->sdef_constructor->cl_state_p,
+								node->node_arguments,sdef->sdef_constructor->cl_constructor_arguments,symbol->symb_def->sdef_constructor->cl_state_p,
 								arg_next,type_arg_next)
 						{
 							Node arg_node;
@@ -886,7 +881,7 @@ static void GenStatesInLhsNode (Node node,StateP arg_state_p)
 						struct type_arg *type_arg_p;
 						ArgS *arg;
 						
-						for_ll (arg,type_arg_p,node->node_arguments,sdef->sdef_constructor->cl_constructor->type_node_arguments,arg_next,type_arg_next){
+						for_ll (arg,type_arg_p,node->node_arguments,sdef->sdef_constructor->cl_constructor_arguments,arg_next,type_arg_next){
 							Node arg_node;
 							
 							arg->arg_state=LazyState;							
@@ -1230,7 +1225,7 @@ void ExamineTypesAndLhsOfSymbolDefinition (SymbDef def)
 				def->sdef_number = next_def_number++;
 
 			for_l (constructor,def->sdef_type->type_constructors,cl_next)
-				ExamineTypesAndLhsOfConstructorDefinition (constructor->cl_constructor->type_node_symbol->symb_def);
+				ExamineTypesAndLhsOfConstructorDefinition (constructor->cl_constructor_symbol->symb_def);
 
 			rootstate = LazyState;
 			break;
@@ -1403,7 +1398,7 @@ void ImportSymbols (int size_dcl_mfts_a,struct module_function_and_type_symbols 
 					for_l (constructor,sdef->sdef_type->type_constructors,cl_next){
 						SymbDef constructor_sdef;
 						
-						constructor_sdef = constructor->cl_constructor->type_node_symbol->symb_def;
+						constructor_sdef = constructor->cl_constructor_symbol->symb_def;
 						if (constructor_sdef->sdef_isused
 							&& constructor_sdef->sdef_mark & (SDEF_USED_STRICTLY_MASK | SDEF_USED_LAZILY_MASK | SDEF_USED_CURRIED_MASK)
 						){
@@ -3014,7 +3009,7 @@ static void DetermineStatesOfNodeAndDefs (Node root_node,NodeDefs node_defs,Stat
 											StateP constructor_arg_state_p;
 											
 											for_lla (node_ids_elem,type_arg_p,constructor_arg_state_p,
-													node_ids,sdef->sdef_constructor->cl_constructor->type_node_arguments,symbol->symb_def->sdef_constructor->cl_state_p,
+													node_ids,sdef->sdef_constructor->cl_constructor_arguments,symbol->symb_def->sdef_constructor->cl_state_p,
 													nidl_next,type_arg_next)
 											{
 												NodeIdP node_id_p;
@@ -3028,7 +3023,7 @@ static void DetermineStatesOfNodeAndDefs (Node root_node,NodeDefs node_defs,Stat
 										} else {
 											struct type_arg *type_arg_p;
 											
-											for_ll (node_ids_elem,type_arg_p,node_ids,sdef->sdef_constructor->cl_constructor->type_node_arguments,nidl_next,type_arg_next){
+											for_ll (node_ids_elem,type_arg_p,node_ids,sdef->sdef_constructor->cl_constructor_arguments,nidl_next,type_arg_next){
 												NodeIdP node_id_p;
 												
 												node_id_p=node_ids_elem->nidl_node_id;

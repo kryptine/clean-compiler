@@ -821,7 +821,7 @@ static void GenerateLazyConstructorDescriptorAndFunctionForStrictConstructor (Co
 {
 	SymbDef constructor_def;
 
-	constructor_def=constructor->cl_constructor->type_node_symbol->symb_def;
+	constructor_def=constructor->cl_constructor_symbol->symb_def;
 
 	if (constructor_def->sdef_exported || (constructor_def->sdef_mark & (SDEF_USED_LAZILY_MASK | SDEF_USED_CURRIED_MASK)) || ExportLocalLabels){
 		LabDef constructor_label,ealab,n_lab,d_lab;
@@ -1593,7 +1593,7 @@ void GenerateCodeForConstructorsAndRecords (struct module_function_and_type_symb
 					ConstructorList alt;
 
 					for_l (alt,def->sdef_type->type_constructors,cl_next)
-						if (alt->cl_constructor->type_node_symbol->symb_def->sdef_arity!=0)
+						if (alt->cl_constructor_symbol->symb_def->sdef_arity!=0)
 							break;
 					
 					if (alt==NULL){
@@ -1601,14 +1601,14 @@ void GenerateCodeForConstructorsAndRecords (struct module_function_and_type_symb
 						
 						constructor_n=0;
 						for_l (alt,def->sdef_type->type_constructors,cl_next){
-							GenConstructor0DescriptorAndExport (alt->cl_constructor->type_node_symbol->symb_def,constructor_n);
+							GenConstructor0DescriptorAndExport (alt->cl_constructor_symbol->symb_def,constructor_n);
 							++constructor_n;
 						}
 					} else {
 						for_l (alt,def->sdef_type->type_constructors,cl_next){
 							SymbDef constructor_def;
 
-							constructor_def=alt->cl_constructor->type_node_symbol->symb_def;
+							constructor_def=alt->cl_constructor_symbol->symb_def;
 							if (constructor_def->sdef_kind==CONSTRUCTOR && constructor_def->sdef_strict_constructor)
 								GenerateLazyConstructorDescriptorAndFunctionForStrictConstructor (alt);
 						}
@@ -1616,7 +1616,7 @@ void GenerateCodeForConstructorsAndRecords (struct module_function_and_type_symb
 						for_l (alt,def->sdef_type->type_constructors,cl_next){
 							SymbDef constructor_def;
 
-							constructor_def=alt->cl_constructor->type_node_symbol->symb_def;							
+							constructor_def=alt->cl_constructor_symbol->symb_def;
 							if (constructor_def->sdef_kind==CONSTRUCTOR && constructor_def->sdef_strict_constructor)
 								GenStrictConstructorDescriptor (constructor_def,alt->cl_state_p);
 							else
@@ -3138,12 +3138,12 @@ SymbDef create_select_and_match_function (SymbolP constructor_symbol,int n_dicti
 		StateP lhs_type_root_state_p;
 			
 		if (n_dictionaries==0)
-			type_node=constructor_symbol->symb_def->sdef_constructor->cl_constructor->type_node_arguments->type_arg_node;
+			type_node=constructor_symbol->symb_def->sdef_constructor->cl_constructor_arguments->type_arg_node;
 		else {
 			struct type_arg *type_arg;
 			int n;
 			
-			type_arg=constructor_symbol->symb_def->sdef_constructor->cl_constructor->type_node_arguments;
+			type_arg=constructor_symbol->symb_def->sdef_constructor->cl_constructor_arguments;
 			for (n=0; n<n_dictionaries; ++n)
 				type_arg=type_arg->type_arg_next;
 			type_node=type_arg->type_arg_node;			
@@ -4252,7 +4252,7 @@ static int generate_code_for_switch_node (NodeP node,int asp,int bsp,struct esc 
 								if (state_p[0].state_type!=RecordState){
 									LabDef ratio_record_lab;
 
-									ConvertSymbolToKLabel (&ratio_record_lab,special_types[1]->sdef_type->type_constructors->cl_constructor->type_node_symbol->symb_def);
+									ConvertSymbolToKLabel (&ratio_record_lab,special_types[1]->sdef_type->type_constructors->cl_constructor_symbol->symb_def);
 									GenBuildhr (&ratio_record_lab,2,0);
 								}
 							} else
@@ -4283,7 +4283,7 @@ static int generate_code_for_switch_node (NodeP node,int asp,int bsp,struct esc 
 
 							push_rational (symbol);
 
-							ConvertSymbolToKLabel (&ratio_record_lab,special_types[1]->sdef_type->type_constructors->cl_constructor->type_node_symbol->symb_def);
+							ConvertSymbolToKLabel (&ratio_record_lab,special_types[1]->sdef_type->type_constructors->cl_constructor_symbol->symb_def);
 
 							GenBuildhr (&ratio_record_lab,2,0);
 						} else
