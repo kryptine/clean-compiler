@@ -751,11 +751,9 @@ static void PrintAttribute (AttributeKind attr, File file)
 
 void PrintTypeAlt (TypeAlts type_alts, File file)
 {
-	TypeNode lhs_root = type_alts -> type_alt_lhs;
-	
-	PrintSymbol (lhs_root -> type_node_symbol, file);
+	PrintSymbol (type_alts -> type_alt_lhs_symbol, file);
 	FPutS (" :: ", file);
-	PrintTypeArguments (lhs_root -> type_node_arguments, ' ', file);
+	PrintTypeArguments (type_alts -> type_alt_lhs_arguments, ' ', file);
 
 	FPutS (" -> ", file);
 	PrintTypeNode (type_alts -> type_alt_rhs, file);

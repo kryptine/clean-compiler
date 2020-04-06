@@ -553,14 +553,14 @@ BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, in
 	{
 		case BE_UnqArraySelectFun:
 		case BE_UnqArraySelectLastFun:
-			Assert (typeAlt->type_alt_lhs->type_node_arity == 2);
+			Assert (typeAlt->type_alt_lhs_arity == 2);
 			elementType	= typeAlt->type_alt_rhs;
-			arrayType	= typeAlt->type_alt_lhs->type_node_arguments->type_arg_node;
+			arrayType	= typeAlt->type_alt_lhs_arguments->type_arg_node;
 			Assert (originalsdef->sdef_arfun == BEArraySelectFun);
 			break;
 		case BE_ArrayUpdateFun:
-			elementType	= typeAlt->type_alt_lhs->type_node_arguments->type_arg_next->type_arg_next->type_arg_node;
-			arrayType	= typeAlt->type_alt_lhs->type_node_arguments->type_arg_node;
+			elementType	= typeAlt->type_alt_lhs_arguments->type_arg_next->type_arg_next->type_arg_node;
+			arrayType	= typeAlt->type_alt_lhs_arguments->type_arg_node;
 			Assert (originalsdef->sdef_arfun == BEArrayUpdateFun);
 			break;
 		default:
@@ -659,7 +659,9 @@ BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, in
 		strcat (functionName, ";");
 		strcat (functionName, originalsdef->sdef_name);
 
-		newTypeAlt->type_alt_lhs	= BESymbolTypeNode (NoAnnot,NoUniAttr,newFunctionSymbol, lhsArgs);
+		newTypeAlt->type_alt_lhs_arguments = lhsArgs;
+		newTypeAlt->type_alt_lhs_arity = CountTypeArgs (lhsArgs);
+		newTypeAlt->type_alt_lhs_symbol = newFunctionSymbol;
 		newTypeAlt->type_alt_rhs	= rhs;
 		newTypeAlt->type_alt_strict_positions	= NULL;
 
@@ -671,7 +673,7 @@ BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, in
 		newsdef->sdef_mark		= 0;
 		newsdef->sdef_isused		= True;
 		newsdef->sdef_exported		= False;
-		newsdef->sdef_arity			= newTypeAlt->type_alt_lhs->type_node_arity;
+		newsdef->sdef_arity			= newTypeAlt->type_alt_lhs_arity;
 		newsdef->sdef_arfun			= arrayFunKind;
 		newsdef->sdef_kind 			= SYSRULE;
 		newsdef->sdef_rule_type		= newRuleType;
@@ -745,7 +747,9 @@ CreateLocallyDefinedFunction (int index, char ** abcCode, TypeArgs lhsArgs, Type
 
 	typeAlt	= ConvertAllocType (TypeAlt);
 
-	typeAlt->type_alt_lhs	= BESymbolTypeNode (NoAnnot,NoUniAttr,functionSymbol, lhsArgs);
+	typeAlt->type_alt_lhs_arguments = lhsArgs;
+	typeAlt->type_alt_lhs_arity = CountTypeArgs (lhsArgs);
+	typeAlt->type_alt_lhs_symbol = functionSymbol;
 	typeAlt->type_alt_rhs	= rhsType;
 	typeAlt->type_alt_strict_positions	= NULL;
 
@@ -1051,7 +1055,7 @@ void BEAdjustStrictListConsInstance (int functionIndex,int moduleIndex)
 		TypeArgs type_args_p;
 		
 		sdef=symbol_p->symb_def;
-		type_args_p=sdef->sdef_rule_type->rule_type_rule->type_alt_lhs->type_node_arguments;
+		type_args_p=sdef->sdef_rule_type->rule_type_rule->type_alt_lhs_arguments;
 		element_type_p=type_args_p->type_arg_node;
 		list_type_p=type_args_p->type_arg_next->type_arg_node;
 		
@@ -1120,7 +1124,7 @@ void BEAdjustUnboxedListDeconsInstance (int functionIndex,int moduleIndex)
 	Assert (symbol_p->symb_kind==definition);
 	sdef_p=symbol_p->symb_def;
 	
-	list_type_p=sdef_p->sdef_rule_type->rule_type_rule->type_alt_lhs->type_node_arguments->type_arg_node;
+	list_type_p=sdef_p->sdef_rule_type->rule_type_rule->type_alt_lhs_arguments->type_arg_node;
 	element_type_p=list_type_p->type_node_arguments->type_arg_node;
 	
 	Assert (list_type_p->type_node_is_var==0);
@@ -1169,7 +1173,7 @@ BESymbolP BEOverloadedConsSymbol (int constructorIndex,int moduleIndex,int decon
 
 	Assert (decons_symbol->symb_kind==definition);
 	
-	list_type=decons_symbol->symb_def->sdef_rule_type->rule_type_rule->type_alt_lhs->type_node_arguments->type_arg_node;
+	list_type=decons_symbol->symb_def->sdef_rule_type->rule_type_rule->type_alt_lhs_arguments->type_arg_node;
 	element_type=list_type->type_node_arguments->type_arg_node;
 	
 	Assert ((unsigned int) moduleIndex < gBEState.be_nModules);
@@ -1345,7 +1349,9 @@ BETypeAlt (BETypeNodeP lhs, BETypeNodeP rhs)
 
 	alt	= ConvertAllocType (struct type_alt);
 
-	alt->type_alt_lhs	= lhs;
+	alt->type_alt_lhs_arguments = lhs->type_node_arguments;
+	alt->type_alt_lhs_arity = lhs->type_node_arity;
+	alt->type_alt_lhs_symbol = lhs->type_node_symbol;
 	alt->type_alt_rhs	= rhs;
 
 	alt->type_alt_strict_positions	= NULL;
@@ -2389,7 +2395,7 @@ BEDefineRuleType (int functionIndex, int moduleIndex, BETypeAltP typeAlt)
 
 	sdef	= functionSymbol->symb_def;
 	Assert (sdef->sdef_kind == NEWDEFINITION);
-	sdef->sdef_arity		= typeAlt->type_alt_lhs->type_node_arity;
+	sdef->sdef_arity		= typeAlt->type_alt_lhs_arity;
 	sdef->sdef_arfun		= NoArrayFun;
 	sdef->sdef_kind 		= module->bem_isSystemModule ? SYSRULE : DEFRULE;
 	sdef->sdef_rule_type	= ruleType;
@@ -2411,7 +2417,7 @@ BEDefineRuleTypeWithCode (int functionIndex, int moduleIndex, BETypeAltP typeAlt
 
 	sdef	= functionSymbol->symb_def;
 	Assert (sdef->sdef_kind == NEWDEFINITION);
-	sdef->sdef_arity		= typeAlt->type_alt_lhs->type_node_arity;
+	sdef->sdef_arity		= typeAlt->type_alt_lhs_arity;
 	sdef->sdef_arfun		= NoArrayFun;
 	sdef->sdef_kind 		= module->bem_isSystemModule ? SYSRULE : DEFRULE;
 	sdef->sdef_rule_type	= ruleType;

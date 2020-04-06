@@ -77,7 +77,9 @@ STRUCT (strict_positions, StrictPositions)
 
 typedef struct type_alt
 {
-	TypeNode				type_alt_lhs;
+	struct type_arg *		type_alt_lhs_arguments;
+	short					type_alt_lhs_arity;
+	Symbol					type_alt_lhs_symbol;
 	TypeNode				type_alt_rhs;
 	StrictPositionsP		type_alt_strict_positions;
 } TypeAlt;

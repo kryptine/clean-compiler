@@ -2892,7 +2892,7 @@ static void generate_code_for_apply_in_strict_context (NodeP node,int *asp_p,int
 				field_sdef=selector_node_p->node_symbol->symb_def;
 				member_type_alt=field_sdef->sdef_member_type_of_field;
 				if (DoDebug)
-					if (member_type_alt->type_alt_lhs->type_node_arity==n_apply_args+1){
+					if (member_type_alt->type_alt_lhs_arity==n_apply_args+1){
 						PutSOutFile ("\n||\t");
 						PutSOutFile (selector_node_p->node_symbol->symb_def->sdef_name);
 					} else {
@@ -2913,7 +2913,7 @@ static void generate_code_for_apply_in_strict_context (NodeP node,int *asp_p,int
 			int member_arity,member_called_with_root_node,a_size,b_size;
 
 			member_states_of_field=field_sdef->sdef_member_states_of_field;
-			member_arity=field_sdef->sdef_member_type_of_field->type_alt_lhs->type_node_arity;
+			member_arity=field_sdef->sdef_member_type_of_field->type_alt_lhs_arity;
 
 			member_called_with_root_node = member_states_of_field[-1].state_type==SimpleState
 											&& !(member_states_of_field[-1].state_kind==StrictRedirection || member_states_of_field[-1].state_kind==OnB);

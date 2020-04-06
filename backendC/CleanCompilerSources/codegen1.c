@@ -1142,7 +1142,7 @@ static int generate_instance_entry_arguments
 	int member_called_with_root_node,function_updates_node,create_new_node;
 	
 	field_type_alt=dictionary_field->sdef_member_type_of_field; 
-	member_arity=field_type_alt->type_alt_lhs->type_node_arity-1;
+	member_arity=field_type_alt->type_alt_lhs_arity-1;
 	member_state_p=dictionary_field->sdef_member_states_of_field;
 	
 	if (DoDebug){
@@ -1495,7 +1495,7 @@ void GenerateCodeForLazyUnboxedRecordListFunctions (void)
 			LabDef unboxed_record_cons_lab;
 			int tail_strict;
 					
-			type_node_arguments_p=fun_def->sdef_rule_type->rule_type_rule->type_alt_lhs->type_node_arguments;
+			type_node_arguments_p=fun_def->sdef_rule_type->rule_type_rule->type_alt_lhs_arguments;
 			tail_strict=type_node_arguments_p->type_arg_next->type_arg_node->type_node_symbol->symb_tail_strictness;
 			
 			if (ExportLocalLabels){
@@ -1663,7 +1663,7 @@ void GenerateCodeForConstructorsAndRecords (struct module_function_and_type_symb
 		int tail_strict;
 		
 		cons_instance_sdef=unboxed_record_cons_element->pl_elem;
-		type_node_arguments_p=cons_instance_sdef->sdef_rule_type->rule_type_rule->type_alt_lhs->type_node_arguments;
+		type_node_arguments_p=cons_instance_sdef->sdef_rule_type->rule_type_rule->type_alt_lhs_arguments;
 		record_sdef=type_node_arguments_p->type_arg_node->type_node_symbol->symb_def;
 		tail_strict=type_node_arguments_p->type_arg_next->type_arg_node->type_node_symbol->symb_tail_strictness;
 		
@@ -4549,7 +4549,7 @@ static void repl_overloaded_cons_arguments (NodeP node_p,int *asp_p,int *bsp_p,S
 
 			member_states_of_field=field_sdef->sdef_member_states_of_field;
 
-			member_arity=field_sdef->sdef_member_type_of_field->type_alt_lhs->type_node_arity;
+			member_arity=field_sdef->sdef_member_type_of_field->type_alt_lhs_arity;
 
 			member_called_with_root_node = member_states_of_field[-1].state_type==SimpleState
 											&& !(member_states_of_field[-1].state_kind==StrictRedirection || member_states_of_field[-1].state_kind==OnB);
