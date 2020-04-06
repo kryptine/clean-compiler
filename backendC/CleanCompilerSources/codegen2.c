@@ -3570,7 +3570,7 @@ static void FillNormalNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 
 			push_rational (symb);
 
-			ConvertSymbolToKLabel (&ratio_record_lab,special_types[1]->sdef_type->type_constructors->cl_constructor->type_node_symbol->symb_def);
+			ConvertSymbolToKLabel (&ratio_record_lab,special_types[1]->sdef_type->type_constructors->cl_constructor_symbol->symb_def);
 
 			if (update_node_id==NULL){
 				GenBuildhr (&ratio_record_lab,2,0);

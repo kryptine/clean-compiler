@@ -2501,10 +2501,9 @@ BEDefineAlgebraicType (BESymbolP symbol, BEAttribution attribution, BEConstructo
 	{
 		SymbDef	cdef;
 
-		Assert (!constructors->cl_constructor->type_node_is_var);
-		Assert (constructors->cl_constructor->type_node_symbol->symb_kind == definition);
+		Assert (constructors->cl_constructor_symbol->symb_kind == definition);
 
-		cdef	= constructors->cl_constructor->type_node_symbol->symb_def;
+		cdef	= constructors->cl_constructor_symbol->symb_def;
 		Assert (cdef->sdef_type == NULL);
 		cdef->sdef_type	= type;
 
@@ -2532,7 +2531,7 @@ void BEDefineExtensibleAlgebraicType (BESymbolP symbol, BEAttribution attributio
 	type->type_nr_of_constructors = 0;
 
 	for (; constructors!=NULL; constructors=constructors->cl_next)
-		constructors->cl_constructor->type_node_symbol->symb_def->sdef_type = type;
+		constructors->cl_constructor_symbol->symb_def->sdef_type = type;
 
 	sdef = symbol->symb_def;
 	sdef->sdef_kind = TYPE;
@@ -2543,7 +2542,6 @@ void BEDefineRecordType
 	(BESymbolP symbol, BEAttribution attribution, int moduleIndex, int constructorIndex, BETypeArgP constructor_args, int is_boxed_record, BEFieldListP fields)
 {
 	struct symbol *constructor_symbol_p;
-	BETypeNodeP constructorType;
 	int					nFields;
 	Types				type;
 	SymbDefP			sdef;
@@ -2551,11 +2549,10 @@ void BEDefineRecordType
 
 	constructor_symbol_p = &gBEState.be_modules [moduleIndex].bem_constructors [constructorIndex];
 
-	constructorType = BESymbolTypeNode (NoAnnot,NoUniAttr,constructor_symbol_p,constructor_args);
-
 	constructor	= ConvertAllocType (struct constructor_list);
 	constructor->cl_next		= NULL;
-	constructor->cl_constructor	= constructorType;
+	constructor->cl_constructor_symbol = constructor_symbol_p;
+	constructor->cl_constructor_arguments = constructor_args;
 
 	type = ConvertAllocType (struct type);
 	type->type_symbol =	symbol;
@@ -2584,7 +2581,7 @@ void BEDefineRecordType
 	sdef->sdef_checkstatus	= TypeChecked;
 	sdef->sdef_kind 		= RECORDTYPE;
 	sdef->sdef_type			= type;
-	sdef->sdef_arity		= constructorType->type_node_arity;
+	sdef->sdef_arity		= CountTypeArgs (constructor_args);;
 
 	sdef->sdef_boxed_record	= is_boxed_record;
 
@@ -2625,7 +2622,8 @@ BEConstructorList (BETypeNodeP type, BEConstructorListP constructors)
 
 	constructor	= ConvertAllocType (struct constructor_list);
 	constructor->cl_next = constructors;
-	constructor->cl_constructor	= type;
+	constructor->cl_constructor_symbol	= type->type_node_symbol;
+	constructor->cl_constructor_arguments = type->type_node_arguments;
 
 	sdef->sdef_kind = CONSTRUCTOR;
 	sdef->sdef_constructor	= constructor;

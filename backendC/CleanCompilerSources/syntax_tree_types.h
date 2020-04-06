@@ -26,7 +26,8 @@ typedef struct field_list
 
 typedef struct constructor_list
 {
-	TypeNode					cl_constructor;
+	Symbol						cl_constructor_symbol;
+	struct type_arg *			cl_constructor_arguments;
 	FieldList					cl_fields;
 	StateP						cl_state_p; /* for constructors, union met cl_fields ? */
 	struct constructor_list *	cl_next;

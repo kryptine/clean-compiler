@@ -1906,7 +1906,7 @@ static void UpdateExp (Exp src, Exp dst)
 static Bool has_fail;						/* the current alternative contains a Fail			*/
 
 #define IsTupleExp(A)				((A)->e_kind==Value && ((A)->e_fun>=tuplesym[0] && (A)->e_fun<=tuplesym[MaxNodeArity-1]))
-#define TypeArgsOfRecord(R)			((R)->sdef_type->type_constructors->cl_constructor->type_node_arguments)
+#define TypeArgsOfRecord(R)			((R)->sdef_type->type_constructors->cl_constructor_arguments)
 
 static Bool HasStrictAnnot (Annotation annot)
 {
@@ -3606,7 +3606,7 @@ static void convert_type (SymbDef sdef)
 			
 			f=SAllocType (Fun);
 			
-			cdef = talts->cl_constructor->type_node_symbol->symb_def;
+			cdef = talts->cl_constructor_symbol->symb_def;
 
 			cdef->sdef_sa_fun = f;
 			f->fun_symbol        = cdef;
@@ -3618,7 +3618,7 @@ static void convert_type (SymbDef sdef)
 			cdef->sdef_constructor=talts;
 
 			if (cdef->sdef_strict_constructor)
-				ConvertTypeArgsToStrictInfos (talts->cl_constructor->type_node_arguments,arity,&f->fun_strictargs, True);
+				ConvertTypeArgsToStrictInfos (talts->cl_constructor_arguments,arity,&f->fun_strictargs, True);
 			else
 				f->fun_strictargs = NULL;
 
