@@ -142,9 +142,23 @@ NewNode (SymbolP symb, Args args, int arity)
 } /* NewNode */
 
 NodeP
-NewUpdateNode (SymbolP symb, Args args, int arity)
+NewUpdateNode (SymbDef sdef, Args args, int arity)
 {
-	return (NewNodeByKind (UpdateNode, symb, args, arity));
+	NodeP node;
+
+	node = CompAllocType (struct node);
+
+	node->node_annotation	= NoAnnot;
+	node->node_number		= 0;
+	node->node_kind			= UpdateNode;
+	node->node_arguments	= args;
+	node->node_sdef			= sdef;
+	node->node_arity		= arity;
+
+	if (arity > MaxNodeArity)
+		StaticErrorMessage_s_Ds ("<node>", sdef, " Too many arguments (> 32)");
+
+	return node;
 } /* NewUpdateNode */
 
 SymbolP

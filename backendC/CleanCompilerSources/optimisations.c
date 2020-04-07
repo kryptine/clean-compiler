@@ -4030,15 +4030,8 @@ static void ExamineSymbolApplication (struct node *node)
 	}
 }
 
-static void ExamineSymbolApplicationOfSelectorOrUpdateNode (Symbol symb,StateS symbstate)
+static void ExamineSymbolApplicationOfUpdateNode (SymbDef sdef,StateS symbstate)
 {
-	SymbDef sdef;
-
-	if (symb->symb_kind!=definition)
-		return;
-	
-	sdef = symb->symb_def;
-
 	if (IsLazyState (symbstate))
 		sdef->sdef_mark |= SDEF_USED_LAZILY_MASK;
 	else
@@ -4173,7 +4166,7 @@ static void MarkDependentNodeDefs (NodeP node)
 			}
 			break;
 		case UpdateNode:
-			ExamineSymbolApplicationOfSelectorOrUpdateNode (node->node_symbol,node->node_state);
+			ExamineSymbolApplicationOfUpdateNode (node->node_sdef,node->node_state);
 
 			arg=node->node_arguments;
 			MarkDependentNodeDefs (arg->arg_node);

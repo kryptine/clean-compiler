@@ -2511,9 +2511,9 @@ static Exp ConvertNode (Node node, NodeId nid)
 			oldrecordexp = ConvertNode (arg->arg_node, NULL);
 
 			/* build a record expression for the new record node */
-			newrecordexp->e_fun  = node->node_symbol->symb_def->sdef_sa_fun;
+			newrecordexp->e_fun  = node->node_sdef->sdef_sa_fun;
 			newrecordexp->e_kind = Value;
-			arity                = node->node_symbol->symb_def->sdef_arity;
+			arity                = node->node_sdef->sdef_arity;
 			
 			/* initialise the arguments of the new record exp */
 			newrecordexp->e_args = NewExpArgs (arity);

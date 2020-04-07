@@ -1363,7 +1363,7 @@ static void CodeRootUpdateNode (Node root,NodeId rootid,int asp,int bsp,CodeGenN
 	LabDef name;
 	SymbDef record_sdef;
 
-	record_sdef=root->node_symbol->symb_def;
+	record_sdef=root->node_sdef;
 	
 	ConvertSymbolToLabel (&name,record_sdef);
 	
@@ -1481,7 +1481,7 @@ static void CodeRootUpdateNode (Node root,NodeId rootid,int asp,int bsp,CodeGenN
 		int a_size,b_size;
 		StateP record_state_p;
 
-		record_state_p=&root->node_symbol->symb_def->sdef_record_state;
+		record_state_p=&root->node_sdef->sdef_record_state;
 
 		record_arg->arg_state=*record_state_p;
 

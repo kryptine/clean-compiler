@@ -4093,7 +4093,7 @@ static void FillUpdateNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 
 		if (node->node_state.state_kind==StrictOnA){
 			update_immediately=1;
-			record_state_p=&node->node_symbol->symb_def->sdef_record_state;
+			record_state_p=&node->node_sdef->sdef_record_state;
 		} else {
 			update_immediately=0;
 
@@ -4103,7 +4103,7 @@ static void FillUpdateNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 				record_state_p=&record_node->node_state;
 			
 			if (record_state_p->state_type==SimpleState && record_state_p->state_kind==StrictOnA)
-				record_state_p=&node->node_symbol->symb_def->sdef_record_state;
+				record_state_p=&node->node_sdef->sdef_record_state;
 
 			if (record_state_p->state_type==RecordState){
 #else
@@ -4115,7 +4115,7 @@ static void FillUpdateNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 			record_state_p=&record_node->node_node_id->nid_state;
 			
 			if (record_state_p->state_type==SimpleState && record_state_p->state_kind==StrictOnA)
-				record_state_p=&node->node_symbol->symb_def->sdef_record_state;
+				record_state_p=&node->node_sdef->sdef_record_state;
 
 			if (record_state_p->state_type==RecordState){
 				int update_immediately;
@@ -4262,7 +4262,7 @@ static void FillUpdateNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 			rhs_arg_p=update_rule_p->rule_alts->alt_rhs_root->node_arguments;
 			i=0;
 			
-			record_state_p=&node->node_symbol->symb_def->sdef_record_state;
+			record_state_p=&node->node_sdef->sdef_record_state;
 
 			if (unbox_record){
 				int record_size,n_old_fields,field_number;
@@ -4441,7 +4441,7 @@ static void FillUpdateNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 		int end_args_a_offset,end_args_b_offset;
 
 #if BOXED_RECORDS
-		node->node_arguments->arg_state=node->node_symbol->symb_def->sdef_record_state;
+		node->node_arguments->arg_state=node->node_sdef->sdef_record_state;
 #endif		
 		BuildArgs (node->node_arguments,asp_p,bsp_p,code_gen_node_ids_p);
 

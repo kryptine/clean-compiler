@@ -5,7 +5,7 @@ extern Args NewArgument (NodeP pattern);
 extern NodeP NewNode (SymbolP symb, Args args, int arity);
 extern NodeP NewSelectorNode (SymbolP symb, Args args, int arity);
 extern NodeP NewNodeIdNode (NodeIdP node_id);
-extern NodeP NewUpdateNode (SymbolP symb,Args args,int arity);
+extern NodeP NewUpdateNode (SymbDef sdef,Args args,int arity);
 extern NodeP NewNodeByKind (NodeKind nodeKind, SymbolP symb, Args args, int arity);
 
 extern NodeIdP NewNodeId (void);
