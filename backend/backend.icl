@@ -244,11 +244,11 @@ BETypeArgs a0 a1 a2 = code {
 }
 // BETypeArgP BETypeArgs (BETypeNodeP node,BETypeArgP nextArgs);
 
-BETypeAlt :: !BETypeNodeP !BETypeNodeP !BackEnd -> (!BETypeAltP,!BackEnd);
-BETypeAlt a0 a1 a2 = code {
-	ccall BETypeAlt "pp:p:p"
+BETypeAlt :: !BESymbolP !BETypeArgP !BETypeNodeP !BackEnd -> (!BETypeAltP,!BackEnd);
+BETypeAlt a0 a1 a2 a3 = code {
+	ccall BETypeAlt "ppp:p:p"
 }
-// BETypeAltP BETypeAlt (BETypeNodeP lhs,BETypeNodeP rhs);
+// BETypeAltP BETypeAlt (BESymbolP lhs_symbol,BETypeArgP lhs_arguments,BETypeNodeP rhs);
 
 BENormalNode :: !BESymbolP !BEArgP !BackEnd -> (!BENodeP,!BackEnd);
 BENormalNode a0 a1 a2 = code {
@@ -478,11 +478,11 @@ BEAbstractType a0 a1 = code {
 }
 // void BEAbstractType (BESymbolP symbol);
 
-BEConstructorList :: !BETypeNodeP !BEConstructorListP !BackEnd -> (!BEConstructorListP,!BackEnd);
-BEConstructorList a0 a1 a2 = code {
-	ccall BEConstructorList "pp:p:p"
+BEConstructorList :: !BESymbolP !BETypeArgP !BEConstructorListP !BackEnd -> (!BEConstructorListP,!BackEnd);
+BEConstructorList a0 a1 a2 a3 = code {
+	ccall BEConstructorList "ppp:p:p"
 }
-// BEConstructorListP BEConstructorList (BETypeNodeP type,BEConstructorListP constructors);
+// BEConstructorListP BEConstructorList (BESymbolP symbol_p,BETypeArgP type_args,BEConstructorListP constructors);
 
 BENoConstructors :: !BackEnd -> (!BEConstructorListP,!BackEnd);
 BENoConstructors a0 = code {

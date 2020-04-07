@@ -1343,15 +1343,15 @@ BETypeArgs (BETypeNodeP node, BETypeArgP nextArgs)
 } /* BETypeArgs */
 
 BETypeAltP
-BETypeAlt (BETypeNodeP lhs, BETypeNodeP rhs)
+BETypeAlt (BESymbolP lhs_symbol,BETypeArgP lhs_arguments, BETypeNodeP rhs)
 {
 	TypeAlt	*alt;
 
 	alt	= ConvertAllocType (struct type_alt);
 
-	alt->type_alt_lhs_arguments = lhs->type_node_arguments;
-	alt->type_alt_lhs_arity = lhs->type_node_arity;
-	alt->type_alt_lhs_symbol = lhs->type_node_symbol;
+	alt->type_alt_lhs_arguments = lhs_arguments;
+	alt->type_alt_lhs_arity = CountTypeArgs (lhs_arguments);
+	alt->type_alt_lhs_symbol = lhs_symbol;
 	alt->type_alt_rhs	= rhs;
 
 	alt->type_alt_strict_positions	= NULL;
@@ -2587,8 +2587,8 @@ void BEDefineRecordType
 
 	constructor_symbol_p->symb_arity = 0;
 
-	gBEState.be_modules [moduleIndex].bem_constructors [constructorIndex].symb_val = symbol->symb_val;
-	gBEState.be_modules [moduleIndex].bem_constructors [constructorIndex].symb_kind = symbol->symb_kind;
+	constructor_symbol_p->symb_val = symbol->symb_val;
+	constructor_symbol_p->symb_kind = symbol->symb_kind;
 }
 
 void
@@ -2610,24 +2610,22 @@ BENoConstructors (void)
 } /* BENoConstructors */
 
 BEConstructorListP
-BEConstructorList (BETypeNodeP type, BEConstructorListP constructors)
+BEConstructorList (BESymbolP symbol_p, BETypeArgP type_args, BEConstructorListP constructors)
 {
 	ConstructorList	constructor;
 	SymbDef			sdef;
 
-	Assert (!type->type_node_is_var);
-	Assert (type->type_node_symbol->symb_kind == definition);
-
-	sdef	= type->type_node_symbol->symb_def;
+	Assert (symbol_p->symb_kind == definition);
+	sdef = symbol_p->symb_def;
 
 	constructor	= ConvertAllocType (struct constructor_list);
 	constructor->cl_next = constructors;
-	constructor->cl_constructor_symbol	= type->type_node_symbol;
-	constructor->cl_constructor_arguments = type->type_node_arguments;
+	constructor->cl_constructor_symbol = symbol_p;
+	constructor->cl_constructor_arguments = type_args;
 
 	sdef->sdef_kind = CONSTRUCTOR;
 	sdef->sdef_constructor	= constructor;
-	sdef->sdef_arity		= type->type_node_arity;
+	sdef->sdef_arity		= CountTypeArgs (type_args);
 	/* ifdef DEBUG */
 	sdef->sdef_type			= NULL;
 	/* endif */

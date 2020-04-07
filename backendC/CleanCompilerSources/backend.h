@@ -263,8 +263,8 @@ Clean (BENoTypeArgs :: BackEnd -> (BETypeArgP, BackEnd))
 BETypeArgP BETypeArgs (BETypeNodeP node, BETypeArgP nextArgs);
 Clean (BETypeArgs :: BETypeNodeP BETypeArgP BackEnd -> (BETypeArgP, BackEnd))
 
-BETypeAltP BETypeAlt (BETypeNodeP lhs, BETypeNodeP rhs);
-Clean (BETypeAlt :: BETypeNodeP BETypeNodeP BackEnd -> (BETypeAltP, BackEnd))
+BETypeAltP BETypeAlt (BESymbolP lhs_symbol, BETypeArgP lhs_arguments, BETypeNodeP rhs);
+Clean (BETypeAlt :: BESymbolP BETypeArgP BETypeNodeP BackEnd -> (BETypeAltP, BackEnd))
 
 BENodeP BENormalNode (BESymbolP symbol, BEArgP args);
 Clean (BENormalNode :: BESymbolP BEArgP BackEnd -> (BENodeP, BackEnd))
@@ -387,8 +387,8 @@ Clean (BEAbstractType :: BESymbolP BackEnd -> BackEnd)
 BEConstructorListP BENoConstructors (void);
 Clean (BENoConstructors:: BackEnd -> (BEConstructorListP, BackEnd))
 
-BEConstructorListP BEConstructorList (BETypeNodeP type, BEConstructorListP constructors);
-Clean (BEConstructorList:: BETypeNodeP BEConstructorListP BackEnd -> (BEConstructorListP, BackEnd))
+BEConstructorListP BEConstructorList (BESymbolP symbol_p, BETypeArgP type_args, BEConstructorListP constructors);
+Clean (BEConstructorList:: BESymbolP BETypeArgP BEConstructorListP BackEnd -> (BEConstructorListP, BackEnd))
 
 BEFieldListP BEFieldList (int fieldIndex, int moduleIndex, CleanString name, BETypeNodeP type, BEFieldListP next_fields);
 Clean (BEFieldList :: Int Int String BETypeNodeP BEFieldListP BackEnd -> (BEFieldListP, BackEnd))
