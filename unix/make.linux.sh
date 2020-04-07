@@ -8,4 +8,5 @@ $CLM -ci -I backend -I frontend -I main -I main/Unix -ABC -fusion backendconvert
 $CLM -h 40M -nt -nw -ci -nr -I backend -I frontend -I main -I main/Unix \
 	-IL ArgEnv \
 	-l backendC/CleanCompilerSources/backend.a \
+	-l -m32 \
 	cocl -o cocl

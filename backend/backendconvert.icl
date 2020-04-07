@@ -193,8 +193,8 @@ beUpdateNode
 	:==	beFunction1 BEUpdateNode
 beRuleAlt lineNumber
 	:==	beFunction5 (BERuleAlt lineNumber)
-beTypeAlt
-	:==	beFunction2 BETypeAlt
+beTypeAlt symbol_p
+	:==	beFunction2 (BETypeAlt symbol_p)
 beRule index isCaf
 	:==	beFunction2 (BERule index isCaf)
 beNoNodeDefs
@@ -910,8 +910,7 @@ convertConstructor typeIndex typeName moduleIndex constructorDefs {ds_index} con
 	  bes = appBackEnd (BEDeclareConstructor ds_index moduleIndex constructorDef.cons_ident.id_name) bes // +++ remove declare
 	  (atype_args,type_var_heap,bes) = convertTypeDefAnnotatedTypeArgs constructorType.st_args constructorType.st_args_strictness type_var_heap bes
 	  (constructor_symbol,bes) = beConstructorSymbol moduleIndex ds_index bes
-	  (type_node,bes) = accBackEnd (BESymbolTypeNode BENoAnnot BENoUniAttr constructor_symbol atype_args) bes
-	  (constructors,bes) = accBackEnd (BEConstructorList type_node constructors) bes
+	  (constructors,bes) = accBackEnd (BEConstructorList constructor_symbol atype_args constructors) bes
 	= (constructors,type_var_heap,bes)
 	where
 		constructorDef
@@ -1053,6 +1052,12 @@ declareDynamicTemp predefs
 	  (v2,be) = f2 be
 	:== f v1 v2 be
 
+@^^^ f f1 f2 f3 be
+	# (v1,be) = f1 be
+	  (v2,be) = f2 be
+	  (v3,be) = f3 be
+	:== f v1 v2 v3 be
+
 @^&^ f f1 v2 f3 be
 	# (v1,be) = f1 be
 	  (v3,be) = f3 be
@@ -1140,8 +1145,7 @@ predefineSymbols {dcl_common} predefs
 
 		define_unit_type
 			# constructor_symbol_be_f = BEConstructorSymbol predefs.[PD_UnitConsSymbol].pds_def cPredefinedModuleIndex
-			  type_be_f = @^^ (BESymbolTypeNode BENoAnnot BENoUniAttr) constructor_symbol_be_f BENoTypeArgs
-			  constructors_be_f = @^^ BEConstructorList type_be_f BENoConstructors
+			  constructors_be_f = @^^^ BEConstructorList constructor_symbol_be_f BENoTypeArgs BENoConstructors
 			  type_symbol_be_f = BETypeSymbol predefs.[PD_UnitType].pds_def cPredefinedModuleIndex
 			= appBackEnd
 				(  BEDeclareConstructor predefs.[PD_UnitConsSymbol].pds_def cPredefinedModuleIndex "_Unit"
@@ -1425,18 +1429,16 @@ convertTypeAltForSymbolP :: BESymbolP SymbolType -> BEMonad BETypeAltP
 convertTypeAltForSymbolP symbol_p symbolType
 	=	beautifyAttributes (symbolType) ==> \symbolType=:{st_result, st_attr_env, st_attr_vars} 
 	->	resetAttrNumbers st_attr_vars
-	o`	(beTypeAlt
-			(convertSymbolTypeArgs symbolType ==> \a2 ->
-			 accBackEnd (BESymbolTypeNode BENoAnnot BENoUniAttr symbol_p a2))
+	o`	(beTypeAlt symbol_p
+			(convertSymbolTypeArgs symbolType)
 			(convertAnnotTypeNode st_result))
 
 convertExportedTypeAltForSymbolP :: BESymbolP SymbolType -> BEMonad BETypeAltP
 convertExportedTypeAltForSymbolP symbol_p symbolType
 	=	beautifyAttributes symbolType ==> \ {st_args,st_args_strictness,st_result, st_attr_env, st_attr_vars} 
 	->	resetAttrNumbers st_attr_vars
-	o`	(beTypeAlt
-			(convertAnnotatedExternalTypeArgs st_args st_args_strictness ==> \a2 ->
-			 accBackEnd (BESymbolTypeNode BENoAnnot BENoUniAttr symbol_p a2))
+	o`	(beTypeAlt symbol_p
+			(convertAnnotatedExternalTypeArgs st_args st_args_strictness)
 			(convertAnnotExternalTypeNode st_result))
 
 resetAttrNumbers :: [AttributeVar] *BackEndState -> *BackEndState
