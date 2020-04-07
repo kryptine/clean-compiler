@@ -324,6 +324,7 @@ STRUCT (node,Node){
 #ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
 		StrictNodeIdP				contents_guard_strict_node_ids;
 #endif
+		struct symbol_def *			contents_sdef;				/* for UpdateNode */
 	} node_contents;
 
 	struct arg *					node_arguments;
@@ -370,6 +371,7 @@ STRUCT (node,Node){
 #define node_node_id				node_contents.contents_node_id
 #define node_node					node_contents.contents_node
 #define node_node_ids				node_contents.contents_node_ids
+#define node_sdef					node_contents.contents_sdef
 
 #ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
 #define node_guard_strict_node_ids	node_contents.contents_guard_strict_node_ids

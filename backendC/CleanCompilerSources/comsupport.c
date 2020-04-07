@@ -535,6 +535,26 @@ void StaticErrorMessage_S_ss (struct symbol *symbol_p,char *message1,char *messa
 	CompilerError = True;
 }
 
+void StaticErrorMessage_s_Ds (char *symbol_s,struct symbol_def *symb_def_p,char *message)
+{
+	PutSStdError ("Error [");
+	PutSStdError (CurrentModule);
+	if (CurrentLine > 0){
+		PutCStdError (',');
+		PutIStdError (CurrentLine);
+	}
+	PutCStdError (',');
+	PutSStdError (symbol_s);
+	PutSStdError ("]: ");
+
+	WriteSymbolOfIdentToStdError (symb_def_p->sdef_name, 0);
+	PutSStdError (message);
+
+	PutCStdError ('\n');
+
+	CompilerError = True;
+}
+
 void StaticErrorMessage_s_Ss (char *symbol_s,struct symbol *symbol_p,char *message)
 {
 	PutSStdError ("Error [");

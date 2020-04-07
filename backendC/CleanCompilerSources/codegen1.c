@@ -2542,12 +2542,12 @@ SymbDef CreateUpdateFunction (ArgS *record_arg,ArgS *first_field_arg,Node node
 	++next_update_function_n;
 	
 	n_arguments=node->node_arity;
-	record_state=node->node_symbol->symb_def->sdef_record_state;
+	record_state=node->node_sdef->sdef_record_state;
 #if UNBOX_UPDATE_FUNCTION_ARGUMENTS
 	if (unbox_record)
 		n_arguments=record_state.state_arity;
 #endif
-	if (node->node_symbol->symb_def->sdef_boxed_record){
+	if (node->node_sdef->sdef_boxed_record){
 		SetUnaryState (&boxed_record_state,StrictOnA,RecordObj);
 		strict_record_state_p = &boxed_record_state;
 	} else
@@ -2559,7 +2559,7 @@ SymbDef CreateUpdateFunction (ArgS *record_arg,ArgS *first_field_arg,Node node
 	update_function_sdef->sdef_isused=True;
 	update_function_sdef->sdef_mark |= SDEF_USED_LAZILY_MASK;
 
-	if (node->node_symbol->symb_def->sdef_boxed_record){
+	if (node->node_sdef->sdef_boxed_record){
 		update_function_sdef->sdef_returnsnode=True;
 		update_function_sdef->sdef_calledwithrootnode=True;
 	} else {
@@ -2578,7 +2578,7 @@ SymbDef CreateUpdateFunction (ArgS *record_arg,ArgS *first_field_arg,Node node
 		lhs_root=NewNode (update_function_symbol,NULL,n_arguments);
 		lhs_root->node_state=*strict_record_state_p;
 
-		rhs_root=NewNode (node->node_symbol,NULL,n_arguments);
+		rhs_root=NewNode (node->node_sdef->sdef_type->type_constructors->cl_constructor_symbol,NULL,n_arguments);
 		rhs_root->node_state=*strict_record_state_p;
 		rhs_root->node_number=0;
 
@@ -2642,7 +2642,7 @@ SymbDef CreateUpdateFunction (ArgS *record_arg,ArgS *first_field_arg,Node node
 		lhs_root=NewNode (update_function_symbol,lhs_record_arg,n_arguments);
 		lhs_root->node_state=*strict_record_state_p;
 
-		rhs_root=NewUpdateNode (node->node_symbol,rhs_record_arg,n_arguments);
+		rhs_root=NewUpdateNode (node->node_sdef,rhs_record_arg,n_arguments);
 		rhs_root->node_state=*strict_record_state_p;
 		rhs_root->node_number=0;
 

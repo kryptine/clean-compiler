@@ -1879,7 +1879,7 @@ BENodeP
 BEUpdateNode (BEArgP args)
 {
 	NodeP	node;
-	SymbolP	recordSymbol;
+	SymbDef	record_sdef;
 	int n_args;
 	
 	n_args = CountArgs (args);
@@ -1888,13 +1888,13 @@ BEUpdateNode (BEArgP args)
 	Assert (args->arg_next->arg_node->node_kind == SelectorNode);
 	Assert (args->arg_next->arg_node->node_arity == BESelector);
 
-	recordSymbol	= args->arg_next->arg_node->node_symbol->symb_def->sdef_type->type_symbol;
+	record_sdef = args->arg_next->arg_node->node_symbol->symb_def->sdef_type->type_symbol->symb_def;
 
 	node	= ConvertAllocType (NodeS);
 
 	node->node_annotation	= NoAnnot;
 	node->node_kind			= UpdateNode;
-	node->node_symbol		= recordSymbol;
+	node->node_sdef			= record_sdef;
 	node->node_arity		= n_args;
 	node->node_arguments	= args;
 	node->node_number=0;
