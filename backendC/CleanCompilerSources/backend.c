@@ -1840,11 +1840,7 @@ BEPushNode (int arity, BESymbolP symbol, BEArgP arguments, BENodeIdListP nodeIds
 	pushNode->node_kind			= PushNode;
 	pushNode->node_arity		= arity;
 	pushNode->node_arguments	= arguments;
-#if STRICT_LISTS
 	pushNode->node_push_symbol = symbol;
-#else
-	pushNode->node_record_symbol= symbol;
-#endif
 	pushNode->node_node_ids		= nodeIds;
 	pushNode->node_number		= 0;
 
