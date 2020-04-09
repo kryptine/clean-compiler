@@ -3563,7 +3563,7 @@ static FreeUniqueNodeIdsP check_unique_push_node (NodeP node,FreeUniqueNodeIdsP 
 	NodeIdP node_id_p;
 
 # if STRICT_LISTS
-	if (node->node_symbol->symb_kind==cons_symb && (node->node_symbol->symb_head_strictness & 1))
+	if (node->node_push_symbol->symb_kind==cons_symb && (node->node_push_symbol->symb_head_strictness & 1))
 		return f_node_ids;
 #endif
 
