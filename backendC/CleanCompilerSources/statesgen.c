@@ -1882,7 +1882,7 @@ static Bool ArgsInAStrictContext (StateP arg_state_p,Args argn, int local_scope)
 
 	parallel=False;
 	
-	record_sdef=node->node_symbol->symb_def;
+	record_sdef=node->node_sdef;
 	
 	if (!semi_strict){
 #if DESTRUCTIVE_RECORD_UPDATES
